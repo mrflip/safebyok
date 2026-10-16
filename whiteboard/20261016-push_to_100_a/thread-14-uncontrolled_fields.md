@@ -99,5 +99,6 @@ green at every package (react 180, demo 176 + 15 skipped, core 1612 + 33 skipped
   - **Chrome and `autocomplete="off"`**: Chrome still offers a saved password on a
     `type="password"` field marked `off`. Rec: accept, as ruled; the only way out is a
     `type="text"` field masked by the non-standard `-webkit-text-security`, not worth it.
+    → *Coach (2026-10-16):* WONTFIX: accepted; thread 9 enters it in notes/wontfix.md.
   - **The demo dashboard's whisper textarea** stays controlled (the edit form fills it with the
     stored whisper, and the table shows whispers in plain text by design). Rec: leave it.
