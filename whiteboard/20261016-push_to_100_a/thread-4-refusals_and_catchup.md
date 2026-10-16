@@ -3,7 +3,9 @@
 Branch `20261016-refusals_and_catchup`, PR [#132](https://github.com/mrflip/safebyok/pull/132),
 stacked on [#127](https://github.com/mrflip/safebyok/pull/127). Justify: green; core 1677 passed /
 33 skipped, React 111, demo 162, every other package as on #127. `pnpm size`: openVault
-**24.7 kB** against main's 23 kB (thread 1's 30 kB covers it), everything 31.81 kB.
+**24.7 kB**, over main's 23 kB, so its one line in `.size-limit.json` is raised to **28 kB** by
+the rule, at the orchestrator's word (thread 1 sets 30 kB; thread 9 lowers all); everything
+31.81 kB.
 
 The per-row ledger the orchestrator sweeps by is beside this file:
 `thread-4-refusals_and_catchup-ledger.md` (every G### closed or not, and where).
