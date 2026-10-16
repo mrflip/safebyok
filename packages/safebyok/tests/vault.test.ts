@@ -3762,6 +3762,35 @@ describe("the key deriver seam", () => {
     }
   })
 
+  it("refuses a deriver that hands back 32 zero bytes, a key anyone could rebuild, and makes no vault of it", async () => {
+    const Zeros = [new Uint8Array(32), new Uint32Array(8), new Uint8Array(new ArrayBuffer(40), 8, 32)] as const
+    for (const output of Zeros) {
+      const world = makeWorld()
+      const zeroDeriver = { ...TH.testDeriver, deriveKeyBytes: () => Promise.resolve(output as Uint8Array) }
+      const vault = await world.open({ keyDeriver: zeroDeriver })
+      const err = await TH.expectRefusal(vault.unlock('pw'), 'bad_option')
+      expect(err.message).to.match(/zero bytes/)
+      expect(world.dbStore.ckeys()).to.have.lengthOf(0)
+    }
+  })
+
+  it("refuses zero bytes at unlock too: a deriver that kept its output cannot open a vault", async () => {
+    const world = makeWorld()
+    await world.openUnlocked('pw')
+    const zeroDeriver = { ...TH.testDeriver, deriveKeyBytes: () => Promise.resolve(new Uint8Array(32)) }
+    const fresh = await world.open({ deviceDB: memoryDeviceDB(), keyDeriver: zeroDeriver })
+    await TH.expectRefusal(fresh.unlock('pw'), 'bad_option')
+    expect(fresh.getSnapshot().state).to.eq('locked')
+  })
+
+  it("takes a key whose one nonzero byte is its last: only all zeros is refused", async () => {
+    const world = makeWorld()
+    const lastByteSet = new Uint8Array(32)
+    lastByteSet[31] = 1
+    const vault = await world.openUnlocked('pw', { keyDeriver: { ...TH.testDeriver, deriveKeyBytes: () => Promise.resolve(lastByteSet.slice()) } })
+    expect(vault.getSnapshot().state).to.eq('unlocked')
+  })
+
   it("keeps the keyDeriver it was handed, so one whose method lives on its prototype still derives", async () => {
     class PrototypeDeriver implements KeyDeriver {
       readonly key_deriver_label = TH.testDeriver.key_deriver_label

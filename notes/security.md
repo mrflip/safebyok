@@ -1057,3 +1057,11 @@ security expert who knows what questions to ask.
   the deciphered whisper is dropped, never returned. It is a separate count from the one unlocks
   race against, so a refresh an `unlock()` makes for itself does not defeat that unlock. Not hard
   locks, by design: a `lockSoon()` grace running out, and a clock that cannot be read.
+* 2026-10-16 (secure_floor, G032): **an all-zero passphraseKey is refused.** `passphraseKeyOf`
+  (`envelope.ts`), the one place the core receives any key deriver's output, refuses 32 zero
+  bytes as `bad_option`, at create, unlock and every change to the ways in alike. No derivation
+  makes them; a host deriver that kept its output and handed back bytes since wiped would, and
+  the vault would seal under a key anyone can rebuild. The check reads every byte, OR-ing them
+  together as libsodium's `sodium_is_zero` does, so its time does not depend on where the first
+  nonzero byte lies; no dependency offers it, and `@noble/ciphers`' `equalBytes` would be a new
+  one for one line.

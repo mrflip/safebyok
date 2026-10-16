@@ -248,8 +248,10 @@ vaults made on one device stop opening on another. There are three ways to choos
   without carrying exactly its parameters; it cannot check the bytes, so that test is yours.
 
 Any `keyDeriver` needs a `salt_bytes` from 1 to 65536 (the most `crypto.getRandomValues` hands out
-at once), and must hand back 32 bytes from `deriveKeyBytes`; `openVault` and `unlock()` refuse one
-that does not, with `bad_option`.
+at once), which `openVault` checks, and must hand back 32 bytes from `deriveKeyBytes`, derived
+afresh on every call. `unlock()` and the calls that set a passphrase refuse anything else with
+`bad_option`, 32 zero bytes among it: a key anyone could rebuild, which a deriver handing back
+bytes it kept from an earlier call would.
 
 ## Locking
 

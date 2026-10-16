@@ -96,13 +96,27 @@ const passphraseKeyBytes = Z.custom<Uint8Array>((candidate) => (
 ))
 
 /**
+ * True when every byte of `bytes` is zero. Reads every byte whatever it finds, OR-ing them
+ * together as libsodium's `sodium_is_zero` does, so how long it takes says nothing of where the
+ * first nonzero byte lies.
+ */
+const isAllZero = (bytes: Uint8Array): boolean => bytes.reduce((seen, byte) => seen | byte, 0) === 0
+
+/**
  * The passphraseKey `keyDeriver` makes of `passphrase` and its salt: 32 bytes, no other, or kind
  * `bad_option` before anything is wrapped -- WebCrypto would accept 16 or 24 as a weaker AES key.
+ * Thirty-two zero bytes are refused too, with the same kind: a key anyone could rebuild, which no
+ * derivation makes, but a deriver handing back bytes it kept from an earlier call, wiped since,
+ * would.
  */
 const passphraseKeyOf = async (keyDeriver: KeyDeriver, passphrase: string, saltBytes: Uint8Array): Promise<CryptoKey> => {
   const checked = passphraseKeyBytes.safeParse(await keyDeriver.deriveKeyBytes(passphrase, saltBytes))
   if (! checked.success) {
     throw new VaultError('bad_option', 'keyDeriver handed back something other than 32 key bytes: a passphraseKey is a 256-bit key.')
+  }
+  const keyBytes = new Uint8Array(checked.data.buffer, checked.data.byteOffset, checked.data.byteLength)
+  if (isAllZero(keyBytes)) {
+    throw new VaultError('bad_option', 'keyDeriver handed back 32 zero bytes, a key anyone could rebuild: derive the key afresh on every call, and never hand back bytes kept from an earlier one.')
   }
   return importWrappingKeyBytes(checked.data)
 }
