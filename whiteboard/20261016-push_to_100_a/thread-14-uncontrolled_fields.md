@@ -2,7 +2,7 @@
 
 Branch `20261016-uncontrolled_fields`, PR [#134](https://github.com/mrflip/safebyok/pull/134),
 stacked on [#129](https://github.com/mrflip/safebyok/pull/129) (cut at `3d62fc04`). Justify:
-green at every package (react 177, demo 176 + 15 skipped, core 1612 + 33 skipped).
+green at every package (react 180, demo 176 + 15 skipped, core 1612 + 33 skipped).
 
 * **Built**:
   - **CI flakes, first, three `tests:` commits.** (1) `vault-provider.test.tsx`: the grabber kept
@@ -81,6 +81,16 @@ green at every package (react 177, demo 176 + 15 skipped, core 1612 + 33 skipped
   - Measured with `react` and `safebyok` external: React everything 4,876 B (thread 7: 4,554),
     `{ VaultProvider }` 4,412 B, `{ WhisperField }` 1,053 B. Under thread 8's appended lines
     (5.3 kB, 4.7 kB) as their method was described; the restack's `pnpm size` is the check.
+
+* **Review** (thread-reviewer, `fixed`): `passphraseAdvice` hears the passphrase in plain text,
+  so its doc block, the README and the security note tell the host to keep it on the device; the
+  changeset names the `defaultValue` removal and the `ref` passthrough. Folded in at filing (the
+  reviewer's three recommendations, one `client:` commit, a test each): a superseded advice
+  call's failure is ignored; what was said goes when the mode changes (render-adjusted state,
+  plus a layout effect making in-flight calls stale -- `set-state-in-effect` refuses the plain
+  effect); an `undefined` answer reads as null. Left for the Coach, as sprint-doc rows: the
+  reveal toggle's `aria-pressed` and label, the demo `WaysIn` field, the changeset reading as a
+  migration, the demo App tests' order dependence, host CSS defeating `hidden`.
 
 * **For the Coach** (each is in the report's *Open matters* too):
   - **Capital letters**: "passphrase must contain a capital letter" is a composition rule; NIST
