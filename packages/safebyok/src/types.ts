@@ -62,11 +62,12 @@ export const Whisper: Z.ZodMiniType<Whisper> = Z.union([
  * time the vault keeps lies past it, and a stored record holding a later one fails validation;
  * see {@link EpochMillis}.
  *
- * `askPassphraseAt` equals it when the vault never asks for the passphrase again on this device
- * until `lock()`: `forcePassphraseReentryHours: Infinity`, or a window so large its deadline
- * would pass it. A host compares against it to show "until locked" rather than a date in 2255.
+ * `askPassphraseAt` is at or near it when the vault never asks for the passphrase again on this
+ * device until `lock()`: `forcePassphraseReentryHours: Infinity`. A host shows "until locked"
+ * rather than a date in 2255 for any instant within a minute of it, never only for one equal to
+ * it: `at >= FarFuture - MinuteMillis`.
  *
- * @example askPassphraseAt === FarFuture ? 'until locked' : new Date(askPassphraseAt).toLocaleString()
+ * @example askPassphraseAt >= FarFuture - MinuteMillis ? 'until locked' : new Date(askPassphraseAt).toLocaleString()
  * @example new Date(FarFuture).toISOString()   // '2255-06-05T23:47:34.740Z'
  */
 export const FarFuture = 9_007_199_254_740 // Math.floor(Number.MAX_SAFE_INTEGER / 1000)
@@ -80,14 +81,21 @@ export const FarFuture = 9_007_199_254_740 // Math.floor(Number.MAX_SAFE_INTEGER
 export const FarPast = 347_155_200_000 // Date.UTC(1981, 0, 1)
 
 /**
- * The longest unlock window a vault keeps, in milliseconds: from {@link FarPast} to
- * {@link FarFuture}, so a deadline it sets from any instant the clock may read is
- * {@link FarFuture}. `forcePassphraseReentryHours: Infinity`, or any number of hours as long or
- * longer, becomes this window as `openVault` parses it, and a vault's `reentryWindowMillis` reads as
- * exactly this when it stays unlocked until `lock()`.
+ * One minute, in milliseconds: the margin a host leaves when it asks whether an instant is
+ * {@link FarFuture}, the vault's "never".
  *
- * @example vault.reentryWindowMillis === ForeverMillis   // true when opened with forcePassphraseReentryHours: Infinity
- * @example FarPast + ForeverMillis === FarFuture        // true: a window from the earliest instant ends at the last
+ * @example askPassphraseAt >= FarFuture - MinuteMillis   // true while the vault stays unlocked until lock()
+ */
+export const MinuteMillis = 60_000
+
+/**
+ * The unlock window a vault keeps for "until `lock()`", in milliseconds: from {@link FarPast} to
+ * {@link FarFuture}, so a deadline it sets from any instant the clock may read is
+ * {@link FarFuture}. `forcePassphraseReentryHours: Infinity` becomes this window as `openVault`
+ * parses it, and a vault's `reentryWindowMillis` reads as it then.
+ *
+ * @example vault.reentryWindowMillis >= ForeverMillis - MinuteMillis   // true when opened with forcePassphraseReentryHours: Infinity
+ * @example FarPast + ForeverMillis === FarFuture                       // true: a window from the earliest instant ends at the last
  */
 export const ForeverMillis = FarFuture - FarPast
 
@@ -433,14 +441,17 @@ export type DeviceUnlock = Z.infer<typeof DeviceUnlock>
 
 /**
  * What a device keeps of a vault, locked or not, on its own storage: its own random `device_id`
- * for the vault, which every way in it adds carries, and the highest `unlock_epoch` and
+ * for the vault, which every way in it adds carries; the highest `unlock_epoch` and
  * `vault_key_epoch` it has seen the vault's bundle at, so that an older copy of the bundle storage
- * hands back later is refused (kind 'rolled_back'). Nothing in it is secret. One per scope: a vault made anew under the scope,
- * with another `vault_id`, starts a mark of its own, under a new `device_id`. `lock()` leaves it;
+ * hands back later is refused (kind 'rolled_back'); and its `lock_generation`, how many times a
+ * lock on this device has forgotten the remembered unlock, so that an unlock under way in another
+ * tab when the lock lands remembers nothing. Nothing in it is secret. One per scope: a vault made
+ * anew under the scope, with another `vault_id`, starts a mark of its own, under a new
+ * `device_id`, and keeps the lock generation. `lock()` leaves it, raising its lock generation;
  * `destroy()` erases it.
  */
 export const DeviceMark = Z.object({
-  format:          Z.literal('safebyok-mark-v1'),
+  format:          Z.literal('safebyok-mark-v2'),
   applabel:        Z.string(),
   user_id:         Z.string(),
   vaultlabel:      Z.string(),
@@ -452,6 +463,12 @@ export const DeviceMark = Z.object({
   unlock_epoch:    Z.int().check(Z.positive()),
   /** The highest `vault_key_epoch` this device has seen the vault's bundle at. */
   vault_key_epoch: vaultKeyEpoch,
+  /**
+   * How many locks on this device have forgotten the vault's remembered unlock: 0 at first, one
+   * more at each. A remembered unlock is written only while the mark stands at the generation its
+   * unlock began under; see `DeviceDB.writeUnlock`.
+   */
+  lock_generation: Z.int().check(Z.gte(0)),
 })
 export type DeviceMark = Z.infer<typeof DeviceMark>
 
@@ -460,6 +477,16 @@ export type DeviceMark = Z.infer<typeof DeviceMark>
  * unless the caller says otherwise: seven days.
  */
 export const ForcePassphraseReentryHours = 168 // seven days
+
+/**
+ * The longest finite `forcePassphraseReentryHours` a vault takes: 588 hours, 24.5 days. The vault
+ * drops its key with a timer when the window ends, and one timer reaches no further than
+ * 2^31 - 1 milliseconds, about 24.8 days. A longer window is `Infinity`, until `lock()`; anything
+ * between is refused.
+ *
+ * @example openVault({ ...opts, forcePassphraseReentryHours: MaxReentryHours })   // the longest that ends by itself
+ */
+export const MaxReentryHours = 588
 
 /**
  * The largest whisper a vault stores unless the caller says otherwise, in bytes of its JSON:

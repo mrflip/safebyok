@@ -630,12 +630,20 @@ const ckeyOf = (scope: VaultScope) => `${scope.applabel}:${scope.user_id}:${scop
 TH.describeDeviceDB('describeDeviceDB, over the smallest honest DeviceDB', () => {
   const rows = new Map<string, DeviceUnlock>()
   const marks = new Map<string, DeviceMark>()
+  const lockGenerationOf = (scope: VaultScope) => marks.get(ckeyOf(scope))?.lock_generation ?? 0
   return {
     readUnlock:  (scope) => Promise.resolve(rows.get(ckeyOf(scope)) ?? null),
-    writeUnlock: (unlock) => { rows.set(ckeyOf(unlock), unlock); return Promise.resolve() },
+    writeUnlock: (unlock, expected) => {
+      if (lockGenerationOf(unlock) !== expected.lock_generation) { return Promise.reject(new VaultError('stale_write', 'A lock came first.')) }
+      rows.set(ckeyOf(unlock), unlock)
+      return Promise.resolve()
+    },
     eraseUnlock: (scope) => { rows.delete(ckeyOf(scope)); return Promise.resolve() },
     readMark:    (scope) => Promise.resolve(marks.get(ckeyOf(scope)) ?? null),
-    writeMark:   (mark) => { marks.set(ckeyOf(mark), mark); return Promise.resolve() },
+    writeMark:   (mark) => {
+      marks.set(ckeyOf(mark), { ...mark, lock_generation: Math.max(mark.lock_generation, lockGenerationOf(mark)) })
+      return Promise.resolve()
+    },
     eraseMark:   (scope) => { marks.delete(ckeyOf(scope)); return Promise.resolve() },
     eraseAll:    () => { rows.clear(); marks.clear(); return Promise.resolve() },
   }
