@@ -111,10 +111,11 @@ await vault.store('מפתח OpenAI: עבודה', 'sk-...', { note: 'the team acc
 * **The floor holds beneath every check.** Whatever your schemas admit, a name is one character
   to 1 KiB of UTF-8, a note at most 4 KiB, each well-formed Unicode (no lone surrogate, half of
   a character), in Unicode's composed form (NFC), and with no control character (a note may hold
-  tab and newline): `NameFloor` and `NoteFloor`. Below it is `bad_label` (`bad_option` for a
-  note), and a stored record below it reads back as damaged. Your storage may hold less: a
-  key-value store refuses the character it joins names on (`^` by default, which no default
-  admits), and Postgres a name over 640 bytes (`VAULTDB.md`, *Names*).
+  tab and newline): `NameFloor` and `NoteFloor`. A name holds no `^` either, the character the
+  key-value stores join a row's names on, so every store holds the same names: a vault whose
+  names suit Postgres today suits IndexedDB tomorrow. Below the floor is `bad_label`
+  (`bad_option` for a note), and a stored record below it reads back as damaged. Your storage
+  may hold less: Postgres holds a name of at most 640 bytes (`VAULTDB.md`, *Names*).
 * **A check only checks.** What passes is kept exactly as you passed it, never what the schema
   makes of it: a name is bound into the ciphertext and names its rows, so a schema that trims or
   lowercases would otherwise send the same user to another vault. Nothing is normalized either:
@@ -164,20 +165,18 @@ under one string -- a key-value store, localStorage -- files them under `Ckeys`,
 ```ts
 import { Ckeys } from 'safebyok'
 
-const ckeys = Ckeys.joiner()   // or Ckeys.joiner('/'), say, for a store with folders
-ckeys.bundle(scope)            // 'vault^acme^u1^main'
-ckeys.box(scope, 'anthropic')  // 'box^acme^u1^main^anthropic'
-ckeys.boxPrefix(scope)         // 'box^acme^u1^main^' -- every lockbox of the vault, by prefix scan
-store.ckeys().filter(ckeys.isBoxIn(scope))  // every lockbox of the vault, from a list of every ckey
+Ckeys.bundle(scope)            // 'vault^acme^u1^main'
+Ckeys.box(scope, 'anthropic')  // 'box^acme^u1^main^anthropic'
+Ckeys.boxPrefix(scope)         // 'box^acme^u1^main^' -- every lockbox of the vault, by prefix scan
+store.ckeys().filter(Ckeys.isBoxIn(scope))  // every lockbox of the vault, from a list of every ckey
 ```
 
-A name holding the delimiter is refused (`bad_label`) rather than joined, so no two vaults ever
-share a ckey or list each other's lockboxes; declare it as your adapter's `reservedNameChars`, and
-the base class refuses such a name before your code sees it. The ckeys are part of the stored
-format: use these, not a join of your own, and every device finds your rows.
+No name holds `^` (the floor refuses it), so no two vaults ever share a ckey or list each other's
+lockboxes. The ckeys are part of the stored format: use these, not a join of your own, and every
+device finds your rows.
 
 Your `do*` methods take any name the base class passed: every public verb holds each name to the
-floor and to your adapter's declared `maxNameBytes` and `reservedNameChars`, and takes no
+floor and to your adapter's declared `maxNameBytes`, and takes no
 validators of the host's, which are the vault's own. So an adapter that hands its calls on to
 another VaultDB's public verbs passes each call through as it came.
 

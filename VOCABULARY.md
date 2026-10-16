@@ -91,7 +91,8 @@ How a vault is addressed, what the storage layer holds, and when. A label is, by
 (`Label`), lowercase words of letters and digits joined by single underscores, such as
 `anthropic_api_key`; a host may check its labels, user ids and notes with its own `validators`
 instead, which admit what they will above the **floor** every name and note is held to (`NameFloor`,
-`NoteFloor`: well-formed Unicode in NFC, no control characters, 1 KiB a name and 4 KiB a note).
+`NoteFloor`: well-formed Unicode in NFC, no control characters, no `^` in a name, 1 KiB a name and
+4 KiB a note).
 
 | Name                            | What it is                                                                                                                                                                  |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -115,7 +116,7 @@ instead, which admit what they will above the **floor** every name and note is h
 | **EpochMillis**                 | Every time safebyok keeps: whole UTC milliseconds since 1970, from `FarPast` (1981) to `FarFuture` (2255). The bounds catch seconds and microseconds passed by mistake.      |
 | **format**                      | The tag at the head of every stored record (`safebyok-vault-v2`, `safebyok-lockbox-v2`, `safebyok-unlock-v1`, `safebyok-mark-v1`). It is also the first part of the cipherAdditionalData. Any change to what a record may hold moves its format on. |
 | **validators**                  | The `openVault` option holding a host's own checks for its labels, user id and note (`VaultValidators`), each replacing safebyok's default, run where a name enters the vault and never on what storage hands back. A check only checks: what passes is kept as given. |
-| **ckey**                        | Where a key-value store files a row: its kind and names joined on one delimiter (`box^acme^u1^main^anthropic`, from `Ckeys`), which no name it holds may contain. |
+| **ckey**                        | Where a key-value store files a row: its kind and names joined on `^` (`box^acme^u1^main^anthropic`, from `Ckeys`), which no name may contain. |
 | **clock**, **logger**           | Two options your app may pass to `openVault`: a source of the time (`Clock`), and a place for the vault to say what it has no one to throw to (`VaultLogger`).             |
 
 ## Other credentials

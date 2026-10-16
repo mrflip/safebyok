@@ -883,15 +883,16 @@ security expert who knows what questions to ask.
   first way in, named `passphrase` by the vault itself, is not checked.
 * 2026-10-16: **ckeys are joined on `^`, and a name holding it is refused** (push_to_100_a, thread
   1). The key-value stores (`localVaultDB`, `idbVaultDB`, `idbDeviceDB`, `memoryDeviceDB`) file
-  rows under `kind^applabel^user_id^vaultlabel[^boxlabel]` (`Ckeys.joiner()`), replacing the
-  JSON-tuple ckeys of the entry above. The join is injective only because no part holds the
-  delimiter, so that is enforced twice and cannot be turned off: every `VaultDB` verb refuses a
-  name holding a character of the adapter's declared `reservedNameChars` (`bad_label`, before the
-  adapter sees it), and the joiner itself refuses one as it composes, which also guards the device
-  shelves, which have no base class. Were either missing, `a^b` + `c` and `a` + `b^c` would share
-  a ckey: one user's lockbox under another's scope. The default validators admit neither `^` nor
-  `/`; a host that wants either passes another delimiter (`ckeyDelimiter`), and the NUL character,
-  which the floor keeps out of every name, joins names of any other text. A hash was not chosen:
+  rows under `kind^applabel^user_id^vaultlabel[^boxlabel]` (`Ckeys`), replacing the JSON-tuple
+  ckeys of the entry above. The join is injective only because no part holds `^`, so that is
+  enforced twice and cannot be turned off: `^` is in the name floor (`NameFloor`), which every
+  `VaultDB` verb, every record schema and the vault's entry hold every name to, whatever the
+  host's validators and whatever the store; and `Ckeys` itself refuses one as it composes, which
+  also guards the device shelves, which have no base class. Were either missing, `a^b` + `c` and
+  `a` + `b^c` would share a ckey: one user's lockbox under another's scope. The delimiter is fixed:
+  no host sets another (the Coach's ruling), and every store refuses `^` alike, so a host
+  never meets a refusal from one store (the browser's device shelf, say) that its vault store
+  never raised. A hash was not chosen:
   it hides nothing (each name is plaintext in the row, and an indexed column in Convex and
   Postgres) and loses the name of a damaged row, which the listing needs to offer `erase()`. Rows
   under the JSON ckeys read as absent; the device shelf sweeps them as strays.
