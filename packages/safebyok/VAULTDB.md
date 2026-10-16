@@ -36,8 +36,8 @@ holds each record to its shape and each name to the floor and its storage's limi
 same verbs. Nothing more: what text a name may be beyond that is each browser vault's own
 `validators`, checked where a name enters the vault, and a host whose clients run different
 validators has chosen that. A record a client's validators would refuse reads back as any other
-(the vault never takes a name or note it would not have written for damage); one below the floor
-is damage.
+(the vault never takes a name it would not have written for damage); one below the floor is
+damage.
 
 So the versioned update is split: the adapter owns the atomic compare-and-write (lines 3.1 to
 3.5, and 3.8), and the vault owns the read before it and the retry after it. "Last write wins" is the
@@ -85,7 +85,7 @@ within it. Every name a verb is handed passes, before the adapter sees it:
 
 * **The floor** (`NameFloor`): one character to 1 KiB of UTF-8, well-formed Unicode, in its
   composed form (NFC), with no control character and no `^`. Nothing turns it off, and no host's
-  validators widen it. A stored record holding a name or note below it reads back as damaged.
+  validators widen it. A stored record holding a name below it reads back as damaged.
   `^` is there because a key-value store joins a row's names into one ckey on it (`Ckeys`): a
   name holding it could make two rows' ckeys one, another user's lockbox under this one's name.
   Every store refuses it alike, whether it joins names or keeps each in a column of its own, so a
@@ -97,8 +97,10 @@ Each refusal is `bad_label`, naming which name and which rule, and quoting none 
 ## 1. Records
 
 **1.1. What is stored reads back whole.** A record reads back exactly as it was written, field
-for field: a field left out stays out (a lockbox with no note has no `note` field, not a null
-one), and nothing is added. Before anything is written, a read finds nothing: `null`, never a
+for field: a field left out stays out (a bundle with no prior vaultKey has no `prior_vault_key`
+field, not a null one), and nothing is added. Text comes back as the exact text written: a
+lockbox's `public_json` is bound into its encryption as written, so a store that rewrites JSON
+it holds (Postgres's `jsonb`, say) keeps that field as plain text. Before anything is written, a read finds nothing: `null`, never a
 default.
 
 **1.2. Each vault keeps to itself.** Two scopes that differ anywhere, by however little (a
@@ -243,7 +245,7 @@ one: a lock timeout or a serialization failure is `storage_unavailable`, and und
 at the backend's default settings, there is none to report. Its test is line 3.7's.
 
 **5.3. A refusal quotes nothing it was handed.** No refusal's message or properties carry a
-record's ciphertext, a boxlabel or a note: the base class never quotes what it refuses, and an
+record's ciphertext, a boxlabel or a public bag: the base class never quotes what it refuses, and an
 adapter's own messages name the vault's limits, never its contents. A `storage_unavailable`
 refusal's `cause` is the backend's own error, passed up as it came for debugging; it holds only
 what the backend holds, which is ciphertext and public fields.

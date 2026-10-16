@@ -72,10 +72,10 @@ const vaultDB = postgresVaultDB({ client: pool, userId: session.userId })
 * **What the server checks** is who may reach which vault, that each write is atomic, and that
   each record has its shape and each name is above the floor (`VAULTDB.md`, *Names*) and within
   the limit above: the same checks every VaultDB's verbs make, on the server side of the wire.
-  It never holds a name to a label grammar or a note to a length: those are each browser vault's
-  own `validators`, checked where a name enters it. A host whose clients run different
-  validators has chosen that, and a client reads a record another's validators let through as
-  any other, never as damage.
+  It never holds a name to a label grammar, nor looks inside a lockbox's public bag: the one is
+  each browser vault's own `validators`, checked where a name enters it, the other the host's.
+  A host whose clients run different validators has chosen that, and a client reads a record
+  another's validators let through as any other, never as damage.
 * **Trouble** refuses with kind `storage_unavailable`, your driver's own error as its `cause`.
   Every refusal is a `VaultError`, and its `kind` and message are safe to send to the browser;
   its `cause` is not, being your driver's, and may name your database.
@@ -333,20 +333,21 @@ subscriber: at worst, a refresh that finds nothing new.
 Two tables, each record **a column to a field**, exactly as safebyok wrote it: text as text, a
 time or a count as a `bigint`, and each structured value as one opaque `jsonb` -- an encrypted
 value (a cipherIv and its ciphertext, `{ cipher_iv_b64, ciphertext_b64 }`), or the bundle's
-`unlocks`, its list of unlock envelopes. Nothing is normalized: a note or a
-user id reads back byte for byte, as it must, since every field a record holds is bound into its
-encryption (all but the bundle's `unlock_epoch` and which envelopes its `unlocks` holds).
+`unlocks`, its list of unlock envelopes. A lockbox's public bag is `text`, never `jsonb`, which
+would rewrite it. Nothing is normalized: a public bag or a user id reads back byte for byte, as it
+must, since every field a record holds is bound into its encryption (all but the bundle's
+`unlock_epoch` and which envelopes its `unlocks` holds).
 
 | Table                | One row per | Primary key                                     | Columns                                                                                                |
 | -------------------- | ----------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `safebyok_bundles`   | vault       | `applabel`, `user_id`, `vaultlabel`             | every field of the `VaultBundle`                                                                       |
-| `safebyok_lockboxes` | lockbox     | `applabel`, `user_id`, `vaultlabel`, `boxlabel` | the vault's scope and `vault_id`, then every field of the `Lockbox`; a lockbox with no note, null      |
+| `safebyok_lockboxes` | lockbox     | `applabel`, `user_id`, `vaultlabel`, `boxlabel` | the vault's scope and `vault_id`, then every field of the `Lockbox`; its public bag as `text`          |
 
 * **Encrypted**: each whisper (`whisper_ciphered`), each lockbox's lockboxKey
   (`lockbox_key_wrapped`), and the vaultKey, once under each way into the vault (each unlock
   envelope's `vault_key_wrapped`, inside the bundle's `unlocks`).
-* **In the open**: the scope, each `boxlabel` and `note`, the `vault_id`, `unlock_epoch`,
-  `revision_id`s, each unlock envelope's method, id, label, salt and key deriver's label, when
+* **In the open**: the scope, each `boxlabel` and public bag (`public_json`), each whisper's codec
+  and schema version, the `vault_id`, `unlock_epoch`, `revision_id`s, each unlock envelope's method, id, label, salt and key deriver's label, when
   each vault and lockbox was first stored and each whisper last changed (`registered_at`,
   `changed_at`, epoch milliseconds), and the length of every ciphertext.
 * **Never**: a whisper, a passphrase, any key in usable form, or the device-local remembered

@@ -107,8 +107,8 @@ socket and its signed-in user. `safebyok-convex` itself imports nothing of React
   [`safebyok` README](../safebyok/README.md), which say what each means and what a host does.
   The Convex functions throw two, `identity_revoked` and `vault_full`; a write that came too late is
   a `stale_write`; and `storage_unavailable` is anything else Convex reported. It carries nothing
-  of Convex's own error, which on a dev deployment may quote the call's arguments (names, notes,
-  ciphertext): your deployment's logs have it, or, for trouble before the call left, the browser
+  of Convex's own error, which on a dev deployment may quote the call's arguments (names, public
+  bags, ciphertext): your deployment's logs have it, or, for trouble before the call left, the browser
   console, where the Convex client reports its connection.
 * **Offline, a call waits** for the connection, as every Convex call does, rather than failing.
   Convex resends a mutation when it reconnects, so a write may land after any timeout you set:
@@ -130,7 +130,7 @@ Three tables, inside the component, beside nothing of your app's:
 * **Encrypted**, as `{ cipher_iv_b64, ciphertext_b64 }`: each whisper (`whisper_ciphered`), each
   lockbox's lockboxKey (`lockbox_key_wrapped`), and the vaultKey once for each of the vault's
   ways in (each envelope's `vault_key_wrapped`, in the bundle's `unlocks`).
-* **In the open**: the scope (`applabel`, `user_id`, `vaultlabel`), each `boxlabel` and `note`,
+* **In the open**: the scope (`applabel`, `user_id`, `vaultlabel`), each `boxlabel` and public bag (`public_json`),
   the `vault_id`, `unlock_epoch`, `revision_id`s, each way in's `method`, `unlock_id`,
   `unlocklabel`, passphraseSalt (`salt_b64`) and key deriver's label, how many ways in there are,
   when each vault and lockbox was first stored and each whisper last changed (`registered_at`,
@@ -140,7 +140,7 @@ Three tables, inside the component, beside nothing of your app's:
   they keep.)
 * `user_id` leads the bundle and lockbox indexes, so one user's rows are one range of each.
 * **Any text is a name** to the component: it never sees the vault's `validators`, which check
-  each name and note where it enters the vault, on the client. The floor beneath them, which the
+  each name where it enters the vault, on the client. The floor beneath them, which the
   client's VaultDB holds every name to whatever the validators say, refuses what Convex could
   not store: a lone surrogate (half of a character, which Convex's documentation forbids in a
   string), a control character, text not in NFC, a name over 1 KiB.

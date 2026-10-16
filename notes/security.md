@@ -910,3 +910,23 @@ security expert who knows what questions to ask.
   clients cannot keep. `VaultDB` verbs no longer take a validators bag at all, so no server or
   wrapper can be handed the wrong one. Each adapter declares `maxNameBytes` (Postgres: 640, so a
   lockbox's four-name primary key fits a btree entry) and the base class refuses a longer name.
+* 2026-10-16: **a lockbox's note becomes a public bag of any JSON, bound; its whisper's codec
+  and schema version are reserved, bound too** (push_to_100_a, thread 2; G023, G025, G040). The
+  lockbox (`safebyok-lockbox-v3`) holds `public_json`, the host's bag as stable-serialized JSON
+  text, always written (`{}` when the host gave none, so an absent bag and an empty one are one
+  record and one binding), and `whisper_codec` (`json_v1`) and `whisper_schema_version` (`1`).
+  All three join the header both of the lockbox's encryptions bind, so a bag swapped between
+  boxes, emptied, or merely respaced in storage makes `read()` refuse it (`damaged_lockbox`);
+  the bound value is the stored text itself, never a re-serialization, so a store must keep it
+  byte for byte (Postgres keeps it as `text`, never `jsonb`). What the bag reveals: everything in
+  it, in the clear, to anyone who reads storage, and its size; the vault never interprets it,
+  checks only that it is JSON, and the snapshot shows it unverified until the box is opened, as
+  every public field is. Its size is capped only with the whisper's (`maxWhisperBytes` counts
+  both), so a host cannot put a bag of megabytes in front of the listing through the vault.
+  Reserving the codec fields now means a later codec (padding, G026) or a whisper shape version
+  changes no bound field set and re-encrypts nothing. Two binding fixes ride along: the lockbox's
+  format is bound once, as the leading tag (it was also in the header), and `cipherBinding`
+  refuses a record part holding a field set to `undefined` (`bad_option`) instead of dropping it
+  as JSON would, so a field gone missing by mistake can never bind as if it were absent. The
+  note's control-character floor (G177) goes with the note: the bag is the host's, and a host
+  that shows it checks what it shows.

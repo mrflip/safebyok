@@ -144,8 +144,8 @@ without `format` -- which the browser's VaultDB may not hand back from its own l
   behind it does, and a vault to no size of its own.
 * **The server checks** who may reach which vault, that each write is atomic, and that each
   record has its shape and each name is above the floor and within its storage's limits (the
-  VaultDB verbs' own checks, `VAULTDB.md`, *Names*); never a label grammar or a note's length,
-  which are each browser vault's own `validators`.
+  VaultDB verbs' own checks, `VAULTDB.md`, *Names*); never a label grammar, which is each browser
+  vault's own `validators`, nor what a lockbox's public bag holds.
 * **It declares the lockbox limit your server holds a vault to**: 1000, the Postgres VaultDB's
   own unless told otherwise, or the `maxLockboxes` you pass (`graphqlVaultDB(client, {
   maxLockboxes: 250 })`; `Infinity` for a server that sets none). Pass the number your server's
@@ -162,7 +162,7 @@ by, exactly as safebyok wrote it:
 | Type                    | Carries                                                                     |
 | ----------------------- | --------------------------------------------------------------------------- |
 | `SafebyokVaultBundle`   | every field of the `VaultBundle`                                            |
-| `SafebyokLockbox`       | every field of the `Lockbox`; a lockbox with no note, a null `note`         |
+| `SafebyokLockbox`       | every field of the `Lockbox`; its public bag as JSON text, as written       |
 | `SafebyokListedLockbox` | a lockbox as a listing has it: every field but the two encrypted ones       |
 | `SafebyokCiphered`      | an encrypted value: its `cipher_iv_b64` and its `ciphertext_b64`            |
 | `SafebyokVaultScope`    | which vault: `applabel`, `user_id`, `vaultlabel`                            |
