@@ -7,7 +7,7 @@ import * as Validators from '../src/validators'
 describe("the package's entry point", () => {
   it("exports exactly the public surface", () => {
     expect(Object.keys(safebyok)).to.have.members([
-      'Argon2idWebV1', 'argon2idDeriver', 'argon2idWebV1Deriver', 'parseKeyDeriverSpec',
+      'Argon2idWebV1', 'argon2idDeriver', 'argon2idWebV1Deriver', 'ensureSaltFits', 'parseKeyDeriverSpec',
       'openVault', 'eraseDamagedVault', 'MinPassphraseChars', 'passphraseLengthTest',
       'Ciphered', 'EpochMillis', 'FarFuture', 'FarPast', 'ForcePassphraseReentryHours', 'ForeverMillis', 'Lockbox', 'LockboxSummary', 'MaxLockboxes', 'MaxReentryHours', 'MaxUnlocks', 'MaxWhisperBytes', 'MinuteMillis', 'PasskeyEnvelope', 'PasskeySaltBytes', 'PassphraseEnvelope', 'PublicBag', 'UnlockEnvelope', 'UnlockMethodVals', 'VaultBundle', 'VaultScope', 'Whisper', 'wallClock',
       'AnyTextValidators', 'DefaultValidators', 'Label', 'LabelPattern', 'MaxLabelChars', 'MaxUserIdChars', 'NameFloor', 'NameFloorBytes', 'UserId', 'UserIdPattern', 'checkValidators',

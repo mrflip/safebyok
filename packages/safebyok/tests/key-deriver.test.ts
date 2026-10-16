@@ -1,7 +1,7 @@
 import { argon2idAsync } from '@noble/hashes/argon2.js'
 import { describe, expect, it } from 'vitest'
-import { argon2idDeriver, argon2idWebV1Deriver, parseKeyDeriverSpec } from '../src/key-deriver'
-import { Argon2idWebV1, MaxSaltBytes, PassphraseKeyBytes, type KeyDeriverSpec } from '../src/key-deriver-spec'
+import { argon2idDeriver, argon2idWebV1Deriver } from '../src/key-deriver'
+import { Argon2idWebV1, MaxSaltBytes, PassphraseKeyBytes, parseKeyDeriverSpec, type KeyDeriverSpec } from '../src/key-deriver-spec'
 import { VaultError, isVaultError } from '../src/errors'
 
 /** A spec of the host's own, cheap to derive under; no two of its counts alike, so a swap shows. */
@@ -94,6 +94,37 @@ const UnworkableSpecs = [
   [{ algorithm: 'scrypt' },                  'algorithm',    'another key derivation function'],
   [{ key_deriver_label: '' },                'key_deriver_label', 'no label for a vault to record'],
 ] as const
+
+describe("a deriver's salt", () => {
+  const Misfits = [
+    [new Uint8Array(0),   'an empty salt'],
+    [new Uint8Array(15),  'a salt one byte short'],
+    [new Uint8Array(17),  'a salt one byte long'],
+  ] as const
+
+  for (const [salt, blurb] of Misfits) {
+    it(`is refused by argon2idWebV1Deriver as bad_option, before it derives: ${blurb}`, async () => {
+      await expect(argon2idWebV1Deriver.deriveKeyBytes('pw', salt)).rejects.toSatisfy((err: unknown) => isVaultError(err, 'bad_option'))
+    })
+
+    it(`is refused by a deriver of a host's spec as bad_option: ${blurb}`, async () => {
+      await expect(argon2idDeriver(CheapSpec).deriveKeyBytes('pw', salt)).rejects.toSatisfy((err: unknown) => isVaultError(err, 'bad_option'))
+    })
+  }
+
+  it("is taken at the spec's own length, whatever that is: 8 for a spec asking 8", async () => {
+    const deriver = argon2idDeriver({ ...CheapSpec, salt_bytes: 8 })
+    expect(await deriver.deriveKeyBytes('pw', new Uint8Array(8))).to.have.lengthOf(32)
+    await expect(deriver.deriveKeyBytes('pw', new Uint8Array(16))).rejects.toSatisfy((err: unknown) => isVaultError(err, 'bad_option'))
+  })
+})
+
+describe("argon2idDeriver and the reserved labels", () => {
+  it("refuses a label of the reserved namespace that safebyok does not supply, however well-formed the spec", () => {
+    expect(() => argon2idDeriver({ ...CheapSpec, key_deriver_label: 'argon2id_web_v2' }))
+      .to.throw(/reserved/u).that.satisfies((err: unknown) => isVaultError(err, 'bad_option'))
+  })
+})
 
 describe("argon2idDeriver's bounds", () => {
   for (const [change, field, blurb] of UnworkableSpecs) {

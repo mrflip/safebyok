@@ -9,8 +9,9 @@ import { jsonBytes, localVaultDB, type VaultDB } from '../src/vault-db'
 import { memoryStore } from '../src/string-store'
 import { LockboxFieldsBytes, LockboxFixedBytes, StoredBytesPerWhisperByte, deviceTroubleAsConditions, eraseDamagedVault, openVault, type OpenVaultOpts, type Vault } from '../src/vault'
 import { cipherBinding, cipherBytes, fromB64, makeLockboxKey, makeVaultKey, randomBytes, toB64, wrapKeyUnder } from '../src/crypto'
-import type { KeyDeriver } from '../src/key-deriver'
-import { Argon2idWebV1, MaxSaltBytes } from '../src/key-deriver-spec'
+import type { CustomKeyDeriver, KeyDeriver } from '../src/key-deriver'
+import type { VaultLogger } from '../src/logger'
+import { Argon2idWebV1, MaxSaltBytes, TestDeriverNotice } from '../src/key-deriver-spec'
 import * as Ckeys from '../src/ckeys'
 import type { PassphraseVerdict } from '../src/passphrase-strength'
 import * as TH from './test-helpers'
@@ -2541,8 +2542,11 @@ describe("several passphrases", () => {
     await vault.unlock('pw')
     await vault.lock()
     const [only] = vault.getSnapshot().unlocks
-    expect(only).to.deep.equal({ method: 'passphrase', unlock_id: only?.unlock_id, unlocklabel: 'passphrase' })
+    expect(only).to.deep.equal({
+      method: 'passphrase', unlock_id: only?.unlock_id, unlocklabel: 'passphrase', device_id: only?.device_id, registered_at: Date.parse('2026-10-14T12:00:00Z'),
+    })
     expect(only?.unlock_id).to.have.length.greaterThan(0)
+    expect(only?.device_id).to.have.length.greaterThan(0)
   })
 
   it("addPassphrase gives another way in: either passphrase opens the vault, on any device", async () => {
@@ -2826,9 +2830,12 @@ describe("passkeys", () => {
     const { world, laptop, unlockId } = await vaultWithPasskey()
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })
     expect(fresh.getSnapshot().state).to.eq('locked')
-    expect(fresh.getSnapshot().unlocks[1]).to.deep.equal({
-      method: 'passkey', unlock_id: unlockId, unlocklabel: 'laptop', credential_id: laptop.credentialId, prf_salt_b64: laptop.prfSaltB64,
+    const listed = fresh.getSnapshot().unlocks[1]
+    expect(listed).to.deep.equal({
+      method: 'passkey', unlock_id: unlockId, unlocklabel: 'laptop', device_id: listed?.device_id, registered_at: listed?.registered_at,
+      credential_id: laptop.credentialId, prf_salt_b64: laptop.prfSaltB64,
     })
+    expect(listed?.device_id).to.have.length.greaterThan(0)
   })
 
   it("an unlock with a passkey is remembered on this device until askPassphraseAt, as a passphrase's is", async () => {
@@ -2983,9 +2990,60 @@ describe("passkeys", () => {
     expect(await fresh.read('anthropic')).to.eq('sk-fake')
   })
 
-  it("changePassphrase changes a passphrase, never a passkey", async () => {
-    const { vault, laptop, unlockId } = await vaultWithPasskey()
-    await TH.expectRefusal(vault.changePassphrase(laptop as unknown as string, 'new pw'), 'bad_option')
+  it("changePassphrase takes a passkey's answer as proof, and changes the vault's one passphrase", async () => {
+    const { world, vault, laptop } = await vaultWithPasskey()
+    await vault.lock()
+    const [passphraseWay] = vault.getSnapshot().unlocks
+    await vault.changePassphrase(laptop, 'a new passphrase')
+    expect(vault.getSnapshot().state).to.eq('unlocked')
+    expect(unlocklabelsOf(vault)).to.deep.equal(['passphrase', 'laptop'])
+    // The passphrase's way in is the same one, as a changed passphrase's is.
+    expect(vault.getSnapshot().unlocks[0]?.unlock_id).to.eq(passphraseWay?.unlock_id)
+    const fresh = await world.open({ deviceDB: memoryDeviceDB() })
+    await TH.expectRefusal(fresh.unlock('pw'), 'wrong_passphrase')
+    await fresh.unlock('a new passphrase')
+    expect(await fresh.read('anthropic')).to.eq('sk-fake')
+  })
+
+  it("changePassphrase with a passkey among several passphrases changes the one unlockId names, and refuses to guess", async () => {
+    const { world, vault, laptop } = await vaultWithPasskey()
+    const spareId = await vault.addPassphrase('pw', 'spare pw', { unlocklabel: 'spare' })
+    const firstId = vault.getSnapshot().unlocks[0]?.unlock_id ?? ''
+    await TH.expectRefusal(vault.changePassphrase(laptop, 'new pw'), 'bad_option')
+    await vault.changePassphrase(laptop, 'new pw', { unlockId: spareId })
+    const fresh = await world.open({ deviceDB: memoryDeviceDB() })
+    await TH.expectRefusal(fresh.unlock('spare pw'), 'wrong_passphrase')
+    await fresh.unlock('new pw')
+    await fresh.lock()
+    await fresh.unlock('pw', { unlockId: firstId })
+    expect(unlocklabelsOf(vault)).to.deep.equal(['passphrase', 'laptop', 'spare'])
+  })
+
+  it("changePassphrase with a passkey refuses an unlockId that is not one of the vault's passphrases, and a passkey that does not open it", async () => {
+    const { world, vault, laptop, unlockId } = await vaultWithPasskey()
+    await TH.expectRefusal(vault.changePassphrase(laptop, 'new pw', { unlockId }), 'absent_unlock')
+    await TH.expectRefusal(vault.changePassphrase(laptop, 'new pw', { unlockId: 'unlock-gone' }), 'absent_unlock')
+    const stranger = await TH.passkeyOf('stranger')
+    await TH.expectRefusal(vault.changePassphrase(stranger, 'new pw'), 'absent_unlock')
+    const wrongAnswer = { ...laptop, prfBytes: new Uint8Array(32).fill(7) }
+    await TH.expectRefusal(vault.changePassphrase(wrongAnswer, 'new pw'), 'wrong_passkey')
+    // Nothing changed through any of it: the old passphrase still opens the vault.
+    const fresh = await world.open({ deviceDB: memoryDeviceDB() })
+    await fresh.unlock('pw')
+    expect(unlocklabelsOf(vault)).to.deep.equal(['passphrase', 'laptop'])
+  })
+
+  it("changePassphrase with a passkey refuses a blank new passphrase and a misshapen answer, quoting neither", async () => {
+    const { vault, laptop } = await vaultWithPasskey()
+    await TH.expectRefusal(vault.changePassphrase(laptop, ' '.repeat(3)), 'wrong_passphrase')
+    await TH.expectRefusal(vault.changePassphrase(laptop, 42 as unknown as string), 'bad_option')
+    const misshapen = { ...laptop, prfBytes: [...laptop.prfBytes] } as unknown as PasskeyProof
+    const err = await TH.expectRefusal(vault.changePassphrase(misshapen, 'new pw'), 'bad_option')
+    expect(err.message).to.not.include(laptop.prfBytes.join(','))
+  })
+
+  it("changePassphrase with a passphrase of a vault that has a passkey still aims at the way in that opened, and refuses a passkey's unlock_id", async () => {
+    const { vault, unlockId } = await vaultWithPasskey()
     await TH.expectRefusal(vault.changePassphrase('pw', 'new pw', { unlockId }), 'absent_unlock')
     expect(unlocklabelsOf(vault)).to.deep.equal(['passphrase', 'laptop'])
   })
@@ -3708,6 +3766,18 @@ describe("lockSoon", () => {
 /** The testDeriver's derivation, to put in a deriver of another shape. */
 const cheapDerive: KeyDeriver['deriveKeyBytes'] = (passphrase, saltBytes) => TH.testDeriver.deriveKeyBytes(passphrase, saltBytes)
 
+/** A hand-built Argon2id deriver over the cheap derivation: the whole spec, under a label of its own, then `change`. */
+const handBuilt = (change: Record<string, unknown> = {}): KeyDeriver => (
+  { ...Argon2idWebV1, key_deriver_label: 'acme_argon2id_v1', deriveKeyBytes: cheapDerive, ...change }
+)
+
+/** A logger that keeps everything it hears, the notice included, which TH.spyLogger drops. */
+const hearingEverything = () => {
+  const heard: TH.LoggedCall[] = []
+  const hear = (level: keyof VaultLogger) => (message?: string, story?: Record<string, unknown>, err?: Error | null) => { heard.push({ level, message, story, err }) }
+  return { heard, logger: { log: hear('log'), warn: hear('warn'), error: hear('error') } }
+}
+
 describe("the key deriver seam", () => {
   it("a vault made under one deriver refuses to unlock under another, by label", async () => {
     const world = makeWorld()
@@ -3817,8 +3887,104 @@ describe("the key deriver seam", () => {
     expect(vault.getSnapshot().state).to.eq('unlocked')
   })
 
+  describe("a deriver that declares Argon2id", () => {
+    it("opens, and unlocks, when its spec is one Argon2id can run", async () => {
+      const world = makeWorld()
+      const vault = await world.openUnlocked('pw', { keyDeriver: handBuilt({ salt_bytes: 16 }) })
+      expect(vault.getSnapshot().state).to.eq('unlocked')
+    })
+
+    const Unrunnable = [
+      [{ salt_bytes: 4 },            'a salt under 8 bytes'],
+      [{ memory_kib: 4 },            'memory under 8 KiB a lane'],
+      [{ iterations: 0 },            'no passes'],
+      [{ parallelism: 0 },           'no lanes'],
+      [{ output_bytes: 16 },         'a key other than 32 bytes'],
+      [{ memory_kib: undefined },    'a parameter missing'],
+    ] as const
+
+    for (const [change, blurb] of Unrunnable) {
+      it(`is refused at open as bad_option, not at the first unlock: ${blurb}`, async () => {
+        const world = makeWorld()
+        const err = await TH.expectRefusal(world.open({ keyDeriver: handBuilt(change) }), 'bad_option')
+        expect(err.message).to.include('keyDeriverSpec')
+        expect(await world.vaultDB.readBundle(TH.scopeOf('u1'))).to.be.null
+      })
+    }
+
+    it("is refused at open when it wears the supplied label on other parameters", async () => {
+      const err = await TH.expectRefusal(makeWorld().open({ keyDeriver: handBuilt({ key_deriver_label: 'argon2id_web_v1', iterations: 2 }) }), 'bad_option')
+      expect(err.message).to.include('argon2id_web_v1')
+    })
+  })
+
+  describe("a deriver of another algorithm, or none declared", () => {
+    it("opens and unlocks, declaring an algorithm of its own, with no Argon2id parameters to carry", async () => {
+      const scrypt: CustomKeyDeriver = { ...TH.testDeriver, key_deriver_label: 'acme_scrypt_v1', algorithm: 'scrypt' }
+      const vault = await makeWorld().openUnlocked('pw', { keyDeriver: scrypt })
+      expect(vault.getSnapshot().state).to.eq('unlocked')
+    })
+
+    it("opens and unlocks, declaring none, as the test deriver does", async () => {
+      expect(TH.testDeriver).to.not.have.property('algorithm')
+      const vault = await makeWorld().openUnlocked('pw')
+      expect(vault.getSnapshot().state).to.eq('unlocked')
+    })
+
+    it("is refused at open when its algorithm is not text", async () => {
+      await TH.expectRefusal(makeWorld().open({ keyDeriver: { ...TH.testDeriver, algorithm: 7 } as unknown as KeyDeriver }), 'bad_option')
+    })
+  })
+
+  describe("the reserved label namespace", () => {
+    const Reserved = [
+      ['argon2id_web_v2',     'a spec safebyok may supply later'],
+      ['Argon2id_Web_acme',   'the prefix in another case'],
+      ['argon2id_web_v1',     'the supplied label, on a deriver carrying no parameters'],
+    ] as const
+
+    for (const [label, blurb] of Reserved) {
+      it(`is refused at open as bad_option: ${blurb}`, async () => {
+        const err = await TH.expectRefusal(makeWorld().open({ keyDeriver: { ...TH.testDeriver, key_deriver_label: label } }), 'bad_option')
+        expect(err.message).to.match(/argon2id_web_/u)
+      })
+    }
+  })
+
+  describe("a label that begins test_", () => {
+    it("warns once through the logger as the vault opens, and goes on to work", async () => {
+      const { heard, logger } = hearingEverything()
+      const vault = await makeWorld().openUnlocked('pw', { logger })
+      expect(heard).to.deep.equal([{ level: 'warn', message: TestDeriverNotice, story: { call: 'openVault' }, err: undefined }])
+      expect(vault.getSnapshot().state).to.eq('unlocked')
+    })
+
+    it("warns each time a vault is opened, quoting no passphrase", async () => {
+      const { heard, logger } = hearingEverything()
+      const world = makeWorld()
+      await world.open({ logger })
+      await world.open({ logger })
+      expect(heard).to.have.lengthOf(2)
+      expect(TH.loggedText(heard)).to.not.include('pw ')
+    })
+
+    it("says nothing of a label that does not begin test_, or merely holds it", async () => {
+      const { heard, logger } = hearingEverything()
+      const world = makeWorld()
+      await world.open({ logger, keyDeriver: { ...TH.testDeriver, key_deriver_label: 'acme_test_v1' } })
+      await world.open({ logger, keyDeriver: { ...TH.testDeriver, key_deriver_label: 'Test_digest' } })
+      expect(heard).to.deep.equal([])
+    })
+
+    it("is heard by TH.spyLogger as nothing, so a test's own count of what the vault said stands", async () => {
+      const world = makeWorld()
+      await world.open()
+      expect(world.logged).to.deep.equal([])
+    })
+  })
+
   it("keeps the keyDeriver it was handed, so one whose method lives on its prototype still derives", async () => {
-    class PrototypeDeriver implements KeyDeriver {
+    class PrototypeDeriver implements CustomKeyDeriver {
       readonly key_deriver_label = TH.testDeriver.key_deriver_label
       readonly salt_bytes = TH.testDeriver.salt_bytes
       readonly #inner = TH.testDeriver

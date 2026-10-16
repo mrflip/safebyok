@@ -1,32 +1,61 @@
-import * as Z from 'zod/mini'
 import { argon2idAsync } from '@noble/hashes/argon2.js'
-import { Argon2idWebV1, MaxSaltBytes, PassphraseKeyBytes, ensureSuppliedSpecKept, type KeyDeriverSpec } from './key-deriver-spec'
-import { VaultError } from './errors'
+import { Argon2idWebV1, ensureSaltFits, parseKeyDeriverSpec, type KeyDeriverSpec } from './key-deriver-spec'
 
 /**
- * What turns a passphrase into passphraseKey bytes. The one to use is
- * {@link argon2idWebV1Deriver}; {@link argon2idDeriver} makes one for a spec of your own. The
- * seam exists so tests can substitute a cheap deriver, and so a host on a platform with a faster
- * implementation of the same Argon2id spec (WebAssembly, native) can plug it in.
+ * What every key deriver carries, whatever its algorithm: the label a vault stores, the salt
+ * length it takes, and the function that derives.
+ */
+type KeyDeriverBase = {
+  /** Stored beside each vault, so the stored format says how it was made. */
+  key_deriver_label: string
+  /** How long a passphraseSalt this deriver expects, in bytes: from 1 to 65536. */
+  salt_bytes:        number
+  /**
+   * 32 key bytes from the passphrase and its salt: deterministic, and slow by design. Refuses a
+   * salt of another length than `salt_bytes` (kind 'bad_option'), as the supplied derivers do.
+   */
+  deriveKeyBytes(passphrase: string, saltBytes: Uint8Array): Promise<Uint8Array>
+}
+
+/**
+ * A key deriver running Argon2id: the whole {@link KeyDeriverSpec} beside its function, every
+ * parameter present. `openVault` checks the spec as `argon2idDeriver` does, so one Argon2id
+ * cannot run is refused (kind 'bad_option') when the vault is opened, not at its first unlock.
+ * What {@link argon2idDeriver}, {@link argon2idWebV1Deriver} and safebyok-fastkey's derivers are.
+ */
+export type Argon2idKeyDeriver = KeyDeriverSpec & KeyDeriverBase
+
+/**
+ * A key deriver of any other algorithm, or of none declared: a label, a salt length and a
+ * function, and optionally the `algorithm` it runs, named in the host's own words. It carries no
+ * Argon2id parameters; `openVault` refuses one that declares `algorithm: 'argon2id'` without
+ * them being a whole spec, and one whose label safebyok reserves (those beginning `argon2id_web_`).
+ */
+export type CustomKeyDeriver = KeyDeriverBase & {
+  /** What the deriver runs, if it says: `argon2id` here means a whole {@link KeyDeriverSpec} must be carried. */
+  readonly algorithm?: string
+}
+
+/**
+ * What turns a passphrase into passphraseKey bytes: an {@link Argon2idKeyDeriver}, the one to use
+ * being {@link argon2idWebV1Deriver} and {@link argon2idDeriver} making one for a spec of your
+ * own, or a {@link CustomKeyDeriver} of some other algorithm. The seam exists so tests can
+ * substitute a cheap deriver, and so a host on a platform with a faster implementation of the
+ * same Argon2id spec (WebAssembly, native) can plug it in.
  *
  * A vault stores its deriver's `key_deriver_label`, and unlocks only through a deriver carrying
  * that same label: plugging in your own commits every one of your users' vaults to it. An
  * Argon2id deriver carries its whole keyDeriverSpec beside its function, and one that wears the
  * label of a spec safebyok supplies must carry exactly that spec's parameters, or openVault
- * refuses it (kind 'bad_option'). Do not write your own derivation; if you must substitute, use a
- * vetted Argon2id implementation, spread the spec into it, keep the label, and test that it
- * derives the same bytes as the deriver it stands in for.
+ * refuses it (kind 'bad_option'); so does a label beginning `argon2id_web_` that is not one
+ * safebyok supplies, those being reserved. Do not write your own derivation; if you must
+ * substitute, use a vetted Argon2id implementation, spread the spec into it, keep the label, and
+ * test that it derives the same bytes as the deriver it stands in for. openVault logs a warning
+ * for a label beginning `test_`, the mark of a deriver made cheap for tests.
  *
  * @example const wasmDeriver: KeyDeriver = { ...Argon2idWebV1, deriveKeyBytes: deriveWithWasm }
  */
-export type KeyDeriver = Partial<KeyDeriverSpec> & {
-  /** Stored beside each vault, so the stored format says how it was made. */
-  key_deriver_label: string
-  /** How long a passphraseSalt this deriver expects, in bytes: from 1 to 65536. */
-  salt_bytes:        number
-  /** 32 key bytes from the passphrase and its salt: deterministic, and slow by design. */
-  deriveKeyBytes(passphrase: string, saltBytes: Uint8Array): Promise<Uint8Array>
-}
+export type KeyDeriver = Argon2idKeyDeriver | CustomKeyDeriver
 
 /**
  * A KeyDeriver running Argon2id at `spec`, through `@noble/hashes` (audited, pure JS, runs
@@ -36,7 +65,9 @@ export type KeyDeriver = Partial<KeyDeriverSpec> & {
  *
  * Refuses (kind 'bad_option') a spec Argon2id cannot run -- a salt under 8 bytes or over 65536,
  * memory under 8 KiB a lane or over 1 GiB, no passes, no lanes, a key other than 32 bytes -- and
- * one wearing a supplied spec's label without its parameters. A weak spec that runs is allowed.
+ * one wearing a label safebyok reserves, or a supplied spec's without its parameters. A weak spec
+ * that runs is allowed. The deriver it returns refuses (kind 'bad_option') a salt of another
+ * length than the spec's `salt_bytes`, before any derivation.
  *
  * @param spec - The whole Argon2id parameter set, and the label vaults made under it record.
  * @returns A frozen KeyDeriver: the spec's fields and `deriveKeyBytes`.
@@ -52,14 +83,17 @@ export type KeyDeriver = Partial<KeyDeriverSpec> & {
  *   argon2idDeriver({ ...Argon2idWebV1, iterations: 4 })
  *   // throws 'bad_option': argon2id_web_v1 always means 3 passes
  */
-export const argon2idDeriver = (spec: KeyDeriverSpec): KeyDeriver & KeyDeriverSpec => deriverOf(parseKeyDeriverSpec(spec))
+export const argon2idDeriver = (spec: KeyDeriverSpec): Argon2idKeyDeriver => deriverOf(parseKeyDeriverSpec(spec))
 
 /** A frozen deriver of a spec already checked: Argon2idWebV1, or one argon2idDeriver parsed. */
-const deriverOf = (spec: KeyDeriverSpec): KeyDeriver & KeyDeriverSpec => {
+const deriverOf = (spec: KeyDeriverSpec): Argon2idKeyDeriver => {
   const argonOpts = { m: spec.memory_kib, t: spec.iterations, p: spec.parallelism, dkLen: spec.output_bytes }
   return Object.freeze({
     ...spec,
-    deriveKeyBytes: (passphrase: string, saltBytes: Uint8Array) => argon2idAsync(passphrase, saltBytes, argonOpts),
+    deriveKeyBytes: async (passphrase: string, saltBytes: Uint8Array) => {
+      ensureSaltFits(spec, saltBytes)
+      return await argon2idAsync(passphrase, saltBytes, argonOpts)
+    },
   })
 }
 
@@ -73,69 +107,3 @@ const deriverOf = (spec: KeyDeriverSpec): KeyDeriver & KeyDeriverSpec => {
  *   keyBytes.length  // 32
  */
 export const argon2idWebV1Deriver = /* @__PURE__ */ deriverOf(Argon2idWebV1)
-
-/** The fewest salt bytes Argon2id takes: its reference code and `@noble/hashes` refuse fewer. */
-const MinArgon2SaltBytes = 8
-
-/** The most memory `@noble/hashes` allocates for one Argon2 derivation, in KiB: 1 GiB. */
-const MaxMemoryKib = 1_048_576
-
-/** Argon2's least memory per lane, in KiB. */
-const MinMemoryKibPerLane = 8
-
-/** One past the largest 32-bit unsigned integer, Argon2's bound on its counts. */
-const Uint32Bound = 2 ** 32
-
-// Marked pure, so a bundler drops it from an app that imports only argon2idWebV1Deriver.
-const keyDeriverSpec = /* @__PURE__ */ Z.object({
-  algorithm:         Z.literal('argon2id'),
-  key_deriver_label: Z.string().check(Z.minLength(1)),
-  memory_kib:        Z.int().check(Z.gte(MinMemoryKibPerLane), Z.lte(MaxMemoryKib)),
-  iterations:        Z.int().check(Z.gte(1), Z.lt(Uint32Bound)),
-  parallelism:       Z.int().check(Z.gte(1)),
-  salt_bytes:        Z.int().check(Z.gte(MinArgon2SaltBytes), Z.lte(MaxSaltBytes)),
-  output_bytes:      Z.literal(PassphraseKeyBytes),
-}).check(Z.refine((spec) => spec.memory_kib >= MinMemoryKibPerLane * spec.parallelism, { path: ['memory_kib'] }))
-
-/** What each of a spec's fields must be, as a refusal says it: never quoting what was handed in. */
-const SpecLimitForField: Readonly<Record<keyof KeyDeriverSpec, string>> = {
-  algorithm:         "algorithm is 'argon2id', the one key derivation function safebyok runs.",
-  key_deriver_label: 'key_deriver_label is a non-empty string of your own choosing, stored beside every vault made under the spec.',
-  memory_kib:        'memory_kib is a whole number of KiB, at least 8 for each lane (parallelism) and at most 1048576 (1 GiB), the most @noble/hashes allocates.',
-  iterations:        'iterations is a whole number of passes, at least 1 and below 2^32, the most Argon2 counts.',
-  parallelism:       'parallelism is a whole number of lanes, at least 1.',
-  salt_bytes:        "salt_bytes is a whole number of bytes, at least 8 (Argon2id's least) and at most 65536 (the most the platform's random source hands out at once).",
-  output_bytes:      'output_bytes is 32: the passphraseKey is a 256-bit key.',
-}
-
-/**
- * `candidate` as a KeyDeriverSpec Argon2id can run, holding only a spec's fields: the check
- * {@link argon2idDeriver} makes, for a deriver of another Argon2id implementation to make the
- * same. Refuses (kind 'bad_option') a spec Argon2id cannot run -- a salt under 8 bytes or over
- * 65536, memory under 8 KiB a lane or over 1 GiB, no passes, no lanes, a key other than 32
- * bytes -- and one wearing a supplied spec's label without its parameters, naming the field and
- * never quoting what was handed in. Weak parameters that run are allowed: choosing them is the
- * host's call.
- *
- * @param candidate - A host's keyDeriverSpec, as handed to a deriver factory.
- * @returns The spec, checked, with nothing but its fields.
- *
- * @example
- *   const spec = parseKeyDeriverSpec({ ...Argon2idWebV1, key_deriver_label: 'acme_argon2id_v1', memory_kib: 131_072 })
- *   // spec.memory_kib === 131_072
- * @example
- *   parseKeyDeriverSpec({ ...Argon2idWebV1, key_deriver_label: 'acme_argon2id_v1', salt_bytes: 4 })
- *   // throws 'bad_option': Argon2id takes no salt under 8 bytes
- */
-export const parseKeyDeriverSpec = (candidate: KeyDeriverSpec): KeyDeriverSpec => {
-  const checked = keyDeriverSpec.safeParse(candidate)
-  if (! checked.success) {
-    const field = checked.error.issues[0]?.path[0]
-    const limit = (typeof field === 'string' && Object.hasOwn(SpecLimitForField, field))
-      ? SpecLimitForField[field as keyof KeyDeriverSpec]
-      : 'It needs every field of a KeyDeriverSpec: algorithm, key_deriver_label, memory_kib, iterations, parallelism, salt_bytes and output_bytes.'
-    throw new VaultError('bad_option', `Argon2id cannot run that keyDeriverSpec. ${limit}`)
-  }
-  ensureSuppliedSpecKept(checked.data)
-  return checked.data
-}

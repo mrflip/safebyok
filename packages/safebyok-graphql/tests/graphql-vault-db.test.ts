@@ -184,7 +184,7 @@ describe("graphqlVaultDB, carrying a passkey's way in", () => {
     first.close()
 
     const second = await opened()
-    expect(second.getSnapshot().unlocks).to.deep.include({
+    expect(second.getSnapshot().unlocks.find((unlock) => unlock.unlock_id === unlockId)).to.deep.include({
       method: 'passkey', unlock_id: unlockId, unlocklabel: 'laptop', credential_id: laptop.credentialId, prf_salt_b64: laptop.prfSaltB64,
     })
     await second.unlock(laptop)

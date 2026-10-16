@@ -378,17 +378,20 @@ const unlockList = Z.array(UnlockEnvelope).check(
 /**
  * The public face of one way into a vault, as a vault's snapshot lists it even while locked:
  * what a host shows the user, and what it names when it aims `unlock()` or `removeUnlock()` at
- * one. Every way in shows its `method`, `unlock_id` and `unlocklabel`; a passkey also shows its
+ * one. Every way in shows its `method`, `unlock_id` and `unlocklabel`, and when it was added
+ * (`registered_at`) and by which device (`device_id`, this vault's id for that device: one per
+ * device per vault, so it links nothing the vault does not already link), so the user can tell
+ * the way in they made last week from one made on a phone they do not recognise; a passkey also shows its
  * `credential_id` and `prf_salt_b64`, which a host needs before unlocking, to ask the
  * authenticator (`safebyok-react`'s `askPasskey` takes the list whole). Never a salt of a
  * passphrase, never a wrap.
  *
- * @example vault.getSnapshot().unlocks  // [{ method: 'passphrase', unlock_id: '1b9d...', unlocklabel: 'passphrase' }]
- * @example vault.getSnapshot().unlocks.filter((unlock) => unlock.method === 'passkey')  // [{ method: 'passkey', unlock_id, unlocklabel: 'laptop', credential_id: 'AXk3...', prf_salt_b64: 'q83v...' }]
+ * @example vault.getSnapshot().unlocks  // [{ method: 'passphrase', unlock_id: '1b9d...', unlocklabel: 'passphrase', device_id: 'k3x9...', registered_at: 1760000000000 }]
+ * @example vault.getSnapshot().unlocks.filter((unlock) => unlock.method === 'passkey')  // [{ method: 'passkey', unlock_id, unlocklabel: 'laptop', device_id, registered_at, credential_id: 'AXk3...', prf_salt_b64: 'q83v...' }]
  */
 export type UnlockSummary =
-  | Pick<PassphraseEnvelope, 'method' | 'unlock_id' | 'unlocklabel'>
-  | Pick<PasskeyEnvelope, 'method' | 'unlock_id' | 'unlocklabel' | 'credential_id' | 'prf_salt_b64'>
+  | Pick<PassphraseEnvelope, 'method' | 'unlock_id' | 'unlocklabel' | 'device_id' | 'registered_at'>
+  | Pick<PasskeyEnvelope, 'method' | 'unlock_id' | 'unlocklabel' | 'device_id' | 'registered_at' | 'credential_id' | 'prf_salt_b64'>
 
 /**
  * What a passkey answers when asked for a vault's PRF, as a host hands it to the vault: which

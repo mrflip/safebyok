@@ -1080,3 +1080,49 @@ security expert who knows what questions to ask.
   `@zxcvbn-ts/language-common` (runtime dependencies at the Coach's yes): the length floor, then a
   zxcvbn score of at least 3, which is its blocklist of common passwords (NIST's other ask) and its
   pattern matchers. It keeps nothing of a passphrase between calls.
+* 2026-10-16: **a key deriver's bytes are zeroed once imported.** `passphraseKeyOf`
+  (`src/envelope.ts`) `fill(0)`s the 32 bytes a `KeyDeriver` hands back as soon as
+  `importWrappingKeyBytes` has made the non-extractable passphraseKey of them, whether or not the
+  import succeeded, on every path that derives (sealing, and each envelope tried in an unlock).
+  Best effort, as it is in any JavaScript crypto: the deriver's own working memory (hash-wasm's
+  and `@noble/hashes`' internals), the engine's copies and the passphrase string are not reached.
+  The bytes are the vault's the moment they are returned, so a deriver that returns a buffer it
+  keeps (a cache, a constant) would see it zeroed under it; the `KeyDeriver` doc and the README
+  say to hand back a fresh array. A result over a `SharedArrayBuffer` is refused (`bad_option`)
+  before it is touched: another thread could read it, and WebCrypto will not import it.
+* 2026-10-16: **the deriver's label is checked three ways before a vault trusts it.** `openVault`
+  refuses a label beginning `argon2id_web_` (any case) that is not a spec safebyok supplies,
+  or is one without exactly its parameters, so a spec added later (`argon2id_web_v2`) cannot
+  collide with a label a host stored vaults under. It runs the Argon2id spec check
+  (`parseKeyDeriverSpec`) on any deriver declaring `algorithm: 'argon2id'`, so a spec Argon2id
+  cannot run fails at open with a kind, not at the first unlock as a library's plain Error. The
+  supplied derivers (the core's and `safebyok-fastkey`'s) refuse a salt of another length than the
+  spec's before deriving (`bad_option`, never quoting the salt): the stored-vault half of that
+  was already so, an envelope with a salt of the wrong length being passed over as damaged.
+* 2026-10-16: **a `test_` label is warned of, never refused.** `openVault` says through the
+  logger, once per open, that a key deriver whose label begins `test_` (the published
+  `safebyok/testing` deriver is `test_digest_v0`: one SHA-256 of passphrase and salt) gives a
+  passphrase next to no protection against guessing. It does not refuse: no option, no flag, so a
+  host that meant it reads one line and one that did not has a chance to see it. The warning is a
+  best-effort signal, not a gate: a host that passes a `logger` doing nothing hears nothing, and a
+  deriver as weak under another label is not noticed. The vault's records still name the label
+  that sealed them.
+* 2026-10-16: **any way in proves `changePassphrase`**, a passkey's answer included, as it
+  already proved `addPassphrase`, `addPasskey` and `removeUnlock`. A passkey's answer is as good
+  as a passphrase for its vault (VOCABULARY.md), so this opens nothing new: whoever holds the
+  authenticator and passes its user verification could already add a passphrase and remove the
+  old one in two calls, and now does it in one, as one write at one unlockEpoch. With several
+  passphrases the caller names which to replace (`unlockId`); the vault does not guess. The
+  vaultKey is untouched, so what the replaced passphrase's holder kept of an earlier bundle still
+  opens that copy, as for any removal.
+* 2026-10-16: **`removeUnlock` and a vaultKey rotation stay separate verbs**, as the rotation
+  design (`whiteboard/20261016-rotation/rotation-design.md`) has them: `removeUnlock` is the
+  cheap removal and is not revocation, and `rotateVaultKey` is its own call. Removing a way in
+  stops it opening the vault from here on and cannot take back what it opened; folding a rotation
+  into every removal would rewrite every lockbox for what is usually housekeeping, and make the
+  common call the slow one. A host that removes a way in because it was compromised rotates too.
+* 2026-10-16: **`UnlockSummary` shows `device_id` and `registered_at`.** The snapshot of a locked
+  vault already listed each way in; it now says too when it was added and by which device, so a
+  user can spot a way in they did not make. Both are public fields of the envelope, bound into its
+  wrap, and `device_id` is one random id per device per vault (the mark's `device_id`), so it
+  links nothing the vault does not already link: not across vaults, not to the hardware.

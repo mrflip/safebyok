@@ -20,10 +20,11 @@ const expectRefusal = async (operation: Promise<unknown>, kind: VaultError['kind
 
 /** A passkey's way in as the snapshot lists it, for `proof`. */
 const summaryOf = (proof: PasskeyProof, unlocklabel: string): UnlockSummary => ({
-  method: 'passkey', unlock_id: `unlock-${unlocklabel}`, unlocklabel, credential_id: proof.credentialId, prf_salt_b64: proof.prfSaltB64,
+  method: 'passkey', unlock_id: `unlock-${unlocklabel}`, unlocklabel, device_id: 'device-one', registered_at: Date.UTC(2026, 9, 15),
+  credential_id: proof.credentialId, prf_salt_b64: proof.prfSaltB64,
 })
 
-const passphraseSummary: UnlockSummary = { method: 'passphrase', unlock_id: 'unlock-passphrase', unlocklabel: 'passphrase' }
+const passphraseSummary: UnlockSummary = { method: 'passphrase', unlock_id: 'unlock-passphrase', unlocklabel: 'passphrase', device_id: 'device-one', registered_at: Date.UTC(2026, 9, 15) }
 
 /** A fresh vault in memory, made with the passphrase `pw` and unlocked, and an opener for another device on the same storage. */
 const vaultInMemory = async () => {

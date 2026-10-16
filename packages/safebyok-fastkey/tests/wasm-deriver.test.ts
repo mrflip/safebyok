@@ -165,6 +165,25 @@ describe("argon2idWasmDeriver", () => {
     await expect(argon2idWasmDeriver(CheapSpec).deriveKeyBytes('', saltOf(16))).rejects.toThrow(VaultError)
     await expect(argon2idWasmDeriver(CheapSpec).deriveKeyBytes('', saltOf(16))).rejects.toThrow(/empty/u)
   })
+
+  it("refuses a label safebyok reserves, as the core's deriver does, in the same words", () => {
+    const spec = { ...CheapSpec, key_deriver_label: 'argon2id_web_v2' }
+    expect(refusalOf(() => argon2idWasmDeriver(spec))).to.eq(refusalOf(() => argon2idDeriver(spec)))
+    expect(refusalOf(() => argon2idWasmDeriver(spec))).to.include('reserved')
+  })
+
+  for (const length of [0, 15, 17]) {
+    it(`refuses a salt of ${String(length)} bytes where the spec asks 16, as bad_option and as the core's deriver does, before deriving`, async () => {
+      const wasmMessage = (await rejectionOf(argon2idWasmDeriver(CheapSpec).deriveKeyBytes('pw', saltOf(length))) as VaultError).message
+      const coreMessage = (await rejectionOf(argon2idDeriver(CheapSpec).deriveKeyBytes('pw', saltOf(length))) as VaultError).message
+      expect(wasmMessage).to.eq(coreMessage)
+    })
+  }
+
+  it("refuses a misfit salt of the supplied spec too, with kind 'bad_option'", async () => {
+    const err = await rejectionOf(argon2idWasmWebV1Deriver.deriveKeyBytes('pw', saltOf(8)))
+    expect(isVaultError(err, 'bad_option')).to.be.true
+  })
 })
 
 // The core's parseKeyDeriverSpec is what both factories check with: these hold the two to the

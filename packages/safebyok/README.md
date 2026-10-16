@@ -243,7 +243,8 @@ vaults made on one device stop opening on another. There are three ways to choos
   ```
 
   Give it a label of your own, and never change its parameters once a vault is made under it.
-  It refuses (`bad_option`) what Argon2id cannot run -- a salt under 8 bytes or over 65536,
+  Labels beginning `argon2id_web_` are reserved for the specs we supply, now and later, and
+  refused. It refuses (`bad_option`) what Argon2id cannot run -- a salt under 8 bytes or over 65536,
   memory under 8 KiB a lane or over 1 GiB, no passes or lanes, a key other than 32 bytes -- and
   allows weak parameters that run: those are yours to judge.
 * **Another implementation of a spec**: `safebyok-fastkey` runs any of them through
@@ -254,10 +255,21 @@ vaults made on one device stop opening on another. There are three ways to choos
   without carrying exactly its parameters; it cannot check the bytes, so that test is yours.
 
 Any `keyDeriver` needs a `salt_bytes` from 1 to 65536 (the most `crypto.getRandomValues` hands out
-at once), which `openVault` checks, and must hand back 32 bytes from `deriveKeyBytes`, derived
-afresh on every call. `unlock()` and the calls that set a passphrase refuse anything else with
+at once), which `openVault` checks, and must hand back 32 bytes of memory of its own from
+`deriveKeyBytes`, derived afresh on every call -- a fresh `Uint8Array`, not a view over a
+`SharedArrayBuffer`, and not one it keeps: the vault zeroes the bytes once it has made the
+passphraseKey of them. `unlock()` and the calls that set a passphrase refuse anything else with
 `bad_option`, 32 zero bytes among it: a key anyone could rebuild, which a deriver handing back
-bytes it kept from an earlier call would.
+bytes it kept from an earlier call would. A deriver of ours refuses a salt of another length than
+its spec's.
+
+`KeyDeriver` is one of two types. An `Argon2idKeyDeriver` carries a whole keyDeriverSpec beside
+its function, as every deriver above does, and `openVault` checks the spec as `argon2idDeriver`
+would, so one Argon2id cannot run is refused at open, not at the first unlock. A
+`CustomKeyDeriver` carries only `key_deriver_label`, `salt_bytes` and `deriveKeyBytes`, and may
+name its `algorithm`; it may not declare `'argon2id'` without being a whole spec. `openVault` logs
+a warning (not a refusal) for a label beginning `test_`, the mark of a deriver made cheap for
+tests, such as `safebyok/testing`'s.
 
 ## Locking
 
@@ -460,11 +472,12 @@ says these things:
 A vault may have up to `MaxUnlocks` (8) passphrases and passkeys together, each its own way in: a daily one, one
 written down at home, one a partner holds. Each wraps the same vaultKey under its own salt, no
 passphrase is ever stored, and adding or removing one rewrites no lockbox. The snapshot lists
-them, locked or not, as `unlocks`: each a `method` (`passphrase`), an `unlock_id`, and the
-`unlocklabel` the user chose.
+them, locked or not, as `unlocks`: each a `method` (`passphrase` or `passkey`), an `unlock_id`, the
+`unlocklabel` the user chose, and when it was added and by which device (`registered_at`,
+`device_id`).
 
 ```ts
-vault.getSnapshot().unlocks       // [{ method: 'passphrase', unlock_id: '1b9d...', unlocklabel: 'passphrase' }]
+vault.getSnapshot().unlocks       // [{ method: 'passphrase', unlock_id: '1b9d...', unlocklabel: 'passphrase', device_id: 'k3x9...', registered_at: 1760000000000 }]
 
 const spareId = await vault.addPassphrase(passphrase, spare, { unlocklabel: 'written_down' })
 await vault.changePassphrase(spare, renewedSpare)       // changes that one; the first still opens
@@ -472,9 +485,12 @@ await vault.removeUnlock(passphrase, spareId)           // never the last one: '
 await vault.unlock(passphrase, { unlockId })            // aimed at one: a single key derivation
 ```
 
-* **Every change asks for a passphrase**, even on an unlocked vault: the vault keeps no copy of
+* **Every change asks for proof**, even on an unlocked vault: the vault keeps no copy of
   its vaultKey it could wrap anew, and a walked-away unlocked screen should not be able to add a
-  way in. Any passphrase the vault opens with will do.
+  way in. Any way in the vault has will do: a passphrase, or a passkey's answer. That includes
+  `changePassphrase`, so a user who forgot their passphrase sets a new one with their
+  fingerprint: `vault.changePassphrase(passkey, newPassphrase)`, naming which passphrase with
+  `{ unlockId }` when the vault has several.
 * **Every change locks the other devices.** It moves the bundle's `unlock_epoch`, so each
   other device falls back to `locked` and must unlock with a passphrase still standing. This
   device stays unlocked.
@@ -538,7 +554,7 @@ framework's host can use them).
 const unlockId = await vault.addPasskey(passphrase, () => createPasskey({ rp: { name: 'Acme' }, user: { name: email, displayName } }), { unlocklabel: 'laptop' })
 // unlockId is null if the user dismissed the prompt
 
-vault.getSnapshot().unlocks       // [..., { method: 'passkey', unlock_id, unlocklabel: 'laptop', credential_id, prf_salt_b64 }]
+vault.getSnapshot().unlocks       // [..., { method: 'passkey', unlock_id, unlocklabel: 'laptop', device_id, registered_at, credential_id, prf_salt_b64 }]
 
 const answer = await askPasskey(vault.getSnapshot().unlocks)   // null if the user dismissed it
 if (answer !== null) { await vault.unlock(answer) }             // no key derivation to wait for

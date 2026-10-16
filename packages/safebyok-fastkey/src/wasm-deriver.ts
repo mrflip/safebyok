@@ -1,8 +1,8 @@
 import { argon2id } from 'hash-wasm'
-import { Argon2idWebV1, VaultError, parseKeyDeriverSpec, type KeyDeriver, type KeyDeriverSpec } from 'safebyok'
+import { Argon2idWebV1, VaultError, ensureSaltFits, parseKeyDeriverSpec, type Argon2idKeyDeriver, type KeyDeriverSpec } from 'safebyok'
 
 /** A frozen deriver of a spec already checked: Argon2idWebV1, or one parseKeyDeriverSpec passed. */
-const deriverOf = (spec: KeyDeriverSpec): KeyDeriver & KeyDeriverSpec => Object.freeze({
+const deriverOf = (spec: KeyDeriverSpec): Argon2idKeyDeriver => Object.freeze({
   ...spec,
   deriveKeyBytes: (passphrase: string, saltBytes: Uint8Array) => deriveWithWasm(spec, passphrase, saltBytes),
 })
@@ -14,8 +14,9 @@ const deriverOf = (spec: KeyDeriverSpec): KeyDeriver & KeyDeriverSpec => Object.
  * opens under the other, so each device may use whichever it runs best.
  *
  * It checks `spec` exactly as `argon2idDeriver` does, and refuses (kind 'bad_option') what that
- * refuses: a spec Argon2id cannot run, and one wearing a supplied spec's label without its
- * parameters. Choose a label of your own, and never change its parameters once a vault is made
+ * refuses: a spec Argon2id cannot run, a label safebyok reserves, and one wearing a supplied
+ * spec's label without its parameters. Its `deriveKeyBytes` refuses (kind 'bad_option') a
+ * passphraseSalt of another length than the spec's `salt_bytes`, as the core's does. Choose a label of your own, and never change its parameters once a vault is made
  * under it.
  *
  * It needs WebAssembly, which React Native's Hermes lacks, and a page whose
@@ -38,7 +39,7 @@ const deriverOf = (spec: KeyDeriverSpec): KeyDeriver & KeyDeriverSpec => Object.
  *   argon2idWasmDeriver({ ...Argon2idWebV1, iterations: 4 })
  *   // throws 'bad_option': argon2id_web_v1 always means 3 passes
  */
-export const argon2idWasmDeriver = (spec: KeyDeriverSpec): KeyDeriver & KeyDeriverSpec => deriverOf(parseKeyDeriverSpec(spec))
+export const argon2idWasmDeriver = (spec: KeyDeriverSpec): Argon2idKeyDeriver => deriverOf(parseKeyDeriverSpec(spec))
 
 /**
  * Argon2id at the supplied `Argon2idWebV1` spec, through WebAssembly: a stand-in for safebyok's
@@ -55,6 +56,7 @@ export const argon2idWasmWebV1Deriver = /* @__PURE__ */ deriverOf(Argon2idWebV1)
 
 /** 32 key bytes from hash-wasm's Argon2id at `spec`; its failures to run come back as VaultErrors. */
 const deriveWithWasm = async (spec: KeyDeriverSpec, passphrase: string, saltBytes: Uint8Array): Promise<Uint8Array> => {
+  ensureSaltFits(spec, saltBytes)
   if (typeof WebAssembly === 'undefined') {
     throw new VaultError('bad_option', "This platform has no WebAssembly (React Native's Hermes has none), so the WebAssembly key deriver cannot run here: use argon2idWebV1Deriver, or argon2idDeriver, from safebyok.")
   }
