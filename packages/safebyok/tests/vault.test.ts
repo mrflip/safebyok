@@ -10,7 +10,7 @@ import { jsonBytes, localVaultDB, type VaultDB } from '../src/vault-db'
 import { memoryStore } from '../src/string-store'
 import { LockboxFieldsBytes, LockboxFixedBytes, StoredBytesPerWhisperByte, deviceTroubleAsConditions, retireDamagedVault, Vault, type MakeVaultOpts } from '../src/vault'
 import { cipherCtx, cipherBytes, fromB64, makeLockboxKey, makeVaultKey, randomBytes, toB64, wrapKeyUnder } from '../src/crypto'
-import type { CustomKeyDeriver, KeyDeriver } from '../src/key-deriver'
+import { Argon2idKeyDeriver, type KeyDeriver } from '../src/key-deriver'
 import { DefaultLogger, setDefaultLogger, type VaultLogger } from '../src/logger'
 import { Argon2idWebV1, MaxSaltBytes, TestDeriverNotice } from '../src/key-deriver-spec'
 import * as Ckeys from '../src/ckeys'
@@ -2888,8 +2888,8 @@ const wayinlabelsOf = (vault: Vault) => vault.getSnapshot().wayins.map((summary)
 
 /** A testDeriver that counts its derivations, for an open that should spend few. */
 const countingDeriver = () => {
-  const derivations = vi.fn(async (passphrase: string, saltBytes: Uint8Array) => await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes))
-  return { keyDeriver: { ...TH.testDeriver, deriveKeyBytes: derivations }, derivations }
+  const derivations = vi.fn(TH.digestDerivation)
+  return { keyDeriver: new TH.TestDeriver({}, derivations), derivations }
 }
 
 describe("several passphrases", () => {
@@ -3474,11 +3474,11 @@ describe("passkeys", () => {
 /**
  * A world whose slow waits can be held mid-flight, to land a lock inside an unlock: each
  * `holdNext` arms a gate on the next look at the vault props, passphrase derivation, device-record
- * write, or (to hold a store in hand) read of a lockbox, and hands it back. Its key deriver is its
- * own copy of testDeriver, so a spy on it stays here.
+ * write, or (to hold a store in hand) read of a lockbox, and hands it back. Its key deriver is a
+ * TestDeriver of its own, so a spy on it stays here.
  */
 const makeRacingWorld = (defaults?: Partial<MakeVaultOpts>) => {
-  const keyDeriver: KeyDeriver = { ...TH.testDeriver }
+  const keyDeriver = new TH.TestDeriver()
   const world = makeWorld({ keyDeriver, ...defaults })
   const holdNextLook = () => TH.holdNextCall(world.vaultDB, 'readVaultProps')
   const holdNextDerive = () => TH.holdNextCall(keyDeriver, 'deriveKeyBytes')
@@ -4211,13 +4211,12 @@ describe("lockSoon", () => {
   })
 })
 
-/** The testDeriver's derivation, to put in a deriver of another shape. */
-const cheapDerive: KeyDeriver['deriveKeyBytes'] = (passphrase, saltBytes) => TH.testDeriver.deriveKeyBytes(passphrase, saltBytes)
-
-/** A hand-built Argon2id deriver over the cheap derivation: the whole spec, under a label of its own, then `change`. */
-const handBuilt = (change: Record<string, unknown> = {}): KeyDeriver => (
-  { ...Argon2idWebV1, key_deriver_label: 'acme_argon2id_v1', deriveKeyBytes: cheapDerive, ...change }
-)
+/** A stand-in for another implementation of Argon2id, deriving cheaply: what a WebAssembly or native one extends. */
+class CheapArgon2idDeriver extends Argon2idKeyDeriver {
+  protected doDeriveKeyBytes(passphrase: string, saltBytes: Uint8Array) {
+    return TH.digestDerivation(passphrase, saltBytes)
+  }
+}
 
 /** A logger that keeps everything it hears, the notice included, which TH.spyLogger drops. */
 const hearingEverything = () => {
@@ -4226,11 +4225,13 @@ const hearingEverything = () => {
   return { heard, logger: { log: hear('log'), warn: hear('warn'), error: hear('error') } }
 }
 
+// What a deriver's spec may be, and what it may hand back, is the KeyDeriver class's to check
+// (key-deriver.test.ts); these hold Vault.make to taking only a KeyDeriver, and the vault to using it.
 describe("the key deriver seam", () => {
   it("a vault made under one deriver refuses to unlock under another, by label", async () => {
     const world = makeWorld()
     await world.openUnlocked('pw')
-    const alienDeriver = { ...TH.testDeriver, key_deriver_label: 'someone_elses_deriver_v9' }
+    const alienDeriver = new TH.TestDeriver({ key_deriver_label: 'someone_elses_deriver_v9' })
     const alien = await world.open({ deviceDB: memoryDeviceDB(), keyDeriver: alienDeriver })
     await TH.expectRefusal(alien.unlock('pw'), 'unknown_key_deriver')
   })
@@ -4246,59 +4247,53 @@ describe("the key deriver seam", () => {
     expect(err.message).to.include('safebyok/browser')
   })
 
-  it("refuses a keyDeriver that is not one", async () => {
+  it("refuses a keyDeriver that is not a KeyDeriver, however much of one it looks", async () => {
     const world = makeWorld()
     const NotDerivers = [
       null,
       'argon2id_web_v1',
       { key_deriver_label: 'test_digest_v0', salt_bytes: 16 },
-      { ...TH.testDeriver, salt_bytes: 0 },
-      { ...TH.testDeriver, salt_bytes: 1.5 },
-      { ...TH.testDeriver, salt_bytes: MaxSaltBytes + 1 },
-      { ...TH.testDeriver, key_deriver_label: '' },
+      // A plain-object deriver, as one was written before KeyDeriver was a class:
+      { ...Argon2idWebV1, deriveKeyBytes: TH.digestDerivation },
+      // A deriver's own fields and methods, without its class:
+      { ...TH.TestDeriverSpec, spec: TH.TestDeriverSpec },
+      { ...TH.TestDeriverSpec, spec: TH.TestDeriverSpec, passphraseKeyOf: () => Promise.resolve({}), deriveKeyBytes: TH.digestDerivation },
     ]
     for (const notDeriver of NotDerivers) {
-      await TH.expectRefusal(world.open({ keyDeriver: notDeriver as unknown as KeyDeriver }), 'bad_option')
+      const err = await TH.expectRefusal(world.open({ keyDeriver: notDeriver as unknown as KeyDeriver }), 'bad_option')
+      expect(err.message).to.include('subclass of KeyDeriver')
     }
   })
 
-  it("allows a foolish salt of one byte, and the longest the platform's random source hands out", async () => {
+  it("salts each passphrase at its deriver's length, from one byte to the longest the platform's random source hands out", async () => {
     for (const saltBytes of [1, MaxSaltBytes]) {
       const world = makeWorld()
-      await world.openUnlocked('pw', { keyDeriver: { ...TH.testDeriver, salt_bytes: saltBytes } })
+      await world.openUnlocked('pw', { keyDeriver: new TH.TestDeriver({ salt_bytes: saltBytes }) })
       const stored = await world.vaultDB.readVaultProps(TH.scopeOf('u1'))
       const [wayin] = stored?.wayins ?? []
       expect(fromB64(wayin?.wayinkind === 'passphrase' ? wayin.salt_b64 : '')).to.have.lengthOf(saltBytes)
     }
   })
 
-  it("refuses a deriver wearing a supplied spec's label without that spec's parameters", async () => {
-    const world = makeWorld()
-    const Impostors = [
-      { ...TH.testDeriver, key_deriver_label: Argon2idWebV1.key_deriver_label },
-      { ...Argon2idWebV1, iterations: 1, deriveKeyBytes: cheapDerive },
-      { ...Argon2idWebV1, salt_bytes: 32, deriveKeyBytes: cheapDerive },
-    ]
-    for (const impostor of Impostors) {
-      const err = await TH.expectRefusal(world.open({ keyDeriver: impostor }), 'bad_option')
-      expect(err.message).to.include('argon2id_web_v1')
-    }
-  })
-
   it("takes a stand-in that carries a supplied spec whole, as a WebAssembly Argon2id would", async () => {
     const world = makeWorld()
-    const standIn: KeyDeriver = { ...Argon2idWebV1, deriveKeyBytes: cheapDerive }
-    await world.openUnlocked('pw', { keyDeriver: standIn })
+    await world.openUnlocked('pw', { keyDeriver: new CheapArgon2idDeriver(Argon2idWebV1) })
     const stored = await world.vaultDB.readVaultProps(TH.scopeOf('u1'))
     const [wayin] = stored?.wayins ?? []
     expect(wayin?.wayinkind === 'passphrase' && wayin.key_deriver_label).to.eq('argon2id_web_v1')
+  })
+
+  it("opens and unlocks under a deriver of another algorithm, with no Argon2id parameters to carry", async () => {
+    const scrypt = new TH.TestDeriver({ key_deriver_label: 'acme_scrypt_v1', algorithm: 'scrypt' })
+    const vault = await makeWorld().openUnlocked('pw', { keyDeriver: scrypt })
+    expect(vault.getSnapshot().state).to.eq('unlocked')
   })
 
   it("refuses a deriver that hands back anything but 32 key bytes, and makes no vault of it", async () => {
     const Outputs = [new Uint8Array(16), new Uint8Array(24), new Uint8Array(64), new Uint8Array(0), 'thirty-two bytes, honest'] as const
     for (const output of Outputs) {
       const world = makeWorld()
-      const shortDeriver = { ...TH.testDeriver, deriveKeyBytes: () => Promise.resolve(output as Uint8Array) }
+      const shortDeriver = new TH.TestDeriver({}, () => Promise.resolve(output as Uint8Array))
       const vault = await world.open({ keyDeriver: shortDeriver })
       await TH.expectRefusal(vault.unlock('pw'), 'bad_option')
       expect(await world.vaultDB.readVaultProps(TH.scopeOf('u1'))).to.be.null
@@ -4310,7 +4305,7 @@ describe("the key deriver seam", () => {
     const Zeros = [new Uint8Array(32), new Uint32Array(8), new Uint8Array(new ArrayBuffer(40), 8, 32)] as const
     for (const output of Zeros) {
       const world = makeWorld()
-      const zeroDeriver = { ...TH.testDeriver, deriveKeyBytes: () => Promise.resolve(output as Uint8Array) }
+      const zeroDeriver = new TH.TestDeriver({}, () => Promise.resolve(output as Uint8Array))
       const vault = await world.open({ keyDeriver: zeroDeriver })
       const err = await TH.expectRefusal(vault.unlock('pw'), 'bad_option')
       expect(err.message).to.match(/zero bytes/)
@@ -4321,7 +4316,7 @@ describe("the key deriver seam", () => {
   it("refuses zero bytes at unlock too: a deriver that kept its output cannot open a vault", async () => {
     const world = makeWorld()
     await world.openUnlocked('pw')
-    const zeroDeriver = { ...TH.testDeriver, deriveKeyBytes: () => Promise.resolve(new Uint8Array(32)) }
+    const zeroDeriver = new TH.TestDeriver({}, () => Promise.resolve(new Uint8Array(32)))
     const fresh = await world.open({ deviceDB: memoryDeviceDB(), keyDeriver: zeroDeriver })
     await TH.expectRefusal(fresh.unlock('pw'), 'bad_option')
     expect(fresh.getSnapshot().state).to.eq('locked')
@@ -4331,72 +4326,16 @@ describe("the key deriver seam", () => {
     const world = makeWorld()
     const lastByteSet = new Uint8Array(32)
     lastByteSet[31] = 1
-    const vault = await world.openUnlocked('pw', { keyDeriver: { ...TH.testDeriver, deriveKeyBytes: () => Promise.resolve(lastByteSet.slice()) } })
+    const vault = await world.openUnlocked('pw', { keyDeriver: new TH.TestDeriver({}, () => Promise.resolve(lastByteSet.slice())) })
     expect(vault.getSnapshot().state).to.eq('unlocked')
   })
 
-  describe("a deriver that declares Argon2id", () => {
-    it("opens, and unlocks, when its spec is one Argon2id can run", async () => {
-      const world = makeWorld()
-      const vault = await world.openUnlocked('pw', { keyDeriver: handBuilt({ salt_bytes: 16 }) })
-      expect(vault.getSnapshot().state).to.eq('unlocked')
-    })
-
-    const Unrunnable = [
-      [{ salt_bytes: 4 },            'a salt under 8 bytes'],
-      [{ memory_kib: 4 },            'memory under 8 KiB a lane'],
-      [{ iterations: 0 },            'no passes'],
-      [{ parallelism: 0 },           'no lanes'],
-      [{ output_bytes: 16 },         'a key other than 32 bytes'],
-      [{ memory_kib: undefined },    'a parameter missing'],
-    ] as const
-
-    for (const [change, blurb] of Unrunnable) {
-      it(`is refused at open as bad_option, not at the first unlock: ${blurb}`, async () => {
-        const world = makeWorld()
-        const err = await TH.expectRefusal(world.open({ keyDeriver: handBuilt(change) }), 'bad_option')
-        expect(err.message).to.include('keyDeriverSpec')
-        expect(await world.vaultDB.readVaultProps(TH.scopeOf('u1'))).to.be.null
-      })
-    }
-
-    it("is refused at open when it wears the supplied label on other parameters", async () => {
-      const err = await TH.expectRefusal(makeWorld().open({ keyDeriver: handBuilt({ key_deriver_label: 'argon2id_web_v1', iterations: 2 }) }), 'bad_option')
-      expect(err.message).to.include('argon2id_web_v1')
-    })
-  })
-
-  describe("a deriver of another algorithm, or none declared", () => {
-    it("opens and unlocks, declaring an algorithm of its own, with no Argon2id parameters to carry", async () => {
-      const scrypt: CustomKeyDeriver = { ...TH.testDeriver, key_deriver_label: 'acme_scrypt_v1', algorithm: 'scrypt' }
-      const vault = await makeWorld().openUnlocked('pw', { keyDeriver: scrypt })
-      expect(vault.getSnapshot().state).to.eq('unlocked')
-    })
-
-    it("opens and unlocks, declaring none, as the test deriver does", async () => {
-      expect(TH.testDeriver).to.not.have.property('algorithm')
-      const vault = await makeWorld().openUnlocked('pw')
-      expect(vault.getSnapshot().state).to.eq('unlocked')
-    })
-
-    it("is refused at open when its algorithm is not text", async () => {
-      await TH.expectRefusal(makeWorld().open({ keyDeriver: { ...TH.testDeriver, algorithm: 7 } as unknown as KeyDeriver }), 'bad_option')
-    })
-  })
-
-  describe("the reserved label namespace", () => {
-    const Reserved = [
-      ['argon2id_web_v2',     'a spec safebyok may supply later'],
-      ['Argon2id_Web_acme',   'the prefix in another case'],
-      ['argon2id_web_v1',     'the supplied label, on a deriver carrying no parameters'],
-    ] as const
-
-    for (const [label, blurb] of Reserved) {
-      it(`is refused at open as bad_option: ${blurb}`, async () => {
-        const err = await TH.expectRefusal(makeWorld().open({ keyDeriver: { ...TH.testDeriver, key_deriver_label: label } }), 'bad_option')
-        expect(err.message).to.match(/argon2id_web_/u)
-      })
-    }
+  it("keeps the very deriver it was handed, and derives through its one method", async () => {
+    const keyDeriver = new TH.TestDeriver()
+    const passphraseKeyOf = vi.spyOn(keyDeriver, 'passphraseKeyOf')
+    const vault = await makeWorld().openUnlocked('pw', { keyDeriver })
+    expect(vault.getSnapshot().state).to.eq('unlocked')
+    expect(passphraseKeyOf).toHaveBeenCalledTimes(1)
   })
 
   describe("a label that begins test_", () => {
@@ -4419,8 +4358,8 @@ describe("the key deriver seam", () => {
     it("says nothing of a label that does not begin test_, or merely holds it", async () => {
       const { heard, logger } = hearingEverything()
       const world = makeWorld()
-      await world.open({ logger, keyDeriver: { ...TH.testDeriver, key_deriver_label: 'acme_test_v1' } })
-      await world.open({ logger, keyDeriver: { ...TH.testDeriver, key_deriver_label: 'Test_digest' } })
+      await world.open({ logger, keyDeriver: new TH.TestDeriver({ key_deriver_label: 'acme_test_v1' }) })
+      await world.open({ logger, keyDeriver: new TH.TestDeriver({ key_deriver_label: 'Test_digest' }) })
       expect(heard).to.deep.equal([])
     })
 
@@ -4429,18 +4368,6 @@ describe("the key deriver seam", () => {
       await world.open()
       expect(world.logged).to.deep.equal([])
     })
-  })
-
-  it("keeps the keyDeriver it was handed, so one whose method lives on its prototype still derives", async () => {
-    class PrototypeDeriver implements CustomKeyDeriver {
-      readonly key_deriver_label = TH.testDeriver.key_deriver_label
-      readonly salt_bytes = TH.testDeriver.salt_bytes
-      readonly #inner = TH.testDeriver
-      deriveKeyBytes(passphrase: string, saltBytes: Uint8Array) { return this.#inner.deriveKeyBytes(passphrase, saltBytes) }
-    }
-    const world = makeWorld()
-    const vault = await world.openUnlocked('pw', { keyDeriver: new PrototypeDeriver() })
-    expect(vault.getSnapshot().state).to.eq('unlocked')
   })
 })
 

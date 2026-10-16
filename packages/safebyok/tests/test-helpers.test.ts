@@ -567,6 +567,48 @@ describe("testDeriver", () => {
     expect(await TH.testDeriver.deriveKeyBytes('pass', salt)).to.deep.equal(once)
     expect(await TH.testDeriver.deriveKeyBytes('other', salt)).to.not.deep.equal(once)
   })
+
+  it("is a TestDeriver at TestDeriverSpec, frozen, so no test's spy lands on it", () => {
+    expect(TH.testDeriver).to.be.instanceOf(TH.TestDeriver)
+    expect(TH.testDeriver.spec).to.deep.equal(TH.TestDeriverSpec)
+    expect(TH.testDeriver).to.be.frozen
+    expect(() => vi.spyOn(TH.testDeriver, 'deriveKeyBytes')).to.throw(TypeError)
+  })
+})
+
+describe("digestDerivation", () => {
+  it("is one SHA-256 of the passphrase's UTF-8 and the salt: 32 bytes, as the @example", async () => {
+    const salt = new Uint8Array(16).fill(1)
+    const joined = new Uint8Array([...new TextEncoder().encode('pw'), ...salt])
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', joined))
+    expect(await TH.digestDerivation('pw', salt)).to.deep.equal(digest)
+  })
+})
+
+describe("TestDeriver", () => {
+  it("relabels, as the @example's alien deriver, keeping the rest of TestDeriverSpec", () => {
+    const alienDeriver = new TH.TestDeriver({ key_deriver_label: 'someone_elses_deriver_v9' })
+    expect(alienDeriver.spec).to.deep.equal({ ...TH.TestDeriverSpec, key_deriver_label: 'someone_elses_deriver_v9' })
+  })
+
+  it("derives through the derivation it is handed, as the @example's counting deriver", async () => {
+    const derivation = vi.fn(TH.digestDerivation)
+    const counting = new TH.TestDeriver({}, derivation)
+    await counting.passphraseKeyOf('pw', new Uint8Array(16))
+    expect(derivation).toHaveBeenCalledTimes(1)
+  })
+
+  it("checks its spec and what its derivation hands back, as every KeyDeriver does", async () => {
+    expect(() => new TH.TestDeriver({ salt_bytes: 0 })).to.throw(VaultError)
+    await TH.expectRefusal(new TH.TestDeriver({}, () => Promise.resolve(new Uint8Array(8))).deriveKeyBytes('pw', new Uint8Array(16)), 'bad_option')
+  })
+
+  it("can be spied on, a fresh one being the test's own", async () => {
+    const keyDeriver = new TH.TestDeriver()
+    const spied = vi.spyOn(keyDeriver, 'deriveKeyBytes')
+    await keyDeriver.passphraseKeyOf('pw', new Uint8Array(16))
+    expect(spied).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe("the fixtures", () => {

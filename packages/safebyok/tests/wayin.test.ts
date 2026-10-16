@@ -12,8 +12,8 @@ const identity = TH.vaultPropsOf('u1')
 
 /** A testDeriver that counts its derivations: the deriver, and the spy that counts. */
 const countingDeriver = () => {
-  const derivations = vi.fn(async (passphrase: string, saltBytes: Uint8Array) => await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes))
-  return { keyDeriver: { ...TH.testDeriver, deriveKeyBytes: derivations }, derivations }
+  const derivations = vi.fn(TH.digestDerivation)
+  return { keyDeriver: new TH.TestDeriver({}, derivations), derivations }
 }
 
 /** What a way in labelled `wayinlabel` is stamped with: its id, the vault props' vaultKey epoch, the device that added it and when. */
@@ -82,20 +82,19 @@ describe("Wayin.sealFirstPassphrase", () => {
 /** A deriver whose handed-back bytes the test keeps hold of, to look at after the vault is through with them. */
 const keepingDeriver = () => {
   const handed: Uint8Array[] = []
-  const keyDeriver: KeyDeriver = {
-    ...TH.testDeriver,
-    deriveKeyBytes: async (passphrase, saltBytes) => {
-      const bytes = await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes)
-      handed.push(bytes)
-      return bytes
-    },
-  }
+  const keyDeriver = new TH.TestDeriver({}, async (passphrase, saltBytes) => {
+    const bytes = await TH.digestDerivation(passphrase, saltBytes)
+    handed.push(bytes)
+    return bytes
+  })
   return { keyDeriver, handed }
 }
 
 /** `count` bytes of `filler`, as an array to compare a view's bytes with. */
 const bytesOf = (filler: number, count: number): number[] => Array.from({ length: count }, () => filler)
 
+// What KeyDeriver.passphraseKeyOf does to the bytes is tested in key-deriver.test.ts; these hold
+// the wayin to calling it at every derivation.
 describe("a key deriver's bytes", () => {
   it("are zeroed once they have made the passphraseKey, when sealing", async () => {
     const { keyDeriver, handed } = keepingDeriver()
@@ -114,40 +113,6 @@ describe("a key deriver's bytes", () => {
     await expectRefusal(Wayin.openWithPassphrase(keyDeriver, 'neither', scope, vaultProps), 'wrong_passphrase')
     expect(handed).to.have.lengthOf(2)
     for (const bytes of handed) { expect(bytes.every((byte) => byte === 0)).to.be.true }
-  })
-
-  it("are zeroed through a view with an offset, touching nothing around it", async () => {
-    const backing = new Uint8Array(48).fill(9)
-    const keyDeriver: KeyDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase, saltBytes) => {
-      backing.set(await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes), 8)
-      return backing.subarray(8, 40)
-    } }
-    await sealed('pw', 'passphrase', await makeVaultKey(), keyDeriver)
-    expect([...backing.subarray(8, 40)]).to.deep.equal(bytesOf(0, 32))
-    expect([...backing.subarray(0, 8)]).to.deep.equal(bytesOf(9, 8))
-    expect([...backing.subarray(40)]).to.deep.equal(bytesOf(9, 8))
-  })
-
-  it("are refused as bad_option when they sit in shared memory, saying so and not quoting them", async () => {
-    const shared = new Uint8Array(new SharedArrayBuffer(32)).fill(5)
-    const keyDeriver: KeyDeriver = { ...TH.testDeriver, deriveKeyBytes: () => Promise.resolve(shared) }
-    const err = await expectRefusal(Wayin.sealPassphrase(keyDeriver, 'pw', scope, identity, stampOf('one'), await makeVaultKey()), 'bad_option')
-    expect(err.message).to.include('SharedArrayBuffer')
-    expect(err.message).to.not.include('5,5')
-  })
-
-  it("are zeroed when refused for their length, as when imported", async () => {
-    const long = new Uint8Array(64).fill(5)
-    const keyDeriver: KeyDeriver = { ...TH.testDeriver, deriveKeyBytes: () => Promise.resolve(long) }
-    await expectRefusal(Wayin.sealPassphrase(keyDeriver, 'pw', scope, identity, stampOf('one'), await makeVaultKey()), 'bad_option')
-    expect([...long]).to.deep.equal(bytesOf(0, 64))
-  })
-
-  it("are refused as bad_option when they are not 32 bytes of a view at all", async () => {
-    for (const handed of [new Uint8Array(31), new Uint8Array(33), 'thirty-two bytes, honest', null, new ArrayBuffer(32)]) {
-      const keyDeriver: KeyDeriver = { ...TH.testDeriver, deriveKeyBytes: () => Promise.resolve(handed as unknown as Uint8Array) }
-      await expectRefusal(Wayin.sealPassphrase(keyDeriver, 'pw', scope, identity, stampOf('one'), await makeVaultKey()), 'bad_option')
-    }
   })
 })
 
@@ -180,7 +145,7 @@ describe("Wayin.openWithPassphrase", () => {
 
   it("says how many passphrases another key deriver made went untried, and that opening the vault where it was made may help", async () => {
     const vaultKey = await makeVaultKey()
-    const alienDeriver = { ...TH.testDeriver, key_deriver_label: 'someone_elses_deriver_v9' }
+    const alienDeriver = new TH.TestDeriver({ key_deriver_label: 'someone_elses_deriver_v9' })
     const vaultProps = vaultPropsWith([await sealed('first', 'one', vaultKey), await sealed('second', 'two', vaultKey, alienDeriver), await sealed('third', 'three', vaultKey, alienDeriver)])
     const err = await expectRefusal(Wayin.openWithPassphrase(TH.testDeriver, 'second', scope, vaultProps), 'wrong_passphrase')
     expect(err.message).to.include('2 of this vault\'s passphrases were made with a key deriver this package does not carry')
@@ -190,7 +155,7 @@ describe("Wayin.openWithPassphrase", () => {
 
   it("says it of one passphrase in the singular", async () => {
     const vaultKey = await makeVaultKey()
-    const alienDeriver = { ...TH.testDeriver, key_deriver_label: 'someone_elses_deriver_v9' }
+    const alienDeriver = new TH.TestDeriver({ key_deriver_label: 'someone_elses_deriver_v9' })
     const vaultProps = vaultPropsWith([await sealed('first', 'one', vaultKey), await sealed('second', 'two', vaultKey, alienDeriver)])
     const err = await expectRefusal(Wayin.openWithPassphrase(TH.testDeriver, 'second', scope, vaultProps), 'wrong_passphrase')
     expect(err.message).to.include("One of this vault's passphrases was made with a key deriver this package does not carry, so it was not tried")
@@ -198,7 +163,7 @@ describe("Wayin.openWithPassphrase", () => {
 
   it("says it beside a damaged passphrase too, and says nothing of other derivers when none was passed over", async () => {
     const vaultKey = await makeVaultKey()
-    const alienDeriver = { ...TH.testDeriver, key_deriver_label: 'someone_elses_deriver_v9' }
+    const alienDeriver = new TH.TestDeriver({ key_deriver_label: 'someone_elses_deriver_v9' })
     const damagedToo = vaultPropsWith([await sealed('first', 'one', vaultKey), { ...await sealed('second', 'two', vaultKey), salt_b64: 'c2FsdA' }, await sealed('third', 'three', vaultKey, alienDeriver)])
     const told = await expectRefusal(Wayin.openWithPassphrase(TH.testDeriver, 'nope', scope, damagedToo), 'wrong_passphrase')
     expect(told.message).to.include('stored damaged')
@@ -227,7 +192,7 @@ describe("Wayin.openWithPassphrase", () => {
   it("refuses as unknown_key_deriver when no wayin it would try was made by this deriver", async () => {
     const vaultKey = await makeVaultKey()
     const vaultProps = vaultPropsWith([await sealed('first', 'one', vaultKey)])
-    const alienDeriver = { ...TH.testDeriver, key_deriver_label: 'someone_elses_deriver_v9' }
+    const alienDeriver = new TH.TestDeriver({ key_deriver_label: 'someone_elses_deriver_v9' })
     await expectRefusal(Wayin.openWithPassphrase(alienDeriver, 'first', scope, vaultProps), 'unknown_key_deriver')
   })
 
@@ -268,7 +233,7 @@ describe("Wayin.openWithPassphrase", () => {
 
     it("refuses as damaged_wayin, not saying every passphrase is damaged, when another deriver made the rest", async () => {
       const vaultKey = await makeVaultKey()
-      const alienDeriver = { ...TH.testDeriver, key_deriver_label: 'someone_elses_deriver_v9' }
+      const alienDeriver = new TH.TestDeriver({ key_deriver_label: 'someone_elses_deriver_v9' })
       const vaultProps = vaultPropsWith([await sealed('first', 'one', vaultKey, alienDeriver), { ...await sealed('second', 'two', vaultKey), salt_b64: 'c2FsdA' }])
       const err = await expectRefusal(Wayin.openWithPassphrase(TH.testDeriver, 'first', scope, vaultProps), 'damaged_wayin')
       expect(err.message).to.include('a key deriver this package does not carry')
@@ -311,7 +276,7 @@ describe("Wayin.openWithPassphrase", () => {
 
   it("passes over wayins another deriver made, and opens one this deriver did", async () => {
     const vaultKey = await makeVaultKey()
-    const alienDeriver = { ...TH.testDeriver, key_deriver_label: 'someone_elses_deriver_v9' }
+    const alienDeriver = new TH.TestDeriver({ key_deriver_label: 'someone_elses_deriver_v9' })
     const vaultProps = vaultPropsWith([await sealed('first', 'one', vaultKey, alienDeriver), await sealed('second', 'two', vaultKey)])
     const { keyDeriver, derivations } = countingDeriver()
     const opened = await Wayin.openWithPassphrase(keyDeriver, 'second', scope, vaultProps)
@@ -335,7 +300,7 @@ describe("a wayin's ctx", () => {
     it(`refuses to open with ${blurb}`, async () => {
       const vaultKey = await makeVaultKey()
       const vaultProps = vaultPropsWith([{ ...await sealed('pw', 'passphrase', vaultKey), ...altered }])
-      const keyDeriver = { ...TH.testDeriver, key_deriver_label: (vaultProps.wayins[0] as PassphraseWayin).key_deriver_label }
+      const keyDeriver = new TH.TestDeriver({ key_deriver_label: (vaultProps.wayins[0] as PassphraseWayin).key_deriver_label })
       await expectRefusal(Wayin.openWithPassphrase(keyDeriver, 'pw', scope, vaultProps), 'wrong_passphrase')
     })
   }
