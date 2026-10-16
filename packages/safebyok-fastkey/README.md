@@ -61,7 +61,8 @@ supplied one, consider running the vault's unlock where a pause does not show.
 
 ## Where it runs, and where it does not
 
-* **Browsers, Node, Bun, and the frameworks on them**: anywhere WebAssembly runs.
+* **Browsers, Node, Bun, and the frameworks on them**: anywhere WebAssembly runs, on Node 22 and
+  up and evergreen browsers (the floor is stated in the core's *Where it runs*).
 * **Not React Native.** Hermes has no WebAssembly; use the core's `argon2idWebV1Deriver` there, or a
   native Argon2 binding behind the same label (tested against it byte for byte).
 * **A Content-Security-Policy** must allow WebAssembly to compile: `script-src 'self'

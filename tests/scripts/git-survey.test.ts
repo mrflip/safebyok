@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
 import * as TH from '../test-helpers'
@@ -113,6 +113,14 @@ const seedKinds = (repo: RepoT) => {
     [7, 'MERGED', 'elsewhere', elsewhereTip, 'landed'],
   ])
   return { landedTip, rebasedTip, rebasedHead, draftedTip, draftedHead, extraHead }
+}
+
+/** A worktree of `branch`, its directory then removed from under git, as when a checkout cannot see the path another container made it at. */
+const strand = (repo: RepoT, scratch: string, branch: string) => {
+  const tree = path.join(scratch, `wt-${branch}`)
+  repo.git('worktree', 'add', '--quiet', tree, branch)
+  rmSync(tree, { recursive: true })
+  return tree
 }
 
 describe('scripts/git-survey.sh', () => {
@@ -260,6 +268,50 @@ describe('scripts/git-survey.sh', () => {
     seedKinds(repo)
     repo.git('worktree', 'add', '--quiet', path.join(scratch, 'wt-opened'), 'opened')
     expect(repo.survey('--apply', '--idle', '0')).to.match(/\nkeep\t[^\t]*wt-opened\topened\tits branch is active\n/)
+  })
+
+  describe('a worktree whose directory is missing', () => {
+    it('is pruned when its branch is finished', () => {
+      seedKinds(repo)
+      strand(repo, scratch, 'landed')
+      const said = repo.survey('--apply', '--idle', '0')
+      expect(said).to.match(/\npruned\tRemoving worktrees\/wt-landed/)
+      expect(repo.git('worktree', 'prune', '--dry-run', '--verbose')).to.equal('')
+    })
+
+    it('is left registered, and says why, when its branch has an open PR', () => {
+      seedKinds(repo)
+      strand(repo, scratch, 'opened')
+      const said = repo.survey('--apply', '--idle', '0')
+      expect(said).to.match(/\nkeep\t[^\t]*wt-opened\topened\tits directory is missing, but its branch has an open PR \(#5\): no worktree is pruned while it stands\n/)
+      expect(said).to.match(/\nheld\tgit worktree prune\t-\tnot run: /)
+      expect(repo.git('worktree', 'list')).to.include('wt-opened')
+    })
+
+    it('holds back every prune, a finished branch\'s entry too, while one branch holds work', () => {
+      seedKinds(repo)
+      strand(repo, scratch, 'opened')
+      strand(repo, scratch, 'landed')
+      repo.survey('--apply', '--idle', '0')
+      expect(repo.git('worktree', 'list')).to.include('wt-landed')
+    })
+
+    it('is left registered when its branch has commits origin lacks', () => {
+      seedKinds(repo)
+      repo.git('switch', '--quiet', '--create', 'underway', 'main')
+      repo.commit('underway.md', 'not pushed\n', 'feat: not pushed')
+      repo.git('switch', '--quiet', 'main')
+      strand(repo, scratch, 'underway')
+      const said = repo.survey('--apply', '--idle', '0')
+      expect(said).to.match(/\nkeep\t[^\t]*wt-underway\tunderway\tits directory is missing, but its branch has 1 commit not on origin: /)
+      expect(repo.git('worktree', 'list')).to.include('wt-underway')
+    })
+
+    it('reports a dry run the same way, and prunes nothing', () => {
+      seedKinds(repo)
+      strand(repo, scratch, 'opened')
+      expect(repo.survey('--idle', '0')).to.match(/\nheld\tgit worktree prune\t-\tnot run: /)
+    })
   })
 
   it('prints its section of notes/housekeeping.md for --help, and no further', () => {

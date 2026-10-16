@@ -14,6 +14,9 @@ pnpm add safebyok safebyok-convex convex
 `safebyok` and `convex` are peer dependencies: your app installs them itself, so the adapter and
 your app share one copy of each, and a `VaultError` from one is a `VaultError` to the other.
 
+Platform: Node 22 and up, and evergreen browsers for the client; the floor is stated in the core's
+*Where it runs*.
+
 ## What your app adds to its `convex/` directory
 
 Install the component, in `convex/convex.config.ts`:

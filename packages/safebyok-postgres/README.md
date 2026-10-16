@@ -17,6 +17,9 @@ pnpm add safebyok safebyok-postgres
 `safebyok` is a peer dependency: your app installs it, so the adapter and your app share one
 copy, and a `VaultError` from one is a `VaultError` to the other.
 
+Platform: Node 22 and up, wherever your server runs it; the floor is stated in the core's *Where it
+runs*.
+
 ## Make the tables
 
 `VaultTablesSql` is the SQL, for Postgres 14 or later in a UTF8 database. The package also ships
