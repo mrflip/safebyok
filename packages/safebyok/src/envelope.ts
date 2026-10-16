@@ -97,8 +97,9 @@ const passphraseKeyBytes = Z.custom<Uint8Array>((candidate) => (
 
 /**
  * True when every byte of `bytes` is zero. Reads every byte whatever it finds, OR-ing them
- * together as libsodium's `sodium_is_zero` does, so how long it takes says nothing of where the
- * first nonzero byte lies.
+ * together as libsodium's `sodium_is_zero` does, with no early exit. No JavaScript engine promises
+ * constant time, and nothing secret rides on this one's: an all-zero output is refused, and any
+ * other is a key whose bytes the check only reads.
  */
 const isAllZero = (bytes: Uint8Array): boolean => bytes.reduce((seen, byte) => seen | byte, 0) === 0
 
