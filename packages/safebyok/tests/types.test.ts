@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import * as Z from 'zod/mini'
 import { DeviceMark, DeviceUnlock, EpochMillis, FarFuture, FarPast, ForeverMs, Lockbox, LockboxSummary, MaxUnlocks, VaultBundle, VaultScope, Whisper } from '../src/types'
 import * as TH from './test-helpers'
 
@@ -300,5 +301,24 @@ const MarkCases = [
 describe("DeviceMark", () => {
   for (const [candidate, expected, blurb] of MarkCases) {
     it(blurb, () => { expect(DeviceMark.safeParse(candidate).success).to.eq(expected) })
+  }
+})
+
+// Every record the package writes to storage, by the schema that checks it. A record whose shape
+// changes moves its `format` on (VOCABULARY.md, *format*): each schema is rendered as JSON Schema
+// and kept as a snapshot under its own format literal, so a change made without a bump fails here.
+// After a bump, the new format's snapshot is written once (`vitest -u`), and the old one goes as
+// obsolete: never update the snapshot of a format that stands. A refinement (a `Z.refine`, such
+// as the floor's character rules) renders as nothing, so this sees fields, types, optionality and
+// the ranges a check states, not every rule.
+const StoredRecords = [VaultBundle, Lockbox, DeviceUnlock, DeviceMark] as const
+
+describe("Stored record formats", () => {
+  for (const schema of StoredRecords) {
+    const format = schema.shape.format.def.values.join(' | ')
+    it(format, () => {
+      const rendered = Z.toJSONSchema(schema, { unrepresentable: 'any' })
+      expect(rendered, `The ${format} record's schema changed: bump format, then write the new format's snapshot`).toMatchSnapshot()
+    })
   }
 })
