@@ -36,3 +36,13 @@ updates:
     groups:
       actions:
         patterns: ['*']
+
+  # The Postgres image the e2e tests run on (e2e/compose.yaml), pinned by digest. The same digest
+  # is written in .github/workflows/ci.yml's `postgres` job, which Dependabot does not read: move
+  # the two together.
+  - package-ecosystem: docker-compose
+    directory: /e2e
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: deps
