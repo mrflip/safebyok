@@ -52,9 +52,9 @@ import { VaultProvider } from 'safebyok-react'
 The provider takes every `openVault` option as a prop. `browserOpts()` supplies the two a browser
 app answers like any other, `keyDeriver` and `deviceDB`; `vaultDB` is your backend's adapter. It
 answers the same bag on every call, so it is safe in a render: the provider reopens the vault
-whenever a prop changes identity. So define a `logger` or a `clock` once, outside the component (or
-memoize it): an object literal written in the props is a new one at every render, and reopens
-the vault each time. `validators` is the one exception: the provider watches each schema in the
+whenever a prop changes identity. So define a `logger`, a `clock` or a `passphraseStrengthTest`
+once, outside the component (or memoize it): an object literal or an arrow written in the props is
+a new one at every render, and reopens the vault each time. `validators` is the one exception: the provider watches each schema in the
 bag rather than the bag, so `validators={{ boxlabel: BoxlabelCheck }}` is fine in the props, so
 long as `BoxlabelCheck` itself is built once, at module level. A bag with a field it does not know
 (`boxLabel`) is thrown, as `bad_option`, to the nearest error boundary, as `openVault` would refuse
@@ -127,7 +127,13 @@ shows it and a different user (or a sign-out and back in) gets a fresh attempt:
 
 **The user sees what they can mend.** A wrong passphrase, storage out of reach, a passkey that
 does not answer: each condition shows in the dialog in the vault's own calm words, to try again
-or cancel.
+or cancel. So does a new passphrase too easy to guess (`weak_passphrase`): its message is the
+reason the vault's `passphraseStrengthTest` gave, at least 12 characters by default. Pass
+`passphraseStrengthTest={zxcvbnPassphraseTest}` (from `safebyok/browser`) to the provider to turn
+away common passwords and keyboard patterns too; it is a few hundred kB of dictionary, so it is
+its own import. The test is a plain function of the passphrase, so a field of your own can call
+the same one as the user types: `const verdict = passphraseStrengthTest(typed)`, then show
+`verdict.reason` while `verdict.strong` is false (await it, should yours answer a promise).
 
 **Anything else never takes your page down.** Misuse -- a closed vault handle, an `rpId` that
 does not fit the page, a vault made with a key deriver this build lacks (as in a tab left open
@@ -190,6 +196,11 @@ if (passkey !== null) { await vault.unlock(passkey) }
   new passkey a moment after the click. Current browsers allow that; older Safari releases
   wanted WebAuthn called straight from the click and refused it otherwise, which `createPasskey`
   reports as a dismissal (null). Try it on the Safari versions you support.
+* **The authenticator always checks the user.** `createPasskey` and `askPasskey` ask WebAuthn for
+  `userVerification: 'required'`, so an authenticator answers only once the user has proved
+  themselves to it -- a fingerprint, a face, or the device's PIN or passcode -- never for a mere
+  touch. An authenticator that cannot verify its user (some older security keys) is turned away
+  by the browser, which the helpers report as a dismissal (null): offer the passphrase then.
 * **These passkeys are not logins.** Each is a new credential under a random user handle, so it
   never replaces a passkey your sign-in uses; its challenge is random and nothing on your server
   checks it. If you pass `rp.id` to `createPasskey`, pass the same `rpId` to `askPasskey` (and to

@@ -59,11 +59,17 @@ const answer = await vault.use('anthropic_api_key', (whisper) => callAnthropic(w
 The vault store is never among the defaults: where the vault lives is the one choice every app
 makes for itself. Any option you pass after the spread replaces the default it names.
 
+Serve the app over https: a browser withholds WebCrypto from a page served over plain http, so
+`openVault` refuses one at once, with kind `insecure_context` (`http://localhost` counts as
+secure, for development).
+
 ## Entry points, and why the main one asks for everything
 
 * `safebyok` -- `openVault` and the types, errors and stores around it.
 * `safebyok/browser` -- `browserOpts({ dbName }?)`: the pinned Argon2id key deriver
   (`argon2idWebV1Deriver`) and the IndexedDB device store (`idbDeviceDB`), as a bag of options.
+  And `zxcvbnPassphraseTest`, a passphrase strength test that knows common passwords, imported
+  on its own (see *A new passphrase's strength*): `browserOpts()` does not bring it in.
 * `safebyok/idb` -- the IndexedDB device store, `idbDeviceDB`, and `inspectIdbDeviceDB`, a raw
   window onto its rows for a debug panel. The IndexedDB vault store, `idbVaultDB`, is a package
   of its own, `safebyok-indexeddb`.
@@ -480,6 +486,45 @@ await vault.unlock(passphrase, { unlockId })            // aimed at one: a singl
   whoever knew it and kept a copy of the bundle from before can still open that copy, and the
   vaultKey inside is the one the vault still uses. There is no key rotation yet.
 
+## A new passphrase's strength
+
+Every passphrase about to become a way in -- the one the first `unlock()` creates the vault
+with, and each `addPassphrase()` or `changePassphrase()` sets -- is put to the vault's
+`passphraseStrengthTest` first, before any key derivation. One it finds weak is refused with kind
+`weak_passphrase`, the test's reason the message. An `unlock()` of a vault that stands is never
+refused for weakness: a passphrase already in use is the user's to change, not the vault's to
+lock them out with.
+
+```ts
+import { passphraseLengthTest } from 'safebyok'
+import { zxcvbnPassphraseTest } from 'safebyok/browser'
+
+passphraseLengthTest('hunter2')
+// { strong: false, reason: 'A passphrase needs at least 12 characters: ...' }
+
+const vault = await openVault({ ...opts, passphraseStrengthTest: zxcvbnPassphraseTest })
+zxcvbnPassphraseTest('password1234')
+// { strong: false, reason: 'That is very like a commonly used password: ...' }
+```
+
+* **The default is length, and only length**: `passphraseLengthTest`, at least `MinPassphraseChars`
+  (12) characters, each Unicode code point counting one. No composition rules (a digit, a capital,
+  a symbol): NIST SP 800-63B advises against them, as they make a passphrase harder to remember
+  and no harder to guess.
+* **`zxcvbnPassphraseTest`**, from `safebyok/browser`, adds what NIST asks for beside length: it
+  turns away passwords found on lists of common ones, keyboard walks, repeats, sequences and dates,
+  through `@zxcvbn-ts/core` and its common-password dictionary, asking for a score of at least
+  3 of 4. That dictionary is about 216 kB (minified and brotlied), so it is its own import, and an
+  app that never imports it never ships it. It runs in a few milliseconds, after about 15 ms of
+  setup on its first call.
+* **Your own test** is any function from the passphrase to a verdict, `{ strong: true }` or
+  `{ strong: false, reason }`, at once or as a promise; the reason is shown to the user, so write
+  it calmly, say what to do, and never quote the passphrase. `openVault` refuses anything but a
+  function, and a test that answers anything but a verdict, with `bad_option`.
+* **Call it from the field as well.** A strength test is a plain function of the passphrase, with
+  no vault behind it, so the field the user types into can call the very same one on each
+  keystroke, and show the reason before the user submits: `safebyok-react`'s README says how.
+
 ## Fingerprint unlock (passkeys)
 
 A vault's ways in may include passkeys: a fingerprint, a face, a phone or a security key, whose
@@ -548,6 +593,7 @@ render for that, and hands a condition down as `openError`).
 | `bad_option`          | an option or argument out of its range: an `openVault` option, an `argon2idDeriver` spec, a `store()`'s public bag, a passphrase or callback of the wrong type, a record handed to a `VaultDB` write; a passkey's answer of the wrong shape, or one already a way in | Fix the call; the message names what it takes |
 | `vault_closed`        | the vault handle was closed                                      | Open the vault again; do not use a handle after `close()` |
 | `unknown_key_deriver` | the vault names a key deriver this handle was not built with     | Update safebyok, or open the vault with the deriver that made it |
+| `insecure_context`    | `openVault` in a page that is not a secure context: served over plain http from anywhere but localhost, where the browser withholds WebCrypto | Serve the app over https |
 
 ### Conditions: handle them at run time
 
@@ -557,6 +603,7 @@ Part of normal operation. Each can reach the user; the app decides how.
 | --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |
 | `vault_locked`        | a whisper was asked for before the vault was unlocked            | Ask for the passphrase and `unlock()`, then retry (`safebyok-react`'s `withUnlockedVault` does) |
 | `wrong_passphrase`    | the passphrase did not unlock the vault, or was empty. A passphrase envelope altered in storage refuses its passphrase in just the same way, so the message says that the stored vault may be damaged | Ask again                                               |
+| `weak_passphrase`     | a new passphrase -- the one the first `unlock()` creates the vault with, or one `addPassphrase()` or `changePassphrase()` sets -- that the vault's `passphraseStrengthTest` finds too easy to guess. The message is the test's own reason. Never raised by an `unlock()` of a vault that stands | Show the message beside the field, and ask for another |
 | `wrong_passkey`       | the passkey's answer did not unlock the vault, or answered for another salt. An answer for the envelope's own salt that does not open it most likely means the envelope was altered in storage, and the message says so | Ask for a passphrase; if it works, the user may remove that passkey and add it again |
 | `passkey_unavailable` | this browser or authenticator cannot answer for a passkey unlock: no WebAuthn, or no PRF extension | Offer the passphrase instead; on `createPasskey`, tell the user this device cannot be a fingerprint unlock |
 | `absent_box`          | no lockbox under that label                                      | Offer to create it, or refresh the list: it may have been erased elsewhere |
@@ -578,7 +625,7 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `identity_revoked`    | the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in. The vault has locked itself (see *When the user signs out*) | Have the user sign in again, then open the vault for whoever that is |
 | `storage_unavailable` | the storage backend could not be reached, or failed; or this device's own store failed | Try again shortly; the adapter's own error is the `cause`, unless it may quote the call (Convex's) |
 
-`openVault` itself can refuse with `bad_option`, `bad_label`, and, as it reads the vault from
+`openVault` itself can refuse with `bad_option`, `bad_label`, `insecure_context`, and, as it reads the vault from
 storage, `storage_unavailable`, `not_permitted`, `identity_revoked` or `damaged_bundle` (a
 damaged lockbox never stops an open): the last four are conditions, though they surface at open.
 A refused open leaves nothing running behind it, so the host simply opens again.

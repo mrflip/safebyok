@@ -82,9 +82,11 @@ const FamilyCases = [
   ["bad_option",          "misuse",    'an openVault option out of range is a bug'],
   ["vault_closed",        "misuse",    'using a handle after close() is a bug'],
   ["unknown_key_deriver", "misuse",    'opening with the wrong key deriver is a bug'],
+  ["insecure_context",    "misuse",    'serving the app over plain http is a deployment bug'],
   // conditions: normal operation, which may reach the user
   ["vault_locked",        "condition", 'a locked vault asks for the passphrase'],
   ["wrong_passphrase",    "condition", 'a mistyped passphrase asks again'],
+  ["weak_passphrase",     "condition", 'a passphrase too easy to guess asks the user for another'],
   ["wrong_passkey",       "condition", 'a passkey that does not open the vault asks again, or for a passphrase'],
   ["passkey_unavailable", "condition", 'a browser or authenticator without PRF falls back to the passphrase'],
   ["absent_box",          "condition", 'a lockbox erased elsewhere is a fact of syncing'],

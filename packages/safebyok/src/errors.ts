@@ -4,11 +4,11 @@
  * families, told apart by who must act:
  *
  * - **Misuse**: a programming error, the host developer's to fix, and loud. `bad_label`,
- *   `bad_whisper`, `bad_option`, `vault_closed`, `unknown_key_deriver`. Let it reach an error
+ *   `bad_whisper`, `bad_option`, `vault_closed`, `unknown_key_deriver`, `insecure_context`. Let it reach an error
  *   boundary or the dev overlay; do not show it to the user, and do not retry.
  * - **Condition**: something the app handles at run time, which may reach the user: ask again,
  *   show a message, retry, or tell them to free room. `vault_locked`, `wrong_passphrase`,
- *   `wrong_passkey`, `passkey_unavailable`, `absent_box`, `absent_vault`, `absent_unlock`,
+ *   `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `absent_box`, `absent_vault`, `absent_unlock`,
  *   `whisper_too_large`, `lockbox_too_large`, `vault_full`, `too_many_unlocks`, `last_unlock`,
  *   `corrupt_record`, `damaged_bundle`, `damaged_unlock`, `damaged_lockbox`, `newer_format`, `stale_write`,
  *   `rolled_back`, `not_permitted`, `identity_revoked`, `storage_unavailable`.
@@ -34,6 +34,14 @@
  * `wrong_passphrase` or `wrong_passkey` even when the stored vault was altered, because the
  * decryption fails alike either way. Their messages say so.
  *
+ * `weak_passphrase` is a new passphrase -- the one a vault is created with, one added, or one
+ * changed to -- that the vault's `passphraseStrengthTest` finds too easy to guess; its message is
+ * the test's own reason, which a field can show beside the passphrase. Never raised by `unlock()`
+ * of a vault that stands: a passphrase already in use is the user's to replace, not to be refused.
+ *
+ * `insecure_context` is a page served over plain http (anywhere but localhost), where the browser
+ * withholds WebCrypto: the host serves it over https.
+ *
  * `newer_format` is a stored vault in a form this version does not know, which a newer version of
  * safebyok may have written: the user's next move is to update the app, never to start over, so
  * it is told apart from `damaged_bundle`, and nothing erases it.
@@ -48,6 +56,7 @@
 export const VaultErrorKindVals = [
   'vault_locked',        // a whisper was asked for before the vault was unlocked
   'wrong_passphrase',    // the passphrase given did not unlock the vault
+  'weak_passphrase',     // a new passphrase the vault's passphraseStrengthTest finds too easy to guess
   'wrong_passkey',       // the passkey's answer did not unlock the vault, or was for another salt
   'passkey_unavailable', // this browser or authenticator cannot answer for a passkey unlock (no WebAuthn, or no PRF)
   'absent_box',          // no lockbox under that label
@@ -68,6 +77,7 @@ export const VaultErrorKindVals = [
   'damaged_lockbox',     // a lockbox failed its checks, or would not open under the vault's own vaultKey
   'newer_format',        // a stored vault in a form this version does not know, which a newer one may have written
   'unknown_key_deriver', // the vault names a key deriver this handle was not built with
+  'insecure_context',    // the page is not a secure context (plain http), where the browser withholds WebCrypto
   'stale_write',         // storage changed since this device read it, so the write was refused
   'rolled_back',         // storage handed back an older copy of the vault than this device has seen, which it refuses to use
   'not_permitted',       // the storage backend refused the signed-in user this call: not theirs to make
@@ -125,6 +135,7 @@ export type VaultErrorFamily = typeof VaultErrorFamilyVals[number]
 export const VaultErrorFamilyForKind = {
   vault_locked:        'condition',
   wrong_passphrase:    'condition',
+  weak_passphrase:     'condition',
   wrong_passkey:       'condition',
   passkey_unavailable: 'condition',
   absent_box:          'condition',
@@ -145,6 +156,7 @@ export const VaultErrorFamilyForKind = {
   damaged_lockbox:     'condition',
   newer_format:        'condition',
   unknown_key_deriver: 'misuse',
+  insecure_context:    'misuse',
   stale_write:         'condition',
   rolled_back:         'condition',
   not_permitted:       'condition',

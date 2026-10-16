@@ -1065,3 +1065,18 @@ security expert who knows what questions to ask.
   together as libsodium's `sodium_is_zero` does, so its time does not depend on where the first
   nonzero byte lies; no dependency offers it, and `@noble/ciphers`' `equalBytes` would be a new
   one for one line.
+* 2026-10-16 (secure_floor): **`openVault` refuses an insecure context** (`isSecureContext ===
+  false`) first of all, as `insecure_context` (misuse): a browser withholds WebCrypto from plain
+  http, which otherwise failed later as a `TypeError` with no kind. A runtime with no notion of
+  one (Node, Bun, React Native: the global is absent) passes.
+* 2026-10-16 (secure_floor): **a new passphrase must pass `passphraseStrengthTest`** before any key
+  derivation: the one a vault is created with, and each one `addPassphrase` or `changePassphrase`
+  sets; never at `unlock`, so no user is locked out of a vault that stands by a test made
+  stricter later. The default is NIST SP 800-63B's length and no composition rules, at 12 code
+  points (the Coach's floor; SP 800-63B rev. 4 asks 15 of a password that is the only factor,
+  which a vault passphrase is). The refusal's message is the host test's own reason, a host
+  string: the doc tells hosts never to quote the passphrase in it, and the core cannot check.
+  `safebyok/browser` offers `zxcvbnPassphraseTest` on `@zxcvbn-ts/core` and
+  `@zxcvbn-ts/language-common` (runtime dependencies at the Coach's yes): the length floor, then a
+  zxcvbn score of at least 3, which is its blocklist of common passwords (NIST's other ask) and its
+  pattern matchers. It keeps nothing of a passphrase between calls.

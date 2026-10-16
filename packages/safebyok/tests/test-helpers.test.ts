@@ -621,7 +621,7 @@ describe("omitting", () => {
   it("leaves out the one field named, and keeps the rest", () => {
     const without = TH.omitting(opts, 'keyDeriver')
     expect(without).to.not.have.property('keyDeriver')
-    expect(Object.keys(without)).to.have.members(['applabel', 'userId', 'vaultlabel', 'vaultDB', 'deviceDB'])
+    expect(Object.keys(without)).to.have.members(['applabel', 'userId', 'vaultlabel', 'vaultDB', 'deviceDB', 'passphraseStrengthTest'])
     expect(opts.keyDeriver).to.eq(TH.testDeriver)
   })
 

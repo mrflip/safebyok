@@ -68,7 +68,7 @@ const grabber = () => {
 const makeWorld = () => {
   const vaultDB = localVaultDB(memoryStore())
   const deviceDB = memoryDeviceDB()
-  const props = { applabel: 'acme', vaultlabel: 'main', vaultDB, deviceDB, keyDeriver: TH.testDeriver }
+  const props = { applabel: 'acme', vaultlabel: 'main', vaultDB, deviceDB, keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest }
   const tree = (userId: string | null, caught: unknown[] = []) => (
     <CatchingBoundary caught={caught}>
       <VaultProvider {...props} userId={userId}>
@@ -85,7 +85,7 @@ const damagedWorld = async () => {
   const store = memoryStore()
   const vaultDB = localVaultDB(store)
   const deviceDB = memoryDeviceDB()
-  const props = { applabel: 'acme', vaultlabel: 'main', vaultDB, deviceDB, keyDeriver: TH.testDeriver }
+  const props = { applabel: 'acme', vaultlabel: 'main', vaultDB, deviceDB, keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest }
   const made = await openVault({ ...props, userId: 'u1' })
   await made.unlock('correct horse')
   await made.store('anthropic_api_key', 'sk-fake')

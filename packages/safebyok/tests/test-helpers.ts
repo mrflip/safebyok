@@ -14,6 +14,7 @@ import { memoryDeviceDB, type DeviceDB, type UnlockExpectation } from '../src/de
 import { VaultError, type VaultErrorKind } from '../src/errors'
 import type { KeyDeriver } from '../src/key-deriver'
 import type { VaultLogger } from '../src/logger'
+import { StrongVerdict, type PassphraseStrengthTest } from '../src/passphrase-strength'
 import { memoryStore } from '../src/string-store'
 import type { DamagedLockbox, DeviceMark, DeviceUnlock, Lockbox, LockboxSummary, PasskeyEnvelope, PasskeyProof, PassphraseEnvelope, PublicBag, SeenVault, VaultBundle, VaultScope } from '../src/types'
 import { stableJsonify } from '../src/stable-jsonify'
@@ -42,8 +43,17 @@ export const testDeriver: KeyDeriver = {
 }
 
 /**
+ * A passphraseStrengthTest for tests, admitting every passphrase, so a suite may unlock with a
+ * short one such as 'pw'. Never hand it to a vault that holds a real secret.
+ *
+ * @example openVault({ ...opts, passphraseStrengthTest: anyPassphraseTest })
+ */
+export const anyPassphraseTest: PassphraseStrengthTest = () => StrongVerdict
+
+/**
  * Everything openVault needs, over stores in memory made fresh for each call: `u1`'s `main` vault
- * in the `acme` app (as {@link scopeOf} has it), deriving through {@link testDeriver}. `overrides`
+ * in the `acme` app (as {@link scopeOf} has it), deriving through {@link testDeriver}, and
+ * admitting any passphrase ({@link anyPassphraseTest}). `overrides`
  * replace any of it -- a store of the test's own, a clock, a logger, another user.
  *
  * @param overrides - Options to use in place of the defaults.
@@ -59,6 +69,7 @@ export const memoryVaultOpts = (overrides: Partial<OpenVaultOpts> = {}): OpenVau
   vaultDB:    localVaultDB(memoryStore()),
   deviceDB:   memoryDeviceDB(),
   keyDeriver: testDeriver,
+  passphraseStrengthTest: anyPassphraseTest,
   ...overrides,
 })
 

@@ -3,11 +3,15 @@ import { idbDeviceDB, type IdbOpts } from './idb'
 import { parseDbName } from './idb-opts'
 import type { OpenVaultOpts } from './vault'
 
+export { MinZxcvbnScore, zxcvbnPassphraseTest } from './zxcvbn-passphrase-test'
+
 /**
  * The defaults for an app in a browser, as an entry point of their own, `safebyok/browser`: the
  * options `openVault` asks for that nearly every browser app answers the same way. The main entry
  * asks for each of them outright, so an app that answers differently -- another key deriver, a
- * device store of its own -- never ships the code for these.
+ * device store of its own -- never ships the code for these. Beside them, `zxcvbnPassphraseTest`,
+ * a `passphraseStrengthTest` that knows common passwords: its own import, with its dictionary,
+ * which `browserOpts()` never brings in.
  */
 
 /** The openVault options {@link browserOpts} supplies: spread them in beside your own. */

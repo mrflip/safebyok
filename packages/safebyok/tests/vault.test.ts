@@ -12,6 +12,7 @@ import { cipherBinding, cipherBytes, fromB64, makeLockboxKey, makeVaultKey, rand
 import type { KeyDeriver } from '../src/key-deriver'
 import { Argon2idWebV1, MaxSaltBytes } from '../src/key-deriver-spec'
 import * as Ckeys from '../src/ckeys'
+import type { PassphraseVerdict } from '../src/passphrase-strength'
 import * as TH from './test-helpers'
 
 
@@ -43,7 +44,7 @@ const makeWorld = (defaults?: Partial<OpenVaultOpts>) => {
   const advance = (byMillis: number) => { nowMillis += byMillis }
   const { logger, calls: logged } = TH.spyLogger()
   const optsWith = (overrides?: Partial<OpenVaultOpts>): OpenVaultOpts => (
-    { applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB, clock, keyDeriver: TH.testDeriver, logger, ...defaults, ...overrides }
+    { applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB, clock, keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest, logger, ...defaults, ...overrides }
   )
   const open = (overrides?: Partial<OpenVaultOpts>) => openVault(optsWith(overrides))
   const openUnlocked = async (passphrase: string, overrides?: Partial<OpenVaultOpts>) => {
@@ -176,6 +177,31 @@ const OutOfBoundsReadings = [
   ['1792022400000',                             'a number written as text'],
   [new Date('2026-10-14T12:00:00Z'),            'a Date, not its epoch milliseconds'],
 ] as const
+
+describe("a page that is not a secure context", () => {
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it("refuses openVault over plain http with kind 'insecure_context', before it touches storage", async () => {
+    vi.stubGlobal('isSecureContext', false)
+    const world = makeWorld()
+    const readBundle = vi.spyOn(world.vaultDB, 'readBundle')
+    const err = await TH.expectRefusal(world.open(), 'insecure_context')
+    expect(err.message).to.match(/https/)
+    expect(readBundle).not.toHaveBeenCalled()
+  })
+
+  it("refuses first of all, even a bag of options that is no bag", async () => {
+    vi.stubGlobal('isSecureContext', false)
+    await TH.expectRefusal(openVault(null as unknown as OpenVaultOpts), 'insecure_context')
+  })
+
+  it("opens in a secure context, and in a runtime with no notion of one (Node)", async () => {
+    expect((globalThis as { isSecureContext?: unknown }).isSecureContext).to.be.undefined
+    expect(await makeWorld().stateOnOpen()).to.eq('absent')
+    vi.stubGlobal('isSecureContext', true)
+    expect(await makeWorld().stateOnOpen()).to.eq('absent')
+  })
+})
 
 describe("the host's clock", () => {
   for (const [reading, blurb] of OutOfBoundsReadings) {
@@ -3823,6 +3849,97 @@ const makeTimedWorld = () => {
 
 /** Fake the timers and `Date` alone: promises, and vitest's own waits, keep running as they do. */
 const fakeTheClock = () => { vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] }) }
+
+/** A passphraseStrengthTest that refuses `weakOne` and admits the rest, counting its calls. */
+const refusing = (weakOne: string) => vi.fn((passphrase: string): PassphraseVerdict => (
+  passphrase === weakOne ? { strong: false, reason: 'That one is on every list of guesses: try another.' } : { strong: true }
+))
+
+/** A passphraseStrengthTest that answers later, refusing a passphrase of two characters or fewer. */
+const refusingTinyLater = async (passphrase: string): Promise<PassphraseVerdict> => {
+  await Promise.resolve()
+  return passphrase.length > 2 ? { strong: true } : { strong: false, reason: 'Found in a breach: pick another.' }
+}
+
+describe("a new passphrase's strength", () => {
+
+  it("by default refuses a vault's first passphrase under 12 characters, with kind 'weak_passphrase', creating nothing", async () => {
+    const world = makeWorld()
+    const vault = await world.open({ passphraseStrengthTest: undefined })
+    const err = await TH.expectRefusal(vault.unlock('hunter2'), 'weak_passphrase')
+    expect(err.message).to.match(/at least 12 characters/)
+    expect(err.message).to.not.include('hunter2')
+    expect(world.dbStore.ckeys()).to.have.lengthOf(0)
+    expect(vault.getSnapshot().state).to.eq('absent')
+    await vault.unlock('correct horse battery staple')
+    expect(vault.getSnapshot().state).to.eq('unlocked')
+  })
+
+  it("by default refuses a short passphrase added or changed to, and asks for no composition", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('correct horse battery staple', { passphraseStrengthTest: undefined })
+    await TH.expectRefusal(vault.addPassphrase('correct horse battery staple', 'spare', { unlocklabel: 'spare' }), 'weak_passphrase')
+    await TH.expectRefusal(vault.changePassphrase('correct horse battery staple', 'Sh0rt&Sw33t'), 'weak_passphrase')
+    await vault.changePassphrase('correct horse battery staple', 'only lowercase words here')
+    expect(unlocklabelsOf(vault)).to.deep.equal(['passphrase'])
+  })
+
+  it("never runs at unlock: a vault that stands opens with whatever passphrase made it", async () => {
+    const world = makeWorld()
+    await world.openUnlocked('pw')
+    const strengthTest = refusing('pw')
+    const fresh = await world.open({ deviceDB: memoryDeviceDB(), passphraseStrengthTest: strengthTest })
+    await fresh.unlock('pw')
+    expect(fresh.getSnapshot().state).to.eq('unlocked')
+    expect(strengthTest).not.toHaveBeenCalled()
+  })
+
+  it("runs the host's test on the passphrase a vault is created with, its reason the refusal's message", async () => {
+    const world = makeWorld()
+    const strengthTest = refusing('acme acme acme')
+    const vault = await world.open({ passphraseStrengthTest: strengthTest })
+    const err = await TH.expectRefusal(vault.unlock('acme acme acme'), 'weak_passphrase')
+    expect(err.message).to.eq('That one is on every list of guesses: try another.')
+    expect(world.dbStore.ckeys()).to.have.lengthOf(0)
+    await vault.unlock('pw')
+    expect(strengthTest.mock.calls).to.deep.equal([['acme acme acme'], ['pw']])
+  })
+
+  it("refuses a weak passphrase at addPassphrase and changePassphrase before any key derivation, changing nothing", async () => {
+    const world = makeWorld()
+    await world.openUnlocked('pw')
+    const { keyDeriver, derivations } = countingDeriver()
+    const vault = await world.open({ keyDeriver, passphraseStrengthTest: refusing('acme acme acme') })
+    const before = await world.vaultDB.readBundle(TH.scopeOf('u1'))
+    await TH.expectRefusal(vault.addPassphrase('pw', 'acme acme acme', { unlocklabel: 'spare' }), 'weak_passphrase')
+    await TH.expectRefusal(vault.changePassphrase('pw', 'acme acme acme'), 'weak_passphrase')
+    expect(derivations).not.toHaveBeenCalled()
+    expect(await world.vaultDB.readBundle(TH.scopeOf('u1'))).to.deep.equal(before)
+  })
+
+  it("awaits a host's test that answers a promise", async () => {
+    const world = makeWorld()
+    const vault = await world.open({ passphraseStrengthTest: refusingTinyLater })
+    await TH.expectRefusal(vault.unlock('pw'), 'weak_passphrase')
+    await vault.unlock('pw longer')
+    expect(vault.getSnapshot().state).to.eq('unlocked')
+  })
+
+  it("refuses a passphraseStrengthTest that is not a function at openVault, with kind 'bad_option'", async () => {
+    const world = makeWorld()
+    await TH.expectRefusal(world.open({ passphraseStrengthTest: 12 as unknown as OpenVaultOpts['passphraseStrengthTest'] }), 'bad_option')
+  })
+
+  it("refuses with kind 'bad_option' a test that answers no verdict, and throws what a test throws, creating nothing", async () => {
+    const world = makeWorld()
+    const misfit = await world.open({ passphraseStrengthTest: (() => 'weak') as unknown as OpenVaultOpts['passphraseStrengthTest'] })
+    await TH.expectRefusal(misfit.unlock('pw'), 'bad_option')
+    const thrown = new Error('the strength service is down')
+    const broken = await world.open({ passphraseStrengthTest: () => { throw thrown } })
+    await expect(broken.unlock('pw')).rejects.toThrow(thrown)
+    expect(world.dbStore.ckeys()).to.have.lengthOf(0)
+  })
+})
 
 describe("natural expiry", () => {
   beforeEach(() => { fakeTheClock() })
