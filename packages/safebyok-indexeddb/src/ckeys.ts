@@ -10,15 +10,24 @@ import type { Ckeys, VaultScope } from 'safebyok'
 
 /**
  * The key range of every lockbox in `scope`, for a store that reads by range instead of reading
- * the whole shelf: from the vault's lockbox prefix (`joiner.boxPrefix`, `box^acme^u1^main^`) up to
- * that prefix and the highest character there is. No other vault's rows share the prefix, as no
- * name holds the delimiter, and every lockbox's ckey goes on with a character of its boxlabel,
- * which sorts below that highest character.
+ * the whole shelf: every ckey that begins with the vault's lockbox prefix (`joiner.boxPrefix`,
+ * `box^acme^u1^main^`), and no other. No other vault's rows share the prefix, as no name holds the
+ * delimiter. The range runs from the prefix up to, and not including, the prefix with its last
+ * character -- the delimiter -- raised by one, so a boxlabel of any character (U+FFFF among them,
+ * which the floor admits) is inside it. A delimiter of U+FFFF, the highest there is, has no
+ * character above it; then no name holds U+FFFF, and the range runs up to the prefix and U+FFFF.
  *
  * @example
  *   store.getAll(boxRange(Ckeys.joiner(), scope))  // just this vault's lockboxes
  */
 export const boxRange = (joiner: Ckeys.CkeyJoiner, scope: VaultScope): IDBKeyRange => {
   const prefix = joiner.boxPrefix(scope)
-  return IDBKeyRange.bound(prefix, `${prefix}\u{FFFF}`)
+  // The delimiter is one UTF-16 code unit (`Ckeys.joiner` holds it so), which is its code point.
+  const delimiterCode = joiner.delimiter.codePointAt(0) ?? HighestCodeUnit
+  if (delimiterCode === HighestCodeUnit) { return IDBKeyRange.bound(prefix, `${prefix}\u{FFFF}`) }
+  const pastPrefix = `${prefix.slice(0, -1)}${String.fromCodePoint(delimiterCode + 1)}`
+  return IDBKeyRange.bound(prefix, pastPrefix, false, true)
 }
+
+/** The highest UTF-16 code unit, U+FFFF: no character of a string key sorts above it. */
+const HighestCodeUnit = 0xFF_FF

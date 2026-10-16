@@ -14,7 +14,7 @@ describe("the ckeys", () => {
 })
 
 describe("boxRange", () => {
-  const InsideLabels = ['anthropic', 'a', '\u{FFFE}\u{FFFE}', 'zz"}\\', 'Work: מפתח', 'key \u{1F511}']
+  const InsideLabels = ['anthropic', 'a', '\u{FFFE}\u{FFFE}', '\u{FFFF}', '\u{FFFF}\u{FFFF}x', 'zz"}\\', 'Work: מפתח', 'key \u{1F511}']
 
   for (const boxlabel of InsideLabels) {
     it(`holds the ckey of a lockbox labelled ${JSON.stringify(boxlabel)}`, () => {
@@ -28,6 +28,7 @@ describe("boxRange", () => {
     ['box^acme^u1^spare^anthropic',         "a lockbox of the user's other vault"],
     ['box^acme^u12^main^anthropic',         'a lockbox of a user whose id starts the same'],
     ['box^acme^u1^mainx^anthropic',         'a lockbox of a vault whose label starts the same'],
+    ['box^acme^u1^main_',                   'the prefix with its delimiter raised by one, where the range stops'],
     ['unlock^acme^u1^main',                 "a remembered unlock"],
     ['["box","acme","u1","main","x"]',      "a lockbox under an earlier version's ckey"],
   ] as const
@@ -47,5 +48,15 @@ describe("boxRange", () => {
     const range = boxRange(slash, u1)
     expect(range.includes(slash.box(u1, 'anthropic'))).to.be.true
     expect(range.includes(caret.box(u1, 'anthropic'))).to.be.false
+  })
+
+  it("holds every lockbox of the vault and nothing else under a delimiter of U+FFFF, the highest character there is", () => {
+    const highest = Ckeys.joiner('\u{FFFF}')
+    const u1 = TH.scopeOf('u1')
+    const range = boxRange(highest, u1)
+    expect(range.includes(highest.box(u1, '\u{FFFE}\u{FFFE}'))).to.be.true
+    const u12 = TH.scopeOf('u12')
+    expect(range.includes(highest.box(u12, 'anthropic'))).to.be.false
+    expect(range.includes(highest.bundle(u1))).to.be.false
   })
 })
