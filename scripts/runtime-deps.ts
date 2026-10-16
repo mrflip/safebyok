@@ -1,9 +1,11 @@
 /**
  * The runtime dependencies a change moves in the public packages: their `dependencies`,
- * `peerDependencies` and `optionalDependencies`, which ship to every host that installs them. CI
- * asks it of a Dependabot pull request (.github/workflows/ci.yml): one that moves none ships
- * nothing new and needs no changeset; one that moves any needs a changeset like any other pull
- * request, and the Coach writes it by hand.
+ * `peerDependencies` and `optionalDependencies`, which ship to every host that installs them,
+ * and the two fields that say how: `peerDependenciesMeta` and `bundledDependencies`. A public
+ * package removed, or made private, moves all of its runtime dependencies out; one made public,
+ * or added, moves them all in. CI asks it of a Dependabot pull request (.github/workflows/ci.yml):
+ * one that moves none ships nothing new and needs no changeset; one that moves any needs a
+ * changeset like any other pull request, and scripts/dependabot.ts writes it.
  *
  * Prints one line per dependency moved, and nothing when none moved:
  *
@@ -13,14 +15,41 @@
 import path from 'node:path'
 import { listWorkspace, processRunner, publicPackages, type Runner, type WorkspacePackage } from './release.ts'
 
-/** The `package.json` fields that ship to a host, as ranges it will install */
-export const RuntimeFields = ['dependencies', 'peerDependencies', 'optionalDependencies'] as const
+/** The `package.json` fields that ship to a host, and say what it will install and how */
+export const RuntimeFields = ['dependencies', 'peerDependencies', 'optionalDependencies', 'peerDependenciesMeta', 'bundledDependencies'] as const
 
 /** One of the `package.json` fields that ship to a host */
 export type RuntimeField = typeof RuntimeFields[number]
 
-/** A `package.json`, as far as its runtime dependencies go */
-export type Manifest = Partial<Record<RuntimeField, Record<string, string>>>
+/** The fields that hold a dependency's range, by its name */
+type RangeField = 'dependencies' | 'peerDependencies' | 'optionalDependencies'
+
+/**
+ * A `package.json`, as far as its runtime dependencies go. `bundledDependencies` is a list of
+ * names, or `true` for all of `dependencies`; npm also reads it spelled `bundleDependencies`.
+ */
+export interface Manifest extends Partial<Record<RangeField, Record<string, string>>> {
+  name?:                 string
+  /** A private package ships nothing: it reads as one with no runtime dependencies */
+  private?:              boolean
+  peerDependenciesMeta?: Record<string, object>
+  bundledDependencies?:  string[] | boolean
+  bundleDependencies?:   string[] | boolean
+}
+
+/** What the manifest holds under one field, as a map from a dependency's name to how it is held */
+function entriesOf(manifest: Manifest, field: RuntimeField): Record<string, string> {
+  if (manifest.private) { return {} }
+  if (field === 'peerDependenciesMeta') {
+    return Object.fromEntries(Object.entries(manifest.peerDependenciesMeta ?? {}).map(([depname, meta]) => [depname, JSON.stringify(meta)]))
+  }
+  if (field === 'bundledDependencies') {
+    const bundled = manifest.bundledDependencies ?? manifest.bundleDependencies ?? []
+    const depnames = bundled === true ? Object.keys(manifest.dependencies ?? {}) : (bundled || [])
+    return Object.fromEntries(depnames.map((depname) => [depname, 'bundled']))
+  }
+  return manifest[field] ?? {}
+}
 
 /** One runtime dependency moved: added, dropped, or its range changed */
 export interface RuntimeDepChange {
@@ -46,8 +75,8 @@ export interface RuntimeDepChange {
  */
 export function runtimeDepChanges(pkgname: string, ante: Manifest, post: Manifest): RuntimeDepChange[] {
   return RuntimeFields.flatMap((field) => {
-    const anteDeps = ante[field] ?? {}
-    const postDeps = post[field] ?? {}
+    const anteDeps = entriesOf(ante, field)
+    const postDeps = entriesOf(post, field)
     const depnames = [...new Set([...Object.keys(anteDeps), ...Object.keys(postDeps)])]
     return depnames
       .filter((depname) => anteDeps[depname] !== postDeps[depname])
@@ -72,12 +101,13 @@ export function describeChange(change: RuntimeDepChange): string {
 
 /**
  * The runtime dependencies moved in the given packages between two commits, reading each
- * package's `package.json` from git at both. A package absent at the base is new, and every
- * runtime dependency it has counts as moved.
+ * package's `package.json` from git at both. A package absent at the base (or private there) is
+ * new, and every runtime dependency it has counts as moved; one that was under `packages/` and
+ * public at the base but is gone or private at the head counts the same, as removed.
  *
  * @param run      - Runs `git`, in the repository.
  * @param rootDir  - The repository's root.
- * @param packages - The packages to compare: the public ones.
+ * @param packages - The packages to compare: the public ones, as the workspace stands.
  * @param base     - The commit the change starts from.
  * @param head     - The commit the change ends at.
  * @returns The dependencies moved, package by package.
@@ -85,12 +115,26 @@ export function describeChange(change: RuntimeDepChange): string {
 export async function changedRuntimeDeps(run: Runner, rootDir: string, packages: readonly WorkspacePackage[], base: string, head: string): Promise<RuntimeDepChange[]> {
   await verifyCommit(run, base)
   await verifyCommit(run, head)
-  const changes = await Promise.all(packages.map(async (pkg) => {
-    const manifestPath = path.relative(rootDir, path.join(pkg.path, 'package.json')).split(path.sep).join('/')
+  const known = packages.map((pkg) => ({ pkgname: pkg.name, manifestPath: path.relative(rootDir, path.join(pkg.path, 'package.json')).split(path.sep).join('/') }))
+  const atBase = await publishedManifestPaths(run, base)
+  const departed = atBase
+    .filter((manifestPath) => known.every((pkg) => pkg.manifestPath !== manifestPath))
+    .map((manifestPath) => ({ pkgname: undefined, manifestPath }))
+  const changes = await Promise.all([...known, ...departed].map(async ({ pkgname, manifestPath }) => {
     const [ante, post] = await Promise.all([manifestAt(run, base, manifestPath), manifestAt(run, head, manifestPath)])
-    return runtimeDepChanges(pkg.name, ante, post)
+    return runtimeDepChanges(pkgname ?? ante.name ?? path.basename(path.dirname(manifestPath)), ante, post)
   }))
   return changes.flat()
+}
+
+/** Where the published packages live: the workspace's `packages/*` */
+const PublishedManifest = /^packages\/[^/]+\/package\.json$/
+
+/** The manifests of the packages under `packages/` at a commit, as paths from the repository's root */
+async function publishedManifestPaths(run: Runner, commit: string): Promise<string[]> {
+  const result = await run('git', ['ls-tree', '-r', '--name-only', commit, '--', 'packages'])
+  if (result.exitCode !== 0) { throw new Error(`runtime-deps: git could not list packages/ at ${commit}: ${result.stderr.trim()}`) }
+  return result.stdout.split('\n').filter((line) => PublishedManifest.test(line))
 }
 
 async function verifyCommit(run: Runner, commit: string): Promise<void> {

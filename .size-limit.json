@@ -9,5 +9,8 @@
   { "name": "validators", "path": "packages/safebyok/dist/validators.js", "limit": "8.5 kB" },
   { "name": "DefaultValidators", "path": "packages/safebyok/dist/validators.js", "import": "{ DefaultValidators }", "limit": "4 kB" },
   { "name": "argon2idWasmWebV1Deriver", "path": "packages/safebyok-fastkey/dist/index.js", "import": "{ argon2idWasmWebV1Deriver }", "limit": "13 kB" },
-  { "name": "argon2idWasmDeriver", "path": "packages/safebyok-fastkey/dist/index.js", "import": "{ argon2idWasmDeriver }", "limit": "19 kB" }
+  { "name": "argon2idWasmDeriver", "path": "packages/safebyok-fastkey/dist/index.js", "import": "{ argon2idWasmDeriver }", "limit": "19 kB" },
+  { "name": "idbVaultDB", "path": "packages/safebyok-indexeddb/dist/index.js", "import": "{ idbVaultDB }", "ignore": ["safebyok", "zod"], "limit": "2.6 kB" },
+  { "name": "VaultProvider", "path": "packages/safebyok-react/dist/index.js", "import": "{ VaultProvider }", "ignore": ["react", "react-dom", "safebyok", "zod"], "limit": "4.7 kB" },
+  { "name": "reactEverything", "path": "packages/safebyok-react/dist/index.js", "ignore": ["react", "react-dom", "safebyok", "zod"], "limit": "5.3 kB" }
 ]

@@ -110,12 +110,18 @@ would change the code in the PR -- are asked in chat, and lead the PR's body unt
   what a consumer or an existing vault has to do about it.
 
 CI runs on every PR, over the root and every workspace package: `lint-typecheck` (lint, typecheck,
-no merge commits, a changeset) and `test-build` (tests with coverage, then the builds with their
-package checks) must pass; `node-compat` runs the tests on the other Node majors and reports.
-CodeQL scans the code and the workflows, and a finding shows on the PR. Dependabot opens grouped
-`deps:` PRs weekly; they get the same review as any other. One is asked for a changeset only when
-it moves a public package's runtime dependencies (`scripts/runtime-deps.ts`), and the Coach adds it
-by hand; a devDependency or lockfile bump needs none.
+no merge commits, a changeset, and `actionlint` over the workflows) and `test-build` (tests with
+coverage, which builds every package with its package checks, then the size budgets) must pass;
+`node-compat` runs the tests on Node 22, the platform floor, which must pass too, and on the
+newest Node, which reports. CodeQL scans the code and the workflows, and a finding shows on the
+PR. Dependabot opens grouped `deps:` PRs weekly; they get the same review as any other. One
+whose every commit is Dependabot's is asked for a changeset only when it moves a public package's
+runtime dependencies, as `scripts/runtime-deps.ts` reads them (`dependencies`, `peerDependencies`,
+`optionalDependencies`, `peerDependenciesMeta`, `bundledDependencies`, a package added, removed
+or made private): `.github/workflows/dependabot-changeset.yml` writes it, a `patch`
+named `.changeset/dependabot-<n>.md`, and pushes it with the release App's token, so CI runs
+again on it. A devDependency or lockfile bump needs none. A Dependabot branch with a commit of
+anyone else's on it is a PR like any other, and carries a changeset like one.
 
 ## Packages
 
@@ -140,6 +146,11 @@ numbers and the CHANGELOGs; `.github/workflows/release.yml` does the rest.
   `scripts/changeset.ts` runs the changesets CLI and renames what it writes. A PR that changes a
   public package carries one, or CI fails it; one that needs no release (tooling, tests, docs)
   carries an empty one, `pnpm changeset --empty`. Agents write changesets: they state intent, not a version.
+* **The level, before 1.0**: `minor` for anything that touches a stored shape or an exported name
+  (an interface a host may implement, or fake, counts: adding to it breaks the host's object);
+  `patch` for any other change that ships (a fix, a runtime-dependency bump); an empty changeset
+  for what ships nothing. A README-only change to a published package takes an empty one too: the
+  packages release in lockstep, and a line of README does not earn a bump of all seven.
 * **Versions are semver, in lockstep.** The public packages are one `fixed` group in
   `.changeset/config.json`, so one bump moves them all; a test refuses a public package left out
   of it. Private packages, demos and `e2e/` are never versioned or released. Until 1.0, a minor bump may
@@ -150,9 +161,9 @@ numbers and the CHANGELOGs; `.github/workflows/release.yml` does the rest.
   and the spent changesets, as one `rel:` commit named the same way. It is the bot's: nobody
   rebases, edits or merges it but the Coach. The release workflow writes it with the repository's
   GitHub App, so CI runs on it as on any PR.
-* **It is a draft until the Coach says otherwise.** The Coach marks it ready when they mean to
-  release it; any later push to main rebuilds it and puts it back in draft, so a ready Version PR
-  always holds what the Coach read.
+* **It opens as a draft.** The Coach marks it ready when they mean to release it. A later push
+  to main rebuilds it but leaves a ready PR ready, so before merging, reread what it holds: new
+  changesets may have joined it since it was read.
 * **Merging it is the release.** `release.yml` then checks the lockstep group, runs
   `pnpm justify`, packs each package whose version npm lacks, stages each tarball, and tags each
   package staged (`safebyok@0.2.0`) with a GitHub release from its CHANGELOG, the core's marked
@@ -216,6 +227,17 @@ size-limit's `kB` is 1000 bytes, and it measures minified and brotlied.
    3.5 kB of budget; 22.15 kB is 23 kB; 26.83 kB is 30 kB). Round numbers keep a stack of PRs
    from fighting over digits: a budget of 2_431 bytes is a conflict waiting for the next
    thread, and 2_500 is not.
+
+The rule sets a budget; it may lower one as well as raise it. A bundle that shrank gets the
+smaller budget the rule gives, so a budget never sits looser than its measure earns.
+
+Only the ESM build is measured: it is what a bundler reads and tree-shakes, and the CommonJS
+build is for Node hosts, where bytes shipped to a browser are not the concern. A package's
+peers (`safebyok`, `zod`, `react`) are left out of its own entry's measure with `ignore`: the
+host has them already, and the budget is for what the package adds. `pnpm size` builds the
+measured packages once and measures them; `pnpm size:check` measures what is already built,
+which is what `pnpm justify` does after its tests have built everything. size-limit itself runs
+on Node `^22.19`, `^24.5` or `>=26`, narrower than our `engines`; CI runs it on the pinned Node.
 
 A sprint's orchestrator guesses the target up front and has the first thread set it, so the
 stacked PRs agree (`.claude/skills/sprint/SKILL.md`); a late thread lowers the budgets to this
