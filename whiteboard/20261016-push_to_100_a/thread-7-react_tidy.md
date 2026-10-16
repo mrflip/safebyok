@@ -10,15 +10,15 @@ Branch `20261016-react_tidy`, PR [#129](https://github.com/mrflip/safebyok/pull/
   - `PassphraseModal`: a modal `dialog` (on the scrim, named by its heading, Escape cancels and
     stops propagation); the error line a live region mounted from the start; subscribes through
     `useSyncExternalStore`; keyed by its vault handle (`useRoundFor`, `boundary.tsx`); passkey
-    first, with focus; focus check reads the form's own root (shadow DOM); window line omitted
-    where `Intl.RelativeTimeFormat` is missing; far future is `>= ForeverMs - MinuteMillis`;
-    `allowStartOver` (ask first, `vault.destroy()`, then "Choose a vault passphrase").
+    first, with focus; focus check reads the form's own root (shadow DOM); one
+    `Intl.RelativeTimeFormat` per locale, made at first use and assumed present (the Coach);
+    far future is `>= ForeverMs - MinuteMillis`; `allowStartOver` (ask first, `vault.destroy()`,
+    then "Choose a vault passphrase").
   - `PasskeyUnlockButton`: subscribes, keyed by handle, `onGripe(null)` as each press begins,
     `autoFocus`.
   - `VaultProvider`: each dialog keyed by the vault the action ran against (`ranOn`), the
-    snapshot read when a dialog would open, a warn-once for a `logger`/`clock` changing identity
-    and for a missing `Intl.RelativeTimeFormat`, `allowStartOver`, `eraseDamagedVault` reopening
-    only on `stale_write`.
+    snapshot read when a dialog would open, a warn-once for a `logger`/`clock` changing identity,
+    `allowStartOver`, `eraseDamagedVault` reopening only on `stale_write`.
   - `WhisperField` (React) over `WhisperFieldAttributes` (`safebyok/utils`); `parseLogger`
     exported from `safebyok`.
   - Demo: `keepStorage()` on the sign-in click, a "lives only in this browser" line,
@@ -41,13 +41,16 @@ Branch `20261016-react_tidy`, PR [#129](https://github.com/mrflip/safebyok/pull/
     `safebyok/utils`).
   - **Not closed**: G357's "blank note clears" point: the note dies in thread 2 (G023), so it
     is moot there, not here. The note's "do we offer a hint?" (opened, below).
-  - **Opened**: the `@formatjs/intl-relativetimeformat` dependency (built default: not added,
-    named in the README, warned of once); "do we offer a hint?" (built default: no hint; I read
-    it as "a hint under the whisper field", and a host's `placeholder` covers the common case).
+  - **Opened**: "do we offer a hint?" (built default: no hint; I read it as "a hint under the
+    whisper field", and a host's `placeholder` covers the common case). The polyfill question
+    the preplan opened is answered by the Coach and closed: we assume `Intl.RelativeTimeFormat`,
+    add no dependency, and the README tells a host on Hermes or an older engine to import
+    `@formatjs/intl-relativetimeformat` with its locale data. Still open with the Coach, through
+    the orchestrator: an uncontrolled `WhisperField` (below).
 
 * **Decisions taken**:
-  - Missing `Intl.RelativeTimeFormat` leaves the window line out rather than throwing: the user
-    can still unlock, and nothing hand-rolled formats a time. The provider tells the developer.
+  - `Intl.RelativeTimeFormat` is assumed, at the Coach's word on filing: no presence check, no
+    fallback, no warning. On an engine without it the dialog's boundary shows its trouble notice.
   - G322's warning needs the console when the host passes no logger, and `src/` may reach it only
     through the core's fallback: so `parseLogger` is exported (fallback and guard in one).
   - The dialog role goes on `.modal-scrim` (Bootstrap's pattern): a `form` may not carry
@@ -77,6 +80,15 @@ Branch `20261016-react_tidy`, PR [#129](https://github.com/mrflip/safebyok/pull/
     the modal's passkey line, "Keep it", one test) and
     `jsx-a11y/no-noninteractive-element-interactions` (the dialog scrim's Escape). No
     `@ts-expect-error`, no `any`.
+
+* **Review** (thread-reviewer, `fixed`): three commits on the start-over path, each with a
+  test -- a `stale_write` erase now ends the question, a vault turning absent ends it, and
+  "Erase and start over" waits for its erase (no double destroy). Folded in at filing: minor 1,
+  React 19 copies a controlled input's value into its `value` attribute, so a whisper typed into
+  `WhisperField` is in `outerHTML` (README *Revealing a whisper*, `notes/security.md`, a test
+  pinning it; the uncontrolled option is with the Coach, not built); minor 6, the formatter
+  made once per locale. The review's other minors are left as the reviewer reported them: their
+  text went to the orchestrator, not to this worker, so they are not restated here.
 
 * **For the Coach**:
   - `autocomplete="new-password"` (your list) stops autofill of saved passwords, but Chrome may
