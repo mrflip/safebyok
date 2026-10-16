@@ -104,8 +104,7 @@ It does nothing for any other `openError`, or none, and rejects with storage's r
 
 **A sign-out the app did not hear of** -- in another tab, or a session that expired -- reaches
 the vault as storage refusing it, kind `identity_revoked`, and an open vault locks itself
-(`whenIdentityRevoked`, passed through like any other option; the `safebyok` README's *When the
-user signs out*). The snapshot reads `locked`; the next `withUnlockedVault` opens the passphrase
+(the `safebyok` README's *When the user signs out*). The snapshot reads `locked`; the next `withUnlockedVault` opens the passphrase
 dialog, whose unlock meets the same refusal and shows its message there. Once your auth says the
 user signed out, pass `userId={null}`, which closes the handle.
 

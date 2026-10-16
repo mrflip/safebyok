@@ -246,6 +246,8 @@ describe("VaultDashboard, its lock", () => {
     await TH.answerPassphraseDialog()
     const chip = await screen.findByText(/unlocked until/)
     expect(chip.textContent).to.match(/^🔓 unlocked until /)
+    // The read finishes first: a lock landing while it is under way would refuse it, as it should.
+    await screen.findByText('sk-ant-test-not-a-real-key')
     fireEvent.click(screen.getByRole('button', { name: 'lock now' }))
     await screen.findByText('🔒 locked')
   })

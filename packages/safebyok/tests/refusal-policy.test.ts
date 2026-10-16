@@ -4,61 +4,27 @@ import { AnyTextValidators } from '../src/validators'
 import { localVaultDB } from '../src/vault-db'
 import { memoryStore } from '../src/string-store'
 import * as RefusalPolicy from '../src/refusal-policy'
-import type { IdentityRevokedResponse } from '../src/refusal-policy'
 import * as TH from './test-helpers'
 
 const signedOut = () => new VaultError('identity_revoked', 'No one is signed in, so this vault cannot be reached: sign in, then try again.')
 
-describe("RefusalPolicy.parse", () => {
-  const TakenCases = [
-    [undefined,  "lock",  'locks when the host leaves it out'],
-    ["lock",     "lock",  'takes lock'],
-    ["stay",     "stay",  'takes stay'],
-  ] as const
-
-  for (const [candidate, expected, blurb] of TakenCases) {
-    it(blurb, () => { expect(RefusalPolicy.parse(candidate)).to.eq(expected) })
-  }
-
-  const RefusedCases = [
-    ["erase",    'refuses erase: a revocation never erases anything'],
-    ["Lock",     'refuses a capitalised choice'],
-    [null,       'refuses null, which is not leaving it out'],
-    [true,       'refuses a boolean'],
-  ] as const
-
-  for (const [candidate, blurb] of RefusedCases) {
-    it(blurb, () => {
-      expect(() => RefusalPolicy.parse(candidate as unknown as IdentityRevokedResponse)).to.throw(VaultError, /whenIdentityRevoked is 'lock'/).with.property('kind', 'bad_option')
-    })
-  }
-
-  it("leaves it out as the default, lock", () => {
-    expect(RefusalPolicy.DefaultIdentityRevokedResponse).to.eq('lock')
-  })
-
-  it("names every choice in IdentityRevokedResponseVals", () => {
-    expect(RefusalPolicy.IdentityRevokedResponseVals).to.deep.equal(['lock', 'stay'])
-  })
-})
-
 describe("RefusalPolicy.decide", () => {
   const DecideCases = [
     // the examples:
-    [signedOut(),                                                       "lock",  "lock",  'locks for identity_revoked'],
-    [signedOut(),                                                       "stay",  "none",  'does nothing more for identity_revoked when the host chose stay'],
-    [new VaultError('not_permitted', 'Not yours.'),                     "lock",  "none",  'does nothing more for not_permitted: the vault\'s own user, refused one call'],
+    [signedOut(),                                                       "lock",  'locks for identity_revoked'],
+    [new VaultError('rolled_back', 'An older copy.'),                   "lock",  'locks for rolled_back: storage handing back an older copy is as little to be trusted'],
+    [new VaultError('not_permitted', 'Not yours.'),                     "none",  'does nothing more for not_permitted: the vault\'s own user, refused one call'],
     // what says nothing about who is signed in:
-    [new VaultError('stale_write', 'Another device wrote first.'),      "lock",  "none",  'does nothing more for a stale write'],
-    [new VaultError('storage_unavailable', 'Down.'),                    "lock",  "none",  'does nothing more for storage that could not be reached'],
-    [new VaultError('vault_full', 'Full.'),                             "lock",  "none",  'does nothing more for a full vault'],
+    [new VaultError('stale_write', 'Another device wrote first.'),      "none",  'does nothing more for a stale write'],
+    [new VaultError('storage_unavailable', 'Down.'),                    "none",  'does nothing more for storage that could not be reached'],
+    [new VaultError('vault_full', 'Full.'),                             "none",  'does nothing more for a full vault'],
     // what is no refusal of storage's:
-    [new Error('identity_revoked'),                                     "lock",  "none",  'does nothing for a plain Error naming the kind'],
-    [{ kind: 'identity_revoked', message: 'Signed out.' },              "lock",  "none",  'does nothing for an object shaped like the refusal'],
+    [new Error('identity_revoked'),                                     "none",  'does nothing for a plain Error naming the kind'],
+    [{ kind: 'identity_revoked', message: 'Signed out.' },              "none",  'does nothing for an object shaped like the refusal'],
   ] as const
 
-  for (const [refusal, whenRevoked, expected, blurb] of DecideCases) {
-    it(blurb, () => { expect(RefusalPolicy.decide(refusal, whenRevoked)).to.eq(expected) })
+  for (const [refusal, expected, blurb] of DecideCases) {
+    it(blurb, () => { expect(RefusalPolicy.decide(refusal)).to.eq(expected) })
   }
 })
 
