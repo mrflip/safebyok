@@ -44,6 +44,26 @@ describe("browserOpts", () => {
     }
   })
 
+  it("files the device store's records under the ckeyDelimiter it is given", async () => {
+    const dbName = TH.freshDbName()
+    await browserOpts({ dbName, ckeyDelimiter: '/' }).deviceDB.writeUnlock(await TH.unlockOf('u1'))
+    const rows = await inspectIdbDeviceDB({ dbName }).rows()
+    expect(rows.map((row) => row.ckey)).to.deep.equal(['unlock/acme/u1/main'])
+  })
+
+  it("answers one bag for each dbName and delimiter, the default delimiter spelled out or not", () => {
+    expect(browserOpts({ dbName: 'acme', ckeyDelimiter: '/' })).to.eq(browserOpts({ dbName: 'acme', ckeyDelimiter: '/' }))
+    expect(browserOpts({ dbName: 'acme' })).to.eq(browserOpts({ dbName: 'acme', ckeyDelimiter: '^' }))
+    expect(browserOpts({ dbName: 'acme' })).to.not.eq(browserOpts({ dbName: 'acme', ckeyDelimiter: '/' }))
+  })
+
+  it("refuses a ckeyDelimiter that is not one character with kind 'bad_option'", () => {
+    for (const ckeyDelimiter of ['', '^^', 42]) {
+      expect(() => browserOpts({ ckeyDelimiter } as unknown as { ckeyDelimiter: string }))
+        .to.throw(VaultError, /ckeyDelimiter/).with.property('kind', 'bad_option')
+    }
+  })
+
   it("spreads into openVault beside the host's vault store", async () => {
     const vault = await openVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: localVaultDB(memoryStore()), ...browserOpts({ dbName: TH.freshDbName() }) })
     expect(vault.getSnapshot().state).to.eq('absent')
