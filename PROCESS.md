@@ -220,7 +220,7 @@ The toolchain: TypeScript, Vitest, ESLint, tsdown.
 ## Size budgets
 
 `.size-limit.json` holds one budget per import shape of the built packages, checked by `pnpm size`
-(CI runs it after the build). JSON has no comments, so the rule for setting a budget lives here.
+(`pnpm justify` and CI run it after the build). JSON has no comments, so the rule for setting a budget lives here.
 size-limit's `kB` is 1000 bytes, and it measures minified and brotlied.
 
 1. **Start from the measure** (`pnpm size`, or `npx size-limit --json` for exact bytes).
