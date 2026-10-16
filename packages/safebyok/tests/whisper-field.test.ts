@@ -10,8 +10,8 @@ describe("WhisperFieldAttributes", () => {
     ])
   })
 
-  it("turns off filling, capitalizing, correcting and spell-checking", () => {
-    expect(WhisperFieldAttributes.autoComplete).to.eq('new-password')
+  it("turns off filling, saving and generating, capitalizing, correcting and spell-checking: a whisper is no credential", () => {
+    expect(WhisperFieldAttributes.autoComplete).to.eq('off')
     expect(WhisperFieldAttributes.autoCapitalize).to.eq('none')
     expect(WhisperFieldAttributes.autoCorrect).to.eq('off')
     expect(WhisperFieldAttributes.spellCheck).to.eq('false')
@@ -22,6 +22,6 @@ describe("WhisperFieldAttributes", () => {
     const field = { setAttribute: (attrname: string, attrval: string) => { set[attrname.toLowerCase()] = attrval } }
     for (const [attrname, attrval] of Object.entries(WhisperFieldAttributes)) { field.setAttribute(attrname, attrval) }
     expect(Object.values(WhisperFieldAttributes).every((attrval) => typeof attrval === 'string')).to.be.true
-    expect(set).to.include({ 'data-1p-ignore': 'true', 'autocomplete': 'new-password', 'spellcheck': 'false' })
+    expect(set).to.include({ 'data-1p-ignore': 'true', 'autocomplete': 'off', 'spellcheck': 'false' })
   })
 })

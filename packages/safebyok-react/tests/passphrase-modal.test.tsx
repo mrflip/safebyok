@@ -48,6 +48,19 @@ const lockedVault = async () => {
   return vault
 }
 
+/** The dialog's username field, which a password manager files the passphrase under. */
+const usernameField = () => {
+  const found = document.querySelector<HTMLInputElement>('input[autocomplete="username"]')
+  if (found === null) { throw new Error('the dialog has no username field') }
+  return found
+}
+
+/** The passphraseAdvice @example: a word until the passphrase is twelve characters or more. */
+const twelveOrMore = (typed: string) => (typed.length < 12 ? 'Twelve characters or more, please.' : null)
+
+/** The polite region beside the field, which says the advice. */
+const adviceRegion = () => screen.getByRole('status')
+
 afterEach(cleanup)
 
 describe("PassphraseModal", () => {
@@ -404,6 +417,129 @@ describe("PassphraseModal", () => {
       expect(screen.queryByText('Erase and start over')).to.be.null
       expect(screen.queryByPlaceholderText('vault passphrase')).to.not.be.null
       vault.close()
+    })
+  })
+
+  describe("for a password manager", () => {
+    it("asks for a new password in a real form while it creates the vault", () => {
+      render(<PassphraseModal vault={vaultInState('absent')} onDone={noop} />)
+      const field = screen.getByPlaceholderText<HTMLInputElement>('vault passphrase')
+      expect(field.closest('form')).to.not.be.null
+      expect(field.type).to.eq('password')
+      expect(field.getAttribute('autocomplete')).to.eq('new-password')
+      expect(field.name).to.eq('new-password')
+    })
+
+    it("asks for the current password on an ordinary unlock", () => {
+      render(<PassphraseModal vault={vaultInState('locked')} onDone={noop} />)
+      const field = screen.getByPlaceholderText<HTMLInputElement>('vault passphrase')
+      expect(field.getAttribute('autocomplete')).to.eq('current-password')
+      expect(field.name).to.eq('current-password')
+    })
+
+    it("files the passphrase under the user and the vault, in a hidden username field of the same form", () => {
+      render(<PassphraseModal vault={vaultInState('locked')} onDone={noop} />)
+      expect(usernameField().value).to.eq('u1 (main vault)')
+      expect(usernameField().hidden).to.be.true
+      expect(usernameField().form).to.eq(screen.getByPlaceholderText<HTMLInputElement>('vault passphrase').form)
+    })
+
+    it("files it under the host's passphraseUsername when given, as its example does", () => {
+      const email = 'margo@example.com'
+      render(<PassphraseModal vault={vaultInState('absent')} passphraseUsername={`${email} (vault)`} onDone={noop} />)
+      expect(usernameField().value).to.eq('margo@example.com (vault)')
+    })
+
+    it("never capitalizes, corrects or spell-checks the passphrase", () => {
+      render(<PassphraseModal vault={vaultInState('locked')} onDone={noop} />)
+      const field = screen.getByPlaceholderText('vault passphrase')
+      expect(field.getAttribute('autocapitalize')).to.eq('none')
+      expect(field.getAttribute('autocorrect')).to.eq('off')
+      expect(field.getAttribute('spellcheck')).to.eq('false')
+    })
+
+    it("keeps the passphrase out of the page's markup, hidden or shown, and submits what was typed", async () => {
+      const given: string[] = []
+      render(<PassphraseModal vault={vaultUnlockingWith((passphrase) => { given.push(passphrase); return Promise.resolve() })} onDone={noop} />)
+      const field = screen.getByPlaceholderText<HTMLInputElement>('vault passphrase')
+      fireEvent.change(field, { target: { value: 'pw kept from the page' } })
+      expect(field.hasAttribute('value')).to.be.false
+      fireEvent.click(screen.getByRole('button', { name: 'Show' }))
+      expect(field.type).to.eq('text')
+      expect(screen.getByRole('button', { name: 'Hide' }).getAttribute('aria-pressed')).to.eq('true')
+      expect(field.hasAttribute('value')).to.be.false
+      expect(document.body.outerHTML).to.not.include('pw kept from the page')
+      fireEvent.click(screen.getByText('Unlock'))
+      await waitFor(() => { expect(given).to.deep.equal(['pw kept from the page']) })
+    })
+  })
+
+  describe("advice while the user chooses a passphrase", () => {
+    it("shows what passphraseAdvice says of the text typed, tied to the field and announced politely, as its example does", async () => {
+      render(<PassphraseModal vault={vaultInState('absent')} passphraseAdvice={twelveOrMore} onDone={noop} />)
+      const field = screen.getByPlaceholderText('vault passphrase')
+      expect(field.getAttribute('aria-describedby')).to.eq(adviceRegion().id)
+      fireEvent.change(field, { target: { value: 'short' } })
+      await waitFor(() => { expect(adviceRegion().textContent).to.eq('Twelve characters or more, please.') })
+      fireEvent.change(field, { target: { value: 'four unrelated words here' } })
+      await waitFor(() => { expect(adviceRegion().textContent).to.eq('') })
+    })
+
+    it("says nothing before anything is typed, nor once the field is emptied, without asking", async () => {
+      const asked: string[] = []
+      const advice = (typed: string) => { asked.push(typed); return 'Longer is stronger.' }
+      render(<PassphraseModal vault={vaultInState('absent')} passphraseAdvice={advice} onDone={noop} />)
+      expect(adviceRegion().textContent).to.eq('')
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
+      await waitFor(() => { expect(adviceRegion().textContent).to.eq('Longer is stronger.') })
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: '' } })
+      await waitFor(() => { expect(adviceRegion().textContent).to.eq('') })
+      expect(asked).to.deep.equal(['pw'])
+    })
+
+    it("shows only the answer to the latest text, however late an earlier answer arrives", async () => {
+      const gate = TH.makeGate()
+      const advice = async (typed: string) => {
+        if (typed === 'slow') { await gate.pass() }
+        return `said of ${typed}`
+      }
+      render(<PassphraseModal vault={vaultInState('absent')} passphraseAdvice={advice} onDone={noop} />)
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'slow' } })
+      await gate.reached
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'fast' } })
+      await waitFor(() => { expect(adviceRegion().textContent).to.eq('said of fast') })
+      await act(async () => {
+        gate.release()
+        await TH.wakeupAtNextTick()
+      })
+      expect(adviceRegion().textContent).to.eq('said of fast')
+    })
+
+    it("is never asked while unlocking, and has no region there", () => {
+      const asked: string[] = []
+      render(<PassphraseModal vault={vaultInState('locked')} passphraseAdvice={(typed) => { asked.push(typed); return 'Longer.' }} onDone={noop} />)
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
+      expect(screen.queryByRole('status')).to.be.null
+      expect(screen.getByPlaceholderText('vault passphrase').hasAttribute('aria-describedby')).to.be.false
+      expect(asked).to.deep.equal([])
+    })
+
+    it("lets the user create the vault whatever it says: it is advice, and the vault decides", async () => {
+      const given: unknown[] = []
+      const vault = TH.stubVault({ state: 'absent', unlock: (passphrase) => { given.push(passphrase); return Promise.resolve() } })
+      render(<PassphraseModal vault={vault} passphraseAdvice={() => 'Too short.'} onDone={noop} />)
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
+      await screen.findByText('Too short.')
+      fireEvent.click(screen.getByText('Create vault'))
+      await waitFor(() => { expect(given).to.deep.equal(['pw']) })
+    })
+
+    it("meets advice that throws with the calm trouble notice, and reports the very error to React", async () => {
+      const broken = new Error('the advice broke')
+      const { reported } = TH.renderReporting(<PassphraseModal vault={vaultInState('absent')} passphraseAdvice={() => { throw broken }} onDone={noop} />)
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
+      expect(await screen.findByText(Trouble)).to.not.be.null
+      expect(reported).to.deep.equal([broken])
     })
   })
 })

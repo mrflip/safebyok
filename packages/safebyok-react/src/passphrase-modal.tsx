@@ -1,8 +1,9 @@
-import { useId, useRef, useState, useSyncExternalStore, type KeyboardEvent, type SubmitEvent } from 'react'
+import { useId, useRef, useState, useSyncExternalStore, type KeyboardEvent, type Ref, type SubmitEvent } from 'react'
 import { ForeverMillis, MinuteMillis, isVaultCondition, isVaultError, type Vault } from 'safebyok'
 import { Boundary, useRoundFor } from './boundary'
 import { Locale, Messages } from './messages'
 import { PasskeyUnlockButton, offersPasskey } from './passkey-unlock-button'
+import { useRevealToggle } from './reveal-toggle'
 
 const MinutesPerHour = 60
 const MinutesPerDay = 24 * MinutesPerHour
@@ -80,9 +81,28 @@ const unlockedFor = (reentryWindowMillis: number, creating: boolean): string => 
  * Start a new vault" asks first, then erases the vault (`vault.destroy()`, on every device) and
  * turns the dialog into "Choose a vault passphrase" for the new one. Off by default.
  *
+ * The passphrase field is made for password managers, so that a user may keep a long, strong
+ * passphrase without remembering it: a real form, `autocomplete="new-password"` while choosing
+ * (a manager offers to generate one, and to save it) and `current-password` while unlocking (it
+ * offers the one it saved), and beside it a hidden `autocomplete="username"` field naming what the
+ * manager files it under, `passphraseUsername`. That defaults to the user and the vault, as
+ * 'u1 (main vault)'; never make it the user's sign-in name alone, or a manager may take the
+ * passphrase for their sign-in password and offer to overwrite it. The field is uncontrolled, so
+ * React never writes what is typed into the page; a Show / Hide button reveals it, and it is
+ * never capitalized, corrected or spell-checked.
+ *
+ * While the user chooses a passphrase, `passphraseAdvice` (if given) hears what they have typed
+ * after each change, and what it answers shows beside the field, tied to it by
+ * `aria-describedby` and announced politely: 'Longer is stronger: try a few unrelated words'.
+ * It answers null for nothing to say, and may answer through a promise; only the answer to the
+ * latest text shows. It is advice: what the vault itself refuses at creation shows as any refusal
+ * does. It is never asked while unlocking.
+ *
  * @example
  *   <PassphraseModal vault={vault} onDone={(unlocked) => { setAsking(false) }} />
  * @example <PassphraseModal vault={vault} allowStartOver onDone={close} />  // offers to erase and start over
+ * @example <PassphraseModal vault={vault} passphraseUsername={`${email} (vault)`} onDone={close} />
+ * @example <PassphraseModal vault={vault} passphraseAdvice={(typed) => (typed.length < 12 ? 'Twelve characters or more, please.' : null)} onDone={close} />
  */
 export const PassphraseModal = (props: PassphraseModalProps) => (
   <Boundary key={useRoundFor(props.vault)} fallback={<DialogTrouble onDone={props.onDone} />}>
@@ -90,12 +110,24 @@ export const PassphraseModal = (props: PassphraseModalProps) => (
   </Boundary>
 )
 
+/**
+ * What a host says of a passphrase as the user chooses it: a sentence to show beside the field, or
+ * null for nothing to say; through a promise, if it must wait.
+ *
+ * @example const passphraseAdvice: PassphraseAdvice = (typed) => (typed.length < 12 ? 'Twelve characters or more, please.' : null)
+ */
+export type PassphraseAdvice = (passphrase: string) => string | null | Promise<string | null>
+
 /** What PassphraseModal is handed. */
-type PassphraseModalProps = {
-  vault:           Vault
-  onDone:          (unlocked: boolean) => void
+export type PassphraseModalProps = {
+  vault:               Vault
+  onDone:              (unlocked: boolean) => void
   /** Whether to offer a user who has forgotten the passphrase to erase the vault and start a new one. */
-  allowStartOver?: boolean | undefined
+  allowStartOver?:     boolean | undefined
+  /** What a password manager files the passphrase under. Default: the user and the vault, as 'u1 (main vault)'. */
+  passphraseUsername?: string | undefined
+  /** What to say beside the field as the user chooses a passphrase. Default: nothing. */
+  passphraseAdvice?:   PassphraseAdvice | undefined
 }
 
 /** Escape, from anywhere in a dialog, cancels it, and goes no further: a host's own Escape handler never hears it too. */
@@ -151,10 +183,79 @@ const holdsFocus = (container: HTMLElement | null): boolean => {
   return container.contains(focused)
 }
 
+/**
+ * What the host's `passphraseAdvice` last said of the text typed so far, and `hear`, which asks it
+ * of a new text. Only the answer to the latest text is kept; an empty text has nothing said of
+ * it; advice that throws or rejects goes to `fail`.
+ */
+const useAdvice = (passphraseAdvice: PassphraseAdvice | undefined, fail: (err: unknown) => void) => {
+  const [said, setSaid] = useState<string | null>(null)
+  const asked = useRef(0)
+  const hear = async (typed: string) => {
+    if (passphraseAdvice === undefined) { return }
+    asked.current += 1
+    if (typed === '') { setSaid(null); return }
+    const askedNow = asked.current
+    try {
+      const answer = await passphraseAdvice(typed)
+      if (askedNow === asked.current) { setSaid(answer) }
+    } catch (err) {
+      fail(err)
+    }
+  }
+  return { said, hear }
+}
+
+/**
+ * The passphrase field, made for password managers: the hidden username they file it under, the
+ * field itself (`new-password` while choosing, `current-password` while unlocking), uncontrolled
+ * so that React writes nothing typed into the page, its Show / Hide button, and, when there is
+ * advice to give (`advice` is not undefined), the polite region that says it.
+ */
+const PassphraseField = ({ ref, creating, takesFocus, username, advice, onChange }: {
+  ref:        Ref<HTMLInputElement>
+  creating:   boolean
+  takesFocus: boolean
+  username:   string
+  advice:     string | null | undefined
+  onChange:   (typed: string) => void
+}) => {
+  const reveal = useRevealToggle(Messages.showPassphrase, Messages.hidePassphrase)
+  const fieldId = useId()
+  const adviceId = useId()
+  const credential = creating ? 'new-password' : 'current-password'
+  return (
+    <>
+      {/* What a password manager files the passphrase under: never shown, never typed. */}
+      <input type="text" name="username" autoComplete="username" value={username} readOnly hidden />
+      <span className="passphrase-field">
+        <input
+          id={fieldId}
+          ref={ref}
+          type={reveal.fieldType}
+          name={credential}
+          autoComplete={credential}
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck="false"
+          // eslint-disable-next-line jsx-a11y/no-autofocus -- moving focus to the dialog's first field on open is the WAI-ARIA dialog pattern; the rule aims at page-load autofocus
+          autoFocus={takesFocus}
+          aria-label={Messages.passphraseField}
+          aria-describedby={advice === undefined ? undefined : adviceId}
+          placeholder={Messages.passphraseField}
+          onChange={(evt) => { onChange(evt.target.value) }}
+        />
+        {reveal.button(fieldId)}
+      </span>
+      {/* Mounted with the field, so that each word put in it is announced, politely. */}
+      {advice !== undefined && <p className="quiet" id={adviceId} role="status">{advice}</p>}
+    </>
+  )
+}
+
 /** The dialog itself, inside PassphraseModal's boundary. */
-const UnlockForm = ({ vault, onDone, allowStartOver }: PassphraseModalProps) => {
+const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphraseAdvice }: PassphraseModalProps) => {
   const snapshot = useSyncExternalStore(vault.subscribe, vault.getSnapshot)
-  const [passphrase, setPassphrase] = useState('')
   const [gripe, setGripe] = useState<Gripe | null>(null)
   const [startingOver, setStartingOver] = useState(false)
   // While an erase runs, so that a second press never starts another.
@@ -165,6 +266,7 @@ const UnlockForm = ({ vault, onDone, allowStartOver }: PassphraseModalProps) => 
   const blurbId = useId()
   // Wrapped, so that a failure carrying any value at all still reads as "failed".
   const [failure, setFailure] = useState<{ err: unknown } | null>(null)
+  const advice = useAdvice(passphraseAdvice, (err) => { setFailure({ err }) })
   if (failure !== null) { throw failure.err }
   const creating = snapshot.state === 'absent'
   const passkeyFirst = ! creating && offersPasskey(snapshot)
@@ -186,7 +288,7 @@ const UnlockForm = ({ vault, onDone, allowStartOver }: PassphraseModalProps) => 
     evt.preventDefault()
     setGripe(null)
     try {
-      await vault.unlock(passphrase)
+      await vault.unlock(fieldRef.current?.value ?? '')
       onDone(true)
     } catch (err) {
       // The vault was locked while this unlock was under way, and the lock wins: as if dismissed.
@@ -211,6 +313,12 @@ const UnlockForm = ({ vault, onDone, allowStartOver }: PassphraseModalProps) => 
     }
   }
 
+  /** Each change to the field: a word about what was typed before goes, and, while choosing, the host's advice is asked anew. */
+  const hearPassphrase = (typed: string) => {
+    setGripe((prev) => (prev?.fromPasskey === true ? prev : null))
+    if (creating) { void advice.hear(typed) }
+  }
+
   const passkeyGripe = (text: string | null) => {
     setGripe(text === null ? null : { text, fromPasskey: true })
     // A passkey button that took itself away took the focus with it: back to the passphrase.
@@ -229,15 +337,13 @@ const UnlockForm = ({ vault, onDone, allowStartOver }: PassphraseModalProps) => 
             <>
               {/* eslint-disable-next-line jsx-a11y/no-autofocus -- the passkey is the dialog's first choice: the WAI-ARIA dialog pattern moves focus to its first control */}
               {passkeyFirst && <PasskeyUnlockButton vault={vault} autoFocus onDone={onDone} onGripe={passkeyGripe} />}
-              <input
-                type="password"
-                // eslint-disable-next-line jsx-a11y/no-autofocus -- moving focus to the dialog's first field on open is the WAI-ARIA dialog pattern; the rule aims at page-load autofocus
-                autoFocus={! passkeyFirst}
+              <PassphraseField
                 ref={fieldRef}
-                aria-label={Messages.passphraseField}
-                placeholder={Messages.passphraseField}
-                value={passphrase}
-                onChange={(evt) => { setPassphrase(evt.target.value); setGripe((prev) => (prev?.fromPasskey === true ? prev : null)) }}
+                creating={creating}
+                takesFocus={! passkeyFirst}
+                username={passphraseUsername ?? Messages.passphraseUsername(snapshot.scope.user_id, snapshot.scope.vaultlabel)}
+                advice={creating && passphraseAdvice !== undefined ? advice.said : undefined}
+                onChange={hearPassphrase}
               />
             </>
           )}
@@ -257,7 +363,7 @@ const UnlockForm = ({ vault, onDone, allowStartOver }: PassphraseModalProps) => 
               <button type="submit">{creating ? Messages.createButton : Messages.unlockButton}</button>
               <button type="button" onClick={() => { onDone(false) }}>{Messages.cancelButton}</button>
               {allowStartOver === true && ! creating && (
-                <button type="button" className="quiet" onClick={() => { setStartingOver(true); setPassphrase(''); setGripe(null) }}>{Messages.startOverButton}</button>
+                <button type="button" className="quiet" onClick={() => { setStartingOver(true); setGripe(null) }}>{Messages.startOverButton}</button>
               )}
             </div>
           )}

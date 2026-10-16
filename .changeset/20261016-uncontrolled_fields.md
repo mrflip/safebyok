@@ -1,0 +1,6 @@
+---
+"safebyok": minor
+"safebyok-react": minor
+---
+
+`WhisperField` is uncontrolled, so React never writes a typed whisper into the page's markup: it no longer takes `value`, and `onChange` is optional. A host drops `value={...}` and keeps `onChange`, or reads the text from its form (`new FormData(form).get('whisper_text')`) or through a `ref`; to empty it, reset the form or remount it with a new `key`. The passphrase dialog's field is uncontrolled too, with a Show / Hide button, and is made for password managers: a real form, `autocomplete="new-password"` while creating and `current-password` while unlocking, and a hidden `autocomplete="username"` field naming what the manager files it under (`passphraseUsername` on `VaultProvider` and `PassphraseModal`, default `<user_id> (<vaultlabel> vault)`). New on both: `passphraseAdvice`, a host function whose answer shows beside the field, announced politely, as the user chooses a passphrase; the `PassphraseAdvice` and `PassphraseModalProps` types are exported. In `safebyok`, `WhisperFieldAttributes.autoComplete` is now `'off'` (was `'new-password'`, which invites a browser's password generator): a whisper field turns autofill away.

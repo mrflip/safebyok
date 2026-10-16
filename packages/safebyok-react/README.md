@@ -28,8 +28,10 @@ otherwise write itself.
   goes no further; its error line is a live region a screen reader announces. It follows the
   vault as it changes, and starts afresh when handed another. With `allowStartOver`, a user who
   has forgotten the passphrase may erase the vault and start a new one (*Starting over*, below).
+  Its passphrase field is made for password managers, with a Show / Hide button and room for your
+  advice beside it (*The passphrase field*, below).
 * `WhisperField` -- the field a user types or pastes a whisper into, hidden as they type, with a
-  Show / Hide button; password managers are asked to leave it alone (*Entering a whisper*,
+  Show / Hide button; password managers and autofill are turned away (*Entering a whisper*,
   below).
 * `createPasskey()`, `askPasskey()`, `passkeysAvailable()` and `PasskeyUnlockButton` -- the
   WebAuthn half of a fingerprint (passkey, security key) unlock, below. The three functions import
@@ -180,6 +182,45 @@ passphrase" for the new one; the action that summoned it runs again there. It is
 a vault with another way in (a second passphrase, a passkey) may not need it, and it erases
 every lockbox.
 
+## The passphrase field
+
+The dialog's passphrase field is built to be the field a password manager handles best, so a user
+can keep a long, generated passphrase without remembering it: a real `<form>`, `type="password"`,
+`autocomplete="new-password"` while it creates the vault (the manager offers to generate one, and
+to save it once the dialog closes) and `autocomplete="current-password"` while it unlocks (the
+manager offers the one it saved). Beside it, a hidden field with `autocomplete="username"` names
+what the manager files the passphrase under: by default the user and the vault, `u1 (main
+vault)`. Name it yourself with `passphraseUsername`, on `VaultProvider` or `PassphraseModal` --
+but never the user's sign-in name alone: the vault passphrase is not their sign-in password, and a
+manager that saw a new password for their sign-in name would offer to overwrite the one they log
+in with.
+
+```tsx
+<VaultProvider {...browserOpts()} applabel="acme" vaultlabel="main" userId={userId} vaultDB={vaultDB}
+  passphraseUsername={`${email} (vault)`}>
+```
+
+It has a Show / Hide button (`aria-pressed`), flipping the field between `password` and `text`,
+and is never capitalized, corrected or spell-checked, shown or hidden. Like `WhisperField`, it is
+uncontrolled: React never writes the passphrase into the page.
+
+**Advice while choosing.** Pass `passphraseAdvice`, a function of what has been typed, and what it
+answers shows beside the field as the user chooses a passphrase: tied to the field by
+`aria-describedby`, announced politely (`role="status"`), only the answer to the latest text kept.
+It answers a sentence, or null for nothing to say, and may answer through a promise. It is never
+asked while unlocking, and it is advice, not a gate: the user may still create the vault, and what
+the vault itself refuses shows as any refusal does. Say what helps -- length, and how guessable
+the passphrase is -- rather than rules of composition: NIST SP 800-63B advises against requiring
+capitals, digits or symbols, which make passphrases harder to remember and no harder to guess.
+
+```tsx
+const passphraseAdvice = (typed: string) => (typed.length < 12 ? 'Twelve characters or more, please.' : null)
+<VaultProvider ... passphraseAdvice={passphraseAdvice}>
+```
+
+An advice function that throws, or rejects, shows the dialog's calm "Something went wrong", as any
+other failure inside it does.
+
 ## The dialog's words
 
 Every word the binding shows a user lives in one module, `src/messages.ts`, sentence by
@@ -201,34 +242,47 @@ went wrong" notice in place of the form.
 
 ## Entering a whisper
 
-`WhisperField` is a controlled input for an API key or another whisper: hidden as the user types,
-with a Show / Hide button (`aria-pressed`) to check it. It is named `whisper_text` -- a password
-manager looks for `key`, `password` and `token` -- and carries `WhisperFieldAttributes` from
-`safebyok/utils`: each major password manager's flag to ignore it, `autocomplete="new-password"`,
-and no capitalizing, correcting or spell-checking (a browser's enhanced spell-check may send what
-is typed to its maker's servers). It shows no placeholder unless you give one; any other input
-attribute passes through.
+`WhisperField` is the input for an API key or another whisper: hidden as the user types, with a
+Show / Hide button (`aria-pressed`) to check it. A whisper is no credential, so where the
+passphrase field invites password managers, this one turns them away: it is named `whisper_text`
+-- a password manager looks for `key`, `password` and `token` -- and carries
+`WhisperFieldAttributes` from `safebyok/utils`: each major password manager's flag to ignore it,
+`autocomplete="off"` (nothing saved fills it, nothing is generated for it), and no capitalizing,
+correcting or spell-checking (a browser's enhanced spell-check may send what is typed to its
+maker's servers). It shows no placeholder unless you give one; any other input attribute passes
+through, `ref` among them.
+
+It is uncontrolled: it takes no `value`, and React never writes what is typed into the page
+(*Revealing a whisper*, below). Hear the text through `onChange`, read it from the form under its
+name, or through a `ref`; to empty it, reset the form or give the field a new `key`.
 
 ```tsx
 import { WhisperField } from 'safebyok-react'
 
 const [keyText, setKeyText] = useState('')
-<WhisperField value={keyText} onChange={setKeyText} placeholder="sk-ant-…" aria-label="Anthropic API key" />
+<WhisperField onChange={setKeyText} placeholder="sk-ant-…" aria-label="Anthropic API key" />
+
+// or, in a form:
+<form onSubmit={(evt) => { evt.preventDefault(); void save(new FormData(evt.currentTarget).get('whisper_text')) }}>
+  <WhisperField aria-label="Anthropic API key" /> <button>Save</button>
+</form>
 ```
 
 A field of your own, or another framework's, spreads the same attributes:
 `<input name="whisper_text" type="password" {...WhisperFieldAttributes} />`. Each manager
-honors only its own flag, and a browser's built-in manager may honor none.
+honors only its own flag, and a browser's built-in manager may honor none: Chrome's still offers a
+saved password for a `type="password"` field, `autocomplete="off"` or not.
 
 ## Revealing a whisper
 
 A whisper you show the user -- a "view" button, an edit form filled with the stored key, the
 field above while they type -- is in React state, and so in your component tree's memory, until
 that state lets go of it: React DevTools shows it, and an error reporter that captures props or
-state may send it. That is the cost of showing it; keep it as small as the feature allows. A controlled input --
-`WhisperField` among them -- carries more: React 19 copies its value into the element's `value`
-attribute, so the whisper as typed is in the page's markup (`outerHTML`), where a CSS attribute
-selector, a browser extension or a session-replay tool can read it, hidden or shown. Show
+state may send it. That is the cost of showing it; keep it as small as the feature allows. A
+controlled input carries more: React 19 copies its value into the element's `value` attribute, so
+the whisper as typed is in the page's markup (`outerHTML`), where a CSS attribute selector, a
+browser extension or a session-replay tool can read it, hidden or shown. `WhisperField` and the
+passphrase dialog are uncontrolled for that reason; a field of your own should be too. Show
 `mask(whisper)` (from `safebyok/utils`) where the user only needs to tell keys apart; read a
 whisper into state only when the user asks to see or edit it, and drop it (set the state back)
 when they hide it, save, or navigate away; and to use a whisper, call `vault.use(boxlabel,
