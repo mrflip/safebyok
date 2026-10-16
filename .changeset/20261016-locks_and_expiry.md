@@ -3,7 +3,7 @@
 "safebyok-react": minor
 ---
 
-**Renamed: every `Ms` is now `Millis`.** `ForeverMs` is `ForeverMillis`, and a vault's `reentryWindowMs` is its `reentryWindowMillis`; `safebyok/testing`'s timing constants follow. Rename them where your app reads them. New exports: `MinuteMillis`, and `MaxReentryHours` (588).
+**Renamed: every `Ms` is now `Millis`.** `ForeverMs` is `ForeverMillis`, and a vault's `reentryWindowMs` is its `reentryWindowMillis`. Rename them where your app reads them. New exports: `MinuteMillis`, and `MaxReentryHours` (588).
 
 **The unlock window has a hard edge.** `forcePassphraseReentryHours` takes a number of hours up to 588 (24.5 days), or `Infinity` for "until `lock()`"; a finite number past 588 is now refused with `bad_option`, where it used to be clamped. From `askPassphraseAt` no new work starts, and a minute later a timer drops the vaultKey, with no call needed; a timer that runs late is caught at the next call. The timer is `unref`'d, so it never keeps a Node or Bun process alive. Compare `askPassphraseAt` (and `reentryWindowMillis`) against `FarFuture - MinuteMillis` (`ForeverMillis - MinuteMillis`) to say "until locked", never for equality.
 
