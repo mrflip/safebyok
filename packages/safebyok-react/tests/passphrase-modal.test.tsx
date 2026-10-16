@@ -387,5 +387,16 @@ describe("PassphraseModal", () => {
       await screen.findByText('Storage could not be reached; try again in a moment.')
       expect(screen.queryByText('Erase and start over')).to.not.be.null
     })
+
+    it("asks afresh once the vault it was asked of changed elsewhere, rather than erasing the one that stands", async () => {
+      const destroy = vi.fn().mockRejectedValue(new VaultError('stale_write', 'The vault changed in storage since this device read it.'))
+      render(<PassphraseModal vault={TH.stubVault({ destroy })} allowStartOver onDone={noop} />)
+      fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
+      fireEvent.click(screen.getByText('Erase and start over'))
+      await screen.findByText('The vault changed in storage since this device read it.')
+      expect(screen.queryByText('Erase and start over')).to.be.null
+      expect(screen.queryByPlaceholderText('vault passphrase')).to.not.be.null
+      expect(destroy).toHaveBeenCalledOnce()
+    })
   })
 })
