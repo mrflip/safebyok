@@ -43,7 +43,7 @@ import { idbVaultDB } from 'safebyok-indexeddb'
 
 const vault = await openVault({
   applabel:   'acme',
-  userId:     session.userId,                 // stable and opaque, from your auth, 1 to 100 characters; never an email
+  userId:     session.userId,                 // your auth's stable, opaque id for the user; never an email
   vaultlabel: 'main',
   vaultDB:    idbVaultDB({ dbName: 'acme' }), // or your backend's adapter
   ...browserOpts({ dbName: 'acme' }),         // the key deriver and device store a browser wants
@@ -68,9 +68,10 @@ makes for itself. Any option you pass after the spread replaces the default it n
   window onto its rows for a debug panel. The IndexedDB vault store, `idbVaultDB`, is a package
   of its own, `safebyok-indexeddb`.
 * `safebyok/validators` -- the checks for names and notes (`Label`, `UserId`, `LockboxNote`,
-  `DefaultValidators`, `AnyTextValidators`) and their bounds (`MaxLabelChars`, `LabelPattern`,
-  `MaxUserIdChars`, `MaxNoteChars`), for a form, a server or another library to check what the
-  vault will, at a few kB. All are in the main entry too, with the record schemas (`Whisper`,
+  `DefaultValidators`, `AnyTextValidators`), the floor beneath them all (`NameFloor`,
+  `NoteFloor`), and their bounds (`MaxLabelChars`, `LabelPattern`, `MaxUserIdChars`,
+  `UserIdPattern`, `MaxNoteChars`, `NameFloorBytes`, `NoteFloorBytes`), for a form, a server or
+  another library to check what the vault will, at a few kB. All are in the main entry too, with the record schemas (`Whisper`,
   `EpochMillis` and the rest).
 
 `openVault` takes its `keyDeriver` and `deviceDB` from you, with no default behind them. A
@@ -85,12 +86,13 @@ marked `sideEffects: false`: what you never import never ships.
 
 By default a label (`applabel`, `vaultlabel`, `boxlabel`, and the `unlocklabel` of each way in
 you add) is lowercase words of letters and digits joined by single underscores, 2 to 40
-characters (`Label`); a `userId` is text of 1 to 100 characters (`UserId`); and a note is text
-of at most 256 characters, with no control characters but tab and newline (`LockboxNote`). That suits API keys. Every default, `AnyTextValidators`
-included, refuses text that is not well-formed Unicode: a lone surrogate, half of a character such
-as an emoji, which text cut off mid-character holds and which storage such as Convex refuses. A host that wants more -- labels in Hebrew, Arabic or Thai, a password manager's
-long notes, its own auth's id shape -- passes its own Zod schemas as `validators`, and each
-**replaces** ours outright:
+characters (`Label`); a `userId` is 1 to 100 ASCII letters, digits and `-_.:@+|` (`UserId`),
+which holds every stable id an auth provider issues -- a UUID, Auth0's `provider|id`, Clerk's
+`user_...`, a DID -- and pass your provider's stable, opaque id, never an email or a handle,
+which can change and would orphan the vault; and a note is at most 256 characters, with no
+control characters but tab and newline (`LockboxNote`). That suits API keys. A host that wants
+more -- labels in Hebrew, Arabic or Thai, a password manager's long notes, its own auth's id
+shape -- passes its own Zod schemas as `validators`, and each **replaces** ours:
 
 ```ts
 import * as z from 'zod'
@@ -98,7 +100,7 @@ import { AnyTextValidators, UserId } from 'safebyok/validators'
 
 // Built once, at module level.
 const validators = {
-  ...AnyTextValidators,                                 // labels and notes of any text
+  ...AnyTextValidators,                                 // labels and notes of any text above the floor
   boxlabel: z.string().min(1).max(200),                 // ...but box names of 1 to 200 characters
   userId:   z.string().regex(/^user_[A-Za-z0-9]{27}$/), // and Clerk's user ids
 }
@@ -106,29 +108,44 @@ const vault = await openVault({ applabel: 'acme', userId, vaultlabel: 'main', va
 await vault.store('מפתח OpenAI: עבודה', 'sk-...', { note: 'the team account, billed monthly' })
 ```
 
+* **The floor holds beneath every check.** Whatever your schemas admit, a name is one character
+  to 1 KiB of UTF-8, a note at most 4 KiB, each well-formed Unicode (no lone surrogate, half of
+  a character), in Unicode's composed form (NFC), and with no control character (a note may hold
+  tab and newline): `NameFloor` and `NoteFloor`. Below it is `bad_label` (`bad_option` for a
+  note), and a stored record below it reads back as damaged. Your storage may hold less: a
+  key-value store refuses the character it joins names on (`^` by default, which no default
+  admits), and Postgres a name over 640 bytes (`VAULTDB.md`, *Names*).
 * **A check only checks.** What passes is kept exactly as you passed it, never what the schema
   makes of it: a name is bound into the ciphertext and names its rows, so a schema that trims or
-  lowercases would otherwise send the same user to another vault.
+  lowercases would otherwise send the same user to another vault. Nothing is normalized either:
+  text not in NFC is refused, never composed for you.
+* **Your checks are an alarm at the door, not a promise about storage.** They run where a name
+  enters the vault: `openVault` (the scope), `store()` (the boxlabel and note), `addPassphrase`
+  and `addPasskey` (the unlocklabel). A lockbox already stored under a name or note they refuse
+  -- by another client, or before you narrowed them -- lists, reads and erases as any other, by
+  the name it was stored under; `store()` refuses only to write a new one under a refused name.
+  With nothing stored under it, a name they refuse is `bad_label` at `read()`, `use()` and
+  `erase()`. The first way in, which the vault names `passphrase`, is not checked.
+* **Widen with care.** A check admitting text outside ASCII should require NFC, as the floor
+  does, and widen only once every client you serve runs the wider check: an older one refuses at
+  its door the names a newer one stores.
 * **The refusal is the vault's own**: kind `bad_label` (`bad_option` for a note), naming the
   field, never quoting the name or your schema's issues. Where one of our checks refused, it says
   what was wrong (too long, a control character, not well-formed); your schema's, it names only.
   A schema must check synchronously; one that is async or throws is refused as `bad_option`,
-  carrying nothing of what it threw.
+  carrying nothing of what it threw. Each refusal names the first failure: a form checks its
+  fields with the exported schemas first, and the vault's refusal is the backstop.
 * **A misspelt field is refused**, as `bad_option`: `boxLabel` would otherwise leave the default
   check quietly in place. `checkValidators(bag)` runs that check alone, for a binding or wrapper
   that takes the bag apart (`VaultProvider` does).
-* **Every name is checked everywhere**, records read back included. Narrow a check later and a
-  lockbox stored under a name or note the new one refuses is listed as damaged (see *Damaged
-  lockboxes*). `erase()` still reaches it by the name it was stored under; `store()` refuses a
-  refused name, and stores afresh over a box whose note alone is refused. An `unlocklabel` is
-  checked only as a way in is added: one already stored still opens the vault, whatever the
-  check says now, and the first way in, which the vault names `passphrase`, is not checked.
 * **Sizes follow the names.** Each `store()` weighs its lockbox -- whisper, names and note -- and
   refuses one heavier than the backend holds in a record (`lockbox_too_large`), or one that
   would take the vault past what the backend holds of a vault (`vault_full`). The record is
   weighed as its real serialized bytes; the vault's total is a conservative estimate made before
   the lockbox is sealed (each counted at twice `maxWhisperBytes`, with its names and note as
   measured), so at a `maxVaultBytes` set exactly tight it may refuse a write that would just fit.
+  `maxWhisperBytes` is checked as a whisper is stored, never as one is read, so lowering it
+  strands nothing.
 * Labels of any text are shown to your users as written: mind what bidirectional and invisible
   characters can make one look like.
 
@@ -142,26 +159,27 @@ through a turnstile -- and it races your writes from two devices, holding one be
 trip while the other moves ([Proving the races](VAULTDB.md#proving-the-races)). A backend with columns (Convex, SQL) keeps
 the applabel, user id, vaultlabel and boxlabel in columns of their own. A backend that holds rows
 under one string -- a key-value store, localStorage -- files them under `Ckeys`, as
-`localVaultDB` and `idbVaultDB` do:
+`localVaultDB` and `idbVaultDB` do, names joined on `^`:
 
 ```ts
 import { Ckeys } from 'safebyok'
 
-Ckeys.bundle(scope)            // '["vault","acme","u1","main"]'
-Ckeys.box(scope, 'anthropic')  // '["box","acme","u1","main","anthropic"]'
-Ckeys.boxPrefix(scope)         // '["box","acme","u1","main",' -- every lockbox of the vault, by prefix scan
-store.ckeys().filter(Ckeys.isBoxIn(scope))  // every lockbox of the vault, from a list of every ckey
+const ckeys = Ckeys.joiner()   // or Ckeys.joiner('/'), say, for a store with folders
+ckeys.bundle(scope)            // 'vault^acme^u1^main'
+ckeys.box(scope, 'anthropic')  // 'box^acme^u1^main^anthropic'
+ckeys.boxPrefix(scope)         // 'box^acme^u1^main^' -- every lockbox of the vault, by prefix scan
+store.ckeys().filter(ckeys.isBoxIn(scope))  // every lockbox of the vault, from a list of every ckey
 ```
 
-Each ckey is the JSON text of its kind and names, so a name may hold any text at all -- a colon, a
-quote, a bracket -- and no two vaults ever share a ckey or list each other's lockboxes. The ckeys
-are part of the stored format: use these, not a join of your own, and every version finds your
-rows.
+A name holding the delimiter is refused (`bad_label`) rather than joined, so no two vaults ever
+share a ckey or list each other's lockboxes; declare it as your adapter's `reservedNameChars`, and
+the base class refuses such a name before your code sees it. The ckeys are part of the stored
+format: use these, not a join of your own, and every device finds your rows.
 
-Your `do*` methods take any text as a name: the public verbs check every name and note, with the
-vault's `validators`, which each takes as its last argument. Handed none, a verb admits any
-well-formed text (`AnyTextValidators`), so an adapter that hands its calls on to another VaultDB's
-public verbs need pass nothing, its own having checked.
+Your `do*` methods take any name the base class passed: every public verb holds each name to the
+floor and to your adapter's declared `maxNameBytes` and `reservedNameChars`, and takes no
+validators of the host's, which are the vault's own. So an adapter that hands its calls on to
+another VaultDB's public verbs passes each call through as it came.
 
 ## Key derivation
 
@@ -532,17 +550,17 @@ refusal on every device that saw a newer copy than the backup.
 
 ### Damaged lockboxes
 
-A lockbox whose stored record does not read back -- not JSON, a malformed note or time, a
-record naming another boxlabel than the one it is stored under, one from a newer safebyok, or
-one stored under a boxlabel or with a note the vault's `validators` now refuse -- is listed in the snapshot as damaged, `{ boxlabel, damaged: true }`, sorted among the sound
-ones, which carry `damaged: false`. The rest of the vault opens and works as ever. `read()` and
-`use()` refuse a damaged lockbox (`bad_label` for one under a name the checks refuse,
-`damaged_lockbox` otherwise); `erase()` removes it by the name it is listed under, whatever the
-boxlabel check now says, and `store()` writes a fresh lockbox over it -- except under a name the
-check refuses, which `store()` refuses with `bad_label`, writing nothing, since the lockbox it
-made would list as damaged still. A damaged lockbox's boxlabel is whatever text it is stored
-under, which your boxlabel check may refuse: show it as text, never as markup. Show it as
-removable:
+A lockbox whose stored record does not read back -- not JSON, a malformed time, a note below
+the floor, a record naming another boxlabel than the one it is stored under, or one from a newer
+safebyok -- is listed in the snapshot as damaged, `{ boxlabel, damaged: true }`, sorted among
+the sound ones, which carry `damaged: false`. (One stored under a name or note your `validators`
+refuse is not damaged: it lists and reads as any other.) The rest of the vault opens and works
+as ever. `read()` and `use()` refuse a damaged lockbox with `damaged_lockbox`; `erase()` removes
+it by the name it is listed under, and `store()` writes a fresh lockbox over it -- except under a
+name your boxlabel check refuses, which `store()` refuses with `bad_label`, writing nothing. A
+damaged lockbox's boxlabel is the name it is stored under, above the floor but perhaps one your
+boxlabel check refuses: show it as text, never as markup. A row stored under a name below the
+floor, which no call could reach, is not listed. Show it as removable:
 
 ```ts
 for (const box of vault.getSnapshot().boxes) {

@@ -140,8 +140,12 @@ without `format` -- which the browser's VaultDB may not hand back from its own l
 * **A refusal crosses**: the server's VaultError comes back as the same VaultError, kind and
   message. Anything else -- the network down, a server not serving this schema -- refuses with
   kind `storage_unavailable`, urql's own error as its `cause`.
-* **It holds a record to 1 MiB**, as the Postgres VaultDB behind it does, and a vault to no size
-  of its own.
+* **It holds a record to 1 MiB**, and a name to 640 bytes of UTF-8, as the Postgres VaultDB
+  behind it does, and a vault to no size of its own.
+* **The server checks** who may reach which vault, that each write is atomic, and that each
+  record has its shape and each name is above the floor and within its storage's limits (the
+  VaultDB verbs' own checks, `VAULTDB.md`, *Names*); never a label grammar or a note's length,
+  which are each browser vault's own `validators`.
 * **It declares the lockbox limit your server holds a vault to**: 1000, the Postgres VaultDB's
   own unless told otherwise, or the `maxLockboxes` you pass (`graphqlVaultDB(client, {
   maxLockboxes: 250 })`; `Infinity` for a server that sets none). Pass the number your server's

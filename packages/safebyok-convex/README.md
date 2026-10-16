@@ -140,10 +140,10 @@ Three tables, inside the component, beside nothing of your app's:
   they keep.)
 * `user_id` leads the bundle and lockbox indexes, so one user's rows are one range of each.
 * **Any text is a name** to the component: it never sees the vault's `validators`, which check
-  every name and note on the client. Convex's documentation requires every string to be valid
-  Unicode, so safebyok's checks, `AnyTextValidators` among them, refuse a lone surrogate (half of a
-  character) before it is sent. A host's own schema that admits one sends it as written: what the
-  Convex server then says is its own, and reaches you as `storage_unavailable`.
+  each name and note where it enters the vault, on the client. The floor beneath them, which the
+  client's VaultDB holds every name to whatever the validators say, refuses what Convex could
+  not store: a lone surrogate (half of a character, which Convex's documentation forbids in a
+  string), a control character, text not in NFC, a name over 1 KiB.
 * **A vault's tally** counts its lockboxes and their bytes as Convex weighs them, kept in step
   by every lockbox write and erase in the same transaction. A vault written before tallies
   were kept has none, and reads as ever: its next lockbox write counts it, reading the vault

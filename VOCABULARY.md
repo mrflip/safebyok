@@ -90,17 +90,18 @@ wrong or has been tampered with, decryption fails.
 How a vault is addressed, what the storage layer holds, and when. A label is, by default
 (`Label`), lowercase words of letters and digits joined by single underscores, such as
 `anthropic_api_key`; a host may check its labels, user ids and notes with its own `validators`
-instead, which admit what they will.
+instead, which admit what they will above the **floor** every name and note is held to (`NameFloor`,
+`NoteFloor`: well-formed Unicode in NFC, no control characters, 1 KiB a name and 4 KiB a note).
 
 | Name                            | What it is                                                                                                                                                                  |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **applabel**                    | Your app's own label, so several apps can share one backend without colliding. Stored as `applabel`.                                                                        |
 | **vaultlabel**                  | The label of one of a user's vaults, such as `main`. Stored as `vaultlabel`.                                                                                                |
 | **boxlabel**                    | The label of a lockbox within its vault: what you pass to `store`, `read`, `use` and `erase`. Stored as `boxlabel`.                                                         |
-| **userId**                      | The signed-in user's id from your own auth, the one name in a scope that is not a label: by default text of 1 to 100 characters (`UserId`). Stored as `user_id`.            |
+| **userId**                      | The signed-in user's stable, opaque id from your own auth, the one name in a scope that is not a label: by default 1 to 100 ASCII letters, digits and `-_.:@+\|` (`UserId`). Never an email or a handle, which can change. Stored as `user_id`. |
 | **scope**                       | An applabel, a userId and a vaultlabel together: it names one vault (`VaultScope`).                                                                                         |
 | **note**                        | A lockbox's public text, by default up to 256 characters with no control characters but tab and newline (`LockboxNote`), which your UI may show while the vault is locked. It is never encrypted: never put a secret in it. |
-| **damaged**                     | Said of a lockbox whose stored record does not read back as one. The snapshot lists it as `{ boxlabel, damaged: true }` (`DamagedLockbox`) beside the sound ones; `erase()` removes it, `store()` writes a fresh lockbox over it, and `read()` refuses it. A lockbox stored under a name or note the vault's validators now refuse is damaged too; `store()` refuses a refused name, and only `erase()` reaches a lockbox under one. |
+| **damaged**                     | Said of a lockbox whose stored record does not read back as one. The snapshot lists it as `{ boxlabel, damaged: true }` (`DamagedLockbox`) beside the sound ones; `erase()` removes it, `store()` writes a fresh lockbox over it, and `read()` refuses it. A lockbox stored under a name or note the vault's validators refuse is not damaged: it lists and reads as any other, and only `store()` refuses the name. |
 | **bundle**                      | The one record per vault that every device syncs (`VaultBundle`): the vaultId, unlockEpoch and vaultKeyEpoch, the prior vaultKey once there is one, and its unlocks, each an unlock envelope. Nothing in it opens without a passphrase. |
 | **device unlock**               | (Also a remembered unlock.) What a device keeps to unlock without the passphrase (`DeviceUnlock`): the localUnlockKey, the vaultKeyLocalWrapped, the vaultId, the unlockEpoch and the askPassphraseAt. It stays on the device. |
 | **device mark**                 | What a device keeps of a vault, locked or not (`DeviceMark`): its own deviceId for the vault, the vaultId, and the highest unlockEpoch and vaultKeyEpoch it has seen the bundle at. Nothing in it is secret; it stays on the device, `lock()` leaves it and `destroy()` erases it. |
@@ -113,7 +114,8 @@ instead, which admit what they will.
 | **forcePassphraseReentryHours** | The `openVault` option for how long a device stays unlocked after the passphrase is entered. The default is 168 (`ForcePassphraseReentryHours`); `Infinity` means until it is locked. A vault reports the window it was opened with as `reentryWindowMs`, in milliseconds; `Infinity` reads as `ForeverMs`. |
 | **EpochMillis**                 | Every time safebyok keeps: whole UTC milliseconds since 1970, from `FarPast` (1981) to `FarFuture` (2255). The bounds catch seconds and microseconds passed by mistake.      |
 | **format**                      | The tag at the head of every stored record (`safebyok-vault-v2`, `safebyok-lockbox-v2`, `safebyok-unlock-v1`, `safebyok-mark-v1`). It is also the first part of the cipherAdditionalData. Any change to what a record may hold moves its format on. |
-| **validators**                  | The `openVault` option holding a host's own checks for its labels, user id and note (`VaultValidators`), each replacing safebyok's default. A check only checks: what passes is kept as given. |
+| **validators**                  | The `openVault` option holding a host's own checks for its labels, user id and note (`VaultValidators`), each replacing safebyok's default, run where a name enters the vault and never on what storage hands back. A check only checks: what passes is kept as given. |
+| **ckey**                        | Where a key-value store files a row: its kind and names joined on one delimiter (`box^acme^u1^main^anthropic`, from `Ckeys`), which no name it holds may contain. |
 | **clock**, **logger**           | Two options your app may pass to `openVault`: a source of the time (`Clock`), and a place for the vault to say what it has no one to throw to (`VaultLogger`).             |
 
 ## Other credentials

@@ -881,3 +881,31 @@ security expert who knows what questions to ask.
   refuses still opens the vault and lists as it is. Refusing it on read would make the bundle
   `corrupt_record` and lock the user out of their own vault, or hide a way in they rely on. The
   first way in, named `passphrase` by the vault itself, is not checked.
+* 2026-10-16: **ckeys are joined on `^`, and a name holding it is refused** (push_to_100_a, thread
+  1). The key-value stores (`localVaultDB`, `idbVaultDB`, `idbDeviceDB`, `memoryDeviceDB`) file
+  rows under `kind^applabel^user_id^vaultlabel[^boxlabel]` (`Ckeys.joiner()`), replacing the
+  JSON-tuple ckeys of the entry above. The join is injective only because no part holds the
+  delimiter, so that is enforced twice and cannot be turned off: every `VaultDB` verb refuses a
+  name holding a character of the adapter's declared `reservedNameChars` (`bad_label`, before the
+  adapter sees it), and the joiner itself refuses one as it composes, which also guards the device
+  shelves, which have no base class. Were either missing, `a^b` + `c` and `a` + `b^c` would share
+  a ckey: one user's lockbox under another's scope. The default validators admit neither `^` nor
+  `/`; a host that wants either passes another delimiter (`ckeyDelimiter`), and the NUL character,
+  which the floor keeps out of every name, joins names of any other text. A hash was not chosen:
+  it hides nothing (each name is plaintext in the row, and an indexed column in Convex and
+  Postgres) and loses the name of a damaged row, which the listing needs to offer `erase()`. Rows
+  under the JSON ckeys read as absent; the device shelf sweeps them as strays.
+* 2026-10-16: **a floor beneath every name and note, and the host's validators at entry only**
+  (thread 1). `NameFloor` and `NoteFloor` (well-formed Unicode, NFC, no control character but tab
+  and newline in a note, 1 KiB a name, 4 KiB a note) now run beneath whatever schema a host
+  passes, at the vault's entry, in every `VaultDB` verb, and in every record schema, so a stored
+  name or note below it reads back as damaged and never reaches `snapshot.boxes` unchecked (a row
+  stored under a name below it is not listed at all). This bounds what storage can put in front
+  of a host's UI whatever its validators: no control characters, no 1 MB label. The host's
+  `validators`, by contrast, now run only where a name enters the vault (`openVault`, `store`,
+  `addPassphrase`, `addPasskey`) and never on a record read back: a lockbox stored under a name or
+  note they refuse lists, reads and erases as sound, as an unlocklabel already did. They are an
+  alarm for the host's own use, not a promise about storage, which a server serving several
+  clients cannot keep. `VaultDB` verbs no longer take a validators bag at all, so no server or
+  wrapper can be handed the wrong one. Each adapter declares `maxNameBytes` (Postgres: 640, so a
+  lockbox's four-name primary key fits a btree entry) and the base class refuses a longer name.

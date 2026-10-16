@@ -65,6 +65,17 @@ const vaultDB = postgresVaultDB({ client: pool, userId: session.userId })
   verb needs a retry.
 * **`maxLockboxes`**, 1000 unless you say otherwise, is the most lockboxes one vault holds, as a
   best effort: see *A limit of the server's own*, below.
+* **Names of up to 640 bytes** of UTF-8 each (`maxNameBytes`): a lockbox's primary key is its
+  four names together, and Postgres holds a btree entry of at most 2704 bytes. A longer name is
+  refused with kind `bad_label` before a statement runs. No character is reserved: each name is
+  a column of its own.
+* **What the server checks** is who may reach which vault, that each write is atomic, and that
+  each record has its shape and each name is above the floor (`VAULTDB.md`, *Names*) and within
+  the limit above: the same checks every VaultDB's verbs make, on the server side of the wire.
+  It never holds a name to a label grammar or a note to a length: those are each browser vault's
+  own `validators`, checked where a name enters it. A host whose clients run different
+  validators has chosen that, and a client reads a record another's validators let through as
+  any other, never as damage.
 * **Trouble** refuses with kind `storage_unavailable`, your driver's own error as its `cause`.
   Every refusal is a `VaultError`, and its `kind` and message are safe to send to the browser;
   its `cause` is not, being your driver's, and may name your database.

@@ -71,8 +71,14 @@ list holds, so one changed in storage makes the record refuse to open.
 
 | ckey                                               | Row                       |
 | -------------------------------------------------- | ------------------------- |
-| `vault:<applabel>:<user_id>:<vaultlabel>`          | the vault's `VaultBundle` |
-| `box:<applabel>:<user_id>:<vaultlabel>:<boxlabel>` | one `Lockbox`             |
+| `vault^<applabel>^<user_id>^<vaultlabel>`          | the vault's `VaultBundle` |
+| `box^<applabel>^<user_id>^<vaultlabel>^<boxlabel>` | one `Lockbox`             |
+
+The names are joined on `^` (the core's `Ckeys`), which no name may then hold: the adapter
+declares it as its `reservedNameChars`, and a name holding one is refused with kind `bad_label`
+before anything is read or written. The default validators admit no `^`. A host whose names need
+it passes another delimiter, one character, as `idbVaultDB({ dbName, ckeyDelimiter: '/' })`, and
+keeps every vault in that database under the same one.
 
 * **Encrypted**: each whisper (`whisper_ciphered`), each lockbox's lockboxKey
   (`lockbox_key_wrapped`), and, inside the bundle, the vaultKey, wrapped under each passphrase.
@@ -83,8 +89,8 @@ list holds, so one changed in storage makes the record refuse to open.
 * **Never**: a whisper, a passphrase, any key in usable form. The remembered unlock lives in the
   device store's database, not here.
 
-The ckeys and the database name are the ones `safebyok/idb` used when it held this store, so a
-vault written there reads here unchanged.
+A vault written under the JSON-tuple ckeys of earlier versions (`["vault","acme","u1","main"]`)
+reads as absent, its rows left as they were.
 
 ### Looking at the rows
 
@@ -102,8 +108,10 @@ places:
 
 1. **`src/ckeys.ts`: where each record lives.** A ckey per record, built from its scope, so a
    read is one lookup and a vault's lockboxes are the rows under its prefix, read as a key range
-   (`boxRange`) rather than by scanning the shelf. The core's `Ckeys.boxPrefix` is exact whatever
-   characters a `user_id` holds. If your store has columns or namespaces, use them instead.
+   (`boxRange`) rather than by scanning the shelf. The core's `Ckeys.joiner()` joins on one
+   delimiter that no name may hold, so a vault's prefix (`box^acme^u1^main^`) begins its own
+   lockboxes' ckeys and no other's; declare that delimiter as your `reservedNameChars`. If your
+   store has columns or namespaces, use them instead, and reserve nothing.
 2. **`src/idb-vault-db.ts`: each verb, in one transaction of your store.** Extend `VaultDB` and
    write its `do*` methods, never its public verbs: the base class checks labels, scope, records
    and expectations on the way in, validates every record on the way out, and turns a `false`
