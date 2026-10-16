@@ -1,7 +1,7 @@
 # Thread 4: refusals_and_catchup (2026-10-16)
 
 Branch `20261016-refusals_and_catchup`, PR [#132](https://github.com/mrflip/safebyok/pull/132),
-stacked on [#127](https://github.com/mrflip/safebyok/pull/127). Justify: green; core 1677 passed /
+stacked on [#127](https://github.com/mrflip/safebyok/pull/127). Justify: green; core 1678 passed /
 33 skipped, React 111, demo 162, every other package as on #127. `pnpm size`: openVault
 **24.7 kB**, over main's 23 kB, so its one line in `.size-limit.json` is raised to **28 kB** by
 the rule, at the orchestrator's word (thread 1 sets 30 kB; thread 9 lowers all); everything
@@ -79,6 +79,22 @@ The per-row ledger the orchestrator sweeps by is beside this file:
   - Restack with thread 7: three lines of `vault-provider.tsx` (the dropped prop), mechanical.
   - `vi.setSystemTime` shifts pending fake timers, so `advance` (clock alone) makes them ring
     late: what the late-ring test relies on.
+
+* **Review** (`fixed`, `3c7631de`): `store()` over a box the listing did not yet show as damaged
+  no longer erases first; only a box listed damaged with no revision is (`isListedDamaged`), with a
+  test. Left open, minor, not built:
+  1. `close()`, an outlived relock, a clock failure and `lockSoon()` past its shut time drop the
+     key without counting a shut, so a read in flight still returns (none is a hard lock by
+     `lock()`'s doc).
+  2. `catchUp` wraps `rolled_back`, `identity_revoked`, `newer_format` and `damaged_bundle` as
+     `stale_write`, where `read()` passes the catch-up's kind through.
+  3. `isCaughtUpStale` reads the shared `syncing` flag (fails safe both ways).
+  4. A box under the prior vaultKey epoch lists sound but reads `damaged_lockbox`: latent until
+     rotation lands.
+  5. A hard lock does not stop a `store()` already past its last `keyInHand()` (P3: a write sent
+     lands).
+  6. The hand-rolled refresh queue needs the Coach's yes (now an Open Matters row; the reviewer
+     found it correct and found no library for it).
 
 * **For the Coach**: the *Open matters* list in the PR body and the report: the hand-rolled
   queue, the pre-existing race, and five calls above that a reviewer may want to see.
