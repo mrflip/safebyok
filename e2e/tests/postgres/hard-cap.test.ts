@@ -43,6 +43,8 @@ TH.describeOnPostgres('hard cap', "the README's hard-cap trigger, over a real Po
     await getDb().host.query(triggerSql(Cap))
   })
   afterEach(async () => {
+    // A failed race may leave a writer's transaction open, holding the table the drop needs.
+    await getDb().endDevices()
     await getDb().host.query('DROP TRIGGER IF EXISTS safebyok_lockboxes_capped ON safebyok_lockboxes')
   })
 
