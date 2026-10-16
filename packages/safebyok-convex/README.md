@@ -99,8 +99,7 @@ socket and its signed-in user. `safebyok-convex` itself imports nothing of React
 * **Signing out locks the vault.** Once the Convex client signs out (or signs in as someone
   else), the vault's live `watchVault` query is refused, the vault looks again, meets
   `identity_revoked`, and locks itself, as `lock()` does: an idle vault in another tab included.
-  (`openVault`'s `whenIdentityRevoked: 'stay'` turns this off.) Close the vault when your user
-  signs out all the same: in React, pass `userId={null}` to the provider.
+  Close the vault when your user signs out all the same: in React, pass `userId={null}` to the provider.
 * **Other devices' writes arrive live.** The vault watches `watchVault` and refreshes whenever
   it changes, so its snapshot (and a React render) follows writes from anywhere.
 * **Refusals** are `VaultError`s, of the kinds in the *Errors* tables of the

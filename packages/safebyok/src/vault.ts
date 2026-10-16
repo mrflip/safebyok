@@ -36,8 +36,10 @@ export type VaultSnapshot = {
   scope:     VaultScope
   /**
    * Every lockbox in the vault, sorted by boxlabel: a {@link LockboxSummary} for each, or a
-   * {@link DamagedLockbox} (`damaged: true`, its boxlabel and nothing else) for one whose stored
-   * record does not read back -- which `erase()` removes and `store()` overwrites.
+   * {@link DamagedLockbox} (`damaged: true`, its boxlabel and revision and nothing else) for one
+   * whose stored record does not read back, or is sealed under a vaultKey the vault does not hold
+   * -- which `erase()` removes and `store()` overwrites. The listing reads each record's shape and
+   * never opens its ciphertext: ciphertext altered in storage shows only when it is read.
    */
   boxes:     readonly (LockboxSummary | DamagedLockbox)[]
   /**
@@ -152,14 +154,20 @@ export type OpenVaultOpts = {
  * their passphrase, calls unlock(), and retries. Nothing prompts on open.
  *
  * This device keeps a mark of the newest copy of the vault's bundle it has seen (a device mark, in
- * the deviceDB, which `lock()` leaves and `destroy()` erases). A call that reads the bundle afresh
+ * the deviceDB, which `lock()` leaves and `destroy()` empties). A call that reads the bundle afresh
  * -- `openVault`, `unlock()`, a change to the ways in, a store that catches up with storage, a
  * background refresh -- refuses an older copy of that same vault, one at a lower unlock epoch or
  * vaultKey epoch than this device has seen, with kind 'rolled_back', taking nothing from it and
  * writing nothing: storage handing back an older bundle could otherwise bring back a way in that
- * was removed. The vault stays as it stood before that read. A host that knows its storage was
- * restored from an older copy on purpose accepts it on this device by erasing the device's mark
- * of the vault (`deviceDB.eraseMark(scope)`) and opening the vault again.
+ * was removed. Storage so little to be trusted locks the vault, as `lock()` does, as a storage
+ * refusal of kind 'identity_revoked' does. A host that knows its storage was restored from an
+ * older copy on purpose accepts it on this device by erasing the device's mark of the vault
+ * (`deviceDB.eraseMark(scope)`) and opening the vault again.
+ *
+ * Storage alone settles a race. When it refuses a write as stale, or a lockbox will not open, the
+ * vault catches up with storage once before it names the refusal: a vault destroyed and made
+ * anew, or its ways in changed, elsewhere relocks this device. A catch-up that fails leaves the
+ * snapshot saying `syncing: false` until a read succeeds.
  */
 export type Vault = {
   /**
@@ -204,9 +212,10 @@ export type Vault = {
    * passphrase and it proves -- `changePassphrase()`, or a way in added or removed with a
    * passphrase as proof -- starts the window again from then; nothing else moves it.
    *
-   * A `lock()`, `lockSoon()` or `destroy()` called while the unlock is still under way wins, in
-   * this tab or in another on this device: the vault stays locked, this device remembers nothing,
-   * and the call throws kind 'vault_locked'. A vault the unlock was creating stays created,
+   * A `lock()` or `destroy()` called while the unlock is still under way wins, in this tab or in
+   * another on this device: the vault stays locked, this device remembers nothing, and the call
+   * throws kind 'vault_locked'. A `lockSoon()` does not: it lets work in hand finish, this unlock
+   * among it. A vault the unlock was creating stays created,
    * locked, under this passphrase. So does a vault destroyed, made anew, or with its unlocks
    * changed on another device meanwhile: the passphrase was proven against a vault that no longer
    * stands as it was. A wrong passphrase is still told as 'wrong_passphrase', lock or no lock.
@@ -227,22 +236,25 @@ export type Vault = {
    */
   unlock(proof: string | PasskeyProof, opts?: { unlockId?: string | undefined }): Promise<void>
   /**
-   * Forget the unlock, in memory and on this device: back to `locked`. Wins over an `unlock()` or
-   * `changePassphrase()` still under way, which then leaves the vault locked -- in this tab, or
-   * in another on this device, whose unlock then remembers nothing either.
+   * Forget the unlock, in memory and on this device: back to `locked`, at once -- the hard lock.
+   * Wins over an `unlock()` or `changePassphrase()` still under way, which then leaves the vault
+   * locked -- in this tab, or in another on this device, whose unlock then remembers nothing
+   * either -- and over a `read()` or `use()` under way, which refuses with kind 'vault_locked',
+   * handing back nothing. A write already sent to storage lands. Kind 'storage_unavailable' when
+   * this device's store fails to forget its record; the vault is locked all the same.
    */
   lock(): Promise<void>
   /**
-   * Lock gently, for a hidden tab or a sign-out: no new secrets from this instant, work in hand
-   * finishes, and the vaultKey is dropped `graceSeconds` from now -- or sooner, when the unlock's
-   * own window would drop it sooner: a key past `askPassphraseAt` keeps only the minute it had
-   * left, and one past that is dropped at once. At once, the snapshot reads `locked`, every read,
-   * use, store or erase called from now on throws kind 'vault_locked', this device forgets its
-   * remembered unlock, and an `unlock()` or `changePassphrase()` still under way, in this tab or
-   * another on this device, loses, as to `lock()`. What the grace spares is work already past its
-   * start: a `store()` retrying after another device's write, or an `erase()`, still lands. An
-   * `unlock()` or `changePassphrase()` begun within the grace ends it: the vault is unlocked
-   * again, and nothing is dropped.
+   * Lock gently, for a hidden tab or a sign-out -- the soft lock: no new secrets from this instant,
+   * work in hand finishes, and the vaultKey is dropped `graceSeconds` from now -- or sooner, when
+   * the unlock's own window would drop it sooner: a key past `askPassphraseAt` keeps only the
+   * minute it had left, and one past that is dropped at once. At once, the snapshot reads
+   * `locked`, every read, use, store or erase called from now on throws kind 'vault_locked', and
+   * this device forgets its remembered unlock. What the grace spares is work already past its
+   * start: a `read()`, a `store()` retrying after another device's write, or an `erase()`, still
+   * lands; and an `unlock()` or `changePassphrase()` still under way, in this tab or another on
+   * this device, finishes, leaving the vault unlocked again. An `unlock()` or `changePassphrase()`
+   * begun within the grace ends it too: the vault is unlocked again, and nothing is dropped.
    *
    * `graceSeconds` is from 0 to 60, fractions too; kind 'bad_option' otherwise. 0 is `lock()`.
    * `close()` cuts the grace short. A clock reading out of bounds cannot time a grace: the vault
@@ -270,10 +282,12 @@ export type Vault = {
    * written and the call throws kind 'stale_write', after catching up with storage.
    *
    * Leaves the vault unlocked under the new passphrase, the unlock window starting again from
-   * now, since the user just proved who they are -- unless `lock()`, `lockSoon()` or `destroy()`
-   * is called while the change is under way, which wins: the passphrase still changes, and the
-   * vault stays locked. The window running out while the change is under way is no lock: the
-   * vault ends unlocked, with its new window.
+   * now, since the user just proved who they are -- unless `lock()` or `destroy()` is called
+   * while the change is under way, which wins: the passphrase still changes, and the vault stays
+   * locked. A `lockSoon()` lets it finish, unlocked. So does the window running out while the
+   * change is under way: the vault ends unlocked, with its new window. Once the change has landed
+   * in storage, the call resolves: should this device then fail to keep its own records of it,
+   * the logger says so, and the vault asks for the passphrase at its next open.
    *
    * @example await vault.changePassphrase(oldPassphrase, newPassphrase)
    */
@@ -382,11 +396,16 @@ export type Vault = {
    * `changed_at` only when the whisper differs from the one it replaces: storing the same whisper
    * again writes a new revision, and leaves `changed_at` standing.
    *
+   * Should the catch-up after a refusal fail itself, the call throws kind 'stale_write' at once,
+   * the catch-up's failure its cause, and the snapshot says `syncing: false`.
+   *
    * A lockbox whose stored record cannot be read as one -- every lockbox the snapshot lists as
    * damaged, and also one that lists as sound but whose ciphered fields are missing or malformed
-   * -- is overwritten as though it were new: erased first, then written with nothing carried
-   * from it, neither its note nor its `registered_at`. Should the write then fail, the old record
-   * is gone and the call throws: storing again writes the lockbox afresh. (A record that reads
+   * -- is overwritten as though it were new, with nothing carried from it, neither its note nor
+   * its `registered_at`: in one write over the revision the listing names, which another device's
+   * write meanwhile refuses, as for any lockbox. A record that names no revision is erased first,
+   * then written; should that write fail, the old record is gone and the call throws: storing
+   * again writes the lockbox afresh. (A record that reads
    * but will not decipher, its ciphertext altered, is replaced as any other, its note and
    * `registered_at` kept.) A boxlabel the vault's check refuses is kind 'bad_label', writing
    * nothing, even where a lockbox stored under other checks stands under it: `erase()` removes
@@ -406,7 +425,10 @@ export type Vault = {
   /**
    * The whisper in `boxlabel`. Requires unlocked; kind 'absent_box' when there is none, and
    * 'damaged_lockbox' when its stored record fails its checks, or will not open under the vault's
-   * key: `erase()` it, or `store()` over it.
+   * key: `erase()` it, or `store()` over it. A lockbox that will not open is named so only after
+   * one catch-up with storage: one a vault destroyed and made anew elsewhere wrote relocks this
+   * device, and the call throws kind 'vault_locked'; a catch-up that fails throws its own
+   * refusal. A `lock()` landing while it reads wins: kind 'vault_locked', and nothing handed back.
    * A boxlabel the vault's check refuses is kind 'bad_label', a malformed name and also one a
    * lockbox stands under, stored under other checks, which the snapshot lists as damaged:
    * `erase()` clears that lockbox, by the name it was stored under.
@@ -443,8 +465,11 @@ export type Vault = {
    *
    * Deletes the vault this handle last read, and only that one: if it was destroyed, or
    * destroyed and made anew, elsewhere since, storage keeps what stands there now and the call
-   * throws kind 'stale_write', after catching up -- a second destroy() then deletes the vault
-   * that stands. On a vault this handle has never seen created, only the device-local record goes.
+   * throws kind 'stale_write', after catching up -- so a second destroy(), the user asking again,
+   * deletes the vault that then stands, the one the snapshot shows. A handle that has seen no
+   * vault reads storage first, and deletes whatever vault stands there: "delete my vault" never
+   * reports success over one standing. Locks as `lock()` does, and wins as it does over work under
+   * way; this device's mark of the vault forgets it, keeping its lock generation.
    */
   destroy(): Promise<void>
   /**
@@ -472,8 +497,11 @@ const UnreadBundle = Symbol.for('safebyok.unread_bundle')
  *
  * An open that fails -- storage refusing a user not yet signed in, say -- rejects with the
  * storage's own error and leaves nothing running behind it, so the host simply opens again later.
- * A stored bundle that fails its checks is kind 'damaged_bundle', which no retry mends; one older
- * than this device has already seen the vault at, kind 'rolled_back' (see the `Vault`'s own doc).
+ * A stored bundle that fails its checks is kind 'damaged_bundle', which no retry mends; one a
+ * newer safebyok may have written, kind 'newer_format': update the app; one older than this device
+ * has already seen the vault at, kind 'rolled_back', which also forgets this device's remembered
+ * unlock (see the `Vault`'s own doc). Kind 'bad_option' for a `vaultDB` that is not an instance
+ * of the `VaultDB` class.
  * Misuse is refused before storage is touched: kind 'bad_label' for a label or a `userId` that
  * fails its check (`validators`), and 'bad_option' for any other option, a `vaultDB` or
  * `deviceDB` short of a verb among them.
@@ -1750,8 +1778,8 @@ export type EraseDamagedVaultOpts = Pick<OpenVaultOpts, 'applabel' | 'userId' | 
  * 'bad_option' for an option missing.
  *
  * A record this version cannot read may be one a newer safebyok wrote and opens, so a `format`,
- * unlock method or number of unlocks it does not know is refused too, as 'damaged_bundle' with
- * nothing erased and a message to update the app: any change to what a stored record may hold --
+ * unlock method or number of unlocks it does not know is refused too, as 'newer_format', with
+ * nothing erased and a message to update the app, as `openVault` refuses it: any change to what a stored record may hold --
  * a field, a shape, or a range a check accepts -- bumps `format`, so that newer can be told from
  * damaged. There is no handle to lock, so a storage refusal such as 'identity_revoked' is thrown
  * as it comes, with no lock to make.
@@ -1964,8 +1992,9 @@ const MaxWriteAttempts = 3
  * again in lockstep -- a thundering herd -- so each waits a random time in
  * `[WriteRetryBaseMillis * 2^(n-1), WriteRetryBaseMillis * 2^n)` before retry n: 1 to 2 seconds before the
  * first, 2 to 4 before the second. The windows double, so the longer a box stays contested, the
- * further apart the contenders spread. Not a public option: a host that needs a different policy
- * wants the conflict-handler hook, not a knob on this one.
+ * further apart the contenders spread. Not a public option, and there is no conflict handler: an
+ * erase wins, the last writer wins, and a host that disagrees with an outcome calls `store()` or
+ * `erase()` again.
  */
 const WriteRetryBaseMillis = 1000
 

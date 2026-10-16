@@ -85,7 +85,9 @@ const VaultPanel = () => {
 ```
 
 Branch on `openError.kind` for a better message: an `identity_revoked` user should sign in
-again, and a `damaged_bundle` will not mend on retry. Its `message` is calm and safe to show.
+again, a `damaged_bundle` will not mend on retry, and a `newer_format` vault was written by a
+newer version of the app: the user updates, and never erases it. Its `message` is calm and safe to
+show.
 
 For a `damaged_bundle`, the one way forward is to erase the vault and start over:
 `eraseDamagedVault()` from `useVault()` does that (the `safebyok` README's *A vault that cannot be

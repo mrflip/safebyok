@@ -475,7 +475,7 @@ security expert who knows what questions to ask.
   Every attempt reads the box afresh and seals the whisper anew, under its own lockboxKey and
   `revision_id`: a refused attempt's ciphertext is never reused, so no two ciphertexts share a
   binding. The retry's first act is to require unlocked, so a refusal that caught the device up
-  with a vault reborn elsewhere (or a changed passphrase) relocks it and ends the retry as
+  with a vault reborn elsewhere (or its ways in changed) relocks it and ends the retry as
   `vault_locked` before any whisper is sealed for the new vault. A retry overwrites what the
   other device wrote (last writer wins), as a host's own retry did, except that a box erased
   elsewhere is not brought back (an erase wins: `stale_write` at once); `erase()` is never retried.
@@ -771,7 +771,7 @@ security expert who knows what questions to ask.
   hands the very thrown value to the host root's `onCaughtError` (the console by default), as it
   would any error a boundary catches; before, it went to the host's boundary instead. The dialog's
   form, and the passphrase typed into its state, unmount with the failure.
-* 2026-10-16: **a sign-out locks the vault.** An adapter whose backend knows who is signed in
+* 2026-10-16 (revised the same day by refusals_and_catchup, below: `whenIdentityRevoked` is gone, and `rolled_back` locks too): **a sign-out locks the vault.** An adapter whose backend knows who is signed in
   refuses a vault whose `user_id` is not that user -- signed out, or another user signed in --
   with kind `identity_revoked`, distinct from `not_permitted` (the vault's own user refused one
   call). Convex, Postgres (and so GraphQL over it) refuse both of their old `not_permitted` cases
@@ -826,7 +826,7 @@ security expert who knows what questions to ask.
   The notify trigger is no longer installed by `VaultTablesSql`: a host opts in with
   `VaultNotifySql`, and without it nothing is pushed (the vault refreshes after its own writes).
   Not run against concurrent connections: the tests are on PGlite, one statement at a time.
-* 2026-10-16: **`eraseDamagedVault`, the one way to erase a vault without a handle** (the Coach:
+* 2026-10-16 (revised the same day by refusals_and_catchup, below: a vault that may be newer is `newer_format`): **`eraseDamagedVault`, the one way to erase a vault without a handle** (the Coach:
   "yes"). `destroy()` deliberately needs no unlock ("owning the account is enough"), but needs a
   handle the vault's own reading made; a bundle that fails its checks gave none. The new call
   erases a vault `openVault` refuses as `damaged_bundle` and no other: it refuses (`bad_option`,
@@ -910,7 +910,7 @@ security expert who knows what questions to ask.
   `changePassphrase()` is under way does not defeat it; only a lock the user (or a sign-out)
   makes does. For review: a passkey's proof keeping, not renewing, the deadline is the weaker
   reading of "proves I am mrflip" (G530 asks the deeper question, NOT YET).
-* 2026-10-16 (locks_and_expiry): **a lock reaches every tab's unlock under way: the versioned
+* 2026-10-16 (locks_and_expiry; revised the same day by refusals_and_catchup, below: `lockSoon()` raises nothing, and the generation outlives a destroy): **a lock reaches every tab's unlock under way: the versioned
   erase.** The device mark gains `lock_generation` (format `safebyok-mark-v2`). Every lock that
   forgets the remembered unlock -- `lock()`, `lockSoon()`, a sign-out's lock, `destroy()`'s --
   raises it before erasing the record. An unlock (or a change to the ways in) reads it as it
@@ -934,3 +934,50 @@ security expert who knows what questions to ask.
   this reads as none (the format moved), so on its first open after upgrading a device restarts
   its rollback check from the copy storage holds then, once; before 1.0 that is the stated cost
   of a format change.
+* 2026-10-16 (refusals_and_catchup; the Coach: "lockSoon is a soft lock"): **two locks, hard and
+  soft.** `lock()`, `destroy()` and a lock for untrusted storage are hard: the key goes at once,
+  the device mark's lock generation rises, an unlock or change under way anywhere on the device
+  takes nothing up, and a `read()` or `use()` under way refuses `vault_locked` after its last
+  await, dropping the whisper it deciphered (one monotonic compare of the handle's shut count,
+  which can only turn a success into a refusal). `lockSoon()` and expiry are soft: the door closes
+  at once and the remembered unlock is forgotten, but work in hand finishes -- an unlock or change
+  under way, in any tab, completes and leaves the vault unlocked -- and the generation is not
+  raised. **For review**: a soft lock no longer stops another tab's unlock; a host wanting that
+  calls `lock()`.
+* 2026-10-16 (refusals_and_catchup; the Coach on G119 and G516): **one rule for storage the vault
+  cannot trust.** `identity_revoked` and `rolled_back` both lock the vault, hard, wherever they are
+  met -- a call, a catch-up, a background refresh, the open itself (which forgets the remembered
+  unlock) -- decided in `refusal-policy.ts`'s `decide`, with no host option: `whenIdentityRevoked`
+  and its `'stay'` are gone. An adapter that says `identity_revoked` for a passing fault breaks
+  VAULTDB.md 5.5. After a deliberate restore, the README's `eraseMark` recipe stays the only way
+  out (G513): no verb puts forgetting the newer copy one call away. **For review**: a storage
+  replica that briefly serves an older copy now makes every device that saw the newer one ask for
+  the passphrase again.
+* 2026-10-16 (refusals_and_catchup): **the lock generation outlives `destroy()`, and a lock with
+  no mark still counts.** The device mark (now `safebyok-mark-v3`) holds what it has `seen` of the
+  scope's vault, or null; `destroy()` writes it with nothing seen at its raised generation, rather
+  than erasing it, and a lock on a scope with no readable mark writes one at generation 1. So an
+  unlock under way elsewhere at generation 0 loses to a destroy, and a vault-creating first unlock
+  loses to another tab's lock. `eraseMark` (the restore recipe, `eraseDamagedVault`) still resets
+  the generation; neither runs with a handle that could be unlocking that vault.
+* 2026-10-16 (refusals_and_catchup): **one catch-up before a kind is named.** A write storage
+  refuses as stale, or a lockbox that will not open, gets one refresh before the vault names it: a
+  vault destroyed and made anew, or its ways in changed, elsewhere relocks the device (P4: never on
+  no evidence), so a successor vault's lockbox reads as `vault_locked`, not `damaged_lockbox`. A
+  catch-up that fails is thrown as `stale_write` with the failure as cause, never retried blind,
+  and the snapshot says `syncing: false`. Refreshes are serialized per handle (one in flight, one
+  queued), so two reads never interleave their snapshot updates. Only `store()` retries; a change
+  to the ways in, an erase and a destroy refuse once. There is no conflict hook: an erase wins.
+* 2026-10-16 (refusals_and_catchup, G498): **a damaged lockbox is replaced in one conditional
+  write.** The listing keeps a damaged record's `revision_id` when it holds one as text, and
+  `store()` writes over that revision under contract line 3.3, so a sound lockbox another device
+  wrote meanwhile refuses the write and is never erased; the store then retries over it, last
+  writer wins. The revision is untrusted text used only as an expectation storage compares. Only
+  a record naming no revision is erased first, which leaves a gap P6 accepts. A lockbox under a
+  vaultKey epoch neither the bundle's nor the prior's lists as damaged from its epoch alone (G063);
+  the listing still never opens ciphertext (G121).
+* 2026-10-16 (refusals_and_catchup): **`openVault` takes only a `VaultDB`** (G122): a duck-typed
+  object would skip the base class's checks of every record and expectation. `instanceof` holds
+  within one copy of the package, as `VaultError`'s does; the peer dependency keeps it one. And a
+  vault a newer safebyok may have written is `newer_format`, never `damaged_bundle`, so no UI
+  offers to erase it (G120).

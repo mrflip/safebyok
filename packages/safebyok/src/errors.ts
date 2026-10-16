@@ -40,7 +40,7 @@
  *
  * `rolled_back` is storage handing back an older copy of a vault's bundle than this device has
  * already seen -- a backup restored over it, or storage tampered with -- which the vault refuses to
- * use: nothing is unlocked from it and nothing written over it. Only a device that saw the newer
+ * use, and locks, as for `identity_revoked`: nothing is unlocked from it and nothing written over it. Only a device that saw the newer
  * copy can tell, and only while its own storage keeps the mark of it.
  *
  * The package README's *Errors* section lists what each kind means and what to do about it.
