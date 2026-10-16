@@ -22,6 +22,7 @@ TH.describeOnPostgres('races', "postgresVaultDB's lockbox limit, over a real Pos
   it("takes writers racing for the last place only as far as the README says: some land, none past the writers racing, and each that landed reads back", async () => {
     const db = getDb()
     for (let round = 0; round < Rounds; round += 1) {
+      await db.endDevices()
       await db.empty()
       const first = TH.deviceOver(db, undefined, { maxLockboxes: Cap })
       await TH.filled(first('u1'), ['standing_one', 'standing_two', 'standing_three', 'standing_four'])
