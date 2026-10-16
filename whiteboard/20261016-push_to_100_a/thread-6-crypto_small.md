@@ -78,6 +78,24 @@ built as answered.
   `draftBundle`/`sealFor`/`addPasskey` call sites, `changePassphrase`, and `passphraseToReplace`
   beside `parseUnlockId`.
 
+## Review (medium), three fixes committed on the branch
+
+* e9bcb00a: `changePassphrase` by passkey stamps the new envelope with the bundle's
+  `vault_key_epoch`, not the replaced envelope's.
+* 79a8200a: a deriver result refused for its length is zeroed too (`notes/security.md` clause).
+* 4ab1d66c: the changeset's two overclaims corrected.
+
+Six minor findings left as notes, for the Coach or a later thread:
+
+* `KeyDeriver` is not discriminated: a literal with a partial Argon2id spec still typechecks as a
+  `CustomKeyDeriver`, caught at runtime only under `algorithm: 'argon2id'`.
+* A deriver that caches its buffer sees zeros after the first use; refusing an all-zero result is
+  the Coach's call.
+* `fill(0)` on an immutable (frozen/read-only) buffer can throw from the `finally`.
+* `absentUnlock()`'s wording says "no way in" even when the id names a passkey.
+* `ensureSuppliedSpecKept` runs twice on an Argon2id deriver at open (harmless).
+* The `test_` warning is case-sensitive (`Test_` is not warned of), unlike the reserved prefix.
+
 ## For the Coach
 
 * **G031**: the exported type is now a union (changeset says so). If you would rather keep one
