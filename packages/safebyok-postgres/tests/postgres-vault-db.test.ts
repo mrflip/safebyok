@@ -415,7 +415,7 @@ describe("postgresVaultDB, its lockbox limit", () => {
   it("lets exactly one of two first writes sent at once take the last place, when one statement is run after the other", async () => {
     // PGlite runs one statement at a time, so the second counts the first's lockbox: this holds
     // writes made one after another, as they arrive here. Writers racing on a real server may
-    // each find room, and the README says so; no test here can race.
+    // each find room, and the README says so; e2e/tests/postgres/races.test.ts races them on a real server.
     const db = await TH.emptyDatabase()
     const vaultDB = await filledTo(db, 2, ['openai'])
     const outcomes = await Promise.allSettled([
