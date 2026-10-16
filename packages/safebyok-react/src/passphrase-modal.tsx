@@ -156,6 +156,8 @@ const UnlockForm = ({ vault, onDone, allowStartOver }: PassphraseModalProps) => 
   const [passphrase, setPassphrase] = useState('')
   const [gripe, setGripe] = useState<Gripe | null>(null)
   const [startingOver, setStartingOver] = useState(false)
+  // While an erase runs, so that a second press never starts another.
+  const [erasing, setErasing] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
   const fieldRef = useRef<HTMLInputElement>(null)
   const titleId = useId()
@@ -193,6 +195,7 @@ const UnlockForm = ({ vault, onDone, allowStartOver }: PassphraseModalProps) => 
   }
 
   const startOver = async () => {
+    setErasing(true)
     setGripe(null)
     try {
       await vault.destroy()
@@ -202,6 +205,8 @@ const UnlockForm = ({ vault, onDone, allowStartOver }: PassphraseModalProps) => 
       // was never confirmed, so the question goes, to be asked afresh.
       if (isVaultError(err, 'stale_write')) { setStartingOver(false) }
       meet(err)
+    } finally {
+      setErasing(false)
     }
   }
 
@@ -241,7 +246,7 @@ const UnlockForm = ({ vault, onDone, allowStartOver }: PassphraseModalProps) => 
         {askingStartOver
           ? (
             <div className="row" key="start-over">
-              <button type="button" onClick={() => { void startOver() }}>{Messages.startOverConfirm}</button>
+              <button type="button" disabled={erasing} onClick={() => { void startOver() }}>{Messages.startOverConfirm}</button>
               {/* eslint-disable-next-line jsx-a11y/no-autofocus -- the button that held focus is gone; it moves to the choice that loses nothing */}
               <button type="button" autoFocus onClick={() => { setStartingOver(false); setGripe(null) }}>{Messages.startOverBack}</button>
             </div>
