@@ -3,9 +3,11 @@
 # commit main holds (as the same change, or under the same subject line, as scripts/git-attic
 # judges), gets an annotated tag closed/<branch> at its tip and is pointed at the PR's merged
 # head. Each worktree holding such a branch is removed when it is clean and idle. Every other
-# branch and worktree is only reported: active, a stray for scripts/git-attic, or weird. Reports
-# what it would do unless given --apply. Never pushes, deletes a branch, or moves a closed/ tag
-# unless --retag names it.
+# branch and worktree is only reported: active, a stray for scripts/git-attic, or weird. A
+# worktree whose directory is missing is pruned, unless its branch has an open PR or commits not on
+# origin: then no prune is run, and the report says which held it back. Reports what it would do
+# unless given --apply. Never pushes, deletes a branch, or moves a closed/ tag unless --retag
+# names it.
 #
 # The manual is notes/housekeeping.md, *Sweeping finished threads*; --help prints that section.
 #
@@ -217,12 +219,36 @@ closingNote() {
   fi
 }
 
+# What a branch holds that only this checkout has, in words, or nothing: an open PR, or commits not
+# on origin (a branch origin lacks counts its commits not on the history judged by).
+holdsOnlyHere() {
+  local branch="$1" opened unpushed
+  if [[ "$branch" == "(detached)" ]]; then return; fi
+  opened="$(prsOf "$branch" OPEN | head -1)"
+  if [[ -n "$opened" ]]; then
+    echo "an open PR (#$(cut -f1 <<< "$opened"))"
+    return
+  fi
+  if git show-ref --verify --quiet "refs/remotes/origin/${branch}"; then
+    unpushed="$(git rev-list --count "refs/remotes/origin/${branch}..refs/heads/${branch}" 2> /dev/null || echo 0)"
+  else
+    unpushed="$(git rev-list --count "${base}..refs/heads/${branch}" 2> /dev/null || echo 0)"
+  fi
+  if [[ "$unpushed" -gt 0 ]]; then echo "$(counted "$unpushed" commit) not on origin"; fi
+}
+
 # Whether a worktree may go, as one line: <verdict> TAB <path> TAB <branch> TAB <note>.
 judgeTree() {
-  local where="$1" branch="$2" verdict real why dirty precious busy recent
+  local where="$1" branch="$2" verdict real why dirty precious busy recent held
   verdict="$(awk -F '\t' -v branch="$branch" '$2 == branch { print $1; exit }' "${scratch}/verdicts")"
   if [[ ! -d "$where" ]]; then
-    printf 'keep\t%s\t%s\t%s\n' "$where" "$branch" "its directory is gone: git worktree prune clears it"
+    held="$(holdsOnlyHere "$branch")"
+    if [[ -n "$held" ]]; then
+      : > "${scratch}/hold-prune"
+      printf 'keep\t%s\t%s\t%s\n' "$where" "$branch" "its directory is missing, but its branch has ${held}: no worktree is pruned while it stands"
+    else
+      printf 'keep\t%s\t%s\t%s\n' "$where" "$branch" "its directory is gone: git worktree prune clears it"
+    fi
     return
   fi
   if [[ "$verdict" != close && "$verdict" != done ]]; then
@@ -293,7 +319,11 @@ while IFS=$'\t' read -r verdict where branch note; do
   if [[ "$verdict" == keep ]]; then kept=$((kept + 1)); else removed=$((removed + 1)); fi
   printf '%s\t%s\t%s\t%s\n' "$verdict" "$where" "$branch" "$note"
 done < "${scratch}/trees" > "${scratch}/swept-trees"
-if [[ "$apply" == yes ]]; then
+if [[ -e "${scratch}/hold-prune" ]]; then
+  # git worktree prune takes every registration whose directory is missing, a branch with work
+  # in it as readily as any (a directory that merely cannot be seen from here looks the same).
+  printf 'held\tgit worktree prune\t-\t%s\n' "not run: a worktree whose directory is missing holds a branch that is not finished (above)" >> "${scratch}/swept-trees"
+elif [[ "$apply" == yes ]]; then
   git worktree prune --verbose 2>&1 | sed 's/^/pruned\t/' >> "${scratch}/swept-trees" || true
 else
   git worktree prune --dry-run --verbose 2>&1 | sed 's/^/prune\t/' >> "${scratch}/swept-trees" || true

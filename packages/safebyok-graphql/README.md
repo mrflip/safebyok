@@ -30,6 +30,9 @@ second version installed beside your server's), every refusal is a GraphQLError 
 not recognize: Yoga masks it as "Unexpected error", and its kind is lost. `pnpm why graphql`
 shows how many you have.
 
+Platform: Node 22 and up on the server, evergreen browsers on the client; the floor is stated in the
+core's *Where it runs*.
+
 ## The recipe: Yoga on Next.js, Postgres behind
 
 The package's tests run this recipe whole (`tests/yoga-recipe.test.ts`), against the same suite

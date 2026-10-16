@@ -63,6 +63,25 @@ Serve the app over https: a browser withholds WebCrypto from a page served over 
 `openVault` refuses one at once, with kind `insecure_context` (`http://localhost` counts as
 secure, for development).
 
+## Where it runs
+
+The platform floor, which `engines` and CI hold to:
+
+* **Node 22 and up.** CI runs the tests on Node 22, the floor, and on the newest Node.
+* **Evergreen browsers**: current Chrome, Edge, Firefox and Safari, with WebCrypto
+  (`crypto.subtle`), IndexedDB (for the device store in `safebyok/idb` and `safebyok-indexeddb`),
+  Unicode property escapes in regular expressions, and `Intl.RelativeTimeFormat` (for the
+  dialog's "locks again in 7 days" in `safebyok-react`). The browser paths are tested against
+  jsdom and a fake IndexedDB, not in real browsers; a release is walked by hand first
+  (`notes/release-checklist.md`).
+* **Bun and the frameworks on Node or the browser** (Next.js, Nuxt): they provide the same
+  globals, and are not run in CI.
+* **React Native (Hermes) is untested.** It lacks WebAssembly (so `safebyok-fastkey`) and has
+  partial `Intl` and property-escape support; try it before you rely on it.
+
+No Node built-ins are used in `src/`, and nothing is polyfilled: a host on a platform without one
+of the above supplies it.
+
 ## Entry points, and why the main one asks for everything
 
 * `safebyok` -- `openVault` and the types, errors and stores around it.

@@ -1174,3 +1174,28 @@ security expert who knows what questions to ask.
   (NIST SP 800-63B). It is also host code that hears the passphrase in plain text at every change
   while the user chooses one; its doc block and the README tell the host to keep it on the device
   (no server, no log, no error tracker), which nothing here can enforce.
+* 2026-10-16: **a workflow with the release App's key runs on Dependabot's pull requests**
+  (`.github/workflows/dependabot-changeset.yml`). It writes the changeset a Dependabot branch
+  needs and pushes it as the App, so CI runs again (a GITHUB_TOKEN push would not). It runs on
+  `pull_request_target`, so it is main's copy of the file, with the `releasing` environment's
+  secrets, whatever the pull request holds; what keeps that safe is that it never runs anything the
+  pull request wrote: no install, no package script, only main's `scripts/dependabot.ts` reading the
+  branch's `package.json` files out of git as data, and writing names and ranges into the changeset
+  only after replacing everything but plain text. It writes only when every commit on the branch is
+  Dependabot's, by its author email, and its own commit then ends that. The App's token is cut to
+  `contents: write`. Unproven until the first Dependabot runtime-dependency pull request after
+  merge: whether the environment's secret reaches a run Dependabot started (if not, the key is
+  added as a Dependabot secret too), and that the push re-runs CI.
+* 2026-10-16: **the Version PR is no longer put back in draft** (`pr-draft: create`, the Coach's
+  ruling). A push to main rebuilds a Version PR the Coach has marked ready and leaves it ready, so
+  new changesets can join a PR already read: the Coach rereads it before merging
+  (PROCESS.md, *Releases*).
+* 2026-10-16: **the changeset skip trusts the release App by login.** CI skips *Require a
+  changeset* only for a pull request on a `changeset-release/` branch opened by `safebyok[bot]`;
+  the same branch name from anyone else is asked for a changeset like any other. The login is the
+  App's today (read from the Version PR's author); renaming the App would have CI ask the Version PR
+  for a changeset until the workflow names the new login.
+* 2026-10-16: **actionlint runs in CI from a release tarball checked against its recorded sha256**
+  (v1.7.12, over seven days old), the way `release.yml` checks npm: fetched, compared to the
+  hash written in `ci.yml`, and only then unpacked and run. A new version is a deliberate edit of
+  both the version and the hash.
