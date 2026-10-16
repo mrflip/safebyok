@@ -132,6 +132,27 @@ describe("getBox and updateBox", () => {
     })
   }
 
+  it("refuses a box sealed under a vaultKey since replaced, writing nothing, and lands one sealed under the vaultKey that stands", async () => {
+    const t = await withBundle()
+    await t.mutation(TH.vaults.updateBox, { scope: u1, lockbox: TH.boxOf('anthropic_api_key', 'a1'), expected: TH.noBoxYet })
+    await t.mutation(TH.vaults.updateBundle, { bundle: TH.rotatedBundleOf('u1'), expected: { vault_id: 'vault-id-u1', unlock_epoch: 1 } })
+    const underFirstKey = { vault_id: 'vault-id-u1', revision_id: 'rev-a1', vault_key_epoch: 1 }
+    expect(await t.mutation(TH.vaults.updateBox, { scope: u1, lockbox: TH.boxOf('anthropic_api_key', 'a2'), expected: underFirstKey })).to.be.false
+    expect(await t.mutation(TH.vaults.updateBox, { scope: u1, lockbox: TH.boxOf('openai_api_key', 'o1'), expected: TH.noBoxYet })).to.be.false
+    expect(await t.query(TH.vaults.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })).to.deep.equal(TH.boxOf('anthropic_api_key', 'a1'))
+    expect(await t.query(TH.vaults.getBox, { scope: u1, boxlabel: 'openai_api_key' })).to.be.null
+    const resealed = TH.boxOf('anthropic_api_key', 'a2', { vault_key_epoch: 2 })
+    expect(await t.mutation(TH.vaults.updateBox, { scope: u1, lockbox: resealed, expected: { ...underFirstKey, vault_key_epoch: 2 } })).to.be.true
+    expect(await t.query(TH.vaults.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })).to.deep.equal(resealed)
+  })
+
+  it("refuses a box sealed under a vaultKey the vault does not stand for yet", async () => {
+    const t = await withBundle()
+    const ahead = TH.boxOf('anthropic_api_key', 'a1', { vault_key_epoch: 2 })
+    expect(await t.mutation(TH.vaults.updateBox, { scope: u1, lockbox: ahead, expected: { ...TH.noBoxYet, vault_key_epoch: 2 } })).to.be.false
+    expect(await t.query(TH.vaults.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })).to.be.null
+  })
+
   it("refuses to rewrite a box erased since it was read", async () => {
     const t = await withBundle()
     await t.mutation(TH.vaults.updateBox, { scope: u1, lockbox: TH.boxOf('anthropic_api_key', 'a1'), expected: TH.noBoxYet })

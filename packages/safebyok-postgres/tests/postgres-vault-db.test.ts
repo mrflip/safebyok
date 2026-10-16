@@ -26,7 +26,6 @@ TH.describeVaultDB('postgresVaultDB over PGlite', async () => {
   const db = await TH.emptyDatabase()
   return TH.perUser((userId) => TH.requestFor(db, userId))
 }, {
-  comparesVaultKeyEpoch: false,
   makeCappedVaultDB: async (maxLockboxes) => {
     const db = await TH.emptyDatabase()
     return TH.perUser((userId) => postgresVaultDB({ client: db, userId, maxLockboxes }))
@@ -378,7 +377,7 @@ describe("postgresVaultDB, its lockbox limit", () => {
     expect(await boxlabelsIn(vaultDB)).to.deep.equal([])
   })
 
-  it("asks one statement of every first write, and holds no lock and keeps no count to do it", async () => {
+  it("asks one statement of every first write, keeping no count, and locking nothing but its bundle, shared", async () => {
     const db = await TH.emptyDatabase()
     await filledTo(db, 2, ['openai'])
     const spy = TH.spyClient(db)
@@ -389,8 +388,19 @@ describe("postgresVaultDB, its lockbox limit", () => {
     await vaultDB.eraseBox(u1, 'anthropic', thisVault)
     expect(spy.sent).to.have.lengthOf(4)
     for (const { text } of spy.sent) {
-      expect(text).to.not.match(/FOR (UPDATE|SHARE)|lockbox_count/)
+      expect(text).to.not.match(/FOR (NO KEY )?UPDATE|FOR KEY SHARE|lockbox_count/)
     }
+    // Each lockbox write reads its bundle FOR SHARE, once; the erase locks nothing.
+    expect(spy.sent.map(({ text }) => text.match(/FOR SHARE/g)?.length ?? 0)).to.deep.equal([1, 1, 1, 0])
+  })
+
+  it("reads the bundle FOR SHARE in a replacement too, in its one statement", async () => {
+    const db = await TH.emptyDatabase()
+    await filledTo(db, 2, ['openai'])
+    const spy = TH.spyClient(db)
+    const vaultDB = postgresVaultDB({ client: spy.client, userId: 'u1', maxLockboxes: 2 })
+    await vaultDB.updateBox(u1, TH.boxOf('openai', 'sk-fake-again'), { ...noBoxYet, revision_id: 'rev-sk-fake-openai' })
+    expect(spy.sent.map(({ text }) => text.match(/FOR SHARE/g)?.length ?? 0)).to.deep.equal([1])
   })
 
   it("makes room with an erase", async () => {

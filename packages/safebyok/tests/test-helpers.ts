@@ -951,13 +951,6 @@ export type DescribeVaultDBOpts = {
    * Without it, the races run through one adapter, as `makeVaultDB` makes it, and the rest is skipped.
    */
   makeDevices?: MakeVaultDBDevices | undefined
-  /**
-   * Whether the adapter compares a lockbox write's `vault_key_epoch` with its vault's bundle, as
-   * line 3.8 has it: true unless said otherwise. False skips line 3.8's refusals and registers one
-   * pending test in their place, for an adapter that does not compare it yet -- one that skips it lets a
-   * device still holding a replaced vaultKey write under it.
-   */
-  comparesVaultKeyEpoch?: boolean | undefined
 }
 
 /** What a device of {@link DescribeVaultDBOpts.makeDevices} is made with: the limit to hold it to, where the adapter takes one. */
@@ -995,7 +988,7 @@ const CappedLockboxes = 3
  *   })
  */
 export const describeVaultDB = (adapterTitle: string, makeVaultDB: () => VaultDBVerbs | Promise<VaultDBVerbs>, opts: DescribeVaultDBOpts = {}) => {
-  const { makeCappedVaultDB, makeVaultDBFor, comparesVaultKeyEpoch = true } = opts
+  const { makeCappedVaultDB, makeVaultDBFor } = opts
 
   /** The title of a group of tests for one line of the contract. */
   const lineTitle = (line: VaultDBContractLine) => `${adapterTitle}, as a VaultDB, ${line}: ${VaultDBContract[line]}`
@@ -1405,22 +1398,19 @@ export const describeVaultDB = (adapterTitle: string, makeVaultDB: () => VaultDB
     const underFirstKey = { vault_id: 'vault-id-u1', revision_id: 'rev-anthropic', vault_key_epoch: 1 } as const
     const underSecondKey = { ...underFirstKey, vault_key_epoch: 2 } as const
 
-    // An adapter that does not compare the vaultKey's epoch yet has its refusals stand as one todo.
-    if (! comparesVaultKeyEpoch) { it.todo("refuses a write sealed under any vaultKey but the one that stands, writing nothing") }
-
-    it.runIf(comparesVaultKeyEpoch)("refuses a write sealed under a vaultKey since replaced, over the revision it read, writing nothing", async () => {
+    it("refuses a write sealed under a vaultKey since replaced, over the revision it read, writing nothing", async () => {
       const vaultDB = await rotatedHolding()
       await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'stale'), underFirstKey), 'stale_write')
       expect(await revisionIn(vaultDB, 'anthropic')).to.eq('rev-anthropic')
     })
 
-    it.runIf(comparesVaultKeyEpoch)("refuses a new lockbox sealed under a vaultKey since replaced, though none stands under its boxlabel", async () => {
+    it("refuses a new lockbox sealed under a vaultKey since replaced, though none stands under its boxlabel", async () => {
       const vaultDB = await rotatedHolding()
       await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('openai', 'stale'), noBoxYet), 'stale_write')
       expect(await vaultDB.readBox(scopeOf('u1'), 'openai')).to.be.null
     })
 
-    it.runIf(comparesVaultKeyEpoch)("refuses a write sealed under a vaultKey the vault does not stand for yet", async () => {
+    it("refuses a write sealed under a vaultKey the vault does not stand for yet", async () => {
       const vaultDB = await withBundle()
       await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'ahead', { vault_key_epoch: 2 }), { ...noBoxYet, vault_key_epoch: 2 }), 'stale_write')
       expect(await vaultDB.readBox(scopeOf('u1'), 'anthropic')).to.be.null

@@ -102,6 +102,7 @@ export const listBoxSummaries = query({
 
 /**
  * Write `lockbox` under its boxlabel, only while the scope's bundle has `expected.vault_id` and
+ * `expected.vault_key_epoch` -- it stands for the vaultKey the lockbox was sealed under -- and
  * the standing lockbox has `expected.revision_id` -- or, for null, there is none. True when
  * written; false, writing nothing, otherwise -- including when the scope holds no bundle.
  *
@@ -115,7 +116,7 @@ export const updateBox = mutation({
   returns: v.boolean(),
   handler: async (ctx, { scope, lockbox, expected }) => {
     const bundle = await findBundleRow(ctx.db, scope)
-    if (bundle?.vault_id !== expected.vault_id) { return false }
+    if (bundle?.vault_id !== expected.vault_id || bundle.vault_key_epoch !== expected.vault_key_epoch) { return false }
     const standing = await findBoxRow(ctx.db, scope, lockbox.boxlabel)
     const standingRevisionId = standing?.revision_id ?? null
     if (standingRevisionId !== expected.revision_id) { return false }

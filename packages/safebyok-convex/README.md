@@ -56,7 +56,8 @@ mistake for the first request.
   name, on which a vault locks itself. The message names no user and quotes no record.
 * **Writes that come too late.** An update (`updateBundle`, `updateBox`) or an erase
   (`eraseBox`, `eraseVault`) carries what its writer expects to stand -- the vault's `vault_id`,
-  and the bundle's `unlock_epoch` or the lockbox's `revision_id` -- and checks it in the same
+  and the bundle's `unlock_epoch`, or the lockbox's `revision_id` and the bundle's
+  `vault_key_epoch` (the vaultKey the lockbox was sealed under) -- and checks it in the same
   transaction it writes in. When that no longer stands, it writes nothing and resolves `false`,
   which the client turns into a `stale_write`. Not an error: no `ConvexError`, nothing in your logs.
 * **A vault the component has no room for.** `updateBox` refuses, writing nothing, a lockbox
@@ -185,7 +186,7 @@ the core's own records, scopes and expectations.
 | `updateBundle`     | mutation | `{ bundle, expected: { vault_id, unlock_epoch } }` | `true` if written, `false` if not           |
 | `getBox`           | query    | `{ scope, boxlabel }`                       | the `Lockbox`, or null                                |
 | `listBoxSummaries` | query    | `{ scope }`                                 | each lockbox without its ciphered fields, `format` kept, in boxlabel order |
-| `updateBox`        | mutation | `{ scope, lockbox, expected: { vault_id, revision_id } }` | `true` if written, `false` if not; refuses `vault_full` past the vault's limits |
+| `updateBox`        | mutation | `{ scope, lockbox, expected: { vault_id, revision_id, vault_key_epoch } }` | `true` if written, `false` if not; refuses `vault_full` past the vault's limits |
 | `eraseBox`         | mutation | `{ scope, boxlabel, expected: { vault_id } }` | `true` if the vault still stands (box or none), `false` if not |
 | `eraseVault`       | mutation | `{ scope, expected: { vault_id } }`         | `true` if erased, `false` if not                      |
 | `watchVault`       | query    | `{ scope }`                                 | `{ vault_id, unlock_epoch, boxes: [[boxlabel, revision_id]] }`, changing with every write |

@@ -52,7 +52,6 @@ for (const [clientTitle, connect] of ClientCases) {
     const deployment = deploy()
     return TH.perUser((userId) => convexVaultDB(connect(deployment, userId === '' ? null : userId), deployment.api.safebyok))
   }, {
-    comparesVaultKeyEpoch: false,
     makeVaultDBFor: () => {
       const deployment = deploy()
       return (userId) => convexVaultDB(connect(deployment, userId), deployment.api.safebyok)

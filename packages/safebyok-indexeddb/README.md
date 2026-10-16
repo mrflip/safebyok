@@ -125,8 +125,10 @@ places:
 And keep, as they are:
 
 * **`src/expectations.ts`**: the comparisons each write makes before it lands. An adapter
-  compares only the scope, `boxlabel`, `vault_id`, `unlock_epoch` and `revision_id`, and a
-  standing row too damaged to show one of them fails the comparison.
+  compares only the scope, `boxlabel`, `vault_id`, `unlock_epoch`, `vault_key_epoch` and
+  `revision_id`, and a standing row too damaged to show one of them fails the comparison. A
+  lockbox write compares the bundle's `vault_key_epoch` too, in the same transaction: skip it,
+  and a device still holding a vaultKey since replaced can seal a whisper under it.
 * **Store each record as itself, field by field**, exactly as handed to you, and return it
   exactly as stored, or null for none. Never look inside a ciphered field, never repair a
   damaged row: safebyok validates everything it reads back.

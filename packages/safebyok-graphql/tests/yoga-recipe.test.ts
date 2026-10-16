@@ -74,7 +74,6 @@ TH.describeVaultDB('the README Yoga recipe, over postgresVaultDB', async () => {
   const route = await routeOver()
   return TH.perUser((userId) => browserFor(route, userId))
 }, {
-  comparesVaultKeyEpoch: false,
   makeVaultDBFor: async () => {
     const route = await routeOver()
     return (userId) => browserFor(route, userId)

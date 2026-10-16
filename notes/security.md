@@ -1037,3 +1037,16 @@ security expert who knows what questions to ask.
   within one copy of the package, as `VaultError`'s does; the peer dependency keeps it one. And a
   vault a newer safebyok may have written is `newer_format`, never `damaged_bundle`, so no UI
   offers to erase it (G120).
+* 2026-10-16 (epoch_expectation, G065, G138): **every in-tree adapter now compares the
+  `vault_key_epoch` expectation** (line 3.8), and the battery holds every adapter to it, with no
+  opt-out (`describeVaultDB` no longer takes `comparesVaultKeyEpoch`). IndexedDB compares in the
+  write's transaction; the Convex component in `updateBox`'s mutation; Postgres in the write's one
+  statement, reading the bundle row `FOR SHARE` -- without the lock, READ COMMITTED would compare
+  the epoch in the statement's snapshot, and a rotation committed after it would go unseen; GraphQL
+  passes the expectation whole to the VaultDB it serves. So "no look before writing" (G138) holds:
+  storage alone refuses a stale vaultKey's write, atomically. The `FOR SHARE` lock is new: a bundle
+  update now waits for lockbox writes in flight, and the README's hard-cap trigger takes a
+  per-vault advisory lock rather than `FOR UPDATE` on the bundle, which would deadlock two writers
+  each holding the shared lock. The real-Postgres race that proves the lock waits on thread 11's
+  container suite. The 2026-10-16 entry above that says IndexedDB, Convex and Postgres "do not yet"
+  is superseded.

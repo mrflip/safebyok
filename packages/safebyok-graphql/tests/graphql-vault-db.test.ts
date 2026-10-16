@@ -29,7 +29,6 @@ TH.describeVaultDB('graphqlVaultDB, through vaultResolvers to postgresVaultDB ov
   const schema = TH.schemaOver(await TH.emptyDatabase())
   return TH.perUser((userId) => TH.browserFor(schema, userId))
 }, {
-  comparesVaultKeyEpoch: false,
   makeCappedVaultDB: async (maxLockboxes) => {
     const db = await TH.emptyDatabase()
     const schema = TH.schemaOver(db, ({ userId }) => postgresVaultDB({ client: db, userId, maxLockboxes }))

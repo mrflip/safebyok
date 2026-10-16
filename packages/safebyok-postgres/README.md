@@ -56,8 +56,11 @@ const vaultDB = postgresVaultDB({ client: pool, userId: session.userId })
   Client or PoolClient, or a PGlite, as they stand. postgres.js takes a wrapper:
   `{ query: async (text, params) => ({ rows: await sql.unsafe(text, params) }) }`.
 * **Every write is one statement**, atomic as Postgres makes every statement, so it asks no
-  transaction of your driver, no lock and no retry: a write lands only while what it expects
-  still stands, and refuses with kind `stale_write` otherwise.
+  transaction of your driver and no retry: a write lands only while what it expects still
+  stands, and refuses with kind `stale_write` otherwise. A lockbox write reads its vault's bundle
+  row `FOR SHARE`, the one lock any verb takes: lockbox writes never wait for each other, and a
+  bundle update waits for the lockbox writes under way (or they for it), so a lockbox lands only
+  under the vaultKey that stands.
 * **Isolation**: every guarantee here holds under READ COMMITTED, Postgres's default. Above it --
   a session default of REPEATABLE READ or SERIALIZABLE, or your own transaction around a call --
   some races fail with a serialization error (`40001`) instead, which refuses as
@@ -238,8 +241,8 @@ const isKind = (kind: unknown): kind is VaultErrorKind => (VaultErrorKindVals as
     growth near it.
 
   **For a hard cap**, *vaya con dios*: this is unsupported, and it costs what the package does not
-  ask of you -- a trigger of your own, and a row lock that makes lockbox inserts into one vault
-  take turns, so that racing writers can no longer overshoot under READ COMMITTED. (Under
+  ask of you -- a trigger of your own, and a transaction-scoped advisory lock per vault that makes
+  lockbox inserts into one vault take turns, so that racing writers can no longer overshoot under READ COMMITTED. (Under
   REPEATABLE READ the trigger counts from its transaction's snapshot, which misses a racer's
   lockbox committed meanwhile, and racers may still overshoot.) Put your number where `1000` is,
   and pass the same as `maxLockboxes`: the adapter's own count still refuses a write to a full
@@ -253,9 +256,9 @@ const isKind = (kind: unknown): kind is VaultErrorKind => (VaultErrorKindVals as
   ```sql
   CREATE OR REPLACE FUNCTION safebyok_lockboxes_capped() RETURNS trigger LANGUAGE plpgsql AS $$
   BEGIN
-    PERFORM 1 FROM safebyok_bundles
-      WHERE (applabel, user_id, vaultlabel, vault_id) = (NEW.applabel, NEW.user_id, NEW.vaultlabel, NEW.vault_id)
-      FOR UPDATE;
+    -- Inserts into one vault take turns. Not a row lock on the bundle: every lockbox write already
+    -- holds that row FOR SHARE, and two writers each raising theirs to FOR UPDATE would deadlock.
+    PERFORM pg_advisory_xact_lock(hashtext('safebyok_lockboxes_capped'), hashtext(NEW.applabel || '^' || NEW.user_id || '^' || NEW.vaultlabel));
     IF (SELECT count(*) FROM safebyok_lockboxes
           WHERE (applabel, user_id, vaultlabel) = (NEW.applabel, NEW.user_id, NEW.vaultlabel)) >= 1000 THEN
       RAISE EXCEPTION 'This vault holds its limit of lockboxes' USING ERRCODE = 'check_violation';
@@ -395,7 +398,7 @@ shape of table, copy it, and keep to what makes it right:
   the `vault_id`, so a lockbox cannot outlive its vault or land in one made anew, and erasing a
   vault is one `DELETE` of its bundle.
 * **Store each record a column to a field**, and compare only the scope, `boxlabel`, `vault_id`,
-  `unlock_epoch` and `revision_id`. `src/columns.ts` names each record's columns once, the
+  `unlock_epoch`, `vault_key_epoch` and `revision_id`. `src/columns.ts` names each record's columns once, the
   compiler holding the list to the record's fields both ways, and builds every statement from it.
 * **Authorize in the adapter**: made per request for one user, it refuses every other user's
   scope with `identity_revoked`.
@@ -407,10 +410,15 @@ shape of table, copy it, and keep to what makes it right:
   was full -- so that no second read is needed to tell a full vault from a stale writer. And
   map a foreign key violation (`23503`) on the insert to `stale_write`: a vault erased after the
   statement's snapshot, before its foreign key check, is only a stale writer.
-* **Read the bundle without a lock, and know what that sees.** The insert takes the bundle from
-  its snapshot, and the foreign key re-checks only `vault_id` against the bundle that stands now.
-  A write that must compare any other column of the bundle atomically with a lockbox write
-  would need that row read `FOR SHARE` in the same statement; none does today.
+* **Read the bundle `FOR SHARE` in a lockbox write, and know why.** A lockbox write compares the
+  bundle's `vault_key_epoch` (contract line 3.8), a column no foreign key covers, and a plain
+  read would take it from the statement's snapshot: a bundle update committed after the snapshot
+  -- a rotation of the vaultKey -- would go unseen, and a device still holding the replaced
+  vaultKey could seal a whisper under it. `FOR SHARE` makes the update wait for the write, or the
+  write for the update and then re-read the bundle as it stands. It is a shared lock, so lockbox
+  writes never wait for each other. A trigger of your own that locks the bundle row anew -- `FOR
+  UPDATE`, say -- turns two such writers into a deadlock: serialize on something else (the hard
+  cap above takes an advisory lock).
 * **Prove it with the shared suite**: `describeVaultDB` from `safebyok/testing` runs every verb,
   expectation and refusal against a fresh adapter. Its two users' vaults go through one adapter,
   so a per-request adapter answers it with one VaultDB per user, through `perUser` from

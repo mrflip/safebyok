@@ -64,8 +64,12 @@ const LockboxCases = [
   // the bundle half:
   [undefined,  undefined,                     null,       false,  'a write into a scope with no bundle'],
   [TH.bundleOf('u1', { vault_id: 'reborn' }), Box,  "rev-one",  false,  'a write sealed for a vault since made anew'],
+  [TH.rotatedBundleOf('u1'),                  Box,  "rev-one",  false,  'a write sealed under a vaultKey since replaced'],
+  [TH.rotatedBundleOf('u1'),                  undefined, null,  false,  'a first write sealed under a vaultKey since replaced'],
   // nothing, or damage, standing:
   [{ vault_id: "vault-id-u1" },  undefined,   null,       false,  'a bundle row that shows no epoch'],
+  [{ vault_id: "vault-id-u1", unlock_epoch: 1 }, undefined, null, false, "a bundle row that shows no vaultKey's epoch"],
+  [{ ...Bundle, vault_key_epoch: "1" },  undefined,  null,  false,  "a vaultKey's epoch stored as text"],
   [Bundle,     null,                          null,       true,   'a null row reads as no lockbox, as a read does'],
   [Bundle,     { boxlabel: "anthropic" },     "rev-one",  false,  'a lockbox row that shows no revision'],
 ] as const
@@ -76,4 +80,14 @@ describe("lockboxMeetsExpectation", () => {
       expect(lockboxMeetsExpectation(standingBundle, standingBox, { vault_id: 'vault-id-u1', revision_id: revisionId, vault_key_epoch: 1 })).to.eq(landed)
     })
   }
+})
+
+describe("lockboxMeetsExpectation, under a vaultKey replaced", () => {
+  it("holds for a write sealed under the vaultKey that stands, over a lockbox sealed under the one before", () => {
+    expect(lockboxMeetsExpectation(TH.rotatedBundleOf('u1'), Box, { vault_id: 'vault-id-u1', revision_id: 'rev-one', vault_key_epoch: 2 })).to.be.true
+  })
+
+  it("fails a write sealed under a vaultKey the bundle does not stand for yet", () => {
+    expect(lockboxMeetsExpectation(Bundle, undefined, { vault_id: 'vault-id-u1', revision_id: null, vault_key_epoch: 2 })).to.be.false
+  })
 })

@@ -133,6 +133,14 @@ fields left out. A VaultDB's own `listBoxes` gives summaries instead -- the shap
 without `format` -- which the browser's VaultDB may not hand back from its own listing.
 `safebyok-postgres`'s VaultDB is a ServedVaultDB as it stands; nothing here is tied to Postgres.
 
+The resolvers decide nothing: every expectation crosses whole, and the VaultDB you serve keeps
+[the VaultDB contract](https://github.com/mrflip/safebyok/blob/main/packages/safebyok/VAULTDB.md)
+for the browser. Its line 3.8 in particular: a lockbox write's expectation names the
+`vault_key_epoch` the lockbox was sealed under, and your VaultDB lands it only while the vault's
+bundle stands at that epoch, compared in the same atomic step as the write. One that skips the
+comparison lets a device still holding a replaced vaultKey seal a whisper under it.
+`tests/yoga-recipe.test.ts` runs the shared suite through the recipe, that line included.
+
 ## The browser half
 
 `graphqlVaultDB(client)` is a VaultDB, each verb one operation through `client`.
