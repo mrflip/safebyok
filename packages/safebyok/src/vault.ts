@@ -1559,10 +1559,11 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       await reviseUnlocks(proof, byPasskey ? undefined : unlockId, {
         call:   'changePassphrase',
         // The passphrase's way in takes the new one, keeping its stamp: its id and label, and the
-        // device and time that added it.
+        // device and time that added it. Its vault_key_epoch is the bundle's, whatever the
+        // replaced envelope's: a passkey can mend a passphrase stored at another.
         revise: async (standing, proven) => {
           const replaced = passphraseToReplace(standing, byPasskey ? unlockId : proven.unlockId)
-          const sealed = await sealFor(standing, newPassphrase, replaced, proven)
+          const sealed = await sealFor(standing, newPassphrase, { ...replaced, vault_key_epoch: standing.vault_key_epoch }, proven)
           return standing.unlocks.map((envelope) => (envelope === replaced ? sealed : envelope))
         },
       })

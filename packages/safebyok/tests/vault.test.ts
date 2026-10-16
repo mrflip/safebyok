@@ -3033,6 +3033,20 @@ describe("passkeys", () => {
     expect(unlocklabelsOf(vault)).to.deep.equal(['passphrase', 'laptop'])
   })
 
+  it("changePassphrase with a passkey mends a passphrase stored at another vault_key_epoch: the new one opens", async () => {
+    const { world, laptop } = await vaultWithPasskey()
+    const bundle = JSON.parse(world.dbStore.read(u1BundleCkey) ?? '{}') as { unlocks: Record<string, unknown>[] }
+    const unlocks = bundle.unlocks.map((envelope, ii) => (ii === 0 ? { ...envelope, vault_key_epoch: 2 } : envelope))
+    world.dbStore.write(u1BundleCkey, JSON.stringify({ ...bundle, unlocks }))
+    const vault = await world.open({ deviceDB: memoryDeviceDB() })
+    await TH.expectRefusal(vault.unlock('pw'), 'damaged_unlock')
+    await vault.changePassphrase(laptop, 'a new passphrase')
+    expect(storedUnlocksOf(world)[0]).to.deep.include({ vault_key_epoch: 1 })
+    const fresh = await world.open({ deviceDB: memoryDeviceDB() })
+    await fresh.unlock('a new passphrase')
+    expect(await fresh.read('anthropic')).to.eq('sk-fake')
+  })
+
   it("changePassphrase with a passkey refuses a blank new passphrase and a misshapen answer, quoting neither", async () => {
     const { vault, laptop } = await vaultWithPasskey()
     await TH.expectRefusal(vault.changePassphrase(laptop, ' '.repeat(3)), 'wrong_passphrase')
