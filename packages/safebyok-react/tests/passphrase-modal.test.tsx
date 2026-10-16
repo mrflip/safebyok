@@ -386,7 +386,17 @@ describe("PassphraseModal", () => {
       fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
       fireEvent.click(screen.getByText('Erase and start over'))
       await screen.findByText('Storage could not be reached; try again in a moment.')
-      expect(screen.queryByText('Erase and start over')).to.not.be.null
+      expect(screen.getByText('Erase and start over')).to.have.property('disabled', false)
+    })
+
+    it("erases once for a double press, taking no second press while the erase runs", () => {
+      const destroy = vi.fn(() => new Promise<void>(() => { /* still erasing */ }))
+      render(<PassphraseModal vault={TH.stubVault({ destroy })} allowStartOver onDone={noop} />)
+      fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
+      fireEvent.click(screen.getByText('Erase and start over'))
+      fireEvent.click(screen.getByText('Erase and start over'))
+      expect(destroy).toHaveBeenCalledOnce()
+      expect(screen.getByText('Erase and start over')).to.have.property('disabled', true)
     })
 
     it("asks afresh once the vault it was asked of changed elsewhere, rather than erasing the one that stands", async () => {
