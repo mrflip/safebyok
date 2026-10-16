@@ -100,8 +100,8 @@ export type OpenVaultOpts = {
   /**
    * The largest whisper `store()` accepts, in bytes of its JSON and its lockbox's public bag's
    * together. Default: {@link MaxWhisperBytes}, 40444. Checked on write only, so lowering it never
-   * strands a whisper already stored. At most
-   * half the vaultDB's `maxRecordBytes`: openVault refuses more with kind 'bad_option'.
+   * strands a whisper already stored. At most half the vaultDB's `maxRecordBytes`: openVault
+   * refuses more with kind 'bad_option'.
    */
   maxWhisperBytes?: number | undefined
   /**
@@ -127,8 +127,9 @@ export type OpenVaultOpts = {
    * field given replaces ours (`Label` for each label, an unlock's `unlocklabel` among them,
    * `UserId` for the user, from `safebyok/validators`), and each left out keeps ours. Each is a Zod
    * schema that checks synchronously, and only checks: what passes is kept exactly as given.
-   * Beneath every one, the floor (`NameFloor`) holds whatever the bag says. Kind 'bad_option' for a bag holding anything else, or a field it does
-   * not know.
+   * Beneath every one, the floor (`NameFloor`) holds whatever the bag says. Kind 'bad_option' for
+   * a bag holding anything else, or a field it does not know (a `note` among them: a lockbox's
+   * public bag is the host's to check).
    */
   validators?: VaultValidators | undefined
   /**
@@ -343,10 +344,10 @@ export type Vault = {
   /**
    * Write a whisper into the lockbox `boxlabel`, creating or replacing it. Requires unlocked;
    * kind 'whisper_too_large' when its JSON and the lockbox's public bag's together are over the
-   * vault's `maxWhisperBytes`, and kind
-   * 'vault_full' when `boxlabel` is new and the vault already holds its `maxLockboxes` -- erase
-   * one first. Replacing a lockbox is never refused by `maxLockboxes`, though storage may refuse a
-   * heavier replacement in a full vault as kind 'vault_full'.
+   * vault's `maxWhisperBytes`, and kind 'vault_full' when `boxlabel` is new and the vault already
+   * holds its `maxLockboxes` -- erase one first. Replacing a lockbox is never refused by the vault's
+   * own limits, though a backend holding a limit of its own may refuse a heavier replacement in a
+   * full vault as kind 'vault_full'.
    *
    * The write lands only if storage still holds what this device last read: the same vault, and
    * the same revision of this lockbox (or still none). When another device got in first, the
@@ -1017,9 +1018,9 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   }
 
   /**
-   * Refuse a write that would crowd the vault: a new lockbox while it holds `maxLockboxes`, or any
-   * lockbox heavier than the one it replaces (by {@link lockboxWeight}) that would take the vault
-   * past its storage's `maxVaultBytes`. Counted from the snapshot's boxes, which every write and
+   * Refuse a write that would crowd the vault: a new lockbox while it holds `maxLockboxes`, or one
+   * that would take the vault past its storage's `maxVaultBytes` (each weighed by
+   * {@link lockboxWeight}). Counted from the snapshot's boxes, which every write and
    * every change pushed from storage refreshes, so a store costs no extra read of the whole vault;
    * a vault that looks full is caught up with storage before it is refused.
    */
@@ -1591,7 +1592,7 @@ const LockboxFormat = 'safebyok-lockbox-v3'
  */
 type LockboxHeader = Omit<Lockbox, 'format' | 'lockbox_key_wrapped' | 'whisper_ciphered'>
 
-/** The public bag a lockbox is given none of has, as JSON. */
+/** The JSON of an empty public bag: what a lockbox given none holds. */
 const EmptyPublicJson = '{}'
 
 /**
