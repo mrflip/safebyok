@@ -290,8 +290,8 @@ describe("raceEveryWay", () => {
       moves:       [(move) => move('one'), () => new Promise<never>(() => undefined)],
       verdict:     () => undefined,
     })
-    await expect(hung).rejects.toThrow(/^Under the schedule "made together": the moves did not finish within 2000 ms/)
-  }, 10_000)
+    await expect(hung).rejects.toThrow(/^Under the schedule "made together": the moves did not finish within 10000 ms/)
+  }, 20_000)
 
   it("holds a move just before its round trip while the other moves to its end, then lets it go", async () => {
     const logs: string[][] = []
