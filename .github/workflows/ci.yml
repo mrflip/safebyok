@@ -139,3 +139,35 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
+
+  # The VaultDB battery, its races, the lockbox limit's and the hard-cap trigger's, run over a real
+  # Postgres: PGlite, which every other Postgres test uses, runs one statement at a time and cannot
+  # race (packages/safebyok/VAULTDB.md, Proving the races). The role is a superuser with no
+  # password, the container reachable on this runner alone, and each test file makes a database
+  # of its own. Which suites run here is the one list in e2e/tests/postgres/test-helpers.ts.
+  # Not required by the ruleset until it has run a while.
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready --username postgres"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      SAFEBYOK_PG_URL: postgres://postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .tool-versions
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter safebyok-e2e test:postgres
