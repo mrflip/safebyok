@@ -349,7 +349,6 @@ describe("VaultProvider", () => {
       const { rerender } = render(world.tree('u1'))
       const vault = await world.opened()
       let release: () => void = noop
-      // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- Promise.withResolvers is ES2024, and every tsconfig's lib stops at ES2023
       const held = new Promise<void>((resolve) => { release = resolve })
       // A host action that holds its refusal back a while, as one that logs it first might.
       const reading = watched(world.latest().withUnlockedVault(async () => {
@@ -852,7 +851,6 @@ describe("VaultProvider", () => {
       hushConsole()
       const world = makeWorld()
       let rejectRead: (err: unknown) => void = noop
-      // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- Promise.withResolvers is ES2024, and every tsconfig's lib stops at ES2023
       const readBundle = vi.spyOn(world.vaultDB, 'readBundle').mockReturnValueOnce(new Promise((_resolve, reject) => { rejectRead = reject }))
       const caught: unknown[] = []
       const tree = (userId: string | null) => (

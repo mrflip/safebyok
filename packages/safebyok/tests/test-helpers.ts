@@ -518,10 +518,18 @@ export const throughTurnstile = <Target extends object>(turnstile: Turnstile, ta
 /** How one move in a race settled: `landed`, with what it resolved to, or the kind it was refused with, with what it threw. */
 export type RaceOutcome = { kind: string, val: unknown }
 
+/**
+ * A fresh, empty backend, as a way to make devices over it: handed the race's `turnstile`, it gives
+ * a factory of devices, each sharing nothing but the backend, each round trip of each passing the
+ * turnstile. The factory takes `DeviceOptsT` -- the limit to hold a device to, for a VaultDB's --
+ * or nothing, as `() => device` does.
+ */
+export type MakeDevices<DeviceT, DeviceOptsT = void> = (turnstile: Turnstile) => ((deviceOpts: DeviceOptsT) => DeviceT) | Promise<(deviceOpts: DeviceOptsT) => DeviceT>
+
 /** A race between devices over one backend, for {@link raceEveryWay}. */
 export type Race<DeviceT> = {
-  /** Fresh devices over one fresh, empty backend, each sharing nothing but the backend, each round trip of each passing `turnstile`. */
-  makeDevices: (turnstile: Turnstile) => (() => DeviceT) | Promise<() => DeviceT>
+  /** Fresh devices over one fresh, empty backend: see {@link MakeDevices}. */
+  makeDevices: MakeDevices<DeviceT>
   /** What stands before the race, made through the first device. */
   setup?: ((first: DeviceT) => Promise<unknown>) | undefined
   /** Each device's move, a device to each: the first move on the first device, and so on. Two or more. */
@@ -546,7 +554,7 @@ export type Race<DeviceT> = {
  *
  * @param race - The devices, what stands before, each device's move, and the verdict.
  * @returns The title of each schedule run, in order; it rejects, naming the schedule, on the
- *   first verdict that fails or device that waits too long.
+ *   first verdict that fails, device that waits too long, or move that does not finish.
  *
  * @example
  *   await TH.raceEveryWay({
@@ -641,7 +649,7 @@ const pairOf = (starts: readonly Start[], firstIdx: 0 | 1): [Start, Start] => {
 /** Outcomes back in the moves' own order, from the order a schedule made them in. */
 const inMoveOrder = (firstIdx: 0 | 1, first: RaceOutcome, second: RaceOutcome): RaceOutcome[] => (firstIdx === 0 ? [first, second] : [second, first])
 
-const together: Schedule = async (starts) => ({ outcomes: await Promise.all(starts.map((start) => start())), held: false })
+const together: Schedule = async (starts) => ({ outcomes: await finishing(Promise.all(starts.map((start) => start())), 'the moves'), held: false })
 
 /** The move of `firstIdx` started, then the other once `wait` resolves. */
 const staggered = (firstIdx: 0 | 1, wait: () => Promise<void>): Schedule => async (starts) => {
@@ -649,7 +657,8 @@ const staggered = (firstIdx: 0 | 1, wait: () => Promise<void>): Schedule => asyn
   const firstMove = first()
   await wait()
   const secondMove = second()
-  return { outcomes: inMoveOrder(firstIdx, await firstMove, await secondMove), held: false }
+  const [firstOutcome, secondOutcome] = await finishing(Promise.all([firstMove, secondMove]), 'the moves')
+  return { outcomes: inMoveOrder(firstIdx, firstOutcome, secondOutcome), held: false }
 }
 
 /**
@@ -661,16 +670,16 @@ const holding = (firstIdx: 0 | 1, nth: number): Schedule => async (starts, keepe
   const [first, second] = pairOf(starts, firstIdx)
   const gate = keeper.holdAt(nth)
   const firstMove = first()
-  const arrived = await reachedBeforeEnd(gate, firstMove)
+  const arrived = await finishing(reachedBeforeEnd(gate, firstMove), `the first move, before its round trip ${String(nth)}`)
   if (! arrived) {
     keeper.holdNone()
-    const firstOutcome = await firstMove
-    return { outcomes: inMoveOrder(firstIdx, firstOutcome, await second()), held: false }
+    const firstOutcome = await finishing(firstMove, 'the first move')
+    return { outcomes: inMoveOrder(firstIdx, firstOutcome, await finishing(second(), 'the second move')), held: false }
   }
   const secondMove = await inTime(second())
   gate.release()
   if (! secondMove.inTime) { throw waitedTooLong() }
-  return { outcomes: inMoveOrder(firstIdx, await firstMove, secondMove.val), held: true }
+  return { outcomes: inMoveOrder(firstIdx, await finishing(firstMove, 'the first move, let go'), secondMove.val), held: true }
 }
 
 /** Each move held before its nth round trip in turn, so all are midway at once, then all let go together. */
@@ -689,7 +698,7 @@ const crowding = (nth: number): Schedule => async (starts, keeper) => {
     if (arrival.val) { gates.push(gate) } else { keeper.holdNone() }
   }
   for (const gate of gates) { gate.release() }
-  return { outcomes: await Promise.all(moves), held: gates.length > 0 }
+  return { outcomes: await finishing(Promise.all(moves), 'the moves, let go'), held: gates.length > 0 }
 }
 
 /** True once a move waits at `gate`, or false once `move` ends without coming to it. */
@@ -713,6 +722,13 @@ const inTime = async <ValT>(promise: Promise<ValT>): Promise<{ inTime: true, val
   return settled
 }
 
+/** What `promise` resolves to; rejects, saying `what` did not finish, when it takes longer than {@link WaitedTooLongMs}: so a hung adapter fails the schedule, which names it, not the test's own timeout. */
+const finishing = async <ValT>(promise: Promise<ValT>, what: string): Promise<ValT> => {
+  const settled = await inTime(promise)
+  if (! settled.inTime) { throw new Error(`${what} did not finish within ${String(WaitedTooLongMs)} ms: the adapter hung, or waits on something that never comes.`) }
+  return settled.val
+}
+
 const waitedTooLong = () => new Error(
   `a device's move did not finish within ${String(WaitedTooLongMs)} ms while another device waited at the turnstile, before a round trip to the backend. The devices share something that makes one wait for the other -- a lock, a queue, a connection -- that two real devices would not, or the adapter holds a lock from one round trip to the next, which the VaultDB contract's baseline rules out.`,
 )
@@ -733,7 +749,6 @@ const unresolved = () => { /* replaced before use */ }
 /** A promise, and apart from it the function that resolves it. */
 const deferred = () => {
   let resolve: () => void = unresolved
-  // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- Promise.withResolvers is ES2024, and every tsconfig's lib stops at ES2023
   const promise = new Promise<void>((resolver) => { resolve = resolver })
   return { promise, resolve }
 }
@@ -933,8 +948,8 @@ export type DescribeVaultDBOpts = {
 /** What a device of {@link DescribeVaultDBOpts.makeDevices} is made with: the limit to hold it to, where the adapter takes one. */
 export type VaultDBDeviceOpts = { maxLockboxes?: number | undefined }
 
-/** A fresh, empty backend, as a way to make devices over it, each round trip of each passing `turnstile`. */
-export type MakeVaultDBDevices = (turnstile: Turnstile) => ((deviceOpts: VaultDBDeviceOpts) => VaultDBVerbs) | Promise<(deviceOpts: VaultDBDeviceOpts) => VaultDBVerbs>
+/** A fresh, empty backend, as a way to make devices over it: {@link MakeDevices} of a VaultDB, its factory taking {@link VaultDBDeviceOpts}. */
+export type MakeVaultDBDevices = MakeDevices<VaultDBVerbs, VaultDBDeviceOpts>
 
 /** The lockbox limit {@link describeVaultDB} asks a capped adapter for. */
 const CappedLockboxes = 3
@@ -1568,11 +1583,18 @@ export type VaultDBTimingCheck = { line: VaultDBContractLine, title: string, run
  * devices from `makeDevices`, or else every move through one adapter from `makeVaultDB` (or
  * `makeCappedVaultDB`, for the limit's).
  *
+ * Two limits of what they prove. `pushFromTheStart` holds a watch's start at the turnstile only
+ * where that start is a round trip through it; a watch that starts as `subscribe` returns, or
+ * whose start `makeDevices` leaves unwired (a Convex client's `watchQuery` is not a promise, so
+ * cannot pass it), is live at once, and the check then shows what the other push checks do. And a
+ * push check credits a call to a write by when it ran, not by what caused it: a late call from an
+ * earlier write that reads the vault after a later one landed is credited to the later.
+ *
  * @param makeVaultDB - A fresh, empty adapter, as `describeVaultDB` takes it.
  * @param opts - `describeVaultDB`'s options.
  * @returns Each check, by a handle naming what it races or watches.
  *
- * @example await TH.vaultDBTimingChecks(() => new MyVaultDB(), { makeDevices }).rival_first_writes.check()
+ * @example await TH.vaultDBTimingChecks(() => new MyVaultDB(), { makeDevices }).rivalFirstWrites.check()
  */
 export const vaultDBTimingChecks = (makeVaultDB: () => VaultDBVerbs | Promise<VaultDBVerbs>, opts: DescribeVaultDBOpts = {}) => {
   const { makeCappedVaultDB, makeDevices, pushes = false } = opts
@@ -1607,7 +1629,7 @@ export const vaultDBTimingChecks = (makeVaultDB: () => VaultDBVerbs | Promise<Va
     return [vaultDB, vaultDB]
   }
   return {
-    seen_across_devices: {
+    seenAcrossDevices: {
       line:  '2.1',
       title: "shows a write made on one device to the very next read and listing on another, and an erase likewise",
       runs:  devices,
@@ -1624,7 +1646,7 @@ export const vaultDBTimingChecks = (makeVaultDB: () => VaultDBVerbs | Promise<Va
         expect(await one.readBundle(scopeOf('u1'))).to.be.null
       },
     },
-    rival_creates: {
+    rivalCreates: {
       line:  '3.1',
       title: `settles two creates of one vault made at once ${fromTwo} on one bundle, which both get back, however they interleave`,
       runs:  true,
@@ -1641,7 +1663,7 @@ export const vaultDBTimingChecks = (makeVaultDB: () => VaultDBVerbs | Promise<Va
         })
       },
     },
-    rival_bundle_updates: {
+    rivalBundleUpdates: {
       line:  '3.2',
       title: `lands one of two updates of one bundle made at once ${fromTwo}, and refuses the other as stale_write, however they interleave`,
       runs:  true,
@@ -1659,7 +1681,7 @@ export const vaultDBTimingChecks = (makeVaultDB: () => VaultDBVerbs | Promise<Va
         })
       },
     },
-    rival_first_writes: {
+    rivalFirstWrites: {
       line:  '3.3',
       title: `lands one of two first writes of a lockbox made at once ${fromTwo}, and refuses the other as stale_write, however they interleave`,
       runs:  true,
@@ -1677,7 +1699,7 @@ export const vaultDBTimingChecks = (makeVaultDB: () => VaultDBVerbs | Promise<Va
         })
       },
     },
-    rival_replacements: {
+    rivalReplacements: {
       line:  '3.3',
       title: `lands one of two replacements of one revision made at once ${fromTwo}, and refuses the other as stale_write, however they interleave`,
       runs:  true,
@@ -1695,7 +1717,7 @@ export const vaultDBTimingChecks = (makeVaultDB: () => VaultDBVerbs | Promise<Va
         })
       },
     },
-    erase_beats_replacement: {
+    eraseBeatsReplacement: {
       line:  '3.4',
       title: `lands an erase made at once ${fromTwo} with a replacement of its lockbox, which is gone afterwards, however they interleave`,
       runs:  true,
@@ -1712,7 +1734,7 @@ export const vaultDBTimingChecks = (makeVaultDB: () => VaultDBVerbs | Promise<Va
         })
       },
     },
-    vault_erase_beats_write: {
+    vaultEraseBeatsWrite: {
       line:  '3.5',
       title: `leaves no lockbox behind a vault erased while a lockbox was written into it ${fromTwo}, however they interleave`,
       runs:  true,
@@ -1729,7 +1751,7 @@ export const vaultDBTimingChecks = (makeVaultDB: () => VaultDBVerbs | Promise<Va
         })
       },
     },
-    apart_new_lockboxes: {
+    apartNewLockboxes: {
       line:  '3.7',
       title: `lands two new lockboxes written into one vault at once ${fromTwo}, however they interleave, neither waiting on the other`,
       runs:  true,
@@ -1745,7 +1767,7 @@ export const vaultDBTimingChecks = (makeVaultDB: () => VaultDBVerbs | Promise<Va
         })
       },
     },
-    apart_replace_and_erase: {
+    apartReplaceAndErase: {
       line:  '3.7',
       title: `lands a replacement of one lockbox and an erase of another made at once ${fromTwo}, however they interleave, neither waiting on the other`,
       runs:  true,
@@ -1764,7 +1786,7 @@ export const vaultDBTimingChecks = (makeVaultDB: () => VaultDBVerbs | Promise<Va
         })
       },
     },
-    crowd_for_last_place: {
+    crowdForLastPlace: {
       line:  '4.5',
       title: `keeps every lockbox that landed when four writers race for the last place, ${fromEach}, and leaves nothing of those refused, however they interleave`,
       runs:  capped,
@@ -1792,7 +1814,7 @@ export const vaultDBTimingChecks = (makeVaultDB: () => VaultDBVerbs | Promise<Va
         })
       },
     },
-    past_limit_from_roomier_device: {
+    pastLimitFromRoomierDevice: {
       line:  '4.5',
       title: "keeps every lockbox of a vault past its limit -- filled by a device allowed more -- readable, refuses a new one as full, replaces one, and lists it whole once erases bring it back under",
       runs:  capped && devices,
@@ -1816,19 +1838,19 @@ export const vaultDBTimingChecks = (makeVaultDB: () => VaultDBVerbs | Promise<Va
         expect(await listedRevisions(tight)).to.deep.equal(['rev-cohere', 'rev-groq', 'rev-next'])
       },
     },
-    push_each_write: {
+    pushEachWrite: {
       line:  '6.1',
       title: "calls onChange after each kind of write to the vault, a read on each call seeing the write, once its watch is live",
       runs:  pushes,
       check: () => expectEachWriteHeard(sameAdapterTwice),
     },
-    push_from_another_device: {
+    pushFromAnotherDevice: {
       line:  '6.1',
       title: "calls onChange after each kind of write made on another device, a read on each call seeing the write, once its watch is live",
       runs:  pushes && devices,
       check: () => expectEachWriteHeard(twoDevices),
     },
-    push_from_the_start: {
+    pushFromTheStart: {
       line:  '6.1',
       title: `hears a write made ${devices ? 'on another device ' : ''}while its watch is still starting, a watch that starts late calling once it is live`,
       runs:  pushes,
@@ -1846,7 +1868,7 @@ export const vaultDBTimingChecks = (makeVaultDB: () => VaultDBVerbs | Promise<Va
         watch.unsubscribe()
       },
     },
-    push_ends_on_unsubscribe: {
+    pushEndsOnUnsubscribe: {
       line:  '6.1',
       title: "calls an unsubscribed onChange no more, through several writes, however often it unsubscribes, while another watch hears each",
       runs:  pushes,

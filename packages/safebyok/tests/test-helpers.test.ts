@@ -283,6 +283,15 @@ describe("raceEveryWay", () => {
     ])
   })
 
+  it("fails a move that never finishes under the schedule it hung in, not at the test's own timeout", async () => {
+    const hung = TH.raceEveryWay({
+      makeDevices: (turnstile) => () => loggingDevice(turnstile, [], 2),
+      moves:       [(move) => move('one'), () => new Promise<never>(() => undefined)],
+      verdict:     () => undefined,
+    })
+    await expect(hung).rejects.toThrow(/^Under the schedule "made together": the moves did not finish within 2000 ms/)
+  }, 10_000)
+
   it("holds a move just before its round trip while the other moves to its end, then lets it go", async () => {
     const logs: string[][] = []
     await TH.raceEveryWay({
@@ -976,7 +985,7 @@ TH.describeVaultDB('an honest adapter making round trips through the turnstile',
 TH.describeVaultDB('an honest adapter that counts a vault apart from its write, as a best effort', ...roundTripBattery({ stepping: inOneStep, countsApart: true }))
 
 /** The races a write whose check and write are apart loses, in some interleaving. */
-const SplitLosses = ['rival_creates', 'rival_bundle_updates', 'rival_first_writes', 'rival_replacements', 'erase_beats_replacement', 'vault_erase_beats_write'] as const
+const SplitLosses = ['rivalCreates', 'rivalBundleUpdates', 'rivalFirstWrites', 'rivalReplacements', 'eraseBeatsReplacement', 'vaultEraseBeatsWrite'] as const
 
 /** The battery's checks over a check-then-write adapter whose devices share one lock, a fresh one for each call. */
 const lockedChecks = () => checksOver({ stepping: checkThenWriteUnder(sharedLock()), overTheWire: true })
@@ -1021,20 +1030,20 @@ describe("vaultDBTimingChecks, against adapters that do not guard", () => {
 
   it("lets the writes of different lockboxes through a check-then-write adapter land, as they should", async () => {
     const checks = checksOver({ stepping: checkThenWrite, overTheWire: true })
-    await expectToHold(checks.apart_new_lockboxes)
-    await expectToHold(checks.apart_replace_and_erase)
+    await expectToHold(checks.apartNewLockboxes)
+    await expectToHold(checks.apartReplaceAndErase)
   })
 
   it("fails a check-then-write hidden behind a lock its devices share, once the turnstile holds one inside it", async () => {
     await Promise.all([
-      expect(lockedChecks().rival_first_writes.check()).rejects.toThrow(/held before its round trip 1 while two moved": a device's move did not finish .* share something/),
-      expect(lockedChecks().apart_new_lockboxes.check()).rejects.toThrow(/held before its round trip 1 while two moved": a device's move did not finish/),
+      expect(lockedChecks().rivalFirstWrites.check()).rejects.toThrow(/held before its round trip 1 while two moved": a device's move did not finish .* share something/),
+      expect(lockedChecks().apartNewLockboxes.check()).rejects.toThrow(/held before its round trip 1 while two moved": a device's move did not finish/),
     ])
   }, 10_000)
 
   it("is fooled by that lock where nothing holds a round trip: why makeDevices wires the turnstile", async () => {
     const unwiredUnderLock = checksOver({ stepping: checkThenWriteUnder(sharedLock()), overTheWire: true, unwired: true })
-    await expectToHold(unwiredUnderLock.rival_first_writes)
+    await expectToHold(unwiredUnderLock.rivalFirstWrites)
   })
 
   it("fails a makeDevices that hands one adapter to both devices, or a backend to each", async () => {
@@ -1042,19 +1051,19 @@ describe("vaultDBTimingChecks, against adapters that do not guard", () => {
     const oneAdapter = new RoundTripVaultDB(backend, { stepping: inOneStep })
     const theOne = () => oneAdapter
     const shared = TH.vaultDBTimingChecks(theOne, { makeDevices: () => theOne })
-    await expect(shared.seen_across_devices.check()).rejects.toThrow(/makeDevices made one adapter for both devices/)
+    await expect(shared.seenAcrossDevices.check()).rejects.toThrow(/makeDevices made one adapter for both devices/)
     const overItsOwn = () => new RoundTripVaultDB(new RoundTripBackend(false), { stepping: inOneStep })
     const apart = TH.vaultDBTimingChecks(theOne, { makeDevices: () => overItsOwn })
-    await expect(apart.seen_across_devices.check()).rejects.toThrow()
-    await expect(apart.rival_creates.check()).rejects.toThrow(/^Under the schedule "made together"/)
+    await expect(apart.seenAcrossDevices.check()).rejects.toThrow()
+    await expect(apart.rivalCreates.check()).rejects.toThrow(/^Under the schedule "made together"/)
   })
 
   it("fails a listing cut short at the limit, once a roomier device has taken the vault past it", async () => {
-    await expect(checksOver({ stepping: inOneStep, listsToLimit: true }).past_limit_from_roomier_device.check()).rejects.toThrow(/to have the same members/)
+    await expect(checksOver({ stepping: inOneStep, listsToLimit: true }).pastLimitFromRoomierDevice.check()).rejects.toThrow(/to have the same members/)
   })
 
   it("fails a crowd for the last place whose refused racers leave their lockboxes behind", async () => {
-    await expect(checksOver({ stepping: inOneStep, keepsRefused: true }).crowd_for_last_place.check()).rejects.toThrow(/^Under the schedule "made together": expected /)
+    await expect(checksOver({ stepping: inOneStep, keepsRefused: true }).crowdForLastPlace.check()).rejects.toThrow(/^Under the schedule "made together": expected /)
   })
 
   it("takes a vault past its limit, for real, when racers' counts are apart from their writes", async () => {
@@ -1084,28 +1093,28 @@ describe("vaultDBTimingChecks, against adapters that do not guard", () => {
       subscribe: (listener) => { listeners.add(listener); return () => { listeners.delete(listener) } },
     }
     const checks = TH.vaultDBTimingChecks(() => localVaultDB(earlyStore), { pushes: true })
-    await expect(checks.push_each_write.check()).rejects.toThrow(/no call to onChange read the vault as the write left it/)
+    await expect(checks.pushEachWrite.check()).rejects.toThrow(/no call to onChange read the vault as the write left it/)
   }, 10_000)
 
   it("fails an unsubscribe that leaves its listener listening", async () => {
     const store = memoryStore()
     const leaky: StringStore = { ...store, subscribe: (listener) => { store.subscribe(listener); return noDevice } }
     const checks = TH.vaultDBTimingChecks(() => localVaultDB(leaky), { pushes: true })
-    await expect(checks.push_ends_on_unsubscribe.check()).rejects.toThrow(/an unsubscribed onChange was called/)
+    await expect(checks.pushEndsOnUnsubscribe.check()).rejects.toThrow(/an unsubscribed onChange was called/)
   })
 
   it("fails a watch that starts on its own time and never calls once it is live, missing a write made meanwhile", async () => {
-    await expect(checksOver({ stepping: inOneStep, watchStarts: 'late' }).push_from_the_start.check()).rejects.toThrow(/no call to onChange read the vault as the write left it/)
+    await expect(checksOver({ stepping: inOneStep, watchStarts: 'late' }).pushFromTheStart.check()).rejects.toThrow(/no call to onChange read the vault as the write left it/)
   })
 
   it("passes that watch once it calls as it goes live", async () => {
-    await expectToHold(checksOver({ stepping: inOneStep, watchStarts: 'late, calling once live' }).push_from_the_start)
+    await expectToHold(checksOver({ stepping: inOneStep, watchStarts: 'late, calling once live' }).pushFromTheStart)
   })
 
   it("fails a device that never hears another device's writes", async () => {
     const checks = checksOver({ stepping: inOneStep, ringsOnlyItself: true })
-    await expectToHold(checks.push_each_write)
-    await expect(checks.push_from_another_device.check()).rejects.toThrow(/a watch heard none of 20 writes/)
+    await expectToHold(checks.pushEachWrite)
+    await expect(checks.pushFromAnotherDevice.check()).rejects.toThrow(/a watch heard none of 20 writes/)
   }, 10_000)
 })
 
