@@ -1,11 +1,10 @@
 import { useId, useRef, useState, type SubmitEvent } from 'react'
-import { ForeverMillis, isVaultCondition, isVaultError, type Vault } from 'safebyok'
+import { ForeverMillis, MinuteMillis, isVaultCondition, isVaultError, type Vault } from 'safebyok'
 import { Boundary } from './boundary'
 import { PasskeyUnlockButton } from './passkey-unlock-button'
 
 const MinutesPerHour = 60
 const MinutesPerDay = 24 * MinutesPerHour
-const MinuteMillis = 60_000
 
 /** The locale the window's count and relative phrase are formatted in. */
 const Locale = 'en'
@@ -28,7 +27,7 @@ const windowCount = (reentryWindowMillis: number): { count: number, unit: Unit }
  * keeps (`ForeverMillis`, which `Infinity` hours becomes) reads as lasting until the user locks it.
  */
 const unlockedFor = (reentryWindowMillis: number, creating: boolean): string => {
-  if (reentryWindowMillis >= ForeverMillis) { return 'Stays unlocked on this device until you lock it.' }
+  if (reentryWindowMillis >= ForeverMillis - MinuteMillis) { return 'Stays unlocked on this device until you lock it.' }
   const { count, unit } = windowCount(reentryWindowMillis)
   // numeric 'always', so that one day reads 'in 1 day' and never 'tomorrow'.
   const relativeTime = new Intl.RelativeTimeFormat(Locale, { numeric: 'always', style: 'long' })

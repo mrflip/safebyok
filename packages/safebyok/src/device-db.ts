@@ -1,5 +1,13 @@
 import { DeviceMark, DeviceUnlock, type VaultScope } from './types'
 import * as Ckeys from './ckeys'
+import { VaultError } from './errors'
+
+/**
+ * What a remembered unlock's write expects of the device: that no lock has forgotten the vault's
+ * remembered unlock since the unlock began, its device mark still at the `lock_generation` it
+ * read then (0 for a scope with no mark).
+ */
+export type UnlockExpectation = { lock_generation: number }
 
 /**
  * Device-local storage for what a device keeps of each vault: its remembered unlock, what lets
@@ -19,11 +27,22 @@ import * as Ckeys from './ckeys'
 export interface DeviceDB {
   /** The remembered unlock for one vault, or null when there is none. Expiry is the vault's call. */
   readUnlock(scope: VaultScope): Promise<DeviceUnlock | null>
-  writeUnlock(unlock: DeviceUnlock): Promise<void>
+  /**
+   * Keep `unlock` as the remembered unlock of its vault, in place of any before, only while the
+   * device mark of its scope stands at `expected.lock_generation` (a scope with no mark, or one
+   * that does not read, stands at 0); otherwise write nothing and refuse with kind 'stale_write'.
+   * The compare and the write are one step, as a VaultDB's are: an IndexedDB adapter makes them
+   * in one transaction. This is how a lock in one tab stops an unlock under way in another.
+   */
+  writeUnlock(unlock: DeviceUnlock, expected: UnlockExpectation): Promise<void>
   eraseUnlock(scope: VaultScope): Promise<void>
   /** This device's mark for one vault, or null when there is none. What it says is the vault's to judge. */
   readMark(scope: VaultScope): Promise<DeviceMark | null>
-  /** Keep `mark` as this device's mark for its vault, in place of any it kept before. */
+  /**
+   * Keep `mark` as this device's mark for its vault, in place of any it kept before -- but never
+   * at a lower `lock_generation` than the mark it replaces: the higher of the two is kept, in the
+   * same step as the write, so a mark written from an older read never undoes a lock.
+   */
   writeMark(mark: DeviceMark): Promise<void>
   eraseMark(scope: VaultScope): Promise<void>
   /** Remove every remembered unlock and device mark on this device: the device's part of a full reset. */
@@ -58,7 +77,10 @@ export const memoryDeviceDB = (): DeviceDB => {
       return Promise.resolve(checked.data)
     },
 
-    writeUnlock: (unlock) => {
+    writeUnlock: (unlock, expected) => {
+      if (lockGenerationOf(marks.get(Ckeys.mark(unlock))) !== expected.lock_generation) {
+        return Promise.reject(lockedMeanwhile())
+      }
       unlocks.set(Ckeys.unlock(unlock), unlock)
       return Promise.resolve()
     },
@@ -81,7 +103,8 @@ export const memoryDeviceDB = (): DeviceDB => {
     },
 
     writeMark: (mark) => {
-      marks.set(Ckeys.mark(mark), mark)
+      const ckey = Ckeys.mark(mark)
+      marks.set(ckey, keepingLocks(mark, marks.get(ckey)))
       return Promise.resolve()
     },
 
@@ -97,3 +120,20 @@ export const memoryDeviceDB = (): DeviceDB => {
     },
   }
 }
+
+/**
+ * The lock generation `kept`, a stored mark, stands at: its own when it reads as a mark, and 0
+ * when there is none, or it does not read.
+ */
+export const lockGenerationOf = (kept: unknown): number => {
+  const checked = DeviceMark.safeParse(kept)
+  return checked.success ? checked.data.lock_generation : 0
+}
+
+/** `mark`, to be written over `kept`, at the higher of the two lock generations. */
+export const keepingLocks = (mark: DeviceMark, kept: unknown): DeviceMark => (
+  { ...mark, lock_generation: Math.max(mark.lock_generation, lockGenerationOf(kept)) }
+)
+
+/** A remembered unlock's write refused, a lock having forgotten the vault's since its unlock began. */
+export const lockedMeanwhile = () => new VaultError('stale_write', 'A lock on this device forgot the remembered unlock while this unlock was under way, so nothing was remembered: the lock wins.')

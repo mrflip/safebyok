@@ -319,8 +319,13 @@ const MarkCases = [
   // regular usage:
   [TH.markOf('u1'),                                     true,   'a whole mark'],
   [TH.markOf('u1', { unlock_epoch: 40 }),                true,   'a mark of a vault seen at a later epoch'],
+  [TH.markOf('u1', { lock_generation: 7 }),             true,   'a mark of a device that has locked the vault seven times'],
   // refused, as a damaged or foreign record:
-  [TH.markOf('u1', { format: 'safebyok-mark-v2' as never }), false, 'a format this version does not know'],
+  [TH.markOf('u1', { format: 'safebyok-mark-v3' as never }), false, 'a format this version does not know'],
+  [TH.markOf('u1', { format: 'safebyok-mark-v1' as never }), false, 'a mark from before the lock generation, which reads as none'],
+  [TH.omitting(TH.markOf('u1'), 'lock_generation'),     false,  'a mark missing its lock generation'],
+  [TH.markOf('u1', { lock_generation: -1 }),            false,  'a lock generation below zero'],
+  [TH.markOf('u1', { lock_generation: 1.5 }),           false,  'a lock generation that is no whole number'],
   [TH.markOf('u1', { device_id: '' }),                  false,  'an empty device_id'],
   [TH.markOf('u1', { vault_id: '' }),                   false,  'an empty vault_id'],
   [TH.markOf('u1', { unlock_epoch: 0 }),                false,  'an epoch starts at one'],

@@ -9,7 +9,7 @@ describe("memoryDeviceDB", () => {
   it("treats a mangled record as no remembered unlock, and clears it", async () => {
     const deviceDB = memoryDeviceDB()
     const mangled = { ...(await TH.unlockOf('u1')), local_unlock_key: 'not a key handle' }
-    await deviceDB.writeUnlock(mangled as unknown as DeviceUnlock)
+    await deviceDB.writeUnlock(mangled as unknown as DeviceUnlock, TH.NoLocks)
     expect(await deviceDB.readUnlock(TH.scopeOf('u1'))).to.be.null
     expect(await deviceDB.readUnlock(TH.scopeOf('u1'))).to.be.null  // stays gone
   })

@@ -18,7 +18,7 @@ describe("DeviceDBInspectionPanel", () => {
   it("shows this device's remembered unlock as it lands, its localUnlockKey a handle", async () => {
     render(<DeviceDBInspectionPanel />)
     const unlock = { ...(await TH.unlockOf('u1')), applabel: Applabel }
-    await act(() => idbDeviceDB({ dbName: Applabel }).writeUnlock(unlock))
+    await act(() => idbDeviceDB({ dbName: Applabel }).writeUnlock(unlock, TH.NoLocks))
     await waitFor(() => { expect(screen.getAllByText('🔑 non-extractable key')).to.have.lengthOf(1) })
     expect(screen.getByText(/«CryptoKey non-extractable handle»/)).to.not.be.null
   })

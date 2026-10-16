@@ -1,7 +1,7 @@
 import { Component, type ReactNode } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ForeverMillis, ForcePassphraseReentryHours, VaultError, openVault, type Vault } from 'safebyok'
+import { ForeverMillis, ForcePassphraseReentryHours, MinuteMillis, VaultError, openVault, type Vault } from 'safebyok'
 import { PassphraseModal } from '../src/passphrase-modal'
 import * as TH from './test-helpers'
 
@@ -195,7 +195,7 @@ describe("PassphraseModal", () => {
       [1 / 60,            "Locks on this device in 1 minute.",       'one minute is singular'],
       [0.0001,            "Locks on this device in 1 minute.",       'a window under a minute rounds up to one'],
       [1.5,               "Locks on this device in 90 minutes.",     'an hour and a half reads as minutes'],
-      [1e9,               "Stays unlocked on this device until you lock it.",  'a window longer than the vault can count means until locked'],
+      [Infinity,          "Stays unlocked on this device until you lock it.",  'Infinity means until locked'],
     ] as const
 
     // A real vault that has not been created reads 'Locks on', no 'again'. Each is from a vault
@@ -224,8 +224,13 @@ describe("PassphraseModal", () => {
       expect(screen.queryByText("Locks again on this device in 7 days.")).to.not.be.null
     })
 
-    it("reads a millisecond short of ForeverMillis as a count, not as until locked", () => {
-      render(<PassphraseModal vault={vaultInState('locked', ForeverMillis - 1)} onDone={noop} />)
+    it("reads a window within a minute of ForeverMillis as until locked: never compared for equality", () => {
+      render(<PassphraseModal vault={vaultInState('locked', ForeverMillis - MinuteMillis)} onDone={noop} />)
+      expect(screen.queryByText("Stays unlocked on this device until you lock it.")).to.not.be.null
+    })
+
+    it("reads a window more than a minute short of ForeverMillis as a count", () => {
+      render(<PassphraseModal vault={vaultInState('locked', ForeverMillis - MinuteMillis - 1)} onDone={noop} />)
       expect(screen.queryByText(/Locks again on this device in [\d,]+ minutes\./)).to.not.be.null
     })
   })

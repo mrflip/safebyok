@@ -51,7 +51,7 @@ describe("idbDeviceDB", () => {
     await set('unlock:acme:u1:main', await TH.unlockOf('u1'), shelf)
     await set(['unlock', 'acme', 'u1', 'main'], await TH.unlockOf('u1'), shelf)
     const deviceDB = idbDeviceDB({ dbName })
-    await deviceDB.writeUnlock(await TH.unlockOf('u2'))
+    await deviceDB.writeUnlock(await TH.unlockOf('u2'), TH.NoLocks)
     const gets = vi.spyOn(IDBObjectStore.prototype, 'get')
     const getAlls = vi.spyOn(IDBObjectStore.prototype, 'getAll')
     const cursors = vi.spyOn(IDBObjectStore.prototype, 'openCursor')
@@ -72,7 +72,7 @@ describe("idbDeviceDB", () => {
     const shelf = createStore(`${dbName}:device_db`, 'records')
     await set('unlock:acme:u1:main', await TH.unlockOf('u1'), shelf)
     const deviceDB = idbDeviceDB({ dbName })
-    await deviceDB.writeUnlock(await TH.unlockOf('u2'))
+    await deviceDB.writeUnlock(await TH.unlockOf('u2'), TH.NoLocks)
     await deviceDB.eraseUnlock(TH.scopeOf('u3'))
     expect(await deviceDB.readUnlock(TH.scopeOf('u2'))).to.not.be.null
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
@@ -116,7 +116,7 @@ describe("idbDeviceDB", () => {
   it("forgets the scope's own unlock at an erase even when the sweep fails", async () => {
     const dbName = TH.freshDbName()
     const deviceDB = idbDeviceDB({ dbName })
-    await deviceDB.writeUnlock(await TH.unlockOf('u1'))
+    await deviceDB.writeUnlock(await TH.unlockOf('u1'), TH.NoLocks)
     vi.spyOn(IDBObjectStore.prototype, 'getAllKeys').mockImplementation(() => { throw new Error('the shelf will not list') })
     try {
       await expect(deviceDB.eraseUnlock(TH.scopeOf('u1'))).rejects.toThrow('the shelf will not list')
@@ -131,7 +131,7 @@ describe("idbDeviceDB", () => {
     const shelf = createStore(`${dbName}:device_db`, 'records')
     await set('unlock:acme:u1:main', await TH.unlockOf('u1'), shelf)
     const deviceDB = idbDeviceDB({ dbName })
-    await deviceDB.writeUnlock(await TH.unlockOf('u2'))
+    await deviceDB.writeUnlock(await TH.unlockOf('u2'), TH.NoLocks)
     await deviceDB.eraseAll()
     expect(await inspectIdbDeviceDB({ dbName }).rows()).to.have.lengthOf(0)
   })
@@ -145,7 +145,7 @@ describe("inspectIdbDeviceDB", () => {
     let heardCount = 0
     const unsubscribe = inspector.subscribe(() => { heardCount += 1 })
 
-    await deviceDB.writeUnlock(await TH.unlockOf('u1'))
+    await deviceDB.writeUnlock(await TH.unlockOf('u1'), TH.NoLocks)
     const rows = await inspector.rows()
     expect(rows.map((row) => row.ckey)).to.deep.equal(['unlock^acme^u1^main'])
     await vi.waitFor(() => { expect(heardCount).to.be.greaterThan(0) })
@@ -160,7 +160,7 @@ describe("inspectIdbDeviceDB", () => {
     const dbName = TH.freshDbName()
     const inspector = inspectIdbDeviceDB({ dbName })
     expect(() => inspector.subscribe('not a listener' as unknown as () => void)).to.throw(VaultError, /listener function/)
-    await idbDeviceDB({ dbName }).writeUnlock(await TH.unlockOf('u1'))
+    await idbDeviceDB({ dbName }).writeUnlock(await TH.unlockOf('u1'), TH.NoLocks)
     expect(await inspector.rows()).to.have.lengthOf(1)
   })
 })

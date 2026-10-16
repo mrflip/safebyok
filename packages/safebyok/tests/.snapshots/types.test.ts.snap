@@ -98,7 +98,7 @@ exports[`Stored record formats > safebyok-lockbox-v3 1`] = `
 }
 `;
 
-exports[`Stored record formats > safebyok-mark-v1 1`] = `
+exports[`Stored record formats > safebyok-mark-v2 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -113,8 +113,13 @@ exports[`Stored record formats > safebyok-mark-v1 1`] = `
       "type": "string",
     },
     "format": {
-      "const": "safebyok-mark-v1",
+      "const": "safebyok-mark-v2",
       "type": "string",
+    },
+    "lock_generation": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "type": "integer",
     },
     "unlock_epoch": {
       "exclusiveMinimum": 0,
@@ -150,6 +155,7 @@ exports[`Stored record formats > safebyok-mark-v1 1`] = `
     "vault_id",
     "unlock_epoch",
     "vault_key_epoch",
+    "lock_generation",
   ],
   "type": "object",
 }

@@ -24,7 +24,7 @@ describe("browserOpts", () => {
 
   it("keeps the device store's records in the database it names", async () => {
     const dbName = TH.freshDbName()
-    await browserOpts({ dbName }).deviceDB.writeUnlock(await TH.unlockOf('u1'))
+    await browserOpts({ dbName }).deviceDB.writeUnlock(await TH.unlockOf('u1'), TH.NoLocks)
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
     expect(rows.map((row) => row.ckey)).to.deep.equal(['unlock^acme^u1^main'])
     expect(await browserOpts().deviceDB.readUnlock(TH.scopeOf('u1'))).to.be.null
