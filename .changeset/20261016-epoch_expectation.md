@@ -11,3 +11,7 @@
 **Postgres: a bundle update waits for lockbox writes in flight.** The `FOR SHARE` read is the one lock any verb takes; lockbox writes never wait for each other. If you installed the README's optional hard-cap trigger, replace it with the README's new version, which serializes inserts on an advisory lock: the old one's `FOR UPDATE` on the bundle row deadlocks two first writes into one vault, one of them failing as `storage_unavailable`.
 
 **`safebyok/testing`: `describeVaultDB` no longer takes `comparesVaultKeyEpoch`.** Line 3.8's tests run for every adapter; drop the option, and compare the epoch in your adapter's lockbox write.
+
+**`close()`, and a refresh that outlives the key, now stop a read in flight.** A `read()` or `use()` under way when the handle is closed hands back nothing and refuses with `vault_closed`; one under way when a refresh finds the vault's ways in changed on another device, or the vault gone, refuses with `vault_locked`. A `lockSoon()` grace running out, and a clock that cannot be read, still let a read in hand finish.
+
+**A device-store failure says what failed.** Still kind `storage_unavailable`, the device store's error its cause, but the message now names the step -- reading or writing the remembered unlock, reading or writing this device's mark of the vault, erasing either -- and what to do. `eraseDamagedVault` now reports a device-store failure the same way (it threw the device store's own error before).

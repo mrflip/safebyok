@@ -1798,7 +1798,9 @@ export type EraseDamagedVaultOpts = Pick<OpenVaultOpts, 'applabel' | 'userId' | 
  * device's remembered unlock and mark, so a call that was cut short can be made again. Kind 'damaged_bundle'
  * when the record is too damaged to say which vault it is, which only the backend's own tools can
  * clear; 'stale_write' when the vault was replaced elsewhere meanwhile. Other refusals are
- * storage's: 'storage_unavailable', 'identity_revoked', 'not_permitted'. Misuse is refused before
+ * storage's: 'storage_unavailable', 'identity_revoked', 'not_permitted'. The device store failing
+ * after the vault is erased is 'storage_unavailable' too, saying what failed: call again to finish
+ * clearing the device. Misuse is refused before
  * storage is touched, as `openVault` does: 'bad_label' for a label that fails its check, and
  * 'bad_option' for an option missing.
  *
@@ -1822,7 +1824,7 @@ export const eraseDamagedVault = async (opts: EraseDamagedVaultOpts): Promise<vo
   if (typeof vaultDB.eraseDamagedVault !== 'function') {
     throw new VaultError('bad_option', "vaultDB has no eraseDamagedVault: a storage adapter that hands each call on to another's must hand this one on too.")
   }
-  const deviceDB = parseDeviceDB(opts.deviceDB)
+  const deviceDB = deviceTroubleAsConditions(parseDeviceDB(opts.deviceDB))
   // The vault first: a sound one refuses, and then the device keeps what it remembers of it. A
   // retry after a failure here finds the vault gone, and still clears the device.
   await vaultDB.eraseDamagedVault(scope)
@@ -1847,25 +1849,46 @@ const damagedAs = async <ResultT>(reading: Promise<ResultT>, damaged: (opts: Err
 /**
  * `deviceDB`'s verbs, each with a failure that is no VaultError -- an IndexedDB error, say, or a
  * throw before the promise -- said as 'storage_unavailable', a condition a host shows in place and
- * offers to retry, with the device store's own error as its cause. A VaultError passes as it came.
+ * offers to retry, with the device store's own error as its cause and a message naming what
+ * failed. A VaultError passes as it came. What `openVault` and `eraseDamagedVault` call the
+ * device store through; not exported from the package.
+ *
+ * @param deviceDB - The device store a host handed in.
+ * @returns The same verbs, each failure said as a condition.
+ *
+ * @example await deviceTroubleAsConditions(deviceDB).readMark(scope)  // a failing IndexedDB: 'storage_unavailable', "...failed reading its mark of this vault..."
  */
-const deviceTroubleAsConditions = (deviceDB: DeviceDB): DeviceDB => ({
-  readUnlock:  async (...args) => await asCondition(() => deviceDB.readUnlock(...args)),
-  writeUnlock: async (...args) => { await asCondition(() => deviceDB.writeUnlock(...args)) },
-  eraseUnlock: async (...args) => { await asCondition(() => deviceDB.eraseUnlock(...args)) },
-  readMark:    async (...args) => await asCondition(() => deviceDB.readMark(...args)),
-  writeMark:   async (...args) => { await asCondition(() => deviceDB.writeMark(...args)) },
-  eraseMark:   async (...args) => { await asCondition(() => deviceDB.eraseMark(...args)) },
-  eraseAll:    async (...args) => { await asCondition(() => deviceDB.eraseAll(...args)) },
+export const deviceTroubleAsConditions = (deviceDB: DeviceDB): DeviceDB => ({
+  readUnlock:  async (...args) => await asCondition('readUnlock', () => deviceDB.readUnlock(...args)),
+  writeUnlock: async (...args) => { await asCondition('writeUnlock', () => deviceDB.writeUnlock(...args)) },
+  eraseUnlock: async (...args) => { await asCondition('eraseUnlock', () => deviceDB.eraseUnlock(...args)) },
+  readMark:    async (...args) => await asCondition('readMark', () => deviceDB.readMark(...args)),
+  writeMark:   async (...args) => { await asCondition('writeMark', () => deviceDB.writeMark(...args)) },
+  eraseMark:   async (...args) => { await asCondition('eraseMark', () => deviceDB.eraseMark(...args)) },
+  eraseAll:    async (...args) => { await asCondition('eraseAll', () => deviceDB.eraseAll(...args)) },
 })
 
-/** What `call` to the device store resolves to, or its failure, as {@link deviceTroubleAsConditions} says it. */
-const asCondition = async <ResultT>(call: () => Promise<ResultT>): Promise<ResultT> => {
+/**
+ * What failed, for each device-store verb, and what it leaves undone: the heart of the message a
+ * failure of that verb is said with. None names a scope or quotes a record.
+ */
+const DeviceTroubleSaid: Record<keyof DeviceDB, string> = {
+  readUnlock:  "reading the unlock it remembers for this vault, so the vault could not pick it up: try again, or unlock with a passphrase or passkey",
+  writeUnlock: "writing the unlock it remembers for this vault, so this device may not remember it at the next open: try again",
+  eraseUnlock: "erasing the unlock it remembers for this vault, so the next open on this device may still pick it up: lock again, or try again",
+  readMark:    "reading its mark of this vault (the newest copy of the vault it has seen, and how often it has locked), so the vault could not check storage against it: try again",
+  writeMark:   "writing its mark of this vault (the newest copy of the vault it has seen, and how often it has locked), so it may not be kept: try again",
+  eraseMark:   "erasing its mark of this vault, so it still holds the newest copy of the vault it had seen: try again",
+  eraseAll:    "erasing everything it keeps for safebyok, so some of it may remain: try again",
+}
+
+/** What `call` to the device store's `verb` resolves to, or its failure, as {@link deviceTroubleAsConditions} says it. */
+const asCondition = async <ResultT>(verb: keyof DeviceDB, call: () => Promise<ResultT>): Promise<ResultT> => {
   try {
     return await call()
   } catch (err) {
     if (isVaultError(err)) { throw err }
-    throw new VaultError('storage_unavailable', "This device's own storage failed, so the vault could not read or keep what this device remembers of it: try again. The device store's error is this error's cause.", { cause: err })
+    throw new VaultError('storage_unavailable', `This device's own storage failed ${DeviceTroubleSaid[verb]}. If it fails every time, this device may not let the app keep anything: storage blocked or full, or a private window. The device store's error is this error's cause.`, { cause: err })
   }
 }
 

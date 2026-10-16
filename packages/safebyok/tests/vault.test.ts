@@ -7,7 +7,7 @@ import { VaultError, isVaultError } from '../src/errors'
 import { memoryDeviceDB, type DeviceDB } from '../src/device-db'
 import { jsonBytes, localVaultDB, type VaultDB } from '../src/vault-db'
 import { memoryStore } from '../src/string-store'
-import { LockboxFieldsBytes, LockboxFixedBytes, StoredBytesPerWhisperByte, eraseDamagedVault, openVault, type OpenVaultOpts, type Vault } from '../src/vault'
+import { LockboxFieldsBytes, LockboxFixedBytes, StoredBytesPerWhisperByte, deviceTroubleAsConditions, eraseDamagedVault, openVault, type OpenVaultOpts, type Vault } from '../src/vault'
 import { cipherBinding, cipherBytes, fromB64, makeLockboxKey, makeVaultKey, randomBytes, toB64, wrapKeyUnder } from '../src/crypto'
 import type { KeyDeriver } from '../src/key-deriver'
 import { Argon2idWebV1, MaxSaltBytes } from '../src/key-deriver-spec'
@@ -1899,6 +1899,16 @@ describe("eraseDamagedVault", () => {
     expect(await fresh.read('anthropic')).to.eq('sk-new-fake')
   })
 
+  it("says the device store failing as it clears this device as 'storage_unavailable', naming what failed, the vault already erased", async () => {
+    const world = await damagedVaultWorld()
+    const trouble = new Error('device storage is unavailable')
+    vi.spyOn(world.deviceDB, 'eraseMark').mockRejectedValueOnce(trouble)
+    const err = await TH.expectRefusal(eraseDamagedVault(world.optsWith()), 'storage_unavailable')
+    expect(err.message).to.match(/erasing its mark of this vault/)
+    expect(err.cause).to.eq(trouble)
+    expect(rowsOf(world, 'u1')).to.deep.equal([])
+  })
+
   it("erases that vault alone: another user's vault, and the unlock this device remembers for it, stay", async () => {
     const world = await damagedVaultWorld()
     const theirs = await world.openUnlocked('their pw', { userId: 'u2' })
@@ -1955,7 +1965,8 @@ describe("eraseDamagedVault", () => {
         await world.deviceDB.eraseUnlock(scope)
       },
     }
-    await expect(eraseDamagedVault(world.optsWith({ deviceDB: flakyDevice }))).rejects.toThrow('busy')
+    const err = await TH.expectRefusal(eraseDamagedVault(world.optsWith({ deviceDB: flakyDevice })), 'storage_unavailable')
+    expect((err.cause as Error).message).to.include('busy')
     expect(rowsOf(world, 'u1')).to.deep.equal([])
     expect(await world.rememberedUnlock()).to.not.be.null
     await eraseDamagedVault(world.optsWith({ deviceDB: flakyDevice }))
@@ -4312,6 +4323,33 @@ describe("a failed open", () => {
     expect(err.cause).to.eq(trouble)
     expect(vault.getSnapshot().state).to.eq('locked')
   })
+
+  const DeviceVerbCases = [
+    // what each verb's failure says it was doing:
+    ["readUnlock",   /reading the unlock it remembers/,    'reading the remembered unlock'],
+    ["writeUnlock",  /writing the unlock it remembers/,    'writing the remembered unlock'],
+    ["eraseUnlock",  /erasing the unlock it remembers/,    'erasing the remembered unlock'],
+    ["readMark",     /reading its mark of this vault/,     "reading the device's mark"],
+    ["writeMark",    /writing its mark of this vault/,     "writing the device's mark"],
+    ["eraseMark",    /erasing its mark of this vault/,     "erasing the device's mark"],
+    ["eraseAll",     /erasing everything it keeps/,        'erasing everything'],
+  ] as const
+
+  for (const [verb, said, blurb] of DeviceVerbCases) {
+    it(`says what failed, ${blurb}, as 'storage_unavailable', with what to do and its error the cause`, async () => {
+      const deviceDB = memoryDeviceDB()
+      const trouble = new Error('device storage is unavailable')
+      vi.spyOn(deviceDB, verb).mockRejectedValueOnce(trouble)
+      const wrapped = deviceTroubleAsConditions(deviceDB)
+      const calling = verb === 'eraseAll' ? wrapped.eraseAll() : (wrapped[verb] as (scope: VaultScope) => Promise<unknown>)(TH.scopeOf('u1'))
+      const err = await TH.expectRefusal(calling, 'storage_unavailable')
+      expect(err.cause).to.eq(trouble)
+      expect(err.message).to.match(said)
+      expect(err.message).to.match(/try again/)
+      expect(err.message).to.match(/private window/)
+      expect(err.message).not.to.include('u1')
+    })
+  }
 
   it("lets a refusal the device store gives as a VaultError through as it came", async () => {
     const world = makeWorld()
