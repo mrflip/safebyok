@@ -46,8 +46,8 @@ once (its fixes `37c3d8b4`, `2f4a383b`, the second reworked away by the ruling b
     one the host's check refuses still opens and lists (G061's rule).
   - The `^` refusal is `bad_label`, its message naming the field and the rule.
 
-* **Deviations** (pushback, for the Coach):
-  - **No `bindValidators`.** Once canaries run at entry only (P7, P9) and the VaultDB's verbs run
+* **Deviations**:
+  - **No `bindValidators`** -- settled: the Coach said "yes", accept as built. Once canaries run at entry only (P7, P9) and the VaultDB's verbs run
     only checks nothing turns off, a bound bag has no work: the verbs would never consult it, and
     the "refused if bound to another bag" rule would forbid two vaults with different validators
     on one adapter for no gain. G173's complaint was a bag passed per verb; now no verb takes one.
@@ -107,9 +107,16 @@ once (its fixes `37c3d8b4`, `2f4a383b`, the second reworked away by the ruling b
   - T02 closed: canary failures list sound; the floor bounds `snapshot.boxes`.
   - T03 closed: the table's store-limit row; README *Sizes follow the names*.
 
+* **Left, for the record** (from the second review):
+  - Postgres' `listBoxRecords` gives one catch-all refusal, and its local `heldScope` repeats the
+    core's check: thread 5's base class is where to share it.
+  - `JoinChar` (validators.ts) copies `Ckeys.Delimiter`; a test keeps them equal.
+  - `memoryDeviceDB` throws synchronously on a `^` scope, and `idbDeviceDB.readUnlock` sweeps
+    strays before it refuses one; the vault, whose entry refuses `^` first, reaches neither.
+
 * **For the Coach**:
-  - Opened: is `-_.:@+|` the `user_id` set you want? Built so.
+  - Settled: the `user_id` characters are letters, digits and `-_.:@+|`, 1 to 100 (the Coach: yes).
+  - Settled: dropping `bindValidators` (the Coach: yes, as built).
   - Opened: G497 (Standard Schema) would now land only in `Names.rulesOf`, the vault's one
     entry; no VaultDB takes a schema.
-  - `bindValidators` dropped (deviation above); `^` in the floor for every store (YOLO,
-    orchestrator, above): confirm or reverse.
+  - `^` in the floor for every store stays the orchestrator's YOLO call, above.
