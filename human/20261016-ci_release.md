@@ -10,7 +10,7 @@ the PR; each is something to do or to watch once it merges.
   written and its script tested here (against a scratch repository, and the CI gate's shell block
   run by hand), but it cannot run until it is on main. Unproven: that the `releasing` environment's
   `RELEASE_APP_PRIVATE_KEY` reaches a `pull_request_target` run Dependabot started (if the
-  *Mint the token* step fails for want of a key, add the same key as a **Dependabot secret** in the
+  `app-token` step fails for want of a key, add the same key as a **Dependabot secret** in the
   repository's settings); that the App's push of `.changeset/dependabot-<n>.md` re-runs CI on the
   branch; and that Dependabot's later behaviour on a branch with a bot commit is as expected (it
   stops rebasing, as it did for your hand-written ones).
