@@ -1,10 +1,11 @@
 # Thread 13: epoch_expectation (2026-10-16)
 
 Branch `20261016-epoch_expectation`, PR [#137](https://github.com/mrflip/safebyok/pull/137),
-stacked on [#132](https://github.com/mrflip/safebyok/pull/132) (cut at `57cdb168`). Justify:
-green -- safebyok 1698 passed / 33 skipped, indexeddb 153/10, postgres 232/13, convex 283/8,
-graphql 218/13, react 111, fastkey 44, demo 162/15, e2e 88/8, root 155. `pnpm size`: openVault
-25.05 kB of 28 kB, everything 32.04 kB of 34 kB.
+stacked on [#132](https://github.com/mrflip/safebyok/pull/132), restacked onto its tip `f6d424ef`
+(the line main -> #128 -> #133 -> #127 -> #132 -> #137). Justify: green -- safebyok 1781 passed /
+33 skipped, indexeddb 165/10, postgres 244/13, convex 289/8, graphql 229/13, react 111, fastkey
+44, demo 168/15, e2e 93/8, root 155. `pnpm size`: openVault 25.28 kB of 30 kB, everything
+32.34 kB of 40 kB.
 
 * **Built**:
   - **VAULTDB.md 3.8 in every adapter** (G065). IndexedDB: one more term in
