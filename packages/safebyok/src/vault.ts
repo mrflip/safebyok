@@ -1875,7 +1875,7 @@ export const deviceTroubleAsConditions = (deviceDB: DeviceDB): DeviceDB => ({
 const DeviceTroubleSaid: Record<keyof DeviceDB, string> = {
   readUnlock:  "reading the unlock it remembers for this vault, so the vault could not pick it up: try again, or unlock with a passphrase or passkey",
   writeUnlock: "writing the unlock it remembers for this vault, so this device may not remember it at the next open: try again",
-  eraseUnlock: "erasing the unlock it remembers for this vault, so the next open on this device may still pick it up: lock again, or try again",
+  eraseUnlock: "erasing the unlock it remembers for this vault, so the next open on this device may still pick it up: try again",
   readMark:    "reading its mark of this vault (the newest copy of the vault it has seen, and how often it has locked), so the vault could not check storage against it: try again",
   writeMark:   "writing its mark of this vault (the newest copy of the vault it has seen, and how often it has locked), so it may not be kept: try again",
   eraseMark:   "erasing its mark of this vault, so it still holds the newest copy of the vault it had seen: try again",
