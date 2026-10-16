@@ -136,6 +136,13 @@ describe("a key deriver's bytes", () => {
     expect(err.message).to.not.include('5,5')
   })
 
+  it("are zeroed when refused for their length, as when imported", async () => {
+    const long = new Uint8Array(64).fill(5)
+    const keyDeriver: KeyDeriver = { ...TH.testDeriver, deriveKeyBytes: () => Promise.resolve(long) }
+    await expectRefusal(Envelope.sealPassphrase(keyDeriver, 'pw', scope, identity, stampOf('one'), await makeVaultKey()), 'bad_option')
+    expect([...long]).to.deep.equal(bytesOf(0, 64))
+  })
+
   it("are refused as bad_option when they are not 32 bytes of a view at all", async () => {
     for (const handed of [new Uint8Array(31), new Uint8Array(33), 'thirty-two bytes, honest', null, new ArrayBuffer(32)]) {
       const keyDeriver: KeyDeriver = { ...TH.testDeriver, deriveKeyBytes: () => Promise.resolve(handed as unknown as Uint8Array) }

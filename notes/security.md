@@ -1083,7 +1083,8 @@ security expert who knows what questions to ask.
 * 2026-10-16: **a key deriver's bytes are zeroed once imported.** `passphraseKeyOf`
   (`src/envelope.ts`) `fill(0)`s the 32 bytes a `KeyDeriver` hands back as soon as
   `importWrappingKeyBytes` has made the non-extractable passphraseKey of them, whether or not the
-  import succeeded, on every path that derives (sealing, and each envelope tried in an unlock).
+  import succeeded, on every path that derives (sealing, and each envelope tried in an unlock);
+  a result of another length than 32, refused (`bad_option`), is zeroed likewise.
   Best effort, as it is in any JavaScript crypto: the deriver's own working memory (hash-wasm's
   and `@noble/hashes`' internals), the engine's copies and the passphrase string are not reached.
   The bytes are the vault's the moment they are returned, so a deriver that returns a buffer it
