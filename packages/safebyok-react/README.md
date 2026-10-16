@@ -37,6 +37,10 @@ pnpm add safebyok safebyok-react react
 `safebyok` and `react` are peer dependencies: the host app installs them itself, so the binding and
 the app share one copy of each.
 
+Platform: Node 22 and up for tests and server rendering, and evergreen browsers, with
+`Intl.RelativeTimeFormat` for the dialog's "locks again in ..." line; the floor is stated in the
+core's *Where it runs*.
+
 ## Use
 
 ```tsx

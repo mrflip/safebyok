@@ -19,6 +19,9 @@ and your app share one copy, and a `VaultError` from one is a `VaultError` to th
 dependency is [`idb-keyval`](https://github.com/jakearchibald/idb-keyval), which `safebyok`
 already brings for its device store.
 
+Platform: evergreen browsers with IndexedDB, and Node 22 and up (with a fake IndexedDB, for tests);
+the floor is stated in the core's *Where it runs*.
+
 ## Use
 
 ```ts

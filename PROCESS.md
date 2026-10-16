@@ -143,7 +143,9 @@ numbers and the CHANGELOGs; `.github/workflows/release.yml` does the rest.
 * **A changeset** is a short file in `.changeset/`, written with `pnpm changeset`: which packages
   it bumps, by how much, and a sentence or two for the CHANGELOG. It is named for the thread,
   `.changeset/YYYYMMDD-<label>.md` (a second one on the thread gets `-2`, and so on):
-  `scripts/changeset.ts` runs the changesets CLI and renames what it writes. A PR that changes a
+  `scripts/changeset.ts` runs the changesets CLI and renames what it writes. The CLI asks at a
+  terminal; an agent with none writes it in one line, `pnpm changeset --package safebyok
+  --package safebyok-react --bump minor --message "What a host sees."`. A PR that changes a
   public package carries one, or CI fails it; one that needs no release (tooling, tests, docs)
   carries an empty one, `pnpm changeset --empty`. Agents write changesets: they state intent, not a version.
 * **The level, before 1.0**: `minor` for anything that touches a stored shape or an exported name
@@ -161,9 +163,10 @@ numbers and the CHANGELOGs; `.github/workflows/release.yml` does the rest.
   and the spent changesets, as one `rel:` commit named the same way. It is the bot's: nobody
   rebases, edits or merges it but the Coach. The release workflow writes it with the repository's
   GitHub App, so CI runs on it as on any PR.
-* **It opens as a draft.** The Coach marks it ready when they mean to release it. A later push
-  to main rebuilds it but leaves a ready PR ready, so before merging, reread what it holds: new
-  changesets may have joined it since it was read.
+* **It opens as a draft.** The Coach marks it ready when they mean to release it, after the
+  by-hand passes in `notes/release-checklist.md` (real authenticators, real browsers, the Convex
+  README walk, Supabase). A later push to main rebuilds it but leaves a ready PR ready, so before
+  merging, reread what it holds: new changesets may have joined it since it was read.
 * **Merging it is the release.** `release.yml` then checks the lockstep group, runs
   `pnpm justify`, packs each package whose version npm lacks, stages each tarball, and tags each
   package staged (`safebyok@0.2.0`) with a GitHub release from its CHANGELOG, the core's marked

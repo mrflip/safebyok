@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process'
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -80,5 +81,84 @@ describe("renameNewChangesets", () => {
     writeFileSync(path.join(scratch, 'wacky-deserts-start.md'), '---\n---\n')
     const renamed = Changeset.renameNewChangesets(scratch, before, Thread)
     expect(renamed.map(({ to }) => to)).to.deep.equal([`${Thread}.md`, `${Thread}-2.md`])
+  })
+})
+
+const Public = ['safebyok', 'safebyok-react', 'safebyok-convex']
+
+describe("changesetRequest", () => {
+  it("reads the packages, the level and the sentence", () => {
+    const argv = ['--package', 'safebyok', '--package', 'safebyok-react', '--bump', 'minor', '--message', `${' '.repeat(2)}What a host sees.${' '.repeat(2)}`]
+    expect(Changeset.changesetRequest(argv, Public)).to.deep.equal({ packages: ['safebyok', 'safebyok-react'], bump: 'minor', message: 'What a host sees.' })
+  })
+
+  it("takes packages comma-separated, and the short flags", () => {
+    expect(Changeset.changesetRequest(['-p', 'safebyok,safebyok-convex', '-b', 'patch', '-m', 'A fix.'], Public))
+      .to.deep.equal({ packages: ['safebyok', 'safebyok-convex'], bump: 'patch', message: 'A fix.' })
+  })
+
+  it("names a package named twice once", () => {
+    expect(Changeset.changesetRequest(['-p', 'safebyok', '-p', 'safebyok', '-b', 'patch', '-m', 'A fix.'], Public)?.packages).to.deep.equal(['safebyok'])
+  })
+
+  it("leaves the CLI to run when no flag of ours is given", () => {
+    expect(Changeset.changesetRequest([], Public)).to.be.undefined
+    expect(Changeset.changesetRequest(['--empty'], Public)).to.be.undefined
+  })
+
+  const RefusalCases = [
+    // a request that is not whole:
+    [['--bump', 'minor'],                                                     /go with --package/,           'a level with no package'],
+    [['--message', 'A fix.'],                                                 /go with --package/,           'a sentence with no package'],
+    [['--package', 'safebyok', '--message', 'A fix.'],                        /--bump is one of patch, minor, major/, 'no level'],
+    [['--package', 'safebyok', '--bump', 'minor'],                            /--message is the sentence/,   'no sentence'],
+    [['--package', 'safebyok', '--bump', 'minor', '--message', ' '.repeat(3)],        /may not be empty/,            'a sentence of only spaces'],
+    // a request that is wrong:
+    [['--package', 'safebyok', '--bump', 'huge', '--message', 'A fix.'],      /--bump is one of/,            'a level changesets does not have'],
+    [['--package', 'safebyok-demo-react', '--bump', 'patch', '--message', 'A fix.'], /safebyok-demo-react is not a public package/, 'a package that is not public'],
+    [['--package', '--bump', 'patch', '--message', 'A fix.'],                 /is not a public package/, 'a package flag with no package after it, which takes the next flag for one'],
+  ] as const
+  for (const [argv, expected, blurb] of RefusalCases) {
+    it(`refuses ${blurb}`, () => { expect(() => Changeset.changesetRequest(argv, Public)).to.throw(expected) })
+  }
+})
+
+describe("changesetText", () => {
+  it("writes the file as the CLI would", () => {
+    expect(Changeset.changesetText({ packages: ['safebyok', 'safebyok-react'], bump: 'minor', message: 'A thing.' }))
+      .to.eq('---\n"safebyok": minor\n"safebyok-react": minor\n---\n\nA thing.\n')
+  })
+})
+
+describe("writeChangeset", () => {
+  let scratch: string
+  beforeEach(() => {
+    scratch = TH.makeScratchDir('changeset-write-')
+    writeFileSync(path.join(scratch, 'README.md'), '# Changesets\n')
+  })
+
+  it("names the file for the thread, and a second for its suffix", () => {
+    const request: Changeset.ChangesetRequest = { packages: ['safebyok'], bump: 'patch', message: 'A fix.' }
+    expect(Changeset.writeChangeset(scratch, Thread, request)).to.eq(`${Thread}.md`)
+    expect(Changeset.writeChangeset(scratch, Thread, request)).to.eq(`${Thread}-2.md`)
+    expect(readFileSync(path.join(scratch, `${Thread}.md`), 'utf8')).to.eq('---\n"safebyok": patch\n---\n\nA fix.\n')
+  })
+})
+
+// The script itself, with no terminal: it runs in a scratch copy of the repository's shape.
+describe("pnpm changeset --package, with no terminal", () => {
+  const Script = path.resolve(import.meta.dirname, '../../scripts/changeset.ts')
+  const RepoRoot = path.resolve(import.meta.dirname, '../..')
+
+  it("refuses a branch that is no thread's, and writes nothing", () => {
+    const result = spawnSync(process.execPath, [Script, '--package', 'safebyok', '--bump', 'patch', '--message', 'A fix.'], { cwd: RepoRoot, encoding: 'utf8', env: { ...process.env, GIT_DIR: path.join(RepoRoot, '.git-nowhere') } })
+    expect(result.status).to.eq(2)
+    expect(result.stderr).to.include('is not a thread branch')
+  })
+
+  it("refuses a request that is not whole, with its reason", () => {
+    const result = spawnSync(process.execPath, [Script, '--bump', 'patch'], { cwd: RepoRoot, encoding: 'utf8' })
+    expect(result.status).to.eq(2)
+    expect(result.stderr).to.include('go with --package')
   })
 })

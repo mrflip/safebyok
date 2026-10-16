@@ -58,6 +58,10 @@ a menu choice is a `kind` or a `flavor`.
 
 **Stored fields are underbar_case** (`salt_bytes`, `memory_kib`): they are written to someone
 else's database, and stay one spelling from the wire to the code. Everything else is camelCase.
+That holds wherever the object is the stored record, the facades a record passes through
+included: a key deriver's `key_deriver_label` is written into the bundle as it is. The tag
+smushing below is for a label that names a thing (`boxlabel`); `keyDeriverLabel` is the concept
+"the label of the key deriver", and stays camelCase.
 
 **A time is UTC epoch milliseconds, an integer** (`registered_at: 1760000000000`,
 `askPassphraseAt`), in a stored record, a snapshot, a test fixture and the demo alike: never an

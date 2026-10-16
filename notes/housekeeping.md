@@ -44,7 +44,9 @@ A worktree is removed (`git worktree remove`, never forced) only when its branch
 done, and it is unlocked, has nothing uncommitted or untracked, no ignored files but build output
 (`node_modules`, `dist`, `coverage`, editor and lint caches), no process running in it (read from
 `/proc`, or `lsof` where there is none), and no file touched within `--idle`. Every other worktree
-is kept, with the reason. Worktree entries whose directory is gone are pruned.
+is kept, with the reason. Worktree entries whose directory is gone are pruned, unless the branch
+of one has an open PR or commits not on origin (its directory may only be out of this checkout's
+sight): then no entry is pruned, and the report names the worktree and says why.
 
 It never deletes a branch, and never touches a remote: the `closed/` tags stay local until
 `git push origin 'refs/tags/closed/*'`. Last, it counts the branches on origin whose every PR is
