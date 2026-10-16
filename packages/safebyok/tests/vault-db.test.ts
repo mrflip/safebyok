@@ -169,7 +169,7 @@ describe("localVaultDB", () => {
     store.write(Ckeys.box(scope, 'openai'), JSON.stringify(TH.boxOf('openai', 'two')))
     store.write(Ckeys.box(scope, 'anthropic'), '{"not": json')
     const listed = await localVaultDB(store).listBoxes(scope)
-    expect(listed[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true })
+    expect(listed[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true, revision_id: null })
     expect(listed[1]).to.include({ boxlabel: 'openai', revision_id: 'rev-two', damaged: false })
     // Listed, never repaired: the row is still there for forensics.
     expect(store.read(Ckeys.box(scope, 'anthropic'))).to.eq('{"not": json')
@@ -188,7 +188,7 @@ describe("localVaultDB", () => {
   it("refuses a mangled row with kind 'corrupt_record', quoting none of it", async () => {
     const store = memoryStore()
     const vaultDB = localVaultDB(store)
-    store.write(u1BundleCkey, '{"format":"not-a-vault","shhh":"SUPERSECRET"}')
+    store.write(u1BundleCkey, '{"format":"safebyok-vault-v2","shhh":"SUPERSECRET"}')
     const refusal = await TH.expectRefusal(vaultDB.readBundle(TH.scopeOf('u1')), 'corrupt_record')
     expect(refusal).to.be.instanceOf(VaultError)
     expect(refusal.message).to.not.include('SUPERSECRET')
@@ -229,7 +229,7 @@ const ListedRecordCases = [
 describe("the abstract VaultDB, around an adapter's half", () => {
   it("validates what the adapter returns: a wrong-shaped record is refused, not repaired", async () => {
     const vaultDB = new MapVaultDB()
-    vaultDB.rows.set(Ckeys.bundle(TH.scopeOf('u1')), { format: 'not-a-vault' })
+    vaultDB.rows.set(Ckeys.bundle(TH.scopeOf('u1')), { format: 'safebyok-vault-v2' })
     const refusal = await TH.expectRefusal(vaultDB.readBundle(TH.scopeOf('u1')), 'corrupt_record')
     expect(refusal).to.be.instanceOf(VaultError)
     // Refused, never repaired or deleted: the record is still there for forensics.
@@ -270,8 +270,23 @@ describe("the abstract VaultDB, around an adapter's half", () => {
     const summaries = await vaultDB.listBoxes(TH.scopeOf('u1'))
     expect(TH.summaryOf(summaries[0])?.revision_id).to.eq('rev-one')
     vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), omit(projected, ['format']))
-    expect(await vaultDB.listBoxes(TH.scopeOf('u1'))).to.deep.equal([{ boxlabel: 'anthropic', damaged: true }])
+    expect(await vaultDB.listBoxes(TH.scopeOf('u1'))).to.deep.equal([{ boxlabel: 'anthropic', damaged: true, revision_id: 'rev-one' }])
   })
+
+  const DamagedRevisionCases = [
+    [{ ...TH.boxOf('anthropic', 'one'), changed_at: 'later' },   "rev-one",  'keeps the revision a damaged record holds as text'],
+    [{ ...TH.boxOf('anthropic', 'one'), revision_id: 7 },        null,       'keeps none for a revision that is not text'],
+    [{ ...TH.boxOf('anthropic', 'one'), revision_id: '' },       null,       'keeps none for an empty revision'],
+    ['not a lockbox',                                            null,       'keeps none for a record that is no object'],
+  ] as const
+
+  for (const [stored, expected, blurb] of DamagedRevisionCases) {
+    it(`lists a damaged lockbox with its revision_id: ${blurb}`, async () => {
+      const vaultDB = new MapVaultDB()
+      vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), stored)
+      expect(await vaultDB.listBoxes(TH.scopeOf('u1'))).to.deep.equal([{ boxlabel: 'anthropic', damaged: true, revision_id: expected }])
+    })
+  }
 
   it("turns an adapter's own failure into kind 'storage_unavailable', keeping it as the cause", async () => {
     const outage = new Error('the backend is down')
@@ -406,11 +421,12 @@ describe("the abstract VaultDB, erasing a vault whose bundle is damaged", () => 
   ] as const
 
   for (const [record, blurb] of NewerRecords) {
-    it(`refuses ${blurb} as possibly newer than this version, erasing nothing`, async () => {
+    it(`refuses ${blurb} as possibly newer than this version (newer_format), erasing nothing`, async () => {
       const vaultDB = withDamagedBundle((bundle) => (typeof record === 'function' ? record(bundle) : { ...bundle, ...record }))
-      const refusal = await TH.expectRefusal(vaultDB.eraseDamagedVault(TH.scopeOf('u1')), 'damaged_bundle')
+      const refusal = await TH.expectRefusal(vaultDB.eraseDamagedVault(TH.scopeOf('u1')), 'newer_format')
       expect(refusal.message).to.include('newer version')
-      expect(refusal.message).to.include('nothing was erased')
+      expect(refusal.message).to.include('left as it is')
+      await TH.expectRefusal(vaultDB.readBundle(TH.scopeOf('u1')), 'newer_format')
       expect(vaultDB.rows.size).to.eq(4)
     })
   }
@@ -572,7 +588,7 @@ describe("the abstract VaultDB, with the vault's validators", () => {
     await vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one', { note: 'n'.repeat(500) }), TH.noBoxYet, AnyScript)
     const err = await TH.expectRefusal(vaultDB.readBox(TH.scopeOf('u1'), 'anthropic', DefaultValidators), 'corrupt_record')
     expect(err.message).to.include('validators')
-    expect(await vaultDB.listBoxes(TH.scopeOf('u1'), DefaultValidators)).to.deep.equal([{ boxlabel: 'anthropic', damaged: true }])
+    expect(await vaultDB.listBoxes(TH.scopeOf('u1'), DefaultValidators)).to.deep.equal([{ boxlabel: 'anthropic', damaged: true, revision_id: 'rev-one' }])
     // AnyScript admits that note, but no empty boxlabel: a box stored under one lists as damaged.
     const [admitted] = await vaultDB.listBoxes(TH.scopeOf('u1'), AnyScript)
     expect(TH.summaryOf(admitted)?.note).to.have.lengthOf(500)

@@ -145,7 +145,12 @@ export abstract class VaultDB {
 
   // ------------------------------------------------------------------- the verbs safebyok calls
 
-  /** The vault's bundle, validated, or null when the vault has never been created. */
+  /**
+   * The vault's bundle, validated, or null when the vault has never been created. A stored bundle
+   * that fails its checks is refused as `corrupt_record`, and one a newer safebyok may have
+   * written -- a `format`, unlock method or number of unlocks this version does not know -- as
+   * `newer_format`.
+   */
   async readBundle(scope: VaultScope, validators?: VaultValidators): Promise<VaultBundle | null> {
     const asked = Names.checkScope(rulesFor(validators), scope)
     const raw = await fromStorage(() => this.doReadBundle(asked))
@@ -281,11 +286,13 @@ export abstract class VaultDB {
    * expectation). Resolves quietly when the scope holds no bundle. Refuses with kind `bad_option`
    * when the bundle stands sound, and erases nothing, since a sound vault is deleted through its
    * handle's `destroy()`; with kind `damaged_bundle`, erasing nothing, when the record is too
-   * damaged to name the vault it belongs to (which only the backend's own tools can clear), or
-   * when it may have been written by a newer safebyok, in a `format`, unlock method or number of
-   * unlocks this one does not know, and which a device on the newer version opens: it is told
-   * from damage by those three, and where it cannot be told, it is refused; and with kind
-   * `stale_write` when the vault was replaced meanwhile.
+   * damaged to name the vault it belongs to (which only the backend's own tools can clear); with
+   * kind `newer_format`, erasing nothing, when it may have been written by a newer safebyok, in a
+   * `format`, unlock method or number of unlocks this one does not know, and which a device on the
+   * newer version opens: it is told from damage by those three, and where it cannot be told, it
+   * is refused; and with kind `stale_write` when the vault was replaced meanwhile. A bundle
+   * rewritten under the same `vault_id` between the read and the erase is the same vault, and is
+   * erased with it (line 3.5).
    *
    * An adapter that hands each call on to another VaultDB's public verbs hands this one on too:
    * its `doReadBundle` would meet the inner adapter's refusal of the damaged record, never the
@@ -296,11 +303,10 @@ export abstract class VaultDB {
     const asked = Names.checkScope(rulesFor(validators), scope)
     const raw = await readStoredBundle(() => this.doReadBundle(asked))
     if (raw === null || raw === undefined) { return }
+    if (mayBeNewer(raw)) { throw newerBundle() }
     if (isSoundBundle(raw, asked)) {
       throw new VaultError('bad_option', "That vault's stored bundle is sound, so it is not erased here: a vault that opens is deleted through its handle's destroy(). Only a vault that openVault refuses as damaged_bundle is erased this way.")
     }
-    // A later safebyok may write what this one cannot read, which is no damage: it is refused, not erased.
-    if (mayBeNewer(raw)) { throw newerBundle() }
     const named = StoredVaultId.safeParse(raw)
     if (! named.success) { throw unnamedBundle() }
     const landed = await fromStorage(() => this.doEraseVault(asked, { vault_id: named.data.vault_id }))
@@ -402,8 +408,11 @@ const listedOrDamaged = (rules: Names.NameRules, { boxlabel, lockbox }: StoredLo
   const checked = ListedLockbox.safeParse(lockbox)
   const sound = checked.success && checked.data.boxlabel === boxlabel && Names.admits(rules, 'boxlabel', boxlabel)
     && (checked.data.note === undefined || Names.admits(rules, 'note', checked.data.note))
-  return sound ? LockboxSummary.parse(checked.data) : { boxlabel, damaged: true }
+  return sound ? LockboxSummary.parse(checked.data) : { boxlabel, damaged: true, revision_id: StoredRevision.safeParse(lockbox).data?.revision_id ?? null }
 }
+
+/** The one field of a damaged lockbox the listing keeps, when the record holds it as text: what a write over it names. */
+const StoredRevision = Z.object({ revision_id: Lockbox.shape.revision_id })
 
 /**
  * The checks a public verb runs, from the `validators` it was handed: any well-formed text where
@@ -467,6 +476,8 @@ const checkOutgoing = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, candidate:
 }
 
 const checkBundle = (raw: unknown, scope: VaultScope): VaultBundle => {
+  // A later safebyok may write what this one cannot read, which is no damage: it is said apart.
+  if (mayBeNewer(raw)) { throw newerBundle() }
   const bundle = checkRecord(VaultBundle, raw, 'vault bundle')
   // A record that names some other scope is a record out of place, wherever it came from.
   if (bundle.applabel !== scope.applabel || bundle.user_id !== scope.user_id || bundle.vaultlabel !== scope.vaultlabel) {
@@ -477,7 +488,8 @@ const checkBundle = (raw: unknown, scope: VaultScope): VaultBundle => {
 
 const unnamedBundle = (opts?: ErrorOptions) => new VaultError('damaged_bundle', "This vault's stored record is too damaged to say which vault it is, so storage can't be told which one to erase, and nothing was erased. Its backend's own tools can clear it.", opts)
 
-const newerBundle = () => new VaultError('damaged_bundle', "This vault's stored record is in a form this version of the app does not know. It may have been written by a newer version, which opens it, so nothing was erased: update the app and try again.")
+/** A stored vault this version cannot read, which a newer one may have: its own constructor, its own kind. */
+const newerBundle = () => new VaultError('newer_format', "This vault's stored record is in a form this version of the app does not know. It may have been written by a newer version, which opens it, so it was left as it is: update the app and try again.")
 
 /**
  * The bundle formats earlier versions of this package wrote: a record in one is older, never newer,

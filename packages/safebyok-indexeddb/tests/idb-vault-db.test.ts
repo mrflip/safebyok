@@ -136,7 +136,7 @@ describe("idbVaultDB", () => {
     await set(boxCkey(TH.scopeOf('u1'), 'anthropic'), 'not a lockbox', rawShelf(dbName))
     await set(boxCkey(TH.scopeOf('u1'), 'openai'), TH.boxOf('openai', 'two'), rawShelf(dbName))
     const listed = await idbVaultDB({ dbName }).listBoxes(TH.scopeOf('u1'))
-    expect(listed[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true })
+    expect(listed[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true, revision_id: null })
     expect(listed[1]).to.include({ boxlabel: 'openai', damaged: false })
   })
 

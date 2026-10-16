@@ -10,7 +10,7 @@
  *   show a message, retry, or tell them to free room. `vault_locked`, `wrong_passphrase`,
  *   `wrong_passkey`, `passkey_unavailable`, `absent_box`, `absent_vault`, `absent_unlock`,
  *   `whisper_too_large`, `lockbox_too_large`, `vault_full`, `too_many_unlocks`, `last_unlock`,
- *   `corrupt_record`, `damaged_bundle`, `damaged_unlock`, `damaged_lockbox`, `stale_write`,
+ *   `corrupt_record`, `damaged_bundle`, `damaged_unlock`, `damaged_lockbox`, `newer_format`, `stale_write`,
  *   `rolled_back`, `not_permitted`, `identity_revoked`, `storage_unavailable`.
  *
  * `vault_full` means a new lockbox in a vault already holding its `maxLockboxes` (a limit the
@@ -24,7 +24,7 @@
  *
  * `identity_revoked` is storage saying that the user this vault was opened for is no longer the
  * one signed in -- signed out, or another user signed in -- and the vault locks itself as it
- * throws it (openVault's `whenIdentityRevoked`): the user signs in again, and the host opens the
+ * throws it: the user signs in again, and the host opens the
  * vault for whoever that is. `not_permitted` is the signed-in user, still the vault's own, refused
  * one call: signing in again will not help.
  *
@@ -33,6 +33,10 @@
  * vault can know: a passphrase or passkey whose answer fails to open its way in is
  * `wrong_passphrase` or `wrong_passkey` even when the stored vault was altered, because the
  * decryption fails alike either way. Their messages say so.
+ *
+ * `newer_format` is a stored vault in a form this version does not know, which a newer version of
+ * safebyok may have written: the user's next move is to update the app, never to start over, so
+ * it is told apart from `damaged_bundle`, and nothing erases it.
  *
  * `rolled_back` is storage handing back an older copy of a vault's bundle than this device has
  * already seen -- a backup restored over it, or storage tampered with -- which the vault refuses to
@@ -62,6 +66,7 @@ export const VaultErrorKindVals = [
   'damaged_bundle',      // the vault's stored bundle failed its checks, so no way in can be tried
   'damaged_unlock',      // a way in is stored in a form this package never writes, so it cannot be tried
   'damaged_lockbox',     // a lockbox failed its checks, or would not open under the vault's own vaultKey
+  'newer_format',        // a stored vault in a form this version does not know, which a newer one may have written
   'unknown_key_deriver', // the vault names a key deriver this handle was not built with
   'stale_write',         // storage changed since this device read it, so the write was refused
   'rolled_back',         // storage handed back an older copy of the vault than this device has seen, which it refuses to use
@@ -138,6 +143,7 @@ export const VaultErrorFamilyForKind = {
   damaged_bundle:      'condition',
   damaged_unlock:      'condition',
   damaged_lockbox:     'condition',
+  newer_format:        'condition',
   unknown_key_deriver: 'misuse',
   stale_write:         'condition',
   rolled_back:         'condition',

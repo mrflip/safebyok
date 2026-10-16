@@ -208,18 +208,20 @@ export const LockboxSummary = Z.extend(
 export type LockboxSummary = Z.infer<typeof LockboxSummary>
 
 /**
- * A lockbox whose stored record does not read back as one -- damaged, tampered with, or written by
- * another version of safebyok -- listed under the boxlabel it is stored under, with nothing else
- * from it trusted. It sits in a vault's snapshot beside the {@link LockboxSummary}s, sorted among
- * them, so a UI can offer to remove it: `erase()` removes it and `store()` writes a fresh lockbox
- * over it, while `read()` and `use()` refuse it with kind 'damaged_lockbox'.
+ * A lockbox whose stored record does not read back as one -- damaged, tampered with, written by
+ * another version of safebyok, or sealed under a vaultKey the vault does not hold -- listed under
+ * the boxlabel it is stored under, with nothing else from it trusted but its `revision_id`, when
+ * it holds one as text (null otherwise), which only names the record for a write over it. It
+ * sits in a vault's snapshot beside the {@link LockboxSummary}s, sorted among them, so a UI can
+ * offer to remove it: `erase()` removes it and `store()` writes a fresh lockbox over it, while
+ * `read()` and `use()` refuse it with kind 'damaged_lockbox'.
  *
  * @example
  *   for (const box of snapshot.boxes) {
  *     if (box.damaged) { showRemovable(box.boxlabel) } else { showSummary(box.boxlabel, box.note) }
  *   }
  */
-export type DamagedLockbox = { boxlabel: string, damaged: true }
+export type DamagedLockbox = { boxlabel: string, damaged: true, revision_id: string | null }
 
 /**
  * The ways into a vault, each an {@link UnlockEnvelope}'s `method`: a `passphrase` the user types,
