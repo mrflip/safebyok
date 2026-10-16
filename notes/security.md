@@ -881,3 +881,20 @@ security expert who knows what questions to ask.
   refuses still opens the vault and lists as it is. Refusing it on read would make the bundle
   `corrupt_record` and lock the user out of their own vault, or hide a way in they rely on. The
   first way in, named `passphrase` by the vault itself, is not checked.
+* 2026-10-16: **The whisper field** (`WhisperFieldAttributes` in `safebyok/utils`, spread by
+  `safebyok-react`'s `WhisperField`) asks each major password manager to ignore the field, sets
+  `autocomplete="new-password"`, and turns off capitalizing, autocorrect and spell-check: a
+  browser's enhanced spell-check sends the field's text to its maker's servers, and with the
+  whisper shown (`type="text"`) nothing else stops it. The field is named `whisper_text`, never
+  `key`, `password` or `token`. Each manager honors only its own flag; a browser's built-in
+  manager may honor none, and with `new-password` Chrome may offer to generate a password there.
+* 2026-10-16: **Starting over from the passphrase dialog** (`allowStartOver` on `VaultProvider`
+  and `PassphraseModal`, off by default) erases the vault on every device through
+  `vault.destroy()`, which by design needs no passphrase. It asks first, in the dialog, and focus
+  lands on "Keep it". Anyone at an unlocked session could already do the same through the handle;
+  the option only puts it in the user's reach.
+* 2026-10-16: **`withUnlockedVault` answers a refusal only over the vault the action ran
+  against**: an action whose `vault_locked` lands after its vault was closed (another user, a
+  reopen) resolves null, so a passphrase is never asked over, nor an action rerun against, a
+  vault the action did not touch. `PassphraseModal` and `PasskeyUnlockButton` start afresh when
+  handed another vault, so nothing typed for one vault is submitted to the next.
