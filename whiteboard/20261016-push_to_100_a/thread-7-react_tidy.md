@@ -46,7 +46,8 @@ Branch `20261016-react_tidy`, PR [#129](https://github.com/mrflip/safebyok/pull/
     the preplan opened is answered by the Coach and closed: we assume `Intl.RelativeTimeFormat`,
     add no dependency, and the README tells a host on Hermes or an older engine to import
     `@formatjs/intl-relativetimeformat` with its locale data. Still open with the Coach, through
-    the orchestrator: an uncontrolled `WhisperField` (below).
+    the orchestrator: an uncontrolled `WhisperField` (below). **Answered**: proceed (the Coach,
+    2026-10-16); built in thread 14, both fields, with the reveal toggle kept.
 
 * **Decisions taken**:
   - `Intl.RelativeTimeFormat` is assumed, at the Coach's word on filing: no presence check, no
@@ -93,6 +94,9 @@ Branch `20261016-react_tidy`, PR [#129](https://github.com/mrflip/safebyok/pull/
 * **For the Coach**:
   - `autocomplete="new-password"` (your list) stops autofill of saved passwords, but Chrome may
     offer its password generator on such a field. Keep it, or drop that one attribute?
+    **Answered** (the Coach, 2026-10-16: two fields, two jobs): the whisper field turns autofill
+    and generators away (`autocomplete="off"`); the passphrase field invites managers. Built in
+    thread 14.
   - The provider no longer reopens on `bad_option` per the ruling, though from the provider a
     "reads sound now" refusal is a race, not misuse; `retryOpen()` mends it.
   - Size: no `safebyok-react` line in `.size-limit.json` (thread 8 adds it). Measured with
