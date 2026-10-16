@@ -224,6 +224,14 @@ describe("a record the deployment refused", () => {
   // The whisper's codec and schema version are the same in every lockbox, so nothing to quote.
   const { whisper_codec: _codec, whisper_schema_version: _version, ...quotableBox } = lockbox
 
+  // A rival of every record above, in the same shapes with other values. Whatever a record shares
+  // with it -- the format literals, the test deriver's label, the fake salt -- is public and the
+  // same in every record, so finding it in a refusal is no leak; only what varies per record counts.
+  const rivalScope = { applabel: 'rival_app', user_id: 'user_rival', vaultlabel: 'rival_vault' }
+  const rivalBundle = TH.bundleOf('user_rival', { ...rivalScope, vault_key_epoch: 11, prior_vault_key: { vault_key_epoch: 10, vault_key_wrapped: TH.fakeCiphered('prior_rival') }, unlock_epoch: 7, unlocks: [TH.envelopeOf('rival_phrase', { vault_key_epoch: 11, device_id: 'device_rival', registered_at: Date.UTC(2026, 0, 2) })] })
+  const rivalLeaves = new Set(TH.leafTexts({ scope: rivalScope, record: [rivalBundle, { ...rivalBundle, unlock_epoch: 8, vault_key_passphrase_wrapped: TH.fakeCiphered('rewrapped_rival') }, TH.boxOf('rival_box', 'rival_rev', { note: 'a rival note', vault_key_epoch: 11 })] }))
+  const perRecordLeaves = (record: unknown) => TH.leafTexts({ scope, record }).filter((leaf) => ! rivalLeaves.has(leaf))
+
   const RefusedWrites: [string, unknown, (vaultDB: ReturnType<typeof convexVaultDB>) => Promise<unknown>][] = [
     ['updateBundle', nextBundle, (vaultDB) => vaultDB.updateBundle(nextBundle, { vault_id: standing.vault_id, unlock_epoch: 52_871 })],
     ['updateBox',    quotableBox, (vaultDB) => vaultDB.updateBox(scope, lockbox, { vault_id: standing.vault_id, revision_id: null, vault_key_epoch: 52_874 })],
@@ -247,7 +255,9 @@ describe("a record the deployment refused", () => {
       expect(refusal.cause).to.be.undefined
       const thrown = TH.thrownText(refusal)
       expect(thrown).to.not.include('stray_field')
-      const quotables = TH.leafTexts({ scope, record })
+      const quotables = perRecordLeaves(record)
+      expect(quotables, 'the leak sweep looks for what varies per record').to.include('quotable_app')
+      expect(quotables, 'and not for the public constants every record shares').to.not.include.members(['test_digest_v0'])
       for (const leaf of quotables) {
         expect(thrown).to.not.include(leaf)
       }

@@ -185,11 +185,13 @@ export default defineConfig([
   // A library writes nothing to the console: what it has to say goes back to its caller, who
   // decides what may be logged. A stray debug line is how a key ends up in someone's log drain.
   // The one exception is src/console-logger.ts, the fallback when a host passes no logger, which
-  // disables no-console for itself alone.
+  // disables no-console for itself alone. The helpers published as `safebyok/testing`
+  // (tests/test-helpers.ts) ship to hosts too, so they keep the rules of src/ in this section and
+  // in 3c, besides the rules of the tests.
   // Randomness is the platform's CSPRNG (`crypto.getRandomValues`), never Math.random.
   {
     name: 'safebyok/secret-keeping',
-    files: ['src/**/*.ts'],
+    files: ['src/**/*.ts', 'tests/test-helpers.ts'],
     rules: {
       'no-console':              'error',
       'no-eval':                 'error',
@@ -207,7 +209,7 @@ export default defineConfig([
   // under Node, so the TS project types Node's globals for them, and only this rule keeps src/ clean.
   {
     name: 'safebyok/platform-neutral',
-    files: ['src/**/*.ts'],
+    files: ['src/**/*.ts', 'tests/test-helpers.ts'],
     rules: {
       'import-x/no-nodejs-modules': 'error',
       'no-restricted-globals': ['error', ...['Buffer', 'process', 'global', 'require', '__dirname', '__filename', 'setImmediate'].map((nodeGlobal) => ({
@@ -222,7 +224,7 @@ export default defineConfig([
   // would put all of it in every host's bundle.
   {
     name: 'safebyok/tree-shaking',
-    files: ['src/**/*.ts'],
+    files: ['src/**/*.ts', 'tests/test-helpers.ts'],
     rules: {
       'no-restricted-imports': ['error', {
         // `zod/v4` is classic too, under its version path, and `zod/v3` the classic before it.
@@ -277,6 +279,12 @@ export default defineConfig([
       // `() => undefined` returns undefined and `() => {}` returns void, which TypeScript keeps
       // apart: the rule's fix of an arrow body changes the type, so it leaves arrow bodies alone.
       'unicorn/no-useless-undefined': ['error', { checkArrowFunctionBody: false }],
+      // The lib target stops at ES2023 in every tsconfig, and two rules want a newer one. Off
+      // until it moves, both together: `Iterator#toArray()` is ES2025, the rule's fix does not
+      // typecheck, and `prefer-spread` refuses the bare `Array.from` beside it; and
+      // `Promise.withResolvers` is ES2024.
+      'unicorn/prefer-iterator-to-array':       'off',
+      'unicorn/prefer-promise-with-resolvers':  'off',
     },
   },
 
