@@ -67,8 +67,8 @@ const vaultDB = postgresVaultDB({ client: pool, userId: session.userId })
   some races fail with a serialization error (`40001`) instead, which refuses as
   `storage_unavailable` and may simply be tried again. Leave the isolation level alone, and no
   verb needs a retry.
-* **`maxLockboxes`**, 1000 unless you say otherwise, is the most lockboxes one vault holds, as a
-  best effort: see *A limit of the server's own*, below.
+* **`maxLockboxes`**, none (`Infinity`) unless you say otherwise, is the most lockboxes one vault
+  holds, as a best effort: see *A limit of the server's own*, below. Quotas are yours to set.
 * **Names of up to 640 bytes** of UTF-8 each (`maxNameBytes`): a lockbox's primary key is its
   four names together, and Postgres holds a btree entry of at most 2704 bytes. A longer name is
   refused with kind `bad_label` before a statement runs. No character is reserved: each name is
@@ -98,11 +98,11 @@ import { Pool } from 'pg'
 import { VaultError } from 'safebyok'
 import type { BundleExpectation, EraseExpectation, Lockbox, LockboxExpectation, VaultBundle, VaultScope } from 'safebyok'
 import { postgresVaultDB } from 'safebyok-postgres'
-import type { PostgresVaultDB } from 'safebyok-postgres'
+import type { VaultDB } from 'safebyok'
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 
-type Served = (vaultDB: PostgresVaultDB, args: unknown[]) => Promise<unknown>
+type Served = (vaultDB: VaultDB, args: unknown[]) => Promise<unknown>
 
 // The verbs a browser's vault may call -- VaultDB's own, and nothing else -- each passed to the
 // VaultDB, which refuses another user's vault, and holds each record to its shape and each name
@@ -163,7 +163,7 @@ const VaultRouteUrl = '/api/safebyok'
 export class RouteVaultDB extends VaultDB {
   readonly maxRecordBytes = 1024 * 1024
   readonly maxVaultBytes = Infinity
-  readonly maxLockboxes = 1000 // the server's postgresVaultDB maxLockboxes
+  readonly maxLockboxes = Infinity // the server's postgresVaultDB maxLockboxes
   readonly maxNameBytes = 640  // the server's postgresVaultDB maxNameBytes
 
   protected doReadBundle(scope: VaultScope) { return this.call('readBundle', scope) }
@@ -215,13 +215,13 @@ const isKind = (kind: unknown): kind is VaultErrorKind => (VaultErrorKindVals as
 * **No push over a plain route**: the browser's vault refreshes after its own writes, and learns
   of other devices' writes when it next reads. For live updates, carry `subscribe` over a
   socket, server-sent events, or a GraphQL subscription (`safebyok-graphql`), fed by `listen`.
-* **A limit of the server's own.** As the Convex component does, this VaultDB holds every vault
-  to a number of lockboxes, `maxLockboxes` (1000 unless you pass another), whatever the browser
-  asks: a new lockbox past it refuses with kind `vault_full`, and a lockbox replacing one already
-  there never does. Declare the same number as the browser VaultDB's `maxLockboxes`, so that
-  `openVault` refuses a larger one up front. For no practical limit, pass both a large number,
-  such as `1_200_300_400_500_600`: the server's goes to Postgres as a bigint, where `Infinity`
-  cannot. Nothing bounds a vault's bytes beyond that: your framework's request-size limit bounds
+* **A limit of the server's own, if you give one.** Pass `maxLockboxes` and this VaultDB holds
+  every vault to that many lockboxes, whatever the browser asks: a new lockbox past it refuses
+  with kind `vault_full`, and a lockbox replacing one already there never does. Declare the same
+  number as the browser VaultDB's `maxLockboxes`, so that `openVault` refuses a larger one up
+  front. A limit costs the statement that inserts a new lockbox one count of its vault; with
+  none (`Infinity`, the default), nothing is counted, and how large a vault grows is yours to
+  bound, by your own quotas. Nothing bounds a vault's bytes beyond that: your framework's request-size limit bounds
   each record. What the limit guarantees is
   [the VaultDB contract's](https://github.com/mrflip/safebyok/blob/main/packages/safebyok/VAULTDB.md) (lines 4.2 to 4.5), and no more:
   * **It is a best effort.** The check is a `count(*)` of the vault's lockboxes in the statement

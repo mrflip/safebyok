@@ -34,7 +34,7 @@ describe("VaultDashboard, opening", () => {
   it("shows storage it cannot reach in place, and opens once Retry finds it back", async () => {
     const outage = makeOutage()
     outage.setDown(true)
-    const vaultDB = new OutageVaultDB(localVaultDB(memoryStore()), outage)
+    const vaultDB = new OutageVaultDB(localVaultDB({ store: memoryStore() }), outage)
     TH.makeWorld({ vaultDB }).renderInVault(<VaultDashboard />)
     await screen.findByText(/Can't reach your vault/)
     outage.setDown(false)
@@ -54,7 +54,7 @@ describe("VaultDashboard, opening", () => {
 /** A world whose `u1` vault has had its stored bundle spoiled, over a store the test can read. */
 const damagedWorld = async () => {
   const store = memoryStore()
-  const world = TH.makeWorld({ vaultDB: localVaultDB(store) })
+  const world = TH.makeWorld({ vaultDB: localVaultDB({ store }) })
   await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
   const bundleCkey = Ckeys.bundle(TH.scopeOf('u1'))
   const bundle = JSON.parse(store.read(bundleCkey) ?? 'null') as object
@@ -209,7 +209,7 @@ describe("VaultDashboard, its lockboxes", () => {
 
   it("marks a damaged lockbox as such, offering only to delete it", async () => {
     const store = memoryStore()
-    const world = TH.makeWorld({ vaultDB: localVaultDB(store) })
+    const world = TH.makeWorld({ vaultDB: localVaultDB({ store }) })
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key', openai_api_key: 'sk-test-not-a-real-key' })
     store.write(openaiCkey, '{"not": json')
     world.renderInVault(<VaultDashboard />)
@@ -227,7 +227,7 @@ describe("VaultDashboard, its lockboxes", () => {
 
   it("replaces a damaged lockbox with a fresh whisper", async () => {
     const store = memoryStore()
-    const world = TH.makeWorld({ vaultDB: localVaultDB(store) })
+    const world = TH.makeWorld({ vaultDB: localVaultDB({ store }) })
     await world.seed({ openai_api_key: 'sk-test-not-a-real-key' })
     store.write(openaiCkey, '{"not": json')
     world.renderInVault(<VaultDashboard />)

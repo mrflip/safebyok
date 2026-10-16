@@ -2,7 +2,7 @@ import { beforeAll } from 'vitest'
 import { PGlite } from '@electric-sql/pglite'
 import { postgresVaultDB } from '../src/index'
 import type { PostgresClient, PostgresListen } from '../src/index'
-import type { VaultDB, VaultScope } from 'safebyok'
+import type { VaultDB, VaultDBOpts, VaultScope } from 'safebyok'
 import { VaultNotifySql, VaultTablesSql } from '../src/vault-tables'
 
 // Everything the core's tests use too, so a test here star-imports this one module as TH.
@@ -134,4 +134,4 @@ export const liveWatch = async (vaultDB: Pick<VaultDB, 'subscribe'>, scope: Vaul
 }
 
 /** The postgresVaultDB a request for `userId` makes over `db`, listening there. */
-export const requestFor = (db: PGlite, userId: string | null) => postgresVaultDB({ client: db, userId, listen: listenOn(db) })
+export const requestFor = (db: PGlite, userId: string | null, vaultDBOpts: VaultDBOpts = {}) => postgresVaultDB({ ...vaultDBOpts, client: db, userId, listen: listenOn(db) })

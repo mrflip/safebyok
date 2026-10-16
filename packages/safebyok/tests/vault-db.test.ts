@@ -1,7 +1,7 @@
 import { omit } from 'es-toolkit'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { memoryStore } from '../src/string-store'
-import { VaultDB, jsonBytes, localVaultDB, type BundleExpectation, type EraseExpectation, type LockboxExpectation, type StoredLockbox } from '../src/vault-db'
+import { VaultDB, jsonBytes, localVaultDB, type BundleExpectation, type EraseExpectation, type LockboxExpectation, type StoredLockbox, type VaultDBOpts, type WatchTrouble } from '../src/vault-db'
 import { VaultError } from '../src/errors'
 import type { Lockbox, VaultBundle, VaultScope } from '../src/types'
 import * as Ckeys from '../src/ckeys'
@@ -15,7 +15,8 @@ import * as TH from './test-helpers'
  * `maxLockboxes`, it refuses a new lockbox in a vault already holding that many, after the
  * expectation is checked, so a first write under a boxlabel already taken is stale, never full.
  * Given `rows`, it shares them with every other MapVaultDB given the same: another device of one
- * backend in this process.
+ * backend in this process. Given `vaultDBOpts`, it hands them to the base class, as every adapter's
+ * factory does.
  */
 class MapVaultDB extends VaultDB {
   readonly maxRecordBytes = Infinity
@@ -24,8 +25,8 @@ class MapVaultDB extends VaultDB {
   readonly maxNameBytes: number = Infinity
   readonly rows: Map<string, unknown>
 
-  constructor(maxLockboxes = Infinity, rows = new Map<string, unknown>()) {
-    super()
+  constructor(maxLockboxes = Infinity, rows = new Map<string, unknown>(), vaultDBOpts: VaultDBOpts = {}) {
+    super(vaultDBOpts)
     this.maxLockboxes = maxLockboxes
     this.rows = rows
   }
@@ -62,13 +63,21 @@ class MapVaultDB extends VaultDB {
     if (! meets) {
       return Promise.resolve(false)
     }
-    const isBox = Ckeys.isBoxIn(scope)
-    const held = [...this.rows].filter(([ckey]) => isBox(ckey)).length
-    if (standingBox === undefined && held >= this.maxLockboxes) {
+    if (standingBox === undefined && this.boxCount(scope) >= this.maxLockboxes) {
       return Promise.reject(new VaultError('vault_full', 'This vault is full: erase a lockbox to make room, then try again.'))
     }
     this.rows.set(Ckeys.box(scope, lockbox.boxlabel), lockbox)
     return Promise.resolve(true)
+  }
+
+  /** How many lockboxes `scope` holds: counted through the ckeys, never copying the rows. */
+  private boxCount(scope: VaultScope): number {
+    const isBox = Ckeys.isBoxIn(scope)
+    let held = 0
+    for (const ckey of this.rows.keys()) {
+      if (isBox(ckey)) { held += 1 }
+    }
+    return held
   }
 
   protected doEraseBox(scope: VaultScope, boxlabel: string, expected: EraseExpectation) {
@@ -104,16 +113,44 @@ class TroubledVaultDB extends MapVaultDB {
 
 const unheard = (): void => undefined
 
+/**
+ * A MapVaultDB with push: `ring()` calls every watch's onChange, as a backend's push would, and a
+ * watch's unsubscribe is counted, and throws when `unsubscribeThrows` says. `trouble` is the
+ * watch's trouble, for a test to fail it.
+ */
+class RingingVaultDB extends MapVaultDB {
+  readonly watches = new Set<() => void>()
+  unsubscribeCount = 0
+  unsubscribeThrows: Error | null = null
+  trouble: WatchTrouble | null = null
+
+  constructor(vaultDBOpts: VaultDBOpts = {}) {
+    super(Infinity, new Map(), vaultDBOpts)
+  }
+
+  ring() { for (const onChange of this.watches) { onChange() } }
+
+  protected override doSubscribe(_scope: VaultScope, onChange: () => void) {
+    this.trouble = this.watchTrouble("This vault's watch failed: other devices' changes may not show until its next read.")
+    this.watches.add(onChange)
+    return () => {
+      this.unsubscribeCount += 1
+      this.watches.delete(onChange)
+      if (this.unsubscribeThrows) { throw this.unsubscribeThrows }
+    }
+  }
+}
+
 // Each adapter's devices share one store or Map, synchronous and in this process, so they make no
 // round trips for a turnstile to hold: the races interleave them at every await.
-TH.describeVaultDB('localVaultDB', () => localVaultDB(memoryStore()), {
+TH.describeVaultDB('localVaultDB', (vaultDBOpts) => localVaultDB({ ...vaultDBOpts, store: memoryStore() }), {
   pushes:      true,
   makeDevices: () => {
     const store = memoryStore()
-    return () => localVaultDB(store)
+    return () => localVaultDB({ store })
   },
 })
-TH.describeVaultDB('the smallest honest adapter', () => new MapVaultDB(), {
+TH.describeVaultDB('the smallest honest adapter', (vaultDBOpts) => new MapVaultDB(Infinity, new Map(), vaultDBOpts), {
   makeCappedVaultDB: (maxLockboxes) => new MapVaultDB(maxLockboxes),
   makeDevices:       () => {
     const rows = new Map<string, unknown>()
@@ -127,7 +164,7 @@ const u1BoxCkey = (boxlabel: string) => `box^acme^u1^main^${boxlabel}`
 
 describe("localVaultDB", () => {
   it("holds a mebibyte in one record, and sets no limit on a vault, in bytes or in lockboxes, or on a name", () => {
-    const vaultDB = localVaultDB(memoryStore())
+    const vaultDB = localVaultDB({ store: memoryStore() })
     expect(vaultDB.maxRecordBytes).to.eq(1_048_576)
     expect(vaultDB.maxVaultBytes).to.eq(Infinity)
     expect(vaultDB.maxLockboxes).to.eq(Infinity)
@@ -140,7 +177,7 @@ describe("localVaultDB", () => {
     for (const ckey of earlier) {
       store.write(ckey, JSON.stringify(ckey.includes('box') ? TH.boxOf('anthropic', 'one') : TH.bundleOf('u1')))
     }
-    const vaultDB = localVaultDB(store)
+    const vaultDB = localVaultDB({ store })
     expect(await vaultDB.readBundle(TH.scopeOf('u1'))).to.be.null
     expect(await vaultDB.readBox(TH.scopeOf('u1'), 'anthropic')).to.be.null
     expect(await vaultDB.listBoxes(TH.scopeOf('u1'))).to.have.lengthOf(0)
@@ -156,7 +193,7 @@ describe("localVaultDB", () => {
     store.write(u1BundleCkey, JSON.stringify(TH.bundleOf('u1')))
     store.write(u1BoxCkey('anthropic'), baggedRow)
     store.write(u1BoxCkey('openai'), emptiedRow)
-    const vaultDB = localVaultDB(store)
+    const vaultDB = localVaultDB({ store })
     const summaries = await vaultDB.listBoxes(TH.scopeOf('u1'))
     expect(summaries.map((box) => TH.summaryOf(box)?.public)).to.deep.equal([{ note: 'a test box' }, {}])
     const prev = await vaultDB.readBox(TH.scopeOf('u1'), 'openai')
@@ -170,7 +207,7 @@ describe("localVaultDB", () => {
     const { public_json: _publicJson, whisper_codec: _codec, whisper_schema_version: _version, ...rest } = TH.boxOf('anthropic', 'one')
     store.write(u1BundleCkey, JSON.stringify(TH.bundleOf('u1')))
     store.write(u1BoxCkey('anthropic'), JSON.stringify({ ...rest, format: 'safebyok-lockbox-v2', note: 'a test box' }))
-    const vaultDB = localVaultDB(store)
+    const vaultDB = localVaultDB({ store })
     expect(await vaultDB.listBoxes(TH.scopeOf('u1'))).to.deep.equal([{ boxlabel: 'anthropic', damaged: true, revision_id: 'rev-one' }])
   })
 
@@ -180,7 +217,7 @@ describe("localVaultDB", () => {
     store.write(Ckeys.bundle(scope), JSON.stringify(TH.bundleOf('u1')))
     store.write(Ckeys.box(scope, 'openai'), JSON.stringify(TH.boxOf('openai', 'two')))
     store.write(Ckeys.box(scope, 'anthropic'), '{"not": json')
-    const listed = await localVaultDB(store).listBoxes(scope)
+    const listed = await localVaultDB({ store }).listBoxes(scope)
     expect(listed[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true, revision_id: null })
     expect(listed[1]).to.include({ boxlabel: 'openai', revision_id: 'rev-two', damaged: false })
     // Listed, never repaired: the row is still there for forensics.
@@ -189,7 +226,7 @@ describe("localVaultDB", () => {
 
   it("stores each record as its JSON, under its kind and scope joined on ^", async () => {
     const store = memoryStore()
-    const vaultDB = localVaultDB(store)
+    const vaultDB = localVaultDB({ store })
     await vaultDB.createBundle(TH.bundleOf('u1'))
     await vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet)
     expect(store.read(u1BundleCkey)).to.eq(JSON.stringify(TH.bundleOf('u1')))
@@ -199,7 +236,7 @@ describe("localVaultDB", () => {
 
   it("refuses a mangled row with kind 'corrupt_record', quoting none of it", async () => {
     const store = memoryStore()
-    const vaultDB = localVaultDB(store)
+    const vaultDB = localVaultDB({ store })
     store.write(u1BundleCkey, '{"format":"safebyok-vault-v2","shhh":"SUPERSECRET"}')
     const refusal = await TH.expectRefusal(vaultDB.readBundle(TH.scopeOf('u1')), 'corrupt_record')
     expect(refusal).to.be.instanceOf(VaultError)
@@ -208,14 +245,14 @@ describe("localVaultDB", () => {
 
   it("refuses a row that is not JSON at all, quoting none of it", async () => {
     const store = memoryStore()
-    const vaultDB = localVaultDB(store)
+    const vaultDB = localVaultDB({ store })
     store.write(u1BoxCkey('anthropic'), 'SUPERSECRET{')
     await expect(vaultDB.readBox(TH.scopeOf('u1'), 'anthropic')).rejects.toThrow(/did not read back as JSON/)
   })
 
   it("refuses a record that names a scope or label other than the one asked for", async () => {
     const store = memoryStore()
-    const vaultDB = localVaultDB(store)
+    const vaultDB = localVaultDB({ store })
     // A u2 bundle smuggled into u1's slot, and a lockbox row moved under another label.
     store.write(u1BundleCkey, JSON.stringify(TH.bundleOf('u2')))
     await expect(vaultDB.readBundle(TH.scopeOf('u1'))).rejects.toThrow(/different app, user, or vault/)
@@ -704,4 +741,254 @@ describe("jsonBytes", () => {
   for (const [val, expected, blurb] of JsonBytesCases) {
     it(blurb, () => { expect(jsonBytes(val)).to.eq(expected) })
   }
+})
+
+/** A RingingVaultDB made with `vaultDBOpts`, with one watch on u1's vault whose listener throws. */
+const failingListenerOn = (vaultDBOpts: VaultDBOpts = {}) => {
+  const vaultDB = new RingingVaultDB(vaultDBOpts)
+  vaultDB.subscribe(TH.scopeOf('u1'), () => { throw new Error('a listener that throws') })
+  return vaultDB
+}
+
+describe("the abstract VaultDB, its logger", () => {
+  afterEach(() => { vi.restoreAllMocks() })
+
+  it("says what it has nobody to throw to through the logger it was made with", () => {
+    const spy = TH.spyLogger()
+    failingListenerOn({ logger: spy.logger }).ring()
+    expect(spy.calls.map((call) => call.level)).to.deep.equal(['error'])
+  })
+
+  it("says it through the logger the vault it serves handed it, when it was made with none", () => {
+    const spy = TH.spyLogger()
+    const vaultDB = failingListenerOn()
+    vaultDB.adoptLogger(spy.logger)
+    vaultDB.ring()
+    expect(spy.calls).to.have.lengthOf(1)
+  })
+
+  it("keeps the logger it was made with over one handed it later", () => {
+    const own = TH.spyLogger()
+    const handed = TH.spyLogger()
+    const vaultDB = failingListenerOn({ logger: own.logger })
+    vaultDB.adoptLogger(handed.logger)
+    vaultDB.ring()
+    expect(own.calls).to.have.lengthOf(1)
+    expect(handed.calls).to.have.lengthOf(0)
+  })
+
+  it("keeps the latest logger handed it, serving several vaults", () => {
+    const first = TH.spyLogger()
+    const latest = TH.spyLogger()
+    const vaultDB = failingListenerOn()
+    vaultDB.adoptLogger(first.logger)
+    vaultDB.adoptLogger(latest.logger)
+    vaultDB.ring()
+    expect([first.calls.length, latest.calls.length]).to.deep.equal([0, 1])
+  })
+
+  it("says it to the console, tagged, when it has no logger at all", () => {
+    const consoleErrors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    failingListenerOn().ring()
+    expect(consoleErrors).toHaveBeenCalledOnce()
+    expect(consoleErrors.mock.calls[0]?.[0]).to.match(/^safebyok: A listener passed to subscribe threw/)
+  })
+
+  it("breaks nothing when its logger throws", () => {
+    const throwing = { log: () => { throw new Error('no') }, warn: () => { throw new Error('no') }, error: () => { throw new Error('no') } }
+    expect(() => { failingListenerOn({ logger: throwing }).ring() }).to.not.throw()
+  })
+
+  const BadLoggers = [
+    ["console.log",                 'a function, not a logger'],
+    [{ log: () => undefined },      'a logger missing warn and error'],
+    [null,                          'null'],
+  ] as const
+
+  for (const [logger, blurb] of BadLoggers) {
+    it(`refuses ${blurb} as a logger with kind 'bad_option', made with it or handed it`, () => {
+      expect(() => new RingingVaultDB({ logger: logger as unknown as VaultDBOpts['logger'] })).to.throw(VaultError).with.property('kind', 'bad_option')
+      expect(() => { new RingingVaultDB().adoptLogger(logger as unknown as NonNullable<VaultDBOpts['logger']>) }).to.throw(VaultError).with.property('kind', 'bad_option')
+    })
+  }
+})
+
+describe("the abstract VaultDB, calling a subscriber's listener", () => {
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it("calls every other listener, and lets nothing escape, when one throws: the failure logged as an error, naming the call", () => {
+    const spy = TH.spyLogger()
+    const vaultDB = new RingingVaultDB({ logger: spy.logger })
+    const thrown = new Error('a listener that throws')
+    const heard: string[] = []
+    vaultDB.subscribe(TH.scopeOf('u1'), () => { heard.push('one'); throw thrown })
+    vaultDB.subscribe(TH.scopeOf('u1'), () => { heard.push('two') })
+    expect(() => { vaultDB.ring() }).to.not.throw()
+    expect(heard).to.deep.equal(['one', 'two'])
+    expect(spy.calls).to.have.lengthOf(1)
+    expect(spy.calls[0]).to.include({ level: 'error', err: thrown })
+    expect(spy.calls[0]?.story).to.deep.equal({ call: 'subscribe' })
+  })
+
+  it("logs a listener's promise that rejects, rather than leave it unhandled", async () => {
+    const spy = TH.spyLogger()
+    const vaultDB = new RingingVaultDB({ logger: spy.logger })
+    const rejected = new Error('an async listener that fails')
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- a host's listener may be async
+    vaultDB.subscribe(TH.scopeOf('u1'), async () => { await Promise.resolve(); throw rejected })
+    vaultDB.ring()
+    await vi.waitFor(() => { expect(spy.calls.map((call) => call.err)).to.deep.equal([rejected]) })
+  })
+
+  it("logs a listener that throws something that is no Error, with no error to show", () => {
+    const spy = TH.spyLogger()
+    const vaultDB = new RingingVaultDB({ logger: spy.logger })
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- a host's code may throw anything
+    vaultDB.subscribe(TH.scopeOf('u1'), () => { throw 'a bare string' })
+    vaultDB.ring()
+    expect(spy.calls[0]).to.include({ level: 'error', err: null })
+  })
+
+  it("hands what a listener threw to the platform's reportError too, where there is one", () => {
+    const reported: unknown[] = []
+    vi.stubGlobal('reportError', (err: unknown) => { reported.push(err) })
+    const vaultDB = new RingingVaultDB({ logger: TH.spyLogger().logger })
+    const thrown = new Error('a listener that throws')
+    vaultDB.subscribe(TH.scopeOf('u1'), () => { throw thrown })
+    vaultDB.ring()
+    expect(reported).to.deep.equal([thrown])
+  })
+
+  it("never calls an unsubscribed listener, whatever the backend delivers late", () => {
+    const vaultDB = new RingingVaultDB()
+    let heardCount = 0
+    const watches: (() => void)[] = []
+    // A backend that keeps calling a watch it was told to end.
+    vi.spyOn(vaultDB.watches, 'delete').mockImplementation(() => false)
+    const unsubscribe = vaultDB.subscribe(TH.scopeOf('u1'), () => { heardCount += 1 })
+    watches.push(...vaultDB.watches)
+    unsubscribe()
+    vaultDB.ring()
+    expect(heardCount).to.eq(0)
+    expect(watches).to.have.lengthOf(1)
+  })
+
+  it("ends a watch once: a second unsubscribe is silent, and never reaches the adapter", () => {
+    const spy = TH.spyLogger()
+    const vaultDB = new RingingVaultDB({ logger: spy.logger })
+    const unsubscribe = vaultDB.subscribe(TH.scopeOf('u1'), unheard)
+    unsubscribe()
+    unsubscribe()
+    expect(vaultDB.unsubscribeCount).to.eq(1)
+    expect(spy.calls).to.have.lengthOf(0)
+  })
+
+  it("logs an adapter's unsubscribe that throws, as an error, and throws nothing", () => {
+    const spy = TH.spyLogger()
+    const vaultDB = new RingingVaultDB({ logger: spy.logger })
+    vaultDB.unsubscribeThrows = new Error('the socket was already closed')
+    const unsubscribe = vaultDB.subscribe(TH.scopeOf('u1'), unheard)
+    expect(() => { unsubscribe() }).to.not.throw()
+    expect(spy.calls[0]).to.include({ level: 'error', err: vaultDB.unsubscribeThrows })
+    expect(spy.calls[0]?.message).to.match(/unsubscribe threw/)
+  })
+})
+
+describe("VaultDB.watchTrouble", () => {
+  it("warns of a watch that failed once for a failing streak, naming the call, and again after the watch heard", () => {
+    const spy = TH.spyLogger()
+    const vaultDB = new RingingVaultDB({ logger: spy.logger })
+    vaultDB.subscribe(TH.scopeOf('u1'), unheard)
+    const { trouble } = vaultDB
+    const dropped = new Error('the socket dropped')
+    trouble?.failed(dropped)
+    trouble?.failed(dropped)
+    trouble?.failed(new Error('and again'))
+    expect(spy.calls).to.have.lengthOf(1)
+    expect(spy.calls[0]).to.include({ level: 'warn', err: dropped })
+    expect(spy.calls[0]?.story).to.deep.equal({ call: 'subscribe' })
+    trouble?.delivered()
+    trouble?.failed(dropped)
+    expect(spy.calls).to.have.lengthOf(2)
+  })
+
+  it("keeps each watch's streak apart", () => {
+    const spy = TH.spyLogger()
+    const vaultDB = new RingingVaultDB({ logger: spy.logger })
+    vaultDB.subscribe(TH.scopeOf('u1'), unheard)
+    const one = vaultDB.trouble
+    vaultDB.subscribe(TH.scopeOf('u2'), unheard)
+    const two = vaultDB.trouble
+    one?.failed(new Error('one dropped'))
+    two?.failed(new Error('two dropped'))
+    expect(spy.calls).to.have.lengthOf(2)
+  })
+})
+
+describe("VaultDB.listBoxRecords", () => {
+  it("lists each lockbox as stored, its two ciphered fields left out and format kept, damaged ones too, unchecked", async () => {
+    const vaultDB = new MapVaultDB()
+    const scope = TH.scopeOf('u1')
+    vaultDB.rows.set(Ckeys.box(scope, 'anthropic'), TH.boxOf('anthropic', 'one'))
+    vaultDB.rows.set(Ckeys.box(scope, 'openai'), { ...TH.boxOf('openai', 'two'), changed_at: 'later' })
+    vaultDB.rows.set(Ckeys.box(scope, 'mistral'), 'not a lockbox')
+    const records = await vaultDB.listBoxRecords(scope)
+    expect(records).to.have.deep.members([
+      omit(TH.boxOf('anthropic', 'one'), ['lockbox_key_wrapped', 'whisper_ciphered']),
+      omit({ ...TH.boxOf('openai', 'two'), changed_at: 'later' }, ['lockbox_key_wrapped', 'whisper_ciphered']),
+      'not a lockbox',
+    ])
+  })
+
+  it("leaves out an entry filed under a name below the floor, which no verb could reach", async () => {
+    const vaultDB = new MapVaultDB()
+    vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'tab\there'), TH.boxOf('tab\there', 'one'))
+    expect(await vaultDB.listBoxRecords(TH.scopeOf('u1'))).to.deep.equal([])
+  })
+
+  it("refuses as listBoxes does: a scope below the floor as bad_label, the adapter's failure as storage_unavailable", async () => {
+    class DownVaultDB extends MapVaultDB {
+      protected override doListBoxes(): Promise<StoredLockbox[]> { return Promise.reject(new Error('connection reset')) }
+    }
+    await TH.expectRefusal(new MapVaultDB().listBoxRecords({ ...TH.scopeOf('u1'), vaultlabel: 'tab\there' }), 'bad_label')
+    await TH.expectRefusal(new DownVaultDB().listBoxRecords(TH.scopeOf('u1')), 'storage_unavailable')
+  })
+})
+
+describe("localVaultDB, as it is made", () => {
+  const BadOpts = [
+    [undefined,                                          'nothing at all'],
+    [{},                                                 'a bag with no store'],
+    [{ store: { read: () => null } },                    'a store missing four of its five calls'],
+    [{ store: memoryStore(), logger: 'console' },        'a logger that is not a VaultLogger'],
+  ] as const
+
+  for (const [opts, blurb] of BadOpts) {
+    it(`refuses ${blurb} with kind 'bad_option'`, () => {
+      expect(() => localVaultDB(opts as unknown as Parameters<typeof localVaultDB>[0])).to.throw(VaultError).with.property('kind', 'bad_option')
+    })
+  }
+
+  it("takes a store bare of a bag, by mistake, as no store: kind 'bad_option'", () => {
+    expect(() => localVaultDB(memoryStore() as unknown as Parameters<typeof localVaultDB>[0])).to.throw(VaultError, /one bag of options/)
+  })
+
+  it("logs a listener that throws through its logger, the write it heard of landed", async () => {
+    const spy = TH.spyLogger()
+    const vaultDB = localVaultDB({ store: memoryStore(), logger: spy.logger })
+    vaultDB.subscribe(TH.scopeOf('u1'), () => { throw new Error('a listener that throws') })
+    await vaultDB.createBundle(TH.bundleOf('u1'))
+    expect(await vaultDB.readBundle(TH.scopeOf('u1'))).to.deep.equal(TH.bundleOf('u1'))
+    expect(spy.calls.map((call) => call.level)).to.deep.equal(['error'])
+  })
+
+  it("refuses a write past the store's quota as storage_unavailable, the store's own error its cause, writing nothing", async () => {
+    const quota = new Error('The quota has been exceeded.')
+    const store = memoryStore()
+    const full = { ...store, write: () => { throw quota } }
+    const vaultDB = localVaultDB({ store: full })
+    const refusal = await TH.expectRefusal(vaultDB.createBundle(TH.bundleOf('u1')), 'storage_unavailable')
+    expect(refusal.cause).to.eq(quota)
+    expect(store.ckeys()).to.have.lengthOf(0)
+  })
 })

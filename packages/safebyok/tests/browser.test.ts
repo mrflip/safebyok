@@ -48,14 +48,14 @@ describe("browserOpts", () => {
   })
 
   it("spreads into openVault beside the host's vault store", async () => {
-    const vault = await openVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: localVaultDB(memoryStore()), ...browserOpts({ dbName: TH.freshDbName() }) })
+    const vault = await openVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: localVaultDB({ store: memoryStore() }), ...browserOpts({ dbName: TH.freshDbName() }) })
     expect(vault.getSnapshot().state).to.eq('absent')
     vault.close()
   })
 
   it("yields to a field the host passes after it", async () => {
     const { deviceDB } = browserOpts({ dbName: TH.freshDbName() })
-    const opts = { ...browserOpts({ dbName: 'acme' }), applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: localVaultDB(memoryStore()), deviceDB }
+    const opts = { ...browserOpts({ dbName: 'acme' }), applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: localVaultDB({ store: memoryStore() }), deviceDB }
     expect(opts.deviceDB).to.eq(deviceDB)
     const vault = await openVault(opts)
     expect(vault.getSnapshot().state).to.eq('absent')

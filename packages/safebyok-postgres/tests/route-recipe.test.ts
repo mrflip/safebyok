@@ -8,12 +8,12 @@ import { VaultDB, VaultError, VaultErrorKindVals, memoryDeviceDB, openVault } fr
 import type { BundleExpectation, EraseExpectation, Lockbox, LockboxExpectation, VaultBundle, VaultErrorKind, VaultScope } from 'safebyok'
 import * as TH from './test-helpers'
 import { VaultChangeChannel, postgresVaultDB } from '../src/index'
-import type { PostgresClient, PostgresListen, PostgresVaultDB } from '../src/index'
+import type { PostgresClient, PostgresListen } from '../src/index'
 
 // ------------------------------------------------------------------------- the server half
 
 /** One verb a browser's vault may call, as the route serves it from the arguments the browser sent. */
-type Served = (vaultDB: PostgresVaultDB, args: unknown[]) => Promise<unknown>
+type Served = (vaultDB: VaultDB, args: unknown[]) => Promise<unknown>
 
 /**
  * The verbs a browser's vault may call -- VaultDB's own, and nothing else -- each passed to the
@@ -74,7 +74,7 @@ const VaultRouteUrl = '/api/safebyok'
 class RouteVaultDB extends VaultDB {
   readonly maxRecordBytes = 1024 * 1024
   readonly maxVaultBytes = Infinity
-  readonly maxLockboxes = 1000 // the server's postgresVaultDB maxLockboxes
+  readonly maxLockboxes = Infinity // the server's postgresVaultDB maxLockboxes
   readonly maxNameBytes = 640  // the server's postgresVaultDB maxNameBytes
 
   private readonly fetcher: Fetch

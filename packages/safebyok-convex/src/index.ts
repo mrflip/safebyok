@@ -5,5 +5,5 @@
  * `safebyok-convex/server`; nothing here loads them.
  */
 export { convexVaultDB } from './convex-vault-db'
-export type { ConvexCalls, ConvexReactWatchingClient, ConvexVaultClient, ConvexWatchingClient } from './convex-vault-db'
+export type { ConvexCalls, ConvexReactWatchingClient, ConvexVaultClient, ConvexVaultDBOpts, ConvexWatchingClient } from './convex-vault-db'
 export type { SafebyokApi } from './server'

@@ -12,7 +12,7 @@ describe("makeWorld", () => {
   })
 
   it("puts the vault behind the vaultDB it is handed", async () => {
-    const vaultDB = localVaultDB(memoryStore())
+    const vaultDB = localVaultDB({ store: memoryStore() })
     const world = TH.makeWorld({ vaultDB })
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
     expect(world.vaultDB).to.eq(vaultDB)

@@ -20,7 +20,7 @@ import type { DamagedLockbox, DeviceMark, DeviceUnlock, Lockbox, LockboxSummary,
 import { stableJsonify } from '../src/stable-jsonify'
 import { NameFloorBytes } from '../src/validators'
 import type { OpenVaultOpts } from '../src/vault'
-import { localVaultDB, type VaultDB } from '../src/vault-db'
+import { localVaultDB, type VaultDB, type VaultDBOpts } from '../src/vault-db'
 
 /**
  * A cheap KeyDeriver for tests: one SHA-256 instead of 64 MiB of Argon2id, so a suite full of
@@ -66,7 +66,7 @@ export const memoryVaultOpts = (overrides: Partial<OpenVaultOpts> = {}): OpenVau
   applabel:   'acme',
   userId:     'u1',
   vaultlabel: 'main',
-  vaultDB:    localVaultDB(memoryStore()),
+  vaultDB:    localVaultDB({ store: memoryStore() }),
   deviceDB:   memoryDeviceDB(),
   keyDeriver: testDeriver,
   passphraseStrengthTest: anyPassphraseTest,
@@ -925,8 +925,15 @@ export type VaultDBContractLine = keyof typeof VaultDBContract
  * VaultDB from the built package (`safebyok`) qualifies as readily as one extending `src/`.
  */
 export type VaultDBVerbs = Pick<VaultDB,
-  'maxRecordBytes' | 'maxVaultBytes' | 'maxLockboxes' | 'maxNameBytes' | 'readBundle' | 'createBundle' | 'updateBundle' | 'readBox' | 'listBoxes' | 'updateBox' | 'eraseBox' | 'eraseVault' | 'eraseDamagedVault' | 'subscribe'
+  'maxRecordBytes' | 'maxVaultBytes' | 'maxLockboxes' | 'maxNameBytes' | 'readBundle' | 'createBundle' | 'updateBundle' | 'readBox' | 'listBoxes' | 'listBoxRecords' | 'updateBox' | 'eraseBox' | 'eraseVault' | 'eraseDamagedVault' | 'subscribe'
 >
+
+/**
+ * A fresh, empty adapter, made with the {@link VaultDBOpts} it is handed -- its `logger`, for the
+ * battery to hear what it says -- as every adapter's factory takes them: no record in it, and none
+ * shared with another call.
+ */
+export type MakeVaultDB = (vaultDBOpts: VaultDBOpts) => VaultDBVerbs | Promise<VaultDBVerbs>
 
 /** What {@link describeVaultDB} takes beside its adapter. */
 export type DescribeVaultDBOpts = {
@@ -986,20 +993,23 @@ const CappedLockboxes = 3
  * by `kind` rather than by class, so an adapter passes whichever copy of the package it extends.
  *
  * @param adapterTitle - The adapter under test, as the suite's titles name it.
- * @param makeVaultDB - A fresh, empty adapter: no record in it, and none shared with another call.
+ * @param makeAdapter - A fresh, empty adapter, made with the VaultDBOpts it is handed: no record
+ *   in it, and none shared with another call.
  * @param opts - Optionally, `makeCappedVaultDB`, for the lockbox limit's lines; `makeVaultDBFor`,
  *   for who may reach a vault; and `pushes`, for subscribe's calls.
  *
  * @example
- *   describeVaultDB('localVaultDB', () => localVaultDB(memoryStore()), { pushes: true })
+ *   describeVaultDB('localVaultDB', (vaultDBOpts) => localVaultDB({ ...vaultDBOpts, store: memoryStore() }), { pushes: true })
  * @example
  *   describeVaultDB('postgresVaultDB', makeRequest, {
  *     makeCappedVaultDB: (maxLockboxes) => postgresVaultDB({ client, userId: 'u1', maxLockboxes }),
  *     makeVaultDBFor:    () => (userId) => postgresVaultDB({ client, userId }),
  *   })
  */
-export const describeVaultDB = (adapterTitle: string, makeVaultDB: () => VaultDBVerbs | Promise<VaultDBVerbs>, opts: DescribeVaultDBOpts = {}) => {
+export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, opts: DescribeVaultDBOpts = {}) => {
   const { makeCappedVaultDB, makeVaultDBFor } = opts
+  /** A fresh adapter, made with no VaultDBOpts: the battery's own lines hear nothing it logs. */
+  const makeVaultDB = () => makeAdapter({})
 
   /** The title of a group of tests for one line of the contract. */
   const lineTitle = (line: VaultDBContractLine) => `${adapterTitle}, as a VaultDB, ${line}: ${VaultDBContract[line]}`
@@ -1010,7 +1020,7 @@ export const describeVaultDB = (adapterTitle: string, makeVaultDB: () => VaultDB
   const signsIn = makeVaultDBFor !== undefined
 
   // The races, the lines across devices and the push tests, each runnable on its own.
-  const timing = vaultDBTimingChecks(makeVaultDB, opts)
+  const timing = vaultDBTimingChecks(makeAdapter, opts)
   /** Each timing check of `line`, as a test, run where its adapter can give what it needs. */
   const timingTestsOf = (line: VaultDBContractLine) => {
     for (const check of Object.values(timing)) {
@@ -1203,6 +1213,20 @@ export const describeVaultDB = (adapterTitle: string, makeVaultDB: () => VaultDB
       const vaultDB = await withBundle()
       await storeEach(vaultDB, ['openai', 'anthropic', 'mistral'])
       expect(await vaultDB.listBoxes(scopeOf('u1'))).to.deep.equal(await vaultDB.listBoxes(scopeOf('u1')))
+    })
+
+    it("lists every lockbox as stored through listBoxRecords, for a server to serve: each record whole but for its two ciphered fields", async () => {
+      const vaultDB = await withBundle()
+      await storeEach(vaultDB, ['openai', 'anthropic'])
+      await vaultDB.createBundle(bundleOf('u2'))
+      await vaultDB.updateBox(scopeOf('u2'), boxOf('mistral', 'other'), { vault_id: 'vault-id-u2', revision_id: null, vault_key_epoch: 1 })
+      const records = await vaultDB.listBoxRecords(scopeOf('u1'))
+      const listedOf = (boxlabel: string) => {
+        const { lockbox_key_wrapped: _lockboxKeyWrapped, whisper_ciphered: _whisperCiphered, ...listed } = boxOf(boxlabel, boxlabel)
+        return listed
+      }
+      expect(records).to.have.deep.members([listedOf('openai'), listedOf('anthropic')])
+      expect(await vaultDB.listBoxRecords(scopeOf('u3'))).to.deep.equal([])
     })
   })
 
@@ -1641,14 +1665,16 @@ export type VaultDBTimingCheck = { line: VaultDBContractLine, title: string, run
  * devices from `makeDevices`, or else every move through one adapter from `makeVaultDB` (or
  * `makeCappedVaultDB`, for the limit's).
  *
- * @param makeVaultDB - A fresh, empty adapter, as `describeVaultDB` takes it.
+ * @param makeAdapter - A fresh, empty adapter, as `describeVaultDB` takes it.
  * @param opts - `describeVaultDB`'s options.
  * @returns Each check, by a handle naming what it races or watches.
  *
  * @example await TH.vaultDBTimingChecks(() => new MyVaultDB(), { makeDevices }).rival_first_writes.check()
  */
-export const vaultDBTimingChecks = (makeVaultDB: () => VaultDBVerbs | Promise<VaultDBVerbs>, opts: DescribeVaultDBOpts = {}) => {
+export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaultDBOpts = {}) => {
   const { makeCappedVaultDB, makeDevices, pushes = false } = opts
+  /** A fresh adapter, made with `vaultDBOpts`, or with none. */
+  const makeVaultDB = (vaultDBOpts: VaultDBOpts = {}) => makeAdapter(vaultDBOpts)
   const capped = makeCappedVaultDB !== undefined
   const devices = makeDevices !== undefined
   // Titles say what the moves come from, so a race through one adapter claims no more than it proves.
@@ -1917,6 +1943,36 @@ export const vaultDBTimingChecks = (makeVaultDB: () => VaultDBVerbs | Promise<Va
         keeper.holdNone()
         await expectHeard(watch, writer, () => writer.updateBox(scopeOf('u1'), boxOf('anthropic', 'anthropic'), noBoxYet), gate.release)
         watch.unsubscribe()
+      },
+    },
+    push_past_a_failing_listener: {
+      line:  '6.1',
+      title: "lands each write and calls every other listener when one listener throws and another rejects, logging each failure as an error",
+      runs:  pushes,
+      check: async () => {
+        const spy = spyLogger()
+        const vaultDB = await makeVaultDB({ logger: spy.logger })
+        await vaultDB.createBundle(bundleOf('u1'))
+        const thrown = new Error('a listener that throws')
+        const rejected = new Error('a listener whose promise rejects')
+        const unsubscribes = [
+          vaultDB.subscribe(scopeOf('u1'), () => { throw thrown }),
+          // A host's listener may be async, though subscribe types it as returning nothing.
+          // eslint-disable-next-line @typescript-eslint/no-misused-promises
+          vaultDB.subscribe(scopeOf('u1'), () => Promise.reject(rejected)),
+        ]
+        const watch = readingWatch(vaultDB)
+        await untilLive([watch], vaultDB)
+        await expectHeard(watch, vaultDB, () => vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'anthropic'), noBoxYet))
+        const failures = () => spy.calls.filter((call) => call.err === thrown || call.err === rejected)
+        await vi.waitFor(() => {
+          expect(failures().map((call) => call.err), 'a listener failure the logger never heard').to.include.members([thrown, rejected])
+        }, { timeout: HeardWithinMillis, interval: 5 })
+        for (const call of failures()) {
+          expect(call.level).to.eq('error')
+          expect(call.story).to.deep.equal({ call: 'subscribe' })
+        }
+        for (const unsubscribe of [...unsubscribes, watch.unsubscribe]) { unsubscribe() }
       },
     },
     push_ends_on_unsubscribe: {
@@ -2207,6 +2263,7 @@ export const perUser = (vaultDBFor: (userId: string) => VaultDBVerbs): VaultDBVe
     updateBundle:   (bundle, expected) => as(bundle).updateBundle(bundle, expected),
     readBox:        (scope, boxlabel) => as(scope).readBox(scope, boxlabel),
     listBoxes:      (scope) => as(scope).listBoxes(scope),
+    listBoxRecords: (scope) => as(scope).listBoxRecords(scope),
     updateBox:      (scope, lockbox, expected) => as(scope).updateBox(scope, lockbox, expected),
     eraseBox:       (scope, boxlabel, expected) => as(scope).eraseBox(scope, boxlabel, expected),
     eraseVault:     (scope, expected) => as(scope).eraseVault(scope, expected),

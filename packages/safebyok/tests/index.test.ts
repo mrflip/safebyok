@@ -12,7 +12,7 @@ describe("the package's entry point", () => {
       'Ciphered', 'EpochMillis', 'FarFuture', 'FarPast', 'ForcePassphraseReentryHours', 'ForeverMillis', 'Lockbox', 'LockboxSummary', 'MaxLockboxes', 'MaxReentryHours', 'MaxUnlocks', 'MaxWhisperBytes', 'MinuteMillis', 'PasskeyEnvelope', 'PasskeySaltBytes', 'PassphraseEnvelope', 'PublicBag', 'UnlockEnvelope', 'UnlockMethodVals', 'VaultBundle', 'VaultScope', 'Whisper', 'wallClock',
       'AnyTextValidators', 'DefaultValidators', 'Label', 'LabelPattern', 'MaxLabelChars', 'MaxUserIdChars', 'NameFloor', 'NameFloorBytes', 'UserId', 'UserIdPattern', 'checkValidators',
       'VaultError', 'VaultErrorFamilyForKind', 'VaultErrorFamilyVals', 'VaultErrorKindVals', 'isVaultCondition', 'isVaultError',
-      'VaultDB', 'Ckeys', 'Sanitizer', 'localVaultDB', 'memoryDeviceDB',
+      'VaultDB', 'Ckeys', 'Expectations', 'Refusals', 'Sanitizer', 'localVaultDB', 'memoryDeviceDB',
       'domStore', 'memoryStore',
       'stableJsonify',
     ])
@@ -30,6 +30,11 @@ describe("the package's entry point", () => {
 
   it("exports the sanitizer an adapter throws through in place of a foreign error, as one namespace", () => {
     expect(Object.keys(safebyok.Sanitizer)).to.have.members(['refusalFor'])
+  })
+
+  it("exports the refusals an adapter throws, and the comparisons a key-value adapter makes, each as one namespace", () => {
+    expect(Object.keys(safebyok.Refusals)).to.have.members(['StorageTroubleMessage', 'StaleWriteVals', 'storageUnavailable', 'staleWrite', 'notPermitted', 'vaultFull'])
+    expect(Object.keys(safebyok.Expectations)).to.have.members(['bundleMeets', 'vaultMeets', 'vaultIdMeets', 'lockboxMeets'])
   })
 })
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { domStore, memoryStore } from '../src/string-store'
 import { VaultError } from '../src/errors'
 
@@ -71,5 +71,25 @@ describe("domStore", () => {
     dbStore.erase('greeting')
     expect(webStorage.getItem('safebyok-demo:db:greeting')).to.be.null
     expect(deviceStore.ckeys()).to.deep.equal(['other'])
+  })
+})
+
+describe("the stores' bell", () => {
+  it("rings every other listener, and lands the write, when one throws: what it threw goes to the platform's reportError", () => {
+    const reported: unknown[] = []
+    vi.stubGlobal('reportError', (err: unknown) => { reported.push(err) })
+    try {
+      const store = memoryStore()
+      const thrown = new Error('a listener that throws')
+      const heard: string[] = []
+      store.subscribe(() => { heard.push('one'); throw thrown })
+      store.subscribe(() => { heard.push('two') })
+      expect(() => { store.write('greeting', 'hi') }).to.not.throw()
+      expect(store.read('greeting')).to.eq('hi')
+      expect(heard).to.deep.equal(['one', 'two'])
+      expect(reported).to.deep.equal([thrown])
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })

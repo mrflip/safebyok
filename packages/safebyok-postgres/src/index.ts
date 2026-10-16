@@ -5,5 +5,5 @@
  * VaultDB over them, through whatever driver you already use. It brings no driver of its own.
  */
 export { postgresVaultDB } from './postgres-vault-db'
-export type { PostgresClient, PostgresListen, PostgresUnlisten, PostgresVaultDB, PostgresVaultDBOpts } from './postgres-vault-db'
+export type { PostgresClient, PostgresListen, PostgresUnlisten, PostgresVaultDBOpts } from './postgres-vault-db'
 export { VaultChangeChannel, VaultNotifySql, VaultTablesSql } from './vault-tables'

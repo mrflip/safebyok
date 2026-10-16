@@ -92,3 +92,6 @@ const dropRejection = async (pending: unknown) => {
     // see tell()
   }
 }
+
+/** A thrown value, for a logger's `err`: an Error as it is, anything else -- which may be anything at all -- as null. */
+export const asError = (thrown: unknown): Error | null => (thrown instanceof Error ? thrown : null)

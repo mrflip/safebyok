@@ -21,18 +21,18 @@ const browsersOverPGlite: TH.MakeVaultDBDevices = async (turnstile) => {
   return ({ maxLockboxes }) => {
     const client = TH.throughTurnstile(turnstile, db, ['query', 'listen'])
     const schema = TH.schemaOver(db, ({ userId }) => postgresVaultDB({ client, userId, listen: (channel, onNotify) => client.listen(channel, onNotify), maxLockboxes }))
-    return TH.perUser((userId) => graphqlVaultDB(TH.urqlClientFor(schema, userId), { maxLockboxes }))
+    return TH.perUser((userId) => graphqlVaultDB({ client: TH.urqlClientFor(schema, userId), maxLockboxes }))
   }
 }
 
-TH.describeVaultDB('graphqlVaultDB, through vaultResolvers to postgresVaultDB over PGlite', async () => {
+TH.describeVaultDB('graphqlVaultDB, through vaultResolvers to postgresVaultDB over PGlite', async (vaultDBOpts) => {
   const schema = TH.schemaOver(await TH.emptyDatabase())
-  return TH.perUser((userId) => TH.browserFor(schema, userId))
+  return TH.perUser((userId) => TH.browserFor(schema, userId, vaultDBOpts))
 }, {
   makeCappedVaultDB: async (maxLockboxes) => {
     const db = await TH.emptyDatabase()
     const schema = TH.schemaOver(db, ({ userId }) => postgresVaultDB({ client: db, userId, maxLockboxes }))
-    return TH.perUser((userId) => graphqlVaultDB(TH.urqlClientFor(schema, userId), { maxLockboxes }))
+    return TH.perUser((userId) => graphqlVaultDB({ client: TH.urqlClientFor(schema, userId), maxLockboxes }))
   },
   makeVaultDBFor: async () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
@@ -70,28 +70,28 @@ describe("graphqlVaultDB, its client", () => {
 
   for (const [client, blurb] of BadClients) {
     it(`refuses ${blurb}, with kind bad_option`, () => {
-      expect(() => graphqlVaultDB(client as unknown as GraphqlVaultClient)).to.throw(VaultError).with.property('kind', 'bad_option')
+      expect(() => graphqlVaultDB({ client: client as unknown as GraphqlVaultClient })).to.throw(VaultError).with.property('kind', 'bad_option')
     })
   }
 
-  it("declares a mebibyte to a record, no limit to a vault's bytes, and 1000 lockboxes to a vault", () => {
-    const vaultDB = graphqlVaultDB(new Client({ url: 'https://app.example.test/api/graphql', exchanges: [fetchExchange] }))
+  it("declares a mebibyte to a record, and no limit to a vault's bytes or its lockboxes", () => {
+    const vaultDB = graphqlVaultDB({ client: new Client({ url: 'https://app.example.test/api/graphql', exchanges: [fetchExchange] }) })
     expect(vaultDB.maxRecordBytes).to.eq(1024 * 1024)
     expect(vaultDB.maxVaultBytes).to.eq(Infinity)
-    expect(vaultDB.maxLockboxes).to.eq(1000)
+    expect(vaultDB.maxLockboxes).to.eq(Infinity)
   })
 
   it("declares by default the lockbox limit the Postgres VaultDB holds by default", () => {
     const client = new Client({ url: 'https://app.example.test/api/graphql', exchanges: [fetchExchange] })
     const server = postgresVaultDB({ client: { query: offline }, userId: 'u1' })
-    expect(graphqlVaultDB(client).maxLockboxes).to.eq(server.maxLockboxes)
+    expect(graphqlVaultDB({ client }).maxLockboxes).to.eq(server.maxLockboxes)
   })
 
   it("declares the maxLockboxes it is given, Infinity among them, as the README's example gives it", () => {
     const client = new Client({ url: 'https://app.example.test/api/graphql', exchanges: [fetchExchange] })
-    expect(graphqlVaultDB(client, { maxLockboxes: 250 }).maxLockboxes).to.eq(250)
-    expect(graphqlVaultDB(client, { maxLockboxes: Infinity }).maxLockboxes).to.eq(Infinity)
-    expect(graphqlVaultDB(client, {}).maxLockboxes).to.eq(1000)
+    expect(graphqlVaultDB({ client, maxLockboxes: 250 }).maxLockboxes).to.eq(250)
+    expect(graphqlVaultDB({ client, maxLockboxes: Infinity }).maxLockboxes).to.eq(Infinity)
+    expect(graphqlVaultDB({ client }).maxLockboxes).to.eq(Infinity)
   })
 
   const BadLockboxLimits = [
@@ -105,7 +105,7 @@ describe("graphqlVaultDB, its client", () => {
   for (const [maxLockboxes, blurb] of BadLockboxLimits) {
     it(`refuses ${blurb}, with kind bad_option`, () => {
       const client = new Client({ url: 'https://app.example.test/api/graphql', exchanges: [fetchExchange] })
-      expect(() => graphqlVaultDB(client, { maxLockboxes } as unknown as GraphqlVaultDBOpts)).to.throw(VaultError).with.property('kind', 'bad_option')
+      expect(() => graphqlVaultDB({ client, maxLockboxes } as unknown as GraphqlVaultDBOpts)).to.throw(VaultError).with.property('kind', 'bad_option')
     })
   }
 })
@@ -115,7 +115,7 @@ describe("graphqlVaultDB, a server's lockbox limit", () => {
     const db = await TH.emptyDatabase()
     const schema = TH.schemaOver(db, ({ userId }) => postgresVaultDB({ client: db, userId, maxLockboxes: 1 }))
     // A browser declaring more than its server holds: the server holds the line.
-    const vaultDB = graphqlVaultDB(TH.urqlClientFor(schema, 'u1'), { maxLockboxes: Infinity })
+    const vaultDB = graphqlVaultDB({ client: TH.urqlClientFor(schema, 'u1'), maxLockboxes: Infinity })
     await vaultDB.createBundle(TH.bundleOf('u1'))
     await vaultDB.updateBox(u1, TH.boxOf('openai', 'sk-fake-one'), { vault_id: 'vault-id-u1', revision_id: null, vault_key_epoch: 1 })
     const refusal = await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('secret_project_x', 'sk-fake-two'), { vault_id: 'vault-id-u1', revision_id: null, vault_key_epoch: 1 }), 'vault_full')
@@ -128,7 +128,7 @@ describe("graphqlVaultDB, a server's lockbox limit", () => {
 
   it("has a vault opened over it refuse a maxLockboxes above what it declares", async () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
-    const vaultDB = graphqlVaultDB(TH.urqlClientFor(schema, 'u1'), { maxLockboxes: 3 })
+    const vaultDB = graphqlVaultDB({ client: TH.urqlClientFor(schema, 'u1'), maxLockboxes: 3 })
     const refusal = await TH.expectRefusal(openVault({
       applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, maxLockboxes: 4,
     }), 'bad_option')
@@ -214,14 +214,14 @@ describe("graphqlVaultDB, its refusals", () => {
 
   it("refuses with storage_unavailable, urql's error its cause, when the server does not serve the vault's schema", async () => {
     const schema = buildSchema('type Query { hello: String }')
-    const vaultDB = graphqlVaultDB(new Client({ url: 'https://app.example.test/api/graphql', exchanges: [executeExchange({ schema })] }))
+    const vaultDB = graphqlVaultDB({ client: new Client({ url: 'https://app.example.test/api/graphql', exchanges: [executeExchange({ schema })] }) })
     const refusal = await TH.refusalOf(vaultDB.readBundle(u1))
     expect(refusal.kind).to.eq('storage_unavailable')
     expect(refusal.cause).to.be.instanceOf(CombinedError)
   })
 
   it("refuses with storage_unavailable when the network fails", async () => {
-    const vaultDB = graphqlVaultDB(new Client({ url: 'https://app.example.test/api/graphql', exchanges: [fetchExchange], fetch: offline }))
+    const vaultDB = graphqlVaultDB({ client: new Client({ url: 'https://app.example.test/api/graphql', exchanges: [fetchExchange], fetch: offline }) })
     const refusal = await TH.refusalOf(vaultDB.updateBox(u1, TH.boxOf('openai', 'r1'), { vault_id: 'vault-id-u1', revision_id: null, vault_key_epoch: 1 }))
     expect(refusal.kind).to.eq('storage_unavailable')
   })
@@ -229,14 +229,14 @@ describe("graphqlVaultDB, its refusals", () => {
   it("refuses with storage_unavailable an answer holding neither data nor an error", async () => {
     const answered = { toPromise: () => Promise.resolve({ data: undefined }) }
     const mute = { query: () => answered, mutation: () => answered, subscription: () => answered }
-    const refusal = await TH.refusalOf(graphqlVaultDB(mute as unknown as GraphqlVaultClient).readBundle(u1))
+    const refusal = await TH.refusalOf(graphqlVaultDB({ client: mute as unknown as GraphqlVaultClient }).readBundle(u1))
     expect(refusal.kind).to.eq('storage_unavailable')
   })
 
   it("passes over a GraphQL error whose kind is not a VaultError's", async () => {
     const schema = buildSchema('type Query { safebyokReadBundle(scope: SafebyokVaultScopeInput!): Boolean } input SafebyokVaultScopeInput { applabel: String!, user_id: String!, vaultlabel: String! }')
     const rootValue = { safebyokReadBundle: () => Promise.reject(Object.assign(new Error('no such kind'), { extensions: { kind: 'made_up' } })) }
-    const vaultDB = graphqlVaultDB(new Client({ url: 'https://app.example.test/api/graphql', exchanges: [executeExchange({ schema, rootValue })] }))
+    const vaultDB = graphqlVaultDB({ client: new Client({ url: 'https://app.example.test/api/graphql', exchanges: [executeExchange({ schema, rootValue })] }) })
     const refusal = await TH.refusalOf(vaultDB.readBundle(u1))
     expect(refusal.kind).to.eq('storage_unavailable')
   })
@@ -266,18 +266,21 @@ describe("graphqlVaultDB, hearing other writes", () => {
     unsubscribe()
   })
 
-  it("hears nothing, and throws nothing, when the server refuses the subscription", async () => {
+  it("calls onChange once, warns once, and throws nothing, when the server refuses the subscription: the vault reads again and meets the refusal", async () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
     const { heard, onChange } = TH.changeCounter()
-    const unsubscribe = TH.browserFor(schema, 'u1').subscribe(TH.scopeOf('u2'), onChange)
+    const spy = TH.spyLogger()
+    const unsubscribe = TH.browserFor(schema, 'u1', { logger: spy.logger }).subscribe(TH.scopeOf('u2'), onChange)
     await TH.browserFor(schema, 'u2').createBundle(TH.bundleOf('u2'))
     await TH.aWhile()
-    expect(heard.count).to.eq(0)
+    expect(heard.count).to.eq(1)
+    expect(spy.calls.map((call) => [call.level, call.story])).to.deep.equal([['warn', { call: 'subscribe' }]])
+    expect(spy.calls[0]?.message).to.match(/GraphQL subscription failed/)
     unsubscribe()
   })
 
   it("hears nothing through a Client that has no way to send subscriptions", async () => {
-    const vaultDB = graphqlVaultDB(new Client({ url: 'https://app.example.test/api/graphql', exchanges: [fetchExchange], fetch: offline }))
+    const vaultDB = graphqlVaultDB({ client: new Client({ url: 'https://app.example.test/api/graphql', exchanges: [fetchExchange], fetch: offline }) })
     const { heard, onChange } = TH.changeCounter()
     const unsubscribe = vaultDB.subscribe(u1, onChange)
     await TH.aWhile()

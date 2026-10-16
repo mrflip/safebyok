@@ -6,7 +6,7 @@ safebyok's storage over [GraphQL](https://graphql.org), in two halves:
   **`vaultResolvers`**, its resolvers, each root field one verb of a VaultDB made per request for
   the signed-in user -- [`safebyok-postgres`](../safebyok-postgres)'s, or one of your own. They
   drop into any GraphQL server beside your own schema.
-* **In the browser**, `safebyok-graphql`: **`graphqlVaultDB(client)`**, the VaultDB over your
+* **In the browser**, `safebyok-graphql`: **`graphqlVaultDB({ client })`**, the VaultDB over your
   app's [urql](https://commerce.nearform.com/open-source/urql/) Client, to hand `openVault`.
 
 Your server and your database hold ciphertext and a few public fields; neither ever sees a
@@ -74,7 +74,7 @@ import { Client, fetchExchange } from '@urql/core'
 import { graphqlVaultDB } from 'safebyok-graphql'
 
 const client = new Client({ url: '/api/graphql', exchanges: [fetchExchange], fetchSubscriptions: true })
-const vault = await openVault({ ...browserOpts(), applabel: 'acme', userId, vaultlabel: 'main', vaultDB: graphqlVaultDB(client) })
+const vault = await openVault({ ...browserOpts(), applabel: 'acme', userId, vaultlabel: 'main', vaultDB: graphqlVaultDB({ client }) })
 ```
 
 Your app's own Client serves, cache exchange and all: every query the vault sends is
@@ -143,7 +143,7 @@ comparison lets a device still holding a replaced vaultKey seal a whisper under 
 
 ## The browser half
 
-`graphqlVaultDB(client)` is a VaultDB, each verb one operation through `client`.
+`graphqlVaultDB({ client })` is a VaultDB, each verb one operation through `client`.
 
 * **A refusal crosses**: the server's VaultError comes back as the same VaultError, kind and
   message. Anything else -- the network down, a server not serving this schema -- refuses with
@@ -154,9 +154,9 @@ comparison lets a device still holding a replaced vaultKey seal a whisper under 
   record has its shape and each name is above the floor and within its storage's limits (the
   VaultDB verbs' own checks, `VAULTDB.md`, *Names*); never a label grammar, which is each browser
   vault's own `validators`, nor what a lockbox's public bag holds.
-* **It declares the lockbox limit your server holds a vault to**: 1000, the Postgres VaultDB's
-  own unless told otherwise, or the `maxLockboxes` you pass (`graphqlVaultDB(client, {
-  maxLockboxes: 250 })`; `Infinity` for a server that sets none). Pass the number your server's
+* **It declares the lockbox limit your server holds a vault to**: none (`Infinity`), as the
+  Postgres VaultDB sets none unless told, or the `maxLockboxes` you pass
+  (`graphqlVaultDB({ client, maxLockboxes: 250 })`). Pass the number your server's
   VaultDB enforces, so `openVault` refuses a vault asking for more up front; the server refuses a
   new lockbox past its own with kind `vault_full` either way, and the refusal crosses.
 * **A subscription that fails** (the server refusing it, the socket dropping) is not retried, and

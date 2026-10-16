@@ -22,13 +22,13 @@ const devicesOverPGlite: TH.MakeVaultDBDevices = async (turnstile) => {
   }
 }
 
-TH.describeVaultDB('postgresVaultDB over PGlite', async () => {
+TH.describeVaultDB('postgresVaultDB over PGlite', async (vaultDBOpts) => {
   const db = await TH.emptyDatabase()
-  return TH.perUser((userId) => TH.requestFor(db, userId))
+  return TH.perUser((userId) => TH.requestFor(db, userId, vaultDBOpts))
 }, {
   makeCappedVaultDB: async (maxLockboxes) => {
     const db = await TH.emptyDatabase()
-    return TH.perUser((userId) => postgresVaultDB({ client: db, userId, maxLockboxes }))
+    return TH.perUser((userId) => postgresVaultDB({ client: db, userId, maxLockboxes, listen: TH.listenOn(db) }))
   },
   makeVaultDBFor: async () => {
     const db = await TH.emptyDatabase()
@@ -59,7 +59,7 @@ describe("postgresVaultDB, its options", () => {
     [{ client: { query: () => Promise.resolve({ rows: [] }) }, userId: 'u1', maxLockboxes: 0 },        'a maxLockboxes of none'],
     [{ client: { query: () => Promise.resolve({ rows: [] }) }, userId: 'u1', maxLockboxes: 2.5 },      'a maxLockboxes that is no whole number'],
     [{ client: { query: () => Promise.resolve({ rows: [] }) }, userId: 'u1', maxLockboxes: '1000' },   'a maxLockboxes that is text'],
-    [{ client: { query: () => Promise.resolve({ rows: [] }) }, userId: 'u1', maxLockboxes: Infinity }, 'a maxLockboxes of Infinity, which Postgres cannot take as a bigint'],
+    [{ client: { query: () => Promise.resolve({ rows: [] }) }, userId: 'u1', maxLockboxes: -Infinity }, 'a maxLockboxes of -Infinity'],
     [{ client: { query: () => Promise.resolve({ rows: [] }) }, userId: 'u1', maxLockboxes: 2 ** 53 },  'a maxLockboxes past the safe integers'],
   ] as const
 
@@ -75,17 +75,27 @@ describe("postgresVaultDB, its options", () => {
     expect(await vaultDB.readBundle(u1)).to.be.null
   })
 
-  it("declares a mebibyte to a record, no limit to a vault's bytes, and 1000 lockboxes to a vault", () => {
+  it("declares a mebibyte to a record, and no limit to a vault's bytes or its lockboxes", () => {
     const vaultDB = postgresVaultDB({ client: TH.failingClient(new Error('unused')), userId: 'u1' })
     expect(vaultDB.maxRecordBytes).to.eq(1024 * 1024)
     expect(vaultDB.maxVaultBytes).to.eq(Infinity)
-    expect(vaultDB.maxLockboxes).to.eq(1000)
+    expect(vaultDB.maxLockboxes).to.eq(Infinity)
   })
 
   it("declares the maxLockboxes it is given, as the README's examples give it", () => {
     const client = TH.failingClient(new Error('unused'))
     expect(postgresVaultDB({ client, userId: 'u1', maxLockboxes: 250 }).maxLockboxes).to.eq(250)
     expect(postgresVaultDB({ client, userId: 'u1', maxLockboxes: 1_200_300_400_500_600 }).maxLockboxes).to.eq(1_200_300_400_500_600)
+    expect(postgresVaultDB({ client, userId: 'u1', maxLockboxes: Infinity }).maxLockboxes).to.eq(Infinity)
+  })
+
+  it("holds a vault to no count with no limit, landing every new lockbox", async () => {
+    const vaultDB = postgresVaultDB({ client: await TH.emptyDatabase(), userId: 'u1' })
+    await vaultDB.createBundle(TH.bundleOf('u1'))
+    for (const boxlabel of ['openai', 'anthropic', 'mistral']) {
+      await vaultDB.updateBox(u1, TH.boxOf(boxlabel, boxlabel), noBoxYet)
+    }
+    expect(await vaultDB.listBoxes(u1)).to.have.lengthOf(3)
   })
 })
 
@@ -538,7 +548,9 @@ describe("postgresVaultDB, listBoxRecords", () => {
     for (const vaultlabel of ['main^x', 'tab\there', 'n'.repeat(641)]) {
       const refusal = await TH.refusalOf(vaultDB.listBoxRecords({ ...u1, vaultlabel }))
       expect(refusal.kind).to.eq('bad_label')
-      expect(refusal.message).to.include('640 bytes')
+      // Each refusal names the name and the rule it broke, as every verb's does, quoting none of it.
+      expect(refusal.message).to.include('vaultlabel')
+      expect(refusal.message).to.not.include(vaultlabel)
     }
     expect(await vaultDB.listBoxRecords({ ...u1, vaultlabel: 'n'.repeat(640) })).to.deep.equal([])
     expect(spy.sent).to.have.lengthOf(1)

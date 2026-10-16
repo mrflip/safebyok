@@ -9,7 +9,7 @@ const bundle = TH.bundleOf('u1')
 /** An OutageVaultDB over a fresh in-memory adapter, with its switch. */
 const downOver = () => {
   const outage = makeOutage()
-  const vaultDB = new OutageVaultDB(localVaultDB(memoryStore()), outage)
+  const vaultDB = new OutageVaultDB(localVaultDB({ store: memoryStore() }), outage)
   return { outage, vaultDB }
 }
 
@@ -38,12 +38,12 @@ describe("makeOutage", () => {
 })
 
 // While the switch is up, it is an adapter like any other, and owes the suite every adapter owes.
-TH.describeVaultDB('OutageVaultDB, while up', () => new OutageVaultDB(localVaultDB(memoryStore()), makeOutage()))
+TH.describeVaultDB('OutageVaultDB, while up', () => new OutageVaultDB(localVaultDB({ store: memoryStore() }), makeOutage()))
 
 describe("OutageVaultDB, while up", () => {
   it("lists a lockbox its inner adapter finds damaged as damaged, and the sound ones as they are", async () => {
     const store = memoryStore()
-    const vaultDB = new OutageVaultDB(localVaultDB(store), makeOutage())
+    const vaultDB = new OutageVaultDB(localVaultDB({ store }), makeOutage())
     await vaultDB.createBundle(bundle)
     await vaultDB.updateBox(scope, TH.boxOf('openai', 'two'), TH.noBoxYet)
     store.write(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), '{"not": json')
@@ -59,7 +59,7 @@ describe("OutageVaultDB, while up", () => {
 const damagedOver = async () => {
   const store = memoryStore()
   const outage = makeOutage()
-  const vaultDB = new OutageVaultDB(localVaultDB(store), outage)
+  const vaultDB = new OutageVaultDB(localVaultDB({ store }), outage)
   await vaultDB.createBundle(bundle)
   await vaultDB.updateBox(scope, TH.boxOf('openai', 'two'), TH.noBoxYet)
   store.write(Ckeys.bundle(scope), JSON.stringify({ ...bundle, unlock_epoch: 'one' }))
@@ -121,7 +121,7 @@ describe("OutageVaultDB, while down", () => {
   })
 
   it("states its inner adapter's limits as its own", () => {
-    const inner = localVaultDB(memoryStore())
+    const inner = localVaultDB({ store: memoryStore() })
     const vaultDB = new OutageVaultDB(inner, makeOutage())
     expect(vaultDB.maxRecordBytes).to.eq(inner.maxRecordBytes)
     expect(vaultDB.maxVaultBytes).to.eq(inner.maxVaultBytes)

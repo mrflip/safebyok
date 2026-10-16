@@ -4,8 +4,10 @@ import * as Ckeys from './ckeys'
 import { keepingLocks, lockGenerationOf, lockedMeanwhile, type DeviceDB } from './device-db'
 import { parseDbName, type IdbOpts } from './idb-opts'
 import { VaultError } from './errors'
+import * as ChangeBell from './change-bell'
 
 export type { IdbOpts } from './idb-opts'
+export * as ChangeBell from './change-bell'
 
 /**
  * The device store over this browser's IndexedDB (through `idb-keyval`), as an entry point of its
@@ -15,7 +17,10 @@ export type { IdbOpts } from './idb-opts'
  * `safebyok-indexeddb`.
  *
  * This entry point touches IndexedDB only when the store is used, so importing it is safe
- * anywhere; the store itself needs a browser (or anything else with `indexedDB`).
+ * anywhere; the store itself needs a browser (or anything else with `indexedDB`). It reaches
+ * IndexedDB through `idb-keyval`, a regular dependency of about 600 bytes that only this entry
+ * point loads. Beside the device store, it exports the change bell its writes ring,
+ * {@link ChangeBell}, which `safebyok-indexeddb` rings too.
  */
 
 // One UseStore per dbName, shared by stores and inspectors alike: idb-keyval opens the
@@ -29,31 +34,9 @@ const shelfStore = (dbName: string): UseStore => {
   return fresh
 }
 
-// Change bells, one per dbName: local listeners hear this tab's writes directly, and a
-// BroadcastChannel carries them to other tabs (the channel never echoes to its own sender).
-const bells = new Map<string, Set<() => void>>()
-const channels = new Map<string, BroadcastChannel>()
-const bellCkey = (dbName: string) => `safebyok-idb:${dbName}:device_db`
-
-const ringBell = (dbName: string) => {
-  bells.get(dbName)?.forEach((listener) => { listener() })
-  channels.get(dbName)?.postMessage('changed')
-}
-
-const onBell = (dbName: string, listener: () => void): (() => void) => {
-  let ringers = bells.get(dbName)
-  if (ringers === undefined) {
-    ringers = new Set()
-    bells.set(dbName, ringers)
-    if (typeof BroadcastChannel !== 'undefined') {
-      const channel = new BroadcastChannel(bellCkey(dbName))
-      channel.addEventListener('message', () => { bells.get(dbName)?.forEach((ring) => { ring() }) })
-      channels.set(dbName, channel)
-    }
-  }
-  ringers.add(listener)
-  return () => { ringers.delete(listener) }
-}
+// The device shelf's change bell: every write rings it, here and in every other tab. Its name is
+// shared with every other tab, and with any other version of this package running in one.
+const bellnameOf = (dbName: string) => `safebyok-idb:${dbName}:device_db`
 
 /**
  * DeviceDB over this browser's IndexedDB: the real device storage. IndexedDB keeps the
@@ -76,7 +59,7 @@ const onBell = (dbName: string, listener: () => void): (() => void) => {
 export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
   const dbName = parseDbName(opts, 'idbDeviceDB')
   const shelf = () => shelfStore(dbName)
-  const ring = () => { ringBell(dbName) }
+  const ring = () => { ChangeBell.ring(bellnameOf(dbName)) }
 
   // A row under any ckey but an unlock's or a mark's is one an earlier version filed
   // (`["unlock","acme","u1","main"]` before the joined ckeys), which nothing else would ever
@@ -188,12 +171,12 @@ export const inspectIdbDeviceDB = (opts?: IdbOpts) => {
     /** Calls `listener` after any write to the shelf, this tab or another; returns the unsubscribe. */
     subscribe: (listener: () => void): (() => void) => {
       if (typeof listener !== 'function') { throw new VaultError('bad_option', 'subscribe needs a listener function to call after each write.') }
-      return onBell(dbName, listener)
+      return ChangeBell.listen(bellnameOf(dbName), listener)
     },
     /** Remove every row on the shelf: every remembered unlock and device mark in this database. */
     wipe: async (): Promise<void> => {
       await clear(shelfStore(dbName))
-      ringBell(dbName)
+      ChangeBell.ring(bellnameOf(dbName))
     },
   }
 }

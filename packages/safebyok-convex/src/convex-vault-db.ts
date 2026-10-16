@@ -2,7 +2,7 @@ import { getFunctionName } from 'convex/server'
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server'
 import { ConvexError } from 'convex/values'
 import { Sanitizer, VaultDB, VaultError } from 'safebyok'
-import type { BundleExpectation, EraseExpectation, Lockbox, LockboxExpectation, StoredLockbox, VaultBundle, VaultScope } from 'safebyok'
+import type { BundleExpectation, VaultDBOpts, EraseExpectation, Lockbox, LockboxExpectation, StoredLockbox, VaultBundle, VaultScope } from 'safebyok'
 import { MaxVaultLockboxes } from './component/tallies'
 import { isSafebyokErrorData } from './refusals'
 import type { SafebyokApi } from './server'
@@ -39,6 +39,17 @@ export type ConvexReactWatchingClient = ConvexCalls & {
  */
 export type ConvexVaultClient = ConvexWatchingClient | ConvexReactWatchingClient
 
+/** What {@link convexVaultDB} is made with. */
+export type ConvexVaultDBOpts = VaultDBOpts & {
+  /** Your app's Convex client: a `ConvexClient`, or your `ConvexReactClient`. */
+  client: ConvexVaultClient
+  /**
+   * The safebyok functions as your clients reference them: `api.safebyok`, from your
+   * `convex/_generated/api`, when you re-export them from `convex/safebyok.ts`.
+   */
+  api: SafebyokApi
+}
+
 /**
  * safebyok's storage over Convex: a VaultDB whose every verb is one call to the safebyok functions
  * your app serves (see `safebyok-convex/server`), through the Convex client your app already has.
@@ -59,26 +70,26 @@ export type ConvexVaultClient = ConvexWatchingClient | ConvexReactWatchingClient
  *   quote the call's arguments: your deployment's logs have it, or, for trouble before the call
  *   left, the browser console, where the Convex client reports its connection.
  *
- * @param client - Your app's Convex client: a `ConvexClient`, or your `ConvexReactClient`.
- * @param api - The safebyok functions as your clients reference them: `api.safebyok`, from your
- *   `convex/_generated/api`, when you re-export them from `convex/safebyok.ts`.
+ * @param opts - Your app's Convex `client`, the safebyok functions as its `api`, and optionally a
+ *   `logger`, which otherwise is the vault's: it hears a ConvexClient watch that fails.
  * @returns The VaultDB, holding at most 1 MiB in one record, Convex's document limit, and 8 MiB
  *   in one vault, half of what one Convex function may read (erasing a vault reads it twice), in
  *   at most 8,000 lockboxes, the component's own limit.
  *
  * @example
  *   import { api } from '../convex/_generated/api'
- *   const vaultDB = convexVaultDB(convex, api.safebyok)
+ *   const vaultDB = convexVaultDB({ client: convex, api: api.safebyok })
  *   const vault = await openVault({ applabel: 'acme', userId, vaultlabel: 'main', vaultDB, ...browserOpts() })
  */
-export const convexVaultDB = (client: ConvexVaultClient, api: SafebyokApi): VaultDB => {
+export const convexVaultDB = (opts: ConvexVaultDBOpts): VaultDB => {
+  const { client, api } = (opts as Partial<ConvexVaultDBOpts> | null | undefined) ?? {}
   if (! isConvexClient(client)) {
     throw new VaultError('bad_option', 'convexVaultDB needs a Convex client: a ConvexClient from convex/browser, or the ConvexReactClient your app already has.')
   }
   if (! isSafebyokApi(api)) {
     throw new VaultError('bad_option', 'convexVaultDB needs the safebyok functions your app serves, as `api.safebyok` from your convex/_generated/api: the module, not the whole `api`.')
   }
-  return new ConvexVaultDB(client, api)
+  return new ConvexVaultDB({ ...opts, client, api })
 }
 
 /** Each verb one call to the function of the same purpose; the base class validates both ways. */
@@ -95,10 +106,10 @@ class ConvexVaultDB extends VaultDB {
   private readonly client: ConvexVaultClient
   private readonly api:    SafebyokApi
 
-  constructor(client: ConvexVaultClient, api: SafebyokApi) {
-    super()
-    this.client = client
-    this.api    = api
+  constructor(opts: ConvexVaultDBOpts) {
+    super(opts)
+    this.client = opts.client
+    this.api    = opts.api
   }
 
   protected doReadBundle(scope: VaultScope): Promise<unknown> {
@@ -139,28 +150,23 @@ class ConvexVaultDB extends VaultDB {
   // before its first read, so the first result may already hold a write that read missed; and a
   // ConvexReactClient already watching this vault delivers no first result at all, only changes.
   // A refresh that finds nothing new costs two queries and no render.
+  //
+  // Convex counts a query's watchers, and each of its unsubscribes counts down again however often
+  // it is called: a second call would end another watch of the vault (the app's own, or another
+  // vault handle's) on the same client. The base class's subscribe calls an unsubscribe once.
   protected override doSubscribe(scope: VaultScope, onChange: () => void): () => void {
-    const unsubscribe = this.watch(scope, onChange)
-    // Convex counts a query's watchers, and each of its unsubscribes counts down again however
-    // often it is called: a second call would end another watch of the vault (the app's own, or
-    // another vault handle's) on the same client. So only the first call reaches Convex.
-    let subscribed = true
-    return () => {
-      if (! subscribed) { return }
-      subscribed = false
-      unsubscribe()
-    }
-  }
-
-  private watch(scope: VaultScope, onChange: () => void): () => void {
     const args = { scope }
     if ('watchQuery' in this.client) {
       return this.client.watchQuery(this.api.watchVault, args).onUpdate(() => { onChange() })
     }
     // A failing watch has nobody to throw to: without this handler, ConvexClient throws it from
-    // inside its socket. It calls onChange instead, as a ConvexReactClient's watch does, so the
-    // vault looks again and meets the trouble itself: a sign-out locks it, anything else is logged.
-    return this.client.onUpdate(this.api.watchVault, args, () => { onChange() }, () => { onChange() })
+    // inside its socket. It is logged, once for a failing streak, and calls onChange, as a
+    // ConvexReactClient's watch does, so the vault looks again and meets the trouble itself: a
+    // sign-out locks it.
+    const trouble = this.watchTrouble("This vault's live Convex watch failed, so other devices' changes may not show until the vault next reads. The vault reads again now, and meets the trouble itself.")
+    const heard = () => { trouble.delivered(); onChange() }
+    const failed = (err: Error) => { trouble.failed(err); onChange() }
+    return this.client.onUpdate(this.api.watchVault, args, heard, failed)
   }
 }
 
@@ -183,7 +189,8 @@ const refusing = async <ValT>(call: () => Promise<ValT>): Promise<ValT> => {
     return await call()
   } catch (err) {
     if (err instanceof ConvexError && isSafebyokErrorData(err.data)) {
-      throw new VaultError(err.data.kind, err.data.message, { cause: err })
+      // Rebuilt by the sanitizer too: one rule, and nothing of Convex's error rides along.
+      throw Sanitizer.refusalFor(err, err.data.kind, err.data.message)
     }
     // On a dev deployment, Convex's own error -- its validator refusing the arguments, say --
     // quotes the call's arguments: scope, names, public bags and ciphertext. The sanitizer drops it.

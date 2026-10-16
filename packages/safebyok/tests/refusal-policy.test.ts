@@ -31,7 +31,7 @@ describe("RefusalPolicy.heed", () => {
   const scope = TH.scopeOf('u1')
 
   it("answers each verb as the VaultDB does, passing on every argument", async () => {
-    const vaultDB = localVaultDB(memoryStore())
+    const vaultDB = localVaultDB({ store: memoryStore() })
     const heeded = RefusalPolicy.heed(vaultDB, () => Promise.resolve())
     const readBundle = vi.spyOn(vaultDB, 'readBundle')
     const listBoxes = vi.spyOn(vaultDB, 'listBoxes')
@@ -56,7 +56,7 @@ describe("RefusalPolicy.heed", () => {
 
   for (const [verb, args] of VerbArgsCases) {
     it(`passes ${verb} every argument it is given`, async () => {
-      const vaultDB = localVaultDB(memoryStore())
+      const vaultDB = localVaultDB({ store: memoryStore() })
       const spied = vi.spyOn(vaultDB, verb).mockResolvedValue(undefined)
       const heeded = RefusalPolicy.heed(vaultDB, () => Promise.resolve())
       await (heeded[verb] as (...given: readonly unknown[]) => Promise<unknown>)(...args)
@@ -65,7 +65,7 @@ describe("RefusalPolicy.heed", () => {
   }
 
   it("hands a refusal to onRefusal, waits for it, then rejects with that very refusal", async () => {
-    const vaultDB = localVaultDB(memoryStore())
+    const vaultDB = localVaultDB({ store: memoryStore() })
     const refusal = signedOut()
     vi.spyOn(vaultDB, 'readBox').mockRejectedValueOnce(refusal)
     const heard: string[] = []
@@ -78,7 +78,7 @@ describe("RefusalPolicy.heed", () => {
   })
 
   it("hands on every VaultError, so the policy alone decides what each means", async () => {
-    const vaultDB = localVaultDB(memoryStore())
+    const vaultDB = localVaultDB({ store: memoryStore() })
     const onRefusal = vi.fn(() => Promise.resolve())
     const heeded = RefusalPolicy.heed(vaultDB, onRefusal)
     await TH.expectRefusal(heeded.updateBundle(TH.bundleOf('u1'), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'stale_write')
@@ -86,7 +86,7 @@ describe("RefusalPolicy.heed", () => {
   })
 
   it("hands on nothing that is not a VaultError, and rejects with it as it came", async () => {
-    const vaultDB = localVaultDB(memoryStore())
+    const vaultDB = localVaultDB({ store: memoryStore() })
     const odd = new Error('not a refusal')
     vi.spyOn(vaultDB, 'eraseVault').mockRejectedValueOnce(odd)
     const onRefusal = vi.fn(() => Promise.resolve())
@@ -96,7 +96,7 @@ describe("RefusalPolicy.heed", () => {
   })
 
   it("rejects with the refusal even when onRefusal throws", async () => {
-    const vaultDB = localVaultDB(memoryStore())
+    const vaultDB = localVaultDB({ store: memoryStore() })
     const refusal = signedOut()
     vi.spyOn(vaultDB, 'readBundle').mockRejectedValueOnce(refusal)
     const heeded = RefusalPolicy.heed(vaultDB, () => Promise.reject(new Error('the device store is broken')))
@@ -104,7 +104,7 @@ describe("RefusalPolicy.heed", () => {
   })
 
   it("passes subscribe through, its unsubscribe the VaultDB's own", () => {
-    const vaultDB = localVaultDB(memoryStore())
+    const vaultDB = localVaultDB({ store: memoryStore() })
     const unsubscribe = vi.fn()
     const subscribe = vi.spyOn(vaultDB, 'subscribe').mockReturnValue(unsubscribe)
     const onChange = vi.fn()
