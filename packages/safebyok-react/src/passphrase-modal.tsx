@@ -195,6 +195,9 @@ const UnlockForm = ({ vault, onDone, allowStartOver }: PassphraseModalProps) => 
       await vault.destroy()
       setStartingOver(false)
     } catch (err) {
+      // The vault the user agreed to erase was destroyed or made anew elsewhere: what stands now
+      // was never confirmed, so the question goes, to be asked afresh.
+      if (isVaultError(err, 'stale_write')) { setStartingOver(false) }
       meet(err)
     }
   }
