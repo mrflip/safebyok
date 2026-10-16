@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { checkValidators, eraseDamagedVault as eraseStoredDamagedVault, isVaultCondition, isVaultError, openVault, type OpenVaultOpts, type Vault, type VaultError, type VaultSnapshot, type VaultValidators } from 'safebyok'
-import { PassphraseModal } from './passphrase-modal'
+import { checkValidators, eraseDamagedVault as eraseStoredDamagedVault, isVaultCondition, isVaultError, openVault, parseLogger, type OpenVaultOpts, type Vault, type VaultError, type VaultLogger, type VaultSnapshot, type VaultValidators } from 'safebyok'
+import { PassphraseModal, phrasesRelativeTime } from './passphrase-modal'
 
 /**
  * What the provider hands down: the vault handle (null while opening, signed out, or when the
@@ -32,9 +32,10 @@ export type VaultContextShape = {
    * The user's lockboxes in it are gone for good, so ask first. Resolves when the reopen is under
    * way, and does nothing while `openError` is any other, or none. Rejects with storage's
    * refusal if the erase fails, such as `storage_unavailable`, leaving `openError` as it was; the
-   * `safebyok` package's `eraseDamagedVault` says which refusals to expect. Two of them mean
-   * storage no longer holds the damaged vault -- `bad_option`, it reads sound now, and `stale_write`,
-   * it was made anew -- so those open again as well, and still reject.
+   * `safebyok` package's `eraseDamagedVault` says which refusals to expect. One of them,
+   * `stale_write`, means the vault was made anew meanwhile, so that one opens again as well, and
+   * still rejects. Any other refusal opens nothing: `bad_option` among them, which is misuse, or
+   * a vault that reads sound now, which `retryOpen()` then opens.
    *
    * @example
    *   if (openError?.kind === 'damaged_bundle') {
@@ -51,7 +52,12 @@ export type VaultContextShape = {
    * on that same dialog, and each resolves null when the dialog goes without an unlock -- the
    * user signs out or switches, the vault reopens, or the provider unmounts.
    * A dialog the vault unlocks under, however that came about (an earlier, cancelled dialog's
-   * unlock finishing late, say), closes as unlocked, and the actions waiting on it run again.
+   * unlock finishing late, say), closes as unlocked, and the actions waiting on it run again; an
+   * action refused just as the vault unlocked runs again without a dialog at all. A dialog
+   * belongs to the vault the action ran against: an action whose refusal lands once that vault has
+   * gone (another user, a reopen) resolves null and opens no dialog over the next. A `lock()`
+   * landing between the unlock and the runs again is the user's word, and wins: those runs meet
+   * `vault_locked`, which reaches their callers.
    *
    * @example const whisper = await withUnlockedVault(() => vault.read('anthropic_api_key'))
    *          // whisper === null: the user dismissed the dialog
@@ -61,8 +67,8 @@ export type VaultContextShape = {
 
 const VaultContext = createContext<VaultContextShape | null>(null)
 
-/** One showing of the passphrase dialog: which one, and the actions waiting on its outcome. */
-type Asking = { round: number, waiters: ((unlocked: boolean) => void)[] }
+/** One showing of the passphrase dialog: which one, the vault it asks for, and the actions waiting on its outcome. */
+type Asking = { round: number, vault: Vault, waiters: ((unlocked: boolean) => void)[] }
 
 /** The vault handle and withUnlockedVault, from the nearest VaultProvider. */
 export const useVault = (): VaultContextShape => {
@@ -93,15 +99,35 @@ export const useVaultSnapshot = (): VaultSnapshot => {
 
 /**
  * Every openVault option, passed through as given (an option left out gets openVault's default),
- * except that `userId` may be null. In a browser, spread `browserOpts()` from `safebyok/browser`
- * for the `keyDeriver` and `deviceDB` openVault asks for. The vault reopens whenever an option
- * changes identity, so build each schema in `validators` once, at module level; the bag around
- * them may be built in render, as the provider watches each schema rather than the bag.
+ * except that `userId` may be null; and whether the dialog offers a forgetful user to start over.
+ * In a browser, spread `browserOpts()` from `safebyok/browser` for the `keyDeriver` and
+ * `deviceDB` openVault asks for. The vault reopens whenever an option changes identity, so build
+ * each schema in `validators` once, at module level; the bag around them may be built in render,
+ * as the provider watches each schema rather than the bag. A `logger` or `clock` that changes
+ * identity is warned of once, through the logger (the console when there is none).
  */
 export type VaultProviderProps = Omit<OpenVaultOpts, 'userId'> & {
   /** The signed-in user from the host's auth, or null when nobody is: then there is no vault. */
-  userId:   string | null
-  children: ReactNode
+  userId:          string | null
+  /**
+   * Whether the passphrase dialog offers a user who has forgotten the passphrase to erase the
+   * vault, on every device, and start a new one: `PassphraseModal`'s `allowStartOver`. Off by
+   * default.
+   */
+  allowStartOver?: boolean | undefined
+  children:        ReactNode
+}
+
+/**
+ * Says `message` through the host's logger, or the console when there is none. A logger that is
+ * no VaultLogger hears nothing: openVault refuses it, to the error boundary.
+ */
+const warnHost = (logger: VaultLogger | undefined, message: string, story: Record<string, unknown>) => {
+  try {
+    parseLogger(logger).warn(message, story)
+  } catch {
+    // openVault refuses the same logger, and the provider throws that to the error boundary.
+  }
 }
 
 /**
@@ -122,7 +148,7 @@ export type VaultProviderProps = Omit<OpenVaultOpts, 'userId'> & {
  *     <App />
  *   </VaultProvider>
  */
-export const VaultProvider = ({ userId, children, ...opts }: VaultProviderProps) => {
+export const VaultProvider = ({ userId, allowStartOver, children, ...opts }: VaultProviderProps) => {
   const { applabel, vaultlabel, vaultDB, deviceDB, forcePassphraseReentryHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger, validators, whenIdentityRevoked } = opts
   // The bag is taken apart below, so a misspelt field would be dropped unseen: refused here, as openVault refuses it.
   checkValidators(validators)
@@ -149,6 +175,28 @@ export const VaultProvider = ({ userId, children, ...opts }: VaultProviderProps)
   const [openError, setOpenError] = useState<VaultError | null>(null)
   // Bumped by retryOpen: a fresh value re-runs the open effect.
   const [openAttempt, setOpenAttempt] = useState(0)
+  // The logger and clock the last render had, and whether a change of either was warned of yet.
+  const sinks = useRef({ logger, clock })
+  const toldOfSinks = useRef(false)
+  const toldOfPhrasing = useRef(false)
+
+  // A logger or clock written inline in the props is new at every render, and reopens the vault
+  // each time: said once, the first time either changes.
+  useEffect(() => {
+    const last = sinks.current
+    sinks.current = { logger, clock }
+    const changed = [...(last.logger === logger ? [] : ['logger']), ...(last.clock === clock ? [] : ['clock'])]
+    if (toldOfSinks.current || changed.length === 0) { return }
+    toldOfSinks.current = true
+    warnHost(logger, `VaultProvider reopened the vault because its ${changed.join(' and ')} changed identity between renders. Written inline in the props, it is new at every render, and reopens the vault each time: define it once, outside the component, or memoize it.`, { call: 'VaultProvider', props: changed })
+  }, [logger, clock])
+
+  // An engine that cannot phrase a relative time shows a dialog without its window line: said once.
+  useEffect(() => {
+    if (toldOfPhrasing.current || phrasesRelativeTime()) { return }
+    toldOfPhrasing.current = true
+    warnHost(logger, "This engine has no Intl.RelativeTimeFormat, so the passphrase dialog leaves out how long an unlock lasts. To show it, import the standard polyfill: import '@formatjs/intl-relativetimeformat/polyfill'.", { call: 'VaultProvider' })
+  }, [logger])
 
   /** Closes `ending` if it is still the dialog showing, and settles every action waiting on it. */
   const endAsking = useCallback((ending: Asking | null, unlocked: boolean) => {
@@ -206,33 +254,39 @@ export const VaultProvider = ({ userId, children, ...opts }: VaultProviderProps)
     try {
       await eraseStoredDamagedVault({ applabel, vaultlabel, userId, vaultDB, deviceDB, validators })
     } catch (err) {
-      // Storage no longer holds the damaged vault -- it reads sound now, or was made anew -- so what
-      // openError says is out of date: open again, and still tell the caller why nothing was erased.
-      if (isVaultError(err, 'bad_option') || isVaultError(err, 'stale_write')) { setOpenAttempt((prev) => prev + 1) }
+      // The vault was made anew, so what openError says is out of date: open again, and still tell
+      // the caller why nothing was erased. Misuse (bad_option) reopens nothing.
+      if (isVaultError(err, 'stale_write')) { setOpenAttempt((prev) => prev + 1) }
       throw err
     }
     setOpenAttempt((prev) => prev + 1)
   }, [openError, userId, applabel, vaultlabel, vaultDB, deviceDB, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, noteCheck, unlocklabelCheck])
 
-  /** Waits on the dialog showing now, opening one if none is; settles false while there is no vault. */
-  const awaitUnlock = useCallback(() => new Promise<boolean>((settle) => {
+  /**
+   * Waits on the dialog showing over `ranOn` now, opening one if none is; settles false once
+   * `ranOn` is no longer the vault, and true at once if it is unlocked already.
+   */
+  const awaitUnlock = useCallback((ranOn: Vault | null) => new Promise<boolean>((settle) => {
     // An action whose refusal lands after its vault went resolves null, as the dialog it would
     // have waited on did, rather than leaving a dialog to show over whichever vault comes next.
-    if (vaultRef.current === null) { settle(false); return }
+    if (ranOn === null || vaultRef.current !== ranOn) { settle(false); return }
+    // An unlock that landed between the refusal and here has answered it: no dialog to ask.
+    if (ranOn.getSnapshot().state === 'unlocked') { settle(true); return }
+    // A dialog showing is over this same vault: the open effect ends each with its vault.
     const { current } = askingRef
     if (current !== null) {
       current.waiters.push(settle)
       return
     }
     askingRounds.current += 1
-    const opening = { round: askingRounds.current, waiters: [settle] }
+    const opening = { round: askingRounds.current, vault: ranOn, waiters: [settle] }
     askingRef.current = opening
     setAsking(opening)
   }), [])
 
   // An unlock that lands while a dialog is asking -- the first dialog's, finishing after its Cancel,
   // or one the app made itself through the handle -- answers it: the dialog closes, and the actions
-  // waiting on it run again. Only a change is heard, never the state at the dialog's opening.
+  // waiting on it run again. An unlock before the dialog opened is read by awaitUnlock.
   useEffect(() => {
     if (vault === null) { return }
     return vault.subscribe(() => {
@@ -241,11 +295,13 @@ export const VaultProvider = ({ userId, children, ...opts }: VaultProviderProps)
   }, [vault, endAsking])
 
   const withUnlockedVault = useCallback(async <ResultT,>(action: () => Promise<ResultT>): Promise<ResultT | null> => {
+    // The vault the action runs against: its refusal is answered by a dialog over that vault, or none.
+    const ranOn = vaultRef.current
     try {
       return await action()
     } catch (err) {
       if (! isVaultError(err, 'vault_locked')) { throw err }
-      const unlocked = await awaitUnlock()
+      const unlocked = await awaitUnlock(ranOn)
       if (! unlocked) { return null }
       return await action()
     }
@@ -259,10 +315,11 @@ export const VaultProvider = ({ userId, children, ...opts }: VaultProviderProps)
   return (
     <VaultContext.Provider value={{ vault, openError, retryOpen, eraseDamagedVault, withUnlockedVault }}>
       {children}
-      {asking !== null && vault !== null && (
+      {asking !== null && asking.vault === vault && (
         <PassphraseModal
           key={asking.round}
-          vault={vault}
+          vault={asking.vault}
+          allowStartOver={allowStartOver}
           onDone={(unlocked) => { endAsking(asking, unlocked) }}
         />
       )}

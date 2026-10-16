@@ -1,59 +1,69 @@
-import { useState } from 'react'
-import { isVaultCondition, isVaultError, type Vault } from 'safebyok'
-import { Boundary } from './boundary'
+import { useState, useSyncExternalStore } from 'react'
+import { isVaultCondition, isVaultError, type Vault, type VaultSnapshot } from 'safebyok'
+import { Boundary, useRoundFor } from './boundary'
+import { Messages } from './messages'
 import { askPasskey, passkeysAvailable } from './passkey'
 
 /**
  * A button that unlocks the vault with one of its passkeys: rendered only when the vault has one
  * and the browser offers WebAuthn, so a dialog can place it beside its passphrase field
- * unconditionally. `PassphraseModal` does. A press asks the user to touch a passkey, then unlocks
- * with its answer.
+ * unconditionally. `PassphraseModal` does, first, ahead of the field. A press asks the user to
+ * touch a passkey, then unlocks with its answer. It follows the vault's snapshot as it changes:
+ * a passkey added on another device brings the button, one removed takes it away. Handed another
+ * vault, it starts afresh.
  *
  * `onDone(true)` once unlocked; `onDone(false)` when a `lock()` called meanwhile wins, as the
- * passphrase dialog does. A dismissed prompt does nothing; a condition (a wrong or removed passkey,
- * an authenticator without PRF) goes to `onGripe` with its calm message, for the dialog to show.
- * Anything else -- misuse, such as an `rpId` that does not fit the page or a closed vault handle,
- * or a failure that is no VaultError -- never reaches the host's page: the button takes itself
- * away, `onGripe` hears "Your passkey can't be used here just now. Unlock with your passphrase
- * instead.", and React reports the error through the root's `onCaughtError` (the console, by
- * default, with the component stack), where the developer and an error tracker meet it. Focus
- * the button held falls to the page then: a dialog of the host's own moves it to its passphrase
- * field, as `PassphraseModal` does.
+ * passphrase dialog does. Each press first tells `onGripe(null)`: whatever the button said before
+ * no longer stands. A dismissed prompt then does nothing more; a condition (a wrong or removed
+ * passkey, an authenticator without PRF) goes to `onGripe` with its calm message, for the dialog
+ * to show. Anything else -- misuse, such as an `rpId` that does not fit the page or a closed
+ * vault handle, or a failure that is no VaultError -- never reaches the host's page: the button
+ * takes itself away, `onGripe` hears "Your passkey can't be used here just now. Unlock with your
+ * passphrase instead.", and React reports the error through the root's `onCaughtError` (the
+ * console, by default, with the component stack), where the developer and an error tracker meet
+ * it. Focus the button held falls to the page then: a dialog of the host's own moves it to its
+ * passphrase field, as `PassphraseModal` does.
  *
  * @example <PasskeyUnlockButton vault={vault} onDone={close} onGripe={setGripe} />
  * @example <PasskeyUnlockButton vault={vault} rpId="acme.example" onDone={close} onGripe={setGripe} />  // passkeys made under that rp.id
+ * @example <PasskeyUnlockButton vault={vault} autoFocus onDone={close} onGripe={setGripe} />  // the dialog's first choice
  */
 export const PasskeyUnlockButton = (props: PasskeyUnlockButtonProps) => (
-  <Boundary fallback={null} onCaught={() => { props.onGripe(PasskeyTroubleGripe) }}>
+  <Boundary key={useRoundFor(props.vault)} fallback={null} onCaught={() => { props.onGripe(Messages.passkeyTrouble) }}>
     <PasskeyPress {...props} />
   </Boundary>
 )
 
-/** What the user is told, through `onGripe`, when the button meets a failure not theirs to mend. */
-const PasskeyTroubleGripe = "Your passkey can't be used here just now. Unlock with your passphrase instead."
-
 /** What PasskeyUnlockButton is handed. */
 type PasskeyUnlockButtonProps = {
-  vault:   Vault
-  onDone:  (unlocked: boolean) => void
-  onGripe: (gripe: string) => void
-  rpId?:   string | undefined
+  vault:      Vault
+  onDone:     (unlocked: boolean) => void
+  /** What the button has to say: a calm message, or null when what it said last no longer stands. */
+  onGripe:    (gripe: string | null) => void
+  rpId?:      string | undefined
+  /** Whether the button takes the focus when it first shows: true where it is the first choice. */
+  autoFocus?: boolean | undefined
 }
 
+/** Whether the button shows for a vault in this state: the browser offers WebAuthn, and the vault lists a passkey. */
+export const offersPasskey = (snapshot: VaultSnapshot): boolean => (
+  passkeysAvailable() && snapshot.unlocks.some((unlock) => unlock.method === 'passkey')
+)
+
 /** The button itself, inside PasskeyUnlockButton's boundary. */
-const PasskeyPress = ({ vault, onDone, onGripe, rpId }: PasskeyUnlockButtonProps) => {
+const PasskeyPress = ({ vault, onDone, onGripe, rpId, autoFocus }: PasskeyUnlockButtonProps) => {
+  const snapshot = useSyncExternalStore(vault.subscribe, vault.getSnapshot)
   const [asking, setAsking] = useState(false)
   // Wrapped, so that a rejection carrying any value at all still reads as "failed".
   const [failure, setFailure] = useState<{ err: unknown } | null>(null)
   if (failure !== null) { throw failure.err }
-  if (! passkeysAvailable()) { return null }
-  const { unlocks } = vault.getSnapshot()
-  if (unlocks.every((unlock) => unlock.method !== 'passkey')) { return null }
+  if (! offersPasskey(snapshot)) { return null }
 
   const press = async () => {
     setAsking(true)
+    onGripe(null)
     try {
-      const passkey = await askPasskey(unlocks, { rpId })
+      const passkey = await askPasskey(snapshot.unlocks, { rpId })
       if (passkey === null) { return }
       await vault.unlock(passkey)
       onDone(true)
@@ -69,8 +79,9 @@ const PasskeyPress = ({ vault, onDone, onGripe, rpId }: PasskeyUnlockButtonProps
   }
 
   return (
-    <button type="button" disabled={asking} onClick={() => { void press() }}>
-      Use a passkey
+    // eslint-disable-next-line jsx-a11y/no-autofocus -- only where a dialog makes the passkey its first choice: the WAI-ARIA dialog pattern moves focus to a dialog's first control
+    <button type="button" autoFocus={autoFocus} disabled={asking} onClick={() => { void press() }}>
+      {Messages.passkeyButton}
     </button>
   )
 }

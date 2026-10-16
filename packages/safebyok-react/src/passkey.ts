@@ -1,5 +1,6 @@
 import { PasskeySaltBytes, VaultError, type PasskeyProof, type UnlockSummary } from 'safebyok'
 import { fromB64, toB64 } from 'safebyok/utils'
+import { Messages } from './messages'
 
 /**
  * The WebAuthn half of a passkey unlock, which the core leaves to the host: `createPasskey` makes a
@@ -122,11 +123,11 @@ export const askPasskey = async (unlocks: readonly UnlockSummary[], opts: AskPas
   ensureAvailable()
   const listed = unlocks.filter((unlock) => unlock.method === 'passkey')
   if (listed.length === 0) {
-    throw new VaultError('absent_unlock', 'This vault has no passkey to ask: unlock it with a passphrase, then add one.')
+    throw new VaultError('absent_unlock', Messages.noPasskeyToAsk)
   }
   const passkeys = listed.flatMap((unlock) => askable(unlock) ?? [])
   if (passkeys.length === 0) {
-    throw new VaultError('damaged_unlock', "Every passkey of this vault is stored damaged, so none can be asked. Unlock with a passphrase, then remove the passkeys and add them again.")
+    throw new VaultError('damaged_unlock', Messages.passkeysDamaged)
   }
   const asked = await askAuthenticator(() => navigator.credentials.get({
     publicKey: {
@@ -185,11 +186,11 @@ const optional = <FieldT extends string, ValT>(field: FieldT, val: ValT | undefi
 
 const ensureAvailable = () => {
   if (! passkeysAvailable()) {
-    throw new VaultError('passkey_unavailable', 'This browser offers no passkeys (WebAuthn): unlock with a passphrase.')
+    throw new VaultError('passkey_unavailable', Messages.noWebAuthn)
   }
 }
 
-const noPrf = () => new VaultError('passkey_unavailable', "This passkey's authenticator does not offer the PRF extension a passkey unlock needs: unlock with a passphrase, or try another device or security key.")
+const noPrf = () => new VaultError('passkey_unavailable', Messages.noPrf)
 
 /**
  * The credential a WebAuthn call resolves with, or null when the user dismissed it. Its other
@@ -205,7 +206,7 @@ const askAuthenticator = async (call: () => Promise<Credential | null>): Promise
     if (err instanceof DOMException && err.name === 'SecurityError') {
       throw new VaultError('bad_option', "The browser refused the passkey's relying party: its id must be this page's domain, or one it belongs to.", { cause: err })
     }
-    throw new VaultError('passkey_unavailable', "The browser could not ask for a passkey: unlock with a passphrase. The browser's own error is this error's cause.", { cause: err })
+    throw new VaultError('passkey_unavailable', Messages.passkeyAskFailed, { cause: err })
   }
   return credential === null ? null : credential as PublicKeyCredential
 }

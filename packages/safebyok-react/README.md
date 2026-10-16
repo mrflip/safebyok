@@ -23,7 +23,14 @@ otherwise write itself.
   passphrase, or any other condition the unlock meets (storage out of reach), shows in the dialog
   in place; anything else (misuse, a bug) shows a calm "Something went wrong" with a Close
   button, and goes to React's error reporting, never to your page (*When an unlock fails*,
-  below). For a vault with a passkey, it offers "Use a passkey" beside the passphrase field.
+  below). For a vault with a passkey, "Use a passkey" comes first, ahead of the passphrase
+  field, and takes the focus. It is a modal `dialog` named by its heading; Escape cancels it and
+  goes no further; its error line is a live region a screen reader announces. It follows the
+  vault as it changes, and starts afresh when handed another. With `allowStartOver`, a user who
+  has forgotten the passphrase may erase the vault and start a new one (*Starting over*, below).
+* `WhisperField` -- the field a user types or pastes a whisper into, hidden as they type, with a
+  Show / Hide button; password managers are asked to leave it alone (*Entering a whisper*,
+  below).
 * `createPasskey()`, `askPasskey()`, `passkeysAvailable()` and `PasskeyUnlockButton` -- the
   WebAuthn half of a fingerprint (passkey, security key) unlock, below. The three functions import
   no React.
@@ -54,7 +61,8 @@ app answers like any other, `keyDeriver` and `deviceDB`; `vaultDB` is your backe
 answers the same bag on every call, so it is safe in a render: the provider reopens the vault
 whenever a prop changes identity. So define a `logger` or a `clock` once, outside the component (or
 memoize it): an object literal written in the props is a new one at every render, and reopens
-the vault each time. `validators` is the one exception: the provider watches each schema in the
+the vault each time. The provider warns of it once, through your logger (or the console, when
+you pass none), the first time either changes. `validators` is the one exception: the provider watches each schema in the
 bag rather than the bag, so `validators={{ boxlabel: BoxlabelCheck }}` is fine in the props, so
 long as `BoxlabelCheck` itself is built once, at module level. A bag with a field it does not know
 (`boxLabel`) is thrown, as `bad_option`, to the nearest error boundary, as `openVault` would refuse
@@ -100,7 +108,9 @@ if (openError?.kind === 'damaged_bundle') {
 ```
 
 It does nothing for any other `openError`, or none, and rejects with storage's refusal (say,
-`storage_unavailable`) if the erase fails, leaving `openError` as it was.
+`storage_unavailable`) if the erase fails, leaving `openError` as it was. A `stale_write` means
+the vault was made anew meanwhile, so it opens again as well; any other refusal opens nothing
+(`retryOpen()` will, should the vault read sound now).
 
 **A sign-out the app did not hear of** -- in another tab, or a session that expired -- reaches
 the vault as storage refusing it, kind `identity_revoked`, and an open vault locks itself
@@ -151,6 +161,61 @@ createRoot(rootElement, {
 An open's misuse is the exception: `VaultProvider` throws it to your boundary at mount (*When
 opening fails*, above), where it fires on every load, before any user has typed anything.
 
+## Starting over
+
+A forgotten passphrase cannot be recovered: the vault and its whispers are gone with it, and the
+user starts a new one. `<VaultProvider allowStartOver ...>` (or `<PassphraseModal allowStartOver
+... />`) has the dialog offer that: "Forgot it? Start a new vault" asks first, then erases the
+vault on every device (`vault.destroy()`, which needs no passphrase) and becomes "Choose a vault
+passphrase" for the new one; the action that summoned it runs again there. It is off by default:
+a vault with another way in (a second passphrase, a passkey) may not need it, and it erases
+every lockbox.
+
+## The dialog's words
+
+Every word the binding shows a user lives in one module, `src/messages.ts`, sentence by
+sentence, in English; real locales come later. The dialog phrases how long an unlock lasts with
+`Intl.RelativeTimeFormat`, which every current browser has. An engine without it shows the
+dialog without that line, and the provider warns you once; to show it there, import the
+standard polyfill yourself, before the app renders:
+
+```ts
+import '@formatjs/intl-relativetimeformat/polyfill'
+import '@formatjs/intl-relativetimeformat/locale-data/en'
+```
+
+## Entering a whisper
+
+`WhisperField` is a controlled input for an API key or another whisper: hidden as the user types,
+with a Show / Hide button (`aria-pressed`) to check it. It is named `whisper_text` -- a password
+manager looks for `key`, `password` and `token` -- and carries `WhisperFieldAttributes` from
+`safebyok/utils`: each major password manager's flag to ignore it, `autocomplete="new-password"`,
+and no capitalizing, correcting or spell-checking (a browser's enhanced spell-check may send what
+is typed to its maker's servers). It shows no placeholder unless you give one; any other input
+attribute passes through.
+
+```tsx
+import { WhisperField } from 'safebyok-react'
+
+const [keyText, setKeyText] = useState('')
+<WhisperField value={keyText} onChange={setKeyText} placeholder="sk-ant-…" aria-label="Anthropic API key" />
+```
+
+A field of your own, or another framework's, spreads the same attributes:
+`<input name="whisper_text" type="password" {...WhisperFieldAttributes} />`. Each manager
+honors only its own flag, and a browser's built-in manager may honor none.
+
+## Revealing a whisper
+
+A whisper you show the user -- a "view" button, an edit form filled with the stored key, the
+field above while they type -- is in React state, and so in your component tree's memory, until
+that state lets go of it: React DevTools shows it, and an error reporter that captures props or
+state may send it. That is the cost of showing it; keep it as small as the feature allows. Show
+`mask(whisper)` (from `safebyok/utils`) where the user only needs to tell keys apart; read a
+whisper into state only when the user asks to see or edit it, and drop it (set the state back)
+when they hide it, save, or navigate away; and to use a whisper, call `vault.use(boxlabel,
+callback)`, which hands it to your callback and keeps it out of state altogether.
+
 ## Fingerprint unlock (passkeys)
 
 A vault may let the user in with a passkey -- a fingerprint, a face, a phone, a security key --
@@ -193,10 +258,12 @@ if (passkey !== null) { await vault.unlock(passkey) }
   never replaces a passkey your sign-in uses; its challenge is random and nothing on your server
   checks it. If you pass `rp.id` to `createPasskey`, pass the same `rpId` to `askPasskey` (and to
   `PasskeyUnlockButton`): a passkey answers only under the relying party it was made for.
-* **The dialog.** `PassphraseModal` shows `PasskeyUnlockButton` when the vault lists a passkey and
-  the browser offers WebAuthn, under the page's own relying party. A dialog of your own can place
-  `<PasskeyUnlockButton vault={vault} onDone={close} onGripe={setGripe} />` beside its field;
-  `onGripe` hears each condition's message, and the button's word when it takes itself away.
+* **The dialog.** `PassphraseModal` shows `PasskeyUnlockButton` first when the vault lists a
+  passkey and the browser offers WebAuthn, under the page's own relying party. A dialog of your
+  own can place `<PasskeyUnlockButton vault={vault} onDone={close} onGripe={setGripe} />` beside
+  its field (`autoFocus` to make it the first choice); `onGripe` hears null as each press
+  begins (what it said before no longer stands), each condition's message, and the button's
+  word when it takes itself away.
 * **A passkey can stand in for a forgotten passphrase**: `vault.addPassphrase(passkey, fresh, {
   unlocklabel })`, then `vault.removeUnlock(passkey, oldId)`. A vault always keeps one passphrase:
   removing the last refuses with kind `last_unlock`.
