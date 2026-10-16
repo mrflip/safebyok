@@ -21,7 +21,16 @@ Branch `20261016-pg_container`, PR [#131](https://github.com/mrflip/safebyok/pul
   * The battery and every race passed on a real server on the first run, including the turnstile holds (one device per pool). The adapter's `stale_write` for `23503` does not keep a `cause`, so the foreign key test cannot assert the code; it is the only way the held insert can refuse (the count saw the vault standing).
   * No Docker in the worker's container: verified locally against `embedded-postgres` 18 beta binaries installed in the scratchpad (not in the repo); the proof of record is CI on `postgres:17`.
   * The image digest is written twice (compose, workflow); Dependabot moves the compose one only.
+* **Review** (`fixed`, four `tests:` commits): setup-failure cleanup of a file's database; each race round ends the last round's devices (peak connections 53 to 22); the hard-cap hook ends writers before `DROP TRIGGER`; `untilStatementBlocked` is vitest's `waitUntil` (two seconds), the hand-rolled `eventually` removed. **Six minors left, not built**, also in the PR's open questions:
+  1. The all-at-once rounds, and the REPEATABLE READ / SERIALIZABLE "writers made together" tests, pass with the limit or the trigger removed: they prove bounds and read-back, not the cap. Retitle them to what they prove (the held-writer tests are the ones that prove the cap).
+  2. `untilStatementBlocked` accepts any lock wait in the database, not necessarily the held write's.
+  3. The image digest is written twice (compose, workflow); Dependabot moves only the compose file's.
+  4. The CI service publishes 5432 on all interfaces of the runner (trust auth; the runner is ephemeral).
+  5. No `'error'` listeners on the `pg` pools and clients: an idle connection's error would be an unhandled event.
+  6. `node:crypto`'s `randomBytes` names the file databases: left, tests only.
+* **Coach's rulings**
+  * *Should `postgres` become a required check once it has run a while?* Ruling: a TODO entry, which the orchestrator is filing ("add TODO"); nothing to do in this PR.
+  * *My answers to the Coach's side questions (other backends on the same compose file, one service each; Playwright its own `e2e/` job, written in `e2e/README.md`):* Ruling: "thanks, noted".
 * **For the Coach**
-  * Is `postgres` to become a required check, once it has run a while?
   * Rows: **G203 closed** (code: `e2e/tests/postgres/`, `ci.yml`; docs: VAULTDB.md, e2e README). **G288 closed** (`races.test.ts`, `foreign-key.test.ts`, `hard-cap.test.ts`; the README's hard-cap paragraph points at them). **G524 not closed**: its Postgres half is done (compose file, service container, `e2e/` owns it, the suites are one list), but Convex's local backend and the other backends are slots, not services, and the question of PGlite-shaped adapter tests on a server stays open.
-  * Answers to the Coach's side questions: the other backends go on the same compose file, one service each; Playwright gets its own job, written in `e2e/README.md`.
+  * Still open: the PGlite-shaped wrapper that would let the adapter's own tests run on the container (widening the list to "every Postgres test" is one line only for e2e suites).
