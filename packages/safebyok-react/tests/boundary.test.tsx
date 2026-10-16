@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react'
 import { Component, type ReactNode } from 'react'
 import { describe, expect, it } from 'vitest'
-import { Boundary } from '../src/boundary'
+import { Boundary, useRoundFor } from '../src/boundary'
 import * as TH from './test-helpers'
 
 /** A child that throws `failure.err` while rendering, or shows "fine" when it has no failure. */
@@ -55,5 +55,25 @@ describe("Boundary", () => {
     const { reported } = TH.renderReporting(<Boundary fallback={<p>Something went wrong.</p>}><Thrower failure={{ err: null }} /></Boundary>)
     expect(screen.queryByText('Something went wrong.')).to.not.be.null
     expect(reported).to.deep.equal([null])
+  })
+})
+
+/** The example's shape: a boundary keyed by the handle it serves, over a child that fails for one handle. */
+const Served = ({ handle, failing }: { handle: object, failing: object }) => (
+  <Boundary key={useRoundFor(handle)} fallback={<p>fallback</p>}>
+    <Thrower {...(handle === failing ? { failure: { err: new Error('broke') } } : {})} />
+  </Boundary>
+)
+
+describe("useRoundFor", () => {
+  it("starts a boundary afresh for another handle, and keeps it as it is for the same one", () => {
+    const first = {}
+    const second = {}
+    const { rerender } = TH.renderReporting(<Served handle={first} failing={first} />)
+    expect(screen.queryByText('fallback')).to.not.be.null
+    rerender(<Served handle={first} failing={second} />)
+    expect(screen.queryByText('fallback')).to.not.be.null
+    rerender(<Served handle={second} failing={first} />)
+    expect(screen.queryByText('fine')).to.not.be.null
   })
 })

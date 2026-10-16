@@ -154,12 +154,24 @@ const lockedWorld = async () => {
   return { ...world, ...grab, tree }
 }
 
-/** A promise's outcome so far, read without waiting on it: 'pending' until it settles. */
+/** A promise's outcome so far, read without waiting on it: 'pending' until it settles; `settled` is the promise itself. */
 const watched = <ResultT,>(promise: Promise<ResultT>) => {
-  const seen: { outcome: ResultT | 'pending' } = { outcome: 'pending' }
-  void promise.then((outcome) => { seen.outcome = outcome })
+  const seen: { outcome: ResultT | 'pending', settled: Promise<ResultT> } = { outcome: 'pending', settled: promise }
+  const follow = async () => {
+    try {
+      seen.outcome = await promise
+    } catch {
+      // A rejection is the test's to await, through settled.
+    }
+  }
+  void follow()
   return seen
 }
+
+/** The provider over a world, with whatever logger and clock the render hands it. */
+const providerOf = (world: ReturnType<typeof makeWorld>, sinks: Pick<VaultProviderProps, 'logger' | 'clock'>) => (
+  <VaultProvider {...world.props} userId="u1" {...sinks}><Probe /></VaultProvider>
+)
 
 /** Stands in for a function a test replaces before it is called. */
 const noop = () => { /* replaced before use */ }
@@ -452,6 +464,68 @@ describe("VaultProvider", () => {
       await waitFor(() => { expect(reading.outcome).to.be.null })
     })
 
+    it("runs an action refused just as the vault unlocked again, with no dialog to ask", async () => {
+      const world = await lockedWorld()
+      render(world.tree('u1'))
+      const vault = await world.opened()
+      let tries = 0
+      // The refusal is met while locked, and the unlock lands before withUnlockedVault hears it.
+      const reading = watched(world.latest().withUnlockedVault(async () => {
+        tries += 1
+        if (tries > 1) { return await vault.read('anthropic_api_key') }
+        try {
+          return await vault.read('anthropic_api_key')
+        } catch (err) {
+          await vault.unlock('pw')
+          throw err
+        }
+      }))
+      await waitFor(() => { expect(reading.outcome).to.eq('sk-fake') })
+      expect(tries).to.eq(2)
+      expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null
+    })
+
+    it("resolves null for a refusal landing once the next user's vault is open, and shows that user no dialog", async () => {
+      const world = await lockedWorld()
+      const { rerender } = render(world.tree('u1'))
+      const vault = await world.opened()
+      let release: () => void = noop
+      // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- Promise.withResolvers is ES2024, and every tsconfig's lib stops at ES2023
+      const held = new Promise<void>((resolve) => { release = resolve })
+      const reading = watched(world.latest().withUnlockedVault(async () => {
+        try {
+          return await vault.read('anthropic_api_key')
+        } catch (err) {
+          await held
+          throw err
+        }
+      }))
+      rerender(world.tree('u2'))
+      await waitFor(() => { expect(world.latest().vault).to.not.be.null })
+      expect(world.latest().vault).to.not.equal(vault)
+      release()
+      await waitFor(() => { expect(reading.outcome).to.be.null })
+      await TH.wakeupAtNextTick()
+      expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null
+    })
+
+    it("lets a lock() landing between the unlock and the run again win: the caller hears vault_locked", async () => {
+      const world = await lockedWorld()
+      render(world.tree('u1'))
+      const vault = await world.opened()
+      let tries = 0
+      const reading = world.latest().withUnlockedVault(async () => {
+        tries += 1
+        if (tries > 1) { await vault.lock() }
+        return await vault.read('anthropic_api_key')
+      })
+      fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
+      fireEvent.click(screen.getByText('Unlock'))
+      await expect(reading).rejects.toMatchObject({ kind: 'vault_locked' })
+      await TH.wakeupAtNextTick()
+      expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null
+    })
+
     it("leaves another user's dialog asking when the last user's cancelled unlock finishes late", async () => {
       const world = await lockedWorld()
       const other = await openVault({ ...world.props, deviceDB: memoryDeviceDB(), userId: 'u2' })
@@ -617,6 +691,76 @@ describe("VaultProvider", () => {
     await vault.lockSoon()
     expect(spy.calls.map((heard) => heard.level)).to.deep.equal(['warn'])
     expect(spy.calls[0]?.story).to.deep.equal({ call: 'lockSoon' })
+  })
+
+  it("passes allowStartOver to the dialog: a user who forgot the passphrase may start a new vault", async () => {
+    const world = await lockedWorld()
+    render(<VaultProvider {...world.props} userId="u1" allowStartOver><world.Grab /></VaultProvider>)
+    const vault = await world.opened()
+    const reading = watched(world.latest().withUnlockedVault(() => vault.read('anthropic_api_key')))
+    fireEvent.click(await screen.findByText('Forgot it? Start a new vault'))
+    fireEvent.click(screen.getByText('Erase and start over'))
+    fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'a new pw' } })
+    expect(screen.queryByText('Choose a vault passphrase')).to.not.be.null
+    fireEvent.click(screen.getByText('Create vault'))
+    // The action runs again, in the new vault, where there is no such lockbox.
+    await expect(reading.settled).rejects.toMatchObject({ kind: 'absent_box' })
+  })
+
+  describe("warning the developer once", () => {
+    it("of a logger written inline, which reopens the vault at every render", async () => {
+      const spy = TH.spyLogger()
+      const world = makeWorld()
+      const { rerender } = render(providerOf(world, { logger: { ...spy.logger } }))
+      await expectShown('absent')
+      rerender(providerOf(world, { logger: { ...spy.logger } }))
+      await expectShown('absent')
+      rerender(providerOf(world, { logger: { ...spy.logger } }))
+      await expectShown('absent')
+      const warned = spy.calls.filter((heard) => heard.story?.['call'] === 'VaultProvider')
+      expect(warned).to.have.lengthOf(1)
+      expect(warned[0]?.level).to.eq('warn')
+      expect(warned[0]?.story).to.deep.equal({ call: 'VaultProvider', props: ['logger'] })
+      expect(warned[0]?.message).to.match(/define it once, outside the component, or memoize it/)
+    })
+
+    it("of a clock written inline, through the console when there is no logger", async () => {
+      const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => { /* kept out of the test output */ })
+      const world = makeWorld()
+      const { rerender } = render(providerOf(world, { clock: { now: () => Date.now() } }))
+      await expectShown('absent')
+      rerender(providerOf(world, { clock: { now: () => Date.now() } }))
+      await expectShown('absent')
+      expect(consoleWarn).toHaveBeenCalledOnce()
+      expect(consoleWarn.mock.calls[0]?.[0]).to.match(/^safebyok: VaultProvider reopened the vault because its clock changed identity/)
+    })
+
+    it("of nothing, for a logger and clock that keep their identity", async () => {
+      const spy = TH.spyLogger()
+      const clock = { now: () => Date.now() }
+      const world = makeWorld()
+      const { rerender } = render(providerOf(world, { logger: spy.logger, clock }))
+      await expectShown('absent')
+      rerender(providerOf(world, { logger: spy.logger, clock }))
+      await expectShown('absent')
+      expect(spy.calls).to.deep.equal([])
+    })
+
+    it("of an engine that cannot phrase the dialog's window, naming the polyfill", async () => {
+      const relativeTimeFormat = Intl.RelativeTimeFormat
+      Reflect.deleteProperty(Intl, 'RelativeTimeFormat')
+      try {
+        const spy = TH.spyLogger()
+        const world = makeWorld()
+        const { rerender } = render(providerOf(world, { logger: spy.logger }))
+        await expectShown('absent')
+        rerender(providerOf(world, { logger: spy.logger }))
+        expect(spy.calls).to.have.lengthOf(1)
+        expect(spy.calls[0]?.message).to.match(/@formatjs\/intl-relativetimeformat/)
+      } finally {
+        Object.defineProperty(Intl, 'RelativeTimeFormat', { value: relativeTimeFormat, writable: true, configurable: true })
+      }
+    })
   })
 
   describe("when openVault rejects", () => {
@@ -818,22 +962,37 @@ describe("VaultProvider", () => {
         expect(shownState()).to.eq('absent')
       })
 
-      for (const [kind, blurb] of [['bad_option', 'it reads sound now'], ['stale_write', 'it was made anew']] as const) {
-        it(`opens again, and still rejects, when the erase finds storage changed: ${blurb}`, async () => {
-          const { vaultDB, props } = await damagedWorld()
-          vi.spyOn(vaultDB, 'eraseDamagedVault').mockRejectedValueOnce(new VaultError(kind, 'Storage changed.'))
-          // The vault is mended behind the provider's back: the reopen finds it sound.
-          const reads = vi.spyOn(vaultDB, 'readBundle')
-          const { Grab, latest } = grabber()
-          render(<VaultProvider {...props} userId="u1"><Grab /><Probe /></VaultProvider>)
-          await expectShown('open error: damaged_bundle')
-          reads.mockResolvedValueOnce(null)
-          await act(async () => {
-            await expect(latest().eraseDamagedVault()).rejects.toMatchObject({ kind })
-          })
-          await expectShown('absent')
+      it("opens again, and still rejects, when the erase finds the vault made anew", async () => {
+        const { vaultDB, props } = await damagedWorld()
+        vi.spyOn(vaultDB, 'eraseDamagedVault').mockRejectedValueOnce(new VaultError('stale_write', 'Storage changed.'))
+        // The vault is made anew behind the provider's back: the reopen finds it sound.
+        const reads = vi.spyOn(vaultDB, 'readBundle')
+        const { Grab, latest } = grabber()
+        render(<VaultProvider {...props} userId="u1"><Grab /><Probe /></VaultProvider>)
+        await expectShown('open error: damaged_bundle')
+        reads.mockResolvedValueOnce(null)
+        await act(async () => {
+          await expect(latest().eraseDamagedVault()).rejects.toMatchObject({ kind: 'stale_write' })
         })
-      }
+        await expectShown('absent')
+      })
+
+      it("rejects misuse (bad_option) without opening again, leaving openError for retryOpen", async () => {
+        const { vaultDB, props } = await damagedWorld()
+        const misuse = new VaultError('bad_option', 'That vault reads sound.')
+        vi.spyOn(vaultDB, 'eraseDamagedVault').mockRejectedValueOnce(misuse)
+        const reads = vi.spyOn(vaultDB, 'readBundle')
+        const { Grab, latest } = grabber()
+        render(<VaultProvider {...props} userId="u1"><Grab /><Probe /></VaultProvider>)
+        await expectShown('open error: damaged_bundle')
+        const readsBefore = reads.mock.calls.length
+        await act(async () => {
+          await expect(latest().eraseDamagedVault()).rejects.toMatchObject({ kind: 'bad_option' })
+        })
+        await TH.wakeupAtNextTick()
+        expect(reads.mock.calls.length).to.eq(readsBefore)
+        expect(shownState()).to.eq('open error: damaged_bundle')
+      })
 
       it("rejects with storage's refusal, leaving the damaged openError in place", async () => {
         const { vaultDB, props } = await damagedWorld()

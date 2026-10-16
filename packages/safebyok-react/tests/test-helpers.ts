@@ -6,6 +6,7 @@
 import { render } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import { vi } from 'vitest'
+import { ForcePassphraseReentryHours, type UnlockSummary, type Vault, type VaultState } from 'safebyok'
 import { fromB64, toB64 } from 'safebyok/utils'
 
 export * from 'safebyok/testing'
@@ -23,6 +24,40 @@ export const renderReporting = (ui: ReactElement) => {
   const reported: unknown[] = []
   const rendered = render(ui, { onCaughtError: (err) => { reported.push(err) } })
   return { ...rendered, reported }
+}
+
+/** What a stub's subscribe hands back: there was never anything to hear. */
+const unsubscribeFromNothing = () => { /* nothing ever changes */ }
+
+/** What a {@link stubVault} is made of: each part a test leaves out takes the stub's default. */
+export type StubVaultOpts = {
+  state?:           VaultState
+  unlocks?:         UnlockSummary[]
+  reentryWindowMillis?: number
+  unlock?:          Vault['unlock']
+  destroy?:         Vault['destroy']
+}
+
+/** The window, in milliseconds, of a vault opened with the default forcePassphraseReentryHours. */
+export const DefaultWindowMillis = ForcePassphraseReentryHours * 3_600_000
+
+/**
+ * Just enough of a Vault for a component to render it: a snapshot that keeps its identity and
+ * never changes (`state`, default 'locked'; `unlocks`, default none), a window (default seven
+ * days), a subscribe that never calls back, and whichever calls the test hands it.
+ *
+ * @example const vault = TH.stubVault({ state: 'absent' })
+ * @example const vault = TH.stubVault({ unlock: () => Promise.reject(new VaultError('wrong_passphrase', 'Not that one.')) })
+ */
+export const stubVault = (opts: StubVaultOpts = {}): Vault => {
+  const snapshot = { state: opts.state ?? 'locked', unlocks: opts.unlocks ?? [] }
+  return {
+    getSnapshot:     () => snapshot,
+    subscribe:       () => unsubscribeFromNothing,
+    reentryWindowMillis: opts.reentryWindowMillis ?? DefaultWindowMillis,
+    unlock:          opts.unlock,
+    destroy:         opts.destroy,
+  } as unknown as Vault
 }
 
 /** How the fake authenticator behaves: whether it offers PRF at all, and whether it answers as it makes a passkey. */
