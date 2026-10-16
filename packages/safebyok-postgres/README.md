@@ -239,7 +239,7 @@ const isKind = (kind: unknown): kind is VaultErrorKind => (VaultErrorKindVals as
   so the adapter reports it as `storage_unavailable` rather than `vault_full`; with the trigger's
   number below `maxLockboxes`, every first write it meets in a vault at that number refuses that
   way, one under a boxlabel already taken included, since a `BEFORE` trigger fires ahead of
-  `ON CONFLICT`. The package's tests run this on PGlite, one statement at a time, and cannot race it.
+  `ON CONFLICT`. The package's own tests run this on PGlite, one statement at a time, and cannot race it; the repository's `e2e/tests/postgres/hard-cap.test.ts` runs this very SQL on a real Postgres, with a connection to each writer, under READ COMMITTED, REPEATABLE READ and SERIALIZABLE.
 
   ```sql
   CREATE OR REPLACE FUNCTION safebyok_lockboxes_capped() RETURNS trigger LANGUAGE plpgsql AS $$

@@ -316,10 +316,17 @@ one mutation is atomic is the backend's to keep, and every backend in this repos
 one call at a time. Of Convex and IndexedDB, that is what the real backend promises too -- Convex's
 mutations are serializable, and IndexedDB runs transactions that write one store one after
 another, across tabs and connections. Of Postgres it is not: under READ COMMITTED, statements run at
-once, each over its own snapshot, and PGlite cannot show that. That the adapter's one-statement
-writes still hold -- a conditional `UPDATE` re-checking the row it waited on, `INSERT ... ON CONFLICT`,
-the foreign key read against the bundle that stands -- rests on Postgres's documented behaviour, not
-on a test here; only a run against a real server, with a connection to each device, would show it.
+once, each over its own snapshot, and PGlite cannot show that. So `safebyok-postgres` is also run
+against a real server: `e2e/tests/postgres/` runs this battery, with a pool and a listening
+connection to each device, against `postgres:17` (a CI job, and `e2e/compose.yaml` on a contributor's
+machine; `pnpm justify` needs neither and skips those tests where `SAFEBYOK_PG_URL` is unset). Its
+other files race what the battery's turnstile cannot hold: writers for a vault's last places, with no
+turnstile and no PGlite to take turns; a foreign key violation (`23503`) from a vault erased while
+an insert waited on the foreign key; and the adapter README's optional hard-cap trigger under READ
+COMMITTED, REPEATABLE READ and SERIALIZABLE. Of the one-statement writes -- a conditional `UPDATE`
+re-checking the row it waited on, `INSERT ... ON CONFLICT`, the foreign key read against the bundle
+that stands -- the races and that run show how they came out on that server and no other; which
+suites run there is one list in `e2e/tests/postgres/test-helpers.ts`.
 Nor can the battery see a lock shared by devices whose turnstile is left unwired; and the devices of
 `localVaultDB` and `idbVaultDB`, in one page, share what two tabs would not (the store, the bell, a
 connection), so their races show one tab's devices, and IndexedDB's own rule shows the rest.
