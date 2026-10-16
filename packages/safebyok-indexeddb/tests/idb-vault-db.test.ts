@@ -10,8 +10,6 @@ import type { IdbVaultDBOpts } from '../src/idb-opts'
 import { inspectIdbVaultDB } from '../src/inspect-idb-vault-db'
 import * as TH from './test-helpers'
 
-/** The ckeys idbVaultDB files its rows under, by default. */
-const Caret = Ckeys.joiner()
 
 /** The turnstile of each database a race made its devices over, by the name idb-keyval opens it under. */
 const turnstiles = vi.hoisted(() => new Map<string, { pass: () => Promise<void> }>())
@@ -84,29 +82,6 @@ describe("idbVaultDB", () => {
     expect(idbVaultDB().maxNameBytes).to.eq(Infinity)
   })
 
-  it("reserves the ^ its ckeys join names on, or the delimiter it was made with", () => {
-    expect(idbVaultDB().reservedNameChars).to.eq('^')
-    expect(idbVaultDB({ ckeyDelimiter: '/' }).reservedNameChars).to.eq('/')
-  })
-
-  it("files rows under a delimiter of the host's, and round-trips a name holding ^", async () => {
-    const dbName = TH.freshDbName()
-    const vaultDB = idbVaultDB({ dbName, ckeyDelimiter: '/' })
-    const scope = TH.scopeOf('u1^x')
-    await vaultDB.createBundle(TH.bundleOf('u1^x'))
-    await vaultDB.updateBox(scope, TH.boxOf('anthro^pic', 'one'), { vault_id: 'vault-id-u1^x', revision_id: null, vault_key_epoch: 1 })
-    const rows = await inspectIdbVaultDB({ dbName }).rows()
-    expect(rows.map((row) => row.ckey)).to.have.members(['vault/acme/u1^x/main', 'box/acme/u1^x/main/anthro^pic'])
-    const listed = await vaultDB.listBoxes(scope)
-    expect(listed.map((box) => box.boxlabel)).to.deep.equal(['anthro^pic'])
-    await TH.expectRefusal(vaultDB.readBox(scope, 'a/b'), 'bad_label')
-  })
-
-  it("refuses a delimiter that is not one character as bad_option", () => {
-    expect(() => idbVaultDB({ ckeyDelimiter: '::' })).to.throw(VaultError).with.property('kind', 'bad_option')
-    expect(() => idbVaultDB({ ckeyDelimiter: 42 } as unknown as IdbVaultDBOpts)).to.throw(VaultError).with.property('kind', 'bad_option')
-  })
-
   it("keeps each record as itself, field by field, at the ckey it always had", async () => {
     const dbName = TH.freshDbName()
     const vaultDB = idbVaultDB({ dbName })
@@ -139,7 +114,7 @@ describe("idbVaultDB", () => {
       await vaultDB.createBundle(TH.bundleOf(user))
       await vaultDB.updateBox(TH.scopeOf(user), TH.boxOf('anthropic', user), { vault_id: `vault-id-${user}`, revision_id: null, vault_key_epoch: 1 })
     }
-    await set(Caret.box(lookalike, 'x'), TH.boxOf('x', 'lookalike'), rawShelf(dbName))
+    await set(Ckeys.box(lookalike, 'x'), TH.boxOf('x', 'lookalike'), rawShelf(dbName))
     const rangedGetAll = vi.spyOn(IDBObjectStore.prototype, 'getAll')
     const rangedGetAllKeys = vi.spyOn(IDBObjectStore.prototype, 'getAllKeys')
     const cursoring = vi.spyOn(IDBObjectStore.prototype, 'openCursor')
@@ -160,9 +135,9 @@ describe("idbVaultDB", () => {
 
   it("lists a row that is no lockbox as damaged, under the boxlabel it is stored under", async () => {
     const dbName = TH.freshDbName()
-    await set(Caret.bundle(TH.scopeOf('u1')), TH.bundleOf('u1'), rawShelf(dbName))
-    await set(Caret.box(TH.scopeOf('u1'), 'anthropic'), 'not a lockbox', rawShelf(dbName))
-    await set(Caret.box(TH.scopeOf('u1'), 'openai'), TH.boxOf('openai', 'two'), rawShelf(dbName))
+    await set(Ckeys.bundle(TH.scopeOf('u1')), TH.bundleOf('u1'), rawShelf(dbName))
+    await set(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), 'not a lockbox', rawShelf(dbName))
+    await set(Ckeys.box(TH.scopeOf('u1'), 'openai'), TH.boxOf('openai', 'two'), rawShelf(dbName))
     const listed = await idbVaultDB({ dbName }).listBoxes(TH.scopeOf('u1'))
     expect(listed[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true })
     expect(listed[1]).to.include({ boxlabel: 'openai', damaged: false })
@@ -170,7 +145,7 @@ describe("idbVaultDB", () => {
 
   it("refuses a damaged bundle as corrupt_record, and leaves it as it is", async () => {
     const dbName = TH.freshDbName()
-    await set(Caret.bundle(TH.scopeOf('u1')), { vault_id: 'vault-id-u1', unlock_epoch: 'one' }, rawShelf(dbName))
+    await set(Ckeys.bundle(TH.scopeOf('u1')), { vault_id: 'vault-id-u1', unlock_epoch: 'one' }, rawShelf(dbName))
     const refusal = await TH.refusalOf(idbVaultDB({ dbName }).readBundle(TH.scopeOf('u1')))
     expect(refusal.kind).to.eq('corrupt_record')
     expect(await get('vault^acme^u1^main', rawShelf(dbName))).to.deep.equal({ vault_id: 'vault-id-u1', unlock_epoch: 'one' })
@@ -178,7 +153,7 @@ describe("idbVaultDB", () => {
 
   it("lands no update on a damaged bundle, even one that shows the expected vault_id", async () => {
     const dbName = TH.freshDbName()
-    await set(Caret.bundle(TH.scopeOf('u1')), { vault_id: 'vault-id-u1' }, rawShelf(dbName))
+    await set(Ckeys.bundle(TH.scopeOf('u1')), { vault_id: 'vault-id-u1' }, rawShelf(dbName))
     const refusal = await TH.refusalOf(idbVaultDB({ dbName }).updateBundle(TH.bundleOf('u1', { unlock_epoch: 2 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 }))
     expect(refusal.kind).to.eq('stale_write')
   })
@@ -190,13 +165,13 @@ describe("idbVaultDB", () => {
       await vaultDB.createBundle(TH.bundleOf(user))
       await vaultDB.updateBox(TH.scopeOf(user), TH.boxOf('anthropic', 'one'), { vault_id: `vault-id-${user}`, revision_id: null, vault_key_epoch: 1 })
     }
-    await set(Caret.bundle(TH.scopeOf('u1')), { vault_id: 'vault-id-u1', unlock_epoch: 'one' }, rawShelf(dbName))
+    await set(Ckeys.bundle(TH.scopeOf('u1')), { vault_id: 'vault-id-u1', unlock_epoch: 'one' }, rawShelf(dbName))
     const soundRefusal = await TH.refusalOf(vaultDB.eraseDamagedVault(TH.scopeOf('u2')))
     expect(soundRefusal.kind).to.eq('bad_option')
     await vaultDB.eraseDamagedVault(TH.scopeOf('u1'))
     const shelf = rawShelf(dbName)
-    const ourBundle = Caret.bundle(TH.scopeOf('u1'))
-    const ourBox = Caret.box(TH.scopeOf('u1'), 'anthropic')
+    const ourBundle = Ckeys.bundle(TH.scopeOf('u1'))
+    const ourBox = Ckeys.box(TH.scopeOf('u1'), 'anthropic')
     expect(await get(ourBundle, shelf)).to.be.undefined
     expect(await get(ourBox, shelf)).to.be.undefined
     expect(await vaultDB.readBundle(TH.scopeOf('u2'))).to.deep.equal(TH.bundleOf('u2'))
@@ -260,7 +235,7 @@ describe("idbVaultDB, every verb one transaction", () => {
       await vaultDB.createBundle(TH.bundleOf(user))
       await vaultDB.updateBox(TH.scopeOf(user), TH.boxOf('anthropic', user), { vault_id: `vault-id-${user}`, revision_id: null, vault_key_epoch: 1 })
     }
-    await set(Caret.box(lookalike, 'x'), TH.boxOf('x', 'lookalike'), rawShelf(dbName))
+    await set(Ckeys.box(lookalike, 'x'), TH.boxOf('x', 'lookalike'), rawShelf(dbName))
     const wholeShelf = vi.spyOn(IDBObjectStore.prototype, 'getAllKeys')
     try {
       await vaultDB.eraseVault(scope, { vault_id: 'vault-id-u1' })
@@ -270,11 +245,11 @@ describe("idbVaultDB, every verb one transaction", () => {
     }
     const rows = await inspectIdbVaultDB({ dbName }).rows()
     expect(rows.map((row) => row.ckey)).to.deep.equal([
-      Caret.box(lookalike, 'x'),
-      Caret.box(TH.scopeOf('u12'), 'anthropic'),
-      Caret.box(TH.scopeOf('u2'), 'anthropic'),
-      Caret.bundle(TH.scopeOf('u12')),
-      Caret.bundle(TH.scopeOf('u2')),
+      Ckeys.box(lookalike, 'x'),
+      Ckeys.box(TH.scopeOf('u12'), 'anthropic'),
+      Ckeys.box(TH.scopeOf('u2'), 'anthropic'),
+      Ckeys.bundle(TH.scopeOf('u12')),
+      Ckeys.bundle(TH.scopeOf('u2')),
     ].toSorted((one, two) => one.localeCompare(two)))
   })
 

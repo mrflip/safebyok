@@ -25,7 +25,7 @@ describe("the package's entry point", () => {
   })
 
   it("exports the ckeys an adapter over a key-value store files rows under, as one namespace", () => {
-    expect(Object.keys(safebyok.Ckeys)).to.have.members(['DefaultDelimiter', 'joiner'])
+    expect(Object.keys(safebyok.Ckeys)).to.have.members(['Delimiter', 'bundle', 'box', 'unlock', 'mark', 'boxPrefix', 'isBoxIn', 'boxlabelOf', 'isUnlock', 'isMark'])
   })
 
   it("exports the sanitizer an adapter throws through in place of a foreign error, as one namespace", () => {

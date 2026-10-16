@@ -161,7 +161,6 @@ export class RouteVaultDB extends VaultDB {
   readonly maxVaultBytes = Infinity
   readonly maxLockboxes = 1000 // the server's postgresVaultDB maxLockboxes
   readonly maxNameBytes = 640  // the server's postgresVaultDB maxNameBytes
-  readonly reservedNameChars = ''
 
   protected doReadBundle(scope: VaultScope) { return this.call('readBundle', scope) }
   protected doCreateBundle(bundle: VaultBundle) { return this.call('createBundle', bundle) }

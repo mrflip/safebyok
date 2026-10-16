@@ -8,8 +8,6 @@ import * as Ckeys from '../src/ckeys'
 import { VaultDB, type BundleExpectation, type EraseExpectation, type LockboxExpectation, type StoredLockbox } from '../src/vault-db'
 import * as TH from './test-helpers'
 
-/** The ckeys the round-trip backend files its rows under. */
-const Caret = Ckeys.joiner()
 
 const TweakCases = [
   // regular usage:
@@ -659,7 +657,6 @@ const servingOnly = (userId: string | null, store: StringStore): TH.VaultDBVerbs
     maxVaultBytes:  shared.maxVaultBytes,
     maxLockboxes:   shared.maxLockboxes,
     maxNameBytes:   shared.maxNameBytes,
-    reservedNameChars: shared.reservedNameChars,
     readBundle:     async (scope) => { permitted(scope); return await shared.readBundle(scope) },
     createBundle:   async (bundle) => { permitted(bundle); return await shared.createBundle(bundle) },
     updateBundle:   async (bundle, expected) => { permitted(bundle); await shared.updateBundle(bundle, expected) },
@@ -843,7 +840,6 @@ class RoundTripVaultDB extends VaultDB {
   readonly maxVaultBytes = Infinity
   readonly maxLockboxes: number
   readonly maxNameBytes = Infinity
-  readonly reservedNameChars = Ckeys.DefaultDelimiter
   private readonly backend: RoundTripBackend
   private readonly opts: RoundTripOpts
   private readonly ownListeners = new Set<() => void>()
@@ -855,16 +851,16 @@ class RoundTripVaultDB extends VaultDB {
     this.maxLockboxes = opts.maxLockboxes ?? Infinity
   }
 
-  protected doReadBundle(scope: VaultScope) { return this.backend.atomically((rows) => rows.get(Caret.bundle(scope)) ?? null) }
+  protected doReadBundle(scope: VaultScope) { return this.backend.atomically((rows) => rows.get(Ckeys.bundle(scope)) ?? null) }
 
   protected async doCreateBundle(bundle: VaultBundle) {
-    const ckey = Caret.bundle(bundle)
+    const ckey = Ckeys.bundle(bundle)
     const created = await this.step({ check: (rows) => ! rows.has(ckey), write: (rows) => { rows.set(ckey, bundle) } })
     return created ? bundle : await this.backend.atomically((rows) => rows.get(ckey))
   }
 
   protected doUpdateBundle(bundle: VaultBundle, expected: BundleExpectation) {
-    const ckey = Caret.bundle(bundle)
+    const ckey = Ckeys.bundle(bundle)
     const meets = (rows: Rows) => {
       const standing = rows.get(ckey) as VaultBundle | undefined
       return standing?.vault_id === expected.vault_id && standing.unlock_epoch === expected.unlock_epoch
@@ -872,7 +868,7 @@ class RoundTripVaultDB extends VaultDB {
     return this.step({ check: meets, write: (rows) => { rows.set(ckey, bundle) } })
   }
 
-  protected doReadBox(scope: VaultScope, boxlabel: string) { return this.backend.atomically((rows) => rows.get(Caret.box(scope, boxlabel)) ?? null) }
+  protected doReadBox(scope: VaultScope, boxlabel: string) { return this.backend.atomically((rows) => rows.get(Ckeys.box(scope, boxlabel)) ?? null) }
 
   protected async doListBoxes(scope: VaultScope): Promise<StoredLockbox[]> {
     const listed = await this.backend.atomically((rows) => boxesIn(rows, scope))
@@ -880,7 +876,7 @@ class RoundTripVaultDB extends VaultDB {
   }
 
   protected async doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation) {
-    const ckey = Caret.box(scope, lockbox.boxlabel)
+    const ckey = Ckeys.box(scope, lockbox.boxlabel)
     const isNew = expected.revision_id === null
     const full = (rows: Rows) => isNew && boxesIn(rows, scope).length >= this.maxLockboxes
     if (this.opts.countsApart && await this.backend.atomically((rows) => full(rows) && vaultIs(rows, scope, expected) && ! rows.has(ckey))) {
@@ -899,16 +895,16 @@ class RoundTripVaultDB extends VaultDB {
   }
 
   protected doEraseBox(scope: VaultScope, boxlabel: string, expected: EraseExpectation) {
-    return this.step({ check: (rows) => vaultIs(rows, scope, expected), write: (rows) => { rows.delete(Caret.box(scope, boxlabel)) } })
+    return this.step({ check: (rows) => vaultIs(rows, scope, expected), write: (rows) => { rows.delete(Ckeys.box(scope, boxlabel)) } })
   }
 
   protected doEraseVault(scope: VaultScope, expected: EraseExpectation) {
     const erase = (rows: Rows) => {
-      const isBox = Caret.isBoxIn(scope)
+      const isBox = Ckeys.isBoxIn(scope)
       for (const ckey of rows.keys()) {
         if (isBox(ckey)) { rows.delete(ckey) }
       }
-      rows.delete(Caret.bundle(scope))
+      rows.delete(Ckeys.bundle(scope))
     }
     return this.step({ check: (rows) => vaultIs(rows, scope, expected), write: erase })
   }
@@ -946,11 +942,11 @@ class RoundTripVaultDB extends VaultDB {
   }
 }
 
-const vaultIs = (rows: Rows, scope: VaultScope, expected: { vault_id: string }) => (rows.get(Caret.bundle(scope)) as VaultBundle | undefined)?.vault_id === expected.vault_id
-const vaultKeyIs = (rows: Rows, scope: VaultScope, expected: { vault_key_epoch: number }) => (rows.get(Caret.bundle(scope)) as VaultBundle | undefined)?.vault_key_epoch === expected.vault_key_epoch
+const vaultIs = (rows: Rows, scope: VaultScope, expected: { vault_id: string }) => (rows.get(Ckeys.bundle(scope)) as VaultBundle | undefined)?.vault_id === expected.vault_id
+const vaultKeyIs = (rows: Rows, scope: VaultScope, expected: { vault_key_epoch: number }) => (rows.get(Ckeys.bundle(scope)) as VaultBundle | undefined)?.vault_key_epoch === expected.vault_key_epoch
 
 const boxesIn = (rows: Rows, scope: VaultScope): StoredLockbox[] => [...rows]
-  .map(([ckey, lockbox]) => ({ boxlabel: Caret.isBoxIn(scope)(ckey) ? Caret.boxlabelOf(ckey) : null, lockbox }))
+  .map(([ckey, lockbox]) => ({ boxlabel: Ckeys.isBoxIn(scope)(ckey) ? Ckeys.boxlabelOf(ckey) : null, lockbox }))
   .filter((stored): stored is StoredLockbox => stored.boxlabel !== null)
 
 const vaultFull = () => new VaultError('vault_full', 'This vault is full: erase a lockbox to make room, then try again.')

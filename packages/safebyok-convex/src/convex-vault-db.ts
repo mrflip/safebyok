@@ -103,7 +103,6 @@ class ConvexVaultDB extends VaultDB {
   readonly maxLockboxes = MaxVaultLockboxes
   // Each name is a field of its own, any text Convex holds: the floor's 1 KiB bounds them.
   readonly maxNameBytes = Infinity
-  readonly reservedNameChars = ''
 
   private readonly client: ConvexVaultClient
   private readonly api:    SafebyokApi

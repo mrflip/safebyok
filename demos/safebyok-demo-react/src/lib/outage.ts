@@ -54,7 +54,6 @@ export class OutageVaultDB extends VaultDB {
   readonly maxVaultBytes: number
   readonly maxLockboxes: number
   readonly maxNameBytes: number
-  readonly reservedNameChars: string
   private readonly inner: VaultDB
   private readonly outage: Outage
 
@@ -70,7 +69,6 @@ export class OutageVaultDB extends VaultDB {
     this.maxVaultBytes = inner.maxVaultBytes
     this.maxLockboxes = inner.maxLockboxes
     this.maxNameBytes = inner.maxNameBytes
-    this.reservedNameChars = inner.reservedNameChars
   }
 
   protected async doReadBundle(scope: VaultScope): Promise<unknown> {

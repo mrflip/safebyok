@@ -229,7 +229,6 @@ class TablesVaultDB extends VaultDB implements PostgresVaultDB {
   // Each name is a column of its own, but a lockbox's four make up one primary key, and a btree
   // entry holds at most 2704 bytes: four names of this many fit with room for its overhead.
   readonly maxNameBytes = MaxNameBytes
-  readonly reservedNameChars = ''
 
   private readonly client: PostgresClient
   private readonly userId: string | null
@@ -316,12 +315,12 @@ class TablesVaultDB extends VaultDB implements PostgresVaultDB {
   }
 
   async listBoxRecords(scope: VaultScope): Promise<unknown[]> {
-    const checked = VaultScope.safeParse(scope)
-    if (! checked.success) {
-      throw new VaultError('bad_label', 'A vault scope is an applabel, a user_id and a vaultlabel, each text.')
+    const asked = heldScope(scope)
+    if (asked === null) {
+      throw new VaultError('bad_label', `A vault scope is an applabel, a user_id and a vaultlabel, each a name above the floor every name is held to and at most ${String(MaxNameBytes)} bytes of UTF-8.`)
     }
     try {
-      const listed = await this.doListBoxes(checked.data)
+      const listed = await this.doListBoxes(asked)
       return listed.map((stored) => stored.lockbox)
     } catch (err) {
       if (err instanceof VaultError) { throw err }
@@ -371,6 +370,14 @@ const ForeignKeyViolation = '23503'
  * user_id, vaultlabel and boxlabel together, and Postgres refuses a btree entry over 2704 bytes.
  */
 const MaxNameBytes = 640
+
+/** `scope`, once its names pass the floor and each fits in {@link MaxNameBytes}; null otherwise. */
+const heldScope = (scope: unknown): VaultScope | null => {
+  const checked = VaultScope.safeParse(scope)
+  if (! checked.success) { return null }
+  const { applabel, user_id: userId, vaultlabel } = checked.data
+  return [applabel, userId, vaultlabel].every((part) => new TextEncoder().encode(part).length <= MaxNameBytes) ? checked.data : null
+}
 
 const scopeParams = (scope: VaultScope): string[] => [scope.applabel, scope.user_id, scope.vaultlabel]
 

@@ -3,6 +3,7 @@ import * as ZClassic from 'zod'
 import * as Validators from '../src/validators'
 import { AnyTextValidators, DefaultValidators, Label, LabelPattern, LockboxNote, MaxLabelChars, MaxNoteChars, MaxUserIdChars, NameFloor, NameFloorBytes, NoteFloor, NoteFloorBytes, UserId, UserIdPattern } from '../src/validators'
 import { VaultScope } from '../src/types'
+import * as Ckeys from '../src/ckeys'
 import * as TH from './test-helpers'
 
 describe("safebyok/validators, as an entry point", () => {
@@ -114,6 +115,7 @@ const NameFloorCases = [
   ["tab\there",                      false,  'a tab'],
   ["line\nbreak",                    false,  'a newline'],
   ["nul\0",                          false,  'a NUL'],
+  ["a^b",                            false,  'a ^, which key-value stores join names on'],
   ["next\u{85}line",                 false,  'a C1 control character'],
   [42,                               false,  'a number is not a name'],
 ] as const
@@ -131,6 +133,12 @@ describe("NameFloor", () => {
     expect(NameFloor.safeParse('key \u{D83D}').success).to.be.false
     expect(NameFloor.safeParse('cafe\u{301}').success).to.be.false
     expect(NameFloor.safeParse('tab\there').success).to.be.false
+    expect(NameFloor.safeParse('a^b').success).to.be.false
+  })
+
+  it("refuses the very character Ckeys joins on, so every store refuses it alike", () => {
+    expect(NameFloor.safeParse(`a${Ckeys.Delimiter}b`).success).to.be.false
+    expect(said(`secret-ish${Ckeys.Delimiter}`)).to.include('no ^')
   })
 
   it("says what is wrong, quoting nothing", () => {

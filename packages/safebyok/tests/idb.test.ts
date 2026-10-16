@@ -57,14 +57,14 @@ describe("idbDeviceDB", () => {
     const cursors = vi.spyOn(IDBObjectStore.prototype, 'openCursor')
     try {
       expect(await deviceDB.readUnlock(TH.scopeOf('u1'))).to.be.null
-      expect(gets.mock.calls.map(([ckey]) => ckey)).to.deep.equal([Ckeys.joiner().unlock(TH.scopeOf('u1'))])
+      expect(gets.mock.calls.map(([ckey]) => ckey)).to.deep.equal([Ckeys.unlock(TH.scopeOf('u1'))])
       expect(getAlls).to.have.callCount(0)
       expect(cursors).to.have.callCount(0)
     } finally {
       vi.restoreAllMocks()
     }
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
-    expect(rows.map((row) => row.ckey)).to.deep.equal([Ckeys.joiner().unlock(TH.scopeOf('u2'))])
+    expect(rows.map((row) => row.ckey)).to.deep.equal([Ckeys.unlock(TH.scopeOf('u2'))])
   })
 
   it("sweeps them at an erase too, keeping every unlock it filed", async () => {
@@ -76,7 +76,7 @@ describe("idbDeviceDB", () => {
     await deviceDB.eraseUnlock(TH.scopeOf('u3'))
     expect(await deviceDB.readUnlock(TH.scopeOf('u2'))).to.not.be.null
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
-    expect(rows.map((row) => row.ckey)).to.deep.equal([Ckeys.joiner().unlock(TH.scopeOf('u2'))])
+    expect(rows.map((row) => row.ckey)).to.deep.equal([Ckeys.unlock(TH.scopeOf('u2'))])
   })
 
   it("keeps every device mark through a sweep: a mark's ckey is one this version files", async () => {
@@ -87,13 +87,13 @@ describe("idbDeviceDB", () => {
     await deviceDB.writeMark(TH.markOf('u1'))
     await deviceDB.readUnlock(TH.scopeOf('u1'))
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
-    expect(rows.map((row) => row.ckey)).to.deep.equal([Ckeys.joiner().mark(TH.scopeOf('u1'))])
+    expect(rows.map((row) => row.ckey)).to.deep.equal([Ckeys.mark(TH.scopeOf('u1'))])
   })
 
   it("reads a mark that does not pass its check as none, and drops it", async () => {
     const dbName = TH.freshDbName()
     const shelf = createStore(`${dbName}:device_db`, 'records')
-    await set(Ckeys.joiner().mark(TH.scopeOf('u1')), { ...TH.markOf('u1'), unlock_epoch: 'one' }, shelf)
+    await set(Ckeys.mark(TH.scopeOf('u1')), { ...TH.markOf('u1'), unlock_epoch: 'one' }, shelf)
     const deviceDB = idbDeviceDB({ dbName })
     expect(await deviceDB.readMark(TH.scopeOf('u1'))).to.be.null
     expect(await inspectIdbDeviceDB({ dbName }).rows()).to.have.lengthOf(0)

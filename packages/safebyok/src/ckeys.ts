@@ -1,114 +1,122 @@
-import * as Z from 'zod/mini'
 import { VaultError } from './errors'
 import type { VaultScope } from './types'
 
 /**
  * The ckeys safebyok's key-value adapters file rows under -- `localVaultDB`, `idbVaultDB`,
  * `idbDeviceDB` and `memoryDeviceDB`, and any adapter of your own over a key-value store: the
- * row's kind, then the scope, then (for a lockbox) its boxlabel, joined by one delimiter, `^`
- * unless the adapter was made with another:
+ * row's kind, then the scope, then (for a lockbox) its boxlabel, joined on `^`:
  *
  *     vault^acme^u1^main
  *     box^acme^u1^main^anthropic
  *     unlock^acme^u1^main
  *     mark^acme^u1^main
  *
- * A name holding the delimiter is refused (kind 'bad_label') rather than joined, so no two rows
- * ever share a ckey, and every ckey splits back into the names it was made from. The default
- * validators admit neither `^` nor `/`, so an adapter joining on either holds every name they pass.
- * A row's ckey is part of what is stored: an adapter that files rows under these keeps them where
- * every other device's copy of the package looks for them.
+ * No name holds `^`: the floor every name is held to (`NameFloor`) refuses it, whatever a host's
+ * validators admit, and each function here refuses one too (kind 'bad_label') rather than join
+ * it. So no two rows ever share a ckey, and every ckey splits back into the names it was made
+ * from. A row's ckey is part of what is stored: an adapter that files rows under these keeps them
+ * where every other device's copy of the package looks for them.
  */
 
-/** The delimiter a key-value adapter joins names on when it is made with no other: `^`. */
-export const DefaultDelimiter = '^'
+/** The character every ckey joins its parts on, which no name may hold: `^`. */
+export const Delimiter = '^'
 
 /**
- * The ckeys of one delimiter: what a key-value adapter files and finds its rows by. Each of
- * `bundle`, `box`, `unlock` and `mark` refuses, with kind 'bad_label', a name holding the
- * delimiter, naming the part and never quoting it.
- */
-export type CkeyJoiner = {
-  /** The one character the names are joined on, which no name may hold. */
-  readonly delimiter: string
-  /** The ckey of `scope`'s bundle: `vault^acme^u1^main`. */
-  bundle: (scope: VaultScope) => string
-  /** The ckey of the lockbox under `boxlabel` in `scope`: `box^acme^u1^main^anthropic`. */
-  box: (scope: VaultScope, boxlabel: string) => string
-  /** The ckey of `scope`'s remembered unlock, on a device's own storage: `unlock^acme^u1^main`. */
-  unlock: (scope: VaultScope) => string
-  /** The ckey of `scope`'s device mark, on a device's own storage: `mark^acme^u1^main`. */
-  mark: (scope: VaultScope) => string
-  /**
-   * The text that begins the ckey of every lockbox in `scope`, and of nothing else safebyok
-   * writes, `box^acme^u1^main^`: a store that scans by prefix, or by a key range from it, lists a
-   * vault's lockboxes with it.
-   */
-  boxPrefix: (scope: VaultScope) => string
-  /** A test for the ckeys of `scope`'s lockboxes, for filtering every ckey in a store: false for anything else, and for anything not text. */
-  isBoxIn: (scope: VaultScope) => ((ckey: unknown) => ckey is string)
-  /** The boxlabel a lockbox's ckey files it under, its last part; null for text {@link CkeyJoiner.box} would not give. */
-  boxlabelOf: (ckey: string) => string | null
-  /** True for each ckey {@link CkeyJoiner.unlock} gives, of any scope; false for any other text, and for anything not text. */
-  isUnlock: (ckey: unknown) => ckey is string
-  /** True for each ckey {@link CkeyJoiner.mark} gives, of any scope; false for any other text, and for anything not text. */
-  isMark: (ckey: unknown) => ckey is string
-}
-
-/**
- * The ckeys joined on `delimiter`, one character: `^` when it is left out. Kind 'bad_option' for
- * anything but one character.
+ * The ckey of `scope`'s bundle.
  *
- * @example joiner().box(scope, 'anthropic')                    // 'box^acme^u1^main^anthropic'
- * @example joiner('/').bundle(scope)                           // 'vault/acme/u1/main'
- * @example joiner().boxlabelOf('box^acme^u1^main^anthropic')   // 'anthropic'
- * @example joiner().box({ ...scope, user_id: 'a^b' }, 'x')     // throws: bad_label
+ * @example bundle(scope)  // 'vault^acme^u1^main'
  */
-export const joiner = (delimiter?: string): CkeyJoiner => {
-  const checked = Delimiter.safeParse(delimiter)
-  if (! checked.success) {
-    throw new VaultError('bad_option', `ckeyDelimiter is the one character a key-value store joins names on, which no name may then hold: leave it out for '${DefaultDelimiter}'.`)
-  }
-  const joinedOn = checked.data
-  const join = (parts: readonly Part[]): string => parts.map(([said, part]) => partOf(joinedOn, said, part)).join(joinedOn)
-  const boxPrefix = (scope: VaultScope) => `${join([['kind', 'box'], ...scopeParts(scope)])}${joinedOn}`
-  const unlockPrefix = `unlock${joinedOn}`
-  const markPrefix = `mark${joinedOn}`
-  return Object.freeze({
-    delimiter:  joinedOn,
-    bundle:     (scope: VaultScope) => join([['kind', 'vault'], ...scopeParts(scope)]),
-    box:        (scope: VaultScope, boxlabel: string) => join([['kind', 'box'], ...scopeParts(scope), ['boxlabel', boxlabel]]),
-    unlock:     (scope: VaultScope) => join([['kind', 'unlock'], ...scopeParts(scope)]),
-    mark:       (scope: VaultScope) => join([['kind', 'mark'], ...scopeParts(scope)]),
-    boxPrefix,
-    isBoxIn:    (scope: VaultScope) => {
-      const prefix = boxPrefix(scope)
-      return (ckey: unknown): ckey is string => typeof ckey === 'string' && ckey.startsWith(prefix)
-    },
-    boxlabelOf: (ckey: string) => {
-      const parts = ckey.split(joinedOn)
-      return parts.length === BoxParts && parts[0] === 'box' ? parts[BoxParts - 1] ?? null : null
-    },
-    isUnlock:   (ckey: unknown): ckey is string => typeof ckey === 'string' && ckey.startsWith(unlockPrefix),
-    isMark:     (ckey: unknown): ckey is string => typeof ckey === 'string' && ckey.startsWith(markPrefix),
-  })
+export const bundle = (scope: VaultScope): string => join([['kind', 'vault'], ...scopeParts(scope)])
+
+/**
+ * The ckey of the lockbox under `boxlabel` in `scope`.
+ *
+ * @example box(scope, 'anthropic')  // 'box^acme^u1^main^anthropic'
+ */
+export const box = (scope: VaultScope, boxlabel: string): string => join([['kind', 'box'], ...scopeParts(scope), ['boxlabel', boxlabel]])
+
+/**
+ * The ckey of `scope`'s remembered unlock, on a device's own storage.
+ *
+ * @example unlock(scope)  // 'unlock^acme^u1^main'
+ */
+export const unlock = (scope: VaultScope): string => join([['kind', 'unlock'], ...scopeParts(scope)])
+
+/**
+ * The ckey of `scope`'s device mark, on a device's own storage.
+ *
+ * @example mark(scope)  // 'mark^acme^u1^main'
+ */
+export const mark = (scope: VaultScope): string => join([['kind', 'mark'], ...scopeParts(scope)])
+
+/**
+ * The text that begins the ckey of every lockbox in `scope`, and of nothing else safebyok
+ * writes: a store that scans by prefix, or by a key range from it, lists a vault's lockboxes with
+ * it. As no name holds `^`, no other vault's ckeys begin with it.
+ *
+ * @example boxPrefix(scope)  // 'box^acme^u1^main^'
+ */
+export const boxPrefix = (scope: VaultScope): string => `${join([['kind', 'box'], ...scopeParts(scope)])}${Delimiter}`
+
+/**
+ * A test for the ckeys of `scope`'s lockboxes, for filtering every ckey in a store: true for
+ * each ckey {@link box} gives for `scope`, false for any other ckey safebyok writes, and false for
+ * anything that is not text.
+ *
+ * @example store.ckeys().filter(isBoxIn(scope))
+ */
+export const isBoxIn = (scope: VaultScope): ((ckey: unknown) => ckey is string) => {
+  const prefix = boxPrefix(scope)
+  return (ckey: unknown): ckey is string => typeof ckey === 'string' && ckey.startsWith(prefix)
 }
+
+/**
+ * The boxlabel a lockbox's ckey files it under, its last part: null for text {@link box} would
+ * not give -- another kind's ckey, too few parts or too many, an earlier version's ckey.
+ *
+ * @example boxlabelOf(box(scope, 'anthropic'))  // 'anthropic'
+ */
+export const boxlabelOf = (ckey: string): string | null => {
+  const parts = ckey.split(Delimiter)
+  return parts.length === BoxParts && parts[0] === 'box' ? parts[BoxParts - 1] ?? null : null
+}
+
+/**
+ * True for each ckey {@link unlock} gives, for any scope, false for any other ckey safebyok writes
+ * or wrote before, and false for anything that is not text. On a device shelf, which holds
+ * remembered unlocks and device marks, a row it and {@link isMark} both refuse is one this
+ * version did not write.
+ *
+ * @example isUnlock(unlock(scope))                    // true
+ * @example isUnlock('["unlock","acme","u1","main"]')  // false: an earlier version's ckey
+ */
+export const isUnlock = (ckey: unknown): ckey is string => typeof ckey === 'string' && ckey.startsWith(`unlock${Delimiter}`)
+
+/**
+ * True for each ckey {@link mark} gives, for any scope, false for any other ckey safebyok writes,
+ * and false for anything that is not text.
+ *
+ * @example isMark(mark(scope))     // true
+ * @example isMark(unlock(scope))   // false
+ */
+export const isMark = (ckey: unknown): ckey is string => typeof ckey === 'string' && ckey.startsWith(`mark${Delimiter}`)
 
 /** One part of a ckey, beside what a refusal calls it: a row's kind, or one of its names. */
 type Part = readonly [said: string, part: string]
 
-/** A scope's three names, each beside what a refusal calls it. */
-const scopeParts = (scope: VaultScope): Part[] => [['applabel', scope.applabel], ['user_id', scope.user_id], ['vaultlabel', scope.vaultlabel]]
-
 /** A lockbox's ckey has five parts: its kind, the scope's three names, and its boxlabel. */
 const BoxParts = 5
 
-const Delimiter = Z._default(Z.string().check(Z.length(1)), DefaultDelimiter)
+/** A scope's three names, each beside what a refusal calls it. */
+const scopeParts = (scope: VaultScope): Part[] => [['applabel', scope.applabel], ['user_id', scope.user_id], ['vaultlabel', scope.vaultlabel]]
 
-/** `part`, once it is free of the delimiter: kind 'bad_label' otherwise, naming the part and quoting none of it. */
-const partOf = (delimiter: string, said: string, part: string): string => {
-  if (part.includes(delimiter)) {
-    throw new VaultError('bad_label', `That ${said} holds '${delimiter}', which this storage joins names on, so it can't be stored here: choose a ${said} without it.`)
+/** `part`, once it is free of `^`: kind 'bad_label' otherwise, naming the part and quoting none of it. */
+const partOf = ([said, part]: Part): string => {
+  if (part.includes(Delimiter)) {
+    throw new VaultError('bad_label', `That ${said} holds '${Delimiter}', which no name may hold: storage joins names on it.`)
   }
   return part
 }
+
+/** `parts` joined on `^`, each refused if it holds one. */
+const join = (parts: readonly Part[]): string => parts.map((part) => partOf(part)).join(Delimiter)

@@ -875,7 +875,6 @@ export const VaultDBContract = Object.freeze({
   '7.1': 'The most it holds in one record',
   '7.2': 'The most it holds of one vault',
   '7.3': 'The most it holds in one name',
-  '7.4': 'The characters it cannot hold in a name',
 } as const)
 
 /** A numbered line of the VaultDB contract, such as `'3.3'`. */
@@ -886,7 +885,7 @@ export type VaultDBContractLine = keyof typeof VaultDBContract
  * VaultDB from the built package (`safebyok`) qualifies as readily as one extending `src/`.
  */
 export type VaultDBVerbs = Pick<VaultDB,
-  'maxRecordBytes' | 'maxVaultBytes' | 'maxLockboxes' | 'maxNameBytes' | 'reservedNameChars' | 'readBundle' | 'createBundle' | 'updateBundle' | 'readBox' | 'listBoxes' | 'updateBox' | 'eraseBox' | 'eraseVault' | 'eraseDamagedVault' | 'subscribe'
+  'maxRecordBytes' | 'maxVaultBytes' | 'maxLockboxes' | 'maxNameBytes' | 'readBundle' | 'createBundle' | 'updateBundle' | 'readBox' | 'listBoxes' | 'updateBox' | 'eraseBox' | 'eraseVault' | 'eraseDamagedVault' | 'subscribe'
 >
 
 /** What {@link describeVaultDB} takes beside its adapter. */
@@ -1477,6 +1476,18 @@ export const describeVaultDB = (adapterTitle: string, makeVaultDB: () => VaultDB
       expect(await vaultDB.listBoxes(scopeOf('u1'))).to.have.lengthOf(0)
     })
 
+    it("refuses a name holding ^, which key-value stores join names on, as bad_label in every place a name goes, whatever the store, writing nothing", async () => {
+      const vaultDB = await withBundle()
+      const holding = 'a^b'
+      await expectRefusal(vaultDB.createBundle(bundleOf(holding)), 'bad_label')
+      await expectRefusal(vaultDB.readBundle({ ...scopeOf('u1'), applabel: holding }), 'bad_label')
+      await expectRefusal(vaultDB.listBoxes({ ...scopeOf('u1'), vaultlabel: holding }), 'bad_label')
+      await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf(holding, 'one'), noBoxYet), 'bad_label')
+      await expectRefusal(vaultDB.readBox(scopeOf('u1'), holding), 'bad_label')
+      await expectRefusal(vaultDB.eraseBox(scopeOf('u1'), holding, thisVault), 'bad_label')
+      expect(await vaultDB.listBoxes(scopeOf('u1'))).to.have.lengthOf(0)
+    })
+
     it("takes any name above the floor, whatever a vault's validators would say: they are the vault's, at its entry", async () => {
       const vaultDB = await withBundle()
       await vaultDB.updateBox(scopeOf('u1'), boxOf('Not a Label!', 'one', { note: 'n'.repeat(300) }), noBoxYet)
@@ -1581,27 +1592,6 @@ export const describeVaultDB = (adapterTitle: string, makeVaultDB: () => VaultDB
       await expectRefusal(vaultDB.readBundle({ ...scopeOf('u1'), applabel: overlong }), 'bad_label')
       await expectRefusal(vaultDB.readBundle({ ...scopeOf('u1'), vaultlabel: overlong }), 'bad_label')
       await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf(overlong, 'one'), noBoxYet), 'bad_label')
-      expect(await vaultDB.listBoxes(scopeOf('u1'))).to.have.lengthOf(0)
-    })
-  })
-
-  describe(lineTitle('7.4'), () => {
-    it("declares the characters it cannot hold in a name, as text", async () => {
-      const vaultDB = await makeVaultDB()
-      expect(vaultDB.reservedNameChars).to.be.a('string')
-    })
-
-    it("refuses a name holding any of them as bad_label, in every place a name goes, writing nothing", async () => {
-      const vaultDB = await withBundle()
-      for (const reserved of vaultDB.reservedNameChars) {
-        const holding = `a${reserved}b`
-        await expectRefusal(vaultDB.createBundle(bundleOf(holding)), 'bad_label')
-        await expectRefusal(vaultDB.readBundle({ ...scopeOf('u1'), applabel: holding }), 'bad_label')
-        await expectRefusal(vaultDB.listBoxes({ ...scopeOf('u1'), vaultlabel: holding }), 'bad_label')
-        await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf(holding, 'one'), noBoxYet), 'bad_label')
-        await expectRefusal(vaultDB.readBox(scopeOf('u1'), holding), 'bad_label')
-        await expectRefusal(vaultDB.eraseBox(scopeOf('u1'), holding, thisVault), 'bad_label')
-      }
       expect(await vaultDB.listBoxes(scopeOf('u1'))).to.have.lengthOf(0)
     })
   })
@@ -2175,7 +2165,6 @@ export const perUser = (vaultDBFor: (userId: string) => VaultDBVerbs): VaultDBVe
     maxVaultBytes:  anyone.maxVaultBytes,
     maxLockboxes:   anyone.maxLockboxes,
     maxNameBytes:   anyone.maxNameBytes,
-    reservedNameChars: anyone.reservedNameChars,
     readBundle:     (scope) => as(scope).readBundle(scope),
     createBundle:   (bundle) => as(bundle).createBundle(bundle),
     updateBundle:   (bundle, expected) => as(bundle).updateBundle(bundle, expected),
@@ -2299,7 +2288,7 @@ export const expectRefusal = async (operation: Promise<unknown>, kind: VaultErro
  * @param kind - The refusal's expected `kind`.
  * @returns The refusal, for a closer look at its message.
  *
- * @example TH.expectSyncRefusal(() => Ckeys.joiner('^^'), 'bad_option')
+ * @example TH.expectSyncRefusal(() => Ckeys.box({ ...scope, user_id: 'a^b' }, 'x'), 'bad_label')
  */
 export const expectSyncRefusal = (attempt: () => unknown, kind: VaultErrorKind): VaultError => {
   let refusal: unknown = NotRefused

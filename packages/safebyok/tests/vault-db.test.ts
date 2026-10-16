@@ -8,8 +8,6 @@ import * as Ckeys from '../src/ckeys'
 import { NameFloorBytes, NoteFloorBytes } from '../src/validators'
 import * as TH from './test-helpers'
 
-/** The ckeys a MapVaultDB files its rows under. */
-const Caret = Ckeys.joiner()
 
 /**
  * The smallest honest adapter: a Map of records, each check-and-write in one synchronous step.
@@ -24,7 +22,6 @@ class MapVaultDB extends VaultDB {
   readonly maxVaultBytes = Infinity
   readonly maxLockboxes: number
   readonly maxNameBytes: number = Infinity
-  readonly reservedNameChars: string = Ckeys.DefaultDelimiter
   readonly rows: Map<string, unknown>
 
   constructor(maxLockboxes = Infinity, rows = new Map<string, unknown>()) {
@@ -33,57 +30,57 @@ class MapVaultDB extends VaultDB {
     this.rows = rows
   }
 
-  private standingBundle(scope: VaultScope) { return this.rows.get(Caret.bundle(scope)) as VaultBundle | undefined }
+  private standingBundle(scope: VaultScope) { return this.rows.get(Ckeys.bundle(scope)) as VaultBundle | undefined }
 
-  protected doReadBundle(scope: VaultScope): Promise<unknown> { return Promise.resolve(this.rows.get(Caret.bundle(scope)) ?? null) }
+  protected doReadBundle(scope: VaultScope): Promise<unknown> { return Promise.resolve(this.rows.get(Ckeys.bundle(scope)) ?? null) }
 
   protected doCreateBundle(bundle: VaultBundle) {
-    if (! this.rows.has(Caret.bundle(bundle))) { this.rows.set(Caret.bundle(bundle), bundle) }
-    return Promise.resolve(this.rows.get(Caret.bundle(bundle)))
+    if (! this.rows.has(Ckeys.bundle(bundle))) { this.rows.set(Ckeys.bundle(bundle), bundle) }
+    return Promise.resolve(this.rows.get(Ckeys.bundle(bundle)))
   }
 
   protected doUpdateBundle(bundle: VaultBundle, expected: BundleExpectation) {
     const standing = this.standingBundle(bundle)
     if (standing?.vault_id !== expected.vault_id || standing.unlock_epoch !== expected.unlock_epoch) { return Promise.resolve(false) }
-    this.rows.set(Caret.bundle(bundle), bundle)
+    this.rows.set(Ckeys.bundle(bundle), bundle)
     return Promise.resolve(true)
   }
 
-  protected doReadBox(scope: VaultScope, boxlabel: string) { return Promise.resolve(this.rows.get(Caret.box(scope, boxlabel)) ?? null) }
+  protected doReadBox(scope: VaultScope, boxlabel: string) { return Promise.resolve(this.rows.get(Ckeys.box(scope, boxlabel)) ?? null) }
 
   protected doListBoxes(scope: VaultScope): Promise<StoredLockbox[]> {
-    const isBox = Caret.isBoxIn(scope)
-    const listed = [...this.rows].filter(([ckey]) => isBox(ckey)).map(([ckey, row]) => ({ boxlabel: Caret.boxlabelOf(ckey), lockbox: row }))
+    const isBox = Ckeys.isBoxIn(scope)
+    const listed = [...this.rows].filter(([ckey]) => isBox(ckey)).map(([ckey, row]) => ({ boxlabel: Ckeys.boxlabelOf(ckey), lockbox: row }))
     return Promise.resolve(listed.filter((stored): stored is StoredLockbox => stored.boxlabel !== null))
   }
 
   protected doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation) {
-    const standingBox = this.rows.get(Caret.box(scope, lockbox.boxlabel)) as Lockbox | undefined
+    const standingBox = this.rows.get(Ckeys.box(scope, lockbox.boxlabel)) as Lockbox | undefined
     const standingBundle = this.standingBundle(scope)
     const meets = standingBundle?.vault_id === expected.vault_id && standingBundle.vault_key_epoch === expected.vault_key_epoch
       && (standingBox?.revision_id ?? null) === expected.revision_id
     if (! meets) {
       return Promise.resolve(false)
     }
-    const isBox = Caret.isBoxIn(scope)
+    const isBox = Ckeys.isBoxIn(scope)
     const held = [...this.rows].filter(([ckey]) => isBox(ckey)).length
     if (standingBox === undefined && held >= this.maxLockboxes) {
       return Promise.reject(new VaultError('vault_full', 'This vault is full: erase a lockbox to make room, then try again.'))
     }
-    this.rows.set(Caret.box(scope, lockbox.boxlabel), lockbox)
+    this.rows.set(Ckeys.box(scope, lockbox.boxlabel), lockbox)
     return Promise.resolve(true)
   }
 
   protected doEraseBox(scope: VaultScope, boxlabel: string, expected: EraseExpectation) {
     if (this.standingBundle(scope)?.vault_id !== expected.vault_id) { return Promise.resolve(false) }
-    this.rows.delete(Caret.box(scope, boxlabel))
+    this.rows.delete(Ckeys.box(scope, boxlabel))
     return Promise.resolve(true)
   }
 
   protected doEraseVault(scope: VaultScope, expected: EraseExpectation) {
     if (this.standingBundle(scope)?.vault_id !== expected.vault_id) { return Promise.resolve(false) }
-    const doomed = [...this.rows].map(([ckey]) => ckey).filter(Caret.isBoxIn(scope))
-    for (const ckey of [...doomed, Caret.bundle(scope)]) { this.rows.delete(ckey) }
+    const doomed = [...this.rows].map(([ckey]) => ckey).filter(Ckeys.isBoxIn(scope))
+    for (const ckey of [...doomed, Ckeys.bundle(scope)]) { this.rows.delete(ckey) }
     return Promise.resolve(true)
   }
 }
@@ -137,11 +134,6 @@ describe("localVaultDB", () => {
     expect(vaultDB.maxNameBytes).to.eq(Infinity)
   })
 
-  it("reserves the ^ its ckeys join names on, or the delimiter it was made with", () => {
-    expect(localVaultDB(memoryStore()).reservedNameChars).to.eq('^')
-    expect(localVaultDB(memoryStore(), { ckeyDelimiter: '/' }).reservedNameChars).to.eq('/')
-  })
-
   it("reads rows filed under the ckeys of earlier versions as absent, and leaves them be", async () => {
     const store = memoryStore()
     const earlier = ['vault:acme:u1:main', 'box:acme:u1:main:anthropic', '["vault","acme","u1","main"]', '["box","acme","u1","main","anthropic"]']
@@ -153,24 +145,6 @@ describe("localVaultDB", () => {
     expect(await vaultDB.readBox(TH.scopeOf('u1'), 'anthropic')).to.be.null
     expect(await vaultDB.listBoxes(TH.scopeOf('u1'))).to.have.lengthOf(0)
     expect(store.ckeys()).to.have.members(earlier)
-  })
-
-  it("files its rows under a delimiter of the host's, and round-trips them, as its second example shows", async () => {
-    const store = memoryStore()
-    const vaultDB = localVaultDB(store, { ckeyDelimiter: '/' })
-    const scope = TH.scopeOf('u1^x')
-    await vaultDB.createBundle(TH.bundleOf('u1^x'))
-    await vaultDB.updateBox(scope, TH.boxOf('anthro^pic', 'one'), { vault_id: 'vault-id-u1^x', revision_id: null, vault_key_epoch: 1 })
-    expect(store.ckeys()).to.have.members(['vault/acme/u1^x/main', 'box/acme/u1^x/main/anthro^pic'])
-    const lockbox = await vaultDB.readBox(scope, 'anthro^pic')
-    expect(lockbox?.revision_id).to.eq('rev-one')
-    const listed = await vaultDB.listBoxes(scope)
-    expect(listed.map((box) => box.boxlabel)).to.deep.equal(['anthro^pic'])
-    await TH.expectRefusal(vaultDB.readBox(scope, 'a/b'), 'bad_label')
-  })
-
-  it("refuses a delimiter that is not one character as bad_option", () => {
-    TH.expectSyncRefusal(() => localVaultDB(memoryStore(), { ckeyDelimiter: '::' }), 'bad_option')
   })
 
   it("reads lockboxes as written today, with a note and without one, and writes them back the same", async () => {
@@ -195,14 +169,14 @@ describe("localVaultDB", () => {
   it("lists a row that is not JSON as damaged, under the boxlabel it is stored under, beside the sound ones", async () => {
     const store = memoryStore()
     const scope = TH.scopeOf('u1')
-    store.write(Caret.bundle(scope), JSON.stringify(TH.bundleOf('u1')))
-    store.write(Caret.box(scope, 'openai'), JSON.stringify(TH.boxOf('openai', 'two')))
-    store.write(Caret.box(scope, 'anthropic'), '{"not": json')
+    store.write(Ckeys.bundle(scope), JSON.stringify(TH.bundleOf('u1')))
+    store.write(Ckeys.box(scope, 'openai'), JSON.stringify(TH.boxOf('openai', 'two')))
+    store.write(Ckeys.box(scope, 'anthropic'), '{"not": json')
     const listed = await localVaultDB(store).listBoxes(scope)
     expect(listed[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true })
     expect(listed[1]).to.include({ boxlabel: 'openai', revision_id: 'rev-two', damaged: false })
     // Listed, never repaired: the row is still there for forensics.
-    expect(store.read(Caret.box(scope, 'anthropic'))).to.eq('{"not": json')
+    expect(store.read(Ckeys.box(scope, 'anthropic'))).to.eq('{"not": json')
   })
 
   it("stores each record as its JSON, under its kind and scope joined on ^", async () => {
@@ -263,7 +237,7 @@ const ListedRecordCases = [
 describe("the abstract VaultDB, around an adapter's half", () => {
   it("validates what the adapter returns: a wrong-shaped record is refused, not repaired", async () => {
     const vaultDB = new MapVaultDB()
-    vaultDB.rows.set(Caret.bundle(TH.scopeOf('u1')), { format: 'not-a-vault' })
+    vaultDB.rows.set(Ckeys.bundle(TH.scopeOf('u1')), { format: 'not-a-vault' })
     const refusal = await TH.expectRefusal(vaultDB.readBundle(TH.scopeOf('u1')), 'corrupt_record')
     expect(refusal).to.be.instanceOf(VaultError)
     // Refused, never repaired or deleted: the record is still there for forensics.
@@ -272,7 +246,7 @@ describe("the abstract VaultDB, around an adapter's half", () => {
 
   it("lists a lockbox an earlier version kept with an undefined note, as IndexedDB does, with a null note", async () => {
     const vaultDB = new MapVaultDB()
-    vaultDB.rows.set(Caret.box(TH.scopeOf('u1'), 'anthropic'), { ...TH.boxOf('anthropic', 'one'), note: undefined })
+    vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), { ...TH.boxOf('anthropic', 'one'), note: undefined })
     const [listed] = await vaultDB.listBoxes(TH.scopeOf('u1'))
     const summary = TH.summaryOf(listed)
     expect(summary).to.have.property('note')
@@ -282,7 +256,7 @@ describe("the abstract VaultDB, around an adapter's half", () => {
   for (const [boxlabel, record, expected, blurb] of ListedRecordCases) {
     it(`lists ${blurb}`, async () => {
       const vaultDB = new MapVaultDB()
-      vaultDB.rows.set(Caret.box(TH.scopeOf('u1'), boxlabel), record)
+      vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), boxlabel), record)
       const listed = await vaultDB.listBoxes(TH.scopeOf('u1'))
       expect(listed.map((box) => [box.boxlabel, box.damaged])).to.deep.equal(expected)
     })
@@ -300,10 +274,10 @@ describe("the abstract VaultDB, around an adapter's half", () => {
   it("accepts a listing projected server-side, without ciphered fields, so long as it keeps format", async () => {
     const vaultDB = new MapVaultDB()
     const projected = omit(TH.boxOf('anthropic', 'one'), ['lockbox_key_wrapped', 'whisper_ciphered'])
-    vaultDB.rows.set(Caret.box(TH.scopeOf('u1'), 'anthropic'), projected)
+    vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), projected)
     const summaries = await vaultDB.listBoxes(TH.scopeOf('u1'))
     expect(TH.summaryOf(summaries[0])?.revision_id).to.eq('rev-one')
-    vaultDB.rows.set(Caret.box(TH.scopeOf('u1'), 'anthropic'), omit(projected, ['format']))
+    vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), omit(projected, ['format']))
     expect(await vaultDB.listBoxes(TH.scopeOf('u1'))).to.deep.equal([{ boxlabel: 'anthropic', damaged: true }])
   })
 
@@ -380,10 +354,10 @@ const RefusedWrites = [
 /** A vault in `u1`'s slot with a lockbox, its bundle spoiled by `spoil`, and a sound neighbour beside it. */
 const withDamagedBundle = (spoil: (bundle: VaultBundle) => unknown = (bundle) => ({ ...bundle, unlock_epoch: 'one' })) => {
   const vaultDB = new MapVaultDB()
-  vaultDB.rows.set(Caret.bundle(TH.scopeOf('u1')), spoil(TH.bundleOf('u1')))
-  vaultDB.rows.set(Caret.box(TH.scopeOf('u1'), 'anthropic'), TH.boxOf('anthropic', 'one'))
-  vaultDB.rows.set(Caret.bundle(TH.scopeOf('u2')), TH.bundleOf('u2'))
-  vaultDB.rows.set(Caret.box(TH.scopeOf('u2'), 'anthropic'), TH.boxOf('anthropic', 'one'))
+  vaultDB.rows.set(Ckeys.bundle(TH.scopeOf('u1')), spoil(TH.bundleOf('u1')))
+  vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), TH.boxOf('anthropic', 'one'))
+  vaultDB.rows.set(Ckeys.bundle(TH.scopeOf('u2')), TH.bundleOf('u2'))
+  vaultDB.rows.set(Ckeys.box(TH.scopeOf('u2'), 'anthropic'), TH.boxOf('anthropic', 'one'))
   return vaultDB
 }
 
@@ -393,8 +367,8 @@ describe("the abstract VaultDB, erasing a vault whose bundle is damaged", () => 
     await TH.expectRefusal(vaultDB.readBundle(TH.scopeOf('u1')), 'corrupt_record')
     await vaultDB.eraseDamagedVault(TH.scopeOf('u1'))
     expect(vaultDB.rows.size).to.eq(2)
-    const theirBundle = Caret.bundle(TH.scopeOf('u2'))
-    const theirBox = Caret.box(TH.scopeOf('u2'), 'anthropic')
+    const theirBundle = Ckeys.bundle(TH.scopeOf('u2'))
+    const theirBox = Ckeys.box(TH.scopeOf('u2'), 'anthropic')
     expect(vaultDB.rows.has(theirBundle)).to.eq(true)
     expect(vaultDB.rows.has(theirBox)).to.eq(true)
     expect(await vaultDB.readBundle(TH.scopeOf('u1'))).to.be.null
@@ -402,7 +376,7 @@ describe("the abstract VaultDB, erasing a vault whose bundle is damaged", () => 
 
   it("counts a bundle naming another vault than the one asked for as damaged", async () => {
     const vaultDB = new MapVaultDB()
-    vaultDB.rows.set(Caret.bundle(TH.scopeOf('u1')), TH.bundleOf('u2'))
+    vaultDB.rows.set(Ckeys.bundle(TH.scopeOf('u1')), TH.bundleOf('u2'))
     await vaultDB.eraseDamagedVault(TH.scopeOf('u1'))
     expect(vaultDB.rows.size).to.eq(0)
   })
@@ -466,7 +440,7 @@ describe("the abstract VaultDB, erasing a vault whose bundle is damaged", () => 
       protected override doEraseVault(): Promise<boolean> { return Promise.resolve(false) }
     }
     const vaultDB = new ReplacedVaultDB()
-    vaultDB.rows.set(Caret.bundle(TH.scopeOf('u1')), { ...TH.bundleOf('u1'), unlock_epoch: 'one' })
+    vaultDB.rows.set(Ckeys.bundle(TH.scopeOf('u1')), { ...TH.bundleOf('u1'), unlock_epoch: 'one' })
     await TH.expectRefusal(vaultDB.eraseDamagedVault(TH.scopeOf('u1')), 'stale_write')
   })
 
@@ -479,7 +453,7 @@ describe("the abstract VaultDB, erasing a vault whose bundle is damaged", () => 
       }
     }
     const vaultDB = new SpyingVaultDB()
-    vaultDB.rows.set(Caret.bundle(TH.scopeOf('u1')), { ...TH.bundleOf('u1'), unlock_epoch: 'one' })
+    vaultDB.rows.set(Ckeys.bundle(TH.scopeOf('u1')), { ...TH.bundleOf('u1'), unlock_epoch: 'one' })
     await vaultDB.eraseDamagedVault(TH.scopeOf('u1'))
     expect(asked).to.deep.equal([{ vault_id: TH.bundleOf('u1').vault_id }])
   })
@@ -491,7 +465,7 @@ describe("the abstract VaultDB, erasing a vault whose bundle is damaged", () => 
       }
     }
     const vaultDB = new CheckedVaultDB()
-    vaultDB.rows.set(Caret.bundle(TH.scopeOf('u1')), { ...TH.bundleOf('u1'), unlock_epoch: 'one' })
+    vaultDB.rows.set(Ckeys.bundle(TH.scopeOf('u1')), { ...TH.bundleOf('u1'), unlock_epoch: 'one' })
     const refusal = await TH.expectRefusal(vaultDB.eraseDamagedVault(TH.scopeOf('u1')), 'damaged_bundle')
     expect((refusal.cause as VaultError).kind).to.eq('corrupt_record')
     expect(vaultDB.rows.size).to.eq(1)
@@ -510,7 +484,7 @@ describe("the abstract VaultDB, on the way in", () => {
   for (const [kind, write, blurb] of RefusedWrites) {
     it(`refuses ${blurb} with kind '${kind}', and storage sees nothing`, async () => {
       const vaultDB = new MapVaultDB()
-      vaultDB.rows.set(Caret.bundle(TH.scopeOf('u1')), TH.bundleOf('u1'))
+      vaultDB.rows.set(Ckeys.bundle(TH.scopeOf('u1')), TH.bundleOf('u1'))
       const before = [...vaultDB.rows]
       const refusal = await TH.expectRefusal(write(vaultDB), kind)
       expect(refusal).to.be.instanceOf(VaultError)
@@ -547,9 +521,9 @@ describe("the abstract VaultDB, on the way in", () => {
 describe("the abstract VaultDB, listing", () => {
   it("lists a box whose ciphered fields are damaged, leaving read() to refuse it: one damaged box never costs the vault", async () => {
     const vaultDB = new MapVaultDB()
-    vaultDB.rows.set(Caret.bundle(TH.scopeOf('u1')), TH.bundleOf('u1'))
-    vaultDB.rows.set(Caret.box(TH.scopeOf('u1'), 'anthropic'), { ...TH.boxOf('anthropic', 'one'), whisper_ciphered: { cipher_iv_b64: '' } })
-    vaultDB.rows.set(Caret.box(TH.scopeOf('u1'), 'openai'), TH.boxOf('openai', 'two'))
+    vaultDB.rows.set(Ckeys.bundle(TH.scopeOf('u1')), TH.bundleOf('u1'))
+    vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), { ...TH.boxOf('anthropic', 'one'), whisper_ciphered: { cipher_iv_b64: '' } })
+    vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'openai'), TH.boxOf('openai', 'two'))
     const summaries = await vaultDB.listBoxes(TH.scopeOf('u1'))
     expect(summaries.map((summary) => summary.boxlabel)).to.deep.equal(['anthropic', 'openai'])
     await expect(vaultDB.readBox(TH.scopeOf('u1'), 'anthropic')).rejects.toThrow(/did not read back in a shape/)
@@ -579,6 +553,7 @@ describe("the abstract VaultDB, holding names to the floor", () => {
     ["tab\there",                       'a control character'],
     ["cafe\u{301}",                     'a letter decomposed, not in NFC'],
     ["key\u{D83D}",                     'half of an emoji'],
+    ["a^b",                             'a ^, which key-value stores join names on'],
     ["n".repeat(NameFloorBytes + 1),    'more than a kibibyte'],
     ["\u{E9}".repeat((NameFloorBytes / 2) + 1), 'more than a kibibyte of UTF-8, in fewer characters'],
   ] as const
@@ -604,7 +579,7 @@ describe("the abstract VaultDB, holding names to the floor", () => {
   it("reads and lists as sound a lockbox whose note the default check refuses: it was stored under other checks", async () => {
     const vaultDB = new MapVaultDB()
     await vaultDB.createBundle(TH.bundleOf('u1'))
-    vaultDB.rows.set(Caret.box(TH.scopeOf('u1'), 'anthropic'), TH.boxOf('anthropic', 'one', { note: 'n'.repeat(500) }))
+    vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), TH.boxOf('anthropic', 'one', { note: 'n'.repeat(500) }))
     const lockbox = await vaultDB.readBox(TH.scopeOf('u1'), 'anthropic')
     expect(lockbox?.note).to.have.lengthOf(500)
     const [listed] = await vaultDB.listBoxes(TH.scopeOf('u1'))
@@ -614,7 +589,7 @@ describe("the abstract VaultDB, holding names to the floor", () => {
   it("refuses, as 'corrupt_record', a stored lockbox whose note is below the floor, and lists it as damaged", async () => {
     const vaultDB = new MapVaultDB()
     await vaultDB.createBundle(TH.bundleOf('u1'))
-    vaultDB.rows.set(Caret.box(TH.scopeOf('u1'), 'anthropic'), TH.boxOf('anthropic', 'one', { note: 'beep\u{7}' }))
+    vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), TH.boxOf('anthropic', 'one', { note: 'beep\u{7}' }))
     await TH.expectRefusal(vaultDB.readBox(TH.scopeOf('u1'), 'anthropic'), 'corrupt_record')
     expect(await vaultDB.listBoxes(TH.scopeOf('u1'))).to.deep.equal([{ boxlabel: 'anthropic', damaged: true }])
   })
@@ -623,23 +598,20 @@ describe("the abstract VaultDB, holding names to the floor", () => {
     const vaultDB = new MapVaultDB()
     await vaultDB.createBundle(TH.bundleOf('u1'))
     for (const boxlabel of ['b', 'a_b', 'B', 'a1', '\u{E9}', 'z']) {
-      vaultDB.rows.set(Caret.box(TH.scopeOf('u1'), boxlabel), TH.boxOf(boxlabel, boxlabel))
+      vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), boxlabel), TH.boxOf(boxlabel, boxlabel))
     }
     const listed = await vaultDB.listBoxes(TH.scopeOf('u1'))
     expect(listed.map((box) => box.boxlabel)).to.deep.equal(['B', 'a1', 'a_b', 'b', 'z', '\u{E9}'])
   })
 })
 
-/** A MapVaultDB holding names of at most eight bytes, and none holding `^` or `/`. */
+/** A MapVaultDB holding names of at most eight bytes. */
 class NarrowNamesVaultDB extends MapVaultDB {
   override readonly maxNameBytes = 8
-  override readonly reservedNameChars = '^/'
 }
 
 /** Names the narrow adapter refuses, each by one of its declared limits. */
 const NarrowRefusals = [
-  ["a^b",           "'^'",       'a name holding the first character it reserves'],
-  ["a/b",           "'/'",       'a name holding the second'],
   ["n".repeat(9),   '9 bytes',   'a name of nine bytes'],
   ["\u{E9}".repeat(5), '10 bytes', 'a name of five characters but ten bytes of UTF-8'],
 ] as const
@@ -648,7 +620,7 @@ describe("the abstract VaultDB, holding names to what its adapter declares", () 
   for (const [candidate, said, blurb] of NarrowRefusals) {
     it(`refuses ${blurb} as bad_label, in every verb and every place a candidate goes, naming the rule and quoting nothing`, async () => {
       const vaultDB = new NarrowNamesVaultDB()
-      vaultDB.rows.set(Caret.bundle(TH.scopeOf('u1')), TH.bundleOf('u1'))
+      vaultDB.rows.set(Ckeys.bundle(TH.scopeOf('u1')), TH.bundleOf('u1'))
       const before = [...vaultDB.rows]
       const scopes = [{ ...TH.scopeOf('u1'), applabel: candidate }, { ...TH.scopeOf('u1'), user_id: candidate }, { ...TH.scopeOf('u1'), vaultlabel: candidate }]
       for (const scope of scopes) {
@@ -669,7 +641,7 @@ describe("the abstract VaultDB, holding names to what its adapter declares", () 
     })
   }
 
-  it("takes a name of exactly as many bytes as it declares, and any character it does not reserve", async () => {
+  it("takes a name of exactly as many bytes as it declares", async () => {
     const vaultDB = new NarrowNamesVaultDB()
     await vaultDB.createBundle(TH.bundleOf('u1'))
     await vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('a:b|c.de', 'one'), TH.noBoxYet)

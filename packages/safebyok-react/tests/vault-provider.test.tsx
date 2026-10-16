@@ -90,7 +90,7 @@ const damagedWorld = async () => {
   await made.unlock('correct horse')
   await made.store('anthropic_api_key', 'sk-fake')
   made.close()
-  const bundleCkey = Ckeys.joiner().bundle(TH.scopeOf('u1'))
+  const bundleCkey = Ckeys.bundle(TH.scopeOf('u1'))
   const bundle = JSON.parse(store.read(bundleCkey) ?? 'null') as object
   store.write(bundleCkey, JSON.stringify({ ...bundle, unlock_epoch: 'one' }))
   return { store, vaultDB, deviceDB, props }

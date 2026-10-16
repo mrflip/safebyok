@@ -134,9 +134,8 @@ class UrqlVaultDB extends VaultDB {
   readonly maxVaultBytes = Infinity
   readonly maxLockboxes: number
   // What the Postgres VaultDB behind the server holds in one name, so a longer one is refused here,
-  // before the wire; each name crosses it as a field of its own, so none is reserved.
+  // before the wire.
   readonly maxNameBytes = ServerMaxNameBytes
-  readonly reservedNameChars = ''
 
   private readonly client: GraphqlVaultClient
 

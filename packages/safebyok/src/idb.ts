@@ -63,10 +63,9 @@ const onBell = (dbName: string, listener: () => void): (() => void) => {
  * A record that will not read back (damaged, or written by another version) reads as "no
  * remembered unlock", or no device mark, and is dropped: losing the convenience is the safe
  * failure. A row filed under an earlier version's ckey is deleted unread at the next read or
- * erase of a remembered unlock. Its rows are filed under `Ckeys`, names joined on `^` (or
- * `opts.ckeyDelimiter`), and a scope with a name holding it is refused with kind 'bad_label'.
- * Kind 'bad_option' for a `dbName` that is not non-empty text, or a `ckeyDelimiter` that is not
- * one character.
+ * erase of a remembered unlock. Its rows are filed under `Ckeys`, names joined on `^`, and a
+ * scope with a name holding one is refused with kind 'bad_label'. Kind 'bad_option' for a
+ * `dbName` that is not non-empty text.
  *
  * @example
  *   const deviceDB = idbDeviceDB()
@@ -76,17 +75,16 @@ const onBell = (dbName: string, listener: () => void): (() => void) => {
  */
 export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
   const dbName = parseDbName(opts, 'idbDeviceDB')
-  const joiner = Ckeys.joiner(opts?.ckeyDelimiter)
   const shelf = () => shelfStore(dbName)
   const ring = () => { ringBell(dbName) }
 
   // A row under any ckey but an unlock's or a mark's is one an earlier version filed
-  // (`["unlock","acme","u1","main"]` before the joined ckeys), or one filed under another
-  // delimiter, which nothing else would ever reach, expire or erase. It is deleted unread, so an
-  // old remembered unlock never outlives the lock that should forget it.
+  // (`["unlock","acme","u1","main"]` before the joined ckeys), which nothing else would ever
+  // reach, expire or erase. It is deleted unread, so an old remembered unlock never outlives the
+  // lock that should forget it.
   const sweepStrays = async () => {
     const ckeys = await keys(shelf())
-    const strays = ckeys.filter((ckey) => ! joiner.isUnlock(ckey) && ! joiner.isMark(ckey))
+    const strays = ckeys.filter((ckey) => ! Ckeys.isUnlock(ckey) && ! Ckeys.isMark(ckey))
     if (strays.length === 0) { return }
     await delMany(strays, shelf())
     ring()
@@ -95,11 +93,11 @@ export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
   return {
     readUnlock: async (scope) => {
       await sweepStrays()
-      const raw: unknown = await get(joiner.unlock(scope), shelf())
+      const raw: unknown = await get(Ckeys.unlock(scope), shelf())
       if (raw === undefined || raw === null) { return null }
       const checked = DeviceUnlock.safeParse(raw)
       if (! checked.success) {
-        await del(joiner.unlock(scope), shelf())
+        await del(Ckeys.unlock(scope), shelf())
         ring()
         return null
       }
@@ -107,23 +105,23 @@ export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
     },
 
     writeUnlock: async (unlock) => {
-      await set(joiner.unlock(unlock), unlock, shelf())
+      await set(Ckeys.unlock(unlock), unlock, shelf())
       ring()
     },
 
     // The scope's own unlock goes first, so a sweep that fails never keeps a lock from forgetting it.
     eraseUnlock: async (scope) => {
-      await del(joiner.unlock(scope), shelf())
+      await del(Ckeys.unlock(scope), shelf())
       ring()
       await sweepStrays()
     },
 
     readMark: async (scope) => {
-      const raw: unknown = await get(joiner.mark(scope), shelf())
+      const raw: unknown = await get(Ckeys.mark(scope), shelf())
       if (raw === undefined || raw === null) { return null }
       const checked = DeviceMark.safeParse(raw)
       if (! checked.success) {
-        await del(joiner.mark(scope), shelf())
+        await del(Ckeys.mark(scope), shelf())
         ring()
         return null
       }
@@ -131,12 +129,12 @@ export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
     },
 
     writeMark: async (mark) => {
-      await set(joiner.mark(mark), mark, shelf())
+      await set(Ckeys.mark(mark), mark, shelf())
       ring()
     },
 
     eraseMark: async (scope) => {
-      await del(joiner.mark(scope), shelf())
+      await del(Ckeys.mark(scope), shelf())
       ring()
     },
 

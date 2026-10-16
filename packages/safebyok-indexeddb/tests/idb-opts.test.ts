@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { VaultError } from 'safebyok'
-import { parseDbName, parseIdbVaultDBOpts, type IdbVaultDBOpts } from '../src/idb-opts'
+import { parseDbName, type IdbVaultDBOpts } from '../src/idb-opts'
 
 const DbNameCases = [
   // regular usage:
@@ -25,17 +25,5 @@ describe("parseDbName", () => {
 
   it("never quotes what it refused", () => {
     expect(() => parseDbName({ dbName: 12_345_678 } as unknown as IdbVaultDBOpts, 'idbVaultDB')).to.throw(VaultError).that.satisfies((err: Error) => ! err.message.includes('12345678'))
-  })
-})
-
-describe("parseIdbVaultDBOpts", () => {
-  it("takes a dbName and a ckeyDelimiter, as its example shows, leaving the delimiter's own check to Ckeys", () => {
-    expect(parseIdbVaultDBOpts({ dbName: 'acme', ckeyDelimiter: '/' }, 'idbVaultDB')).to.deep.equal({ dbName: 'acme', ckeyDelimiter: '/' })
-    expect(parseIdbVaultDBOpts(undefined, 'idbVaultDB')).to.deep.equal({ dbName: 'safebyok' })
-  })
-
-  it("refuses a ckeyDelimiter that is not text, naming the call", () => {
-    expect(() => parseIdbVaultDBOpts({ ckeyDelimiter: 42 } as unknown as IdbVaultDBOpts, 'idbVaultDB'))
-      .to.throw(VaultError, /^idbVaultDB takes an optional dbName/).with.property('kind', 'bad_option')
   })
 })

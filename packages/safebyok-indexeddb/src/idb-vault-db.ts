@@ -3,7 +3,7 @@ import type { BundleExpectation, EraseExpectation, Lockbox, LockboxExpectation, 
 import { onBell, ringBell } from './bell'
 import { boxRange } from './ckeys'
 import { bundleMeetsExpectation, lockboxMeetsExpectation, vaultIdMeetsExpectation, vaultMeetsExpectation } from './expectations'
-import { parseIdbVaultDBOpts, type IdbVaultDBOpts } from './idb-opts'
+import { parseDbName, type IdbVaultDBOpts } from './idb-opts'
 import { inOneTransaction, settle, shelfOf } from './shelf'
 
 /**
@@ -19,56 +19,46 @@ import { inOneTransaction, settle, shelfOf } from './shelf'
  * * **No limits of its own**: IndexedDB sets none per record or per vault, so `maxRecordBytes`,
  *   `maxVaultBytes`, `maxLockboxes` and `maxNameBytes` are `Infinity`; the origin's storage quota
  *   bounds the whole database.
- * * **Names joined on `^`** in each row's ckey (the core's `Ckeys`), or on `opts.ckeyDelimiter`:
- *   that character is its `reservedNameChars`, and a name holding it is refused, kind
- *   `bad_label`. The default validators admit no `^`.
+ * * **Names joined on `^`** in each row's ckey (the core's `Ckeys`), which the floor keeps out of
+ *   every name.
  *
  * Browser storage is best-effort: the browser may evict it under pressure, and "clear site data"
  * removes it. An app keeping its vaults here should call `navigator.storage.persist()`, and say
  * plainly that the vault lives only in this browser.
  *
- * @param opts - Where to keep the records: `dbName`, default 'safebyok'; and `ckeyDelimiter`,
- *   default `^`.
+ * @param opts - Where to keep the records: `dbName`, default 'safebyok'.
  * @returns The VaultDB, to hand `openVault`. Kind 'bad_option' for a `dbName` that is not
- *   non-empty text, or a `ckeyDelimiter` that is not one character. Nothing is opened until the
- *   first read or write.
+ *   non-empty text. Nothing is opened until the first read or write.
  *
  * @example
  *   const vault = await openVault({ applabel: 'acme', userId, vaultlabel: 'main', vaultDB: idbVaultDB({ dbName: 'acme' }), ...browserOpts({ dbName: 'acme' }) })
  */
-export const idbVaultDB = (opts?: IdbVaultDBOpts): VaultDB => {
-  const { dbName, ckeyDelimiter } = parseIdbVaultDBOpts(opts, 'idbVaultDB')
-  return new IdbVaultDB(dbName, Ckeys.joiner(ckeyDelimiter))
-}
+export const idbVaultDB = (opts?: IdbVaultDBOpts): VaultDB => new IdbVaultDB(parseDbName(opts, 'idbVaultDB'))
 
 class IdbVaultDB extends VaultDB {
   readonly maxRecordBytes = Infinity
   readonly maxVaultBytes = Infinity
   readonly maxLockboxes = Infinity
   readonly maxNameBytes = Infinity
-  readonly reservedNameChars: string
 
   private readonly dbName: string
-  private readonly joiner: Ckeys.CkeyJoiner
 
-  constructor(dbName: string, joiner: Ckeys.CkeyJoiner) {
+  constructor(dbName: string) {
     super()
     this.dbName = dbName
-    this.joiner = joiner
-    this.reservedNameChars = joiner.delimiter
   }
 
   private get shelf() { return shelfOf(this.dbName) }
 
   protected async doReadBundle(scope: VaultScope): Promise<unknown> {
-    return (await this.shelf('readonly', (store) => rowAt(store, this.joiner.bundle(scope)))) ?? null
+    return (await this.shelf('readonly', (store) => rowAt(store, Ckeys.bundle(scope)))) ?? null
   }
 
   protected async doCreateBundle(bundle: VaultBundle): Promise<unknown> {
     const { standing, created } = await inOneTransaction(this.shelf, async (store) => {
-      const already = await rowAt(store, this.joiner.bundle(bundle))
+      const already = await rowAt(store, Ckeys.bundle(bundle))
       if (already !== undefined) { return { standing: already, created: false } }
-      store.put(bundle, this.joiner.bundle(bundle))
+      store.put(bundle, Ckeys.bundle(bundle))
       return { standing: bundle, created: true }
     })
     if (created) { this.ring() }
@@ -77,41 +67,41 @@ class IdbVaultDB extends VaultDB {
 
   protected async doUpdateBundle(bundle: VaultBundle, expected: BundleExpectation): Promise<boolean> {
     return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {
-      const standing = await rowAt(store, this.joiner.bundle(bundle))
+      const standing = await rowAt(store, Ckeys.bundle(bundle))
       if (! bundleMeetsExpectation(standing, expected)) { return false }
-      store.put(bundle, this.joiner.bundle(bundle))
+      store.put(bundle, Ckeys.bundle(bundle))
       return true
     }))
   }
 
   protected async doReadBox(scope: VaultScope, boxlabel: string): Promise<unknown> {
-    return (await this.shelf('readonly', (store) => rowAt(store, this.joiner.box(scope, boxlabel)))) ?? null
+    return (await this.shelf('readonly', (store) => rowAt(store, Ckeys.box(scope, boxlabel)))) ?? null
   }
 
   // Reads the key range of the scope's lockboxes, not the whole shelf: every other vault's rows, of
   // every user in this database, stay unread. The ckeys and their rows come from one transaction.
   protected async doListBoxes(scope: VaultScope): Promise<StoredLockbox[]> {
-    const range = boxRange(this.joiner, scope)
+    const range = boxRange(scope)
     const [ckeys, rows] = await this.shelf('readonly', (store) => Promise.all([settle(store.getAllKeys(range)), settle<unknown[]>(store.getAll(range))]))
     return ckeys
-      .map((ckey, idx) => ({ boxlabel: typeof ckey === 'string' ? this.joiner.boxlabelOf(ckey) : null, lockbox: rows[idx] }))
+      .map((ckey, idx) => ({ boxlabel: typeof ckey === 'string' ? Ckeys.boxlabelOf(ckey) : null, lockbox: rows[idx] }))
       .filter((stored): stored is StoredLockbox => stored.boxlabel !== null)
   }
 
   protected async doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<boolean> {
     return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {
-      const [standingBundle, standingBox] = await Promise.all([rowAt(store, this.joiner.bundle(scope)), rowAt(store, this.joiner.box(scope, lockbox.boxlabel))])
+      const [standingBundle, standingBox] = await Promise.all([rowAt(store, Ckeys.bundle(scope)), rowAt(store, Ckeys.box(scope, lockbox.boxlabel))])
       if (! lockboxMeetsExpectation(standingBundle, standingBox, expected)) { return false }
-      store.put(lockbox, this.joiner.box(scope, lockbox.boxlabel))
+      store.put(lockbox, Ckeys.box(scope, lockbox.boxlabel))
       return true
     }))
   }
 
   protected async doEraseBox(scope: VaultScope, boxlabel: string, expected: EraseExpectation): Promise<boolean> {
     return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {
-      const standing = await rowAt(store, this.joiner.bundle(scope))
+      const standing = await rowAt(store, Ckeys.bundle(scope))
       if (! vaultMeetsExpectation(standing, expected)) { return false }
-      store.delete(this.joiner.box(scope, boxlabel))
+      store.delete(Ckeys.box(scope, boxlabel))
       return true
     }))
   }
@@ -121,10 +111,10 @@ class IdbVaultDB extends VaultDB {
   // bundle, so no lockbox outlives its vault.
   protected async doEraseVault(scope: VaultScope, expected: EraseExpectation): Promise<boolean> {
     return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {
-      const standing = await rowAt(store, this.joiner.bundle(scope))
+      const standing = await rowAt(store, Ckeys.bundle(scope))
       if (! vaultIdMeetsExpectation(standing, expected)) { return false }
-      store.delete(boxRange(this.joiner, scope))
-      store.delete(this.joiner.bundle(scope))
+      store.delete(boxRange(scope))
+      store.delete(Ckeys.bundle(scope))
       return true
     }))
   }

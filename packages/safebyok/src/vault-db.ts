@@ -94,8 +94,8 @@ export type StoredLockbox = { boxlabel: string, lockbox: unknown }
  *
  * Every name handed to a public verb -- the scope's three and a boxlabel -- is held, before your
  * `do*` method sees it, to what any store holds and to what yours declares: the floor every name
- * is held to (`NameFloor`: well-formed, NFC, no control characters, at most 1 KiB), no character
- * of {@link reservedNameChars}, and no more than {@link maxNameBytes}. Nothing turns these off. A
+ * is held to (`NameFloor`: well-formed, NFC, no control characters, no `^`, at most 1 KiB), and
+ * no more than {@link maxNameBytes}. Nothing turns these off. A
  * host's own `validators` are the vault's, checked where a name enters it, never here: a verb
  * takes any name above the floor, as a server serving several clients must. So a VaultDB that
  * hands each call on to another VaultDB's public verbs passes each name through as it came.
@@ -152,14 +152,6 @@ export abstract class VaultDB {
    * declares its share of the key's limit.
    */
   abstract readonly maxNameBytes: number
-
-  /**
-   * The characters this backend cannot hold in a name, as text: `'^'` for a key-value store that
-   * joins names on it (`Ckeys`), `''` for one that keeps each name in a column or field of its
-   * own. Every public verb refuses a name holding any of them with kind `bad_label`, naming the
-   * name and the character, before the backend sees it.
-   */
-  abstract readonly reservedNameChars: string
 
   // ------------------------------------------------------------------- the verbs safebyok calls
 
@@ -431,7 +423,7 @@ const byCodeUnit = (one: string, two: string): number => {
 const FloorRules: Names.NameRules = Names.rulesOf(AnyTextValidators)
 
 /** What a backend declares about the names it holds. */
-type NameFacts = Pick<VaultDB, 'maxNameBytes' | 'reservedNameChars'>
+type NameFacts = Pick<VaultDB, 'maxNameBytes'>
 
 /**
  * `scope`, once each of its names passes the floor and fits the backend: kind 'bad_label'
@@ -449,16 +441,11 @@ const heldScope = (facts: NameFacts, scope: unknown): VaultScope => {
 const heldBoxlabel = (facts: NameFacts, boxlabel: unknown): string => heldName(facts, 'boxlabel', Names.checkFloor('boxlabel', boxlabel))
 
 /**
- * `part`, a name, once it holds no character the backend reserves and no more bytes than it holds
- * in a name: kind 'bad_label' otherwise, naming `said` and the rule. These hold whatever
- * validators the host chose: a name a backend cannot hold, or would join into another's ckey, is
- * never sent.
+ * `part`, a name, once it holds no more bytes than the backend holds in a name: kind 'bad_label'
+ * otherwise, naming `said` and the limit. It holds whatever validators the host chose: a name a
+ * backend cannot hold is never sent.
  */
 const heldName = (facts: NameFacts, said: string, part: string): string => {
-  const reserved = reservedIn(facts.reservedNameChars, part)
-  if (reserved !== undefined) {
-    throw new VaultError('bad_label', `That ${said} holds '${reserved}', which this storage joins names on, so it can't be stored here: choose a ${said} without it.`)
-  }
   const partBytes = new TextEncoder().encode(part).length
   if (partBytes > facts.maxNameBytes) {
     throw new VaultError('bad_label', `That ${said} is ${String(partBytes)} bytes of UTF-8, over the ${String(facts.maxNameBytes)} this storage holds in one name: choose a shorter ${said}.`)
@@ -466,13 +453,6 @@ const heldName = (facts: NameFacts, said: string, part: string): string => {
   return part
 }
 
-/** The first of the `reserved` characters `part` holds, or undefined for none. */
-const reservedIn = (reserved: string, part: string): string | undefined => {
-  for (const char of reserved) {
-    if (part.includes(char)) { return char }
-  }
-  return undefined
-}
 
 /**
  * The adapter's half of a verb, with anything it throws that is not already a VaultError turned
@@ -653,30 +633,17 @@ export const jsonBytes = (val: unknown): number => new TextEncoder().encode(JSON
 /** `fn`'s result (or failure) as a promise: a sync throw becomes a rejection, never an escape. */
 const soon = async <ValT>(fn: () => ValT | Promise<ValT>): Promise<ValT> => await fn()
 
-/** What {@link localVaultDB} is made with beside its store. */
-export type LocalVaultDBOpts = {
-  /**
-   * The one character the store's ckeys join names on (`Ckeys`), which no name may then hold:
-   * `^` when left out. Every vault in one store must be kept under the same one.
-   */
-  ckeyDelimiter?: string | undefined
-}
-
 /**
  * VaultDB over a {@link StringStore}: rows as JSON text under the ckeys `Ckeys` gives, names
- * joined on `^` (or `opts.ckeyDelimiter`), which no name it holds may then contain. A host backs
- * one with localStorage, for a vault that lives on this device alone; tests back one with a Map.
- * Every secret field in what it stores is ciphertext; what it lacks is reach -- rows stay on this
- * device instead of syncing through a shared database. Kind 'bad_option' for a `ckeyDelimiter`
- * that is not one character.
+ * joined on `^`. A host backs one with localStorage, for a vault that lives on this device alone;
+ * tests back one with a Map. Every secret field in what it stores is ciphertext; what it lacks is
+ * reach -- rows stay on this device instead of syncing through a shared database.
  *
  * @example
  *   const vaultDB = localVaultDB(memoryStore())
  *   await vaultDB.readBundle({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // null
- * @example
- *   const vaultDB = localVaultDB(domStore(localStorage), { ckeyDelimiter: '/' })
  */
-export const localVaultDB = (store: StringStore, opts?: LocalVaultDBOpts): VaultDB => new StringStoreVaultDB(store, Ckeys.joiner(opts?.ckeyDelimiter))
+export const localVaultDB = (store: StringStore): VaultDB => new StringStoreVaultDB(store)
 
 class StringStoreVaultDB extends VaultDB {
   // localStorage holds about five megabytes per origin, in all: a mebibyte is this adapter's
@@ -688,51 +655,47 @@ class StringStoreVaultDB extends VaultDB {
   readonly maxLockboxes = Infinity
   // A ckey holds a name of any length the floor admits.
   readonly maxNameBytes = Infinity
-  readonly reservedNameChars: string
 
   private readonly store: StringStore
-  private readonly joiner: Ckeys.CkeyJoiner
 
-  constructor(store: StringStore, joiner: Ckeys.CkeyJoiner) {
+  constructor(store: StringStore) {
     super()
     this.store = store
-    this.joiner = joiner
-    this.reservedNameChars = joiner.delimiter
   }
 
   // Work is deferred into the promise even though the store is synchronous: a storage fault must
   // reject the returned promise, never throw before the caller has one in hand. And each write
   // checks and saves in one synchronous step, so nothing else in this tab runs in between.
   protected doReadBundle(scope: VaultScope): Promise<unknown> {
-    return soon(() => readJson(this.store, this.joiner.bundle(scope)))
+    return soon(() => readJson(this.store, Ckeys.bundle(scope)))
   }
 
   protected doCreateBundle(bundle: VaultBundle): Promise<unknown> {
     return soon(() => {
-      const standing = readJson(this.store, this.joiner.bundle(bundle))
+      const standing = readJson(this.store, Ckeys.bundle(bundle))
       if (standing !== null) { return standing }
-      this.store.write(this.joiner.bundle(bundle), JSON.stringify(bundle))
+      this.store.write(Ckeys.bundle(bundle), JSON.stringify(bundle))
       return bundle
     })
   }
 
   protected doUpdateBundle(bundle: VaultBundle, expected: BundleExpectation): Promise<boolean> {
     return soon(() => {
-      if (! bundleMeetsExpectation(readJson(this.store, this.joiner.bundle(bundle)), expected)) { return false }
-      this.store.write(this.joiner.bundle(bundle), JSON.stringify(bundle))
+      if (! bundleMeetsExpectation(readJson(this.store, Ckeys.bundle(bundle)), expected)) { return false }
+      this.store.write(Ckeys.bundle(bundle), JSON.stringify(bundle))
       return true
     })
   }
 
   protected doReadBox(scope: VaultScope, boxlabel: string): Promise<unknown> {
-    return soon(() => readJson(this.store, this.joiner.box(scope, boxlabel)))
+    return soon(() => readJson(this.store, Ckeys.box(scope, boxlabel)))
   }
 
   protected doListBoxes(scope: VaultScope): Promise<StoredLockbox[]> {
     return soon(() => (
       this.store.ckeys()
-        .filter(this.joiner.isBoxIn(scope))
-        .map((ckey) => ({ boxlabel: this.joiner.boxlabelOf(ckey), text: this.store.read(ckey) }))
+        .filter(Ckeys.isBoxIn(scope))
+        .map((ckey) => ({ boxlabel: Ckeys.boxlabelOf(ckey), text: this.store.read(ckey) }))
         // A row erased since the ckeys were read is gone; one that is not JSON goes up as its text.
         .filter((row): row is { boxlabel: string, text: string } => row.boxlabel !== null && row.text !== null)
         .map(({ boxlabel, text }) => ({ boxlabel, lockbox: jsonOrText(text) }))
@@ -741,27 +704,27 @@ class StringStoreVaultDB extends VaultDB {
 
   protected doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<boolean> {
     return soon(() => {
-      const standingBundle = readJson(this.store, this.joiner.bundle(scope))
-      const standingBox = readJson(this.store, this.joiner.box(scope, lockbox.boxlabel))
+      const standingBundle = readJson(this.store, Ckeys.bundle(scope))
+      const standingBox = readJson(this.store, Ckeys.box(scope, lockbox.boxlabel))
       if (! lockboxMeetsExpectation(standingBundle, standingBox, expected)) { return false }
-      this.store.write(this.joiner.box(scope, lockbox.boxlabel), JSON.stringify(lockbox))
+      this.store.write(Ckeys.box(scope, lockbox.boxlabel), JSON.stringify(lockbox))
       return true
     })
   }
 
   protected doEraseBox(scope: VaultScope, boxlabel: string, expected: EraseExpectation): Promise<boolean> {
     return soon(() => {
-      if (! vaultMeetsExpectation(readJson(this.store, this.joiner.bundle(scope)), expected)) { return false }
-      this.store.erase(this.joiner.box(scope, boxlabel))
+      if (! vaultMeetsExpectation(readJson(this.store, Ckeys.bundle(scope)), expected)) { return false }
+      this.store.erase(Ckeys.box(scope, boxlabel))
       return true
     })
   }
 
   protected doEraseVault(scope: VaultScope, expected: EraseExpectation): Promise<boolean> {
     return soon(() => {
-      if (! vaultIdMeetsExpectation(readJson(this.store, this.joiner.bundle(scope)), expected)) { return false }
-      const doomed = this.store.ckeys().filter(this.joiner.isBoxIn(scope))
-      for (const ckey of [...doomed, this.joiner.bundle(scope)]) { this.store.erase(ckey) }
+      if (! vaultIdMeetsExpectation(readJson(this.store, Ckeys.bundle(scope)), expected)) { return false }
+      const doomed = this.store.ckeys().filter(Ckeys.isBoxIn(scope))
+      for (const ckey of [...doomed, Ckeys.bundle(scope)]) { this.store.erase(ckey) }
       return true
     })
   }

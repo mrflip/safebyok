@@ -14,13 +14,11 @@ import { Argon2idWebV1, MaxSaltBytes } from '../src/key-deriver-spec'
 import * as Ckeys from '../src/ckeys'
 import * as TH from './test-helpers'
 
-/** The ckeys localVaultDB files its rows under, by default. */
-const Caret = Ckeys.joiner()
 
 /** Where the vault each world opens, `u1`'s `main`, files its bundle and each of its lockboxes. */
-const u1BundleCkey = Caret.bundle(TH.scopeOf('u1'))
-const u1BoxCkey = (boxlabel: string) => Caret.box(TH.scopeOf('u1'), boxlabel)
-const isU1Box = Caret.isBoxIn(TH.scopeOf('u1'))
+const u1BundleCkey = Ckeys.bundle(TH.scopeOf('u1'))
+const u1BoxCkey = (boxlabel: string) => Ckeys.box(TH.scopeOf('u1'), boxlabel)
+const isU1Box = Ckeys.isBoxIn(TH.scopeOf('u1'))
 
 /** An unsubscribe with nothing to undo. */
 const silence = (): void => undefined
@@ -1301,11 +1299,11 @@ describe("the host's validators", () => {
     expect(world.dbStore.ckeys().filter((ckey) => isU1Box(ckey))).to.have.lengthOf(0)
   })
 
-  it("never let a name hold the delimiter its storage joins names on: refused at openVault and at store(), whatever the validators", async () => {
+  it("never let a name hold ^, which storage joins names on: refused at openVault and at store(), whatever the validators", async () => {
     const world = makeWorld({ validators: AnyTextValidators })
     const err = await TH.expectRefusal(world.open({ userId: 'alice^admin' }), 'bad_label')
-    expect(err.message).to.include('user_id')
-    expect(err.message).to.include("'^'")
+    expect(err.message).to.include('userId')
+    expect(err.message).to.include('no ^')
     expect(TH.thrownText(err)).to.not.include('alice')
     await TH.expectRefusal(world.open({ vaultlabel: 'main^x' }), 'bad_label')
     const vault = await world.openUnlocked('pw')
@@ -1744,7 +1742,7 @@ describe("erase and destroy", () => {
 
 /** The ckeys of every row `userId`'s vault has in storage: its bundle and its lockboxes. */
 const rowsOf = (world: ReturnType<typeof makeWorld>, userId: string) => (
-  world.dbStore.ckeys().filter((ckey) => ckey === Caret.bundle(TH.scopeOf(userId)) || Caret.isBoxIn(TH.scopeOf(userId))(ckey))
+  world.dbStore.ckeys().filter((ckey) => ckey === Ckeys.bundle(TH.scopeOf(userId)) || Ckeys.isBoxIn(TH.scopeOf(userId))(ckey))
 )
 
 /** A world whose `u1` vault, with a lockbox and a remembered unlock, has had its stored bundle spoiled. */
@@ -1887,7 +1885,7 @@ describe("eraseDamagedVault", () => {
     const vault = await openVault(opts)
     await vault.unlock('pw')
     vault.close()
-    const ckey = Caret.bundle({ applabel: 'acme', user_id: 'u1@example', vaultlabel: 'main' })
+    const ckey = Ckeys.bundle({ applabel: 'acme', user_id: 'u1@example', vaultlabel: 'main' })
     const bundle = JSON.parse(world.dbStore.read(ckey) ?? 'null') as object
     world.dbStore.write(ckey, JSON.stringify({ ...bundle, unlock_epoch: 'one' }))
     await eraseDamagedVault(opts)
@@ -2564,7 +2562,7 @@ describe("several passphrases", () => {
     const world = makeWorld()
     const { unlocks: _unlocks, ...rest } = TH.bundleOf('u1')
     const oldText = JSON.stringify({ ...rest, key_deriver_label: 'test_digest_v0', passphrase_salt_b64: 'c2FsdA', vault_key_passphrase_wrapped: TH.fakeCiphered('old') })
-    const bundleCkey = Caret.bundle(TH.scopeOf('u1'))
+    const bundleCkey = Ckeys.bundle(TH.scopeOf('u1'))
     world.dbStore.write(bundleCkey, oldText)
     await TH.expectRefusal(world.open(), 'damaged_bundle')
     expect(world.dbStore.read(bundleCkey)).to.eq(oldText)
@@ -2816,10 +2814,10 @@ describe("passkeys", () => {
 
   it("removal is not revocation: a copy of the bundle from before still opens with the removed passkey", async () => {
     const { world, vault, laptop, unlockId } = await vaultWithPasskey()
-    const kept = world.dbStore.read(Caret.bundle(TH.scopeOf('u1'))) ?? ''
+    const kept = world.dbStore.read(Ckeys.bundle(TH.scopeOf('u1'))) ?? ''
     await vault.removeUnlock('pw', unlockId)
     const copy = makeWorld()
-    copy.dbStore.write(Caret.bundle(TH.scopeOf('u1')), kept)
+    copy.dbStore.write(Ckeys.bundle(TH.scopeOf('u1')), kept)
     const thief = await copy.open()
     await thief.unlock(laptop)
     expect(thief.getSnapshot().state).to.eq('unlocked')

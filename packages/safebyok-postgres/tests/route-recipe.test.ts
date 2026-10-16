@@ -76,7 +76,6 @@ class RouteVaultDB extends VaultDB {
   readonly maxVaultBytes = Infinity
   readonly maxLockboxes = 1000 // the server's postgresVaultDB maxLockboxes
   readonly maxNameBytes = 640  // the server's postgresVaultDB maxNameBytes
-  readonly reservedNameChars = ''
 
   private readonly fetcher: Fetch
 

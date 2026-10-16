@@ -516,6 +516,26 @@ describe("postgresVaultDB, listBoxRecords", () => {
     expect(spy.sent).to.have.lengthOf(0)
   })
 
+  it("refuses a scope below the floor, or with a name over 640 bytes, as every verb does, before the database is asked", async () => {
+    const db = await TH.emptyDatabase()
+    const spy = TH.spyClient(db)
+    const vaultDB = postgresVaultDB({ client: spy.client, userId: 'u1' })
+    for (const vaultlabel of ['main^x', 'tab\there', 'n'.repeat(641)]) {
+      const refusal = await TH.refusalOf(vaultDB.listBoxRecords({ ...u1, vaultlabel }))
+      expect(refusal.kind).to.eq('bad_label')
+      expect(refusal.message).to.include('640 bytes')
+    }
+    expect(await vaultDB.listBoxRecords({ ...u1, vaultlabel: 'n'.repeat(640) })).to.deep.equal([])
+    expect(spy.sent).to.have.lengthOf(1)
+  })
+
+  it("declares 640 bytes the most it holds in one name, refusing a longer one at every verb", async () => {
+    const vaultDB = TH.requestFor(await TH.emptyDatabase(), 'u1')
+    expect(vaultDB.maxNameBytes).to.eq(640)
+    const refusal = await TH.refusalOf(vaultDB.readBundle({ ...u1, vaultlabel: 'n'.repeat(641) }))
+    expect(refusal.kind).to.eq('bad_label')
+  })
+
   it("refuses driver trouble with storage_unavailable, the driver's error as its cause", async () => {
     const dbDown = new Error('connect ECONNREFUSED 127.0.0.1:5432')
     const refusal = await TH.refusalOf(postgresVaultDB({ client: TH.failingClient(dbDown), userId: 'u1' }).listBoxRecords(u1))

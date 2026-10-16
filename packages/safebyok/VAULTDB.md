@@ -84,18 +84,15 @@ A vault is named by its scope -- applabel, user id and vaultlabel -- and a lockb
 within it. Every name a verb is handed passes, before the adapter sees it:
 
 * **The floor** (`NameFloor`): one character to 1 KiB of UTF-8, well-formed Unicode, in its
-  composed form (NFC), with no control character. Nothing turns it off, and no host's
+  composed form (NFC), with no control character and no `^`. Nothing turns it off, and no host's
   validators widen it. A stored record holding a name or note below it reads back as damaged.
-* **What the adapter declares** (lines 7.3 and 7.4): no more bytes than `maxNameBytes`, and no
-  character of `reservedNameChars`. A key-value store joins a row's names into one ckey on a
-  delimiter (`Ckeys`, `^` by default), and reserves it: a name holding it could make two rows'
-  ckeys one, another user's lockbox under this one's name. A store that keeps each name in a
-  column or field of its own reserves nothing.
+  `^` is there because a key-value store joins a row's names into one ckey on it (`Ckeys`): a
+  name holding it could make two rows' ckeys one, another user's lockbox under this one's name.
+  Every store refuses it alike, whether it joins names or keeps each in a column of its own, so a
+  name that one store holds every other does too.
+* **What the adapter declares** (line 7.3): no more bytes than `maxNameBytes`.
 
-Each refusal is `bad_label`, naming which name and which rule, and quoting none of it. The default
-validators admit neither `^` nor `/`, so every store in this repository holds every name they
-pass, and a host widening them meets the store's refusal at the vault's first call with that name,
-never a collision.
+Each refusal is `bad_label`, naming which name and which rule, and quoting none of it.
 
 ## 1. Records
 
@@ -308,11 +305,6 @@ lockboxes might not fit in it.
 for a backend that holds any name the floor admits: the bytes of UTF-8 its keys and indexes hold
 of one name. Postgres, whose lockbox key is a btree entry of four names together, declares 640.
 The base class refuses a longer name (`bad_label`) before the adapter sees it, in every verb.
-
-**7.4. The characters it cannot hold in a name.** `reservedNameChars`, as text: the delimiter a
-key-value store joins names on (`^` for `localVaultDB` and `idbVaultDB`, or the one each was made
-with), or `''` for a store that keeps each name apart. The base class refuses a name holding one
-(`bad_label`) before the adapter sees it, in every verb.
 
 A backend that does not hold to the limits it declares, or a vault opened with limits that
 disagree with its backend's, is outside this contract: not a bug we will fix, and not one whose
