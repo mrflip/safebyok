@@ -2,6 +2,7 @@ import { browserOpts } from 'safebyok/browser'
 import { VaultProvider } from 'safebyok-react'
 import { KnockKnock } from './components/KnockKnock'
 import { SessionBar } from './components/SessionBar'
+import { TroubleBoundary } from './components/TroubleBoundary'
 import { VaultDashboard } from './components/VaultDashboard'
 import { WaysIn } from './components/WaysIn'
 import { DeviceDBInspectionPanel } from './components/inspection/DeviceDBInspectionPanel'
@@ -41,17 +42,23 @@ const Page = () => {
   )
 }
 
+// A user who forgets the passphrase may start a new vault from the dialog (allowStartOver), as a
+// real app would let them once it has said a forgotten passphrase cannot be recovered.
 export const App = () => {
   const session = useSession(auth)
+  const userId = session?.userId ?? null
   return (
-    <VaultProvider
-      {...browserOpts({ dbName: Applabel })}
-      applabel={Applabel}
-      vaultlabel="main"
-      userId={session?.userId ?? null}
-      vaultDB={vaultDB}
-    >
-      <Page />
-    </VaultProvider>
+    <TroubleBoundary key={userId ?? 'signed-out'}>
+      <VaultProvider
+        {...browserOpts({ dbName: Applabel })}
+        applabel={Applabel}
+        vaultlabel="main"
+        userId={userId}
+        vaultDB={vaultDB}
+        allowStartOver
+      >
+        <Page />
+      </VaultProvider>
+    </TroubleBoundary>
   )
 }
