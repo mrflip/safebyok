@@ -3576,18 +3576,22 @@ describe("natural expiry", () => {
   beforeEach(() => { vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] }) })
   afterEach(() => { vi.useRealTimers() })
 
-  it("drops the vaultKey a minute past askPassphraseAt with no call made, and says so to subscribers", async () => {
+  it("says 'locked' to subscribers at askPassphraseAt, and drops the vaultKey a minute later, with no call made", async () => {
     const world = makeTimedWorld()
     const vault = await world.openUnlocked('pw one', { forcePassphraseReentryHours: 1 })
     const listener = vi.fn()
     vault.subscribe(listener)
-    world.pass(HourMillis + MinuteMillis - 1)
+    world.pass(HourMillis - 1)
     expect(listener).not.toHaveBeenCalled()
     world.pass(1)
     expect(listener).toHaveBeenCalledTimes(1)
     expect(vault.getSnapshot().state).to.eq('locked')
     expect(vault.getSnapshot().askPassphraseAt).to.be.null
+    world.pass(MinuteMillis - 1)
+    expect(vi.getTimerCount()).to.eq(1)
+    world.pass(1)
     expect(vi.getTimerCount()).to.eq(0)
+    expect(listener).toHaveBeenCalledTimes(1)
   })
 
   it("refuses new work from askPassphraseAt on, while work in hand keeps the key to finish within the minute", async () => {

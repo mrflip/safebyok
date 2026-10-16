@@ -943,8 +943,9 @@ security expert who knows what questions to ask.
 * 2026-10-16 (locks_and_expiry): **the unlock window has a hard edge, and a timer.** The
   threshold is the truth: every call that starts work checks `askPassphraseAt` against the host's
   clock, and past it throws `vault_locked`. A `setTimeout` enforces it: armed at each take-up of a
-  key (an unlock, a remembered unlock at open, a change to the ways in) for `askPassphraseAt` plus
-  60 s, the grace work in hand gets, it drops the vaultKey with no call made. Every look at the key
+  key (an unlock, a remembered unlock at open, a change to the ways in), it rings at
+  `askPassphraseAt`, so the snapshot says `locked`, and 60 s later, the grace work in hand gets,
+  drops the vaultKey with no call made. Every look at the key
   (`ensureUnlocked`, and the second look of work in hand) also drops it once that shut time has
   passed by the clock, so a timer that runs late, on a device asleep, is not depended on. A shut
   time only moves earlier: `lockSoon()` takes the lesser of its grace and what the window has

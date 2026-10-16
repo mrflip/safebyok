@@ -255,10 +255,9 @@ never compare a time for equality. The vault reports the window it was opened wi
 reads as the exported `ForeverMillis`), so a UI can say how long an unlock lasts without being
 told the option again.
 
-The deadline is the truth, and a timer enforces it. From `askPassphraseAt` every call that would
-start new work throws `vault_locked`, and the snapshot reads `locked` at its next change; work
-already under way keeps the key for one more minute to finish, and then a timer drops it, with no
-call needed. A timer that runs late, as one may on a device that slept, is caught at the next
+The deadline is the truth, and a timer enforces it. From `askPassphraseAt` the snapshot reads
+`locked` and every call that would start new work throws `vault_locked`; work already under way
+keeps the key for one more minute to finish, and then a timer drops it, with no call needed. A timer that runs late, as one may on a device that slept, is caught at the next
 call. The timer is `unref`'d, so it never holds a Node or Bun process open.
 
 **The window starts again whenever the user types a passphrase and it proves**: an `unlock()`, a
