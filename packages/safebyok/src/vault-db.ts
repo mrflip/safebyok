@@ -453,7 +453,6 @@ const heldName = (facts: NameFacts, said: string, part: string): string => {
   return part
 }
 
-
 /**
  * The adapter's half of a verb, with anything it throws that is not already a VaultError turned
  * into a calm one: a caller branches on `kind`, whatever the backend. The adapter's own error
