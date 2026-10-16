@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, vi } from 'vitest'
 import { Client, Pool } from 'pg'
 import type { PoolConfig } from 'pg'
 import { randomBytes } from 'node:crypto'
@@ -216,21 +216,16 @@ export const devicesOver = (getDb: () => FileDatabase): MakeVaultDBDevices => as
 
 // --------------------------------------------------------------------------- what a host's own code does
 
-/** Resolves once `check` holds, looking every few milliseconds; rejects after five seconds. */
-export const eventually = async (check: () => boolean | Promise<boolean>): Promise<void> => {
-  for (let ii = 0; ii < 500; ii += 1) {
-    if (await check()) { return }
-    await new Promise((resolve) => { setTimeout(resolve, 10) })
-  }
-  throw new Error('it never came to pass')
-}
-
-/** Resolves once some statement on the file's database is waiting for another's lock: a write held where a race wants it. */
+/**
+ * Resolves once some statement on the file's database is waiting for another's lock: a write held
+ * where a race wants it. Rejects after two seconds, well inside the test's own timeout, so a write
+ * that never waits fails here, by name, rather than as a timed-out test.
+ */
 export const untilStatementBlocked = async (db: FileDatabase): Promise<void> => {
-  await eventually(async () => {
+  await vi.waitUntil(async () => {
     const { rows } = await db.host.query("SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'")
     return (rows[0] as { waiting: number }).waiting > 0
-  })
+  }, { timeout: 2000, interval: 10 })
 }
 
 /** Makes the u1 vault the helpers' bundles stand for, through `vaultDB`, and writes a lockbox under each of `boxlabels`. */
