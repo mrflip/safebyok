@@ -1199,3 +1199,11 @@ security expert who knows what questions to ask.
   (v1.7.12, over seven days old), the way `release.yml` checks npm: fetched, compared to the
   hash written in `ci.yml`, and only then unpacked and run. A new version is a deliberate edit of
   both the version and the hash.
+* 2026-10-16: **The e2e Postgres container runs with no password** (`POSTGRES_HOST_AUTH_METHOD:
+  trust`, `e2e/compose.yaml` and the `postgres` job of `ci.yml`). It holds only ciphertext the
+  tests make, in databases the tests create and drop, and is reachable on the contributor's
+  loopback (`127.0.0.1`) or the CI runner alone; so there is no credential in the repository to
+  leak or rotate, and none to mistake for a pattern to copy into a deployment. The image is
+  pinned by digest (`postgres:17@sha256:...`), the digest written in both files; Dependabot
+  moves the compose file's, and the workflow's is moved by hand with it. `pg` (8.23) is a
+  dev dependency of the private `safebyok-e2e` package, never a dependency of what we publish.
