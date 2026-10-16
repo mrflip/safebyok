@@ -477,21 +477,12 @@ export const DeviceUnlock = Z.object({
 export type DeviceUnlock = Z.infer<typeof DeviceUnlock>
 
 /**
- * What a device keeps of a vault, locked or not, on its own storage: its own random `device_id`
- * for the vault, which every way in it adds carries; the highest `unlock_epoch` and
+ * What a device mark holds of the vault it has seen under its scope: the device's own random
+ * `device_id` for the vault, which every way in it adds carries, and the highest `unlock_epoch` and
  * `vault_key_epoch` it has seen the vault's bundle at, so that an older copy of the bundle storage
- * hands back later is refused (kind 'rolled_back'); and its `lock_generation`, how many times a
- * lock on this device has forgotten the remembered unlock, so that an unlock under way in another
- * tab when the lock lands remembers nothing. Nothing in it is secret. One per scope: a vault made
- * anew under the scope, with another `vault_id`, starts a mark of its own, under a new
- * `device_id`, and keeps the lock generation. `lock()` leaves it, raising its lock generation;
- * `destroy()` erases it.
+ * hands back later is refused (kind 'rolled_back').
  */
-export const DeviceMark = Z.object({
-  format:          Z.literal('safebyok-mark-v2'),
-  applabel:        NameFloor,
-  user_id:         NameFloor,
-  vaultlabel:      NameFloor,
+export const SeenVault = Z.object({
   /** This device's id for the vault: random, minted the first time it reads or makes the vault. */
   device_id:       Z.string().check(Z.minLength(1)),
   /** The vault this mark is of. */
@@ -500,12 +491,34 @@ export const DeviceMark = Z.object({
   unlock_epoch:    Z.int().check(Z.positive()),
   /** The highest `vault_key_epoch` this device has seen the vault's bundle at. */
   vault_key_epoch: vaultKeyEpoch,
+})
+export type SeenVault = Z.infer<typeof SeenVault>
+
+/**
+ * What a device keeps of a vault's scope, locked or not, on its own storage: its `lock_generation`,
+ * how many times a lock on this device has forgotten the remembered unlock, so that an unlock under
+ * way in another tab when the lock lands remembers nothing; and what it has `seen` of the vault
+ * standing under the scope (a {@link SeenVault}), or null when it has seen none. Nothing in it is
+ * secret. One per scope: a vault made anew under the scope, with another `vault_id`, is seen
+ * afresh, under a new `device_id`, and the lock generation counts on. `lock()` leaves the mark,
+ * raising its lock generation; `destroy()` raises it too, and forgets what was seen.
+ *
+ * @example { format: 'safebyok-mark-v3', ...scope, lock_generation: 0, seen: { device_id, vault_id, unlock_epoch: 1, vault_key_epoch: 1 } }
+ * @example { format: 'safebyok-mark-v3', ...scope, lock_generation: 2, seen: null }  // locked twice, the vault since destroyed
+ */
+export const DeviceMark = Z.object({
+  format:          Z.literal('safebyok-mark-v3'),
+  applabel:        NameFloor,
+  user_id:         NameFloor,
+  vaultlabel:      NameFloor,
   /**
-   * How many locks on this device have forgotten the vault's remembered unlock: 0 at first, one
+   * How many locks on this device have forgotten the scope's remembered unlock: 0 at first, one
    * more at each. A remembered unlock is written only while the mark stands at the generation its
    * unlock began under; see `DeviceDB.writeUnlock`.
    */
   lock_generation: Z.int().check(Z.gte(0)),
+  /** The vault this device has seen under the scope, or null for none. */
+  seen:            Z.nullable(SeenVault),
 })
 export type DeviceMark = Z.infer<typeof DeviceMark>
 

@@ -15,7 +15,7 @@ import { VaultError, type VaultErrorKind } from '../src/errors'
 import type { KeyDeriver } from '../src/key-deriver'
 import type { VaultLogger } from '../src/logger'
 import { memoryStore } from '../src/string-store'
-import type { DamagedLockbox, DeviceMark, DeviceUnlock, Lockbox, LockboxSummary, PasskeyEnvelope, PasskeyProof, PassphraseEnvelope, PublicBag, VaultBundle, VaultScope } from '../src/types'
+import type { DamagedLockbox, DeviceMark, DeviceUnlock, Lockbox, LockboxSummary, PasskeyEnvelope, PasskeyProof, PassphraseEnvelope, PublicBag, SeenVault, VaultBundle, VaultScope } from '../src/types'
 import { stableJsonify } from '../src/stable-jsonify'
 import { NameFloorBytes } from '../src/validators'
 import type { OpenVaultOpts } from '../src/vault'
@@ -258,24 +258,34 @@ export const noBoxYet = Object.freeze({ vault_id: 'vault-id-u1', revision_id: nu
  */
 export const thisVault = Object.freeze({ vault_id: 'vault-id-u1' } as const)
 
+/** What {@link markOf} may change of its mark: any field of its own, and any of what it has seen, or null for nothing seen. */
+export type MarkOverrides = Partial<Omit<DeviceMark, 'seen'>> & { seen?: Partial<SeenVault> | null }
+
 /**
  * A shape-valid DeviceMark for device-storage tests: `userId`'s `main` vault as {@link bundleOf}
  * has it, seen at unlock epoch 1 and vaultKey epoch 1, by the device `device-one`, never locked.
  *
  * @example await deviceDB.writeMark(TH.markOf('u1'))
- * @example TH.markOf('u1', { unlock_epoch: 3 })     // a device that has seen the vault at epoch 3
- * @example TH.markOf('u1', { lock_generation: 2 })  // a device that has locked the vault twice
+ * @example TH.markOf('u1', { seen: { unlock_epoch: 3 } })  // a device that has seen the vault at epoch 3
+ * @example TH.markOf('u1', { lock_generation: 2 })         // a device that has locked the vault twice
+ * @example TH.markOf('u1', { seen: null })                 // a device that has seen no vault there
  */
-export const markOf = (userId: string, overrides: Partial<DeviceMark> = {}): DeviceMark => ({
-  format:          'safebyok-mark-v2',
-  ...scopeOf(userId),
-  device_id:       'device-one',
-  vault_id:        `vault-id-${userId}`,
-  unlock_epoch:    1,
-  vault_key_epoch: 1,
-  lock_generation: 0,
-  ...overrides,
-})
+export const markOf = (userId: string, overrides: MarkOverrides = {}): DeviceMark => {
+  const { seen, ...head } = overrides
+  return {
+    format:          'safebyok-mark-v3',
+    ...scopeOf(userId),
+    lock_generation: 0,
+    ...head,
+    seen:            seen === null ? null : {
+      device_id:       'device-one',
+      vault_id:        `vault-id-${userId}`,
+      unlock_epoch:    1,
+      vault_key_epoch: 1,
+      ...seen,
+    },
+  }
+}
 
 /**
  * The expectation a remembered unlock is written under on a device that has never locked its
@@ -2256,8 +2266,8 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
       expect(await deviceDB.readMark(scopeOf('u1'))).to.be.null
       await deviceDB.writeMark(markOf('u1'))
       expect(await deviceDB.readMark(scopeOf('u1'))).to.deep.equal(markOf('u1'))
-      await deviceDB.writeMark(markOf('u1', { unlock_epoch: 4 }))
-      expect(await deviceDB.readMark(scopeOf('u1'))).to.deep.equal(markOf('u1', { unlock_epoch: 4 }))
+      await deviceDB.writeMark(markOf('u1', { seen: { unlock_epoch: 4 } }))
+      expect(await deviceDB.readMark(scopeOf('u1'))).to.deep.equal(markOf('u1', { seen: { unlock_epoch: 4 } }))
     })
 
     it("keeps marks per vault, and apart from remembered unlocks: erasing one leaves the rest", async () => {
@@ -2294,10 +2304,19 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
     it("never lowers a mark's lock generation: a mark written from an older read keeps the higher", async () => {
       const deviceDB = await makeDeviceDB()
       await deviceDB.writeMark(markOf('u1', { lock_generation: 3 }))
-      await deviceDB.writeMark(markOf('u1', { unlock_epoch: 4, lock_generation: 1 }))
-      expect(await deviceDB.readMark(scopeOf('u1'))).to.deep.equal(markOf('u1', { unlock_epoch: 4, lock_generation: 3 }))
+      await deviceDB.writeMark(markOf('u1', { seen: { unlock_epoch: 4 }, lock_generation: 1 }))
+      expect(await deviceDB.readMark(scopeOf('u1'))).to.deep.equal(markOf('u1', { seen: { unlock_epoch: 4 }, lock_generation: 3 }))
       await deviceDB.writeMark(markOf('u1', { lock_generation: 5 }))
       expect(await deviceDB.readMark(scopeOf('u1'))).to.deep.equal(markOf('u1', { lock_generation: 5 }))
+    })
+
+    it("keeps a mark that has seen no vault, its lock generation counting as any mark's", async () => {
+      const deviceDB = await makeDeviceDB()
+      await deviceDB.writeMark(markOf('u1', { seen: null, lock_generation: 2 }))
+      expect(await deviceDB.readMark(scopeOf('u1'))).to.deep.equal(markOf('u1', { seen: null, lock_generation: 2 }))
+      await expectRefusal(deviceDB.writeUnlock(await unlockOf('u1'), NoLocks), 'stale_write')
+      await deviceDB.writeMark(markOf('u1'))
+      expect(await deviceDB.readMark(scopeOf('u1'))).to.deep.equal(markOf('u1', { lock_generation: 2 }))
     })
   })
 }
