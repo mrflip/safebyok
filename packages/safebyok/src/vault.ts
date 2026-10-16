@@ -16,7 +16,6 @@ import type { DeviceDB } from './device-db'
 import { jsonBytes, type VaultDB } from './vault-db'
 import { parseLogger, type VaultLogger } from './logger'
 import * as RefusalPolicy from './refusal-policy'
-import type { IdentityRevokedResponse } from './refusal-policy'
 
 /**
  * Where the vault stands, as the UI branches on it:
@@ -138,15 +137,6 @@ export type OpenVaultOpts = {
    * public bag is the host's to check).
    */
   validators?: VaultValidators | undefined
-  /**
-   * What the vault does when its storage says the user it was opened for is no longer the one
-   * signed in (kind 'identity_revoked': signed out, or another user signed in). `'lock'`, the
-   * default, locks at once, as `lock()` does -- this device forgets its remembered unlock too --
-   * and erases nothing stored. `'stay'` leaves the vault as it was, for a host that locks or
-   * closes it on its own sign-out. Either way the call that met the refusal throws it. See
-   * {@link IdentityRevokedResponse}. Kind 'bad_option' for anything else.
-   */
-  whenIdentityRevoked?: IdentityRevokedResponse | undefined
 }
 
 /**
@@ -524,7 +514,6 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   const whisperByteLimit = parseMaxWhisperBytes(opts.maxWhisperBytes)
   const lockboxLimit = parseMaxLockboxes(opts.maxLockboxes, parseDeclared(givenVaultDB, 'maxLockboxes'))
   const vaultByteLimit = ensureLimitsFit(givenVaultDB, whisperByteLimit, lockboxLimit)
-  const whenIdentityRevoked = RefusalPolicy.parse(opts.whenIdentityRevoked)
   // Every storage refusal, whichever call met it, passes by the refusal policy on its way out.
   const vaultDB = RefusalPolicy.heed(givenVaultDB, async (refusal) => { await heedRefusal(refusal) })
 
@@ -643,7 +632,10 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
     const older = held !== null && held.vault_id === fresh.vault_id
       && (fresh.unlock_epoch < held.unlock_epoch || fresh.vault_key_epoch < held.vault_key_epoch)
     if (older) {
-      throw new VaultError('rolled_back', "This device has already seen a newer copy of this vault than storage offers now, so it won't use this one: nothing was unlocked or written. Storage restored from a backup, or altered, does this. If the vault's storage was restored from an older copy on purpose, the app can have this device accept it by forgetting what it saw of the vault (its deviceDB's eraseMark) and opening the vault again; otherwise the app's support should look at its storage.")
+      const refusal = new VaultError('rolled_back', "This device has already seen a newer copy of this vault than storage offers now, so it won't use this one, and the vault locked: nothing was unlocked or written. Storage restored from a backup, or altered, does this. If the vault's storage was restored from an older copy on purpose, the app can have this device accept it by forgetting what it saw of the vault (its deviceDB's eraseMark) and opening the vault again; otherwise the app's support should look at its storage.")
+      // Storage that hands back an older copy is not to be trusted with an unlocked vault.
+      await heedRefusal(refusal)
+      throw refusal
     }
     return await raiseMark(kept, fresh)
   }
@@ -915,21 +907,25 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   }
 
   /**
-   * Do what the refusal policy says of a storage refusal, before it is thrown: for a user no
-   * longer signed in, lock, as `lock()` does. The refusal is what the caller must hear, so a
-   * device store that will not forget the remembered unlock is only logged.
+   * Do what the refusal policy says of a refusal, before it is thrown: for storage the vault
+   * cannot trust -- a user no longer signed in, an older copy of the vault -- lock, as `lock()`
+   * does. The refusal is what the caller must hear, so a device store that will not forget the
+   * remembered unlock is only logged.
    */
   const heedRefusal = async (refusal: VaultError) => {
-    if (RefusalPolicy.decide(refusal, whenIdentityRevoked) !== 'lock') { return }
+    if (RefusalPolicy.decide(refusal) !== 'lock') { return }
+    const why = refusal.kind === 'rolled_back'
+      ? 'Storage handed back an older copy of the vault than this device has seen'
+      : 'Storage no longer serves the user this vault was opened for -- signed out, or another user signed in --'
     const wasUnlocked = vaultKey !== null
     try {
-      await shut('whenIdentityRevoked')
+      await shut('untrustedStorage')
     } catch (err) {
-      logger.warn("Storage no longer serves the user this vault was opened for, so the vault locked, but this device's remembered unlock could not be forgotten: the next open for the same user may pick it up.", { call: 'whenIdentityRevoked' }, asError(err))
+      logger.warn(`${why} so the vault locked, but this device's remembered unlock could not be forgotten: the next open may pick it up.`, { call: 'untrustedStorage' }, asError(err))
     }
     bump()
     if (wasUnlocked) {
-      logger.log("Storage no longer serves the user this vault was opened for -- signed out, or another user signed in -- so the vault locked, as whenIdentityRevoked 'lock' has it. It asks for the passphrase once the user signs in again.", { call: 'whenIdentityRevoked' })
+      logger.log(`${why} so the vault locked, as it always does when storage cannot be trusted with it. It asks for the passphrase again once storage is sound.`, { call: 'untrustedStorage' })
     }
   }
 
@@ -1227,11 +1223,18 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
     return absentBox()
   }
 
-  /** The whisper in `boxlabel`, for an operation that wants it whole. */
+  /**
+   * The whisper in `boxlabel`, for an operation that wants it whole. A hard lock landing while it
+   * is read wins: the whisper is dropped, never handed back, and the call refuses as locked. A
+   * soft lock, which waits for work in hand, does not stop it.
+   */
   const openBox = async (boxlabel: string): Promise<Whisper> => {
     const unlockedKey = ensureUnlocked()
+    const shutsThen = shutsSoFar
     const lockbox = await readBoxOrThrow(boxlabel)
-    return await decipherLockbox(unlockedKey, currentBundle(), lockbox)
+    const whisper = await decipherLockbox(unlockedKey, currentBundle(), lockbox)
+    if (shutSince(shutsThen)) { throw lockedError() }
+    return whisper
   }
 
   /**
@@ -1323,26 +1326,28 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
     lockSoon: async (graceSeconds) => {
       ensureOpen()
       const graceMillis = parseGraceSeconds(graceSeconds)
-      if (vaultKey === null || graceMillis === 0) {
+      if (graceMillis === 0) {
         await shutAndSay('lockSoon')
         return
       }
-      // A clock gone wrong cannot time a grace, and a key already past its shut time gets none:
-      // either way the lock still wins, at once, as lock(). A key past its deadline but not its
-      // shut time gets no more than the minute it had left: a shut time only moves earlier.
-      const now = readClockOrNull()
-      if (now === null || isShutDue(now)) {
-        await shutAndSay('lockSoon')
-        return
+      if (vaultKey !== null) {
+        // A clock gone wrong cannot time a grace: the lock wins at once, as lock(). A key already
+        // past its shut time gets no grace, and one past its deadline no more than the minute it
+        // had left: a shut time only moves earlier.
+        const now = readClockOrNull()
+        if (now === null) {
+          await shutAndSay('lockSoon')
+          return
+        }
+        if (isShutDue(now)) { dropKey() } else { shutAt(now + graceMillis, now) }
       }
-      shutAt(now + graceMillis, now)
-      // A shut in all but the key: an unlock under way loses, no new operation starts, and this
-      // device forgets its remembered unlock now. Only the vaultKey waits, for work in hand. The
-      // gate closes by having no deadline at all, not one at now, which a clock stepped back reopens.
-      shutsSoFar += 1
+      // A soft lock: no new operation starts, and this device forgets its remembered unlock now,
+      // but work in hand finishes -- an unlock or a change under way, here or in another tab,
+      // among it -- and the vaultKey waits for it. The gate closes by having no deadline at all,
+      // not one at now, which a clock stepped back reopens.
       askPassphraseAt = null
       bump()
-      await forgetUnlock('lockSoon')
+      await deviceDB.eraseUnlock(scope)
     },
 
     changePassphrase: async (oldPassphrase, newPassphrase, changeOpts) => {
@@ -1628,7 +1633,7 @@ export type EraseDamagedVaultOpts = Pick<OpenVaultOpts, 'applabel' | 'userId' | 
  * nothing erased and a message to update the app: any change to what a stored record may hold --
  * a field, a shape, or a range a check accepts -- bumps `format`, so that newer can be told from
  * damaged. There is no handle to lock, so a storage refusal such as 'identity_revoked' is thrown
- * as it comes, without `whenIdentityRevoked`'s action.
+ * as it comes, with no lock to make.
  *
  * @example
  *   try { await openVault(opts) } catch (err) {
@@ -1764,7 +1769,7 @@ type SeenMark = DeviceMark & { seen: SeenVault }
 const MarkFormat = 'safebyok-mark-v3'
 
 /** The vault call, or the moment, a logger's story names: where what it hears happened. */
-type VaultCall = 'openVault' | 'refresh' | 'expiry' | 'unlock' | 'lock' | 'lockSoon' | 'destroy' | 'whenIdentityRevoked'
+type VaultCall = 'openVault' | 'refresh' | 'expiry' | 'unlock' | 'lock' | 'lockSoon' | 'destroy' | 'untrustedStorage'
   | 'changePassphrase' | 'addPassphrase' | 'addPasskey' | 'removeUnlock' | 'store' | 'erase' | 'read'
 
 /** The `unlocklabel` of the way in a vault is created with, by its first `unlock()`. */

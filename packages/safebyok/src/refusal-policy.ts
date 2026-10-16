@@ -1,65 +1,32 @@
-import * as Z from 'zod/mini'
 import { VaultError, isVaultError } from './errors'
 import type { VaultDB } from './vault-db'
-
-/**
- * What a vault does when its storage says the user it was opened for is no longer the one signed
- * in -- a refusal of kind `identity_revoked` -- as openVault's `whenIdentityRevoked` chooses:
- *
- * * `lock`, the default: lock at once, as `lock()` does. The vaultKey is dropped from memory, this
- *   device forgets its remembered unlock, a `lockSoon()` grace is cut short, and an `unlock()`
- *   still under way loses. Nothing stored is erased: not the vault, not a lockbox. Once the user
- *   signs in again, the vault asks for their passphrase.
- * * `stay`: nothing beyond throwing the refusal. The vault stays as it was, unlocked or not, and
- *   the host locks or closes it itself when its user signs out.
- *
- * Either way the call that met the refusal throws it, and the vault never erases anything for one.
- *
- * @example openVault({ ...opts })                               // locks when its user signs out
- * @example openVault({ ...opts, whenIdentityRevoked: 'stay' })  // the host locks it on its own sign-out
- */
-export const IdentityRevokedResponseVals = ['lock', 'stay'] as const
-export type IdentityRevokedResponse = typeof IdentityRevokedResponseVals[number]
-
-/** What `whenIdentityRevoked` is when a host leaves it out: lock. */
-export const DefaultIdentityRevokedResponse: IdentityRevokedResponse = 'lock'
 
 /** What a vault does with a refusal from storage beyond throwing it: lock, or nothing more. */
 export type RefusalResponse = 'lock' | 'none'
 
-const identityRevokedResponse = Z._default(Z.enum(IdentityRevokedResponseVals), DefaultIdentityRevokedResponse)
-
 /**
- * openVault's `whenIdentityRevoked`, checked: `lock` or `stay`, and `lock` when left out. Kind
- * 'bad_option' for anything else.
+ * What a vault does about `refusal`, beyond throwing it: every storage refusal's consequence for
+ * the vault, decided in this one place, by one rule. Storage the vault cannot trust to serve this
+ * user's own vault locks it at once, as `lock()` does, erasing nothing stored:
  *
- * @param candidate - The option as the host passed it.
- */
-export const parse = (candidate: IdentityRevokedResponse | undefined): IdentityRevokedResponse => {
-  const checked = identityRevokedResponse.safeParse(candidate)
-  if (! checked.success) {
-    throw new VaultError('bad_option', "whenIdentityRevoked is 'lock' (the default: the vault locks when storage says its user signed out) or 'stay' (the host locks it itself).")
-  }
-  return checked.data
-}
-
-/**
- * What a vault does about `refusal`, a storage call's, beyond throwing it: every storage refusal's
- * consequence for the vault, decided in this one place. Only `identity_revoked` does anything --
- * locks, unless the host chose `stay`. `not_permitted` is the vault's own user refused one call,
- * which locking would not mend; `stale_write`, `vault_full` and `storage_unavailable` say nothing
- * about who is signed in.
+ * * `identity_revoked`: storage says the user the vault was opened for is no longer the one
+ *   signed in. An adapter says it only when the user really is gone (VAULTDB.md, line 5.5).
+ * * `rolled_back`: storage handed back an older copy of the vault than this device has seen,
+ *   which could bring back a way in since removed.
  *
- * @param refusal - What a storage call threw.
- * @param whenIdentityRevoked - The host's choice, as {@link parse} checked it.
+ * Nothing else does anything more. `not_permitted` is the vault's own user refused one call, which
+ * locking would not mend; `stale_write`, `vault_full` and `storage_unavailable` say nothing about
+ * whom storage serves. No host option changes any of this.
+ *
+ * @param refusal - What a storage call threw, or what the vault made of what storage handed back.
  * @returns `lock`, or `none`.
  *
- * @example decide(new VaultError('identity_revoked', 'Signed out.'), 'lock')  // 'lock'
- * @example decide(new VaultError('identity_revoked', 'Signed out.'), 'stay')  // 'none'
- * @example decide(new VaultError('not_permitted', 'Not yours.'), 'lock')     // 'none'
+ * @example decide(new VaultError('identity_revoked', 'Signed out.'))  // 'lock'
+ * @example decide(new VaultError('rolled_back', 'An older copy.'))     // 'lock'
+ * @example decide(new VaultError('not_permitted', 'Not yours.'))      // 'none'
  */
-export const decide = (refusal: unknown, whenIdentityRevoked: IdentityRevokedResponse): RefusalResponse => (
-  whenIdentityRevoked === 'lock' && isVaultError(refusal, 'identity_revoked') ? 'lock' : 'none'
+export const decide = (refusal: unknown): RefusalResponse => (
+  isVaultError(refusal, 'identity_revoked') || isVaultError(refusal, 'rolled_back') ? 'lock' : 'none'
 )
 
 /** The verbs a vault calls on its VaultDB. */
@@ -71,6 +38,10 @@ export type HeededVaultDB = Pick<VaultDB, 'readBundle' | 'createBundle' | 'updat
  * calls made it, a background refresh's included. Each verb takes its arguments as `vaultDB`'s
  * does, passed on whole, and is looked up on `vaultDB` as it is called, so a test's spy on one is
  * heard. `subscribe`, which answers at once, passes through.
+ *
+ * The refused call waits for `onRefusal` before it rejects, so a device store that never settles
+ * as the vault locks holds that call with it; the vaultKey is dropped before the device store is
+ * asked anything, so nothing is held open meanwhile.
  *
  * @param vaultDB - The storage adapter the host passed to openVault.
  * @param onRefusal - What the vault does about a refusal. Whatever it throws is dropped: the

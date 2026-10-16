@@ -547,21 +547,6 @@ describe("VaultProvider", () => {
     await expectShown('locked')
   })
 
-  it("passes whenIdentityRevoked through: under 'stay', the vault stays unlocked", async () => {
-    const { Grab, opened } = grabber()
-    const { props, vaultDB } = makeWorld()
-    render(
-      <VaultProvider {...props} userId="u1" whenIdentityRevoked="stay">
-        <Grab />
-      </VaultProvider>,
-    )
-    const vault = await opened()
-    await vault.unlock('correct horse battery staple')
-    vi.spyOn(vaultDB, 'readBox').mockRejectedValueOnce(new VaultError('identity_revoked', 'No one is signed in: sign in, then try again.'))
-    await TH.expectRefusal(vault.read('anthropic_api_key'), 'identity_revoked')
-    expect(vault.getSnapshot().state).to.eq('unlocked')
-  })
-
   it("passes the unlocklabel check through: a way in labelled as the host's check allows is added", async () => {
     const { Grab, opened } = grabber()
     render(

@@ -123,7 +123,7 @@ export type VaultProviderProps = Omit<OpenVaultOpts, 'userId'> & {
  *   </VaultProvider>
  */
 export const VaultProvider = ({ userId, children, ...opts }: VaultProviderProps) => {
-  const { applabel, vaultlabel, vaultDB, deviceDB, forcePassphraseReentryHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger, validators, whenIdentityRevoked } = opts
+  const { applabel, vaultlabel, vaultDB, deviceDB, forcePassphraseReentryHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger, validators } = opts
   // The bag is taken apart below, so a misspelt field would be dropped unseen: refused here, as openVault refuses it.
   checkValidators(validators)
   // The vault reopens when a check changes, never for a bag rebuilt in render around the same ones.
@@ -166,7 +166,7 @@ export const VaultProvider = ({ userId, children, ...opts }: VaultProviderProps)
     // Listed one by one so the effect re-runs on each; `satisfies` fails the build if an openVault
     // option is ever added and not passed through.
     const checks = { applabel: applabelCheck, vaultlabel: vaultlabelCheck, boxlabel: boxlabelCheck, userId: userIdCheck, unlocklabel: unlocklabelCheck } satisfies Record<keyof VaultValidators, unknown>
-    const openOpts = { applabel, vaultlabel, userId, vaultDB, deviceDB, forcePassphraseReentryHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger, validators: checks, whenIdentityRevoked } satisfies Record<keyof OpenVaultOpts, unknown>
+    const openOpts = { applabel, vaultlabel, userId, vaultDB, deviceDB, forcePassphraseReentryHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger, validators: checks } satisfies Record<keyof OpenVaultOpts, unknown>
     void openVault(openOpts).then((opened) => {
       if (gone) { opened.close(); return }
       handle = opened
@@ -193,7 +193,7 @@ export const VaultProvider = ({ userId, children, ...opts }: VaultProviderProps)
       setOpenFailure(null)
       setOpenError(null)
     }
-  }, [userId, applabel, vaultlabel, vaultDB, deviceDB, forcePassphraseReentryHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger, whenIdentityRevoked, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, unlocklabelCheck, openAttempt, endAsking])
+  }, [userId, applabel, vaultlabel, vaultDB, deviceDB, forcePassphraseReentryHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, unlocklabelCheck, openAttempt, endAsking])
 
   const retryOpen = useCallback(() => {
     if (openError !== null) { setOpenAttempt((prev) => prev + 1) }

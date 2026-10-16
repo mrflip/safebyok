@@ -3100,6 +3100,49 @@ describe("a lock that lands while an unlock is under way", () => {
   })
 })
 
+describe("a read in flight when a lock lands", () => {
+  afterEach(() => { vi.restoreAllMocks() })
+
+  it("refuses as locked when lock() lands while storage is read, handing back nothing", async () => {
+    const world = makeRacingWorld()
+    const vault = await world.openUnlocked('pw one')
+    await vault.store('anthropic', 'sk-fake')
+    const gate = world.holdNextBoxRead()
+    const reading = TH.expectRefusal(vault.read('anthropic'), 'vault_locked')
+    await gate.reached
+    await vault.lock()
+    gate.release()
+    await reading
+  })
+
+  it("refuses as locked when lock() lands while the whisper is deciphered, its callback never called", async () => {
+    const world = makeRacingWorld()
+    const vault = await world.openUnlocked('pw one')
+    await vault.store('anthropic', 'sk-fake')
+    const gate = TH.holdNextCall(crypto.subtle, 'decrypt')
+    const callback = vi.fn()
+    const using = TH.expectRefusal(vault.use('anthropic', callback), 'vault_locked')
+    await gate.reached
+    await vault.lock()
+    gate.release()
+    await using
+    expect(callback).not.toHaveBeenCalled()
+  })
+
+  it("finishes when lockSoon() lands while storage is read: a soft lock waits for work in hand", async () => {
+    const world = makeRacingWorld()
+    const vault = await world.openUnlocked('pw one')
+    await vault.store('anthropic', 'sk-fake')
+    const gate = world.holdNextBoxRead()
+    const reading = vault.read('anthropic')
+    await gate.reached
+    await vault.lockSoon()
+    gate.release()
+    expect(await reading).to.eq('sk-fake')
+    await TH.expectRefusal(vault.read('anthropic'), 'vault_locked')
+  })
+})
+
 describe("a vault that moves elsewhere while an unlock is under way", () => {
   it("destroyed and made anew: the unlock takes up nothing, throws 'vault_locked', and can't seal into the new vault", async () => {
     const world = makeRacingWorld()
@@ -3262,20 +3305,22 @@ describe("lockSoon", () => {
     await storing
   })
 
-  it("defeats an unlock under way when it is called, as lock() does", async () => {
+  it("lets an unlock under way when it is called finish, unlocked and remembered: a soft lock waits for work in hand", async () => {
     const world = makeRacingWorld()
     const vault = await world.openUnlocked('pw one')
     const gate = world.holdNextDerive()
-    const unlocking = TH.expectRefusal(vault.unlock('pw one'), 'vault_locked')
+    const unlocking = vault.unlock('pw one')
     await gate.reached
     await vault.lockSoon()
+    expect(vault.getSnapshot().state).to.eq('locked')
     gate.release()
     await unlocking
-    expect(vault.getSnapshot().state).to.eq('locked')
-    expect(await world.rememberedUnlock()).to.be.null
+    vi.advanceTimersByTime(GraceMillis * 2)
+    expect(vault.getSnapshot().state).to.eq('unlocked')
+    expect(await world.rememberedUnlock()).to.not.be.null
   })
 
-  it("defeats the unlock of a changePassphrase() under way, which still changes the passphrase", async () => {
+  it("lets a changePassphrase() under way finish, unlocked under the new passphrase", async () => {
     const world = makeRacingWorld()
     const vault = await world.openUnlocked('old passphrase')
     const gate = world.holdNextDerive()
@@ -3284,11 +3329,30 @@ describe("lockSoon", () => {
     await vault.lockSoon()
     gate.release()
     await changing
-    expect(vault.getSnapshot().state).to.eq('locked')
-    expect(await world.rememberedUnlock()).to.be.null
+    vi.advanceTimersByTime(GraceMillis * 2)
+    expect(vault.getSnapshot().state).to.eq('unlocked')
+    expect(await world.rememberedUnlock()).to.not.be.null
+    await vault.lock()
     await TH.expectRefusal(vault.unlock('old passphrase'), 'wrong_passphrase')
     await vault.unlock('new passphrase')
     expect(vault.getSnapshot().state).to.eq('unlocked')
+  })
+
+  it("lets an unlock under way in another tab finish, raising no lock generation", async () => {
+    const world = makeRacingWorld()
+    const otherTab = await world.openUnlocked('pw one')
+    const thisTab = await world.open()
+    await thisTab.lock()
+    const gate = world.holdNextDerive()
+    const unlocking = thisTab.unlock('pw one')
+    await gate.reached
+    await otherTab.unlock('pw one')
+    await otherTab.lockSoon()
+    gate.release()
+    await unlocking
+    expect(thisTab.getSnapshot().state).to.eq('unlocked')
+    expect(await generationOf(world)).to.eq(1)
+    expect(await world.rememberedUnlock()).to.not.be.null
   })
 
   it("is ended by an unlock within the grace: the new unlock stands past it, remembered", async () => {
@@ -3839,7 +3903,7 @@ describe("a lock in another handle on this device", () => {
     const gate = world.holdNextRemember()
     const unlocking = TH.expectRefusal(thisTab.unlock('pw one'), 'vault_locked')
     await gate.reached
-    await otherTab.lockSoon()
+    await otherTab.lock()
     gate.release()
     await unlocking
     expect(await world.rememberedUnlock()).to.be.null
@@ -4882,7 +4946,7 @@ describe("when storage says the user is no longer signed in", () => {
     await vi.waitFor(() => { expect(vault.getSnapshot().state).to.eq('locked') })
     expect(await world.rememberedUnlock()).to.be.null
     await vi.waitFor(() => { expect(world.logged.map((heard) => heard.level)).to.deep.equal(['log', 'warn']) })
-    expect(world.logged[0]).to.deep.include({ level: 'log', story: { call: 'whenIdentityRevoked' } })
+    expect(world.logged[0]).to.deep.include({ level: 'log', story: { call: 'untrustedStorage' } })
     expect(world.logged[0]?.message).to.match(/no longer serves the user/)
   })
 
@@ -4941,16 +5005,13 @@ describe("when storage says the user is no longer signed in", () => {
     await TH.expectRefusal(vault.read('anthropic'), 'vault_locked')
   })
 
-  it("leaves the vault as it was under whenIdentityRevoked 'stay', still throwing the refusal", async () => {
-    const world = makeWorld({ whenIdentityRevoked: 'stay' })
+  it("locks whatever the host passes: there is no option to stay unlocked", async () => {
+    const world = makeWorld({ whenIdentityRevoked: 'stay' } as Partial<OpenVaultOpts>)
     const vault = await world.openUnlocked('pw one')
-    await vault.store('anthropic', 'sk-fake-one')
     vi.spyOn(world.vaultDB, 'readBox').mockRejectedValueOnce(signedOut())
     await TH.expectRefusal(vault.read('anthropic'), 'identity_revoked')
-    expect(vault.getSnapshot().state).to.eq('unlocked')
-    expect(await world.rememberedUnlock()).to.not.be.null
-    expect(await vault.read('anthropic')).to.eq('sk-fake-one')
-    expect(world.logged).to.deep.equal([])
+    expect(vault.getSnapshot().state).to.eq('locked')
+    expect(await world.rememberedUnlock()).to.be.null
   })
 
   it("locks nothing for not_permitted: the vault's own user, refused one call", async () => {
@@ -4971,14 +5032,9 @@ describe("when storage says the user is no longer signed in", () => {
     await TH.expectRefusal(vault.read('anthropic'), 'identity_revoked')
     expect(vault.getSnapshot().state).to.eq('locked')
     await TH.expectRefusal(vault.read('anthropic'), 'vault_locked')
-    expect(world.logged[0]).to.deep.include({ level: 'warn', story: { call: 'whenIdentityRevoked' } })
+    expect(world.logged[0]).to.deep.include({ level: 'warn', story: { call: 'untrustedStorage' } })
     expect((world.logged[0]?.err as VaultError).kind).to.eq('storage_unavailable')
     expect(world.logged[0]?.err?.cause).to.eq(stuck)
-  })
-
-  it("refuses a whenIdentityRevoked that is neither 'lock' nor 'stay'", async () => {
-    const world = makeWorld()
-    await TH.expectRefusal(world.open({ whenIdentityRevoked: 'erase' as unknown as 'lock' }), 'bad_option')
   })
 })
 
@@ -5156,14 +5212,17 @@ describe("a bundle rolled back", () => {
     expect(await world.rememberedUnlock()).to.be.null
   })
 
-  it("refuses an older copy at a background refresh, leaving the vault as it stood, and says so through the logger", async () => {
+  it("locks on an older copy met by a background refresh, taking nothing from it, and says so through the logger", async () => {
     const { world, vault, older } = await rolledBackWorld()
     const standing = vault.getSnapshot()
     world.dbStore.write(u1BundleCkey, older)
     await TH.wakeupAtNextTick()
-    expect(vault.getSnapshot()).to.eq(standing)
-    expect(standing.state).to.eq('unlocked')
-    expect(world.logged.map((call) => [call.level, (call.err as VaultError | null | undefined)?.kind])).to.deep.equal([['warn', 'rolled_back']])
+    expect(vault.getSnapshot().state).to.eq('locked')
+    expect(vault.getSnapshot().unlocks).to.deep.equal(standing.unlocks)
+    expect(await world.rememberedUnlock()).to.be.null
+    await TH.expectRefusal(vault.read('anthropic'), 'vault_locked')
+    expect(world.logged.map((call) => [call.level, call.story, (call.err as VaultError | null | undefined)?.kind]))
+      .to.deep.equal([['log', { call: 'untrustedStorage' }, undefined], ['warn', { call: 'refresh' }, 'rolled_back']])
   })
 
   it("refuses no copy that was the newest when storage handed it back, though another tab of this device raised the mark meanwhile", async () => {
@@ -5209,7 +5268,9 @@ describe("a bundle rolled back", () => {
     await TH.expectRefusal(world.open(), 'rolled_back')
     world.dbStore.write(u1BundleCkey, newer)
     const reopened = await world.open()
-    expect(reopened.getSnapshot().state).to.eq('unlocked')
+    expect(reopened.getSnapshot().state).to.eq('locked')  // the refused open forgot the remembered unlock
+    await reopened.unlock('pw')
+    expect(reopened.getSnapshot().unlocks.map((unlock) => unlock.unlocklabel)).to.deep.equal(['passphrase'])
   })
 
   it("refuses an older copy at a lower vaultKey epoch as rolled_back, though storage raised its unlock epoch past the one seen", async () => {
