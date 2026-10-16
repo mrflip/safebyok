@@ -19,7 +19,7 @@ otherwise write itself.
   names for the host's stylesheet to dress. It says how long an unlock lasts on the device -- "Locks
   again on this device in 7 days", "in 15 minutes", "Stays unlocked ... until you lock it"
   ("Locks on this device ..." while it creates the vault) -- read from the vault itself (its
-  `reentryWindowMs`, the `forcePassphraseReentryHours` it was opened with). A wrong
+  `reentryWindowMillis`, the `forcePassphraseReentryHours` it was opened with). A wrong
   passphrase, or any other condition the unlock meets (storage out of reach), shows in the dialog
   in place; anything else (misuse, a bug) shows a calm "Something went wrong" with a Close
   button, and goes to React's error reporting, never to your page (*When an unlock fails*,

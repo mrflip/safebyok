@@ -33,7 +33,7 @@ const tablesOnlyDatabase = async (): Promise<PGlite> => {
   await db.exec('TRUNCATE safebyok_lockboxes, safebyok_bundles; DROP TRIGGER IF EXISTS safebyok_lockboxes_capped ON safebyok_lockboxes; DROP FUNCTION IF EXISTS safebyok_lockboxes_capped()')
   return db
 }
-beforeAll(async () => { await tablesOnlyDatabase() }, TH.BootMs)
+beforeAll(async () => { await tablesOnlyDatabase() }, TH.BootMillis)
 
 describe("VaultTablesSql", () => {
   it("is the package's vault-tables.sql, word for word", () => {

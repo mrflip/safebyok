@@ -85,13 +85,13 @@ export const FarPast = 347_155_200_000 // Date.UTC(1981, 0, 1)
  * The longest unlock window a vault keeps, in milliseconds: from {@link FarPast} to
  * {@link FarFuture}, so a deadline it sets from any instant the clock may read is
  * {@link FarFuture}. `forcePassphraseReentryHours: Infinity`, or any number of hours as long or
- * longer, becomes this window as `openVault` parses it, and a vault's `reentryWindowMs` reads as
+ * longer, becomes this window as `openVault` parses it, and a vault's `reentryWindowMillis` reads as
  * exactly this when it stays unlocked until `lock()`.
  *
- * @example vault.reentryWindowMs === ForeverMs   // true when opened with forcePassphraseReentryHours: Infinity
- * @example FarPast + ForeverMs === FarFuture        // true: a window from the earliest instant ends at the last
+ * @example vault.reentryWindowMillis === ForeverMillis   // true when opened with forcePassphraseReentryHours: Infinity
+ * @example FarPast + ForeverMillis === FarFuture        // true: a window from the earliest instant ends at the last
  */
-export const ForeverMs = FarFuture - FarPast
+export const ForeverMillis = FarFuture - FarPast
 
 /**
  * Validator for an instant as whole UTC epoch milliseconds, from {@link FarPast} (1981) to

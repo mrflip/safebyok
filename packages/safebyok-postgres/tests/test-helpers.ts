@@ -31,17 +31,17 @@ const madeDatabase = async (): Promise<PGlite> => {
  * The most a file's PGlite may take to boot, in milliseconds. Its WebAssembly compiles cold on a
  * CI runner in eight seconds or more, past any test's timeout, so the boot is paid in a hook.
  */
-export const BootMs = 60_000
+export const BootMillis = 60_000
 
 /**
- * Boots this file's database before its first test, under {@link BootMs}, so no test is charged
+ * Boots this file's database before its first test, under {@link BootMillis}, so no test is charged
  * for the boot and every test's own timeout still catches a real hang. Call it at the top of
  * every test file that touches the database.
  *
  * @example TH.bootDatabaseFirst()
  */
 export const bootDatabaseFirst = (): void => {
-  beforeAll(async () => { await database() }, BootMs)
+  beforeAll(async () => { await database() }, BootMillis)
 }
 
 /**
