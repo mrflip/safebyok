@@ -4548,6 +4548,25 @@ describe("versioned updates: two devices writing at once", () => {
     expect(await there.read('anthropic')).to.eq('sk-ant-fake-mine')
   })
 
+  it("a store over a damaged box its listing does not show yet never erases first: its write over none is refused, and tried again over the revision the catch-up lists", async () => {
+    const { world, hereDB, here, there } = await twoDeviceWorld()
+    await here.store('anthropic', 'sk-ant-fake-one')
+    // A listing gone stale: storage holds a damaged record the snapshot does not show.
+    const listBoxes = vi.spyOn(hereDB, 'listBoxes').mockResolvedValue([])
+    world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), changed_at: 'later' }))
+    await vi.waitFor(() => { expect(here.getSnapshot().boxes).to.have.lengthOf(0) })
+    listBoxes.mockRestore()
+    const damagedRevision = storedRowOf(world, 'anthropic')['revision_id']
+    const eraseBox = vi.spyOn(hereDB, 'eraseBox')
+    const updateBox = vi.spyOn(hereDB, 'updateBox')
+    await drivenToEnd(here.store('anthropic', 'sk-ant-fake-mine'))
+    expect(eraseBox).not.toHaveBeenCalled()
+    expect(updateBox).toHaveBeenCalledTimes(2)
+    expect(updateBox.mock.calls[0]?.[2].revision_id).to.be.null
+    expect(updateBox.mock.calls[1]?.[2].revision_id).to.eq(damagedRevision)
+    expect(await there.read('anthropic')).to.eq('sk-ant-fake-mine')
+  })
+
   it("a store of a box that did not exist, and is created meanwhile elsewhere, is tried again over theirs", async () => {
     const { hereDB, here, there, beforeNextWrite } = await twoDeviceWorld()
     beforeNextWrite('updateBox', () => there.store('anthropic', 'sk-ant-fake-theirs'))

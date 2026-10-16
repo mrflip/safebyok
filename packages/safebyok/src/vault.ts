@@ -1311,6 +1311,9 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
    */
   const listedRevisionOf = (boxlabel: string): string | null => boxes.find((box) => box.boxlabel === boxlabel)?.revision_id ?? null
 
+  /** True when the snapshot's listing shows the lockbox under `boxlabel` as damaged. */
+  const isListedDamaged = (boxlabel: string): boolean => boxes.some((box) => box.boxlabel === boxlabel && box.damaged)
+
   /**
    * The lockbox under `boxlabel`; null when there is none, and 'damaged' when its record fails
    * verification, or stands under a boxlabel the vault's check refuses.
@@ -1602,6 +1605,10 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
         // the revision just read -- for a damaged box, the one the listing names -- : a vault reborn
         // elsewhere, a vaultKey replaced, or a box written meanwhile by another device, refuses it.
         const overRevision = standing === 'damaged' ? listedRevisionOf(label) : prev?.revision_id ?? null
+        // Only a box the listing shows damaged and naming no revision is erased first: one the
+        // listing does not show yet is written as over none, which storage refuses while it
+        // stands, and the catch-up lists it with its revision for the retry.
+        const clearsFirst = standing === 'damaged' && overRevision === null && isListedDamaged(label)
         const expected = { vault_id: vaultId, revision_id: overRevision, vault_key_epoch: vaultKeyEpoch }
         const header: LockboxHeader = {
           format:              LockboxFormat,
@@ -1621,7 +1628,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
         try {
           // A damaged box whose record names no revision is cleared first, as erase() would, so the
           // write meets none.
-          if (standing === 'damaged' && overRevision === null) { await refreshOnStale(vaultDB.eraseBox(scope, label, { vault_id: vaultId }, rules), 'store') }
+          if (clearsFirst) { await refreshOnStale(vaultDB.eraseBox(scope, label, { vault_id: vaultId }, rules), 'store') }
           await refreshOnStale(vaultDB.updateBox(scope, lockbox, expected, rules), 'store')
         } catch (err) {
           if (! isVaultError(err, 'stale_write')) { throw err }
