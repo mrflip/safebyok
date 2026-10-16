@@ -932,22 +932,24 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   const shutAt = (dueAt: number, now: number) => {
     if (pendingShut !== null && pendingShut.dueAt <= dueAt) { return }
     cancelPendingShut()
-    const timer = setTimeout(() => {
-      dropKey()
-      bump()
-    }, Math.max(0, dueAt - now))
-    letProcessExit(timer)
-    pendingShut = { timer, dueAt }
+    pendingShut = { timer: unrefTimeout(() => { dropKey(); bump() }, dueAt - now), dueAt }
   }
 
   /**
    * Arm the shut for a key taken up until `until`, at `now`, in place of any pending: a minute
-   * past the deadline, for work in hand to finish, unless the key lasts until `lock()`.
+   * past the deadline, for work in hand to finish, unless the key lasts until `lock()`. One timer
+   * at a time: the first rings at the deadline, so the snapshot says `locked` then, and leaves
+   * the second to drop the key a minute later.
    */
   const armExpiry = (until: number, now: number) => {
     cancelPendingShut()
     if (isFarFuture(until)) { return }
-    shutAt(until + ExpiryGraceMillis, now)
+    const dueAt = until + ExpiryGraceMillis
+    const atDeadline = () => {
+      pendingShut = { timer: unrefTimeout(() => { dropKey(); bump() }, ExpiryGraceMillis), dueAt }
+      bump()
+    }
+    pendingShut = { timer: unrefTimeout(atDeadline, until - now), dueAt }
   }
 
   /** True when the vaultKey's shut time has come by `now`, whether or not its timer has run. */
@@ -1927,12 +1929,15 @@ const ExpiryGraceMillis = MinuteMillis
 const isFarFuture = (at: number): boolean => at >= FarFuture - MinuteMillis
 
 /**
- * Let a Node or Bun process exit with this timer still pending: a vault left open must not keep
- * a server or a script alive for days. A browser's timer has no `unref`, and needs none.
+ * `setTimeout(callback, delayMillis)`, a delay below zero as none, that lets a Node or Bun process
+ * exit while it is pending: a vault left open must not keep a server or a script alive for days.
+ * A browser's timer has no `unref`, and needs none.
  */
-const letProcessExit = (timer: ReturnType<typeof setTimeout>) => {
+const unrefTimeout = (callback: () => void, delayMillis: number): ReturnType<typeof setTimeout> => {
+  const timer = setTimeout(callback, Math.max(0, delayMillis))
   const handle = timer as unknown as { unref?: () => unknown }
   if (typeof handle.unref === 'function') { handle.unref() }
+  return timer
 }
 
 /** How long `lockSoon()` lets work in hand finish, unless told otherwise, in seconds. */
