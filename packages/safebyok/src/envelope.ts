@@ -98,8 +98,8 @@ const passphraseKeyBytes = Z.custom<Uint8Array>((candidate) => (
 /**
  * True when every byte of `bytes` is zero. Reads every byte whatever it finds, OR-ing them
  * together as libsodium's `sodium_is_zero` does, with no early exit. No JavaScript engine promises
- * constant time, and nothing secret rides on this one's: an all-zero output is refused, and any
- * other is a key whose bytes the check only reads.
+ * constant time, but nothing here branches on a byte: only the verdict steers what follows, and
+ * the refusal of an all-zero output tells that anyway.
  */
 const isAllZero = (bytes: Uint8Array): boolean => bytes.reduce((seen, byte) => seen | byte, 0) === 0
 
