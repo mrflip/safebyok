@@ -1,7 +1,7 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { Component, type ReactNode } from 'react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { VaultError, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, openVault, type Vault } from 'safebyok'
+import { VaultError, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, openVault, type UnlockSummary, type Vault } from 'safebyok'
 import { createPasskey } from '../src/passkey'
 import { PasskeyUnlockButton } from '../src/passkey-unlock-button'
 import { PassphraseModal } from '../src/passphrase-modal'
@@ -19,15 +19,11 @@ const lockedVaultWithPasskey = async () => {
   return { authenticator, vault: await open() }
 }
 
-/** The unlock window a stub vault reports: the default seven days, in ms. */
-const SevenDaysMillis = 604_800_000
-
 /** A vault that refuses every unlock with `err`, and lists one passkey. */
-const vaultRefusing = (err: Error, credentialId: string) => ({
-  reentryWindowMillis: SevenDaysMillis,
-  getSnapshot:     () => ({ state: 'locked', unlocks: [TH.passkeyEnvelopeOf('laptop', { credential_id: credentialId })] }),
-  unlock:          () => Promise.reject(err),
-}) as unknown as Vault
+const vaultRefusing = (err: Error, credentialId: string) => TH.stubVault({
+  unlocks: [TH.passkeyEnvelopeOf('laptop', { credential_id: credentialId })] as unknown as UnlockSummary[],
+  unlock:  () => Promise.reject(err),
+})
 
 /** Catches what its children throw while rendering, and shows the message: the host's own boundary. */
 class HostBoundary extends Component<{ children: ReactNode }, { caught: string | null }> {
@@ -62,30 +58,63 @@ describe("PasskeyUnlockButton", () => {
     render(<PasskeyUnlockButton vault={vault} onDone={noop} onGripe={noop} />)
     expect(screen.queryByRole('button')).to.be.null
     TH.installFakeAuthenticator()
-    const passphraseOnly = { reentryWindowMillis: SevenDaysMillis, getSnapshot: () => ({ state: 'locked', unlocks: [TH.envelopeOf('passphrase')] }) } as unknown as Vault
+    const passphraseOnly = TH.stubVault({ unlocks: [TH.envelopeOf('passphrase')] as unknown as UnlockSummary[] })
     render(<PasskeyUnlockButton vault={passphraseOnly} onDone={noop} onGripe={noop} />)
     expect(screen.queryByRole('button')).to.be.null
   })
 
-  it("does nothing when the user dismisses the prompt", async () => {
+  it("says only that its last word no longer stands when the user dismisses the prompt", async () => {
     const { authenticator, vault } = await lockedVaultWithPasskey()
     authenticator.refuseNext('NotAllowedError')
     const heard: string[] = []
-    render(<PasskeyUnlockButton vault={vault} onDone={(unlocked) => { heard.push(String(unlocked)) }} onGripe={(gripe) => { heard.push(gripe) }} />)
+    render(<PasskeyUnlockButton vault={vault} onDone={(unlocked) => { heard.push(String(unlocked)) }} onGripe={(gripe) => { heard.push(String(gripe)) }} />)
     fireEvent.click(screen.getByText('Use a passkey'))
     await waitFor(() => { expect(authenticator.calls.get).to.have.lengthOf(1) })
     await waitFor(() => { expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Use a passkey' }).disabled).to.be.false })
-    expect(heard).to.deep.equal([])
+    expect(heard).to.deep.equal(['null'])
     expect(vault.getSnapshot().state).to.eq('locked')
+  })
+
+  it("follows the vault's snapshot: a passkey added meanwhile brings the button", async () => {
+    TH.installFakeAuthenticator()
+    const vault = await openVault(TH.memoryVaultOpts())
+    await vault.unlock('pw')
+    render(<PasskeyUnlockButton vault={vault} onDone={noop} onGripe={noop} />)
+    expect(screen.queryByText('Use a passkey')).to.be.null
+    await act(async () => {
+      await vault.addPasskey('pw', () => createPasskey({ rp: { name: 'Acme' }, user: { name: 'ada@example.com', displayName: 'Ada' } }), { unlocklabel: 'laptop' })
+    })
+    expect(screen.queryByText('Use a passkey')).to.not.be.null
+    vault.close()
+  })
+
+  it("starts afresh when handed another vault: one that took itself away comes back", async () => {
+    const { authenticator, vault } = await lockedVaultWithPasskey()
+    const [credentialId = ''] = authenticator.credentialIds()
+    const gripes: (string | null)[] = []
+    const onGripe = (gripe: string | null) => { gripes.push(gripe) }
+    const { rerender } = TH.renderReporting(<PasskeyUnlockButton vault={vaultRefusing(new TypeError('fell over'), credentialId)} onDone={noop} onGripe={onGripe} />)
+    fireEvent.click(screen.getByText('Use a passkey'))
+    await waitFor(() => { expect(gripes).to.deep.equal([null, PasskeyTrouble]) })
+    expect(screen.queryByText('Use a passkey')).to.be.null
+    rerender(<PasskeyUnlockButton vault={vault} onDone={noop} onGripe={onGripe} />)
+    expect(screen.queryByText('Use a passkey')).to.not.be.null
+  })
+
+  it("takes the focus when asked to, as a dialog's first choice", async () => {
+    const { vault } = await lockedVaultWithPasskey()
+    // eslint-disable-next-line jsx-a11y/no-autofocus -- the prop under test
+    render(<PasskeyUnlockButton vault={vault} autoFocus onDone={noop} onGripe={noop} />)
+    expect(document.activeElement).to.equal(screen.getByText('Use a passkey'))
   })
 
   it("hands a condition's message to onGripe, and a lock that wins to onDone(false)", async () => {
     const { authenticator, vault } = await lockedVaultWithPasskey()
     const [credentialId = ''] = authenticator.credentialIds()
-    const gripes: string[] = []
+    const gripes: (string | null)[] = []
     render(<PasskeyUnlockButton vault={vaultRefusing(new VaultError('wrong_passkey', "That passkey's answer didn't unlock the vault."), credentialId)} onDone={noop} onGripe={(gripe) => { gripes.push(gripe) }} />)
     fireEvent.click(screen.getByText('Use a passkey'))
-    await waitFor(() => { expect(gripes).to.deep.equal(["That passkey's answer didn't unlock the vault."]) })
+    await waitFor(() => { expect(gripes).to.deep.equal([null, "That passkey's answer didn't unlock the vault."]) })
     cleanup()
     const heard: boolean[] = []
     render(<PasskeyUnlockButton vault={vaultRefusing(new VaultError('vault_locked', 'Locked meanwhile.'), credentialId)} onDone={(unlocked) => { heard.push(unlocked) }} onGripe={noop} />)
@@ -98,11 +127,11 @@ describe("PasskeyUnlockButton", () => {
     const { authenticator } = await lockedVaultWithPasskey()
     const [credentialId = ''] = authenticator.credentialIds()
     const closed = new VaultError('vault_closed', 'This vault handle was closed.')
-    const gripes: string[] = []
+    const gripes: (string | null)[] = []
     const heard: boolean[] = []
     const { reported } = TH.renderReporting(<HostBoundary><PasskeyUnlockButton vault={vaultRefusing(closed, credentialId)} onDone={(unlocked) => { heard.push(unlocked) }} onGripe={(gripe) => { gripes.push(gripe) }} /></HostBoundary>)
     fireEvent.click(screen.getByText('Use a passkey'))
-    await waitFor(() => { expect(gripes).to.deep.equal([PasskeyTrouble]) })
+    await waitFor(() => { expect(gripes).to.deep.equal([null, PasskeyTrouble]) })
     expect(screen.queryByRole('button')).to.be.null
     expect(reported).to.deep.equal([closed])
     expect(reported[0]).to.equal(closed)
@@ -113,10 +142,10 @@ describe("PasskeyUnlockButton", () => {
   it("meets an rpId that does not fit the page the same way: a mistake the developer meets in development", async () => {
     const { authenticator, vault } = await lockedVaultWithPasskey()
     authenticator.refuseNext('SecurityError')
-    const gripes: string[] = []
+    const gripes: (string | null)[] = []
     const { reported } = TH.renderReporting(<PasskeyUnlockButton vault={vault} rpId="elsewhere.example" onDone={noop} onGripe={(gripe) => { gripes.push(gripe) }} />)
     fireEvent.click(screen.getByText('Use a passkey'))
-    await waitFor(() => { expect(gripes).to.deep.equal([PasskeyTrouble]) })
+    await waitFor(() => { expect(gripes).to.deep.equal([null, PasskeyTrouble]) })
     expect(reported).to.have.lengthOf(1)
     expect(isVaultError(reported[0], 'bad_option')).to.be.true
     expect(vault.getSnapshot().state).to.eq('locked')
@@ -126,21 +155,35 @@ describe("PasskeyUnlockButton", () => {
     const { authenticator } = await lockedVaultWithPasskey()
     const [credentialId = ''] = authenticator.credentialIds()
     const fell = new TypeError('fell over')
-    const gripes: string[] = []
+    const gripes: (string | null)[] = []
     const { reported } = TH.renderReporting(<PasskeyUnlockButton vault={vaultRefusing(fell, credentialId)} onDone={noop} onGripe={(gripe) => { gripes.push(gripe) }} />)
     fireEvent.click(screen.getByText('Use a passkey'))
-    await waitFor(() => { expect(gripes).to.deep.equal([PasskeyTrouble]) })
+    await waitFor(() => { expect(gripes).to.deep.equal([null, PasskeyTrouble]) })
     expect(reported).to.deep.equal([fell])
   })
 })
 
 describe("PassphraseModal, for a vault with a passkey", () => {
-  it("offers the passkey beside the passphrase, and closes unlocked when it is used", async () => {
+  it("offers the passkey first, before the passphrase, and closes unlocked when it is used", async () => {
     const { vault } = await lockedVaultWithPasskey()
     const heard: boolean[] = []
     render(<PassphraseModal vault={vault} onDone={(unlocked) => { heard.push(unlocked) }} />)
-    fireEvent.click(screen.getByText('Use a passkey'))
+    const passkey = screen.getByText('Use a passkey')
+    expect(document.activeElement).to.equal(passkey)
+    expect(passkey.compareDocumentPosition(screen.getByPlaceholderText('vault passphrase')) & Node.DOCUMENT_POSITION_FOLLOWING).to.not.eq(0)
+    fireEvent.click(passkey)
     await waitFor(() => { expect(heard).to.deep.equal([true]) })
+  })
+
+  it("drops the passkey's word once a later press of it is dismissed", async () => {
+    const { authenticator } = await lockedVaultWithPasskey()
+    const [credentialId = ''] = authenticator.credentialIds()
+    render(<PassphraseModal vault={vaultRefusing(new VaultError('wrong_passkey', "That passkey's answer didn't unlock the vault."), credentialId)} onDone={noop} />)
+    fireEvent.click(screen.getByText('Use a passkey'))
+    await screen.findByText("That passkey's answer didn't unlock the vault.")
+    authenticator.refuseNext('NotAllowedError')
+    fireEvent.click(screen.getByText('Use a passkey'))
+    await waitFor(() => { expect(screen.queryByText("That passkey's answer didn't unlock the vault.")).to.be.null })
   })
 
   it("keeps the passphrase when the passkey meets misuse: the button goes, and the dialog says why", async () => {
@@ -150,12 +193,31 @@ describe("PassphraseModal, for a vault with a passkey", () => {
     const { reported } = TH.renderReporting(<PassphraseModal vault={vaultRefusing(closed, credentialId)} onDone={noop} />)
     screen.getByText('Use a passkey').focus()
     fireEvent.click(screen.getByText('Use a passkey'))
-    const said = await screen.findByRole('alert')
-    expect(said.textContent).to.eq(PasskeyTrouble)
+    await waitFor(() => { expect(screen.getByRole('alert').textContent).to.eq(PasskeyTrouble) })
     expect(screen.queryByText('Use a passkey')).to.be.null
     expect(document.activeElement).to.equal(screen.getByPlaceholderText('vault passphrase'))
     expect(screen.queryByText('Something went wrong')).to.be.null
     expect(reported).to.deep.equal([closed])
+  })
+
+  it("leaves the focus on the passkey button after a condition, inside a shadow root too", async () => {
+    const { authenticator } = await lockedVaultWithPasskey()
+    const [credentialId = ''] = authenticator.credentialIds()
+    const shadowHost = document.createElement('div')
+    document.body.append(shadowHost)
+    const shadowRoot = shadowHost.attachShadow({ mode: 'open' })
+    const container = document.createElement('div')
+    shadowRoot.append(container)
+    try {
+      render(<PassphraseModal vault={vaultRefusing(new VaultError('wrong_passkey', "That passkey's answer didn't unlock the vault."), credentialId)} onDone={noop} />, { container })
+      const passkey = within(container).getByText('Use a passkey')
+      passkey.focus()
+      fireEvent.click(passkey)
+      await waitFor(() => { expect(within(container).queryByText("That passkey's answer didn't unlock the vault.")).to.not.be.null })
+      expect(shadowRoot.activeElement).to.equal(passkey)
+    } finally {
+      shadowHost.remove()
+    }
   })
 
   it("keeps the passkey's word while the user types the passphrase, until they submit", async () => {
@@ -178,7 +240,7 @@ describe("PassphraseModal, for a vault with a passkey", () => {
 
   it("offers no passkey to a user choosing the vault's first passphrase", () => {
     TH.installFakeAuthenticator()
-    const absent = { reentryWindowMillis: SevenDaysMillis, getSnapshot: () => ({ state: 'absent', unlocks: [] }) } as unknown as Vault
+    const absent = TH.stubVault({ state: 'absent' })
     render(<PassphraseModal vault={absent} onDone={noop} />)
     expect(screen.queryByText('Use a passkey')).to.be.null
   })
