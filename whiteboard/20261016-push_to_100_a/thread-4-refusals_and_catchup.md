@@ -1,11 +1,12 @@
 # Thread 4: refusals_and_catchup (2026-10-16)
 
 Branch `20261016-refusals_and_catchup`, PR [#132](https://github.com/mrflip/safebyok/pull/132),
-stacked on [#127](https://github.com/mrflip/safebyok/pull/127). Justify: green; core 1678 passed /
-33 skipped, React 111, demo 162, every other package as on #127. `pnpm size`: openVault
-**24.7 kB**, over main's 23 kB, so its one line in `.size-limit.json` is raised to **28 kB** by
-the rule, at the orchestrator's word (thread 1 sets 30 kB; thread 9 lowers all); everything
-31.81 kB.
+stacked on [#127](https://github.com/mrflip/safebyok/pull/127), in the line main → #128 → #133 →
+#127 → #132 (restacked 2026-10-16). Justify: green; core 1761 passed / 33 skipped, React 111,
+demo 168, indexeddb 156, postgres 237, convex 284, graphql 223, fastkey 44, e2e 90, root scripts
+155. `pnpm size`: openVault 24.99 kB, everything 32.1 kB, both within thread 1's budgets (30 kB,
+40 kB). The openVault overrun was only the base: thread 1's 30 kB covers it, and the raise this
+thread once made to `.size-limit.json` was dropped at the restack.
 
 The per-row ledger the orchestrator sweeps by is beside this file:
 `thread-4-refusals_and_catchup-ledger.md` (every G### closed or not, and where).
@@ -67,6 +68,20 @@ The per-row ledger the orchestrator sweeps by is beside this file:
     README line) and the demo's dashboard test, which now waits for its read before locking: a
     lock landing mid-read now refuses it, correctly. G333 untouched, as struck.
 
+* **Restack onto threads 1 to 3** (all conflicts mechanical; none needed a call on which
+  behaviour wins):
+  - The VaultDB verbs lost their validators argument (thread 1): my calls dropped `rules`.
+  - The device mark takes thread 1's `NameFloor` scope fields at `safebyok-mark-v3`; the format
+    snapshot was rewritten for v3 within the commit that bumps it, and only that test.
+  - Thread 2's `store()` (the public bag, `openedWhisperOf`, lockbox v3) kept whole; my damaged
+    revision and catch-up woven in. Its write step moved into `writeOver` to stay under the
+    linter's complexity limit. Under thread 2's rule a record that will not open vouches for
+    nothing, so a store over a box listed damaged by its epoch alone now carries no public bag
+    forward (its test says so), where it once kept the note.
+  - Thread 1 made canaries entry-only: my edits to its removed canary tests were dropped, and
+    thread 2's damaged-listing literals gained `revision_id`.
+  - `whenIdentityRevoked` removed again from thread 1's new `index.ts` exports and the provider.
+  - The `.size-limit.json` raise (`312bcd50`) dropped, as above.
 * **Discoveries**:
   - **A pre-existing race**: during a ways-in change, this handle's own bell refresh can read the
     new bundle before `reviseUnlocks` sets it, judge the key `outlived`, drop it and erase the
