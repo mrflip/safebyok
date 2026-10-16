@@ -1,17 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  Argon2idWebV1, VaultError, argon2idDeriver, argon2idWebV1Deriver, isVaultError, localVaultDB, memoryDeviceDB, memoryStore,
-  type KeyDeriver, type KeyDeriverSpec,
+  Argon2idKeyDeriver, Argon2idWebV1, VaultError, argon2idDeriver, argon2idWebV1Deriver, isVaultError, localVaultDB, memoryDeviceDB, memoryStore,
+  type Argon2idSpec, type KeyDeriver,
 } from 'safebyok'
 import { anyPassphraseTest } from 'safebyok/testing'
 import * as TH from 'safebyok/testing'
 import { argon2idWasmDeriver, argon2idWasmWebV1Deriver } from '../src/wasm-deriver'
 
 /** A spec of the host's own, cheap to derive under; no two of its counts alike, so a swap shows. */
-const CheapSpec: KeyDeriverSpec = { ...Argon2idWebV1, key_deriver_label: 'acme_cheap_v1', memory_kib: 64, iterations: 2, parallelism: 4 }
-
-/** The deriver's fields without its function: the spec it carries. */
-const specOf = ({ deriveKeyBytes: _dropped, ...spec }: { deriveKeyBytes: unknown }) => spec
+const CheapSpec: Argon2idSpec = { ...Argon2idWebV1, key_deriver_label: 'acme_cheap_v1', memory_kib: 64, iterations: 2, parallelism: 4 }
 
 /** Salt bytes that are not all alike, so a byte read out of place would show. */
 const saltOf = (saltBytes: number): Uint8Array => Uint8Array.from({ length: saltBytes }, (_unused, ii) => ((ii * 37) + 11) % 256)
@@ -39,8 +36,8 @@ const FakeApiKey = 'sk-fake-0000-not-a-real-key'
 // core's @noble/hashes deriver, or a vault made on one device would not open on another.
 describe("argon2idWasmWebV1Deriver beside argon2idWebV1Deriver", () => {
   it("carries the supplied spec whole, frozen", () => {
-    expect(specOf(argon2idWasmWebV1Deriver)).to.deep.equal(Argon2idWebV1)
-    expect(specOf(argon2idWasmWebV1Deriver)).to.deep.equal(specOf(argon2idWebV1Deriver))
+    expect(argon2idWasmWebV1Deriver.spec).to.deep.equal(Argon2idWebV1)
+    expect(argon2idWasmWebV1Deriver.spec).to.deep.equal(argon2idWebV1Deriver.spec)
     expect(argon2idWasmWebV1Deriver).to.be.frozen
   })
 
@@ -67,7 +64,7 @@ describe("argon2idWasmWebV1Deriver beside argon2idWebV1Deriver", () => {
 // version 0x13, 2 passes, 64 MiB, one lane, "password" and "somesalt"): both derivers must hit it,
 // so neither can agree with the other by sharing a mistake.
 describe("Argon2id's reference test vector", () => {
-  const ReferenceSpec: KeyDeriverSpec = { ...Argon2idWebV1, key_deriver_label: 'reference_vector', iterations: 2, salt_bytes: 8 }
+  const ReferenceSpec: Argon2idSpec = { ...Argon2idWebV1, key_deriver_label: 'reference_vector', iterations: 2, salt_bytes: 8 }
   const ReferenceHex = '09316115d5cf24ed5a15a31a3ba326e5cf32edc24702987c02b6566f61913cf7'
 
   it("is what the WebAssembly deriver derives", { timeout: 60_000 }, async () => {
@@ -122,26 +119,28 @@ describe("argon2idWasmDeriver beside argon2idDeriver", () => {
 })
 
 describe("argon2idWasmDeriver", () => {
-  it("carries the whole spec beside its function, frozen", () => {
+  it("carries the whole spec, frozen, an Argon2idKeyDeriver as the core's is", () => {
     const deriver = argon2idWasmDeriver(CheapSpec)
-    expect(specOf(deriver)).to.deep.equal(CheapSpec)
+    expect(deriver.spec).to.deep.equal(CheapSpec)
     expect(deriver).to.be.frozen
+    expect(deriver).to.be.instanceOf(Argon2idKeyDeriver)
   })
 
   it("takes a spec of the host's own, under its own label", () => {
     const deriver = argon2idWasmDeriver({ ...Argon2idWebV1, key_deriver_label: 'acme_argon2id_v1', memory_kib: 131_072 })
     expect(deriver.key_deriver_label).to.eq('acme_argon2id_v1')
-    expect(deriver.memory_kib).to.eq(131_072)
+    expect(deriver.spec.memory_kib).to.eq(131_072)
   })
 
   it("makes a deriver of the supplied spec too, the same one argon2idWasmWebV1Deriver is", () => {
-    expect(specOf(argon2idWasmDeriver(Argon2idWebV1))).to.deep.equal(specOf(argon2idWasmWebV1Deriver))
+    expect(argon2idWasmDeriver(Argon2idWebV1).spec).to.deep.equal(argon2idWasmWebV1Deriver.spec)
   })
 
   it("keeps none of the extra fields it was handed: a spec cannot smuggle in a function", async () => {
-    const smuggled = { ...CheapSpec, deriveKeyBytes: () => Promise.resolve(new Uint8Array(32)) } as KeyDeriverSpec
-    const derived = await argon2idWasmDeriver(smuggled).deriveKeyBytes('pw', saltOf(16))
-    expect(derived).to.not.deep.equal(new Uint8Array(32))
+    const smuggled = { ...CheapSpec, deriveKeyBytes: () => Promise.resolve(new Uint8Array(32)) } as Argon2idSpec
+    const deriver = argon2idWasmDeriver(smuggled)
+    expect(deriver.spec).to.not.have.property('deriveKeyBytes')
+    expect(await deriver.deriveKeyBytes('pw', saltOf(16))).to.not.deep.equal(new Uint8Array(32))
   })
 
   it("refuses a spec Argon2id cannot run, before deriving anything", () => {
@@ -179,7 +178,7 @@ describe("argon2idWasmDeriver", () => {
   })
 })
 
-// The core's parseKeyDeriverSpec is what both factories check with: these hold the two to the
+// Both are Argon2idKeyDerivers, which check their spec as they are made: these hold the two to the
 // same refusals, word for word, rather than restating the bounds.
 const UnworkableSpecs = [
   [{ salt_bytes: 7 },                     'a salt under 8 bytes'],
@@ -196,20 +195,20 @@ const UnworkableSpecs = [
 describe("argon2idWasmDeriver's bounds", () => {
   for (const [change, blurb] of UnworkableSpecs) {
     it(`refuses ${blurb} in the core's own words`, () => {
-      const spec = { ...CheapSpec, ...change } as unknown as KeyDeriverSpec
+      const spec = { ...CheapSpec, ...change } as unknown as Argon2idSpec
       expect(refusalOf(() => argon2idWasmDeriver(spec))).to.eq(refusalOf(() => argon2idDeriver(spec)))
     })
   }
 
   it("refuses what is not a spec at all", () => {
     for (const notSpec of [undefined, null, 'argon2id_web_v1', 65_536]) {
-      expect(refusalOf(() => argon2idWasmDeriver(notSpec as unknown as KeyDeriverSpec))).to.include('memory_kib')
+      expect(refusalOf(() => argon2idWasmDeriver(notSpec as unknown as Argon2idSpec))).to.include('memory_kib')
     }
   })
 
   it("allows the largest of each bound", () => {
     const lavish = { ...CheapSpec, memory_kib: 1_048_576, iterations: (2 ** 32) - 1, parallelism: 131_072, salt_bytes: 65_536 }
-    expect(specOf(argon2idWasmDeriver(lavish))).to.deep.equal(lavish)
+    expect(argon2idWasmDeriver(lavish).spec).to.deep.equal(lavish)
   })
 })
 

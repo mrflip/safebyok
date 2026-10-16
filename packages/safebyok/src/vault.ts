@@ -6,8 +6,8 @@ import { isStorageBlocked } from './refusals'
 import { optionsCheck } from './options'
 import type { VaultValidators } from './validators'
 import { VaultError, isVaultError, type VaultErrorKind } from './errors'
-import type { KeyDeriver } from './key-deriver'
-import { MaxSaltBytes, TestDeriverNotice, TestLabelPrefix, ensureSuppliedSpecKept, parseKeyDeriverSpec, type KeyDeriverSpec } from './key-deriver-spec'
+import { KeyDeriver } from './key-deriver'
+import { TestDeriverNotice, TestLabelPrefix } from './key-deriver-spec'
 import {
   cipherCtx, cipherBytes, decipherBytes,
   makeLeaseKey, makeLockboxKey, makeVaultKey, randomId, wrapKeyUnder, unwrapKeyUnder,
@@ -107,8 +107,8 @@ export type MakeVaultOpts = {
   vaultDB:    VaultDB
   deviceDB:   DeviceDB
   /**
-   * What turns a passphrase into passphraseKey bytes: in a browser, the pinned Argon2id deriver
-   * that `browserOpts()` from `safebyok/browser` supplies. See {@link KeyDeriver} for the narrow
+   * What turns a passphrase into its passphraseKey, an instance of a {@link KeyDeriver} subclass:
+   * in a browser, the pinned Argon2id deriver that `browserOpts()` from `safebyok/browser` supplies. See {@link KeyDeriver} for the narrow
    * reasons to substitute. Asked for outright, so an app that passes another never ships this one.
    */
   keyDeriver: KeyDeriver
@@ -2606,30 +2606,18 @@ const parseMaxLockboxes = (candidate: number | undefined, storeLockboxes: number
   return checked.data
 }
 
-/** What a KeyDeriver must carry. Checked only: Vault.make keeps the deriver it was handed, prototype and all. */
-const keyDeriverShape = Z.object({
-  algorithm:         Z.optional(Z.string()),
-  key_deriver_label: Z.string().check(Z.minLength(1)),
-  salt_bytes:        Z.int().check(Z.gte(1), Z.lte(MaxSaltBytes)),
-  deriveKeyBytes:    Z.custom<KeyDeriver['deriveKeyBytes']>((candidate) => typeof candidate === 'function'),
-})
-
 /**
- * `candidate` as the KeyDeriver a vault keeps, once it passes: the shape of a deriver, a label
- * that is not safebyok's to reserve, and -- for one declaring `algorithm: 'argon2id'` -- a whole
- * spec Argon2id can run. Warns through `logger`, and goes on, for the label of a test deriver.
+ * `candidate` as the KeyDeriver a vault keeps, once it is one: an instance of a KeyDeriver
+ * subclass, whose spec was checked as it was made -- the floor every deriver keeps, and Argon2id's
+ * for an Argon2idKeyDeriver. Warns through `logger`, and goes on, for the label of a test deriver.
  */
 const parseKeyDeriver = (candidate: KeyDeriver | undefined, logger: VaultLogger): KeyDeriver => {
   if (candidate === undefined) {
     throw new VaultError('bad_option', "Vault.make needs a keyDeriver: in a browser, spread browserOpts() from 'safebyok/browser' into its options.")
   }
-  if (! keyDeriverShape.safeParse(candidate).success) {
-    throw new VaultError('bad_option', 'keyDeriver is not a KeyDeriver: it needs a key_deriver_label, a salt_bytes from 1 to 65536 and a deriveKeyBytes function.')
+  if (! (candidate instanceof KeyDeriver)) {
+    throw new VaultError('bad_option', 'keyDeriver is not a KeyDeriver: pass argon2idWebV1Deriver (browserOpts() does), one argon2idDeriver(spec) made, or an instance of your own subclass of KeyDeriver.')
   }
-  // A deriver declaring Argon2id must be one Argon2id can run: its refusal here, with a kind, is
-  // the one it would otherwise make at the first unlock, as a plain Error from the library.
-  if (candidate.algorithm === 'argon2id') { parseKeyDeriverSpec(candidate as KeyDeriverSpec) }
-  ensureSuppliedSpecKept(candidate)
   if (candidate.key_deriver_label.startsWith(TestLabelPrefix)) {
     logger.warn(TestDeriverNotice, { call: 'make' })
   }

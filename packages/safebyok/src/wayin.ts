@@ -1,7 +1,6 @@
-import { cipherCtx, deriveWrappingKey, fromB64, importWrappingKeyBytes, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder, type Ciphered } from './crypto'
+import { cipherCtx, deriveWrappingKey, fromB64, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder, type Ciphered } from './crypto'
 import { VaultError } from './errors'
 import type { KeyDeriver } from './key-deriver'
-import { PassphraseKeyBytes } from './key-deriver-spec'
 import { PasskeySaltBytes, type PasskeyWayin, type PasskeyProof, type PassphraseWayin, type Wayin, type WayinKind, type WayinSummary, type VaultProps, type VaultScope } from './types'
 
 /**
@@ -89,48 +88,6 @@ const headerOf = (wayin: Wayin): WayinHeader => {
  */
 export type Proof = string | PasskeyProof
 
-/** The refusal for a key deriver's result that is not 32 bytes of a view. */
-const notKeyBytes = () => new VaultError('bad_option', 'keyDeriver handed back something other than 32 key bytes: a passphraseKey is a 256-bit key.')
-
-/** The memory a key deriver's bytes sit in, as the platform names it: told apart even across realms, and where `SharedArrayBuffer` is absent. */
-const isSharedMemory = (view: ArrayBufferView): boolean => Object.prototype.toString.call(view.buffer) === '[object SharedArrayBuffer]'
-
-/**
- * True when every byte of `bytes` is zero. Reads every byte whatever it finds, OR-ing them
- * together as libsodium's `sodium_is_zero` does, with no early exit. No JavaScript engine promises
- * constant time, but nothing here branches on a byte: only the verdict steers what follows, and
- * the refusal of an all-zero output tells that anyway.
- */
-const isAllZero = (bytes: Uint8Array): boolean => bytes.reduce((seen, byte) => seen | byte, 0) === 0
-
-/**
- * The passphraseKey `keyDeriver` makes of `passphrase` and its salt: 32 bytes, no other, in memory
- * of their own, or kind `bad_option` before anything is wrapped -- WebCrypto would accept 16 or 24
- * as a weaker AES key, and refuses a view over shared memory with no kind. Thirty-two zero bytes
- * are refused too, with the same kind: a key anyone could rebuild, which no derivation makes, but
- * a deriver handing back bytes it kept from an earlier call, wiped since, would. The bytes the
- * deriver handed back are zeroed once imported, whether or not the import succeeds, and when
- * refused for their length: they are ours the moment they are returned, and a copy lingering in
- * memory helps no one. Shared memory is refused untouched.
- */
-const passphraseKeyOf = async (keyDeriver: KeyDeriver, passphrase: string, saltBytes: Uint8Array): Promise<CryptoKey> => {
-  const handed: unknown = await keyDeriver.deriveKeyBytes(passphrase, saltBytes)
-  if (! ArrayBuffer.isView(handed)) { throw notKeyBytes() }
-  if (isSharedMemory(handed)) {
-    throw new VaultError('bad_option', 'keyDeriver handed back key bytes in shared memory (a SharedArrayBuffer), which WebCrypto will not import and other threads could read: hand back a fresh Uint8Array.')
-  }
-  const keyBytes = new Uint8Array(handed.buffer, handed.byteOffset, handed.byteLength)
-  try {
-    if (keyBytes.byteLength !== PassphraseKeyBytes) { throw notKeyBytes() }
-    if (isAllZero(keyBytes)) {
-      throw new VaultError('bad_option', 'keyDeriver handed back 32 zero bytes, a key anyone could rebuild: derive the key afresh on every call, and never hand back bytes kept from an earlier one.')
-    }
-    return await importWrappingKeyBytes(keyBytes)
-  } finally {
-    keyBytes.fill(0)
-  }
-}
-
 /**
  * A passphrase wayin around `vaultKey`, under a fresh passphraseSalt.
  *
@@ -189,7 +146,7 @@ const wrapUnderPassphrase = async (
     key_deriver_label: keyDeriver.key_deriver_label,
     salt_b64:          toB64(saltBytes),
   } as const
-  const wayinKey = await passphraseKeyOf(keyDeriver, passphrase, saltBytes)
+  const wayinKey = await keyDeriver.passphraseKeyOf(passphrase, saltBytes)
   const wayinCtx = wayinCtxOf(scope, vaultProps, header)
   const wrapped = await wrapKeyUnder(wayinKey, vaultKey, wayinCtx)
   const wayin: PassphraseWayin = { ...header, vault_key_wayin_wrapped: wrapped }
@@ -288,7 +245,7 @@ const tryPassphrase = async (
   vaultProps: VaultIdentity,
   wayin: PassphraseWayin,
 ): Promise<VaultKeyPair | null> => {
-  const wayinKey = await passphraseKeyOf(keyDeriver, passphrase, fromB64(wayin.salt_b64))
+  const wayinKey = await keyDeriver.passphraseKeyOf(passphrase, fromB64(wayin.salt_b64))
   return await tryUnwrap(wayinKey, wayinCtxOf(scope, vaultProps, headerOf(wayin)), wayin.vault_key_wayin_wrapped)
 }
 
