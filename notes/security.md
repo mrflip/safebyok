@@ -986,9 +986,9 @@ security expert who knows what questions to ask.
   bytes as `bad_option`, at create, unlock and every change to the ways in alike. No derivation
   makes them; a host deriver that kept its output and handed back bytes since wiped would, and
   the vault would seal under a key anyone can rebuild. The check reads every byte, OR-ing them
-  together as libsodium's `sodium_is_zero` does, with no early exit; no JavaScript JIT promises
-  constant time, and nothing secret rides on its timing, as an all-zero output is refused. No
-  dependency offers the check, and `@noble/ciphers`' `equalBytes` would be a new one for one line.
+  together as libsodium's `sodium_is_zero` does, with no early exit; no JavaScript engine promises
+  constant time, but nothing in it branches on a byte: only the verdict steers what follows, and
+  the refusal of an all-zero output tells that anyway. No dependency offers the check, and `@noble/ciphers`' `equalBytes` would be a new one for one line.
 * 2026-10-16 (secure_floor): **`openVault` refuses an insecure context** (`isSecureContext ===
   false`) first of all, as `insecure_context` (misuse): a browser withholds WebCrypto from plain
   http, which otherwise failed later as a `TypeError` with no kind. A runtime with no notion of
