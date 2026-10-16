@@ -12,6 +12,7 @@ import {
 import * as Envelope from './envelope'
 import type { EnvelopeStamp, UnlockProof, VaultKeyPair } from './envelope'
 import { stableJsonify } from './stable-jsonify'
+import { oneAtATime } from './one-at-a-time'
 import type { DeviceDB } from './device-db'
 import { VaultDB, jsonBytes, type LockboxExpectation } from './vault-db'
 import { parseLogger, type VaultLogger } from './logger'
@@ -612,43 +613,12 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
     cipherBinding(LockboxFormat, applabel, scope.user_id, vaultlabel, vaultId, purpose, header)
   )
 
-  // The refresh running now, and the one queued to run after it, which every request made
-  // meanwhile shares.
-  let refreshing: Promise<void> | null = null
-  let refreshAfter: Promise<void> | null = null
-
   /**
    * Bring the snapshot up to what storage holds now, one read at a time: a refresh asked for while
    * one runs is served by one more run once that ends, shared by every request made meanwhile, so
    * each caller sees storage as it stood after it asked, and no two reads interleave.
    */
-  const refresh = (): Promise<void> => {
-    if (refreshing === null) {
-      refreshing = readStorageAlone()
-      return refreshing
-    }
-    refreshAfter ??= refreshAfterThat(refreshing)
-    return refreshAfter
-  }
-
-  const readStorageAlone = async () => {
-    try {
-      await readStorage()
-    } finally {
-      refreshing = null
-    }
-  }
-
-  /** A refresh once `running` has ended, however it ended: its failure is its own callers' to hear. */
-  const refreshAfterThat = async (running: Promise<void>) => {
-    try {
-      await running
-    } catch {
-      // see above
-    }
-    refreshAfter = null
-    await refresh()
-  }
+  const refresh = oneAtATime(() => readStorage())
 
   /** One read of storage into the snapshot. One that fails leaves the snapshot as it stood, but for its `syncing`. */
   const readStorage = async () => {
