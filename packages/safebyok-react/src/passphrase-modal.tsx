@@ -167,7 +167,10 @@ const UnlockForm = ({ vault, onDone, allowStartOver }: PassphraseModalProps) => 
   const creating = snapshot.state === 'absent'
   const passkeyFirst = ! creating && offersPasskey(snapshot)
   const windowLine = unlockedFor(vault.reentryWindowMs, creating)
-  // Asked only of a vault there is to erase: one erased meanwhile has the user choose anew.
+  // Asked only of a vault there is to erase: one erased meanwhile has the user choose anew, and
+  // ends the question, so that a vault made after it is never asked of. React's "adjusting state
+  // while rendering": it renders again at once, before committing this.
+  if (startingOver && creating) { setStartingOver(false) }
   const askingStartOver = startingOver && ! creating
 
   /** A refusal the user meets: a condition shown in place, misuse rethrown in render, for PassphraseModal's boundary. */
