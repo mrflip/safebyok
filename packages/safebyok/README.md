@@ -297,9 +297,9 @@ doing better.
 
 ## Key derivation
 
-The passphraseKey is made by Argon2id at a keyDeriverSpec: its parameters under a
-`key_deriver_label`, which every vault stores. A label must always mean the same parameters, or
-vaults made on one device stop opening on another. There are three ways to choose:
+The passphraseKey is made by Argon2id at a keyDeriverSpec (an `Argon2idSpec`): its parameters
+under a `key_deriver_label`, which every vault stores. A label must always mean the same
+parameters, or vaults made on one device stop opening on another. There are three ways to choose:
 
 * **The supplied spec**, `Argon2idWebV1`: 64 MiB, 3 passes, 1 lane, a 16-byte salt and a 32-byte
   key. Its deriver, `argon2idWebV1Deriver`, is what `browserOpts()` hands over. Use it unless you
@@ -317,27 +317,52 @@ vaults made on one device stop opening on another. There are three ways to choos
   allows weak parameters that run: those are yours to judge.
 * **Another implementation of a spec**: `safebyok-fastkey` runs any of them through
   WebAssembly, several times faster, deriving the same bytes. For one native to your platform,
-  spread the spec into your deriver, `{ ...Argon2idWebV1, deriveKeyBytes }`, keeping its label,
-  and test that it derives the same bytes as ours; `parseKeyDeriverSpec(spec)` checks a host's
-  spec exactly as `argon2idDeriver` does. `Vault.make` refuses a deriver that wears a supplied spec's label
-  without carrying exactly its parameters; it cannot check the bytes, so that test is yours.
+  extend `Argon2idKeyDeriver` and make it with the spec, keeping its label; then test that it
+  derives the same bytes as ours (`deriveKeyBytes`, on each):
 
-Any `keyDeriver` needs a `salt_bytes` from 1 to 65536 (the most `crypto.getRandomValues` hands out
-at once), which `Vault.make` checks, and must hand back 32 bytes of memory of its own from
-`deriveKeyBytes`, derived afresh on every call -- a fresh `Uint8Array`, not a view over a
-`SharedArrayBuffer`, and not one it keeps: the vault zeroes the bytes once it has made the
-passphraseKey of them. `unlock()` and the calls that set a passphrase refuse anything else with
-`bad_option`, 32 zero bytes among it: a key anyone could rebuild, which a deriver handing back
-bytes it kept from an earlier call would. A deriver of ours refuses a salt of another length than
-its spec's.
+  ```ts
+  class NativeArgon2idDeriver extends Argon2idKeyDeriver {
+    protected doDeriveKeyBytes(passphrase: string, saltBytes: Uint8Array) {
+      const { memory_kib, iterations, parallelism, output_bytes } = this.spec
+      return nativeArgon2id({ passphrase, saltBytes, memory_kib, iterations, parallelism, output_bytes })
+    }
+  }
+  const keyDeriver = new NativeArgon2idDeriver(Argon2idWebV1)
+  ```
 
-`KeyDeriver` is one of two types. An `Argon2idKeyDeriver` carries a whole keyDeriverSpec beside
-its function, as every deriver above does, and `Vault.make` checks the spec as `argon2idDeriver`
-would, so one Argon2id cannot run is refused at open, not at the first unlock. A
-`CustomKeyDeriver` carries only `key_deriver_label`, `salt_bytes` and `deriveKeyBytes`, and may
-name its `algorithm`; it may not declare `'argon2id'` without being a whole spec. `Vault.make` logs
-a warning (not a refusal) for a label beginning `test_`, the mark of a deriver made cheap for
-tests, such as `safebyok/testing`'s.
+  It checks the spec exactly as `argon2idDeriver` does, and refuses one wearing a supplied spec's
+  label without carrying exactly its parameters; it cannot check the bytes, so that test is yours.
+
+Every key deriver is a `KeyDeriver`, an abstract class: `Vault.make` takes nothing else (a plain
+object with a `deriveKeyBytes`, as a deriver was before, is refused with `bad_option`). The vault
+calls one method on it, `passphraseKeyOf`, and the class does the work every deriver shares, so a
+subclass supplies only its runner, `doDeriveKeyBytes`:
+
+* **As it is made**, it checks its spec: an `algorithm`, a `key_deriver_label` and a `salt_bytes`
+  from 1 to 65536 (the most `crypto.getRandomValues` hands out at once), a label safebyok does not
+  reserve, and Argon2id's floors for an `Argon2idKeyDeriver`. Only that family may say
+  `algorithm: 'argon2id'`. So a spec that cannot run is refused (`bad_option`) where the deriver is
+  made, before any vault is opened with it.
+* **At each derivation**, it refuses a salt of another length than its spec's, and anything the
+  runner hands back but 32 bytes of memory of their own: a fresh `Uint8Array`, not a view over a
+  `SharedArrayBuffer`, and not one the runner keeps, since the class zeroes the bytes once it has
+  made the passphraseKey of them (`bad_option`). Thirty-two zero bytes are refused too: a key
+  anyone could rebuild, which a runner handing back bytes it kept from an earlier call would.
+
+A deriver of another algorithm is another subclass, with its own spec and its own check:
+
+```ts
+class ScryptDeriver extends KeyDeriver {
+  constructor() { super({ algorithm: 'scrypt', key_deriver_label: 'acme_scrypt_v1', salt_bytes: 16 }) }
+  protected doDeriveKeyBytes(passphrase: string, saltBytes: Uint8Array) {
+    return scryptAsync(passphrase, saltBytes, { N: 2 ** 17, r: 8, p: 1, dkLen: 32 })
+  }
+}
+```
+
+Run a vetted implementation, never a derivation of your own. `Vault.make` logs a warning (not a
+refusal) for a label beginning `test_`, the mark of a deriver made cheap for tests, such as
+`safebyok/testing`'s `TestDeriver`.
 
 ## Locking
 
