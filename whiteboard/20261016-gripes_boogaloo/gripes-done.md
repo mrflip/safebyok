@@ -2,7 +2,7 @@
 
 Every gripe from the gripes_boogaloo harvest that a merged PR, an open PR, a Coach ruling or an answered question has settled, as of 2026-10-16; ids are shared with gripes-list.md.
 
-260 answered (509 total gripes: 260 answered, 249 remaining).
+265 answered (529 total gripes: 265 answered, 264 remaining).
 
 ## Crypto & key derivation
 
@@ -272,6 +272,9 @@ Every gripe from the gripes_boogaloo harvest that a merged PR, an open PR, a Coa
 - G398 Make the release script refuse a public package under `e2e/` as under `demos/` → done with a test (PR#111, open)
 - G484 Should the packages job and the demo be required checks? → ruleset requires test-build, lint-typecheck and CodeQL; `node-compat` optional on purpose (old_gripes, Addressed)
 - G485 The IDE's phantom `tsconfigRootDir` candidate → each React package names its own; Coach marked fixed (old_gripes, Addressed)
+- G526 Should a hot release be pinned more or less specifically than normal? → more: the exact version, excluded by name and version, recorded in notes/security.md the same day, removed once seven days old, never for convenience (Coach ruling, PR#96)
+- G527 Have a sprint orchestrator watch the size budgets so stacked threads don't fight over them → the sprint skill: guess the target up front, the first thread raises the budgets, a late thread lowers them to the rule (Coach ruling, PR#99)
+- G528 Explain or fix Convex's `--no-error-on-unmatched-pattern` and the demo's coverage with no `include` → both already fixed on main, struck from TODO after checking (PR#99)
 
 ## Release & npm
 
@@ -293,6 +296,7 @@ Every gripe from the gripes_boogaloo harvest that a merged PR, an open PR, a Coa
 - G433 Open the Version PR as a draft → `pr-draft: always` (PR#63)
 - G434 Give `safebyok-react` a publishable build like the core; peer range `^0.0.0` → tsdown build, lockstep `workspace:^` rewritten at pack (PR#15)
 - G486 Commit the reviewer's uncommitted release-script fix; reconcile design drift from the preplan → landed (PR#22); drift recorded (old_gripes, Addressed)
+- G525 Land the `safebyok-argon2-wasm` → `safebyok-fastkey` rename (a commit on the main checkout's branch) as its own PR before cutting the next sprint's threads → renamed (PR#122)
 
 ## Docs & process
 
@@ -311,3 +315,4 @@ Every gripe from the gripes_boogaloo harvest that a merged PR, an open PR, a Coa
 - G462 Close PR#38 and PR#66, which had nothing left to merge → closed (gh pr list)
 - G463 Find and close finished threads' branches and idle worktrees → `scripts/git-survey.sh` and `/branch-sweep` (PR#112); `.DS_Store` cleanup script (PR#116)
 - G487 Fix the relic's 24 survey issues and retire its API dead ends → relic rewritten against src/, recovery kits stripped (PR#5)
+- G529 Worktrees share one git stash and one rerere cache (a worker used `git stash`; rerere replayed a stale resolution into #119) → ground rules: never `git stash`; diff each resolved file after a conflicted rebase (matters-plan.md; Big Feats Next)
