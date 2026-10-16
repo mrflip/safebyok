@@ -212,6 +212,10 @@ const passphraseAdvice = (typed: string) => (typed.length < 12 ? 'Twelve charact
 An advice function that throws, or rejects, shows the dialog's calm "Something went wrong", as any
 other failure inside it does.
 
+It hears the passphrase itself, in plain text, at every change: keep it on the device. Never send
+it to a server, log it, or let an error tracker capture it as an argument or in a thrown error's
+message.
+
 ## The dialog's words
 
 Every word the binding shows a user lives in one module, `src/messages.ts`, sentence by
