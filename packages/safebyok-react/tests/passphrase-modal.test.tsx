@@ -248,29 +248,6 @@ describe("PassphraseModal", () => {
       render(<PassphraseModal vault={vaultInState('locked', ForeverMs - 60_001)} onDone={noop} />)
       expect(screen.queryByText(/Locks again on this device in [\d,]+ minutes\./)).to.not.be.null
     })
-
-    it("leaves the line out on an engine that cannot phrase a relative time, and still asks", () => {
-      const relativeTimeFormat = Intl.RelativeTimeFormat
-      Reflect.deleteProperty(Intl, 'RelativeTimeFormat')
-      try {
-        render(<PassphraseModal vault={vaultInState('locked')} onDone={noop} />)
-        expect(screen.queryByText(/Locks/)).to.be.null
-        expect(screen.queryByText('Unlock your vault')).to.not.be.null
-      } finally {
-        Object.defineProperty(Intl, 'RelativeTimeFormat', { value: relativeTimeFormat, writable: true, configurable: true })
-      }
-    })
-
-    it("still says until locked on such an engine, which needs no phrasing", () => {
-      const relativeTimeFormat = Intl.RelativeTimeFormat
-      Reflect.deleteProperty(Intl, 'RelativeTimeFormat')
-      try {
-        render(<PassphraseModal vault={vaultInState('locked', ForeverMs)} onDone={noop} />)
-        expect(screen.queryByText("Stays unlocked on this device until you lock it.")).to.not.be.null
-      } finally {
-        Object.defineProperty(Intl, 'RelativeTimeFormat', { value: relativeTimeFormat, writable: true, configurable: true })
-      }
-    })
   })
 
   describe("as a dialog", () => {

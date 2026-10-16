@@ -175,14 +175,20 @@ every lockbox.
 
 Every word the binding shows a user lives in one module, `src/messages.ts`, sentence by
 sentence, in English; real locales come later. The dialog phrases how long an unlock lasts with
-`Intl.RelativeTimeFormat`, which every current browser has. An engine without it shows the
-dialog without that line, and the provider warns you once; to show it there, import the
-standard polyfill yourself, before the app renders:
+`Intl.RelativeTimeFormat`, and assumes it is there: every current browser and Node has it. On an
+engine that may lack it -- React Native's Hermes, an older browser you support -- make sure it is
+always there by importing the standard polyfill, with its English locale data, at your app's
+entry, before anything renders (`pnpm add @formatjs/intl-relativetimeformat`; it is yours to
+install, not a dependency of ours):
 
 ```ts
 import '@formatjs/intl-relativetimeformat/polyfill'
 import '@formatjs/intl-relativetimeformat/locale-data/en'
 ```
+
+The polyfill installs itself only where the engine has no `Intl.RelativeTimeFormat` of its own.
+Without it, such an engine meets a `TypeError` in the dialog, which shows its calm "Something
+went wrong" notice in place of the form.
 
 ## Entering a whisper
 
@@ -210,7 +216,10 @@ honors only its own flag, and a browser's built-in manager may honor none.
 A whisper you show the user -- a "view" button, an edit form filled with the stored key, the
 field above while they type -- is in React state, and so in your component tree's memory, until
 that state lets go of it: React DevTools shows it, and an error reporter that captures props or
-state may send it. That is the cost of showing it; keep it as small as the feature allows. Show
+state may send it. That is the cost of showing it; keep it as small as the feature allows. A controlled input --
+`WhisperField` among them -- carries more: React 19 copies its value into the element's `value`
+attribute, so the whisper as typed is in the page's markup (`outerHTML`), where a CSS attribute
+selector, a browser extension or a session-replay tool can read it, hidden or shown. Show
 `mask(whisper)` (from `safebyok/utils`) where the user only needs to tell keys apart; read a
 whisper into state only when the user asks to see or edit it, and drop it (set the state back)
 when they hide it, save, or navigate away; and to use a whisper, call `vault.use(boxlabel,

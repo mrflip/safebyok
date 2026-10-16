@@ -18,12 +18,15 @@ const windowCount = (reentryWindowMs: number): { count: number, unit: Unit } => 
   return { count: minutes, unit: 'minute' }
 }
 
-/**
- * Whether this engine phrases relative times (`Intl.RelativeTimeFormat`), as every current
- * browser does. Where it does not, the dialog leaves out how long an unlock lasts, and a host
- * that wants the line there imports the standard polyfill, `@formatjs/intl-relativetimeformat`.
- */
-export const phrasesRelativeTime = (): boolean => typeof (Intl as Partial<typeof Intl>).RelativeTimeFormat === 'function'
+/** One relative-time formatter per locale, made at first use, after any polyfill the host imports has run. */
+const relativeTimes = new Map<string, Intl.RelativeTimeFormat>()
+
+/** The formatter for `locale`: numeric 'always', so that one day reads 'in 1 day' and never 'tomorrow'. */
+const relativeTimeIn = (locale: string): Intl.RelativeTimeFormat => {
+  const made = relativeTimes.get(locale) ?? new Intl.RelativeTimeFormat(locale, { numeric: 'always', style: 'long' })
+  relativeTimes.set(locale, made)
+  return made
+}
 
 /**
  * What the dialog promises about how long an unlock lasts, from the vault's `reentryWindowMs`:
@@ -31,16 +34,13 @@ export const phrasesRelativeTime = (): boolean => typeof (Intl as Partial<typeof
  * minutes, phrased by `Intl.RelativeTimeFormat`), or 'Locks on this device in 7 days' when the
  * dialog is creating the vault, which has nothing yet to lock "again". A window within a minute
  * of the longest a vault keeps (`ForeverMs`, which `Infinity` hours becomes) reads as lasting
- * until the user locks it. Null on an engine that cannot phrase a relative time.
+ * until the user locks it.
  */
-const unlockedFor = (reentryWindowMs: number, creating: boolean): string | null => {
+const unlockedFor = (reentryWindowMs: number, creating: boolean): string => {
   // Never compared for equality: the far future is anything within a minute of it.
   if (reentryWindowMs >= ForeverMs - MinuteMillis) { return Messages.staysUnlocked }
-  if (! phrasesRelativeTime()) { return null }
   const { count, unit } = windowCount(reentryWindowMs)
-  // numeric 'always', so that one day reads 'in 1 day' and never 'tomorrow'.
-  const relativeTime = new Intl.RelativeTimeFormat(Locale, { numeric: 'always', style: 'long' })
-  const relative = relativeTime.format(count, unit)
+  const relative = relativeTimeIn(Locale).format(count, unit)
   return creating ? Messages.locksIn(relative) : Messages.locksAgainIn(relative)
 }
 
@@ -74,7 +74,8 @@ const unlockedFor = (reentryWindowMs: number, creating: boolean): string | null 
  * `forcePassphraseReentryHours` it was opened with): 'Locks again on this device in 7 days', 'in 15
  * minutes', 'Stays unlocked on this device until you lock it' for `Infinity`; while it creates the
  * vault, 'Locks on this device in 7 days', with nothing yet to lock again. Nobody need tell the
- * dialog the window again. On an engine without `Intl.RelativeTimeFormat` the line is left out.
+ * dialog the window again. It needs `Intl.RelativeTimeFormat`, which a host on an engine without
+ * it (Hermes, an older browser) supplies with the standard polyfill: the README says how.
  *
  * With `allowStartOver`, a user who has forgotten the passphrase is offered a way out: "Forgot it?
  * Start a new vault" asks first, then erases the vault (`vault.destroy()`, on every device) and
@@ -243,7 +244,7 @@ const UnlockForm = ({ vault, onDone, allowStartOver }: PassphraseModalProps) => 
           )}
         {/* A live region, mounted from the start, so that each word put in it is announced. */}
         <div role="alert">{gripe !== null && <p className="gripe">{gripe.text}</p>}</div>
-        {windowLine !== null && ! askingStartOver && <p className="quiet">{windowLine}</p>}
+        {! askingStartOver && <p className="quiet">{windowLine}</p>}
         {askingStartOver
           ? (
             <div className="row" key="start-over">

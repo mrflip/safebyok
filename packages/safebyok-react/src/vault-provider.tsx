@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { checkValidators, eraseDamagedVault as eraseStoredDamagedVault, isVaultCondition, isVaultError, openVault, parseLogger, type OpenVaultOpts, type Vault, type VaultError, type VaultLogger, type VaultSnapshot, type VaultValidators } from 'safebyok'
-import { PassphraseModal, phrasesRelativeTime } from './passphrase-modal'
+import { PassphraseModal } from './passphrase-modal'
 
 /**
  * What the provider hands down: the vault handle (null while opening, signed out, or when the
@@ -178,7 +178,6 @@ export const VaultProvider = ({ userId, allowStartOver, children, ...opts }: Vau
   // The logger and clock the last render had, and whether a change of either was warned of yet.
   const sinks = useRef({ logger, clock })
   const toldOfSinks = useRef(false)
-  const toldOfPhrasing = useRef(false)
 
   // A logger or clock written inline in the props is new at every render, and reopens the vault
   // each time: said once, the first time either changes.
@@ -190,13 +189,6 @@ export const VaultProvider = ({ userId, allowStartOver, children, ...opts }: Vau
     toldOfSinks.current = true
     warnHost(logger, `VaultProvider reopened the vault because its ${changed.join(' and ')} changed identity between renders. Written inline in the props, it is new at every render, and reopens the vault each time: define it once, outside the component, or memoize it.`, { call: 'VaultProvider', props: changed })
   }, [logger, clock])
-
-  // An engine that cannot phrase a relative time shows a dialog without its window line: said once.
-  useEffect(() => {
-    if (toldOfPhrasing.current || phrasesRelativeTime()) { return }
-    toldOfPhrasing.current = true
-    warnHost(logger, "This engine has no Intl.RelativeTimeFormat, so the passphrase dialog leaves out how long an unlock lasts. To show it, import the standard polyfill: import '@formatjs/intl-relativetimeformat/polyfill'.", { call: 'VaultProvider' })
-  }, [logger])
 
   /** Closes `ending` if it is still the dialog showing, and settles every action waiting on it. */
   const endAsking = useCallback((ending: Asking | null, unlocked: boolean) => {
