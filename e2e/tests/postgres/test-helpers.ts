@@ -87,10 +87,25 @@ export const useFileDatabase = (): (() => FileDatabase) => {
     const databaseName = `safebyok_e2e_${randomBytes(6).toString('hex')}`
     const admin = new Client({ connectionString: url })
     await admin.connect()
-    await admin.query(`CREATE DATABASE ${databaseName}`)
-    await admin.end()
+    try {
+      await admin.query(`CREATE DATABASE ${databaseName}`)
+    } finally {
+      await admin.end()
+    }
     const fileUrl = urlNaming(url, databaseName)
     const host = new Pool({ connectionString: fileUrl, max: 4 })
+    // Set before anything else can fail, so a setup that throws still ends the pool and drops the database.
+    made.drop = async () => {
+      await made.db?.endDevices()
+      await host.end()
+      const dropper = new Client({ connectionString: url })
+      await dropper.connect()
+      try {
+        await dropper.query(`DROP DATABASE IF EXISTS ${databaseName} WITH (FORCE)`)
+      } finally {
+        await dropper.end()
+      }
+    }
     await host.query(VaultTablesSql)
     await host.query(VaultNotifySql)
     const devices: { end: () => Promise<void> }[] = []
@@ -110,14 +125,6 @@ export const useFileDatabase = (): (() => FileDatabase) => {
       },
       empty:      async () => { await host.query('TRUNCATE safebyok_lockboxes, safebyok_bundles') },
       endDevices: async () => { await Promise.all(devices.splice(0).map((device) => device.end())) },
-    }
-    made.drop = async () => {
-      await made.db?.endDevices()
-      await host.end()
-      const dropper = new Client({ connectionString: url })
-      await dropper.connect()
-      await dropper.query(`DROP DATABASE IF EXISTS ${databaseName} WITH (FORCE)`)
-      await dropper.end()
     }
   }, 60_000)
   afterEach(async () => { await made.db?.endDevices() })
