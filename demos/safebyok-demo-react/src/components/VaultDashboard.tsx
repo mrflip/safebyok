@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useVault, useVaultSnapshot } from 'safebyok-react'
+import { WhisperFieldAttributes } from 'safebyok/utils'
+import { asksAgain } from '../lib/asks-again'
 import { editableWhisper, parseWhisperText, showWhisper } from '../lib/whisper-text'
 import { PsstModal } from './PsstModal'
 import type { Whisper } from 'safebyok'
@@ -100,6 +102,11 @@ export const VaultDashboard = () => {
         <LockChip state={snapshot.state} askPassphraseAt={snapshot.askPassphraseAt} onLock={() => { void vault.lock() }} />
       </div>
 
+      <p className="quiet">
+        This vault lives only in this browser: another browser, or another device, signed in as you
+        sees none of it, and clearing this site&apos;s data erases it.
+      </p>
+
       {snapshot.boxes.length === 0 && <p className="quiet">No lockboxes yet. Whispers you add live encrypted in the database (watch the inspector below) and open only on your device.</p>}
 
       {snapshot.boxes.length > 0 && (
@@ -162,6 +169,8 @@ export const VaultDashboard = () => {
             <label>
               whisper <span className="quiet">(valid JSON keeps its type; anything else is stored as a string)</span>
               <textarea
+                name="whisper_text"
+                {...WhisperFieldAttributes}
                 placeholder="sk-ant-..."
                 value={form.whisperText}
                 onChange={(evt) => { setForm({ ...form, whisperText: evt.target.value }) }}
@@ -192,7 +201,7 @@ const LockChip = ({ state, askPassphraseAt, onLock }: { state: string, askPassph
   if (state === 'unlocked') {
     return (
       <span className="row">
-        <span className="chip unlocked">🔓 unlocked{askPassphraseAt !== null && ` until ${new Date(askPassphraseAt).toLocaleString()}`}</span>
+        <span className="chip unlocked">🔓 unlocked{asksAgain(askPassphraseAt)}</span>
         <button className="mini" onClick={onLock}>lock now</button>
       </span>
     )

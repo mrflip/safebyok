@@ -1,4 +1,4 @@
-import { Label, wallClock, type Clock, type StringStore } from 'safebyok'
+import { EpochMillis, Label, wallClock, type Clock, type StringStore } from 'safebyok'
 
 /**
  * SCAFFOLDING a real host application replaces with its own auth (Google sign-in, Clerk, Convex
@@ -37,7 +37,9 @@ export type Auth = {
  * passphrase is deliberately a separate thing from signing in.
  *
  * @param opts - `applabel`, namespacing the rows; `dbStore` and `deviceStore`, where they live;
- *   and `clock`, which stamps a new account's `registered_at` (default: the wall clock).
+ *   and `clock`, which stamps a new account's `registered_at` (default: the wall clock). Its
+ *   reading is checked as the vault checks a host's clock: epoch milliseconds from 1981 to 2255,
+ *   rounded down; any other refuses the sign-in that would stamp it.
  *
  * @example
  *   const auth = createAuth({ applabel: 'acme', dbStore, deviceStore })
@@ -47,6 +49,12 @@ export const createAuth = (opts: { applabel: string, dbStore: StringStore, devic
   const { applabel, dbStore, deviceStore, clock = wallClock } = opts
   const accountCkey = (userlabel: string) => `account:${applabel}:${userlabel}`
   const sessionCkey = `session:${applabel}`
+
+  /** A new account for `userlabel`, stamped with the clock's reading; null when that is no time the vault would accept. */
+  const newAccount = (userlabel: string): Account | null => {
+    const reading = EpochMillis.safeParse(Math.floor(clock.now()))
+    return reading.success ? { user_id: randomId(), userlabel, registered_at: reading.data } : null
+  }
 
   let session: Session | null = readSession()
   const listeners = new Set<() => void>()
@@ -80,9 +88,10 @@ export const createAuth = (opts: { applabel: string, dbStore: StringStore, devic
       }
       const ckey = accountCkey(checked.data)
       const existing = dbStore.read(ckey)
-      const account: Account = existing === null
-        ? { user_id: randomId(), userlabel: checked.data, registered_at: clock.now() }
-        : JSON.parse(existing) as Account
+      const account = existing === null ? newAccount(checked.data) : JSON.parse(existing) as Account
+      if (account === null) {
+        return Promise.reject(new Error("The demo's clock read no time between 1981 and 2255, in epoch milliseconds: check what it was handed."))
+      }
       if (existing === null) { dbStore.write(ckey, JSON.stringify(account)) }
       session = { userId: account.user_id, userlabel: account.userlabel }
       deviceStore.write(sessionCkey, JSON.stringify(session))

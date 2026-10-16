@@ -59,6 +59,29 @@ describe("createAuth", () => {
     expect(margosAccount(dbStore)).to.have.property('registered_at', Date.UTC(2026, 9, 15, 9, 30))
   })
 
+  const BadClockCases = [
+    [NaN,                       'a clock reading NaN'],
+    [Date.UTC(2026, 9, 15) / 1000, 'a clock in epoch seconds'],
+    [Date.UTC(2026, 9, 15) * 1000, 'a clock in epoch microseconds'],
+  ] as const
+
+  for (const [reading, blurb] of BadClockCases) {
+    it(`refuses a new account's sign-in, stamping nothing, for ${blurb}`, async () => {
+      const dbStore = memoryStore()
+      const auth = createAuth({ applabel: 'acme', dbStore, deviceStore: memoryStore(), clock: { now: () => reading } })
+      await expect(auth.signIn('margo')).rejects.toThrow(/clock read no time between 1981 and 2255/)
+      expect(dbStore.read('account:acme:margo')).to.be.null
+      expect(auth.getSnapshot()).to.be.null
+    })
+  }
+
+  it("rounds a clock's fraction down, as the vault does", async () => {
+    const dbStore = memoryStore()
+    const auth = createAuth({ applabel: 'acme', dbStore, deviceStore: memoryStore(), clock: { now: () => Date.UTC(2026, 9, 15) + 0.75 } })
+    await auth.signIn('margo')
+    expect(margosAccount(dbStore)).to.have.property('registered_at', Date.UTC(2026, 9, 15))
+  })
+
   it("different userlabels are different accounts", async () => {
     const { auth } = makeWorld()
     const margo = await auth.signIn('margo')
