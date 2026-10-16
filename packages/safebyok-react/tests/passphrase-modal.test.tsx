@@ -398,5 +398,25 @@ describe("PassphraseModal", () => {
       expect(screen.queryByPlaceholderText('vault passphrase')).to.not.be.null
       expect(destroy).toHaveBeenCalledOnce()
     })
+
+    it("drops the question once the vault is erased elsewhere, and never asks it of a vault made after", async () => {
+      const opts = TH.memoryVaultOpts()
+      const vault = await openVault(opts)
+      await vault.unlock('pw')
+      await vault.lock()
+      render(<PassphraseModal vault={vault} allowStartOver onDone={noop} />)
+      fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
+      const eraser = await openVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
+      await act(async () => { await eraser.destroy() })
+      eraser.close()
+      await screen.findByText('Choose a vault passphrase')
+      const maker = await openVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
+      await act(async () => { await maker.unlock('another pw') })
+      maker.close()
+      await screen.findByText('Unlock your vault')
+      expect(screen.queryByText('Erase and start over')).to.be.null
+      expect(screen.queryByPlaceholderText('vault passphrase')).to.not.be.null
+      vault.close()
+    })
   })
 })
