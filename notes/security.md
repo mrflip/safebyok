@@ -883,11 +883,13 @@ security expert who knows what questions to ask.
   first way in, named `passphrase` by the vault itself, is not checked.
 * 2026-10-16: **The whisper field** (`WhisperFieldAttributes` in `safebyok/utils`, spread by
   `safebyok-react`'s `WhisperField`) asks each major password manager to ignore the field, sets
-  `autocomplete="new-password"`, and turns off capitalizing, autocorrect and spell-check: a
+  `autocomplete="off"` (since 2026-10-16, thread 14; it was `new-password`, which invites Chrome's
+  password generator), and turns off capitalizing, autocorrect and spell-check: a
   browser's enhanced spell-check sends the field's text to its maker's servers, and with the
   whisper shown (`type="text"`) nothing else stops it. The field is named `whisper_text`, never
   `key`, `password` or `token`. Each manager honors only its own flag; a browser's built-in
-  manager may honor none, and with `new-password` Chrome may offer to generate a password there.
+  manager may honor none, and Chrome ignores `off` on a `type="password"` field, so it may still
+  offer a saved password there.
 * 2026-10-16: **Starting over from the passphrase dialog** (`allowStartOver` on `VaultProvider`
   and `PassphraseModal`, off by default) erases the vault on every device through
   `vault.destroy()`, which by design needs no passphrase. It asks first, in the dialog, and focus
@@ -903,5 +905,22 @@ security expert who knows what questions to ask.
   so what the user typed sits in `outerHTML` -- readable by a CSS attribute selector
   (`input[value^="sk-"]`, an old exfiltration trick), a browser extension, or a session-replay
   tool that records the DOM -- whether the field shows it or hides it. The README's *Revealing a
-  whisper* says so. An uncontrolled field would keep it out of the attribute; that choice is
-  with the Coach.
+  whisper* says so. Since 2026-10-16 (thread 14) the field is uncontrolled, and the entry below
+  says what holds now.
+* 2026-10-16: **`WhisperField` and the passphrase dialog's field are uncontrolled.** The browser
+  holds what is typed; React writes neither a whisper nor a passphrase into a `value` attribute,
+  so neither is in `outerHTML` for a CSS attribute selector, an extension or a session recorder
+  to read. `WhisperField` takes no `value` or `defaultValue`, and sets both undefined after the
+  host's props, so a value slipped past the types cannot make it controlled. The reveal toggle
+  flips only the input's `type`. What a host keeps from `onChange` is in its own state, in memory,
+  as before.
+* 2026-10-16: **The passphrase field invites password managers** (`PassphraseModal`, thread 14):
+  `autocomplete="new-password"` while creating, `current-password` while unlocking, in a real
+  form, beside a hidden `autocomplete="username"` field (`passphraseUsername`, default
+  `<user_id> (<vaultlabel> vault)`). A manager then holds the vault passphrase, which is the
+  point: a long, generated passphrase the user need not remember beats one they can. The
+  username defaults to something no sign-in form uses, so a manager never takes the passphrase
+  for the user's sign-in password (and offers to overwrite it); a host naming its own is told not
+  to use the sign-in name alone. `passphraseAdvice`, the host's advice shown beside the field, is
+  only advice: nothing refuses a passphrase in the dialog, and composition rules are discouraged
+  (NIST SP 800-63B).

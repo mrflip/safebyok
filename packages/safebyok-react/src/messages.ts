@@ -18,6 +18,10 @@ export const Messages = {
   chooseBlurb:       'This passphrase encrypts your secrets on your device. Nobody can recover it for you -- not even us.',
   unlockBlurb:       'Your secrets are encrypted with this passphrase; enter it to continue. A forgotten passphrase cannot be recovered -- you would start a new vault and re-enter your secrets.',
   passphraseField:   'vault passphrase',
+  /** What a password manager files a vault's passphrase under, unless the host names it. */
+  passphraseUsername: (userId: string, vaultlabel: string) => `${userId} (${vaultlabel} vault)`,
+  showPassphrase:    'Show',
+  hidePassphrase:    'Hide',
   createButton:      'Create vault',
   unlockButton:      'Unlock',
   cancelButton:      'Cancel',

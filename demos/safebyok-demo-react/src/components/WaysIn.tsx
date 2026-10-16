@@ -11,7 +11,10 @@ import { createPasskey, passkeysAvailable, useVault, useVaultSnapshot } from 'sa
 export const WaysIn = () => {
   const { vault } = useVault()
   const snapshot = useVaultSnapshot()
+  // The passphrase as typed, heard from an uncontrolled field, so React never writes it into the
+  // page; a new round remounts the field empty.
   const [passphrase, setPassphrase] = useState('')
+  const [fieldRound, setFieldRound] = useState(0)
   const [unlocklabel, setUnlocklabel] = useState('laptop_fingerprint')
   const [gripe, setGripe] = useState<string | null>(null)
 
@@ -24,6 +27,7 @@ export const WaysIn = () => {
       const unlockId = await vault.addPasskey(passphrase, makePasskey, { unlocklabel })
       if (unlockId === null) { return }
       setPassphrase('')
+      setFieldRound((prev) => prev + 1)
     } catch (err) {
       setGripe(err instanceof Error ? err.message : 'Could not add that passkey.')
     }
@@ -42,7 +46,7 @@ export const WaysIn = () => {
           <div className="lockbox-form">
             <label>
               your passphrase <span className="quiet">(the proof any change to the ways in asks for)</span>
-              <input type="password" value={passphrase} onChange={(evt) => { setPassphrase(evt.target.value) }} />
+              <input key={fieldRound} type="password" autoComplete="current-password" onChange={(evt) => { setPassphrase(evt.target.value) }} />
             </label>
             <label>
               label

@@ -174,6 +174,9 @@ const providerOf = (world: ReturnType<typeof makeWorld>, sinks: Pick<VaultProvid
   <VaultProvider {...world.props} userId="u1" {...sinks}><Probe /></VaultProvider>
 )
 
+/** Advice on a passphrase being chosen: a word until it is twelve characters or more. */
+const twelveOrMore = (typed: string) => (typed.length < 12 ? 'Twelve characters or more, please.' : null)
+
 /** Stands in for a function a test replaces before it is called. */
 const noop = () => { /* replaced before use */ }
 
@@ -682,6 +685,20 @@ describe("VaultProvider", () => {
     fireEvent.click(screen.getByText('Create vault'))
     // The action runs again, in the new vault, where there is no such lockbox.
     await expect(reading.settled).rejects.toMatchObject({ kind: 'absent_box' })
+  })
+
+  it("passes passphraseUsername and passphraseAdvice to the dialog: what a password manager files it under, and what is said as the user chooses", async () => {
+    const world = makeWorld()
+    render(
+      <VaultProvider {...world.props} userId="u1" passphraseUsername="margo@example.com (vault)" passphraseAdvice={twelveOrMore}>
+        <Probe />
+      </VaultProvider>,
+    )
+    fireEvent.click(await screen.findByText('put'))
+    const field = await screen.findByPlaceholderText('vault passphrase')
+    expect(document.querySelector<HTMLInputElement>('input[autocomplete="username"]')?.value).to.eq('margo@example.com (vault)')
+    fireEvent.change(field, { target: { value: 'short' } })
+    expect(await screen.findByText('Twelve characters or more, please.')).to.not.be.null
   })
 
   describe("warning the developer once", () => {
