@@ -45,8 +45,10 @@ const keyDeriver = argon2idWasmDeriver(spec)  // derives what argon2idDeriver(sp
 ```
 
 It refuses (`bad_option`) what the core's factory refuses -- a spec Argon2id cannot run, or one
-wearing a supplied spec's label without its parameters -- in the core's own words, since it calls
-the core's `parseKeyDeriverSpec`.
+wearing a supplied spec's label without its parameters -- in the core's own words, since both are
+an `Argon2idKeyDeriver`, the core's class for Argon2id: it checks the spec, the salt and the bytes
+that come back, and zeroes them once the vault has its key. This package supplies only the
+WebAssembly runner.
 
 ## How fast
 
@@ -76,8 +78,9 @@ the core's deriver on its own: choose one per platform yourself, as `keyDeriver`
 ## Errors
 
 * `bad_option` -- from `argon2idWasmDeriver(spec)`, a spec it cannot run (the message names the
-  field); from `deriveKeyBytes`, no WebAssembly here, or a Content-Security-Policy without
-  `'wasm-unsafe-eval'` (the platform's `CompileError` is its `cause`).
+  field); from `deriveKeyBytes`, a salt of another length than the spec's, no WebAssembly here, or
+  a Content-Security-Policy without `'wasm-unsafe-eval'` (the platform's `CompileError` is its
+  `cause`).
 * `wrong_passphrase` -- an empty passphrase handed straight to `deriveKeyBytes`. The vault refuses
   one before it reaches a deriver.
 

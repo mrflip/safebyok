@@ -796,8 +796,9 @@ folded into through the subagent, and no other entry changes.
   `x/crypto/argon2`, compiled to WebAssembly and embedded in its JavaScript; widely used, but
   with no published audit, as the core's `@noble/hashes` Argon2id has none: its README says its
   one audit left `argon2` out of scope), under the same specs and
-  labels as the core's `@noble/hashes` deriver, `argon2id_web_v1` included. It checks a spec with
-  the core's own `parseKeyDeriverSpec`, so its bounds are the core's by construction; hash-wasm's
+  labels as the core's `@noble/hashes` deriver, `argon2id_web_v1` included. It is an
+  `Argon2idKeyDeriver` (at first, it called the core's spec check itself), so its bounds are the
+  core's by construction; hash-wasm's
   own limits (a salt of at least 8 bytes, memory of at least 8 KiB a lane, below 4 GiB) are no
   narrower. That the two derive the same bytes is a test, not a claim: both are held to Argon2id's
   reference test vector, and to each other byte for byte across the supplied spec and cheap specs
@@ -1173,8 +1174,8 @@ folded into through the subagent, and no other entry changes.
   the deciphered whisper is dropped, never returned. It is a separate count from the one unlocks
   race against, so a refresh an `unlock()` makes for itself does not defeat that unlock. Not hard
   locks, by design: a `lockSoon()` grace running out, and a clock that cannot be read.
-* 2026-10-16 (secure_floor, G032): **an all-zero passphraseKey is refused.** `passphraseKeyOf`
-  (`wayin.ts`), the one place the core receives any key deriver's output, refuses 32 zero
+* 2026-10-16 (secure_floor, G032): **an all-zero passphraseKey is refused.** `KeyDeriver.deriveKeyBytes`
+  (`src/key-deriver.ts`, since the entry on the class; first in `wayin.ts`'s `passphraseKeyOf`), the one place the core receives any key deriver's output, refuses 32 zero
   bytes as `bad_option`, at create, unlock and every change to the ways in alike. No derivation
   makes them; a host deriver that kept its output and handed back bytes since wiped would, and
   the vault would seal under a key anyone can rebuild. The check reads every byte, OR-ing them
@@ -1197,7 +1198,8 @@ folded into through the subagent, and no other entry changes.
   zxcvbn score of at least 3, which is its blocklist of common passwords (NIST's other ask) and its
   pattern matchers. It keeps nothing of a passphrase between calls.
 * 2026-10-16: **a key deriver's bytes are zeroed once imported.** `passphraseKeyOf`
-  (`src/wayin.ts`) `fill(0)`s the 32 bytes a `KeyDeriver` hands back as soon as
+  (`KeyDeriver`, `src/key-deriver.ts`, since the entry below on the class; first in
+  `src/wayin.ts`) `fill(0)`s the 32 bytes a deriver's runner hands back as soon as
   `importWrappingKeyBytes` has made the non-extractable passphraseKey of them, whether or not the
   import succeeded, on every path that derives (sealing, and each wayin tried in an unlock);
   a result of another length than 32, refused (`bad_option`), is zeroed likewise.
@@ -1207,12 +1209,13 @@ folded into through the subagent, and no other entry changes.
   keeps (a cache, a constant) would see it zeroed under it; the `KeyDeriver` doc and the README
   say to hand back a fresh array. A result over a `SharedArrayBuffer` is refused (`bad_option`)
   before it is touched: another thread could read it, and WebCrypto will not import it.
-* 2026-10-16: **the deriver's label is checked three ways before a vault trusts it.** `Vault.make`
-  refuses a label beginning `argon2id_web_` (any case) that is not a spec safebyok supplies,
+* 2026-10-16: **the deriver's label is checked three ways before a vault trusts it.** Every
+  `KeyDeriver`, as it is made (`Vault.make`, until the entry below on the class), refuses a label
+  beginning `argon2id_web_` (any case) that is not a spec safebyok supplies,
   or is one without exactly its parameters, so a spec added later (`argon2id_web_v2`) cannot
-  collide with a label a host stored vaults under. It runs the Argon2id spec check
-  (`parseKeyDeriverSpec`) on any deriver declaring `algorithm: 'argon2id'`, so a spec Argon2id
-  cannot run fails at open with a kind, not at the first unlock as a library's plain Error. The
+  collide with a label a host stored vaults under. Every `Argon2idKeyDeriver` runs the Argon2id
+  spec check (`parseArgon2idSpec`) as it is made, so a spec Argon2id cannot run fails with a
+  kind before any vault is opened with it, not at the first unlock as a library's plain Error. The
   supplied derivers (the core's and `safebyok-fastkey`'s) refuse a salt of another length than the
   spec's before deriving (`bad_option`, never quoting the salt): the stored-vault half of that
   was already so, a wayin with a salt of the wrong length being passed over as damaged.
@@ -1243,6 +1246,21 @@ folded into through the subagent, and no other entry changes.
   user can spot a way in they did not make. Both are public fields of the wayin, bound into its
   wrap, and `device_id` is one random id per device per vault (the mark's `device_id`), so it
   links nothing the vault does not already link: not across vaults, not to the hardware.
+* 2026-10-16: **every key deriver is a `KeyDeriver`, and the class, not the host, does the
+  checking** (`src/key-deriver.ts`; the Coach's ruling on the union #126 had made). `Vault.make`
+  takes only an instance of the abstract class, and calls one method on it, `passphraseKeyOf`.
+  The class checks the spec as a deriver is made (a label, a salt length from 1 to 65536, the
+  reserved `argon2id_web_` labels, and Argon2id's floors in `Argon2idKeyDeriver`, the one family
+  allowed to say `algorithm: 'argon2id'`), and at each derivation refuses a salt of another
+  length, refuses anything but 32 bytes of unshared memory, not all zero, from the runner, makes the
+  passphraseKey and zeroes the bytes. A subclass supplies only `doDeriveKeyBytes`, so a host's
+  deriver of any algorithm, and both of ours, pass through the same checks and the same wipe; a
+  deriver can no longer misreport its parameters beside a function that ignores them, since the
+  Argon2id runners read `this.spec`. What it cannot stop: a subclass that overrides the public
+  methods (the doc block says never to, as `VaultDB`'s does), or a runner that ignores its spec;
+  a stand-in is still the host's to test against the deriver it replaces. `Vault.make` checks
+  with `instanceof`, so a host that loads two copies of safebyok (an ESM and a CommonJS build side
+  by side) has its deriver refused as `bad_option` rather than trusted unchecked.
 
 
 * 2026-10-16: **The whisper field** (`WhisperFieldAttributes` in `safebyok/utils`, spread by

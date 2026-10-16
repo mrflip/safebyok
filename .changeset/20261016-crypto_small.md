@@ -3,33 +3,20 @@
 "safebyok-fastkey": minor
 ---
 
-Key derivers are checked harder, and a passkey can change a passphrase.
+Key derivers are checked harder, and a passkey can change a passphrase. (What a key deriver *is*
+changes in this release too: see the `KeyDeriver` class entry.)
 
-**`KeyDeriver` is now a union** (breaking for a host's types; the reserved labels and the zeroed
-bytes below may break a host's own deriver too): `Argon2idKeyDeriver`
-(a whole `KeyDeriverSpec` beside `key_deriver_label`, `salt_bytes` and `deriveKeyBytes`: what
-`argon2idDeriver`, `argon2idWebV1Deriver` and `safebyok-fastkey`'s derivers return) or
-`CustomKeyDeriver` (those three fields, and optionally an `algorithm` of the host's naming).
-Every field keeps its name. What changes: an `Argon2idKeyDeriver` must carry every parameter
-of the spec (the union as a whole still admits a partial set, which `openVault` checks only on a
-deriver declaring `algorithm: 'argon2id'`), and a class can `implements
-CustomKeyDeriver` or `Argon2idKeyDeriver` but not `KeyDeriver` itself. `openVault` now runs
-the Argon2id spec check on any deriver declaring `algorithm: 'argon2id'`, so a spec Argon2id
-cannot run is refused at open (`bad_option`) rather than failing at the first unlock, and
-refuses a label beginning `argon2id_web_` (any case) that is not a spec safebyok supplies. A
-label beginning `test_` is warned of through the logger, not refused.
-
+* A key deriver whose label begins `argon2id_web_` (any case) and is not a spec safebyok
+  supplies, or is one without exactly its parameters, is refused (`bad_option`): those labels are
+  reserved for specs safebyok may supply later. A label beginning `test_` is warned of through the
+  logger, not refused.
+* The vault zeroes the bytes a deriver hands back once imported, so a deriver must return a
+  fresh array each call, and refuses (`bad_option`) bytes in a `SharedArrayBuffer`.
+* Every deriver refuses a salt of another length than its spec's (`bad_option`) before deriving.
 * `changePassphrase(proof, newPassphrase, { unlockId? })` takes any way in as proof, a
   passkey's answer included. Given a passkey's answer on a vault of several passphrases, say
   which to replace with `unlockId` (`bad_option` otherwise). A passphrase proof behaves as before.
-* The vault zeroes the bytes a deriver hands back once imported, so a deriver must return a
-  fresh array each call, and refuses (`bad_option`) bytes in a `SharedArrayBuffer`.
-* `argon2idDeriver`, `argon2idWebV1Deriver` and `argon2idWasmDeriver` refuse a salt of another
-  length than the spec's (`bad_option`) before deriving. `ensureSaltFits` is exported for a
-  deriver of another implementation to do the same.
-* `parseKeyDeriverSpec` now lives in the spec module and refuses the reserved labels too.
 * A `wrong_passphrase` beside passphrases made by another key deriver says how many went
   untried, and that opening the vault where it was made may help.
 * `UnlockSummary` (the snapshot's `unlocks`) gains `device_id` and `registered_at`.
-* New exports: `Argon2idKeyDeriver`, `CustomKeyDeriver`, `ensureSaltFits`.
 * `Envelope.sealPassphrase` and `sealPasskey` (internal) return the envelope alone.
