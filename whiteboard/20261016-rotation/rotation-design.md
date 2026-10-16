@@ -9,7 +9,7 @@ after section 2, which holds the one decision this design takes that the matter 
 foresee. Thread 11's author (the `VaultDB` contract) needs section 5. Thread 10's author
 (`identity_revoked`) needs the last two rows of the table in section 7.
 
-The source is the Coach's revocation matter (`whiteboard/20261015-matters/matter-revocation.md`
+The source is the Coach's revocation matter (`winboard/20261015-matters/matter-revocation.md`
 in the sprint's worktree). The Coach: "Yes, do (a)" (rotate the vaultKey when a way in is
 removed), and for later, "Do we have a way to invalidate other devices that is legit under
 apple/google strict privacy matters -- to lock all entryways on a given device? ... it should be

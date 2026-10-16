@@ -815,7 +815,7 @@ security expert who knows what questions to ask.
   alarm bell and a guard against a runaway loop, not an abuse quota: the host meters that, like
   its request rates, and the README offers a trigger for a host that wants a hard cap. This
   replaced the `lockbox_count` column, its trigger and a `FOR UPDATE` row lock, reasoned about
-  in `whiteboard/20261015-matters/thread-11-postgres_verdict.md`; what to check: that a refused
+  in `winboard/20261015-matters/thread-11-postgres_verdict.md`; what to check: that a refused
   write inserted nothing (the `WHERE` of one atomic statement), that no lockbox lands in a vault
   but its own (the foreign key, re-read against the bundle that stands now, whose violation
   `23503` is mapped to `stale_write`), and that every lockbox that landed stays readable and
