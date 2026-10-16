@@ -345,9 +345,10 @@ export type Vault = {
    * Write a whisper into the lockbox `boxlabel`, creating or replacing it. Requires unlocked;
    * kind 'whisper_too_large' when its JSON and the lockbox's public bag's together are over the
    * vault's `maxWhisperBytes`, and kind 'vault_full' when `boxlabel` is new and the vault already
-   * holds its `maxLockboxes` -- erase one first. Replacing a lockbox is never refused by the vault's
-   * own limits, though a backend holding a limit of its own may refuse a heavier replacement in a
-   * full vault as kind 'vault_full'.
+   * holds its `maxLockboxes` -- erase one first. A bag left out, and so kept from the lockbox,
+   * counts toward `maxWhisperBytes` as one given does. Replacing a lockbox is never refused as
+   * 'vault_full' by the vault's own limits, though a backend holding a limit of its own may refuse
+   * a heavier replacement in a full vault as kind 'vault_full'.
    *
    * The write lands only if storage still holds what this device last read: the same vault, and
    * the same revision of this lockbox (or still none). When another device got in first, the
