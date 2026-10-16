@@ -64,6 +64,11 @@ for the bag's check.
     check's stack depth could still overflow the snapshot's comparison deeper in the stack; no
     depth cap was ruled, so none was added.
   - **Left as rows for the Coach** (open matters 4 and 5 below).
+  - **Second review** (`67244e8d...b35aac3a`, `flagged`, no changes): both fixes hold; the
+    canonical check refuses nothing the vault writes. Filed as it stands (the orchestrator's YOLO
+    call); its one open finding is open matter 6. **For the rotation thread**: a lockbox under an
+    older epoch does not decipher, so a store over it drops its bag; `openedWhisperOf` follows
+    once `unwrappingKeyFor` learns the prior key.
 
 * **Deviations**: none from the plan. Thread 7's demo edits will meet `VaultDashboard.tsx` at the
   restack; this thread touched only the note's move and the blank-entry fix there.
@@ -105,3 +110,14 @@ for the bag's check.
      a field it does not know.
   5. **Extend `cipherBinding`'s `undefined` guard to top-level parts and `null`.** From the
      review; not built. Recommend yes: the type already forbids both, and the guard is one line.
+  6. **depth-band** (first in the PR): the record check passes bags ~4,700-6,100 deep on Node,
+     `PublicBag` only ~3,000, so a planted bag between lists as sound, and `lockSoon(grace)`
+     threw a bare `RangeError` at 5,800 under ~800 host frames before erasing the remembered
+     unlock; a `store()` of a bag or whisper deeper than ~3,000 throws a bare `RangeError`.
+     The reviewer recommends a stack-independent depth cap (~64), `bad_option` at `store()` and
+     damaged in the record check; thread 9 builds it on a yes. Not built.
+  7. **locksoon-order**: `lockSoon` calls `bump()` before `eraseUnlock`, so a throwing subscriber
+     keeps the remembered unlock (older than this thread; `lock()` erases first).
+  8. **lockbox-module**: the ~2 kB in `idbDeviceDB` and `browserOpts` is safe-stable-stringify,
+     kept by `Lockbox`'s refine; `Lockbox` in a module of its own would let them drop it.
+  9. **proto-key**: `__proto__` keys are silently dropped from bags and whispers.
