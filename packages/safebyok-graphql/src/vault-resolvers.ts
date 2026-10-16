@@ -1,5 +1,5 @@
 import { GraphQLError } from 'graphql'
-import { VaultError } from 'safebyok'
+import { Refusals, VaultError } from 'safebyok'
 import type { BundleExpectation, EraseExpectation, Lockbox, LockboxExpectation, VaultBundle, VaultDB, VaultScope } from 'safebyok'
 import { BundleFields, LockboxFields, ScopeFields, recordOf } from './fields'
 
@@ -7,12 +7,9 @@ import { BundleFields, LockboxFields, ScopeFields, recordOf } from './fields'
  * What the resolvers need of the VaultDB they serve: the verbs a browser's vault calls, and
  * `listBoxRecords`, which lists a vault's lockboxes as stored records -- what the browser's
  * VaultDB must hand back from its own listing -- where a VaultDB's `listBoxes` gives the
- * summaries a vault shows. `safebyok-postgres`'s `PostgresVaultDB` is one as it stands; a VaultDB
- * of your own is one once it has `listBoxRecords`.
+ * summaries a vault shows. Every VaultDB is one: `safebyok-postgres`'s, or one of your own.
  */
-export type ServedVaultDB = Pick<VaultDB, 'readBundle' | 'createBundle' | 'updateBundle' | 'readBox' | 'updateBox' | 'eraseBox' | 'eraseVault' | 'subscribe'> & {
-  listBoxRecords(scope: VaultScope): Promise<unknown[]>
-}
+export type ServedVaultDB = Pick<VaultDB, 'readBundle' | 'createBundle' | 'updateBundle' | 'readBox' | 'listBoxRecords' | 'updateBox' | 'eraseBox' | 'eraseVault' | 'subscribe'>
 
 /** What {@link vaultResolvers} is made with, once, at your server's start. */
 export type VaultResolversOpts<ContextT> = {
@@ -211,7 +208,7 @@ const noUnsubscribing = (): void => undefined
  * an Error's own cause is, for the server's logs: no GraphQL server sends a cause.
  */
 const crossing = (err: unknown): GraphQLError => {
-  const refusal = err instanceof VaultError ? err : storageTrouble(err)
+  const refusal = err instanceof VaultError ? err : Refusals.storageUnavailable(err)
   const crossed = new GraphQLError(refusal.message, { extensions: { kind: refusal.kind } })
   // Set after, never as the constructor's `cause` or `originalError`: either becomes the error's
   // originalError, and Yoga masks a GraphQLError whose originalError is not a GraphQLError too.
@@ -219,7 +216,3 @@ const crossing = (err: unknown): GraphQLError => {
   return crossed
 }
 
-/** What a VaultDB threw that is not a VaultError, as the one a VaultDB would have thrown. */
-const storageTrouble = (err: unknown): VaultError => (
-  new VaultError('storage_unavailable', "The vault's storage could not be reached, or failed partway: try again shortly. The storage adapter's own error is this error's cause.", { cause: err })
-)

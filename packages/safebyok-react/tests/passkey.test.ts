@@ -28,7 +28,7 @@ const passphraseSummary: UnlockSummary = { method: 'passphrase', unlock_id: 'unl
 
 /** A fresh vault in memory, made with the passphrase `pw` and unlocked, and an opener for another device on the same storage. */
 const vaultInMemory = async () => {
-  const vaultDB: VaultDB = localVaultDB(memoryStore())
+  const vaultDB: VaultDB = localVaultDB({ store: memoryStore() })
   const open = async () => await openVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest })
   const vault = await open()
   await vault.unlock('pw')

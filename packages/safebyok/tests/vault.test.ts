@@ -38,7 +38,7 @@ const neverRings = () => silence
  */
 const makeWorld = (defaults?: Partial<OpenVaultOpts>) => {
   const dbStore = memoryStore()
-  const vaultDB = localVaultDB(dbStore)
+  const vaultDB = localVaultDB({ store: dbStore })
   const deviceDB = memoryDeviceDB()
   let nowMillis = Date.parse('2026-10-14T12:00:00Z')
   const clock = { now: () => nowMillis }
@@ -54,7 +54,7 @@ const makeWorld = (defaults?: Partial<OpenVaultOpts>) => {
     return vault
   }
   const rememberedUnlock = () => deviceDB.readUnlock(TH.scopeOf('u1'))
-  const deafVaultDB = () => localVaultDB({ ...dbStore, subscribe: neverRings })
+  const deafVaultDB = () => localVaultDB({ store: { ...dbStore, subscribe: neverRings } })
   const stateOnOpen = async (overrides?: Partial<OpenVaultOpts>) => {
     const vault = await open(overrides)
     return vault.getSnapshot().state
@@ -2005,11 +2005,13 @@ describe("eraseDamagedVault", () => {
     // Storage answers the first look at the bundle with the damaged vault, and every later one with another.
     let looks = 0
     const replacing = localVaultDB({
-      ...world.dbStore,
-      read: (ckey) => {
-        if (ckey !== u1BundleCkey) { return world.dbStore.read(ckey) }
-        looks += 1
-        return looks === 1 ? world.dbStore.read(ckey) : JSON.stringify({ ...storedBundleOf(world), vault_id: 'made-anew' })
+      store: {
+        ...world.dbStore,
+        read: (ckey) => {
+          if (ckey !== u1BundleCkey) { return world.dbStore.read(ckey) }
+          looks += 1
+          return looks === 1 ? world.dbStore.read(ckey) : JSON.stringify({ ...storedBundleOf(world), vault_id: 'made-anew' })
+        },
       },
     })
     await TH.expectRefusal(eraseDamagedVault(world.optsWith({ vaultDB: replacing })), 'stale_write')
@@ -4944,7 +4946,7 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
  */
 const twoDeviceWorld = async (hereOpts?: Partial<OpenVaultOpts>) => {
   const world = makeWorld()
-  const hereDB = localVaultDB(world.dbStore)
+  const hereDB = localVaultDB({ store: world.dbStore })
   const here = await world.openUnlocked('shared pw', { vaultDB: hereDB, ...hereOpts })
   const there = await world.openUnlocked('shared pw', { deviceDB: memoryDeviceDB() })
   const beforeNextWrite = (verb: 'updateBox' | 'updateBundle', meanwhile: () => Promise<void>) => {
@@ -5432,6 +5434,35 @@ describe("the logger", () => {
     } finally {
       warn.mockRestore()
     }
+  })
+
+  it("is the vaultDB's too: what its storage has nobody to throw to, the vault's logger hears", async () => {
+    const world = makeWorld()
+    const vault = await world.open()
+    vault.subscribe(() => undefined)
+    world.vaultDB.subscribe(TH.scopeOf('u1'), () => { throw new Error('a listener of the host that throws') })
+    await vault.unlock('pw')
+    expect(world.logged.map((call) => [call.level, call.story])).to.deep.include(['error', { call: 'subscribe' }])
+  })
+
+  it("is not the vaultDB's when the vaultDB was made with a logger of its own, which it keeps", async () => {
+    const world = makeWorld()
+    const own = TH.spyLogger()
+    const vaultDB = localVaultDB({ store: world.dbStore, logger: own.logger })
+    await world.open({ vaultDB })
+    vaultDB.subscribe(TH.scopeOf('u1'), () => { throw new Error('a listener of the host that throws') })
+    await vaultDB.createBundle(TH.bundleOf('u1'))
+    expect(own.calls).to.have.lengthOf(1)
+    expect(world.logged).to.have.lengthOf(0)
+  })
+
+  it("is handed to the vaultDB only when the host passes one: a vault opened with none leaves the vaultDB's as it was", async () => {
+    const world = makeWorld()
+    await world.open()
+    await world.open({ logger: undefined })
+    world.vaultDB.subscribe(TH.scopeOf('u1'), () => { throw new Error('a listener of the host that throws') })
+    await world.vaultDB.createBundle(TH.bundleOf('u1'))
+    expect(world.logged).to.have.lengthOf(1)
   })
 
   it("refuses a logger that is not one, before reading storage", async () => {

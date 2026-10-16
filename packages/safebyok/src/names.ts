@@ -127,3 +127,8 @@ const verdictOf = (rules: NameRules, field: NameField, candidate: string) => {
 
 /** safebyok's own checks, whose refusals quote nothing and so may be passed on. */
 const OurChecks: ReadonlySet<NameValidator> = new Set([...Object.values(DefaultValidators), ...Object.values(AnyTextValidators)])
+
+/** True when `record` names `scope`: the same app, user and vault. */
+export const sameScope = (record: VaultScope, scope: VaultScope): boolean => (
+  record.applabel === scope.applabel && record.user_id === scope.user_id && record.vaultlabel === scope.vaultlabel
+)

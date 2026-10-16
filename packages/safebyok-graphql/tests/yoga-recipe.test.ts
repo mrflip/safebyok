@@ -40,12 +40,12 @@ const vaultRoute = (pool: PostgresClient, listen: PostgresListen | undefined, si
 // ------------------------------------------------------------------------- the client half
 
 /** The README's browser half: graphqlVaultDB over an urql Client that posts to the route, and subscribes over it too. */
-const browserVaultDB = (fetcher: typeof fetch) => graphqlVaultDB(new Client({
+const browserVaultDB = (fetcher: typeof fetch) => graphqlVaultDB({ client: new Client({
   url:                'https://app.example.test/api/graphql',
   exchanges:          [fetchExchange],
   fetchSubscriptions: true,
   fetch:              fetcher,
-}))
+}) })
 
 // ------------------------------------------------------------------------------------- tests
 

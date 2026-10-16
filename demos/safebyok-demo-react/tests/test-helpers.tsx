@@ -37,7 +37,7 @@ export const Passphrase = 'correct horse battery staple'
  *   await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
  *   world.renderInVault(<VaultDashboard />)
  */
-export const makeWorld = ({ vaultDB = localVaultDB(memoryStore()) }: { vaultDB?: VaultDB } = {}) => {
+export const makeWorld = ({ vaultDB = localVaultDB({ store: memoryStore() }) }: { vaultDB?: VaultDB } = {}) => {
   const opts = memoryVaultOpts({ vaultDB })
   const { deviceDB } = opts
 

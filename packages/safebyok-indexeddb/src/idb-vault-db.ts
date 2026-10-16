@@ -1,9 +1,8 @@
-import { Ckeys, VaultDB } from 'safebyok'
+import { Ckeys, Expectations, VaultDB } from 'safebyok'
 import type { BundleExpectation, EraseExpectation, Lockbox, LockboxExpectation, StoredLockbox, VaultBundle, VaultScope } from 'safebyok'
-import { onBell, ringBell } from './bell'
+import { ChangeBell } from 'safebyok/idb'
 import { boxRange } from './ckeys'
-import { bundleMeetsExpectation, lockboxMeetsExpectation, vaultIdMeetsExpectation, vaultMeetsExpectation } from './expectations'
-import { parseDbName, type IdbVaultDBOpts } from './idb-opts'
+import { bellnameOf, parseDbName, type IdbVaultDBOpts } from './idb-opts'
 import { inOneTransaction, settle, shelfOf } from './shelf'
 
 /**
@@ -26,14 +25,15 @@ import { inOneTransaction, settle, shelfOf } from './shelf'
  * removes it. An app keeping its vaults here should call `navigator.storage.persist()`, and say
  * plainly that the vault lives only in this browser.
  *
- * @param opts - Where to keep the records: `dbName`, default 'safebyok'.
+ * @param opts - Where to keep the records: `dbName`, default 'safebyok'; and optionally a
+ *   `logger`, which otherwise is the vault's.
  * @returns The VaultDB, to hand `openVault`. Kind 'bad_option' for a `dbName` that is not
- *   non-empty text. Nothing is opened until the first read or write.
+ *   non-empty text, or a `logger` that is not a VaultLogger. Nothing is opened until the first read or write.
  *
  * @example
  *   const vault = await openVault({ applabel: 'acme', userId, vaultlabel: 'main', vaultDB: idbVaultDB({ dbName: 'acme' }), ...browserOpts({ dbName: 'acme' }) })
  */
-export const idbVaultDB = (opts?: IdbVaultDBOpts): VaultDB => new IdbVaultDB(parseDbName(opts, 'idbVaultDB'))
+export const idbVaultDB = (opts?: IdbVaultDBOpts): VaultDB => new IdbVaultDB(parseDbName(opts, 'idbVaultDB'), opts)
 
 class IdbVaultDB extends VaultDB {
   readonly maxRecordBytes = Infinity
@@ -43,8 +43,8 @@ class IdbVaultDB extends VaultDB {
 
   private readonly dbName: string
 
-  constructor(dbName: string) {
-    super()
+  constructor(dbName: string, opts: IdbVaultDBOpts | undefined) {
+    super(opts)
     this.dbName = dbName
   }
 
@@ -68,7 +68,7 @@ class IdbVaultDB extends VaultDB {
   protected async doUpdateBundle(bundle: VaultBundle, expected: BundleExpectation): Promise<boolean> {
     return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {
       const standing = await rowAt(store, Ckeys.bundle(bundle))
-      if (! bundleMeetsExpectation(standing, expected)) { return false }
+      if (! Expectations.bundleMeets(standing, expected)) { return false }
       store.put(bundle, Ckeys.bundle(bundle))
       return true
     }))
@@ -91,7 +91,7 @@ class IdbVaultDB extends VaultDB {
   protected async doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<boolean> {
     return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {
       const [standingBundle, standingBox] = await Promise.all([rowAt(store, Ckeys.bundle(scope)), rowAt(store, Ckeys.box(scope, lockbox.boxlabel))])
-      if (! lockboxMeetsExpectation(standingBundle, standingBox, expected)) { return false }
+      if (! Expectations.lockboxMeets(standingBundle, standingBox, expected)) { return false }
       store.put(lockbox, Ckeys.box(scope, lockbox.boxlabel))
       return true
     }))
@@ -100,7 +100,7 @@ class IdbVaultDB extends VaultDB {
   protected async doEraseBox(scope: VaultScope, boxlabel: string, expected: EraseExpectation): Promise<boolean> {
     return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {
       const standing = await rowAt(store, Ckeys.bundle(scope))
-      if (! vaultMeetsExpectation(standing, expected)) { return false }
+      if (! Expectations.vaultMeets(standing, expected)) { return false }
       store.delete(Ckeys.box(scope, boxlabel))
       return true
     }))
@@ -112,7 +112,7 @@ class IdbVaultDB extends VaultDB {
   protected async doEraseVault(scope: VaultScope, expected: EraseExpectation): Promise<boolean> {
     return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {
       const standing = await rowAt(store, Ckeys.bundle(scope))
-      if (! vaultIdMeetsExpectation(standing, expected)) { return false }
+      if (! Expectations.vaultIdMeets(standing, expected)) { return false }
       store.delete(boxRange(scope))
       store.delete(Ckeys.bundle(scope))
       return true
@@ -121,10 +121,10 @@ class IdbVaultDB extends VaultDB {
 
   // Rings on every write to the shelf, not only ones in scope: a spurious refresh is harmless.
   protected override doSubscribe(_scope: VaultScope, onChange: () => void): () => void {
-    return onBell(this.dbName, onChange)
+    return ChangeBell.listen(bellnameOf(this.dbName), onChange)
   }
 
-  private ring() { ringBell(this.dbName) }
+  private ring() { ChangeBell.ring(bellnameOf(this.dbName)) }
 
   private ringIfLanded(landed: boolean): boolean {
     if (landed) { this.ring() }

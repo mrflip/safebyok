@@ -41,7 +41,7 @@ const devicesOverOneDatabase: TH.MakeVaultDBDevices = (turnstile) => {
   return () => idbVaultDB({ dbName })
 }
 
-TH.describeVaultDB('idbVaultDB', () => idbVaultDB({ dbName: TH.freshDbName() }), { pushes: true, makeDevices: devicesOverOneDatabase })
+TH.describeVaultDB('idbVaultDB', (vaultDBOpts) => idbVaultDB({ ...vaultDBOpts, dbName: TH.freshDbName() }), { pushes: true, makeDevices: devicesOverOneDatabase })
 
 describe("idbVaultDB's devices, for the battery's races", () => {
   it("open every write's transaction through the race's turnstile", async () => {

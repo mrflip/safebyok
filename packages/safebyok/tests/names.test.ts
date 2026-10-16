@@ -209,3 +209,15 @@ describe("Names.checkFloor", () => {
     TH.expectSyncRefusal(() => Names.checkFloor('vaultlabel', 'two\nlines'), 'bad_label')
   })
 })
+
+describe("Names.sameScope", () => {
+  it("is true for a record naming the same app, user and vault, whatever else it holds", () => {
+    expect(Names.sameScope(TH.bundleOf('u1'), TH.scopeOf('u1'))).to.be.true
+  })
+
+  it("is false when any one of the three differs", () => {
+    expect(Names.sameScope(TH.scopeOf('u2'), TH.scopeOf('u1'))).to.be.false
+    expect(Names.sameScope(TH.scopeOf('u1', 'spare'), TH.scopeOf('u1'))).to.be.false
+    expect(Names.sameScope({ ...TH.scopeOf('u1'), applabel: 'other' }, TH.scopeOf('u1'))).to.be.false
+  })
+})

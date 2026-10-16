@@ -1,8 +1,8 @@
 import * as Z from 'zod/mini'
-import { VaultError } from 'safebyok'
+import { VaultError, type VaultDBOpts } from 'safebyok'
 
-/** What `idbVaultDB` and `inspectIdbVaultDB` are made with. */
-export type IdbVaultDBOpts = {
+/** What `idbVaultDB` and `inspectIdbVaultDB` are made with: `inspectIdbVaultDB` takes no logger. */
+export type IdbVaultDBOpts = VaultDBOpts & {
   /**
    * The name the IndexedDB databases are made under: non-empty text, default 'safebyok'. Pass the
    * same one to `browserOpts`, and the vault and its device store sit side by side.
@@ -32,3 +32,12 @@ export const parseDbName = (opts: IdbVaultDBOpts | undefined, said: string): str
   }
   return checked.data.dbName
 }
+
+/**
+ * The change bell of the vault shelf in `dbName`: every write rings it, here and in every other
+ * tab. Its name is shared with every other tab, and with any other version of this package running
+ * in one, so it stays as it is.
+ *
+ * @example ChangeBell.ring(bellnameOf('acme'))  // 'safebyok-idb:acme:vault_db'
+ */
+export const bellnameOf = (dbName: string): string => `safebyok-idb:${dbName}:vault_db`

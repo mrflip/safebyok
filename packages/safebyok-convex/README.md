@@ -71,7 +71,7 @@ mistake for the first request.
 
 ## What your app does on the client
 
-`convexVaultDB(client, api.safebyok)`, from `safebyok-convex`, is a vault's storage: a `VaultDB`
+`convexVaultDB({ client, api: api.safebyok })`, from `safebyok-convex`, is a vault's storage: a `VaultDB`
 whose every call is one call to the functions above, through the Convex client your app already
 has. Hand it to `openVault`:
 
@@ -87,7 +87,7 @@ convex.setAuth(fetchToken) // your auth provider's token, as for any Convex call
 
 const vault = await openVault({
   applabel: 'acme', userId, vaultlabel: 'main',
-  vaultDB:  convexVaultDB(convex, api.safebyok),
+  vaultDB:  convexVaultDB({ client: convex, api: api.safebyok }),
   ...browserOpts(), // the key deriver and device store a browser wants
 })
 ```
@@ -235,7 +235,7 @@ const host = app.defineModules({ safebyok: new SafebyokComponent(app.components.
 }) })
 
 const deployment = fakeDeployment(host)
-const vaultDB = convexVaultDB(deployment.client('u1'), deployment.api.safebyok)
+const vaultDB = convexVaultDB({ client: deployment.client('u1'), api: deployment.api.safebyok })
 // ... and after the test:
 await deployment.close()
 ```

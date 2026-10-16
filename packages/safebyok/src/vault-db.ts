@@ -5,6 +5,10 @@ import * as Names from './names'
 import { AnyTextValidators, NameFloor } from './validators'
 import type { StringStore } from './string-store'
 import * as Ckeys from './ckeys'
+import * as Expectations from './expectations'
+import * as Refusals from './refusals'
+import { asError, parseLogger, type VaultLogger } from './logger'
+import { reportToPlatform } from './report-error'
 
 /**
  * What a bundle update was proven against: the vault and the unlock epoch of the bundle the
@@ -60,6 +64,23 @@ const EraseExpectation = Z.object({
 export type StoredLockbox = { boxlabel: string, lockbox: unknown }
 
 /**
+ * What every VaultDB is made with, beside its backend's own options: an adapter's factory takes
+ * these in its one bag of options, and hands them to `super()`.
+ *
+ * @example
+ *   constructor(opts: AcmeVaultDBOpts) { super(opts); this.client = opts.client }
+ */
+export type VaultDBOpts = {
+  /**
+   * Where the VaultDB says what it has nobody to throw to: a subscriber's listener that threw, a
+   * watch that failed to start or dropped. Without one, it says it through the logger of the vault
+   * it serves, which `openVault` hands it, or else the console. Kind 'bad_option' for anything
+   * that is not a VaultLogger.
+   */
+  logger?: VaultLogger | undefined
+}
+
+/**
  * Remote storage for vault records, as the host application plugs it in: extend this class and
  * implement its `do*` methods against your backend, one for each verb safebyok calls. That is the
  * whole job -- you are a shelf, not a safe:
@@ -88,9 +109,14 @@ export type StoredLockbox = { boxlabel: string, lockbox: unknown }
  * The public verbs -- `readBundle`, `updateBox` and the rest -- wrap your `do*` methods with the
  * checks every adapter owes: names, scope, records and expectations on the way in, the shape of
  * every record on the way out, `stale_write` for a failed expectation, and `storage_unavailable`
- * (your own error as its `cause`) for anything you throw that is not already a VaultError.
- * Implement the `do*` methods; never override the public verbs. The package's `VAULTDB.md` is the
- * whole contract, line by line, and `describeVaultDB` (from `safebyok/testing`) tests it so.
+ * (your own error as its `cause`) for anything you throw that is not already a VaultError. They
+ * also own what every adapter would otherwise write again: `subscribe` calls each listener so
+ * that nothing it throws reaches your code, and its unsubscribe runs once; and `listBoxRecords`
+ * lists a vault as stored, for a server to serve. Implement the `do*` methods, and hand your
+ * factory's {@link VaultDBOpts} to `super()`; never override the public verbs, but for
+ * `listBoxRecords` where your backend lists more cheaply. To refuse, throw what `Refusals` makes.
+ * The package's `VAULTDB.md` is the whole contract, line by line, and `describeVaultDB` (from
+ * `safebyok/testing`) tests it so.
  *
  * Every name handed to a public verb -- the scope's three and a boxlabel -- is held, before your
  * `do*` method sees it, to what any store holds and to what yours declares: the floor every name
@@ -153,6 +179,42 @@ export abstract class VaultDB {
    */
   abstract readonly maxNameBytes: number
 
+  // The logger this VaultDB was made with, if any; and the one the vault it serves handed it.
+  private readonly ownLogger: VaultLogger | null
+  private handedLogger: VaultLogger | null = null
+
+  /**
+   * @param opts - What every VaultDB is made with: an optional `logger`. Kind 'bad_option' for a
+   *   logger that is not a VaultLogger.
+   */
+  constructor(opts?: VaultDBOpts) {
+    const given = (opts as VaultDBOpts | null | undefined)?.logger
+    this.ownLogger = given === undefined ? null : parseLogger(given)
+  }
+
+  /**
+   * Where this VaultDB says what it has nobody to throw to: the logger it was made with, else the
+   * one {@link adoptLogger} handed it, else the console. Each call is guarded: a logger that throws
+   * breaks nothing.
+   */
+  protected get logger(): VaultLogger {
+    return this.ownLogger ?? this.handedLogger ?? parseLogger(undefined)
+  }
+
+  /**
+   * Has this VaultDB log through `logger`, unless it was made with a logger of its own, which wins.
+   * `openVault` calls it with the logger it was given, so one logger hears both the vault and its
+   * storage; a host rarely needs to. A VaultDB serving several vaults keeps the latest handed it.
+   * Kind 'bad_option' for anything that is not a VaultLogger.
+   *
+   * @param logger - The logger of the vault this VaultDB serves.
+   *
+   * @example vaultDB.adoptLogger(telemetryLogger)  // as openVault({ ...opts, vaultDB, logger: telemetryLogger }) does
+   */
+  adoptLogger(logger: VaultLogger): void {
+    this.handedLogger = parseLogger(logger)
+  }
+
   // ------------------------------------------------------------------- the verbs safebyok calls
 
   /**
@@ -193,9 +255,7 @@ export abstract class VaultDB {
       throw new VaultError('bad_option', "updateBundle replaces a vault's bundle within that vault: the bundle's vault_id must be the expected one, as a vault_id never changes.")
     }
     const landed = await fromStorage(() => this.doUpdateBundle(outgoing, expectation))
-    if (! landed) {
-      throw new VaultError('stale_write', 'The vault changed in storage since this device read it -- its ways in were changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. Read the vault again before retrying.')
-    }
+    if (! landed) { throw Refusals.staleWrite('bundle') }
   }
 
   /** One lockbox, validated, or null when there is none under that boxlabel. */
@@ -230,6 +290,26 @@ export abstract class VaultDB {
   }
 
   /**
+   * Every lockbox in the vault as stored, each with its two ciphered fields left out: what a server
+   * hands a browser's VaultDB, whose own listing then checks them. `listBoxes` gives summaries
+   * instead, the shape a vault shows, which a VaultDB's adapter may not hand up. Each record is as
+   * the adapter handed it -- damaged ones too, unchecked -- in no particular order; an entry filed
+   * under a name below the floor, which no verb could reach, is left out, as `listBoxes` leaves
+   * it. Refuses as `listBoxes` does. An adapter whose backend lists a vault more cheaply in one
+   * query may override it.
+   *
+   * @example
+   *   const resolvers = { safebyokListBoxes: (_parent, { scope }, ctx) => vaultDBFor(ctx).listBoxRecords(scope) }
+   */
+  async listBoxRecords(scope: VaultScope): Promise<unknown[]> {
+    const asked = heldScope(this, scope)
+    const stored = await fromStorage(() => this.doListBoxes(asked))
+    return stored
+      .filter((entry) => isNameable(entry))
+      .map(({ lockbox }) => withoutCiphered(lockbox))
+  }
+
+  /**
    * Write `lockbox` under its boxlabel, only while the scope's standing bundle has the
    * `vault_id` and `vault_key_epoch` in `expected` and the standing lockbox has its `revision_id`
    * (or, for null, there is none). Refuses with kind `stale_write` otherwise -- including when the
@@ -252,9 +332,7 @@ export abstract class VaultDB {
       throw new VaultError('lockbox_too_large', `That lockbox weighs ${String(recordBytes)} bytes, over the ${String(this.maxRecordBytes)} its storage holds in one record, so nothing was written: store a smaller whisper or public bag, or under a shorter boxlabel.`)
     }
     const landed = await fromStorage(() => this.doUpdateBox(asked, outgoing, expectation))
-    if (! landed) {
-      throw new VaultError('stale_write', 'That lockbox changed in storage since this device read it -- another device or tab wrote or erased it, or the vault was made anew -- so this write was refused and nothing was written. Read it again before retrying.')
-    }
+    if (! landed) { throw Refusals.staleWrite('lockbox') }
   }
 
   /**
@@ -268,7 +346,7 @@ export abstract class VaultDB {
     const label = heldBoxlabel(this, boxlabel)
     const expectation = checkOutgoing(EraseExpectation, expected, 'erase expectation')
     const landed = await fromStorage(() => this.doEraseBox(asked, label, expectation))
-    if (! landed) { throw staleErase() }
+    if (! landed) { throw Refusals.staleWrite('erase') }
   }
 
   /**
@@ -280,7 +358,7 @@ export abstract class VaultDB {
     const asked = heldScope(this, scope)
     const expectation = checkOutgoing(EraseExpectation, expected, 'erase expectation')
     const landed = await fromStorage(() => this.doEraseVault(asked, expectation))
-    if (! landed) { throw staleErase() }
+    if (! landed) { throw Refusals.staleWrite('erase') }
   }
 
   /**
@@ -316,21 +394,68 @@ export abstract class VaultDB {
     const named = StoredVaultId.safeParse(raw)
     if (! named.success) { throw unnamedBundle() }
     const landed = await fromStorage(() => this.doEraseVault(asked, { vault_id: named.data.vault_id }))
-    if (! landed) { throw staleErase() }
+    if (! landed) { throw Refusals.staleWrite('erase') }
   }
 
   /**
    * Calls `onChange` after any write touching `scope`, from this device or another; returns the
    * unsubscribe. A backend without push never calls: safebyok refreshes after its own writes
    * regardless, so all it loses is news of *other* devices' writes.
+   *
+   * `onChange` is called so that nothing it throws, and no promise it returns that rejects, reaches
+   * the adapter or the write that rang it: each failure is logged through this VaultDB's logger
+   * (`error`), and handed to the platform's `reportError` too where there is one (a browser's),
+   * and every other listener is still called. Once unsubscribed, `onChange` is never called again,
+   * whatever the backend delivers late. The unsubscribe ends the watch once: a second call does
+   * nothing, and one the adapter's own unsubscribe throws from is logged, never thrown.
    */
   subscribe(scope: VaultScope, onChange: () => void): () => void {
     const asked = heldScope(this, scope)
     checkListener(onChange)
-    try {
-      return this.doSubscribe(asked, onChange)
-    } catch (err) {
-      throw asStorageTrouble(err)
+    let live = true
+    const unsubscribe = startedWatch(() => this.doSubscribe(asked, () => {
+      if (live) { heedListener(onChange, (err) => { this.listenerFailed(err) }) }
+    }))
+    return () => {
+      if (! live) { return }
+      live = false
+      try {
+        unsubscribe()
+      } catch (err) {
+        this.logger.error("The storage adapter's unsubscribe threw, so its watch of the vault may not have ended. Nothing else is affected; the adapter is its author's to mend.", { call: 'subscribe' }, asError(err))
+      }
+    }
+  }
+
+  /** Says a subscriber's listener failed: through the logger, and to the platform where it reports errors. */
+  private listenerFailed(err: unknown): void {
+    this.logger.error("A listener passed to subscribe threw, or returned a promise that rejected. The write it heard of stands, and every other listener was called; the listener is the host's to mend.", { call: 'subscribe' }, asError(err))
+    reportToPlatform(err)
+  }
+
+  /**
+   * A watch's trouble, said through this VaultDB's logger: for a `doSubscribe` whose backend tells
+   * it when its watch fails to start or drops. `failed(err)` warns with `message` and the backend's
+   * error, once for a failing streak; `delivered()`, called whenever the watch hears again, ends the
+   * streak. Neither calls `onChange`: a watch that fails calls it too, so the vault reads again and
+   * meets the trouble itself (VAULTDB.md line 6.2).
+   *
+   * @param message - What failed and what it costs, calmly, naming no scope or record.
+   * @returns The streak's two calls, for one watch.
+   *
+   * @example
+   *   const trouble = this.watchTrouble("This vault's live watch failed: other devices' changes may not show until its next read.")
+   *   return client.watch(args, () => { trouble.delivered(); onChange() }, (err) => { trouble.failed(err); onChange() })
+   */
+  protected watchTrouble(message: string): WatchTrouble {
+    let warned = false
+    return {
+      failed: (err) => {
+        if (warned) { return }
+        warned = true
+        this.logger.warn(message, { call: 'subscribe' }, asError(err))
+      },
+      delivered: () => { warned = false },
     }
   }
 
@@ -389,7 +514,53 @@ export abstract class VaultDB {
 
 const noUnsubscribing = (): void => undefined
 
-const staleErase = () => new VaultError('stale_write', 'The vault changed in storage since this device read it -- it was deleted, or deleted and made anew, elsewhere -- so this erase was refused and nothing was erased. Read the vault again before retrying.')
+/**
+ * What {@link VaultDB.watchTrouble} hands a watch: `failed`, to say it failed, once for a failing
+ * streak; and `delivered`, to end the streak when it hears again.
+ */
+export type WatchTrouble = {
+  /** Warns, with the backend's error, unless it has already for this failing streak. */
+  failed:    (err: unknown) => void
+  /** Ends a failing streak: the watch hears again. */
+  delivered: () => void
+}
+
+/** The adapter's watch, begun: its unsubscribe, or what it threw said as storage trouble. */
+const startedWatch = (start: () => () => void): (() => void) => {
+  try {
+    return start()
+  } catch (err) {
+    throw asStorageTrouble(err)
+  }
+}
+
+/**
+ * Calls a subscriber's `onChange`, so that nothing it throws, and no promise it hands back that
+ * rejects, escapes: each such failure goes to `failed`.
+ */
+const heedListener = (onChange: () => unknown, failed: (err: unknown) => void): void => {
+  try {
+    void heedRejection(onChange(), failed)
+  } catch (err) {
+    failed(err)
+  }
+}
+
+/** Settles what a listener returned -- a promise, or anything else, which settles at once -- handing a rejection to `failed`. */
+const heedRejection = async (returned: unknown, failed: (err: unknown) => void): Promise<void> => {
+  try {
+    await returned
+  } catch (err) {
+    failed(err)
+  }
+}
+
+/** A stored lockbox as {@link VaultDB.listBoxRecords} hands it on: its two ciphered fields left out, anything else as it came. */
+const withoutCiphered = (lockbox: unknown): unknown => {
+  if (typeof lockbox !== 'object' || lockbox === null || Array.isArray(lockbox)) { return lockbox }
+  const { lockbox_key_wrapped: _lockboxKeyWrapped, whisper_ciphered: _whisperCiphered, ...listed } = lockbox as Record<string, unknown>
+  return listed
+}
 
 /**
  * A lockbox as the list verb's adapter half may hand it back: every field but the two ciphered
@@ -483,10 +654,7 @@ const fromStorage = async <ValT>(attempt: () => Promise<ValT>): Promise<ValT> =>
 }
 
 /** What an adapter threw, as a VaultError: its own VaultError untouched, anything else wrapped. */
-const asStorageTrouble = (err: unknown): VaultError => {
-  if (err instanceof VaultError) { return err }
-  return new VaultError('storage_unavailable', "The vault's storage could not be reached, or failed partway: try again shortly. The storage adapter's own error is this error's cause.", { cause: err })
-}
+const asStorageTrouble = (err: unknown): VaultError => (err instanceof VaultError ? err : Refusals.storageUnavailable(err))
 
 // The label a lockbox is written under, checked before the rest of the record is, so a refusal
 // says which.
@@ -499,24 +667,31 @@ const checkListener = (onChange: unknown) => {
 }
 
 /**
+ * `candidate` through `recordSchema`, or the refusal `refused` makes: the one check behind every
+ * record and expectation a verb is handed, and every record storage hands back. The refusal names
+ * what was refused but never quotes it.
+ */
+const checked = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, candidate: unknown, refused: () => VaultError): RecordT => {
+  const parsed = recordSchema.safeParse(candidate)
+  if (! parsed.success) { throw refused() }
+  return parsed.data
+}
+
+/**
  * A record or expectation a write verb was handed, as this package writes one. One that is not
  * is refused before storage sees it, as misuse, so that nothing is ever written that a read would
- * refuse as corrupt. The refusal names what was refused but never quotes it.
+ * refuse as corrupt.
  */
-const checkOutgoing = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, candidate: unknown, said: string): RecordT => {
-  const checked = recordSchema.safeParse(candidate)
-  if (! checked.success) {
-    throw new VaultError('bad_option', `That ${said} is not one this package writes, so nothing was written: a VaultDB writes only the records and expectations a vault builds.`)
-  }
-  return checked.data
-}
+const checkOutgoing = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, candidate: unknown, said: string): RecordT => checked(recordSchema, candidate, () => (
+  new VaultError('bad_option', `That ${said} is not one this package writes, so nothing was written: a VaultDB writes only the records and expectations a vault builds.`)
+))
 
 const checkBundle = (raw: unknown, scope: VaultScope): VaultBundle => {
   // A later safebyok may write what this one cannot read, which is no damage: it is said apart.
   if (mayBeNewer(raw)) { throw newerBundle() }
   const bundle = checkRecord(VaultBundle, raw, 'vault bundle')
   // A record that names some other scope is a record out of place, wherever it came from.
-  if (bundle.applabel !== scope.applabel || bundle.user_id !== scope.user_id || bundle.vaultlabel !== scope.vaultlabel) {
+  if (! Names.sameScope(bundle, scope)) {
     throw new VaultError('corrupt_record', 'The stored vault bundle names a different app, user, or vault than the one asked for. It was left as it is.')
   }
   return bundle
@@ -585,61 +760,10 @@ const StoredVaultId = Z.object({ vault_id: VaultBundle.shape.vault_id })
 /**
  * A stored record through its validator, with failure as a calm VaultError: storage is someone
  * else's database, and a record may be damaged or written by another version of this package.
- * The refusal names the record but never quotes it.
  */
-const checkRecord = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, raw: unknown, said: string): RecordT => {
-  const checked = recordSchema.safeParse(raw)
-  if (! checked.success) {
-    throw new VaultError('corrupt_record', `A stored ${said} record did not read back in a shape this package knows. It may be damaged, or written by another version of safebyok; it was left as it is.`)
-  }
-  return checked.data
-}
-
-// ---------------------------------------------- localVaultDB's own, not public surface
-
-// Just the fields an expectation compares; a standing row too damaged to show them fails it.
-const StandingBundle = Z.object({ vault_id: Z.string(), unlock_epoch: Z.number() })
-const StandingVault = Z.object({ vault_id: Z.string() })
-const StandingBox = Z.object({ revision_id: Z.string() })
-const StandingVaultKey = Z.object({ vault_key_epoch: Z.number() })
-
-/** True when the bundle row standing in storage is the one `expected` names. */
-const bundleMeetsExpectation = (standingBundle: unknown, expected: BundleExpectation): boolean => {
-  const standing = StandingBundle.safeParse(standingBundle)
-  return standing.success
-    && standing.data.vault_id === expected.vault_id
-    && standing.data.unlock_epoch === expected.unlock_epoch
-}
-
-/** True when the bundle row standing in storage belongs to the vault `expected` names. */
-const vaultMeetsExpectation = (standingBundle: unknown, expected: { vault_id: string }): boolean => {
-  const standing = StandingBundle.safeParse(standingBundle)
-  return standing.success && standing.data.vault_id === expected.vault_id
-}
-
-/**
- * True when the bundle row standing in storage names the vault `expected` names, whatever else of
- * it is damaged: what erasing a whole vault compares, so that a vault whose bundle fails its
- * checks can still be erased.
- */
-const vaultIdMeetsExpectation = (standingBundle: unknown, expected: { vault_id: string }): boolean => {
-  const standing = StandingVault.safeParse(standingBundle)
-  return standing.success && standing.data.vault_id === expected.vault_id
-}
-
-/** True when the bundle row standing in storage stands for the vaultKey `expected` names. */
-const vaultKeyMeetsExpectation = (standingBundle: unknown, expected: { vault_key_epoch: number }): boolean => {
-  const standing = StandingVaultKey.safeParse(standingBundle)
-  return standing.success && standing.data.vault_key_epoch === expected.vault_key_epoch
-}
-
-/** True when the bundle and lockbox rows standing in storage are the ones `expected` names. */
-const lockboxMeetsExpectation = (standingBundle: unknown, standingBox: unknown, expected: LockboxExpectation): boolean => {
-  if (! vaultMeetsExpectation(standingBundle, expected) || ! vaultKeyMeetsExpectation(standingBundle, expected)) { return false }
-  if (standingBox === null || standingBox === undefined) { return expected.revision_id === null }
-  const box = StandingBox.safeParse(standingBox)
-  return box.success && box.data.revision_id === expected.revision_id
-}
+const checkRecord = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, raw: unknown, said: string): RecordT => checked(recordSchema, raw, () => (
+  new VaultError('corrupt_record', `A stored ${said} record did not read back in a shape this package knows. It may be damaged, or written by another version of safebyok; it was left as it is.`)
+))
 
 /**
  * What `val` weighs as the UTF-8 bytes of its JSON: how the vault measures a record against its
@@ -650,17 +774,56 @@ export const jsonBytes = (val: unknown): number => new TextEncoder().encode(JSON
 /** `fn`'s result (or failure) as a promise: a sync throw becomes a rejection, never an escape. */
 const soon = async <ValT>(fn: () => ValT | Promise<ValT>): Promise<ValT> => await fn()
 
+/** What {@link localVaultDB} is made with. */
+export type LocalVaultDBOpts = VaultDBOpts & {
+  /** Where the rows live: `domStore(localStorage, prefix)`, `memoryStore()`, or a StringStore of your own. */
+  store: StringStore
+}
+
 /**
  * VaultDB over a {@link StringStore}: rows as JSON text under the ckeys `Ckeys` gives, names
  * joined on `^`. A host backs one with localStorage, for a vault that lives on this device alone;
  * tests back one with a Map. Every secret field in what it stores is ciphertext; what it lacks is
  * reach -- rows stay on this device instead of syncing through a shared database.
  *
+ * * **One tab.** Each write checks what stands and saves in one synchronous step, so nothing else
+ *   in this tab runs in between: that is its atomic step. Two tabs sharing one localStorage are
+ *   not held apart -- browsers do not lock it across tabs -- so a vault two tabs write at once may
+ *   lose a write. For a vault several tabs keep, use `idbVaultDB` from `safebyok-indexeddb`, whose
+ *   every write is one IndexedDB transaction.
+ * * **No limits but a record's**: a mebibyte in one record, and none on a vault. The origin's
+ *   storage quota bounds the whole store: a write past it is refused as `storage_unavailable`, the
+ *   browser's own error (a `QuotaExceededError`) its cause, and nothing is written.
+ *
+ * @param opts - The `store`, and optionally a `logger`. Kind 'bad_option' for a `store` that is
+ *   not a StringStore, or a `logger` that is not a VaultLogger.
+ * @returns The VaultDB, to hand `openVault`.
+ *
  * @example
- *   const vaultDB = localVaultDB(memoryStore())
+ *   const vaultDB = localVaultDB({ store: memoryStore() })
  *   await vaultDB.readBundle({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // null
+ * @example
+ *   const vaultDB = localVaultDB({ store: domStore(localStorage, 'acme:db:'), logger })
  */
-export const localVaultDB = (store: StringStore): VaultDB => new StringStoreVaultDB(store)
+export const localVaultDB = (opts: LocalVaultDBOpts): VaultDB => {
+  if (! localVaultDBOptsShape.safeParse(opts).success) {
+    throw new VaultError('bad_option', 'localVaultDB takes one bag of options: a `store` (a StringStore, such as memoryStore() or domStore(localStorage, prefix)), and optionally a `logger`.')
+  }
+  return new StringStoreVaultDB(opts)
+}
+
+const isFunction = (candidate: unknown) => typeof candidate === 'function'
+
+/** What localVaultDB must be handed: a store carrying a StringStore's five calls. Checked only. */
+const localVaultDBOptsShape = Z.object({
+  store: Z.object({
+    read:      Z.custom(isFunction),
+    write:     Z.custom(isFunction),
+    erase:     Z.custom(isFunction),
+    ckeys:     Z.custom(isFunction),
+    subscribe: Z.custom(isFunction),
+  }),
+})
 
 class StringStoreVaultDB extends VaultDB {
   // localStorage holds about five megabytes per origin, in all: a mebibyte is this adapter's
@@ -675,9 +838,9 @@ class StringStoreVaultDB extends VaultDB {
 
   private readonly store: StringStore
 
-  constructor(store: StringStore) {
-    super()
-    this.store = store
+  constructor(opts: LocalVaultDBOpts) {
+    super(opts)
+    this.store = opts.store
   }
 
   // Work is deferred into the promise even though the store is synchronous: a storage fault must
@@ -698,7 +861,7 @@ class StringStoreVaultDB extends VaultDB {
 
   protected doUpdateBundle(bundle: VaultBundle, expected: BundleExpectation): Promise<boolean> {
     return soon(() => {
-      if (! bundleMeetsExpectation(readJson(this.store, Ckeys.bundle(bundle)), expected)) { return false }
+      if (! Expectations.bundleMeets(readJson(this.store, Ckeys.bundle(bundle)), expected)) { return false }
       this.store.write(Ckeys.bundle(bundle), JSON.stringify(bundle))
       return true
     })
@@ -723,7 +886,7 @@ class StringStoreVaultDB extends VaultDB {
     return soon(() => {
       const standingBundle = readJson(this.store, Ckeys.bundle(scope))
       const standingBox = readJson(this.store, Ckeys.box(scope, lockbox.boxlabel))
-      if (! lockboxMeetsExpectation(standingBundle, standingBox, expected)) { return false }
+      if (! Expectations.lockboxMeets(standingBundle, standingBox, expected)) { return false }
       this.store.write(Ckeys.box(scope, lockbox.boxlabel), JSON.stringify(lockbox))
       return true
     })
@@ -731,7 +894,7 @@ class StringStoreVaultDB extends VaultDB {
 
   protected doEraseBox(scope: VaultScope, boxlabel: string, expected: EraseExpectation): Promise<boolean> {
     return soon(() => {
-      if (! vaultMeetsExpectation(readJson(this.store, Ckeys.bundle(scope)), expected)) { return false }
+      if (! Expectations.vaultMeets(readJson(this.store, Ckeys.bundle(scope)), expected)) { return false }
       this.store.erase(Ckeys.box(scope, boxlabel))
       return true
     })
@@ -739,7 +902,7 @@ class StringStoreVaultDB extends VaultDB {
 
   protected doEraseVault(scope: VaultScope, expected: EraseExpectation): Promise<boolean> {
     return soon(() => {
-      if (! vaultIdMeetsExpectation(readJson(this.store, Ckeys.bundle(scope)), expected)) { return false }
+      if (! Expectations.vaultIdMeets(readJson(this.store, Ckeys.bundle(scope)), expected)) { return false }
       const doomed = this.store.ckeys().filter(Ckeys.isBoxIn(scope))
       for (const ckey of [...doomed, Ckeys.bundle(scope)]) { this.store.erase(ckey) }
       return true

@@ -13,8 +13,9 @@ import * as TH from './test-helpers'
 TH.describeDeviceDB('idbDeviceDB', () => idbDeviceDB({ dbName: TH.freshDbName() }))
 
 describe("safebyok/idb", () => {
-  it("exports the device store and its inspector, and no vault store: that is safebyok-indexeddb's", () => {
-    expect(Object.keys(Entry)).to.have.members(['idbDeviceDB', 'inspectIdbDeviceDB'])
+  it("exports the device store, its inspector and the change bell, and no vault store: that is safebyok-indexeddb's", () => {
+    expect(Object.keys(Entry)).to.have.members(['idbDeviceDB', 'inspectIdbDeviceDB', 'ChangeBell'])
+    expect(Object.keys(Entry.ChangeBell)).to.have.members(['ring', 'listen'])
   })
 })
 

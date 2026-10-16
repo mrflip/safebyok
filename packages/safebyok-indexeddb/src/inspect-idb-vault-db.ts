@@ -1,7 +1,7 @@
 import { clear, entries } from 'idb-keyval'
 import { VaultError } from 'safebyok'
-import { onBell, ringBell } from './bell'
-import { parseDbName, type IdbVaultDBOpts } from './idb-opts'
+import { ChangeBell } from 'safebyok/idb'
+import { bellnameOf, parseDbName, type IdbVaultDBOpts } from './idb-opts'
 import { shelfOf } from './shelf'
 
 /** One stored row, as {@link inspectIdbVaultDB} reports it: its ckey and the raw stored record. */
@@ -43,11 +43,11 @@ export const inspectIdbVaultDB = (opts?: IdbVaultDBOpts): IdbVaultInspector => {
     },
     subscribe: (listener) => {
       if (typeof listener !== 'function') { throw new VaultError('bad_option', 'subscribe needs a listener function to call after each write.') }
-      return onBell(dbName, listener)
+      return ChangeBell.listen(bellnameOf(dbName), listener)
     },
     wipe: async () => {
       await clear(shelfOf(dbName))
-      ringBell(dbName)
+      ChangeBell.ring(bellnameOf(dbName))
     },
   }
 }

@@ -15,7 +15,7 @@ import { stableJsonify } from './stable-jsonify'
 import { oneAtATime } from './one-at-a-time'
 import type { DeviceDB } from './device-db'
 import { VaultDB, jsonBytes, type LockboxExpectation } from './vault-db'
-import { parseLogger, type VaultLogger } from './logger'
+import { asError, parseLogger, type VaultLogger } from './logger'
 import * as RefusalPolicy from './refusal-policy'
 import { ensureStrongEnough, parseStrengthTest, type PassphraseStrengthTest } from './passphrase-strength'
 
@@ -580,6 +580,8 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   const deviceDB = deviceTroubleAsConditions(parseDeviceDB(opts.deviceDB))
   const reentryMillis = parseForcePassphraseReentryHours(opts.forcePassphraseReentryHours)
   const logger = parseLogger(opts.logger)
+  // The vault's logger is its storage's too, unless the host made the storage with its own.
+  if (opts.logger !== undefined) { givenVaultDB.adoptLogger(logger) }
   const clock = parseClock(opts.clock)
   // Every reading of the host's clock is checked, this first one so that a clock counting in the
   // wrong unit fails the open rather than some later call.
@@ -713,7 +715,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   /** `kept`, a mark the deviceDB handed back, when it passes its check and is of this scope; null otherwise. */
   const checkedMark = (kept: unknown): DeviceMark | null => {
     const checked = DeviceMark.safeParse(kept)
-    return checked.success && isOfScope(checked.data, scope) ? checked.data : null
+    return checked.success && Names.sameScope(checked.data, scope) ? checked.data : null
   }
 
   /**
@@ -1236,7 +1238,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
     if (kept === null) { return }
     const checked = DeviceUnlock.safeParse(kept)
     // A record naming some other scope is out of place, as unreadable as a mangled one.
-    const readable = checked.success && isOfScope(checked.data, scope)
+    const readable = checked.success && Names.sameScope(checked.data, scope)
     const now = clockNow()
     const fits = readable
       && checked.data.vault_id === bundle.vault_id
@@ -1939,9 +1941,6 @@ const damagedBundle = (opts: ErrorOptions) => new VaultError('damaged_bundle', "
 // The refusal never quotes the boxlabel: a host's validators may admit any text, a mistaken paste among it.
 const damagedLockbox = (opts: ErrorOptions) => new VaultError('damaged_lockbox', "That lockbox is stored damaged, so it can't be read. It was left as it is; erase it, or store its whisper again over it.", opts)
 
-/** A thrown value, for a logger: an Error as it is, anything else -- which may be anything at all -- as null. */
-const asError = (thrown: unknown): Error | null => (thrown instanceof Error ? thrown : null)
-
 const lockedError = () => new VaultError('vault_locked', 'The vault is locked: ask the user for their passphrase and call unlock().')
 
 /**
@@ -2159,11 +2158,6 @@ const retryStale = async <ResultT>(retriable: (err: unknown) => boolean, attempt
 
 // The refusal never quotes the boxlabel: a host's validators may admit any text, a mistaken paste among it.
 const absentBox = () => new VaultError('absent_box', 'No lockbox stands under that boxlabel in this vault: its snapshot lists the ones it holds.')
-
-/** True when `record` names `scope`: the same app, user and vault. */
-const isOfScope = (record: VaultScope, scope: VaultScope): boolean => (
-  record.applabel === scope.applabel && record.user_id === scope.user_id && record.vaultlabel === scope.vaultlabel
-)
 
 /**
  * Refuse, with kind 'insecure_context', a page the platform says is not a secure context: plain

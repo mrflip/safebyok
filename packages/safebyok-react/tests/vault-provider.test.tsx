@@ -70,7 +70,7 @@ const grabber = () => {
  * and the Probe in a provider inside a boundary, as a tree or mounted.
  */
 const makeWorld = () => {
-  const vaultDB = localVaultDB(memoryStore())
+  const vaultDB = localVaultDB({ store: memoryStore() })
   const deviceDB = memoryDeviceDB()
   const props = { applabel: 'acme', vaultlabel: 'main', vaultDB, deviceDB, keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest }
   const tree = (userId: string | null, caught: unknown[] = []) => (
@@ -87,7 +87,7 @@ const makeWorld = () => {
 /** A world whose `u1` vault was made, with a lockbox, and then had its stored bundle spoiled. */
 const damagedWorld = async () => {
   const store = memoryStore()
-  const vaultDB = localVaultDB(store)
+  const vaultDB = localVaultDB({ store })
   const deviceDB = memoryDeviceDB()
   const props = { applabel: 'acme', vaultlabel: 'main', vaultDB, deviceDB, keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest }
   const made = await openVault({ ...props, userId: 'u1' })
@@ -574,7 +574,7 @@ describe("VaultProvider", () => {
     const ClockMillis = Date.UTC(2026, 9, 15)
     const { Grab, opened } = grabber()
     render(
-      <VaultProvider applabel="acme" vaultlabel="main" userId="u1" vaultDB={localVaultDB(memoryStore())} deviceDB={memoryDeviceDB()}
+      <VaultProvider applabel="acme" vaultlabel="main" userId="u1" vaultDB={localVaultDB({ store: memoryStore() })} deviceDB={memoryDeviceDB()}
         keyDeriver={TH.testDeriver} clock={{ now: () => ClockMillis }} forcePassphraseReentryHours={1} maxWhisperBytes={8} maxLockboxes={1}>
         <Grab />
       </VaultProvider>,

@@ -75,7 +75,7 @@ export const RealWhispers: Record<string, { whisper: Whisper, bag?: PublicBag }>
 export const RealPassphrase = 'correct horse battery staple'
 
 /** Opens a vault for `userId` over `store` the way an app does, deriving through the cheap test deriver. */
-export const openOver = (store: StringStore, userId = 'u1') => openVault(memoryVaultOpts({ userId, vaultDB: localVaultDB(store) }))
+export const openOver = (store: StringStore, userId = 'u1') => openVault(memoryVaultOpts({ userId, vaultDB: localVaultDB({ store }) }))
 
 /**
  * A real vault, made by the core's own code: a bundle and a lockbox per {@link RealWhispers}

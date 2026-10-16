@@ -163,7 +163,7 @@ describe("KnockKnock", () => {
 
   it("won't knock with a damaged key, and replaces it afresh", async () => {
     const store = memoryStore()
-    const world = TH.makeWorld({ vaultDB: localVaultDB(store) })
+    const world = TH.makeWorld({ vaultDB: localVaultDB({ store }) })
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
     store.write(Ckeys.box(TH.scopeOf('u1'), 'anthropic_api_key'), '{"not": json')
     world.renderInVault(<KnockKnock />)

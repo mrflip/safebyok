@@ -10,7 +10,7 @@ import * as TH from './test-helpers'
 /** A locked vault in memory with one passkey, made through the fake authenticator, and that authenticator. */
 const lockedVaultWithPasskey = async () => {
   const authenticator = TH.installFakeAuthenticator()
-  const vaultDB = localVaultDB(memoryStore())
+  const vaultDB = localVaultDB({ store: memoryStore() })
   const open = async () => await openVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest })
   const maker = await open()
   await maker.unlock('pw')

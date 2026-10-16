@@ -1,7 +1,7 @@
 import { runInNewContext } from 'node:vm'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { VaultError } from '../src/errors'
-import { parseLogger, type VaultLogger } from '../src/logger'
+import { asError, parseLogger, type VaultLogger } from '../src/logger'
 import * as TH from './test-helpers'
 
 /** What a host might hand openVault as its logger that is not one. */
@@ -117,5 +117,14 @@ describe("VaultLogger", () => {
     const story = { call: 'store', attempt: 2, retried: true, when: null, detail: { kinds: ['stale_write'] } }
     spy.logger.warn('a store retried', story)
     expect(spy.calls[0]?.story).to.deep.equal(story)
+  })
+})
+
+describe("asError", () => {
+  it("hands a logger an Error as it is, and anything else thrown as null", () => {
+    const thrown = new Error('a host error')
+    expect(asError(thrown)).to.eq(thrown)
+    expect(asError('a bare string')).to.be.null
+    expect(asError(undefined)).to.be.null
   })
 })

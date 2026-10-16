@@ -1,5 +1,5 @@
-import { VaultDB, VaultError, VaultErrorKindVals } from 'safebyok'
-import type { BundleExpectation, EraseExpectation, Lockbox, LockboxExpectation, StoredLockbox, VaultBundle, VaultErrorKind, VaultScope } from 'safebyok'
+import { Sanitizer, VaultDB, VaultError, VaultErrorKindVals } from 'safebyok'
+import type { BundleExpectation, VaultDBOpts, EraseExpectation, Lockbox, LockboxExpectation, StoredLockbox, VaultBundle, VaultErrorKind, VaultScope } from 'safebyok'
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
 import { BundleFields, ListedLockboxFields, LockboxFields, ScopeFields, recordOf, selectionOf } from './fields'
 
@@ -9,19 +9,18 @@ import { BundleFields, ListedLockboxFields, LockboxFields, ScopeFields, recordOf
  */
 export type GraphqlVaultClient = Pick<Client, 'query' | 'mutation' | 'subscription'>
 
-/** What {@link graphqlVaultDB} takes beside its client. */
-export type GraphqlVaultDBOpts = {
+/** What {@link graphqlVaultDB} is made with. */
+export type GraphqlVaultDBOpts = VaultDBOpts & {
+  /** Your app's urql Client, its `url` your GraphQL server's. */
+  client: GraphqlVaultClient
   /**
    * The most lockboxes one vault holds, as the VaultDB behind your server enforces it: a whole
-   * number above zero, or `Infinity` for a server that sets none. Default: 1000, what the
-   * Postgres VaultDB holds unless told otherwise. Declare your server's own, so that `openVault`
+   * number above zero, or `Infinity` for a server that sets none. Default: `Infinity`, as the
+   * Postgres VaultDB sets none unless told. Declare your server's own, so that `openVault`
    * refuses a vault asking for more up front, rather than the server at the first lockbox past it.
    */
   maxLockboxes?: number | undefined
 }
-
-/** What the Postgres VaultDB holds in one vault unless told otherwise, and so what this declares. */
-const DefaultMaxLockboxes = 1000
 
 /** The most bytes of UTF-8 the Postgres VaultDB behind the server holds in one name. */
 const ServerMaxNameBytes = 640
@@ -40,28 +39,32 @@ const ServerMaxNameBytes = 640
  * * **Other writes** reach `subscribe` through the `safebyokVaultChanged` subscription, when your
  *   Client has a way to send subscriptions (a `subscriptionExchange` over graphql-ws, say, or
  *   `fetchSubscriptions`); without one, nothing is pushed, and the vault refreshes after its own
- *   writes as before. A subscription that fails is not retried, and nothing is told.
+ *   writes as before. A subscription that fails is not retried: it is logged, once for a failing
+ *   streak, and calls `onChange`, so the vault reads again and meets the trouble itself.
+ * * **Misuse crosses as misuse**: a GraphQL validation error (`BAD_USER_INPUT`,
+ *   `GRAPHQL_VALIDATION_FAILED`) refuses with kind `bad_option`, quoting nothing of what the
+ *   server said, which may quote the variables.
  *
- * @param client - Your app's urql Client, its `url` your GraphQL server's.
- * @param opts - Optionally, the `maxLockboxes` your server holds a vault to.
+ * @param opts - Your app's urql `client`; optionally, the `maxLockboxes` your server holds a vault
+ *   to, and a `logger`, which otherwise is the vault's.
  * @returns The VaultDB, holding at most 1 MiB in one record, as the Postgres VaultDB behind it
  *   does, and `maxLockboxes` lockboxes in one vault, setting no limit on a vault's bytes.
  *
  * @example
- *   const vaultDB = graphqlVaultDB(new Client({ url: '/api/graphql', exchanges: [fetchExchange] }))
+ *   const vaultDB = graphqlVaultDB({ client: new Client({ url: '/api/graphql', exchanges: [fetchExchange] }) })
  *   const vault = await openVault({ ...browserOpts(), applabel: 'acme', userId, vaultlabel: 'main', vaultDB })
  * @example
- *   const vaultDB = graphqlVaultDB(client, { maxLockboxes: 250 })  // the server's postgresVaultDB holds 250
+ *   const vaultDB = graphqlVaultDB({ client, maxLockboxes: 250 })  // the server's postgresVaultDB holds 250
  */
-export const graphqlVaultDB = (client: GraphqlVaultClient, opts?: GraphqlVaultDBOpts): VaultDB => {
+export const graphqlVaultDB = (opts: GraphqlVaultDBOpts): VaultDB => {
+  const { client, maxLockboxes = Infinity } = (opts as Partial<GraphqlVaultDBOpts> | null | undefined) ?? {}
   if (! isUrqlClient(client)) {
-    throw new VaultError('bad_option', "graphqlVaultDB needs an urql Client: your app's own, made with `new Client({ url, exchanges })` from @urql/core or urql.")
+    throw new VaultError('bad_option', "graphqlVaultDB needs a `client`, an urql Client: your app's own, made with `new Client({ url, exchanges })` from @urql/core or urql.")
   }
-  const { maxLockboxes = DefaultMaxLockboxes } = (opts as Partial<GraphqlVaultDBOpts> | null | undefined) ?? {}
   if (! isLockboxCount(maxLockboxes)) {
     throw new VaultError('bad_option', "graphqlVaultDB's `maxLockboxes`, when given, is a whole number above zero, or Infinity for a server that sets no limit.")
   }
-  return new UrqlVaultDB(client, maxLockboxes)
+  return new UrqlVaultDB({ ...opts, client, maxLockboxes })
 }
 
 const isLockboxCount = (count: unknown): count is number => (
@@ -139,10 +142,10 @@ class UrqlVaultDB extends VaultDB {
 
   private readonly client: GraphqlVaultClient
 
-  constructor(client: GraphqlVaultClient, maxLockboxes: number) {
-    super()
-    this.client = client
-    this.maxLockboxes = maxLockboxes
+  constructor(opts: GraphqlVaultDBOpts & { maxLockboxes: number }) {
+    super(opts)
+    this.client = opts.client
+    this.maxLockboxes = opts.maxLockboxes
   }
 
   protected async doReadBundle(scope: VaultScope): Promise<unknown> {
@@ -193,8 +196,15 @@ class UrqlVaultDB extends VaultDB {
   }
 
   protected override doSubscribe(scope: VaultScope, onChange: () => void): () => void {
+    const trouble = this.watchTrouble("This vault's GraphQL subscription failed, so other devices' changes may not show until the vault next reads. The vault reads again now, and meets the trouble itself.")
     const subscription = this.client.subscription(VaultChangedDoc, { scope: scopeOut(scope) }).subscribe((result) => {
-      if (result.data) { onChange() }
+      if (result.error) {
+        trouble.failed(result.error)
+        onChange()
+      } else if (result.data) {
+        trouble.delivered()
+        onChange()
+      }
     })
     return () => { subscription.unsubscribe() }
   }
@@ -221,13 +231,23 @@ const answerOf = (result: OperationResult): Record<string, unknown> => {
   return result.data as Record<string, unknown>
 }
 
-/** The server's refusal as the VaultError it was, when one carries a kind; otherwise urql's error, as it is. */
+/**
+ * The server's refusal as the VaultError it was, when one carries a kind; a GraphQL validation
+ * error as misuse, quoting nothing of it, as it may quote the variables; otherwise urql's error, as
+ * it is, which the base class says as storage trouble.
+ */
 const refusalOf = (err: CombinedError): Error => {
   for (const refused of err.graphQLErrors) {
-    const { kind } = refused.extensions
+    const { kind, code } = refused.extensions
     if (isKind(kind)) { return new VaultError(kind, refused.message) }
+    if (typeof code === 'string' && MisuseCodes.has(code)) {
+      return Sanitizer.refusalFor(err, 'bad_option', "The GraphQL server refused this operation's shape or variables: the schema it serves is not the one this version of safebyok-graphql sends. Serve VaultSchemaSdl from the same version.")
+    }
   }
   return err
 }
+
+/** The `extensions.code`s a GraphQL server marks a malformed operation or variable with. */
+const MisuseCodes: ReadonlySet<string> = new Set(['BAD_USER_INPUT', 'GRAPHQL_VALIDATION_FAILED'])
 
 const isKind = (kind: unknown): kind is VaultErrorKind => (VaultErrorKindVals as readonly unknown[]).includes(kind)

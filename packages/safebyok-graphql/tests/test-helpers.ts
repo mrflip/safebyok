@@ -4,7 +4,7 @@ import { makeExecutableSchema } from '@graphql-tools/schema'
 import { Client, cacheExchange } from '@urql/core'
 import { executeExchange } from '@urql/exchange-execute'
 import type { GraphQLSchema } from 'graphql'
-import type { VaultDB, VaultScope } from 'safebyok'
+import type { VaultDB, VaultDBOpts, VaultScope } from 'safebyok'
 import { VaultNotifySql, VaultTablesSql, postgresVaultDB } from 'safebyok-postgres'
 import type { PostgresClient, PostgresListen } from 'safebyok-postgres'
 import { graphqlVaultDB } from '../src/index'
@@ -85,7 +85,7 @@ export const urqlClientFor = (schema: GraphQLSchema, userId: string | null): Cli
 })
 
 /** The browser's VaultDB for `userId`: graphqlVaultDB over its own urql Client. */
-export const browserFor = (schema: GraphQLSchema, userId: string | null): VaultDB => graphqlVaultDB(urqlClientFor(schema, userId))
+export const browserFor = (schema: GraphQLSchema, userId: string | null, vaultDBOpts: VaultDBOpts = {}): VaultDB => graphqlVaultDB({ ...vaultDBOpts, client: urqlClientFor(schema, userId) })
 
 /** A PostgresClient whose every statement rejects with `err`, as a driver does when the database is down. */
 export const failingClient = (err: Error): PostgresClient => ({
