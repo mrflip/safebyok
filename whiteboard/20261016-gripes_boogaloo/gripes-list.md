@@ -2,7 +2,7 @@
 
 Every gripe from the gripes_boogaloo harvest still wanting work or a decision, as of 2026-10-16; ids are shared with gripes-done.md. `**Decide:**` marks an item awaiting the Coach; *Deferred by the Coach* holds what the Coach shelved.
 
-249 remaining: 230 open (49 of them awaiting a Coach decision) and 19 deferred by the Coach. 260 more are answered in gripes-done.md.
+264 remaining: 244 open (54 of them awaiting a Coach decision) and 20 deferred by the Coach. 265 more are answered in gripes-done.md.
 
 ## Crypto & key derivation
 
@@ -30,6 +30,8 @@ Every gripe from the gripes_boogaloo harvest still wanting work or a decision, a
 - G061 **Decide:** whether `wayinlabel` is checked only where a way in is added (built), not where a stored wayin's label is read; rec entry-only — gripes_1_doc, todo_gripes, prs_open, whiteboard_gripes
 - G062 **Decide:** rotation's open names and shapes: `rolled_back` kind, `vault_key_epoch`, `prior_vault_key`, `DeviceMark`, `device_id`; `retireWayin({ rotate })` vs separate `rotateVaultKey` — prs_80_main, whiteboard_gripes
 - G063 **Decide:** whether the listing marks damaged a lockbox under an unknown `vault_key_epoch`, and whether the snapshot counts boxes still to re-encrypt — prs_80_main, whiteboard_gripes
+- G513 **Decide:** a way out of `rolled_back` after a legitimate restore: keep the `deviceDB.eraseMark(scope)` recipe for 1.0, a hatch (`retireDamagedVault` accepting `rolled_back`, or a sibling) only if a host asks; rec keep — matters
+- G514 **Decide:** a failed device-mark write after a wayin change landed rejects a change that landed (`grantLease`'s device write likewise); rec best-effort, log and don't reject — matters
 - G064 Build rotation_shape (thread 14): `vault_key_epoch`/`prior_vault_key` on vault props, epoch and random `device_id` on wayins, epoch on lockbox, `DeviceMark` rollback check — bigfeats_doc, prs_80_main, whiteboard_gripes, humans_gripes
 - G065 Build rotation_adapters (thread 18): the `vault_key_epoch` comparison in IndexedDB, Convex, Postgres (vault props row FOR SHARE in the insert) and GraphQL — bigfeats_doc, prs_80_main, whiteboard_gripes
 - G066 Build rotation_verb (thread 19): `rotateVaultKey(keep)` with its resumable lockbox walk, reads through the prior key, fault-injecting tests — bigfeats_doc, whiteboard_gripes
@@ -42,6 +44,8 @@ Every gripe from the gripes_boogaloo harvest still wanting work or a decision, a
 - G073 Plain `wrong_passphrase` beside wayins another deriver made does not mention the deriver — prs_60_80, prs_80_main, whiteboard_gripes
 - G074 Move the wayin `salt_b64` decode check from unlock into the record schema at read (once schemas tree-shake) — prs_60_80
 - G075 Clean up wayin/vault helpers: unused `sessionKey` from seal helpers, duplicated `absent_wayin` message, an errors.ts comment promising an unthrown case (status unclear) — prs_60_80, whiteboard_gripes
+- G515 Show `device_id` and `registered_at` in the snapshot's `wayins` (#120 left them out) so a host can show which device added which wayin — handed on to a new sprint (thread 20) — matters
+- G516 #120 rollback-check leftovers: a background refresh meeting `rolled_back` leaves the vault unlocked; the message names `eraseMark`; two tabs may each mint a `device_id` after the recipe; a decoy `vault_id` clears a mark; `keptMark` warns only for a host's DeviceDB; redundant reads and parses — matters
 
 ## Vault core: make, hello, unlock, lock, storeBox, retireBox, expiry, errors, logger
 
@@ -81,6 +85,7 @@ Every gripe from the gripes_boogaloo harvest still wanting work or a decision, a
 - G147 `damagedAs` maps only a rejected promise (a synchronously throwing VaultDB still says `corrupt_record`); decipher messages quote the stored boxlabel — prs_80_main
 - G148 `heed` waits on the device store's erase before rethrowing, so a never-settling device store hangs the refused call — prs_80_main, whiteboard_gripes
 - G149 Reduce duplication in vault-db validation: `checkOutgoing`/`checkRecord`, four listener checks, scope comparison, double parse per write — prs_60_80
+- G522 #106 leftovers: a closed handle's in-flight `identity_revoked` still erases the remembered unlock; every `ConvexClient` watch error refreshes; opening before auth is ready erases the remembered unlock — matters
 
 ## Validation, labels & names
 
@@ -108,6 +113,7 @@ Every gripe from the gripes_boogaloo harvest still wanting work or a decision, a
 - G205 **Decide:** whether a write should return a best-effort count (contract deviation; changes every adapter's `updateBox` and the GraphQL wire) — prs_80_main, whiteboard_gripes
 - G206 **Decide:** whether VAULTDB.md ships in the npm tarball (it does now) or lives on GitHub — prs_80_main, whiteboard_gripes
 - G478 **Decide:** rule on the adapter `do*` hook naming (mechanical rename if another rule is preferred) — old_gripes, whiteboard_gripes, humans_gripes
+- G511 **Decide:** a host `onChange` that throws at Postgres's watch start becomes an unhandled rejection (#119's fire-and-forget start call; no adapter guards `onChange`); rec fold into the logger sweep (G210) — matters
 - G207 Write the store base-class design in whiteboard/ and build it: a connector implements only list, replace and delete; fetch/update built on them (Coach: LGTM, design first) — todo_gripes, bigfeats_doc
 - G208 Move `listBoxRecords` into the VaultDB base, built from common verbs and overridden where one query does it (Coach yes; Postgres and GraphQL hand-write it today) — todo_gripes, bigfeats_doc, prs_60_80, humans_gripes, whiteboard_gripes
 - G209 Catch a throwing listener once in the shared `subscribe` (`reportError` where available); the core memory store lets it escape a landed write — todo_gripes, bigfeats_doc, prs_80_main, whiteboard_gripes
@@ -117,6 +123,7 @@ Every gripe from the gripes_boogaloo harvest still wanting work or a decision, a
 - G213 Give the base shared refusal constructors (`storage_unavailable`, `stale_write`, `not_permitted`, `vault_full`) with a never-null cause, so adapters stop copying core messages — bigfeats_doc, prs_60_80, whiteboard_gripes
 - G214 Make it simple to add and test a new adapter: no-op defaults only for truly optional verbs (a watch on a store that cannot push) — bigfeats_doc
 - G215 Race tests made core tests ~2 s → ~17 s and Convex ~5 s → ~11 s by waiting out 2 s deadlines on purpose — prs_open, whiteboard_gripes
+- G523 Battery leftovers: the capped Postgres/GraphQL factories omit `listen`; `MapVaultDB` counts by copying every row; IndexedDB's stray-field check is a base-class test, not a battery test over `idbVaultDB` — matters
 
 ## Convex adapter
 
@@ -218,6 +225,7 @@ Every gripe from the gripes_boogaloo harvest still wanting work or a decision, a
 ## Tests & helpers
 
 - G373 **Decide:** what level of e2e testing is appropriate, and whether to automate the Coach's by-hand acceptance tests on real authenticators and backends — todo_gripes
+- G510 **Decide:** rename `vaultDBTimingChecks`'s snake_case handles (`rival_first_writes` ...) to camelCase before release, in one commit (thread 5b); rec rename — matters
 - G374 Make code refuse the weak `test_digest_v0` testing deriver for a real vault (today recorded in notes/security.md only) — old_gripes
 - G375 `stateOnOpen` in the core's vault.test.ts leaves its vault open (one test counts on that watch) — prs_60_80, prs_open, humans_gripes, whiteboard_gripes
 - G376 Amend the pending `20261015-thin_tests` changeset, which says `expectRefusal` checks "by name and kind rather than class" (status unclear: #103 may amend it) — prs_open
@@ -229,6 +237,9 @@ Every gripe from the gripes_boogaloo harvest still wanting work or a decision, a
 - G382 The demo's 5 s / 15 s ceilings can mask slowdowns and misreport a hang as a timeout; the layout-effect test relies on a refusal within microtasks — prs_80_main
 - G482 Add a snapshot test rendering each stored-record schema (toJSONSchema) keyed by its `format` literal, failing with "bump format" when one changes unbumped — bigfeats_doc, prs_80_main
 - G483 `perUser`'s `@example` is not a call core tests make and omits `listen`; the test `servingOnly` lets a blank `user_id` through where a server says `not_permitted` — prs_80_main, whiteboard_gripes
+- G517 #119 race-driver leftovers: one counted turnstile pass per write; `push_from_the_start` gives up after 20 ticks silently; no deadlines in `holding`/`crowding`; `expectHeard` credits by timing; two device-factory shapes — matters
+- G518 #111 leftovers: e2e's `test:coverage` measures one file (the packages come from `dist/`); a filtered install of `safebyok-convex` still downloads `react` — matters
+- G519 Trim the three Postgres cap tests that repeat battery lines 4.3 and 4.4 — handed on to a new sprint (thread 5a) — matters
 
 ## Tooling, CI, size & dependencies
 
@@ -251,6 +262,8 @@ Every gripe from the gripes_boogaloo harvest still wanting work or a decision, a
 - G415 Check `dist/` is byte-identical after the tsdown move to 0.23.0 — prs_80_main
 - G416 Run actionlint on the workflows — old_gripes, whiteboard_gripes
 - G417 Identify and pin minimum platform support (oldest browsers, Node 22, Bun, Hermes `Intl` and `\p{}` escapes); CI checks it and the README states it — todo_gripes, prs_open, prs_80_main, whiteboard_gripes
+- G520 Re-set the `validators` (8.5 kB) and `DefaultValidators` (4 kB) size budgets by the written rule, and note the rule's 5 kB cliff (argon2idWebV1Deriver) — matters
+- G521 The tsconfig lib stops at ES2023, so #118 added an `eslint-disable-next-line unicorn/prefer-promise-with-resolvers` in a VaultProvider test (reported; see G399) — matters
 
 ## Release & npm
 
@@ -273,6 +286,7 @@ Every gripe from the gripes_boogaloo harvest still wanting work or a decision, a
 ## Docs & process
 
 - G464 **Decide:** split VOCABULARY's `userId` (options) and `user_id` (records) into separate entries, or keep the one camel/underbar pair — prs_60_80, whiteboard_gripes
+- G512 **Decide:** make `scripts/git-survey.sh` (`/branch-sweep`) skip any worktree whose branch has an open PR or unpushed commits (a sweep unregistered four live sprint worktrees); rec yes — matters
 - G465 Strike TODO.md's stale entries: "A lockbox row that breaks the listing" (#93, #115), Roadmapped 1-3 items since done (switches, Convex peer, size cap, wayins) — todo_gripes, bigfeats_doc, whiteboard_gripes
 - G466 Widen VOCABULARY's "damaged" row from lockboxes to a way in and the vault props — prs_80_main
 - G467 Turn on GitHub's "Automatically delete head branches" (off; 89 finished branches remain on origin) — prs_80_main
@@ -303,3 +317,4 @@ Every gripe from the gripes_boogaloo harvest still wanting work or a decision, a
 - G507 A REST vault store over `fetch` with a Next.js demo, and a blob helper for secrets too large to be a whisper — side quests, "not needed yet" — old_gripes, todo_gripes
 - G508 A sub-millisecond tiebreaker beside each timestamp (monotonic or random), bound only where present — NOT YET — todo_gripes, old_gripes
 - G509 A finer unlock race analyser telling a lock the user meant from one that fell due while typing — NOT YET — todo_gripes, whiteboard_gripes
+- G524 One test container for every backend — side quest; the Coach: close out the PRs first, for the push to 1.0.0 — matters

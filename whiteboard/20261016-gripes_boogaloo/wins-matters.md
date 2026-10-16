@@ -1,0 +1,38 @@
+# wins: matters
+
+Read: everything in `winboard/20261015-matters/` that the `whiteboard_gripes` harvest did not (thread 14, the later edits to threads 6, 13 and 15, `matters-plan.md`, `matters-progress.md`, `matter-postgres_cap.md`, `matter-revocation.md`, `20261016-sprint_matters_done-human.md`); the body, comments and reviews of the sprint's PRs #96-#99, #105-#111, #113-#115, #118-#120; and the "Sprint matters", "Open Matters" and "Big Feats Next" tabs of the Claude Doc "Sprint big_feats" (C9kDnwzjidkbmfmjsivjYF). Refs: a file in the folder, `PR#N`, or `matters_doc:<tab>`.
+
+- `safebyok-argon2-wasm` renamed `safebyok-fastkey` (PR#122, merged after the sprint) — matters_doc:Open Matters, "The safebyok-argon2-wasm → safebyok-fastkey rename"
+- (Coach) Ruled: "yes seven days" for `minimumReleaseAge`; every exception recorded in notes/security.md; built with a strict frozen-lockfile check and a seven-day Dependabot cooldown (PR#96) — matters-plan.md, thread 2
+- (Coach) Asked whether hot releases are pinned more or less specifically: answered "more" -- exact version, excluded by name and version, recorded the same day, removed once seven days old, never for convenience; in PROCESS.md *Dependencies* (PR#96) — matters-plan.md, thread 2; PR#96 body
+- (Coach) "Make everything verifiable": the passkey's HKDF info is its wrap's whole binding; envelopes bind `registered_at`, lockboxes their whole public header, a remembered unlock its deadline (PR#97) — matters-plan.md, thread 1
+- (Coach) Ruled: leave the Argon2 settings out of the binding, relegated to notes/security.md (a difficulty measure if anything) (PR#108) — matters-plan.md, thread 9
+- (Coach) Ruled: "use fine-grained error messages": `damaged_bundle`, `damaged_unlock`, `damaged_lockbox` (PR#108) — matters-plan.md, thread 9
+- (Coach) Ruled on #98: the dialog swaps its form for a notice ("LGTM"); skip `react-error-boundary` by the library rubric, keep the hand-written class — matters-plan.md, wave 3; matters_doc:Sprint matters
+- `withUnlockedVault` settles every call; a late unlock closes a newer dialog and its waiters retry (PR#98, PR#110) — matters-progress.md
+- Flaky demo test awaited with `waitFor`; Supabase untested said plainly; `justify:root` runs all three and fails if any failed; TODO's sand cleared after checking each item on main (Convex's `--no-error-on-unmatched-pattern` gone, the demo's coverage `include` there, root eslint ignoring `**/dist/**`) (PR#99) — matters-plan.md, thread 4; PR#99 body
+- (Coach) Size guidance: the orchestrator reads `pnpm size` at planning, guesses the sprint's target, has the first thread raise the budgets so stacked PRs agree, and a late thread lowers them to the rule; in the sprint skill (PR#99) — matters-plan.md, threads 4 and 8
+- (Coach) Size rule: measured + 3 kB at 5 kB and over, + 50% (at least 1 kB) under, rounded up to two significant figures; in PROCESS.md *Size budgets* (PR#99) — matters-plan.md, thread 8
+- (Coach) Ruled: storage adapters say `identity_revoked`, and one policy module decides; `src/refusal-policy.ts`, `whenIdentityRevoked` default `'lock'` (PR#106) — matters-plan.md, thread 10
+- (Coach) Thread 7's question answered: IndexedDB's scope-only reads are a follow-on, nothing deeper (PR#109) — matters-plan.md, thread 7
+- The VaultDB contract written as VAULTDB.md, 26 numbered lines, with the battery titled by line (PR#107) — matter-postgres_cap.md; matters-progress.md
+- (Coach) Ruled: a write returns no count (#107's departure from the manifesto): "yes, better all around" — matters-plan.md, Not in this sprint
+- (Coach) Asked whether the one-statement counting insert meets the contract: yes, at READ COMMITTED; `lockbox_count`, its trigger, `FOR UPDATE` and `StillFullSql` removed; NOTIFY trigger opt-in as `VaultNotifySql`; a "vaya con dios" hard-cap trigger documented (PR#113) — matter-postgres_cap.md; matters-plan.md, thread 12
+- The pending `20261015-store_vault_cap` changeset corrected: it now says Postgres keeps no `lockbox_count` column (YOLO decision 13) — matters-plan.md, Decisions taken in YOLO
+- (Coach) Revocation: "Yes, do (a)" -- rotate the vaultKey; no server signing; the rotation design written with threads 14 and 18-20 (PR#105) — matter-revocation.md; matters-plan.md, thread 13
+- (Coach) Which ways in a rotation keeps: moved to TODO's Soonish with the recommendation landed (keep only the proven ones); thread 19 ungated — matters-plan.md, Not in this sprint
+- (Coach) The device-label question folded into TODO's NOT YET device lockout — matters-plan.md, Not in this sprint
+- (Coach) Ruled the broad `format` rule: any change to what a stored record may hold (a field, a shape, or a range a check accepts) bumps `format`; recorded by #120's `docs:` commit — matters-plan.md, Not in this sprint; PR#120 body
+- Rotation's stored shape built: `vault_key_epoch`/`prior_vault_key` on the bundle, `vault_key_epoch`/`device_id`/`registered_at` on each envelope (bound), `vault_key_epoch` on the lockbox, `LockboxExpectation.vault_key_epoch` and VAULTDB.md line 3.8 (PR#120) — thread-14-rotation_shape.md; PR#120 body
+- Rollback check built: the device mark holds both epochs, a bundle below either is refused `rolled_back`, nothing taken from it; the way out is the tested `eraseMark` recipe in the core README, gated on the host's own knowledge of a restore (PR#120) — thread-14-rotation_shape.md; PR#120 body and reviews
+- #120 reviews fixed: first way in's `device_id` matches the mark; a bundle held to the mark read before it (no false `rolled_back`), on refresh and on create; the epoch `damaged_lockbox` quotes no boxlabel — PR#120 reviews
+- Two tabs on one device can step the mark back to an older epoch (a weaker check, never a wrong refusal): recorded in notes/security.md — thread-14-rotation_shape.md; PR#120 body
+- `eraseDamagedVault` knows `safebyok-vault-v1` as an older format, so vaults from before #120 are cleared rather than refused as maybe newer (PR#120) — thread-14-rotation_shape.md
+- (Coach) #111 ruled option (b): Convex's own tests stay in `safebyok-convex`, the fake shipped as `safebyok-convex/testing` with `fakeDeployment(host)`, `e2e/` runs only the `ConvexReactClient` half; the duplicated loop bodies and `fakeDeployment(host)` confirmed by the Coach (PR#111) — matters-plan.md, Not in this sprint; thread-15-e2e_home.md
+- A race driver (`raceEveryWay`, `Turnstile`) runs every contract race across two devices under every schedule, every in-tree adapter wired, with honesty proofs; Convex wired with `pushes: true` (PR#119) — thread-6-race_helper.md
+- A write made while a Postgres or GraphQL watch was starting was never heard: `postgresVaultDB` now calls once as its listen begins (PR#119) — thread-6-race_helper.md
+- `eraseDamagedVault` erases a vault `openVault` refuses as damaged, and refuses one that may be newer (PR#115) — matters-progress.md
+- CI flakes fixed: a provider race in `VaultProvider`, Convex's 1365-lockbox test given a 120 s ceiling (PR#118) — matters-plan.md, thread 22
+- (Coach) The first-emit deviation accepted as built and struck from TODO; a failed `openVault`'s leaked subscription confirmed closed by #61 (PR#105) — matters-plan.md, wave 5
+- `safebyok` is already a peer of every adapter; Convex's `react` dev dependency kept — matters-plan.md, Swept without a thread; matters_doc:Sprint matters
+- Ground rules learned: never `git stash` in a worktree (one stash for all); git rerere is shared and replayed a stale resolution once, so diff each resolved file after a conflicted rebase; a branch sweep can unregister a live worktree, so commit and push early — matters-plan.md, Ground rules; 20261016-sprint_matters_done-human.md; matters_doc:Big Feats Next
