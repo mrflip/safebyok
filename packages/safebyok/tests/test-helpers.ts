@@ -595,7 +595,7 @@ const TickOffsets = [1, 2] as const
 /** The most round trips a race holds a move before; a move making more fails the race. */
 const MostRoundTrips = 12
 /** How long a device's move may take while another device waits at the turnstile before the race calls it a shared lock. */
-const WaitedTooLongMs = 2000
+const WaitedTooLongMillis = 2000
 
 /** The moves of a race, each started on its device. */
 type Start = () => Promise<RaceOutcome>
@@ -703,10 +703,10 @@ const falseOnce = async (promise: Promise<unknown>) => {
   return false
 }
 
-/** What `promise` resolves to, if it does within {@link WaitedTooLongMs}. */
+/** What `promise` resolves to, if it does within {@link WaitedTooLongMillis}. */
 const inTime = async <ValT>(promise: Promise<ValT>): Promise<{ inTime: true, val: ValT } | { inTime: false }> => {
   let timer: ReturnType<typeof setTimeout> | undefined
-  const late = new Promise<{ inTime: false }>((resolve) => { timer = setTimeout(() => { resolve({ inTime: false }) }, WaitedTooLongMs) })
+  const late = new Promise<{ inTime: false }>((resolve) => { timer = setTimeout(() => { resolve({ inTime: false }) }, WaitedTooLongMillis) })
   const timely = async () => ({ inTime: true as const, val: await promise })
   const settled = await Promise.race([timely(), late])
   clearTimeout(timer)
@@ -714,7 +714,7 @@ const inTime = async <ValT>(promise: Promise<ValT>): Promise<{ inTime: true, val
 }
 
 const waitedTooLong = () => new Error(
-  `a device's move did not finish within ${String(WaitedTooLongMs)} ms while another device waited at the turnstile, before a round trip to the backend. The devices share something that makes one wait for the other -- a lock, a queue, a connection -- that two real devices would not, or the adapter holds a lock from one round trip to the next, which the VaultDB contract's baseline rules out.`,
+  `a device's move did not finish within ${String(WaitedTooLongMillis)} ms while another device waited at the turnstile, before a round trip to the backend. The devices share something that makes one wait for the other -- a lock, a queue, a connection -- that two real devices would not, or the adapter holds a lock from one round trip to the next, which the VaultDB contract's baseline rules out.`,
 )
 
 /** Resolves after `count` turns of the microtask queue. */
@@ -980,7 +980,7 @@ export const describeVaultDB = (adapterTitle: string, makeVaultDB: () => VaultDB
   /** Each timing check of `line`, as a test, run where its adapter can give what it needs. */
   const timingTestsOf = (line: VaultDBContractLine) => {
     for (const check of Object.values(timing)) {
-      if (check.line === line) { it.runIf(check.runs)(check.title, () => expectToHold(check), TimingTestMs) }
+      if (check.line === line) { it.runIf(check.runs)(check.title, () => expectToHold(check), TimingTestMillis) }
     }
   }
 
@@ -1555,7 +1555,7 @@ export const describeVaultDB = (adapterTitle: string, makeVaultDB: () => VaultDB
 }
 
 /** The longest a race or push test may take: a race runs a score of schedules, each over a fresh backend. */
-const TimingTestMs = 60_000
+const TimingTestMillis = 60_000
 
 /** One of {@link vaultDBTimingChecks}: the contract line it proves, its title, whether its adapter can run it, and the check, which rejects when it fails. */
 export type VaultDBTimingCheck = { line: VaultDBContractLine, title: string, runs: boolean, check: () => Promise<void> }
@@ -1963,7 +1963,7 @@ const readingWatch = (watcher: VaultDBVerbs) => {
 const WatchStartTicks = 20
 
 /** How long a watch has to hear a write before a push test calls it unheard. */
-const HeardWithinMs = 2000
+const HeardWithinMillis = 2000
 
 /**
  * That a write made by `write`, through `writer`, is heard by `watch`: some call made after the
@@ -1979,12 +1979,12 @@ const expectHeard = async (watch: ReturnType<typeof readingWatch>, writer: Vault
   const after = await glimpseOf(writer)
   await vi.waitFor(() => {
     expect(watch.reads.filter((read) => read.after >= begun).map((read) => read.found), 'no call to onChange read the vault as the write left it').to.deep.include(after)
-  }, { timeout: HeardWithinMs, interval: 5 })
+  }, { timeout: HeardWithinMillis, interval: 5 })
 }
 
 /** How many probe writes {@link untilLive} makes, and how long it waits on each, before it calls a watch dead. */
 const LiveProbes = 20
-const ProbeWaitMs = 100
+const ProbeWaitMillis = 100
 
 /**
  * Resolves once every one of `watches` has been called, so is known to be live: at once, for a
@@ -1999,7 +1999,7 @@ const untilLive = async (watches: readonly ReturnType<typeof readingWatch>[], wr
     if (! standing) { throw new Error('untilLive probes a vault that holds a bundle, and found none.') }
     await writer.updateBundle({ ...standing, unlock_epoch: standing.unlock_epoch + 1 }, { vault_id: standing.vault_id, unlock_epoch: standing.unlock_epoch })
     try {
-      await vi.waitFor(() => { expect(allHeard()).to.be.true }, { timeout: ProbeWaitMs, interval: 5 })
+      await vi.waitFor(() => { expect(allHeard()).to.be.true }, { timeout: ProbeWaitMillis, interval: 5 })
     } catch {
       // Not heard yet: probe again.
     }

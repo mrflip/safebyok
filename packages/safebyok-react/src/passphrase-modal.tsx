@@ -1,11 +1,11 @@
 import { useId, useRef, useState, type SubmitEvent } from 'react'
-import { ForeverMs, isVaultCondition, isVaultError, type Vault } from 'safebyok'
+import { ForeverMillis, isVaultCondition, isVaultError, type Vault } from 'safebyok'
 import { Boundary } from './boundary'
 import { PasskeyUnlockButton } from './passkey-unlock-button'
 
 const MinutesPerHour = 60
 const MinutesPerDay = 24 * MinutesPerHour
-const MsPerMinute = 60_000
+const MinuteMillis = 60_000
 
 /** The locale the window's count and relative phrase are formatted in. */
 const Locale = 'en'
@@ -13,23 +13,23 @@ const Locale = 'en'
 type Unit = 'day' | 'hour' | 'minute'
 
 /** The window as a count of whole days, else of whole hours, else of minutes (at least one). */
-const windowCount = (reentryWindowMs: number): { count: number, unit: Unit } => {
-  const minutes = Math.max(1, Math.round(reentryWindowMs / MsPerMinute))
+const windowCount = (reentryWindowMillis: number): { count: number, unit: Unit } => {
+  const minutes = Math.max(1, Math.round(reentryWindowMillis / MinuteMillis))
   if (minutes % MinutesPerDay === 0) { return { count: minutes / MinutesPerDay, unit: 'day' } }
   if (minutes % MinutesPerHour === 0) { return { count: minutes / MinutesPerHour, unit: 'hour' } }
   return { count: minutes, unit: 'minute' }
 }
 
 /**
- * What the dialog promises about how long an unlock lasts, from the vault's `reentryWindowMs`:
+ * What the dialog promises about how long an unlock lasts, from the vault's `reentryWindowMillis`:
  * 'Locks again on this device in 7 days' (a whole number of days, else of hours, else of
  * minutes, phrased by `Intl.RelativeTimeFormat`), or 'Locks on this device in 7 days' when the
  * dialog is creating the vault, which has nothing yet to lock "again". The longest window a vault
- * keeps (`ForeverMs`, which `Infinity` hours becomes) reads as lasting until the user locks it.
+ * keeps (`ForeverMillis`, which `Infinity` hours becomes) reads as lasting until the user locks it.
  */
-const unlockedFor = (reentryWindowMs: number, creating: boolean): string => {
-  if (reentryWindowMs >= ForeverMs) { return 'Stays unlocked on this device until you lock it.' }
-  const { count, unit } = windowCount(reentryWindowMs)
+const unlockedFor = (reentryWindowMillis: number, creating: boolean): string => {
+  if (reentryWindowMillis >= ForeverMillis) { return 'Stays unlocked on this device until you lock it.' }
+  const { count, unit } = windowCount(reentryWindowMillis)
   // numeric 'always', so that one day reads 'in 1 day' and never 'tomorrow'.
   const relativeTime = new Intl.RelativeTimeFormat(Locale, { numeric: 'always', style: 'long' })
   const relative = relativeTime.format(count, unit)
@@ -54,7 +54,7 @@ const unlockedFor = (reentryWindowMs: number, creating: boolean): string => {
  * the component stack), where the developer and an error tracker meet it. A passkey that fails
  * that way takes its button away and leaves the passphrase.
  *
- * How long an unlock lasts it reads from the vault itself (its `reentryWindowMs`, the
+ * How long an unlock lasts it reads from the vault itself (its `reentryWindowMillis`, the
  * `forcePassphraseReentryHours` it was opened with): 'Locks again on this device in 7 days', 'in 15
  * minutes', 'Stays unlocked on this device until you lock it' for `Infinity`; while it creates the
  * vault, 'Locks on this device in 7 days', with nothing yet to lock again. Nobody need tell the
@@ -165,7 +165,7 @@ const UnlockForm = ({ vault, onDone }: PassphraseModalProps) => {
           onChange={(evt) => { setPassphrase(evt.target.value); setGripe((prev) => (prev?.fromPasskey === true ? prev : null)) }}
         />
         {gripe !== null && <p className="gripe" role="alert">{gripe.text}</p>}
-        <p className="quiet">{unlockedFor(vault.reentryWindowMs, creating)}</p>
+        <p className="quiet">{unlockedFor(vault.reentryWindowMillis, creating)}</p>
         <div className="row">
           <button type="submit">{creating ? 'Create vault' : 'Unlock'}</button>
           {! creating && <PasskeyUnlockButton vault={vault} onDone={onDone} onGripe={passkeyGripe} />}

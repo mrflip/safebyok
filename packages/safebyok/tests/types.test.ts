@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DeviceMark, DeviceUnlock, EpochMillis, FarFuture, FarPast, ForeverMs, Lockbox, LockboxSummary, MaxUnlocks, VaultBundle, VaultScope, Whisper } from '../src/types'
+import { DeviceMark, DeviceUnlock, EpochMillis, FarFuture, FarPast, ForeverMillis, Lockbox, LockboxSummary, MaxUnlocks, VaultBundle, VaultScope, Whisper } from '../src/types'
 import * as TH from './test-helpers'
 
 const WhisperCases = [
@@ -211,10 +211,10 @@ describe("FarFuture", () => {
   })
 })
 
-describe("ForeverMs", () => {
+describe("ForeverMillis", () => {
   it("runs from FarPast to FarFuture, as its examples show", () => {
-    expect(ForeverMs).to.eq(FarFuture - FarPast)
-    expect(FarPast + ForeverMs).to.eq(FarFuture)
+    expect(ForeverMillis).to.eq(FarFuture - FarPast)
+    expect(FarPast + ForeverMillis).to.eq(FarFuture)
   })
 })
 
@@ -233,22 +233,22 @@ describe("FarPast", () => {
   })
 })
 
-const NowMs = Date.UTC(2026, 9, 15)
+const NowMillis = Date.UTC(2026, 9, 15)
 
 const EpochMillisCases = [
   // regular usage:
-  [NowMs,                     true,   'today, in epoch milliseconds'],
+  [NowMillis,                     true,   'today, in epoch milliseconds'],
   [FarPast,                   true,   'the floor itself'],
   [FarFuture,                 true,   'the ceiling itself'],
   // unit mistakes:
-  [NowMs / 1000,              false,  'epoch seconds, which land in January 1970'],
-  [NowMs * 1000,              false,  'epoch microseconds, which land tens of thousands of years out'],
+  [NowMillis / 1000,              false,  'epoch seconds, which land in January 1970'],
+  [NowMillis * 1000,              false,  'epoch microseconds, which land tens of thousands of years out'],
   // edge cases:
   [FarPast - 1,               false,  'one millisecond before 1981'],
   [FarFuture + 1,             false,  'one millisecond past the ceiling'],
   [8.64e15,                   false,  'the last instant a Date holds, far past the ceiling'],
   [0,                         false,  'the epoch itself'],
-  [NowMs + 0.5,               false,  'a fraction of a millisecond'],
+  [NowMillis + 0.5,               false,  'a fraction of a millisecond'],
   [Infinity,                  false,  'a time that never comes'],
   [NaN,                       false,  'not a number'],
   ["1792022400000",           false,  'a time written as text'],
@@ -263,12 +263,12 @@ describe("EpochMillis", () => {
   }
 
   it("says which unit a refused number likely was", () => {
-    const tooSmall = EpochMillis.safeParse(NowMs / 1000)
-    const tooLarge = EpochMillis.safeParse(NowMs * 1000)
+    const tooSmall = EpochMillis.safeParse(NowMillis / 1000)
+    const tooLarge = EpochMillis.safeParse(NowMillis * 1000)
     expect(tooSmall.error?.issues[0]?.message).to.match(/epoch seconds/)
     expect(tooLarge.error?.issues[0]?.message).to.match(/epoch microseconds/)
     expect(EpochMillis.safeParse(1e300).error?.issues[0]?.message).to.match(/epoch microseconds/)
-    expect(EpochMillis.safeParse(NowMs + 0.5).error?.issues[0]?.message).to.match(/whole epoch milliseconds/)
+    expect(EpochMillis.safeParse(NowMillis + 0.5).error?.issues[0]?.message).to.match(/whole epoch milliseconds/)
   })
 
   it("passes a time through unchanged, as its examples show", () => {

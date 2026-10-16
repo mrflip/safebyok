@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import * as ZClassic from 'zod'
 import * as Z from 'zod/mini'
-import { ForcePassphraseReentryHours, FarFuture, FarPast, ForeverMs, Lockbox, MaxLockboxes, MaxUnlocks, MaxWhisperBytes, VaultScope, type DeviceMark, type DeviceUnlock, type VaultBundle, type PasskeyProof, type Whisper } from '../src/types'
+import { ForcePassphraseReentryHours, FarFuture, FarPast, ForeverMillis, Lockbox, MaxLockboxes, MaxUnlocks, MaxWhisperBytes, VaultScope, type DeviceMark, type DeviceUnlock, type VaultBundle, type PasskeyProof, type Whisper } from '../src/types'
 import { AnyTextValidators, LockboxNote, MaxUserIdChars, type VaultValidators } from '../src/validators'
 import { VaultError, isVaultError } from '../src/errors'
 import { memoryDeviceDB, type DeviceDB } from '../src/device-db'
@@ -37,9 +37,9 @@ const makeWorld = (defaults?: Partial<OpenVaultOpts>) => {
   const dbStore = memoryStore()
   const vaultDB = localVaultDB(dbStore)
   const deviceDB = memoryDeviceDB()
-  let nowMs = Date.parse('2026-10-14T12:00:00Z')
-  const clock = { now: () => nowMs }
-  const advance = (byMs: number) => { nowMs += byMs }
+  let nowMillis = Date.parse('2026-10-14T12:00:00Z')
+  const clock = { now: () => nowMillis }
+  const advance = (byMillis: number) => { nowMillis += byMillis }
   const { logger, calls: logged } = TH.spyLogger()
   const optsWith = (overrides?: Partial<OpenVaultOpts>): OpenVaultOpts => (
     { applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB, clock, keyDeriver: TH.testDeriver, logger, ...defaults, ...overrides }
@@ -69,8 +69,8 @@ const MisfitStores: readonly (readonly [Partial<OpenVaultOpts>, string])[] = [
   [{ deviceDB: TH.omitting(memoryDeviceDB(), 'readMark') }, 'a deviceDB that keeps no device mark'],
 ]
 
-const HourMs = 60 * 60 * 1000
-const SevenDaysMs = 7 * 24 * HourMs
+const HourMillis = 60 * 60 * 1000
+const SevenDaysMillis = 7 * 24 * HourMillis
 
 /** Remembered deadlines outside EpochMillis's bounds, each a unit mistake or an older reading of "far". */
 const OutOfBoundsDeadlines = [
@@ -81,7 +81,7 @@ const OutOfBoundsDeadlines = [
   [1_792_022_400,                                       'epoch seconds'],
   [FarPast - 1,                                         'one millisecond before 1981'],
   [Infinity,                                            'a deadline that never comes'],
-  [Date.parse('2026-10-14T12:00:00Z') + (1e9 * HourMs), 'what 0.2.0 wrote for a window of 1e9 hours'],
+  [Date.parse('2026-10-14T12:00:00Z') + (1e9 * HourMillis), 'what 0.2.0 wrote for a window of 1e9 hours'],
 ] as const
 
 describe("openVault", () => {
@@ -275,7 +275,7 @@ describe("unlock and lock", () => {
     await vault.unlock('correct horse battery staple')
     const snapshot = vault.getSnapshot()
     expect(snapshot.state).to.eq('unlocked')
-    expect(snapshot.askPassphraseAt).to.eq(world.clock.now() + SevenDaysMs)
+    expect(snapshot.askPassphraseAt).to.eq(world.clock.now() + SevenDaysMillis)
   })
 
   it("a wrong passphrase is refused calmly, changing nothing, and quoting nothing", async () => {
@@ -335,7 +335,7 @@ describe("the remembered unlock", () => {
   it("has lapsed by day eight: the next open is locked", async () => {
     const world = makeWorld()
     await world.openUnlocked('pw one')
-    world.advance(SevenDaysMs + 1)
+    world.advance(SevenDaysMillis + 1)
     expect(await world.stateOnOpen()).to.eq('locked')
   })
 
@@ -343,20 +343,20 @@ describe("the remembered unlock", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
     await vault.store('anthropic', 'sk-fake')
-    world.advance(SevenDaysMs + 1)
+    world.advance(SevenDaysMillis + 1)
     await TH.expectRefusal(vault.read('anthropic'), 'vault_locked')
   })
 
   it("lasts ForcePassphraseReentryHours, 168 (seven days), unless told otherwise", () => {
-    expect(ForcePassphraseReentryHours * HourMs).to.eq(SevenDaysMs)
+    expect(ForcePassphraseReentryHours * HourMillis).to.eq(SevenDaysMillis)
   })
 
   it("lasts the forcePassphraseReentryHours the host chose, and asks again from then", async () => {
     const world = makeWorld()
-    const twelveHoursMs = 12 * HourMs
+    const twelveHoursMillis = 12 * HourMillis
     const vault = await world.openUnlocked('pw one', { forcePassphraseReentryHours: 12 })
-    expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + twelveHoursMs)
-    world.advance(twelveHoursMs - 1)
+    expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + twelveHoursMillis)
+    world.advance(twelveHoursMillis - 1)
     expect(await world.stateOnOpen({ forcePassphraseReentryHours: 12 })).to.eq('unlocked')
     world.advance(1)
     expect(await world.stateOnOpen({ forcePassphraseReentryHours: 12 })).to.eq('locked')
@@ -366,11 +366,11 @@ describe("the remembered unlock", () => {
   it("takes fractions of an hour, kept as whole milliseconds", async () => {
     const world = makeWorld()
     const quarterHour = await world.openUnlocked('pw one', { forcePassphraseReentryHours: 0.25 })
-    const fifteenMinutesMs = 15 * 60 * 1000
-    expect(quarterHour.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + fifteenMinutesMs)
+    const fifteenMinutesMillis = 15 * 60 * 1000
+    expect(quarterHour.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + fifteenMinutesMillis)
     const oneThird = await world.openUnlocked('pw one', { deviceDB: memoryDeviceDB(), forcePassphraseReentryHours: 1 / 3 })
-    const twentyMinutesMs = 20 * 60 * 1000
-    expect(oneThird.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + twentyMinutesMs)
+    const twentyMinutesMillis = 20 * 60 * 1000
+    expect(oneThird.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + twentyMinutesMillis)
   })
 
   it("refuses a forcePassphraseReentryHours that is not a span of time above zero", async () => {
@@ -394,7 +394,7 @@ describe("the remembered unlock", () => {
       await vault.store('anthropic', 'sk-fake')
       expect(vault.getSnapshot().state).to.eq('unlocked')
       expect(vault.getSnapshot().askPassphraseAt).to.eq(FarFuture)
-      world.advance(200 * 365 * 24 * HourMs)
+      world.advance(200 * 365 * 24 * HourMillis)
       expect(await vault.read('anthropic')).to.eq('sk-fake')
       expect(vault.getSnapshot().state).to.eq('unlocked')
     })
@@ -405,7 +405,7 @@ describe("the remembered unlock", () => {
       await vault.store('anthropic', 'sk-fake')
       const remembered = await world.rememberedUnlock()
       expect(remembered?.ask_passphrase_at).to.eq(FarFuture)
-      world.advance(10 * 365 * 24 * HourMs)
+      world.advance(10 * 365 * 24 * HourMillis)
       const reopened = await world.open({ forcePassphraseReentryHours: Infinity })
       expect(reopened.getSnapshot().state).to.eq('unlocked')
       expect(reopened.getSnapshot().askPassphraseAt).to.eq(FarFuture)
@@ -433,13 +433,13 @@ describe("the remembered unlock", () => {
     })
   })
 
-  for (const [shiftMs, blurb] of [[HourMs, 'later'], [-HourMs, 'earlier']] as const) {
+  for (const [shiftMillis, blurb] of [[HourMillis, 'later'], [-HourMillis, 'earlier']] as const) {
     it(`reads a remembered deadline moved an hour ${blurb} on the device as no remembered unlock, erases it, and says so: the deadline is bound into its wrap`, async () => {
       const world = makeWorld()
       await world.openUnlocked('pw one')
       const written = await world.rememberedUnlock()
       if (written === null) { throw new Error('expected a remembered unlock on the device') }
-      await world.deviceDB.writeUnlock({ ...written, ask_passphrase_at: written.ask_passphrase_at + shiftMs })
+      await world.deviceDB.writeUnlock({ ...written, ask_passphrase_at: written.ask_passphrase_at + shiftMillis })
       // Under Infinity no window check refuses it, and an hour either way stays in bounds: only the binding can.
       const reopened = await world.open({ forcePassphraseReentryHours: Infinity })
       expect(reopened.getSnapshot().state).to.eq('locked')
@@ -476,16 +476,16 @@ describe("the remembered unlock", () => {
     const world = makeWorld()
     const fractionalClock = { now: () => world.clock.now() + 0.25 }
     const vault = await world.openUnlocked('pw one', { clock: fractionalClock })
-    expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + SevenDaysMs)
+    expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + SevenDaysMillis)
     const remembered = await world.rememberedUnlock()
-    expect(remembered?.ask_passphrase_at).to.eq(world.clock.now() + SevenDaysMs)
+    expect(remembered?.ask_passphrase_at).to.eq(world.clock.now() + SevenDaysMillis)
     expect(await world.stateOnOpen({ clock: fractionalClock })).to.eq('unlocked')
   })
 
   it("leaves a window that fits before the latest deadline exactly as asked", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one', { forcePassphraseReentryHours: 1e6 })
-    expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + (1e6 * HourMs))
+    expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + (1e6 * HourMillis))
   })
 })
 
@@ -493,12 +493,12 @@ describe("the remembered unlock, when the host changes forcePassphraseReentryHou
   it("lowered from Infinity to one hour, forgets a device already remembered at its next open, and the next unlock lasts an hour", async () => {
     const world = makeWorld()
     await world.openUnlocked('pw one', { forcePassphraseReentryHours: Infinity })
-    world.advance(30 * 24 * HourMs)
+    world.advance(30 * 24 * HourMillis)
     const lowered = await world.open({ forcePassphraseReentryHours: 1 })
     expect(lowered.getSnapshot().state).to.eq('locked')
     expect(await world.rememberedUnlock()).to.be.null
     await lowered.unlock('pw one')
-    expect(lowered.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + HourMs)
+    expect(lowered.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + HourMillis)
     expect(await world.stateOnOpen({ forcePassphraseReentryHours: 1 })).to.eq('unlocked')
   })
 
@@ -529,8 +529,8 @@ describe("the remembered unlock, when the host changes forcePassphraseReentryHou
   it("raised, lengthens no unlock already remembered", async () => {
     const world = makeWorld()
     await world.openUnlocked('pw one', { forcePassphraseReentryHours: 12 })
-    const given = world.clock.now() + (12 * HourMs)
-    world.advance(HourMs)
+    const given = world.clock.now() + (12 * HourMillis)
+    world.advance(HourMillis)
     const raised = await world.open({ forcePassphraseReentryHours: Infinity })
     expect(raised.getSnapshot().askPassphraseAt).to.eq(given)
     expect(await rememberedDeadlineOf(world)).to.eq(given)
@@ -539,8 +539,8 @@ describe("the remembered unlock, when the host changes forcePassphraseReentryHou
   it("lowered to a window that still reaches past the deadline given, leaves the unlock and its record as they were", async () => {
     const world = makeWorld()
     await world.openUnlocked('pw one', { forcePassphraseReentryHours: 12 })
-    const given = world.clock.now() + (12 * HourMs)
-    world.advance(11 * HourMs)
+    const given = world.clock.now() + (12 * HourMillis)
+    world.advance(11 * HourMillis)
     const lowered = await world.open({ forcePassphraseReentryHours: 2 })
     expect(lowered.getSnapshot().state).to.eq('unlocked')
     expect(lowered.getSnapshot().askPassphraseAt).to.eq(given)
@@ -550,11 +550,11 @@ describe("the remembered unlock, when the host changes forcePassphraseReentryHou
   it("keeps a deadline exactly at the new window's end, and forgets one a millisecond past it", async () => {
     const world = makeWorld()
     await world.openUnlocked('pw one', { forcePassphraseReentryHours: 12 })
-    const oneMsShort = 12 - (1 / HourMs)
+    const oneMilliShort = 12 - (1 / HourMillis)
     world.advance(1)
-    expect(await world.stateOnOpen({ forcePassphraseReentryHours: oneMsShort })).to.eq('unlocked')
+    expect(await world.stateOnOpen({ forcePassphraseReentryHours: oneMilliShort })).to.eq('unlocked')
     world.advance(-1)
-    expect(await world.stateOnOpen({ forcePassphraseReentryHours: oneMsShort })).to.eq('locked')
+    expect(await world.stateOnOpen({ forcePassphraseReentryHours: oneMilliShort })).to.eq('locked')
   })
 })
 
@@ -600,35 +600,35 @@ const SpoiledUnlocks = [
   [(row: Record<string, unknown>) => ({ ...row, vaultlabel: 'spare' }),                       'a record naming another of the same user\'s vaults'],
 ] as const
 
-/** How long an unlock of `vault` lasts, as `Vault.reentryWindowMs`'s example says it. */
+/** How long an unlock of `vault` lasts, as `Vault.reentryWindowMillis`'s example says it. */
 const windowSaidBy = (vault: Vault): string => (
-  vault.reentryWindowMs === ForeverMs ? 'until you lock it' : `for ${String(Math.round(vault.reentryWindowMs / 60_000))} minutes`
+  vault.reentryWindowMillis === ForeverMillis ? 'until you lock it' : `for ${String(Math.round(vault.reentryWindowMillis / 60_000))} minutes`
 )
 
 const ReentryWindowCases = [
   // regular usage:
-  [undefined,  SevenDaysMs,      'the default, seven days'],
-  [12,         12 * HourMs,      'the hours the host chose'],
+  [undefined,  SevenDaysMillis,      'the default, seven days'],
+  [12,         12 * HourMillis,      'the hours the host chose'],
   [0.25,       15 * 60 * 1000,   'a fraction of an hour'],
-  [Infinity,   ForeverMs,        'Infinity, as ForeverMs'],
+  [Infinity,   ForeverMillis,        'Infinity, as ForeverMillis'],
   // edge cases:
-  [1e9,        ForeverMs,        'a window longer than the vault can count, as ForeverMs'],
+  [1e9,        ForeverMillis,        'a window longer than the vault can count, as ForeverMillis'],
   [1 / 7,      514_286,          'a window that is no whole number of milliseconds, rounded to one'],
 ] as const
 
-describe("the vault's reentryWindowMs", () => {
+describe("the vault's reentryWindowMillis", () => {
   for (const [hours, expected, blurb] of ReentryWindowCases) {
     it(`reports ${blurb}`, async () => {
       const world = makeWorld()
       const vault = await world.open({ forcePassphraseReentryHours: hours })
-      expect(vault.reentryWindowMs).to.eq(expected)
+      expect(vault.reentryWindowMillis).to.eq(expected)
     })
   }
 
   it("is the window an unlock lasts: askPassphraseAt is the unlock's time plus it", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one', { forcePassphraseReentryHours: 0.25 })
-    expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + vault.reentryWindowMs)
+    expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + vault.reentryWindowMillis)
   })
 
   it("stays the same for the handle's life, through unlock and lock", async () => {
@@ -636,7 +636,7 @@ describe("the vault's reentryWindowMs", () => {
     const vault = await world.open({ forcePassphraseReentryHours: 12 })
     await vault.unlock('pw one')
     await vault.lock()
-    expect(vault.reentryWindowMs).to.eq(12 * HourMs)
+    expect(vault.reentryWindowMillis).to.eq(12 * HourMillis)
   })
 
   it("lets a UI say how long an unlock lasts, as its example shows", async () => {
@@ -2580,10 +2580,10 @@ describe("passkeys", () => {
     const deviceDB = memoryDeviceDB()
     const here = await world.open({ deviceDB })
     await here.unlock(laptop)
-    expect(here.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + SevenDaysMs)
+    expect(here.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + SevenDaysMillis)
     const reloaded = await world.open({ deviceDB })
     expect(reloaded.getSnapshot().state).to.eq('unlocked')
-    world.advance(SevenDaysMs)
+    world.advance(SevenDaysMillis)
     const later = await world.open({ deviceDB })
     expect(later.getSnapshot().state).to.eq('locked')
   })
@@ -2818,7 +2818,7 @@ describe("a lock that lands while an unlock is under way", () => {
     await TH.expectRefusal(vault.read('anything'), 'vault_locked')
     expect(await world.rememberedUnlock()).to.be.null
     // Well within the seven days a remembered unlock would last: the reopen is locked all the same.
-    world.advance(HourMs)
+    world.advance(HourMillis)
     expect(await world.stateOnOpen()).to.eq('locked')
   })
 
@@ -2833,14 +2833,14 @@ describe("a lock that lands while an unlock is under way", () => {
     await unlocking
     await vault.unlock('pw one')
     expect(vault.getSnapshot().state).to.eq('unlocked')
-    expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + SevenDaysMs)
+    expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + SevenDaysMillis)
     expect(await world.rememberedUnlock()).to.not.be.null
   })
 
   it("on a vault already unlocked: the lock still wins, and leaves it locked", async () => {
     const world = makeRacingWorld()
     const vault = await world.openUnlocked('pw one')
-    world.advance(HourMs)
+    world.advance(HourMillis)
     const gate = world.holdNextDerive()
     const unlocking = TH.expectRefusal(vault.unlock('pw one'), 'vault_locked')
     await gate.reached
@@ -3042,7 +3042,7 @@ describe("lockSoon", () => {
   beforeEach(() => { vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] }) })
   afterEach(() => { vi.useRealTimers() })
 
-  const GraceMs = 5000
+  const GraceMillis = 5000
 
   it("closes the entry gate at once: the snapshot reads 'locked', and no whisper comes out", async () => {
     const world = makeRacingWorld()
@@ -3105,7 +3105,7 @@ describe("lockSoon", () => {
     const storing = TH.expectRefusal(vault.store('anthropic', 'sk-fake'), 'vault_locked')
     await gate.reached
     await vault.lockSoon()
-    vi.advanceTimersByTime(GraceMs)
+    vi.advanceTimersByTime(GraceMillis)
     gate.release()
     await storing
     expect(vi.getTimerCount()).to.eq(0)
@@ -3160,9 +3160,9 @@ describe("lockSoon", () => {
     await vault.lockSoon()
     await vault.unlock('pw one')
     expect(vi.getTimerCount()).to.eq(0)
-    vi.advanceTimersByTime(GraceMs * 2)
+    vi.advanceTimersByTime(GraceMillis * 2)
     expect(vault.getSnapshot().state).to.eq('unlocked')
-    expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + SevenDaysMs)
+    expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + SevenDaysMillis)
     expect(await vault.read('anthropic')).to.eq('sk-fake')
     expect(await world.rememberedUnlock()).to.not.be.null
   })
@@ -3174,7 +3174,7 @@ describe("lockSoon", () => {
     await vault.lockSoon()
     await vault.changePassphrase('old passphrase', 'new passphrase')
     expect(vi.getTimerCount()).to.eq(0)
-    vi.advanceTimersByTime(GraceMs * 2)
+    vi.advanceTimersByTime(GraceMillis * 2)
     expect(vault.getSnapshot().state).to.eq('unlocked')
     expect(await vault.read('anthropic')).to.eq('sk-fake')
   })
@@ -3187,7 +3187,7 @@ describe("lockSoon", () => {
     const gate = world.holdNextDerive()
     const unlocking = vault.unlock('pw one')
     await gate.reached
-    vi.advanceTimersByTime(GraceMs)
+    vi.advanceTimersByTime(GraceMillis)
     gate.release()
     await unlocking
     expect(vault.getSnapshot().state).to.eq('unlocked')
@@ -3250,7 +3250,7 @@ describe("lockSoon", () => {
     vault.subscribe(listener)
     await vault.lockSoon()
     expect(listener).toHaveBeenCalledTimes(1)
-    vi.advanceTimersByTime(GraceMs)
+    vi.advanceTimersByTime(GraceMillis)
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
@@ -4088,7 +4088,7 @@ describe("the logger", () => {
     await vault.unlock('pw two')
     await vault.erase('anthropic')
     await vault.lock()
-    world.advance(SevenDaysMs * 2)
+    world.advance(SevenDaysMillis * 2)
     await world.open()
     await vault.destroy()
     vault.close()
@@ -4171,7 +4171,7 @@ describe("the logger", () => {
   it("says nothing of a remembered unlock that simply ran out, or that a new passphrase outdated", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    world.advance(SevenDaysMs + 1)
+    world.advance(SevenDaysMillis + 1)
     expect(await world.stateOnOpen()).to.eq('locked')
     await vault.unlock('pw')
     const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
@@ -4440,7 +4440,7 @@ describe("the device mark", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     const { device_id: deviceId } = await markIn(world) ?? {}
-    world.advance(HourMs)
+    world.advance(HourMillis)
     await vault.addPassphrase('pw', 'spare phrase', { unlocklabel: 'spare' })
     expect(await markIn(world)).to.deep.include({ device_id: deviceId, unlock_epoch: 2 })
     expect(storedUnlocksOf(world)[1]).to.deep.include({ device_id: deviceId, registered_at: world.clock.now() })
@@ -4455,7 +4455,7 @@ describe("the device mark", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     const [before] = storedUnlocksOf(world)
-    world.advance(HourMs)
+    world.advance(HourMillis)
     await vault.changePassphrase('pw', 'pw two')
     const [after] = storedUnlocksOf(world)
     expect(after).to.deep.include({ device_id: before?.['device_id'], registered_at: before?.['registered_at'], unlock_id: before?.['unlock_id'] })

@@ -6,9 +6,9 @@ import { createAuth } from '../../src/lib/auth'
 const makeWorld = () => {
   const dbStore = memoryStore()
   const deviceStore = memoryStore()
-  let nowMs = Date.UTC(2026, 9, 15, 9, 30)
-  const clock = { now: () => nowMs }
-  const advance = (byMs: number) => { nowMs += byMs }
+  let nowMillis = Date.UTC(2026, 9, 15, 9, 30)
+  const clock = { now: () => nowMillis }
+  const advance = (byMillis: number) => { nowMillis += byMillis }
   const auth = createAuth({ applabel: 'acme', dbStore, deviceStore, clock })
   return { dbStore, deviceStore, advance, auth }
 }

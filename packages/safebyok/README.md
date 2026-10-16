@@ -199,9 +199,9 @@ An unlocked vault stays unlocked until its remembered unlock expires
 (`forcePassphraseReentryHours`, seven days by default) or the host locks it. `Infinity` hours
 means never on this device, until a lock: `askPassphraseAt` then equals the exported `FarFuture`,
 the latest instant the package accepts (in 2255), so a host can show "until locked" by comparing
-against it. The vault reports the window it was opened with as `vault.reentryWindowMs`, in
+against it. The vault reports the window it was opened with as `vault.reentryWindowMillis`, in
 milliseconds, the default and `Infinity` resolved: `Infinity` hours (or any as long) reads as the
-exported `ForeverMs`, so a UI can say how long an unlock lasts without being told the option again.
+exported `ForeverMillis`, so a UI can say how long an unlock lasts without being told the option again.
 
 Lowering the option later takes hold on each device at its next open: an unlock remembered under
 the longer setting, whose deadline lies past the new number of hours from then, is forgotten, and

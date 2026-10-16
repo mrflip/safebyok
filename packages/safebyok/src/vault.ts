@@ -1,5 +1,5 @@
 import * as Z from 'zod/mini'
-import { DeviceMark, DeviceUnlock, LockboxSummary, type DamagedLockbox, type Lockbox, ForcePassphraseReentryHours, FarFuture, FarPast, ForeverMs, MaxLockboxes, MaxUnlocks, MaxWhisperBytes, PasskeySaltBytes, VaultBundle, type VaultScope, Whisper, wallClock, type Clock, type PasskeyProof, type UnlockEnvelope, type UnlockSummary } from './types'
+import { DeviceMark, DeviceUnlock, LockboxSummary, type DamagedLockbox, type Lockbox, ForcePassphraseReentryHours, FarFuture, FarPast, ForeverMillis, MaxLockboxes, MaxUnlocks, MaxWhisperBytes, PasskeySaltBytes, VaultBundle, type VaultScope, Whisper, wallClock, type Clock, type PasskeyProof, type UnlockEnvelope, type UnlockSummary } from './types'
 import * as Names from './names'
 import type { VaultValidators } from './validators'
 import { VaultError, isVaultError } from './errors'
@@ -161,13 +161,13 @@ export type Vault = {
   /**
    * How long an entered passphrase lasts on this device, in whole milliseconds: the
    * `forcePassphraseReentryHours` the vault was opened with, its default (168 hours) when none
-   * was given, never more than {@link ForeverMs}. A vault that stays unlocked until `lock()`
-   * (`Infinity` hours, or any as long) reads exactly {@link ForeverMs}. Fixed for the handle's
+   * was given, never more than {@link ForeverMillis}. A vault that stays unlocked until `lock()`
+   * (`Infinity` hours, or any as long) reads exactly {@link ForeverMillis}. Fixed for the handle's
    * life, so a UI can say how long an unlock lasts without being told the option again.
    *
-   * @example vault.reentryWindowMs === ForeverMs ? 'until you lock it' : `for ${String(Math.round(vault.reentryWindowMs / 60_000))} minutes`
+   * @example vault.reentryWindowMillis === ForeverMillis ? 'until you lock it' : `for ${String(Math.round(vault.reentryWindowMillis / 60_000))} minutes`
    */
-  readonly reentryWindowMs: number
+  readonly reentryWindowMillis: number
   /** Current snapshot; same object until something changes (useSyncExternalStore-ready). */
   getSnapshot: () => VaultSnapshot
   /**
@@ -475,7 +475,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   const { applabel, vaultlabel } = scope
   const givenVaultDB = parseVaultDB(opts.vaultDB)
   const deviceDB = parseDeviceDB(opts.deviceDB)
-  const reentryMs = parseForcePassphraseReentryHours(opts.forcePassphraseReentryHours)
+  const reentryMillis = parseForcePassphraseReentryHours(opts.forcePassphraseReentryHours)
   const logger = parseLogger(opts.logger)
   const clock = parseClock(opts.clock)
   // Every reading of the host's clock is checked, this first one so that a clock counting in the
@@ -871,15 +871,15 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
     pendingShut = null
   }
 
-  /** Drop the vaultKey `graceMs` from now, unless a shut already pending falls due sooner. */
-  const shutAfter = (graceMs: number) => {
-    const dueAt = clockNow() + graceMs
+  /** Drop the vaultKey `graceMillis` from now, unless a shut already pending falls due sooner. */
+  const shutAfter = (graceMillis: number) => {
+    const dueAt = clockNow() + graceMillis
     if (pendingShut !== null && pendingShut.dueAt <= dueAt) { return }
     cancelPendingShut()
     const timer = setTimeout(() => {
       dropKey()
       bump()
-    }, graceMs)
+    }, graceMillis)
     pendingShut = { timer, dueAt }
   }
 
@@ -906,7 +906,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
    */
   const takeUpUnlock = async (unlocked: VaultKeyPair, standing: VaultBundle, shutsThen: number): Promise<boolean> => {
     if (outrun(standing, shutsThen)) { return false }
-    const until = deadlineAfter(clockNow(), reentryMs)
+    const until = deadlineAfter(clockNow(), reentryMillis)
     // The transient's last act: wrapped into this device's remembered unlock, then dropped.
     await rememberDevice(unlocked.transientKey, standing, until)
     if (outrun(standing, shutsThen)) {
@@ -959,7 +959,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       && checked.data.vault_id === bundle.vault_id
       && checked.data.unlock_epoch === bundle.unlock_epoch
       && checked.data.ask_passphrase_at > now
-      && checked.data.ask_passphrase_at <= deadlineAfter(now, reentryMs)
+      && checked.data.ask_passphrase_at <= deadlineAfter(now, reentryMillis)
     if (! fits) {
       await deviceDB.eraseUnlock(scope)
       // Expired, or outdated by a change to the unlocks or a shorter setting, is routine; unreadable is worth a word.
@@ -1134,7 +1134,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   }
 
   const vault: Vault = {
-    reentryWindowMs: reentryMs,
+    reentryWindowMillis: reentryMillis,
 
     getSnapshot: () => snapshot,
 
@@ -1169,14 +1169,14 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
 
     lockSoon: async (graceSeconds) => {
       ensureOpen()
-      const graceMs = parseGraceSeconds(graceSeconds)
-      if (vaultKey === null || graceMs === 0) {
+      const graceMillis = parseGraceSeconds(graceSeconds)
+      if (vaultKey === null || graceMillis === 0) {
         await shut()
         bump()
         return
       }
       try {
-        shutAfter(graceMs)
+        shutAfter(graceMillis)
       } catch (err) {
         // A clock gone wrong cannot time a grace, and the lock still wins: at once, as lock().
         await shut()
@@ -1612,7 +1612,7 @@ const parseUnlocklabel = (rules: Names.NameRules, candidate: { unlocklabel: stri
  * How many times `store()` tries its versioned write before it lets a `stale_write` through: this
  * many attempts in all, the first one included, so three means one try and two retries. Small,
  * because a box that three reads in a row find changed again is being written in earnest by
- * someone else, and the caller should hear of it. Each retry waits first (see `WriteRetryBaseMs`),
+ * someone else, and the caller should hear of it. Each retry waits first (see `WriteRetryBaseMillis`),
  * so the limit also bounds how long a losing store can take: about six seconds longer.
  */
 const MaxWriteAttempts = 3
@@ -1621,36 +1621,36 @@ const MaxWriteAttempts = 3
  * The shortest wait before `store()`'s first retry, in milliseconds; the retry after that waits
  * twice as long. Two devices that collide on a box would otherwise both retry at once and collide
  * again in lockstep -- a thundering herd -- so each waits a random time in
- * `[WriteRetryBaseMs * 2^(n-1), WriteRetryBaseMs * 2^n)` before retry n: 1 to 2 seconds before the
+ * `[WriteRetryBaseMillis * 2^(n-1), WriteRetryBaseMillis * 2^n)` before retry n: 1 to 2 seconds before the
  * first, 2 to 4 before the second. The windows double, so the longer a box stays contested, the
  * further apart the contenders spread. Not a public option: a host that needs a different policy
  * wants the conflict-handler hook, not a knob on this one.
  */
-const WriteRetryBaseMs = 1000
+const WriteRetryBaseMillis = 1000
 
 /**
  * A random wait before retry number `retryNumber` (1 for the first), uniform over
- * `[WriteRetryBaseMs * 2^(n-1), WriteRetryBaseMs * 2^n)` milliseconds, a whole number.
+ * `[WriteRetryBaseMillis * 2^(n-1), WriteRetryBaseMillis * 2^n)` milliseconds, a whole number.
  *
  * The jitter guards no secret -- it only spreads devices out in time -- so it needs nothing
  * stronger than spreading. It is drawn from `crypto.getRandomValues` all the same, because the
  * linter keeps `Math.random` out of `src/`, and one source of randomness is easier to review.
  */
-const retryDelayMs = (retryNumber: number): number => {
-  const windowMs = WriteRetryBaseMs * (2 ** (retryNumber - 1))
+const retryDelayMillis = (retryNumber: number): number => {
+  const windowMillis = WriteRetryBaseMillis * (2 ** (retryNumber - 1))
   const fraction = new DataView(randomBytes(4).buffer).getUint32(0) / (2 ** 32)
-  return windowMs + Math.floor(fraction * windowMs)
+  return windowMillis + Math.floor(fraction * windowMillis)
 }
 
-/** Resolve after `delayMs`. `setTimeout` runs everywhere the package does. */
-const sleep = (delayMs: number): Promise<void> => (
-  new Promise((resolve) => { setTimeout(resolve, delayMs) })
+/** Resolve after `delayMillis`. `setTimeout` runs everywhere the package does. */
+const sleep = (delayMillis: number): Promise<void> => (
+  new Promise((resolve) => { setTimeout(resolve, delayMillis) })
 )
 
 /**
  * Run `attempt`, and run it again when storage refuses it as stale, up to `attemptsLeft` attempts
  * in all; any other refusal, and the last stale one, is thrown as it came. Before each retry it
- * waits a random, doubling time (`retryDelayMs`); there is no wait before the first attempt, and
+ * waits a random, doubling time (`retryDelayMillis`); there is no wait before the first attempt, and
  * none after the last refusal, which is thrown at once. The attempt must do its own reading, for
  * each try to be made from what storage holds now -- and from whether this device is still
  * unlocked, so that a lock during the wait ends the retry without a write.
@@ -1660,7 +1660,7 @@ const retryStale = async <ResultT>(attempt: () => Promise<ResultT>, attemptsLeft
     return await attempt()
   } catch (err) {
     if (attemptsLeft <= 1 || ! isVaultError(err, 'stale_write')) { throw err }
-    await sleep(retryDelayMs(MaxWriteAttempts - attemptsLeft + 1))
+    await sleep(retryDelayMillis(MaxWriteAttempts - attemptsLeft + 1))
     return await retryStale(attempt, attemptsLeft - 1)
   }
 }
@@ -1784,7 +1784,7 @@ const DeclaredLimitFor = {
   maxLockboxes:   declaredLockboxes,
 } as const
 
-const MsPerHour = 60 * 60 * 1000
+const HourMillis = 60 * 60 * 1000
 
 /** How long `lockSoon()` lets work in hand finish, unless told otherwise, in seconds. */
 const LockSoonGraceSeconds = 5
@@ -1793,8 +1793,8 @@ const MaxLockSoonGraceSeconds = 60
 
 /** A grace in seconds, as the host thinks of it, to whole milliseconds. Zod's number refuses NaN and Infinity. */
 const graceSecondsGiven = Z._default(Z.number().check(Z.gte(0), Z.lte(MaxLockSoonGraceSeconds)), LockSoonGraceSeconds)
-const secondsToMs = Z.transform((seconds: number) => Math.round(seconds * 1000))
-const graceSeconds = Z.pipe(graceSecondsGiven, secondsToMs)
+const secondsToMillis = Z.transform((seconds: number) => Math.round(seconds * 1000))
+const graceSeconds = Z.pipe(graceSecondsGiven, secondsToMillis)
 
 const parseGraceSeconds = (candidate: number | undefined): number => {
   const checked = graceSeconds.safeParse(candidate)
@@ -1807,12 +1807,12 @@ const parseGraceSeconds = (candidate: number | undefined): number => {
 /** Hours, as the host thinks of them, to whole milliseconds, as every time inside is kept. */
 const someHours = Z.union([Z.number().check(Z.positive()), Z.literal(Infinity)])
 const reentryHours = Z._default(someHours, ForcePassphraseReentryHours)
-const hoursToMs = Z.transform((hours: number) => Math.min(Math.round(hours * MsPerHour), ForeverMs))
-const reentryWindowMs = Z.number().check(Z.gte(1), Z.lte(ForeverMs))
-const forcePassphraseReentryHours = Z.pipe(Z.pipe(reentryHours, hoursToMs), reentryWindowMs)
+const hoursToMillis = Z.transform((hours: number) => Math.min(Math.round(hours * HourMillis), ForeverMillis))
+const reentryWindowMillis = Z.number().check(Z.gte(1), Z.lte(ForeverMillis))
+const forcePassphraseReentryHours = Z.pipe(Z.pipe(reentryHours, hoursToMillis), reentryWindowMillis)
 
-/** The deadline for a passphrase entered at `nowMs`: `reentryMs` later, in whole ms, but never past {@link FarFuture}. */
-const deadlineAfter = (nowMs: number, reentryMs: number): number => Math.min(Math.floor(nowMs + reentryMs), FarFuture)
+/** The deadline for a passphrase entered at `nowMillis`: `reentryMillis` later, in whole ms, but never past {@link FarFuture}. */
+const deadlineAfter = (nowMillis: number, reentryMillis: number): number => Math.min(Math.floor(nowMillis + reentryMillis), FarFuture)
 
 const parseForcePassphraseReentryHours = (candidate: number | undefined): number => {
   const checked = forcePassphraseReentryHours.safeParse(candidate)

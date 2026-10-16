@@ -15,7 +15,7 @@ export type { EraseDamagedVaultOpts, OpenVaultOpts, Vault, VaultSnapshot, VaultS
 export type { VaultLogger } from './logger'
 export { IdentityRevokedResponseVals } from './refusal-policy'
 export type { IdentityRevokedResponse } from './refusal-policy'
-export { EpochMillis, FarFuture, FarPast, ForcePassphraseReentryHours, ForeverMs, Lockbox, LockboxSummary, MaxLockboxes, MaxUnlocks, MaxWhisperBytes, PasskeyEnvelope, PasskeySaltBytes, PassphraseEnvelope, UnlockEnvelope, UnlockMethodVals, VaultBundle, VaultScope, Whisper, wallClock } from './types'
+export { EpochMillis, FarFuture, FarPast, ForcePassphraseReentryHours, ForeverMillis, Lockbox, LockboxSummary, MaxLockboxes, MaxUnlocks, MaxWhisperBytes, PasskeyEnvelope, PasskeySaltBytes, PassphraseEnvelope, UnlockEnvelope, UnlockMethodVals, VaultBundle, VaultScope, Whisper, wallClock } from './types'
 export { AnyTextValidators, DefaultValidators, Label, LabelPattern, LockboxNote, MaxLabelChars, MaxNoteChars, MaxUserIdChars, UserId } from './validators'
 export type { NameValidator, VaultValidators } from './validators'
 export { checkValidators } from './names'
