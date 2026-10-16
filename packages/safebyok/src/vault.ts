@@ -1,5 +1,5 @@
 import * as Z from 'zod/mini'
-import { DeviceMark, DeviceUnlock, LockboxSummary, PublicBag, type SeenVault, type DamagedLockbox, type Lockbox, ForcePassphraseReentryHours, FarFuture, FarPast, ForeverMillis, MaxLockboxes, MaxReentryHours, MaxUnlocks, MaxWhisperBytes, MinuteMillis, PasskeySaltBytes, VaultBundle, type VaultScope, Whisper, wallClock, type Clock, type PasskeyProof, type UnlockEnvelope, type UnlockSummary } from './types'
+import { DeviceMark, DeviceUnlock, LockboxSummary, PublicBag, type SeenVault, type DamagedLockbox, type Lockbox, ForcePassphraseReentryHours, FarFuture, FarPast, ForeverMillis, MaxLockboxes, MaxReentryHours, MaxUnlocks, MaxWhisperBytes, MinuteMillis, PasskeySaltBytes, VaultBundle, type VaultScope, Whisper, wallClock, type Clock, type PasskeyProof, type PassphraseEnvelope, type UnlockEnvelope, type UnlockSummary } from './types'
 import * as Names from './names'
 import type { VaultValidators } from './validators'
 import { VaultError, isVaultError } from './errors'
@@ -1561,9 +1561,9 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
         // The passphrase's way in takes the new one, keeping its stamp: its id and label, and the
         // device and time that added it.
         revise: async (standing, proven) => {
-          const replaced = byPasskey ? passphraseToReplace(standing, unlockId) : proven.unlockId
-          const sealed = await sealFor(standing, newPassphrase, standing.unlocks.find((envelope) => envelope.unlock_id === replaced)!, proven)
-          return standing.unlocks.map((envelope) => (envelope.unlock_id === replaced ? sealed : envelope))
+          const replaced = passphraseToReplace(standing, byPasskey ? unlockId : proven.unlockId)
+          const sealed = await sealFor(standing, newPassphrase, replaced, proven)
+          return standing.unlocks.map((envelope) => (envelope === replaced ? sealed : envelope))
         },
       })
     },
@@ -2057,13 +2057,14 @@ const parseAim = (candidate: { unlockId?: string | undefined } | undefined): str
 }
 
 /**
- * The `unlock_id` of the passphrase a passkey's proof replaces in `standing`: the one `unlockId`
- * names, or the vault's only passphrase.
+ * The passphrase envelope of `standing` that a change replaces: the one `unlockId` names, or --
+ * given none, as when a passkey proves the change -- the vault's only passphrase.
  */
-const passphraseToReplace = (standing: VaultBundle, unlockId: string | undefined): string => {
+const passphraseToReplace = (standing: VaultBundle, unlockId: string | undefined): PassphraseEnvelope => {
   const passphrases = standing.unlocks.filter((envelope) => envelope.method === 'passphrase')
   if (unlockId !== undefined) {
-    if (passphrases.some((envelope) => envelope.unlock_id === unlockId)) { return unlockId }
+    const named = passphrases.find((envelope) => envelope.unlock_id === unlockId)
+    if (named !== undefined) { return named }
     throw new VaultError('absent_unlock', "None of this vault's passphrases has that unlock_id: it may have been removed on another device, or be a passkey's, which changePassphrase does not replace. Look again at the snapshot's unlocks.")
   }
   const [only, ...others] = passphrases
@@ -2073,7 +2074,7 @@ const passphraseToReplace = (standing: VaultBundle, unlockId: string | undefined
   if (others.length > 0) {
     throw new VaultError('bad_option', "This vault has several passphrases, and a passkey does not say which to replace: pass the unlock_id of one of the snapshot's unlocks as opts.unlockId.")
   }
-  return only.unlock_id
+  return only
 }
 
 const parseUnlockId = (candidate: string): string => {
