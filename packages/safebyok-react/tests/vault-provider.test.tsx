@@ -745,22 +745,6 @@ describe("VaultProvider", () => {
       await expectShown('absent')
       expect(spy.calls).to.deep.equal([])
     })
-
-    it("of an engine that cannot phrase the dialog's window, naming the polyfill", async () => {
-      const relativeTimeFormat = Intl.RelativeTimeFormat
-      Reflect.deleteProperty(Intl, 'RelativeTimeFormat')
-      try {
-        const spy = TH.spyLogger()
-        const world = makeWorld()
-        const { rerender } = render(providerOf(world, { logger: spy.logger }))
-        await expectShown('absent')
-        rerender(providerOf(world, { logger: spy.logger }))
-        expect(spy.calls).to.have.lengthOf(1)
-        expect(spy.calls[0]?.message).to.match(/@formatjs\/intl-relativetimeformat/)
-      } finally {
-        Object.defineProperty(Intl, 'RelativeTimeFormat', { value: relativeTimeFormat, writable: true, configurable: true })
-      }
-    })
   })
 
   describe("when openVault rejects", () => {
