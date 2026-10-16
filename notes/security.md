@@ -1050,3 +1050,10 @@ security expert who knows what questions to ask.
   each holding the shared lock. The real-Postgres race that proves the lock waits on thread 11's
   container suite. The 2026-10-16 entry above that says IndexedDB, Convex and Postgres "do not yet"
   is superseded.
+* 2026-10-16 (epoch_expectation, the Coach's ruling on thread 4's review): **`close()` and a key
+  outlived by a refresh are hard locks for a read in flight.** A `read()` or `use()` notes a
+  per-handle count of hard locks when it starts (every shut, a `close()`, a refresh that drops the
+  key because the ways in changed or the vault went) and hands back nothing if it moved meanwhile:
+  the deciphered whisper is dropped, never returned. It is a separate count from the one unlocks
+  race against, so a refresh an `unlock()` makes for itself does not defeat that unlock. Not hard
+  locks, by design: a `lockSoon()` grace running out, and a clock that cannot be read.
