@@ -981,3 +981,11 @@ security expert who knows what questions to ask.
   within one copy of the package, as `VaultError`'s does; the peer dependency keeps it one. And a
   vault a newer safebyok may have written is `newer_format`, never `damaged_bundle`, so no UI
   offers to erase it (G120).
+* 2026-10-16 (secure_floor, G032): **an all-zero passphraseKey is refused.** `passphraseKeyOf`
+  (`envelope.ts`), the one place the core receives any key deriver's output, refuses 32 zero
+  bytes as `bad_option`, at create, unlock and every change to the ways in alike. No derivation
+  makes them; a host deriver that kept its output and handed back bytes since wiped would, and
+  the vault would seal under a key anyone can rebuild. The check reads every byte, OR-ing them
+  together as libsodium's `sodium_is_zero` does, so its time does not depend on where the first
+  nonzero byte lies; no dependency offers it, and `@noble/ciphers`' `equalBytes` would be a new
+  one for one line.
