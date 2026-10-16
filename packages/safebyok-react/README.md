@@ -55,8 +55,9 @@ answers the same bag on every call, so it is safe in a render: the provider reop
 whenever a prop changes identity. So define a `logger` or a `clock` once, outside the component (or
 memoize it): an object literal written in the props is a new one at every render, and reopens
 the vault each time. `passphraseStrengthTest` never reopens it: it plays no part in opening, so
-the vault runs whichever test the latest render passed, and an arrow in the props is fine. `validators` is the one exception: the provider watches each schema in the
-bag rather than the bag, so `validators={{ boxlabel: BoxlabelCheck }}` is fine in the props, so
+the vault runs whichever test the latest render passed, and an arrow in the props is fine.
+`validators` is the other exception: the provider watches each schema in the bag rather than the
+bag, so `validators={{ boxlabel: BoxlabelCheck }}` is fine in the props, so
 long as `BoxlabelCheck` itself is built once, at module level. A bag with a field it does not know
 (`boxLabel`) is thrown, as `bad_option`, to the nearest error boundary, as `openVault` would refuse
 it.
