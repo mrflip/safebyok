@@ -1,7 +1,7 @@
 # Thread 15: deriver_shim (2026-10-16)
 
 Branch `20261016-deriver_shim`, PR [#138](https://github.com/mrflip/safebyok/pull/138), stacked on
-#126 (thread 6, `adc94772`). Justify: green (core 1692, from 1664 at the base; fastkey 49; react 111;
+#126 (thread 6, `adc94772`). Justify: green (core 1692, fastkey 49, react 111,
 the rest unchanged). `pnpm size`: three lines over main's budgets (*Discoveries*).
 
 ## Closes
