@@ -3,9 +3,9 @@ import { v } from 'convex/values'
 /**
  * Convex validators for safebyok's stored records, field for field with the core's Zod records
  * (`Lockbox`, `VaultBundle`, `Ciphered`, `VaultScope` in `safebyok`). They check what Convex can:
- * which fields, their types, which are optional, and each record's `format`. Every name and note
- * is any text here: the floor beneath every name and note (well-formed, NFC, no control
- * characters, 1 KiB a name) is the core's records' to hold, and what text each may be beyond it
+ * which fields, their types, which are optional, and each record's `format`. Every name, and a
+ * lockbox's public bag, is any text here: the floor beneath every name (well-formed, NFC, no
+ * control characters, 1 KiB) and that the bag is JSON are the core's records' to hold, and what text each may be beyond it
  * the vault's validators', which the server never sees. The finer rules -- the floor, non-empty
  * strings, a positive whole `unlock_epoch`, each time's bounds as epoch milliseconds -- are the
  * client's, checked by the core's Zod records on every write and every read.
@@ -39,7 +39,7 @@ export const VaultScope = v.object({
 export const VaultBundleFormat = v.union(v.literal('safebyok-vault-v2'))
 
 /** The formats of a Lockbox this package stores. */
-export const LockboxFormat = v.union(v.literal('safebyok-lockbox-v2'))
+export const LockboxFormat = v.union(v.literal('safebyok-lockbox-v3'))
 
 /**
  * A passphrase's way into a vault: its `unlock_id` and `unlocklabel`, how its passphraseKey is
@@ -118,21 +118,23 @@ export const VaultBundle = v.object({
 
 /**
  * One lockbox: its whisper ciphered under its own lockboxKey, that lockboxKey wrapped under the
- * vaultKey, and the public shell -- boxlabel, revision, which vaultKey (`vault_key_epoch`), note,
- * and the epoch-millisecond times it
- * was first stored (`registered_at`) and its whisper last changed (`changed_at`). `note` is absent
- * when there is none, never `undefined`.
+ * vaultKey, and the public shell -- boxlabel, revision, which vaultKey (`vault_key_epoch`), the
+ * whisper's codec and schema version, the public bag as JSON text (`public_json`, always
+ * written), and the epoch-millisecond times it was first stored (`registered_at`) and its whisper
+ * last changed (`changed_at`).
  */
 export const Lockbox = v.object({
-  format:              LockboxFormat,
-  boxlabel:            v.string(),
-  revision_id:         v.string(),
-  vault_key_epoch:     v.number(),
-  lockbox_key_wrapped: Ciphered,
-  whisper_ciphered:    Ciphered,
-  note:                v.optional(v.string()),
-  registered_at:       v.number(),
-  changed_at:          v.number(),
+  format:                 LockboxFormat,
+  boxlabel:               v.string(),
+  revision_id:            v.string(),
+  vault_key_epoch:        v.number(),
+  lockbox_key_wrapped:    Ciphered,
+  whisper_ciphered:       Ciphered,
+  whisper_codec:          v.literal('json_v1'),
+  whisper_schema_version: v.literal(1),
+  public_json:            v.string(),
+  registered_at:          v.number(),
+  changed_at:             v.number(),
 })
 
 /**

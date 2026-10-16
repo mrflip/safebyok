@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import * as ZClassic from 'zod'
 import * as Z from 'zod/mini'
 import * as Names from '../src/names'
-import { AnyTextValidators, DefaultValidators, Label, LockboxNote, NameFloorBytes, UserId } from '../src/validators'
+import { AnyTextValidators, DefaultValidators, Label, NameFloorBytes, UserId } from '../src/validators'
 import * as TH from './test-helpers'
 
 /** A boxlabel check a 1Password-style host might pass: any text at all, up to 200 characters. */
@@ -13,7 +13,7 @@ describe("Names.checkValidators", () => {
     const validators = { boxlabel: ZClassic.string().max(200) }
     expect(Names.checkValidators(validators)).to.eq(validators)
     expect(Names.checkValidators(undefined)).to.be.undefined
-    expect(Names.checkValidators({ boxlabel: undefined, note: Z.string() })).to.have.property('note')
+    expect(Names.checkValidators({ boxlabel: undefined, userId: Z.string() })).to.have.property('userId')
     expect(Names.checkValidators(AnyTextValidators)).to.eq(AnyTextValidators)
     expect(Names.checkValidators({ unlocklabel: Z.string() })).to.have.property('unlocklabel')
   })
@@ -21,6 +21,10 @@ describe("Names.checkValidators", () => {
   it("refuses a misspelt field as 'bad_option', as its second example shows, rather than keep the default unseen", () => {
     const err = TH.expectSyncRefusal(() => Names.checkValidators({ boxLabel: ZClassic.string() } as never), 'bad_option')
     expect(err.message).to.include('spelling')
+  })
+
+  it("refuses a note check, as there is no note: a lockbox's public bag is the host's to check", () => {
+    TH.expectSyncRefusal(() => Names.checkValidators({ note: ZClassic.string() } as never), 'bad_option')
   })
 
   it("refuses a bag of anything but schemas, or no bag at all, as 'bad_option'", () => {
@@ -42,7 +46,6 @@ describe("Names.rulesOf", () => {
     expect(rules.boxlabel).to.eq(AnyBoxlabel)
     expect(rules.applabel).to.eq(Label)
     expect(rules.userId).to.eq(UserId)
-    expect(rules.note).to.eq(LockboxNote)
     expect(rules.unlocklabel).to.eq(Label)
     expect(Names.rulesOf({ unlocklabel: AnyBoxlabel }).unlocklabel).to.eq(AnyBoxlabel)
   })
@@ -79,9 +82,9 @@ describe("Names.check, against a host's check", () => {
   })
 
   it("refuses a check that throws as misuse, carrying nothing of what it threw, which may quote the candidate", () => {
-    const quotingThrow = Names.rulesOf({ note: ZClassic.string().refine((note) => { throw new Error(`no note like ${note}`) }) })
-    const err = TH.expectSyncRefusal(() => Names.check(quotingThrow, 'note', 'sk-ant-fake-pasted-by-mistake'), 'bad_option')
-    expect(err.message).to.include('note')
+    const quotingThrow = Names.rulesOf({ boxlabel: ZClassic.string().refine((boxlabel) => { throw new Error(`no boxlabel like ${boxlabel}`) }) })
+    const err = TH.expectSyncRefusal(() => Names.check(quotingThrow, 'boxlabel', 'sk-ant-fake-pasted-by-mistake'), 'bad_option')
+    expect(err.message).to.include('boxlabel')
     expect(err.cause).to.be.undefined
     expect(Object.getOwnPropertyNames(err)).to.have.members(['stack', 'message', 'name', 'kind'])
     expect(TH.thrownText(err)).to.not.include('sk-ant-fake')
@@ -97,14 +100,11 @@ describe("Names.check", () => {
     expect(Names.check(lowering, 'userId', 'User_2FJ8')).to.eq('User_2FJ8')
   })
 
-  it("refuses a name as bad_label, and a note as bad_option, naming the field and never the candidate", () => {
+  it("refuses a name as bad_label, naming the field and never the candidate", () => {
     const rules = Names.rulesOf()
     const labelErr = TH.expectSyncRefusal(() => Names.check(rules, 'boxlabel', 'Not A Label sk-fake'), 'bad_label')
     expect(labelErr.message).to.include('boxlabel')
     expect(labelErr.message).to.not.include('sk-fake')
-    const noteErr = TH.expectSyncRefusal(() => Names.check(rules, 'note', `sk-fake ${'n'.repeat(300)}`), 'bad_option')
-    expect(noteErr.message).to.include('note')
-    expect(noteErr.message).to.not.include('sk-fake')
   })
 
   it("says what one of our own checks found wrong, quoting nothing", () => {
@@ -113,27 +113,26 @@ describe("Names.check", () => {
       ['boxlabel', 'sk-fake-UPPER',            'lowercase words'],
       ['boxlabel', `sk-fake${'x'.repeat(40)}`, 'at most forty characters'],
       ['userId',   'sk-fake user',             'ASCII letters, digits'],
-      ['note',     `sk-fake${'n'.repeat(256)}`, 'at most 256 characters'],
     ] as const
     for (const [field, candidate, said] of cases) {
-      const err = TH.expectSyncRefusal(() => Names.check(rules, field, candidate), field === 'note' ? 'bad_option' : 'bad_label')
+      const err = TH.expectSyncRefusal(() => Names.check(rules, field, candidate), 'bad_label')
       expect(err.message).to.include(`vault's ${field} check`)
       expect(err.message).to.include(said)
       expect(err.message).to.not.include('sk-fake')
     }
   })
 
-  it("holds every name and note to the floor first, saying what it found wrong and quoting nothing", () => {
+  it("holds every name to the floor first, saying what it found wrong and quoting nothing", () => {
     const rules = Names.rulesOf()
     const cases = [
       ['userId',   '',                         "can't be empty"],
       ['userId',   'sk-fake\u{D800}',          'lone surrogate'],
       ['boxlabel', 'sk-fak\u{E9}'.normalize('NFD'), 'NFC'],
-      ['note',     'sk-fake\u{7}',             'no control characters but tab and newline'],
-      ['note',     'sk-fake\u{DD11}',          'well-formed Unicode'],
+      ['unlocklabel', 'sk-fake\u{7}',          'no control characters'],
+      ['vaultlabel', 'sk-fake\u{DD11}',        'well-formed Unicode'],
     ] as const
     for (const [field, candidate, said] of cases) {
-      const err = TH.expectSyncRefusal(() => Names.check(rules, field, candidate), field === 'note' ? 'bad_option' : 'bad_label')
+      const err = TH.expectSyncRefusal(() => Names.check(rules, field, candidate), 'bad_label')
       expect(err.message).to.include(`That ${field} is not text any vault can hold`)
       expect(err.message).to.include(said)
       expect(err.message).to.not.include('sk-fak')
@@ -143,11 +142,10 @@ describe("Names.check", () => {
   })
 
   it("holds a name to the floor beneath a host's own check, however much that check admits", () => {
-    const rules = Names.rulesOf({ boxlabel: ZClassic.string(), userId: Z.string(), note: ZClassic.string() })
+    const rules = Names.rulesOf({ boxlabel: ZClassic.string(), userId: Z.string() })
     TH.expectSyncRefusal(() => Names.check(rules, 'boxlabel', 'key \u{D83D}'), 'bad_label')
     TH.expectSyncRefusal(() => Names.check(rules, 'userId', 'tab\there'), 'bad_label')
     TH.expectSyncRefusal(() => Names.check(rules, 'boxlabel', 'n'.repeat(NameFloorBytes + 1)), 'bad_label')
-    TH.expectSyncRefusal(() => Names.check(rules, 'note', 'beep\u{7}'), 'bad_option')
     expect(Names.check(rules, 'boxlabel', 'Any Text: מפתח')).to.eq('Any Text: מפתח')
   })
 
@@ -173,7 +171,6 @@ describe("Names.check", () => {
 
   it("refuses a candidate that is not text, saying so", () => {
     expect(TH.expectSyncRefusal(() => Names.check(Names.rulesOf(), 'boxlabel', undefined), 'bad_label').message).to.include('not text')
-    expect(TH.expectSyncRefusal(() => Names.check(Names.rulesOf(), 'note', 42), 'bad_option').message).to.include('not text')
   })
 
   it("never quotes a host check's own issues, which may quote the candidate", () => {
@@ -201,19 +198,14 @@ describe("Names.checkScope", () => {
 })
 
 describe("Names.checkFloor", () => {
-  it("hands back a name or note above the floor as it is, whatever any check would say of it", () => {
+  it("hands back a name above the floor as it is, whatever any check would say of it", () => {
     expect(Names.checkFloor('boxlabel', 'Not A Label')).to.eq('Not A Label')
-    expect(Names.checkFloor('note', 'n'.repeat(1000))).to.have.lengthOf(1000)
+    expect(Names.checkFloor('vaultlabel', 'n'.repeat(1000))).to.have.lengthOf(1000)
   })
 
-  it("refuses a name below the floor as bad_label, and a note as bad_option, quoting neither", () => {
+  it("refuses a name below the floor as bad_label, quoting none of it", () => {
     expect(TH.expectSyncRefusal(() => Names.checkFloor('boxlabel', 'sk-fake\u{7}'), 'bad_label').message).to.not.include('sk-fake')
-    expect(TH.expectSyncRefusal(() => Names.checkFloor('note', 'sk-fake\u{7}'), 'bad_option').message).to.not.include('sk-fake')
     expect(TH.expectSyncRefusal(() => Names.checkFloor('applabel', 42), 'bad_label').message).to.include('not text')
-  })
-
-  it("holds a note to tab and newline, which a name may not hold", () => {
-    expect(Names.checkFloor('note', 'two\nlines')).to.eq('two\nlines')
     TH.expectSyncRefusal(() => Names.checkFloor('vaultlabel', 'two\nlines'), 'bad_label')
   })
 })

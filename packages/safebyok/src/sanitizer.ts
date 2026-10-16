@@ -3,7 +3,7 @@ import { VaultError, type VaultErrorKind } from './errors'
 /**
  * Where safebyok decides what of a foreign error rides along on the refusal it throws in that
  * error's place. A foreign error is one safebyok did not make -- a host's validator that throws, a
- * storage client's failure -- and it may quote what it was handed: a name, a note, a stored
+ * storage client's failure -- and it may quote what it was handed: a name, a public bag, a stored
  * record, any text a user typed or pasted, a key among it. Import it whole:
  * `import { Sanitizer } from 'safebyok'`, then `Sanitizer.refusalFor(...)`.
  */

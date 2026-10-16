@@ -3,9 +3,7 @@ import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex
 import { ConvexError } from 'convex/values'
 import { Sanitizer, VaultDB, VaultError } from 'safebyok'
 import type { BundleExpectation, EraseExpectation, Lockbox, LockboxExpectation, StoredLockbox, VaultBundle, VaultScope } from 'safebyok'
-import type { Infer } from 'convex/values'
 import { MaxVaultLockboxes } from './component/tallies'
-import type { Lockbox as LockboxRecord } from './component/validators'
 import { isSafebyokErrorData } from './refusals'
 import type { SafebyokApi } from './server'
 
@@ -83,16 +81,6 @@ export const convexVaultDB = (client: ConvexVaultClient, api: SafebyokApi): Vaul
   return new ConvexVaultDB(client, api)
 }
 
-/**
- * A core lockbox as Convex's validator takes it: a note, or no note field at all. The core writes
- * no undefined note, but its record type allows one, as earlier versions stored it and IndexedDB
- * keeps it; Convex's validator has no place for it.
- */
-export const toConvexLockbox = (lockbox: Lockbox): Infer<typeof LockboxRecord> => {
-  const { note, ...noteless } = lockbox
-  return { ...noteless, ...(note !== undefined && { note }) }
-}
-
 /** Each verb one call to the function of the same purpose; the base class validates both ways. */
 class ConvexVaultDB extends VaultDB {
   readonly maxRecordBytes = ConvexDocumentBytes
@@ -136,7 +124,7 @@ class ConvexVaultDB extends VaultDB {
   }
 
   protected doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<boolean> {
-    return refusing(() => this.client.mutation(this.api.updateBox, { scope, lockbox: toConvexLockbox(lockbox), expected }))
+    return refusing(() => this.client.mutation(this.api.updateBox, { scope, lockbox, expected }))
   }
 
   protected doEraseBox(scope: VaultScope, boxlabel: string, expected: EraseExpectation): Promise<boolean> {
@@ -198,7 +186,7 @@ const refusing = async <ValT>(call: () => Promise<ValT>): Promise<ValT> => {
       throw new VaultError(err.data.kind, err.data.message, { cause: err })
     }
     // On a dev deployment, Convex's own error -- its validator refusing the arguments, say --
-    // quotes the call's arguments: scope, names, notes and ciphertext. The sanitizer drops it.
+    // quotes the call's arguments: scope, names, public bags and ciphertext. The sanitizer drops it.
     throw Sanitizer.refusalFor(err, 'storage_unavailable', ConvexTroubleMessage)
   }
 }

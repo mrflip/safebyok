@@ -1,5 +1,6 @@
 import { base64urlnopad } from '@scure/base'
 import * as Z from 'zod/mini'
+import { VaultError } from './errors'
 import { stableJsonify } from './stable-jsonify'
 
 /**
@@ -49,21 +50,31 @@ const IvBytes = 12
 
 /**
  * One part of a {@link cipherBinding}: a string or number, or a flat record of them -- the public
- * header of an unlock envelope or a lockbox, say -- encoded with its keys sorted. A field of the
- * record that is undefined is left out, as JSON leaves it out: the same as a field never there.
+ * header of an unlock envelope or a lockbox, say -- encoded with its keys sorted. Every field of a
+ * record is bound: one set to undefined is refused, never dropped as JSON would drop it.
  */
-export type CipherBindingPart = string | number | Readonly<Record<string, string | number | undefined>>
+export type CipherBindingPart = string | number | Readonly<Record<string, string | number>>
 
 /**
  * The context an encryption is bound to, as AES-GCM additional data: a deterministic encoding of
- * the given parts (app, user, vault, lockbox, revision, purpose -- whatever names the slot).
- * Rebuilt rather than stored; if any part differs at decryption, the ciphertext refuses to open.
+ * the given parts (format, app, user, vault, lockbox, revision, purpose -- whatever names the
+ * slot). Rebuilt rather than stored; if any part differs at decryption, the ciphertext refuses to
+ * open. A record part holding a field set to undefined is refused with kind 'bad_option': it
+ * would bind the same as a record without the field, so nothing is encrypted or opened under it.
  *
  * @example cipherBinding('safebyok-unlock-v1', 'acme', 'u1', 'main', vaultId, 1, askPassphraseAt, 'vault_key_local_wrapped')
  * @example cipherBinding('safebyok-vault-v1', 'acme', 'u1', 'main', vaultId, registeredAt, 'vault_key_passphrase_wrapped', { method: 'passphrase', unlock_id, unlocklabel, key_deriver_label, salt_b64 })
  */
-export const cipherBinding = (...parts: readonly CipherBindingPart[]): Uint8Array => (
-  new TextEncoder().encode(stableJsonify(parts))
+export const cipherBinding = (...parts: readonly CipherBindingPart[]): Uint8Array => {
+  if (parts.some((part) => holdsUndefined(part))) {
+    throw new VaultError('bad_option', "A cipher binding was handed a field set to undefined, which would bind as if it were not there, so nothing was encrypted or opened. This is a bug in the code calling it.")
+  }
+  return new TextEncoder().encode(stableJsonify(parts))
+}
+
+/** True when `part` is a record with a field set to undefined, as its type forbids and a caller may still hand in. */
+const holdsUndefined = (part: CipherBindingPart): boolean => (
+  typeof part === 'object' && Object.values(part as Readonly<Record<string, unknown>>).includes(undefined)
 )
 
 /**

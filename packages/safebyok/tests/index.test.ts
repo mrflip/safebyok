@@ -9,8 +9,8 @@ describe("the package's entry point", () => {
     expect(Object.keys(safebyok)).to.have.members([
       'Argon2idWebV1', 'argon2idDeriver', 'argon2idWebV1Deriver', 'parseKeyDeriverSpec',
       'openVault', 'eraseDamagedVault', 'IdentityRevokedResponseVals',
-      'Ciphered', 'EpochMillis', 'FarFuture', 'FarPast', 'ForcePassphraseReentryHours', 'ForeverMs', 'Lockbox', 'LockboxSummary', 'MaxLockboxes', 'MaxUnlocks', 'MaxWhisperBytes', 'PasskeyEnvelope', 'PasskeySaltBytes', 'PassphraseEnvelope', 'UnlockEnvelope', 'UnlockMethodVals', 'VaultBundle', 'VaultScope', 'Whisper', 'wallClock',
-      'AnyTextValidators', 'DefaultValidators', 'Label', 'LabelPattern', 'LockboxNote', 'MaxLabelChars', 'MaxNoteChars', 'MaxUserIdChars', 'NameFloor', 'NameFloorBytes', 'NoteFloor', 'NoteFloorBytes', 'UserId', 'UserIdPattern', 'checkValidators',
+      'Ciphered', 'EpochMillis', 'FarFuture', 'FarPast', 'ForcePassphraseReentryHours', 'ForeverMs', 'Lockbox', 'LockboxSummary', 'MaxLockboxes', 'MaxUnlocks', 'MaxWhisperBytes', 'PasskeyEnvelope', 'PasskeySaltBytes', 'PassphraseEnvelope', 'PublicBag', 'UnlockEnvelope', 'UnlockMethodVals', 'VaultBundle', 'VaultScope', 'Whisper', 'wallClock',
+      'AnyTextValidators', 'DefaultValidators', 'Label', 'LabelPattern', 'MaxLabelChars', 'MaxUserIdChars', 'NameFloor', 'NameFloorBytes', 'UserId', 'UserIdPattern', 'checkValidators',
       'VaultError', 'VaultErrorFamilyForKind', 'VaultErrorFamilyVals', 'VaultErrorKindVals', 'isVaultCondition', 'isVaultError',
       'VaultDB', 'Ckeys', 'Sanitizer', 'localVaultDB', 'memoryDeviceDB',
       'domStore', 'memoryStore',

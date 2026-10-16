@@ -15,13 +15,11 @@ import { VaultError, type VaultErrorKind } from '../src/errors'
 import type { KeyDeriver } from '../src/key-deriver'
 import type { VaultLogger } from '../src/logger'
 import { memoryStore } from '../src/string-store'
-import type { DamagedLockbox, DeviceMark, DeviceUnlock, Lockbox, LockboxSummary, PasskeyEnvelope, PasskeyProof, PassphraseEnvelope, VaultBundle, VaultScope } from '../src/types'
-import { NameFloorBytes, NoteFloorBytes } from '../src/validators'
+import type { DamagedLockbox, DeviceMark, DeviceUnlock, Lockbox, LockboxSummary, PasskeyEnvelope, PasskeyProof, PassphraseEnvelope, PublicBag, VaultBundle, VaultScope } from '../src/types'
+import { stableJsonify } from '../src/stable-jsonify'
+import { NameFloorBytes } from '../src/validators'
 import type { OpenVaultOpts } from '../src/vault'
 import { localVaultDB, type VaultDB } from '../src/vault-db'
-
-/** A Lockbox as the core writes one: a note, or no note field at all, never an undefined one. */
-type WrittenLockbox = Omit<Lockbox, 'note'> & { note?: string }
 
 /**
  * A cheap KeyDeriver for tests: one SHA-256 instead of 64 MiB of Argon2id, so a suite full of
@@ -193,23 +191,34 @@ export const rotatedBundleOf = (userId: string): VaultBundle => bundleOf(userId,
 
 /**
  * A shape-valid Lockbox for storage-layer tests, its ciphered fields fake: revision `rev-<tag>`,
- * sealed under the vault's first vaultKey, with the note `a test box` unless `overrides` says
- * otherwise.
+ * sealed under the vault's first vaultKey, with the public bag `{ note: 'a test box' }` unless
+ * `overrides` says otherwise.
  *
- * @example boxOf('anthropic_api_key', 'a1', { note: 'work account' })
+ * @example boxOf('anthropic_api_key', 'a1', { public_json: publicJsonOf({ note: 'work account' }) })
  */
-export const boxOf = (boxlabel: string, tag: string, overrides: Partial<WrittenLockbox> = {}): WrittenLockbox => ({
-  format:              'safebyok-lockbox-v2',
+export const boxOf = (boxlabel: string, tag: string, overrides: Partial<Lockbox> = {}): Lockbox => ({
+  format:                 'safebyok-lockbox-v3',
   boxlabel,
-  revision_id:         `rev-${tag}`,
-  vault_key_epoch:     1,
-  lockbox_key_wrapped: fakeCiphered(`boxkey-${tag}`),
-  whisper_ciphered:    fakeCiphered(`whisper-${tag}`),
-  note:                'a test box',
-  registered_at:       Date.UTC(2026, 9, 14),
-  changed_at:          Date.UTC(2026, 9, 14),
+  revision_id:            `rev-${tag}`,
+  vault_key_epoch:        1,
+  lockbox_key_wrapped:    fakeCiphered(`boxkey-${tag}`),
+  whisper_ciphered:       fakeCiphered(`whisper-${tag}`),
+  whisper_codec:          'json_v1',
+  whisper_schema_version: 1,
+  public_json:            publicJsonOf({ note: 'a test box' }),
+  registered_at:          Date.UTC(2026, 9, 14),
+  changed_at:             Date.UTC(2026, 9, 14),
   ...overrides,
 })
+
+/**
+ * A public bag as a lockbox's `public_json` holds it: its JSON, every object's keys sorted, as the
+ * vault writes it.
+ *
+ * @example publicJsonOf({ note: 'work account' })  // '{"note":"work account"}'
+ */
+export const publicJsonOf = (bag: PublicBag): string => stableJsonify(bag) ?? ''
+
 
 /**
  * Labels the default grammar refuses and a host's validators may admit: ones differing only by a
@@ -226,7 +235,7 @@ export const OddLabels = Object.freeze([
  * damaged fails the test, naming its boxlabel. For a test reading a summary's fields out of a
  * listing or a snapshot, where TypeScript would otherwise have it ask after damage first.
  *
- * @example expect(TH.summaryOf(vault.getSnapshot().boxes[0])?.note).to.eq('work account')
+ * @example expect(TH.summaryOf(vault.getSnapshot().boxes[0])?.public).to.deep.equal({ note: 'work account' })
  */
 export const summaryOf = (box: LockboxSummary | DamagedLockbox | undefined): LockboxSummary | undefined => {
   if (box?.damaged === true) { throw new Error(`The lockbox '${box.boxlabel}' is listed as damaged, where a summary was expected.`) }
@@ -1026,22 +1035,22 @@ export const describeVaultDB = (adapterTitle: string, makeVaultDB: () => VaultDB
       expect(await vaultDB.readBox(scopeOf('u1'), 'anthropic')).to.deep.equal(boxOf('anthropic', 'one'))
     })
 
-    it("reads back a lockbox with no note field as stored, and lists it with a null note", async () => {
+    it("reads back a lockbox with an empty public bag as stored, and lists it with that bag", async () => {
       const vaultDB = await withBundle()
-      const { note: _note, ...noteless } = boxOf('anthropic', 'one')
-      await vaultDB.updateBox(scopeOf('u1'), noteless, noBoxYet)
-      expect(await vaultDB.readBox(scopeOf('u1'), 'anthropic')).to.deep.equal(noteless)
+      const bagless = boxOf('anthropic', 'one', { public_json: '{}' })
+      await vaultDB.updateBox(scopeOf('u1'), bagless, noBoxYet)
+      expect(await vaultDB.readBox(scopeOf('u1'), 'anthropic')).to.deep.equal(bagless)
       const [summary] = await vaultDB.listBoxes(scopeOf('u1'))
-      expect(summaryOf(summary)?.note).to.be.null
+      expect(summaryOf(summary)?.public).to.deep.equal({})
     })
 
-    it("reads text back exactly as written: a note of accented letters, an emoji, a tab and a newline", async () => {
+    it("reads a public bag's JSON back exactly as written, as it is bound: accented letters, an emoji, a tab, a newline, quotes and backslashes", async () => {
       const vaultDB = await withBundle()
-      await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one', { note: LiteralText }), noBoxYet)
+      await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one', { public_json: publicJsonOf(LiteralBag) }), noBoxYet)
       const lockbox = await vaultDB.readBox(scopeOf('u1'), 'anthropic')
-      expect(lockbox?.note).to.eq(LiteralText)
+      expect(lockbox?.public_json).to.eq(publicJsonOf(LiteralBag))
       const [summary] = await vaultDB.listBoxes(scopeOf('u1'))
-      expect(summaryOf(summary)?.note).to.eq(LiteralText)
+      expect(summaryOf(summary)?.public).to.deep.equal(LiteralBag)
     })
   })
 
@@ -1152,7 +1161,7 @@ export const describeVaultDB = (adapterTitle: string, makeVaultDB: () => VaultDB
         boxlabel:        'anthropic',
         revision_id:     'rev-one',
         vault_key_epoch: 1,
-        note:            'a test box',
+        public:          { note: 'a test box' },
         registered_at:   Date.UTC(2026, 9, 14),
         changed_at:      Date.UTC(2026, 9, 14),
         damaged:         false,
@@ -1349,7 +1358,7 @@ export const describeVaultDB = (adapterTitle: string, makeVaultDB: () => VaultDB
         [() => vaultDB.updateBundle(bundleOf('u1', { unlock_epoch: 3 }), { vault_id: 'vault-id-u1', unlock_epoch: 2 }),                 'stale_write'],
         [() => vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'late'), { vault_id: 'vault-id-u1', revision_id: 'rev-other', vault_key_epoch: 1 }),      'stale_write'],
         [() => vaultDB.updateBox(scopeOf('u1'), boxOf('mistral', 'late'), { vault_id: 'vault-id-gone', revision_id: null, vault_key_epoch: 1 }),             'stale_write'],
-        [() => vaultDB.updateBox(scopeOf('u1'), boxOf('mistral', 'late', { note: 'beep\u{7}' }), noBoxYet),                            'bad_option'],
+        [() => vaultDB.updateBox(scopeOf('u1'), boxOf('mistral', 'late', { public_json: '{"note":' }), noBoxYet),                       'bad_option'],
         [() => vaultDB.eraseBox(scopeOf('u1'), 'anthropic', { vault_id: 'vault-id-gone' }),                                               'stale_write'],
         [() => vaultDB.eraseVault(scopeOf('u1'), { vault_id: 'vault-id-gone' }),                                                          'stale_write'],
       ] as const
@@ -1490,15 +1499,15 @@ export const describeVaultDB = (adapterTitle: string, makeVaultDB: () => VaultDB
 
     it("takes any name above the floor, whatever a vault's validators would say: they are the vault's, at its entry", async () => {
       const vaultDB = await withBundle()
-      await vaultDB.updateBox(scopeOf('u1'), boxOf('Not a Label!', 'one', { note: 'n'.repeat(300) }), noBoxYet)
+      await vaultDB.updateBox(scopeOf('u1'), boxOf('Not a Label!', 'one'), noBoxYet)
       const lockbox = await vaultDB.readBox(scopeOf('u1'), 'Not a Label!')
       expect(lockbox?.revision_id).to.eq('rev-one')
     })
 
     it("refuses a malformed record or expectation, or a bundle under another vault_id, as bad_option, before storage sees it", async () => {
       const vaultDB = await withBundle()
-      const overlong = boxOf('anthropic', 'one', { note: 'n'.repeat(NoteFloorBytes + 1) })
-      await expectRefusal(vaultDB.updateBox(scopeOf('u1'), overlong, noBoxYet), 'bad_option')
+      const unparsable = boxOf('anthropic', 'one', { public_json: 'not json' })
+      await expectRefusal(vaultDB.updateBox(scopeOf('u1'), unparsable, noBoxYet), 'bad_option')
       await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), { vault_id: 'vault-id-u1', revision_id: '', vault_key_epoch: 1 }), 'bad_option')
       await expectRefusal(vaultDB.updateBundle(bundleOf('u1', { unlock_epoch: 0 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'bad_option')
       await expectRefusal(vaultDB.updateBundle(bundleOf('u1', { vault_id: 'vault-id-new', unlock_epoch: 2 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'bad_option')
@@ -1509,16 +1518,16 @@ export const describeVaultDB = (adapterTitle: string, makeVaultDB: () => VaultDB
   })
 
   describe(lineTitle('5.3'), () => {
-    it("quotes no ciphertext, boxlabel or note of a write it refuses as stale", async () => {
+    it("quotes no ciphertext, boxlabel or public bag of a write it refuses as stale", async () => {
       const vaultDB = await withBundle()
-      const lockbox = boxOf('secret_project_x', 'sk-fake-quoted', { note: 'a note never to be quoted' })
+      const lockbox = boxOf('secret_project_x', 'sk-fake-quoted', { public_json: publicJsonOf({ note: 'a bag never to be quoted' }) })
       const refusal = await expectRefusal(vaultDB.updateBox(scopeOf('u1'), lockbox, { vault_id: 'vault-id-gone', revision_id: null, vault_key_epoch: 1 }), 'stale_write')
       expect(quotedOf(refusal, lockbox)).to.deep.equal([])
     })
 
-    it.runIf(capped)("quotes no ciphertext, boxlabel or note of a lockbox it refuses as vault_full", async () => {
+    it.runIf(capped)("quotes no ciphertext, boxlabel or public bag of a lockbox it refuses as vault_full", async () => {
       const vaultDB = await cappedHolding(['anthropic', 'openai', 'mistral'])
-      const lockbox = boxOf('secret_project_x', 'sk-fake-quoted', { note: 'a note never to be quoted' })
+      const lockbox = boxOf('secret_project_x', 'sk-fake-quoted', { public_json: publicJsonOf({ note: 'a bag never to be quoted' }) })
       const refusal = await expectRefusal(vaultDB.updateBox(scopeOf('u1'), lockbox, noBoxYet), 'vault_full')
       expect(quotedOf(refusal, lockbox)).to.deep.equal([])
     })
@@ -2089,8 +2098,15 @@ const everyVerbOn = (stranger: VaultDBVerbs) => [
 ]
 
 /** Text no normalization leaves alone: "café" with its accent composed, then decomposed, and a key. */
-/** A note of accented letters, an emoji, a tab and a newline, in NFC: text a store must hand back as it was written. */
-const LiteralText = 'caf\u{E9} na\u{EF}ve \u{1F511}\trotated\nin March'
+/**
+ * A public bag of accented letters, an emoji, a tab, a newline, quotes, backslashes, Hebrew, a
+ * null and a fraction: JSON a store must hand back byte for byte as it was written, as it is bound.
+ */
+const LiteralBag = Object.freeze({
+  note: 'caf\u{E9} na\u{EF}ve \u{1F511}\trotated\nin March',
+  path: String.raw`C:\keys\"work"`,
+  tags: ['\u{5D0}\u{5D1}', null, 1.5],
+})
 
 /** Enough lockboxes that a listing cut to a page, or a sample, would show it: 25, `box0` to `box24`. */
 const ManyBoxlabels = Object.freeze(Array.from({ length: 25 }, (_unused, ii) => `box${String(ii)}`))
@@ -2130,10 +2146,10 @@ const settledKind = async (write: Promise<unknown>): Promise<string> => {
   }
 }
 
-/** Which of a lockbox's boxlabel, note and ciphertexts a refusal quotes anywhere. */
-const quotedOf = (refusal: unknown, lockbox: WrittenLockbox): string[] => {
+/** Which of a lockbox's boxlabel, public bag and ciphertexts a refusal quotes anywhere. */
+const quotedOf = (refusal: unknown, lockbox: Lockbox): string[] => {
   const told = thrownText(refusal)
-  const quotable = [lockbox.boxlabel, lockbox.note ?? '', ...leafTexts(lockbox.lockbox_key_wrapped), ...leafTexts(lockbox.whisper_ciphered)]
+  const quotable = [lockbox.boxlabel, lockbox.public_json, ...leafTexts(lockbox.lockbox_key_wrapped), ...leafTexts(lockbox.whisper_ciphered)]
   return quotable.filter((text) => text !== '' && told.includes(text))
 }
 

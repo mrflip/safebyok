@@ -1,21 +1,17 @@
 import * as Z from 'zod/mini'
 
 /**
- * The checks safebyok runs on every name and note, and the bounds behind its defaults, in an entry
+ * The checks safebyok runs on every name, and the bounds behind its defaults, in an entry
  * point of their own: `import { Label, DefaultValidators } from 'safebyok/validators'`. A form, a
  * server, or a library of its own can check a name as the vault will before calling it. Each is
  * exported from the main entry too.
  *
- * Two layers: the floor ({@link NameFloor}, {@link NoteFloor}), which every name and note must
- * pass whatever the host chose, and the defaults above it ({@link DefaultValidators}), which a host
+ * Two layers: the floor ({@link NameFloor}), which every name must pass whatever the host chose, and the defaults above it ({@link DefaultValidators}), which a host
  * replaces field by field with openVault's `validators` ({@link VaultValidators}).
  */
 
 /** The most a name holds under any validators, in bytes of UTF-8: the floor's ceiling. */
 export const NameFloorBytes = 1024
-
-/** The most a note holds under any validators, in bytes of UTF-8: the floor's ceiling. */
-export const NoteFloorBytes = 4096
 
 /**
  * Well-formed Unicode: no surrogate standing alone, half of a character such as an emoji, as text
@@ -46,14 +42,6 @@ const JoinChar = '^'
 /** A name free of the character key-value stores join names on. */
 const Unjoined = /* @__PURE__ */ Z.refine<string>((text) => ! text.includes(JoinChar), "A name holds no ^, which storage joins names on")
 
-/**
- * A note's characters: any but the control characters (Unicode's `Cc`: C0, DEL and C1), save tab
- * and newline. Carriage return is refused with the rest; a browser's textarea hands up newlines alone.
- * It searches for a control character that is neither tab nor newline, rather than matching the
- * whole note, so that an overlong note never overflows the regex stack.
- */
-const NoteChars = /* @__PURE__ */ Z.refine<string>((note) => ! /(?![\t\n])\p{Cc}/u.test(note), "A note holds no control characters but tab and newline")
-
 /** At most `limit` bytes of UTF-8: run after a cheap count of characters, each at least a byte, has turned away the longest. */
 const utf8Within = (limit: number, said: string) => Z.refine<string>((text) => new TextEncoder().encode(text).length <= limit, said)
 
@@ -78,23 +66,6 @@ export const NameFloor = /* @__PURE__ */ Z.string().check(
   WellFormed,
   NameChars,
   Unjoined,
-  Composed,
-)
-
-/**
- * The floor beneath every lockbox note, whatever validators a host passed: text of at most {@link
- * NoteFloorBytes} (4 KiB) of UTF-8, well-formed, in NFC, with no control character but tab and
- * newline. The vault refuses a note below the floor with kind 'bad_option', and a stored lockbox
- * holding one lists as damaged.
- *
- * @example NoteFloor.safeParse('work account\nrotated in March').success  // true
- * @example NoteFloor.safeParse('beep\u0007').success                      // false: a control character
- */
-export const NoteFloor = /* @__PURE__ */ Z.string().check(
-  Z.maxLength(NoteFloorBytes, { error: `A note is at most ${String(NoteFloorBytes)} bytes of UTF-8`, abort: true }),
-  utf8Within(NoteFloorBytes, `A note is at most ${String(NoteFloorBytes)} bytes of UTF-8`),
-  WellFormed,
-  NoteChars,
   Composed,
 )
 
@@ -159,28 +130,6 @@ export const UserId = Z.string().check(
   Z.regex(UserIdPattern, "A user_id is ASCII letters, digits and - _ . : @ + |, as an auth provider's stable id is"),
 )
 
-/** The most characters a default {@link LockboxNote} holds (UTF-16 code units). */
-export const MaxNoteChars = 256
-
-/**
- * The default check for a lockbox's public note, shown beside it while the vault is locked:
- * at most {@link MaxNoteChars} (256) characters over {@link NoteFloor}'s own checks -- well-formed,
- * in NFC, with no control characters but tab and newline. Never put secret material in a note.
- * `store()` refuses a note that fails the vault's note check with kind 'bad_option'; a host that
- * wants longer notes passes its own schema as `validators.note`, and the floor still holds beneath it.
- *
- * @example LockboxNote.parse('work account')
- * @example LockboxNote.parse('work account\nrotated in March')
- * @example LockboxNote.safeParse('n'.repeat(257)).success  // false: 256 characters at most
- * @example LockboxNote.safeParse('beep\u0007').success      // false: a control character
- */
-export const LockboxNote = Z.string().check(
-  Z.maxLength(MaxNoteChars, { error: `A note is at most ${String(MaxNoteChars)} characters`, abort: true }),
-  WellFormed,
-  NoteChars,
-  Composed,
-)
-
 /**
  * A schema a host hands the vault in place of one of ours: any Zod 4 schema whose output is
  * text, classic (`zod`) or mini (`zod/mini`). It must check synchronously.
@@ -188,28 +137,28 @@ export const LockboxNote = Z.string().check(
 export type NameValidator = Z.core.$ZodType<string>
 
 /**
- * The checks a vault runs on every name and note at its entry, as openVault's `validators` option:
+ * The checks a vault runs on every name at its entry, as openVault's `validators` option:
  * each field a host gives **replaces** ours, and each it leaves out keeps ours
  * ({@link DefaultValidators}). Build the bag once, at module level, not anew on each call or render.
  *
  * Each runs as a check and nothing more: the vault keeps what it was handed, never what the schema
  * makes of it, as every name is bound into the ciphertext and names its rows. A schema that trims
- * or lowercases still decides only pass or fail. A refusal is the vault's own (kind 'bad_label',
- * 'bad_option' for a note), and never quotes the schema's issues, which may quote the name.
+ * or lowercases still decides only pass or fail. A refusal is the vault's own (kind 'bad_label'),
+ * and never quotes the schema's issues, which may quote the name.
  *
  * What each check is for, and where it runs:
  *
  * | Check | Job | Runs | Fails as |
  * |---|---|---|---|
- * | These validators (`Label`, `UserId`, `LockboxNote` by default) | an alarm for names and notes your app never meant to use | at entry only: openVault (the scope), store (the boxlabel and note), addPassphrase and addPasskey (the unlocklabel) | `bad_label`, `bad_option` for a note |
- * | The floor ({@link NameFloor}, {@link NoteFloor}) | what text must be for every client and store to agree (no `^` in a name, which key-value stores join names on) | beneath these at entry, whatever they are; at every storage verb; on every record read back | `bad_label` or `bad_option` at entry; damaged on read |
+ * | These validators (`Label` and `UserId` by default) | an alarm for names your app never meant to use | at entry only: openVault (the scope), store (the boxlabel), addPassphrase and addPasskey (the unlocklabel) | `bad_label` |
+ * | The floor ({@link NameFloor}) | what text must be for every client and store to agree (no `^` in a name, which key-value stores join names on) | beneath these at entry, whatever they are; at every storage verb; on every record read back | `bad_label` at entry; damaged on read |
  * | The record's shape, scope, boxlabel, ciphertext and expectations | what the design needs | when sent to storage and when read back | `bad_option` (a bug) when sent; damaged on read; `stale_write` |
  * | The storage's own limits (`maxRecordBytes`, `maxVaultBytes`, `maxLockboxes`, `maxNameBytes`) | facts about the backend | when sent to storage | `lockbox_too_large`, `vault_full`, `bad_label` |
  *
  * So a check of yours is an alarm, not a promise about what storage holds: a lockbox stored under a
- * name or note it refuses -- written by another client, or before you narrowed it -- lists, reads
- * and erases as any other, by the name it was stored under; only a name or note below the floor is
- * damage. A server holds names to the floor and its own limits, never to these (`VAULTDB.md`).
+ * name it refuses -- written by another client, or before you narrowed it -- lists, reads and
+ * erases as any other, by the name it was stored under; only a name below the floor is damage.
+ * A lockbox's public bag is never checked by the vault: a host checks its own before `store()`. A server holds names to the floor and its own limits, never to these (`VAULTDB.md`).
  *
  * Widening with care. A name is stored and bound exactly as given, so a check admitting text
  * outside ASCII should require what the floor does, Unicode's composed form (NFC), and an app
@@ -235,15 +184,13 @@ export type VaultValidators = {
   boxlabel?:    NameValidator | undefined
   /** Checks the signed-in user's id. Default: {@link UserId}. */
   userId?:      NameValidator | undefined
-  /** Checks each lockbox's public note. Default: {@link LockboxNote}. */
-  note?:        NameValidator | undefined
   /** Checks the label of each way in a host adds: a passphrase or a passkey. Default: {@link Label}. */
   unlocklabel?: NameValidator | undefined
 }
 
 /**
  * The checks a vault runs when its host passes none: {@link Label} for each label, an
- * unlocklabel's among them, {@link UserId} for the user, {@link LockboxNote} for a note. Frozen.
+ * unlocklabel's among them, and {@link UserId} for the user. Frozen.
  *
  * @example DefaultValidators.boxlabel.safeParse('anthropic_api_key').success  // true
  */
@@ -252,15 +199,13 @@ export const DefaultValidators = Object.freeze({
   vaultlabel:  Label,
   boxlabel:    Label,
   userId:      UserId,
-  note:        LockboxNote,
   unlocklabel: Label,
 })
 
 /**
  * Checks that admit, in every field, whatever passes the floor and no less: a name of any script,
- * up to {@link NameFloorBytes} of UTF-8, and a note up to {@link NoteFloorBytes}, each well-formed,
- * in NFC and free of control characters, a name free of `^` too. What a host keeping labels and
- * notes in any script may pass whole, or start from. Frozen.
+ * up to {@link NameFloorBytes} of UTF-8, well-formed, in NFC, and free of control characters and
+ * `^`. What a host keeping labels in any script may pass whole, or start from. Frozen.
  *
  * @example openVault({ ...opts, validators: AnyTextValidators })
  * @example openVault({ ...opts, validators: { ...AnyTextValidators, userId: UserId } })
@@ -272,6 +217,5 @@ export const AnyTextValidators = /* @__PURE__ */ Object.freeze({
   vaultlabel:  NameFloor,
   boxlabel:    NameFloor,
   userId:      NameFloor,
-  note:        NoteFloor,
   unlocklabel: NameFloor,
 })

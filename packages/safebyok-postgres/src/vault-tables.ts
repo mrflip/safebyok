@@ -37,21 +37,24 @@ CREATE TABLE IF NOT EXISTS safebyok_bundles (
 
 -- One lockbox per boxlabel, beside its vault's scope and vault_id. A lockbox stands only while
 -- its vault's bundle does, under the same vault_id: erasing the bundle erases its lockboxes with
--- it, and no write can leave a lockbox in a vault made anew. A null note is a lockbox with none.
+-- it, and no write can leave a lockbox in a vault made anew. The public bag is kept as the JSON
+-- text it was written as, never jsonb, which would rewrite it: that text is bound into the lockbox.
 CREATE TABLE IF NOT EXISTS safebyok_lockboxes (
-  applabel            text   NOT NULL,
-  user_id             text   NOT NULL,
-  vaultlabel          text   NOT NULL,
-  vault_id            text   NOT NULL,
-  format              text   NOT NULL,
-  boxlabel            text   NOT NULL,
-  revision_id         text   NOT NULL,
-  vault_key_epoch     bigint NOT NULL,
-  lockbox_key_wrapped jsonb  NOT NULL,
-  whisper_ciphered    jsonb  NOT NULL,
-  note                text,
-  registered_at       bigint NOT NULL,
-  changed_at          bigint NOT NULL,
+  applabel               text   NOT NULL,
+  user_id                text   NOT NULL,
+  vaultlabel             text   NOT NULL,
+  vault_id               text   NOT NULL,
+  format                 text   NOT NULL,
+  boxlabel               text   NOT NULL,
+  revision_id            text   NOT NULL,
+  vault_key_epoch        bigint NOT NULL,
+  lockbox_key_wrapped    jsonb  NOT NULL,
+  whisper_ciphered       jsonb  NOT NULL,
+  whisper_codec          text   NOT NULL,
+  whisper_schema_version bigint NOT NULL,
+  public_json            text   NOT NULL,
+  registered_at          bigint NOT NULL,
+  changed_at             bigint NOT NULL,
   PRIMARY KEY (applabel, user_id, vaultlabel, boxlabel),
   FOREIGN KEY (applabel, user_id, vaultlabel, vault_id)
     REFERENCES safebyok_bundles (applabel, user_id, vaultlabel, vault_id) ON DELETE CASCADE

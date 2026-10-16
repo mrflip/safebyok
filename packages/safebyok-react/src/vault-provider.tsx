@@ -131,7 +131,6 @@ export const VaultProvider = ({ userId, children, ...opts }: VaultProviderProps)
   const vaultlabelCheck = validators?.vaultlabel
   const boxlabelCheck = validators?.boxlabel
   const userIdCheck = validators?.userId
-  const noteCheck = validators?.note
   const unlocklabelCheck = validators?.unlocklabel
   const [vault, setVault] = useState<Vault | null>(null)
   // The dialog showing now, if any, and the actions waiting on it. The ref is what the callbacks
@@ -166,7 +165,7 @@ export const VaultProvider = ({ userId, children, ...opts }: VaultProviderProps)
     let gone = false
     // Listed one by one so the effect re-runs on each; `satisfies` fails the build if an openVault
     // option is ever added and not passed through.
-    const checks = { applabel: applabelCheck, vaultlabel: vaultlabelCheck, boxlabel: boxlabelCheck, userId: userIdCheck, note: noteCheck, unlocklabel: unlocklabelCheck } satisfies Record<keyof VaultValidators, unknown>
+    const checks = { applabel: applabelCheck, vaultlabel: vaultlabelCheck, boxlabel: boxlabelCheck, userId: userIdCheck, unlocklabel: unlocklabelCheck } satisfies Record<keyof VaultValidators, unknown>
     const openOpts = { applabel, vaultlabel, userId, vaultDB, deviceDB, forcePassphraseReentryHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger, validators: checks, whenIdentityRevoked } satisfies Record<keyof OpenVaultOpts, unknown>
     void openVault(openOpts).then((opened) => {
       if (gone) { opened.close(); return }
@@ -194,7 +193,7 @@ export const VaultProvider = ({ userId, children, ...opts }: VaultProviderProps)
       setOpenFailure(null)
       setOpenError(null)
     }
-  }, [userId, applabel, vaultlabel, vaultDB, deviceDB, forcePassphraseReentryHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger, whenIdentityRevoked, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, noteCheck, unlocklabelCheck, openAttempt, endAsking])
+  }, [userId, applabel, vaultlabel, vaultDB, deviceDB, forcePassphraseReentryHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger, whenIdentityRevoked, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, unlocklabelCheck, openAttempt, endAsking])
 
   const retryOpen = useCallback(() => {
     if (openError !== null) { setOpenAttempt((prev) => prev + 1) }
@@ -202,7 +201,7 @@ export const VaultProvider = ({ userId, children, ...opts }: VaultProviderProps)
 
   const eraseDamagedVault = useCallback(async () => {
     if (userId === null || ! isVaultError(openError, 'damaged_bundle')) { return }
-    const validators = { applabel: applabelCheck, vaultlabel: vaultlabelCheck, boxlabel: boxlabelCheck, userId: userIdCheck, note: noteCheck, unlocklabel: unlocklabelCheck } satisfies Record<keyof VaultValidators, unknown>
+    const validators = { applabel: applabelCheck, vaultlabel: vaultlabelCheck, boxlabel: boxlabelCheck, userId: userIdCheck, unlocklabel: unlocklabelCheck } satisfies Record<keyof VaultValidators, unknown>
     try {
       await eraseStoredDamagedVault({ applabel, vaultlabel, userId, vaultDB, deviceDB, validators })
     } catch (err) {
@@ -212,7 +211,7 @@ export const VaultProvider = ({ userId, children, ...opts }: VaultProviderProps)
       throw err
     }
     setOpenAttempt((prev) => prev + 1)
-  }, [openError, userId, applabel, vaultlabel, vaultDB, deviceDB, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, noteCheck, unlocklabelCheck])
+  }, [openError, userId, applabel, vaultlabel, vaultDB, deviceDB, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, unlocklabelCheck])
 
   /** Waits on the dialog showing now, opening one if none is; settles false while there is no vault. */
   const awaitUnlock = useCallback(() => new Promise<boolean>((settle) => {

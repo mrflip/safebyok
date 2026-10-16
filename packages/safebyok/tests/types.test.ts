@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as Z from 'zod/mini'
-import { DeviceMark, DeviceUnlock, EpochMillis, FarFuture, FarPast, ForeverMs, Lockbox, LockboxSummary, MaxUnlocks, VaultBundle, VaultScope, Whisper } from '../src/types'
+import { DeviceMark, DeviceUnlock, EpochMillis, FarFuture, FarPast, ForeverMs, Lockbox, LockboxSummary, MaxUnlocks, PublicBag, VaultBundle, VaultScope, Whisper } from '../src/types'
 import * as TH from './test-helpers'
 
 const WhisperCases = [
@@ -140,27 +140,31 @@ describe("VaultBundle", () => {
   }
 })
 
-const { note: _note, ...notelessBox } = TH.boxOf('anthropic_api_key', 'a1')
-const { registered_at: _boxRegistered, changed_at: _boxChanged, ...boxWithoutTimes } = notelessBox
+const wholeBox = TH.boxOf('anthropic_api_key', 'a1')
+const { registered_at: _boxRegistered, changed_at: _boxChanged, ...boxWithoutTimes } = wholeBox
+const { public_json: _publicJson, ...bagless } = wholeBox
 const LockboxCases = [
   // regular usage:
-  [TH.boxOf('anthropic_api_key', 'a1'),                   true,   'a whole lockbox, with its note'],
-  [notelessBox,                                            true,   'a lockbox with no note field at all'],
-  // a stored vault is a contract: earlier versions wrote a lockbox with no note as `note:
-  // undefined`, which IndexedDB's structured clone keeps, so it still reads as no note
-  [{ ...notelessBox, note: undefined },                    true,   'a lockbox an earlier version stored with an undefined note'],
+  [wholeBox,                                               true,   'a whole lockbox, with its public bag'],
+  [{ ...wholeBox, public_json: '{}' },                     true,   'a lockbox with an empty public bag'],
+  [{ ...wholeBox, public_json: '"just text"' },            true,   'a public bag of any JSON, not only an object'],
+  [{ ...wholeBox, public_json: '{"b":1, "a":2}' },         true,   'a public bag as JSON text however written: it is bound as stored'],
+  [{ ...wholeBox, boxlabel: 'Ключ API: מפתח' },           true,   'a boxlabel of any text'],
   // refused, as a damaged or foreign record:
-  [{ ...notelessBox, note: null },                         false,  'a null note'],
-  [{ ...notelessBox, note: 'n'.repeat(257) },              true,   'a note of any length: the validators check notes, not the record'],
-  [{ ...notelessBox, boxlabel: 'Ключ API: מפתח' },        true,   'a boxlabel of any text'],
-  [{ ...notelessBox, note: 42 },                           false,  'a note that is not text'],
-  [{ ...notelessBox, format: 'safebyok-lockbox-v3' },      false,  'a format this version does not know'],
-  [{ ...notelessBox, format: 'safebyok-lockbox-v1' },      false,  'a lockbox from before vaultKey epochs'],
-  [{ ...notelessBox, vault_key_epoch: 1.5 },               false,  'a vaultKey epoch that is not a whole number'],
-  [{ ...notelessBox, changed_at: FarFuture + 1 },          false,  'a changed_at past FarFuture'],
-  [{ ...notelessBox, registered_at: Infinity },            false,  'a registered_at that never comes'],
-  [{ ...notelessBox, changed_at: null },                   false,  'a null changed_at'],
-  [{ ...notelessBox, registered_at: Date.UTC(2026, 9, 14) + 0.5 }, false, 'a registered_at with a fraction of a millisecond'],
+  [bagless,                                                false,  'a lockbox with no public bag: one is always written'],
+  [{ ...wholeBox, public_json: '{"note":' },               false,  'a public bag that is not JSON'],
+  [{ ...wholeBox, public_json: { note: 'work' } },         false,  'a public bag stored as an object rather than its JSON'],
+  [{ ...wholeBox, note: 'work account' },                  true,   'an unknown field such as the old note is dropped, never kept'],
+  [{ ...wholeBox, whisper_codec: 'json_v2' },              false,  'a whisper codec this version does not know'],
+  [{ ...wholeBox, whisper_schema_version: 2 },             false,  'a whisper schema version this version does not know'],
+  [TH.omitting(wholeBox, 'whisper_codec'),                 false,  'a lockbox missing its whisper codec'],
+  [{ ...wholeBox, format: 'safebyok-lockbox-v4' },         false,  'a format this version does not know'],
+  [{ ...wholeBox, format: 'safebyok-lockbox-v2' },         false,  'a lockbox from before the public bag'],
+  [{ ...wholeBox, vault_key_epoch: 1.5 },                  false,  'a vaultKey epoch that is not a whole number'],
+  [{ ...wholeBox, changed_at: FarFuture + 1 },             false,  'a changed_at past FarFuture'],
+  [{ ...wholeBox, registered_at: Infinity },               false,  'a registered_at that never comes'],
+  [{ ...wholeBox, changed_at: null },                      false,  'a null changed_at'],
+  [{ ...wholeBox, registered_at: Date.UTC(2026, 9, 14) + 0.5 }, false, 'a registered_at with a fraction of a millisecond'],
   [boxWithoutTimes,                                        false,  'a lockbox missing its times'],
   [{ ...boxWithoutTimes, created_at: OldIso, updated_at: OldIso }, false, 'a lockbox from before its times were named registered_at and changed_at'],
 ] as const
@@ -169,32 +173,54 @@ describe("Lockbox", () => {
   for (const [candidate, expected, blurb] of LockboxCases) {
     it(blurb, () => { expect(Lockbox.safeParse(candidate).success).to.eq(expected) })
   }
+
+  it("keeps none of a field it does not know, such as the note a lockbox once had", () => {
+    expect(Lockbox.parse({ ...wholeBox, note: 'work account' })).to.deep.equal(wholeBox)
+  })
 })
 
-const { format: _format, lockbox_key_wrapped: _wrapped, whisper_ciphered: _ciphered, ...notelessSummary } = notelessBox
-const SummaryNoteCases = [
-  // however a lockbox's lack of a note was stored, its summary says null:
-  [notelessSummary,                                  null,            'a lockbox stored with no note field, as one is today'],
-  [{ ...notelessSummary, note: undefined },          null,            'a lockbox an earlier version stored with an undefined note'],
-  [{ ...notelessSummary, note: null },               null,            'a summary already null, parsed again'],
-  // and a note is kept as it is:
-  [{ ...notelessSummary, note: 'work account' },     "work account",  'a lockbox with a note'],
+const PublicBagCases = [
+  // any JSON value:
+  [{ note: "work account" },          true,   'a plain object, the common case'],
+  [{},                                true,   'an empty bag'],
+  ["work account",                    true,   'a string'],
+  [null,                              true,   'null, a JSON value'],
+  [[1, "two", { three: 3 }],          true,   'an array, nested as deep as it likes'],
+  // what JSON cannot carry is refused, not mangled:
+  [undefined,                         false,  'undefined is not a JSON value'],
+  [{ when: new Date() },              false,  'a Date would silently flatten to {}'],
+  [{ count: NaN },             false,  'NaN would silently become null'],
+  [() => 'nope',                      false,  'a function is not data'],
 ] as const
 
-describe("LockboxSummary", () => {
-  for (const [candidate, expected, blurb] of SummaryNoteCases) {
-    it(blurb, () => { expect(LockboxSummary.parse(candidate).note).to.eq(expected) })
+describe("PublicBag", () => {
+  for (const [candidate, expected, blurb] of PublicBagCases) {
+    it(blurb, () => { expect(PublicBag.safeParse(candidate).success).to.eq(expected) })
   }
 
-  it("takes a note of any length, as a stored lockbox does, and refuses one that is not text", () => {
-    expect(LockboxSummary.safeParse({ ...notelessSummary, note: 'n'.repeat(257) }).success).to.be.true
-    expect(LockboxSummary.safeParse({ ...notelessSummary, note: 42 }).success).to.be.false
+  it("passes the examples its doc block shows", () => {
+    expect(PublicBag.parse({ note: 'work account', project: 'atlas' })).to.deep.equal({ note: 'work account', project: 'atlas' })
+    expect(PublicBag.safeParse({ when: new Date() }).success).to.be.false
+    expect(PublicBag.safeParse(undefined).success).to.be.false
+  })
+})
+
+const wholeSummary = { boxlabel: 'anthropic', revision_id: 'r1', vault_key_epoch: 1, public: {}, registered_at: Date.UTC(2026, 9, 14), changed_at: Date.UTC(2026, 9, 14) }
+
+describe("LockboxSummary", () => {
+  it("marks a summary undamaged, as its example shows", () => {
+    expect(LockboxSummary.parse(wholeSummary).damaged).to.be.false
   })
 
-  it("strips the two ciphered fields and the format from a whole lockbox, and marks it undamaged", () => {
-    const summary = LockboxSummary.parse(TH.boxOf('anthropic_api_key', 'a1'))
-    expect(Object.keys(summary)).to.have.members(['boxlabel', 'revision_id', 'vault_key_epoch', 'note', 'registered_at', 'changed_at', 'damaged'])
-    expect(summary.damaged).to.be.false
+  it("takes a public bag of any JSON, and refuses a summary without one", () => {
+    expect(LockboxSummary.safeParse({ ...wholeSummary, public: { note: 'work account' } }).success).to.be.true
+    expect(LockboxSummary.safeParse({ ...wholeSummary, public: [1, 2] }).success).to.be.true
+    expect(LockboxSummary.safeParse(TH.omitting(wholeSummary, 'public')).success).to.be.false
+  })
+
+  it("holds neither ciphered field, the format nor the codec: a whole lockbox is not a summary", () => {
+    const summary = LockboxSummary.parse({ ...wholeBox, public: {} })
+    expect(Object.keys(summary)).to.have.members(['boxlabel', 'revision_id', 'vault_key_epoch', 'public', 'registered_at', 'changed_at', 'damaged'])
   })
 })
 
@@ -318,7 +344,7 @@ describe("Stored record formats", () => {
     const format = schema.shape.format.def.values.join(' | ')
     it(format, () => {
       const rendered = Z.toJSONSchema(schema, { unrepresentable: 'any' })
-      expect(rendered, `The ${format} record's schema changed: bump format, then write the new format's snapshot`).toMatchSnapshot()
+      expect(rendered, `The ${format} record's schema is not the one on record: if its shape changed, bump format, then write the new format's snapshot (vitest -u)`).toMatchSnapshot()
     })
   }
 })

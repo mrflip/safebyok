@@ -172,6 +172,24 @@ describe("VaultDashboard, its lockboxes", () => {
     await waitFor(() => { expect(within(rowOf('anthropic_api_key')).queryByText('rotated')).to.not.be.null })
     const vault = await world.openUnlocked()
     expect(await vault.read('anthropic_api_key')).to.eq('sk-ant-test-replaced')
+    expect(vault.getSnapshot().boxes[0]).to.deep.include({ public: { note: 'rotated' } })
+  })
+
+  it("keeps a lockbox's note when a new whisper is stored over it with the note left blank", async () => {
+    const world = TH.makeWorld()
+    world.renderInVault(<VaultDashboard />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Add a lockbox' }))
+    fillForm({ boxlabel: 'anthropic_api_key', whisper: 'sk-ant-test-not-a-real-key', note: 'work account' })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await TH.answerPassphraseDialog()
+    await screen.findByText('anthropic_api_key')
+    fireEvent.click(screen.getByRole('button', { name: 'Add a lockbox' }))
+    fillForm({ boxlabel: 'anthropic_api_key', whisper: 'sk-ant-test-replaced', note: ' '.repeat(3) })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => { expect(screen.queryByRole('button', { name: 'Save' })).to.be.null })
+    expect(within(rowOf('anthropic_api_key')).getByText('work account')).to.not.be.null
+    const vault = await world.openUnlocked()
+    expect(await vault.read('anthropic_api_key')).to.eq('sk-ant-test-replaced')
   })
 
   it("deletes a lockbox once the user confirms, and keeps it when they don't", async () => {

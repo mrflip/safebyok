@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   cipherBinding, cipherBytes, decipherBytes, deriveWrappingKey, fromB64, importWrappingKeyBytes,
   makeLocalUnlockKey, makeLockboxKey, makeVaultKey, randomBytes, randomId, toB64, unwrapKeyUnder, wrapKeyUnder,
+  type CipherBindingPart,
 } from '../src/crypto'
 import * as TH from './test-helpers'
 
@@ -43,11 +44,15 @@ describe("cipherBinding", () => {
     expect(toB64(cipherBinding('ab', 'c'))).to.not.eq(toB64(cipherBinding('a', 'bc')))
   })
 
-  it("encodes a record part with its keys sorted, an undefined field left out as if never there", () => {
-    const header = cipherBinding('safebyok-lockbox-v1', { revision_id: 'r1', boxlabel: 'anthropic', changed_at: 1 })
-    expect(toB64(cipherBinding('safebyok-lockbox-v1', { boxlabel: 'anthropic', changed_at: 1, revision_id: 'r1' }))).to.eq(toB64(header))
-    expect(toB64(cipherBinding('safebyok-lockbox-v1', { boxlabel: 'anthropic', changed_at: 1, revision_id: 'r1', note: undefined }))).to.eq(toB64(header))
-    expect(toB64(cipherBinding('safebyok-lockbox-v1', { boxlabel: 'anthropic', changed_at: 1, revision_id: 'r1', note: '' }))).to.not.eq(toB64(header))
+  it("encodes a record part with its keys sorted, every field bound", () => {
+    const header = cipherBinding('safebyok-lockbox-v3', { revision_id: 'r1', boxlabel: 'anthropic', changed_at: 1 })
+    expect(toB64(cipherBinding('safebyok-lockbox-v3', { boxlabel: 'anthropic', changed_at: 1, revision_id: 'r1' }))).to.eq(toB64(header))
+    expect(toB64(cipherBinding('safebyok-lockbox-v3', { boxlabel: 'anthropic', changed_at: 1, revision_id: 'r1', public_json: '{}' }))).to.not.eq(toB64(header))
+  })
+
+  it("refuses a record part holding a field set to undefined as bad_option, rather than binding it as if it were not there", () => {
+    const holding = { boxlabel: 'anthropic', changed_at: 1, revision_id: 'r1', public_json: undefined } as unknown as CipherBindingPart
+    TH.expectSyncRefusal(() => cipherBinding('safebyok-lockbox-v3', holding), 'bad_option')
   })
 })
 

@@ -1,5 +1,5 @@
 import * as Z from 'zod/mini'
-import { DeviceMark, DeviceUnlock, LockboxSummary, type DamagedLockbox, type Lockbox, ForcePassphraseReentryHours, FarFuture, FarPast, ForeverMs, MaxLockboxes, MaxUnlocks, MaxWhisperBytes, PasskeySaltBytes, VaultBundle, type VaultScope, Whisper, wallClock, type Clock, type PasskeyProof, type UnlockEnvelope, type UnlockSummary } from './types'
+import { DeviceMark, DeviceUnlock, LockboxSummary, PublicBag, type DamagedLockbox, type Lockbox, ForcePassphraseReentryHours, FarFuture, FarPast, ForeverMs, MaxLockboxes, MaxUnlocks, MaxWhisperBytes, PasskeySaltBytes, VaultBundle, type VaultScope, Whisper, wallClock, type Clock, type PasskeyProof, type UnlockEnvelope, type UnlockSummary } from './types'
 import * as Names from './names'
 import type { VaultValidators } from './validators'
 import { VaultError, isVaultError } from './errors'
@@ -98,8 +98,9 @@ export type OpenVaultOpts = {
    */
   clock?: Clock | undefined
   /**
-   * The largest whisper `store()` accepts, in bytes of its JSON. Default: {@link MaxWhisperBytes},
-   * 40444. Checked on write only, so lowering it never strands a whisper already stored. At most
+   * The largest whisper `store()` accepts, in bytes of its JSON and its lockbox's public bag's
+   * together. Default: {@link MaxWhisperBytes}, 40444. Checked on write only, so lowering it never
+   * strands a whisper already stored. At most
    * half the vaultDB's `maxRecordBytes`: openVault refuses more with kind 'bad_option'.
    */
   maxWhisperBytes?: number | undefined
@@ -122,12 +123,11 @@ export type OpenVaultOpts = {
    */
   logger?: VaultLogger | undefined
   /**
-   * The checks for the vault's names and notes where they enter it, as a {@link VaultValidators}
-   * bag: each field given replaces ours (`Label` for each label, an unlock's `unlocklabel` among
-   * them, `UserId` for the user, `LockboxNote` for a note, from `safebyok/validators`), and each
-   * left out keeps ours. Each is a Zod schema that checks synchronously, and only checks: what
-   * passes is kept exactly as given. Beneath every one, the floor (`NameFloor`, `NoteFloor`) holds
-   * whatever the bag says. Kind 'bad_option' for a bag holding anything else, or a field it does
+   * The checks for the vault's names where they enter it, as a {@link VaultValidators} bag: each
+   * field given replaces ours (`Label` for each label, an unlock's `unlocklabel` among them,
+   * `UserId` for the user, from `safebyok/validators`), and each left out keeps ours. Each is a Zod
+   * schema that checks synchronously, and only checks: what passes is kept exactly as given.
+   * Beneath every one, the floor (`NameFloor`) holds whatever the bag says. Kind 'bad_option' for a bag holding anything else, or a field it does
    * not know.
    */
   validators?: VaultValidators | undefined
@@ -342,7 +342,8 @@ export type Vault = {
 
   /**
    * Write a whisper into the lockbox `boxlabel`, creating or replacing it. Requires unlocked;
-   * kind 'whisper_too_large' when its JSON is over the vault's `maxWhisperBytes`, and kind
+   * kind 'whisper_too_large' when its JSON and the lockbox's public bag's together are over the
+   * vault's `maxWhisperBytes`, and kind
    * 'vault_full' when `boxlabel` is new and the vault already holds its `maxLockboxes` -- erase
    * one first. Replacing a lockbox is never refused by `maxLockboxes`, though storage may refuse a
    * heavier replacement in a full vault as kind 'vault_full'.
@@ -368,24 +369,27 @@ export type Vault = {
    * A lockbox whose stored record cannot be read as one -- every lockbox the snapshot lists as
    * damaged, and also one that lists as sound but whose ciphered fields are missing or malformed
    * -- is overwritten as though it were new: erased first, then written with nothing carried
-   * from it, neither its note nor its `registered_at`. Should the write then fail, the old record
-   * is gone and the call throws: storing again writes the lockbox afresh. (A record that reads
-   * but will not decipher, its ciphertext altered, is replaced as any other, its note and
+   * from it, neither its public bag nor its `registered_at`. Should the write then fail, the old
+   * record is gone and the call throws: storing again writes the lockbox afresh. (A record that
+   * reads but will not decipher, its ciphertext altered, is replaced as any other, its bag and
    * `registered_at` kept.) A boxlabel the vault's check refuses is kind 'bad_label', writing
    * nothing, even where a lockbox stored under other checks stands under it: that one reads and
    * erases by its name, but is never written anew under it.
    *
-   * `opts.note` is the lockbox's public note, shown while locked: text the vault's note check
-   * passes (by default `LockboxNote`: at most 256 characters), or null for none -- kind
-   * 'bad_option' otherwise. Left out, the lockbox keeps the note it has. Never put secret
-   * material in a note. A lockbox heavier, whisper and names and note together, than storage
-   * holds in one record is refused with kind 'lockbox_too_large'; one that would take the vault
-   * past what its storage holds of one vault, with kind 'vault_full'.
+   * `opts.public` is the lockbox's public bag ({@link PublicBag}): any JSON value, shown in the
+   * snapshot while locked, never interpreted by the vault -- kind 'bad_option' for anything JSON
+   * cannot carry. Check its shape yourself before storing it. Left out, the lockbox keeps the bag
+   * it has, and a new lockbox gets `{}`; `{}` empties it. The bag is stored in the clear and
+   * bound into the lockbox's encryption, so a bag altered in storage makes the lockbox refuse to
+   * open. Never put secret material in it. A lockbox heavier, whisper and names and bag together,
+   * than storage holds in one record is refused with kind 'lockbox_too_large'; one that would take
+   * the vault past what its storage holds of one vault, with kind 'vault_full'.
    *
-   * @example await vault.store('anthropic_api_key', 'sk-ant-...', { note: 'work account' })
-   * @example await vault.store('anthropic_api_key', 'sk-ant-...', { note: null })  // and no note
+   * @example await vault.store('anthropic_api_key', 'sk-ant-...', { public: { note: 'work account' } })
+   * @example await vault.store('anthropic_api_key', 'sk-ant-...')                 // keeps the bag it has
+   * @example await vault.store('anthropic_api_key', 'sk-ant-...', { public: {} })  // and empties it
    */
-  store(boxlabel: string, whisper: Whisper, opts?: { note?: string | null | undefined }): Promise<void>
+  store(boxlabel: string, whisper: Whisper, opts?: { public?: PublicBag | undefined }): Promise<void>
   /**
    * The whisper in `boxlabel`. Requires unlocked; kind 'absent_box' when there is none, and
    * 'damaged_lockbox' when its stored record fails its checks, or will not open under the vault's
@@ -542,9 +546,9 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   const localBinding = (vaultId: string, epoch: number, deadline: number) => (
     cipherBinding('safebyok-unlock-v1', applabel, scope.user_id, vaultlabel, vaultId, epoch, deadline, 'vault_key_local_wrapped')
   )
-  // A lockbox's binds the vault it lies in, and its record's whole public header: every field but
-  // the two encrypted ones, so a note, a time or its vaultKey's epoch altered in storage refuses
-  // to open.
+  // A lockbox's binds its format, the vault it lies in, and its record's whole public header:
+  // every field but the format, which leads, and the two encrypted ones, so a bag, a time, its
+  // codec or its vaultKey's epoch altered in storage refuses to open.
   const boxBinding = (vaultId: string, header: LockboxHeader, purpose: 'lockbox_key_wrapped' | 'whisper_ciphered') => (
     cipherBinding(LockboxFormat, applabel, scope.user_id, vaultlabel, vaultId, purpose, header)
   )
@@ -993,14 +997,24 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   }
 
   /**
-   * What one lockbox counts for against the vault's storage: room for a whisper of
-   * `maxWhisperBytes` (twice that, as {@link StoredBytesPerWhisperByte} says), its fixed-size
-   * fields, and its scope, boxlabel and note as measured, so names and notes of any length are
-   * counted as they are.
+   * What one lockbox counts for against the vault's storage: room for a whisper and public bag of
+   * `maxWhisperBytes` together (twice that, as {@link StoredBytesPerWhisperByte} says), its
+   * fixed-size fields, and its scope and boxlabel as measured, so names of any length are counted
+   * as they are.
    */
-  const lockboxWeight = (boxlabel: string, note: string | null = null) => (
-    (whisperByteLimit * StoredBytesPerWhisperByte) + LockboxFixedBytes + jsonBytes([scope, boxlabel, note])
+  const lockboxWeight = (boxlabel: string) => (
+    (whisperByteLimit * StoredBytesPerWhisperByte) + LockboxFixedBytes + jsonBytes([scope, boxlabel])
   )
+
+  /**
+   * Refuse a whisper whose JSON, with the public bag's beside it, is over `maxWhisperBytes`: kind
+   * 'whisper_too_large', quoting neither.
+   */
+  const ensureWhisperFits = (whisperBytes: Uint8Array, publicJson: string) => {
+    const publicBytes = new TextEncoder().encode(publicJson).length
+    if (whisperBytes.length + publicBytes <= whisperByteLimit) { return }
+    throw new VaultError('whisper_too_large', `That whisper and its lockbox's public bag are over this vault's limit of ${String(whisperByteLimit)} bytes of JSON together: check that the right value is being stored. If it really is meant to be this large, pass a larger maxWhisperBytes to openVault.`)
+  }
 
   /**
    * Refuse a write that would crowd the vault: a new lockbox while it holds `maxLockboxes`, or any
@@ -1009,15 +1023,14 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
    * every change pushed from storage refreshes, so a store costs no extra read of the whole vault;
    * a vault that looks full is caught up with storage before it is refused.
    */
-  const ensureRoomFor = async (boxlabel: string, note: string | null, prev: Lockbox | null) => {
-    const weight = lockboxWeight(boxlabel, note)
-    // A replacement no heavier than what it replaces never makes the vault fuller: it always lands.
-    if (prev !== null && weight <= lockboxWeight(prev.boxlabel, prev.note)) { return }
+  const ensureRoomFor = async (boxlabel: string, prev: Lockbox | null) => {
+    // A replacement weighs what it replaces, so it never makes the vault fuller: it always lands.
+    if (prev !== null) { return }
+    const weight = lockboxWeight(boxlabel)
     const crowding = () => {
       const others = boxes.filter((box) => box.boxlabel !== boxlabel)
-      if (prev === null && others.length >= lockboxLimit) { return 'count' }
-      // A damaged box is weighed by its boxlabel alone: nothing else of it is trusted.
-      const othersWeight = others.reduce((sum, box) => sum + lockboxWeight(box.boxlabel, box.damaged ? null : box.note), 0)
+      if (others.length >= lockboxLimit) { return 'count' }
+      const othersWeight = others.reduce((sum, box) => sum + lockboxWeight(box.boxlabel), 0)
       return othersWeight + weight > vaultByteLimit ? 'bytes' : null
     }
     if (crowding() === null) { return }
@@ -1027,7 +1040,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       throw new VaultError('vault_full', `This vault already holds its limit of ${String(lockboxLimit)} lockboxes: erase one before storing another. A vault meant to hold more can be opened with a larger maxLockboxes, up to what its storage adapter allows.`)
     }
     if (crowded === 'bytes') {
-      throw new VaultError('vault_full', `This vault has no room for that lockbox in the ${String(vaultByteLimit)} bytes its storage holds of one vault, counting each lockbox's boxlabel and note and room for a whisper of maxWhisperBytes: erase a lockbox, or store a shorter note or boxlabel.`)
+      throw new VaultError('vault_full', `This vault has no room for that lockbox in the ${String(vaultByteLimit)} bytes its storage holds of one vault, counting each lockbox's boxlabel and room for a whisper and public bag of maxWhisperBytes: erase a lockbox, or store under a shorter boxlabel.`)
     }
   }
 
@@ -1097,7 +1110,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
    */
   const decipherLockbox = async (unlockedKey: CryptoKey, standing: VaultBundle, lockbox: Lockbox): Promise<Whisper> => {
     let whisperBytes: Uint8Array
-    const { lockbox_key_wrapped: lockboxKeyWrapped, whisper_ciphered: whisperCiphered, ...header } = lockbox
+    const { format: _format, lockbox_key_wrapped: lockboxKeyWrapped, whisper_ciphered: whisperCiphered, ...header } = lockbox
     const vaultId = standing.vault_id
     const unwrappingKey = unwrappingKeyFor(unlockedKey, standing, lockbox)
     try {
@@ -1272,16 +1285,14 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       // A name the check refuses is never written anew, even where a lockbox stored under other
       // checks stands under it: reading and erasing reach that one.
       const label = Names.check(rules, 'boxlabel', boxlabel)
-      const givenNote = storeOpts?.note === undefined || storeOpts.note === null ? storeOpts?.note : Names.check(rules, 'note', storeOpts.note)
+      const givenPublicJson = publicJsonOf(storeOpts)
       const checked = Whisper.safeParse(whisper)
       // The refusal never quotes its input: a whisper stays out of error messages.
       if (! checked.success) {
         throw new VaultError('bad_whisper', 'A whisper must be a JSON value: a string, number, boolean, array, or plain object. A bare null or undefined cannot be stored -- to empty a lockbox, erase it. (null inside an array or object is fine.)')
       }
       const whisperBytes = new TextEncoder().encode(stableJsonify(checked.data))
-      if (whisperBytes.length > whisperByteLimit) {
-        throw new VaultError('whisper_too_large', `That whisper is over this vault's limit of ${String(whisperByteLimit)} bytes of JSON: check that the right value is being stored. If it really is meant to be this large, pass a larger maxWhisperBytes to openVault.`)
-      }
+      ensureWhisperFits(whisperBytes, givenPublicJson ?? EmptyPublicJson)
       // Each attempt reads the box afresh and seals the whisper anew, under a lockboxKey and a
       // revision of its own; only the write that follows is ever repeated.
       let boxStood = false
@@ -1296,8 +1307,9 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
         // A damaged box is overwritten as a fresh store: nothing in it can be carried forward.
         const prev = standing === 'damaged' ? null : standing
         boxStood ||= prev !== null
-        const note = noteToStore(givenNote, prev)
-        await ensureRoomFor(label, note, prev)
+        const publicJson = givenPublicJson ?? prev?.public_json ?? EmptyPublicJson
+        ensureWhisperFits(whisperBytes, publicJson)
+        await ensureRoomFor(label, prev)
         // The key and the vault it belongs to, taken together after the last look at storage.
         const unlockedKey = keyInHand()
         const standingBundle = currentBundle()
@@ -1312,16 +1324,17 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
         // meanwhile by another device, refuses it.
         const expected = { vault_id: vaultId, revision_id: prev?.revision_id ?? null, vault_key_epoch: vaultKeyEpoch }
         const header: LockboxHeader = {
-          format:              LockboxFormat,
-          boxlabel:            label,
-          revision_id:         revisionId,
-          vault_key_epoch:     vaultKeyEpoch,
-          // A box with no note is stored with no note field: never a null or undefined one.
-          ...(note !== null && { note }),
-          registered_at:       prev?.registered_at ?? now,
-          changed_at:          unchanged ? prev.changed_at : now,
+          boxlabel:               label,
+          revision_id:            revisionId,
+          vault_key_epoch:        vaultKeyEpoch,
+          whisper_codec:          'json_v1',
+          whisper_schema_version: 1,
+          public_json:            publicJson,
+          registered_at:          prev?.registered_at ?? now,
+          changed_at:             unchanged ? prev.changed_at : now,
         }
         const lockbox: Lockbox = {
+          format:              LockboxFormat,
           ...header,
           lockbox_key_wrapped: await wrapKeyUnder(unlockedKey, lockboxKey, boxBinding(vaultId, header, 'lockbox_key_wrapped')),
           whisper_ciphered:    await cipherBytes(lockboxKey, whisperBytes, boxBinding(vaultId, header, 'whisper_ciphered')),
@@ -1570,10 +1583,29 @@ const FirstUnlocklabel = 'passphrase'
 const FirstVaultKeyEpoch = 1
 
 /** The lockbox's format, as each record carries it and each of its bindings begins. */
-const LockboxFormat = 'safebyok-lockbox-v2'
+const LockboxFormat = 'safebyok-lockbox-v3'
 
-/** A lockbox's public header: every field of its record but the two encrypted ones, all bound into both. */
-type LockboxHeader = Omit<Lockbox, 'lockbox_key_wrapped' | 'whisper_ciphered'>
+/**
+ * A lockbox's public header: every field of its record but its format, which leads each binding,
+ * and the two encrypted ones. All of it is bound into both.
+ */
+type LockboxHeader = Omit<Lockbox, 'format' | 'lockbox_key_wrapped' | 'whisper_ciphered'>
+
+/** The public bag a lockbox is given none of has, as JSON. */
+const EmptyPublicJson = '{}'
+
+/**
+ * The public bag a `store()` was handed, as the JSON a lockbox keeps, keys sorted; undefined when
+ * it was handed none. Kind 'bad_option' for anything JSON cannot carry, quoting none of it.
+ */
+const publicJsonOf = (storeOpts: { public?: PublicBag | undefined } | undefined): string | undefined => {
+  if (storeOpts?.public === undefined) { return undefined }
+  const checked = PublicBag.safeParse(storeOpts.public)
+  if (! checked.success) {
+    throw new VaultError('bad_option', "A lockbox's public bag must be a JSON value: a string, number, boolean, null, array, or plain object, with nothing JSON cannot carry (undefined, a function, a Date) inside it.")
+  }
+  return stableJsonify(checked.data)
+}
 
 /** An unlock_id as a host hands one back: the id of one of the snapshot's `unlocks`. */
 const unlockIdShape = Z.string().check(Z.minLength(1))
@@ -1665,11 +1697,6 @@ const retryStale = async <ResultT>(attempt: () => Promise<ResultT>, attemptsLeft
   }
 }
 
-/** The note a store writes: the one given, or -- given none -- the one `prev` stands with; null for none. */
-const noteToStore = (given: string | null | undefined, prev: Lockbox | null): string | null => (
-  given === undefined ? prev?.note ?? null : given
-)
-
 // The refusal never quotes the boxlabel: a host's validators may admit any text, a mistaken paste among it.
 const absentBox = () => new VaultError('absent_box', 'No lockbox stands under that boxlabel in this vault: its snapshot lists the ones it holds.')
 
@@ -1727,29 +1754,31 @@ const parseDeviceDB = (candidate: DeviceDB): DeviceDB => {
 }
 
 /**
- * How many bytes of storage a vault reserves for each byte of whisper: two. Stored, a whisper's
- * ciphertext is base64, a third larger than the whisper; the rest is room for each backend's own
- * way of counting bytes. So one whisper may claim at most half of an adapter's `maxRecordBytes`.
+ * How many bytes of storage a vault reserves for each byte of whisper and public bag: two.
+ * Stored, a whisper's ciphertext is base64, a third larger than the whisper, and a bag's JSON,
+ * written as text inside its record, at most twice its own (each quote and backslash escaped);
+ * the rest is room for each backend's own way of counting bytes. So one whisper and its bag may
+ * claim at most half of an adapter's `maxRecordBytes`.
  */
 export const StoredBytesPerWhisperByte = 2
 
 /**
- * The room openVault plans for a lockbox's stored fields besides its whisper, in bytes of their
- * JSON, when it checks that `maxLockboxes` lockboxes fit the storage's `maxVaultBytes`: its
- * format, boxlabel, revision, note, times, wrapped lockboxKey, the cipherIv and tag of its
- * whisperCiphered, and the scope a backend files it under. Under the default validators, at their
- * largest -- a forty-character boxlabel, applabel and vaultlabel, a note of 256 UTF-16 code units
- * and a user_id of 100, each unit at three UTF-8 bytes -- they take under 1700. A host's
- * validators may admit longer names and notes, so each store also weighs its lockbox as it is
- * ({@link LockboxFixedBytes}); this is only the plan.
+ * The room openVault plans for a lockbox's stored fields besides its whisper and public bag, in
+ * bytes of their JSON, when it checks that `maxLockboxes` lockboxes fit the storage's
+ * `maxVaultBytes`: its format, boxlabel, revision, codec, times, wrapped lockboxKey, the cipherIv
+ * and tag of its whisperCiphered, and the scope a backend files it under. Under the default
+ * validators, at their largest -- a forty-character boxlabel, applabel and vaultlabel and a
+ * user_id of 100, each unit at three UTF-8 bytes -- they take under 1000. A host's validators may
+ * admit longer names, so each store also weighs its lockbox as it is ({@link LockboxFixedBytes});
+ * this is only the plan.
  */
 export const LockboxFieldsBytes = 2048
 
 /**
  * Room for the stored fields every lockbox has at the same size, in bytes of their JSON: its
- * format, revision, times, wrapped lockboxKey, and the cipherIv and tag of its whisperCiphered,
- * with every field's name. A store weighs a lockbox as this, its whisper's room, and its scope,
- * boxlabel and note as measured.
+ * format, revision, codec, times, wrapped lockboxKey, and the cipherIv and tag of its
+ * whisperCiphered, with every field's name. A store weighs a lockbox as this, its whisper and
+ * bag's room, and its scope and boxlabel as measured.
  */
 export const LockboxFixedBytes = 512
 

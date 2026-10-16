@@ -7,7 +7,6 @@ import { ConvexError } from 'convex/values'
 import { VaultError, memoryDeviceDB, openVault } from 'safebyok'
 import * as TH from './test-helpers'
 import { convexVaultDB } from '../src/index'
-import { toConvexLockbox } from '../src/convex-vault-db'
 import { MaxVaultLockboxes } from '../src/component/tallies'
 import type { ConvexVaultClient, SafebyokApi } from '../src/index'
 import type { GetUserId } from '../src/server'
@@ -67,24 +66,6 @@ for (const [clientTitle, connect] of ClientCases) {
 }
 
 const u1 = TH.scopeOf('u1')
-
-describe("toConvexLockbox", () => {
-  const { note: _note, ...noteless } = TH.boxOf('anthropic_api_key', 'a1')
-
-  it("keeps a lockbox's note", () => {
-    expect(toConvexLockbox(TH.boxOf('anthropic_api_key', 'a1'))).to.deep.equal(TH.boxOf('anthropic_api_key', 'a1'))
-  })
-
-  it("drops an undefined note, as an earlier version's store may hold one", () => {
-    const converted = toConvexLockbox({ ...noteless, note: undefined })
-    expect(converted).to.deep.equal(noteless)
-    expect(converted).to.not.have.property('note')
-  })
-
-  it("leaves a lockbox with no note as it is", () => {
-    expect(toConvexLockbox(noteless)).to.deep.equal(noteless)
-  })
-})
 
 describe("convexVaultDB, as it is made", () => {
   it("holds at most Convex's document limit in one record", () => {
@@ -184,7 +165,7 @@ describe("convexVaultDB, refusing", () => {
     await vaultDB.createBundle(TH.bundleOf('u1'))
     await vaultDB.updateBox(u1, TH.boxOf('openai', 'two'), TH.noBoxYet)
     // Past the adapter's own checks, straight to the component, which bounds no time's form.
-    const lockbox = toConvexLockbox({ ...TH.boxOf('anthropic', 'one'), changed_at: Date.UTC(2026, 9, 14) + 0.5 })
+    const lockbox = { ...TH.boxOf('anthropic', 'one'), changed_at: Date.UTC(2026, 9, 14) + 0.5 }
     await client.mutation(deployment.api.safebyok.updateBox, { scope: u1, lockbox, expected: TH.noBoxYet })
     const listed = await vaultDB.listBoxes(u1)
     expect(listed.map((box) => [box.boxlabel, box.damaged])).to.deep.equal([['anthropic', true], ['openai', false]])
@@ -240,11 +221,13 @@ describe("a record the deployment refused", () => {
   const quotableUnlocks = [TH.envelopeOf('quotable_phrase', { vault_key_epoch: 52_874, device_id: 'device_quotable', registered_at: Date.UTC(2026, 8, 17) })]
   const standing = TH.bundleOf(subject, { ...scope, ...quotableKey, unlock_epoch: 52_871, unlocks: quotableUnlocks })
   const nextBundle = { ...standing, unlock_epoch: 52_872, vault_key_passphrase_wrapped: TH.fakeCiphered('rewrapped_quotable') }
-  const lockbox = TH.boxOf('quotable_box', 'quotable_rev', { note: 'a quotable note', vault_key_epoch: 52_874 })
+  const lockbox = TH.boxOf('quotable_box', 'quotable_rev', { public_json: TH.publicJsonOf({ note: 'a quotable bag' }), vault_key_epoch: 52_874 })
+  // The whisper's codec and schema version are the same in every lockbox, so nothing to quote.
+  const { whisper_codec: _codec, whisper_schema_version: _version, ...quotableBox } = lockbox
 
   const RefusedWrites: [string, unknown, (vaultDB: ReturnType<typeof convexVaultDB>) => Promise<unknown>][] = [
     ['updateBundle', nextBundle, (vaultDB) => vaultDB.updateBundle(nextBundle, { vault_id: standing.vault_id, unlock_epoch: 52_871 })],
-    ['updateBox',    lockbox,    (vaultDB) => vaultDB.updateBox(scope, lockbox, { vault_id: standing.vault_id, revision_id: null, vault_key_epoch: 52_874 })],
+    ['updateBox',    quotableBox, (vaultDB) => vaultDB.updateBox(scope, lockbox, { vault_id: standing.vault_id, revision_id: null, vault_key_epoch: 52_874 })],
   ]
 
   for (const [verb, record, write] of RefusedWrites) {
@@ -279,12 +262,12 @@ describe("a record the deployment refused", () => {
     const client = deployment.client(subject)
     await convexVaultDB(client, deployment.api.safebyok).createBundle(standing)
     const expected = { vault_id: standing.vault_id, revision_id: null, vault_key_epoch: lockbox.vault_key_epoch }
-    const quotedArgs = misnoted({ scope, lockbox: toConvexLockbox(lockbox), expected })
+    const quotedArgs = misbagged({ scope, lockbox, expected })
     await expect(client.mutation(deployment.api.safebyok.updateBox, quotedArgs)).rejects.toThrow('quoted_by_convex')
     const quoting: ConvexVaultClient = {
       query:    client.query.bind(client),
       onUpdate: client.onUpdate.bind(client),
-      mutation: (mutationRef, args) => client.mutation(mutationRef, misnoted(args)),
+      mutation: (mutationRef, args) => client.mutation(mutationRef, misbagged(args)),
     }
     const vaultDB = convexVaultDB(quoting, deployment.api.safebyok)
     const refusal = await TH.expectRefusal(vaultDB.updateBox(scope, lockbox, expected), 'storage_unavailable')
@@ -294,8 +277,8 @@ describe("a record the deployment refused", () => {
   })
 })
 
-/** `args` with its lockbox's note not text, past the core's checks: convex-test's validator quotes it. */
-const misnoted = <ArgsT extends object>(args: ArgsT): ArgsT => ({ ...args, lockbox: { ...(args as { lockbox?: object }).lockbox, note: ['quoted_by_convex'] } })
+/** `args` with its lockbox's public bag not text, past the core's checks: convex-test's validator quotes it. */
+const misbagged = <ArgsT extends object>(args: ArgsT): ArgsT => ({ ...args, lockbox: { ...(args as { lockbox?: object }).lockbox, public_json: ['quoted_by_convex'] } })
 
 /** Resolves once every message already sent to `vaultDB`'s client has arrived: one round trip behind them. */
 const caughtUp = async (vaultDB: ReturnType<typeof convexVaultDB>) => { await vaultDB.readBundle(u1) }

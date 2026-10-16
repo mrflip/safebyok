@@ -1,6 +1,6 @@
 import * as Z from 'zod/mini'
 import { Ciphered } from './crypto'
-import { NameFloor, NoteFloor } from './validators'
+import { NameFloor } from './validators'
 
 /**
  * The JSON a whisper is made of. `null` is legal here -- inside an array or object -- because
@@ -141,64 +141,94 @@ const vaultKeyEpoch = Z.int().check(Z.positive())
 const cryptoKeyHandle = Z.custom<CryptoKey>((val) => val instanceof CryptoKey, 'a CryptoKey handle')
 
 /**
+ * A lockbox's public bag: any JSON value the host keeps beside the whisper -- what the user calls
+ * the account, which project a key belongs to -- shown while the vault is locked, and never
+ * interpreted by safebyok. It is stored in the clear, as its JSON (`public_json`), and bound into
+ * the lockbox's encryption, so a bag altered or swapped in storage makes the lockbox refuse to
+ * open. A host checks its own bag's shape before `store()`. Never put secret material in it.
+ *
+ * @example PublicBag.parse({ note: 'work account', project: 'atlas' })
+ * @example PublicBag.safeParse({ when: new Date() }).success   // false: JSON would flatten it to {}
+ * @example PublicBag.safeParse(undefined).success              // false: undefined is not JSON
+ */
+export const PublicBag: Z.ZodMiniType<WhisperJson> = whisperJson
+export type PublicBag = Z.infer<typeof PublicBag>
+
+/** True when `text` is JSON text: what a lockbox's `public_json` holds. */
+const isJsonText = (text: string): boolean => {
+  try {
+    JSON.parse(text)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
  * One lockbox as the storage layer holds it: the whisper ciphered under its own lockboxKey, that
- * lockboxKey wrapped under the vaultKey, and the public shell -- boxlabel, note, the times it
- * was first stored and last changed -- a locked vault may show. Nothing in this record opens without the vaultKey.
+ * lockboxKey wrapped under the vaultKey, and the public shell -- boxlabel, public bag, the times
+ * it was first stored and last changed -- a locked vault may show. Nothing in this record opens
+ * without the vaultKey.
  *
  * `revision_id` is minted fresh on every write and bound into both encryptions, so ciphertext
- * moved between revisions (or boxes, or vaults) refuses to open.
+ * moved between revisions (or boxes, or vaults) refuses to open. So is every other field but the
+ * two encrypted ones: an altered bag, time or codec refuses to open as well.
  *
  * Stored fields are underbar_case: this record is written to the storage layer as-is, and it is
- * plain JSON -- any backend that can hold text can hold it. Its boxlabel and note are checked here
- * against the floor every name and note is held to (`NameFloor`, `NoteFloor`); the vault's
- * validators check them only where a host hands them in.
+ * plain JSON -- any backend that can hold text can hold it. Its boxlabel is checked here against
+ * the floor every name is held to (`NameFloor`); the vault's validators check it only where a
+ * host hands it in.
  */
 export const Lockbox = Z.object({
-  format:              Z.literal('safebyok-lockbox-v2'),
-  boxlabel:            NameFloor,
-  revision_id:         Z.string().check(Z.minLength(1)),
+  format:                 Z.literal('safebyok-lockbox-v3'),
+  boxlabel:               NameFloor,
+  revision_id:            Z.string().check(Z.minLength(1)),
   /**
    * Which vaultKey this lockbox's lockboxKey is wrapped under: the bundle's `vault_key_epoch` when
    * it was written. Public, so a locked vault's listing shows which lockboxes stand under which.
    */
-  vault_key_epoch:     vaultKeyEpoch,
+  vault_key_epoch:        vaultKeyEpoch,
   /** This lockbox's lockboxKey, wrapped under the vaultKey. */
-  lockbox_key_wrapped: Ciphered,
+  lockbox_key_wrapped:    Ciphered,
   /** The whisper, ciphered under this lockbox's lockboxKey. */
-  whisper_ciphered:    Ciphered,
+  whisper_ciphered:       Ciphered,
+  /** How the whisper became the bytes ciphered: `json_v1`, its JSON with every object's keys sorted, as UTF-8. */
+  whisper_codec:          Z.literal('json_v1'),
+  /** Which generation of the whisper's own shape this lockbox holds: 1, the only one so far. */
+  whisper_schema_version: Z.literal(1),
   /**
-   * The lockbox's public note, as the vault's note check passed it (`LockboxNote` by default).
-   * Written only when there is one; read as absent when undefined too, as IndexedDB keeps it.
+   * The lockbox's {@link PublicBag}, as JSON with every object's keys sorted: `{}` when the host
+   * gave none. Always written, so a lockbox with no bag and one with an empty bag are one record.
    */
-  note:                Z.optional(NoteFloor),
+  public_json:            Z.string().check(Z.refine(isJsonText, "public_json holds the lockbox's public bag as JSON text")),
   /** When this boxlabel was first stored, an {@link EpochMillis}: every later store carries it forward. */
-  registered_at:       EpochMillis,
+  registered_at:          EpochMillis,
   /**
    * When the whisper last changed, an {@link EpochMillis}: a store whose whisper serializes the
    * same as the one it replaces writes a new revision and leaves this standing.
    */
-  changed_at:          EpochMillis,
+  changed_at:             EpochMillis,
 })
 export type Lockbox = Z.infer<typeof Lockbox>
 
-/** A summary's note: null where the lockbox has none, however that was stored. */
-const summaryNote = Z._default(Z.nullable(Z.string()), null)
-
 /**
- * The public face of a lockbox: everything but its two encrypted fields, with `note` null when
- * the lockbox has none -- never absent, never undefined, however the record was stored -- and
- * `damaged` false. This, or a {@link DamagedLockbox}, is what a VaultDB's `listBoxes` returns
- * and a vault's snapshot holds, readable while locked.
+ * The public face of a lockbox: its boxlabel, revision, vaultKey epoch and times, its public bag
+ * as the JSON value the host stored (`{}` when it gave none), and `damaged` false. This, or a
+ * {@link DamagedLockbox}, is what a VaultDB's `listBoxes` returns and a vault's snapshot holds,
+ * readable while locked. The bag is shown as storage holds it: only `read()` opens the lockbox
+ * and so proves it unaltered.
  *
- * @example LockboxSummary.parse({ boxlabel: 'anthropic', revision_id: 'r1', vault_key_epoch: 1, registered_at, changed_at }).note  // null
+ * @example LockboxSummary.parse({ boxlabel: 'anthropic', revision_id: 'r1', vault_key_epoch: 1, public: {}, registered_at, changed_at }).damaged  // false
  */
-export const LockboxSummary = Z.extend(
-  Z.omit(Lockbox, { format: true, lockbox_key_wrapped: true, whisper_ciphered: true }),
-  {
-    note:    summaryNote,
-    damaged: Z._default(Z.literal(false), false),
-  },
-)
+export const LockboxSummary = Z.object({
+  boxlabel:        NameFloor,
+  revision_id:     Z.string().check(Z.minLength(1)),
+  vault_key_epoch: vaultKeyEpoch,
+  public:          PublicBag,
+  registered_at:   EpochMillis,
+  changed_at:      EpochMillis,
+  damaged:         Z._default(Z.literal(false), false),
+})
 export type LockboxSummary = Z.infer<typeof LockboxSummary>
 
 /**
@@ -210,7 +240,7 @@ export type LockboxSummary = Z.infer<typeof LockboxSummary>
  *
  * @example
  *   for (const box of snapshot.boxes) {
- *     if (box.damaged) { showRemovable(box.boxlabel) } else { showSummary(box.boxlabel, box.note) }
+ *     if (box.damaged) { showRemovable(box.boxlabel) } else { showSummary(box.boxlabel, box.public) }
  *   }
  */
 export type DamagedLockbox = { boxlabel: string, damaged: true }
@@ -464,8 +494,8 @@ export type DeviceMark = Z.infer<typeof DeviceMark>
 export const ForcePassphraseReentryHours = 168 // seven days
 
 /**
- * The largest whisper a vault stores unless the caller says otherwise, in bytes of its JSON:
- * several times the beefiest credential (an RSA-8192 private key as PEM is about 6.4 KB), and
+ * The largest whisper a vault stores unless the caller says otherwise, in bytes of its JSON and
+ * its lockbox's public bag's together: several times the beefiest credential (an RSA-8192 private key as PEM is about 6.4 KB), and
  * well inside what every storage backend can hold. A larger whisper is usually a sign that the
  * wrong value is being stored.
  */

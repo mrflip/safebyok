@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { AnyTextValidators, Ckeys, VaultError, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, openVault, type KeyDeriver, type Vault, type VaultValidators } from 'safebyok'
+import { AnyTextValidators, Ckeys, Label, VaultError, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, openVault, type KeyDeriver, type Vault, type VaultValidators } from 'safebyok'
 import * as TH from 'safebyok/testing'
 import { Component, useEffect, useLayoutEffect, useState, type ErrorInfo, type ReactNode } from 'react'
 import { VaultProvider, useVault, useVaultSnapshot, type VaultProviderProps } from '../src/vault-provider'
@@ -523,8 +523,9 @@ describe("VaultProvider", () => {
     await first.store('Anthropic API key', 'sk-fake')
     rerender(tree(AnyTextValidators.boxlabel))
     expect(latest().vault).to.eq(first)
-    // Another schema, admitting as much: a new check, so a new vault handle.
-    rerender(tree(AnyTextValidators.note))
+    // Another schema, a narrower one: a new check, so a new vault handle, which lists what is
+    // stored as it stands, the checks running at entry only.
+    rerender(tree(Label))
     await waitFor(() => { expect(latest().vault).to.not.be.null.and.not.eq(first) })
     expect(latest().vault?.getSnapshot().boxes.map((summary) => summary.boxlabel)).to.deep.equal(['Anthropic API key'])
   })

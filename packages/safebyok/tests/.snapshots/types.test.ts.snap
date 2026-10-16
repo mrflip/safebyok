@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`Stored record formats > safebyok-lockbox-v2 1`] = `
+exports[`Stored record formats > safebyok-lockbox-v3 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -16,7 +16,7 @@ exports[`Stored record formats > safebyok-lockbox-v2 1`] = `
       "type": "integer",
     },
     "format": {
-      "const": "safebyok-lockbox-v2",
+      "const": "safebyok-lockbox-v3",
       "type": "string",
     },
     "lockbox_key_wrapped": {
@@ -37,8 +37,7 @@ exports[`Stored record formats > safebyok-lockbox-v2 1`] = `
       ],
       "type": "object",
     },
-    "note": {
-      "maxLength": 4096,
+    "public_json": {
       "type": "string",
     },
     "registered_at": {
@@ -73,6 +72,14 @@ exports[`Stored record formats > safebyok-lockbox-v2 1`] = `
       ],
       "type": "object",
     },
+    "whisper_codec": {
+      "const": "json_v1",
+      "type": "string",
+    },
+    "whisper_schema_version": {
+      "const": 1,
+      "type": "number",
+    },
   },
   "required": [
     "format",
@@ -81,6 +88,9 @@ exports[`Stored record formats > safebyok-lockbox-v2 1`] = `
     "vault_key_epoch",
     "lockbox_key_wrapped",
     "whisper_ciphered",
+    "whisper_codec",
+    "whisper_schema_version",
+    "public_json",
     "registered_at",
     "changed_at",
   ],

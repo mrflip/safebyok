@@ -16,9 +16,9 @@
  * `vault_full` means a new lockbox in a vault already holding its `maxLockboxes` (a limit the
  * client keeps), and also that storage has no room for the write (a limit of the backend's own,
  * such as the Convex component's or the Postgres server's). Either way the user erases a lockbox,
- * or the host raises `maxLockboxes` where the backend allows. `whisper_too_large` is the user's value over
- * `maxWhisperBytes`, so a condition, and `lockbox_too_large` the user's whisper and note together
- * over what storage holds in one record. `bad_label` is a label the app passed that fails the
+ * or the host raises `maxLockboxes` where the backend allows. `whisper_too_large` is the user's value, with its
+ * lockbox's public bag, over `maxWhisperBytes`, so a condition, and `lockbox_too_large` the
+ * user's whisper and bag together over what storage holds in one record. `bad_label` is a label the app passed that fails the
  * vault's check, a misuse -- a label the user types is checked first, with `Label` or with the
  * host's own `validators.boxlabel`.
  *
@@ -51,12 +51,12 @@ export const VaultErrorKindVals = [
   'absent_unlock',       // no unlock envelope of that unlock_id, or none of the method asked for
   'bad_label',           // a label, or the userId, that fails the vault's check for it
   'bad_whisper',         // a whisper JSON cannot carry (undefined, a function, a class), or a non-string
-  'whisper_too_large',   // a whisper over the vault's maxWhisperBytes
-  'lockbox_too_large',   // a lockbox -- whisper, names and note together -- over what storage holds in one record
+  'whisper_too_large',   // a whisper, with its lockbox's public bag, over the vault's maxWhisperBytes
+  'lockbox_too_large',   // a lockbox -- whisper, names and public bag together -- over what storage holds in one record
   'vault_full',          // a new lockbox in a vault already holding its maxLockboxes, or a write storage has no room for
   'too_many_unlocks',    // a new unlock envelope in a vault already holding MaxUnlocks
   'last_unlock',         // removing the vault's last passphrase, which would leave no sure way in
-  'bad_option',          // an option or argument out of its range: openVault's, mask's, argon2idDeriver's, a store()'s note, a VaultDB write's record
+  'bad_option',          // an option or argument out of its range: openVault's, mask's, argon2idDeriver's, a store()'s public bag, a VaultDB write's record
   'vault_closed',        // the vault handle was closed and cannot be used again
   'corrupt_record',      // a stored record failed validation as storage read it back
   'damaged_bundle',      // the vault's stored bundle failed its checks, so no way in can be tried

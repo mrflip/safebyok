@@ -39,8 +39,8 @@ export type PostgresListen = (channel: string, onNotify: (payload: string) => vo
  */
 export type PostgresVaultDB = VaultDB & {
   /**
-   * Every lockbox in `scope` as stored, its two ciphered fields left out, `format` kept and a
-   * missing note missing: what the browser's VaultDB hands back from its own `doListBoxes`, to be
+   * Every lockbox in `scope` as stored, its two ciphered fields left out, `format` kept and the
+   * public bag as its JSON text: what the browser's VaultDB hands back from its own `doListBoxes`, to be
    * validated there. `listBoxes` gives summaries instead, the shape a vault shows, which a VaultDB
    * may not hand back. Refuses as `listBoxes` does: `bad_label` for a malformed scope,
    * `identity_revoked` for another user's, `storage_unavailable` for trouble.

@@ -3,7 +3,7 @@
  * Whispers are encrypted on the user's device under keys that never leave it; the storage layer
  * holds ciphertext only. The IndexedDB device store lives in its own entry point, `safebyok/idb`,
  * the browser's defaults for openVault's options in another, `safebyok/browser`, the checks for
- * names and notes, with their bounds, in `safebyok/validators` as well as here, and the IndexedDB
+ * names, with their bounds, in `safebyok/validators` as well as here, and the IndexedDB
  * vault store in a package of its own, `safebyok-indexeddb`.
  */
 export { Argon2idWebV1 } from './key-deriver-spec'
@@ -15,8 +15,8 @@ export type { EraseDamagedVaultOpts, OpenVaultOpts, Vault, VaultSnapshot, VaultS
 export type { VaultLogger } from './logger'
 export { IdentityRevokedResponseVals } from './refusal-policy'
 export type { IdentityRevokedResponse } from './refusal-policy'
-export { EpochMillis, FarFuture, FarPast, ForcePassphraseReentryHours, ForeverMs, Lockbox, LockboxSummary, MaxLockboxes, MaxUnlocks, MaxWhisperBytes, PasskeyEnvelope, PasskeySaltBytes, PassphraseEnvelope, UnlockEnvelope, UnlockMethodVals, VaultBundle, VaultScope, Whisper, wallClock } from './types'
-export { AnyTextValidators, DefaultValidators, Label, LabelPattern, LockboxNote, MaxLabelChars, MaxNoteChars, MaxUserIdChars, NameFloor, NameFloorBytes, NoteFloor, NoteFloorBytes, UserId, UserIdPattern } from './validators'
+export { EpochMillis, FarFuture, FarPast, ForcePassphraseReentryHours, ForeverMs, Lockbox, LockboxSummary, MaxLockboxes, MaxUnlocks, MaxWhisperBytes, PasskeyEnvelope, PasskeySaltBytes, PassphraseEnvelope, PublicBag, UnlockEnvelope, UnlockMethodVals, VaultBundle, VaultScope, Whisper, wallClock } from './types'
+export { AnyTextValidators, DefaultValidators, Label, LabelPattern, MaxLabelChars, MaxUserIdChars, NameFloor, NameFloorBytes, UserId, UserIdPattern } from './validators'
 export type { NameValidator, VaultValidators } from './validators'
 export { checkValidators } from './names'
 export type { Clock, DamagedLockbox, DeviceMark, DeviceUnlock, PasskeyProof, UnlockMethod, UnlockSummary, WhisperJson } from './types'

@@ -1,5 +1,5 @@
 import * as Z from 'zod/mini'
-import { Lockbox, LockboxSummary, MaxUnlocks, UnlockMethodVals, VaultBundle, VaultScope, type DamagedLockbox } from './types'
+import { Lockbox, MaxUnlocks, UnlockMethodVals, VaultBundle, VaultScope, type DamagedLockbox, type LockboxSummary, type PublicBag } from './types'
 import { VaultError, isVaultError } from './errors'
 import * as Names from './names'
 import { AnyTextValidators, NameFloor } from './validators'
@@ -106,7 +106,7 @@ export abstract class VaultDB {
    * `Infinity` when it sets no per-record limit. A vault refuses to open with a `maxWhisperBytes`
    * over half of it, leaving room for encoding and the record's other fields; and `updateBox`
    * refuses, with kind `lockbox_too_large`, a lockbox that with its scope weighs more than this
-   * as the UTF-8 bytes of its JSON -- a long note or long names can make one so.
+   * as the UTF-8 bytes of its JSON -- a large public bag or long names can make one so.
    */
   abstract readonly maxRecordBytes: number
 
@@ -116,12 +116,12 @@ export abstract class VaultDB {
    * list and erase whole: a backend that reads a vault in one transaction under a read budget
    * declares the share of that budget its heaviest verb leaves. A vault refuses to open when its
    * `maxLockboxes` lockboxes might not fit in it, each counted at twice `maxWhisperBytes` (room
-   * for encoding and for the backend's own counting) and 2 KiB for its other fields, which covers
-   * them at their largest under the default validators. And since a host's validators may admit
-   * names and notes of any length, each `store()` measures them: it refuses, with kind
-   * `vault_full`, a write that would take the vault past this limit, each lockbox counted at
-   * twice `maxWhisperBytes` and the UTF-8 bytes of its scope, boxlabel and note as JSON, with a
-   * little more for its fixed-size fields. That total is a conservative estimate, made before the
+   * for its whisper and public bag together, their encoding, and the backend's own counting) and
+   * 2 KiB for its other fields, which covers them at their largest under the default validators.
+   * And since a host's validators may admit names of any length, each `store()` measures them: it
+   * refuses, with kind `vault_full`, a new lockbox that would take the vault past this limit, each
+   * lockbox counted at twice `maxWhisperBytes` and the UTF-8 bytes of its scope and boxlabel as
+   * JSON, with a little more for its fixed-size fields. That total is a conservative estimate, made before the
    * lockbox is sealed, so at a limit declared exactly tight it may refuse a write that would just
    * have fit; `maxRecordBytes`, by contrast, is checked on the real serialized bytes. A backend
    * that also enforces a limit of its own sets it above what this admits, and refuses a lockbox write past it with a
@@ -208,8 +208,8 @@ export abstract class VaultDB {
   }
 
   /**
-   * Public faces of every lockbox in the vault -- ciphered fields stripped, `note` null where a
-   * lockbox has none -- valid while locked, sorted by boxlabel, character by character (UTF-16
+   * Public faces of every lockbox in the vault -- ciphered fields stripped, the public bag as the
+   * JSON value it holds -- valid while locked, sorted by boxlabel, character by character (UTF-16
    * code unit, never by a locale), so every device lists in one order. A lockbox whose record does
    * not read back as one, or names another boxlabel than it is stored under, is listed as a
    * {@link DamagedLockbox} rather than refused, so one bad record never hides the rest. A row
@@ -237,8 +237,6 @@ export abstract class VaultDB {
   async updateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<void> {
     const asked = heldScope(this, scope)
     heldBoxlabel(this, LabelledBox.safeParse(lockbox).data?.boxlabel)
-    const { note } = NotedBox.safeParse(lockbox).data ?? {}
-    if (note !== undefined) { Names.checkFloor('note', note) }
     const outgoing = checkOutgoing(Lockbox, lockbox, 'lockbox')
     const expectation = checkOutgoing(LockboxExpectation, expected, 'lockbox expectation')
     if (outgoing.vault_key_epoch !== expectation.vault_key_epoch) {
@@ -246,7 +244,7 @@ export abstract class VaultDB {
     }
     const recordBytes = jsonBytes({ ...asked, ...outgoing })
     if (recordBytes > this.maxRecordBytes) {
-      throw new VaultError('lockbox_too_large', `That lockbox weighs ${String(recordBytes)} bytes, over the ${String(this.maxRecordBytes)} its storage holds in one record, so nothing was written: store a smaller whisper, or a shorter note or boxlabel.`)
+      throw new VaultError('lockbox_too_large', `That lockbox weighs ${String(recordBytes)} bytes, over the ${String(this.maxRecordBytes)} its storage holds in one record, so nothing was written: store a smaller whisper or public bag, or under a shorter boxlabel.`)
     }
     const landed = await fromStorage(() => this.doUpdateBox(asked, outgoing, expectation))
     if (! landed) {
@@ -402,15 +400,24 @@ const isNameable = (stored: StoredLockbox): boolean => NameFloor.safeParse((stor
 
 /**
  * One nameable stored lockbox as the listing shows it: its summary, or -- when its record fails
- * the check (its names and note held to the floor among it), or names another boxlabel than it
+ * the check (its names held to the floor among it), or names another boxlabel than it
  * is stored under, as `readBox` would refuse it -- a {@link DamagedLockbox} under the boxlabel it
- * is stored under. A name or note the vault's own validators refuse is no damage: it was stored
+ * is stored under. A name the vault's own validators refuse is no damage: it was stored
  * under other checks, and lists as it stands.
  */
 const listedOrDamaged = ({ boxlabel, lockbox }: StoredLockbox): LockboxSummary | DamagedLockbox => {
   const checked = ListedLockbox.safeParse(lockbox)
   const sound = checked.success && checked.data.boxlabel === boxlabel
-  return sound ? LockboxSummary.parse(checked.data) : { boxlabel, damaged: true }
+  return sound ? summaryOf(checked.data) : { boxlabel, damaged: true }
+}
+
+/**
+ * A listed lockbox's summary: its public fields, and its bag as the JSON value its record holds
+ * (`public_json` is JSON text, as the record's check has found).
+ */
+const summaryOf = (listed: Z.infer<typeof ListedLockbox>): LockboxSummary => {
+  const { boxlabel, revision_id, vault_key_epoch, public_json, registered_at, changed_at } = listed
+  return { boxlabel, revision_id, vault_key_epoch, public: JSON.parse(public_json) as PublicBag, registered_at, changed_at, damaged: false }
 }
 
 /** Two names in one order on every device: character by character, by UTF-16 code unit, never by a locale. */
@@ -472,10 +479,9 @@ const asStorageTrouble = (err: unknown): VaultError => {
   return new VaultError('storage_unavailable', "The vault's storage could not be reached, or failed partway: try again shortly. The storage adapter's own error is this error's cause.", { cause: err })
 }
 
-// The label a lockbox is written under, and its note, each checked before the rest of the record
-// is, so a refusal says which.
+// The label a lockbox is written under, checked before the rest of the record is, so a refusal
+// says which.
 const LabelledBox = Z.object({ boxlabel: Z.string() })
-const NotedBox = Z.object({ note: Z.optional(Z.string()) })
 
 const checkListener = (onChange: unknown) => {
   if (typeof onChange !== 'function') {

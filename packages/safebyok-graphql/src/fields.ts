@@ -53,15 +53,17 @@ export const BundleFields = everyFieldOf<VaultBundle>()([
  * lockbox's fields for the wire. The compiler holds it to the lockbox's shape.
  */
 export const LockboxFields = everyFieldOf<Lockbox>()([
-  ['format',              'plain'],
-  ['boxlabel',            'plain'],
-  ['revision_id',         'plain'],
-  ['vault_key_epoch',     'plain'],
-  ['lockbox_key_wrapped', 'ciphered'],
-  ['whisper_ciphered',    'ciphered'],
-  ['note',                'plain'],
-  ['registered_at',       'plain'],
-  ['changed_at',          'plain'],
+  ['format',                 'plain'],
+  ['boxlabel',               'plain'],
+  ['revision_id',            'plain'],
+  ['vault_key_epoch',        'plain'],
+  ['lockbox_key_wrapped',    'ciphered'],
+  ['whisper_ciphered',       'ciphered'],
+  ['whisper_codec',          'plain'],
+  ['whisper_schema_version', 'plain'],
+  ['public_json',            'plain'],
+  ['registered_at',          'plain'],
+  ['changed_at',             'plain'],
 ] as const)
 
 /** A lockbox as a listing carries it, as `SafebyokListedLockbox` has it: every field but the two ciphered ones. */
@@ -81,12 +83,12 @@ export const selectionOf = (fields: readonly Field[]): string => fields.map(([fi
 
 /**
  * The record `sent` carries, field by field: each of `fields`, a null or missing one left out (a
- * lockbox with no note), and a ciphered one as its two halves -- so whatever else rode along, a
+ * bundle with no prior vaultKey), and a ciphered one as its two halves -- so whatever else rode along, a
  * GraphQL client's `__typename` or a stray field, stays behind. Nothing is checked here: the
  * VaultDB on each side validates what it is handed. What is not an object comes back as it is,
  * for that validation to refuse.
  *
- * @example recordOf({ boxlabel: 'openai', note: null, __typename: 'SafebyokLockbox' }, [['boxlabel', 'plain'], ['note', 'plain']])  // { boxlabel: 'openai' }
+ * @example recordOf({ vault_id: 'v1', prior_vault_key: null, __typename: 'SafebyokVaultBundle' }, [['vault_id', 'plain'], ['prior_vault_key', 'plain']])  // { vault_id: 'v1' }
  */
 export const recordOf = (sent: unknown, fields: readonly Field[]): unknown => {
   if (! isBag(sent)) { return sent }

@@ -8,13 +8,13 @@ describe("selectionOf", () => {
   })
 
   it("asks for a listed lockbox without either ciphered field", () => {
-    expect(selectionOf(ListedLockboxFields)).to.eq('format boxlabel revision_id vault_key_epoch note registered_at changed_at')
+    expect(selectionOf(ListedLockboxFields)).to.eq('format boxlabel revision_id vault_key_epoch whisper_codec whisper_schema_version public_json registered_at changed_at')
   })
 })
 
 describe("recordOf", () => {
   it("keeps the fields asked for, leaving out a null one and a GraphQL client's __typename", () => {
-    expect(recordOf({ boxlabel: 'openai', note: null, __typename: 'SafebyokLockbox' }, [['boxlabel', 'plain'], ['note', 'plain']])).to.deep.equal({ boxlabel: 'openai' })
+    expect(recordOf({ vault_id: 'v1', prior_vault_key: null, __typename: 'SafebyokVaultBundle' }, [['vault_id', 'plain'], ['prior_vault_key', 'plain']])).to.deep.equal({ vault_id: 'v1' })
   })
 
   it("gives back a whole lockbox as it was, and a ciphered field as its two halves alone", () => {
@@ -29,10 +29,15 @@ describe("recordOf", () => {
     expect(recordOf(bundle, BundleFields)).to.deep.equal(bundle)
   })
 
-  it("leaves out a lockbox's missing or undefined note", () => {
-    const { note: _note, ...noteless } = TH.boxOf('openai', 'r1')
-    expect(recordOf({ ...noteless, note: undefined }, LockboxFields)).to.deep.equal(noteless)
-    expect(recordOf(noteless, LockboxFields)).to.not.have.property('note')
+  it("leaves out a bundle's missing or undefined prior vaultKey", () => {
+    const bundle = TH.bundleOf('u1')
+    expect(recordOf({ ...bundle, prior_vault_key: undefined }, BundleFields)).to.deep.equal(bundle)
+    expect(recordOf(bundle, BundleFields)).to.not.have.property('prior_vault_key')
+  })
+
+  it("carries a lockbox's public bag as the JSON text it was written as", () => {
+    const lockbox = TH.boxOf('openai', 'r1', { public_json: '{"b": 1, "a": "caf\u{E9}"}' })
+    expect(recordOf(lockbox, LockboxFields)).to.include({ public_json: '{"b": 1, "a": "caf\u{E9}"}' })
   })
 
   it("drops a field the record has not got", () => {

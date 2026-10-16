@@ -97,14 +97,14 @@ describe("getBox and updateBox", () => {
     expect(await t.query(TH.vaults.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })).to.deep.equal(TH.boxOf('anthropic_api_key', 'a1'))
   })
 
-  it("stores a lockbox without a note with no note field at all, and reads it back so", async () => {
+  it("stores a lockbox's public bag as the JSON text it was handed, and reads it back so", async () => {
     const t = await withBundle()
-    const { note: _note, ...noteless } = TH.boxOf('anthropic_api_key', 'a1')
-    await t.mutation(TH.vaults.updateBox, { scope: u1, lockbox: noteless, expected: TH.noBoxYet })
+    const bagged = TH.boxOf('anthropic_api_key', 'a1', { public_json: TH.publicJsonOf({ note: 'caf\u{E9} "quoted"', tags: [null] }) })
+    await t.mutation(TH.vaults.updateBox, { scope: u1, lockbox: bagged, expected: TH.noBoxYet })
     const { lockboxes } = await allRows(t)
     const [row] = lockboxes
-    expect(row).not.to.have.property('note')
-    expect(await t.query(TH.vaults.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })).to.deep.equal(noteless)
+    expect(row).to.include({ public_json: bagged.public_json })
+    expect(await t.query(TH.vaults.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })).to.deep.equal(bagged)
   })
 
   it("replaces a box whose standing revision is the one expected", async () => {
@@ -321,8 +321,12 @@ describe("a real vault's records", () => {
     }
     const vault = await TH.openOver(memoryStoreHolding(real))
     const listed = await t.query(TH.vaults.listBoxSummaries, { scope: u1 })
-    // The core's summary strips `format` and nulls a missing note; the listing itself holds neither.
-    expect(listed.map((row) => LockboxSummary.parse(row))).to.deep.equal(vault.getSnapshot().boxes)
+    // The core's summary drops `format` and the codec, and parses the public bag's JSON; the
+    // listing holds the record's fields as stored.
+    const summaries = listed.map(({ format: _format, whisper_codec: _codec, whisper_schema_version: _version, public_json: publicJson, ...shell }) => (
+      LockboxSummary.parse({ ...shell, public: JSON.parse(publicJson) as unknown })
+    ))
+    expect(summaries).to.deep.equal(vault.getSnapshot().boxes)
     vault.close()
   })
 })
@@ -526,7 +530,7 @@ describe("a vault's weight limit", () => {
 // lockboxes, each counted at twice maxWhisperBytes plus 2 KiB for its other fields, fit in the
 // 8 MiB: at most 101 of the largest default whisper (40444 bytes of JSON, about 54 KB stored),
 // and at most 1365 of 2 KiB whispers. The tests below fill a vault to each of those, and to each
-// of the component's own limits, with the longest labels and notes, and erase it.
+// of the component's own limits, with the longest labels, and erase it.
 
 /** A bundle as heavy as a Convex document may be, near enough: the most an erase reads beside the lockboxes. */
 const wholeDocumentBundle = () => {
@@ -545,11 +549,9 @@ const fillVault = async (count: number, whisperBytes: number, bundle = TH.bundle
   await t.mutation(TH.vaults.createBundle, { bundle })
   const whisperCiphered = { cipher_iv_b64: 'i'.repeat(16), ciphertext_b64: 'c'.repeat(Math.ceil((whisperBytes + 16) * 4 / 3)) }
   const lockboxKeyWrapped = { cipher_iv_b64: 'i'.repeat(16), ciphertext_b64: 'k'.repeat(64) }
-  // 256 characters of four UTF-8 bytes each: the most a note can weigh.
-  const note = '\u{1F512}'.repeat(256)
   for (let ii = 0; ii < count; ii++) {
     const boxlabel = `b${String(ii).padStart(39, '0')}`
-    const lockbox = TH.boxOf(boxlabel, crypto.randomUUID(), { whisper_ciphered: whisperCiphered, lockbox_key_wrapped: lockboxKeyWrapped, note })
+    const lockbox = TH.boxOf(boxlabel, crypto.randomUUID(), { whisper_ciphered: whisperCiphered, lockbox_key_wrapped: lockboxKeyWrapped })
     if (! await landsOrIsFull(t, lockbox)) { return { t, filledCount: ii } }
   }
   return { t, filledCount: count }

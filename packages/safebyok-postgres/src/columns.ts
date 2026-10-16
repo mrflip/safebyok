@@ -3,8 +3,8 @@ import type { Lockbox, VaultBundle } from 'safebyok'
 /**
  * How one field is stored: `text` as given, `bigint` for a whole number (a time, an epoch), and
  * `jsonb` for an opaque structured value -- a Ciphered, a bundle's prior vaultKey, or its list of
- * unlock envelopes --
- * whose binding safebyok rebuilds from field values, so jsonb's reordering of keys is harmless.
+ * unlock envelopes -- whose binding safebyok rebuilds from field values, so jsonb's reordering of
+ * keys is harmless. A lockbox's `public_json` is `text`: its exact text is what is bound.
  */
 export type ColumnKind = 'text' | 'bigint' | 'jsonb'
 
@@ -48,15 +48,17 @@ export const BundleColumns = everyFieldOf<VaultBundle>()([
  * lockbox's shape.
  */
 export const LockboxColumns = everyFieldOf<Lockbox>()([
-  ['format',              'text'],
-  ['boxlabel',            'text'],
-  ['revision_id',         'text'],
-  ['vault_key_epoch',     'bigint'],
-  ['lockbox_key_wrapped', 'jsonb'],
-  ['whisper_ciphered',    'jsonb'],
-  ['note',                'text'],
-  ['registered_at',       'bigint'],
-  ['changed_at',          'bigint'],
+  ['format',                 'text'],
+  ['boxlabel',               'text'],
+  ['revision_id',            'text'],
+  ['vault_key_epoch',        'bigint'],
+  ['lockbox_key_wrapped',    'jsonb'],
+  ['whisper_ciphered',       'jsonb'],
+  ['whisper_codec',          'text'],
+  ['whisper_schema_version', 'bigint'],
+  ['public_json',            'text'],
+  ['registered_at',          'bigint'],
+  ['changed_at',             'bigint'],
 ] as const)
 
 /** A lockbox as a listing reads it: every column but the two ciphered ones. */
@@ -106,9 +108,10 @@ export const selected = (columns: readonly Column[]): string => columns.map(([fi
 
 /**
  * The record's values for its columns, in their order, as {@link placeholders} numbers them: a
- * jsonb value as its JSON text, and a field the record leaves out (a lockbox with no note) as null.
+ * jsonb value as its JSON text, and a field the record leaves out (a bundle with no prior vaultKey)
+ * as null.
  *
- * @example paramsOf({ vault_id: 'v1', note: undefined }, [['vault_id', 'text'], ['note', 'text']])  // ['v1', null]
+ * @example paramsOf({ vault_id: 'v1', prior_vault_key: undefined }, [['vault_id', 'text'], ['prior_vault_key', 'jsonb']])  // ['v1', null]
  */
 export const paramsOf = (record: object, columns: readonly Column[]): unknown[] => (
   columns.map(([field, kind]) => {
@@ -123,7 +126,7 @@ export const paramsOf = (record: object, columns: readonly Column[]): unknown[] 
  * out, and a jsonb column's text parsed. Nothing is checked here: the VaultDB validates what it
  * reads. A row that is not an object comes back as it is, for that validation to refuse.
  *
- * @example recordOf({ vault_id: 'v1', note: null }, [['vault_id', 'text'], ['note', 'text']])  // { vault_id: 'v1' }
+ * @example recordOf({ vault_id: 'v1', prior_vault_key: null }, [['vault_id', 'text'], ['prior_vault_key', 'jsonb']])  // { vault_id: 'v1' }
  */
 export const recordOf = (row: unknown, columns: readonly Column[]): unknown => {
   if (typeof row !== 'object' || row === null) { return row }

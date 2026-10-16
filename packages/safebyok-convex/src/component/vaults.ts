@@ -244,7 +244,5 @@ const lockboxOfRow = (row: Doc<'safebyok_lockboxes'>): Lockbox => {
   return lockbox
 }
 
-/** The row a lockbox is stored as: its scope columns added, and `note` absent rather than undefined. */
-const boxRowOf = (scope: VaultScope, { note, ...lockbox }: Lockbox) => (
-  note === undefined ? { ...scope, ...lockbox } : { ...scope, ...lockbox, note }
-)
+/** The row a lockbox is stored as: its scope columns added. */
+const boxRowOf = (scope: VaultScope, lockbox: Lockbox) => ({ ...scope, ...lockbox })

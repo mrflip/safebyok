@@ -105,7 +105,7 @@ describe("postgresVaultDB, as the README has it", () => {
     })
     const first = await opened()
     await first.unlock('correct horse battery staple')
-    await first.store('anthropic_api_key', 'sk-ant-test-not-a-real-key', { note: 'work account' })
+    await first.store('anthropic_api_key', 'sk-ant-test-not-a-real-key', { public: { note: 'work account' } })
     await first.store('openai_api_key', { apiKey: 'sk-test-not-a-real-key', orgId: null })
     first.close()
 
@@ -113,7 +113,7 @@ describe("postgresVaultDB, as the README has it", () => {
     await second.unlock('correct horse battery staple')
     expect(await second.read('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
     expect(await second.read('openai_api_key')).to.deep.equal({ apiKey: 'sk-test-not-a-real-key', orgId: null })
-    expect(second.getSnapshot().boxes.map((box) => box.damaged ? null : box.note)).to.deep.equal(['work account', null])
+    expect(second.getSnapshot().boxes.map((box) => box.damaged ? null : box.public)).to.deep.equal([{ note: 'work account' }, {}])
     await second.erase('openai_api_key')
     expect(second.getSnapshot().boxes.map((box) => box.boxlabel)).to.deep.equal(['anthropic_api_key'])
     second.close()
@@ -207,28 +207,32 @@ describe("postgresVaultDB, what it stores", () => {
     expect(standing?.unlocks.map((envelope) => envelope.unlocklabel)).to.deep.equal(['work_phrase', 'home_phrase', 'passphrase'])
   })
 
-  it("stores a lockbox a column to a field, beside its vault's scope and vault_id, and no note as null", async () => {
+  it("stores a lockbox a column to a field, beside its vault's scope and vault_id, its public bag as the text it was written as", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
     await vaultDB.createBundle(TH.bundleOf('u1'))
-    const { note: _note, ...noteless } = TH.boxOf('anthropic', 'one')
-    await vaultDB.updateBox(u1, noteless, noBoxYet)
+    // Spacing jsonb would drop, and keys in an order it would change: the text is bound as written.
+    const publicJson = '{"zeta": 1, "alpha": "café"}'
+    await vaultDB.updateBox(u1, TH.boxOf('anthropic', 'one', { public_json: publicJson }), noBoxYet)
     const { rows } = await db.query('SELECT * FROM safebyok_lockboxes')
     expect(rows).to.deep.equal([{
-      applabel:            'acme',
-      user_id:             'u1',
-      vaultlabel:          'main',
-      vault_id:            'vault-id-u1',
-      format:              'safebyok-lockbox-v2',
-      boxlabel:            'anthropic',
-      revision_id:         'rev-one',
-      vault_key_epoch:     1,
-      lockbox_key_wrapped: TH.fakeCiphered('boxkey-one'),
-      whisper_ciphered:    TH.fakeCiphered('whisper-one'),
-      note:                null,
-      registered_at:       Date.UTC(2026, 9, 14),
-      changed_at:          Date.UTC(2026, 9, 14),
+      applabel:               'acme',
+      user_id:                'u1',
+      vaultlabel:             'main',
+      vault_id:               'vault-id-u1',
+      format:                 'safebyok-lockbox-v3',
+      boxlabel:               'anthropic',
+      revision_id:            'rev-one',
+      vault_key_epoch:        1,
+      lockbox_key_wrapped:    TH.fakeCiphered('boxkey-one'),
+      whisper_ciphered:       TH.fakeCiphered('whisper-one'),
+      whisper_codec:          'json_v1',
+      whisper_schema_version: 1,
+      public_json:            publicJson,
+      registered_at:          Date.UTC(2026, 9, 14),
+      changed_at:             Date.UTC(2026, 9, 14),
     }])
+    expect(await vaultDB.readBox(u1, 'anthropic')).to.include({ public_json: publicJson })
   })
 
   it("lists lockboxes without asking for their ciphered fields", async () => {
@@ -365,8 +369,8 @@ describe("postgresVaultDB, its lockbox limit", () => {
     const vaultDB = await filledTo(db, 5, [])
     const orphan = TH.boxOf('anthropic', 'sk-fake')
     const insertOrphan = db.query(
-      `INSERT INTO safebyok_lockboxes (applabel, user_id, vaultlabel, vault_id, format, boxlabel, revision_id, vault_key_epoch, lockbox_key_wrapped, whisper_ciphered, registered_at, changed_at)
-       VALUES ('acme', 'u1', 'main', 'vault-id-gone', $1, $2, $3, 1, '{}', '{}', 0, 0)`,
+      `INSERT INTO safebyok_lockboxes (applabel, user_id, vaultlabel, vault_id, format, boxlabel, revision_id, vault_key_epoch, lockbox_key_wrapped, whisper_ciphered, whisper_codec, whisper_schema_version, public_json, registered_at, changed_at)
+       VALUES ('acme', 'u1', 'main', 'vault-id-gone', $1, $2, $3, 1, '{}', '{}', 'json_v1', 1, '{}', 0, 0)`,
       [orphan.format, orphan.boxlabel, orphan.revision_id],
     )
     expect(await TH.refusalOf(insertOrphan)).to.have.property('code', '23503')
@@ -484,17 +488,17 @@ describe("postgresVaultDB, its lockbox limit", () => {
 })
 
 describe("postgresVaultDB, listBoxRecords", () => {
-  it("lists each lockbox as stored, ciphered fields left out, format kept, a missing note missing", async () => {
+  it("lists each lockbox as stored, ciphered fields left out, format kept, the public bag as its JSON text", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
     await vaultDB.createBundle(TH.bundleOf('u1'))
-    const { note: _note, ...noteless } = TH.boxOf('openai', 'two')
+    const emptied = TH.boxOf('openai', 'two', { public_json: '{}' })
     await vaultDB.updateBox(u1, TH.boxOf('anthropic', 'one'), noBoxYet)
-    await vaultDB.updateBox(u1, noteless, noBoxYet)
+    await vaultDB.updateBox(u1, emptied, noBoxYet)
     const records = await vaultDB.listBoxRecords(u1)
     const { lockbox_key_wrapped: _wrapped, whisper_ciphered: _ciphered, ...listed } = TH.boxOf('anthropic', 'one')
-    const { lockbox_key_wrapped: _wrappedToo, whisper_ciphered: _cipheredToo, ...listedNoteless } = noteless
-    expect(records).to.have.deep.members([listed, listedNoteless])
+    const { lockbox_key_wrapped: _wrappedToo, whisper_ciphered: _cipheredToo, ...listedEmptied } = emptied
+    expect(records).to.have.deep.members([listed, listedEmptied])
   })
 
   it("is what a browser's VaultDB may hand back from its doListBoxes, where listBoxes's summaries are not", async () => {
@@ -503,7 +507,7 @@ describe("postgresVaultDB, listBoxRecords", () => {
     await vaultDB.createBundle(TH.bundleOf('u1'))
     await vaultDB.updateBox(u1, TH.boxOf('anthropic', 'one'), noBoxYet)
     const [record] = await vaultDB.listBoxRecords(u1)
-    expect(record).to.have.property('format', 'safebyok-lockbox-v2')
+    expect(record).to.have.property('format', 'safebyok-lockbox-v3')
     const [summary] = await vaultDB.listBoxes(u1)
     expect(summary).to.not.have.property('format')
   })

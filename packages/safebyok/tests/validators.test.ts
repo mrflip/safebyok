@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as ZClassic from 'zod'
 import * as Validators from '../src/validators'
-import { AnyTextValidators, DefaultValidators, Label, LabelPattern, LockboxNote, MaxLabelChars, MaxNoteChars, MaxUserIdChars, NameFloor, NameFloorBytes, NoteFloor, NoteFloorBytes, UserId, UserIdPattern } from '../src/validators'
+import { AnyTextValidators, DefaultValidators, Label, LabelPattern, MaxLabelChars, MaxUserIdChars, NameFloor, NameFloorBytes, UserId, UserIdPattern } from '../src/validators'
 import { VaultScope } from '../src/types'
 import * as Ckeys from '../src/ckeys'
 import * as TH from './test-helpers'
@@ -9,7 +9,7 @@ import * as TH from './test-helpers'
 describe("safebyok/validators, as an entry point", () => {
   it("exports the default checks, their bounds, and the schemas a host's forms use, and no record schema", () => {
     expect(Object.keys(Validators)).to.have.members([
-      'AnyTextValidators', 'DefaultValidators', 'Label', 'LabelPattern', 'LockboxNote', 'MaxLabelChars', 'MaxNoteChars', 'MaxUserIdChars', 'NameFloor', 'NameFloorBytes', 'NoteFloor', 'NoteFloorBytes', 'UserId', 'UserIdPattern',
+      'AnyTextValidators', 'DefaultValidators', 'Label', 'LabelPattern', 'MaxLabelChars', 'MaxUserIdChars', 'NameFloor', 'NameFloorBytes', 'UserId', 'UserIdPattern',
     ])
   })
 })
@@ -156,31 +156,6 @@ describe("NameFloor", () => {
   })
 })
 
-const NoteFloorCases = [
-  // regular usage:
-  ["",                               true,   'an empty note'],
-  ["work account\nrotated in March", true,   'a newline'],
-  ["rotated\tin March",              true,   'a tab'],
-  ["n".repeat(NoteFloorBytes),       true,   'four kibibytes is the ceiling'],
-  // refused:
-  ["n".repeat(NoteFloorBytes + 1),   false,  'a byte over four kibibytes'],
-  ["work\r\naccount",                false,  'a carriage return'],
-  ["beep\u{7}",                      false,  'a control character'],
-  ["cafe\u{301}",                    false,  'an accented letter decomposed: not NFC'],
-  ["key \u{D83D}",                   false,  'half of an emoji'],
-] as const
-
-describe("NoteFloor", () => {
-  for (const [candidate, expected, blurb] of NoteFloorCases) {
-    it(blurb, () => { expect(NoteFloor.safeParse(candidate).success).to.eq(expected) })
-  }
-
-  it("passes and refuses as its examples show", () => {
-    expect(NoteFloor.safeParse('work account\nrotated in March').success).to.be.true
-    expect(NoteFloor.safeParse('beep\u{7}').success).to.be.false
-  })
-})
-
 describe("MaxLabelChars and LabelPattern", () => {
   it("are the bounds Label checks: forty characters, and the pattern alone", () => {
     expect(Label.safeParse('x'.repeat(MaxLabelChars)).success).to.be.true
@@ -199,64 +174,6 @@ describe("MaxLabelChars and LabelPattern", () => {
   })
 })
 
-const NoteCases = [
-  // regular usage:
-  ["work account",         true,   'a few words'],
-  ["",                     true,   'even empty text'],
-  ["n".repeat(256),        true,   'two hundred fifty-six characters is the ceiling'],
-  ["rotated\tin March",     true,   'a tab'],
-  ["work\nrotated in March", true,  'a newline'],
-  ["key \u{1F511}",          true,   'an emoji, whole'],
-  ["Mixed: עברית, ไทย",     true,   'any script'],
-  // refused:
-  ["n".repeat(257),        false,  'two hundred fifty-seven is one too many'],
-  ["work\r\naccount",       false,  'a carriage return, which a textarea never hands up'],
-  ["beep\u{7}",            false,  'a C0 control character: the bell'],
-  ["nul\0",             false,  'a NUL'],
-  ["esc\u{1B}[31mred",      false,  'an escape, as a terminal colour code starts'],
-  ["del\u{7F}",             false,  'DEL'],
-  ["next\u{85}line",        false,  'a C1 control character: next line'],
-  ["csi\u{9B}",             false,  'the last C1 control character'],
-  ["key \u{D83D}",            false,  'half of an emoji: a lone surrogate'],
-  [null,                   false,  'null: a lockbox with no note stores no note field'],
-  [42,                     false,  'a number is not a note'],
-] as const
-
-/** What LockboxNote says of a note it refuses: its issues' messages, as one text. */
-const noteRefusalSaid = (note: string) => JSON.stringify(LockboxNote.safeParse(note).error?.issues.map((issue) => issue.message))
-
-describe("LockboxNote", () => {
-  for (const [candidate, expected, blurb] of NoteCases) {
-    it(blurb, () => { expect(LockboxNote.safeParse(candidate).success).to.eq(expected) })
-  }
-
-  it("hands a note back as it is, as its examples show", () => {
-    expect(LockboxNote.parse('work account')).to.eq('work account')
-    expect(LockboxNote.parse('work account\nrotated in March')).to.eq('work account\nrotated in March')
-    expect(LockboxNote.safeParse('beep\u{7}').success).to.be.false
-  })
-
-  it("says which characters it refuses, without quoting the note", () => {
-    expect(noteRefusalSaid('secret-ish\u{7}')).to.include('no control characters but tab and newline')
-    expect(noteRefusalSaid('secret-ish\u{D800}')).to.include('lone surrogate')
-    expect(noteRefusalSaid('secret-ish\u{7}') + noteRefusalSaid('secret-ish\u{D800}')).to.not.include('secret-ish')
-  })
-})
-
-describe("MaxNoteChars", () => {
-  it("is the bound LockboxNote checks", () => {
-    expect(LockboxNote.safeParse('n'.repeat(MaxNoteChars)).success).to.be.true
-    expect(LockboxNote.safeParse('n'.repeat(MaxNoteChars + 1)).success).to.be.false
-  })
-
-  it("names its bound when a note is refused, and never quotes the note", () => {
-    const refused = LockboxNote.safeParse(`secret-ish ${'n'.repeat(MaxNoteChars)}`)
-    const said = JSON.stringify(refused.error?.issues.map((issue) => issue.message))
-    expect(said).to.include('at most 256 characters')
-    expect(said).to.not.include('secret-ish')
-  })
-})
-
 describe("AnyTextValidators", () => {
   it("admits, in every field, whatever passes the floor, and nothing that is not text", () => {
     for (const check of Object.values(AnyTextValidators)) {
@@ -268,8 +185,8 @@ describe("AnyTextValidators", () => {
     expect(Object.isFrozen(AnyTextValidators)).to.be.true
   })
 
-  it("is the floor itself, field by field: a name's for each name, a note's for the note", () => {
-    expect(AnyTextValidators).to.deep.equal({ applabel: NameFloor, vaultlabel: NameFloor, boxlabel: NameFloor, userId: NameFloor, note: NoteFloor, unlocklabel: NameFloor })
+  it("is the floor itself, field by field", () => {
+    expect(AnyTextValidators).to.deep.equal({ applabel: NameFloor, vaultlabel: NameFloor, boxlabel: NameFloor, userId: NameFloor, unlocklabel: NameFloor })
   })
 
   it("refuses, in every field, a lone surrogate, a carriage return, and text not in NFC", () => {
@@ -281,16 +198,16 @@ describe("AnyTextValidators", () => {
     }
   })
 
-  it("refuses any control character in a name, a tab and a newline included, which a note may hold", () => {
+  it("refuses any control character in a name, a tab and a newline included", () => {
     expect(AnyTextValidators.boxlabel.safeParse('two\nlines').success).to.be.false
-    expect(AnyTextValidators.note.safeParse('two\nlines').success).to.be.true
+    expect(AnyTextValidators.boxlabel.safeParse('two\tcolumns').success).to.be.false
   })
 
   it("answers for text of millions of characters, refusing it by its length", () => {
     const vast = 'n'.repeat(12_000_000)
-    expect(AnyTextValidators.note.safeParse(vast).success).to.be.false
-    const said = JSON.stringify(LockboxNote.safeParse(`${vast}\u{0007}\u{D800}`).error?.issues.map((issue) => issue.message))
-    expect(said).to.include('at most 256 characters')
+    expect(AnyTextValidators.boxlabel.safeParse(vast).success).to.be.false
+    const said = JSON.stringify(NameFloor.safeParse(`${vast}\u{0007}\u{D800}`).error?.issues.map((issue) => issue.message))
+    expect(said).to.include('at most 1024 bytes')
   })
 
   it("passes and refuses as its examples show", () => {
@@ -306,11 +223,10 @@ describe("AnyTextValidators", () => {
 })
 
 describe("DefaultValidators", () => {
-  it("checks each label with Label, an unlocklabel included, the user with UserId, and a note with LockboxNote", () => {
-    expect(DefaultValidators).to.deep.equal({ applabel: Label, vaultlabel: Label, boxlabel: Label, userId: UserId, note: LockboxNote, unlocklabel: Label })
+  it("checks each label with Label, an unlocklabel included, and the user with UserId", () => {
+    expect(DefaultValidators).to.deep.equal({ applabel: Label, vaultlabel: Label, boxlabel: Label, userId: UserId, unlocklabel: Label })
     expect(DefaultValidators.applabel).to.eq(Label)
     expect(DefaultValidators.userId).to.eq(UserId)
-    expect(DefaultValidators.note).to.eq(LockboxNote)
   })
 
   it("is frozen: a host replaces a check in openVault's validators, never here", () => {
@@ -325,15 +241,15 @@ describe("DefaultValidators", () => {
 
 describe("the default validators, inside a host's own Zod", () => {
   // A host on classic Zod holds them in its own schemas, as a form checking a lockbox might.
-  const BoxForm = ZClassic.object({ scope: VaultScope, boxlabel: Label, note: ZClassic.optional(LockboxNote) })
+  const BoxForm = ZClassic.object({ scope: VaultScope, boxlabel: Label, userId: ZClassic.optional(UserId) })
 
   it("compose into a classic Zod schema and check as they do alone", () => {
-    const form = { scope: TH.scopeOf('u1'), boxlabel: 'anthropic_api_key', note: 'work account' }
+    const form = { scope: TH.scopeOf('u1'), boxlabel: 'anthropic_api_key', userId: 'auth0|5f7c8ec7' }
     expect(BoxForm.parse(form)).to.deep.equal(form)
   })
 
   it("refuse inside a classic Zod schema what they refuse alone", () => {
     expect(BoxForm.safeParse({ scope: TH.scopeOf('u1'), boxlabel: 'ANTHROPIC' }).success).to.be.false
-    expect(BoxForm.safeParse({ scope: TH.scopeOf('u1'), boxlabel: 'anthropic', note: 'n'.repeat(257) }).success).to.be.false
+    expect(BoxForm.safeParse({ scope: TH.scopeOf('u1'), boxlabel: 'anthropic', userId: 'u'.repeat(101) }).success).to.be.false
   })
 })

@@ -5,7 +5,7 @@ import { VaultDB, jsonBytes, localVaultDB, type BundleExpectation, type EraseExp
 import { VaultError } from '../src/errors'
 import type { Lockbox, VaultBundle, VaultScope } from '../src/types'
 import * as Ckeys from '../src/ckeys'
-import { NameFloorBytes, NoteFloorBytes } from '../src/validators'
+import { NameFloorBytes } from '../src/validators'
 import * as TH from './test-helpers'
 
 
@@ -147,23 +147,31 @@ describe("localVaultDB", () => {
     expect(store.ckeys()).to.have.members(earlier)
   })
 
-  it("reads lockboxes as written today, with a note and without one, and writes them back the same", async () => {
+  it("reads lockboxes as written today, with a public bag and with an empty one, and writes them back the same", async () => {
     // A stored vault is a contract: these rows are byte for byte what store() writes today.
     const store = memoryStore()
-    const { note: _note, ...noteless } = TH.boxOf('openai', 'two')
-    const notedRow = JSON.stringify(TH.boxOf('anthropic', 'one'))
-    const notelessRow = JSON.stringify(noteless)
-    expect(notelessRow).to.not.include('note')
+    const emptied = TH.boxOf('openai', 'two', { public_json: '{}' })
+    const baggedRow = JSON.stringify(TH.boxOf('anthropic', 'one'))
+    const emptiedRow = JSON.stringify(emptied)
     store.write(u1BundleCkey, JSON.stringify(TH.bundleOf('u1')))
-    store.write(u1BoxCkey('anthropic'), notedRow)
-    store.write(u1BoxCkey('openai'), notelessRow)
+    store.write(u1BoxCkey('anthropic'), baggedRow)
+    store.write(u1BoxCkey('openai'), emptiedRow)
     const vaultDB = localVaultDB(store)
     const summaries = await vaultDB.listBoxes(TH.scopeOf('u1'))
-    expect(summaries.map((box) => TH.summaryOf(box)?.note)).to.deep.equal(['a test box', null])
+    expect(summaries.map((box) => TH.summaryOf(box)?.public)).to.deep.equal([{ note: 'a test box' }, {}])
     const prev = await vaultDB.readBox(TH.scopeOf('u1'), 'openai')
-    expect(prev).to.deep.equal(noteless)
-    await vaultDB.updateBox(TH.scopeOf('u1'), noteless, { vault_id: 'vault-id-u1', revision_id: 'rev-two', vault_key_epoch: 1 })
-    expect(store.read(u1BoxCkey('openai'))).to.eq(notelessRow)
+    expect(prev).to.deep.equal(emptied)
+    await vaultDB.updateBox(TH.scopeOf('u1'), emptied, { vault_id: 'vault-id-u1', revision_id: 'rev-two', vault_key_epoch: 1 })
+    expect(store.read(u1BoxCkey('openai'))).to.eq(emptiedRow)
+  })
+
+  it("lists a lockbox written before the public bag, with a note, as damaged: no earlier record is read", async () => {
+    const store = memoryStore()
+    const { public_json: _publicJson, whisper_codec: _codec, whisper_schema_version: _version, ...rest } = TH.boxOf('anthropic', 'one')
+    store.write(u1BundleCkey, JSON.stringify(TH.bundleOf('u1')))
+    store.write(u1BoxCkey('anthropic'), JSON.stringify({ ...rest, format: 'safebyok-lockbox-v2', note: 'a test box' }))
+    const vaultDB = localVaultDB(store)
+    expect(await vaultDB.listBoxes(TH.scopeOf('u1'))).to.deep.equal([{ boxlabel: 'anthropic', damaged: true }])
   })
 
   it("lists a row that is not JSON as damaged, under the boxlabel it is stored under, beside the sound ones", async () => {
@@ -223,13 +231,13 @@ const ListedRecordCases = [
   // damaged, listed so they can be erased:
   ["anthropic",  TH.boxOf('other_box', 'one'),                               [["anthropic", true]],   'a record naming another boxlabel as damaged, under the one it is stored under'],
   ["anthropic",  { ...TH.boxOf('anthropic', 'one'), changed_at: 'later' },   [["anthropic", true]],   'a record with a malformed time as damaged'],
-  ["anthropic",  { ...TH.boxOf('anthropic', 'one'), note: 'beep\u{7}' },     [["anthropic", true]],   'a record whose note holds a control character, below the floor, as damaged'],
-  ["anthropic",  { ...TH.boxOf('anthropic', 'one'), note: 'cafe\u{301}' },   [["anthropic", true]],   'a record whose note is not in NFC, below the floor, as damaged'],
+  ["anthropic",  { ...TH.boxOf('anthropic', 'one'), public_json: '{"a":' }, [["anthropic", true]],  'a record whose public bag is not JSON as damaged'],
+  ["anthropic",  TH.omitting(TH.boxOf('anthropic', 'one'), 'public_json'),   [["anthropic", true]],   'a record with no public bag as damaged'],
   ["anthropic",  null,                                                       [["anthropic", true]],   'a null record as damaged'],
   ["anthropic",  'not a lockbox',                                            [["anthropic", true]],   'a record that is not an object as damaged'],
-  // stored under a name or note a vault's validators would refuse at its entry: stored under other checks, and sound
+  // stored under a name a vault's validators would refuse at its entry, or with a bag no host meant: stored under other checks, and sound
   ["Anthropic",  TH.boxOf('Anthropic', 'one'),                               [["Anthropic", false]],  'a record stored under a boxlabel the default check refuses as sound: a check is an alarm at entry, not a promise about storage'],
-  ["anthropic",  { ...TH.boxOf('anthropic', 'one'), note: 'n'.repeat(257) }, [["anthropic", false]],  'a record whose note is longer than the default check admits as sound'],
+  ["anthropic",  { ...TH.boxOf('anthropic', 'one'), public_json: String.raw`"beep\u0007"` }, [["anthropic", false]], 'a record whose public bag holds a control character as sound: the bag is never interpreted'],
   // stored under a name below the floor, which no verb could reach: not listed at all
   ["tab\there",  TH.boxOf('tab\there', 'one'),                               [],                      'nothing for a record stored under a boxlabel below the floor, which no verb could name'],
 ] as const
@@ -244,13 +252,14 @@ describe("the abstract VaultDB, around an adapter's half", () => {
     expect(vaultDB.rows.size).to.eq(1)
   })
 
-  it("lists a lockbox an earlier version kept with an undefined note, as IndexedDB does, with a null note", async () => {
+  it("lists a lockbox's public bag as the JSON value its record holds, and nothing of its codec", async () => {
     const vaultDB = new MapVaultDB()
-    vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), { ...TH.boxOf('anthropic', 'one'), note: undefined })
+    vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), TH.boxOf('anthropic', 'one', { public_json: '{"note":"work","tags":["a",null]}' }))
     const [listed] = await vaultDB.listBoxes(TH.scopeOf('u1'))
     const summary = TH.summaryOf(listed)
-    expect(summary).to.have.property('note')
-    expect(summary?.note).to.be.null
+    expect(summary?.public).to.deep.equal({ note: 'work', tags: ['a', null] })
+    expect(summary).to.not.have.property('whisper_codec')
+    expect(summary).to.not.have.property('public_json')
   })
 
   for (const [boxlabel, record, expected, blurb] of ListedRecordCases) {
@@ -335,7 +344,7 @@ const RefusedWrites = [
   ['bad_option', (vaultDB: VaultDB) => vaultDB.createBundle({ ...TH.bundleOf('u1'), unlock_epoch: 1.5 }),                              'a bundle with a fractional unlock_epoch'],
   ['bad_option', (vaultDB: VaultDB) => vaultDB.createBundle({ ...TH.bundleOf('u1'), unlocks: [omit(TH.envelopeOf('passphrase'), ['vault_key_wrapped'])] } as VaultBundle), 'a bundle whose envelope is missing its wrapped vaultKey'],
   ['bad_label',  (vaultDB: VaultDB) => vaultDB.createBundle({ ...TH.bundleOf('u1'), applabel: 'Ac\u{7}me' }),                         'a bundle whose applabel holds a control character'],
-  ['bad_option', (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one', { note: 'beep\u{7}' }), TH.noBoxYet), 'a lockbox whose note no read would accept'],
+  ['bad_option', (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one', { public_json: 'not json' }), TH.noBoxYet), 'a lockbox whose public bag no read would accept'],
   ['bad_label',  (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('key\u{D83D}', 'one'), TH.noBoxYet),                  'a lockbox whose boxlabel is half of an emoji, whatever the checks'],
   ['bad_option', (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one', { changed_at: 1_792_022_400 }), TH.noBoxYet), 'a lockbox time in epoch seconds'],
   ['bad_label',  (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), undefined as unknown as Lockbox, TH.noBoxYet),               'no lockbox at all'],
@@ -506,12 +515,12 @@ describe("the abstract VaultDB, on the way in", () => {
     expect(vaultDB.rows.get(u1BundleCkey)).to.deep.equal(TH.bundleOf('u1'))
   })
 
-  it("lets a vault's own writes through untouched: a noteless box, a box replaced, an erase", async () => {
+  it("lets a vault's own writes through untouched: a box with an empty bag, a box replaced, an erase", async () => {
     const vaultDB = new MapVaultDB()
     await vaultDB.createBundle(TH.bundleOf('u1'))
-    const noteless = omit(TH.boxOf('anthropic', 'one'), ['note'])
-    await vaultDB.updateBox(TH.scopeOf('u1'), noteless, TH.noBoxYet)
-    expect(vaultDB.rows.get(u1BoxCkey('anthropic'))).to.deep.equal(noteless)
+    const emptied = TH.boxOf('anthropic', 'one', { public_json: '{}' })
+    await vaultDB.updateBox(TH.scopeOf('u1'), emptied, TH.noBoxYet)
+    expect(vaultDB.rows.get(u1BoxCkey('anthropic'))).to.deep.equal(emptied)
     await vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'two'), { vault_id: 'vault-id-u1', revision_id: 'rev-one', vault_key_epoch: 1 })
     await vaultDB.eraseBox(TH.scopeOf('u1'), 'anthropic', TH.thisVault)
     expect(await vaultDB.listBoxes(TH.scopeOf('u1'))).to.have.lengthOf(0)
@@ -537,9 +546,9 @@ describe("the abstract VaultDB, holding names to the floor", () => {
   it("takes any name above the floor in every verb, as a server serving several clients must: a vault's own validators are its own, at its entry", async () => {
     const vaultDB = new MapVaultDB()
     await vaultDB.createBundle({ ...TH.bundleOf('u1'), ...scriptScope })
-    await vaultDB.updateBox(scriptScope, TH.boxOf('مفتاح العمل', 'one', { note: 'n'.repeat(500) }), TH.noBoxYet)
+    await vaultDB.updateBox(scriptScope, TH.boxOf('مفتاح العمل', 'one'), TH.noBoxYet)
     const lockbox = await vaultDB.readBox(scriptScope, 'مفتاح العمل')
-    expect(lockbox?.note).to.have.lengthOf(500)
+    expect(lockbox?.revision_id).to.eq('rev-one')
     const summaries = await vaultDB.listBoxes(scriptScope)
     expect(summaries.map((summary) => summary.boxlabel)).to.deep.equal(['مفتاح العمل'])
     await vaultDB.eraseBox(scriptScope, 'مفتاح العمل', TH.thisVault)
@@ -568,28 +577,18 @@ describe("the abstract VaultDB, holding names to the floor", () => {
     })
   }
 
-  it("refuses, as 'bad_option', a lockbox whose note is below the floor, writing nothing", async () => {
+  it("refuses, as 'bad_option', a lockbox whose public bag is not JSON, writing nothing", async () => {
     const vaultDB = new MapVaultDB()
     await vaultDB.createBundle(TH.bundleOf('u1'))
-    const overlong = TH.boxOf('anthropic', 'one', { note: 'n'.repeat(NoteFloorBytes + 1) })
-    await TH.expectRefusal(vaultDB.updateBox(TH.scopeOf('u1'), overlong, TH.noBoxYet), 'bad_option')
+    const unparsable = TH.boxOf('anthropic', 'one', { public_json: '{"note":' })
+    await TH.expectRefusal(vaultDB.updateBox(TH.scopeOf('u1'), unparsable, TH.noBoxYet), 'bad_option')
     expect(await vaultDB.readBox(TH.scopeOf('u1'), 'anthropic')).to.be.null
   })
 
-  it("reads and lists as sound a lockbox whose note the default check refuses: it was stored under other checks", async () => {
+  it("refuses, as 'corrupt_record', a stored lockbox whose public bag is not JSON, and lists it as damaged", async () => {
     const vaultDB = new MapVaultDB()
     await vaultDB.createBundle(TH.bundleOf('u1'))
-    vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), TH.boxOf('anthropic', 'one', { note: 'n'.repeat(500) }))
-    const lockbox = await vaultDB.readBox(TH.scopeOf('u1'), 'anthropic')
-    expect(lockbox?.note).to.have.lengthOf(500)
-    const [listed] = await vaultDB.listBoxes(TH.scopeOf('u1'))
-    expect(TH.summaryOf(listed)?.note).to.have.lengthOf(500)
-  })
-
-  it("refuses, as 'corrupt_record', a stored lockbox whose note is below the floor, and lists it as damaged", async () => {
-    const vaultDB = new MapVaultDB()
-    await vaultDB.createBundle(TH.bundleOf('u1'))
-    vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), TH.boxOf('anthropic', 'one', { note: 'beep\u{7}' }))
+    vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), TH.boxOf('anthropic', 'one', { public_json: '{"note":' }))
     await TH.expectRefusal(vaultDB.readBox(TH.scopeOf('u1'), 'anthropic'), 'corrupt_record')
     expect(await vaultDB.listBoxes(TH.scopeOf('u1'))).to.deep.equal([{ boxlabel: 'anthropic', damaged: true }])
   })
@@ -662,7 +661,7 @@ class SmallRecordVaultDB extends MapVaultDB {
 
 describe("the abstract VaultDB, weighing a lockbox", () => {
   it("refuses, as 'lockbox_too_large', a lockbox heavier with its scope than its backend holds in one record, writing nothing", async () => {
-    const lockbox = TH.boxOf('anthropic', 'one', { note: 'n'.repeat(900) })
+    const lockbox = TH.boxOf('anthropic', 'one', { public_json: TH.publicJsonOf({ note: 'n'.repeat(900) }) })
     const recordBytes = jsonBytes({ ...TH.scopeOf('u1'), ...lockbox })
     const fits = new SmallRecordVaultDB(recordBytes)
     await fits.createBundle(TH.bundleOf('u1'))
