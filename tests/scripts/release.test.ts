@@ -207,9 +207,9 @@ describe("packedManifest", () => {
   }, 30_000)
 })
 
-// A runner standing in for npm, git and tar: npm answers per package, origin holds the tags
-// given (each naming a commit), HEAD is `HeadSha`, and every tarball's package.json is clean
-// unless a manifest is given for it.
+// A runner standing in for npm, git, gh and tar: npm answers per package, origin holds the tags
+// given (each naming a commit), GitHub holds a release for each tag in `releases`, HEAD is
+// `HeadSha`, and every tarball's package.json is clean unless a manifest is given for it.
 const HeadSha = 'headd00d0000000000000000000000000000000'
 interface FakeT {
   run:   Release.Runner
@@ -223,13 +223,17 @@ const npmFailure = (code: string, summary: string, detail = ''): Release.RunResu
   stderr:   'npm error a long log, its request headers included: Authorization: Bearer npm_FAKETOKEN',
 })
 
-const makeFake = (npmFor: Record<string, Release.RunResult>, opts: { tags?: Record<string, string>, manifests?: Record<string, object> } = {}): FakeT => {
+const makeFake = (npmFor: Record<string, Release.RunResult>, opts: { tags?: Record<string, string>, releases?: string[], manifests?: Record<string, object> } = {}): FakeT => {
   const calls: string[][] = []
   const run: Release.Runner = (command, args) => {
     calls.push([command, ...args])
     if (command === 'tar') {
       const tarball = args[1] ?? ''
       return Promise.resolve(ok(JSON.stringify(opts.manifests?.[tarball] ?? { name: 'x', peerDependencies: { safebyok: '^0.1.0' } })))
+    }
+    if (command === 'gh') {
+      const found = opts.releases?.includes(args[2] ?? '') ?? false
+      return Promise.resolve(found ? ok('title: a release\n') : { exitCode: 1, stdout: '', stderr: 'release not found' })
     }
     if (command === 'git' && args[0] === 'rev-parse') { return Promise.resolve(ok(`${HeadSha}\n`)) }
     if (command === 'git') {
@@ -281,11 +285,41 @@ describe("stage", () => {
   it("does nothing more for a release already staged and tagged: a re-run is safe", async () => {
     const fake = makeFake(
       { 'safebyok': npmFailure('E403', 'You cannot publish over the previously published versions: 0.1.0.') },
-      { tags: { 'safebyok@0.1.0': HeadSha } },
+      { tags: { 'safebyok@0.1.0': HeadSha }, releases: ['safebyok@0.1.0'] },
     )
     const outcomes = await Release.stage([releaseOf('safebyok')], { run: fake.run, dryRun: false, tagfile })
     expect(outcomes.map((outcome) => [outcome.kind, outcome.tagged])).to.deep.equal([['already', undefined]])
     expect(reported()).to.deep.equal([])
+  })
+
+  it("reports the tag again when it landed but its GitHub release did not, so a re-run writes the release", async () => {
+    const fake = makeFake(
+      { 'safebyok': npmFailure('E403', 'You cannot publish over the previously published versions: 0.1.0.') },
+      { tags: { 'safebyok@0.1.0': HeadSha } },
+    )
+    const outcomes = await Release.stage([releaseOf('safebyok')], { run: fake.run, dryRun: false, tagfile })
+    expect(outcomes.map((outcome) => [outcome.kind, outcome.tagged])).to.deep.equal([['already', 'safebyok@0.1.0']])
+    expect(reported()).to.deep.equal([{ type: 'git-tag', tag: 'safebyok@0.1.0', packageName: 'safebyok' }])
+    expect(fake.calls).to.deep.include(['gh', 'release', 'view', 'safebyok@0.1.0'])
+  })
+
+  it("asks GitHub about no release when the tag is not on origin yet: the tag is reported anyway", async () => {
+    const fake = makeFake({})
+    await Release.stage([releaseOf('safebyok')], { run: fake.run, dryRun: false, tagfile })
+    expect(fake.calls.map(([command]) => command)).not.to.include('gh')
+  })
+
+  it("fails a release whose GitHub release gh cannot look up, rather than guessing, and still attempts the next", async () => {
+    const fake = makeFake({}, { tags: { 'safebyok@0.1.0': HeadSha } })
+    const run: Release.Runner = (command, args) => (
+      command === 'gh'
+        ? Promise.resolve({ exitCode: 4, stdout: '', stderr: 'gh: To use GitHub CLI, set GH_TOKEN' })
+        : fake.run(command, args)
+    )
+    const outcomes = await Release.stage([releaseOf('safebyok'), releaseOf('safebyok-react')], { run, dryRun: false, tagfile })
+    expect(outcomes.map((outcome) => outcome.kind)).to.deep.equal(['failed', 'staged'])
+    expect(outcomes[0]?.detail).to.match(/could not tell what is left to do: gh release view safebyok@0.1.0 failed \(exit 4\)/)
+    expect(reported()).to.deep.equal([{ type: 'git-tag', tag: 'safebyok-react@0.1.0', packageName: 'safebyok-react' }])
   })
 
   it("leaves alone a version its tag says was released from another commit, without asking npm", async () => {
@@ -321,7 +355,7 @@ describe("stage", () => {
     )
     const outcomes = await Release.stage([releaseOf('safebyok'), releaseOf('safebyok-react')], { run, dryRun: false, tagfile })
     expect(outcomes.map((outcome) => outcome.kind)).to.deep.equal(['failed', 'staged'])
-    expect(outcomes[0]?.detail).to.match(/could not tell whether to stage it: git ls-remote .* failed \(exit 128\): fatal: unable to access/)
+    expect(outcomes[0]?.detail).to.match(/could not tell what is left to do: git ls-remote .* failed \(exit 128\): fatal: unable to access/)
     expect(fake.calls.filter(([command]) => command === 'npm')).to.have.lengthOf(1)
     expect(reported()).to.deep.equal([{ type: 'git-tag', tag: 'safebyok-react@0.1.0', packageName: 'safebyok-react' }])
   })

@@ -1,0 +1,80 @@
+name: Dependabot changeset
+
+# A Dependabot pull request that moves a public package's runtime dependencies needs a changeset
+# (ci.yml asks for one), and Dependabot cannot write it. This workflow does: a `patch` named
+# `.changeset/dependabot-<pr-number>.md` saying which dependencies moved (scripts/dependabot.ts),
+# pushed to the pull request's branch as one commit. `patch` is the level before 1.0 for a
+# dependency bump (PROCESS.md, Releases). It pushes with the release GitHub App's token, which
+# re-runs CI on the branch: a push by the GITHUB_TOKEN would start no workflow. Once a commit that
+# is not Dependabot's is on the branch, Dependabot stops rebasing it, and ci.yml reads the branch
+# as any other pull request's, so this workflow writes the changeset once and never again.
+#
+# It runs on `pull_request_target`, which is the workflow file as main has it, with secrets,
+# whatever the pull request holds. So it never runs anything the pull request wrote: it checks out
+# main, and reads the pull request's package.json files out of git as data. No `pnpm install`, no
+# package script, no file of the pull request's is executed or written into a changeset
+# unchecked (scripts/dependabot.ts keeps what is not plain text out of it). The App's key lives in
+# the `releasing` environment, which only `main` may use, and `main` is the ref a
+# `pull_request_target` run has. The token is cut down to contents.
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+    paths: ['packages/*/package.json']
+
+permissions: {}
+
+# One pull request's runs never overlap, and a newer push is the one that counts.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  changeset:
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    environment: releasing
+    permissions:
+      contents: read
+    env:
+      BASE_SHA:  ${{ github.event.pull_request.base.sha }}
+      HEAD_SHA:  ${{ github.event.pull_request.head.sha }}
+      HEAD_REF:  ${{ github.event.pull_request.head.ref }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+    steps:
+      # The default ref of a `pull_request_target` run is the base branch, which is what is wanted.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .tool-versions
+      # The pull request's commits, as objects to read: nothing of it is checked out.
+      - name: Fetch the pull request's commits
+        run: git fetch --no-tags origin "refs/pull/${PR_NUMBER}/head"
+      - id: write
+        name: Write the changeset, if the branch needs one
+        run: |
+          fork=$(git merge-base "$BASE_SHA" "$HEAD_SHA")
+          file=$(node scripts/dependabot.ts changeset "$fork" "$HEAD_SHA" "$PR_NUMBER")
+          echo "file=$file" >> "$GITHUB_OUTPUT"
+      # Minted only when there is a changeset to push, and after nothing of the pull request's has run.
+      - id: app-token
+        if: ${{ steps.write.outputs.file != '' }}
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+      # One commit on the pull request's branch, made by the contents API as the App.
+      - name: Push the changeset to the pull request's branch
+        if: ${{ steps.write.outputs.file != '' }}
+        env:
+          GH_TOKEN:       ${{ steps.app-token.outputs.token }}
+          CHANGESET_FILE: ${{ steps.write.outputs.file }}
+        run: |
+          gh api --method PUT "repos/${GITHUB_REPOSITORY}/contents/${CHANGESET_FILE}" \
+            --raw-field message="deps: a changeset for the runtime dependencies this moves (#${PR_NUMBER})" \
+            --raw-field content="$(base64 --wrap=0 "$CHANGESET_FILE")" \
+            --raw-field branch="$HEAD_REF"

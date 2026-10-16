@@ -5,9 +5,10 @@ name: Release
 #
 # * version -- changesets are waiting on main. `version` turns them into version bumps and
 #   CHANGELOG entries on the branch changeset-release/main, rebuilt from main's tip each time, and
-#   opens or updates the Version PR from it, named for the release it makes, as a draft. The Coach
-#   marks it ready to release it; any later push to main puts it back in draft, so what is
-#   marked ready is what was read. Merging that PR is the release.
+#   opens or updates the Version PR from it, named for the release it makes, as a draft when it
+#   is first opened. The Coach marks it ready to release it; a later push to main rebuilds it but
+#   leaves it as it is, so the Coach rereads a ready Version PR that main has moved under.
+#   Merging that PR is the release.
 # * publish -- no changesets wait, and a public package's version is not yet on npm: the Version
 #   PR has just been merged. `pack` checks the lockstep group, lints, typechecks, tests and builds
 #   every package, and packs each package to release with pnpm (which writes real ranges in place
@@ -31,7 +32,9 @@ name: Release
 #
 # Each job holds only the permissions it needs. Only `publish` can mint an npm token, and it runs
 # no package's scripts: it stages the tarballs `pack` built. A failed `publish` is mended by
-# re-running it, since scripts/release.ts skips what is already done. No job caches dependencies,
+# re-running it, since scripts/release.ts skips what is already done, and reports again a tag
+# whose GitHub release is missing, so the action writes it (it reads the release with `gh`, by the
+# GITHUB_TOKEN the action hands the script). No job caches dependencies,
 # so nothing a pull request's run wrote can reach a release.
 on:
   push:
@@ -103,7 +106,7 @@ jobs:
           script: pnpm release:version
           commit-message: ${{ steps.names.outputs.commit-message }}
           pr-title: ${{ steps.names.outputs.pr-title }}
-          pr-draft: always
+          pr-draft: create
 
   pack:
     needs: select-mode

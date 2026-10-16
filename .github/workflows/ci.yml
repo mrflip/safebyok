@@ -17,12 +17,14 @@ permissions:
 
 # Within a job every check runs whatever an earlier one found, so one failure never hides another,
 # and the job fails if any did. `lint-typecheck` and `test-build` are the two the main ruleset
-# requires. Each step is a root script: the root's own check, then every workspace package's
-# (`pnpm -r`), so a package added under packages/, demos/ or e2e/ is covered with no edit here.
+# requires, and `node-compat (22)` is the third it should (the platform floor: engines `>=22`).
+# Each step is a root script: the root's own check, then every workspace package's (`pnpm -r`),
+# so a package added under packages/, demos/ or e2e/ is covered with no edit here. A new job
+# stands beside these, with its own checkout and setup.
 jobs:
   # Lint first, as the likelier of the two to fail for a reason worth reading, then typecheck, then
   # keep a pull request's history semi-linear (PROCESS.md): its branch may hold no merge commit;
-  # last, a pull request's changeset.
+  # then a pull request's changeset, and last the workflows themselves.
   lint-typecheck:
     runs-on: ubuntu-latest
     steps:
@@ -48,25 +50,31 @@ jobs:
           merges=$(git rev-list --merges "$BASE_SHA..$HEAD_SHA")
           if [ -n "$merges" ]; then
             echo "::error::Branch contains merge commits. Rebase instead: git fetch origin && git rebase origin/main"
-            git log --oneline --no-walk $merges
+            git log --oneline --merges "$BASE_SHA..$HEAD_SHA"
             exit 1
           fi
       # A pull request that changes a public package carries a changeset saying what its release
       # would say; one that needs no release carries an empty one (PROCESS.md, Releases). The Version
       # PR is where changesets are used up, so asking it for one is wrong by construction: it is
-      # skipped. Dependabot cannot write a changeset, so its pull request is asked for one only
-      # when it moves a public package's runtime dependencies (scripts/runtime-deps.ts), which ship
-      # to hosts; the Coach adds that changeset by hand. A devDependency or lockfile bump passes.
+      # skipped, when the release GitHub App (safebyok[bot]) opened it from its branch; a branch
+      # named for it, opened by anyone else, is asked like any other. Dependabot cannot write a
+      # changeset, so its pull request is asked for one only when every commit on it is Dependabot's
+      # and it moves a public package's runtime dependencies (scripts/runtime-deps.ts), which ship
+      # to hosts: dependabot-changeset.yml writes that changeset, and pushes it, which runs this
+      # again. A devDependency or lockfile bump passes. A Dependabot branch with anyone else's
+      # commit on it, the changeset's own included, is asked like any other.
       - name: Require a changeset
         if: >-
           ${{ !cancelled() && steps.install.outcome == 'success' && github.event_name == 'pull_request'
-          && !startsWith(github.head_ref, 'changeset-release/') }}
+          && !(startsWith(github.head_ref, 'changeset-release/') && github.event.pull_request.user.login == 'safebyok[bot]') }}
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
-          if [ "$PR_AUTHOR" = 'dependabot[bot]' ]; then
-            moved=$(node scripts/runtime-deps.ts "$BASE_SHA")
+          if [ "$PR_AUTHOR" = 'dependabot[bot]' ] && node scripts/dependabot.ts commits "$BASE_SHA" "$HEAD_SHA" > /dev/null; then
+            fork=$(git merge-base "$BASE_SHA" "$HEAD_SHA")
+            moved=$(node scripts/runtime-deps.ts "$fork" "$HEAD_SHA")
             if [ -z "$moved" ]; then
               echo "Dependabot moved no public package's runtime dependencies: no changeset needed."
               exit 0
@@ -76,10 +84,27 @@ jobs:
           fi
           pnpm changeset status --since="$BASE_SHA"
 
-  # The unit tests with coverage, then the build. Under CI a build fails on any warning, and checks
-  # each package as a consumer would see it (publint, arethetypeswrong: each tsdown.config.ts).
-  # Last, the size budget: what a bundler ships for each way of importing the core, against the
-  # limits in .size-limit.json.
+      # actionlint, the release recorded here by its hash: the tarball is fetched and checked
+      # against the sha256 in its release's checksums file (actionlint_<version>_checksums.txt)
+      # before anything in it runs. The runner's shellcheck lints each `run:` script.
+      - name: Lint the workflows
+        if: ${{ !cancelled() }}
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          tarball="$RUNNER_TEMP/actionlint.tgz"
+          curl --fail --silent --show-error --location --output "$tarball" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "$ACTIONLINT_SHA256  $tarball" | sha256sum --check --strict
+          tar --extract --gzip --file "$tarball" --directory "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -color
+
+  # The unit tests with coverage, which build every package first: under CI a build fails on any
+  # warning, and checks each package as a consumer would see it (publint, arethetypeswrong: each
+  # tsdown.config.ts), and a failed build fails this step before any test runs. Last, the size
+  # budget: what a bundler ships for each way of importing the packages measured, against the
+  # limits in .size-limit.json, read from the build the step before made.
   test-build:
     runs-on: ubuntu-latest
     steps:
@@ -93,14 +118,14 @@ jobs:
         run: pnpm install --frozen-lockfile
       - run: pnpm test:coverage
       - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: pnpm build
-      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: pnpm size
+        run: pnpm size:check
 
-  # The unit tests on the other Node majors a consumer may run, beside the one we develop on.
-  # Not required by the ruleset: a failure here is news, not a gate.
+  # The unit tests on the Node majors a consumer may run, beside the one we develop on. Node 22 is
+  # the platform floor (`engines`), and a failure there is a gate; the newest Node reports, and a
+  # failure there is news. The floor's check, `node-compat (22)`, is the one for the main ruleset.
   node-compat:
     runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.node != 22 }}
     strategy:
       fail-fast: false
       matrix:
