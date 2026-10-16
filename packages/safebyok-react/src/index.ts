@@ -8,6 +8,7 @@
 export { VaultProvider, useVault, useVaultSnapshot } from './vault-provider'
 export type { VaultContextShape, VaultProviderProps } from './vault-provider'
 export { PassphraseModal } from './passphrase-modal'
+export type { PassphraseAdvice, PassphraseModalProps } from './passphrase-modal'
 export { PasskeyUnlockButton } from './passkey-unlock-button'
 export { WhisperField } from './whisper-field'
 export type { WhisperFieldProps } from './whisper-field'

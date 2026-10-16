@@ -140,7 +140,7 @@ const ApiKeySlot = ({ haveKeyBox, damaged, changedAt }: { haveKeyBox: boolean, d
 
   return (
     <div className="api-key-slot">
-      <WhisperField value={keyText} onChange={setKeyText} placeholder="sk-ant-…" aria-label="Anthropic API key" />
+      <WhisperField onChange={setKeyText} placeholder="sk-ant-…" aria-label="Anthropic API key" />
       <button disabled={! keyText.trim()} onClick={() => { void save() }}>Save key</button>
       <button onClick={() => { setEditing(false); setKeyText(''); setGripe(null) }}>Cancel</button>
       {gripe !== null && <span className="gripe">{gripe}</span>}

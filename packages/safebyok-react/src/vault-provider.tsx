@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { VaultError, checkValidators, eraseDamagedVault as eraseStoredDamagedVault, isVaultCondition, isVaultError, openVault, parseLogger, passphraseLengthTest, type OpenVaultOpts, type PassphraseStrengthTest, type Vault, type VaultLogger, type VaultSnapshot, type VaultValidators } from 'safebyok'
-import { PassphraseModal } from './passphrase-modal'
+import { PassphraseModal, type PassphraseAdvice } from './passphrase-modal'
 
 /**
  * What the provider hands down: the vault handle (null while opening, signed out, or when the
@@ -100,8 +100,9 @@ export const useVaultSnapshot = (): VaultSnapshot => {
 
 /**
  * Every openVault option, passed through as given (an option left out gets openVault's default),
- * except that `userId` may be null; and whether the dialog offers a forgetful user to start over.
- * In a browser, spread `browserOpts()` from `safebyok/browser` for the `keyDeriver` and
+ * except that `userId` may be null; and three for the passphrase dialog: whether it offers a
+ * forgetful user to start over, what a password manager files the passphrase under, and the advice
+ * it shows as the user chooses one (`PassphraseModal` has each). In a browser, spread `browserOpts()` from `safebyok/browser` for the `keyDeriver` and
  * `deviceDB` openVault asks for. The vault reopens whenever an option changes identity, so build
  * each schema in `validators` once, at module level; the bag around them may be built in render,
  * as the provider watches each schema rather than the bag. `passphraseStrengthTest` is the other
@@ -111,14 +112,22 @@ export const useVaultSnapshot = (): VaultSnapshot => {
  */
 export type VaultProviderProps = Omit<OpenVaultOpts, 'userId'> & {
   /** The signed-in user from the host's auth, or null when nobody is: then there is no vault. */
-  userId:          string | null
+  userId:              string | null
   /**
    * Whether the passphrase dialog offers a user who has forgotten the passphrase to erase the
    * vault, on every device, and start a new one: `PassphraseModal`'s `allowStartOver`. Off by
    * default.
    */
-  allowStartOver?: boolean | undefined
-  children:        ReactNode
+  allowStartOver?:     boolean | undefined
+  /**
+   * What a password manager files the vault's passphrase under: `PassphraseModal`'s
+   * `passphraseUsername`. Default: the user and the vault, as 'u1 (main vault)'. Never the user's
+   * sign-in name alone, or a manager may take the passphrase for their sign-in password.
+   */
+  passphraseUsername?: string | undefined
+  /** What to say beside the field as the user chooses a passphrase: `PassphraseModal`'s `passphraseAdvice`. */
+  passphraseAdvice?:   PassphraseAdvice | undefined
+  children:            ReactNode
 }
 
 /**
@@ -151,7 +160,7 @@ const warnHost = (logger: VaultLogger | undefined, message: string, story: Recor
  *     <App />
  *   </VaultProvider>
  */
-export const VaultProvider = ({ userId, allowStartOver, children, ...opts }: VaultProviderProps) => {
+export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, passphraseAdvice, children, ...opts }: VaultProviderProps) => {
   const { applabel, vaultlabel, vaultDB, deviceDB, forcePassphraseReentryHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger, validators, passphraseStrengthTest } = opts
   // The bag is taken apart below, so a misspelt field would be dropped unseen: refused here, as openVault refuses it.
   checkValidators(validators)
@@ -322,6 +331,8 @@ export const VaultProvider = ({ userId, allowStartOver, children, ...opts }: Vau
           key={asking.round}
           vault={asking.vault}
           allowStartOver={allowStartOver}
+          passphraseUsername={passphraseUsername}
+          passphraseAdvice={passphraseAdvice}
           onDone={(unlocked) => { endAsking(asking, unlocked) }}
         />
       )}
