@@ -52,6 +52,12 @@ describe("WhisperField", () => {
     expect(theField().getAttribute('spellcheck')).to.eq('false')
   })
 
+  it("carries the whisper as typed in its value attribute, as React keeps a controlled input's: what the README warns of", () => {
+    render(<Host />)
+    fireEvent.change(theField(), { target: { value: 'sk-ant-fake' } })
+    expect(theField().getAttribute('value')).to.eq('sk-ant-fake')
+  })
+
   it("shows no placeholder unless the host gives one", () => {
     const { unmount } = render(<Host />)
     expect(theField().hasAttribute('placeholder')).to.be.false
