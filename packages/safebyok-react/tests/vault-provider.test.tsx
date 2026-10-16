@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { AnyTextValidators, Ckeys, Label, VaultError, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, openVault, type KeyDeriver, type PassphraseVerdict, type Vault, type VaultValidators } from 'safebyok'
 import * as TH from 'safebyok/testing'
-import { Component, useEffect, useLayoutEffect, useState, type ErrorInfo, type ReactNode } from 'react'
+import { Component, useLayoutEffect, useState, type ErrorInfo, type ReactNode } from 'react'
 import { VaultProvider, useVault, useVaultSnapshot, type VaultProviderProps } from '../src/vault-provider'
 
 /** A probe component exercising the binding the way a host app would. */
@@ -45,7 +45,11 @@ const grabber = () => {
   const seen: { provided: ReturnType<typeof useVault> | null } = { provided: null }
   const Grab = () => {
     const provided = useVault()
-    useEffect(() => { seen.provided = provided }, [provided])
+    // A layout effect runs in the same task as the commit that changed the page, so whatever a
+    // test waited to see on the page, latest() hands down from that same render. A passive effect
+    // may run after the wait has returned -- on a loaded machine, often enough to fail in CI --
+    // and latest() would hand down the render before, with its openError and callbacks.
+    useLayoutEffect(() => { seen.provided = provided }, [provided])
     return null
   }
   const latest = () => {
