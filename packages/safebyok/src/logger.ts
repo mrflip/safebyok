@@ -46,9 +46,13 @@ const loggerShape = Z.object({ log: loggerCall, warn: loggerCall, error: loggerC
 /**
  * The logger a vault keeps: the host's, or the console when there is none, made safe to call --
  * whatever the host's throws or rejects with is dropped. Kind 'bad_option' for anything that is
- * not an object carrying `log`, `warn` and `error` functions.
+ * not an object carrying `log`, `warn` and `error` functions. A binding that has something of
+ * its own to say, beside the vault it opens, says it here, through the same logger.
  *
  * @param candidate - The host's logger, as handed to openVault.
+ *
+ * @example parseLogger(props.logger).warn('VaultProvider reopened the vault for a logger rebuilt in render', { call: 'VaultProvider' })
+ * @example parseLogger(undefined).log('opened')  // to the console: 'safebyok: opened'
  */
 export const parseLogger = (candidate: VaultLogger | undefined): VaultLogger => {
   if (candidate === undefined) { return guarded(consoleLogger) }

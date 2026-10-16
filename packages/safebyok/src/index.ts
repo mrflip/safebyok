@@ -12,6 +12,7 @@ export { argon2idDeriver, argon2idWebV1Deriver, parseKeyDeriverSpec } from './ke
 export type { KeyDeriver } from './key-deriver'
 export { eraseDamagedVault, openVault } from './vault'
 export type { EraseDamagedVaultOpts, OpenVaultOpts, Vault, VaultSnapshot, VaultState } from './vault'
+export { parseLogger } from './logger'
 export type { VaultLogger } from './logger'
 export { IdentityRevokedResponseVals } from './refusal-policy'
 export type { IdentityRevokedResponse } from './refusal-policy'
