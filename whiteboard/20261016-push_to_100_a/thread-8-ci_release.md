@@ -41,6 +41,18 @@ safebyok 1610, indexeddb 144, postgres 225, react 111, fastkey 44, convex 278, g
   budgets were measured on main, so if 7 lands first, re-measure them at the restack (thread 9
   re-derives them anyway).
 
+## Review's minors
+
+Folded in at filing: a whole schedule's hang deadline is its own `ScheduleHungMs` (10 s, for a
+slow real backend such as thread 11's `postgres:17`), the 2 s `WaitedTooLongMs` kept for a single
+held move; `peerDependenciesMeta` is compared with `safe-stable-stringify` (now a root
+devDependency, the version the core already installs), a reorder alone being no move.
+
+Left: (1) the Contents API PUT does not check that the branch tip is still `HEAD_SHA`; a
+non-force ref update would close that window. (2) Dependabot is recognized by author email only;
+committer and signature are not checked. (4) `entriesOf` casts manifest fields without validating
+them.
+
 ## Closes
 
 Closed in code or config: G436 (`release.yml`), G435 and G437 (PROCESS.md *Releases*), G401

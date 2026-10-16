@@ -23,6 +23,8 @@ const OptVitest   = { optionalDependencies: { vitest: '^5.0.0' } }
 const IdbAsPeer   = { peerDependencies: { 'idb-keyval': '^6.3.0' } }
 const OptionalReact = { peerDependencies: { react: '^19.0.0' }, peerDependenciesMeta: { react: { optional: true } } }
 const RequiredReact = { peerDependencies: { react: '^19.0.0' } }
+const TwoMeta       = { peerDependencies: { react: '^19.0.0', zod: '^4.0.0' }, peerDependenciesMeta: { react: { optional: true, other: 1 }, zod: { optional: true } } }
+const TwoMetaReordered = { peerDependencies: { zod: '^4.0.0', react: '^19.0.0' }, peerDependenciesMeta: { zod: { optional: true }, react: { other: 1, optional: true } } }
 const BundlesIdb    = { ...Idb6_3, bundledDependencies: ['idb-keyval'] }
 const BundlesAll    = { ...Idb6_3, bundleDependencies: true }
 const PrivateIdb    = { ...Idb6_3, private: true }
@@ -41,6 +43,7 @@ const ChangeCases = [
   [RequiredReact, OptionalReact, [moved('peerDependenciesMeta', 'react', undefined, '{"optional":true}')], 'a peer made optional counts'],
   [OptionalReact, RequiredReact, [moved('peerDependenciesMeta', 'react', '{"optional":true}', undefined)], 'a peer made required counts'],
   [OptionalReact, OptionalReact, [],                                                 'a peer\'s meta left alone does not count'],
+  [TwoMeta,      TwoMetaReordered, [],                                               'a reorder of the meta, its keys or its entries, is not a move'],
   [Idb6_3,       BundlesIdb,   [moved('bundledDependencies', 'idb-keyval', undefined, 'bundled')], 'a dependency newly bundled counts'],
   [BundlesIdb,   Idb6_3,       [moved('bundledDependencies', 'idb-keyval', 'bundled', undefined)], 'a dependency no longer bundled counts'],
   [BundlesIdb,   BundlesAll,   [],                                                   '`true` bundles every dependency, the same as naming each'],

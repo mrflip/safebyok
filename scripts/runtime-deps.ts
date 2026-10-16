@@ -13,6 +13,7 @@
  *   safebyok: dependencies.idb-keyval ^6.3.0 -> ^6.4.0
  */
 import path from 'node:path'
+import { stringify } from 'safe-stable-stringify'
 import { listWorkspace, processRunner, publicPackages, type Runner, type WorkspacePackage } from './release.ts'
 
 /** The `package.json` fields that ship to a host, and say what it will install and how */
@@ -41,7 +42,7 @@ export interface Manifest extends Partial<Record<RangeField, Record<string, stri
 function entriesOf(manifest: Manifest, field: RuntimeField): Record<string, string> {
   if (manifest.private) { return {} }
   if (field === 'peerDependenciesMeta') {
-    return Object.fromEntries(Object.entries(manifest.peerDependenciesMeta ?? {}).map(([depname, meta]) => [depname, JSON.stringify(meta)]))
+    return Object.fromEntries(Object.entries(manifest.peerDependenciesMeta ?? {}).map(([depname, meta]) => [depname, stringify(meta)]))
   }
   if (field === 'bundledDependencies') {
     const bundled = manifest.bundledDependencies ?? manifest.bundleDependencies ?? []

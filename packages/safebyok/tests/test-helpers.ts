@@ -604,6 +604,8 @@ const TickOffsets = [1, 2] as const
 const MostRoundTrips = 12
 /** How long a device's move may take while another device waits at the turnstile before the race calls it a shared lock. */
 const WaitedTooLongMs = 2000
+/** How long a whole schedule's moves, or one waited on for its own sake, may take before the race calls the adapter hung: room for a slow real backend, which a single held move is not given. */
+const ScheduleHungMs = 10_000
 
 /** The moves of a race, each started on its device. */
 type Start = () => Promise<RaceOutcome>
@@ -712,20 +714,20 @@ const falseOnce = async (promise: Promise<unknown>) => {
   return false
 }
 
-/** What `promise` resolves to, if it does within {@link WaitedTooLongMs}. */
-const inTime = async <ValT>(promise: Promise<ValT>): Promise<{ inTime: true, val: ValT } | { inTime: false }> => {
+/** What `promise` resolves to, if it does within `limitMs`: {@link WaitedTooLongMs} unless given. */
+const inTime = async <ValT>(promise: Promise<ValT>, limitMs = WaitedTooLongMs): Promise<{ inTime: true, val: ValT } | { inTime: false }> => {
   let timer: ReturnType<typeof setTimeout> | undefined
-  const late = new Promise<{ inTime: false }>((resolve) => { timer = setTimeout(() => { resolve({ inTime: false }) }, WaitedTooLongMs) })
+  const late = new Promise<{ inTime: false }>((resolve) => { timer = setTimeout(() => { resolve({ inTime: false }) }, limitMs) })
   const timely = async () => ({ inTime: true as const, val: await promise })
   const settled = await Promise.race([timely(), late])
   clearTimeout(timer)
   return settled
 }
 
-/** What `promise` resolves to; rejects, saying `what` did not finish, when it takes longer than {@link WaitedTooLongMs}: so a hung adapter fails the schedule, which names it, not the test's own timeout. */
+/** What `promise` resolves to; rejects, saying `what` did not finish, when it takes longer than {@link ScheduleHungMs}: so a hung adapter fails the schedule, which names it, not the test's own timeout. */
 const finishing = async <ValT>(promise: Promise<ValT>, what: string): Promise<ValT> => {
-  const settled = await inTime(promise)
-  if (! settled.inTime) { throw new Error(`${what} did not finish within ${String(WaitedTooLongMs)} ms: the adapter hung, or waits on something that never comes.`) }
+  const settled = await inTime(promise, ScheduleHungMs)
+  if (! settled.inTime) { throw new Error(`${what} did not finish within ${String(ScheduleHungMs)} ms: the adapter hung, or waits on something that never comes.`) }
   return settled.val
 }
 

@@ -214,6 +214,9 @@ importers:
       eslint-plugin-unicorn:
         specifier: ^77.0.0
         version: 77.0.0(eslint@10.12.0)
+      safe-stable-stringify:
+        specifier: ^2.5.0
+        version: 2.5.0
       size-limit:
         specifier: ^14.2.0
         version: 14.2.0
