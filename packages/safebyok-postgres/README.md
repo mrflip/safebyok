@@ -58,9 +58,10 @@ const vaultDB = postgresVaultDB({ client: pool, userId: session.userId })
 * **Every write is one statement**, atomic as Postgres makes every statement, so it asks no
   transaction of your driver and no retry: a write lands only while what it expects still
   stands, and refuses with kind `stale_write` otherwise. A lockbox write reads its vault's bundle
-  row `FOR SHARE`, the one lock any verb takes: lockbox writes never wait for each other, and a
-  bundle update waits for the lockbox writes under way (or they for it), so a lockbox lands only
-  under the vaultKey that stands.
+  row `FOR SHARE`, a shared lock: lockbox writes never wait for each other on the bundle (two
+  writes to one boxlabel still meet at that lockbox's row), and a bundle update waits for the
+  lockbox writes under way (or they for it), so a lockbox lands only under the vaultKey that
+  stands.
 * **Isolation**: every guarantee here holds under READ COMMITTED, Postgres's default. Above it --
   a session default of REPEATABLE READ or SERIALIZABLE, or your own transaction around a call --
   some races fail with a serialization error (`40001`) instead, which refuses as
@@ -416,7 +417,7 @@ shape of table, copy it, and keep to what makes it right:
   -- a rotation of the vaultKey -- would go unseen, and a device still holding the replaced
   vaultKey could seal a whisper under it. `FOR SHARE` makes the update wait for the write, or the
   write for the update and then re-read the bundle as it stands. It is a shared lock, so lockbox
-  writes never wait for each other. A trigger of your own that locks the bundle row anew -- `FOR
+  writes never wait for each other on the bundle. A trigger of your own that locks the bundle row anew -- `FOR
   UPDATE`, say -- turns two such writers into a deadlock: serialize on something else (the hard
   cap above takes an advisory lock).
 * **Prove it with the shared suite**: `describeVaultDB` from `safebyok/testing` runs every verb,

@@ -88,7 +88,7 @@ const DefaultMaxLockboxes = 1000
  *   while what it expects still stands, and a failed expectation refuses with kind `stale_write`.
  *   A lockbox write reads its vault's bundle row `FOR SHARE`, so it lands only while that bundle
  *   stands for the vaultKey the lockbox was sealed under: a bundle update waits for it to end, or
- *   it for the update, and lockbox writes never wait for each other.
+ *   it for the update, and lockbox writes never wait for each other on the bundle.
  * * **A full vault**: a new lockbox in a vault already holding `maxLockboxes` refuses with kind
  *   `vault_full`, and the refused write stored nothing. The check is a best effort, made in the
  *   statement that inserts, by counting the vault's lockboxes as of that statement's start, with
@@ -179,7 +179,8 @@ const ListBoxesSql = `SELECT ${Columns.selected(ListedLockboxColumns)} FROM safe
 // rotation replacing the vaultKey -- waits until the write's statement ends, or the write waits
 // for it, and then reads the bundle as it stands: the vault_key_epoch compared is the one standing
 // when the write lands, never only the one in the statement's snapshot. Lockbox writers share the
-// lock, so they never wait on each other.
+// lock, so they never wait on each other for the bundle (two writes to one boxlabel still meet at
+// its row, or at the unique index).
 const ExpectedVaultSql = `SELECT applabel, user_id, vaultlabel, vault_id FROM safebyok_bundles
     WHERE ${ScopeIs} AND vault_id = $4::text AND vault_key_epoch = $5::bigint
     FOR SHARE`
