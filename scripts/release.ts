@@ -14,7 +14,10 @@
  * which the changesets action reads). It skips a version already staged or published, so a failed
  * run is mended by running it again, and a version whose tag names an earlier commit, so a later
  * push to main never restages it; it attempts every package before it exits non-zero for any that
- * failed. `--dry-run` passes `--dry-run` to npm and reports no tags.
+ * failed. A package whose tag is on origin but whose GitHub release is not (the action pushed the
+ * tag, then failed to write the release) has its tag reported again, so the action writes the
+ * release; it tolerates the tag being there. `--dry-run` passes `--dry-run` to npm and reports no
+ * tags.
  *
  * `names` names the Version PR and its commit for the release they make, from the release plan
  * `changeset status --output` wrote: `pr-title` and `commit-message`, to the file named by
@@ -341,8 +344,9 @@ export interface StageOpts {
  * never staged. One whose tag already names another commit was released from that commit, and is
  * left alone without asking npm: a later push to main never restages it. One npm refuses as
  * already published (or already staged) counts as done. A release staged or done whose tag is not
- * yet on origin has it reported, to name this commit; a dry run reports none. Every release is
- * attempted, whatever happened to the one before.
+ * yet on origin, or whose tag is there at this commit but has no GitHub release, has it reported,
+ * for the changesets action to push and to write the release; a dry run reports none. Every
+ * release is attempted, whatever happened to the one before.
  *
  * @param releases - From `readPackDir`, in order.
  * @param opts     - The runner, dry run, and tag file.
@@ -363,10 +367,10 @@ export async function stage(releases: readonly Release[], opts: StageOpts): Prom
   return outcomes
 }
 
-/** A release that stopped on a failure of ours (git, tar) rather than on npm's answer: reported failed, and the next is still tried */
+/** A release that stopped on a failure of ours (git, gh, tar) rather than on npm's answer: reported failed, and the next is still tried */
 function unexpectedFailure(release: Release, err: unknown): StageOutcome {
   const reason = err instanceof Error ? firstLine(err.message) : 'something unexpected'
-  return { release, kind: 'failed', detail: `could not tell whether to stage it: ${reason}` }
+  return { release, kind: 'failed', detail: `could not tell what is left to do: ${reason}` }
 }
 
 async function stageOne(release: Release, head: string, opts: StageOpts): Promise<StageOutcome> {
@@ -380,7 +384,8 @@ async function stageOne(release: Release, head: string, opts: StageOpts): Promis
   }
   const outcome = await stageTarball(release, opts)
   const done = outcome.kind === 'staged' || outcome.kind === 'already'
-  if (taggedAt || ! done || opts.dryRun) { return outcome }
+  if (! done || opts.dryRun) { return outcome }
+  if (taggedAt && await releaseExists(opts.run, tag)) { return outcome }
   if (opts.tagfile) {
     appendFileSync(opts.tagfile, `${JSON.stringify({ type: 'git-tag', tag, packageName: release.name })}\n`)
   }
@@ -414,6 +419,14 @@ async function tagCommit(run: Runner, tag: string): Promise<string | undefined> 
     return [ref, sha] as const
   }))
   return refs.get(`refs/tags/${tag}^{}`) ?? refs.get(`refs/tags/${tag}`)
+}
+
+/** Whether GitHub holds a release of the tag; an answer other than "not found" is an error, not a no */
+async function releaseExists(run: Runner, tag: string): Promise<boolean> {
+  const result = await run('gh', ['release', 'view', tag])
+  if (result.exitCode === 0) { return true }
+  if (/release not found/i.test(result.stderr)) { return false }
+  throw new Error(`gh release view ${tag} failed (exit ${String(result.exitCode)}): ${firstLine(result.stderr)}`)
 }
 
 async function runGit(run: Runner, args: readonly string[]): Promise<string> {
