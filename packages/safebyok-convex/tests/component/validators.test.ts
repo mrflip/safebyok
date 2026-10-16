@@ -168,7 +168,7 @@ const LockboxCases = [
   [TH.boxOf('anthropic_api_key', 'a1'),                                      true,   true,   'a whole lockbox'],
   [boxWithoutNote,                                                           true,   true,   'a lockbox with no note'],
   [{ ...TH.boxOf('مفتاح العمل', 'a1') },                                    true,   true,   'a boxlabel of any text'],
-  [{ ...TH.boxOf('anthropic_api_key', 'a1'), note: 'n'.repeat(5000) },       true,   true,   'a note of any length'],
+  [{ ...TH.boxOf('anthropic_api_key', 'a1'), note: 'n'.repeat(4096) },       true,   true,   'a note as long as the floor admits'],
   // both refuse:
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), note: null },                   false,  false,  'a null note'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), format: 'safebyok-vault-v1' },  false,  false,  "another record's format"],
@@ -176,6 +176,8 @@ const LockboxCases = [
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), changed_at: '1792022400000' },  false,  false,  'a changed_at written as text'],
   [{ ...boxWithoutTimes, created_at: OldIso, updated_at: OldIso },           false,  false,  'a lockbox from before its times were named registered_at and changed_at'],
   // Zod refuses, Convex accepts:
+  [{ ...TH.boxOf('anthropic_api_key', 'a1'), note: 'n'.repeat(4097) },       false,  true,   'a note longer than the floor admits'],
+  [{ ...TH.boxOf('anthropic_api_key', 'a1'), note: 'beep\u{7}' },             false,  true,   'a note holding a control character'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), revision_id: '' },              false,  true,   'an empty revision_id'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), changed_at: Infinity },         false,  true,   'a changed_at that never comes'],
 ] as const

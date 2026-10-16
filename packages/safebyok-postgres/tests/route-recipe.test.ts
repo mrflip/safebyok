@@ -4,7 +4,7 @@
 // and the README changes with it.
 import { describe, expect, it } from 'vitest'
 import type { Client } from 'pg'
-import { AnyTextValidators, VaultDB, VaultError, VaultErrorKindVals, memoryDeviceDB, openVault } from 'safebyok'
+import { VaultDB, VaultError, VaultErrorKindVals, memoryDeviceDB, openVault } from 'safebyok'
 import type { BundleExpectation, EraseExpectation, Lockbox, LockboxExpectation, VaultBundle, VaultErrorKind, VaultScope } from 'safebyok'
 import * as TH from './test-helpers'
 import { VaultChangeChannel, postgresVaultDB } from '../src/index'
@@ -16,26 +16,21 @@ import type { PostgresClient, PostgresListen, PostgresVaultDB } from '../src/ind
 type Served = (vaultDB: PostgresVaultDB, args: unknown[]) => Promise<unknown>
 
 /**
- * What the server takes a name to be: any text. The browser's vault checks names with whichever
- * validators it was opened with, and reads a row they refuse back as damaged; this server's job
- * is to keep each user to their own vault, whatever the names.
- */
-const validators = AnyTextValidators
-
-/**
  * The verbs a browser's vault may call -- VaultDB's own, and nothing else -- each passed to the
- * VaultDB, which refuses another user's vault. A listing
- * goes as the stored records, which the browser's VaultDB validates.
+ * VaultDB, which refuses another user's vault, and holds each record to its shape and each name
+ * to the floor and the table's limits; what text a name may be beyond that is each browser
+ * vault's own validators' to say. A listing goes as the stored records, which the browser's
+ * VaultDB validates.
  */
 const served = new Map<string, Served>([
-  ['readBundle',   (vaultDB, [scope]) => vaultDB.readBundle(scope as VaultScope, validators)],
-  ['createBundle', (vaultDB, [bundle]) => vaultDB.createBundle(bundle as VaultBundle, validators)],
-  ['updateBundle', (vaultDB, [bundle, expected]) => vaultDB.updateBundle(bundle as VaultBundle, expected as BundleExpectation, validators)],
-  ['readBox',      (vaultDB, [scope, boxlabel]) => vaultDB.readBox(scope as VaultScope, boxlabel as string, validators)],
+  ['readBundle',   (vaultDB, [scope]) => vaultDB.readBundle(scope as VaultScope)],
+  ['createBundle', (vaultDB, [bundle]) => vaultDB.createBundle(bundle as VaultBundle)],
+  ['updateBundle', (vaultDB, [bundle, expected]) => vaultDB.updateBundle(bundle as VaultBundle, expected as BundleExpectation)],
+  ['readBox',      (vaultDB, [scope, boxlabel]) => vaultDB.readBox(scope as VaultScope, boxlabel as string)],
   ['listBoxes',    (vaultDB, [scope]) => vaultDB.listBoxRecords(scope as VaultScope)],
-  ['updateBox',    (vaultDB, [scope, lockbox, expected]) => vaultDB.updateBox(scope as VaultScope, lockbox as Lockbox, expected as LockboxExpectation, validators)],
-  ['eraseBox',     (vaultDB, [scope, boxlabel, expected]) => vaultDB.eraseBox(scope as VaultScope, boxlabel as string, expected as EraseExpectation, validators)],
-  ['eraseVault',   (vaultDB, [scope, expected]) => vaultDB.eraseVault(scope as VaultScope, expected as EraseExpectation, validators)],
+  ['updateBox',    (vaultDB, [scope, lockbox, expected]) => vaultDB.updateBox(scope as VaultScope, lockbox as Lockbox, expected as LockboxExpectation)],
+  ['eraseBox',     (vaultDB, [scope, boxlabel, expected]) => vaultDB.eraseBox(scope as VaultScope, boxlabel as string, expected as EraseExpectation)],
+  ['eraseVault',   (vaultDB, [scope, expected]) => vaultDB.eraseVault(scope as VaultScope, expected as EraseExpectation)],
 ])
 
 /** What a request posts: its verb and arguments, or nothing when its body is not a JSON object. */
@@ -80,6 +75,8 @@ class RouteVaultDB extends VaultDB {
   readonly maxRecordBytes = 1024 * 1024
   readonly maxVaultBytes = Infinity
   readonly maxLockboxes = 1000 // the server's postgresVaultDB maxLockboxes
+  readonly maxNameBytes = 640  // the server's postgresVaultDB maxNameBytes
+  readonly reservedNameChars = ''
 
   private readonly fetcher: Fetch
 

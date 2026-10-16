@@ -2,7 +2,7 @@ import * as Z from 'zod/mini'
 import { Lockbox, LockboxSummary, MaxUnlocks, UnlockMethodVals, VaultBundle, VaultScope, type DamagedLockbox } from './types'
 import { VaultError, isVaultError } from './errors'
 import * as Names from './names'
-import { AnyTextValidators, type VaultValidators } from './validators'
+import { AnyTextValidators, NameFloor } from './validators'
 import type { StringStore } from './string-store'
 import * as Ckeys from './ckeys'
 
@@ -92,12 +92,13 @@ export type StoredLockbox = { boxlabel: string, lockbox: unknown }
  * Implement the `do*` methods; never override the public verbs. The package's `VAULTDB.md` is the
  * whole contract, line by line, and `describeVaultDB` (from `safebyok/testing`) tests it so.
  *
- * Each public verb takes the vault's `validators` last, as openVault was given them, and checks
- * every name and note with them, going in and coming back. Left out, they are `AnyTextValidators`:
- * any well-formed text passes. So a VaultDB that hands each call on to another VaultDB's public
- * verbs need pass nothing, its own verbs having checked every name already, and one that forgets
- * to never has a well-formed name refused that the vault's own checks passed. Your `do*` methods
- * never see them: they take any text as a name.
+ * Every name handed to a public verb -- the scope's three and a boxlabel -- is held, before your
+ * `do*` method sees it, to what any store holds and to what yours declares: the floor every name
+ * is held to (`NameFloor`: well-formed, NFC, no control characters, at most 1 KiB), no character
+ * of {@link reservedNameChars}, and no more than {@link maxNameBytes}. Nothing turns these off. A
+ * host's own `validators` are the vault's, checked where a name enters it, never here: a verb
+ * takes any name above the floor, as a server serving several clients must. So a VaultDB that
+ * hands each call on to another VaultDB's public verbs passes each name through as it came.
  */
 export abstract class VaultDB {
   /**
@@ -143,11 +144,28 @@ export abstract class VaultDB {
    */
   abstract readonly maxLockboxes: number
 
+  /**
+   * The most bytes of UTF-8 this backend holds in one name -- an applabel, a user_id, a vaultlabel
+   * or a boxlabel -- or `Infinity` when it holds any name the floor admits (1 KiB). Every public
+   * verb refuses a longer name with kind `bad_label` before the backend sees it. Declare what the
+   * backend's keys and indexes hold: a store whose key holds every name of a lockbox together
+   * declares its share of the key's limit.
+   */
+  abstract readonly maxNameBytes: number
+
+  /**
+   * The characters this backend cannot hold in a name, as text: `'^'` for a key-value store that
+   * joins names on it (`Ckeys`), `''` for one that keeps each name in a column or field of its
+   * own. Every public verb refuses a name holding any of them with kind `bad_label`, naming the
+   * name and the character, before the backend sees it.
+   */
+  abstract readonly reservedNameChars: string
+
   // ------------------------------------------------------------------- the verbs safebyok calls
 
   /** The vault's bundle, validated, or null when the vault has never been created. */
-  async readBundle(scope: VaultScope, validators?: VaultValidators): Promise<VaultBundle | null> {
-    const asked = Names.checkScope(rulesFor(validators), scope)
+  async readBundle(scope: VaultScope): Promise<VaultBundle | null> {
+    const asked = heldScope(this, scope)
     const raw = await fromStorage(() => this.doReadBundle(asked))
     if (raw === null || raw === undefined) { return null }
     return checkBundle(raw, asked)
@@ -157,8 +175,8 @@ export abstract class VaultDB {
    * Store `bundle` only if its scope holds none, and return whichever bundle stands there after:
    * the given one, or the one another device got in first with.
    */
-  async createBundle(bundle: VaultBundle, validators?: VaultValidators): Promise<VaultBundle> {
-    const asked = Names.checkScope(rulesFor(validators), bundle)
+  async createBundle(bundle: VaultBundle): Promise<VaultBundle> {
+    const asked = heldScope(this, bundle)
     const outgoing = checkOutgoing(VaultBundle, bundle, 'vault bundle')
     const raw = await fromStorage(() => this.doCreateBundle(outgoing))
     return checkBundle(raw, asked)
@@ -170,8 +188,8 @@ export abstract class VaultDB {
    * no bundle stands at all -- and writes nothing. A vault's `vault_id` never changes, so `bundle`
    * must carry the one in `expected`: kind 'bad_option' otherwise.
    */
-  async updateBundle(bundle: VaultBundle, expected: BundleExpectation, validators?: VaultValidators): Promise<void> {
-    Names.checkScope(rulesFor(validators), bundle)
+  async updateBundle(bundle: VaultBundle, expected: BundleExpectation): Promise<void> {
+    heldScope(this, bundle)
     const outgoing = checkOutgoing(VaultBundle, bundle, 'vault bundle')
     const expectation = checkOutgoing(BundleExpectation, expected, 'bundle expectation')
     if (outgoing.vault_id !== expectation.vault_id) {
@@ -184,13 +202,12 @@ export abstract class VaultDB {
   }
 
   /** One lockbox, validated, or null when there is none under that boxlabel. */
-  async readBox(scope: VaultScope, boxlabel: string, validators?: VaultValidators): Promise<Lockbox | null> {
-    const rules = rulesFor(validators)
-    const asked = Names.checkScope(rules, scope)
-    const label = Names.check(rules, 'boxlabel', boxlabel)
+  async readBox(scope: VaultScope, boxlabel: string): Promise<Lockbox | null> {
+    const asked = heldScope(this, scope)
+    const label = heldBoxlabel(this, boxlabel)
     const raw = await fromStorage(() => this.doReadBox(asked, label))
     if (raw === null || raw === undefined) { return null }
-    const lockbox = checkStoredBox(rules, Lockbox, raw)
+    const lockbox = checkRecord(Lockbox, raw, 'lockbox')
     // A record that names some other boxlabel is a record out of place, wherever it came from.
     if (lockbox.boxlabel !== label) {
       throw new VaultError('corrupt_record', 'The stored lockbox names a different boxlabel than the one asked for. It was left as it is.')
@@ -200,19 +217,19 @@ export abstract class VaultDB {
 
   /**
    * Public faces of every lockbox in the vault -- ciphered fields stripped, `note` null where a
-   * lockbox has none, sorted by boxlabel -- valid while locked. A lockbox whose record does not
-   * read back as one, names another boxlabel than it is stored under, or is stored under a
-   * boxlabel or with a note `validators` refuse (written under other checks), is listed as a
-   * {@link DamagedLockbox} rather than refused, so one bad record never hides the rest.
+   * lockbox has none -- valid while locked, sorted by boxlabel, character by character (UTF-16
+   * code unit, never by a locale), so every device lists in one order. A lockbox whose record does
+   * not read back as one, or names another boxlabel than it is stored under, is listed as a
+   * {@link DamagedLockbox} rather than refused, so one bad record never hides the rest. A row
+   * stored under a name below the floor, which no verb could reach, is not listed at all.
    */
-  async listBoxes(scope: VaultScope, validators?: VaultValidators): Promise<(LockboxSummary | DamagedLockbox)[]> {
-    const rules = rulesFor(validators)
-    const asked = Names.checkScope(rules, scope)
+  async listBoxes(scope: VaultScope): Promise<(LockboxSummary | DamagedLockbox)[]> {
+    const asked = heldScope(this, scope)
     const stored = await fromStorage(() => this.doListBoxes(asked))
     return stored
       .filter((entry) => isNameable(entry))
-      .map((entry) => listedOrDamaged(rules, entry))
-      .toSorted((one, two) => one.boxlabel.localeCompare(two.boxlabel))
+      .map((entry) => listedOrDamaged(entry))
+      .toSorted((one, two) => byCodeUnit(one.boxlabel, two.boxlabel))
   }
 
   /**
@@ -225,12 +242,12 @@ export abstract class VaultDB {
    * lockbox is written under the vaultKey it was sealed with, so its `vault_key_epoch` must be the
    * one in `expected`: kind 'bad_option' otherwise.
    */
-  async updateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation, validators?: VaultValidators): Promise<void> {
-    const rules = rulesFor(validators)
-    const asked = Names.checkScope(rules, scope)
-    Names.check(rules, 'boxlabel', LabelledBox.safeParse(lockbox).data?.boxlabel)
+  async updateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<void> {
+    const asked = heldScope(this, scope)
+    heldBoxlabel(this, LabelledBox.safeParse(lockbox).data?.boxlabel)
+    const { note } = NotedBox.safeParse(lockbox).data ?? {}
+    if (note !== undefined) { Names.checkFloor('note', note) }
     const outgoing = checkOutgoing(Lockbox, lockbox, 'lockbox')
-    if (outgoing.note !== undefined) { Names.check(rules, 'note', outgoing.note) }
     const expectation = checkOutgoing(LockboxExpectation, expected, 'lockbox expectation')
     if (outgoing.vault_key_epoch !== expectation.vault_key_epoch) {
       throw new VaultError('bad_option', "updateBox writes a lockbox under the vaultKey it was sealed with: the lockbox's vault_key_epoch must be the expected one.")
@@ -251,10 +268,9 @@ export abstract class VaultDB {
    * kind `stale_write` otherwise -- including when the scope holds no bundle -- and erases
    * nothing.
    */
-  async eraseBox(scope: VaultScope, boxlabel: string, expected: EraseExpectation, validators?: VaultValidators): Promise<void> {
-    const rules = rulesFor(validators)
-    const asked = Names.checkScope(rules, scope)
-    const label = Names.check(rules, 'boxlabel', boxlabel)
+  async eraseBox(scope: VaultScope, boxlabel: string, expected: EraseExpectation): Promise<void> {
+    const asked = heldScope(this, scope)
+    const label = heldBoxlabel(this, boxlabel)
     const expectation = checkOutgoing(EraseExpectation, expected, 'erase expectation')
     const landed = await fromStorage(() => this.doEraseBox(asked, label, expectation))
     if (! landed) { throw staleErase() }
@@ -265,8 +281,8 @@ export abstract class VaultDB {
    * the standing bundle has the `vault_id` in `expected`. Refuses with kind `stale_write`
    * otherwise -- including when the scope holds no bundle -- and erases nothing.
    */
-  async eraseVault(scope: VaultScope, expected: EraseExpectation, validators?: VaultValidators): Promise<void> {
-    const asked = Names.checkScope(rulesFor(validators), scope)
+  async eraseVault(scope: VaultScope, expected: EraseExpectation): Promise<void> {
+    const asked = heldScope(this, scope)
     const expectation = checkOutgoing(EraseExpectation, expected, 'erase expectation')
     const landed = await fromStorage(() => this.doEraseVault(asked, expectation))
     if (! landed) { throw staleErase() }
@@ -292,8 +308,8 @@ export abstract class VaultDB {
    * record, and so could not name the vault. So does a backend whose server validates what it
    * reads, as `safebyok-graphql`'s: there a damaged record is the backend's own to clear.
    */
-  async eraseDamagedVault(scope: VaultScope, validators?: VaultValidators): Promise<void> {
-    const asked = Names.checkScope(rulesFor(validators), scope)
+  async eraseDamagedVault(scope: VaultScope): Promise<void> {
+    const asked = heldScope(this, scope)
     const raw = await readStoredBundle(() => this.doReadBundle(asked))
     if (raw === null || raw === undefined) { return }
     if (isSoundBundle(raw, asked)) {
@@ -312,8 +328,8 @@ export abstract class VaultDB {
    * unsubscribe. A backend without push never calls: safebyok refreshes after its own writes
    * regardless, so all it loses is news of *other* devices' writes.
    */
-  subscribe(scope: VaultScope, onChange: () => void, validators?: VaultValidators): () => void {
-    const asked = Names.checkScope(rulesFor(validators), scope)
+  subscribe(scope: VaultScope, onChange: () => void): () => void {
+    const asked = heldScope(this, scope)
     checkListener(onChange)
     try {
       return this.doSubscribe(asked, onChange)
@@ -387,30 +403,76 @@ const staleErase = () => new VaultError('stale_write', 'The vault changed in sto
 const ListedLockbox = Z.omit(Lockbox, { lockbox_key_wrapped: true, whisper_ciphered: true })
 
 /**
- * True when a listed lockbox is stored under text, which reaches it whatever the vault's checks:
- * a vault erases a box by the name it was stored under, even one its boxlabel check now refuses.
+ * True when a listed lockbox is stored under a name above the floor, which a verb can reach
+ * whatever the vault's checks: a vault erases a box by the name it was stored under.
  */
-const isNameable = (stored: StoredLockbox): boolean => typeof (stored as { boxlabel?: unknown }).boxlabel === 'string'
+const isNameable = (stored: StoredLockbox): boolean => NameFloor.safeParse((stored as { boxlabel?: unknown }).boxlabel).success
 
 /**
  * One nameable stored lockbox as the listing shows it: its summary, or -- when its record fails
- * the check, names another boxlabel than it is stored under, or is stored under a boxlabel or
- * with a note the vault's checks refuse, as `readBox` would refuse it -- a
- * {@link DamagedLockbox} under the boxlabel it is stored under.
+ * the check (its names and note held to the floor among it), or names another boxlabel than it
+ * is stored under, as `readBox` would refuse it -- a {@link DamagedLockbox} under the boxlabel it
+ * is stored under. A name or note the vault's own validators refuse is no damage: it was stored
+ * under other checks, and lists as it stands.
  */
-const listedOrDamaged = (rules: Names.NameRules, { boxlabel, lockbox }: StoredLockbox): LockboxSummary | DamagedLockbox => {
+const listedOrDamaged = ({ boxlabel, lockbox }: StoredLockbox): LockboxSummary | DamagedLockbox => {
   const checked = ListedLockbox.safeParse(lockbox)
-  const sound = checked.success && checked.data.boxlabel === boxlabel && Names.admits(rules, 'boxlabel', boxlabel)
-    && (checked.data.note === undefined || Names.admits(rules, 'note', checked.data.note))
+  const sound = checked.success && checked.data.boxlabel === boxlabel
   return sound ? LockboxSummary.parse(checked.data) : { boxlabel, damaged: true }
 }
 
+/** Two names in one order on every device: character by character, by UTF-16 code unit, never by a locale. */
+const byCodeUnit = (one: string, two: string): number => {
+  if (one === two) { return 0 }
+  return one < two ? -1 : 1
+}
+
+/** The checks a public verb runs on a name: the floor beneath every name, and nothing a host chose. */
+const FloorRules: Names.NameRules = Names.rulesOf(AnyTextValidators)
+
+/** What a backend declares about the names it holds. */
+type NameFacts = Pick<VaultDB, 'maxNameBytes' | 'reservedNameChars'>
+
 /**
- * The checks a public verb runs, from the `validators` it was handed: any well-formed text where
- * it was handed none, so that a caller forgetting the vault's bag refuses nothing well-formed the
- * vault passed.
+ * `scope`, once each of its names passes the floor and fits the backend: kind 'bad_label'
+ * otherwise, naming the name and the rule, quoting none of it.
  */
-const rulesFor = (validators: VaultValidators | undefined): Names.NameRules => Names.rulesOf(validators ?? AnyTextValidators)
+const heldScope = (facts: NameFacts, scope: unknown): VaultScope => {
+  const asked = Names.checkScope(FloorRules, scope)
+  heldName(facts, 'applabel', asked.applabel)
+  heldName(facts, 'user_id', asked.user_id)
+  heldName(facts, 'vaultlabel', asked.vaultlabel)
+  return asked
+}
+
+/** `boxlabel`, once it passes the floor and fits the backend: kind 'bad_label' otherwise. */
+const heldBoxlabel = (facts: NameFacts, boxlabel: unknown): string => heldName(facts, 'boxlabel', Names.checkFloor('boxlabel', boxlabel))
+
+/**
+ * `part`, a name, once it holds no character the backend reserves and no more bytes than it holds
+ * in a name: kind 'bad_label' otherwise, naming `said` and the rule. These hold whatever
+ * validators the host chose: a name a backend cannot hold, or would join into another's ckey, is
+ * never sent.
+ */
+const heldName = (facts: NameFacts, said: string, part: string): string => {
+  const reserved = reservedIn(facts.reservedNameChars, part)
+  if (reserved !== undefined) {
+    throw new VaultError('bad_label', `That ${said} holds '${reserved}', which this storage joins names on, so it can't be stored here: choose a ${said} without it.`)
+  }
+  const partBytes = new TextEncoder().encode(part).length
+  if (partBytes > facts.maxNameBytes) {
+    throw new VaultError('bad_label', `That ${said} is ${String(partBytes)} bytes of UTF-8, over the ${String(facts.maxNameBytes)} this storage holds in one name: choose a shorter ${said}.`)
+  }
+  return part
+}
+
+/** The first of the `reserved` characters `part` holds, or undefined for none. */
+const reservedIn = (reserved: string, part: string): string | undefined => {
+  for (const char of reserved) {
+    if (part.includes(char)) { return char }
+  }
+  return undefined
+}
 
 /**
  * The adapter's half of a verb, with anything it throws that is not already a VaultError turned
@@ -431,21 +493,10 @@ const asStorageTrouble = (err: unknown): VaultError => {
   return new VaultError('storage_unavailable', "The vault's storage could not be reached, or failed partway: try again shortly. The storage adapter's own error is this error's cause.", { cause: err })
 }
 
-// The label a lockbox is written under, checked as a name before the rest of the record is.
+// The label a lockbox is written under, and its note, each checked before the rest of the record
+// is, so a refusal says which.
 const LabelledBox = Z.object({ boxlabel: Z.string() })
-
-/**
- * A stored lockbox, whole or as listed, through its record's validator and then the vault's
- * checks for its boxlabel and note: a record that fails either is refused as 'corrupt_record'.
- */
-const checkStoredBox = <RecordT extends { boxlabel: string, note?: string | undefined }>(rules: Names.NameRules, recordSchema: Z.ZodMiniType<RecordT>, raw: unknown): RecordT => {
-  const lockbox = checkRecord(recordSchema, raw, 'lockbox')
-  const named = Names.admits(rules, 'boxlabel', lockbox.boxlabel) && (lockbox.note === undefined || Names.admits(rules, 'note', lockbox.note))
-  if (! named) {
-    throw new VaultError('corrupt_record', "A stored lockbox's boxlabel or note does not pass the vault's validators. It may be damaged, or stored under other validators than these; it was left as it is.")
-  }
-  return lockbox
-}
+const NotedBox = Z.object({ note: Z.optional(Z.string()) })
 
 const checkListener = (onChange: unknown) => {
   if (typeof onChange !== 'function') {
@@ -602,17 +653,30 @@ export const jsonBytes = (val: unknown): number => new TextEncoder().encode(JSON
 /** `fn`'s result (or failure) as a promise: a sync throw becomes a rejection, never an escape. */
 const soon = async <ValT>(fn: () => ValT | Promise<ValT>): Promise<ValT> => await fn()
 
+/** What {@link localVaultDB} is made with beside its store. */
+export type LocalVaultDBOpts = {
+  /**
+   * The one character the store's ckeys join names on (`Ckeys`), which no name may then hold:
+   * `^` when left out. Every vault in one store must be kept under the same one.
+   */
+  ckeyDelimiter?: string | undefined
+}
+
 /**
- * VaultDB over a {@link StringStore}: rows as JSON text under the ckeys `Ckeys` gives. A host
- * backs one with localStorage, for a vault that lives on this device alone; tests back one with a
- * Map. Every secret field in what it stores is ciphertext; what it lacks is reach -- rows stay
- * on this device instead of syncing through a shared database.
+ * VaultDB over a {@link StringStore}: rows as JSON text under the ckeys `Ckeys` gives, names
+ * joined on `^` (or `opts.ckeyDelimiter`), which no name it holds may then contain. A host backs
+ * one with localStorage, for a vault that lives on this device alone; tests back one with a Map.
+ * Every secret field in what it stores is ciphertext; what it lacks is reach -- rows stay on this
+ * device instead of syncing through a shared database. Kind 'bad_option' for a `ckeyDelimiter`
+ * that is not one character.
  *
  * @example
  *   const vaultDB = localVaultDB(memoryStore())
  *   await vaultDB.readBundle({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // null
+ * @example
+ *   const vaultDB = localVaultDB(domStore(localStorage), { ckeyDelimiter: '/' })
  */
-export const localVaultDB = (store: StringStore): VaultDB => new StringStoreVaultDB(store)
+export const localVaultDB = (store: StringStore, opts?: LocalVaultDBOpts): VaultDB => new StringStoreVaultDB(store, Ckeys.joiner(opts?.ckeyDelimiter))
 
 class StringStoreVaultDB extends VaultDB {
   // localStorage holds about five megabytes per origin, in all: a mebibyte is this adapter's
@@ -622,47 +686,53 @@ class StringStoreVaultDB extends VaultDB {
   readonly maxVaultBytes = Infinity
   // Nor does it count lockboxes: the vault's own maxLockboxes is the only limit.
   readonly maxLockboxes = Infinity
+  // A ckey holds a name of any length the floor admits.
+  readonly maxNameBytes = Infinity
+  readonly reservedNameChars: string
 
   private readonly store: StringStore
+  private readonly joiner: Ckeys.CkeyJoiner
 
-  constructor(store: StringStore) {
+  constructor(store: StringStore, joiner: Ckeys.CkeyJoiner) {
     super()
     this.store = store
+    this.joiner = joiner
+    this.reservedNameChars = joiner.delimiter
   }
 
   // Work is deferred into the promise even though the store is synchronous: a storage fault must
   // reject the returned promise, never throw before the caller has one in hand. And each write
   // checks and saves in one synchronous step, so nothing else in this tab runs in between.
   protected doReadBundle(scope: VaultScope): Promise<unknown> {
-    return soon(() => readJson(this.store, Ckeys.bundle(scope)))
+    return soon(() => readJson(this.store, this.joiner.bundle(scope)))
   }
 
   protected doCreateBundle(bundle: VaultBundle): Promise<unknown> {
     return soon(() => {
-      const standing = readJson(this.store, Ckeys.bundle(bundle))
+      const standing = readJson(this.store, this.joiner.bundle(bundle))
       if (standing !== null) { return standing }
-      this.store.write(Ckeys.bundle(bundle), JSON.stringify(bundle))
+      this.store.write(this.joiner.bundle(bundle), JSON.stringify(bundle))
       return bundle
     })
   }
 
   protected doUpdateBundle(bundle: VaultBundle, expected: BundleExpectation): Promise<boolean> {
     return soon(() => {
-      if (! bundleMeetsExpectation(readJson(this.store, Ckeys.bundle(bundle)), expected)) { return false }
-      this.store.write(Ckeys.bundle(bundle), JSON.stringify(bundle))
+      if (! bundleMeetsExpectation(readJson(this.store, this.joiner.bundle(bundle)), expected)) { return false }
+      this.store.write(this.joiner.bundle(bundle), JSON.stringify(bundle))
       return true
     })
   }
 
   protected doReadBox(scope: VaultScope, boxlabel: string): Promise<unknown> {
-    return soon(() => readJson(this.store, Ckeys.box(scope, boxlabel)))
+    return soon(() => readJson(this.store, this.joiner.box(scope, boxlabel)))
   }
 
   protected doListBoxes(scope: VaultScope): Promise<StoredLockbox[]> {
     return soon(() => (
       this.store.ckeys()
-        .filter(Ckeys.isBoxIn(scope))
-        .map((ckey) => ({ boxlabel: Ckeys.boxlabelOf(ckey), text: this.store.read(ckey) }))
+        .filter(this.joiner.isBoxIn(scope))
+        .map((ckey) => ({ boxlabel: this.joiner.boxlabelOf(ckey), text: this.store.read(ckey) }))
         // A row erased since the ckeys were read is gone; one that is not JSON goes up as its text.
         .filter((row): row is { boxlabel: string, text: string } => row.boxlabel !== null && row.text !== null)
         .map(({ boxlabel, text }) => ({ boxlabel, lockbox: jsonOrText(text) }))
@@ -671,27 +741,27 @@ class StringStoreVaultDB extends VaultDB {
 
   protected doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<boolean> {
     return soon(() => {
-      const standingBundle = readJson(this.store, Ckeys.bundle(scope))
-      const standingBox = readJson(this.store, Ckeys.box(scope, lockbox.boxlabel))
+      const standingBundle = readJson(this.store, this.joiner.bundle(scope))
+      const standingBox = readJson(this.store, this.joiner.box(scope, lockbox.boxlabel))
       if (! lockboxMeetsExpectation(standingBundle, standingBox, expected)) { return false }
-      this.store.write(Ckeys.box(scope, lockbox.boxlabel), JSON.stringify(lockbox))
+      this.store.write(this.joiner.box(scope, lockbox.boxlabel), JSON.stringify(lockbox))
       return true
     })
   }
 
   protected doEraseBox(scope: VaultScope, boxlabel: string, expected: EraseExpectation): Promise<boolean> {
     return soon(() => {
-      if (! vaultMeetsExpectation(readJson(this.store, Ckeys.bundle(scope)), expected)) { return false }
-      this.store.erase(Ckeys.box(scope, boxlabel))
+      if (! vaultMeetsExpectation(readJson(this.store, this.joiner.bundle(scope)), expected)) { return false }
+      this.store.erase(this.joiner.box(scope, boxlabel))
       return true
     })
   }
 
   protected doEraseVault(scope: VaultScope, expected: EraseExpectation): Promise<boolean> {
     return soon(() => {
-      if (! vaultIdMeetsExpectation(readJson(this.store, Ckeys.bundle(scope)), expected)) { return false }
-      const doomed = this.store.ckeys().filter(Ckeys.isBoxIn(scope))
-      for (const ckey of [...doomed, Ckeys.bundle(scope)]) { this.store.erase(ckey) }
+      if (! vaultIdMeetsExpectation(readJson(this.store, this.joiner.bundle(scope)), expected)) { return false }
+      const doomed = this.store.ckeys().filter(this.joiner.isBoxIn(scope))
+      for (const ckey of [...doomed, this.joiner.bundle(scope)]) { this.store.erase(ckey) }
       return true
     })
   }

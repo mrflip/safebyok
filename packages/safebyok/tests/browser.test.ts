@@ -26,7 +26,7 @@ describe("browserOpts", () => {
     const dbName = TH.freshDbName()
     await browserOpts({ dbName }).deviceDB.writeUnlock(await TH.unlockOf('u1'))
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
-    expect(rows.map((row) => row.ckey)).to.deep.equal(['["unlock","acme","u1","main"]'])
+    expect(rows.map((row) => row.ckey)).to.deep.equal(['unlock^acme^u1^main'])
     expect(await browserOpts().deviceDB.readUnlock(TH.scopeOf('u1'))).to.be.null
   })
 

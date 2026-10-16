@@ -23,11 +23,21 @@ Three layers share the work, and each guarantee below belongs to one of them.
 * **The base class** (`VaultDB`'s public verbs) checks every name, record and expectation on the
   way in and every record on the way out, refuses what is malformed before your code sees it,
   turns a `false` from you into `stale_write`, and turns anything you throw that is not a
-  `VaultError` into `storage_unavailable`, your error as its cause.
+  `VaultError` into `storage_unavailable`, your error as its cause. It holds every name to the
+  floor and to what your adapter declares (*Names*, below), never to a host's own validators.
 * **Your adapter** (the `do*` methods) stores and returns records, and makes each write
   conditional: it checks the expectation and writes in one atomic step. It never resolves a
   conflict itself, never merges two writes, and never retries one: a write whose expectation
   failed resolves `false`, and the vault decides what happens next.
+
+A server that serves these verbs to browsers -- the Convex component, the Postgres route recipe,
+the GraphQL resolvers -- checks who may reach which vault (line 5.4), makes each write atomic, and
+holds each record to its shape and each name to the floor and its storage's limits, through these
+same verbs. Nothing more: what text a name may be beyond that is each browser vault's own
+`validators`, checked where a name enters the vault, and a host whose clients run different
+validators has chosen that. A record a client's validators would refuse reads back as any other
+(the vault never takes a name or note it would not have written for damage); one below the floor
+is damage.
 
 So the versioned update is split: the adapter owns the atomic compare-and-write (lines 3.1 to
 3.5, and 3.8), and the vault owns the read before it and the retry after it. "Last write wins" is the
@@ -68,6 +78,25 @@ Every adapter in this repository has an atomic step that spans a vault: a statem
 (Postgres), a transaction (Convex, IndexedDB), or one synchronous turn of a single tab
 (`localVaultDB`).
 
+## Names
+
+A vault is named by its scope -- applabel, user id and vaultlabel -- and a lockbox by its boxlabel
+within it. Every name a verb is handed passes, before the adapter sees it:
+
+* **The floor** (`NameFloor`): one character to 1 KiB of UTF-8, well-formed Unicode, in its
+  composed form (NFC), with no control character. Nothing turns it off, and no host's
+  validators widen it. A stored record holding a name or note below it reads back as damaged.
+* **What the adapter declares** (lines 7.3 and 7.4): no more bytes than `maxNameBytes`, and no
+  character of `reservedNameChars`. A key-value store joins a row's names into one ckey on a
+  delimiter (`Ckeys`, `^` by default), and reserves it: a name holding it could make two rows'
+  ckeys one, another user's lockbox under this one's name. A store that keeps each name in a
+  column or field of its own reserves nothing.
+
+Each refusal is `bad_label`, naming which name and which rule, and quoting none of it. The default
+validators admit neither `^` nor `/`, so every store in this repository holds every name they
+pass, and a host widening them meets the store's refusal at the vault's first call with that name,
+never a collision.
+
 ## 1. Records
 
 **1.1. What is stored reads back whole.** A record reads back exactly as it was written, field
@@ -75,10 +104,9 @@ for field: a field left out stays out (a lockbox with no note has no `note` fiel
 one), and nothing is added. Before anything is written, a read finds nothing: `null`, never a
 default.
 
-**1.2. Each vault keeps to itself.** A vault is named by its scope -- applabel, user id and
-vaultlabel -- and a lockbox by its boxlabel within it. Two scopes that differ anywhere, by
-however little (a colon, a quote, a bracket, a script), never share a record, a listing or an
-erase, whatever text a host's validators let a name hold.
+**1.2. Each vault keeps to itself.** Two scopes that differ anywhere, by however little (a
+colon, a quote, a bracket, a script), never share a record, a listing or an erase, whatever names
+above the floor and within the adapter's declared limits they hold (*Names*, above).
 
 **1.3. Nothing is repaired, and nothing is dropped.** An adapter hands up every record as it is
 stored, damaged or not; the base class decides what is damaged, and the vault lists a damaged
@@ -275,6 +303,16 @@ refuses to open with a `maxWhisperBytes` over half of it.
 **7.2. The most it holds of one vault.** `maxVaultBytes`, no less than one record, or `Infinity`:
 what the backend can still list and erase whole. A vault refuses to open when its `maxLockboxes`
 lockboxes might not fit in it.
+
+**7.3. The most it holds in one name.** `maxNameBytes`, a whole number above zero, or `Infinity`
+for a backend that holds any name the floor admits: the bytes of UTF-8 its keys and indexes hold
+of one name. Postgres, whose lockbox key is a btree entry of four names together, declares 640.
+The base class refuses a longer name (`bad_label`) before the adapter sees it, in every verb.
+
+**7.4. The characters it cannot hold in a name.** `reservedNameChars`, as text: the delimiter a
+key-value store joins names on (`^` for `localVaultDB` and `idbVaultDB`, or the one each was made
+with), or `''` for a store that keeps each name apart. The base class refuses a name holding one
+(`bad_label`) before the adapter sees it, in every verb.
 
 A backend that does not hold to the limits it declares, or a vault opened with limits that
 disagree with its backend's, is outside this contract: not a bug we will fix, and not one whose

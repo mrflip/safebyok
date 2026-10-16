@@ -1,13 +1,13 @@
 import * as Z from 'zod/mini'
 import { VaultError } from './errors'
 import * as Sanitizer from './sanitizer'
-import { VaultScope } from './types'
-import { AnyTextValidators, DefaultValidators, type NameValidator, type VaultValidators } from './validators'
+import type { VaultScope } from './types'
+import { AnyTextValidators, DefaultValidators, NameFloor, NoteFloor, type NameValidator, type VaultValidators } from './validators'
 
 /**
- * The one place a name or a note meets its check: the vault's own calls and every VaultDB verb
- * go through here, with the host's validators where it gave them and ours where not. A check
- * decides pass or fail and nothing more: what passes is kept exactly as handed in.
+ * The one place a name or a note meets its check at the vault's entry: the floor beneath, then the
+ * host's validators where it gave them and ours where not. A check decides pass or fail and
+ * nothing more: what passes is kept exactly as handed in.
  */
 
 /** Which check: one of the fields of {@link VaultValidators}. */
@@ -68,25 +68,18 @@ export const rulesOf = (validators: VaultValidators = {}): NameRules => {
 }
 
 /**
- * True when `candidate` is text that passes the `field` check. A check that throws rather than
- * answering -- an async one, or a host's own bug -- is misuse: kind 'bad_option', carrying nothing
- * of what it threw, which may quote the candidate.
- */
-export const admits = (rules: NameRules, field: NameField, candidate: unknown): candidate is string => (
-  typeof candidate === 'string' && verdictOf(rules, field, candidate).success
-)
-
-/**
- * `candidate`, exactly as handed in, once it passes the `field` check: kind 'bad_label' when it
- * does not ('bad_option' for a note). The refusal names the field, never the candidate, and says
- * what one of safebyok's own checks found wrong; a host's check it names only.
+ * `candidate`, exactly as handed in, once it passes the floor and then the `field` check: kind
+ * 'bad_label' when it does not ('bad_option' for a note). The host's check runs once, and only on
+ * text above the floor. The refusal names the field, never the candidate, and says what one of
+ * safebyok's own checks found wrong; a host's check it names only. A check that throws rather
+ * than answering -- an async one, or a host's own bug -- is misuse: kind 'bad_option', carrying
+ * nothing of what it threw, which may quote the candidate.
  */
 export const check = (rules: NameRules, field: NameField, candidate: unknown): string => {
-  if (typeof candidate !== 'string') {
-    throw new VaultError(kindFor(field), `That ${field} is missing, or is not text.`)
-  }
-  const verdict = verdictOf(rules, field, candidate)
-  if (verdict.success) { return candidate }
+  const floored = checkFloor(field, candidate)
+  if (rules[field] === floorOf(field)) { return floored }
+  const verdict = verdictOf(rules, field, floored)
+  if (verdict.success) { return floored }
   // Our own checks' messages quote nothing, so they may say just what was wrong; a host's may
   // quote the candidate, so its refusal is never passed on.
   const said = OurChecks.has(rules[field]) ? verdict.error.issues[0]?.message : undefined
@@ -96,17 +89,37 @@ export const check = (rules: NameRules, field: NameField, candidate: unknown): s
   throw new VaultError(kindFor(field), `That ${field} does not pass the vault's ${field} check. ${said}.`)
 }
 
-/** `scope`, once its three names pass their checks: kind 'bad_label' otherwise. */
+/**
+ * `candidate`, exactly as handed in, once it passes the floor beneath every `field`, whatever the
+ * host's validators: {@link NameFloor} for a name, {@link NoteFloor} for a note. Kind 'bad_label'
+ * when it does not ('bad_option' for a note), saying what was wrong and quoting nothing.
+ */
+export const checkFloor = (field: NameField, candidate: unknown): string => {
+  if (typeof candidate !== 'string') {
+    throw new VaultError(kindFor(field), `That ${field} is missing, or is not text.`)
+  }
+  const verdict = Z.safeParse(floorOf(field), candidate)
+  if (verdict.success) { return candidate }
+  throw new VaultError(kindFor(field), `That ${field} is not text any vault can hold. ${verdict.error.issues[0]?.message ?? 'It fails the floor every name is held to'}.`)
+}
+
+/** `scope`, once its three names pass the floor and their checks: kind 'bad_label' otherwise. */
 export const checkScope = (rules: NameRules, scope: unknown): VaultScope => {
-  const checked = VaultScope.safeParse(scope)
+  const checked = ScopeShape.safeParse(scope)
   if (! checked.success) {
     throw new VaultError('bad_label', 'A vault scope is an applabel, a user_id and a vaultlabel, each text that passes its check.')
   }
   check(rules, 'applabel', checked.data.applabel)
   check(rules, 'userId', checked.data.user_id)
   check(rules, 'vaultlabel', checked.data.vaultlabel)
-  return checked.data
+  return { applabel: checked.data.applabel, user_id: checked.data.user_id, vaultlabel: checked.data.vaultlabel }
 }
+
+/** A scope's shape, before its names meet their checks. */
+const ScopeShape = Z.object({ applabel: Z.string(), user_id: Z.string(), vaultlabel: Z.string() })
+
+/** The floor beneath every `field`: one for a note, one for each name. */
+const floorOf = (field: NameField): NameValidator => (field === 'note' ? NoteFloor : NameFloor)
 
 /** The `field` check's verdict on `candidate`. A check that throws rather than answering is misuse. */
 const verdictOf = (rules: NameRules, field: NameField, candidate: string) => {

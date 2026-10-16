@@ -61,8 +61,10 @@ export type OpenVaultOpts = {
   /** The host application's namespace: one backend can serve several apps without collision. */
   applabel:   string
   /**
-   * Stable identifier of the signed-in user, from the host's auth: by default text of 1 to 100
-   * characters, as the exported `UserId` checks, or what `validators.userId` admits. Never an email.
+   * Stable identifier of the signed-in user, from the host's auth: by default 1 to 100 ASCII
+   * letters, digits and `-_.:@+|`, as the exported `UserId` checks, or what `validators.userId`
+   * admits. The provider's stable, opaque id: never an email or a handle, which can change and
+   * would orphan the vault.
    */
   userId:     string
   /** The vault's own label; an app that keeps one vault per user calls it `main`. */
@@ -120,12 +122,13 @@ export type OpenVaultOpts = {
    */
   logger?: VaultLogger | undefined
   /**
-   * The checks for the vault's names and notes, as a {@link VaultValidators} bag: each field given
-   * replaces ours outright (`Label` for each label, an unlock's `unlocklabel` among them, `UserId`
-   * for the user, `LockboxNote` for a note, from `safebyok/validators`), and each left out keeps
-   * ours. Each is a Zod schema that
-   * checks synchronously, and only checks: what passes is kept exactly as given. Kind
-   * 'bad_option' for a bag holding anything else, or a field it does not know.
+   * The checks for the vault's names and notes where they enter it, as a {@link VaultValidators}
+   * bag: each field given replaces ours (`Label` for each label, an unlock's `unlocklabel` among
+   * them, `UserId` for the user, `LockboxNote` for a note, from `safebyok/validators`), and each
+   * left out keeps ours. Each is a Zod schema that checks synchronously, and only checks: what
+   * passes is kept exactly as given. Beneath every one, the floor (`NameFloor`, `NoteFloor`) holds
+   * whatever the bag says. Kind 'bad_option' for a bag holding anything else, or a field it does
+   * not know.
    */
   validators?: VaultValidators | undefined
   /**
@@ -369,8 +372,8 @@ export type Vault = {
    * is gone and the call throws: storing again writes the lockbox afresh. (A record that reads
    * but will not decipher, its ciphertext altered, is replaced as any other, its note and
    * `registered_at` kept.) A boxlabel the vault's check refuses is kind 'bad_label', writing
-   * nothing, even where a lockbox stored under other checks stands under it: `erase()` removes
-   * that one.
+   * nothing, even where a lockbox stored under other checks stands under it: that one reads and
+   * erases by its name, but is never written anew under it.
    *
    * `opts.note` is the lockbox's public note, shown while locked: text the vault's note check
    * passes (by default `LockboxNote`: at most 256 characters), or null for none -- kind
@@ -387,17 +390,17 @@ export type Vault = {
    * The whisper in `boxlabel`. Requires unlocked; kind 'absent_box' when there is none, and
    * 'damaged_lockbox' when its stored record fails its checks, or will not open under the vault's
    * key: `erase()` it, or `store()` over it.
-   * A boxlabel the vault's check refuses is kind 'bad_label', a malformed name and also one a
-   * lockbox stands under, stored under other checks, which the snapshot lists as damaged:
-   * `erase()` clears that lockbox, by the name it was stored under.
+   * A lockbox stored under a boxlabel the vault's check refuses -- by another client, or under
+   * other checks -- reads as any other, by the name it was stored under. With nothing under it, a
+   * name the check refuses is kind 'bad_label', and one below the floor every name is held to is
+   * 'bad_label' always.
    */
   read(boxlabel: string): Promise<Whisper>
   /**
    * Hand the whisper to `callback` and return its result: the shape that discourages parking a
    * secret in state. Requires unlocked; kind 'bad_option', before anything is read, for a
    * `callback` that is not a function. Refuses `boxlabel` as `read()` does: 'absent_box',
-   * 'corrupt_record', and 'bad_label' for a name the vault's check refuses, even one a lockbox
-   * listed as damaged stands under, which `erase()` clears.
+   * 'damaged_lockbox', and 'bad_label' for a name the vault's check refuses with nothing under it.
    *
    * @example await vault.use('anthropic_api_key', (whisper) => callAnthropic(whisper))
    */
@@ -406,7 +409,7 @@ export type Vault = {
    * Remove the lockbox `boxlabel` entirely, whatever revision of it stands -- even one whose
    * stored record fails verification, which the snapshot lists as damaged and reading refuses as
    * 'damaged_lockbox': erasing it needs nothing from it, and is the remedy for it. A lockbox
-   * stored under a boxlabel the vault's check now refuses is reached by that name too. Requires
+   * stored under a boxlabel the vault's check refuses is reached by that name too. Requires
    * unlocked; kind 'absent_box' when absent, and 'bad_label' for a refused name with nothing
    * under it. The erase lands only in the vault this device last read: if it was destroyed, or
    * destroyed and made anew, elsewhere, nothing is erased and the call throws kind
@@ -466,11 +469,6 @@ const UnreadBundle = Symbol.for('safebyok.unread_bundle')
 export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   if (! isBag(opts)) { throw new VaultError('bad_option', 'openVault takes one bag of options: applabel, userId, vaultlabel, vaultDB, deviceDB and keyDeriver at least.') }
   const rules = Names.rulesOf(opts.validators)
-  // The same checks, but any text for a boxlabel: for reaching a lockbox that already stands under
-  // a name the boxlabel check refuses, which erase() alone does, by the name it stands under. Any
-  // text at all, not AnyTextValidators' well-formed text: a host's own check may have let a lone
-  // surrogate stand.
-  const standingRules: Names.NameRules = { ...rules, boxlabel: Z.string() }
   const scope = Names.checkScope(rules, { applabel: opts.applabel, user_id: opts.userId, vaultlabel: opts.vaultlabel })
   const { applabel, vaultlabel } = scope
   const givenVaultDB = parseVaultDB(opts.vaultDB)
@@ -555,7 +553,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
     // The mark the bundle is held to is read before it (see heedMark), and an older copy of a vault
     // this device has seen newer is refused before anything is taken from it.
     const seenBefore = checkedMark(await deviceDB.readMark(scope))
-    const fresh = await damagedAs(vaultDB.readBundle(scope, rules), damagedBundle)
+    const fresh = await damagedAs(vaultDB.readBundle(scope), damagedBundle)
     const mark = fresh === null ? null : await heedMark(fresh, { seenBefore })
     // A change to the unlocks elsewhere (new epoch) or a deletion ends this device's unlock: the
     // vaultKey in hand still works on old rows, but passing as current invites confusion.
@@ -567,7 +565,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
     }
     bundle = fresh
     deviceMark = mark
-    boxes = fresh === null ? [] : await vaultDB.listBoxes(scope, rules)
+    boxes = fresh === null ? [] : await vaultDB.listBoxes(scope)
     bump()
   }
 
@@ -734,7 +732,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       drafted = { vault_id: draft.vault_id, device_id: deviceId }
       // Another device's vault, if one was made meanwhile, is held to the mark as it was before it.
       const seenBefore = checkedMark(await deviceDB.readMark(scope))
-      const settled = await damagedAs(vaultDB.createBundle(draft, rules), damagedBundle)
+      const settled = await damagedAs(vaultDB.createBundle(draft), damagedBundle)
       const mark = await heedMark(settled, { seenBefore })
       bundle = settled
       deviceMark = mark
@@ -782,7 +780,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       unlock_epoch:     standing.unlock_epoch + 1,
       unlocks,
     }
-    await refreshOnStale(vaultDB.updateBundle(next, { vault_id: standing.vault_id, unlock_epoch: standing.unlock_epoch }, rules))
+    await refreshOnStale(vaultDB.updateBundle(next, { vault_id: standing.vault_id, unlock_epoch: standing.unlock_epoch }))
     // This device's own write raises its mark, never refuses: a newer one seen meanwhile stands.
     const mark = await raiseMark(await keptMark(), next)
     bundle = next
@@ -1034,30 +1032,21 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   }
 
   /**
-   * `boxlabel` as text, once a lockbox stands under it, for erase(), which reaches a lockbox by the
-   * name it was stored under: one the vault's boxlabel check refuses -- stored under other checks
-   * -- still stands, listed as damaged, and so does a record that fails verification. With no
-   * lockbox under it, a refused boxlabel is kind 'bad_label' and a passing one 'absent_box'.
-   * Storage is read once.
+   * `boxlabel`, once a lockbox stands under it, for erase(), which reaches a lockbox by the name it
+   * was stored under: a record that fails verification still stands, and so does one stored under
+   * a name the vault's boxlabel check refuses (by another client, or under other checks). Storage
+   * is read once.
    */
   const checkStandingBoxlabel = async (boxlabel: string): Promise<string> => {
-    const label = Names.check(standingRules, 'boxlabel', boxlabel)
-    if (await readBoxOrDamaged(label) === null) {
-      Names.check(rules, 'boxlabel', label)
-      throw absentBox()
-    }
+    const label = Names.checkFloor('boxlabel', boxlabel)
+    if (await readBoxOrDamaged(label) === null) { throw nothingUnder(label) }
     return label
   }
 
-  /**
-   * The lockbox under `boxlabel`; null when there is none, and 'damaged' when its record fails
-   * verification, or stands under a boxlabel the vault's check refuses.
-   */
+  /** The lockbox under `boxlabel`; null when there is none, and 'damaged' when its record fails verification. */
   const readBoxOrDamaged = async (boxlabel: string): Promise<Lockbox | 'damaged' | null> => {
-    const admitted = Names.admits(rules, 'boxlabel', boxlabel)
     try {
-      const lockbox = await vaultDB.readBox(scope, boxlabel, admitted ? rules : standingRules)
-      return lockbox === null || admitted ? lockbox : 'damaged'
+      return await vaultDB.readBox(scope, boxlabel)
     } catch (err) {
       if (! isVaultError(err, 'corrupt_record')) { throw err }
       return 'damaged'
@@ -1065,10 +1054,21 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   }
 
   const readBoxOrThrow = async (boxlabel: string) => {
-    const label = Names.check(rules, 'boxlabel', boxlabel)
-    const lockbox = await damagedAs(vaultDB.readBox(scope, label, rules), damagedLockbox)
-    if (lockbox === null) { throw absentBox() }
+    const label = Names.checkFloor('boxlabel', boxlabel)
+    const lockbox = await damagedAs(vaultDB.readBox(scope, label), damagedLockbox)
+    if (lockbox === null) { throw nothingUnder(label) }
     return lockbox
+  }
+
+  /**
+   * Why nothing stands under `boxlabel`, a name above the floor: kind 'bad_label' when the vault's
+   * boxlabel check refuses it -- the name was never one this app would store under -- and
+   * 'absent_box' otherwise. The host's check runs here, once, only when storage holds nothing
+   * under the name: a lockbox stored under a name it refuses reads and erases as any other.
+   */
+  const nothingUnder = (boxlabel: string): VaultError => {
+    Names.check(rules, 'boxlabel', boxlabel)
+    return absentBox()
   }
 
   /** The whisper in `boxlabel`, for an operation that wants it whole. */
@@ -1269,8 +1269,8 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
 
     store: async (boxlabel, whisper, storeOpts) => {
       ensureUnlocked()
-      // A box under a name the check refuses lists as damaged, and storing there would only make
-      // another that does: such a name is refused here too, and only erase() reaches it.
+      // A name the check refuses is never written anew, even where a lockbox stored under other
+      // checks stands under it: reading and erasing reach that one.
       const label = Names.check(rules, 'boxlabel', boxlabel)
       const givenNote = storeOpts?.note === undefined || storeOpts.note === null ? storeOpts?.note : Names.check(rules, 'note', storeOpts.note)
       const checked = Whisper.safeParse(whisper)
@@ -1329,8 +1329,8 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
         try {
           // A damaged box is cleared first, as erase() would, so the write meets no revision: its
           // record cannot say which one it holds.
-          if (standing === 'damaged') { await refreshOnStale(vaultDB.eraseBox(scope, label, { vault_id: vaultId }, rules)) }
-          await refreshOnStale(vaultDB.updateBox(scope, lockbox, expected, rules))
+          if (standing === 'damaged') { await refreshOnStale(vaultDB.eraseBox(scope, label, { vault_id: vaultId })) }
+          await refreshOnStale(vaultDB.updateBox(scope, lockbox, expected))
         } catch (err) {
           if (! isVaultError(err, 'stale_write')) { throw err }
           // The catch-up has just shown what stands now. A device it relocked, or a box it shows
@@ -1363,7 +1363,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       // Lands only in the vault this device holds keys for, whatever revision of the box stands:
       // a vault destroyed and made anew elsewhere refuses it. That is its only expectation, and
       // trying again could not change it: a stale erase is thrown at once, never retried.
-      await refreshOnStale(vaultDB.eraseBox(scope, label, { vault_id: currentBundle().vault_id }, standingRules))
+      await refreshOnStale(vaultDB.eraseBox(scope, label, { vault_id: currentBundle().vault_id }))
       await refresh()
     },
 
@@ -1374,7 +1374,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       const doomed = bundle
       await shut()
       if (doomed !== null && doomed !== UnreadBundle) {
-        await refreshOnStale(vaultDB.eraseVault(scope, { vault_id: doomed.vault_id }, rules))
+        await refreshOnStale(vaultDB.eraseVault(scope, { vault_id: doomed.vault_id }))
       }
       // This device forgets the vault it had seen, too: one made later under this scope is another.
       await deviceDB.eraseMark(scope)
@@ -1416,7 +1416,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       logger.warn("A background refresh from storage failed, so what the vault shows may lag behind storage until its next call, which will meet the same trouble and throw it.", { call: 'refresh' }, asError(err))
     }
   }
-  const unsubscribeDB = vaultDB.subscribe(scope, () => { void quietRefresh() }, rules)
+  const unsubscribeDB = vaultDB.subscribe(scope, () => { void quietRefresh() })
 
   try {
     await refresh()
@@ -1480,7 +1480,7 @@ export const eraseDamagedVault = async (opts: EraseDamagedVaultOpts): Promise<vo
   const deviceDB = parseDeviceDB(opts.deviceDB)
   // The vault first: a sound one refuses, and then the device keeps what it remembers of it. A
   // retry after a failure here finds the vault gone, and still clears the device.
-  await vaultDB.eraseDamagedVault(scope, rules)
+  await vaultDB.eraseDamagedVault(scope)
   await deviceDB.eraseUnlock(scope)
   await deviceDB.eraseMark(scope)
 }

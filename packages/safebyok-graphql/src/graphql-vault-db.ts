@@ -23,6 +23,9 @@ export type GraphqlVaultDBOpts = {
 /** What the Postgres VaultDB holds in one vault unless told otherwise, and so what this declares. */
 const DefaultMaxLockboxes = 1000
 
+/** The most bytes of UTF-8 the Postgres VaultDB behind the server holds in one name. */
+const ServerMaxNameBytes = 640
+
 /**
  * safebyok's storage over GraphQL, in the browser: a VaultDB whose every verb is one operation,
  * sent through your app's urql Client to a server serving `VaultSchemaSdl` with `vaultResolvers`
@@ -130,6 +133,10 @@ class UrqlVaultDB extends VaultDB {
   // Nothing here reads a vault under a budget: the server's storage sets what it sets.
   readonly maxVaultBytes = Infinity
   readonly maxLockboxes: number
+  // What the Postgres VaultDB behind the server holds in one name, so a longer one is refused here,
+  // before the wire; each name crosses it as a field of its own, so none is reserved.
+  readonly maxNameBytes = ServerMaxNameBytes
+  readonly reservedNameChars = ''
 
   private readonly client: GraphqlVaultClient
 

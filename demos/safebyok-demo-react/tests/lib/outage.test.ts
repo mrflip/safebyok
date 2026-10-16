@@ -46,10 +46,10 @@ describe("OutageVaultDB, while up", () => {
     const vaultDB = new OutageVaultDB(localVaultDB(store), makeOutage())
     await vaultDB.createBundle(bundle)
     await vaultDB.updateBox(scope, TH.boxOf('openai', 'two'), TH.noBoxYet)
-    store.write(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), '{"not": json')
+    store.write(Ckeys.joiner().box(TH.scopeOf('u1'), 'anthropic'), '{"not": json')
     // missing its whisper: the inner list finds it sound, and only a whole read finds it damaged
     const { whisper_ciphered: _gone, ...whisperless } = TH.boxOf('cohere', 'three')
-    store.write(Ckeys.box(TH.scopeOf('u1'), 'cohere'), JSON.stringify(whisperless))
+    store.write(Ckeys.joiner().box(TH.scopeOf('u1'), 'cohere'), JSON.stringify(whisperless))
     const listed = await vaultDB.listBoxes(scope)
     expect(listed.map((box) => [box.boxlabel, box.damaged])).to.deep.equal([['anthropic', true], ['cohere', true], ['openai', false]])
   })
@@ -62,7 +62,7 @@ const damagedOver = async () => {
   const vaultDB = new OutageVaultDB(localVaultDB(store), outage)
   await vaultDB.createBundle(bundle)
   await vaultDB.updateBox(scope, TH.boxOf('openai', 'two'), TH.noBoxYet)
-  store.write(Ckeys.bundle(scope), JSON.stringify({ ...bundle, unlock_epoch: 'one' }))
+  store.write(Ckeys.joiner().bundle(scope), JSON.stringify({ ...bundle, unlock_epoch: 'one' }))
   return { store, outage, vaultDB }
 }
 

@@ -2,7 +2,7 @@ import { beforeAll } from 'vitest'
 import { PGlite } from '@electric-sql/pglite'
 import { postgresVaultDB } from '../src/index'
 import type { PostgresClient, PostgresListen } from '../src/index'
-import type { VaultDB, VaultScope, VaultValidators } from 'safebyok'
+import type { VaultDB, VaultScope } from 'safebyok'
 import { VaultNotifySql, VaultTablesSql } from '../src/vault-tables'
 
 // Everything the core's tests use too, so a test here star-imports this one module as TH.
@@ -125,9 +125,9 @@ export const changeCounter = () => {
  *
  * @example const { heard, unsubscribe } = await TH.liveWatch(TH.requestFor(db, 'u1'), TH.scopeOf('u1'))
  */
-export const liveWatch = async (vaultDB: Pick<VaultDB, 'subscribe'>, scope: VaultScope, validators?: VaultValidators) => {
+export const liveWatch = async (vaultDB: Pick<VaultDB, 'subscribe'>, scope: VaultScope) => {
   const heard = { count: 0 }
-  const unsubscribe = vaultDB.subscribe(scope, () => { heard.count += 1 }, validators)
+  const unsubscribe = vaultDB.subscribe(scope, () => { heard.count += 1 })
   await eventually(() => heard.count > 0)
   heard.count = 0
   return { heard, unsubscribe }

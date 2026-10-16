@@ -10,7 +10,7 @@ describe("the package's entry point", () => {
       'Argon2idWebV1', 'argon2idDeriver', 'argon2idWebV1Deriver', 'parseKeyDeriverSpec',
       'openVault', 'eraseDamagedVault', 'IdentityRevokedResponseVals',
       'Ciphered', 'EpochMillis', 'FarFuture', 'FarPast', 'ForcePassphraseReentryHours', 'ForeverMs', 'Lockbox', 'LockboxSummary', 'MaxLockboxes', 'MaxUnlocks', 'MaxWhisperBytes', 'PasskeyEnvelope', 'PasskeySaltBytes', 'PassphraseEnvelope', 'UnlockEnvelope', 'UnlockMethodVals', 'VaultBundle', 'VaultScope', 'Whisper', 'wallClock',
-      'AnyTextValidators', 'DefaultValidators', 'Label', 'LabelPattern', 'LockboxNote', 'MaxLabelChars', 'MaxNoteChars', 'MaxUserIdChars', 'UserId', 'checkValidators',
+      'AnyTextValidators', 'DefaultValidators', 'Label', 'LabelPattern', 'LockboxNote', 'MaxLabelChars', 'MaxNoteChars', 'MaxUserIdChars', 'NameFloor', 'NameFloorBytes', 'NoteFloor', 'NoteFloorBytes', 'UserId', 'UserIdPattern', 'checkValidators',
       'VaultError', 'VaultErrorFamilyForKind', 'VaultErrorFamilyVals', 'VaultErrorKindVals', 'isVaultCondition', 'isVaultError',
       'VaultDB', 'Ckeys', 'Sanitizer', 'localVaultDB', 'memoryDeviceDB',
       'domStore', 'memoryStore',
@@ -25,7 +25,7 @@ describe("the package's entry point", () => {
   })
 
   it("exports the ckeys an adapter over a key-value store files rows under, as one namespace", () => {
-    expect(Object.keys(safebyok.Ckeys)).to.have.members(['bundle', 'box', 'unlock', 'mark', 'boxPrefix', 'isBoxIn', 'boxlabelOf', 'isUnlock', 'isMark'])
+    expect(Object.keys(safebyok.Ckeys)).to.have.members(['DefaultDelimiter', 'joiner'])
   })
 
   it("exports the sanitizer an adapter throws through in place of a foreign error, as one namespace", () => {

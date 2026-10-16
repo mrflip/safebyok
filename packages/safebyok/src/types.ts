@@ -1,5 +1,6 @@
 import * as Z from 'zod/mini'
 import { Ciphered } from './crypto'
+import { NameFloor, NoteFloor } from './validators'
 
 /**
  * The JSON a whisper is made of. `null` is legal here -- inside an array or object -- because
@@ -118,14 +119,14 @@ export const EpochMillis = Z.number().check(
 /**
  * What names one vault: the host application's label, the authenticated user, and the vault's own
  * label. Two users may each have a vault labelled `main` without collision; so may two apps
- * sharing a backend. This checks only that each is text: what text a name may be is the vault's
- * validators' to say (`Label` and `UserId` by default, from `safebyok/validators`), and every
- * VaultDB verb checks a scope with them.
+ * sharing a backend. This checks each name against the floor every name is held to
+ * (`NameFloor`); what text a name may be beyond that is the vault's validators' to say, at its
+ * entry (`Label` and `UserId` by default, from `safebyok/validators`).
  */
 export const VaultScope = Z.object({
-  applabel:   Z.string(),
-  user_id:    Z.string(),
-  vaultlabel: Z.string(),
+  applabel:   NameFloor,
+  user_id:    NameFloor,
+  vaultlabel: NameFloor,
 })
 export type VaultScope = Z.infer<typeof VaultScope>
 
@@ -149,11 +150,12 @@ const cryptoKeyHandle = Z.custom<CryptoKey>((val) => val instanceof CryptoKey, '
  *
  * Stored fields are underbar_case: this record is written to the storage layer as-is, and it is
  * plain JSON -- any backend that can hold text can hold it. Its boxlabel and note are checked here
- * only as text; every VaultDB verb checks them with the vault's validators.
+ * against the floor every name and note is held to (`NameFloor`, `NoteFloor`); the vault's
+ * validators check them only where a host hands them in.
  */
 export const Lockbox = Z.object({
   format:              Z.literal('safebyok-lockbox-v2'),
-  boxlabel:            Z.string(),
+  boxlabel:            NameFloor,
   revision_id:         Z.string().check(Z.minLength(1)),
   /**
    * Which vaultKey this lockbox's lockboxKey is wrapped under: the bundle's `vault_key_epoch` when
@@ -168,7 +170,7 @@ export const Lockbox = Z.object({
    * The lockbox's public note, as the vault's note check passed it (`LockboxNote` by default).
    * Written only when there is one; read as absent when undefined too, as IndexedDB keeps it.
    */
-  note:                Z.optional(Z.string()),
+  note:                Z.optional(NoteFloor),
   /** When this boxlabel was first stored, an {@link EpochMillis}: every later store carries it forward. */
   registered_at:       EpochMillis,
   /**
@@ -241,7 +243,7 @@ export const PassphraseEnvelope = Z.object({
   /** Random id minted when the envelope is added, and kept when its passphrase changes. */
   unlock_id:         Z.string().check(Z.minLength(1)),
   /** What the user calls this way in, so they can tell one from another: `home_phrase`, say. */
-  unlocklabel:       Z.string().check(Z.minLength(1)),
+  unlocklabel:       NameFloor,
   /** Which keyDeriverSpec made the passphraseKey: `argon2id_web_v1`, or a host's own label. */
   key_deriver_label: Z.string().check(Z.minLength(1)),
   /** This envelope's passphraseSalt: fresh for every envelope, and for every change of its passphrase. */
@@ -279,7 +281,7 @@ export const PasskeyEnvelope = Z.object({
   /** Random id minted when the envelope is added. */
   unlock_id:         Z.string().check(Z.minLength(1)),
   /** What the user calls this way in, so they can tell one from another: `laptop_fingerprint`, say. */
-  unlocklabel:       Z.string().check(Z.minLength(1)),
+  unlocklabel:       NameFloor,
   /** The WebAuthn credential's id, base64url, as `PublicKeyCredential.id` gives it: which passkey to ask. */
   credential_id:     Z.string().check(Z.minLength(1)),
   /** The salt the passkey's PRF is evaluated over: {@link PasskeySaltBytes} random bytes, fresh for every envelope. */
@@ -388,9 +390,9 @@ const priorFits = (bundle: { vault_key_epoch: number, prior_vault_key?: { vault_
  */
 export const VaultBundle = Z.object({
   format:              Z.literal('safebyok-vault-v2'),
-  applabel:            Z.string(),
-  user_id:             Z.string(),
-  vaultlabel:          Z.string(),
+  applabel:            NameFloor,
+  user_id:             NameFloor,
+  vaultlabel:          NameFloor,
   /** Random id minted when the vault is made, and never changed; bound into every encryption. */
   vault_id:            Z.string().check(Z.minLength(1)),
   unlock_epoch:        Z.int().check(Z.positive()),
@@ -416,9 +418,9 @@ export type VaultBundle = Z.infer<typeof VaultBundle>
  */
 export const DeviceUnlock = Z.object({
   format:           Z.literal('safebyok-unlock-v1'),
-  applabel:         Z.string(),
-  user_id:          Z.string(),
-  vaultlabel:       Z.string(),
+  applabel:         NameFloor,
+  user_id:          NameFloor,
+  vaultlabel:       NameFloor,
   vault_id:         Z.string().check(Z.minLength(1)),
   /** The bundle's unlock_epoch when this unlock was remembered; a mismatch voids it. */
   unlock_epoch:     Z.int().check(Z.positive()),
@@ -441,9 +443,9 @@ export type DeviceUnlock = Z.infer<typeof DeviceUnlock>
  */
 export const DeviceMark = Z.object({
   format:          Z.literal('safebyok-mark-v1'),
-  applabel:        Z.string(),
-  user_id:         Z.string(),
-  vaultlabel:      Z.string(),
+  applabel:        NameFloor,
+  user_id:         NameFloor,
+  vaultlabel:      NameFloor,
   /** This device's id for the vault: random, minted the first time it reads or makes the vault. */
   device_id:       Z.string().check(Z.minLength(1)),
   /** The vault this mark is of. */

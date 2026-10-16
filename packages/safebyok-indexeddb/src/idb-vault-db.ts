@@ -1,9 +1,9 @@
 import { Ckeys, VaultDB } from 'safebyok'
 import type { BundleExpectation, EraseExpectation, Lockbox, LockboxExpectation, StoredLockbox, VaultBundle, VaultScope } from 'safebyok'
 import { onBell, ringBell } from './bell'
-import { boxCkey, boxRange, bundleCkey } from './ckeys'
+import { boxRange } from './ckeys'
 import { bundleMeetsExpectation, lockboxMeetsExpectation, vaultIdMeetsExpectation, vaultMeetsExpectation } from './expectations'
-import { parseDbName, type IdbVaultDBOpts } from './idb-opts'
+import { parseIdbVaultDBOpts, type IdbVaultDBOpts } from './idb-opts'
 import { inOneTransaction, settle, shelfOf } from './shelf'
 
 /**
@@ -17,45 +17,58 @@ import { inOneTransaction, settle, shelfOf } from './shelf'
  *   `stale_write` otherwise.
  * * **Other tabs' writes** ring `subscribe`, over a BroadcastChannel.
  * * **No limits of its own**: IndexedDB sets none per record or per vault, so `maxRecordBytes`,
- *   `maxVaultBytes` and `maxLockboxes` are `Infinity`; the origin's storage quota bounds the
- *   whole database.
+ *   `maxVaultBytes`, `maxLockboxes` and `maxNameBytes` are `Infinity`; the origin's storage quota
+ *   bounds the whole database.
+ * * **Names joined on `^`** in each row's ckey (the core's `Ckeys`), or on `opts.ckeyDelimiter`:
+ *   that character is its `reservedNameChars`, and a name holding it is refused, kind
+ *   `bad_label`. The default validators admit no `^`.
  *
  * Browser storage is best-effort: the browser may evict it under pressure, and "clear site data"
  * removes it. An app keeping its vaults here should call `navigator.storage.persist()`, and say
  * plainly that the vault lives only in this browser.
  *
- * @param opts - Where to keep the records: `dbName`, default 'safebyok'.
+ * @param opts - Where to keep the records: `dbName`, default 'safebyok'; and `ckeyDelimiter`,
+ *   default `^`.
  * @returns The VaultDB, to hand `openVault`. Kind 'bad_option' for a `dbName` that is not
- *   non-empty text. Nothing is opened until the first read or write.
+ *   non-empty text, or a `ckeyDelimiter` that is not one character. Nothing is opened until the
+ *   first read or write.
  *
  * @example
  *   const vault = await openVault({ applabel: 'acme', userId, vaultlabel: 'main', vaultDB: idbVaultDB({ dbName: 'acme' }), ...browserOpts({ dbName: 'acme' }) })
  */
-export const idbVaultDB = (opts?: IdbVaultDBOpts): VaultDB => new IdbVaultDB(parseDbName(opts, 'idbVaultDB'))
+export const idbVaultDB = (opts?: IdbVaultDBOpts): VaultDB => {
+  const { dbName, ckeyDelimiter } = parseIdbVaultDBOpts(opts, 'idbVaultDB')
+  return new IdbVaultDB(dbName, Ckeys.joiner(ckeyDelimiter))
+}
 
 class IdbVaultDB extends VaultDB {
   readonly maxRecordBytes = Infinity
   readonly maxVaultBytes = Infinity
   readonly maxLockboxes = Infinity
+  readonly maxNameBytes = Infinity
+  readonly reservedNameChars: string
 
   private readonly dbName: string
+  private readonly joiner: Ckeys.CkeyJoiner
 
-  constructor(dbName: string) {
+  constructor(dbName: string, joiner: Ckeys.CkeyJoiner) {
     super()
     this.dbName = dbName
+    this.joiner = joiner
+    this.reservedNameChars = joiner.delimiter
   }
 
   private get shelf() { return shelfOf(this.dbName) }
 
   protected async doReadBundle(scope: VaultScope): Promise<unknown> {
-    return (await this.shelf('readonly', (store) => rowAt(store, bundleCkey(scope)))) ?? null
+    return (await this.shelf('readonly', (store) => rowAt(store, this.joiner.bundle(scope)))) ?? null
   }
 
   protected async doCreateBundle(bundle: VaultBundle): Promise<unknown> {
     const { standing, created } = await inOneTransaction(this.shelf, async (store) => {
-      const already = await rowAt(store, bundleCkey(bundle))
+      const already = await rowAt(store, this.joiner.bundle(bundle))
       if (already !== undefined) { return { standing: already, created: false } }
-      store.put(bundle, bundleCkey(bundle))
+      store.put(bundle, this.joiner.bundle(bundle))
       return { standing: bundle, created: true }
     })
     if (created) { this.ring() }
@@ -64,41 +77,41 @@ class IdbVaultDB extends VaultDB {
 
   protected async doUpdateBundle(bundle: VaultBundle, expected: BundleExpectation): Promise<boolean> {
     return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {
-      const standing = await rowAt(store, bundleCkey(bundle))
+      const standing = await rowAt(store, this.joiner.bundle(bundle))
       if (! bundleMeetsExpectation(standing, expected)) { return false }
-      store.put(bundle, bundleCkey(bundle))
+      store.put(bundle, this.joiner.bundle(bundle))
       return true
     }))
   }
 
   protected async doReadBox(scope: VaultScope, boxlabel: string): Promise<unknown> {
-    return (await this.shelf('readonly', (store) => rowAt(store, boxCkey(scope, boxlabel)))) ?? null
+    return (await this.shelf('readonly', (store) => rowAt(store, this.joiner.box(scope, boxlabel)))) ?? null
   }
 
   // Reads the key range of the scope's lockboxes, not the whole shelf: every other vault's rows, of
   // every user in this database, stay unread. The ckeys and their rows come from one transaction.
   protected async doListBoxes(scope: VaultScope): Promise<StoredLockbox[]> {
-    const range = boxRange(scope)
+    const range = boxRange(this.joiner, scope)
     const [ckeys, rows] = await this.shelf('readonly', (store) => Promise.all([settle(store.getAllKeys(range)), settle<unknown[]>(store.getAll(range))]))
     return ckeys
-      .map((ckey, idx) => ({ boxlabel: typeof ckey === 'string' ? Ckeys.boxlabelOf(ckey) : null, lockbox: rows[idx] }))
+      .map((ckey, idx) => ({ boxlabel: typeof ckey === 'string' ? this.joiner.boxlabelOf(ckey) : null, lockbox: rows[idx] }))
       .filter((stored): stored is StoredLockbox => stored.boxlabel !== null)
   }
 
   protected async doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<boolean> {
     return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {
-      const [standingBundle, standingBox] = await Promise.all([rowAt(store, bundleCkey(scope)), rowAt(store, boxCkey(scope, lockbox.boxlabel))])
+      const [standingBundle, standingBox] = await Promise.all([rowAt(store, this.joiner.bundle(scope)), rowAt(store, this.joiner.box(scope, lockbox.boxlabel))])
       if (! lockboxMeetsExpectation(standingBundle, standingBox, expected)) { return false }
-      store.put(lockbox, boxCkey(scope, lockbox.boxlabel))
+      store.put(lockbox, this.joiner.box(scope, lockbox.boxlabel))
       return true
     }))
   }
 
   protected async doEraseBox(scope: VaultScope, boxlabel: string, expected: EraseExpectation): Promise<boolean> {
     return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {
-      const standing = await rowAt(store, bundleCkey(scope))
+      const standing = await rowAt(store, this.joiner.bundle(scope))
       if (! vaultMeetsExpectation(standing, expected)) { return false }
-      store.delete(boxCkey(scope, boxlabel))
+      store.delete(this.joiner.box(scope, boxlabel))
       return true
     }))
   }
@@ -108,10 +121,10 @@ class IdbVaultDB extends VaultDB {
   // bundle, so no lockbox outlives its vault.
   protected async doEraseVault(scope: VaultScope, expected: EraseExpectation): Promise<boolean> {
     return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {
-      const standing = await rowAt(store, bundleCkey(scope))
+      const standing = await rowAt(store, this.joiner.bundle(scope))
       if (! vaultIdMeetsExpectation(standing, expected)) { return false }
-      store.delete(boxRange(scope))
-      store.delete(bundleCkey(scope))
+      store.delete(boxRange(this.joiner, scope))
+      store.delete(this.joiner.bundle(scope))
       return true
     }))
   }

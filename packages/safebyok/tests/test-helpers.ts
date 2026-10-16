@@ -16,9 +16,9 @@ import type { KeyDeriver } from '../src/key-deriver'
 import type { VaultLogger } from '../src/logger'
 import { memoryStore } from '../src/string-store'
 import type { DamagedLockbox, DeviceMark, DeviceUnlock, Lockbox, LockboxSummary, PasskeyEnvelope, PasskeyProof, PassphraseEnvelope, VaultBundle, VaultScope } from '../src/types'
+import { NameFloorBytes, NoteFloorBytes } from '../src/validators'
 import type { OpenVaultOpts } from '../src/vault'
 import { localVaultDB, type VaultDB } from '../src/vault-db'
-import { AnyTextValidators, DefaultValidators } from '../src/validators'
 
 /** A Lockbox as the core writes one: a note, or no note field at all, never an undefined one. */
 type WrittenLockbox = Omit<Lockbox, 'note'> & { note?: string }
@@ -874,6 +874,8 @@ export const VaultDBContract = Object.freeze({
   '6.2': 'A watch that fails calls onChange',
   '7.1': 'The most it holds in one record',
   '7.2': 'The most it holds of one vault',
+  '7.3': 'The most it holds in one name',
+  '7.4': 'The characters it cannot hold in a name',
 } as const)
 
 /** A numbered line of the VaultDB contract, such as `'3.3'`. */
@@ -884,7 +886,7 @@ export type VaultDBContractLine = keyof typeof VaultDBContract
  * VaultDB from the built package (`safebyok`) qualifies as readily as one extending `src/`.
  */
 export type VaultDBVerbs = Pick<VaultDB,
-  'maxRecordBytes' | 'maxVaultBytes' | 'maxLockboxes' | 'readBundle' | 'createBundle' | 'updateBundle' | 'readBox' | 'listBoxes' | 'updateBox' | 'eraseBox' | 'eraseVault' | 'eraseDamagedVault' | 'subscribe'
+  'maxRecordBytes' | 'maxVaultBytes' | 'maxLockboxes' | 'maxNameBytes' | 'reservedNameChars' | 'readBundle' | 'createBundle' | 'updateBundle' | 'readBox' | 'listBoxes' | 'updateBox' | 'eraseBox' | 'eraseVault' | 'eraseDamagedVault' | 'subscribe'
 >
 
 /** What {@link describeVaultDB} takes beside its adapter. */
@@ -1034,13 +1036,13 @@ export const describeVaultDB = (adapterTitle: string, makeVaultDB: () => VaultDB
       expect(summaryOf(summary)?.note).to.be.null
     })
 
-    it("reads text back exactly as written, never normalized: a note holding a letter both composed and decomposed", async () => {
+    it("reads text back exactly as written: a note of accented letters, an emoji, a tab and a newline", async () => {
       const vaultDB = await withBundle()
-      await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one', { note: UnnormalizedText }), noBoxYet)
+      await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one', { note: LiteralText }), noBoxYet)
       const lockbox = await vaultDB.readBox(scopeOf('u1'), 'anthropic')
-      expect(lockbox?.note).to.eq(UnnormalizedText)
+      expect(lockbox?.note).to.eq(LiteralText)
       const [summary] = await vaultDB.listBoxes(scopeOf('u1'))
-      expect(summaryOf(summary)?.note).to.eq(UnnormalizedText)
+      expect(summaryOf(summary)?.note).to.eq(LiteralText)
     })
   })
 
@@ -1072,32 +1074,26 @@ export const describeVaultDB = (adapterTitle: string, makeVaultDB: () => VaultDB
       expect(after.map((listing) => listing.length)).to.deep.equal([0, 1, 1, 1, 1, 1, 1, 1])
     })
 
-    it("keeps apart users whose ids differ only in how a letter is composed, reading each back as written", async () => {
+    it("holds one spelling of a letter: a user id with it composed is stored, and one with it decomposed refused, never normalized", async () => {
       const vaultDB = await makeVaultDB()
       const [composed, decomposed] = ['caf\u{E9}', 'cafe\u{301}']
-      for (const userId of [composed, decomposed]) {
-        await vaultDB.createBundle(bundleOf(userId))
-        await vaultDB.updateBox(scopeOf(userId), boxOf('anthropic', userId), { vault_id: `vault-id-${userId}`, revision_id: null, vault_key_epoch: 1 })
-      }
+      await vaultDB.createBundle(bundleOf(composed))
       expect(await vaultDB.readBundle(scopeOf(composed))).to.deep.equal(bundleOf(composed))
-      expect(await vaultDB.readBundle(scopeOf(decomposed))).to.deep.equal(bundleOf(decomposed))
-      await vaultDB.eraseVault(scopeOf(composed), { vault_id: `vault-id-${composed}` })
-      expect(await vaultDB.readBundle(scopeOf(composed))).to.be.null
-      const kept = await vaultDB.listBoxes(scopeOf(decomposed))
-      expect(kept.map((box) => summaryOf(box)?.revision_id)).to.deep.equal([`rev-${decomposed}`])
+      await expectRefusal(vaultDB.createBundle(bundleOf(decomposed)), 'bad_label')
+      await expectRefusal(vaultDB.readBundle(scopeOf(decomposed)), 'bad_label')
     })
 
     it("keeps apart vaults and boxes whose labels differ only by a colon, a quote, a backslash, a comma or a bracket, or are in any script", async () => {
       const vaultDB = await makeVaultDB()
       const scopes = OddLabels.map((vaultlabel) => scopeOf('u1', vaultlabel))
       for (const [ii, scope] of scopes.entries()) {
-        await vaultDB.createBundle(bundleOf('u1', { ...scope, vault_id: `vault-id-${String(ii)}` }), AnyTextValidators)
-        await vaultDB.updateBox(scope, boxOf(OddLabels[ii] ?? '', `of-${String(ii)}`), { vault_id: `vault-id-${String(ii)}`, revision_id: null, vault_key_epoch: 1 }, AnyTextValidators)
+        await vaultDB.createBundle(bundleOf('u1', { ...scope, vault_id: `vault-id-${String(ii)}` }))
+        await vaultDB.updateBox(scope, boxOf(OddLabels[ii] ?? '', `of-${String(ii)}`), { vault_id: `vault-id-${String(ii)}`, revision_id: null, vault_key_epoch: 1 })
       }
-      const listEach = () => Promise.all(scopes.map((scope) => vaultDB.listBoxes(scope, AnyTextValidators)))
+      const listEach = () => Promise.all(scopes.map((scope) => vaultDB.listBoxes(scope)))
       const before = await listEach()
       expect(before.map((listing) => listing.map((box) => [box.boxlabel, summaryOf(box)?.revision_id]))).to.deep.equal(OddLabels.map((label, ii) => [[label, `rev-of-${String(ii)}`]]))
-      await vaultDB.eraseVault(scopes[0] ?? scopeOf('u1'), { vault_id: 'vault-id-0' }, AnyTextValidators)
+      await vaultDB.eraseVault(scopes[0] ?? scopeOf('u1'), { vault_id: 'vault-id-0' })
       const after = await listEach()
       expect(after.map((listing) => listing.length)).to.deep.equal(OddLabels.map((_label, ii) => (ii === 0 ? 0 : 1)))
     })
@@ -1105,16 +1101,16 @@ export const describeVaultDB = (adapterTitle: string, makeVaultDB: () => VaultDB
     it("keeps boxes of one vault apart, by any labels, reading back each under its own", async () => {
       const vaultDB = await withBundle()
       for (const [ii, boxlabel] of OddLabels.entries()) {
-        await vaultDB.updateBox(scopeOf('u1'), boxOf(boxlabel, `of-${String(ii)}`), noBoxYet, AnyTextValidators)
+        await vaultDB.updateBox(scopeOf('u1'), boxOf(boxlabel, `of-${String(ii)}`), noBoxYet)
       }
-      const summaries = await vaultDB.listBoxes(scopeOf('u1'), AnyTextValidators)
+      const summaries = await vaultDB.listBoxes(scopeOf('u1'))
       expect(summaries.map((box) => box.boxlabel)).to.have.members([...OddLabels])
       for (const [ii, boxlabel] of OddLabels.entries()) {
-        const lockbox = await vaultDB.readBox(scopeOf('u1'), boxlabel, AnyTextValidators)
+        const lockbox = await vaultDB.readBox(scopeOf('u1'), boxlabel)
         expect(lockbox?.revision_id).to.eq(`rev-of-${String(ii)}`)
       }
-      await vaultDB.eraseBox(scopeOf('u1'), 'main"', thisVault, AnyTextValidators)
-      const remaining = await vaultDB.listBoxes(scopeOf('u1'), AnyTextValidators)
+      await vaultDB.eraseBox(scopeOf('u1'), 'main"', thisVault)
+      const remaining = await vaultDB.listBoxes(scopeOf('u1'))
       expect(remaining).to.have.lengthOf(OddLabels.length - 1)
     })
   })
@@ -1354,7 +1350,7 @@ export const describeVaultDB = (adapterTitle: string, makeVaultDB: () => VaultDB
         [() => vaultDB.updateBundle(bundleOf('u1', { unlock_epoch: 3 }), { vault_id: 'vault-id-u1', unlock_epoch: 2 }),                 'stale_write'],
         [() => vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'late'), { vault_id: 'vault-id-u1', revision_id: 'rev-other', vault_key_epoch: 1 }),      'stale_write'],
         [() => vaultDB.updateBox(scopeOf('u1'), boxOf('mistral', 'late'), { vault_id: 'vault-id-gone', revision_id: null, vault_key_epoch: 1 }),             'stale_write'],
-        [() => vaultDB.updateBox(scopeOf('u1'), boxOf('mistral', 'late', { note: 'n'.repeat(257) }), noBoxYet, DefaultValidators),      'bad_option'],
+        [() => vaultDB.updateBox(scopeOf('u1'), boxOf('mistral', 'late', { note: 'beep\u{7}' }), noBoxYet),                            'bad_option'],
         [() => vaultDB.eraseBox(scopeOf('u1'), 'anthropic', { vault_id: 'vault-id-gone' }),                                               'stale_write'],
         [() => vaultDB.eraseVault(scopeOf('u1'), { vault_id: 'vault-id-gone' }),                                                          'stale_write'],
       ] as const
@@ -1470,20 +1466,28 @@ export const describeVaultDB = (adapterTitle: string, makeVaultDB: () => VaultDB
   })
 
   describe(lineTitle('5.1'), () => {
-    it("refuses a malformed scope or boxlabel as bad_label, before storage sees it", async () => {
+    it("refuses a scope or boxlabel below the floor every name is held to as bad_label, before storage sees it", async () => {
       const vaultDB = await withBundle()
-      await expectRefusal(vaultDB.readBundle({ ...scopeOf('u1'), vaultlabel: 'not-a-label' }, DefaultValidators), 'bad_label')
-      await expectRefusal(vaultDB.readBox(scopeOf('u1'), 'not:a:label', DefaultValidators), 'bad_label')
-      await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('Not_a_label', 'one'), noBoxYet, DefaultValidators), 'bad_label')
-      await expectRefusal(vaultDB.eraseBox({ ...scopeOf('u1'), user_id: '' }, 'anthropic', thisVault, DefaultValidators), 'bad_label')
-      const overlongScope = scopeOf('u'.repeat(101))
-      await expectRefusal(vaultDB.listBoxes(overlongScope, DefaultValidators), 'bad_label')
+      await expectRefusal(vaultDB.readBundle({ ...scopeOf('u1'), vaultlabel: '' }), 'bad_label')
+      await expectRefusal(vaultDB.readBox(scopeOf('u1'), 'tab\there'), 'bad_label')
+      await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('cafe\u{301}', 'one'), noBoxYet), 'bad_label')
+      await expectRefusal(vaultDB.eraseBox({ ...scopeOf('u1'), user_id: 'u1\u{D800}' }, 'anthropic', thisVault), 'bad_label')
+      const overlong = 'u'.repeat(NameFloorBytes + 1)
+      await expectRefusal(vaultDB.listBoxes(scopeOf(overlong)), 'bad_label')
+      expect(await vaultDB.listBoxes(scopeOf('u1'))).to.have.lengthOf(0)
+    })
+
+    it("takes any name above the floor, whatever a vault's validators would say: they are the vault's, at its entry", async () => {
+      const vaultDB = await withBundle()
+      await vaultDB.updateBox(scopeOf('u1'), boxOf('Not a Label!', 'one', { note: 'n'.repeat(300) }), noBoxYet)
+      const lockbox = await vaultDB.readBox(scopeOf('u1'), 'Not a Label!')
+      expect(lockbox?.revision_id).to.eq('rev-one')
     })
 
     it("refuses a malformed record or expectation, or a bundle under another vault_id, as bad_option, before storage sees it", async () => {
       const vaultDB = await withBundle()
-      const overlong = boxOf('anthropic', 'one', { note: 'n'.repeat(257) })
-      await expectRefusal(vaultDB.updateBox(scopeOf('u1'), overlong, noBoxYet, DefaultValidators), 'bad_option')
+      const overlong = boxOf('anthropic', 'one', { note: 'n'.repeat(NoteFloorBytes + 1) })
+      await expectRefusal(vaultDB.updateBox(scopeOf('u1'), overlong, noBoxYet), 'bad_option')
       await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), { vault_id: 'vault-id-u1', revision_id: '', vault_key_epoch: 1 }), 'bad_option')
       await expectRefusal(vaultDB.updateBundle(bundleOf('u1', { unlock_epoch: 0 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'bad_option')
       await expectRefusal(vaultDB.updateBundle(bundleOf('u1', { vault_id: 'vault-id-new', unlock_epoch: 2 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'bad_option')
@@ -1550,6 +1554,55 @@ export const describeVaultDB = (adapterTitle: string, makeVaultDB: () => VaultDB
       const vaultDB = await makeVaultDB()
       expect(vaultDB.maxVaultBytes).to.be.a('number')
       expect(vaultDB.maxVaultBytes).to.be.at.least(vaultDB.maxRecordBytes)
+    })
+  })
+
+  describe(lineTitle('7.3'), () => {
+    it("declares the most bytes it holds in one name: a whole number above zero, or Infinity", async () => {
+      const vaultDB = await makeVaultDB()
+      expect(vaultDB.maxNameBytes === Infinity || (Number.isSafeInteger(vaultDB.maxNameBytes) && vaultDB.maxNameBytes > 0)).to.be.true
+    })
+
+    it("holds a name of every length it declares, up to the floor's, in every place a name goes", async () => {
+      const vaultDB = await makeVaultDB()
+      const longest = 'n'.repeat(Math.min(vaultDB.maxNameBytes, NameFloorBytes))
+      const scope = { applabel: longest, user_id: longest, vaultlabel: longest }
+      await vaultDB.createBundle({ ...bundleOf(longest), ...scope })
+      await vaultDB.updateBox(scope, boxOf(longest, 'one'), { vault_id: `vault-id-${longest}`, revision_id: null, vault_key_epoch: 1 })
+      const lockbox = await vaultDB.readBox(scope, longest)
+      expect(lockbox?.revision_id).to.eq('rev-one')
+    })
+
+    it("refuses a name one byte longer than it holds as bad_label, in every place a name goes, writing nothing", async () => {
+      const vaultDB = await withBundle()
+      if (vaultDB.maxNameBytes >= NameFloorBytes) { return }
+      const overlong = 'n'.repeat(vaultDB.maxNameBytes + 1)
+      await expectRefusal(vaultDB.createBundle(bundleOf(overlong)), 'bad_label')
+      await expectRefusal(vaultDB.readBundle({ ...scopeOf('u1'), applabel: overlong }), 'bad_label')
+      await expectRefusal(vaultDB.readBundle({ ...scopeOf('u1'), vaultlabel: overlong }), 'bad_label')
+      await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf(overlong, 'one'), noBoxYet), 'bad_label')
+      expect(await vaultDB.listBoxes(scopeOf('u1'))).to.have.lengthOf(0)
+    })
+  })
+
+  describe(lineTitle('7.4'), () => {
+    it("declares the characters it cannot hold in a name, as text", async () => {
+      const vaultDB = await makeVaultDB()
+      expect(vaultDB.reservedNameChars).to.be.a('string')
+    })
+
+    it("refuses a name holding any of them as bad_label, in every place a name goes, writing nothing", async () => {
+      const vaultDB = await withBundle()
+      for (const reserved of vaultDB.reservedNameChars) {
+        const holding = `a${reserved}b`
+        await expectRefusal(vaultDB.createBundle(bundleOf(holding)), 'bad_label')
+        await expectRefusal(vaultDB.readBundle({ ...scopeOf('u1'), applabel: holding }), 'bad_label')
+        await expectRefusal(vaultDB.listBoxes({ ...scopeOf('u1'), vaultlabel: holding }), 'bad_label')
+        await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf(holding, 'one'), noBoxYet), 'bad_label')
+        await expectRefusal(vaultDB.readBox(scopeOf('u1'), holding), 'bad_label')
+        await expectRefusal(vaultDB.eraseBox(scopeOf('u1'), holding, thisVault), 'bad_label')
+      }
+      expect(await vaultDB.listBoxes(scopeOf('u1'))).to.have.lengthOf(0)
     })
   })
 }
@@ -2046,7 +2099,8 @@ const everyVerbOn = (stranger: VaultDBVerbs) => [
 ]
 
 /** Text no normalization leaves alone: "café" with its accent composed, then decomposed, and a key. */
-const UnnormalizedText = 'caf\u{E9} cafe\u{301} \u{1F511}'
+/** A note of accented letters, an emoji, a tab and a newline, in NFC: text a store must hand back as it was written. */
+const LiteralText = 'caf\u{E9} na\u{EF}ve \u{1F511}\trotated\nin March'
 
 /** Enough lockboxes that a listing cut to a page, or a sample, would show it: 25, `box0` to `box24`. */
 const ManyBoxlabels = Object.freeze(Array.from({ length: 25 }, (_unused, ii) => `box${String(ii)}`))
@@ -2120,16 +2174,18 @@ export const perUser = (vaultDBFor: (userId: string) => VaultDBVerbs): VaultDBVe
     maxRecordBytes: anyone.maxRecordBytes,
     maxVaultBytes:  anyone.maxVaultBytes,
     maxLockboxes:   anyone.maxLockboxes,
-    readBundle:     (scope, validators) => as(scope).readBundle(scope, validators),
-    createBundle:   (bundle, validators) => as(bundle).createBundle(bundle, validators),
-    updateBundle:   (bundle, expected, validators) => as(bundle).updateBundle(bundle, expected, validators),
-    readBox:        (scope, boxlabel, validators) => as(scope).readBox(scope, boxlabel, validators),
-    listBoxes:      (scope, validators) => as(scope).listBoxes(scope, validators),
-    updateBox:      (scope, lockbox, expected, validators) => as(scope).updateBox(scope, lockbox, expected, validators),
-    eraseBox:       (scope, boxlabel, expected, validators) => as(scope).eraseBox(scope, boxlabel, expected, validators),
-    eraseVault:     (scope, expected, validators) => as(scope).eraseVault(scope, expected, validators),
-    eraseDamagedVault: (scope, validators) => as(scope).eraseDamagedVault(scope, validators),
-    subscribe:      (scope, onChange, validators) => as(scope).subscribe(scope, onChange, validators),
+    maxNameBytes:   anyone.maxNameBytes,
+    reservedNameChars: anyone.reservedNameChars,
+    readBundle:     (scope) => as(scope).readBundle(scope),
+    createBundle:   (bundle) => as(bundle).createBundle(bundle),
+    updateBundle:   (bundle, expected) => as(bundle).updateBundle(bundle, expected),
+    readBox:        (scope, boxlabel) => as(scope).readBox(scope, boxlabel),
+    listBoxes:      (scope) => as(scope).listBoxes(scope),
+    updateBox:      (scope, lockbox, expected) => as(scope).updateBox(scope, lockbox, expected),
+    eraseBox:       (scope, boxlabel, expected) => as(scope).eraseBox(scope, boxlabel, expected),
+    eraseVault:     (scope, expected) => as(scope).eraseVault(scope, expected),
+    eraseDamagedVault: (scope) => as(scope).eraseDamagedVault(scope),
+    subscribe:      (scope, onChange) => as(scope).subscribe(scope, onChange),
   }
 }
 
@@ -2230,6 +2286,29 @@ export const expectRefusal = async (operation: Promise<unknown>, kind: VaultErro
     refusal = err
   }
   expect(refusal, `expected a refusal of kind '${kind}', but the operation resolved`).to.not.eq(NotRefused)
+  expect(refusal).to.be.instanceOf(VaultError)
+  expect(refusal).to.have.property('kind', kind)
+  return refusal as VaultError
+}
+
+/**
+ * Asserts that `attempt` throws, there and then, a VaultError of kind `kind`, and returns it: the
+ * synchronous twin of {@link expectRefusal}, for a check that throws rather than rejects.
+ *
+ * @param attempt - The call expected to throw.
+ * @param kind - The refusal's expected `kind`.
+ * @returns The refusal, for a closer look at its message.
+ *
+ * @example TH.expectSyncRefusal(() => Ckeys.joiner('^^'), 'bad_option')
+ */
+export const expectSyncRefusal = (attempt: () => unknown, kind: VaultErrorKind): VaultError => {
+  let refusal: unknown = NotRefused
+  try {
+    attempt()
+  } catch (err) {
+    refusal = err
+  }
+  expect(refusal, `expected a refusal of kind '${kind}', but the call returned`).to.not.eq(NotRefused)
   expect(refusal).to.be.instanceOf(VaultError)
   expect(refusal).to.have.property('kind', kind)
   return refusal as VaultError

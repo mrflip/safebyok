@@ -33,7 +33,8 @@ export interface DeviceDB {
 /**
  * DeviceDB over a Map: what the tests use, and the fallback anywhere without IndexedDB. Remembered
  * unlocks and device marks last exactly as long as the page -- which is to say, it remembers
- * nothing, safely.
+ * nothing, safely. Its rows are filed under `Ckeys`, names joined on `^` (or
+ * `opts.ckeyDelimiter`), and a scope with a name holding it is refused with kind 'bad_label'.
  *
  * @example
  *   const deviceDB = memoryDeviceDB()
@@ -41,51 +42,52 @@ export interface DeviceDB {
  * @example
  *   await deviceDB.readMark({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })    // null
  */
-export const memoryDeviceDB = (): DeviceDB => {
+export const memoryDeviceDB = (opts?: { ckeyDelimiter?: string | undefined }): DeviceDB => {
+  const joiner = Ckeys.joiner(opts?.ckeyDelimiter)
   const unlocks = new Map<string, DeviceUnlock>()
   const marks = new Map<string, DeviceMark>()
   return {
     readUnlock: (scope) => {
-      const kept = unlocks.get(Ckeys.unlock(scope))
+      const kept = unlocks.get(joiner.unlock(scope))
       if (kept === undefined) { return Promise.resolve(null) }
       const checked = DeviceUnlock.safeParse(kept)
       // A malformed record reads as "no remembered unlock": losing the convenience is the safe failure.
       if (! checked.success) {
-        unlocks.delete(Ckeys.unlock(scope))
+        unlocks.delete(joiner.unlock(scope))
         return Promise.resolve(null)
       }
       return Promise.resolve(checked.data)
     },
 
     writeUnlock: (unlock) => {
-      unlocks.set(Ckeys.unlock(unlock), unlock)
+      unlocks.set(joiner.unlock(unlock), unlock)
       return Promise.resolve()
     },
 
     eraseUnlock: (scope) => {
-      unlocks.delete(Ckeys.unlock(scope))
+      unlocks.delete(joiner.unlock(scope))
       return Promise.resolve()
     },
 
     readMark: (scope) => {
-      const kept = marks.get(Ckeys.mark(scope))
+      const kept = marks.get(joiner.mark(scope))
       if (kept === undefined) { return Promise.resolve(null) }
       const checked = DeviceMark.safeParse(kept)
       // A malformed mark reads as none, as on a device that never saw the vault.
       if (! checked.success) {
-        marks.delete(Ckeys.mark(scope))
+        marks.delete(joiner.mark(scope))
         return Promise.resolve(null)
       }
       return Promise.resolve(checked.data)
     },
 
     writeMark: (mark) => {
-      marks.set(Ckeys.mark(mark), mark)
+      marks.set(joiner.mark(mark), mark)
       return Promise.resolve()
     },
 
     eraseMark: (scope) => {
-      marks.delete(Ckeys.mark(scope))
+      marks.delete(joiner.mark(scope))
       return Promise.resolve()
     },
 

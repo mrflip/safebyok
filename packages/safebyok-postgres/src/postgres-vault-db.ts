@@ -226,6 +226,10 @@ class TablesVaultDB extends VaultDB implements PostgresVaultDB {
   // Nothing here reads a vault under a budget: a vault is as many bytes as the database lets it grow.
   readonly maxVaultBytes = Infinity
   readonly maxLockboxes: number
+  // Each name is a column of its own, but a lockbox's four make up one primary key, and a btree
+  // entry holds at most 2704 bytes: four names of this many fit with room for its overhead.
+  readonly maxNameBytes = MaxNameBytes
+  readonly reservedNameChars = ''
 
   private readonly client: PostgresClient
   private readonly userId: string | null
@@ -361,6 +365,12 @@ type InsertBoxOutcome = { landed: boolean, vault_stands: boolean, box_stood: boo
 
 /** Postgres's error code for a foreign key violation: `23503`. */
 const ForeignKeyViolation = '23503'
+
+/**
+ * The most bytes of UTF-8 a Postgres-backed name holds: a lockbox's primary key is its applabel,
+ * user_id, vaultlabel and boxlabel together, and Postgres refuses a btree entry over 2704 bytes.
+ */
+const MaxNameBytes = 640
 
 const scopeParams = (scope: VaultScope): string[] => [scope.applabel, scope.user_id, scope.vaultlabel]
 

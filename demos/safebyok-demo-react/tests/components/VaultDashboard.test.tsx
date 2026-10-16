@@ -7,7 +7,7 @@ import { OutageVaultDB, makeOutage } from '../../src/lib/outage'
 import * as TH from '../test-helpers'
 
 /** The ckey of `u1`'s `openai_api_key` lockbox, for planting damage in storage. */
-const openaiCkey = Ckeys.box(TH.scopeOf('u1'), 'openai_api_key')
+const openaiCkey = Ckeys.joiner().box(TH.scopeOf('u1'), 'openai_api_key')
 
 /** The lockbox form's fields, by their labels. */
 const fillForm = (fields: { boxlabel?: string, whisper?: string, note?: string }) => {
@@ -56,7 +56,7 @@ const damagedWorld = async () => {
   const store = memoryStore()
   const world = TH.makeWorld({ vaultDB: localVaultDB(store) })
   await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
-  const bundleCkey = Ckeys.bundle(TH.scopeOf('u1'))
+  const bundleCkey = Ckeys.joiner().bundle(TH.scopeOf('u1'))
   const bundle = JSON.parse(store.read(bundleCkey) ?? 'null') as object
   store.write(bundleCkey, JSON.stringify({ ...bundle, unlock_epoch: 'one' }))
   return { store, world }

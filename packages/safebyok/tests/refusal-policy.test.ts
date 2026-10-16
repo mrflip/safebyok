@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../src/errors'
-import { AnyTextValidators } from '../src/validators'
 import { localVaultDB } from '../src/vault-db'
 import { memoryStore } from '../src/string-store'
 import * as RefusalPolicy from '../src/refusal-policy'
@@ -70,27 +69,27 @@ describe("RefusalPolicy.heed", () => {
     const heeded = RefusalPolicy.heed(vaultDB, () => Promise.resolve())
     const readBundle = vi.spyOn(vaultDB, 'readBundle')
     const listBoxes = vi.spyOn(vaultDB, 'listBoxes')
-    await heeded.createBundle(TH.bundleOf('u1'), AnyTextValidators)
-    expect(await heeded.readBundle(scope, AnyTextValidators)).to.deep.equal(TH.bundleOf('u1'))
-    expect(readBundle).toHaveBeenCalledWith(scope, AnyTextValidators)
+    await heeded.createBundle(TH.bundleOf('u1'))
+    expect(await heeded.readBundle(scope)).to.deep.equal(TH.bundleOf('u1'))
+    expect(readBundle).toHaveBeenCalledWith(scope)
     expect(await heeded.listBoxes(scope)).to.deep.equal([])
     expect(listBoxes).toHaveBeenCalledWith(scope)
   })
 
-  /** Each heeded verb, and the arguments a vault hands it, validators last. */
+  /** Each heeded verb, and the arguments a vault hands it. */
   const VerbArgsCases = [
-    ['readBundle',   [scope, AnyTextValidators]],
-    ['createBundle', [TH.bundleOf('u1'), AnyTextValidators]],
-    ['updateBundle', [TH.bundleOf('u1'), TH.thisVault, AnyTextValidators]],
-    ['readBox',      [scope, 'anthropic', AnyTextValidators]],
-    ['listBoxes',    [scope, AnyTextValidators]],
-    ['updateBox',    [scope, 'anthropic', TH.thisVault, AnyTextValidators]],
-    ['eraseBox',     [scope, 'anthropic', TH.thisVault, AnyTextValidators]],
-    ['eraseVault',   [scope, TH.thisVault, AnyTextValidators]],
+    ['readBundle',   [scope]],
+    ['createBundle', [TH.bundleOf('u1')]],
+    ['updateBundle', [TH.bundleOf('u1'), TH.thisVault]],
+    ['readBox',      [scope, 'anthropic']],
+    ['listBoxes',    [scope]],
+    ['updateBox',    [scope, 'anthropic', TH.thisVault]],
+    ['eraseBox',     [scope, 'anthropic', TH.thisVault]],
+    ['eraseVault',   [scope, TH.thisVault]],
   ] as const
 
   for (const [verb, args] of VerbArgsCases) {
-    it(`passes ${verb} every argument it is given, validators included`, async () => {
+    it(`passes ${verb} every argument it is given`, async () => {
       const vaultDB = localVaultDB(memoryStore())
       const spied = vi.spyOn(vaultDB, verb).mockResolvedValue(undefined)
       const heeded = RefusalPolicy.heed(vaultDB, () => Promise.resolve())

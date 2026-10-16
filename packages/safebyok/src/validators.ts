@@ -6,9 +6,85 @@ import * as Z from 'zod/mini'
  * server, or a library of its own can check a name as the vault will before calling it. Each is
  * exported from the main entry too.
  *
- * Every default is replaceable: a host passes its own schema for any field in openVault's
- * `validators` ({@link VaultValidators}), and it replaces ours outright.
+ * Two layers: the floor ({@link NameFloor}, {@link NoteFloor}), which every name and note must
+ * pass whatever the host chose, and the defaults above it ({@link DefaultValidators}), which a host
+ * replaces field by field with openVault's `validators` ({@link VaultValidators}).
  */
+
+/** The most a name holds under any validators, in bytes of UTF-8: the floor's ceiling. */
+export const NameFloorBytes = 1024
+
+/** The most a note holds under any validators, in bytes of UTF-8: the floor's ceiling. */
+export const NoteFloorBytes = 4096
+
+/**
+ * Well-formed Unicode: no surrogate standing alone, half of a character such as an emoji, as text
+ * cut off mid-character has. Such text has no UTF-8 form, and Convex requires valid Unicode. Under
+ * the `u` flag a surrogate pair reads as the one character it encodes, so `\p{Cs}` (the Unicode
+ * category of surrogates) finds only a lone one. It searches for one rather than matching the
+ * whole text, which on text of millions of characters would overflow the regex engine's stack.
+ */
+const WellFormed = Z.refine<string>((text) => ! /\p{Cs}/u.test(text), "Text must be well-formed Unicode, and this holds a lone surrogate: half of a character such as an emoji, as text cut off mid-character does")
+
+/**
+ * Text in Unicode's composed form (NFC), so one visible spelling is one name: the same letter
+ * composed (`é`) and decomposed (`e` and a combining accent) would otherwise be two names, two
+ * rows and two cipher bindings. Refused, never normalized: a name is bound into the ciphertext as
+ * given.
+ */
+const Composed = Z.refine<string>((text) => text.normalize('NFC') === text, "Text must be in Unicode's composed form (NFC): normalize it with text.normalize('NFC') before passing it")
+
+/** A name's characters: no control character at all (Unicode's `Cc`: C0, DEL and C1). */
+const NameChars = Z.refine<string>((text) => ! /\p{Cc}/u.test(text), "A name holds no control characters")
+
+/**
+ * A note's characters: any but the control characters (Unicode's `Cc`: C0, DEL and C1), save tab
+ * and newline. Carriage return is refused with the rest; a browser's textarea hands up newlines alone.
+ * It searches for a control character that is neither tab nor newline, rather than matching the
+ * whole note, so that an overlong note never overflows the regex stack.
+ */
+const NoteChars = Z.refine<string>((note) => ! /(?![\t\n])\p{Cc}/u.test(note), "A note holds no control characters but tab and newline")
+
+/** At most `limit` bytes of UTF-8: run after a cheap count of characters, each at least a byte, has turned away the longest. */
+const utf8Within = (limit: number, said: string) => Z.refine<string>((text) => new TextEncoder().encode(text).length <= limit, said)
+
+/**
+ * The floor beneath every name -- an applabel, a user_id, a vaultlabel, a boxlabel, an
+ * unlocklabel -- whatever validators a host passed: text of one character to {@link
+ * NameFloorBytes} (1 KiB) of UTF-8, well-formed, in NFC, with no control character. A host's own
+ * check narrows what passes; nothing widens it. The vault refuses a name below the floor with kind
+ * 'bad_label', and a stored record holding one reads back as damaged.
+ *
+ * @example NameFloor.safeParse('Work: מפתח API').success  // true: any script
+ * @example NameFloor.safeParse('key \uD83D').success      // false: half of an emoji
+ * @example NameFloor.safeParse('café').success      // false: decomposed, not NFC
+ * @example NameFloor.safeParse('tab\there').success       // false: a control character
+ */
+export const NameFloor = Z.string().check(
+  Z.minLength(1, "A name can't be empty"),
+  Z.maxLength(NameFloorBytes, { error: `A name is at most ${String(NameFloorBytes)} bytes of UTF-8`, abort: true }),
+  utf8Within(NameFloorBytes, `A name is at most ${String(NameFloorBytes)} bytes of UTF-8`),
+  WellFormed,
+  NameChars,
+  Composed,
+)
+
+/**
+ * The floor beneath every lockbox note, whatever validators a host passed: text of at most {@link
+ * NoteFloorBytes} (4 KiB) of UTF-8, well-formed, in NFC, with no control character but tab and
+ * newline. The vault refuses a note below the floor with kind 'bad_option', and a stored lockbox
+ * holding one lists as damaged.
+ *
+ * @example NoteFloor.safeParse('work account\nrotated in March').success  // true
+ * @example NoteFloor.safeParse('beep\u0007').success                      // false: a control character
+ */
+export const NoteFloor = Z.string().check(
+  Z.maxLength(NoteFloorBytes, { error: `A note is at most ${String(NoteFloorBytes)} bytes of UTF-8`, abort: true }),
+  utf8Within(NoteFloorBytes, `A note is at most ${String(NoteFloorBytes)} bytes of UTF-8`),
+  WellFormed,
+  NoteChars,
+  Composed,
+)
 
 /** The most characters a default {@link Label} holds. */
 export const MaxLabelChars = 40
@@ -39,53 +115,47 @@ export const Label = Z.string().check(
   Z.regex(LabelPattern, "A label is lowercase words of letters and digits joined by single underscores, starting with a letter"),
 )
 
-/**
- * Well-formed Unicode: no surrogate standing alone, half of a character such as an emoji, as text
- * cut off mid-character has. Such text has no UTF-8 form, and Convex requires valid Unicode. Under
- * the `u` flag a surrogate pair reads as the one character it encodes, so `\p{Cs}` (the Unicode
- * category of surrogates) finds only a lone one. It searches for one rather than matching the
- * whole text, which on text of millions of characters would overflow the regex engine's stack.
- */
-const WellFormed = Z.refine<string>((text) => ! /\p{Cs}/u.test(text), "Text must be well-formed Unicode, and this holds a lone surrogate: half of a character such as an emoji, as text cut off mid-character does")
-
-/** The most characters a default {@link UserId} holds (UTF-16 code units, as JavaScript counts them). */
+/** The most characters a default {@link UserId} holds. */
 export const MaxUserIdChars = 100
 
 /**
- * The default check for a scope's `user_id`: the signed-in user's id from the host's own auth,
- * well-formed text of 1 to {@link MaxUserIdChars} (100) characters. Not a {@link Label}: it takes
- * whatever form the host's auth issues, colons and capitals and all, and is bounded only in length.
- * `openVault` refuses a `userId` that fails it with kind 'bad_label'; a host whose ids look
- * otherwise passes its own schema as `validators.userId`.
+ * The characters a default {@link UserId} is made of: ASCII letters and digits and `-_.:@+|`. Its
+ * `source` suits an HTML input's `pattern` attribute.
  *
- * @example UserId.parse('user|2fJ8:google')
- * @example UserId.safeParse('').success                // false: an empty id names no one
- * @example UserId.safeParse('u'.repeat(101)).success   // false: 100 characters at most
- * @example UserId.safeParse('u\uD800').success          // false: half of a character
+ * @example UserIdPattern.test('auth0|5f7c8ec7c33c6c004bbafe82')  // true
+ */
+export const UserIdPattern = /^[A-Za-z0-9_.:@+|-]+$/
+
+/**
+ * The default check for a scope's `user_id`: the signed-in user's id from the host's own auth,
+ * 1 to {@link MaxUserIdChars} (100) ASCII letters, digits and `-_.:@+|`. That holds every stable id
+ * a provider issues -- a UUID or ULID, Auth0's `provider|id`, Clerk's `user_...`, Firebase's,
+ * Okta's, Apple's dotted `sub`, a DID -- and a practical email address, though the id should be
+ * the provider's stable, opaque one: a vault is found by its user_id, and one that changes (an
+ * email, a handle) orphans the vault. `^` and `/` are in no default, as key-value stores join
+ * names on them. `openVault` refuses a `userId` that fails it with kind 'bad_label'; a host whose
+ * ids look otherwise passes its own schema as `validators.userId`.
+ *
+ * @example UserId.parse('auth0|5f7c8ec7c33c6c004bbafe82')
+ * @example UserId.safeParse('').success               // false: an empty id names no one
+ * @example UserId.safeParse('u'.repeat(101)).success  // false: 100 characters at most
+ * @example UserId.safeParse('alice smith').success    // false: no spaces
  */
 export const UserId = Z.string().check(
   Z.minLength(1, "A user_id names the signed-in user, so it can't be empty"),
   Z.maxLength(MaxUserIdChars, `A user_id is at most ${String(MaxUserIdChars)} characters`),
-  WellFormed,
+  Z.regex(UserIdPattern, "A user_id is ASCII letters, digits and - _ . : @ + |, as an auth provider's stable id is"),
 )
 
 /** The most characters a default {@link LockboxNote} holds (UTF-16 code units). */
 export const MaxNoteChars = 256
 
 /**
- * A note's characters: any but the control characters (Unicode's `Cc`: C0, DEL and C1), save tab
- * and newline. Carriage return is refused with the rest; a browser's textarea hands up newlines alone.
- * It searches for a control character that is neither tab nor newline, rather than matching the
- * whole note, so that an overlong note is refused for its length and never overflows the regex stack.
- */
-const NoteChars = Z.refine<string>((note) => ! /(?![\t\n])\p{Cc}/u.test(note), "A note holds no control characters but tab and newline")
-
-/**
  * The default check for a lockbox's public note, shown beside it while the vault is locked:
- * well-formed text of at most {@link MaxNoteChars} (256) characters, with no control characters
- * but tab and newline. Never put secret material in a note. `store()` refuses a note that fails
- * the vault's note check with kind 'bad_option'; a host that wants longer notes, or other
- * characters, passes its own schema as `validators.note`.
+ * at most {@link MaxNoteChars} (256) characters over {@link NoteFloor}'s own checks -- well-formed,
+ * in NFC, with no control characters but tab and newline. Never put secret material in a note.
+ * `store()` refuses a note that fails the vault's note check with kind 'bad_option'; a host that
+ * wants longer notes passes its own schema as `validators.note`, and the floor still holds beneath it.
  *
  * @example LockboxNote.parse('work account')
  * @example LockboxNote.parse('work account\nrotated in March')
@@ -93,9 +163,10 @@ const NoteChars = Z.refine<string>((note) => ! /(?![\t\n])\p{Cc}/u.test(note), "
  * @example LockboxNote.safeParse('beep\u0007').success      // false: a control character
  */
 export const LockboxNote = Z.string().check(
-  Z.maxLength(MaxNoteChars, `A note is at most ${String(MaxNoteChars)} characters`),
-  NoteChars,
+  Z.maxLength(MaxNoteChars, { error: `A note is at most ${String(MaxNoteChars)} characters`, abort: true }),
   WellFormed,
+  NoteChars,
+  Composed,
 )
 
 /**
@@ -105,8 +176,8 @@ export const LockboxNote = Z.string().check(
 export type NameValidator = Z.core.$ZodType<string>
 
 /**
- * The checks a vault runs on every name and note, as openVault's `validators` option: each field
- * a host gives **replaces** ours outright, and each it leaves out keeps ours
+ * The checks a vault runs on every name and note at its entry, as openVault's `validators` option:
+ * each field a host gives **replaces** ours, and each it leaves out keeps ours
  * ({@link DefaultValidators}). Build the bag once, at module level, not anew on each call or render.
  *
  * Each runs as a check and nothing more: the vault keeps what it was handed, never what the schema
@@ -114,15 +185,25 @@ export type NameValidator = Z.core.$ZodType<string>
  * or lowercases still decides only pass or fail. A refusal is the vault's own (kind 'bad_label',
  * 'bad_option' for a note), and never quotes the schema's issues, which may quote the name.
  *
- * The vault checks with them everywhere a name passes: at openVault for the scope; at store,
- * read, use and erase for the boxlabel; at store for the note; at addPassphrase and addPasskey
- * for the unlocklabel; and on every record read back. So a host that narrows a check later finds
- * a lockbox stored under a name or note the new one refuses listed as damaged: `read()` refuses
- * it, `erase()` still reaches it by the name it was stored under, and `store()` writes over it
- * only where the name passes. A way in already stored under an unlocklabel the new check refuses
- * is the exception: it still opens the vault and lists as it is, since refusing it could lock a
- * user out. The first way in, which the vault names `passphrase`, is the vault's own name, and
- * not checked.
+ * What each check is for, and where it runs:
+ *
+ * | Check | Job | Runs | Fails as |
+ * |---|---|---|---|
+ * | These validators (`Label`, `UserId`, `LockboxNote` by default) | an alarm for names and notes your app never meant to use | at entry only: openVault (the scope), store (the boxlabel and note), addPassphrase and addPasskey (the unlocklabel) | `bad_label`, `bad_option` for a note |
+ * | The floor ({@link NameFloor}, {@link NoteFloor}) | what text must be for every client and store to agree | beneath these at entry, whatever they are; at every storage verb; on every record read back | `bad_label` or `bad_option` at entry; damaged on read |
+ * | The record's shape, scope, boxlabel, ciphertext and expectations | what the design needs | when sent to storage and when read back | `bad_option` (a bug) when sent; damaged on read; `stale_write` |
+ * | The storage's own limits (`maxRecordBytes`, `maxVaultBytes`, `maxLockboxes`, `maxNameBytes`, `reservedNameChars`) | facts about the backend | when sent to storage | `lockbox_too_large`, `vault_full`, `bad_label` |
+ *
+ * So a check of yours is an alarm, not a promise about what storage holds: a lockbox stored under a
+ * name or note it refuses -- written by another client, or before you narrowed it -- lists, reads
+ * and erases as any other, by the name it was stored under; only a name or note below the floor is
+ * damage. A server holds names to the floor and its own limits, never to these (`VAULTDB.md`).
+ *
+ * Widening with care. A name is stored and bound exactly as given, so a check admitting text
+ * outside ASCII should require what the floor does, Unicode's composed form (NFC), and an app
+ * should widen a check only once every client it serves runs the wider one, or an older client
+ * refuses at its entry the names a newer one stores. A `user_id` is the auth provider's stable,
+ * opaque id for the user, never an email or a handle that can change.
  *
  * @example
  *   import * as z from 'zod'
@@ -163,16 +244,12 @@ export const DefaultValidators = Object.freeze({
   unlocklabel: Label,
 })
 
-/** A check for any well-formed text: each of {@link AnyTextValidators} is one of its own. */
-const anyText = () => Z.string().check(WellFormed)
-
 /**
- * Checks that admit any well-formed text in every field: what a host keeping labels and notes in
- * any script, of any length, may pass whole, or start from. Text holding a lone surrogate, half of
- * a character, is refused, as storage such as Convex's refuses it too. A VaultDB's public verbs
- * check with these when handed no validators. Frozen. Text of any kind reaches the host's UI as a
- * name: one that shows labels from others should mind what bidirectional, invisible and control
- * characters can make a label look like.
+ * Checks that admit, in every field, whatever passes the floor and no less: a name of any script,
+ * up to {@link NameFloorBytes} of UTF-8, and a note up to {@link NoteFloorBytes}, each well-formed,
+ * in NFC and free of control characters. What a host keeping labels and notes in any script may
+ * pass whole, or start from. Frozen. A key-value store still refuses the characters it joins names
+ * on (`^` by default): see a VaultDB's `reservedNameChars`.
  *
  * @example openVault({ ...opts, validators: AnyTextValidators })
  * @example openVault({ ...opts, validators: { ...AnyTextValidators, userId: UserId } })
@@ -180,10 +257,10 @@ const anyText = () => Z.string().check(WellFormed)
  * @example AnyTextValidators.boxlabel.safeParse('key \uD83D').success      // false: half of an emoji
  */
 export const AnyTextValidators = Object.freeze({
-  applabel:    anyText(),
-  vaultlabel:  anyText(),
-  boxlabel:    anyText(),
-  userId:      anyText(),
-  note:        anyText(),
-  unlocklabel: anyText(),
+  applabel:    NameFloor,
+  vaultlabel:  NameFloor,
+  boxlabel:    NameFloor,
+  userId:      NameFloor,
+  note:        NoteFloor,
+  unlocklabel: NameFloor,
 })

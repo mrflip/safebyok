@@ -36,9 +36,13 @@ const ScopeCases = [
   // regular usage:
   [TH.scopeOf('u1'),                                  true,   'an applabel, a user_id and a vaultlabel'],
   [TH.scopeOf('user|2fJ8:google'),                    true,   'a user_id in whatever form the host app issues'],
-  [TH.scopeOf('u'.repeat(101)),                       true,   'a user_id of any length: what a name may be is the validators\' to say'],
-  [{ ...TH.scopeOf('u1'), applabel: 'Acme: Ünïcode' },  true,   'an applabel of any text'],
-  [{ ...TH.scopeOf('u1'), user_id: '' },              true,   'even empty text, which the default UserId refuses'],
+  [TH.scopeOf('u'.repeat(101)),                       true,   'a user_id longer than the default check admits: past the floor, what a name may be is the validators\' to say'],
+  [{ ...TH.scopeOf('u1'), applabel: 'Acme: Ünïcode' },  true,   'an applabel of any script'],
+  // refused, below the floor every name is held to:
+  [{ ...TH.scopeOf('u1'), user_id: '' },              false,  'an empty user_id'],
+  [{ ...TH.scopeOf('u1'), vaultlabel: 'tab\there' },  false,  'a vaultlabel holding a control character'],
+  [{ ...TH.scopeOf('u1'), applabel: 'cafe\u{301}' },  false,  'an applabel not in NFC'],
+  [TH.scopeOf('u'.repeat(1025)),                      false,  'a user_id over a kibibyte'],
   // refused:
   [{ ...TH.scopeOf('u1'), applabel: 42 },             false,  'an applabel that is not text'],
   [{ applabel: 'acme', user_id: 'u1' },              false,  'a scope missing its vaultlabel'],

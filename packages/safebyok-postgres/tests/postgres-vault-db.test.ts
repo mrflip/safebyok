@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
 import type { Client, Pool, PoolClient } from 'pg'
-import { AnyTextValidators, VaultError, memoryDeviceDB, openVault } from 'safebyok'
+import { VaultError, memoryDeviceDB, openVault } from 'safebyok'
 import type { VaultDB } from 'safebyok'
 import * as TH from './test-helpers'
 import { VaultChangeChannel, postgresVaultDB } from '../src/index'
@@ -626,11 +626,10 @@ describe("postgresVaultDB, subscribe", () => {
     await unlisten()
   })
 
-  it("calls onChange on an empty notification: a scope too long for a payload", async () => {
+  it("calls onChange on an empty notification, as the trigger sends for a scope too long for a payload", async () => {
     const db = await TH.emptyDatabase()
-    const longUserId = 'u'.repeat(8000)
-    const { heard, unsubscribe } = await TH.liveWatch(TH.requestFor(db, longUserId), TH.scopeOf(longUserId), AnyTextValidators)
-    await TH.requestFor(db, longUserId).createBundle(TH.bundleOf(longUserId), AnyTextValidators)
+    const { heard, unsubscribe } = await TH.liveWatch(TH.requestFor(db, 'u1'), TH.scopeOf('u1'))
+    await db.query(`SELECT pg_notify('${VaultChangeChannel}', '')`)
     await TH.eventually(() => heard.count > 0)
     expect(heard.count).to.eq(1)
     unsubscribe()

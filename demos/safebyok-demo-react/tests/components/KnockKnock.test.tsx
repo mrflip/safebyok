@@ -135,7 +135,7 @@ describe("KnockKnock", () => {
     const store = memoryStore()
     const world = TH.makeWorld({ vaultDB: localVaultDB(store) })
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
-    store.write(Ckeys.box(TH.scopeOf('u1'), 'anthropic_api_key'), '{"not": json')
+    store.write(Ckeys.joiner().box(TH.scopeOf('u1'), 'anthropic_api_key'), '{"not": json')
     world.renderInVault(<KnockKnock />)
     await screen.findByText(/stored Anthropic key is damaged/)
     fireEvent.change(screen.getByPlaceholderText('Banana'), { target: { value: 'Banana' } })
