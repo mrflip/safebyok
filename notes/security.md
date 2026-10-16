@@ -1098,3 +1098,10 @@ security expert who knows what questions to ask.
   reopen) resolves null, so a passphrase is never asked over, nor an action rerun against, a
   vault the action did not touch. `PassphraseModal` and `PasskeyUnlockButton` start afresh when
   handed another vault, so nothing typed for one vault is submitted to the next.
+* 2026-10-16: **A whisper typed into `WhisperField` is in the page's markup.** The field is a
+  controlled input, and React 19 copies a controlled input's value into its `value` attribute,
+  so what the user typed sits in `outerHTML` -- readable by a CSS attribute selector
+  (`input[value^="sk-"]`, an old exfiltration trick), a browser extension, or a session-replay
+  tool that records the DOM -- whether the field shows it or hides it. The README's *Revealing a
+  whisper* says so. An uncontrolled field would keep it out of the attribute; that choice is
+  with the Coach.
