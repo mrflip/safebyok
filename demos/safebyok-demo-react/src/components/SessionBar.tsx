@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { useVault } from 'safebyok-react'
 import { useSession } from '../hooks/useSession'
 import type { Auth } from '../lib/auth'
+import { keepStorage } from '../lib/persist-storage'
 
 /**
  * The app's sign-in strip. Typing a username signs you in (or up); there is no password, because
- * the demo's point is that the vault passphrase is a separate thing from signing in. Signing out
- * locks the vault: the remembered unlock on this device ends with the session.
+ * the demo's point is that the vault passphrase is a separate thing from signing in. Signing in
+ * asks the browser to keep this site's storage, on the user's gesture. Signing out locks the
+ * vault: the remembered unlock on this device ends with the session.
  */
 export const SessionBar = ({ auth }: { auth: Auth }) => {
   const session = useSession(auth)
@@ -15,6 +17,9 @@ export const SessionBar = ({ auth }: { auth: Auth }) => {
   const [gripe, setGripe] = useState<string | null>(null)
 
   const signIn = async () => {
+    // The vault lives in this browser's IndexedDB, which the browser may evict unless asked not
+    // to: asked here, on the user's own click, since a browser may prompt for it.
+    void keepStorage()
     try {
       await auth.signIn(userlabelText.trim())
       setUserlabelText('')

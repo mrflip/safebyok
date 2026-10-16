@@ -38,6 +38,20 @@ describe("SessionBar", () => {
     expect(auth.getSnapshot()).to.not.be.null
   })
 
+  it("asks the browser to keep this site's storage on the sign-in click, not before", async () => {
+    const persist = vi.fn().mockResolvedValue(true)
+    Object.defineProperty(navigator, 'storage', { value: { persist }, configurable: true })
+    try {
+      renderBar()
+      expect(persist).not.toHaveBeenCalled()
+      signInAs('margo')
+      await screen.findByText('margo')
+      expect(persist).toHaveBeenCalledOnce()
+    } finally {
+      Reflect.deleteProperty(navigator, 'storage')
+    }
+  })
+
   it("says what a username is when one will not do, and stays signed out", async () => {
     const { auth } = renderBar()
     signInAs('not a label')
