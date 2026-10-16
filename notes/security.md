@@ -262,7 +262,8 @@ security expert who knows what questions to ask.
   one vault may hold different windows. It is client-side politeness, not a vault-wide synced
   policy: nothing stored enforces it across devices, and a modified client could choose any window
   it likes. The real bounds stay the passphrase and the device-bound localUnlockKey.
-* 2026-10-15 (revised the same day by clean_times): a host may let a device stay unlocked
+* 2026-10-15 (revised the same day by clean_times; the cap and the timer since 2026-10-16, by
+  locks_and_expiry, below): a host may let a device stay unlocked
   indefinitely, by passing `forcePassphraseReentryHours: Infinity` (or any huge number); that is the
   host's choice, with no upper cap. `openVault` turns it, as it parses the option, into a finite
   window of `FarFuture - FarPast` ms, so the deadline it sets from any in-bounds clock reading is
@@ -488,7 +489,8 @@ security expert who knows what questions to ask.
   `src/`, for the workspace's own tooling; `pnpm pack` ships `publishConfig.exports` (dist only)
   instead. `scripts/release.ts` refuses a tarball that still carries the condition, and each
   public package's `prepublishOnly` refuses a publish not run by pnpm.
-* 2026-10-15: a `lock()` (or `destroy()`) called while an `unlock()` or `changePassphrase()` is
+* 2026-10-15 (across tabs and on `close()`, revised 2026-10-16 by locks_and_expiry, below): a
+  `lock()` (or `destroy()`) called while an `unlock()` or `changePassphrase()` is
   still under way wins. Each lock moves a per-handle counter; the unlock reads it at its start
   and again after each wait (the bundle read, the key derivation, the device record's write),
   and on finding it moved takes up no vaultKey, erases a device record it had already written,
@@ -503,7 +505,8 @@ security expert who knows what questions to ask.
   `unlock_epoch`: a vault destroyed, remade, or re-keyed elsewhere while the passphrase was
   being checked. Without that, the old vault's vaultKey was taken up against the new bundle, and a
   `store()` sealed boxes into the new vault that its owner could never open.
-* 2026-10-15: `lockSoon(graceSeconds = 5)`, at most 60 seconds, closes the entry gate at once
+* 2026-10-15 (`close()` and the timer revised 2026-10-16 by locks_and_expiry, below):
+  `lockSoon(graceSeconds = 5)`, at most 60 seconds, closes the entry gate at once
   (`askPassphraseAt` cleared, so the snapshot reads `locked` and every operation started
   afterwards throws `vault_locked`; cleared rather than set to now, which a wall clock stepped
   back would reopen), erases the device record at once, and moves the shut counter
@@ -881,3 +884,52 @@ security expert who knows what questions to ask.
   refuses still opens the vault and lists as it is. Refusing it on read would make the bundle
   `corrupt_record` and lock the user out of their own vault, or hide a way in they rely on. The
   first way in, named `passphrase` by the vault itself, is not checked.
+* 2026-10-16 (locks_and_expiry): **the unlock window has a hard edge, and a timer.** The
+  threshold is the truth: every call that starts work checks `askPassphraseAt` against the host's
+  clock, and past it throws `vault_locked`. A `setTimeout` enforces it: armed at each take-up of a
+  key (an unlock, a remembered unlock at open, a change to the ways in) for `askPassphraseAt` plus
+  60 s, the grace work in hand gets, it drops the vaultKey with no call made. Every look at the key
+  (`ensureUnlocked`, and the second look of work in hand) also drops it once that shut time has
+  passed by the clock, so a timer that runs late, on a device asleep, is not depended on. A shut
+  time only moves earlier: `lockSoon()` takes the lesser of its grace and what the window has
+  left, and on a key already past its shut time drops it at once. To make one timer always reach,
+  `forcePassphraseReentryHours` is now at most 588 hours (24.5 days; 588 h + 60 s is under
+  `setTimeout`'s 2^31 - 1 ms) or `Infinity`, which arms no timer; a finite number past 588 is
+  refused (`bad_option`), where it used to be clamped to "forever" -- a host that meant "very
+  long" now says `Infinity` and means it. The timer is `unref`'d where the platform has it
+  (Node, Bun), so an open vault never holds a process alive; that costs nothing, since a process
+  that exits drops the key with it. **The window renews only on a typed passphrase that proves**
+  (the Coach, 2026-10-16: "if I type in a password for any reason and prove I am mrflip, ... no
+  need to type that password again for seven days"): `unlock()`, `changePassphrase()`, and any
+  change to the ways in proved by a passphrase. An `unlock()` by passkey also sets it, as it did.
+  A passkey proving a change on an unlocked vault keeps the deadline standing (on a locked one it
+  sets one, as `unlock()` by passkey would). Reads, stores, erases and refreshes never move it.
+  One place decides (`deadlineFor` in `vault.ts`), so a new kind of proof cannot slip past it.
+  Expiry is a soft lock (the strawman's two locks): the window running out while an `unlock()` or
+  `changePassphrase()` is under way does not defeat it; only a lock the user (or a sign-out)
+  makes does. For review: a passkey's proof keeping, not renewing, the deadline is the weaker
+  reading of "proves I am mrflip" (G530 asks the deeper question, NOT YET).
+* 2026-10-16 (locks_and_expiry): **a lock reaches every tab's unlock under way: the versioned
+  erase.** The device mark gains `lock_generation` (format `safebyok-mark-v2`). Every lock that
+  forgets the remembered unlock -- `lock()`, `lockSoon()`, a sign-out's lock, `destroy()`'s --
+  raises it before erasing the record. An unlock (or a change to the ways in) reads it as it
+  starts, and `DeviceDB.writeUnlock(unlock, expected)` writes the remembered record only while
+  the mark still stands at that generation, comparing and writing in one step (one IndexedDB
+  transaction in `idbDeviceDB`), else refusing `stale_write`, which the vault takes as "a lock
+  won": it takes nothing up and throws `vault_locked`. A record written before the raise is
+  erased by the lock's own erase, which follows it. `writeMark` never lowers the generation (the
+  higher of the mark written and the mark replaced is kept, in the same step), so a mark written
+  from an older read -- a rollback mark raised by another tab -- cannot undo a lock. Limits: a
+  host's own `DeviceDB` that ignores the expectation is back to per-handle locking (the
+  `describeDeviceDB` battery checks it); a lock on a device with no mark for the vault (one that
+  never read it, or whose mark would not read) has nothing to raise; and `destroy()` erases the
+  mark, so its generation starts again from 0, and an unlock under way in another tab that began
+  at 0 may write a record of the destroyed vault, which opens nothing and is erased at the next
+  open of a vault under the scope. `close()` is no lock: it erases nothing, raises nothing, and a
+  record an unlock under way wrote before the close stays (G126). The undoing erase of a losing
+  unlock now runs only for a lock in its own handle (which may have erased before the record
+  landed); a record of a bundle no longer standing is left, since its wrap is bound to that
+  bundle's `vault_id` and `unlock_epoch` and opens nothing. **For review**: a mark written before
+  this reads as none (the format moved), so on its first open after upgrading a device restarts
+  its rollback check from the copy storage holds then, once; before 1.0 that is the stated cost
+  of a format change.

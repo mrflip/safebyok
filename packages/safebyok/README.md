@@ -163,6 +163,13 @@ vault's `validators`, which each takes as its last argument. Handed none, a verb
 well-formed text (`AnyTextValidators`), so an adapter that hands its calls on to another VaultDB's
 public verbs need pass nothing, its own having checked.
 
+A device store of your own (a `DeviceDB`, for a platform without IndexedDB) owes two things beyond
+keeping its records, each the compare and the write in one step: `writeUnlock(unlock, expected)`
+writes only while the scope's device mark stands at `expected.lock_generation` (0 with no mark),
+and otherwise writes nothing and refuses with `stale_write`; and `writeMark` keeps the higher
+`lock_generation` of the mark it writes and the one it replaces. That is how a lock in one tab
+stops an unlock under way in another. `describeDeviceDB` from `safebyok/testing` checks both.
+
 ## Key derivation
 
 The passphraseKey is made by Argon2id at a keyDeriverSpec: its parameters under a
@@ -195,17 +202,37 @@ that does not, with `bad_option`.
 
 ## Locking
 
-An unlocked vault stays unlocked until its remembered unlock expires
-(`forcePassphraseReentryHours`, seven days by default) or the host locks it. `Infinity` hours
-means never on this device, until a lock: `askPassphraseAt` then equals the exported `FarFuture`,
-the latest instant the package accepts (in 2255), so a host can show "until locked" by comparing
-against it. The vault reports the window it was opened with as `vault.reentryWindowMillis`, in
-milliseconds, the default and `Infinity` resolved: `Infinity` hours (or any as long) reads as the
-exported `ForeverMillis`, so a UI can say how long an unlock lasts without being told the option again.
+An unlocked vault stays unlocked until its window runs out (`forcePassphraseReentryHours`, seven
+days by default, at most 588 hours: 24.5 days) or the host locks it. `Infinity` hours means never
+on this device, until a lock: `askPassphraseAt` is then the exported `FarFuture`, the latest
+instant the package accepts (in 2255). A finite number past 588 is refused, since no timer
+reaches further. Show "until locked" for any `askPassphraseAt >= FarFuture - MinuteMillis`;
+never compare a time for equality. The vault reports the window it was opened with as
+`vault.reentryWindowMillis`, in milliseconds, the default and `Infinity` resolved (`Infinity`
+reads as the exported `ForeverMillis`), so a UI can say how long an unlock lasts without being
+told the option again.
+
+The deadline is the truth, and a timer enforces it. From `askPassphraseAt` every call that would
+start new work throws `vault_locked`, and the snapshot reads `locked` at its next change; work
+already under way keeps the key for one more minute to finish, and then a timer drops it, with no
+call needed. A timer that runs late, as one may on a device that slept, is caught at the next
+call. The timer is `unref`'d, so it never holds a Node or Bun process open.
+
+**The window starts again whenever the user types a passphrase and it proves**: an `unlock()`, a
+`changePassphrase()`, and an `addPassphrase()`, `addPasskey()` or `removeUnlock()` with a
+passphrase as proof. An `unlock()` with a passkey sets it too. Nothing else moves it: not a read,
+a store or a refresh, nor a passkey proving a change on a vault already unlocked. The window
+running out while an `unlock()` or `changePassphrase()` is under way is no lock: the call ends
+unlocked, with a window of its own.
 
 Lowering the option later takes hold on each device at its next open: an unlock remembered under
 the longer setting, whose deadline lies past the new number of hours from then, is forgotten, and
-the user types their passphrase again. Raising it lengthens no unlock already remembered.
+the user types their passphrase again. Raising it lengthens no unlock already remembered. A
+device keeps one remembered unlock per vault, shared by its tabs, so open a vault with one
+setting on a device: two tabs opening it with different ones each forget what the other
+remembers (`notes/wontfix.md`). A device clock stepped backwards does the same to an unlock
+remembered just before: it seems to last past the window, and the user is asked again, the safe
+direction.
 
 Two calls lock, and each forgets the unlock in memory and on this device alike, so the user types
 their passphrase again afterwards:
@@ -216,14 +243,23 @@ their passphrase again afterwards:
   tab, a sign-out. From the instant it is called the snapshot reads `locked`, every read, use,
   store or erase called afterwards throws kind `vault_locked`, and this device forgets its
   remembered unlock; but work already under way (a `store()` retrying after another device's
-  write, say) keeps the key to finish, until it is dropped `graceSeconds` later. An `unlock()`
-  (or a `changePassphrase()`, which proves the passphrase too) within the grace ends it. The
-  grace is at most 60 seconds; `lockSoon(0)` is `lock()`.
+  write, say) keeps the key to finish, until it is dropped `graceSeconds` later, or sooner when
+  the window would drop it sooner. An `unlock()` (or a `changePassphrase()`, which proves the
+  passphrase too) within the grace ends it. The grace is at most 60 seconds; `lockSoon(0)` is
+  `lock()`.
 
-Either one wins over an unlock still under way: that `unlock()` throws kind `vault_locked` and
-remembers nothing, so a vault locked while the passphrase was being checked stays locked.
-`close()` is not a lock -- the remembered unlock stays, for the next open -- but it ends a
-`lockSoon()` grace at once, and an unlock under way on the closed handle takes nothing up.
+Either one wins over an unlock still under way, in this tab or in another on the same device:
+that `unlock()` throws kind `vault_locked` and remembers nothing, so a vault locked while the
+passphrase was being checked stays locked. (A wrong passphrase is still told as
+`wrong_passphrase`: it is the more useful news.) Across tabs this rides on the device mark's
+`lock_generation`, which every lock raises and an unlock's record write compares. `close()` is
+not a lock: the remembered unlock stays, for the next open, along with any an unlock under way
+wrote before the close; it ends a `lockSoon()` grace at once, and an unlock under way on the
+closed handle takes nothing up.
+
+A host clock that turns bad partway through a call (it throws, or reads outside 1981 to 2255)
+drops the key and fails the call with `bad_option`, even when the call's write had already
+landed: fix the clock, and look again.
 
 **Locking ends the remembered unlock.** A host that wants "stay unlocked on this device for a
 week" should not lock on tab-away: each time the user comes back to the tab, the vault would ask
@@ -239,21 +275,33 @@ gentle one:
 
 ```ts
 const lockWhenHidden = (vault: Vault) => {
-  const onChange = () => { if (document.hidden) { vault.lockSoon().catch(() => {}) } }
+  const onChange = () => {
+    if (! document.hidden) { return }
+    vault.lockSoon().catch((err: unknown) => {
+      // A lockSoon() racing a close() is the one refusal to expect; any other, such as a device
+      // store that would not forget the remembered unlock, is worth a word.
+      if (! isVaultError(err, 'vault_closed')) { console.warn('The vault did not lock cleanly', err) }
+    })
+  }
   document.addEventListener('visibilitychange', onChange)
   return () => { document.removeEventListener('visibilitychange', onChange) }
 }
 ```
 
-Call the function it returns when you close the vault; the `catch` covers a `lockSoon()` that
-races a `close()`. Chromium's Idle Detection API, behind a permission the user grants, is the
-only true screen-lock signal, and a locked screen is the user meaning it, so it calls `lock()`:
+Call the function it returns when you close the vault. The `catch` quiets only a `lockSoon()`
+that races a `close()`, and lets a failure to forget the remembered unlock be heard: that vault
+is locked in this tab, but the next open may unlock without the passphrase. Chromium's Idle
+Detection API, behind a permission the user grants, is the only true screen-lock signal, and a
+locked screen is the user meaning it, so it calls `lock()`, quieted the same way:
 
 ```ts
 const aborter = new AbortController()   // aborter.abort() when you close the vault
 if (await IdleDetector.requestPermission() === 'granted') {   // from a click: it needs a user gesture
   const idle = new IdleDetector()
-  idle.addEventListener('change', () => { if (idle.screenState === 'locked') { vault.lock().catch(() => {}) } })
+  idle.addEventListener('change', () => {
+    if (idle.screenState !== 'locked') { return }
+    vault.lock().catch((err: unknown) => { if (! isVaultError(err, 'vault_closed')) { console.warn('The vault did not lock cleanly', err) } })
+  })
   await idle.start({ threshold: 60_000, signal: aborter.signal })
 }
 ```
@@ -454,7 +502,7 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `rolled_back`         | this device has already seen a newer copy of the vault's bundle than storage offers now (storage restored from a backup, or altered), so it won't use this one: nothing was unlocked or written | Tell the user this device has seen a newer copy of the vault than storage holds. If the storage was restored from an older copy on purpose, accept it on this device (see *A vault rolled back*, below); otherwise the app's support should look at its storage |
 | `not_permitted`       | the storage backend refused the signed-in user, still the vault's own, this one call | Tell the user they may not; signing in again will not help |
 | `identity_revoked`    | the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in. The vault has locked itself (see *When the user signs out*) | Have the user sign in again, then open the vault for whoever that is |
-| `storage_unavailable` | the storage backend could not be reached, or failed              | Try again shortly; the adapter's own error is the `cause`, unless it may quote the call (Convex's) |
+| `storage_unavailable` | the storage backend could not be reached, or failed; or this device's own store failed as the vault opened | Try again shortly; the adapter's own error is the `cause`, unless it may quote the call (Convex's) |
 
 `openVault` itself can refuse with `bad_option`, `bad_label`, and, as it reads the vault from
 storage, `storage_unavailable`, `not_permitted`, `identity_revoked` or `damaged_bundle` (a
