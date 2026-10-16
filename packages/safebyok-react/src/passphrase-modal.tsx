@@ -112,7 +112,9 @@ export const PassphraseModal = (props: PassphraseModalProps) => (
 
 /**
  * What a host says of a passphrase as the user chooses it: a sentence to show beside the field, or
- * null for nothing to say; through a promise, if it must wait.
+ * null for nothing to say; through a promise, if it must wait. It hears the passphrase itself, in
+ * plain text, at every change: keep it on the device -- never send it to a server, log it, or let
+ * an error tracker capture it.
  *
  * @example const passphraseAdvice: PassphraseAdvice = (typed) => (typed.length < 12 ? 'Twelve characters or more, please.' : null)
  */

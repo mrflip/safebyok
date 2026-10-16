@@ -1123,4 +1123,6 @@ security expert who knows what questions to ask.
   for the user's sign-in password (and offers to overwrite it); a host naming its own is told not
   to use the sign-in name alone. `passphraseAdvice`, the host's advice shown beside the field, is
   only advice: nothing refuses a passphrase in the dialog, and composition rules are discouraged
-  (NIST SP 800-63B).
+  (NIST SP 800-63B). It is also host code that hears the passphrase in plain text at every change
+  while the user chooses one; its doc block and the README tell the host to keep it on the device
+  (no server, no log, no error tracker), which nothing here can enforce.
