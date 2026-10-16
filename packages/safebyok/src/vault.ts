@@ -16,6 +16,7 @@ import type { DeviceDB } from './device-db'
 import { VaultDB, jsonBytes } from './vault-db'
 import { parseLogger, type VaultLogger } from './logger'
 import * as RefusalPolicy from './refusal-policy'
+import { ensureStrongEnough, parseStrengthTest, type PassphraseStrengthTest } from './passphrase-strength'
 
 /**
  * Where the vault stands, as the UI branches on it:
@@ -143,6 +144,17 @@ export type OpenVaultOpts = {
    * 'bad_option' for a bag holding anything else, or a field it does not know.
    */
   validators?: VaultValidators | undefined
+  /**
+   * The check every new passphrase must pass, as a {@link PassphraseStrengthTest}: the one the
+   * first `unlock()` creates the vault with, and each `addPassphrase()` or `changePassphrase()`
+   * sets, before any key derivation. A passphrase it finds weak is refused with kind
+   * 'weak_passphrase', the test's reason the message. It never runs on `unlock()` of a vault that
+   * stands. Default: `passphraseLengthTest`, at least `MinPassphraseChars` (12) characters
+   * and no composition rules; `zxcvbnPassphraseTest`, from `safebyok/browser`, also turns away
+   * common passwords and patterns. Kind 'bad_option' for anything but a function, and for a test
+   * that answers anything but a verdict; whatever it throws, the call throws.
+   */
+  passphraseStrengthTest?: PassphraseStrengthTest | undefined
 }
 
 /**
@@ -191,7 +203,10 @@ export type Vault = {
   /**
    * Open the vault with its passphrase, remembering the unlock on this device for
    * `forcePassphraseReentryHours`. On an `absent` vault this first unlock creates it, with this
-   * passphrase as its one way in, labelled `passphrase`. A wrong passphrase throws kind
+   * passphrase as its one way in, labelled `passphrase` -- once the vault's
+   * `passphraseStrengthTest` passes it: kind 'weak_passphrase' otherwise, the test's reason its
+   * message, and nothing is created. A vault that stands is never refused its passphrase for
+   * weakness. A wrong passphrase throws kind
    * 'wrong_passphrase' and changes nothing -- learned from the vaultKey envelope refusing to
    * decrypt, never from a comparison. A passphrase that is not text is misuse: kind 'bad_option'.
    *
@@ -275,6 +290,9 @@ export type Vault = {
    * cheap no matter how many there are. Every other device's unlock (remembered or in hand)
    * lapses: the bundle's unlockEpoch moves, and they fall back to `locked` on their next look.
    *
+   * A `newPassphrase` the vault's `passphraseStrengthTest` finds weak is refused first, before any
+   * key derivation, with kind 'weak_passphrase', the test's reason its message.
+   *
    * Works locked or unlocked, since the old passphrase is proof enough. A wrong `oldPassphrase`
    * throws kind 'wrong_passphrase' and changes nothing. It is tried against each passphrase, as
    * `unlock()` tries one, unless `opts.unlockId` aims it at one. If another device changes the
@@ -304,7 +322,9 @@ export type Vault = {
    * Refuses with kind 'wrong_passphrase' when `proof` opens nothing (or `newPassphrase` is
    * empty), 'wrong_passkey' or 'absent_unlock' for a passkey's answer that does not open the
    * vault, 'bad_label' for an unlocklabel that fails the vault's unlocklabel check (by default
-   * `Label`; a host's own in openVault's `validators`), is empty or is already taken, and
+   * `Label`; a host's own in openVault's `validators`), is empty or is already taken,
+   * 'weak_passphrase' for a `newPassphrase` the vault's `passphraseStrengthTest` finds weak (the
+   * test's reason the message, before any key derivation), and
    * 'too_many_unlocks' when the vault already holds {@link MaxUnlocks}: remove one first. Like
    * `changePassphrase()`, it moves the unlockEpoch, so every other device locks; it leaves
    * this one unlocked, and throws kind 'stale_write' when another device changed the vault's ways
@@ -504,7 +524,9 @@ const UnreadBundle = Symbol.for('safebyok.unread_bundle')
  * of the `VaultDB` class.
  * Misuse is refused before storage is touched: kind 'bad_label' for a label or a `userId` that
  * fails its check (`validators`), and 'bad_option' for any other option, a `vaultDB` or
- * `deviceDB` short of a verb among them.
+ * `deviceDB` short of a verb among them. Kind 'insecure_context', first of all, in a page the
+ * browser says is not a secure context (`isSecureContext` false: plain http, anywhere but
+ * localhost), where it withholds WebCrypto: serve the app over https.
  *
  * @example
  *   const vault = await openVault({ applabel: 'acme', userId: session.userId, vaultlabel: 'main', vaultDB, ...browserOpts() })
@@ -513,6 +535,7 @@ const UnreadBundle = Symbol.for('safebyok.unread_bundle')
  *   const vault = await openVault({ applabel: 'acme', userId: session.userId, vaultlabel: 'main', vaultDB, deviceDB, keyDeriver })
  */
 export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
+  ensureSecureContext()
   if (! isBag(opts)) { throw new VaultError('bad_option', 'openVault takes one bag of options: applabel, userId, vaultlabel, vaultDB, deviceDB and keyDeriver at least.') }
   const rules = Names.rulesOf(opts.validators)
   // The same checks, but any text for a boxlabel: for reaching a lockbox that already stands under
@@ -542,6 +565,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
     }
   }
   const keyDeriver = parseKeyDeriver(opts.keyDeriver)
+  const strengthTest = parseStrengthTest(opts.passphraseStrengthTest)
   const whisperByteLimit = parseMaxWhisperBytes(opts.maxWhisperBytes)
   const lockboxLimit = parseMaxLockboxes(opts.maxLockboxes, parseDeclared(givenVaultDB, 'maxLockboxes'))
   const vaultByteLimit = ensureLimitsFit(givenVaultDB, whisperByteLimit, lockboxLimit)
@@ -859,6 +883,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       if (unlockId !== undefined) {
         throw new VaultError('absent_unlock', "This vault has no way in with that unlock_id: it does not exist, and may have been destroyed on another device. Unlock without an unlockId to create it anew.")
       }
+      await ensureStrongEnough(strengthTest, proof)
       const deviceId = randomId()
       const { draft, transientKey, sessionKey } = await draftBundle(proof, deviceId)
       drafted = { vault_id: draft.vault_id, device_id: deviceId }
@@ -1493,6 +1518,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       parsePassphrase(newPassphrase, 'changePassphrase')
       if (! newPassphrase.trim()) { throw new VaultError('wrong_passphrase', "A passphrase can't be empty or only spaces.") }
       const unlockId = parseAim(changeOpts)
+      await ensureStrongEnough(strengthTest, newPassphrase)
       await reviseUnlocks(oldPassphrase, unlockId, {
         call:   'changePassphrase',
         // The way in the old passphrase opened takes the new one, keeping its stamp: its id and
@@ -1509,6 +1535,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       if (! newPassphrase.trim()) { throw new VaultError('wrong_passphrase', "A passphrase can't be empty or only spaces.") }
       const proof = parseProof(givenProof)
       const unlocklabel = parseUnlocklabel(rules, labelling, 'addPassphrase')
+      await ensureStrongEnough(strengthTest, newPassphrase)
       const naming = { unlock_id: randomId(), unlocklabel }
       await reviseUnlocks(proof, undefined, {
         call:   'addPassphrase',
@@ -2055,6 +2082,17 @@ const absentBox = () => new VaultError('absent_box', 'No lockbox stands under th
 const isOfScope = (record: VaultScope, scope: VaultScope): boolean => (
   record.applabel === scope.applabel && record.user_id === scope.user_id && record.vaultlabel === scope.vaultlabel
 )
+
+/**
+ * Refuse, with kind 'insecure_context', a page the platform says is not a secure context: plain
+ * http, anywhere but localhost, where a browser withholds WebCrypto and the vault would fail with
+ * a TypeError and no kind. A runtime with no such notion (Node, Bun, React Native) passes.
+ */
+const ensureSecureContext = () => {
+  if ((globalThis as { isSecureContext?: unknown }).isSecureContext === false) {
+    throw new VaultError('insecure_context', 'This page is not a secure context -- it was served over plain http -- so the browser withholds the cryptography the vault needs: serve the app over https (http://localhost counts as secure, for development).')
+  }
+}
 
 // The refusal never quotes its input: a passphrase stays out of error messages.
 const parsePassphrase = (candidate: string, said: 'changePassphrase' | 'addPassphrase') => {

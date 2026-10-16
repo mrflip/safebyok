@@ -1,8 +1,11 @@
 // fake-indexeddb installs a Node-side indexedDB global before the adapters load, so the device
 // store browserOpts makes is a real IndexedDB one.
 import 'fake-indexeddb/auto'
+import { fileURLToPath } from 'node:url'
+import { Rolldown } from 'tsdown'
 import { describe, expect, it } from 'vitest'
-import { browserOpts } from '../src/browser'
+import * as Browser from '../src/browser'
+import { browserOpts, zxcvbnPassphraseTest } from '../src/browser'
 import { VaultError } from '../src/errors'
 import { argon2idWebV1Deriver } from '../src/key-deriver'
 import { inspectIdbDeviceDB } from '../src/idb'
@@ -58,4 +61,57 @@ describe("browserOpts", () => {
     expect(vault.getSnapshot().state).to.eq('absent')
     vault.close()
   })
+})
+
+describe("safebyok/browser", () => {
+  it("exports browserOpts, and the zxcvbn strength test beside it", () => {
+    expect(Object.keys(Browser)).to.have.members(['browserOpts', 'zxcvbnPassphraseTest', 'MinZxcvbnScore'])
+  })
+})
+
+describe("zxcvbnPassphraseTest, as openVault's passphraseStrengthTest", () => {
+  it("refuses a common password at create with kind 'weak_passphrase', and creates the vault with a strong one", async () => {
+    const vault = await openVault({ ...TH.memoryVaultOpts(), passphraseStrengthTest: zxcvbnPassphraseTest })
+    const err = await TH.expectRefusal(vault.unlock('password1234'), 'weak_passphrase')
+    expect(err.message).to.match(/commonly used password/)
+    expect(vault.getSnapshot().state).to.eq('absent')
+    await vault.unlock('correct horse battery staple')
+    expect(vault.getSnapshot().state).to.eq('unlocked')
+    vault.close()
+  })
+})
+
+const browserSource = fileURLToPath(new URL('../src/browser.ts', import.meta.url))
+
+/** The minified JavaScript a bundler ships for an app whose only import from safebyok/browser is `imports`. */
+const bundleOf = async (imports: string): Promise<string> => {
+  const appModule = `export { ${imports} } from ${JSON.stringify(browserSource)}`
+  const built = await Rolldown.build({
+    input:    'app',
+    platform: 'browser',
+    write:    false,
+    logLevel: 'silent',
+    output:   { minify: true },
+    plugins:  [{
+      name:      'app_module',
+      resolveId: (specifier) => (specifier === 'app' ? specifier : null),
+      load:      (moduleId) => (moduleId === 'app' ? appModule : null),
+    }],
+  })
+  return built.output.map((piece) => (piece.type === 'chunk' ? piece.code : '')).join('\n')
+}
+
+// zxcvbn's own word for a match against its dictionaries, and the compressed common-password list.
+const ZxcvbnImplementation = /passwords-common/u
+
+describe("safebyok/browser's tree-shaking", () => {
+  it("leaves zxcvbn and its dictionary out of an app that imports browserOpts alone", async () => {
+    const shipped = await bundleOf('browserOpts')
+    expect(shipped).to.include('safebyok')
+    expect(shipped).to.not.match(ZxcvbnImplementation)
+  }, 30_000)
+
+  it("brings zxcvbn in for an app that imports zxcvbnPassphraseTest: the check above can fail", async () => {
+    expect(await bundleOf('zxcvbnPassphraseTest')).to.match(ZxcvbnImplementation)
+  }, 30_000)
 })
