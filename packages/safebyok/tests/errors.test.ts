@@ -99,6 +99,7 @@ const FamilyCases = [
   ["damaged_bundle",      "condition", 'a vault stored damaged is told to the user, who cannot open it'],
   ["damaged_unlock",      "condition", 'a way in stored damaged sends the user to another way in'],
   ["damaged_lockbox",     "condition", 'a lockbox stored damaged is told to the user, who may erase it'],
+  ["newer_format",        "condition", 'a vault a newer version wrote is told to the user, who updates the app'],
   ["stale_write",         "condition", 'another device writing first is a fact of syncing'],
   ["rolled_back",         "condition", 'storage handing back an older copy of the vault is a fact a user can be told'],
   ["not_permitted",       "condition", 'a call refused to the signed-in owner is told to them'],

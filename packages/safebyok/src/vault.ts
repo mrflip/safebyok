@@ -13,7 +13,7 @@ import * as Envelope from './envelope'
 import type { EnvelopeStamp, UnlockProof, VaultKeyPair } from './envelope'
 import { stableJsonify } from './stable-jsonify'
 import type { DeviceDB } from './device-db'
-import { jsonBytes, type VaultDB } from './vault-db'
+import { VaultDB, jsonBytes, type LockboxExpectation } from './vault-db'
 import { parseLogger, type VaultLogger } from './logger'
 import * as RefusalPolicy from './refusal-policy'
 
@@ -652,7 +652,9 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
     }
     bundle = fresh
     deviceMark = mark
-    boxes = fresh === null ? [] : await vaultDB.listBoxes(scope)
+    const listed = fresh === null ? [] : await vaultDB.listBoxes(scope)
+    // A lockbox under a vaultKey the vault does not hold lists as damaged from its epoch alone.
+    boxes = fresh === null ? [] : listed.map((box) => (isUnderHeldKey(box, fresh) ? box : asDamaged(box)))
     syncing = true
     bump()
   }
@@ -712,9 +714,16 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
    * that vault under, and for a vault not seen, the one this handle drafted it under, or a new one.
    */
   const raiseMark = async (kept: DeviceMark | null, fresh: VaultBundle): Promise<SeenMark> => {
+    const mark = markSeeing(kept, fresh)
+    if (mark.seen !== kept?.seen) { await deviceDB.writeMark(mark) }
+    return mark
+  }
+
+  /** The mark {@link raiseMark} keeps, `kept` itself (whose `seen` it keeps) when nothing is raised. */
+  const markSeeing = (kept: DeviceMark | null, fresh: VaultBundle): SeenMark => {
     const seen = kept?.seen?.vault_id === fresh.vault_id ? kept.seen : null
     if (kept !== null && seen !== null && seen.unlock_epoch >= fresh.unlock_epoch && seen.vault_key_epoch >= fresh.vault_key_epoch) { return { ...kept, seen } }
-    const mark: SeenMark = {
+    return {
       format:          MarkFormat,
       ...scope,
       // The scope's locks count on, whichever vault stands under it.
@@ -726,8 +735,6 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
         vault_key_epoch: Math.max(seen?.vault_key_epoch ?? 0, fresh.vault_key_epoch),
       },
     }
-    await deviceDB.writeMark(mark)
-    return mark
   }
 
   /** This scope's mark with nothing seen, at `lockGeneration`: what a lock leaves where no vault was seen, and destroy() leaves of one. */
@@ -884,14 +891,33 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       unlocks,
     }
     await refreshOnStale(vaultDB.updateBundle(next, { vault_id: standing.vault_id, unlock_epoch: standing.unlock_epoch }), plan.call)
-    // This device's own write raises its mark, never refuses: a newer one seen meanwhile stands.
-    const mark = await raiseMark(await keptMark(plan.call), next)
+    // The change has landed, whatever happens now: what follows is this device's own, and a
+    // failure of it is said through the logger, never thrown as though the change had not landed.
+    deviceMark = await raiseMarkAfter(next, plan.call)
     bundle = next
-    deviceMark = mark
-    // The change has landed, whatever happens now: a shut meanwhile leaves only its unlock untaken.
-    await takeUpUnlock(proven, next, started, deadlineFor(proof, 'revise'))
+    // A shut meanwhile leaves only the change's unlock untaken.
+    try {
+      await takeUpUnlock(proven, next, started, deadlineFor(proof, 'revise'))
+    } catch (err) {
+      logger.warn("The change to the vault's ways in landed in storage, but this device could not take up its unlock afresh: it stands as it stood here, and asks for the passphrase at its next open.", { call: plan.call }, asError(err))
+    }
     bump()
     return true
+  }
+
+  /**
+   * This device's mark raised to `next`, a bundle its own write just landed: never a refusal, as a
+   * newer one seen meanwhile stands. A device store that fails to keep it is said through the
+   * logger, and the mark is held in memory as raised: a missed mark only weakens the rollback
+   * check until a later read raises it.
+   */
+  const raiseMarkAfter = async (next: VaultBundle, call: VaultCall): Promise<SeenMark> => {
+    try {
+      return await raiseMark(await keptMark(call), next)
+    } catch (err) {
+      logger.warn("The change to the vault's ways in landed in storage, but this device could not note it in its mark of the vault: the change stands, and the mark catches up at a later read.", { call }, asError(err))
+      return markSeeing(deviceMark, next)
+    }
   }
 
   /** A passphrase envelope in `standing` for `newPassphrase`, stamped `stamp`, around the vaultKey `proven` holds. */
@@ -1260,6 +1286,13 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
     return label
   }
 
+  /**
+   * The revision the snapshot's listing names for the lockbox under `boxlabel`, sound or damaged;
+   * null for none listed, or a damaged record that holds none. Storage arbitrates a write that
+   * names it, so a listing gone stale costs a refusal and a retry, never a record.
+   */
+  const listedRevisionOf = (boxlabel: string): string | null => boxes.find((box) => box.boxlabel === boxlabel)?.revision_id ?? null
+
   /** The lockbox under `boxlabel`; null when there is none, and 'damaged' when its record fails verification. */
   const readBoxOrDamaged = async (boxlabel: string): Promise<Lockbox | 'damaged' | null> => {
     try {
@@ -1371,6 +1404,26 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       // decipherLockbox refuses only as damaged_lockbox: a record that will not open.
       return null
     }
+  }
+
+  /**
+   * Write `lockbox` over `expected`, as `store()` does, erasing what stands under its boxlabel
+   * first when `clearsFirst`. A refusal as stale has just caught this device up with storage: a
+   * device it relocked, or a box it shows gone that stood when the store began (`boxStood`), ends
+   * the store here -- 'erased', for the latter -- as the next attempt would end it, but without the
+   * wait before it that no retry could use. Work in hand, it may finish within a grace.
+   */
+  const writeOver = async (lockbox: Lockbox, expected: LockboxExpectation, clearsFirst: boolean, boxStood: boolean): Promise<'written' | 'erased'> => {
+    try {
+      if (clearsFirst) { await refreshOnStale(vaultDB.eraseBox(scope, lockbox.boxlabel, { vault_id: expected.vault_id }), 'store') }
+      await refreshOnStale(vaultDB.updateBox(scope, lockbox, expected), 'store')
+    } catch (err) {
+      if (! isVaultError(err, 'stale_write')) { throw err }
+      keyInHand()
+      if (boxStood && boxes.every((box) => box.boxlabel !== lockbox.boxlabel)) { return 'erased' }
+      throw err
+    }
+    return 'written'
   }
 
   const vault: Vault = {
@@ -1558,9 +1611,10 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
         // secret from storage, which sees changed_at stand still or move.
         const unchanged = vouched !== null && stableJsonify(prevWhisper) === stableJsonify(checked.data)
         // Lands only in the vault this whisper is sealed for, under the vaultKey that seals it, over
-        // the revision just read: a vault reborn elsewhere, a vaultKey replaced, or a box written
-        // meanwhile by another device, refuses it.
-        const expected = { vault_id: vaultId, revision_id: prev?.revision_id ?? null, vault_key_epoch: vaultKeyEpoch }
+        // the revision just read -- for a damaged box, the one the listing names -- : a vault reborn
+        // elsewhere, a vaultKey replaced, or a box written meanwhile by another device, refuses it.
+        const overRevision = standing === 'damaged' ? listedRevisionOf(label) : prev?.revision_id ?? null
+        const expected = { vault_id: vaultId, revision_id: overRevision, vault_key_epoch: vaultKeyEpoch }
         const header: LockboxHeader = {
           boxlabel:               label,
           revision_id:            revisionId,
@@ -1577,21 +1631,9 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
           lockbox_key_wrapped: await wrapKeyUnder(unlockedKey, lockboxKey, boxBinding(vaultId, header, 'lockbox_key_wrapped')),
           whisper_ciphered:    await cipherBytes(lockboxKey, whisperBytes, boxBinding(vaultId, header, 'whisper_ciphered')),
         }
-        try {
-          // A damaged box is cleared first, as erase() would, so the write meets no revision: its
-          // record cannot say which one it holds.
-          if (standing === 'damaged') { await refreshOnStale(vaultDB.eraseBox(scope, label, { vault_id: vaultId }), 'store') }
-          await refreshOnStale(vaultDB.updateBox(scope, lockbox, expected), 'store')
-        } catch (err) {
-          if (! isVaultError(err, 'stale_write')) { throw err }
-          // The catch-up has just shown what stands now. A device it relocked, or a box it shows
-          // gone, ends the store here, as the next attempt would end it, but without the wait
-          // before it that no retry could use. Work in hand, it may finish within a grace.
-          keyInHand()
-          if (boxStood && boxes.every((box) => box.boxlabel !== label)) { return 'erased' }
-          throw err
-        }
-        return 'written'
+        // A damaged box whose record names no revision is cleared first, as erase() would, so the
+        // write meets none.
+        return await writeOver(lockbox, expected, standing === 'damaged' && overRevision === null, boxStood)
       })
       if (outcome === 'erased') {
         throw new VaultError('stale_write', 'That lockbox was erased on another device while this one was storing into it, so nothing was written: an erase wins. Store it again if it should exist after all.')
@@ -1620,8 +1662,11 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
 
     destroy: async () => {
       ensureOpen()
-      // Only the vault this handle had read when called: one destroyed and made anew since
-      // refuses, even if a background refresh brings it in while this awaits.
+      // A handle that has seen no vault looks first: "delete my vault" must not report success
+      // over one standing. Otherwise only the vault this handle had read when called: one
+      // destroyed and made anew since refuses, even if a background refresh brings it in while
+      // this awaits.
+      if (bundle === null) { await refresh() }
       const doomed = bundle
       await shut('destroy')
       if (doomed !== null && doomed !== UnreadBundle) {
@@ -1864,6 +1909,17 @@ const saltLengthOf = (saltB64: string): number | null => {
   }
 }
 
+/**
+ * True when `box` lists as damaged already, or stands under a vaultKey `standing` holds: its own,
+ * or the prior one. A lockbox under any other epoch opens under no key the vault holds.
+ */
+const isUnderHeldKey = (box: LockboxSummary | DamagedLockbox, standing: VaultBundle): boolean => (
+  box.damaged || box.vault_key_epoch === standing.vault_key_epoch || box.vault_key_epoch === standing.prior_vault_key?.vault_key_epoch
+)
+
+/** `box`, a lockbox listed sound, as damaged: under its boxlabel and revision, nothing else of it trusted. */
+const asDamaged = (box: LockboxSummary | DamagedLockbox): DamagedLockbox => ({ boxlabel: box.boxlabel, damaged: true, revision_id: box.revision_id })
+
 /** What an unlock notes as it starts: this handle's shut count, and the device mark's lock generation. */
 type UnlockStart = { shutsThen: number, lockGeneration: number }
 
@@ -2017,7 +2073,11 @@ const parsePassphrase = (candidate: string, said: 'changePassphrase' | 'addPassp
 const isFunction = (candidate: unknown) => typeof candidate === 'function'
 const isBag = (candidate: unknown) => typeof candidate === 'object' && candidate !== null
 
-/** What a VaultDB must carry: its public verbs. Checked only: openVault keeps the adapter. */
+/**
+ * What a VaultDB must carry: its public verbs, on an instance of the `VaultDB` base class, whose
+ * verbs check every record and expectation an adapter's own code sees. Checked only: openVault
+ * keeps the adapter.
+ */
 const vaultDBShape = Z.object({
   readBundle:   Z.custom(isFunction),
   createBundle: Z.custom(isFunction),
@@ -2031,8 +2091,8 @@ const vaultDBShape = Z.object({
 })
 
 const parseVaultDB = (candidate: VaultDB): VaultDB => {
-  if (! vaultDBShape.safeParse(candidate).success) {
-    throw new VaultError('bad_option', "vaultDB is not a VaultDB: pass a storage adapter, such as localVaultDB(), idbVaultDB() from 'safebyok-indexeddb', or your backend's own.")
+  if (! (candidate instanceof VaultDB) || ! vaultDBShape.safeParse(candidate).success) {
+    throw new VaultError('bad_option', "vaultDB is not a VaultDB: pass a storage adapter, such as localVaultDB(), idbVaultDB() from 'safebyok-indexeddb', or your backend's own, which extends the VaultDB class.")
   }
   return candidate
 }
