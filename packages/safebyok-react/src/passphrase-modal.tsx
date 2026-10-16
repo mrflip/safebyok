@@ -1,4 +1,4 @@
-import { useId, useRef, useState, useSyncExternalStore, type KeyboardEvent, type Ref, type SubmitEvent } from 'react'
+import { useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type Ref, type SubmitEvent } from 'react'
 import { ForeverMs, isVaultCondition, isVaultError, type Vault } from 'safebyok'
 import { Boundary, useRoundFor } from './boundary'
 import { Locale, Messages } from './messages'
@@ -188,22 +188,34 @@ const holdsFocus = (container: HTMLElement | null): boolean => {
 
 /**
  * What the host's `passphraseAdvice` last said of the text typed so far, and `hear`, which asks it
- * of a new text. Only the answer to the latest text is kept; an empty text has nothing said of
- * it; advice that throws or rejects goes to `fail`.
+ * of a new text. Only the answer to the latest text is kept, and only the latest call's failure
+ * goes to `fail`; an empty text has nothing said of it, nor has an undefined answer; and what was
+ * said goes when `creating` changes.
  */
-const useAdvice = (passphraseAdvice: PassphraseAdvice | undefined, fail: (err: unknown) => void) => {
+const useAdvice = (passphraseAdvice: PassphraseAdvice | undefined, creating: boolean, fail: (err: unknown) => void) => {
   const [said, setSaid] = useState<string | null>(null)
   const asked = useRef(0)
+  // A change of mode -- the vault made elsewhere, or erased -- forgets what was said (React's
+  // "adjusting state while rendering"), and makes any answer or failure still on its way stale,
+  // in the same commit: advice given while choosing never shows again after the vault changed.
+  const [saidWhile, setSaidWhile] = useState(creating)
+  if (saidWhile !== creating) {
+    setSaidWhile(creating)
+    setSaid(null)
+  }
+  useLayoutEffect(() => { asked.current += 1 }, [creating])
   const hear = async (typed: string) => {
     if (passphraseAdvice === undefined) { return }
     asked.current += 1
     if (typed === '') { setSaid(null); return }
     const askedNow = asked.current
     try {
-      const answer = await passphraseAdvice(typed)
+      // A JavaScript host's undefined is nothing to say, as null is.
+      const answer = (await passphraseAdvice(typed)) ?? null
       if (askedNow === asked.current) { setSaid(answer) }
     } catch (err) {
-      fail(err)
+      // Only the latest call can fail the dialog: a superseded one's failure is as stale as its answer.
+      if (askedNow === asked.current) { fail(err) }
     }
   }
   return { said, hear }
@@ -269,7 +281,7 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
   const blurbId = useId()
   // Wrapped, so that a failure carrying any value at all still reads as "failed".
   const [failure, setFailure] = useState<{ err: unknown } | null>(null)
-  const advice = useAdvice(passphraseAdvice, (err) => { setFailure({ err }) })
+  const advice = useAdvice(passphraseAdvice, snapshot.state === 'absent', (err) => { setFailure({ err }) })
   if (failure !== null) { throw failure.err }
   const creating = snapshot.state === 'absent'
   const passkeyFirst = ! creating && offersPasskey(snapshot)

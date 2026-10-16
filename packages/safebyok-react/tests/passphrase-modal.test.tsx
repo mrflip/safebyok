@@ -2,7 +2,7 @@ import { Component, type ReactNode } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ForeverMs, VaultError, openVault } from 'safebyok'
-import { PassphraseModal } from '../src/passphrase-modal'
+import { PassphraseModal, type PassphraseAdvice } from '../src/passphrase-modal'
 import * as TH from './test-helpers'
 
 /** Just enough of a Vault for the dialog to read its state and window (the default, unless given). */
@@ -541,6 +541,66 @@ describe("PassphraseModal", () => {
       fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
       expect(await screen.findByText(Trouble)).to.not.be.null
       expect(reported).to.deep.equal([broken])
+    })
+
+    it("lets a superseded call's failure pass unseen: only the latest call can fail the dialog", async () => {
+      const gate = TH.makeGate()
+      const advice = async (typed: string) => {
+        if (typed === 'slow') {
+          await gate.pass()
+          throw new Error('the superseded advice broke')
+        }
+        return `said of ${typed}`
+      }
+      const { reported } = TH.renderReporting(<PassphraseModal vault={vaultInState('absent')} passphraseAdvice={advice} onDone={noop} />)
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'slow' } })
+      await gate.reached
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'fast' } })
+      await waitFor(() => { expect(adviceRegion().textContent).to.eq('said of fast') })
+      await act(async () => {
+        gate.release()
+        await TH.wakeupAtNextTick()
+      })
+      expect(screen.queryByText(Trouble)).to.be.null
+      expect(reported).to.deep.equal([])
+      expect(adviceRegion().textContent).to.eq('said of fast')
+    })
+
+    it("forgets what it said once the vault is made and erased elsewhere, and an answer still on its way with it", async () => {
+      const opts = TH.memoryVaultOpts()
+      const vault = await openVault(opts)
+      const gate = TH.makeGate()
+      const advice = async (typed: string) => {
+        if (typed === 'slow') { await gate.pass() }
+        return `said of ${typed}`
+      }
+      render(<PassphraseModal vault={vault} passphraseAdvice={advice} onDone={noop} />)
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'quick' } })
+      await waitFor(() => { expect(adviceRegion().textContent).to.eq('said of quick') })
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'slow' } })
+      await gate.reached
+      const elsewhere = await openVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
+      await act(async () => { await elsewhere.unlock('pw') })
+      await screen.findByText('Unlock your vault')
+      await act(async () => { await elsewhere.destroy() })
+      elsewhere.close()
+      await screen.findByText('Choose a vault passphrase')
+      await act(async () => {
+        gate.release()
+        await TH.wakeupAtNextTick()
+      })
+      expect(adviceRegion().textContent).to.eq('')
+      vault.close()
+    })
+
+    it("reads an undefined answer, from a host in JavaScript, as nothing to say, keeping its region", async () => {
+      const silent = (() => undefined) as unknown as PassphraseAdvice
+      render(<PassphraseModal vault={vaultInState('absent')} passphraseAdvice={silent} onDone={noop} />)
+      const field = screen.getByPlaceholderText('vault passphrase')
+      fireEvent.change(field, { target: { value: 'pw' } })
+      await act(async () => { await TH.wakeupAtNextTick() })
+      expect(adviceRegion().textContent).to.eq('')
+      expect(field.getAttribute('aria-describedby')).to.eq(adviceRegion().id)
     })
   })
 })
