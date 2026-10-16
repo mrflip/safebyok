@@ -47,8 +47,6 @@ export const memoryStore = (): StringStore => {
     read:  (ckey) => bag.get(ckey) ?? null,
     write: (ckey, text) => { bag.set(ckey, text); bell.ring() },
     erase: (ckey) => { bag.delete(ckey); bell.ring() },
-    // Iterator#toArray would be tidier, but needs lib ES2025; this package targets ES2023.
-    // eslint-disable-next-line unicorn/prefer-iterator-to-array
     ckeys: () => [...bag.keys()],
     subscribe: bell.subscribe,
   }

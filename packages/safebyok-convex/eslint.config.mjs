@@ -263,6 +263,12 @@ export default defineConfig([
       // `() => undefined` returns undefined and `() => {}` returns void, which TypeScript keeps
       // apart: the rule's fix of an arrow body changes the type, so it leaves arrow bodies alone.
       'unicorn/no-useless-undefined': ['error', { checkArrowFunctionBody: false }],
+      // The lib target stops at ES2023 in every tsconfig, and two rules want a newer one. Off
+      // until it moves, both together: `Iterator#toArray()` is ES2025, the rule's fix does not
+      // typecheck, and `prefer-spread` refuses the bare `Array.from` beside it; and
+      // `Promise.withResolvers` is ES2024.
+      'unicorn/prefer-iterator-to-array':       'off',
+      'unicorn/prefer-promise-with-resolvers':  'off',
     },
   },
 

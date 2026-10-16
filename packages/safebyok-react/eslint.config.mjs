@@ -107,6 +107,9 @@ export default defineConfig([
     ],
     // 'detect' would be righter, but eslint-plugin-react 7.37.5 detects via an API eslint 10
     // removed (context.getFilename); pin the version until the plugin catches up.
+    // As of 2026-10-16 neither plugin has a release that declares eslint 10: eslint-plugin-react
+    // 7.37.5 allows up to ^9.7 and eslint-plugin-jsx-a11y 6.10.2 up to ^9, so `pnpm peers check`
+    // reports both as unmet. They lint under eslint 10 here; raise them when either releases.
     settings: { react: { version: '19.3' } },
     rules: {
       'react-hooks/exhaustive-deps': 'error',
@@ -281,6 +284,12 @@ export default defineConfig([
       // `() => undefined` returns undefined and `() => {}` returns void, which TypeScript keeps
       // apart: the rule's fix of an arrow body changes the type, so it leaves arrow bodies alone.
       'unicorn/no-useless-undefined': ['error', { checkArrowFunctionBody: false }],
+      // The lib target stops at ES2023 in every tsconfig, and two rules want a newer one. Off
+      // until it moves, both together: `Iterator#toArray()` is ES2025, the rule's fix does not
+      // typecheck, and `prefer-spread` refuses the bare `Array.from` beside it; and
+      // `Promise.withResolvers` is ES2024.
+      'unicorn/prefer-iterator-to-array':       'off',
+      'unicorn/prefer-promise-with-resolvers':  'off',
     },
   },
 
