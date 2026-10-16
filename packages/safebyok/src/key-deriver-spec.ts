@@ -35,6 +35,8 @@ export type Argon2idSpec = KeyDeriverSpec & {
   readonly iterations:   number
   /** Argon2 lanes: at least 1. A JavaScript deriver runs them one after another. */
   readonly parallelism:  number
+  /** How long a passphraseSalt is, in bytes: from 8, Argon2id's least, to 65536. */
+  readonly salt_bytes:   number
   /** How many key bytes come out: always 32, as a 256-bit passphraseKey needs. */
   readonly output_bytes: number
 }
@@ -193,12 +195,12 @@ export const ensureKeyDeriverSpec = (candidate: KeyDeriverSpec) => {
 
 /**
  * `candidate` as an Argon2idSpec Argon2id can run, holding only a spec's fields: the check every
- * Argon2idKeyDeriver makes as it is made, `argon2idDeriver`'s and safebyok-fastkey's alike.
- * Refuses (kind 'bad_option') a spec Argon2id cannot run -- a salt under 8 bytes or over
- * 65536, memory under 8 KiB a lane or over 1 GiB, no passes, no lanes, a key other than 32
- * bytes -- and a label safebyok reserves (see {@link ReservedLabelPrefix}) or a supplied spec's
- * label without its parameters, naming the field and never quoting what was handed in. Weak
- * parameters that run are allowed: choosing them is the host's call.
+ * Argon2idKeyDeriver makes as it is made, `argon2idDeriver`'s and safebyok-fastkey's alike, before
+ * the floor every KeyDeriver keeps (which refuses the labels safebyok reserves). Refuses (kind
+ * 'bad_option') a spec Argon2id cannot run -- a salt under 8 bytes or over 65536, memory under 8
+ * KiB a lane or over 1 GiB, no passes, no lanes, a key other than 32 bytes -- naming the field and
+ * never quoting what was handed in. Weak parameters that run are allowed: choosing them is the
+ * host's call.
  *
  * @param candidate - A host's Argon2idSpec, as handed to a deriver.
  * @returns The spec, checked, with nothing but its fields.
@@ -209,9 +211,6 @@ export const ensureKeyDeriverSpec = (candidate: KeyDeriverSpec) => {
  * @example
  *   parseArgon2idSpec({ ...Argon2idWebV1, key_deriver_label: 'acme_argon2id_v1', salt_bytes: 4 })
  *   // throws 'bad_option': Argon2id takes no salt under 8 bytes
- * @example
- *   parseArgon2idSpec({ ...Argon2idWebV1, key_deriver_label: 'argon2id_web_v2' })
- *   // throws 'bad_option': that label is reserved
  */
 export const parseArgon2idSpec = (candidate: Argon2idSpec): Argon2idSpec => {
   const checked = argon2idSpec.safeParse(candidate)
@@ -219,7 +218,6 @@ export const parseArgon2idSpec = (candidate: Argon2idSpec): Argon2idSpec => {
     const limit = limitBroken(Argon2idLimitForField, checked.error.issues, 'It needs every field of an Argon2idSpec: algorithm, key_deriver_label, memory_kib, iterations, parallelism, salt_bytes and output_bytes.')
     throw new VaultError('bad_option', `Argon2id cannot run that keyDeriverSpec. ${limit}`)
   }
-  ensureSuppliedSpecKept(checked.data)
   return checked.data
 }
 

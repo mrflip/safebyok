@@ -92,8 +92,8 @@ describe("the reserved label namespace", () => {
     expect(() => { ensureSuppliedSpecKept(Argon2idWebV1) }).to.not.throw()
   })
 
-  it("is refused by parseArgon2idSpec too, a well-formed spec notwithstanding", () => {
-    expect(() => parseArgon2idSpec({ ...Argon2idWebV1, key_deriver_label: 'argon2id_web_v2' }))
+  it("is refused by ensureKeyDeriverSpec too, a well-formed Argon2id spec notwithstanding", () => {
+    expect(() => { ensureKeyDeriverSpec({ ...Argon2idWebV1, key_deriver_label: 'argon2id_web_v2' }) })
       .to.throw(/reserved/u).that.satisfies((err: unknown) => isVaultError(err, 'bad_option'))
   })
 
@@ -168,8 +168,10 @@ describe("parseArgon2idSpec", () => {
     expect(refusalOf(() => parseArgon2idSpec({ ...CheapSpec, algorithm: 'scrypt' } as unknown as Argon2idSpec))).to.include('extends KeyDeriver')
   })
 
-  it("refuses the supplied spec's label on other parameters", () => {
-    expect(refusalOf(() => parseArgon2idSpec({ ...Argon2idWebV1, parallelism: 4 }))).to.include('argon2id_web_v1')
+  it("leaves the labels safebyok reserves to the floor every KeyDeriver keeps, which runs after it", () => {
+    const fourLanes: Argon2idSpec = { ...Argon2idWebV1, parallelism: 4 }
+    expect(parseArgon2idSpec(fourLanes).parallelism).to.eq(4)
+    expect(refusalOf(() => { ensureKeyDeriverSpec(fourLanes) })).to.include('argon2id_web_v1')
   })
 })
 
