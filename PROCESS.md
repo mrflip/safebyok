@@ -230,4 +230,6 @@ says in the PR why the bundle grew.
   entries renamed `*-human.md` and a `*-resolution.md` saying how each of its gripes was settled.
 * **`notes/security.md`** -- a decision a security reviewer should look at, in a sentence or two,
   dated. Add one when you make such a decision, in the same PR.
+* **`notes/wontfix.md`** -- behaviour the package leaves undefined on purpose, dated, with the
+  ruling that put it there.
 * **Doc blocks** -- what a caller needs, and nothing about how the code came to be.

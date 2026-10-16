@@ -142,7 +142,8 @@ pnpm changeset                     # a PR's release note; `--empty` when it need
 * `human/` -- **from agents, to Coaches.** A scratchpad, not a record: write to it, don't read it
   as input. `human/README.md` has the rules.
 * `notes/` -- durable notes. `notes/security.md` lists decisions a security reviewer should look
-  at: **add one whenever you make such a decision.**
+  at: **add one whenever you make such a decision.** `notes/wontfix.md` lists behaviour left
+  undefined on purpose.
 
 ## Notable files
 
