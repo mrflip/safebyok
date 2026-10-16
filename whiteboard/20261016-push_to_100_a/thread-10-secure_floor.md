@@ -25,7 +25,12 @@ on its base. `pnpm size`: green; openVault 25.22 kB of 28 kB.
   - G032: `passphraseKeyOf` (`envelope.ts`) refuses 32 zero bytes as `bad_option`. It is the one
     door every deriver's output passes, so one check covers every deriver.
   - `VaultProvider` passes the new prop through (its `satisfies Record<keyof OpenVaultOpts,
-    unknown>` demands it), and reopens when it changes identity, as with `logger`.
+    unknown>` demands it). *After review, the orchestrator's YOLO call:* it holds the latest test
+    in a ref and hands `openVault` one stable wrapper, `(typed) => (ref.current ??
+    passphraseLengthTest)(typed)`, so an arrow in the props never reopens the vault; it refuses a
+    test that is not a function at render (`bad_option`, to the boundary), as openVault would.
+    Tests: the prop reaches the vault, the default applies without it, rerenders with new arrows
+    keep the handle and run the latest, a non-function reaches the boundary.
   - `safebyok/testing`: `anyPassphraseTest`, which `memoryVaultOpts` uses, so suites keep their
     `'pw'`s. `vault.test.ts`'s `makeWorld` and three React test setups pass it too.
   - Size: one line appended for `zxcvbnPassphraseTest`, 216.3 kB measured, a 220 kB budget.
@@ -53,7 +58,9 @@ on its base. `pnpm size`: green; openVault 25.22 kB of 28 kB.
     warning keys to our own sentences (typed against `TranslationKeys`). Its suggestions are
     dropped, since several are composition rules NIST advises against.
   - **The all-zero check** is a one-line OR-fold (libsodium's `sodium_is_zero` shape), reading
-    every byte. No present dependency offers one.
+    every byte. No present dependency offers one. *After review, the orchestrator's YOLO call:*
+    its doc block and `notes/security.md` no longer claim constant time; they say it has no early
+    exit, and that nothing secret rides on its timing, an all-zero output being refused.
   - **The lazy estimator** is held in a module-level object (`made.estimator ??= ...`), like
     `browser.ts`'s `bagsByDbName`. The linter refuses a top-level `let` assigned from a function.
 * **Deviations**: touched `safebyok-react`'s source (the provider's pass-through), which the plan
