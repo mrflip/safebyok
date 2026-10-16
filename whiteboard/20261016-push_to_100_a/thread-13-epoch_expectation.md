@@ -81,7 +81,16 @@ graphql 218/13, react 111, fastkey 44, demo 162/15, e2e 88/8, root 155. `pnpm si
   answer, now true; `notes/security.md`). Thread 4's Open Matters rows: **the refresh queue's
   library-first yes, closed** (module built, as ruled); **drops that are not hard locks, closed**;
   **storage_unavailable for every device-store failure, closed**.
+* **Review**: `fixed`, nothing significant. The reviewer's `990da2c5`: an `eraseUnlock` failure
+  says "try again", not "lock again" (`eraseDamagedVault` has no vault to lock). A `docs:` commit
+  at filing: lockbox writes never wait for each other *on the bundle* (one boxlabel's writes still
+  meet at its row; the hard-cap trigger makes inserts take turns).
 * **Open matters**:
+  - **`oneAtATime`'s `begin` duplicates `vault-db.ts`'s `soon`.** Rec: share one at 5b or 9.
+  - **An `eraseUnlock` failing after a refresh outlives the key is never retried** (older than
+    this thread). Rec: leave; an open refuses a remembered unlock at the wrong `unlock_epoch`.
+  - **`FOR SHARE` on a real Postgres is unproven** until thread 11's race suite runs it. Rec: add
+    the race at the restack (above).
   - **A device store that never opens** (storage blocked, a private window) is
     `storage_unavailable` like a passing failure, though retrying will not help. Rec: keep the kind
     (the Coach's grouping); the message now says what to check. A kind of its own only if a host
