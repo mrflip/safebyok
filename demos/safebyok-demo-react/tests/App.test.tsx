@@ -61,6 +61,9 @@ describe("App", () => {
     fireEvent.change(within(choosing).getByPlaceholderText('vault passphrase'), { target: { value: 'correct horse one' } })
     fireEvent.click(within(choosing).getByRole('button', { name: 'Create vault' }))
     await screen.findByText(/🔓 unlocked until/)
+    // The save runs again once the vault unlocks: its lockbox is listed before the lock below,
+    // which would otherwise win the race and refuse the save (withUnlockedVault's doc block).
+    await screen.findByRole('button', { name: 'view' })
 
     // Lock, then mistype: the dialog stays, saying so.
     fireEvent.click(screen.getByRole('button', { name: 'lock now' }))
