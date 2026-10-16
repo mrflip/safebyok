@@ -4271,6 +4271,44 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
     expect(await vaultTwo.read('anthropic')).to.eq('sk-ant-fake-new')
   })
 
+  it("read() of a box the reborn vault wrote catches up once, finds the vault moved, and refuses as locked, not damaged", async () => {
+    const { vaultOne } = await rebornWorld()
+    expect(vaultOne.getSnapshot().state).to.eq('unlocked')
+    await TH.expectRefusal(vaultOne.read('anthropic'), 'vault_locked')
+    expect(vaultOne.getSnapshot().state).to.eq('locked')
+  })
+
+  it("read() of a box that will not open in a vault that has not moved catches up once, and names it damaged", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.store('anthropic', 'sk-fake')
+    const row = storedRowOf(world, 'anthropic')
+    const wrapped = row['whisper_ciphered'] as { cipher_iv_b64: string, ciphertext_b64: string }
+    world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...row, whisper_ciphered: { ...wrapped, ciphertext_b64: TH.tweakB64(wrapped.ciphertext_b64) } }))
+    await TH.wakeupAtNextTick()
+    const readBundle = vi.spyOn(world.vaultDB, 'readBundle')
+    await TH.expectRefusal(vault.read('anthropic'), 'damaged_lockbox')
+    expect(readBundle).toHaveBeenCalledTimes(1)
+    expect(vault.getSnapshot().state).to.eq('unlocked')
+    vi.restoreAllMocks()
+  })
+
+  it("read() whose catch-up fails throws the catch-up's own refusal: whether the box is damaged is not known", async () => {
+    const world = makeWorld()
+    const deafDB = world.deafVaultDB()
+    const vault = await world.openUnlocked('pw', { vaultDB: deafDB })
+    await vault.store('anthropic', 'sk-fake')
+    const row = storedRowOf(world, 'anthropic')
+    world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...row, revision_id: 'tampered' }))
+    const down = new VaultError('storage_unavailable', 'The vault storage could not be reached.')
+    vi.spyOn(deafDB, 'readBundle').mockRejectedValueOnce(down)
+    expect(await TH.expectRefusal(vault.read('anthropic'), 'storage_unavailable')).to.eq(down)
+    expect(vault.getSnapshot().syncing).to.be.false
+    await TH.expectRefusal(vault.read('anthropic'), 'damaged_lockbox')
+    expect(vault.getSnapshot().syncing).to.be.true
+    vi.restoreAllMocks()
+  })
+
   it("store() of a box the reborn vault has never held is refused all the same", async () => {
     const { vaultOne, vaultTwo } = await rebornWorld()
     await TH.expectRefusal(vaultOne.store('openai', 'sk-fake-stale'), 'vault_locked')
@@ -4563,6 +4601,26 @@ describe("versioned updates: two devices writing at once", () => {
     expect(await there.read('anthropic')).to.eq('sk-ant-fake-theirs')
   })
 
+  it("a store whose catch-up fails is refused as stale at once, the failure its cause, and never tried again blind", async () => {
+    const { world, hereDB, here, there, beforeNextWrite } = await twoDeviceWorld()
+    await here.store('anthropic', 'sk-ant-fake-one')
+    const down = new VaultError('storage_unavailable', 'The vault storage could not be reached.')
+    beforeNextWrite('updateBox', async () => {
+      await there.store('anthropic', 'sk-ant-fake-theirs')
+      vi.spyOn(hereDB, 'readBundle').mockRejectedValue(down)
+    })
+    const updateBox = vi.spyOn(hereDB, 'updateBox')
+    const err = await TH.expectRefusal(here.store('anthropic', 'sk-ant-fake-mine'), 'stale_write')
+    expect(err.cause).to.eq(down)
+    expect(err.message).to.include('Catching up with storage afterwards failed too')
+    expect(updateBox).toHaveBeenCalledTimes(1)
+    expect(delaysAsked(waits)).to.have.lengthOf(0)
+    expect(here.getSnapshot().syncing).to.be.false
+    const told = world.logged.find((heard) => heard.story?.['call'] === 'store')
+    expect(told).to.deep.include({ level: 'warn', err: down })
+    expect(told?.message).to.match(/catch-up with storage, after a write it refused as stale, failed/)
+  })
+
   it("an erase refused as stale is thrown at once, never tried again", async () => {
     const world = makeWorld()
     const hereDB = world.deafVaultDB()
@@ -4702,6 +4760,55 @@ describe("versioned updates: two devices writing at once", () => {
       expect(delaysAsked(waits)).to.have.lengthOf(1)
       await TH.expectRefusal(world.there.read('anthropic'), 'absent_box')
     })
+  })
+})
+
+describe("refreshes, one at a time", () => {
+  it("runs refreshes asked for at once one after the other, every request made meanwhile sharing one more", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    const readBundle = world.vaultDB.readBundle.bind(world.vaultDB)
+    const tally = { inFlight: 0, most: 0 }
+    const reads = vi.spyOn(world.vaultDB, 'readBundle').mockImplementation(async (...args) => {
+      tally.inFlight += 1
+      tally.most = Math.max(tally.most, tally.inFlight)
+      try {
+        await TH.wakeupAtNextTick()
+        return await readBundle(...args)
+      } finally {
+        tally.inFlight -= 1
+      }
+    })
+    // Each write rings the storage watch, which asks for a refresh.
+    for (const ii of [1, 2, 3]) { world.dbStore.write('elsewhere', String(ii)) }
+    await vi.waitFor(() => { expect(reads).toHaveBeenCalledTimes(2) })
+    await vi.waitFor(() => { expect(tally.inFlight).to.eq(0) })
+    await TH.wakeupAtNextTick()
+    expect(reads).toHaveBeenCalledTimes(2)
+    expect(tally.most).to.eq(1)
+    vi.restoreAllMocks()
+    vault.close()
+  })
+
+  it("says syncing: false while the storage watch cannot read, warns once for the streak, and says once when a read succeeds", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    expect(vault.getSnapshot().syncing).to.be.true
+    const sound = world.dbStore.read(u1BundleCkey) ?? ''
+    world.dbStore.write(u1BundleCkey, '{"format":"not-a-vault"}')
+    await TH.wakeupAtNextTick()
+    for (const ii of [1, 2]) {
+      world.dbStore.write('elsewhere', String(ii))
+      await TH.wakeupAtNextTick()
+    }
+    expect(vault.getSnapshot().syncing).to.be.false
+    expect(vault.getSnapshot().state).to.eq('unlocked')
+    expect(world.logged.map((heard) => [heard.level, heard.story])).to.deep.equal([['warn', { call: 'refresh' }]])
+    world.dbStore.write(u1BundleCkey, sound)
+    await TH.wakeupAtNextTick()
+    expect(vault.getSnapshot().syncing).to.be.true
+    expect(world.logged.map((heard) => heard.level)).to.deep.equal(['warn', 'log'])
+    expect(world.logged[1]?.message).to.match(/reads again/)
   })
 })
 

@@ -55,6 +55,14 @@ export type VaultSnapshot = {
    * `removeUnlock()`, and ask a passkey's authenticator for its answer. Empty until the vault exists.
    */
   unlocks:   readonly UnlockSummary[]
+  /**
+   * False when the vault's last read of storage failed -- a change pushed from storage it could
+   * not read, or a catch-up after a write storage refused -- so what it shows may be behind
+   * storage until a read succeeds; true otherwise. A UI may say "not syncing" while it is false.
+   * The vault keeps working either way: every write still lands only where storage stands as
+   * this device last read it.
+   */
+  syncing:   boolean
 }
 
 export type OpenVaultOpts = {
@@ -548,12 +556,16 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   const unlockSummaries = (): readonly UnlockSummary[] => (
     bundle === UnreadBundle || bundle === null ? [] : bundle.unlocks.map((envelope) => Envelope.summarize(envelope))
   )
-  let snapshot: VaultSnapshot = { state: vaultState(), scope, boxes, askPassphraseAt, unlocks: [] }
+  // Whether the last read of storage succeeded, as the snapshot says; and whether the storage
+  // watch has warned of a failing streak it has not yet seen end.
+  let syncing = true
+  let watchWarned = false
+  let snapshot: VaultSnapshot = { state: vaultState(), scope, boxes, askPassphraseAt, unlocks: [], syncing }
   // The snapshot keeps its identity until something really changed: useSyncExternalStore's
   // contract, and what spares React a render when a background refresh found nothing new.
   const bump = () => {
     const state = vaultState()
-    const next: VaultSnapshot = { state, scope, boxes, askPassphraseAt: state === 'unlocked' ? askPassphraseAt : null, unlocks: unlockSummaries() }
+    const next: VaultSnapshot = { state, scope, boxes, askPassphraseAt: state === 'unlocked' ? askPassphraseAt : null, unlocks: unlockSummaries(), syncing }
     if (stableJsonify(next) === stableJsonify(snapshot)) { return }
     snapshot = next
     listeners.forEach((listener) => { listener() })
@@ -572,7 +584,59 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
     cipherBinding(LockboxFormat, applabel, scope.user_id, vaultlabel, vaultId, purpose, header)
   )
 
-  const refresh = async () => {
+  // The refresh running now, and the one queued to run after it, which every request made
+  // meanwhile shares.
+  let refreshing: Promise<void> | null = null
+  let refreshAfter: Promise<void> | null = null
+
+  /**
+   * Bring the snapshot up to what storage holds now, one read at a time: a refresh asked for while
+   * one runs is served by one more run once that ends, shared by every request made meanwhile, so
+   * each caller sees storage as it stood after it asked, and no two reads interleave.
+   */
+  const refresh = (): Promise<void> => {
+    if (refreshing === null) {
+      refreshing = readStorageAlone()
+      return refreshing
+    }
+    refreshAfter ??= refreshAfterThat(refreshing)
+    return refreshAfter
+  }
+
+  const readStorageAlone = async () => {
+    try {
+      await readStorage()
+    } finally {
+      refreshing = null
+    }
+  }
+
+  /** A refresh once `running` has ended, however it ended: its failure is its own callers' to hear. */
+  const refreshAfterThat = async (running: Promise<void>) => {
+    try {
+      await running
+    } catch {
+      // see above
+    }
+    refreshAfter = null
+    await refresh()
+  }
+
+  /** One read of storage into the snapshot. One that fails leaves the snapshot as it stood, but for its `syncing`. */
+  const readStorage = async () => {
+    try {
+      await takeStorage()
+    } catch (err) {
+      syncing = false
+      bump()
+      throw err
+    }
+    if (! watchWarned) { return }
+    watchWarned = false
+    logger.log('Storage reads again after the failures the vault warned of: what it shows has caught up with storage.', { call: 'refresh' })
+  }
+
+  const takeStorage = async () => {
     // The mark the bundle is held to is read before it (see heedMark), and an older copy of a vault
     // this device has seen newer is refused before anything is taken from it.
     const seenBefore = checkedMark(await deviceDB.readMark(scope))
@@ -589,6 +653,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
     bundle = fresh
     deviceMark = mark
     boxes = fresh === null ? [] : await vaultDB.listBoxes(scope)
+    syncing = true
     bump()
   }
 
@@ -818,7 +883,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       unlock_epoch:     standing.unlock_epoch + 1,
       unlocks,
     }
-    await refreshOnStale(vaultDB.updateBundle(next, { vault_id: standing.vault_id, unlock_epoch: standing.unlock_epoch }))
+    await refreshOnStale(vaultDB.updateBundle(next, { vault_id: standing.vault_id, unlock_epoch: standing.unlock_epoch }), plan.call)
     // This device's own write raises its mark, never refuses: a newer one seen meanwhile stands.
     const mark = await raiseMark(await keptMark(plan.call), next)
     bundle = next
@@ -1232,9 +1297,27 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
     const unlockedKey = ensureUnlocked()
     const shutsThen = shutsSoFar
     const lockbox = await readBoxOrThrow(boxlabel)
-    const whisper = await decipherLockbox(unlockedKey, currentBundle(), lockbox)
+    const whisper = await decipherOrCatchUp(unlockedKey, lockbox)
     if (shutSince(shutsThen)) { throw lockedError() }
     return whisper
+  }
+
+  /**
+   * The whisper `lockbox` holds, or -- for one that will not open under the key in hand -- one
+   * catch-up with storage before the kind is named: a vault destroyed and made anew elsewhere, or
+   * its ways in changed, relocks this device, and the call refuses as 'vault_locked'; otherwise
+   * the lockbox is 'damaged_lockbox'. A catch-up that fails is thrown as it came: whether the box
+   * is damaged is not known.
+   */
+  const decipherOrCatchUp = async (unlockedKey: CryptoKey, lockbox: Lockbox): Promise<Whisper> => {
+    try {
+      return await decipherLockbox(unlockedKey, currentBundle(), lockbox)
+    } catch (err) {
+      if (! isVaultError(err, 'damaged_lockbox')) { throw err }
+      await refresh()
+      keyInHand()
+      throw err
+    }
   }
 
   /**
@@ -1444,7 +1527,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       // Each attempt reads the box afresh and seals the whisper anew, under a lockboxKey and a
       // revision of its own; only the write that follows is ever repeated.
       let boxStood = false
-      const outcome = await retryStale(async () => {
+      const outcome = await retryStale(isCaughtUpStale, async () => {
         // A refusal as stale has just caught this device up with storage, which may have relocked
         // it (a vault reborn, or its unlocks changed, elsewhere): then the retry ends here.
         keyInHand()
@@ -1497,8 +1580,8 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
         try {
           // A damaged box is cleared first, as erase() would, so the write meets no revision: its
           // record cannot say which one it holds.
-          if (standing === 'damaged') { await refreshOnStale(vaultDB.eraseBox(scope, label, { vault_id: vaultId })) }
-          await refreshOnStale(vaultDB.updateBox(scope, lockbox, expected))
+          if (standing === 'damaged') { await refreshOnStale(vaultDB.eraseBox(scope, label, { vault_id: vaultId }), 'store') }
+          await refreshOnStale(vaultDB.updateBox(scope, lockbox, expected), 'store')
         } catch (err) {
           if (! isVaultError(err, 'stale_write')) { throw err }
           // The catch-up has just shown what stands now. A device it relocked, or a box it shows
@@ -1531,7 +1614,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       // Lands only in the vault this device holds keys for, whatever revision of the box stands:
       // a vault destroyed and made anew elsewhere refuses it. That is its only expectation, and
       // trying again could not change it: a stale erase is thrown at once, never retried.
-      await refreshOnStale(vaultDB.eraseBox(scope, label, { vault_id: currentBundle().vault_id }))
+      await refreshOnStale(vaultDB.eraseBox(scope, label, { vault_id: currentBundle().vault_id }), 'erase')
       await refresh()
     },
 
@@ -1542,7 +1625,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       const doomed = bundle
       await shut('destroy')
       if (doomed !== null && doomed !== UnreadBundle) {
-        await refreshOnStale(vaultDB.eraseVault(scope, { vault_id: doomed.vault_id }))
+        await refreshOnStale(vaultDB.eraseVault(scope, { vault_id: doomed.vault_id }), 'destroy')
       }
       // This device forgets the vault it had seen, too: one made later under this scope is
       // another. It keeps the scope's lock generation, which the shut has just raised: an unlock
@@ -1565,29 +1648,51 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   }
 
   /**
-   * `write`, with a refusal as stale catching this device up with storage before it is thrown:
-   * the snapshot then shows what beat the write, and a reborn vault relocks this device.
+   * `write`, with a refusal as stale catching this device up with storage before it is thrown --
+   * once, before the kind is named: the snapshot then shows what beat the write, and a vault
+   * reborn elsewhere, or its ways in changed, relocks this device. A catch-up that fails is
+   * thrown as 'stale_write' too, its failure the cause, the snapshot saying `syncing: false`.
    */
-  const refreshOnStale = async (write: Promise<void>): Promise<void> => {
+  const refreshOnStale = async (write: Promise<void>, call: VaultCall): Promise<void> => {
     try {
       await write
     } catch (err) {
-      if (isVaultError(err, 'stale_write')) { await quietRefresh() }
+      if (! isVaultError(err, 'stale_write')) { throw err }
+      await catchUp(err, call)
       throw err
+    }
+  }
+
+  /**
+   * True for a refusal as stale that the catch-up after it has caught up with: what `store()` tries
+   * again. A retry made blind, after a catch-up that failed, would meet the same trouble.
+   */
+  const isCaughtUpStale = (err: unknown) => isVaultError(err, 'stale_write') && syncing
+
+  /** One refresh after `refusal`, a write storage refused as stale; one that fails is said as {@link refreshOnStale} says. */
+  const catchUp = async (refusal: VaultError, call: VaultCall) => {
+    try {
+      await refresh()
+    } catch (err) {
+      logger.warn('A catch-up with storage, after a write it refused as stale, failed: what the vault shows may lag behind storage (syncing: false) until a read succeeds.', { call }, asError(err))
+      throw new VaultError('stale_write', `${refusal.message} Catching up with storage afterwards failed too, so what the vault shows may be behind it: this error's cause says why.`, { cause: err })
     }
   }
 
   // Watch the backend so lockboxes written elsewhere (another tab, the inspector's reset button)
   // show up without a manual refresh. A failing background refresh has nobody to throw to, so it
-  // leaves the snapshot standing; the next foreground operation surfaces the trouble itself.
-  const quietRefresh = async () => {
+  // leaves the snapshot standing, saying `syncing: false`, and warns once for a failing streak;
+  // the next read that succeeds says so once.
+  const watchRefresh = async () => {
     try {
       await refresh()
     } catch (err) {
-      logger.warn("A background refresh from storage failed, so what the vault shows may lag behind storage until its next call, which will meet the same trouble and throw it.", { call: 'refresh' }, asError(err))
+      if (watchWarned) { return }
+      watchWarned = true
+      logger.warn('Storage rang with a change the vault could not read, so what it shows may lag behind storage (syncing: false). It says nothing more of this until a read succeeds; its next call meets the same trouble, and throws it.', { call: 'refresh' }, asError(err))
     }
   }
-  const unsubscribeDB = vaultDB.subscribe(scope, () => { void quietRefresh() })
+  const unsubscribeDB = vaultDB.subscribe(scope, () => { void watchRefresh() })
 
   try {
     await refresh()
@@ -1876,20 +1981,21 @@ const sleep = (delayMillis: number): Promise<void> => (
 )
 
 /**
- * Run `attempt`, and run it again when storage refuses it as stale, up to `attemptsLeft` attempts
- * in all; any other refusal, and the last stale one, is thrown as it came. Before each retry it
+ * Run `attempt`, and run it again when it refuses as `retriable` says it may be tried again -- a
+ * refusal as stale, once caught up -- up to `attemptsLeft` attempts in all; any other refusal, and
+ * the last one, is thrown as it came. Before each retry it
  * waits a random, doubling time (`retryDelayMillis`); there is no wait before the first attempt, and
  * none after the last refusal, which is thrown at once. The attempt must do its own reading, for
  * each try to be made from what storage holds now -- and from whether this device is still
  * unlocked, so that a lock during the wait ends the retry without a write.
  */
-const retryStale = async <ResultT>(attempt: () => Promise<ResultT>, attemptsLeft = MaxWriteAttempts): Promise<ResultT> => {
+const retryStale = async <ResultT>(retriable: (err: unknown) => boolean, attempt: () => Promise<ResultT>, attemptsLeft = MaxWriteAttempts): Promise<ResultT> => {
   try {
     return await attempt()
   } catch (err) {
-    if (attemptsLeft <= 1 || ! isVaultError(err, 'stale_write')) { throw err }
+    if (attemptsLeft <= 1 || ! retriable(err)) { throw err }
     await sleep(retryDelayMillis(MaxWriteAttempts - attemptsLeft + 1))
-    return await retryStale(attempt, attemptsLeft - 1)
+    return await retryStale(retriable, attempt, attemptsLeft - 1)
   }
 }
 

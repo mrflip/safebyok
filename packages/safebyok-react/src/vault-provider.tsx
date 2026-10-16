@@ -77,6 +77,7 @@ const emptySnapshot: VaultSnapshot = {
   boxes:           [],
   askPassphraseAt: null,
   unlocks:         [],
+  syncing:         true,
 }
 const getEmptySnapshot = () => emptySnapshot
 const unsubscribeFromNothing = () => { /* nothing was heard */ }
