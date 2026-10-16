@@ -74,18 +74,24 @@ other package as on main. `pnpm size`: openVault 22.21 kB, under main's 23 kB.
 * **Discoveries**:
   - Every unlock now arms a `setTimeout`: a test spying on `setTimeout` must filter (see
     `delaysAsked` in `vault.test.ts`), and `vi.runAllTimers()` would lock a vault.
-  - `destroy()` erases the mark, so its generation restarts at 0; an unlock under way in another
-    tab that began at 0 may still write a record of the destroyed vault (harmless: opens nothing).
+  - The review (fixed, `d716b306`) left seven minors; the orchestrator hands all but (4) to
+    thread 4: (1) the drop is armed a fixed minute after a late ring, not `dueAt - now` (the fix
+    wants `pass()` moving clock and timers together); (2) `destroy()`'s `eraseMark` resets the
+    generation, so an unlock elsewhere under way at 0 can take up a destroyed vault's key; (3) a
+    lock before any mark exists raises nothing; (4) the post-deadline minute is open to a clock
+    stepped back (G128's class, left); (5) `store()`'s stale-write retry calls `ensureUnlocked()`
+    where `keyInHand()` honours the grace; (6) G130's wrap covers `rememberedUnlock` only, not
+    `refresh()`'s `readMark`; (7) `keptMark()` warns as `call: 'refresh'` when a lock calls it.
   - A mark from before (`-v1`) reads as none, once: the rollback check restarts from storage.
   - Thread 4: `noteStart()`/`takeUpUnlock(…, started, until)` is the unlock's shape now;
     `destroy()` goes through `shut()` → `forgetUnlock()`.
   - Thread 6: route a passkey-proved `changePassphrase` through `reviseUnlocks`; `deadlineFor`
     already keeps the standing deadline for it. No re-plumbing.
-  - Thread 7: import `MinuteMillis` from `safebyok`; the dialog already uses it.
+  - Thread 7: import `MinuteMillis` from `safebyok`.
   - Thread 2: the mark's format is already bumped to `-v2`; the snapshot test should list it.
 
 * **For the Coach**:
-  - Is `lockSoon()` soft (an unlock already under way finishes, as the strawman's table has it) or
-    as built (it loses, as G115's four calls have it)? Built: loses. Flipping it is two lines.
+  - Is `lockSoon()` soft (an unlock under way finishes, as the strawman's table has it) or as
+    built (it loses, per G115)? Now an Open Matters row.
   - A passkey proving a change keeps the deadline rather than renewing it: the narrower reading
     of "type a password ... and prove I am mrflip". G530 (NOT YET) asks the deeper question.
