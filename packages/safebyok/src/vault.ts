@@ -247,6 +247,12 @@ export type Vault = {
    * either -- and over a `read()` or `use()` under way, which refuses with kind 'vault_locked',
    * handing back nothing. A write already sent to storage lands. Kind 'storage_unavailable' when
    * this device's store fails to forget its record; the vault is locked all the same.
+   *
+   * The other hard locks: `destroy()`, a lock for storage the vault cannot trust (a user signed
+   * out, an older copy of the vault), and a refresh that finds the vault's ways in changed or the
+   * vault gone, which drops the key; `close()` likewise stops a read under way. Not hard locks:
+   * `lockSoon()`, whose grace lets work in hand finish even once its shut time has come and the
+   * key is dropped, and a clock that cannot be read, which drops the key at once without a grace.
    */
   lock(): Promise<void>
   /**
@@ -439,7 +445,9 @@ export type Vault = {
    * key: `erase()` it, or `store()` over it. A lockbox that will not open is named so only after
    * one catch-up with storage: one a vault destroyed and made anew elsewhere wrote relocks this
    * device, and the call throws kind 'vault_locked'; a catch-up that fails throws its own
-   * refusal. A `lock()` landing while it reads wins: kind 'vault_locked', and nothing handed back.
+   * refusal. A hard lock landing while it reads wins, and nothing is handed back: kind
+   * 'vault_locked' for a `lock()`, a `destroy()`, or a refresh that finds the vault's ways in
+   * changed or the vault gone; 'vault_closed' for a `close()`.
    * A lockbox stored under a boxlabel the vault's check refuses -- by another client, or under
    * other checks -- reads as any other, by the name it was stored under. With nothing under it, a
    * name the check refuses is kind 'bad_label', and one below the floor every name is held to is
@@ -485,10 +493,11 @@ export type Vault = {
   destroy(): Promise<void>
   /**
    * Release subscriptions and refuse further calls, dropping the vaultKey from memory. It is not
-   * a lock, and forgets nothing stored: this device's remembered unlock stays, and the next open
-   * picks it up. An `unlock()` still under way takes nothing up and throws kind 'vault_closed';
-   * whatever it remembered on the device before the close stays too. A second `close()` does
-   * nothing.
+   * a lock of the vault, and forgets nothing stored: this device's remembered unlock stays, and
+   * the next open picks it up. An `unlock()` still under way takes nothing up and throws kind
+   * 'vault_closed'; whatever it remembered on the device before the close stays too. A `read()` or
+   * `use()` still under way hands back nothing and throws kind 'vault_closed', as after a hard
+   * lock. A second `close()` does nothing.
    */
   close(): void
 }
@@ -569,6 +578,10 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   // and takes nothing up if a lock has moved it meanwhile: the lock wins. Its twin across the
   // handles on this device is the device mark's lock_generation.
   let shutsSoFar = 0
+  // How many hard locks this handle has met: every shut, a close(), and a key outlived by a
+  // refresh. A read under way notes the number when it starts, and hands back nothing if it has
+  // moved meanwhile. A soft lock's timer, or a clock that fails, drops the key without counting.
+  let hardLocksSoFar = 0
   // The timer that drops the vaultKey, and when it falls due: a minute past askPassphraseAt (see
   // ExpiryGraceMillis), or sooner for lockSoon(). Null when no key is held, or the one held lasts
   // until lock().
@@ -645,6 +658,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
     const outlived = vaultKey !== null && bundle !== UnreadBundle && bundle !== null
       && (fresh?.unlock_epoch !== bundle.unlock_epoch || fresh.vault_id !== bundle.vault_id)
     if (outlived) {
+      hardLocksSoFar += 1
       dropKey()
       await deviceDB.eraseUnlock(scope)
     }
@@ -960,6 +974,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
    */
   const shut = async (call: VaultCall) => {
     shutsSoFar += 1
+    hardLocksSoFar += 1
     dropKey()
     await forgetUnlock(call)
   }
@@ -1324,15 +1339,20 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
 
   /**
    * The whisper in `boxlabel`, for an operation that wants it whole. A hard lock landing while it
-   * is read wins: the whisper is dropped, never handed back, and the call refuses as locked. A
-   * soft lock, which waits for work in hand, does not stop it.
+   * is read wins -- a shut, a close(), or a refresh finding the key outlived -- and the whisper is
+   * dropped, never handed back: the call refuses as locked, or as closed. A soft lock, which waits
+   * for work in hand, does not stop it.
    */
   const openBox = async (boxlabel: string): Promise<Whisper> => {
     const unlockedKey = ensureUnlocked()
-    const shutsThen = shutsSoFar
+    const hardLocksThen = hardLocksSoFar
     const lockbox = await readBoxOrThrow(boxlabel)
     const whisper = await decipherOrCatchUp(unlockedKey, lockbox)
-    if (shutSince(shutsThen)) { throw lockedError() }
+    if (hardLocksSoFar !== hardLocksThen) {
+      // A close() meanwhile is said as such: the handle, not the vault, is what refuses now.
+      ensureOpen()
+      throw lockedError()
+    }
     return whisper
   }
 
@@ -1687,8 +1707,9 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       // A second close does nothing: an adapter's unsubscribe may count down a watch it shares.
       if (closed) { return }
       closed = true
-      // Not a lock: an unlock under way takes nothing up, but nothing this device remembers is
-      // erased, nor its lock generation raised.
+      // Not a lock of the vault: an unlock under way takes nothing up, but nothing this device
+      // remembers is erased, nor its lock generation raised. A hard lock of this handle's key.
+      hardLocksSoFar += 1
       dropKey()
       unsubscribeDB()
       listeners.clear()

@@ -3222,6 +3222,65 @@ describe("a read in flight when a lock lands", () => {
     expect(await reading).to.eq('sk-fake')
     await TH.expectRefusal(vault.read('anthropic'), 'vault_locked')
   })
+
+  it("refuses as closed when close() lands while storage is read, handing back nothing", async () => {
+    const world = makeRacingWorld()
+    const vault = await world.openUnlocked('pw one')
+    await vault.store('anthropic', 'sk-fake')
+    const gate = world.holdNextBoxRead()
+    const reading = TH.expectRefusal(vault.read('anthropic'), 'vault_closed')
+    await gate.reached
+    vault.close()
+    gate.release()
+    await reading
+  })
+
+  it("refuses as closed when close() lands while the whisper is deciphered, its callback never called", async () => {
+    const world = makeRacingWorld()
+    const vault = await world.openUnlocked('pw one')
+    await vault.store('anthropic', 'sk-fake')
+    const gate = TH.holdNextCall(crypto.subtle, 'decrypt')
+    const callback = vi.fn()
+    const using = TH.expectRefusal(vault.use('anthropic', callback), 'vault_closed')
+    await gate.reached
+    vault.close()
+    gate.release()
+    await using
+    expect(callback).not.toHaveBeenCalled()
+  })
+
+  it("refuses as locked when a refresh finds the passphrase changed elsewhere while storage is read: the key it held is outlived", async () => {
+    const world = makeRacingWorld()
+    const vault = await world.openUnlocked('pw one')
+    await vault.store('anthropic', 'sk-fake')
+    const there = await world.openUnlocked('pw one', { deviceDB: memoryDeviceDB() })
+    const gate = world.holdNextBoxRead()
+    const reading = TH.expectRefusal(vault.read('anthropic'), 'vault_locked')
+    await gate.reached
+    await there.changePassphrase('pw one', 'pw two')
+    // Let this handle's background refresh, rung by the write above, find its key outlived.
+    await TH.wakeupAtNextTick()
+    expect(vault.getSnapshot().state).to.eq('locked')
+    gate.release()
+    await reading
+  })
+
+  it("refuses as locked when a refresh finds the vault destroyed elsewhere while the whisper is deciphered", async () => {
+    const world = makeRacingWorld()
+    const vault = await world.openUnlocked('pw one')
+    await vault.store('anthropic', 'sk-fake')
+    const there = await world.openUnlocked('pw one', { deviceDB: memoryDeviceDB() })
+    const gate = TH.holdNextCall(crypto.subtle, 'decrypt')
+    const callback = vi.fn()
+    const using = TH.expectRefusal(vault.use('anthropic', callback), 'vault_locked')
+    await gate.reached
+    await there.destroy()
+    await TH.wakeupAtNextTick()
+    expect(vault.getSnapshot().state).to.eq('absent')
+    gate.release()
+    await using
+    expect(callback).not.toHaveBeenCalled()
+  })
 })
 
 describe("a vault that moves elsewhere while an unlock is under way", () => {

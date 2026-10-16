@@ -296,6 +296,9 @@ their passphrase again afterwards:
   dropped, never handed back. A write already sent to storage lands. Across tabs this rides on the
   device mark's `lock_generation`, which every hard lock raises and an unlock's record write
   compares. `destroy()` locks the same way, and so does storage the vault cannot trust (below).
+  A refresh that finds the vault's ways in changed on another device, or the vault gone, drops
+  the key the same way for this handle: a `read()` or `use()` under way refuses with
+  `vault_locked`.
 * **`vault.lockSoon(graceSeconds = 5)`** is the soft lock: the bartender's stinkeye. Use it when
   the user steps away: a hidden tab, a sign-out. From the instant it is called the snapshot reads
   `locked`, every read, use, store or erase called afterwards throws kind `vault_locked`, and this
@@ -307,8 +310,9 @@ their passphrase again afterwards:
   `lock()`.
 
 `close()` is not a lock: the remembered unlock stays, for the next open, along with any an unlock
-under way wrote before the close; it ends a `lockSoon()` grace at once, and an unlock under way on
-the closed handle takes nothing up.
+under way wrote before the close; it ends a `lockSoon()` grace at once, an unlock under way on
+the closed handle takes nothing up, and a `read()` or `use()` under way hands back nothing,
+refusing with `vault_closed`.
 
 A host clock that turns bad partway through a call (it throws, or reads outside 1981 to 2255)
 drops the key and fails the call with `bad_option`, even when the call's write had already
