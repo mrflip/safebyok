@@ -19,7 +19,7 @@ export { EpochMillis, FarFuture, FarPast, ForcePassphraseReentryHours, ForeverMi
 export { AnyTextValidators, DefaultValidators, Label, LabelPattern, LockboxNote, MaxLabelChars, MaxNoteChars, MaxUserIdChars, UserId } from './validators'
 export type { NameValidator, VaultValidators } from './validators'
 export { checkValidators } from './names'
-export type { Clock, DamagedLockbox, DeviceMark, DeviceUnlock, PasskeyProof, UnlockMethod, UnlockSummary, WhisperJson } from './types'
+export type { Clock, DamagedLockbox, DeviceMark, DeviceUnlock, PasskeyProof, SeenVault, UnlockMethod, UnlockSummary, WhisperJson } from './types'
 export { Ciphered } from './crypto'
 export { VaultError, VaultErrorFamilyForKind, VaultErrorFamilyVals, VaultErrorKindVals, isVaultCondition, isVaultError } from './errors'
 export type { VaultErrorFamily, VaultErrorKind } from './errors'

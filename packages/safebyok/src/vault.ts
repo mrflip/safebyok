@@ -1,5 +1,5 @@
 import * as Z from 'zod/mini'
-import { DeviceMark, DeviceUnlock, LockboxSummary, type DamagedLockbox, type Lockbox, ForcePassphraseReentryHours, FarFuture, FarPast, ForeverMillis, MaxLockboxes, MaxReentryHours, MaxUnlocks, MaxWhisperBytes, MinuteMillis, PasskeySaltBytes, VaultBundle, type VaultScope, Whisper, wallClock, type Clock, type PasskeyProof, type UnlockEnvelope, type UnlockSummary } from './types'
+import { DeviceMark, DeviceUnlock, LockboxSummary, type SeenVault, type DamagedLockbox, type Lockbox, ForcePassphraseReentryHours, FarFuture, FarPast, ForeverMillis, MaxLockboxes, MaxReentryHours, MaxUnlocks, MaxWhisperBytes, MinuteMillis, PasskeySaltBytes, VaultBundle, type VaultScope, Whisper, wallClock, type Clock, type PasskeyProof, type UnlockEnvelope, type UnlockSummary } from './types'
 import * as Names from './names'
 import type { VaultValidators } from './validators'
 import { VaultError, isVaultError } from './errors'
@@ -497,7 +497,8 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   const scope = Names.checkScope(rules, { applabel: opts.applabel, user_id: opts.userId, vaultlabel: opts.vaultlabel })
   const { applabel, vaultlabel } = scope
   const givenVaultDB = parseVaultDB(opts.vaultDB)
-  const deviceDB = parseDeviceDB(opts.deviceDB)
+  // Every failure of the device's own storage reaches the vault's callers as a condition, with a kind.
+  const deviceDB = deviceTroubleAsConditions(parseDeviceDB(opts.deviceDB))
   const reentryMillis = parseForcePassphraseReentryHours(opts.forcePassphraseReentryHours)
   const logger = parseLogger(opts.logger)
   const clock = parseClock(opts.clock)
@@ -524,7 +525,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
 
   let bundle: VaultBundle | null | typeof UnreadBundle = UnreadBundle
   // This device's mark for the bundle in hand, set with it, so the two always name one vault.
-  let deviceMark: DeviceMark | null = null
+  let deviceMark: SeenMark | null = null
   // The vault this handle last drafted, and the device_id its first way in carries: whichever of
   // this handle's reads starts the vault's mark -- the unlock making it, or a refresh its write
   // set off -- starts it under that id.
@@ -582,7 +583,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
     // this device has seen newer is refused before anything is taken from it.
     const seenBefore = checkedMark(await deviceDB.readMark(scope))
     const fresh = await damagedAs(vaultDB.readBundle(scope, rules), damagedBundle)
-    const mark = fresh === null ? null : await heedMark(fresh, { seenBefore })
+    const mark = fresh === null ? null : await heedMark(fresh, { seenBefore, call: 'refresh' })
     // A change to the unlocks elsewhere (new epoch) or a deletion ends this device's unlock: the
     // vaultKey in hand still works on old rows, but passing as current invites confusion.
     const outlived = vaultKey !== null && bundle !== UnreadBundle && bundle !== null
@@ -608,12 +609,12 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
    * other scope, reads as none, as on a device that never saw the vault -- and is said so once,
    * since the rollback check starts again from what storage holds now.
    */
-  const keptMark = async (): Promise<DeviceMark | null> => {
+  const keptMark = async (call: VaultCall): Promise<DeviceMark | null> => {
     const kept = await deviceDB.readMark(scope)
     if (kept === null) { return null }
     const checked = checkedMark(kept)
     if (checked !== null) { return checked }
-    logger.warn("This device's mark of the newest copy of the vault it had seen could not be read, so it starts again from the copy storage holds now.", { call: 'refresh' })
+    logger.warn("This device's mark of the newest copy of the vault it had seen could not be read, so it starts again from the copy storage holds now.", { call })
     return null
   }
 
@@ -631,9 +632,9 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
    * epoch, written meanwhile by another tab or this one, and refuse a bundle that was the newest
    * when it was read.
    */
-  const heedMark = async (fresh: VaultBundle, opts: { seenBefore?: DeviceMark | null } = {}): Promise<DeviceMark> => {
-    const kept = await keptMark()
-    const held = opts.seenBefore === undefined ? kept : opts.seenBefore
+  const heedMark = async (fresh: VaultBundle, opts: { seenBefore?: DeviceMark | null, call: VaultCall }): Promise<SeenMark> => {
+    const kept = await keptMark(opts.call)
+    const held = (opts.seenBefore === undefined ? kept : opts.seenBefore)?.seen ?? null
     const older = held !== null && held.vault_id === fresh.vault_id
       && (fresh.unlock_epoch < held.unlock_epoch || fresh.vault_key_epoch < held.vault_key_epoch)
     if (older) {
@@ -643,28 +644,32 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   }
 
   /**
-   * The mark this device keeps once it has seen `fresh`: `kept` itself when it already stands at
-   * that `unlock_epoch` and `vault_key_epoch` of that vault or past both, and otherwise a new mark
-   * at the higher of each, written before it is
-   * returned -- under `kept`'s `device_id` for the same vault, and for a vault not seen, the one
-   * this handle drafted it under, or a new one.
+   * The mark this device keeps once it has seen `fresh`: `kept` itself when it has already seen
+   * that vault at that `unlock_epoch` and `vault_key_epoch` or past both, and otherwise a new mark
+   * at the higher of each, written before it is returned -- under the `device_id` `kept` has seen
+   * that vault under, and for a vault not seen, the one this handle drafted it under, or a new one.
    */
-  const raiseMark = async (kept: DeviceMark | null, fresh: VaultBundle): Promise<DeviceMark> => {
-    const sameVault = kept !== null && kept.vault_id === fresh.vault_id
-    if (sameVault && kept.unlock_epoch >= fresh.unlock_epoch && kept.vault_key_epoch >= fresh.vault_key_epoch) { return kept }
-    const mark: DeviceMark = {
-      format:          'safebyok-mark-v2',
+  const raiseMark = async (kept: DeviceMark | null, fresh: VaultBundle): Promise<SeenMark> => {
+    const seen = kept?.seen?.vault_id === fresh.vault_id ? kept.seen : null
+    if (kept !== null && seen !== null && seen.unlock_epoch >= fresh.unlock_epoch && seen.vault_key_epoch >= fresh.vault_key_epoch) { return { ...kept, seen } }
+    const mark: SeenMark = {
+      format:          MarkFormat,
       ...scope,
-      device_id:       sameVault ? kept.device_id : newDeviceIdFor(fresh.vault_id),
-      vault_id:        fresh.vault_id,
-      unlock_epoch:    sameVault ? Math.max(kept.unlock_epoch, fresh.unlock_epoch) : fresh.unlock_epoch,
-      vault_key_epoch: sameVault ? Math.max(kept.vault_key_epoch, fresh.vault_key_epoch) : fresh.vault_key_epoch,
       // The scope's locks count on, whichever vault stands under it.
       lock_generation: kept?.lock_generation ?? 0,
+      seen:            {
+        device_id:       seen?.device_id ?? newDeviceIdFor(fresh.vault_id),
+        vault_id:        fresh.vault_id,
+        unlock_epoch:    Math.max(seen?.unlock_epoch ?? 0, fresh.unlock_epoch),
+        vault_key_epoch: Math.max(seen?.vault_key_epoch ?? 0, fresh.vault_key_epoch),
+      },
     }
     await deviceDB.writeMark(mark)
     return mark
   }
+
+  /** This scope's mark with nothing seen, at `lockGeneration`: what a lock leaves where no vault was seen, and destroy() leaves of one. */
+  const blankMark = (lockGeneration: number): DeviceMark => ({ format: MarkFormat, ...scope, lock_generation: lockGeneration, seen: null })
 
   /** The `device_id` a mark of `vaultId` starts under: the one this handle drafted it under, or a new one. */
   const newDeviceIdFor = (vaultId: string): string => (drafted?.vault_id === vaultId ? drafted.device_id : randomId())
@@ -675,7 +680,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
    * meanwhile is said as the stale write it would make.
    */
   const deviceIdFor = (standing: VaultBundle): string => {
-    if (deviceMark?.vault_id === standing.vault_id) { return deviceMark.device_id }
+    if (deviceMark?.seen.vault_id === standing.vault_id) { return deviceMark.seen.device_id }
     throw new VaultError('stale_write', 'The vault changed in storage while this device was reading it -- it was deleted or made anew elsewhere -- so nothing was written. Read the vault again before retrying.')
   }
 
@@ -768,7 +773,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       // Another device's vault, if one was made meanwhile, is held to the mark as it was before it.
       const seenBefore = checkedMark(await deviceDB.readMark(scope))
       const settled = await damagedAs(vaultDB.createBundle(draft, rules), damagedBundle)
-      const mark = await heedMark(settled, { seenBefore })
+      const mark = await heedMark(settled, { seenBefore, call: 'unlock' })
       bundle = settled
       deviceMark = mark
       if (settled.vault_id === draft.vault_id) { return { standing: settled, transientKey, sessionKey } }
@@ -794,6 +799,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
     proof: UnlockProof,
     unlockId: string | undefined,
     plan: {
+      call:    'changePassphrase' | 'addPassphrase' | 'addPasskey' | 'removeUnlock'
       check?:  (standing: VaultBundle) => void
       // Runs once the proof holds, given this device's id for the vault; resolving null abandons
       // the change, writing nothing.
@@ -817,7 +823,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
     }
     await refreshOnStale(vaultDB.updateBundle(next, { vault_id: standing.vault_id, unlock_epoch: standing.unlock_epoch }, rules))
     // This device's own write raises its mark, never refuses: a newer one seen meanwhile stands.
-    const mark = await raiseMark(await keptMark(), next)
+    const mark = await raiseMark(await keptMark(plan.call), next)
     bundle = next
     deviceMark = mark
     // The change has landed, whatever happens now: a shut meanwhile leaves only its unlock untaken.
@@ -866,20 +872,30 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
    * `lockSoon()` with a grace, which does the same save that the key waits for its timer; whatever
    * unlock is under way when either does loses to it, in this handle or another on this device.
    */
-  const shut = async () => {
+  const shut = async (call: VaultCall) => {
     shutsSoFar += 1
     dropKey()
-    await forgetUnlock()
+    await forgetUnlock(call)
+  }
+
+  /** {@link shut}, and the snapshot told, even when the device store fails: the key is dropped at once. */
+  const shutAndSay = async (call: VaultCall) => {
+    try {
+      await shut(call)
+    } finally {
+      bump()
+    }
   }
 
   /**
-   * Forget this device's remembered unlock, raising its mark's lock generation first, so an
-   * unlock under way in any handle on this device, which began under the generation before,
-   * writes no record after this one is erased: the versioned erase.
+   * Forget this device's remembered unlock, raising its mark's lock generation first -- a scope
+   * with no mark readable gets one with nothing seen, at generation 1 -- so an unlock under way in
+   * any handle on this device, which began under the generation before, writes no record after
+   * this one is erased: the versioned erase. An unlock creating the vault loses to it too.
    */
-  const forgetUnlock = async () => {
-    const kept = await keptMark()
-    if (kept !== null) { await deviceDB.writeMark({ ...kept, lock_generation: kept.lock_generation + 1 }) }
+  const forgetUnlock = async (call: VaultCall) => {
+    const kept = await keptMark(call)
+    await deviceDB.writeMark(kept === null ? blankMark(1) : { ...kept, lock_generation: kept.lock_generation + 1 })
     await deviceDB.eraseUnlock(scope)
   }
 
@@ -902,7 +918,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
     if (RefusalPolicy.decide(refusal, whenIdentityRevoked) !== 'lock') { return }
     const wasUnlocked = vaultKey !== null
     try {
-      await shut()
+      await shut('whenIdentityRevoked')
     } catch (err) {
       logger.warn("Storage no longer serves the user this vault was opened for, so the vault locked, but this device's remembered unlock could not be forgotten: the next open for the same user may pick it up.", { call: 'whenIdentityRevoked' }, asError(err))
     }
@@ -932,22 +948,34 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   const shutAt = (dueAt: number, now: number) => {
     if (pendingShut !== null && pendingShut.dueAt <= dueAt) { return }
     cancelPendingShut()
-    pendingShut = { timer: unrefTimeout(() => { dropKey(); bump() }, dueAt - now), dueAt }
+    pendingShut = { timer: unrefTimeout(dropNow, dueAt - now), dueAt }
+  }
+
+  /** Drop the vaultKey now, and say so: what each shut timer does when it rings. */
+  const dropNow = () => {
+    dropKey()
+    bump()
   }
 
   /**
    * Arm the shut for a key taken up until `until`, at `now`, in place of any pending: a minute
    * past the deadline, for work in hand to finish, unless the key lasts until `lock()`. One timer
    * at a time: the first rings at the deadline, so the snapshot says `locked` then, and leaves
-   * the second to drop the key a minute later.
+   * the second to drop the key at its shut time, read against the clock as it rings: a timer that
+   * rang late leaves the second no more than what was left.
    */
   const armExpiry = (until: number, now: number) => {
     cancelPendingShut()
     if (isFarFuture(until)) { return }
     const dueAt = until + ExpiryGraceMillis
     const atDeadline = () => {
-      pendingShut = { timer: unrefTimeout(() => { dropKey(); bump() }, ExpiryGraceMillis), dueAt }
-      bump()
+      try {
+        pendingShut = { timer: unrefTimeout(dropNow, dueAt - clockNow()), dueAt }
+        bump()
+      } catch (err) {
+        // The clock read has dropped the key already; a timer has nobody else to tell.
+        logger.warn("The clock passed to openVault failed when the unlock's window ended, so the vault dropped its key at once, without the minute's grace. The clock's now() must return epoch milliseconds, as Date.now() does.", { call: 'expiry' }, asError(err))
+      }
     }
     pendingShut = { timer: unrefTimeout(atDeadline, until - now), dueAt }
   }
@@ -1275,16 +1303,14 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
 
     lock: async () => {
       ensureOpen()
-      await shut()
-      bump()
+      await shutAndSay('lock')
     },
 
     lockSoon: async (graceSeconds) => {
       ensureOpen()
       const graceMillis = parseGraceSeconds(graceSeconds)
       if (vaultKey === null || graceMillis === 0) {
-        await shut()
-        bump()
+        await shutAndSay('lockSoon')
         return
       }
       // A clock gone wrong cannot time a grace, and a key already past its shut time gets none:
@@ -1292,8 +1318,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       // shut time gets no more than the minute it had left: a shut time only moves earlier.
       const now = readClockOrNull()
       if (now === null || isShutDue(now)) {
-        await shut()
-        bump()
+        await shutAndSay('lockSoon')
         return
       }
       shutAt(now + graceMillis, now)
@@ -1303,7 +1328,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       shutsSoFar += 1
       askPassphraseAt = null
       bump()
-      await forgetUnlock()
+      await forgetUnlock('lockSoon')
     },
 
     changePassphrase: async (oldPassphrase, newPassphrase, changeOpts) => {
@@ -1317,6 +1342,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       if (! newPassphrase.trim()) { throw new VaultError('wrong_passphrase', "A passphrase can't be empty or only spaces.") }
       const unlockId = parseAim(changeOpts)
       await reviseUnlocks(oldPassphrase, unlockId, {
+        call:   'changePassphrase',
         // The way in the old passphrase opened takes the new one, keeping its stamp: its id and
         // label, and the device and time that added it.
         revise: async (standing, proven) => await Promise.all(standing.unlocks.map(async (envelope) => (
@@ -1333,7 +1359,8 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       const unlocklabel = parseUnlocklabel(rules, labelling, 'addPassphrase')
       const naming = { unlock_id: randomId(), unlocklabel }
       await reviseUnlocks(proof, undefined, {
-        check: (standing) => { ensureRoomForUnlock(standing, unlocklabel) },
+        call:   'addPassphrase',
+        check:  (standing) => { ensureRoomForUnlock(standing, unlocklabel) },
         revise: async (standing, proven, deviceId) => [...standing.unlocks, await sealFor(standing, newPassphrase, newStamp(standing, naming, deviceId), proven)],
       })
       return naming.unlock_id
@@ -1346,6 +1373,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       const unlocklabel = parseUnlocklabel(rules, labelling, 'addPasskey')
       const naming = { unlock_id: randomId(), unlocklabel }
       const added = await reviseUnlocks(proof, undefined, {
+        call:   'addPasskey',
         check:  (standing) => { ensureRoomForUnlock(standing, unlocklabel) },
         // The authenticator is asked only now, the proof proven: a refusal before leaves no passkey behind.
         revise: async (standing, proven, deviceId) => {
@@ -1365,6 +1393,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       const proof = parseProof(givenProof)
       const doomedId = parseUnlockId(unlockId)
       await reviseUnlocks(proof, undefined, {
+        call:  'removeUnlock',
         check: (standing) => {
           const doomed = standing.unlocks.find((envelope) => envelope.unlock_id === doomedId)
           if (doomed === undefined) {
@@ -1448,8 +1477,8 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
           if (! isVaultError(err, 'stale_write')) { throw err }
           // The catch-up has just shown what stands now. A device it relocked, or a box it shows
           // gone, ends the store here, as the next attempt would end it, but without the wait
-          // before it that no retry could use.
-          ensureUnlocked()
+          // before it that no retry could use. Work in hand, it may finish within a grace.
+          keyInHand()
           if (boxStood && boxes.every((box) => box.boxlabel !== label)) { return 'erased' }
           throw err
         }
@@ -1485,12 +1514,15 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       // Only the vault this handle had read when called: one destroyed and made anew since
       // refuses, even if a background refresh brings it in while this awaits.
       const doomed = bundle
-      await shut()
+      await shut('destroy')
       if (doomed !== null && doomed !== UnreadBundle) {
         await refreshOnStale(vaultDB.eraseVault(scope, { vault_id: doomed.vault_id }, rules))
       }
-      // This device forgets the vault it had seen, too: one made later under this scope is another.
-      await deviceDB.eraseMark(scope)
+      // This device forgets the vault it had seen, too: one made later under this scope is
+      // another. It keeps the scope's lock generation, which the shut has just raised: an unlock
+      // under way in another tab must not find it back where it began.
+      const kept = await keptMark('destroy')
+      await deviceDB.writeMark(blankMark(kept?.lock_generation ?? 0))
       await refresh()
     },
 
@@ -1533,7 +1565,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
 
   try {
     await refresh()
-    await deviceTroubleAsCondition(rememberedUnlock())
+    await rememberedUnlock()
   } catch (err) {
     // A failed open hands its caller no handle to close, so it closes itself: no storage watch
     // (with Convex, a live query) may outlive it. The caller gets the original error, even if
@@ -1613,16 +1645,27 @@ const damagedAs = async <ResultT>(reading: Promise<ResultT>, damaged: (opts: Err
 }
 
 /**
- * What `reading` the device store resolves to, with a failure that is no VaultError -- an
- * IndexedDB error, say -- said as 'storage_unavailable', a condition a host shows in place and
- * offers to retry, with the device store's own error as its cause.
+ * `deviceDB`'s verbs, each with a failure that is no VaultError -- an IndexedDB error, say, or a
+ * throw before the promise -- said as 'storage_unavailable', a condition a host shows in place and
+ * offers to retry, with the device store's own error as its cause. A VaultError passes as it came.
  */
-const deviceTroubleAsCondition = async <ResultT>(reading: Promise<ResultT>): Promise<ResultT> => {
+const deviceTroubleAsConditions = (deviceDB: DeviceDB): DeviceDB => ({
+  readUnlock:  async (...args) => await asCondition(() => deviceDB.readUnlock(...args)),
+  writeUnlock: async (...args) => { await asCondition(() => deviceDB.writeUnlock(...args)) },
+  eraseUnlock: async (...args) => { await asCondition(() => deviceDB.eraseUnlock(...args)) },
+  readMark:    async (...args) => await asCondition(() => deviceDB.readMark(...args)),
+  writeMark:   async (...args) => { await asCondition(() => deviceDB.writeMark(...args)) },
+  eraseMark:   async (...args) => { await asCondition(() => deviceDB.eraseMark(...args)) },
+  eraseAll:    async (...args) => { await asCondition(() => deviceDB.eraseAll(...args)) },
+})
+
+/** What `call` to the device store resolves to, or its failure, as {@link deviceTroubleAsConditions} says it. */
+const asCondition = async <ResultT>(call: () => Promise<ResultT>): Promise<ResultT> => {
   try {
-    return await reading
+    return await call()
   } catch (err) {
     if (isVaultError(err)) { throw err }
-    throw new VaultError('storage_unavailable', "This device's own storage failed while reading what it remembers of the vault, so the vault did not open: try again. The device store's error is this error's cause.", { cause: err })
+    throw new VaultError('storage_unavailable', "This device's own storage failed, so the vault could not read or keep what this device remembers of it: try again. The device store's error is this error's cause.", { cause: err })
   }
 }
 
@@ -1692,6 +1735,16 @@ const saltLengthOf = (saltB64: string): number | null => {
 
 /** What an unlock notes as it starts: this handle's shut count, and the device mark's lock generation. */
 type UnlockStart = { shutsThen: number, lockGeneration: number }
+
+/** A device mark that has seen a vault: what this handle holds beside the bundle in hand. */
+type SeenMark = DeviceMark & { seen: SeenVault }
+
+/** The device mark's format, as each mark carries it. */
+const MarkFormat = 'safebyok-mark-v3'
+
+/** The vault call, or the moment, a logger's story names: where what it hears happened. */
+type VaultCall = 'openVault' | 'refresh' | 'expiry' | 'unlock' | 'lock' | 'lockSoon' | 'destroy' | 'whenIdentityRevoked'
+  | 'changePassphrase' | 'addPassphrase' | 'addPasskey' | 'removeUnlock' | 'store' | 'erase' | 'read'
 
 /** The `unlocklabel` of the way in a vault is created with, by its first `unlock()`. */
 const FirstUnlocklabel = 'passphrase'
