@@ -44,6 +44,11 @@ export interface DeviceDB {
    * same step as the write, so a mark written from an older read never undoes a lock.
    */
   writeMark(mark: DeviceMark): Promise<void>
+  /**
+   * Forget this device's mark for one vault, its lock generation with it. The vault never calls
+   * this on its own (`destroy()` writes a mark with nothing `seen`, keeping the generation): it is
+   * for a host accepting storage restored on purpose, and for `eraseDamagedVault`.
+   */
   eraseMark(scope: VaultScope): Promise<void>
   /** Remove every remembered unlock and device mark on this device: the device's part of a full reset. */
   eraseAll(): Promise<void>

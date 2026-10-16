@@ -43,6 +43,19 @@ So the versioned update is split: the adapter owns the atomic compare-and-write 
 3.5, and 3.8), and the vault owns the read before it and the retry after it. "Last write wins" is the
 vault's policy over the adapter's guarantee, not something an adapter implements.
 
+Only a lockbox write is retried. A change to the ways in, a `destroy()` or an erase that meets
+someone else's is news the user must hear, refused once as `stale_write`. Before it names any
+refusal -- a stale write, or a lockbox that will not open -- the vault catches up with storage
+once, so a vault destroyed and made anew elsewhere relocks the device rather than reading as
+damage. There is no conflict handler beyond this, and no hook for one: an erase wins, the last
+writer wins, and a host that disagrees calls `store()` or `erase()` again. The vault never clears
+a damaged record on its own; the user's `erase()` or `store()` on its boxlabel does.
+
+The base class turns anything your code throws that is not a `VaultError` into
+`storage_unavailable` -- a bug in your adapter among it, which it cannot tell from a driver's
+failure: the `cause` carries your error, and an adapter that means a kind throws a `VaultError` of
+it.
+
 ## The baseline
 
 An adapter as it ships, with no options, keeps every numbered line below and asks nothing more of
@@ -161,7 +174,9 @@ otherwise it refuses as `stale_write` and erases nothing, so a vault made anew s
 that missed its predecessor's end.
 
 It compares the `vault_id` and nothing else, so a vault whose bundle is damaged in any other field
-is still erased: the vault's `eraseDamagedVault`, the one way to clear a vault `openVault` refuses
+is still erased, and a bundle rewritten under the same `vault_id` between a read and the erase is
+erased with it: it is the same vault. A typed backend (Convex, Postgres) cannot hold a damaged
+bundle, so there the hatch below has nothing to do: the vault's `eraseDamagedVault`, the one way to clear a vault `openVault` refuses
 as `damaged_bundle`, reads the bundle through `doReadBundle` as stored, takes its `vault_id`, and
 aims this erase at it. An adapter that hands each call on to another VaultDB's public verbs hands
 `eraseDamagedVault` on too. Proven by the base class's own tests for a damaged record, which the
@@ -258,8 +273,8 @@ writes nothing to it. A server cannot tell "the user changed" from "the host ope
 user's vault", and to the vault both mean the same: its user is not the one signed in.
 
 **5.5. identity_revoked means the user is gone.** The vault locks itself on `identity_revoked`,
-dropping its key, so an adapter says it only when the signed-in identity really is gone or
-changed. A passing fault -- a token expired mid-refresh, a network error, a backend that could
+dropping its key, always -- no host option turns it off -- so an adapter says it only when the
+signed-in identity really is gone or changed. A passing fault -- a token expired mid-refresh, a network error, a backend that could
 not say who is signed in -- is `storage_unavailable`, which locks nothing. *Tested per adapter*:
 the battery cannot make a fault.
 
