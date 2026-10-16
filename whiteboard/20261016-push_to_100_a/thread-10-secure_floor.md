@@ -48,6 +48,14 @@ on its base. `pnpm size`: green; openVault 25.22 kB of 28 kB.
   change), never while entering one to unlock. `weak_passphrase` is a condition, so
   `PassphraseModal` already shows its message (`isVaultCondition` -> `err.message`) with no React
   change.
+  **At the restack** (the orchestrator's plan): the provider shows this test's reason as thread
+  14's `passphraseAdvice` when the host gives none, so the dialog says "too weak" as the user types.
+* **Second review**: `fixed`, by two reviewer commits (README wording, and the all-zero check's
+  timing reason: nothing in it branches on a byte). Left, minor, rows in the sprint doc: a child's
+  same-commit `useLayoutEffect` that sets a passphrase runs the previous test; the provider copies
+  the core's not-a-function check and default (a `checkStrengthTest` beside `checkValidators`
+  later); no provider tests for switching back to no test, StrictMode, or a test changing while
+  the open is pending.
 * **Decisions taken**:
   - **`@zxcvbn-ts/language-common` came in beside `@zxcvbn-ts/core`.** On its own, core is a sham:
     `password1234` scores 4 of 4, and only repeats and sequences are caught. The dictionary is what
