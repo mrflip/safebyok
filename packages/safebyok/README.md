@@ -99,10 +99,12 @@ vault.getSnapshot().boxes[0]  // { boxlabel: 'anthropic_api_key', public: {}, da
 * **It is bound.** Its JSON, keys sorted, is bound into the lockbox's encryption with the rest of
   the lockbox's public fields, so a bag altered or swapped in storage makes the lockbox refuse to
   open (`damaged_lockbox`). The snapshot shows the bag as storage holds it; only `read()` proves
-  it unaltered.
+  it unaltered. A bag stored other than as the vault writes it (respaced, reordered) lists the
+  lockbox as damaged.
 * **Its shape is yours.** The vault checks only that it is JSON (`PublicBag`; anything else is
   `bad_option`): check its shape yourself, with your own schema, before `store()`. Left out of a
-  `store()`, the lockbox keeps the bag it has; a new lockbox's is `{}`.
+  `store()`, the lockbox keeps the bag it has, once its record opens; a new lockbox's is `{}`, as
+  is one written over a record that will not open.
 * **It shares the whisper's room.** `maxWhisperBytes` counts the whisper's JSON and the bag's
   together, so a large bag leaves less room for the whisper. Its size shows in storage, as every
   public field's does.
@@ -597,8 +599,9 @@ shows only when the lockbox is read: it lists as sound, `read()` refuses it with
 `damaged_lockbox`, and `erase()` removes it. `store()` starts afresh over any record it cannot
 read as a lockbox -- every one the snapshot lists as damaged, and one missing or mangling a
 ciphered field -- carrying nothing from it, neither its public bag nor when it was first stored.
-A record that reads but will not decipher, its ciphertext altered, is replaced as any other, its
-bag and first-stored time kept. A storage adapter's `doListBoxes` hands up each lockbox as a
+A record that reads but will not decipher -- its ciphertext, bag or times altered -- is written
+over its revision, and carries nothing forward either: nothing vouches for its public fields, so
+its bag becomes `{}` unless you give one, and its first-stored time is now. A storage adapter's `doListBoxes` hands up each lockbox as a
 `StoredLockbox`, the boxlabel it is stored under beside its record exactly as stored, so a record
 too damaged to name itself is still listed under the boxlabel that reaches it.
 

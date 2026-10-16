@@ -843,18 +843,73 @@ describe("the times a vault keeps", () => {
     expect(vault.getSnapshot().boxes[0]).to.include({ changed_at: storedAt + 60_000 })
   })
 
-  it("counts a previous record that will not open as changed, and writes over it", async () => {
+  it("counts a previous record that will not open as changed, and writes over it, carrying nothing from it", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    await vault.store('anthropic', 'sk-fake')
+    await vault.store('anthropic', 'sk-fake', { public: { note: 'work account' } })
     const storedAt = world.clock.now()
     const row = storedRowOf(world, 'anthropic') as { whisper_ciphered: { ciphertext_b64: string } }
     row.whisper_ciphered.ciphertext_b64 = TH.tweakB64(row.whisper_ciphered.ciphertext_b64)
     world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify(row))
     world.advance(60_000)
     await vault.store('anthropic', 'sk-fake')
-    expect(vault.getSnapshot().boxes[0]).to.include({ registered_at: storedAt, changed_at: storedAt + 60_000 })
+    expect(vault.getSnapshot().boxes[0]).to.deep.include({ registered_at: storedAt + 60_000, changed_at: storedAt + 60_000, public: {} })
     expect(await vault.read('anthropic')).to.eq('sk-fake')
+  })
+
+  it("never seals a public bag planted in storage into a fresh revision: a store over it without a bag writes {}", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.store('anthropic', 'sk-fake', { public: { note: 'work account' } })
+    world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), public_json: '{"note":"INJECTED"}' }))
+    await TH.expectRefusal(vault.read('anthropic'), 'damaged_lockbox')
+    await vault.store('anthropic', 'sk-fake-2')
+    expect(await vault.read('anthropic')).to.eq('sk-fake-2')
+    expect(TH.summaryOf(vault.getSnapshot().boxes[0])?.public).to.deep.equal({})
+    expect(storedRowOf(world, 'anthropic')).to.include({ public_json: '{}' })
+    // A bag given with the store is written as given, over the planted one.
+    world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), public_json: '{"note":"INJECTED"}' }))
+    await vault.store('anthropic', 'sk-fake-3', { public: { note: 'mended' } })
+    expect(TH.summaryOf(vault.getSnapshot().boxes[0])?.public).to.deep.equal({ note: 'mended' })
+  })
+
+  it("never carries forward a registered_at moved in storage: a store over it stamps now", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.store('anthropic', 'sk-fake')
+    const planted = Date.UTC(2001, 0, 1)
+    world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), registered_at: planted }))
+    await TH.expectRefusal(vault.read('anthropic'), 'damaged_lockbox')
+    world.advance(60_000)
+    await vault.store('anthropic', 'sk-fake')
+    expect(vault.getSnapshot().boxes[0]).to.include({ registered_at: world.clock.now(), changed_at: world.clock.now() })
+    expect(await vault.read('anthropic')).to.eq('sk-fake')
+  })
+
+  it("opens a vault holding a lockbox whose stored bag is nested too deep to serialize, listing that one as damaged", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.store('anthropic', 'sk-fake')
+    await vault.store('openai', 'sk-fake-two', { public: { note: 'work account' } })
+    vault.close()
+    const deep = `${'['.repeat(200_000)}${']'.repeat(200_000)}`
+    world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), public_json: deep }))
+    const fresh = await world.openUnlocked('pw')
+    expect(fresh.getSnapshot().boxes[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true })
+    expect(TH.summaryOf(fresh.getSnapshot().boxes[1])?.public).to.deep.equal({ note: 'work account' })
+    await TH.expectRefusal(fresh.read('anthropic'), 'damaged_lockbox')
+    expect(await fresh.read('openai')).to.eq('sk-fake-two')
+  })
+
+  it("lists a lockbox whose stored bag is respaced or reordered as damaged: only the text the vault writes is read", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.store('respaced', 'sk-fake', { public: { note: 'work' } })
+    await vault.store('reordered', 'sk-fake', { public: { a: 1, b: 2 } })
+    world.dbStore.write(u1BoxCkey('respaced'), JSON.stringify({ ...storedRowOf(world, 'respaced'), public_json: '{"note": "work"}' }))
+    world.dbStore.write(u1BoxCkey('reordered'), JSON.stringify({ ...storedRowOf(world, 'reordered'), public_json: '{"b":2,"a":1}' }))
+    const fresh = await world.open()
+    expect(fresh.getSnapshot().boxes).to.deep.equal([{ boxlabel: 'reordered', damaged: true }, { boxlabel: 'respaced', damaged: true }])
   })
 
   it("stamps the bundle's registered_at when the vault is made, and keeps it through a passphrase change", async () => {

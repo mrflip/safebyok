@@ -1,5 +1,6 @@
 import * as Z from 'zod/mini'
 import { Ciphered } from './crypto'
+import { stableJsonify } from './stable-jsonify'
 import { NameFloor } from './validators'
 
 /**
@@ -154,12 +155,16 @@ const cryptoKeyHandle = Z.custom<CryptoKey>((val) => val instanceof CryptoKey, '
 export const PublicBag: Z.ZodMiniType<WhisperJson> = whisperJson
 export type PublicBag = Z.infer<typeof PublicBag>
 
-/** True when `text` is JSON text: what a lockbox's `public_json` holds. */
-const isJsonText = (text: string): boolean => {
+/**
+ * True when `text` is a public bag's JSON exactly as the vault writes it: parsed and serialized
+ * again, keys sorted, it comes back the same. Text respaced, reordered, or nested too deep to
+ * serialize is not, and the lockbox holding it reads as damaged, its refusal a calm one.
+ */
+const isStableJsonText = (text: string): boolean => {
   try {
-    JSON.parse(text)
-    return true
+    return stableJsonify(JSON.parse(text)) === text
   } catch {
+    // Not JSON, or nested past what the stack can serialize (a RangeError).
     return false
   }
 }
@@ -197,10 +202,10 @@ export const Lockbox = Z.object({
   /** Which generation of the whisper's own shape this lockbox holds: 1, the only one so far. */
   whisper_schema_version: Z.literal(1),
   /**
-   * The lockbox's {@link PublicBag}, as JSON with every object's keys sorted: `{}` when the host
-   * gave none. Always written, so a lockbox with no bag and one with an empty bag are one record.
+   * The lockbox's {@link PublicBag}, as JSON with every object's keys sorted and no spacing,
+   * exactly as `stableJsonify` writes it: `{}` when the host gave none. Always written, so a lockbox with no bag and one with an empty bag are one record.
    */
-  public_json:            Z.string().check(Z.refine(isJsonText, "public_json holds the lockbox's public bag as JSON text")),
+  public_json:            Z.string().check(Z.refine(isStableJsonText, "public_json holds the lockbox's public bag as the JSON text the vault writes, keys sorted")),
   /** When this boxlabel was first stored, an {@link EpochMillis}: every later store carries it forward. */
   registered_at:          EpochMillis,
   /**

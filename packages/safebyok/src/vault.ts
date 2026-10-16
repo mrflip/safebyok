@@ -372,16 +372,17 @@ export type Vault = {
    * damaged, and also one that lists as sound but whose ciphered fields are missing or malformed
    * -- is overwritten as though it were new: erased first, then written with nothing carried
    * from it, neither its public bag nor its `registered_at`. Should the write then fail, the old
-   * record is gone and the call throws: storing again writes the lockbox afresh. (A record that
-   * reads but will not decipher, its ciphertext altered, is replaced as any other, its bag and
-   * `registered_at` kept.) A boxlabel the vault's check refuses is kind 'bad_label', writing
+   * record is gone and the call throws: storing again writes the lockbox afresh. A record that
+   * reads but will not decipher -- its ciphertext, its bag or a time altered in storage -- is
+   * written over its revision, but carries nothing forward either: nothing vouches for its public
+   * fields, so its bag becomes `{}` unless one is given, and its `registered_at` is now. A boxlabel the vault's check refuses is kind 'bad_label', writing
    * nothing, even where a lockbox stored under other checks stands under it: that one reads and
    * erases by its name, but is never written anew under it.
    *
    * `opts.public` is the lockbox's public bag ({@link PublicBag}): any JSON value, shown in the
    * snapshot while locked, never interpreted by the vault -- kind 'bad_option' for anything JSON
    * cannot carry. Check its shape yourself before storing it. Left out, the lockbox keeps the bag
-   * it has, and a new lockbox gets `{}`; `{}` empties it. The bag is stored in the clear and
+   * it has (when its record opens: see above), and a new lockbox gets `{}`; `{}` empties it. The bag is stored in the clear and
    * bound into the lockbox's encryption, so a bag altered in storage makes the lockbox refuse to
    * open. Never put secret material in it. A lockbox heavier, whisper and names and bag together,
    * than storage holds in one record is refused with kind 'lockbox_too_large'; one that would take
@@ -1134,17 +1135,15 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   }
 
   /**
-   * True when `prev` holds a whisper that serializes as `whisper` does. A previous record that
-   * will not open counts as different: the store clobbers it, and its `changed_at` moves.
+   * The whisper `prev` holds, or null when it will not open: a record altered in storage, whose
+   * public fields a store must not carry forward, as nothing vouches for them.
    */
-  const holdsWhisper = async (unlockedKey: CryptoKey, standing: VaultBundle, prev: Lockbox, whisper: Whisper): Promise<boolean> => {
+  const openedWhisperOf = async (unlockedKey: CryptoKey, standing: VaultBundle, prev: Lockbox): Promise<Whisper | null> => {
     try {
-      // A plain comparison: both sides are this device's own, and its outcome is no secret from
-      // storage, which sees changed_at stand still or move.
-      return stableJsonify(await decipherLockbox(unlockedKey, standing, prev)) === stableJsonify(whisper)
+      return await decipherLockbox(unlockedKey, standing, prev)
     } catch {
       // decipherLockbox refuses only as damaged_lockbox: a record that will not open.
-      return false
+      return null
     }
   }
 
@@ -1309,18 +1308,25 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
         // A damaged box is overwritten as a fresh store: nothing in it can be carried forward.
         const prev = standing === 'damaged' ? null : standing
         boxStood ||= prev !== null
-        const publicJson = givenPublicJson ?? prev?.public_json ?? EmptyPublicJson
-        ensureWhisperFits(whisperBytes, publicJson)
         await ensureRoomFor(label, prev)
         // The key and the vault it belongs to, taken together after the last look at storage.
         const unlockedKey = keyInHand()
         const standingBundle = currentBundle()
         const { vault_id: vaultId, vault_key_epoch: vaultKeyEpoch } = standingBundle
+        // Only a record that opens vouches for its public fields: one that will not, altered in
+        // storage, is written over as a fresh lockbox is, keeping neither its bag nor its
+        // registered_at, so a bag planted in storage is never sealed into a revision that reads clean.
+        const prevWhisper = prev === null ? null : await openedWhisperOf(unlockedKey, standingBundle, prev)
+        const vouched = prevWhisper === null ? null : prev
+        const publicJson = givenPublicJson ?? vouched?.public_json ?? EmptyPublicJson
+        ensureWhisperFits(whisperBytes, publicJson)
         const revisionId = randomId()
         const lockboxKey = await makeLockboxKey()
         const now = clockNow()
-        // A store of the whisper already there writes a new revision, and leaves changed_at standing.
-        const unchanged = prev !== null && await holdsWhisper(unlockedKey, standingBundle, prev, checked.data)
+        // A store of the whisper already there writes a new revision, and leaves changed_at
+        // standing. A plain comparison: both sides are this device's own, and its outcome is no
+        // secret from storage, which sees changed_at stand still or move.
+        const unchanged = vouched !== null && stableJsonify(prevWhisper) === stableJsonify(checked.data)
         // Lands only in the vault this whisper is sealed for, under the vaultKey that seals it, over
         // the revision just read: a vault reborn elsewhere, a vaultKey replaced, or a box written
         // meanwhile by another device, refuses it.
@@ -1332,8 +1338,8 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
           whisper_codec:          'json_v1',
           whisper_schema_version: 1,
           public_json:            publicJson,
-          registered_at:          prev?.registered_at ?? now,
-          changed_at:             unchanged ? prev.changed_at : now,
+          registered_at:          vouched?.registered_at ?? now,
+          changed_at:             unchanged ? vouched.changed_at : now,
         }
         const lockbox: Lockbox = {
           format:              LockboxFormat,

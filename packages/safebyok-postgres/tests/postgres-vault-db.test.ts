@@ -211,8 +211,9 @@ describe("postgresVaultDB, what it stores", () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
     await vaultDB.createBundle(TH.bundleOf('u1'))
-    // Spacing jsonb would drop, and keys in an order it would change: the text is bound as written.
-    const publicJson = '{"zeta": 1, "alpha": "café"}'
+    // Keys jsonb would reorder (it sorts the shorter first) and spacing it would add: the text is
+    // bound as written, so it must come back so.
+    const publicJson = '{"alpha":"café","zeta":1}'
     await vaultDB.updateBox(u1, TH.boxOf('anthropic', 'one', { public_json: publicJson }), noBoxYet)
     const { rows } = await db.query('SELECT * FROM safebyok_lockboxes')
     expect(rows).to.deep.equal([{

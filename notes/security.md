@@ -918,7 +918,14 @@ security expert who knows what questions to ask.
   All three join the header both of the lockbox's encryptions bind, so a bag swapped between
   boxes, emptied, or merely respaced in storage makes `read()` refuse it (`damaged_lockbox`);
   the bound value is the stored text itself, never a re-serialization, so a store must keep it
-  byte for byte (Postgres keeps it as `text`, never `jsonb`). What the bag reveals: everything in
+  byte for byte (Postgres keeps it as `text`, never `jsonb`). The record's check also requires
+  that text to be its own stable re-serialization, inside a try: a bag respaced, reordered, or
+  nested too deep to serialize (which once overflowed the stack in the snapshot's comparison and
+  stopped the vault opening with a bare `RangeError`) lists as damaged and reads as
+  `damaged_lockbox`, so one bad record never hides the rest. A `store()` carries the standing
+  bag and `registered_at` forward only from a record that deciphers: over one that will not, its
+  bag becomes `{}` unless one is given, and its `registered_at` is now, so a bag planted in
+  storage is never sealed into a fresh revision that reads clean (found in review). What the bag reveals: everything in
   it, in the clear, to anyone who reads storage, and its size; the vault never interprets it,
   checks only that it is JSON, and the snapshot shows it unverified until the box is opened, as
   every public field is. Its size is capped only with the whisper's (`maxWhisperBytes` counts
