@@ -1321,6 +1321,9 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
    */
   const listedRevisionOf = (boxlabel: string): string | null => boxes.find((box) => box.boxlabel === boxlabel)?.revision_id ?? null
 
+  /** True when the snapshot's listing shows the lockbox under `boxlabel` as damaged. */
+  const isListedDamaged = (boxlabel: string): boolean => boxes.some((box) => box.boxlabel === boxlabel && box.damaged)
+
   /** The lockbox under `boxlabel`; null when there is none, and 'damaged' when its record fails verification. */
   const readBoxOrDamaged = async (boxlabel: string): Promise<Lockbox | 'damaged' | null> => {
     try {
@@ -1642,6 +1645,10 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
         // the revision just read -- for a damaged box, the one the listing names -- : a vault reborn
         // elsewhere, a vaultKey replaced, or a box written meanwhile by another device, refuses it.
         const overRevision = standing === 'damaged' ? listedRevisionOf(label) : prev?.revision_id ?? null
+        // Only a box the listing shows damaged and naming no revision is erased first: one the
+        // listing does not show yet is written as over none, which storage refuses while it
+        // stands, and the catch-up lists it with its revision for the retry.
+        const clearsFirst = standing === 'damaged' && overRevision === null && isListedDamaged(label)
         const expected = { vault_id: vaultId, revision_id: overRevision, vault_key_epoch: vaultKeyEpoch }
         const header: LockboxHeader = {
           boxlabel:               label,
@@ -1659,9 +1666,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
           lockbox_key_wrapped: await wrapKeyUnder(unlockedKey, lockboxKey, boxBinding(vaultId, header, 'lockbox_key_wrapped')),
           whisper_ciphered:    await cipherBytes(lockboxKey, whisperBytes, boxBinding(vaultId, header, 'whisper_ciphered')),
         }
-        // A damaged box whose record names no revision is cleared first, as erase() would, so the
-        // write meets none.
-        return await writeOver(lockbox, expected, standing === 'damaged' && overRevision === null, boxStood)
+        return await writeOver(lockbox, expected, clearsFirst, boxStood)
       })
       if (outcome === 'erased') {
         throw new VaultError('stale_write', 'That lockbox was erased on another device while this one was storing into it, so nothing was written: an erase wins. Store it again if it should exist after all.')
