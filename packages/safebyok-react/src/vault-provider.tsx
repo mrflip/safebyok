@@ -1,5 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { checkValidators, eraseDamagedVault as eraseStoredDamagedVault, isVaultCondition, isVaultError, openVault, type OpenVaultOpts, type Vault, type VaultError, type VaultSnapshot, type VaultValidators } from 'safebyok'
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { VaultError, checkValidators, eraseDamagedVault as eraseStoredDamagedVault, isVaultCondition, isVaultError, openVault, passphraseLengthTest, type OpenVaultOpts, type PassphraseStrengthTest, type Vault, type VaultSnapshot, type VaultValidators } from 'safebyok'
 import { PassphraseModal } from './passphrase-modal'
 
 /**
@@ -96,10 +96,10 @@ export const useVaultSnapshot = (): VaultSnapshot => {
  * Every openVault option, passed through as given (an option left out gets openVault's default),
  * except that `userId` may be null. In a browser, spread `browserOpts()` from `safebyok/browser`
  * for the `keyDeriver` and `deviceDB` openVault asks for. The vault reopens whenever an option
- * changes identity, so build each schema in `validators` once, at module level, and pass a
- * module-level `passphraseStrengthTest` (`passphraseLengthTest`, `zxcvbnPassphraseTest`), never
- * an arrow made in render; the bag around the schemas may be built in render, as the provider
- * watches each schema rather than the bag.
+ * changes identity, so build each schema in `validators` once, at module level; the bag around
+ * them may be built in render, as the provider watches each schema rather than the bag.
+ * `passphraseStrengthTest` is the other exception: it plays no part in opening, so the vault runs
+ * whichever test the latest render passed, and an arrow written in the props never reopens it.
  */
 export type VaultProviderProps = Omit<OpenVaultOpts, 'userId'> & {
   /** The signed-in user from the host's auth, or null when nobody is: then there is no vault. */
@@ -129,6 +129,13 @@ export const VaultProvider = ({ userId, children, ...opts }: VaultProviderProps)
   const { applabel, vaultlabel, vaultDB, deviceDB, forcePassphraseReentryHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger, validators, passphraseStrengthTest } = opts
   // The bag is taken apart below, so a misspelt field would be dropped unseen: refused here, as openVault refuses it.
   checkValidators(validators)
+  // Checked here, as openVault would: the vault itself is handed a wrapper, always a function.
+  if (passphraseStrengthTest !== undefined && typeof passphraseStrengthTest !== 'function') {
+    throw new VaultError('bad_option', 'passphraseStrengthTest is a function from the passphrase to a verdict, { strong: true } or { strong: false, reason }; leave it out for the default, passphraseLengthTest.')
+  }
+  // The test the latest render passed, read by the wrapper the vault holds: a new test never reopens it.
+  const strengthTestRef = useRef<PassphraseStrengthTest | undefined>(passphraseStrengthTest)
+  useLayoutEffect(() => { strengthTestRef.current = passphraseStrengthTest }, [passphraseStrengthTest])
   // The vault reopens when a check changes, never for a bag rebuilt in render around the same ones.
   const applabelCheck = validators?.applabel
   const vaultlabelCheck = validators?.vaultlabel
@@ -170,7 +177,8 @@ export const VaultProvider = ({ userId, children, ...opts }: VaultProviderProps)
     // Listed one by one so the effect re-runs on each; `satisfies` fails the build if an openVault
     // option is ever added and not passed through.
     const checks = { applabel: applabelCheck, vaultlabel: vaultlabelCheck, boxlabel: boxlabelCheck, userId: userIdCheck, note: noteCheck, unlocklabel: unlocklabelCheck } satisfies Record<keyof VaultValidators, unknown>
-    const openOpts = { applabel, vaultlabel, userId, vaultDB, deviceDB, forcePassphraseReentryHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger, validators: checks, passphraseStrengthTest } satisfies Record<keyof OpenVaultOpts, unknown>
+    const strengthTest: PassphraseStrengthTest = (typed) => (strengthTestRef.current ?? passphraseLengthTest)(typed)
+    const openOpts = { applabel, vaultlabel, userId, vaultDB, deviceDB, forcePassphraseReentryHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger, validators: checks, passphraseStrengthTest: strengthTest } satisfies Record<keyof OpenVaultOpts, unknown>
     void openVault(openOpts).then((opened) => {
       if (gone) { opened.close(); return }
       handle = opened
@@ -197,7 +205,7 @@ export const VaultProvider = ({ userId, children, ...opts }: VaultProviderProps)
       setOpenFailure(null)
       setOpenError(null)
     }
-  }, [userId, applabel, vaultlabel, vaultDB, deviceDB, forcePassphraseReentryHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger, passphraseStrengthTest, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, noteCheck, unlocklabelCheck, openAttempt, endAsking])
+  }, [userId, applabel, vaultlabel, vaultDB, deviceDB, forcePassphraseReentryHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, noteCheck, unlocklabelCheck, openAttempt, endAsking])
 
   const retryOpen = useCallback(() => {
     if (openError !== null) { setOpenAttempt((prev) => prev + 1) }

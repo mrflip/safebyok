@@ -52,9 +52,10 @@ import { VaultProvider } from 'safebyok-react'
 The provider takes every `openVault` option as a prop. `browserOpts()` supplies the two a browser
 app answers like any other, `keyDeriver` and `deviceDB`; `vaultDB` is your backend's adapter. It
 answers the same bag on every call, so it is safe in a render: the provider reopens the vault
-whenever a prop changes identity. So define a `logger`, a `clock` or a `passphraseStrengthTest`
-once, outside the component (or memoize it): an object literal or an arrow written in the props is
-a new one at every render, and reopens the vault each time. `validators` is the one exception: the provider watches each schema in the
+whenever a prop changes identity. So define a `logger` or a `clock` once, outside the component (or
+memoize it): an object literal written in the props is a new one at every render, and reopens
+the vault each time. `passphraseStrengthTest` never reopens it: it plays no part in opening, so
+the vault runs whichever test the latest render passed, and an arrow in the props is fine. `validators` is the one exception: the provider watches each schema in the
 bag rather than the bag, so `validators={{ boxlabel: BoxlabelCheck }}` is fine in the props, so
 long as `BoxlabelCheck` itself is built once, at module level. A bag with a field it does not know
 (`boxLabel`) is thrown, as `bad_option`, to the nearest error boundary, as `openVault` would refuse

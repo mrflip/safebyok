@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { AnyTextValidators, Ckeys, VaultError, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, openVault, type KeyDeriver, type Vault, type VaultValidators } from 'safebyok'
+import { AnyTextValidators, Ckeys, VaultError, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, openVault, type KeyDeriver, type PassphraseVerdict, type Vault, type VaultValidators } from 'safebyok'
 import * as TH from 'safebyok/testing'
 import { Component, useEffect, useLayoutEffect, useState, type ErrorInfo, type ReactNode } from 'react'
 import { VaultProvider, useVault, useVaultSnapshot, type VaultProviderProps } from '../src/vault-provider'
@@ -95,6 +95,9 @@ const damagedWorld = async () => {
   store.write(bundleCkey, JSON.stringify({ ...bundle, unlock_epoch: 'one' }))
   return { store, vaultDB, deviceDB, props }
 }
+
+/** A passphraseStrengthTest that refuses any passphrase holding the app's name. */
+const refuseAcme = (typed: string): PassphraseVerdict => (typed.includes('acme') ? { strong: false, reason: 'Not the name of the app, please.' } : { strong: true })
 
 /** The state the Probe, or the boundary in its place, shows. */
 const shownState = () => screen.getByTestId('state').textContent
@@ -529,6 +532,44 @@ describe("VaultProvider", () => {
     expect(latest().vault?.getSnapshot().boxes.map((summary) => summary.boxlabel)).to.deep.equal(['Anthropic API key'])
   })
 
+  it("passes passphraseStrengthTest through: the vault it opens refuses a weak new passphrase with the test's reason", async () => {
+    const { Grab, opened } = grabber()
+    const { props } = makeWorld()
+    render(<VaultProvider {...props} userId="u1" passphraseStrengthTest={refuseAcme}><Grab /></VaultProvider>)
+    const vault = await opened()
+    const err = await TH.expectRefusal(vault.unlock('acme acme acme acme'), 'weak_passphrase')
+    expect(err.message).to.eq('Not the name of the app, please.')
+    await vault.unlock('correct horse battery staple')
+    expect(vault.getSnapshot().state).to.eq('unlocked')
+  })
+
+  it("gives the vault the core's default, 12 characters, when no passphraseStrengthTest is passed", async () => {
+    const { Grab, opened } = grabber()
+    const { passphraseStrengthTest: _admitsAny, ...props } = makeWorld().props
+    render(<VaultProvider {...props} userId="u1"><Grab /></VaultProvider>)
+    const vault = await opened()
+    const err = await TH.expectRefusal(vault.unlock('hunter2'), 'weak_passphrase')
+    expect(err.message).to.match(/at least 12 characters/)
+  })
+
+  it("never reopens for a passphraseStrengthTest written in the props, and runs whichever the latest render passed", async () => {
+    const { Grab, latest, opened } = grabber()
+    const { props } = makeWorld()
+    // An arrow in the props, as a host might write one: new at every render.
+    const tree = (reason: string) => (
+      <VaultProvider {...props} userId="u1" passphraseStrengthTest={(_typed) => ({ strong: false, reason })}>
+        <Grab />
+      </VaultProvider>
+    )
+    const { rerender } = render(tree('First reason.'))
+    const first = await opened()
+    rerender(tree('Second reason.'))
+    rerender(tree('Third reason.'))
+    expect(latest().vault).to.eq(first)
+    const err = await TH.expectRefusal(first.unlock('correct horse battery staple'), 'weak_passphrase')
+    expect(err.message).to.eq('Third reason.')
+  })
+
   it("shows the vault locked when storage says its user signed out, as the vault locks itself", async () => {
     const { Grab, opened } = grabber()
     const { props, vaultDB } = makeWorld()
@@ -607,6 +648,22 @@ describe("VaultProvider", () => {
       await expectShown('boundary')
       expect(isVaultError(caught[0], 'bad_option')).to.be.true
       expect((caught[0] as Error).message).to.include('spelling')
+    })
+
+    it("throws a passphraseStrengthTest that is no function to the error boundary, as openVault would refuse it", async () => {
+      hushConsole()
+      const caught: unknown[] = []
+      const misfit = { strong: true } as unknown as VaultProviderProps['passphraseStrengthTest']
+      render(
+        <CatchingBoundary caught={caught}>
+          <VaultProvider {...makeWorld().props} userId="u1" passphraseStrengthTest={misfit}>
+            <Probe />
+          </VaultProvider>
+        </CatchingBoundary>,
+      )
+      await expectShown('boundary')
+      expect(isVaultError(caught[0], 'bad_option')).to.be.true
+      expect((caught[0] as Error).message).to.include('passphraseStrengthTest')
     })
 
     it("throws a bad option to the error boundary, as the very VaultError", async () => {
