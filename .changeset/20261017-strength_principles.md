@@ -13,3 +13,4 @@
 
 **The dialog's advice defaults to the strength test.** With no `passphraseAdvice`, the passphrase dialog says the test's reason beside the field as the user chooses a weak passphrase, and nothing once it is strong enough. A host's own `passphraseAdvice` still wins.
 
+**`withUnlockedVault` resolves null for an action the provider's own close cut short**, where it used to reject with `vault_closed`: an action, or its run again after an unlock, still under way when the provider unmounts, signs out, switches users or reopens. A `vault_closed` from a handle closed by anyone else still rejects.
