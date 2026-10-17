@@ -3,7 +3,7 @@ import type { BundleExpectation, EraseExpectation, Lockbox, LockboxExpectation, 
 import { ChangeBell } from 'safebyok/idb'
 import { boxRange } from './ckeys'
 import { bellnameOf, parseDbName, type IdbVaultDBOpts } from './idb-opts'
-import { inOneTransaction, settle, shelfOf } from './shelf'
+import { inOneTransaction, settle, withheldShelfOf } from './shelf'
 
 /**
  * safebyok's storage in this browser's IndexedDB: a VaultDB for an app with no backend, keeping
@@ -18,6 +18,9 @@ import { inOneTransaction, settle, shelfOf } from './shelf'
  * * **No limits of its own**: IndexedDB sets none per record or per vault, so `maxRecordBytes`,
  *   `maxVaultBytes`, `maxLockboxes` and `maxNameBytes` are `Infinity`; the origin's storage quota
  *   bounds the whole database.
+ * * **Storage the browser withholds** -- site data blocked, a private window or frame that keeps
+ *   none, no room left, or no IndexedDB at all -- refuses with kind `storage_blocked`, which a
+ *   retry cannot mend; any other trouble from IndexedDB, with kind `storage_unavailable`.
  * * **Names joined on `^`** in each row's ckey (the core's `Ckeys`), which the floor keeps out of
  *   every name.
  *
@@ -48,7 +51,7 @@ class IdbVaultDB extends VaultDB {
     this.dbName = dbName
   }
 
-  private get shelf() { return shelfOf(this.dbName) }
+  private get shelf() { return withheldShelfOf(this.dbName) }
 
   protected async doReadBundle(scope: VaultScope): Promise<unknown> {
     return (await this.shelf('readonly', (store) => rowAt(store, Ckeys.bundle(scope)))) ?? null

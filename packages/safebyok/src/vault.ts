@@ -2,6 +2,7 @@ import * as Z from 'zod/mini'
 import { DeviceMark, DeviceUnlock, LockboxSummary, PublicBag, type SeenVault, type DamagedLockbox, ForcePassphraseReentryHours, FarFuture, FarPast, ForeverMillis, MaxLockboxes, MaxReentryHours, MaxUnlocks, MaxWhisperBytes, MinuteMillis, PasskeySaltBytes, VaultBundle, type VaultScope, Whisper, wallClock, type Clock, type PasskeyProof, type PassphraseEnvelope, type UnlockEnvelope, type UnlockSummary } from './types'
 import type { Lockbox } from './lockbox'
 import * as Names from './names'
+import { isStorageBlocked } from './refusals'
 import { optionsCheck } from './options'
 import type { VaultValidators } from './validators'
 import { VaultError, isVaultError, type VaultErrorKind } from './errors'
@@ -1911,7 +1912,7 @@ const damagedAs = async <ResultT>(reading: Promise<ResultT>, damaged: (opts: Err
  * `deviceDB`'s verbs, each with a failure that is no VaultError -- an IndexedDB error, say, or a
  * throw before the promise -- said as a condition, with the device store's own error as its cause
  * and a message naming what failed: 'storage_blocked' for a refusal the browser gives for a reason
- * that holds until something outside the app changes ({@link isStorageBlocked}), which a host
+ * that holds until something outside the app changes (`Refusals.isStorageBlocked`), which a host
  * shows without offering a retry, and 'storage_unavailable' for any other, which it shows in
  * place and offers to retry. A VaultError passes as it came. What `openVault` and
  * `eraseDamagedVault` call the device store through; not exported from the package.
@@ -1947,20 +1948,6 @@ const DeviceTroubleSaid: Record<keyof DeviceDB, { failed: string, instead?: stri
   eraseMark:   { failed: "erasing its mark of this vault, so it still holds the newest copy of the vault it had seen" },
   eraseAll:    { failed: "erasing everything it keeps for safebyok, so some of it may remain" },
 }
-
-/**
- * The names a browser gives a storage refusal whose reason holds until something outside the app
- * changes: storage withheld from the page (`SecurityError`: site data blocked, a sandboxed frame),
- * no room in it (`QuotaExceededError`: a quota of zero, a full disk), or no storage of the kind at
- * all (`NotSupportedError`). Every other name may pass.
- */
-const BlockedStorageNames: ReadonlySet<string> = new Set(['SecurityError', 'QuotaExceededError', 'NotSupportedError'])
-
-/** True for a device store's failure that a retry cannot mend until something outside the app changes: one named in {@link BlockedStorageNames}. */
-const isStorageBlocked = (err: unknown): boolean => (
-  // By name, not by class: a DOMException from another frame is no instance of this one's Error.
-  typeof err === 'object' && err !== null && 'name' in err && typeof err.name === 'string' && BlockedStorageNames.has(err.name)
-)
 
 /** What `call` to the device store's `verb` resolves to, or its failure, as {@link deviceTroubleAsConditions} says it. */
 const asCondition = async <ResultT>(verb: keyof DeviceDB, call: () => Promise<ResultT>): Promise<ResultT> => {

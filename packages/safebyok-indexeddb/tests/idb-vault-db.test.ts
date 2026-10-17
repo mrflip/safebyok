@@ -190,6 +190,51 @@ describe("idbVaultDB", () => {
     }
   })
 
+  const WithheldCases = [
+    ["SecurityError",       'storage withheld from the page: site data blocked, a sandboxed frame'],
+    ["QuotaExceededError",  'no room: a quota of zero, as some private windows give, or a full disk'],
+    ["NotSupportedError",   'no storage of the kind'],
+  ] as const
+
+  for (const [errName, blurb] of WithheldCases) {
+    it(`refuses a browser's ${errName} as storage_blocked, by the rule the vault says its device store's by: ${blurb}`, async () => {
+      const vaultDB = idbVaultDB({ dbName: TH.freshDbName() })
+      const withheld = new DOMException('The browser refused.', errName)
+      const blocked = vi.spyOn(globalThis.indexedDB, 'open').mockImplementation(() => { throw withheld })
+      try {
+        const refusal = await TH.refusalOf(vaultDB.readBundle(TH.scopeOf('u1')))
+        expect(refusal.kind).to.eq('storage_blocked')
+        expect(refusal.message).to.include('will not help until that changes')
+        expect((refusal as { cause?: unknown }).cause).to.eq(withheld)
+      } finally {
+        blocked.mockRestore()
+      }
+    })
+  }
+
+  it("refuses as storage_blocked in a context with no IndexedDB at all", async () => {
+    const vaultDB = idbVaultDB({ dbName: TH.freshDbName() })
+    vi.stubGlobal('indexedDB', undefined)
+    try {
+      const refusal = await TH.refusalOf(vaultDB.createBundle(TH.bundleOf('u1')))
+      expect(refusal.kind).to.eq('storage_blocked')
+      expect(refusal.message).to.include('no IndexedDB')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it("has openVault refuse as storage_blocked when the browser withholds the vault's storage", async () => {
+    const vaultDB = idbVaultDB({ dbName: TH.freshDbName() })
+    const opts = { applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest, deviceDB: memoryDeviceDB() }
+    const blocked = vi.spyOn(globalThis.indexedDB, 'open').mockImplementation(() => { throw new DOMException('The operation is insecure.', 'SecurityError') })
+    try {
+      await TH.expectRefusal(openVault(opts), 'storage_blocked')
+    } finally {
+      blocked.mockRestore()
+    }
+  })
+
   it("reports a write aborted from outside with the error its request failed with, never a null cause", async () => {
     const vaultDB = idbVaultDB({ dbName: TH.freshDbName() })
     // A transaction aborted from outside has a null error; its pending put fails with an AbortError.
@@ -264,7 +309,7 @@ describe("idbVaultDB, every verb one transaction", () => {
     })
     try {
       const refusal = await TH.refusalOf(vaultDB.eraseVault(scope, { vault_id: 'vault-id-u1' }))
-      expect(refusal.kind).to.eq('storage_unavailable')
+      expect(refusal.kind).to.eq('storage_blocked')
     } finally {
       failing.mockRestore()
     }

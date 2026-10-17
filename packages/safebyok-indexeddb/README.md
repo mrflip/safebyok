@@ -53,8 +53,11 @@ const vault = await openVault({
 * **No limits of its own.** IndexedDB sets none per record or per vault, so `maxRecordBytes`,
   `maxVaultBytes` and `maxLockboxes` are `Infinity`: a vault holds what `openVault`'s
   `maxLockboxes` allows (100 by default), the origin's storage quota bounds the whole database,
-  and a write past it refuses with kind `storage_unavailable`, IndexedDB's own error as its
-  `cause`.
+  and a write past it refuses with kind `storage_blocked`, IndexedDB's own error as its `cause`.
+* **Storage the browser withholds** -- site data blocked, a private window or frame that keeps
+  none, no room left, or no IndexedDB at all -- refuses with kind `storage_blocked`, which a retry
+  cannot mend, by the rule the vault says its device store's failures by; any other trouble from
+  IndexedDB, with kind `storage_unavailable`.
 * **Best-effort storage.** The browser may evict IndexedDB under pressure, and "clear site data"
   removes it: the vault goes with it, and there is no other copy. Call
   `navigator.storage.persist()`, and tell your users plainly that the vault lives only in this

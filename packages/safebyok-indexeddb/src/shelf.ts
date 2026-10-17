@@ -1,4 +1,5 @@
 import { createStore, promisifyRequest, type UseStore } from 'idb-keyval'
+import { Refusals } from 'safebyok'
 
 /**
  * The shelf: the one IndexedDB object store this package keeps its rows in, `records` in the
@@ -22,6 +23,26 @@ export const shelfOf = (dbName: string): UseStore => {
   const fresh = createStore(`${dbName}:vault_db`, 'records')
   shelves.set(dbName, fresh)
   return fresh
+}
+
+/**
+ * The shelf of the database `dbName` as a VaultDB reaches it: a call's failure that the browser
+ * gives for storage it withholds (`Refusals.isStorageBlocked`: site data blocked, no room left)
+ * refuses as `storage_blocked`, the browser's own error its cause, and so does a call in a context
+ * with no IndexedDB at all. Any other failure comes as it came, which the VaultDB base class says
+ * as `storage_unavailable`.
+ *
+ * @example await withheldShelfOf('acme')('readonly', (store) => settle(store.get(ckey)))
+ */
+export const withheldShelfOf = (dbName: string): UseStore => async <ValT>(txMode: IDBTransactionMode, callback: (store: IDBObjectStore) => ValT | PromiseLike<ValT>): Promise<ValT> => {
+  if (typeof indexedDB === 'undefined' || (indexedDB as IDBFactory | null) === null) {
+    throw Refusals.storageBlocked('This context offers no IndexedDB, so the vault has nowhere to keep its records. Trying again will not help until that changes.')
+  }
+  try {
+    return await shelfOf(dbName)(txMode, callback)
+  } catch (err) {
+    throw Refusals.isStorageBlocked(err) ? Refusals.storageBlocked(undefined, { cause: err }) : err
+  }
 }
 
 /**

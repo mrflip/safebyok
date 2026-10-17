@@ -88,6 +88,51 @@ export const vaultFull = (limit?: number, opts?: ErrorOptions): VaultError => {
   return new VaultError('vault_full', message, optsOf(opts))
 }
 
+/** What `storage_blocked` says unless an adapter says more exactly what was withheld. */
+export const StorageBlockedMessage = "This browser does not let the app keep anything on this device -- storage blocked for this site, a private window or frame that withholds it, or no room left -- so the vault's storage failed. Trying again will not help until that changes."
+
+/**
+ * A `storage_blocked` refusal: storage on this device that the browser withholds, for a reason
+ * that holds until something outside the app changes, so a retry cannot mend it -- a host says
+ * why rather than offering one. An adapter over the browser's own storage throws it for a failure
+ * {@link isStorageBlocked} names, or for no such storage at all.
+ *
+ * @param message - What was withheld, and what the user may do, when there is more to say. Never
+ *   quotes a record.
+ * @param opts - `cause`: the browser's own error, when there is one.
+ * @returns The refusal, to throw.
+ *
+ * @example
+ *   try { return await shelf(txMode, work) } catch (err) {
+ *     throw Refusals.isStorageBlocked(err) ? Refusals.storageBlocked(undefined, { cause: err }) : err
+ *   }
+ * @example throw Refusals.storageBlocked('This context offers no IndexedDB, so the vault has nowhere to keep its records.')
+ */
+export const storageBlocked = (message: string = StorageBlockedMessage, opts?: ErrorOptions): VaultError => (
+  new VaultError('storage_blocked', message, optsOf(opts))
+)
+
+/**
+ * The names a browser gives a storage refusal whose reason holds until something outside the app
+ * changes: storage withheld from the page (`SecurityError`: site data blocked, a sandboxed frame),
+ * no room in it (`QuotaExceededError`: a quota of zero, a full disk), or no storage of the kind at
+ * all (`NotSupportedError`). Every other name may pass.
+ */
+const BlockedStorageNames: ReadonlySet<string> = new Set(['SecurityError', 'QuotaExceededError', 'NotSupportedError'])
+
+/**
+ * True for a failure of the browser's own storage that a retry cannot mend until something
+ * outside the app changes: one named `SecurityError`, `QuotaExceededError` or
+ * `NotSupportedError`. Told by name, not by class, so a DOMException from another frame, or a
+ * plain Error of that name where there is no DOMException, is told alike.
+ *
+ * @example Refusals.isStorageBlocked(new DOMException('The operation is insecure.', 'SecurityError'))  // true
+ * @example Refusals.isStorageBlocked(new DOMException('The connection is closing.', 'InvalidStateError'))  // false
+ */
+export const isStorageBlocked = (err: unknown): boolean => (
+  typeof err === 'object' && err !== null && 'name' in err && typeof err.name === 'string' && BlockedStorageNames.has(err.name)
+)
+
 /** What a backend that failed without an error is said to have failed with. */
 const NoErrorGiven = 'The storage backend failed without giving an error.'
 

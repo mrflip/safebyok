@@ -675,12 +675,12 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `not_permitted`       | the storage backend refused the signed-in user, still the vault's own, this one call | Tell the user they may not; signing in again will not help |
 | `identity_revoked`    | the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in. The vault has locked itself (see *When the user signs out*) | Have the user sign in again, then open the vault for whoever that is |
 | `storage_unavailable` | the storage backend could not be reached, or failed; or this device's own store failed for a reason that may pass | Try again shortly; the adapter's own error is the `cause`, unless it may quote the call (Convex's) |
-| `storage_blocked`     | this device's own store refused for a reason that holds until something outside the app changes: the browser withholds storage from the page (site data blocked, a sandboxed frame), has no room for it (a quota of zero, as some private windows give, or a full disk), or offers no IndexedDB at all | Do not offer a retry: tell the user this browser is keeping the app from storing anything on this device. The app may open the vault again with `memoryDeviceDB()`, which remembers no unlock here; the browser's own error is the `cause` |
+| `storage_blocked`     | this device's own store (its device store, or a vault kept on the device, as `safebyok-indexeddb`'s) refused for a reason that holds until something outside the app changes: the browser withholds storage from the page (site data blocked, a sandboxed frame), has no room for it (a quota of zero, as some private windows give, or a full disk), or offers no IndexedDB at all | Do not offer a retry: tell the user this browser is keeping the app from storing anything on this device. The app may open the vault again with `memoryDeviceDB()`, which remembers no unlock here; the browser's own error is the `cause` |
 
 `openVault` itself can refuse with `bad_option`, `bad_label`, `insecure_context`, and, as it reads the vault from
 storage, `storage_unavailable`, `not_permitted`, `identity_revoked` or `damaged_bundle` (a
 damaged lockbox never stops an open): the last four are conditions, though they surface at open.
-So is `storage_blocked`, from this device's own store, which opening again will not mend.
+So is `storage_blocked`, from this device's own store or a vault store on it, which opening again will not mend.
 A refused open leaves nothing running behind it, so the host simply opens again.
 
 ### A vault that cannot be opened

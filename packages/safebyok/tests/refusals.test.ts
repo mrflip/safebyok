@@ -92,10 +92,63 @@ describe("Refusals.vaultFull", () => {
   })
 })
 
+describe("Refusals.storageBlocked", () => {
+  it("refuses as storage_blocked, saying trying again will not help, with no cause when none is given", () => {
+    const refusal = Refusals.storageBlocked()
+    expect(refusal.kind).to.eq('storage_blocked')
+    expect(refusal.message).to.eq(Refusals.StorageBlockedMessage)
+    expect(refusal.message).to.include('Trying again will not help')
+    expect(refusal).to.not.have.property('cause')
+  })
+
+  it("keeps the browser's own error as the cause, as its first example does", async () => {
+    const withheld = new DOMException('The operation is insecure.', 'SecurityError')
+    const shelf = () => Promise.reject(withheld)
+    const reading = async () => {
+      try { return await shelf() } catch (err) {
+        throw Refusals.isStorageBlocked(err) ? Refusals.storageBlocked(undefined, { cause: err }) : err
+      }
+    }
+    const err = await TH.expectRefusal(reading(), 'storage_blocked')
+    expect(err.cause).to.eq(withheld)
+  })
+
+  it("says what was withheld when given, as its second example does", () => {
+    const refusal = Refusals.storageBlocked('This context offers no IndexedDB, so the vault has nowhere to keep its records.')
+    expect(refusal.message).to.include('no IndexedDB')
+  })
+})
+
+/** A plain Error named as a browser names a storage it does not offer, as a runtime with no DOMException makes one. */
+class HermesNotSupportedError extends Error {
+  override readonly name = 'NotSupportedError'
+}
+
+describe("Refusals.isStorageBlocked", () => {
+  const BlockedCases = [
+    // what holds until something outside the app changes:
+    [new DOMException('The operation is insecure.', 'SecurityError'),         true,   'storage withheld from the page, as its first example shows'],
+    [new DOMException('Quota exceeded.', 'QuotaExceededError'),               true,   'no room left'],
+    [new DOMException('No IndexedDB.', 'NotSupportedError'),                  true,   'no storage of the kind at all'],
+    [{ name: 'SecurityError', message: 'from another frame' },                true,   'one from another frame, told by name rather than class'],
+    [new HermesNotSupportedError('no DOMException here'),                    true,   'a plain Error of the name, where there is no DOMException'],
+    // what may pass:
+    [new DOMException('The connection is closing.', 'InvalidStateError'),     false,  'a connection closing, as its second example shows'],
+    [new DOMException('Aborted.', 'AbortError'),                              false,  'a transaction aborted'],
+    [new Error('anything else'),                                              false,  'an Error of no such name'],
+    [null,                                                                    false,  'a failure with no error at all'],
+    ["SecurityError",                                                         false,  'a bare string, which names nothing'],
+  ] as const
+
+  for (const [err, expected, blurb] of BlockedCases) {
+    it(blurb, () => { expect(Refusals.isStorageBlocked(err)).to.eq(expected) })
+  }
+})
+
 describe("Refusals, between them", () => {
   it("quote nothing they were handed but the message an adapter writes", () => {
     const quoted = 'SUPERSECRET-ciphertext'
-    const refusals = [Refusals.staleWrite('lockbox'), Refusals.vaultFull(3), Refusals.notPermitted()]
+    const refusals = [Refusals.staleWrite('lockbox'), Refusals.vaultFull(3), Refusals.notPermitted(), Refusals.storageBlocked()]
     for (const refusal of refusals) { expect(TH.thrownText(refusal)).to.not.include(quoted) }
   })
 })
