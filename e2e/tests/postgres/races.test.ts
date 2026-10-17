@@ -19,7 +19,7 @@ TH.describeOnPostgres('races', "postgresVaultDB's lockbox limit, over a real Pos
   const Racers = 8
   const Rounds = 5
 
-  it("takes writers racing for the last place only as far as the README says: some land, none past the writers racing, and each that landed reads back", async () => {
+  it("leaves writers racing for the last place with some landed, none refused for another reason, and each that landed readable and listed (bounds and read-back, not the limit)", async () => {
     const db = getDb()
     for (let round = 0; round < Rounds; round += 1) {
       await db.endDevices()

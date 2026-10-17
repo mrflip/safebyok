@@ -250,37 +250,15 @@ const isKind = (kind: unknown): kind is VaultErrorKind => (VaultErrorKindVals as
     `count(*)` over the vault's primary-key prefix, at most about `maxLockboxes` index entries,
     since the limit stops growth near it. With no limit, there is no count either.
 
-  **For a hard cap**, *vaya con dios*: this is unsupported, and it costs what the package does not
-  ask of you -- a trigger of your own, and a transaction-scoped advisory lock per vault that makes
-  lockbox inserts into one vault take turns, so that racing writers can no longer overshoot under READ COMMITTED. (Under
-  REPEATABLE READ the trigger counts from its transaction's snapshot, which misses a racer's
-  lockbox committed meanwhile, and racers may still overshoot.) Put your number where `1000` is,
-  and pass the same as `maxLockboxes`: the adapter's own count still refuses a write to a full
-  vault first, as `vault_full`, and a first write under a boxlabel already taken as `stale_write`,
-  so the trigger meets only the racers that count let through. Its refusal is a database error,
-  so the adapter reports it as `storage_unavailable` rather than `vault_full`; with the trigger's
-  number below `maxLockboxes`, every first write it meets in a vault at that number refuses that
-  way, one under a boxlabel already taken included, since a `BEFORE` trigger fires ahead of
-  `ON CONFLICT`. The package's own tests run this on PGlite, one statement at a time, and cannot race it; the repository's `e2e/tests/postgres/hard-cap.test.ts` runs this very SQL on a real Postgres, with a connection to each writer, under READ COMMITTED, REPEATABLE READ and SERIALIZABLE.
+  **For a hard cap**, which this package does not ship (a trigger is yours to own, and its
+  trade-offs depend on your isolation level and your tables), paste this to your coding agent:
 
-  ```sql
-  CREATE OR REPLACE FUNCTION safebyok_lockboxes_capped() RETURNS trigger LANGUAGE plpgsql AS $$
-  BEGIN
-    -- Inserts into one vault take turns. Not a row lock on the bundle: every lockbox write already
-    -- holds that row FOR SHARE, and two writers each raising theirs to FOR UPDATE would deadlock.
-    PERFORM pg_advisory_xact_lock(hashtext('safebyok_lockboxes_capped'), hashtext(NEW.applabel || '^' || NEW.user_id || '^' || NEW.vaultlabel));
-    IF (SELECT count(*) FROM safebyok_lockboxes
-          WHERE (applabel, user_id, vaultlabel) = (NEW.applabel, NEW.user_id, NEW.vaultlabel)) >= 1000 THEN
-      RAISE EXCEPTION 'This vault holds its limit of lockboxes' USING ERRCODE = 'check_violation';
-    END IF;
-    RETURN NEW;
-  END
-  $$;
-
-  CREATE OR REPLACE TRIGGER safebyok_lockboxes_capped
-    BEFORE INSERT ON safebyok_lockboxes
-    FOR EACH ROW EXECUTE FUNCTION safebyok_lockboxes_capped();
-  ```
+  > Read the "A limit of the server's own" bullet of the `safebyok-postgres` README and `VAULTDB.md` (lines
+  > 4.2 to 4.5), and the SQL in `vault-tables.sql`. Write me a `BEFORE INSERT` trigger on
+  > `safebyok_lockboxes` that refuses a vault's lockbox past a hard limit, and explain its
+  > trade-offs: the lock it takes, what my connections' isolation level does to it, and that its
+  > refusal surfaces as `storage_unavailable` rather than `vault_full`. Then write the test that
+  > proves it against a real Postgres, not PGlite.
 
 ## Hearing other writes
 

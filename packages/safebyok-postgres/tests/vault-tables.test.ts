@@ -30,7 +30,7 @@ const tablesOnlyDatabase = async (): Promise<PGlite> => {
     return db
   })()
   const db = await tablesOnly.db
-  await db.exec('TRUNCATE safebyok_lockboxes, safebyok_bundles; DROP TRIGGER IF EXISTS safebyok_lockboxes_capped ON safebyok_lockboxes; DROP FUNCTION IF EXISTS safebyok_lockboxes_capped()')
+  await db.exec('TRUNCATE safebyok_lockboxes, safebyok_bundles')
   return db
 }
 beforeAll(async () => { await tablesOnlyDatabase() }, TH.BootMillis)
@@ -114,32 +114,6 @@ describe("VaultNotifySql", () => {
     expect(heard.count).to.eq(0)
     expect(await TH.requestFor(db, 'u1').listBoxes(TH.scopeOf('u1'))).to.have.lengthOf(1)
     unsubscribe()
-  })
-})
-
-describe("the README's hard cap, vaya con dios", () => {
-  const readme = readFileSync(path.join(import.meta.dirname, '..', 'README.md'), 'utf8')
-  const note = /```sql\n([\s\S]*?safebyok_lockboxes_capped[\s\S]*?)```/.exec(readme)?.[1]?.replaceAll(/^ {2}/gm, '')
-
-  it("is in the README as a block of SQL", () => {
-    expect(note).to.be.a('string')
-  })
-
-  it("refuses the lockbox past its limit, one vault at a time, and lets a vault below it take another", async () => {
-    const db = await tablesOnlyDatabase()
-    await db.exec(String(note).replaceAll('>= 1000', '>= 2'))
-    const vaultDB = TH.requestFor(db, 'u1')
-    const u1 = TH.scopeOf('u1')
-    const noBoxYet = { vault_id: 'vault-id-u1', revision_id: null, vault_key_epoch: 1 }
-    await vaultDB.createBundle(TH.bundleOf('u1'))
-    await vaultDB.createBundle({ ...TH.bundleOf('u1'), vaultlabel: 'other' })
-    await vaultDB.updateBox(u1, TH.boxOf('openai', 'sk-fake'), noBoxYet)
-    await vaultDB.updateBox(u1, TH.boxOf('anthropic', 'sk-fake'), noBoxYet)
-    await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('mistral', 'sk-fake'), noBoxYet), 'storage_unavailable')
-    expect(await vaultDB.listBoxes(u1)).to.have.lengthOf(2)
-    await vaultDB.updateBox({ ...u1, vaultlabel: 'other' }, TH.boxOf('mistral', 'sk-fake'), noBoxYet)
-    await vaultDB.eraseBox(u1, 'openai', { vault_id: 'vault-id-u1' })
-    await vaultDB.updateBox(u1, TH.boxOf('mistral', 'sk-fake'), noBoxYet)
   })
 })
 
