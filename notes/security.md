@@ -1080,3 +1080,42 @@ security expert who knows what questions to ask.
   `@zxcvbn-ts/language-common` (runtime dependencies at the Coach's yes): the length floor, then a
   zxcvbn score of at least 3, which is its blocklist of common passwords (NIST's other ask) and its
   pattern matchers. It keeps nothing of a passphrase between calls.
+* 2026-10-17 (thread 5b, store_base, [PR #139](https://github.com/mrflip/safebyok/pull/139)):
+  **host listener errors go to the platform's `reportError` as they are.** The `VaultDB` base
+  class (`vault-db.ts`, `subscribe`) and `ChangeBell` (`change-bell.ts`) call each host listener
+  so that what it throws, or a promise it returns that rejects, never escapes: it goes to the
+  logger as an error (the VaultDB) and to `globalThis.reportError` where the platform has one
+  (`report-error.ts`, looked up at call time). The error is the host's own and passed unredacted:
+  safebyok put nothing secret in it, and a host listener that puts a secret in its own error has
+  chosen to. In a browser such an error is reported twice, to the logger and to `reportError`, as
+  designed.
+* 2026-10-17 (thread 5b, store_base): **an adapter keeps its own logger over `openVault`'s.**
+  `openVault` hands its logger to the VaultDB through the public `VaultDB.adoptLogger`, and only
+  when the host passed a logger; a VaultDB made with its own `logger` keeps it, and one shared
+  between vaults keeps the latest logger handed it. A host that wants an adapter's messages kept
+  apart (a server-side redacting logger, say) passes that logger to the adapter directly. Every
+  logger call is guarded, so a throwing logger never breaks a verb.
+* 2026-10-17 (thread 5b, store_base): **Convex carries no cause on any refusal.** `convexVaultDB`
+  (`safebyok-convex/src/convex-vault-db.ts`) refuses with no `cause` at all -- `identity_revoked`,
+  `vault_full` and `storage_unavailable` alike -- because a Convex error on a dev deployment may
+  quote the call's arguments (names, public bags, ciphertext). Its refusals are made through
+  `Sanitizer.refusalFor`, and the message points the developer to the deployment's logs and the
+  browser console instead.
+* 2026-10-17 (thread 5b, store_base, G304): **GraphQL errors cross with no server text where they
+  might quote.** In the browser, `graphqlVaultDB` (`safebyok-graphql/src/graphql-vault-db.ts`)
+  refuses a server's `BAD_USER_INPUT` or `GRAPHQL_VALIDATION_FAILED` as `bad_option` with a fixed
+  message and no cause, since such errors may quote the variables, which are records. On the
+  server, `vaultResolvers` (`vault-resolvers.ts`) sends a `vaultDBFor` that throws as `bad_option`
+  with a generic "the server's setup is wrong" message; its own message, which may name the host's
+  setup or the env var names of secrets, is kept only server-side, as the non-enumerable `cause`
+  of the GraphQL error.
+* 2026-10-17 (thread 5b, store_base, G247): **the Convex component checks a bundle update's
+  `vault_id` and epoch.** The component's `updateBundle` (`safebyok-convex/src/component/vaults.ts`)
+  writes only when the new bundle keeps the standing `vault_id` and its `unlock_epoch` is greater
+  than the standing one; otherwise it resolves `false`, which the client reads as `stale_write`.
+  This now holds even against a modified client; the core client already never sends otherwise.
+* 2026-10-17 (thread 5b, store_base): **a null IndexedDB failure becomes an Error at the base
+  class.** `safebyok-indexeddb`'s `settle` (`shelf.ts`) no longer replaces a null rejection
+  itself; the base class's `Refusals.storageUnavailable` (`refusals.ts`) turns a null or
+  undefined cause into an Error saying the backend gave none, so no refusal ever carries a null
+  cause.
