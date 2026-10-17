@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { Suspense } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ForeverMillis, MinuteMillis, VaultError, openVault } from 'safebyok'
 import { PassphraseModal, type PassphraseAdvice } from '../src/passphrase-modal'
@@ -373,6 +374,37 @@ describe("PassphraseModal", () => {
       fireEvent.click(screen.getByText('Erase and start over'))
       expect(destroy).toHaveBeenCalledOnce()
       expect(screen.getByText('Erase and start over')).to.have.property('disabled', true)
+    })
+
+    it("meets an erase that settles while a Suspense boundary hides it, offering it again once shown", async () => {
+      const erasing = TH.held()
+      const vault = TH.stubVault({ destroy: () => erasing.promise })
+      const hiding = TH.held()
+      const shown = (pending: Promise<undefined> | null) => (
+        <Suspense fallback={<p>Loading</p>}>
+          <TH.Hider hiding={pending} />
+          <PassphraseModal vault={vault} allowStartOver onDone={noop} />
+        </Suspense>
+      )
+      const { rerender } = render(shown(null))
+      fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
+      fireEvent.click(screen.getByText('Erase and start over'))
+      await act(async () => {
+        rerender(shown(hiding.promise))
+        await TH.wakeupAtNextTick()
+      })
+      expect(screen.getByText('Loading')).to.not.be.null
+      await act(async () => {
+        erasing.reject(new VaultError('storage_unavailable', 'Storage could not be reached; try again in a moment.'))
+        await TH.wakeupAtNextTick()
+      })
+      await act(async () => {
+        hiding.resolve(undefined)
+        await TH.wakeupAtNextTick()
+      })
+      expect(screen.queryByText('Loading')).to.be.null
+      expect(screen.getByText('Storage could not be reached; try again in a moment.')).to.not.be.null
+      expect(screen.getByText('Erase and start over')).to.have.property('disabled', false)
     })
 
     it("asks afresh once the vault it was asked of changed elsewhere, rather than erasing the one that stands", async () => {

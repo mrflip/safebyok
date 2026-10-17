@@ -1,11 +1,12 @@
 /**
  * safebyok-react's test helpers: everything `safebyok/testing` has, a fake WebAuthn
  * authenticator, a render that hears what React reports, a promise held for the test to settle,
- * and a count of the state updates React schedules. Star-import it as `TH`
+ * a count of the state updates React schedules, and a way to have Suspense hide what it holds.
+ * Star-import it as `TH`
  * (`import * as TH from './test-helpers'`).
  */
 import { fireEvent, render, screen } from '@testing-library/react'
-import { Component, createElement, type ReactElement, type ReactNode } from 'react'
+import { Component, createElement, use, type ReactElement, type ReactNode } from 'react'
 import { onTestFinished, vi } from 'vitest'
 import { ForcePassphraseReentryHours, VaultError, type UnlockSummary, type Vault, type VaultState } from 'safebyok'
 import { scopeOf } from 'safebyok/testing'
@@ -137,6 +138,21 @@ export class Catcher extends Component<{ children: ReactNode }, { caught: string
   override state = { caught: null as string | null }
   static getDerivedStateFromError(err: unknown) { return { caught: err instanceof Error ? err.message : 'not an Error' } }
   override render() { return this.state.caught === null ? this.props.children : createElement('p', null, `caught: ${this.state.caught}`) }
+}
+
+/**
+ * Suspends the Suspense boundary it stands in while `hiding` is pending, and renders nothing: a
+ * boundary already shown hides what it holds, which stays mounted, and shows it again once
+ * `hiding` settles. Null suspends nothing.
+ *
+ * @example
+ *   const hiding = TH.held()
+ *   rerender(<Suspense fallback="Loading"><TH.Hider hiding={hiding.promise} /><Dialog /></Suspense>)
+ *   await act(async () => { hiding.resolve(undefined) })
+ */
+export const Hider = ({ hiding }: { hiding: Promise<unknown> | null }) => {
+  if (hiding !== null) { use(hiding) }
+  return null
 }
 
 /** How the fake authenticator behaves: whether it offers PRF at all, and whether it answers as it makes a passkey. */
