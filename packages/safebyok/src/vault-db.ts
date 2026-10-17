@@ -67,7 +67,7 @@ export type StoredLockbox = { boxlabel: string, lockbox: unknown }
 /**
  * What an adapter's factory takes from the host, beside its backend's own options: an optional
  * `logger`. The factory settles it before the VaultDB exists -- `parseLogger(opts.logger)`, which is
- * the console when the host gave none -- and hands the base class a {@link VaultDBInit}.
+ * the default logger when the host gave none -- and hands the base class a {@link VaultDBInit}.
  *
  * @example
  *   export type AcmeVaultDBOpts = VaultDBOpts & { client: AcmeClient }
@@ -78,7 +78,7 @@ export type VaultDBOpts = {
    * watch that failed to start or dropped. Fixed when the VaultDB is made, and not the logger
    * `openVault` is given, which is the vault's alone. A vault opened with no logger of its own
    * uses this one, so give it here, once, to have one logger hear both. Without one (or with null),
-   * the console. Kind 'bad_option' for anything else that is not a VaultLogger.
+   * the default logger. Kind 'bad_option' for anything else that is not a VaultLogger.
    */
   logger?: VaultLogger | null | undefined
 }
@@ -203,7 +203,7 @@ export abstract class VaultDB {
   constructor(init: VaultDBInit) {
     const given = (init as { logger?: VaultLogger | null } | null | undefined)?.logger
     if (given === undefined || given === null) {
-      throw new VaultError('bad_option', "A VaultDB is made with a logger: hand `super()` { logger }. An adapter's factory settles it with parseLogger(opts.logger), which is the console when the host gave none.")
+      throw new VaultError('bad_option', "A VaultDB is made with a logger: hand `super()` { logger }. An adapter's factory settles it with parseLogger(opts.logger), which is the default logger when the host gave none.")
     }
     this.#logger = parseLogger(given)
   }

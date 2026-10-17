@@ -139,10 +139,10 @@ export type OpenVaultOpts = {
    * {@link VaultLogger}: `log`, `warn` and `error` functions. The vault hands
    * it no secret material or option's value (a host's own error goes as the host made it); whatever
    * it throws is ignored. Pass functions that do nothing for quiet. Default (none, or null): the
-   * logger the `vaultDB` was made with, which is the console when it was given none. It does not go
-   * the other way: a storage adapter keeps the logger it was made with, so to have one logger hear
-   * both, give it to the adapter's factory and leave this out; to have the vault log to the console
-   * whatever the adapter was given, pass `ConsoleLogger`. Kind 'bad_option' for anything else.
+   * logger the `vaultDB` was made with, which is the default logger when it was given none. It does
+   * not go the other way: a storage adapter keeps the logger it was made with, so to have one logger
+   * hear both, give it to the adapter's factory and leave this out; to have the vault use the
+   * default whatever the adapter was given, pass `DefaultLogger`. Kind 'bad_option' for anything else.
    */
   logger?: VaultLogger | null | undefined
   /**

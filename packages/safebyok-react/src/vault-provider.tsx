@@ -117,7 +117,7 @@ export const useVaultSnapshot = (): VaultSnapshot => {
  * provider watches each schema rather than the bag. A `logger`, `clock` or
  * `passphraseStrengthTest` that changes identity is warned of once, through the logger. The
  * provider and the vault it opens say things through one logger: the `logger` given here, else
- * the one the `vaultDB` was made with (the console when it was given none).
+ * the one the `vaultDB` was made with (the default logger when it was given none).
  */
 export type VaultProviderProps = Omit<OpenVaultOpts, 'userId'> & {
   /** The signed-in user from the host's auth, or null when nobody is: then there is no vault. */

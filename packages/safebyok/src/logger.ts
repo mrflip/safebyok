@@ -6,7 +6,8 @@ import { consoleLogger } from './console-logger'
  * Where a vault says what it has nobody to throw to: a lock that had to skip its grace, a
  * background refresh that failed, a remembered unlock it could not read. Pass one to the storage
  * adapter's factory as `logger`, and the vault opened over it hears it too; pass openVault one of
- * its own to keep them apart. With none anywhere, the console. Each call has a plain-language
+ * its own to keep them apart. With none anywhere, the {@link DefaultLogger}: the console, unless the
+ * app handed {@link setDefaultLogger} its own. Each call has a plain-language
  * `message`, a `story` of a few facts to filter on (`call`, the vault call it happened in), and
  * the error behind it, when there is one: a VaultError, or the host's own (its clock's, its
  * storage adapter's). The vault puts no whisper, passphrase, key, ciphertext or option's value in
@@ -53,7 +54,7 @@ const guardedFor = new WeakMap<object, VaultLogger>()
 
 /**
  * The logger a vault keeps: the host's, made safe to call -- whatever it throws or rejects with is
- * dropped -- or {@link ConsoleLogger} when there is none (null, like undefined, is none). Kind
+ * dropped -- or {@link DefaultLogger} when there is none (null, like undefined, is none). Kind
  * 'bad_option' for anything that is not an object carrying `log`, `warn` and `error` functions.
  * A binding that has something of its own to say, beside the vault it opens, says it here,
  * through the same logger.
@@ -64,15 +65,15 @@ const guardedFor = new WeakMap<object, VaultLogger>()
  * @param candidate - The host's logger, as handed to openVault.
  *
  * @example parseLogger(props.logger).warn('VaultProvider reopened the vault for a logger rebuilt in render', { call: 'VaultProvider' })
- * @example parseLogger(undefined).log('opened')  // to the console: 'safebyok: opened'
- * @example parseLogger(undefined) === ConsoleLogger  // true: the one console logger
+ * @example parseLogger(undefined).log('opened')  // to the default: the console says 'safebyok: opened'
+ * @example parseLogger(undefined) === DefaultLogger  // true: the one default logger
  * @example parseLogger(telemetry) === parseLogger(parseLogger(telemetry))  // true: guarded once
  */
 export const parseLogger = (candidate: VaultLogger | null | undefined): VaultLogger => {
-  if (candidate === undefined || candidate === null) { return ConsoleLogger }
+  if (candidate === undefined || candidate === null) { return DefaultLogger }
   if (guardedOnes.has(candidate)) { return candidate }
   if (! loggerShape.safeParse(candidate).success) {
-    throw new VaultError('bad_option', 'logger is not a VaultLogger: it needs log, warn and error functions. Leave it out to log to the console, or pass functions that do nothing to log nowhere.')
+    throw new VaultError('bad_option', 'logger is not a VaultLogger: it needs log, warn and error functions. Leave it out to use the default logger (the console, unless setDefaultLogger was given another), or pass functions that do nothing to log nowhere.')
   }
   const known = guardedFor.get(candidate)
   if (known !== undefined) { return known }
@@ -98,14 +99,51 @@ const guarded = (hostLogger: AnyReturningLogger): VaultLogger => {
   return safe
 }
 
+/** The console, each line tagged 'safebyok:', guarded: where the default logger says things until a host sets its own. */
+const GuardedConsole = guarded(consoleLogger)
+
+/** Where the default logger says things now: the console, or what the host last handed setDefaultLogger. */
+const defaults: { target: VaultLogger } = { target: GuardedConsole }
+
+/** A logger that hands each call on to `defaults.target` as it stands when called; kept as guarded, its target being so. */
+const forwarding = (): VaultLogger => {
+  const forwarder: VaultLogger = {
+    log:   (message, story, err) => { defaults.target.log(message, story, err) },
+    warn:  (message, story, err) => { defaults.target.warn(message, story, err) },
+    error: (message, story, err) => { defaults.target.error(message, story, err) },
+  }
+  guardedOnes.add(forwarder)
+  return forwarder
+}
+
 /**
- * The console, each line tagged 'safebyok:', and safe to call: what a storage adapter, a store or
- * a vault logs to when given no logger. Pass it to openVault, or to VaultProvider, to have the
- * vault log to the console whatever its storage adapter was given.
+ * The default logger: what every storage adapter, vault, provider and store says things through
+ * when it was given no logger of its own. One object, which hands each call on to the console --
+ * each line tagged 'safebyok:' -- or to the logger the host handed {@link setDefaultLogger}, as it
+ * stands when the call is made. Pass it to openVault, or to VaultProvider, to have the vault use
+ * the default whatever its storage adapter was given.
  *
- * @example openVault({ ...opts, vaultDB: idbVaultDB({ logger: telemetry }), logger: ConsoleLogger })  // the storage to telemetry, the vault to the console
+ * @example openVault({ ...opts, vaultDB: idbVaultDB({ logger: storageLogger }), logger: DefaultLogger })  // the storage to its own, the vault to the default
  */
-export const ConsoleLogger: VaultLogger = guarded(consoleLogger)
+export const DefaultLogger: VaultLogger = forwarding()
+
+/**
+ * Sends everything safebyok would say to the console to `logger` instead: what every storage
+ * adapter, vault, provider and store says when it was given no logger of its own, made before
+ * this call or after. Call it once, as the app starts. A logger handed to an adapter's factory,
+ * to openVault or to VaultProvider still wins there, as a child logger would. Guarded as
+ * parseLogger guards any logger. Kind 'bad_option' for anything that is not a VaultLogger.
+ *
+ * @param logger - The app's own logger; none (or null) puts the console back.
+ *
+ * @example setDefaultLogger(telemetry)  // every line safebyok says, to telemetry
+ * @example setDefaultLogger(undefined)  // back to the console
+ */
+export const setDefaultLogger = (logger: VaultLogger | null | undefined): void => {
+  const parsed = parseLogger(logger)
+  // The default handed back as its own target would hand each call to itself, forever.
+  defaults.target = parsed === DefaultLogger ? GuardedConsole : parsed
+}
 
 const tell = (hostLogger: AnyReturningLogger, level: VaultLoggerLevel, message?: string, story?: Record<string, unknown>, err?: Error | null) => {
   try {

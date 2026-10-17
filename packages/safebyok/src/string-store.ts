@@ -1,5 +1,5 @@
 import { VaultError } from './errors'
-import { asError, parseLogger, type VaultLogger } from './logger'
+import { DefaultLogger, asError } from './logger'
 import { reportToPlatform } from './report-error'
 
 /**
@@ -19,30 +19,16 @@ export type StringStore = {
 }
 
 /**
- * What `memoryStore` and `domStore` may be made with.
- *
- * @example memoryStore({ logger: telemetryLogger })
- */
-export type StringStoreOpts = {
-  /**
-   * Who hears of a listener that throws: the console when there is none (or null). Kind
-   * 'bad_option' for anything else that is not a VaultLogger.
-   */
-  logger?: VaultLogger | null | undefined
-}
-
-/**
  * Listener bookkeeping shared by both stores. A listener that is not a function is refused as it
  * subscribes, with kind 'bad_option', rather than breaking some later write that rings it. Each
  * listener is called in turn, as the write lands; one that throws stops no other and fails no
- * write, and what it threw goes to the store's logger, and to the platform's `reportError` where
+ * write, and what it threw goes to the default logger, and to the platform's `reportError` where
  * there is one.
  */
-const makeBell = (opts: StringStoreOpts | undefined) => {
-  const logger = parseLogger(opts?.logger)
+const makeBell = () => {
   const listeners = new Set<() => void>()
   return {
-    ring: () => { listeners.forEach((listener) => { callQuietly(listener, logger) }) },
+    ring: () => { listeners.forEach((listener) => { callQuietly(listener) }) },
     subscribe: (listener: () => void) => {
       if (typeof listener !== 'function') { throw new VaultError('bad_option', 'subscribe needs a listener function to call after each write or erase.') }
       listeners.add(listener)
@@ -51,11 +37,11 @@ const makeBell = (opts: StringStoreOpts | undefined) => {
   }
 }
 
-const callQuietly = (listener: () => void, logger: VaultLogger) => {
+const callQuietly = (listener: () => void) => {
   try {
     listener()
   } catch (err) {
-    logger.error("A listener of a string store threw. The write landed, and every other listener was called; the listener is its author's to mend.", { call: 'StringStore' }, asError(err))
+    DefaultLogger.error("A listener of a string store threw. The write landed, and every other listener was called; the listener is its author's to mend.", { call: 'StringStore' }, asError(err))
     reportToPlatform(err)
   }
 }
@@ -64,15 +50,13 @@ const callQuietly = (listener: () => void, logger: VaultLogger) => {
  * In-memory StringStore over a Map: what the tests use, and a fallback anywhere localStorage
  * is missing.
  *
- * @param opts - Optionally, the `logger` that hears of a listener that throws.
- *
  * @example
  *   const store = memoryStore()
  *   store.write('greeting', 'hi'); store.read('greeting')  // 'hi'
  */
-export const memoryStore = (opts?: StringStoreOpts): StringStore => {
+export const memoryStore = (): StringStore => {
   const bag = new Map<string, string>()
-  const bell = makeBell(opts)
+  const bell = makeBell()
   return {
     read:  (ckey) => bag.get(ckey) ?? null,
     write: (ckey, text) => { bag.set(ckey, text); bell.ring() },
@@ -92,14 +76,13 @@ export const memoryStore = (opts?: StringStoreOpts): StringStore => {
  *
  * @param webStorage - The Storage to write through, usually `window.localStorage`.
  * @param prefix - Namespace for this store's entries, e.g. 'safebyok-demo:db:'.
- * @param opts - Optionally, the `logger` that hears of a listener that throws.
  *
  * @example
  *   const dbStore = domStore(localStorage, 'safebyok-demo:db:')
  *   dbStore.write('greeting', 'hi')   // lands at 'safebyok-demo:db:greeting'
  */
-export const domStore = (webStorage: Storage, prefix: string, opts?: StringStoreOpts): StringStore => {
-  const bell = makeBell(opts)
+export const domStore = (webStorage: Storage, prefix: string): StringStore => {
+  const bell = makeBell()
   return {
     read:  (ckey) => webStorage.getItem(prefix + ckey),
     write: (ckey, text) => { webStorage.setItem(prefix + ckey, text); bell.ring() },

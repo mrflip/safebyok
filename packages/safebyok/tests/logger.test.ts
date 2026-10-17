@@ -1,7 +1,7 @@
 import { runInNewContext } from 'node:vm'
-import { describe, expect, expectTypeOf, it, vi } from 'vitest'
+import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { VaultError } from '../src/errors'
-import { ConsoleLogger, asError, parseLogger, type VaultLogger } from '../src/logger'
+import { DefaultLogger, asError, parseLogger, setDefaultLogger, type VaultLogger } from '../src/logger'
 import * as TH from './test-helpers'
 
 /** What a host might hand openVault as its logger that is not one. */
@@ -41,10 +41,10 @@ describe("parseLogger", () => {
     warn.mockRestore()
   })
 
-  it("answers the one console logger, ConsoleLogger, whenever it is given none or null, as its third example shows", () => {
-    expect(parseLogger(undefined)).to.eq(ConsoleLogger)
-    expect(parseLogger(null)).to.eq(ConsoleLogger)
-    expect(parseLogger(ConsoleLogger)).to.eq(ConsoleLogger)
+  it("answers the one default logger, DefaultLogger, whenever it is given none or null, as its third example shows", () => {
+    expect(parseLogger(undefined)).to.eq(DefaultLogger)
+    expect(parseLogger(null)).to.eq(DefaultLogger)
+    expect(parseLogger(DefaultLogger)).to.eq(DefaultLogger)
   })
 
   it("guards the same host logger as the same object, however often it is handed in, as its fourth example shows", () => {
@@ -141,6 +141,53 @@ describe("parseLogger", () => {
       process.off('unhandledRejection', unhandled)
     }
   })
+})
+
+describe("setDefaultLogger", () => {
+  afterEach(() => { setDefaultLogger(undefined) })
+
+  it("sends what the default logger hears to the app's own, as its first example shows: a fallback taken before the call included", () => {
+    const fallback = parseLogger(undefined)
+    const telemetry = TH.spyLogger()
+    setDefaultLogger(telemetry.logger)
+    fallback.warn('a refresh failed', { call: 'refresh' })
+    DefaultLogger.error('a listener threw')
+    expect(telemetry.calls.map((call) => [call.level, call.message])).to.deep.equal([['warn', 'a refresh failed'], ['error', 'a listener threw']])
+  })
+
+  it("puts the console back when given none or null, as its second example shows", () => {
+    const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => { /* kept out of the test output */ })
+    for (const none of [undefined, null]) {
+      setDefaultLogger(TH.spyLogger().logger)
+      setDefaultLogger(none)
+      DefaultLogger.log('opened')
+    }
+    expect(consoleLog.mock.calls.map(([said]) => String(said))).to.deep.equal(['safebyok: opened', 'safebyok: opened'])
+    consoleLog.mockRestore()
+  })
+
+  it("guards the logger it is given: one that throws breaks nothing", () => {
+    setDefaultLogger({ log: () => undefined, warn: () => undefined, error: () => { throw new Error('a logger that throws') } })
+    expect(() => { DefaultLogger.error('a listener threw') }).to.not.throw()
+  })
+
+  it("takes the default logger itself as the console, rather than handing each call to itself", () => {
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => { /* kept out of the test output */ })
+    setDefaultLogger(DefaultLogger)
+    DefaultLogger.warn('heard once')
+    expect(consoleWarn).toHaveBeenCalledOnce()
+    consoleWarn.mockRestore()
+  })
+
+  for (const [candidate, blurb] of NotLoggers) {
+    it(`refuses ${blurb} as bad_option, keeping the default it had`, () => {
+      const telemetry = TH.spyLogger()
+      setDefaultLogger(telemetry.logger)
+      expect(() => { setDefaultLogger(candidate as unknown as VaultLogger) }).to.throw(VaultError, /log, warn and error functions/)
+      DefaultLogger.log('still heard')
+      expect(telemetry.calls).to.have.lengthOf(1)
+    })
+  }
 })
 
 describe("VaultLogger", () => {

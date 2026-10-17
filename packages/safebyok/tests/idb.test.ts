@@ -7,7 +7,6 @@ import { idbDeviceDB, inspectIdbDeviceDB, type IdbOpts } from '../src/idb'
 import * as Entry from '../src/idb'
 import { VaultError } from '../src/errors'
 import * as Ckeys from '../src/ckeys'
-import type { VaultLogger } from '../src/logger'
 import * as TH from './test-helpers'
 
 // Each test gets its own database, so tests never see each other's rows.
@@ -242,19 +241,5 @@ describe("inspectIdbDeviceDB", () => {
     expect(() => inspector.subscribe('not a listener' as unknown as () => void)).to.throw(VaultError, /listener function/)
     await idbDeviceDB({ dbName }).writeUnlock(await TH.unlockOf('u1'), TH.NoLocks)
     expect(await inspector.rows()).to.have.lengthOf(1)
-  })
-
-  it("tells the logger it was made with of a listener that throws, as IdbInspectorOpts's example shows", async () => {
-    const dbName = TH.freshDbName()
-    const spy = TH.spyLogger()
-    const thrown = new Error('a listener that throws')
-    const unsubscribe = inspectIdbDeviceDB({ dbName, logger: spy.logger }).subscribe(() => { throw thrown })
-    await idbDeviceDB({ dbName }).writeUnlock(await TH.unlockOf('u1'), TH.NoLocks)
-    await vi.waitFor(() => { expect(spy.calls.map((call) => [call.level, call.story, call.err])).to.deep.equal([['error', { call: 'ChangeBell' }, thrown]]) })
-    unsubscribe()
-  })
-
-  it("refuses a logger that is not one as it is made, with kind 'bad_option'", () => {
-    expect(() => inspectIdbDeviceDB({ logger: {} as unknown as VaultLogger })).to.throw(VaultError, /log, warn and error functions/).with.property('kind', 'bad_option')
   })
 })

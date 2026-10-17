@@ -11,7 +11,7 @@ import { memoryStore } from '../src/string-store'
 import { LockboxFieldsBytes, LockboxFixedBytes, StoredBytesPerWhisperByte, deviceTroubleAsConditions, eraseDamagedVault, openVault, type OpenVaultOpts, type Vault } from '../src/vault'
 import { cipherBinding, cipherBytes, fromB64, makeLockboxKey, makeVaultKey, randomBytes, toB64, wrapKeyUnder } from '../src/crypto'
 import type { CustomKeyDeriver, KeyDeriver } from '../src/key-deriver'
-import { ConsoleLogger, type VaultLogger } from '../src/logger'
+import { DefaultLogger, setDefaultLogger, type VaultLogger } from '../src/logger'
 import { Argon2idWebV1, MaxSaltBytes, TestDeriverNotice } from '../src/key-deriver-spec'
 import * as Ckeys from '../src/ckeys'
 import type { PassphraseStrengthTest, PassphraseVerdict } from '../src/passphrase-strength'
@@ -5653,21 +5653,37 @@ describe("the logger", () => {
     expect(own.calls.map((call) => call.story)).to.deep.equal([{ call: 'lockSoon' }])
   })
 
-  it("is the console, whatever the vaultDB was made with, when the host passes ConsoleLogger, as its example shows", async () => {
+  it("is the default logger, whatever the vaultDB was made with, when the host passes DefaultLogger, as its example shows", async () => {
     const world = makeWorld()
     const own = TH.spyLogger()
-    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => { /* kept out of the test output */ })
+    const telemetry = TH.spyLogger()
+    setDefaultLogger(telemetry.logger)
     try {
       const vaultDB = localVaultDB({ store: world.dbStore, logger: own.logger })
       let reading = world.clock.now()
-      const vault = await world.openUnlocked('pw', { vaultDB, logger: ConsoleLogger, clock: { now: () => reading } })
+      const vault = await world.openUnlocked('pw', { vaultDB, logger: DefaultLogger, clock: { now: () => reading } })
       reading = world.clock.now() / 1000
       await vault.lockSoon()
-      const said = consoleWarn.mock.calls.map(([message]) => String(message)).filter((message) => message.startsWith('safebyok: lockSoon()'))
-      expect(said).to.have.lengthOf(1)
+      expect(telemetry.calls.map((call) => call.story)).to.deep.equal([{ call: 'lockSoon' }])
       expect(own.calls).to.have.lengthOf(0)
     } finally {
-      consoleWarn.mockRestore()
+      setDefaultLogger(undefined)
+    }
+  })
+
+  it("is the app's default, set once, when neither the host nor the vaultDB's factory was given one", async () => {
+    const world = makeWorld()
+    const telemetry = TH.spyLogger()
+    setDefaultLogger(telemetry.logger)
+    try {
+      const vaultDB = localVaultDB({ store: world.dbStore })
+      let reading = world.clock.now()
+      const vault = await world.openUnlocked('pw', { vaultDB, logger: undefined, clock: { now: () => reading } })
+      reading = world.clock.now() / 1000
+      await vault.lockSoon()
+      expect(telemetry.calls.map((call) => call.story)).to.deep.equal([{ call: 'lockSoon' }])
+    } finally {
+      setDefaultLogger(undefined)
     }
   })
 

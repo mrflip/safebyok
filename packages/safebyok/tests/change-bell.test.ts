@@ -1,8 +1,7 @@
 import { spawnSync } from 'node:child_process'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as ChangeBell from '../src/change-bell'
-import { VaultError } from '../src/errors'
-import type { VaultLogger } from '../src/logger'
+import { setDefaultLogger } from '../src/logger'
 import * as TH from './test-helpers'
 
 /** A bell of its own for each test, named as an IndexedDB store's is. */
@@ -12,6 +11,51 @@ const freshBell = () => `safebyok-idb:${TH.freshDbName()}:vault_db`
 const throwFromLogger = () => { throw new Error('a logger that throws') }
 
 describe("ChangeBell", () => {
+  // A listener that throws is said through the default logger: a spy's, kept out of the test output.
+  beforeEach(() => { setDefaultLogger(TH.spyLogger().logger) })
+  afterEach(() => { setDefaultLogger(undefined) })
+
+  it("tells the default logger of what a listener threw", async () => {
+    const spy = TH.spyLogger()
+    setDefaultLogger(spy.logger)
+    const bellname = freshBell()
+    const thrown = new Error('a listener that throws')
+    const stop = ChangeBell.listen(bellname, () => { throw thrown })
+    ChangeBell.ring(bellname)
+    await vi.waitFor(() => { expect(spy.calls).to.have.lengthOf(1) })
+    expect(spy.calls.map((call) => [call.level, call.story, call.err])).to.deep.equal([['error', { call: 'ChangeBell' }, thrown]])
+    stop()
+  })
+
+  it("tells the console of a listener that throws, when no default logger was set", async () => {
+    setDefaultLogger(undefined)
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => { /* kept out of the test output */ })
+    try {
+      const bellname = freshBell()
+      const stop = ChangeBell.listen(bellname, () => { throw new Error('a listener that throws') })
+      ChangeBell.ring(bellname)
+      await vi.waitFor(() => { expect(consoleError).toHaveBeenCalledOnce() })
+      expect(String(consoleError.mock.calls[0]?.[0])).to.match(/^safebyok: A listener of the change bell threw/)
+      stop()
+    } finally {
+      consoleError.mockRestore()
+    }
+  })
+
+  it("rings on, letting nothing escape, when the default logger throws too", async () => {
+    setDefaultLogger({ log: throwFromLogger, warn: throwFromLogger, error: throwFromLogger })
+    const bellname = freshBell()
+    const heard: string[] = []
+    const stops = [
+      ChangeBell.listen(bellname, () => { heard.push('one'); throw new Error('a listener that throws') }),
+      ChangeBell.listen(bellname, () => { heard.push('two') }),
+    ]
+    ChangeBell.ring(bellname)
+    await vi.waitFor(() => { expect(heard).to.deep.equal(['one', 'two']) })
+    await TH.wakeupAtNextTick()
+    for (const stop of stops) { stop() }
+  })
+
   it("calls every listener of the bell rung, and only that bell's", async () => {
     const bellname = freshBell()
     const heard: string[] = []
@@ -95,7 +139,7 @@ describe("ChangeBell", () => {
     try {
       const bellname = freshBell()
       const thrown = new Error('a listener that throws')
-      const stop = ChangeBell.listen(bellname, () => { throw thrown }, TH.spyLogger().logger)
+      const stop = ChangeBell.listen(bellname, () => { throw thrown })
       ChangeBell.ring(bellname)
       await vi.waitFor(() => { expect(reported).to.deep.equal([thrown]) })
       stop()
@@ -109,12 +153,10 @@ describe("ChangeBell", () => {
     vi.stubGlobal('reportError', (err: unknown) => { reported.push(err) })
     try {
       const bellname = freshBell()
-      const spy = TH.spyLogger()
-      const stop = ChangeBell.listen(bellname, () => { throw 'a string, thrown' }, spy.logger) // eslint-disable-line @typescript-eslint/only-throw-error
+      const stop = ChangeBell.listen(bellname, () => { throw 'a string, thrown' }) // eslint-disable-line @typescript-eslint/only-throw-error
       ChangeBell.ring(bellname)
       await vi.waitFor(() => { expect(reported).to.have.lengthOf(1) })
       expect(reported).to.deep.equal(['a string, thrown'])
-      expect(spy.calls.map((call) => call.err)).to.deep.equal([null])
       stop()
     } finally {
       vi.unstubAllGlobals()
@@ -128,74 +170,13 @@ describe("ChangeBell", () => {
       ChangeBell.listen(bellname, () => {
         heard.push('one')
         throw new Error('a listener that throws')
-      }, TH.spyLogger().logger),
+      }),
       ChangeBell.listen(bellname, () => { heard.push('two') }),
     ]
     ChangeBell.ring(bellname)
     await vi.waitFor(() => { expect(heard).to.deep.equal(['one', 'two']) })
     await TH.wakeupAtNextTick()
     for (const stop of stops) { stop() }
-  })
-
-  it("tells the logger a listener was listened with of what it threw, as its second example shows", async () => {
-    const bellname = freshBell()
-    const spy = TH.spyLogger()
-    const thrown = new Error('a listener that throws')
-    const stop = ChangeBell.listen(bellname, () => { throw thrown }, spy.logger)
-    ChangeBell.ring(bellname)
-    await vi.waitFor(() => { expect(spy.calls).to.have.lengthOf(1) })
-    expect(spy.calls.map((call) => [call.level, call.story, call.err])).to.deep.equal([['error', { call: 'ChangeBell' }, thrown]])
-    stop()
-  })
-
-  it("tells the console of a listener that throws, when it was listened with no logger", async () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => { /* kept out of the test output */ })
-    try {
-      const bellname = freshBell()
-      const stop = ChangeBell.listen(bellname, () => { throw new Error('a listener that throws') })
-      ChangeBell.ring(bellname)
-      await vi.waitFor(() => { expect(consoleError).toHaveBeenCalledOnce() })
-      expect(String(consoleError.mock.calls[0]?.[0])).to.match(/^safebyok: A listener of the change bell threw/)
-      stop()
-    } finally {
-      consoleError.mockRestore()
-    }
-  })
-
-  it("calls a listener listened twice once, telling the later logger", async () => {
-    const bellname = freshBell()
-    const [first, later] = [TH.spyLogger(), TH.spyLogger()]
-    let calls = 0
-    const listener = () => { calls += 1; throw new Error('a listener that throws') }
-    const stopFirst = ChangeBell.listen(bellname, listener, first.logger)
-    const stopLater = ChangeBell.listen(bellname, listener, later.logger)
-    ChangeBell.ring(bellname)
-    await vi.waitFor(() => { expect(later.calls).to.have.lengthOf(1) })
-    await TH.wakeupAtNextTick()
-    expect(calls).to.eq(1)
-    expect(first.calls).to.have.lengthOf(0)
-    stopFirst()
-    stopLater()
-  })
-
-  it("rings on, letting nothing escape, when a listener's logger throws too", async () => {
-    const bellname = freshBell()
-    const heard: string[] = []
-    const stops = [
-      ChangeBell.listen(bellname, () => { heard.push('one'); throw new Error('a listener that throws') }, { log: throwFromLogger, warn: throwFromLogger, error: throwFromLogger }),
-      ChangeBell.listen(bellname, () => { heard.push('two') }),
-    ]
-    ChangeBell.ring(bellname)
-    await vi.waitFor(() => { expect(heard).to.deep.equal(['one', 'two']) })
-    await TH.wakeupAtNextTick()
-    for (const stop of stops) { stop() }
-  })
-
-  it("refuses a logger that is not one as it listens, with kind 'bad_option', and listens to nothing", () => {
-    const bellname = freshBell()
-    for (const nonsense of [{}, 'console']) {
-      expect(() => ChangeBell.listen(bellname, () => undefined, nonsense as unknown as VaultLogger)).to.throw(VaultError, /log, warn and error functions/)
-    }
   })
 
   it("closes its channel when its last listener leaves, and opens it afresh for the next", async () => {
