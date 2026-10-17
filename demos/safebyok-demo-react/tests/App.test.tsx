@@ -39,7 +39,7 @@ describe("App", () => {
     fireEvent.change(screen.getByPlaceholderText('sk-ant-...'), { target: { value: 'sk-ant-test-not-a-real-key' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     const choosing = await screen.findByRole('dialog', { name: 'Choose a vault passphrase' })
-    fireEvent.change(within(choosing).getByPlaceholderText('vault passphrase'), { target: { value: 'pw one' } })
+    fireEvent.change(within(choosing).getByPlaceholderText('vault passphrase'), { target: { value: 'correct horse one' } })
     fireEvent.click(within(choosing).getByRole('button', { name: 'Create vault' }))
     await screen.findByText(/🔓 unlocked until/)
 
@@ -48,7 +48,7 @@ describe("App", () => {
     await screen.findByText('🔒 locked')
     fireEvent.click(await screen.findByRole('button', { name: 'view' }))
     const unlocking = await screen.findByRole('dialog', { name: 'Unlock your vault' })
-    fireEvent.change(within(unlocking).getByPlaceholderText('vault passphrase'), { target: { value: 'pw wrong' } })
+    fireEvent.change(within(unlocking).getByPlaceholderText('vault passphrase'), { target: { value: 'correct horse wrong' } })
     fireEvent.click(within(unlocking).getByRole('button', { name: 'Unlock' }))
     await waitFor(() => { expect(within(unlocking).getByRole('alert').textContent).to.not.eq('') })
 
@@ -59,7 +59,7 @@ describe("App", () => {
 
     // Enter: the whisper shows.
     fireEvent.click(screen.getByRole('button', { name: 'view' }))
-    fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'pw one' } })
+    fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'correct horse one' } })
     fireEvent.click(screen.getByRole('button', { name: 'Unlock' }))
     await screen.findByText('sk-ant-test-not-a-real-key')
 
@@ -70,7 +70,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole('button', { name: 'delete' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Forgot it? Start a new vault' }))
     fireEvent.click(screen.getByRole('button', { name: 'Erase and start over' }))
-    fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'pw two' } })
+    fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'correct horse two' } })
     expect(screen.getByRole('dialog', { name: 'Choose a vault passphrase' })).to.not.be.null
     fireEvent.click(screen.getByRole('button', { name: 'Create vault' }))
     await screen.findByText(/No lockboxes yet/)
