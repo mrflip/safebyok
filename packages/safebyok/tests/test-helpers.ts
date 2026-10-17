@@ -395,7 +395,8 @@ export const changeCounter = () => {
  * A watch on `scope` through `vaultDB`, once it is live, its calls counted from then: an adapter
  * whose server sends a change as the subscription starts (postgresVaultDB with a `listen`, a
  * GraphQL subscription) calls once at the start, and this resolves after that call, the count
- * back at zero. Waits up to two seconds for it.
+ * back at zero. Waits up to two seconds for it; if the call never comes, it unsubscribes, then
+ * rejects.
  *
  * @param vaultDB - The adapter to watch through.
  * @param scope - The vault to watch.
@@ -406,7 +407,13 @@ export const changeCounter = () => {
 export const liveWatch = async (vaultDB: Pick<VaultDB, 'subscribe'>, scope: VaultScope) => {
   const heard = { count: 0 }
   const unsubscribe = vaultDB.subscribe(scope, () => { heard.count += 1 })
-  await eventually(() => heard.count > 0)
+  try {
+    await eventually(() => heard.count > 0)
+  } catch (err) {
+    // A watch left live past its test would hold its connection open, and count in the next.
+    unsubscribe()
+    throw err
+  }
   heard.count = 0
   return { heard, unsubscribe }
 }

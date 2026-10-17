@@ -124,6 +124,20 @@ describe("liveWatch", () => {
     expect(heard.count).to.eq(1)
     unsubscribe()
   })
+
+  it("unsubscribes before it rejects, when the opening call never comes", async () => {
+    const unsubscribe = vi.fn()
+    const silent = { subscribe: () => unsubscribe }
+    vi.useFakeTimers()
+    try {
+      const outcome = expect(TH.liveWatch(silent, TH.scopeOf('u1'))).rejects.toThrow('never came to pass')
+      await vi.advanceTimersByTimeAsync(3000)
+      await outcome
+    } finally {
+      vi.useRealTimers()
+    }
+    expect(unsubscribe.mock.calls).to.have.lengthOf(1)
+  })
 })
 
 describe("makeGate", () => {
