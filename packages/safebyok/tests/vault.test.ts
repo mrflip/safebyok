@@ -1100,6 +1100,20 @@ describe("the public bag", () => {
     expect(world.dbStore.ckeys().filter((ckey) => isU1Box(ckey))).to.have.lengthOf(0)
   })
 
+  it("refuses an option beside `public`, as 'bad_option', writing nothing: a note is kept in the bag, not beside it", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    const misfits = [{ note: 'work account' }, { pubilc: { note: 'work account' } }, { public: {}, note: 'work account' }, 'work account']
+    for (const opts of misfits) {
+      const err = await TH.expectRefusal(vault.store('anthropic', 'sk-fake', opts as never), 'bad_option')
+      expect(err.message).to.include('public')
+      expect(err.message).to.not.include('work account')
+    }
+    expect(world.dbStore.ckeys().filter((ckey) => isU1Box(ckey))).to.have.lengthOf(0)
+    await vault.store('anthropic', 'sk-fake', { public: undefined })
+    expect(TH.summaryOf(vault.getSnapshot().boxes[0])?.public).to.deep.equal({})
+  })
+
   it("counts toward maxWhisperBytes with the whisper, refusing the two together as 'whisper_too_large'", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw', { maxWhisperBytes: 64 })

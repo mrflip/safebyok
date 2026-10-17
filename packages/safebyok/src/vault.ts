@@ -1,6 +1,7 @@
 import * as Z from 'zod/mini'
 import { DeviceMark, DeviceUnlock, LockboxSummary, PublicBag, type SeenVault, type DamagedLockbox, type Lockbox, ForcePassphraseReentryHours, FarFuture, FarPast, ForeverMillis, MaxLockboxes, MaxReentryHours, MaxUnlocks, MaxWhisperBytes, MinuteMillis, PasskeySaltBytes, VaultBundle, type VaultScope, Whisper, wallClock, type Clock, type PasskeyProof, type PassphraseEnvelope, type UnlockEnvelope, type UnlockSummary } from './types'
 import * as Names from './names'
+import { optionsCheck } from './options'
 import type { VaultValidators } from './validators'
 import { VaultError, isVaultError, type VaultErrorKind } from './errors'
 import type { KeyDeriver } from './key-deriver'
@@ -468,7 +469,8 @@ export type Vault = {
    *
    * `opts.public` is the lockbox's public bag ({@link PublicBag}): any JSON value, shown in the
    * snapshot while locked, never interpreted by the vault -- kind 'bad_option' for anything JSON
-   * cannot carry. Check its shape yourself before storing it. Left out, the lockbox keeps the bag
+   * cannot carry. Check its shape yourself before storing it. It is the only option: any other
+   * (a misspelt `pubilc`, or a `note` beside it) is kind 'bad_option', writing nothing. Left out, the lockbox keeps the bag
    * it has (when its record opens: see above), and a new lockbox gets `{}`; `{}` empties it. The bag is stored in the clear and
    * bound into the lockbox's encryption, so a bag altered in storage makes the lockbox refuse to
    * open. Never put secret material in it. A lockbox heavier, whisper and names and bag together,
@@ -2074,11 +2076,16 @@ type LockboxHeader = Omit<Lockbox, 'format' | 'lockbox_key_wrapped' | 'whisper_c
 /** The JSON of an empty public bag: what a lockbox given none holds. */
 const EmptyPublicJson = '{}'
 
+/** What `store()`'s options may hold: a public bag, which {@link publicJsonOf} checks, and nothing else. */
+const checkStoreOpts = optionsCheck({ public: Z.optional(Z.unknown()) }, "store()'s only option is `public`, the lockbox's public bag: check its spelling, and leave out any other. A note is kept in the public bag: { public: { note } }.")
+
 /**
  * The public bag a `store()` was handed, as the JSON a lockbox keeps, keys sorted; undefined when
- * it was handed none. Kind 'bad_option' for anything JSON cannot carry, quoting none of it.
+ * it was handed none. Kind 'bad_option' for anything JSON cannot carry, quoting none of it, and
+ * for options beside it.
  */
 const publicJsonOf = (storeOpts: { public?: PublicBag | undefined } | undefined): string | undefined => {
+  checkStoreOpts(storeOpts)
   if (storeOpts?.public === undefined) { return undefined }
   const checked = PublicBag.safeParse(storeOpts.public)
   if (! checked.success) {

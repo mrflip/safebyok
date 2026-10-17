@@ -1,5 +1,6 @@
 import * as Z from 'zod/mini'
 import { VaultError } from './errors'
+import { optionsCheck } from './options'
 import * as Sanitizer from './sanitizer'
 import type { VaultScope } from './types'
 import { AnyTextValidators, DefaultValidators, NameFloor, type NameValidator, type VaultValidators } from './validators'
@@ -20,13 +21,13 @@ export type NameRules = Readonly<Record<NameField, NameValidator>>
 const nameValidator = Z.optional(Z.custom<NameValidator>((candidate: unknown) => typeof candidate === 'object' && candidate !== null && '_zod' in candidate))
 
 /** What `validators` may hold: a schema or undefined for each field it knows, and no other field. */
-const validatorsShape = Z.optional(Z.strictObject({
+const validatorsCheck = optionsCheck({
   applabel:    nameValidator,
   vaultlabel:  nameValidator,
   boxlabel:    nameValidator,
   userId:      nameValidator,
   unlocklabel: nameValidator,
-}))
+}, 'validators is a bag of Zod schemas, each checking one of applabel, vaultlabel, boxlabel, userId and unlocklabel: leave out any field to keep its default check, and check the spelling of each one given.')
 
 /**
  * A host's `validators` bag, exactly as handed in, once its shape passes: each field one of
@@ -40,12 +41,7 @@ const validatorsShape = Z.optional(Z.strictObject({
  * @example checkValidators({ boxlabel: z.string().max(200) })  // the same bag
  * @example checkValidators({ boxLabel: z.string() })           // throws: bad_option
  */
-export const checkValidators = (validators: VaultValidators | undefined): VaultValidators | undefined => {
-  if (! validatorsShape.safeParse(validators).success) {
-    throw new VaultError('bad_option', 'validators is a bag of Zod schemas, each checking one of applabel, vaultlabel, boxlabel, userId and unlocklabel: leave out any field to keep its default check, and check the spelling of each one given.')
-  }
-  return validators
-}
+export const checkValidators = (validators: VaultValidators | undefined): VaultValidators | undefined => validatorsCheck(validators)
 
 /**
  * The checks a vault runs, from a host's `validators`: each field it gives replaces ours, and
