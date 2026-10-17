@@ -71,7 +71,9 @@ export class SafebyokComponent {
    *   a bag holding a `getUserId` function.
    */
   api<DataModel extends GenericDataModel>(opts: SafebyokApiOpts<DataModel>) {
-    const { getUserId } = checkedApiOpts<DataModel>(opts)
+    if (typeof (opts as Partial<SafebyokApiOpts<DataModel>> | null | undefined)?.getUserId !== 'function') {
+      throw new VaultError('bad_option', "SafebyokComponent.api takes { getUserId }, a function that answers who is signed in: async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null.")
+    }
     const { vaults } = this.component
     // Convex's builders, typed by the host's data model, as its own codegen types them: each
     // handler's ctx is then the one the host's getUserId is written against.
@@ -80,7 +82,8 @@ export class SafebyokComponent {
 
     /** Refuses unless the caller is signed in as `userId`, the vault's own user. */
     const mustBe = async (ctx: GenericQueryCtx<DataModel>, userId: string): Promise<void> => {
-      const callerId = await getUserId(ctx)
+      // Called as a method of the host's bag, so a getUserId that leans on `this` works.
+      const callerId = await opts.getUserId(ctx)
       if (! callerId) {
         throw identityRevoked('No one is signed in, so this vault cannot be reached: sign in, then try again.')
       }
@@ -171,14 +174,6 @@ export class SafebyokComponent {
  * the host re-exports {@link SafebyokComponent.api}'s functions from `convex/safebyok.ts`.
  */
 export type SafebyokApi = ApiFromModules<{ safebyok: ReturnType<SafebyokComponent['api']> }>['safebyok']
-
-/** The bag `api` was handed, once it holds a `getUserId` function: misuse, caught at setup. */
-const checkedApiOpts = <DataModel extends GenericDataModel>(opts: unknown): SafebyokApiOpts<DataModel> => {
-  if (typeof opts !== 'object' || opts === null || typeof (opts as { getUserId?: unknown }).getUserId !== 'function') {
-    throw new VaultError('bad_option', "SafebyokComponent.api takes { getUserId }, a function that answers who is signed in: async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null.")
-  }
-  return opts as SafebyokApiOpts<DataModel>
-}
 
 const identityRevoked = (message: string) => (
   new ConvexError<SafebyokErrorData>({ kind: 'identity_revoked', message })

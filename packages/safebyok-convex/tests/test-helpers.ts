@@ -26,8 +26,14 @@ export const componentTest = (transactionLimits = false) => convexTest({ schema,
  * and its functions re-exported from `convex/safebyok.ts`, authenticating through `getUserId`.
  */
 export const hostWith = (getUserId: GetUserId) => {
+  const { app, component } = installedComponent()
+  return app.defineModules({ safebyok: component.api({ getUserId }) })
+}
+
+/** A host app with the component installed as `safebyok`, and the SafebyokComponent wrapping it: for a test that builds `api` with options of its own. */
+export const installedComponent = () => {
   const app = defineTestApp({ schema: defineSchema({}), components: { safebyok: { register } } })
-  return app.defineModules({ safebyok: new SafebyokComponent(app.components.safebyok).api({ getUserId }) })
+  return { app, component: new SafebyokComponent(app.components.safebyok) }
 }
 
 /**

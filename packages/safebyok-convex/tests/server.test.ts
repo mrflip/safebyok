@@ -1,8 +1,5 @@
-import { defineSchema } from 'convex/server'
-import { defineTestApp } from 'convex-test'
 import { describe, expect, it } from 'vitest'
 import { SafebyokComponent } from '../src/server'
-import { register } from '../src/test'
 import * as TH from './test-helpers'
 
 const { api, createTest } = TH.hostWith(TH.bySubject)
@@ -142,9 +139,11 @@ describe("SafebyokComponent.api, with the host's getUserId", () => {
   })
 })
 
+/** The names of the functions in `fns`, in order. */
+const namesOf = (fns: object) => Object.keys(fns).toSorted((left, right) => left.localeCompare(right))
+
 describe("SafebyokComponent.api, at setup", () => {
-  const app = defineTestApp({ schema: defineSchema({}), components: { safebyok: { register } } })
-  const component = new SafebyokComponent(app.components.safebyok)
+  const { component } = TH.installedComponent()
 
   const BadOptsCases = [
     [undefined,                        'no options at all'],
@@ -172,8 +171,26 @@ describe("SafebyokComponent.api, at setup", () => {
     })
   }
 
-  it("builds the functions when getUserId is a function, sync or async", () => {
-    expect(Object.keys(component.api({ getUserId: () => null }))).to.have.length(9)
-    expect(Object.keys(component.api({ getUserId: () => Promise.resolve('u1') }))).to.have.length(9)
+  it("builds the same functions whether getUserId is sync or async", () => {
+    const fromSync = namesOf(component.api({ getUserId: () => null }))
+    expect(fromSync).to.not.be.empty
+    expect(namesOf(component.api({ getUserId: () => Promise.resolve('u1') }))).to.deep.equal(fromSync)
+  })
+
+  it("calls getUserId as a method of the bag it was handed, so one that leans on this works", async () => {
+    const { app, component } = TH.installedComponent()
+    const host = app.defineModules({ safebyok: component.api(new SignedInAs('u1')) })
+    const t = host.createTest()
+    await t.mutation(host.api.safebyok.createBundle, { bundle: TH.bundleOf('u1') })
+    expect(await t.query(host.api.safebyok.getBundle, { scope: u1 })).to.deep.equal(TH.bundleOf('u1'))
   })
 })
+
+/** A getUserId bag whose method answers from the bag itself: it fails if called detached from it. */
+class SignedInAs {
+  private readonly userId: string
+
+  constructor(userId: string) { this.userId = userId }
+
+  getUserId() { return this.userId }
+}
