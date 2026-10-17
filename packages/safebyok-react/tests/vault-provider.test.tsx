@@ -569,7 +569,7 @@ describe("VaultProvider", () => {
       const vault = await world.opened()
       await vault.unlock('pw')
       vault.close()
-      await expect(world.latest().withUnlockedVault(() => vault.read('anthropic_api_key'))).rejects.toMatchObject({ kind: 'vault_closed' })
+      await TH.expectRefusal(world.latest().withUnlockedVault(() => vault.read('anthropic_api_key')), 'vault_closed')
     })
 
     it("leaves another user's dialog asking when the last user's cancelled unlock finishes late", async () => {
