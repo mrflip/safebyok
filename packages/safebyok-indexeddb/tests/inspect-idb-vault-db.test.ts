@@ -27,6 +27,21 @@ describe("inspectIdbVaultDB", () => {
     unsubscribe()
   })
 
+  it("meets trouble from IndexedDB as an Error, never a null, as the vault's own reads do", async () => {
+    const dbName = TH.freshDbName()
+    await idbVaultDB({ dbName }).createBundle(TH.bundleOf('u1'))
+    const failing = vi.spyOn(IDBObjectStore.prototype, 'getAll').mockImplementationOnce(function (this: IDBObjectStore) {
+      const request = this.getAll()
+      this.transaction.abort()
+      return request
+    })
+    try {
+      await expect(inspectIdbVaultDB({ dbName }).rows()).rejects.toThrow(Error)
+    } finally {
+      failing.mockRestore()
+    }
+  })
+
   it("looks at 'safebyok' given no options", async () => {
     await idbVaultDB().createBundle(TH.bundleOf('inspected_u1'))
     const rows = await inspectIdbVaultDB().rows()
