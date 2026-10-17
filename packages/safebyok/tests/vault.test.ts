@@ -4933,6 +4933,23 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
  * the write itself reaches storage. `here` has a vaultDB of its own over the shared store, so
  * `hereDB` sees only its writes, whatever `there` does. `hereOpts` override `here`'s options.
  */
+/**
+ * A vault unlocked here, over storage that does not ring, with a lockbox `anthropic` in it,
+ * destroyed and made anew through another handle (`there`), which stores its own `anthropic`:
+ * this device has not heard.
+ */
+const rebornUnheard = async () => {
+  const world = makeWorld()
+  const hereDB = world.deafVaultDB()
+  const here = await world.openUnlocked('pw one', { vaultDB: hereDB })
+  await here.store('anthropic', 'sk-ant-fake-old')
+  const there = await world.open({ deviceDB: memoryDeviceDB() })
+  await there.destroy()
+  await there.unlock('pw two')
+  await there.store('anthropic', 'sk-ant-fake-new')
+  return { world, hereDB, here, there }
+}
+
 const twoDeviceWorld = async (hereOpts?: Partial<OpenVaultOpts>) => {
   const world = makeWorld()
   const hereDB = localVaultDB({ store: world.dbStore })
@@ -5191,19 +5208,67 @@ describe("versioned updates: two devices writing at once", () => {
     expect(told?.message).to.match(/catch-up with storage, after a write it refused as stale, failed/)
   })
 
-  it("an erase refused as stale is thrown at once, never tried again", async () => {
+  // A catch-up refusal that asks the caller for something else than a stale write passes as it came.
+  const CatchUpRefusals = [
+    [new VaultError('identity_revoked', 'Signed out.'), "locked",   'the user signed out: the vault locks, and the user signs in again'],
+    [new VaultError('rolled_back', 'An older copy.'),   "locked",   'storage handed back an older copy: the vault locks, and storage wants looking at'],
+    [new VaultError('newer_format', 'A newer build.'),  "unlocked", 'a newer build wrote the vault: the app wants updating'],
+  ] as const
+
+  for (const [refusal, state, blurb] of CatchUpRefusals) {
+    it(`a store whose catch-up is refused as ${refusal.kind} throws that refusal as it came, never as stale: ${blurb}`, async () => {
+      const { hereDB, here, there, beforeNextWrite } = await twoDeviceWorld()
+      await here.store('anthropic', 'sk-ant-fake-one')
+      beforeNextWrite('updateBox', async () => {
+        await there.store('anthropic', 'sk-ant-fake-theirs')
+        vi.spyOn(hereDB, 'readBundle').mockRejectedValue(refusal)
+      })
+      const updateBox = vi.spyOn(hereDB, 'updateBox')
+      const err = await TH.expectRefusal(here.store('anthropic', 'sk-ant-fake-mine'), refusal.kind)
+      expect(err).to.eq(refusal)
+      expect(updateBox).toHaveBeenCalledTimes(1)
+      expect(delaysAsked(waits)).to.have.lengthOf(0)
+      expect(here.getSnapshot()).to.include({ state, syncing: false })
+    })
+
+    it(`an erase whose catch-up is refused as ${refusal.kind} throws that refusal as it came, never as stale`, async () => {
+      const { hereDB, here } = await rebornUnheard()
+      vi.spyOn(hereDB, 'readBundle').mockRejectedValue(refusal)
+      const err = await TH.expectRefusal(here.erase('anthropic'), refusal.kind)
+      expect(err).to.eq(refusal)
+    })
+  }
+
+  it("an erase refused as stale is thrown at once, never tried again, saying the lockbox could not be erased because its vault is gone", async () => {
+    const { hereDB, here, there } = await rebornUnheard()
+    const eraseBox = vi.spyOn(hereDB, 'eraseBox')
+    const err = await TH.expectRefusal(here.erase('anthropic'), 'stale_write')
+    expect(err.message).to.match(/^The contents of that lockbox could not be erased, because the vault it was in is gone/)
+    // A boxlabel is never quoted: a host's check may admit any text, a mistaken paste among it.
+    expect(err.message).to.not.include('anthropic')
+    expect(err.cause).to.be.an.instanceOf(VaultError).and.to.have.property('kind', 'stale_write')
+    expect(eraseBox).toHaveBeenCalledTimes(1)
+    expect(here.getSnapshot().state).to.eq('locked')
+    expect(await there.read('anthropic')).to.eq('sk-ant-fake-new')
+  })
+
+  it("an erase into a vault deleted elsewhere, and not made anew, finds no lockbox to erase", async () => {
     const world = makeWorld()
-    const hereDB = world.deafVaultDB()
-    const here = await world.openUnlocked('pw one', { vaultDB: hereDB })
+    const here = await world.openUnlocked('pw one', { vaultDB: world.deafVaultDB() })
     await here.store('anthropic', 'sk-ant-fake-old')
     const there = await world.open({ deviceDB: memoryDeviceDB() })
     await there.destroy()
-    await there.unlock('pw two')
-    await there.store('anthropic', 'sk-ant-fake-new')
-    const eraseBox = vi.spyOn(hereDB, 'eraseBox')
-    await TH.expectRefusal(here.erase('anthropic'), 'stale_write')
-    expect(eraseBox).toHaveBeenCalledTimes(1)
-    expect(await there.read('anthropic')).to.eq('sk-ant-fake-new')
+    await TH.expectRefusal(here.erase('anthropic'), 'absent_box')
+  })
+
+  it("an erase whose catch-up fails says so, the failure its cause, rather than that the vault is gone", async () => {
+    const { hereDB, here } = await rebornUnheard()
+    const down = new VaultError('storage_unavailable', 'The vault storage could not be reached.')
+    vi.spyOn(hereDB, 'readBundle').mockRejectedValue(down)
+    const err = await TH.expectRefusal(here.erase('anthropic'), 'stale_write')
+    expect(err.cause).to.eq(down)
+    expect(err.message).to.include('Catching up with storage afterwards failed too')
+    expect(err.message).to.not.match(/vault it was in is gone/)
   })
 
   it("a passphrase change racing another device's is refused as stale; theirs stands", async () => {
