@@ -2057,6 +2057,7 @@ const DamagedListings = [
   [(row: Record<string, unknown>) => JSON.stringify({ ...row, written_at: 1_792_022_400_000.5 }), 'whose written_at holds a fraction of a millisecond'],
   [(row: Record<string, unknown>) => JSON.stringify({ ...row, public_json: '{"note":' }),          'whose public bag is not JSON'],
   [(row: Record<string, unknown>) => JSON.stringify({ ...row, format: 'safebyok-lockbox-v9' }),   'written in a format this version does not know'],
+  [({ written_at: kept, ...row }: Record<string, unknown>) => JSON.stringify({ ...row, format: 'safebyok-lockbox-v3', changed_at: kept }), 'written before written_at, as safebyok-lockbox-v3 with its changed_at'],
 ] as const
 
 /** A world holding `anthropic`, spoiled by `spoil`, beside a sound `openai` with a public bag; and the vault that stored them, unlocked. */
