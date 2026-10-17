@@ -9,9 +9,9 @@ import type { JSONValue, Value } from 'convex/values'
  * {@link FakeDeployment.connectWith}, any other client, such as `ConvexReactClient`, unmodified,
  * over a fake WebSocket. `convex-test` runs the host's safebyok functions (as the README has a
  * host serve them) and the component beneath; this answers the handful of sync-protocol messages
- * a client sends for queries and mutations. For the tests of an adapter, a binding, or an app
- * that holds a Convex client: it imports `convex` and nothing else, and `convex-test` stays with
- * you, whose `defineTestApp(...).defineModules(...)` is the `host`.
+ * a client sends for queries and mutations, as convex 1.46 sends them. For the tests of an
+ * adapter, a binding, or an app that holds a Convex client: it imports `convex` and nothing else,
+ * and `convex-test` stays with you, whose `defineTestApp(...).defineModules(...)` is the `host`.
  *
  * What it stands in for, and so cannot prove: the network and a real server. Every call runs one
  * at a time, in arrival order, so no two transactions ever race (Convex's own serializability is

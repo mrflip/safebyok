@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { version as convexVersion } from 'convex'
 import { ConvexClient } from 'convex/browser'
 import * as TH from './test-helpers'
 import { fakeDeployment } from '../src/testing'
@@ -16,6 +17,12 @@ afterEach(async () => {
 const u1 = TH.scopeOf('u1')
 
 describe("fakeDeployment", () => {
+  // The fake socket answers the sync protocol as convex 1.46 speaks it. A bump of convex fails
+  // here, on purpose: check the fake against the new client's messages, then move this line.
+  it("follows the sync protocol of the convex it was written against, 1.46", () => {
+    expect(convexVersion).to.match(/^1\.46\./)
+  })
+
   it("answers a ConvexClient's query and mutation, signed in as the subject it was given", async () => {
     const deployment = deploy()
     const client = deployment.client('u1')

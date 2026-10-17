@@ -2,7 +2,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
 import type { Client, Pool, PoolClient } from 'pg'
 import { VaultError, memoryDeviceDB, openVault } from 'safebyok'
-import type { VaultDB } from 'safebyok'
+import type { VaultDB, VaultErrorKind } from 'safebyok'
 import * as TH from './test-helpers'
 import { VaultChangeChannel, postgresVaultDB } from '../src/index'
 import type { PostgresClient, PostgresListen, PostgresVaultDBOpts } from '../src/index'
@@ -303,6 +303,8 @@ const missedBecause = (why: { vault_stands: boolean, box_stood: boolean, was_ful
 /** The foreign key violation Postgres raises for a lockbox whose vault is gone, as a driver hands it up. */
 const foreignKeyViolation = Object.assign(new Error('insert or update on table "safebyok_lockboxes" violates foreign key constraint'), { code: '23503' })
 
+// A replacement in a full vault, and a first write over a boxlabel taken there, are the battery's
+// line 4.3; a lockbox landing once an erase has made room, its line 4.4: run over makeCappedVaultDB.
 describe("postgresVaultDB, its lockbox limit", () => {
   it("refuses a new lockbox past maxLockboxes as vault_full, writing nothing and naming no boxlabel", async () => {
     const db = await TH.emptyDatabase()
@@ -311,24 +313,6 @@ describe("postgresVaultDB, its lockbox limit", () => {
     expect(refusal.message).to.include('2 lockboxes')
     expect(refusal.message).to.not.include('secret_project_x')
     expect(await boxlabelsIn(vaultDB)).to.have.members(['openai', 'anthropic'])
-  })
-
-  it("never refuses a replacement for the count", async () => {
-    const db = await TH.emptyDatabase()
-    const vaultDB = await filledTo(db, 1, ['openai'])
-    const standing = await vaultDB.readBox(u1, 'openai')
-    await vaultDB.updateBox(u1, { ...TH.boxOf('openai', 'sk-fake-new'), revision_id: 'rev-new' }, { vault_id: 'vault-id-u1', revision_id: standing?.revision_id ?? null, vault_key_epoch: 1 })
-    const replaced = await vaultDB.readBox(u1, 'openai')
-    expect(replaced?.revision_id).to.eq('rev-new')
-    expect(await boxlabelsIn(vaultDB)).to.deep.equal(['openai'])
-  })
-
-  it("refuses a first write under a boxlabel already taken in a full vault as stale_write, not vault_full: the writer missed a lockbox it would replace", async () => {
-    const db = await TH.emptyDatabase()
-    const vaultDB = await filledTo(db, 1, ['openai'])
-    const standing = await vaultDB.readBox(u1, 'openai')
-    await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('openai', 'sk-fake-other'), noBoxYet), 'stale_write')
-    expect(await vaultDB.readBox(u1, 'openai')).to.deep.equal(standing)
   })
 
   it("refuses a first write in a full vault of another vault_id as stale_write: the count is the standing vault's", async () => {
@@ -347,7 +331,7 @@ describe("postgresVaultDB, its lockbox limit", () => {
 
   // The insert says why it missed, from one snapshot, so no second read is asked. What a miss means
   // is the adapter's to read; these answer the insert with each reason a race can leave.
-  const misses: [string, { vault_stands: boolean, box_stood: boolean, was_full: boolean }, string][] = [
+  const misses: [string, { vault_stands: boolean, box_stood: boolean, was_full: boolean }, VaultErrorKind][] = [
     ['the vault at its limit when the statement began', { vault_stands: true, box_stood: false, was_full: true }, 'vault_full'],
     ['the vault gone or made anew', { vault_stands: false, box_stood: false, was_full: false }, 'stale_write'],
     ['a vault gone, though it was counted full', { vault_stands: false, box_stood: false, was_full: true }, 'stale_write'],
@@ -360,7 +344,7 @@ describe("postgresVaultDB, its lockbox limit", () => {
       await filledTo(db, 1, [])
       const spy = TH.spyClient(db, missedBecause(why))
       const vaultDB = postgresVaultDB({ client: spy.client, userId: 'u1', maxLockboxes: 1 })
-      await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('anthropic', 'sk-fake'), noBoxYet), kind as 'vault_full')
+      await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('anthropic', 'sk-fake'), noBoxYet), kind)
       expect(spy.sent).to.have.lengthOf(1)
     })
   }
@@ -411,15 +395,6 @@ describe("postgresVaultDB, its lockbox limit", () => {
     const vaultDB = postgresVaultDB({ client: spy.client, userId: 'u1', maxLockboxes: 2 })
     await vaultDB.updateBox(u1, TH.boxOf('openai', 'sk-fake-again'), { ...noBoxYet, revision_id: 'rev-sk-fake-openai' })
     expect(spy.sent.map(({ text }) => text.match(/FOR SHARE/g)?.length ?? 0)).to.deep.equal([1])
-  })
-
-  it("makes room with an erase", async () => {
-    const db = await TH.emptyDatabase()
-    const vaultDB = await filledTo(db, 1, ['openai'])
-    await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('anthropic', 'sk-fake'), noBoxYet), 'vault_full')
-    await vaultDB.eraseBox(u1, 'openai', thisVault)
-    await vaultDB.updateBox(u1, TH.boxOf('anthropic', 'sk-fake'), noBoxYet)
-    expect(await boxlabelsIn(vaultDB)).to.deep.equal(['anthropic'])
   })
 
   it("lets exactly one of two first writes sent at once take the last place, when one statement is run after the other", async () => {
