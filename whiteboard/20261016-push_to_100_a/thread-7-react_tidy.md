@@ -1,8 +1,9 @@
 # Thread 7: react_tidy (2026-10-16)
 
 Branch `20261016-react_tidy`, PR [#129](https://github.com/mrflip/safebyok/pull/129), cut from
-`main` (`f63bd915`). Justify: green at every package (react 158, demo 176 + 15 skipped, core
-1612 + 33 skipped); `pnpm size` within every existing budget.
+`main` (`f63bd915`); restacked 2026-10-17 onto thread 10 (#136, `8439aa01`) -- see *Restack*,
+at the end. Justify, after the restack: green at every package (react 160, demo 182 + 15
+skipped, core 1852 + 33 skipped); `pnpm size` within every existing budget.
 
 * **Built**:
   - `safebyok-react/src/messages.ts`: every word a user reads (dialog, passkey button and its
@@ -47,6 +48,8 @@ Branch `20261016-react_tidy`, PR [#129](https://github.com/mrflip/safebyok/pull/
     add no dependency, and the README tells a host on Hermes or an older engine to import
     `@formatjs/intl-relativetimeformat` with its locale data. Still open with the Coach, through
     the orchestrator: an uncontrolled `WhisperField` (below).
+    - → *Coach (2026-10-16):* Yes: host placeholder, no default hint; NOTYET: option for a user's passphrase hint.
+    - → *Coach (2026-10-16):* Proceed (thread 14): uncontrolled, eyeball kept, host-fed passphrase message beside it.
 
 * **Decisions taken**:
   - `Intl.RelativeTimeFormat` is assumed, at the Coach's word on filing: no presence check, no
@@ -93,9 +96,19 @@ Branch `20261016-react_tidy`, PR [#129](https://github.com/mrflip/safebyok/pull/
 * **For the Coach**:
   - `autocomplete="new-password"` (your list) stops autofill of saved passwords, but Chrome may
     offer its password generator on such a field. Keep it, or drop that one attribute?
+    - → *Coach (2026-10-16):* Whisper field turns away autofill and generators; passphrase field welcomes password managers (thread 14).
   - The provider no longer reopens on `bad_option` per the ruling, though from the provider a
     "reads sound now" refusal is a race, not misuse; `retryOpen()` mends it.
+    - → *Coach (2026-10-16):* Took it as it stands; no change, thread 7 stands as filed.
   - Size: no `safebyok-react` line in `.size-limit.json` (thread 8 adds it). Measured with
     `react` and `safebyok` external: everything 4,554 B, `{ VaultProvider }` 4,034 B,
     `{ WhisperField }` 974 B; by PROCESS.md's rule, everything's budget is **6.9 kB**.
   - Not done: a real screen reader, real shadow-DOM hosting, a real browser (G356 stays).
+    - → *Coach (2026-10-16):* Add to NOTYET (done): React binding under real assistive technology and real hosts.
+
+* **Restack** (2026-10-17, onto #136): thread 3's names taken (`ForeverMillis`, `MinuteMillis`,
+  `reentryWindowMillis`, `TH.DefaultWindowMillis`), the local `MinuteMillis` dropped; thread 4's
+  identical `stale_write` edit collapsed; thread 10's strength-test ref and wrapper kept beside
+  `allowStartOver` and the sinks warning; the dialog-window table's `1e9` hours row dropped, as
+  openVault now refuses hours above `MaxReentryHours`. The demo's click-through test now types
+  passphrases of 12 characters and more, thread 10's default floor.
