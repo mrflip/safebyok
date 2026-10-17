@@ -1,8 +1,9 @@
 # Thread 14: uncontrolled_fields (2026-10-16)
 
 Branch `20261016-uncontrolled_fields`, PR [#134](https://github.com/mrflip/safebyok/pull/134),
-stacked on [#129](https://github.com/mrflip/safebyok/pull/129) (cut at `3d62fc04`). Justify:
-green at every package (react 180, demo 176 + 15 skipped, core 1612 + 33 skipped).
+stacked on [#129](https://github.com/mrflip/safebyok/pull/129) (cut at `3d62fc04`; restacked
+2026-10-17 onto its tip `05d0177b`). Justify: green at every package (react 181, demo 182 + 15
+skipped, core 1852 + 33 skipped); `pnpm size` within every budget.
 
 * **Built**:
   - **CI flakes, first, three `tests:` commits.** (1) `vault-provider.test.tsx`: the grabber kept
@@ -34,8 +35,8 @@ green at every package (react 180, demo 176 + 15 skipped, core 1612 + 33 skipped
 
 * **Rows**: the plan gives thread 14 no `G###` list. It settles the two *Open Matters* rows
   already in the resolutions (uncontrolled fields; `autocomplete="new-password"`): **closed**, in
-  code, the README and `notes/security.md`. The one-line restatement sits beside thread 7's
-  question in its thread file, on this branch.
+  code, the README and `notes/security.md`. The Coach's rulings sit under thread 7's questions in
+  its thread file (one copy, from thread 7's restack).
 
 * **Decisions taken**:
   - **Sources for the passphrase field.** Chromium, *Create Amazing Password Forms*
@@ -54,6 +55,7 @@ green at every package (react 180, demo 176 + 15 skipped, core 1612 + 33 skipped
   - **The username default** is `<user_id> (<vaultlabel> vault)` (`Messages.passphraseUsername`),
     not the bare user id: a manager seeing a new password for the user's *sign-in* name would
     offer to overwrite their login password. One vault, one entry.
+    - → *Coach (2026-10-16):* Keep the default; try it out.
   - **Advice is advice**: it never blocks Create. Empty text asks nothing; only the latest answer
     shows (a counter, no debounce); a throw or rejection goes to the dialog's boundary. The region
     is `role="status"` (polite), mounted with the field, only while creating and only when given.
@@ -76,6 +78,14 @@ green at every package (react 180, demo 176 + 15 skipped, core 1612 + 33 skipped
     own `passphraseAdvice` wins. If 10 makes `weak_passphrase` a condition, the dialog shows the
     refusal in its alert region with no change here; if it is misuse, the dialog shows "Something
     went wrong" -- 10 should make it a condition.
+    - → *Coach (2026-10-16):* Yes (thread 16).
+  - **At the restack onto thread 10** (2026-10-17): `VaultProvider` keeps 10's wiring whole --
+    the host's `passphraseStrengthTest` in `strengthTestRef`, one stable wrapper handed to
+    `openVault` -- beside `passphraseUsername` and `passphraseAdvice`, which go to the dialog.
+    `weak_passphrase` is a condition, so a refused passphrase shows in the dialog's alert region.
+    **The advice default (`adviceFrom(passphraseStrengthTest)`) is not wired: it is thread 16's**,
+    by the Coach's ruling, with holding the test like `logger` rather than in a ref. Today the
+    dialog shows advice only when the host passes `passphraseAdvice`.
   - The stub vault in the React tests now carries a scope (`TH.scopeOf('u1')`): the dialog reads
     `snapshot.scope` for the username.
   - Measured with `react` and `safebyok` external: React everything 4,876 B (thread 7: 4,554),
@@ -91,14 +101,22 @@ green at every package (react 180, demo 176 + 15 skipped, core 1612 + 33 skipped
   effect); an `undefined` answer reads as null. Left for the Coach, as sprint-doc rows: the
   reveal toggle's `aria-pressed` and label, the demo `WaysIn` field, the changeset reading as a
   migration, the demo App tests' order dependence, host CSS defeating `hidden`.
+  - The demo `WaysIn` field → *Coach (2026-10-16):* Yes, thread 9.
+  - The changeset reading as a migration → *Coach (2026-10-16):* No migration text; describe the
+    fields as they stand (at the restack). Done: the changeset is rewritten.
+  - The demo App tests' order dependence → *Coach (2026-10-16):* Leave; filed under RAGEBAIT.
+  - Host CSS un-hiding the username field → *Coach (2026-10-16):* Hide it with display: none for
+    now (thread 9).
 
 * **For the Coach** (each is in the report's *Open matters* too):
   - **Capital letters**: "passphrase must contain a capital letter" is a composition rule; NIST
     SP 800-63B advises length and strength instead. Rec: none of ours; the advice slot lets a
     host say what it likes, and the README steers it to length and guessability.
+    - → *Coach (2026-10-16):* None of ours; three strength principles go to thread 16.
   - **Chrome and `autocomplete="off"`**: Chrome still offers a saved password on a
     `type="password"` field marked `off`. Rec: accept, as ruled; the only way out is a
     `type="text"` field masked by the non-standard `-webkit-text-security`, not worth it.
     → *Coach (2026-10-16):* WONTFIX: accepted; thread 9 enters it in notes/wontfix.md.
   - **The demo dashboard's whisper textarea** stays controlled (the edit form fills it with the
     stored whisper, and the table shows whispers in plain text by design). Rec: leave it.
+    - → *Coach (2026-10-16):* Yes, a plain text box in the demo.
