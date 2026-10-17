@@ -68,5 +68,21 @@ Branch `20261017-dialog_after_close`, PR [#147](https://github.com/mrflip/safeby
   - After the App fix the click-through's re-run delete settles about 2 ms before the test ends;
     nothing on the page shows it, so the test cannot wait for it. Watch for it if a demo flake
     names `VaultDashboard`'s `erase`.
-* **For the Coach**: none blocking. Minor: whether to raise the react package's `lib` to ES2024
-  (`Promise.withResolvers`); whether the demo's shuffle-order dependence deserves a row.
+* **Review** (thread-reviewer, medium, `flagged`): two commits on the branch. `TH.watchStateUpdates`
+  now forwards `window.event`'s setter beside its counting getter, so a test assigning it no longer
+  throws in strict mode while it watches; its doc block says what the count rests on (React reads
+  `window.event` for an unmounted component's update too), the CI story staying here.
+* **For the Coach**: none blocking.
+  1. **`useIsMounted` is hand-rolled**, and CLAUDE.md wants a Coach's yes first. No mechanism
+     already in the tree replaces it; `usehooks-ts` or `react-use` would add a runtime dependency
+     for six lines. Rec: keep.
+  2. **Layout effect or passive effect.** A layout effect makes a dialog hidden by a re-suspending
+     Suspense boundary (or by `<Activity>`) read as gone: an outcome landing while it is hidden is
+     dropped, and an interrupted erase leaves its button disabled. Coach's call between the two.
+  3. For the record, no action: the passkey button unmounted mid-press by `passkeyFirst` turning
+     false drops that press; unmount does not abort the WebAuthn prompt (that wants an
+     `AbortSignal` through the exported `askPasskey`, a public-surface change for a later thread);
+     the demo's `erase` still rethrows other conditions unhandled and hides on a dismissed dialog,
+     predating this thread.
+  4. Minor: whether to raise the react package's `lib` to ES2024 (`Promise.withResolvers`);
+     whether the demo's shuffle-order dependence (58 of 96 under shuffle) deserves a row.
