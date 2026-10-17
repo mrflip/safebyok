@@ -4972,12 +4972,6 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
 })
 
 /**
- * Two devices on one vault, and a way to slip `there`'s doings between `here`'s look at storage
- * and its write: `beforeNextWrite` runs once, inside the next call to the verb it names, before
- * the write itself reaches storage. `here` has a vaultDB of its own over the shared store, so
- * `hereDB` sees only its writes, whatever `there` does. `hereOpts` override `here`'s options.
- */
-/**
  * A vault unlocked here, over storage that does not ring, with a lockbox `anthropic` in it,
  * destroyed and made anew through another handle (`there`), which stores its own `anthropic`:
  * this device has not heard.
@@ -4994,6 +4988,12 @@ const rebornUnheard = async () => {
   return { world, hereDB, here, there }
 }
 
+/**
+ * Two devices on one vault, and a way to slip `there`'s doings between `here`'s look at storage
+ * and its write: `beforeNextWrite` runs once, inside the next call to the verb it names, before
+ * the write itself reaches storage. `here` has a vaultDB of its own over the shared store, so
+ * `hereDB` sees only its writes, whatever `there` does. `hereOpts` override `here`'s options.
+ */
 const twoDeviceWorld = async (hereOpts?: Partial<OpenVaultOpts>) => {
   const world = makeWorld()
   const hereDB = localVaultDB({ store: world.dbStore })
