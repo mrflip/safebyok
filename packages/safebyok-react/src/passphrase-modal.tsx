@@ -240,8 +240,9 @@ const PassphraseField = ({ ref, creating, takesFocus, username, advice, onChange
   const credential = creating ? 'new-password' : 'current-password'
   return (
     <>
-      {/* What a password manager files the passphrase under: never shown, never typed. */}
-      <input type="text" name="username" autoComplete="username" value={username} readOnly hidden />
+      {/* What a password manager files the passphrase under: never shown, never typed. The inline
+          display wins over a host's stylesheet, which can override [hidden]. */}
+      <input type="text" name="username" autoComplete="username" value={username} readOnly hidden style={{ display: 'none' }} />
       <span className="passphrase-field">
         <input
           id={fieldId}

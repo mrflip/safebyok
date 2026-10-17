@@ -441,7 +441,21 @@ describe("PassphraseModal", () => {
       render(<PassphraseModal vault={vaultInState('locked')} onDone={noop} />)
       expect(usernameField().value).to.eq('u1 (main vault)')
       expect(usernameField().hidden).to.be.true
+      expect(usernameField().style.display).to.eq('none')
       expect(usernameField().form).to.eq(screen.getByPlaceholderText<HTMLInputElement>('vault passphrase').form)
+    })
+
+    it("keeps the username field hidden under a host stylesheet that shows every input", () => {
+      const hostStyle = document.createElement('style')
+      hostStyle.textContent = 'input { display: block }'
+      document.head.append(hostStyle)
+      try {
+        render(<PassphraseModal vault={vaultInState('locked')} onDone={noop} />)
+        expect(getComputedStyle(usernameField()).display).to.eq('none')
+        expect(getComputedStyle(screen.getByPlaceholderText('vault passphrase')).display).to.eq('block')
+      } finally {
+        hostStyle.remove()
+      }
     })
 
     it("files it under the host's passphraseUsername when given, as its example does", () => {
