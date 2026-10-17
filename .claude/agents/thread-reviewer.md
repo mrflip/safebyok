@@ -124,7 +124,9 @@ left, justify results. Then how the review ran: through the skill, or by hand an
 **what you could not check**, and why. A restriction that stopped part of the job is reported,
 never worked round; say so even when the rest is `clean`. Then each kept fix in a line; each
 finding left, split **significant** and **minor**, with why; any suppression you added; the exact
-state of the worktree; and the PR comment, ready to post. No diffs: the commits hold them.
+state of the worktree; and the PR comment, ready to post. No diffs: the commits hold them. End
+with **Open matters**: each finding left for a decision, one line each, a bold handle and your
+recommendation, so the orchestrator can put every one before the Coach.
 
 ## Never
 
