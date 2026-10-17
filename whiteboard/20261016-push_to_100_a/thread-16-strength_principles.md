@@ -88,3 +88,5 @@ skipped; every other package green; sizes within every line).
   `browserOpts()`; dependencies, not optional peers). And a behaviour change a host will notice:
   an inline arrow as `passphraseStrengthTest` now reopens the vault each render (warned once),
   per YOLO 17.
+
+* **Review**: two fixes are in (the React README's advice default is `VaultProvider`'s only; a test uses `TH.expectRefusal`); seven minors are recorded in the plan.
