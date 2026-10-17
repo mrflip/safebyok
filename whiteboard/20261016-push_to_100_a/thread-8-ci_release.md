@@ -1,9 +1,13 @@
 # Thread 8: ci_release (2026-10-16)
 
-Branch `20261016-ci_release`, PR [#130](https://github.com/mrflip/safebyok/pull/130), cut from main
-(`f63bd915`). Justify: green on this branch against main's size budgets, none over: root 211 tests;
-safebyok 1610, indexeddb 144, postgres 225, react 111, fastkey 44, convex 278, graphql 212, demo
-162, e2e 85; the new `idbVaultDB`, `VaultProvider` and `reactEverything` entries pass.
+Branch `20261016-ci_release`, PR [#130](https://github.com/mrflip/safebyok/pull/130), restacked
+2026-10-17 onto thread 10's tip (`8439aa01`; main -> #128 -> #133 -> #127 -> #132 -> #137 -> #136 ->
+this). Justify: green; root 212 tests; safebyok 1850, indexeddb 165, postgres 244, react 115,
+fastkey 44, convex 289, graphql 229, demo 168, e2e 93; every size budget within its limit,
+including thread 10's `zxcvbnPassphraseTest` (216.26 of 220 kB) and my `idbVaultDB`,
+`VaultProvider` and `reactEverything`. Restack: `.size-limit.json` and `notes/security.md` kept both
+sides (mine at the end); the schedule deadline names became `*Millis`; the convex leak sweep's rival
+lockbox moved its note into `public_json` (v3 has no `note` field).
 
 * **Built**: `.github/workflows/dependabot-changeset.yml` and `scripts/dependabot.ts` (the Dependabot
   changeset, G447/G448); `runtime-deps.ts` reads `peerDependenciesMeta`, `bundledDependencies` and a
@@ -43,8 +47,8 @@ safebyok 1610, indexeddb 144, postgres 225, react 111, fastkey 44, convex 278, g
 
 ## Review's minors
 
-Folded in at filing: a whole schedule's hang deadline is its own `ScheduleHungMs` (10 s, for a
-slow real backend such as thread 11's `postgres:17`), the 2 s `WaitedTooLongMs` kept for a single
+Folded in at filing: a whole schedule's hang deadline is its own `ScheduleHungMillis` (10 s, for a
+slow real backend such as thread 11's `postgres:17`), the 2 s `WaitedTooLongMillis` kept for a single
 held move; `peerDependenciesMeta` is compared with `safe-stable-stringify` (now a root
 devDependency, the version the core already installs), a reorder alone being no move.
 
