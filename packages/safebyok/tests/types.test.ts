@@ -141,7 +141,8 @@ describe("VaultBundle", () => {
 })
 
 const wholeBox = TH.boxOf('anthropic_api_key', 'a1')
-const { registered_at: _boxRegistered, changed_at: _boxChanged, ...boxWithoutTimes } = wholeBox
+const { registered_at: _boxRegistered, written_at: _boxWritten, ...boxWithoutTimes } = wholeBox
+const lockboxV3 = { ...boxWithoutTimes, format: 'safebyok-lockbox-v3', registered_at: Date.UTC(2026, 9, 14), changed_at: Date.UTC(2026, 9, 14) }
 const { public_json: _publicJson, ...bagless } = wholeBox
 const LockboxCases = [
   // regular usage:
@@ -162,12 +163,13 @@ const LockboxCases = [
   [{ ...wholeBox, whisper_codec: 'json_v2' },              false,  'a whisper codec this version does not know'],
   [{ ...wholeBox, whisper_schema_version: 2 },             false,  'a whisper schema version this version does not know'],
   [TH.omitting(wholeBox, 'whisper_codec'),                 false,  'a lockbox missing its whisper codec'],
-  [{ ...wholeBox, format: 'safebyok-lockbox-v4' },         false,  'a format this version does not know'],
+  [{ ...wholeBox, format: 'safebyok-lockbox-v5' },         false,  'a format this version does not know'],
   [{ ...wholeBox, format: 'safebyok-lockbox-v2' },         false,  'a lockbox from before the public bag'],
+  [lockboxV3,                                              false,  'a lockbox from before written_at, holding changed_at'],
   [{ ...wholeBox, vault_key_epoch: 1.5 },                  false,  'a vaultKey epoch that is not a whole number'],
-  [{ ...wholeBox, changed_at: FarFuture + 1 },             false,  'a changed_at past FarFuture'],
+  [{ ...wholeBox, written_at: FarFuture + 1 },             false,  'a written_at past FarFuture'],
   [{ ...wholeBox, registered_at: Infinity },               false,  'a registered_at that never comes'],
-  [{ ...wholeBox, changed_at: null },                      false,  'a null changed_at'],
+  [{ ...wholeBox, written_at: null },                      false,  'a null written_at'],
   [{ ...wholeBox, registered_at: Date.UTC(2026, 9, 14) + 0.5 }, false, 'a registered_at with a fraction of a millisecond'],
   [boxWithoutTimes,                                        false,  'a lockbox missing its times'],
   [{ ...boxWithoutTimes, created_at: OldIso, updated_at: OldIso }, false, 'a lockbox from before its times were named registered_at and changed_at'],
@@ -209,7 +211,7 @@ describe("PublicBag", () => {
   })
 })
 
-const wholeSummary = { boxlabel: 'anthropic', revision_id: 'r1', vault_key_epoch: 1, public: {}, registered_at: Date.UTC(2026, 9, 14), changed_at: Date.UTC(2026, 9, 14) }
+const wholeSummary = { boxlabel: 'anthropic', revision_id: 'r1', vault_key_epoch: 1, public: {}, registered_at: Date.UTC(2026, 9, 14), written_at: Date.UTC(2026, 9, 14) }
 
 describe("LockboxSummary", () => {
   it("marks a summary undamaged, as its example shows", () => {
@@ -224,7 +226,7 @@ describe("LockboxSummary", () => {
 
   it("holds neither ciphered field, the format nor the codec: a whole lockbox is not a summary", () => {
     const summary = LockboxSummary.parse({ ...wholeBox, public: {} })
-    expect(Object.keys(summary)).to.have.members(['boxlabel', 'revision_id', 'vault_key_epoch', 'public', 'registered_at', 'changed_at', 'damaged'])
+    expect(Object.keys(summary)).to.have.members(['boxlabel', 'revision_id', 'vault_key_epoch', 'public', 'registered_at', 'written_at', 'damaged'])
   })
 })
 

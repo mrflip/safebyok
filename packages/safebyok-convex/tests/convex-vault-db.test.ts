@@ -141,7 +141,7 @@ describe("convexVaultDB, refusing", () => {
     await vaultDB.createBundle(TH.bundleOf('u1'))
     await vaultDB.updateBox(u1, TH.boxOf('openai', 'two'), TH.noBoxYet)
     // Past the adapter's own checks, straight to the component, which bounds no time's form.
-    const lockbox = { ...TH.boxOf('anthropic', 'one'), changed_at: Date.UTC(2026, 9, 14) + 0.5 }
+    const lockbox = { ...TH.boxOf('anthropic', 'one'), written_at: Date.UTC(2026, 9, 14) + 0.5 }
     await client.mutation(deployment.api.safebyok.updateBox, { scope: u1, lockbox, expected: TH.noBoxYet })
     const listed = await vaultDB.listBoxes(u1)
     expect(listed.map((box) => [box.boxlabel, box.damaged])).to.deep.equal([['anthropic', true], ['openai', false]])

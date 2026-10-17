@@ -230,7 +230,7 @@ describe("postgresVaultDB, what it stores", () => {
       user_id:                'u1',
       vaultlabel:             'main',
       vault_id:               'vault-id-u1',
-      format:                 'safebyok-lockbox-v3',
+      format:                 'safebyok-lockbox-v4',
       boxlabel:               'anthropic',
       revision_id:            'rev-one',
       vault_key_epoch:        1,
@@ -240,7 +240,7 @@ describe("postgresVaultDB, what it stores", () => {
       whisper_schema_version: 1,
       public_json:            publicJson,
       registered_at:          Date.UTC(2026, 9, 14),
-      changed_at:             Date.UTC(2026, 9, 14),
+      written_at:             Date.UTC(2026, 9, 14),
     }])
     expect(await vaultDB.readBox(u1, 'anthropic')).to.include({ public_json: publicJson })
   })
@@ -363,7 +363,7 @@ describe("postgresVaultDB, its lockbox limit", () => {
     const vaultDB = await filledTo(db, 5, [])
     const orphan = TH.boxOf('anthropic', 'sk-fake')
     const insertOrphan = db.query(
-      `INSERT INTO safebyok_lockboxes (applabel, user_id, vaultlabel, vault_id, format, boxlabel, revision_id, vault_key_epoch, lockbox_key_wrapped, whisper_ciphered, whisper_codec, whisper_schema_version, public_json, registered_at, changed_at)
+      `INSERT INTO safebyok_lockboxes (applabel, user_id, vaultlabel, vault_id, format, boxlabel, revision_id, vault_key_epoch, lockbox_key_wrapped, whisper_ciphered, whisper_codec, whisper_schema_version, public_json, registered_at, written_at)
        VALUES ('acme', 'u1', 'main', 'vault-id-gone', $1, $2, $3, 1, '{}', '{}', 'json_v1', 1, '{}', 0, 0)`,
       [orphan.format, orphan.boxlabel, orphan.revision_id],
     )
@@ -503,7 +503,7 @@ describe("postgresVaultDB, listBoxRecords", () => {
     await vaultDB.createBundle(TH.bundleOf('u1'))
     await vaultDB.updateBox(u1, TH.boxOf('anthropic', 'one'), noBoxYet)
     const [record] = await vaultDB.listBoxRecords(u1)
-    expect(record).to.have.property('format', 'safebyok-lockbox-v3')
+    expect(record).to.have.property('format', 'safebyok-lockbox-v4')
     const [summary] = await vaultDB.listBoxes(u1)
     expect(summary).to.not.have.property('format')
   })

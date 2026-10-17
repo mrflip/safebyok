@@ -96,7 +96,7 @@ type SafebyokLockbox {
   whisper_schema_version: Int!
   public_json:            String!
   registered_at:          Float!
-  changed_at:             Float!
+  written_at:             Float!
 }
 
 """One lockbox, as stored. Times are epoch milliseconds; the public bag is its JSON text."""
@@ -111,7 +111,7 @@ input SafebyokLockboxInput {
   whisper_schema_version: Int!
   public_json:            String!
   registered_at:          Float!
-  changed_at:             Float!
+  written_at:             Float!
 }
 
 """A lockbox as a listing has it: every field but the two encrypted ones."""
@@ -124,7 +124,7 @@ type SafebyokListedLockbox {
   whisper_schema_version: Int!
   public_json:            String!
   registered_at:          Float!
-  changed_at:             Float!
+  written_at:             Float!
 }
 
 """What a bundle update was proven against: it lands only while the standing bundle has both."""

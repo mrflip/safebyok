@@ -37,7 +37,7 @@ describe("KnockKnock", () => {
     expect(await vault.read('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
   })
 
-  it("flashes 'saved' after a save, then relaxes to when the key last changed", async () => {
+  it("flashes 'saved' after a save, then relaxes to when the key was last saved", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     try {
       const world = TH.makeWorld()
@@ -48,9 +48,9 @@ describe("KnockKnock", () => {
       fireEvent.change(screen.getByLabelText('Anthropic API key'), { target: { value: 'sk-ant-test-not-a-real-key' } })
       fireEvent.click(screen.getByRole('button', { name: 'Save key' }))
       const said = await screen.findByText(/Anthropic key saved/)
-      expect(said.textContent).to.not.match(/changed/)
+      expect(said.textContent).to.not.match(/\(saved/)
       await act(async () => { await vi.advanceTimersByTimeAsync(SavedFlashMillis) })
-      expect(screen.getByText(/Anthropic key in the vault/).textContent).to.match(/\(changed .+\)/)
+      expect(screen.getByText(/Anthropic key in the vault/).textContent).to.match(/\(saved .+\)/)
     } finally {
       vi.useRealTimers()
     }

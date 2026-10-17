@@ -596,8 +596,8 @@ const StoredRevision = Z.object({ revision_id: Lockbox.shape.revision_id })
  * (`public_json` is JSON text, as the record's check has found).
  */
 const summaryOf = (listed: Z.infer<typeof ListedLockbox>): LockboxSummary => {
-  const { boxlabel, revision_id, vault_key_epoch, public_json, registered_at, changed_at } = listed
-  return { boxlabel, revision_id, vault_key_epoch, public: JSON.parse(public_json) as PublicBag, registered_at, changed_at, damaged: false }
+  const { boxlabel, revision_id, vault_key_epoch, public_json, registered_at, written_at } = listed
+  return { boxlabel, revision_id, vault_key_epoch, public: JSON.parse(public_json) as PublicBag, registered_at, written_at, damaged: false }
 }
 
 /** Two names in one order on every device: character by character, by UTF-16 code unit, never by a locale. */

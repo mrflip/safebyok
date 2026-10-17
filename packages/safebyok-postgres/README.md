@@ -363,8 +363,8 @@ must, since every field a record holds is bound into its encryption (all but the
   envelope's `vault_key_wrapped`, inside the bundle's `unlocks`).
 * **In the open**: the scope, each `boxlabel` and public bag (`public_json`), each whisper's codec
   and schema version, the `vault_id`, `unlock_epoch`, `revision_id`s, each unlock envelope's method, id, label, salt and key deriver's label, when
-  each vault and lockbox was first stored and each whisper last changed (`registered_at`,
-  `changed_at`, epoch milliseconds), and the length of every ciphertext.
+  each vault and lockbox was first stored and each lockbox last written (`registered_at`,
+  `written_at`, epoch milliseconds), and the length of every ciphertext.
 * **Never**: a whisper, a passphrase, any key in usable form, or the device-local remembered
   unlock. No history: an update replaces its row (your database's backups and WAL keep what
   they keep).

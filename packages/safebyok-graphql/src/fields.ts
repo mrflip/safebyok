@@ -63,7 +63,7 @@ export const LockboxFields = everyFieldOf<Lockbox>()([
   ['whisper_schema_version', 'plain'],
   ['public_json',            'plain'],
   ['registered_at',          'plain'],
-  ['changed_at',             'plain'],
+  ['written_at',             'plain'],
 ] as const)
 
 /** A lockbox as a listing carries it, as `SafebyokListedLockbox` has it: every field but the two ciphered ones. */

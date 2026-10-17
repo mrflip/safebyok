@@ -67,21 +67,21 @@ export const KnockKnock = () => {
       {telling && <p className="quiet">Claude is clearing its throat…</p>}
       {joke !== null && <blockquote className="joke">{joke}</blockquote>}
       {gripe !== null && <p className="gripe">{gripe}</p>}
-      <ApiKeySlot haveKeyBox={keyBox !== undefined} damaged={keyBox?.damaged === true} changedAt={keyBox?.damaged === false ? keyBox.changed_at : undefined} />
+      <ApiKeySlot haveKeyBox={keyBox !== undefined} damaged={keyBox?.damaged === true} savedAt={keyBox?.damaged === false ? keyBox.written_at : undefined} />
     </section>
   )
 }
 
-/** How long the slot says "saved" after a save, before it relaxes to the key's changed date. */
+/** How long the slot says "saved" after a save, before it relaxes to when the key was last saved. */
 export const SavedFlashMillis = 2000
 
 /**
  * The facility for entering (or replacing) the Anthropic API key, stored as a lockbox. A damaged
  * key lockbox -- its stored record unreadable -- is offered for replacing: storing over it writes it afresh.
- * A save flashes "saved" a moment, then relaxes to when the key last changed -- which an identical
- * key saved again does not move.
+ * A save flashes "saved" a moment, then relaxes to when the key was last saved -- any save, the
+ * same key saved again included.
  */
-const ApiKeySlot = ({ haveKeyBox, damaged, changedAt }: { haveKeyBox: boolean, damaged: boolean, changedAt?: number | undefined }) => {
+const ApiKeySlot = ({ haveKeyBox, damaged, savedAt }: { haveKeyBox: boolean, damaged: boolean, savedAt?: number | undefined }) => {
   const { vault, withUnlockedVault } = useVault()
   const [editing, setEditing] = useState(false)
   const [keyText, setKeyText] = useState('')
@@ -115,7 +115,7 @@ const ApiKeySlot = ({ haveKeyBox, damaged, changedAt }: { haveKeyBox: boolean, d
   if (! editing) {
     return (
       <p className="api-key-slot quiet">
-        ✓ Anthropic key {justSaved ? 'saved' : 'in the vault'}{! justSaved && changedAt !== undefined && ` (changed ${new Date(changedAt).toLocaleString()})`}.{' '}
+        ✓ Anthropic key {justSaved ? 'saved' : 'in the vault'}{! justSaved && savedAt !== undefined && ` (saved ${new Date(savedAt).toLocaleString()})`}.{' '}
         <button className="mini" onClick={() => { setEditing(true) }}>replace it</button>
       </p>
     )

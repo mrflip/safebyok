@@ -849,26 +849,26 @@ const storedBundleOf = (world: ReturnType<typeof makeWorld>): Record<string, unk
 )
 
 describe("the times a vault keeps", () => {
-  it("stamps a new lockbox's registered_at and changed_at with the clock's time", async () => {
+  it("stamps a new lockbox's registered_at and written_at with the clock's time", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.store('anthropic', 'sk-fake')
     const storedAt = world.clock.now()
-    expect(vault.getSnapshot().boxes[0]).to.include({ registered_at: storedAt, changed_at: storedAt })
-    expect(storedRowOf(world, 'anthropic')).to.include({ registered_at: storedAt, changed_at: storedAt })
+    expect(vault.getSnapshot().boxes[0]).to.include({ registered_at: storedAt, written_at: storedAt })
+    expect(storedRowOf(world, 'anthropic')).to.include({ registered_at: storedAt, written_at: storedAt })
   })
 
-  it("keeps registered_at when the whisper is replaced, and moves changed_at", async () => {
+  it("keeps registered_at when the whisper is replaced, and moves written_at", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.store('anthropic', 'sk-old')
     const storedAt = world.clock.now()
     world.advance(60_000)
     await vault.store('anthropic', 'sk-new')
-    expect(vault.getSnapshot().boxes[0]).to.include({ registered_at: storedAt, changed_at: storedAt + 60_000 })
+    expect(vault.getSnapshot().boxes[0]).to.include({ registered_at: storedAt, written_at: storedAt + 60_000 })
   })
 
-  it("leaves changed_at standing when the same whisper is stored again, under a new revision", async () => {
+  it("moves written_at when the same whisper is stored again: it says when the lockbox was written, not whether it changed", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.store('openai', { apiKey: 'sk-fake', tier: 2 })
@@ -878,21 +878,11 @@ describe("the times a vault keeps", () => {
     // The same whisper, its fields given in another order: it serializes the same.
     await vault.store('openai', { tier: 2, apiKey: 'sk-fake' }, { public: { note: 'a new note' } })
     const after = TH.summaryOf(vault.getSnapshot().boxes[0])
-    expect(after).to.deep.include({ registered_at: storedAt, changed_at: storedAt, public: { note: 'a new note' } })
+    expect(after).to.deep.include({ registered_at: storedAt, written_at: storedAt + 60_000, public: { note: 'a new note' } })
     expect(after?.revision_id).to.not.eq(before?.revision_id)
   })
 
-  it("moves changed_at when a whisper changes only in type, as its serialized form does", async () => {
-    const world = makeWorld()
-    const vault = await world.openUnlocked('pw')
-    await vault.store('pin', '1234')
-    const storedAt = world.clock.now()
-    world.advance(60_000)
-    await vault.store('pin', 1234)
-    expect(vault.getSnapshot().boxes[0]).to.include({ changed_at: storedAt + 60_000 })
-  })
-
-  it("counts a previous record that will not open as changed, and writes over it, carrying nothing from it", async () => {
+  it("writes over a previous record that will not open, carrying nothing from it", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.store('anthropic', 'sk-fake', { public: { note: 'work account' } })
@@ -902,7 +892,7 @@ describe("the times a vault keeps", () => {
     world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify(row))
     world.advance(60_000)
     await vault.store('anthropic', 'sk-fake')
-    expect(vault.getSnapshot().boxes[0]).to.deep.include({ registered_at: storedAt + 60_000, changed_at: storedAt + 60_000, public: {} })
+    expect(vault.getSnapshot().boxes[0]).to.deep.include({ registered_at: storedAt + 60_000, written_at: storedAt + 60_000, public: {} })
     expect(await vault.read('anthropic')).to.eq('sk-fake')
   })
 
@@ -931,7 +921,7 @@ describe("the times a vault keeps", () => {
     await TH.expectRefusal(vault.read('anthropic'), 'damaged_lockbox')
     world.advance(60_000)
     await vault.store('anthropic', 'sk-fake')
-    expect(vault.getSnapshot().boxes[0]).to.include({ registered_at: world.clock.now(), changed_at: world.clock.now() })
+    expect(vault.getSnapshot().boxes[0]).to.include({ registered_at: world.clock.now(), written_at: world.clock.now() })
     expect(await vault.read('anthropic')).to.eq('sk-fake')
   })
 
@@ -985,14 +975,14 @@ describe("the times a vault keeps", () => {
     const vault = await world.openUnlocked('pw', { clock: { now: () => world.clock.now() + 0.75 } })
     await vault.store('anthropic', 'sk-fake')
     expect(storedBundleOf(world)).to.include({ registered_at: world.clock.now() })
-    expect(storedRowOf(world, 'anthropic')).to.include({ registered_at: world.clock.now(), changed_at: world.clock.now() })
+    expect(storedRowOf(world, 'anthropic')).to.include({ registered_at: world.clock.now(), written_at: world.clock.now() })
   })
 
   it("refuses a stored lockbox or bundle whose time holds a fraction of a millisecond, leaving it as it is", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.store('anthropic', 'sk-fake')
-    const box = JSON.stringify({ ...storedRowOf(world, 'anthropic'), changed_at: world.clock.now() + 0.5 })
+    const box = JSON.stringify({ ...storedRowOf(world, 'anthropic'), written_at: world.clock.now() + 0.5 })
     world.dbStore.write(u1BoxCkey('anthropic'), box)
     await TH.expectRefusal(vault.read('anthropic'), 'damaged_lockbox')
     expect(world.dbStore.read(u1BoxCkey('anthropic'))).to.eq(box)
@@ -1009,7 +999,7 @@ describe("the times a vault keeps", () => {
     await vault.store(pasted, 'sk-fake')
     await vault.store('other', 'sk-fake-two')
     const row = storedRowOf(world, pasted)
-    world.dbStore.write(u1BoxCkey(pasted), JSON.stringify({ ...row, changed_at: world.clock.now() + 0.5 }))
+    world.dbStore.write(u1BoxCkey(pasted), JSON.stringify({ ...row, written_at: world.clock.now() + 0.5 }))
     const storedDamaged = await TH.expectRefusal(vault.read(pasted), 'damaged_lockbox')
     // The other lockbox's ciphertext, moved under this boxlabel: it will not open here.
     world.dbStore.write(u1BoxCkey(pasted), JSON.stringify({ ...row, whisper_ciphered: storedRowOf(world, 'other')['whisper_ciphered'] }))
@@ -1021,7 +1011,7 @@ describe("the times a vault keeps", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.store('anthropic', 'sk-fake')
-    const { registered_at: _registered, changed_at: _changed, ...row } = storedRowOf(world, 'anthropic')
+    const { registered_at: _registered, written_at: _written, ...row } = storedRowOf(world, 'anthropic')
     const olden = JSON.stringify({ ...row, created_at: '2026-10-14T00:00:00.000Z', updated_at: '2026-10-14T00:00:00.000Z' })
     world.dbStore.write(u1BoxCkey('anthropic'), olden)
     await TH.expectRefusal(vault.read('anthropic'), 'damaged_lockbox')
@@ -1137,7 +1127,7 @@ describe("the public bag", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.store('anthropic', { apiKey: 'sk-fake' })
-    expect(storedRowOf(world, 'anthropic')).to.include({ format: 'safebyok-lockbox-v3', whisper_codec: 'json_v1', whisper_schema_version: 1 })
+    expect(storedRowOf(world, 'anthropic')).to.include({ format: 'safebyok-lockbox-v4', whisper_codec: 'json_v1', whisper_schema_version: 1 })
   })
 })
 
@@ -1170,7 +1160,7 @@ const heaviestRowOf = async (whisperBytes: number, bag: PublicBag = {}) => {
     applabel:            'a'.repeat(40),
     user_id:             '\u{4E00}'.repeat(MaxUserIdChars),
     vaultlabel:          'v'.repeat(40),
-    format:                 'safebyok-lockbox-v3',
+    format:                 'safebyok-lockbox-v4',
     boxlabel:               'b'.repeat(40),
     revision_id:            crypto.randomUUID(),
     vault_key_epoch:        Number.MAX_SAFE_INTEGER,
@@ -1180,7 +1170,7 @@ const heaviestRowOf = async (whisperBytes: number, bag: PublicBag = {}) => {
     whisper_schema_version: 1,
     public_json:            TH.publicJsonOf(bag),
     registered_at:          FarFuture,
-    changed_at:             FarFuture,
+    written_at:             FarFuture,
   }
 }
 
@@ -2064,7 +2054,7 @@ describe("eraseDamagedVault", () => {
 const DamagedListings = [
   [() => '{"not": json',                                                                          'that is not JSON at all'],
   [(row: Record<string, unknown>) => JSON.stringify({ ...row, boxlabel: 'other_box' }),           'naming another boxlabel than the one it is stored under'],
-  [(row: Record<string, unknown>) => JSON.stringify({ ...row, changed_at: 1_792_022_400_000.5 }), 'whose changed_at holds a fraction of a millisecond'],
+  [(row: Record<string, unknown>) => JSON.stringify({ ...row, written_at: 1_792_022_400_000.5 }), 'whose written_at holds a fraction of a millisecond'],
   [(row: Record<string, unknown>) => JSON.stringify({ ...row, public_json: '{"note":' }),          'whose public bag is not JSON'],
   [(row: Record<string, unknown>) => JSON.stringify({ ...row, format: 'safebyok-lockbox-v9' }),   'written in a format this version does not know'],
 ] as const
@@ -2106,7 +2096,7 @@ describe("damaged lockboxes", () => {
       await vault.store('anthropic', 'sk-ant-new')
       expect(await vault.read('anthropic')).to.eq('sk-ant-new')
       const summary = TH.summaryOf(vault.getSnapshot().boxes[0])
-      expect(summary).to.deep.include({ boxlabel: 'anthropic', public: {}, registered_at: world.clock.now(), changed_at: world.clock.now() })
+      expect(summary).to.deep.include({ boxlabel: 'anthropic', public: {}, registered_at: world.clock.now(), written_at: world.clock.now() })
       expect(boxlabelsOf(vault)).to.deep.equal(['anthropic', 'openai'])
     })
   }
@@ -2320,7 +2310,7 @@ const SpoiledShells = [
   [(row: Record<string, unknown>) => ({ ...row, public_json: '{}' }),                                     'its public bag emptied'],
   [(row: Record<string, unknown>) => ({ ...row, public_json: '{"note": "work account"}' }),               'its public bag respaced, the same JSON value written otherwise'],
   [({ registered_at: kept, ...row }: Record<string, unknown>) => ({ ...row, registered_at: (kept as number) - 1 }), 'its registered_at moved'],
-  [({ changed_at: kept, ...row }: Record<string, unknown>) => ({ ...row, changed_at: (kept as number) + 1 }),       'its changed_at moved'],
+  [({ written_at: kept, ...row }: Record<string, unknown>) => ({ ...row, written_at: (kept as number) + 1 }),       'its written_at moved'],
   [(row: Record<string, unknown>) => ({ ...row, revision_id: 'rev-elsewhere' }),                          'its revision_id swapped'],
 ] as const
 
@@ -5099,7 +5089,7 @@ describe("versioned updates: two devices writing at once", () => {
   it("a store over a damaged box, a sound one written over it meanwhile elsewhere, never erases theirs: its write is refused, and tried again over theirs", async () => {
     const { world, hereDB, here, there, beforeNextWrite } = await twoDeviceWorld()
     await here.store('anthropic', 'sk-ant-fake-one')
-    world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), changed_at: 'later' }))
+    world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), written_at: 'later' }))
     await vi.waitFor(() => { expect(here.getSnapshot().boxes[0]?.damaged).to.be.true })
     const theirs = { revisionId: '' }
     beforeNextWrite('updateBox', async () => {
@@ -5120,7 +5110,7 @@ describe("versioned updates: two devices writing at once", () => {
     await here.store('anthropic', 'sk-ant-fake-one')
     // A listing gone stale: storage holds a damaged record the snapshot does not show.
     const listBoxes = vi.spyOn(hereDB, 'listBoxes').mockResolvedValue([])
-    world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), changed_at: 'later' }))
+    world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), written_at: 'later' }))
     await vi.waitFor(() => { expect(here.getSnapshot().boxes).to.have.lengthOf(0) })
     listBoxes.mockRestore()
     const damagedRevision = storedRowOf(world, 'anthropic')['revision_id']
@@ -6058,7 +6048,7 @@ describe("the vaultKey's epoch", () => {
     const vault = await world.openUnlocked('pw')
     await vault.store('anthropic', 'sk-fake')
     await vault.lock()
-    expect(storedRowOf(world, 'anthropic')).to.deep.include({ format: 'safebyok-lockbox-v3', vault_key_epoch: 1 })
+    expect(storedRowOf(world, 'anthropic')).to.deep.include({ format: 'safebyok-lockbox-v4', vault_key_epoch: 1 })
     expect(TH.summaryOf(vault.getSnapshot().boxes[0])?.vault_key_epoch).to.eq(1)
   })
 

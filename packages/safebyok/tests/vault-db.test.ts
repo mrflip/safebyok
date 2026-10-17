@@ -267,7 +267,7 @@ const ListedRecordCases = [
   ["anthropic",  TH.boxOf('anthropic', 'one'),                               [["anthropic", false]],  'a sound lockbox as its summary'],
   // damaged, listed so they can be erased:
   ["anthropic",  TH.boxOf('other_box', 'one'),                               [["anthropic", true]],   'a record naming another boxlabel as damaged, under the one it is stored under'],
-  ["anthropic",  { ...TH.boxOf('anthropic', 'one'), changed_at: 'later' },   [["anthropic", true]],   'a record with a malformed time as damaged'],
+  ["anthropic",  { ...TH.boxOf('anthropic', 'one'), written_at: 'later' },   [["anthropic", true]],   'a record with a malformed time as damaged'],
   ["anthropic",  { ...TH.boxOf('anthropic', 'one'), public_json: '{"a":' }, [["anthropic", true]],  'a record whose public bag is not JSON as damaged'],
   ["anthropic",  TH.omitting(TH.boxOf('anthropic', 'one'), 'public_json'),   [["anthropic", true]],   'a record with no public bag as damaged'],
   ["anthropic",  null,                                                       [["anthropic", true]],   'a null record as damaged'],
@@ -328,7 +328,7 @@ describe("the abstract VaultDB, around an adapter's half", () => {
   })
 
   const DamagedRevisionCases = [
-    [{ ...TH.boxOf('anthropic', 'one'), changed_at: 'later' },   "rev-one",  'keeps the revision a damaged record holds as text'],
+    [{ ...TH.boxOf('anthropic', 'one'), written_at: 'later' },   "rev-one",  'keeps the revision a damaged record holds as text'],
     [{ ...TH.boxOf('anthropic', 'one'), revision_id: 7 },        null,       'keeps none for a revision that is not text'],
     [{ ...TH.boxOf('anthropic', 'one'), revision_id: '' },       null,       'keeps none for an empty revision'],
     ['not a lockbox',                                            null,       'keeps none for a record that is no object'],
@@ -398,7 +398,7 @@ const RefusedWrites = [
   ['bad_label',  (vaultDB: VaultDB) => vaultDB.createBundle({ ...TH.bundleOf('u1'), applabel: 'Ac\u{7}me' }),                         'a bundle whose applabel holds a control character'],
   ['bad_option', (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one', { public_json: 'not json' }), TH.noBoxYet), 'a lockbox whose public bag no read would accept'],
   ['bad_label',  (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('key\u{D83D}', 'one'), TH.noBoxYet),                  'a lockbox whose boxlabel is half of an emoji, whatever the checks'],
-  ['bad_option', (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one', { changed_at: 1_792_022_400 }), TH.noBoxYet), 'a lockbox time in epoch seconds'],
+  ['bad_option', (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one', { written_at: 1_792_022_400 }), TH.noBoxYet), 'a lockbox time in epoch seconds'],
   ['bad_label',  (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), undefined as unknown as Lockbox, TH.noBoxYet),               'no lockbox at all'],
   // the expectations:
   ['bad_option', (vaultDB: VaultDB) => vaultDB.updateBundle(TH.bundleOf('u1'), { vault_id: 'vault-id-u1', unlock_epoch: 0 }),          'a bundle expectation at epoch zero'],
@@ -930,12 +930,12 @@ describe("VaultDB.listBoxRecords", () => {
     const vaultDB = new MapVaultDB()
     const scope = TH.scopeOf('u1')
     vaultDB.rows.set(Ckeys.box(scope, 'anthropic'), TH.boxOf('anthropic', 'one'))
-    vaultDB.rows.set(Ckeys.box(scope, 'openai'), { ...TH.boxOf('openai', 'two'), changed_at: 'later' })
+    vaultDB.rows.set(Ckeys.box(scope, 'openai'), { ...TH.boxOf('openai', 'two'), written_at: 'later' })
     vaultDB.rows.set(Ckeys.box(scope, 'mistral'), 'not a lockbox')
     const records = await vaultDB.listBoxRecords(scope)
     expect(records).to.have.deep.members([
       omit(TH.boxOf('anthropic', 'one'), ['lockbox_key_wrapped', 'whisper_ciphered']),
-      omit({ ...TH.boxOf('openai', 'two'), changed_at: 'later' }, ['lockbox_key_wrapped', 'whisper_ciphered']),
+      omit({ ...TH.boxOf('openai', 'two'), written_at: 'later' }, ['lockbox_key_wrapped', 'whisper_ciphered']),
       'not a lockbox',
     ])
   })
