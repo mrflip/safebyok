@@ -31,7 +31,10 @@ Each PR's first line says "Stacked on #<the one below>, in the line main → ...
 16. [#143](https://github.com/mrflip/safebyok/pull/143) sweep_small (9a)
 17. [#140](https://github.com/mrflip/safebyok/pull/140) floors_forward (12)
 18. [#145](https://github.com/mrflip/safebyok/pull/145) budgets (9c)
-19. [#125](https://github.com/mrflip/safebyok/pull/125) the sprint PR, squashed to one `plan:` commit -- the top
+19. [#125](https://github.com/mrflip/safebyok/pull/125) the sprint PR, squashed to one `plan:` commit
+20. [#147](https://github.com/mrflip/safebyok/pull/147) dialog_after_close (18), added at the
+    closeout -- **now the top**: merging it merges the line. Its first line reads "Stacked on #125";
+    the PRs below still name #145 as the end of their line.
 
 Outside the line: [#138](https://github.com/mrflip/safebyok/pull/138) deriver_shim (15), stacked
 on #126's old tip, unfiled in `/workspace/byok-deriver_shim`; and
@@ -62,6 +65,13 @@ process rules folded into #135's text (independent of the line; it adds
 
 ## Open questions, in one place
 
+* **#147 waits on you** (added at the closeout): keep the hand-rolled `useIsMounted` (Rec: yes;
+  nothing existing does its job, and the libraries would be a runtime dependency for six lines),
+  and a layout or a passive effect under it (a layout effect reads a dialog hidden by Suspense or
+  `<Activity>` as gone, so an erase interrupted while hidden leaves its button disabled; Rec:
+  passive, as the libraries do). Minor: `lib` ES2024 for `Promise.withResolvers`; the demo App
+  tests' order dependence under shuffle. The provider's read after close (taken, below) had a
+  sibling in the dialog: this is it.
 * **#138 waits on you**: the row "An overridden deriveKeyBytes skips the 32-byte check". On yes,
   a fresh worker applies the reviewer's `keyBytesOf` fix, a second review covers it, and it
   restacks onto #126's new tip and joins the top of the line.

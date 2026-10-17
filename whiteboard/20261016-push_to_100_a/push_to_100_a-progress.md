@@ -1,6 +1,6 @@
 # Sprint push_to_100_a -- progress
 
-**Status** (2026-10-17): **done**. The line through #145 is filed on today's main; the sprint PR #125 closes on top; 15 (#138) waits on the Coach; G403/G415 follow after 16:00Z.
+**Status** (2026-10-17): **done**. The line through #145 is filed on today's main; the sprint PR #125 sits above it, and thread 18 (#147), added at the closeout, is now the top; 15 (#138) waits on the Coach; G403/G415 follow after 16:00Z.
 
 ## Status
 
@@ -25,9 +25,23 @@
 | 9a | sweep_small | on 9b (YOLO 28) | filed (tip 1d19c5a1) | [#143](https://github.com/mrflip/safebyok/pull/143) |
 | 12 | floors_forward | on 9a (YOLO 24, 29) | filed (tip b9a61cc1); G403/G415 a follow-up after 16:00Z | [#140](https://github.com/mrflip/safebyok/pull/140) |
 | 9c | budgets | on 12 | filed (tip 5eab9956; G520 closed: nine lines re-derived, four raised) | [#145](https://github.com/mrflip/safebyok/pull/145) |
+| 18 | dialog_after_close | on #125 (67b08ace) | filed (tip d1813953); flagged: `useIsMounted` waits on the Coach | [#147](https://github.com/mrflip/safebyok/pull/147) |
 | 15 | deriver_shim | on 6's old tip (adc94772) | flagged: waits on the Coach | [#138](https://github.com/mrflip/safebyok/pull/138) |
 
 ## What the threads have taught
+
+* *Orchestrator:* **The closeout's flake census** (2026-10-17): of 14 red jobs across the line,
+  12 were one flake, the unhandled `vault_closed` in the demo's `test-helpers.test.tsx` (YOLO 23),
+  on every PR below #142, where 16 fixed it; two were the flakes 14 fixed (#133's "made anew",
+  #129's click-through timeout), on PRs below #134; #138's red is its size budget. One was new:
+  #142's `window is not defined`, a dialog's `submit` setting state after its test's environment
+  went. **Thread 18** (#147) settled it: `PassphraseModal` and `PasskeyUnlockButton` let go once
+  they unmount (`useIsMounted`, hand-rolled, flagged for the Coach), the advice's counter bumps on
+  unmount too, 17 tests that fail without it. It did not reproduce locally (0 in 480 before and
+  after); a probe showed the continuation landing after `window` went in 13 of 96 runs, and React
+  reading `window.event` only when no update priority is set. On the way it found the demo's
+  delete rejecting `absent_box` unhandled after a start-over (now read as deleted), and the demo
+  App tests depending on order under shuffle (58 of 96 fail).
 
 * *Orchestrator:* **The final restack** (YOLO 30, 2026-10-17 05:00Z): one restacker moved all
   sixteen onto `365d1dcd`; one conflict (thread 3's docs commit, `CLAUDE.md` and `PROCESS.md`,

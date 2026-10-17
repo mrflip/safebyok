@@ -583,6 +583,22 @@ and a failed zxcvbn load wrapped with the nearest existing kind meaning "try aga
   26); `erase()`'s message reading the shared `syncing` flag (thread 4's decision); the
   passthrough covering only the three ruled kinds (as ruled).
 
+### 18. `dialog_after_close` -- the dialog's handlers outlive it (new, from the closeout)
+
+*Orchestrator* (2026-10-17): added at the Coach's closeout, stacked on #125. #142's CI met an
+unhandled `window is not defined` from the demo's `App.test.tsx`: `PassphraseModal`'s `submit`
+still awaited `vault.unlock` when the test's environment went, and its `catch` set state on a
+dialog that was gone -- the sibling of YOLO 23's provider read, which 16 settled. Settle it at its
+cause in every async handler of the dialog and the passkey button, with tests that fail without
+it; no timeout. Built and filed as [#147](https://github.com/mrflip/safebyok/pull/147).
+* *Review* (`flagged`, #147, 2026-10-17): two fixes (`eff02bb9` `TH.watchStateUpdates` forwards
+  `window.event`'s setter; `1c666491` its doc block says what the count rests on). Flagged: the
+  hand-rolled `useIsMounted` wants the Coach's yes (no existing mechanism does its job; Rec keep).
+  Left: a layout effect reads a dialog hidden by Suspense or `<Activity>` as gone (the Coach's
+  call against a passive one); a passkey press dropped when `passkeyFirst` turns false mid-press;
+  no abort of the WebAuthn prompt on unmount (an `AbortSignal` through `askPasskey`, a later
+  thread); the demo's `erase` rethrowing other conditions (predates 18).
+
 ## Coach rulings during the sprint
 
 From the sprint doc's *Open Matters*, as rows are swept:
