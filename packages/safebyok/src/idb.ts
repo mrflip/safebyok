@@ -24,14 +24,33 @@ export * as ChangeBell from './change-bell'
  */
 
 // One UseStore per dbName, shared by stores and inspectors alike: idb-keyval opens the
-// underlying database lazily, so making these is free until something reads or writes.
+// underlying database lazily, so making these is free until something reads or writes. Each use
+// meets the guard first: a context with no IndexedDB at all (storage turned off, or a runtime
+// without it) is said as the browser says a storage it does not offer.
 const shelfStores = new Map<string, UseStore>()
 const shelfStore = (dbName: string): UseStore => {
+  if (typeof indexedDB === 'undefined' || (indexedDB as IDBFactory | null) === null) { throw noIndexedDB() }
   const kept = shelfStores.get(dbName)
   if (kept !== undefined) { return kept }
   const fresh = createStore(`${dbName}:device_db`, 'records')
   shelfStores.set(dbName, fresh)
   return fresh
+}
+
+/**
+ * The refusal of a context with no IndexedDB, named as a browser names a storage it does not
+ * offer: a `NotSupportedError` DOMException, or, in a runtime with no DOMException either (React
+ * Native's Hermes, say), a plain Error of that name.
+ */
+const noIndexedDB = (): Error => {
+  const message = 'This context offers no IndexedDB, so the device store has nowhere to keep its records.'
+  if (typeof DOMException === 'function') { return new DOMException(message, 'NotSupportedError') }
+  return new NotSupportedError(message)
+}
+
+/** A `NotSupportedError` for a runtime with no DOMException to make one. */
+class NotSupportedError extends Error {
+  override readonly name = 'NotSupportedError'
 }
 
 // The device shelf's change bell: every write rings it, here and in every other tab. Its name is
@@ -63,14 +82,7 @@ const bellnameOf = (dbName: string) => `safebyok-idb:${dbName}:device_db`
  */
 export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
   const dbName = parseDbName(opts, 'idbDeviceDB')
-  const shelf = () => {
-    // Where the device store opens: a context with no IndexedDB at all (storage turned off, or a
-    // runtime without it) is said as the browser says a storage it does not offer.
-    if (typeof indexedDB === 'undefined' || (indexedDB as IDBFactory | null) === null) {
-      throw new DOMException('This context offers no IndexedDB, so the device store has nowhere to keep its records.', 'NotSupportedError')
-    }
-    return shelfStore(dbName)
-  }
+  const shelf = () => shelfStore(dbName)
   const ring = () => { ChangeBell.ring(bellnameOf(dbName)) }
 
   // A row under any ckey but an unlock's or a mark's is one an earlier version filed
@@ -162,7 +174,8 @@ export type IdbRow = { ckey: string, row: unknown }
  *
  * @param opts - The database to look at: `dbName`, default 'safebyok'.
  * @returns The inspector. Kind 'bad_option' for a `dbName` that is not non-empty text, and from
- *   its `subscribe`, for a listener that is not a function.
+ *   its `subscribe`, for a listener that is not a function. Its `rows()` and `wipe()` reject in a
+ *   context with no IndexedDB, as the device store does, with a `NotSupportedError`.
  *
  * @example
  *   const inspector = inspectIdbDeviceDB({ dbName: 'acme' })

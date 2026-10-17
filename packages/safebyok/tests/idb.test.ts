@@ -45,6 +45,16 @@ describe("the IndexedDB device store's options", () => {
   }
 })
 
+/** What `attempt` rejects with; it fails the test should it resolve. */
+const rejectionOf = async (attempt: Promise<unknown>): Promise<unknown> => {
+  try {
+    await attempt
+  } catch (err) {
+    return err
+  }
+  throw new Error('it resolved, where a rejection was expected')
+}
+
 describe("idbDeviceDB", () => {
   const NoIndexedDBCases = [
     [undefined,  'a runtime with no indexedDB global'],
@@ -61,7 +71,44 @@ describe("idbDeviceDB", () => {
         vi.unstubAllGlobals()
       }
     })
+
+    it(`has its inspector's rows() and wipe() refuse with a NotSupportedError too, in ${blurb}`, async () => {
+      const inspector = inspectIdbDeviceDB({ dbName: TH.freshDbName() })
+      vi.stubGlobal('indexedDB', factory)
+      try {
+        await expect(inspector.rows()).rejects.toThrow(expect.objectContaining({ name: 'NotSupportedError' }))
+        await expect(inspector.wipe()).rejects.toThrow(expect.objectContaining({ name: 'NotSupportedError' }))
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    })
   }
+
+  it("refuses with a DOMException where the runtime has one", async () => {
+    const deviceDB = idbDeviceDB({ dbName: TH.freshDbName() })
+    vi.stubGlobal('indexedDB', undefined)
+    try {
+      const err = await rejectionOf(deviceDB.readMark(TH.scopeOf('u1')))
+      expect(err).to.be.instanceOf(DOMException)
+      expect(err).to.have.property('name', 'NotSupportedError')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it("refuses with a plain Error named NotSupportedError where the runtime has no DOMException, as Hermes has none", async () => {
+    const deviceDB = idbDeviceDB({ dbName: TH.freshDbName() })
+    vi.stubGlobal('indexedDB', undefined)
+    vi.stubGlobal('DOMException', undefined)
+    try {
+      const err = await rejectionOf(deviceDB.readMark(TH.scopeOf('u1')))
+      expect(err).to.be.instanceOf(Error)
+      expect(err).to.have.property('name', 'NotSupportedError')
+      expect(err).to.have.property('message').that.includes('no IndexedDB')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
 
   it("sweeps an unlock filed under an earlier version's ckey at the first read, never reading it", async () => {
     const dbName = TH.freshDbName()
