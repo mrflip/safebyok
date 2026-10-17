@@ -1,11 +1,15 @@
 # Thread 17: written_at (2026-10-17)
 
 Branch `20261017-written_at`, PR [#141](https://github.com/mrflip/safebyok/pull/141), stacked on
-#139 (line main → #128 → #133 → #127 → #132 → #137 → #136 → #126 → #129 → #134 → #130 → #131 →
-#139 → this), cut at `9eb576a7`. Thread 16 is built beside it from the same base; restack onto 16
-once both file. Justify green: core 2041, IDB 129, Postgres 247, GraphQL 238, Convex 257, React
-181, fastkey 49, demo 184, e2e 81 (Postgres suites skip without `SAFEBYOK_PG_URL`), root 212.
-Size: `openVault` 27.36 of 30 kB (27.11 at base), everything 34.58 of 40 kB (34.31).
+[#142](https://github.com/mrflip/safebyok/pull/142) (line main → #128 → #133 → #127 → #132 → #137
+→ #136 → #126 → #129 → #134 → #130 → #131 → #139 → #142 → this): built from `9eb576a7`, rebased
+onto thread 16's filed tip `23743f18` at filing. Justify green: core 2044, IDB 129, Postgres 247,
+GraphQL 238, Convex 257, React 190, fastkey 49, demo 184, e2e 81 (Postgres suites skip without
+`SAFEBYOK_PG_URL`), root 212. Size: `openVault` 27.31 of 30 kB, everything 34.5 of 40 kB,
+`browserOpts` 18.07 of 20 kB, `VaultProvider` 4.53 of 4.7 kB; every line within budget.
+
+**Review**: fixed -- four commits (twoDeviceWorld's doc block, a v3 lockbox in DamagedListings,
+VOCABULARY's format tag, cipherBinding's tag), in the PR; its minors went to thread 9.
 
 ## The four rulings
 
