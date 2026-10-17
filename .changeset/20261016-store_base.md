@@ -17,3 +17,9 @@
 **Postgres and GraphQL set no lockbox limit by default** (`maxLockboxes` was 1000, now `Infinity`). A Postgres vault with no limit is never counted. Pass `maxLockboxes` to both, as before, to keep a limit.
 
 **Postgres logs a `listen` that fails to start; GraphQL logs a subscription that fails and calls `onChange`**, so the vault reads again and meets the refusal itself. Convex logs a `ConvexClient` watch that fails. A GraphQL validation error (`BAD_USER_INPUT`, `GRAPHQL_VALIDATION_FAILED`) now refuses as `bad_option`, not `storage_unavailable`. safebyok's own Convex refusals (`identity_revoked`, `vault_full`) no longer carry the `ConvexError` as their cause.
+
+**A GraphQL `vaultDBFor` that throws crosses as `bad_option` with a generic message**, saying the server's setup is wrong; its own message, which used to reach the browser, stays on the server as the GraphQL error's `cause`.
+
+**The Convex component's `updateBundle` lands only a bundle that keeps the vault's `vault_id` and moves its `unlock_epoch` forward**, else resolves `false` (`stale_write` to the client). Every safebyok client already writes so; a client that does not is refused.
+
+**An IndexedDB failure the browser gives no error for** reaches a caller as `storage_unavailable` whose cause reads "The storage backend failed without giving an error.", where it read "The IndexedDB request failed for an unknown reason".
