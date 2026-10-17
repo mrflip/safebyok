@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { isVaultError } from 'safebyok'
 import { useVault, useVaultSnapshot } from 'safebyok-react'
 import { WhisperFieldAttributes } from 'safebyok/utils'
 import { asksAgain } from '../lib/asks-again'
@@ -88,7 +89,13 @@ export const VaultDashboard = () => {
 
   const erase = async (boxlabel: string) => {
     if (! globalThis.confirm(`Delete the lockbox '${boxlabel}'?`)) { return }
-    await withUnlockedVault(() => vault.erase(boxlabel))
+    try {
+      await withUnlockedVault(() => vault.erase(boxlabel))
+    } catch (err) {
+      // Gone already -- from another device, or with the vault the user erased to start over from
+      // the passphrase dialog -- is what was asked for.
+      if (! isVaultError(err, 'absent_box')) { throw err }
+    }
     hide(boxlabel)
   }
 

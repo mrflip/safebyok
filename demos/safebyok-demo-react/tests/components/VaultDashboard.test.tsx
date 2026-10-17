@@ -215,6 +215,22 @@ describe("VaultDashboard, its lockboxes", () => {
     expect(screen.getByText('anthropic_api_key')).to.not.be.null
   })
 
+  it("deletes a lockbox erased elsewhere while it asked for the passphrase as deleted, quietly", async () => {
+    const world = TH.makeWorld()
+    await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key', openai_api_key: 'sk-test-not-a-real-key' })
+    world.renderInVault(<VaultDashboard />)
+    await screen.findByText('🔒 locked')
+    vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
+    fireEvent.click(within(rowOf('openai_api_key')).getByRole('button', { name: 'delete' }))
+    await screen.findByPlaceholderText('vault passphrase')
+    const elsewhere = await world.openUnlocked()
+    await elsewhere.erase('openai_api_key')
+    await TH.answerPassphraseDialog()
+    await waitFor(() => { expect(screen.queryByText('openai_api_key')).to.be.null })
+    await screen.findByText(/🔓 unlocked until/)
+    expect(screen.getByText('anthropic_api_key')).to.not.be.null
+  })
+
   it("marks a damaged lockbox as such, offering only to delete it", async () => {
     const store = memoryStore()
     const world = TH.makeWorld({ vaultDB: localVaultDB({ store }) })

@@ -95,6 +95,11 @@ describe("App", () => {
     fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'correct horse two' } })
     expect(screen.getByRole('dialog', { name: 'Choose a vault passphrase' })).to.not.be.null
     fireEvent.click(screen.getByRole('button', { name: 'Create vault' }))
-    await screen.findByText(/No lockboxes yet/)
+    // The emptied vault lists no lockboxes the moment it is erased, before the new one is made:
+    // the test waits for the unlock it started to land, and the dialog to close, rather than end
+    // with it under way.
+    await screen.findByText(/🔓 unlocked until/)
+    await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })
+    expect(screen.getByText(/No lockboxes yet/)).to.not.be.null
   })
 })
