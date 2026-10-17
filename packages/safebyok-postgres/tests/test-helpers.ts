@@ -2,7 +2,7 @@ import { beforeAll } from 'vitest'
 import { PGlite } from '@electric-sql/pglite'
 import { postgresVaultDB } from '../src/index'
 import type { PostgresClient, PostgresListen } from '../src/index'
-import type { VaultDB, VaultDBOpts, VaultScope } from 'safebyok'
+import type { VaultDBOpts } from 'safebyok'
 import { VaultNotifySql, VaultTablesSql } from '../src/vault-tables'
 
 // Everything the core's tests use too, so a test here star-imports this one module as TH.
@@ -92,46 +92,6 @@ export const spyClient = (client: PostgresClient, answer?: (text: string) => Pro
 export const failingClient = (err: Error): PostgresClient => ({
   query: () => Promise.reject(err),
 })
-
-/** What `operation` rejected with; fails the test if it resolved. */
-export const refusalOf = async (operation: Promise<unknown>): Promise<{ kind?: unknown, cause?: unknown, message?: unknown }> => {
-  try {
-    await operation
-  } catch (err) {
-    return err as { kind?: unknown }
-  }
-  throw new Error('the operation was not refused')
-}
-
-/** Resolves once `check` holds, looking every few milliseconds; rejects after a second. */
-export const eventually = async (check: () => boolean): Promise<void> => {
-  for (let ii = 0; ii < 200; ii += 1) {
-    if (check()) { return }
-    await new Promise((resolve) => { setTimeout(resolve, 5) })
-  }
-  throw new Error('it never came to pass')
-}
-
-/** Whether `onChange` got called, kept for a test to look at. */
-export const changeCounter = () => {
-  const heard = { count: 0 }
-  return { heard, onChange: () => { heard.count += 1 } }
-}
-
-/**
- * A watch on `scope` through `vaultDB`, once it is live, its calls counted from then: a
- * postgresVaultDB with a listen calls once as the listen begins, and this resolves after that
- * call, the count back at zero.
- *
- * @example const { heard, unsubscribe } = await TH.liveWatch(TH.requestFor(db, 'u1'), TH.scopeOf('u1'))
- */
-export const liveWatch = async (vaultDB: Pick<VaultDB, 'subscribe'>, scope: VaultScope) => {
-  const heard = { count: 0 }
-  const unsubscribe = vaultDB.subscribe(scope, () => { heard.count += 1 })
-  await eventually(() => heard.count > 0)
-  heard.count = 0
-  return { heard, unsubscribe }
-}
 
 /** The postgresVaultDB a request for `userId` makes over `db`, listening there. */
 export const requestFor = (db: PGlite, userId: string | null, vaultDBOpts: VaultDBOpts = {}) => postgresVaultDB({ ...vaultDBOpts, client: db, userId, listen: listenOn(db) })

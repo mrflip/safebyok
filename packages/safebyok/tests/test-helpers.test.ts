@@ -52,6 +52,79 @@ describe("wakeupAtNextTick", () => {
   })
 })
 
+describe("aWhile", () => {
+  it("takes about fifty milliseconds", async () => {
+    const began = Date.now()
+    await TH.aWhile()
+    expect(Date.now() - began).to.be.at.least(40)
+  })
+})
+
+describe("eventually", () => {
+  it("resolves once the check holds, though it did not at first", async () => {
+    let ready = false
+    setTimeout(() => { ready = true }, 20)
+    await TH.eventually(() => ready)
+    expect(ready).to.be.true
+  })
+
+  it("resolves at once for a check that holds already", async () => {
+    let looks = 0
+    await TH.eventually(() => { looks += 1; return true })
+    expect(looks).to.eq(1)
+  })
+
+  it("rejects when the thing never comes to pass", async () => {
+    vi.useFakeTimers()
+    try {
+      const waiting = TH.eventually(() => false)
+      const outcome = expect(waiting).rejects.toThrow('never came to pass')
+      await vi.advanceTimersByTimeAsync(3000)
+      await outcome
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe("changeCounter", () => {
+  it("counts each call of its listener", () => {
+    const { heard, onChange } = TH.changeCounter()
+    expect(heard.count).to.eq(0)
+    onChange()
+    onChange()
+    expect(heard.count).to.eq(2)
+  })
+
+  it("keeps one count per counter", () => {
+    const first = TH.changeCounter()
+    const second = TH.changeCounter()
+    first.onChange()
+    expect(second.heard.count).to.eq(0)
+  })
+})
+
+/** What a stub's subscribe hands back: an unsubscribe that does nothing. */
+const unsubscribeFromNothing = () => undefined
+
+describe("liveWatch", () => {
+  it("resolves once the server's opening call has come, the count back at zero, then counts changes", async () => {
+    const subscribed: (() => void)[] = []
+    const watched = {
+      subscribe: (_scope: VaultScope, onChange: () => void) => {
+        subscribed.push(onChange)
+        queueMicrotask(onChange)
+        return unsubscribeFromNothing
+      },
+    }
+    const { heard, unsubscribe } = await TH.liveWatch(watched, TH.scopeOf('u1'))
+    expect(heard.count).to.eq(0)
+    subscribed[0]?.()
+    expect(heard.count).to.eq(1)
+    unsubscribe()
+  })
+})
+
 describe("makeGate", () => {
   it("holds a pass until released, and says when something reached it", async () => {
     const gate = TH.makeGate()

@@ -196,9 +196,7 @@ describe("graphqlVaultDB, carrying a passkey's way in", () => {
 describe("graphqlVaultDB, its refusals", () => {
   it("carries the server's refusal across as the same VaultError, kind and message", async () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
-    const notMine = await TH.refusalOf(TH.browserFor(schema, 'u1').readBundle(TH.scopeOf('u2')))
-    expect(notMine).to.be.instanceOf(VaultError)
-    expect(notMine.kind).to.eq('identity_revoked')
+    const notMine = await TH.expectRefusal(TH.browserFor(schema, 'u1').readBundle(TH.scopeOf('u2')), 'identity_revoked')
     expect(notMine.message).to.eq('This vault belongs to another user than the one signed in: a signed-in user reaches only their own vaults. If the user changed, open the vault for the new one.')
     expect(notMine.cause).to.be.undefined
   })
@@ -206,31 +204,27 @@ describe("graphqlVaultDB, its refusals", () => {
   it("refuses with storage_unavailable when the database is down, never saying what the driver said", async () => {
     const dbDown = new Error('password authentication failed for user "vault_owner"')
     const schema = TH.schemaOver(await TH.database(), ({ userId }) => postgresVaultDB({ client: TH.failingClient(dbDown), userId }))
-    const refusal = await TH.refusalOf(TH.browserFor(schema, 'u1').readBundle(u1))
-    expect(refusal.kind).to.eq('storage_unavailable')
-    expect(String(refusal.message)).to.not.include('vault_owner')
+    const refusal = await TH.expectRefusal(TH.browserFor(schema, 'u1').readBundle(u1), 'storage_unavailable')
+    expect(refusal.message).to.not.include('vault_owner')
     expect(JSON.stringify(refusal)).to.not.include('vault_owner')
   })
 
   it("refuses with storage_unavailable, urql's error its cause, when the server does not serve the vault's schema", async () => {
     const schema = buildSchema('type Query { hello: String }')
     const vaultDB = graphqlVaultDB({ client: new Client({ url: 'https://app.example.test/api/graphql', exchanges: [executeExchange({ schema })] }) })
-    const refusal = await TH.refusalOf(vaultDB.readBundle(u1))
-    expect(refusal.kind).to.eq('storage_unavailable')
+    const refusal = await TH.expectRefusal(vaultDB.readBundle(u1), 'storage_unavailable')
     expect(refusal.cause).to.be.instanceOf(CombinedError)
   })
 
   it("refuses with storage_unavailable when the network fails", async () => {
     const vaultDB = graphqlVaultDB({ client: new Client({ url: 'https://app.example.test/api/graphql', exchanges: [fetchExchange], fetch: offline }) })
-    const refusal = await TH.refusalOf(vaultDB.updateBox(u1, TH.boxOf('openai', 'r1'), { vault_id: 'vault-id-u1', revision_id: null, vault_key_epoch: 1 }))
-    expect(refusal.kind).to.eq('storage_unavailable')
+    await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('openai', 'r1'), { vault_id: 'vault-id-u1', revision_id: null, vault_key_epoch: 1 }), 'storage_unavailable')
   })
 
   it("refuses with storage_unavailable an answer holding neither data nor an error", async () => {
     const answered = { toPromise: () => Promise.resolve({ data: undefined }) }
     const mute = { query: () => answered, mutation: () => answered, subscription: () => answered }
-    const refusal = await TH.refusalOf(graphqlVaultDB({ client: mute as unknown as GraphqlVaultClient }).readBundle(u1))
-    expect(refusal.kind).to.eq('storage_unavailable')
+    await TH.expectRefusal(graphqlVaultDB({ client: mute as unknown as GraphqlVaultClient }).readBundle(u1), 'storage_unavailable')
   })
 
   for (const code of ['BAD_USER_INPUT', 'GRAPHQL_VALIDATION_FAILED']) {
@@ -238,11 +232,10 @@ describe("graphqlVaultDB, its refusals", () => {
       const quoting = new GraphQLError('Variable "$lockbox" got invalid value "sk-ant-not-a-real-key"', { extensions: { code } })
       const answered = { toPromise: () => Promise.resolve({ error: new CombinedError({ graphQLErrors: [quoting] }) }) }
       const strict = { query: () => answered, mutation: () => answered, subscription: () => answered }
-      const refusal = await TH.refusalOf(graphqlVaultDB({ client: strict as unknown as GraphqlVaultClient }).readBundle(u1))
-      expect(refusal.kind).to.eq('bad_option')
+      const refusal = await TH.expectRefusal(graphqlVaultDB({ client: strict as unknown as GraphqlVaultClient }).readBundle(u1), 'bad_option')
       expect(refusal.message).to.include('VaultSchemaSdl')
       expect(refusal.cause).to.be.undefined
-      expect(JSON.stringify({ ...refusal, message: refusal.message })).to.not.include('sk-ant')
+      expect(JSON.stringify(Object.assign({}, refusal, { message: refusal.message }))).to.not.include('sk-ant')
     })
   }
 
@@ -251,16 +244,14 @@ describe("graphqlVaultDB, its refusals", () => {
     const revoked = new GraphQLError('No one is signed in, so this vault cannot be reached: sign in, then try again.', { extensions: { kind: 'identity_revoked' } })
     const answered = { toPromise: () => Promise.resolve({ error: new CombinedError({ graphQLErrors: [misuse, revoked] }) }) }
     const both = { query: () => answered, mutation: () => answered, subscription: () => answered }
-    const refusal = await TH.refusalOf(graphqlVaultDB({ client: both as unknown as GraphqlVaultClient }).readBundle(u1))
-    expect(refusal.kind).to.eq('identity_revoked')
+    await TH.expectRefusal(graphqlVaultDB({ client: both as unknown as GraphqlVaultClient }).readBundle(u1), 'identity_revoked')
   })
 
   it("passes over a GraphQL error whose kind is not a VaultError's", async () => {
     const schema = buildSchema('type Query { safebyokReadBundle(scope: SafebyokVaultScopeInput!): Boolean } input SafebyokVaultScopeInput { applabel: String!, user_id: String!, vaultlabel: String! }')
     const rootValue = { safebyokReadBundle: () => Promise.reject(Object.assign(new Error('no such kind'), { extensions: { kind: 'made_up' } })) }
     const vaultDB = graphqlVaultDB({ client: new Client({ url: 'https://app.example.test/api/graphql', exchanges: [executeExchange({ schema, rootValue })] }) })
-    const refusal = await TH.refusalOf(vaultDB.readBundle(u1))
-    expect(refusal.kind).to.eq('storage_unavailable')
+    await TH.expectRefusal(vaultDB.readBundle(u1), 'storage_unavailable')
   })
 })
 

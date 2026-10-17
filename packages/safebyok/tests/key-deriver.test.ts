@@ -2,7 +2,8 @@ import { argon2idAsync } from '@noble/hashes/argon2.js'
 import { describe, expect, it } from 'vitest'
 import { argon2idDeriver, argon2idWebV1Deriver } from '../src/key-deriver'
 import { Argon2idWebV1, MaxSaltBytes, PassphraseKeyBytes, parseKeyDeriverSpec, type KeyDeriverSpec } from '../src/key-deriver-spec'
-import { VaultError, isVaultError } from '../src/errors'
+import { isVaultError } from '../src/errors'
+import * as TH from './test-helpers'
 
 /** A spec of the host's own, cheap to derive under; no two of its counts alike, so a swap shows. */
 const CheapSpec: KeyDeriverSpec = { ...Argon2idWebV1, key_deriver_label: 'acme_cheap_v1', memory_kib: 64, iterations: 2, parallelism: 4 }
@@ -60,17 +61,8 @@ describe("argon2idDeriver", () => {
   })
 })
 
-/** Expect `attempt` to throw a VaultError of kind 'bad_option'; hands back its message. */
-const refusalOf = (attempt: () => unknown): string => {
-  try {
-    attempt()
-  } catch (err) {
-    expect(err).to.be.instanceOf(VaultError)
-    expect((err as VaultError).kind).to.eq('bad_option')
-    return (err as VaultError).message
-  }
-  throw new Error("expected a VaultError of kind 'bad_option', but nothing was thrown")
-}
+/** The message of the 'bad_option' refusal `attempt` throws. */
+const refusalOf = (attempt: () => unknown): string => TH.expectSyncRefusal(attempt, 'bad_option').message
 
 const UnworkableSpecs = [
   // salts Argon2id or the platform cannot use:

@@ -146,16 +146,14 @@ describe("idbVaultDB", () => {
   it("refuses a damaged bundle as corrupt_record, and leaves it as it is", async () => {
     const dbName = TH.freshDbName()
     await set(Ckeys.bundle(TH.scopeOf('u1')), { vault_id: 'vault-id-u1', unlock_epoch: 'one' }, rawShelf(dbName))
-    const refusal = await TH.refusalOf(idbVaultDB({ dbName }).readBundle(TH.scopeOf('u1')))
-    expect(refusal.kind).to.eq('corrupt_record')
+    await TH.expectRefusal(idbVaultDB({ dbName }).readBundle(TH.scopeOf('u1')), 'corrupt_record')
     expect(await get('vault^acme^u1^main', rawShelf(dbName))).to.deep.equal({ vault_id: 'vault-id-u1', unlock_epoch: 'one' })
   })
 
   it("lands no update on a damaged bundle, even one that shows the expected vault_id", async () => {
     const dbName = TH.freshDbName()
     await set(Ckeys.bundle(TH.scopeOf('u1')), { vault_id: 'vault-id-u1' }, rawShelf(dbName))
-    const refusal = await TH.refusalOf(idbVaultDB({ dbName }).updateBundle(TH.bundleOf('u1', { unlock_epoch: 2 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 }))
-    expect(refusal.kind).to.eq('stale_write')
+    await TH.expectRefusal(idbVaultDB({ dbName }).updateBundle(TH.bundleOf('u1', { unlock_epoch: 2 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'stale_write')
   })
 
   it("erases a vault whose bundle is damaged -- eraseDamagedVault reads its vault_id as stored -- and only that vault", async () => {
@@ -166,8 +164,7 @@ describe("idbVaultDB", () => {
       await vaultDB.updateBox(TH.scopeOf(user), TH.boxOf('anthropic', 'one'), { vault_id: `vault-id-${user}`, revision_id: null, vault_key_epoch: 1 })
     }
     await set(Ckeys.bundle(TH.scopeOf('u1')), { vault_id: 'vault-id-u1', unlock_epoch: 'one' }, rawShelf(dbName))
-    const soundRefusal = await TH.refusalOf(vaultDB.eraseDamagedVault(TH.scopeOf('u2')))
-    expect(soundRefusal.kind).to.eq('bad_option')
+    await TH.expectRefusal(vaultDB.eraseDamagedVault(TH.scopeOf('u2')), 'bad_option')
     await vaultDB.eraseDamagedVault(TH.scopeOf('u1'))
     const shelf = rawShelf(dbName)
     const ourBundle = Ckeys.bundle(TH.scopeOf('u1'))
@@ -183,8 +180,7 @@ describe("idbVaultDB", () => {
     const vaultDB = idbVaultDB({ dbName: TH.freshDbName() })
     const blocked = vi.spyOn(globalThis.indexedDB, 'open').mockImplementation(() => { throw new DOMException('IndexedDB is off', 'InvalidStateError') })
     try {
-      const refusal = await TH.refusalOf(vaultDB.readBundle(TH.scopeOf('u1')))
-      expect(refusal.kind).to.eq('storage_unavailable')
+      await TH.expectRefusal(vaultDB.readBundle(TH.scopeOf('u1')), 'storage_unavailable')
     } finally {
       blocked.mockRestore()
     }
@@ -199,8 +195,7 @@ describe("idbVaultDB", () => {
       return request
     })
     try {
-      const refusal = await TH.refusalOf(vaultDB.createBundle(TH.bundleOf('u1')))
-      expect(refusal.kind).to.eq('storage_unavailable')
+      const refusal = await TH.expectRefusal(vaultDB.createBundle(TH.bundleOf('u1')), 'storage_unavailable')
       const { cause } = refusal as { cause?: unknown }
       expect(cause).to.be.instanceOf(Error)
       expect((cause as Error).name).to.eq('AbortError')
@@ -263,8 +258,7 @@ describe("idbVaultDB, every verb one transaction", () => {
       throw new DOMException('the disk is full', 'QuotaExceededError')
     })
     try {
-      const refusal = await TH.refusalOf(vaultDB.eraseVault(scope, { vault_id: 'vault-id-u1' }))
-      expect(refusal.kind).to.eq('storage_unavailable')
+      await TH.expectRefusal(vaultDB.eraseVault(scope, { vault_id: 'vault-id-u1' }), 'storage_unavailable')
     } finally {
       failing.mockRestore()
     }
@@ -281,7 +275,7 @@ describe("idbVaultDB's subscribe", () => {
     const vaultDB = idbVaultDB({ dbName: TH.freshDbName() })
     let heardCount = 0
     vaultDB.subscribe(TH.scopeOf('u1'), () => { heardCount += 1 })
-    await TH.refusalOf(vaultDB.updateBundle(TH.bundleOf('u1'), { vault_id: 'vault-id-u1', unlock_epoch: 1 }))
+    await TH.expectRefusal(vaultDB.updateBundle(TH.bundleOf('u1'), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'stale_write')
     await vaultDB.createBundle(TH.bundleOf('u1'))
     await vaultDB.createBundle(TH.bundleOf('u1', { vault_id: 'too-late' }))
     await TH.wakeupAtNextTick()

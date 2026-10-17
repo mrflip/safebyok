@@ -4,7 +4,7 @@ import { makeExecutableSchema } from '@graphql-tools/schema'
 import { Client, cacheExchange } from '@urql/core'
 import { executeExchange } from '@urql/exchange-execute'
 import type { GraphQLSchema } from 'graphql'
-import type { VaultDB, VaultDBOpts, VaultScope } from 'safebyok'
+import type { VaultDB, VaultDBOpts } from 'safebyok'
 import { VaultNotifySql, VaultTablesSql, postgresVaultDB } from 'safebyok-postgres'
 import type { PostgresClient, PostgresListen } from 'safebyok-postgres'
 import { graphqlVaultDB } from '../src/index'
@@ -91,46 +91,3 @@ export const browserFor = (schema: GraphQLSchema, userId: string | null, vaultDB
 export const failingClient = (err: Error): PostgresClient => ({
   query: () => Promise.reject(err),
 })
-
-/** What `operation` rejected with; fails the test if it resolved. */
-export const refusalOf = async (operation: Promise<unknown>): Promise<{ kind?: unknown, cause?: unknown, message?: unknown }> => {
-  try {
-    await operation
-  } catch (err) {
-    return err as { kind?: unknown }
-  }
-  throw new Error('the operation was not refused')
-}
-
-/** Resolves once `check` holds, looking every few milliseconds; rejects after two seconds. */
-export const eventually = async (check: () => boolean): Promise<void> => {
-  for (let ii = 0; ii < 400; ii += 1) {
-    if (check()) { return }
-    await new Promise((resolve) => { setTimeout(resolve, 5) })
-  }
-  throw new Error('it never came to pass')
-}
-
-/**
- * A watch on `scope` through `vaultDB`, once it is live, its calls counted from then: over
- * postgresVaultDB, which calls as its listen begins, the server sends a change as the subscription
- * starts, and this resolves after that call, the count back at zero.
- *
- * @example const { heard, unsubscribe } = await TH.liveWatch(TH.browserFor(schema, 'u1'), TH.scopeOf('u1'))
- */
-export const liveWatch = async (vaultDB: Pick<VaultDB, 'subscribe'>, scope: VaultScope) => {
-  const heard = { count: 0 }
-  const unsubscribe = vaultDB.subscribe(scope, () => { heard.count += 1 })
-  await eventually(() => heard.count > 0)
-  heard.count = 0
-  return { heard, unsubscribe }
-}
-
-/** A while for something that should not happen to have had its chance: fifty milliseconds. */
-export const aWhile = (): Promise<void> => new Promise((resolve) => { setTimeout(resolve, 50) })
-
-/** How often `onChange` got called, kept for a test to look at. */
-export const changeCounter = () => {
-  const heard = { count: 0 }
-  return { heard, onChange: () => { heard.count += 1 } }
-}

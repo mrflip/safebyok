@@ -80,8 +80,7 @@ describe("VaultTablesSql", () => {
       await db.exec('SET ROLE stranger')
       const { rows } = await db.query('SELECT * FROM safebyok_bundles')
       expect(rows).to.have.lengthOf(0)
-      const refusal = await TH.refusalOf(TH.requestFor(db, 'u2').createBundle(TH.bundleOf('u2')))
-      expect(refusal.kind).to.eq('storage_unavailable')
+      await TH.expectRefusal(TH.requestFor(db, 'u2').createBundle(TH.bundleOf('u2')), 'storage_unavailable')
     } finally {
       await db.exec('RESET ROLE; DROP OWNED BY stranger; DROP ROLE stranger')
     }
@@ -136,8 +135,7 @@ describe("the README's hard cap, vaya con dios", () => {
     await vaultDB.createBundle({ ...TH.bundleOf('u1'), vaultlabel: 'other' })
     await vaultDB.updateBox(u1, TH.boxOf('openai', 'sk-fake'), noBoxYet)
     await vaultDB.updateBox(u1, TH.boxOf('anthropic', 'sk-fake'), noBoxYet)
-    const refusal = await TH.refusalOf(vaultDB.updateBox(u1, TH.boxOf('mistral', 'sk-fake'), noBoxYet))
-    expect(refusal.kind).to.eq('storage_unavailable')
+    await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('mistral', 'sk-fake'), noBoxYet), 'storage_unavailable')
     expect(await vaultDB.listBoxes(u1)).to.have.lengthOf(2)
     await vaultDB.updateBox({ ...u1, vaultlabel: 'other' }, TH.boxOf('mistral', 'sk-fake'), noBoxYet)
     await vaultDB.eraseBox(u1, 'openai', { vault_id: 'vault-id-u1' })
