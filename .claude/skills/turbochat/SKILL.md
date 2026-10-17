@@ -9,9 +9,10 @@ argument-hint: "[setup | go] [clarifications]"
 Chat takes one question at a time, and a long session's open questions bury each other. Turbochat
 moves them into an **Open Matters** tab: one row per matter, a box for the Coach's answer, and a
 state chip. The Coach works down it at their own pace, from any device, and agents act on the
-rows they have flipped. It is closer to chat than to a record. Keep no provenance and no archive
-of matters: rows come and go, and what they settle is written where it usually goes (a plan in
-`whiteboard/`, a note in `human/`, a TODO entry, a PR).
+rows they have flipped. It is closer to chat than to a record. The tab keeps no archive: rows
+come and go, and what they settle is written where it usually goes (a plan in `whiteboard/`, a
+note in `human/`, a TODO entry, a PR), with the ruling carried back to where it was asked
+(*Carrying a ruling back*, below).
 
 The Coach's words after the command: `$ARGUMENTS`. They are clarifications, and they win where
 they conflict with this file.
@@ -39,12 +40,14 @@ every chip over to it.
 
 ## Writing a matter
 
-One decision per row. Lead with a bold handle of a few words, then **one to three sentences**: what
-the matter is, why it matters, and what we recommend (**Rec:**). Write in language a little less
-technical than the whiteboard's, so the Coach can answer without hunting through the files behind
-it. A row that waits on the Coach's own action rather than their word (try it on a real device,
-delete a file on their machine) starts **For coach:**. Inside a cell a PR is `#N`; in chat, link it
-in full.
+One decision per row, and one row per decision: never roll a report's leftovers into one row, even
+when they share a Rec. Lead with a bold handle of a few words, then **one to three sentences**: what
+the matter is, why it matters, and what we recommend (**Rec:**). End with where it was raised
+(`(#129)`, `(thread 7)`, `(human/…)`), so its ruling can be carried back. Write in language a little
+less technical than the whiteboard's, so the Coach can answer without hunting through the files
+behind it. A row that waits on the Coach's own action rather than their word (try it on a real
+device, delete a file on their machine) starts **For coach:**. Inside a cell a PR is `#N`; in chat,
+link it in full.
 
 Agents may rewrite any *Matter* cell whenever they like. *Coach answer* is the Coach's only place
 to speak, and agents never edit it.
@@ -93,8 +96,14 @@ the session that keeps it, rather than writing it themselves.
    replace or delete of a whole block carries the guards that read printed for it, `ifHash` (its
    `h`) and `ifRev` (the read's rev). If the Coach has changed the block since, the write is
    refused rather than overwriting them: re-read that block and redo just that edit. Never
-   re-read to check what you wrote, and never re-send the whole table.
-4. **Add new matters** as they surface, `drafting`, at the bottom of the matters table.
+   re-read to check what you wrote, and never re-send the whole table. To reset a chip,
+   `replace` its paragraph `"as":"markdown"`, content `<?claude block st?>`, with the chip in the
+   `blocks` map (`{"st":{"type":"dropdown","enum":"<State enum id>","index":0}}`): an
+   `"as":"blocks"` replace keeps the old chip beside the new.
+4. **Add new matters** as they surface, `drafting`, at the bottom of the matters table. Every open
+   question an agent of the session reports (a worker's or reviewer's *Open matters*, a
+   subagent's leftover) reaches the tab, put there by the session that keeps it. Leaving one out
+   is a decision: say why in chat.
 5. **Report in chat** in a few lines: what proceeded and where it went, what was explained, what
    was elevated. Don't repeat the answers: the Coach reads them in the doc.
 
@@ -103,6 +112,19 @@ memory, a TODO) and swept the same way.
 
 Never ask the Coach to leave a doc comment for Claude: each one wakes the session as a full turn,
 carrying all of its context. Typing in cells costs nothing until the next pass.
+
+### Carrying a ruling back
+
+When a matter is ruled (`proceed`, or an answer in chat), beside acting on it:
+
+* **The resolutions file**: append the question as the row put it and the Coach's reply word for
+  word, with where it was raised and where the work went, newest batch first -- in a sprint,
+  `<YYYYMMDD-sprint_name>-resolutions.md` in its directory; otherwise
+  `YYYYMMDD-<thread>-resolutions.md` in the thread's whiteboard directory. An empty answer on
+  `proceed` is "(empty: took the Rec)".
+* **Beside the question**, wherever it was raised (a PR, a `whiteboard/` or `human/` file):
+  `→ *Coach (YYYY-MM-DD):* <the ruling, briefly>`, the question left in place. A file on a branch
+  another agent owns gets the line from that agent (the sprint skill, §3, says who and when).
 
 ## An elevated matter's tab
 
