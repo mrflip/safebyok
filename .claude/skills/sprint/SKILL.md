@@ -49,6 +49,7 @@ worktree's root; hand on the sprint directory's in full, since workers read it f
   context only grows, and the long threads cost the most by far, so a thread that would build
   two features, or plainly run long, is two threads.
 * *For the Coach*: anything already visible that needs a human.
+* *Coach rulings*: one line per matter the Coach resolves, as it comes (§3).
 
 **Dependencies decide the base.** A thread depends on another when it builds on its code, or
 when the two would rewrite the same lines; threads in different corners of the tree are
@@ -82,6 +83,10 @@ curated summary of what the threads have taught, newer than the plan wherever th
 It is what you write each handoff from; workers only look things up in it.
 Each worker writes its own section to `thread-<N>-<label>.md` in the same directory of its own
 branch, so no two writers ever share a file.
+
+**`<YYYYMMDD-sprint_name>-resolutions.md`** -- yours too, begun at the first ruling: every matter
+the Coach resolved, the full question and the full reply, newest batch first (§3). Mirrored like
+the rest.
 
 Commit both (`plan:`), push the sprint branch, and file it at once as a **draft** PR against
 `main` (documents only, a `plan:` title): the *sprint PR*. It is yours, and you commit to it
@@ -215,6 +220,10 @@ follows the resume that finishes it.
    branch. Trust the reports for the rest -- do not re-review the diff.
 2. **Relay, whole.** Put the report in chat verbatim -- the Coach reads the entire bolus, not a
    précis -- under one lead line of your own (thread, verdict, PR link when there is one).
+   **Cycle its open matters to the Coach**: with an *Open Matters* tab (`/turbochat`), each new
+   item of the report's *Open matters* becomes a `drafting` row of its own in the same pass --
+   one item, one row, never rolled up -- tagged with where it was raised (`#N`, thread N). Say
+   in the relay why you left any out. Nothing open is left only in chat.
 3. **Tend the documents.** Keep the status table and status lines current, and revise later
    threads' glosses where a thread's discoveries changed them. When a thread files, add a
    `*Review:*` line under its entry from the reviewer's report -- what it fixed, and each
@@ -225,8 +234,19 @@ follows the resume that finishes it.
    look, and spin an outgrown block into a file of its own in the sprint directory, with a line
    on who should read it. Keep the progress document under about 5,000 words: you write every
    later handoff from it. Mark what you add with `*Orchestrator:*`; never edit a worker's
-   thread file. Commit (`plan:`) and push to the sprint PR; mirror at the milestones §1 names.
-4. **Decide** (§4), refill the frontier, and wait for the next report. If the Coach has
+   thread file but to add owed ruling lines (§5). Commit (`plan:`) and push to the sprint PR;
+   mirror at the milestones §1 names.
+4. **Carry each ruling back.** When the Coach resolves a matter (in chat, or a row flipped to
+   `proceed`), beside acting on it:
+   - append the question and the Coach's reply, both in full and word for word, with where it
+     was raised and where the work went, to the resolutions file;
+   - put `→ *Coach (YYYY-MM-DD):* <the ruling, briefly>` beside the question wherever it stands
+     (PR description, thread file, `human/` entry), the question left in place. A live worker
+     does it when you relay the ruling; for a filed thread, edit the PR description yourself
+     (`gh pr edit`) and list the thread-file and `human/` lines as owed in the progress
+     document, for the restack (§5);
+   - add a line to the plan's *Coach rulings*.
+5. **Decide** (§4), refill the frontier, and wait for the next report. If the Coach has
    interjected in chat meanwhile, fold their guidance in first.
 
 ## 4. Continue, resume, or stop
@@ -284,14 +304,16 @@ When the last thread files (or the sprint pauses for good):
    check the middle. Push each branch with a lease on the SHA it replaces
    (`--force-with-lease=<branch>:<old sha>`), and rewrite each PR's first line to "Stacked on
    #N, in the line main → #A → #B → …". Check the bottom stands on today's `origin/main`, not on
-   an unmerged PR whose commits `main` already holds under other SHAs.
+   an unmerged PR whose commits `main` already holds under other SHAs. As you restack each
+   branch, add the ruling lines the progress document lists as owed to its thread file and
+   `human/` entry, in one `plan:` commit on that branch.
 2. **Close the sprint PR.** Set both documents' status lines; add
    `human/YYYYMMDD-sprint_<name>_done.md` -- the sprint in a paragraph, the PRs in merge order
    with their "Stacked on" notes, YOLO decisions if any, and the open questions gathered in one
-   place; commit. Tag the tip and push the tag (`sprint/YYYYMMDD-<name>`), so its history stays
-   on GitHub. Then squash the sprint branch into one commit on top of the line, push it with a
-   lease, and take the PR out of draft (`gh pr ready`). It is the line's top: merging it merges
-   everything.
+   place (what the Coach resolved stays in the resolutions file: point to it); commit. Tag the
+   tip and push the tag (`sprint/YYYYMMDD-<name>`), so its history stays on GitHub. Then squash
+   the sprint branch into one commit on top of the line, push it with a lease, and take the PR
+   out of draft (`gh pr ready`). It is the line's top: merging it merges everything.
 3. **Mirror** every tab a last time, `git worktree remove` your worktrees, and give the Coach
    the closing summary in chat, leading with what shipped, what the reviews fixed and left, and
    what needs their word, with the PRs in merge order and the top named. Never merge
