@@ -1,6 +1,6 @@
 # Thread 12: floors_forward (2026-10-17)
 
-Branch `20261017-floors_forward`, PR to follow in the report, stacked on #139. Justify: green (lint, typecheck, tests, build, size); one pre-existing `safebyok-react` lint warning (an unused `eslint-disable` for `unicorn/prefer-promise-with-resolvers`), not touched here.
+Branch `20261017-floors_forward`, PR #140, stacked on #139. Justify: green (lint, typecheck, tests, build, size); one pre-existing `safebyok-react` lint warning (an unused `eslint-disable` for `unicorn/prefer-promise-with-resolvers`), not touched here.
 
 * **Built**: `convex-test` is `^0.0.61` again in `safebyok-convex` and `e2e`; its `minimumReleaseAgeExclude` (and comment) is gone from `pnpm-workspace.yaml`; its `notes/security.md` entry is struck (by a sonnet subagent). Four direct-dependency floors raised to the newest release that has aged (checked with `npm view <pkg> time --json`, cutoff 2026-10-10T03:40Z): `@types/node` `^24.19.2`, `eslint-plugin-chai-expect` `^4.1.1`, `@types/pg` `^8.23.1`, `graphql-yoga` `^5.24.4`. All devDependencies; the changeset is empty.
 * **Decisions taken**: peer ranges (`zod ^4.0.0`, `vitest ^5.0.0`, `react ^19.0.0`, `@urql/core ^6.0.0`, `graphql`) were left wide on purpose: raising a peer floor narrows what a host may install. Every runtime `dependencies` floor was already at the newest aged release. `convex` left at `^1.46.0` (the test pins it). `@zxcvbn-ts/*` untouched (thread 16).
