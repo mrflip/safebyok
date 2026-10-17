@@ -1,7 +1,7 @@
 import { getFunctionName } from 'convex/server'
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server'
 import { ConvexError } from 'convex/values'
-import { Sanitizer, VaultDB, VaultError, parseLogger } from 'safebyok'
+import { Sanitizer, VaultDB, VaultError } from 'safebyok'
 import type { BundleExpectation, VaultDBOpts, EraseExpectation, Lockbox, LockboxExpectation, StoredLockbox, VaultBundle, VaultScope } from 'safebyok'
 import { MaxVaultLockboxes } from './component/tallies'
 import { isSafebyokErrorData } from './refusals'
@@ -107,7 +107,7 @@ class ConvexVaultDB extends VaultDB {
   private readonly api:    SafebyokApi
 
   constructor(opts: ConvexVaultDBOpts) {
-    super({ logger: parseLogger(opts.logger) })
+    super(opts)
     this.client = opts.client
     this.api    = opts.api
   }

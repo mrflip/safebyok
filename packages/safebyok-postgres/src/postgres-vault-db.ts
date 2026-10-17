@@ -1,5 +1,5 @@
-import { Refusals, VaultDB, VaultError, VaultScope, parseLogger } from 'safebyok'
-import type { BundleExpectation, VaultDBInit, VaultDBOpts, EraseExpectation, Lockbox, LockboxExpectation, StoredLockbox, VaultBundle } from 'safebyok'
+import { Refusals, VaultDB, VaultError, VaultScope } from 'safebyok'
+import type { BundleExpectation, VaultDBOpts, EraseExpectation, Lockbox, LockboxExpectation, StoredLockbox, VaultBundle } from 'safebyok'
 import * as Columns from './columns'
 import { BundleColumns, ListedLockboxColumns, LockboxColumns } from './columns'
 import { VaultChangeChannel } from './vault-tables'
@@ -114,7 +114,7 @@ export const postgresVaultDB = (opts: PostgresVaultDBOpts): VaultDB => {
   if (! isLockboxCount(maxLockboxes)) {
     throw new VaultError('bad_option', "postgresVaultDB's `maxLockboxes`, when given, is a whole number above zero, or Infinity for no limit.")
   }
-  return new TablesVaultDB(client, userId === undefined || userId === '' ? null : userId, listen, maxLockboxes, { logger: parseLogger(opts.logger) })
+  return new TablesVaultDB(client, userId === undefined || userId === '' ? null : userId, listen, maxLockboxes, opts)
 }
 
 // A safe integer, so it reaches Postgres as the bigint it reads; Infinity reaches it as null, no limit.
@@ -238,8 +238,8 @@ class TablesVaultDB extends VaultDB {
   private readonly userId: string | null
   private readonly listen: PostgresListen | undefined
 
-  constructor(client: PostgresClient, userId: string | null, listen: PostgresListen | undefined, maxLockboxes: number, vaultDBInit: VaultDBInit) {
-    super(vaultDBInit)
+  constructor(client: PostgresClient, userId: string | null, listen: PostgresListen | undefined, maxLockboxes: number, vaultDBOpts: VaultDBOpts) {
+    super(vaultDBOpts)
     this.client = client
     this.userId = userId
     this.listen = listen

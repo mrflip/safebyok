@@ -474,10 +474,9 @@ one to `openVault` (or `VaultProvider`), and it is the vault's alone, the adapte
 Pass `logger: DefaultLogger` to have the vault use the default whatever its adapter was given.
 An adapter's logger is fixed when it is made: `vaultDB.logger` reads it, and nothing replaces it.
 
-An adapter of your own extends `VaultDB` and hands `super()` a `{ logger }`, which its factory
-settles from the host's options with `parseLogger(opts.logger)` (the default logger when the host
-gave none); the base class refuses to be made without one. It says what it has nobody to throw to
-through `this.logger`.
+An adapter of your own extends `VaultDB` and hands `super()` the host's options, `super(opts)`:
+the base class settles the logger from them, the host's or the default. It says what it has nobody
+to throw to through `this.logger`.
 
 Each call is a plain-language `message`; a `story` naming the vault call it happened in
 (`{ call: 'lockSoon' }`); and, when there is one, the error behind it, a `VaultError` or your own

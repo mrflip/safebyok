@@ -66,11 +66,13 @@ export type StoredLockbox = { boxlabel: string, lockbox: unknown }
 
 /**
  * What an adapter's factory takes from the host, beside its backend's own options: an optional
- * `logger`. The factory settles it before the VaultDB exists -- `parseLogger(opts.logger)`, which is
- * the default logger when the host gave none -- and hands the base class a {@link VaultDBInit}.
+ * `logger`. The adapter hands its options to `super()`, which settles the logger once, as the
+ * VaultDB is made: the host's, guarded, or the default logger when the host gave none.
  *
  * @example
  *   export type AcmeVaultDBOpts = VaultDBOpts & { client: AcmeClient }
+ * @example
+ *   constructor(opts: AcmeVaultDBOpts) { super(opts); this.client = opts.client }
  */
 export type VaultDBOpts = {
   /**
@@ -81,17 +83,6 @@ export type VaultDBOpts = {
    * the default logger. Kind 'bad_option' for anything else that is not a VaultLogger.
    */
   logger?: VaultLogger | null | undefined
-}
-
-/**
- * What the VaultDB base class demands of its subclass: a `logger`, always. A factory that takes
- * {@link VaultDBOpts} makes this with `parseLogger(opts.logger)`.
- *
- * @example
- *   constructor(opts: AcmeVaultDBOpts) { super({ logger: parseLogger(opts.logger) }); this.client = opts.client }
- */
-export type VaultDBInit = {
-  logger: VaultLogger
 }
 
 /**
@@ -126,8 +117,8 @@ export type VaultDBInit = {
  * (your own error as its `cause`) for anything you throw that is not already a VaultError. They
  * also own what every adapter would otherwise write again: `subscribe` calls each listener so
  * that nothing it throws reaches your code, and its unsubscribe runs once; and `listBoxRecords`
- * lists a vault as stored, for a server to serve. Implement the `do*` methods, and hand `super()` a
- * {@link VaultDBInit}, the `logger` your factory settles from its {@link VaultDBOpts}; never override the public verbs, but for
+ * lists a vault as stored, for a server to serve. Implement the `do*` methods, and hand `super()`
+ * the host's {@link VaultDBOpts}; never override the public verbs, but for
  * `listBoxRecords` where your backend lists more cheaply. To refuse, throw what `Refusals` makes.
  * The package's `VAULTDB.md` is the whole contract, line by line, and `describeVaultDB` (from
  * `safebyok/testing`) tests it so.
@@ -197,15 +188,13 @@ export abstract class VaultDB {
   readonly #logger: VaultLogger
 
   /**
-   * @param init - What every VaultDB is made with: a `logger`. Kind 'bad_option' for none, or one
-   *   that is not a VaultLogger.
+   * @param opts - The host's options, as the adapter's factory was handed them: the base class reads
+   *   only `logger`, the default logger when there is none. Kind 'bad_option' for a `logger` that is
+   *   not a VaultLogger.
    */
-  constructor(init: VaultDBInit) {
-    const given = (init as { logger?: VaultLogger | null } | null | undefined)?.logger
-    if (given === undefined || given === null) {
-      throw new VaultError('bad_option', "A VaultDB is made with a logger: hand `super()` { logger }. An adapter's factory settles it with parseLogger(opts.logger), which is the default logger when the host gave none.")
-    }
-    this.#logger = parseLogger(given)
+  constructor(opts: VaultDBOpts) {
+    // Generous to a subclass written in JavaScript that hands super() nothing.
+    this.#logger = parseLogger((opts as VaultDBOpts | null | undefined)?.logger)
   }
 
   /**
@@ -840,7 +829,7 @@ class StringStoreVaultDB extends VaultDB {
   private readonly store: StringStore
 
   constructor(opts: LocalVaultDBOpts) {
-    super({ logger: parseLogger(opts.logger) })
+    super(opts)
     this.store = opts.store
   }
 

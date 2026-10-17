@@ -164,8 +164,8 @@ shape a vault shows, and a VaultDB in the browser must hand back records as stor
 The client half, a VaultDB over `fetch`, to hand `openVault` as its `vaultDB`:
 
 ```ts
-import { VaultDB, VaultError, VaultErrorKindVals, parseLogger } from 'safebyok'
-import type { BundleExpectation, EraseExpectation, Lockbox, LockboxExpectation, VaultBundle, VaultErrorKind, VaultLogger, VaultScope } from 'safebyok'
+import { VaultDB, VaultError, VaultErrorKindVals } from 'safebyok'
+import type { BundleExpectation, EraseExpectation, Lockbox, LockboxExpectation, VaultBundle, VaultDBOpts, VaultErrorKind, VaultScope } from 'safebyok'
 
 const VaultRouteUrl = '/api/safebyok'
 
@@ -175,8 +175,8 @@ export class RouteVaultDB extends VaultDB {
   readonly maxLockboxes = Infinity // the server's postgresVaultDB maxLockboxes
   readonly maxNameBytes = 640  // the server's postgresVaultDB maxNameBytes
 
-  // A VaultDB is made with a logger: the host's, or the console's when it gives none.
-  constructor(logger?: VaultLogger) { super({ logger: parseLogger(logger) }) }
+  // Its logger: the host's `logger`, or the default logger when it gives none.
+  constructor(opts: VaultDBOpts = {}) { super(opts) }
 
   protected doReadBundle(scope: VaultScope) { return this.call('readBundle', scope) }
   protected doCreateBundle(bundle: VaultBundle) { return this.call('createBundle', bundle) }

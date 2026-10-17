@@ -1,9 +1,9 @@
 import { omit } from 'es-toolkit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { memoryStore } from '../src/string-store'
-import { VaultDB, jsonBytes, localVaultDB, type BundleExpectation, type EraseExpectation, type LockboxExpectation, type StoredLockbox, type VaultDBInit, type VaultDBOpts, type WatchTrouble } from '../src/vault-db'
+import { VaultDB, jsonBytes, localVaultDB, type BundleExpectation, type EraseExpectation, type LockboxExpectation, type StoredLockbox, type VaultDBOpts, type WatchTrouble } from '../src/vault-db'
 import { VaultError } from '../src/errors'
-import { parseLogger, type VaultLogger } from '../src/logger'
+import { DefaultLogger, parseLogger, type VaultLogger } from '../src/logger'
 import type { Lockbox } from '../src/lockbox'
 import type { VaultBundle, VaultScope } from '../src/types'
 import * as Ckeys from '../src/ckeys'
@@ -27,8 +27,10 @@ class MapVaultDB extends VaultDB {
   readonly maxNameBytes: number = Infinity
   readonly rows: Map<string, unknown>
 
-  constructor(maxLockboxes = Infinity, rows = new Map<string, unknown>(), vaultDBOpts: VaultDBOpts = {}, init: VaultDBInit = TH.vaultDBInit(vaultDBOpts.logger)) {
-    super(init)
+  // What super() is handed: the options, quiet unless they carry a logger (a spy's, kept out of the
+  // test output), or `handed`, for a test of what the base class makes of it.
+  constructor(maxLockboxes = Infinity, rows = new Map<string, unknown>(), vaultDBOpts: VaultDBOpts = {}, handed?: VaultDBOpts) {
+    super(handed ?? { ...vaultDBOpts, logger: vaultDBOpts.logger ?? TH.spyLogger().logger })
     this.maxLockboxes = maxLockboxes
     this.rows = rows
   }
@@ -767,17 +769,17 @@ describe("the abstract VaultDB, its logger", () => {
     expect(spy.calls.map((call) => call.level)).to.deep.equal(['error'])
   })
 
-  it("is made with a logger or refused, kind 'bad_option', whatever is handed super() in place of one", () => {
-    for (const init of [{}, { logger: undefined }, null]) {
-      const made = () => new MapVaultDB(Infinity, new Map(), {}, init as unknown as VaultDBInit)
-      expect(made).to.throw(VaultError, /made with a logger/).with.property('kind', 'bad_option')
+  it("is made with the default logger when its subclass hands super() options with none", () => {
+    for (const handed of [{}, { logger: undefined }, { logger: null }]) {
+      const vaultDB = new MapVaultDB(Infinity, new Map(), {}, handed)
+      expect(vaultDB.logger).to.eq(DefaultLogger)
     }
   })
 
-  it("keeps the very logger its factory settled and handed super(), as VaultDBInit's example has it", () => {
-    const settled = parseLogger(TH.spyLogger().logger)
-    const vaultDB = new MapVaultDB(Infinity, new Map(), {}, { logger: settled })
-    expect(vaultDB.logger).to.eq(settled)
+  it("is made with the host's logger, guarded, from the options its subclass hands super(), as VaultDBOpts's second example shows", () => {
+    const spy = TH.spyLogger()
+    const vaultDB = new MapVaultDB(Infinity, new Map(), {}, { logger: spy.logger })
+    expect(vaultDB.logger).to.eq(parseLogger(spy.logger))
   })
 
   it("keeps its logger off the VaultDB itself, so it is neither listed nor copied", () => {

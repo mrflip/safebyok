@@ -4,7 +4,7 @@
 // and the README changes with it.
 import { describe, expect, it } from 'vitest'
 import type { Client } from 'pg'
-import { VaultDB, VaultError, VaultErrorKindVals, memoryDeviceDB, openVault, parseLogger } from 'safebyok'
+import { VaultDB, VaultError, VaultErrorKindVals, memoryDeviceDB, openVault } from 'safebyok'
 import type { BundleExpectation, EraseExpectation, Lockbox, LockboxExpectation, VaultBundle, VaultErrorKind, VaultScope } from 'safebyok'
 import * as TH from './test-helpers'
 import { VaultChangeChannel, postgresVaultDB } from '../src/index'
@@ -80,7 +80,7 @@ class RouteVaultDB extends VaultDB {
   private readonly fetcher: Fetch
 
   constructor(fetcher: Fetch) {
-    super({ logger: parseLogger(undefined) })
+    super({})
     this.fetcher = fetcher
   }
 

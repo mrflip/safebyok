@@ -2,7 +2,7 @@
 
 Branch `20261017-logger_contract`, cut from `origin/main`; the PR carries the same list.
 
-* **Built**: a `VaultDB` is made with a logger (the base class demands `super({ logger })`) and keeps it
+* **Built**: a `VaultDB` is made with a logger (settled by the base class from `super(opts)`) and keeps it
   in a private field behind a read-only getter; a vault opened with no `logger` uses its storage's,
   guarded; `openVault`'s `logger` is not pushed into a store (`adoptLogger` is gone); `VaultProvider`
   and its vault share one logger, its prop or else its `vaultDB`'s. `null` means none everywhere.
@@ -13,7 +13,7 @@ Branch `20261017-logger_contract`, cut from `origin/main`; the PR carries the sa
 * **Guarding**: `parseLogger` knows what it has guarded through a private `WeakSet`, and maps each
   host logger to one guarded form through a `WeakMap`: idempotent, identity kept, and no logger can
   skip the guard. The `_safebyok_modded` mark and its opt-out are gone.
-* **Open question**: the base constructor could take `VaultDBOpts` (a required argument with an
-  optional `logger`) and run `parseLogger` itself, so an adapter writes `super(opts)`; `VaultDBInit`,
-  `TH.vaultDBInit`, and the `parseLogger` import in every adapter would go away. Not done; awaiting
-  a yes.
+* **Constructor, resolved**: the base constructor takes the host's `VaultDBOpts` and runs `parseLogger`
+  itself; an adapter writes `super(opts)`. `VaultDBInit`, `TH.vaultDBInit`, and the `parseLogger`
+  import in every adapter are gone. A subclass that hands `super()` no logger, or nothing at all,
+  gets the default logger.

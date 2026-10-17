@@ -13,7 +13,7 @@ import { toB64, type Ciphered } from '../src/crypto'
 import { memoryDeviceDB, type DeviceDB, type UnlockExpectation } from '../src/device-db'
 import { VaultError, type VaultErrorKind } from '../src/errors'
 import type { KeyDeriver } from '../src/key-deriver'
-import { parseLogger, type VaultLogger } from '../src/logger'
+import type { VaultLogger } from '../src/logger'
 import { StrongVerdict, type PassphraseStrengthTest } from '../src/passphrase-strength'
 import { memoryStore } from '../src/string-store'
 import type { Lockbox } from '../src/lockbox'
@@ -22,7 +22,7 @@ import { stableJsonify } from '../src/stable-jsonify'
 import { NameFloorBytes } from '../src/validators'
 import { TestDeriverNotice } from '../src/key-deriver-spec'
 import type { OpenVaultOpts } from '../src/vault'
-import { localVaultDB, type VaultDB, type VaultDBInit, type VaultDBOpts } from '../src/vault-db'
+import { localVaultDB, type VaultDB, type VaultDBOpts } from '../src/vault-db'
 
 /**
  * A cheap KeyDeriver for tests: one SHA-256 instead of 64 MiB of Argon2id, so a suite full of
@@ -900,22 +900,6 @@ export const spyLogger = () => {
   const logger: VaultLogger = { log: hear('log'), warn: hear('warn'), error: hear('error') }
   return { logger, calls }
 }
-
-/**
- * What a VaultDB under test hands `super()`: a logger, which the base class demands. With none
- * given (or null), a {@link spyLogger}'s, so that the VaultDB says nothing to the test output; either way
- * it is acquired through `parseLogger`, as an adapter's factory acquires the host's or the
- * console's.
- *
- * @param logger - The logger the VaultDB under test is to say things through.
- *
- * @example
- *   class AcmeVaultDB extends VaultDB { constructor() { super(TH.vaultDBInit()) } }
- * @example
- *   const spy = TH.spyLogger()
- *   const vaultDB = new AcmeVaultDB(TH.vaultDBInit(spy.logger))
- */
-export const vaultDBInit = (logger?: VaultLogger | null): VaultDBInit => ({ logger: parseLogger(logger ?? spyLogger().logger) })
 
 /**
  * Everything a logger was handed, as one text to search for what must never be there: each

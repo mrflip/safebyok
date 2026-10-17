@@ -1,4 +1,4 @@
-import { Sanitizer, VaultDB, VaultError, VaultErrorKindVals, parseLogger } from 'safebyok'
+import { Sanitizer, VaultDB, VaultError, VaultErrorKindVals } from 'safebyok'
 import type { BundleExpectation, VaultDBOpts, EraseExpectation, Lockbox, LockboxExpectation, StoredLockbox, VaultBundle, VaultErrorKind, VaultScope } from 'safebyok'
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
 import { BundleFields, ListedLockboxFields, LockboxFields, ScopeFields, recordOf, selectionOf } from './fields'
@@ -148,7 +148,7 @@ class UrqlVaultDB extends VaultDB {
   private readonly client: GraphqlVaultClient
 
   constructor(opts: GraphqlVaultDBOpts & { maxLockboxes: number }) {
-    super({ logger: parseLogger(opts.logger) })
+    super(opts)
     this.client = opts.client
     this.maxLockboxes = opts.maxLockboxes
   }

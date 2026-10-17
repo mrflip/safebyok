@@ -1234,14 +1234,15 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
 * 2026-10-17 (thread 5b, store_base; revised on branch 20261017-logger_contract): **an adapter's
   logger is fixed when it is made; `openVault`'s is not handed to it; the default logger is one
   page-wide object, which any code on the page can redirect.** A `VaultDB` is made with a logger
-  and keeps it from then on: the base-class constructor demands `{ logger }` and refuses none
-  (null included) as `bad_option`, since a subclass must hand it one; an adapter's factory settles
-  it with `parseLogger(opts.logger)`, which answers `DefaultLogger` when the host gave none, `null`
-  meaning "none" like `undefined`. The base class keeps it in the ES private field `#logger`, set
-  once in the constructor, and shows it through the read-only getter `vaultDB.logger`. It is not an
-  own property, so a VaultDB that is logged, spread or JSON-stringified does not show or copy a
-  host's logger, and assignment does not take (in strict mode it throws a TypeError). A host's own
-  VaultDB subclass could still override the getter, which is why `openVault` still runs
+  and keeps it from then on: every adapter hands the host's `VaultDBOpts` to `super(opts)`, and the
+  base-class constructor runs `parseLogger(opts?.logger)` once, which answers `DefaultLogger` when
+  the host gave none (`undefined`, `null` meaning "none", an options bag without one, or, from a
+  JavaScript subclass, no argument at all) and refuses a non-logger as `bad_option`. The base class
+  keeps it in the ES private field `#logger`, set once in the constructor, and shows it through the
+  read-only getter `vaultDB.logger`. It is not an own property, so a VaultDB that is logged, spread
+  or JSON-stringified does not show or copy a host's logger, and assignment does not take (in strict
+  mode it throws a TypeError). A host's own VaultDB subclass could still override the getter, which
+  is why `openVault` still runs
   `parseLogger` on `vaultDB.logger`. `openVault`'s `logger` is the vault's alone and is not handed
   to the storage adapter: an adapter made with its own logger keeps it, and one made with none
   uses `DefaultLogger`, whatever `openVault` is given. A vault opened with no `logger` of its own

@@ -1,4 +1,4 @@
-import { Ckeys, Expectations, VaultDB, parseLogger } from 'safebyok'
+import { Ckeys, Expectations, VaultDB } from 'safebyok'
 import type { BundleExpectation, EraseExpectation, Lockbox, LockboxExpectation, StoredLockbox, VaultBundle, VaultScope } from 'safebyok'
 import { ChangeBell } from 'safebyok/idb'
 import { boxRange } from './ckeys'
@@ -47,7 +47,7 @@ class IdbVaultDB extends VaultDB {
   private readonly dbName: string
 
   constructor(dbName: string, opts: IdbVaultDBOpts | undefined) {
-    super({ logger: parseLogger(opts?.logger) })
+    super(opts ?? {})
     this.dbName = dbName
   }
 
