@@ -1,6 +1,6 @@
 # Thread 9a: sweep_small (2026-10-17)
 
-Branch `20261017-sweep_small`, PR [#143](https://github.com/mrflip/safebyok/pull/143), stacked on #141. Justify: green (core 2055 passed | 35 skipped; every package and e2e green; the real-Postgres suites skip here).
+Branch `20261017-sweep_small`, PR [#143](https://github.com/mrflip/safebyok/pull/143), stacked on [#144](https://github.com/mrflip/safebyok/pull/144) (thread 9b, core_tidy), after a catch-up rebase onto it. Justify: green (core 2089 passed | 35 skipped; every package, the demo and e2e green; the real-Postgres suites skip here).
 
 * **Built** (each item a commit or two, grouped, in this order):
   * **G379** the passphrase modal's `vaultUnlockingWith`, `submitPassphrase`, `Catcher`, `wrong` moved to the React `tests/test-helpers.ts`; `passkey-unlock-button.test.tsx`'s `HostBoundary` was `Catcher`'s twin and now uses it. The unused `eslint-disable unicorn/prefer-promise-with-resolvers` in `vault-provider.test.tsx` removed (added item 6).
@@ -42,3 +42,4 @@ Branch `20261017-sweep_small`, PR [#143](https://github.com/mrflip/safebyok/pull
   * Not run here: the real-Postgres e2e suites (they typecheck and lint; `SAFEBYOK_PG_URL` is unset), and the CI workflow edit (no `actionlint` here; the new step's grep was run by hand against the current files and reports them equal).
   * The `postgres` and `node-compat (22)` required checks are in TODO; the ruleset is yours.
   * `LabelPattern.source` is a different string now (same language): worth a glance at the changeset line.
+* **Review**: four fixes by the reviewer are in (`mask`'s doc block, `liveWatch` unsubscribing when the opening call never comes, the Postgres file database taking dropped connections when ending devices fails, NOTYET quoting the Coach's words). The rebase onto 9b met two conflicts, both mechanical: 9b's `storage_blocked` expectation and my `expectRefusal` in `idb-vault-db.test.ts` (kept both: `expectRefusal(..., 'storage_blocked')`, and 9b's two new `refusalOf` tests converted likewise), and `notes/security.md` (my two entries after 9b's six).
