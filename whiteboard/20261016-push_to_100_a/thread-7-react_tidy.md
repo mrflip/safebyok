@@ -2,8 +2,9 @@
 
 Branch `20261016-react_tidy`, PR [#129](https://github.com/mrflip/safebyok/pull/129), cut from
 `main` (`f63bd915`); restacked 2026-10-17 onto thread 10 (#136, `8439aa01`) -- see *Restack*,
-at the end. Justify, after the restack: green at every package (react 160, demo 182 + 15
-skipped, core 1852 + 33 skipped); `pnpm size` within every existing budget.
+at the end; chained onto thread 6 (#126, `83ed9ce3`). Justify, after the chain: green at every
+package (react 160, demo 182 + 15 skipped, core 1910 + 33 skipped); `pnpm size` within every
+existing budget.
 
 * **Built**:
   - `safebyok-react/src/messages.ts`: every word a user reads (dialog, passkey button and its
@@ -113,3 +114,7 @@ skipped, core 1852 + 33 skipped); `pnpm size` within every existing budget.
   `allowStartOver` and the sinks warning; the dialog-window table's `1e9` hours row dropped, as
   openVault now refuses hours above `MaxReentryHours`. The demo's click-through test now types
   passphrases of 12 characters and more, thread 10's default floor.
+* **Chained onto thread 6** (2026-10-17, #126, `83ed9ce3`): both sides' exports kept
+  (`ensureSaltFits`, `parseLogger`), thread 6's security entries before this thread's. Thread 6's
+  `openVault` warns of a `test_` deriver at every open, so the inline-clock warning's test counts
+  only the provider's own console warnings.
