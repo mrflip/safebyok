@@ -3,10 +3,10 @@
  * authenticator, and a render that hears what React reports. Star-import it as `TH`
  * (`import * as TH from './test-helpers'`).
  */
-import { render } from '@testing-library/react'
-import type { ReactElement } from 'react'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { Component, createElement, type ReactElement, type ReactNode } from 'react'
 import { vi } from 'vitest'
-import { ForcePassphraseReentryHours, type UnlockSummary, type Vault, type VaultState } from 'safebyok'
+import { ForcePassphraseReentryHours, VaultError, type UnlockSummary, type Vault, type VaultState } from 'safebyok'
 import { scopeOf } from 'safebyok/testing'
 import { fromB64, toB64 } from 'safebyok/utils'
 
@@ -60,6 +60,29 @@ export const stubVault = (opts: StubVaultOpts = {}): Vault => {
     unlock:          opts.unlock,
     destroy:         opts.destroy,
   } as unknown as Vault
+}
+
+/**
+ * A locked Vault whose unlock runs `unlock`, which gets the passphrase the dialog submits.
+ *
+ * @example const vault = TH.vaultUnlockingWith((passphrase) => { given.push(passphrase); return Promise.resolve() })
+ */
+export const vaultUnlockingWith = (unlock: (passphrase: string) => Promise<void>) => stubVault({ unlock })
+
+/** A locked Vault whose every unlock is refused as a wrong passphrase. */
+export const wrong = () => vaultUnlockingWith(() => Promise.reject(new VaultError('wrong_passphrase', 'That passphrase did not open the vault.')))
+
+/** Types the passphrase in the dialog and presses Unlock. */
+export const submitPassphrase = (passphrase: string) => {
+  fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
+  fireEvent.click(screen.getByText('Unlock'))
+}
+
+/** An error boundary that shows `caught: <message>` for what it caught, as a host's would. */
+export class Catcher extends Component<{ children: ReactNode }, { caught: string | null }> {
+  override state = { caught: null as string | null }
+  static getDerivedStateFromError(err: unknown) { return { caught: err instanceof Error ? err.message : 'not an Error' } }
+  override render() { return this.state.caught === null ? this.props.children : createElement('p', null, `caught: ${this.state.caught}`) }
 }
 
 /** How the fake authenticator behaves: whether it offers PRF at all, and whether it answers as it makes a passkey. */

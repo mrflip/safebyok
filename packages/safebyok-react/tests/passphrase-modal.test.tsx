@@ -1,4 +1,3 @@
-import { Component, type ReactNode } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ForeverMillis, MinuteMillis, VaultError, openVault } from 'safebyok'
@@ -8,30 +7,11 @@ import * as TH from './test-helpers'
 /** Just enough of a Vault for the dialog to read its state and window (the default, unless given). */
 const vaultInState = (state: 'absent' | 'locked', reentryWindowMillis = TH.DefaultWindowMillis) => TH.stubVault({ state, reentryWindowMillis })
 
-/** A locked Vault whose unlock runs `unlock`, which gets the passphrase the dialog submits. */
-const vaultUnlockingWith = (unlock: (passphrase: string) => Promise<void>) => TH.stubVault({ unlock })
-
 /** The dialog's `onDone` for tests that never submit. */
 const noop = (_unlocked: boolean) => undefined
 
-/** Types the passphrase in the dialog and presses Unlock. */
-const submitPassphrase = (passphrase: string) => {
-  fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
-  fireEvent.click(screen.getByText('Unlock'))
-}
-
-/** An error boundary that shows what it caught, as a host's would. */
-class Catcher extends Component<{ children: ReactNode }, { caught: string | null }> {
-  override state = { caught: null as string | null }
-  static getDerivedStateFromError(err: unknown) { return { caught: err instanceof Error ? err.message : 'not an Error' } }
-  override render() { return this.state.caught === null ? this.props.children : <p>{`caught: ${this.state.caught}`}</p> }
-}
-
 /** The dialog's word to a user it cannot help, once something not theirs to mend went wrong. */
 const Trouble = /This app ran into a problem of its own, not one you caused, and could not unlock your vault\. Your secrets are safe\./
-
-/** A locked Vault whose every unlock is refused as a wrong passphrase. */
-const wrong = () => vaultUnlockingWith(() => Promise.reject(new VaultError('wrong_passphrase', 'That passphrase did not open the vault.')))
 
 /** What the dialog says of `relative` (null: until locked) while it creates the vault, or on an ordinary unlock. */
 const wordingOf = (relative: string | null, creating: boolean) => {
@@ -80,9 +60,9 @@ describe("PassphraseModal", () => {
   it("hands the typed passphrase to the vault and reports an unlock", async () => {
     const heard: boolean[] = []
     const given: string[] = []
-    const vault = vaultUnlockingWith((passphrase) => { given.push(passphrase); return Promise.resolve() })
+    const vault = TH.vaultUnlockingWith((passphrase) => { given.push(passphrase); return Promise.resolve() })
     render(<PassphraseModal vault={vault} onDone={(unlocked) => { heard.push(unlocked) }} />)
-    submitPassphrase('pw one')
+    TH.submitPassphrase('pw one')
     await waitFor(() => { expect(heard).to.deep.equal([true]) })
     expect(given).to.deep.equal(['pw one'])
   })
@@ -96,9 +76,9 @@ describe("PassphraseModal", () => {
 
   it("closes as if dismissed when its unlock loses to a lock() called meanwhile", async () => {
     const heard: boolean[] = []
-    const vault = vaultUnlockingWith(() => Promise.reject(new VaultError('vault_locked', 'The vault was locked while this unlock was under way.')))
+    const vault = TH.vaultUnlockingWith(() => Promise.reject(new VaultError('vault_locked', 'The vault was locked while this unlock was under way.')))
     render(<PassphraseModal vault={vault} onDone={(unlocked) => { heard.push(unlocked) }} />)
-    submitPassphrase('pw one')
+    TH.submitPassphrase('pw one')
     await waitFor(() => { expect(heard).to.deep.equal([false]) })
   })
 
@@ -106,24 +86,24 @@ describe("PassphraseModal", () => {
 
     it("stays in the dialog with the vault's calm message, and does not report done", async () => {
       const heard: boolean[] = []
-      render(<PassphraseModal vault={wrong()} onDone={(unlocked) => { heard.push(unlocked) }} />)
-      submitPassphrase('pw wrong')
+      render(<PassphraseModal vault={TH.wrong()} onDone={(unlocked) => { heard.push(unlocked) }} />)
+      TH.submitPassphrase('pw wrong')
       await waitFor(() => { expect(screen.queryByText('That passphrase did not open the vault.')).to.not.be.null })
       expect(heard).to.deep.equal([])
     })
 
     it("announces the message to a screen reader, through a live region there from the start", async () => {
-      render(<PassphraseModal vault={wrong()} onDone={noop} />)
+      render(<PassphraseModal vault={TH.wrong()} onDone={noop} />)
       const region = screen.getByRole('alert')
       expect(region.textContent).to.eq('')
-      submitPassphrase('pw wrong')
+      TH.submitPassphrase('pw wrong')
       await waitFor(() => { expect(region.textContent).to.eq('That passphrase did not open the vault.') })
       expect(screen.getByRole('alert')).to.equal(region)
     })
 
     it("empties the live region at each submit, so the same word again is announced again", async () => {
-      render(<PassphraseModal vault={wrong()} onDone={noop} />)
-      submitPassphrase('pw wrong')
+      render(<PassphraseModal vault={TH.wrong()} onDone={noop} />)
+      TH.submitPassphrase('pw wrong')
       await waitFor(() => { expect(screen.getByRole('alert').textContent).to.not.eq('') })
       fireEvent.click(screen.getByText('Unlock'))
       expect(screen.getByRole('alert').textContent).to.eq('')
@@ -131,8 +111,8 @@ describe("PassphraseModal", () => {
     })
 
     it("clears the message once the user types again", async () => {
-      render(<PassphraseModal vault={wrong()} onDone={noop} />)
-      submitPassphrase('pw wrong')
+      render(<PassphraseModal vault={TH.wrong()} onDone={noop} />)
+      TH.submitPassphrase('pw wrong')
       await waitFor(() => { expect(screen.queryByText('That passphrase did not open the vault.')).to.not.be.null })
       fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw wrong again' } })
       expect(screen.queryByText('That passphrase did not open the vault.')).to.be.null
@@ -142,9 +122,9 @@ describe("PassphraseModal", () => {
   describe("any other failure of the unlock", () => {
     it("shows a condition in the dialog in place, as it does a wrong passphrase", async () => {
       const heard: boolean[] = []
-      const vault = vaultUnlockingWith(() => Promise.reject(new VaultError('storage_unavailable', 'Storage could not be reached; try again in a moment.')))
-      render(<Catcher><PassphraseModal vault={vault} onDone={(unlocked) => { heard.push(unlocked) }} /></Catcher>)
-      submitPassphrase('pw one')
+      const vault = TH.vaultUnlockingWith(() => Promise.reject(new VaultError('storage_unavailable', 'Storage could not be reached; try again in a moment.')))
+      render(<TH.Catcher><PassphraseModal vault={vault} onDone={(unlocked) => { heard.push(unlocked) }} /></TH.Catcher>)
+      TH.submitPassphrase('pw one')
       await waitFor(() => { expect(screen.queryByText('Storage could not be reached; try again in a moment.')).to.not.be.null })
       expect(heard).to.deep.equal([])
       expect(screen.queryByText(/caught:/)).to.be.null
@@ -153,8 +133,8 @@ describe("PassphraseModal", () => {
     it("meets misuse with a calm notice in the dialog, and reports the very error to React, leaving the page alone", async () => {
       const closed = new VaultError('vault_closed', 'The vault was closed.')
       const heard: boolean[] = []
-      const { reported } = TH.renderReporting(<Catcher><PassphraseModal vault={vaultUnlockingWith(() => Promise.reject(closed))} onDone={(unlocked) => { heard.push(unlocked) }} /></Catcher>)
-      submitPassphrase('pw one')
+      const { reported } = TH.renderReporting(<TH.Catcher><PassphraseModal vault={TH.vaultUnlockingWith(() => Promise.reject(closed))} onDone={(unlocked) => { heard.push(unlocked) }} /></TH.Catcher>)
+      TH.submitPassphrase('pw one')
       expect(await screen.findByText('Something went wrong')).to.not.be.null
       expect(screen.getByRole('alertdialog', { name: 'Something went wrong' }).textContent).to.match(Trouble)
       expect(reported).to.deep.equal([closed])
@@ -165,9 +145,9 @@ describe("PassphraseModal", () => {
     })
 
     it("forgets the typed passphrase with the form, and moves focus to Close", async () => {
-      const vault = vaultUnlockingWith(() => Promise.reject(new VaultError('bad_option', 'A bad option.')))
+      const vault = TH.vaultUnlockingWith(() => Promise.reject(new VaultError('bad_option', 'A bad option.')))
       TH.renderReporting(<PassphraseModal vault={vault} onDone={noop} />)
-      submitPassphrase('pw one')
+      TH.submitPassphrase('pw one')
       await screen.findByText('Something went wrong')
       expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null
       expect(screen.queryByDisplayValue('pw one')).to.be.null
@@ -176,34 +156,34 @@ describe("PassphraseModal", () => {
 
     it("closes as if dismissed when the user presses Escape on the notice", async () => {
       const heard: boolean[] = []
-      const vault = vaultUnlockingWith(() => Promise.reject(new VaultError('vault_closed', 'The vault was closed.')))
+      const vault = TH.vaultUnlockingWith(() => Promise.reject(new VaultError('vault_closed', 'The vault was closed.')))
       TH.renderReporting(<PassphraseModal vault={vault} onDone={(unlocked) => { heard.push(unlocked) }} />)
-      submitPassphrase('pw one')
+      TH.submitPassphrase('pw one')
       fireEvent.keyDown(await screen.findByRole('button', { name: 'Close' }), { key: 'Escape' })
       expect(heard).to.deep.equal([false])
     })
 
     it("closes as if dismissed when the user closes the notice", async () => {
       const heard: boolean[] = []
-      const vault = vaultUnlockingWith(() => Promise.reject(new VaultError('unknown_key_deriver', 'This vault was made with a key deriver this package does not carry.')))
+      const vault = TH.vaultUnlockingWith(() => Promise.reject(new VaultError('unknown_key_deriver', 'This vault was made with a key deriver this package does not carry.')))
       TH.renderReporting(<PassphraseModal vault={vault} onDone={(unlocked) => { heard.push(unlocked) }} />)
-      submitPassphrase('pw one')
+      TH.submitPassphrase('pw one')
       fireEvent.click(await screen.findByRole('button', { name: 'Close' }))
       expect(heard).to.deep.equal([false])
     })
 
     it("meets a failure that is no VaultError the same way", async () => {
       const fell = new TypeError('fell over')
-      const { reported } = TH.renderReporting(<Catcher><PassphraseModal vault={vaultUnlockingWith(() => Promise.reject(fell))} onDone={noop} /></Catcher>)
-      submitPassphrase('pw one')
+      const { reported } = TH.renderReporting(<TH.Catcher><PassphraseModal vault={TH.vaultUnlockingWith(() => Promise.reject(fell))} onDone={noop} /></TH.Catcher>)
+      TH.submitPassphrase('pw one')
       expect(await screen.findByText('Something went wrong')).to.not.be.null
       expect(reported).to.deep.equal([fell])
       expect(screen.queryByText(/caught:|fell over/)).to.be.null
     })
 
     it("meets a rejection that is no Error at all the same way", async () => {
-      const { reported } = TH.renderReporting(<Catcher><PassphraseModal vault={TH.stubVault({ unlock: vi.fn().mockRejectedValue(null) })} onDone={noop} /></Catcher>)
-      submitPassphrase('pw one')
+      const { reported } = TH.renderReporting(<TH.Catcher><PassphraseModal vault={TH.stubVault({ unlock: vi.fn().mockRejectedValue(null) })} onDone={noop} /></TH.Catcher>)
+      TH.submitPassphrase('pw one')
       expect(await screen.findByText('Something went wrong')).to.not.be.null
       expect(reported).to.deep.equal([null])
     })
@@ -289,8 +269,8 @@ describe("PassphraseModal", () => {
     it("keeps Escape on the trouble notice to itself, too", async () => {
       const hostHeard: string[] = []
       const hostListener = (evt: KeyboardEvent) => { hostHeard.push(evt.key) }
-      TH.renderReporting(<PassphraseModal vault={vaultUnlockingWith(() => Promise.reject(new VaultError('vault_closed', 'The vault was closed.')))} onDone={noop} />)
-      submitPassphrase('pw one')
+      TH.renderReporting(<PassphraseModal vault={TH.vaultUnlockingWith(() => Promise.reject(new VaultError('vault_closed', 'The vault was closed.')))} onDone={noop} />)
+      TH.submitPassphrase('pw one')
       const close = await screen.findByRole('button', { name: 'Close' })
       document.addEventListener('keydown', hostListener)
       try {
@@ -321,8 +301,8 @@ describe("PassphraseModal", () => {
     })
 
     it("starts afresh after trouble when handed another vault", async () => {
-      const { rerender } = TH.renderReporting(<PassphraseModal vault={vaultUnlockingWith(() => Promise.reject(new VaultError('vault_closed', 'The vault was closed.')))} onDone={noop} />)
-      submitPassphrase('pw one')
+      const { rerender } = TH.renderReporting(<PassphraseModal vault={TH.vaultUnlockingWith(() => Promise.reject(new VaultError('vault_closed', 'The vault was closed.')))} onDone={noop} />)
+      TH.submitPassphrase('pw one')
       await screen.findByText('Something went wrong')
       rerender(<PassphraseModal vault={vaultInState('locked')} onDone={noop} />)
       expect(screen.queryByText('Something went wrong')).to.be.null
@@ -460,7 +440,7 @@ describe("PassphraseModal", () => {
 
     it("keeps the passphrase out of the page's markup, hidden or shown, and submits what was typed", async () => {
       const given: string[] = []
-      render(<PassphraseModal vault={vaultUnlockingWith((passphrase) => { given.push(passphrase); return Promise.resolve() })} onDone={noop} />)
+      render(<PassphraseModal vault={TH.vaultUnlockingWith((passphrase) => { given.push(passphrase); return Promise.resolve() })} onDone={noop} />)
       const field = screen.getByPlaceholderText<HTMLInputElement>('vault passphrase')
       fireEvent.change(field, { target: { value: 'pw kept from the page' } })
       expect(field.hasAttribute('value')).to.be.false
