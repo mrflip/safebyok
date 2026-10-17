@@ -110,7 +110,7 @@ describe("postgresVaultDB, as the README has it", () => {
   it("stores and reads a real vault, made and opened by the core", async () => {
     const db = await TH.emptyDatabase()
     const opened = () => openVault({
-      applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: TH.requestFor(db, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver,
+      applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: TH.requestFor(db, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest,
     })
     const first = await opened()
     await first.unlock('correct horse battery staple')
@@ -450,7 +450,7 @@ describe("postgresVaultDB, its lockbox limit", () => {
   it("refuses as vault_full a store() its vault's own count let through, when another device filled the vault unheard", async () => {
     const db = await TH.emptyDatabase()
     const opened = () => openVault({
-      applabel: 'acme', userId: 'u1', vaultlabel: 'main', deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver,
+      applabel: 'acme', userId: 'u1', vaultlabel: 'main', deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest,
       // No listen: neither vault hears the other's writes.
       vaultDB: postgresVaultDB({ client: db, userId: 'u1', maxLockboxes: 2 }),
     })
@@ -470,7 +470,7 @@ describe("postgresVaultDB, its lockbox limit", () => {
   it("opens a vault with the smaller of MaxLockboxes and its own, and refuses one asking for more", async () => {
     const db = await TH.emptyDatabase()
     const optsFor = (maxLockboxes?: number) => ({
-      applabel: 'acme', userId: 'u1', vaultlabel: 'main', deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver,
+      applabel: 'acme', userId: 'u1', vaultlabel: 'main', deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest,
       vaultDB: postgresVaultDB({ client: db, userId: 'u1', maxLockboxes: 3 }), maxLockboxes,
     })
     await TH.expectRefusal(openVault(optsFor(4)), 'bad_option')

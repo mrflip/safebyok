@@ -1,23 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
-import { MinPassphraseChars, StrongVerdict, ensureStrongEnough, parseStrengthTest, passphraseLengthTest, type PassphraseStrengthTest, type PassphraseVerdict } from '../src/passphrase-strength'
+import { StrongVerdict, checkStrengthTest, ensureStrongEnough, type PassphraseStrengthTest, type PassphraseVerdict } from '../src/passphrase-strength'
+import { zxcvbnPassphraseTest } from '../src/zxcvbn-passphrase-test'
+import type { VaultScope } from '../src/types'
 import * as TH from './test-helpers'
 
-const LengthCases = [
-  // regular usage:
-  ["correct horse battery staple", true,  'a few words together pass'],
-  ["twelve chars",                 true,  'twelve characters, a space among them, is exactly enough'],
-  ["hunter2",                      false, 'a short password is refused'],
-  ["eleven char",                  false, 'one character short is refused'],
-  // no composition rules:
-  ["alllowercaseletters",          true,  'no digit, capital or symbol is asked for'],
-  ["Tr0ub4dor&3",                  false, 'digits, capitals and symbols do not make up for length'],
-  // characters, not bytes or UTF-16 code units:
-  ["🔑🔑🔑🔑🔑🔑🔑🔑🔑🔑🔑",           false, 'eleven emoji are eleven characters, though 22 code units'],
-  ["🔑🔑🔑🔑🔑🔑🔑🔑🔑🔑🔑🔑",          true,  'twelve emoji are twelve characters'],
-  ["päßwörd-ünd",                  false, 'eleven accented letters are eleven, though more bytes'],
-  // edge cases:
-  ["",                             false, 'nothing at all is refused'],
-] as const
+/** The scope the tests hand a strength test. */
+const scope: VaultScope = TH.scopeOf('u1')
 
 /** A test that finds every passphrase weak. */
 const neverStrong: PassphraseStrengthTest = () => ({ strong: false, reason: 'Pick a phrase nobody would guess.' })
@@ -29,34 +17,6 @@ const breachedLater: PassphraseStrengthTest = async () => {
 /** A test that admits every passphrase. */
 const alwaysStrong: PassphraseStrengthTest = () => StrongVerdict
 
-describe("passphraseLengthTest", () => {
-  for (const [passphrase, strong, blurb] of LengthCases) {
-    it(blurb, () => { expect(passphraseLengthTest(passphrase).strong).to.eq(strong) })
-  }
-
-  it("admits a passphrase of MinPassphraseChars, 12, and refuses one shorter", () => {
-    expect(MinPassphraseChars).to.eq(12)
-    expect(passphraseLengthTest('x'.repeat(MinPassphraseChars))).to.deep.equal({ strong: true })
-    expect(passphraseLengthTest('x'.repeat(MinPassphraseChars - 1)).strong).to.be.false
-  })
-
-  it("gives a reason saying how long a passphrase must be, never quoting the one it was given", () => {
-    const verdict = passphraseLengthTest('hunter2')
-    expect(verdict.strong).to.be.false
-    const reason = verdict.strong ? '' : verdict.reason
-    expect(reason).to.match(/at least 12 characters/)
-    expect(reason).to.not.include('hunter2')
-  })
-
-  it("passes twelve spaces: the vault refuses a blank passphrase itself, before any test", () => {
-    expect(passphraseLengthTest(' '.repeat(12)).strong).to.be.true
-  })
-
-  it("answers at once, not as a promise, so a field may call it on every keystroke", () => {
-    expect(passphraseLengthTest('correct horse battery staple')).to.not.be.instanceOf(Promise)
-  })
-})
-
 describe("StrongVerdict", () => {
   it("is the one verdict that admits, frozen", () => {
     expect(StrongVerdict).to.deep.equal({ strong: true })
@@ -66,18 +26,18 @@ describe("StrongVerdict", () => {
 
 describe("ensureStrongEnough", () => {
   it("refuses one the test finds weak with kind 'weak_passphrase', the test's reason its message", async () => {
-    const err = await TH.expectRefusal(ensureStrongEnough(neverStrong, 'acme acme acme'), 'weak_passphrase')
+    const err = await TH.expectRefusal(ensureStrongEnough(neverStrong, 'acme acme acme', scope), 'weak_passphrase')
     expect(err.message).to.eq('Pick a phrase nobody would guess.')
   })
 
   it("awaits a test that answers a promise", async () => {
-    await TH.expectRefusal(ensureStrongEnough(breachedLater, 'acme acme acme'), 'weak_passphrase')
+    await TH.expectRefusal(ensureStrongEnough(breachedLater, 'acme acme acme', scope), 'weak_passphrase')
   })
 
-  it("passes a passphrase the test admits, handing it the passphrase exactly as given", async () => {
-    const test = vi.fn((_passphrase: string): PassphraseVerdict => StrongVerdict)
-    await ensureStrongEnough(test, '  Spaced Out Phrase  ')
-    expect(test).toHaveBeenCalledWith('  Spaced Out Phrase  ')
+  it("passes a passphrase the test admits, handing it the passphrase exactly as given and the vault's scope", async () => {
+    const test = vi.fn((_passphrase: string, _scope: VaultScope): PassphraseVerdict => StrongVerdict)
+    await ensureStrongEnough(test, '  Spaced Out Phrase  ', scope)
+    expect(test).toHaveBeenCalledWith('  Spaced Out Phrase  ', { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })
   })
 
   const Misanswers = [
@@ -92,7 +52,7 @@ describe("ensureStrongEnough", () => {
   for (const [answer, blurb] of Misanswers) {
     it(`refuses a test answering ${blurb} with kind 'bad_option'`, async () => {
       const misfit = (() => answer) as unknown as PassphraseStrengthTest
-      const err = await TH.expectRefusal(ensureStrongEnough(misfit, 'acme acme acme'), 'bad_option')
+      const err = await TH.expectRefusal(ensureStrongEnough(misfit, 'acme acme acme', scope), 'bad_option')
       expect(err.message).to.match(/passphraseStrengthTest/)
       expect(err.message).to.not.include('acme acme acme')
     })
@@ -101,22 +61,27 @@ describe("ensureStrongEnough", () => {
   it("throws whatever the test throws", async () => {
     const thrown = new Error('the strength service is down')
     const broken: PassphraseStrengthTest = () => { throw thrown }
-    await expect(ensureStrongEnough(broken, 'acme acme acme')).rejects.toThrow(thrown)
+    await expect(ensureStrongEnough(broken, 'acme acme acme', scope)).rejects.toThrow(thrown)
   })
 })
 
-describe("parseStrengthTest", () => {
-  it("takes the length test by default", () => {
-    expect(parseStrengthTest(undefined)).to.eq(passphraseLengthTest)
+describe("checkStrengthTest", () => {
+  it("keeps a host's own test as given", () => {
+    expect(checkStrengthTest(alwaysStrong)).to.eq(alwaysStrong)
   })
 
-  it("keeps a host's own test as given", () => {
-    expect(parseStrengthTest(alwaysStrong)).to.eq(alwaysStrong)
+  it("keeps zxcvbnPassphraseTest, as its example says", () => {
+    expect(checkStrengthTest(zxcvbnPassphraseTest)).to.eq(zxcvbnPassphraseTest)
+  })
+
+  it("refuses a missing test with kind 'bad_option', as its example says, naming where a good one is", () => {
+    const missing = undefined as unknown as PassphraseStrengthTest
+    expect(() => checkStrengthTest(missing)).to.throw(/passphraseStrengthTest is required.*browserOpts/).with.property('kind', 'bad_option')
   })
 
   it("refuses anything but a function with kind 'bad_option'", () => {
     for (const misfit of [null, 12, 'zxcvbn', { strong: true }]) {
-      expect(() => parseStrengthTest(misfit as unknown as PassphraseStrengthTest)).to.throw(/passphraseStrengthTest/).with.property('kind', 'bad_option')
+      expect(() => checkStrengthTest(misfit as unknown as PassphraseStrengthTest)).to.throw(/passphraseStrengthTest/).with.property('kind', 'bad_option')
     }
   })
 })

@@ -17,7 +17,7 @@ import type { DeviceDB } from './device-db'
 import { VaultDB, jsonBytes, type LockboxExpectation } from './vault-db'
 import { asError, parseLogger, type VaultLogger } from './logger'
 import * as RefusalPolicy from './refusal-policy'
-import { ensureStrongEnough, parseStrengthTest, type PassphraseStrengthTest } from './passphrase-strength'
+import { checkStrengthTest, ensureStrongEnough, type PassphraseStrengthTest } from './passphrase-strength'
 
 /**
  * Where the vault stands, as the UI branches on it:
@@ -152,14 +152,16 @@ export type OpenVaultOpts = {
   /**
    * The check every new passphrase must pass, as a {@link PassphraseStrengthTest}: the one the
    * first `unlock()` creates the vault with, and each `addPassphrase()` or `changePassphrase()`
-   * sets, before any key derivation. A passphrase it finds weak is refused with kind
-   * 'weak_passphrase', the test's reason the message. It never runs on `unlock()` of a vault that
-   * stands. Default: `passphraseLengthTest`, at least `MinPassphraseChars` (12) characters
-   * and no composition rules; `zxcvbnPassphraseTest`, from `safebyok/browser`, also turns away
-   * common passwords and patterns. Kind 'bad_option' for anything but a function, and for a test
-   * that answers anything but a verdict; whatever it throws, the call throws.
+   * sets, before any key derivation. It is handed the passphrase and the vault's scope, and a
+   * passphrase it finds weak is refused with kind 'weak_passphrase', the test's reason the
+   * message. It never runs on `unlock()` of a vault that stands. Required, as the vault has no
+   * test of its own: in a browser, `browserOpts()` from `safebyok/browser` supplies
+   * `zxcvbnPassphraseTest`, which turns away short passphrases, common passwords and patterns.
+   * The vault keeps the test it was opened with for its life. Kind 'bad_option' for anything but a
+   * function, and for a test that answers anything but a verdict; whatever it throws, the call
+   * throws.
    */
-  passphraseStrengthTest?: PassphraseStrengthTest | undefined
+  passphraseStrengthTest: PassphraseStrengthTest
 }
 
 /**
@@ -567,11 +569,11 @@ const UnreadBundle = Symbol.for('safebyok.unread_bundle')
  *   const vault = await openVault({ applabel: 'acme', userId: session.userId, vaultlabel: 'main', vaultDB, ...browserOpts() })
  *   vault.getSnapshot().state  // 'absent' | 'locked' | 'unlocked'
  * @example
- *   const vault = await openVault({ applabel: 'acme', userId: session.userId, vaultlabel: 'main', vaultDB, deviceDB, keyDeriver })
+ *   const vault = await openVault({ applabel: 'acme', userId: session.userId, vaultlabel: 'main', vaultDB, deviceDB, keyDeriver, passphraseStrengthTest })
  */
 export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   ensureSecureContext()
-  if (! isBag(opts)) { throw new VaultError('bad_option', 'openVault takes one bag of options: applabel, userId, vaultlabel, vaultDB, deviceDB and keyDeriver at least.') }
+  if (! isBag(opts)) { throw new VaultError('bad_option', 'openVault takes one bag of options: applabel, userId, vaultlabel, vaultDB, deviceDB, keyDeriver and passphraseStrengthTest at least.') }
   const rules = Names.rulesOf(opts.validators)
   const scope = Names.checkScope(rules, { applabel: opts.applabel, user_id: opts.userId, vaultlabel: opts.vaultlabel })
   const { applabel, vaultlabel } = scope
@@ -597,7 +599,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
     }
   }
   const keyDeriver = parseKeyDeriver(opts.keyDeriver, logger)
-  const strengthTest = parseStrengthTest(opts.passphraseStrengthTest)
+  const strengthTest = checkStrengthTest(opts.passphraseStrengthTest)
   const whisperByteLimit = parseMaxWhisperBytes(opts.maxWhisperBytes)
   const lockboxLimit = parseMaxLockboxes(opts.maxLockboxes, parseDeclared(givenVaultDB, 'maxLockboxes'))
   const vaultByteLimit = ensureLimitsFit(givenVaultDB, whisperByteLimit, lockboxLimit)
@@ -889,7 +891,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       if (unlockId !== undefined) {
         throw new VaultError('absent_unlock', "This vault has no way in with that unlock_id: it does not exist, and may have been destroyed on another device. Unlock without an unlockId to create it anew.")
       }
-      await ensureStrongEnough(strengthTest, proof)
+      await ensureStrongEnough(strengthTest, proof, scope)
       const deviceId = randomId()
       const { draft, transientKey, sessionKey } = await draftBundle(proof, deviceId)
       drafted = { vault_id: draft.vault_id, device_id: deviceId }
@@ -1557,7 +1559,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       // A passphrase proves the way in it opens, and that is the one it changes; a passkey proves
       // the user, and which passphrase to change is then the caller's to say (or the only one).
       const byPasskey = typeof proof !== 'string'
-      await ensureStrongEnough(strengthTest, newPassphrase)
+      await ensureStrongEnough(strengthTest, newPassphrase, scope)
       await reviseUnlocks(proof, byPasskey ? undefined : unlockId, {
         call:   'changePassphrase',
         // The passphrase's way in takes the new one, keeping its stamp: its id and label, and the
@@ -1577,7 +1579,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       if (! newPassphrase.trim()) { throw new VaultError('wrong_passphrase', "A passphrase can't be empty or only spaces.") }
       const proof = parseProof(givenProof)
       const unlocklabel = parseUnlocklabel(rules, labelling, 'addPassphrase')
-      await ensureStrongEnough(strengthTest, newPassphrase)
+      await ensureStrongEnough(strengthTest, newPassphrase, scope)
       const naming = { unlock_id: randomId(), unlocklabel }
       await reviseUnlocks(proof, undefined, {
         call:   'addPassphrase',

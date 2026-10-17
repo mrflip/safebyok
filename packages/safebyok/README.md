@@ -46,7 +46,7 @@ const vault = await openVault({
   userId:     session.userId,                 // your auth's stable, opaque id for the user; never an email
   vaultlabel: 'main',
   vaultDB:    idbVaultDB({ dbName: 'acme' }), // or your backend's adapter
-  ...browserOpts({ dbName: 'acme' }),         // the key deriver and device store a browser wants
+  ...browserOpts({ dbName: 'acme' }),         // the key deriver, device store and passphrase strength test a browser wants
 })
 
 vault.getSnapshot().state         // 'absent' | 'locked' | 'unlocked'
@@ -86,9 +86,10 @@ of the above supplies it.
 
 * `safebyok` -- `openVault` and the types, errors and stores around it.
 * `safebyok/browser` -- `browserOpts({ dbName }?)`: the pinned Argon2id key deriver
-  (`argon2idWebV1Deriver`) and the IndexedDB device store (`idbDeviceDB`), as a bag of options.
-  And `zxcvbnPassphraseTest`, a passphrase strength test that knows common passwords, imported
-  on its own (see *A new passphrase's strength*): `browserOpts()` does not bring it in.
+  (`argon2idWebV1Deriver`), the IndexedDB device store (`idbDeviceDB`) and the passphrase
+  strength test (`zxcvbnPassphraseTest`), as a bag of options. The strength test's zxcvbn
+  dictionary loads, as a chunk of its own, only when a passphrase is first tested (see *A new
+  passphrase's strength*).
 * `safebyok/idb` -- the IndexedDB device store, `idbDeviceDB`, and `inspectIdbDeviceDB`, a raw
   window onto its rows for a debug panel. The IndexedDB vault store, `idbVaultDB`, is a package
   of its own, `safebyok-indexeddb`.
@@ -98,7 +99,7 @@ of the above supplies it.
   form, a server or another library to check what the vault will, at a few kB. All are in the main entry too, with the record schemas (`Whisper`,
   `EpochMillis` and the rest).
 
-`openVault` takes its `keyDeriver` and `deviceDB` from you, with no default behind them. A
+`openVault` takes its `keyDeriver`, `deviceDB` and `passphraseStrengthTest` from you, with no default behind them. A
 default would be imported by `openVault` itself, so every app would ship it, used or not: a
 bundler drops only the code nothing imports. The key deriver is the choice an app most plausibly
 makes differently -- another implementation of the same Argon2id spec, in WebAssembly or native
@@ -531,34 +532,49 @@ refused for weakness: a passphrase already in use is the user's to change, not t
 lock them out with.
 
 ```ts
-import { passphraseLengthTest } from 'safebyok'
-import { zxcvbnPassphraseTest } from 'safebyok/browser'
+import { browserOpts, zxcvbnPassphraseTest } from 'safebyok/browser'
 
-passphraseLengthTest('hunter2')
-// { strong: false, reason: 'A passphrase needs at least 12 characters: ...' }
-
-const vault = await openVault({ ...opts, passphraseStrengthTest: zxcvbnPassphraseTest })
-zxcvbnPassphraseTest('password1234')
+const vault = await openVault({ ...opts, ...browserOpts() })   // brings zxcvbnPassphraseTest
+await zxcvbnPassphraseTest('password1234')
 // { strong: false, reason: 'That is very like a commonly used password: ...' }
+await zxcvbnPassphraseTest('skylarkpinecone', { applabel: 'skylark', user_id: 'u1', vaultlabel: 'pinecone' })
+// { strong: false, reason: 'That holds something about you or this site, ...' }
 ```
 
-* **The default is length, and only length**: `passphraseLengthTest`, at least `MinPassphraseChars`
-  (12) characters, each Unicode code point counting one. No composition rules (a digit, a capital,
-  a symbol): NIST SP 800-63B advises against them, as they make a passphrase harder to remember
-  and no harder to guess.
-* **`zxcvbnPassphraseTest`**, from `safebyok/browser`, adds what NIST asks for beside length: it
-  turns away passwords found on lists of common ones, keyboard walks, repeats, sequences and dates,
-  through `@zxcvbn-ts/core` and its common-password dictionary, asking for a score of at least
-  3 of 4. That dictionary is about 216 kB (minified and brotlied), so it is its own import, and an
-  app that never imports it never ships it. It runs in a few milliseconds, after about 15 ms of
-  setup on its first call.
-* **Your own test** is any function from the passphrase to a verdict, `{ strong: true }` or
-  `{ strong: false, reason }`, at once or as a promise; the reason is shown to the user, so write
-  it calmly, say what to do, and never quote the passphrase. `openVault` refuses anything but a
-  function, and a test that answers anything but a verdict, with `bad_option`.
-* **Call it from the field as well.** A strength test is a plain function of the passphrase, with
-  no vault behind it, so the field the user types into can call the very same one on each
-  keystroke, and show the reason before the user submits: `safebyok-react`'s README says how.
+* **There is no default in the core.** `passphraseStrengthTest` is required, as `keyDeriver` and
+  `deviceDB` are: `openVault` refuses to open without one (`bad_option`), and `checkStrengthTest`
+  is the same check, for a wrapper that takes the options apart. A test of length alone is no
+  test -- 'a' and eleven spaces is twelve characters -- so the package offers none.
+* **In a browser, `browserOpts()` brings `zxcvbnPassphraseTest`.** It asks for at least
+  `MinPassphraseChars` (12) characters, each Unicode code point counting one, and then a zxcvbn
+  score of at least `MinZxcvbnScore` (3 of 4), through `@zxcvbn-ts/core` and its common-password
+  dictionary: it turns away common passwords and ones very like them, keyboard walks, repeats,
+  sequences, dates, and the vault's own names. No composition rules (a digit, a capital, a
+  symbol): NIST SP 800-63B advises against them, as they make a passphrase harder to remember and
+  no harder to guess. Its dictionary is about 214 kB (minified and brotlied), so the test loads it
+  with a dynamic `import()` at its first call, and a bundler splits it into a chunk of its own:
+  a page that never chooses a passphrase never fetches it. It answers through a promise, in a
+  few milliseconds after that first load. If the load fails (the network dropped), the call
+  rejects, the vault refuses the new passphrase with that rejection, and the next call tries again.
+* **The test hears the vault's scope.** It is called as `test(passphrase, scope)`, `scope` the
+  vault's `{ applabel, user_id, vaultlabel }`: words a guesser who knows the user tries first.
+  `zxcvbnPassphraseTest` hands each name, whole and split into its runs of letters and digits, to
+  zxcvbn as the user's own words.
+* **Your own test** replaces it: pass it after the spread. It is any function from the passphrase
+  (and the scope) to a verdict, `{ strong: true }` or `{ strong: false, reason }`, at once or as a
+  promise; the reason is shown to the user, so write it calmly, say what to do, and never quote the
+  passphrase. To ask for more, wrap ours:
+  `async (typed, scope) => (typed.includes('acme') ? { strong: false, reason: 'Leave out the name of the app.' } : await zxcvbnPassphraseTest(typed, scope))`.
+  `openVault` refuses anything but a function, and a test that answers anything but a verdict,
+  with `bad_option`; whatever a test throws, the call throws.
+* **Build it once.** The vault keeps the test it was opened with for its life. A binding that
+  reopens on a changed option (`safebyok-react`'s provider) reopens for a new test, so define it
+  at module level, or memoize it, rather than writing it inline.
+* **Call it from the field as well.** A strength test is a plain function of the passphrase and
+  the scope, with no vault behind it, so the field the user types into can call the very same one
+  on each keystroke, and show the reason before the user submits: `safebyok-react`'s dialog does
+  so by default. It hears the passphrase in plain text, so it must run on the device and keep
+  nothing: never send it to a server, log it, or let an error tracker capture it.
 
 ## Fingerprint unlock (passkeys)
 
