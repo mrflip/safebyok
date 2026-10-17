@@ -111,8 +111,13 @@ const VaultChangedDoc = `subscription SafebyokVaultChanged(${Scope}) {
 }`
 
 /**
- * Every operation graphqlVaultDB sends, by the root field it asks for: for a test to hold them
- * to the schema.
+ * Every operation graphqlVaultDB sends, by the root field it asks for: the documents a host whose
+ * GraphQL server accepts only allowlisted (persisted) operations registers, and a test holds to
+ * the schema. They change only as the SDL ({@link VaultSchemaSdl}) does, and are versioned with
+ * the package, which moves its client and its server together.
+ *
+ * @example
+ *   for (const document of Object.values(VaultOperations)) { allowlist.register(document) }
  */
 export const VaultOperations = {
   safebyokReadBundle:   ReadBundleDoc,
