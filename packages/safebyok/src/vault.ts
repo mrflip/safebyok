@@ -136,11 +136,12 @@ export type OpenVaultOpts = {
   /**
    * Where the vault says what it has nobody to throw to -- a lock that skipped its grace, a
    * background refresh that failed, a remembered unlock it could not read -- as a
-   * {@link VaultLogger}: `log`, `warn` and `error` functions. Default: the console. The vault hands
+   * {@link VaultLogger}: `log`, `warn` and `error` functions. The vault hands
    * it no secret material or option's value (a host's own error goes as the host made it); whatever
-   * it throws is ignored. Pass functions that do nothing for quiet. It is the vault's own: a storage
-   * adapter keeps the logger it was made with, so give its factory the same one to hear both. Kind
-   * 'bad_option' for anything else.
+   * it throws is ignored. Pass functions that do nothing for quiet. Default: the logger the `vaultDB`
+   * was made with, which is the console when it was given none. It does not go the other way: a
+   * storage adapter keeps the logger it was made with, so to have one logger hear both, give it to
+   * the adapter's factory and leave this out. Kind 'bad_option' for anything else.
    */
   logger?: VaultLogger | undefined
   /**
@@ -591,7 +592,8 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   // Every failure of the device's own storage reaches the vault's callers as a condition, with a kind.
   const deviceDB = deviceTroubleAsConditions(parseDeviceDB(opts.deviceDB))
   const reentryMillis = parseForcePassphraseReentryHours(opts.forcePassphraseReentryHours)
-  const logger = parseLogger(opts.logger)
+  // The host's logger for the vault, else the one its storage was made with: always one, as every VaultDB has one.
+  const logger = opts.logger === undefined ? givenVaultDB.logger : parseLogger(opts.logger)
   const clock = parseClock(opts.clock)
   // Every reading of the host's clock is checked, this first one so that a clock counting in the
   // wrong unit fails the open rather than some later call.

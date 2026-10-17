@@ -136,7 +136,7 @@ class RingingVaultDB extends MapVaultDB {
   loggerNow() { return this.logger }
 
   /** Puts `logger` in place of it, as a host's hook or a test may. */
-  swapLogger(logger: VaultLogger) { this.logger = logger }
+  swapLogger(logger: VaultLogger) { Reflect.set(this, 'logger', logger) }
 
   protected override doSubscribe(_scope: VaultScope, onChange: () => void) {
     this.trouble = this.watchTrouble("This vault's watch failed: other devices' changes may not show until its next read.")

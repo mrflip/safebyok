@@ -76,8 +76,8 @@ export type VaultDBOpts = {
   /**
    * Where the VaultDB says what it has nobody to throw to: a subscriber's listener that threw, a
    * watch that failed to start or dropped. Fixed when the VaultDB is made, and not the logger
-   * `openVault` is given, which is the vault's alone: hand both the same one to have one logger
-   * hear both. Without one, the console. Kind 'bad_option' for anything that is not a VaultLogger.
+   * `openVault` is given, which is the vault's alone. A vault opened with no logger of its own
+   * uses this one, so give it here, once, to have one logger hear both. Without one, the console. Kind 'bad_option' for anything that is not a VaultLogger.
    */
   logger?: VaultLogger | undefined
 }
@@ -196,9 +196,10 @@ export abstract class VaultDB {
    * Where this VaultDB says what it has nobody to throw to: always a logger, fixed when it is made.
    * Each call is guarded: a logger that throws breaks nothing. An own property, writable and
    * configurable so that a host or a test may swap it, and not enumerable, so that a VaultDB
-   * logged, spread or compared never shows or copies a host's logger.
+   * logged, spread or compared never shows or copies a host's logger. `openVault` reads it as the
+   * vault's own logger when it is given none.
    */
-  protected declare logger: VaultLogger
+  declare readonly logger: VaultLogger
 
   /**
    * @param init - What every VaultDB is made with: a `logger`. Kind 'bad_option' for none, or one

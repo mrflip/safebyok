@@ -1,4 +1,4 @@
-import { Global, asThrown } from './global'
+import { Global } from './global'
 
 /**
  * The change bell: how a write to a store in this browser tells everyone listening to it, in this
@@ -29,7 +29,7 @@ const callEach = (listeners: Set<() => void> | undefined) => {
       try {
         listener()
       } catch (err) {
-        Global.logger.error('A listener of the change bell threw. The bell rang on, and every other listener was called.', { call: 'ChangeBell' }, asThrown(err))
+        Global.logger.error('A listener of the change bell threw. The bell rang on, and every other listener was called.', { call: 'ChangeBell' }, err)
       }
     })
   })

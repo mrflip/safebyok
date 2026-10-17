@@ -5605,6 +5605,30 @@ describe("the logger", () => {
     consoleErrors.mockRestore()
   })
 
+  it("is the vaultDB's logger when the host passes the vault none: one given to the storage once hears both", async () => {
+    const world = makeWorld()
+    const own = TH.spyLogger()
+    const vaultDB = localVaultDB({ store: world.dbStore, logger: own.logger })
+    let reading = world.clock.now()
+    const vault = await world.openUnlocked('pw', { vaultDB, logger: undefined, clock: { now: () => reading } })
+    reading = world.clock.now() / 1000
+    await vault.lockSoon()
+    expect(own.calls.map((call) => [call.level, call.story])).to.deep.equal([['warn', { call: 'lockSoon' }]])
+    expect(world.logged).to.have.lengthOf(0)
+  })
+
+  it("is the host's own for the vault, when it passes one, whatever the vaultDB was made with", async () => {
+    const world = makeWorld()
+    const own = TH.spyLogger()
+    const vaultDB = localVaultDB({ store: world.dbStore, logger: own.logger })
+    let reading = world.clock.now()
+    const vault = await world.openUnlocked('pw', { vaultDB, clock: { now: () => reading } })
+    reading = world.clock.now() / 1000
+    await vault.lockSoon()
+    expect(world.logged).to.have.lengthOf(1)
+    expect(own.calls).to.have.lengthOf(0)
+  })
+
   it("refuses a logger that is not one, before reading storage", async () => {
     const world = makeWorld()
     const readBundle = vi.spyOn(world.vaultDB, 'readBundle')

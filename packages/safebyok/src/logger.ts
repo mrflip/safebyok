@@ -48,6 +48,8 @@ const loggerShape = Z.object({ log: loggerCall, warn: loggerCall, error: loggerC
  * logger is taken as it is, so a logger handed down through several layers is guarded once, and
  * stays the same object.
  */
+// A host that sets this property itself is taken as having guarded its logger: it is returned as it
+// is (its shape still checked). Not documented to hosts.
 const GuardMark = '_safebyok_modded'
 
 /**
@@ -57,10 +59,7 @@ const GuardMark = '_safebyok_modded'
  * its own to say, beside the vault it opens, says it here, through the same logger.
  *
  * It is idempotent: a logger it has made safe comes back as itself, and with none, every call
- * answers the one console logger, made once. A logger carrying the property `_safebyok_modded:
- * true` is taken as it is, unguarded -- the way to keep safebyok's hands off your logger; one that
- * then throws can break a lock, an open or a store.
- *
+ * answers the one console logger, made once. *
  * @param candidate - The host's logger, as handed to openVault.
  *
  * @example parseLogger(props.logger).warn('VaultProvider reopened the vault for a logger rebuilt in render', { call: 'VaultProvider' })

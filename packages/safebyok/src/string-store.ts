@@ -1,5 +1,5 @@
 import { VaultError } from './errors'
-import { Global, asThrown } from './global'
+import { Global } from './global'
 
 /**
  * The smallest storage the local adapters need: strings by string ckey, with change notification
@@ -39,7 +39,7 @@ const callQuietly = (listener: () => void) => {
   try {
     listener()
   } catch (err) {
-    Global.logger.error('A listener of a string store threw. The write landed, and every other listener was called.', { call: 'StringStore' }, asThrown(err))
+    Global.logger.error('A listener of a string store threw. The write landed, and every other listener was called.', { call: 'StringStore' }, err)
   }
 }
 

@@ -459,9 +459,10 @@ a promise that rejects, is ignored: logging never breaks a lock, an open or a st
 else is refused as `bad_option`.
 
 Your storage adapter has a logger of its own, fixed when you make it: each adapter's factory takes
-an optional `logger` (the console, without one), and `openVault`'s is not handed to it. You build
-the adapter before you open the vault, so to have one logger hear both, pass it to both:
-`const logger = ...`, `idbVaultDB({ logger })`, `openVault({ ..., logger })`. An adapter of your
+an optional `logger` (the console, without one), and `openVault`'s is not handed to it. A vault
+opened with no `logger` uses its adapter's, so to have one logger hear both, give it to the adapter
+once: `idbVaultDB({ logger })`, `openVault({ ... })`. A `logger` given to `openVault` is the
+vault's alone. An adapter of your
 own extends `VaultDB` and hands `super()` a `{ logger }`, which its factory settles from the host's
 options with `parseLogger(opts.logger)`; the base class refuses to be made without one. It says
 what it has nobody to throw to through `this.logger`.

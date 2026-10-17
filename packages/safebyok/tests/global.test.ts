@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Global, asThrown } from '../src/global'
+import { Global } from '../src/global'
 
 describe("Global.logger", () => {
   afterEach(() => { vi.unstubAllGlobals() })
@@ -10,6 +10,13 @@ describe("Global.logger", () => {
     const thrown = new Error('a listener that throws')
     Global.logger.error('A listener threw.', { call: 'ChangeBell' }, thrown)
     expect(reported).to.deep.equal([thrown])
+  })
+
+  it("hands anything at all that was thrown to reportError, as it came: a string stays a string", () => {
+    const reported: unknown[] = []
+    vi.stubGlobal('reportError', (err: unknown) => { reported.push(err) })
+    for (const thrown of ['a string', 42, null, undefined]) { Global.logger.error('A listener threw.', { call: 'ChangeBell' }, thrown) }
+    expect(reported).to.deep.equal(['a string', 42, null, undefined])
   })
 
   it("hands the platform neither the message nor the story, which are for a logger the host will one day choose", () => {
@@ -51,19 +58,6 @@ describe("Global.logger", () => {
       expect(reportError).not.toHaveBeenCalled()
     } finally {
       Global.logger = original
-    }
-  })
-})
-
-describe("asThrown", () => {
-  it("hands an Error back as itself", () => {
-    const thrown = new Error('x')
-    expect(asThrown(thrown)).to.eq(thrown)
-  })
-
-  it("wraps anything else in an Error that holds it as its cause", () => {
-    for (const thrown of ['a string', 42, null, undefined, { code: 'E' }]) {
-      expect(asThrown(thrown)).to.be.instanceOf(Error).with.property('cause', thrown)
     }
   })
 })
