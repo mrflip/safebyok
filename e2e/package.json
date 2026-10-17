@@ -30,7 +30,7 @@
     "convex-test": "^0.0.61",
     "eslint": "^10.12.0",
     "eslint-import-resolver-typescript": "^4.4.5",
-    "eslint-plugin-chai-expect": "^4.1.0",
+    "eslint-plugin-chai-expect": "^4.1.1",
     "eslint-plugin-chai-friendly": "^1.2.1",
     "eslint-plugin-import-x": "^4.17.1",
     "eslint-plugin-sonarjs": "^4.2.2",
