@@ -1339,3 +1339,53 @@ security expert who knows what questions to ask.
   messages name the verb that failed and quote no scope, record or key, and the browser's error
   is the `cause`. `InvalidStateError` stays `storage_unavailable`. `idbDeviceDB` (`idb.ts`) now
   throws a `NotSupportedError` DOMException at first use where the context has no `indexedDB`.
+* 2026-10-17 (thread 9b, core_tidy, [#144](https://github.com/mrflip/safebyok/pull/144)):
+  **`cipherBinding` refuses a top-level `undefined` or `null` part.** `cipherBinding` and its guard
+  `isUnbound` (`packages/safebyok/src/crypto.ts`) refuse both as `bad_option`, before anything is
+  encrypted or opened. Before, a record part holding an `undefined` field was refused, but a
+  top-level `undefined` part bound as `null` (safe-stable-stringify writes it so) and a `null`
+  part threw a bare `TypeError`. The types already excluded both and every caller is internal, so
+  no stored vault or ciphertext changes. Left as it was: a non-finite number part (`NaN`,
+  `Infinity`), which the JSON encoding also writes as `null`; every caller passes validated
+  integers (epochs, `EpochMillis`), so it is noted, not guarded.
+* 2026-10-17 (thread 9b, core_tidy, [#144](https://github.com/mrflip/safebyok/pull/144)):
+  **Postgres refuses a bundle update that does not move `unlock_epoch` forward.**
+  `UpdateBundleSql` (`packages/safebyok-postgres/src/postgres-vault-db.ts`) now carries `AND
+  unlock_epoch < $new::bigint`; a bundle update at the same or a lower epoch is refused as
+  `stale_write` and writes nothing, as the Convex component's `updateBundle` already did (G247).
+  Before, a modified or older client reaching the server could write a bundle (its ways in) back
+  over the one it read at the same or a lower epoch. The core always sends the standing epoch plus
+  one. VAULTDB.md line 3.2 now says a server-side adapter enforces it; client-side adapters
+  (`localVaultDB`, `idbVaultDB`) are not required to.
+* 2026-10-17 (thread 9b, core_tidy, [#144](https://github.com/mrflip/safebyok/pull/144)):
+  **`zxcvbnPassphraseTest`'s failed load is a `VaultError` of kind `storage_unavailable`.**
+  `loadEstimator` (`packages/safebyok/src/zxcvbn-passphrase-test.ts`) keeps the dynamic import's
+  own error as `cause`; that import never saw the passphrase, and the message names none. No new
+  error kind was added; `storage_unavailable` is the nearest existing kind meaning a retry may
+  mend it. A failed load never admits a passphrase untested: the vault still refuses to create,
+  add or change a passphrase it could not test. Also, `VaultProvider`'s default passphrase advice
+  (`adviceFrom`, `packages/safebyok-react/src/vault-provider.tsx`) now treats a strength test that
+  rejects as nothing to say (no advice shown) rather than ending the dialog at the error
+  boundary; the gate at Create is unchanged, since the vault runs the test again there.
+* 2026-10-17 (thread 9b, core_tidy, [#144](https://github.com/mrflip/safebyok/pull/144)):
+  **the vault-size allowance per lockbox is 1 KiB, down from 2 KiB.** `LockboxFieldsBytes`
+  (`packages/safebyok/src/vault.ts`) is the allowance for the fields beside the whisper and bag.
+  `openVault` refuses a `maxLockboxes` whose lockboxes, each counted at twice `maxWhisperBytes`
+  plus this allowance, might not fit the adapter's `maxVaultBytes` (the bound that keeps a vault
+  erasable whole in one Convex transaction). Those fields measure under 1,000 bytes at the default
+  validators' longest names (a test proves it), and each `store()` still weighs its lockbox's real
+  names against the limit. On Convex's 8 MiB: 102 lockboxes of the default 40,444-byte whisper fit
+  (was 101), 1,638 of 2 KiB whispers (was 1,365). The Convex component's own server-side limits
+  (8,000 lockboxes, 7 MiB less 1 KiB) are unchanged. This supersedes the 2 KiB allowance named in
+  earlier entries.
+* 2026-10-17 (thread 9b, core_tidy, [#144](https://github.com/mrflip/safebyok/pull/144)):
+  **the vault's checked scope is frozen.** `checkScope` (`packages/safebyok/src/names.ts`) returns
+  `Object.freeze(...)`. The same object is handed to the host's `passphraseStrengthTest` and held
+  in `getSnapshot().scope`, and the vault keys storage and the cipher binding by it; frozen, none
+  of the three can change it for the others.
+* 2026-10-17 (thread 9b, core_tidy, [#144](https://github.com/mrflip/safebyok/pull/144)):
+  **`store()` refuses unknown option keys with `bad_option`.** `optionsCheck`
+  (`packages/safebyok/src/options.ts`, shared with the strict check of `openVault`'s `validators`)
+  refuses a key it does not know. A caller still passing the retired `{ note }`, beside or instead
+  of `{ public }`, is told at once rather than silently storing no public bag. The refusal never
+  quotes the options.
