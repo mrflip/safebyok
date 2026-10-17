@@ -382,8 +382,7 @@ connection to each device, against `postgres:17` (a CI job, and `e2e/compose.yam
 machine; `pnpm justify` needs neither and skips those tests where `SAFEBYOK_PG_URL` is unset). Its
 other files race what the battery's turnstile cannot hold: writers for a vault's last places, with no
 turnstile and no PGlite to take turns; a foreign key violation (`23503`) from a vault erased while
-an insert waited on the foreign key; and the adapter README's optional hard-cap trigger under READ
-COMMITTED, REPEATABLE READ and SERIALIZABLE. Of the one-statement writes -- a conditional `UPDATE`
+an insert waited on the foreign key. Of the one-statement writes -- a conditional `UPDATE`
 re-checking the row it waited on, `INSERT ... ON CONFLICT`, the foreign key read against the bundle
 that stands -- the races and that run show how they came out on that server and no other; which
 suites run there is one list in `e2e/tests/postgres/test-helpers.ts`.

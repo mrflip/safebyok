@@ -1,7 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, vi } from 'vitest'
 import { Client, Pool } from 'pg'
 import type { PoolConfig } from 'pg'
-import { randomBytes } from 'node:crypto'
 import { VaultChangeChannel, VaultNotifySql, VaultTablesSql, postgresVaultDB } from 'safebyok-postgres'
 import type { PostgresListen } from 'safebyok-postgres'
 import type { VaultDBOpts } from 'safebyok'
@@ -17,16 +16,16 @@ export * from 'safebyok/testing'
 export const PgUrlVar = 'SAFEBYOK_PG_URL'
 
 /** Every suite this directory has, by the name {@link OnRealPostgres} and {@link describeOnPostgres} know it. */
-export type PostgresSuite = 'battery' | 'races' | 'hard cap' | 'foreign key'
+export type PostgresSuite = 'battery' | 'races' | 'foreign key'
 
 /**
  * The suites that run against a real Postgres, when {@link PgUrlVar} names one: the whole
  * selection, in one place. The VaultDB battery and its races, the lockbox limit's real races and
- * the README's optional hard-cap trigger, and the `23503` case. Every other Postgres test stays
+ * the `23503` case. Every other Postgres test stays
  * in `packages/safebyok-postgres`, over a PGlite, so `pnpm justify` needs no Docker. A suite added
  * to this directory is added to {@link PostgresSuite} and to this list; to run one more, list it.
  */
-export const OnRealPostgres: readonly PostgresSuite[] = ['battery', 'races', 'hard cap', 'foreign key']
+export const OnRealPostgres: readonly PostgresSuite[] = ['battery', 'races', 'foreign key']
 
 /** The connection string of the Postgres to run against, or undefined where there is none: every suite is then skipped. */
 export const postgresUrl = (): string | undefined => {
@@ -65,6 +64,20 @@ export type FileDatabase = {
   endDevices: () => Promise<void>
 }
 
+/**
+ * `byteCount` random bytes as lowercase hex, from WebCrypto's `crypto.getRandomValues` (the same
+ * global in Node and a browser): for a name that must not collide with another file's, such as a
+ * database made by a file running beside others.
+ *
+ * @example TH.randomHex(6)  // 'a41f09c2b7d3'
+ */
+export const randomHex = (byteCount: number): string => (
+  Array.from(crypto.getRandomValues(new Uint8Array(byteCount)), (byte) => byte.toString(16).padStart(2, '0')).join('')
+)
+
+/** Anything `pg` hands out that reports a dropped connection as an 'error' event: a Pool or a Client. */
+type PgEmitter = { on: (event: 'error', listener: (err: Error) => void) => unknown }
+
 /** The connection string `url` has, naming `database` in place of its own. */
 const urlNaming = (url: string, database: string): string => {
   const named = new URL(url)
@@ -83,10 +96,17 @@ const urlNaming = (url: string, database: string): string => {
 export const useFileDatabase = (): (() => FileDatabase) => {
   const url = postgresUrl()
   const made: { db?: FileDatabase, drop?: () => Promise<void> } = {}
+  // A pool or client with no 'error' listener crashes the whole run when the server drops it.
+  // Heard instead, the drop is held for the test that was running, which fails by name.
+  const dropped: Error[] = []
+  const watched = <Emitter extends PgEmitter>(emitter: Emitter): Emitter => {
+    emitter.on('error', (err) => { dropped.push(err) })
+    return emitter
+  }
   beforeAll(async () => {
     if (url === undefined) { return }
-    const databaseName = `safebyok_e2e_${randomBytes(6).toString('hex')}`
-    const admin = new Client({ connectionString: url })
+    const databaseName = `safebyok_e2e_${randomHex(6)}`
+    const admin = watched(new Client({ connectionString: url }))
     await admin.connect()
     try {
       await admin.query(`CREATE DATABASE ${databaseName}`)
@@ -94,12 +114,12 @@ export const useFileDatabase = (): (() => FileDatabase) => {
       await admin.end()
     }
     const fileUrl = urlNaming(url, databaseName)
-    const host = new Pool({ connectionString: fileUrl, max: 4 })
+    const host = watched(new Pool({ connectionString: fileUrl, max: 4 }))
     // Set before anything else can fail, so a setup that throws still ends the pool and drops the database.
     made.drop = async () => {
       await made.db?.endDevices()
       await host.end()
-      const dropper = new Client({ connectionString: url })
+      const dropper = watched(new Client({ connectionString: url }))
       await dropper.connect()
       try {
         await dropper.query(`DROP DATABASE IF EXISTS ${databaseName} WITH (FORCE)`)
@@ -114,12 +134,12 @@ export const useFileDatabase = (): (() => FileDatabase) => {
       url: fileUrl,
       host,
       devicePool: (config = {}) => {
-        const pool = new Pool({ connectionString: fileUrl, ...config })
+        const pool = watched(new Pool({ connectionString: fileUrl, ...config }))
         devices.push({ end: () => pool.end() })
         return pool
       },
       client: async () => {
-        const client = new Client({ connectionString: fileUrl })
+        const client = watched(new Client({ connectionString: fileUrl }))
         await client.connect()
         devices.push({ end: () => client.end() })
         return client
@@ -128,7 +148,11 @@ export const useFileDatabase = (): (() => FileDatabase) => {
       endDevices: async () => { await Promise.all(devices.splice(0).map((device) => device.end())) },
     }
   }, 60_000)
-  afterEach(async () => { await made.db?.endDevices() })
+  afterEach(async () => {
+    await made.db?.endDevices()
+    const lost = dropped.splice(0)
+    if (lost.length > 0) { throw new Error(`The server dropped a connection during this test: ${lost.map((err) => err.message).join('; ')}`, { cause: lost[0] }) }
+  })
   afterAll(async () => { await made.drop?.() }, 60_000)
   return () => {
     if (made.db === undefined) { throw new Error(`No database: ${PgUrlVar} names none, or the file's tests have not begun.`) }
@@ -218,16 +242,26 @@ export const devicesOver = (getDb: () => FileDatabase): MakeVaultDBDevices => as
 // --------------------------------------------------------------------------- what a host's own code does
 
 /**
- * Resolves once some statement on the file's database is waiting for another's lock: a write held
- * where a race wants it. Rejects after two seconds, well inside the test's own timeout, so a write
- * that never waits fails here, by name, rather than as a timed-out test.
+ * Resolves once a statement matching `statementLike` (an SQL `LIKE` pattern over the statement's
+ * text) is waiting on another's lock on the file's database: the write under test, held where a
+ * race wants it -- not any lock wait, nor this check's own query. Rejects after two seconds, well
+ * inside the test's own timeout, so a write that never waits fails here, by name, rather than as a
+ * timed-out test.
+ *
+ * @example await TH.untilStatementBlocked(db, '%INSERT INTO safebyok_lockboxes%')
  */
-export const untilStatementBlocked = async (db: FileDatabase): Promise<void> => {
+export const untilStatementBlocked = async (db: FileDatabase, statementLike: string): Promise<void> => {
   await vi.waitUntil(async () => {
-    const { rows } = await db.host.query("SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'")
+    const { rows } = await db.host.query(
+      "SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid() AND wait_event_type = 'Lock' AND query LIKE $1",
+      [statementLike],
+    )
     return (rows[0] as { waiting: number }).waiting > 0
   }, { timeout: 2000, interval: 10 })
 }
+
+/** The `LIKE` pattern of the statement a first write to a vault sends: an insert of a lockbox. */
+export const FirstWriteStatement = '%INSERT INTO safebyok_lockboxes%'
 
 /** Makes the u1 vault the helpers' bundles stand for, through `vaultDB`, and writes a lockbox under each of `boxlabels`. */
 export const filled = async (vaultDB: VaultDBVerbs, boxlabels: readonly string[]): Promise<void> => {

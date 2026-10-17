@@ -21,7 +21,7 @@ TH.describeOnPostgres('foreign key', "postgresVaultDB's first write, over a real
     await eraser.query("DELETE FROM safebyok_bundles WHERE user_id = 'u1'")
 
     const write = TH.expectRefusal(device.updateBox(u1, TH.boxOf('anthropic', 'sk-fake'), TH.noBoxYet), 'stale_write')
-    await TH.untilStatementBlocked(db)
+    await TH.untilStatementBlocked(db, TH.FirstWriteStatement)
     await eraser.query('COMMIT')
     await write
 
@@ -39,7 +39,7 @@ TH.describeOnPostgres('foreign key', "postgresVaultDB's first write, over a real
     await eraser.query("DELETE FROM safebyok_bundles WHERE user_id = 'u1'")
 
     const write = device.updateBox(u1, TH.boxOf('anthropic', 'sk-fake'), TH.noBoxYet)
-    await TH.untilStatementBlocked(db)
+    await TH.untilStatementBlocked(db, TH.FirstWriteStatement)
     await eraser.query('ROLLBACK')
     await write
 
