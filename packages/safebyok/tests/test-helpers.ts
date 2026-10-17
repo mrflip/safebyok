@@ -1107,6 +1107,14 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       const [summary] = await vaultDB.listBoxes(scopeOf('u1'))
       expect(summaryOf(summary)?.public).to.deep.equal(LiteralBag)
     })
+
+    it("adds nothing it was handed beyond the record: a field safebyok never writes is left behind", async () => {
+      const vaultDB = await makeVaultDB()
+      await vaultDB.createBundle({ ...bundleOf('u1'), stray_field: 'never stored' } as VaultBundle)
+      await vaultDB.updateBox(scopeOf('u1'), { ...boxOf('anthropic', 'one'), stray_field: 'never stored' } as Lockbox, noBoxYet)
+      expect(await vaultDB.readBundle(scopeOf('u1'))).to.deep.equal(bundleOf('u1'))
+      expect(await vaultDB.readBox(scopeOf('u1'), 'anthropic')).to.deep.equal(boxOf('anthropic', 'one'))
+    })
   })
 
   describe(lineTitle('1.2'), () => {
