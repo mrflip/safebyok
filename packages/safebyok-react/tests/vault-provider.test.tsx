@@ -532,6 +532,46 @@ describe("VaultProvider", () => {
       expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null
     })
 
+    it("resolves null when the provider unmounts while the run again after the unlock is under way", async () => {
+      const world = await lockedWorld()
+      const { unmount } = render(world.tree('u1'))
+      const vault = await world.opened()
+      let tries = 0
+      const reading = world.latest().withUnlockedVault(async () => {
+        tries += 1
+        const read = vault.read('anthropic_api_key')
+        // The page goes as the run again starts, and the provider closes the vault under the read.
+        if (tries > 1) { unmount() }
+        return await read
+      })
+      fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
+      fireEvent.click(screen.getByText('Unlock'))
+      expect(await reading).to.be.null
+      expect(tries).to.eq(2)
+    })
+
+    it("resolves null when the provider unmounts while the action is under way", async () => {
+      const world = await lockedWorld()
+      const { unmount } = render(world.tree('u1'))
+      const vault = await world.opened()
+      await vault.unlock('pw')
+      const reading = world.latest().withUnlockedVault(async () => {
+        const read = vault.read('anthropic_api_key')
+        unmount()
+        return await read
+      })
+      expect(await reading).to.be.null
+    })
+
+    it("still throws vault_closed for a handle closed by someone else, which is misuse", async () => {
+      const world = await lockedWorld()
+      render(world.tree('u1'))
+      const vault = await world.opened()
+      await vault.unlock('pw')
+      vault.close()
+      await expect(world.latest().withUnlockedVault(() => vault.read('anthropic_api_key'))).rejects.toMatchObject({ kind: 'vault_closed' })
+    })
+
     it("leaves another user's dialog asking when the last user's cancelled unlock finishes late", async () => {
       const world = await lockedWorld()
       const other = await openVault({ ...world.props, deviceDB: memoryDeviceDB(), userId: 'u2' })

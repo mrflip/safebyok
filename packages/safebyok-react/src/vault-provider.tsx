@@ -50,7 +50,9 @@ export type VaultContextShape = {
    * never null. Only an action whose own result could be null needs to wrap it in an object.
    * Every call settles: actions that find the vault locked while the dialog is already open wait
    * on that same dialog, and each resolves null when the dialog goes without an unlock -- the
-   * user signs out or switches, the vault reopens, or the provider unmounts.
+   * user signs out or switches, the vault reopens, or the provider unmounts. So does an action
+   * still under way when one of those closes the vault it ran on, whether its first run or its run
+   * again after an unlock: the close is the provider's, never the caller's to catch.
    * A dialog the vault unlocks under, however that came about (an earlier, cancelled dialog's
    * unlock finishing late, say), closes as unlocked, and the actions waiting on it run again; an
    * action refused just as the vault unlocked runs again without a dialog at all. A dialog
@@ -321,13 +323,24 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
   const withUnlockedVault = useCallback(async <ResultT,>(action: () => Promise<ResultT>): Promise<ResultT | null> => {
     // The vault the action runs against: its refusal is answered by a dialog over that vault, or none.
     const ranOn = vaultRef.current
+    /** The action's result, or null when the provider closed the vault it ran on under it. */
+    const run = async (): Promise<ResultT | null> => {
+      try {
+        return await action()
+      } catch (err) {
+        // The provider closes a handle as it lets it go -- a sign-out, another user, a reopen, the
+        // provider unmounting -- and an action that close cut short resolves null, as a dialog it ends does.
+        if (ranOn !== null && vaultRef.current !== ranOn && isVaultError(err, 'vault_closed')) { return null }
+        throw err
+      }
+    }
     try {
-      return await action()
+      return await run()
     } catch (err) {
       if (! isVaultError(err, 'vault_locked')) { throw err }
       const unlocked = await awaitUnlock(ranOn)
       if (! unlocked) { return null }
-      return await action()
+      return await run()
     }
   }, [awaitUnlock])
 
