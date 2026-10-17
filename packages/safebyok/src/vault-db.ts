@@ -1,5 +1,6 @@
 import * as Z from 'zod/mini'
-import { Lockbox, MaxUnlocks, UnlockMethodVals, VaultBundle, VaultScope, type DamagedLockbox, type LockboxSummary, type PublicBag } from './types'
+import { Lockbox } from './lockbox'
+import { MaxUnlocks, UnlockMethodVals, VaultBundle, VaultScope, type DamagedLockbox, type LockboxSummary, type PublicBag } from './types'
 import { VaultError, isVaultError } from './errors'
 import * as Names from './names'
 import { AnyTextValidators, NameFloor } from './validators'
