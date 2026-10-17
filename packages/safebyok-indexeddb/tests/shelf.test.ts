@@ -39,18 +39,18 @@ describe("settle", () => {
     expect(await get('ckey', shelf)).to.eq('row')
   })
 
-  it("rejects with an Error that says why not, never null, when the browser gave no error", async () => {
+  // The base class makes a null cause an Error that says so (Refusals' never-null rule).
+  it("rejects with the browser's null, as it came, when the browser gave no error", async () => {
     const request = Object.assign(new EventTarget(), { error: null }) as unknown as IDBRequest
     const settled = settle(request)
     request.onerror?.(new Event('error'))
-    let rejection: unknown = null
+    let rejection: unknown = 'not rejected'
     try {
       await settled
     } catch (err) {
       rejection = err
     }
-    expect(rejection).to.be.instanceOf(Error)
-    expect((rejection as Error).message).to.match(/failed for an unknown reason/)
+    expect(rejection).to.be.null
   })
 })
 
