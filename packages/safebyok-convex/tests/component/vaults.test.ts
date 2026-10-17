@@ -82,6 +82,20 @@ describe("updateBundle", () => {
     })
   }
 
+  const ThisVaultAtOne = { vault_id: 'vault-id-u1', unlock_epoch: 1 }
+  const UnmovedCases = [
+    [{ ...rewrapped, vault_id: 'vault-id-other' }, 'refuses a bundle naming another vault than the one it replaces'],
+    [{ ...rewrapped, unlock_epoch: 1 },             'refuses a bundle that keeps the standing unlock_epoch'],
+  ] as const
+
+  for (const [bundle, blurb] of UnmovedCases) {
+    it(`${blurb}, writing nothing`, async () => {
+      const t = await withBundle()
+      expect(await t.mutation(TH.vaults.updateBundle, { bundle, expected: ThisVaultAtOne })).to.be.false
+      expect(await t.query(TH.vaults.getBundle, { scope: u1 })).to.deep.equal(TH.bundleOf('u1'))
+    })
+  }
+
   it("refuses when the scope holds no bundle at all, and creates none", async () => {
     const t = TH.componentTest()
     expect(await t.mutation(TH.vaults.updateBundle, { bundle: rewrapped, expected: { vault_id: 'vault-id-u1', unlock_epoch: 1 } })).to.be.false
