@@ -178,6 +178,13 @@ comparison lets a device still holding a replaced vaultKey seal a whisper under 
   vault goes on refreshing after its own writes.
 * **`logger`**, when given, hears what the VaultDB has to say (`graphqlVaultDB({ client, logger
   })`); left out, it is the one `openVault` is given, else the console.
+* **Client and server move in step.** The browser half and `safebyok-graphql/server` are one
+  version of one package: a client of one version against a server of another can fail every
+  call on a field one of them does not know, and the user sees `storage_unavailable`, which
+  reads like a passing outage. Deploy them together, and do not retry your way past it.
+* **For a server that accepts only persisted operations**, `VaultOperations` holds every
+  document the client sends, by the root field it asks for, to register in your allowlist
+  (`import { VaultOperations } from 'safebyok-graphql'`). They change only as the SDL does.
 
 ## What crosses the wire
 
@@ -197,6 +204,10 @@ of its own.
 
 * **Text is a `String`**, a count (`unlock_epoch`) an `Int`, and a time a `Float` -- epoch
   milliseconds, a whole number past what GraphQL's 32-bit `Int` holds.
+* **A count is held to GraphQL's 32-bit `Int`**: `unlock_epoch`, which goes up by one on each
+  change to a vault's ways in, and `vault_key_epoch`. Past 2,147,483,647 the field fails on the
+  wire and the browser sees `storage_unavailable`. That is accepted: two billion changes to
+  the ways in is not a vault anyone keeps.
 * **The bundle's `unlocks`** is a list of `SafebyokUnlockEnvelope`, each one opaque JSON, its
   `method` saying its shape: the adapter carries an envelope as it is, never looking inside, as
   the Postgres table stores the list as one `jsonb`. A new way to unlock reaches the browser with
