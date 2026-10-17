@@ -39,6 +39,14 @@ describe("Label", () => {
   for (const [candidate, expected, blurb] of LabelCases) {
     it(blurb, () => { expect(Label.safeParse(candidate).success).to.eq(expected) })
   }
+
+  it("answers for text of millions of characters, refusing it by its length", () => {
+    const vast = 'n'.repeat(12_000_000)
+    expect(Label.safeParse(vast).success).to.be.false
+    expect(JSON.stringify(Label.safeParse(vast).error?.issues.map((issue) => issue.message))).to.include('at most forty characters')
+    expect(LabelPattern.test(vast)).to.be.true
+    expect(LabelPattern.test(`${vast}__`)).to.be.false
+  })
 })
 
 const UserIdCases = [

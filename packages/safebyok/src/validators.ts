@@ -75,11 +75,12 @@ export const MaxLabelChars = 40
 /**
  * The pattern a default {@link Label} matches: lowercase words of letters and digits joined by
  * single underscores, starting with a letter, two characters at least. Its `source` suits an
- * HTML input's `pattern` attribute.
+ * HTML input's `pattern` attribute. It has no repeated group, which on text of millions of
+ * characters would overflow the regex engine's stack: such text is refused, not thrown at.
  *
  * @example <input pattern={LabelPattern.source} maxLength={MaxLabelChars} />
  */
-export const LabelPattern = /^[a-z](_?[a-z0-9])+$/
+export const LabelPattern = /^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$/
 
 /**
  * The default check for every label in the package: `applabel`, `vaultlabel`, `boxlabel` and an
