@@ -210,11 +210,12 @@ It has a Show / Hide button (`aria-pressed`), flipping the field between `passwo
 and is never capitalized, corrected or spell-checked, shown or hidden. Like `WhisperField`, it is
 uncontrolled: React never writes the passphrase into the page.
 
-**Advice while choosing.** By default the dialog says the `passphraseStrengthTest`'s reason as the
-user chooses a weak passphrase, and nothing once the test admits it, so they hear why before
-pressing Create. Pass `passphraseAdvice`, a function of what has been typed, to say something of
-your own instead (the test then goes unasked until Create); what it answers shows beside the field
-as the user chooses a passphrase: tied to the field by
+**Advice while choosing.** By default the dialog `VaultProvider` renders says the
+`passphraseStrengthTest`'s reason as the user chooses a weak passphrase, and nothing once the test
+admits it, so they hear why before pressing Create; a `PassphraseModal` you render yourself says
+nothing unless you pass it `passphraseAdvice`. Pass `passphraseAdvice`, a function of what has
+been typed, to say something of your own instead (the test then goes unasked until Create); what
+it answers shows beside the field as the user chooses a passphrase: tied to the field by
 `aria-describedby`, announced politely (`role="status"`), only the answer to the latest text kept.
 It answers a sentence, or null for nothing to say, and may answer through a promise. It is never
 asked while unlocking, and it is advice, not a gate: the user may still create the vault, and what
