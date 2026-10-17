@@ -13,11 +13,16 @@ export type VaultContextShape = {
    * Why the vault could not be opened, when it is a condition the app can show in place:
    * storage that cannot be reached (`storage_unavailable`), a user storage no longer serves
    * (`identity_revoked`, as when signed out of the backend, or not yet signed in to it), a stored
-   * vault that fails its checks (`damaged_bundle`). Null while
-   * opening, once open, and while signed out. Misuse -- a bad label or option -- never lands
-   * here: the provider throws it to the nearest error boundary.
+   * vault that fails its checks (`damaged_bundle`), a browser that will not let the app keep
+   * anything on this device (`storage_blocked`). Null while opening, once open, and while signed
+   * out. Misuse -- a bad label or option -- never lands here: the provider throws it to the
+   * nearest error boundary. Offer `retryOpen` only for one a retry may mend: never for
+   * `storage_blocked`, which holds until something outside the app changes (say why instead), nor
+   * for `damaged_bundle`, which `eraseDamagedVault` answers.
    *
    * @example
+   *   if (openError?.kind === 'storage_blocked') { return <p>{"This browser won't let the app keep your vault on this device."}</p> }
+   *   if (openError?.kind === 'damaged_bundle') { return <p>{"Your vault's stored record is damaged."}</p> }
    *   if (openError !== null) { return <p>{"Can't reach your vault."} <button onClick={retryOpen}>Retry</button></p> }
    */
   openError: VaultError | null
@@ -166,8 +171,9 @@ const adviceFrom = (strengthTest: PassphraseStrengthTest, scope: VaultScope): Pa
  * `modal-scrim` / `modal` class names; the host's stylesheet dresses it.
  *
  * If openVault rejects with a condition (`isVaultCondition` from safebyok) -- storage that
- * cannot be reached, a signed-out user, a damaged record -- the provider hands it down as
- * `openError`, for the app to show in place beside a `retryOpen` button. Anything else it
+ * cannot be reached, a signed-out user, a damaged record, a browser withholding storage -- the
+ * provider hands it down as `openError`, for the app to show in place, beside a `retryOpen`
+ * button where a retry may mend it (not `storage_blocked`). Anything else it
  * rejects with -- misuse, such as a bad label or option, or a value that is no VaultError at
  * all -- the provider throws while rendering, for the nearest error boundary to catch.
  *

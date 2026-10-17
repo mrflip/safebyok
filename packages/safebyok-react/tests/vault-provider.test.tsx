@@ -133,6 +133,8 @@ class CatchingBoundary extends Component<{ caught: unknown[], children: ReactNod
 /** openError's @example, as a host would write it. */
 const OpenErrorExample = () => {
   const { openError, retryOpen } = useVault()
+  if (openError?.kind === 'storage_blocked') { return <p>{"This browser won't let the app keep your vault on this device."}</p> }
+  if (openError?.kind === 'damaged_bundle') { return <p>{"Your vault's stored record is damaged."}</p> }
   if (openError !== null) { return <p>{"Can't reach your vault."} <button onClick={retryOpen}>Retry</button></p> }
   return <span>opened</span>
 }
@@ -1149,6 +1151,30 @@ describe("VaultProvider", () => {
       fireEvent.click(screen.getByText('Retry'))
       const opened = await screen.findByText('opened')
       expect(opened.tagName).to.eq('SPAN')
+    })
+
+    it("matches openError's @example for a browser that withholds storage: it says why, and offers no Retry", async () => {
+      const world = makeWorld()
+      vi.spyOn(world.props.deviceDB, 'readMark').mockRejectedValue(new DOMException('The operation is insecure.', 'SecurityError'))
+      render(
+        <VaultProvider {...world.props} userId="u1">
+          <OpenErrorExample />
+        </VaultProvider>,
+      )
+      await screen.findByText("This browser won't let the app keep your vault on this device.")
+      expect(screen.queryByText('Retry')).to.be.null
+    })
+
+    it("matches openError's @example for a damaged record: no Retry, which cannot mend it", async () => {
+      const world = makeWorld()
+      vi.spyOn(world.vaultDB, 'readBundle').mockRejectedValue(new VaultError('corrupt_record', 'The stored vault failed its checks.'))
+      render(
+        <VaultProvider {...world.props} userId="u1">
+          <OpenErrorExample />
+        </VaultProvider>,
+      )
+      await screen.findByText("Your vault's stored record is damaged.")
+      expect(screen.queryByText('Retry')).to.be.null
     })
 
     it("throws a rejection of null too: the failure is held, not the value", async () => {
