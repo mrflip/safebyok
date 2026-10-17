@@ -1,7 +1,4 @@
-import { FarFuture } from 'safebyok'
-
-/** A minute, in milliseconds: how near FarFuture a deadline may fall and still mean "never". */
-const MinuteMillis = 60_000
+import { FarFuture, MinuteMillis } from 'safebyok'
 
 /**
  * When the vault next asks for the passphrase, as the chip says it: a date, or "never" for a
