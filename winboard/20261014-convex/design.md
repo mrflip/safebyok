@@ -1,6 +1,6 @@
 # 20261014-convex: the Convex VaultDB adapter
 
-Design agreed in chat with the Coach, 2026-10-14. Intent, not yet code.
+Design agreed in chat with the Coach, 2026-10-14. Built since: the component, the host's `SafebyokComponent` and the client's `convexVaultDB` shipped in `packages/safebyok-convex` (this file is historical, and what it says may have moved on; the code and the package README are current).
 
 ## Decisions
 
