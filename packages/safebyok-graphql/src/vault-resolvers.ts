@@ -16,7 +16,9 @@ export type VaultResolversOpts<ContextT> = {
   /**
    * The VaultDB for one request, made from your server's context for it: for the user your own
    * auth signed in, never one the request names. Called for every vault field resolved, so it
-   * should be cheap -- `postgresVaultDB` is, connecting to nothing.
+   * should be cheap -- `postgresVaultDB` is, connecting to nothing. Whatever it throws is the
+   * server's own setup gone wrong, never the request's: it crosses as `bad_option` with a generic
+   * message, and the VaultDB, not this, refuses a signed-out request.
    */
   vaultDBFor: (context: ContextT) => ServedVaultDB
 }
@@ -71,6 +73,8 @@ export type VaultResolvers<ContextT> = {
  *   which may name your database. That stays on the server, as the GraphQL error's `cause`, for
  *   your own logs. Anything else a VaultDB throws crosses as `storage_unavailable`, what it threw
  *   kept as that VaultError's cause.
+ * * **A `vaultDBFor` that throws** crosses as `bad_option` saying only that the server is
+ *   misconfigured: its own message, which may name your setup, stays on the server as the cause.
  * * **`safebyokVaultChanged`** sends the vault's scope after every write to it, as the VaultDB's
  *   `subscribe` hears them -- for `postgresVaultDB`, through its `listen` -- and stops listening
  *   when the subscriber goes. Changes that come while the subscriber is still busy with the last
@@ -93,11 +97,19 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
   // The server holds a name only to the floor every name is held to and to its storage's limits,
   // which every VaultDB verb checks: what text a name may be beyond that is each browser vault's
   // own validators' to say, at its entry. The server's job is to keep each user to their own vault.
+  /** The request's VaultDB, or the refusal that says the server could not make one. */
+  const vaultDBOf = (context: ContextT): ServedVaultDB => {
+    try {
+      return vaultDBFor(context)
+    } catch (err) {
+      throw new VaultError('bad_option', MisconfiguredMessage, { cause: err })
+    }
+  }
   /** A resolver calling `verb` on the request's VaultDB, any refusal made one a wire can carry. */
   const served = (verb: (vaultDB: ServedVaultDB, args: VaultFieldArgs) => Promise<unknown>): VaultFieldResolver<ContextT> => (
     async (_parent, args, context) => {
       try {
-        return await verb(vaultDBFor(context), args)
+        return await verb(vaultDBOf(context), args)
       } catch (err) {
         throw crossing(err)
       }
@@ -133,7 +145,7 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
       safebyokVaultChanged: {
         subscribe: (_parent, args, context) => {
           try {
-            return changesOf(vaultDBFor(context), scopeIn(args))
+            return changesOf(vaultDBOf(context), scopeIn(args))
           } catch (err) {
             throw crossing(err)
           }
@@ -143,6 +155,9 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
     },
   }
 }
+
+/** What a browser hears when `vaultDBFor` throws: the server's own message stays on the server. */
+const MisconfiguredMessage = "The vault's server could not serve this request: its own setup is wrong, not the request. Retrying will not help until it is fixed; the server's logs say what is wrong."
 
 // The arguments as the schema shapes them, rebuilt field by field as plain records: the
 // VaultDB checks them as it would any caller's.

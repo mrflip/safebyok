@@ -151,10 +151,28 @@ describe("vaultResolvers, refusing", () => {
     expect(refusalBehind(result.errors![0]).cause).to.eq(oops)
   })
 
-  it("sends a refusal from vaultDBFor itself as its kind", async () => {
+  it("sends a vaultDBFor that throws as bad_option with a generic message, keeping its own as the cause", async () => {
     const schema = TH.schemaOver(await TH.database(), () => postgresVaultDB({ client: null as never, userId: 'u1' }))
     const result = await asked(schema, VaultOperations.safebyokReadBundle, { scope: u1 })
-    expect(result.errors![0]!.extensions).to.deep.equal({ kind: 'bad_option' })
+    const [crossed] = result.errors!
+    expect(crossed!.extensions).to.deep.equal({ kind: 'bad_option' })
+    expect(crossed!.message).to.include("its own setup is wrong")
+    expect(crossed!.message).to.not.include('client')
+    const ownRefusal = refusalBehind(crossed).cause as VaultError
+    expect(ownRefusal.kind).to.eq('bad_option')
+    expect(ownRefusal.message).to.include('client')
+  })
+
+  it("sends anything else vaultDBFor throws as bad_option too, before subscribing as before reading", async () => {
+    const oops = new Error('AUTH_SECRET is not set')
+    const schema = TH.schemaOver(await TH.database(), () => { throw oops })
+    const read = await asked(schema, VaultOperations.safebyokReadBundle, { scope: u1 })
+    const watched = await subscribe({ schema, document: parse(VaultOperations.safebyokVaultChanged), variableValues: { scope: u1 }, contextValue: { userId: 'u1' } }) as ExecutionResult
+    for (const crossed of [read.errors![0], watched.errors![0]]) {
+      expect(crossed!.extensions).to.deep.equal({ kind: 'bad_option' })
+      expect(crossed!.message).to.not.include('AUTH_SECRET')
+      expect(refusalBehind(crossed).cause).to.eq(oops)
+    }
   })
 })
 
