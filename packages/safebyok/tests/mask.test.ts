@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { VaultError } from '../src/errors'
 import { mask } from '../src/mask'
 import type { MaskOpts } from '../src/mask'
+import * as TH from './test-helpers'
 
 const KeyEmoji = '\u{1F511}'
 const Rocket = '\u{1F680}'
@@ -20,7 +20,7 @@ const KnownBlanks = [
 ].map((cp) => String.fromCodePoint(cp))
 
 /** What no result may contain: marks, controls, spaces of any kind, ignorables, bidi controls, blank symbols. */
-const Unsafe = /[\p{M}\p{C}\p{Z}\p{Default_Ignorable_Code_Point}\p{Bidi_Control}\u{2800}\u{1D159}]/u
+const Unsafe = /[\p{M}\p{C}\p{Z}\p{Default_Ignorable_Code_Point}\p{Bidi_Control}\u{2800}\u{1D159}\u{FFFC}]/u
 
 /** The scripts written right to left, whose letters and digits `mask` keeps. */
 const RtlScripts = [
@@ -36,15 +36,6 @@ const rtlLettersOf = (script: string): string => {
   return Array.from({ length: 0x2_00_00 }, (_, cp) => String.fromCodePoint(cp))
     .filter((chr) => /^[\p{L}\p{N}]$/u.test(chr) && inScript.test(chr))
     .join('')
-}
-
-const thrownBy = (run: () => void): unknown => {
-  try {
-    run()
-  } catch (err) {
-    return err
-  }
-  return undefined
 }
 
 // A small seeded generator, so a failure repeats.
@@ -293,22 +284,21 @@ describe("mask", () => {
     ]
     for (const [opts, blurb] of BadOpts) {
       it(`refuses ${blurb} as bad_option`, () => {
-        expect(() => mask('sk-ant-abcd1234', opts)).to.throw(VaultError).with.property('kind', 'bad_option')
+        TH.expectSyncRefusal(() => mask('sk-ant-abcd1234', opts), 'bad_option')
       })
     }
 
     it("refuses a whisper that is not a string as bad_whisper", () => {
       for (const whisper of [42, null, undefined, { key: 'x' }]) {
-        expect(() => mask(whisper as unknown as string)).to.throw(VaultError).with.property('kind', 'bad_whisper')
+        TH.expectSyncRefusal(() => mask(whisper as unknown as string), 'bad_whisper')
       }
     })
 
     it("never quotes the whisper in what it throws", () => {
       const fake = 'sk-FAKE-do-not-leak-0123456789'
       for (const opts of [{ head: -1 }, { maxLen: 0.5 }, { tail: 'x' as unknown as number }]) {
-        const err = thrownBy(() => mask(fake, opts))
-        expect(err).to.be.instanceOf(VaultError)
-        expect(JSON.stringify(err, Object.getOwnPropertyNames(err))).not.to.contain('FAKE')
+        const err = TH.expectSyncRefusal(() => mask(fake, opts), 'bad_option')
+        expect(TH.thrownText(err)).not.to.contain('FAKE')
       }
     })
   })
