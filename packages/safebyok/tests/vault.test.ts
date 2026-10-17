@@ -4344,6 +4344,17 @@ describe("the unlock window, renewed", () => {
     expect(await world.stateOnOpen()).to.eq('unlocked')
   })
 
+  it("not by a passkey proving a passphrase change on an unlocked vault: the new passphrase lands, the deadline stays", async () => {
+    const { world, vault, laptop } = await vaultWithPasskey()
+    const deadline = vault.getSnapshot().askPassphraseAt
+    world.advance(24 * HourMillis)
+    await vault.changePassphrase(laptop, 'pw renewed')
+    expect(vault.getSnapshot().askPassphraseAt).to.eq(deadline)
+    expect(await rememberedDeadlineOf(world)).to.eq(deadline)
+    await vault.lock()
+    await vault.unlock('pw renewed')
+  })
+
   it("by a passkey proving a change on a locked vault, which it unlocks as unlock() by passkey would", async () => {
     const { world, vault, laptop } = await vaultWithPasskey()
     await vault.lock()
