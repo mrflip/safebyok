@@ -1253,3 +1253,45 @@ security expert who knows what questions to ask.
   without bound, and Postgres sets no limit on a vault's bytes either; bounding that is the host's,
   by `maxLockboxes` or its own quotas. `graphqlVaultDB` declares `Infinity` to match, so a browser
   learns a server's limit only when the host declares it there too.
+* 2026-10-17 (thread 17, written_at, [#141](https://github.com/mrflip/safebyok/pull/141)): **`store()`
+  no longer deciphers the old lockbox to compare whispers; `changed_at` is now `written_at`.**
+  `store()` (`packages/safebyok/src/vault.ts`) used to open the lockbox it replaced and compare the
+  stable-serialized whispers, so storing the same whisper again left `changed_at` standing. Every
+  store now stamps `written_at` with the time of the write and the field claims nothing about
+  whether the whisper changed, so storage can no longer tell from a standing timestamp that the
+  same whisper was stored again. The field is bound into both of the lockbox's encryptions with the
+  rest of its header, and the stored format moves from `safebyok-lockbox-v3` to `-v4`
+  (`Lockbox` and `LockboxSummary`, `types.ts`); v3 records fail validation and list as damaged,
+  with no migration.
+* 2026-10-17 (thread 17, written_at, [#141](https://github.com/mrflip/safebyok/pull/141)): **`store()`
+  still deciphers the old record before carrying its public fields forward.** A store that leaves
+  out the public bag carries the old record's `public_json` and `registered_at` forward only from
+  a record that opens under the vault's key (`recordOpens`, `vault.ts`, formerly
+  `openedWhisperOf`), so a bag or time planted in storage is not sealed into a fresh revision that
+  reads clean; the function returns only a boolean and the deciphered whisper is dropped unread.
+  Not taken: unwrapping only the old lockboxKey, whose AES-GCM additional data binds the whole
+  header, would vouch for the header without deciphering the whisper, but a record with only its
+  whisper ciphertext altered would then carry its bag forward.
+* 2026-10-17 (thread 17, written_at, [#141](https://github.com/mrflip/safebyok/pull/141)): **a write's
+  catch-up passes `identity_revoked`, `rolled_back` and `newer_format` through unchanged.** When
+  storage refuses a write as stale, the vault refreshes once; if that refresh fails with one of
+  these three kinds, the same error object is now thrown as it came, where it was wrapped as
+  `stale_write` with the failure as `cause` (`catchUp`, `CatchUpPassesThrough`, `vault.ts`). The
+  vault's locking on `identity_revoked` and `rolled_back` still happens in the refresh; other
+  catch-up failures are still wrapped.
+* 2026-10-17 (thread 17, written_at, [#141](https://github.com/mrflip/safebyok/pull/141)): **`erase()`
+  into a vault reborn elsewhere keeps kind `stale_write` and says why, quoting no boxlabel.** The
+  message says the lockbox's contents could not be erased because the vault it was in is gone
+  (deleted, or deleted and made anew, on another device), and the adapter's refusal is its
+  `cause`. It names no boxlabel, since a host's boxlabel check may admit any text. It is said only
+  after a successful catch-up; a failed catch-up keeps its own message.
+* 2026-10-17 (thread 17, written_at, [#141](https://github.com/mrflip/safebyok/pull/141)): **new
+  kind `storage_blocked`, told from `storage_unavailable` by the browser error's `name`.** The
+  device-store wrapper (`deviceTroubleAsConditions` / `asCondition`, `vault.ts`) says a failure
+  named `SecurityError`, `QuotaExceededError` or `NotSupportedError` as `storage_blocked` (no
+  retry mends it) and every other non-VaultError failure as `storage_unavailable`. The check is
+  duck-typed on `name`, not `instanceof`, so a DOMException from another frame is told alike; it
+  decides only the kind and the retry advice, never whether anything is written or unlocked. The
+  messages name the verb that failed and quote no scope, record or key, and the browser's error
+  is the `cause`. `InvalidStateError` stays `storage_unavailable`. `idbDeviceDB` (`idb.ts`) now
+  throws a `NotSupportedError` DOMException at first use where the context has no `indexedDB`.
