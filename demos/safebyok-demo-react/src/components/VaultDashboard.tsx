@@ -56,6 +56,11 @@ export const VaultDashboard = () => {
       </>
     )
   }
+  // A browser that will not let the app keep anything here holds to that until the user changes
+  // it, so it gets no Retry button either: only what to change.
+  if (openError?.kind === 'storage_blocked') {
+    return <p className="gripe">{"This browser won't let the app keep your vault on this device. "}{openError.message}</p>
+  }
   if (openError !== null) {
     return (
       <p className="gripe">
