@@ -1270,11 +1270,11 @@ describe("the lockbox limit", () => {
   it("refuses a maxLockboxes and maxWhisperBytes the adapter might not hold together, naming both and its limit", async () => {
     const world = makeWorld()
     const vaultDB = declaringVaultBytes(world.vaultDB, 8 * 1024 * 1024)
-    const err = await TH.expectRefusal(world.open({ vaultDB, maxLockboxes: 102 }), 'bad_option')
+    const err = await TH.expectRefusal(world.open({ vaultDB, maxLockboxes: 103 }), 'bad_option')
     expect(err.message).to.include('maxLockboxes')
     expect(err.message).to.include('maxWhisperBytes')
     expect(err.message).to.include('8388608 bytes')
-    expect(err.message).to.include('at most 101 lockboxes')
+    expect(err.message).to.include('at most 102 lockboxes')
   })
 
   it("lets the host raise either limit while the pair still fits", async () => {
@@ -1288,8 +1288,8 @@ describe("the lockbox limit", () => {
   it("counts room for each lockbox's other fields, so a vault of tiny whispers cannot be made unerasable", async () => {
     const world = makeWorld()
     const vaultDB = declaringVaultBytes(world.vaultDB, 8 * 1024 * 1024)
-    await world.open({ vaultDB, maxLockboxes: 4092, maxWhisperBytes: 1 })
-    await TH.expectRefusal(world.open({ vaultDB, maxLockboxes: 4093, maxWhisperBytes: 1 }), 'bad_option')
+    await world.open({ vaultDB, maxLockboxes: 8176, maxWhisperBytes: 1 })
+    await TH.expectRefusal(world.open({ vaultDB, maxLockboxes: 8177, maxWhisperBytes: 1 }), 'bad_option')
   })
 
   for (const limitBytes of [3, 100, 2048, MaxWhisperBytes]) {
@@ -1697,9 +1697,10 @@ describe("what a lockbox weighs in storage", () => {
   it("refuses, as 'vault_full', a lockbox whose names would take the vault past what storage holds of it", async () => {
     const world = makeWorld({ validators: AnyTextValidators })
     // Room for three lockboxes of the default fields' plan, each a whisper of 1000 bytes; names
-    // of a kibibyte take more than that plan, so two fit and a third does not.
+    // of half a kibibyte take more than that plan, so two fit and a third does not.
     const vaultDB = declaringVaultBytes(world.vaultDB, 3 * ((1000 * StoredBytesPerWhisperByte) + LockboxFieldsBytes))
-    const vault = await world.openUnlocked('pw', { vaultDB, maxWhisperBytes: 1000, maxLockboxes: 3, ...LongScope })
+    const halfLongScope = { applabel: 'a'.repeat(500), vaultlabel: 'v'.repeat(500) }
+    const vault = await world.openUnlocked('pw', { vaultDB, maxWhisperBytes: 1000, maxLockboxes: 3, ...halfLongScope })
     await vault.store('one', 'sk-fake')
     await vault.store('two', 'sk-fake')
     const err = await TH.expectRefusal(vault.store('three', 'sk-fake'), 'vault_full')

@@ -380,9 +380,9 @@ describe("a vault's weight limit", () => {
 // again). So the component holds every vault to MaxVaultLockboxes lockboxes and
 // MaxVaultLockboxBytes bytes of them, whatever its client asks, and convexVaultDB declares half the
 // read budget, 8 MiB, as its maxVaultBytes. openVault admits a maxLockboxes only while that many
-// lockboxes, each counted at twice maxWhisperBytes plus 2 KiB for its other fields, fit in the
-// 8 MiB: at most 101 of the largest default whisper (40444 bytes of JSON, about 54 KB stored),
-// and at most 1365 of 2 KiB whispers. The tests below fill a vault to each of those, and to each
+// lockboxes, each counted at twice maxWhisperBytes plus 1 KiB for its other fields, fit in the
+// 8 MiB: at most 102 of the largest default whisper (40444 bytes of JSON, about 54 KB stored),
+// and at most 1638 of 2 KiB whispers. The tests below fill a vault to each of those, and to each
 // of the component's own limits, with the longest labels, and erase it.
 
 /** A bundle as heavy as a Convex document may be, near enough: the most an erase reads beside the lockboxes. */
@@ -430,17 +430,17 @@ const listWatchErase = async (t: ReturnType<typeof TH.componentTest>) => {
 }
 
 describe("a large vault, within Convex's per-transaction limits", () => {
-  it("lists, signs and erases the 101 of the largest lockboxes the core admits", async () => {
-    const { t, filledCount } = await fillVault(101, 40_444)
-    expect(filledCount).to.eq(101)
-    expect(await listWatchErase(t)).to.deep.equal({ listedCount: 101, watchedCount: 101, erased: true, leftCount: 0 })
+  it("lists, signs and erases the 102 of the largest lockboxes the core admits", async () => {
+    const { t, filledCount } = await fillVault(102, 40_444)
+    expect(filledCount).to.eq(102)
+    expect(await listWatchErase(t)).to.deep.equal({ listedCount: 102, watchedCount: 102, erased: true, leftCount: 0 })
   })
 
-  it("lists, signs and erases the 1365 lockboxes of 2 KiB whispers the core admits", async () => {
-    const { t, filledCount } = await fillVault(1365, 2048)
-    expect(filledCount).to.eq(1365)
-    expect(await listWatchErase(t)).to.deep.equal({ listedCount: 1365, watchedCount: 1365, erased: true, leftCount: 0 })
-  }, 120_000) // landing 1365 lockboxes, a mutation each, is the work, past vitest's 30 s default under CI's coverage
+  it("lists, signs and erases the 1638 lockboxes of 2 KiB whispers the core admits", async () => {
+    const { t, filledCount } = await fillVault(1638, 2048)
+    expect(filledCount).to.eq(1638)
+    expect(await listWatchErase(t)).to.deep.equal({ listedCount: 1638, watchedCount: 1638, erased: true, leftCount: 0 })
+  }, 120_000) // landing 1638 lockboxes, a mutation each, is the work, past vitest's 30 s default under CI's coverage
 
   it("refuses the largest lockboxes past its weight limit, and erases the vault so filled beside a bundle of a whole document", async () => {
     const { t, filledCount } = await fillVault(200, 40_444, wholeDocumentBundle())

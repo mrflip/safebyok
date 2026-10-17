@@ -2285,7 +2285,7 @@ export const StoredBytesPerWhisperByte = 2
  * admit longer names, so each store also weighs its lockbox as it is ({@link LockboxFixedBytes});
  * this is only the plan.
  */
-export const LockboxFieldsBytes = 2048
+export const LockboxFieldsBytes = 1024
 
 /**
  * Room for the stored fields every lockbox has at the same size, in bytes of their JSON: its

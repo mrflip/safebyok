@@ -166,8 +166,8 @@ its revision, since a Convex query cannot read some of a document's fields -- wh
 erasing reads it twice, so `convexVaultDB` declares a `maxVaultBytes` of 8 MiB. A vault holds 100 lockboxes by default, raised with
 `maxLockboxes` as far as `maxVaultBytes` allows: `openVault` refuses, with kind `bad_option`, a
 `maxLockboxes` whose lockboxes at `maxWhisperBytes` each might not fit, and its message says how
-many would. At the default `maxWhisperBytes` (40444) that is at most 101; at a `maxWhisperBytes`
-of 2048, ample for API keys, it is 1365. A store past the limit is refused with kind
+many would. At the default `maxWhisperBytes` (40444) that is at most 102; at a `maxWhisperBytes`
+of 2048, ample for API keys, it is 1638. A store past the limit is refused with kind
 `vault_full`, until a lockbox is erased. Each record must also fit Convex's 1 MiB document limit,
 which the core's `maxWhisperBytes` keeps well inside. `convexVaultDB` declares the component's own
 8,000 as its `maxLockboxes`, so `openVault` also refuses a `maxLockboxes` above that.
