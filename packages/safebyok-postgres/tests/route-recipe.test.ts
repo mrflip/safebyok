@@ -220,8 +220,7 @@ describe("the README route recipe", () => {
     const notJson = await route(new Request(`https://app.example.test${VaultRouteUrl}`, { method: 'POST', body: '{"verb": "readBundle", ' }))
     expect(notJson.status).to.eq(400)
     const broken = new RouteVaultDB(() => Promise.resolve(Response.json({}, { status: 502 })))
-    const refusal = await TH.refusalOf(broken.readBundle(TH.scopeOf('u1')))
-    expect(refusal.kind).to.eq('storage_unavailable')
+    await TH.expectRefusal(broken.readBundle(TH.scopeOf('u1')), 'storage_unavailable')
   })
 
   it("never sends the driver's own error to the browser", async () => {

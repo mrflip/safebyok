@@ -4,6 +4,7 @@ import {
   type KeyDeriver, type KeyDeriverSpec,
 } from 'safebyok'
 import { anyPassphraseTest } from 'safebyok/testing'
+import * as TH from 'safebyok/testing'
 import { argon2idWasmDeriver, argon2idWasmWebV1Deriver } from '../src/wasm-deriver'
 
 /** A spec of the host's own, cheap to derive under; no two of its counts alike, so a swap shows. */
@@ -15,17 +16,8 @@ const specOf = ({ deriveKeyBytes: _dropped, ...spec }: { deriveKeyBytes: unknown
 /** Salt bytes that are not all alike, so a byte read out of place would show. */
 const saltOf = (saltBytes: number): Uint8Array => Uint8Array.from({ length: saltBytes }, (_unused, ii) => ((ii * 37) + 11) % 256)
 
-/** Expect `attempt` to throw a VaultError of kind 'bad_option'; hands back its message. */
-const refusalOf = (attempt: () => unknown): string => {
-  try {
-    attempt()
-  } catch (err) {
-    expect(err).to.be.instanceOf(VaultError)
-    expect((err as VaultError).kind).to.eq('bad_option')
-    return (err as VaultError).message
-  }
-  throw new Error("expected a VaultError of kind 'bad_option', but nothing was thrown")
-}
+/** The message of the 'bad_option' refusal `attempt` throws. */
+const refusalOf = (attempt: () => unknown): string => TH.expectSyncRefusal(attempt, 'bad_option').message
 
 /** What `attempt` rejects with; throws if it resolves instead. */
 const rejectionOf = async (attempt: Promise<unknown>): Promise<unknown> => {

@@ -350,6 +350,68 @@ export const tweakB64 = (b64: string): string => {
 export const wakeupAtNextTick = (): Promise<void> => new Promise((resolve) => { setTimeout(resolve, 0) })
 
 /**
+ * A while for something that should not happen to have had its chance: fifty milliseconds.
+ *
+ * @returns A promise for the end of the while.
+ *
+ * @example
+ *   await TH.aWhile()
+ *   expect(heard.count).to.eq(0)   // nothing came, though it had its chance
+ */
+export const aWhile = (): Promise<void> => new Promise((resolve) => { setTimeout(resolve, 50) })
+
+/**
+ * Resolves once `check` holds, looking every few milliseconds; rejects after two seconds, so a
+ * thing that never comes to pass fails its test rather than hanging it.
+ *
+ * @param check - Whether the thing has come to pass yet.
+ *
+ * @example await TH.eventually(() => heard.count === 1)
+ */
+export const eventually = async (check: () => boolean): Promise<void> => {
+  for (let ii = 0; ii < 400; ii += 1) {
+    if (check()) { return }
+    await new Promise((resolve) => { setTimeout(resolve, 5) })
+  }
+  throw new Error('it never came to pass')
+}
+
+/**
+ * A listener for a VaultDB's `subscribe`, and a count of how often it was called, kept for a test
+ * to look at.
+ *
+ * @returns `onChange`, to subscribe with; `heard`, whose `count` it raises.
+ *
+ * @example
+ *   const { heard, onChange } = TH.changeCounter()
+ *   const unsubscribe = vaultDB.subscribe(TH.scopeOf('u1'), onChange)
+ */
+export const changeCounter = () => {
+  const heard = { count: 0 }
+  return { heard, onChange: () => { heard.count += 1 } }
+}
+
+/**
+ * A watch on `scope` through `vaultDB`, once it is live, its calls counted from then: an adapter
+ * whose server sends a change as the subscription starts (postgresVaultDB with a `listen`, a
+ * GraphQL subscription) calls once at the start, and this resolves after that call, the count
+ * back at zero. Waits up to two seconds for it.
+ *
+ * @param vaultDB - The adapter to watch through.
+ * @param scope - The vault to watch.
+ * @returns `heard`, whose `count` rises with each change from here on; `unsubscribe`.
+ *
+ * @example const { heard, unsubscribe } = await TH.liveWatch(TH.browserFor(schema, 'u1'), TH.scopeOf('u1'))
+ */
+export const liveWatch = async (vaultDB: Pick<VaultDB, 'subscribe'>, scope: VaultScope) => {
+  const heard = { count: 0 }
+  const unsubscribe = vaultDB.subscribe(scope, () => { heard.count += 1 })
+  await eventually(() => heard.count > 0)
+  heard.count = 0
+  return { heard, unsubscribe }
+}
+
+/**
  * A gate for holding an async seam mid-flight, so a test can land one call in the middle of
  * another: `pass()` waits until `release()` is called, and `reached` resolves once something is
  * waiting at it. Released, it stays open: later passes go straight through.
