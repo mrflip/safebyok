@@ -1934,17 +1934,18 @@ export const deviceTroubleAsConditions = (deviceDB: DeviceDB): DeviceDB => ({
 
 /**
  * What failed, for each device-store verb, and what it leaves undone: the heart of the message a
- * failure of that verb is said with, and what a retry may do about it. None names a scope or
- * quotes a record.
+ * failure of that verb is said with; and, where there is one, what the user may do instead of
+ * trying again, which holds whether a retry may mend it or not. None names a scope or quotes a
+ * record.
  */
-const DeviceTroubleSaid: Record<keyof DeviceDB, { failed: string, retry: string }> = {
-  readUnlock:  { failed: "reading the unlock it remembers for this vault, so the vault could not pick it up", retry: "try again, or unlock with a passphrase or passkey" },
-  writeUnlock: { failed: "writing the unlock it remembers for this vault, so this device may not remember it at the next open", retry: "try again" },
-  eraseUnlock: { failed: "erasing the unlock it remembers for this vault, so the next open on this device may still pick it up", retry: "try again" },
-  readMark:    { failed: "reading its mark of this vault (the newest copy of the vault it has seen, and how often it has locked), so the vault could not check storage against it", retry: "try again" },
-  writeMark:   { failed: "writing its mark of this vault (the newest copy of the vault it has seen, and how often it has locked), so it may not be kept", retry: "try again" },
-  eraseMark:   { failed: "erasing its mark of this vault, so it still holds the newest copy of the vault it had seen", retry: "try again" },
-  eraseAll:    { failed: "erasing everything it keeps for safebyok, so some of it may remain", retry: "try again" },
+const DeviceTroubleSaid: Record<keyof DeviceDB, { failed: string, instead?: string }> = {
+  readUnlock:  { failed: "reading the unlock it remembers for this vault, so the vault could not pick it up", instead: "unlock with a passphrase or passkey" },
+  writeUnlock: { failed: "writing the unlock it remembers for this vault, so this device may not remember it at the next open" },
+  eraseUnlock: { failed: "erasing the unlock it remembers for this vault, so the next open on this device may still pick it up" },
+  readMark:    { failed: "reading its mark of this vault (the newest copy of the vault it has seen, and how often it has locked), so the vault could not check storage against it" },
+  writeMark:   { failed: "writing its mark of this vault (the newest copy of the vault it has seen, and how often it has locked), so it may not be kept" },
+  eraseMark:   { failed: "erasing its mark of this vault, so it still holds the newest copy of the vault it had seen" },
+  eraseAll:    { failed: "erasing everything it keeps for safebyok, so some of it may remain" },
 }
 
 /**
@@ -1967,10 +1968,12 @@ const asCondition = async <ResultT>(verb: keyof DeviceDB, call: () => Promise<Re
     return await call()
   } catch (err) {
     if (isVaultError(err)) { throw err }
-    const { failed, retry } = DeviceTroubleSaid[verb]
+    const { failed, instead } = DeviceTroubleSaid[verb]
     if (isStorageBlocked(err)) {
-      throw new VaultError('storage_blocked', `This browser does not let the app keep anything on this device -- storage blocked for this site, a private window or frame that withholds it, or no room left -- so it failed ${failed}. Trying again will not help until that changes. The device store's error is this error's cause.`, { cause: err })
+      const meanwhile = instead === undefined ? '' : `: ${instead} instead`
+      throw new VaultError('storage_blocked', `This browser does not let the app keep anything on this device -- storage blocked for this site, a private window or frame that withholds it, or no room left -- so it failed ${failed}. Trying again will not help until that changes${meanwhile}. The device store's error is this error's cause.`, { cause: err })
     }
+    const retry = instead === undefined ? 'try again' : `try again, or ${instead}`
     throw new VaultError('storage_unavailable', `This device's own storage failed ${failed}: ${retry}. If it fails every time, this device may not let the app keep anything: storage blocked or full, or a private window. The device store's error is this error's cause.`, { cause: err })
   }
 }

@@ -4719,6 +4719,22 @@ describe("a failed open", () => {
     })
   }
 
+  it("keeps a verb's own way forward in its 'storage_blocked' message: a remembered unlock that will not read leaves a passphrase or passkey", async () => {
+    const deviceDB = memoryDeviceDB()
+    vi.spyOn(deviceDB, 'readUnlock').mockRejectedValueOnce(new DOMException('The operation is insecure.', 'SecurityError'))
+    const err = await TH.expectRefusal(deviceTroubleAsConditions(deviceDB).readUnlock(TH.scopeOf('u1')), 'storage_blocked')
+    expect(err.message).to.match(/reading the unlock it remembers/)
+    expect(err.message).to.match(/will not help until that changes: unlock with a passphrase or passkey instead\./)
+    expect(err.message).to.not.match(/try again/i)
+  })
+
+  it("keeps it in its 'storage_unavailable' message too, beside trying again", async () => {
+    const deviceDB = memoryDeviceDB()
+    vi.spyOn(deviceDB, 'readUnlock').mockRejectedValueOnce(new Error('device storage is unavailable'))
+    const err = await TH.expectRefusal(deviceTroubleAsConditions(deviceDB).readUnlock(TH.scopeOf('u1')), 'storage_unavailable')
+    expect(err.message).to.match(/try again, or unlock with a passphrase or passkey\./)
+  })
+
   it("tells a blocked store by its error's name, so one from another frame, no instance of this one's Error, is told alike", async () => {
     const deviceDB = memoryDeviceDB()
     const trouble = { name: 'SecurityError', message: 'The operation is insecure.' }
