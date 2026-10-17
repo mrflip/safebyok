@@ -91,7 +91,10 @@ bundle that fails its checks (`damaged_bundle`) arrives as `openError`, a `Vault
 `vault` still null. (A damaged lockbox never stops the open: the snapshot lists it with
 `damaged: true`, for your UI to offer `erase()` or a fresh `store()`; see the `safebyok`
 README's *Damaged lockboxes*.) Show it where the vault's UI would be, and offer `retryOpen()`, which clears it and
-opens again; a failed open leaves no storage watch behind, so retrying costs nothing:
+opens again; a failed open leaves no storage watch behind, so retrying costs nothing. A browser
+that keeps the app from storing anything on this device (`storage_blocked`) is a condition too,
+but one a retry will not mend until the browser's settings or room change: say so, rather than
+offering `retryOpen()`.
 
 ```tsx
 const VaultPanel = () => {

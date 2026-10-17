@@ -46,6 +46,23 @@ describe("the IndexedDB device store's options", () => {
 })
 
 describe("idbDeviceDB", () => {
+  const NoIndexedDBCases = [
+    [undefined,  'a runtime with no indexedDB global'],
+    [null,       'a browser with IndexedDB turned off, its indexedDB null'],
+  ] as const
+
+  for (const [factory, blurb] of NoIndexedDBCases) {
+    it(`refuses at its first use with a NotSupportedError, in ${blurb}`, async () => {
+      const deviceDB = idbDeviceDB({ dbName: TH.freshDbName() })
+      vi.stubGlobal('indexedDB', factory)
+      try {
+        await expect(deviceDB.readMark(TH.scopeOf('u1'))).rejects.toThrow(expect.objectContaining({ name: 'NotSupportedError' }))
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    })
+  }
+
   it("sweeps an unlock filed under an earlier version's ckey at the first read, never reading it", async () => {
     const dbName = TH.freshDbName()
     const shelf = createStore(`${dbName}:device_db`, 'records')

@@ -11,7 +11,7 @@
  *   `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `absent_box`, `absent_vault`, `absent_unlock`,
  *   `whisper_too_large`, `lockbox_too_large`, `vault_full`, `too_many_unlocks`, `last_unlock`,
  *   `corrupt_record`, `damaged_bundle`, `damaged_unlock`, `damaged_lockbox`, `newer_format`, `stale_write`,
- *   `rolled_back`, `not_permitted`, `identity_revoked`, `storage_unavailable`.
+ *   `rolled_back`, `not_permitted`, `identity_revoked`, `storage_unavailable`, `storage_blocked`.
  *
  * `vault_full` means a new lockbox in a vault already holding its `maxLockboxes` (a limit the
  * client keeps), and also that storage has no room for the write (a limit of the backend's own,
@@ -51,6 +51,21 @@
  * use, and locks, as for `identity_revoked`: nothing is unlocked from it and nothing written over it. Only a device that saw the newer
  * copy can tell, and only while its own storage keeps the mark of it.
  *
+ * `storage_unavailable` and `storage_blocked` are both storage that failed, told apart by whether
+ * trying again may help. `storage_unavailable` is a failure a retry may mend: a backend that could
+ * not be reached, or an error from storage that names no lasting cause -- a device store's
+ * transaction aborted, its connection closed under it, a failure the browser gives no reason
+ * for. `storage_blocked` is this device's own store refusing for a reason that holds until
+ * something outside the app changes, so that trying again cannot help until then: the browser
+ * withholding storage from the page (site data blocked, a sandboxed frame, cookies turned off:
+ * a `SecurityError`), storage it has no room in (a quota of zero, as some private windows give,
+ * or a full disk: a `QuotaExceededError`), or no IndexedDB at all (`NotSupportedError`). A
+ * private window that offers IndexedDB with room in it is no block, and a refusal the browser
+ * names otherwise -- an `InvalidStateError`, an `UnknownError` -- is `storage_unavailable`, as
+ * it may pass. A host meeting `storage_blocked` stops offering a retry: it tells the user why, and
+ * may open the vault again with a device store that keeps nothing (`memoryDeviceDB`), which
+ * remembers no unlock on this device.
+ *
  * The package README's *Errors* section lists what each kind means and what to do about it.
  */
 export const VaultErrorKindVals = [
@@ -82,7 +97,8 @@ export const VaultErrorKindVals = [
   'rolled_back',         // storage handed back an older copy of the vault than this device has seen, which it refuses to use
   'not_permitted',       // the storage backend refused the signed-in user this call: not theirs to make
   'identity_revoked',    // the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in
-  'storage_unavailable', // the storage backend could not be reached, or failed
+  'storage_unavailable', // the storage backend could not be reached, or failed: a retry may mend it
+  'storage_blocked',     // this device's own store refuses until something outside the app changes: storage blocked, or no room
 ] as const
 export type VaultErrorKind = typeof VaultErrorKindVals[number]
 
@@ -162,6 +178,7 @@ export const VaultErrorFamilyForKind = {
   not_permitted:       'condition',
   identity_revoked:    'condition',
   storage_unavailable: 'condition',
+  storage_blocked:     'condition',
 } as const satisfies Readonly<Record<VaultErrorKind, VaultErrorFamily>>
 
 /**
