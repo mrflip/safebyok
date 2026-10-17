@@ -54,6 +54,15 @@ describe("cipherBinding", () => {
     const holding = { boxlabel: 'anthropic', written_at: 1, revision_id: 'r1', public_json: undefined } as unknown as CipherBindingPart
     TH.expectSyncRefusal(() => cipherBinding('safebyok-lockbox-v4', holding), 'bad_option')
   })
+
+  it("refuses a part that is undefined or null as bad_option, rather than binding it as null", () => {
+    for (const missing of [undefined, null]) {
+      const part = missing as unknown as CipherBindingPart
+      const err = TH.expectSyncRefusal(() => cipherBinding('safebyok-unlock-v1', 'acme', part, 'main'), 'bad_option')
+      expect(err.message).to.include('undefined or null')
+      TH.expectSyncRefusal(() => cipherBinding(part), 'bad_option')
+    }
+  })
 })
 
 describe("cipher and decipher", () => {

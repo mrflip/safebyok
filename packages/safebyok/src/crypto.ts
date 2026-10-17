@@ -59,22 +59,27 @@ export type CipherBindingPart = string | number | Readonly<Record<string, string
  * The context an encryption is bound to, as AES-GCM additional data: a deterministic encoding of
  * the given parts (format, app, user, vault, lockbox, revision, purpose -- whatever names the
  * slot). Rebuilt rather than stored; if any part differs at decryption, the ciphertext refuses to
- * open. A record part holding a field set to undefined is refused with kind 'bad_option': it
- * would bind the same as a record without the field, so nothing is encrypted or opened under it.
+ * open. A part that is undefined or null, or a record part holding a field set to undefined, is
+ * refused with kind 'bad_option': each would bind the same as some other binding (a missing part
+ * as null; a missing field as no field at all), so nothing is encrypted or opened under it.
  *
  * @example cipherBinding('safebyok-unlock-v1', 'acme', 'u1', 'main', vaultId, 1, askPassphraseAt, 'vault_key_local_wrapped')
  * @example cipherBinding('safebyok-vault-v1', 'acme', 'u1', 'main', vaultId, registeredAt, 'vault_key_passphrase_wrapped', { method: 'passphrase', unlock_id, unlocklabel, key_deriver_label, salt_b64 })
  */
 export const cipherBinding = (...parts: readonly CipherBindingPart[]): Uint8Array => {
-  if (parts.some((part) => holdsUndefined(part))) {
-    throw new VaultError('bad_option', "A cipher binding was handed a field set to undefined, which would bind as if it were not there, so nothing was encrypted or opened. This is a bug in the code calling it.")
+  if (parts.some((part) => isUnbound(part))) {
+    throw new VaultError('bad_option', "A cipher binding was handed a part, or a field of one, that is undefined or null, which would bind as if it were something else, so nothing was encrypted or opened. This is a bug in the code calling it.")
   }
   return new TextEncoder().encode(stableJsonify(parts))
 }
 
-/** True when `part` is a record with a field set to undefined, as its type forbids and a caller may still hand in. */
-const holdsUndefined = (part: CipherBindingPart): boolean => (
-  typeof part === 'object' && Object.values(part as Readonly<Record<string, unknown>>).includes(undefined)
+/**
+ * True when `part` is undefined or null, or a record with a field set to undefined: what its type
+ * forbids and a caller may still hand in.
+ */
+const isUnbound = (part: CipherBindingPart | null | undefined): boolean => (
+  part === undefined || part === null
+  || (typeof part === 'object' && Object.values(part as Readonly<Record<string, unknown>>).includes(undefined))
 )
 
 /**
