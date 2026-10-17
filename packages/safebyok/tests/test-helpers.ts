@@ -2345,7 +2345,7 @@ const quotedOf = (refusal: unknown, lockbox: Lockbox): string[] => {
  * @returns The verbs of one adapter, each sent on to its user's VaultDB.
  *
  * @example
- *   describeVaultDB('postgresVaultDB', () => perUser((userId) => postgresVaultDB({ client, userId })))
+ *   describeVaultDB('postgresVaultDB', () => perUser((userId) => postgresVaultDB({ client, userId, listen: (channel, onNotify) => client.listen(channel, onNotify) })))
  */
 export const perUser = (vaultDBFor: (userId: string) => VaultDBVerbs): VaultDBVerbs => {
   const vaultDBs = new Map<string, VaultDBVerbs>()

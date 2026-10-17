@@ -761,12 +761,13 @@ TH.describeDeviceDB('describeDeviceDB, over the smallest honest DeviceDB', () =>
 /**
  * A server's VaultDB for one signed-in user, over a store every user's vaults share: it refuses
  * any scope naming someone else, as a server's must, so the VaultDB suite reaches it only through
- * `perUser`.
+ * `perUser`. A blank or missing `userId` is no one signed in, as a real server reads it: it
+ * refuses everything.
  */
 const servingOnly = (userId: string | null, store: StringStore): TH.VaultDBVerbs => {
   const shared = localVaultDB({ store })
   const permitted = ({ user_id }: { user_id: string }): void => {
-    if (user_id !== userId) { throw new VaultError('identity_revoked', "That vault belongs to someone other than the user signed in.") }
+    if (userId === null || userId === '' || user_id !== userId) { throw new VaultError('identity_revoked', "That vault belongs to someone other than the user signed in.") }
   }
   return {
     maxRecordBytes: shared.maxRecordBytes,
@@ -827,6 +828,12 @@ describe("perUser", () => {
     await vaultDB.eraseVault(TH.scopeOf('u2'), { vault_id: 'vault-id-u2' })
     expect(await servingOnly('u2', store).readBundle(TH.scopeOf('u2'))).to.be.null
     expect(await servingOnly('u1', store).readBundle(TH.scopeOf('u1'))).to.deep.equal(TH.bundleOf('u1'))
+  })
+
+  it("refuses a blank user_id as a server does for no one signed in, never as a bad label", async () => {
+    const { vaultDB } = counted()
+    await TH.expectRefusal(vaultDB.readBundle(TH.scopeOf('')), 'identity_revoked')
+    await TH.expectRefusal(vaultDB.createBundle(TH.bundleOf('')), 'identity_revoked')
   })
 
   it("makes each user's VaultDB once, and keeps it", async () => {
