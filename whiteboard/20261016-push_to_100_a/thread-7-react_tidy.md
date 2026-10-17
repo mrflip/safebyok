@@ -107,7 +107,8 @@ skipped, core 1852 + 33 skipped); `pnpm size` within every existing budget.
     - → *Coach (2026-10-16):* Add to NOTYET (done): React binding under real assistive technology and real hosts.
 
 * **Restack** (2026-10-17, onto #136): thread 3's names taken (`ForeverMillis`, `MinuteMillis`,
-  `reentryWindowMillis`, `TH.DefaultWindowMillis`), the local `MinuteMillis` dropped; thread 4's
+  `reentryWindowMillis`, `TH.DefaultWindowMillis`), the local `MinuteMillis` constants dropped
+  (`passphrase-modal.tsx`, the demo's `lib/asks-again.ts`); thread 4's
   identical `stale_write` edit collapsed; thread 10's strength-test ref and wrapper kept beside
   `allowStartOver` and the sinks warning; the dialog-window table's `1e9` hours row dropped, as
   openVault now refuses hours above `MaxReentryHours`. The demo's click-through test now types
