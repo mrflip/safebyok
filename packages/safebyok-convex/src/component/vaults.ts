@@ -188,6 +188,9 @@ export const eraseVault = mutation({
 /**
  * The vault's change signature, for a client to subscribe to: it changes when, and only when, a
  * write lands in the vault -- the bundle replaced, a lockbox written or erased, the vault erased.
+ * It reads each lockbox document whole, ciphertext and all, for its revision: a Convex query
+ * cannot read some of a document's fields. So each run reads the vault, within the read limits a
+ * listing and an erase keep it to.
  */
 export const watchVault = query({
   args:    { scope: VaultScope },

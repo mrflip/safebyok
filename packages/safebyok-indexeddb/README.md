@@ -41,6 +41,8 @@ const vault = await openVault({
 * **`dbName`** names the IndexedDB databases the records go in, default `'safebyok'`: the vault's
   rows in `<dbName>:vault_db`, and, through `browserOpts`, the remembered unlock in
   `<dbName>:device_db`. Anything but non-empty text refuses with kind `bad_option`.
+* **`logger`**, when given, hears what the store has to say (a listener that threw, say); left
+  out, the store uses the one `openVault` is given, else the console.
 * **Every verb is one IndexedDB transaction.** IndexedDB runs readwrite transactions over one
   store one after another, across every tab of the origin, so a write lands only while what it
   expects still stands, and refuses with kind `stale_write` otherwise. Two tabs creating a vault
@@ -118,16 +120,19 @@ places:
    stands, compares, and writes, all in one transaction (`src/shelf.ts`'s `inOneTransaction`);
    a store with no transactions needs a conditional write instead (compare-and-set on the
    ckey), or it cannot keep the promise.
-3. **`src/bell.ts`: how your store tells listeners of a write.** Here, this tab's listeners and
-   a BroadcastChannel to the others. A store with push of its own -- a live query, a socket --
-   rings from that, and one with none leaves `doSubscribe` out: the vault refreshes after its own
-   writes regardless. Whatever rings, call each listener so that one that throws stops neither
-   the others nor the write, let no handle (a channel, a socket) hold a Node process open, and
-   close it when its last listener leaves.
+3. **`doSubscribe`: how your store tells listeners of a write.** Here, `ChangeBell` from
+   `safebyok/idb`, rung after each write that lands: this tab's listeners, and a
+   BroadcastChannel to the others. Another store in this browser rings a bell of its own name the
+   same way. A store with push of its own -- a live query, a socket -- calls from that, and one
+   with none leaves `doSubscribe` out: the vault refreshes after its own writes regardless. The
+   base class calls each listener so that one that throws stops neither the others nor the
+   write, and unsubscribes once; yours is to let no handle (a channel, a socket) hold a Node
+   process open, and to close it when its last listener leaves.
 
 And keep, as they are:
 
-* **`src/expectations.ts`**: the comparisons each write makes before it lands. An adapter
+* **`Expectations`, from `safebyok`**: the comparisons each write makes before it lands
+  (`Expectations.bundleMeets`, `lockboxMeets`, `vaultMeets`, `vaultIdMeets`). An adapter
   compares only the scope, `boxlabel`, `vault_id`, `unlock_epoch`, `vault_key_epoch` and
   `revision_id`, and a standing row too damaged to show one of them fails the comparison. A
   lockbox write compares the bundle's `vault_key_epoch` too, in the same transaction: skip it,

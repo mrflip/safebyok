@@ -25,6 +25,12 @@ Three layers share the work, and each guarantee below belongs to one of them.
   turns a `false` from you into `stale_write`, and turns anything you throw that is not a
   `VaultError` into `storage_unavailable`, your error as its cause. It holds every name to the
   floor and to what your adapter declares (*Names*, below), never to a host's own validators.
+  It guards `subscribe`: each listener is called so that nothing it throws, and no promise it
+  hands back that rejects, escapes -- each goes to the logger as an error -- and your unsubscribe
+  runs once, however often the host calls it. It lists a vault's records whole for a server to
+  serve (`listBoxRecords`), from your `doListBoxes`. It keeps the `logger`, as `this.logger`:
+  your adapter's own, else the one `openVault` hands it, else the console; and
+  `this.watchTrouble(message)` warns once for each failing streak of a live watch.
 * **Your adapter** (the `do*` methods) stores and returns records, and makes each write
   conditional: it checks the expectation and writes in one atomic step. It never resolves a
   conflict itself, never merges two writes, and never retries one: a write whose expectation
@@ -271,6 +277,9 @@ signed-in user's -- including every scope while no one is signed in -- with kind
 `identity_revoked`, before the backend is asked anything: it reads nothing of that scope and
 writes nothing to it. A server cannot tell "the user changed" from "the host opened another
 user's vault", and to the vault both mean the same: its user is not the one signed in.
+Who is signed in is the backend's own seam, never the core's: the Convex component asks the
+host's `getUserId(ctx)`, Postgres and the GraphQL resolvers take the user from the host's request
+context, and every adapter compares it with the scope's `user_id`, which the vault already carries.
 
 **5.5. identity_revoked means the user is gone.** The vault locks itself on `identity_revoked`,
 dropping its key, always -- no host option turns it off -- so an adapter says it only when the

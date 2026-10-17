@@ -101,7 +101,9 @@ vaultResolvers({ vaultDBFor: (context) => postgresVaultDB({ client: pool, userId
 * **`vaultDBFor(context)`** makes the VaultDB for one request, from your server's context for it.
   It is called for every vault field resolved, so keep it cheap: `postgresVaultDB` connects to
   nothing. Over a websocket, the context is the connection's, so its user is the one signed in
-  when it opened.
+  when it opened. Whatever it throws is your server's setup gone wrong, and crosses as
+  `bad_option` saying only that: its own message stays on your server, as the cause. Let the
+  VaultDB, not `vaultDBFor`, refuse a request signed out.
 * **Who may reach a vault** is the VaultDB's to say. `postgresVaultDB`, made for the signed-in
   user, refuses every other user's vault, and any while signed out, before asking the database
   anything.
@@ -136,6 +138,11 @@ fields left out. A VaultDB's own `listBoxes` gives summaries instead -- the shap
 without `format` -- which the browser's VaultDB may not hand back from its own listing.
 `safebyok-postgres`'s VaultDB is a ServedVaultDB as it stands; nothing here is tied to Postgres.
 
+Every stored field is non-null in the schema. A listing of yours that hands back a record missing
+one fails in GraphQL itself, before any VaultError is made, and reaches the browser as
+`storage_unavailable`, not `corrupt_record`: Postgres's `NOT NULL` columns rule it out, and a
+store of your own keeps every field it was handed.
+
 The resolvers decide nothing: every expectation crosses whole, and the VaultDB you serve keeps
 [the VaultDB contract](https://github.com/mrflip/safebyok/blob/main/packages/safebyok/VAULTDB.md)
 for the browser. Its line 3.8 in particular: a lockbox write's expectation names the
@@ -149,8 +156,11 @@ comparison lets a device still holding a replaced vaultKey seal a whisper under 
 `graphqlVaultDB({ client })` is a VaultDB, each verb one operation through `client`.
 
 * **A refusal crosses**: the server's VaultError comes back as the same VaultError, kind and
-  message. Anything else -- the network down, a server not serving this schema -- refuses with
-  kind `storage_unavailable`, urql's own error as its `cause`.
+  message. A server that refuses the operation's shape or variables (`extensions.code`
+  `BAD_USER_INPUT` or `GRAPHQL_VALIDATION_FAILED`, a schema of another version) refuses with kind
+  `bad_option`, quoting nothing of it, since such an error may quote the variables. Anything else
+  -- the network down, a server not serving this schema -- refuses with kind
+  `storage_unavailable`, urql's own error as its `cause`.
 * **It holds a record to 1 MiB**, and a name to 640 bytes of UTF-8, as the Postgres VaultDB
   behind it does, and a vault to no size of its own.
 * **The server checks** who may reach which vault, that each write is atomic, and that each
@@ -162,8 +172,12 @@ comparison lets a device still holding a replaced vaultKey seal a whisper under 
   (`graphqlVaultDB({ client, maxLockboxes: 250 })`). Pass the number your server's
   VaultDB enforces, so `openVault` refuses a vault asking for more up front; the server refuses a
   new lockbox past its own with kind `vault_full` either way, and the refusal crosses.
-* **A subscription that fails** (the server refusing it, the socket dropping) is not retried, and
-  nothing is told: the vault goes on refreshing after its own writes.
+* **A subscription that fails** (the server refusing it, the socket dropping) is not retried. It
+  is warned of through the `logger`, once, and calls the vault's listener, so the vault reads
+  again and meets the trouble itself: a server's `identity_revoked` locks it. After that, the
+  vault goes on refreshing after its own writes.
+* **`logger`**, when given, hears what the VaultDB has to say (`graphqlVaultDB({ client, logger
+  })`); left out, it is the one `openVault` is given, else the console.
 
 ## What crosses the wire
 
@@ -186,7 +200,8 @@ of its own.
 * **The bundle's `unlocks`** is a list of `SafebyokUnlockEnvelope`, each one opaque JSON, its
   `method` saying its shape: the adapter carries an envelope as it is, never looking inside, as
   the Postgres table stores the list as one `jsonb`. A new way to unlock reaches the browser with
-  no change here.
+  no change here. That is by choice, not for want of a typed union: GraphQL has no input unions
+  before graphql 17's `@oneOf`, and the adapter is a shelf.
 * **Encrypted**: each whisper (`whisper_ciphered`), each lockboxKey (`lockbox_key_wrapped`), and
   the vaultKey under each way in (inside each envelope). **In the open**: everything else, as
   [`safebyok-postgres`](../safebyok-postgres#what-is-stored) lists it.

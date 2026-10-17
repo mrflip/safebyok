@@ -2199,7 +2199,7 @@ const vaultDBShape = Z.object({
 
 const parseVaultDB = (candidate: VaultDB): VaultDB => {
   if (! (candidate instanceof VaultDB) || ! vaultDBShape.safeParse(candidate).success) {
-    throw new VaultError('bad_option', "vaultDB is not a VaultDB: pass a storage adapter, such as localVaultDB(), idbVaultDB() from 'safebyok-indexeddb', or your backend's own, which extends the VaultDB class.")
+    throw new VaultError('bad_option', "vaultDB is not a VaultDB: pass a storage adapter, such as localVaultDB({ store }), idbVaultDB() from 'safebyok-indexeddb', or your backend's own, which extends the VaultDB class.")
   }
   return candidate
 }

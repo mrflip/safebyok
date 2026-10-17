@@ -36,6 +36,10 @@ await pglite.exec(VaultTablesSql)   // PGlite
 That is tables, columns, keys and row-level security, and nothing more: no trigger, no function, no
 extra table, nothing to keep in step. Push between devices is opt-in; see *Hearing other writes*.
 
+For your app's own tests, the same SQL on [PGlite](https://pglite.dev), in-process, is the whole
+backend: a PGlite is a `client` as it stands, so there is no fake to install, as there is for
+Convex (`safebyok-convex/testing`). This package's own tests run that way.
+
 ## Where it runs
 
 Postgres has nowhere to run a vault's verbs, and the vault itself runs in the browser. So
@@ -72,6 +76,8 @@ const vaultDB = postgresVaultDB({ client: pool, userId: session.userId })
   verb needs a retry.
 * **`maxLockboxes`**, none (`Infinity`) unless you say otherwise, is the most lockboxes one vault
   holds, as a best effort: see *A limit of the server's own*, below. Quotas are yours to set.
+* **`logger`**, when given, hears what the VaultDB has to say: a `listen` that failed to start, an
+  unlisten that failed, a subscriber that threw. Left out, it is the console's.
 * **Names of up to 640 bytes** of UTF-8 each (`maxNameBytes`): a lockbox's primary key is its
   four names together, and Postgres holds a btree entry of at most 2704 bytes. A longer name is
   refused with kind `bad_label` before a statement runs. No character is reserved: each name is
@@ -240,9 +246,9 @@ const isKind = (kind: unknown): kind is VaultErrorKind => (VaultErrorKindVals as
     lands again.
   * **The count a write checks is the vault's, as of the start of its statement.** A write reports
     no count; the vault learns it from the listing it reads after every write.
-  * **It costs the host nothing**: no column, trigger, lock or retry, and one `count(*)` over the
-    vault's primary-key prefix, at most about `maxLockboxes` index entries, since the limit stops
-    growth near it.
+  * **It costs the host nothing** but the count: no column, trigger, lock or retry, and one
+    `count(*)` over the vault's primary-key prefix, at most about `maxLockboxes` index entries,
+    since the limit stops growth near it. With no limit, there is no count either.
 
   **For a hard cap**, *vaya con dios*: this is unsupported, and it costs what the package does not
   ask of you -- a trigger of your own, and a transaction-scoped advisory lock per vault that makes
@@ -296,8 +302,10 @@ await pool.query(VaultNotifySql)    // once, as a migration: safe to run again
 
 Its trigger sends a notification on the channel `VaultChangeChannel` (`safebyok_vault_changes`)
 after every write that changes a vault, its payload the vault's scope as JSON: no record, nothing
-ciphered. A `listen` without the trigger hears nothing; the trigger without a `listen` costs a
-notification nobody hears.
+ciphered. A `listen` without the trigger hears nothing, by design, and says nothing of it; the
+trigger without a `listen` costs a notification nobody hears. A `listen` that throws as it is
+called refuses `subscribe` as `storage_unavailable`; one that rejects later is warned of through
+the `logger`, once, and its subscriber hears nothing more, as without a `listen`.
 
 `listen(channel, onNotify)` calls `onNotify` with each notification's payload and returns the
 unlisten (or a promise for it). A PGlite's own `listen` is one, called on its PGlite -- passed
