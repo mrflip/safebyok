@@ -24,12 +24,12 @@ implementation.
     against the host app's privacy review, which owns what its users are told.
 
 * **Let the user add a hint on their passphrase.** The Coach (2026-10-16, thread 7,
-  [#129](https://github.com/mrflip/safebyok/pull/129)): "Option to let the user add a hint on
-  their passphrase." A hint is stored in the clear, so it is a decision about what the backend may
+  [#129](https://github.com/mrflip/safebyok/pull/129)): "Option to let user add a hint on their
+  passphrase". A hint is stored in the clear, so it is a decision about what the backend may
   see; the whisper field's host `placeholder` (none by default) is not it.
 * **Break out dependencies into a `-utils` or `-bestpractices` package.** The Coach (2026-10-16,
-  thread 10, [#136](https://github.com/mrflip/safebyok/pull/136)): "Break out dependencies,
-  including -fastkey, into a -utils or -bestpractices package." The strength test's
+  thread 10, [#136](https://github.com/mrflip/safebyok/pull/136)): "Break out dependencies
+  including the -fastkey into a -utils or -bestpractices package". The strength test's
   `@zxcvbn-ts/core` comes from `safebyok/browser`, and `safebyok-fastkey` is a separate package
   already; a single package for the best-practice defaults would hold them together.
 * **The React binding under real assistive technology and real hosts.** The Coach (2026-10-16,
