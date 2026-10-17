@@ -65,13 +65,10 @@ process rules folded into #135's text (independent of the line; it adds
 
 ## Open questions, in one place
 
-* **#147 waits on you** (added at the closeout): keep the hand-rolled `useIsMounted` (Rec: yes;
-  nothing existing does its job, and the libraries would be a runtime dependency for six lines),
-  and a layout or a passive effect under it (a layout effect reads a dialog hidden by Suspense or
-  `<Activity>` as gone, so an erase interrupted while hidden leaves its button disabled; Rec:
-  passive, as the libraries do). Minor: `lib` ES2024 for `Promise.withResolvers`; the demo App
-  tests' order dependence under shuffle. The provider's read after close (taken, below) had a
-  sibling in the dialog: this is it.
+* **#147, answered** (added at the closeout; #147 merged): the hand-rolled `useIsMounted` kept,
+  on a passive effect (`20261017-mounted_passive`); `lib` stays ES2023; the demo App tests' order
+  dependence stays in NOTYET. The plan's thread 18 has the rulings in the Coach's words. The
+  provider's read after close (taken, below) had a sibling in the dialog: #147 was it.
 * **#138 waits on you**: the row "An overridden deriveKeyBytes skips the 32-byte check". On yes,
   a fresh worker applies the reviewer's `keyBytesOf` fix, a second review covers it, and it
   restacks onto #126's new tip and joins the top of the line.

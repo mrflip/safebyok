@@ -598,6 +598,12 @@ it; no timeout. Built and filed as [#147](https://github.com/mrflip/safebyok/pul
   call against a passive one); a passkey press dropped when `passkeyFirst` turns false mid-press;
   no abort of the WebAuthn prompt on unmount (an `AbortSignal` through `askPasskey`, a later
   thread); the demo's `erase` rethrowing other conditions (predates 18).
+* *Coach* (2026-10-17, after #147 merged): keep the hand-rolled `useIsMounted`; "yes passive
+  effect" -- built in `20261017-mounted_passive`, with a Suspense test that fails under the layout
+  effect. `lib` stays ES2023: "We've stuck with ES2023 when the question's come up before, so hold
+  on that." The demo App tests' order dependence stays as filed (NOTYET, RAGEBAIT): "The solutions
+  to the shuffling have all come with a proposal that would make the code have long waits, and
+  it's a demo app."
 
 ## Coach rulings during the sprint
 

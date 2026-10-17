@@ -62,4 +62,6 @@ be bitten finds the ruling.
   [#134](https://github.com/mrflip/safebyok/pull/134)): "leave, file under RAGEBAIT." Under
   `--sequence.shuffle`, two App tests fail when they run after the click-through test, whose fake
   user stays signed in. In order they pass, so CI is green. Fix by resetting the fake sign-in in
-  `afterEach`, or by giving each test a fresh fake IndexedDB.
+  `afterEach`, or by giving each test a fresh fake IndexedDB. Asked again at thread 18 (2026-10-17,
+  58 of 96 shuffled runs failing), the Coach: "The solutions to the shuffling have all come with a
+  proposal that would make the code have long waits, and it's a demo app."
