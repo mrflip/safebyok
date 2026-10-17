@@ -54,8 +54,9 @@ export const createBundle = mutation({
 
 /**
  * Replace the bundle with `bundle`, only while the standing one has `expected.vault_id` and
- * `expected.unlock_epoch`. True when written; false, writing nothing, otherwise -- including
- * when no bundle stands.
+ * `expected.unlock_epoch`, and only when `bundle` names the same vault and moves its
+ * `unlock_epoch` forward. True when written; false, writing nothing, otherwise -- including when
+ * no bundle stands.
  */
 export const updateBundle = mutation({
   args:    { bundle: VaultBundle, expected: BundleExpectation },
@@ -65,7 +66,10 @@ export const updateBundle = mutation({
     const meetsExpectation = standing !== null
       && standing.vault_id === expected.vault_id
       && standing.unlock_epoch === expected.unlock_epoch
-    if (! meetsExpectation) { return false }
+    const movesForward = standing !== null
+      && bundle.vault_id === standing.vault_id
+      && bundle.unlock_epoch > standing.unlock_epoch
+    if (! (meetsExpectation && movesForward)) { return false }
     await ctx.db.replace('safebyok_bundles', standing._id, bundle)
     return true
   },
