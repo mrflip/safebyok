@@ -731,8 +731,10 @@ describe("VaultProvider", () => {
       await expectShown('absent')
       rerender(providerOf(world, { clock: { now: () => Date.now() } }))
       await expectShown('absent')
-      expect(consoleWarn).toHaveBeenCalledOnce()
-      expect(consoleWarn.mock.calls[0]?.[0]).to.match(/^safebyok: VaultProvider reopened the vault because its clock changed identity/)
+      // Each open with the test deriver also warns, of the deriver: only the provider's own are counted.
+      const warned = consoleWarn.mock.calls.map(([said]) => String(said)).filter((said) => said.startsWith('safebyok: VaultProvider'))
+      expect(warned).to.have.lengthOf(1)
+      expect(warned[0]).to.match(/^safebyok: VaultProvider reopened the vault because its clock changed identity/)
     })
 
     it("of nothing, for a logger and clock that keep their identity", async () => {
