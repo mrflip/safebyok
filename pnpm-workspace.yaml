@@ -26,6 +26,3 @@ allowBuilds:
 # is made, and each one is recorded in notes/security.md.
 minimumReleaseAge: 10080
 minimumReleaseAgeStrict: true
-minimumReleaseAgeExclude:
-  # Ages past seven days at 2026-10-16T23:01Z: delete this line and re-range the pin (notes/security.md).
-  - convex-test@0.0.61
