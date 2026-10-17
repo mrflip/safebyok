@@ -13,7 +13,8 @@ import type { CustomKeyDeriver, KeyDeriver } from '../src/key-deriver'
 import type { VaultLogger } from '../src/logger'
 import { Argon2idWebV1, MaxSaltBytes, TestDeriverNotice } from '../src/key-deriver-spec'
 import * as Ckeys from '../src/ckeys'
-import type { PassphraseVerdict } from '../src/passphrase-strength'
+import type { PassphraseStrengthTest, PassphraseVerdict } from '../src/passphrase-strength'
+import { zxcvbnPassphraseTest } from '../src/zxcvbn-passphrase-test'
 import * as TH from './test-helpers'
 
 
@@ -4045,25 +4046,23 @@ const refusingTinyLater = async (passphrase: string): Promise<PassphraseVerdict>
 
 describe("a new passphrase's strength", () => {
 
-  it("by default refuses a vault's first passphrase under 12 characters, with kind 'weak_passphrase', creating nothing", async () => {
+  it("refuses to open without a passphraseStrengthTest, with kind 'bad_option': the vault has no test of its own", async () => {
     const world = makeWorld()
-    const vault = await world.open({ passphraseStrengthTest: undefined })
-    const err = await TH.expectRefusal(vault.unlock('hunter2'), 'weak_passphrase')
-    expect(err.message).to.match(/at least 12 characters/)
-    expect(err.message).to.not.include('hunter2')
-    expect(world.dbStore.ckeys()).to.have.lengthOf(0)
-    expect(vault.getSnapshot().state).to.eq('absent')
-    await vault.unlock('correct horse battery staple')
-    expect(vault.getSnapshot().state).to.eq('unlocked')
+    const err = await TH.expectRefusal(world.open({ passphraseStrengthTest: undefined as unknown as PassphraseStrengthTest }), 'bad_option')
+    expect(err.message).to.match(/passphraseStrengthTest is required/)
+    expect(err.message).to.match(/browserOpts/)
   })
 
-  it("by default refuses a short passphrase added or changed to, and asks for no composition", async () => {
+  it("with zxcvbnPassphraseTest, refuses a common password, or one made of the vault's own names, creating nothing", async () => {
     const world = makeWorld()
-    const vault = await world.openUnlocked('correct horse battery staple', { passphraseStrengthTest: undefined })
-    await TH.expectRefusal(vault.addPassphrase('correct horse battery staple', 'spare', { unlocklabel: 'spare' }), 'weak_passphrase')
-    await TH.expectRefusal(vault.changePassphrase('correct horse battery staple', 'Sh0rt&Sw33t'), 'weak_passphrase')
-    await vault.changePassphrase('correct horse battery staple', 'only lowercase words here')
-    expect(unlocklabelsOf(vault)).to.deep.equal(['passphrase'])
+    const vault = await world.open({ passphraseStrengthTest: zxcvbnPassphraseTest, applabel: 'skylark', vaultlabel: 'pinecone' })
+    const err = await TH.expectRefusal(vault.unlock('password1234'), 'weak_passphrase')
+    expect(err.message).to.match(/commonly used password/)
+    expect(err.message).to.not.include('password1234')
+    await TH.expectRefusal(vault.unlock('skylarkpinecone'), 'weak_passphrase')
+    expect(world.dbStore.ckeys()).to.have.lengthOf(0)
+    await vault.unlock('correct horse battery staple')
+    expect(vault.getSnapshot().state).to.eq('unlocked')
   })
 
   it("never runs at unlock: a vault that stands opens with whatever passphrase made it", async () => {
@@ -4084,7 +4083,7 @@ describe("a new passphrase's strength", () => {
     expect(err.message).to.eq('That one is on every list of guesses: try another.')
     expect(world.dbStore.ckeys()).to.have.lengthOf(0)
     await vault.unlock('pw')
-    expect(strengthTest.mock.calls).to.deep.equal([['acme acme acme'], ['pw']])
+    expect(strengthTest.mock.calls).to.deep.equal([['acme acme acme', TH.scopeOf('u1')], ['pw', TH.scopeOf('u1')]])
   })
 
   it("refuses a weak passphrase at addPassphrase and changePassphrase before any key derivation, changing nothing", async () => {

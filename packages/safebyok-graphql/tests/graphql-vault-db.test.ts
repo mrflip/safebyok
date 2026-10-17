@@ -53,7 +53,7 @@ const thisVault = { vault_id: 'vault-id-u1' }
 
 /** u1's main vault, opened by the core in a browser of its own, over graphqlVaultDB to `schema`. */
 const vaultIn = (schema: GraphQLSchema) => openVault({
-  applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: TH.browserFor(schema, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver,
+  applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: TH.browserFor(schema, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest,
 })
 
 /** A fetch with no network behind it. */
@@ -130,7 +130,7 @@ describe("graphqlVaultDB, a server's lockbox limit", () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
     const vaultDB = graphqlVaultDB({ client: TH.urqlClientFor(schema, 'u1'), maxLockboxes: 3 })
     const refusal = await TH.expectRefusal(openVault({
-      applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, maxLockboxes: 4,
+      applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest, maxLockboxes: 4,
     }), 'bad_option')
     expect(refusal.message).to.include('3 lockboxes')
   })

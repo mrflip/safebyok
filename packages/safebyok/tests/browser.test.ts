@@ -15,10 +15,11 @@ import { openVault } from '../src/vault'
 import * as TH from './test-helpers'
 
 describe("browserOpts", () => {
-  it("supplies the pinned Argon2id deriver and an IndexedDB device store, and nothing else", () => {
+  it("supplies the pinned Argon2id deriver, an IndexedDB device store and the zxcvbn strength test, and nothing else", () => {
     const bag = browserOpts()
-    expect(Object.keys(bag)).to.have.members(['keyDeriver', 'deviceDB'])
+    expect(Object.keys(bag)).to.have.members(['keyDeriver', 'deviceDB', 'passphraseStrengthTest'])
     expect(bag.keyDeriver).to.eq(argon2idWebV1Deriver)
+    expect(bag.passphraseStrengthTest).to.eq(zxcvbnPassphraseTest)
   })
 
   it("never supplies the vault store: the backend is every host's own choice", () => {
@@ -53,6 +54,20 @@ describe("browserOpts", () => {
     vault.close()
   })
 
+  it("yields to a strength test of the host's own, passed after it", async () => {
+    const vault = await openVault({ ...browserOpts({ dbName: TH.freshDbName() }), applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: localVaultDB({ store: memoryStore() }), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest })
+    await vault.unlock('pw')
+    expect(vault.getSnapshot().state).to.eq('unlocked')
+    vault.close()
+  })
+
+  it("brings the zxcvbn test to openVault: a common password is refused at create", async () => {
+    const vault = await openVault({ ...browserOpts({ dbName: TH.freshDbName() }), applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: localVaultDB({ store: memoryStore() }), keyDeriver: TH.testDeriver })
+    await TH.expectRefusal(vault.unlock('password1234'), 'weak_passphrase')
+    expect(vault.getSnapshot().state).to.eq('absent')
+    vault.close()
+  })
+
   it("yields to a field the host passes after it", async () => {
     const { deviceDB } = browserOpts({ dbName: TH.freshDbName() })
     const opts = { ...browserOpts({ dbName: 'acme' }), applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: localVaultDB({ store: memoryStore() }), deviceDB }
@@ -64,8 +79,8 @@ describe("browserOpts", () => {
 })
 
 describe("safebyok/browser", () => {
-  it("exports browserOpts, and the zxcvbn strength test beside it", () => {
-    expect(Object.keys(Browser)).to.have.members(['browserOpts', 'zxcvbnPassphraseTest', 'MinZxcvbnScore'])
+  it("exports browserOpts, and the zxcvbn strength test and its bounds beside it", () => {
+    expect(Object.keys(Browser)).to.have.members(['browserOpts', 'zxcvbnPassphraseTest', 'MinPassphraseChars', 'MinZxcvbnScore'])
   })
 })
 
@@ -83,8 +98,12 @@ describe("zxcvbnPassphraseTest, as openVault's passphraseStrengthTest", () => {
 
 const browserSource = fileURLToPath(new URL('../src/browser.ts', import.meta.url))
 
-/** The minified JavaScript a bundler ships for an app whose only import from safebyok/browser is `imports`. */
-const bundleOf = async (imports: string): Promise<string> => {
+/**
+ * The minified JavaScript a bundler ships for an app whose only import from safebyok/browser is
+ * `imports`: what the page loads at once (the entry and every chunk it imports), and what it loads
+ * only when the code asks for it (each chunk imported dynamically).
+ */
+const bundleOf = async (imports: string): Promise<{ atOnce: string, onDemand: string }> => {
   const appModule = `export { ${imports} } from ${JSON.stringify(browserSource)}`
   const built = await Rolldown.build({
     input:    'app',
@@ -98,20 +117,35 @@ const bundleOf = async (imports: string): Promise<string> => {
       load:      (moduleId) => (moduleId === 'app' ? appModule : null),
     }],
   })
-  return built.output.map((piece) => (piece.type === 'chunk' ? piece.code : '')).join('\n')
+  const chunks = built.output.flatMap((piece) => (piece.type === 'chunk' ? [piece] : []))
+  const byFileName = new Map(chunks.map((chunk) => [chunk.fileName, chunk]))
+  const loadedAtOnce = new Set<string>()
+  const follow = (fileName: string) => {
+    if (loadedAtOnce.has(fileName)) { return }
+    loadedAtOnce.add(fileName)
+    const imports = byFileName.get(fileName)?.imports ?? []
+    for (const imported of imports) { follow(imported) }
+  }
+  const entries = chunks.filter((piece) => piece.isEntry)
+  for (const chunk of entries) { follow(chunk.fileName) }
+  const codeOf = (wanted: boolean) => chunks.filter((chunk) => loadedAtOnce.has(chunk.fileName) === wanted).map((chunk) => chunk.code).join('\n')
+  return { atOnce: codeOf(true), onDemand: codeOf(false) }
 }
 
 // zxcvbn's own word for a match against its dictionaries, and the compressed common-password list.
 const ZxcvbnImplementation = /passwords-common/u
 
 describe("safebyok/browser's tree-shaking", () => {
-  it("leaves zxcvbn and its dictionary out of an app that imports browserOpts alone", async () => {
-    const shipped = await bundleOf('browserOpts')
-    expect(shipped).to.include('safebyok')
-    expect(shipped).to.not.match(ZxcvbnImplementation)
+  it("loads zxcvbn and its dictionary for browserOpts only on demand, never with the page", async () => {
+    const { atOnce, onDemand } = await bundleOf('browserOpts')
+    expect(atOnce).to.include('safebyok')
+    expect(atOnce).to.not.match(ZxcvbnImplementation)
+    expect(onDemand).to.match(ZxcvbnImplementation)
   }, 30_000)
 
-  it("brings zxcvbn in for an app that imports zxcvbnPassphraseTest: the check above can fail", async () => {
-    expect(await bundleOf('zxcvbnPassphraseTest')).to.match(ZxcvbnImplementation)
+  it("loads zxcvbn on demand for an app that imports zxcvbnPassphraseTest alone, too", async () => {
+    const { atOnce, onDemand } = await bundleOf('zxcvbnPassphraseTest')
+    expect(atOnce).to.not.match(ZxcvbnImplementation)
+    expect(onDemand).to.match(ZxcvbnImplementation)
   }, 30_000)
 })

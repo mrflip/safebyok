@@ -62,15 +62,16 @@ import { VaultProvider } from 'safebyok-react'
 </VaultProvider>
 ```
 
-The provider takes every `openVault` option as a prop. `browserOpts()` supplies the two a browser
-app answers like any other, `keyDeriver` and `deviceDB`; `vaultDB` is your backend's adapter. It
-answers the same bag on every call, so it is safe in a render: the provider reopens the vault
-whenever a prop changes identity. So define a `logger` or a `clock` once, outside the component (or
-memoize it): an object literal written in the props is a new one at every render, and reopens
-the vault each time. The provider warns of it once, through your logger (or the console, when
-you pass none), the first time either changes. `passphraseStrengthTest` never reopens it: it
-plays no part in opening, so the vault runs whichever test the latest render passed, and an arrow
-in the props is fine. `validators` is the other exception: the provider watches each schema in
+The provider takes every `openVault` option as a prop. `browserOpts()` supplies the three a
+browser app answers like any other, `keyDeriver`, `deviceDB` and `passphraseStrengthTest`;
+`vaultDB` is your backend's adapter. It answers the same bag on every call, so it is safe in a
+render: the provider reopens the vault whenever a prop changes identity. So define a `logger`, a
+`clock` or a `passphraseStrengthTest` of your own once, outside the component (or memoize it): a
+function or object literal written in the props is a new one at every render, and reopens the
+vault each time, ending any dialog. The provider warns of it once, through your logger (or the
+console, when you pass none), the first time any of them changes. The vault keeps the test it
+was opened with for its life; one that is no function, or none at all, is thrown at the render
+that has it, as `bad_option`, to the nearest error boundary. `validators` is the exception: the provider watches each schema in
 the bag rather than the bag, so `validators={{ boxlabel: BoxlabelCheck }}` is fine in the props, so
 long as `BoxlabelCheck` itself is built once, at module level. A bag with a field it does not know
 (`boxLabel`) is thrown, as `bad_option`, to the nearest error boundary, as `openVault` would refuse
@@ -146,12 +147,12 @@ shows it and a different user (or a sign-out and back in) gets a fresh attempt:
 **The user sees what they can mend.** A wrong passphrase, storage out of reach, a passkey that
 does not answer: each condition shows in the dialog in the vault's own calm words, to try again
 or cancel. So does a new passphrase too easy to guess (`weak_passphrase`): its message is the
-reason the vault's `passphraseStrengthTest` gave, at least 12 characters by default. Pass
-`passphraseStrengthTest={zxcvbnPassphraseTest}` (from `safebyok/browser`) to the provider to turn
-away common passwords and keyboard patterns too; it is a few hundred kB of dictionary, so it is
-its own import. The test is a plain function of the passphrase, so a field of your own can call
-the same one as the user types: `const verdict = passphraseStrengthTest(typed)`, then show
-`verdict.reason` while `verdict.strong` is false (await it, should yours answer a promise).
+reason the vault's `passphraseStrengthTest` gave -- with `browserOpts()`, `zxcvbnPassphraseTest`,
+which asks for 12 characters and turns away common passwords, keyboard patterns and the vault's
+own names. The user hears the same reason before pressing Create, as advice (below). The test is
+a plain function of the passphrase and the vault's scope, so a field of your own can call the
+same one as the user types: `const verdict = await passphraseStrengthTest(typed, vault.getSnapshot().scope)`,
+then show `verdict.reason` while `verdict.strong` is false.
 
 **Anything else never takes your page down.** Misuse -- a closed vault handle, an `rpId` that
 does not fit the page, a vault made with a key deriver this build lacks (as in a tab left open
@@ -208,8 +209,11 @@ It has a Show / Hide button (`aria-pressed`), flipping the field between `passwo
 and is never capitalized, corrected or spell-checked, shown or hidden. Like `WhisperField`, it is
 uncontrolled: React never writes the passphrase into the page.
 
-**Advice while choosing.** Pass `passphraseAdvice`, a function of what has been typed, and what it
-answers shows beside the field as the user chooses a passphrase: tied to the field by
+**Advice while choosing.** By default the dialog says the `passphraseStrengthTest`'s reason as the
+user chooses a weak passphrase, and nothing once the test admits it, so they hear why before
+pressing Create. Pass `passphraseAdvice`, a function of what has been typed, to say something of
+your own instead (the test then goes unasked until Create); what it answers shows beside the field
+as the user chooses a passphrase: tied to the field by
 `aria-describedby`, announced politely (`role="status"`), only the answer to the latest text kept.
 It answers a sentence, or null for nothing to say, and may answer through a promise. It is never
 asked while unlocking, and it is advice, not a gate: the user may still create the vault, and what
@@ -225,9 +229,9 @@ const passphraseAdvice = (typed: string) => (typed.length < 12 ? 'Twelve charact
 An advice function that throws, or rejects, shows the dialog's calm "Something went wrong", as any
 other failure inside it does.
 
-It hears the passphrase itself, in plain text, at every change: keep it on the device. Never send
-it to a server, log it, or let an error tracker capture it as an argument or in a thrown error's
-message.
+It hears the passphrase itself, in plain text, at every change -- and so does the strength test,
+when it gives the advice: keep both on the device. Never send the passphrase to a server, log it,
+or let an error tracker capture it as an argument or in a thrown error's message.
 
 ## The dialog's words
 
