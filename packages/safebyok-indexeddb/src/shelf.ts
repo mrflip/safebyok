@@ -26,10 +26,10 @@ export const shelfOf = (dbName: string): UseStore => {
 
 /**
  * The result of an IndexedDB request, or the outcome of a transaction, as a promise: `idb-keyval`'s
- * `promisifyRequest`, except that it never rejects with null, which would reach a caller as an
- * error with a null cause. A transaction one of whose requests failed rejects with that request's
- * error (the transaction's own is still null when the failure reaches it); a failure the browser
- * gives no error for at all (a transaction aborted from outside) rejects with an Error saying so.
+ * `promisifyRequest`, except that a transaction one of whose requests failed rejects with that
+ * request's error, where the transaction's own is still null when the failure reaches it. A
+ * failure the browser gives no error for at all (a transaction aborted from outside) rejects with
+ * that null, which the VaultDB base class says as `storage_unavailable` with an Error for a cause.
  *
  * @example const standing = await settle<unknown>(store.get(ckey))
  */
@@ -42,11 +42,9 @@ export const settle = async <ValT = undefined>(request: IDBRequest<ValT> | IDBTr
   try {
     return await promisifyRequest<ValT>(request)
   } catch (err) {
-    throw [err, failedRequestError].find((candidate) => candidate instanceof Error) ?? new Error(UnknownFailure)
+    throw err ?? failedRequestError
   }
 }
-
-const UnknownFailure = 'The IndexedDB request failed for an unknown reason: the browser gave no error. Try again shortly.'
 
 /**
  * `work`, run in one readwrite IndexedDB transaction over the shelf: what it reads and what it
