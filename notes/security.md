@@ -1215,26 +1215,32 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
   (`string-store.ts`, listener bookkeeping) call each host listener so that what it throws, or a
   promise it returns that rejects, never escapes: it goes to the logger as an error (the VaultDB's
   `subscribe` only) and to `globalThis.reportError` where the platform has one (`report-error.ts`,
-  looked up at call time). `ChangeBell` and the string stores reach it through the internal
-  `global-logger.ts` (`GlobalLogger.fail(message, story, thrown)`), which hands `thrown` to
-  `reportToPlatform` as it is and uses neither `message` nor `story`; it is not host-pluggable
-  today. The error is the host's own and passed unredacted:
+  looked up at call time). `ChangeBell` and the string stores call
+  `Global.logger.error(message, story, thrown)` from the internal `global.ts`. `Global.logger` is
+  a logger-shaped object (`log`, `warn`, `error`), replaceable by assignment (unguarded; not
+  exposed to hosts yet); its default `error` hands the error to `reportToPlatform` and ignores
+  `message` and `story`, and its `log` and `warn` do nothing. A listener's thrown value that is
+  not an `Error` reaches `reportError` wrapped in an `Error` holding it as `cause`; an `Error`
+  goes as it is. The error is the host's own and passed unredacted:
   safebyok put nothing secret in it, and a host listener that puts a secret in its own error has
   chosen to. In a browser such an error is reported twice, to the logger and to `reportError`, as
   designed.
-* 2026-10-17 (thread 5b, store_base; reversed on branch 20261017-logger_contract): **`openVault`'s
-  logger replaces an adapter's own.** A `VaultDB` is always made with a logger (its base-class
-  constructor demands one; an adapter's factory settles it with `parseLogger(opts.logger)`, the
-  console when the host gave none), kept as the non-enumerable, writable, configurable own
-  property `logger`, so a VaultDB that is logged, spread, JSON-stringified or compared does not
-  show or copy a host's logger. `openVault` hands its logger to the VaultDB through the public
-  `VaultDB.adoptLogger`, and only when the host passed a logger; that logger replaces the
-  adapter's own, whether or not the adapter was made with one, and a VaultDB shared between
-  vaults keeps the latest logger handed it. A host that gave an adapter a redacting or separate
-  logger directly and also passes a logger to `openVault` has the adapter's messages go to the
-  `openVault` logger; to keep them apart it passes no `logger` to `openVault`, or hands the
-  adapter's logger to both. Every logger call is guarded, so a throwing logger never breaks a
-  verb.
+* 2026-10-17 (thread 5b, store_base; revised on branch 20261017-logger_contract): **an adapter's
+  logger is fixed when it is made; `openVault`'s is not handed to it.** A `VaultDB` is made with a
+  logger and keeps it from then on: the base-class constructor demands `{ logger }` and refuses
+  none as `bad_option`; an adapter's factory settles it with `parseLogger(opts.logger)`, which
+  answers one shared console logger, made once, when the host gave none. It is kept as the
+  non-enumerable, writable, configurable own property `logger`, so a VaultDB that is logged,
+  spread, JSON-stringified or compared does not show or copy a host's logger. `openVault`'s
+  `logger` is the vault's alone and is not handed to the storage adapter: an adapter made with
+  its own logger keeps it, and one made with none logs to the console, whatever `openVault` is
+  given. A host that wants one logger to hear both passes it to both; one that wants an adapter's
+  messages apart passes that adapter its own. Every logger call is guarded, so a throwing logger
+  never breaks a verb, except a logger the host marked `_safebyok_modded`. `parseLogger` is
+  idempotent: a logger it has guarded carries a non-enumerable property `_safebyok_modded: true`
+  and comes back as itself; a host may set that property on its own logger to have safebyok take
+  it unguarded (shape still checked), so that a throwing or rejecting logger of the host's can
+  then break a lock, an open or a store.
 * 2026-10-17 (thread 5b, store_base): **Convex carries no cause on any refusal.** `convexVaultDB`
   (`safebyok-convex/src/convex-vault-db.ts`) refuses with no `cause` at all -- `identity_revoked`,
   `vault_full` and `storage_unavailable` alike -- because a Convex error on a dev deployment may

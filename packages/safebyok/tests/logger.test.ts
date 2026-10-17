@@ -41,6 +41,33 @@ describe("parseLogger", () => {
     expect(warn).toHaveBeenCalledWith('safebyok: a refresh failed', { call: 'refresh' })
   })
 
+  it("answers the one console logger, made once, whenever it is given none", () => {
+    expect(parseLogger(undefined)).to.eq(parseLogger(undefined))
+  })
+
+  it("guards a logger once: one it has guarded comes back as itself, however many layers hand it down", () => {
+    const spy = TH.spyLogger()
+    const guarded = parseLogger(spy.logger)
+    expect(guarded).to.not.eq(spy.logger)
+    expect(parseLogger(guarded)).to.eq(guarded)
+    const fallback = parseLogger(undefined)
+    expect(parseLogger(parseLogger(fallback))).to.eq(fallback)
+  })
+
+  it("marks a guarded logger with a property that is not enumerable, so that spreading or listing it shows nothing", () => {
+    const guarded = parseLogger(TH.spyLogger().logger)
+    expect(Object.getOwnPropertyDescriptor(guarded, '_safebyok_modded')).to.include({ value: true, enumerable: false })
+    expect(Object.keys(guarded)).to.deep.equal(['log', 'warn', 'error'])
+  })
+
+  it("takes a logger the host marked `_safebyok_modded` as it is, unguarded, and still refuses a marked non-logger", () => {
+    const hostGuarded = { log: () => undefined, warn: () => undefined, error: () => { throw new Error('the host chose not to be guarded') }, _safebyok_modded: true }
+    const taken = parseLogger(hostGuarded)
+    expect(taken).to.eq(hostGuarded)
+    expect(() => { taken.error('x') }).to.throw('the host chose not to be guarded')
+    expect(() => parseLogger({ _safebyok_modded: true } as unknown as VaultLogger)).to.throw(VaultError, /log, warn and error functions/)
+  })
+
   it("takes the console itself", () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => { /* kept out of the test output */ })
     parseLogger(console).error('the adapter is broken')

@@ -71,7 +71,7 @@ export type ConvexVaultDBOpts = VaultDBOpts & {
  *   left, the browser console, where the Convex client reports its connection.
  *
  * @param opts - Your app's Convex `client`, the safebyok functions as its `api`, and optionally a
- *   `logger`, the console without one, or the vault's when `openVault` is given one: it hears a ConvexClient watch that fails.
+ *   `logger`, the console without one (give `openVault` the same one to hear both): it hears a ConvexClient watch that fails.
  * @returns The VaultDB, holding at most 1 MiB in one record, Convex's document limit, and 8 MiB
  *   in one vault, half of what one Convex function may read (erasing a vault reads it twice), in
  *   at most 8,000 lockboxes, the component's own limit.

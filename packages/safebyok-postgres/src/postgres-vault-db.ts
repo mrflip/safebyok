@@ -89,7 +89,7 @@ export type PostgresVaultDBOpts = VaultDBOpts & {
  *   own error as its `cause`. Every refusal is a VaultError, whose `kind` a wire can carry.
  *
  * @param opts - The `client`, the `userId` this request is for, an optional `listen`, an
- *   optional `maxLockboxes`, and an optional `logger`, which hears a `listen` that fails (the console without one, or the vault's when `openVault` is given one).
+ *   optional `maxLockboxes`, and an optional `logger`, which hears a `listen` that fails (the console without one; give `openVault` the same one to hear both).
  * @returns The VaultDB, holding at most 1 MiB in one record and `maxLockboxes` lockboxes in one
  *   vault, setting no limit on a vault's bytes; its `listBoxRecords` lists a vault as stored, for
  *   a route to serve.

@@ -99,6 +99,21 @@ describe("ChangeBell", () => {
     }
   })
 
+  it("reports a listener that throws something other than an Error as an Error holding it as its cause", async () => {
+    const reported: unknown[] = []
+    vi.stubGlobal('reportError', (err: unknown) => { reported.push(err) })
+    try {
+      const bellname = freshBell()
+      const stop = ChangeBell.listen(bellname, () => { throw 'a string, thrown' }) // eslint-disable-line @typescript-eslint/only-throw-error
+      ChangeBell.ring(bellname)
+      await vi.waitFor(() => { expect(reported).to.have.lengthOf(1) })
+      expect(reported[0]).to.be.instanceOf(Error).with.property('cause', 'a string, thrown')
+      stop()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it("calls the other listeners when one throws, and lets nothing escape as an uncaught error", async () => {
     const bellname = freshBell()
     const heard: string[] = []

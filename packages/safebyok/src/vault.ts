@@ -138,8 +138,9 @@ export type OpenVaultOpts = {
    * background refresh that failed, a remembered unlock it could not read -- as a
    * {@link VaultLogger}: `log`, `warn` and `error` functions. Default: the console. The vault hands
    * it no secret material or option's value (a host's own error goes as the host made it); whatever
-   * it throws is ignored. Pass functions that do nothing for quiet. Kind 'bad_option' for anything
-   * else.
+   * it throws is ignored. Pass functions that do nothing for quiet. It is the vault's own: a storage
+   * adapter keeps the logger it was made with, so give its factory the same one to hear both. Kind
+   * 'bad_option' for anything else.
    */
   logger?: VaultLogger | undefined
   /**
@@ -591,8 +592,6 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   const deviceDB = deviceTroubleAsConditions(parseDeviceDB(opts.deviceDB))
   const reentryMillis = parseForcePassphraseReentryHours(opts.forcePassphraseReentryHours)
   const logger = parseLogger(opts.logger)
-  // A logger the host gave is its storage's too, in place of the storage's own.
-  if (opts.logger !== undefined) { givenVaultDB.adoptLogger(logger) }
   const clock = parseClock(opts.clock)
   // Every reading of the host's clock is checked, this first one so that a clock counting in the
   // wrong unit fails the open rather than some later call.

@@ -44,22 +44,35 @@ const loggerCall = Z.custom<VaultLogger['log']>((candidate) => typeof candidate 
 const loggerShape = Z.object({ log: loggerCall, warn: loggerCall, error: loggerCall })
 
 /**
+ * The mark on a logger that safebyok has made safe to call, a non-enumerable property. A marked
+ * logger is taken as it is, so a logger handed down through several layers is guarded once, and
+ * stays the same object.
+ */
+const GuardMark = '_safebyok_modded'
+
+/**
  * The logger a vault keeps: the host's, or the console when there is none, made safe to call --
  * whatever the host's throws or rejects with is dropped. Kind 'bad_option' for anything that is
  * not an object carrying `log`, `warn` and `error` functions. A binding that has something of
  * its own to say, beside the vault it opens, says it here, through the same logger.
  *
+ * It is idempotent: a logger it has made safe comes back as itself, and with none, every call
+ * answers the one console logger, made once. A logger carrying the property `_safebyok_modded:
+ * true` is taken as it is, unguarded -- the way to keep safebyok's hands off your logger; one that
+ * then throws can break a lock, an open or a store.
+ *
  * @param candidate - The host's logger, as handed to openVault.
  *
  * @example parseLogger(props.logger).warn('VaultProvider reopened the vault for a logger rebuilt in render', { call: 'VaultProvider' })
  * @example parseLogger(undefined).log('opened')  // to the console: 'safebyok: opened'
+ * @example parseLogger(undefined) === parseLogger(undefined)  // true: the one console logger
  */
 export const parseLogger = (candidate: VaultLogger | undefined): VaultLogger => {
-  if (candidate === undefined) { return guarded(consoleLogger) }
+  if (candidate === undefined) { return DefaultLogger }
   if (! loggerShape.safeParse(candidate).success) {
     throw new VaultError('bad_option', 'logger is not a VaultLogger: it needs log, warn and error functions. Leave it out to log to the console, or pass functions that do nothing to log nowhere.')
   }
-  return guarded(candidate)
+  return (candidate as Record<string, unknown>)[GuardMark] === true ? candidate : guarded(candidate)
 }
 
 /**
@@ -68,12 +81,22 @@ export const parseLogger = (candidate: VaultLogger | undefined): VaultLogger => 
  */
 type AnyReturningLogger = Record<VaultLoggerLevel, (message?: string, story?: Record<string, unknown>, err?: Error | null) => unknown>
 
-/** `hostLogger`, each call made so that nothing it throws or rejects with reaches the vault. */
-const guarded = (hostLogger: AnyReturningLogger): VaultLogger => ({
-  log:   (message, story, err) => { tell(hostLogger, 'log', message, story, err) },
-  warn:  (message, story, err) => { tell(hostLogger, 'warn', message, story, err) },
-  error: (message, story, err) => { tell(hostLogger, 'error', message, story, err) },
-})
+/** `hostLogger`, each call made so that nothing it throws or rejects with reaches the vault; marked as guarded. */
+const guarded = (hostLogger: AnyReturningLogger): VaultLogger => {
+  const safe: VaultLogger = {
+    log:   (message, story, err) => { tell(hostLogger, 'log', message, story, err) },
+    warn:  (message, story, err) => { tell(hostLogger, 'warn', message, story, err) },
+    error: (message, story, err) => { tell(hostLogger, 'error', message, story, err) },
+  }
+  Object.defineProperty(safe, GuardMark, { value: true, enumerable: false })
+  return safe
+}
+
+/**
+ * The console logger, guarded, made once: what every vault, VaultDB and binding logs to when its
+ * host gave it none. One object, so that it is the same one wherever it is the default.
+ */
+export const DefaultLogger: VaultLogger = guarded(consoleLogger)
 
 const tell = (hostLogger: AnyReturningLogger, level: VaultLoggerLevel, message?: string, story?: Record<string, unknown>, err?: Error | null) => {
   try {

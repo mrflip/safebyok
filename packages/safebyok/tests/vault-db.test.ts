@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { memoryStore } from '../src/string-store'
 import { VaultDB, jsonBytes, localVaultDB, type BundleExpectation, type EraseExpectation, type LockboxExpectation, type StoredLockbox, type VaultDBInit, type VaultDBOpts, type WatchTrouble } from '../src/vault-db'
 import { VaultError } from '../src/errors'
+import type { VaultLogger } from '../src/logger'
 import type { Lockbox } from '../src/lockbox'
 import type { VaultBundle, VaultScope } from '../src/types'
 import * as Ckeys from '../src/ckeys'
@@ -133,6 +134,9 @@ class RingingVaultDB extends MapVaultDB {
 
   /** The logger it says things through, as it stands. */
   loggerNow() { return this.logger }
+
+  /** Puts `logger` in place of it, as a host's hook or a test may. */
+  swapLogger(logger: VaultLogger) { this.logger = logger }
 
   protected override doSubscribe(_scope: VaultScope, onChange: () => void) {
     this.trouble = this.watchTrouble("This vault's watch failed: other devices' changes may not show until its next read.")
@@ -763,26 +767,6 @@ describe("the abstract VaultDB, its logger", () => {
     expect(spy.calls.map((call) => call.level)).to.deep.equal(['error'])
   })
 
-  it("says it through the logger the vault it serves handed it, in place of the one it was made with", () => {
-    const own = TH.spyLogger()
-    const handed = TH.spyLogger()
-    const vaultDB = failingListenerOn({ logger: own.logger })
-    vaultDB.adoptLogger(handed.logger)
-    vaultDB.ring()
-    expect(own.calls).to.have.lengthOf(0)
-    expect(handed.calls).to.have.lengthOf(1)
-  })
-
-  it("keeps the latest logger handed it, serving several vaults", () => {
-    const first = TH.spyLogger()
-    const latest = TH.spyLogger()
-    const vaultDB = failingListenerOn()
-    vaultDB.adoptLogger(first.logger)
-    vaultDB.adoptLogger(latest.logger)
-    vaultDB.ring()
-    expect([first.calls.length, latest.calls.length]).to.deep.equal([0, 1])
-  })
-
   it("is made with a logger or refused, kind 'bad_option', whatever is handed super() in place of one", () => {
     for (const init of [{}, { logger: undefined }, null]) {
       const made = () => new MapVaultDB(Infinity, new Map(), {}, init as unknown as VaultDBInit)
@@ -791,13 +775,20 @@ describe("the abstract VaultDB, its logger", () => {
   })
 
   it("keeps its logger as an own property that is writable and configurable, and neither listed nor copied", () => {
-    const spy = TH.spyLogger()
-    const vaultDB = failingListenerOn({ logger: spy.logger })
-    vaultDB.adoptLogger(TH.spyLogger().logger)
+    const vaultDB = failingListenerOn({ logger: TH.spyLogger().logger })
     expect(Object.getOwnPropertyDescriptor(vaultDB, 'logger')).to.include({ enumerable: false, writable: true, configurable: true })
     expect(Object.keys(vaultDB)).to.not.include('logger')
     expect(Object.keys(Object.assign({}, vaultDB))).to.not.include('logger')
     expect(JSON.stringify(vaultDB)).to.not.include('logger')
+  })
+
+  it("says it through a logger swapped in after it was made, the property being writable", () => {
+    const own = TH.spyLogger()
+    const swapped = TH.spyLogger()
+    const vaultDB = failingListenerOn({ logger: own.logger })
+    vaultDB.swapLogger(swapped.logger)
+    vaultDB.ring()
+    expect([own.calls.length, swapped.calls.length]).to.deep.equal([0, 1])
   })
 
   it("keeps one logger, rather than one built for each line it says", () => {
@@ -826,9 +817,8 @@ describe("the abstract VaultDB, its logger", () => {
   ] as const
 
   for (const [logger, blurb] of BadLoggers) {
-    it(`refuses ${blurb} as a logger with kind 'bad_option', made with it or handed it`, () => {
+    it(`refuses ${blurb} as a logger with kind 'bad_option', made with it`, () => {
       expect(() => new RingingVaultDB({ logger: logger as unknown as VaultDBOpts['logger'] })).to.throw(VaultError).with.property('kind', 'bad_option')
-      expect(() => { new RingingVaultDB().adoptLogger(logger as unknown as NonNullable<VaultDBOpts['logger']>) }).to.throw(VaultError).with.property('kind', 'bad_option')
     })
   }
 })

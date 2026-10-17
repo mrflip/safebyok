@@ -75,9 +75,9 @@ export type StoredLockbox = { boxlabel: string, lockbox: unknown }
 export type VaultDBOpts = {
   /**
    * Where the VaultDB says what it has nobody to throw to: a subscriber's listener that threw, a
-   * watch that failed to start or dropped. Without one it says it to the console, until `openVault`
-   * is given a logger of its own, which it then takes up. Kind 'bad_option' for anything that is
-   * not a VaultLogger.
+   * watch that failed to start or dropped. Fixed when the VaultDB is made, and not the logger
+   * `openVault` is given, which is the vault's alone: hand both the same one to have one logger
+   * hear both. Without one, the console. Kind 'bad_option' for anything that is not a VaultLogger.
    */
   logger?: VaultLogger | undefined
 }
@@ -193,9 +193,9 @@ export abstract class VaultDB {
   abstract readonly maxNameBytes: number
 
   /**
-   * Where this VaultDB says what it has nobody to throw to: always a logger, the one it was made
-   * with until {@link adoptLogger} replaces it. Each call is guarded: a logger that throws breaks
-   * nothing. An own property, writable and configurable, and not enumerable, so that a VaultDB
+   * Where this VaultDB says what it has nobody to throw to: always a logger, fixed when it is made.
+   * Each call is guarded: a logger that throws breaks nothing. An own property, writable and
+   * configurable so that a host or a test may swap it, and not enumerable, so that a VaultDB
    * logged, spread or compared never shows or copies a host's logger.
    */
   protected declare logger: VaultLogger
@@ -210,20 +210,6 @@ export abstract class VaultDB {
       throw new VaultError('bad_option', 'A VaultDB is made with a logger: hand `super()` { logger }. An adapter\'s factory settles it with parseLogger(opts.logger), which is the console when the host gave none.')
     }
     Object.defineProperty(this, 'logger', { value: parseLogger(given), writable: true, configurable: true, enumerable: false })
-  }
-
-  /**
-   * Has this VaultDB log through `logger` from now on, in place of the one it had. `openVault`
-   * calls it with the logger it was given, when it was given one, so one logger hears both the
-   * vault and its storage; a host rarely needs to. A VaultDB serving several vaults keeps the
-   * latest handed it. Kind 'bad_option' for anything that is not a VaultLogger.
-   *
-   * @param logger - The logger of the vault this VaultDB serves.
-   *
-   * @example vaultDB.adoptLogger(telemetryLogger)  // as openVault({ ...opts, vaultDB, logger: telemetryLogger }) does
-   */
-  adoptLogger(logger: VaultLogger): void {
-    this.logger = parseLogger(logger)
   }
 
   // ------------------------------------------------------------------- the verbs safebyok calls

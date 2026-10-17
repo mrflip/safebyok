@@ -5582,43 +5582,27 @@ describe("the logger", () => {
     }
   })
 
-  it("is the vaultDB's too: what its storage has nobody to throw to, the vault's logger hears", async () => {
-    const world = makeWorld()
-    const vault = await world.open()
-    vault.subscribe(() => undefined)
-    world.vaultDB.subscribe(TH.scopeOf('u1'), () => { throw new Error('a listener of the host that throws') })
-    await vault.unlock('pw')
-    expect(world.logged.map((call) => [call.level, call.story])).to.deep.include(['error', { call: 'subscribe' }])
-  })
-
-  it("is the vaultDB's in place of one it was made with, when the host passes one", async () => {
+  it("is not the vaultDB's: what its storage has nobody to throw to goes to the logger the storage was made with", async () => {
     const world = makeWorld()
     const own = TH.spyLogger()
     const vaultDB = localVaultDB({ store: world.dbStore, logger: own.logger })
     await world.open({ vaultDB })
     vaultDB.subscribe(TH.scopeOf('u1'), () => { throw new Error('a listener of the host that throws') })
     await vaultDB.createBundle(TH.bundleOf('u1'))
-    expect(own.calls).to.have.lengthOf(0)
-    expect(world.logged).to.have.lengthOf(1)
+    expect(own.calls).to.have.lengthOf(1)
+    expect(world.logged).to.have.lengthOf(0)
   })
 
-  it("leaves the vaultDB its own logger when the host passes the vault none", async () => {
+  it("is not the vaultDB's when the vaultDB was made with none: that one logs to the console, whatever the vault is given", async () => {
     const world = makeWorld()
-    const own = TH.spyLogger()
-    const vaultDB = localVaultDB({ store: world.dbStore, logger: own.logger })
-    await world.open({ vaultDB, logger: undefined })
+    const consoleErrors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const vaultDB = localVaultDB({ store: world.dbStore })
+    await world.open({ vaultDB })
     vaultDB.subscribe(TH.scopeOf('u1'), () => { throw new Error('a listener of the host that throws') })
     await vaultDB.createBundle(TH.bundleOf('u1'))
-    expect(own.calls).to.have.lengthOf(1)
-  })
-
-  it("is handed to the vaultDB only when the host passes one: a vault opened with none leaves the vaultDB's as it was", async () => {
-    const world = makeWorld()
-    await world.open()
-    await world.open({ logger: undefined })
-    world.vaultDB.subscribe(TH.scopeOf('u1'), () => { throw new Error('a listener of the host that throws') })
-    await world.vaultDB.createBundle(TH.bundleOf('u1'))
-    expect(world.logged).to.have.lengthOf(1)
+    expect(consoleErrors).toHaveBeenCalledOnce()
+    expect(world.logged).to.have.lengthOf(0)
+    consoleErrors.mockRestore()
   })
 
   it("refuses a logger that is not one, before reading storage", async () => {

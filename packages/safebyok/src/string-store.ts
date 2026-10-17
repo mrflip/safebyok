@@ -1,5 +1,5 @@
 import { VaultError } from './errors'
-import * as GlobalLogger from './global-logger'
+import { Global, asThrown } from './global'
 
 /**
  * The smallest storage the local adapters need: strings by string ckey, with change notification
@@ -21,7 +21,7 @@ export type StringStore = {
  * Listener bookkeeping shared by both stores. A listener that is not a function is refused as it
  * subscribes, with kind 'bad_option', rather than breaking some later write that rings it. Each
  * listener is called in turn, as the write lands; one that throws stops no other and fails no
- * write, and what it threw goes to the global logger.
+ * write, and what it threw goes to `Global.logger`.
  */
 const makeBell = () => {
   const listeners = new Set<() => void>()
@@ -39,7 +39,7 @@ const callQuietly = (listener: () => void) => {
   try {
     listener()
   } catch (err) {
-    GlobalLogger.fail('A listener of a string store threw. The write landed, and every other listener was called.', { call: 'StringStore' }, err)
+    Global.logger.error('A listener of a string store threw. The write landed, and every other listener was called.', { call: 'StringStore' }, asThrown(err))
   }
 }
 

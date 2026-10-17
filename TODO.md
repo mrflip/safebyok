@@ -20,7 +20,7 @@ Small irritants, each a few lines, picked up by whoever is nearby.
 
 * **A host's logger does not hear the change bell or the string stores.** A listener of
   `ChangeBell` or of a string store (`memoryStore`, `domStore`) that throws is reported through
-  `GlobalLogger` (`packages/safebyok/src/global-logger.ts`) to the platform's `reportError`, never
+  `Global.logger` (`packages/safebyok/src/global.ts`) to the platform's `reportError`, never
   to the `logger` a host gave `openVault`; on Node and Bun there is no `reportError`, so no one
   hears it.
 

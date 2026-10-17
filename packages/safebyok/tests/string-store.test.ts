@@ -75,6 +75,20 @@ describe("domStore", () => {
 })
 
 describe("the stores' bell", () => {
+  it("reports a listener that throws something other than an Error as an Error holding it as its cause", () => {
+    const reported: unknown[] = []
+    vi.stubGlobal('reportError', (err: unknown) => { reported.push(err) })
+    try {
+      const store = memoryStore()
+      store.subscribe(() => { throw 'a string, thrown' }) // eslint-disable-line @typescript-eslint/only-throw-error
+      store.write('greeting', 'hi')
+      expect(reported).to.have.lengthOf(1)
+      expect(reported[0]).to.be.instanceOf(Error).with.property('cause', 'a string, thrown')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it("rings every other listener, and lands the write, when one throws: what it threw goes to the platform's reportError", () => {
     const reported: unknown[] = []
     vi.stubGlobal('reportError', (err: unknown) => { reported.push(err) })
