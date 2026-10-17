@@ -9,6 +9,15 @@ What is reasonable but deferred is in `NOTYET.md`: do not anticipate it in your 
 
 Small irritants, each a few lines, picked up by whoever is nearby.
 
+* **`postgres` a required check, once it has run a while.** Ruled 2026-10-16
+  ([#131](https://github.com/mrflip/safebyok/pull/131), the Postgres container): CI's `postgres`
+  job runs the VaultDB battery, its races and the `23503` case over a real server, and is not
+  required by the main ruleset until it has a record. The ruleset is the Coach's to change.
+* **`node-compat (22)` a required check.** Ruled 2026-10-16
+  ([#130](https://github.com/mrflip/safebyok/pull/130)): the job gates on Node 22, the platform
+  floor (`engines`), and only reports on the newest Node. A workflow cannot make a check
+  required; the ruleset is the Coach's to change.
+
 ## Roadmapped
 
 In order. A later item that depends on an earlier one says so.
@@ -32,6 +41,14 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
   stored schema with Zod's own `toJSONSchema`, keyed by its `format` literal, and fails with
   "bump `format`" when a schema changes under the same literal, so a loosened check (`.min(1)`
   to `.min(0)`) cannot ship unmarked.
+
+* **`ShelfVaultDB`, a base for key-value stores.** Declined for the store-base sprint, ruled
+  2026-10-16 ("agree, add as a TODO"; thread 5b, [#137](https://github.com/mrflip/safebyok/pull/137)).
+  A connector over a list/get/put shelf writes one atomic step, and the base writes every verb on
+  top of it, folding `localVaultDB` and `idbVaultDB` into it. It needs a short promise chain we
+  would hand-roll, so it waits for a later design; the shared expectation checks of the store base
+  are built, and this builds on them (`whiteboard/20261016-push_to_100_a/store-base-design.md`,
+  while it stands).
 
 ## Soonish
 
@@ -84,4 +101,43 @@ and `lockSoon()` already gives a grace in which work started before it finishes 
 started before it hands back a whisper after it), and if so, is a re-check after storage enough,
 or does the whisper's decryption also need to be refused once the key is gone?
 
+### Are we doing anyone a favor by accepting multiple passphrases?
+
+From [#126](https://github.com/mrflip/safebyok/pull/126) (thread 6): `changePassphrase` takes any
+proof, a passkey's included, and when a vault has several passphrases and the proof is a passkey,
+the caller must name which to replace (`unlockId`), or the call is refused rather than guessing.
+The Coach (2026-10-16): "keep as built, but this is too complicated for a user to tolerate or a
+customer to implement UX for." Decide whether a vault should hold more than one passphrase at
+all, or exactly one, with passkeys the other ways in. The Gripefest doc's NOT YET row G530 asks the
+deeper question beside it: whether a periodic passphrase re-entry is still the right demand once a
+vault has a passkey. Decide both before the ways-in surface is 1.0.
+
+### Identity should not be tied to the backing database
+
+The Coach (2026-10-16), in a note to the push_to_100_a sprint: "Identity should not be tied to the
+backing database." No design yet. Today a vault is found by the scope's `user_id`, which each
+storage adapter reads from the host's own auth (a Convex subject, a Postgres `userId`, a GraphQL
+context); the question is what a vault's identity is, so that a host can change its database
+without orphaning vaults.
+
+### Call-time work that could be composed once or memoized
+
+The Coach (2026-10-16), on thread 5b: `reportError` is checked at call time and stands, but review
+the package for other work done on every call that could be composed once when the vault or the
+adapter is made, or memoized: a check of an option, a formatter, a validator built per call. Measure
+first; maintainability beats speed unless something is shown slow.
+
+### A ways-in change racing this handle's own refresh
+
+From thread 4 ([#132](https://github.com/mrflip/safebyok/pull/132), `thread-4-refusals_and_catchup.md`,
+*A pre-existing race*): during a change to the ways in, this handle's own bell refresh can read the
+new bundle before `reviseUnlocks` sets it, judge the key `outlived`, drop it and erase the
+remembered unlock. `takeUpUnlock` restores the key in memory, but that erase can land after the
+new record, so the next open asks for the passphrase. The direction is safe, and serializing the
+refreshes does not cure it. The Coach (2026-10-16): into the TODO, beside the multiple-passphrases
+question. The fix, small: do not judge `outlived` against a bundle this handle wrote itself.
+
 ## RAGEBAIT
+
+Moved to `NOTYET.md`, which holds the shelf.
+
