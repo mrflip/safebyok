@@ -72,7 +72,8 @@ from the thread file and `git log`, not from the build's history:
 - **Push** the reviewer's commits with the builder's; after a catch-up rebase, with
   `--force-with-lease=<branch>:<the sha last pushed>` (`git rev-parse origin/<branch>` before
   the rebase). Bring the PR's body up to date.
-- **Clean up**: `git -C <main checkout> worktree remove <root>`. Then report `filed`.
+- **Clean up**: `scripts/clear-ds-store.sh` in your root first (a Finder `.DS_Store` stops the
+  removal half done), then `git -C <main checkout> worktree remove <root>`. Then report `filed`.
 
 ## Significant questions
 
@@ -123,7 +124,13 @@ The same facts, to different readers, at different altitudes. Every channel is w
   justify results. Then: a few sentences of what you built; deviations and suppressions
   (`eslint-disable`, `ts-expect-error`); questions, split **blocking** and **minor**; what you
   looked up in the plan or progress document that the handoff did not give you; the exact state
-  you left your worktree in. No file dumps: point at your thread file.
+  you left your worktree in. No file dumps: point at your thread file. End every report with
+  **Open matters**: each question you leave open anywhere, one line each, a bold handle and your
+  recommendation, so the orchestrator can put every one before the Coach. Repeat one from an
+  earlier report only if it changed.
+* **A Coach ruling relayed to you** on a question you raised: restate it in one line beside the
+  question wherever it stands (PR description, thread file, `human/` entry), as
+  `→ *Coach (YYYY-MM-DD):* <the ruling, briefly>`, leaving the question in place.
 
 ## Never
 
