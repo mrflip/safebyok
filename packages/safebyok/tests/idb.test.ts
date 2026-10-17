@@ -114,6 +114,20 @@ describe("idbDeviceDB", () => {
     unsubscribe()
   })
 
+  it("rings another tab's inspector for a write with nothing in this tab listening", async () => {
+    const dbName = TH.freshDbName()
+    // Another tab's inspector of the device shelf: a channel of the shelf's bell, opened apart.
+    const otherTab = new BroadcastChannel(`safebyok-idb:${dbName}:device_db`)
+    const otherHeard: unknown[] = []
+    otherTab.addEventListener('message', (event) => { otherHeard.push(event.data) })
+    try {
+      await idbDeviceDB({ dbName }).eraseUnlock(TH.scopeOf('u1'))
+      await vi.waitFor(() => { expect(otherHeard).to.deep.equal(['changed']) })
+    } finally {
+      otherTab.close()
+    }
+  })
+
   it("forgets the scope's own unlock at an erase even when the sweep fails", async () => {
     const dbName = TH.freshDbName()
     const deviceDB = idbDeviceDB({ dbName })

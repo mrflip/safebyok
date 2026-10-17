@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Client, CombinedError, fetchExchange } from '@urql/core'
 import { executeExchange } from '@urql/exchange-execute'
-import { buildSchema, type GraphQLSchema } from 'graphql'
+import { GraphQLError, buildSchema, type GraphQLSchema } from 'graphql'
 import { VaultError, memoryDeviceDB, openVault } from 'safebyok'
 import { postgresVaultDB } from 'safebyok-postgres'
 import * as TH from './test-helpers'
@@ -232,6 +232,19 @@ describe("graphqlVaultDB, its refusals", () => {
     const refusal = await TH.refusalOf(graphqlVaultDB({ client: mute as unknown as GraphqlVaultClient }).readBundle(u1))
     expect(refusal.kind).to.eq('storage_unavailable')
   })
+
+  for (const code of ['BAD_USER_INPUT', 'GRAPHQL_VALIDATION_FAILED']) {
+    it(`refuses a server's ${code} as bad_option, quoting nothing of it`, async () => {
+      const quoting = new GraphQLError('Variable "$lockbox" got invalid value "sk-ant-not-a-real-key"', { extensions: { code } })
+      const answered = { toPromise: () => Promise.resolve({ error: new CombinedError({ graphQLErrors: [quoting] }) }) }
+      const strict = { query: () => answered, mutation: () => answered, subscription: () => answered }
+      const refusal = await TH.refusalOf(graphqlVaultDB({ client: strict as unknown as GraphqlVaultClient }).readBundle(u1))
+      expect(refusal.kind).to.eq('bad_option')
+      expect(refusal.message).to.include('VaultSchemaSdl')
+      expect(refusal.cause).to.be.undefined
+      expect(JSON.stringify({ ...refusal, message: refusal.message })).to.not.include('sk-ant')
+    })
+  }
 
   it("passes over a GraphQL error whose kind is not a VaultError's", async () => {
     const schema = buildSchema('type Query { safebyokReadBundle(scope: SafebyokVaultScopeInput!): Boolean } input SafebyokVaultScopeInput { applabel: String!, user_id: String!, vaultlabel: String! }')

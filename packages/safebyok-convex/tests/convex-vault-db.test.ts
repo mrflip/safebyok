@@ -380,6 +380,42 @@ describe("convexVaultDB.subscribe", () => {
 /** The README's example: a vault opened over the app's own Convex client. */
 const openOver = (client: ConvexVaultClient, api: SafebyokApi) => openVault(TH.memoryVaultOpts({ vaultDB: convexVaultDB({ client, api }) }))
 
+const resolvesNull = () => Promise.resolve(null)
+const unwatches = () => undefined
+
+/** A ConvexClient whose one watch the test drives by hand: `heard` delivers, `failed` errs. */
+const handDrivenClient = () => {
+  const watch = { heard: (): unknown => undefined, failed: (_err: Error): unknown => undefined }
+  const client = {
+    query:    resolvesNull,
+    mutation: resolvesNull,
+    onUpdate: (_queryRef: unknown, _args: unknown, onUpdate: (result: unknown) => unknown, onError: (err: Error) => unknown) => {
+      watch.heard = () => onUpdate(null)
+      watch.failed = onError
+      return unwatches
+    },
+  }
+  return { client: client as unknown as ConvexVaultClient, watch }
+}
+
+describe("convexVaultDB.subscribe, when its ConvexClient watch fails", () => {
+  it("warns once for a failing streak, calling onChange each time, and again once it has heard between", () => {
+    const spy = TH.spyLogger()
+    const { client, watch } = handDrivenClient()
+    const onChange = vi.fn()
+    convexVaultDB({ client, api: anyApi['safebyok'] as unknown as SafebyokApi, logger: spy.logger }).subscribe(u1, onChange)
+    watch.failed(new Error('socket closed'))
+    watch.failed(new Error('socket closed'))
+    expect(spy.calls.map((heard) => heard.level)).to.deep.equal(['warn'])
+    expect(onChange).toHaveBeenCalledTimes(2)
+    watch.heard()
+    watch.failed(new Error('socket closed again'))
+    expect(spy.calls.map((heard) => heard.level)).to.deep.equal(['warn', 'warn'])
+    expect(spy.calls[1]!.err?.message).to.eq('socket closed again')
+    expect(onChange).toHaveBeenCalledTimes(4)
+  })
+})
+
 describe("a vault over convexVaultDB, opened before sign-in", () => {
   for (const [clientTitle, connect] of ClientCases) {
     it(`is refused as identity_revoked over a ${clientTitle}, leaving no watch live on the deployment`, async () => {
