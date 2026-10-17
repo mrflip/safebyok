@@ -4,6 +4,7 @@ import type { PoolConfig } from 'pg'
 import { randomBytes } from 'node:crypto'
 import { VaultChangeChannel, VaultNotifySql, VaultTablesSql, postgresVaultDB } from 'safebyok-postgres'
 import type { PostgresListen } from 'safebyok-postgres'
+import type { VaultDBOpts } from 'safebyok'
 import { boxOf, bundleOf, noBoxYet, perUser, scopeOf, throughTurnstile } from 'safebyok/testing'
 import type { MakeVaultDBDevices, Turnstile, VaultDBVerbs } from 'safebyok/testing'
 
@@ -183,10 +184,10 @@ const poolConfigFor = ({ isolation }: DeviceKind): PoolConfig => {
  *
  * @param db - The file's database.
  * @param turnstile - Where the race holds this device's round trips; omit for a device that races none.
- * @param deviceOpts - The lockbox limit to hold the device to; and `kind`, its pool's isolation level.
+ * @param deviceOpts - The lockbox limit to hold the device to; `kind`, its pool's isolation level; and `vaultDBOpts`, the base class's own options, such as the battery's logger.
  */
-export const deviceOver = (db: FileDatabase, turnstile: Turnstile | undefined, deviceOpts: { maxLockboxes?: number | undefined, kind?: DeviceKind } = {}) => {
-  const { maxLockboxes, kind = {} } = deviceOpts
+export const deviceOver = (db: FileDatabase, turnstile: Turnstile | undefined, deviceOpts: { maxLockboxes?: number | undefined, kind?: DeviceKind, vaultDBOpts?: VaultDBOpts } = {}) => {
+  const { maxLockboxes, kind = {}, vaultDBOpts = {} } = deviceOpts
   const pool = db.devicePool(poolConfigFor(kind))
   const listenHere = listenOver(db)
   const client = turnstile === undefined ? pool : throughTurnstile(turnstile, pool, ['query'])
@@ -196,7 +197,7 @@ export const deviceOver = (db: FileDatabase, turnstile: Turnstile | undefined, d
       await turnstile.pass()
       return await listenHere(channel, onNotify)
     }
-  return (userId: string | null) => postgresVaultDB({ client, userId, listen, maxLockboxes })
+  return (userId: string | null) => postgresVaultDB({ ...vaultDBOpts, client, userId, listen, maxLockboxes })
 }
 
 /**
