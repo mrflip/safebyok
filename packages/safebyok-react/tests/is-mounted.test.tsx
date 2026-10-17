@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { StrictMode } from 'react'
+import { StrictMode, Suspense } from 'react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { useIsMounted } from '../src/is-mounted'
 import * as TH from './test-helpers'
@@ -38,6 +38,31 @@ describe("useIsMounted", () => {
   it("answers true once committed under StrictMode, which mounts, unmounts and mounts again", () => {
     const grabbed: (() => boolean)[] = []
     render(<StrictMode><Grabber grab={(isMounted) => { grabbed.push(isMounted) }} /></StrictMode>)
+    expect(grabbed.every((isMounted) => isMounted())).to.be.true
+  })
+
+  it("answers true while a Suspense boundary hides the component, which still stands", async () => {
+    const grabbed: (() => boolean)[] = []
+    const grab = (isMounted: () => boolean) => { grabbed.push(isMounted) }
+    const hiding = TH.held()
+    const shown = (pending: Promise<undefined> | null) => (
+      <Suspense fallback={<p>Loading</p>}>
+        <TH.Hider hiding={pending} />
+        <Grabber grab={grab} />
+      </Suspense>
+    )
+    const { rerender } = render(shown(null))
+    await act(async () => {
+      rerender(shown(hiding.promise))
+      await TH.wakeupAtNextTick()
+    })
+    expect(screen.getByText('Loading')).to.not.be.null
+    expect(grabbed.every((isMounted) => isMounted())).to.be.true
+    await act(async () => {
+      hiding.resolve(undefined)
+      await TH.wakeupAtNextTick()
+    })
+    expect(screen.queryByText('Loading')).to.be.null
     expect(grabbed.every((isMounted) => isMounted())).to.be.true
   })
 
