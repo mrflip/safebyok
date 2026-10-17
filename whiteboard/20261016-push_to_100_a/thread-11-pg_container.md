@@ -16,6 +16,7 @@ Branch `20261016-pg_container`, PR [#131](https://github.com/mrflip/safebyok/pul
   * No password: `trust` on loopback / the runner alone, so no credential is in the repo.
 * **Deviations**
   * "Widening to every Postgres test is a one-line change" holds for the e2e suites only. The adapter's own tests (`packages/safebyok-postgres/tests/`) are written against a PGlite (`exec`, `transaction`, `listen`, `TRUNCATE`); running them on a server needs a PGlite-shaped wrapper over a `pg` Pool first. I did not build it; it is the natural next step if the Coach wants it.
+    * *Coach (2026-10-16):* NOTYET: the adapter's own tests stay on PGlite (NOTYET.md).
   * The `postgres` job is not added to the ruleset (the Coach's hand).
 * **Discoveries**
   * The battery and every race passed on a real server on the first run, including the turnstile holds (one device per pool). The adapter's `stale_write` for `23503` does not keep a `cause`, so the foreign key test cannot assert the code; it is the only way the held insert can refuse (the count saw the vault standing).
@@ -27,7 +28,9 @@ Branch `20261016-pg_container`, PR [#131](https://github.com/mrflip/safebyok/pul
   3. The image digest is written twice (compose, workflow); Dependabot moves only the compose file's.
   4. The CI service publishes 5432 on all interfaces of the runner (trust auth; the runner is ephemeral).
   5. No `'error'` listeners on the `pg` pools and clients: an idle connection's error would be an unhandled event.
+     * *Coach (2026-10-16):* Fix in a later thread: thread 9 takes 1-5.
   6. `node:crypto`'s `randomBytes` names the file databases: left, tests only.
+     * *Coach (2026-10-16):* Yes: getRandomValues, the helper exported (thread 9).
 * **Coach's rulings**
   * *Should `postgres` become a required check once it has run a while?* Ruling: a TODO entry, which the orchestrator is filing ("add TODO"); nothing to do in this PR.
   * *My answers to the Coach's side questions (other backends on the same compose file, one service each; Playwright its own `e2e/` job, written in `e2e/README.md`):* Ruling: "thanks, noted".
