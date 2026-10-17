@@ -68,3 +68,4 @@ demo 188 (16), fastkey 49, e2e 81 (98), root 212. `.size-limit.json` untouched (
   `maxWhisperBytes: 1`) while the default moves by one; confirm that is "not too many more".
   Item 15's kind is `storage_unavailable` for something that is not storage; the alternative is
   a new kind, which is public surface.
+* **Review**: one fix, c4a4ba2d (`maxVaultBytes`'s doc now says 1 KiB for a lockbox's other fields, as `LockboxFieldsBytes` does); the six minors are with the orchestrator.
