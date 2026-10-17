@@ -723,24 +723,28 @@ describe("postgresVaultDB, subscribe", () => {
     expect(heard.count).to.eq(0)
   })
 
-  it("refuses a listen that throws at once with storage_unavailable, and lets one that rejects pass quietly", async () => {
+  it("refuses a listen that throws at once with storage_unavailable, and warns of one that rejects", async () => {
     const sudden = new Error('no connection to listen on')
     const throwing: PostgresListen = () => { throw sudden }
     const vaultDB = postgresVaultDB({ client: TH.failingClient(new Error('unused')), userId: 'u1', listen: throwing })
     expect(() => vaultDB.subscribe(u1, TH.changeCounter().onChange)).to.throw(VaultError).with.property('kind', 'storage_unavailable')
 
+    const spy = TH.spyLogger()
     const rejecting: PostgresListen = () => Promise.reject(sudden)
-    const unsubscribe = postgresVaultDB({ client: TH.failingClient(new Error('unused')), userId: 'u1', listen: rejecting }).subscribe(u1, TH.changeCounter().onChange)
-    await TH.wakeupAtNextTick()
+    const unsubscribe = postgresVaultDB({ client: TH.failingClient(new Error('unused')), userId: 'u1', listen: rejecting, logger: spy.logger }).subscribe(u1, TH.changeCounter().onChange)
+    await TH.eventually(() => spy.calls.length > 0)
+    expect(spy.calls.map((heard) => [heard.level, heard.err])).to.deep.equal([['warn', sudden]])
     unsubscribe()
     await TH.wakeupAtNextTick()
   })
 
-  it("lets an unlisten that throws or rejects pass quietly", async () => {
+  it("logs an unlisten that throws or rejects, and throws nothing from the unsubscribe", async () => {
     for (const listen of UnlistenCases) {
-      const unsubscribe = postgresVaultDB({ client: TH.failingClient(new Error('unused')), userId: 'u1', listen }).subscribe(u1, TH.changeCounter().onChange)
+      const spy = TH.spyLogger()
+      const unsubscribe = postgresVaultDB({ client: TH.failingClient(new Error('unused')), userId: 'u1', listen, logger: spy.logger }).subscribe(u1, TH.changeCounter().onChange)
       expect(unsubscribe).to.not.throw()
-      await TH.wakeupAtNextTick()
+      await TH.eventually(() => spy.calls.length > 0)
+      expect(spy.calls.map((heard) => [heard.level, heard.err?.message])).to.deep.equal([['error', 'already closed']])
     }
   })
 })
