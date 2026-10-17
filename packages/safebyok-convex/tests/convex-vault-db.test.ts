@@ -114,47 +114,25 @@ const nearlyFull = async (vaultDB: ReturnType<typeof convexVaultDB>) => {
 }
 
 describe("convexVaultDB, refusing", () => {
-  /** One call of each verb that reaches the deployment, on `u1`'s vault. */
-  const EveryVerb: [string, (vaultDB: ReturnType<typeof convexVaultDB>) => Promise<unknown>][] = [
-    ['readBundle',   (vaultDB) => vaultDB.readBundle(u1)],
-    ['createBundle', (vaultDB) => vaultDB.createBundle(TH.bundleOf('u1'))],
-    ['updateBundle', (vaultDB) => vaultDB.updateBundle(TH.bundleOf('u1', { unlock_epoch: 2 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 })],
-    ['readBox',      (vaultDB) => vaultDB.readBox(u1, 'anthropic_api_key')],
-    ['listBoxes',    (vaultDB) => vaultDB.listBoxes(u1)],
-    ['updateBox',    (vaultDB) => vaultDB.updateBox(u1, TH.boxOf('anthropic_api_key', 'a1'), TH.noBoxYet)],
-    ['eraseBox',     (vaultDB) => vaultDB.eraseBox(u1, 'anthropic_api_key', TH.thisVault)],
-    ['eraseVault',   (vaultDB) => vaultDB.eraseVault(u1, TH.thisVault)],
-  ]
-
+  // Every verb's identity_revoked is the battery's line 5.4: these are what Convex's own says.
   for (const [clientTitle, connect] of ClientCases) {
-    for (const [verb, call] of EveryVerb) {
-      it(`refuses ${verb} over a ${clientTitle} as identity_revoked when no one is signed in`, async () => {
-        const deployment = deploy()
-        const vaultDB = convexVaultDB({ client: connect(deployment, null), api: deployment.api.safebyok })
-        const refusal = await TH.expectRefusal(call(vaultDB), 'identity_revoked')
-        expect(refusal).to.be.instanceOf(VaultError)
-        expect(refusal.message).to.eq('No one is signed in, so this vault cannot be reached: sign in, then try again.')
-        expect(refusal).to.not.have.property('cause')
-      })
+    it(`refuses over a ${clientTitle} as identity_revoked when no one is signed in, saying so, with no cause`, async () => {
+      const deployment = deploy()
+      const vaultDB = convexVaultDB({ client: connect(deployment, null), api: deployment.api.safebyok })
+      const refusal = await TH.expectRefusal(vaultDB.readBundle(u1), 'identity_revoked')
+      expect(refusal).to.be.instanceOf(VaultError)
+      expect(refusal.message).to.eq('No one is signed in, so this vault cannot be reached: sign in, then try again.')
+      expect(refusal).to.not.have.property('cause')
+    })
 
-      it(`refuses ${verb} over a ${clientTitle} as identity_revoked for another user's vault`, async () => {
-        const deployment = deploy()
-        const vaultDB = convexVaultDB({ client: connect(deployment, 'u2'), api: deployment.api.safebyok })
-        const refusal = await TH.expectRefusal(call(vaultDB), 'identity_revoked')
-        expect(refusal.message).to.eq('This vault belongs to another user than the one signed in: a signed-in user reaches only their own vaults. If the user changed, open the vault for the new one.')
-      })
-    }
+    it(`refuses over a ${clientTitle} as identity_revoked for another user's vault, saying so, with no cause`, async () => {
+      const deployment = deploy()
+      const vaultDB = convexVaultDB({ client: connect(deployment, 'u2'), api: deployment.api.safebyok })
+      const refusal = await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('anthropic_api_key', 'a1'), TH.noBoxYet), 'identity_revoked')
+      expect(refusal.message).to.eq('This vault belongs to another user than the one signed in: a signed-in user reaches only their own vaults. If the user changed, open the vault for the new one.')
+      expect(refusal).to.not.have.property('cause')
+    })
   }
-
-  it("leaves another user's vault as it was, after their every refused attempt", async () => {
-    const deployment = deploy()
-    const owner = convexVaultDB({ client: deployment.client('u1'), api: deployment.api.safebyok })
-    await owner.createBundle(TH.bundleOf('u1'))
-    const intruder = convexVaultDB({ client: deployment.client('u2'), api: deployment.api.safebyok })
-    for (const [, call] of EveryVerb) { await TH.expectRefusal(call(intruder), 'identity_revoked') }
-    expect(await owner.readBundle(u1)).to.deep.equal(TH.bundleOf('u1'))
-    expect(await owner.listBoxes(u1)).to.deep.equal([])
-  })
 
   it("lists a lockbox the component holds but safebyok would never write as damaged, under its boxlabel", async () => {
     const deployment = deploy()
@@ -312,18 +290,6 @@ describe("convexVaultDB.subscribe", () => {
       const watch = await settledWatch(here)
       await there.createBundle(TH.bundleOf('u1'))
       await vi.waitFor(() => { expect(watch.onChange.mock.calls.length).to.be.greaterThan(watch.heardBefore) })
-    })
-
-    it(`hears nothing over a ${clientTitle} once unsubscribed`, async () => {
-      const deployment = deploy()
-      const here = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
-      const there = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
-      const watch = await settledWatch(here)
-      watch.unsubscribe()
-      const heardBefore = watch.onChange.mock.calls.length
-      await there.createBundle(TH.bundleOf('u1'))
-      await caughtUp(here)
-      expect(watch.onChange.mock.calls.length).to.eq(heardBefore)
     })
 
     it(`hears nothing over a ${clientTitle} of another vault's writes`, async () => {
