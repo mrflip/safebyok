@@ -1339,3 +1339,28 @@ security expert who knows what questions to ask.
   messages name the verb that failed and quote no scope, record or key, and the browser's error
   is the `cause`. `InvalidStateError` stays `storage_unavailable`. `idbDeviceDB` (`idb.ts`) now
   throws a `NotSupportedError` DOMException at first use where the context has no `indexedDB`.
+* 2026-10-17 (PR [#6](https://github.com/mrflip/safebyok/pull/6)): **the non-extractable vaultKey
+  is not a defence against code running in the page while the vault is unlocked.** The session's
+  vaultKey handle is a non-extractable WebCrypto `CryptoKey`, so page code cannot export its raw
+  bytes. That keeps a passing compromise (an XSS, a malicious extension, a stolen unlocked device)
+  from carrying the key away for use after `lock()`. It does not stop injected code, while the
+  vault is unlocked, from calling WebCrypto with the handle to decrypt every lockbox, or from
+  reading whispers through the vault's own API (`read()`, `use()`), which no design prevents. The
+  `addPasskey` entry of 2026-10-15 mentions this in passing; this entry states it on its own. A
+  host can keep the unlock window short, call `lock()` on sign-out and on screen lock, serve the
+  page under a strict Content-Security-Policy, and never load third-party script into a page that
+  holds an unlocked vault.
+* 2026-10-17 (thread sweep_small): **the Postgres README no longer ships a hard-cap trigger
+  recipe.** The `safebyok-postgres` README used to carry SQL for a `BEFORE INSERT` trigger on
+  `safebyok_lockboxes` that refused a lockbox past a hard limit, taking a transaction-scoped
+  advisory lock per vault; under REPEATABLE READ it counts from its snapshot, so racers may
+  overshoot. The repository ran that SQL against a real Postgres in
+  `e2e/tests/postgres/hard-cap.test.ts`. The recipe, that test, and the PGlite test that read the
+  README's SQL are deleted; the README now gives a short prompt a host pastes to its coding agent,
+  which reads the library and writes the trigger, explaining the trade-offs. The package's own
+  lockbox limit (`maxLockboxes`, one counting insert) remains a best effort that racing writers
+  may overshoot by up to N-1 places, and is documented as such. A host that needs a hard cap now
+  owns a trigger the package no longer tests, so its isolation level, its lock and its refusal
+  (surfaced as `storage_unavailable`, not `vault_full`) are the host's to verify. The limit exists
+  to stop a runaway loop and keep a vault listable and erasable; it is not a quota against a
+  determined client.
