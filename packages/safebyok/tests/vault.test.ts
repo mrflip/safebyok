@@ -5591,15 +5591,25 @@ describe("the logger", () => {
     expect(world.logged.map((call) => [call.level, call.story])).to.deep.include(['error', { call: 'subscribe' }])
   })
 
-  it("is not the vaultDB's when the vaultDB was made with a logger of its own, which it keeps", async () => {
+  it("is the vaultDB's in place of one it was made with, when the host passes one", async () => {
     const world = makeWorld()
     const own = TH.spyLogger()
     const vaultDB = localVaultDB({ store: world.dbStore, logger: own.logger })
     await world.open({ vaultDB })
     vaultDB.subscribe(TH.scopeOf('u1'), () => { throw new Error('a listener of the host that throws') })
     await vaultDB.createBundle(TH.bundleOf('u1'))
+    expect(own.calls).to.have.lengthOf(0)
+    expect(world.logged).to.have.lengthOf(1)
+  })
+
+  it("leaves the vaultDB its own logger when the host passes the vault none", async () => {
+    const world = makeWorld()
+    const own = TH.spyLogger()
+    const vaultDB = localVaultDB({ store: world.dbStore, logger: own.logger })
+    await world.open({ vaultDB, logger: undefined })
+    vaultDB.subscribe(TH.scopeOf('u1'), () => { throw new Error('a listener of the host that throws') })
+    await vaultDB.createBundle(TH.bundleOf('u1'))
     expect(own.calls).to.have.lengthOf(1)
-    expect(world.logged).to.have.lengthOf(0)
   })
 
   it("is handed to the vaultDB only when the host passes one: a vault opened with none leaves the vaultDB's as it was", async () => {

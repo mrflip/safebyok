@@ -1,7 +1,7 @@
 import { omit } from 'es-toolkit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { memoryStore } from '../src/string-store'
-import { VaultDB, jsonBytes, localVaultDB, type BundleExpectation, type EraseExpectation, type LockboxExpectation, type StoredLockbox, type VaultDBOpts, type WatchTrouble } from '../src/vault-db'
+import { VaultDB, jsonBytes, localVaultDB, type BundleExpectation, type EraseExpectation, type LockboxExpectation, type StoredLockbox, type VaultDBInit, type VaultDBOpts, type WatchTrouble } from '../src/vault-db'
 import { VaultError } from '../src/errors'
 import type { Lockbox } from '../src/lockbox'
 import type { VaultBundle, VaultScope } from '../src/types'
@@ -26,8 +26,8 @@ class MapVaultDB extends VaultDB {
   readonly maxNameBytes: number = Infinity
   readonly rows: Map<string, unknown>
 
-  constructor(maxLockboxes = Infinity, rows = new Map<string, unknown>(), vaultDBOpts: VaultDBOpts = {}) {
-    super(vaultDBOpts)
+  constructor(maxLockboxes = Infinity, rows = new Map<string, unknown>(), vaultDBOpts: VaultDBOpts = {}, init: VaultDBInit = TH.vaultDBInit(vaultDBOpts.logger)) {
+    super(init)
     this.maxLockboxes = maxLockboxes
     this.rows = rows
   }
@@ -763,22 +763,14 @@ describe("the abstract VaultDB, its logger", () => {
     expect(spy.calls.map((call) => call.level)).to.deep.equal(['error'])
   })
 
-  it("says it through the logger the vault it serves handed it, when it was made with none", () => {
-    const spy = TH.spyLogger()
-    const vaultDB = failingListenerOn()
-    vaultDB.adoptLogger(spy.logger)
-    vaultDB.ring()
-    expect(spy.calls).to.have.lengthOf(1)
-  })
-
-  it("keeps the logger it was made with over one handed it later", () => {
+  it("says it through the logger the vault it serves handed it, in place of the one it was made with", () => {
     const own = TH.spyLogger()
     const handed = TH.spyLogger()
     const vaultDB = failingListenerOn({ logger: own.logger })
     vaultDB.adoptLogger(handed.logger)
     vaultDB.ring()
-    expect(own.calls).to.have.lengthOf(1)
-    expect(handed.calls).to.have.lengthOf(0)
+    expect(own.calls).to.have.lengthOf(0)
+    expect(handed.calls).to.have.lengthOf(1)
   })
 
   it("keeps the latest logger handed it, serving several vaults", () => {
@@ -791,20 +783,35 @@ describe("the abstract VaultDB, its logger", () => {
     expect([first.calls.length, latest.calls.length]).to.deep.equal([0, 1])
   })
 
-  it("says it to the console, tagged, when it has no logger at all", () => {
-    const consoleErrors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    failingListenerOn().ring()
-    expect(consoleErrors).toHaveBeenCalledOnce()
-    expect(consoleErrors.mock.calls[0]?.[0]).to.match(/^safebyok: A listener passed to subscribe threw/)
+  it("is made with a logger or refused, kind 'bad_option', whatever is handed super() in place of one", () => {
+    for (const init of [{}, { logger: undefined }, null]) {
+      const made = () => new MapVaultDB(Infinity, new Map(), {}, init as unknown as VaultDBInit)
+      expect(made).to.throw(VaultError, /made with a logger/).with.property('kind', 'bad_option')
+    }
   })
 
-  it("says each line to the console through the one logger, built once, rather than one built for each", () => {
-    const consoleErrors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+  it("keeps its logger as an own property that is writable and configurable, and neither listed nor copied", () => {
+    const spy = TH.spyLogger()
+    const vaultDB = failingListenerOn({ logger: spy.logger })
+    vaultDB.adoptLogger(TH.spyLogger().logger)
+    expect(Object.getOwnPropertyDescriptor(vaultDB, 'logger')).to.include({ enumerable: false, writable: true, configurable: true })
+    expect(Object.keys(vaultDB)).to.not.include('logger')
+    expect(Object.keys(Object.assign({}, vaultDB))).to.not.include('logger')
+    expect(JSON.stringify(vaultDB)).to.not.include('logger')
+  })
+
+  it("keeps one logger, rather than one built for each line it says", () => {
     const vaultDB = failingListenerOn()
     expect(vaultDB.loggerNow()).to.eq(vaultDB.loggerNow())
-    vaultDB.ring()
-    vaultDB.ring()
-    expect(consoleErrors).to.have.callCount(2)
+  })
+
+  it("is the console, tagged, in the adapter whose factory was given no logger", async () => {
+    const consoleErrors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const vaultDB = localVaultDB({ store: memoryStore() })
+    vaultDB.subscribe(TH.scopeOf('u1'), () => { throw new Error('a listener that throws') })
+    await vaultDB.createBundle(TH.bundleOf('u1'))
+    expect(consoleErrors).toHaveBeenCalledOnce()
+    expect(consoleErrors.mock.calls[0]?.[0]).to.match(/^safebyok: A listener passed to subscribe threw/)
   })
 
   it("breaks nothing when its logger throws", () => {

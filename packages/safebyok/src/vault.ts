@@ -591,7 +591,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   const deviceDB = deviceTroubleAsConditions(parseDeviceDB(opts.deviceDB))
   const reentryMillis = parseForcePassphraseReentryHours(opts.forcePassphraseReentryHours)
   const logger = parseLogger(opts.logger)
-  // The vault's logger is its storage's too, unless the host made the storage with its own.
+  // A logger the host gave is its storage's too, in place of the storage's own.
   if (opts.logger !== undefined) { givenVaultDB.adoptLogger(logger) }
   const clock = parseClock(opts.clock)
   // Every reading of the host's clock is checked, this first one so that a clock counting in the

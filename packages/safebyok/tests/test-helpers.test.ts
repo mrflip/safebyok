@@ -983,7 +983,7 @@ class RoundTripVaultDB extends VaultDB {
   private readonly ownListeners = new Set<() => void>()
 
   constructor(backend: RoundTripBackend, opts: RoundTripOpts) {
-    super(opts)
+    super(TH.vaultDBInit(opts.logger))
     this.backend = backend
     this.opts = opts
     this.maxLockboxes = opts.maxLockboxes ?? Infinity

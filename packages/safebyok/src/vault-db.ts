@@ -65,20 +65,32 @@ const EraseExpectation = Z.object({
 export type StoredLockbox = { boxlabel: string, lockbox: unknown }
 
 /**
- * What every VaultDB is made with, beside its backend's own options: an adapter's factory takes
- * these in its one bag of options, and hands them to `super()`.
+ * What an adapter's factory takes from the host, beside its backend's own options: an optional
+ * `logger`. The factory settles it before the VaultDB exists -- `parseLogger(opts.logger)`, which is
+ * the console when the host gave none -- and hands the base class a {@link VaultDBInit}.
  *
  * @example
- *   constructor(opts: AcmeVaultDBOpts) { super(opts); this.client = opts.client }
+ *   export type AcmeVaultDBOpts = VaultDBOpts & { client: AcmeClient }
  */
 export type VaultDBOpts = {
   /**
    * Where the VaultDB says what it has nobody to throw to: a subscriber's listener that threw, a
-   * watch that failed to start or dropped. Without one, it says it through the logger of the vault
-   * it serves, which `openVault` hands it, or else the console. Kind 'bad_option' for anything
-   * that is not a VaultLogger.
+   * watch that failed to start or dropped. Without one it says it to the console, until `openVault`
+   * is given a logger of its own, which it then takes up. Kind 'bad_option' for anything that is
+   * not a VaultLogger.
    */
   logger?: VaultLogger | undefined
+}
+
+/**
+ * What the VaultDB base class demands of its subclass: a `logger`, always. A factory that takes
+ * {@link VaultDBOpts} makes this with `parseLogger(opts.logger)`.
+ *
+ * @example
+ *   constructor(opts: AcmeVaultDBOpts) { super({ logger: parseLogger(opts.logger) }); this.client = opts.client }
+ */
+export type VaultDBInit = {
+  logger: VaultLogger
 }
 
 /**
@@ -113,8 +125,8 @@ export type VaultDBOpts = {
  * (your own error as its `cause`) for anything you throw that is not already a VaultError. They
  * also own what every adapter would otherwise write again: `subscribe` calls each listener so
  * that nothing it throws reaches your code, and its unsubscribe runs once; and `listBoxRecords`
- * lists a vault as stored, for a server to serve. Implement the `do*` methods, and hand your
- * factory's {@link VaultDBOpts} to `super()`; never override the public verbs, but for
+ * lists a vault as stored, for a server to serve. Implement the `do*` methods, and hand `super()` a
+ * {@link VaultDBInit}, the `logger` your factory settles from its {@link VaultDBOpts}; never override the public verbs, but for
  * `listBoxRecords` where your backend lists more cheaply. To refuse, throw what `Refusals` makes.
  * The package's `VAULTDB.md` is the whole contract, line by line, and `describeVaultDB` (from
  * `safebyok/testing`) tests it so.
@@ -180,42 +192,38 @@ export abstract class VaultDB {
    */
   abstract readonly maxNameBytes: number
 
-  // The logger this VaultDB was made with, if any; and the one the vault it serves handed it.
-  private readonly ownLogger: VaultLogger | null
-  private handedLogger: VaultLogger | null = null
-  // The console, guarded, for a VaultDB with neither: built once, not on every line said.
-  private readonly fallbackLogger = parseLogger(undefined)
+  /**
+   * Where this VaultDB says what it has nobody to throw to: always a logger, the one it was made
+   * with until {@link adoptLogger} replaces it. Each call is guarded: a logger that throws breaks
+   * nothing. An own property, writable and configurable, and not enumerable, so that a VaultDB
+   * logged, spread or compared never shows or copies a host's logger.
+   */
+  protected declare logger: VaultLogger
 
   /**
-   * @param opts - What every VaultDB is made with: an optional `logger`. Kind 'bad_option' for a
-   *   logger that is not a VaultLogger.
+   * @param init - What every VaultDB is made with: a `logger`. Kind 'bad_option' for none, or one
+   *   that is not a VaultLogger.
    */
-  constructor(opts?: VaultDBOpts) {
-    const given = (opts as VaultDBOpts | null | undefined)?.logger
-    this.ownLogger = given === undefined ? null : parseLogger(given)
+  constructor(init: VaultDBInit) {
+    const given = (init as VaultDBInit | null | undefined)?.logger
+    if (given === undefined) {
+      throw new VaultError('bad_option', 'A VaultDB is made with a logger: hand `super()` { logger }. An adapter\'s factory settles it with parseLogger(opts.logger), which is the console when the host gave none.')
+    }
+    Object.defineProperty(this, 'logger', { value: parseLogger(given), writable: true, configurable: true, enumerable: false })
   }
 
   /**
-   * Where this VaultDB says what it has nobody to throw to: the logger it was made with, else the
-   * one {@link adoptLogger} handed it, else the console. Each call is guarded: a logger that throws
-   * breaks nothing.
-   */
-  protected get logger(): VaultLogger {
-    return this.ownLogger ?? this.handedLogger ?? this.fallbackLogger
-  }
-
-  /**
-   * Has this VaultDB log through `logger`, unless it was made with a logger of its own, which wins.
-   * `openVault` calls it with the logger it was given, so one logger hears both the vault and its
-   * storage; a host rarely needs to. A VaultDB serving several vaults keeps the latest handed it.
-   * Kind 'bad_option' for anything that is not a VaultLogger.
+   * Has this VaultDB log through `logger` from now on, in place of the one it had. `openVault`
+   * calls it with the logger it was given, when it was given one, so one logger hears both the
+   * vault and its storage; a host rarely needs to. A VaultDB serving several vaults keeps the
+   * latest handed it. Kind 'bad_option' for anything that is not a VaultLogger.
    *
    * @param logger - The logger of the vault this VaultDB serves.
    *
    * @example vaultDB.adoptLogger(telemetryLogger)  // as openVault({ ...opts, vaultDB, logger: telemetryLogger }) does
    */
   adoptLogger(logger: VaultLogger): void {
-    this.handedLogger = parseLogger(logger)
+    this.logger = parseLogger(logger)
   }
 
   // ------------------------------------------------------------------- the verbs safebyok calls
@@ -842,7 +850,7 @@ class StringStoreVaultDB extends VaultDB {
   private readonly store: StringStore
 
   constructor(opts: LocalVaultDBOpts) {
-    super(opts)
+    super({ logger: parseLogger(opts.logger) })
     this.store = opts.store
   }
 

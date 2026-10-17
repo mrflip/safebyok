@@ -458,6 +458,13 @@ error as `undefined` or `null`). A logger that throws, or returns
 a promise that rejects, is ignored: logging never breaks a lock, an open or a store. Anything
 else is refused as `bad_option`.
 
+Your storage adapter hears the same logger. Each adapter's factory takes an optional `logger` (the
+console, without one), and `openVault`, when you give it a `logger`, hands it to the adapter in
+place of the one the adapter had. To keep an adapter's messages apart, give `openVault` no `logger`.
+An adapter of your own extends `VaultDB` and hands `super()` a `{ logger }`, which its factory
+settles from the host's options with `parseLogger(opts.logger)`; the base class refuses to be made
+without one. It says what it has nobody to throw to through `this.logger`.
+
 Each call is a plain-language `message`; a `story` naming the vault call it happened in
 (`{ call: 'lockSoon' }`); and, when there is one, the error behind it, a `VaultError` or your own
 (your clock's, your storage adapter's). The vault puts no whisper, passphrase, key, ciphertext or

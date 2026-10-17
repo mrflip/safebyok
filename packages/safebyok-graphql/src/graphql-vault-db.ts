@@ -1,4 +1,4 @@
-import { Sanitizer, VaultDB, VaultError, VaultErrorKindVals } from 'safebyok'
+import { Sanitizer, VaultDB, VaultError, VaultErrorKindVals, parseLogger } from 'safebyok'
 import type { BundleExpectation, VaultDBOpts, EraseExpectation, Lockbox, LockboxExpectation, StoredLockbox, VaultBundle, VaultErrorKind, VaultScope } from 'safebyok'
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
 import { BundleFields, ListedLockboxFields, LockboxFields, ScopeFields, recordOf, selectionOf } from './fields'
@@ -46,7 +46,7 @@ const ServerMaxNameBytes = 640
  *   server said, which may quote the variables.
  *
  * @param opts - Your app's urql `client`; optionally, the `maxLockboxes` your server holds a vault
- *   to, and a `logger`, which otherwise is the vault's.
+ *   to, and a `logger`, the console without one, or the vault's when `openVault` is given one.
  * @returns The VaultDB, holding at most 1 MiB in one record, as the Postgres VaultDB behind it
  *   does, and `maxLockboxes` lockboxes in one vault, setting no limit on a vault's bytes.
  *
@@ -148,7 +148,7 @@ class UrqlVaultDB extends VaultDB {
   private readonly client: GraphqlVaultClient
 
   constructor(opts: GraphqlVaultDBOpts & { maxLockboxes: number }) {
-    super(opts)
+    super({ logger: parseLogger(opts.logger) })
     this.client = opts.client
     this.maxLockboxes = opts.maxLockboxes
   }

@@ -1,4 +1,4 @@
-import { reportToPlatform } from './report-error'
+import * as GlobalLogger from './global-logger'
 
 /**
  * The change bell: how a write to a store in this browser tells everyone listening to it, in this
@@ -21,7 +21,7 @@ const channels = new Map<string, BroadcastChannel>()
 // Each listener is called on its own, after the ringing code has run on, and one that leaves before
 // its turn comes is not called. One that throws silences no other, fails no write, and never
 // escapes as an uncaught error, which would end a Node or Bun process: what it threw goes to the
-// platform's `reportError`, where there is one (the bell has no logger).
+// global logger (the bell has no logger of its own to hand).
 const callEach = (listeners: Set<() => void> | undefined) => {
   listeners?.forEach((listener) => {
     queueMicrotask(() => {
@@ -29,7 +29,7 @@ const callEach = (listeners: Set<() => void> | undefined) => {
       try {
         listener()
       } catch (err) {
-        reportToPlatform(err)
+        GlobalLogger.fail('A listener of the change bell threw. The bell rang on, and every other listener was called.', { call: 'ChangeBell' }, err)
       }
     })
   })

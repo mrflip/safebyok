@@ -1211,19 +1211,30 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
   dev dependency of the private `safebyok-e2e` package, never a dependency of what we publish.
 * 2026-10-17 (thread 5b, store_base, [PR #139](https://github.com/mrflip/safebyok/pull/139)):
   **host listener errors go to the platform's `reportError` as they are.** The `VaultDB` base
-  class (`vault-db.ts`, `subscribe`) and `ChangeBell` (`change-bell.ts`) call each host listener
-  so that what it throws, or a promise it returns that rejects, never escapes: it goes to the
-  logger as an error (the VaultDB) and to `globalThis.reportError` where the platform has one
-  (`report-error.ts`, looked up at call time). The error is the host's own and passed unredacted:
+  class (`vault-db.ts`, `subscribe`), `ChangeBell` (`change-bell.ts`) and the string stores
+  (`string-store.ts`, listener bookkeeping) call each host listener so that what it throws, or a
+  promise it returns that rejects, never escapes: it goes to the logger as an error (the VaultDB's
+  `subscribe` only) and to `globalThis.reportError` where the platform has one (`report-error.ts`,
+  looked up at call time). `ChangeBell` and the string stores reach it through the internal
+  `global-logger.ts` (`GlobalLogger.fail(message, story, thrown)`), which hands `thrown` to
+  `reportToPlatform` as it is and uses neither `message` nor `story`; it is not host-pluggable
+  today. The error is the host's own and passed unredacted:
   safebyok put nothing secret in it, and a host listener that puts a secret in its own error has
   chosen to. In a browser such an error is reported twice, to the logger and to `reportError`, as
   designed.
-* 2026-10-17 (thread 5b, store_base): **an adapter keeps its own logger over `openVault`'s.**
-  `openVault` hands its logger to the VaultDB through the public `VaultDB.adoptLogger`, and only
-  when the host passed a logger; a VaultDB made with its own `logger` keeps it, and one shared
-  between vaults keeps the latest logger handed it. A host that wants an adapter's messages kept
-  apart (a server-side redacting logger, say) passes that logger to the adapter directly. Every
-  logger call is guarded, so a throwing logger never breaks a verb.
+* 2026-10-17 (thread 5b, store_base; reversed on branch 20261017-logger_contract): **`openVault`'s
+  logger replaces an adapter's own.** A `VaultDB` is always made with a logger (its base-class
+  constructor demands one; an adapter's factory settles it with `parseLogger(opts.logger)`, the
+  console when the host gave none), kept as the non-enumerable, writable, configurable own
+  property `logger`, so a VaultDB that is logged, spread, JSON-stringified or compared does not
+  show or copy a host's logger. `openVault` hands its logger to the VaultDB through the public
+  `VaultDB.adoptLogger`, and only when the host passed a logger; that logger replaces the
+  adapter's own, whether or not the adapter was made with one, and a VaultDB shared between
+  vaults keeps the latest logger handed it. A host that gave an adapter a redacting or separate
+  logger directly and also passes a logger to `openVault` has the adapter's messages go to the
+  `openVault` logger; to keep them apart it passes no `logger` to `openVault`, or hands the
+  adapter's logger to both. Every logger call is guarded, so a throwing logger never breaks a
+  verb.
 * 2026-10-17 (thread 5b, store_base): **Convex carries no cause on any refusal.** `convexVaultDB`
   (`safebyok-convex/src/convex-vault-db.ts`) refuses with no `cause` at all -- `identity_revoked`,
   `vault_full` and `storage_unavailable` alike -- because a Convex error on a dev deployment may

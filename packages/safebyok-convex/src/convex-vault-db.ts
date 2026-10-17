@@ -1,7 +1,7 @@
 import { getFunctionName } from 'convex/server'
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server'
 import { ConvexError } from 'convex/values'
-import { Sanitizer, VaultDB, VaultError } from 'safebyok'
+import { Sanitizer, VaultDB, VaultError, parseLogger } from 'safebyok'
 import type { BundleExpectation, VaultDBOpts, EraseExpectation, Lockbox, LockboxExpectation, StoredLockbox, VaultBundle, VaultScope } from 'safebyok'
 import { MaxVaultLockboxes } from './component/tallies'
 import { isSafebyokErrorData } from './refusals'
@@ -71,7 +71,7 @@ export type ConvexVaultDBOpts = VaultDBOpts & {
  *   left, the browser console, where the Convex client reports its connection.
  *
  * @param opts - Your app's Convex `client`, the safebyok functions as its `api`, and optionally a
- *   `logger`, which otherwise is the vault's: it hears a ConvexClient watch that fails.
+ *   `logger`, the console without one, or the vault's when `openVault` is given one: it hears a ConvexClient watch that fails.
  * @returns The VaultDB, holding at most 1 MiB in one record, Convex's document limit, and 8 MiB
  *   in one vault, half of what one Convex function may read (erasing a vault reads it twice), in
  *   at most 8,000 lockboxes, the component's own limit.
@@ -107,7 +107,7 @@ class ConvexVaultDB extends VaultDB {
   private readonly api:    SafebyokApi
 
   constructor(opts: ConvexVaultDBOpts) {
-    super(opts)
+    super({ logger: parseLogger(opts.logger) })
     this.client = opts.client
     this.api    = opts.api
   }

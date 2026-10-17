@@ -18,6 +18,12 @@ Small irritants, each a few lines, picked up by whoever is nearby.
   floor (`engines`), and only reports on the newest Node. A workflow cannot make a check
   required; the ruleset is the Coach's to change.
 
+* **A host's logger does not hear the change bell or the string stores.** A listener of
+  `ChangeBell` or of a string store (`memoryStore`, `domStore`) that throws is reported through
+  `GlobalLogger` (`packages/safebyok/src/global-logger.ts`) to the platform's `reportError`, never
+  to the `logger` a host gave `openVault`; on Node and Bun there is no `reportError`, so no one
+  hears it.
+
 ## Roadmapped
 
 In order. A later item that depends on an earlier one says so.
