@@ -209,7 +209,7 @@ export const rotatedBundleOf = (userId: string): VaultBundle => bundleOf(userId,
  * @example boxOf('anthropic_api_key', 'a1', { public_json: publicJsonOf({ note: 'work account' }) })
  */
 export const boxOf = (boxlabel: string, tag: string, overrides: Partial<Lockbox> = {}): Lockbox => ({
-  format:                 'safebyok-lockbox-v3',
+  format:                 'safebyok-lockbox-v4',
   boxlabel,
   revision_id:            `rev-${tag}`,
   vault_key_epoch:        1,
@@ -219,7 +219,7 @@ export const boxOf = (boxlabel: string, tag: string, overrides: Partial<Lockbox>
   whisper_schema_version: 1,
   public_json:            publicJsonOf({ note: 'a test box' }),
   registered_at:          Date.UTC(2026, 9, 14),
-  changed_at:             Date.UTC(2026, 9, 14),
+  written_at:             Date.UTC(2026, 9, 14),
   ...overrides,
 })
 
@@ -1226,7 +1226,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
         vault_key_epoch: 1,
         public:          { note: 'a test box' },
         registered_at:   Date.UTC(2026, 9, 14),
-        changed_at:      Date.UTC(2026, 9, 14),
+        written_at:      Date.UTC(2026, 9, 14),
         damaged:         false,
       })
     })

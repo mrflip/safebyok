@@ -442,9 +442,9 @@ export type Vault = {
    * finds this device locked instead, and throws kind 'vault_locked' without writing: a stale
    * session never writes into a vault reborn under new keys.
    *
-   * The lockbox keeps the time it was first stored as `registered_at`, and moves its
-   * `changed_at` only when the whisper differs from the one it replaces: storing the same whisper
-   * again writes a new revision, and leaves `changed_at` standing.
+   * The lockbox keeps the time it was first stored as `registered_at`, and stamps `written_at`
+   * with the time of this write: every store moves it, the same whisper stored again included, so
+   * it says when the lockbox was last written, never whether its whisper changed.
    *
    * Should the catch-up after a refusal fail itself, the call throws kind 'stale_write' at once,
    * the catch-up's failure its cause, and the snapshot says `syncing: false`.
@@ -1458,15 +1458,17 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   }
 
   /**
-   * The whisper `prev` holds, or null when it will not open: a record altered in storage, whose
-   * public fields a store must not carry forward, as nothing vouches for them.
+   * True when `prev` opens under the vault's key, and so vouches for the public fields a store
+   * carries forward from it; false for a record altered in storage, whose fields nothing vouches
+   * for. What it holds is dropped unread: a store compares nothing.
    */
-  const openedWhisperOf = async (unlockedKey: CryptoKey, standing: VaultBundle, prev: Lockbox): Promise<Whisper | null> => {
+  const recordOpens = async (unlockedKey: CryptoKey, standing: VaultBundle, prev: Lockbox): Promise<boolean> => {
     try {
-      return await decipherLockbox(unlockedKey, standing, prev)
+      await decipherLockbox(unlockedKey, standing, prev)
+      return true
     } catch {
       // decipherLockbox refuses only as damaged_lockbox: a record that will not open.
-      return null
+      return false
     }
   }
 
@@ -1666,17 +1668,12 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
         // Only a record that opens vouches for its public fields: one that will not, altered in
         // storage, is written over as a fresh lockbox is, keeping neither its bag nor its
         // registered_at, so a bag planted in storage is never sealed into a revision that reads clean.
-        const prevWhisper = prev === null ? null : await openedWhisperOf(unlockedKey, standingBundle, prev)
-        const vouched = prevWhisper === null ? null : prev
+        const vouched = prev !== null && await recordOpens(unlockedKey, standingBundle, prev) ? prev : null
         const publicJson = givenPublicJson ?? vouched?.public_json ?? EmptyPublicJson
         ensureWhisperFits(whisperBytes, publicJson)
         const revisionId = randomId()
         const lockboxKey = await makeLockboxKey()
         const now = clockNow()
-        // A store of the whisper already there writes a new revision, and leaves changed_at
-        // standing. A plain comparison: both sides are this device's own, and its outcome is no
-        // secret from storage, which sees changed_at stand still or move.
-        const unchanged = vouched !== null && stableJsonify(prevWhisper) === stableJsonify(checked.data)
         // Lands only in the vault this whisper is sealed for, under the vaultKey that seals it, over
         // the revision just read -- for a damaged box, the one the listing names -- : a vault reborn
         // elsewhere, a vaultKey replaced, or a box written meanwhile by another device, refuses it.
@@ -1694,7 +1691,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
           whisper_schema_version: 1,
           public_json:            publicJson,
           registered_at:          vouched?.registered_at ?? now,
-          changed_at:             unchanged ? vouched.changed_at : now,
+          written_at:             now,
         }
         const lockbox: Lockbox = {
           format:              LockboxFormat,
@@ -2021,7 +2018,7 @@ const FirstUnlocklabel = 'passphrase'
 const FirstVaultKeyEpoch = 1
 
 /** The lockbox's format, as each record carries it and each of its bindings begins. */
-const LockboxFormat = 'safebyok-lockbox-v3'
+const LockboxFormat = 'safebyok-lockbox-v4'
 
 /**
  * A lockbox's public header: every field of its record but its format, which leads each binding,

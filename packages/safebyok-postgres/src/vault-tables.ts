@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS safebyok_lockboxes (
   whisper_schema_version bigint NOT NULL,
   public_json            text   NOT NULL,
   registered_at          bigint NOT NULL,
-  changed_at             bigint NOT NULL,
+  written_at             bigint NOT NULL,
   PRIMARY KEY (applabel, user_id, vaultlabel, boxlabel),
   FOREIGN KEY (applabel, user_id, vaultlabel, vault_id)
     REFERENCES safebyok_bundles (applabel, user_id, vaultlabel, vault_id) ON DELETE CASCADE

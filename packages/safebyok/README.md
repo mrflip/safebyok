@@ -776,7 +776,7 @@ floor, which no call could reach, is not listed. Show it as removable:
 ```ts
 for (const box of vault.getSnapshot().boxes) {
   if (box.damaged) { showDamaged(box.boxlabel) }   // offer erase(box.boxlabel), or a fresh store()
-  else { showSummary(box.boxlabel, box.public, box.changed_at) }
+  else { showSummary(box.boxlabel, box.public, box.written_at) }
 }
 ```
 

@@ -39,7 +39,7 @@ export const VaultScope = v.object({
 export const VaultBundleFormat = v.union(v.literal('safebyok-vault-v2'))
 
 /** The formats of a Lockbox this package stores. */
-export const LockboxFormat = v.union(v.literal('safebyok-lockbox-v3'))
+export const LockboxFormat = v.union(v.literal('safebyok-lockbox-v4'))
 
 /**
  * A passphrase's way into a vault: its `unlock_id` and `unlocklabel`, how its passphraseKey is
@@ -120,8 +120,8 @@ export const VaultBundle = v.object({
  * One lockbox: its whisper ciphered under its own lockboxKey, that lockboxKey wrapped under the
  * vaultKey, and the public shell -- boxlabel, revision, which vaultKey (`vault_key_epoch`), the
  * whisper's codec and schema version, the public bag as JSON text (`public_json`, always
- * written), and the epoch-millisecond times it was first stored (`registered_at`) and its whisper
- * last changed (`changed_at`).
+ * written), and the epoch-millisecond times it was first stored (`registered_at`) and this
+ * revision written (`written_at`).
  */
 export const Lockbox = v.object({
   format:                 LockboxFormat,
@@ -134,7 +134,7 @@ export const Lockbox = v.object({
   whisper_schema_version: v.literal(1),
   public_json:            v.string(),
   registered_at:          v.number(),
-  changed_at:             v.number(),
+  written_at:             v.number(),
 })
 
 /**

@@ -104,7 +104,7 @@ export const ForeverMillis = FarFuture - FarPast
 /**
  * Validator for an instant as whole UTC epoch milliseconds, from {@link FarPast} (1981) to
  * {@link FarFuture} (2255), both included. Every time the package keeps is one -- a lockbox's
- * `registered_at` and `changed_at`, a vault bundle's `registered_at`, a remembered unlock's
+ * `registered_at` and `written_at`, a vault bundle's `registered_at`, a remembered unlock's
  * `ask_passphrase_at` -- and a stored record holding anything else fails validation. A host can
  * check its own times with it.
  *
@@ -180,7 +180,7 @@ const isStableJsonText = (text: string): boolean => {
 /**
  * One lockbox as the storage layer holds it: the whisper ciphered under its own lockboxKey, that
  * lockboxKey wrapped under the vaultKey, and the public shell -- boxlabel, public bag, the times
- * it was first stored and last changed -- a locked vault may show. Nothing in this record opens
+ * it was first stored and last written -- a locked vault may show. Nothing in this record opens
  * without the vaultKey.
  *
  * `revision_id` is minted fresh on every write and bound into both encryptions, so ciphertext
@@ -193,7 +193,7 @@ const isStableJsonText = (text: string): boolean => {
  * host hands it in.
  */
 export const Lockbox = Z.object({
-  format:                 Z.literal('safebyok-lockbox-v3'),
+  format:                 Z.literal('safebyok-lockbox-v4'),
   boxlabel:               NameFloor,
   revision_id:            Z.string().check(Z.minLength(1)),
   /**
@@ -217,10 +217,10 @@ export const Lockbox = Z.object({
   /** When this boxlabel was first stored, an {@link EpochMillis}: every later store carries it forward. */
   registered_at:          EpochMillis,
   /**
-   * When the whisper last changed, an {@link EpochMillis}: a store whose whisper serializes the
-   * same as the one it replaces writes a new revision and leaves this standing.
+   * When this revision was written, an {@link EpochMillis}: every store stamps it anew. It says
+   * nothing of whether the whisper changed -- a store of the same whisper moves it too.
    */
-  changed_at:             EpochMillis,
+  written_at:             EpochMillis,
 })
 export type Lockbox = Z.infer<typeof Lockbox>
 
@@ -231,7 +231,7 @@ export type Lockbox = Z.infer<typeof Lockbox>
  * readable while locked. The bag is shown as storage holds it: only `read()` opens the lockbox
  * and so proves it unaltered.
  *
- * @example LockboxSummary.parse({ boxlabel: 'anthropic', revision_id: 'r1', vault_key_epoch: 1, public: {}, registered_at, changed_at }).damaged  // false
+ * @example LockboxSummary.parse({ boxlabel: 'anthropic', revision_id: 'r1', vault_key_epoch: 1, public: {}, registered_at, written_at }).damaged  // false
  */
 export const LockboxSummary = Z.object({
   boxlabel:        NameFloor,
@@ -239,7 +239,7 @@ export const LockboxSummary = Z.object({
   vault_key_epoch: vaultKeyEpoch,
   public:          PublicBag,
   registered_at:   EpochMillis,
-  changed_at:      EpochMillis,
+  written_at:      EpochMillis,
   damaged:         Z._default(Z.literal(false), false),
 })
 export type LockboxSummary = Z.infer<typeof LockboxSummary>

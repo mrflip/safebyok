@@ -128,7 +128,8 @@ const OldEnvelopeFields = {
   passphrase_salt_b64:          'c2FsdA',
   vault_key_passphrase_wrapped: TH.fakeCiphered('old'),
 }
-const { registered_at: _boxRegistered, changed_at: _boxChanged, ...boxWithoutTimes } = TH.boxOf('anthropic_api_key', 'a1')
+const { registered_at: _boxRegistered, written_at: _boxWritten, ...boxWithoutTimes } = TH.boxOf('anthropic_api_key', 'a1')
+const lockboxV3 = { ...boxWithoutTimes, format: 'safebyok-lockbox-v3', registered_at: Date.UTC(2026, 9, 14), changed_at: Date.UTC(2026, 9, 14) }
 /** An ISO time, as records stored them before every time became epoch milliseconds. */
 const OldIso = '2026-10-14T00:00:00.000Z'
 
@@ -172,14 +173,15 @@ const LockboxCases = [
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), whisper_codec: 'json_v2' },     false,  false,  'a whisper codec neither knows'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), whisper_schema_version: 2 },    false,  false,  'a whisper schema version neither knows'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), format: 'safebyok-lockbox-v2' }, false, false,  'a lockbox from before the public bag'],
+  [lockboxV3,                                                                false,  false,  'a lockbox from before written_at, holding changed_at'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), format: 'safebyok-vault-v1' },  false,  false,  "another record's format"],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), whisper_ciphered: 'ct-flat' },  false,  false,  'a whisper ciphered as bare text, not an envelope'],
-  [{ ...TH.boxOf('anthropic_api_key', 'a1'), changed_at: '1792022400000' },  false,  false,  'a changed_at written as text'],
+  [{ ...TH.boxOf('anthropic_api_key', 'a1'), written_at: '1792022400000' },  false,  false,  'a written_at written as text'],
   [{ ...boxWithoutTimes, created_at: OldIso, updated_at: OldIso },           false,  false,  'a lockbox from before its times were named registered_at and changed_at'],
   // Zod refuses, Convex accepts:
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), public_json: '{"note":' },      false,  true,   'a public bag that is not JSON'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), revision_id: '' },              false,  true,   'an empty revision_id'],
-  [{ ...TH.boxOf('anthropic_api_key', 'a1'), changed_at: Infinity },         false,  true,   'a changed_at that never comes'],
+  [{ ...TH.boxOf('anthropic_api_key', 'a1'), written_at: Infinity },         false,  true,   'a written_at that never comes'],
 ] as const
 
 describe("the Convex validators, against the core's Zod records, record by record", () => {

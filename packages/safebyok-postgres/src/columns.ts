@@ -58,7 +58,7 @@ export const LockboxColumns = everyFieldOf<Lockbox>()([
   ['whisper_schema_version', 'bigint'],
   ['public_json',            'text'],
   ['registered_at',          'bigint'],
-  ['changed_at',             'bigint'],
+  ['written_at',             'bigint'],
 ] as const)
 
 /** A lockbox as a listing reads it: every column but the two ciphered ones. */
