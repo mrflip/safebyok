@@ -238,11 +238,11 @@ const answerOf = (result: OperationResult): Record<string, unknown> => {
  */
 const refusalOf = (err: CombinedError): Error => {
   for (const refused of err.graphQLErrors) {
-    const { kind, code } = refused.extensions
+    const { kind } = refused.extensions
     if (isKind(kind)) { return new VaultError(kind, refused.message) }
-    if (typeof code === 'string' && MisuseCodes.has(code)) {
-      return Sanitizer.refusalFor(err, 'bad_option', "The GraphQL server refused this operation's shape or variables: the schema it serves is not the one this version of safebyok-graphql sends. Serve VaultSchemaSdl from the same version.")
-    }
+  }
+  if (err.graphQLErrors.some(({ extensions: { code } }) => typeof code === 'string' && MisuseCodes.has(code))) {
+    return Sanitizer.refusalFor(err, 'bad_option', "The GraphQL server refused this operation's shape or variables: the schema it serves is not the one this version of safebyok-graphql sends. Serve VaultSchemaSdl from the same version.")
   }
   return err
 }

@@ -246,6 +246,15 @@ describe("graphqlVaultDB, its refusals", () => {
     })
   }
 
+  it("carries a server's refusal by its kind, though a validation code came before it", async () => {
+    const misuse = new GraphQLError('Variable "$scope" got invalid value', { extensions: { code: 'BAD_USER_INPUT' } })
+    const revoked = new GraphQLError('No one is signed in, so this vault cannot be reached: sign in, then try again.', { extensions: { kind: 'identity_revoked' } })
+    const answered = { toPromise: () => Promise.resolve({ error: new CombinedError({ graphQLErrors: [misuse, revoked] }) }) }
+    const both = { query: () => answered, mutation: () => answered, subscription: () => answered }
+    const refusal = await TH.refusalOf(graphqlVaultDB({ client: both as unknown as GraphqlVaultClient }).readBundle(u1))
+    expect(refusal.kind).to.eq('identity_revoked')
+  })
+
   it("passes over a GraphQL error whose kind is not a VaultError's", async () => {
     const schema = buildSchema('type Query { safebyokReadBundle(scope: SafebyokVaultScopeInput!): Boolean } input SafebyokVaultScopeInput { applabel: String!, user_id: String!, vaultlabel: String! }')
     const rootValue = { safebyokReadBundle: () => Promise.reject(Object.assign(new Error('no such kind'), { extensions: { kind: 'made_up' } })) }
