@@ -99,10 +99,11 @@ reads as absent, its rows left as they were.
 
 ### Looking at the rows
 
-`inspectIdbVaultDB({ dbName })` is a raw window onto the rows, for a debug panel or a demo's
+`inspectIdbVaultDB({ dbName, logger })` is a raw window onto the rows, for a debug panel or a demo's
 "what the backend sees": `rows()` lists every stored row with its ckey, `subscribe(listener)`
 hears every write, and `wipe()` removes every row, every user's vault in that database. It asks
-no vault's opinion: what it shows is what is stored.
+no vault's opinion: what it shows is what is stored. A listener that throws is told to its
+`logger` (the console, without one), and to the platform's `reportError` where there is one.
 
 ## Writing an adapter of your own
 

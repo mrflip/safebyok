@@ -69,8 +69,9 @@ browser app answers like any other, `keyDeriver`, `deviceDB` and `passphraseStre
 render: the provider reopens the vault whenever a prop changes identity. So define a `logger`, a
 `clock` or a `passphraseStrengthTest` of your own once, outside the component (or memoize it): a
 function or object literal written in the props is a new one at every render, and reopens the
-vault each time, ending any dialog. The provider warns of it once, through your logger (or the
-console, when you pass none), the first time any of them changes. The vault keeps the test it
+vault each time, ending any dialog. The provider warns of it once, the first time any of them
+changes, through the one logger it and its vault share: your `logger` prop, or, when you pass
+none, the logger your `vaultDB` was made with (the console, if it was given none). The vault keeps the test it
 was opened with for its life; one that is no function, or none at all, is thrown at the render
 that has it, as `bad_option`, to the nearest error boundary. `validators` is the exception: the provider watches each schema in
 the bag rather than the bag, so `validators={{ boxlabel: BoxlabelCheck }}` is fine in the props, so

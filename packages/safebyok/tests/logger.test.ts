@@ -1,12 +1,11 @@
 import { runInNewContext } from 'node:vm'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { VaultError } from '../src/errors'
-import { asError, parseLogger, type VaultLogger } from '../src/logger'
+import { ConsoleLogger, asError, parseLogger, type VaultLogger } from '../src/logger'
 import * as TH from './test-helpers'
 
 /** What a host might hand openVault as its logger that is not one. */
 const NotLoggers = [
-  [null,                                                       'null'],
   [{},                                                         'an empty object'],
   [{ log: () => undefined, warn: () => undefined },            'a logger without error'],
   [{ log: 'info', warn: () => undefined, error: () => undefined }, 'a logger whose log is a string'],
@@ -35,14 +34,24 @@ describe("parseLogger", () => {
     })
   }
 
-  it("falls back to the console when given none", () => {
+  it("falls back to the console when given none, as its second example shows", () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => { /* kept out of the test output */ })
     parseLogger(undefined).warn('a refresh failed', { call: 'refresh' })
     expect(warn).toHaveBeenCalledWith('safebyok: a refresh failed', { call: 'refresh' })
+    warn.mockRestore()
   })
 
-  it("answers the one console logger, made once, whenever it is given none", () => {
-    expect(parseLogger(undefined)).to.eq(parseLogger(undefined))
+  it("answers the one console logger, ConsoleLogger, whenever it is given none or null, as its third example shows", () => {
+    expect(parseLogger(undefined)).to.eq(ConsoleLogger)
+    expect(parseLogger(null)).to.eq(ConsoleLogger)
+    expect(parseLogger(ConsoleLogger)).to.eq(ConsoleLogger)
+  })
+
+  it("guards the same host logger as the same object, however often it is handed in, as its fourth example shows", () => {
+    const telemetry = TH.spyLogger().logger
+    expect(parseLogger(telemetry)).to.eq(parseLogger(parseLogger(telemetry)))
+    expect(parseLogger(telemetry)).to.eq(parseLogger(telemetry))
+    expect(parseLogger(TH.spyLogger().logger)).to.not.eq(parseLogger(telemetry))
   })
 
   it("guards a logger once: one it has guarded comes back as itself, however many layers hand it down", () => {
@@ -54,18 +63,24 @@ describe("parseLogger", () => {
     expect(parseLogger(parseLogger(fallback))).to.eq(fallback)
   })
 
-  it("marks a guarded logger with a property that is not enumerable, so that spreading or listing it shows nothing", () => {
+  it("carries nothing beside its three calls, so that spreading or listing a guarded logger shows nothing more", () => {
     const guarded = parseLogger(TH.spyLogger().logger)
-    expect(Object.getOwnPropertyDescriptor(guarded, '_safebyok_modded')).to.include({ value: true, enumerable: false })
-    expect(Object.keys(guarded)).to.deep.equal(['log', 'warn', 'error'])
+    expect(Reflect.ownKeys(guarded)).to.deep.equal(['log', 'warn', 'error'])
   })
 
-  it("takes a logger the host marked `_safebyok_modded` as it is, unguarded, and still refuses a marked non-logger", () => {
-    const hostGuarded = { log: () => undefined, warn: () => undefined, error: () => { throw new Error('the host chose not to be guarded') }, _safebyok_modded: true }
-    const taken = parseLogger(hostGuarded)
-    expect(taken).to.eq(hostGuarded)
-    expect(() => { taken.error('x') }).to.throw('the host chose not to be guarded')
-    expect(() => parseLogger({ _safebyok_modded: true } as unknown as VaultLogger)).to.throw(VaultError, /log, warn and error functions/)
+  it("guards a logger made from a guarded one, which inherits nothing that would let it skip the guard", () => {
+    const child = Object.create(parseLogger(TH.spyLogger().logger)) as VaultLogger
+    child.error = () => { throw new Error('a child logger that throws') }
+    const taken = parseLogger(child)
+    expect(taken).to.not.eq(child)
+    expect(() => { taken.error('x') }).to.not.throw()
+  })
+
+  it("guards a logger that claims to be guarded already, by any property it carries", () => {
+    const claiming = { log: () => undefined, warn: () => undefined, error: () => { throw new Error('a logger that throws') }, _safebyok_modded: true }
+    const taken = parseLogger(claiming)
+    expect(taken).to.not.eq(claiming)
+    expect(() => { taken.error('x') }).to.not.throw()
   })
 
   it("takes the console itself", () => {

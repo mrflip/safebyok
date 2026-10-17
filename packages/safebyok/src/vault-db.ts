@@ -77,9 +77,10 @@ export type VaultDBOpts = {
    * Where the VaultDB says what it has nobody to throw to: a subscriber's listener that threw, a
    * watch that failed to start or dropped. Fixed when the VaultDB is made, and not the logger
    * `openVault` is given, which is the vault's alone. A vault opened with no logger of its own
-   * uses this one, so give it here, once, to have one logger hear both. Without one, the console. Kind 'bad_option' for anything that is not a VaultLogger.
+   * uses this one, so give it here, once, to have one logger hear both. Without one (or with null),
+   * the console. Kind 'bad_option' for anything else that is not a VaultLogger.
    */
-  logger?: VaultLogger | undefined
+  logger?: VaultLogger | null | undefined
 }
 
 /**
@@ -192,26 +193,28 @@ export abstract class VaultDB {
    */
   abstract readonly maxNameBytes: number
 
-  /**
-   * Where this VaultDB says what it has nobody to throw to: always a logger, fixed when it is made.
-   * Each call is guarded: a logger that throws breaks nothing. An own property, writable and
-   * configurable so that a host or a test may swap it, and not enumerable, so that a VaultDB
-   * logged, spread or compared never shows or copies a host's logger. `openVault` reads it as the
-   * vault's own logger when it is given none.
-   */
-  declare readonly logger: VaultLogger
+  /** The logger this VaultDB was made with, guarded: private, so that nothing can put another in its place. */
+  readonly #logger: VaultLogger
 
   /**
    * @param init - What every VaultDB is made with: a `logger`. Kind 'bad_option' for none, or one
    *   that is not a VaultLogger.
    */
   constructor(init: VaultDBInit) {
-    const given = (init as VaultDBInit | null | undefined)?.logger
-    if (given === undefined) {
-      throw new VaultError('bad_option', 'A VaultDB is made with a logger: hand `super()` { logger }. An adapter\'s factory settles it with parseLogger(opts.logger), which is the console when the host gave none.')
+    const given = (init as { logger?: VaultLogger | null } | null | undefined)?.logger
+    if (given === undefined || given === null) {
+      throw new VaultError('bad_option', "A VaultDB is made with a logger: hand `super()` { logger }. An adapter's factory settles it with parseLogger(opts.logger), which is the console when the host gave none.")
     }
-    Object.defineProperty(this, 'logger', { value: parseLogger(given), writable: true, configurable: true, enumerable: false })
+    this.#logger = parseLogger(given)
   }
+
+  /**
+   * Where this VaultDB says what it has nobody to throw to: always a logger, fixed when it is made,
+   * and guarded, so a logger that throws breaks nothing. Read only, and kept off the VaultDB
+   * itself, so a VaultDB logged, spread or compared never shows or copies a host's logger.
+   * `openVault` and `VaultProvider` use it when they are given no logger of their own.
+   */
+  get logger(): VaultLogger { return this.#logger }
 
   // ------------------------------------------------------------------- the verbs safebyok calls
 

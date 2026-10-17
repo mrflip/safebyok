@@ -452,20 +452,29 @@ const vault = await openVault({
 })
 ```
 
-With no logger, the vault writes to the console, each message tagged `safebyok:`. Pass functions
-that do nothing for quiet, or `console` itself to drop the tag (it then prints a missing story or
-error as `undefined` or `null`). A logger that throws, or returns
-a promise that rejects, is ignored: logging never breaks a lock, an open or a store. Anything
-else is refused as `bad_option`.
+With no logger anywhere, the vault writes to the console, each message tagged `safebyok:` (null
+counts as none). Pass functions that do nothing for quiet, or `console` itself to drop the tag (it
+then prints a missing story or error as `undefined` or `null`). A logger that throws, or returns a
+promise that rejects, is ignored: logging never breaks a lock, an open or a store. Anything else is
+refused as `bad_option`.
 
-Your storage adapter has a logger of its own, fixed when you make it: each adapter's factory takes
-an optional `logger` (the console, without one), and `openVault`'s is not handed to it. A vault
-opened with no `logger` uses its adapter's, so to have one logger hear both, give it to the adapter
-once: `idbVaultDB({ logger })`, `openVault({ ... })`. A `logger` given to `openVault` is the
-vault's alone. An adapter of your
-own extends `VaultDB` and hands `super()` a `{ logger }`, which its factory settles from the host's
-options with `parseLogger(opts.logger)`; the base class refuses to be made without one. It says
-what it has nobody to throw to through `this.logger`.
+Most apps name their logger once, or not at all. Give it to your storage adapter's factory --
+`idbVaultDB({ logger })` -- and the adapter, every vault opened over it, and `VaultProvider` all
+hear it, as one object. A `logger` given to `openVault` (or `VaultProvider`) is the vault's alone,
+and the adapter keeps its own: that is the second mention, for an app that wants the two apart, or
+a child logger for the vault. To have the vault log to the console whatever the adapter was given,
+pass `logger: ConsoleLogger`. An adapter's logger is fixed when it is made: `vaultDB.logger` reads
+it, and nothing replaces it.
+
+An adapter of your own extends `VaultDB` and hands `super()` a `{ logger }`, which its factory
+settles from the host's options with `parseLogger(opts.logger)`; the base class refuses to be made
+without one. It says what it has nobody to throw to through `this.logger`.
+
+The few things that call your own listeners outside a vault take a `logger` the same way, told when
+one throws (and the platform's `reportError` too, which is where a browser's error tracking hears
+it): `memoryStore({ logger })`, `domStore(localStorage, prefix, { logger })`,
+`inspectIdbDeviceDB({ logger })` and `ChangeBell.listen(bellname, listener, logger)`. Without one,
+the console.
 
 Each call is a plain-language `message`; a `story` naming the vault call it happened in
 (`{ call: 'lockSoon' }`); and, when there is one, the error behind it, a `VaultError` or your own

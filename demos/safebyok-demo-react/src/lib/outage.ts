@@ -1,4 +1,4 @@
-import { VaultDB, VaultError, isVaultError, parseLogger, type BundleExpectation, type EraseExpectation, type Lockbox, type LockboxExpectation, type StoredLockbox, type VaultBundle, type VaultScope } from 'safebyok'
+import { VaultDB, VaultError, isVaultError, type BundleExpectation, type EraseExpectation, type Lockbox, type LockboxExpectation, type StoredLockbox, type VaultBundle, type VaultScope } from 'safebyok'
 
 /**
  * DEMO JANK: a pretend backend outage, switched on and off from the backend inspection panel, so
@@ -58,11 +58,11 @@ export class OutageVaultDB extends VaultDB {
   private readonly outage: Outage
 
   /**
-   * @param inner - The adapter that really stores the vault.
+   * @param inner - The adapter that really stores the vault, whose logger this one says things through.
    * @param outage - The switch that takes it down.
    */
   constructor(inner: VaultDB, outage: Outage) {
-    super({ logger: parseLogger(undefined) })
+    super({ logger: inner.logger })
     this.inner = inner
     this.outage = outage
     this.maxRecordBytes = inner.maxRecordBytes

@@ -624,6 +624,27 @@ describe("spyLogger", () => {
   })
 })
 
+describe("vaultDBInit", () => {
+  it("hands super() a spy's logger when given none, so a VaultDB made as its first example shows says nothing to the test output", () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => { /* kept out of the test output */ })
+    try {
+      const vaultDB = new RoundTripVaultDB(new RoundTripBackend(false), { stepping: inOneStep })
+      vaultDB.logger.error('said to no one')
+      expect(consoleError).not.toHaveBeenCalled()
+    } finally {
+      consoleError.mockRestore()
+    }
+  })
+
+  it("hands super() the logger it is given, guarded, as its second example shows", () => {
+    const spy = TH.spyLogger()
+    const vaultDB = new RoundTripVaultDB(new RoundTripBackend(false), { stepping: inOneStep, logger: spy.logger })
+    vaultDB.logger.warn('heard by the spy')
+    expect(spy.calls.map((call) => call.message)).to.deep.equal(['heard by the spy'])
+    expect(TH.vaultDBInit(vaultDB.logger).logger).to.eq(vaultDB.logger)
+  })
+})
+
 describe("loggedText", () => {
   it("holds each message, story and error, down through every cause and own property", () => {
     const spy = TH.spyLogger()

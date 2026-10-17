@@ -4,6 +4,7 @@ import * as Ckeys from './ckeys'
 import { keepingLocks, lockGenerationOf, lockedMeanwhile, type DeviceDB } from './device-db'
 import { parseDbName, type IdbOpts } from './idb-opts'
 import { VaultError } from './errors'
+import { parseLogger, type VaultLogger } from './logger'
 import * as ChangeBell from './change-bell'
 
 export type { IdbOpts } from './idb-opts'
@@ -167,14 +168,29 @@ export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
 export type IdbRow = { ckey: string, row: unknown }
 
 /**
+ * What {@link inspectIdbDeviceDB} is made with: the database, and optionally a logger.
+ *
+ * @example inspectIdbDeviceDB({ dbName: 'acme', logger: telemetryLogger })
+ */
+export type IdbInspectorOpts = IdbOpts & {
+  /**
+   * Who hears of a `subscribe` listener that throws: the console when there is none (or null).
+   * Kind 'bad_option' for anything else that is not a VaultLogger.
+   */
+  logger?: VaultLogger | null | undefined
+}
+
+/**
  * A window onto the rows {@link idbDeviceDB} keeps, for inspectors and debug panels: the raw
  * rows, a change bell, and a wipe. This is how the demo shows what this device remembers without
  * asking the vault's opinion -- what it reports is what is actually stored. The vault store's
  * own rows have their window beside it, `inspectIdbVaultDB` from `safebyok-indexeddb`.
  *
- * @param opts - The database to look at: `dbName`, default 'safebyok'.
- * @returns The inspector. Kind 'bad_option' for a `dbName` that is not non-empty text, and from
- *   its `subscribe`, for a listener that is not a function. Its `rows()` and `wipe()` reject in a
+ * @param opts - The database to look at: `dbName`, default 'safebyok'; and optionally the
+ *   `logger` that hears of a `subscribe` listener that throws, the console without one.
+ * @returns The inspector. Kind 'bad_option' for a `dbName` that is not non-empty text, or a
+ *   `logger` that is not a VaultLogger, and from its `subscribe`, for a listener that is not a
+ *   function. Its `rows()` and `wipe()` reject in a
  *   context with no IndexedDB, as the device store does, with a `NotSupportedError`.
  *
  * @example
@@ -182,8 +198,9 @@ export type IdbRow = { ckey: string, row: unknown }
  *   const rows = await inspector.rows()
  *   const stop = inspector.subscribe(() => { void inspector.rows().then(render) })
  */
-export const inspectIdbDeviceDB = (opts?: IdbOpts) => {
+export const inspectIdbDeviceDB = (opts?: IdbInspectorOpts) => {
   const dbName = parseDbName(opts, 'inspectIdbDeviceDB')
+  const logger = parseLogger(opts?.logger)
   return {
     /** Every stored row on the shelf, sorted by ckey. */
     rows: async (): Promise<IdbRow[]> => {
@@ -196,7 +213,7 @@ export const inspectIdbDeviceDB = (opts?: IdbOpts) => {
     /** Calls `listener` after any write to the shelf, this tab or another; returns the unsubscribe. */
     subscribe: (listener: () => void): (() => void) => {
       if (typeof listener !== 'function') { throw new VaultError('bad_option', 'subscribe needs a listener function to call after each write.') }
-      return ChangeBell.listen(bellnameOf(dbName), listener)
+      return ChangeBell.listen(bellnameOf(dbName), listener, logger)
     },
     /** Remove every row on the shelf: every remembered unlock and device mark in this database. */
     wipe: async (): Promise<void> => {

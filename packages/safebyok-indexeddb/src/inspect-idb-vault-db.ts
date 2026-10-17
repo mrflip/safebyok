@@ -1,4 +1,4 @@
-import { VaultError } from 'safebyok'
+import { VaultError, parseLogger } from 'safebyok'
 import { ChangeBell } from 'safebyok/idb'
 import { bellnameOf, parseDbName, type IdbVaultDBOpts } from './idb-opts'
 import { inOneTransaction, settle, shelfOf } from './shelf'
@@ -21,9 +21,11 @@ export type IdbVaultInspector = {
  * records, a change bell, and a wipe. What it reports is what is actually stored, without asking
  * any vault's opinion -- which is how a demo shows "what the backend sees".
  *
- * @param opts - The database to look at: `dbName`, default 'safebyok'.
- * @returns The inspector. Kind 'bad_option' for a `dbName` that is not non-empty text, and from
- *   its `subscribe`, for a listener that is not a function.
+ * @param opts - The database to look at: `dbName`, default 'safebyok'; and optionally the
+ *   `logger` that hears of a `subscribe` listener that throws, the console without one.
+ * @returns The inspector. Kind 'bad_option' for a `dbName` that is not non-empty text, or a
+ *   `logger` that is not a VaultLogger, and from its `subscribe`, for a listener that is not a
+ *   function.
  *
  * @example
  *   const inspector = inspectIdbVaultDB({ dbName: 'acme' })
@@ -32,6 +34,7 @@ export type IdbVaultInspector = {
  */
 export const inspectIdbVaultDB = (opts?: IdbVaultDBOpts): IdbVaultInspector => {
   const dbName = parseDbName(opts, 'inspectIdbVaultDB')
+  const logger = parseLogger(opts?.logger)
   return {
     rows: async () => {
       // Both reads in one transaction, so a ckey and its row are the same moment's.
@@ -43,7 +46,7 @@ export const inspectIdbVaultDB = (opts?: IdbVaultDBOpts): IdbVaultInspector => {
     },
     subscribe: (listener) => {
       if (typeof listener !== 'function') { throw new VaultError('bad_option', 'subscribe needs a listener function to call after each write.') }
-      return ChangeBell.listen(bellnameOf(dbName), listener)
+      return ChangeBell.listen(bellnameOf(dbName), listener, logger)
     },
     wipe: async () => {
       await inOneTransaction(shelfOf(dbName), async (store) => { await settle(store.clear()) })

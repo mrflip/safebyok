@@ -1,5 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { checkStrengthTest, checkValidators, eraseDamagedVault as eraseStoredDamagedVault, isVaultCondition, isVaultError, openVault, parseLogger, type OpenVaultOpts, type PassphraseStrengthTest, type Vault, type VaultError, type VaultLogger, type VaultScope, type VaultSnapshot, type VaultValidators } from 'safebyok'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { checkStrengthTest, checkValidators, eraseDamagedVault as eraseStoredDamagedVault, isVaultCondition, isVaultError, openVault, parseLogger, type OpenVaultOpts, type PassphraseStrengthTest, type Vault, type VaultDB, type VaultError, type VaultLogger, type VaultScope, type VaultSnapshot, type VaultValidators } from 'safebyok'
 import { PassphraseModal, type PassphraseAdvice } from './passphrase-modal'
 
 /**
@@ -115,8 +115,9 @@ export const useVaultSnapshot = (): VaultSnapshot => {
  * identity, so build each once -- at module level, or memoized -- never inline in the props; each
  * schema in `validators` likewise, though the bag around them may be built in render, as the
  * provider watches each schema rather than the bag. A `logger`, `clock` or
- * `passphraseStrengthTest` that changes identity is warned of once, through the logger (the
- * console when there is none).
+ * `passphraseStrengthTest` that changes identity is warned of once, through the logger. The
+ * provider and the vault it opens say things through one logger: the `logger` given here, else
+ * the one the `vaultDB` was made with (the console when it was given none).
  */
 export type VaultProviderProps = Omit<OpenVaultOpts, 'userId'> & {
   /** The signed-in user from the host's auth, or null when nobody is: then there is no vault. */
@@ -144,14 +145,16 @@ export type VaultProviderProps = Omit<OpenVaultOpts, 'userId'> & {
 }
 
 /**
- * Says `message` through the host's logger, or the console when there is none. A logger that is
- * no VaultLogger hears nothing: openVault refuses it, to the error boundary.
+ * The one logger the provider and the vault it opens say things through: the host's `logger`,
+ * else the one its `vaultDB` was made with, guarded. Undefined for a logger, or a vaultDB, that
+ * openVault will refuse, to the error boundary.
  */
-const warnHost = (logger: VaultLogger | undefined, message: string, story: Record<string, unknown>) => {
+const settleLogger = (logger: VaultLogger | null | undefined, vaultDB: VaultDB): VaultLogger | undefined => {
   try {
-    parseLogger(logger).warn(message, story)
+    return parseLogger(logger ?? vaultDB.logger)
   } catch {
-    // openVault refuses the same logger, and the provider throws that to the error boundary.
+    // openVault refuses the same logger or vaultDB, and the provider throws that to the error boundary.
+    return undefined
   }
 }
 
@@ -218,6 +221,8 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
   const [openError, setOpenError] = useState<VaultError | null>(null)
   // Bumped by retryOpen: a fresh value re-runs the open effect.
   const [openAttempt, setOpenAttempt] = useState(0)
+  // Settled once for each logger and vaultDB, so the provider and every vault it opens share it.
+  const heardBy = useMemo(() => settleLogger(logger, vaultDB), [logger, vaultDB])
   // The logger, clock and strength test the last render had, and whether a change of any was warned of yet.
   const sinks = useRef({ logger, clock, passphraseStrengthTest })
   const toldOfSinks = useRef(false)
@@ -234,8 +239,8 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
     ]
     if (toldOfSinks.current || changed.length === 0) { return }
     toldOfSinks.current = true
-    warnHost(logger, `VaultProvider reopened the vault because its ${changed.join(' and ')} changed identity between renders. Written inline in the props, it is new at every render, and reopens the vault each time: define it once, outside the component, or memoize it.`, { call: 'VaultProvider', props: changed })
-  }, [logger, clock, passphraseStrengthTest])
+    heardBy?.warn(`VaultProvider reopened the vault because its ${changed.join(' and ')} changed identity between renders. Written inline in the props, it is new at every render, and reopens the vault each time: define it once, outside the component, or memoize it.`, { call: 'VaultProvider', props: changed })
+  }, [logger, clock, passphraseStrengthTest, heardBy])
 
   /** Closes `ending` if it is still the dialog showing, and settles every action waiting on it. */
   const endAsking = useCallback((ending: Asking | null, unlocked: boolean) => {
@@ -254,7 +259,7 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
     // Listed one by one so the effect re-runs on each; `satisfies` fails the build if an openVault
     // option is ever added and not passed through.
     const checks = { applabel: applabelCheck, vaultlabel: vaultlabelCheck, boxlabel: boxlabelCheck, userId: userIdCheck, unlocklabel: unlocklabelCheck } satisfies Record<keyof VaultValidators, unknown>
-    const openOpts = { applabel, vaultlabel, userId, vaultDB, deviceDB, forcePassphraseReentryHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger, validators: checks, passphraseStrengthTest } satisfies Record<keyof OpenVaultOpts, unknown>
+    const openOpts = { applabel, vaultlabel, userId, vaultDB, deviceDB, forcePassphraseReentryHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger: heardBy ?? logger, validators: checks, passphraseStrengthTest } satisfies Record<keyof OpenVaultOpts, unknown>
     void openVault(openOpts).then((opened) => {
       if (gone) { opened.close(); return }
       handle = opened
@@ -281,7 +286,7 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
       setOpenFailure(null)
       setOpenError(null)
     }
-  }, [userId, applabel, vaultlabel, vaultDB, deviceDB, forcePassphraseReentryHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger, passphraseStrengthTest, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, unlocklabelCheck, openAttempt, endAsking])
+  }, [userId, applabel, vaultlabel, vaultDB, deviceDB, forcePassphraseReentryHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger, heardBy, passphraseStrengthTest, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, unlocklabelCheck, openAttempt, endAsking])
 
   const retryOpen = useCallback(() => {
     if (openError !== null) { setOpenAttempt((prev) => prev + 1) }

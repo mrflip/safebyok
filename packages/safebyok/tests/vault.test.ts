@@ -11,7 +11,7 @@ import { memoryStore } from '../src/string-store'
 import { LockboxFieldsBytes, LockboxFixedBytes, StoredBytesPerWhisperByte, deviceTroubleAsConditions, eraseDamagedVault, openVault, type OpenVaultOpts, type Vault } from '../src/vault'
 import { cipherBinding, cipherBytes, fromB64, makeLockboxKey, makeVaultKey, randomBytes, toB64, wrapKeyUnder } from '../src/crypto'
 import type { CustomKeyDeriver, KeyDeriver } from '../src/key-deriver'
-import type { VaultLogger } from '../src/logger'
+import { ConsoleLogger, type VaultLogger } from '../src/logger'
 import { Argon2idWebV1, MaxSaltBytes, TestDeriverNotice } from '../src/key-deriver-spec'
 import * as Ckeys from '../src/ckeys'
 import type { PassphraseStrengthTest, PassphraseVerdict } from '../src/passphrase-strength'
@@ -5549,6 +5549,9 @@ const storedSecrets = (world: ReturnType<typeof makeWorld>): string[] => {
   return Array.from(everything.matchAll(/"(?:ciphertext_b64|salt_b64)":"([^"]+)"/g), (hit) => hit[1]!)
 }
 
+/** A logger's every call, for a logger that fails: what it throws must break nothing. */
+const throwFromLogger = () => { throw new Error('a logger that throws') }
+
 describe("the logger", () => {
   it("hears nothing from a vault going about its business", async () => {
     const world = makeWorld()
@@ -5617,6 +5620,57 @@ describe("the logger", () => {
     expect(world.logged).to.have.lengthOf(0)
   })
 
+  it("guards the vaultDB's logger too: a VaultDB of the host's own whose logger throws breaks no lock", async () => {
+    const world = makeWorld()
+    const vaultDB = localVaultDB({ store: world.dbStore })
+    // As a subclass overriding the getter would: its logger is the host's to answer.
+    Object.defineProperty(vaultDB, 'logger', { value: { log: throwFromLogger, warn: throwFromLogger, error: throwFromLogger } })
+    let reading = world.clock.now()
+    const vault = await world.openUnlocked('pw', { vaultDB, logger: undefined, clock: { now: () => reading } })
+    reading = world.clock.now() / 1000
+    await vault.lockSoon()
+    expect(vault.getSnapshot().state).to.eq('locked')
+  })
+
+  it("refuses a vaultDB whose logger is not one, before reading storage, when the host passes the vault none", async () => {
+    const world = makeWorld()
+    const vaultDB = localVaultDB({ store: world.dbStore })
+    const readBundle = vi.spyOn(vaultDB, 'readBundle')
+    Object.defineProperty(vaultDB, 'logger', { value: { log: () => undefined } })
+    const err = await TH.expectRefusal(world.open({ vaultDB, logger: undefined }), 'bad_option')
+    expect(err.message).to.match(/log, warn and error functions/)
+    expect(readBundle).not.toHaveBeenCalled()
+  })
+
+  it("takes null as none: the vaultDB's logger", async () => {
+    const world = makeWorld()
+    const own = TH.spyLogger()
+    const vaultDB = localVaultDB({ store: world.dbStore, logger: own.logger })
+    let reading = world.clock.now()
+    const vault = await world.openUnlocked('pw', { vaultDB, logger: null, clock: { now: () => reading } })
+    reading = world.clock.now() / 1000
+    await vault.lockSoon()
+    expect(own.calls.map((call) => call.story)).to.deep.equal([{ call: 'lockSoon' }])
+  })
+
+  it("is the console, whatever the vaultDB was made with, when the host passes ConsoleLogger, as its example shows", async () => {
+    const world = makeWorld()
+    const own = TH.spyLogger()
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => { /* kept out of the test output */ })
+    try {
+      const vaultDB = localVaultDB({ store: world.dbStore, logger: own.logger })
+      let reading = world.clock.now()
+      const vault = await world.openUnlocked('pw', { vaultDB, logger: ConsoleLogger, clock: { now: () => reading } })
+      reading = world.clock.now() / 1000
+      await vault.lockSoon()
+      const said = consoleWarn.mock.calls.map(([message]) => String(message)).filter((message) => message.startsWith('safebyok: lockSoon()'))
+      expect(said).to.have.lengthOf(1)
+      expect(own.calls).to.have.lengthOf(0)
+    } finally {
+      consoleWarn.mockRestore()
+    }
+  })
+
   it("is the host's own for the vault, when it passes one, whatever the vaultDB was made with", async () => {
     const world = makeWorld()
     const own = TH.spyLogger()
@@ -5632,7 +5686,7 @@ describe("the logger", () => {
   it("refuses a logger that is not one, before reading storage", async () => {
     const world = makeWorld()
     const readBundle = vi.spyOn(world.vaultDB, 'readBundle')
-    for (const nonsense of [null, {}, { log: () => undefined, warn: () => undefined }, 'console']) {
+    for (const nonsense of [{}, { log: () => undefined, warn: () => undefined }, 'console']) {
       const err = await TH.expectRefusal(world.open({ logger: nonsense as unknown as OpenVaultOpts['logger'] }), 'bad_option')
       expect(err.message).to.match(/log, warn and error functions/)
     }

@@ -1,7 +1,7 @@
 import * as Z from 'zod/mini'
 import { VaultError, type VaultDBOpts } from 'safebyok'
 
-/** What `idbVaultDB` and `inspectIdbVaultDB` are made with: `inspectIdbVaultDB` takes no logger. */
+/** What `idbVaultDB` and `inspectIdbVaultDB` are made with: the database, and optionally a logger. */
 export type IdbVaultDBOpts = VaultDBOpts & {
   /**
    * The name the IndexedDB databases are made under: non-empty text, default 'safebyok'. Pass the

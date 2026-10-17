@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto'
 import { describe, expect, it, vi } from 'vitest'
-import { VaultError } from 'safebyok'
+import { VaultError, type VaultLogger } from 'safebyok'
 import { idbVaultDB } from '../src/idb-vault-db'
 import type { IdbVaultDBOpts } from '../src/idb-opts'
 import { inspectIdbVaultDB } from '../src/inspect-idb-vault-db'
@@ -60,5 +60,19 @@ describe("inspectIdbVaultDB", () => {
     expect(() => inspector.subscribe('not a listener' as unknown as () => void)).to.throw(VaultError, /listener function/).with.property('kind', 'bad_option')
     await idbVaultDB({ dbName }).createBundle(TH.bundleOf('u1'))
     expect(await inspector.rows()).to.have.lengthOf(1)
+  })
+
+  it("tells the logger it was made with of a listener that throws", async () => {
+    const dbName = TH.freshDbName()
+    const spy = TH.spyLogger()
+    const thrown = new Error('a listener that throws')
+    const unsubscribe = inspectIdbVaultDB({ dbName, logger: spy.logger }).subscribe(() => { throw thrown })
+    await idbVaultDB({ dbName }).createBundle(TH.bundleOf('u1'))
+    await vi.waitFor(() => { expect(spy.calls.map((call) => [call.level, call.story, call.err])).to.deep.equal([['error', { call: 'ChangeBell' }, thrown]]) })
+    unsubscribe()
+  })
+
+  it("refuses a logger that is not one as it is made, with kind 'bad_option'", () => {
+    expect(() => inspectIdbVaultDB({ logger: {} as unknown as VaultLogger })).to.throw(VaultError, /log, warn and error functions/).with.property('kind', 'bad_option')
   })
 })

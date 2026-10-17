@@ -1,4 +1,5 @@
-import { Global } from './global'
+import { asError, parseLogger, type VaultLogger } from './logger'
+import { reportToPlatform } from './report-error'
 
 /**
  * The change bell: how a write to a store in this browser tells everyone listening to it, in this
@@ -15,21 +16,23 @@ import { Global } from './global'
  * or Bun process open, it is also unref'd, so a process exits when its own work is done.
  */
 
-const listenersByBell = new Map<string, Set<() => void>>()
+// Each bell's listeners in this tab, each with the logger that hears of its failures.
+const listenersByBell = new Map<string, Map<() => void, VaultLogger>>()
 const channels = new Map<string, BroadcastChannel>()
 
 // Each listener is called on its own, after the ringing code has run on, and one that leaves before
 // its turn comes is not called. One that throws silences no other, fails no write, and never
 // escapes as an uncaught error, which would end a Node or Bun process: what it threw goes to the
-// global logger, `Global.logger` (the bell has no logger of its own to hand).
-const callEach = (listeners: Set<() => void> | undefined) => {
-  listeners?.forEach((listener) => {
+// logger it was listened with, and to the platform's `reportError` where there is one.
+const callEach = (listeners: Map<() => void, VaultLogger> | undefined) => {
+  listeners?.forEach((logger, listener) => {
     queueMicrotask(() => {
       if (! listeners.has(listener)) { return }
       try {
         listener()
       } catch (err) {
-        Global.logger.error('A listener of the change bell threw. The bell rang on, and every other listener was called.', { call: 'ChangeBell' }, err)
+        logger.error("A listener of the change bell threw. The bell rang on, and every other listener was called; the listener is its author's to mend.", { call: 'ChangeBell' }, asError(err))
+        reportToPlatform(err)
       }
     })
   })
@@ -52,21 +55,27 @@ export const ring = (bellname: string): void => {
 
 /**
  * Calls `listener` whenever the bell named `bellname` rings, from this tab or another; returns the
- * unsubscribe. Where there is no BroadcastChannel, only this tab's rings are heard.
+ * unsubscribe. Where there is no BroadcastChannel, only this tab's rings are heard. What the
+ * listener throws goes to `logger`, as an error, and to the platform's `reportError` where there
+ * is one. A listener listened twice is called once, and tells the later `logger`.
  *
  * @param bellname - The bell to listen to.
  * @param listener - What to call, with nothing, on each ring.
+ * @param logger - Who hears of a listener that throws: the console when there is none (or null). Kind
+ *   'bad_option' for anything that is not a VaultLogger.
  * @returns The unsubscribe: once the last listener of this tab leaves, its channel closes.
  *
  * @example
  *   const stop = ChangeBell.listen('safebyok-idb:acme:vault_db', () => { void refresh() })
  *   stop()
+ * @example ChangeBell.listen('safebyok-idb:acme:vault_db', render, telemetryLogger)  // what render throws, telemetry hears
  */
-export const listen = (bellname: string, listener: () => void): (() => void) => {
+export const listen = (bellname: string, listener: () => void, logger?: VaultLogger | null): (() => void) => {
+  const heardBy = parseLogger(logger)
   channelOf(bellname)
-  const listeners = listenersByBell.get(bellname) ?? new Set()
+  const listeners = listenersByBell.get(bellname) ?? new Map<() => void, VaultLogger>()
   listenersByBell.set(bellname, listeners)
-  listeners.add(listener)
+  listeners.set(listener, heardBy)
   return () => {
     listeners.delete(listener)
     closeIfIdle(bellname)

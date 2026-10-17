@@ -903,7 +903,7 @@ export const spyLogger = () => {
 
 /**
  * What a VaultDB under test hands `super()`: a logger, which the base class demands. With none
- * given, a {@link spyLogger}'s, so that the VaultDB says nothing to the test output; either way
+ * given (or null), a {@link spyLogger}'s, so that the VaultDB says nothing to the test output; either way
  * it is acquired through `parseLogger`, as an adapter's factory acquires the host's or the
  * console's.
  *
@@ -915,7 +915,7 @@ export const spyLogger = () => {
  *   const spy = TH.spyLogger()
  *   const vaultDB = new AcmeVaultDB(TH.vaultDBInit(spy.logger))
  */
-export const vaultDBInit = (logger: VaultLogger | undefined = spyLogger().logger): VaultDBInit => ({ logger: parseLogger(logger) })
+export const vaultDBInit = (logger?: VaultLogger | null): VaultDBInit => ({ logger: parseLogger(logger ?? spyLogger().logger) })
 
 /**
  * Everything a logger was handed, as one text to search for what must never be there: each

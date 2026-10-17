@@ -29,7 +29,7 @@ import { inOneTransaction, settle, withheldShelfOf } from './shelf'
  * plainly that the vault lives only in this browser.
  *
  * @param opts - Where to keep the records: `dbName`, default 'safebyok'; and optionally a
- *   `logger`, the console without one (give `openVault` the same one to hear both).
+ *   `logger`, the console without one (a vault opened with no logger of its own hears it too).
  * @returns The VaultDB, to hand `openVault`. Kind 'bad_option' for a `dbName` that is not
  *   non-empty text, or a `logger` that is not a VaultLogger. Nothing is opened until the first read or write.
  *
@@ -124,7 +124,7 @@ class IdbVaultDB extends VaultDB {
 
   // Rings on every write to the shelf, not only ones in scope: a spurious refresh is harmless.
   protected override doSubscribe(_scope: VaultScope, onChange: () => void): () => void {
-    return ChangeBell.listen(bellnameOf(this.dbName), onChange)
+    return ChangeBell.listen(bellnameOf(this.dbName), onChange, this.logger)
   }
 
   private ring() { ChangeBell.ring(bellnameOf(this.dbName)) }

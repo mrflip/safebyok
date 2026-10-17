@@ -138,12 +138,13 @@ export type OpenVaultOpts = {
    * background refresh that failed, a remembered unlock it could not read -- as a
    * {@link VaultLogger}: `log`, `warn` and `error` functions. The vault hands
    * it no secret material or option's value (a host's own error goes as the host made it); whatever
-   * it throws is ignored. Pass functions that do nothing for quiet. Default: the logger the `vaultDB`
-   * was made with, which is the console when it was given none. It does not go the other way: a
-   * storage adapter keeps the logger it was made with, so to have one logger hear both, give it to
-   * the adapter's factory and leave this out. Kind 'bad_option' for anything else.
+   * it throws is ignored. Pass functions that do nothing for quiet. Default (none, or null): the
+   * logger the `vaultDB` was made with, which is the console when it was given none. It does not go
+   * the other way: a storage adapter keeps the logger it was made with, so to have one logger hear
+   * both, give it to the adapter's factory and leave this out; to have the vault log to the console
+   * whatever the adapter was given, pass `ConsoleLogger`. Kind 'bad_option' for anything else.
    */
-  logger?: VaultLogger | undefined
+  logger?: VaultLogger | null | undefined
   /**
    * The checks for the vault's names where they enter it, as a {@link VaultValidators} bag: each
    * field given replaces ours (`Label` for each label, an unlock's `unlocklabel` among them,
@@ -592,8 +593,8 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   // Every failure of the device's own storage reaches the vault's callers as a condition, with a kind.
   const deviceDB = deviceTroubleAsConditions(parseDeviceDB(opts.deviceDB))
   const reentryMillis = parseForcePassphraseReentryHours(opts.forcePassphraseReentryHours)
-  // The host's logger for the vault, else the one its storage was made with: always one, as every VaultDB has one.
-  const logger = opts.logger === undefined ? givenVaultDB.logger : parseLogger(opts.logger)
+  // The host's logger for the vault, else the one its storage was made with; guarded either way.
+  const logger = parseLogger(opts.logger ?? givenVaultDB.logger)
   const clock = parseClock(opts.clock)
   // Every reading of the host's clock is checked, this first one so that a clock counting in the
   // wrong unit fails the open rather than some later call.
