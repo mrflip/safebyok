@@ -407,9 +407,14 @@ export const beforeNextCall = <Target extends object>(target: Target, verb: Asyn
     // A mock of the test's own stands here: stand in front of it for one call, and call it
     // through, so it records that call once. A second spy on top of it would record it twice.
     const errands = [meanwhile]
+    // The mock may live on a prototype: then the stand-in is an own property to remove after, not
+    // one to write the mock over, which would hide the prototype's from then on.
+    const replaced = Object.getOwnPropertyDescriptor(target, verb)
     const standIn = async (...args: unknown[]) => {
       const errand = errands.shift()
-      if (errands.length === 0) { Reflect.set(target, verb, method) }
+      if (errands.length === 0) {
+        if (replaced === undefined) { Reflect.deleteProperty(target, verb) } else { Object.defineProperty(target, verb, replaced) }
+      }
       await errand?.()
       return await method.apply(target, args)
     }
