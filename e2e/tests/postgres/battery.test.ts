@@ -21,7 +21,6 @@ TH.describeOnPostgres('battery', "postgresVaultDB over a real Postgres", () => {
     const vaultDBFor = await freshServer()
     return TH.perUser((userId) => vaultDBFor(userId))
   }, {
-    comparesVaultKeyEpoch: false,
     makeCappedVaultDB:     async (maxLockboxes) => {
       const db = getDb()
       await db.endDevices()
