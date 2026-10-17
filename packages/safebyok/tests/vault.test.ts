@@ -4093,6 +4093,21 @@ describe("a new passphrase's strength", () => {
     expect(strengthTest.mock.calls).to.deep.equal([['acme acme acme', TH.scopeOf('u1')], ['pw', TH.scopeOf('u1')]])
   })
 
+  it("hands the host's test the vault's scope frozen, the very one the snapshot holds, so neither can change it for the other", async () => {
+    const world = makeWorld()
+    const heard: VaultScope[] = []
+    const strengthTest = (_passphrase: string, scope: VaultScope): PassphraseVerdict => {
+      heard.push(scope)
+      return { strong: true }
+    }
+    const vault = await world.open({ passphraseStrengthTest: strengthTest })
+    await vault.unlock('pw')
+    expect(heard[0]).to.eq(vault.getSnapshot().scope)
+    expect(Object.isFrozen(vault.getSnapshot().scope)).to.be.true
+    expect(() => { Object.assign(vault.getSnapshot().scope, { user_id: 'u2' }) }).to.throw(TypeError)
+    expect(vault.getSnapshot().scope).to.deep.equal(TH.scopeOf('u1'))
+  })
+
   it("refuses a weak passphrase at addPassphrase and changePassphrase before any key derivation, changing nothing", async () => {
     const world = makeWorld()
     await world.openUnlocked('pw')

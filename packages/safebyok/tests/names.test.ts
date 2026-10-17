@@ -187,6 +187,14 @@ describe("Names.checkScope", () => {
     expect(Names.checkScope(rules, scope)).to.deep.equal(scope)
   })
 
+  it("hands back a frozen copy, which no one it is handed to can change, leaving the scope handed in as it was", () => {
+    const scope = { ...TH.scopeOf('u1') }
+    const checked = Names.checkScope(Names.rulesOf(), scope)
+    expect(Object.isFrozen(checked)).to.be.true
+    expect(checked).to.not.eq(scope)
+    expect(Object.isFrozen(scope)).to.be.false
+  })
+
   it("refuses, as bad_label, a scope with a name its check refuses, or one that is not text", () => {
     const rules = Names.rulesOf()
     expect(TH.expectSyncRefusal(() => Names.checkScope(rules, { ...TH.scopeOf('u1'), applabel: 'Acme' }), 'bad_label').message).to.include('applabel')

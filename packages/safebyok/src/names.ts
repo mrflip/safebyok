@@ -97,7 +97,11 @@ export const checkFloor = (field: NameField, candidate: unknown): string => {
   throw new VaultError('bad_label', `That ${field} is not text any vault can hold. ${verdict.error.issues[0]?.message ?? 'It fails the floor every name is held to'}.`)
 }
 
-/** `scope`, once its three names pass the floor and their checks: kind 'bad_label' otherwise. */
+/**
+ * `scope`, once its three names pass the floor and their checks, as a frozen copy: whoever it is
+ * handed to -- a host's strength test, a snapshot's reader -- cannot change it for everyone else.
+ * Kind 'bad_label' otherwise.
+ */
 export const checkScope = (rules: NameRules, scope: unknown): VaultScope => {
   const checked = ScopeShape.safeParse(scope)
   if (! checked.success) {
@@ -106,7 +110,7 @@ export const checkScope = (rules: NameRules, scope: unknown): VaultScope => {
   check(rules, 'applabel', checked.data.applabel)
   check(rules, 'userId', checked.data.user_id)
   check(rules, 'vaultlabel', checked.data.vaultlabel)
-  return { applabel: checked.data.applabel, user_id: checked.data.user_id, vaultlabel: checked.data.vaultlabel }
+  return Object.freeze({ applabel: checked.data.applabel, user_id: checked.data.user_id, vaultlabel: checked.data.vaultlabel })
 }
 
 /** A scope's shape, before its names meet their checks. */
