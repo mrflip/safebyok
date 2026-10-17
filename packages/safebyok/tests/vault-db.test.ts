@@ -131,6 +131,9 @@ class RingingVaultDB extends MapVaultDB {
 
   ring() { for (const onChange of this.watches) { onChange() } }
 
+  /** The logger it says things through, as it stands. */
+  loggerNow() { return this.logger }
+
   protected override doSubscribe(_scope: VaultScope, onChange: () => void) {
     this.trouble = this.watchTrouble("This vault's watch failed: other devices' changes may not show until its next read.")
     this.watches.add(onChange)
@@ -793,6 +796,15 @@ describe("the abstract VaultDB, its logger", () => {
     failingListenerOn().ring()
     expect(consoleErrors).toHaveBeenCalledOnce()
     expect(consoleErrors.mock.calls[0]?.[0]).to.match(/^safebyok: A listener passed to subscribe threw/)
+  })
+
+  it("says each line to the console through the one logger, built once, rather than one built for each", () => {
+    const consoleErrors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const vaultDB = failingListenerOn()
+    expect(vaultDB.loggerNow()).to.eq(vaultDB.loggerNow())
+    vaultDB.ring()
+    vaultDB.ring()
+    expect(consoleErrors).to.have.callCount(2)
   })
 
   it("breaks nothing when its logger throws", () => {

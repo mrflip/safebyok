@@ -183,6 +183,8 @@ export abstract class VaultDB {
   // The logger this VaultDB was made with, if any; and the one the vault it serves handed it.
   private readonly ownLogger: VaultLogger | null
   private handedLogger: VaultLogger | null = null
+  // The console, guarded, for a VaultDB with neither: built once, not on every line said.
+  private readonly fallbackLogger = parseLogger(undefined)
 
   /**
    * @param opts - What every VaultDB is made with: an optional `logger`. Kind 'bad_option' for a
@@ -199,7 +201,7 @@ export abstract class VaultDB {
    * breaks nothing.
    */
   protected get logger(): VaultLogger {
-    return this.ownLogger ?? this.handedLogger ?? parseLogger(undefined)
+    return this.ownLogger ?? this.handedLogger ?? this.fallbackLogger
   }
 
   /**
