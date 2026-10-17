@@ -126,6 +126,26 @@ describe("beforeNextCall on a method already spied on", () => {
     expect(heard).to.deep.equal(['errand'])
   })
 
+  it("leaves a spy on the prototype showing through afterwards, with no own property in its way", async () => {
+    class Shelf { fetchRow(ckey: string) { return Promise.resolve(ckey.length) } }
+    const spy = vi.spyOn(Shelf.prototype, 'fetchRow')
+    const target = new Shelf()
+    TH.beforeNextCall(target, 'fetchRow', () => Promise.resolve())
+    expect(await target.fetchRow('one')).to.eq(3)
+    expect(Object.hasOwn(target, 'fetchRow')).to.be.false
+    spy.mockImplementation(() => Promise.resolve(-1))
+    expect(await target.fetchRow('one')).to.eq(-1)
+    spy.mockRestore()
+  })
+
+  it("puts back an own property of the target's, spy and all", async () => {
+    const target = { fetchRow: (ckey: string) => Promise.resolve(ckey.length) }
+    const spy = vi.spyOn(target, 'fetchRow')
+    TH.beforeNextCall(target, 'fetchRow', () => Promise.resolve())
+    await target.fetchRow('one')
+    expect(Object.getOwnPropertyDescriptor(target, 'fetchRow')?.value).to.eq(spy)
+  })
+
   it("can be armed again once its call has gone through", async () => {
     const target = { fetchRow: (ckey: string) => Promise.resolve(ckey.length) }
     const spy = vi.spyOn(target, 'fetchRow')
