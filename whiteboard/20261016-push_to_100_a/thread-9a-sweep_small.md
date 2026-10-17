@@ -1,0 +1,44 @@
+# Thread 9a: sweep_small (2026-10-17)
+
+Branch `20261017-sweep_small`, PR [#143](https://github.com/mrflip/safebyok/pull/143), stacked on #141. Justify: green (core 2055 passed | 35 skipped; every package and e2e green; the real-Postgres suites skip here).
+
+* **Built** (each item a commit or two, grouped, in this order):
+  * **G379** the passphrase modal's `vaultUnlockingWith`, `submitPassphrase`, `Catcher`, `wrong` moved to the React `tests/test-helpers.ts`; `passkey-unlock-button.test.tsx`'s `HostBoundary` was `Catcher`'s twin and now uses it. The unused `eslint-disable unicorn/prefer-promise-with-resolvers` in `vault-provider.test.tsx` removed (added item 6).
+  * **G377** `beforeNextCall` (`safebyok/testing`) restores by the replaced own property's descriptor (`Object.defineProperty`), and removes its stand-in when it replaced none (a spy on the prototype), with two tests.
+  * **G380** `aWhile`, `eventually`, `changeCounter` and `liveWatch` moved into `safebyok/testing` (tested); the postgres, graphql and indexeddb `refusalOf` are gone, their tests use `TH.expectRefusal` (`TH.expectSyncRefusal` in core and fastkey for the sync one, behind a one-line `refusalOf` wrapper that returns the message).
+  * **G483** `perUser`'s example is the call the postgres tests make (with `listen`); `servingOnly` reads a blank user id as no one signed in (`identity_revoked`), with a test.
+  * **G255** convex: `getUserId` called as a method of the bag (a class-method test); plain guard in `api` in place of `checkedApiOpts`; setup tests share `TH.installedComponent()` and no longer pin 9 functions. The fourth minor (test counts disagreeing in #102's thread file and body) is history: nothing to build.
+  * **G274** `inspectIdbVaultDB` reads (`getAllKeys` + `getAll` in one transaction) and wipes through `settle`/`inOneTransaction`, with a test.
+  * **G259** the Convex `design.md` header (in `winboard/`, historical) says it is built. **G466** VOCABULARY's damaged row names lockbox, way in and bundle. **G301** `VaultOperations` exported from `safebyok-graphql` (test; README). **G302, G306** README lines (32-bit `Int`, lockstep).
+  * **G039** and the hard-cap decision: two entries in `notes/security.md` (a sonnet subagent wrote them; I did not read the file).
+  * **G343** `mask` reviewed (below). **G488** the three post-review changes reviewed (below).
+  * Added items 1-6: see *Added by the Coach's rulings*.
+* **Decisions taken**:
+  * `liveWatch` moved with the other three (postgres and graphql each had a copy that used `eventually`); declared pull-forward of nothing later, just a duplicate removed.
+  * `eventually`'s timeout is the longer of the two copies' (2 s).
+  * G343 fixes: the doc block's `@returns` ran a "Throws" sentence together and the prose said "at least `minStars` stars always stand" though `maxLen` wins (the tests already say so); the test file's `Unsafe` pattern lacked U+FFFC, which the source strips; the refusal tests used a local `thrownBy` + `JSON.stringify` where `TH.expectSyncRefusal` and `TH.thrownText` exist. No behaviour changed. Checked: a 10M-character whisper masks in ~0.2 s.
+  * G488 findings: (a) #102's component check and message are sound. (b) #103's per-method queue is sound (restore happens as the last errand is taken, so re-arming inside it works); only G377's restore was wrong, fixed. (c) #104's rewrites of `WellFormed` and `NameChars` are right, but `LabelPattern`, `/^[a-z](_?[a-z0-9])+$/`, has the same disease: a repeated group overflows V8's stack on a 12M-character label, and `Label.safeParse` threw `RangeError` (verified). Rewritten as `/^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$/` (same language, checked against the old on 200k fuzzed strings and the test cases), with a test. This is a bug fix, not new behaviour; its `source` string changes (a changeset line says so). `scripts/newb-label.ts` keeps its own copy of the old regex: a root tool, untouched.
+  * `randomHex` (e2e Postgres helpers) is hand-written hex over `crypto.getRandomValues`, since `safebyok/utils` has no hex and `Uint8Array.prototype.toHex` is past Node 22; exported for every suite.
+  * `untilStatementBlocked(db, statementLike)` filters on `pg_stat_activity.query LIKE` and `pid <> pg_backend_pid()`; the callers pass `TH.FirstWriteStatement` (`%INSERT INTO safebyok_lockboxes%`). I chose the statement over the pid because the device's pid is not known to the test.
+  * A dropped pg connection is recorded by an `'error'` listener on every pool and client the file database makes, and fails the next `afterEach` by name.
+  * The agent prompt in the Postgres README is four lines in a blockquote, under the limit bullet.
+* **Added by the Coach's rulings**:
+  1. Thread 11's leftovers: the all-at-once race retitled (bounds and read-back, not the cap); the REPEATABLE READ / SERIALIZABLE "writers made together" cases went with `hard-cap.test.ts` (item 3); `untilStatementBlocked`; `'error'` listeners; CI service on `127.0.0.1:5432:5432` (and the URL on 127.0.0.1); a `lint-typecheck` step that fails when the image digest of `ci.yml` and `e2e/compose.yaml` differ (grep of `postgres:N@sha256:...` from both, tried here against the current files; `actionlint` is not installed here, so the workflow edit is unlinted).
+  2. `randomHex`, exported.
+  3. README recipe deleted, prompt in its place; patch changeset for `safebyok-postgres` (in the single sweep changeset). Deleted `e2e/tests/postgres/hard-cap.test.ts` (it tested only the README's trigger, reading the SQL from the README) **and** the PGlite test `the README's hard cap, vaya con dios` in `packages/safebyok-postgres/tests/vault-tables.test.ts`, same reason; e2e README, VAULTDB.md and the ci.yml comment no longer name the trigger. Old `notes/security.md` entries that mention the trigger are history and stay.
+  4. `notes/wontfix.md`: both entries, dated 2026-10-16 (the rulings' date).
+  5. `TODO.md`: Sand in the sandals (`postgres`, `node-compat (22)` required checks), Side quests (`ShelfVaultDB`), Soonish (multiple passphrases, identity and the backing database, call-time work, thread 4's race). `NOTYET.md`: hint, `-utils`/`-bestpractices`, React under real AT/hosts (G356), conflict handler (G499), Postgres own tests on PGlite; its own `## RAGEBAIT` section (bag kept, App tests' order). `TODO.md` had an empty `## RAGEBAIT` heading; it now points to `NOTYET.md`.
+  6. Done (item G379's commit).
+* **Closed or not** (each G###):
+  * **closed (built)**: G379, G380, G377, G483, G255, G274, G259, G466, G301, G302, G306, G039, G343, G488.
+  * **closed by note**: G135 (`vault.ts` calls `logger.log` since #106: nothing to build); G253 (`DeviceUnlock`'s doc block in `types.ts` already says it has no JSON form: accepted); G238 (merged as #111, option (b)); G254 (`BoxRevision` stays `v.array(v.string())`: Convex has no tuple validator, and the component's other structural-only checks are the same; the VaultDB base class checks the pair's shape on read); G375 (keep: `stateOnOpen` leaves its vault open because one test counts on that watch); G378 (keep the ordered pair, which proves the after-each close); G409 (not worth the noise: `/* @__PURE__ */` on every schema for ~0.5 kB); G413 (keep the trade: a build failure skips every package's tests so none runs on a stale `dist/`); G508 (dropped: `revision_id` already orders writes to one box; nothing added to NOTYET).
+  * **not closed**: G344 (needs real terminals, fonts and other Unicode versions; no agent has them; see For the Coach). G520 is 9c's.
+* **Discoveries**:
+  * `LabelPattern` overflowed V8's regex stack on a 12M-character label (above). Nothing else in `src/` has an anchored repeated-group pattern (`UserIdPattern` is a plain class and is fine).
+  * `api.safebyok` in convex-test is a proxy, so `Object.keys` of it is empty; the setup test compares two `api()` builds instead.
+  * pg's `Client` and `Pool` crash a run on an unhandled `'error'` event: the `watched` helper in `e2e/tests/postgres/test-helpers.ts` is the single place.
+* **For the Coach**:
+  * G344 stays open: someone with real terminals could paste `mask` output of the 29 `KnownBlanks` and a few scripts into iTerm, Terminal, a Linux terminal and a browser console, and note anything that draws blank or moves the cursor.
+  * Not run here: the real-Postgres e2e suites (they typecheck and lint; `SAFEBYOK_PG_URL` is unset), and the CI workflow edit (no `actionlint` here; the new step's grep was run by hand against the current files and reports them equal).
+  * The `postgres` and `node-compat (22)` required checks are in TODO; the ruleset is yours.
+  * `LabelPattern.source` is a different string now (same language): worth a glance at the changeset line.
