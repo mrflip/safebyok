@@ -1,5 +1,4 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { Component, type ReactNode } from 'react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { VaultError, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, openVault, type UnlockSummary, type Vault } from 'safebyok'
 import { createPasskey } from '../src/passkey'
@@ -24,13 +23,6 @@ const vaultRefusing = (err: Error, credentialId: string) => TH.stubVault({
   unlocks: [TH.passkeyEnvelopeOf('laptop', { credential_id: credentialId })] as unknown as UnlockSummary[],
   unlock:  () => Promise.reject(err),
 })
-
-/** Catches what its children throw while rendering, and shows the message: the host's own boundary. */
-class HostBoundary extends Component<{ children: ReactNode }, { caught: string | null }> {
-  override state = { caught: null as string | null }
-  static getDerivedStateFromError(err: unknown) { return { caught: err instanceof Error ? err.message : 'something' } }
-  override render() { return this.state.caught === null ? this.props.children : <p>caught: {this.state.caught}</p> }
-}
 
 const noop = () => undefined
 
@@ -129,7 +121,7 @@ describe("PasskeyUnlockButton", () => {
     const closed = new VaultError('vault_closed', 'This vault handle was closed.')
     const gripes: (string | null)[] = []
     const heard: boolean[] = []
-    const { reported } = TH.renderReporting(<HostBoundary><PasskeyUnlockButton vault={vaultRefusing(closed, credentialId)} onDone={(unlocked) => { heard.push(unlocked) }} onGripe={(gripe) => { gripes.push(gripe) }} /></HostBoundary>)
+    const { reported } = TH.renderReporting(<TH.Catcher><PasskeyUnlockButton vault={vaultRefusing(closed, credentialId)} onDone={(unlocked) => { heard.push(unlocked) }} onGripe={(gripe) => { gripes.push(gripe) }} /></TH.Catcher>)
     fireEvent.click(screen.getByText('Use a passkey'))
     await waitFor(() => { expect(gripes).to.deep.equal([null, PasskeyTrouble]) })
     expect(screen.queryByRole('button')).to.be.null
