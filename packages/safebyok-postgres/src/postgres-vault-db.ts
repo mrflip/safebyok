@@ -65,7 +65,8 @@ export type PostgresVaultDBOpts = VaultDBOpts & {
  *   the database is asked anything: the user the browser's vault was opened for is not the one
  *   signed in, and that vault locks itself.
  * * **Every write is one statement**, atomic as Postgres makes every statement: a write lands only
- *   while what it expects still stands, and a failed expectation refuses with kind `stale_write`.
+ *   while what it expects still stands, and a failed expectation refuses with kind `stale_write`,
+ *   as does a bundle update that does not move its `unlock_epoch` forward.
  *   A lockbox write reads its vault's bundle row `FOR SHARE`, so it lands only while that bundle
  *   stands for the vaultKey the lockbox was sealed under: a bundle update waits for it to end, or
  *   it for the update, and lockbox writes never wait for each other on the bundle.
@@ -143,11 +144,14 @@ const CreateBundleSql = `INSERT INTO safebyok_bundles (${Columns.names(BundleCol
   ON CONFLICT (applabel, user_id, vaultlabel) DO UPDATE SET format = safebyok_bundles.format
   RETURNING ${Columns.selected(BundleColumns)}`
 
-// The bundle written must name the vault it replaces: a vault_id never changes.
+// The bundle written must name the vault it replaces, as a vault_id never changes, and move its
+// unlock_epoch forward, as every update does (line 3.2): a modified client cannot write a bundle
+// back over the one it read.
 const UpdateBundleSql = `UPDATE safebyok_bundles SET (${Columns.names(BundleColumns)}) = ROW(${Columns.placeholders(BundleColumns, 1)})
   WHERE ${ScopeIs}
     AND vault_id = $${String(BundleParamCount + 1)}::text AND unlock_epoch = $${String(BundleParamCount + 2)}::bigint
     AND vault_id = ${Columns.placeholderOf(BundleColumns, 'vault_id', 1)}
+    AND unlock_epoch < ${Columns.placeholderOf(BundleColumns, 'unlock_epoch', 1)}
   RETURNING 1 AS landed`
 
 const ReadBoxSql = `SELECT ${Columns.selected(LockboxColumns)} FROM safebyok_lockboxes WHERE ${ScopeIs} AND boxlabel = $4::text`

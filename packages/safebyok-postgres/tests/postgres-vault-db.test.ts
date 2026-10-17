@@ -216,6 +216,21 @@ describe("postgresVaultDB, what it stores", () => {
     expect(standing?.unlocks.map((envelope) => envelope.unlocklabel)).to.deep.equal(['work_phrase', 'home_phrase', 'passphrase'])
   })
 
+  // The core never sends it -- its vault moves the epoch on with every update -- so it is a client
+  // of another version's, or of none.
+  it("refuses, as stale_write, a bundle update that does not move unlock_epoch forward, writing nothing", async () => {
+    const db = await TH.emptyDatabase()
+    const vaultDB = TH.requestFor(db, 'u1')
+    await vaultDB.createBundle(TH.bundleOf('u1', { unlock_epoch: 2 }))
+    const atTwo = { vault_id: 'vault-id-u1', unlock_epoch: 2 }
+    const rewrapped = (unlockEpoch: number) => TH.bundleOf('u1', { unlock_epoch: unlockEpoch, unlocks: [TH.envelopeOf('home_phrase')] })
+    await TH.expectRefusal(vaultDB.updateBundle(rewrapped(2), atTwo), 'stale_write')
+    await TH.expectRefusal(vaultDB.updateBundle(rewrapped(1), atTwo), 'stale_write')
+    expect(await vaultDB.readBundle(u1)).to.deep.equal(TH.bundleOf('u1', { unlock_epoch: 2 }))
+    await vaultDB.updateBundle(rewrapped(3), atTwo)
+    expect(await vaultDB.readBundle(u1)).to.deep.equal(rewrapped(3))
+  })
+
   it("stores a lockbox a column to a field, beside its vault's scope and vault_id, its public bag as the text it was written as", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')

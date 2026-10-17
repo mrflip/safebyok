@@ -159,7 +159,11 @@ first. Two devices creating at once settle on one bundle.
 
 **3.2. A bundle update lands only over the bundle it read.** `updateBundle` writes only while the
 standing bundle has the expected `vault_id` and `unlock_epoch`, and refuses as `stale_write`
-otherwise, including where no bundle stands: an update never creates.
+otherwise, including where no bundle stands: an update never creates. A server-side adapter,
+which a client of another version's may reach, also enforces what every update carries: it lands
+only a bundle that keeps the standing `vault_id` and moves `unlock_epoch` forward, and refuses any
+other as `stale_write` (Convex's component and Postgres do). The core always sends the standing
+`unlock_epoch` plus one, so none of its own writes meets this refusal.
 
 **3.3. A lockbox write lands only over the lockbox it read, in the vault it was sealed for.**
 `updateBox` writes only while the scope's standing bundle has the expected `vault_id` and the
