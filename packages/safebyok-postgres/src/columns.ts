@@ -89,6 +89,8 @@ export const placeholders = (columns: readonly Column[], first: number): string 
  */
 export const placeholderOf = (columns: readonly Column[], field: string, first: number): string => {
   const idx = columns.findIndex(([named]) => named === field)
+  // Called only as the module's SQL is built, from its own column lists: a miss is this package's
+  // bug, met at import by every test, never a host's mistake to branch on, so it has no kind.
   if (idx === -1) { throw new Error(`No column holds ${field}`) }
   return `$${String(first + idx)}::${columns[idx]![1]}`
 }

@@ -178,7 +178,11 @@ export const EraseExpectation = v.object({
   vault_id: v.string(),
 })
 
-/** One lockbox's place in a {@link VaultSignature}: `[boxlabel, revision_id]`. */
+/**
+ * One lockbox's place in a {@link VaultSignature}: `[boxlabel, revision_id]`. Convex has no
+ * fixed-length tuple validator, so any list of strings passes: the component makes these, and a
+ * client only compares one signature with the next.
+ */
 const BoxRevision = v.array(v.string())
 
 /**

@@ -538,7 +538,7 @@ const openTurnstile: Turnstile = { pass: () => Promise.resolve() }
  * @returns A stand-in for `target`, to hand the device's adapter in its place.
  *
  * @example postgresVaultDB({ client: TH.throughTurnstile(turnstile, pool, ['query']), userId })
- * @example convexVaultDB(TH.throughTurnstile(turnstile, client, ['query', 'mutation']), api)
+ * @example convexVaultDB({ client: TH.throughTurnstile(turnstile, client, ['query', 'mutation']), api })
  */
 export const throughTurnstile = <Target extends object>(turnstile: Turnstile, target: Target, verbs: readonly (AsyncVerbOf<Target> & string)[]): Target => (
   new Proxy(target, {
