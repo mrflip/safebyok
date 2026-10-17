@@ -100,6 +100,7 @@ describe("mask", () => {
     ["",                                        { minStars: 0 },       "",                 'an empty whisper stays empty'],
     ["\n\t\r\0\u{1B}\u{7F}",                        undefined,             "******",           'a whisper of only control characters is minStars stars'],
     ["\n\t\r\0\u{1B}\u{7F}",                        { minStars: 0 },       "",                 'a whisper of only control characters with minStars of zero is empty'],
+    ["\n\t\r\0\u{1B}\u{7F}",                        { maxLen: 3 },         "***",              'a whisper of only control characters under a maxLen below minStars is maxLen stars'],
     ["\u{2028}\u{2029}",                        undefined,             "******",           'line and paragraph separators are removed too'],
     ["abc\0def\u{7F}ghi\rjkl",                    undefined,             "ab******ijkl",     'control characters inside a key vanish, and do not count toward its length'],
 

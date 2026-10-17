@@ -105,22 +105,24 @@ const butcher = (chars: readonly string[], { head, tail, minStars, maxLen }: Rec
  * beside them.
  *
  * What is cut is cut by code point, so a cut can part an emoji sequence or a flag; whatever that
- * leaves is visible text. At least `minStars` stars stand in the whisper's place, unless
- * `maxLen` is smaller: a whisper too short to keep `head` and `tail` and still hide `minStars`
- * characters gives up `head` characters first, then `tail`, and one shorter than `minStars`
- * shows only stars. A result that would pass `maxLen` characters is instead the `head` kept,
- * `***...***`, then the `tail` kept; if that is too long too, it is `maxLen` stars, nothing
- * else. Whatever the options, the result is never longer than `maxLen`. An empty whisper gives the empty string; a
- * whisper that is nothing but removed characters gives `minStars` stars.
+ * leaves is visible text. At least `minStars` stars stand in the whisper's place, unless the
+ * result is shortened for `maxLen`: a whisper too short to keep `head` and `tail` and still hide
+ * `minStars` characters gives up `head` characters first, then `tail`, and one shorter than
+ * `minStars` shows only stars. A result that would pass `maxLen` characters is instead the `head`
+ * kept, `***...***`, then the `tail` kept, whatever `minStars` is; if that is too long too, it is
+ * `maxLen` stars, nothing else. Whatever the options, the result is never longer than `maxLen`.
+ * An empty whisper gives the empty string; a whisper that is nothing but removed characters gives
+ * `minStars` stars, or `maxLen` if that is fewer.
  *
  * Pass `{ head: 0, tail: 0 }` to show nothing of the whisper but how long it is. Lower `minStars`
  * with care: at 0 a short whisper may be shown whole.
  *
  * @param whisper - Text to mask: an API key, say.
  * @param opts - How much to keep and hide; see {@link MaskOpts}.
- * @returns The masked text. Kind 'bad_option' for an option that is not a whole number of at
- *   least zero (`head`, `tail` and `minStars` at most 1000; `maxLen` also `Infinity`), and
- *   'bad_whisper' for a whisper that is not a string. Neither message quotes the whisper.
+ * @returns The masked text. Throws a VaultError of kind 'bad_option' for an option that is not a
+ *   whole number of at least zero (`head`, `tail` and `minStars` at most 1000; `maxLen` also
+ *   `Infinity`), and of kind 'bad_whisper' for a whisper that is not a string. Neither message
+ *   quotes the whisper.
  *
  * @example mask('sk-ant-api03-abcdefghijklmnopqrstuvwxyz')  // 'sk***...***wxyz'
  * @example mask('sk-ant-abcd1234')                          // 'sk*********1234'
