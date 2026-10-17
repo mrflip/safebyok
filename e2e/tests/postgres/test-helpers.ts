@@ -149,9 +149,11 @@ export const useFileDatabase = (): (() => FileDatabase) => {
     }
   }, 60_000)
   afterEach(async () => {
-    await made.db?.endDevices()
+    // The drops are taken whether or not the devices end cleanly, so none is left for the next test.
+    const [ended] = await Promise.allSettled([made.db?.endDevices()])
     const lost = dropped.splice(0)
     if (lost.length > 0) { throw new Error(`The server dropped a connection during this test: ${lost.map((err) => err.message).join('; ')}`, { cause: lost[0] }) }
+    if (ended.status === 'rejected') { throw ended.reason }
   })
   afterAll(async () => { await made.drop?.() }, 60_000)
   return () => {
