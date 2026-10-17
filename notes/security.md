@@ -1253,3 +1253,47 @@ security expert who knows what questions to ask.
   without bound, and Postgres sets no limit on a vault's bytes either; bounding that is the host's,
   by `maxLockboxes` or its own quotas. `graphqlVaultDB` declares `Infinity` to match, so a browser
   learns a server's limit only when the host declares it there too.
+* 2026-10-17 (thread 16, strength_principles, [PR #142](https://github.com/mrflip/safebyok/pull/142)):
+  **the core has no strength test of its own, and refuses to open without one.** `openVault`'s
+  `passphraseStrengthTest` is required: a missing one, or one that is not a function, is refused
+  as `bad_option` before the vault opens (`checkStrengthTest`, `passphrase-strength.ts`, called
+  from `vault.ts`, and exported from `safebyok` beside `checkValidators`). The length-only
+  `passphraseLengthTest` is no longer exported; it passed `'a'` plus eleven spaces.
+* 2026-10-17 (thread 16, strength_principles): **the browser default is zxcvbn, loaded on
+  demand.** `browserOpts()` (`browser.ts`) supplies `zxcvbnPassphraseTest`
+  (`zxcvbn-passphrase-test.ts`): at least 12 code points, then a zxcvbn score of at least 3 of
+  4. zxcvbn and its dictionary come in by a dynamic `import()` at the test's first call, which a
+  bundler splits into a chunk served from the host's own origin and bundle; no third-party fetch
+  is made. If that load fails the call rejects, so the vault refuses the new passphrase (no
+  passphrase is admitted untested); the failed load is forgotten and the next call tries again.
+  `@zxcvbn-ts/core` and `@zxcvbn-ts/language-common` are ordinary dependencies, not optional
+  peers, because `browserOpts()` imports them: about 1.3 MB installed, about 214 kB shipped on
+  demand.
+* 2026-10-17 (thread 16, strength_principles): **the strength test is handed the passphrase and
+  the vault's scope.** It is called as `test(passphrase, scope)`, `scope` being `{ applabel,
+  user_id, vaultlabel }`. `zxcvbnPassphraseTest` passes each of the three, whole and split into
+  runs of letters and digits, to zxcvbn as user inputs (`check(passphrase, userInputs)`). It
+  keeps nothing between calls and sends nothing anywhere. The `user_id` is the host's opaque id,
+  already in every stored record.
+* 2026-10-17 (thread 16, strength_principles): **in the dialog, the strength test runs on every
+  keystroke by default.** In `VaultProvider` (`safebyok-react/src/vault-provider.tsx`), with no
+  host `passphraseAdvice`, the passphrase dialog's advice is the strength test's reason, so the
+  host's `passphraseStrengthTest` is called with each partial passphrase as the user types while
+  creating a vault, never while unlocking. A host test that does anything off the device (a
+  breach-check API call, logging) does it per keystroke, on prefixes of the passphrase in plain
+  text. The doc blocks and READMEs say the test hears the passphrase in plain text, must stay on
+  the device, keep nothing and send nothing. A host's own `passphraseAdvice` replaces this
+  default, and the test is then asked only at submit.
+* 2026-10-17 (thread 16, strength_principles): **the vault holds its strength test for its whole
+  life.** Thread 10's ref wrapper is gone: the vault keeps the test it was opened with, unchanged.
+  `VaultProvider` checks the test at render with `checkStrengthTest` (missing, or not a function,
+  goes to the error boundary as `bad_option`), and a test with a new identity reopens the vault,
+  warned of once. The test that gates a passphrase is the one validated at open; none is swapped
+  in later through a ref.
+* 2026-10-17 (thread 16, strength_principles): **`withUnlockedVault` resolves null when the
+  provider's own close cuts an action short.** An action, or its run again after an unlock, still
+  under way when the provider closes the handle (unmount, sign-out, user switch, reopen) used to
+  reject `vault_closed` to a fire-and-forget caller; it now resolves null, as a dialog the
+  provider ends does. A `vault_closed` on a handle the provider still holds still rejects. Null
+  from `withUnlockedVault` now also means that the vault went away under the action; the vault
+  was already closed and its key dropped.
