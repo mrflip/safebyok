@@ -2,7 +2,7 @@ import * as Z from 'zod/mini'
 import { DeviceMark, DeviceUnlock, LockboxSummary, PublicBag, type SeenVault, type DamagedLockbox, type Lockbox, ForcePassphraseReentryHours, FarFuture, FarPast, ForeverMillis, MaxLockboxes, MaxReentryHours, MaxUnlocks, MaxWhisperBytes, MinuteMillis, PasskeySaltBytes, VaultBundle, type VaultScope, Whisper, wallClock, type Clock, type PasskeyProof, type PassphraseEnvelope, type UnlockEnvelope, type UnlockSummary } from './types'
 import * as Names from './names'
 import type { VaultValidators } from './validators'
-import { VaultError, isVaultError } from './errors'
+import { VaultError, isVaultError, type VaultErrorKind } from './errors'
 import type { KeyDeriver } from './key-deriver'
 import { MaxSaltBytes, TestDeriverNotice, TestLabelPrefix, ensureSuppliedSpecKept, parseKeyDeriverSpec, type KeyDeriverSpec } from './key-deriver-spec'
 import {
@@ -184,7 +184,9 @@ export type OpenVaultOpts = {
  * Storage alone settles a race. When it refuses a write as stale, or a lockbox will not open, the
  * vault catches up with storage once before it names the refusal: a vault destroyed and made
  * anew, or its ways in changed, elsewhere relocks this device. A catch-up that fails leaves the
- * snapshot saying `syncing: false` until a read succeeds.
+ * snapshot saying `syncing: false` until a read succeeds; a write whose catch-up fails throws
+ * 'stale_write', the catch-up's failure its cause -- unless that failure is 'identity_revoked',
+ * 'rolled_back' or 'newer_format', which the write throws as it came.
  */
 export type Vault = {
   /**
@@ -445,7 +447,8 @@ export type Vault = {
    * it says when the lockbox was last written, never whether its whisper changed.
    *
    * Should the catch-up after a refusal fail itself, the call throws kind 'stale_write' at once,
-   * the catch-up's failure its cause, and the snapshot says `syncing: false`.
+   * the catch-up's failure its cause, and the snapshot says `syncing: false` -- or, for a catch-up
+   * refused as 'identity_revoked', 'rolled_back' or 'newer_format', that refusal as it came.
    *
    * A lockbox whose stored record cannot be read as one -- every lockbox the snapshot lists as
    * damaged, and also one that lists as sound but whose ciphered fields are missing or malformed
@@ -506,9 +509,10 @@ export type Vault = {
    * unlocked; kind 'absent_box' when absent, and 'bad_label' for a refused name with nothing
    * under it. The erase lands only in the vault this device last read: if it was destroyed, or
    * destroyed and made anew, elsewhere, nothing is erased and the call throws kind
-   * 'stale_write', after catching up with storage -- which relocks this device.
-   * Unlike `store()`, an erase is never retried: that is its only expectation, and trying again
-   * could not meet it.
+   * 'stale_write', after catching up with storage -- which relocks this device -- its message
+   * saying the lockbox could not be erased because the vault it was in is gone, and the
+   * adapter's refusal its cause. Unlike `store()`, an erase is never retried: that is its only
+   * expectation, and trying again could not meet it.
    */
   erase(boxlabel: string): Promise<void>
 
@@ -1720,7 +1724,13 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       // Lands only in the vault this device holds keys for, whatever revision of the box stands:
       // a vault destroyed and made anew elsewhere refuses it. That is its only expectation, and
       // trying again could not change it: a stale erase is thrown at once, never retried.
-      await refreshOnStale(vaultDB.eraseBox(scope, label, { vault_id: currentBundle().vault_id }), 'erase')
+      try {
+        await refreshOnStale(vaultDB.eraseBox(scope, label, { vault_id: currentBundle().vault_id }), 'erase')
+      } catch (err) {
+        // Said as what happened to the box, once caught up; a catch-up that failed says so instead.
+        if (! isCaughtUpStale(err)) { throw err }
+        throw new VaultError('stale_write', "The contents of that lockbox could not be erased, because the vault it was in is gone: it was deleted, or deleted and made anew, on another device. Nothing was erased, and this device has caught up with storage. If the vault was made anew and the lockbox stands in it, unlock that vault and erase it there.", { cause: err })
+      }
       await refresh()
     },
 
@@ -1761,7 +1771,9 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
    * `write`, with a refusal as stale catching this device up with storage before it is thrown --
    * once, before the kind is named: the snapshot then shows what beat the write, and a vault
    * reborn elsewhere, or its ways in changed, relocks this device. A catch-up that fails is
-   * thrown as 'stale_write' too, its failure the cause, the snapshot saying `syncing: false`.
+   * thrown as 'stale_write' too, its failure the cause, the snapshot saying `syncing: false` --
+   * but for a catch-up refused as 'identity_revoked', 'rolled_back' or 'newer_format', which is
+   * thrown as it came: each asks something else of the caller than a stale write does.
    */
   const refreshOnStale = async (write: Promise<void>, call: VaultCall): Promise<void> => {
     try {
@@ -1785,6 +1797,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       await refresh()
     } catch (err) {
       logger.warn('A catch-up with storage, after a write it refused as stale, failed: what the vault shows may lag behind storage (syncing: false) until a read succeeds.', { call }, asError(err))
+      if (CatchUpPassesThrough.some((kind) => isVaultError(err, kind))) { throw err }
       throw new VaultError('stale_write', `${refusal.message} Catching up with storage afterwards failed too, so what the vault shows may be behind it: this error's cause says why.`, { cause: err })
     }
   }
@@ -2017,6 +2030,14 @@ const FirstVaultKeyEpoch = 1
 
 /** The lockbox's format, as each record carries it and each of its bindings begins. */
 const LockboxFormat = 'safebyok-lockbox-v4'
+
+/**
+ * The refusals a write's catch-up with storage throws as they came, never as 'stale_write': each
+ * asks the caller for something a stale write does not -- the user to sign in again
+ * ('identity_revoked'; the vault has locked), storage to be looked at ('rolled_back'; locked too),
+ * or the app to be updated ('newer_format').
+ */
+const CatchUpPassesThrough = ['identity_revoked', 'rolled_back', 'newer_format'] as const satisfies readonly VaultErrorKind[]
 
 /**
  * A lockbox's public header: every field of its record but its format, which leads each binding,
