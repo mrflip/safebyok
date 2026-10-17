@@ -144,7 +144,7 @@ export abstract class VaultDB {
    * declares the share of that budget its heaviest verb leaves. A vault refuses to open when its
    * `maxLockboxes` lockboxes might not fit in it, each counted at twice `maxWhisperBytes` (room
    * for its whisper and public bag together, their encoding, and the backend's own counting) and
-   * 2 KiB for its other fields, which covers them at their largest under the default validators.
+   * 1 KiB for its other fields, which covers them at their largest under the default validators.
    * And since a host's validators may admit names of any length, each `store()` measures them: it
    * refuses, with kind `vault_full`, a new lockbox that would take the vault past this limit, each
    * lockbox counted at twice `maxWhisperBytes` and the UTF-8 bytes of its scope and boxlabel as
