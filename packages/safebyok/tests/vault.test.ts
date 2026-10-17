@@ -4680,6 +4680,50 @@ describe("a failed open", () => {
     })
   }
 
+  const BlockedNameCases = [
+    // what holds until something outside the app changes:
+    ["SecurityError",        "storage_blocked",      'storage withheld from the page: site data blocked, a sandboxed frame'],
+    ["QuotaExceededError",   "storage_blocked",      'no room: a quota of zero, as some private windows give, or a full disk'],
+    ["NotSupportedError",    "storage_blocked",      'no IndexedDB at all'],
+    // what may pass:
+    ["InvalidStateError",    "storage_unavailable",  'a connection closing under the store'],
+    ["UnknownError",         "storage_unavailable",  'a failure the browser gives no reason for'],
+    ["AbortError",           "storage_unavailable",  'a transaction aborted'],
+  ] as const
+
+  for (const [errName, kind, blurb] of BlockedNameCases) {
+    it(`says a device store's ${errName} as '${kind}': ${blurb}`, async () => {
+      const deviceDB = memoryDeviceDB()
+      const trouble = new DOMException('The browser refused.', errName)
+      vi.spyOn(deviceDB, 'writeMark').mockRejectedValueOnce(trouble)
+      const err = await TH.expectRefusal(deviceTroubleAsConditions(deviceDB).writeMark(TH.markOf('u1')), kind)
+      expect(err.cause).to.eq(trouble)
+      expect(err.message).to.match(/writing its mark of this vault/)
+      expect(err.message).to.match(kind === 'storage_blocked' ? /will not help until that changes/ : /try again/)
+    })
+  }
+
+  it("tells a blocked store by its error's name, so one from another frame, no instance of this one's Error, is told alike", async () => {
+    const deviceDB = memoryDeviceDB()
+    const trouble = { name: 'SecurityError', message: 'The operation is insecure.' }
+    vi.spyOn(deviceDB, 'readUnlock').mockRejectedValueOnce(trouble)
+    const err = await TH.expectRefusal(deviceTroubleAsConditions(deviceDB).readUnlock(TH.scopeOf('u1')), 'storage_blocked')
+    expect(err.cause).to.eq(trouble)
+  })
+
+  it("refuses to open as 'storage_blocked' when the browser withholds the device's storage, without a word of retrying", async () => {
+    const world = makeWorld()
+    await seedVault(world)
+    const trouble = new DOMException('The operation is insecure.', 'SecurityError')
+    vi.spyOn(world.deviceDB, 'readMark').mockRejectedValue(trouble)
+    const tally = TH.tallyWatches(world.vaultDB)
+    const err = await TH.expectRefusal(world.open(), 'storage_blocked')
+    expect(err.cause).to.eq(trouble)
+    expect(err.message).to.not.match(/try again/i)
+    expect(err.message).not.to.include('u1')
+    expect(tally).to.deep.equal({ opened: 1, closed: 1 })
+  })
+
   it("lets a refusal the device store gives as a VaultError through as it came", async () => {
     const world = makeWorld()
     await seedVault(world)

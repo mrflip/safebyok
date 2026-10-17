@@ -263,7 +263,8 @@ export type Vault = {
    * locked -- in this tab, or in another on this device, whose unlock then remembers nothing
    * either -- and over a `read()` or `use()` under way, which refuses with kind 'vault_locked',
    * handing back nothing. A write already sent to storage lands. Kind 'storage_unavailable' when
-   * this device's store fails to forget its record; the vault is locked all the same.
+   * this device's store fails to forget its record ('storage_blocked' when the browser withholds
+   * that store); the vault is locked all the same.
    *
    * The other hard locks: `destroy()`, a lock for storage the vault cannot trust (a user signed
    * out, an older copy of the vault), and a refresh that finds the vault's ways in changed or the
@@ -1854,7 +1855,8 @@ export type EraseDamagedVaultOpts = Pick<OpenVaultOpts, 'applabel' | 'userId' | 
  * clear; 'stale_write' when the vault was replaced elsewhere meanwhile. Other refusals are
  * storage's: 'storage_unavailable', 'identity_revoked', 'not_permitted'. The device store failing
  * after the vault is erased is 'storage_unavailable' too, saying what failed: call again to finish
- * clearing the device. Misuse is refused before
+ * clearing the device -- or 'storage_blocked', which calling again cannot mend until the
+ * browser lets the device keep its storage. Misuse is refused before
  * storage is touched, as `openVault` does: 'bad_label' for a label that fails its check, and
  * 'bad_option' for an option missing.
  *
@@ -1902,15 +1904,18 @@ const damagedAs = async <ResultT>(reading: Promise<ResultT>, damaged: (opts: Err
 
 /**
  * `deviceDB`'s verbs, each with a failure that is no VaultError -- an IndexedDB error, say, or a
- * throw before the promise -- said as 'storage_unavailable', a condition a host shows in place and
- * offers to retry, with the device store's own error as its cause and a message naming what
- * failed. A VaultError passes as it came. What `openVault` and `eraseDamagedVault` call the
- * device store through; not exported from the package.
+ * throw before the promise -- said as a condition, with the device store's own error as its cause
+ * and a message naming what failed: 'storage_blocked' for a refusal the browser gives for a reason
+ * that holds until something outside the app changes ({@link isStorageBlocked}), which a host
+ * shows without offering a retry, and 'storage_unavailable' for any other, which it shows in
+ * place and offers to retry. A VaultError passes as it came. What `openVault` and
+ * `eraseDamagedVault` call the device store through; not exported from the package.
  *
  * @param deviceDB - The device store a host handed in.
  * @returns The same verbs, each failure said as a condition.
  *
  * @example await deviceTroubleAsConditions(deviceDB).readMark(scope)  // a failing IndexedDB: 'storage_unavailable', "...failed reading its mark of this vault..."
+ * @example await deviceTroubleAsConditions(deviceDB).readMark(scope)  // site data blocked (a SecurityError): 'storage_blocked', "...will not help until that changes..."
  */
 export const deviceTroubleAsConditions = (deviceDB: DeviceDB): DeviceDB => ({
   readUnlock:  async (...args) => await asCondition('readUnlock', () => deviceDB.readUnlock(...args)),
@@ -1924,17 +1929,32 @@ export const deviceTroubleAsConditions = (deviceDB: DeviceDB): DeviceDB => ({
 
 /**
  * What failed, for each device-store verb, and what it leaves undone: the heart of the message a
- * failure of that verb is said with. None names a scope or quotes a record.
+ * failure of that verb is said with, and what a retry may do about it. None names a scope or
+ * quotes a record.
  */
-const DeviceTroubleSaid: Record<keyof DeviceDB, string> = {
-  readUnlock:  "reading the unlock it remembers for this vault, so the vault could not pick it up: try again, or unlock with a passphrase or passkey",
-  writeUnlock: "writing the unlock it remembers for this vault, so this device may not remember it at the next open: try again",
-  eraseUnlock: "erasing the unlock it remembers for this vault, so the next open on this device may still pick it up: try again",
-  readMark:    "reading its mark of this vault (the newest copy of the vault it has seen, and how often it has locked), so the vault could not check storage against it: try again",
-  writeMark:   "writing its mark of this vault (the newest copy of the vault it has seen, and how often it has locked), so it may not be kept: try again",
-  eraseMark:   "erasing its mark of this vault, so it still holds the newest copy of the vault it had seen: try again",
-  eraseAll:    "erasing everything it keeps for safebyok, so some of it may remain: try again",
+const DeviceTroubleSaid: Record<keyof DeviceDB, { failed: string, retry: string }> = {
+  readUnlock:  { failed: "reading the unlock it remembers for this vault, so the vault could not pick it up", retry: "try again, or unlock with a passphrase or passkey" },
+  writeUnlock: { failed: "writing the unlock it remembers for this vault, so this device may not remember it at the next open", retry: "try again" },
+  eraseUnlock: { failed: "erasing the unlock it remembers for this vault, so the next open on this device may still pick it up", retry: "try again" },
+  readMark:    { failed: "reading its mark of this vault (the newest copy of the vault it has seen, and how often it has locked), so the vault could not check storage against it", retry: "try again" },
+  writeMark:   { failed: "writing its mark of this vault (the newest copy of the vault it has seen, and how often it has locked), so it may not be kept", retry: "try again" },
+  eraseMark:   { failed: "erasing its mark of this vault, so it still holds the newest copy of the vault it had seen", retry: "try again" },
+  eraseAll:    { failed: "erasing everything it keeps for safebyok, so some of it may remain", retry: "try again" },
 }
+
+/**
+ * The names a browser gives a storage refusal whose reason holds until something outside the app
+ * changes: storage withheld from the page (`SecurityError`: site data blocked, a sandboxed frame),
+ * no room in it (`QuotaExceededError`: a quota of zero, a full disk), or no storage of the kind at
+ * all (`NotSupportedError`). Every other name may pass.
+ */
+const BlockedStorageNames: ReadonlySet<string> = new Set(['SecurityError', 'QuotaExceededError', 'NotSupportedError'])
+
+/** True for a device store's failure that a retry cannot mend until something outside the app changes: one named in {@link BlockedStorageNames}. */
+const isStorageBlocked = (err: unknown): boolean => (
+  // By name, not by class: a DOMException from another frame is no instance of this one's Error.
+  typeof err === 'object' && err !== null && 'name' in err && typeof err.name === 'string' && BlockedStorageNames.has(err.name)
+)
 
 /** What `call` to the device store's `verb` resolves to, or its failure, as {@link deviceTroubleAsConditions} says it. */
 const asCondition = async <ResultT>(verb: keyof DeviceDB, call: () => Promise<ResultT>): Promise<ResultT> => {
@@ -1942,7 +1962,11 @@ const asCondition = async <ResultT>(verb: keyof DeviceDB, call: () => Promise<Re
     return await call()
   } catch (err) {
     if (isVaultError(err)) { throw err }
-    throw new VaultError('storage_unavailable', `This device's own storage failed ${DeviceTroubleSaid[verb]}. If it fails every time, this device may not let the app keep anything: storage blocked or full, or a private window. The device store's error is this error's cause.`, { cause: err })
+    const { failed, retry } = DeviceTroubleSaid[verb]
+    if (isStorageBlocked(err)) {
+      throw new VaultError('storage_blocked', `This browser does not let the app keep anything on this device -- storage blocked for this site, a private window or frame that withholds it, or no room left -- so it failed ${failed}. Trying again will not help until that changes. The device store's error is this error's cause.`, { cause: err })
+    }
+    throw new VaultError('storage_unavailable', `This device's own storage failed ${failed}: ${retry}. If it fails every time, this device may not let the app keep anything: storage blocked or full, or a private window. The device store's error is this error's cause.`, { cause: err })
   }
 }
 

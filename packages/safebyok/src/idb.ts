@@ -50,6 +50,11 @@ const bellnameOf = (dbName: string) => `safebyok-idb:${dbName}:device_db`
  * scope with a name holding one is refused with kind 'bad_label'. Kind 'bad_option' for a
  * `dbName` that is not non-empty text.
  *
+ * Its failures are IndexedDB's own errors, which a vault says as conditions: one the browser gives
+ * for storage withheld or full (a `SecurityError`, a `QuotaExceededError`) as 'storage_blocked',
+ * and so a context with no IndexedDB at all, which this store refuses with a `NotSupportedError`
+ * at its first use; any other as 'storage_unavailable'.
+ *
  * @example
  *   const deviceDB = idbDeviceDB()
  *   await deviceDB.readUnlock({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // null
@@ -58,7 +63,14 @@ const bellnameOf = (dbName: string) => `safebyok-idb:${dbName}:device_db`
  */
 export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
   const dbName = parseDbName(opts, 'idbDeviceDB')
-  const shelf = () => shelfStore(dbName)
+  const shelf = () => {
+    // Where the device store opens: a context with no IndexedDB at all (storage turned off, or a
+    // runtime without it) is said as the browser says a storage it does not offer.
+    if (typeof indexedDB === 'undefined' || (indexedDB as IDBFactory | null) === null) {
+      throw new DOMException('This context offers no IndexedDB, so the device store has nowhere to keep its records.', 'NotSupportedError')
+    }
+    return shelfStore(dbName)
+  }
   const ring = () => { ChangeBell.ring(bellnameOf(dbName)) }
 
   // A row under any ckey but an unlock's or a mark's is one an earlier version filed

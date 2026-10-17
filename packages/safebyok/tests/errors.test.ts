@@ -107,6 +107,7 @@ const FamilyCases = [
   ["not_permitted",       "condition", 'a call refused to the signed-in owner is told to them'],
   ["identity_revoked",    "condition", 'a signed-out user signs in again'],
   ["storage_unavailable", "condition", 'unreachable storage is tried again shortly'],
+  ["storage_blocked",     "condition", 'a browser withholding its storage is told to the user, without a retry'],
 ] as const
 
 describe("each kind's family", () => {
