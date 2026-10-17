@@ -3,6 +3,7 @@ import { ForeverMillis, MinuteMillis, isVaultCondition, isVaultError, type Vault
 import { Boundary, useRoundFor } from './boundary'
 import { Locale, Messages } from './messages'
 import { PasskeyUnlockButton, offersPasskey } from './passkey-unlock-button'
+import { useIsMounted } from './is-mounted'
 import { useRevealToggle } from './reveal-toggle'
 
 const MinutesPerHour = 60
@@ -58,7 +59,9 @@ const unlockedFor = (reentryWindowMillis: number, creating: boolean): string => 
  *
  * It follows the vault as it changes -- a vault made on another device meanwhile turns "choose"
  * into "unlock", a passkey added brings its button -- and handed another vault, it starts afresh,
- * keeping nothing typed for the last.
+ * keeping nothing typed for the last. Taken away, it lets go: an unlock, an erase or advice still
+ * under way finishes unheard, calling `onDone` no more and showing nothing (the vault's own
+ * snapshot says whether an unlock landed).
  *
  * A condition the unlock meets (storage that cannot be reached, a record that fails
  * verification) shows in the dialog in place, in the vault's own calm words, through a live
@@ -188,8 +191,8 @@ const holdsFocus = (container: HTMLElement | null): boolean => {
 /**
  * What the host's `passphraseAdvice` last said of the text typed so far, and `hear`, which asks it
  * of a new text. Only the answer to the latest text is kept, and only the latest call's failure
- * goes to `fail`; an empty text has nothing said of it, nor has an undefined answer; and what was
- * said goes when `creating` changes.
+ * goes to `fail`; an empty text has nothing said of it, nor has an undefined answer; what was
+ * said goes when `creating` changes; and nothing comes back once the dialog has gone.
  */
 const useAdvice = (passphraseAdvice: PassphraseAdvice | undefined, creating: boolean, fail: (err: unknown) => void) => {
   const [said, setSaid] = useState<string | null>(null)
@@ -197,12 +200,15 @@ const useAdvice = (passphraseAdvice: PassphraseAdvice | undefined, creating: boo
   // A change of mode -- the vault made elsewhere, or erased -- forgets what was said (React's
   // "adjusting state while rendering"), and makes any answer or failure still on its way stale,
   // in the same commit: advice given while choosing never shows again after the vault changed.
+  // The dialog unmounting makes them stale too, so that none reaches a dialog that has gone.
   const [saidWhile, setSaidWhile] = useState(creating)
   if (saidWhile !== creating) {
     setSaidWhile(creating)
     setSaid(null)
   }
-  useLayoutEffect(() => { asked.current += 1 }, [creating])
+  useLayoutEffect(() => {
+    return () => { asked.current += 1 }
+  }, [creating])
   const hear = async (typed: string) => {
     if (passphraseAdvice === undefined) { return }
     asked.current += 1
@@ -277,6 +283,9 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
   const [erasing, setErasing] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
   const fieldRef = useRef<HTMLInputElement>(null)
+  // Asked after each await: a dialog gone meanwhile -- its host took it away, another vault
+  // remounted it, or the page closed -- touches neither its state nor its host's onDone again.
+  const isMounted = useIsMounted()
   const titleId = useId()
   const blurbId = useId()
   // Wrapped, so that a failure carrying any value at all still reads as "failed".
@@ -304,8 +313,10 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
     setGripe(null)
     try {
       await vault.unlock(fieldRef.current?.value ?? '')
+      if (! isMounted()) { return }
       onDone(true)
     } catch (err) {
+      if (! isMounted()) { return }
       // The vault was locked while this unlock was under way, and the lock wins: as if dismissed.
       if (isVaultError(err, 'vault_locked')) { onDone(false); return }
       meet(err)
@@ -317,14 +328,16 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
     setGripe(null)
     try {
       await vault.destroy()
+      if (! isMounted()) { return }
       setStartingOver(false)
     } catch (err) {
+      if (! isMounted()) { return }
       // The vault the user agreed to erase was destroyed or made anew elsewhere: what stands now
       // was never confirmed, so the question goes, to be asked afresh.
       if (isVaultError(err, 'stale_write')) { setStartingOver(false) }
       meet(err)
     } finally {
-      setErasing(false)
+      if (isMounted()) { setErasing(false) }
     }
   }
 

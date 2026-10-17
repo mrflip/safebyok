@@ -1,11 +1,12 @@
 /**
  * safebyok-react's test helpers: everything `safebyok/testing` has, a fake WebAuthn
- * authenticator, and a render that hears what React reports. Star-import it as `TH`
+ * authenticator, a render that hears what React reports, a promise held for the test to settle,
+ * and a count of the state updates React schedules. Star-import it as `TH`
  * (`import * as TH from './test-helpers'`).
  */
 import { fireEvent, render, screen } from '@testing-library/react'
 import { Component, createElement, type ReactElement, type ReactNode } from 'react'
-import { vi } from 'vitest'
+import { onTestFinished, vi } from 'vitest'
 import { ForcePassphraseReentryHours, VaultError, type UnlockSummary, type Vault, type VaultState } from 'safebyok'
 import { scopeOf } from 'safebyok/testing'
 import { fromB64, toB64 } from 'safebyok/utils'
@@ -76,6 +77,59 @@ export const wrong = () => vaultUnlockingWith(() => Promise.reject(new VaultErro
 export const submitPassphrase = (passphrase: string) => {
   fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
   fireEvent.click(screen.getByText('Unlock'))
+}
+
+/** Stands in for a settler until the promise hands over its own. */
+const unsettled = () => { /* replaced before use */ }
+
+/**
+ * A promise held unsettled until the test resolves or rejects it, so that a call stays under way
+ * while something else happens: `Promise.withResolvers`, which this package's ES2023 lib leaves
+ * untyped. Its value is `undefined` unless the test says otherwise.
+ *
+ * @example
+ *   const unlocking = TH.held()
+ *   const vault = TH.vaultUnlockingWith(() => unlocking.promise)
+ *   unlocking.reject(new VaultError('wrong_passphrase', 'Not that one.'))
+ * @example
+ *   const answering = TH.held<string | null>()
+ *   answering.resolve('Longer is stronger.')
+ */
+export const held = <ValT = undefined>() => {
+  let resolve: (val: ValT) => void = unsettled
+  let reject: (err: unknown) => void = unsettled
+  const promise = new Promise<ValT>((resolver, rejecter) => {
+    resolve = resolver
+    reject = rejecter
+  })
+  return { promise, resolve, reject }
+}
+
+/**
+ * Counts each state update React is asked to schedule outside an event, from now until the test
+ * ends, changing nothing React sees: it reads `window.event` to choose each one's priority. That
+ * read is what threw `window is not defined` when a dialog's await settled after the test
+ * environment had gone, so a count of none says that no component touched its state.
+ *
+ * @example
+ *   const updates = TH.watchStateUpdates()
+ *   await act(async () => { unlocking.resolve(undefined) })
+ *   expect(updates.count()).to.eq(0)
+ */
+export const watchStateUpdates = () => {
+  const tally = { reads: 0 }
+  const own = Object.getOwnPropertyDescriptor(globalThis, 'event')
+  Object.defineProperty(globalThis, 'event', {
+    configurable: true,
+    get:          () => {
+      tally.reads += 1
+      return own?.get?.call(globalThis) as Event | undefined
+    },
+  })
+  onTestFinished(() => {
+    if (own === undefined) { Reflect.deleteProperty(globalThis, 'event') } else { Object.defineProperty(globalThis, 'event', own) }
+  })
+  return { count: () => tally.reads }
 }
 
 /** An error boundary that shows `caught: <message>` for what it caught, as a host's would. */

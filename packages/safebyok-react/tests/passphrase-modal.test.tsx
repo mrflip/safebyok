@@ -41,6 +41,13 @@ const twelveOrMore = (typed: string) => (typed.length < 12 ? 'Twelve characters 
 /** The polite region beside the field, which says the advice. */
 const adviceRegion = () => screen.getByRole('status')
 
+/** The dialog, unlocking through `unlocking`, rendered, and what reached its host: each onDone, and each error React reported. */
+const renderUnlocking = (unlocking: Promise<undefined>) => {
+  const heard: boolean[] = []
+  const rendered = TH.renderReporting(<PassphraseModal vault={TH.vaultUnlockingWith(() => unlocking)} onDone={(unlocked) => { heard.push(unlocked) }} />)
+  return { ...rendered, heard }
+}
+
 afterEach(cleanup)
 
 describe("PassphraseModal", () => {
@@ -595,5 +602,114 @@ describe("PassphraseModal", () => {
       expect(adviceRegion().textContent).to.eq('')
       expect(field.getAttribute('aria-describedby')).to.eq(adviceRegion().id)
     })
+  })
+
+  describe("once it has gone", () => {
+    // Each call is held under way while the dialog unmounts -- its host took it away, or the test
+    // that rendered it ended -- and settles after. A dialog gone touches neither its own state nor
+    // its host's callbacks, whatever the outcome; one that stands meets the outcome as ever.
+
+    it("meets a refusal that lands while it stands, as ever", async () => {
+      const unlocking = TH.held()
+      const { heard } = renderUnlocking(unlocking.promise)
+      TH.submitPassphrase('pw')
+      const updates = TH.watchStateUpdates()
+      await act(async () => {
+        unlocking.reject(new VaultError('wrong_passphrase', 'That passphrase did not open the vault.'))
+        await TH.wakeupAtNextTick()
+      })
+      expect(screen.getByRole('alert').textContent).to.eq('That passphrase did not open the vault.')
+      expect(updates.count()).to.be.above(0)
+      expect(heard).to.deep.equal([])
+    })
+
+    const UnlockOutcomes = [
+      [null,                                                                  'an unlock that succeeds'],
+      [new VaultError('wrong_passphrase', 'That passphrase did not open it.'), 'a wrong passphrase'],
+      [new VaultError('vault_locked', 'Locked meanwhile.'),                   'a lock that won meanwhile'],
+      [new VaultError('vault_closed', 'This vault handle was closed.'),       'misuse: the handle its provider closed as it unmounted'],
+      [new Error('not a VaultError'),                                         'a failure that is no VaultError'],
+    ] as const
+
+    for (const [refusal, blurb] of UnlockOutcomes) {
+      it(`does nothing with ${blurb}, landing after it unmounted`, async () => {
+        const unlocking = TH.held()
+        const { heard, reported, unmount } = renderUnlocking(unlocking.promise)
+        TH.submitPassphrase('pw')
+        unmount()
+        const updates = TH.watchStateUpdates()
+        await act(async () => {
+          if (refusal === null) { unlocking.resolve(undefined) } else { unlocking.reject(refusal) }
+          await TH.wakeupAtNextTick()
+        })
+        expect(updates.count()).to.eq(0)
+        expect(heard).to.deep.equal([])
+        expect(reported).to.deep.equal([])
+      })
+    }
+
+    it("does nothing with an unlock of the vault it was handed before, landing after another took its place", async () => {
+      const unlocking = TH.held()
+      const heard: boolean[] = []
+      const onDone = (unlocked: boolean) => { heard.push(unlocked) }
+      const { rerender } = render(<PassphraseModal vault={TH.vaultUnlockingWith(() => unlocking.promise)} onDone={onDone} />)
+      TH.submitPassphrase('pw')
+      rerender(<PassphraseModal vault={vaultInState('locked')} onDone={onDone} />)
+      const updates = TH.watchStateUpdates()
+      await act(async () => {
+        unlocking.resolve(undefined)
+        await TH.wakeupAtNextTick()
+      })
+      expect(updates.count()).to.eq(0)
+      expect(heard).to.deep.equal([])
+      expect(screen.getByText('Unlock your vault')).to.not.be.null
+    })
+
+    const EraseOutcomes = [
+      [null,                                                                   'an erase that succeeds'],
+      [new VaultError('stale_write', 'The vault changed in storage.'),         'an erase refused: the vault changed elsewhere'],
+      [new VaultError('storage_unavailable', 'Storage could not be reached.'), 'an erase that meets a condition'],
+      [new VaultError('vault_closed', 'This vault handle was closed.'),        'an erase that meets misuse: a closed handle'],
+    ] as const
+
+    for (const [refusal, blurb] of EraseOutcomes) {
+      it(`does nothing with ${blurb}, landing after it unmounted`, async () => {
+        const erasing = TH.held()
+        const heard: boolean[] = []
+        const { reported, unmount } = TH.renderReporting(<PassphraseModal vault={TH.stubVault({ destroy: () => erasing.promise })} allowStartOver onDone={(unlocked) => { heard.push(unlocked) }} />)
+        fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
+        fireEvent.click(screen.getByText('Erase and start over'))
+        unmount()
+        const updates = TH.watchStateUpdates()
+        await act(async () => {
+          if (refusal === null) { erasing.resolve(undefined) } else { erasing.reject(refusal) }
+          await TH.wakeupAtNextTick()
+        })
+        expect(updates.count()).to.eq(0)
+        expect(heard).to.deep.equal([])
+        expect(reported).to.deep.equal([])
+      })
+    }
+
+    const AdviceOutcomes = [
+      ["Longer is stronger.",          'advice that answers'],
+      [new Error('the advice failed'), 'advice that fails'],
+    ] as const
+
+    for (const [outcome, blurb] of AdviceOutcomes) {
+      it(`does nothing with ${blurb}, landing after it unmounted`, async () => {
+        const answering = TH.held<string | null>()
+        const { reported, unmount } = TH.renderReporting(<PassphraseModal vault={vaultInState('absent')} passphraseAdvice={() => answering.promise} onDone={noop} />)
+        fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
+        unmount()
+        const updates = TH.watchStateUpdates()
+        await act(async () => {
+          if (typeof outcome === 'string') { answering.resolve(outcome) } else { answering.reject(outcome) }
+          await TH.wakeupAtNextTick()
+        })
+        expect(updates.count()).to.eq(0)
+        expect(reported).to.deep.equal([])
+      })
+    }
   })
 })

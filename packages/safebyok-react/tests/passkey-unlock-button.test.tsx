@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { VaultError, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, openVault, type UnlockSummary, type Vault } from 'safebyok'
 import { createPasskey } from '../src/passkey'
 import { PasskeyUnlockButton } from '../src/passkey-unlock-button'
@@ -152,6 +152,72 @@ describe("PasskeyUnlockButton", () => {
     fireEvent.click(screen.getByText('Use a passkey'))
     await waitFor(() => { expect(gripes).to.deep.equal([null, PasskeyTrouble]) })
     expect(reported).to.deep.equal([fell])
+  })
+
+  describe("once it has gone", () => {
+    // Each call is held under way while the button unmounts -- its dialog went, or the test that
+    // rendered it ended -- and settles after. A button gone touches neither its own state nor the
+    // callbacks its dialog handed it.
+
+    const UnlockOutcomes = [
+      [null,                                                                      'an unlock that succeeds'],
+      [new VaultError('wrong_passkey', "That passkey's answer didn't unlock it."), 'a condition'],
+      [new VaultError('vault_locked', 'Locked meanwhile.'),                       'a lock that won meanwhile'],
+      [new VaultError('vault_closed', 'This vault handle was closed.'),           'misuse: a closed handle'],
+    ] as const
+
+    for (const [refusal, blurb] of UnlockOutcomes) {
+      it(`does nothing with ${blurb}, landing after it unmounted`, async () => {
+        const { authenticator } = await lockedVaultWithPasskey()
+        const [credentialId = ''] = authenticator.credentialIds()
+        const unlocking = TH.held()
+        const unlock = vi.fn(() => unlocking.promise)
+        const vault = TH.stubVault({ unlocks: [TH.passkeyEnvelopeOf('laptop', { credential_id: credentialId })] as unknown as UnlockSummary[], unlock })
+        const gripes: (string | null)[] = []
+        const heard: boolean[] = []
+        const { reported, unmount } = TH.renderReporting(<PasskeyUnlockButton vault={vault} onDone={(unlocked) => { heard.push(unlocked) }} onGripe={(gripe) => { gripes.push(gripe) }} />)
+        fireEvent.click(screen.getByText('Use a passkey'))
+        await waitFor(() => { expect(unlock).toHaveBeenCalledOnce() })
+        unmount()
+        const updates = TH.watchStateUpdates()
+        await act(async () => {
+          if (refusal === null) { unlocking.resolve(undefined) } else { unlocking.reject(refusal) }
+          await TH.wakeupAtNextTick()
+        })
+        expect(updates.count()).to.eq(0)
+        expect(gripes).to.deep.equal([null])
+        expect(heard).to.deep.equal([])
+        expect(reported).to.deep.equal([])
+      })
+    }
+
+    it("never unlocks with a passkey the user touched after it unmounted", async () => {
+      const { vault } = await lockedVaultWithPasskey()
+      const touching = TH.held()
+      const answered = TH.held()
+      const fakeGet = navigator.credentials.get.bind(navigator.credentials)
+      vi.spyOn(navigator.credentials, 'get').mockImplementation(async (options) => {
+        await touching.promise
+        const credential = await fakeGet(options)
+        answered.resolve(undefined)
+        return credential
+      })
+      const unlock = vi.spyOn(vault, 'unlock')
+      const gripes: (string | null)[] = []
+      const { unmount } = render(<PasskeyUnlockButton vault={vault} onDone={noop} onGripe={(gripe) => { gripes.push(gripe) }} />)
+      fireEvent.click(screen.getByText('Use a passkey'))
+      unmount()
+      const updates = TH.watchStateUpdates()
+      await act(async () => {
+        touching.resolve(undefined)
+        await answered.promise
+        await TH.wakeupAtNextTick()
+      })
+      expect(unlock).not.toHaveBeenCalled()
+      expect(vault.getSnapshot().state).to.eq('locked')
+      expect(updates.count()).to.eq(0)
+      expect(gripes).to.deep.equal([null])
+    })
   })
 })
 

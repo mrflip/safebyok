@@ -2,6 +2,7 @@ import { useState, useSyncExternalStore } from 'react'
 import { isVaultCondition, isVaultError, type Vault, type VaultSnapshot } from 'safebyok'
 import { Boundary, useRoundFor } from './boundary'
 import { Messages } from './messages'
+import { useIsMounted } from './is-mounted'
 import { askPasskey, passkeysAvailable } from './passkey'
 
 /**
@@ -10,7 +11,8 @@ import { askPasskey, passkeysAvailable } from './passkey'
  * unconditionally. `PassphraseModal` does, first, ahead of the field. A press asks the user to
  * touch a passkey, then unlocks with its answer. It follows the vault's snapshot as it changes:
  * a passkey added on another device brings the button, one removed takes it away. Handed another
- * vault, it starts afresh.
+ * vault, it starts afresh. Taken away, it lets go: a press still under way finishes unheard,
+ * unlocking with no passkey touched after, and calling `onDone` and `onGripe` no more.
  *
  * `onDone(true)` once unlocked; `onDone(false)` when a `lock()` called meanwhile wins, as the
  * passphrase dialog does. Each press first tells `onGripe(null)`: whatever the button said before
@@ -56,6 +58,9 @@ const PasskeyPress = ({ vault, onDone, onGripe, rpId, autoFocus }: PasskeyUnlock
   const [asking, setAsking] = useState(false)
   // Wrapped, so that a rejection carrying any value at all still reads as "failed".
   const [failure, setFailure] = useState<{ err: unknown } | null>(null)
+  // Asked after each await: a button gone meanwhile -- its dialog went, or another vault remounted
+  // it -- unlocks nothing, and touches neither its state nor its dialog's callbacks again.
+  const isMounted = useIsMounted()
   if (failure !== null) { throw failure.err }
   if (! offersPasskey(snapshot)) { return null }
 
@@ -64,17 +69,19 @@ const PasskeyPress = ({ vault, onDone, onGripe, rpId, autoFocus }: PasskeyUnlock
     onGripe(null)
     try {
       const passkey = await askPasskey(snapshot.unlocks, { rpId })
-      if (passkey === null) { return }
+      if (passkey === null || ! isMounted()) { return }
       await vault.unlock(passkey)
+      if (! isMounted()) { return }
       onDone(true)
     } catch (err) {
+      if (! isMounted()) { return }
       // The vault was locked while this unlock was under way, and the lock wins: as if dismissed.
       if (isVaultError(err, 'vault_locked')) { onDone(false); return }
       if (isVaultCondition(err)) { onGripe(err.message); return }
       // Misuse, or no VaultError at all: rethrown in render, for PasskeyUnlockButton's boundary.
       setFailure({ err })
     } finally {
-      setAsking(false)
+      if (isMounted()) { setAsking(false) }
     }
   }
 
