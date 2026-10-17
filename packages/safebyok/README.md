@@ -555,7 +555,8 @@ await zxcvbnPassphraseTest('skylarkpinecone', { applabel: 'skylark', user_id: 'u
   with a dynamic `import()` at its first call, and a bundler splits it into a chunk of its own:
   a page that never chooses a passphrase never fetches it. It answers through a promise, in a
   few milliseconds after that first load. If the load fails (the network dropped), the call
-  rejects, the vault refuses the new passphrase with that rejection, and the next call tries again.
+  rejects with kind `storage_unavailable`, a condition a retry may mend; the vault refuses the new
+  passphrase with that refusal, making nothing, and the next call tries again.
 * **The test hears the vault's scope.** It is called as `test(passphrase, scope)`, `scope` the
   vault's `{ applabel, user_id, vaultlabel }`: words a guesser who knows the user tries first.
   `zxcvbnPassphraseTest` hands each name, whole and split into its runs of letters and digits, to
@@ -674,7 +675,7 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `rolled_back`         | this device has already seen a newer copy of the vault's bundle than storage offers now (storage restored from a backup, or altered), so it won't use this one, and the vault locked: nothing was unlocked or written | Tell the user this device has seen a newer copy of the vault than storage holds. If the storage was restored from an older copy on purpose, accept it on this device (see *A vault rolled back*, below); otherwise the app's support should look at its storage |
 | `not_permitted`       | the storage backend refused the signed-in user, still the vault's own, this one call | Tell the user they may not; signing in again will not help |
 | `identity_revoked`    | the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in. The vault has locked itself (see *When the user signs out*) | Have the user sign in again, then open the vault for whoever that is |
-| `storage_unavailable` | the storage backend could not be reached, or failed; or this device's own store failed for a reason that may pass | Try again shortly; the adapter's own error is the `cause`, unless it may quote the call (Convex's) |
+| `storage_unavailable` | the storage backend could not be reached, or failed; or this device's own store failed for a reason that may pass; or `zxcvbnPassphraseTest`'s word list could not be fetched | Try again shortly; the adapter's own error is the `cause`, unless it may quote the call (Convex's) |
 | `storage_blocked`     | this device's own store (its device store, or a vault kept on the device, as `safebyok-indexeddb`'s) refused for a reason that holds until something outside the app changes: the browser withholds storage from the page (site data blocked, a sandboxed frame), has no room for it (a quota of zero, as some private windows give, or a full disk), or offers no IndexedDB at all | Do not offer a retry: tell the user this browser is keeping the app from storing anything on this device. The app may open the vault again with `memoryDeviceDB()`, which remembers no unlock here; the browser's own error is the `cause` |
 
 `openVault` itself can refuse with `bad_option`, `bad_label`, `insecure_context`, and, as it reads the vault from

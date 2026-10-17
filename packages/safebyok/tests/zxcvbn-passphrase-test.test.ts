@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MinPassphraseChars, MinZxcvbnScore, zxcvbnPassphraseTest } from '../src/zxcvbn-passphrase-test'
 import type { VaultScope } from '../src/types'
+import { openVault } from '../src/vault'
+import * as TH from './test-helpers'
 
 /** The reason a verdict gives, or '' for a strong one. */
 const reasonOf = async (passphrase: string, scope?: VaultScope): Promise<string> => {
@@ -113,6 +115,16 @@ describe("zxcvbnPassphraseTest, given the vault's scope", () => {
   })
 })
 
+/** What `attempt` rejects with; it fails the test should it resolve. */
+const rejectionOf = async (attempt: Promise<unknown>): Promise<unknown> => {
+  try {
+    await attempt
+  } catch (err) {
+    return err
+  }
+  throw new Error('it resolved, where a rejection was expected')
+}
+
 /** A fresh copy of the module, over a zxcvbn whose loads are counted and whose first load fails when `failFirst`. */
 const freshModule = async (failFirst: boolean) => {
   vi.resetModules()
@@ -147,8 +159,32 @@ describe("zxcvbnPassphraseTest's loading", () => {
 
   it("rejects when zxcvbn fails to load, and tries again at the next call", async () => {
     const { loads, fresh } = await freshModule(true)
-    await expect(fresh.zxcvbnPassphraseTest('password1234')).rejects.toThrow()
+    await expect(fresh.zxcvbnPassphraseTest('password1234')).rejects.toThrow(/could not be loaded/)
     expect(await fresh.zxcvbnPassphraseTest('password1234')).to.have.property('strong', false)
     expect(loads.count).to.eq(2)
+  })
+
+  it("says a failed load as 'storage_unavailable', a condition a retry may mend, its cause the load's own failure, quoting no passphrase", async () => {
+    const { fresh } = await freshModule(true)
+    const passphrase = 'SUPERSECRET staple horse'
+    const err = await rejectionOf(fresh.zxcvbnPassphraseTest(passphrase))
+    expect(err).to.include({ kind: 'storage_unavailable', name: 'VaultError' })
+    expect((err as Error).message).to.match(/Try again shortly/)
+    expect((err as Error).cause).to.be.instanceOf(Error)
+    expect(TH.thrownText(err)).to.not.include('SUPERSECRET')
+  })
+
+  it("refuses a vault's Create as 'storage_unavailable' when zxcvbn fails to load, making nothing", async () => {
+    const { fresh } = await freshModule(true)
+    const vault = await openVault(TH.memoryVaultOpts({ passphraseStrengthTest: fresh.zxcvbnPassphraseTest }))
+    try {
+      // The fresh module's VaultError is a class of its own: told by kind.
+      await expect(vault.unlock('correct horse battery staple')).rejects.toThrow(expect.objectContaining({ kind: 'storage_unavailable' }))
+      expect(vault.getSnapshot().state).to.eq('absent')
+      await vault.unlock('correct horse battery staple')
+      expect(vault.getSnapshot().state).to.eq('unlocked')
+    } finally {
+      vault.close()
+    }
   })
 })

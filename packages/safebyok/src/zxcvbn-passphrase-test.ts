@@ -1,4 +1,5 @@
 import type { TranslationKeys, ZxcvbnFactory } from '@zxcvbn-ts/core'
+import { VaultError } from './errors'
 import type { PassphraseVerdict } from './passphrase-strength'
 import type { VaultScope } from './types'
 
@@ -52,14 +53,25 @@ const Remedy = ': add a few more words, less common ones.'
 // again.
 const made: { estimator?: Promise<ZxcvbnFactory> } = {}
 
-/** Loads zxcvbn and builds its estimator, over the common-password dictionary and the keyboard layouts; forgets a load that failed. */
+/**
+ * What a failed load says. Its kind is `storage_unavailable`, the one that means "a retry may mend
+ * it": a chunk the page could not fetch is a resource out of reach, as storage out of reach is, and
+ * a host already shows that kind in place with a way to try again.
+ */
+const LoadFailedSaid = "The passphrase checker could not be loaded -- the connection may have dropped, or the app was updated meanwhile -- so this passphrase was not checked, and nothing was made of it. Try again shortly; if it fails every time, reload the page. The failed load is this error's cause."
+
+/**
+ * Loads zxcvbn and builds its estimator, over the common-password dictionary and the keyboard
+ * layouts; forgets a load that failed, and refuses with kind 'storage_unavailable', the load's own
+ * failure its cause (it never saw a passphrase).
+ */
 const loadEstimator = async (): Promise<ZxcvbnFactory> => {
   try {
     const [{ ZxcvbnFactory: Factory }, { adjacencyGraphs, dictionary }] = await Promise.all([import('@zxcvbn-ts/core'), import('@zxcvbn-ts/language-common')])
     return new Factory({ dictionary, graphs: adjacencyGraphs })
   } catch (err) {
     delete made.estimator
-    throw err
+    throw new VaultError('storage_unavailable', LoadFailedSaid, { cause: err })
   }
 }
 
@@ -109,8 +121,9 @@ const reasonFor = (warning: string | null): string => {
  * It answers through a promise: zxcvbn and its dictionary, about 216 kB minified and brotlied,
  * load at its first call, as a chunk of their own in a bundled app, so a page that never chooses a
  * passphrase never fetches them. That first call takes the fetch and about 15 ms more; each after
- * it a few milliseconds, so a field may call it on every keystroke. A load that fails rejects, and
- * the next call tries again. It keeps nothing and sends nothing anywhere.
+ * it a few milliseconds, so a field may call it on every keystroke. A load that fails rejects with
+ * kind 'storage_unavailable', which a retry may mend -- the vault's refusal at Create, shown in
+ * place -- and the next call tries again. It keeps nothing and sends nothing anywhere.
  *
  * @param passphrase - The passphrase as the user typed it.
  * @param scope - The vault it is for, whose names zxcvbn treats as the user's own words. Optional

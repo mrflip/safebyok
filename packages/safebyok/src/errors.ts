@@ -55,7 +55,7 @@
  * trying again may help. `storage_unavailable` is a failure a retry may mend: a backend that could
  * not be reached, or an error from storage that names no lasting cause -- a device store's
  * transaction aborted, its connection closed under it, a failure the browser gives no reason
- * for. `storage_blocked` is this device's own store -- its device store, or a vault kept on the
+ * for -- or, as the nearest kind, `zxcvbnPassphraseTest`'s word list that could not be fetched. `storage_blocked` is this device's own store -- its device store, or a vault kept on the
  * device, as `safebyok-indexeddb`'s -- refusing for a reason that holds until
  * something outside the app changes, so that trying again cannot help until then: the browser
  * withholding storage from the page (site data blocked, a sandboxed frame, cookies turned off:
