@@ -6,6 +6,8 @@ unchanged). `pnpm size`: openVault 22.75 kB against main's 23 kB limit (main's m
 +0.96 kB for the Argon2id schema now reached by `openVault`); every other bundle moves by under
 0.2 kB. No `.size-limit.json` edit.
 
+Restacked 2026-10-17 onto thread 10's tip (`8439aa01`, PR [#136](https://github.com/mrflip/safebyok/pull/136)), in the line main → #128 → #133 → #127 → #132 → #137 → #136 → this. Justify green (core 1907 tests, fastkey 49, react 115, graphql 229); `pnpm size` under every budget (openVault 26.7 of 30 kB). `passphraseKeyOf` now checks length, then all-zero (thread 10), then imports, then wipes; a passkey-proved `changePassphrase` keeps the standing deadline through thread 3's `deadlineFor`, proved by a test added at the restack.
+
 ## Closes
 
 | Row | Status |
@@ -104,4 +106,5 @@ Six minor findings left as notes, for the Coach or a later thread:
   compile time. I judged the union the better reading of "split by algorithm".
 * **G072**: please confirm the passkey-plus-several-passphrases rule (`unlockId` names the
   passphrase to replace; `bad_option` rather than a guess).
+  * → *Coach (2026-10-16):* Keep as built; too complex for users, so a TODO asks if several passphrases help anyone.
 * G028 (a menu of shipped KDF configurations) is not touched.
