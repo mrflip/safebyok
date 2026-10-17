@@ -107,9 +107,8 @@ export const held = <ValT = undefined>() => {
 
 /**
  * Counts each state update React is asked to schedule outside an event, from now until the test
- * ends, changing nothing React sees: it reads `window.event` to choose each one's priority. That
- * read is what threw `window is not defined` when a dialog's await settled after the test
- * environment had gone, so a count of none says that no component touched its state.
+ * ends, changing nothing React sees: it reads `window.event` to choose each one's priority, for a
+ * component that has unmounted too, so a count of none says that no component touched its state.
  *
  * @example
  *   const updates = TH.watchStateUpdates()
