@@ -1,10 +1,11 @@
 # Thread 5b: store_base (2026-10-17)
 
 Branch `20261016-store_base`, PR [#139](https://github.com/mrflip/safebyok/pull/139), stacked on
-#136 (line main → #128 → #133 → #127 → #132 → #137 → #136 → this), cut at `8439aa01`; to be
-rebased onto thread 11's restacked tip by the filer. Built across two sessions (checkpoint
-`3ef9fd97`, finished `de6315a8`). Justify green: core 1960, IDB 129, Postgres 247, GraphQL 237,
-Convex 256, React 115, fastkey 44, demo 170, e2e 81, root 155.
+#131 (line main → #128 → #133 → #127 → #132 → #137 → #136 → #126 → #129 → #134 → #130 → #131 →
+this), cut at `8439aa01` and rebased onto thread 11's tip `07aed87c` at filing. Built across two
+sessions (checkpoint `3ef9fd97`, finished `de6315a8`). Justify green at filing: core 2022, IDB
+129, Postgres 247, GraphQL 238, Convex 256, React 181, fastkey 49, demo 184, e2e 81 (Postgres
+suites skipped without `SAFEBYOK_PG_URL`), root 212; size within every budget.
 
 * **Built**:
   - `VaultDB(opts?: VaultDBOpts)`: protected `logger` (own, else `adoptLogger`'s, else console),
@@ -55,6 +56,14 @@ Convex 256, React 115, fastkey 44, demo 170, e2e 81, root 155.
   GraphQL (761 → 789: G303, G304, 6.2, logger, as the design's Risks foresaw) nor Convex
   (1454 → 1472, mostly doc comments for G248/G254/G250 and G247); Convex's tests shrank 1757 → 1597.
 
+* **Review**: `fixed` -- `1f5eb155` (GraphQL `refusalOf` lets a later error's safebyok kind win
+  over a validation code) and `935dbc98` (G285 security note); its four minors are rows.
+
+* **Filing**: two conflicts with thread 8's camelCase timing-check handles (`test-helpers.ts`,
+  `test-helpers.test.ts`: this thread's checks renamed `pushPastAFailingListener` etc., thread 8's
+  doc paragraph kept) and one append-both in `notes/security.md`. Thread 11's real-Postgres
+  battery now hands `vaultDBOpts` through `deviceOver` to `postgresVaultDB` (`e9966fa8`).
+
 * **Discoveries**: a package's tests resolve sibling packages through `dist/`: run
   `pnpm --filter safebyok build` after changing core. The e2e Convex file copies the package's
   `ClientCases` loops; a trim there is made in both. `oneAtATime`'s `begin` and `vault-db.ts`'s
@@ -62,7 +71,7 @@ Convex 256, React 115, fastkey 44, demo 170, e2e 81, root 155.
 
 * **Size** (`pnpm size`, `.size-limit.json` untouched; base at `8439aa01` in brackets): `openVault`
   26.23 kB [25.75] of 30; everything 33.76 kB [32.94] of 40; `idbDeviceDB` 12.35 kB [12.23] of
-  15. All inside budget.
+  15. All inside budget. At filing, over the line below: 27.16, 34.31 and 12.35 kB.
 
 * **Rows** (34), all **closed**:
   G207, G208, G209, G210, G211 (base class, logger, guarded subscribe, `listBoxRecords`);
