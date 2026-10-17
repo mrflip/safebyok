@@ -1246,3 +1246,10 @@ security expert who knows what questions to ask.
   itself; the base class's `Refusals.storageUnavailable` (`refusals.ts`) turns a null or
   undefined cause into an Error saying the backend gave none, so no refusal ever carries a null
   cause.
+* 2026-10-17 (thread 5b, store_base, G285): **Postgres sets no lockbox limit unless told.**
+  `postgresVaultDB`'s `maxLockboxes` (`safebyok-postgres/src/postgres-vault-db.ts`) defaults to
+  `Infinity`, where it was 1000: it is sent as SQL null, and the insert counts nothing. A host
+  that passes no limit lets one signed-in user, through a modified browser, grow their own vault
+  without bound, and Postgres sets no limit on a vault's bytes either; bounding that is the host's,
+  by `maxLockboxes` or its own quotas. `graphqlVaultDB` declares `Infinity` to match, so a browser
+  learns a server's limit only when the host declares it there too.
