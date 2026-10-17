@@ -2,8 +2,9 @@
 
 Branch `20261016-uncontrolled_fields`, PR [#134](https://github.com/mrflip/safebyok/pull/134),
 stacked on [#129](https://github.com/mrflip/safebyok/pull/129) (cut at `3d62fc04`; restacked
-2026-10-17 onto its tip `05d0177b`). Justify: green at every package (react 181, demo 182 + 15
-skipped, core 1852 + 33 skipped); `pnpm size` within every budget.
+2026-10-17 onto its tip `05d0177b`, then onto `9169da4d`, #129 chained onto thread 6's
+[#126](https://github.com/mrflip/safebyok/pull/126)). Justify: green at every package (react 181,
+demo 182 + 15 skipped, core 1910 + 33 skipped); `pnpm size` within every budget.
 
 * **Built**:
   - **CI flakes, first, three `tests:` commits.** (1) `vault-provider.test.tsx`: the grabber kept
