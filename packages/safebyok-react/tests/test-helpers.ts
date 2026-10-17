@@ -125,6 +125,7 @@ export const watchStateUpdates = () => {
       tally.reads += 1
       return own?.get?.call(globalThis) as Event | undefined
     },
+    set:          (val: unknown) => { own?.set?.call(globalThis, val) },
   })
   onTestFinished(() => {
     if (own === undefined) { Reflect.deleteProperty(globalThis, 'event') } else { Object.defineProperty(globalThis, 'event', own) }
