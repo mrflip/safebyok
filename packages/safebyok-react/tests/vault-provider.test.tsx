@@ -796,6 +796,22 @@ describe("VaultProvider", () => {
       await waitFor(() => { expect(screen.getByRole('status').textContent).to.eq('') })
     })
 
+    it("says nothing for a test that fails to answer, as a word list failing to load mid-typing does, and keeps the dialog", async () => {
+      const world = makeWorld()
+      const caught: unknown[] = []
+      const flaky = vi.fn(refuseAcme).mockRejectedValueOnce(new Error('Failed to fetch dynamically imported module'))
+      render(<CatchingBoundary caught={caught}><VaultProvider {...world.props} userId="u1" passphraseStrengthTest={flaky}><Probe /></VaultProvider></CatchingBoundary>)
+      fireEvent.click(await screen.findByText('put'))
+      const field = await screen.findByPlaceholderText('vault passphrase')
+      fireEvent.change(field, { target: { value: 'acme' } })
+      await waitFor(() => { expect(flaky).to.have.callCount(1) })
+      expect(screen.getByRole('status').textContent).to.eq('')
+      fireEvent.change(field, { target: { value: 'acme forever' } })
+      await waitFor(() => { expect(screen.getByRole('status').textContent).to.eq('Not the name of the app, please.') })
+      expect(caught).to.have.lengthOf(0)
+      expect(screen.queryByPlaceholderText('vault passphrase')).to.not.be.null
+    })
+
     it("hands the test the vault's scope, as the vault does", async () => {
       const world = makeWorld()
       const heard = vi.fn((_typed: string, _scope: VaultScope): PassphraseVerdict => ({ strong: true }))

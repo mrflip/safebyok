@@ -157,11 +157,18 @@ const warnHost = (logger: VaultLogger | undefined, message: string, story: Recor
 
 /**
  * The strength test as the dialog's advice: its reason for a passphrase it finds weak, and nothing
- * for one it admits. It runs on the device, as the test does.
+ * for one it admits, or for one it fails to judge -- its word list failing to load mid-typing,
+ * say -- which Create, running the test again, then says as its own refusal. It runs on the
+ * device, as the test does.
  */
 const adviceFrom = (strengthTest: PassphraseStrengthTest, scope: VaultScope): PassphraseAdvice => async (typed) => {
-  const verdict = await strengthTest(typed, scope)
-  return verdict.strong ? null : verdict.reason
+  try {
+    const verdict = await strengthTest(typed, scope)
+    return verdict.strong ? null : verdict.reason
+  } catch {
+    // Advice is a courtesy: a test that cannot answer now ends nothing, and Create asks it again.
+    return null
+  }
 }
 
 /**
