@@ -33,7 +33,7 @@ This repository is a pnpm workspace. Its packages:
 
 Facade over a backing store (convex, postgres, etc) or another vaultDB (graphQL, etc).
 Holds vault​s and lockbox​es scoped by app, user_id, vaultlabel and boxlabel.
-* A lockbox holds a public​ bag under the app's control and an encrypted whisper​
+* A lockbox holds a sidecar under the app's control and an encrypted whisper​
 * verbs: vault: fetchOrCreate, update, retire, subscribe, listLockboxes; lockbox: fetchOrCreate, update, retire.
 
 ### Browser
@@ -41,7 +41,7 @@ Holds vault​s and lockbox​es scoped by app, user_id, vaultlabel and boxlabel
 * a vault​ object
   - Vault.make({ app, user_id, vaultlabel, requestPasskeyFunc, ... })​: Vault, non-async
   - vault.hello (initial bookkeeping that doesn't bother the user)
-  - lock​, unlock​, changePassword​, view(boxlabel)​, store(boxlabel, whisper, { public? })​, retire(boxlabel)
+  - lock​, unlock​, changePassword​, view(boxlabel)​, store(boxlabel, whisper, { sidecar? })​, retire(boxlabel)
 * a pantry​ holding keys
 * a DeviceDB​ safely holding and managing access to the lockboxes (indexedDB)
 * a pluggable KDF (Argon2id wasm/native)

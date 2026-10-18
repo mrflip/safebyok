@@ -6,14 +6,14 @@ Every gripe from the gripes_boogaloo harvest still wanting work or a decision, a
 
 ## Crypto & key derivation
 
-- G023 **Decide:** drop `note` for a reserved, bound `public` bag (any JSON, default `{}`), or keep label-plus-note and let hosts keep their own table — todo_gripes, old_gripes, whiteboard_gripes
+- G023 **Decide:** drop `note` for a reserved, bound `sidecar` (any JSON, default `{}`), or keep label-plus-note and let hosts keep their own table — todo_gripes, old_gripes, whiteboard_gripes
 - G024 **Decide:** whether `deriveKeyBytes` refuses a salt whose length differs from the spec's (a corrupt stored salt reaches hash-wasm/noble as a plain Error) — bigfeats_doc, prs_60_80, whiteboard_gripes
-- G025 Reserve `whisper_codec` (default `json_v1`) and `whisper_schema_version` (default 1) in the lockbox record and its binding; Convex schema widens with them — todo_gripes, old_gripes, whiteboard_gripes, humans_gripes
+- G025 Reserve `whisper_codec` (default `json_v1`) and `whisper_schema_version` (default 1) in the lockbox record and its ctx; Convex schema widens with them — todo_gripes, old_gripes, whiteboard_gripes, humans_gripes
 - G026 Build padding: a pluggable stringifier padding serialized JSON inside the encryption (PADME or power-of-two buckets, 64-byte minimum) — todo_gripes, old_gripes
 - G027 Survey standard payload sizes (API keys, OAuth tokens, service-account JSON, PKCS#8 keys) so no kind sits alone in a padding bucket — todo_gripes
 - G028 Ship built-as-a-whole recommended KDF configurations plus functions to roll your own, following `argon2idDeriver(spec)` — todo_gripes, humans_gripes, prs_60_80, whiteboard_gripes
 - G029 Reserve a label namespace for supplied KDF specs (refuse host labels like `argon2id_web_*`) — humans_gripes, prs_60_80, whiteboard_gripes
-- G030 Run the Argon2id schema at `openVault` for any hand-built deriver declaring `algorithm: 'argon2id'`, so an unrunnable spec fails with a kind, not at unlock — humans_gripes, prs_60_80, whiteboard_gripes
+- G030 Run the Argon2id schema at `Vault.make` for any hand-built deriver declaring `algorithm: 'argon2id'`, so an unrunnable spec fails with a kind, not at unlock — humans_gripes, prs_60_80, whiteboard_gripes
 - G031 Split the `KeyDeriver` type by algorithm (today `Partial<KeyDeriverSpec>` gives every deriver Argon2id's fields) before 1.0 — humans_gripes, prs_60_80, whiteboard_gripes
 - G032 Zero the passphraseKey bytes after `importKey` in `unlock()` and `changePassphrase()` — prs_60_80, whiteboard_gripes
 - G033 `argon2idDeriver`: name bounds once instead of repeated literals, and report an oversized `parallelism` under its own field, not `memory_kib` — prs_60_80, whiteboard_gripes
@@ -25,59 +25,59 @@ Every gripe from the gripes_boogaloo harvest still wanting work or a decision, a
 - G039 Say in notes/security.md that injected code (XSS, an extension, a stolen unlocked device) can still use the non-extractable vaultKey to read whispers — old_gripes
 - G040 `CipherBindingPart` silently drops a field set to `undefined` by mistake; the lockbox format tag is bound twice — prs_80_main, whiteboard_gripes
 
-## Ways in: unlocks, passkeys, revocation & rotation
+## Ways in: wayins, passkeys, revocation & rotation
 
-- G061 **Decide:** whether `unlocklabel` is checked only where a way in is added (built), not where a stored envelope's label is read; rec entry-only — gripes_1_doc, todo_gripes, prs_open, whiteboard_gripes
-- G062 **Decide:** rotation's open names and shapes: `rolled_back` kind, `vault_key_epoch`, `prior_vault_key`, `DeviceMark`, `device_id`; `removeUnlock({ rotate })` vs separate `rotateVaultKey` — prs_80_main, whiteboard_gripes
+- G061 **Decide:** whether `wayinlabel` is checked only where a way in is added (built), not where a stored wayin's label is read; rec entry-only — gripes_1_doc, todo_gripes, prs_open, whiteboard_gripes
+- G062 **Decide:** rotation's open names and shapes: `rolled_back` kind, `vault_key_epoch`, `prior_vault_key`, `DeviceMark`, `device_id`; `retireWayin({ rotate })` vs separate `rotateVaultKey` — prs_80_main, whiteboard_gripes
 - G063 **Decide:** whether the listing marks damaged a lockbox under an unknown `vault_key_epoch`, and whether the snapshot counts boxes still to re-encrypt — prs_80_main, whiteboard_gripes
-- G064 Build rotation_shape (thread 14): `vault_key_epoch`/`prior_vault_key` on bundle, epoch and random `device_id` on envelopes, epoch on lockbox, `DeviceMark` rollback check — bigfeats_doc, prs_80_main, whiteboard_gripes, humans_gripes
-- G065 Build rotation_adapters (thread 18): the `vault_key_epoch` comparison in IndexedDB, Convex, Postgres (bundle row FOR SHARE in the insert) and GraphQL — bigfeats_doc, prs_80_main, whiteboard_gripes
+- G064 Build rotation_shape (thread 14): `vault_key_epoch`/`prior_vault_key` on vault props, epoch and random `device_id` on wayins, epoch on lockbox, `DeviceMark` rollback check — bigfeats_doc, prs_80_main, whiteboard_gripes, humans_gripes
+- G065 Build rotation_adapters (thread 18): the `vault_key_epoch` comparison in IndexedDB, Convex, Postgres (vault props row FOR SHARE in the insert) and GraphQL — bigfeats_doc, prs_80_main, whiteboard_gripes
 - G066 Build rotation_verb (thread 19): `rotateVaultKey(keep)` with its resumable lockbox walk, reads through the prior key, fault-injecting tests — bigfeats_doc, whiteboard_gripes
 - G067 Build rotation_docs (thread 20): README "Rotating the vaultKey", adapter-author note, demo "remove and lock out" button, VOCABULARY rows, notes/security.md entries — bigfeats_doc, whiteboard_gripes
-- G068 Detect rollback: a device should refuse a bundle whose epoch went backwards (today `refresh()` takes up any changed epoch) — bigfeats_doc, prs_80_main, whiteboard_gripes
+- G068 Detect rollback: a device should refuse the vault props whose epoch went backwards (today `refresh()` takes up any changed epoch) — bigfeats_doc, prs_80_main, whiteboard_gripes
 - G069 Try passkeys on real authenticators (Chrome platform passkey, Safari, a security key), incl. addPasskey's prompt after Argon2 on slow devices/older Safari — todo_gripes, bigfeats_doc, prs_60_80, prs_80_main, humans_gripes, whiteboard_gripes
 - G070 `addPasskey`: a `lock()` during the WebAuthn prompt still lands the passkey, and a `stale_write` orphans it with no retry reusing the made passkey — prs_80_main, whiteboard_gripes
-- G071 Offer a relabel verb for `unlocklabel` (bound into the wrap, so it needs a proof) — bigfeats_doc
-- G072 Let `changePassphrase` take a passkey proof (today `bad_option`; recovery is addPassphrase then removeUnlock) if wanted — bigfeats_doc
-- G073 Plain `wrong_passphrase` beside envelopes another deriver made does not mention the deriver — prs_60_80, prs_80_main, whiteboard_gripes
-- G074 Move the envelope `salt_b64` decode check from unlock into the record schema at read (once schemas tree-shake) — prs_60_80
-- G075 Clean up envelope/vault helpers: unused `sessionKey` from seal helpers, duplicated `absent_unlock` message, an errors.ts comment promising an unthrown case (status unclear) — prs_60_80, whiteboard_gripes
+- G071 Offer a relabel verb for `wayinlabel` (bound into the wrap, so it needs a proof) — bigfeats_doc
+- G072 Let `changePassphrase` take a passkey proof (today `bad_option`; recovery is addPassphrase then retireWayin) if wanted — bigfeats_doc
+- G073 Plain `wrong_passphrase` beside wayins another deriver made does not mention the deriver — prs_60_80, prs_80_main, whiteboard_gripes
+- G074 Move the wayin `salt_b64` decode check from unlock into the record schema at read (once schemas tree-shake) — prs_60_80
+- G075 Clean up wayin/vault helpers: unused `sessionKey` from seal helpers, duplicated `absent_wayin` message, an errors.ts comment promising an unthrown case (status unclear) — prs_60_80, whiteboard_gripes
 
-## Vault core: open, unlock, lock, store, erase, expiry, errors, logger
+## Vault core: make, hello, unlock, lock, storeBox, retireBox, expiry, errors, logger
 
 - G115 **Decide:** #60's four `lockSoon()` calls (snapshot flips at once, unlock in grace wins, 60 s cap, `close()` throws `vault_closed`) and #55's `vault_locked` for a lost unlock; rec keep — todo_gripes, prs_60_80, humans_gripes, whiteboard_gripes
-- G116 **Decide:** `destroy()` on a handle that never saw a bundle resolving without erasing, a retry after a refused `destroy()` taking the reborn vault, and `destroy()` needing no unlock — todo_gripes, old_gripes, humans_gripes, whiteboard_gripes
-- G117 **Decide:** whether erase-wins needs a kind apart from an exhausted retry's `stale_write`, and `vault_locked` vs `stale_write` when a retry finds the device relocked — old_gripes, humans_gripes, whiteboard_gripes
+- G116 **Decide:** `retire()` on a handle that never saw the vault props resolving without retiring, a retry after a refused `retire()` taking the reborn vault, and `retire()` needing no unlock — todo_gripes, old_gripes, humans_gripes, whiteboard_gripes
+- G117 **Decide:** whether retire-wins needs a kind apart from an exhausted retry's `stale_write`, and `vault_locked` vs `stale_write` when a retry finds the device relocked — old_gripes, humans_gripes, whiteboard_gripes
 - G118 **Decide:** group several offending values into one refusal ("Group error messages?"); Coach said fine-grained until there are too many — todo_gripes, whiteboard_gripes
-- G119 **Decide:** whether `whenIdentityRevoked: 'stay'` should exist, and whether a lock withholds a whisper already on its way out of `read()` — prs_80_main, whiteboard_gripes
-- G120 **Decide:** whether "may be newer" (eraseDamagedVault refusal) and "sound vault" (`bad_option`) want kinds of their own apart from `damaged_bundle` — prs_80_main, whiteboard_gripes
-- G121 **Decide:** whether the listing should detect damage it cannot see today (altered ciphertext, missing whisper show only at `read()`) — gripes_1_doc
-- G122 **Decide:** whether `openVault` keeps duck-typing `vaultDB` (a hand-written object skips the base class's checks) or checks a brand — prs_60_80, humans_gripes, whiteboard_gripes
+- G119 **Decide:** whether `whenIdentityRevoked: 'stay'` should exist, and whether a lock withholds a whisper already on its way out of `readBox()` — prs_80_main, whiteboard_gripes
+- G120 **Decide:** whether "may be newer" (retireDamagedVault refusal) and "sound vault" (`bad_option`) want kinds of their own apart from `damaged_vault` — prs_80_main, whiteboard_gripes
+- G121 **Decide:** whether the listing should detect damage it cannot see today (altered ciphertext, missing whisper show only at `readBox()`) — gripes_1_doc
+- G122 **Decide:** whether `Vault.make` keeps duck-typing `vaultDB` (a hand-written object skips the base class's checks) or checks a brand — prs_60_80, humans_gripes, whiteboard_gripes
 - G123 **Decide:** whether `maxWhisperBytes` being checked on write only is intended — old_gripes
 - G474 **Decide:** confirm #40's calls: the entry is `safebyok/browser` (the Coach had said `basic`), one frozen `browserOpts` bag per `dbName`, `SevenDaysMs` removed — old_gripes, whiteboard_gripes
 - G124 Build natural expiry's timer: shut at `askPassphraseAt` + 60 s, re-armed within setTimeout's 2^31-1 ms reach, taking over from `ensureUnlocked()`, with a security note — todo_gripes, prs_60_80, whiteboard_gripes
 - G125 `lockSoon()` leftovers: an already-expired held key gets a full grace; `ensureUnlocked()` can take a key from a store in hand; grace timer not `unref`'d — prs_60_80, whiteboard_gripes
-- G126 `close()` during an unlock's record write loses the older remembered record that write overwrote; `close()` does not move the shut counter — prs_60_80, whiteboard_gripes
-- G127 A clock that goes bad mid `store()`/`erase()`/`changePassphrase()` lets the write land, then throws `bad_option` from the closing refresh — todo_gripes, prs_60_80, humans_gripes, whiteboard_gripes
-- G128 A backward clock step erases a fresh remembered unlock — todo_gripes, humans_gripes, whiteboard_gripes
-- G129 Tabs opening with different settings erase each other's remembered-unlock records — todo_gripes, humans_gripes, whiteboard_gripes
-- G130 Wrap a `deviceDB.readUnlock` failure at open as `storage_unavailable` so it reaches `openError`, not the error boundary — todo_gripes, prs_60_80, humans_gripes, whiteboard_gripes
+- G126 `close()` during an unlock's record write loses the older lease that write overwrote; `close()` does not move the shut counter — prs_60_80, whiteboard_gripes
+- G127 A clock that goes bad mid `storeBox()`/`retireBox()`/`changePassphrase()` lets the write land, then throws `bad_option` from the closing refresh — todo_gripes, prs_60_80, humans_gripes, whiteboard_gripes
+- G128 A backward clock step erases a fresh lease — todo_gripes, humans_gripes, whiteboard_gripes
+- G129 Tabs opening with different settings erase each other's leases — todo_gripes, humans_gripes, whiteboard_gripes
+- G130 Wrap a `deviceDB.readLease` failure at open as `storage_unavailable` so it reaches `openError`, not the error boundary — todo_gripes, prs_60_80, humans_gripes, whiteboard_gripes
 - G131 A lock in one tab does not stop an unlock under way in another (needs a shared signal); DeviceDB has no compare-and-erase — whiteboard_gripes
 - G132 A lock during a wrong-passphrase check surfaces `wrong_passphrase` rather than `vault_locked` — whiteboard_gripes
 - G133 Pass an abort signal into a long key derivation — old_gripes, whiteboard_gripes
 - G134 Logger leftovers: rate-limit warnings from a watch on broken storage; log a failed catch-up after `stale_write` as such, not "a background refresh" — todo_gripes, prs_60_80, humans_gripes, whiteboard_gripes
 - G135 Give `VaultLogger.log` a call site, or stop requiring it — todo_gripes, prs_60_80, humans_gripes, whiteboard_gripes
 - G136 Serialize the core's refreshes (every open runs two at once, which can interleave after a write) — old_gripes, whiteboard_gripes
-- G137 Make `quietRefresh` surface a failed catch-up read after a stale refusal, so the device relocks and the erase reaches the snapshot — old_gripes
-- G138 Restore a look before writing in `store()`/`erase()`: a session stale from a passphrase change elsewhere can write before relocking (status unclear: expectations may now cover it) — old_gripes
-- G139 Retry `changePassphrase()` and `destroy()` on `stale_write` so a concurrent change elsewhere does not reach the user — old_gripes
-- G140 `read()`/`use()` report a misleading damaged/corrupt kind on a box the successor vault rewrote (status unclear since #108) — old_gripes
-- G141 Design the conflict-handler hook for erase-versus-update collisions after the retry limit (Coach: comes with the retry work, which exists) — todo_gripes, old_gripes, whiteboard_gripes
+- G137 Make `quietRefresh` surface a failed catch-up read after a stale refusal, so the device relocks and the retirement reaches the snapshot — old_gripes
+- G138 Restore a look before writing in `storeBox()`/`retireBox()`: a session stale from a passphrase change elsewhere can write before relocking (status unclear: expectations may now cover it) — old_gripes
+- G139 Retry `changePassphrase()` and `retire()` on `stale_write` so a concurrent change elsewhere does not reach the user — old_gripes
+- G140 `readBox()`/`useBox()` report a misleading damaged/corrupt kind on a box the successor vault rewrote (status unclear since #108) — old_gripes
+- G141 Design the conflict-handler hook for retire-versus-update collisions after the retry limit (Coach: comes with the retry work, which exists) — todo_gripes, old_gripes, whiteboard_gripes
 - G142 Reduce refresh cost growing with the vault (every refresh reads every lockbox; a whisper sits in memory several times) — old_gripes
-- G143 Avoid a full refresh on every refused `store()` in a vault at its limit — old_gripes, whiteboard_gripes
+- G143 Avoid a full refresh on every refused `storeBox()` in a vault at its limit — old_gripes, whiteboard_gripes
 - G144 `storage_unavailable` also wraps an adapter's own programming errors (TypeError) under "try again shortly" — old_gripes, humans_gripes, whiteboard_gripes
-- G145 `eraseDamagedVault` aims at `vault_id` alone, so a same-id rewrite between its read and erase is erased too (fix touches VAULTDB.md 3.5) — prs_80_main
-- G146 The damaged-bundle hatch cannot reach Convex, Postgres or GraphQL, and a local bundle that is not JSON cannot be cleared — prs_80_main, whiteboard_gripes
+- G145 `retireDamagedVault` aims at `vault_id` alone, so a same-id rewrite between its read and retirement is retired too (fix touches VAULTDB.md 3.5) — prs_80_main
+- G146 The damaged-vault props hatch cannot reach Convex, Postgres or GraphQL, and a local vault props that is not JSON cannot be cleared — prs_80_main, whiteboard_gripes
 - G147 `damagedAs` maps only a rejected promise (a synchronously throwing VaultDB still says `corrupt_record`); decipher messages quote the stored boxlabel — prs_80_main
 - G148 `heed` waits on the device store's erase before rethrowing, so a never-settling device store hangs the refused call — prs_80_main, whiteboard_gripes
 - G149 Reduce duplication in vault-db validation: `checkOutgoing`/`checkRecord`, four listener checks, scope comparison, double parse per write — prs_60_80
@@ -91,7 +91,7 @@ Every gripe from the gripes_boogaloo harvest still wanting work or a decision, a
 - G176 **Decide:** whether server-side names as any text (Postgres route, `listBoxRecords`, GraphQL resolvers) is the guarantee for a host serving several clients — todo_gripes, bigfeats_doc, prs_60_80
 - G177 **Decide:** whether the note's control-character rule must also hold on the server, in the listing, and under a host validator — todo_gripes
 - G178 **Decide:** stored-field underbar_case at the facades (`key_deriver_label`) or only at the adapter, and `keyDeriverLabel` vs STYLE's smush rule — old_gripes, humans_gripes
-- G475 **Decide:** approve #117's new public surface: `Sanitizer.refusalFor` on the main entry and the `unlocklabel` field of the validator bags — prs_open
+- G475 **Decide:** approve #117's new public surface: `Sanitizer.refusalFor` on the main entry and the `wayinlabel` field of the validator bags — prs_open
 - G179 Record "label grammar on the server" in TODO's validator-guarantees section (thread 17), and move the label/user-id entries under it — bigfeats_doc, whiteboard_gripes
 - G180 Verify Convex's real refusal text for a lone surrogate in a stored string (convex-test admits it) — todo_gripes, prs_open, whiteboard_gripes
 - G181 Sort `listBoxes` by code point instead of runtime-locale `localeCompare` (vault-db.ts, idb.ts), matching Convex byte order — old_gripes, humans_gripes, whiteboard_gripes
@@ -131,17 +131,17 @@ Every gripe from the gripes_boogaloo harvest still wanting work or a decision, a
 - G240 Convex battery follow-ups: pass `pushes: true` and `makeVaultDBFor`, drop tests repeating lines 1.1-3.5, 5.4, 6.1 — prs_80_main, whiteboard_gripes
 - G241 Give Convex a capped battery factory (MaxVaultLockboxes 8,000 is a server constant no test can lower) — prs_80_main, whiteboard_gripes
 - G242 The Coach walks the Convex README cold in another app as the acceptance test; what trips becomes a TODO — todo_gripes, old_gripes
-- G243 Run against a real Convex deployment: concurrency, invalidation, `setAuth`/JWT refresh, reconnect, resend, error redaction, the big-vault erase — old_gripes, whiteboard_gripes
+- G243 Run against a real Convex deployment: concurrency, invalidation, `setAuth`/JWT refresh, reconnect, resend, error redaction, the big-vault retirement — old_gripes, whiteboard_gripes
 - G244 Run a real Convex dev deployment's error text through the sanitizer and the "never quotes" leak test — prs_open, prs_60_80, whiteboard_gripes
 - G245 Check production Convex read accounting against `getDocumentSize`, and a rollback deploy beside the leftover tally table — humans_gripes, whiteboard_gripes
 - G246 Add timeouts to Convex calls (offline calls wait; an abandoned write can land on reconnect) — old_gripes
-- G247 Make the component check rows beyond structure: empty ids, `vault_id` constancy, epoch increase, `revision_id` freshness — old_gripes, whiteboard_gripes
+- G247 Make the component check rows beyond structure: empty ids, `vault_id` constancy, epoch increase, `revision_tok` freshness — old_gripes, whiteboard_gripes
 - G248 `watchVault` reads whole lockbox documents to emit revision pairs (Convex cannot project fields) — old_gripes, whiteboard_gripes
 - G249 Make the `./test` entry stop assuming Vite/vitest (`import.meta.glob`) and importing devDependency `convex-test`; stop wrappers restating validators — old_gripes, todo_gripes, prs_60_80, whiteboard_gripes
 - G250 Guard the fake socket that follows convex 1.46.0's wire protocol against a convex bump — old_gripes, whiteboard_gripes
 - G251 Run Convex codegen against a real deployment (`ComponentApi` is derived, `_generated/` from templates) — old_gripes, whiteboard_gripes
 - G252 Decide on Convex revision history (only current rows kept; no recovery from a bad overwrite) — old_gripes
-- G253 Give `DeviceUnlock` a JSON form, or accept only structured-clone stores can hold one — old_gripes
+- G253 Give `Lease` a JSON form, or accept only structured-clone stores can hold one — old_gripes
 - G254 `boxes` validated as `string[][]` since Convex has no tuple validator — old_gripes, whiteboard_gripes
 - G255 PR#102 leftovers: `getUserId` relying on `this` passes the check; setup tests repeat `hostWith` and pin exactly 9 functions; `checkedApiOpts` cast; test counts disagree — prs_open, whiteboard_gripes
 - G256 Measure importing `VaultError` into Convex `server.ts` with a real `convex deploy`, not only esbuild — prs_open
@@ -166,15 +166,15 @@ Every gripe from the gripes_boogaloo harvest still wanting work or a decision, a
 - G286 **Decide:** what the Postgres equivalent is of Convex's deployment test file (migration-like, with all its functions) — the Coach's question — bigfeats_doc
 - G287 Test `safebyok-postgres` against Supabase (the section is written from docs) — bigfeats_doc, prs_60_80, whiteboard_gripes
 - G288 Run Postgres races (overshoot, 23503, hard-cap trigger per isolation level) on a real multi-connection Postgres; PGlite runs one statement at a time — prs_60_80, prs_80_main, prs_open, whiteboard_gripes
-- G289 Route-borne bundles, lockboxes and expectations are validated server-side only as far as the core's VaultDB does (past scope and boxlabel) — bigfeats_doc, prs_60_80, whiteboard_gripes
+- G289 Route-borne vault props, lockboxes and expectations are validated server-side only as far as the core's VaultDB does (past scope and boxlabel) — bigfeats_doc, prs_60_80, whiteboard_gripes
 - G290 `placeholderOf` throws a plain Error at module load for a column-list mistake — bigfeats_doc, prs_60_80, whiteboard_gripes
-- G291 Hard-cap trigger docs: old tables keeping the count trigger can deadlock `eraseBox` against `eraseVault` (changeset should say "must" drop it); its refusal is `storage_unavailable` — prs_80_main, whiteboard_gripes
+- G291 Hard-cap trigger docs: old tables keeping the count trigger can deadlock `retireBox` against `retireVault` (changeset should say "must" drop it); its refusal is `storage_unavailable` — prs_80_main, whiteboard_gripes
 - G292 README leftovers: `listen` without `VaultNotifySql` is silent by design (say so); miss reasons computed on a landed write; a `kind as 'vault_full'` cast — prs_80_main
 - G293 The pending `20261015-store_vault_cap` changeset still announces `lockbox_count`, which #113 removed — prs_80_main
 
 ## GraphQL adapter
 
-- G300 **Decide:** keep opaque JSON for `unlocks` envelopes in the schema rather than a typed union (GraphQL has no input unions) — bigfeats_doc, prs_60_80, whiteboard_gripes
+- G300 **Decide:** keep opaque JSON for `wayins` in the schema rather than a typed union (GraphQL has no input unions) — bigfeats_doc, prs_60_80, whiteboard_gripes
 - G301 Export `VaultOperations` (the client's documents) from the package entry for hosts with persisted-operation allowlists — bigfeats_doc, prs_60_80, whiteboard_gripes
 - G302 `unlock_epoch` is a GraphQL `Int` (32-bit), narrower than the core's safe integer; past 2^31 it reads as `storage_unavailable` — bigfeats_doc, prs_60_80, whiteboard_gripes
 - G303 GraphQL validation/coercion errors carry no kind and reach the browser as retryable `storage_unavailable` — bigfeats_doc, prs_60_80, whiteboard_gripes
@@ -273,31 +273,31 @@ Every gripe from the gripes_boogaloo harvest still wanting work or a decision, a
 ## Docs & process
 
 - G464 **Decide:** split VOCABULARY's `userId` (options) and `user_id` (records) into separate entries, or keep the one camel/underbar pair — prs_60_80, whiteboard_gripes
-- G465 Strike TODO.md's stale entries: "A lockbox row that breaks the listing" (#93, #115), Roadmapped 1-3 items since done (switches, Convex peer, size cap, envelopes) — todo_gripes, bigfeats_doc, whiteboard_gripes
-- G466 Widen VOCABULARY's "damaged" row from lockboxes to a way in and a bundle — prs_80_main
+- G465 Strike TODO.md's stale entries: "A lockbox row that breaks the listing" (#93, #115), Roadmapped 1-3 items since done (switches, Convex peer, size cap, wayins) — todo_gripes, bigfeats_doc, whiteboard_gripes
+- G466 Widen VOCABULARY's "damaged" row from lockboxes to a way in and the vault props — prs_80_main
 - G467 Turn on GitHub's "Automatically delete head branches" (off; 89 finished branches remain on origin) — prs_80_main
 - G468 Test git-survey's compare-and-swap failure path, and run git-survey.sh and clear-ds-store.sh on macOS bash 3.2 / BSD find — prs_80_main
 - G469 Rename the devcontainer `byok-*` volumes at the next container rebuild (renaming orphans the old ones) — old_gripes, humans_gripes, whiteboard_gripes
 - G488 Review the three post-review changes no reviewer saw: #102's component check and trimmed message, #103's per-method `beforeNextCall` queue, #104's regex rewrite — humans_gripes
-- G489 The `vault_locked` message, the unlock doc and notes/security.md still say "a new passphrase" where any unlock change applies (status unclear: not re-checked) — prs_80_main
-- G490 The core README's screen-lock recipe's `.catch` also swallows a failed `eraseUnlock` — prs_60_80
+- G489 The `vault_locked` message, the unlock doc and notes/security.md still say "a new passphrase" where any change to the wayins applies (status unclear: not re-checked) — prs_80_main
+- G490 The core README's screen-lock recipe's `.catch` also swallows a failed `eraseLease` — prs_60_80
 
 ## Deferred by the Coach
 
 - G336 `safebyok-vue`: a `shallowRef` plus `onScopeDispose` binding, so Nuxt hosts get a store — side quest, "not needed yet" — old_gripes, todo_gripes
-- G492 Recovery keys: a second high-entropy envelope, waiting on the host's UX (show once, warn, use flow) — NOT YET — todo_gripes, old_gripes
+- G492 Recovery keys: a second high-entropy wayin, waiting on the host's UX (show once, warn, use flow) — NOT YET — todo_gripes, old_gripes
 - G493 A PBKDF2 key deriver (native, fast, not memory-hard), its own package with the iteration count in the label — NOT YET — todo_gripes, old_gripes
 - G494 A key pair per way in (HPKE) so rotation does not sign every other device out — NOT YET, Coach moved it to TODO — todo_gripes, bigfeats_doc, whiteboard_gripes
 - G495 Lock out a lost device (every way in it added; device list, UX) and decide what may be retained to name a device under Apple/Google privacy rules — NOTYET, data stored meanwhile — todo_gripes, bigfeats_doc, prs_80_main, whiteboard_gripes
-- G496 A superseded bundle kept in Convex backups still opens the unrotated vaultKey with the old passphrase — NOTYET — old_gripes
+- G496 A superseded vault props kept in Convex backups still opens the unrotated vaultKey with the old passphrase — NOTYET — old_gripes
 - G497 Accept Standard Schema (`@standard-schema/spec`) for host validators in place of a Zod type — later, per the Coach — gripes_1_doc, humans_gripes, prs_80_main, whiteboard_gripes
-- G498 Close the `store()`-over-a-damaged-box race (and the store-then-erase gap) with a revision-checked erase in the VaultDB contract — Coach: "TODO it", at the contract tightening party once every adapter shares the battery — gripes_1_doc, todo_gripes, prs_80_main, humans_gripes, whiteboard_gripes
+- G498 Close the `storeBox()`-over-a-damaged-box race (and the store-then-erase gap) with a revision-checked erase in the VaultDB contract — Coach: "TODO it", at the contract tightening party once every adapter shares the battery — gripes_1_doc, todo_gripes, prs_80_main, humans_gripes, whiteboard_gripes
 - G499 A pluggable conflict handler for the weird cases (a lockbox too damaged to know its epoch vs a healthy store) — NOT YET — todo_gripes
 - G500 An opt-in `lockWhenHidden` prop on safebyok-react (and its naming clash with the README recipe) — ruled "not yet" (TODO side quest) — old_gripes, whiteboard_gripes
 - G501 `maskCarefully`: keep one or two combining marks per base character and drop orphaned marks at a cut edge — NOT YET — todo_gripes, whiteboard_gripes
 - G502 A generator to keep the eslint configs cut from the core's in step — RAGEBAIT, until drift causes an uncaught bug — old_gripes, todo_gripes, humans_gripes
 - G503 Hold comments to 100 columns (#81): redo the reflow from its recipe, decide trailing comments, `@ts-expect-error` lines, Markdown tables, STYLE's "two more spaces" — Coach: leave until 1.0.0-pre — gripes_1_doc, old_gripes, prs_open, prs_60_80, humans_gripes, whiteboard_gripes
-- G504 Take `p-retry` or `exponential-backoff` if `store()`'s retry ever grows — RAGEBAIT — todo_gripes
+- G504 Take `p-retry` or `exponential-backoff` if `storeBox()`'s retry ever grows — RAGEBAIT — todo_gripes
 - G505 React Native: a WebCrypto shim, a keychain DeviceDB, a native Argon2 binding, no IndexedDB/BroadcastChannel/TextDecoder paths — NOT YET — todo_gripes, old_gripes
 - G506 Delete the leftover worktree directories and `git worktree prune` (look first at byok-strict_configs and byok-passkey_unlock, which hold unpushed work) — Coach: the Coach will, when things settle down — gripes_1_doc, bigfeats_doc, humans_gripes, prs_80_main, old_gripes, whiteboard_gripes
 - G507 A REST vault store over `fetch` with a Next.js demo, and a blob helper for secrets too large to be a whisper — side quests, "not needed yet" — old_gripes, todo_gripes

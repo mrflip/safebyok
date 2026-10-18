@@ -2346,7 +2346,7 @@ const makeVaultOptsShape = Z.strictObject({
   passphraseStrengthTest: anyOpt,
 } satisfies Record<keyof MakeVaultOpts, typeof anyOpt>)
 
-/** Each option Vault.make once took under another name, and the name it takes now (VOCABULARY.md, *Old names*). */
+/** Each option Vault.make once took under another name, and the name it takes now (notes/old_vocabulary.md). */
 const RenamedMakeVaultOpts: ReadonlyMap<string, keyof MakeVaultOpts> = new Map([
   ['forcePassphraseReentryHours', 'leaseHours'],
 ])

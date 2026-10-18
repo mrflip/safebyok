@@ -119,6 +119,8 @@ pnpm changeset                     # a PR's release note; `--empty` when it need
 * `notes/` -- durable notes. Each decision a security reviewer should see goes into
   `notes/security.md` through a `sonnet` subagent (the file's header says how); don't read it
   yourself. `notes/wontfix.md`: behaviour left undefined on purpose.
+  `notes/old_vocabulary.md`: the names the Oct 2026 reform retired, to read older code and records by;
+  nothing current uses them.
 
 ## Reading
 
