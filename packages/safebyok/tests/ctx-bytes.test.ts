@@ -15,8 +15,9 @@ import * as TH from './test-helpers'
 // A builder inside openVault, or the wayin's own, cannot be called from a test, so each is pinned
 // through the narrowest path that reaches it: the ciphertext it made unwraps or deciphers under a
 // hand-written literal of the bytes expected, and under no other. The literal is the UTF-8 text of
-// the ctx's JSON; the values a vault draws afresh (vault_id, revision_id, salt) are interpolated
-// from the record that carries them.
+// the ctx's JSON; the values a vault draws afresh or stamps from its clock (vault_id, revision_id,
+// a salt or credential, a time, the unlock epoch) are interpolated from the record that carries
+// them, so the literal pins the ctx's shape and order, not those values.
 
 const textBytes = (text: string) => new TextEncoder().encode(text)
 
