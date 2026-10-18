@@ -60,7 +60,7 @@
     "eslint-plugin-unicorn": "^77.0.0",
     "fake-indexeddb": "^6.2.5",
     "publint": "^0.3.25",
-    "tsdown": "^0.23.0",
+    "tsdown": "^0.23.1",
     "typescript": "6.0.3",
     "typescript-eslint": "^8.71.1",
     "vitest": "^5.0.3",
