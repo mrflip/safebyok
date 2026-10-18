@@ -1,6 +1,6 @@
 # Thread 14: people_words (2026-10-18)
 
-Branch `20261018-people_words`, PR #TBD, stacked on #170. Justify: green (core 2161 passed, 35
+Branch `20261018-people_words`, PR #173, stacked on #170. Justify: green (core 2161 passed, 35
 skipped; react 229; demo 191, 16 skipped; every package green, no size line moved).
 
 A follow-up carrying the Coach's rulings on three matters from thread 11's review.
@@ -59,3 +59,10 @@ A follow-up carrying the Coach's rulings on three matters from thread 11's revie
   note): `revokeLease` → `hardRevokeLease`; `revokeUnreadableLease` → `discardUnreadableLease`;
   warning "…so it was revoked" → "…so it was discarded"; a lease past a lowered `leaseHours` is
   "discarded", not "revoked"; "the lease running out" → "the lease expiring".
+
+## Open questions (also in the PR)
+
+* **Demo account deletion**: "Delete account" keeps *delete* for the account; its confirm now
+  says "remove its vault". Recommend keeping it that way.
+* **`lockedMeanwhile`'s message** says "A lock on this device revoked…", though only a hard lock
+  causes it. Recommend leaving it: `lock()` is what a developer knows as a lock.
