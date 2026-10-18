@@ -13,7 +13,9 @@ fastkey 49; demo 191 | 16; e2e 81 | 89.
   `wrong_passphrase` its cause. The vault settles `locked` on the standing props. A passphrase
   that opens the standing vault unlocks as before. README's conditions table has the row;
   `Vault.unlock`'s doc has a paragraph and a third example. React `PassphraseModal` renders it in
-  the `quiet` class (advice) rather than `gripe`, in the same live region; the dialog stays open.
+  the `quiet` class (advice) rather than `gripe`, in the same live region; the dialog stays open,
+  the passphrase field is emptied and focused, and the advice stays through typing until the next
+  submit (as a passkey's gripe does), which replaces it with its own outcome.
   Changeset `minor`, `safebyok` and `safebyok-react`.
 * **Decisions taken**:
   * **The catch-up is a full `refresh()`**, not just the props already taken up: the snapshot then
@@ -25,6 +27,7 @@ fastkey 49; demo 191 | 16; e2e 81 | 89.
   * **Message**: "A vault was just created for this label on another device, with a different
     passphrase than the one you entered. Nothing was created on this device. Enter the passphrase
     you chose there to unlock it."
+  * **The field is emptied** (the field stays mounted; its value is set to '' and focused) because the passphrase typed was just shown not to open the vault, and the advice is kept through typing so that clearing the field does not wipe the one line saying what to type (the review's finding). The placeholder is the same while unlocking; `autocomplete` follows the snapshot to `current-password`.
   * **The modal's advice is `quiet` styling** on the same `<p>` in the same `role="alert"` region
     (`Gripe.asAdvice`), since the host's stylesheet already styles `quiet` and `gripe`.
   * **No `notes/security.md` entry**: telling the two apart says only that a vault with another id
@@ -36,6 +39,3 @@ fastkey 49; demo 191 | 16; e2e 81 | 89.
   case ("A creates, then B's first unlock with P2") is therefore the race too; the tests drive it
   with `TH.beforeNextCall(vaultDB, 'fetchOrCreateVaultProps', ...)` over a bell-deaf vaultDB for B.
   The helper `raceLostToPwOne` is module-level in `vault.test.ts` for the linter.
-* **For the Coach**: the modal shows the advice in the unchanged dialog; after the refusal the
-  vault is `locked`, so a real vault turns the dialog from "Choose" into "Unlock" beneath the
-  advice (unchecked in a real browser; only the stub-vault tests ran). Say if the typed field should clear.

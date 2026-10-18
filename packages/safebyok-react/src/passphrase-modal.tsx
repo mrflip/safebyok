@@ -68,7 +68,8 @@ const unlockedFor = (leaseMillis: number, creating: boolean): string => {
  * region a screen reader announces, and the user may try again or cancel. A first unlock that
  * lost the race to create the vault to another device (`created_elsewhere`) is shown as advice,
  * in the `quiet` style rather than the `gripe` one -- it is no typo -- and the dialog, now an
- * unlock of that vault, stays open for the passphrase chosen there. Anything else --
+ * unlock of that vault, stays open: the field is emptied and focused for the passphrase chosen
+ * there, and the advice stays, through typing, until the next submit. Anything else --
  * misuse, such as a closed vault handle, or a failure that is no VaultError -- never reaches the
  * host's page: the dialog shows a calm notice in its place, "Something went wrong", whose Close
  * (or Escape) calls `onDone(false)`, and React reports the error through the root's
@@ -178,7 +179,9 @@ const DialogTrouble = ({ onDone }: { onDone: (unlocked: boolean) => void }) => {
  * What the dialog says to the user, whether it is about the passkey, and whether it is advice
  * rather than a complaint: a word about the typed passphrase goes once the user types again;
  * one about the passkey stays until the next submit, or the next press of the passkey. Advice
- * (a vault created on another device meanwhile) shows in the `quiet` style, not the `gripe` one.
+ * (a vault created on another device meanwhile) shows in the `quiet` style, not the `gripe` one,
+ * and stays until the next submit as the passkey's does: the user's first move is to clear the
+ * field, and the advice is what tells them what to type instead.
  */
 type Gripe = { text: string, fromPasskey: boolean, asAdvice: boolean }
 
@@ -307,7 +310,15 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
 
   /** A refusal the user meets: a condition shown in place, misuse rethrown in render, for PassphraseModal's boundary. */
   const meet = (err: unknown) => {
-    if (isVaultCondition(err)) { setGripe({ text: err.message, fromPasskey: false, asAdvice: err.kind === 'created_elsewhere' }); return }
+    if (isVaultError(err, 'created_elsewhere')) {
+      // The passphrase typed has just been shown not to open the vault: the field is emptied for
+      // the one chosen on the other device, and the advice stays until the next submit.
+      setGripe({ text: err.message, fromPasskey: false, asAdvice: true })
+      if (fieldRef.current !== null) { fieldRef.current.value = '' }
+      fieldRef.current?.focus()
+      return
+    }
+    if (isVaultCondition(err)) { setGripe({ text: err.message, fromPasskey: false, asAdvice: false }); return }
     // Thrown from an event handler, it would miss every boundary.
     setFailure({ err })
   }
@@ -347,7 +358,7 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
 
   /** Each change to the field: a word about what was typed before goes, and, while choosing, the host's advice is asked anew. */
   const hearPassphrase = (typed: string) => {
-    setGripe((prev) => (prev?.fromPasskey === true ? prev : null))
+    setGripe((prev) => (prev?.fromPasskey === true || prev?.asAdvice === true ? prev : null))
     if (creating) { void advice.hear(typed) }
   }
 

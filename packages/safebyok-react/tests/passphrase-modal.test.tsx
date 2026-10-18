@@ -143,7 +143,7 @@ describe("PassphraseModal", () => {
       expect(screen.queryByText(/didn't unlock|did not open/)).to.be.null
     })
 
-    it("stays in the dialog for another try, not reporting done, and clears the advice once the user types again", async () => {
+    it("stays in the dialog for another try, not reporting done", async () => {
       const heard: boolean[] = []
       render(<PassphraseModal vault={createdElsewhere()} onDone={(unlocked) => { heard.push(unlocked) }} />)
       fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw one' } })
@@ -151,14 +151,42 @@ describe("PassphraseModal", () => {
       await waitFor(() => { expect(screen.queryByText(Advice)).to.not.be.null })
       expect(heard).to.deep.equal([])
       expect(screen.getByRole('dialog')).to.not.be.null
+    })
+
+    it("empties the passphrase field and focuses it, for the passphrase chosen on the other device", async () => {
+      render(<PassphraseModal vault={createdElsewhere()} onDone={noop} />)
+      const field = screen.getByPlaceholderText<HTMLInputElement>('vault passphrase')
+      fireEvent.change(field, { target: { value: 'pw one' } })
+      screen.getByText('Cancel').focus()
+      fireEvent.click(screen.getByText('Create vault'))
+      await waitFor(() => { expect(screen.queryByText(Advice)).to.not.be.null })
+      expect(screen.getByPlaceholderText('vault passphrase')).to.equal(field)
+      expect(field.value).to.eq('')
+      expect(document.activeElement).to.equal(field)
+    })
+
+    it("keeps the advice through typing, and clears it at the next submit, replaced by that submit's outcome", async () => {
+      const outcomes = [new VaultError('created_elsewhere', Advice), new VaultError('wrong_passphrase', 'That passphrase did not open the vault.')]
+      let tries = 0
+      const vault = TH.stubVault({ state: 'absent', unlock: () => Promise.reject(outcomes[tries++] ?? new Error('no more outcomes')) })
+      render(<PassphraseModal vault={vault} onDone={noop} />)
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw one' } })
+      fireEvent.click(screen.getByText('Create vault'))
+      await waitFor(() => { expect(screen.queryByText(Advice)).to.not.be.null })
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw t' } })
       fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw two' } })
-      expect(screen.queryByText(Advice)).to.be.null
+      expect(screen.queryByText(Advice)).to.not.be.null
+      fireEvent.click(screen.getByText('Create vault'))
+      expect(screen.getByRole('alert').textContent).to.eq('')
+      await waitFor(() => { expect(screen.getByRole('alert').textContent).to.eq('That passphrase did not open the vault.') })
     })
 
     it("shows a wrong passphrase as a gripe still", async () => {
       render(<PassphraseModal vault={TH.wrong()} onDone={noop} />)
       TH.submitPassphrase('pw wrong')
       await waitFor(() => { expect(screen.getByText('That passphrase did not open the vault.').className).to.eq('gripe') })
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw again' } })
+      expect(screen.queryByText('That passphrase did not open the vault.')).to.be.null
     })
   })
 
