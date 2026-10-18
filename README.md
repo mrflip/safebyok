@@ -26,3 +26,26 @@ This repository is a pnpm workspace. Its packages:
 
 `pnpm install`, then `pnpm justify` lints, typechecks, tests and builds every package.
 [CONTRIBUTING.md](CONTRIBUTING.md) has the rest.
+
+## Basic e2ee architecture:
+
+### Backend (VaultDB)
+
+Facade over a backing store (convex, postgres, etc) or another vaultDB (graphQL, etc).
+Holds vault​s and lockbox​es scoped by app, user_id, vaultlabel and boxlabel.
+* A lockbox holds a public​ bag under the app's control and an encrypted whisper​
+* verbs: vault: fetchOrCreate, update, retire, subscribe, listLockboxes; lockbox: fetchOrCreate, update, retire.
+
+### Browser
+
+* a vault​ object
+  - Vault.make({ app, user_id, vaultlabel, requestPasskeyFunc, ... })​: Vault, non-async
+  - vault.hello (initial bookkeeping that doesn't bother the user)
+  - lock​, unlock​, changePassword​, view(boxlabel)​, store(boxlabel, whisper, { public? })​, retire(boxlabel)
+* a pantry​ holding keys
+* a DeviceDB​ safely holding and managing access to the lockboxes (indexedDB)
+* a pluggable KDF (Argon2id wasm/native)
+
+assume initially that the app provides and guarantees the user_id, and that the vaultDB can access all and only the records needed to support this.
+the app interface is to call  non-async At the app level, whisper is anything JSONable.
+for concreteness of discussion, assume a postgres backing store,d
