@@ -3,7 +3,7 @@ import type { Lockbox, VaultBundle } from 'safebyok'
 /**
  * How one field is stored: `text` as given, `bigint` for a whole number (a time, an epoch), and
  * `jsonb` for an opaque structured value -- a Ciphered, a bundle's prior vaultKey, or its list of
- * wayins -- whose binding safebyok rebuilds from field values, so jsonb's reordering of
+ * wayins -- whose ctx safebyok rebuilds from field values, so jsonb's reordering of
  * keys is harmless. A lockbox's `public_json` is `text`: its exact text is what is bound.
  */
 export type ColumnKind = 'text' | 'bigint' | 'jsonb'

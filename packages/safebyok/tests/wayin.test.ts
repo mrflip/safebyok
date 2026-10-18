@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { cipherBinding, deriveWrappingKey, makeLockboxKey, makeVaultKey, toB64, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
+import { cipherCtx, deriveWrappingKey, makeLockboxKey, makeVaultKey, toB64, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
 import * as Wayin from '../src/wayin'
 import { VaultError } from '../src/errors'
 import type { KeyDeriver } from '../src/key-deriver'
@@ -321,7 +321,7 @@ describe("Wayin.openWithPassphrase", () => {
   })
 })
 
-/** Each of a wayin's public fields altered: every one is in its wrap's binding. */
+/** Each of a wayin's public fields altered: every one is in its wrap's ctx. */
 const TamperCases: readonly (readonly [Partial<PassphraseWayin>, string])[] = [
   [{ wayin_id: 'wayin-elsewhere' },              'its wayin_id swapped'],
   [{ wayinlabel: 'relabelled' },                 'its wayinlabel swapped'],
@@ -330,7 +330,7 @@ const TamperCases: readonly (readonly [Partial<PassphraseWayin>, string])[] = [
   [{ registered_at: Date.UTC(2026, 9, 1) },      'its registered_at moved'],
 ]
 
-describe("a wayin's binding", () => {
+describe("a wayin's ctx", () => {
   for (const [altered, blurb] of TamperCases) {
     it(`refuses to open with ${blurb}`, async () => {
       const vaultKey = await makeVaultKey()
@@ -482,7 +482,7 @@ const PasskeyTamperCases = [
   [{ registered_at: Date.UTC(2026, 9, 1) }, 'its registered_at moved'],
 ] as const
 
-describe("a passkey wayin's binding", () => {
+describe("a passkey wayin's ctx", () => {
   for (const [altered, blurb] of PasskeyTamperCases) {
     it(`refuses to open with ${blurb}`, async () => {
       const laptop = await TH.passkeyOf('laptop')
@@ -515,28 +515,28 @@ describe("a passkey wayin's binding", () => {
   })
 })
 
-/** Unwrap `wayin` under the key HKDF makes of `prfBytes` with `info`, its wrap bound to `binding`. */
-const unwrapsUnder = async (wayin: PasskeyWayin, prfBytes: Uint8Array, info: Uint8Array, binding: Uint8Array) => {
+/** Unwrap `wayin` under the key HKDF makes of `prfBytes` with `info`, its wrap bound to `ctx`. */
+const unwrapsUnder = async (wayin: PasskeyWayin, prfBytes: Uint8Array, info: Uint8Array, ctx: Uint8Array) => {
   const passkeyKey = await deriveWrappingKey(prfBytes, info)
-  return await unwrapKeyUnder(passkeyKey, wayin.vault_key_wayin_wrapped, binding, { extractable: false, usage: ['wrapKey'] })
+  return await unwrapKeyUnder(passkeyKey, wayin.vault_key_wayin_wrapped, ctx, { extractable: false, usage: ['wrapKey'] })
 }
 
 describe("a passkey wayin's key", () => {
-  it("is HKDF over the answer with the wrap's whole binding as its info: scope, vault_id, registered_at, purpose and header", async () => {
+  it("is HKDF over the answer with the wrap's whole ctx as its info: scope, vault_id, registered_at, purpose and header", async () => {
     const laptop = await TH.passkeyOf('laptop')
     const wayin = await sealedPasskey(laptop, 'laptop', await makeVaultKey())
     const { vault_key_wayin_wrapped: _wrapped, ...header } = wayin
-    const binding = cipherBinding('safebyok-vault-v3', 'acme', 'u1', 'main', 'vault-id-u1', identity.registered_at, 'vault_key_passkey_wrapped', header)
-    expect(await unwrapsUnder(wayin, laptop.prfBytes, binding, binding)).to.be.instanceOf(CryptoKey)
+    const ctx = cipherCtx('safebyok-vault-v3', 'acme', 'u1', 'main', 'vault-id-u1', identity.registered_at, 'vault_key_passkey_wrapped', header)
+    expect(await unwrapsUnder(wayin, laptop.prfBytes, ctx, ctx)).to.be.instanceOf(CryptoKey)
   })
 
   it("is not the key an info of the purpose and credential alone makes: the vault is in it", async () => {
     const laptop = await TH.passkeyOf('laptop')
     const wayin = await sealedPasskey(laptop, 'laptop', await makeVaultKey())
     const { vault_key_wayin_wrapped: _wrapped, ...header } = wayin
-    const binding = cipherBinding('safebyok-vault-v3', 'acme', 'u1', 'main', 'vault-id-u1', identity.registered_at, 'vault_key_passkey_wrapped', header)
-    const vaultlessInfo = cipherBinding('safebyok-vault-v3', 'vault_key_passkey_wrapped', laptop.credentialId)
-    await expect(unwrapsUnder(wayin, laptop.prfBytes, vaultlessInfo, binding)).rejects.toThrow()
+    const ctx = cipherCtx('safebyok-vault-v3', 'acme', 'u1', 'main', 'vault-id-u1', identity.registered_at, 'vault_key_passkey_wrapped', header)
+    const vaultlessInfo = cipherCtx('safebyok-vault-v3', 'vault_key_passkey_wrapped', laptop.credentialId)
+    await expect(unwrapsUnder(wayin, laptop.prfBytes, vaultlessInfo, ctx)).rejects.toThrow()
   })
 })
 

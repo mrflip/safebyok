@@ -1,4 +1,4 @@
-import { cipherBinding, deriveWrappingKey, fromB64, importWrappingKeyBytes, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder, type Ciphered } from './crypto'
+import { cipherCtx, deriveWrappingKey, fromB64, importWrappingKeyBytes, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder, type Ciphered } from './crypto'
 import { VaultError } from './errors'
 import type { KeyDeriver } from './key-deriver'
 import { PassphraseKeyBytes } from './key-deriver-spec'
@@ -48,10 +48,10 @@ export type BundleIdentity = Pick<VaultBundle, 'vault_id' | 'registered_at'>
  */
 export type WayinStamp = Pick<Wayin, 'wayin_id' | 'wayinlabel' | 'vault_key_epoch' | 'device_id' | 'registered_at'>
 
-/** The binding's first part: the bundle's format, under which every wayin's wrap is bound. */
+/** The ctx's first part: the bundle's format, under which every wayin's wrap is bound. */
 const BundleFormat = 'safebyok-vault-v3'
 
-/** The binding purpose of each wayinkind's wrap, so no kind of wayin opens as another. */
+/** The ctx purpose of each wayinkind's wrap, so no kind of wayin opens as another. */
 const PurposeForWayinkind = {
   passphrase: 'vault_key_passphrase_wrapped',
   passkey:    'vault_key_passkey_wrapped',
@@ -67,8 +67,8 @@ const TransientUsage = { extractable: true, usage: ['wrapKey'] } as const
  * The context a wayin's wrap is bound to (and, for a passkey, its key made with): the vault it
  * lets into, and its own public header.
  */
-const binding = (scope: VaultScope, bundle: BundleIdentity, header: WayinHeader): Uint8Array => (
-  cipherBinding(BundleFormat, scope.applabel, scope.user_id, scope.vaultlabel, bundle.vault_id, bundle.registered_at, PurposeForWayinkind[header.wayinkind], header)
+const wayinCtxOf = (scope: VaultScope, bundle: BundleIdentity, header: WayinHeader): Uint8Array => (
+  cipherCtx(BundleFormat, scope.applabel, scope.user_id, scope.vaultlabel, bundle.vault_id, bundle.registered_at, PurposeForWayinkind[header.wayinkind], header)
 )
 
 /** The stamp's own fields, and nothing else of whatever carries them: a wayin sealed anew passes itself. */
@@ -168,12 +168,12 @@ export const sealFirstPassphrase = async (
   stamp: WayinStamp,
   vaultKey: CryptoKey,
 ): Promise<{ wayin: PassphraseWayin, sessionKey: CryptoKey }> => {
-  const { wayin, wayinKey, envelopeBinding } = await wrapUnderPassphrase(keyDeriver, passphrase, scope, bundle, stamp, vaultKey)
-  const sessionKey = await unwrapKeyUnder(wayinKey, wayin.vault_key_wayin_wrapped, envelopeBinding, SessionUsage)
+  const { wayin, wayinKey, wayinCtx } = await wrapUnderPassphrase(keyDeriver, passphrase, scope, bundle, stamp, vaultKey)
+  const sessionKey = await unwrapKeyUnder(wayinKey, wayin.vault_key_wayin_wrapped, wayinCtx, SessionUsage)
   return { wayin, sessionKey }
 }
 
-/** The wayin around `vaultKey` under `passphrase`'s key, with that key and the binding it was wrapped to. */
+/** The wayin around `vaultKey` under `passphrase`'s key, with that key and the ctx it was wrapped to. */
 const wrapUnderPassphrase = async (
   keyDeriver: KeyDeriver,
   passphrase: string,
@@ -190,10 +190,10 @@ const wrapUnderPassphrase = async (
     salt_b64:          toB64(saltBytes),
   } as const
   const wayinKey = await passphraseKeyOf(keyDeriver, passphrase, saltBytes)
-  const envelopeBinding = binding(scope, bundle, header)
-  const wrapped = await wrapKeyUnder(wayinKey, vaultKey, envelopeBinding)
+  const wayinCtx = wayinCtxOf(scope, bundle, header)
+  const wrapped = await wrapKeyUnder(wayinKey, vaultKey, wayinCtx)
   const wayin: PassphraseWayin = { ...header, vault_key_wayin_wrapped: wrapped }
-  return { wayin, wayinKey, envelopeBinding }
+  return { wayin, wayinKey, wayinCtx }
 }
 
 /**
@@ -289,14 +289,14 @@ const tryPassphrase = async (
   wayin: PassphraseWayin,
 ): Promise<VaultKeyPair | null> => {
   const wayinKey = await passphraseKeyOf(keyDeriver, passphrase, fromB64(wayin.salt_b64))
-  return await tryUnwrap(wayinKey, binding(scope, bundle, headerOf(wayin)), wayin.vault_key_wayin_wrapped)
+  return await tryUnwrap(wayinKey, wayinCtxOf(scope, bundle, headerOf(wayin)), wayin.vault_key_wayin_wrapped)
 }
 
 /** Both lives of the vaultKey out of `wrapped` under `wayinKey`, or null when it will not open. */
-const tryUnwrap = async (wayinKey: CryptoKey, envelopeBinding: Uint8Array, wrapped: Ciphered): Promise<VaultKeyPair | null> => {
+const tryUnwrap = async (wayinKey: CryptoKey, wayinCtx: Uint8Array, wrapped: Ciphered): Promise<VaultKeyPair | null> => {
   try {
-    const transientKey = await unwrapKeyUnder(wayinKey, wrapped, envelopeBinding, TransientUsage)
-    const sessionKey = await unwrapKeyUnder(wayinKey, wrapped, envelopeBinding, SessionUsage)
+    const transientKey = await unwrapKeyUnder(wayinKey, wrapped, wayinCtx, TransientUsage)
+    const sessionKey = await unwrapKeyUnder(wayinKey, wrapped, wayinCtx, SessionUsage)
     return { transientKey, sessionKey }
   } catch {
     return null
@@ -335,12 +335,12 @@ export const open = async (
 
 /**
  * The passkeyKey a passkey's PRF answer makes: HKDF-SHA256 over the answer, its `info` the
- * wayin's whole binding -- the vault, the purpose, and every public field of the wayin,
+ * wayin's whole ctx -- the vault, the purpose, and every public field of the wayin,
  * the credential among them -- so the same answer put to any other use, or in any other vault,
  * makes another key.
  */
-const passkeyKeyOf = async (prfBytes: Uint8Array, envelopeBinding: Uint8Array): Promise<CryptoKey> => (
-  await deriveWrappingKey(prfBytes, envelopeBinding)
+const passkeyKeyOf = async (prfBytes: Uint8Array, wayinCtx: Uint8Array): Promise<CryptoKey> => (
+  await deriveWrappingKey(prfBytes, wayinCtx)
 )
 
 /**
@@ -367,9 +367,9 @@ export const sealPasskey = async (
     credential_id: passkey.credentialId,
     prf_salt_b64:  passkey.prfSaltB64,
   } as const
-  const envelopeBinding = binding(scope, bundle, header)
-  const wayinKey = await passkeyKeyOf(passkey.prfBytes, envelopeBinding)
-  const wrapped = await wrapKeyUnder(wayinKey, vaultKey, envelopeBinding)
+  const wayinCtx = wayinCtxOf(scope, bundle, header)
+  const wayinKey = await passkeyKeyOf(passkey.prfBytes, wayinCtx)
+  const wrapped = await wrapKeyUnder(wayinKey, vaultKey, wayinCtx)
   return { ...header, vault_key_wayin_wrapped: wrapped }
 }
 
@@ -410,9 +410,9 @@ export const openWithPasskey = async (
   if (wayin.prf_salt_b64 !== passkey.prfSaltB64) {
     throw new VaultError('wrong_passkey', "The passkey answered for a different salt than this vault keeps for it: ask it again with the prf_salt_b64 the snapshot's wayins list.")
   }
-  const envelopeBinding = binding(scope, bundle, headerOf(wayin))
-  const wayinKey = await passkeyKeyOf(passkey.prfBytes, envelopeBinding)
-  const opened = await tryUnwrap(wayinKey, envelopeBinding, wayin.vault_key_wayin_wrapped)
+  const wayinCtx = wayinCtxOf(scope, bundle, headerOf(wayin))
+  const wayinKey = await passkeyKeyOf(passkey.prfBytes, wayinCtx)
+  const opened = await tryUnwrap(wayinKey, wayinCtx, wayin.vault_key_wayin_wrapped)
   if (opened === null) {
     throw new VaultError('wrong_passkey', "That passkey answered, but its answer didn't unlock the vault: its stored way in may be damaged. Unlock with a passphrase; if that works, remove this passkey and add it again.")
   }

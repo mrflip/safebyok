@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cipherBinding, decipherBytes, deriveWrappingKey, fromB64, importWrappingKeyBytes, makeVaultKey, unwrapKeyUnder } from '../src/crypto'
+import { cipherCtx, decipherBytes, deriveWrappingKey, fromB64, importWrappingKeyBytes, makeVaultKey, unwrapKeyUnder } from '../src/crypto'
 import { memoryDeviceDB } from '../src/device-db'
 import { memoryStore } from '../src/string-store'
 import { localVaultDB } from '../src/vault-db'
@@ -27,8 +27,8 @@ const stamp = (wayinlabel: string): Wayin.WayinStamp => (
 )
 
 describe("the ctx builders' output, byte for byte", () => {
-  it("cipherBinding's encoding of strings, numbers and a record with its keys sorted is pinned byte for byte", () => {
-    const ctx = cipherBinding('safebyok-lockbox-v4', 'acme', 'u1', 'main', 'vid', 1, 'whisper_ciphered', { written_at: 2, boxlabel: 'anthropic', revision_id: 'r1' })
+  it("cipherCtx's encoding of strings, numbers and a record with its keys sorted is pinned byte for byte", () => {
+    const ctx = cipherCtx('safebyok-lockbox-v4', 'acme', 'u1', 'main', 'vid', 1, 'whisper_ciphered', { written_at: 2, boxlabel: 'anthropic', revision_id: 'r1' })
     expect(new TextDecoder().decode(ctx)).to.eq('["safebyok-lockbox-v4","acme","u1","main","vid",1,"whisper_ciphered",{"boxlabel":"anthropic","revision_id":"r1","written_at":2}]')
     expect(hexOf(ctx)).to.eq('5b227361666562796f6b2d6c6f636b626f782d7634222c2261636d65222c227531222c226d61696e222c22766964222c312c22776869737065725f6369706865726564222c7b22626f786c6162656c223a22616e7468726f706963222c227265766973696f6e5f6964223a227231222c227772697474656e5f6174223a327d5d')
   })

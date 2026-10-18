@@ -9,7 +9,7 @@ import { VaultError, isVaultError, type VaultErrorKind } from './errors'
 import type { KeyDeriver } from './key-deriver'
 import { MaxSaltBytes, TestDeriverNotice, TestLabelPrefix, ensureSuppliedSpecKept, parseKeyDeriverSpec, type KeyDeriverSpec } from './key-deriver-spec'
 import {
-  cipherBinding, cipherBytes, decipherBytes,
+  cipherCtx, cipherBytes, decipherBytes,
   makeLocalUnlockKey, makeLockboxKey, makeVaultKey, randomId, wrapKeyUnder, unwrapKeyUnder,
 } from './crypto'
 import * as Wayin from './wayin'
@@ -663,17 +663,17 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
     listeners.forEach((listener) => { listener() })
   }
 
-  // The context each encryption is bound to; see VOCABULARY.md on cipherAdditionalData. A
-  // wayin's binding is the Wayin module's. The remembered device unlock's binds every field of
+  // The context each encryption is bound to; see VOCABULARY.md on ctx. A
+  // wayin's ctx is the Wayin module's. The remembered device unlock's is bound to every field of
   // its record but the key and the wrap, the scope, vault and epoch as this vault expects them.
-  const localBinding = (vaultId: string, epoch: number, deadline: number) => (
-    cipherBinding('safebyok-unlock-v1', applabel, scope.user_id, vaultlabel, vaultId, epoch, deadline, 'vault_key_local_wrapped')
+  const leaseCtx = (vaultId: string, epoch: number, deadline: number) => (
+    cipherCtx('safebyok-unlock-v1', applabel, scope.user_id, vaultlabel, vaultId, epoch, deadline, 'vault_key_local_wrapped')
   )
-  // A lockbox's binds its format, the vault it lies in, and its record's whole public header:
+  // A lockbox's ctx binds its format, the vault it lies in, and its record's whole public header:
   // every field but the format, which leads, and the two encrypted ones, so a bag, a time, its
   // codec or its vaultKey's epoch altered in storage refuses to open.
-  const boxBinding = (vaultId: string, header: LockboxHeader, purpose: 'lockbox_key_wrapped' | 'whisper_ciphered') => (
-    cipherBinding(LockboxFormat, applabel, scope.user_id, vaultlabel, vaultId, purpose, header)
+  const boxCtx = (vaultId: string, header: LockboxHeader, purpose: 'lockbox_key_wrapped' | 'whisper_ciphered') => (
+    cipherCtx(LockboxFormat, applabel, scope.user_id, vaultlabel, vaultId, purpose, header)
   )
 
   /**
@@ -1217,7 +1217,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
    */
   const rememberDevice = async (unlockedKey: CryptoKey, standing: VaultBundle, until: number, lockGeneration: number) => {
     const localUnlockKey = await makeLocalUnlockKey()
-    const wrapped = await wrapKeyUnder(localUnlockKey, unlockedKey, localBinding(standing.vault_id, standing.unlock_epoch, until))
+    const wrapped = await wrapKeyUnder(localUnlockKey, unlockedKey, leaseCtx(standing.vault_id, standing.unlock_epoch, until))
     await deviceDB.writeUnlock({
       format:                  'safebyok-unlock-v1',
       ...scope,
@@ -1267,7 +1267,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       const unwrapped = await unwrapKeyUnder(
         remembered.local_unlock_key,
         remembered.vault_key_local_wrapped,
-        localBinding(bundle.vault_id, bundle.unlock_epoch, remembered.ask_passphrase_at),
+        leaseCtx(bundle.vault_id, bundle.unlock_epoch, remembered.ask_passphrase_at),
         { extractable: false, usage: ['wrapKey', 'unwrapKey'] },
       )
       // A shut meanwhile -- a storage refusal saying the user signed out -- wins over the record.
@@ -1450,10 +1450,10 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       const lockboxKey = await unwrapKeyUnder(
         unwrappingKey,
         lockboxKeyWrapped,
-        boxBinding(vaultId, header, 'lockbox_key_wrapped'),
+        boxCtx(vaultId, header, 'lockbox_key_wrapped'),
         { extractable: false, usage: ['decrypt'] },
       )
-      whisperBytes = await decipherBytes(lockboxKey, whisperCiphered, boxBinding(vaultId, header, 'whisper_ciphered'))
+      whisperBytes = await decipherBytes(lockboxKey, whisperCiphered, boxCtx(vaultId, header, 'whisper_ciphered'))
     } catch {
       throw new VaultError('damaged_lockbox', "That lockbox is damaged: it would not open under this vault's key, as if altered in storage or moved there from somewhere else. It was left as it is; erase it, or store its whisper again over it.")
     }
@@ -1700,8 +1700,8 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       const lockbox: Lockbox = {
         format:              LockboxFormat,
         ...header,
-        lockbox_key_wrapped: await wrapKeyUnder(unlockedKey, lockboxKey, boxBinding(vaultId, header, 'lockbox_key_wrapped')),
-        whisper_ciphered:    await cipherBytes(lockboxKey, whisperBytes, boxBinding(vaultId, header, 'whisper_ciphered')),
+        lockbox_key_wrapped: await wrapKeyUnder(unlockedKey, lockboxKey, boxCtx(vaultId, header, 'lockbox_key_wrapped')),
+        whisper_ciphered:    await cipherBytes(lockboxKey, whisperBytes, boxCtx(vaultId, header, 'whisper_ciphered')),
       }
       await writeOver(lockbox, expected, clearsFirst)
       await refresh()
@@ -2037,7 +2037,7 @@ const FirstWayinlabel = 'passphrase'
 /** The `vault_key_epoch` of a vault's first vaultKey, the one it is created with. */
 const FirstVaultKeyEpoch = 1
 
-/** The lockbox's format, as each record carries it and each of its bindings begins. */
+/** The lockbox's format, as each record carries it and each of its ctxs begins. */
 const LockboxFormat = 'safebyok-lockbox-v4'
 
 /**
@@ -2049,7 +2049,7 @@ const LockboxFormat = 'safebyok-lockbox-v4'
 const CatchUpPassesThrough = ['identity_revoked', 'rolled_back', 'newer_format'] as const satisfies readonly VaultErrorKind[]
 
 /**
- * A lockbox's public header: every field of its record but its format, which leads each binding,
+ * A lockbox's public header: every field of its record but its format, which leads each ctx,
  * and the two encrypted ones. All of it is bound into both.
  */
 type LockboxHeader = Omit<Lockbox, 'format' | 'lockbox_key_wrapped' | 'whisper_ciphered'>

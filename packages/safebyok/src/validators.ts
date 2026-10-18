@@ -25,7 +25,7 @@ const WellFormed = /* @__PURE__ */ Z.refine<string>((text) => ! /\p{Cs}/u.test(t
 /**
  * Text in Unicode's composed form (NFC), so one visible spelling is one name: the same letter
  * composed (`é`) and decomposed (`e` and a combining accent) would otherwise be two names, two
- * rows and two cipher bindings. Refused, never normalized: a name is bound into the ciphertext as
+ * rows and two cipher ctxs. Refused, never normalized: a name is bound into the ciphertext as
  * given.
  */
 const Composed = /* @__PURE__ */ Z.refine<string>((text) => text.normalize('NFC') === text, "Text must be in Unicode's composed form (NFC): normalize it with text.normalize('NFC') before passing it")

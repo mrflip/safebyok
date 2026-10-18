@@ -9,7 +9,7 @@ import { memoryDeviceDB, type DeviceDB } from '../src/device-db'
 import { jsonBytes, localVaultDB, type VaultDB } from '../src/vault-db'
 import { memoryStore } from '../src/string-store'
 import { LockboxFieldsBytes, LockboxFixedBytes, StoredBytesPerWhisperByte, deviceTroubleAsConditions, eraseDamagedVault, openVault, type OpenVaultOpts, type Vault } from '../src/vault'
-import { cipherBinding, cipherBytes, fromB64, makeLockboxKey, makeVaultKey, randomBytes, toB64, wrapKeyUnder } from '../src/crypto'
+import { cipherCtx, cipherBytes, fromB64, makeLockboxKey, makeVaultKey, randomBytes, toB64, wrapKeyUnder } from '../src/crypto'
 import type { CustomKeyDeriver, KeyDeriver } from '../src/key-deriver'
 import { DefaultLogger, setDefaultLogger, type VaultLogger } from '../src/logger'
 import { Argon2idWebV1, MaxSaltBytes, TestDeriverNotice } from '../src/key-deriver-spec'
@@ -487,7 +487,7 @@ describe("the remembered unlock", () => {
       const written = await world.rememberedUnlock()
       if (written === null) { throw new Error('expected a remembered unlock on the device') }
       await world.deviceDB.writeUnlock({ ...written, ask_passphrase_at: written.ask_passphrase_at + shiftMillis }, TH.NoLocks)
-      // Under Infinity no window check refuses it, and an hour either way stays in bounds: only the binding can.
+      // Under Infinity no window check refuses it, and an hour either way stays in bounds: only the ctx can.
       const reopened = await world.open({ forcePassphraseReentryHours: Infinity })
       expect(reopened.getSnapshot().state).to.eq('locked')
       expect(await world.rememberedUnlock()).to.be.null
@@ -1170,7 +1170,7 @@ const declaringLockboxes = (vaultDB: VaultDB, maxLockboxes: unknown): VaultDB =>
  * `bag` as its public bag.
  */
 const heaviestRowOf = async (whisperBytes: number, bag: PublicBag = {}) => {
-  const binding = cipherBinding('a test binding')
+  const ctx = cipherCtx('a test ctx')
   const lockboxKey = await makeLockboxKey()
   return {
     applabel:            'a'.repeat(40),
@@ -1180,8 +1180,8 @@ const heaviestRowOf = async (whisperBytes: number, bag: PublicBag = {}) => {
     boxlabel:               'b'.repeat(40),
     revision_id:            crypto.randomUUID(),
     vault_key_epoch:        Number.MAX_SAFE_INTEGER,
-    lockbox_key_wrapped:    await wrapKeyUnder(await makeVaultKey(), lockboxKey, binding),
-    whisper_ciphered:       await cipherBytes(lockboxKey, randomBytes(whisperBytes), binding),
+    lockbox_key_wrapped:    await wrapKeyUnder(await makeVaultKey(), lockboxKey, ctx),
+    whisper_ciphered:       await cipherBytes(lockboxKey, randomBytes(whisperBytes), ctx),
     whisper_codec:          'json_v1',
     whisper_schema_version: 1,
     public_json:            TH.publicJsonOf(bag),
@@ -1419,7 +1419,7 @@ const AnyScript = {
 /** A scope of names a kibibyte long, which only a host's validators admit: heavier than the default fields' plan. */
 const LongScope = { applabel: 'a'.repeat(1000), vaultlabel: 'v'.repeat(1000) } as const
 
-/** Labels no default check admits: punctuation the ckeys and binding once leaned on, and Hebrew, Arabic and Thai text. */
+/** Labels no default check admits: punctuation the ckeys and ctx once leaned on, and Hebrew, Arabic and Thai text. */
 const ScriptLabels = ['OpenAI: work', String.raw`say "hi", \ [ok]`, 'מפתח API של העבודה', 'مفتاح العمل', 'กุญแจงาน', 'Mixed: English, עברית, العربية, ไทย'] as const
 
 describe("the host's validators", () => {

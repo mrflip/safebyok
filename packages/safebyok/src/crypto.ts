@@ -49,26 +49,27 @@ const AesGcm = { name: 'AES-GCM', length: 256 } as const
 const IvBytes = 12
 
 /**
- * One part of a {@link cipherBinding}: a string or number, or a flat record of them -- the public
- * header of a wayin or a lockbox, say -- encoded with its keys sorted. Every field of a
+ * One part of a {@link cipherCtx} (one string or number, or a flat record of them -- the public
+ * header of a wayin or a lockbox, say) encoded with its keys sorted. Every field of a
  * record is bound: one set to undefined is refused, never dropped as JSON would drop it.
  */
-export type CipherBindingPart = string | number | Readonly<Record<string, string | number>>
+export type CipherCtxPart = string | number | Readonly<Record<string, string | number>>
 
 /**
- * The context an encryption is bound to, as AES-GCM additional data: a deterministic encoding of
- * the given parts (format, app, user, vault, lockbox, revision, purpose -- whatever names the
- * slot). Rebuilt rather than stored; if any part differs at decryption, the ciphertext refuses to
- * open. A part that is undefined or null, or a record part holding a field set to undefined, is
- * refused with kind 'bad_option': each would bind the same as some other binding (a missing part
- * as null; a missing field as no field at all), so nothing is encrypted or opened under it.
+ * The ctx an encryption is bound to, as AES-GCM additional data: the props and metadata the
+ * ciphertext's tag proves unchanged, as a deterministic encoding of the given parts (format, app,
+ * user, vault, lockbox, revision, purpose -- whatever names the slot). Rebuilt rather than
+ * stored; if any part differs at decryption, the ciphertext refuses to open. A part that is
+ * undefined or null, or a record part holding a field set to undefined, is refused with kind
+ * 'bad_option': each would bind the same as some other ctx (a missing part as null; a missing
+ * field as no field at all), so nothing is encrypted or opened under it.
  *
- * @example cipherBinding('safebyok-unlock-v1', 'acme', 'u1', 'main', vaultId, 1, askPassphraseAt, 'vault_key_local_wrapped')
- * @example cipherBinding('safebyok-vault-v3', 'acme', 'u1', 'main', vaultId, registeredAt, 'vault_key_passphrase_wrapped', { wayinkind: 'passphrase', wayin_id, wayinlabel, key_deriver_label, salt_b64 })
+ * @example cipherCtx('safebyok-unlock-v1', 'acme', 'u1', 'main', vaultId, 1, askPassphraseAt, 'vault_key_local_wrapped')
+ * @example cipherCtx('safebyok-vault-v3', 'acme', 'u1', 'main', vaultId, registeredAt, 'vault_key_passphrase_wrapped', { wayinkind: 'passphrase', wayin_id, wayinlabel, key_deriver_label, salt_b64 })
  */
-export const cipherBinding = (...parts: readonly CipherBindingPart[]): Uint8Array => {
+export const cipherCtx = (...parts: readonly CipherCtxPart[]): Uint8Array => {
   if (parts.some((part) => isUnbound(part))) {
-    throw new VaultError('bad_option', "A cipher binding was handed a part, or a field of one, that is undefined or null, which would bind as if it were something else, so nothing was encrypted or opened. This is a bug in the code calling it.")
+    throw new VaultError('bad_option', "A cipher ctx was handed a part, or a field of one, that is undefined or null, which would bind as if it were something else, so nothing was encrypted or opened. This is a bug in the code calling it.")
   }
   return new TextEncoder().encode(stableJsonify(parts))
 }
@@ -77,7 +78,7 @@ export const cipherBinding = (...parts: readonly CipherBindingPart[]): Uint8Arra
  * True when `part` is undefined or null, or a record with a field set to undefined: what its type
  * forbids and a caller may still hand in.
  */
-const isUnbound = (part: CipherBindingPart | null | undefined): boolean => (
+const isUnbound = (part: CipherCtxPart | null | undefined): boolean => (
   part === undefined || part === null
   || (typeof part === 'object' && Object.values(part as Readonly<Record<string, unknown>>).includes(undefined))
 )
@@ -123,7 +124,7 @@ export const importWrappingKeyBytes = (keyBytes: Uint8Array): Promise<CryptoKey>
  * bytes put to another use, or in another place, make another key: the passkeyKey. The bytes stay
  * with the caller; drop them promptly.
  *
- * @example await deriveWrappingKey(prfBytes, cipherBinding('safebyok-vault-v3', 'acme', 'u1', 'main', vaultId, registeredAt, 'vault_key_passkey_wrapped', header))
+ * @example await deriveWrappingKey(prfBytes, cipherCtx('safebyok-vault-v3', 'acme', 'u1', 'main', vaultId, registeredAt, 'vault_key_passkey_wrapped', header))
  */
 export const deriveWrappingKey = async (keyBytes: Uint8Array, info: Uint8Array): Promise<CryptoKey> => {
   const inputKey = await crypto.subtle.importKey('raw', keyBytes as BufferSource, 'HKDF', false, ['deriveKey'])
@@ -137,13 +138,13 @@ export const deriveWrappingKey = async (keyBytes: Uint8Array, info: Uint8Array):
 }
 
 /**
- * `plainBytes` encrypted under `cipherKey`, bound to `binding`: a fresh cipherIv every call,
+ * `plainBytes` encrypted under `cipherKey`, bound to `ctx`: a fresh cipherIv every call,
  * authentication tag on the end of the ciphertext, both halves base64url.
  */
-export const cipherBytes = async (cipherKey: CryptoKey, plainBytes: Uint8Array, binding: Uint8Array): Promise<Ciphered> => {
+export const cipherBytes = async (cipherKey: CryptoKey, plainBytes: Uint8Array, ctx: Uint8Array): Promise<Ciphered> => {
   const cipherIv = randomBytes(IvBytes)
   const ciphertext = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: cipherIv as BufferSource, additionalData: binding as BufferSource },
+    { name: 'AES-GCM', iv: cipherIv as BufferSource, additionalData: ctx as BufferSource },
     cipherKey,
     plainBytes as BufferSource,
   )
@@ -151,13 +152,13 @@ export const cipherBytes = async (cipherKey: CryptoKey, plainBytes: Uint8Array, 
 }
 
 /**
- * The plain bytes back out of a {@link Ciphered}, verifying its authentication tag and `binding`.
- * Rejects (a DOMException from WebCrypto) when the key is wrong, the binding differs, or the
+ * The plain bytes back out of a {@link Ciphered}, verifying its authentication tag and `ctx`.
+ * Rejects (a DOMException from WebCrypto) when the key is wrong, the ctx differs, or the
  * ciphertext was altered -- the caller turns that into its own calm error.
  */
-export const decipherBytes = async (cipherKey: CryptoKey, ciphered: Ciphered, binding: Uint8Array): Promise<Uint8Array> => {
+export const decipherBytes = async (cipherKey: CryptoKey, ciphered: Ciphered, ctx: Uint8Array): Promise<Uint8Array> => {
   const plain = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: fromB64(ciphered.cipher_iv_b64) as BufferSource, additionalData: binding as BufferSource },
+    { name: 'AES-GCM', iv: fromB64(ciphered.cipher_iv_b64) as BufferSource, additionalData: ctx as BufferSource },
     cipherKey,
     fromB64(ciphered.ciphertext_b64) as BufferSource,
   )
@@ -165,23 +166,23 @@ export const decipherBytes = async (cipherKey: CryptoKey, ciphered: Ciphered, bi
 }
 
 /**
- * `wrappedKey` encrypted under `wrappingKey`, bound to `binding`: how a vaultKey travels inside
+ * `wrappedKey` encrypted under `wrappingKey`, bound to `ctx`: how a vaultKey travels inside
  * a bundle and a lockboxKey inside its lockbox. The key being wrapped must be extractable.
  */
-export const wrapKeyUnder = async (wrappingKey: CryptoKey, wrappedKey: CryptoKey, binding: Uint8Array): Promise<Ciphered> => {
+export const wrapKeyUnder = async (wrappingKey: CryptoKey, wrappedKey: CryptoKey, ctx: Uint8Array): Promise<Ciphered> => {
   const cipherIv = randomBytes(IvBytes)
   const ciphertext = await crypto.subtle.wrapKey(
     'raw',
     wrappedKey,
     wrappingKey,
-    { name: 'AES-GCM', iv: cipherIv as BufferSource, additionalData: binding as BufferSource },
+    { name: 'AES-GCM', iv: cipherIv as BufferSource, additionalData: ctx as BufferSource },
   )
   return { cipher_iv_b64: toB64(cipherIv), ciphertext_b64: toB64(new Uint8Array(ciphertext)) }
 }
 
 /**
- * The key back out of a wrapped wayin, verifying its tag and `binding`. Rejects (a
- * DOMException) on a wrong wrappingKey, a different binding, or altered ciphertext: for the
+ * The key back out of a wrapped wayin, verifying its tag and `ctx`. Rejects (a
+ * DOMException) on a wrong wrappingKey, a different ctx, or altered ciphertext: for the
  * passphrase wayin that rejection IS how a wrong passphrase is learned -- never a comparison.
  *
  * @param usages - What the recovered key may do; also sets extractability. Non-extractable is
@@ -191,14 +192,14 @@ export const wrapKeyUnder = async (wrappingKey: CryptoKey, wrappedKey: CryptoKey
 export const unwrapKeyUnder = async (
   wrappingKey: CryptoKey,
   wrapped: Ciphered,
-  binding: Uint8Array,
+  ctx: Uint8Array,
   usages: { extractable: boolean, usage: readonly KeyUsage[] },
 ): Promise<CryptoKey> => (
   crypto.subtle.unwrapKey(
     'raw',
     fromB64(wrapped.ciphertext_b64) as BufferSource,
     wrappingKey,
-    { name: 'AES-GCM', iv: fromB64(wrapped.cipher_iv_b64) as BufferSource, additionalData: binding as BufferSource },
+    { name: 'AES-GCM', iv: fromB64(wrapped.cipher_iv_b64) as BufferSource, additionalData: ctx as BufferSource },
     AesGcm,
     usages.extractable,
     [...usages.usage],
