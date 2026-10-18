@@ -79,20 +79,24 @@ git -C "$root" -c credential.helper= -c credential.helper='!gh auth git-credenti
 # Prints the files in directory $1 that are none of: in the tree of commit $2, a .DS_Store, the
 # stub of a .git file, or ignored by the main checkout's rules. node_modules is not entered.
 # Names are compared as lines, so a name with a newline in it is reported, which refuses safely.
+# Fails, printing nothing, when any step does (an unreadable folder, a full disk), so that a check
+# it could not make never reads as a clean one.
 leftover_strangers() {
-  local left="$1" tip="$2" work found tracked ignored
-  work="$(mktemp -d -t file-thread-left.XXXXXX)"
-  found="$work/found"
-  tracked="$work/tracked"
-  ignored="$work/ignored"
-  (cd "$left" && find -P . -xdev -name node_modules -prune -o \( -type f -o -type l \) -print) \
-    | sed 's|^\./||' | grep -v -E '^\.git$|(^|/)\.DS_Store$' | LC_ALL=C sort > "$found" || true
-  git -C "$main" ls-tree -r --name-only "$tip" | LC_ALL=C sort > "$tracked"
-  LC_ALL=C comm -23 "$found" "$tracked" > "$work/unlisted"
-  tr '\n' '\0' < "$work/unlisted" | git -C "$main" check-ignore --no-index --stdin -z 2> /dev/null \
-    | tr '\0' '\n' | LC_ALL=C sort > "$ignored" || true
-  LC_ALL=C comm -23 "$work/unlisted" "$ignored"
+  local left="$1" tip="$2" work status=0
+  work="$(mktemp -d -t file-thread-left.XXXXXX)" || return 1
+  { (cd "$left" && find -P . -xdev -name node_modules -prune -o \( -type f -o -type l \) -print) \
+      | sed 's|^\./||' | awk '$0 != ".git" && $0 != ".DS_Store" && $0 !~ /\/\.DS_Store$/' \
+      | LC_ALL=C sort > "$work/found" \
+    && git -C "$main" ls-tree -r --name-only "$tip" | LC_ALL=C sort > "$work/tracked" \
+    && LC_ALL=C comm -23 "$work/found" "$work/tracked" > "$work/unlisted" \
+    && { tr '\n' '\0' < "$work/unlisted" \
+           | git -C "$main" check-ignore --no-index --stdin -z > "$work/ignored0" 2> /dev/null \
+         || [[ $? -eq 1 ]]; } \
+    && tr '\0' '\n' < "$work/ignored0" | LC_ALL=C sort > "$work/ignored" \
+    && LC_ALL=C comm -23 "$work/unlisted" "$work/ignored" > "$work/strangers"; } || status=1
+  if [[ "$status" -eq 0 ]]; then cat "$work/strangers"; fi
   rm -rf -- "$work"
+  return "$status"
 }
 
 # Finishes a removal that `git worktree remove` left half done (see the header), or says why not.
@@ -107,7 +111,8 @@ finish_removal() {
   fi
   [[ "$(git -C "$main" rev-parse --verify --quiet "refs/remotes/origin/${branch}")" == "$tip" ]] \
     || fail "origin's $branch is not at $tip, so $root is left for a person to inspect"
-  strangers="$(leftover_strangers "$root" "$tip")"
+  strangers="$(leftover_strangers "$root" "$tip")" \
+    || fail "could not check what is left in $root, so it is left for a person to inspect"
   if [[ -n "$strangers" ]]; then
     echo "$strangers" | head -n 10 >&2
     fail "$root holds the files above, which the thread's tip does not, so it is left for a person to inspect"
