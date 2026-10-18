@@ -975,7 +975,14 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
   same order, same purpose strings, the sidecar in the header where the bag was. A v4 lockbox
   lists as damaged and reads as `damaged_lockbox` on every adapter that reads it (a Convex
   deployment refuses the new component schema until its tables are cleared), with no migration,
-  so no old ciphertext has to open under the new bytes.
+  so no old ciphertext has to open under the new bytes. Also 2026-10-18 (branch
+  `20261018-vaultprops`): the lockbox's stored field `revision_id` is renamed `revision_tok` (a
+  `_tok` names a value that changes on every write), and `boxCtx` follows it, so the field name in
+  the bound header changes; the construction is unchanged, the same parts in the same order, and
+  `revision_tok` sorts where `revision_id` did. It rides the format bump to `safebyok-lockbox-v5`
+  already in this release, so there is no second bump, and a lockbox in an older format lists as
+  damaged, as before, with no migration. The wayin's and the lease's contexts bind no field the
+  rename touches, so their bytes do not move. `tests/ctx-bytes.test.ts` pins the lockbox's bytes.
 * 2026-10-16 (locks_and_expiry): **the unlock window has a hard edge, and a timer.** The
   threshold is the truth: every call that starts work checks `askPassphraseAt` against the host's
   clock, and past it throws `vault_locked`. A `setTimeout` enforces it: armed at each take-up of a
