@@ -64,7 +64,7 @@ disagree. Workers look things up here; they do not write here (each keeps its
 * Three old entries in `notes/security.md` still describe the retry; the file's header forbids
   touching them (row for the Coach; thread 10 if allowed).
 
-### Thread 3, wayin (#161), in progress
+### Thread 3, wayin (#161)
 
 * *Orchestrator:* ruling A (YOLO): ctx bytes follow renamed stored fields and the bumped tag; see
   the plan's ground rules. Where each ctx is built: wayin `binding()` in `envelope.ts` →
@@ -76,3 +76,18 @@ disagree. Workers look things up here; they do not write here (each keeps its
   `newer_format`: each tag-bumping thread adds the tag it retires there (an allowed grep survivor).
 * `gh pr ready` was refused once for a worker by the permission classifier; the orchestrator takes
   a PR out of draft when that happens.
+* Built (worker): `envelope.ts` → `wayin.ts`; vault record `safebyok-vault-v3`; `OlderBundleFormats`
+  holds `'safebyok-vault-v2'` (a test shows v2 reads `damaged_bundle`); tests that stood for "a
+  future format" moved from `-v3` to `-v4`. Public option `{ wayinlabel }` on
+  `addPassphrase`/`addPasskey` and in the validators bag. Postgres column `unlocks` → `wayins`:
+  `VaultTablesSql` creates only what is missing, so the changeset gives hosts the `ALTER TABLE`.
+  Derived names: `FirstWayinlabel`, `PurposeForWayinkind`, `parseWayinId`, `parseWayinlabel`,
+  `wayinIdShape`, `reviseWayins`, `ensureRoomForWayin`, `wayinSummaries`, `wayinList`,
+  `TH.wayinOf`, `TH.passkeyWayinOf`, fake ids `wayin-<label>`.
+* The `Wayin` module and the `Wayin` type collide on import: `vault.ts` and `wayin.test.ts` write
+  the list's type as `VaultBundle['wayins']`.
+* The device-unlock noun ("remembered unlocks", the `unlocks` map in `device-db.ts`) still
+  matches `\bunlocks\b`: thread 6 retires it.
+* Grep survivors judged allowed: `envelopeBinding` (thread 4), VOCABULARY.md's *Old names*,
+  `prior_vault_key.vault_key_wrapped`, `safebyok-vault-v2` in `OlderBundleFormats` and its test,
+  HTTP/JS `method`, the verb "unlocks", old `notes/security.md` entries (header forbids edits).
