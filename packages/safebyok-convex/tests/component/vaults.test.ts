@@ -424,22 +424,22 @@ const landsOrIsFull = async (CVX: ReturnType<typeof TH.componentTest>, lockbox: 
 const listWatchRetire = async (CVX: ReturnType<typeof TH.componentTest>) => {
   const listed = await CVX.query(TH.vaults.listBoxSummaries, { scope: u1 })
   const { boxes } = await CVX.query(TH.vaults.watchVault, { scope: u1 })
-  const erased = await CVX.mutation(TH.vaults.retireVault, { scope: u1, expected: TH.thisVault })
+  const retired = await CVX.mutation(TH.vaults.retireVault, { scope: u1, expected: TH.thisVault })
   const { lockboxes } = await allRows(CVX)
-  return { listedCount: listed.length, watchedCount: boxes.length, erased, leftCount: lockboxes.length }
+  return { listedCount: listed.length, watchedCount: boxes.length, retired, leftCount: lockboxes.length }
 }
 
 describe("a large vault, within Convex's per-transaction limits", () => {
   it("lists, signs and retires the 102 of the largest lockboxes the core admits", async () => {
     const { CVX, filledCount } = await fillVault(102, 40_444)
     expect(filledCount).to.eq(102)
-    expect(await listWatchRetire(CVX)).to.deep.equal({ listedCount: 102, watchedCount: 102, erased: true, leftCount: 0 })
+    expect(await listWatchRetire(CVX)).to.deep.equal({ listedCount: 102, watchedCount: 102, retired: true, leftCount: 0 })
   })
 
   it("lists, signs and retires the 1638 lockboxes of 2 KiB whispers the core admits", async () => {
     const { CVX, filledCount } = await fillVault(1638, 2048)
     expect(filledCount).to.eq(1638)
-    expect(await listWatchRetire(CVX)).to.deep.equal({ listedCount: 1638, watchedCount: 1638, erased: true, leftCount: 0 })
+    expect(await listWatchRetire(CVX)).to.deep.equal({ listedCount: 1638, watchedCount: 1638, retired: true, leftCount: 0 })
   }, 120_000) // landing 1638 lockboxes, a mutation each, is the work, past vitest's 30 s default under CI's coverage
 
   it("refuses the largest lockboxes past its weight limit, and retires the vault so filled beside vault props of a whole document", async () => {
@@ -448,7 +448,7 @@ describe("a large vault, within Convex's per-transaction limits", () => {
     const kept = await keptTally(CVX)
     expect(kept).to.deep.equal(await weighedTally(CVX))
     expect(kept?.lockbox_bytes).to.be.within(MaxVaultLockboxBytes - 60_000, MaxVaultLockboxBytes)
-    expect(await listWatchRetire(CVX)).to.deep.equal({ listedCount: filledCount, watchedCount: filledCount, erased: true, leftCount: 0 })
+    expect(await listWatchRetire(CVX)).to.deep.equal({ listedCount: filledCount, watchedCount: filledCount, retired: true, leftCount: 0 })
   })
 
   it("refuses a lockbox past its count limit, never a replacement, and retires the vault so filled", async () => {
@@ -459,6 +459,6 @@ describe("a large vault, within Convex's per-transaction limits", () => {
     expect(await CVX.mutation(TH.vaults.updateBox, { scope: u1, lockbox: TH.boxOf('b0000', 'replaced'), expected: over('0') })).to.be.true
     expect(await keptTally(CVX)).to.deep.equal(await weighedTally(CVX))
     expect(await keptTally(CVX)).to.have.property('lockbox_count', MaxVaultLockboxes)
-    expect(await listWatchRetire(CVX)).to.deep.equal({ listedCount: MaxVaultLockboxes, watchedCount: MaxVaultLockboxes, erased: true, leftCount: 0 })
+    expect(await listWatchRetire(CVX)).to.deep.equal({ listedCount: MaxVaultLockboxes, watchedCount: MaxVaultLockboxes, retired: true, leftCount: 0 })
   }, 30_000)
 })

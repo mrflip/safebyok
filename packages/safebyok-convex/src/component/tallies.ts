@@ -77,13 +77,13 @@ export const weigh = (row: Record<string, Value>, rowId?: Id<'safebyok_lockboxes
  * null, and the vault is refused anything that adds to it until retired lockboxes bring it back in.
  *
  * @param db - The transaction's database.
- * @param vaultPropsId - The vault row, which its tally is filed under.
+ * @param vaultRowId - The vault row, which its tally is filed under.
  * @param boxRows - The vault's lockbox rows, read only when there is no tally to keep.
  */
 export const reckon = async (
-  db: DatabaseReader, vaultPropsId: Id<'safebyok_vaults'>, boxRows: AsyncIterable<Doc<'safebyok_lockboxes'>>,
+  db: DatabaseReader, vaultRowId: Id<'safebyok_vaults'>, boxRows: AsyncIterable<Doc<'safebyok_lockboxes'>>,
 ): Promise<Reckoning> => {
-  const kept = await findTallyRow(db, vaultPropsId)
+  const kept = await findTallyRow(db, vaultRowId)
   if (kept) { return { kept, tally: { lockbox_count: kept.lockbox_count, lockbox_bytes: kept.lockbox_bytes } } }
   // A loop rather than a reduce: it reads the rows as it goes, and stops reading past a limit.
   let tally: Tally = { lockbox_count: 0, lockbox_bytes: 0 }
@@ -120,13 +120,13 @@ export const refuses = (tally: Tally | null, growth: Tally): boolean => {
  * the first time. A vault whose count stopped at a limit keeps no tally: its next write counts it
  * again.
  */
-export const record = async (db: DatabaseWriter, vaultPropsId: Id<'safebyok_vaults'>, { kept, tally }: Reckoning, growth: Tally): Promise<void> => {
+export const record = async (db: DatabaseWriter, vaultRowId: Id<'safebyok_vaults'>, { kept, tally }: Reckoning, growth: Tally): Promise<void> => {
   if (tally === null) { return }
   const moved = plus(tally, growth)
   if (kept) {
     await db.patch('safebyok_vault_tallies', kept._id, moved)
   } else {
-    await db.insert('safebyok_vault_tallies', { vault_row_id: vaultPropsId, ...moved })
+    await db.insert('safebyok_vault_tallies', { vault_row_id: vaultRowId, ...moved })
   }
 }
 
@@ -134,15 +134,15 @@ export const record = async (db: DatabaseWriter, vaultPropsId: Id<'safebyok_vaul
  * Take a retired lockbox off its vault's tally, when the vault has one. A retire never counts a
  * vault that has none: a vault too large to read whole must still be retirable, a box at a time.
  */
-export const forget = async (db: DatabaseWriter, vaultPropsId: Id<'safebyok_vaults'>, erased: Doc<'safebyok_lockboxes'>): Promise<void> => {
-  const kept = await findTallyRow(db, vaultPropsId)
+export const forget = async (db: DatabaseWriter, vaultRowId: Id<'safebyok_vaults'>, retired: Doc<'safebyok_lockboxes'>): Promise<void> => {
+  const kept = await findTallyRow(db, vaultRowId)
   if (! kept) { return }
-  await db.patch('safebyok_vault_tallies', kept._id, plus(kept, { lockbox_count: -1, lockbox_bytes: -weigh(erased) }))
+  await db.patch('safebyok_vault_tallies', kept._id, plus(kept, { lockbox_count: -1, lockbox_bytes: -weigh(retired) }))
 }
 
 /** Remove the vault's tally, when it has one: its vault is being retired. */
-export const drop = async (db: DatabaseWriter, vaultPropsId: Id<'safebyok_vaults'>): Promise<void> => {
-  const kept = await findTallyRow(db, vaultPropsId)
+export const drop = async (db: DatabaseWriter, vaultRowId: Id<'safebyok_vaults'>): Promise<void> => {
+  const kept = await findTallyRow(db, vaultRowId)
   if (kept) { await db.delete('safebyok_vault_tallies', kept._id) }
 }
 
@@ -153,8 +153,8 @@ const plus = (tally: Tally, growth: Tally): Tally => ({
 
 // `.unique()` throws on a second row: a tally is inserted only where none was found, in the same
 // transaction, so two would be damage, and damage surfaces rather than being papered over.
-const findTallyRow = (db: DatabaseReader, vaultPropsId: Id<'safebyok_vaults'>) => (
+const findTallyRow = (db: DatabaseReader, vaultRowId: Id<'safebyok_vaults'>) => (
   db.query('safebyok_vault_tallies')
-    .withIndex('by_vault_row', (idx) => idx.eq('vault_row_id', vaultPropsId))
+    .withIndex('by_vault_row', (idx) => idx.eq('vault_row_id', vaultRowId))
     .unique()
 )

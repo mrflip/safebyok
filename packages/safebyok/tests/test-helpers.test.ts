@@ -1038,14 +1038,14 @@ class RoundTripVaultDB extends VaultDB {
   }
 
   protected doRetireVault(scope: VaultScope, expected: RetireExpectation) {
-    const erase = (rows: Rows) => {
+    const retire = (rows: Rows) => {
       const isBox = Ckeys.isBoxIn(scope)
       for (const ckey of rows.keys()) {
         if (isBox(ckey)) { rows.delete(ckey) }
       }
       rows.delete(Ckeys.vaultProps(scope))
     }
-    return this.step({ check: (rows) => vaultIs(rows, scope, expected), write: erase })
+    return this.step({ check: (rows) => vaultIs(rows, scope, expected), write: retire })
   }
 
   protected override doSubscribe(_scope: VaultScope, onChange: () => void) {

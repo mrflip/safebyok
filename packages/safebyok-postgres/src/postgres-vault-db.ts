@@ -211,7 +211,7 @@ const ReplaceBoxSql = `WITH vault AS (
   RETURNING 1 AS landed`
 
 // Lands while the vault props of that vault_id stand, whether or not there was a lockbox to retire.
-const RetireBoxSql = `WITH erased AS (
+const RetireBoxSql = `WITH retired AS (
     DELETE FROM safebyok_lockboxes WHERE ${ScopeIs} AND boxlabel = $4::text AND vault_id = $5::text
       AND EXISTS (SELECT 1 FROM safebyok_vaults WHERE ${ScopeIs} AND vault_id = $5::text)
   )
