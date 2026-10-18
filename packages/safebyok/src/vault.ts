@@ -786,7 +786,8 @@ const make = (opts: MakeVaultOpts): Vault => {
     const mark = fresh === null ? null : await heedMark(fresh, { seenBefore, call: 'refresh' })
     // A change to the wayins elsewhere (new epoch) or a deletion ends this device's unlock: the
     // vaultKey in hand still works on old rows, but passing as current invites confusion. The
-    // lease, outdated by the same change, is discarded: no lock made this, so nothing is counted.
+    // key goes as at a hard lock; the lease, outdated by the same change, is discarded, which is
+    // no revocation, so revokesSoFar does not count it.
     const outlived = vaultKey !== null && vaultProps !== UnreadVaultProps && vaultProps !== null
       && (fresh?.unlock_epoch !== vaultProps.unlock_epoch || fresh.vault_id !== vaultProps.vault_id)
     if (outlived) {
@@ -1367,10 +1368,9 @@ const make = (opts: MakeVaultOpts): Vault => {
    * Fetch this device's lease, and take it up if it still fits and still opens: the vault is
    * then unlocked until the lease's askPassphraseAt, with no proof asked. Anything else leaves
    * the vault as it stands, and a lease that does not fit or open is discarded: erased, with no
-   * revocation counted. Runs once the vault
-   * props are read, in hello(), and does nothing while there are none. The deviceDB may be the
-   * host's own, so what it hands back is checked here, whoever wrote it: a record that does not
-   * pass reads as "no lease", the safe failure.
+   * revocation counted. Runs once the vault props are read, in hello(), and does nothing while
+   * there are none. The deviceDB may be the host's own, so what it hands back is checked here,
+   * whoever wrote it: a record that does not pass reads as "no lease", the safe failure.
    *
    * A lease whose deadline lies past what this handle's leaseHours allows from now was granted
    * under a longer setting, and does not fit either: lowering the option has each device ask
@@ -1380,12 +1380,13 @@ const make = (opts: MakeVaultOpts): Vault => {
    *
    * Only a handle on which no lock has revoked a lease takes one up: `revokesThen`, read from
    * `revokesSoFar` before the vault props were, must be 0, and must not have moved by the time the
-   * lease opens. A lease discarded, here or by a refresh that found it outdated, counts for nothing. A lock on this handle, hard or soft, or a lock for storage it cannot trust, is the
-   * user's word, or the vault's, that this handle is locked: a lease the lock could not erase is
-   * left for the next handle made (the next page load), and this one asks for a proof. A handle
-   * whose first hello failed -- storage unreachable, say -- has met no lock, and still takes
-   * its lease up once a hello succeeds; but one refused as storage it cannot trust has locked, as
-   * above. One already unlocked holds its key, and loses nothing.
+   * lease opens. A lease discarded, here or by a refresh that found it outdated, is no
+   * revocation, and is not counted. A lock on this handle, hard or soft, or a lock for storage it
+   * cannot trust, is the user's word, or the vault's, that this handle is locked: a lease the lock
+   * could not erase is left for the next handle made (the next page load), and this one asks for
+   * a proof. A handle whose first hello failed -- storage unreachable, say -- has met no lock, and
+   * still takes its lease up once a hello succeeds; but one refused as storage it cannot trust
+   * has locked, as above. One already unlocked holds its key, and loses nothing.
    */
   const fetchLease = async (revokesThen: number) => {
     if (revokesThen !== 0 || vaultProps === UnreadVaultProps || vaultProps === null) { return }
@@ -1727,10 +1728,11 @@ const make = (opts: MakeVaultOpts): Vault => {
         }
         if (isShutDue(now)) { dropKey() } else { shutAt(now + graceMillis, now) }
       }
-      // A soft lock: no new operation starts, and this device revokes its lease now -- the soft
-      // revocation, which leaves the lock generation be -- but work in hand finishes -- an unlock or a change under way, here or in another tab,
-      // among it -- and the vaultKey waits for it. The gate closes by having no deadline at all,
-      // not one at now, which a clock stepped back reopens.
+      // A soft lock: no new operation starts, and this device revokes its lease now, in a soft
+      // revocation that leaves the lock generation be; but work in hand finishes -- an unlock or a
+      // change under way, here or in another tab, among it -- and the vaultKey waits for it. The
+      // gate closes by having no deadline at all, not one at now, which a clock stepped back
+      // reopens.
       askPassphraseAt = null
       revokesSoFar += 1
       bump()
