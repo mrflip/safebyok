@@ -1,6 +1,6 @@
 # Thread 3: the envelope becomes the wayin (2026-10-18)
 
-Branch `20261018-wayin`, PR #TBD, stacked on [#160](https://github.com/mrflip/safebyok/pull/160)
+Branch `20261018-wayin`, PR [#161](https://github.com/mrflip/safebyok/pull/161), stacked on [#160](https://github.com/mrflip/safebyok/pull/160)
 (line main → #159 → #160 → this). Justify: not yet run. Nothing renamed yet: **blocked** on the
 question below, which the handoff told me to stop on.
 
