@@ -1,6 +1,6 @@
 # Thread 10: sweep (2026-10-18)
 
-Branch `20261018-sweep`, PR #PRNUM, stacked on [#167](https://github.com/mrflip/safebyok/pull/167) (line main → #159 → … → #167 → #PRNUM). Justify: green -- core 2161 passed | 35 skipped; react 227; indexeddb 135 | 10; convex 258 | 8; postgres 246 | 14; graphql 239 | 14; fastkey 49; demo 191 | 16; e2e 81 | 89; scripts 258.
+Branch `20261018-sweep`, PR [#168](https://github.com/mrflip/safebyok/pull/168), stacked on [#167](https://github.com/mrflip/safebyok/pull/167) (line main → #159 → … → #167 → #168). Justify: green -- core 2161 passed | 35 skipped; react 227; indexeddb 135 | 10; convex 258 | 8; postgres 246 | 14; graphql 239 | 14; fastkey 49; demo 191 | 16; e2e 81 | 89; scripts 258.
 
 * **Built**
   * The sprint's grep run over the repo and its survivors removed or classified (the PR quotes the command and every survivor). Fixed: `TODO.md` ("bundle", "remembered unlock", `takeUpUnlock` → `takeUpVaultKey`), `NOTYET.md` ("remembered unlock", "public bag"), `ctx-bytes.test.ts`'s encoding test (now `'safebyok-lockbox-v5'` and `revision_tok`, text and hex together; the other literals did not move), and a retired option name `unlockId` used as an arbitrary unknown option in a `vault.test.ts` test (now `colour`).
