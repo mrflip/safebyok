@@ -111,3 +111,20 @@ disagree. Workers look things up here; they do not write here (each keeps its
   package's `src/index.ts`. `cipherCtx`'s `bad_option` message says "cipher ctx".
 * "binding" survives legitimately in React/host bindings, fastkey's native Argon2 binding, and
   eslint configs: later greps should not flag those.
+
+### Thread 5, sidecar (#163)
+
+* Lockbox format `safebyok-lockbox-v5`; `public_json` → `sidecar_json` (Postgres column too:
+  the changeset gives `ALTER TABLE safebyok_lockboxes RENAME COLUMN public_json TO sidecar_json`
+  and the Convex clear-tables line).
+* **No lockbox older-formats list exists, and none is needed:** a lockbox in any format other than
+  the current one already lists as damaged, never `newer_format`. Tests cover v4.
+* The lockbox ctx header is key-sorted JSON: `sidecar_json` sorts after `revision_id`. In thread
+  7, `revision_tok` sorts where `revision_id` does, so only the field name changes in the
+  ctx-bytes literal.
+* `ctx-bytes.test.ts`'s first test (how `cipherCtx` encodes, as text and hex) passes the string
+  `'safebyok-lockbox-v4'` as an arbitrary input; it is not the lockbox's ctx. Thread 10's grep
+  will meet it: an allowed survivor, or change text and hex together.
+* The option parse stays in one place: `checkStoreOpts` with `sidecarJsonOf` in `vault.ts`.
+* The security note was folded into the existing 2026-10-16 lockbox entry (the header's rule for
+  a fact that entry already covers).

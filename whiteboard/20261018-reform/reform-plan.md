@@ -7,7 +7,7 @@ medium. Threads at once: 2. Issued by: the Coach, from `reform-preplan.md` besid
 Sprint doc: https://claude.ai/code/artifact/b7fd117e-7a03-4f68-b2fa-b2c1e70e118b (*Open Matters*,
 *Progress*, *Resolved*).
 
-**Status:** threads 1 to 4 filed, in the line main → #159 → #160 → #161 → #162; thread 5 building.
+**Status:** threads 1 to 5 filed, in the line main → #159 → #160 → #161 → #162 → #163; thread 6 building.
 
 ## Read first
 
@@ -144,6 +144,8 @@ matters only at the start.
 
 *Gloss:* *Touches* `lockbox.ts`, `types.ts`, `vault.ts`, `vault-db.ts`, `index.ts`, `safebyok-postgres` (`columns.ts`, `vault-tables.ts`, migrations or DDL), `safebyok-graphql` (`fields.ts`, schema), the convex component's schema, react `WhisperField`, demos, e2e, README. *Model*: default. *Depends on*: 4. *Grep*: `PublicBag|public_json|publicJson|publicJsonOf|\{ public \}|\.public\b|safebyok-lockbox-v4` and case-insensitive `public bag`. Its renames move the lockbox ctx bytes pinned in `tests/ctx-bytes.test.ts`: update those literals in the same commit. Its tag bump adds `safebyok-lockbox-v4` to the older-formats list (as thread 3 did for the vault), and tests that use `-v5` to mean "a future format" move to `-v6`. *Look-ahead*: thread 7 renames `store(..., { sidecar })` to `storeBox(..., { sidecar })`; keep the option's parse in one place. *Size*: medium.
 
+*Review:* fixed (medium). `boxCtx` changed only in its inputs; the pinned bytes moved only by the tag and field; the worker's no-list claim holds (`Lockbox.format` accepts only v5, so any other lists as damaged). One fix: the README's `lockbox_too_large` row said "bag". Left: the demo hint naming "the sidecar" (*Orchestrator:* ruled, YOLO, back to words of effect in thread 10); the v4 string in `ctx-bytes.test.ts`'s encoding test; a newer-format lockbox lists as damaged on an older client (row in *Open Matters*). Postgres and e2e backends were absent, so the column rename is proven by unit tests and DDL text.
+
 ### 6. `lease`
 
 > Rename the device unlock to the lease: `DeviceUnlock` → `Lease` with format
@@ -222,7 +224,7 @@ matters only at the start.
 > Have a `sonnet` subagent add a `notes/security.md` entry listing each stored-format tag that
 > changed and that no migration exists. One changeset summarising the sprint for the release note.
 
-*Gloss:* *Touches* docs and whatever the grep finds; `.size-limit.json` (`--write`), `notes/security.md` (through a `sonnet` subagent), one changeset summarising the sprint. The grep list is the union of threads 3 to 8's, handed over in full. The *Old names* table stays unless the Coach's word is in the doc's *Coach notes* or a ruled row. *Model*: `sonnet`. *Depends on*: 9. *Size*: small to medium.
+*Gloss:* *Touches* docs and whatever the grep finds; `.size-limit.json` (`--write`), `notes/security.md` (through a `sonnet` subagent), one changeset summarising the sprint. The grep list is the union of threads 3 to 8's, handed over in full. *Orchestrator:* also put the demo's note hint back in words of effect, e.g. "(not encrypted: visible without the passphrase; left blank, the note stands)", rather than naming the sidecar (YOLO ruling from thread 5's review). The grep meets `'safebyok-lockbox-v4'` as an arbitrary input in `ctx-bytes.test.ts`'s first (encoding) test: allowed, or change its text and hex together. The *Old names* table stays unless the Coach's word is in the doc's *Coach notes* or a ruled row. *Model*: `sonnet`. *Depends on*: 9. *Size*: small to medium.
 
 
 ## For the Coach
