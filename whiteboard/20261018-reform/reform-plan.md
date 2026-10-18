@@ -7,7 +7,7 @@ medium. Threads at once: 2. Issued by: the Coach, from `reform-preplan.md` besid
 Sprint doc: https://claude.ai/code/artifact/b7fd117e-7a03-4f68-b2fa-b2c1e70e118b (*Open Matters*,
 *Progress*, *Resolved*).
 
-**Status:** planned; threads 1 and 2 starting.
+**Status:** thread 1 filed (#159); thread 2 in review (#160).
 
 ## Read first
 
@@ -78,6 +78,8 @@ matters only at the start.
 
 *Gloss:* *Touches* `VOCABULARY.md`, `STYLE.md`, `CLAUDE.md` (*Conventions At A Glance*'s `Envelope.swak(...)` example and any old word in *Notable files*). Documents only: no review needed beyond the orchestrator's check; an empty changeset. *Model*: default. *Depends on*: nothing; cut from `origin/main`. *Look-ahead*: every rename thread reads it as its dictionary, so it carries the plan's *Amendments* too (`wayinkind` as the stored field; `useBox`; `readBox`), and every name in the map's New column, `revision_tok` and the `_tok` rule included. It defines only what lands this sprint; the one-passphrase policy is named as intended, not landed. *Size*: small. Sits at the bottom of the line.
 
+*Review:* none, documents only. Filed as #159. Seven YOLO name calls from the worker are rows in *Open Matters*.
+
 ### 2. `no_retry`
 
 > Remove the retry loop from `store()`. One attempt: read the box, seal, write with the versioned
@@ -105,7 +107,7 @@ matters only at the start.
 > one-passphrase policy are deferred, so a vault still holds up to `MaxUnlocks` ways in. Leave `unlock()` and `lock()` as verbs: they stay.
 > Leave every `*_epoch` untouched, `unlock_epoch` included.
 
-*Gloss:* *Touches* core (`types.ts`, `envelope.ts` → `wayin.ts` via `git mv`, `vault.ts`, `vault-db.ts`, `errors.ts`, `refusals.ts`, `crypto.ts`, `names.ts`, `validators.ts`, `index.ts`), every adapter's record checks, schema and fixtures, react (`VaultProvider`, `PassphraseModal`, `PasskeyUnlockButton` keeps its name), demos, e2e, README, `notes/`. Includes `passphraseKey`/`passkeyKey` → `wayinKey` where the key acts on the vaultKey (the map's row; the preparing code keeps the specific names), and the stored field `method` → `wayinkind` (*Amendments*). `envelopeBinding` survives: thread 4 renames it. *Model*: default. *Depends on*: 2 (and 1, beneath it). *Grep*: `UnlockEnvelope|PassphraseEnvelope|PasskeyEnvelope|Envelope\.|envelope\.ts|envelope\.test|UnlockSummary|unlock_id|unlocklabel|UnlockMethod|UnlockProof|vault_key_wrapped|removeUnlock|absent_unlock|damaged_unlock|last_unlock|too_many_unlocks|safebyok-vault-v2|\bunlocks\b|\bmethod:` and, case-insensitive, `envelope` other than `envelopeBinding`. *Look-ahead*: threads 4 to 10 grep the same trees; leave no half-renamed doc block. *Size*: large, mechanical.
+*Gloss:* *Touches* core (`types.ts`, `envelope.ts` → `wayin.ts` via `git mv`, `vault.ts`, `vault-db.ts`, `errors.ts`, `refusals.ts`, `crypto.ts`, `names.ts`, `validators.ts`, `index.ts`), every adapter's record checks, schema and fixtures, react (`VaultProvider`, `PassphraseModal`, `PasskeyUnlockButton` keeps its name), demos, e2e, README, `notes/`. Includes `passphraseKey`/`passkeyKey` → `wayinKey` where the key acts on the vaultKey (the map's row; the preparing code keeps the specific names), and the stored field `method` → `wayinkind` (*Amendments*). `envelopeBinding` survives: thread 4 renames it. Also the public `unlockId` option → `wayinId`, GraphQL `SafebyokUnlockEnvelope` → `SafebyokWayin`, and the internals in the progress document's thread-1 notes. *Model*: default. *Depends on*: 2 (and 1, beneath it). *Grep*: `UnlockEnvelope|PassphraseEnvelope|PasskeyEnvelope|Envelope\.|envelope\.ts|envelope\.test|UnlockSummary|unlock_id|unlocklabel|UnlockMethod|UnlockProof|vault_key_wrapped|removeUnlock|absent_unlock|damaged_unlock|last_unlock|too_many_unlocks|safebyok-vault-v2|\bunlocks\b|\bmethod:` and, case-insensitive, `envelope` other than `envelopeBinding`. *Look-ahead*: threads 4 to 10 grep the same trees; leave no half-renamed doc block. *Size*: large, mechanical.
 
 ### 4. `ctx`
 
@@ -140,7 +142,7 @@ matters only at the start.
 > mark, `lock_generation`, `lockSoon()` and every lock timer are untouched. `safebyok-indexeddb`'s
 > store names follow.
 
-*Gloss:* *Touches* `types.ts`, `device-db.ts`, `crypto.ts`, `vault.ts`, `idb.ts`, `idb-opts.ts`, `options.ts`, `safebyok-indexeddb`, react (`leaseHours` prop), demos, README. Internals per *Amendments*: `rememberDevice` → `grantLease`, `rememberedUnlock` → `takeUpLease`, `takeUpUnlock` → `takeUpVaultKey`. Renaming an IndexedDB object store needs a database version bump; with no migration, the upgrade drops the old store and an existing device's lease is simply gone (the user proves once more). The changeset says so. *Model*: default. *Depends on*: 5. *Grep*: `DeviceUnlock|safebyok-unlock-v1|localUnlockKey|LocalUnlockKey|local_unlock_key|vault_key_local_wrapped|readUnlock|writeUnlock|eraseUnlock|UnlockExpectation|rememberDevice|rememberedUnlock|takeUpUnlock|ForcePassphraseReentryHours|forcePassphraseReentryHours|MaxReentryHours`, and case-insensitive `device unlock|remembered unlock`. *Look-ahead*: thread 8's `hello()` reads the lease through `takeUpLease`. *Size*: medium.
+*Gloss:* *Touches* `types.ts`, `device-db.ts`, `crypto.ts`, `vault.ts`, `idb.ts`, `idb-opts.ts`, `options.ts`, `safebyok-indexeddb`, react (`leaseHours` prop), demos, README. Internals per *Amendments*: `rememberDevice` → `grantLease`, `rememberedUnlock` → `takeUpLease`, `takeUpUnlock` → `takeUpVaultKey`; the public field `reentryWindowMillis` → `leaseMillis`. Renaming an IndexedDB object store needs a database version bump; with no migration, the upgrade drops the old store and an existing device's lease is simply gone (the user proves once more). The changeset says so. *Model*: default. *Depends on*: 5. *Grep*: `DeviceUnlock|safebyok-unlock-v1|localUnlockKey|LocalUnlockKey|local_unlock_key|vault_key_local_wrapped|readUnlock|writeUnlock|eraseUnlock|UnlockExpectation|rememberDevice|rememberedUnlock|takeUpUnlock|ForcePassphraseReentryHours|forcePassphraseReentryHours|MaxReentryHours`, and case-insensitive `device unlock|remembered unlock`. *Look-ahead*: thread 8's `hello()` reads the lease through `takeUpLease`. *Size*: medium.
 
 ### 7. `vaultprops`
 
@@ -155,7 +157,7 @@ matters only at the start.
 > stored, expected or compared. `retire` still means erased: no tombstone. Every adapter's
 > abstract methods and tests follow; the convex component's function names follow.
 
-*Gloss:* *Touches* everything that touches storage: core (`types.ts`, `vault-db.ts`, `expectations.ts`, `lockbox.ts`, `vault.ts`, `errors.ts`, `refusals.ts`), all four adapters (postgres, graphql, convex incl. its component function names, indexeddb's VaultDB), react, demos, e2e, README, `notes/security.md`. The vault's read verb is **`readBox`** (ruling; the text's `viewBox` is stale), and `vault.use` → `useBox` joins (*Amendments*). `revision_id` → `revision_tok` rides the v3/v5 bumps of threads 3 and 5: no second bump. `DeviceDB.destroy`, if any, is not in the map: leave it. *Model*: default. *Depends on*: 6. *Grep*: `VaultBundle|BundleIdentity|BundleExpectation|damaged_bundle|readBundle|createBundle|updateBundle|eraseBox|eraseVault|eraseDamagedVault|EraseExpectation|revision_id|revisionId|\.erase\(|\.destroy\(|\.use\(` and case-insensitive `\bbundle`. Judge `\.store\(` and `\.read\(` hits by receiver. *Look-ahead*: thread 8 wraps every one of these methods with an awaited `hello`. *Size*: large, mechanical; may run long, so commit and push as each package goes green.
+*Gloss:* *Touches* everything that touches storage: core (`types.ts`, `vault-db.ts`, `expectations.ts`, `lockbox.ts`, `vault.ts`, `errors.ts`, `refusals.ts`), all four adapters (postgres, graphql, convex incl. its component function names, indexeddb's VaultDB), react, demos, e2e, README, `notes/security.md`. The vault's read verb is **`readBox`** (ruling; the text's `viewBox` is stale), and `vault.use` → `useBox` joins (*Amendments*). `revision_id` → `revision_tok` rides the v3/v5 bumps of threads 3 and 5: no second bump. `DeviceDB.destroy`, if any, is not in the map: leave it. Storage-side names per the progress document's thread-1 notes (`safebyok_vaults`, the `VaultProps` stem). *Model*: default. *Depends on*: 6. *Grep*: `VaultBundle|BundleIdentity|BundleExpectation|damaged_bundle|readBundle|createBundle|updateBundle|eraseBox|eraseVault|eraseDamagedVault|EraseExpectation|revision_id|revisionId|\.erase\(|\.destroy\(|\.use\(` and case-insensitive `\bbundle`. Judge `\.store\(` and `\.read\(` hits by receiver. *Look-ahead*: thread 8 wraps every one of these methods with an awaited `hello`. *Size*: large, mechanical; may run long, so commit and push as each package goes green.
 
 ### 8. `make_hello`
 
