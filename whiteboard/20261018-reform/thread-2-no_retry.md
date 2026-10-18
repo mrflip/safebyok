@@ -1,6 +1,6 @@
 # Thread 2: store() without the retry (2026-10-18)
 
-Branch `20261018-no_retry`, PR #TBD, cut from `origin/main` `2946a499`. Justify: green (core
+Branch `20261018-no_retry`, PR [#160](https://github.com/mrflip/safebyok/pull/160), cut from `origin/main` `2946a499`. Justify: green (core
 2105 passed / 35 skipped; react 218; demo 190 / 16 skipped; e2e 81 / 89 skipped; every adapter green).
 
 * **Built**:
@@ -49,3 +49,6 @@ Branch `20261018-no_retry`, PR #TBD, cut from `origin/main` `2946a499`. Justify:
     ("as a retried store's would"), 1028 ("Only `store()` retries ... an erase wins") and 1034
     ("the store then retries over it, last writer wins"). The header says to change no other
     entry, so the subagent left them as they are. Should the next writer of the file amend them?
+  - Relock kind: a stale store whose catch-up relocks the device throws `vault_locked`, while
+    `erase()` throws `stale_write` in the same case. I recommend keeping it as it is (see
+    *Decisions taken*).
