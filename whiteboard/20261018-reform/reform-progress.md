@@ -91,3 +91,23 @@ disagree. Workers look things up here; they do not write here (each keeps its
 * Grep survivors judged allowed: `envelopeBinding` (thread 4), VOCABULARY.md's *Old names*,
   `prior_vault_key.vault_key_wrapped`, `safebyok-vault-v2` in `OlderBundleFormats` and its test,
   HTTP/JS `method`, the verb "unlocks", old `notes/security.md` entries (header forbids edits).
+
+### Thread 4, ctx (#162)
+
+* `packages/safebyok/tests/ctx-bytes.test.ts` pins every ctx's bytes as hand-written literals
+  (readable JSON text; `cipherCtx`'s own encoding as hex): the wayin's passphrase and passkey ctx
+  (and the passkey HKDF `info`), the lockbox's two wraps, the lease's wrap. **Threads 5, 6 and 7
+  move these bytes on purpose and update the literals in the same commit as the tag or field
+  rename**; a test failing anywhere else means a byte moved that should not have.
+* *Orchestrator:* the fixture's header (fixed in review) says each literal pins the ctx's shape and
+  order; `vault_id`, `revision_id`, `salt_b64`, `registered_at`, `written_at`, `unlock_epoch` and
+  `ask_passphrase_at` are read off the record. The thread file says only the first three: the test
+  is right.
+* The closures are reached without new exports: the wayin through `Wayin.sealPassphrase` /
+  `sealPasskey`, the lockbox through a stored box opened with the vaultKey from
+  `Wayin.openWithPassphrase`, the lease through `deviceDB.readUnlock` (thread 6 renames it).
+* Names: `cipherCtx`, `CipherCtxPart`, `ctx` parameters, `wayinCtx` (built by private
+  `wayinCtxOf`), `boxCtx`, `leaseCtx`. Neither `cipherCtx` nor `CipherCtxPart` is exported from a
+  package's `src/index.ts`. `cipherCtx`'s `bad_option` message says "cipher ctx".
+* "binding" survives legitimately in React/host bindings, fastkey's native Argon2 binding, and
+  eslint configs: later greps should not flag those.
