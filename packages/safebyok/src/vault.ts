@@ -1720,8 +1720,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       const label = await checkStandingBoxlabel(boxlabel)
       keyInHand()
       // Lands only in the vault this device holds keys for, whatever revision of the box stands:
-      // a vault destroyed and made anew elsewhere refuses it. That is its only expectation, and
-      // trying again could not change it: a stale erase is thrown at once, never retried.
+      // a vault destroyed and made anew elsewhere refuses it. That is its only expectation.
       try {
         await refreshOnStale(vaultDB.eraseBox(scope, label, { vault_id: currentBundle().vault_id }), 'erase')
       } catch (err) {
