@@ -114,7 +114,7 @@ finish_removal() {
   strangers="$(leftover_strangers "$root" "$tip")" \
     || fail "could not check what is left in $root, so it is left for a person to inspect"
   if [[ -n "$strangers" ]]; then
-    echo "$strangers" | head -n 10 >&2
+    head -n 10 <<< "$strangers" >&2
     fail "$root holds the files above, which the thread's tip does not, so it is left for a person to inspect"
   fi
   for attempt in 1 2 3 4; do
