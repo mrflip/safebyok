@@ -63,7 +63,7 @@ it). The ones with the most weight:
 * **Five earlier changesets still give their own Postgres steps** (`public_bag`, `written_at`,
   `wayin`, `sidecar`, `vaultprops`), contradicting the summary's one 0.3.0 path in ways a host
   would act on. Rec: cut each to a pointer before the release.
-* VOCABULARY.md's *Old names* table stays, marked for 1.0.0.
+* `notes/old_vocabulary.md` (the old names table) stays, marked for 1.0.0.
 
 No row was ruled during the sprint, so `whiteboard/20261018-reform/reform-resolutions.md` records
 only that; every matter is still in *Open Matters*, born `drafting`, each with its Rec.
