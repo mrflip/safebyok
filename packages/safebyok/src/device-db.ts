@@ -3,7 +3,7 @@ import * as Ckeys from './ckeys'
 import { VaultError } from './errors'
 
 /**
- * What a lease's write expects of the device: that no lock has forgotten the vault's lease since
+ * What a lease's write expects of the device: that no lock has revoked the vault's lease since
  * the unlock granting it began, its device mark still at the `lock_generation` it read then (0
  * for a scope with no mark).
  */
@@ -140,5 +140,5 @@ export const keepingLocks = (mark: DeviceMark, kept: unknown): DeviceMark => (
   { ...mark, lock_generation: Math.max(mark.lock_generation, lockGenerationOf(kept)) }
 )
 
-/** A lease's write refused, a lock having forgotten the vault's lease since the unlock granting it began. */
-export const lockedMeanwhile = () => new VaultError('stale_write', "A lock on this device forgot the vault's lease while this unlock was under way, so no lease was granted: the lock wins.")
+/** A lease's write refused, a lock having revoked the vault's lease since the unlock granting it began. */
+export const lockedMeanwhile = () => new VaultError('stale_write', "A lock on this device revoked the vault's lease while this unlock was under way, so no lease was granted: the lock wins.")

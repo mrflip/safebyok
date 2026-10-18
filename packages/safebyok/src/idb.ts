@@ -87,7 +87,7 @@ export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
   // A row under any ckey but a lease's or a mark's is one an earlier version filed (`unlock^…`
   // before the lease, `["unlock","acme","u1","main"]` before the joined ckeys), which nothing else
   // would ever reach, expire or erase. It is deleted unread, so an old record never outlives the
-  // lock that should forget it.
+  // lock that should revoke it.
   const sweepStrays = async () => {
     const ckeys = await keys(shelf())
     const strays = ckeys.filter((ckey) => ! Ckeys.isLease(ckey) && ! Ckeys.isMark(ckey))
@@ -124,7 +124,7 @@ export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
       ring()
     },
 
-    // The scope's own lease goes first, so a sweep that fails never keeps a lock from forgetting it.
+    // The scope's own lease goes first, so a sweep that fails never keeps a lock from revoking it.
     eraseLease: async (scope) => {
       await del(Ckeys.lease(scope), shelf())
       ring()
@@ -153,7 +153,7 @@ export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
       ring()
     },
 
-    // The shelf holds leases and device marks and nothing else, so forgetting them all
+    // The shelf holds leases and device marks and nothing else, so erasing them all
     // is clearing it: any row an earlier version filed under another ckey goes too.
     eraseAll: async () => {
       await clear(shelf())

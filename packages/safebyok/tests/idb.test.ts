@@ -205,7 +205,7 @@ describe("idbDeviceDB", () => {
     }
   })
 
-  it("forgets the scope's own lease at an erase even when the sweep fails", async () => {
+  it("erases the scope's own lease even when the sweep fails", async () => {
     const dbName = TH.freshDbName()
     const deviceDB = idbDeviceDB({ dbName })
     await deviceDB.writeLease(await TH.leaseOf('u1'), TH.NoLocks)
