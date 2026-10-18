@@ -76,10 +76,13 @@ export type VaultSnapshot = {
    * or what a later read of storage failed with, a change pushed from storage or a catch-up after a
    * write it refused. Null before any read has failed, and again once a read succeeds.
    *
-   * A vault whose first `hello()` failed stays `opening`, saying why here: show the refusal in
-   * place, and offer a retry that calls `hello()` again where one may mend it (`isVaultCondition`,
-   * and not `storage_blocked`). Any other call tries again first, as it waits for `hello()`. Once
-   * the vault has settled, a failure never takes it back to `opening`: `state` says what it last
+   * A first `hello()` that fails before the vault props are read -- storage unreachable, a user
+   * not yet signed in, vault props damaged -- leaves the vault `opening`, saying why here: show the
+   * refusal in place, and offer a retry that calls `hello()` again where one may mend it (`isVaultCondition`,
+   * and not `storage_blocked`). Any other call tries again first, as it waits for `hello()`. One
+   * that fails after them, as this device's store refuses its lease, settles the state (`absent` or
+   * `locked`) with `trouble` beside it. Once the vault has settled, a failure never takes it back
+   * to `opening`: `state` says what it last
    * read, and `trouble` beside it why that may be behind storage now.
    *
    * @example
@@ -247,8 +250,9 @@ export type Vault = {
    * once. A lock leaves it standing; after `close()` it refuses with kind 'vault_closed'.
    *
    * It refuses with storage's own error -- storage refusing a user not yet signed in, say -- and
-   * the snapshot says the same as its `trouble`, its `state` still the last it settled into
-   * (`opening`, before any). Stored vault props that fail their checks are kind 'damaged_vault',
+   * the snapshot says the same as its `trouble`, its `state` the last it settled into: `opening`
+   * while the vault props were never read, `absent` or `locked` for a failure after them, as this
+   * device's store refusing its lease. Stored vault props that fail their checks are kind 'damaged_vault',
    * which no retry mends (`retireDamagedVault` clears them); those a newer safebyok may have
    * written, kind 'newer_format': update the app; those older than this device has already seen
    * the vault at, kind 'rolled_back', which also forgets this device's lease (see the `Vault`'s
@@ -606,7 +610,8 @@ const UnreadVaultProps = Symbol.for('safebyok.unread_vault_props')
  * from `opening` into `absent`, `locked` or `unlocked`; every call on the handle but `lock()`,
  * `lockSoon()` and `close()` waits for that first, so the handle may be used at once. A hello that
  * fails -- storage unreachable, a user not yet signed in -- rejects nothing unheard: the snapshot
- * says why as its `trouble`, still `opening`, and the vault's logger warns of it. Await
+ * says why as its `trouble` (the vault still `opening`, when storage could not be read), and the
+ * vault's logger warns of it. Await
  * `vault.hello()` to hear the refusal itself, and call it again to retry.
  *
  * Misuse throws here, before storage is touched: kind 'bad_label' for a label or a `userId` that
@@ -1352,11 +1357,18 @@ const make = (opts: MakeVaultOpts): Vault => {
    * under a longer setting, and does not fit either: lowering the option has each device ask
    * again at its next hello, and raising it lengthens no lease already granted. Nothing on this
    * path writes a record, so it can never bring back one that another tab's lock() erased
-   * meanwhile; and nothing is taken up once this handle closes, or forgets its lease (a lock, hard
-   * or soft) after `forgetsThen`, read from `forgetsSoFar` before the vault props were.
+   * meanwhile.
+   *
+   * Only a handle that has never forgotten a lease takes one up: `forgetsThen`, read from
+   * `forgetsSoFar` before the vault props were, must be 0, and must not have moved by the time the
+   * lease opens. A lock on this handle, hard or soft, or a lock for storage it cannot trust, is the
+   * user's word, or the vault's, that this handle is locked: a lease the lock could not erase is
+   * left for the next handle made (the next page load), and this one asks for a proof. A handle
+   * whose first hello failed has forgotten nothing, and still takes its lease up once a hello
+   * succeeds; one already unlocked holds its key, and loses nothing.
    */
   const takeUpLease = async (forgetsThen: number) => {
-    if (vaultProps === UnreadVaultProps || vaultProps === null) { return }
+    if (forgetsThen !== 0 || vaultProps === UnreadVaultProps || vaultProps === null) { return }
     const kept = await deviceDB.readLease(scope)
     if (kept === null) { return }
     const checked = Lease.safeParse(kept)

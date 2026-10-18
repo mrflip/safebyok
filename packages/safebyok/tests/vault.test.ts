@@ -424,6 +424,33 @@ describe("hello", () => {
     expect(vault.getSnapshot()).to.eq(settled)
   })
 
+  const LockThatKeptItsLeaseCases = [
+    ["lock()",                     async (vault: Vault) => { await TH.expectRefusal(vault.lock(), 'storage_unavailable') }],
+    ["lockSoon()",                 async (vault: Vault) => { await TH.expectRefusal(vault.lockSoon(), 'storage_unavailable') }],
+    ["a lock for untrusted storage", async (vault: Vault, world: ReturnType<typeof makeWorld>) => {
+      vi.spyOn(world.vaultDB, 'readBox').mockRejectedValueOnce(new VaultError('identity_revoked', 'Signed out.'))
+      await TH.expectRefusal(vault.readBox('anthropic'), 'identity_revoked')
+    }],
+  ] as const
+
+  for (const [blurb, lockIt] of LockThatKeptItsLeaseCases) {
+    it(`takes up no lease after ${blurb} could not erase it, though a failed read has it say hello afresh: a page load may, this handle never`, async () => {
+      const world = makeWorld()
+      const vault = await world.openUnlocked('pw')
+      await vault.storeBox('anthropic', 'sk-fake')
+      vi.spyOn(world.deviceDB, 'eraseLease').mockRejectedValueOnce(new Error('the device store is read-only'))
+      await lockIt(vault, world)
+      expect(vault.getSnapshot().state).to.eq('locked')
+      expect(await world.readLease()).to.not.be.null
+      vi.spyOn(world.vaultDB, 'readVaultProps').mockRejectedValueOnce(new VaultError('storage_unavailable', 'The vault storage could not be reached.'))
+      world.dbStore.write('elsewhere', '{}')
+      await TH.wakeupAtNextTick()
+      await TH.expectRefusal(vault.readBox('anthropic'), 'vault_locked')
+      expect(vault.getSnapshot()).to.deep.include({ state: 'locked', trouble: null })
+      expect(await world.stateOnOpen()).to.eq('unlocked')
+    })
+  }
+
   it("lets lock() win at once, waiting for no hello: storage unreachable, and the lease being read is not taken up", async () => {
     const world = makeWorld()
     await seedVault(world)
@@ -4973,13 +5000,15 @@ describe("a hello that fails", () => {
     })
   }
 
-  it("says the device's own store failing to read the lease as 'storage_unavailable', its error the cause", async () => {
+  it("says the device's own store failing to read the lease as 'storage_unavailable', its error the cause, settling locked beside that trouble", async () => {
     const world = makeWorld()
     await seedVault(world)
     const trouble = new Error('device storage is unavailable')
     vi.spyOn(world.deviceDB, 'readLease').mockRejectedValueOnce(trouble)
-    const err = await TH.expectRefusal(world.open(), 'storage_unavailable')
+    const vault = Vault.make(world.optsWith())
+    const err = await TH.expectRefusal(vault.hello(), 'storage_unavailable')
     expect(err.cause).to.eq(trouble)
+    expect(vault.getSnapshot()).to.deep.include({ state: 'locked', trouble: err })
   })
 
   it("says the device's own store failing to read its mark of the vault as 'storage_unavailable', its error the cause", async () => {
@@ -6115,9 +6144,10 @@ describe("when storage says the user is no longer signed in", () => {
     vi.spyOn(world.vaultDB, 'readBox').mockRejectedValueOnce(signedOut())
     await TH.expectRefusal(vault.readBox('anthropic'), 'identity_revoked')
     expect(vault.getSnapshot().state).to.eq('locked')
-    // The next call says hello afresh, and takes up the lease the lock could not forget, as the
-    // next page load would.
-    await TH.expectRefusal(vault.readBox('anthropic'), 'absent_box')
+    // The next call says hello afresh, but this handle takes up no lease the lock could not
+    // forget: that is left for the next page load.
+    await TH.expectRefusal(vault.readBox('anthropic'), 'vault_locked')
+    expect(await world.readLease()).to.not.be.null
     expect(world.logged[0]).to.deep.include({ level: 'warn', story: { call: 'untrustedStorage' } })
     expect((world.logged[0]?.err as VaultError).kind).to.eq('storage_unavailable')
     expect(world.logged[0]?.err?.cause).to.eq(stuck)

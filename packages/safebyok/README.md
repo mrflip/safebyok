@@ -64,8 +64,10 @@ option `Vault.make` does not take -- a misspelling, or a name it no longer uses 
 
 `Vault.make` answers at once, and the handle starts its own `hello()`: until that has read
 storage, the snapshot says `opening`, and any call made meanwhile waits for it. A hello that
-fails leaves the vault `opening`, saying why as the snapshot's `trouble` (and through the logger);
-`vault.hello()` tries again, and so does any other call.
+fails reading storage leaves the vault `opening`, saying why as the snapshot's `trouble` (and
+through the logger); one that fails after it, as this device's store refuses its lease, settles
+`absent` or `locked` with the `trouble` beside it. `vault.hello()` tries again, and so does any
+other call.
 
 Serve the app over https: a browser withholds WebCrypto from a page served over plain http, so
 `Vault.make` refuses one at once, with kind `insecure_context` (`http://localhost` counts as
