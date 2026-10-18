@@ -637,7 +637,8 @@ const uncheckingDeviceDB = () => {
 }
 
 const SpoiledWayins = [
-  [(row: Record<string, unknown>) => ({ ...row, format: 'byok-unlock-v1' }),                  'a record under the format tag before the rename'],
+  [(row: Record<string, unknown>) => ({ ...row, format: 'byok-unlock-v1' }),                  "a record under the format tag from before the package's rename"],
+  [({ lease_key: kept, vault_key_lease_wrapped: wrapped, ...row }: Record<string, unknown>) => ({ ...row, format: 'safebyok-unlock-v1', local_unlock_key: kept, vault_key_local_wrapped: wrapped }), 'a record from before the lease, under safebyok-unlock-v1'],
   [(row: Record<string, unknown>) => ({ ...row, ask_passphrase_at: '99999999999999' }),       'a deadline written as text, which would compare as a number'],
   [(row: Record<string, unknown>) => ({ ...row, ask_passphrase_at: Infinity }),               'a deadline that never comes'],
   [({ ask_passphrase_at: _gone, ...row }: Record<string, unknown>) => row,                    'a record missing its deadline'],
@@ -725,6 +726,17 @@ describe("the lease, from a host's own DeviceDB", () => {
     await world.openUnlocked('pw one', { deviceDB: device.deviceDB })
     device.spoilRow((row) => ({ ...row, user_id: 'u2' }))
     await world.open({ deviceDB: device.deviceDB })
+    expect(world.logged.map((call) => call.level)).to.deep.equal(['warn'])
+    expect(world.logged[0]?.message).to.include('could not be read')
+  })
+
+  it("says once through the logger that a record from before the lease, under safebyok-unlock-v1, was forgotten", async () => {
+    const world = makeWorld()
+    const device = uncheckingDeviceDB()
+    await world.openUnlocked('pw one', { deviceDB: device.deviceDB })
+    device.spoilRow(({ lease_key: kept, vault_key_lease_wrapped: wrapped, ...row }) => ({ ...row, format: 'safebyok-unlock-v1', local_unlock_key: kept, vault_key_local_wrapped: wrapped }))
+    await world.open({ deviceDB: device.deviceDB })
+    expect(device.rows.size).to.eq(0)
     expect(world.logged.map((call) => call.level)).to.deep.equal(['warn'])
     expect(world.logged[0]?.message).to.include('could not be read')
   })
