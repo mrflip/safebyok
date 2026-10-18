@@ -149,8 +149,8 @@ export const vaultKeyEpoch = Z.int().check(Z.positive())
 const cryptoKeyHandle = Z.custom<CryptoKey>((val) => val instanceof CryptoKey, 'a CryptoKey handle')
 
 /**
- * A lockbox's sidecar: your app's own plain data, riding beside the whisper, authenticated but
- * not encrypted. Any JSON value -- what the user calls the account, which project a key belongs
+ * A lockbox's sidecar: your app's own plain data, riding beside the whisper, not encrypted,
+ * but guaranteed unchanged. Any JSON value -- what the user calls the account, which project a key belongs
  * to -- shown while the vault is locked, and never interpreted by safebyok. It is stored in the clear, as its JSON (`sidecar_json`), and bound into
  * the lockbox's encryption, so a sidecar altered or swapped in storage makes the lockbox refuse to
  * open. A host checks its own sidecar's shape before `storeBox()`. Never put secret material in it.

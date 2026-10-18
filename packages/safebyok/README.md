@@ -157,7 +157,7 @@ marked `sideEffects: false`: what you never import never ships.
 ## A lockbox's sidecar
 
 Each lockbox carries a **sidecar**: your app's own plain data, riding beside the whisper,
-authenticated but not encrypted. It is any JSON value your app keeps about the lockbox -- what the
+not encrypted, but guaranteed unchanged. It is any JSON value your app keeps about the lockbox -- what the
 user calls the account, which project a key belongs to, when it was last rotated -- shown in the
 snapshot while the vault is locked, as `box.sidecar`. The vault never looks inside it.
 
@@ -170,10 +170,10 @@ vault.getSnapshot().boxes[0]  // { boxlabel: 'anthropic_api_key', sidecar: {}, d
 
 * **It is not encrypted.** It is stored in the clear, so never put secret material in it: a key, a
   password, a recovery code. Anyone who can read your storage reads it.
-* **It is authenticated.** Its JSON, keys sorted, is bound into the lockbox's encryption with the rest of
-  the lockbox's public fields, so a sidecar altered or swapped in storage makes the lockbox refuse to
-  open (`damaged_lockbox`). The snapshot shows the sidecar as storage holds it; only `readBox()` proves
-  it unaltered. A sidecar stored other than as the vault writes it (respaced, reordered) lists the
+* **It is guaranteed unchanged.** Its JSON, keys sorted, is bound into the lockbox's encryption with the
+  rest of the lockbox's public fields, so a sidecar altered or swapped in storage makes the lockbox refuse
+  to open (`damaged_lockbox`). The guarantee comes with `readBox()`: the snapshot shows the sidecar as
+  storage holds it, and only `readBox()` proves it unaltered. A sidecar stored other than as the vault writes it (respaced, reordered) lists the
   lockbox as damaged.
 * **Its shape is yours.** The vault checks only that it is JSON (`Sidecar`; anything else is
   `bad_option`): check its shape yourself, with your own schema, before `storeBox()`. Left out of a

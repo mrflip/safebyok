@@ -531,7 +531,7 @@ export type Vault = {
    * it: that one reads and retires by its name, but is never written anew under it.
    *
    * `opts.sidecar` is the lockbox's sidecar ({@link Sidecar}): your app's own plain data, riding
-   * beside the whisper, authenticated but not encrypted. Any JSON value, shown in the snapshot while locked, never interpreted by the vault -- kind 'bad_option' for anything JSON
+   * beside the whisper, not encrypted, but guaranteed unchanged. Any JSON value, shown in the snapshot while locked, never interpreted by the vault -- kind 'bad_option' for anything JSON
    * cannot carry. Check its shape yourself before storing it. It is the only option: any other
    * (a misspelt `sidcar`, or a `note` beside it) is kind 'bad_option', writing nothing. Left out, the lockbox keeps the sidecar
    * it has (when its record opens: see above), and a new lockbox gets `{}`; `{}` empties it. The sidecar is stored in the clear and
