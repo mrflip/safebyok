@@ -1,9 +1,9 @@
 # Thread 8: make_hello (2026-10-18)
 
 Branch `20261018-make_hello`, PR [#166](https://github.com/mrflip/safebyok/pull/166), stacked on #165 (line main →
-#159 → #160 → #161 → #162 → #163 → #164 → #165). Justify: green -- core 2151 passed | 35
+#159 → #160 → #161 → #162 → #163 → #164 → #165). Justify: green -- core 2154 passed | 35
 skipped; react 221; indexeddb 135 | 10; convex 258 | 8; postgres 246 | 14; graphql 239 | 14;
-fastkey 49; demo 190 | 16; e2e 81 | 89; root scripts 258. Security note: one new 2026-10-18 entry
+fastkey 49; demo 191 | 16; e2e 81 | 89; root scripts 258. Security note: one new 2026-10-18 entry
 (through a `sonnet` subagent).
 
 * **Built**: `openVault(opts)` is gone, no alias. `Vault.make(opts): Vault` (synchronous) checks
@@ -68,9 +68,17 @@ fastkey 49; demo 190 | 16; e2e 81 | 89; root scripts 258. Security note: one new
     `setOpenFailure` when `Vault.make` throws in the effect (the handle is the effect's to make
     and close; make answers synchronously, so there is no callback to set state from).
 * **Discoveries**:
-  * A lease that an untrusted-storage lock failed to erase (device store erroring) is taken up by
-    the next call's hello once storage serves the user again, where before only the next page
-    load would. Tested; in the security note.
+  * **Fixed in review: a lock was undone on its own handle.** A `lock()`, `lockSoon()` or
+    untrusted-storage lock whose lease erase failed, then a failed read (resetting the memo), let
+    the next call's hello take the lease up and hand back a whisper with no passphrase:
+    `forgetsSoFar` was compared only within one hello. Now a handle takes up a lease only while it
+    has never forgotten one (`forgetsThen === 0`, checked in `takeUpLease`); a lease the lock
+    could not erase is left for the next page load, as before this thread. A handle whose first
+    hello failed still takes its lease up; an unlocked one loses nothing. Regression tests for the
+    three locks; the security note's entry amended (through a `sonnet` subagent).
+  * A hello that fails at the lease step (the device store refusing `readLease` or `eraseLease`)
+    settles `absent`/`locked` with `trouble` set, not `opening`: the `trouble`, `hello()` and
+    `Vault.make` docs and the README say so (no restructuring of the take-up).
   * `forcePassphraseReentryHours` survives in `RenamedMakeVaultOpts` and its tests: thread 10's
     grep (thread 6's pattern) meets it. An allowed survivor until 1.0, like *Old names*.
   * `scripts/size-budget.ts`'s usage message named `--add openVault=1.5`; now `Vault`.
@@ -82,6 +90,7 @@ fastkey 49; demo 190 | 16; e2e 81 | 89; root scripts 258. Security note: one new
   * **Provider's vault while opening**: `vault` is now non-null while opening, and `retryOpen()`
     no longer clears `openError` while the retry runs (it clears when the vault settles).
     Recommend keeping both.
-  * **Suppression**: the `set-state-in-effect` disable above. Recommend accepting.
-  * **Lease re-take-up** after an untrusted-storage lock that could not erase the lease (see
-    *Discoveries*). Recommend accepting; it is in the security note.
+  * **Suppression**: the `set-state-in-effect` disable above (its reason now on the line, by the
+    reviewer). CLAUDE.md pre-approves only `no-param-reassign`/`no-explicit-any` disables, so
+    this one awaits the Coach's yes; the reviewer found no clean alternative (making in render
+    doubles side effects under StrictMode; a microtask brings back a late handle).
