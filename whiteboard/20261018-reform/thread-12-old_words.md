@@ -1,6 +1,6 @@
 # Thread 12: old_words (2026-10-18)
 
-Branch `20261018-old_words`, PR #PRNUM, stacked on [#158](https://github.com/mrflip/safebyok/pull/158) (the top of the reform line). Documents only. Justify: JUSTIFY.
+Branch `20261018-old_words`, PR [#170](https://github.com/mrflip/safebyok/pull/170), stacked on [#158](https://github.com/mrflip/safebyok/pull/158) (the top of the reform line). Documents only. Justify: green -- core 2161 passed | 35 skipped; react 227; indexeddb 135 | 10; postgres 246 | 14; fastkey 49; scripts 258.
 
 * **Built**
   * `notes/old_vocabulary.md`: VOCABULARY.md's *Old names* table moved there whole, under a short header (what it is, who reads it, that nothing current uses it, deleted at 1.0.0). VOCABULARY.md keeps one sentence pointing to it. `CLAUDE.md`'s `notes/` bullet names the file. Three dead pointers to the old section were repointed: the `Vault.make` option-names doc comment in `vault.ts` (comment only, no code), this release's `.changeset/20261018-sweep.md`, and `human/20261018-sprint_reform_done.md`.
