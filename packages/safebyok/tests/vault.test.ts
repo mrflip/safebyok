@@ -206,8 +206,8 @@ describe("Vault.make's options", () => {
 
   it("names every option it refuses, and never quotes a value", () => {
     const world = makeWorld()
-    const err = TH.expectSyncRefusal(() => Vault.make({ ...world.optsWith(), note: 'FAKESECRET', unlockId: 'FAKESECRET' } as MakeVaultOpts), 'bad_option')
-    expect(err.message).to.match(/the options note, unlockId:/)
+    const err = TH.expectSyncRefusal(() => Vault.make({ ...world.optsWith(), note: 'FAKESECRET', colour: 'FAKESECRET' } as MakeVaultOpts), 'bad_option')
+    expect(err.message).to.match(/the options note, colour:/)
     expect(TH.thrownText(err)).to.not.include('FAKESECRET')
   })
 
