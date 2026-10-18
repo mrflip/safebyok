@@ -19,7 +19,8 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
   rename to "wayin".** A wayin's wrap is bound to a context of the record's format tag, then its
   whole stored header, as key-sorted JSON (a passkey wayin's HKDF `info` is the same bytes); it now
   spells the renamed fields and begins `safebyok-vault-v3`. The construction and the purpose
-  strings are unchanged. A `safebyok-vault-v2` record reads as `damaged_bundle`, with no migration,
+  strings are unchanged. A `safebyok-vault-v2` record reads as `damaged_bundle` on adapters that read
+  it (a Convex deployment refuses the new schema until its tables are cleared), with no migration,
   so no old ciphertext has to open under the new bytes. Rejected: a translation back to the old
   spellings under the v2 tag, which puts a name table in the crypto path for records nobody reads.
 * 2026-10-16: `describeVaultDB` now races every compare-and-write line (VAULTDB.md, 3.1 to 3.5, 3.7,
