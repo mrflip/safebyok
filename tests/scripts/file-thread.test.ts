@@ -138,7 +138,7 @@ describe('scripts/file-thread', () => {
     expect(existsSync(root)).to.eq(true)
   })
 
-  describe('when git worktree remove fails and leaves its directory behind', () => {
+  describe("when git worktree remove fails and leaves its directory behind", () => {
     let stubs: string
     /** Runs the script with a git that does its worktree removal, then, as Finder does, leaves `leftovers` behind and fails */
     const fileWithLeftovers = (leftovers: Record<string, string>, extraEnv: Record<string, string> = {}, prove = 'true') => {
@@ -177,7 +177,7 @@ describe('scripts/file-thread', () => {
       chmodSync(path.join(stubs, 'rm'), 0o755)
     })
 
-    it('deletes the leftover directory, retrying, and prunes, when it holds only the tip, a .DS_Store and ignored files', () => {
+    it("deletes the leftover directory, retrying, and prunes, when it holds only the tip, a .DS_Store and ignored files", () => {
       writeFileSync(path.join(main, '.gitignore'), 'node_modules\ndist\n')
       git('add', '.gitignore')
       git('commit', '--quiet', '--message', 'docs: ignore')
@@ -193,7 +193,7 @@ describe('scripts/file-thread', () => {
       expect(git('worktree', 'list', '--porcelain')).not.to.include(root)
     })
 
-    it('leaves the directory for a person when it holds a file the tip does not, naming it', () => {
+    it("leaves the directory for a person when it holds a file the tip does not, naming it", () => {
       cutAndBuild('origin/main')
       const result = fileWithLeftovers({ 'shim.ts': 'export {}\n', 'notes/scratch.txt': 'mine' })
       expect(result.status).to.eq(1)
@@ -202,7 +202,7 @@ describe('scripts/file-thread', () => {
       expect(existsSync(path.join(root, 'notes/scratch.txt'))).to.eq(true)
     })
 
-    it('leaves the directory for a person when the worktree held uncommitted changes before the removal', () => {
+    it("leaves the directory for a person when the worktree held uncommitted changes before the removal", () => {
       cutAndBuild('origin/main')
       const result = fileWithLeftovers({ 'shim.ts': 'export {}\n' }, {}, 'echo changed > shim.ts')
       expect(result.status).to.eq(1)
@@ -210,7 +210,7 @@ describe('scripts/file-thread', () => {
       expect(existsSync(root)).to.eq(true)
     })
 
-    it('leaves the directory for a person when git refused the removal outright and still lists the worktree', () => {
+    it("leaves the directory for a person when git refused the removal outright and still lists the worktree", () => {
       cutAndBuild('origin/main')
       git('worktree', 'lock', root)
       const result = fileWithLeftovers({})
@@ -219,7 +219,7 @@ describe('scripts/file-thread', () => {
       expect(existsSync(path.join(root, 'shim.ts'))).to.eq(true)
     })
 
-    it('leaves the directory for a person when origin\'s branch is not at the tip', () => {
+    it("leaves the directory for a person when origin's branch is not at the tip", () => {
       cutAndBuild('origin/main')
       commit(root, 'review.ts', 'export {}\n')
       const result = fileWithLeftovers({ 'shim.ts': 'export {}\n' }, { STUB_NOPUSH: '1' })
