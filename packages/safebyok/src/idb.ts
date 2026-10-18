@@ -63,7 +63,7 @@ const bellnameOf = (dbName: string) => `safebyok-idb:${dbName}:device_db`
  * non-extractable leaseKey -- as a handle, never as bytes. Device marks share its shelf.
  *
  * A record that will not read back (damaged, or written by another version) reads as "no
- * * lease", or no device mark, and is discarded: losing the convenience is the safe failure. A row
+ * lease", or no device mark, and is discarded: losing the convenience is the safe failure. A row
  * filed under an earlier version's ckey is deleted unread at the next read or erase of a lease.
  * Its rows are filed under `Ckeys`, names joined on `^`, and a scope with a name holding one is
  * refused with kind 'bad_label'. Kind 'bad_option' for a `dbName` that is not non-empty text.
