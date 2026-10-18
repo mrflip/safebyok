@@ -7,7 +7,7 @@ medium. Threads at once: 2. Issued by: the Coach, from `reform-preplan.md` besid
 Sprint doc: https://claude.ai/code/artifact/b7fd117e-7a03-4f68-b2fa-b2c1e70e118b (*Open Matters*,
 *Progress*, *Resolved*).
 
-**Status:** threads 1 to 9 filed, in the line main → #159 → … → #167; thread 10 building.
+**Status:** done. All ten threads filed, in the line main → #159 → #160 → #161 → #162 → #163 → #164 → #165 → #166 → #167 → #168 → #158 (this sprint PR, the top). Three threads (8, 9, 10) came back flagged and passed a second review. Nothing merged.
 
 ## Read first
 
@@ -234,6 +234,8 @@ matters only at the start.
 
 *Gloss:* *Touches* docs and whatever the grep finds; `.size-limit.json` (`--write`), `notes/security.md` (through a `sonnet` subagent), one changeset summarising the sprint. The grep list is the union of threads 3 to 8's, handed over in full. *Orchestrator:* the sweep covers `TODO.md` and `NOTYET.md` too (`TODO.md:135`, `NOTYET.md:7` say "remembered unlock"; TODO names `takeUpUnlock`). Also put the demo's note hint back in words of effect, e.g. "(not encrypted: visible without the passphrase; left blank, the note stands)", rather than naming the sidecar (YOLO ruling from thread 5's review). The grep meets `'safebyok-lockbox-v4'` as an arbitrary input in `ctx-bytes.test.ts`'s first (encoding) test: allowed, or change its text and hex together. The *Old names* table stays unless the Coach's word is in the doc's *Coach notes* or a ruled row. *Model*: `sonnet`. *Depends on*: 9. *Size*: small to medium.
 
+
+*Review:* flagged (medium), then fixed on a second review. First review: two fixes (the trigger rename marked "only if you ran VaultNotifySql", else `revision_id` never renamed; the README's "all ciphertext" beside the plain sidecar) and one significant finding: the summary changeset's Postgres steps were written against the sprint base, and fail on a `safebyok-postgres@0.3.0` database. *Orchestrator:* resumed the builder (YOLO): one 0.3.0 path (drop the lockbox table, three vault-table renames, the new SQL), the tag history as 0.3.0 wrote it, the security entry's lease wording, two README lines. Second review (PGlite from the 0.3.0 tag, `postgresVaultDB` driven against the result): holds; three fixes (what is superseded named by what it touches; the dropped hard-cap trigger; how a 0.3.0 vault reads on each store). *Orchestrator:* the security entry, still measured against unreleased steps, was corrected against 0.3.0 through a `sonnet` subagent (`de23a411`). Left for the Coach: five earlier changesets still give their own Postgres steps (row); the thread file's `unlock^` line.
 
 ## For the Coach
 

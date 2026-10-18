@@ -203,3 +203,17 @@ disagree. Workers look things up here; they do not write here (each keeps its
 * React `PassphraseModal` shows it in the `quiet` (advice) class, dialog open.
 * For thread 10: README/doc text that says "check for typos" beside `wrong_passphrase` now has a
   sibling kind.
+
+### Thread 10, sweep (#168)
+
+* The summary changeset (`.changeset/20261018-sweep.md`) is the release's one upgrade path from
+  0.3.0: Postgres (drop `safebyok_lockboxes`, rename `unlocks` → `wayins` and the table to
+  `safebyok_vaults`, the trigger only if `VaultNotifySql` ran, then the new SQL), Convex
+  (clear tables), GraphQL pairing, the renames, `Vault.make`/`hello`/`trouble`,
+  `created_elsewhere`, the retry removed. 0.3.0 wrote vault `-v2`, lockbox `-v2`, lease
+  `safebyok-unlock-v1` under JSON-tuple ckeys; on `localVaultDB`/`idbVaultDB` a 0.3.0 vault reads
+  as absent, elsewhere as `damaged_vault`; the 0.3.0 device mark is swept with the lease.
+* *Orchestrator:* the thread file says `idbDeviceDB` deletes an old `unlock^` row; a 0.3.0 device's
+  rows are JSON tuples. The changeset and the security note are right.
+* Size budgets moved: `everything` 38 → 39 kB, `Vault` 31 → 32, `VaultProvider` 6.8 → 7.2,
+  `reactEverything` 8.1 → 8.3.
