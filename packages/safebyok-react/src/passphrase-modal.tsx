@@ -175,9 +175,10 @@ const DialogTrouble = ({ onDone }: { onDone: (unlocked: boolean) => void }) => {
 }
 
 /**
- * What the dialog says to the user, and whether it is about the passkey: a word about the typed
- * passphrase goes once the user types again; one about the passkey stays until the next submit,
- * or the next press of the passkey.
+ * What the dialog says to the user, whether it is about the passkey, and whether it is advice
+ * rather than a complaint: a word about the typed passphrase goes once the user types again;
+ * one about the passkey stays until the next submit, or the next press of the passkey. Advice
+ * (a vault created on another device meanwhile) shows in the `quiet` style, not the `gripe` one.
  */
 type Gripe = { text: string, fromPasskey: boolean, asAdvice: boolean }
 
