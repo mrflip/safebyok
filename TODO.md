@@ -54,28 +54,29 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
 
 Wanted; each has a design question to settle first, named here.
 
-### Which ways in a rotation keeps
+### Which wayins a rotation keeps
 
 From [#105](https://github.com/mrflip/safebyok/pull/105) (the rotation design, section 9). The
-first matter said rotation "re-wraps the remaining wayins", but it can't: each way in's key
+first matter said rotation "re-wraps the remaining wayins", but it can't: each wayin's key
 comes from a passphrase or a passkey touch the vault never keeps, and any shortcut would hand the
-new vaultKey to the way in being removed. So the design keeps only the ways in the user proves
+new vaultKey to the wayin being removed. So the design keeps only the wayins the user proves
 during the rotation and removes the rest -- which is also what locks out a lost phone's passkey,
-and signs every other device out until it is asked again. The alternative, a key pair per way in
+and signs every other device out until it is asked again. The alternative, a key pair per wayin
 so rotation can re-wrap every wayin unasked (HPKE), is a new construction (the design's open
-question 1).
+question 1). That design file is gone: the Coach (2026-10-18) removed it, "we will have a different
+plan", so the question stands for the plan that replaces it.
 
 The Coach (2026-10-16): wants to understand this better; land the recommendation for now. **Landed
-as recommended**: thread 19 (`rotateVaultKey`, not yet built) keeps only the ways in proven during
+as recommended**: thread 19 (`rotateVaultKey`, not yet built) keeps only the wayins proven during
 the rotation.
 Revisit before 1.0 if rotation signing every other device out is too blunt.
 
-### `destroy()`'s edge cases
+### `retire()`'s edge cases
 
 From the Convex sprint ([#18](https://github.com/mrflip/safebyok/pull/18)): a handle that never
-saw vault props resolves `destroy()` without erasing, even if a vault has since appeared elsewhere, so
-"delete account" can report success while a vault stands. And after a refused `destroy()`, an
-app's automatic retry erases the vault that was made again in between. The Coach (2026-10-16):
+saw vault props resolves `retire()` without retiring anything, even if a vault has since appeared elsewhere, so
+"delete account" can report success while a vault stands. And after a refused `retire()`, an
+app's automatic retry retires the vault that was made again in between. The Coach (2026-10-16):
 assess these once the contract is tight and the tests unified -- that is, against
 `packages/safebyok/VAULTDB.md` ([#107](https://github.com/mrflip/safebyok/pull/107)) and the
 shared battery ([#114](https://github.com/mrflip/safebyok/pull/114)), after the Convex tests settle
@@ -84,7 +85,7 @@ changed either.
 
 ### Lock NOW vs soft lock
 
-From [#106](https://github.com/mrflip/safebyok/pull/106): a `read()` or `use()` that started
+From [#106](https://github.com/mrflip/safebyok/pull/106): a `readBox()` or `useBox()` that started
 while the vault was unlocked still hands back its whisper if the vault locks (a sign-out, or
 `lock()`) while it waits on storage. It has always been so for `lock()`; a sign-out makes it
 likelier. The orchestrator proposed that reads check again after storage answers and refuse with
@@ -94,7 +95,7 @@ The Coach (2026-10-16), holding it: there should be a distinction between *lock 
 goons are here* and *it's time for a password refresh*. The proposal sounds like its own race
 condition; decide what guarantee we offer, and why, before writing more code.
 
-Where it stands today: the expiry ruling (*5. Expiry and the unlock window*, now in
+Where it stands today: the expiry ruling (section 5, on when a lease runs out, now in
 `winboard/20261016-todo/20261016-todo-open.md`) says "in-flight work is never clawed back",
 and `lockSoon()` already gives a grace in which work started before it finishes -- the soft lock.
 `lock()` and a sign-out have no separate meaning yet. Decide: does `lock()` mean "now" (nothing
@@ -108,9 +109,9 @@ proof, a passkey's included, and when a vault has several passphrases and the pr
 the caller must name which to replace (`wayinId`), or the call is refused rather than guessing.
 The Coach (2026-10-16): "keep as built, but this is too complicated for a user to tolerate or a
 customer to implement UX for." Decide whether a vault should hold more than one passphrase at
-all, or exactly one, with passkeys the other ways in. The Gripefest doc's NOT YET row G530 asks the
-deeper question beside it: whether a periodic passphrase re-entry is still the right demand once a
-vault has a passkey. Decide both before the ways-in surface is 1.0.
+all, or exactly one, with passkeys the other wayins. The Gripefest doc's NOT YET row G530 asks the
+deeper question beside it: whether asking for the passphrase again whenever a lease runs out is still the right demand once a
+vault has a passkey. Decide both before the wayin surface is 1.0.
 
 ### Identity should not be tied to the backing database
 
@@ -127,15 +128,57 @@ the package for other work done on every call that could be composed once when t
 adapter is made, or memoized: a check of an option, a formatter, a validator built per call. Measure
 first; maintainability beats speed unless something is shown slow.
 
-### A ways-in change racing this handle's own refresh
+### A wayin change racing this handle's own refresh
 
 From thread 4 ([#132](https://github.com/mrflip/safebyok/pull/132), `thread-4-refusals_and_catchup.md`,
-*A pre-existing race*): during a change to the ways in, this handle's own bell refresh can read the
+*A pre-existing race*): during a change to the wayins, this handle's own bell refresh can read the
 new vault props before `reviseWayins` sets it, judge the key `outlived`, drop it and erase the
-lease. `takeUpVaultKey` restores the key in memory, but that erase can land after the
+lease. `grantLease` restores the key in memory, but that erase can land after the
 new record, so the next open asks for the passphrase. The direction is safe, and serializing the
 refreshes does not cure it. The Coach (2026-10-16): into the TODO, beside the multiple-passphrases
 question. The fix, small: do not judge `outlived` against vault props this handle wrote itself.
+
+### A "newer, don't touch" state for lockboxes
+
+From [#163](https://github.com/mrflip/safebyok/pull/163) (thread 5 and its review): a lockbox has
+no format version to read ahead of, so it has no newer-format state. A lockbox in any format but
+today's lists as damaged, and an app on an older safebyok shows a lockbox written by a newer one as
+damaged, where the user may retire it or store over it (only on the user's own action, never by
+the vault). The Coach: "Yes add to TODO: version number on lockbox." Give lockboxes a "newer, don't
+touch" state like the vault's `newer_format`: the format tag read as a version, so that a newer
+lockbox lists as one to leave alone and an older, unreadable one still lists as damaged.
+
+## hello, make and the react lifecycle
+
+The Coach (2026-10-18), on the make_hello sprint's review: "This sounds like a design issue, sweep
+to a todo section for all of the below, hello and make and react lifecycle." Four behaviours that
+came with `Vault.make` and `hello()` ([#166](https://github.com/mrflip/safebyok/pull/166)); each
+works as built, and a redesign of the lifecycle may change all four.
+
+* **`lock()`, `lockSoon()` and `close()` don't wait for `hello()`.** Every other method waits for
+  storage to answer first; these three act at once, and a lock made while `hello()` runs wins over
+  taking up the lease. `retire()` waits. (#166, thread 8)
+* **A failed `hello()` keeps the handle alive.** A refused `hello()` no longer closes the storage
+  watch, so the same handle can retry; after an untrusted-storage refusal the next call meets that
+  refusal again rather than `vault_locked`. (#166, thread 8)
+* **React's vault is non-null while opening.** `VaultProvider` hands down the handle at once, in
+  state `opening`; `openError` comes from the snapshot's trouble, and `retryOpen()` no longer clears
+  it while the retry runs. A host checking `vault !== null` for "ready" must check the state
+  instead. (#166, thread 8)
+* **The `react-hooks/set-state-in-effect` suppression in `vault-provider.tsx`.** `VaultProvider`
+  makes the vault in an effect, and `Vault.make` throws synchronously (`bad_option`, for one), so
+  the failure is set in the effect body. Making the vault in render doubles its side effects under
+  StrictMode, and deferring the failure brings back a late handle. A lifecycle redesign may remove
+  the need for the suppression. (#166, thread 8 and review)
+
+## Accessibility
+
+The Coach (2026-10-18): "make a todo section for accessability, enter this there."
+
+* **A screen-reader check of the `created_elsewhere` advice.** The dialog writes the advice in an
+  alert region and then moves focus to the emptied field; a screen reader may announce the field
+  and cut the advice off. Try it with VoiceOver before 1.0; if the advice is cut off, point the
+  field's `aria-describedby` at the advice too. (#167 second review)
 
 ## RAGEBAIT
 
