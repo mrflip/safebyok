@@ -1,3 +1,4 @@
+import { hex } from '@scure/base'
 import { describe, expect, it } from 'vitest'
 import { cipherCtx, decipherBytes, deriveWrappingKey, fromB64, importWrappingKeyBytes, makeVaultKey, unwrapKeyUnder } from '../src/crypto'
 import { memoryDeviceDB } from '../src/device-db'
@@ -17,7 +18,6 @@ import * as TH from './test-helpers'
 // the ctx's JSON; the values a vault draws afresh (vault_id, revision_id, salt) are interpolated
 // from the record that carries them.
 
-const hexOf = (bytes: Uint8Array) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
 const textBytes = (text: string) => new TextEncoder().encode(text)
 
 const scope = TH.scopeOf('u1')
@@ -30,7 +30,7 @@ describe("the ctx builders' output, byte for byte", () => {
   it("cipherCtx's encoding of strings, numbers and a record with its keys sorted is pinned byte for byte", () => {
     const ctx = cipherCtx('safebyok-lockbox-v4', 'acme', 'u1', 'main', 'vid', 1, 'whisper_ciphered', { written_at: 2, boxlabel: 'anthropic', revision_id: 'r1' })
     expect(new TextDecoder().decode(ctx)).to.eq('["safebyok-lockbox-v4","acme","u1","main","vid",1,"whisper_ciphered",{"boxlabel":"anthropic","revision_id":"r1","written_at":2}]')
-    expect(hexOf(ctx)).to.eq('5b227361666562796f6b2d6c6f636b626f782d7634222c2261636d65222c227531222c226d61696e222c22766964222c312c22776869737065725f6369706865726564222c7b22626f786c6162656c223a22616e7468726f706963222c227265766973696f6e5f6964223a227231222c227772697474656e5f6174223a327d5d')
+    expect(hex.encode(ctx)).to.eq('5b227361666562796f6b2d6c6f636b626f782d7634222c2261636d65222c227531222c226d61696e222c22766964222c312c22776869737065725f6369706865726564222c7b22626f786c6162656c223a22616e7468726f706963222c227265766973696f6e5f6964223a227231222c227772697474656e5f6174223a327d5d')
   })
 
   it("a passphrase wayin's wrap is bound to the vault, the purpose and its whole header, byte for byte", async () => {
