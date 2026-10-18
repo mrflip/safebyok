@@ -2439,7 +2439,7 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
       expect(await deviceDB.readMark(scopeOf('u1'))).to.deep.equal(markOf('u1', { seen: { unlock_epoch: 4 } }))
     })
 
-    it("keeps marks per vault, and apart from remembered wayins: erasing one leaves the rest", async () => {
+    it("keeps marks per vault, and apart from remembered unlocks: erasing one leaves the rest", async () => {
       const deviceDB = await makeDeviceDB()
       await deviceDB.writeUnlock(await unlockOf('u1'), NoLocks)
       await deviceDB.writeMark(markOf('u1'))

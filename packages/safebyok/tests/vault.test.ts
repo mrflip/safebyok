@@ -3912,7 +3912,7 @@ describe("the key deriver seam", () => {
   })
 
   describe("a deriver that declares Argon2id", () => {
-    it("opens, and wayins, when its spec is one Argon2id can run", async () => {
+    it("opens, and unlocks, when its spec is one Argon2id can run", async () => {
       const world = makeWorld()
       const vault = await world.openUnlocked('pw', { keyDeriver: handBuilt({ salt_bytes: 16 }) })
       expect(vault.getSnapshot().state).to.eq('unlocked')
@@ -3943,13 +3943,13 @@ describe("the key deriver seam", () => {
   })
 
   describe("a deriver of another algorithm, or none declared", () => {
-    it("opens and wayins, declaring an algorithm of its own, with no Argon2id parameters to carry", async () => {
+    it("opens and unlocks, declaring an algorithm of its own, with no Argon2id parameters to carry", async () => {
       const scrypt: CustomKeyDeriver = { ...TH.testDeriver, key_deriver_label: 'acme_scrypt_v1', algorithm: 'scrypt' }
       const vault = await makeWorld().openUnlocked('pw', { keyDeriver: scrypt })
       expect(vault.getSnapshot().state).to.eq('unlocked')
     })
 
-    it("opens and wayins, declaring none, as the test deriver does", async () => {
+    it("opens and unlocks, declaring none, as the test deriver does", async () => {
       expect(TH.testDeriver).to.not.have.property('algorithm')
       const vault = await makeWorld().openUnlocked('pw')
       expect(vault.getSnapshot().state).to.eq('unlocked')
