@@ -877,7 +877,7 @@ describe("the lease", () => {
 })
 
 describe("the lease, when the host changes leaseHours", () => {
-  it("lowered from Infinity to one hour, forgets a lease already granted at its next open, and the next unlock lasts an hour", async () => {
+  it("lowered from Infinity to one hour, revokes a lease already granted at its next open, and the next unlock lasts an hour", async () => {
     const world = makeWorld()
     await world.openUnlocked('pw one', { leaseHours: Infinity })
     world.advance(30 * 24 * HourMillis)
@@ -934,7 +934,7 @@ describe("the lease, when the host changes leaseHours", () => {
     expect(await leaseDeadlineOf(world)).to.eq(given)
   })
 
-  it("keeps a deadline exactly at the new window's end, and forgets one a millisecond past it", async () => {
+  it("keeps a deadline exactly at the new window's end, and revokes one a millisecond past it", async () => {
     const world = makeWorld()
     await world.openUnlocked('pw one', { leaseHours: 12 })
     const oneMilliShort = 12 - (1 / HourMillis)
@@ -1055,7 +1055,7 @@ describe("the lease, from a host's own DeviceDB", () => {
     })
   }
 
-  it("says through the logger that a record naming another scope was forgotten", async () => {
+  it("says through the logger that a record naming another scope was revoked", async () => {
     const world = makeWorld()
     const device = uncheckingDeviceDB()
     await world.openUnlocked('pw one', { deviceDB: device.deviceDB })
@@ -1065,7 +1065,7 @@ describe("the lease, from a host's own DeviceDB", () => {
     expect(world.logged[0]?.message).to.include('could not be read')
   })
 
-  it("says once through the logger that a record from before the lease, under safebyok-unlock-v1, was forgotten", async () => {
+  it("says once through the logger that a record from before the lease, under safebyok-unlock-v1, was revoked", async () => {
     const world = makeWorld()
     const device = uncheckingDeviceDB()
     await world.openUnlocked('pw one', { deviceDB: device.deviceDB })
@@ -3929,7 +3929,7 @@ describe("lockSoon", () => {
     expect(vault.getSnapshot().state).to.eq('locked')
   })
 
-  it("forgets the lease at once: a reopen within the grace asks for the passphrase", async () => {
+  it("revokes the lease at once: a reopen within the grace asks for the passphrase", async () => {
     const world = makeRacingWorld()
     const vault = await world.openUnlocked('pw one')
     await vault.lockSoon()
@@ -6055,7 +6055,7 @@ describe("the logger", () => {
     await vault.lockSoon()
     expect(vault.getSnapshot().state).to.eq('locked')
     reading = world.clock.now()
-    // an open that forgets an unreadable lease
+    // an open that revokes an unreadable lease
     await vault.unlock('pw')
     device.spoilRow(() => 'not a record')
     expect(await world.stateOnOpen({ logger, deviceDB: device.deviceDB, clock })).to.eq('locked')
@@ -6168,7 +6168,7 @@ describe("when storage says the user is no longer signed in", () => {
     expect(await world.readLease()).to.be.null
   })
 
-  it("forgets the lease when it meets the open, which then refuses", async () => {
+  it("revokes the lease when it meets the open, which then refuses", async () => {
     const world = makeWorld()
     const first = await world.openUnlocked('pw one')
     first.close()
@@ -6212,7 +6212,7 @@ describe("when storage says the user is no longer signed in", () => {
     expect(await world.readLease()).to.not.be.null
   })
 
-  it("locks all the same, and throws the refusal, when the device store will not forget the lease", async () => {
+  it("locks all the same, and throws the refusal, when the device store will not erase the lease", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
     const stuck = new Error('the device store is read-only')
@@ -6221,7 +6221,7 @@ describe("when storage says the user is no longer signed in", () => {
     await TH.expectRefusal(vault.readBox('anthropic'), 'identity_revoked')
     expect(vault.getSnapshot().state).to.eq('locked')
     // The next call says hello afresh, but this handle takes up no lease the lock could not
-    // forget: that is left for the next page load.
+    // revoke: that is left for the next page load.
     await TH.expectRefusal(vault.readBox('anthropic'), 'vault_locked')
     expect(await world.readLease()).to.not.be.null
     expect(world.logged[0]).to.deep.include({ level: 'warn', story: { call: 'untrustedStorage' } })
@@ -6463,7 +6463,7 @@ describe("vault props rolled back", () => {
     await TH.expectRefusal(world.open(), 'rolled_back')
     world.dbStore.write(u1VaultPropsCkey, newer)
     const reopened = await world.open()
-    expect(reopened.getSnapshot().state).to.eq('locked')  // the refused open forgot the lease
+    expect(reopened.getSnapshot().state).to.eq('locked')  // the refused open revoked the lease
     await reopened.unlock('pw')
     expect(reopened.getSnapshot().wayins.map((wayin) => wayin.wayinlabel)).to.deep.equal(['passphrase'])
   })

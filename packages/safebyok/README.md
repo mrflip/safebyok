@@ -367,7 +367,7 @@ Lowering the option later takes hold on each device at its next open: a lease gr
 longer setting, whose deadline lies past the new number of hours from then, is forgotten, and the
 user types their passphrase again. Raising it lengthens no lease already granted. A device keeps
 one lease per vault, shared by its tabs, so open a vault with one setting on a device: two tabs
-opening it with different ones each forget the other's lease (`notes/wontfix.md`). A device clock
+opening it with different ones each revoke the other's lease (`notes/wontfix.md`). A device clock
 stepped backwards does the same to a lease granted just before: it seems to last past its
 setting, and the user is asked again, the safe direction.
 
@@ -389,7 +389,7 @@ their passphrase again afterwards:
 * **`vault.lockSoon(graceSeconds = 5)`** is the soft lock: the bartender's stinkeye. Use it when
   the user steps away: a hidden tab, a sign-out. From the instant it is called the snapshot reads
   `locked`, every `readBox`, `useBox`, `storeBox` or `retireBox` called afterwards throws kind `vault_locked`, and this
-  device forgets its lease; but work already in hand finishes: a `readBox()` or a
+  device revokes its lease; but work already in hand finishes: a `readBox()` or a
   `storeBox()` under way, and an `unlock()` or `changePassphrase()` under way, here or in another tab,
   which leaves the vault unlocked again. The key is dropped `graceSeconds` later, or sooner when
   the lease would drop it sooner. An `unlock()` (or a `changePassphrase()`, which proves the
@@ -423,7 +423,7 @@ const lockWhenHidden = (vault: Vault) => {
     if (! document.hidden) { return }
     vault.lockSoon().catch((err: unknown) => {
       // A lockSoon() racing a close() is the one refusal to expect; any other, such as a device
-      // store that would not forget the lease, is worth a word.
+      // store that would not erase the lease, is worth a word.
       if (! isVaultError(err, 'vault_closed')) { console.warn('The vault did not lock cleanly', err) }
     })
   }
@@ -433,7 +433,7 @@ const lockWhenHidden = (vault: Vault) => {
 ```
 
 Call the function it returns when you close the vault. The `catch` quiets only a `lockSoon()`
-that races a `close()`, and lets a failure to forget the lease be heard: that vault
+that races a `close()`, and lets a failure to revoke the lease be heard: that vault
 is locked in this tab, but the next open may unlock without the passphrase. Chromium's Idle
 Detection API, behind a permission the user grants, is the only true screen-lock signal, and a
 locked screen is the user meaning it, so it calls `lock()`, quieted the same way:
@@ -463,7 +463,7 @@ another tab, a session that expired, another user signing in -- storage tells th
 adapter whose backend knows who is signed in refuses a vault whose user is no longer that one
 with kind `identity_revoked` (`safebyok-convex`, `safebyok-postgres` and `safebyok-graphql` do;
 `safebyok-indexeddb` and `localVaultDB` keep everything on the device, and never do). The vault
-then locks at once, as `lock()` does: it drops its vaultKey, this device forgets its lease, and
+then locks at once, as `lock()` does: it drops its vaultKey, this device revokes its lease, and
 the snapshot reads `locked`. It removes nothing stored. The call that met the refusal
 throws it, and the next unlock, once the user has signed in again, asks for the passphrase. A
 background refresh that meets it has nobody to throw to: it locks all the same, and tells the
@@ -476,10 +476,10 @@ stay unlocked: an adapter that refuses `identity_revoked` for a passing fault, r
 `storage_unavailable`, breaks its contract (VAULTDB.md, line 5.5), and is the bug to fix.
 
 Open the vault only once your backend knows who is signed in: a vault opened while its auth is
-still loading meets `identity_revoked` at once, and forgets the lease with it (safe:
+still loading meets `identity_revoked` at once, and revokes the lease with it (safe:
 the user types the passphrase again). A backend that tells "who are you?" from "you may not"
 refuses the second as `not_permitted`, which locks nothing. A call that meets the refusal in a tab
-closed meanwhile still forgets the lease; and the Convex adapter's watch refreshes on
+closed meanwhile still revokes the lease; and the Convex adapter's watch refreshes on
 every error it hears, not only a sign-out. Both are the safe direction, and stay.
 
 ## Logging
@@ -536,7 +536,7 @@ says these things:
 
 * `warn`: `lockSoon()` could not read the clock, so it locked at once, without a grace; or the
   clock failed as a lease ended (`{ call: 'expiry' }`), so the key went at once.
-* `warn`: this device's lease could not be read or would not open, so it was forgotten, and the
+* `warn`: this device's lease could not be read or would not open, so it was revoked, and the
   vault opened locked. A lease that simply ran out, or that a new
   passphrase outdated, is routine, and says nothing.
 * `warn`: a refresh rung by a change in storage failed, so the snapshot may lag behind storage

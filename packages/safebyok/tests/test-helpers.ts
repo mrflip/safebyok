@@ -2444,7 +2444,7 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
       expect(await deviceDB.readLease(scopeOf('u2'))).to.not.be.null
     })
 
-    it("eraseAll forgets every lease, and every device mark", async () => {
+    it("eraseAll erases every lease, and every device mark", async () => {
       const deviceDB = await makeDeviceDB()
       await deviceDB.writeLease(await leaseOf('u1'), NoLocks)
       await deviceDB.writeLease(await leaseOf('u2'), NoLocks)

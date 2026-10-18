@@ -225,7 +225,7 @@ describe("a vault over convexVaultDB, opened before sign-in", () => {
 
 describe("a vault over convexVaultDB, when its user signs out", () => {
   for (const [clientTitle, connect] of ClientCases) {
-    it(`locks over a ${clientTitle} while idle, forgetting its lease, and retires nothing`, async () => {
+    it(`locks over a ${clientTitle} while idle, revoking its lease, and retires nothing`, async () => {
       const deployment = deploy()
       const spy = TH.spyLogger()
       const deviceDB = memoryDeviceDB()
