@@ -7,7 +7,7 @@ medium. Threads at once: 2. Issued by: the Coach, from `reform-preplan.md` besid
 Sprint doc: https://claude.ai/code/artifact/b7fd117e-7a03-4f68-b2fa-b2c1e70e118b (*Open Matters*,
 *Progress*, *Resolved*).
 
-**Status:** threads 1 to 4 filed, in the line main → #159 → #160 → #161 → #162; thread 3 filed (#161); thread 4 filed (#162); thread 5 building.
+**Status:** threads 1 to 4 filed, in the line main → #159 → #160 → #161 → #162; thread 5 building.
 
 ## Read first
 
