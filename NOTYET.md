@@ -4,7 +4,7 @@ Reasonable tasks that we do not plan to do in the near term. Do not anticipate t
 implementation.
 
 * **Lock out a device: every way in it added.** From another device, the user locks out a lost or
-  compromised one: its passkeys removed, its remembered unlock void, and nothing it holds reading
+  compromised one: its passkeys removed, its lease void, and nothing it holds reading
   what is written next. Vault-key rotation does the cryptography (designed in
   `whiteboard/20261016-rotation/rotation-design.md`, built as sprint matters' threads 14 and
   18-20); what waits is the UX, a device list, and, if the Coach wants rotation not to sign every
@@ -53,11 +53,11 @@ implementation.
 Things we are leaving as they are until they bite again. Each is filed so that the next person to
 be bitten finds the ruling.
 
-* **Storing without a public bag keeps the old one.** The Coach (2026-10-16, thread 2,
+* **Storing without a sidecar keeps the old one.** The Coach (2026-10-16, thread 2,
   [#133](https://github.com/mrflip/safebyok/pull/133)): "I hate optional fields but we can wait for
   it to bug me again, go ahead as you propose." Storing a new whisper under an existing label with
-  no public bag keeps the lockbox's bag; passing `{}` empties it. The alternative, an omitted bag
-  meaning empty, is one line.
+  no sidecar keeps the lockbox's sidecar; passing `{}` empties it. The alternative, an omitted
+  sidecar meaning empty, is one line.
 * **The demo's App tests depend on order.** The Coach (2026-10-16, thread 14,
   [#134](https://github.com/mrflip/safebyok/pull/134)): "leave, file under RAGEBAIT." Under
   `--sequence.shuffle`, two App tests fail when they run after the click-through test, whose fake

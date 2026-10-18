@@ -72,6 +72,42 @@ Serve the app over https: a browser withholds WebCrypto from a page served over 
 `Vault.make` refuses one at once, with kind `insecure_context` (`http://localhost` counts as
 secure, for development).
 
+## The cast, and how it fits together
+
+safebyok names each thing once; [VOCABULARY.md](../../VOCABULARY.md) is the dictionary, and the
+code, the stored records and these docs all use its words.
+
+* A **whisper** is the secret you store: any JSON value, such as an API key. A **lockbox** holds
+  one whisper, encrypted, with its `boxlabel` and its **sidecar**, your app's own plain data that
+  rides beside it unencrypted. A **vault** is one user's set of lockboxes, named by your `applabel`,
+  the signed-in user's id and a `vaultlabel`.
+* The vault is unlocked by a **proof** of one of its **wayins**: a passphrase, or a passkey's
+  answer. Each wayin holds the one **vaultKey** (the vault's random master key) wrapped under a key
+  made from that proof, so adding, changing or retiring a wayin rewrites no lockbox. The vaultKey
+  wraps a fresh **lockboxKey** for every stored whisper, and the lockboxKey encrypts the whisper.
+  The wayins live in the **vault props**, the one record per vault that every device syncs; the
+  backend holds those, the lockboxes and nothing else, all ciphertext.
+* A **lease** lets this device unlock again without a proof for a while: when a proof unlocks the
+  vault, the device keeps the vaultKey wrapped under a key the browser cannot export, until
+  `leaseHours` run out. It never leaves the device.
+* Every encryption is bound to its **ctx**: the app, user and vault, the field, and every other
+  field of its record. Ciphertext moved to another record, or under an altered field, will not
+  open.
+* The vault is made with `Vault.make(opts)`, which answers at once, and `hello()` reads what
+  storage and this device hold of it, so the snapshot's `state` is `absent`, `locked` or
+  `unlocked`. Its lockboxes are written with `storeBox`, read with `readBox` and `useBox`, and
+  removed with `retireBox`; `retire()` removes the whole vault. Two devices that write at once
+  cannot both win: the late one is refused as `stale_write` (see *Two devices storing at once*),
+  and a first unlock that loses the race to another device's is `created_elsewhere`.
+* Storage is two plug-ins the core speaks to only as interfaces: a **vaultDB** for what syncs
+  (vault props and lockboxes) and a **deviceDB** for this device's lease and device mark.
+
+```text
+proof + wayin ──> wayinKey ──unwraps──> vaultKey ──unwraps──> lockboxKey ──deciphers──> whisper
+                                           ^
+                                   lease: leaseKey on this device unwraps it without a proof
+```
+
 ## Where it runs
 
 The platform floor, which `engines` and CI hold to:
@@ -684,7 +720,7 @@ Part of normal operation. Each can reach the user; the app decides how.
 | Kind                  | What happened                                                    | What to do                                              |
 | --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |
 | `vault_locked`        | a whisper was asked for before the vault was unlocked            | Ask for the passphrase and `unlock()`, then retry (`safebyok-react`'s `withUnlockedVault` does) |
-| `wrong_passphrase`    | the passphrase did not unlock the vault, or was empty. A passphrase wayin altered in storage refuses its passphrase in just the same way, so the message says that the stored vault may be damaged | Ask again                                                  |
+| `wrong_passphrase`    | the passphrase did not unlock the vault, or was empty. A passphrase wayin altered in storage refuses its passphrase in just the same way, so the message says that the stored vault may be damaged | Ask again, with a hint to check for typos; but on a first unlock, if the vault may just have been made on another device, see `created_elsewhere` |
 | `created_elsewhere`   | a first `unlock()` on an `absent` vault lost a race: another device created the vault between this one's look at storage and its write, and the passphrase given does not open that vault. Nothing was created here, and the vault now shows `locked` as the other device made it. A passphrase that does open it unlocks as usual | Show the message as advice, not as a typo: the user enters the passphrase chosen on the other device |
 | `weak_passphrase`     | a new passphrase -- the one the first `unlock()` creates the vault with, or one `addPassphrase()` or `changePassphrase()` sets -- that the vault's `passphraseStrengthTest` finds too easy to guess. The message is the test's own reason. Never raised by an `unlock()` of a vault that stands | Show the message beside the field, and ask for another |
 | `wrong_passkey`       | the passkey's answer did not unlock the vault, or answered for another salt. An answer for the wayin's own salt that does not open it most likely means the wayin was altered in storage, and the message says so | Ask for a passphrase; if it works, the user may remove that passkey and add it again |

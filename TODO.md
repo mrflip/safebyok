@@ -73,7 +73,7 @@ Revisit before 1.0 if rotation signing every other device out is too blunt.
 ### `destroy()`'s edge cases
 
 From the Convex sprint ([#18](https://github.com/mrflip/safebyok/pull/18)): a handle that never
-saw a bundle resolves `destroy()` without erasing, even if a vault has since appeared elsewhere, so
+saw vault props resolves `destroy()` without erasing, even if a vault has since appeared elsewhere, so
 "delete account" can report success while a vault stands. And after a refused `destroy()`, an
 app's automatic retry erases the vault that was made again in between. The Coach (2026-10-16):
 assess these once the contract is tight and the tests unified -- that is, against
@@ -131,11 +131,11 @@ first; maintainability beats speed unless something is shown slow.
 
 From thread 4 ([#132](https://github.com/mrflip/safebyok/pull/132), `thread-4-refusals_and_catchup.md`,
 *A pre-existing race*): during a change to the ways in, this handle's own bell refresh can read the
-new bundle before `reviseWayins` sets it, judge the key `outlived`, drop it and erase the
-remembered unlock. `takeUpUnlock` restores the key in memory, but that erase can land after the
+new vault props before `reviseWayins` sets it, judge the key `outlived`, drop it and erase the
+lease. `takeUpVaultKey` restores the key in memory, but that erase can land after the
 new record, so the next open asks for the passphrase. The direction is safe, and serializing the
 refreshes does not cure it. The Coach (2026-10-16): into the TODO, beside the multiple-passphrases
-question. The fix, small: do not judge `outlived` against a bundle this handle wrote itself.
+question. The fix, small: do not judge `outlived` against vault props this handle wrote itself.
 
 ## RAGEBAIT
 
