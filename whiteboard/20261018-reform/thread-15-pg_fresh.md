@@ -1,6 +1,6 @@
 # Thread 15: the Postgres schema, from fresh (2026-10-18)
 
-Branch `20261018-pg_fresh`, PR #PR, stacked on #170. Justify: green (postgres 249 passed, 14
+Branch `20261018-pg_fresh`, PR [#174](https://github.com/mrflip/safebyok/pull/174), stacked on #170. Justify: green (postgres 249 passed, 14
 skipped; every package green).
 
 * **Built**:
