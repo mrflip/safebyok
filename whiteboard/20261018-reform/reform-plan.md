@@ -7,7 +7,7 @@ medium. Threads at once: 2. Issued by: the Coach, from `reform-preplan.md` besid
 Sprint doc: https://claude.ai/code/artifact/b7fd117e-7a03-4f68-b2fa-b2c1e70e118b (*Open Matters*,
 *Progress*, *Resolved*).
 
-**Status:** threads 1 (#159) and 2 (#160) filed, in the line main → #159 → #160; thread 3 building.
+**Status:** threads 1 (#159) and 2 (#160) filed, in the line main → #159 → #160; thread 3 filed (#161); thread 4 building.
 
 ## Read first
 
@@ -118,6 +118,8 @@ matters only at the start.
 > Leave every `*_epoch` untouched, `unlock_epoch` included.
 
 *Gloss:* *Touches* core (`types.ts`, `envelope.ts` → `wayin.ts` via `git mv`, `vault.ts`, `vault-db.ts`, `errors.ts`, `refusals.ts`, `crypto.ts`, `names.ts`, `validators.ts`, `index.ts`), every adapter's record checks, schema and fixtures, react (`VaultProvider`, `PassphraseModal`, `PasskeyUnlockButton` keeps its name), demos, e2e, README, `notes/`. Includes `passphraseKey`/`passkeyKey` → `wayinKey` where the key acts on the vaultKey (the map's row; the preparing code keeps the specific names), and the stored field `method` → `wayinkind` (*Amendments*). `envelopeBinding` survives: thread 4 renames it. Also the public `unlockId` option → `wayinId`, GraphQL `SafebyokUnlockEnvelope` → `SafebyokWayin`, and the internals in the progress document's thread-1 notes. *Model*: default. *Depends on*: 2 (and 1, beneath it). *Grep*: `UnlockEnvelope|PassphraseEnvelope|PasskeyEnvelope|Envelope\.|envelope\.ts|envelope\.test|UnlockSummary|unlock_id|unlocklabel|UnlockMethod|UnlockProof|vault_key_wrapped|removeUnlock|absent_unlock|damaged_unlock|last_unlock|too_many_unlocks|safebyok-vault-v2|\bunlocks\b|\bmethod:` and, case-insensitive, `envelope` other than `envelopeBinding`. *Look-ahead*: threads 4 to 10 grep the same trees; leave no half-renamed doc block. *Size*: large, mechanical.
+
+*Review:* fixed (medium). The ctx ruling holds: `binding()` keeps its parts and order; only the tag, header field names and the purpose's key move. Six fixes: three verb-sense "unlocks" titles and the DeviceDB battery title restored; column alignment in `names.ts`, `validators.ts`, the wayin headers and four test tables; `passkeyKeyOf`'s doc says passkeyKey again; the changeset no longer promises Convex hosts that an old vault reads as damaged (a Convex deployment refuses the schema until its tables are cleared). *Orchestrator:* a `sonnet` subagent qualified the security note the same way (`0fe4f7b0`). Left: the Postgres `ALTER` (a row in *Open Matters*), drift in two test tables that predates the thread, and README table padding (cosmetic, not raised).
 
 ### 4. `ctx`
 
