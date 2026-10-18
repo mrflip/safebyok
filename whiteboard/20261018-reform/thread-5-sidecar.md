@@ -1,7 +1,7 @@
 # Thread 5: the public bag is the sidecar (2026-10-18)
 
-Branch `20261018-sidecar`, PR #TBD, stacked on
-[#162](https://github.com/mrflip/safebyok/pull/162) (line main → #159 → #160 → #161 → #162 → this).
+Branch `20261018-sidecar`, PR [#163](https://github.com/mrflip/safebyok/pull/163), stacked on
+[#162](https://github.com/mrflip/safebyok/pull/162) (line main → #159 → #160 → #161 → #162 → #163).
 Justify: green (core 2114 passed / 35 skipped, four tests new; indexeddb 135/10, postgres 246/14, convex 258/8, graphql 239/14, react 218, fastkey 49, scripts 258, demo 190/16, e2e 81/89 skipped; size check green).
 
 * **Built**:
@@ -45,12 +45,11 @@ Justify: green (core 2114 passed / 35 skipped, four tests new; indexeddb 135/10,
   - The header in `boxCtx` is key-sorted JSON, so `sidecar_json` now sorts after `revision_id`
     (where `public_json` sorted after `boxlabel`). Same parts, same order; the key moved by the
     sort. Thread 7's `revision_tok` sorts in the same place as `revision_id`, before `sidecar_json`.
-  - Postgres' 14 skipped are its container suites, skipped locally as before: CI runs them.
   - `scratchpad/sidecar/realign.py` (not committed) restored column alignment after the rename by
     pairing each changed line with its old version.
 * **For the Coach**:
   - The lockbox has no newer-vs-older format distinction; every unknown lockbox format is damage.
     The handoff assumed a list like `OlderBundleFormats`. Recommend leaving it so: a lockbox from a
     newer safebyok listing as damaged is safe (nothing is written over it unless the user stores
-    over it), and a newer safebyok means a newer vault record too, which already refuses as
-    `newer_format` first.
+    over it). Adding a lockbox list that tells newer from older is a construct of its own, for
+    another thread if wanted.
