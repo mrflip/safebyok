@@ -17,7 +17,8 @@
 #   deleting, and git then fails ("Directory not empty") with the worktree unregistered and its
 #   directory left behind. The push is proven by then, so the script finishes the job: it deletes
 #   that directory (retrying a few times) and prunes, but only when the worktree was clean before
-#   the removal, origin's branch is the local tip, and nothing is left in the directory except
+#   the removal, git no longer lists it (a refusal, such as a lock, deletes nothing and leaves it
+#   listed), origin's branch is the local tip, and nothing is left in the directory except
 #   what the tip holds, a .DS_Store, or what git ignores. Otherwise it stops and leaves the
 #   directory for a person.
 #
@@ -96,10 +97,14 @@ leftover_strangers() {
 
 # Finishes a removal that `git worktree remove` left half done (see the header), or says why not.
 finish_removal() {
-  local removal="$1" tip="$2" dirty="$3" strangers attempt
+  local removal="$1" tip="$2" dirty="$3" registered strangers attempt
   echo "file-thread: git could not remove $root: $removal" >&2
   [[ -e "$root" ]] || fail "$root is already gone; run \`git worktree prune\` to finish"
   [[ -z "$dirty" ]] || fail "$root held uncommitted changes before the removal, so it is left for a person to inspect"
+  registered="$(git -C "$main" worktree list --porcelain)" || fail "git could not list its worktrees, so $root is left for a person to inspect"
+  if grep -Fqx "worktree $root" <<< "$registered"; then
+    fail "git refused to remove $root and still lists it as a worktree, so it is left for a person to inspect"
+  fi
   [[ "$(git -C "$main" rev-parse --verify --quiet "refs/remotes/origin/${branch}")" == "$tip" ]] \
     || fail "origin's $branch is not at $tip, so $root is left for a person to inspect"
   strangers="$(leftover_strangers "$root" "$tip")"
