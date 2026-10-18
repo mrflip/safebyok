@@ -4,7 +4,7 @@ import { localVaultDB, memoryStore, openVault, type StringStore } from '../src/i
 import { Ciphered, fromB64, toB64 } from '../src/crypto'
 import { VaultError } from '../src/errors'
 import { Lockbox } from '../src/lockbox'
-import { PasskeySaltBytes, VaultBundle, VaultScope, type DeviceMark, type DeviceUnlock } from '../src/types'
+import { PasskeySaltBytes, VaultBundle, VaultScope, type DeviceMark, type Lease } from '../src/types'
 import * as Ckeys from '../src/ckeys'
 import { VaultDB, type BundleExpectation, type EraseExpectation, type LockboxExpectation, type StoredLockbox, type VaultDBOpts } from '../src/vault-db'
 import * as TH from './test-helpers'
@@ -509,7 +509,7 @@ describe("memoryVaultOpts", () => {
     const vault = await openVault(opts)
     await vault.unlock('pw')
     expect(await opts.vaultDB.readBundle(TH.scopeOf('u1'))).to.not.be.null
-    expect(await opts.deviceDB.readUnlock(TH.scopeOf('u1'))).to.not.be.null
+    expect(await opts.deviceDB.readLease(TH.scopeOf('u1'))).to.not.be.null
   })
 
   it("makes new stores for each call, and takes any option in place of its own", () => {
@@ -751,17 +751,17 @@ describe("omitting", () => {
 const ckeyOf = (scope: VaultScope) => `${scope.applabel}:${scope.user_id}:${scope.vaultlabel}`
 
 TH.describeDeviceDB('describeDeviceDB, over the smallest honest DeviceDB', () => {
-  const rows = new Map<string, DeviceUnlock>()
+  const rows = new Map<string, Lease>()
   const marks = new Map<string, DeviceMark>()
   const lockGenerationOf = (scope: VaultScope) => marks.get(ckeyOf(scope))?.lock_generation ?? 0
   return {
-    readUnlock:  (scope) => Promise.resolve(rows.get(ckeyOf(scope)) ?? null),
-    writeUnlock: (unlock, expected) => {
-      if (lockGenerationOf(unlock) !== expected.lock_generation) { return Promise.reject(new VaultError('stale_write', 'A lock came first.')) }
-      rows.set(ckeyOf(unlock), unlock)
+    readLease:  (scope) => Promise.resolve(rows.get(ckeyOf(scope)) ?? null),
+    writeLease: (lease, expected) => {
+      if (lockGenerationOf(lease) !== expected.lock_generation) { return Promise.reject(new VaultError('stale_write', 'A lock came first.')) }
+      rows.set(ckeyOf(lease), lease)
       return Promise.resolve()
     },
-    eraseUnlock: (scope) => { rows.delete(ckeyOf(scope)); return Promise.resolve() },
+    eraseLease: (scope) => { rows.delete(ckeyOf(scope)); return Promise.resolve() },
     readMark:    (scope) => Promise.resolve(marks.get(ckeyOf(scope)) ?? null),
     writeMark:   (mark) => {
       marks.set(ckeyOf(mark), { ...mark, lock_generation: Math.max(mark.lock_generation, lockGenerationOf(mark)) })

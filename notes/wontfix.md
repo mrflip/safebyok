@@ -6,14 +6,14 @@ reviewer reads `notes/security.md` for what we decided; this file is for what we
 decide. Add an entry at the end of the list, dated, with the ruling or the row it came from.
 
 * 2026-10-16 (G129, the Coach: "make a file WONTFIX"): **one device, one setting.** Opening the
-  same vault on one device with different settings -- a different `forcePassphraseReentryHours`,
+  same vault on one device with different settings -- a different `leaseHours`,
   `maxWhisperBytes`, `maxLockboxes`, `validators` or `keyDeriver` -- is
-  undefined behaviour, whether the handles are in one tab or in two. A device keeps one
-  remembered unlock and one device mark per vault, shared by every handle on it, and each handle
-  reads them by its own settings. Today, for the window: an open with a shorter window than the
-  remembered unlock was written under forgets it (see `rememberedUnlock` in
-  `packages/safebyok/src/vault.ts`), so a tab opened with the shorter window forgets what a tab
-  with the longer one remembered, and every tab on the device asks for the passphrase again.
+  undefined behaviour, whether the handles are in one tab or in two. A device keeps one lease
+  and one device mark per vault, shared by every handle on it, and each handle reads them by its
+  own settings. Today, for the lease: an open with a shorter `leaseHours` than the lease was
+  granted under forgets it (see `takeUpLease` in `packages/safebyok/src/vault.ts`), so a tab
+  opened with the shorter setting forgets the lease a tab with the longer one granted, and every
+  tab on the device asks for the passphrase again.
   That is the safe direction, and it is all we say of it. A host that varies a setting by route
   passes the same one everywhere a vault opens on a device.
 * 2026-10-16 (the Coach, thread 7, [#129](https://github.com/mrflip/safebyok/pull/129) and thread

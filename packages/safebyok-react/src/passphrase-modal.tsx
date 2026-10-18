@@ -11,9 +11,9 @@ const MinutesPerDay = 24 * MinutesPerHour
 
 type Unit = 'day' | 'hour' | 'minute'
 
-/** The window as a count of whole days, else of whole hours, else of minutes (at least one). */
-const windowCount = (reentryWindowMillis: number): { count: number, unit: Unit } => {
-  const minutes = Math.max(1, Math.round(reentryWindowMillis / MinuteMillis))
+/** The lease as a count of whole days, else of whole hours, else of minutes (at least one). */
+const leaseCount = (leaseMillis: number): { count: number, unit: Unit } => {
+  const minutes = Math.max(1, Math.round(leaseMillis / MinuteMillis))
   if (minutes % MinutesPerDay === 0) { return { count: minutes / MinutesPerDay, unit: 'day' } }
   if (minutes % MinutesPerHour === 0) { return { count: minutes / MinutesPerHour, unit: 'hour' } }
   return { count: minutes, unit: 'minute' }
@@ -30,17 +30,17 @@ const relativeTimeIn = (locale: string): Intl.RelativeTimeFormat => {
 }
 
 /**
- * What the dialog promises about how long an unlock lasts, from the vault's `reentryWindowMillis`:
+ * What the dialog promises about how long an unlock lasts, from the vault's `leaseMillis`:
  * 'Locks again on this device in 7 days' (a whole number of days, else of hours, else of
  * minutes, phrased by `Intl.RelativeTimeFormat`), or 'Locks on this device in 7 days' when the
- * dialog is creating the vault, which has nothing yet to lock "again". A window within a minute
+ * dialog is creating the vault, which has nothing yet to lock "again". A lease within a minute
  * of the longest a vault keeps (`ForeverMillis`, which `Infinity` hours becomes) reads as lasting
  * until the user locks it.
  */
-const unlockedFor = (reentryWindowMillis: number, creating: boolean): string => {
+const unlockedFor = (leaseMillis: number, creating: boolean): string => {
   // Never compared for equality: the far future is anything within a minute of it.
-  if (reentryWindowMillis >= ForeverMillis - MinuteMillis) { return Messages.staysUnlocked }
-  const { count, unit } = windowCount(reentryWindowMillis)
+  if (leaseMillis >= ForeverMillis - MinuteMillis) { return Messages.staysUnlocked }
+  const { count, unit } = leaseCount(leaseMillis)
   const relative = relativeTimeIn(Locale).format(count, unit)
   return creating ? Messages.locksIn(relative) : Messages.locksAgainIn(relative)
 }
@@ -73,11 +73,10 @@ const unlockedFor = (reentryWindowMillis: number, creating: boolean): string => 
  * error tracker meet it. A passkey that fails that way takes its button away and leaves the
  * passphrase.
  *
- * How long an unlock lasts it reads from the vault itself (its `reentryWindowMillis`, the
- * `forcePassphraseReentryHours` it was opened with): 'Locks again on this device in 7 days', 'in 15
- * minutes', 'Stays unlocked on this device until you lock it' for `Infinity`; while it creates the
- * vault, 'Locks on this device in 7 days', with nothing yet to lock again. Nobody need tell the
- * dialog the window again. It needs `Intl.RelativeTimeFormat`, which a host on an engine without
+ * How long a lease lasts it reads from the vault itself (its `leaseMillis`, the `leaseHours` it
+ * was opened with): 'Locks again on this device in 7 days', 'in 15 minutes', 'Stays unlocked on
+ * this device until you lock it' for `Infinity`; while it creates the vault, 'Locks on this
+ * device in 7 days', with nothing yet to lock again. Nobody need tell the dialog the lease again. It needs `Intl.RelativeTimeFormat`, which a host on an engine without
  * it (Hermes, an older browser) supplies with the standard polyfill: the README says how.
  *
  * With `allowStartOver`, a user who has forgotten the passphrase is offered a way out: "Forgot it?
@@ -294,7 +293,7 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
   if (failure !== null) { throw failure.err }
   const creating = snapshot.state === 'absent'
   const passkeyFirst = ! creating && offersPasskey(snapshot)
-  const windowLine = unlockedFor(vault.reentryWindowMillis, creating)
+  const windowLine = unlockedFor(vault.leaseMillis, creating)
   // Asked only of a vault there is to erase: one erased meanwhile has the user choose anew, and
   // ends the question, so that a vault made after it is never asked of. React's "adjusting state
   // while rendering": it renders again at once, before committing this.

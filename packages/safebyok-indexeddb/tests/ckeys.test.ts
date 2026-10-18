@@ -32,7 +32,7 @@ describe("boxRange", () => {
     ['box^acme^u12^main^anthropic',         'a lockbox of a user whose id starts the same'],
     ['box^acme^u1^mainx^anthropic',         'a lockbox of a vault whose label starts the same'],
     ['box^acme^u1^main_',                   'the prefix with its ^ raised by one, where the range stops'],
-    ['unlock^acme^u1^main',                 "a remembered unlock"],
+    ['lease^acme^u1^main',                  "a lease"],
     ['["box","acme","u1","main","x"]',      "a lockbox under an earlier version's ckey"],
   ] as const
 

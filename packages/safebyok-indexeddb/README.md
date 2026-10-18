@@ -39,7 +39,7 @@ const vault = await openVault({
 ```
 
 * **`dbName`** names the IndexedDB databases the records go in, default `'safebyok'`: the vault's
-  rows in `<dbName>:vault_db`, and, through `browserOpts`, the remembered unlock in
+  rows in `<dbName>:vault_db`, and, through `browserOpts`, the lease in
   `<dbName>:device_db`. Anything but non-empty text refuses with kind `bad_option`.
 * **`logger`**, when given, hears what the store has to say (a listener that threw, say); left
   out, the store uses the one `openVault` is given, else the console.
@@ -91,8 +91,8 @@ of every name, whatever a host's validators admit.
   `revision_id`s, how each passphrase was made into a key (its key deriver's label and salt),
   when each vault and lockbox was first stored and each lockbox last written (epoch
   milliseconds), and the length of every ciphertext.
-* **Never**: a whisper, a passphrase, any key in usable form. The remembered unlock lives in the
-  device store's database, not here.
+* **Never**: a whisper, a passphrase, any key in usable form. The lease lives in the device
+  store's database, not here.
 
 A vault written under the JSON-tuple ckeys of earlier versions (`["vault","acme","u1","main"]`)
 reads as absent, its rows left as they were.

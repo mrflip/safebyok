@@ -203,7 +203,7 @@ describe("the README route recipe", () => {
     session.userId = null
     await TH.expectRefusal(vault.read('anthropic_api_key'), 'identity_revoked')
     expect(vault.getSnapshot().state).to.eq('locked')
-    expect(await deviceDB.readUnlock(TH.scopeOf('u1'))).to.be.null
+    expect(await deviceDB.readLease(TH.scopeOf('u1'))).to.be.null
     // Signed in again: the same passphrase opens what was stored.
     session.userId = 'u1'
     await vault.unlock('correct horse battery staple')

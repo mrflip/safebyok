@@ -5,7 +5,7 @@ import { PassphraseModal, type PassphraseAdvice } from '../src/passphrase-modal'
 import * as TH from './test-helpers'
 
 /** Just enough of a Vault for the dialog to read its state and window (the default, unless given). */
-const vaultInState = (state: 'absent' | 'locked', reentryWindowMillis = TH.DefaultWindowMillis) => TH.stubVault({ state, reentryWindowMillis })
+const vaultInState = (state: 'absent' | 'locked', leaseMillis = TH.DefaultLeaseMillis) => TH.stubVault({ state, leaseMillis })
 
 /** The dialog's `onDone` for tests that never submit. */
 const noop = (_unlocked: boolean) => undefined
@@ -217,14 +217,14 @@ describe("PassphraseModal", () => {
     // them: one not yet created reads 'Locks on', one created and locked 'Locks again'.
     for (const [hours, relative, blurb] of WindowCases) {
       it(`${blurb}, while it creates the vault`, async () => {
-        const vault = await openVault(TH.memoryVaultOpts({ forcePassphraseReentryHours: hours }))
+        const vault = await openVault(TH.memoryVaultOpts({ leaseHours: hours }))
         render(<PassphraseModal vault={vault} onDone={noop} />)
         expect(screen.queryByText(wordingOf(relative, true))).to.not.be.null
         vault.close()
       })
 
       it(`${blurb}, on an ordinary unlock`, async () => {
-        const vault = await openVault(TH.memoryVaultOpts({ forcePassphraseReentryHours: hours }))
+        const vault = await openVault(TH.memoryVaultOpts({ leaseHours: hours }))
         await vault.unlock('pw')
         await vault.lock()
         render(<PassphraseModal vault={vault} onDone={noop} />)

@@ -8,7 +8,7 @@ import type { VaultScope } from './types'
  *
  *     vault^acme^u1^main
  *     box^acme^u1^main^anthropic
- *     unlock^acme^u1^main
+ *     lease^acme^u1^main
  *     mark^acme^u1^main
  *
  * No name holds `^`: the floor every name is held to (`NameFloor`) refuses it, whatever a host's
@@ -36,11 +36,11 @@ export const bundle = (scope: VaultScope): string => join([['kind', 'vault'], ..
 export const box = (scope: VaultScope, boxlabel: string): string => join([['kind', 'box'], ...scopeParts(scope), ['boxlabel', boxlabel]])
 
 /**
- * The ckey of `scope`'s remembered unlock, on a device's own storage.
+ * The ckey of `scope`'s lease, on a device's own storage.
  *
- * @example unlock(scope)  // 'unlock^acme^u1^main'
+ * @example lease(scope)  // 'lease^acme^u1^main'
  */
-export const unlock = (scope: VaultScope): string => join([['kind', 'unlock'], ...scopeParts(scope)])
+export const lease = (scope: VaultScope): string => join([['kind', 'lease'], ...scopeParts(scope)])
 
 /**
  * The ckey of `scope`'s device mark, on a device's own storage.
@@ -82,22 +82,22 @@ export const boxlabelOf = (ckey: string): string | null => {
 }
 
 /**
- * True for each ckey {@link unlock} gives, for any scope, false for any other ckey safebyok writes
+ * True for each ckey {@link lease} gives, for any scope, false for any other ckey safebyok writes
  * or wrote before, and false for anything that is not text. On a device shelf, which holds
- * remembered unlocks and device marks, a row it and {@link isMark} both refuse is one this
- * version did not write.
+ * leases and device marks, a row it and {@link isMark} both refuse is one this version did not
+ * write.
  *
- * @example isUnlock(unlock(scope))                    // true
- * @example isUnlock('["unlock","acme","u1","main"]')  // false: an earlier version's ckey
+ * @example isLease(lease(scope))           // true
+ * @example isLease('unlock^acme^u1^main')  // false: an earlier version's ckey
  */
-export const isUnlock = (ckey: unknown): ckey is string => typeof ckey === 'string' && ckey.startsWith(`unlock${Delimiter}`)
+export const isLease = (ckey: unknown): ckey is string => typeof ckey === 'string' && ckey.startsWith(`lease${Delimiter}`)
 
 /**
  * True for each ckey {@link mark} gives, for any scope, false for any other ckey safebyok writes,
  * and false for anything that is not text.
  *
  * @example isMark(mark(scope))     // true
- * @example isMark(unlock(scope))   // false
+ * @example isMark(lease(scope))    // false
  */
 export const isMark = (ckey: unknown): ckey is string => typeof ckey === 'string' && ckey.startsWith(`mark${Delimiter}`)
 

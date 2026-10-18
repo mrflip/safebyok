@@ -1,5 +1,5 @@
 import * as Z from 'zod/mini'
-import { DeviceMark, DeviceUnlock, LockboxSummary, Sidecar, type SeenVault, type DamagedLockbox, ForcePassphraseReentryHours, FarFuture, FarPast, ForeverMillis, MaxLockboxes, MaxReentryHours, MaxUnlocks, MaxWhisperBytes, MinuteMillis, PasskeySaltBytes, VaultBundle, type VaultScope, Whisper, wallClock, type Clock, type PasskeyProof, type PassphraseWayin, type WayinSummary } from './types'
+import { DeviceMark, Lease, LockboxSummary, Sidecar, type SeenVault, type DamagedLockbox, LeaseHours, FarFuture, FarPast, ForeverMillis, MaxLockboxes, MaxLeaseHours, MaxUnlocks, MaxWhisperBytes, MinuteMillis, PasskeySaltBytes, VaultBundle, type VaultScope, Whisper, wallClock, type Clock, type PasskeyProof, type PassphraseWayin, type WayinSummary } from './types'
 import type { Lockbox } from './lockbox'
 import * as Names from './names'
 import { isStorageBlocked } from './refusals'
@@ -10,7 +10,7 @@ import type { KeyDeriver } from './key-deriver'
 import { MaxSaltBytes, TestDeriverNotice, TestLabelPrefix, ensureSuppliedSpecKept, parseKeyDeriverSpec, type KeyDeriverSpec } from './key-deriver-spec'
 import {
   cipherCtx, cipherBytes, decipherBytes,
-  makeLocalUnlockKey, makeLockboxKey, makeVaultKey, randomId, wrapKeyUnder, unwrapKeyUnder,
+  makeLeaseKey, makeLockboxKey, makeVaultKey, randomId, wrapKeyUnder, unwrapKeyUnder,
 } from './crypto'
 import * as Wayin from './wayin'
 import type { WayinStamp, Proof, VaultKeyPair } from './wayin'
@@ -49,8 +49,7 @@ export type VaultSnapshot = {
   boxes:     readonly (LockboxSummary | DamagedLockbox)[]
   /**
    * Epoch ms from which the vault asks for the passphrase again, while unlocked; null otherwise.
-   * The time the passphrase was last typed and proven plus `forcePassphraseReentryHours`
-   * (see `Vault.unlock`), never later than {@link FarFuture} (in 2255): with `Infinity` hours, a
+   * The time the passphrase was last typed and proven plus `leaseHours` (see `Vault.unlock`), never later than {@link FarFuture} (in 2255): with `Infinity` hours, a
    * vault that asks again only after `lock()` reads as that instant. Compare with
    * `>= FarFuture - MinuteMillis`, never for equality.
    */
@@ -93,21 +92,21 @@ export type OpenVaultOpts = {
    */
   keyDeriver: KeyDeriver
   /**
-   * How many hours an entered passphrase lasts on this device, remembered across reloads, before
-   * the vault asks for it again. Default: {@link ForcePassphraseReentryHours}, 168 (seven days).
-   * Any number above zero up to {@link MaxReentryHours}, 588 (24.5 days), fractions too: 0.25 is
+   * How many hours a lease lasts on this device, across reloads, after a proof unlocks the vault,
+   * before the vault asks for a proof again. Default: {@link LeaseHours}, 168 (seven days).
+   * Any number above zero up to {@link MaxLeaseHours}, 588 (24.5 days), fractions too: 0.25 is
    * fifteen minutes. `Infinity` means never on this device: the vault stays unlocked until
    * `lock()` (or the vault changes under it), and `askPassphraseAt` reads as {@link FarFuture}.
    * A finite number past 588 is refused with kind 'bad_option': the vault drops its key with a
-   * timer a minute after the window ends, and no timer reaches further.
+   * timer a minute after the lease ends, and no timer reaches further.
    *
-   * Lowering it takes hold on each device at its next open: an unlock remembered under the
-   * longer setting, whose deadline lies past this many hours from then, is forgotten, and the
-   * vault opens locked. Raising it lengthens no unlock already remembered. A device keeps one
-   * remembered unlock per vault, so two tabs opening a vault with different settings are one
+   * Lowering it takes hold on each device at its next open: a lease granted under the longer
+   * setting, whose deadline lies past this many hours from then, is forgotten, and the vault
+   * opens locked. Raising it lengthens no lease already granted. A device keeps one lease per
+   * vault, so two tabs opening a vault with different settings are one
    * device with two settings, which is not supported (`notes/wontfix.md`): the lower one wins.
    */
-  forcePassphraseReentryHours?: number | undefined
+  leaseHours?: number | undefined
   /**
    * Time source for expiry and for the times stored with each record; tests inject one. Default:
    * the wall clock. Its `now()` returns epoch milliseconds, as `Date.now()` does, from 1981 to 2255
@@ -135,7 +134,7 @@ export type OpenVaultOpts = {
   maxLockboxes?: number | undefined
   /**
    * Where the vault says what it has nobody to throw to -- a lock that skipped its grace, a
-   * background refresh that failed, a remembered unlock it could not read -- as a
+   * background refresh that failed, a lease it could not read -- as a
    * {@link VaultLogger}: `log`, `warn` and `error` functions. The vault hands
    * it no secret material or option's value (a host's own error goes as the host made it); whatever
    * it throws is ignored. Pass functions that do nothing for quiet. Default (none, or null): the
@@ -198,15 +197,14 @@ export type OpenVaultOpts = {
  */
 export type Vault = {
   /**
-   * How long an entered passphrase lasts on this device, in whole milliseconds: the
-   * `forcePassphraseReentryHours` the vault was opened with, its default (168 hours) when none
-   * was given. A vault that stays unlocked until `lock()` (`Infinity` hours) reads
-   * {@link ForeverMillis}. Fixed for the handle's life, so a UI can say how long an unlock lasts
+   * How long a lease lasts on this device, in whole milliseconds: the `leaseHours` the vault was
+   * opened with, its default (168 hours) when none was given. A vault that stays unlocked until
+   * `lock()` (`Infinity` hours) reads {@link ForeverMillis}. Fixed for the handle's life, so a UI can say how long an unlock lasts
    * without being told the option again.
    *
-   * @example vault.reentryWindowMillis >= ForeverMillis - MinuteMillis ? 'until you lock it' : `for ${String(Math.round(vault.reentryWindowMillis / MinuteMillis))} minutes`
+   * @example vault.leaseMillis >= ForeverMillis - MinuteMillis ? 'until you lock it' : `for ${String(Math.round(vault.leaseMillis / MinuteMillis))} minutes`
    */
-  readonly reentryWindowMillis: number
+  readonly leaseMillis: number
   /** Current snapshot; same object until something changes (useSyncExternalStore-ready). */
   getSnapshot: () => VaultSnapshot
   /**
@@ -216,8 +214,7 @@ export type Vault = {
   subscribe: (listener: () => void) => () => void
 
   /**
-   * Open the vault with its passphrase, remembering the unlock on this device for
-   * `forcePassphraseReentryHours`. On an `absent` vault this first unlock creates it, with this
+   * Open the vault with its passphrase, granting this device a lease for `leaseHours`. On an `absent` vault this first unlock creates it, with this
    * passphrase as its one way in, labelled `passphrase` -- once the vault's
    * `passphraseStrengthTest` passes it: kind 'weak_passphrase' otherwise, the test's reason its
    * message, and nothing is created. A vault that stands is never refused its passphrase for
@@ -236,26 +233,26 @@ export type Vault = {
    * passphrase is. A passphrase wayin altered in storage refuses its passphrase just as a typo
    * does, so 'wrong_passphrase' is all the vault can say of it; its message names both.
    *
-   * The unlock lasts until `askPassphraseAt`, `forcePassphraseReentryHours` from now: from then
+   * The lease lasts until `askPassphraseAt`, `leaseHours` from now: from then
    * no new work starts, work in hand has a minute more to finish, and then the vaultKey is
    * dropped, by a timer and at the next look alike. Every later call in which the user types a
    * passphrase and it proves -- `changePassphrase()`, or a way in added or removed with a
-   * passphrase as proof -- starts the window again from then; nothing else moves it.
+   * passphrase as proof -- starts the lease again from then; nothing else moves it.
    *
    * A `lock()` or `destroy()` called while the unlock is still under way wins, in this tab or in
-   * another on this device: the vault stays locked, this device remembers nothing, and the call
+   * another on this device: the vault stays locked, this device is granted no lease, and the call
    * throws kind 'vault_locked'. A `lockSoon()` does not: it lets work in hand finish, this unlock
    * among it. A vault the unlock was creating stays created,
    * locked, under this passphrase. So does a vault destroyed, made anew, or with its wayins
    * changed on another device meanwhile: the passphrase was proven against a vault that no longer
    * stands as it was. A wrong passphrase is still told as 'wrong_passphrase', lock or no lock.
-   * The window running out while the unlock is under way is no lock: the unlock stands, with a
-   * window of its own.
+   * The lease running out while the unlock is under way is no lock: the unlock stands, with a
+   * lease of its own.
    *
    * `proof` may instead be a passkey's answer, a {@link PasskeyProof} (`safebyok-react`'s
    * `askPasskey` gets one): it opens the passkey wayin of the credential that answered, with
-   * no key derivation to wait for, and is remembered on this device for
-   * `forcePassphraseReentryHours` as a passphrase is. It refuses with kind 'absent_wayin' when no
+   * no key derivation to wait for, and grants this device a lease for `leaseHours` as a
+   * passphrase does. It refuses with kind 'absent_wayin' when no
    * way in is that passkey's, 'wrong_passkey' when its answer does not open the vault (its
    * message saying that the way in may be damaged), 'damaged_wayin' when its wayin is stored
    * damaged, and 'absent_vault' on an `absent` vault: a vault is created with a passphrase.
@@ -268,7 +265,7 @@ export type Vault = {
   /**
    * Forget the unlock, in memory and on this device: back to `locked`, at once -- the hard lock.
    * Wins over an `unlock()` or `changePassphrase()` still under way, which then leaves the vault
-   * locked -- in this tab, or in another on this device, whose unlock then remembers nothing
+   * locked -- in this tab, or in another on this device, whose unlock is then granted no lease
    * either -- and over a `read()` or `use()` under way, which refuses with kind 'vault_locked',
    * handing back nothing. A write already sent to storage lands. Kind 'storage_unavailable' when
    * this device's store fails to forget its record ('storage_blocked' when the browser withholds
@@ -284,10 +281,10 @@ export type Vault = {
   /**
    * Lock gently, for a hidden tab or a sign-out -- the soft lock: no new secrets from this instant,
    * work in hand finishes, and the vaultKey is dropped `graceSeconds` from now -- or sooner, when
-   * the unlock's own window would drop it sooner: a key past `askPassphraseAt` keeps only the
+   * the unlock's own lease would drop it sooner: a key past `askPassphraseAt` keeps only the
    * minute it had left, and one past that is dropped at once. At once, the snapshot reads
    * `locked`, every read, use, store or erase called from now on throws kind 'vault_locked', and
-   * this device forgets its remembered unlock. What the grace spares is work already past its
+   * this device forgets its lease. What the grace spares is work already past its
    * start: a `read()`, a `store()` or an `erase()` still lands; and an `unlock()` or
    * `changePassphrase()` still under way, in this tab or another on this device, finishes, leaving
    * the vault unlocked again. An `unlock()` or `changePassphrase()` begun within the grace ends it
@@ -309,7 +306,7 @@ export type Vault = {
    * in keeps its `wayin_id` and `wayinlabel`, and takes a fresh passphraseSalt. The vault's
    * other ways in are untouched, and still open it. Lockboxes are untouched too -- their
    * lockboxKeys stay wrapped under the unchanged vaultKey -- so this is cheap no matter how many
-   * there are. Every other device's unlock (remembered or in hand) lapses: the bundle's
+   * there are. Every other device's unlock (a lease or in hand) lapses: the bundle's
    * unlockEpoch moves, and they fall back to `locked` on their next look.
    *
    * A `newPassphrase` the vault's `passphraseStrengthTest` finds weak is refused first, before any
@@ -330,13 +327,13 @@ export type Vault = {
    * destroys the vault) between this device's look and its write, nothing is written and the
    * call throws kind 'stale_write', after catching up with storage.
    *
-   * Leaves the vault unlocked under the new passphrase, the unlock window starting again from
-   * now when a passphrase proved the change, since the user just typed who they are; a passkey's
-   * answer keeps the window standing on an unlocked vault, and sets one on a locked vault, as
+   * Leaves the vault unlocked under the new passphrase, the lease starting again from now when a
+   * passphrase proved the change, since the user just typed who they are; a passkey's answer
+   * keeps the lease standing on an unlocked vault, and grants one on a locked vault, as
    * `unlock()` by passkey would -- unless `lock()` or `destroy()` is called
    * while the change is under way, which wins: the passphrase still changes, and the vault stays
-   * locked. A `lockSoon()` lets it finish, unlocked. So does the window running out while the
-   * change is under way: the vault ends unlocked, with its new window. Once the change has landed
+   * locked. A `lockSoon()` lets it finish, unlocked. So does the lease running out while the
+   * change is under way: the vault ends unlocked, with its new lease. Once the change has landed
    * in storage, the call resolves: should this device then fail to keep its own records of it,
    * the logger says so, and the vault asks for the passphrase at its next open.
    *
@@ -363,7 +360,7 @@ export type Vault = {
    * 'too_many_wayins' when the vault already holds {@link MaxUnlocks}: remove one first. Like
    * `changePassphrase()`, it moves the unlockEpoch, so every other device locks; it leaves
    * this one unlocked, and throws kind 'stale_write' when another device changed the vault's ways
-   * in meanwhile. A passphrase as proof starts the unlock window again from now; a passkey's
+   * in meanwhile. A passphrase as proof starts the lease again from now; a passkey's
    * keeps the deadline that stands, or, on a vault locked, sets one as `unlock()` by passkey
    * would. So does every change to the ways in.
    *
@@ -538,9 +535,9 @@ export type Vault = {
   destroy(): Promise<void>
   /**
    * Release subscriptions and refuse further calls, dropping the vaultKey from memory. It is not
-   * a lock of the vault, and forgets nothing stored: this device's remembered unlock stays, and
-   * the next open picks it up. An `unlock()` still under way takes nothing up and throws kind
-   * 'vault_closed'; whatever it remembered on the device before the close stays too. A `read()` or
+   * a lock of the vault, and forgets nothing stored: this device's lease stays, and the next open
+   * takes it up. An `unlock()` still under way takes nothing up and throws kind 'vault_closed';
+   * any lease it granted on the device before the close stays too. A `read()` or
    * `use()` still under way hands back nothing and throws kind 'vault_closed', as after a hard
    * lock. A second `close()` does nothing.
    */
@@ -555,8 +552,8 @@ export type Vault = {
 const UnreadBundle = Symbol.for('safebyok.unread_bundle')
 
 /**
- * Open a handle on one user's vault. Reads the bundle and the device's remembered unlock, then
- * settles into `absent`, `locked`, or (when a remembered unlock is still fresh) `unlocked` --
+ * Open a handle on one user's vault. Reads the bundle and the device's lease, then settles into
+ * `absent`, `locked`, or (when a lease is still fresh) `unlocked` --
  * never prompting: asking for a passphrase is the host's job, and only when a whisper is
  * actually wanted.
  *
@@ -564,8 +561,8 @@ const UnreadBundle = Symbol.for('safebyok.unread_bundle')
  * storage's own error and leaves nothing running behind it, so the host simply opens again later.
  * A stored bundle that fails its checks is kind 'damaged_bundle', which no retry mends; one a
  * newer safebyok may have written, kind 'newer_format': update the app; one older than this device
- * has already seen the vault at, kind 'rolled_back', which also forgets this device's remembered
- * unlock (see the `Vault`'s own doc). Kind 'bad_option' for a `vaultDB` that is not an instance
+ * has already seen the vault at, kind 'rolled_back', which also forgets this device's lease (see
+ * the `Vault`'s own doc). Kind 'bad_option' for a `vaultDB` that is not an instance
  * of the `VaultDB` class.
  * Misuse is refused before storage is touched: kind 'bad_label' for a label or a `userId` that
  * fails its check (`validators`), and 'bad_option' for any other option, a `vaultDB` or
@@ -588,7 +585,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   const givenVaultDB = parseVaultDB(opts.vaultDB)
   // Every failure of the device's own storage reaches the vault's callers as a condition, with a kind.
   const deviceDB = deviceTroubleAsConditions(parseDeviceDB(opts.deviceDB))
-  const reentryMillis = parseForcePassphraseReentryHours(opts.forcePassphraseReentryHours)
+  const leaseMillis = parseLeaseHours(opts.leaseHours)
   // The host's logger for the vault, else the one its storage was made with; guarded either way.
   const logger = parseLogger(opts.logger ?? givenVaultDB.logger)
   const clock = parseClock(opts.clock)
@@ -664,10 +661,10 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   }
 
   // The context each encryption is bound to; see VOCABULARY.md on ctx. A
-  // wayin's ctx is the Wayin module's. The remembered device unlock's is bound to every field of
-  // its record but the key and the wrap, the scope, vault and epoch as this vault expects them.
+  // wayin's ctx is the Wayin module's. A lease's is bound to every field of its record but the
+  // key and the wrap, the scope, vault and epoch as this vault expects them.
   const leaseCtx = (vaultId: string, epoch: number, deadline: number) => (
-    cipherCtx('safebyok-unlock-v1', applabel, scope.user_id, vaultlabel, vaultId, epoch, deadline, 'vault_key_local_wrapped')
+    cipherCtx('safebyok-lease-v1', applabel, scope.user_id, vaultlabel, vaultId, epoch, deadline, 'vault_key_lease_wrapped')
   )
   // A lockbox's ctx binds its format, the vault it lies in, and its record's whole public header:
   // every field but the format, which leads, and the two encrypted ones, so a sidecar, a time, its
@@ -710,7 +707,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
     if (outlived) {
       hardLocksSoFar += 1
       dropKey()
-      await deviceDB.eraseUnlock(scope)
+      await deviceDB.eraseLease(scope)
     }
     bundle = fresh
     deviceMark = mark
@@ -960,7 +957,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
     bundle = next
     // A shut meanwhile leaves only the change's unlock untaken.
     try {
-      await takeUpUnlock(proven, next, started, deadlineFor(proof, 'revise'))
+      await takeUpVaultKey(proven, next, started, deadlineFor(proof, 'revise'))
     } catch (err) {
       logger.warn("The change to the vault's ways in landed in storage, but this device could not take up its unlock afresh: it stands as it stood here, and asks for the passphrase at its next open.", { call: plan.call }, asError(err))
     }
@@ -1026,7 +1023,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
     shutsSoFar += 1
     hardLocksSoFar += 1
     dropKey()
-    await forgetUnlock(call)
+    await forgetLease(call)
   }
 
   /** {@link shut}, and the snapshot told, even when the device store fails: the key is dropped at once. */
@@ -1039,15 +1036,15 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   }
 
   /**
-   * Forget this device's remembered unlock, raising its mark's lock generation first -- a scope
+   * Forget this device's lease, raising its mark's lock generation first -- a scope
    * with no mark readable gets one with nothing seen, at generation 1 -- so an unlock under way in
    * any handle on this device, which began under the generation before, writes no record after
    * this one is erased: the versioned erase. An unlock creating the vault loses to it too.
    */
-  const forgetUnlock = async (call: VaultCall) => {
+  const forgetLease = async (call: VaultCall) => {
     const kept = await keptMark(call)
     await deviceDB.writeMark(kept === null ? blankMark(1) : { ...kept, lock_generation: kept.lock_generation + 1 })
-    await deviceDB.eraseUnlock(scope)
+    await deviceDB.eraseLease(scope)
   }
 
   /**
@@ -1064,7 +1061,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
    * Do what the refusal policy says of a refusal, before it is thrown: for storage the vault
    * cannot trust -- a user no longer signed in, an older copy of the vault -- lock, as `lock()`
    * does. The refusal is what the caller must hear, so a device store that will not forget the
-   * remembered unlock is only logged.
+   * lease is only logged.
    */
   const heedRefusal = async (refusal: VaultError) => {
     if (RefusalPolicy.decide(refusal) !== 'lock') { return }
@@ -1075,7 +1072,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
     try {
       await shut('untrustedStorage')
     } catch (err) {
-      logger.warn(`${why} so the vault locked, but this device's remembered unlock could not be forgotten: the next open may pick it up.`, { call: 'untrustedStorage' }, asError(err))
+      logger.warn(`${why} so the vault locked, but this device's lease could not be forgotten: the next open may take it up.`, { call: 'untrustedStorage' }, asError(err))
     }
     bump()
     if (wasUnlocked) {
@@ -1169,7 +1166,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   )
 
   /**
-   * The deadline of an unlock taken up now by `proof`, in `call`. The window renews whenever the
+   * The deadline of an unlock taken up now by `proof`, in `call`. The lease renews whenever the
    * user proves who they are by typing a passphrase, in any call: an `unlock()`, a change of
    * passphrase, a way in added or removed. An `unlock()` by passkey sets it too, as it unlocks. A
    * passkey proving a change to the ways in keeps the deadline that stands, when the vault is
@@ -1180,11 +1177,11 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
     const now = clockNow()
     const standing = vaultKey !== null && askPassphraseAt !== null && askPassphraseAt > now ? askPassphraseAt : null
     const renews = call === 'unlock' || typeof proof === 'string'
-    return renews || standing === null ? deadlineAfter(now, reentryMillis) : standing
+    return renews || standing === null ? deadlineAfter(now, leaseMillis) : standing
   }
 
   /**
-   * Remember an unlock on this device and take up its vaultKey until `until`, ending any grace
+   * Grant this device a lease and take up the vaultKey until `until`, ending any grace
    * lockSoon() left and arming the shut anew -- unless something wins over it since `started`:
    * a lock in this handle, or in another on this device (whose raised lock generation refuses the
    * record), the handle closing, or the bundle the key was proven against no longer standing.
@@ -1194,16 +1191,16 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
    *
    * @returns True when the vault is now unlocked.
    */
-  const takeUpUnlock = async (unlocked: VaultKeyPair, standing: VaultBundle, started: UnlockStart, until: number): Promise<boolean> => {
+  const takeUpVaultKey = async (unlocked: VaultKeyPair, standing: VaultBundle, started: UnlockStart, until: number): Promise<boolean> => {
     if (outrun(standing, started.shutsThen)) { return false }
     try {
-      // The transient's last act: wrapped into this device's remembered unlock, then dropped.
-      await rememberDevice(unlocked.transientKey, standing, until, started.lockGeneration)
+      // The transient's last act: wrapped into this device's lease, then dropped.
+      await grantLease(unlocked.transientKey, standing, until, started.lockGeneration)
     } catch (err) {
       if (isVaultError(err, 'stale_write')) { return false }
       throw err
     }
-    if (shutSince(started.shutsThen)) { await deviceDB.eraseUnlock(scope) }
+    if (shutSince(started.shutsThen)) { await deviceDB.eraseLease(scope) }
     if (outrun(standing, started.shutsThen)) { return false }
     armExpiry(until, clockNow())
     vaultKey = unlocked.sessionKey
@@ -1212,40 +1209,43 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   }
 
   /**
-   * Mint a fresh localUnlockKey, wrap the vaultKey under it, and remember the unlock on this
-   * device, while its mark still stands at `lockGeneration`: kind 'stale_write' otherwise.
+   * Mint a fresh leaseKey, wrap the vaultKey under it, and keep the lease on this device, while
+   * its mark still stands at `lockGeneration`: kind 'stale_write' otherwise.
    */
-  const rememberDevice = async (unlockedKey: CryptoKey, standing: VaultBundle, until: number, lockGeneration: number) => {
-    const localUnlockKey = await makeLocalUnlockKey()
-    const wrapped = await wrapKeyUnder(localUnlockKey, unlockedKey, leaseCtx(standing.vault_id, standing.unlock_epoch, until))
-    await deviceDB.writeUnlock({
-      format:                  'safebyok-unlock-v1',
+  const grantLease = async (unlockedKey: CryptoKey, standing: VaultBundle, until: number, lockGeneration: number) => {
+    const leaseKey = await makeLeaseKey()
+    const wrapped = await wrapKeyUnder(leaseKey, unlockedKey, leaseCtx(standing.vault_id, standing.unlock_epoch, until))
+    await deviceDB.writeLease({
+      format:                  'safebyok-lease-v1',
       ...scope,
       vault_id:                standing.vault_id,
       unlock_epoch:            standing.unlock_epoch,
-      local_unlock_key:        localUnlockKey,
-      vault_key_local_wrapped: wrapped,
+      lease_key:               leaseKey,
+      vault_key_lease_wrapped: wrapped,
       ask_passphrase_at:       until,
     }, { lock_generation: lockGeneration })
   }
 
   /**
-   * Pick up a remembered unlock, if this device holds one that still fits and still opens. The
-   * deviceDB may be the host's own, so what it hands back is checked here, whoever wrote it: a
-   * record that does not pass reads as "no remembered unlock", the safe failure.
+   * Take up this device's lease, if it holds one that still fits and still opens: the vault is
+   * then unlocked until the lease's askPassphraseAt, with no proof asked. Anything else leaves
+   * the vault as it stands, and a lease that does not fit or open is erased. Runs once the bundle
+   * is read, and does nothing while there is none. The deviceDB may be the host's own, so what it
+   * hands back is checked here, whoever wrote it: a record that does not pass reads as "no
+   * lease", the safe failure.
    *
-   * A record whose deadline lies past what this open's forcePassphraseReentryHours allows from
-   * now was remembered under a longer setting, and does not fit either: lowering the option has
-   * each device ask again at its next open, and raising it lengthens no unlock already
-   * remembered. Nothing on this path writes a record, so it can never bring back one that
-   * another tab's lock() erased meanwhile.
+   * A lease whose deadline lies past what this open's leaseHours allows from now was granted
+   * under a longer setting, and does not fit either: lowering the option has each device ask
+   * again at its next open, and raising it lengthens no lease already granted. Nothing on this
+   * path writes a record, so it can never bring back one that another tab's lock() erased
+   * meanwhile.
    */
-  const rememberedUnlock = async () => {
+  const takeUpLease = async () => {
     if (bundle === UnreadBundle || bundle === null) { return }
     const shutsThen = shutsSoFar
-    const kept = await deviceDB.readUnlock(scope)
+    const kept = await deviceDB.readLease(scope)
     if (kept === null) { return }
-    const checked = DeviceUnlock.safeParse(kept)
+    const checked = Lease.safeParse(kept)
     // A record naming some other scope is out of place, as unreadable as a mangled one.
     const readable = checked.success && Names.sameScope(checked.data, scope)
     const now = clockNow()
@@ -1253,40 +1253,40 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       && checked.data.vault_id === bundle.vault_id
       && checked.data.unlock_epoch === bundle.unlock_epoch
       && checked.data.ask_passphrase_at > now
-      && checked.data.ask_passphrase_at <= deadlineAfter(now, reentryMillis)
+      && checked.data.ask_passphrase_at <= deadlineAfter(now, leaseMillis)
     if (! fits) {
-      await deviceDB.eraseUnlock(scope)
+      await deviceDB.eraseLease(scope)
       // Expired, or outdated by a change to the wayins or a shorter setting, is routine; unreadable is worth a word.
-      if (! readable) { forgetUnreadableUnlock() }
+      if (! readable) { forgetUnreadableLease() }
       return
     }
-    const remembered = checked.data
+    const lease = checked.data
     try {
-      // Nothing on the remembered path ever re-wraps the vaultKey, so no extractable handle
-      // exists on it at all.
+      // Nothing on the lease's path ever re-wraps the vaultKey, so no extractable handle exists
+      // on it at all.
       const unwrapped = await unwrapKeyUnder(
-        remembered.local_unlock_key,
-        remembered.vault_key_local_wrapped,
-        leaseCtx(bundle.vault_id, bundle.unlock_epoch, remembered.ask_passphrase_at),
+        lease.lease_key,
+        lease.vault_key_lease_wrapped,
+        leaseCtx(bundle.vault_id, bundle.unlock_epoch, lease.ask_passphrase_at),
         { extractable: false, usage: ['wrapKey', 'unwrapKey'] },
       )
       // A shut meanwhile -- a storage refusal saying the user signed out -- wins over the record.
       if (closed || shutSince(shutsThen)) { return }
-      armExpiry(remembered.ask_passphrase_at, now)
+      armExpiry(lease.ask_passphrase_at, now)
       vaultKey = unwrapped
-      askPassphraseAt = remembered.ask_passphrase_at
+      askPassphraseAt = lease.ask_passphrase_at
     } catch {
-      // A record that no longer opens reads as "no remembered unlock": the safe failure.
-      await deviceDB.eraseUnlock(scope)
-      forgetUnreadableUnlock()
+      // A lease that no longer opens reads as "no lease": the safe failure.
+      await deviceDB.eraseLease(scope)
+      forgetUnreadableLease()
     }
   }
 
   // Told once the record is erased, so it never claims a forgetting that failed. Neither the record
   // nor the reason it failed is told: the record holds key material, and its validator's issues
   // may quote it.
-  const forgetUnreadableUnlock = () => {
-    logger.warn("This device's remembered unlock could not be read or would not open, so it was forgotten: the vault opens locked, and asks for the passphrase again.", { call: 'openVault' })
+  const forgetUnreadableLease = () => {
+    logger.warn("This device's lease could not be read or would not open, so it was forgotten: the vault opens locked, and asks for the passphrase again.", { call: 'openVault' })
   }
 
   /**
@@ -1508,7 +1508,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   }
 
   const vault: Vault = {
-    reentryWindowMillis: reentryMillis,
+    leaseMillis,
 
     getSnapshot: () => snapshot,
 
@@ -1527,12 +1527,12 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       // stands there now, not against a cached one a destroy or recreate may have outdated.
       await refresh()
       const unlocked = closed || shutSince(started.shutsThen) ? null : await settleUnlock(proof, wayinId)
-      const tookUp = unlocked !== null && await takeUpUnlock(unlocked, unlocked.standing, started, deadlineFor(proof, 'unlock'))
+      const tookUp = unlocked !== null && await takeUpVaultKey(unlocked, unlocked.standing, started, deadlineFor(proof, 'unlock'))
       bump()
       if (tookUp) { return }
       // A close() meanwhile is said as such: the handle, not the vault, is what refuses now.
       ensureOpen()
-      throw new VaultError('vault_locked', 'The vault was locked or destroyed on this device, or its ways in changed on another, while this unlock was under way, and that wins: nothing was unlocked, and this device remembers nothing. Unlock again to carry on.')
+      throw new VaultError('vault_locked', 'The vault was locked or destroyed on this device, or its ways in changed on another, while this unlock was under way, and that wins: nothing was unlocked, and this device keeps no lease. Unlock again to carry on.')
     },
 
     lock: async () => {
@@ -1558,13 +1558,13 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
         }
         if (isShutDue(now)) { dropKey() } else { shutAt(now + graceMillis, now) }
       }
-      // A soft lock: no new operation starts, and this device forgets its remembered unlock now,
+      // A soft lock: no new operation starts, and this device forgets its lease now,
       // but work in hand finishes -- an unlock or a change under way, here or in another tab,
       // among it -- and the vaultKey waits for it. The gate closes by having no deadline at all,
       // not one at now, which a clock stepped back reopens.
       askPassphraseAt = null
       bump()
-      await deviceDB.eraseUnlock(scope)
+      await deviceDB.eraseLease(scope)
     },
 
     changePassphrase: async (givenProof, newPassphrase, changeOpts) => {
@@ -1816,7 +1816,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
 
   try {
     await refresh()
-    await rememberedUnlock()
+    await takeUpLease()
   } catch (err) {
     // A failed open hands its caller no handle to close, so it closes itself: no storage watch
     // (with Convex, a live query) may outlive it. The caller gets the original error, even if
@@ -1838,15 +1838,14 @@ export type EraseDamagedVaultOpts = Pick<OpenVaultOpts, 'applabel' | 'userId' | 
 
 /**
  * Erase a vault that `openVault` refuses as `damaged_bundle`, and only that: its stored bundle and
- * every lockbox, through the VaultDB, and the unlock this device remembered for it and its device
- * mark, through the DeviceDB -- what `destroy()` does for a vault that opens, and nothing else. A stored bundle that
+ * every lockbox, through the VaultDB, and this device's lease of it and its device mark, through the DeviceDB -- what `destroy()` does for a vault that opens, and nothing else. A stored bundle that
  * fails its checks cannot be opened, so no handle exists to `destroy()`; this is the way to clear
  * it and start over. Whatever the vault held is gone for good, so ask the user first.
  *
  * It takes the options `openVault` took, and refuses a vault that is sound: kind 'bad_option' and
  * nothing erased, since a vault that opens is deleted with its handle's `destroy()`, which takes
  * the care of a handle that has seen the vault it deletes. With no vault stored it erases only the
- * device's remembered unlock and mark, so a call that was cut short can be made again. Kind 'damaged_bundle'
+ * device's lease and mark, so a call that was cut short can be made again. Kind 'damaged_bundle'
  * when the record is too damaged to say which vault it is, which only the backend's own tools can
  * clear; 'stale_write' when the vault was replaced elsewhere meanwhile. Other refusals are
  * storage's: 'storage_unavailable', 'identity_revoked', 'not_permitted'. The device store failing
@@ -1880,7 +1879,7 @@ export const eraseDamagedVault = async (opts: EraseDamagedVaultOpts): Promise<vo
   // The vault first: a sound one refuses, and then the device keeps what it remembers of it. A
   // retry after a failure here finds the vault gone, and still clears the device.
   await vaultDB.eraseDamagedVault(scope)
-  await deviceDB.eraseUnlock(scope)
+  await deviceDB.eraseLease(scope)
   await deviceDB.eraseMark(scope)
 }
 
@@ -1914,13 +1913,13 @@ const damagedAs = async <ResultT>(reading: Promise<ResultT>, damaged: (opts: Err
  * @example await deviceTroubleAsConditions(deviceDB).readMark(scope)  // site data blocked (a SecurityError): 'storage_blocked', "...will not help until that changes..."
  */
 export const deviceTroubleAsConditions = (deviceDB: DeviceDB): DeviceDB => ({
-  readUnlock:  async (...args) => await asCondition('readUnlock', () => deviceDB.readUnlock(...args)),
-  writeUnlock: async (...args) => { await asCondition('writeUnlock', () => deviceDB.writeUnlock(...args)) },
-  eraseUnlock: async (...args) => { await asCondition('eraseUnlock', () => deviceDB.eraseUnlock(...args)) },
-  readMark:    async (...args) => await asCondition('readMark', () => deviceDB.readMark(...args)),
-  writeMark:   async (...args) => { await asCondition('writeMark', () => deviceDB.writeMark(...args)) },
-  eraseMark:   async (...args) => { await asCondition('eraseMark', () => deviceDB.eraseMark(...args)) },
-  eraseAll:    async (...args) => { await asCondition('eraseAll', () => deviceDB.eraseAll(...args)) },
+  readLease:  async (...args) => await asCondition('readLease', () => deviceDB.readLease(...args)),
+  writeLease: async (...args) => { await asCondition('writeLease', () => deviceDB.writeLease(...args)) },
+  eraseLease: async (...args) => { await asCondition('eraseLease', () => deviceDB.eraseLease(...args)) },
+  readMark:   async (...args) => await asCondition('readMark', () => deviceDB.readMark(...args)),
+  writeMark:  async (...args) => { await asCondition('writeMark', () => deviceDB.writeMark(...args)) },
+  eraseMark:  async (...args) => { await asCondition('eraseMark', () => deviceDB.eraseMark(...args)) },
+  eraseAll:   async (...args) => { await asCondition('eraseAll', () => deviceDB.eraseAll(...args)) },
 })
 
 /**
@@ -1930,13 +1929,13 @@ export const deviceTroubleAsConditions = (deviceDB: DeviceDB): DeviceDB => ({
  * record.
  */
 const DeviceTroubleSaid: Record<keyof DeviceDB, { failed: string, instead?: string }> = {
-  readUnlock:  { failed: "reading the unlock it remembers for this vault, so the vault could not pick it up", instead: "unlock with a passphrase or passkey" },
-  writeUnlock: { failed: "writing the unlock it remembers for this vault, so this device may not remember it at the next open" },
-  eraseUnlock: { failed: "erasing the unlock it remembers for this vault, so the next open on this device may still pick it up" },
-  readMark:    { failed: "reading its mark of this vault (the newest copy of the vault it has seen, and how often it has locked), so the vault could not check storage against it" },
-  writeMark:   { failed: "writing its mark of this vault (the newest copy of the vault it has seen, and how often it has locked), so it may not be kept" },
-  eraseMark:   { failed: "erasing its mark of this vault, so it still holds the newest copy of the vault it had seen" },
-  eraseAll:    { failed: "erasing everything it keeps for safebyok, so some of it may remain" },
+  readLease:  { failed: "reading the lease it keeps for this vault, so the vault could not take it up", instead: "unlock with a passphrase or passkey" },
+  writeLease: { failed: "writing the lease it keeps for this vault, so this device may ask for the passphrase again at the next open" },
+  eraseLease: { failed: "erasing the lease it keeps for this vault, so the next open on this device may still take it up" },
+  readMark:   { failed: "reading its mark of this vault (the newest copy of the vault it has seen, and how often it has locked), so the vault could not check storage against it" },
+  writeMark:  { failed: "writing its mark of this vault (the newest copy of the vault it has seen, and how often it has locked), so it may not be kept" },
+  eraseMark:  { failed: "erasing its mark of this vault, so it still holds the newest copy of the vault it had seen" },
+  eraseAll:   { failed: "erasing everything it keeps for safebyok, so some of it may remain" },
 }
 
 /** What `call` to the device store's `verb` resolves to, or its failure, as {@link deviceTroubleAsConditions} says it. */
@@ -2179,13 +2178,13 @@ const parseVaultDB = (candidate: VaultDB): VaultDB => {
 
 /** What a DeviceDB must carry. Checked only: openVault keeps the device store it was handed. */
 const deviceDBShape = Z.object({
-  readUnlock:  Z.custom(isFunction),
-  writeUnlock: Z.custom(isFunction),
-  eraseUnlock: Z.custom(isFunction),
-  readMark:    Z.custom(isFunction),
-  writeMark:   Z.custom(isFunction),
-  eraseMark:   Z.custom(isFunction),
-  eraseAll:    Z.custom(isFunction),
+  readLease:  Z.custom(isFunction),
+  writeLease: Z.custom(isFunction),
+  eraseLease: Z.custom(isFunction),
+  readMark:   Z.custom(isFunction),
+  writeMark:  Z.custom(isFunction),
+  eraseMark:  Z.custom(isFunction),
+  eraseAll:   Z.custom(isFunction),
 })
 
 const parseDeviceDB = (candidate: DeviceDB): DeviceDB => {
@@ -2300,23 +2299,23 @@ const parseGraceSeconds = (candidate: number | undefined): number => {
 }
 
 /**
- * Hours, as the host thinks of them, to whole milliseconds, as every time inside is kept: a window
- * one timer can reach ({@link MaxReentryHours} at most), or `Infinity`, which becomes
+ * Hours, as the host thinks of them, to whole milliseconds, as every time inside is kept: a lease
+ * one timer can reach ({@link MaxLeaseHours} at most), or `Infinity`, which becomes
  * {@link ForeverMillis}.
  */
-const someHours = Z.union([Z.number().check(Z.positive(), Z.lte(MaxReentryHours)), Z.literal(Infinity)])
-const reentryHours = Z._default(someHours, ForcePassphraseReentryHours)
+const someHours = Z.union([Z.number().check(Z.positive(), Z.lte(MaxLeaseHours)), Z.literal(Infinity)])
+const leaseHoursOrDefault = Z._default(someHours, LeaseHours)
 const hoursToMillis = Z.transform((hours: number) => (hours === Infinity ? ForeverMillis : Math.round(hours * HourMillis)))
-const reentryWindowMillis = Z.number().check(Z.gte(1))
-const forcePassphraseReentryHours = Z.pipe(Z.pipe(reentryHours, hoursToMillis), reentryWindowMillis)
+const someMillis = Z.number().check(Z.gte(1))
+const leaseHoursAsMillis = Z.pipe(Z.pipe(leaseHoursOrDefault, hoursToMillis), someMillis)
 
-/** The deadline for a passphrase entered at `nowMillis`: `reentryMillis` later, in whole ms, but never past {@link FarFuture}. */
-const deadlineAfter = (nowMillis: number, reentryMillis: number): number => Math.min(Math.floor(nowMillis + reentryMillis), FarFuture)
+/** The deadline for a lease granted at `nowMillis`: `leaseMillis` later, in whole ms, but never past {@link FarFuture}. */
+const deadlineAfter = (nowMillis: number, leaseMillis: number): number => Math.min(Math.floor(nowMillis + leaseMillis), FarFuture)
 
-const parseForcePassphraseReentryHours = (candidate: number | undefined): number => {
-  const checked = forcePassphraseReentryHours.safeParse(candidate)
+const parseLeaseHours = (candidate: number | undefined): number => {
+  const checked = leaseHoursAsMillis.safeParse(candidate)
   if (! checked.success) {
-    throw new VaultError('bad_option', `forcePassphraseReentryHours is a number of hours greater than zero and at most ${String(MaxReentryHours)} (24.5 days), fractions too (0.25 is fifteen minutes), or Infinity for never: until lock(). A longer finite window is refused, as no timer reaches past it.`)
+    throw new VaultError('bad_option', `leaseHours is a number of hours greater than zero and at most ${String(MaxLeaseHours)} (24.5 days), fractions too (0.25 is fifteen minutes), or Infinity for never: until lock(). A longer finite lease is refused, as no timer reaches past it.`)
   }
   return checked.data
 }

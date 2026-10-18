@@ -145,7 +145,7 @@ between columns lets the editor align them (see *Tests*).
 * A Zod schema is the first choice for defaults, coercion, limits and collapsing unions: one
   schema, one message per limit, never a hand-written `if (n > 99) throw` beside it.
 * **Clear intent at the door, clean data inside.** An entrypoint may take a host's plain way of
-  saying something -- `forcePassphraseReentryHours: Infinity` for "never" -- and turns it into
+  saying something -- `leaseHours: Infinity` for "never" -- and turns it into
   the bounded form the code keeps, at the parse: `Infinity` hours becomes the longest finite
   window. Past the entrypoint, and in every stored field, nothing is infinite.
 * **`src/` uses `zod/mini`**, never classic `zod` (the linter refuses it): mini's builders

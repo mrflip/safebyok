@@ -346,8 +346,7 @@ must, since every field a record holds is bound into its encryption (all but the
   and schema version, the `vault_id`, `unlock_epoch`, `revision_id`s, each wayin's wayinkind, id, label, salt and key deriver's label, when
   each vault and lockbox was first stored and each lockbox last written (`registered_at`,
   `written_at`, epoch milliseconds), and the length of every ciphertext.
-* **Never**: a whisper, a passphrase, any key in usable form, or the device-local remembered
-  unlock. No history: an update replaces its row (your database's backups and WAL keep what
+* **Never**: a whisper, a passphrase, any key in usable form, or the device-local lease. No history: an update replaces its row (your database's backups and WAL keep what
   they keep).
 * **A lockbox stands only beside its bundle**, under the same `vault_id`: the foreign key
   erases a vault's lockboxes with its bundle, in one statement, and refuses a lockbox written for

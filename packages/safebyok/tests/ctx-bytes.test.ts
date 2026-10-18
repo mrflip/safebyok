@@ -56,7 +56,7 @@ describe("the ctx builders' output, byte for byte", () => {
     expect(await unwrapKeyUnder(passkeyKey, wayin.vault_key_wayin_wrapped, ctx, { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)
   })
 
-  it("a lockbox's two wraps and the remembered unlock's open only under the ctx bytes they have always been made with", async () => {
+  it("a lockbox's two wraps and the lease's open only under the ctx bytes they have always been made with", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
     const deviceDB = memoryDeviceDB()
     const vault = await openVault({
@@ -67,17 +67,17 @@ describe("the ctx builders' output, byte for byte", () => {
     await vault.store('anthropic', 'sk-fake')
     const bundle = (await vaultDB.readBundle(scope))!
     const lockbox = (await vaultDB.readBox(scope, 'anthropic'))!
-    const unlock = (await deviceDB.readUnlock(scope))!
+    const lease = (await deviceDB.readLease(scope))!
     const box = `"acme","u1","main","${bundle.vault_id}"`
     const header = `{"boxlabel":"anthropic","registered_at":${String(lockbox.registered_at)},"revision_id":"${lockbox.revision_id}","sidecar_json":"{}","vault_key_epoch":1,"whisper_codec":"json_v1","whisper_schema_version":1,"written_at":${String(lockbox.written_at)}}`
     const keyCtx = textBytes(`["safebyok-lockbox-v5",${box},"lockbox_key_wrapped",${header}]`)
     const whisperCtx = textBytes(`["safebyok-lockbox-v5",${box},"whisper_ciphered",${header}]`)
-    const leaseCtx = textBytes(`["safebyok-unlock-v1",${box},${String(unlock.unlock_epoch)},${String(unlock.ask_passphrase_at)},"vault_key_local_wrapped"]`)
+    const leaseCtx = textBytes(`["safebyok-lease-v1",${box},${String(lease.unlock_epoch)},${String(lease.ask_passphrase_at)},"vault_key_lease_wrapped"]`)
 
     const { sessionKey } = await Wayin.openWithPassphrase(TH.testDeriver, 'pw', scope, bundle)
     const lockboxKey = await unwrapKeyUnder(sessionKey, lockbox.lockbox_key_wrapped, keyCtx, { extractable: false, usage: ['decrypt'] })
     expect(new TextDecoder().decode(await decipherBytes(lockboxKey, lockbox.whisper_ciphered, whisperCtx))).to.include('sk-fake')
-    expect(await unwrapKeyUnder(unlock.local_unlock_key, unlock.vault_key_local_wrapped, leaseCtx, { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)
+    expect(await unwrapKeyUnder(lease.lease_key, lease.vault_key_lease_wrapped, leaseCtx, { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)
   })
 })
 

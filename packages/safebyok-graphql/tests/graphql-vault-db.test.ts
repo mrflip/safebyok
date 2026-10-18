@@ -173,7 +173,7 @@ describe("graphqlVaultDB, carrying a passkey's way in", () => {
     expect(await TH.browserFor(schema, 'u1').readBundle(u1)).to.deep.equal(withPasskey)
   })
 
-  it("lets a real vault add a passkey through it, a bundle update, and another device unlock with that passkey alone", async () => {
+  it("lets a real vault add a passkey through it, a bundle update, and unlock it on another device with that passkey alone", async () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
     const opened = () => vaultIn(schema)
     const laptop = await TH.passkeyOf('laptop')

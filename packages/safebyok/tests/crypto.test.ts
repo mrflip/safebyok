@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   cipherCtx, cipherBytes, decipherBytes, deriveWrappingKey, fromB64, importWrappingKeyBytes,
-  makeLocalUnlockKey, makeLockboxKey, makeVaultKey, randomBytes, randomId, toB64, unwrapKeyUnder, wrapKeyUnder,
+  makeLeaseKey, makeLockboxKey, makeVaultKey, randomBytes, randomId, toB64, unwrapKeyUnder, wrapKeyUnder,
   type CipherCtxPart,
 } from '../src/crypto'
 import * as TH from './test-helpers'
@@ -58,7 +58,7 @@ describe("cipherCtx", () => {
   it("refuses a part that is undefined or null as bad_option, rather than treating it as null", () => {
     for (const missing of [undefined, null]) {
       const part = missing as unknown as CipherCtxPart
-      const err = TH.expectSyncRefusal(() => cipherCtx('safebyok-unlock-v1', 'acme', part, 'main'), 'bad_option')
+      const err = TH.expectSyncRefusal(() => cipherCtx('safebyok-lease-v1', 'acme', part, 'main'), 'bad_option')
       expect(err.message).to.include('undefined or null')
       TH.expectSyncRefusal(() => cipherCtx(part), 'bad_option')
     }
@@ -131,13 +131,13 @@ describe("wrap and unwrap", () => {
     await expect(crypto.subtle.exportKey('raw', recovered)).rejects.toThrow()
   })
 
-  it("a localUnlockKey is born non-extractable, and still wraps and unwraps", async () => {
-    const localUnlockKey = await makeLocalUnlockKey()
-    expect(localUnlockKey.extractable).to.be.false
+  it("a leaseKey is born non-extractable, and still wraps and unwraps", async () => {
+    const leaseKey = await makeLeaseKey()
+    expect(leaseKey.extractable).to.be.false
     const vaultKey = await makeVaultKey()
-    const ctx = cipherCtx('vault_key_local_wrapped')
-    const wrapped = await wrapKeyUnder(localUnlockKey, vaultKey, ctx)
-    const recovered = await unwrapKeyUnder(localUnlockKey, wrapped, ctx, { extractable: true, usage: ['wrapKey', 'unwrapKey'] })
+    const ctx = cipherCtx('vault_key_lease_wrapped')
+    const wrapped = await wrapKeyUnder(leaseKey, vaultKey, ctx)
+    const recovered = await unwrapKeyUnder(leaseKey, wrapped, ctx, { extractable: true, usage: ['wrapKey', 'unwrapKey'] })
     expect(recovered).to.be.instanceOf(CryptoKey)
   })
 })

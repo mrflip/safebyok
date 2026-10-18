@@ -17,7 +17,7 @@ on the host's server, and `safebyok-graphql` to reach a server's VaultDB over Gr
 device store ships in `safebyok/idb`.
 `safebyok/testing` is for tests only, star-imported as `TH`: a cheap key deriver, a vault's
 options over stores in memory (`memoryVaultOpts`), shape-valid records with fake ciphertext, a
-live device unlock, small timing and tampering aids, a way to hold or slip work into an
+live lease, small timing and tampering aids, a way to hold or slip work into an
 adapter's next call (`holdNextCall`, `beforeNextCall`) and to count its storage watches
 (`tallyWatches`), a logger that keeps what it hears (`spyLogger`), checks that a call refuses
 (`expectRefusal`) and that what it threw quotes nothing it should not (`thrownText`,
@@ -235,7 +235,7 @@ validators of the host's, which are the vault's own. So an adapter that hands it
 another VaultDB's public verbs passes each call through as it came.
 
 A device store of your own (a `DeviceDB`, for a platform without IndexedDB) owes two things beyond
-keeping its records, each the compare and the write in one step: `writeUnlock(unlock, expected)`
+keeping its records, each the compare and the write in one step: `writeLease(lease, expected)`
 writes only while the scope's device mark stands at `expected.lock_generation` (0 with no mark),
 and otherwise writes nothing and refuses with `stale_write`; and `writeMark` keeps the higher
 `lock_generation` of the mark it writes and the one it replaces. That is how a lock in one tab
@@ -294,13 +294,13 @@ tests, such as `safebyok/testing`'s.
 
 ## Locking
 
-An unlocked vault stays unlocked until its window runs out (`forcePassphraseReentryHours`, seven
-days by default, at most 588 hours: 24.5 days) or the host locks it. `Infinity` hours means never
+A proof that unlocks the vault grants this device a **lease**: the vault stays unlocked, across
+reloads, until the lease runs out (`leaseHours`, seven days by default, at most 588 hours: 24.5 days) or the host locks it. `Infinity` hours means never
 on this device, until a lock: `askPassphraseAt` is then the exported `FarFuture`, the latest
 instant the package accepts (in 2255). A finite number past 588 is refused, since no timer
 reaches further. Show "until locked" for any `askPassphraseAt >= FarFuture - MinuteMillis`;
-never compare a time for equality. The vault reports the window it was opened with as
-`vault.reentryWindowMillis`, in milliseconds, the default and `Infinity` resolved (`Infinity`
+never compare a time for equality. The vault reports the lease it was opened with as
+`vault.leaseMillis`, in milliseconds, the default and `Infinity` resolved (`Infinity`
 reads as the exported `ForeverMillis`), so a UI can say how long an unlock lasts without being
 told the option again.
 
@@ -309,21 +309,20 @@ The deadline is the truth, and a timer enforces it. From `askPassphraseAt` the s
 keeps the key for one more minute to finish, and then a timer drops it, with no call needed. A timer that runs late, as one may on a device that slept, is caught at the next
 call. The timer is `unref`'d, so it never holds a Node or Bun process open.
 
-**The window starts again whenever the user types a passphrase and it proves**: an `unlock()`, a
+**The lease starts again whenever the user types a passphrase and it proves**: an `unlock()`, a
 `changePassphrase()`, and an `addPassphrase()`, `addPasskey()` or `retireWayin()` with a
 passphrase as proof. An `unlock()` with a passkey sets it too. Nothing else moves it: not a read,
-a store or a refresh, nor a passkey proving a change on a vault already unlocked. The window
+a store or a refresh, nor a passkey proving a change on a vault already unlocked. The lease
 running out while an `unlock()` or `changePassphrase()` is under way is no lock: the call ends
-unlocked, with a window of its own.
+unlocked, with a lease of its own.
 
-Lowering the option later takes hold on each device at its next open: an unlock remembered under
-the longer setting, whose deadline lies past the new number of hours from then, is forgotten, and
-the user types their passphrase again. Raising it lengthens no unlock already remembered. A
-device keeps one remembered unlock per vault, shared by its tabs, so open a vault with one
-setting on a device: two tabs opening it with different ones each forget what the other
-remembers (`notes/wontfix.md`). A device clock stepped backwards does the same to an unlock
-remembered just before: it seems to last past the window, and the user is asked again, the safe
-direction.
+Lowering the option later takes hold on each device at its next open: a lease granted under the
+longer setting, whose deadline lies past the new number of hours from then, is forgotten, and the
+user types their passphrase again. Raising it lengthens no lease already granted. A device keeps
+one lease per vault, shared by its tabs, so open a vault with one setting on a device: two tabs
+opening it with different ones each forget the other's lease (`notes/wontfix.md`). A device clock
+stepped backwards does the same to a lease granted just before: it seems to last past its
+setting, and the user is asked again, the safe direction.
 
 Two calls lock, and each forgets the unlock in memory and on this device alike, so the user types
 their passphrase again afterwards:
@@ -331,7 +330,7 @@ their passphrase again afterwards:
 * **`vault.lock()`** is the hard lock: the goons are at the door. Use it for a real lock signal: a
   Lock button, or a locked screen. The key is dropped at once, and the lock wins over everything
   under way, in this tab or in another on the same device: an `unlock()` or `changePassphrase()`
-  still under way remembers nothing and leaves the vault locked (the `unlock()` throws kind
+  still under way is granted no lease and leaves the vault locked (the `unlock()` throws kind
   `vault_locked`; a wrong passphrase is still told as `wrong_passphrase`, the more useful news),
   and a `read()` or `use()` under way refuses with `vault_locked`, the whisper it had deciphered
   dropped, never handed back. A write already sent to storage lands. Across tabs this rides on the
@@ -343,15 +342,15 @@ their passphrase again afterwards:
 * **`vault.lockSoon(graceSeconds = 5)`** is the soft lock: the bartender's stinkeye. Use it when
   the user steps away: a hidden tab, a sign-out. From the instant it is called the snapshot reads
   `locked`, every read, use, store or erase called afterwards throws kind `vault_locked`, and this
-  device forgets its remembered unlock; but work already in hand finishes: a `read()` or a
+  device forgets its lease; but work already in hand finishes: a `read()` or a
   `store()` under way, and an `unlock()` or `changePassphrase()` under way, here or in another tab,
   which leaves the vault unlocked again. The key is dropped `graceSeconds` later, or sooner when
-  the window would drop it sooner. An `unlock()` (or a `changePassphrase()`, which proves the
+  the lease would drop it sooner. An `unlock()` (or a `changePassphrase()`, which proves the
   passphrase too) within the grace ends it. The grace is at most 60 seconds; `lockSoon(0)` is
   `lock()`.
 
-`close()` is not a lock: the remembered unlock stays, for the next open, along with any an unlock
-under way wrote before the close; it ends a `lockSoon()` grace at once, an unlock under way on
+`close()` is not a lock: the lease stays, for the next open, along with any an unlock under way
+granted before the close; it ends a `lockSoon()` grace at once, an unlock under way on
 the closed handle takes nothing up, and a `read()` or `use()` under way hands back nothing,
 refusing with `vault_closed`.
 
@@ -359,7 +358,7 @@ A host clock that turns bad partway through a call (it throws, or reads outside 
 drops the key and fails the call with `bad_option`, even when the call's write had already
 landed: fix the clock, and look again.
 
-**Locking ends the remembered unlock.** A host that wants "stay unlocked on this device for a
+**Locking ends the lease.** A host that wants "stay unlocked on this device for a
 week" should not lock on tab-away: each time the user comes back to the tab, the vault would ask
 for the passphrase again. Lock on the signals your users mean as "lock it".
 
@@ -377,7 +376,7 @@ const lockWhenHidden = (vault: Vault) => {
     if (! document.hidden) { return }
     vault.lockSoon().catch((err: unknown) => {
       // A lockSoon() racing a close() is the one refusal to expect; any other, such as a device
-      // store that would not forget the remembered unlock, is worth a word.
+      // store that would not forget the lease, is worth a word.
       if (! isVaultError(err, 'vault_closed')) { console.warn('The vault did not lock cleanly', err) }
     })
   }
@@ -387,7 +386,7 @@ const lockWhenHidden = (vault: Vault) => {
 ```
 
 Call the function it returns when you close the vault. The `catch` quiets only a `lockSoon()`
-that races a `close()`, and lets a failure to forget the remembered unlock be heard: that vault
+that races a `close()`, and lets a failure to forget the lease be heard: that vault
 is locked in this tab, but the next open may unlock without the passphrase. Chromium's Idle
 Detection API, behind a permission the user grants, is the only true screen-lock signal, and a
 locked screen is the user meaning it, so it calls `lock()`, quieted the same way:
@@ -417,8 +416,8 @@ another tab, a session that expired, another user signing in -- storage tells th
 adapter whose backend knows who is signed in refuses a vault whose user is no longer that one
 with kind `identity_revoked` (`safebyok-convex`, `safebyok-postgres` and `safebyok-graphql` do;
 `safebyok-indexeddb` and `localVaultDB` keep everything on the device, and never do). The vault
-then locks at once, as `lock()` does: it drops its vaultKey, this device forgets its remembered
-unlock, and the snapshot reads `locked`. It erases nothing stored. The call that met the refusal
+then locks at once, as `lock()` does: it drops its vaultKey, this device forgets its lease, and
+the snapshot reads `locked`. It erases nothing stored. The call that met the refusal
 throws it, and the next unlock, once the user has signed in again, asks for the passphrase. A
 background refresh that meets it has nobody to throw to: it locks all the same, and tells the
 logger.
@@ -430,10 +429,10 @@ stay unlocked: an adapter that refuses `identity_revoked` for a passing fault, r
 `storage_unavailable`, breaks its contract (VAULTDB.md, line 5.5), and is the bug to fix.
 
 Open the vault only once your backend knows who is signed in: a vault opened while its auth is
-still loading meets `identity_revoked` at once, and forgets the remembered unlock with it (safe:
+still loading meets `identity_revoked` at once, and forgets the lease with it (safe:
 the user types the passphrase again). A backend that tells "who are you?" from "you may not"
 refuses the second as `not_permitted`, which locks nothing. A call that meets the refusal in a tab
-closed meanwhile still forgets the remembered unlock; and the Convex adapter's watch refreshes on
+closed meanwhile still forgets the lease; and the Convex adapter's watch refreshes on
 every error it hears, not only a sign-out. Both are the safe direction, and stay.
 
 ## Logging
@@ -489,9 +488,9 @@ storage client's error may quote the request it failed) is yours to keep clean. 
 says these things:
 
 * `warn`: `lockSoon()` could not read the clock, so it locked at once, without a grace; or the
-  clock failed as an unlock's window ended (`{ call: 'expiry' }`), so the key went at once.
-* `warn`: this device's remembered unlock could not be read or would not open, so it was
-  forgotten, and the vault opened locked. An unlock that simply ran out, or that a new
+  clock failed as a lease ended (`{ call: 'expiry' }`), so the key went at once.
+* `warn`: this device's lease could not be read or would not open, so it was forgotten, and the
+  vault opened locked. A lease that simply ran out, or that a new
   passphrase outdated, is routine, and says nothing.
 * `warn`: a refresh rung by a change in storage failed, so the snapshot may lag behind storage
   (it reads `syncing: false`) until a read succeeds. Said once for a failing streak; then `log`,
@@ -499,10 +498,10 @@ says these things:
 * `warn`: the catch-up after a write storage refused as stale failed. The call throws
   `stale_write`, the catch-up's failure its `cause`, and the snapshot reads `syncing: false`.
 * `log`: storage the vault cannot trust -- its user signed out, or an older copy of the vault --
-  locked it (`{ call: 'untrustedStorage' }`); `warn` when this device's remembered unlock could
-  not then be forgotten.
+  locked it (`{ call: 'untrustedStorage' }`); `warn` when this device's lease could not then be
+  forgotten.
 * `warn`: a change to the ways in landed in storage, but this device could not keep its mark of
-  the vault, or remember its unlock afresh. The change stands, and the call resolves.
+  the vault, or grant its lease afresh. The change stands, and the call resolves.
 * `warn`: this device's mark of the vault could not be read, so its rollback check starts again
   from what storage holds now.
 * `error`: a failed `openVault`, closing its storage watch, found the adapter's unsubscribe
@@ -618,8 +617,8 @@ if (answer !== null) { await vault.unlock(answer) }             // no key deriva
 ```
 
 * **A passkey is a way in like a passphrase.** Its wayin wraps the same vaultKey, under a key
-  made from the passkey's answer by HKDF-SHA256; an unlock with it is remembered on the device
-  for `forcePassphraseReentryHours`, and `askPassphraseAt` applies, as for a passphrase. It counts
+  made from the passkey's answer by HKDF-SHA256; an unlock with it grants this device a lease
+  for `leaseHours`, and `askPassphraseAt` applies, as for a passphrase. It counts
   toward `MaxUnlocks`.
 * **Adding one asks for proof**, a passphrase or another passkey's answer, as every change to the
   ways in does; `addPassphrase` and `retireWayin` take a passkey's answer as proof too.
@@ -697,7 +696,7 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `not_permitted`       | the storage backend refused the signed-in user, still the vault's own, this one call | Tell the user they may not; signing in again will not help |
 | `identity_revoked`    | the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in. The vault has locked itself (see *When the user signs out*) | Have the user sign in again, then open the vault for whoever that is |
 | `storage_unavailable` | the storage backend could not be reached, or failed; or this device's own store failed for a reason that may pass; or `zxcvbnPassphraseTest`'s word list could not be fetched | Try again shortly; the adapter's own error is the `cause`, unless it may quote the call (Convex's) |
-| `storage_blocked`     | this device's own store (its device store, or a vault kept on the device, as `safebyok-indexeddb`'s) refused for a reason that holds until something outside the app changes: the browser withholds storage from the page (site data blocked, a sandboxed frame), has no room for it (a quota of zero, as some private windows give, or a full disk), or offers no IndexedDB at all | Do not offer a retry: tell the user this browser is keeping the app from storing anything on this device. The app may open the vault again with `memoryDeviceDB()`, which remembers no unlock here; the browser's own error is the `cause` |
+| `storage_blocked`     | this device's own store (its device store, or a vault kept on the device, as `safebyok-indexeddb`'s) refused for a reason that holds until something outside the app changes: the browser withholds storage from the page (site data blocked, a sandboxed frame), has no room for it (a quota of zero, as some private windows give, or a full disk), or offers no IndexedDB at all | Do not offer a retry: tell the user this browser is keeping the app from storing anything on this device. The app may open the vault again with `memoryDeviceDB()`, which keeps no lease here; the browser's own error is the `cause` |
 
 `openVault` itself can refuse with `bad_option`, `bad_label`, `insecure_context`, and, as it reads the vault from
 storage, `storage_unavailable`, `not_permitted`, `identity_revoked` or `damaged_bundle` (a
@@ -724,8 +723,8 @@ meets another device's write is refused as `stale_write` the same way, once caug
 A stored bundle that fails its checks makes `openVault` refuse with `damaged_bundle`, and `destroy()`
 needs a handle that was never made. `eraseDamagedVault` is the way to clear such a vault and start
 over. It takes the options `openVault` took (only the vault's names and its two stores matter) and
-erases that vault's stored bundle and lockboxes through the `VaultDB`, and the unlock this device
-remembers for it through the `DeviceDB`: what `destroy()` does, for this one case. Whatever the
+erases that vault's stored bundle and lockboxes through the `VaultDB`, and this device's lease of
+it through the `DeviceDB`: what `destroy()` does, for this one case. Whatever the
 vault held is gone for good, so ask the user first.
 
 ```ts
@@ -740,7 +739,7 @@ try {
 
 It refuses a vault that is sound, with `bad_option` and nothing erased: a vault that opens is
 deleted through its handle's `destroy()`. With no vault stored it erases only the device's
-remembered unlock, so a call cut short can be made again. It needs the stored record's `vault_id`
+lease, so a call cut short can be made again. It needs the stored record's `vault_id`
 to aim the erase, so a bundle too damaged to show one is refused as `damaged_bundle` still, with
 nothing erased: the backend's own tools can clear it (`localVaultDB`'s bundle that is not JSON at
 all is one). A record this version cannot read may instead have been written by a **newer**
@@ -788,8 +787,8 @@ try {
 Close any handle already open on the vault first; `rolled_back` also reaches an open handle, from
 `unlock()`, a change to the ways in or a store. Whatever the older copy holds stands then, so tell
 the user what that means: ways in removed since, and passphrases since changed, open the vault
-again, and a passphrase added or changed since opens it no longer. The unlock this device
-remembered is from the newer copy, so it lapses, and the user enters a passphrase again. The
+again, and a passphrase added or changed since opens it no longer. This device's lease is from
+the newer copy, so it lapses, and the user enters a passphrase again. The
 device takes a new `device_id` for the vault, so the ways in it adds from then on carry a different
 one than those it added before. A restore for a vault refused as `damaged_bundle` meets the same
 refusal on every device that saw a newer copy than the backup.

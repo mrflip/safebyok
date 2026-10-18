@@ -11,9 +11,9 @@ pnpm justify                 # from demos/safebyok-demo-react: lint, typecheck, 
 ## Encrypted for real
 
 Whispers are encrypted on this device before anything reaches storage: the inspection panels show
-the ciphertext rows a backend would hold, and the remembered unlock around a key handle the
-browser will not export. The vault's records live in IndexedDB (through `safebyok-indexeddb`, and the
-remembered unlock through `safebyok/idb`); only the fake auth's scaffolding rows sit in
+the ciphertext rows a backend would hold, and the lease around a key handle the browser will
+not export. The vault's records live in IndexedDB (through `safebyok-indexeddb`, and the
+lease through `safebyok/idb`); only the fake auth's scaffolding rows sit in
 localStorage.
 
 ## The page
@@ -25,8 +25,8 @@ localStorage.
   punchline. No server of ours ever sees the key.
 * **Vault dashboard** ([src/components/VaultDashboard.tsx](src/components/VaultDashboard.tsx)) --
   direct manipulation of the vault: add, view, edit, delete and *use* lockboxes. Whisper-touching
-  actions summon the passphrase dialog only when the vault is actually locked; an unlock is
-  remembered on the device for seven days. Signing out locks the vault.
+  actions summon the passphrase dialog only when the vault is actually locked; an unlock grants
+  the device a lease of seven days. Signing out locks the vault.
 * **Ways in** ([src/components/WaysIn.tsx](src/components/WaysIn.tsx)) -- the vault's passphrases
   and passkeys, listed even while locked, and an "Add fingerprint" button: `vault.addPasskey()` checks your
   passphrase, then has `createPasskey()` make the passkey and adds it, and the passphrase dialog then

@@ -193,6 +193,7 @@ To be deleted at 1.0.0. Each retired name, and the one that replaced it.
 | `ForcePassphraseReentryHours`, `MaxReentryHours`       | `LeaseHours`, `MaxLeaseHours`                           |
 | `forcePassphraseReentryHours`                          | `leaseHours`                                            |
 | `reentryWindowMillis`                                  | `leaseMillis`                                           |
+| `Ckeys.unlock`, `Ckeys.isUnlock`, ckey `unlock^…`      | `Ckeys.lease`, `Ckeys.isLease`, ckey `lease^…`          |
 | bundle, `VaultBundle`                                  | vault props, `VaultProps`                               |
 | format `safebyok-vault-v2`                             | format `safebyok-vault-v3`                              |
 | format `safebyok-lockbox-v4`                           | format `safebyok-lockbox-v5`                            |

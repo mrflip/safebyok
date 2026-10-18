@@ -103,7 +103,7 @@ when given (`convexVaultDB({ client, api, logger })`), hears what the VaultDB ha
 * **Sign in first.** `userId` is the id your `getUserId` answers for the signed-in user. Open
   the vault once the Convex client is authenticated (in React, once `useConvexAuth()` says so):
   a call made before then is refused with kind `identity_revoked`, which also makes this device
-  forget its remembered unlock, so the user types their passphrase again. An `openVault` refused
+  forget its lease, so the user types their passphrase again. An `openVault` refused
   that way leaves no watch behind: open it again once signed in.
 * **Signing out locks the vault.** Once the Convex client signs out (or signs in as someone
   else), the vault's live `watchVault` query is refused, the vault looks again, meets
@@ -145,8 +145,7 @@ Three tables, inside the component, beside nothing of your app's:
   `wayinlabel`, passphraseSalt (`salt_b64`) and key deriver's label, how many ways in there are,
   when each vault and lockbox was first stored and each lockbox last written (`registered_at`,
   `written_at`, epoch milliseconds), and the length of every ciphertext.
-* **Never**: a whisper, a passphrase, any key in usable form, or the device-local remembered
-  unlock. No history: an update replaces its row, and a write made over a revision since replaced
+* **Never**: a whisper, a passphrase, any key in usable form, or the device-local lease. No history: an update replaces its row, and a write made over a revision since replaced
   is refused, never merged: the vault's policy ([`VAULTDB.md`](../safebyok/VAULTDB.md), *Who does what*). An app that wants history
   keeps it in its own backups; Convex's backups and exports keep what they keep.
 * `user_id` leads the bundle and lockbox indexes, so one user's rows are one range of each.

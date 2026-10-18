@@ -394,7 +394,7 @@ describe("a vault over convexVaultDB, opened before sign-in", () => {
 
 describe("a vault over convexVaultDB, when its user signs out", () => {
   for (const [clientTitle, connect] of ClientCases) {
-    it(`locks over a ${clientTitle} while idle, forgetting its remembered unlock, and erases nothing`, async () => {
+    it(`locks over a ${clientTitle} while idle, forgetting its lease, and erases nothing`, async () => {
       const deployment = deploy()
       const spy = TH.spyLogger()
       const deviceDB = memoryDeviceDB()
@@ -404,7 +404,7 @@ describe("a vault over convexVaultDB, when its user signs out", () => {
       await vault.store('anthropic_api_key', 'sk-ant-test-not-a-real-key')
       deployment.signOut()
       await vi.waitFor(() => { expect(vault.getSnapshot().state).to.eq('locked') })
-      expect(await deviceDB.readUnlock(u1)).to.be.null
+      expect(await deviceDB.readLease(u1)).to.be.null
       await TH.expectRefusal(vault.read('anthropic_api_key'), 'vault_locked')
       await TH.expectRefusal(vault.unlock(TH.RealPassphrase), 'identity_revoked')
       expect(spy.calls.map((heard) => heard.level)).to.include('log')

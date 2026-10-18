@@ -2,7 +2,7 @@
  * safebyok's test helpers, everything in one module: star-import it as `TH` in this package's
  * tests (`import * as TH from './test-helpers'`), and from `safebyok/testing` in another package's.
  * A cheap key deriver, a vault's options over stores in memory, shape-valid records whose
- * ciphertext is fake, a live device unlock, small timing, interception and tampering aids, a
+ * ciphertext is fake, a live lease, small timing, interception and tampering aids, a
  * logger that keeps what it hears, checks that a call refuses and that what it threw quotes
  * nothing it shouldn't, and the suites every VaultDB and DeviceDB adapter owes (the VaultDB suite
  * runnable over an adapter made per signed-in user). For tests only, and under vitest: the
@@ -10,14 +10,14 @@
  */
 import { describe, expect, it, vi } from 'vitest'
 import { toB64, type Ciphered } from '../src/crypto'
-import { memoryDeviceDB, type DeviceDB, type UnlockExpectation } from '../src/device-db'
+import { memoryDeviceDB, type DeviceDB, type LeaseExpectation } from '../src/device-db'
 import { VaultError, type VaultErrorKind } from '../src/errors'
 import type { KeyDeriver } from '../src/key-deriver'
 import type { VaultLogger } from '../src/logger'
 import { StrongVerdict, type PassphraseStrengthTest } from '../src/passphrase-strength'
 import { memoryStore } from '../src/string-store'
 import type { Lockbox } from '../src/lockbox'
-import type { DamagedLockbox, DeviceMark, DeviceUnlock, LockboxSummary, PasskeyWayin, PasskeyProof, PassphraseWayin, Sidecar, SeenVault, VaultBundle, VaultScope } from '../src/types'
+import type { DamagedLockbox, DeviceMark, Lease, LockboxSummary, PasskeyWayin, PasskeyProof, PassphraseWayin, Sidecar, SeenVault, VaultBundle, VaultScope } from '../src/types'
 import { stableJsonify } from '../src/stable-jsonify'
 import { NameFloorBytes } from '../src/validators'
 import { TestDeriverNotice } from '../src/key-deriver-spec'
@@ -301,21 +301,21 @@ export const markOf = (userId: string, overrides: MarkOverrides = {}): DeviceMar
 }
 
 /**
- * The expectation a remembered unlock is written under on a device that has never locked its
+ * The expectation a lease is written under on a device that has never locked its
  * vault: the lock generation of a scope with no mark, or a mark from {@link markOf}.
  *
- * @example await deviceDB.writeUnlock(await TH.unlockOf('u1'), TH.NoLocks)
+ * @example await deviceDB.writeLease(await TH.leaseOf('u1'), TH.NoLocks)
  */
-export const NoLocks: UnlockExpectation = Object.freeze({ lock_generation: 0 })
+export const NoLocks: LeaseExpectation = Object.freeze({ lock_generation: 0 })
 
-/** A real DeviceUnlock for device-storage tests: a live non-extractable localUnlockKey around fake wrapped material. */
-export const unlockOf = async (userId: string): Promise<DeviceUnlock> => ({
-  format:                  'safebyok-unlock-v1',
+/** A real Lease for device-storage tests: a live non-extractable leaseKey around fake wrapped material. */
+export const leaseOf = async (userId: string): Promise<Lease> => ({
+  format:                  'safebyok-lease-v1',
   ...scopeOf(userId),
   vault_id:                `vault-id-${userId}`,
-  unlock_epoch:        1,
-  local_unlock_key:        await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['wrapKey', 'unwrapKey']),
-  vault_key_local_wrapped: fakeCiphered(`local-${userId}`),
+  unlock_epoch:            1,
+  lease_key:               await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['wrapKey', 'unwrapKey']),
+  vault_key_lease_wrapped: fakeCiphered(`lease-${userId}`),
   ask_passphrase_at:       1_900_000_000_000,
 })
 
@@ -2384,11 +2384,11 @@ export const perUser = (vaultDBFor: (userId: string) => VaultDBVerbs): VaultDBVe
 }
 
 /**
- * The behaviour every DeviceDB owes, written once: no remembered unlock until one is written,
- * then that one back, its localUnlockKey still a non-extractable CryptoKey; likewise a device
- * mark, the newest written in place of the one before but never at a lower lock generation; a
- * remembered unlock written only while its scope's mark stands at the lock generation expected;
- * each scope kept to itself, and marks apart from unlocks; and an erase of one, or of all. Run it against an adapter with a factory making a fresh,
+ * The behaviour every DeviceDB owes, written once: no lease until one is written, then that one
+ * back, its leaseKey still a non-extractable CryptoKey; likewise a device mark, the newest
+ * written in place of the one before but never at a lower lock generation; a lease written only
+ * while its scope's mark stands at the lock generation expected; each scope kept to itself, and
+ * marks apart from leases; and an erase of one, or of all. Run it against an adapter with a factory making a fresh,
  * empty one per test. For a DeviceDB's own tests, from `safebyok/testing`; it runs under vitest.
  *
  * @param adapterTitle - The adapter under test, as the suite's titles name it.
@@ -2399,34 +2399,34 @@ export const perUser = (vaultDBFor: (userId: string) => VaultDBVerbs): VaultDBVe
  */
 export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => DeviceDB | Promise<DeviceDB>) => {
   describe(`${adapterTitle}, as a DeviceDB`, () => {
-    it("has no remembered unlock until one is written, then keeps it whole, localUnlockKey handle and all", async () => {
+    it("has no lease until one is written, then keeps it whole, leaseKey handle and all", async () => {
       const deviceDB = await makeDeviceDB()
-      expect(await deviceDB.readUnlock(scopeOf('u1'))).to.be.null
-      const unlock = await unlockOf('u1')
-      await deviceDB.writeUnlock(unlock, NoLocks)
-      const kept = await deviceDB.readUnlock(scopeOf('u1'))
-      expect(kept).to.deep.equal(unlock)
-      expect(kept?.local_unlock_key).to.be.instanceOf(CryptoKey)
-      expect(kept?.local_unlock_key.extractable).to.be.false
+      expect(await deviceDB.readLease(scopeOf('u1'))).to.be.null
+      const lease = await leaseOf('u1')
+      await deviceDB.writeLease(lease, NoLocks)
+      const kept = await deviceDB.readLease(scopeOf('u1'))
+      expect(kept).to.deep.equal(lease)
+      expect(kept?.lease_key).to.be.instanceOf(CryptoKey)
+      expect(kept?.lease_key.extractable).to.be.false
     })
 
-    it("keeps unlocks per user: erasing one leaves the other", async () => {
+    it("keeps leases per user: erasing one leaves the other", async () => {
       const deviceDB = await makeDeviceDB()
-      await deviceDB.writeUnlock(await unlockOf('u1'), NoLocks)
-      await deviceDB.writeUnlock(await unlockOf('u2'), NoLocks)
-      await deviceDB.eraseUnlock(scopeOf('u1'))
-      expect(await deviceDB.readUnlock(scopeOf('u1'))).to.be.null
-      expect(await deviceDB.readUnlock(scopeOf('u2'))).to.not.be.null
+      await deviceDB.writeLease(await leaseOf('u1'), NoLocks)
+      await deviceDB.writeLease(await leaseOf('u2'), NoLocks)
+      await deviceDB.eraseLease(scopeOf('u1'))
+      expect(await deviceDB.readLease(scopeOf('u1'))).to.be.null
+      expect(await deviceDB.readLease(scopeOf('u2'))).to.not.be.null
     })
 
-    it("eraseAll forgets every remembered unlock, and every device mark", async () => {
+    it("eraseAll forgets every lease, and every device mark", async () => {
       const deviceDB = await makeDeviceDB()
-      await deviceDB.writeUnlock(await unlockOf('u1'), NoLocks)
-      await deviceDB.writeUnlock(await unlockOf('u2'), NoLocks)
+      await deviceDB.writeLease(await leaseOf('u1'), NoLocks)
+      await deviceDB.writeLease(await leaseOf('u2'), NoLocks)
       await deviceDB.writeMark(markOf('u1'))
       await deviceDB.eraseAll()
-      expect(await deviceDB.readUnlock(scopeOf('u1'))).to.be.null
-      expect(await deviceDB.readUnlock(scopeOf('u2'))).to.be.null
+      expect(await deviceDB.readLease(scopeOf('u1'))).to.be.null
+      expect(await deviceDB.readLease(scopeOf('u2'))).to.be.null
       expect(await deviceDB.readMark(scopeOf('u1'))).to.be.null
     })
 
@@ -2439,35 +2439,35 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
       expect(await deviceDB.readMark(scopeOf('u1'))).to.deep.equal(markOf('u1', { seen: { unlock_epoch: 4 } }))
     })
 
-    it("keeps marks per vault, and apart from remembered unlocks: erasing one leaves the rest", async () => {
+    it("keeps marks per vault, and apart from leases: erasing one leaves the rest", async () => {
       const deviceDB = await makeDeviceDB()
-      await deviceDB.writeUnlock(await unlockOf('u1'), NoLocks)
+      await deviceDB.writeLease(await leaseOf('u1'), NoLocks)
       await deviceDB.writeMark(markOf('u1'))
       await deviceDB.writeMark(markOf('u2'))
       await deviceDB.eraseMark(scopeOf('u1'))
       expect(await deviceDB.readMark(scopeOf('u1'))).to.be.null
       expect(await deviceDB.readMark(scopeOf('u2'))).to.deep.equal(markOf('u2'))
-      expect(await deviceDB.readUnlock(scopeOf('u1'))).to.not.be.null
-      await deviceDB.eraseUnlock(scopeOf('u2'))
+      expect(await deviceDB.readLease(scopeOf('u1'))).to.not.be.null
+      await deviceDB.eraseLease(scopeOf('u2'))
       expect(await deviceDB.readMark(scopeOf('u2'))).to.deep.equal(markOf('u2'))
     })
 
-    it("writes a remembered unlock only while the mark stands at the lock generation expected, refusing as 'stale_write' otherwise", async () => {
+    it("writes a lease only while the mark stands at the lock generation expected, refusing as 'stale_write' otherwise", async () => {
       const deviceDB = await makeDeviceDB()
       await deviceDB.writeMark(markOf('u1', { lock_generation: 2 }))
-      await expectRefusal(deviceDB.writeUnlock(await unlockOf('u1'), { lock_generation: 1 }), 'stale_write')
-      expect(await deviceDB.readUnlock(scopeOf('u1'))).to.be.null
-      await deviceDB.writeUnlock(await unlockOf('u1'), { lock_generation: 2 })
-      expect(await deviceDB.readUnlock(scopeOf('u1'))).to.not.be.null
+      await expectRefusal(deviceDB.writeLease(await leaseOf('u1'), { lock_generation: 1 }), 'stale_write')
+      expect(await deviceDB.readLease(scopeOf('u1'))).to.be.null
+      await deviceDB.writeLease(await leaseOf('u1'), { lock_generation: 2 })
+      expect(await deviceDB.readLease(scopeOf('u1'))).to.not.be.null
     })
 
     it("reads the lock generation of a scope with no mark as 0, and of each scope apart", async () => {
       const deviceDB = await makeDeviceDB()
-      await deviceDB.writeUnlock(await unlockOf('u1'), NoLocks)
+      await deviceDB.writeLease(await leaseOf('u1'), NoLocks)
       await deviceDB.writeMark(markOf('u1', { lock_generation: 1 }))
-      await deviceDB.writeUnlock(await unlockOf('u2'), NoLocks)
-      expect(await deviceDB.readUnlock(scopeOf('u2'))).to.not.be.null
-      await expectRefusal(deviceDB.writeUnlock(await unlockOf('u1'), NoLocks), 'stale_write')
+      await deviceDB.writeLease(await leaseOf('u2'), NoLocks)
+      expect(await deviceDB.readLease(scopeOf('u2'))).to.not.be.null
+      await expectRefusal(deviceDB.writeLease(await leaseOf('u1'), NoLocks), 'stale_write')
     })
 
     it("never lowers a mark's lock generation: a mark written from an older read keeps the higher", async () => {
@@ -2483,7 +2483,7 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
       const deviceDB = await makeDeviceDB()
       await deviceDB.writeMark(markOf('u1', { seen: null, lock_generation: 2 }))
       expect(await deviceDB.readMark(scopeOf('u1'))).to.deep.equal(markOf('u1', { seen: null, lock_generation: 2 }))
-      await expectRefusal(deviceDB.writeUnlock(await unlockOf('u1'), NoLocks), 'stale_write')
+      await expectRefusal(deviceDB.writeLease(await leaseOf('u1'), NoLocks), 'stale_write')
       await deviceDB.writeMark(markOf('u1'))
       expect(await deviceDB.readMark(scopeOf('u1'))).to.deep.equal(markOf('u1', { lock_generation: 2 }))
     })

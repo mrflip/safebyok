@@ -220,7 +220,7 @@ describe("VaultProvider", () => {
     const world = makeWorld()
     render(
       <VaultProvider applabel="acme" vaultlabel="main" userId="u1" vaultDB={world.vaultDB} deviceDB={world.deviceDB} keyDeriver={TH.testDeriver}
-        passphraseStrengthTest={TH.anyPassphraseTest} forcePassphraseReentryHours={0.25}>
+        passphraseStrengthTest={TH.anyPassphraseTest} leaseHours={0.25}>
         <Probe />
       </VaultProvider>,
     )
@@ -257,7 +257,7 @@ describe("VaultProvider", () => {
     await putThroughNewVault('the right one')
     first.unmount()
 
-    // A fresh mount after the remembered unlock is gone: lock it by clearing the device side.
+    // A fresh mount after the lease is gone: lock it by clearing the device side.
     await world.deviceDB.eraseAll()
     world.mount('u1')
     await expectShown('locked')
@@ -616,7 +616,7 @@ describe("VaultProvider", () => {
     const { Grab, opened } = grabber()
     render(
       <VaultProvider applabel="acme" vaultlabel="main" userId="u1" vaultDB={localVaultDB({ store: memoryStore() })} deviceDB={memoryDeviceDB()}
-        keyDeriver={TH.testDeriver} passphraseStrengthTest={TH.anyPassphraseTest} clock={{ now: () => ClockMillis }} forcePassphraseReentryHours={1} maxWhisperBytes={8} maxLockboxes={1}>
+        keyDeriver={TH.testDeriver} passphraseStrengthTest={TH.anyPassphraseTest} clock={{ now: () => ClockMillis }} leaseHours={1} maxWhisperBytes={8} maxLockboxes={1}>
         <Grab />
       </VaultProvider>,
     )
@@ -1082,16 +1082,16 @@ describe("VaultProvider", () => {
     })
 
     describe("eraseDamagedVault", () => {
-      it("erases the vault openError says is damaged, with the unlock this device remembers, and opens a fresh one", async () => {
+      it("erases the vault openError says is damaged, with this device's lease, and opens a fresh one", async () => {
         const { store, deviceDB, props } = await damagedWorld()
         const { Grab, latest } = grabber()
         render(<VaultProvider {...props} userId="u1"><Grab /><Probe /></VaultProvider>)
         await expectShown('open error: damaged_bundle')
-        expect(await deviceDB.readUnlock(TH.scopeOf('u1'))).to.not.be.null
+        expect(await deviceDB.readLease(TH.scopeOf('u1'))).to.not.be.null
         await act(async () => { await latest().eraseDamagedVault() })
         await expectShown('absent')
         expect(store.ckeys()).to.deep.equal([])
-        expect(await deviceDB.readUnlock(TH.scopeOf('u1'))).to.be.null
+        expect(await deviceDB.readLease(TH.scopeOf('u1'))).to.be.null
         expect(latest().openError).to.be.null
       })
 

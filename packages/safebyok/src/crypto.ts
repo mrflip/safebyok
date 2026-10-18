@@ -64,7 +64,7 @@ export type CipherCtxPart = string | number | Readonly<Record<string, string | n
  * 'bad_option': each would bind the same as some other ctx (a missing part as null; a missing
  * field as no field at all), so nothing is encrypted or opened under it.
  *
- * @example cipherCtx('safebyok-unlock-v1', 'acme', 'u1', 'main', vaultId, 1, askPassphraseAt, 'vault_key_local_wrapped')
+ * @example cipherCtx('safebyok-lease-v1', 'acme', 'u1', 'main', vaultId, 1, askPassphraseAt, 'vault_key_lease_wrapped')
  * @example cipherCtx('safebyok-vault-v3', 'acme', 'u1', 'main', vaultId, registeredAt, 'vault_key_passphrase_wrapped', { wayinkind: 'passphrase', wayin_id, wayinlabel, key_deriver_label, salt_b64 })
  */
 export const cipherCtx = (...parts: readonly CipherCtxPart[]): Uint8Array => {
@@ -86,7 +86,7 @@ const isUnbound = (part: CipherCtxPart | null | undefined): boolean => (
 /**
  * A fresh random 256-bit AES-GCM key for wrapping and unwrapping other keys: a brand-new
  * vaultKey. Extractable, because a key must be to be wrapped (under the passphraseKey, under the
- * localUnlockKey) -- so this handle lives only inside the operation doing that wrapping, and the
+ * leaseKey) -- so this handle lives only inside the operation doing that wrapping, and the
  * handle a vault holds between operations is a separate non-extractable unwrap of the wayin.
  */
 export const makeVaultKey = (): Promise<CryptoKey> => (
@@ -102,10 +102,10 @@ export const makeLockboxKey = (): Promise<CryptoKey> => (
 )
 
 /**
- * This browser's localUnlockKey: non-extractable, so it cannot leave the device even through the
+ * This browser's leaseKey: non-extractable, so it cannot leave the device even through the
  * code that made it. Persisted only by structured clone (IndexedDB), never as bytes.
  */
-export const makeLocalUnlockKey = (): Promise<CryptoKey> => (
+export const makeLeaseKey = (): Promise<CryptoKey> => (
   crypto.subtle.generateKey(AesGcm, false, ['wrapKey', 'unwrapKey'])
 )
 

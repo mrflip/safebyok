@@ -64,9 +64,9 @@ export const Whisper: Z.ZodMiniType<Whisper> = Z.union([
  * see {@link EpochMillis}.
  *
  * `askPassphraseAt` is at or near it when the vault never asks for the passphrase again on this
- * device until `lock()`: `forcePassphraseReentryHours: Infinity`. A host shows "until locked"
- * rather than a date in 2255 for any instant within a minute of it, never only for one equal to
- * it: `at >= FarFuture - MinuteMillis`.
+ * device until `lock()`: `leaseHours: Infinity`. A host shows "until locked" rather than a date
+ * in 2255 for any instant within a minute of it, never only for one equal to it:
+ * `at >= FarFuture - MinuteMillis`.
  *
  * @example askPassphraseAt >= FarFuture - MinuteMillis ? 'until locked' : new Date(askPassphraseAt).toLocaleString()
  * @example new Date(FarFuture).toISOString()   // '2255-06-05T23:47:34.740Z'
@@ -90,12 +90,12 @@ export const FarPast = 347_155_200_000 // Date.UTC(1981, 0, 1)
 export const MinuteMillis = 60_000
 
 /**
- * The unlock window a vault keeps for "until `lock()`", in milliseconds: from {@link FarPast} to
+ * The lease a vault grants for "until `lock()`", in milliseconds: from {@link FarPast} to
  * {@link FarFuture}, so a deadline it sets from any instant the clock may read is
- * {@link FarFuture}. `forcePassphraseReentryHours: Infinity` becomes this window as `openVault`
- * parses it, and a vault's `reentryWindowMillis` reads as it then.
+ * {@link FarFuture}. `leaseHours: Infinity` becomes this as `openVault` parses it, and a vault's
+ * `leaseMillis` reads as it then.
  *
- * @example vault.reentryWindowMillis >= ForeverMillis - MinuteMillis   // true when opened with forcePassphraseReentryHours: Infinity
+ * @example vault.leaseMillis >= ForeverMillis - MinuteMillis   // true when opened with leaseHours: Infinity
  * @example FarPast + ForeverMillis === FarFuture                       // true: a window from the earliest instant ends at the last
  */
 export const ForeverMillis = FarFuture - FarPast
@@ -103,7 +103,7 @@ export const ForeverMillis = FarFuture - FarPast
 /**
  * Validator for an instant as whole UTC epoch milliseconds, from {@link FarPast} (1981) to
  * {@link FarFuture} (2255), both included. Every time the package keeps is one -- a lockbox's
- * `registered_at` and `written_at`, a vault bundle's `registered_at`, a remembered unlock's
+ * `registered_at` and `written_at`, a vault bundle's `registered_at`, a lease's
  * `ask_passphrase_at` -- and a stored record holding anything else fails validation. A host can
  * check its own times with it.
  *
@@ -370,7 +370,7 @@ const priorFits = (bundle: { vault_key_epoch: number, prior_vault_key?: { vault_
  * All of it is safe in the open; none of it opens without a passphrase or a passkey.
  *
  * `unlock_epoch` goes up by one on every change to the wayins -- a passphrase or passkey
- * added, removed or changed -- so other devices and remembered unlocks know to ask again.
+ * added, removed or changed -- so other devices and leases know to ask again.
  * `vault_key_epoch` says which vaultKey the wayins wrap, and from a vault's second vaultKey on,
  * `prior_vault_key` holds the one before it.
  */
@@ -397,27 +397,26 @@ export const VaultBundle = Z.object({
 export type VaultBundle = Z.infer<typeof VaultBundle>
 
 /**
- * The device-local record of a remembered unlock: this browser's localUnlockKey (a
- * non-extractable handle -- it cannot leave the device even through the code that made it) and
+ * The device-local record of a lease: this browser's leaseKey (a non-extractable handle -- it cannot leave the device even through the code that made it) and
  * the vaultKey wrapped under it. Held only by structured-clone storage (IndexedDB) or memory;
  * it has no JSON form, and nothing in it ever goes to the backend.
  */
-export const DeviceUnlock = Z.object({
-  format:           Z.literal('safebyok-unlock-v1'),
-  applabel:         NameFloor,
-  user_id:          NameFloor,
-  vaultlabel:       NameFloor,
-  vault_id:         Z.string().check(Z.minLength(1)),
-  /** The bundle's unlock_epoch when this unlock was remembered; a mismatch voids it. */
-  unlock_epoch:     Z.int().check(Z.positive()),
-  /** This browser's localUnlockKey: non-extractable, usable only to unwrap what it wrapped. */
-  local_unlock_key: cryptoKeyHandle,
-  /** The vaultKey, wrapped under the localUnlockKey. */
-  vault_key_local_wrapped: Ciphered,
-  /** The instant from which the remembered unlock no longer counts, and the vault asks for the passphrase: an {@link EpochMillis}. */
+export const Lease = Z.object({
+  format:            Z.literal('safebyok-lease-v1'),
+  applabel:          NameFloor,
+  user_id:           NameFloor,
+  vaultlabel:        NameFloor,
+  vault_id:          Z.string().check(Z.minLength(1)),
+  /** The bundle's unlock_epoch when this lease was granted; a mismatch voids it. */
+  unlock_epoch:      Z.int().check(Z.positive()),
+  /** This browser's leaseKey: non-extractable, usable only to unwrap what it wrapped. */
+  lease_key:         cryptoKeyHandle,
+  /** The vaultKey, wrapped under the leaseKey. */
+  vault_key_lease_wrapped: Ciphered,
+  /** The instant from which the lease no longer counts, and the vault asks for the passphrase: an {@link EpochMillis}. */
   ask_passphrase_at: EpochMillis,
 })
-export type DeviceUnlock = Z.infer<typeof DeviceUnlock>
+export type Lease = Z.infer<typeof Lease>
 
 /**
  * What a device mark holds of the vault it has seen under its scope: the device's own random
@@ -439,8 +438,8 @@ export type SeenVault = Z.infer<typeof SeenVault>
 
 /**
  * What a device keeps of a vault's scope, locked or not, on its own storage: its `lock_generation`,
- * how many times a lock on this device has forgotten the remembered unlock, so that an unlock under
- * way in another tab when the lock lands remembers nothing; and what it has `seen` of the vault
+ * how many times a lock on this device has forgotten the lease, so that an unlock under way in
+ * another tab when the lock lands is granted none; and what it has `seen` of the vault
  * standing under the scope (a {@link SeenVault}), or null when it has seen none. Nothing in it is
  * secret. One per scope: a vault made anew under the scope, with another `vault_id`, is seen
  * afresh, under a new `device_id`, and the lock generation counts on. `lock()` leaves the mark,
@@ -455,9 +454,9 @@ export const DeviceMark = Z.object({
   user_id:         NameFloor,
   vaultlabel:      NameFloor,
   /**
-   * How many locks on this device have forgotten the scope's remembered unlock: 0 at first, one
-   * more at each. A remembered unlock is written only while the mark stands at the generation its
-   * unlock began under; see `DeviceDB.writeUnlock`.
+   * How many locks on this device have forgotten the scope's lease: 0 at first, one more at each.
+   * A lease is written only while the mark stands at the generation its unlock began under; see
+   * `DeviceDB.writeLease`.
    */
   lock_generation: Z.int().check(Z.gte(0)),
   /** The vault this device has seen under the scope, or null for none. */
@@ -466,20 +465,19 @@ export const DeviceMark = Z.object({
 export type DeviceMark = Z.infer<typeof DeviceMark>
 
 /**
- * How many hours an entered passphrase lasts on the device before the vault asks for it again,
- * unless the caller says otherwise: seven days.
+ * How many hours a lease lasts on the device, after a proof unlocks the vault, before the vault
+ * asks for a proof again, unless the caller says otherwise: seven days.
  */
-export const ForcePassphraseReentryHours = 168 // seven days
+export const LeaseHours = 168 // seven days
 
 /**
- * The longest finite `forcePassphraseReentryHours` a vault takes: 588 hours, 24.5 days. The vault
- * drops its key with a timer when the window ends, and one timer reaches no further than
- * 2^31 - 1 milliseconds, about 24.8 days. A longer window is `Infinity`, until `lock()`; anything
- * between is refused.
+ * The longest finite `leaseHours` a vault takes: 588 hours, 24.5 days. The vault drops its key
+ * with a timer when the lease ends, and one timer reaches no further than 2^31 - 1 milliseconds,
+ * about 24.8 days. A longer lease is `Infinity`, until `lock()`; anything between is refused.
  *
- * @example openVault({ ...opts, forcePassphraseReentryHours: MaxReentryHours })   // the longest that ends by itself
+ * @example openVault({ ...opts, leaseHours: MaxLeaseHours })   // the longest that ends by itself
  */
-export const MaxReentryHours = 588
+export const MaxLeaseHours = 588
 
 /**
  * The largest whisper a vault stores unless the caller says otherwise, in bytes of its JSON and

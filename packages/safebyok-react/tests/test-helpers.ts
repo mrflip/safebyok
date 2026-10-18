@@ -7,7 +7,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { Component, createElement, type ReactElement, type ReactNode } from 'react'
 import { onTestFinished, vi } from 'vitest'
-import { ForcePassphraseReentryHours, VaultError, type WayinSummary, type Vault, type VaultState } from 'safebyok'
+import { LeaseHours, VaultError, type WayinSummary, type Vault, type VaultState } from 'safebyok'
 import { scopeOf } from 'safebyok/testing'
 import { fromB64, toB64 } from 'safebyok/utils'
 
@@ -35,13 +35,13 @@ const unsubscribeFromNothing = () => { /* nothing ever changes */ }
 export type StubVaultOpts = {
   state?:           VaultState
   wayins?:          WayinSummary[]
-  reentryWindowMillis?: number
+  leaseMillis?: number
   unlock?:          Vault['unlock']
   destroy?:         Vault['destroy']
 }
 
-/** The window, in milliseconds, of a vault opened with the default forcePassphraseReentryHours. */
-export const DefaultWindowMillis = ForcePassphraseReentryHours * 3_600_000
+/** The lease, in milliseconds, of a vault opened with the default leaseHours. */
+export const DefaultLeaseMillis = LeaseHours * 3_600_000
 
 /**
  * Just enough of a Vault for a component to render it: a snapshot that keeps its identity and
@@ -57,7 +57,7 @@ export const stubVault = (opts: StubVaultOpts = {}): Vault => {
   return {
     getSnapshot:     () => snapshot,
     subscribe:       () => unsubscribeFromNothing,
-    reentryWindowMillis: opts.reentryWindowMillis ?? DefaultWindowMillis,
+    leaseMillis: opts.leaseMillis ?? DefaultLeaseMillis,
     unlock:          opts.unlock,
     destroy:         opts.destroy,
   } as unknown as Vault

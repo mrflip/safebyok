@@ -4,7 +4,7 @@ import { consoleLogger } from './console-logger'
 
 /**
  * Where a vault says what it has nobody to throw to: a lock that had to skip its grace, a
- * background refresh that failed, a remembered unlock it could not read. Pass one to the storage
+ * background refresh that failed, a lease it could not read. Pass one to the storage
  * adapter's factory as `logger`, and the vault opened over it hears it too; pass openVault one of
  * its own to keep them apart. With none anywhere, the {@link DefaultLogger}: the console, unless the
  * app handed {@link setDefaultLogger} its own. Each call has a plain-language
