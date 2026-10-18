@@ -193,6 +193,14 @@ describe('scripts/file-thread', () => {
       expect(git('worktree', 'list', '--porcelain')).not.to.include(root)
     })
 
+    it("knows a tracked file whose name is not ASCII as the tip's", () => {
+      cutAndBuild('origin/main')
+      commit(root, 'café.md', 'bonjour\n')
+      const result = fileWithLeftovers({ 'café.md': 'bonjour\n' })
+      expect(result.status, result.stderr).to.eq(0)
+      expect(existsSync(root)).to.eq(false)
+    })
+
     it("leaves the directory for a person when it holds a file the tip does not, naming it", () => {
       cutAndBuild('origin/main')
       const result = fileWithLeftovers({ 'shim.ts': 'export {}\n', 'notes/scratch.txt': 'mine' })

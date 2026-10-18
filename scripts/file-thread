@@ -87,7 +87,7 @@ leftover_strangers() {
   { (cd "$left" && find -P . -xdev -name node_modules -prune -o \( -type f -o -type l \) -print) \
       | sed 's|^\./||' | awk '$0 != ".git" && $0 != ".DS_Store" && $0 !~ /\/\.DS_Store$/' \
       | LC_ALL=C sort > "$work/found" \
-    && git -C "$main" ls-tree -r --name-only "$tip" | LC_ALL=C sort > "$work/tracked" \
+    && git -C "$main" -c core.quotePath=false ls-tree -r --name-only "$tip" | LC_ALL=C sort > "$work/tracked" \
     && LC_ALL=C comm -23 "$work/found" "$work/tracked" > "$work/unlisted" \
     && { tr '\n' '\0' < "$work/unlisted" \
            | git -C "$main" check-ignore --no-index --stdin -z > "$work/ignored0" 2> /dev/null \
