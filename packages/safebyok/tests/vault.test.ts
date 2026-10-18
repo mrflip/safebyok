@@ -1062,7 +1062,7 @@ describe("the lease, from a host's own DeviceDB", () => {
     device.spoilRow((row) => ({ ...row, user_id: 'u2' }))
     await world.open({ deviceDB: device.deviceDB })
     expect(world.logged.map((call) => call.level)).to.deep.equal(['warn'])
-    expect(world.logged[0]?.message).to.include('could not be read')
+    expect(world.logged[0]?.message).to.include('could not be read or would not open, so it was discarded')
   })
 
   it("says once through the logger that a record from before the lease, under safebyok-unlock-v1, was discarded", async () => {
