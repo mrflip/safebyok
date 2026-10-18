@@ -35,7 +35,7 @@ const unsubscribeFromNothing = () => { /* nothing ever changes */ }
 export type StubVaultOpts = {
   state?:           VaultState
   wayins?:          WayinSummary[]
-  leaseMillis?: number
+  leaseMillis?:     number
   unlock?:          Vault['unlock']
   destroy?:         Vault['destroy']
 }
@@ -57,7 +57,7 @@ export const stubVault = (opts: StubVaultOpts = {}): Vault => {
   return {
     getSnapshot:     () => snapshot,
     subscribe:       () => unsubscribeFromNothing,
-    leaseMillis: opts.leaseMillis ?? DefaultLeaseMillis,
+    leaseMillis:     opts.leaseMillis ?? DefaultLeaseMillis,
     unlock:          opts.unlock,
     destroy:         opts.destroy,
   } as unknown as Vault

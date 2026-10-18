@@ -762,13 +762,13 @@ TH.describeDeviceDB('describeDeviceDB, over the smallest honest DeviceDB', () =>
       return Promise.resolve()
     },
     eraseLease: (scope) => { rows.delete(ckeyOf(scope)); return Promise.resolve() },
-    readMark:    (scope) => Promise.resolve(marks.get(ckeyOf(scope)) ?? null),
-    writeMark:   (mark) => {
+    readMark:   (scope) => Promise.resolve(marks.get(ckeyOf(scope)) ?? null),
+    writeMark:  (mark) => {
       marks.set(ckeyOf(mark), { ...mark, lock_generation: Math.max(mark.lock_generation, lockGenerationOf(mark)) })
       return Promise.resolve()
     },
-    eraseMark:   (scope) => { marks.delete(ckeyOf(scope)); return Promise.resolve() },
-    eraseAll:    () => { rows.clear(); marks.clear(); return Promise.resolve() },
+    eraseMark:  (scope) => { marks.delete(ckeyOf(scope)); return Promise.resolve() },
+    eraseAll:   () => { rows.clear(); marks.clear(); return Promise.resolve() },
   }
 })
 

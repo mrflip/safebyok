@@ -64,7 +64,7 @@ export interface DeviceDB {
  *   const deviceDB = memoryDeviceDB()
  *   await deviceDB.readLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // null
  * @example
- *   await deviceDB.readMark({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })    // null
+ *   await deviceDB.readMark({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })   // null
  */
 export const memoryDeviceDB = (): DeviceDB => {
   const leases = new Map<string, Lease>()

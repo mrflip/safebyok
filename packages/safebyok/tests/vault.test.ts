@@ -623,10 +623,10 @@ const uncheckingDeviceDB = () => {
     readLease:  (scope) => Promise.resolve((rows.get(ckeyOf(scope)) ?? null) as Lease | null),
     writeLease: (lease) => { rows.set(ckeyOf(lease), lease); return Promise.resolve() },
     eraseLease: (scope) => { rows.delete(ckeyOf(scope)); return Promise.resolve() },
-    readMark:    (scope) => Promise.resolve((marks.get(ckeyOf(scope)) ?? null) as DeviceMark | null),
-    writeMark:   (mark) => { marks.set(ckeyOf(mark), mark); return Promise.resolve() },
-    eraseMark:   (scope) => { marks.delete(ckeyOf(scope)); return Promise.resolve() },
-    eraseAll:    () => { rows.clear(); marks.clear(); return Promise.resolve() },
+    readMark:   (scope) => Promise.resolve((marks.get(ckeyOf(scope)) ?? null) as DeviceMark | null),
+    writeMark:  (mark) => { marks.set(ckeyOf(mark), mark); return Promise.resolve() },
+    eraseMark:  (scope) => { marks.delete(ckeyOf(scope)); return Promise.resolve() },
+    eraseAll:   () => { rows.clear(); marks.clear(); return Promise.resolve() },
   }
   /** Rewrite the one stored row through `spoil`. */
   const spoilRow = (spoil: (row: Record<string, unknown>) => unknown) => {
@@ -664,7 +664,7 @@ const LeaseHoursCases = [
   [0.25,             15 * 60 * 1000,                 'a fraction of an hour'],
   [Infinity,         ForeverMillis,                  'Infinity, as ForeverMillis'],
   // edge cases:
-  [MaxLeaseHours,  MaxLeaseHours * HourMillis,   'the longest finite window, MaxLeaseHours'],
+  [MaxLeaseHours,    MaxLeaseHours * HourMillis,     'the longest finite window, MaxLeaseHours'],
   [1 / 7,            514_286,                        'a window that is no whole number of milliseconds, rounded to one'],
 ] as const
 

@@ -77,7 +77,7 @@ const bellnameOf = (dbName: string) => `safebyok-idb:${dbName}:device_db`
  *   const deviceDB = idbDeviceDB()
  *   await deviceDB.readLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // null
  * @example
- *   await deviceDB.readMark({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })    // null
+ *   await deviceDB.readMark({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })   // null
  */
 export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
   const dbName = parseDbName(opts, 'idbDeviceDB')

@@ -95,7 +95,7 @@ export const MinuteMillis = 60_000
  * {@link FarFuture}. `leaseHours: Infinity` becomes this as `openVault` parses it, and a vault's
  * `leaseMillis` reads as it then.
  *
- * @example vault.leaseMillis >= ForeverMillis - MinuteMillis   // true when opened with leaseHours: Infinity
+ * @example vault.leaseMillis >= ForeverMillis - MinuteMillis           // true when opened with leaseHours: Infinity
  * @example FarPast + ForeverMillis === FarFuture                       // true: a window from the earliest instant ends at the last
  */
 export const ForeverMillis = FarFuture - FarPast
