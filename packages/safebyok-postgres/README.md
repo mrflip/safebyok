@@ -289,10 +289,11 @@ ciphered. **Why a trigger**: Postgres tells another connection of a write only b
 trigger sends one from inside every write to the two tables, whatever made it -- any of your
 servers, another version of this adapter, your own SQL, a retired vault's cascade -- and Postgres
 delivers it only once that write commits. It is the one trigger this package ships; the hard cap
-above is one you would write and own. A `listen` without the trigger hears nothing, by design, and says nothing of it; the
-trigger without a `listen` costs a notification nobody hears. A `listen` that throws as it is
-called refuses `subscribe` as `storage_unavailable`; one that rejects later is warned of through
-the `logger`, once, and its subscriber hears nothing more, as without a `listen`.
+above is one you would write and own. A `listen` without the trigger hears nothing, by design,
+and says nothing of it; the trigger without a `listen` costs a notification nobody hears. A
+`listen` that throws as it is called refuses `subscribe` as `storage_unavailable`; one that
+rejects later is warned of through the `logger`, once, and its subscriber hears nothing more, as
+without a `listen`.
 
 `listen(channel, onNotify)` calls `onNotify` with each notification's payload and returns the
 unlisten (or a promise for it). A PGlite's own `listen` is one, called on its PGlite -- passed
