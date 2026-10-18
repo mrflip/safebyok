@@ -1,6 +1,6 @@
 # Thread 6: lease (2026-10-18)
 
-Branch `20261018-lease`, PR #TBD, stacked on #163 (line main → #159 → #160 → #161 → #162 → #163).
+Branch `20261018-lease`, PR [#164](https://github.com/mrflip/safebyok/pull/164), stacked on #163 (line main → #159 → #160 → #161 → #162 → #163).
 Justify: green -- core 2115 passed | 35 skipped; react 218; indexeddb 135 | 10; convex 258 | 8;
 postgres 246 | 14; graphql 239 | 14; fastkey 49; demo 190 | 16; e2e 81 | 89; root scripts 258.
 
