@@ -29,6 +29,14 @@ The preplan's *Ground rules* hold, with these additions:
   `safebyok-lockbox-v5` in thread 5, and the lease is born `safebyok-lease-v1` in thread 6. A
   later thread renaming a field on one of these records adds no second bump, and its changeset
   says the field was renamed.
+* **A ctx's bytes follow its record's renamed fields** (*Orchestrator:* YOLO ruling during thread 3).
+  Each record's ctx is its format tag plus its stored header, field names included. A thread that
+  renames a stored field, or bumps a tag, lets the ctx bytes follow: same parts, same order, new
+  inputs. The ground rule "a rename changes names, not constructions" forbids changing what a ctx
+  is made of, not this. Each such thread adds a `notes/security.md` entry (through a `sonnet`
+  subagent). Bound purpose constants follow only when they carry a retired word
+  (`vault_key_local_wrapped` → `vault_key_lease_wrapped` in thread 6). Thread 4 renames code
+  identifiers only, so its ctx bytes must not move.
 * **VOCABULARY.md lives in the line.** Thread 1 sits at the bottom of the line (the orchestrator
   restacks thread 2 onto it before thread 3 is cut). A rename thread that finds the vocabulary
   lacking a name stops and asks (in YOLO the orchestrator answers), then adds the entry to

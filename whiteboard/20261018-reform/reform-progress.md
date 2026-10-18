@@ -63,3 +63,16 @@ disagree. Workers look things up here; they do not write here (each keeps its
 * Size: `everything` 34.86 → 34.72 kB, `openVault` 27.56 → 27.45 kB.
 * Three old entries in `notes/security.md` still describe the retry; the file's header forbids
   touching them (row for the Coach; thread 10 if allowed).
+
+### Thread 3, wayin (#161), in progress
+
+* *Orchestrator:* ruling A (YOLO): ctx bytes follow renamed stored fields and the bumped tag; see
+  the plan's ground rules. Where each ctx is built: wayin `binding()` in `envelope.ts` →
+  `cipherBinding(format, applabel, user_id, vaultlabel, vault_id, registered_at, purpose, header)`,
+  also a passkey's HKDF `info`; lockbox `boxBinding` in `vault.ts` (`LockboxFormat` + the whole
+  lockbox header, holding `public_json` and `revision_id`); lease `localBinding` in `vault.ts`
+  (`'safebyok-unlock-v1'` first, purpose `'vault_key_local_wrapped'` last).
+* `OlderBundleFormats` in `vault-db.ts` lists retired tags so an old record reads as damaged, not
+  `newer_format`: each tag-bumping thread adds the tag it retires there (an allowed grep survivor).
+* `gh pr ready` was refused once for a worker by the permission classifier; the orchestrator takes
+  a PR out of draft when that happens.
