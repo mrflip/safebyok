@@ -1,6 +1,6 @@
 # Thread 13: file-thread and .DS_Store (2026-10-18)
 
-Branch `20261018-dsstore_filing`, cut from origin/main (not stacked). Justify: green (root 262 tests,
+Branch `20261018-dsstore_filing`, PR #171, cut from origin/main (not stacked). Justify: green (root 262 tests,
 `tests/scripts/file-thread.test.ts` 11).
 
 * **Built**: `scripts/file-thread` now finishes the job when `git worktree remove` fails
@@ -22,7 +22,7 @@ Branch `20261018-dsstore_filing`, cut from origin/main (not stacked). Justify: g
   is reused as before, before the removal; it cannot serve the fallback, which runs after the
   worktree has become unregistered (it needs a git worktree to run in).
 * **Deviations**: none.
-* **Discoveries**: the pre-existing first-line rm of the `mktemp` log meant a PATH stub for `rm`
+* **Discoveries**: the script's own `rm -f "$log"` means a PATH stub for `rm`
   must match only the worktree's path, or it kills the script under `set -e`.
 * **For the Coach**: the field failure could not be reproduced on Linux; the tests simulate it
   by recreating the leftover after a real removal. Worth watching the next sprint's filings for
