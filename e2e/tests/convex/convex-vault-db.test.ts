@@ -114,7 +114,7 @@ describe("convexVaultDB, refusing", () => {
       const vaultDB = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
       await nearlyFull(vaultDB)
       const refusal = await TH.expectRefusal(vaultDB.updateBox(u1, TH.heavyBox('one_too_many', 200_000), TH.noBoxYet), 'vault_full')
-      expect(refusal.message).to.eq('This vault is full: retire a lockbox to make room, then try again.')
+      expect(refusal.message).to.eq('This vault is full: remove a lockbox to make room, then try again.')
       expect(refusal).to.not.have.property('cause')
       const listed = await vaultDB.listBoxes(u1)
       expect(listed.map((summary) => summary.boxlabel)).to.not.include('one_too_many')

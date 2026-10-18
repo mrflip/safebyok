@@ -55,7 +55,7 @@ describe("SafebyokComponent.api, for the vault's own user", () => {
       await asU1.mutation(api.safebyok.updateBox, { scope: u1, lockbox: TH.heavyBox(`heavy_${String(ii)}`, 900_000), expected: TH.noBoxYet })
     }
     const refusal = await TH.convexRefusalOf(asU1.mutation(api.safebyok.updateBox, { scope: u1, lockbox: TH.heavyBox('one_too_many', 200_000), expected: TH.noBoxYet }))
-    expect(refusal).to.deep.equal({ kind: 'vault_full', message: 'This vault is full: retire a lockbox to make room, then try again.' })
+    expect(refusal).to.deep.equal({ kind: 'vault_full', message: 'This vault is full: remove a lockbox to make room, then try again.' })
   })
 
   it("resolves a failed expectation false, not as a refusal", async () => {

@@ -155,7 +155,7 @@ describe("convexVaultDB, refusing", () => {
       const vaultDB = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
       await nearlyFull(vaultDB)
       const refusal = await TH.expectRefusal(vaultDB.updateBox(u1, TH.heavyBox('one_too_many', 200_000), TH.noBoxYet), 'vault_full')
-      expect(refusal.message).to.eq('This vault is full: retire a lockbox to make room, then try again.')
+      expect(refusal.message).to.eq('This vault is full: remove a lockbox to make room, then try again.')
       expect(refusal).to.not.have.property('cause')
       const listed = await vaultDB.listBoxes(u1)
       expect(listed.map((summary) => summary.boxlabel)).to.not.include('one_too_many')
@@ -175,7 +175,7 @@ describe("convexVaultDB, refusing", () => {
       await vaultDB.updateBox(u1, TH.heavyBox(`heavy_${String(ii)}`, bytes), { vault_id: vaultId, revision_tok: null, vault_key_epoch: 1 })
     }
     const refusal = await TH.expectRefusal(vault.storeBox('anthropic_api_key', 'x'.repeat(40_000)), 'vault_full')
-    expect(refusal.message).to.eq('This vault is full: retire a lockbox to make room, then try again.')
+    expect(refusal.message).to.eq('This vault is full: remove a lockbox to make room, then try again.')
     expect(vault.getSnapshot().boxes.map((box) => box.boxlabel)).to.not.include('anthropic_api_key')
     vault.close()
   })

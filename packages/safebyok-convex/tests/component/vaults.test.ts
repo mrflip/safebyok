@@ -221,7 +221,7 @@ const refusedWrite = (CVX: ReturnType<typeof TH.componentTest>, lockbox: ReturnT
   TH.convexRefusalOf(CVX.mutation(TH.vaults.updateBox, { scope: u1, lockbox, expected }))
 )
 
-const VaultFull = { kind: 'vault_full', message: 'This vault is full: retire a lockbox to make room, then try again.' }
+const VaultFull = { kind: 'vault_full', message: 'This vault is full: remove a lockbox to make room, then try again.' }
 
 /** The expectation a replacement of the box tagged `tag` carries. */
 const over = (tag: string) => ({ vault_id: 'vault-id-u1', revision_tok: `rev-${tag}`, vault_key_epoch: 1 })

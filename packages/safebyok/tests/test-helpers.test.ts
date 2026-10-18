@@ -1112,7 +1112,7 @@ const boxesIn = (rows: Rows, scope: VaultScope): StoredLockbox[] => [...rows]
   .map(([ckey, lockbox]) => ({ boxlabel: Ckeys.isBoxIn(scope)(ckey) ? Ckeys.boxlabelOf(ckey) : null, lockbox }))
   .filter((stored): stored is StoredLockbox => stored.boxlabel !== null)
 
-const vaultFull = () => new VaultError('vault_full', 'This vault is full: retire a lockbox to make room, then try again.')
+const vaultFull = () => new VaultError('vault_full', 'This vault is full: remove a lockbox to make room, then try again.')
 
 /**
  * makeDevices for a RoundTripVaultDB: a fresh backend, and devices over it, each with `opts` --
