@@ -1,6 +1,6 @@
 # Thread 8: make_hello (2026-10-18)
 
-Branch `20261018-make_hello`, PR (draft, number below once opened), stacked on #165 (line main →
+Branch `20261018-make_hello`, PR [#166](https://github.com/mrflip/safebyok/pull/166), stacked on #165 (line main →
 #159 → #160 → #161 → #162 → #163 → #164 → #165). Justify: green -- core 2151 passed | 35
 skipped; react 221; indexeddb 135 | 10; convex 258 | 8; postgres 246 | 14; graphql 239 | 14;
 fastkey 49; demo 190 | 16; e2e 81 | 89; root scripts 258. Security note: one new 2026-10-18 entry
@@ -78,7 +78,10 @@ fastkey 49; demo 190 | 16; e2e 81 | 89; root scripts 258. Security note: one new
     `VaultProvider` 4.73 of 6.8.
 * **For thread 9**: `TH.settledVault({ ...opts, deviceDB: memoryDeviceDB() })` twice over one
   `vaultDB` gives two devices; its second `@example` is that.
-* **For the Coach**:
-  * The provider's `vault` is now non-null while opening; `retryOpen()` no longer clears
-    `openError` while the retry runs (it clears when the vault settles).
-  * The suppression above.
+* **For the Coach** (the PR's *Open questions*):
+  * **Provider's vault while opening**: `vault` is now non-null while opening, and `retryOpen()`
+    no longer clears `openError` while the retry runs (it clears when the vault settles).
+    Recommend keeping both.
+  * **Suppression**: the `set-state-in-effect` disable above. Recommend accepting.
+  * **Lease re-take-up** after an untrusted-storage lock that could not erase the lease (see
+    *Discoveries*). Recommend accepting; it is in the security note.
