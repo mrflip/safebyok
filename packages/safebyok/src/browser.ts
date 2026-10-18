@@ -46,7 +46,11 @@ export const browserOpts = (opts?: IdbOpts): BrowserOpts => {
   const dbName = parseDbName(opts, 'browserOpts')
   const kept = bagsByDbName.get(dbName)
   if (kept !== undefined) { return kept }
-  const bag: BrowserOpts = Object.freeze({ keyDeriver: argon2idWebV1Deriver, deviceDB: idbDeviceDB({ dbName }), passphraseStrengthTest: zxcvbnPassphraseTest })
+  const bag: BrowserOpts = Object.freeze({
+    keyDeriver:             argon2idWebV1Deriver,
+    deviceDB:               idbDeviceDB({ dbName }),
+    passphraseStrengthTest: zxcvbnPassphraseTest,
+  })
   bagsByDbName.set(dbName, bag)
   return bag
 }
