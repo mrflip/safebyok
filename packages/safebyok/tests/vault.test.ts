@@ -2748,7 +2748,7 @@ describe("tampering", () => {
     const err = await TH.expectRefusal(vault.readBox('anthropic'), 'damaged_lockbox')
     expect(err.message).to.include('That lockbox is damaged')
     expect(err.message).to.not.include('anthropic')
-    expect(err.message).to.include('retire it')
+    expect(err.message).to.include('remove it')
     await vault.retireBox('anthropic')
     expect(boxlabelsOf(vault)).to.deep.equal([])
   })
@@ -5539,7 +5539,7 @@ describe("versioned updates: two devices writing at once", () => {
     TH.beforeNextCall(hereDB, 'updateBox', () => there.storeBox('anthropic', 'sk-ant-fake-theirs', { sidecar: { note: 'theirs' } }))
     const updateBox = vi.spyOn(hereDB, 'updateBox')
     const err = await TH.expectRefusal(here.storeBox('anthropic', 'sk-ant-fake-mine'), 'stale_write')
-    expect(err.message).to.match(/^That lockbox was written or retired on another device or tab while this one was storing into it, so nothing was written\./)
+    expect(err.message).to.match(/^That lockbox was written or removed on another device or tab while this one was storing into it, so nothing was written\./)
     expect(err.message).to.include("call storeBox() again")
     // A boxlabel is never quoted: a host's check may admit any text, a mistaken paste among it.
     expect(err.message).to.not.include('anthropic')
@@ -5689,11 +5689,11 @@ describe("versioned updates: two devices writing at once", () => {
     })
   }
 
-  it("a retirement refused as stale is thrown at once, never tried again, saying the lockbox could not be retired because its vault is gone", async () => {
+  it("a retirement refused as stale is thrown at once, never tried again, saying the lockbox could not be removed because its vault is gone", async () => {
     const { hereDB, here, there } = await rebornUnheard()
     const retireBox = vi.spyOn(hereDB, 'retireBox')
     const err = await TH.expectRefusal(here.retireBox('anthropic'), 'stale_write')
-    expect(err.message).to.match(/^That lockbox could not be retired, because the vault it was in is gone/)
+    expect(err.message).to.match(/^That lockbox could not be removed, because the vault it was in is gone/)
     // A boxlabel is never quoted: a host's check may admit any text, a mistaken paste among it.
     expect(err.message).to.not.include('anthropic')
     expect(err.cause).to.be.an.instanceOf(VaultError).and.to.have.property('kind', 'stale_write')

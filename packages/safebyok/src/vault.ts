@@ -1021,7 +1021,7 @@ const make = (opts: MakeVaultOpts): Vault => {
         throw new VaultError('absent_vault', 'This vault has not been created yet, so no passkey opens it: the first unlock(), with a passphrase, creates it.')
       }
       if (wayinId !== undefined) {
-        throw new VaultError('absent_wayin', "This vault has no way in with that wayin_id: it does not exist, and may have been retired on another device. Unlock without a wayinId to create it anew.")
+        throw new VaultError('absent_wayin', "This vault has no way in with that wayin_id: it does not exist, and may have been removed on another device. Unlock without a wayinId to create it anew.")
       }
       await ensureStrongEnough(strengthTest, proof, scope)
       const deviceId = randomId()
@@ -1468,10 +1468,10 @@ const make = (opts: MakeVaultOpts): Vault => {
     await refresh()
     const crowded = crowding()
     if (crowded === 'count') {
-      throw new VaultError('vault_full', `This vault already holds its limit of ${String(lockboxLimit)} lockboxes: retire one before storing another. A vault meant to hold more can be opened with a larger maxLockboxes, up to what its storage adapter allows.`)
+      throw new VaultError('vault_full', `This vault already holds its limit of ${String(lockboxLimit)} lockboxes: remove one before storing another. A vault meant to hold more can be opened with a larger maxLockboxes, up to what its storage adapter allows.`)
     }
     if (crowded === 'bytes') {
-      throw new VaultError('vault_full', `This vault has no room for that lockbox in the ${String(vaultByteLimit)} bytes its storage holds of one vault, counting each lockbox's boxlabel and room for a whisper and sidecar of maxWhisperBytes: retire a lockbox, or store under a shorter boxlabel.`)
+      throw new VaultError('vault_full', `This vault has no room for that lockbox in the ${String(vaultByteLimit)} bytes its storage holds of one vault, counting each lockbox's boxlabel and room for a whisper and sidecar of maxWhisperBytes: remove a lockbox, or store under a shorter boxlabel.`)
     }
   }
 
@@ -1571,7 +1571,7 @@ const make = (opts: MakeVaultOpts): Vault => {
   const unwrappingKeyFor = (unlockedKey: CryptoKey, standing: VaultProps, lockbox: Lockbox): CryptoKey => {
     if (lockbox.vault_key_epoch === standing.vault_key_epoch) { return unlockedKey }
     // Quotes no boxlabel, as no refusal here does: a host's boxlabel check may admit any text.
-    throw new VaultError('damaged_lockbox', "That lockbox is damaged: it says it was sealed under a vaultKey this vault does not hold, so it can't be opened. It was left as it is; retire it, or store its whisper again over it.")
+    throw new VaultError('damaged_lockbox', "That lockbox is damaged: it says it was sealed under a vaultKey this vault does not hold, so it can't be opened. It was left as it is; remove it, or store its whisper again over it.")
   }
 
   /**
@@ -1594,11 +1594,11 @@ const make = (opts: MakeVaultOpts): Vault => {
       )
       whisperBytes = await decipherBytes(lockboxKey, whisperCiphered, boxCtx(vaultId, header, 'whisper_ciphered'))
     } catch {
-      throw new VaultError('damaged_lockbox', "That lockbox is damaged: it would not open under this vault's key, as if altered in storage or moved there from somewhere else. It was left as it is; retire it, or store its whisper again over it.")
+      throw new VaultError('damaged_lockbox', "That lockbox is damaged: it would not open under this vault's key, as if altered in storage or moved there from somewhere else. It was left as it is; remove it, or store its whisper again over it.")
     }
     const checked = Whisper.safeParse(parseJsonOrNull(new TextDecoder().decode(whisperBytes)))
     if (! checked.success) {
-      throw new VaultError('damaged_lockbox', "That lockbox opened, but what was inside is not a whisper this package knows, so it is damaged. It was left as it is; retire it, or store its whisper again over it.")
+      throw new VaultError('damaged_lockbox', "That lockbox opened, but what was inside is not a whisper this package knows, so it is damaged. It was left as it is; remove it, or store its whisper again over it.")
     }
     return checked.data
   }
@@ -1643,7 +1643,7 @@ const make = (opts: MakeVaultOpts): Vault => {
   const refuseStaleStoreBox = (err: unknown): never => {
     if (! isCaughtUpStale(err)) { throw err }
     keyInHand()
-    throw new VaultError('stale_write', 'That lockbox was written or retired on another device or tab while this one was storing into it, so nothing was written. This device has caught up with storage, and the vault now shows the lockbox as storage holds it: call storeBox() again if this whisper should still replace what is there.', { cause: err })
+    throw new VaultError('stale_write', 'That lockbox was written or removed on another device or tab while this one was storing into it, so nothing was written. This device has caught up with storage, and the vault now shows the lockbox as storage holds it: call storeBox() again if this whisper should still replace what is there.', { cause: err })
   }
 
   /**
@@ -1691,7 +1691,7 @@ const make = (opts: MakeVaultOpts): Vault => {
       if (tookUp) { return }
       // A close() meanwhile is said as such: the handle, not the vault, is what refuses now.
       ensureOpen()
-      throw new VaultError('vault_locked', 'The vault was locked or retired on this device, or its ways in changed on another, while this unlock was under way, and that wins: nothing was unlocked, and this device keeps no lease. Unlock again to carry on.')
+      throw new VaultError('vault_locked', 'The vault was locked or removed on this device, or its ways in changed on another, while this unlock was under way, and that wins: nothing was unlocked, and this device keeps no lease. Unlock again to carry on.')
     },
 
     // Neither lock waits for hello(): a lock wins at once, storage reachable or not, and a lease
@@ -1802,7 +1802,7 @@ const make = (opts: MakeVaultOpts): Vault => {
           }
           const remaining = standing.wayins.filter((wayin) => wayin !== doomed)
           if (remaining.length === 0 || (doomed.wayinkind === 'passphrase' && remaining.every((wayin) => wayin.wayinkind !== 'passphrase'))) {
-            throw new VaultError('last_wayin', "That is this vault's last passphrase, and a vault always keeps one: a passkey can be lost with its device, and every way in with it. Add another passphrase first, or retire the vault if that is what's meant.")
+            throw new VaultError('last_wayin', "That is this vault's last passphrase, and a vault always keeps one: a passkey can be lost with its device, and every way in with it. Add another passphrase first, or remove the vault if that is what's meant.")
           }
         },
         // Any way in still standing is proof enough, the one going included.
@@ -1890,7 +1890,7 @@ const make = (opts: MakeVaultOpts): Vault => {
       } catch (err) {
         // Said as what happened to the box, once caught up; a catch-up that failed says so instead.
         if (! isCaughtUpStale(err)) { throw err }
-        throw new VaultError('stale_write', "That lockbox could not be retired, because the vault it was in is gone: it was deleted, or deleted and made anew, on another device. Nothing was removed, and this device has caught up with storage. If the vault was made anew and the lockbox stands in it, unlock that vault and retire it there.", { cause: err })
+        throw new VaultError('stale_write', "That lockbox could not be removed, because the vault it was in is gone: it was deleted, or deleted and made anew, on another device. Nothing was removed, and this device has caught up with storage. If the vault was made anew and the lockbox stands in it, unlock that vault and remove it there.", { cause: err })
       }
       await refresh()
     },
@@ -2124,7 +2124,7 @@ const asCondition = async <ResultT>(verb: keyof DeviceDB, call: () => Promise<Re
 const damagedVaultProps = (opts: ErrorOptions) => new VaultError('damaged_vault', "This vault's stored record is damaged, so no passphrase or passkey can be tried against it, and it can't be opened. It was left as it is: the app's support may be able to restore it.", opts)
 
 // The refusal never quotes the boxlabel: a host's validators may admit any text, a mistaken paste among it.
-const damagedLockbox = (opts: ErrorOptions) => new VaultError('damaged_lockbox', "That lockbox is stored damaged, so it can't be read. It was left as it is; retire it, or store its whisper again over it.", opts)
+const damagedLockbox = (opts: ErrorOptions) => new VaultError('damaged_lockbox', "That lockbox is stored damaged, so it can't be read. It was left as it is; remove it, or store its whisper again over it.", opts)
 
 const lockedError = () => new VaultError('vault_locked', 'The vault is locked: ask the user for their passphrase and call unlock().')
 

@@ -691,7 +691,7 @@ const checkVaultProps = (raw: unknown, scope: VaultScope): VaultProps => {
   return vaultProps
 }
 
-const unnamedVaultProps = (opts?: ErrorOptions) => new VaultError('damaged_vault', "This vault's stored record is too damaged to say which vault it is, so storage can't be told which one to retire, and nothing was removed. Its backend's own tools can clear it.", opts)
+const unnamedVaultProps = (opts?: ErrorOptions) => new VaultError('damaged_vault', "This vault's stored record is too damaged to say which vault it is, so storage can't be told which one to remove, and nothing was removed. Its backend's own tools can clear it.", opts)
 
 /** A stored vault this version cannot read, which a newer one may have: its own constructor, its own kind. */
 const newerVaultProps = () => new VaultError('newer_format', "This vault's stored record is in a form this version of the app does not know. It may have been written by a newer version, which opens it, so it was left as it is: update the app and try again.")
