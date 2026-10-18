@@ -1,7 +1,7 @@
 # Thread 9: created_elsewhere (2026-10-18)
 
-Branch `20261018-created_elsewhere`, PR filed against `main`, stacked on #166 (line main → #159 →
-#160 → #161 → #162 → #163 → #164 → #165 → #166 → this). Justify: green -- core 2161 passed | 35
+Branch `20261018-created_elsewhere`, PR [#167](https://github.com/mrflip/safebyok/pull/167), stacked on #166 (line main → #159 →
+#160 → #161 → #162 → #163 → #164 → #165 → #166 → #167). Justify: green -- core 2161 passed | 35
 skipped; react 224; indexeddb 135 | 10; convex 258 | 8; postgres 246 | 14; graphql 239 | 14;
 fastkey 49; demo 191 | 16; e2e 81 | 89.
 
