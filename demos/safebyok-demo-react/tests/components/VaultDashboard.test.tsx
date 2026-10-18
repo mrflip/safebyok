@@ -75,11 +75,11 @@ describe("VaultDashboard, a vault stored damaged", () => {
     const { store, world } = await damagedWorld()
     const confirming = vi.spyOn(globalThis, 'confirm').mockReturnValue(false)
     world.renderInVault(<VaultDashboard />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Erase and start over' }))
-    expect(confirming).toHaveBeenCalledWith("Erase this vault and start over? Every lockbox in it is lost for good.")
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove and start over' }))
+    expect(confirming).toHaveBeenCalledWith("Remove this vault and start over? Every lockbox in it is lost for good.")
     expect(store.ckeys()).to.have.lengthOf(2)
     confirming.mockReturnValue(true)
-    fireEvent.click(screen.getByRole('button', { name: 'Erase and start over' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove and start over' }))
     expect(await screen.findByText(/No lockboxes yet/)).to.not.be.null
     expect(store.ckeys()).to.deep.equal([])
   })
@@ -89,9 +89,9 @@ describe("VaultDashboard, a vault stored damaged", () => {
     vi.spyOn(world.vaultDB, 'retireDamagedVault').mockRejectedValueOnce(new VaultError('storage_unavailable', 'The vault storage could not be reached: try again shortly.'))
     vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
     world.renderInVault(<VaultDashboard />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Erase and start over' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove and start over' }))
     await screen.findByText(/could not be reached/)
-    fireEvent.click(screen.getByRole('button', { name: 'Erase and start over' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove and start over' }))
     expect(await screen.findByText(/No lockboxes yet/)).to.not.be.null
   })
 })
@@ -200,28 +200,28 @@ describe("VaultDashboard, its lockboxes", () => {
     expect(await vault.readBox('anthropic_api_key')).to.eq('sk-ant-test-replaced')
   })
 
-  it("deletes a lockbox once the user confirms, and keeps it when they don't", async () => {
+  it("removes a lockbox once the user confirms, and keeps it when they don't", async () => {
     const world = TH.makeWorld()
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key', openai_api_key: 'sk-test-not-a-real-key' })
     world.renderInVault(<VaultDashboard />)
     await screen.findByText('🔒 locked')
     const confirming = vi.spyOn(globalThis, 'confirm').mockReturnValue(false)
-    fireEvent.click(within(rowOf('openai_api_key')).getByRole('button', { name: 'delete' }))
-    expect(confirming).toHaveBeenCalledWith("Delete the lockbox 'openai_api_key'?")
+    fireEvent.click(within(rowOf('openai_api_key')).getByRole('button', { name: 'remove' }))
+    expect(confirming).toHaveBeenCalledWith("Remove the lockbox 'openai_api_key'?")
     confirming.mockReturnValue(true)
-    fireEvent.click(within(rowOf('openai_api_key')).getByRole('button', { name: 'delete' }))
+    fireEvent.click(within(rowOf('openai_api_key')).getByRole('button', { name: 'remove' }))
     await TH.answerPassphraseDialog()
     await waitFor(() => { expect(screen.queryByText('openai_api_key')).to.be.null })
     expect(screen.getByText('anthropic_api_key')).to.not.be.null
   })
 
-  it("deletes a lockbox retired elsewhere while it asked for the passphrase as deleted, quietly", async () => {
+  it("removes a lockbox retired elsewhere while it asked for the passphrase as removed, quietly", async () => {
     const world = TH.makeWorld()
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key', openai_api_key: 'sk-test-not-a-real-key' })
     world.renderInVault(<VaultDashboard />)
     await screen.findByText('🔒 locked')
     vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
-    fireEvent.click(within(rowOf('openai_api_key')).getByRole('button', { name: 'delete' }))
+    fireEvent.click(within(rowOf('openai_api_key')).getByRole('button', { name: 'remove' }))
     await screen.findByPlaceholderText('vault passphrase')
     const elsewhere = await world.openUnlocked()
     await elsewhere.retireBox('openai_api_key')
@@ -231,7 +231,7 @@ describe("VaultDashboard, its lockboxes", () => {
     expect(screen.getByText('anthropic_api_key')).to.not.be.null
   })
 
-  it("marks a damaged lockbox as such, offering only to delete it", async () => {
+  it("marks a damaged lockbox as such, offering only to remove it", async () => {
     const store = memoryStore()
     const world = TH.makeWorld({ vaultDB: localVaultDB({ store }) })
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key', openai_api_key: 'sk-test-not-a-real-key' })
@@ -242,7 +242,7 @@ describe("VaultDashboard, its lockboxes", () => {
     expect(within(damagedRow).queryByRole('button', { name: 'view' })).to.be.null
     expect(within(damagedRow).queryByRole('button', { name: 'use' })).to.be.null
     vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
-    fireEvent.click(within(damagedRow).getByRole('button', { name: 'delete' }))
+    fireEvent.click(within(damagedRow).getByRole('button', { name: 'remove' }))
     await TH.answerPassphraseDialog()
     await waitFor(() => { expect(screen.queryByText('openai_api_key')).to.be.null })
     expect(store.read(openaiCkey)).to.be.null

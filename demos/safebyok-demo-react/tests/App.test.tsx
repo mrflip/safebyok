@@ -89,9 +89,9 @@ describe("App", () => {
     fireEvent.click(screen.getByRole('button', { name: 'lock now' }))
     await screen.findByText('🔒 locked')
     vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
-    fireEvent.click(screen.getByRole('button', { name: 'delete' }))
+    fireEvent.click(screen.getByRole('button', { name: 'remove' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Forgot it? Start a new vault' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Erase and start over' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove and start over' }))
     fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'correct horse two' } })
     expect(screen.getByRole('dialog', { name: 'Choose a vault passphrase' })).to.not.be.null
     fireEvent.click(screen.getByRole('button', { name: 'Create vault' }))
