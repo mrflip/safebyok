@@ -3,6 +3,7 @@ import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { Ckeys, localVaultDB, memoryStore } from 'safebyok'
 import { KnockKnock, SavedFlashMillis } from '../../src/components/KnockKnock'
+import { OutageVaultDB, makeOutage } from '../../src/lib/outage'
 import * as TH from '../test-helpers'
 
 /** Anthropic, faked at the global `fetch` the SDK calls: see TH.fakeAnthropic. */
@@ -23,6 +24,16 @@ describe("KnockKnock", () => {
     await screen.findByText(/No Anthropic API key yet/)
     fireEvent.change(screen.getByPlaceholderText('Banana'), { target: { value: 'Banana' } })
     expect(screen.getByRole<HTMLButtonElement>('button', { name: /Banana Who\?/ }).disabled).to.be.true
+  })
+
+  it("shows nothing while the vault is still opening, never offering to add a key it may hold", async () => {
+    const outage = makeOutage()
+    outage.setDown(true)
+    const vaultDB = new OutageVaultDB(localVaultDB({ store: memoryStore() }), outage)
+    const { container } = TH.makeWorld({ vaultDB }).renderInVault(<KnockKnock />)
+    await TH.aWhile()
+    expect(container.textContent).to.eq('')
+    expect(screen.queryByText(/No Anthropic API key yet/)).to.be.null
   })
 
   it("saves a key into the vault, asking for a new vault's passphrase on the way", async () => {
