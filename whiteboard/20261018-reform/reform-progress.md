@@ -144,3 +144,25 @@ disagree. Workers look things up here; they do not write here (each keeps its
   `leaseHours`, `LeaseHours`, `MaxLeaseHours`, DeviceDB `readLease`/`writeLease`/`eraseLease`,
   `LeaseExpectation`.
 * The security note was folded into the 2026-10-15 entry "every field a record writes is bound".
+
+### Thread 7, vaultprops (#165)
+
+* The vault's methods: `storeBox`, `readBox`, `useBox`, `retireBox`, `retire`. VaultDB:
+  `readVaultProps`, `fetchOrCreateVaultProps`, `updateVaultProps`, `retireBox`, `retireVault`,
+  `retireDamagedVault`. Refusal `damaged_vault`. `revision_tok` everywhere.
+* **Thread 8**: the open path is unchanged; the logger's `VaultCall` labels follow the new method
+  names and `'openVault'` is still one of them.
+* **Thread 9**: `fetchOrCreateVaultProps`'s doc block says it returns the standing props untouched,
+  under their own `vault_id`, when the vault already exists; a caller tells the cases apart by
+  comparing `vault_id`. Thread 2's catch-up step is now `refuseStaleStoreBox`.
+* Convex `bundle_id` held the vault row's Convex `_id`: it is `vault_row_id`, index
+  `by_vault_row`; the read query is `getVaultProps`. Postgres has no `bundle_id`; its trigger is
+  `safebyok_vaults_changed`, renamed in the changeset's host lines.
+* Public names: `Ckeys.vaultProps` (stored ckey `vault^` unchanged), `TH.vaultPropsOf`,
+  `TH.rotatedVaultPropsOf`, `Refusals.staleWrite('vaultProps' | 'retire')`, GraphQL
+  `safebyok{Read,FetchOrCreate,Update}VaultProps`, `safebyokRetire{Box,Vault}`,
+  `SafebyokRetireExpectationInput`.
+* End-user copy keeps "Erase" (react `startOverQuestion`/`startOverConfirm`, demo); refusal
+  messages say "retire". Both rows in *Open Matters*.
+* `ctx-bytes.test.ts:32-33` (the encoding test) holds `revision_id` and `'safebyok-lockbox-v4'` as
+  arbitrary input: thread 10.

@@ -7,7 +7,7 @@ medium. Threads at once: 2. Issued by: the Coach, from `reform-preplan.md` besid
 Sprint doc: https://claude.ai/code/artifact/b7fd117e-7a03-4f68-b2fa-b2c1e70e118b (*Open Matters*,
 *Progress*, *Resolved*).
 
-**Status:** threads 1 to 6 filed, in the line main → #159 → #160 → #161 → #162 → #163 → #164; thread 7 building.
+**Status:** threads 1 to 7 filed, in the line main → #159 → #160 → #161 → #162 → #163 → #164 → #165; thread 8 building.
 
 ## Read first
 
@@ -176,6 +176,8 @@ matters only at the start.
 > abstract methods and tests follow; the convex component's function names follow.
 
 *Gloss:* *Touches* everything that touches storage: core (`types.ts`, `vault-db.ts`, `expectations.ts`, `lockbox.ts`, `vault.ts`, `errors.ts`, `refusals.ts`), all four adapters (postgres, graphql, convex incl. its component function names, indexeddb's VaultDB), react, demos, e2e, README, `notes/security.md`. The vault's read verb is **`readBox`** (ruling; the text's `viewBox` is stale), and `vault.use` → `useBox` joins (*Amendments*). `revision_id` → `revision_tok` moves the lockbox ctx bytes (update `tests/ctx-bytes.test.ts`'s literals in that commit) and rides the v3/v5 bumps of threads 3 and 5: no second bump. `DeviceDB.destroy`, if any, is not in the map: leave it. `vault.ts` writes the wayin list's type as `VaultBundle['wayins']` (the `Wayin` module shadows the type): it becomes `VaultProps['wayins']`. Storage-side names per the progress document's thread-1 notes (`safebyok_vaults`, the `VaultProps` stem). *Model*: default. *Depends on*: 6. *Grep*: `VaultBundle|BundleIdentity|BundleExpectation|damaged_bundle|readBundle|createBundle|updateBundle|eraseBox|eraseVault|eraseDamagedVault|EraseExpectation|revision_id|revisionId|\.erase\(|\.destroy\(|\.use\(` and case-insensitive `\bbundle`. Judge `\.store\(` and `\.read\(` hits by receiver. *Look-ahead*: thread 8 wraps every one of these methods with an awaited `hello`. *Size*: large, mechanical; may run long, so commit and push as each package goes green.
+
+*Review:* fixed (medium). No string, SQL or fixture content changed beyond the renames (whitespace-exact literal comparison); `boxCtx` moved only `revision_tok`; the Postgres upgrade works on PGlite in the changeset's order. Four fixes: the changeset says to run the `ALTER`s before the new `VaultTablesSql` first runs (after it, every vault reads as never created); missed names (`vaultRowId`, `erased` in four places); react's `erasing` → `retiring`; the demo's `erase` handler. Left: an upgraded Postgres keeps old key names (row), and three cosmetic nits.
 
 ### 8. `make_hello`
 
