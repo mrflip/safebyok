@@ -128,3 +128,19 @@ disagree. Workers look things up here; they do not write here (each keeps its
 * The option parse stays in one place: `checkStoreOpts` with `sidecarJsonOf` in `vault.ts`.
 * The security note was folded into the existing 2026-10-16 lockbox entry (the header's rule for
   a fact that entry already covers).
+
+### Thread 6, lease (#164)
+
+* Lease format `safebyok-lease-v1`; `leaseCtx` purpose `vault_key_lease_wrapped`; the lease
+  literal in `ctx-bytes.test.ts` moved, nothing else.
+* **No IndexedDB store rename**: lease and device mark share the `records` store of
+  `<dbName>:device_db` (from `safebyok/idb`), told apart by ckey. The ckey kind is now `lease^`
+  (was `unlock^`); `idbDeviceDB`'s sweep of unknown ckeys drops an old lease at the next
+  `readLease`/`eraseLease`, keeping the mark (test in `tests/idb.test.ts`). A host DeviceDB
+  returning an old record sees the vault erase it and warn once.
+* `takeUpLease` (reads the lease at open) is one function with a contract in its doc block: thread
+  8's `hello()` calls it. `takeUpVaultKey` adopts a proven vaultKey and grants a lease.
+* Public: `Ckeys.lease`, `Ckeys.isLease`, `TH.leaseOf` (in `safebyok/testing`), `leaseMillis`,
+  `leaseHours`, `LeaseHours`, `MaxLeaseHours`, DeviceDB `readLease`/`writeLease`/`eraseLease`,
+  `LeaseExpectation`.
+* The security note was folded into the 2026-10-15 entry "every field a record writes is bound".

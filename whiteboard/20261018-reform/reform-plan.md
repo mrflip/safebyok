@@ -7,7 +7,7 @@ medium. Threads at once: 2. Issued by: the Coach, from `reform-preplan.md` besid
 Sprint doc: https://claude.ai/code/artifact/b7fd117e-7a03-4f68-b2fa-b2c1e70e118b (*Open Matters*,
 *Progress*, *Resolved*).
 
-**Status:** threads 1 to 5 filed, in the line main → #159 → #160 → #161 → #162 → #163; thread 6 building.
+**Status:** threads 1 to 6 filed, in the line main → #159 → #160 → #161 → #162 → #163 → #164; thread 7 building.
 
 ## Read first
 
@@ -160,6 +160,8 @@ matters only at the start.
 
 *Gloss:* *Touches* `types.ts`, `device-db.ts`, `crypto.ts`, `vault.ts`, `idb.ts`, `idb-opts.ts`, `options.ts`, `safebyok-indexeddb`, react (`leaseHours` prop), demos, README. Internals per *Amendments*: `rememberDevice` → `grantLease`, `rememberedUnlock` → `takeUpLease`, `takeUpUnlock` → `takeUpVaultKey`; the public field `reentryWindowMillis` → `leaseMillis`. Renaming an IndexedDB object store needs a database version bump; with no migration, the upgrade drops the old store and an existing device's lease is simply gone (the user proves once more). The changeset says so. *Model*: default. *Depends on*: 5. *Grep*: `DeviceUnlock|safebyok-unlock-v1|localUnlockKey|LocalUnlockKey|local_unlock_key|vault_key_local_wrapped|readUnlock|writeUnlock|eraseUnlock|UnlockExpectation|rememberDevice|rememberedUnlock|takeUpUnlock|ForcePassphraseReentryHours|forcePassphraseReentryHours|MaxReentryHours`, and case-insensitive `device unlock|remembered unlock`, plus `\bunlocks\b` for the device-unlock noun thread 3 left ("remembered unlocks" in `types.ts`, `ckeys.ts`, `idb.ts`, `device-db.ts`; the `unlocks` map in `device-db.ts`; the demo's DeviceDB panel title; a DeviceDB battery title in TH). The lease's ctx purpose `vault_key_local_wrapped` → `vault_key_lease_wrapped` (ctx ruling); update the lease literal in `tests/ctx-bytes.test.ts` in the same commit. *Look-ahead*: thread 8's `hello()` reads the lease through `takeUpLease`. *Size*: medium.
 
+*Review:* fixed (medium). The `unlock^` sweep drops an old lease unread and keeps the mark; `leaseCtx` moved only its format and purpose; lock behaviour untouched. Four fixes: overlong doc blocks rewrapped; `askPassphraseAt`'s doc now says a passkey proof sets it too; test columns realigned; a test that a host's pre-lease `safebyok-unlock-v1` record is erased with one warning. Left: a retired `forcePassphraseReentryHours` passes silently (*Orchestrator:* ruled, YOLO, that thread 8's `Vault.make` refuses unknown options); `parseDeviceDB`'s advice names no missing verbs (row); `TODO.md`/`NOTYET.md` old names (thread 10); two message and table nits.
+
 ### 7. `vaultprops`
 
 > Rename the bundle to the vault's props and erase to retire, repo-wide: `VaultBundle` →
@@ -200,7 +202,7 @@ matters only at the start.
 > failure. Tests cover each reset and each non-reset. No prompt callback: the modal and
 > `unlock()` keep their shapes.
 
-*Gloss:* *Touches* `vault.ts` (the open path, `refresh`, `takeUpLease`), `types.ts` (`MakeVaultOpts`, the snapshot's `trouble`), `index.ts`, `browser.ts` (it names `OpenVaultOpts`), every doc block naming `openVault` (some fifteen files in core), react `vault-provider.tsx`, demos, e2e, README quick start, and `.size-limit.json`'s `openVault` entry (point its import at `Vault`, rename the entry; no limit changed). `Vault` is today an exported type; `Vault.make` makes it a value too. Choose the shape that keeps both the type and the value under one name, and say which in the PR. A public-surface addition (`trouble` on the snapshot) needs the doc block and an `@example` test. *Model*: default. *Depends on*: 7. *Grep*: `openVault|OpenVaultOpts`. *Look-ahead*: thread 9's two-device test opens two vaults with `Vault.make`. *Size*: medium; the reset/non-reset test matrix is most of it.
+*Gloss:* *Touches* `vault.ts` (the open path, `refresh`, `takeUpLease`), `types.ts` (`MakeVaultOpts`, the snapshot's `trouble`), `index.ts`, `browser.ts` (it names `OpenVaultOpts`), every doc block naming `openVault` (some fifteen files in core), react `vault-provider.tsx`, demos, e2e, README quick start, and `.size-limit.json`'s `openVault` entry (point its import at `Vault`, rename the entry; no limit changed). `Vault` is today an exported type; `Vault.make` makes it a value too. Choose the shape that keeps both the type and the value under one name, and say which in the PR. **`Vault.make` refuses unknown options** as `bad_option` (*Orchestrator:* YOLO ruling from thread 6's review: a host still passing the retired `forcePassphraseReentryHours` must not silently get the 7-day default). Validate `MakeVaultOpts` with a strict object, as `options.ts` does; check `VaultProvider`'s `...opts` spread passes only vault options. A public-surface addition (`trouble` on the snapshot) needs the doc block and an `@example` test. *Model*: default. *Depends on*: 7. *Grep*: `openVault|OpenVaultOpts`. *Look-ahead*: thread 9's two-device test opens two vaults with `Vault.make`. *Size*: medium; the reset/non-reset test matrix is most of it.
 
 ### 9. `created_elsewhere`
 
@@ -224,7 +226,7 @@ matters only at the start.
 > Have a `sonnet` subagent add a `notes/security.md` entry listing each stored-format tag that
 > changed and that no migration exists. One changeset summarising the sprint for the release note.
 
-*Gloss:* *Touches* docs and whatever the grep finds; `.size-limit.json` (`--write`), `notes/security.md` (through a `sonnet` subagent), one changeset summarising the sprint. The grep list is the union of threads 3 to 8's, handed over in full. *Orchestrator:* also put the demo's note hint back in words of effect, e.g. "(not encrypted: visible without the passphrase; left blank, the note stands)", rather than naming the sidecar (YOLO ruling from thread 5's review). The grep meets `'safebyok-lockbox-v4'` as an arbitrary input in `ctx-bytes.test.ts`'s first (encoding) test: allowed, or change its text and hex together. The *Old names* table stays unless the Coach's word is in the doc's *Coach notes* or a ruled row. *Model*: `sonnet`. *Depends on*: 9. *Size*: small to medium.
+*Gloss:* *Touches* docs and whatever the grep finds; `.size-limit.json` (`--write`), `notes/security.md` (through a `sonnet` subagent), one changeset summarising the sprint. The grep list is the union of threads 3 to 8's, handed over in full. *Orchestrator:* the sweep covers `TODO.md` and `NOTYET.md` too (`TODO.md:135`, `NOTYET.md:7` say "remembered unlock"; TODO names `takeUpUnlock`). Also put the demo's note hint back in words of effect, e.g. "(not encrypted: visible without the passphrase; left blank, the note stands)", rather than naming the sidecar (YOLO ruling from thread 5's review). The grep meets `'safebyok-lockbox-v4'` as an arbitrary input in `ctx-bytes.test.ts`'s first (encoding) test: allowed, or change its text and hex together. The *Old names* table stays unless the Coach's word is in the doc's *Coach notes* or a ruled row. *Model*: `sonnet`. *Depends on*: 9. *Size*: small to medium.
 
 
 ## For the Coach
