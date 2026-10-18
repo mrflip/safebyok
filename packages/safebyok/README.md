@@ -364,7 +364,7 @@ running out while an `unlock()` or `changePassphrase()` is under way is no lock:
 unlocked, with a lease of its own.
 
 Lowering the option later takes hold on each device at its next open: a lease granted under the
-longer setting, whose deadline lies past the new number of hours from then, is forgotten, and the
+longer setting, whose deadline lies past the new number of hours from then, is revoked, and the
 user types their passphrase again. Raising it lengthens no lease already granted. A device keeps
 one lease per vault, shared by its tabs, so open a vault with one setting on a device: two tabs
 opening it with different ones each revoke the other's lease (`notes/wontfix.md`). A device clock
@@ -546,7 +546,7 @@ says these things:
   `stale_write`, the catch-up's failure its `cause`, and the snapshot reads `syncing: false`.
 * `log`: storage the vault cannot trust -- its user signed out, or an older copy of the vault --
   locked it (`{ call: 'untrustedStorage' }`); `warn` when this device's lease could not then be
-  forgotten.
+  revoked.
 * `warn`: a change to the ways in landed in storage, but this device could not keep its mark of
   the vault, or grant its lease afresh. The change stands, and the call resolves.
 * `warn`: this device's mark of the vault could not be read, so its rollback check starts again
