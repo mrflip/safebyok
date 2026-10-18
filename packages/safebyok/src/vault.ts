@@ -685,8 +685,9 @@ const make = (opts: MakeVaultOpts): Vault => {
   // moved meanwhile. A soft lock's timer, or a clock that fails, drops the key without counting.
   let hardLocksSoFar = 0
   // How many times this handle has had this device forget its lease: every shut, and every
-  // lockSoon(). A lease take-up under way notes the number when it starts, and takes nothing up if
-  // it has moved meanwhile: a lock, soft or hard, wins over the lease it forgot.
+  // lockSoon(). A hello notes the number when it starts, and takes up no lease unless it was 0 then
+  // and has not moved meanwhile: a lock, soft or hard, wins over the lease it forgot, on this
+  // handle for good.
   let forgetsSoFar = 0
   // The timer that drops the vaultKey, and when it falls due: a minute past askPassphraseAt (see
   // ExpiryGraceMillis), or sooner for lockSoon(). Null when no key is held, or the one held lasts
@@ -1364,8 +1365,9 @@ const make = (opts: MakeVaultOpts): Vault => {
    * lease opens. A lock on this handle, hard or soft, or a lock for storage it cannot trust, is the
    * user's word, or the vault's, that this handle is locked: a lease the lock could not erase is
    * left for the next handle made (the next page load), and this one asks for a proof. A handle
-   * whose first hello failed has forgotten nothing, and still takes its lease up once a hello
-   * succeeds; one already unlocked holds its key, and loses nothing.
+   * whose first hello failed -- storage unreachable, say -- has forgotten nothing, and still takes
+   * its lease up once a hello succeeds; but one refused as storage it cannot trust has locked, as
+   * above. One already unlocked holds its key, and loses nothing.
    */
   const takeUpLease = async (forgetsThen: number) => {
     if (forgetsThen !== 0 || vaultProps === UnreadVaultProps || vaultProps === null) { return }
