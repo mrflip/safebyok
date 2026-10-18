@@ -816,7 +816,7 @@ describe("the lease", () => {
   })
 
   for (const [shiftMillis, blurb] of [[HourMillis, 'later'], [-HourMillis, 'earlier']] as const) {
-    it(`reads a lease's deadline moved an hour ${blurb} on the device as no lease, erases it, and says so: the deadline is bound into its wrap`, async () => {
+    it(`reads a lease's deadline moved an hour ${blurb} on the device as no lease, discards it, and says so: the deadline is bound into its wrap`, async () => {
       const world = makeWorld()
       await world.openUnlocked('pw one')
       const written = await world.readLease()
@@ -831,7 +831,7 @@ describe("the lease", () => {
   }
 
   for (const [askPassphraseAt, blurb] of OutOfBoundsDeadlines) {
-    it(`reads a lease's deadline of ${blurb} as no lease, and erases it`, async () => {
+    it(`reads a lease's deadline of ${blurb} as no lease, and discards it`, async () => {
       const world = makeWorld()
       await world.openUnlocked('pw one')
       const written = await world.readLease()
@@ -877,7 +877,7 @@ describe("the lease", () => {
 })
 
 describe("the lease, when the host changes leaseHours", () => {
-  it("lowered from Infinity to one hour, revokes a lease already granted at its next open, and the next unlock lasts an hour", async () => {
+  it("lowered from Infinity to one hour, discards a lease already granted at its next open, and the next unlock lasts an hour", async () => {
     const world = makeWorld()
     await world.openUnlocked('pw one', { leaseHours: Infinity })
     world.advance(30 * 24 * HourMillis)
@@ -934,7 +934,7 @@ describe("the lease, when the host changes leaseHours", () => {
     expect(await leaseDeadlineOf(world)).to.eq(given)
   })
 
-  it("keeps a deadline exactly at the new window's end, and revokes one a millisecond past it", async () => {
+  it("keeps a deadline exactly at the new window's end, and discards one a millisecond past it", async () => {
     const world = makeWorld()
     await world.openUnlocked('pw one', { leaseHours: 12 })
     const oneMilliShort = 12 - (1 / HourMillis)
@@ -1043,7 +1043,7 @@ describe("the lease, from a host's own DeviceDB", () => {
   })
 
   for (const [spoil, blurb] of SpoiledWayins) {
-    it(`reads ${blurb} as no lease, and erases it`, async () => {
+    it(`reads ${blurb} as no lease, and discards it`, async () => {
       const world = makeWorld()
       const device = uncheckingDeviceDB()
       await world.openUnlocked('pw one', { deviceDB: device.deviceDB })
@@ -1055,7 +1055,7 @@ describe("the lease, from a host's own DeviceDB", () => {
     })
   }
 
-  it("says through the logger that a record naming another scope was revoked", async () => {
+  it("says through the logger that a record naming another scope was discarded", async () => {
     const world = makeWorld()
     const device = uncheckingDeviceDB()
     await world.openUnlocked('pw one', { deviceDB: device.deviceDB })
@@ -1065,7 +1065,7 @@ describe("the lease, from a host's own DeviceDB", () => {
     expect(world.logged[0]?.message).to.include('could not be read')
   })
 
-  it("says once through the logger that a record from before the lease, under safebyok-unlock-v1, was revoked", async () => {
+  it("says once through the logger that a record from before the lease, under safebyok-unlock-v1, was discarded", async () => {
     const world = makeWorld()
     const device = uncheckingDeviceDB()
     await world.openUnlocked('pw one', { deviceDB: device.deviceDB })
@@ -6055,7 +6055,7 @@ describe("the logger", () => {
     await vault.lockSoon()
     expect(vault.getSnapshot().state).to.eq('locked')
     reading = world.clock.now()
-    // an open that revokes an unreadable lease
+    // an open that discards an unreadable lease
     await vault.unlock('pw')
     device.spoilRow(() => 'not a record')
     expect(await world.stateOnOpen({ logger, deviceDB: device.deviceDB, clock })).to.eq('locked')

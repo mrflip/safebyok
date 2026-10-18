@@ -122,7 +122,7 @@ export type MakeVaultOpts = {
    * timer a minute after the lease ends, and no timer reaches further.
    *
    * Lowering it takes hold on each device at its next hello: a lease granted under the longer
-   * setting, whose deadline lies past this many hours from then, is revoked, and the vault
+   * setting, whose deadline lies past this many hours from then, is discarded, and the vault
    * opens locked. Raising it lengthens no lease already granted. A device keeps one lease per
    * vault, so two tabs opening a vault with different settings are one device with two settings,
    * which is not supported (`notes/wontfix.md`): the lower one wins.
@@ -306,7 +306,7 @@ export type Vault = {
    * locked, under this passphrase. So does a vault retired, made anew, or with its wayins
    * changed on another device meanwhile: the passphrase was proven against a vault that no longer
    * stands as it was. A wrong passphrase is still told as 'wrong_passphrase', lock or no lock.
-   * The lease running out while the unlock is under way is no lock: the unlock stands, with a
+   * The lease expiring while the unlock is under way is no lock: the unlock stands, with a
    * lease of its own.
    *
    * `proof` may instead be a passkey's answer, a {@link PasskeyProof} (`safebyok-react`'s
@@ -396,7 +396,7 @@ export type Vault = {
    * keeps the lease standing on an unlocked vault, and grants one on a locked vault, as
    * `unlock()` by passkey would -- unless `lock()` or `retire()` is called
    * while the change is under way, which wins: the passphrase still changes, and the vault stays
-   * locked. A `lockSoon()` lets it finish, unlocked. So does the lease running out while the
+   * locked. A `lockSoon()` lets it finish, unlocked. So does the lease expiring while the
    * change is under way: the vault ends unlocked, with its new lease. Once the change has landed
    * in storage, the call resolves: should this device then fail to keep its own records of it,
    * the logger says so, and the vault asks for the passphrase at its next open.
@@ -695,10 +695,11 @@ const make = (opts: MakeVaultOpts): Vault => {
   // refresh. A read under way notes the number when it starts, and hands back nothing if it has
   // moved meanwhile. A soft lock's timer, or a clock that fails, drops the key without counting.
   let hardLocksSoFar = 0
-  // How many times this handle has revoked this device's lease: every shut, and every
-  // lockSoon(). A hello notes the number when it starts, and takes up no lease unless it was 0 then
-  // and has not moved meanwhile: a lock, soft or hard, wins over the lease it revoked, on this
-  // handle for good.
+  // How many times a lock on this handle has revoked this device's lease: every shut (a hard
+  // revocation) and every lockSoon() with a grace (a soft one). Discarding a lease that cannot be
+  // taken up is no revocation, and is not counted. A hello notes the number when it starts, and
+  // takes up no lease unless it was 0 then and has not moved meanwhile: a lock, soft or hard, wins
+  // over the lease it revoked, on this handle for good.
   let revokesSoFar = 0
   // The timer that drops the vaultKey, and when it falls due: a minute past askPassphraseAt (see
   // ExpiryGraceMillis), or sooner for lockSoon(). Null when no key is held, or the one held lasts
@@ -784,7 +785,8 @@ const make = (opts: MakeVaultOpts): Vault => {
     const fresh = await damagedAs(vaultDB.readVaultProps(scope), damagedVaultProps)
     const mark = fresh === null ? null : await heedMark(fresh, { seenBefore, call: 'refresh' })
     // A change to the wayins elsewhere (new epoch) or a deletion ends this device's unlock: the
-    // vaultKey in hand still works on old rows, but passing as current invites confusion.
+    // vaultKey in hand still works on old rows, but passing as current invites confusion. The
+    // lease, outdated by the same change, is discarded: no lock made this, so nothing is counted.
     const outlived = vaultKey !== null && vaultProps !== UnreadVaultProps && vaultProps !== null
       && (fresh?.unlock_epoch !== vaultProps.unlock_epoch || fresh.vault_id !== vaultProps.vault_id)
     if (outlived) {
@@ -1149,16 +1151,18 @@ const make = (opts: MakeVaultOpts): Vault => {
   }
 
   /**
-   * Forget the unlock, in memory and on this device. Every lock goes through here but a
-   * `lockSoon()` with a grace, which does the same save that the key waits for its timer; whatever
-   * unlock is under way when either does loses to it, in this handle or another on this device.
+   * Forget the unlock, in memory and on this device: the hard lock, whose revocation of the lease
+   * raises the lock generation (see hardRevokeLease). Every lock goes through here but a
+   * `lockSoon()` with a grace, whose soft revocation leaves the generation be and lets work in hand
+   * finish. Whatever unlock is under way when this runs loses to it, in this handle or another on
+   * this device.
    */
   const shut = async (call: VaultCall) => {
     shutsSoFar += 1
     hardLocksSoFar += 1
     revokesSoFar += 1
     dropKey()
-    await revokeLease(call)
+    await hardRevokeLease(call)
   }
 
   /** {@link shut}, and the snapshot told, even when the device store fails: the key is dropped at once. */
@@ -1171,12 +1175,13 @@ const make = (opts: MakeVaultOpts): Vault => {
   }
 
   /**
-   * Revoke this device's lease, raising its mark's lock generation first -- a scope
-   * with no mark readable gets one with nothing seen, at generation 1 -- so an unlock under way in
-   * any handle on this device, which began under the generation before, writes no record after
-   * this one is erased: the versioned erase. An unlock creating the vault loses to it too.
+   * A hard lock's revocation of this device's lease: its mark's lock generation raised first -- a
+   * scope with no mark readable gets one with nothing seen, at generation 1 -- so an unlock under
+   * way in any handle on this device, which began under the generation before, writes no record
+   * after this one is erased: the versioned erase. An unlock creating the vault loses to it too.
+   * A soft lock's revocation, lockSoon()'s, only erases the lease.
    */
-  const revokeLease = async (call: VaultCall) => {
+  const hardRevokeLease = async (call: VaultCall) => {
     const kept = await keptMark(call)
     await deviceDB.writeMark(kept === null ? blankMark(1) : { ...kept, lock_generation: kept.lock_generation + 1 })
     await deviceDB.eraseLease(scope)
@@ -1348,6 +1353,8 @@ const make = (opts: MakeVaultOpts): Vault => {
       if (isVaultError(err, 'stale_write')) { return false }
       throw err
     }
+    // A shut in this handle meanwhile may have erased before this record landed: the record goes
+    // too, as part of that revocation.
     if (shutSince(started.shutsThen)) { await deviceDB.eraseLease(scope) }
     if (outrun(standing, started.shutsThen)) { return false }
     armExpiry(until, clockNow())
@@ -1359,7 +1366,8 @@ const make = (opts: MakeVaultOpts): Vault => {
   /**
    * Fetch this device's lease, and take it up if it still fits and still opens: the vault is
    * then unlocked until the lease's askPassphraseAt, with no proof asked. Anything else leaves
-   * the vault as it stands, and a lease that does not fit or open is erased. Runs once the vault
+   * the vault as it stands, and a lease that does not fit or open is discarded: erased, with no
+   * revocation counted. Runs once the vault
    * props are read, in hello(), and does nothing while there are none. The deviceDB may be the
    * host's own, so what it hands back is checked here, whoever wrote it: a record that does not
    * pass reads as "no lease", the safe failure.
@@ -1370,12 +1378,12 @@ const make = (opts: MakeVaultOpts): Vault => {
    * path writes a record, so it can never bring back one that another tab's lock() erased
    * meanwhile.
    *
-   * Only a handle that has never revoked a lease takes one up: `revokesThen`, read from
+   * Only a handle on which no lock has revoked a lease takes one up: `revokesThen`, read from
    * `revokesSoFar` before the vault props were, must be 0, and must not have moved by the time the
-   * lease opens. A lock on this handle, hard or soft, or a lock for storage it cannot trust, is the
+   * lease opens. A lease discarded, here or by a refresh that found it outdated, counts for nothing. A lock on this handle, hard or soft, or a lock for storage it cannot trust, is the
    * user's word, or the vault's, that this handle is locked: a lease the lock could not erase is
    * left for the next handle made (the next page load), and this one asks for a proof. A handle
-   * whose first hello failed -- storage unreachable, say -- has revoked nothing, and still takes
+   * whose first hello failed -- storage unreachable, say -- has met no lock, and still takes
    * its lease up once a hello succeeds; but one refused as storage it cannot trust has locked, as
    * above. One already unlocked holds its key, and loses nothing.
    */
@@ -1393,8 +1401,8 @@ const make = (opts: MakeVaultOpts): Vault => {
       && checked.data.ask_passphrase_at > now
       && checked.data.ask_passphrase_at <= deadlineAfter(now, leaseMillis)
     if (! fits) {
-      // Expired, or outdated by a change to the wayins or a shorter setting, is routine; unreadable is worth a word.
-      if (readable) { await deviceDB.eraseLease(scope) } else { await revokeUnreadableLease() }
+      // Discarded. Expired, or outdated by a change to the wayins or a shorter setting, is routine; unreadable is worth a word.
+      if (readable) { await deviceDB.eraseLease(scope) } else { await discardUnreadableLease() }
       return
     }
     const lease = checked.data
@@ -1415,16 +1423,16 @@ const make = (opts: MakeVaultOpts): Vault => {
       askPassphraseAt = lease.ask_passphrase_at
     } catch {
       // A lease that no longer opens reads as "no lease": the safe failure.
-      await revokeUnreadableLease()
+      await discardUnreadableLease()
     }
   }
 
-  // Erase a lease that would not read or open, and say so -- once the record is erased, so it
-  // never claims a revocation that failed. Neither the record nor the reason it failed is told:
+  // Discard a lease that would not read or open, and say so -- once the record is erased, so it
+  // never claims a discard that failed. Neither the record nor the reason it failed is told:
   // the record holds key material, and its validator's issues may quote it.
-  const revokeUnreadableLease = async () => {
+  const discardUnreadableLease = async () => {
     await deviceDB.eraseLease(scope)
-    logger.warn("This device's lease could not be read or would not open, so it was revoked: the vault opens locked, and asks for the passphrase again.", { call: 'hello' })
+    logger.warn("This device's lease could not be read or would not open, so it was discarded: the vault opens locked, and asks for the passphrase again.", { call: 'hello' })
   }
 
   /**
@@ -1719,8 +1727,8 @@ const make = (opts: MakeVaultOpts): Vault => {
         }
         if (isShutDue(now)) { dropKey() } else { shutAt(now + graceMillis, now) }
       }
-      // A soft lock: no new operation starts, and this device revokes its lease now,
-      // but work in hand finishes -- an unlock or a change under way, here or in another tab,
+      // A soft lock: no new operation starts, and this device revokes its lease now -- the soft
+      // revocation, which leaves the lock generation be -- but work in hand finishes -- an unlock or a change under way, here or in another tab,
       // among it -- and the vaultKey waits for it. The gate closes by having no deadline at all,
       // not one at now, which a clock stepped back reopens.
       askPassphraseAt = null

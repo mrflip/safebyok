@@ -360,14 +360,14 @@ call. The timer is `unref`'d, so it never holds a Node or Bun process open.
 `changePassphrase()`, and an `addPassphrase()`, `addPasskey()` or `retireWayin()` with a
 passphrase as proof. An `unlock()` with a passkey sets it too. Nothing else moves it: not a read,
 a store or a refresh, nor a passkey proving a change on a vault already unlocked. The lease
-running out while an `unlock()` or `changePassphrase()` is under way is no lock: the call ends
+expiring while an `unlock()` or `changePassphrase()` is under way is no lock: the call ends
 unlocked, with a lease of its own.
 
 Lowering the option later takes hold on each device at its next open: a lease granted under the
-longer setting, whose deadline lies past the new number of hours from then, is revoked, and the
+longer setting, whose deadline lies past the new number of hours from then, is discarded, and the
 user types their passphrase again. Raising it lengthens no lease already granted. A device keeps
 one lease per vault, shared by its tabs, so open a vault with one setting on a device: two tabs
-opening it with different ones each revoke the other's lease (`notes/wontfix.md`). A device clock
+opening it with different ones each discard the other's lease (`notes/wontfix.md`). A device clock
 stepped backwards does the same to a lease granted just before: it seems to last past its
 setting, and the user is asked again, the safe direction.
 
@@ -536,8 +536,8 @@ says these things:
 
 * `warn`: `lockSoon()` could not read the clock, so it locked at once, without a grace; or the
   clock failed as a lease ended (`{ call: 'expiry' }`), so the key went at once.
-* `warn`: this device's lease could not be read or would not open, so it was revoked, and the
-  vault opened locked. A lease that simply ran out, or that a new
+* `warn`: this device's lease could not be read or would not open, so it was discarded, and the
+  vault opened locked. A lease that simply expired, or that a new
   passphrase outdated, is routine, and says nothing.
 * `warn`: a refresh rung by a change in storage failed, so the snapshot may lag behind storage
   (it reads `syncing: false`) until a read succeeds. Said once for a failing streak; then `log`,

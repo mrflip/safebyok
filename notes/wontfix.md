@@ -11,8 +11,8 @@ decide. Add an entry at the end of the list, dated, with the ruling or the row i
   undefined behaviour, whether the handles are in one tab or in two. A device keeps one lease
   and one device mark per vault, shared by every handle on it, and each handle reads them by its
   own settings. Today, for the lease: an open with a shorter `leaseHours` than the lease was
-  granted under revokes it (see `fetchLease` in `packages/safebyok/src/vault.ts`), so a tab
-  opened with the shorter setting revokes the lease a tab with the longer one granted, and every
+  granted under discards it (see `fetchLease` in `packages/safebyok/src/vault.ts`), so a tab
+  opened with the shorter setting discards the lease a tab with the longer one granted, and every
   tab on the device asks for the passphrase again.
   That is the safe direction, and it is all we say of it. A host that varies a setting by route
   passes the same one everywhere a vault opens on a device.

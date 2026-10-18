@@ -439,7 +439,7 @@ export type SeenVault = Z.infer<typeof SeenVault>
 
 /**
  * What a device keeps of a vault's scope, locked or not, on its own storage: its `lock_generation`,
- * how many times a lock on this device has revoked the lease, so that an unlock under way in
+ * how many times a hard lock on this device has revoked the lease, so that an unlock under way in
  * another tab when the lock lands is granted none; and what it has `seen` of the vault
  * standing under the scope (a {@link SeenVault}), or null when it has seen none. Nothing in it is
  * secret. One per scope: a vault made anew under the scope, with another `vault_id`, is seen
@@ -455,7 +455,8 @@ export const DeviceMark = Z.object({
   user_id:         NameFloor,
   vaultlabel:      NameFloor,
   /**
-   * How many locks on this device have revoked the scope's lease: 0 at first, one more at each.
+   * How many hard locks on this device have revoked the scope's lease: 0 at first, one more at
+   * each. A soft lock's revocation (`lockSoon()`'s) leaves it be.
    * A lease is written only while the mark stands at the generation its unlock began under; see
    * `DeviceDB.writeLease`.
    */
