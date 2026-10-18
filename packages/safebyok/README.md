@@ -99,7 +99,8 @@ code, the stored records and these docs all use its words.
   `unlocked`. Its lockboxes are written with `storeBox`, read with `readBox` and `useBox`, and
   removed with `retireBox`; `retire()` removes the whole vault. Two devices that write at once
   cannot both win: the late one is refused as `stale_write` (see *Two devices storing at once*),
-  and a first unlock that loses the race to another device's is `created_elsewhere`.
+  and a first unlock that loses the race to create the vault, and whose passphrase does not open
+  the vault made there, is `created_elsewhere`.
 * Storage is two plug-ins the core speaks to only as interfaces: a **vaultDB** for what syncs
   (vault props and lockboxes) and a **deviceDB** for this device's lease and device mark.
 
@@ -721,7 +722,7 @@ Part of normal operation. Each can reach the user; the app decides how.
 | Kind                  | What happened                                                    | What to do                                              |
 | --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |
 | `vault_locked`        | a whisper was asked for before the vault was unlocked            | Ask for the passphrase and `unlock()`, then retry (`safebyok-react`'s `withUnlockedVault` does) |
-| `wrong_passphrase`    | the passphrase did not unlock the vault, or was empty. A passphrase wayin altered in storage refuses its passphrase in just the same way, so the message says that the stored vault may be damaged | Ask again, with a hint to check for typos; but on a first unlock, if the vault may just have been made on another device, see `created_elsewhere` |
+| `wrong_passphrase`    | the passphrase did not unlock the vault, or was empty. A passphrase wayin altered in storage refuses its passphrase in just the same way, so the message says that the stored vault may be damaged | Ask again, with a hint to check for typos. If your handling says "check for typos", treat `created_elsewhere` alongside it, with its own advice |
 | `created_elsewhere`   | a first `unlock()` on an `absent` vault lost a race: another device created the vault between this one's look at storage and its write, and the passphrase given does not open that vault. Nothing was created here, and the vault now shows `locked` as the other device made it. A passphrase that does open it unlocks as usual | Show the message as advice, not as a typo: the user enters the passphrase chosen on the other device |
 | `weak_passphrase`     | a new passphrase -- the one the first `unlock()` creates the vault with, or one `addPassphrase()` or `changePassphrase()` sets -- that the vault's `passphraseStrengthTest` finds too easy to guess. The message is the test's own reason. Never raised by an `unlock()` of a vault that stands | Show the message beside the field, and ask for another |
 | `wrong_passkey`       | the passkey's answer did not unlock the vault, or answered for another salt. An answer for the wayin's own salt that does not open it most likely means the wayin was altered in storage, and the message says so | Ask for a passphrase; if it works, the user may remove that passkey and add it again |
