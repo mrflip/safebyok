@@ -1,6 +1,6 @@
 # Thread 16: modern_terms (2026-10-18)
 
-Branch `20261018-modern_terms`, PR PRNUM, stacked on [#170](https://github.com/mrflip/safebyok/pull/170). Documents only. Justify: green -- root 258; core 2161 passed | 35 skipped; react 229; indexeddb 135 | 10; postgres 246 | 14; fastkey 49; convex 258 | 8; graphql 239 | 14; demo 191 | 16; e2e 81 | 89.
+Branch `20261018-modern_terms`, PR [#172](https://github.com/mrflip/safebyok/pull/172), stacked on [#170](https://github.com/mrflip/safebyok/pull/170). Documents only. Justify: green -- root 258; core 2161 passed | 35 skipped; react 229; indexeddb 135 | 10; postgres 246 | 14; fastkey 49; convex 258 | 8; graphql 239 | 14; demo 191 | 16; e2e 81 | 89.
 
 * **Built**
   * `TODO.md`: retired words became today's names (`destroy()` → `retire()`, `read()`/`use()` → `readBox()`/`useBox()`, "erasing" a vault → retiring it, `takeUpVaultKey` → `grantLease`, "unlock window" → the lease's expiry, "way in" → wayin, "re-entry" → asking again when a lease runs out). New entries: the section *hello, make and the react lifecycle* (four entries, from #166 thread 8), the section *Accessibility* (the `created_elsewhere` screen-reader check, #167), and under *Soonish* a *"newer, don't touch" state for lockboxes* (#163).
