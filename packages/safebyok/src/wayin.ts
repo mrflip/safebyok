@@ -184,7 +184,7 @@ const wrapUnderPassphrase = async (
 ) => {
   const saltBytes = randomBytes(keyDeriver.salt_bytes)
   const header = {
-    wayinkind:            'passphrase',
+    wayinkind:         'passphrase',
     ...stampOf(stamp),
     key_deriver_label: keyDeriver.key_deriver_label,
     salt_b64:          toB64(saltBytes),
@@ -362,7 +362,7 @@ export const sealPasskey = async (
   vaultKey: CryptoKey,
 ): Promise<PasskeyWayin> => {
   const header = {
-    wayinkind:        'passkey',
+    wayinkind:     'passkey',
     ...stampOf(stamp),
     credential_id: passkey.credentialId,
     prf_salt_b64:  passkey.prfSaltB64,
