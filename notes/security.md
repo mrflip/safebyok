@@ -473,14 +473,21 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
   from a tarball checked against the sha512 `dist.integrity` recorded in `release.yml`, offline
   (npm bundles its dependencies), so a changed tarball on the registry stops the job instead of
   running beside the token. Moving npm means recording the new version's integrity by hand.
-* 2026-10-15: `store()` retries a write storage refused as stale, up to three attempts in all.
-  Every attempt reads the box afresh and seals the whisper anew, under its own lockboxKey and
-  `revision_id`: a refused attempt's ciphertext is never reused, so no two ciphertexts share a
-  binding. The retry's first act is to require unlocked, so a refusal that caught the device up
-  with a vault reborn elsewhere (or its ways in changed) relocks it and ends the retry as
-  `vault_locked` before any whisper is sealed for the new vault. A retry overwrites what the
-  other device wrote (last writer wins), as a host's own retry did, except that a box erased
-  elsewhere is not brought back (an erase wins: `stale_write` at once); `erase()` is never retried.
+* 2026-10-15; 2026-10-18 (reform, thread 2, `20261018-no_retry`): `store()` makes one attempt and
+  no longer retries a write storage refused as stale. It reads the box, seals, and writes under the
+  versioned expectation (same `vault_id`, same `vault_key_epoch`, same `revision_id` or none). On a
+  `stale_write` refusal it catches up with storage once and throws `stale_write` (nothing written;
+  the adapter's refusal is the `cause`); a catch-up that relocks the device (vault reborn, or its
+  ways in changed) throws `vault_locked` with nothing written, and one that fails throws as it came
+  (`stale_write` with the failure as cause, `identity_revoked`, `rolled_back`, `newer_format`). A
+  box erased elsewhere is now just a stale write. So no whisper is sealed over what another device
+  wrote without the caller's say, and no jittered wait or `crypto.getRandomValues` draw remains in
+  the path. Until 2026-10-18 a refused store tried up to three times (waits of 1-2 s, then 2-4 s,
+  jittered), each attempt sealing anew under its own lockboxKey and `revision_id`, and overwrote
+  the other device's box (last writer wins) unless it found the box erased (an erase wins). Still
+  load-bearing: the versioned write (a stale tab cannot resurrect a retired or erased box, and a
+  box sealed under a retired vaultKey never lands) and the damaged-box handling below; `erase()` is
+  never retried.
 * 2026-10-15: the published package has a `safebyok/testing` entry point of test helpers
   (the `TH` namespace of its tests), among them `testDeriver`, a KeyDeriver that is one SHA-256
   of passphrase and salt, labelled `test_digest_v0`. `openVault` accepts any KeyDeriver, so
