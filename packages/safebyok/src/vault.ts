@@ -1191,7 +1191,7 @@ const make = (opts: MakeVaultOpts): Vault => {
     try {
       await shut('untrustedStorage')
     } catch (err) {
-      logger.warn(`${why} so the vault locked, but this device's lease could not be forgotten: the vault's next hello may take it up.`, { call: 'untrustedStorage' }, asError(err))
+      logger.warn(`${why} so the vault locked, but this device's lease could not be forgotten: the next vault made on this device, as at the next page load, may take it up.`, { call: 'untrustedStorage' }, asError(err))
     }
     bump()
     if (wasUnlocked) {
@@ -2070,7 +2070,7 @@ export const deviceTroubleAsConditions = (deviceDB: DeviceDB): DeviceDB => ({
 const DeviceTroubleSaid: Record<keyof DeviceDB, { failed: string, instead?: string }> = {
   readLease:  { failed: "reading the lease it keeps for this vault, so the vault could not take it up", instead: "unlock with a passphrase or passkey" },
   writeLease: { failed: "writing the lease it keeps for this vault, so this device may ask for the passphrase again at the next open" },
-  eraseLease: { failed: "erasing the lease it keeps for this vault, so a later hello on this device may still take it up" },
+  eraseLease: { failed: "erasing the lease it keeps for this vault, so the next vault made on this device, as at the next page load, may still take it up" },
   readMark:   { failed: "reading its mark of this vault (the newest copy of the vault it has seen, and how often it has locked), so the vault could not check storage against it" },
   writeMark:  { failed: "writing its mark of this vault (the newest copy of the vault it has seen, and how often it has locked), so it may not be kept" },
   eraseMark:  { failed: "erasing its mark of this vault, so it still holds the newest copy of the vault it had seen" },
