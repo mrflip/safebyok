@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ForeverMillis, MinuteMillis, VaultError } from 'safebyok'
+import { ForeverMillis, MinuteMillis, VaultError, localVaultDB, memoryDeviceDB, memoryStore } from 'safebyok'
 import { PassphraseModal, type PassphraseAdvice } from '../src/passphrase-modal'
 import * as TH from './test-helpers'
 
@@ -9,6 +9,11 @@ const vaultInState = (state: 'absent' | 'locked', leaseMillis = TH.DefaultLeaseM
 
 /** The dialog's `onDone` for tests that never submit. */
 const noop = (_unlocked: boolean) => undefined
+
+/** An unsubscribe with nothing to undo. */
+const silence = (): void => undefined
+/** A store's subscribe that never rings. */
+const neverRings = () => silence
 
 /** The dialog's word to a user it cannot help, once something not theirs to mend went wrong. */
 const Trouble = /This app ran into a problem of its own, not one you caused, and could not unlock your vault\. Your secrets are safe\./
@@ -179,6 +184,29 @@ describe("PassphraseModal", () => {
       fireEvent.click(screen.getByText('Create vault'))
       expect(screen.getByRole('alert').textContent).to.eq('')
       await waitFor(() => { expect(screen.getByRole('alert').textContent).to.eq('That passphrase did not open the vault.') })
+    })
+
+    it("turns, with a real vault that lost the race, into an unlock: the same field, emptied, focused, and asking for the current password", async () => {
+      const store = memoryStore()
+      const opts = TH.memoryVaultOpts({ vaultDB: localVaultDB({ store }) })
+      // Deaf to the other device's create, so that it is met only at this device's own write.
+      const deafDB = localVaultDB({ store: { ...store, subscribe: neverRings } })
+      const here = await TH.settledVault({ ...opts, vaultDB: deafDB })
+      const there = await TH.settledVault({ ...opts, deviceDB: memoryDeviceDB() })
+      TH.beforeNextCall(deafDB, 'fetchOrCreateVaultProps', () => there.unlock('pw one'))
+      render(<PassphraseModal vault={here} onDone={noop} />)
+      const field = screen.getByPlaceholderText<HTMLInputElement>('vault passphrase')
+      fireEvent.change(field, { target: { value: 'pw two' } })
+      fireEvent.click(screen.getByText('Create vault'))
+      await waitFor(() => { expect(screen.getByRole('alert').textContent).to.match(/created for this label on another device/) })
+      expect(screen.queryByText('Unlock your vault')).to.not.be.null
+      expect(screen.getByPlaceholderText('vault passphrase')).to.equal(field)
+      expect(field.value).to.eq('')
+      expect(document.activeElement).to.equal(field)
+      expect(field.getAttribute('autocomplete')).to.eq('current-password')
+      expect(field.name).to.eq('current-password')
+      here.close()
+      there.close()
     })
 
     it("shows a wrong passphrase as a gripe still", async () => {
