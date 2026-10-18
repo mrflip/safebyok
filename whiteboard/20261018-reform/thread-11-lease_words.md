@@ -1,6 +1,6 @@
 # Thread 11: lease words (2026-10-18)
 
-Branch `20261018-lease_words`, PR #PR, stacked on #158. Justify: green (core 2161 passed, 35
+Branch `20261018-lease_words`, PR [#169](https://github.com/mrflip/safebyok/pull/169), stacked on [#158](https://github.com/mrflip/safebyok/pull/158). Justify: green (core 2161 passed, 35
 skipped; convex 258; react 227; e2e 81; every package green).
 
 A follow-up thread on the Coach's rulings over the sprint's open matters: renames and wording only.
