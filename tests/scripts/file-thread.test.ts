@@ -202,6 +202,16 @@ describe('scripts/file-thread', () => {
       expect(existsSync(path.join(root, 'notes/scratch.txt'))).to.eq(true)
     })
 
+    it("leaves the directory for a person when it cannot finish checking what is left, rather than reading that as nothing", () => {
+      writeFileSync(path.join(stubs, 'comm'), ['#!/bin/sh', 'exit 2'].join('\n'))
+      chmodSync(path.join(stubs, 'comm'), 0o755)
+      cutAndBuild('origin/main')
+      const result = fileWithLeftovers({ 'shim.ts': 'export {}\n', 'notes/scratch.txt': 'mine' })
+      expect(result.status).to.eq(1)
+      expect(result.stderr).to.include('could not check what is left')
+      expect(existsSync(path.join(root, 'notes/scratch.txt'))).to.eq(true)
+    })
+
     it("leaves the directory for a person when the worktree held uncommitted changes before the removal", () => {
       cutAndBuild('origin/main')
       const result = fileWithLeftovers({ 'shim.ts': 'export {}\n' }, {}, 'echo changed > shim.ts')
