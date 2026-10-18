@@ -6,7 +6,7 @@
 'safebyok-indexeddb': patch
 ---
 
-**`safebyok-postgres`: the README's hard-cap trigger recipe is gone.** Its SQL, and the repository's tests of it, are deleted; in its place the README gives a short prompt a host pastes to its coding agent, which reads the library and writes the trigger for the host, explaining the trade-offs (the lock it takes, what the connections' isolation level does to it, and that its refusal surfaces as `storage_unavailable`, not `vault_full`). The package's own `maxLockboxes` limit is unchanged: still a best effort. A host that copied the old trigger keeps it, and now owns its tests.
+**`safebyok-postgres`: the README's hard-cap trigger recipe is gone.** Its SQL, and the repository's tests of it, are deleted; in its place the README gives a short prompt a host pastes to its coding agent, which reads the library and writes the trigger for the host, explaining the trade-offs (the lock it takes, what the connections' isolation level does to it, and that its refusal surfaces as `storage_unavailable`, not `vault_full`). The package's own `maxLockboxes` limit is unchanged: still a best effort. A host that copied the old trigger owns it and its tests; this release's entry "The vocabulary reform, in one place" says what becomes of it when the tables are dropped.
 
 **`safebyok-graphql`: `VaultOperations` is exported** from the package entry, the GraphQL documents `graphqlVaultDB` sends by the root field each asks for, for a host whose server accepts only persisted (allowlisted) operations. They change only as the SDL does, and are versioned with the package. The README also says that client and server move in step, and that `unlock_epoch` and `vault_key_epoch` are held to GraphQL's 32-bit `Int`.
 
