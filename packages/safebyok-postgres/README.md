@@ -24,7 +24,9 @@ runs*.
 
 `VaultTablesSql` is the SQL, for Postgres 14 or later in a UTF8 database. The package also ships
 it as `vault-tables.sql`, to copy into your migrations. It is safe to run again: it creates only
-what is missing.
+what is missing, and never changes the columns or keys of a table already there. Until 1.0 there
+is no migration: a release that changes the tables says so in its changelog, and you drop them
+and run it again.
 
 ```ts
 import { VaultTablesSql } from 'safebyok-postgres'
@@ -283,7 +285,11 @@ await pool.query(VaultNotifySql)    // once, as a migration: safe to run again
 
 Its trigger sends a notification on the channel `VaultChangeChannel` (`safebyok_vault_changes`)
 after every write that changes a vault, its payload the vault's scope as JSON: no record, nothing
-ciphered. A `listen` without the trigger hears nothing, by design, and says nothing of it; the
+ciphered. **Why a trigger**: Postgres tells another connection of a write only by `NOTIFY`, and a
+trigger sends one from inside every write to the two tables, whatever made it -- any of your
+servers, another version of this adapter, your own SQL, a retired vault's cascade -- and Postgres
+delivers it only once that write commits. It is the one trigger this package ships; the hard cap
+above is one you would write and own. A `listen` without the trigger hears nothing, by design, and says nothing of it; the
 trigger without a `listen` costs a notification nobody hears. A `listen` that throws as it is
 called refuses `subscribe` as `storage_unavailable`; one that rejects later is warned of through
 the `logger`, once, and its subscriber hears nothing more, as without a `listen`.

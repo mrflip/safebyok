@@ -19,6 +19,19 @@ const describedColumns = async (db: PGlite, table: string) => {
   return rows.map((row) => [row.column_name, row.data_type])
 }
 
+/** A key as pg_constraint describes it: its name and its definition. */
+type DescribedKey = { conname: string, definition: string }
+
+// Primary, unique, foreign and check constraints: every key a table has, and none of the NOT NULLs
+// a newer Postgres also lists there.
+const describedKeys = async (db: PGlite, table: string) => {
+  const { rows } = await db.query<DescribedKey>(
+    "SELECT conname, pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid = $1::regclass AND contype IN ('p', 'u', 'f', 'c') ORDER BY conname",
+    [table],
+  )
+  return rows.map((row) => [row.conname, row.definition])
+}
+
 TH.bootDatabaseFirst()
 
 /** A PGlite of its own with VaultTablesSql run in it and nothing else, made once per file. */
@@ -60,6 +73,41 @@ describe("VaultTablesSql", () => {
       ...adapterColumns,
       ...LockboxColumns.map(([field, kind]) => [field, TypeForKind[kind]]),
     ])
+  })
+
+  it("names each key for its table, as Postgres does a key made with the table", async () => {
+    const db = await tablesOnlyDatabase()
+    expect(await describedKeys(db, 'safebyok_vaults')).to.deep.equal([
+      ['safebyok_vaults_applabel_user_id_vaultlabel_vault_id_key', 'UNIQUE (applabel, user_id, vaultlabel, vault_id)'],
+      ['safebyok_vaults_pkey',                                     'PRIMARY KEY (applabel, user_id, vaultlabel)'],
+    ])
+    expect(await describedKeys(db, 'safebyok_lockboxes')).to.deep.equal([
+      ['safebyok_lockboxes_applabel_user_id_vaultlabel_vault_id_fkey', 'FOREIGN KEY (applabel, user_id, vaultlabel, vault_id) REFERENCES safebyok_vaults(applabel, user_id, vaultlabel, vault_id) ON DELETE CASCADE'],
+      ['safebyok_lockboxes_pkey',                                      'PRIMARY KEY (applabel, user_id, vaultlabel, boxlabel)'],
+    ])
+  })
+
+  it("holds every column NOT NULL but the vault props' prior_vault_key, the one field a record may leave out, and defaults none", async () => {
+    const db = await tablesOnlyDatabase()
+    const { rows } = await db.query(
+      "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name IN ('safebyok_vaults', 'safebyok_lockboxes') AND (is_nullable = 'YES' OR column_default IS NOT NULL)",
+    )
+    expect(rows).to.deep.equal([{ table_name: 'safebyok_vaults', column_name: 'prior_vault_key' }])
+  })
+
+  it("never changes the columns of a table already there, so a table of another release's shape stays as it was until the host drops it", async () => {
+    const db = await tablesOnlyDatabase()
+    const elderColumns = await db.transaction(async (tx) => {
+      await tx.exec('CREATE SCHEMA elder; SET LOCAL search_path TO elder')
+      await tx.exec('CREATE TABLE safebyok_lockboxes (applabel text, revision_id text)')
+      await tx.exec(VaultTablesSql)
+      const { rows } = await tx.query<{ column_name: string }>(
+        "SELECT column_name FROM information_schema.columns WHERE table_schema = 'elder' AND table_name = 'safebyok_lockboxes' ORDER BY ordinal_position",
+      )
+      await tx.rollback()
+      return rows.map((row) => row.column_name)
+    })
+    expect(elderColumns).to.deep.equal(['applabel', 'revision_id'])
   })
 
   it("makes tables and their keys, and no function, trigger or table beyond the two", async () => {

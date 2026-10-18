@@ -11,7 +11,8 @@
  * @example await pglite.exec(VaultTablesSql)
  */
 export const VaultTablesSql = `-- safebyok-postgres: the tables a safebyok vault is stored in. For Postgres 14 or later, in a
--- UTF8 database. Safe to run again: it creates only the tables that are missing.
+-- UTF8 database. Safe to run again: it creates only the tables that are missing, and never
+-- changes the columns or keys of one already there.
 --
 -- Each record is stored field by field, a column to a field, exactly as safebyok wrote it:
 -- text as text, a time or a count as a bigint, and each structured value -- an encrypted value
@@ -23,8 +24,8 @@ CREATE TABLE IF NOT EXISTS safebyok_vaults (
   applabel         text   NOT NULL,
   user_id          text   NOT NULL,
   vaultlabel       text   NOT NULL,
-  format           text   NOT NULL,
   vault_id         text   NOT NULL,
+  format           text   NOT NULL,
   unlock_epoch     bigint NOT NULL,
   vault_key_epoch  bigint NOT NULL,
   prior_vault_key  jsonb,
