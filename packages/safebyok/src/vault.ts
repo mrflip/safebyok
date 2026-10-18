@@ -49,9 +49,10 @@ export type VaultSnapshot = {
   boxes:     readonly (LockboxSummary | DamagedLockbox)[]
   /**
    * Epoch ms from which the vault asks for the passphrase again, while unlocked; null otherwise.
-   * The time the passphrase was last typed and proven plus `leaseHours` (see `Vault.unlock`), never later than {@link FarFuture} (in 2255): with `Infinity` hours, a
-   * vault that asks again only after `lock()` reads as that instant. Compare with
-   * `>= FarFuture - MinuteMillis`, never for equality.
+   * `leaseHours` after a proof last unlocked the vault, by passphrase or passkey, or a passphrase
+   * last proved a change to its ways in (see `Vault.unlock`); never later than {@link FarFuture}
+   * (in 2255): with `Infinity` hours, a vault that asks again only after `lock()` reads as that
+   * instant. Compare with `>= FarFuture - MinuteMillis`, never for equality.
    */
   askPassphraseAt: number | null
   /**
