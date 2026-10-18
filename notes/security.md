@@ -25,18 +25,23 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
   construction, ctx, stored format or key handling changed. Five points to look at:
   (1) **A lock does not wait for `hello()`.** `lock()` and `lockSoon()` act at once, storage
   reachable or not. A `hello()` taking up the lease while a lock lands takes nothing up:
-  `takeUpLease` holds a counter (`forgetsSoFar`, raised by every hard lock and every `lockSoon()`)
-  noted before the vault props are read, and takes nothing up if it moved or the handle has closed.
-  Tests hold the lease read open while each lock lands.
-  (2) **`hello()` is memoised, and a lock for untrusted storage can be followed by a take-up on the
-  same handle.** Callers share one in-flight promise; a rejected one clears at once; a resolved one
-  stands until a read of storage fails, storage the vault cannot trust refuses it
-  (`identity_revoked`, `rolled_back`, `newer_format`, from any call, read or write), or the vault is
-  retired. The next call then reads storage and the lease again. If the lock for untrusted storage
-  could not erase the lease (the device store erroring), and storage now serves the user again,
-  that call takes up the surviving lease -- where before only a new open could. If storage still
-  refuses, the call meets the refusal again and the vault stays locked. A plain `lock()` does not
-  reset the memo and erases the lease in any case.
+  `takeUpLease` returns at once unless the counter `forgetsSoFar` (raised by every hard lock --
+  `lock()`, `retire()`, a lock for untrusted storage -- and every `lockSoon()`) was 0 when that
+  hello started, and it takes nothing up if the counter has moved by the time the lease opens or
+  the handle has closed. Tests hold the lease read open while each lock lands.
+  (2) **`hello()` is memoised, and a lock is never undone on its handle by a later `hello()`.**
+  Callers share one in-flight promise; a rejected one clears at once; a resolved one stands until a
+  read of storage fails, storage the vault cannot trust refuses it (`identity_revoked`,
+  `rolled_back`, `newer_format`, from any call, read or write), or the vault is retired. The next
+  call then reads storage and the lease again, but a handle that has ever forgotten (the counter
+  above is not 0) takes up no lease: so a lock, hard, soft or for untrusted storage, stays locked
+  on that handle even when the device store failed to erase the lease, and whispers stay refused as
+  `vault_locked` until a proof unlocks it. A lease the lock could not erase is left for the next
+  handle made (the next page load), as before. A handle whose first `hello()` failed has forgotten
+  nothing, so it still takes its lease up once a `hello()` (or a storage change bell) succeeds; an
+  unlocked handle holds its key and loses nothing. If storage still refuses, the call meets the
+  refusal again and the vault stays locked. A plain `lock()` does not reset the memo and erases the
+  lease in any case. Regression tests cover `lock()`, `lockSoon()` and the untrusted-storage case.
   (3) **`Vault.make` refuses any option it does not take**, `bad_option`, by a strict Zod object
   over the option names. Before, unknown keys were ignored, so a host still passing the retired
   `forcePassphraseReentryHours` (now `leaseHours`) got the 7-day default lease: a longer unlock.
