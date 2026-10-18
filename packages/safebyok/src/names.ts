@@ -26,7 +26,7 @@ const validatorsCheck = optionsCheck({
   vaultlabel:  nameValidator,
   boxlabel:    nameValidator,
   userId:      nameValidator,
-  wayinlabel: nameValidator,
+  wayinlabel:  nameValidator,
 }, 'validators is a bag of Zod schemas, each checking one of applabel, vaultlabel, boxlabel, userId and wayinlabel: leave out any field to keep its default check, and check the spelling of each one given.')
 
 /**
@@ -57,7 +57,7 @@ export const rulesOf = (validators: VaultValidators = {}): NameRules => {
     vaultlabel:  validators.vaultlabel ?? DefaultValidators.vaultlabel,
     boxlabel:    validators.boxlabel ?? DefaultValidators.boxlabel,
     userId:      validators.userId ?? DefaultValidators.userId,
-    wayinlabel: validators.wayinlabel ?? DefaultValidators.wayinlabel,
+    wayinlabel:  validators.wayinlabel ?? DefaultValidators.wayinlabel,
   }
 }
 

@@ -186,7 +186,7 @@ export type VaultValidators = {
   /** Checks the signed-in user's id. Default: {@link UserId}. */
   userId?:      NameValidator | undefined
   /** Checks the label of each way in a host adds: a passphrase or a passkey. Default: {@link Label}. */
-  wayinlabel?: NameValidator | undefined
+  wayinlabel?:  NameValidator | undefined
 }
 
 /**
@@ -200,7 +200,7 @@ export const DefaultValidators = Object.freeze({
   vaultlabel:  Label,
   boxlabel:    Label,
   userId:      UserId,
-  wayinlabel: Label,
+  wayinlabel:  Label,
 })
 
 /**
@@ -218,5 +218,5 @@ export const AnyTextValidators = /* @__PURE__ */ Object.freeze({
   vaultlabel:  NameFloor,
   boxlabel:    NameFloor,
   userId:      NameFloor,
-  wayinlabel: NameFloor,
+  wayinlabel:  NameFloor,
 })
