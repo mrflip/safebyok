@@ -89,7 +89,7 @@ const BundleCases = [
   [{ ...TH.bundleOf('u1'), registered_at: OldIso },          false,  'a registered_at as an ISO string'],
   [bundleWithoutTime,                                       false,  'a bundle missing its registered_at'],
   [{ ...bundleWithoutTime, created_at: OldIso, updated_at: OldIso }, false, 'a bundle from before its time was named registered_at'],
-  [{ ...bundleWithoutWayins, ...WayinFieldsOfOld },      false,  'a bundle from before its wayins were a list'],
+  [{ ...bundleWithoutWayins, ...WayinFieldsOfOld },          false,  'a bundle from before its wayins were a list'],
   [{ ...bundleWithoutEpoch, passphrase_epoch: 1 },           false,  'a bundle from before its epoch was named unlock_epoch'],
   [{ ...bundleWithoutKeyEpoch, format: 'safebyok-vault-v1' }, false, 'a bundle from before vaultKey epochs'],
   [bundleWithoutKeyEpoch,                                   false,  'a bundle missing its vault_key_epoch'],

@@ -20,7 +20,7 @@ const lockedVaultWithPasskey = async () => {
 
 /** A vault that refuses every unlock with `err`, and lists one passkey. */
 const vaultRefusing = (err: Error, credentialId: string) => TH.stubVault({
-  wayins: [TH.passkeyWayinOf('laptop', { credential_id: credentialId })] as unknown as WayinSummary[],
+  wayins:  [TH.passkeyWayinOf('laptop', { credential_id: credentialId })] as unknown as WayinSummary[],
   unlock:  () => Promise.reject(err),
 })
 

@@ -146,7 +146,7 @@ const BundleCases = [
   [{ ...TH.bundleOf('u1'), wayins: [TH.wayinOf('passphrase', { vault_key_wayin_wrapped: { cipher_iv_b64: 'iv' } as never })] }, false, false, 'a ciphered wayin missing its ciphertext'],
   [{ ...TH.bundleOf('u1'), wayins: [TH.wayinOf('passphrase', { wayinkind: 'fingerprint' as never })] }, false, false, 'a wayinkind this package does not know'],
   [{ ...TH.bundleOf('u1'), wayins: [TH.wayinOf('passphrase', { wayinkind: 'passkey' as never })] }, false, false, "a passphrase's fields under the passkey wayinkind"],
-  [{ ...bundleWithoutWayins, ...OldWayinFields },                     false,  false,  'a bundle from before its wayins were a list'],
+  [{ ...bundleWithoutWayins, ...OldWayinFields },                            false,  false,  'a bundle from before its wayins were a list'],
   [{ ...TH.bundleOf('u1'), registered_at: null },                            false,  false,  'a null registered_at'],
   [{ ...TH.bundleOf('u1'), registered_at: '2026-10-14T00:00:00.000Z' },      false,  false,  'a registered_at as an ISO string'],
   [{ ...bundleWithoutTime, created_at: OldIso, updated_at: OldIso },         false,  false,  'a bundle from before its time was named registered_at'],

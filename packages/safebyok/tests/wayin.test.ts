@@ -323,8 +323,8 @@ describe("Wayin.openWithPassphrase", () => {
 
 /** Each of a wayin's public fields altered: every one is in its wrap's binding. */
 const TamperCases: readonly (readonly [Partial<PassphraseWayin>, string])[] = [
-  [{ wayin_id: 'wayin-elsewhere' },            'its wayin_id swapped'],
-  [{ wayinlabel: 'relabelled' },                'its wayinlabel swapped'],
+  [{ wayin_id: 'wayin-elsewhere' },              'its wayin_id swapped'],
+  [{ wayinlabel: 'relabelled' },                 'its wayinlabel swapped'],
   [{ key_deriver_label: 'test_digest_v1' },      'its key_deriver_label swapped, to one the deriver then wears'],
   [{ device_id: 'device-elsewhere' },            'its device_id swapped'],
   [{ registered_at: Date.UTC(2026, 9, 1) },      'its registered_at moved'],
