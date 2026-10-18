@@ -356,7 +356,7 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
     }
   }
 
-  /** Each change to the field: a word about what was typed before goes, and, while choosing, the host's advice is asked anew. */
+  /** Each change to the field: a complaint about what was typed before goes (a passkey's word, or a vault made elsewhere, stays till the next submit), and, while choosing, the host's advice is asked anew. */
   const hearPassphrase = (typed: string) => {
     setGripe((prev) => (prev?.fromPasskey === true || prev?.asAdvice === true ? prev : null))
     if (creating) { void advice.hear(typed) }
