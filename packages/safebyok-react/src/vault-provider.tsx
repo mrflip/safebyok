@@ -298,7 +298,7 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
     try {
       made = Vault.make(makeOpts)
     } catch (err) {
-      setOpenFailure({ err }) // eslint-disable-line react-hooks/set-state-in-effect
+      setOpenFailure({ err }) // eslint-disable-line react-hooks/set-state-in-effect -- the effect makes the handle, and Vault.make refuses at once: there is no callback to set state from
     }
     if (made !== null) {
       vaultRef.current = made
