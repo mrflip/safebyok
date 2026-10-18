@@ -16,20 +16,24 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
 ## Of Interest
 
 * 2026-10-18 (sprint reform): **three stored-format tags changed in the renaming, none with a
-  migration.** The vault props format `safebyok-vault-v2` became `safebyok-vault-v3` (the unlocks
-  became "wayins", with the field renames that follow; `revision_id` became `revision_tok`); the
-  lockbox format `safebyok-lockbox-v4` became `safebyok-lockbox-v5` (`public_json` became
-  `sidecar_json`; `revision_id` became `revision_tok`); the device lease format
-  `safebyok-unlock-v1` became `safebyok-lease-v1`, and its device-store ckey `unlock^` became
-  `lease^`. Each record's ctx (the associated data its ciphertext is bound to) follows that
+  migration.** Against the last release (0.3.0), the vault props format `safebyok-vault-v2` became
+  `safebyok-vault-v3` (the unlocks became "wayins", with the field renames that follow;
+  `revision_id` became `revision_tok`); the lockbox format `safebyok-lockbox-v2` became
+  `safebyok-lockbox-v5` (`public_json` became `sidecar_json`; `revision_id` became
+  `revision_tok`; the sprint's `-v4` was only ever on `main`, never released); the device lease
+  format `safebyok-unlock-v1` became `safebyok-lease-v1`, and its device-store ckey `unlock^`
+  became `lease^`. Each record's ctx (the associated data its ciphertext is bound to) follows that
   record's fields and tag; the construction is unchanged, and only field names, the tag and the
   purpose strings moved. The package is before 1.0.0, where stored shapes do not bind backward.
   An old record fails safe: a v2 vault reads as damaged (`damaged_vault`, never `newer_format`,
-  since `safebyok-vault-v2` is listed among the older formats), a v4 lockbox lists as damaged, and
-  an old lease is swept unread (the vault erases it and warns once; the device mark is kept).
-  Nothing old is ever decrypted by the new code, and nothing is rewritten in place. A Convex
-  deployment refuses the new schema until its tables are cleared; Postgres hosts must run the
-  `ALTER` lines of the sprint's changesets before the new table SQL.
+  since `safebyok-vault-v2` is listed among the older formats), and any older lockbox lists as
+  damaged. An old lease is never read as a lease: with `idbDeviceDB`, the store deletes the old
+  `unlock^` rows itself, silently, at the next lease read or erase (`src/idb.ts`); only a host's
+  own DeviceDB that hands the old record back gets the vault's one logger warning and its own
+  erase. The device mark is kept either way. Nothing old is ever decrypted by the new code, and
+  nothing is rewritten in place. A Convex deployment refuses the new schema until its tables are
+  cleared; Postgres hosts must run the summary changeset's Postgres steps before the new table
+  SQL.
 * 2026-10-18 (make_hello): **`openVault` is split into `Vault.make`, which returns a handle at
   once, and `vault.hello()`, which reads storage and the lease.** `Vault.make(opts)` is synchronous:
   it validates every option and starts `hello()` itself. `hello()` reads the vault props and this
