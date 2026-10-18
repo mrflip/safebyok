@@ -8,8 +8,8 @@ import { stableJsonify } from './stable-jsonify'
  * WebCrypto, random material through `crypto.getRandomValues`. Nothing here is home-made; every
  * primitive is the platform's. Key derivation from a passphrase lives in key-deriver.ts.
  *
- * Every encryption binds its context (which app, user, vault, lockbox, revision, and for what
- * purpose) as cipherAdditionalData, so ciphertext copied anywhere else refuses to open.
+ * Every encryption binds its ctx (which app, user, vault, lockbox, revision, and for what
+ * purpose) as AES-GCM's additional data, so ciphertext copied anywhere else refuses to open.
  */
 
 /**
