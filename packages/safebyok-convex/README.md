@@ -217,8 +217,8 @@ instance. It assumes vitest, or another runner on Vite: it loads the component's
 ```ts
 import { register } from 'safebyok-convex/test'
 
-const t = convexTest(schema, modules)
-register(t)
+const CVX = convexTest(schema, modules)
+register(CVX)
 ```
 
 ## Testing your own client code

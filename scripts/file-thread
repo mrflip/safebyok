@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# Files a built and reviewed thread from its worktree: catches it up, proves it, pushes it to its
+# PR, and removes the worktree, leaving the branch for the PR. `scripts/file-thread
+# ../byok-deriver_shim`. A sprint's orchestrator runs it for each thread its reviewer is done with,
+# and hands the thread to a thread-worker only when it stops short.
+#
+# * Catch up: fetch, and when the branch was cut from main (its `branch.<branch>.sprintbase`,
+#   which scripts/cut-thread records, is on origin/main) and main has moved since, rebase it onto
+#   origin/main. A stacked branch stays on the thread it stands on. A conflict aborts the rebase,
+#   leaving the branch as it was, for a thread-worker (PROCESS.md, *Rebase conflicts*).
+# * Prove: `pnpm justify`, or the command given with --prove, in the worktree. Its output goes to
+#   a log, of which only a failure prints the end.
+# * Push to origin's branch of the same name, with a lease on the SHA origin had, so a rebase
+#   replaces only what it was rebased from.
+# * Clean up: scripts/clear-ds-store.sh in the worktree (a Finder .DS_Store stops a removal half
+#   done), then `git worktree remove`.
+#
+# Usage: scripts/file-thread [--prove <command>] <worktree root>
+# Exits 0 when filed; 1 on a failure; 2 on arguments it does not understand; 3 on a rebase
+# conflict; 4 when the proof is red. On 3 or 4 nothing is pushed and the worktree stays.
+set -euo pipefail
+
+usage="Usage: scripts/file-thread [--prove <command>] <worktree root>"
+prove="pnpm justify"
+if [[ "${1:-}" == "--prove" && $# -ge 2 ]]; then
+  prove="$2"
+  shift 2
+fi
+if [[ $# -ne 1 ]]; then
+  echo "$usage" >&2
+  exit 2
+fi
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+root="$(cd "$1" 2> /dev/null && git rev-parse --show-toplevel 2> /dev/null)" || { echo "file-thread: $1 is not a git worktree" >&2; exit 1; }
+fail() { echo "file-thread: $*" >&2; exit 1; }
+
+main="$(git -C "$root" worktree list --porcelain | sed -n '1s/^worktree //p')"
+[[ "$root" != "$main" ]] || fail "$root is the main checkout, not a thread's worktree"
+branch="$(git -C "$root" symbolic-ref -q --short HEAD)" || fail "$root has no branch checked out"
+[[ -z "$(git -C "$root" status --porcelain)" ]] || fail "$root has uncommitted changes: commit them, or hand the thread to a worker"
+base="$(git -C "$root" config "branch.${branch}.sprintbase")" || fail "$branch records no base; set it with git config branch.${branch}.sprintbase <the SHA it was cut from>"
+
+git -C "$root" fetch --quiet origin
+caught="as cut"
+if git -C "$root" merge-base --is-ancestor "$base" origin/main && ! git -C "$root" merge-base --is-ancestor origin/main HEAD; then
+  if ! git -C "$root" rebase --quiet --no-update-refs origin/main > /dev/null 2>&1; then
+    git -C "$root" rebase --abort
+    echo "file-thread: $branch conflicts with origin/main; the rebase is undone and nothing is pushed. A thread-worker resolves it (PROCESS.md, *Rebase conflicts*)." >&2
+    exit 3
+  fi
+  git -C "$root" config "branch.${branch}.sprintbase" "$(git -C "$root" rev-parse origin/main)"
+  caught="rebased onto origin/main at $(git -C "$root" rev-parse --short origin/main)"
+fi
+
+log="$(mktemp -t file-thread.XXXXXX)"
+if ! (cd "$root" && bash -c "$prove") > "$log" 2>&1; then
+  tail -n 40 "$log" >&2
+  echo "file-thread: $prove is red in $root ($caught; the whole log is $log). Nothing is pushed." >&2
+  exit 4
+fi
+rm -f "$log"
+
+pushed="$(git -C "$root" rev-parse --verify --quiet "refs/remotes/origin/${branch}" || true)"
+lease=()
+if [[ -n "$pushed" ]]; then lease=("--force-with-lease=${branch}:${pushed}"); fi
+git -C "$root" -c credential.helper= -c credential.helper='!gh auth git-credential' \
+  push --quiet ${lease[@]+"${lease[@]}"} origin "${branch}:${branch}"
+
+(cd "$root" && "$here/clear-ds-store.sh" > /dev/null)
+git -C "$main" worktree remove "$root"
+echo "file-thread: $branch filed: $caught, proved, pushed at $(git -C "$main" rev-parse --short "$branch"), its worktree removed."

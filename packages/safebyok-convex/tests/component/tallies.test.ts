@@ -20,8 +20,8 @@ describe("weigh", () => {
   const row = { ...TH.scopeOf('u1'), ...TH.boxOf('anthropic_api_key', 'a1') }
 
   it("weighs a stored row as Convex counts the document it reads", async () => {
-    const t = TH.componentTest()
-    const stored = await t.run(async (ctx) => {
+    const CVX = TH.componentTest()
+    const stored = await CVX.run(async (ctx) => {
       const rowId = await ctx.db.insert('safebyok_lockboxes', row)
       return await ctx.db.get('safebyok_lockboxes', rowId)
     })
@@ -30,8 +30,8 @@ describe("weigh", () => {
   })
 
   it("weighs a row just inserted, by the _id it was given, as its stored document will weigh", async () => {
-    const t = TH.componentTest()
-    const { rowId, stored } = await t.run(async (ctx) => {
+    const CVX = TH.componentTest()
+    const { rowId, stored } = await CVX.run(async (ctx) => {
       const insertedId = await ctx.db.insert('safebyok_lockboxes', row)
       return { rowId: insertedId, stored: await ctx.db.get('safebyok_lockboxes', insertedId) }
     })

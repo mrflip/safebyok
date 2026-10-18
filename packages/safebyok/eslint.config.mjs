@@ -107,6 +107,9 @@ export default defineConfig([
       '@stylistic/no-multiple-empty-lines':        ['warn'],
       '@stylistic/no-trailing-spaces':             ['warn'],
       '@stylistic/semi':                           ['warn', 'never'],
+      '@stylistic/brace-style':                    ['warn', '1tbs', { allowSingleLine: true }],
+      'curly':                                     ['error', 'all'],
+      'id-length':                                 ['error', { min: 2, exceptions: ['Z', '_'] }],
       // '@stylistic/space-unary-ops' is not carried: its `!` override also fires on
       // TypeScript's postfix non-null assertion (`arr[0]!`), which it cannot distinguish
       // from the negation operator the rule is aimed at.

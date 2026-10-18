@@ -120,3 +120,15 @@ one. It deletes only a regular file named exactly `.DS_Store` that git ignores, 
 stays, and what git sees never changes. It follows no symlink, crosses into no other filesystem,
 and skips `.git` and `node_modules`. Finder may write a new one a moment later; if git still
 balks, run it once more.
+
+## CLAUDE.md's long-file list
+
+CLAUDE.md's *Reading* names the files long enough that an agent should search them rather than
+read them whole: those past about 700 lines, leaving out `notes/security.md` (an agent never
+reads it), thread folders, lockfiles and changelogs. When a file is split or grows, bring the
+list in line with:
+
+```sh
+git ls-files ':!:whiteboard' ':!:winboard' ':!:human' ':!:**/pnpm-lock.yaml' ':!:pnpm-lock.yaml' \
+  ':!:**/CHANGELOG.md' ':!:notes/security.md' | xargs wc -l | awk '$1 > 700 && $2 != "total"' | sort -n
+```

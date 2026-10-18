@@ -19,7 +19,7 @@
  */
 export function pnpmRefusal(userAgent: string | undefined): string | null {
   if (userAgent?.startsWith('pnpm/')) { return null }
-  return 'Publish this package with pnpm (`pnpm publish`), not npm: npm would ship the workspace-only `@safebyok/source` export condition, which points at a src/ the package does not include. Releases normally go through the release workflow (PROCESS.md, Releases).'
+  return 'Publish this package with pnpm (`pnpm publish`), not npm: npm would ship the workspace-only `@safebyok/source` export condition, which points at a src/ the package does not include. Releases normally go through the release workflow (notes/releasing.md).'
 }
 
 if (import.meta.main) {

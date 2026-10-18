@@ -1,9 +1,10 @@
 # Style Guide
 
 Conventions for the `.ts` files in this package, for a human or an AI session working in it.
-CLAUDE.md's *Conventions At A Glance* covers a small edit; read this when naming something new,
-writing a doc block, or writing a test. The naming vocabulary below is specific, and not
-guessable from general TypeScript habit.
+CLAUDE.md's *Conventions At A Glance* covers a local name and a small edit. Read the section you
+need here when naming an export, a module, a stored field or a new tag, or when writing a doc
+block, a test, or an entrypoint that takes a caller's input. The naming vocabulary below is
+specific, and not guessable from general TypeScript habit.
 
 The core's `eslint.config.mjs` (`packages/safebyok/`) is the source of truth for anything
 mechanically enforceable; where it and this document disagree, the linter wins and this document
@@ -48,7 +49,7 @@ or `payload` for a variable or field we control: it is a whisper, or a whisperCi
   `vaultKey`, `lockboxKey`, `localUnlockKey`. Not `kek` or `dek`. A WebCrypto `CryptoKey` and its
   raw bytes are told apart by a tag: `lockboxKey` is the `CryptoKey`, `lockboxKeyBytes` the
   `Uint8Array`.
-* a **map key** is a `ckey` (a string key or an array index), and a list of them `ckeys`.
+* a **map key** is a `ckey` (see *Tags*).
 
 **Smush the tags `name`, `kind`, `label`, `path` and `bag` into one word**: `vaultlabel`,
 `boxlabel`, `woodkind` -- but not `fooCount` or `fooIter`.
@@ -66,10 +67,8 @@ smushing below is for a label that names a thing (`boxlabel`); `keyDeriverLabel`
 **A time is UTC epoch milliseconds, an integer** (`registered_at: 1760000000000`,
 `askPassphraseAt`), in a stored record, a snapshot, a test fixture and the demo alike: never an
 ISO string, never a `Date`. The clock seam (`Clock.now()`) already yields it, every index sorts
-it, and one convention means no parsing at any boundary. A field named `*_at` holds one. The
-package writes and reads whole milliseconds, which `EpochMillis` checks with the bounds (1981 to
-2255): a stored time with a fraction fails. Only a reading of the host's clock may carry a
-fraction, and the vault rounds it down as it reads it.
+it, and one convention means no parsing at any boundary. A field named `*_at` holds one, checked
+by `EpochMillis`.
 
 Specificity is a virtue (`saltBytes` says it is bytes), but don't tag the obvious: `title`, not
 `titleStr`. When genericity is exactly the point, use the tag bare: `encode(bytes)`.
@@ -202,7 +201,9 @@ Vitest, in each package's `tests/`, path for path with its `src/`: `src/foo/bar.
   passes. Name it for what it does: if the helper should not assert, give it a different name
   (`check...`, `read...`); if it should, make it assert and keep the name. Never add an assertion
   to a helper merely to make the rule happy.
-* **Every use case of an exported function has a test, and every `@example` has one.**
+* **Every use case of an exported function has a test, and every `@example` has one whose
+  title points back to it**: `"refuses a misspelt field as 'bad_option', as its second example
+  shows"`, so a reviewer, or whoever changes the example, finds its test by the title.
 * **Each example ties to a plausible failure mode.** Ask what null, undefined and a missing value
   mean; what an absurd type does (`seal(42)`); what a not-quite-absurd one does (a salt one byte
   short, a passphrase of only whitespace, a vault written by a newer version).
@@ -239,7 +240,8 @@ Vitest, in each package's `tests/`, path for path with its `src/`: `src/foo/bar.
 The core's `eslint.config.mjs` is strict. These are **off on purpose**, so don't "fix" code for
 them: `camelcase` (`vaultlabel` is right), `no-use-before-define` (define helpers below their callers
 when that reads better), `@stylistic/quotes` (the convention above is kept by hand),
-`no-underscore-dangle`, `no-continue`, `no-await-in-loop`.
+`@stylistic/space-unary-ops` (it mistakes the non-null `arr[0]!` for a negation, so `(! foo)` is
+kept by hand), `no-underscore-dangle`, `no-continue`, `no-await-in-loop`.
 
 **Safety hatches** -- `@ts-expect-error`, `any`, the non-null `!` -- are allowed, because
 forbidding them sends a fix into a tailspin when the problem is elsewhere. Use them with care,

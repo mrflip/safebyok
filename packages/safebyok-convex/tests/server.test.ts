@@ -6,13 +6,13 @@ const { api, createTest } = TH.hostWith(TH.bySubject)
 
 const u1 = TH.scopeOf('u1')
 
-/** A backend where `u1`'s vault holds a bundle and one lockbox, written as `u1`. */
+/** A CVX where `u1`'s vault holds a bundle and one lockbox, written as `u1`. */
 const seeded = async () => {
-  const t = createTest()
-  const asU1 = t.withIdentity({ subject: 'u1' })
+  const CVX = createTest()
+  const asU1 = CVX.withIdentity({ subject: 'u1' })
   await asU1.mutation(api.safebyok.createBundle, { bundle: TH.bundleOf('u1') })
   await asU1.mutation(api.safebyok.updateBox, { scope: u1, lockbox: TH.boxOf('anthropic_api_key', 'a1'), expected: TH.noBoxYet })
-  return t
+  return CVX
 }
 
 type Caller = ReturnType<ReturnType<typeof createTest>['withIdentity']>
@@ -33,14 +33,14 @@ const EveryCall: [string, (caller: Caller) => Promise<unknown>][] = [
 describe("SafebyokComponent.api, for the vault's own user", () => {
   for (const [fnName, call] of EveryCall) {
     it(`lets the signed-in owner call ${fnName}`, async () => {
-      const t = await seeded()
-      await expect(call(t.withIdentity({ subject: 'u1' }))).resolves.not.toThrow()
+      const CVX = await seeded()
+      await expect(call(CVX.withIdentity({ subject: 'u1' }))).resolves.not.toThrow()
     })
   }
 
   it("hands back what the component holds, exactly", async () => {
-    const t = await seeded()
-    const asU1 = t.withIdentity({ subject: 'u1' })
+    const CVX = await seeded()
+    const asU1 = CVX.withIdentity({ subject: 'u1' })
     expect(await asU1.query(api.safebyok.getBundle, { scope: u1 })).to.deep.equal(TH.bundleOf('u1'))
     expect(await asU1.query(api.safebyok.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })).to.deep.equal(TH.boxOf('anthropic_api_key', 'a1'))
     expect(await asU1.query(api.safebyok.watchVault, { scope: u1 })).to.deep.equal({
@@ -49,8 +49,8 @@ describe("SafebyokComponent.api, for the vault's own user", () => {
   })
 
   it("passes on the component's refusal of a lockbox it has no room for, as it came", async () => {
-    const t = await seeded()
-    const asU1 = t.withIdentity({ subject: 'u1' })
+    const CVX = await seeded()
+    const asU1 = CVX.withIdentity({ subject: 'u1' })
     for (let ii = 0; ii < 8; ii++) {
       await asU1.mutation(api.safebyok.updateBox, { scope: u1, lockbox: TH.heavyBox(`heavy_${String(ii)}`, 900_000), expected: TH.noBoxYet })
     }
@@ -59,48 +59,48 @@ describe("SafebyokComponent.api, for the vault's own user", () => {
   })
 
   it("resolves a failed expectation false, not as a refusal", async () => {
-    const t = await seeded()
+    const CVX = await seeded()
     const stale = { vault_id: 'vault-id-u1', revision_id: 'rev-a0', vault_key_epoch: 1 }
-    expect(await t.withIdentity({ subject: 'u1' }).mutation(api.safebyok.updateBox, { scope: u1, lockbox: TH.boxOf('anthropic_api_key', 'a2'), expected: stale })).to.be.false
+    expect(await CVX.withIdentity({ subject: 'u1' }).mutation(api.safebyok.updateBox, { scope: u1, lockbox: TH.boxOf('anthropic_api_key', 'a2'), expected: stale })).to.be.false
   })
 })
 
 describe("SafebyokComponent.api, for anyone else", () => {
   for (const [fnName, call] of EveryCall) {
     it(`refuses ${fnName} as identity_revoked when no one is signed in`, async () => {
-      const t = await seeded()
-      const refusal = await TH.convexRefusalOf(call(t))
+      const CVX = await seeded()
+      const refusal = await TH.convexRefusalOf(call(CVX))
       expect(refusal.kind).to.eq('identity_revoked')
     })
 
     it(`refuses ${fnName} as identity_revoked for another signed-in user`, async () => {
-      const t = await seeded()
-      const refusal = await TH.convexRefusalOf(call(t.withIdentity({ subject: 'u2' })))
+      const CVX = await seeded()
+      const refusal = await TH.convexRefusalOf(call(CVX.withIdentity({ subject: 'u2' })))
       expect(refusal.kind).to.eq('identity_revoked')
     })
   }
 
   it("leaves the vault as it was after another user's every attempt", async () => {
-    const t = await seeded()
-    const asU2 = t.withIdentity({ subject: 'u2' })
+    const CVX = await seeded()
+    const asU2 = CVX.withIdentity({ subject: 'u2' })
     for (const [, call] of EveryCall) { await TH.convexRefusalOf(call(asU2)) }
-    const asU1 = t.withIdentity({ subject: 'u1' })
+    const asU1 = CVX.withIdentity({ subject: 'u1' })
     expect(await asU1.query(api.safebyok.getBundle, { scope: u1 })).to.deep.equal(TH.bundleOf('u1'))
     expect(await asU1.query(api.safebyok.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })).to.deep.equal(TH.boxOf('anthropic_api_key', 'a1'))
   })
 
   it("shows a user only their own vault: their listing holds none of another's boxes", async () => {
-    const t = await seeded()
-    const asU2 = t.withIdentity({ subject: 'u2' })
+    const CVX = await seeded()
+    const asU2 = CVX.withIdentity({ subject: 'u2' })
     await asU2.mutation(api.safebyok.createBundle, { bundle: TH.bundleOf('u2') })
     expect(await asU2.query(api.safebyok.listBoxSummaries, { scope: TH.scopeOf('u2') })).to.deep.equal([])
   })
 
   it("says what to do, calmly, and names no user in a refusal", async () => {
-    const t = await seeded()
+    const CVX = await seeded()
     const refusals = [
-      await TH.convexRefusalOf(t.query(api.safebyok.getBundle, { scope: u1 })),
-      await TH.convexRefusalOf(t.withIdentity({ subject: 'u2' }).query(api.safebyok.getBundle, { scope: u1 })),
+      await TH.convexRefusalOf(CVX.query(api.safebyok.getBundle, { scope: u1 })),
+      await TH.convexRefusalOf(CVX.withIdentity({ subject: 'u2' }).query(api.safebyok.getBundle, { scope: u1 })),
     ]
     expect(refusals.map((refusal) => refusal.message)).to.deep.equal([
       'No one is signed in, so this vault cannot be reached: sign in, then try again.',
@@ -120,8 +120,8 @@ describe("SafebyokComponent.api, with the host's getUserId", () => {
   for (const [getUserId, blurb] of SignedOutCases) {
     it(blurb, async () => {
       const host = TH.hostWith(getUserId)
-      const t = host.createTest().withIdentity({ subject: 'u1' })
-      const refusal = await TH.convexRefusalOf(t.query(host.api.safebyok.getBundle, { scope: u1 }))
+      const CVX = host.createTest().withIdentity({ subject: 'u1' })
+      const refusal = await TH.convexRefusalOf(CVX.query(host.api.safebyok.getBundle, { scope: u1 }))
       expect(refusal.kind).to.eq('identity_revoked')
     })
   }
@@ -131,10 +131,10 @@ describe("SafebyokComponent.api, with the host's getUserId", () => {
       const identity = await ctx.auth.getUserIdentity()
       return identity ? `user|${identity.subject}` : null
     })
-    const t = host.createTest().withIdentity({ subject: 'u1' })
-    await t.mutation(host.api.safebyok.createBundle, { bundle: TH.bundleOf('user|u1') })
-    expect(await t.query(host.api.safebyok.getBundle, { scope: TH.scopeOf('user|u1') })).to.deep.equal(TH.bundleOf('user|u1'))
-    const refusal = await TH.convexRefusalOf(t.query(host.api.safebyok.getBundle, { scope: u1 }))
+    const CVX = host.createTest().withIdentity({ subject: 'u1' })
+    await CVX.mutation(host.api.safebyok.createBundle, { bundle: TH.bundleOf('user|u1') })
+    expect(await CVX.query(host.api.safebyok.getBundle, { scope: TH.scopeOf('user|u1') })).to.deep.equal(TH.bundleOf('user|u1'))
+    const refusal = await TH.convexRefusalOf(CVX.query(host.api.safebyok.getBundle, { scope: u1 }))
     expect(refusal.kind).to.eq('identity_revoked')
   })
 })
@@ -180,9 +180,9 @@ describe("SafebyokComponent.api, at setup", () => {
   it("calls getUserId as a method of the bag it was handed, so one that leans on this works", async () => {
     const { app, component } = TH.installedComponent()
     const host = app.defineModules({ safebyok: component.api(new SignedInAs('u1')) })
-    const t = host.createTest()
-    await t.mutation(host.api.safebyok.createBundle, { bundle: TH.bundleOf('u1') })
-    expect(await t.query(host.api.safebyok.getBundle, { scope: u1 })).to.deep.equal(TH.bundleOf('u1'))
+    const CVX = host.createTest()
+    await CVX.mutation(host.api.safebyok.createBundle, { bundle: TH.bundleOf('u1') })
+    expect(await CVX.query(host.api.safebyok.getBundle, { scope: u1 })).to.deep.equal(TH.bundleOf('u1'))
   })
 })
 

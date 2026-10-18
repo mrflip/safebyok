@@ -1,6 +1,6 @@
 /**
  * Dependabot's pull requests that move a public package's runtime dependencies, and the changeset
- * they need (PROCESS.md, *Releases*). Two questions, answered for CI and for the workflow that
+ * they need (notes/ci.md, *Dependabot*). Two questions, answered for CI and for the workflow that
  * writes the changeset (.github/workflows/dependabot-changeset.yml):
  *
  * * `commits` -- is every commit on the branch Dependabot's? One human commit pushed to a

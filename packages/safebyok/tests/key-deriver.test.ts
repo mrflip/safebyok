@@ -21,7 +21,7 @@ describe("argon2idDeriver", () => {
   it("derives exactly what Argon2id derives at the spec's parameters", async () => {
     const saltBytes = new Uint8Array(16).fill(7)
     const derived = await argon2idDeriver(CheapSpec).deriveKeyBytes('correct horse battery staple', saltBytes)
-    const direct = await argon2idAsync('correct horse battery staple', saltBytes, { m: 64, t: 2, p: 4, dkLen: 32 })
+    const direct = await argon2idAsync('correct horse battery staple', saltBytes, { m: 64, t: 2, p: 4, dkLen: 32 }) // eslint-disable-line id-length -- noble's option names
     expect(derived).to.have.lengthOf(32)
     expect(derived).to.deep.equal(direct)
   })
@@ -191,13 +191,13 @@ describe("parseKeyDeriverSpec", () => {
 // The bounds above are Argon2id's and the library's own, not ours: these hold them to it.
 describe("the limits argon2idDeriver's bounds stand on", () => {
   it("@noble/hashes refuses a salt under 8 bytes, and takes 8", async () => {
-    const opts = { m: 8, t: 1, p: 1, dkLen: PassphraseKeyBytes }
+    const opts = { m: 8, t: 1, p: 1, dkLen: PassphraseKeyBytes } // eslint-disable-line id-length -- noble's option names
     await expect(argon2idAsync('pw', new Uint8Array(7), opts)).rejects.toThrow(/salt/u)
     expect(await argon2idAsync('pw', new Uint8Array(8), opts)).to.have.lengthOf(PassphraseKeyBytes)
   })
 
   it("@noble/hashes refuses memory past 1 GiB, before allocating any", async () => {
-    await expect(argon2idAsync('pw', new Uint8Array(16), { m: 1_048_580, t: 1, p: 1 })).rejects.toThrow(/maxmem/u)
+    await expect(argon2idAsync('pw', new Uint8Array(16), { m: 1_048_580, t: 1, p: 1 })).rejects.toThrow(/maxmem/u) // eslint-disable-line id-length -- noble's option names
   })
 })
 

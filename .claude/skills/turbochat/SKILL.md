@@ -1,6 +1,6 @@
 ---
 name: turbochat
-description: Run turbochat -- an "Open Matters" tab in a Claude Doc where the Coach answers many open questions at once, each row a matter with an answer box and a state chip, and agents act on a row only once the Coach has flipped it out of drafting. Sets the tab up; when the Coach says "go" (or whenever an agent is in the doc anyway) it reads the tab once, acts on every flipped row, and sweeps away what has moved on, so the tab holds only what still waits for the Coach. Use when the Coach invokes /turbochat, asks for open questions to be gathered into a doc, or says "go" on an Open Matters tab.
+description: Run turbochat -- an "Open Matters" tab in a Claude Doc where the Coach answers many open questions at once, a row per matter with an answer box and a state chip. Sets the tab up, and on "go" acts on every row the Coach has flipped. Use when the Coach invokes /turbochat, asks for open questions to be gathered into a doc, or says "go" on an Open Matters tab.
 argument-hint: "[setup | go] [clarifications]"
 ---
 
@@ -9,10 +9,10 @@ argument-hint: "[setup | go] [clarifications]"
 Chat takes one question at a time, and a long session's open questions bury each other. Turbochat
 moves them into an **Open Matters** tab: one row per matter, a box for the Coach's answer, and a
 state chip. The Coach works down it at their own pace, from any device, and agents act on the
-rows they have flipped. It is closer to chat than to a record. The tab keeps no archive: rows
-come and go, and what they settle is written where it usually goes (a plan in `whiteboard/`, a
-note in `human/`, a TODO entry, a PR), with the ruling carried back to where it was asked
-(*Carrying a ruling back*, below).
+rows they have flipped. It is closer to chat than to a record: a ruled row moves to a
+*Resolved* tab, swept into a resolutions file at the end, and what it settles is written where it
+usually goes (a plan in `whiteboard/`, a note in `human/`, a TODO entry, a PR), with the ruling
+carried back to where it was asked (*Carrying a ruling back*, below).
 
 The Coach's words after the command: `$ARGUMENTS`. They are clarifications, and they win where
 they conflict with this file.
@@ -33,6 +33,9 @@ moves.
   a mention chip linking its tab.
 * **Coach notes**, the last table: `Note | State`, one empty row born `drafting`. It is for
   whatever the Coach wants agents to know outside any matter. The states work the same.
+
+Beside it, a **Resolved** tab: a one-line lead, then a bullet per ruled matter, appended at its
+end (*Carrying a ruling back*). Agents write it and never read it, until the sweep.
 
 A doc's dropdown options are append-only: an option can be neither renamed nor removed. So create
 the enum with exactly these five options, once. Changing them later means a new enum, and swapping
@@ -62,7 +65,7 @@ questions, and say so in the lead.
   if one is read by accident, that is no cause for alarm or a halt: it is simply not yet a request.
 * **proceed**: sweep the row, and act as if the Coach had said in chat what *Coach answer* says
   (when it is empty, they took the Rec). The work goes where work goes: a thread in a sprint plan,
-  a TODO entry, a worker you start, a commit on an open PR. The row then leaves the table.
+  a TODO entry, a worker you start, a commit on an open PR. The row then moves to *Resolved*.
 * **explain**: bring in more of the explanation that already exists. Hand the matter to a cheap,
   fast subagent (`haiku`, or `sonnet` for a knotty one) with the whiteboard and `human/` files
   behind it, and more if they would help, and have it write the fuller *Matter* cell: still plain,
@@ -83,23 +86,24 @@ session that keeps the doc may act on flipped rows whenever it is there.
 
 **That session keeps the tab.** In a sprint it is the orchestrator: a row that proceeds into a
 thread goes into that thread's handoff as text -- the matter and the Coach's answer, or a
-snapshot file in the sprint directory -- and the orchestrator sweeps the row when the thread
-files. Other agents send what belongs in the tab -- a new matter, a row they have settled -- to
-the session that keeps it, rather than writing it themselves.
+snapshot file in the sprint directory -- and the orchestrator moves the row to *Resolved* once
+the work is under way. Other agents send what belongs in the tab -- a new matter, a row they have
+settled -- to the session that keeps it, rather than writing it themselves.
 
 1. **Read the tab once** per pass. A doc read returns that tab alone, not the session.
 2. **Act on every flipped row** in that pass. Investigation goes to subagents, so the code they
    read stays out of the session's context and only their paragraph comes back; independent
    proceed work goes to workers or threads at once, carrying the row's text, not the doc.
 3. **Edit by id, cell by cell.** Make every write from that one read, against the ids it gave:
-   replace one *Matter* cell's paragraph, one chip's paragraph, or delete one swept row. Each
+   replace one *Matter* cell's paragraph, one chip's paragraph, or delete one ruled row. Each
    replace or delete of a whole block carries the guards that read printed for it, `ifHash` (its
    `h`) and `ifRev` (the read's rev). If the Coach has changed the block since, the write is
    refused rather than overwriting them: re-read that block and redo just that edit. Never
    re-read to check what you wrote, and never re-send the whole table. To reset a chip,
    `replace` its paragraph `"as":"markdown"`, content `<?claude block st?>`, with the chip in the
    `blocks` map (`{"st":{"type":"dropdown","enum":"<State enum id>","index":0}}`): an
-   `"as":"blocks"` replace keeps the old chip beside the new.
+   `"as":"blocks"` replace keeps the old chip beside the new. *Resolved* takes an insert at its
+   end, with no read.
 4. **Add new matters** as they surface, `drafting`, at the bottom of the matters table. Every open
    question an agent of the session reports (a worker's or reviewer's *Open matters*, a
    subagent's leftover) reaches the tab, put there by the session that keeps it. Leaving one out
@@ -117,14 +121,16 @@ carrying all of its context. Typing in cells costs nothing until the next pass.
 
 When a matter is ruled (`proceed`, or an answer in chat), beside acting on it:
 
-* **The resolutions file**: append the question as the row put it and the Coach's reply word for
-  word, with where it was raised and where the work went, newest batch first -- in a sprint,
-  `<YYYYMMDD-sprint_name>-resolutions.md` in its directory; otherwise
-  `YYYYMMDD-<thread>-resolutions.md` in the thread's whiteboard directory. An empty answer on
-  `proceed` is "(empty: took the Rec)".
-* **Beside the question**, wherever it was raised (a PR, a `whiteboard/` or `human/` file):
-  `→ *Coach (YYYY-MM-DD):* <the ruling, briefly>`, the question left in place. A file on a branch
-  another agent owns gets the line from that agent (the sprint skill, §3, says who and when).
+* **Resolved**: delete the row, and append a bullet to *Resolved*: the handle, the matter as the
+  row put it, the Coach's answer word for word ("(empty: took the Rec)" on an empty `proceed`),
+  the date, where it was raised, and where the work went.
+* **The PR** it was raised on: `gh pr edit` puts `→ *Coach (YYYY-MM-DD):* <the ruling, briefly>`
+  beside the question in its description, the question left in place. A question raised only in
+  a file needs no line there: *Resolved* is the record.
+* **At the end** of the sprint or session, a `sonnet` subagent reads *Resolved* once, writes it
+  into the resolutions file, newest batch first -- in a sprint, `<sprint_name>-resolutions.md` in
+  its directory; otherwise `YYYYMMDD-<label>-resolutions.md` in the session's whiteboard
+  directory -- and clears the tab.
 
 ## An elevated matter's tab
 
@@ -145,7 +151,8 @@ has no other memory of it.
 
 A read comes back as XML with an id and a hash on every paragraph, cell and run of text, so it
 costs about four times the tab's visible text: 25 matters came to about 10,000 tokens. That is why
-swept rows leave, elevated matters move to their own tabs, and cells stay at three sentences.
+ruled rows move to *Resolved*, which nothing reads until the sweep, elevated matters move to their
+own tabs, and cells stay at three sentences.
 Still, the tab is small next to the session: what costs more is the session's own context,
 re-sent on every turn. So the session that
 runs turbochat should be a lean one: once the matters that need a long session's memory are

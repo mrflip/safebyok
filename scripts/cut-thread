@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Cuts a thread a worktree of its own beside the main checkout (PROCESS.md, *A worktree per
+# thread*): `scripts/cut-thread deriver_shim` on 2026-10-16 makes ../byok-deriver_shim, on a new
+# branch 20261016-deriver_shim cut from origin/main. A second argument cuts it from another base:
+# the tip of the thread it stacks on, a branch, a SHA.
+#
+# The branch tracks nothing it was cut from: its upstream is origin's branch of the same name,
+# which its first push creates. A branch tracking origin/main would push to main. The base's SHA
+# is kept as `branch.<branch>.sprintbase`, where a reviewer and scripts/file-thread look for it.
+# Then it runs `pnpm install` in the new worktree, unless given --no-install.
+#
+# Usage: scripts/cut-thread [--no-install] <label> [<base>]
+# Prints the new worktree's root. Exits 0 when cut, 1 on a failure, 2 on arguments it does not
+# understand.
+set -euo pipefail
+
+usage="Usage: scripts/cut-thread [--no-install] <label> [<base>], eg scripts/cut-thread deriver_shim origin/20261016-vault_split"
+install=1
+if [[ "${1:-}" == "--no-install" ]]; then
+  install=0
+  shift
+fi
+if [[ $# -lt 1 || $# -gt 2 ]]; then
+  echo "$usage" >&2
+  exit 2
+fi
+label="$1"
+base="${2:-origin/main}"
+if [[ ! "$label" =~ ^[a-z](_?[a-z0-9])+$ ]]; then
+  echo "cut-thread: \"$label\" is not a label: use lowercase letters, digits and single underscores, starting with a letter (eg 'deriver_shim')." >&2
+  exit 2
+fi
+
+main="$(git worktree list --porcelain 2> /dev/null | sed -n '1s/^worktree //p')"
+if [[ -z "$main" ]]; then
+  echo "cut-thread: not inside a git repository" >&2
+  exit 1
+fi
+branch="$(date +%Y%m%d)-${label}"
+root="$(dirname "$main")/$(basename "$main")-${label}"
+if [[ -e "$root" ]]; then
+  echo "cut-thread: $root already exists" >&2
+  exit 1
+fi
+if git show-ref --verify --quiet "refs/heads/${branch}"; then
+  echo "cut-thread: the branch $branch already exists" >&2
+  exit 1
+fi
+
+git fetch --quiet origin
+sha="$(git rev-parse --verify --quiet "${base}^{commit}")" || { echo "cut-thread: no commit named $base" >&2; exit 1; }
+git worktree add --quiet --no-track -b "$branch" "$root" "$sha"
+git -C "$root" config "branch.${branch}.remote" origin
+git -C "$root" config "branch.${branch}.merge" "refs/heads/${branch}"
+git -C "$root" config "branch.${branch}.sprintbase" "$sha"
+echo "cut-thread: $branch, from $base at ${sha:0:8}" >&2
+if [[ "$install" -eq 1 ]]; then
+  (cd "$root" && pnpm install >&2)
+fi
+echo "$root"

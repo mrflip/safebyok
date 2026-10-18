@@ -1,7 +1,8 @@
 # Release checklist
 
-The passes only a person can make, before the Coach marks a Version PR ready (PROCESS.md,
-*Releases*). CI cannot run them: the tests use a fake `navigator.credentials`, jsdom, a fake
+The passes only a person can make, before the Coach marks a Version PR ready
+(`notes/releasing.md`). CI cannot run them: the tests use a fake `navigator.credentials`,
+jsdom, a fake
 IndexedDB and in-process stores, and a fake Convex deployment. The same pass each time, so that
 what was checked last release is what is checked this one. Whatever a container can run is
 automated instead, so it is not here; what is below stays by hand.

@@ -1,7 +1,7 @@
 name: Release
 
 # Every push to main runs this, and changesets decides which of three things it does
-# (PROCESS.md, Releases):
+# (notes/releasing.md):
 #
 # * version -- changesets are waiting on main. `version` turns them into version bumps and
 #   CHANGELOG entries on the branch changeset-release/main, rebuilt from main's tip each time, and

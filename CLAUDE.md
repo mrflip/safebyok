@@ -9,58 +9,49 @@ API keys and other small secrets that users bring to a browser app. Secrets are 
 user's device under keys that never leave it, and are synchronized between devices through a
 storage layer the host application plugs in. The backend only ever holds ciphertext.
 
-It is at the very start: the toolchain is in place, and the interface is being designed in
-`whiteboard/`. Treat what is there as intent, not as settled design.
-
-Project instructions, loaded at the start of every session. Keep this file short and true:
-everything here costs context on every task, whether or not the task needs it.
+It is not yet used outside of the project that motivated it, but we are close to a wider release.
 
 ## Working Relationship
 
 This project follows an Agent-Coach approach. Experienced human architects are the Coaches, with
 you (the AI agent) developing the code: two equally important roles. Coaches want pushback where
-warranted, and encourage you to think independently, governed by the guardrails outlined here
-and in the linked documents.
+warranted, and encourage you to think independently, governed by this file and the linked documents.
 
 If a guardrail looks wrong for the case at hand, say so and propose the alternative. Do not
 quietly route around it, and do not treat a convention you find inconvenient as optional.
 
-When you report on a PR, branch or commit in chat or in `human/`, link it in full the first time
-each message names it (`[#12](https://github.com/mrflip/safebyok/pull/12)`): the Coach often reads
-from a phone, where a bare `#12` goes nowhere.
+Link each PR, branch or commit on first mention (`[#12](https://github.com/mrflip/safebyok/pull/12)`).
 
 ## Philosophy and Values
 
 The top three values while writing code are **empathy, safety and readability**. Empathy here
-means three audiences: the developer integrating the package, the end user typing a passphrase,
+means three audiences: the end user typing a passphrase, the customer integrating the package,
 and the security reviewer reading the code.
 
-* **Never invent cryptography.** Primitives come from WebCrypto or an audited, widely used
-  library; constructions follow the design in `whiteboard/` or a published standard. No
-  home-made ciphers, padding, key stretching, comparisons or randomness. If the design seems to
-  need something new, stop and raise it.
+* **Never invent cryptography.** No home-made ciphers, padding, key stretching, comparisons or
+  randomness. Primitives come from WebCrypto or an audited, widely used library; constructions
+  follow those already in `src/` or a published standard. If your task seems to need something
+  new, stop and raise it.
 * **Prefer the toolkit to the home brew** (see Library-first, below). If you are banging rocks
   together, we have probably misdirected you or we are solving the wrong problem. Say so.
-* **Maintainability and legibility beat performance** unless we have demonstrated that something
-  is slow. Cleverness is rarely called for -- but if it seems to be, propose it.
+* **Maintainability and legibility beat performance** unless it is shown to be slow where it
+  matters. Cleverness is rarely called for -- but if it seems to be, propose it.
 
 ## What the package promises
 
-* **Framework-agnostic, React-friendly.** No React import, ever. State is exposed the way
-  `useSyncExternalStore` wants it: `subscribe(listener)` returning an unsubscribe, and a
-  `getSnapshot()` whose result is immutable and keeps its identity until something changes. A
-  React binding, if there is one, is a thin separate entry point.
-* **Pluggable storage.** The core speaks only to storage interfaces. An adapter for a particular
-  database lives in its own entry point, and its dependency is an optional peer: an app that
-  does not use Convex never installs it.
-* **Few runtime dependencies.** Each is a supply-chain decision for every app that installs us.
-  Adding one needs a Coach's yes; prefer a peer dependency for anything the host app likely
-  already has. Validation is plain Zod, no kit on top of it.
+* **Security first.** Where the stronger measure (Argon2id, say) is not available on every
+  platform, we implement it first anyway, and make it pluggable second.
+* **Framework-agnostic, framework-friendly.** State is exposed the way `useSyncExternalStore`
+  wants it: `subscribe(listener)` returning an unsubscribe, and an immutable `getSnapshot()`
+  that keeps its identity until something changes.
+* **Pluggable interfaces.** The core speaks only to interfaces. A concrete implementation lives
+  in its own package or entry point, its dependencies optional peers: an app that does not use
+  Postgres never installs it.
+* **Few, tree-shakeable runtime dependencies.** We are library-first, but each dependency is a
+  supply-chain decision for every app that installs us. Adding one needs a Coach's yes before
+  a PR is merged. Prefer a peer dependency for anything the host app likely already has.
 * **Runs everywhere the host app does**: browsers, Node, Bun, and the frameworks on
-  them (PROCESS.md, *Dependencies*). No Node built-ins in `src/`. The tests run under Node, where
-  WebCrypto is the same global as in a browser.
-* **Security First**: if the stronger security measure (eg Argon) is not available on every platform,
-  we nonetheless implement it first, and make it pluggable second
+  them (PROCESS.md, *Dependencies*). No Node built-ins in `src/`.
 * **What is exported is a contract.** Each published package's `src/index.ts` (and each entry
   point beside it) is its public surface, versioned by semver. **A stored vault is a contract
   too**: a change to the shape of what is written to storage must still read every vault already
@@ -76,86 +67,73 @@ and the security reviewer reading the code.
   strongest exactly where it should be weakest: the small, done-a-thousand-times utility (a
   stable stringify, a deep-equal, a debounce). "Twelve lines, cheap to read" is the trap, not
   the justification -- those twelve lines have a proven npm package, and the search for it comes
-  before writing them, every time. The Coach's yes comes before the hand-rolled version exists,
-  not after.
+  before writing them. The Coach's yes comes before the hand-rolled version exists, not after.
 * **Secret material never leaves through a side door.** Not into an error message, a thrown
-  value's properties, a log line, a `toString`, or a validation error quoting its input. `src/`
-  writes nothing to the console but through the fallback logger, `src/console-logger.ts`, used
-  when a host passes no logger (the linter enforces it everywhere else). An error says what went wrong and what
-  to do, calmly, and carries a `kind` a caller can branch on.
-* Every new piece of code gets a proportional doc block and test suite: at least one test per use
-  case, and one per `@example` (STYLE.md, *Tests*).
+  value's properties, a log line, a `toString`, or a validation error quoting its input.
+  Log through the host's logger, never `console`. Errors must say what went wrong and what
+  to do, calmly, for a non-expert, and carry a `kind` the caller can branch on.
+* Every new piece of code gets a proportional doc block and test suite (STYLE.md, *Tests*).
 * Validate at module entrypoints; write confident, paranoia-free code past that boundary.
 * Progress notes, development caveats and open questions go in `human/` or `whiteboard/` --
   never in doc blocks or code comments.
 * The core's `eslint.config.mjs` (`packages/safebyok/`) is the final authority on formatting.
-  Run the linter; however, if it conflicts with the higher guidelines of legibility and
-  productivity, you are approved for `eslint-disable-line` (`no-param-reassign`,
-  `no-explicit-any`) or `@ts-expect-error` if they are the correct compromise -- apply them but
-  **report it** in chat, or in the PR's open questions.
-* Never handle a real secret in a test, fixture or example: generate one, or use an obvious fake.
-  Credentials for anything (npm, GitHub) come from the environment, never from a file in the repo.
+  If the linter conflicts with the higher guidelines of legibility and productivity, you are
+  approved for `@ts-expect-error` or `eslint-disable-line` (`no-param-reassign`,
+  `no-explicit-any`) when they are the correct compromise. **Always report it** in chat and in
+  the PR's open questions.
+* Never handle a real secret in a test, fixture, or example: generate one or use an obvious
+  fake that validates. Credentials for anything (npm, GitHub) come from the environment, not a file.
 
 ## Commands
 
 ```sh
 pnpm install
-pnpm justify         # lint, typecheck, test, build, every package: green before every commit;
-                     #   also runs pnpm `size`, the treeshaking budget
+pnpm justify         # lint, typecheck, test, build, treeshake budget for every package: green before every commit
 pnpm test            # vitest, every package; pnpm test:coverage likewise
 pnpm lint            # eslint, every package
 pnpm typecheck       # tsc --noEmit, every package
 pnpm build           # tsdown: ESM + CJS + declarations into each dist/, checked by publint and attw
-pnpm --filter safebyok test        # one package, any script (or `pnpm test` in its directory);
-                                   # it builds the packages it depends on first
+pnpm --filter safebyok <task>      # runs within target package after building its dependencies; or run `pnpm <task>` in its directory
 pnpm --filter safebyok add <dep>   # a package's dependency; `pnpm add -w` is for root tooling only
 pnpm changeset                     # a PR's release note; `--empty` when it needs none (PROCESS.md)
 ```
 
 ## Layout
 
-* `packages/` -- the workspace packages: `safebyok` (the core), `safebyok-react` (the React
-  binding), `safebyok-fastkey` (a WebAssembly key deriver), and the storage adapters
-  `safebyok-convex`, `safebyok-indexeddb`, `safebyok-postgres` and `safebyok-graphql`. A new one
-  is named for what it plugs in: `safebyok-<store>` for a storage adapter, `safebyok-<framework>`
-  for a binding. Each has its own `package.json`, configs, `src/` and `tests/`, and runs its own
-  `pnpm justify`; the root's runs them all.
-* In a package, `src/index.ts` is the entry point; nothing else is importable by a consumer unless
-  it is its own entry in that package's `tsdown.config.ts` (in `safebyok-convex`, its
-  hand-written `exports`, which follow Convex's component layout).
-* `tests/` mirrors `src/` path for path: `src/foo/bar.ts` is tested in `tests/foo/bar.test.ts`.
-  `fixtures/` holds sample data, when there is some.
-* `demos/` -- private playground apps exercising the packages; never published.
-* `e2e/` -- the private `safebyok-e2e` package: the adapter-by-framework checks (Convex with
-  `ConvexReactClient`; later Vue) and any heavyweight browser spec, so no adapter's `package.json`
-  lists a framework. An adapter's own tests stay in its package. Never published; its README says
-  where a new pairing goes.
-* The root is a private workspace, never published: its own `scripts/` (tested in `tests/scripts/`)
-  and the configs that check them.
-* `dist/` is built, never committed.
-* `whiteboard/` -- work threads in progress, under a `YYYYMMDD-threadname` directory.
-* `winboard/` -- finished threads, moved from `whiteboard/` once addressed, each with the
-  `human/` reports that went with it (`*-human.md`) and a `*-resolution.md` of its gripes.
-  **Historical files**: what they say may be outdated or no longer relevant. Check the code and
-  current docs before acting on anything there.
-* `human/` -- **from agents, to Coaches.** A scratchpad, not a record: write to it, don't read it
-  as input. `human/README.md` has the rules.
-* `notes/` -- durable notes. `notes/security.md` lists decisions a security reviewer should look
-  at: **add one whenever you make such a decision.** It is long and you need none of it to
-  build: hand your caution to a `sonnet` subagent, which merges it into the entry that already
-  says it or inserts it (the file's header says how), and commit what it wrote.
-  `notes/wontfix.md` lists behaviour left undefined on purpose.
+* `packages/` -- the published packages, each with its own `package.json`, configs, `src/`,
+  `tests/` and `pnpm justify`: `safebyok` (the core), `safebyok-react`, `safebyok-fastkey` (WASM
+  key deriver), and the storage adapters (convex, indexeddb, postgres, graphql).
+* A consumer imports only `src/index.ts` and the other entries in the package's
+  `tsdown.config.ts` (in `safebyok-convex`, its hand-written `exports`).
+* `tests/` mirrors `src/` path for path; `fixtures/` holds sample data.
+* Private, never published: the root (`scripts/`, tested in `tests/scripts/`), `demos/`, and
+  `e2e/` (adapter-by-framework checks, so no adapter lists a framework; its README says where a
+  new pairing goes).
+* `whiteboard/` and `winboard/` -- thread and session folders, `YYYYMMDD-<label>/`: in
+  `whiteboard/` while open, moved to `winboard/` when done. They swamp a repo-wide search:
+  search `packages/` and the root's docs instead, or pass `--exclude-dir={whiteboard,winboard}`.
+  Read the folder of the thread or session you are working in, or one
+  your task names, and no other: you need none of the rest to build, and where it disagrees
+  with the code, the code wins.
+* `human/` -- from agents to Coaches: write to it, never read it as input (`human/README.md`).
+* `notes/` -- durable notes. Each decision a security reviewer should see goes into
+  `notes/security.md` through a `sonnet` subagent (the file's header says how); don't read it
+  yourself. `notes/wontfix.md`: behaviour left undefined on purpose.
 
 ## Reading
 
 What you read stays in your context and is paid for again on every later turn, so read for the
-task at hand. Find with `grep -n`, then read the lines you need; do not `cat` a whole source file
-or document of more than a couple of hundred lines, and do not read again what is already in
-your context. The documents below are looked up by section, not read through.
+task at hand, and never read again what is already there. Find with `grep -n`, then read the
+lines you need. Read a file whole when you will change it or need most of it.
+These are long enough to search instead, reading only the lines you need: in
+`packages/safebyok/`, `src/vault.ts`, `src/vault-db.ts`, `README.md`, `tests/vault.test.ts`,
+`tests/test-helpers.ts`, `tests/test-helpers.test.ts` and `tests/vault-db.test.ts`;
+`safebyok-react/tests/vault-provider.test.tsx`; `safebyok-postgres/tests/postgres-vault-db.test.ts`.
+The documents below are looked up by section, not read through.
 
 ## Notable files
 
-* `PROCESS.md` -- threads, branches, commits, PRs, releases, dependencies. **Read the section
+* `PROCESS.md` -- threads, branches, commits, PRs, changesets, dependencies. **Read the section
   you need before any git operation beyond a commit, and before adding a dependency.**
 * `VOCABULARY.md` -- the cast: whisper, lockbox, vault, passphrase, each key by role, and their
   encrypted forms. Its names are the only names for those things, in code, docs and stored fields.
@@ -163,8 +141,10 @@ your context. The documents below are looked up by section, not read through.
   thing in the cast.
 * `STYLE.md` -- the naming vocabulary (`val`, `ckey`, `bag`, `kind`, and what `key` means here),
   braces, quotes, doc blocks, and how tests are written. These conventions are specific and
-  unguessable, and the linter enforces most of the layout. **Read *Naming* before naming
-  anything new, and *Tests* before writing a test.**
+  unguessable, and the linter enforces only some of them. *Conventions At A Glance*, below,
+  covers a local name and a small edit. **Read the section you need before naming an export, a
+  module, a stored field or a new tag (*Naming*), and before writing a doc block, a test, or an
+  entrypoint that takes a caller's input (*Validation*).**
 * `packages/safebyok/eslint.config.mjs` -- mechanically enforced style; the other packages' and
   the root's configs are cut from it. Where it and a prose document disagree, it is a bug -- flag
   it.
@@ -174,16 +154,21 @@ your context. The documents below are looked up by section, not read through.
 
 ## Conventions At A Glance
 
-Enough to keep you out of trouble on a small edit. STYLE.md is the real source.
+The house conventions a writer gets wrong unless told: the linter does not catch these, or they
+shape code too deeply to fix in review. The linter has semicolons, indents, `const` and the
+banned names. STYLE.md is the real source.
 
-* Semicolonless. Two-space indents, no tabs.
-* Always brace blocks, even single-statement ones: `if (nope) { return }`
-* Opening brace at end of line; cuddle `} else if (...) {` and `} catch (err) {`.
-* No single-letter names. Never bare `name`, `value`, `node`, `query`. Use `err`, never `error`.
-  `type` only for an actual datatype; for "variety of", `kind` or `flavor`.
-* Never a bare `key`: a cryptographic key is named for its role (`vaultKey`, `lockboxKey`); a
-  map key is a `ckey`. The linter refuses `key`, `name`, `value`, `node`, `error` and `query` as
-  a variable or parameter.
-* `const` by default; when necessary, `let`; never `var`. Functional style is strongly preferred.
-* Parenthesize and space every negation: `if (! approved) { ... }`
-* Stored fields are underbar_case (`salt_bytes`); everything else camelCase.
+* Always brace, opening brace at the end of the line, cuddled: `if (nope) { return }`,
+  `} else if (...) {`, `} catch (err) {`. Parenthesize and space every negation: `if (! approved)`.
+* `"` for prose, error messages, and `describe`/`it` titles. Otherwise use `'`.
+* No single-letter names, even in a lambda: `(row) => row.label`. `ii`, `jj` for a loop counter.
+* The cast keeps VOCABULARY.md's names -- whisper, lockbox, vault -- never `data` or `payload`. A
+  cryptographic key is named for its role (`vaultKey`, `lockboxKey`); a map key is a `ckey`.
+* Smush the tags `name`, `kind`, `label`, `path` and `bag` into one word: `vaultlabel`,
+  `woodkind`. `type` is only a datatype; a menu choice is a `kind` or a `flavor`.
+* Stored fields are underbar_case (`salt_bytes`); everything else camelCase. Use integer
+  UTC epoch milliseconds, not strings or `Date`s, for times.
+* A module of related verbs is star-imported under its Startcase name: `Envelope.swak(...)`.
+* Every export has a doc block written for its caller. Each `@example` in it has a test whose
+  title points back to it: `"refuses a misspelt field, as its second example shows"`.
+* Tests are chai-style (`expect(foo).to.eq(bar)`), their helpers star-imported as `TH`.

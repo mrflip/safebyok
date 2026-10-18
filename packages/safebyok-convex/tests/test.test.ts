@@ -7,10 +7,10 @@ import * as TH from './test-helpers'
 
 describe("register", () => {
   it("installs the component under the name a host gave it, and hands back its functions", async () => {
-    const t = defineTestApp({ schema: defineSchema({}) }).defineModules({}).createTest()
-    const vaultstore = register(t, 'vaultstore')
-    await t.mutation(vaultstore.vaults.createBundle, { bundle: TH.bundleOf('u1') })
-    expect(await t.query(vaultstore.vaults.getBundle, { scope: TH.scopeOf('u1') })).to.deep.equal(TH.bundleOf('u1'))
+    const CVX = defineTestApp({ schema: defineSchema({}) }).defineModules({}).createTest()
+    const vaultstore = register(CVX, 'vaultstore')
+    await CVX.mutation(vaultstore.vaults.createBundle, { bundle: TH.bundleOf('u1') })
+    expect(await CVX.query(vaultstore.vaults.getBundle, { scope: TH.scopeOf('u1') })).to.deep.equal(TH.bundleOf('u1'))
   })
 
   it("serves a host app's re-exported functions, as defineTestApp's component helper", async () => {
@@ -18,8 +18,8 @@ describe("register", () => {
     const { api, createTest } = app.defineModules({
       safebyok: new SafebyokComponent(app.components.safebyok).api({ getUserId: () => 'u1' }),
     })
-    const t = createTest()
-    await t.mutation(api.safebyok.createBundle, { bundle: TH.bundleOf('u1') })
-    expect(await t.query(api.safebyok.getBundle, { scope: TH.scopeOf('u1') })).to.deep.equal(TH.bundleOf('u1'))
+    const CVX = createTest()
+    await CVX.mutation(api.safebyok.createBundle, { bundle: TH.bundleOf('u1') })
+    expect(await CVX.query(api.safebyok.getBundle, { scope: TH.scopeOf('u1') })).to.deep.equal(TH.bundleOf('u1'))
   })
 })

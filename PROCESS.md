@@ -1,7 +1,8 @@
 # Process
 
-How work moves from an idea to a published version: threads, commits, pull requests, releases,
-and what may be added to the package. CLAUDE.md has the values these serve; STYLE.md has how the
+How work moves from an idea to a merged PR: threads, commits, pull requests, changesets, and what
+may be added to the package. What CI checks is `notes/ci.md`; how a release is made,
+`notes/releasing.md`. CLAUDE.md has the values these serve; STYLE.md has how the
 code itself reads.
 
 ## Threads
@@ -16,20 +17,13 @@ mid-refactor, not on a timer.
 
 ### A worktree per thread
 
-Other agents share the main checkout, so a thread is built in a worktree of its own beside it,
-`../byok-<label>`. From the main checkout:
-
-```sh
-git fetch origin
-git worktree add --no-track -b YYYYMMDD-<label> ../byok-<label> origin/main
-git -C ../byok-<label> config branch.YYYYMMDD-<label>.remote origin
-git -C ../byok-<label> config branch.YYYYMMDD-<label>.merge refs/heads/YYYYMMDD-<label>
-cd ../byok-<label> && pnpm install
-```
-
-`--no-track` matters: the container's git pushes a branch to its upstream, and a branch cut
-tracking `origin/main` would push to main. A thread built on another's unmerged work is cut from
-that branch's tip instead of `origin/main`, and its PR says "Stacked on #N". Push with
+Other agents share the main checkout, so a thread is built in a worktree of its own beside it:
+`scripts/cut-thread <label> [<base>]` makes `../byok-<label>` on a branch `YYYYMMDD-<label>`, cut
+from `origin/main` or the base given, records that base as `branch.<branch>.sprintbase`, and runs
+`pnpm install` there. It cuts with `--no-track`, as anyone cutting one by hand must: the
+container's git pushes a branch to its upstream, and a branch tracking `origin/main` would push to
+main. A thread built on another's unmerged work is cut from that branch's tip, and its PR says
+"Stacked on #N". Push with
 `git -c credential.helper= -c credential.helper='!gh auth git-credential' push`. Once the PR is
 filed, `git worktree remove ../byok-<label>`; the branch stays for the PR. Once it has merged,
 `/branch-sweep`, run when the Coach asks, has `scripts/git-survey.sh` tag the branch
@@ -109,19 +103,7 @@ would change the code in the PR -- are asked in chat, and lead the PR's body unt
 * A change to the public surface or to the stored format says so in its first line, and says
   what a consumer or an existing vault has to do about it.
 
-CI runs on every PR, over the root and every workspace package: `lint-typecheck` (lint, typecheck,
-no merge commits, a changeset, and `actionlint` over the workflows) and `test-build` (tests with
-coverage, which builds every package with its package checks, then the size budgets) must pass;
-`node-compat` runs the tests on Node 22, the platform floor, which must pass too, and on the
-newest Node, which reports. CodeQL scans the code and the workflows, and a finding shows on the
-PR. Dependabot opens grouped `deps:` PRs weekly; they get the same review as any other. One
-whose every commit is Dependabot's is asked for a changeset only when it moves a public package's
-runtime dependencies, as `scripts/runtime-deps.ts` reads them (`dependencies`, `peerDependencies`,
-`optionalDependencies`, `peerDependenciesMeta`, `bundledDependencies`, a package added, removed
-or made private): `.github/workflows/dependabot-changeset.yml` writes it, a `patch`
-named `.changeset/dependabot-<n>.md`, and pushes it with the release App's token, so CI runs
-again on it. A devDependency or lockfile bump needs none. A Dependabot branch with a commit of
-anyone else's on it is a PR like any other, and carries a changeset like one.
+What CI checks on a PR, and how Dependabot's PRs get their changesets, is `notes/ci.md`.
 
 ## Packages
 
@@ -137,8 +119,8 @@ README is written as the template for a storage adapter.
 
 ## Releases
 
-The Coach releases; agents never tag, publish, or change a version number. Changesets keeps the
-numbers and the CHANGELOGs; `.github/workflows/release.yml` does the rest.
+The Coach releases; agents never tag, publish, or change a version number. What a thread
+contributes is a changeset.
 
 * **A changeset** is a short file in `.changeset/`, written with `pnpm changeset`: which packages
   it bumps, by how much, and a sentence or two for the CHANGELOG. It is named for the thread,
@@ -152,33 +134,10 @@ numbers and the CHANGELOGs; `.github/workflows/release.yml` does the rest.
   (an interface a host may implement, or fake, counts: adding to it breaks the host's object);
   `patch` for any other change that ships (a fix, a runtime-dependency bump); an empty changeset
   for what ships nothing. A README-only change to a published package takes an empty one too: the
-  packages release in lockstep, and a line of README does not earn a bump of all seven.
-* **Versions are semver, in lockstep.** The public packages are one `fixed` group in
-  `.changeset/config.json`, so one bump moves them all; a test refuses a public package left out
-  of it. Private packages, demos and `e2e/` are never versioned or released. Until 1.0, a minor bump may
-  break the public surface, and its changeset says how. Between releases, main's version is the
-  last one released: the next is not knowable until release time.
-* **The Version PR**, named for the release it makes ("Release 0.2.0: safebyok, ..."), is rebuilt
-  from main's tip by every push to main while changesets wait: the bumps, the CHANGELOG entries
-  and the spent changesets, as one `rel:` commit named the same way. It is the bot's: nobody
-  rebases, edits or merges it but the Coach. The release workflow writes it with the repository's
-  GitHub App, so CI runs on it as on any PR.
-* **It opens as a draft.** The Coach marks it ready when they mean to release it, after the
-  by-hand passes in `notes/release-checklist.md` (real authenticators, real browsers, the Convex
-  README walk, Supabase). A later push to main rebuilds it but leaves a ready PR ready, so before
-  merging, reread what it holds: new changesets may have joined it since it was read.
-* **Merging it is the release.** `release.yml` then checks the lockstep group, runs
-  `pnpm justify`, packs each package whose version npm lacks, stages each tarball, and tags each
-  package staged (`safebyok@0.2.0`) with a GitHub release from its CHANGELOG, the core's marked
-  the repository's latest. A prerelease
-  version goes out under the `next` dist-tag; `pnpm changeset pre enter beta` starts prereleases
-  and `pnpm changeset pre exit` ends them.
-* **Staged, not published.** The workflow's npm trusted publisher may only `npm stage publish`.
-  A version goes public when the Coach approves it with 2FA, on npmjs.com or with
-  `npm stage approve <stage-id>` (`npm stage list` shows the ids); CI cannot approve its own
-  staging. A failed run is mended by re-running its failed jobs: what is done is skipped. A staged
-  version nobody wants is `npm stage reject`ed, and its number counts as burned until the Coach
-  has tested otherwise.
+  packages release in lockstep, and a line of README does not earn a bump of all seven. Until 1.0,
+  a minor bump may break the public surface, and its changeset says how.
+* **The packages version in lockstep**, one `fixed` group in `.changeset/config.json`. How a
+  release is made -- the Version PR, staging, the Coach's approval -- is `notes/releasing.md`.
 
 ## Dependencies
 
@@ -220,32 +179,27 @@ The toolchain: TypeScript, Vitest, ESLint, tsdown.
 ## Size budgets
 
 `.size-limit.json` holds one budget per import shape of the built packages, checked by `pnpm size`
-(`pnpm justify` and CI run it after the build). JSON has no comments, so the rule for setting a budget lives here.
-size-limit's `kB` is 1000 bytes, and it measures minified and brotlied.
+(`pnpm justify` and CI run it after the build). JSON has no comments, so the rule for setting a
+budget lives here. size-limit's `kB` is 1000 bytes, and it measures minified and brotlied.
 
 1. **Start from the measure** (`pnpm size`, or `npx size-limit --json` for exact bytes).
 2. **Add the room.** A bundle of 5 kB or more gets **+3 kB**; one under 5 kB gets **+50%**, and at
    least +1 kB, so a small bundle is not given more room than its own size.
 3. **Round up to a round number**: two significant figures, never down (2.3 kB of measure is
-   3.5 kB of budget; 22.15 kB is 23 kB; 26.83 kB is 30 kB). Round numbers keep a stack of PRs
+   3.5 kB of budget; 22.15 kB is 23 kB; 26.83 kB is 27 kB). Round numbers keep a stack of PRs
    from fighting over digits: a budget of 2_431 bytes is a conflict waiting for the next
    thread, and 2_500 is not.
+
+`pnpm size:budget` applies the rule: it prints each budget beside the rule's, and `--raise` or
+`--write` sets them (its header says how).
 
 The rule sets a budget; it may lower one as well as raise it. A bundle that shrank gets the
 smaller budget the rule gives, so a budget never sits looser than its measure earns.
 
-Only the ESM build is measured: it is what a bundler reads and tree-shakes, and the CommonJS
-build is for Node hosts, where bytes shipped to a browser are not the concern. A package's
-peers (`safebyok`, `zod`, `react`) are left out of its own entry's measure with `ignore`: the
-host has them already, and the budget is for what the package adds. `pnpm size` builds the
-measured packages once and measures them; `pnpm size:check` measures what is already built,
-which is what `pnpm justify` does after its tests have built everything. size-limit itself runs
-on Node `^22.19`, `^24.5` or `>=26`, narrower than our `engines`; CI runs it on the pinned Node.
-
-A sprint's orchestrator guesses the target up front and has the first thread set it, so the
-stacked PRs agree (`.claude/skills/sprint/SKILL.md`); a late thread lowers the budgets to this
-rule once the sprint's sizes are known. Anyone else raising a budget follows the same rule, and
-says in the PR why the bundle grew.
+A sprint's first thread raises the budgets for the whole sprint, so the stacked PRs agree, and a
+late thread lowers them to the rule (`.claude/skills/sprint/SKILL.md`). Anyone else raising a
+budget follows the same rule, and says in the PR why the bundle grew. How an entry is measured is
+`notes/ci.md`, *Size checks*.
 
 ## Where things are written
 

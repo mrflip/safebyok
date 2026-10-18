@@ -30,9 +30,10 @@ pnpm --filter safebyok test:watch   # one package's tests, as you edit
   installs safebyok.
 
 How we write the code -- names, braces, quotes, doc blocks, tests -- is in
-[STYLE.md](STYLE.md); how work is organized, committed and released is in
-[PROCESS.md](PROCESS.md). Commit messages take a prefix naming the part of the package they touch
-(`vault: ...`, `crypto: ...`): the table is in PROCESS.md.
+[STYLE.md](STYLE.md); how work is organized and committed is in [PROCESS.md](PROCESS.md); what
+CI checks is in [notes/ci.md](notes/ci.md), and how a release is made in
+[notes/releasing.md](notes/releasing.md). Commit messages take a prefix naming the part of the
+package they touch (`vault: ...`, `crypto: ...`): the table is in PROCESS.md.
 
 ## License
 

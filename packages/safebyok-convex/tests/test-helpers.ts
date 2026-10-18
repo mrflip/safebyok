@@ -16,7 +16,7 @@ export * from 'safebyok/testing'
 export const vaults = anyApi['vaults'] as unknown as ComponentApi['vaults']
 
 /**
- * A fresh in-memory backend holding only the component, its functions at the root. With
+ * A fresh in-memory CVX holding only the component, its functions at the root. With
  * `transactionLimits`, it enforces Convex's own per-transaction limits.
  */
 export const componentTest = (transactionLimits = false) => convexTest({ schema, modules, transactionLimits })
@@ -45,7 +45,7 @@ export const installedComponent = () => {
  * @returns The refusal's data, its `kind` and `message`.
  *
  * @example
- *   const refusal = await TH.convexRefusalOf(t.query(api.safebyok.getBundle, { scope }))
+ *   const refusal = await TH.convexRefusalOf(CVX.query(api.safebyok.getBundle, { scope }))
  *   expect(refusal.kind).to.eq('identity_revoked')
  */
 export const convexRefusalOf = async (operation: Promise<unknown>): Promise<SafebyokErrorData> => {

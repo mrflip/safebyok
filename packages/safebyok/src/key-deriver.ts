@@ -87,7 +87,7 @@ export const argon2idDeriver = (spec: KeyDeriverSpec): Argon2idKeyDeriver => der
 
 /** A frozen deriver of a spec already checked: Argon2idWebV1, or one argon2idDeriver parsed. */
 const deriverOf = (spec: KeyDeriverSpec): Argon2idKeyDeriver => {
-  const argonOpts = { m: spec.memory_kib, t: spec.iterations, p: spec.parallelism, dkLen: spec.output_bytes }
+  const argonOpts = { m: spec.memory_kib, t: spec.iterations, p: spec.parallelism, dkLen: spec.output_bytes } // eslint-disable-line id-length -- noble's option names
   return Object.freeze({
     ...spec,
     deriveKeyBytes: async (passphrase: string, saltBytes: Uint8Array) => {

@@ -14,25 +14,25 @@ export { default as schema } from './component/schema'
  * Install the safebyok component into a `convex-test` instance, so the host's own functions --
  * the ones `SafebyokComponent.api` made -- can be tested against it, in memory.
  *
- * @param t - The test instance, from `convexTest(...)` or `defineTestApp(...).createTest()`.
+ * @param testRoot - The test instance, from `convexTest(...)` or `defineTestApp(...).createTest()`.
  * @param componentPath - The name the host installs the component under: `safebyok` unless it
  *   passed another to `app.use`.
  * @returns The component's functions as the host references them, `components.safebyok`.
  *
  * @example
- *   const t = convexTest(schema, modules)
- *   register(t)
- *   await t.withIdentity({ subject: 'u1' }).query(api.safebyok.getBundle, { scope })
+ *   const CVX = convexTest(schema, modules)
+ *   register(CVX)
+ *   await CVX.withIdentity({ subject: 'u1' }).query(api.safebyok.getBundle, { scope })
  *
  * @example
  *   const app = defineTestApp({ schema, components: { safebyok: { register } } })
  *   new SafebyokComponent(app.components.safebyok).api({ getUserId })
  */
 export const register = <ComponentPath extends string = 'safebyok'>(
-  t: Pick<TestConvexRoot<GenericDataModel>, 'registerComponent'>,
+  testRoot: Pick<TestConvexRoot<GenericDataModel>, 'registerComponent'>,
   componentPath: ComponentPath = 'safebyok' as ComponentPath,
 ): ComponentApi<ComponentPath> => {
-  t.registerComponent(componentPath, schema, modules)
+  testRoot.registerComponent(componentPath, schema, modules)
   // What the host's generated `components` is at runtime; its type comes from the functions.
   return (componentsGeneric() as Record<string, unknown>)[componentPath] as ComponentApi<ComponentPath>
 }
