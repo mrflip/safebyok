@@ -1,6 +1,6 @@
 # Thread 1: vocabulary (2026-10-18)
 
-Branch `20261018-vocabulary`, PR #PRNUM, cut from `origin/main`. Justify: green (core 2118
+Branch `20261018-vocabulary`, PR [#159](https://github.com/mrflip/safebyok/pull/159), cut from `origin/main`. Justify: green (core 2118
 passed, 35 skipped; every package and the demos and e2e green). Documents only.
 
 * **Built**: `VOCABULARY.md` rewritten in the reform's cast, for the tree as it will stand at the
