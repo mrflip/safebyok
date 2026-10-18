@@ -280,7 +280,7 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
   const [gripe, setGripe] = useState<Gripe | null>(null)
   const [startingOver, setStartingOver] = useState(false)
   // While a retire runs, so that a second press never starts another.
-  const [erasing, setErasing] = useState(false)
+  const [retiring, setRetiring] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
   const fieldRef = useRef<HTMLInputElement>(null)
   // Asked after each await: a dialog gone meanwhile -- its host took it away, another vault
@@ -324,7 +324,7 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
   }
 
   const startOver = async () => {
-    setErasing(true)
+    setRetiring(true)
     setGripe(null)
     try {
       await vault.retire()
@@ -337,7 +337,7 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
       if (isVaultError(err, 'stale_write')) { setStartingOver(false) }
       meet(err)
     } finally {
-      if (isMounted()) { setErasing(false) }
+      if (isMounted()) { setRetiring(false) }
     }
   }
 
@@ -381,7 +381,7 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
         {askingStartOver
           ? (
             <div className="row" key="start-over">
-              <button type="button" disabled={erasing} onClick={() => { void startOver() }}>{Messages.startOverConfirm}</button>
+              <button type="button" disabled={retiring} onClick={() => { void startOver() }}>{Messages.startOverConfirm}</button>
               {/* eslint-disable-next-line jsx-a11y/no-autofocus -- the button that held focus is gone; it moves to the choice that loses nothing */}
               <button type="button" autoFocus onClick={() => { setStartingOver(false); setGripe(null) }}>{Messages.startOverBack}</button>
             </div>

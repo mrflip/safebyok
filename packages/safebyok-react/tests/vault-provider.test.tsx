@@ -1097,24 +1097,24 @@ describe("VaultProvider", () => {
 
       it("does nothing for an openError that is not damaged_vault", async () => {
         const world = makeWorld()
-        const erasing = vi.spyOn(world.vaultDB, 'retireDamagedVault')
+        const retiring = vi.spyOn(world.vaultDB, 'retireDamagedVault')
         vi.spyOn(world.vaultDB, 'readVaultProps').mockRejectedValueOnce(unreachable())
         const { Grab, latest } = grabber()
         render(<VaultProvider {...world.props} userId="u1"><Grab /><Probe /></VaultProvider>)
         await expectShown('open error: storage_unavailable')
         await act(async () => { await latest().retireDamagedVault() })
-        expect(erasing).not.toHaveBeenCalled()
+        expect(retiring).not.toHaveBeenCalled()
         expect(shownState()).to.eq('open error: storage_unavailable')
       })
 
       it("does nothing while the vault is open, however sound", async () => {
         const world = makeWorld()
-        const erasing = vi.spyOn(world.vaultDB, 'retireDamagedVault')
+        const retiring = vi.spyOn(world.vaultDB, 'retireDamagedVault')
         const { Grab, latest } = grabber()
         render(<VaultProvider {...world.props} userId="u1"><Grab /><Probe /></VaultProvider>)
         await expectShown('absent')
         await act(async () => { await latest().retireDamagedVault() })
-        expect(erasing).not.toHaveBeenCalled()
+        expect(retiring).not.toHaveBeenCalled()
         expect(shownState()).to.eq('absent')
       })
 

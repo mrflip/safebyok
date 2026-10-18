@@ -393,9 +393,9 @@ describe("PassphraseModal", () => {
       await vault.lock()
       render(<PassphraseModal vault={vault} allowStartOver onDone={noop} />)
       fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
-      const eraser = await openVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
-      await act(async () => { await eraser.retire() })
-      eraser.close()
+      const retirer = await openVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
+      await act(async () => { await retirer.retire() })
+      retirer.close()
       await screen.findByText('Choose a vault passphrase')
       const maker = await openVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
       await act(async () => { await maker.unlock('another pw') })
@@ -665,24 +665,24 @@ describe("PassphraseModal", () => {
       expect(screen.getByText('Unlock your vault')).to.not.be.null
     })
 
-    const EraseOutcomes = [
+    const RetireOutcomes = [
       [null,                                                                   'a retire that succeeds'],
       [new VaultError('stale_write', 'The vault changed in storage.'),         'a retire refused: the vault changed elsewhere'],
       [new VaultError('storage_unavailable', 'Storage could not be reached.'), 'a retire that meets a condition'],
       [new VaultError('vault_closed', 'This vault handle was closed.'),        'a retire that meets misuse: a closed handle'],
     ] as const
 
-    for (const [refusal, blurb] of EraseOutcomes) {
+    for (const [refusal, blurb] of RetireOutcomes) {
       it(`does nothing with ${blurb}, landing after it unmounted`, async () => {
-        const erasing = TH.held()
+        const retiring = TH.held()
         const heard: boolean[] = []
-        const { reported, unmount } = TH.renderReporting(<PassphraseModal vault={TH.stubVault({ retire: () => erasing.promise })} allowStartOver onDone={(unlocked) => { heard.push(unlocked) }} />)
+        const { reported, unmount } = TH.renderReporting(<PassphraseModal vault={TH.stubVault({ retire: () => retiring.promise })} allowStartOver onDone={(unlocked) => { heard.push(unlocked) }} />)
         fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
         fireEvent.click(screen.getByText('Erase and start over'))
         unmount()
         const updates = TH.watchStateUpdates()
         await act(async () => {
-          if (refusal === null) { erasing.resolve(undefined) } else { erasing.reject(refusal) }
+          if (refusal === null) { retiring.resolve(undefined) } else { retiring.reject(refusal) }
           await TH.wakeupAtNextTick()
         })
         expect(updates.count()).to.eq(0)
