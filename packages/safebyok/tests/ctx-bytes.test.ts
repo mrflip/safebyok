@@ -15,14 +15,14 @@ import * as TH from './test-helpers'
 // A builder inside openVault, or the wayin's own, cannot be called from a test, so each is pinned
 // through the narrowest path that reaches it: the ciphertext it made unwraps or deciphers under a
 // hand-written literal of the bytes expected, and under no other. The literal is the UTF-8 text of
-// the ctx's JSON; the values a vault draws afresh or stamps from its clock (vault_id, revision_id,
+// the ctx's JSON; the values a vault draws afresh or stamps from its clock (vault_id, revision_tok,
 // a salt or credential, a time, the unlock epoch) are interpolated from the record that carries
 // them, so the literal pins the ctx's shape and order, not those values.
 
 const textBytes = (text: string) => new TextEncoder().encode(text)
 
 const scope = TH.scopeOf('u1')
-const identity = TH.bundleOf('u1')
+const identity = TH.vaultPropsOf('u1')
 const stamp = (wayinlabel: string): Wayin.WayinStamp => (
   { wayin_id: `wayin-${wayinlabel}`, wayinlabel, vault_key_epoch: 1, device_id: 'device-one', registered_at: Date.UTC(2026, 9, 15) }
 )
@@ -64,17 +64,17 @@ describe("the ctx builders' output, byte for byte", () => {
       keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest, logger: TH.spyLogger().logger,
     })
     await vault.unlock('pw')
-    await vault.store('anthropic', 'sk-fake')
-    const bundle = (await vaultDB.readBundle(scope))!
+    await vault.storeBox('anthropic', 'sk-fake')
+    const vaultProps = (await vaultDB.readVaultProps(scope))!
     const lockbox = (await vaultDB.readBox(scope, 'anthropic'))!
     const lease = (await deviceDB.readLease(scope))!
-    const box = `"acme","u1","main","${bundle.vault_id}"`
-    const header = `{"boxlabel":"anthropic","registered_at":${String(lockbox.registered_at)},"revision_id":"${lockbox.revision_id}","sidecar_json":"{}","vault_key_epoch":1,"whisper_codec":"json_v1","whisper_schema_version":1,"written_at":${String(lockbox.written_at)}}`
+    const box = `"acme","u1","main","${vaultProps.vault_id}"`
+    const header = `{"boxlabel":"anthropic","registered_at":${String(lockbox.registered_at)},"revision_tok":"${lockbox.revision_tok}","sidecar_json":"{}","vault_key_epoch":1,"whisper_codec":"json_v1","whisper_schema_version":1,"written_at":${String(lockbox.written_at)}}`
     const keyCtx = textBytes(`["safebyok-lockbox-v5",${box},"lockbox_key_wrapped",${header}]`)
     const whisperCtx = textBytes(`["safebyok-lockbox-v5",${box},"whisper_ciphered",${header}]`)
     const leaseCtx = textBytes(`["safebyok-lease-v1",${box},${String(lease.unlock_epoch)},${String(lease.ask_passphrase_at)},"vault_key_lease_wrapped"]`)
 
-    const { sessionKey } = await Wayin.openWithPassphrase(TH.testDeriver, 'pw', scope, bundle)
+    const { sessionKey } = await Wayin.openWithPassphrase(TH.testDeriver, 'pw', scope, vaultProps)
     const lockboxKey = await unwrapKeyUnder(sessionKey, lockbox.lockbox_key_wrapped, keyCtx, { extractable: false, usage: ['decrypt'] })
     expect(new TextDecoder().decode(await decipherBytes(lockboxKey, lockbox.whisper_ciphered, whisperCtx))).to.include('sk-fake')
     expect(await unwrapKeyUnder(lease.lease_key, lease.vault_key_lease_wrapped, leaseCtx, { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)

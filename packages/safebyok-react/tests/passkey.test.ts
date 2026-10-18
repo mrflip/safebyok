@@ -164,7 +164,7 @@ describe("a passkey unlock, end to end", () => {
   it("createPasskey's answer adds a way in, and askPasskey's opens the vault on another device", async () => {
     install()
     const { vault, open } = await vaultInMemory()
-    await vault.store('anthropic', 'sk-fake')
+    await vault.storeBox('anthropic', 'sk-fake')
     const wayinId = await vault.addPasskey('pw', () => createPasskey(passkeyOpts), { wayinlabel: 'laptop' })
     if (wayinId === null) { throw new Error('the fake authenticator made no passkey') }
 
@@ -173,6 +173,6 @@ describe("a passkey unlock, end to end", () => {
     const asked = await askPasskey(elsewhere.getSnapshot().wayins)
     if (asked === null) { throw new Error('the fake authenticator gave no answer') }
     await elsewhere.unlock(asked)
-    expect(await elsewhere.read('anthropic')).to.eq('sk-fake')
+    expect(await elsewhere.readBox('anthropic')).to.eq('sk-fake')
   })
 })

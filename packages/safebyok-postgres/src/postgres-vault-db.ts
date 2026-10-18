@@ -1,7 +1,7 @@
 import { Refusals, VaultDB, VaultError, VaultScope } from 'safebyok'
-import type { BundleExpectation, VaultDBOpts, EraseExpectation, Lockbox, LockboxExpectation, StoredLockbox, VaultBundle } from 'safebyok'
+import type { VaultPropsExpectation, VaultDBOpts, RetireExpectation, Lockbox, LockboxExpectation, StoredLockbox, VaultProps } from 'safebyok'
 import * as Columns from './columns'
-import { BundleColumns, ListedLockboxColumns, LockboxColumns } from './columns'
+import { VaultPropsColumns, ListedLockboxColumns, LockboxColumns } from './columns'
 import { VaultChangeChannel } from './vault-tables'
 
 /**
@@ -66,10 +66,10 @@ export type PostgresVaultDBOpts = VaultDBOpts & {
  *   signed in, and that vault locks itself.
  * * **Every write is one statement**, atomic as Postgres makes every statement: a write lands only
  *   while what it expects still stands, and a failed expectation refuses with kind `stale_write`,
- *   as does a bundle update that does not move its `unlock_epoch` forward.
- *   A lockbox write reads its vault's bundle row `FOR SHARE`, so it lands only while that bundle
- *   stands for the vaultKey the lockbox was sealed under: a bundle update waits for it to end, or
- *   it for the update, and lockbox writes never wait for each other on the bundle.
+ *   as does an update of the vault props that does not move their `unlock_epoch` forward.
+ *   A lockbox write reads its vault row `FOR SHARE`, so it lands only while those vault props
+ *   stand for the vaultKey the lockbox was sealed under: an update of the vault props waits for it
+ *   to end, or it for the update, and lockbox writes never wait for each other on the vault row.
  * * **A full vault**: a new lockbox in a vault already holding `maxLockboxes` refuses with kind
  *   `vault_full`, and the refused write stored nothing. The check is a best effort, made in the
  *   statement that inserts, by counting the vault's lockboxes as of that statement's start, with
@@ -96,7 +96,7 @@ export type PostgresVaultDBOpts = VaultDBOpts & {
  *
  * @example
  *   const vaultDB = postgresVaultDB({ client: pool, userId: session.userId })
- *   await vaultDB.readBundle({ applabel: 'acme', user_id: session.userId, vaultlabel: 'main' })
+ *   await vaultDB.readVaultProps({ applabel: 'acme', user_id: session.userId, vaultlabel: 'main' })
  * @example
  *   const vaultDB = postgresVaultDB({ client: pool, userId: session.userId, maxLockboxes: 250 })
  */
@@ -128,62 +128,62 @@ const isPostgresClient = (client: unknown): client is PostgresClient => (
 
 // Every statement names its vault by these three parameters, first.
 const ScopeIs = 'applabel = $1::text AND user_id = $2::text AND vaultlabel = $3::text'
-const BundleParamCount = BundleColumns.length
+const VaultPropsParamCount = VaultPropsColumns.length
 // A lockbox write's parameters: the scope, then $4 the expected vault_id, $5 the expected
-// vault_key_epoch, $6 the expected revision_id (a replace) or the lockbox limit (an insert), and
+// vault_key_epoch, $6 the expected revision_tok (a replace) or the lockbox limit (an insert), and
 // the lockbox's own columns from $7.
 const LockboxParamsFrom = 7
 
-const ReadBundleSql = `SELECT ${Columns.selected(BundleColumns)} FROM safebyok_bundles WHERE ${ScopeIs}`
+const ReadVaultPropsSql = `SELECT ${Columns.selected(VaultPropsColumns)} FROM safebyok_vaults WHERE ${ScopeIs}`
 
-// Another device's bundle may land between this statement's start and its insert: DO NOTHING
-// would then return no row, so a no-op update instead returns the bundle that stands. Nothing
+// Another device's vault props may land between this statement's start and its insert: DO NOTHING
+// would then return no row, so a no-op update instead returns the vault props that stand. Nothing
 // changes, so a notify trigger, if the host installed one, tells no one.
-const CreateBundleSql = `INSERT INTO safebyok_bundles (${Columns.names(BundleColumns)})
-  VALUES (${Columns.placeholders(BundleColumns, 1)})
-  ON CONFLICT (applabel, user_id, vaultlabel) DO UPDATE SET format = safebyok_bundles.format
-  RETURNING ${Columns.selected(BundleColumns)}`
+const FetchOrCreateVaultPropsSql = `INSERT INTO safebyok_vaults (${Columns.names(VaultPropsColumns)})
+  VALUES (${Columns.placeholders(VaultPropsColumns, 1)})
+  ON CONFLICT (applabel, user_id, vaultlabel) DO UPDATE SET format = safebyok_vaults.format
+  RETURNING ${Columns.selected(VaultPropsColumns)}`
 
-// The bundle written must name the vault it replaces, as a vault_id never changes, and move its
-// unlock_epoch forward, as every update does (line 3.2): a modified client cannot write a bundle
-// back over the one it read.
-const UpdateBundleSql = `UPDATE safebyok_bundles SET (${Columns.names(BundleColumns)}) = ROW(${Columns.placeholders(BundleColumns, 1)})
+// The vault props written must name the vault they replace, as a vault_id never changes, and move
+// their unlock_epoch forward, as every update does (line 3.2): a modified client cannot write vault
+// props back over those it read.
+const UpdateVaultPropsSql = `UPDATE safebyok_vaults SET (${Columns.names(VaultPropsColumns)}) = ROW(${Columns.placeholders(VaultPropsColumns, 1)})
   WHERE ${ScopeIs}
-    AND vault_id = $${String(BundleParamCount + 1)}::text AND unlock_epoch = $${String(BundleParamCount + 2)}::bigint
-    AND vault_id = ${Columns.placeholderOf(BundleColumns, 'vault_id', 1)}
-    AND unlock_epoch < ${Columns.placeholderOf(BundleColumns, 'unlock_epoch', 1)}
+    AND vault_id = $${String(VaultPropsParamCount + 1)}::text AND unlock_epoch = $${String(VaultPropsParamCount + 2)}::bigint
+    AND vault_id = ${Columns.placeholderOf(VaultPropsColumns, 'vault_id', 1)}
+    AND unlock_epoch < ${Columns.placeholderOf(VaultPropsColumns, 'unlock_epoch', 1)}
   RETURNING 1 AS landed`
 
 const ReadBoxSql = `SELECT ${Columns.selected(LockboxColumns)} FROM safebyok_lockboxes WHERE ${ScopeIs} AND boxlabel = $4::text`
 
 const ListBoxesSql = `SELECT ${Columns.selected(ListedLockboxColumns)} FROM safebyok_lockboxes WHERE ${ScopeIs}`
 
-// The bundle a lockbox write lands beside: the vault's, of the expected vault_id, standing for the
-// vaultKey the lockbox was sealed under (line 3.8). It is read FOR SHARE, so a bundle update -- a
-// rotation replacing the vaultKey -- waits until the write's statement ends, or the write waits
-// for it, and then reads the bundle as it stands: the vault_key_epoch compared is the one standing
-// when the write lands, never only the one in the statement's snapshot. Lockbox writers share the
-// lock, so they never wait on each other for the bundle (two writes to one boxlabel still meet at
-// its row, or at the unique index).
-const ExpectedVaultSql = `SELECT applabel, user_id, vaultlabel, vault_id FROM safebyok_bundles
+// The vault row a lockbox write lands beside: the vault's, of the expected vault_id, standing for
+// the vaultKey the lockbox was sealed under (line 3.8). It is read FOR SHARE, so an update of the
+// vault props -- a rotation replacing the vaultKey -- waits until the write's statement ends, or the
+// write waits for it, and then reads the vault props as they stand: the vault_key_epoch compared is
+// the one standing when the write lands, never only the one in the statement's snapshot. Lockbox
+// writers share the lock, so they never wait on each other for the vault row (two writes to one
+// boxlabel still meet at its row, or at the unique index).
+const ExpectedVaultSql = `SELECT applabel, user_id, vaultlabel, vault_id FROM safebyok_vaults
     WHERE ${ScopeIs} AND vault_id = $4::text AND vault_key_epoch = $5::bigint
     FOR SHARE`
 
-// A first lockbox under its boxlabel: inserted only beside the bundle it expects, only where no
+// A first lockbox under its boxlabel: inserted only beside the vault props it expects, only where no
 // lockbox stands, and only while the vault holds fewer than $6 lockboxes -- or, for a null $6, no
 // limit, when nothing is counted: Postgres runs the count, an uncorrelated subquery, only when the
-// CASE asks for it. It answers one row that
-// says why it did or did not land: whether it landed, whether the bundle it expects stood, whether
-// the boxlabel was already taken, and whether the vault was already at its limit.
+// CASE asks for it. It answers one row that says why it did or did not land: whether it landed,
+// whether the vault props it expects stood, whether the boxlabel was already taken, and whether
+// the vault was already at its limit.
 //
 // Nothing is counted in advance: the limit is the count of the vault's lockboxes at the start of
 // this statement, a best effort. Under READ COMMITTED, Postgres's default, writers racing for the
 // last places each count from their own snapshot, may each find room, and all land: the vault goes
 // a few past its limit (by at most one less than the number of racers), which the contract allows,
 // and a refused write inserted nothing, since the refusal is the WHERE of one atomic statement. A
-// vault erased after the statement began is met by the bundle's FOR SHARE read, which finds it
-// gone, or by the foreign key, which reads the bundle that stands now: that failure is caught as a
-// stale writer (see insertBox), and no lockbox ever lands in a vault but its own.
+// vault retired after the statement began is met by the vault row's FOR SHARE read, which finds it
+// gone, or by the foreign key, which reads the vault row that stands now: that failure is caught as
+// a stale writer (see insertBox), and no lockbox ever lands in a vault but its own.
 const InsertBoxSql = `WITH vault AS (
     ${ExpectedVaultSql}
   ), counted AS (
@@ -200,25 +200,25 @@ const InsertBoxSql = `WITH vault AS (
          EXISTS (SELECT 1 FROM safebyok_lockboxes WHERE ${ScopeIs} AND boxlabel = ${Columns.placeholderOf(LockboxColumns, 'boxlabel', LockboxParamsFrom)}) AS box_stood,
          COALESCE((SELECT standing FROM counted) >= $6::bigint, false) AS was_full`
 
-// A lockbox over the revision read, beside the bundle it expects.
+// A lockbox over the revision read, beside the vault props it expects.
 const ReplaceBoxSql = `WITH vault AS (
     ${ExpectedVaultSql}
   )
   UPDATE safebyok_lockboxes SET (${Columns.names(LockboxColumns)}) = ROW(${Columns.placeholders(LockboxColumns, LockboxParamsFrom)})
-  WHERE ${ScopeIs} AND vault_id = $4::text AND revision_id = $6::text
+  WHERE ${ScopeIs} AND vault_id = $4::text AND revision_tok = $6::text
     AND boxlabel = ${Columns.placeholderOf(LockboxColumns, 'boxlabel', LockboxParamsFrom)}
     AND EXISTS (SELECT 1 FROM vault)
   RETURNING 1 AS landed`
 
-// Lands while the bundle of that vault_id stands, whether or not there was a lockbox to erase.
-const EraseBoxSql = `WITH erased AS (
+// Lands while the vault props of that vault_id stand, whether or not there was a lockbox to retire.
+const RetireBoxSql = `WITH erased AS (
     DELETE FROM safebyok_lockboxes WHERE ${ScopeIs} AND boxlabel = $4::text AND vault_id = $5::text
-      AND EXISTS (SELECT 1 FROM safebyok_bundles WHERE ${ScopeIs} AND vault_id = $5::text)
+      AND EXISTS (SELECT 1 FROM safebyok_vaults WHERE ${ScopeIs} AND vault_id = $5::text)
   )
-  SELECT 1 AS landed FROM safebyok_bundles WHERE ${ScopeIs} AND vault_id = $5::text`
+  SELECT 1 AS landed FROM safebyok_vaults WHERE ${ScopeIs} AND vault_id = $5::text`
 
-// The lockboxes go with their bundle, by the foreign key's cascade, in the same statement.
-const EraseVaultSql = `DELETE FROM safebyok_bundles WHERE ${ScopeIs} AND vault_id = $4::text RETURNING 1 AS landed`
+// The lockboxes go with their vault props, by the foreign key's cascade, in the same statement.
+const RetireVaultSql = `DELETE FROM safebyok_vaults WHERE ${ScopeIs} AND vault_id = $4::text RETURNING 1 AS landed`
 
 // ------------------------------------------------------------------------------------ the adapter
 
@@ -246,22 +246,22 @@ class TablesVaultDB extends VaultDB {
     this.maxLockboxes = maxLockboxes
   }
 
-  protected async doReadBundle(scope: VaultScope): Promise<unknown> {
+  protected async doReadVaultProps(scope: VaultScope): Promise<unknown> {
     this.mustReach(scope)
-    const { rows } = await this.client.query(ReadBundleSql, scopeParams(scope))
-    return rows.length === 0 ? null : Columns.recordOf(rows[0], BundleColumns)
+    const { rows } = await this.client.query(ReadVaultPropsSql, scopeParams(scope))
+    return rows.length === 0 ? null : Columns.recordOf(rows[0], VaultPropsColumns)
   }
 
-  protected async doCreateBundle(bundle: VaultBundle): Promise<unknown> {
-    this.mustReach(bundle)
-    const { rows } = await this.client.query(CreateBundleSql, Columns.paramsOf(bundle, BundleColumns))
-    return Columns.recordOf(rows[0], BundleColumns)
+  protected async doFetchOrCreateVaultProps(vaultProps: VaultProps): Promise<unknown> {
+    this.mustReach(vaultProps)
+    const { rows } = await this.client.query(FetchOrCreateVaultPropsSql, Columns.paramsOf(vaultProps, VaultPropsColumns))
+    return Columns.recordOf(rows[0], VaultPropsColumns)
   }
 
-  protected async doUpdateBundle(bundle: VaultBundle, expected: BundleExpectation): Promise<boolean> {
-    this.mustReach(bundle)
-    const params = [...Columns.paramsOf(bundle, BundleColumns), expected.vault_id, expected.unlock_epoch]
-    return landed(await this.client.query(UpdateBundleSql, params))
+  protected async doUpdateVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<boolean> {
+    this.mustReach(vaultProps)
+    const params = [...Columns.paramsOf(vaultProps, VaultPropsColumns), expected.vault_id, expected.unlock_epoch]
+    return landed(await this.client.query(UpdateVaultPropsSql, params))
   }
 
   protected async doReadBox(scope: VaultScope, boxlabel: string): Promise<unknown> {
@@ -280,8 +280,8 @@ class TablesVaultDB extends VaultDB {
   protected async doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<boolean> {
     this.mustReach(scope)
     const boxParams = Columns.paramsOf(lockbox, LockboxColumns)
-    if (expected.revision_id !== null) {
-      const params = [...scopeParams(scope), expected.vault_id, expected.vault_key_epoch, expected.revision_id, ...boxParams]
+    if (expected.revision_tok !== null) {
+      const params = [...scopeParams(scope), expected.vault_id, expected.vault_key_epoch, expected.revision_tok, ...boxParams]
       return landed(await this.client.query(ReplaceBoxSql, params))
     }
     const outcome = await this.insertBox([...scopeParams(scope), expected.vault_id, expected.vault_key_epoch, this.maxLockboxes === Infinity ? null : this.maxLockboxes, ...boxParams])
@@ -297,8 +297,8 @@ class TablesVaultDB extends VaultDB {
   }
 
   // Runs InsertBoxSql and reads its one row; null for the one failure that is only a stale writer:
-  // its vault erased between the statement's snapshot and the foreign key's check, which reads the
-  // bundle as it stands then.
+  // its vault retired between the statement's snapshot and the foreign key's check, which reads the
+  // vault row as it stands then.
   private async insertBox(params: unknown[]): Promise<InsertBoxOutcome | null> {
     try {
       const { rows } = await this.client.query(InsertBoxSql, params)
@@ -309,14 +309,14 @@ class TablesVaultDB extends VaultDB {
     }
   }
 
-  protected async doEraseBox(scope: VaultScope, boxlabel: string, expected: EraseExpectation): Promise<boolean> {
+  protected async doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation): Promise<boolean> {
     this.mustReach(scope)
-    return landed(await this.client.query(EraseBoxSql, [...scopeParams(scope), boxlabel, expected.vault_id]))
+    return landed(await this.client.query(RetireBoxSql, [...scopeParams(scope), boxlabel, expected.vault_id]))
   }
 
-  protected async doEraseVault(scope: VaultScope, expected: EraseExpectation): Promise<boolean> {
+  protected async doRetireVault(scope: VaultScope, expected: RetireExpectation): Promise<boolean> {
     this.mustReach(scope)
-    return landed(await this.client.query(EraseVaultSql, [...scopeParams(scope), expected.vault_id]))
+    return landed(await this.client.query(RetireVaultSql, [...scopeParams(scope), expected.vault_id]))
   }
 
   protected override doSubscribe(scope: VaultScope, onChange: () => void): () => void {

@@ -1,10 +1,10 @@
-import type { Lockbox, VaultBundle } from 'safebyok'
+import type { Lockbox, VaultProps } from 'safebyok'
 
 /**
  * How one field is stored: `text` as given, `bigint` for a whole number (a time, an epoch), and
- * `jsonb` for an opaque structured value -- a Ciphered, a bundle's prior vaultKey, or its list of
- * wayins -- whose ctx safebyok rebuilds from field values, so jsonb's reordering of
- * keys is harmless. A lockbox's `sidecar_json` is `text`: its exact text is what is bound.
+ * `jsonb` for an opaque structured value -- a Ciphered, the vault props' prior vaultKey, or their
+ * list of wayins -- whose ctx safebyok rebuilds from field values, so jsonb's reordering of keys is
+ * harmless. A lockbox's `sidecar_json` is `text`: its exact text is what is bound.
  */
 export type ColumnKind = 'text' | 'bigint' | 'jsonb'
 
@@ -26,10 +26,10 @@ function everyFieldOf<RecordT>() {
 }
 
 /**
- * Every field of a VaultBundle, in `safebyok_bundles`'s order: the one place, beside
- * vault-tables.sql, that names the bundle's columns. The compiler holds it to the bundle's shape.
+ * Every field of a VaultProps, in `safebyok_vaults`'s order: the one place, beside
+ * vault-tables.sql, that names the vault props' columns. The compiler holds it to their shape.
  */
-export const BundleColumns = everyFieldOf<VaultBundle>()([
+export const VaultPropsColumns = everyFieldOf<VaultProps>()([
   ['applabel',         'text'],
   ['user_id',          'text'],
   ['vaultlabel',       'text'],
@@ -50,7 +50,7 @@ export const BundleColumns = everyFieldOf<VaultBundle>()([
 export const LockboxColumns = everyFieldOf<Lockbox>()([
   ['format',                 'text'],
   ['boxlabel',               'text'],
-  ['revision_id',            'text'],
+  ['revision_tok',           'text'],
   ['vault_key_epoch',        'bigint'],
   ['lockbox_key_wrapped',    'jsonb'],
   ['whisper_ciphered',       'jsonb'],
@@ -110,8 +110,8 @@ export const selected = (columns: readonly Column[]): string => columns.map(([fi
 
 /**
  * The record's values for its columns, in their order, as {@link placeholders} numbers them: a
- * jsonb value as its JSON text, and a field the record leaves out (a bundle with no prior vaultKey)
- * as null.
+ * jsonb value as its JSON text, and a field the record leaves out (the prior vaultKey of vault
+ * props that hold none) as null.
  *
  * @example paramsOf({ vault_id: 'v1', prior_vault_key: undefined }, [['vault_id', 'text'], ['prior_vault_key', 'jsonb']])  // ['v1', null]
  */

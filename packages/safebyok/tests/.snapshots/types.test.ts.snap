@@ -110,7 +110,7 @@ exports[`Stored record formats > safebyok-lockbox-v5 1`] = `
       "minimum": 347155200000,
       "type": "integer",
     },
-    "revision_id": {
+    "revision_tok": {
       "minLength": 1,
       "type": "string",
     },
@@ -157,7 +157,7 @@ exports[`Stored record formats > safebyok-lockbox-v5 1`] = `
   "required": [
     "format",
     "boxlabel",
-    "revision_id",
+    "revision_tok",
     "vault_key_epoch",
     "lockbox_key_wrapped",
     "whisper_ciphered",

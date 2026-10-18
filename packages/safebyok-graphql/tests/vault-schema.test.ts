@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildSchema, getNamedType, isInputObjectType, isListType, isNonNullType, isObjectType, parse, validate } from 'graphql'
 import type { GraphQLInputField, GraphQLField } from 'graphql'
-import { Ciphered, Lockbox, VaultBundle, VaultScope } from 'safebyok'
+import { Ciphered, Lockbox, VaultProps, VaultScope } from 'safebyok'
 import { VaultSchemaSdl } from '../src/vault-schema'
 import { VaultOperations } from '../src/graphql-vault-db'
 
@@ -15,8 +15,8 @@ type RecordSchema = { shape: Record<string, { _zod: { optin?: string } }> }
 const RecordTypes = [
   ['SafebyokVaultScope',         VaultScope,  []],
   ['SafebyokVaultScopeInput',    VaultScope,  []],
-  ['SafebyokVaultBundle',        VaultBundle, []],
-  ['SafebyokVaultBundleInput',   VaultBundle, []],
+  ['SafebyokVaultProps',         VaultProps, []],
+  ['SafebyokVaultPropsInput',    VaultProps, []],
   ['SafebyokLockbox',            Lockbox,     []],
   ['SafebyokLockboxInput',       Lockbox,     []],
   ['SafebyokListedLockbox',      Lockbox,     ['lockbox_key_wrapped', 'whisper_ciphered']],
@@ -53,8 +53,8 @@ describe("VaultSchemaSdl", () => {
     })
   }
 
-  it("carries a bundle's wayins as a list, each one opaque JSON", () => {
-    for (const typename of ['SafebyokVaultBundle', 'SafebyokVaultBundleInput']) {
+  it("carries the vault props' wayins as a list, each one opaque JSON", () => {
+    for (const typename of ['SafebyokVaultProps', 'SafebyokVaultPropsInput']) {
       const wayins = fieldsOf(typename)['wayins']!.type
       expect(isNonNullType(wayins) && isListType(wayins.ofType)).to.be.true
       expect(getNamedType(wayins).name).to.eq('SafebyokWayin')
@@ -62,9 +62,9 @@ describe("VaultSchemaSdl", () => {
   })
 
   it("names one root field for each VaultDB verb a browser's vault calls, and one subscription", () => {
-    expect(Object.keys(schema.getQueryType()!.getFields())).to.have.members(['safebyokReadBundle', 'safebyokReadBox', 'safebyokListBoxes'])
+    expect(Object.keys(schema.getQueryType()!.getFields())).to.have.members(['safebyokReadVaultProps', 'safebyokReadBox', 'safebyokListBoxes'])
     expect(Object.keys(schema.getMutationType()!.getFields())).to.have.members([
-      'safebyokCreateBundle', 'safebyokUpdateBundle', 'safebyokUpdateBox', 'safebyokEraseBox', 'safebyokEraseVault',
+      'safebyokFetchOrCreateVaultProps', 'safebyokUpdateVaultProps', 'safebyokUpdateBox', 'safebyokRetireBox', 'safebyokRetireVault',
     ])
     expect(Object.keys(schema.getSubscriptionType()!.getFields())).to.have.members(['safebyokVaultChanged'])
   })

@@ -2,7 +2,7 @@ import { v } from 'convex/values'
 
 /**
  * Convex validators for safebyok's stored records, field for field with the core's Zod records
- * (`Lockbox`, `VaultBundle`, `Ciphered`, `VaultScope` in `safebyok`). They check what Convex can:
+ * (`Lockbox`, `VaultProps`, `Ciphered`, `VaultScope` in `safebyok`). They check what Convex can:
  * which fields, their types, which are optional, and each record's `format`. Every name, and a
  * lockbox's sidecar, is any text here: the floor beneath every name (well-formed, NFC, no
  * control characters, 1 KiB) and that the sidecar is JSON are the core's records' to hold, and what text each may be beyond it
@@ -35,8 +35,8 @@ export const VaultScope = v.object({
   vaultlabel: v.string(),
 })
 
-/** The formats of a VaultBundle this package stores. */
-export const VaultBundleFormat = v.union(v.literal('safebyok-vault-v3'))
+/** The VaultProps formats this package stores. */
+export const VaultPropsFormat = v.union(v.literal('safebyok-vault-v3'))
 
 /** The formats of a Lockbox this package stores. */
 export const LockboxFormat = v.union(v.literal('safebyok-lockbox-v5'))
@@ -88,7 +88,7 @@ export const PasskeyWayin = v.object({
 export const Wayin = v.union(PassphraseWayin, PasskeyWayin)
 
 /**
- * The vaultKey before a bundle's own, wrapped under its own, at its `vault_key_epoch`: absent
+ * The vaultKey before the vault's own, wrapped under its own, at its `vault_key_epoch`: absent
  * until a vault's vaultKey is first replaced.
  */
 export const PriorVaultKey = v.object({
@@ -97,14 +97,14 @@ export const PriorVaultKey = v.object({
 })
 
 /**
- * A vault's bundle: its scope, `vault_id`, `unlock_epoch`, which vaultKey its ways in wrap
+ * A vault's props: its scope, `vault_id`, `unlock_epoch`, which vaultKey its ways in wrap
  * (`vault_key_epoch`, and the one before as `prior_vault_key`), its ways in (`wayins`, each the
  * vaultKey wrapped under a wayinKey one kind of wayin makes), and when it was made (`registered_at`, epoch
  * milliseconds). Nothing in it opens without a passphrase or passkey. How many ways in, and that no two
  * share an id or label, are the client's rules.
  */
-export const VaultBundle = v.object({
-  format:           VaultBundleFormat,
+export const VaultProps = v.object({
+  format:           VaultPropsFormat,
   applabel:         v.string(),
   user_id:          v.string(),
   vaultlabel:       v.string(),
@@ -126,7 +126,7 @@ export const VaultBundle = v.object({
 export const Lockbox = v.object({
   format:                 LockboxFormat,
   boxlabel:               v.string(),
-  revision_id:            v.string(),
+  revision_tok:           v.string(),
   vault_key_epoch:        v.number(),
   lockbox_key_wrapped:    Ciphered,
   whisper_ciphered:       Ciphered,
@@ -144,51 +144,51 @@ export const Lockbox = v.object({
 export const ListedLockbox = Lockbox.omit('lockbox_key_wrapped', 'whisper_ciphered')
 
 /**
- * What a bundle update was proven against: it lands only while the standing bundle still has
- * this `vault_id` and `unlock_epoch`.
+ * What an update of the vault props was proven against: it lands only while the vault props
+ * standing still have this `vault_id` and `unlock_epoch`.
  *
  * @example { vault_id: standing.vault_id, unlock_epoch: standing.unlock_epoch }
  */
-export const BundleExpectation = v.object({
+export const VaultPropsExpectation = v.object({
   vault_id:         v.string(),
   unlock_epoch:     v.number(),
 })
 
 /**
- * What a lockbox update was written for and read: it lands only while the scope's bundle has this
- * `vault_id`, and the standing lockbox this `revision_id` -- or, for null, there is no lockbox. Its
- * `vault_key_epoch` names the vaultKey the lockbox was sealed under.
+ * What a lockbox update was written for and read: it lands only while the scope's vault props
+ * have this `vault_id`, and the standing lockbox this `revision_tok` -- or, for null, there is no
+ * lockbox. Its `vault_key_epoch` names the vaultKey the lockbox was sealed under.
  *
- * @example { vault_id: bundle.vault_id, revision_id: null, vault_key_epoch: bundle.vault_key_epoch }   // a box that was not there
+ * @example { vault_id: vaultProps.vault_id, revision_tok: null, vault_key_epoch: vaultProps.vault_key_epoch } // a box that was not there
  */
 export const LockboxExpectation = v.object({
   vault_id:        v.string(),
-  revision_id:     v.nullable(v.string()),
+  revision_tok:    v.nullable(v.string()),
   vault_key_epoch: v.number(),
 })
 
 /**
- * What an erase was meant for: the vault it lands in. An erase lands only while the scope's
- * bundle has this `vault_id`, whatever revision any lockbox stands at -- so a stale session
- * never erases from a vault made anew elsewhere.
+ * What a retire was meant for: the vault it lands in. A retire lands only while the scope's
+ * vault props have this `vault_id`, whatever revision any lockbox stands at -- so a stale session
+ * never retires anything from a vault made anew elsewhere.
  *
- * @example { vault_id: bundle.vault_id }
+ * @example { vault_id: vaultProps.vault_id }
  */
-export const EraseExpectation = v.object({
+export const RetireExpectation = v.object({
   vault_id: v.string(),
 })
 
 /**
- * One lockbox's place in a {@link VaultSignature}: `[boxlabel, revision_id]`. Convex has no
+ * One lockbox's place in a {@link VaultSignature}: `[boxlabel, revision_tok]`. Convex has no
  * fixed-length tuple validator, so any list of strings passes: the component makes these, and a
  * client only compares one signature with the next.
  */
 const BoxRevision = v.array(v.string())
 
 /**
- * The vault's change signature: its bundle's `vault_id` and `unlock_epoch` (null while it has
- * no bundle) and each lockbox's `[boxlabel, revision_id]`, in boxlabel order. It changes exactly
- * when a write lands in the vault, and holds nothing a listing does not already show.
+ * The vault's change signature: its vault props' `vault_id` and `unlock_epoch` (null while it has
+ * no vault props) and each lockbox's `[boxlabel, revision_tok]`, in boxlabel order. It changes
+ * exactly when a write lands in the vault, and holds nothing a listing does not already show.
  *
  * @example { vault_id: 'b3f1...', unlock_epoch: 2, boxes: [['anthropic_api_key', '9c4e...']] }
  */

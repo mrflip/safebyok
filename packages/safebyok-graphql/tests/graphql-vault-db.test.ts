@@ -116,9 +116,9 @@ describe("graphqlVaultDB, a server's lockbox limit", () => {
     const schema = TH.schemaOver(db, ({ userId }) => postgresVaultDB({ client: db, userId, maxLockboxes: 1 }))
     // A browser declaring more than its server holds: the server holds the line.
     const vaultDB = graphqlVaultDB({ client: TH.urqlClientFor(schema, 'u1'), maxLockboxes: Infinity })
-    await vaultDB.createBundle(TH.bundleOf('u1'))
-    await vaultDB.updateBox(u1, TH.boxOf('openai', 'sk-fake-one'), { vault_id: 'vault-id-u1', revision_id: null, vault_key_epoch: 1 })
-    const refusal = await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('secret_project_x', 'sk-fake-two'), { vault_id: 'vault-id-u1', revision_id: null, vault_key_epoch: 1 }), 'vault_full')
+    await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
+    await vaultDB.updateBox(u1, TH.boxOf('openai', 'sk-fake-one'), { vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 1 })
+    const refusal = await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('secret_project_x', 'sk-fake-two'), { vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 1 }), 'vault_full')
     expect(refusal).to.be.instanceOf(VaultError)
     expect(refusal.message).to.include('1 lockboxes')
     expect(refusal.message).to.not.include('secret_project_x')
@@ -142,16 +142,16 @@ describe("graphqlVaultDB, as the README has it", () => {
     const opened = () => vaultIn(schema)
     const first = await opened()
     await first.unlock('correct horse battery staple')
-    await first.store('anthropic_api_key', 'sk-ant-test-not-a-real-key', { sidecar: { note: 'work account' } })
-    await first.store('openai_api_key', { apiKey: 'sk-test-not-a-real-key', orgId: null })
+    await first.storeBox('anthropic_api_key', 'sk-ant-test-not-a-real-key', { sidecar: { note: 'work account' } })
+    await first.storeBox('openai_api_key', { apiKey: 'sk-test-not-a-real-key', orgId: null })
     first.close()
 
     const second = await opened()
     await second.unlock('correct horse battery staple')
-    expect(await second.read('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
-    expect(await second.read('openai_api_key')).to.deep.equal({ apiKey: 'sk-test-not-a-real-key', orgId: null })
+    expect(await second.readBox('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
+    expect(await second.readBox('openai_api_key')).to.deep.equal({ apiKey: 'sk-test-not-a-real-key', orgId: null })
     expect(second.getSnapshot().boxes.map((box) => box.damaged ? null : box.sidecar)).to.deep.equal([{ note: 'work account' }, {}])
-    await second.erase('openai_api_key')
+    await second.retireBox('openai_api_key')
     expect(second.getSnapshot().boxes.map((box) => box.boxlabel)).to.deep.equal(['anthropic_api_key'])
     second.close()
   })
@@ -159,27 +159,27 @@ describe("graphqlVaultDB, as the README has it", () => {
   it("never lets the Client's cache answer: a read after another device's write sees it", async () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
     const browser = TH.browserFor(schema, 'u1')
-    expect(await browser.readBundle(u1)).to.be.null
-    await TH.browserFor(schema, 'u1').createBundle(TH.bundleOf('u1'))
-    expect(await browser.readBundle(u1)).to.deep.equal(TH.bundleOf('u1'))
+    expect(await browser.readVaultProps(u1)).to.be.null
+    await TH.browserFor(schema, 'u1').fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
+    expect(await browser.readVaultProps(u1)).to.deep.equal(TH.vaultPropsOf('u1'))
   })
 })
 
 describe("graphqlVaultDB, carrying a passkey's way in", () => {
-  it("stores a bundle holding a passkey wayin and reads it back exactly, with no change to the schema", async () => {
+  it("stores vault props holding a passkey wayin and reads them back exactly, with no change to the schema", async () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
-    const withPasskey = TH.bundleOf('u1', { wayins: [TH.wayinOf('passphrase'), TH.passkeyWayinOf('laptop')] })
-    await TH.browserFor(schema, 'u1').createBundle(withPasskey)
-    expect(await TH.browserFor(schema, 'u1').readBundle(u1)).to.deep.equal(withPasskey)
+    const withPasskey = TH.vaultPropsOf('u1', { wayins: [TH.wayinOf('passphrase'), TH.passkeyWayinOf('laptop')] })
+    await TH.browserFor(schema, 'u1').fetchOrCreateVaultProps(withPasskey)
+    expect(await TH.browserFor(schema, 'u1').readVaultProps(u1)).to.deep.equal(withPasskey)
   })
 
-  it("lets a real vault add a passkey through it, a bundle update, and unlock it on another device with that passkey alone", async () => {
+  it("lets a real vault add a passkey through it, an update of its props, and unlock it on another device with that passkey alone", async () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
     const opened = () => vaultIn(schema)
     const laptop = await TH.passkeyOf('laptop')
     const first = await opened()
     await first.unlock('correct horse battery staple')
-    await first.store('anthropic_api_key', 'sk-ant-test-not-a-real-key')
+    await first.storeBox('anthropic_api_key', 'sk-ant-test-not-a-real-key')
     const wayinId = await first.addPasskey('correct horse battery staple', () => Promise.resolve(laptop), { wayinlabel: 'laptop' })
     first.close()
 
@@ -188,7 +188,7 @@ describe("graphqlVaultDB, carrying a passkey's way in", () => {
       wayinkind: 'passkey', wayin_id: wayinId, wayinlabel: 'laptop', credential_id: laptop.credentialId, prf_salt_b64: laptop.prfSaltB64,
     })
     await second.unlock(laptop)
-    expect(await second.read('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
+    expect(await second.readBox('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
     second.close()
   })
 })
@@ -196,7 +196,7 @@ describe("graphqlVaultDB, carrying a passkey's way in", () => {
 describe("graphqlVaultDB, its refusals", () => {
   it("carries the server's refusal across as the same VaultError, kind and message", async () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
-    const notMine = await TH.expectRefusal(TH.browserFor(schema, 'u1').readBundle(TH.scopeOf('u2')), 'identity_revoked')
+    const notMine = await TH.expectRefusal(TH.browserFor(schema, 'u1').readVaultProps(TH.scopeOf('u2')), 'identity_revoked')
     expect(notMine.message).to.eq('This vault belongs to another user than the one signed in: a signed-in user reaches only their own vaults. If the user changed, open the vault for the new one.')
     expect(notMine.cause).to.be.undefined
   })
@@ -204,7 +204,7 @@ describe("graphqlVaultDB, its refusals", () => {
   it("refuses with storage_unavailable when the database is down, never saying what the driver said", async () => {
     const dbDown = new Error('password authentication failed for user "vault_owner"')
     const schema = TH.schemaOver(await TH.database(), ({ userId }) => postgresVaultDB({ client: TH.failingClient(dbDown), userId }))
-    const refusal = await TH.expectRefusal(TH.browserFor(schema, 'u1').readBundle(u1), 'storage_unavailable')
+    const refusal = await TH.expectRefusal(TH.browserFor(schema, 'u1').readVaultProps(u1), 'storage_unavailable')
     expect(refusal.message).to.not.include('vault_owner')
     expect(JSON.stringify(refusal)).to.not.include('vault_owner')
   })
@@ -212,19 +212,19 @@ describe("graphqlVaultDB, its refusals", () => {
   it("refuses with storage_unavailable, urql's error its cause, when the server does not serve the vault's schema", async () => {
     const schema = buildSchema('type Query { hello: String }')
     const vaultDB = graphqlVaultDB({ client: new Client({ url: 'https://app.example.test/api/graphql', exchanges: [executeExchange({ schema })] }) })
-    const refusal = await TH.expectRefusal(vaultDB.readBundle(u1), 'storage_unavailable')
+    const refusal = await TH.expectRefusal(vaultDB.readVaultProps(u1), 'storage_unavailable')
     expect(refusal.cause).to.be.instanceOf(CombinedError)
   })
 
   it("refuses with storage_unavailable when the network fails", async () => {
     const vaultDB = graphqlVaultDB({ client: new Client({ url: 'https://app.example.test/api/graphql', exchanges: [fetchExchange], fetch: offline }) })
-    await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('openai', 'r1'), { vault_id: 'vault-id-u1', revision_id: null, vault_key_epoch: 1 }), 'storage_unavailable')
+    await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('openai', 'r1'), { vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 1 }), 'storage_unavailable')
   })
 
   it("refuses with storage_unavailable an answer holding neither data nor an error", async () => {
     const answered = { toPromise: () => Promise.resolve({ data: undefined }) }
     const mute = { query: () => answered, mutation: () => answered, subscription: () => answered }
-    await TH.expectRefusal(graphqlVaultDB({ client: mute as unknown as GraphqlVaultClient }).readBundle(u1), 'storage_unavailable')
+    await TH.expectRefusal(graphqlVaultDB({ client: mute as unknown as GraphqlVaultClient }).readVaultProps(u1), 'storage_unavailable')
   })
 
   for (const code of ['BAD_USER_INPUT', 'GRAPHQL_VALIDATION_FAILED']) {
@@ -232,7 +232,7 @@ describe("graphqlVaultDB, its refusals", () => {
       const quoting = new GraphQLError('Variable "$lockbox" got invalid value "sk-ant-not-a-real-key"', { extensions: { code } })
       const answered = { toPromise: () => Promise.resolve({ error: new CombinedError({ graphQLErrors: [quoting] }) }) }
       const strict = { query: () => answered, mutation: () => answered, subscription: () => answered }
-      const refusal = await TH.expectRefusal(graphqlVaultDB({ client: strict as unknown as GraphqlVaultClient }).readBundle(u1), 'bad_option')
+      const refusal = await TH.expectRefusal(graphqlVaultDB({ client: strict as unknown as GraphqlVaultClient }).readVaultProps(u1), 'bad_option')
       expect(refusal.message).to.include('VaultSchemaSdl')
       expect(refusal.cause).to.be.undefined
       expect(JSON.stringify(Object.assign({}, refusal, { message: refusal.message }))).to.not.include('sk-ant')
@@ -244,14 +244,14 @@ describe("graphqlVaultDB, its refusals", () => {
     const revoked = new GraphQLError('No one is signed in, so this vault cannot be reached: sign in, then try again.', { extensions: { kind: 'identity_revoked' } })
     const answered = { toPromise: () => Promise.resolve({ error: new CombinedError({ graphQLErrors: [misuse, revoked] }) }) }
     const both = { query: () => answered, mutation: () => answered, subscription: () => answered }
-    await TH.expectRefusal(graphqlVaultDB({ client: both as unknown as GraphqlVaultClient }).readBundle(u1), 'identity_revoked')
+    await TH.expectRefusal(graphqlVaultDB({ client: both as unknown as GraphqlVaultClient }).readVaultProps(u1), 'identity_revoked')
   })
 
   it("passes over a GraphQL error whose kind is not a VaultError's", async () => {
-    const schema = buildSchema('type Query { safebyokReadBundle(scope: SafebyokVaultScopeInput!): Boolean } input SafebyokVaultScopeInput { applabel: String!, user_id: String!, vaultlabel: String! }')
-    const rootValue = { safebyokReadBundle: () => Promise.reject(Object.assign(new Error('no such kind'), { extensions: { kind: 'made_up' } })) }
+    const schema = buildSchema('type Query { safebyokReadVaultProps(scope: SafebyokVaultScopeInput!): Boolean } input SafebyokVaultScopeInput { applabel: String!, user_id: String!, vaultlabel: String! }')
+    const rootValue = { safebyokReadVaultProps: () => Promise.reject(Object.assign(new Error('no such kind'), { extensions: { kind: 'made_up' } })) }
     const vaultDB = graphqlVaultDB({ client: new Client({ url: 'https://app.example.test/api/graphql', exchanges: [executeExchange({ schema, rootValue })] }) })
-    await TH.expectRefusal(vaultDB.readBundle(u1), 'storage_unavailable')
+    await TH.expectRefusal(vaultDB.readVaultProps(u1), 'storage_unavailable')
   })
 })
 
@@ -259,12 +259,12 @@ describe("graphqlVaultDB, hearing other writes", () => {
   it("hears another device's write to its vault, and stops when unsubscribed", async () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
     const elsewhere = TH.browserFor(schema, 'u1')
-    await elsewhere.createBundle(TH.bundleOf('u1'))
+    await elsewhere.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
     const { heard, unsubscribe } = await TH.liveWatch(TH.browserFor(schema, 'u1'), u1)
-    await elsewhere.updateBox(u1, TH.boxOf('openai', 'r1'), { ...thisVault, revision_id: null, vault_key_epoch: 1 })
+    await elsewhere.updateBox(u1, TH.boxOf('openai', 'r1'), { ...thisVault, revision_tok: null, vault_key_epoch: 1 })
     await TH.eventually(() => heard.count === 1)
     unsubscribe()
-    await elsewhere.eraseBox(u1, 'openai', thisVault)
+    await elsewhere.retireBox(u1, 'openai', thisVault)
     await TH.aWhile()
     expect(heard.count).to.eq(1)
   })
@@ -272,8 +272,8 @@ describe("graphqlVaultDB, hearing other writes", () => {
   it("hears nothing of another vault's writes", async () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
     const { heard, unsubscribe } = await TH.liveWatch(TH.browserFor(schema, 'u1'), u1)
-    await TH.browserFor(schema, 'u2').createBundle(TH.bundleOf('u2'))
-    await TH.browserFor(schema, 'u1').createBundle(TH.bundleOf('u1', { vaultlabel: 'spare' }))
+    await TH.browserFor(schema, 'u2').fetchOrCreateVaultProps(TH.vaultPropsOf('u2'))
+    await TH.browserFor(schema, 'u1').fetchOrCreateVaultProps(TH.vaultPropsOf('u1', { vaultlabel: 'spare' }))
     await TH.aWhile()
     expect(heard.count).to.eq(0)
     unsubscribe()
@@ -284,7 +284,7 @@ describe("graphqlVaultDB, hearing other writes", () => {
     const { heard, onChange } = TH.changeCounter()
     const spy = TH.spyLogger()
     const unsubscribe = TH.browserFor(schema, 'u1', { logger: spy.logger }).subscribe(TH.scopeOf('u2'), onChange)
-    await TH.browserFor(schema, 'u2').createBundle(TH.bundleOf('u2'))
+    await TH.browserFor(schema, 'u2').fetchOrCreateVaultProps(TH.vaultPropsOf('u2'))
     await TH.aWhile()
     expect(heard.count).to.eq(1)
     expect(spy.calls.map((call) => [call.level, call.story])).to.deep.equal([['warn', { call: 'subscribe' }]])

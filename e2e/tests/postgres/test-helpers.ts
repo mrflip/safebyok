@@ -4,7 +4,7 @@ import type { PoolConfig } from 'pg'
 import { VaultChangeChannel, VaultNotifySql, VaultTablesSql, postgresVaultDB } from 'safebyok-postgres'
 import type { PostgresListen } from 'safebyok-postgres'
 import type { VaultDBOpts } from 'safebyok'
-import { boxOf, bundleOf, noBoxYet, perUser, scopeOf, throughTurnstile } from 'safebyok/testing'
+import { boxOf, vaultPropsOf, noBoxYet, perUser, scopeOf, throughTurnstile } from 'safebyok/testing'
 import type { MakeVaultDBDevices, Turnstile, VaultDBVerbs } from 'safebyok/testing'
 
 // Everything the core's tests use too, so a test here star-imports this one module as TH.
@@ -144,7 +144,7 @@ export const useFileDatabase = (): (() => FileDatabase) => {
         devices.push({ end: () => client.end() })
         return client
       },
-      empty:      async () => { await host.query('TRUNCATE safebyok_lockboxes, safebyok_bundles') },
+      empty:      async () => { await host.query('TRUNCATE safebyok_lockboxes, safebyok_vaults') },
       endDevices: async () => { await Promise.all(devices.splice(0).map((device) => device.end())) },
     }
   }, 60_000)
@@ -265,9 +265,9 @@ export const untilStatementBlocked = async (db: FileDatabase, statementLike: str
 /** The `LIKE` pattern of the statement a first write to a vault sends: an insert of a lockbox. */
 export const FirstWriteStatement = '%INSERT INTO safebyok_lockboxes%'
 
-/** Makes the u1 vault the helpers' bundles stand for, through `vaultDB`, and writes a lockbox under each of `boxlabels`. */
+/** Makes the u1 vault the helpers' vault props stand for, through `vaultDB`, and writes a lockbox under each of `boxlabels`. */
 export const filled = async (vaultDB: VaultDBVerbs, boxlabels: readonly string[]): Promise<void> => {
-  await vaultDB.createBundle(bundleOf('u1'))
+  await vaultDB.fetchOrCreateVaultProps(vaultPropsOf('u1'))
   for (const boxlabel of boxlabels) { await vaultDB.updateBox(scopeOf('u1'), boxOf(boxlabel, `sk-fake-${boxlabel}`), noBoxYet) }
 }
 
@@ -279,7 +279,7 @@ export const filled = async (vaultDB: VaultDBVerbs, boxlabels: readonly string[]
  */
 export const insertRawBox = async (client: Client, boxlabel: string, like: string): Promise<void> => {
   await client.query('CREATE TEMP TABLE raw_box ON COMMIT DROP AS SELECT * FROM safebyok_lockboxes WHERE boxlabel = $1', [like])
-  await client.query("UPDATE raw_box SET boxlabel = $1, revision_id = 'rev-raw'", [boxlabel])
+  await client.query("UPDATE raw_box SET boxlabel = $1, revision_tok = 'rev-raw'", [boxlabel])
   await client.query('INSERT INTO safebyok_lockboxes SELECT * FROM raw_box')
 }
 

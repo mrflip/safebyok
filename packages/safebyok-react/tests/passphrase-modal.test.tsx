@@ -23,7 +23,7 @@ const wordingOf = (relative: string | null, creating: boolean) => {
 const lockedVault = async () => {
   const vault = await openVault(TH.memoryVaultOpts())
   await vault.unlock('pw')
-  await vault.store('anthropic_api_key', 'sk-fake')
+  await vault.storeBox('anthropic_api_key', 'sk-fake')
   await vault.lock()
   return vault
 }
@@ -328,7 +328,7 @@ describe("PassphraseModal", () => {
       expect(screen.queryByText('Forgot it? Start a new vault')).to.be.null
     })
 
-    it("asks first, and keeping the vault goes back to the passphrase, erasing nothing", async () => {
+    it("asks first, and keeping the vault goes back to the passphrase, retiring nothing", async () => {
       const vault = await lockedVault()
       render(<PassphraseModal vault={vault} allowStartOver onDone={noop} />)
       fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
@@ -341,7 +341,7 @@ describe("PassphraseModal", () => {
       vault.close()
     })
 
-    it("erases the vault once confirmed, and asks the user to choose a passphrase for a new one", async () => {
+    it("retires the vault once confirmed, and asks the user to choose a passphrase for a new one", async () => {
       const vault = await lockedVault()
       const heard: boolean[] = []
       render(<PassphraseModal vault={vault} allowStartOver onDone={(unlocked) => { heard.push(unlocked) }} />)
@@ -356,37 +356,37 @@ describe("PassphraseModal", () => {
       vault.close()
     })
 
-    it("shows a condition the erase meets in place, to try again", async () => {
-      const destroy = vi.fn().mockRejectedValue(new VaultError('storage_unavailable', 'Storage could not be reached; try again in a moment.'))
-      render(<PassphraseModal vault={TH.stubVault({ destroy })} allowStartOver onDone={noop} />)
+    it("shows a condition the retire meets in place, to try again", async () => {
+      const retire = vi.fn().mockRejectedValue(new VaultError('storage_unavailable', 'Storage could not be reached; try again in a moment.'))
+      render(<PassphraseModal vault={TH.stubVault({ retire })} allowStartOver onDone={noop} />)
       fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
       fireEvent.click(screen.getByText('Erase and start over'))
       await screen.findByText('Storage could not be reached; try again in a moment.')
       expect(screen.getByText('Erase and start over')).to.have.property('disabled', false)
     })
 
-    it("erases once for a double press, taking no second press while the erase runs", () => {
-      const destroy = vi.fn(() => new Promise<void>(() => { /* still erasing */ }))
-      render(<PassphraseModal vault={TH.stubVault({ destroy })} allowStartOver onDone={noop} />)
+    it("retires once for a double press, taking no second press while the retire runs", () => {
+      const retire = vi.fn(() => new Promise<void>(() => { /* still retiring */ }))
+      render(<PassphraseModal vault={TH.stubVault({ retire })} allowStartOver onDone={noop} />)
       fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
       fireEvent.click(screen.getByText('Erase and start over'))
       fireEvent.click(screen.getByText('Erase and start over'))
-      expect(destroy).toHaveBeenCalledOnce()
+      expect(retire).toHaveBeenCalledOnce()
       expect(screen.getByText('Erase and start over')).to.have.property('disabled', true)
     })
 
-    it("asks afresh once the vault it was asked of changed elsewhere, rather than erasing the one that stands", async () => {
-      const destroy = vi.fn().mockRejectedValue(new VaultError('stale_write', 'The vault changed in storage since this device read it.'))
-      render(<PassphraseModal vault={TH.stubVault({ destroy })} allowStartOver onDone={noop} />)
+    it("asks afresh once the vault it was asked of changed elsewhere, rather than retiring the one that stands", async () => {
+      const retire = vi.fn().mockRejectedValue(new VaultError('stale_write', 'The vault changed in storage since this device read it.'))
+      render(<PassphraseModal vault={TH.stubVault({ retire })} allowStartOver onDone={noop} />)
       fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
       fireEvent.click(screen.getByText('Erase and start over'))
       await screen.findByText('The vault changed in storage since this device read it.')
       expect(screen.queryByText('Erase and start over')).to.be.null
       expect(screen.queryByPlaceholderText('vault passphrase')).to.not.be.null
-      expect(destroy).toHaveBeenCalledOnce()
+      expect(retire).toHaveBeenCalledOnce()
     })
 
-    it("drops the question once the vault is erased elsewhere, and never asks it of a vault made after", async () => {
+    it("drops the question once the vault is retired elsewhere, and never asks it of a vault made after", async () => {
       const opts = TH.memoryVaultOpts()
       const vault = await openVault(opts)
       await vault.unlock('pw')
@@ -394,7 +394,7 @@ describe("PassphraseModal", () => {
       render(<PassphraseModal vault={vault} allowStartOver onDone={noop} />)
       fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
       const eraser = await openVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
-      await act(async () => { await eraser.destroy() })
+      await act(async () => { await eraser.retire() })
       eraser.close()
       await screen.findByText('Choose a vault passphrase')
       const maker = await openVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
@@ -566,7 +566,7 @@ describe("PassphraseModal", () => {
       expect(adviceRegion().textContent).to.eq('said of fast')
     })
 
-    it("forgets what it said once the vault is made and erased elsewhere, and an answer still on its way with it", async () => {
+    it("forgets what it said once the vault is made and retired elsewhere, and an answer still on its way with it", async () => {
       const opts = TH.memoryVaultOpts()
       const vault = await openVault(opts)
       const gate = TH.makeGate()
@@ -582,7 +582,7 @@ describe("PassphraseModal", () => {
       const elsewhere = await openVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
       await act(async () => { await elsewhere.unlock('pw') })
       await screen.findByText('Unlock your vault')
-      await act(async () => { await elsewhere.destroy() })
+      await act(async () => { await elsewhere.retire() })
       elsewhere.close()
       await screen.findByText('Choose a vault passphrase')
       await act(async () => {
@@ -666,17 +666,17 @@ describe("PassphraseModal", () => {
     })
 
     const EraseOutcomes = [
-      [null,                                                                   'an erase that succeeds'],
-      [new VaultError('stale_write', 'The vault changed in storage.'),         'an erase refused: the vault changed elsewhere'],
-      [new VaultError('storage_unavailable', 'Storage could not be reached.'), 'an erase that meets a condition'],
-      [new VaultError('vault_closed', 'This vault handle was closed.'),        'an erase that meets misuse: a closed handle'],
+      [null,                                                                   'a retire that succeeds'],
+      [new VaultError('stale_write', 'The vault changed in storage.'),         'a retire refused: the vault changed elsewhere'],
+      [new VaultError('storage_unavailable', 'Storage could not be reached.'), 'a retire that meets a condition'],
+      [new VaultError('vault_closed', 'This vault handle was closed.'),        'a retire that meets misuse: a closed handle'],
     ] as const
 
     for (const [refusal, blurb] of EraseOutcomes) {
       it(`does nothing with ${blurb}, landing after it unmounted`, async () => {
         const erasing = TH.held()
         const heard: boolean[] = []
-        const { reported, unmount } = TH.renderReporting(<PassphraseModal vault={TH.stubVault({ destroy: () => erasing.promise })} allowStartOver onDone={(unlocked) => { heard.push(unlocked) }} />)
+        const { reported, unmount } = TH.renderReporting(<PassphraseModal vault={TH.stubVault({ retire: () => erasing.promise })} allowStartOver onDone={(unlocked) => { heard.push(unlocked) }} />)
         fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
         fireEvent.click(screen.getByText('Erase and start over'))
         unmount()

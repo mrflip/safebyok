@@ -57,7 +57,7 @@ TH.describeOnPostgres('races', "postgresVaultDB's lockbox limit, over a real Pos
     expect(await device.readBox(u1, 'fifth_in_flight')).to.not.be.null
   })
 
-  it("keeps every lockbox that landed past the limit readable, refuses a new one until erases make room, and then lands it", async () => {
+  it("keeps every lockbox that landed past the limit readable, refuses a new one until retired lockboxes make room, and then lands it", async () => {
     const db = getDb()
     await db.empty()
     const device = TH.deviceOver(db, undefined, { maxLockboxes: Cap })('u1')
@@ -69,9 +69,9 @@ TH.describeOnPostgres('races', "postgresVaultDB's lockbox limit, over a real Pos
     await racer.query('COMMIT')
 
     await TH.expectRefusal(device.updateBox(u1, TH.boxOf('sixth', 'sk-fake'), TH.noBoxYet), 'vault_full')
-    await device.eraseBox(u1, 'one', TH.thisVault)
+    await device.retireBox(u1, 'one', TH.thisVault)
     await TH.expectRefusal(device.updateBox(u1, TH.boxOf('sixth', 'sk-fake'), TH.noBoxYet), 'vault_full')
-    await device.eraseBox(u1, 'two', TH.thisVault)
+    await device.retireBox(u1, 'two', TH.thisVault)
     await device.updateBox(u1, TH.boxOf('sixth', 'sk-fake'), TH.noBoxYet)
     expect(await TH.lockboxesStanding(db)).to.eq(Cap)
   })

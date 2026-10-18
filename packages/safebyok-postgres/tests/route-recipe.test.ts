@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Client } from 'pg'
 import { VaultDB, VaultError, VaultErrorKindVals, memoryDeviceDB, openVault } from 'safebyok'
-import type { BundleExpectation, EraseExpectation, Lockbox, LockboxExpectation, VaultBundle, VaultErrorKind, VaultScope } from 'safebyok'
+import type { VaultPropsExpectation, RetireExpectation, Lockbox, LockboxExpectation, VaultProps, VaultErrorKind, VaultScope } from 'safebyok'
 import * as TH from './test-helpers'
 import { VaultChangeChannel, postgresVaultDB } from '../src/index'
 import type { PostgresClient, PostgresListen } from '../src/index'
@@ -23,14 +23,14 @@ type Served = (vaultDB: VaultDB, args: unknown[]) => Promise<unknown>
  * VaultDB validates.
  */
 const served = new Map<string, Served>([
-  ['readBundle',   (vaultDB, [scope]) => vaultDB.readBundle(scope as VaultScope)],
-  ['createBundle', (vaultDB, [bundle]) => vaultDB.createBundle(bundle as VaultBundle)],
-  ['updateBundle', (vaultDB, [bundle, expected]) => vaultDB.updateBundle(bundle as VaultBundle, expected as BundleExpectation)],
-  ['readBox',      (vaultDB, [scope, boxlabel]) => vaultDB.readBox(scope as VaultScope, boxlabel as string)],
-  ['listBoxes',    (vaultDB, [scope]) => vaultDB.listBoxRecords(scope as VaultScope)],
-  ['updateBox',    (vaultDB, [scope, lockbox, expected]) => vaultDB.updateBox(scope as VaultScope, lockbox as Lockbox, expected as LockboxExpectation)],
-  ['eraseBox',     (vaultDB, [scope, boxlabel, expected]) => vaultDB.eraseBox(scope as VaultScope, boxlabel as string, expected as EraseExpectation)],
-  ['eraseVault',   (vaultDB, [scope, expected]) => vaultDB.eraseVault(scope as VaultScope, expected as EraseExpectation)],
+  ['readVaultProps',          (vaultDB, [scope]) => vaultDB.readVaultProps(scope as VaultScope)],
+  ['fetchOrCreateVaultProps', (vaultDB, [vaultProps]) => vaultDB.fetchOrCreateVaultProps(vaultProps as VaultProps)],
+  ['updateVaultProps',        (vaultDB, [vaultProps, expected]) => vaultDB.updateVaultProps(vaultProps as VaultProps, expected as VaultPropsExpectation)],
+  ['readBox',                 (vaultDB, [scope, boxlabel]) => vaultDB.readBox(scope as VaultScope, boxlabel as string)],
+  ['listBoxes',               (vaultDB, [scope]) => vaultDB.listBoxRecords(scope as VaultScope)],
+  ['updateBox',               (vaultDB, [scope, lockbox, expected]) => vaultDB.updateBox(scope as VaultScope, lockbox as Lockbox, expected as LockboxExpectation)],
+  ['retireBox',               (vaultDB, [scope, boxlabel, expected]) => vaultDB.retireBox(scope as VaultScope, boxlabel as string, expected as RetireExpectation)],
+  ['retireVault',             (vaultDB, [scope, expected]) => vaultDB.retireVault(scope as VaultScope, expected as RetireExpectation)],
 ])
 
 /** What a request posts: its verb and arguments, or nothing when its body is not a JSON object. */
@@ -84,10 +84,10 @@ class RouteVaultDB extends VaultDB {
     this.fetcher = fetcher
   }
 
-  protected doReadBundle(scope: VaultScope) { return this.call('readBundle', scope) }
-  protected doCreateBundle(bundle: VaultBundle) { return this.call('createBundle', bundle) }
-  protected async doUpdateBundle(bundle: VaultBundle, expected: BundleExpectation) {
-    await this.call('updateBundle', bundle, expected)
+  protected doReadVaultProps(scope: VaultScope) { return this.call('readVaultProps', scope) }
+  protected doFetchOrCreateVaultProps(vaultProps: VaultProps) { return this.call('fetchOrCreateVaultProps', vaultProps) }
+  protected async doUpdateVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation) {
+    await this.call('updateVaultProps', vaultProps, expected)
     return true
   }
   protected doReadBox(scope: VaultScope, boxlabel: string) { return this.call('readBox', scope, boxlabel) }
@@ -99,12 +99,12 @@ class RouteVaultDB extends VaultDB {
     await this.call('updateBox', scope, lockbox, expected)
     return true
   }
-  protected async doEraseBox(scope: VaultScope, boxlabel: string, expected: EraseExpectation) {
-    await this.call('eraseBox', scope, boxlabel, expected)
+  protected async doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation) {
+    await this.call('retireBox', scope, boxlabel, expected)
     return true
   }
-  protected async doEraseVault(scope: VaultScope, expected: EraseExpectation) {
-    await this.call('eraseVault', scope, expected)
+  protected async doRetireVault(scope: VaultScope, expected: RetireExpectation) {
+    await this.call('retireVault', scope, expected)
     return true
   }
 
@@ -187,8 +187,8 @@ describe("the README route recipe", () => {
       applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: browserFor(route, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest,
     })
     await vault.unlock('correct horse battery staple')
-    await vault.store('anthropic_api_key', 'sk-ant-test-not-a-real-key')
-    expect(await vault.read('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
+    await vault.storeBox('anthropic_api_key', 'sk-ant-test-not-a-real-key')
+    expect(await vault.readBox('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
     vault.close()
   })
 
@@ -199,34 +199,34 @@ describe("the README route recipe", () => {
     const opts = { applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: sessionedBrowser(route, session), deviceDB, keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest, logger: TH.spyLogger().logger }
     const vault = await openVault(opts)
     await vault.unlock('correct horse battery staple')
-    await vault.store('anthropic_api_key', 'sk-ant-test-not-a-real-key')
+    await vault.storeBox('anthropic_api_key', 'sk-ant-test-not-a-real-key')
     session.userId = null
-    await TH.expectRefusal(vault.read('anthropic_api_key'), 'identity_revoked')
+    await TH.expectRefusal(vault.readBox('anthropic_api_key'), 'identity_revoked')
     expect(vault.getSnapshot().state).to.eq('locked')
     expect(await deviceDB.readLease(TH.scopeOf('u1'))).to.be.null
     // Signed in again: the same passphrase opens what was stored.
     session.userId = 'u1'
     await vault.unlock('correct horse battery staple')
-    expect(await vault.read('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
+    expect(await vault.readBox('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
     vault.close()
   })
 
   it("answers 400 to anything but a vault verb, a malformed body among them, and the client says so as storage_unavailable", async () => {
     const route = await routeOver()
-    for (const body of [{ verb: 'subscribe', args: [] }, { verb: 'constructor', args: [] }, { verb: 'readBundle', args: 'nope' }, null, 42]) {
+    for (const body of [{ verb: 'subscribe', args: [] }, { verb: 'constructor', args: [] }, { verb: 'readVaultProps', args: 'nope' }, null, 42]) {
       const response = await route(postOf(body))
       expect(response.status).to.eq(400)
     }
-    const notJson = await route(new Request(`https://app.example.test${VaultRouteUrl}`, { method: 'POST', body: '{"verb": "readBundle", ' }))
+    const notJson = await route(new Request(`https://app.example.test${VaultRouteUrl}`, { method: 'POST', body: '{"verb": "readVaultProps", ' }))
     expect(notJson.status).to.eq(400)
     const broken = new RouteVaultDB(() => Promise.resolve(Response.json({}, { status: 502 })))
-    await TH.expectRefusal(broken.readBundle(TH.scopeOf('u1')), 'storage_unavailable')
+    await TH.expectRefusal(broken.readVaultProps(TH.scopeOf('u1')), 'storage_unavailable')
   })
 
   it("never sends the driver's own error to the browser", async () => {
     const dbDown = new Error('password authentication failed for user "vault_owner"')
     const route = vaultRoute(TH.failingClient(dbDown), () => Promise.resolve('u1'))
-    const response = await route(postOf({ verb: 'readBundle', args: [TH.scopeOf('u1')] }))
+    const response = await route(postOf({ verb: 'readVaultProps', args: [TH.scopeOf('u1')] }))
     const sent = await response.text()
     expect(sent).to.include('storage_unavailable')
     expect(sent).to.not.include('vault_owner')

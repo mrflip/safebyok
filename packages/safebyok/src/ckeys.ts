@@ -22,11 +22,11 @@ import type { VaultScope } from './types'
 export const Delimiter = '^'
 
 /**
- * The ckey of `scope`'s bundle.
+ * The ckey of `scope`'s vault props.
  *
- * @example bundle(scope)  // 'vault^acme^u1^main'
+ * @example vaultProps(scope) // 'vault^acme^u1^main'
  */
-export const bundle = (scope: VaultScope): string => join([['kind', 'vault'], ...scopeParts(scope)])
+export const vaultProps = (scope: VaultScope): string => join([['kind', 'vault'], ...scopeParts(scope)])
 
 /**
  * The ckey of the lockbox under `boxlabel` in `scope`.

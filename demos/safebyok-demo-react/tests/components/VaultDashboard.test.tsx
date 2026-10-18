@@ -52,26 +52,26 @@ describe("VaultDashboard, opening", () => {
 
   it("says a damaged vault record can't be opened, and offers no Retry", async () => {
     const world = TH.makeWorld()
-    vi.spyOn(world.vaultDB, 'readBundle').mockRejectedValue(new VaultError('corrupt_record', 'The stored vault failed its checks.'))
+    vi.spyOn(world.vaultDB, 'readVaultProps').mockRejectedValue(new VaultError('corrupt_record', 'The stored vault failed its checks.'))
     world.renderInVault(<VaultDashboard />)
     await screen.findByText(/stored record is damaged/)
     expect(screen.queryByRole('button', { name: 'Retry' })).to.be.null
   })
 })
 
-/** A world whose `u1` vault has had its stored bundle spoiled, over a store the test can read. */
+/** A world whose `u1` vault has had its stored props spoiled, over a store the test can read. */
 const damagedWorld = async () => {
   const store = memoryStore()
   const world = TH.makeWorld({ vaultDB: localVaultDB({ store }) })
   await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
-  const bundleCkey = Ckeys.bundle(TH.scopeOf('u1'))
-  const bundle = JSON.parse(store.read(bundleCkey) ?? 'null') as object
-  store.write(bundleCkey, JSON.stringify({ ...bundle, unlock_epoch: 'one' }))
+  const vaultPropsCkey = Ckeys.vaultProps(TH.scopeOf('u1'))
+  const vaultProps = JSON.parse(store.read(vaultPropsCkey) ?? 'null') as object
+  store.write(vaultPropsCkey, JSON.stringify({ ...vaultProps, unlock_epoch: 'one' }))
   return { store, world }
 }
 
 describe("VaultDashboard, a vault stored damaged", () => {
-  it("erases it and opens a fresh one, once the user confirms", async () => {
+  it("retires it and opens a fresh one, once the user confirms", async () => {
     const { store, world } = await damagedWorld()
     const confirming = vi.spyOn(globalThis, 'confirm').mockReturnValue(false)
     world.renderInVault(<VaultDashboard />)
@@ -84,9 +84,9 @@ describe("VaultDashboard, a vault stored damaged", () => {
     expect(store.ckeys()).to.deep.equal([])
   })
 
-  it("says why the erase failed, and keeps offering it", async () => {
+  it("says why retiring it failed, and keeps offering it", async () => {
     const { world } = await damagedWorld()
-    vi.spyOn(world.vaultDB, 'eraseDamagedVault').mockRejectedValueOnce(new VaultError('storage_unavailable', 'The vault storage could not be reached: try again shortly.'))
+    vi.spyOn(world.vaultDB, 'retireDamagedVault').mockRejectedValueOnce(new VaultError('storage_unavailable', 'The vault storage could not be reached: try again shortly.'))
     vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
     world.renderInVault(<VaultDashboard />)
     fireEvent.click(await screen.findByRole('button', { name: 'Erase and start over' }))
@@ -108,7 +108,7 @@ describe("VaultDashboard, its lockboxes", () => {
     expect(within(rowOf('anthropic_api_key')).getByText('work account')).to.not.be.null
     expect(within(rowOf('anthropic_api_key')).queryByText('sk-ant-test-not-a-real-key')).to.be.null
     const vault = await world.openUnlocked()
-    expect(await vault.read('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
+    expect(await vault.readBox('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
   })
 
   it("keeps a whisper typed as JSON its type", async () => {
@@ -120,7 +120,7 @@ describe("VaultDashboard, its lockboxes", () => {
     await TH.answerPassphraseDialog()
     await screen.findByText('openai_api_key')
     const vault = await world.openUnlocked()
-    expect(await vault.read('openai_api_key')).to.deep.equal({ apiKey: 'sk-test-not-a-real-key', orgId: null })
+    expect(await vault.readBox('openai_api_key')).to.deep.equal({ apiKey: 'sk-test-not-a-real-key', orgId: null })
   })
 
   it("shows a refused store in the form, and keeps the form open", async () => {
@@ -179,7 +179,7 @@ describe("VaultDashboard, its lockboxes", () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => { expect(within(rowOf('anthropic_api_key')).queryByText('rotated')).to.not.be.null })
     const vault = await world.openUnlocked()
-    expect(await vault.read('anthropic_api_key')).to.eq('sk-ant-test-replaced')
+    expect(await vault.readBox('anthropic_api_key')).to.eq('sk-ant-test-replaced')
     expect(vault.getSnapshot().boxes[0]).to.deep.include({ sidecar: { note: 'rotated' } })
   })
 
@@ -197,7 +197,7 @@ describe("VaultDashboard, its lockboxes", () => {
     await waitFor(() => { expect(screen.queryByRole('button', { name: 'Save' })).to.be.null })
     expect(within(rowOf('anthropic_api_key')).getByText('work account')).to.not.be.null
     const vault = await world.openUnlocked()
-    expect(await vault.read('anthropic_api_key')).to.eq('sk-ant-test-replaced')
+    expect(await vault.readBox('anthropic_api_key')).to.eq('sk-ant-test-replaced')
   })
 
   it("deletes a lockbox once the user confirms, and keeps it when they don't", async () => {
@@ -215,7 +215,7 @@ describe("VaultDashboard, its lockboxes", () => {
     expect(screen.getByText('anthropic_api_key')).to.not.be.null
   })
 
-  it("deletes a lockbox erased elsewhere while it asked for the passphrase as deleted, quietly", async () => {
+  it("deletes a lockbox retired elsewhere while it asked for the passphrase as deleted, quietly", async () => {
     const world = TH.makeWorld()
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key', openai_api_key: 'sk-test-not-a-real-key' })
     world.renderInVault(<VaultDashboard />)
@@ -224,7 +224,7 @@ describe("VaultDashboard, its lockboxes", () => {
     fireEvent.click(within(rowOf('openai_api_key')).getByRole('button', { name: 'delete' }))
     await screen.findByPlaceholderText('vault passphrase')
     const elsewhere = await world.openUnlocked()
-    await elsewhere.erase('openai_api_key')
+    await elsewhere.retireBox('openai_api_key')
     await TH.answerPassphraseDialog()
     await waitFor(() => { expect(screen.queryByText('openai_api_key')).to.be.null })
     await screen.findByText(/🔓 unlocked until/)
@@ -262,7 +262,7 @@ describe("VaultDashboard, its lockboxes", () => {
     await TH.answerPassphraseDialog()
     await screen.findByRole('button', { name: 'view' })
     const vault = await world.openUnlocked()
-    expect(await vault.read('openai_api_key')).to.eq('sk-test-replaced')
+    expect(await vault.readBox('openai_api_key')).to.eq('sk-test-replaced')
   })
 
   it("uses a whisper by whispering it back in the Psst dialog", async () => {

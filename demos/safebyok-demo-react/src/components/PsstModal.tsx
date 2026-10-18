@@ -1,6 +1,6 @@
 /**
  * What the dashboard's "use" button does with a whisper: a real app hands it to an API client
- * inside `vault.use(...)`'s callback (as the knock-knock machine does); this just whispers it
+ * inside `vault.useBox(...)`'s callback (as the knock-knock machine does); this just whispers it
  * back at you.
  */
 export const PsstModal = ({ boxlabel, whisperShown, onClose }: { boxlabel: string, whisperShown: string, onClose: () => void }) => (

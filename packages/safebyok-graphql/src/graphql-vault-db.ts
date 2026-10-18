@@ -1,7 +1,7 @@
 import { Sanitizer, VaultDB, VaultError, VaultErrorKindVals } from 'safebyok'
-import type { BundleExpectation, VaultDBOpts, EraseExpectation, Lockbox, LockboxExpectation, StoredLockbox, VaultBundle, VaultErrorKind, VaultScope } from 'safebyok'
+import type { VaultPropsExpectation, VaultDBOpts, RetireExpectation, Lockbox, LockboxExpectation, StoredLockbox, VaultProps, VaultErrorKind, VaultScope } from 'safebyok'
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
-import { BundleFields, ListedLockboxFields, LockboxFields, ScopeFields, recordOf, selectionOf } from './fields'
+import { VaultPropsFields, ListedLockboxFields, LockboxFields, ScopeFields, recordOf, selectionOf } from './fields'
 
 /**
  * What graphqlVaultDB needs of an urql Client: its three ways to send an operation. The Client
@@ -80,10 +80,10 @@ const isUrqlClient = (client: unknown): client is GraphqlVaultClient => {
 // ---------------------------------------------------------------------------------- the operations
 
 const Scope = '$scope: SafebyokVaultScopeInput!'
-const BundleSelection = selectionOf(BundleFields)
+const VaultPropsSelection = selectionOf(VaultPropsFields)
 
-const ReadBundleDoc = `query SafebyokReadBundle(${Scope}) {
-  safebyokReadBundle(scope: $scope) { ${BundleSelection} }
+const ReadVaultPropsDoc = `query SafebyokReadVaultProps(${Scope}) {
+  safebyokReadVaultProps(scope: $scope) { ${VaultPropsSelection} }
 }`
 const ReadBoxDoc = `query SafebyokReadBox(${Scope}, $boxlabel: String!) {
   safebyokReadBox(scope: $scope, boxlabel: $boxlabel) { ${selectionOf(LockboxFields)} }
@@ -91,20 +91,20 @@ const ReadBoxDoc = `query SafebyokReadBox(${Scope}, $boxlabel: String!) {
 const ListBoxesDoc = `query SafebyokListBoxes(${Scope}) {
   safebyokListBoxes(scope: $scope) { ${selectionOf(ListedLockboxFields)} }
 }`
-const CreateBundleDoc = `mutation SafebyokCreateBundle($bundle: SafebyokVaultBundleInput!) {
-  safebyokCreateBundle(bundle: $bundle) { ${BundleSelection} }
+const FetchOrCreateVaultPropsDoc = `mutation SafebyokFetchOrCreateVaultProps($vaultProps: SafebyokVaultPropsInput!) {
+  safebyokFetchOrCreateVaultProps(vaultProps: $vaultProps) { ${VaultPropsSelection} }
 }`
-const UpdateBundleDoc = `mutation SafebyokUpdateBundle($bundle: SafebyokVaultBundleInput!, $expected: SafebyokBundleExpectationInput!) {
-  safebyokUpdateBundle(bundle: $bundle, expected: $expected)
+const UpdateVaultPropsDoc = `mutation SafebyokUpdateVaultProps($vaultProps: SafebyokVaultPropsInput!, $expected: SafebyokVaultPropsExpectationInput!) {
+  safebyokUpdateVaultProps(vaultProps: $vaultProps, expected: $expected)
 }`
 const UpdateBoxDoc = `mutation SafebyokUpdateBox(${Scope}, $lockbox: SafebyokLockboxInput!, $expected: SafebyokLockboxExpectationInput!) {
   safebyokUpdateBox(scope: $scope, lockbox: $lockbox, expected: $expected)
 }`
-const EraseBoxDoc = `mutation SafebyokEraseBox(${Scope}, $boxlabel: String!, $expected: SafebyokEraseExpectationInput!) {
-  safebyokEraseBox(scope: $scope, boxlabel: $boxlabel, expected: $expected)
+const RetireBoxDoc = `mutation SafebyokRetireBox(${Scope}, $boxlabel: String!, $expected: SafebyokRetireExpectationInput!) {
+  safebyokRetireBox(scope: $scope, boxlabel: $boxlabel, expected: $expected)
 }`
-const EraseVaultDoc = `mutation SafebyokEraseVault(${Scope}, $expected: SafebyokEraseExpectationInput!) {
-  safebyokEraseVault(scope: $scope, expected: $expected)
+const RetireVaultDoc = `mutation SafebyokRetireVault(${Scope}, $expected: SafebyokRetireExpectationInput!) {
+  safebyokRetireVault(scope: $scope, expected: $expected)
 }`
 const VaultChangedDoc = `subscription SafebyokVaultChanged(${Scope}) {
   safebyokVaultChanged(scope: $scope) { ${selectionOf(ScopeFields)} }
@@ -120,15 +120,15 @@ const VaultChangedDoc = `subscription SafebyokVaultChanged(${Scope}) {
  *   for (const document of Object.values(VaultOperations)) { allowlist.register(document) }
  */
 export const VaultOperations = {
-  safebyokReadBundle:   ReadBundleDoc,
-  safebyokReadBox:      ReadBoxDoc,
-  safebyokListBoxes:    ListBoxesDoc,
-  safebyokCreateBundle: CreateBundleDoc,
-  safebyokUpdateBundle: UpdateBundleDoc,
-  safebyokUpdateBox:    UpdateBoxDoc,
-  safebyokEraseBox:     EraseBoxDoc,
-  safebyokEraseVault:   EraseVaultDoc,
-  safebyokVaultChanged: VaultChangedDoc,
+  safebyokReadVaultProps:          ReadVaultPropsDoc,
+  safebyokReadBox:                 ReadBoxDoc,
+  safebyokListBoxes:               ListBoxesDoc,
+  safebyokFetchOrCreateVaultProps: FetchOrCreateVaultPropsDoc,
+  safebyokUpdateVaultProps:        UpdateVaultPropsDoc,
+  safebyokUpdateBox:               UpdateBoxDoc,
+  safebyokRetireBox:               RetireBoxDoc,
+  safebyokRetireVault:             RetireVaultDoc,
+  safebyokVaultChanged:            VaultChangedDoc,
 } as const
 
 // ------------------------------------------------------------------------------------ the adapter
@@ -153,20 +153,20 @@ class UrqlVaultDB extends VaultDB {
     this.maxLockboxes = opts.maxLockboxes
   }
 
-  protected async doReadBundle(scope: VaultScope): Promise<unknown> {
-    const { safebyokReadBundle } = await this.asked(ReadBundleDoc, { scope: scopeOut(scope) })
-    return recordOf(safebyokReadBundle, BundleFields)
+  protected async doReadVaultProps(scope: VaultScope): Promise<unknown> {
+    const { safebyokReadVaultProps } = await this.asked(ReadVaultPropsDoc, { scope: scopeOut(scope) })
+    return recordOf(safebyokReadVaultProps, VaultPropsFields)
   }
 
-  protected async doCreateBundle(bundle: VaultBundle): Promise<unknown> {
-    const { safebyokCreateBundle } = await this.told(CreateBundleDoc, { bundle: recordOf(bundle, BundleFields) })
-    return recordOf(safebyokCreateBundle, BundleFields)
+  protected async doFetchOrCreateVaultProps(vaultProps: VaultProps): Promise<unknown> {
+    const { safebyokFetchOrCreateVaultProps } = await this.told(FetchOrCreateVaultPropsDoc, { vaultProps: recordOf(vaultProps, VaultPropsFields) })
+    return recordOf(safebyokFetchOrCreateVaultProps, VaultPropsFields)
   }
 
   // A stale write refuses on the server and crosses as its kind, so a write that answers landed.
-  protected async doUpdateBundle(bundle: VaultBundle, expected: BundleExpectation): Promise<boolean> {
+  protected async doUpdateVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<boolean> {
     const { vault_id, unlock_epoch } = expected
-    await this.told(UpdateBundleDoc, { bundle: recordOf(bundle, BundleFields), expected: { vault_id, unlock_epoch } })
+    await this.told(UpdateVaultPropsDoc, { vaultProps: recordOf(vaultProps, VaultPropsFields), expected: { vault_id, unlock_epoch } })
     return true
   }
 
@@ -185,18 +185,18 @@ class UrqlVaultDB extends VaultDB {
   }
 
   protected async doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<boolean> {
-    const { vault_id, revision_id, vault_key_epoch } = expected
-    await this.told(UpdateBoxDoc, { scope: scopeOut(scope), lockbox: recordOf(lockbox, LockboxFields), expected: { vault_id, revision_id, vault_key_epoch } })
+    const { vault_id, revision_tok, vault_key_epoch } = expected
+    await this.told(UpdateBoxDoc, { scope: scopeOut(scope), lockbox: recordOf(lockbox, LockboxFields), expected: { vault_id, revision_tok, vault_key_epoch } })
     return true
   }
 
-  protected async doEraseBox(scope: VaultScope, boxlabel: string, expected: EraseExpectation): Promise<boolean> {
-    await this.told(EraseBoxDoc, { scope: scopeOut(scope), boxlabel, expected: { vault_id: expected.vault_id } })
+  protected async doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation): Promise<boolean> {
+    await this.told(RetireBoxDoc, { scope: scopeOut(scope), boxlabel, expected: { vault_id: expected.vault_id } })
     return true
   }
 
-  protected async doEraseVault(scope: VaultScope, expected: EraseExpectation): Promise<boolean> {
-    await this.told(EraseVaultDoc, { scope: scopeOut(scope), expected: { vault_id: expected.vault_id } })
+  protected async doRetireVault(scope: VaultScope, expected: RetireExpectation): Promise<boolean> {
+    await this.told(RetireVaultDoc, { scope: scopeOut(scope), expected: { vault_id: expected.vault_id } })
     return true
   }
 

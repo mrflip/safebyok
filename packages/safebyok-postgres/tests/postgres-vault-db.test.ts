@@ -46,7 +46,7 @@ describe("postgresVaultDB's devices, for the battery's races", () => {
 
 const u1 = TH.scopeOf('u1')
 const thisVault = { vault_id: 'vault-id-u1' }
-const noBoxYet = { vault_id: 'vault-id-u1', revision_id: null, vault_key_epoch: 1 }
+const noBoxYet = { vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 1 }
 
 describe("postgresVaultDB, its options", () => {
   const BadOpts = [
@@ -72,7 +72,7 @@ describe("postgresVaultDB, its options", () => {
   it("takes a client and a userId, and listen only when it is given", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = postgresVaultDB({ client: db, userId: 'u1' })
-    expect(await vaultDB.readBundle(u1)).to.be.null
+    expect(await vaultDB.readVaultProps(u1)).to.be.null
   })
 
   it("declares a mebibyte to a record, and no limit to a vault's bytes or its lockboxes", () => {
@@ -91,7 +91,7 @@ describe("postgresVaultDB, its options", () => {
 
   it("holds a vault to no count with no limit, landing every new lockbox", async () => {
     const vaultDB = postgresVaultDB({ client: await TH.emptyDatabase(), userId: 'u1' })
-    await vaultDB.createBundle(TH.bundleOf('u1'))
+    await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
     for (const boxlabel of ['openai', 'anthropic', 'mistral']) {
       await vaultDB.updateBox(u1, TH.boxOf(boxlabel, boxlabel), noBoxYet)
     }
@@ -104,7 +104,7 @@ describe("postgresVaultDB, as the README has it", () => {
     const db = await TH.emptyDatabase()
     const session = { userId: 'u1' }
     const vaultDB = postgresVaultDB({ client: db, userId: session.userId })
-    expect(await vaultDB.readBundle({ applabel: 'acme', user_id: session.userId, vaultlabel: 'main' })).to.be.null
+    expect(await vaultDB.readVaultProps({ applabel: 'acme', user_id: session.userId, vaultlabel: 'main' })).to.be.null
   })
 
   it("stores and reads a real vault, made and opened by the core", async () => {
@@ -114,16 +114,16 @@ describe("postgresVaultDB, as the README has it", () => {
     })
     const first = await opened()
     await first.unlock('correct horse battery staple')
-    await first.store('anthropic_api_key', 'sk-ant-test-not-a-real-key', { sidecar: { note: 'work account' } })
-    await first.store('openai_api_key', { apiKey: 'sk-test-not-a-real-key', orgId: null })
+    await first.storeBox('anthropic_api_key', 'sk-ant-test-not-a-real-key', { sidecar: { note: 'work account' } })
+    await first.storeBox('openai_api_key', { apiKey: 'sk-test-not-a-real-key', orgId: null })
     first.close()
 
     const second = await opened()
     await second.unlock('correct horse battery staple')
-    expect(await second.read('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
-    expect(await second.read('openai_api_key')).to.deep.equal({ apiKey: 'sk-test-not-a-real-key', orgId: null })
+    expect(await second.readBox('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
+    expect(await second.readBox('openai_api_key')).to.deep.equal({ apiKey: 'sk-test-not-a-real-key', orgId: null })
     expect(second.getSnapshot().boxes.map((box) => box.damaged ? null : box.sidecar)).to.deep.equal([{ note: 'work account' }, {}])
-    await second.erase('openai_api_key')
+    await second.retireBox('openai_api_key')
     expect(second.getSnapshot().boxes.map((box) => box.boxlabel)).to.deep.equal(['anthropic_api_key'])
     second.close()
   })
@@ -132,16 +132,16 @@ describe("postgresVaultDB, as the README has it", () => {
 describe("postgresVaultDB, who may reach a vault", () => {
   const u2 = TH.scopeOf('u2')
   const EveryVerb = [
-    ['readBundle',   (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.readBundle(u2)],
-    ['createBundle', (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.createBundle(TH.bundleOf('u2'))],
-    ['updateBundle', (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.updateBundle(TH.bundleOf('u2'), { vault_id: 'vault-id-u2', unlock_epoch: 1 })],
-    ['readBox',      (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.readBox(u2, 'anthropic')],
-    ['listBoxes',    (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.listBoxes(u2)],
-    ['listBoxRecords', (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.listBoxRecords(u2)],
-    ['updateBox',    (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.updateBox(u2, TH.boxOf('anthropic', 'one'), { vault_id: 'vault-id-u2', revision_id: null, vault_key_epoch: 1 })],
-    ['eraseBox',     (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.eraseBox(u2, 'anthropic', { vault_id: 'vault-id-u2' })],
-    ['eraseVault',   (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.eraseVault(u2, { vault_id: 'vault-id-u2' })],
-    ['subscribe',    (vaultDB: ReturnType<typeof postgresVaultDB>) => new Promise<void>((resolve) => { vaultDB.subscribe(u2, TH.changeCounter().onChange); resolve() })],
+    ['readVaultProps',          (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.readVaultProps(u2)],
+    ['fetchOrCreateVaultProps', (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u2'))],
+    ['updateVaultProps',        (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.updateVaultProps(TH.vaultPropsOf('u2'), { vault_id: 'vault-id-u2', unlock_epoch: 1 })],
+    ['readBox',                 (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.readBox(u2, 'anthropic')],
+    ['listBoxes',               (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.listBoxes(u2)],
+    ['listBoxRecords',          (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.listBoxRecords(u2)],
+    ['updateBox',               (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.updateBox(u2, TH.boxOf('anthropic', 'one'), { vault_id: 'vault-id-u2', revision_tok: null, vault_key_epoch: 1 })],
+    ['retireBox',               (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.retireBox(u2, 'anthropic', { vault_id: 'vault-id-u2' })],
+    ['retireVault',             (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.retireVault(u2, { vault_id: 'vault-id-u2' })],
+    ['subscribe',               (vaultDB: ReturnType<typeof postgresVaultDB>) => new Promise<void>((resolve) => { vaultDB.subscribe(u2, TH.changeCounter().onChange); resolve() })],
   ] as const
 
   for (const [verb, call] of EveryVerb) {
@@ -166,7 +166,7 @@ describe("postgresVaultDB, who may reach a vault", () => {
       const db = await TH.emptyDatabase()
       const spy = TH.spyClient(db)
       const vaultDB = postgresVaultDB({ client: spy.client, userId })
-      const refusal = await TH.expectRefusal(vaultDB.readBundle(u1), 'identity_revoked')
+      const refusal = await TH.expectRefusal(vaultDB.readVaultProps(u1), 'identity_revoked')
       expect(refusal.message).to.include('No one is signed in')
       expect(() => vaultDB.subscribe(u1, TH.changeCounter().onChange)).to.throw(VaultError).with.property('kind', 'identity_revoked')
       expect(spy.sent).to.have.lengthOf(0)
@@ -175,18 +175,18 @@ describe("postgresVaultDB, who may reach a vault", () => {
 
   it("never quotes the user in a refusal", async () => {
     const vaultDB = postgresVaultDB({ client: TH.failingClient(new Error('unused')), userId: 'alice@example.test' })
-    const refusal = await TH.expectRefusal(vaultDB.readBundle(TH.scopeOf('mallory@example.test')), 'identity_revoked')
+    const refusal = await TH.expectRefusal(vaultDB.readVaultProps(TH.scopeOf('mallory@example.test')), 'identity_revoked')
     expect(refusal.message).to.not.include('alice')
     expect(refusal.message).to.not.include('mallory')
   })
 })
 
 describe("postgresVaultDB, what it stores", () => {
-  it("stores a bundle a column to a field, its wayins as one jsonb", async () => {
+  it("stores the vault props a column to a field, their wayins as one jsonb", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
-    await vaultDB.createBundle(TH.bundleOf('u1'))
-    const { rows } = await db.query('SELECT * FROM safebyok_bundles')
+    await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
+    const { rows } = await db.query('SELECT * FROM safebyok_vaults')
     expect(rows).to.deep.equal([{
       applabel:         'acme',
       user_id:          'u1',
@@ -196,42 +196,42 @@ describe("postgresVaultDB, what it stores", () => {
       unlock_epoch:     1,
       vault_key_epoch:  1,
       prior_vault_key:  null,
-      wayins:           TH.bundleOf('u1').wayins,
+      wayins:           TH.vaultPropsOf('u1').wayins,
       registered_at:    Date.UTC(2026, 9, 14),
     }])
   })
 
-  it("keeps a bundle's wayins whole and in their order, through an update", async () => {
+  it("keeps the vault props' wayins whole and in their order, through an update", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
-    await vaultDB.createBundle(TH.bundleOf('u1'))
+    await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
     const wayins = [TH.wayinOf('work_phrase'), TH.wayinOf('home_phrase'), TH.wayinOf('passphrase')]
-    const next = TH.bundleOf('u1', { unlock_epoch: 2, wayins })
-    await vaultDB.updateBundle(next, { vault_id: 'vault-id-u1', unlock_epoch: 1 })
-    const standing = await vaultDB.readBundle(u1)
+    const next = TH.vaultPropsOf('u1', { unlock_epoch: 2, wayins })
+    await vaultDB.updateVaultProps(next, { vault_id: 'vault-id-u1', unlock_epoch: 1 })
+    const standing = await vaultDB.readVaultProps(u1)
     expect(standing).to.deep.equal(next)
     expect(standing?.wayins.map((wayin) => wayin.wayinlabel)).to.deep.equal(['work_phrase', 'home_phrase', 'passphrase'])
   })
 
   // The core never sends it -- its vault moves the epoch on with every update -- so it is a client
   // of another version's, or of none.
-  it("refuses, as stale_write, a bundle update that does not move unlock_epoch forward, writing nothing", async () => {
+  it("refuses, as stale_write, an update of the vault props that does not move unlock_epoch forward, writing nothing", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
-    await vaultDB.createBundle(TH.bundleOf('u1', { unlock_epoch: 2 }))
+    await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1', { unlock_epoch: 2 }))
     const atTwo = { vault_id: 'vault-id-u1', unlock_epoch: 2 }
-    const rewrapped = (unlockEpoch: number) => TH.bundleOf('u1', { unlock_epoch: unlockEpoch, wayins: [TH.wayinOf('home_phrase')] })
-    await TH.expectRefusal(vaultDB.updateBundle(rewrapped(2), atTwo), 'stale_write')
-    await TH.expectRefusal(vaultDB.updateBundle(rewrapped(1), atTwo), 'stale_write')
-    expect(await vaultDB.readBundle(u1)).to.deep.equal(TH.bundleOf('u1', { unlock_epoch: 2 }))
-    await vaultDB.updateBundle(rewrapped(3), atTwo)
-    expect(await vaultDB.readBundle(u1)).to.deep.equal(rewrapped(3))
+    const rewrapped = (unlockEpoch: number) => TH.vaultPropsOf('u1', { unlock_epoch: unlockEpoch, wayins: [TH.wayinOf('home_phrase')] })
+    await TH.expectRefusal(vaultDB.updateVaultProps(rewrapped(2), atTwo), 'stale_write')
+    await TH.expectRefusal(vaultDB.updateVaultProps(rewrapped(1), atTwo), 'stale_write')
+    expect(await vaultDB.readVaultProps(u1)).to.deep.equal(TH.vaultPropsOf('u1', { unlock_epoch: 2 }))
+    await vaultDB.updateVaultProps(rewrapped(3), atTwo)
+    expect(await vaultDB.readVaultProps(u1)).to.deep.equal(rewrapped(3))
   })
 
   it("stores a lockbox a column to a field, beside its vault's scope and vault_id, its sidecar as the text it was written as", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
-    await vaultDB.createBundle(TH.bundleOf('u1'))
+    await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
     // Keys jsonb would reorder (it sorts the shorter first) and spacing it would add: the text is
     // bound as written, so it must come back so.
     const sidecarJson = '{"alpha":"café","zeta":1}'
@@ -244,7 +244,7 @@ describe("postgresVaultDB, what it stores", () => {
       vault_id:               'vault-id-u1',
       format:                 'safebyok-lockbox-v5',
       boxlabel:               'anthropic',
-      revision_id:            'rev-one',
+      revision_tok:           'rev-one',
       vault_key_epoch:        1,
       lockbox_key_wrapped:    TH.fakeCiphered('boxkey-one'),
       whisper_ciphered:       TH.fakeCiphered('whisper-one'),
@@ -272,22 +272,22 @@ describe("postgresVaultDB, what it stores", () => {
     const db = await TH.emptyDatabase()
     const spy = TH.spyClient(db)
     const vaultDB = postgresVaultDB({ client: spy.client, userId: 'u1' })
-    await vaultDB.createBundle(TH.bundleOf('u1'))
-    await vaultDB.updateBundle({ ...TH.bundleOf('u1'), unlock_epoch: 2 }, { vault_id: 'vault-id-u1', unlock_epoch: 1 })
+    await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
+    await vaultDB.updateVaultProps({ ...TH.vaultPropsOf('u1'), unlock_epoch: 2 }, { vault_id: 'vault-id-u1', unlock_epoch: 1 })
     await vaultDB.updateBox(u1, TH.boxOf('anthropic', 'one'), noBoxYet)
-    await vaultDB.updateBox(u1, TH.boxOf('anthropic', 'two'), { vault_id: 'vault-id-u1', revision_id: 'rev-one', vault_key_epoch: 1 })
+    await vaultDB.updateBox(u1, TH.boxOf('anthropic', 'two'), { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 1 })
     await vaultDB.readBox(u1, 'anthropic')
-    await vaultDB.eraseBox(u1, 'anthropic', thisVault)
-    await vaultDB.eraseVault(u1, thisVault)
+    await vaultDB.retireBox(u1, 'anthropic', thisVault)
+    await vaultDB.retireVault(u1, thisVault)
     expect(spy.sent).to.have.lengthOf(7)
   })
 
-  it("leaves no lockbox standing when its bundle goes: erasing the vault takes them in the same statement", async () => {
+  it("leaves no lockbox standing when its vault props go: retiring the vault takes them in the same statement", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
-    await vaultDB.createBundle(TH.bundleOf('u1'))
+    await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
     await vaultDB.updateBox(u1, TH.boxOf('anthropic', 'one'), noBoxYet)
-    await db.query('DELETE FROM safebyok_bundles')
+    await db.query('DELETE FROM safebyok_vaults')
     const { rows } = await db.query('SELECT boxlabel FROM safebyok_lockboxes')
     expect(rows).to.have.lengthOf(0)
   })
@@ -302,7 +302,7 @@ const boxlabelsIn = async (vaultDB: VaultDB): Promise<string[]> => {
 /** A request for u1 over `db` holding vaults to `maxLockboxes`, its vault made and given those boxlabels. */
 const filledTo = async (db: PGlite, maxLockboxes: number, boxlabels: readonly string[]) => {
   const vaultDB = postgresVaultDB({ client: db, userId: 'u1', maxLockboxes })
-  await vaultDB.createBundle(TH.bundleOf('u1'))
+  await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
   for (const boxlabel of boxlabels) { await vaultDB.updateBox(u1, TH.boxOf(boxlabel, `sk-fake-${boxlabel}`), noBoxYet) }
   return vaultDB
 }
@@ -316,7 +316,7 @@ const missedBecause = (why: { vault_stands: boolean, box_stood: boolean, was_ful
 const foreignKeyViolation = Object.assign(new Error('insert or update on table "safebyok_lockboxes" violates foreign key constraint'), { code: '23503' })
 
 // A replacement in a full vault, and a first write over a boxlabel taken there, are the battery's
-// line 4.3; a lockbox landing once an erase has made room, its line 4.4: run over makeCappedVaultDB.
+// line 4.3; a lockbox landing once a retired lockbox has made room, its line 4.4: run over makeCappedVaultDB.
 describe("postgresVaultDB, its lockbox limit", () => {
   it("refuses a new lockbox past maxLockboxes as vault_full, writing nothing and naming no boxlabel", async () => {
     const db = await TH.emptyDatabase()
@@ -330,7 +330,7 @@ describe("postgresVaultDB, its lockbox limit", () => {
   it("refuses a first write in a full vault of another vault_id as stale_write: the count is the standing vault's", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = await filledTo(db, 1, ['openai'])
-    await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('anthropic', 'sk-fake'), { vault_id: 'vault-id-gone', revision_id: null, vault_key_epoch: 1 }), 'stale_write')
+    await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('anthropic', 'sk-fake'), { vault_id: 'vault-id-gone', revision_tok: null, vault_key_epoch: 1 }), 'stale_write')
     expect(await boxlabelsIn(vaultDB)).to.deep.equal(['openai'])
   })
 
@@ -338,7 +338,7 @@ describe("postgresVaultDB, its lockbox limit", () => {
     const db = await TH.emptyDatabase()
     const vaultDB = postgresVaultDB({ client: db, userId: 'u1', maxLockboxes: 1 })
     await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('anthropic', 'sk-fake'), noBoxYet), 'stale_write')
-    expect(await vaultDB.readBundle(u1)).to.be.null
+    expect(await vaultDB.readVaultProps(u1)).to.be.null
   })
 
   // The insert says why it missed, from one snapshot, so no second read is asked. What a miss means
@@ -361,7 +361,7 @@ describe("postgresVaultDB, its lockbox limit", () => {
     })
   }
 
-  it("refuses as stale_write a foreign key violation on the insert: its vault was erased after the statement began", async () => {
+  it("refuses as stale_write a foreign key violation on the insert: its vault was retired after the statement began", async () => {
     const db = await TH.emptyDatabase()
     await filledTo(db, 5, [])
     const spy = TH.spyClient(db, (text) => (text.includes('INSERT INTO safebyok_lockboxes') ? Promise.reject(foreignKeyViolation) : undefined))
@@ -375,37 +375,37 @@ describe("postgresVaultDB, its lockbox limit", () => {
     const vaultDB = await filledTo(db, 5, [])
     const orphan = TH.boxOf('anthropic', 'sk-fake')
     const insertOrphan = db.query(
-      `INSERT INTO safebyok_lockboxes (applabel, user_id, vaultlabel, vault_id, format, boxlabel, revision_id, vault_key_epoch, lockbox_key_wrapped, whisper_ciphered, whisper_codec, whisper_schema_version, sidecar_json, registered_at, written_at)
+      `INSERT INTO safebyok_lockboxes (applabel, user_id, vaultlabel, vault_id, format, boxlabel, revision_tok, vault_key_epoch, lockbox_key_wrapped, whisper_ciphered, whisper_codec, whisper_schema_version, sidecar_json, registered_at, written_at)
        VALUES ('acme', 'u1', 'main', 'vault-id-gone', $1, $2, $3, 1, '{}', '{}', 'json_v1', 1, '{}', 0, 0)`,
-      [orphan.format, orphan.boxlabel, orphan.revision_id],
+      [orphan.format, orphan.boxlabel, orphan.revision_tok],
     )
     await expect(insertOrphan).rejects.toMatchObject({ code: '23503' })
     expect(await boxlabelsIn(vaultDB)).to.deep.equal([])
   })
 
-  it("asks one statement of every first write, keeping no count, and locking nothing but its bundle, shared", async () => {
+  it("asks one statement of every first write, keeping no count, and locking nothing but its vault row, shared", async () => {
     const db = await TH.emptyDatabase()
     await filledTo(db, 2, ['openai'])
     const spy = TH.spyClient(db)
     const vaultDB = postgresVaultDB({ client: spy.client, userId: 'u1', maxLockboxes: 2 })
     await vaultDB.updateBox(u1, TH.boxOf('anthropic', 'sk-fake'), noBoxYet)
     await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('mistral', 'sk-fake'), noBoxYet), 'vault_full')
-    await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('mistral', 'sk-fake'), { vault_id: 'vault-id-gone', revision_id: null, vault_key_epoch: 1 }), 'stale_write')
-    await vaultDB.eraseBox(u1, 'anthropic', thisVault)
+    await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('mistral', 'sk-fake'), { vault_id: 'vault-id-gone', revision_tok: null, vault_key_epoch: 1 }), 'stale_write')
+    await vaultDB.retireBox(u1, 'anthropic', thisVault)
     expect(spy.sent).to.have.lengthOf(4)
     for (const { text } of spy.sent) {
       expect(text).to.not.match(/FOR (NO KEY )?UPDATE|FOR KEY SHARE|lockbox_count/)
     }
-    // Each lockbox write reads its bundle FOR SHARE, once; the erase locks nothing.
+    // Each lockbox write reads its vault row FOR SHARE, once; the retire locks nothing.
     expect(spy.sent.map(({ text }) => text.match(/FOR SHARE/g)?.length ?? 0)).to.deep.equal([1, 1, 1, 0])
   })
 
-  it("reads the bundle FOR SHARE in a replacement too, in its one statement", async () => {
+  it("reads the vault row FOR SHARE in a replacement too, in its one statement", async () => {
     const db = await TH.emptyDatabase()
     await filledTo(db, 2, ['openai'])
     const spy = TH.spyClient(db)
     const vaultDB = postgresVaultDB({ client: spy.client, userId: 'u1', maxLockboxes: 2 })
-    await vaultDB.updateBox(u1, TH.boxOf('openai', 'sk-fake-again'), { ...noBoxYet, revision_id: 'rev-sk-fake-openai' })
+    await vaultDB.updateBox(u1, TH.boxOf('openai', 'sk-fake-again'), { ...noBoxYet, revision_tok: 'rev-sk-fake-openai' })
     expect(spy.sent.map(({ text }) => text.match(/FOR SHARE/g)?.length ?? 0)).to.deep.equal([1])
   })
 
@@ -423,7 +423,7 @@ describe("postgresVaultDB, its lockbox limit", () => {
     expect(await boxlabelsIn(vaultDB)).to.have.lengthOf(2)
   })
 
-  it("keeps every lockbox of a vault racing writers took past its limit, readable by its boxlabel, and lands a new one once erases make room", async () => {
+  it("keeps every lockbox of a vault racing writers took past its limit, readable by its boxlabel, and lands a new one once retired lockboxes make room", async () => {
     // As racing writers may leave a vault, by the README: past its limit, here by a writer holding
     // a higher one.
     const db = await TH.emptyDatabase()
@@ -434,9 +434,9 @@ describe("postgresVaultDB, its lockbox limit", () => {
     const racer = await vaultDB.readBox(u1, 'mistral')
     expect(racer?.boxlabel).to.eq('mistral')
     await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('gemini', 'sk-fake'), noBoxYet), 'vault_full')
-    await vaultDB.eraseBox(u1, 'openai', thisVault)
+    await vaultDB.retireBox(u1, 'openai', thisVault)
     await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('gemini', 'sk-fake'), noBoxYet), 'vault_full')
-    await vaultDB.eraseBox(u1, 'anthropic', thisVault)
+    await vaultDB.retireBox(u1, 'anthropic', thisVault)
     await vaultDB.updateBox(u1, TH.boxOf('gemini', 'sk-fake'), noBoxYet)
     expect(await boxlabelsIn(vaultDB)).to.have.members(['mistral', 'gemini'])
   })
@@ -453,13 +453,13 @@ describe("postgresVaultDB, its lockbox limit", () => {
     const db = await TH.emptyDatabase()
     const vaultDB = await filledTo(db, 1, ['openai'])
     const other = { ...u1, vaultlabel: 'other' }
-    await vaultDB.createBundle({ ...TH.bundleOf('u1'), vaultlabel: 'other' })
+    await vaultDB.fetchOrCreateVaultProps({ ...TH.vaultPropsOf('u1'), vaultlabel: 'other' })
     await vaultDB.updateBox(other, TH.boxOf('openai', 'sk-fake'), noBoxYet)
     await TH.expectRefusal(vaultDB.updateBox(other, TH.boxOf('anthropic', 'sk-fake'), noBoxYet), 'vault_full')
     expect(await boxlabelsIn(vaultDB)).to.deep.equal(['openai'])
   })
 
-  it("refuses as vault_full a store() its vault's own count let through, when another device filled the vault unheard", async () => {
+  it("refuses as vault_full a storeBox() its vault's own count let through, when another device filled the vault unheard", async () => {
     const db = await TH.emptyDatabase()
     const opened = () => openVault({
       applabel: 'acme', userId: 'u1', vaultlabel: 'main', deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest,
@@ -468,12 +468,12 @@ describe("postgresVaultDB, its lockbox limit", () => {
     })
     const here = await opened()
     await here.unlock('correct horse battery staple')
-    await here.store('openai', 'sk-fake-one')
+    await here.storeBox('openai', 'sk-fake-one')
     const there = await opened()
     await there.unlock('correct horse battery staple')
-    await there.store('anthropic', 'sk-fake-two')
+    await there.storeBox('anthropic', 'sk-fake-two')
     expect(here.getSnapshot().boxes).to.have.lengthOf(1)
-    const refusal = await TH.expectRefusal(here.store('mistral', 'sk-fake-three'), 'vault_full')
+    const refusal = await TH.expectRefusal(here.storeBox('mistral', 'sk-fake-three'), 'vault_full')
     expect(refusal.message).to.include('its storage keeps')
     here.close()
     there.close()
@@ -488,8 +488,8 @@ describe("postgresVaultDB, its lockbox limit", () => {
     await TH.expectRefusal(openVault(optsFor(4)), 'bad_option')
     const vault = await openVault(optsFor())
     await vault.unlock('correct horse battery staple')
-    for (const boxlabel of ['one', 'two', 'three']) { await vault.store(boxlabel, `sk-fake-${boxlabel}`) }
-    const refusal = await TH.expectRefusal(vault.store('four', 'sk-fake-four'), 'vault_full')
+    for (const boxlabel of ['one', 'two', 'three']) { await vault.storeBox(boxlabel, `sk-fake-${boxlabel}`) }
+    const refusal = await TH.expectRefusal(vault.storeBox('four', 'sk-fake-four'), 'vault_full')
     expect(refusal.message).to.include('limit of 3 lockboxes')
     vault.close()
   })
@@ -499,7 +499,7 @@ describe("postgresVaultDB, listBoxRecords", () => {
   it("lists each lockbox as stored, ciphered fields left out, format kept, the sidecar as its JSON text", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
-    await vaultDB.createBundle(TH.bundleOf('u1'))
+    await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
     const emptied = TH.boxOf('openai', 'two', { sidecar_json: '{}' })
     await vaultDB.updateBox(u1, TH.boxOf('anthropic', 'one'), noBoxYet)
     await vaultDB.updateBox(u1, emptied, noBoxYet)
@@ -512,7 +512,7 @@ describe("postgresVaultDB, listBoxRecords", () => {
   it("is what a browser's VaultDB may hand back from its doListBoxes, where listBoxes's summaries are not", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
-    await vaultDB.createBundle(TH.bundleOf('u1'))
+    await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
     await vaultDB.updateBox(u1, TH.boxOf('anthropic', 'one'), noBoxYet)
     const [record] = await vaultDB.listBoxRecords(u1)
     expect(record).to.have.property('format', 'safebyok-lockbox-v5')
@@ -544,7 +544,7 @@ describe("postgresVaultDB, listBoxRecords", () => {
   it("declares 640 bytes the most it holds in one name, refusing a longer one at every verb", async () => {
     const vaultDB = TH.requestFor(await TH.emptyDatabase(), 'u1')
     expect(vaultDB.maxNameBytes).to.eq(640)
-    await TH.expectRefusal(vaultDB.readBundle({ ...u1, vaultlabel: 'n'.repeat(641) }), 'bad_label')
+    await TH.expectRefusal(vaultDB.readVaultProps({ ...u1, vaultlabel: 'n'.repeat(641) }), 'bad_label')
   })
 
   it("refuses driver trouble with storage_unavailable, the driver's error as its cause", async () => {
@@ -558,13 +558,13 @@ describe("postgresVaultDB, in trouble", () => {
   it("refuses with storage_unavailable when the driver fails, its error as the cause", async () => {
     const dbDown = new Error('connect ECONNREFUSED 127.0.0.1:5432')
     const vaultDB = postgresVaultDB({ client: TH.failingClient(dbDown), userId: 'u1' })
-    const refusal = await TH.expectRefusal(vaultDB.readBundle(u1), 'storage_unavailable')
+    const refusal = await TH.expectRefusal(vaultDB.readVaultProps(u1), 'storage_unavailable')
     expect(refusal.cause).to.eq(dbDown)
   })
 
   it("refuses with storage_unavailable where the tables were never made", async () => {
     const db = await TH.emptyDatabase()
-    await TH.expectRefusal(postgresVaultDB({ client: TH.tablelessClient(db), userId: 'u1' }).readBundle(u1), 'storage_unavailable')
+    await TH.expectRefusal(postgresVaultDB({ client: TH.tablelessClient(db), userId: 'u1' }).readVaultProps(u1), 'storage_unavailable')
   })
 
   it("refuses a failure of a first lockbox write as storage_unavailable, a serialization failure among them", async () => {
@@ -572,7 +572,7 @@ describe("postgresVaultDB, in trouble", () => {
     const tooBusy = Object.assign(new Error('could not serialize access due to concurrent update'), { code: '40001' })
     const spy = TH.spyClient(db, (text) => (text.includes('INSERT INTO safebyok_lockboxes') ? Promise.reject(tooBusy) : undefined))
     const vaultDB = postgresVaultDB({ client: spy.client, userId: 'u1' })
-    await vaultDB.createBundle(TH.bundleOf('u1'))
+    await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
     const refusal = await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('anthropic', 'one'), noBoxYet), 'storage_unavailable')
     expect(refusal.cause).to.eq(tooBusy)
   })
@@ -580,10 +580,10 @@ describe("postgresVaultDB, in trouble", () => {
   it("refuses a row damaged in the database as corrupt_record, leaving it as it is", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
-    await vaultDB.createBundle(TH.bundleOf('u1'))
-    await db.query(`UPDATE safebyok_bundles SET wayins = '"not a list"'::jsonb`)
-    await TH.expectRefusal(vaultDB.readBundle(u1), 'corrupt_record')
-    const { rows } = await db.query<{ wayins: unknown }>('SELECT wayins FROM safebyok_bundles')
+    await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
+    await db.query(`UPDATE safebyok_vaults SET wayins = '"not a list"'::jsonb`)
+    await TH.expectRefusal(vaultDB.readVaultProps(u1), 'corrupt_record')
+    const { rows } = await db.query<{ wayins: unknown }>('SELECT wayins FROM safebyok_vaults')
     expect(rows[0]?.wayins).to.eq('not a list')
   })
 })
@@ -614,7 +614,7 @@ describe("postgresVaultDB, subscribe", () => {
   it("calls onChange after a write to the vault from another request, and not after its unsubscribe", async () => {
     const db = await TH.emptyDatabase()
     const { heard, unsubscribe } = await TH.liveWatch(TH.requestFor(db, 'u1'), u1)
-    await TH.requestFor(db, 'u1').createBundle(TH.bundleOf('u1'))
+    await TH.requestFor(db, 'u1').fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
     await TH.eventually(() => heard.count === 1)
     unsubscribe()
     await TH.requestFor(db, 'u1').updateBox(u1, TH.boxOf('anthropic', 'one'), noBoxYet)
@@ -625,25 +625,25 @@ describe("postgresVaultDB, subscribe", () => {
   it("hears nothing of another user's vault, nor of another vault of the same user", async () => {
     const db = await TH.emptyDatabase()
     const { heard, unsubscribe } = await TH.liveWatch(TH.requestFor(db, 'u1'), u1)
-    await TH.requestFor(db, 'u2').createBundle(TH.bundleOf('u2'))
-    await TH.requestFor(db, 'u1').createBundle({ ...TH.bundleOf('u1'), ...TH.scopeOf('u1', 'spare') })
-    await TH.requestFor(db, 'u1').createBundle(TH.bundleOf('u1'))
+    await TH.requestFor(db, 'u2').fetchOrCreateVaultProps(TH.vaultPropsOf('u2'))
+    await TH.requestFor(db, 'u1').fetchOrCreateVaultProps({ ...TH.vaultPropsOf('u1'), ...TH.scopeOf('u1', 'spare') })
+    await TH.requestFor(db, 'u1').fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
     await TH.eventually(() => heard.count > 0)
     await TH.wakeupAtNextTick()
     expect(heard.count).to.eq(1)
     unsubscribe()
   })
 
-  it("hears an erased vault once, its lockboxes and all, and a create that changed nothing not at all", async () => {
+  it("hears a retired vault once, its lockboxes and all, and a create that changed nothing not at all", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
-    await vaultDB.createBundle(TH.bundleOf('u1'))
+    await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
     await vaultDB.updateBox(u1, TH.boxOf('anthropic', 'one'), noBoxYet)
     await vaultDB.updateBox(u1, TH.boxOf('openai', 'two'), noBoxYet)
     const payloads: string[] = []
     const unlisten = await db.listen(VaultChangeChannel, (payload) => { payloads.push(payload) })
-    await vaultDB.createBundle({ ...TH.bundleOf('u1'), vault_id: 'the-second-arrival' })
-    await vaultDB.eraseVault(u1, thisVault)
+    await vaultDB.fetchOrCreateVaultProps({ ...TH.vaultPropsOf('u1'), vault_id: 'the-second-arrival' })
+    await vaultDB.retireVault(u1, thisVault)
     await TH.eventually(() => payloads.length > 0)
     await TH.wakeupAtNextTick()
     expect(payloads.map((payload) => JSON.parse(payload) as unknown)).to.deep.equal([u1])
@@ -663,7 +663,7 @@ describe("postgresVaultDB, subscribe", () => {
     const db = await TH.emptyDatabase()
     const { heard, onChange } = TH.changeCounter()
     const unsubscribe = postgresVaultDB({ client: db, userId: 'u1' }).subscribe(u1, onChange)
-    await TH.requestFor(db, 'u1').createBundle(TH.bundleOf('u1'))
+    await TH.requestFor(db, 'u1').fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
     await TH.wakeupAtNextTick()
     expect(heard.count).to.eq(0)
     unsubscribe()

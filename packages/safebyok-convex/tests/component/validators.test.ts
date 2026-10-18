@@ -6,17 +6,17 @@ import * as Z from 'zod/mini'
 import type { GenericValidator, Infer } from 'convex/values'
 import * as Records from 'safebyok'
 import type {
-  BundleExpectation as CoreBundleExpectation, EraseExpectation as CoreEraseExpectation, LockboxExpectation as CoreLockboxExpectation,
+  VaultPropsExpectation as CoreVaultPropsExpectation, RetireExpectation as CoreRetireExpectation, LockboxExpectation as CoreLockboxExpectation,
 } from 'safebyok'
 import {
-  BundleExpectation, Ciphered, EraseExpectation, ListedLockbox, Lockbox, LockboxExpectation, VaultBundle, VaultScope,
+  VaultPropsExpectation, Ciphered, RetireExpectation, ListedLockbox, Lockbox, LockboxExpectation, VaultProps, VaultScope,
 } from '../../src/component/validators'
 import * as TH from '../test-helpers'
 
 /**
  * A record's shape, as both validator libraries can be read: which fields, which optional, and
  * each field's base type. The literal a `format` field allows is part of its shape; so is each
- * member of a union of records, such as the wayins a bundle lists.
+ * member of a union of records, such as the wayins the vault props list.
  */
 type Shape =
   | { kind: 'string' | 'number' }
@@ -73,7 +73,7 @@ const listedZod = Z.omit(Records.Lockbox, { lockbox_key_wrapped: true, whisper_c
 const ShapeCases = [
   [Records.Ciphered,     Ciphered,      'Ciphered: the shared encrypted-value shape'],
   [Records.VaultScope,   VaultScope,    'VaultScope: what names one vault'],
-  [Records.VaultBundle,  VaultBundle,   'VaultBundle: every field, each wayin and its ciphered wrap nested'],
+  [Records.VaultProps,   VaultProps,   'VaultProps: every field, each wayin and its ciphered wrap nested'],
   [Records.Lockbox,      Lockbox,       'Lockbox: every field, the sidecar as JSON text, both ciphered fields nested'],
   [listedZod,            ListedLockbox, 'a listed lockbox: the record without its ciphered fields, format kept'],
 ] as const
@@ -86,15 +86,15 @@ describe("the Convex validators, field for field with the core's Zod records", (
   }
 
   it("type the same records, expectations and summaries as the core", () => {
-    expectTypeOf<Infer<typeof VaultBundle>>().toEqualTypeOf<Records.VaultBundle>()
+    expectTypeOf<Infer<typeof VaultProps>>().toEqualTypeOf<Records.VaultProps>()
     expectTypeOf<Infer<typeof VaultScope>>().toEqualTypeOf<Records.VaultScope>()
     expectTypeOf<Infer<typeof Lockbox>>().toEqualTypeOf<Records.Lockbox>()
     // A listing is the stored record less its ciphered fields; the core's summary of it parses
     // the sidecar's JSON, so it is the stored record's shape a listing must meet.
     expectTypeOf<Infer<typeof ListedLockbox>>().toEqualTypeOf<Omit<Records.Lockbox, 'lockbox_key_wrapped' | 'whisper_ciphered'>>()
-    expectTypeOf<Infer<typeof BundleExpectation>>().toEqualTypeOf<CoreBundleExpectation>()
+    expectTypeOf<Infer<typeof VaultPropsExpectation>>().toEqualTypeOf<CoreVaultPropsExpectation>()
     expectTypeOf<Infer<typeof LockboxExpectation>>().toEqualTypeOf<CoreLockboxExpectation>()
-    expectTypeOf<Infer<typeof EraseExpectation>>().toEqualTypeOf<CoreEraseExpectation>()
+    expectTypeOf<Infer<typeof RetireExpectation>>().toEqualTypeOf<CoreRetireExpectation>()
   })
 })
 
@@ -103,7 +103,7 @@ describe("the Convex validators, field for field with the core's Zod records", (
 const probeApp = defineTestApp({ schema: defineSchema({}) })
 const { api: probeApi, createTest } = probeApp.defineModules({
   probe: {
-    takeBundle:  probeApp.mutation({ args: { bundle: VaultBundle }, returns: v.null(), handler: () => null }),
+    takeVaultProps: probeApp.mutation({ args: { vaultProps: VaultProps }, returns: v.null(), handler: () => null }),
     takeLockbox: probeApp.mutation({ args: { lockbox: Lockbox }, returns: v.null(), handler: () => null }),
   },
 })
@@ -117,11 +117,11 @@ const convexAccepts = async (call: Promise<unknown>): Promise<boolean> => {
   }
 }
 
-const { vault_id: _vaultId, ...bundleWithoutVaultId } = TH.bundleOf('u1')
+const { vault_id: _vaultId, ...vaultPropsWithoutVaultId } = TH.vaultPropsOf('u1')
 const { sidecar_json: _sidecarJson, ...boxWithoutSidecar } = TH.boxOf('anthropic_api_key', 'a1')
-const { registered_at: _bundleTime, ...bundleWithoutTime } = TH.bundleOf('u1')
-const { wayins: _wayins, ...bundleWithoutWayins } = TH.bundleOf('u1')
-/** The three fields a bundle held its one passphrase in, before `wayins`. */
+const { registered_at: _vaultPropsTime, ...vaultPropsWithoutTime } = TH.vaultPropsOf('u1')
+const { wayins: _wayins, ...vaultPropsWithoutWayins } = TH.vaultPropsOf('u1')
+/** The three fields the vault props held their one passphrase in, before `wayins`. */
 const OldWayinFields = {
   key_deriver_label:            'test_digest_v0',
   // base64 of the literal text 'salt': a fake salt, public material anyway
@@ -133,33 +133,33 @@ const lockboxV3 = { ...boxWithoutTimes, format: 'safebyok-lockbox-v3', registere
 /** An ISO time, as records stored them before every time became epoch milliseconds. */
 const OldIso = '2026-10-14T00:00:00.000Z'
 
-const BundleCases = [
+const VaultPropsCases = [
   // both accept:
-  [TH.bundleOf('u1'),                                                        true,   true,   'a whole bundle'],
+  [TH.vaultPropsOf('u1'),                                                    true,   true,   'whole vault props'],
   // names are any text to both: the vault's validators check them, client side
-  [{ ...TH.bundleOf('u1'), wayins: [TH.wayinOf('passphrase'), TH.passkeyWayinOf('laptop')] }, true, true, 'a bundle with a passphrase and a passkey'],
+  [{ ...TH.vaultPropsOf('u1'), wayins: [TH.wayinOf('passphrase'), TH.passkeyWayinOf('laptop')] }, true, true, 'vault props with a passphrase and a passkey'],
   // both refuse -- what Convex can see:
-  [{ ...TH.bundleOf('u1'), format: 'safebyok-vault-v4' },                    false,  false,  'a format this package does not know'],
-  [{ ...TH.bundleOf('u1'), format: 'safebyok-lockbox-v1' },                  false,  false,  "another record's format"],
-  [bundleWithoutVaultId,                                                     false,  false,  'a bundle missing its vault_id'],
-  [{ ...TH.bundleOf('u1'), unlock_epoch: '1' },                              false,  false,  'an epoch written as text'],
-  [{ ...TH.bundleOf('u1'), wayins: [TH.wayinOf('passphrase', { vault_key_wayin_wrapped: { cipher_iv_b64: 'iv' } as never })] }, false, false, 'a ciphered wayin missing its ciphertext'],
-  [{ ...TH.bundleOf('u1'), wayins: [TH.wayinOf('passphrase', { wayinkind: 'fingerprint' as never })] }, false, false, 'a wayinkind this package does not know'],
-  [{ ...TH.bundleOf('u1'), wayins: [TH.wayinOf('passphrase', { wayinkind: 'passkey' as never })] }, false, false, "a passphrase's fields under the passkey wayinkind"],
-  [{ ...bundleWithoutWayins, ...OldWayinFields },                            false,  false,  'a bundle from before its wayins were a list'],
-  [{ ...TH.bundleOf('u1'), registered_at: null },                            false,  false,  'a null registered_at'],
-  [{ ...TH.bundleOf('u1'), registered_at: '2026-10-14T00:00:00.000Z' },      false,  false,  'a registered_at as an ISO string'],
-  [{ ...bundleWithoutTime, created_at: OldIso, updated_at: OldIso },         false,  false,  'a bundle from before its time was named registered_at'],
+  [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v4' },                false,  false,  'a format this package does not know'],
+  [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-lockbox-v1' },              false,  false,  "another record's format"],
+  [vaultPropsWithoutVaultId,                                                 false,  false,  'vault props missing their vault_id'],
+  [{ ...TH.vaultPropsOf('u1'), unlock_epoch: '1' },                          false,  false,  'an epoch written as text'],
+  [{ ...TH.vaultPropsOf('u1'), wayins: [TH.wayinOf('passphrase', { vault_key_wayin_wrapped: { cipher_iv_b64: 'iv' } as never })] }, false, false, 'a ciphered wayin missing its ciphertext'],
+  [{ ...TH.vaultPropsOf('u1'), wayins: [TH.wayinOf('passphrase', { wayinkind: 'fingerprint' as never })] }, false, false, 'a wayinkind this package does not know'],
+  [{ ...TH.vaultPropsOf('u1'), wayins: [TH.wayinOf('passphrase', { wayinkind: 'passkey' as never })] }, false, false, "a passphrase's fields under the passkey wayinkind"],
+  [{ ...vaultPropsWithoutWayins, ...OldWayinFields },                        false,  false,  'vault props from before their wayins were a list'],
+  [{ ...TH.vaultPropsOf('u1'), registered_at: null },                        false,  false,  'a null registered_at'],
+  [{ ...TH.vaultPropsOf('u1'), registered_at: '2026-10-14T00:00:00.000Z' },  false,  false,  'a registered_at as an ISO string'],
+  [{ ...vaultPropsWithoutTime, created_at: OldIso, updated_at: OldIso },     false,  false,  'vault props from before their time was named registered_at'],
   // Convex refuses, Zod strips: a field neither record has never reaches storage.
-  [{ ...TH.bundleOf('u1'), passphrase: 'not-a-real-passphrase' },            true,   false,  'a field the record does not have'],
+  [{ ...TH.vaultPropsOf('u1'), passphrase: 'not-a-real-passphrase' },        true,   false,  'a field the record does not have'],
   // Zod refuses, Convex accepts -- the finer rules are the client's:
-  [{ ...TH.bundleOf('u1'), vault_id: '' },                                   false,  true,   'an empty vault_id'],
-  [{ ...TH.bundleOf('u1'), unlock_epoch: 0 },                                false,  true,   'an epoch of zero'],
-  [{ ...TH.bundleOf('u1'), unlock_epoch: 1.5 },                              false,  true,   'a fractional epoch'],
-  [{ ...TH.bundleOf('u1'), registered_at: 1_792_022_400 },                   false,  true,   'a registered_at in epoch seconds, before 1981'],
-  [{ ...TH.bundleOf('u1'), wayins: [] },                                     false,  true,   'a vault with no way in'],
-  [{ ...TH.bundleOf('u1'), wayins: [TH.wayinOf('one'), TH.wayinOf('one', { wayin_id: 'wayin-two' })] }, false, true, 'two ways in sharing a wayinlabel'],
-  [{ ...TH.bundleOf('u1'), wayins: [TH.passkeyWayinOf('one'), TH.passkeyWayinOf('two', { credential_id: 'cred-one' })] }, false, true, 'two passkeys for the same credential'],
+  [{ ...TH.vaultPropsOf('u1'), vault_id: '' },                               false,  true,   'an empty vault_id'],
+  [{ ...TH.vaultPropsOf('u1'), unlock_epoch: 0 },                            false,  true,   'an epoch of zero'],
+  [{ ...TH.vaultPropsOf('u1'), unlock_epoch: 1.5 },                          false,  true,   'a fractional epoch'],
+  [{ ...TH.vaultPropsOf('u1'), registered_at: 1_792_022_400 },               false,  true,   'a registered_at in epoch seconds, before 1981'],
+  [{ ...TH.vaultPropsOf('u1'), wayins: [] },                                 false,  true,   'a vault with no way in'],
+  [{ ...TH.vaultPropsOf('u1'), wayins: [TH.wayinOf('one'), TH.wayinOf('one', { wayin_id: 'wayin-two' })] }, false, true, 'two ways in sharing a wayinlabel'],
+  [{ ...TH.vaultPropsOf('u1'), wayins: [TH.passkeyWayinOf('one'), TH.passkeyWayinOf('two', { credential_id: 'cred-one' })] }, false, true, 'two passkeys for the same credential'],
 ] as const
 
 const LockboxCases = [
@@ -180,15 +180,15 @@ const LockboxCases = [
   [{ ...boxWithoutTimes, created_at: OldIso, updated_at: OldIso },           false,  false,  'a lockbox from before its times were named registered_at and changed_at'],
   // Zod refuses, Convex accepts:
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar_json: '{"note":' },     false,  true,   'a sidecar that is not JSON'],
-  [{ ...TH.boxOf('anthropic_api_key', 'a1'), revision_id: '' },              false,  true,   'an empty revision_id'],
+  [{ ...TH.boxOf('anthropic_api_key', 'a1'), revision_tok: '' },             false,  true,   'an empty revision_tok'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), written_at: Infinity },         false,  true,   'a written_at that never comes'],
 ] as const
 
 describe("the Convex validators, against the core's Zod records, record by record", () => {
-  for (const [bundle, zodOk, convexOk, blurb] of BundleCases) {
-    it(`bundle: ${blurb}`, async () => {
-      expect(Records.VaultBundle.safeParse(bundle).success).to.eq(zodOk)
-      expect(await convexAccepts(createTest().mutation(probeApi.probe.takeBundle, { bundle: bundle as never }))).to.eq(convexOk)
+  for (const [vaultProps, zodOk, convexOk, blurb] of VaultPropsCases) {
+    it(`vaultProps: ${blurb}`, async () => {
+      expect(Records.VaultProps.safeParse(vaultProps).success).to.eq(zodOk)
+      expect(await convexAccepts(createTest().mutation(probeApi.probe.takeVaultProps, { vaultProps: vaultProps as never }))).to.eq(convexOk)
     })
   }
 

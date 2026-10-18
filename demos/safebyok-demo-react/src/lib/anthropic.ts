@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 
 /**
  * The knock-knock machine's one Anthropic call. The API key arrives as an argument from inside
- * `vault.use(...)` and is handed straight to the SDK client: it never lands in React state, a
+ * `vault.useBox(...)` and is handed straight to the SDK client: it never lands in React state, a
  * store, or storage. The request goes browser-to-Anthropic, which is the whole point of BYOK --
  * no server of ours ever sees the key.
  */

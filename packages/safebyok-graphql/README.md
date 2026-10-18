@@ -147,7 +147,7 @@ The resolvers decide nothing: every expectation crosses whole, and the VaultDB y
 [the VaultDB contract](https://github.com/mrflip/safebyok/blob/main/packages/safebyok/VAULTDB.md)
 for the browser. Its line 3.8 in particular: a lockbox write's expectation names the
 `vault_key_epoch` the lockbox was sealed under, and your VaultDB lands it only while the vault's
-bundle stands at that epoch, compared in the same atomic step as the write. One that skips the
+props stand at that epoch, compared in the same atomic step as the write. One that skips the
 comparison lets a device still holding a replaced vaultKey seal a whisper under it.
 `tests/yoga-recipe.test.ts` runs the shared suite through the recipe, that line included.
 
@@ -193,13 +193,13 @@ by, exactly as safebyok wrote it:
 
 | Type                    | Carries                                                                     |
 | ----------------------- | --------------------------------------------------------------------------- |
-| `SafebyokVaultBundle`   | every field of the `VaultBundle`                                            |
+| `SafebyokVaultProps`    | every field of the `VaultProps`                                             |
 | `SafebyokLockbox`       | every field of the `Lockbox`; its sidecar as JSON text, as written          |
 | `SafebyokListedLockbox` | a lockbox as a listing has it: every field but the two encrypted ones       |
 | `SafebyokCiphered`      | an encrypted value: its `cipher_iv_b64` and its `ciphertext_b64`            |
 | `SafebyokVaultScope`    | which vault: `applabel`, `user_id`, `vaultlabel`                            |
 
-Each has an input type twin (`SafebyokVaultBundleInput`, and so on), and each expectation one
+Each has an input type twin (`SafebyokVaultPropsInput`, and so on), and each expectation one
 of its own.
 
 * **Text is a `String`**, a count (`unlock_epoch`) an `Int`, and a time a `Float` -- epoch
@@ -208,7 +208,7 @@ of its own.
   change to a vault's ways in, and `vault_key_epoch`. Past 2,147,483,647 the field fails on the
   wire and the browser sees `storage_unavailable`. That is accepted: two billion changes to
   the ways in is not a vault anyone keeps.
-* **The bundle's `wayins`** is a list of `SafebyokWayin`, each one opaque JSON, its
+* **The vault props' `wayins`** is a list of `SafebyokWayin`, each one opaque JSON, its
   `wayinkind` saying its shape: the adapter carries a wayin as it is, never looking inside, as
   the Postgres table stores the list as one `jsonb`. A new way to unlock reaches the browser with
   no change here. That is by choice, not for want of a typed union: GraphQL has no input unions

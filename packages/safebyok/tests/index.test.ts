@@ -8,8 +8,8 @@ describe("the package's entry point", () => {
   it("exports exactly the public surface", () => {
     expect(Object.keys(safebyok)).to.have.members([
       'Argon2idWebV1', 'argon2idDeriver', 'argon2idWebV1Deriver', 'ensureSaltFits', 'parseKeyDeriverSpec',
-      'openVault', 'eraseDamagedVault', 'parseLogger', 'DefaultLogger', 'setDefaultLogger', 'checkStrengthTest',
-      'Ciphered', 'EpochMillis', 'FarFuture', 'FarPast', 'LeaseHours', 'ForeverMillis', 'Lockbox', 'LockboxSummary', 'MaxLockboxes', 'MaxLeaseHours', 'MaxUnlocks', 'MaxWhisperBytes', 'MinuteMillis', 'PasskeyWayin', 'PasskeySaltBytes', 'PassphraseWayin', 'Sidecar', 'Wayin', 'WayinKindVals', 'VaultBundle', 'VaultScope', 'Whisper', 'wallClock',
+      'openVault', 'retireDamagedVault', 'parseLogger', 'DefaultLogger', 'setDefaultLogger', 'checkStrengthTest',
+      'Ciphered', 'EpochMillis', 'FarFuture', 'FarPast', 'LeaseHours', 'ForeverMillis', 'Lockbox', 'LockboxSummary', 'MaxLockboxes', 'MaxLeaseHours', 'MaxUnlocks', 'MaxWhisperBytes', 'MinuteMillis', 'PasskeyWayin', 'PasskeySaltBytes', 'PassphraseWayin', 'Sidecar', 'Wayin', 'WayinKindVals', 'VaultProps', 'VaultScope', 'Whisper', 'wallClock',
       'AnyTextValidators', 'DefaultValidators', 'Label', 'LabelPattern', 'MaxLabelChars', 'MaxUserIdChars', 'NameFloor', 'NameFloorBytes', 'UserId', 'UserIdPattern', 'checkValidators',
       'VaultError', 'VaultErrorFamilyForKind', 'VaultErrorFamilyVals', 'VaultErrorKindVals', 'isVaultCondition', 'isVaultError',
       'VaultDB', 'Ckeys', 'Expectations', 'Refusals', 'Sanitizer', 'localVaultDB', 'memoryDeviceDB',
@@ -25,7 +25,7 @@ describe("the package's entry point", () => {
   })
 
   it("exports the ckeys an adapter over a key-value store files rows under, as one namespace", () => {
-    expect(Object.keys(safebyok.Ckeys)).to.have.members(['Delimiter', 'bundle', 'box', 'lease', 'mark', 'boxPrefix', 'isBoxIn', 'boxlabelOf', 'isLease', 'isMark'])
+    expect(Object.keys(safebyok.Ckeys)).to.have.members(['Delimiter', 'vaultProps', 'box', 'lease', 'mark', 'boxPrefix', 'isBoxIn', 'boxlabelOf', 'isLease', 'isMark'])
   })
 
   it("exports the sanitizer an adapter throws through in place of a foreign error, as one namespace", () => {
@@ -34,7 +34,7 @@ describe("the package's entry point", () => {
 
   it("exports the refusals an adapter throws, and the comparisons a key-value adapter makes, each as one namespace", () => {
     expect(Object.keys(safebyok.Refusals)).to.have.members(['StorageTroubleMessage', 'StaleWriteVals', 'storageUnavailable', 'staleWrite', 'notPermitted', 'vaultFull', 'StorageBlockedMessage', 'storageBlocked', 'isStorageBlocked'])
-    expect(Object.keys(safebyok.Expectations)).to.have.members(['bundleMeets', 'vaultMeets', 'vaultIdMeets', 'lockboxMeets'])
+    expect(Object.keys(safebyok.Expectations)).to.have.members(['vaultPropsMeets', 'vaultMeets', 'vaultIdMeets', 'lockboxMeets'])
   })
 })
 

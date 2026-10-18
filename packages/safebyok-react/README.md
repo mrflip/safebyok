@@ -28,7 +28,7 @@ otherwise write itself.
   field, and takes the focus. It is a modal `dialog` named by its heading; Escape cancels it and
   goes no further; its error line is a live region a screen reader announces. It follows the
   vault as it changes, and starts afresh when handed another. With `allowStartOver`, a user who
-  has forgotten the passphrase may erase the vault and start a new one (*Starting over*, below).
+  has forgotten the passphrase may retire the vault and start a new one (*Starting over*, below).
   Its passphrase field is made for password managers, with a Show / Hide button and room for your
   advice beside it (*The passphrase field*, below).
 * `WhisperField` -- the field a user types or pastes a whisper into, hidden as they type, with a
@@ -87,15 +87,14 @@ kind, its family, and what it means.
 
 **A condition stays in place.** Storage that cannot be reached (`storage_unavailable`), a user
 storage no longer serves (`identity_revoked`, as when signed out of the backend, or not yet
-signed in to it) or a stored vault
-bundle that fails its checks (`damaged_bundle`) arrives as `openError`, a `VaultError`, with
-`vault` still null. (A damaged lockbox never stops the open: the snapshot lists it with
-`damaged: true`, for your UI to offer `erase()` or a fresh `store()`; see the `safebyok`
-README's *Damaged lockboxes*.) Show it where the vault's UI would be, and offer `retryOpen()`, which clears it and
-opens again; a failed open leaves no storage watch behind, so retrying costs nothing. A browser
-that keeps the app from storing anything on this device (`storage_blocked`) is a condition too,
-but one a retry will not mend until the browser's settings or room change: say so, rather than
-offering `retryOpen()`.
+signed in to it) or a vault whose stored props fail their checks (`damaged_vault`) arrives as
+`openError`, a `VaultError`, with `vault` still null. (A damaged lockbox never stops the open:
+the snapshot lists it with `damaged: true`, for your UI to offer `retireBox()` or a fresh
+`storeBox()`; see the `safebyok` README's *Damaged lockboxes*.) Show it where the vault's UI
+would be, and offer `retryOpen()`, which clears it and opens again; a failed open leaves no
+storage watch behind, so retrying costs nothing. A browser that keeps the app from storing
+anything on this device (`storage_blocked`) is a condition too, but one a retry will not mend
+until the browser's settings or room change: say so, rather than offering `retryOpen()`.
 
 ```tsx
 const VaultPanel = () => {
@@ -107,24 +106,24 @@ const VaultPanel = () => {
 ```
 
 Branch on `openError.kind` for a better message: an `identity_revoked` user should sign in
-again, a `damaged_bundle` will not mend on retry, and a `newer_format` vault was written by a
-newer version of the app: the user updates, and never erases it. Its `message` is calm and safe to
+again, a `damaged_vault` will not mend on retry, and a `newer_format` vault was written by a
+newer version of the app: the user updates, and never retires it. Its `message` is calm and safe to
 show.
 
-For a `damaged_bundle`, the one way forward is to erase the vault and start over:
-`eraseDamagedVault()` from `useVault()` does that (the `safebyok` README's *A vault that cannot be
+For a `damaged_vault`, the one way forward is to retire the vault and start over:
+`retireDamagedVault()` from `useVault()` does that (the `safebyok` README's *A vault that cannot be
 opened*) and opens again, with the provider's own options. The user's lockboxes in it are lost for
 good, so ask first:
 
 ```tsx
-const { openError, eraseDamagedVault } = useVault()
-if (openError?.kind === 'damaged_bundle') {
-  return <button onClick={() => { if (confirm('Erase your vault and start over?')) { void eraseDamagedVault() } }}>Start over</button>
+const { openError, retireDamagedVault } = useVault()
+if (openError?.kind === 'damaged_vault') {
+  return <button onClick={() => { if (confirm('Erase your vault and start over?')) { void retireDamagedVault() } }}>Start over</button>
 }
 ```
 
 It does nothing for any other `openError`, or none, and rejects with storage's refusal (say,
-`storage_unavailable`) if the erase fails, leaving `openError` as it was. A `stale_write` means
+`storage_unavailable`) if retiring it fails, leaving `openError` as it was. A `stale_write` means
 the vault was made anew meanwhile, so it opens again as well; any other refusal opens nothing
 (`retryOpen()` will, should the vault read sound now).
 
@@ -186,11 +185,11 @@ opening fails*, above), where it fires on every load, before any user has typed 
 
 A forgotten passphrase cannot be recovered: the vault and its whispers are gone with it, and the
 user starts a new one. `<VaultProvider allowStartOver ...>` (or `<PassphraseModal allowStartOver
-... />`) has the dialog offer that: "Forgot it? Start a new vault" asks first, then erases the
-vault on every device (`vault.destroy()`, which needs no passphrase) and becomes "Choose a vault
+... />`) has the dialog offer that: "Forgot it? Start a new vault" asks first, then retires the
+vault on every device (`vault.retire()`, which needs no passphrase) and becomes "Choose a vault
 passphrase" for the new one; the action that summoned it runs again there. It is off by default:
-a vault with another way in (a second passphrase, a passkey) may not need it, and it erases
-every lockbox.
+a vault with another way in (a second passphrase, a passkey) may not need it, and starting over
+loses every lockbox.
 
 ## The passphrase field
 
@@ -303,7 +302,7 @@ browser extension or a session-replay tool can read it, hidden or shown. `Whispe
 passphrase dialog are uncontrolled for that reason; a field of your own should be too. Show
 `mask(whisper)` (from `safebyok/utils`) where the user only needs to tell keys apart; read a
 whisper into state only when the user asks to see or edit it, and drop it (set the state back)
-when they hide it, save, or navigate away; and to use a whisper, call `vault.use(boxlabel,
+when they hide it, save, or navigate away; and to use a whisper, call `vault.useBox(boxlabel,
 callback)`, which hands it to your callback and keeps it out of state altogether.
 
 ## Fingerprint unlock (passkeys)

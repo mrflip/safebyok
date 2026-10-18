@@ -2,7 +2,7 @@ import { cipherCtx, deriveWrappingKey, fromB64, importWrappingKeyBytes, randomBy
 import { VaultError } from './errors'
 import type { KeyDeriver } from './key-deriver'
 import { PassphraseKeyBytes } from './key-deriver-spec'
-import { PasskeySaltBytes, type PasskeyWayin, type PasskeyProof, type PassphraseWayin, type Wayin, type WayinKind, type WayinSummary, type VaultBundle, type VaultScope } from './types'
+import { PasskeySaltBytes, type PasskeyWayin, type PasskeyProof, type PassphraseWayin, type Wayin, type WayinKind, type WayinSummary, type VaultProps, type VaultScope } from './types'
 
 /**
  * Wayins: each the vaultKey wrapped under a wayinKey one kind of wayin makes, so a vault has several
@@ -10,15 +10,15 @@ import { PasskeySaltBytes, type PasskeyWayin, type PasskeyProof, type Passphrase
  * and `Wayin.sealPasskey` make one, `Wayin.open` finds the one a passphrase or a passkey
  * opens, `Wayin.summarize` gives its public face. Internal to the package; the vault calls it.
  *
- * Each wayin's wrap is bound to its vault -- the scope, and the bundle fields that never
+ * Each wayin's wrap is bound to its vault -- the scope, and the fields of the vault props that never
  * change, `vault_id` and `registered_at` -- and to its own public header (every field but the wrap
  * itself, encoded with its keys sorted: its `vault_key_epoch`, `device_id` and `registered_at`
  * among them), under a purpose its wayinkind names. A passkey wayin's key is made with that same
- * context as its HKDF `info`. The bundle's `unlock_epoch` and the list of wayins are not in it:
+ * context as its HKDF `info`. The vault props' `unlock_epoch` and the list of wayins are not in it:
  * a change to one wayin bumps the epoch and rewrites the list, and the others, whose
  * passphrases this device does not hold, must still open. A wayin whose `vault_key_epoch` is
- * not the bundle's is passed over as damaged, so one spliced in from an older bundle never hands
- * over its older vaultKey as the bundle's own.
+ * not the vault props' is passed over as damaged, so one spliced in from older vault props never
+ * hands over its older vaultKey as theirs.
  */
 
 /**
@@ -35,10 +35,10 @@ type HeaderOf<WayinT> = WayinT extends unknown ? Omit<WayinT, 'vault_key_wayin_w
 export type WayinHeader = HeaderOf<Wayin>
 
 /**
- * What a wayin's wrap binds of the bundle it belongs to: the fields a bundle never changes once
- * made. A whole {@link VaultBundle} is one.
+ * What a wayin's wrap binds of the vault props it belongs to: the fields the vault props never
+ * change once made. A whole {@link VaultProps} is one.
  */
-export type BundleIdentity = Pick<VaultBundle, 'vault_id' | 'registered_at'>
+export type VaultIdentity = Pick<VaultProps, 'vault_id' | 'registered_at'>
 
 /**
  * What a wayin is stamped with besides its wayinkind's own fields: its `wayin_id` and
@@ -48,8 +48,8 @@ export type BundleIdentity = Pick<VaultBundle, 'vault_id' | 'registered_at'>
  */
 export type WayinStamp = Pick<Wayin, 'wayin_id' | 'wayinlabel' | 'vault_key_epoch' | 'device_id' | 'registered_at'>
 
-/** The ctx's first part: the bundle's format, under which every wayin's wrap is bound. */
-const BundleFormat = 'safebyok-vault-v3'
+/** The ctx's first part: the vault props' format, under which every wayin's wrap is bound. */
+const VaultPropsFormat = 'safebyok-vault-v3'
 
 /** The ctx purpose of each wayinkind's wrap, so no kind of wayin opens as another. */
 const PurposeForWayinkind = {
@@ -67,8 +67,8 @@ const TransientUsage = { extractable: true, usage: ['wrapKey'] } as const
  * The context a wayin's wrap is bound to (and, for a passkey, its key made with): the vault it
  * lets into, and its own public header.
  */
-const wayinCtxOf = (scope: VaultScope, bundle: BundleIdentity, header: WayinHeader): Uint8Array => (
-  cipherCtx(BundleFormat, scope.applabel, scope.user_id, scope.vaultlabel, bundle.vault_id, bundle.registered_at, PurposeForWayinkind[header.wayinkind], header)
+const wayinCtxOf = (scope: VaultScope, vaultProps: VaultIdentity, header: WayinHeader): Uint8Array => (
+  cipherCtx(VaultPropsFormat, scope.applabel, scope.user_id, scope.vaultlabel, vaultProps.vault_id, vaultProps.registered_at, PurposeForWayinkind[header.wayinkind], header)
 )
 
 /** The stamp's own fields, and nothing else of whatever carries them: a wayin sealed anew passes itself. */
@@ -137,7 +137,7 @@ const passphraseKeyOf = async (keyDeriver: KeyDeriver, passphrase: string, saltB
  * @param keyDeriver - What makes the passphraseKey; its label goes on the wayin.
  * @param passphrase - The passphrase this wayin admits.
  * @param scope - The vault's scope, bound into the wrap.
- * @param bundle - The bundle's `vault_id` and `registered_at`, bound into the wrap.
+ * @param vaultProps - The vault props' `vault_id` and `registered_at`, bound into the wrap.
  * @param stamp - The wayin's {@link WayinStamp}: its id, label, vaultKey epoch, device and time.
  * @param vaultKey - The vaultKey to wrap: extractable, as only such a key can be.
  */
@@ -145,11 +145,11 @@ export const sealPassphrase = async (
   keyDeriver: KeyDeriver,
   passphrase: string,
   scope: VaultScope,
-  bundle: BundleIdentity,
+  vaultProps: VaultIdentity,
   stamp: WayinStamp,
   vaultKey: CryptoKey,
 ): Promise<PassphraseWayin> => {
-  const { wayin } = await wrapUnderPassphrase(keyDeriver, passphrase, scope, bundle, stamp, vaultKey)
+  const { wayin } = await wrapUnderPassphrase(keyDeriver, passphrase, scope, vaultProps, stamp, vaultKey)
   return wayin
 }
 
@@ -164,11 +164,11 @@ export const sealFirstPassphrase = async (
   keyDeriver: KeyDeriver,
   passphrase: string,
   scope: VaultScope,
-  bundle: BundleIdentity,
+  vaultProps: VaultIdentity,
   stamp: WayinStamp,
   vaultKey: CryptoKey,
 ): Promise<{ wayin: PassphraseWayin, sessionKey: CryptoKey }> => {
-  const { wayin, wayinKey, wayinCtx } = await wrapUnderPassphrase(keyDeriver, passphrase, scope, bundle, stamp, vaultKey)
+  const { wayin, wayinKey, wayinCtx } = await wrapUnderPassphrase(keyDeriver, passphrase, scope, vaultProps, stamp, vaultKey)
   const sessionKey = await unwrapKeyUnder(wayinKey, wayin.vault_key_wayin_wrapped, wayinCtx, SessionUsage)
   return { wayin, sessionKey }
 }
@@ -178,7 +178,7 @@ const wrapUnderPassphrase = async (
   keyDeriver: KeyDeriver,
   passphrase: string,
   scope: VaultScope,
-  bundle: BundleIdentity,
+  vaultProps: VaultIdentity,
   stamp: WayinStamp,
   vaultKey: CryptoKey,
 ) => {
@@ -190,24 +190,24 @@ const wrapUnderPassphrase = async (
     salt_b64:          toB64(saltBytes),
   } as const
   const wayinKey = await passphraseKeyOf(keyDeriver, passphrase, saltBytes)
-  const wayinCtx = wayinCtxOf(scope, bundle, header)
+  const wayinCtx = wayinCtxOf(scope, vaultProps, header)
   const wrapped = await wrapKeyUnder(wayinKey, vaultKey, wayinCtx)
   const wayin: PassphraseWayin = { ...header, vault_key_wayin_wrapped: wrapped }
   return { wayin, wayinKey, wayinCtx }
 }
 
 /**
- * The vaultKey out of whichever of `bundle`'s passphrase wayins `passphrase` opens -- or, given
+ * The vaultKey out of whichever of `vaultProps`'s passphrase wayins `passphrase` opens -- or, given
  * `wayinId`, out of that one wayin only. Each wayin tried costs one key derivation, in the
- * order the bundle lists them, and the first that opens ends the search. A wayin refusing to
+ * order the vault props list them, and the first that opens ends the search. A wayin refusing to
  * open IS the passphrase check: there is no comparison.
  *
  * A wayin whose salt is not base64url of `keyDeriver.salt_bytes` bytes is damaged: its
- * deriver never made such a salt. So is one whose `vault_key_epoch` is not the bundle's: it wraps
- * some other vaultKey than the bundle stands for. Either is passed over, costing no derivation,
+ * deriver never made such a salt. So is one whose `vault_key_epoch` is not the vault props': it
+ * wraps some other vaultKey than the vault props stand for. Either is passed over, costing no derivation,
  * and the others are tried as ever, so one damaged way in shuts out no other.
  *
- * Refuses with kind `absent_wayin` when `wayinId` names no passphrase wayin of the bundle,
+ * Refuses with kind `absent_wayin` when `wayinId` names no passphrase wayin of the vault props,
  * `unknown_key_deriver` when every wayin it would try was made by a key deriver other than
  * `keyDeriver`, `damaged_wayin` when every one it would try is damaged, and `wrong_passphrase`
  * when none it tried opens. That last is all the wayins can say: a wrong passphrase and a
@@ -221,10 +221,10 @@ export const openWithPassphrase = async (
   keyDeriver: KeyDeriver,
   passphrase: string,
   scope: VaultScope,
-  bundle: VaultBundle,
+  vaultProps: VaultProps,
   wayinId?: string,
 ): Promise<VaultKeyPair & { wayinId: string }> => {
-  const passphrases = bundle.wayins.filter((wayin) => wayin.wayinkind === 'passphrase')
+  const passphrases = vaultProps.wayins.filter((wayin) => wayin.wayinkind === 'passphrase')
   const aimed = wayinId === undefined ? passphrases : passphrases.filter((wayin) => wayin.wayin_id === wayinId)
   if (aimed.length === 0) { throw absentWayin() }
   const derivable = aimed.filter((wayin) => wayin.key_deriver_label === keyDeriver.key_deriver_label)
@@ -232,9 +232,9 @@ export const openWithPassphrase = async (
     throw new VaultError('unknown_key_deriver', 'This vault was made with a key deriver this package does not carry: update safebyok, or open the vault where it was made.')
   }
   // Sorted out before the first derivation, so the outcome never hangs on order. (Checked here
-  // rather than in the record's schema, which every entry point's bundle carries whole.)
+  // rather than in the record's schema, which every entry point's vault props carry whole.)
   const sound = derivable.filter((wayin) => (
-    saltBytesOf(wayin.salt_b64)?.length === keyDeriver.salt_bytes && wayin.vault_key_epoch === bundle.vault_key_epoch
+    saltBytesOf(wayin.salt_b64)?.length === keyDeriver.salt_bytes && wayin.vault_key_epoch === vaultProps.vault_key_epoch
   ))
   if (sound.length === 0) {
     if (wayinId !== undefined) {
@@ -246,7 +246,7 @@ export const openWithPassphrase = async (
     throw new VaultError('damaged_wayin', told)
   }
   for (const wayin of sound) {
-    const opened = await tryPassphrase(keyDeriver, passphrase, scope, bundle, wayin)
+    const opened = await tryPassphrase(keyDeriver, passphrase, scope, vaultProps, wayin)
     if (opened !== null) { return { ...opened, wayinId: wayin.wayin_id } }
   }
   const skipped = aimed.length - derivable.length
@@ -266,7 +266,7 @@ const skippedByOtherDeriver = (count: number): string => {
 }
 
 /**
- * The refusal for a `wayin_id` that names no way in of the bundle: it may have been removed on
+ * The refusal for a `wayin_id` that names no way in of the vault props: it may have been removed on
  * another device. Never quotes the id.
  */
 export const absentWayin = () => new VaultError('absent_wayin', "This vault has no way in with that wayin_id: it may have been removed on another device. Look again at the snapshot's wayins.")
@@ -285,11 +285,11 @@ const tryPassphrase = async (
   keyDeriver: KeyDeriver,
   passphrase: string,
   scope: VaultScope,
-  bundle: BundleIdentity,
+  vaultProps: VaultIdentity,
   wayin: PassphraseWayin,
 ): Promise<VaultKeyPair | null> => {
   const wayinKey = await passphraseKeyOf(keyDeriver, passphrase, fromB64(wayin.salt_b64))
-  return await tryUnwrap(wayinKey, wayinCtxOf(scope, bundle, headerOf(wayin)), wayin.vault_key_wayin_wrapped)
+  return await tryUnwrap(wayinKey, wayinCtxOf(scope, vaultProps, headerOf(wayin)), wayin.vault_key_wayin_wrapped)
 }
 
 /** Both lives of the vaultKey out of `wrapped` under `wayinKey`, or null when it will not open. */
@@ -308,7 +308,7 @@ const tryUnwrap = async (wayinKey: CryptoKey, wayinCtx: Uint8Array, wrapped: Cip
  * device and time that added it, and for a passkey the credential and salt a host asks its
  * authenticator with; never a passphrase's salt, never a wrap.
  *
- * @example Wayin.summarize(bundle.wayins[0])  // { wayinkind: 'passphrase', wayin_id: '1b9d...', wayinlabel: 'passphrase', device_id: 'k3x9...', registered_at: 1760000000000 }
+ * @example Wayin.summarize(vaultProps.wayins[0]) // { wayinkind: 'passphrase', wayin_id: '1b9d...', wayinlabel: 'passphrase', device_id: 'k3x9...', registered_at: 1760000000000 }
  * @example Wayin.summarize(passkeyWayin)    // { wayinkind: 'passkey', wayin_id, wayinlabel: 'laptop', device_id, registered_at, credential_id: 'AXk3...', prf_salt_b64: 'q83v...' }
  */
 export const summarize = (wayin: Wayin): WayinSummary => {
@@ -318,19 +318,19 @@ export const summarize = (wayin: Wayin): WayinSummary => {
 }
 
 /**
- * The vaultKey out of whichever of `bundle`'s wayins `proof` opens: a passphrase as
+ * The vaultKey out of whichever of `vaultProps`'s wayins `proof` opens: a passphrase as
  * {@link openWithPassphrase} finds it, a passkey as {@link openWithPasskey} does.
  */
 export const open = async (
   keyDeriver: KeyDeriver,
   proof: Proof,
   scope: VaultScope,
-  bundle: VaultBundle,
+  vaultProps: VaultProps,
   wayinId?: string,
 ): Promise<VaultKeyPair & { wayinId: string }> => (
   typeof proof === 'string'
-    ? await openWithPassphrase(keyDeriver, proof, scope, bundle, wayinId)
-    : await openWithPasskey(proof, scope, bundle, wayinId)
+    ? await openWithPassphrase(keyDeriver, proof, scope, vaultProps, wayinId)
+    : await openWithPasskey(proof, scope, vaultProps, wayinId)
 )
 
 /**
@@ -350,14 +350,14 @@ const passkeyKeyOf = async (prfBytes: Uint8Array, wayinCtx: Uint8Array): Promise
  *
  * @param passkey - What the new passkey answered, over a fresh salt of {@link PasskeySaltBytes}.
  * @param scope - The vault's scope, bound into the wrap and its key.
- * @param bundle - The bundle's `vault_id` and `registered_at`, bound into the wrap and its key.
+ * @param vaultProps - The vault props' `vault_id` and `registered_at`, bound into the wrap and its key.
  * @param stamp - The wayin's {@link WayinStamp}: its id, label, vaultKey epoch, device and time.
  * @param vaultKey - The vaultKey to wrap: extractable, as only such a key can be.
  */
 export const sealPasskey = async (
   passkey: PasskeyProof,
   scope: VaultScope,
-  bundle: BundleIdentity,
+  vaultProps: VaultIdentity,
   stamp: WayinStamp,
   vaultKey: CryptoKey,
 ): Promise<PasskeyWayin> => {
@@ -367,7 +367,7 @@ export const sealPasskey = async (
     credential_id: passkey.credentialId,
     prf_salt_b64:  passkey.prfSaltB64,
   } as const
-  const wayinCtx = wayinCtxOf(scope, bundle, header)
+  const wayinCtx = wayinCtxOf(scope, vaultProps, header)
   const wayinKey = await passkeyKeyOf(passkey.prfBytes, wayinCtx)
   const wrapped = await wrapKeyUnder(wayinKey, vaultKey, wayinCtx)
   return { ...header, vault_key_wayin_wrapped: wrapped }
@@ -378,9 +378,9 @@ export const sealPasskey = async (
  * `wayinId`, only if that is the wayin it names. No key derivation to speak of, and nothing
  * to try in turn: a credential has at most one wayin in a vault.
  *
- * Refuses with kind `absent_wayin` when no passkey wayin of the bundle is that credential's
+ * Refuses with kind `absent_wayin` when no passkey wayin of the vault props is that credential's
  * (or the one `wayinId` names is not), `damaged_wayin` when its wayin's salt is not
- * base64url of {@link PasskeySaltBytes} bytes or its `vault_key_epoch` is not the bundle's, and
+ * base64url of {@link PasskeySaltBytes} bytes or its `vault_key_epoch` is not the vault props', and
  * `wrong_passkey` when the answer is for another
  * salt than the wayin's, or does not open it. An answer for the wayin's own credential and
  * salt that does not open it is most likely a wayin altered in storage, but a passkey asked
@@ -392,25 +392,25 @@ export const sealPasskey = async (
 export const openWithPasskey = async (
   passkey: PasskeyProof,
   scope: VaultScope,
-  bundle: VaultBundle,
+  vaultProps: VaultProps,
   wayinId?: string,
 ): Promise<VaultKeyPair & { wayinId: string }> => {
-  const wayin = bundle.wayins.find((candidate): candidate is PasskeyWayin => (
+  const wayin = vaultProps.wayins.find((candidate): candidate is PasskeyWayin => (
     candidate.wayinkind === 'passkey' && candidate.credential_id === passkey.credentialId
     && (wayinId === undefined || candidate.wayin_id === wayinId)
   ))
   if (wayin === undefined) {
     throw new VaultError('absent_wayin', "None of this vault's passkeys is the one that answered: it may have been removed on another device, or be a passkey for another vault. Look again at the snapshot's wayins.")
   }
-  // A salt no wayin this package writes could hold, or a vaultKey other than the bundle's, is a
+  // A salt no wayin this package writes could hold, or a vaultKey other than the vault props', is a
   // damaged way in, not a wrong passkey.
-  if (saltBytesOf(wayin.prf_salt_b64)?.length !== PasskeySaltBytes || wayin.vault_key_epoch !== bundle.vault_key_epoch) {
+  if (saltBytesOf(wayin.prf_salt_b64)?.length !== PasskeySaltBytes || wayin.vault_key_epoch !== vaultProps.vault_key_epoch) {
     throw new VaultError('damaged_wayin', "This passkey's way into the vault is stored damaged, so it could not be tried. Unlock with a passphrase, then remove this passkey and add it again. The vault was left as it is.")
   }
   if (wayin.prf_salt_b64 !== passkey.prfSaltB64) {
     throw new VaultError('wrong_passkey', "The passkey answered for a different salt than this vault keeps for it: ask it again with the prf_salt_b64 the snapshot's wayins list.")
   }
-  const wayinCtx = wayinCtxOf(scope, bundle, headerOf(wayin))
+  const wayinCtx = wayinCtxOf(scope, vaultProps, headerOf(wayin))
   const wayinKey = await passkeyKeyOf(passkey.prfBytes, wayinCtx)
   const opened = await tryUnwrap(wayinKey, wayinCtx, wayin.vault_key_wayin_wrapped)
   if (opened === null) {

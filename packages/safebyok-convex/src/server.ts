@@ -5,7 +5,7 @@ import { VaultError } from 'safebyok'
 import type { ComponentApi } from './component-api'
 import type { SafebyokErrorData } from './refusals'
 import {
-  BundleExpectation, EraseExpectation, ListedLockbox, Lockbox, LockboxExpectation, VaultBundle, VaultScope, VaultSignature,
+  VaultPropsExpectation, RetireExpectation, ListedLockbox, Lockbox, LockboxExpectation, VaultProps, VaultScope, VaultSignature,
 } from './component/validators'
 
 export type { ComponentApi } from './component-api'
@@ -38,8 +38,8 @@ export type SafebyokApiOpts<DataModel extends GenericDataModel = GenericDataMode
  *   import { components } from './_generated/api'
  *
  *   export const {
- *     getBundle, createBundle, updateBundle, getBox, listBoxSummaries,
- *     updateBox, eraseBox, eraseVault, watchVault,
+ *     getVaultProps, fetchOrCreateVaultProps, updateVaultProps, getBox, listBoxSummaries,
+ *     updateBox, retireBox, retireVault, watchVault,
  *   } = new SafebyokComponent(components.safebyok).api({
  *     getUserId: async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null,
  *   })
@@ -93,28 +93,28 @@ export class SafebyokComponent {
     }
 
     return {
-      getBundle: publicQuery({
+      getVaultProps: publicQuery({
         args:    { scope: VaultScope },
-        returns: v.nullable(VaultBundle),
+        returns: v.nullable(VaultProps),
         handler: async (ctx, args) => {
           await mustBe(ctx, args.scope.user_id)
-          return await ctx.runQuery(vaults.getBundle, args)
+          return await ctx.runQuery(vaults.getVaultProps, args)
         },
       }),
-      createBundle: publicMutation({
-        args:    { bundle: VaultBundle },
-        returns: VaultBundle,
+      fetchOrCreateVaultProps: publicMutation({
+        args:    { vaultProps: VaultProps },
+        returns: VaultProps,
         handler: async (ctx, args) => {
-          await mustBe(ctx, args.bundle.user_id)
-          return await ctx.runMutation(vaults.createBundle, args)
+          await mustBe(ctx, args.vaultProps.user_id)
+          return await ctx.runMutation(vaults.fetchOrCreateVaultProps, args)
         },
       }),
-      updateBundle: publicMutation({
-        args:    { bundle: VaultBundle, expected: BundleExpectation },
+      updateVaultProps: publicMutation({
+        args:    { vaultProps: VaultProps, expected: VaultPropsExpectation },
         returns: v.boolean(),
         handler: async (ctx, args) => {
-          await mustBe(ctx, args.bundle.user_id)
-          return await ctx.runMutation(vaults.updateBundle, args)
+          await mustBe(ctx, args.vaultProps.user_id)
+          return await ctx.runMutation(vaults.updateVaultProps, args)
         },
       }),
       getBox: publicQuery({
@@ -141,20 +141,20 @@ export class SafebyokComponent {
           return await ctx.runMutation(vaults.updateBox, args)
         },
       }),
-      eraseBox: publicMutation({
-        args:    { scope: VaultScope, boxlabel: v.string(), expected: EraseExpectation },
+      retireBox: publicMutation({
+        args:    { scope: VaultScope, boxlabel: v.string(), expected: RetireExpectation },
         returns: v.boolean(),
         handler: async (ctx, args) => {
           await mustBe(ctx, args.scope.user_id)
-          return await ctx.runMutation(vaults.eraseBox, args)
+          return await ctx.runMutation(vaults.retireBox, args)
         },
       }),
-      eraseVault: publicMutation({
-        args:    { scope: VaultScope, expected: EraseExpectation },
+      retireVault: publicMutation({
+        args:    { scope: VaultScope, expected: RetireExpectation },
         returns: v.boolean(),
         handler: async (ctx, args) => {
           await mustBe(ctx, args.scope.user_id)
-          return await ctx.runMutation(vaults.eraseVault, args)
+          return await ctx.runMutation(vaults.retireVault, args)
         },
       }),
       watchVault: publicQuery({

@@ -7,8 +7,8 @@ import * as TH from './test-helpers'
 const u1 = TH.scopeOf('u1')
 
 describe("Ckeys, the ckey of each row", () => {
-  it("files a bundle under its kind and scope, joined on ^", () => {
-    expect(Ckeys.bundle(u1)).to.eq('vault^acme^u1^main')
+  it("files the vault props under their kind and scope, joined on ^", () => {
+    expect(Ckeys.vaultProps(u1)).to.eq('vault^acme^u1^main')
   })
 
   it("files a lockbox under its kind, scope and boxlabel, joined on ^", () => {
@@ -30,7 +30,7 @@ describe("Ckeys, the ckey of each row", () => {
 
   it("picks a scope's lockbox ckeys out of a store, and nothing else", () => {
     const store = memoryStore()
-    const others = [Ckeys.bundle(u1), Ckeys.lease(u1), Ckeys.box(TH.scopeOf('u2'), 'anthropic'), Ckeys.box(TH.scopeOf('u12'), 'anthropic'), '["box","acme","u1","main","legacy"]']
+    const others = [Ckeys.vaultProps(u1), Ckeys.lease(u1), Ckeys.box(TH.scopeOf('u2'), 'anthropic'), Ckeys.box(TH.scopeOf('u12'), 'anthropic'), '["box","acme","u1","main","legacy"]']
     for (const ckey of [...others, Ckeys.box(u1, 'anthropic'), Ckeys.box(u1, 'openai')]) {
       store.write(ckey, '{}')
     }
@@ -71,9 +71,9 @@ describe("Ckeys, refusing a name that holds its delimiter", () => {
     })
   }
 
-  it("refuses a scope holding ^ in every ckey it makes: bundle, lease, mark and prefix", () => {
+  it("refuses a scope holding ^ in every ckey it makes: vault props, lease, mark and prefix", () => {
     const scope = { ...u1, user_id: 'u1^x' }
-    for (const make of [Ckeys.bundle, Ckeys.lease, Ckeys.mark, Ckeys.boxPrefix]) {
+    for (const make of [Ckeys.vaultProps, Ckeys.lease, Ckeys.mark, Ckeys.boxPrefix]) {
       TH.expectSyncRefusal(() => make(scope), 'bad_label')
     }
   })
@@ -176,7 +176,7 @@ describe("Ckeys.isLease", () => {
     expect(Ckeys.isLease('unlock^acme^u1^main')).to.be.false
     expect(Ckeys.isLease('["unlock","acme","u1","main"]')).to.be.false
     expect(Ckeys.isLease('lease:acme:u1:main')).to.be.false
-    expect(Ckeys.isLease(Ckeys.bundle(u1))).to.be.false
+    expect(Ckeys.isLease(Ckeys.vaultProps(u1))).to.be.false
     expect(Ckeys.isLease('leased^acme^u1^main')).to.be.false
     expect(Ckeys.isLease(['unlock', 'acme', 'u1', 'main'])).to.be.false
   })
@@ -195,11 +195,11 @@ describe("Ckeys.isMark", () => {
 })
 
 describe("Ckeys, between kinds", () => {
-  it("never takes a bundle or a lease for a lockbox, nor one kind's ckey for another's", () => {
+  it("never takes vault props or a lease for a lockbox, nor one kind's ckey for another's", () => {
     const isBox = Ckeys.isBoxIn(u1)
-    expect(isBox(Ckeys.bundle(u1))).to.be.false
+    expect(isBox(Ckeys.vaultProps(u1))).to.be.false
     expect(isBox(Ckeys.lease(u1))).to.be.false
     expect(isBox(Ckeys.mark(u1))).to.be.false
-    expect(new Set([Ckeys.bundle(u1), Ckeys.lease(u1), Ckeys.mark(u1), Ckeys.box(u1, 'main')]).size).to.eq(4)
+    expect(new Set([Ckeys.vaultProps(u1), Ckeys.lease(u1), Ckeys.mark(u1), Ckeys.box(u1, 'main')]).size).to.eq(4)
   })
 })

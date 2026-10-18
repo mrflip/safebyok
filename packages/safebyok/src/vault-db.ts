@@ -1,6 +1,6 @@
 import * as Z from 'zod/mini'
 import { Lockbox } from './lockbox'
-import { MaxUnlocks, WayinKindVals, VaultBundle, VaultScope, type DamagedLockbox, type LockboxSummary, type Sidecar } from './types'
+import { MaxUnlocks, WayinKindVals, VaultProps, VaultScope, type DamagedLockbox, type LockboxSummary, type Sidecar } from './types'
 import { VaultError, isVaultError } from './errors'
 import * as Names from './names'
 import { AnyTextValidators, NameFloor } from './validators'
@@ -12,53 +12,53 @@ import { asError, parseLogger, type VaultLogger } from './logger'
 import { reportToPlatform } from './report-error'
 
 /**
- * What a bundle update was proven against: the vault and the unlock epoch of the bundle the
- * writer read. The update lands only while the standing bundle still has both. Plain JSON, so it
- * crosses any wire as-is.
+ * What an update of the vault props was proven against: the vault and the unlock epoch of the
+ * vault props the writer read. The update lands only while the standing vault props still have
+ * both. Plain JSON, so it crosses any wire as-is.
  *
  * @example { vault_id: standing.vault_id, unlock_epoch: standing.unlock_epoch }
  */
-export type BundleExpectation = Z.infer<typeof BundleExpectation>
-const BundleExpectation = Z.object({
-  vault_id:         VaultBundle.shape.vault_id,
-  unlock_epoch:     VaultBundle.shape.unlock_epoch,
+export type VaultPropsExpectation = Z.infer<typeof VaultPropsExpectation>
+const VaultPropsExpectation = Z.object({
+  vault_id:         VaultProps.shape.vault_id,
+  unlock_epoch:     VaultProps.shape.unlock_epoch,
 })
 
 /**
  * What a lockbox update was written for and read: the vault and the vaultKey that sealed it -- its
- * `vault_id`, and the `vault_key_epoch` the lockbox carries -- and the `revision_id` of the lockbox
+ * `vault_id`, and the `vault_key_epoch` the lockbox carries -- and the `revision_tok` of the lockbox
  * the writer read under its boxlabel, or null when there was none. The update lands only while the
- * scope's standing bundle has that `vault_id` and that `vault_key_epoch`, and the standing lockbox
- * has that `revision_id` -- or, for null, while there is no lockbox there at all. Plain JSON, so it
- * crosses any wire as-is.
+ * scope's standing vault props have that `vault_id` and that `vault_key_epoch`, and the standing
+ * lockbox has that `revision_tok` -- or, for null, while there is no lockbox there at all. Plain
+ * JSON, so it crosses any wire as-is.
  *
- * @example { vault_id: bundle.vault_id, revision_id: prev?.revision_id ?? null, vault_key_epoch: bundle.vault_key_epoch }
+ * @example { vault_id: vaultProps.vault_id, revision_tok: prev?.revision_tok ?? null, vault_key_epoch: vaultProps.vault_key_epoch }
  */
 export type LockboxExpectation = Z.infer<typeof LockboxExpectation>
 const LockboxExpectation = Z.object({
-  vault_id:        VaultBundle.shape.vault_id,
-  revision_id:     Z.nullable(Lockbox.shape.revision_id),
-  vault_key_epoch: VaultBundle.shape.vault_key_epoch,
+  vault_id:        VaultProps.shape.vault_id,
+  revision_tok:    Z.nullable(Lockbox.shape.revision_tok),
+  vault_key_epoch: VaultProps.shape.vault_key_epoch,
 })
 
 /**
- * What an erase was aimed at: the vault whose lockbox, or whole self, the eraser means to remove.
- * The erase lands only while the scope's standing bundle has that `vault_id`, so a device that
- * missed a vault being destroyed and made anew never erases the successor. It names no revision:
- * an erase wins over any write. Plain JSON, so it crosses any wire as-is.
+ * What a retirement was aimed at: the vault whose lockbox, or whole self, the caller means to
+ * remove. The retirement lands only while the scope's standing vault props have that `vault_id`, so
+ * a device that missed a vault being retired and made anew never retires the successor. It names
+ * no revision: a retirement wins over any write. Plain JSON, so it crosses any wire as-is.
  *
- * @example { vault_id: bundle.vault_id }
+ * @example { vault_id: vaultProps.vault_id }
  */
-export type EraseExpectation = Z.infer<typeof EraseExpectation>
-const EraseExpectation = Z.object({
-  vault_id: VaultBundle.shape.vault_id,
+export type RetireExpectation = Z.infer<typeof RetireExpectation>
+const RetireExpectation = Z.object({
+  vault_id: VaultProps.shape.vault_id,
 })
 
 /**
  * One lockbox as a VaultDB's `doListBoxes` hands it up: the boxlabel it is stored under -- the
- * one `doReadBox` and `doEraseBox` reach it by -- and its record exactly as stored, damaged or
+ * one `doReadBox` and `doRetireBox` reach it by -- and its record exactly as stored, damaged or
  * not. The listing checks the record; the boxlabel is what lets a damaged one still be named, and
- * so erased or overwritten.
+ * so retired or overwritten.
  *
  * @example { boxlabel: 'anthropic', lockbox: storedRecord }
  */
@@ -94,12 +94,12 @@ export type VaultDBOpts = {
  *    fields are base64url text), so any backend that can hold JSON can hold a vault, as-is.
  *  * **Never look inside.** Every secret field arrives encrypted; nothing you hold can open a
  *    vault, and nothing safebyok does ever needs you to understand a record -- only to compare a
- *    few public fields (`vault_id`, `unlock_epoch`, `vault_key_epoch`, `revision_id`) before a
+ *    few public fields (`vault_id`, `unlock_epoch`, `vault_key_epoch`, `revision_tok`) before a
  *    write.
- *  * **Write only as expected.** Every update and erase carries an expectation of what stands in
- *    storage, and writes only if it still does: check and write in one atomic step (a
- *    transaction, a conditional write), and resolve `false` when the expectation fails. An
- *    erase's names only the vault, never a revision: within the right vault, an erase wins.
+ *  * **Write only as expected.** Every update and retirement carries an expectation of what
+ *    stands in storage, and writes only if it still does: check and write in one atomic step (a
+ *    transaction, a conditional write), and resolve `false` when the expectation fails. A
+ *    retirement's names only the vault, never a revision: within the right vault, a retirement wins.
  *  * **Enforce who may reach which rows.** Your backend should let a signed-in user reach only
  *    their own records: safebyok's encryption protects the contents, your authorization decides
  *    who may fetch or overwrite them at all. When no one is signed in, or someone other than the
@@ -111,7 +111,7 @@ export type VaultDBOpts = {
  *    validates everything it reads back; a damaged record is safebyok's to refuse, never yours to
  *    fix or quietly drop.
  *
- * The public verbs -- `readBundle`, `updateBox` and the rest -- wrap your `do*` methods with the
+ * The public verbs -- `readVaultProps`, `updateBox` and the rest -- wrap your `do*` methods with the
  * checks every adapter owes: names, scope, records and expectations on the way in, the shape of
  * every record on the way out, `stale_write` for a failed expectation, and `storage_unavailable`
  * (your own error as its `cause`) for anything you throw that is not already a VaultError. They
@@ -144,12 +144,12 @@ export abstract class VaultDB {
   /**
    * The most this backend holds of one vault in all, in bytes as stored -- every lockbox
    * together -- or `Infinity` when it sets no such limit. Declare what the backend can still
-   * list and erase whole: a backend that reads a vault in one transaction under a read budget
+   * list and retire whole: a backend that reads a vault in one transaction under a read budget
    * declares the share of that budget its heaviest verb leaves. A vault refuses to open when its
    * `maxLockboxes` lockboxes might not fit in it, each counted at twice `maxWhisperBytes` (room
    * for its whisper and sidecar together, their encoding, and the backend's own counting) and
    * 1 KiB for its other fields, which covers them at their largest under the default validators.
-   * And since a host's validators may admit names of any length, each `store()` measures them: it
+   * And since a host's validators may admit names of any length, each `storeBox()` measures them: it
    * refuses, with kind `vault_full`, a new lockbox that would take the vault past this limit, each
    * lockbox counted at twice `maxWhisperBytes` and the UTF-8 bytes of its scope and boxlabel as
    * JSON, with a little more for its fixed-size fields. That total is a conservative estimate, made before the
@@ -208,44 +208,48 @@ export abstract class VaultDB {
   // ------------------------------------------------------------------- the verbs safebyok calls
 
   /**
-   * The vault's bundle, validated, or null when the vault has never been created. A stored bundle
-   * that fails its checks is refused as `corrupt_record`, and one a newer safebyok may have
+   * The vault props, validated, or null when the vault has never been created. Stored vault props
+   * that fail their checks are refused as `corrupt_record`, and those a newer safebyok may have
    * written -- a `format`, wayinkind or number of wayins this version does not know -- as
    * `newer_format`.
    */
-  async readBundle(scope: VaultScope): Promise<VaultBundle | null> {
+  async readVaultProps(scope: VaultScope): Promise<VaultProps | null> {
     const asked = heldScope(this, scope)
-    const raw = await fromStorage(() => this.doReadBundle(asked))
+    const raw = await fromStorage(() => this.doReadVaultProps(asked))
     if (raw === null || raw === undefined) { return null }
-    return checkBundle(raw, asked)
+    return checkVaultProps(raw, asked)
   }
 
   /**
-   * Store `bundle` only if its scope holds none, and return whichever bundle stands there after:
-   * the given one, or the one another device got in first with.
+   * Fetch the vault props standing in `vaultProps`' scope, creating them from `vaultProps` only if
+   * the scope holds none, in one atomic step. Returns whichever vault props stand there afterwards:
+   * the given ones when this call created them, or, when the vault already existed -- made by
+   * another device, perhaps in the same moment -- the standing ones, exactly as stored, untouched
+   * and with their own `vault_id`. A caller tells the two apart by comparing the `vault_id` it gets
+   * back with the one it drafted.
    */
-  async createBundle(bundle: VaultBundle): Promise<VaultBundle> {
-    const asked = heldScope(this, bundle)
-    const outgoing = checkOutgoing(VaultBundle, bundle, 'vault bundle')
-    const raw = await fromStorage(() => this.doCreateBundle(outgoing))
-    return checkBundle(raw, asked)
+  async fetchOrCreateVaultProps(vaultProps: VaultProps): Promise<VaultProps> {
+    const asked = heldScope(this, vaultProps)
+    const outgoing = checkOutgoing(VaultProps, vaultProps, 'vault props record')
+    const raw = await fromStorage(() => this.doFetchOrCreateVaultProps(outgoing))
+    return checkVaultProps(raw, asked)
   }
 
   /**
-   * Replace the bundle with `bundle`, only while the standing one still has the `vault_id` and
-   * `unlock_epoch` in `expected`. Refuses with kind `stale_write` otherwise -- including when
-   * no bundle stands at all -- and writes nothing. A vault's `vault_id` never changes, so `bundle`
-   * must carry the one in `expected`: kind 'bad_option' otherwise.
+   * Replace the vault props with `vaultProps`, only while the standing ones still have the
+   * `vault_id` and `unlock_epoch` in `expected`. Refuses with kind `stale_write` otherwise --
+   * including when no vault props stand at all -- and writes nothing. A vault's `vault_id` never
+   * changes, so `vaultProps` must carry the one in `expected`: kind 'bad_option' otherwise.
    */
-  async updateBundle(bundle: VaultBundle, expected: BundleExpectation): Promise<void> {
-    heldScope(this, bundle)
-    const outgoing = checkOutgoing(VaultBundle, bundle, 'vault bundle')
-    const expectation = checkOutgoing(BundleExpectation, expected, 'bundle expectation')
+  async updateVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<void> {
+    heldScope(this, vaultProps)
+    const outgoing = checkOutgoing(VaultProps, vaultProps, 'vault props record')
+    const expectation = checkOutgoing(VaultPropsExpectation, expected, 'vault props expectation')
     if (outgoing.vault_id !== expectation.vault_id) {
-      throw new VaultError('bad_option', "updateBundle replaces a vault's bundle within that vault: the bundle's vault_id must be the expected one, as a vault_id never changes.")
+      throw new VaultError('bad_option', "updateVaultProps replaces a vault's props within that vault: the vault props' vault_id must be the expected one, as a vault_id never changes.")
     }
-    const landed = await fromStorage(() => this.doUpdateBundle(outgoing, expectation))
-    if (! landed) { throw Refusals.staleWrite('bundle') }
+    const landed = await fromStorage(() => this.doUpdateVaultProps(outgoing, expectation))
+    if (! landed) { throw Refusals.staleWrite('vaultProps') }
   }
 
   /** One lockbox, validated, or null when there is none under that boxlabel. */
@@ -300,11 +304,11 @@ export abstract class VaultDB {
   }
 
   /**
-   * Write `lockbox` under its boxlabel, only while the scope's standing bundle has the
-   * `vault_id` and `vault_key_epoch` in `expected` and the standing lockbox has its `revision_id`
+   * Write `lockbox` under its boxlabel, only while the scope's standing vault props have the
+   * `vault_id` and `vault_key_epoch` in `expected` and the standing lockbox has its `revision_tok`
    * (or, for null, there is none). Refuses with kind `stale_write` otherwise -- including when the
-   * scope holds no bundle -- and writes nothing. A backend that holds each vault to a limit of its
-   * own refuses a write past it with kind `vault_full`, writing nothing. A lockbox heavier than the
+   * scope holds no vault props -- and writes nothing. A backend that holds each vault to a limit of
+   * its own refuses a write past it with kind `vault_full`, writing nothing. A lockbox heavier than the
    * backend's `maxRecordBytes` is refused with kind `lockbox_too_large` before storage sees it. A
    * lockbox is written under the vaultKey it was sealed with, so its `vault_key_epoch` must be the
    * one in `expected`: kind 'bad_option' otherwise.
@@ -327,64 +331,64 @@ export abstract class VaultDB {
 
   /**
    * Remove the lockbox under `boxlabel`, whatever revision stands, only while the scope's standing
-   * bundle has the `vault_id` in `expected`; quiet when there is no such lockbox. Refuses with
-   * kind `stale_write` otherwise -- including when the scope holds no bundle -- and erases
+   * vault props have the `vault_id` in `expected`; quiet when there is no such lockbox. Refuses with
+   * kind `stale_write` otherwise -- including when the scope holds no vault props -- and removes
    * nothing.
    */
-  async eraseBox(scope: VaultScope, boxlabel: string, expected: EraseExpectation): Promise<void> {
+  async retireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation): Promise<void> {
     const asked = heldScope(this, scope)
     const label = heldBoxlabel(this, boxlabel)
-    const expectation = checkOutgoing(EraseExpectation, expected, 'erase expectation')
-    const landed = await fromStorage(() => this.doEraseBox(asked, label, expectation))
-    if (! landed) { throw Refusals.staleWrite('erase') }
+    const expectation = checkOutgoing(RetireExpectation, expected, 'retire expectation')
+    const landed = await fromStorage(() => this.doRetireBox(asked, label, expectation))
+    if (! landed) { throw Refusals.staleWrite('retire') }
   }
 
   /**
-   * Remove the bundle and every lockbox -- the backend's part of deleting a vault -- only while
-   * the standing bundle has the `vault_id` in `expected`. Refuses with kind `stale_write`
-   * otherwise -- including when the scope holds no bundle -- and erases nothing.
+   * Remove the vault props and every lockbox -- the backend's part of deleting a vault -- only while
+   * the standing vault props have the `vault_id` in `expected`. Refuses with kind `stale_write`
+   * otherwise -- including when the scope holds no vault props -- and removes nothing.
    */
-  async eraseVault(scope: VaultScope, expected: EraseExpectation): Promise<void> {
+  async retireVault(scope: VaultScope, expected: RetireExpectation): Promise<void> {
     const asked = heldScope(this, scope)
-    const expectation = checkOutgoing(EraseExpectation, expected, 'erase expectation')
-    const landed = await fromStorage(() => this.doEraseVault(asked, expectation))
-    if (! landed) { throw Refusals.staleWrite('erase') }
+    const expectation = checkOutgoing(RetireExpectation, expected, 'retire expectation')
+    const landed = await fromStorage(() => this.doRetireVault(asked, expectation))
+    if (! landed) { throw Refusals.staleWrite('retire') }
   }
 
   /**
-   * Remove a vault whose stored bundle fails its checks -- the one vault `readBundle` refuses as
-   * `corrupt_record`, which `openVault` says as `damaged_bundle` -- and no other: the escape
-   * hatch behind `eraseDamagedVault`, for a vault that no handle can be opened on to `destroy()`.
-   * It reads the bundle as stored, takes the `vault_id` out of it, and erases the bundle and
-   * every lockbox only while the standing bundle still has that `vault_id` (`eraseVault`'s own
-   * expectation). Resolves quietly when the scope holds no bundle. Refuses with kind `bad_option`
-   * when the bundle stands sound, and erases nothing, since a sound vault is deleted through its
-   * handle's `destroy()`; with kind `damaged_bundle`, erasing nothing, when the record is too
-   * damaged to name the vault it belongs to (which only the backend's own tools can clear); with
-   * kind `newer_format`, erasing nothing, when it may have been written by a newer safebyok, in a
-   * `format`, wayinkind or number of wayins this one does not know, and which a device on the
-   * newer version opens: it is told from damage by those three, and where it cannot be told, it
-   * is refused; and with kind `stale_write` when the vault was replaced meanwhile. A bundle
-   * rewritten under the same `vault_id` between the read and the erase is the same vault, and is
-   * erased with it (line 3.5).
+   * Remove a vault whose stored vault props fail their checks -- the one vault `readVaultProps`
+   * refuses as `corrupt_record`, which `openVault` says as `damaged_vault` -- and no other: the
+   * escape hatch behind `retireDamagedVault`, for a vault that no handle can be opened on to
+   * `retire()`. It reads the vault props as stored, takes the `vault_id` out of them, and removes
+   * the vault props and every lockbox only while the standing vault props still have that
+   * `vault_id` (`retireVault`'s own expectation). Resolves quietly when the scope holds no vault
+   * props. Refuses with kind `bad_option` when the vault props stand sound, and removes nothing,
+   * since a sound vault is retired through its handle's `retire()`; with kind `damaged_vault`,
+   * removing nothing, when the record is too damaged to name the vault it belongs to (which only
+   * the backend's own tools can clear); with kind `newer_format`, removing nothing, when it may
+   * have been written by a newer safebyok, in a `format`, wayinkind or number of wayins this one
+   * does not know, and which a device on the newer version opens: it is told from damage by those
+   * three, and where it cannot be told, it is refused; and with kind `stale_write` when the vault
+   * was replaced meanwhile. Vault props rewritten under the same `vault_id` between the read and
+   * the retirement are the same vault, and are retired with it (line 3.5).
    *
    * An adapter that hands each call on to another VaultDB's public verbs hands this one on too:
-   * its `doReadBundle` would meet the inner adapter's refusal of the damaged record, never the
+   * its `doReadVaultProps` would meet the inner adapter's refusal of the damaged record, never the
    * record, and so could not name the vault. So does a backend whose server validates what it
    * reads, as `safebyok-graphql`'s: there a damaged record is the backend's own to clear.
    */
-  async eraseDamagedVault(scope: VaultScope): Promise<void> {
+  async retireDamagedVault(scope: VaultScope): Promise<void> {
     const asked = heldScope(this, scope)
-    const raw = await readStoredBundle(() => this.doReadBundle(asked))
+    const raw = await readStoredVaultProps(() => this.doReadVaultProps(asked))
     if (raw === null || raw === undefined) { return }
-    if (mayBeNewer(raw)) { throw newerBundle() }
-    if (isSoundBundle(raw, asked)) {
-      throw new VaultError('bad_option', "That vault's stored bundle is sound, so it is not erased here: a vault that opens is deleted through its handle's destroy(). Only a vault that openVault refuses as damaged_bundle is erased this way.")
+    if (mayBeNewer(raw)) { throw newerVaultProps() }
+    if (isSoundVaultProps(raw, asked)) {
+      throw new VaultError('bad_option', "That vault's stored props are sound, so it is not retired here: a vault that opens is retired through its handle's retire(). Only a vault that openVault refuses as damaged_vault is retired this way.")
     }
     const named = StoredVaultId.safeParse(raw)
-    if (! named.success) { throw unnamedBundle() }
-    const landed = await fromStorage(() => this.doEraseVault(asked, { vault_id: named.data.vault_id }))
-    if (! landed) { throw Refusals.staleWrite('erase') }
+    if (! named.success) { throw unnamedVaultProps() }
+    const landed = await fromStorage(() => this.doRetireVault(asked, { vault_id: named.data.vault_id }))
+    if (! landed) { throw Refusals.staleWrite('retire') }
   }
 
   /**
@@ -451,20 +455,20 @@ export abstract class VaultDB {
 
   // --------------------------------------------------------------------------- the half you write
 
-  /** The stored bundle record for `scope`, exactly as saved, or null when there is none. */
-  protected abstract doReadBundle(scope: VaultScope): Promise<unknown>
+  /** The stored vault props record for `scope`, exactly as saved, or null when there is none. */
+  protected abstract doReadVaultProps(scope: VaultScope): Promise<unknown>
   /**
-   * Store `bundle` if its scope holds none, then return the bundle standing there, exactly as
-   * stored: `bundle` itself, or the one already there. Find and insert in one atomic step where
-   * the backend allows, so two devices creating at once settle on one bundle.
+   * Store `vaultProps` if its scope holds none, then return the vault props standing there, exactly
+   * as stored: `vaultProps` itself, or the ones already there, untouched. Find and insert in one
+   * atomic step where the backend allows, so two devices creating at once settle on one vault.
    */
-  protected abstract doCreateBundle(bundle: VaultBundle): Promise<unknown>
+  protected abstract doFetchOrCreateVaultProps(vaultProps: VaultProps): Promise<unknown>
   /**
-   * Replace the standing bundle with `bundle` if, and only if, it has `expected.vault_id` and
-   * `expected.unlock_epoch`. True when it was written; false, writing nothing, when the
-   * expectation failed or no bundle stands.
+   * Replace the standing vault props with `vaultProps` if, and only if, they have
+   * `expected.vault_id` and `expected.unlock_epoch`. True when they were written; false, writing
+   * nothing, when the expectation failed or no vault props stand.
    */
-  protected abstract doUpdateBundle(bundle: VaultBundle, expected: BundleExpectation): Promise<boolean>
+  protected abstract doUpdateVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<boolean>
   /** The stored lockbox record under `boxlabel`, exactly as saved, or null when there is none. */
   protected abstract doReadBox(scope: VaultScope, boxlabel: string): Promise<unknown>
   /**
@@ -475,24 +479,24 @@ export abstract class VaultDB {
    */
   protected abstract doListBoxes(scope: VaultScope): Promise<StoredLockbox[]>
   /**
-   * Store `lockbox` under its boxlabel if, and only if, the scope's standing bundle has
+   * Store `lockbox` under its boxlabel if, and only if, the scope's standing vault props have
    * `expected.vault_id` and `expected.vault_key_epoch`, and the standing lockbox has
-   * `expected.revision_id` -- or, when that is null, no lockbox stands there: all compared in the
+   * `expected.revision_tok` -- or, when that is null, no lockbox stands there: all compared in the
    * same atomic step as the write. True when it was written; false, writing nothing, otherwise.
    */
   protected abstract doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<boolean>
   /**
-   * Remove the lockbox under `boxlabel` if, and only if, the scope's standing bundle has
-   * `expected.vault_id`. True when that bundle stands, whether or not there was a lockbox to
-   * remove; false, erasing nothing, otherwise.
+   * Remove the lockbox under `boxlabel` if, and only if, the scope's standing vault props have
+   * `expected.vault_id`. True when those vault props stand, whether or not there was a lockbox to
+   * remove; false, removing nothing, otherwise.
    */
-  protected abstract doEraseBox(scope: VaultScope, boxlabel: string, expected: EraseExpectation): Promise<boolean>
+  protected abstract doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation): Promise<boolean>
   /**
-   * Remove the bundle and every lockbox of `scope` if, and only if, the standing bundle has
-   * `expected.vault_id` -- in one transaction, where the backend has them. True when erased;
-   * false, erasing nothing, otherwise.
+   * Remove the vault props and every lockbox of `scope` if, and only if, the standing vault props
+   * have `expected.vault_id` -- in one transaction, where the backend has them. True when removed;
+   * false, removing nothing, otherwise.
    */
-  protected abstract doEraseVault(scope: VaultScope, expected: EraseExpectation): Promise<boolean>
+  protected abstract doRetireVault(scope: VaultScope, expected: RetireExpectation): Promise<boolean>
   /**
    * Call `onChange` after any write touching `scope`, and return the unsubscribe. The default
    * never calls; a backend with live queries or push (Convex, a websocket) overrides it.
@@ -561,7 +565,7 @@ const ListedLockbox = Z.omit(Lockbox, { lockbox_key_wrapped: true, whisper_ciphe
 
 /**
  * True when a listed lockbox is stored under a name above the floor, which a verb can reach
- * whatever the vault's checks: a vault erases a box by the name it was stored under.
+ * whatever the vault's checks: a vault retires a box by the name it was stored under.
  */
 const isNameable = (stored: StoredLockbox): boolean => NameFloor.safeParse((stored as { boxlabel?: unknown }).boxlabel).success
 
@@ -575,19 +579,19 @@ const isNameable = (stored: StoredLockbox): boolean => NameFloor.safeParse((stor
 const listedOrDamaged = ({ boxlabel, lockbox }: StoredLockbox): LockboxSummary | DamagedLockbox => {
   const checked = ListedLockbox.safeParse(lockbox)
   const sound = checked.success && checked.data.boxlabel === boxlabel
-  return sound ? summaryOf(checked.data) : { boxlabel, damaged: true, revision_id: StoredRevision.safeParse(lockbox).data?.revision_id ?? null }
+  return sound ? summaryOf(checked.data) : { boxlabel, damaged: true, revision_tok: StoredRevision.safeParse(lockbox).data?.revision_tok ?? null }
 }
 
 /** The one field of a damaged lockbox the listing keeps, when the record holds it as text: what a write over it names. */
-const StoredRevision = Z.object({ revision_id: Lockbox.shape.revision_id })
+const StoredRevision = Z.object({ revision_tok: Lockbox.shape.revision_tok })
 
 /**
  * A listed lockbox's summary: its public fields, and its sidecar as the JSON value its record holds
  * (`sidecar_json` is JSON text, as the record's check has found).
  */
 const summaryOf = (listed: Z.infer<typeof ListedLockbox>): LockboxSummary => {
-  const { boxlabel, revision_id, vault_key_epoch, sidecar_json, registered_at, written_at } = listed
-  return { boxlabel, revision_id, vault_key_epoch, sidecar: JSON.parse(sidecar_json) as Sidecar, registered_at, written_at, damaged: false }
+  const { boxlabel, revision_tok, vault_key_epoch, sidecar_json, registered_at, written_at } = listed
+  return { boxlabel, revision_tok, vault_key_epoch, sidecar: JSON.parse(sidecar_json) as Sidecar, registered_at, written_at, damaged: false }
 }
 
 /** Two names in one order on every device: character by character, by UTF-16 code unit, never by a locale. */
@@ -676,27 +680,27 @@ const checkOutgoing = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, candidate:
   new VaultError('bad_option', `That ${said} is not one this package writes, so nothing was written: a VaultDB writes only the records and expectations a vault builds.`)
 ))
 
-const checkBundle = (raw: unknown, scope: VaultScope): VaultBundle => {
+const checkVaultProps = (raw: unknown, scope: VaultScope): VaultProps => {
   // A later safebyok may write what this one cannot read, which is no damage: it is said apart.
-  if (mayBeNewer(raw)) { throw newerBundle() }
-  const bundle = checkRecord(VaultBundle, raw, 'vault bundle')
+  if (mayBeNewer(raw)) { throw newerVaultProps() }
+  const vaultProps = checkRecord(VaultProps, raw, 'vault props')
   // A record that names some other scope is a record out of place, wherever it came from.
-  if (! Names.sameScope(bundle, scope)) {
-    throw new VaultError('corrupt_record', 'The stored vault bundle names a different app, user, or vault than the one asked for. It was left as it is.')
+  if (! Names.sameScope(vaultProps, scope)) {
+    throw new VaultError('corrupt_record', 'The stored vault props name a different app, user, or vault than the one asked for. They were left as they are.')
   }
-  return bundle
+  return vaultProps
 }
 
-const unnamedBundle = (opts?: ErrorOptions) => new VaultError('damaged_bundle', "This vault's stored record is too damaged to say which vault it is, so storage can't be told which one to erase, and nothing was erased. Its backend's own tools can clear it.", opts)
+const unnamedVaultProps = (opts?: ErrorOptions) => new VaultError('damaged_vault', "This vault's stored record is too damaged to say which vault it is, so storage can't be told which one to retire, and nothing was removed. Its backend's own tools can clear it.", opts)
 
 /** A stored vault this version cannot read, which a newer one may have: its own constructor, its own kind. */
-const newerBundle = () => new VaultError('newer_format', "This vault's stored record is in a form this version of the app does not know. It may have been written by a newer version, which opens it, so it was left as it is: update the app and try again.")
+const newerVaultProps = () => new VaultError('newer_format', "This vault's stored record is in a form this version of the app does not know. It may have been written by a newer version, which opens it, so it was left as it is: update the app and try again.")
 
 /**
- * The bundle formats earlier versions of this package wrote: a record in one is older, never newer,
- * and fails today's checks as damage does.
+ * The vault props formats earlier versions of this package wrote: a record in one is older, never
+ * newer, and fails today's checks as damage does.
  */
-const OlderBundleFormats: ReadonlySet<unknown> = new Set(['safebyok-vault-v1', 'safebyok-vault-v2'])
+const OlderVaultPropsFormats: ReadonlySet<unknown> = new Set(['safebyok-vault-v1', 'safebyok-vault-v2'])
 
 /**
  * True when a record that fails this version's checks may be one a later version writes, which
@@ -709,7 +713,7 @@ const OlderBundleFormats: ReadonlySet<unknown> = new Set(['safebyok-vault-v1', '
 const mayBeNewer = (raw: unknown): boolean => {
   if (typeof raw !== 'object' || raw === null) { return false }
   const { format, wayins } = raw as { format?: unknown, wayins?: unknown }
-  const knownFormat = VaultBundle.shape.format.safeParse(format).success || OlderBundleFormats.has(format)
+  const knownFormat = VaultProps.shape.format.safeParse(format).success || OlderVaultPropsFormats.has(format)
   if (format !== undefined && ! knownFormat) { return true }
   if (! Array.isArray(wayins)) { return false }
   if (wayins.length > MaxUnlocks) { return true }
@@ -720,23 +724,23 @@ const mayBeNewer = (raw: unknown): boolean => {
 }
 
 /**
- * The bundle as the adapter stores it. An adapter that validates on the way up, as a wrapper over
- * another VaultDB's public verbs or a server's checked reads do, refuses the damaged record
- * instead of handing it up: that refusal is the vault's id being out of reach, said as such.
+ * The vault props as the adapter stores them. An adapter that validates on the way up, as a
+ * wrapper over another VaultDB's public verbs or a server's checked reads do, refuses the damaged
+ * record instead of handing it up: that refusal is the vault's id being out of reach, said as such.
  */
-const readStoredBundle = async (reading: () => Promise<unknown>): Promise<unknown> => {
+const readStoredVaultProps = async (reading: () => Promise<unknown>): Promise<unknown> => {
   try {
     return await fromStorage(reading)
   } catch (err) {
-    if (isVaultError(err, 'corrupt_record')) { throw unnamedBundle({ cause: err }) }
+    if (isVaultError(err, 'corrupt_record')) { throw unnamedVaultProps({ cause: err }) }
     throw err
   }
 }
 
-/** True when `raw` reads back as the scope's bundle: what `readBundle` would hand up rather than refuse. */
-const isSoundBundle = (raw: unknown, scope: VaultScope): boolean => {
+/** True when `raw` reads back as the scope's vault props: what `readVaultProps` would hand up rather than refuse. */
+const isSoundVaultProps = (raw: unknown, scope: VaultScope): boolean => {
   try {
-    checkBundle(raw, scope)
+    checkVaultProps(raw, scope)
     return true
   } catch (err) {
     if (isVaultError(err, 'corrupt_record')) { return false }
@@ -744,8 +748,8 @@ const isSoundBundle = (raw: unknown, scope: VaultScope): boolean => {
   }
 }
 
-/** The one field of a stored bundle an erase needs, as the vault's own check has it. */
-const StoredVaultId = Z.object({ vault_id: VaultBundle.shape.vault_id })
+/** The one field of stored vault props a retirement needs, as the vault's own check has it. */
+const StoredVaultId = Z.object({ vault_id: VaultProps.shape.vault_id })
 
 /**
  * A stored record through its validator, with failure as a calm VaultError: storage is someone
@@ -791,7 +795,7 @@ export type LocalVaultDBOpts = VaultDBOpts & {
  *
  * @example
  *   const vaultDB = localVaultDB({ store: memoryStore() })
- *   await vaultDB.readBundle({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // null
+ *   await vaultDB.readVaultProps({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // null
  * @example
  *   const vaultDB = localVaultDB({ store: domStore(localStorage, 'acme:db:'), logger })
  */
@@ -836,23 +840,23 @@ class StringStoreVaultDB extends VaultDB {
   // Work is deferred into the promise even though the store is synchronous: a storage fault must
   // reject the returned promise, never throw before the caller has one in hand. And each write
   // checks and saves in one synchronous step, so nothing else in this tab runs in between.
-  protected doReadBundle(scope: VaultScope): Promise<unknown> {
-    return soon(() => readJson(this.store, Ckeys.bundle(scope)))
+  protected doReadVaultProps(scope: VaultScope): Promise<unknown> {
+    return soon(() => readJson(this.store, Ckeys.vaultProps(scope)))
   }
 
-  protected doCreateBundle(bundle: VaultBundle): Promise<unknown> {
+  protected doFetchOrCreateVaultProps(vaultProps: VaultProps): Promise<unknown> {
     return soon(() => {
-      const standing = readJson(this.store, Ckeys.bundle(bundle))
+      const standing = readJson(this.store, Ckeys.vaultProps(vaultProps))
       if (standing !== null) { return standing }
-      this.store.write(Ckeys.bundle(bundle), JSON.stringify(bundle))
-      return bundle
+      this.store.write(Ckeys.vaultProps(vaultProps), JSON.stringify(vaultProps))
+      return vaultProps
     })
   }
 
-  protected doUpdateBundle(bundle: VaultBundle, expected: BundleExpectation): Promise<boolean> {
+  protected doUpdateVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<boolean> {
     return soon(() => {
-      if (! Expectations.bundleMeets(readJson(this.store, Ckeys.bundle(bundle)), expected)) { return false }
-      this.store.write(Ckeys.bundle(bundle), JSON.stringify(bundle))
+      if (! Expectations.vaultPropsMeets(readJson(this.store, Ckeys.vaultProps(vaultProps)), expected)) { return false }
+      this.store.write(Ckeys.vaultProps(vaultProps), JSON.stringify(vaultProps))
       return true
     })
   }
@@ -874,27 +878,27 @@ class StringStoreVaultDB extends VaultDB {
 
   protected doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<boolean> {
     return soon(() => {
-      const standingBundle = readJson(this.store, Ckeys.bundle(scope))
+      const standingVaultProps = readJson(this.store, Ckeys.vaultProps(scope))
       const standingBox = readJson(this.store, Ckeys.box(scope, lockbox.boxlabel))
-      if (! Expectations.lockboxMeets(standingBundle, standingBox, expected)) { return false }
+      if (! Expectations.lockboxMeets(standingVaultProps, standingBox, expected)) { return false }
       this.store.write(Ckeys.box(scope, lockbox.boxlabel), JSON.stringify(lockbox))
       return true
     })
   }
 
-  protected doEraseBox(scope: VaultScope, boxlabel: string, expected: EraseExpectation): Promise<boolean> {
+  protected doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation): Promise<boolean> {
     return soon(() => {
-      if (! Expectations.vaultMeets(readJson(this.store, Ckeys.bundle(scope)), expected)) { return false }
+      if (! Expectations.vaultMeets(readJson(this.store, Ckeys.vaultProps(scope)), expected)) { return false }
       this.store.erase(Ckeys.box(scope, boxlabel))
       return true
     })
   }
 
-  protected doEraseVault(scope: VaultScope, expected: EraseExpectation): Promise<boolean> {
+  protected doRetireVault(scope: VaultScope, expected: RetireExpectation): Promise<boolean> {
     return soon(() => {
-      if (! Expectations.vaultIdMeets(readJson(this.store, Ckeys.bundle(scope)), expected)) { return false }
+      if (! Expectations.vaultIdMeets(readJson(this.store, Ckeys.vaultProps(scope)), expected)) { return false }
       const doomed = this.store.ckeys().filter(Ckeys.isBoxIn(scope))
-      for (const ckey of [...doomed, Ckeys.bundle(scope)]) { this.store.erase(ckey) }
+      for (const ckey of [...doomed, Ckeys.vaultProps(scope)]) { this.store.erase(ckey) }
       return true
     })
   }

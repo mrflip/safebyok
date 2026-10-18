@@ -13,7 +13,7 @@ export type WhisperJson = string | number | boolean | null | WhisperJson[] | { [
  * Two shapes are refused rather than silently mangled:
  *  * `undefined`, anywhere in the value: JSON cannot carry it.
  *  * a bare `null` as the whole whisper: nobody's secret is "nothing here", and emptying a
- *    lockbox is `erase`'s job. (`null` inside a structure is fine: {@link WhisperJson}.)
+ *    lockbox is `retireBox`'s job. (`null` inside a structure is fine: {@link WhisperJson}.)
  *
  * @example 'sk-ant-api03-...'
  * @example { apiKey: 'sk-ant-...', orgId: null }
@@ -46,7 +46,7 @@ const whisperArr = Z.array(whisperJson)
  * @example Whisper.parse('sk-ant-...')                  // a string passes through
  * @example Whisper.safeParse(new Date()).success        // false: JSON would flatten it to {}
  * @example Whisper.safeParse(undefined).success         // false: undefined cannot be stored
- * @example Whisper.safeParse(null).success              // false: emptying a lockbox is erase's job
+ * @example Whisper.safeParse(null).success              // false: emptying a lockbox is retireBox's job
  * @example Whisper.safeParse({ orgId: null }).success   // true: null inside a structure is JSON
  */
 export const Whisper: Z.ZodMiniType<Whisper> = Z.union([
@@ -103,7 +103,7 @@ export const ForeverMillis = FarFuture - FarPast
 /**
  * Validator for an instant as whole UTC epoch milliseconds, from {@link FarPast} (1981) to
  * {@link FarFuture} (2255), both included. Every time the package keeps is one -- a lockbox's
- * `registered_at` and `written_at`, a vault bundle's `registered_at`, a lease's
+ * `registered_at` and `written_at`, the vault props' `registered_at`, a lease's
  * `ask_passphrase_at` -- and a stored record holding anything else fails validation. A host can
  * check its own times with it.
  *
@@ -140,7 +140,7 @@ export type VaultScope = Z.infer<typeof VaultScope>
 
 /**
  * Which vaultKey a record stands for: 1 for a vault's first, and one more for each vaultKey that
- * replaces the one before. A bundle's `vault_key_epoch` is its wayins' vaultKey; a lockbox's,
+ * replaces the one before. The vault props' `vault_key_epoch` is their wayins' vaultKey; a lockbox's,
  * the vaultKey its lockboxKey is wrapped under.
  */
 export const vaultKeyEpoch = Z.int().check(Z.positive())
@@ -153,7 +153,7 @@ const cryptoKeyHandle = Z.custom<CryptoKey>((val) => val instanceof CryptoKey, '
  * not encrypted. Any JSON value -- what the user calls the account, which project a key belongs
  * to -- shown while the vault is locked, and never interpreted by safebyok. It is stored in the clear, as its JSON (`sidecar_json`), and bound into
  * the lockbox's encryption, so a sidecar altered or swapped in storage makes the lockbox refuse to
- * open. A host checks its own sidecar's shape before `store()`. Never put secret material in it.
+ * open. A host checks its own sidecar's shape before `storeBox()`. Never put secret material in it.
  *
  * @example Sidecar.parse({ note: 'work account', project: 'atlas' })
  * @example Sidecar.safeParse({ when: new Date() }).success     // false: JSON would flatten it to {}
@@ -166,14 +166,14 @@ export type Sidecar = Z.infer<typeof Sidecar>
  * The public face of a lockbox: its boxlabel, revision, vaultKey epoch and times, its sidecar
  * as the JSON value the host stored (`{}` when it gave none), and `damaged` false. This, or a
  * {@link DamagedLockbox}, is what a VaultDB's `listBoxes` returns and a vault's snapshot holds,
- * readable while locked. The sidecar is shown as storage holds it: only `read()` opens the lockbox
+ * readable while locked. The sidecar is shown as storage holds it: only `readBox()` opens the lockbox
  * and so proves it unaltered.
  *
- * @example LockboxSummary.parse({ boxlabel: 'anthropic', revision_id: 'r1', vault_key_epoch: 1, sidecar: {}, registered_at, written_at }).damaged // false
+ * @example LockboxSummary.parse({ boxlabel: 'anthropic', revision_tok: 'r1', vault_key_epoch: 1, sidecar: {}, registered_at, written_at }).damaged // false
  */
 export const LockboxSummary = Z.object({
   boxlabel:        NameFloor,
-  revision_id:     Z.string().check(Z.minLength(1)),
+  revision_tok:    Z.string().check(Z.minLength(1)),
   vault_key_epoch: vaultKeyEpoch,
   sidecar:         Sidecar,
   registered_at:   EpochMillis,
@@ -185,18 +185,18 @@ export type LockboxSummary = Z.infer<typeof LockboxSummary>
 /**
  * A lockbox whose stored record does not read back as one -- damaged, tampered with, written by
  * another version of safebyok, or sealed under a vaultKey the vault does not hold -- listed under
- * the boxlabel it is stored under, with nothing else from it trusted but its `revision_id`, when
+ * the boxlabel it is stored under, with nothing else from it trusted but its `revision_tok`, when
  * it holds one as text (null otherwise), which only names the record for a write over it. It
  * sits in a vault's snapshot beside the {@link LockboxSummary}s, sorted among them, so a UI can
- * offer to remove it: `erase()` removes it and `store()` writes a fresh lockbox over it, while
- * `read()` and `use()` refuse it with kind 'damaged_lockbox'.
+ * offer to remove it: `retireBox()` removes it and `storeBox()` writes a fresh lockbox over it,
+ * while `readBox()` and `useBox()` refuse it with kind 'damaged_lockbox'.
  *
  * @example
  *   for (const box of snapshot.boxes) {
  *     if (box.damaged) { showRemovable(box.boxlabel) } else { showSummary(box.boxlabel, box.sidecar) }
  *   }
  */
-export type DamagedLockbox = { boxlabel: string, damaged: true, revision_id: string | null }
+export type DamagedLockbox = { boxlabel: string, damaged: true, revision_tok: string | null }
 
 /**
  * The ways into a vault, each a {@link Wayin}'s `wayinkind`: a `passphrase` the user types,
@@ -210,8 +210,8 @@ export type WayinKind = typeof WayinKindVals[number]
  * The most wayins a vault holds, passphrases and passkeys together: room for every way
  * in a person plausibly keeps (a daily passphrase, one written down at home, a fingerprint on
  * each of their devices), and a bound on how long an unlock can take. An unlock not aimed at one wayin tries each passphrase wayin in turn,
- * one key derivation apiece, so a wrong passphrase costs up to this many. A stored bundle with
- * more fails validation.
+ * one key derivation apiece, so a wrong passphrase costs up to this many. Stored vault props with
+ * more fail validation.
  */
 export const MaxUnlocks = 8
 
@@ -231,7 +231,7 @@ export const PassphraseWayin = Z.object({
   key_deriver_label:       Z.string().check(Z.minLength(1)),
   /** This wayin's passphraseSalt: fresh for every wayin, and for every change of its passphrase. */
   salt_b64:                Z.string().check(Z.minLength(1)),
-  /** The `vault_key_epoch` of the vaultKey this wayin wraps: in a sound bundle, the bundle's own. */
+  /** The `vault_key_epoch` of the vaultKey this wayin wraps: in sound vault props, the props' own. */
   vault_key_epoch:         vaultKeyEpoch,
   /**
    * The id the device that added this way in keeps for the vault in its device mark: random, one
@@ -269,7 +269,7 @@ export const PasskeyWayin = Z.object({
   credential_id:           Z.string().check(Z.minLength(1)),
   /** The salt the passkey's PRF is evaluated over: {@link PasskeySaltBytes} random bytes, fresh for every wayin. */
   prf_salt_b64:            Z.string().check(Z.minLength(1)),
-  /** The `vault_key_epoch` of the vaultKey this wayin wraps: in a sound bundle, the bundle's own. */
+  /** The `vault_key_epoch` of the vaultKey this wayin wraps: in sound vault props, the props' own. */
   vault_key_epoch:         vaultKeyEpoch,
   /**
    * The id the device that added this way in keeps for the vault in its device mark: random, one
@@ -304,7 +304,7 @@ const distinctCredentials = (wayins: readonly Wayin[]): boolean => {
   return new Set(credentialIds).size === credentialIds.length
 }
 
-/** A bundle's wayins: at least one, at most {@link MaxUnlocks}, no id, label or credential twice. */
+/** The vault props' wayins: at least one, at most {@link MaxUnlocks}, no id, label or credential twice. */
 const wayinList = Z.array(Wayin).check(
   Z.minLength(1, "A vault has at least one way in"),
   Z.maxLength(MaxUnlocks, `A vault holds at most ${String(MaxUnlocks)} wayins`),
@@ -349,7 +349,7 @@ export type PasskeyProof = {
 }
 
 /**
- * The vaultKey before a bundle's own, wrapped under its own: `vault_key_wrapped` opens only under
+ * The vaultKey before the vault props' own, wrapped under their own: `vault_key_wrapped` opens only under
  * the vaultKey that replaced it, so a holder of the older vaultKey gains nothing from it.
  */
 const PriorVaultKey = Z.object({
@@ -357,11 +357,11 @@ const PriorVaultKey = Z.object({
   vault_key_wrapped: Ciphered,
 })
 
-/** True when a bundle holds the vaultKey just before its own as its prior, from its second vaultKey on, and no prior before then. */
-const priorFits = (bundle: { vault_key_epoch: number, prior_vault_key?: { vault_key_epoch: number } }): boolean => (
-  bundle.prior_vault_key === undefined
-    ? bundle.vault_key_epoch === 1
-    : bundle.prior_vault_key.vault_key_epoch === bundle.vault_key_epoch - 1
+/** True when vault props hold the vaultKey just before their own as their prior, from their second vaultKey on, and no prior before then. */
+const priorFits = (vaultProps: { vault_key_epoch: number, prior_vault_key?: { vault_key_epoch: number } }): boolean => (
+  vaultProps.prior_vault_key === undefined
+    ? vaultProps.vault_key_epoch === 1
+    : vaultProps.prior_vault_key.vault_key_epoch === vaultProps.vault_key_epoch - 1
 )
 
 /**
@@ -374,7 +374,7 @@ const priorFits = (bundle: { vault_key_epoch: number, prior_vault_key?: { vault_
  * `vault_key_epoch` says which vaultKey the wayins wrap, and from a vault's second vaultKey on,
  * `prior_vault_key` holds the one before it.
  */
-export const VaultBundle = Z.object({
+export const VaultProps = Z.object({
   format:              Z.literal('safebyok-vault-v3'),
   applabel:            NameFloor,
   user_id:             NameFloor,
@@ -386,15 +386,15 @@ export const VaultBundle = Z.object({
   vault_key_epoch:     vaultKeyEpoch,
   /**
    * The vaultKey before this one, wrapped under this one, at the `vault_key_epoch` just below the
-   * bundle's: absent while the bundle's is 1, and present from then on.
+   * vault props' own: absent while theirs is 1, and present from then on.
    */
   prior_vault_key:     Z.exactOptional(PriorVaultKey),
   /** The ways into the vault, each wrapping the one vaultKey: see {@link Wayin}. */
   wayins:              wayinList,
   /** When the vault was made, an {@link EpochMillis}; never changed. */
   registered_at:       EpochMillis,
-}).check(Z.refine(priorFits, "A bundle holds the vaultKey just before its own as prior_vault_key, from its second vaultKey on, and none before then"))
-export type VaultBundle = Z.infer<typeof VaultBundle>
+}).check(Z.refine(priorFits, "Vault props hold the vaultKey just before their own as prior_vault_key, from their second vaultKey on, and none before then"))
+export type VaultProps = Z.infer<typeof VaultProps>
 
 /**
  * The device-local record of a lease: this browser's leaseKey (a non-extractable handle -- it
@@ -408,7 +408,7 @@ export const Lease = Z.object({
   user_id:           NameFloor,
   vaultlabel:        NameFloor,
   vault_id:          Z.string().check(Z.minLength(1)),
-  /** The bundle's unlock_epoch when this lease was granted; a mismatch voids it. */
+  /** The vault props' unlock_epoch when this lease was granted; a mismatch voids it. */
   unlock_epoch:      Z.int().check(Z.positive()),
   /** This browser's leaseKey: non-extractable, usable only to unwrap what it wrapped. */
   lease_key:         cryptoKeyHandle,
@@ -422,7 +422,7 @@ export type Lease = Z.infer<typeof Lease>
 /**
  * What a device mark holds of the vault it has seen under its scope: the device's own random
  * `device_id` for the vault, which every way in it adds carries, and the highest `unlock_epoch` and
- * `vault_key_epoch` it has seen the vault's bundle at, so that an older copy of the bundle storage
+ * `vault_key_epoch` it has seen the vault props at, so that an older copy of the vault props storage
  * hands back later is refused (kind 'rolled_back').
  */
 export const SeenVault = Z.object({
@@ -430,9 +430,9 @@ export const SeenVault = Z.object({
   device_id:       Z.string().check(Z.minLength(1)),
   /** The vault this mark is of. */
   vault_id:        Z.string().check(Z.minLength(1)),
-  /** The highest `unlock_epoch` this device has seen the vault's bundle at. */
+  /** The highest `unlock_epoch` this device has seen the vault props at. */
   unlock_epoch:    Z.int().check(Z.positive()),
-  /** The highest `vault_key_epoch` this device has seen the vault's bundle at. */
+  /** The highest `vault_key_epoch` this device has seen the vault props at. */
   vault_key_epoch: vaultKeyEpoch,
 })
 export type SeenVault = Z.infer<typeof SeenVault>
@@ -444,10 +444,10 @@ export type SeenVault = Z.infer<typeof SeenVault>
  * standing under the scope (a {@link SeenVault}), or null when it has seen none. Nothing in it is
  * secret. One per scope: a vault made anew under the scope, with another `vault_id`, is seen
  * afresh, under a new `device_id`, and the lock generation counts on. `lock()` leaves the mark,
- * raising its lock generation; `destroy()` raises it too, and forgets what was seen.
+ * raising its lock generation; `retire()` raises it too, and forgets what was seen.
  *
  * @example { format: 'safebyok-mark-v3', ...scope, lock_generation: 0, seen: { device_id, vault_id, unlock_epoch: 1, vault_key_epoch: 1 } }
- * @example { format: 'safebyok-mark-v3', ...scope, lock_generation: 2, seen: null }  // locked twice, the vault since destroyed
+ * @example { format: 'safebyok-mark-v3', ...scope, lock_generation: 2, seen: null }  // locked twice, the vault since retired
  */
 export const DeviceMark = Z.object({
   format:          Z.literal('safebyok-mark-v3'),
@@ -491,7 +491,7 @@ export const MaxWhisperBytes = 40_444 // searchable: 40444
 /**
  * The most lockboxes a vault holds unless the caller says otherwise: room for every API key a
  * person plausibly keeps, at the largest default whisper, inside what every in-tree storage
- * adapter can hold and still erase in one go. A vault that needs more raises its `maxLockboxes`.
+ * adapter can hold and still retire in one go. A vault that needs more raises its `maxLockboxes`.
  */
 export const MaxLockboxes = 100
 

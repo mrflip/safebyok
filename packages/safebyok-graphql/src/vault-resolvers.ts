@@ -1,7 +1,7 @@
 import { GraphQLError } from 'graphql'
 import { Refusals, VaultError } from 'safebyok'
-import type { BundleExpectation, EraseExpectation, Lockbox, LockboxExpectation, VaultBundle, VaultDB, VaultScope } from 'safebyok'
-import { BundleFields, LockboxFields, ScopeFields, recordOf } from './fields'
+import type { VaultPropsExpectation, RetireExpectation, Lockbox, LockboxExpectation, VaultProps, VaultDB, VaultScope } from 'safebyok'
+import { VaultPropsFields, LockboxFields, ScopeFields, recordOf } from './fields'
 
 /**
  * What the resolvers need of the VaultDB they serve: the verbs a browser's vault calls, and
@@ -9,7 +9,7 @@ import { BundleFields, LockboxFields, ScopeFields, recordOf } from './fields'
  * VaultDB must hand back from its own listing -- where a VaultDB's `listBoxes` gives the
  * summaries a vault shows. Every VaultDB is one: `safebyok-postgres`'s, or one of your own.
  */
-export type ServedVaultDB = Pick<VaultDB, 'readBundle' | 'createBundle' | 'updateBundle' | 'readBox' | 'listBoxRecords' | 'updateBox' | 'eraseBox' | 'eraseVault' | 'subscribe'>
+export type ServedVaultDB = Pick<VaultDB, 'readVaultProps' | 'fetchOrCreateVaultProps' | 'updateVaultProps' | 'readBox' | 'listBoxRecords' | 'updateBox' | 'retireBox' | 'retireVault' | 'subscribe'>
 
 /** What {@link vaultResolvers} is made with, once, at your server's start. */
 export type VaultResolversOpts<ContextT> = {
@@ -27,7 +27,7 @@ export type VaultResolversOpts<ContextT> = {
 export type VaultFieldArgs = {
   scope?:    unknown
   boxlabel?: unknown
-  bundle?:   unknown
+  vaultProps?: unknown
   lockbox?:  unknown
   expected?: unknown
 }
@@ -41,16 +41,16 @@ export type VaultFieldResolver<ContextT> = (parent: unknown, args: VaultFieldArg
  */
 export type VaultResolvers<ContextT> = {
   Query: {
-    safebyokReadBundle: VaultFieldResolver<ContextT>
-    safebyokReadBox:    VaultFieldResolver<ContextT>
-    safebyokListBoxes:  VaultFieldResolver<ContextT>
+    safebyokReadVaultProps: VaultFieldResolver<ContextT>
+    safebyokReadBox:        VaultFieldResolver<ContextT>
+    safebyokListBoxes:      VaultFieldResolver<ContextT>
   }
   Mutation: {
-    safebyokCreateBundle: VaultFieldResolver<ContextT>
-    safebyokUpdateBundle: VaultFieldResolver<ContextT>
-    safebyokUpdateBox:    VaultFieldResolver<ContextT>
-    safebyokEraseBox:     VaultFieldResolver<ContextT>
-    safebyokEraseVault:   VaultFieldResolver<ContextT>
+    safebyokFetchOrCreateVaultProps: VaultFieldResolver<ContextT>
+    safebyokUpdateVaultProps:        VaultFieldResolver<ContextT>
+    safebyokUpdateBox:               VaultFieldResolver<ContextT>
+    safebyokRetireBox:               VaultFieldResolver<ContextT>
+    safebyokRetireVault:             VaultFieldResolver<ContextT>
   }
   Subscription: {
     safebyokVaultChanged: {
@@ -117,27 +117,27 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
   )
   return {
     Query: {
-      safebyokReadBundle: served((vaultDB, args) => vaultDB.readBundle(scopeIn(args))),
-      safebyokReadBox:    served((vaultDB, args) => vaultDB.readBox(scopeIn(args), args.boxlabel as string)),
+      safebyokReadVaultProps: served((vaultDB, args) => vaultDB.readVaultProps(scopeIn(args))),
+      safebyokReadBox:        served((vaultDB, args) => vaultDB.readBox(scopeIn(args), args.boxlabel as string)),
       // As stored records, which the browser's VaultDB validates: not listBoxes' summaries.
       safebyokListBoxes:  served((vaultDB, args) => vaultDB.listBoxRecords(scopeIn(args))),
     },
     Mutation: {
-      safebyokCreateBundle: served((vaultDB, args) => vaultDB.createBundle(bundleIn(args))),
-      safebyokUpdateBundle: served(async (vaultDB, args) => {
-        await vaultDB.updateBundle(bundleIn(args), bundleExpectationIn(args))
+      safebyokFetchOrCreateVaultProps: served((vaultDB, args) => vaultDB.fetchOrCreateVaultProps(vaultPropsIn(args))),
+      safebyokUpdateVaultProps: served(async (vaultDB, args) => {
+        await vaultDB.updateVaultProps(vaultPropsIn(args), vaultPropsExpectationIn(args))
         return true
       }),
       safebyokUpdateBox: served(async (vaultDB, args) => {
         await vaultDB.updateBox(scopeIn(args), recordOf(args.lockbox, LockboxFields) as Lockbox, lockboxExpectationIn(args))
         return true
       }),
-      safebyokEraseBox: served(async (vaultDB, args) => {
-        await vaultDB.eraseBox(scopeIn(args), args.boxlabel as string, eraseExpectationIn(args))
+      safebyokRetireBox: served(async (vaultDB, args) => {
+        await vaultDB.retireBox(scopeIn(args), args.boxlabel as string, retireExpectationIn(args))
         return true
       }),
-      safebyokEraseVault: served(async (vaultDB, args) => {
-        await vaultDB.eraseVault(scopeIn(args), eraseExpectationIn(args))
+      safebyokRetireVault: served(async (vaultDB, args) => {
+        await vaultDB.retireVault(scopeIn(args), retireExpectationIn(args))
         return true
       }),
     },
@@ -162,21 +162,21 @@ const MisconfiguredMessage = "The vault's server could not serve this request: i
 // The arguments as the schema shapes them, rebuilt field by field as plain records: the
 // VaultDB checks them as it would any caller's.
 const scopeIn = (args: VaultFieldArgs) => recordOf(args.scope, ScopeFields) as VaultScope
-const bundleIn = (args: VaultFieldArgs) => recordOf(args.bundle, BundleFields) as VaultBundle
+const vaultPropsIn = (args: VaultFieldArgs) => recordOf(args.vaultProps, VaultPropsFields) as VaultProps
 
-const bundleExpectationIn = (args: VaultFieldArgs): BundleExpectation => {
-  const { vault_id, unlock_epoch } = args.expected as BundleExpectation
+const vaultPropsExpectationIn = (args: VaultFieldArgs): VaultPropsExpectation => {
+  const { vault_id, unlock_epoch } = args.expected as VaultPropsExpectation
   return { vault_id, unlock_epoch }
 }
 
-// A revision_id left out, as a GraphQL client may leave out a null, is the null it means.
+// A revision_tok left out, as a GraphQL client may leave out a null, is the null it means.
 const lockboxExpectationIn = (args: VaultFieldArgs): LockboxExpectation => {
-  const { vault_id, revision_id = null, vault_key_epoch } = args.expected as { vault_id: string, revision_id?: string | null, vault_key_epoch: number }
-  return { vault_id, revision_id, vault_key_epoch }
+  const { vault_id, revision_tok = null, vault_key_epoch } = args.expected as { vault_id: string, revision_tok?: string | null, vault_key_epoch: number }
+  return { vault_id, revision_tok, vault_key_epoch }
 }
 
-const eraseExpectationIn = (args: VaultFieldArgs): EraseExpectation => {
-  const { vault_id } = args.expected as EraseExpectation
+const retireExpectationIn = (args: VaultFieldArgs): RetireExpectation => {
+  const { vault_id } = args.expected as RetireExpectation
   return { vault_id }
 }
 

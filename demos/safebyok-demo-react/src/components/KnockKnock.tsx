@@ -5,7 +5,7 @@ import { gripeForJokeErr, tellKnockKnockJoke } from '../lib/anthropic'
 /**
  * The "app": a knock-knock machine powered by the user's own Anthropic key. This is what using
  * the library day-to-day looks like -- one lockbox holding the key, `withUnlockedVault()` around
- * anything that needs it, and `vault.use()` scoping the decrypted key to the API call.
+ * anything that needs it, and `vault.useBox()` scoping the decrypted key to the API call.
  */
 
 /** The lockbox the knock-knock machine keeps its key in. */
@@ -35,7 +35,7 @@ export const KnockKnock = () => {
     setJoke(null)
     setGripe(null)
     try {
-      const told = await withUnlockedVault(() => vault.use(ApiKeyBoxlabel, (whisper) => tellKnockKnockJoke(apiKeyOf(whisper), whosThere.trim())))
+      const told = await withUnlockedVault(() => vault.useBox(ApiKeyBoxlabel, (whisper) => tellKnockKnockJoke(apiKeyOf(whisper), whosThere.trim())))
       if (told !== null) { setJoke(told) }
     } catch (err) {
       setGripe(gripeForJokeErr(err))
@@ -125,7 +125,7 @@ const ApiKeySlot = ({ haveKeyBox, damaged, savedAt }: { haveKeyBox: boolean, dam
     setGripe(null)
     try {
       const saved = await withUnlockedVault(async () => {
-        await vault.store(ApiKeyBoxlabel, keyText.trim(), { sidecar: { note: 'feeds the knock-knock machine' } })
+        await vault.storeBox(ApiKeyBoxlabel, keyText.trim(), { sidecar: { note: 'feeds the knock-knock machine' } })
         return true
       })
       if (saved !== null) {

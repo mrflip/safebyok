@@ -87,15 +87,15 @@ describe("the README Yoga recipe", () => {
       applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: browserFor(route, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest,
     })
     await vault.unlock('correct horse battery staple')
-    await vault.store('anthropic_api_key', 'sk-ant-test-not-a-real-key')
-    expect(await vault.read('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
+    await vault.storeBox('anthropic_api_key', 'sk-ant-test-not-a-real-key')
+    expect(await vault.readBox('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
     vault.close()
   })
 
   it("never sends the driver's own error to the browser, not even in Yoga's development mode", async () => {
     const dbDown = new Error('password authentication failed for user "vault_owner"')
     const route = vaultRoute(TH.failingClient(dbDown), undefined, () => Promise.resolve('u1'), true)
-    const document = 'query ($scope: SafebyokVaultScopeInput!) { safebyokReadBundle(scope: $scope) { vault_id } }'
+    const document = 'query ($scope: SafebyokVaultScopeInput!) { safebyokReadVaultProps(scope: $scope) { vault_id } }'
     const variables = { scope: TH.scopeOf('u1') }
     const response = await route(new Request('https://app.example.test/api/graphql', {
       method:  'POST',
@@ -111,7 +111,7 @@ describe("the README Yoga recipe", () => {
     const route = await routeOver()
     const elsewhere = browserFor(route, 'u1')
     const { heard, unsubscribe } = await TH.liveWatch(browserFor(route, 'u1'), TH.scopeOf('u1'))
-    await elsewhere.createBundle(TH.bundleOf('u1'))
+    await elsewhere.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
     await TH.eventually(() => heard.count > 0)
     unsubscribe()
     expect(heard.count).to.eq(1)

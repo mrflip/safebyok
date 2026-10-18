@@ -9,9 +9,9 @@ import type { Sidecar, Whisper } from 'safebyok'
 
 /**
  * Direct manipulation of the vault's lockboxes: add, view, edit, delete, use. The lines that
- * matter are the one-liners inside each handler -- `vault.store(...)`, `vault.read(...)`,
- * `vault.use(...)`, `vault.erase(...)`, each wrapped in `withUnlockedVault()` so a locked vault
- * summons the passphrase dialog and retries. Everything else is table furniture.
+ * matter are the one-liners inside each handler -- `vault.storeBox(...)`, `vault.readBox(...)`,
+ * `vault.useBox(...)`, `vault.retireBox(...)`, each wrapped in `withUnlockedVault()` so a locked
+ * vault summons the passphrase dialog and retries. Everything else is table furniture.
  */
 
 type FormState = { editing: string | null, boxlabelText: string, whisperText: string, noteText: string }
@@ -28,7 +28,7 @@ const noteOf = (sidecar: Sidecar): string => {
 }
 
 export const VaultDashboard = () => {
-  const { vault, openError, retryOpen, eraseDamagedVault, withUnlockedVault } = useVault()
+  const { vault, openError, retryOpen, retireDamagedVault, withUnlockedVault } = useVault()
   const snapshot = useVaultSnapshot()
   const [form, setForm] = useState<FormState | null>(null)
   const [shown, setShown] = useState<Record<string, Whisper>>({})
@@ -38,14 +38,14 @@ export const VaultDashboard = () => {
   // A condition that stopped the vault opening -- storage unreachable, signed out of the
   // backend -- is shown here, in place, with a way to try again. (Misuse would have gone to an
   // error boundary instead.)
-  // A damaged record will not mend on retry, so it gets no Retry button: only a way to erase it
+  // A damaged record will not mend on retry, so it gets no Retry button: only a way to retire it
   // and start over, which asks first, as it takes every lockbox in the vault with it.
-  if (openError?.kind === 'damaged_bundle') {
+  if (openError?.kind === 'damaged_vault') {
     const startOver = async () => {
       if (! globalThis.confirm("Erase this vault and start over? Every lockbox in it is lost for good.")) { return }
       setGripe(null)
       try {
-        await eraseDamagedVault()
+        await retireDamagedVault()
       } catch (err) {
         setGripe(err instanceof Error ? err.message : 'Could not erase the vault.')
       }
@@ -74,7 +74,7 @@ export const VaultDashboard = () => {
   // A whisper is never null (the vault refuses a bare one), so null from withUnlockedVault can
   // only mean the user dismissed the passphrase dialog: the read needs no wrapping.
   const view = async (boxlabel: string) => {
-    const whisper = await withUnlockedVault(() => vault.read(boxlabel))
+    const whisper = await withUnlockedVault(() => vault.readBox(boxlabel))
     if (whisper !== null) { setShown((prev) => ({ ...prev, [boxlabel]: whisper })) }
   }
 
@@ -83,23 +83,23 @@ export const VaultDashboard = () => {
   }
 
   const edit = async (boxlabel: string, noteText: string) => {
-    const whisper = await withUnlockedVault(() => vault.read(boxlabel))
+    const whisper = await withUnlockedVault(() => vault.readBox(boxlabel))
     if (whisper !== null) { setForm({ editing: boxlabel, boxlabelText: boxlabel, whisperText: editableWhisper(whisper), noteText }) }
   }
 
   const erase = async (boxlabel: string) => {
     if (! globalThis.confirm(`Delete the lockbox '${boxlabel}'?`)) { return }
     try {
-      await withUnlockedVault(() => vault.erase(boxlabel))
+      await withUnlockedVault(() => vault.retireBox(boxlabel))
     } catch (err) {
-      // Gone already -- from another device, or with the vault the user erased to start over from
+      // Gone already -- from another device, or with the vault the user retired to start over from
       // the passphrase dialog -- is what was asked for.
       if (! isVaultError(err, 'absent_box')) { throw err }
     }
     hide(boxlabel)
   }
 
-  const applyWhisper = (boxlabel: string) => withUnlockedVault(() => vault.use(boxlabel, (whisper) => { setPsst({ boxlabel, whisper }) }))
+  const applyWhisper = (boxlabel: string) => withUnlockedVault(() => vault.useBox(boxlabel, (whisper) => { setPsst({ boxlabel, whisper }) }))
 
   const save = async () => {
     if (form === null) { return }
@@ -110,7 +110,7 @@ export const VaultDashboard = () => {
         // null, and the store's refusal lands in the gripe below. A blank note leaves the
         // sidecar out, so the lockbox keeps the one it has.
         const note = form.noteText.trim()
-        await vault.store(form.boxlabelText.trim(), parseWhisperText(form.whisperText)!, note === '' ? {} : { sidecar: { note } })
+        await vault.storeBox(form.boxlabelText.trim(), parseWhisperText(form.whisperText)!, note === '' ? {} : { sidecar: { note } })
         return true
       })
       if (saved !== null) { setForm(null) }

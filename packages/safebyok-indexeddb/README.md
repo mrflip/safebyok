@@ -46,7 +46,7 @@ const vault = await openVault({
 * **Every verb is one IndexedDB transaction.** IndexedDB runs readwrite transactions over one
   store one after another, across every tab of the origin, so a write lands only while what it
   expects still stands, and refuses with kind `stale_write` otherwise. Two tabs creating a vault
-  at once settle on one; erasing a vault takes its every lockbox with it, or none of them.
+  at once settle on one; retiring a vault takes its every lockbox with it, or none of them.
 * **Other tabs' writes** ring `subscribe`, over a BroadcastChannel, so a vault open in two tabs
   stays current in both. The bell says only that something changed; the vault reads again. Its
   channel is closed when the last vault listening to it closes.
@@ -74,21 +74,21 @@ its own failures.
 One IndexedDB database per `dbName`, `<dbName>:vault_db`, holding one object store, `records`:
 **a row per record, each the record itself**, as safebyok wrote it, kept by structured clone
 field by field. Nothing is serialized, normalized or repaired: every field a record holds is
-bound into its encryption, but for the bundle's `unlock_epoch` and which wayins its `wayins`
+bound into its encryption, but for the vault props' `unlock_epoch` and which wayins their `wayins`
 list holds, so one changed in storage makes the record refuse to open.
 
 | ckey                                               | Row                       |
 | -------------------------------------------------- | ------------------------- |
-| `vault^<applabel>^<user_id>^<vaultlabel>`          | the vault's `VaultBundle` |
+| `vault^<applabel>^<user_id>^<vaultlabel>`          | the vault's `VaultProps`  |
 | `box^<applabel>^<user_id>^<vaultlabel>^<boxlabel>` | one `Lockbox`             |
 
 The names are joined on `^` (the core's `Ckeys`), which the floor every name is held to keeps out
 of every name, whatever a host's validators admit.
 
 * **Encrypted**: each whisper (`whisper_ciphered`), each lockbox's lockboxKey
-  (`lockbox_key_wrapped`), and, inside the bundle, the vaultKey, wrapped under each passphrase.
+  (`lockbox_key_wrapped`), and, inside the vault props, the vaultKey, wrapped under each passphrase.
 * **In the open**: the scope, each `boxlabel` and sidecar (`sidecar_json`), the `vault_id`, `unlock_epoch`,
-  `revision_id`s, how each passphrase was made into a key (its key deriver's label and salt),
+  `revision_tok`s, how each passphrase was made into a key (its key deriver's label and salt),
   when each vault and lockbox was first stored and each lockbox last written (epoch
   milliseconds), and the length of every ciphertext.
 * **Never**: a whisper, a passphrase, any key in usable form. The lease lives in the device
@@ -135,10 +135,10 @@ places:
 And keep, as they are:
 
 * **`Expectations`, from `safebyok`**: the comparisons each write makes before it lands
-  (`Expectations.bundleMeets`, `lockboxMeets`, `vaultMeets`, `vaultIdMeets`). An adapter
+  (`Expectations.vaultPropsMeets`, `lockboxMeets`, `vaultMeets`, `vaultIdMeets`). An adapter
   compares only the scope, `boxlabel`, `vault_id`, `unlock_epoch`, `vault_key_epoch` and
-  `revision_id`, and a standing row too damaged to show one of them fails the comparison. A
-  lockbox write compares the bundle's `vault_key_epoch` too, in the same transaction: skip it,
+  `revision_tok`, and a standing row too damaged to show one of them fails the comparison. A
+  lockbox write compares the vault props' `vault_key_epoch` too, in the same transaction: skip it,
   and a device still holding a vaultKey since replaced can seal a whisper under it.
 * **Store each record as itself, field by field**, exactly as handed to you, and return it
   exactly as stored, or null for none. Never look inside a ciphered field, never repair a

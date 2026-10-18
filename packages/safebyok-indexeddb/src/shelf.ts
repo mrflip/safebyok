@@ -15,7 +15,7 @@ const shelves = new Map<string, UseStore>()
 /**
  * The shelf of the database `dbName`, as `idb-keyval` hands one to its own calls.
  *
- * @example await get(bundleCkey(scope), shelfOf('acme'))
+ * @example await get(vaultPropsCkey(scope), shelfOf('acme'))
  */
 export const shelfOf = (dbName: string): UseStore => {
   const kept = shelves.get(dbName)

@@ -33,14 +33,14 @@ export const storageUnavailable = (cause: unknown, message: string = StorageTrou
 )
 
 /** What a write met that it did not expect, as {@link staleWrite} says it. */
-export const StaleWriteVals = ['bundle', 'lockbox', 'erase'] as const
+export const StaleWriteVals = ['vaultProps', 'lockbox', 'retire'] as const
 export type StaleWrite = typeof StaleWriteVals[number]
 
 /** What each stale write says: what changed under the writer, and to read again. */
 const StaleWriteSaid: Readonly<Record<StaleWrite, string>> = {
-  bundle:  'The vault changed in storage since this device read it -- its ways in were changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. Read the vault again before retrying.',
-  lockbox: 'That lockbox changed in storage since this device read it -- another device or tab wrote or erased it, or the vault was made anew -- so this write was refused and nothing was written. Read it again before retrying.',
-  erase:   'The vault changed in storage since this device read it -- it was deleted, or deleted and made anew, elsewhere -- so this erase was refused and nothing was erased. Read the vault again before retrying.',
+  vaultProps: 'The vault changed in storage since this device read it -- its ways in were changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. Read the vault again before retrying.',
+  lockbox:    'That lockbox changed in storage since this device read it -- another device or tab wrote or retired it, or the vault was made anew -- so this write was refused and nothing was written. Read it again before retrying.',
+  retire:     'The vault changed in storage since this device read it -- it was deleted, or deleted and made anew, elsewhere -- so this retirement was refused and nothing was removed. Read the vault again before retrying.',
 }
 
 /**
@@ -48,7 +48,7 @@ const StaleWriteSaid: Readonly<Record<StaleWrite, string>> = {
  * base class throws it for an adapter's `false`; an adapter that hands each call on to another
  * VaultDB meets it as it is.
  *
- * @param what - The write refused: a bundle update, a lockbox write, or an erase.
+ * @param what - The write refused: an update of the vault props, a lockbox write, or a retirement.
  * @returns The refusal, to throw.
  *
  * @example throw Refusals.staleWrite('lockbox')
@@ -72,7 +72,7 @@ export const notPermitted = (message = "The vault's storage does not let the sig
 
 /**
  * A `vault_full` refusal: a lockbox write past a limit the backend keeps on a vault, which wrote
- * nothing. The user erases a lockbox, or the host raises the limit where the backend allows.
+ * nothing. The user retires a lockbox, or the host raises the limit where the backend allows.
  *
  * @param limit - The most lockboxes the backend keeps in one vault, when that is the limit met.
  * @param opts - `cause`: the backend's own refusal, when there is one.
@@ -83,8 +83,8 @@ export const notPermitted = (message = "The vault's storage does not let the sig
  */
 export const vaultFull = (limit?: number, opts?: ErrorOptions): VaultError => {
   const message = limit === undefined
-    ? 'This vault is full: erase a lockbox to make room, then try again.'
-    : `This vault already holds the ${String(limit)} lockboxes its storage keeps in one vault: erase one before storing another.`
+    ? 'This vault is full: retire a lockbox to make room, then try again.'
+    : `This vault already holds the ${String(limit)} lockboxes its storage keeps in one vault: retire one before storing another.`
   return new VaultError('vault_full', message, optsOf(opts))
 }
 

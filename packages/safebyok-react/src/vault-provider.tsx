@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { checkStrengthTest, checkValidators, eraseDamagedVault as eraseStoredDamagedVault, isVaultCondition, isVaultError, openVault, parseLogger, type OpenVaultOpts, type PassphraseStrengthTest, type Vault, type VaultDB, type VaultError, type VaultLogger, type VaultScope, type VaultSnapshot, type VaultValidators } from 'safebyok'
+import { checkStrengthTest, checkValidators, retireDamagedVault as retireStoredDamagedVault, isVaultCondition, isVaultError, openVault, parseLogger, type OpenVaultOpts, type PassphraseStrengthTest, type Vault, type VaultDB, type VaultError, type VaultLogger, type VaultScope, type VaultSnapshot, type VaultValidators } from 'safebyok'
 import { PassphraseModal, type PassphraseAdvice } from './passphrase-modal'
 
 /**
@@ -12,17 +12,17 @@ export type VaultContextShape = {
   /**
    * Why the vault could not be opened, when it is a condition the app can show in place:
    * storage that cannot be reached (`storage_unavailable`), a user storage no longer serves
-   * (`identity_revoked`, as when signed out of the backend, or not yet signed in to it), a stored
-   * vault that fails its checks (`damaged_bundle`), a browser that will not let the app keep
-   * anything on this device (`storage_blocked`). Null while opening, once open, and while signed
-   * out. Misuse -- a bad label or option -- never lands here: the provider throws it to the
+   * (`identity_revoked`, as when signed out of the backend, or not yet signed in to it), a vault
+   * whose stored props fail their checks (`damaged_vault`), a browser that will not let the app
+   * keep anything on this device (`storage_blocked`). Null while opening, once open, and while
+   * signed out. Misuse -- a bad label or option -- never lands here: the provider throws it to the
    * nearest error boundary. Offer `retryOpen` only for one a retry may mend: never for
    * `storage_blocked`, which holds until something outside the app changes (say why instead), nor
-   * for `damaged_bundle`, which `eraseDamagedVault` answers.
+   * for `damaged_vault`, which `retireDamagedVault` answers.
    *
    * @example
    *   if (openError?.kind === 'storage_blocked') { return <p>{"This browser won't let the app keep your vault on this device."}</p> }
-   *   if (openError?.kind === 'damaged_bundle') { return <p>{"Your vault's stored record is damaged."}</p> }
+   *   if (openError?.kind === 'damaged_vault') { return <p>{"Your vault's stored record is damaged."}</p> }
    *   if (openError !== null) { return <p>{"Can't reach your vault."} <button onClick={retryOpen}>Retry</button></p> }
    */
   openError: VaultError | null
@@ -32,22 +32,22 @@ export type VaultContextShape = {
    */
   retryOpen: () => void
   /**
-   * Erase the stored vault that `openError` reports as `damaged_bundle`, with this device's lease
+   * Retire the stored vault that `openError` reports as `damaged_vault`, with this device's lease
    * of it, and open again: a fresh, absent vault, for the user to make anew.
    * The user's lockboxes in it are gone for good, so ask first. Resolves when the reopen is under
    * way, and does nothing while `openError` is any other, or none. Rejects with storage's
-   * refusal if the erase fails, such as `storage_unavailable`, leaving `openError` as it was; the
-   * `safebyok` package's `eraseDamagedVault` says which refusals to expect. One of them,
+   * refusal if retiring it fails, such as `storage_unavailable`, leaving `openError` as it was; the
+   * `safebyok` package's `retireDamagedVault` says which refusals to expect. One of them,
    * `stale_write`, means the vault was made anew meanwhile, so that one opens again as well, and
    * still rejects. Any other refusal opens nothing: `bad_option` among them, which is misuse, or
    * a vault that reads sound now, which `retryOpen()` then opens.
    *
    * @example
-   *   if (openError?.kind === 'damaged_bundle') {
-   *     return <button onClick={() => { if (confirm('Erase your vault and start over?')) { void eraseDamagedVault() } }}>Start over</button>
+   *   if (openError?.kind === 'damaged_vault') {
+   *     return <button onClick={() => { if (confirm('Erase your vault and start over?')) { void retireDamagedVault() } }}>Start over</button>
    *   }
    */
-  eraseDamagedVault: () => Promise<void>
+  retireDamagedVault: () => Promise<void>
   /**
    * Run an action that may need the vault unlocked. If it refuses with kind 'vault_locked', the
    * passphrase dialog opens; after a successful unlock the action runs again. Resolves null when
@@ -66,7 +66,7 @@ export type VaultContextShape = {
    * landing between the unlock and the runs again is the user's word, and wins: those runs meet
    * `vault_locked`, which reaches their callers.
    *
-   * @example const whisper = await withUnlockedVault(() => vault.read('anthropic_api_key'))
+   * @example const whisper = await withUnlockedVault(() => vault.readBox('anthropic_api_key'))
    *          // whisper === null: the user dismissed the dialog
    */
   withUnlockedVault: <ResultT>(action: () => Promise<ResultT>) => Promise<ResultT | null>
@@ -123,7 +123,7 @@ export type VaultProviderProps = Omit<OpenVaultOpts, 'userId'> & {
   /** The signed-in user from the host's auth, or null when nobody is: then there is no vault. */
   userId:              string | null
   /**
-   * Whether the passphrase dialog offers a user who has forgotten the passphrase to erase the
+   * Whether the passphrase dialog offers a user who has forgotten the passphrase to retire the
    * vault, on every device, and start a new one: `PassphraseModal`'s `allowStartOver`. Off by
    * default.
    */
@@ -292,14 +292,14 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
     if (openError !== null) { setOpenAttempt((prev) => prev + 1) }
   }, [openError])
 
-  const eraseDamagedVault = useCallback(async () => {
-    if (userId === null || ! isVaultError(openError, 'damaged_bundle')) { return }
+  const retireDamagedVault = useCallback(async () => {
+    if (userId === null || ! isVaultError(openError, 'damaged_vault')) { return }
     const validators = { applabel: applabelCheck, vaultlabel: vaultlabelCheck, boxlabel: boxlabelCheck, userId: userIdCheck, wayinlabel: wayinlabelCheck } satisfies Record<keyof VaultValidators, unknown>
     try {
-      await eraseStoredDamagedVault({ applabel, vaultlabel, userId, vaultDB, deviceDB, validators })
+      await retireStoredDamagedVault({ applabel, vaultlabel, userId, vaultDB, deviceDB, validators })
     } catch (err) {
       // The vault was made anew, so what openError says is out of date: open again, and still tell
-      // the caller why nothing was erased. Misuse (bad_option) reopens nothing.
+      // the caller why nothing was retired. Misuse (bad_option) reopens nothing.
       if (isVaultError(err, 'stale_write')) { setOpenAttempt((prev) => prev + 1) }
       throw err
     }
@@ -368,7 +368,7 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
   if (openFailure !== null) { throw openFailure.err }
 
   return (
-    <VaultContext.Provider value={{ vault, openError, retryOpen, eraseDamagedVault, withUnlockedVault }}>
+    <VaultContext.Provider value={{ vault, openError, retryOpen, retireDamagedVault, withUnlockedVault }}>
       {children}
       {asking !== null && asking.vault === vault && (
         <PassphraseModal

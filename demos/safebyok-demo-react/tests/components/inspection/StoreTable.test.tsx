@@ -32,7 +32,7 @@ describe("StoreTable", () => {
 
   it("shows each row's ckey and text, with a chip for ciphertext and for a key handle", () => {
     const rows: StoreRow[] = [
-      { ckey: 'bundle:acme',  text: '{"vault_key_passphrase_wrapped":{}}', flavor: 'ciphered' },
+      { ckey: 'vault:acme',   text: '{"vault_key_passphrase_wrapped":{}}', flavor: 'ciphered' },
       { ckey: 'lease:acme',   text: '«CryptoKey non-extractable handle»',  flavor: 'keyhandle' },
       { ckey: 'session:acme', text: '{"userlabel":"margo"}',               flavor: 'plain' },
     ]
@@ -62,10 +62,10 @@ describe("useStoreRows", () => {
 
 describe("useIdbRows", () => {
   it("fetches a shelf's rows as display text, and again when the shelf rings", async () => {
-    const shelf = fakeInspector([{ ckey: 'bundle:acme', row: { lockbox_key_wrapped: { ciphertext_b64: 'ct' } } }])
+    const shelf = fakeInspector([{ ckey: 'vault:acme', row: { lockbox_key_wrapped: { ciphertext_b64: 'ct' } } }])
     const { result } = renderHook(() => useIdbRows(shelf.inspector))
     await waitFor(() => { expect(result.current).to.have.lengthOf(1) })
-    expect(result.current[0]).to.deep.equal({ ckey: 'bundle:acme', text: '{"lockbox_key_wrapped":{"ciphertext_b64":"ct"}}', flavor: 'ciphered' })
+    expect(result.current[0]).to.deep.equal({ ckey: 'vault:acme', text: '{"lockbox_key_wrapped":{"ciphertext_b64":"ct"}}', flavor: 'ciphered' })
     act(() => { shelf.put({ ckey: 'note:acme', row: 'plain text' }) })
     await waitFor(() => { expect(result.current).to.have.lengthOf(2) })
   })

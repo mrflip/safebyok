@@ -17,7 +17,7 @@ import type { VaultLogger } from '../src/logger'
 import { StrongVerdict, type PassphraseStrengthTest } from '../src/passphrase-strength'
 import { memoryStore } from '../src/string-store'
 import type { Lockbox } from '../src/lockbox'
-import type { DamagedLockbox, DeviceMark, Lease, LockboxSummary, PasskeyWayin, PasskeyProof, PassphraseWayin, Sidecar, SeenVault, VaultBundle, VaultScope } from '../src/types'
+import type { DamagedLockbox, DeviceMark, Lease, LockboxSummary, PasskeyWayin, PasskeyProof, PassphraseWayin, Sidecar, SeenVault, VaultProps, VaultScope } from '../src/types'
 import { stableJsonify } from '../src/stable-jsonify'
 import { NameFloorBytes } from '../src/validators'
 import { TestDeriverNotice } from '../src/key-deriver-spec'
@@ -106,7 +106,7 @@ export const scopeOf = (userId: string, vaultlabel = 'main'): VaultScope => ({ a
  * tests, which never decrypt. Its wayin_id is `wayin-<wayinlabel>`; it wraps the vault's first
  * vaultKey, and was added by `device-one`.
  *
- * @example wayinOf('passphrase')                                            // the one bundleOf holds
+ * @example wayinOf('passphrase')                                            // the one vaultPropsOf holds
  * @example wayinOf('home_phrase', { vault_key_wayin_wrapped: fakeCiphered('home') })
  */
 export const wayinOf = (wayinlabel: string, overrides: Partial<PassphraseWayin> = {}): PassphraseWayin => ({
@@ -129,7 +129,7 @@ export const wayinOf = (wayinlabel: string, overrides: Partial<PassphraseWayin> 
  * `cred-<wayinlabel>`; it wraps the vault's first vaultKey, and was added by `device-one`.
  *
  * @example passkeyWayinOf('laptop')
- * @example bundleOf('u1', { wayins: [wayinOf('passphrase'), passkeyWayinOf('laptop')] })
+ * @example vaultPropsOf('u1', { wayins: [wayinOf('passphrase'), passkeyWayinOf('laptop')] })
  */
 export const passkeyWayinOf = (wayinlabel: string, overrides: Partial<PasskeyWayin> = {}): PasskeyWayin => ({
   wayinkind:               'passkey',
@@ -168,34 +168,34 @@ export const passkeyOf = async (tag: string, prfSaltB64?: string): Promise<Passk
 }
 
 /**
- * A shape-valid VaultBundle for `userId`'s `main` vault, its one wayin fake: for storage-layer
+ * A shape-valid VaultProps for `userId`'s `main` vault, its one wayin fake: for storage-layer
  * tests, which never decrypt. Its vault_id is `vault-id-<userId>`, its unlock epoch and its
  * vaultKey's epoch both 1, and its one way in a {@link wayinOf} labelled `passphrase` whose
- * wrap is `bundle-<userId>`.
+ * wrap is `vault-<userId>`.
  *
- * @example bundleOf('u1', { unlock_epoch: 2 })
- * @example bundleOf('u1', { wayins: [wayinOf('passphrase'), wayinOf('home_phrase')] })
+ * @example vaultPropsOf('u1', { unlock_epoch: 2 })
+ * @example vaultPropsOf('u1', { wayins: [wayinOf('passphrase'), wayinOf('home_phrase')] })
  */
-export const bundleOf = (userId: string, overrides: Partial<VaultBundle> = {}): VaultBundle => ({
+export const vaultPropsOf = (userId: string, overrides: Partial<VaultProps> = {}): VaultProps => ({
   format:              'safebyok-vault-v3',
   ...scopeOf(userId),
   vault_id:            `vault-id-${userId}`,
   unlock_epoch:        1,
   vault_key_epoch:     1,
-  wayins:              [wayinOf('passphrase', { vault_key_wayin_wrapped: fakeCiphered(`bundle-${userId}`) })],
+  wayins:              [wayinOf('passphrase', { vault_key_wayin_wrapped: fakeCiphered(`vault-${userId}`) })],
   registered_at:       Date.UTC(2026, 9, 14),
   ...overrides,
 })
 
 /**
- * {@link bundleOf}'s vault once its vaultKey has been replaced: at unlock epoch 2 and vaultKey
+ * {@link vaultPropsOf}'s vault once its vaultKey has been replaced: at unlock epoch 2 and vaultKey
  * epoch 2, its one way in sealed around the new vaultKey, and the first vaultKey kept, fake, as
  * its `prior_vault_key`. What a lockbox write sealed under the first vaultKey meets once the
  * vaultKey has moved on.
  *
- * @example await vaultDB.updateBundle(TH.rotatedBundleOf('u1'), { vault_id: 'vault-id-u1', unlock_epoch: 1 })
+ * @example await vaultDB.updateVaultProps(TH.rotatedVaultPropsOf('u1'), { vault_id: 'vault-id-u1', unlock_epoch: 1 })
  */
-export const rotatedBundleOf = (userId: string): VaultBundle => bundleOf(userId, {
+export const rotatedVaultPropsOf = (userId: string): VaultProps => vaultPropsOf(userId, {
   unlock_epoch:    2,
   vault_key_epoch: 2,
   prior_vault_key: { vault_key_epoch: 1, vault_key_wrapped: fakeCiphered(`prior-${userId}`) },
@@ -212,7 +212,7 @@ export const rotatedBundleOf = (userId: string): VaultBundle => bundleOf(userId,
 export const boxOf = (boxlabel: string, tag: string, overrides: Partial<Lockbox> = {}): Lockbox => ({
   format:                 'safebyok-lockbox-v5',
   boxlabel,
-  revision_id:            `rev-${tag}`,
+  revision_tok:           `rev-${tag}`,
   vault_key_epoch:        1,
   lockbox_key_wrapped:    fakeCiphered(`boxkey-${tag}`),
   whisper_ciphered:       fakeCiphered(`whisper-${tag}`),
@@ -256,18 +256,19 @@ export const summaryOf = (box: LockboxSummary | DamagedLockbox | undefined): Loc
 }
 
 /**
- * What a write into {@link bundleOf}('u1')'s vault expects when its lockbox is not there yet:
+ * What a write into {@link vaultPropsOf}('u1')'s vault expects when its lockbox is not there yet:
  * that vault, under its first vaultKey, and no revision. Frozen, since every test shares it.
  *
  * @example vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet)
  */
-export const noBoxYet = Object.freeze({ vault_id: 'vault-id-u1', revision_id: null, vault_key_epoch: 1 } as const)
+export const noBoxYet = Object.freeze({ vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 1 } as const)
 
 /**
- * What an erase of {@link bundleOf}('u1')'s vault, or of a lockbox in it, expects: that vault.
+ * What a retirement of {@link vaultPropsOf}('u1')'s vault, or of a lockbox in it, expects: that
+ * vault.
  * Frozen, since every test shares it.
  *
- * @example vaultDB.eraseVault(TH.scopeOf('u1'), TH.thisVault)
+ * @example vaultDB.retireVault(TH.scopeOf('u1'), TH.thisVault)
  */
 export const thisVault = Object.freeze({ vault_id: 'vault-id-u1' } as const)
 
@@ -275,7 +276,7 @@ export const thisVault = Object.freeze({ vault_id: 'vault-id-u1' } as const)
 export type MarkOverrides = Partial<Omit<DeviceMark, 'seen'>> & { seen?: Partial<SeenVault> | null }
 
 /**
- * A shape-valid DeviceMark for device-storage tests: `userId`'s `main` vault as {@link bundleOf}
+ * A shape-valid DeviceMark for device-storage tests: `userId`'s `main` vault as {@link vaultPropsOf}
  * has it, seen at unlock epoch 1 and vaultKey epoch 1, by the device `device-one`, never locked.
  *
  * @example await deviceDB.writeMark(TH.markOf('u1'))
@@ -460,7 +461,7 @@ export type AsyncVerbOf<Target> = {
  * @param meanwhile - What to run first, and wait for.
  *
  * @example
- *   TH.beforeNextCall(vaultDB, 'updateBox', () => there.store('anthropic', 'sk-ant-fake-theirs'))
+ *   TH.beforeNextCall(vaultDB, 'updateBox', () => there.storeBox('anthropic', 'sk-ant-fake-theirs'))
  */
 export const beforeNextCall = <Target extends object>(target: Target, verb: AsyncVerbOf<Target> & string, meanwhile: () => Promise<unknown>): void => {
   const method = (target as unknown as Record<string, AsyncFn | undefined>)[verb]
@@ -519,7 +520,7 @@ const originalOf = new WeakMap<object, AsyncFn>()
  * @returns The gate: await `reached`, then `release()`.
  *
  * @example
- *   const gate = TH.holdNextCall(vaultDB, 'readBundle')
+ *   const gate = TH.holdNextCall(vaultDB, 'readVaultProps')
  *   const unlocking = vault.unlock('pw')   // now waiting at the gate
  *   await gate.reached
  *   await vault.lock()                     // lands mid-unlock
@@ -675,8 +676,8 @@ export type Race<DeviceT> = {
  * @example
  *   await TH.raceEveryWay({
  *     makeDevices: (turnstile) => () => postgresVaultDB({ client: TH.throughTurnstile(turnstile, db, ['query']), userId: 'u1' }),
- *     setup:       (first) => first.createBundle(TH.bundleOf('u1')),
- *     moves:       [(one) => one.eraseVault(TH.scopeOf('u1'), TH.thisVault), (two) => two.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet)],
+ *     setup:       (first) => first.fetchOrCreateVaultProps(TH.vaultPropsOf('u1')),
+ *     moves:       [(one) => one.retireVault(TH.scopeOf('u1'), TH.thisVault), (two) => two.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet)],
  *     verdict:     async (outcomes, [one]) => { expect(await one.listBoxes(TH.scopeOf('u1'))).to.have.lengthOf(0) },
  *   })
  */
@@ -985,11 +986,11 @@ export const VaultDBContract = Object.freeze({
   '2.1': 'A write that resolved is seen by every read after it',
   '2.2': 'Every lockbox stored can be read by its boxlabel',
   '2.3': 'A listing is whole',
-  '3.1': 'A bundle is created once',
-  '3.2': 'A bundle update lands only over the bundle it read',
+  '3.1': 'Vault props are created once',
+  '3.2': 'An update of the vault props lands only over the props it read',
   '3.3': 'A lockbox write lands only over the lockbox it read, in the vault it was sealed for',
-  '3.4': 'An erase wins, within its vault',
-  '3.5': 'A vault is erased whole, and alone',
+  '3.4': 'A retirement wins, within its vault',
+  '3.5': 'A vault is retired whole, and alone',
   '3.6': 'A refused write wrote nothing',
   '3.7': 'Writes that do not collide all land',
   '3.8': 'A lockbox write lands only under the vaultKey that stands',
@@ -1021,7 +1022,7 @@ export type VaultDBContractLine = keyof typeof VaultDBContract
  * VaultDB from the built package (`safebyok`) qualifies as readily as one extending `src/`.
  */
 export type VaultDBVerbs = Pick<VaultDB,
-  'maxRecordBytes' | 'maxVaultBytes' | 'maxLockboxes' | 'maxNameBytes' | 'readBundle' | 'createBundle' | 'updateBundle' | 'readBox' | 'listBoxes' | 'listBoxRecords' | 'updateBox' | 'eraseBox' | 'eraseVault' | 'eraseDamagedVault' | 'subscribe'
+  'maxRecordBytes' | 'maxVaultBytes' | 'maxLockboxes' | 'maxNameBytes' | 'readVaultProps' | 'fetchOrCreateVaultProps' | 'updateVaultProps' | 'readBox' | 'listBoxes' | 'listBoxRecords' | 'updateBox' | 'retireBox' | 'retireVault' | 'retireDamagedVault' | 'subscribe'
 >
 
 /**
@@ -1124,10 +1125,10 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
     }
   }
 
-  /** A fresh adapter whose `u1` scope holds a bundle, as every lockbox write needs. */
-  const withBundle = async () => {
+  /** A fresh adapter whose `u1` scope holds vault props, as every lockbox write needs. */
+  const withVaultProps = async () => {
     const vaultDB = await makeVaultDB()
-    await vaultDB.createBundle(bundleOf('u1'))
+    await vaultDB.fetchOrCreateVaultProps(vaultPropsOf('u1'))
     return vaultDB
   }
 
@@ -1136,7 +1137,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
     if (! makeVaultDBFor) { throw new Error('describeVaultDB ran a sign-in test with no makeVaultDBFor.') }
     const vaultDBFor = await makeVaultDBFor()
     const owner = vaultDBFor('u1')
-    await owner.createBundle(bundleOf('u1'))
+    await owner.fetchOrCreateVaultProps(vaultPropsOf('u1'))
     await storeEach(owner, ['anthropic', 'openai'])
     return { owner, vaultDBFor }
   }
@@ -1145,28 +1146,28 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
   const cappedHolding = async (boxlabels: readonly string[]) => {
     if (! makeCappedVaultDB) { throw new Error('describeVaultDB ran a lockbox limit test with no makeCappedVaultDB.') }
     const vaultDB = await makeCappedVaultDB(CappedLockboxes)
-    await vaultDB.createBundle(bundleOf('u1'))
+    await vaultDB.fetchOrCreateVaultProps(vaultPropsOf('u1'))
     await storeEach(vaultDB, boxlabels)
     return vaultDB
   }
 
   describe(lineTitle('1.1'), () => {
-    it("has no bundle until one is created, then reads it back whole", async () => {
+    it("has no vault props until they are created, then reads them back whole", async () => {
       const vaultDB = await makeVaultDB()
-      expect(await vaultDB.readBundle(scopeOf('u1'))).to.be.null
-      expect(await vaultDB.createBundle(bundleOf('u1'))).to.deep.equal(bundleOf('u1'))
-      expect(await vaultDB.readBundle(scopeOf('u1'))).to.deep.equal(bundleOf('u1'))
+      expect(await vaultDB.readVaultProps(scopeOf('u1'))).to.be.null
+      expect(await vaultDB.fetchOrCreateVaultProps(vaultPropsOf('u1'))).to.deep.equal(vaultPropsOf('u1'))
+      expect(await vaultDB.readVaultProps(scopeOf('u1'))).to.deep.equal(vaultPropsOf('u1'))
     })
 
     it("has no lockbox until one is written, then reads it back whole", async () => {
-      const vaultDB = await withBundle()
+      const vaultDB = await withVaultProps()
       expect(await vaultDB.readBox(scopeOf('u1'), 'anthropic')).to.be.null
       await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), noBoxYet)
       expect(await vaultDB.readBox(scopeOf('u1'), 'anthropic')).to.deep.equal(boxOf('anthropic', 'one'))
     })
 
     it("reads back a lockbox with an empty sidecar as stored, and lists it with that sidecar", async () => {
-      const vaultDB = await withBundle()
+      const vaultDB = await withVaultProps()
       const sidecarless = boxOf('anthropic', 'one', { sidecar_json: '{}' })
       await vaultDB.updateBox(scopeOf('u1'), sidecarless, noBoxYet)
       expect(await vaultDB.readBox(scopeOf('u1'), 'anthropic')).to.deep.equal(sidecarless)
@@ -1175,7 +1176,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
     })
 
     it("reads a sidecar's JSON back exactly as written, as it is bound: accented letters, an emoji, a tab, a newline, quotes and backslashes", async () => {
-      const vaultDB = await withBundle()
+      const vaultDB = await withVaultProps()
       await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one', { sidecar_json: sidecarJsonOf(LiteralSidecar) }), noBoxYet)
       const lockbox = await vaultDB.readBox(scopeOf('u1'), 'anthropic')
       expect(lockbox?.sidecar_json).to.eq(sidecarJsonOf(LiteralSidecar))
@@ -1185,23 +1186,23 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
 
     it("adds nothing it was handed beyond the record: a field safebyok never writes is left behind", async () => {
       const vaultDB = await makeVaultDB()
-      await vaultDB.createBundle({ ...bundleOf('u1'), stray_field: 'never stored' } as VaultBundle)
+      await vaultDB.fetchOrCreateVaultProps({ ...vaultPropsOf('u1'), stray_field: 'never stored' } as VaultProps)
       await vaultDB.updateBox(scopeOf('u1'), { ...boxOf('anthropic', 'one'), stray_field: 'never stored' } as Lockbox, noBoxYet)
-      expect(await vaultDB.readBundle(scopeOf('u1'))).to.deep.equal(bundleOf('u1'))
+      expect(await vaultDB.readVaultProps(scopeOf('u1'))).to.deep.equal(vaultPropsOf('u1'))
       expect(await vaultDB.readBox(scopeOf('u1'), 'anthropic')).to.deep.equal(boxOf('anthropic', 'one'))
     })
   })
 
   describe(lineTitle('1.2'), () => {
     it("keeps each scope to itself: same boxlabel, two users, no collision", async () => {
-      const vaultDB = await withBundle()
-      await vaultDB.createBundle(bundleOf('u2'))
+      const vaultDB = await withVaultProps()
+      await vaultDB.fetchOrCreateVaultProps(vaultPropsOf('u2'))
       await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), noBoxYet)
-      await vaultDB.updateBox(scopeOf('u2'), boxOf('anthropic', 'two'), { vault_id: 'vault-id-u2', revision_id: null, vault_key_epoch: 1 })
+      await vaultDB.updateBox(scopeOf('u2'), boxOf('anthropic', 'two'), { vault_id: 'vault-id-u2', revision_tok: null, vault_key_epoch: 1 })
       const oneBox = await vaultDB.readBox(scopeOf('u1'), 'anthropic')
       const twoBox = await vaultDB.readBox(scopeOf('u2'), 'anthropic')
-      expect(oneBox?.revision_id).to.eq('rev-one')
-      expect(twoBox?.revision_id).to.eq('rev-two')
+      expect(oneBox?.revision_tok).to.eq('rev-one')
+      expect(twoBox?.revision_tok).to.eq('rev-two')
       expect(await vaultDB.listBoxes(scopeOf('u2'))).to.have.lengthOf(1)
     })
 
@@ -1209,13 +1210,13 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       const vaultDB = await makeVaultDB()
       const userIds = ['u1', 'u1:', 'u1"', String.raw`u1\\`, 'u1,', 'u1[', 'u1]', 'u1","main']
       for (const [ii, userId] of userIds.entries()) {
-        await vaultDB.createBundle(bundleOf(userId))
-        await vaultDB.updateBox(scopeOf(userId), boxOf('anthropic', `of-${String(ii)}`), { vault_id: `vault-id-${userId}`, revision_id: null, vault_key_epoch: 1 })
+        await vaultDB.fetchOrCreateVaultProps(vaultPropsOf(userId))
+        await vaultDB.updateBox(scopeOf(userId), boxOf('anthropic', `of-${String(ii)}`), { vault_id: `vault-id-${userId}`, revision_tok: null, vault_key_epoch: 1 })
       }
       const listEach = () => Promise.all(userIds.map((userId) => vaultDB.listBoxes(scopeOf(userId))))
       const before = await listEach()
-      expect(before.map((listing) => listing.map((box) => summaryOf(box)?.revision_id))).to.deep.equal(userIds.map((_userId, ii) => [`rev-of-${String(ii)}`]))
-      await vaultDB.eraseVault(scopeOf('u1'), thisVault)
+      expect(before.map((listing) => listing.map((box) => summaryOf(box)?.revision_tok))).to.deep.equal(userIds.map((_userId, ii) => [`rev-of-${String(ii)}`]))
+      await vaultDB.retireVault(scopeOf('u1'), thisVault)
       const after = await listEach()
       expect(after.map((listing) => listing.length)).to.deep.equal([0, 1, 1, 1, 1, 1, 1, 1])
     })
@@ -1223,29 +1224,29 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
     it("holds one spelling of a letter: a user id with it composed is stored, and one with it decomposed refused, never normalized", async () => {
       const vaultDB = await makeVaultDB()
       const [composed, decomposed] = ['caf\u{E9}', 'cafe\u{301}']
-      await vaultDB.createBundle(bundleOf(composed))
-      expect(await vaultDB.readBundle(scopeOf(composed))).to.deep.equal(bundleOf(composed))
-      await expectRefusal(vaultDB.createBundle(bundleOf(decomposed)), 'bad_label')
-      await expectRefusal(vaultDB.readBundle(scopeOf(decomposed)), 'bad_label')
+      await vaultDB.fetchOrCreateVaultProps(vaultPropsOf(composed))
+      expect(await vaultDB.readVaultProps(scopeOf(composed))).to.deep.equal(vaultPropsOf(composed))
+      await expectRefusal(vaultDB.fetchOrCreateVaultProps(vaultPropsOf(decomposed)), 'bad_label')
+      await expectRefusal(vaultDB.readVaultProps(scopeOf(decomposed)), 'bad_label')
     })
 
     it("keeps apart vaults and boxes whose labels differ only by a colon, a quote, a backslash, a comma or a bracket, or are in any script", async () => {
       const vaultDB = await makeVaultDB()
       const scopes = OddLabels.map((vaultlabel) => scopeOf('u1', vaultlabel))
       for (const [ii, scope] of scopes.entries()) {
-        await vaultDB.createBundle(bundleOf('u1', { ...scope, vault_id: `vault-id-${String(ii)}` }))
-        await vaultDB.updateBox(scope, boxOf(OddLabels[ii] ?? '', `of-${String(ii)}`), { vault_id: `vault-id-${String(ii)}`, revision_id: null, vault_key_epoch: 1 })
+        await vaultDB.fetchOrCreateVaultProps(vaultPropsOf('u1', { ...scope, vault_id: `vault-id-${String(ii)}` }))
+        await vaultDB.updateBox(scope, boxOf(OddLabels[ii] ?? '', `of-${String(ii)}`), { vault_id: `vault-id-${String(ii)}`, revision_tok: null, vault_key_epoch: 1 })
       }
       const listEach = () => Promise.all(scopes.map((scope) => vaultDB.listBoxes(scope)))
       const before = await listEach()
-      expect(before.map((listing) => listing.map((box) => [box.boxlabel, summaryOf(box)?.revision_id]))).to.deep.equal(OddLabels.map((label, ii) => [[label, `rev-of-${String(ii)}`]]))
-      await vaultDB.eraseVault(scopes[0] ?? scopeOf('u1'), { vault_id: 'vault-id-0' })
+      expect(before.map((listing) => listing.map((box) => [box.boxlabel, summaryOf(box)?.revision_tok]))).to.deep.equal(OddLabels.map((label, ii) => [[label, `rev-of-${String(ii)}`]]))
+      await vaultDB.retireVault(scopes[0] ?? scopeOf('u1'), { vault_id: 'vault-id-0' })
       const after = await listEach()
       expect(after.map((listing) => listing.length)).to.deep.equal(OddLabels.map((_label, ii) => (ii === 0 ? 0 : 1)))
     })
 
     it("keeps boxes of one vault apart, by any labels, reading back each under its own", async () => {
-      const vaultDB = await withBundle()
+      const vaultDB = await withVaultProps()
       for (const [ii, boxlabel] of OddLabels.entries()) {
         await vaultDB.updateBox(scopeOf('u1'), boxOf(boxlabel, `of-${String(ii)}`), noBoxYet)
       }
@@ -1253,26 +1254,26 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       expect(summaries.map((box) => box.boxlabel)).to.have.members([...OddLabels])
       for (const [ii, boxlabel] of OddLabels.entries()) {
         const lockbox = await vaultDB.readBox(scopeOf('u1'), boxlabel)
-        expect(lockbox?.revision_id).to.eq(`rev-of-${String(ii)}`)
+        expect(lockbox?.revision_tok).to.eq(`rev-of-${String(ii)}`)
       }
-      await vaultDB.eraseBox(scopeOf('u1'), 'main"', thisVault)
+      await vaultDB.retireBox(scopeOf('u1'), 'main"', thisVault)
       const remaining = await vaultDB.listBoxes(scopeOf('u1'))
       expect(remaining).to.have.lengthOf(OddLabels.length - 1)
     })
   })
 
   describe(lineTitle('2.1'), () => {
-    it("shows each write to the very next read and listing, and each erase likewise", async () => {
-      const vaultDB = await withBundle()
+    it("shows each write to the very next read and listing, and each retirement likewise", async () => {
+      const vaultDB = await withVaultProps()
       const revisionsNow = async () => ({
         read:   await revisionIn(vaultDB, 'anthropic'),
         listed: await listedRevisions(vaultDB),
       })
       await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), noBoxYet)
       expect(await revisionsNow()).to.deep.equal({ read: 'rev-one', listed: ['rev-one'] })
-      await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'two'), { vault_id: 'vault-id-u1', revision_id: 'rev-one', vault_key_epoch: 1 })
+      await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'two'), { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 1 })
       expect(await revisionsNow()).to.deep.equal({ read: 'rev-two', listed: ['rev-two'] })
-      await vaultDB.eraseBox(scopeOf('u1'), 'anthropic', thisVault)
+      await vaultDB.retireBox(scopeOf('u1'), 'anthropic', thisVault)
       expect(await revisionsNow()).to.deep.equal({ read: null, listed: [] })
     })
 
@@ -1281,7 +1282,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
 
   describe(lineTitle('2.2'), () => {
     it("reads each of many lockboxes back by its boxlabel", async () => {
-      const vaultDB = await withBundle()
+      const vaultDB = await withVaultProps()
       await storeEach(vaultDB, ManyBoxlabels)
       const revisions = await Promise.all(ManyBoxlabels.map((boxlabel) => revisionIn(vaultDB, boxlabel)))
       expect(revisions).to.deep.equal(ManyBoxlabels.map((boxlabel) => `rev-${boxlabel}`))
@@ -1290,14 +1291,14 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
 
   describe(lineTitle('2.3'), () => {
     it("lists summaries sorted by boxlabel, with format and both ciphered fields stripped", async () => {
-      const vaultDB = await withBundle()
+      const vaultDB = await withVaultProps()
       await vaultDB.updateBox(scopeOf('u1'), boxOf('openai', 'two'), noBoxYet)
       await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), noBoxYet)
       const summaries = await vaultDB.listBoxes(scopeOf('u1'))
       expect(summaries.map((box) => box.boxlabel)).to.deep.equal(['anthropic', 'openai'])
       expect(summaries[0]).to.deep.equal({
         boxlabel:        'anthropic',
-        revision_id:     'rev-one',
+        revision_tok:    'rev-one',
         vault_key_epoch: 1,
         sidecar:         { note: 'a test box' },
         registered_at:   Date.UTC(2026, 9, 14),
@@ -1307,23 +1308,23 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
     })
 
     it("lists every lockbox, however many: never a page or a sample", async () => {
-      const vaultDB = await withBundle()
+      const vaultDB = await withVaultProps()
       await storeEach(vaultDB, ManyBoxlabels)
       const listed = await vaultDB.listBoxes(scopeOf('u1'))
       expect(listed.map((box) => box.boxlabel)).to.deep.equal(ManyBoxlabels.toSorted((one, two) => one.localeCompare(two)))
     })
 
     it("lists the same twice with nothing written between", async () => {
-      const vaultDB = await withBundle()
+      const vaultDB = await withVaultProps()
       await storeEach(vaultDB, ['openai', 'anthropic', 'mistral'])
       expect(await vaultDB.listBoxes(scopeOf('u1'))).to.deep.equal(await vaultDB.listBoxes(scopeOf('u1')))
     })
 
     it("lists every lockbox as stored through listBoxRecords, for a server to serve: each record whole but for its two ciphered fields", async () => {
-      const vaultDB = await withBundle()
+      const vaultDB = await withVaultProps()
       await storeEach(vaultDB, ['openai', 'anthropic'])
-      await vaultDB.createBundle(bundleOf('u2'))
-      await vaultDB.updateBox(scopeOf('u2'), boxOf('mistral', 'other'), { vault_id: 'vault-id-u2', revision_id: null, vault_key_epoch: 1 })
+      await vaultDB.fetchOrCreateVaultProps(vaultPropsOf('u2'))
+      await vaultDB.updateBox(scopeOf('u2'), boxOf('mistral', 'other'), { vault_id: 'vault-id-u2', revision_tok: null, vault_key_epoch: 1 })
       const records = await vaultDB.listBoxRecords(scopeOf('u1'))
       const listedOf = (boxlabel: string) => {
         const { lockbox_key_wrapped: _lockboxKeyWrapped, whisper_ciphered: _whisperCiphered, ...listed } = boxOf(boxlabel, boxlabel)
@@ -1335,44 +1336,44 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
   })
 
   describe(lineTitle('3.1'), () => {
-    it("yields to a bundle already standing: the second device gets the first's back", async () => {
-      const vaultDB = await withBundle()
-      const latecomer = { ...bundleOf('u1'), vault_id: 'the-second-arrival' }
-      expect(await vaultDB.createBundle(latecomer)).to.deep.equal(bundleOf('u1'))
-      expect(await vaultDB.readBundle(scopeOf('u1'))).to.deep.equal(bundleOf('u1'))
+    it("yields to vault props already standing: the second device gets the first's back", async () => {
+      const vaultDB = await withVaultProps()
+      const latecomer = { ...vaultPropsOf('u1'), vault_id: 'the-second-arrival' }
+      expect(await vaultDB.fetchOrCreateVaultProps(latecomer)).to.deep.equal(vaultPropsOf('u1'))
+      expect(await vaultDB.readVaultProps(scopeOf('u1'))).to.deep.equal(vaultPropsOf('u1'))
     })
 
     timingTestsOf('3.1')
   })
 
   describe(lineTitle('3.2'), () => {
-    it("lands while the standing bundle is the one proven against", async () => {
-      const vaultDB = await withBundle()
-      const next = { ...bundleOf('u1'), unlock_epoch: 2 }
-      await vaultDB.updateBundle(next, { vault_id: 'vault-id-u1', unlock_epoch: 1 })
-      expect(await vaultDB.readBundle(scopeOf('u1'))).to.deep.equal(next)
+    it("lands while the standing vault props are the ones proven against", async () => {
+      const vaultDB = await withVaultProps()
+      const next = { ...vaultPropsOf('u1'), unlock_epoch: 2 }
+      await vaultDB.updateVaultProps(next, { vault_id: 'vault-id-u1', unlock_epoch: 1 })
+      expect(await vaultDB.readVaultProps(scopeOf('u1'))).to.deep.equal(next)
     })
 
     it("refuses over an unlock_epoch since moved on, writing nothing", async () => {
-      const vaultDB = await withBundle()
-      const theirs = { ...bundleOf('u1'), unlock_epoch: 2, wayins: [wayinOf('passphrase', { vault_key_wayin_wrapped: fakeCiphered('theirs') })] }
-      await vaultDB.updateBundle(theirs, { vault_id: 'vault-id-u1', unlock_epoch: 1 })
-      const mine = { ...bundleOf('u1'), unlock_epoch: 2, wayins: [wayinOf('passphrase', { vault_key_wayin_wrapped: fakeCiphered('mine') })] }
-      await expectRefusal(vaultDB.updateBundle(mine, { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'stale_write')
-      expect(await vaultDB.readBundle(scopeOf('u1'))).to.deep.equal(theirs)
+      const vaultDB = await withVaultProps()
+      const theirs = { ...vaultPropsOf('u1'), unlock_epoch: 2, wayins: [wayinOf('passphrase', { vault_key_wayin_wrapped: fakeCiphered('theirs') })] }
+      await vaultDB.updateVaultProps(theirs, { vault_id: 'vault-id-u1', unlock_epoch: 1 })
+      const mine = { ...vaultPropsOf('u1'), unlock_epoch: 2, wayins: [wayinOf('passphrase', { vault_key_wayin_wrapped: fakeCiphered('mine') })] }
+      await expectRefusal(vaultDB.updateVaultProps(mine, { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'stale_write')
+      expect(await vaultDB.readVaultProps(scopeOf('u1'))).to.deep.equal(theirs)
     })
 
     it("refuses over a vault made anew under another vault_id", async () => {
-      const vaultDB = await withBundle()
-      const next = { ...bundleOf('u1'), vault_id: 'vault-id-gone', unlock_epoch: 2 }
-      await expectRefusal(vaultDB.updateBundle(next, { vault_id: 'vault-id-gone', unlock_epoch: 1 }), 'stale_write')
-      expect(await vaultDB.readBundle(scopeOf('u1'))).to.deep.equal(bundleOf('u1'))
+      const vaultDB = await withVaultProps()
+      const next = { ...vaultPropsOf('u1'), vault_id: 'vault-id-gone', unlock_epoch: 2 }
+      await expectRefusal(vaultDB.updateVaultProps(next, { vault_id: 'vault-id-gone', unlock_epoch: 1 }), 'stale_write')
+      expect(await vaultDB.readVaultProps(scopeOf('u1'))).to.deep.equal(vaultPropsOf('u1'))
     })
 
-    it("refuses where no bundle stands: an update never creates", async () => {
+    it("refuses where no vault props stand: an update never creates", async () => {
       const vaultDB = await makeVaultDB()
-      await expectRefusal(vaultDB.updateBundle(bundleOf('u1'), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'stale_write')
-      expect(await vaultDB.readBundle(scopeOf('u1'))).to.be.null
+      await expectRefusal(vaultDB.updateVaultProps(vaultPropsOf('u1'), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'stale_write')
+      expect(await vaultDB.readVaultProps(scopeOf('u1'))).to.be.null
     })
 
     timingTestsOf('3.2')
@@ -1380,42 +1381,42 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
 
   describe(lineTitle('3.3'), () => {
     it("replaces a lockbox over the revision it read", async () => {
-      const vaultDB = await withBundle()
+      const vaultDB = await withVaultProps()
       await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), noBoxYet)
-      await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'two'), { vault_id: 'vault-id-u1', revision_id: 'rev-one', vault_key_epoch: 1 })
+      await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'two'), { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 1 })
       expect(await vaultDB.readBox(scopeOf('u1'), 'anthropic')).to.deep.equal(boxOf('anthropic', 'two'))
     })
 
     it("refuses a write over a revision it never read, writing nothing", async () => {
-      const vaultDB = await withBundle()
+      const vaultDB = await withVaultProps()
       await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), noBoxYet)
       // A second device that saw no box, and one that saw some other revision, both lose.
       await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'two'), noBoxYet), 'stale_write')
-      await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'two'), { vault_id: 'vault-id-u1', revision_id: 'rev-other', vault_key_epoch: 1 }), 'stale_write')
+      await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'two'), { vault_id: 'vault-id-u1', revision_tok: 'rev-other', vault_key_epoch: 1 }), 'stale_write')
       expect(await vaultDB.readBox(scopeOf('u1'), 'anthropic')).to.deep.equal(boxOf('anthropic', 'one'))
     })
 
-    it("refuses a write into a scope that holds no bundle", async () => {
+    it("refuses a write into a scope that holds no vault props", async () => {
       const vaultDB = await makeVaultDB()
       await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), noBoxYet), 'stale_write')
       expect(await vaultDB.readBox(scopeOf('u1'), 'anthropic')).to.be.null
     })
 
-    it("refuses a box sealed for a vault since destroyed and made anew, though no box stands in either", async () => {
-      const vaultDB = await withBundle()
-      await vaultDB.eraseVault(scopeOf('u1'), thisVault)
-      await vaultDB.createBundle({ ...bundleOf('u1'), vault_id: 'vault-id-reborn' })
+    it("refuses a box sealed for a vault since retired and made anew, though no box stands in either", async () => {
+      const vaultDB = await withVaultProps()
+      await vaultDB.retireVault(scopeOf('u1'), thisVault)
+      await vaultDB.fetchOrCreateVaultProps({ ...vaultPropsOf('u1'), vault_id: 'vault-id-reborn' })
       await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'stale'), noBoxYet), 'stale_write')
       expect(await vaultDB.readBox(scopeOf('u1'), 'anthropic')).to.be.null
-      await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'fresh'), { vault_id: 'vault-id-reborn', revision_id: null, vault_key_epoch: 1 })
+      await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'fresh'), { vault_id: 'vault-id-reborn', revision_tok: null, vault_key_epoch: 1 })
       const reborn = await vaultDB.readBox(scopeOf('u1'), 'anthropic')
-      expect(reborn?.revision_id).to.eq('rev-fresh')
+      expect(reborn?.revision_tok).to.eq('rev-fresh')
     })
 
     it("refuses a write expecting another user's vault_id", async () => {
-      const vaultDB = await withBundle()
-      await vaultDB.createBundle(bundleOf('u2'))
-      await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), { vault_id: 'vault-id-u2', revision_id: null, vault_key_epoch: 1 }), 'stale_write')
+      const vaultDB = await withVaultProps()
+      await vaultDB.fetchOrCreateVaultProps(vaultPropsOf('u2'))
+      await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), { vault_id: 'vault-id-u2', revision_tok: null, vault_key_epoch: 1 }), 'stale_write')
     })
 
     timingTestsOf('3.3')
@@ -1423,96 +1424,96 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
 
   describe(lineTitle('3.4'), () => {
     it("removes one box without touching its neighbours, and is quiet when there is none", async () => {
-      const vaultDB = await withBundle()
+      const vaultDB = await withVaultProps()
       await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), noBoxYet)
       await vaultDB.updateBox(scopeOf('u1'), boxOf('openai', 'two'), noBoxYet)
-      await vaultDB.eraseBox(scopeOf('u1'), 'anthropic', thisVault)
-      await vaultDB.eraseBox(scopeOf('u1'), 'anthropic', thisVault)
+      await vaultDB.retireBox(scopeOf('u1'), 'anthropic', thisVault)
+      await vaultDB.retireBox(scopeOf('u1'), 'anthropic', thisVault)
       expect(await vaultDB.readBox(scopeOf('u1'), 'anthropic')).to.be.null
       expect(await vaultDB.readBox(scopeOf('u1'), 'openai')).to.not.be.null
     })
 
-    it("wins over a write: a write over a revision erased meanwhile refuses, and the box stays gone", async () => {
-      const vaultDB = await withBundle()
+    it("wins over a write: a write over a revision retired meanwhile refuses, and the box stays gone", async () => {
+      const vaultDB = await withVaultProps()
       await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), noBoxYet)
-      await vaultDB.eraseBox(scopeOf('u1'), 'anthropic', thisVault)
-      await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'two'), { vault_id: 'vault-id-u1', revision_id: 'rev-one', vault_key_epoch: 1 }), 'stale_write')
+      await vaultDB.retireBox(scopeOf('u1'), 'anthropic', thisVault)
+      await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'two'), { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 1 }), 'stale_write')
       expect(await vaultDB.readBox(scopeOf('u1'), 'anthropic')).to.be.null
     })
 
-    it("refuses from a stale handle: a vault destroyed and made anew keeps its box", async () => {
-      const vaultDB = await withBundle()
-      await vaultDB.eraseVault(scopeOf('u1'), thisVault)
-      await vaultDB.createBundle({ ...bundleOf('u1'), vault_id: 'vault-id-reborn' })
-      await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'reborn'), { vault_id: 'vault-id-reborn', revision_id: null, vault_key_epoch: 1 })
-      await expectRefusal(vaultDB.eraseBox(scopeOf('u1'), 'anthropic', thisVault), 'stale_write')
+    it("refuses from a stale handle: a vault retired and made anew keeps its box", async () => {
+      const vaultDB = await withVaultProps()
+      await vaultDB.retireVault(scopeOf('u1'), thisVault)
+      await vaultDB.fetchOrCreateVaultProps({ ...vaultPropsOf('u1'), vault_id: 'vault-id-reborn' })
+      await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'reborn'), { vault_id: 'vault-id-reborn', revision_tok: null, vault_key_epoch: 1 })
+      await expectRefusal(vaultDB.retireBox(scopeOf('u1'), 'anthropic', thisVault), 'stale_write')
       const kept = await vaultDB.readBox(scopeOf('u1'), 'anthropic')
-      expect(kept?.revision_id).to.eq('rev-reborn')
+      expect(kept?.revision_tok).to.eq('rev-reborn')
     })
 
-    it("refuses in a scope that holds no bundle, even with no box to erase", async () => {
+    it("refuses in a scope that holds no vault props, even with no box to retire", async () => {
       const vaultDB = await makeVaultDB()
-      await expectRefusal(vaultDB.eraseBox(scopeOf('u1'), 'anthropic', thisVault), 'stale_write')
+      await expectRefusal(vaultDB.retireBox(scopeOf('u1'), 'anthropic', thisVault), 'stale_write')
     })
 
     timingTestsOf('3.4')
   })
 
   describe(lineTitle('3.5'), () => {
-    it("removes the bundle and every box of that scope, and nothing else", async () => {
-      const vaultDB = await withBundle()
-      await vaultDB.createBundle(bundleOf('u2'))
+    it("removes the vault props and every box of that scope, and nothing else", async () => {
+      const vaultDB = await withVaultProps()
+      await vaultDB.fetchOrCreateVaultProps(vaultPropsOf('u2'))
       await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), noBoxYet)
-      await vaultDB.updateBox(scopeOf('u2'), boxOf('anthropic', 'two'), { vault_id: 'vault-id-u2', revision_id: null, vault_key_epoch: 1 })
-      await vaultDB.eraseVault(scopeOf('u1'), thisVault)
-      expect(await vaultDB.readBundle(scopeOf('u1'))).to.be.null
+      await vaultDB.updateBox(scopeOf('u2'), boxOf('anthropic', 'two'), { vault_id: 'vault-id-u2', revision_tok: null, vault_key_epoch: 1 })
+      await vaultDB.retireVault(scopeOf('u1'), thisVault)
+      expect(await vaultDB.readVaultProps(scopeOf('u1'))).to.be.null
       expect(await vaultDB.listBoxes(scopeOf('u1'))).to.have.lengthOf(0)
-      expect(await vaultDB.readBundle(scopeOf('u2'))).to.not.be.null
+      expect(await vaultDB.readVaultProps(scopeOf('u2'))).to.not.be.null
       expect(await vaultDB.readBox(scopeOf('u2'), 'anthropic')).to.not.be.null
     })
 
-    it("refuses from a stale handle: a vault made anew survives, bundle and boxes", async () => {
-      const vaultDB = await withBundle()
-      await vaultDB.eraseVault(scopeOf('u1'), thisVault)
-      const reborn = { ...bundleOf('u1'), vault_id: 'vault-id-reborn' }
-      await vaultDB.createBundle(reborn)
-      await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'reborn'), { vault_id: 'vault-id-reborn', revision_id: null, vault_key_epoch: 1 })
-      await expectRefusal(vaultDB.eraseVault(scopeOf('u1'), thisVault), 'stale_write')
-      expect(await vaultDB.readBundle(scopeOf('u1'))).to.deep.equal(reborn)
+    it("refuses from a stale handle: a vault made anew survives, vault props and boxes", async () => {
+      const vaultDB = await withVaultProps()
+      await vaultDB.retireVault(scopeOf('u1'), thisVault)
+      const reborn = { ...vaultPropsOf('u1'), vault_id: 'vault-id-reborn' }
+      await vaultDB.fetchOrCreateVaultProps(reborn)
+      await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'reborn'), { vault_id: 'vault-id-reborn', revision_tok: null, vault_key_epoch: 1 })
+      await expectRefusal(vaultDB.retireVault(scopeOf('u1'), thisVault), 'stale_write')
+      expect(await vaultDB.readVaultProps(scopeOf('u1'))).to.deep.equal(reborn)
       expect(await vaultDB.listBoxes(scopeOf('u1'))).to.have.lengthOf(1)
     })
 
-    it("refuses where no bundle stands: there is no vault of that vault_id to erase", async () => {
+    it("refuses where no vault props stand: there is no vault of that vault_id to retire", async () => {
       const vaultDB = await makeVaultDB()
-      await expectRefusal(vaultDB.eraseVault(scopeOf('u1'), thisVault), 'stale_write')
-      expect(await vaultDB.readBundle(scopeOf('u1'))).to.be.null
+      await expectRefusal(vaultDB.retireVault(scopeOf('u1'), thisVault), 'stale_write')
+      expect(await vaultDB.readVaultProps(scopeOf('u1'))).to.be.null
     })
 
-    it("eraseDamagedVault leaves a vault that stands sound as it is, and is quiet where none stands", async () => {
-      const vaultDB = await withBundle()
+    it("retireDamagedVault leaves a vault that stands sound as it is, and is quiet where none stands", async () => {
+      const vaultDB = await withVaultProps()
       await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), noBoxYet)
-      await expectRefusal(vaultDB.eraseDamagedVault(scopeOf('u1')), 'bad_option')
-      expect(await vaultDB.readBundle(scopeOf('u1'))).to.deep.equal(bundleOf('u1'))
+      await expectRefusal(vaultDB.retireDamagedVault(scopeOf('u1')), 'bad_option')
+      expect(await vaultDB.readVaultProps(scopeOf('u1'))).to.deep.equal(vaultPropsOf('u1'))
       expect(await vaultDB.listBoxes(scopeOf('u1'))).to.have.lengthOf(1)
-      await vaultDB.eraseVault(scopeOf('u1'), thisVault)
-      await vaultDB.eraseDamagedVault(scopeOf('u1'))
-      expect(await vaultDB.readBundle(scopeOf('u1'))).to.be.null
+      await vaultDB.retireVault(scopeOf('u1'), thisVault)
+      await vaultDB.retireDamagedVault(scopeOf('u1'))
+      expect(await vaultDB.readVaultProps(scopeOf('u1'))).to.be.null
     })
     timingTestsOf('3.5')
   })
 
   describe(lineTitle('3.6'), () => {
-    it("leaves the whole vault as it stood after each refusal: bundle, boxes and listing", async () => {
-      const vaultDB = await withBundle()
+    it("leaves the whole vault as it stood after each refusal: vault props, boxes and listing", async () => {
+      const vaultDB = await withVaultProps()
       await storeEach(vaultDB, ['anthropic', 'openai'])
       const before = await standingVault(vaultDB, ['anthropic', 'openai', 'mistral'])
       const refusals = [
-        [() => vaultDB.updateBundle(bundleOf('u1', { unlock_epoch: 3 }), { vault_id: 'vault-id-u1', unlock_epoch: 2 }),                 'stale_write'],
-        [() => vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'late'), { vault_id: 'vault-id-u1', revision_id: 'rev-other', vault_key_epoch: 1 }),      'stale_write'],
-        [() => vaultDB.updateBox(scopeOf('u1'), boxOf('mistral', 'late'), { vault_id: 'vault-id-gone', revision_id: null, vault_key_epoch: 1 }),             'stale_write'],
+        [() => vaultDB.updateVaultProps(vaultPropsOf('u1', { unlock_epoch: 3 }), { vault_id: 'vault-id-u1', unlock_epoch: 2 }),         'stale_write'],
+        [() => vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'late'), { vault_id: 'vault-id-u1', revision_tok: 'rev-other', vault_key_epoch: 1 }),     'stale_write'],
+        [() => vaultDB.updateBox(scopeOf('u1'), boxOf('mistral', 'late'), { vault_id: 'vault-id-gone', revision_tok: null, vault_key_epoch: 1 }),            'stale_write'],
         [() => vaultDB.updateBox(scopeOf('u1'), boxOf('mistral', 'late', { sidecar_json: '{"note":' }), noBoxYet),                      'bad_option'],
-        [() => vaultDB.eraseBox(scopeOf('u1'), 'anthropic', { vault_id: 'vault-id-gone' }),                                               'stale_write'],
-        [() => vaultDB.eraseVault(scopeOf('u1'), { vault_id: 'vault-id-gone' }),                                                          'stale_write'],
+        [() => vaultDB.retireBox(scopeOf('u1'), 'anthropic', { vault_id: 'vault-id-gone' }),                                              'stale_write'],
+        [() => vaultDB.retireVault(scopeOf('u1'), { vault_id: 'vault-id-gone' }),                                                         'stale_write'],
       ] as const
       for (const [refuse, kind] of refusals) {
         await expectRefusal(refuse(), kind)
@@ -1527,14 +1528,14 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
 
   /** A fresh adapter whose u1 vault held `anthropic` under its first vaultKey, and then replaced the vaultKey. */
   const rotatedHolding = async () => {
-    const vaultDB = await withBundle()
+    const vaultDB = await withVaultProps()
     await storeEach(vaultDB, ['anthropic'])
-    await vaultDB.updateBundle(rotatedBundleOf('u1'), { vault_id: 'vault-id-u1', unlock_epoch: 1 })
+    await vaultDB.updateVaultProps(rotatedVaultPropsOf('u1'), { vault_id: 'vault-id-u1', unlock_epoch: 1 })
     return vaultDB
   }
 
   describe(lineTitle('3.8'), () => {
-    const underFirstKey = { vault_id: 'vault-id-u1', revision_id: 'rev-anthropic', vault_key_epoch: 1 } as const
+    const underFirstKey = { vault_id: 'vault-id-u1', revision_tok: 'rev-anthropic', vault_key_epoch: 1 } as const
     const underSecondKey = { ...underFirstKey, vault_key_epoch: 2 } as const
 
     it("refuses a write sealed under a vaultKey since replaced, over the revision it read, writing nothing", async () => {
@@ -1550,7 +1551,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
     })
 
     it("refuses a write sealed under a vaultKey the vault does not stand for yet", async () => {
-      const vaultDB = await withBundle()
+      const vaultDB = await withVaultProps()
       await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'ahead', { vault_key_epoch: 2 }), { ...noBoxYet, vault_key_epoch: 2 }), 'stale_write')
       expect(await vaultDB.readBox(scopeOf('u1'), 'anthropic')).to.be.null
     })
@@ -1594,24 +1595,24 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
   describe.runIf(capped)(lineTitle('4.3'), () => {
     it("replaces a lockbox in a full vault", async () => {
       const vaultDB = await cappedHolding(['anthropic', 'openai', 'mistral'])
-      await vaultDB.updateBox(scopeOf('u1'), boxOf('openai', 'next'), { vault_id: 'vault-id-u1', revision_id: 'rev-openai', vault_key_epoch: 1 })
+      await vaultDB.updateBox(scopeOf('u1'), boxOf('openai', 'next'), { vault_id: 'vault-id-u1', revision_tok: 'rev-openai', vault_key_epoch: 1 })
       const replaced = await vaultDB.readBox(scopeOf('u1'), 'openai')
-      expect(replaced?.revision_id).to.eq('rev-next')
+      expect(replaced?.revision_tok).to.eq('rev-next')
     })
 
     it("refuses a first write under a boxlabel already taken in a full vault as stale_write, not vault_full", async () => {
       const vaultDB = await cappedHolding(['anthropic', 'openai', 'mistral'])
       await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('openai', 'mine'), noBoxYet), 'stale_write')
       const standing = await vaultDB.readBox(scopeOf('u1'), 'openai')
-      expect(standing?.revision_id).to.eq('rev-openai')
+      expect(standing?.revision_tok).to.eq('rev-openai')
     })
   })
 
   describe.runIf(capped)(lineTitle('4.4'), () => {
-    it("lands a new lockbox once an erase has made room", async () => {
+    it("lands a new lockbox once retiring one has made room", async () => {
       const vaultDB = await cappedHolding(['anthropic', 'openai', 'mistral'])
       await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('gemini', 'gemini'), noBoxYet), 'vault_full')
-      await vaultDB.eraseBox(scopeOf('u1'), 'openai', thisVault)
+      await vaultDB.retireBox(scopeOf('u1'), 'openai', thisVault)
       await vaultDB.updateBox(scopeOf('u1'), boxOf('gemini', 'gemini'), noBoxYet)
       const listed = await vaultDB.listBoxes(scopeOf('u1'))
       expect(listed.map((box) => box.boxlabel)).to.deep.equal(['anthropic', 'gemini', 'mistral'])
@@ -1624,53 +1625,53 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
 
   describe(lineTitle('5.1'), () => {
     it("refuses a scope or boxlabel below the floor every name is held to as bad_label, before storage sees it", async () => {
-      const vaultDB = await withBundle()
-      await expectRefusal(vaultDB.readBundle({ ...scopeOf('u1'), vaultlabel: '' }), 'bad_label')
+      const vaultDB = await withVaultProps()
+      await expectRefusal(vaultDB.readVaultProps({ ...scopeOf('u1'), vaultlabel: '' }), 'bad_label')
       await expectRefusal(vaultDB.readBox(scopeOf('u1'), 'tab\there'), 'bad_label')
       await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('cafe\u{301}', 'one'), noBoxYet), 'bad_label')
-      await expectRefusal(vaultDB.eraseBox({ ...scopeOf('u1'), user_id: 'u1\u{D800}' }, 'anthropic', thisVault), 'bad_label')
+      await expectRefusal(vaultDB.retireBox({ ...scopeOf('u1'), user_id: 'u1\u{D800}' }, 'anthropic', thisVault), 'bad_label')
       const overlong = 'u'.repeat(NameFloorBytes + 1)
       await expectRefusal(vaultDB.listBoxes(scopeOf(overlong)), 'bad_label')
       expect(await vaultDB.listBoxes(scopeOf('u1'))).to.have.lengthOf(0)
     })
 
     it("refuses a name holding ^, which key-value stores join names on, as bad_label in every place a name goes, whatever the store, writing nothing", async () => {
-      const vaultDB = await withBundle()
+      const vaultDB = await withVaultProps()
       const holding = 'a^b'
-      await expectRefusal(vaultDB.createBundle(bundleOf(holding)), 'bad_label')
-      await expectRefusal(vaultDB.readBundle({ ...scopeOf('u1'), applabel: holding }), 'bad_label')
+      await expectRefusal(vaultDB.fetchOrCreateVaultProps(vaultPropsOf(holding)), 'bad_label')
+      await expectRefusal(vaultDB.readVaultProps({ ...scopeOf('u1'), applabel: holding }), 'bad_label')
       await expectRefusal(vaultDB.listBoxes({ ...scopeOf('u1'), vaultlabel: holding }), 'bad_label')
       await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf(holding, 'one'), noBoxYet), 'bad_label')
       await expectRefusal(vaultDB.readBox(scopeOf('u1'), holding), 'bad_label')
-      await expectRefusal(vaultDB.eraseBox(scopeOf('u1'), holding, thisVault), 'bad_label')
+      await expectRefusal(vaultDB.retireBox(scopeOf('u1'), holding, thisVault), 'bad_label')
       expect(await vaultDB.listBoxes(scopeOf('u1'))).to.have.lengthOf(0)
     })
 
     it("takes any name above the floor, whatever a vault's validators would say: they are the vault's, at its entry", async () => {
-      const vaultDB = await withBundle()
+      const vaultDB = await withVaultProps()
       await vaultDB.updateBox(scopeOf('u1'), boxOf('Not a Label!', 'one'), noBoxYet)
       const lockbox = await vaultDB.readBox(scopeOf('u1'), 'Not a Label!')
-      expect(lockbox?.revision_id).to.eq('rev-one')
+      expect(lockbox?.revision_tok).to.eq('rev-one')
     })
 
-    it("refuses a malformed record or expectation, or a bundle under another vault_id, as bad_option, before storage sees it", async () => {
-      const vaultDB = await withBundle()
+    it("refuses a malformed record or expectation, or vault props under another vault_id, as bad_option, before storage sees it", async () => {
+      const vaultDB = await withVaultProps()
       const unparsable = boxOf('anthropic', 'one', { sidecar_json: 'not json' })
       await expectRefusal(vaultDB.updateBox(scopeOf('u1'), unparsable, noBoxYet), 'bad_option')
-      await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), { vault_id: 'vault-id-u1', revision_id: '', vault_key_epoch: 1 }), 'bad_option')
-      await expectRefusal(vaultDB.updateBundle(bundleOf('u1', { unlock_epoch: 0 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'bad_option')
-      await expectRefusal(vaultDB.updateBundle(bundleOf('u1', { vault_id: 'vault-id-new', unlock_epoch: 2 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'bad_option')
-      await expectRefusal(vaultDB.eraseVault(scopeOf('u1'), { vault_id: '' }), 'bad_option')
-      expect(await vaultDB.readBundle(scopeOf('u1'))).to.deep.equal(bundleOf('u1'))
+      await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), { vault_id: 'vault-id-u1', revision_tok: '', vault_key_epoch: 1 }), 'bad_option')
+      await expectRefusal(vaultDB.updateVaultProps(vaultPropsOf('u1', { unlock_epoch: 0 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'bad_option')
+      await expectRefusal(vaultDB.updateVaultProps(vaultPropsOf('u1', { vault_id: 'vault-id-new', unlock_epoch: 2 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'bad_option')
+      await expectRefusal(vaultDB.retireVault(scopeOf('u1'), { vault_id: '' }), 'bad_option')
+      expect(await vaultDB.readVaultProps(scopeOf('u1'))).to.deep.equal(vaultPropsOf('u1'))
       expect(await vaultDB.listBoxes(scopeOf('u1'))).to.have.lengthOf(0)
     })
   })
 
   describe(lineTitle('5.3'), () => {
     it("quotes no ciphertext, boxlabel or sidecar of a write it refuses as stale", async () => {
-      const vaultDB = await withBundle()
+      const vaultDB = await withVaultProps()
       const lockbox = boxOf('secret_project_x', 'sk-fake-quoted', { sidecar_json: sidecarJsonOf({ note: 'a sidecar never to be quoted' }) })
-      const refusal = await expectRefusal(vaultDB.updateBox(scopeOf('u1'), lockbox, { vault_id: 'vault-id-gone', revision_id: null, vault_key_epoch: 1 }), 'stale_write')
+      const refusal = await expectRefusal(vaultDB.updateBox(scopeOf('u1'), lockbox, { vault_id: 'vault-id-gone', revision_tok: null, vault_key_epoch: 1 }), 'stale_write')
       expect(quotedOf(refusal, lockbox)).to.deep.equal([])
     })
 
@@ -1736,19 +1737,19 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       const vaultDB = await makeVaultDB()
       const longest = 'n'.repeat(Math.min(vaultDB.maxNameBytes, NameFloorBytes))
       const scope = { applabel: longest, user_id: longest, vaultlabel: longest }
-      await vaultDB.createBundle({ ...bundleOf(longest), ...scope })
-      await vaultDB.updateBox(scope, boxOf(longest, 'one'), { vault_id: `vault-id-${longest}`, revision_id: null, vault_key_epoch: 1 })
+      await vaultDB.fetchOrCreateVaultProps({ ...vaultPropsOf(longest), ...scope })
+      await vaultDB.updateBox(scope, boxOf(longest, 'one'), { vault_id: `vault-id-${longest}`, revision_tok: null, vault_key_epoch: 1 })
       const lockbox = await vaultDB.readBox(scope, longest)
-      expect(lockbox?.revision_id).to.eq('rev-one')
+      expect(lockbox?.revision_tok).to.eq('rev-one')
     })
 
     it("refuses a name one byte longer than it holds as bad_label, in every place a name goes, writing nothing", async () => {
-      const vaultDB = await withBundle()
+      const vaultDB = await withVaultProps()
       if (vaultDB.maxNameBytes >= NameFloorBytes) { return }
       const overlong = 'n'.repeat(vaultDB.maxNameBytes + 1)
-      await expectRefusal(vaultDB.createBundle(bundleOf(overlong)), 'bad_label')
-      await expectRefusal(vaultDB.readBundle({ ...scopeOf('u1'), applabel: overlong }), 'bad_label')
-      await expectRefusal(vaultDB.readBundle({ ...scopeOf('u1'), vaultlabel: overlong }), 'bad_label')
+      await expectRefusal(vaultDB.fetchOrCreateVaultProps(vaultPropsOf(overlong)), 'bad_label')
+      await expectRefusal(vaultDB.readVaultProps({ ...scopeOf('u1'), applabel: overlong }), 'bad_label')
+      await expectRefusal(vaultDB.readVaultProps({ ...scopeOf('u1'), vaultlabel: overlong }), 'bad_label')
       await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf(overlong, 'one'), noBoxYet), 'bad_label')
       expect(await vaultDB.listBoxes(scopeOf('u1'))).to.have.lengthOf(0)
     })
@@ -1819,52 +1820,52 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
   return {
     seenAcrossDevices: {
       line:  '2.1',
-      title: "shows a write made on one device to the very next read and listing on another, and an erase likewise",
+      title: "shows a write made on one device to the very next read and listing on another, and a retirement likewise",
       runs:  devices,
       check: async () => {
         const [one, two] = await twoDevices()
         expect(one, 'makeDevices made one adapter for both devices').to.not.eq(two)
-        await one.createBundle(bundleOf('u1'))
-        expect(await two.readBundle(scopeOf('u1'))).to.deep.equal(bundleOf('u1'))
+        await one.fetchOrCreateVaultProps(vaultPropsOf('u1'))
+        expect(await two.readVaultProps(scopeOf('u1'))).to.deep.equal(vaultPropsOf('u1'))
         await one.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), noBoxYet)
         expect({ read: await revisionIn(two, 'anthropic'), listed: await listedRevisions(two) }).to.deep.equal({ read: 'rev-one', listed: ['rev-one'] })
-        await two.eraseBox(scopeOf('u1'), 'anthropic', thisVault)
+        await two.retireBox(scopeOf('u1'), 'anthropic', thisVault)
         expect({ read: await revisionIn(one, 'anthropic'), listed: await listedRevisions(one) }).to.deep.equal({ read: null, listed: [] })
-        await two.eraseVault(scopeOf('u1'), thisVault)
-        expect(await one.readBundle(scopeOf('u1'))).to.be.null
+        await two.retireVault(scopeOf('u1'), thisVault)
+        expect(await one.readVaultProps(scopeOf('u1'))).to.be.null
       },
     },
     rivalCreates: {
       line:  '3.1',
-      title: `settles two creates of one vault made at once ${fromTwo} on one bundle, which both get back, however they interleave`,
+      title: `settles two creates of one vault made at once ${fromTwo} on one vault record, which both get back, however they interleave`,
       runs:  true,
       check: async () => {
         await raceEveryWay({
           makeDevices: devicesFor(),
-          moves:       [(one) => one.createBundle(bundleOf('u1', { vault_id: 'vault-id-one' })), (two) => two.createBundle(bundleOf('u1', { vault_id: 'vault-id-two' }))],
+          moves:       [(one) => one.fetchOrCreateVaultProps(vaultPropsOf('u1', { vault_id: 'vault-id-one' })), (two) => two.fetchOrCreateVaultProps(vaultPropsOf('u1', { vault_id: 'vault-id-two' }))],
           verdict:     async (outcomes, racers) => {
             expect(kindsOf(outcomes)).to.deep.equal(['landed', 'landed'])
             const [first, second] = outcomes
             expect(first?.val).to.deep.equal(second?.val)
-            for (const racer of racers) { expect(await racer.readBundle(scopeOf('u1'))).to.deep.equal(first?.val) }
+            for (const racer of racers) { expect(await racer.readVaultProps(scopeOf('u1'))).to.deep.equal(first?.val) }
           },
         })
       },
     },
-    rivalBundleUpdates: {
+    rivalVaultPropsUpdates: {
       line:  '3.2',
-      title: `lands one of two updates of one bundle made at once ${fromTwo}, and refuses the other as stale_write, however they interleave`,
+      title: `lands one of two updates of one vault record made at once ${fromTwo}, and refuses the other as stale_write, however they interleave`,
       runs:  true,
       check: async () => {
-        const rivals = [bundleOf('u1', { unlock_epoch: 2, wayins: [wayinOf('one')] }), bundleOf('u1', { unlock_epoch: 2, wayins: [wayinOf('two')] })]
+        const rivals = [vaultPropsOf('u1', { unlock_epoch: 2, wayins: [wayinOf('one')] }), vaultPropsOf('u1', { unlock_epoch: 2, wayins: [wayinOf('two')] })]
         await raceEveryWay({
           makeDevices: devicesFor(),
-          setup:       withBundleFirst,
-          moves:       rivals.map((rival) => (racer: VaultDBVerbs) => racer.updateBundle(rival, { vault_id: 'vault-id-u1', unlock_epoch: 1 })),
+          setup:       withVaultPropsFirst,
+          moves:       rivals.map((rival) => (racer: VaultDBVerbs) => racer.updateVaultProps(rival, { vault_id: 'vault-id-u1', unlock_epoch: 1 })),
           verdict:     async (outcomes, racers) => {
             expect(kindsOf(outcomes)).to.deep.equal(['landed', 'stale_write'])
             const winner = rivals[outcomes.findIndex((outcome) => outcome.kind === 'landed')]
-            for (const racer of racers) { expect(await racer.readBundle(scopeOf('u1'))).to.deep.equal(winner) }
+            for (const racer of racers) { expect(await racer.readVaultProps(scopeOf('u1'))).to.deep.equal(winner) }
           },
         })
       },
@@ -1877,7 +1878,7 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
         const rivals = [boxOf('anthropic', 'one'), boxOf('anthropic', 'two')]
         await raceEveryWay({
           makeDevices: devicesFor(),
-          setup:       withBundleFirst,
+          setup:       withVaultPropsFirst,
           moves:       rivals.map((rival) => (racer: VaultDBVerbs) => racer.updateBox(scopeOf('u1'), rival, noBoxYet)),
           verdict:     async (outcomes, racers) => {
             expect(kindsOf(outcomes)).to.deep.equal(['landed', 'stale_write'])
@@ -1905,15 +1906,15 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
         })
       },
     },
-    eraseBeatsReplacement: {
+    retireBeatsReplacement: {
       line:  '3.4',
-      title: `lands an erase made at once ${fromTwo} with a replacement of its lockbox, which is gone afterwards, however they interleave`,
+      title: `lands a retirement made at once ${fromTwo} with a replacement of its lockbox, which is gone afterwards, however they interleave`,
       runs:  true,
       check: async () => {
         await raceEveryWay({
           makeDevices: devicesFor(),
           setup:       holdingFirst(['anthropic']),
-          moves:       [(one) => one.eraseBox(scopeOf('u1'), 'anthropic', thisVault), (two) => two.updateBox(scopeOf('u1'), boxOf('anthropic', 'next'), over('rev-anthropic'))],
+          moves:       [(one) => one.retireBox(scopeOf('u1'), 'anthropic', thisVault), (two) => two.updateBox(scopeOf('u1'), boxOf('anthropic', 'next'), over('rev-anthropic'))],
           verdict:     async ([erased, written], racers) => {
             expect(erased?.kind).to.eq('landed')
             expect(['landed', 'stale_write']).to.include(written?.kind)
@@ -1922,19 +1923,19 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
         })
       },
     },
-    vaultEraseBeatsWrite: {
+    vaultRetireBeatsWrite: {
       line:  '3.5',
-      title: `leaves no lockbox behind a vault erased while a lockbox was written into it ${fromTwo}, however they interleave`,
+      title: `leaves no lockbox behind a vault retired while a lockbox was written into it ${fromTwo}, however they interleave`,
       runs:  true,
       check: async () => {
         await raceEveryWay({
           makeDevices: devicesFor(),
-          setup:       withBundleFirst,
-          moves:       [(one) => one.eraseVault(scopeOf('u1'), thisVault), (two) => two.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), noBoxYet)],
+          setup:       withVaultPropsFirst,
+          moves:       [(one) => one.retireVault(scopeOf('u1'), thisVault), (two) => two.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), noBoxYet)],
           verdict:     async ([erased, written], racers) => {
             expect(erased?.kind).to.eq('landed')
             expect(['landed', 'stale_write']).to.include(written?.kind)
-            for (const racer of racers) { expect(await standingVault(racer, ['anthropic'])).to.deep.equal({ bundle: null, listed: [], lockboxes: [null] }) }
+            for (const racer of racers) { expect(await standingVault(racer, ['anthropic'])).to.deep.equal({ vaultProps: null, listed: [], lockboxes: [null] }) }
           },
         })
       },
@@ -1946,7 +1947,7 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
       check: async () => {
         await raceEveryWay({
           makeDevices: devicesFor(),
-          setup:       withBundleFirst,
+          setup:       withVaultPropsFirst,
           moves:       [(one) => one.updateBox(scopeOf('u1'), boxOf('anthropic', 'anthropic'), noBoxYet), (two) => two.updateBox(scopeOf('u1'), boxOf('openai', 'openai'), noBoxYet)],
           verdict:     async (outcomes, racers) => {
             expect(kindsOf(outcomes)).to.deep.equal(['landed', 'landed'])
@@ -1955,20 +1956,20 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
         })
       },
     },
-    apartReplaceAndErase: {
+    apartReplaceAndRetire: {
       line:  '3.7',
-      title: `lands a replacement of one lockbox and an erase of another made at once ${fromTwo}, however they interleave, neither waiting on the other`,
+      title: `lands a replacement of one lockbox and a retirement of another made at once ${fromTwo}, however they interleave, neither waiting on the other`,
       runs:  true,
       check: async () => {
         await raceEveryWay({
           makeDevices: devicesFor(),
           setup:       holdingFirst(['anthropic', 'openai']),
-          moves:       [(one) => one.updateBox(scopeOf('u1'), boxOf('anthropic', 'next'), over('rev-anthropic')), (two) => two.eraseBox(scopeOf('u1'), 'openai', thisVault)],
+          moves:       [(one) => one.updateBox(scopeOf('u1'), boxOf('anthropic', 'next'), over('rev-anthropic')), (two) => two.retireBox(scopeOf('u1'), 'openai', thisVault)],
           verdict:     async (outcomes, racers) => {
             expect(kindsOf(outcomes)).to.deep.equal(['landed', 'landed'])
             for (const racer of racers) {
               const listed = await racer.listBoxes(scopeOf('u1'))
-              expect(listed.map((box) => [box.boxlabel, summaryOf(box)?.revision_id])).to.deep.equal([['anthropic', 'rev-next']])
+              expect(listed.map((box) => [box.boxlabel, summaryOf(box)?.revision_tok])).to.deep.equal([['anthropic', 'rev-next']])
             }
           },
         })
@@ -1995,7 +1996,7 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
             expect(found).to.deep.equal(racers.map((boxlabel, ii) => (outcomes[ii]?.kind === 'landed' ? `rev-${boxlabel}` : null)))
             // Back under the limit, keeping one racer that landed: the listing is whole again.
             const [kept, ...others] = landed
-            for (const boxlabel of ['anthropic', 'openai', ...others]) { await first.eraseBox(scopeOf('u1'), boxlabel, thisVault) }
+            for (const boxlabel of ['anthropic', 'openai', ...others]) { await first.retireBox(scopeOf('u1'), boxlabel, thisVault) }
             const listed = await first.listBoxes(scopeOf('u1'))
             expect(listed.map((box) => box.boxlabel)).to.deep.equal([kept])
           },
@@ -2004,7 +2005,7 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
     },
     pastLimitFromRoomierDevice: {
       line:  '4.5',
-      title: "keeps every lockbox of a vault past its limit -- filled by a device allowed more -- readable, refuses a new one as full, replaces one, and lists it whole once erases bring it back under",
+      title: "keeps every lockbox of a vault past its limit -- filled by a device allowed more -- readable, refuses a new one as full, replaces one, and lists it whole once retirements bring it back under",
       runs:  capped && devices,
       check: async () => {
         if (! makeDevices) { throw new Error('vaultDBTimingChecks ran a check across devices with no makeDevices.') }
@@ -2013,7 +2014,7 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
         const roomy = deviceFor({ maxLockboxes: CappedLockboxes + 2 })
         expect(tight.maxLockboxes, 'makeDevices made a device not held to the maxLockboxes it was asked for').to.eq(CappedLockboxes)
         const held = ['anthropic', 'openai', 'mistral', 'gemini', 'cohere']
-        await roomy.createBundle(bundleOf('u1'))
+        await roomy.fetchOrCreateVaultProps(vaultPropsOf('u1'))
         await storeEach(roomy, held)
         expect(await Promise.all(held.map((boxlabel) => revisionIn(tight, boxlabel)))).to.deep.equal(held.map((boxlabel) => `rev-${boxlabel}`))
         await expectWholeOrRefused(tight, held)
@@ -2021,7 +2022,7 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
         await expectRefusal(tight.updateBox(scopeOf('u1'), boxOf('groq', 'groq'), noBoxYet), 'vault_full')
         expect(await standingVault(tight, [...held, 'groq'])).to.deep.equal(before)
         await tight.updateBox(scopeOf('u1'), boxOf('openai', 'next'), over('rev-openai'))
-        for (const boxlabel of ['anthropic', 'mistral', 'gemini']) { await tight.eraseBox(scopeOf('u1'), boxlabel, thisVault) }
+        for (const boxlabel of ['anthropic', 'mistral', 'gemini']) { await tight.retireBox(scopeOf('u1'), boxlabel, thisVault) }
         await tight.updateBox(scopeOf('u1'), boxOf('groq', 'groq'), noBoxYet)
         expect(await listedRevisions(tight)).to.deep.equal(['rev-cohere', 'rev-groq', 'rev-next'])
       },
@@ -2045,7 +2046,7 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
       check: async () => {
         const keeper = makeTurnstile()
         const [watcher, writer] = await (devices ? twoDevices(keeper.turnstile) : sameAdapterTwice())
-        await writer.createBundle(bundleOf('u1'))
+        await writer.fetchOrCreateVaultProps(vaultPropsOf('u1'))
         // A watch whose start is a round trip is held there while the write lands; one that starts
         // as subscribe returns, or not through the turnstile, never comes to the gate.
         const gate = keeper.holdAt(1)
@@ -2063,7 +2064,7 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
       check: async () => {
         const spy = spyLogger()
         const vaultDB = await makeVaultDB({ logger: spy.logger })
-        await vaultDB.createBundle(bundleOf('u1'))
+        await vaultDB.fetchOrCreateVaultProps(vaultPropsOf('u1'))
         const thrown = new Error('a listener that throws')
         const rejected = new Error('a listener whose promise rejects')
         const unsubscribes = [
@@ -2092,7 +2093,7 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
       runs:  pushes,
       check: async () => {
         const [watcher, writer] = await (devices ? twoDevices() : sameAdapterTwice())
-        await writer.createBundle(bundleOf('u1'))
+        await writer.fetchOrCreateVaultProps(vaultPropsOf('u1'))
         const gone = readingWatch(watcher)
         const stays = readingWatch(watcher)
         await untilLive([gone, stays], writer)
@@ -2112,12 +2113,12 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
 
 /**
  * That a device from `makeDevices` passes the turnstile it was made with before each of its writes
- * goes to the backend -- a create, an update of the bundle, a write of a lockbox, an erase of one
- * and of the vault -- so the races of {@link describeVaultDB} can hold it there. A race cannot tell
- * a turnstile left unwired from an adapter that makes no round trips; an adapter over a backend
- * reached by round trips calls this in its own tests to show its factory wires one. It counts at
- * least one pass for each write, so a write that makes a second round trip around the turnstile
- * goes unseen here, and unheld in the races.
+ * goes to the backend -- a create, an update of the vault props, a write of a lockbox, a retirement
+ * of one and of the vault -- so the races of {@link describeVaultDB} can hold it there. A race
+ * cannot tell a turnstile left unwired from an adapter that makes no round trips; an adapter over a
+ * backend reached by round trips calls this in its own tests to show its factory wires one. It
+ * counts at least one pass for each write, so a write that makes a second round trip around the
+ * turnstile goes unseen here, and unheld in the races.
  *
  * @param makeDevices - The adapter's makeDevices, as `describeVaultDB` takes it.
  *
@@ -2128,11 +2129,11 @@ export const expectRoundTripsThroughTurnstile = async (makeDevices: MakeVaultDBD
   const counting: Turnstile = { pass: () => { tally.passes += 1; return Promise.resolve() } }
   const device = (await makeDevices(counting))({})
   const writes = [
-    ['createBundle', () => device.createBundle(bundleOf('u1'))],
-    ['updateBundle', () => device.updateBundle(bundleOf('u1', { unlock_epoch: 2 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 })],
-    ['updateBox',    () => device.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), noBoxYet)],
-    ['eraseBox',     () => device.eraseBox(scopeOf('u1'), 'anthropic', thisVault)],
-    ['eraseVault',   () => device.eraseVault(scopeOf('u1'), thisVault)],
+    ['fetchOrCreateVaultProps', () => device.fetchOrCreateVaultProps(vaultPropsOf('u1'))],
+    ['updateVaultProps',        () => device.updateVaultProps(vaultPropsOf('u1', { unlock_epoch: 2 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 })],
+    ['updateBox',               () => device.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), noBoxYet)],
+    ['retireBox',               () => device.retireBox(scopeOf('u1'), 'anthropic', thisVault)],
+    ['retireVault',             () => device.retireVault(scopeOf('u1'), thisVault)],
   ] as const
   for (const [verb, write] of writes) {
     const before = tally.passes
@@ -2145,16 +2146,16 @@ export const expectRoundTripsThroughTurnstile = async (makeDevices: MakeVaultDBD
 const expectToHold = (check: VaultDBTimingCheck): Promise<void> => check.check()
 
 /** A race's setup: u1's vault made, through the first device. */
-const withBundleFirst = (first: VaultDBVerbs) => first.createBundle(bundleOf('u1'))
+const withVaultPropsFirst = (first: VaultDBVerbs) => first.fetchOrCreateVaultProps(vaultPropsOf('u1'))
 
 /** A race's setup: u1's vault made, holding a new lockbox under each of `boxlabels`, through the first device. */
 const holdingFirst = (boxlabels: readonly string[]) => async (first: VaultDBVerbs) => {
-  await first.createBundle(bundleOf('u1'))
+  await first.fetchOrCreateVaultProps(vaultPropsOf('u1'))
   await storeEach(first, boxlabels)
 }
 
 /** What a replacement in u1's vault expects: that vault, and the revision it read. */
-const over = (revisionId: string) => ({ vault_id: 'vault-id-u1', revision_id: revisionId, vault_key_epoch: 1 })
+const over = (revisionTok: string) => ({ vault_id: 'vault-id-u1', revision_tok: revisionTok, vault_key_epoch: 1 })
 
 /** The kinds of `outcomes`, sorted, so a test of who won need not say which device it was. */
 const kindsOf = (outcomes: readonly RaceOutcome[]): string[] => outcomes.map((outcome) => outcome.kind).toSorted((one, two) => one.localeCompare(two))
@@ -2170,11 +2171,11 @@ const expectWholeOrRefused = async (vaultDB: VaultDBVerbs, boxlabels: readonly s
   expect(listing.val, 'a listing refused with something other than a VaultError').to.have.property('name', 'VaultError')
 }
 
-/** What u1's vault holds as one device reads it: its bundle, and each listed lockbox's boxlabel and revision. */
+/** What u1's vault holds as one device reads it: its vault props, and each listed lockbox's boxlabel and revision. */
 const glimpseOf = async (vaultDB: VaultDBVerbs) => {
-  const bundle = await vaultDB.readBundle(scopeOf('u1'))
+  const vaultProps = await vaultDB.readVaultProps(scopeOf('u1'))
   const listed = await vaultDB.listBoxes(scopeOf('u1'))
-  return { bundle, listed: listed.map((box) => [box.boxlabel, summaryOf(box)?.revision_id]) }
+  return { vaultProps, listed: listed.map((box) => [box.boxlabel, summaryOf(box)?.revision_tok]) }
 }
 
 /**
@@ -2228,16 +2229,16 @@ const ProbeWaitMillis = 100
 
 /**
  * Resolves once every one of `watches` has been called, so is known to be live: at once, for a
- * watch that calls when it starts; otherwise after a probe write through `writer` -- the bundle's
+ * watch that calls when it starts; otherwise after a probe write through `writer` -- the vault props'
  * unlock_epoch moved on -- made again until each is heard, as a watch that starts on its own time
- * may miss the first. u1's vault must hold a bundle.
+ * may miss the first. u1's vault props must already stand.
  */
 const untilLive = async (watches: readonly ReturnType<typeof readingWatch>[], writer: VaultDBVerbs) => {
   const allHeard = () => watches.every((watch) => watch.tally.calls > 0)
   for (let ii = 0; ii < LiveProbes && ! allHeard(); ii += 1) {
-    const standing = await writer.readBundle(scopeOf('u1'))
-    if (! standing) { throw new Error('untilLive probes a vault that holds a bundle, and found none.') }
-    await writer.updateBundle({ ...standing, unlock_epoch: standing.unlock_epoch + 1 }, { vault_id: standing.vault_id, unlock_epoch: standing.unlock_epoch })
+    const standing = await writer.readVaultProps(scopeOf('u1'))
+    if (! standing) { throw new Error('untilLive probes a vault that holds vault props, and found none.') }
+    await writer.updateVaultProps({ ...standing, unlock_epoch: standing.unlock_epoch + 1 }, { vault_id: standing.vault_id, unlock_epoch: standing.unlock_epoch })
     try {
       await vi.waitFor(() => { expect(allHeard()).to.be.true }, { timeout: ProbeWaitMillis, interval: 5 })
     } catch {
@@ -2249,24 +2250,24 @@ const untilLive = async (watches: readonly ReturnType<typeof readingWatch>[], wr
 
 /**
  * That a watch through the first of `pair` hears each kind of write made through the second: an
- * update of the bundle, two new lockboxes, a replacement, an erase of one, of the vault, and a
- * create of the vault anew. The two may be one adapter, or two devices.
+ * update of the vault props, two new lockboxes, a replacement, a retirement of one, of the vault,
+ * and a create of the vault anew. The two may be one adapter, or two devices.
  */
 const expectEachWriteHeard = async (pair: () => Promise<[VaultDBVerbs, VaultDBVerbs]>) => {
   const [watcher, writer] = await pair()
-  await writer.createBundle(bundleOf('u1'))
+  await writer.fetchOrCreateVaultProps(vaultPropsOf('u1'))
   const watch = readingWatch(watcher)
   await untilLive([watch], writer)
-  const standing = await writer.readBundle(scopeOf('u1'))
+  const standing = await writer.readVaultProps(scopeOf('u1'))
   const epoch = standing?.unlock_epoch ?? 1
   const writes = [
-    () => writer.updateBundle(bundleOf('u1', { unlock_epoch: epoch + 1 }), { vault_id: 'vault-id-u1', unlock_epoch: epoch }),
+    () => writer.updateVaultProps(vaultPropsOf('u1', { unlock_epoch: epoch + 1 }), { vault_id: 'vault-id-u1', unlock_epoch: epoch }),
     () => writer.updateBox(scopeOf('u1'), boxOf('anthropic', 'anthropic'), noBoxYet),
     () => writer.updateBox(scopeOf('u1'), boxOf('openai', 'openai'), noBoxYet),
-    () => writer.updateBox(scopeOf('u1'), boxOf('anthropic', 'next'), { vault_id: 'vault-id-u1', revision_id: 'rev-anthropic', vault_key_epoch: 1 }),
-    () => writer.eraseBox(scopeOf('u1'), 'anthropic', thisVault),
-    () => writer.eraseVault(scopeOf('u1'), thisVault),
-    () => writer.createBundle(bundleOf('u1', { vault_id: 'vault-id-anew' })),
+    () => writer.updateBox(scopeOf('u1'), boxOf('anthropic', 'next'), { vault_id: 'vault-id-u1', revision_tok: 'rev-anthropic', vault_key_epoch: 1 }),
+    () => writer.retireBox(scopeOf('u1'), 'anthropic', thisVault),
+    () => writer.retireVault(scopeOf('u1'), thisVault),
+    () => writer.fetchOrCreateVaultProps(vaultPropsOf('u1', { vault_id: 'vault-id-anew' })),
   ]
   for (const write of writes) { await expectHeard(watch, writer, write) }
   watch.unsubscribe()
@@ -2274,15 +2275,15 @@ const expectEachWriteHeard = async (pair: () => Promise<[VaultDBVerbs, VaultDBVe
 
 /** Every verb a stranger might try on `u1`'s vault, each as a thunk. */
 const everyVerbOn = (stranger: VaultDBVerbs) => [
-  () => stranger.readBundle(scopeOf('u1')),
-  () => stranger.createBundle(bundleOf('u1', { vault_id: 'vault-id-theirs' })),
-  () => stranger.updateBundle(bundleOf('u1', { unlock_epoch: 2 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 }),
+  () => stranger.readVaultProps(scopeOf('u1')),
+  () => stranger.fetchOrCreateVaultProps(vaultPropsOf('u1', { vault_id: 'vault-id-theirs' })),
+  () => stranger.updateVaultProps(vaultPropsOf('u1', { unlock_epoch: 2 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 }),
   () => stranger.readBox(scopeOf('u1'), 'anthropic'),
   () => stranger.listBoxes(scopeOf('u1')),
-  () => stranger.updateBox(scopeOf('u1'), boxOf('anthropic', 'theirs'), { vault_id: 'vault-id-u1', revision_id: 'rev-anthropic', vault_key_epoch: 1 }),
+  () => stranger.updateBox(scopeOf('u1'), boxOf('anthropic', 'theirs'), { vault_id: 'vault-id-u1', revision_tok: 'rev-anthropic', vault_key_epoch: 1 }),
   () => stranger.updateBox(scopeOf('u1'), boxOf('mistral', 'theirs'), noBoxYet),
-  () => stranger.eraseBox(scopeOf('u1'), 'openai', thisVault),
-  () => stranger.eraseVault(scopeOf('u1'), thisVault),
+  () => stranger.retireBox(scopeOf('u1'), 'openai', thisVault),
+  () => stranger.retireVault(scopeOf('u1'), thisVault),
 ]
 
 /** Text no normalization leaves alone: "café" with its accent composed, then decomposed, and a key. */
@@ -2304,23 +2305,23 @@ const storeEach = async (vaultDB: VaultDBVerbs, boxlabels: readonly string[]) =>
   for (const boxlabel of boxlabels) { await vaultDB.updateBox(scopeOf('u1'), boxOf(boxlabel, boxlabel), noBoxYet) }
 }
 
-/** Everything `u1`'s vault holds, as its verbs read it: the bundle, the listing, and each of `boxlabels` read. */
+/** Everything `u1`'s vault holds, as its verbs read it: the vault props, the listing, and each of `boxlabels` read. */
 const standingVault = async (vaultDB: VaultDBVerbs, boxlabels: readonly string[]) => ({
-  bundle:  await vaultDB.readBundle(scopeOf('u1')),
-  listed:  await vaultDB.listBoxes(scopeOf('u1')),
-  lockboxes: await Promise.all(boxlabels.map((boxlabel) => vaultDB.readBox(scopeOf('u1'), boxlabel))),
+  vaultProps: await vaultDB.readVaultProps(scopeOf('u1')),
+  listed:     await vaultDB.listBoxes(scopeOf('u1')),
+  lockboxes:  await Promise.all(boxlabels.map((boxlabel) => vaultDB.readBox(scopeOf('u1'), boxlabel))),
 })
 
 /** The revision of `u1`'s lockbox under `boxlabel`, or null when there is none. */
 const revisionIn = async (vaultDB: VaultDBVerbs, boxlabel: string): Promise<string | null> => {
   const lockbox = await vaultDB.readBox(scopeOf('u1'), boxlabel)
-  return lockbox?.revision_id ?? null
+  return lockbox?.revision_tok ?? null
 }
 
 /** The revision of each lockbox `u1`'s listing shows, in its order. */
 const listedRevisions = async (vaultDB: VaultDBVerbs): Promise<(string | undefined)[]> => {
   const listed = await vaultDB.listBoxes(scopeOf('u1'))
-  return listed.map((box) => summaryOf(box)?.revision_id)
+  return listed.map((box) => summaryOf(box)?.revision_tok)
 }
 
 /** How a write settled: `landed`, or the kind it was refused with (`unknown` for no kind). */
@@ -2345,7 +2346,7 @@ const quotedOf = (refusal: unknown, lockbox: Lockbox): string[] => {
  * One adapter reaching every user's vaults, made of a VaultDB per user: for
  * {@link describeVaultDB} over an adapter that serves only the user signed in, as a server's
  * does when it makes one per request. The suite reaches two users' vaults through one adapter;
- * this sends each verb to the VaultDB `vaultDBFor` made for the user its scope or bundle names,
+ * this sends each verb to the VaultDB `vaultDBFor` made for the user its scope or vault props name,
  * making each user's once and keeping it. Its limits are those of the one made for `anyone`.
  *
  * @param vaultDBFor - The VaultDB a request signed in as `userId` gets.
@@ -2365,21 +2366,21 @@ export const perUser = (vaultDBFor: (userId: string) => VaultDBVerbs): VaultDBVe
   }
   const anyone = as({ user_id: 'anyone' })
   return {
-    maxRecordBytes: anyone.maxRecordBytes,
-    maxVaultBytes:  anyone.maxVaultBytes,
-    maxLockboxes:   anyone.maxLockboxes,
-    maxNameBytes:   anyone.maxNameBytes,
-    readBundle:     (scope) => as(scope).readBundle(scope),
-    createBundle:   (bundle) => as(bundle).createBundle(bundle),
-    updateBundle:   (bundle, expected) => as(bundle).updateBundle(bundle, expected),
-    readBox:        (scope, boxlabel) => as(scope).readBox(scope, boxlabel),
-    listBoxes:      (scope) => as(scope).listBoxes(scope),
-    listBoxRecords: (scope) => as(scope).listBoxRecords(scope),
-    updateBox:      (scope, lockbox, expected) => as(scope).updateBox(scope, lockbox, expected),
-    eraseBox:       (scope, boxlabel, expected) => as(scope).eraseBox(scope, boxlabel, expected),
-    eraseVault:     (scope, expected) => as(scope).eraseVault(scope, expected),
-    eraseDamagedVault: (scope) => as(scope).eraseDamagedVault(scope),
-    subscribe:      (scope, onChange) => as(scope).subscribe(scope, onChange),
+    maxRecordBytes:          anyone.maxRecordBytes,
+    maxVaultBytes:           anyone.maxVaultBytes,
+    maxLockboxes:            anyone.maxLockboxes,
+    maxNameBytes:            anyone.maxNameBytes,
+    readVaultProps:          (scope) => as(scope).readVaultProps(scope),
+    fetchOrCreateVaultProps: (vaultProps) => as(vaultProps).fetchOrCreateVaultProps(vaultProps),
+    updateVaultProps:        (vaultProps, expected) => as(vaultProps).updateVaultProps(vaultProps, expected),
+    readBox:                 (scope, boxlabel) => as(scope).readBox(scope, boxlabel),
+    listBoxes:               (scope) => as(scope).listBoxes(scope),
+    listBoxRecords:          (scope) => as(scope).listBoxRecords(scope),
+    updateBox:               (scope, lockbox, expected) => as(scope).updateBox(scope, lockbox, expected),
+    retireBox:               (scope, boxlabel, expected) => as(scope).retireBox(scope, boxlabel, expected),
+    retireVault:             (scope, expected) => as(scope).retireVault(scope, expected),
+    retireDamagedVault:      (scope) => as(scope).retireDamagedVault(scope),
+    subscribe:               (scope, onChange) => as(scope).subscribe(scope, onChange),
   }
 }
 
@@ -2505,7 +2506,7 @@ const NotRefused = Symbol('not refused')
  * @param kind - The refusal's expected `kind`.
  * @returns The refusal, for a closer look at its message or cause.
  *
- * @example await TH.expectRefusal(vault.read('anthropic_api_key'), 'vault_locked')
+ * @example await TH.expectRefusal(vault.readBox('anthropic_api_key'), 'vault_locked')
  * @example
  *   const err = await TH.expectRefusal(openVault(TH.omitting(opts, 'keyDeriver')), 'bad_option')
  *   expect(err.message).to.include('safebyok/browser')

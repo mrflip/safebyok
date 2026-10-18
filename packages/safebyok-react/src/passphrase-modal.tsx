@@ -59,7 +59,7 @@ const unlockedFor = (leaseMillis: number, creating: boolean): string => {
  *
  * It follows the vault as it changes -- a vault made on another device meanwhile turns "choose"
  * into "unlock", a passkey added brings its button -- and handed another vault, it starts afresh,
- * keeping nothing typed for the last. Taken away, it lets go: an unlock, an erase or advice still
+ * keeping nothing typed for the last. Taken away, it lets go: an unlock, a retire or advice still
  * under way finishes unheard, calling `onDone` no more and showing nothing (the vault's own
  * snapshot says whether an unlock landed).
  *
@@ -81,7 +81,7 @@ const unlockedFor = (leaseMillis: number, creating: boolean): string => {
  * browser) supplies with the standard polyfill: the README says how.
  *
  * With `allowStartOver`, a user who has forgotten the passphrase is offered a way out: "Forgot it?
- * Start a new vault" asks first, then erases the vault (`vault.destroy()`, on every device) and
+ * Start a new vault" asks first, then retires the vault (`vault.retire()`, on every device) and
  * turns the dialog into "Choose a vault passphrase" for the new one. Off by default.
  *
  * The passphrase field is made for password managers, so that a user may keep a long, strong
@@ -103,7 +103,7 @@ const unlockedFor = (leaseMillis: number, creating: boolean): string => {
  *
  * @example
  *   <PassphraseModal vault={vault} onDone={(unlocked) => { setAsking(false) }} />
- * @example <PassphraseModal vault={vault} allowStartOver onDone={close} />  // offers to erase and start over
+ * @example <PassphraseModal vault={vault} allowStartOver onDone={close} />  // offers to retire the vault and start over
  * @example <PassphraseModal vault={vault} passphraseUsername={`${email} (vault)`} onDone={close} />
  * @example <PassphraseModal vault={vault} passphraseAdvice={(typed) => (typed.length < 12 ? 'Twelve characters or more, please.' : null)} onDone={close} />
  */
@@ -127,7 +127,7 @@ export type PassphraseAdvice = (passphrase: string) => string | null | Promise<s
 export type PassphraseModalProps = {
   vault:               Vault
   onDone:              (unlocked: boolean) => void
-  /** Whether to offer a user who has forgotten the passphrase to erase the vault and start a new one. */
+  /** Whether to offer a user who has forgotten the passphrase to retire the vault and start a new one. */
   allowStartOver?:     boolean | undefined
   /** What a password manager files the passphrase under. Default: the user and the vault, as 'u1 (main vault)'. */
   passphraseUsername?: string | undefined
@@ -197,7 +197,7 @@ const holdsFocus = (container: HTMLElement | null): boolean => {
 const useAdvice = (passphraseAdvice: PassphraseAdvice | undefined, creating: boolean, fail: (err: unknown) => void) => {
   const [said, setSaid] = useState<string | null>(null)
   const asked = useRef(0)
-  // A change of mode -- the vault made elsewhere, or erased -- forgets what was said (React's
+  // A change of mode -- the vault made elsewhere, or retired -- forgets what was said (React's
   // "adjusting state while rendering"), and makes any answer or failure still on its way stale,
   // in the same commit: advice given while choosing never shows again after the vault changed.
   // The dialog unmounting makes them stale too, so that none reaches a dialog that has gone.
@@ -279,7 +279,7 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
   const snapshot = useSyncExternalStore(vault.subscribe, vault.getSnapshot)
   const [gripe, setGripe] = useState<Gripe | null>(null)
   const [startingOver, setStartingOver] = useState(false)
-  // While an erase runs, so that a second press never starts another.
+  // While a retire runs, so that a second press never starts another.
   const [erasing, setErasing] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
   const fieldRef = useRef<HTMLInputElement>(null)
@@ -295,7 +295,7 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
   const creating = snapshot.state === 'absent'
   const passkeyFirst = ! creating && offersPasskey(snapshot)
   const windowLine = unlockedFor(vault.leaseMillis, creating)
-  // Asked only of a vault there is to erase: one erased meanwhile has the user choose anew, and
+  // Asked only of a vault there is to retire: one retired meanwhile has the user choose anew, and
   // ends the question, so that a vault made after it is never asked of. React's "adjusting state
   // while rendering": it renders again at once, before committing this.
   if (startingOver && creating) { setStartingOver(false) }
@@ -327,13 +327,13 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
     setErasing(true)
     setGripe(null)
     try {
-      await vault.destroy()
+      await vault.retire()
       if (! isMounted()) { return }
       setStartingOver(false)
     } catch (err) {
       if (! isMounted()) { return }
-      // The vault the user agreed to erase was destroyed or made anew elsewhere: what stands now
-      // was never confirmed, so the question goes, to be asked afresh.
+      // The vault the user agreed to retire was retired already, or made anew, elsewhere: what
+      // stands now was never confirmed, so the question goes, to be asked afresh.
       if (isVaultError(err, 'stale_write')) { setStartingOver(false) }
       meet(err)
     } finally {

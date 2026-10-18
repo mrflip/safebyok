@@ -58,7 +58,7 @@ export const makeWorld = ({ vaultDB = localVaultDB({ store: memoryStore() }) }: 
     try {
       await vault.unlock(Passphrase)
       for (const [boxlabel, whisper] of Object.entries(whispers)) {
-        await vault.store(boxlabel, whisper)
+        await vault.storeBox(boxlabel, whisper)
       }
     } finally {
       vault.close()
@@ -145,7 +145,7 @@ export const VaultProbe = () => {
       <span data-testid="vault">{vault === null ? 'none' : 'open'}</span>
       <span data-testid="state">{snapshot.state}</span>
       <span data-testid="boxes">{snapshot.boxes.map((box) => box.boxlabel).join(',')}</span>
-      <button onClick={() => { void withUnlockedVault(() => vault?.read('anthropic_api_key') ?? Promise.resolve(null)) }}>read</button>
+      <button onClick={() => { void withUnlockedVault(() => vault?.readBox('anthropic_api_key') ?? Promise.resolve(null)) }}>read</button>
       <button onClick={() => { void vault?.unlock(Passphrase) }}>unlock</button>
     </p>
   )

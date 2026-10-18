@@ -28,7 +28,7 @@ export const randomBytes = (count: number): Uint8Array => (
   crypto.getRandomValues(new Uint8Array(count))
 )
 
-/** A fresh random identifier (for a vaultId or revisionId): a UUID, minted by the platform. */
+/** A fresh random identifier (for a vaultId or revisionTok): a UUID, minted by the platform. */
 export const randomId = (): string => crypto.randomUUID()
 
 /**
@@ -167,7 +167,7 @@ export const decipherBytes = async (cipherKey: CryptoKey, ciphered: Ciphered, ct
 
 /**
  * `wrappedKey` encrypted under `wrappingKey`, bound to `ctx`: how a vaultKey travels inside
- * a bundle and a lockboxKey inside its lockbox. The key being wrapped must be extractable.
+ * the vault props and a lockboxKey inside its lockbox. The key being wrapped must be extractable.
  */
 export const wrapKeyUnder = async (wrappingKey: CryptoKey, wrappedKey: CryptoKey, ctx: Uint8Array): Promise<Ciphered> => {
   const cipherIv = randomBytes(IvBytes)

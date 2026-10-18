@@ -12,7 +12,7 @@ export type LeaseExpectation = { lock_generation: number }
 /**
  * Device-local storage for what a device keeps of each vault: its lease, what lets "enter your
  * passphrase once, keep it for seven days" survive a page reload, and its device mark,
- * the device's own id for the vault and the newest copy of the vault's bundle it has seen. A
+ * the device's own id for the vault and the newest copy of the vault props it has seen. A
  * {@link Lease} record holds this browser's leaseKey -- a non-extractable CryptoKey
  * handle, which has no JSON form -- so an adapter must keep records by structured clone
  * (IndexedDB: see `safebyok/idb`) or in memory; nothing here ever goes to the backend.
@@ -46,8 +46,8 @@ export interface DeviceDB {
   writeMark(mark: DeviceMark): Promise<void>
   /**
    * Forget this device's mark for one vault, its lock generation with it. The vault never calls
-   * this on its own (`destroy()` writes a mark with nothing `seen`, keeping the generation): it is
-   * for a host accepting storage restored on purpose, and for `eraseDamagedVault`.
+   * this on its own (`retire()` writes a mark with nothing `seen`, keeping the generation): it is
+   * for a host accepting storage restored on purpose, and for `retireDamagedVault`.
    */
   eraseMark(scope: VaultScope): Promise<void>
   /** Remove every lease and device mark on this device: the device's part of a full reset. */

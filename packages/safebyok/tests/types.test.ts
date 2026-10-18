@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as Z from 'zod/mini'
 import { Lockbox } from '../src/lockbox'
-import { DeviceMark, EpochMillis, FarFuture, FarPast, ForeverMillis, Lease, LockboxSummary, MaxUnlocks, Sidecar, VaultBundle, VaultScope, Whisper } from '../src/types'
+import { DeviceMark, EpochMillis, FarFuture, FarPast, ForeverMillis, Lease, LockboxSummary, MaxUnlocks, Sidecar, VaultProps, VaultScope, Whisper } from '../src/types'
 import * as TH from './test-helpers'
 
 const WhisperCases = [
@@ -16,7 +16,7 @@ const WhisperCases = [
   [{ deep: { list: [1, null] } },     true,   'nesting, arbitrarily'],
   // what JSON cannot carry is refused, not mangled:
   [undefined,                         false,  'undefined is not a JSON value'],
-  [null,                              false,  'a bare null: emptying a lockbox is erase\'s job'],
+  [null,                              false,  'a bare null: emptying a lockbox is retireBox\'s job'],
   [() => 'nope',                      false,  'a function is not data'],
   [new Date(),                        false,  'a Date would silently flatten to {}'],
   [new Map([["a", 1]]),               false,  'a Map would silently flatten to {}'],
@@ -58,13 +58,13 @@ describe("VaultScope", () => {
 
 /** An ISO time, as records stored them before every time became epoch milliseconds. */
 const OldIso = '2026-10-14T00:00:00.000Z'
-const { registered_at: _bundleTime, ...bundleWithoutTime } = TH.bundleOf('u1')
-const { wayins: _wayins, ...bundleWithoutWayins } = TH.bundleOf('u1')
-const { unlock_epoch: _epoch, ...bundleWithoutEpoch } = TH.bundleOf('u1')
-const { vault_key_epoch: _keyEpoch, ...bundleWithoutKeyEpoch } = TH.bundleOf('u1')
-const { prior_vault_key: _prior, ...rotatedWithoutPrior } = TH.rotatedBundleOf('u1')
+const { registered_at: _vaultPropsTime, ...vaultPropsWithoutTime } = TH.vaultPropsOf('u1')
+const { wayins: _wayins, ...vaultPropsWithoutWayins } = TH.vaultPropsOf('u1')
+const { unlock_epoch: _epoch, ...vaultPropsWithoutEpoch } = TH.vaultPropsOf('u1')
+const { vault_key_epoch: _keyEpoch, ...vaultPropsWithoutKeyEpoch } = TH.vaultPropsOf('u1')
+const { prior_vault_key: _prior, ...rotatedWithoutPrior } = TH.rotatedVaultPropsOf('u1')
 const priorAt = (vaultKeyEpoch: number) => ({ vault_key_epoch: vaultKeyEpoch, vault_key_wrapped: TH.fakeCiphered('prior') })
-/** The three fields a bundle held its one passphrase in, before `wayins`. */
+/** The three fields the vault props held their one passphrase in, before `wayins`. */
 const WayinFieldsOfOld = {
   key_deriver_label:            'test_digest_v0',
   // eslint-disable-next-line sonarjs/no-hardcoded-passwords -- base64 of the literal text 'saltsaltsaltsalt': a fake salt (which is public material anyway), not a credential
@@ -73,33 +73,33 @@ const WayinFieldsOfOld = {
 }
 
 
-const BundleCases = [
+const VaultPropsCases = [
   // regular usage:
-  [TH.bundleOf('u1'),                                       true,   'a whole bundle'],
+  [TH.vaultPropsOf('u1'),                                   true,   'whole vault props'],
   // refused, as a damaged or foreign record:
-  [{ ...TH.bundleOf('u1'), format: 'safebyok-vault-v4' },    false,  'a format this version does not know'],
-  [{ ...TH.bundleOf('u1'), unlock_epoch: 0 },                false,  'an epoch starts at one'],
-  [{ ...TH.bundleOf('u1'), unlock_epoch: 1.5 },              false,  'an epoch is a whole number'],
-  [{ ...TH.bundleOf('u1'), vault_id: '' },                   false,  'an empty vault_id'],
-  [TH.bundleOf('u'.repeat(101)),                            true,   'a user_id of any length: the validators check names, not the record'],
-  [{ ...TH.bundleOf('u1'), vaultlabel: null },               false,  'a vaultlabel that is not text'],
-  [{ ...TH.bundleOf('u1'), wayins: [TH.wayinOf('passphrase', { vault_key_wayin_wrapped: { cipher_iv_b64: 'iv' } as never })] }, false, 'a wayin missing its ciphertext'],
-  [{ ...TH.bundleOf('u1'), registered_at: 1_792_022_400 },   false,  'a registered_at in epoch seconds'],
-  [{ ...TH.bundleOf('u1'), registered_at: Infinity },        false,  'a registered_at that never comes'],
-  [{ ...TH.bundleOf('u1'), registered_at: OldIso },          false,  'a registered_at as an ISO string'],
-  [bundleWithoutTime,                                       false,  'a bundle missing its registered_at'],
-  [{ ...bundleWithoutTime, created_at: OldIso, updated_at: OldIso }, false, 'a bundle from before its time was named registered_at'],
-  [{ ...bundleWithoutWayins, ...WayinFieldsOfOld },          false,  'a bundle from before its wayins were a list'],
-  [{ ...bundleWithoutEpoch, passphrase_epoch: 1 },           false,  'a bundle from before its epoch was named unlock_epoch'],
-  [{ ...bundleWithoutKeyEpoch, format: 'safebyok-vault-v1' }, false, 'a bundle from before vaultKey epochs'],
-  [bundleWithoutKeyEpoch,                                   false,  'a bundle missing its vault_key_epoch'],
-  [{ ...TH.bundleOf('u1'), vault_key_epoch: 0 },             false,  'a vaultKey epoch starts at one'],
+  [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v4' }, false,  'a format this version does not know'],
+  [{ ...TH.vaultPropsOf('u1'), unlock_epoch: 0 },            false,  'an epoch starts at one'],
+  [{ ...TH.vaultPropsOf('u1'), unlock_epoch: 1.5 },          false,  'an epoch is a whole number'],
+  [{ ...TH.vaultPropsOf('u1'), vault_id: '' },               false,  'an empty vault_id'],
+  [TH.vaultPropsOf('u'.repeat(101)),                        true,   'a user_id of any length: the validators check names, not the record'],
+  [{ ...TH.vaultPropsOf('u1'), vaultlabel: null },           false,  'a vaultlabel that is not text'],
+  [{ ...TH.vaultPropsOf('u1'), wayins: [TH.wayinOf('passphrase', { vault_key_wayin_wrapped: { cipher_iv_b64: 'iv' } as never })] }, false, 'a wayin missing its ciphertext'],
+  [{ ...TH.vaultPropsOf('u1'), registered_at: 1_792_022_400 }, false,  'a registered_at in epoch seconds'],
+  [{ ...TH.vaultPropsOf('u1'), registered_at: Infinity },    false,  'a registered_at that never comes'],
+  [{ ...TH.vaultPropsOf('u1'), registered_at: OldIso },      false,  'a registered_at as an ISO string'],
+  [vaultPropsWithoutTime,                                   false,  'vault props missing their registered_at'],
+  [{ ...vaultPropsWithoutTime, created_at: OldIso, updated_at: OldIso }, false, 'vault props from before their time was named registered_at'],
+  [{ ...vaultPropsWithoutWayins, ...WayinFieldsOfOld },      false,  'vault props from before their wayins were a list'],
+  [{ ...vaultPropsWithoutEpoch, passphrase_epoch: 1 },       false,  'vault props from before their epoch was named unlock_epoch'],
+  [{ ...vaultPropsWithoutKeyEpoch, format: 'safebyok-vault-v1' }, false, 'vault props from before vaultKey epochs'],
+  [vaultPropsWithoutKeyEpoch,                               false,  'vault props missing their vault_key_epoch'],
+  [{ ...TH.vaultPropsOf('u1'), vault_key_epoch: 0 },         false,  'a vaultKey epoch starts at one'],
   // the prior vaultKey: none at the first, the one just before from the second on
-  [TH.rotatedBundleOf('u1'),                                true,   'a bundle at its second vaultKey, holding the first as its prior'],
-  [rotatedWithoutPrior,                                     false,  'a bundle past its first vaultKey with no prior'],
-  [{ ...TH.bundleOf('u1'), prior_vault_key: priorAt(1) },    false,  'a bundle at its first vaultKey holding a prior'],
-  [{ ...TH.rotatedBundleOf('u1'), vault_key_epoch: 3 },      false,  'a prior that is not the vaultKey just before'],
-  [{ ...TH.rotatedBundleOf('u1'), prior_vault_key: { vault_key_epoch: 1 } }, false, 'a prior with no wrap'],
+  [TH.rotatedVaultPropsOf('u1'),                            true,   'vault props at their second vaultKey, holding the first as their prior'],
+  [rotatedWithoutPrior,                                     false,  'vault props past their first vaultKey with no prior'],
+  [{ ...TH.vaultPropsOf('u1'), prior_vault_key: priorAt(1) }, false,  'vault props at their first vaultKey holding a prior'],
+  [{ ...TH.rotatedVaultPropsOf('u1'), vault_key_epoch: 3 },  false,  'a prior that is not the vaultKey just before'],
+  [{ ...TH.rotatedVaultPropsOf('u1'), prior_vault_key: { vault_key_epoch: 1 } }, false, 'a prior with no wrap'],
 ] as const
 
 const manyWayins = (count: number) => Array.from({ length: count }, (_unused, ii) => TH.wayinOf(`phrase${String(ii)}`))
@@ -126,18 +126,18 @@ const WayinListCases = [
   [[TH.wayinOf('passphrase', { device_id: '' })],                          false,  'an empty device_id'],
   [[TH.passkeyWayinOf('laptop', { registered_at: 1_792_022_400 })],       false,  'a registered_at in epoch seconds'],
   [[TH.wayinOf('passphrase', { vault_key_epoch: 0 })],                     false,  'a vaultKey epoch of zero'],
-  [[TH.wayinOf('passphrase', { vault_key_epoch: 2 })],                     true,   "a wayin at another vaultKey epoch than the bundle's: a damaged way in, which an unlock passes over"],
+  [[TH.wayinOf('passphrase', { vault_key_epoch: 2 })],                     true,   "a wayin at another vaultKey epoch than the vault props': a damaged way in, which an unlock passes over"],
 ] as const
 
-describe("VaultBundle's wayins", () => {
+describe("VaultProps.wayins", () => {
   for (const [wayins, expected, blurb] of WayinListCases) {
-    it(blurb, () => { expect(VaultBundle.safeParse({ ...TH.bundleOf('u1'), wayins }).success).to.eq(expected) })
+    it(blurb, () => { expect(VaultProps.safeParse({ ...TH.vaultPropsOf('u1'), wayins }).success).to.eq(expected) })
   }
 })
 
-describe("VaultBundle", () => {
-  for (const [candidate, expected, blurb] of BundleCases) {
-    it(blurb, () => { expect(VaultBundle.safeParse(candidate).success).to.eq(expected) })
+describe("VaultProps", () => {
+  for (const [candidate, expected, blurb] of VaultPropsCases) {
+    it(blurb, () => { expect(VaultProps.safeParse(candidate).success).to.eq(expected) })
   }
 })
 
@@ -167,7 +167,7 @@ describe("Sidecar", () => {
   })
 })
 
-const wholeSummary = { boxlabel: 'anthropic', revision_id: 'r1', vault_key_epoch: 1, sidecar: {}, registered_at: Date.UTC(2026, 9, 14), written_at: Date.UTC(2026, 9, 14) }
+const wholeSummary = { boxlabel: 'anthropic', revision_tok: 'r1', vault_key_epoch: 1, sidecar: {}, registered_at: Date.UTC(2026, 9, 14), written_at: Date.UTC(2026, 9, 14) }
 
 describe("LockboxSummary", () => {
   it("marks a summary undamaged, as its example shows", () => {
@@ -182,7 +182,7 @@ describe("LockboxSummary", () => {
 
   it("holds neither ciphered field, the format nor the codec: a whole lockbox is not a summary", () => {
     const summary = LockboxSummary.parse({ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: {} })
-    expect(Object.keys(summary)).to.have.members(['boxlabel', 'revision_id', 'vault_key_epoch', 'sidecar', 'registered_at', 'written_at', 'damaged'])
+    expect(Object.keys(summary)).to.have.members(['boxlabel', 'revision_tok', 'vault_key_epoch', 'sidecar', 'registered_at', 'written_at', 'damaged'])
   })
 })
 
@@ -306,7 +306,7 @@ describe("DeviceMark", () => {
 // obsolete: never update the snapshot of a format that stands. A refinement (a `Z.refine`, such
 // as the floor's character rules) renders as nothing, so this sees fields, types, optionality and
 // the ranges a check states, not every rule.
-const StoredRecords = [VaultBundle, Lockbox, Lease, DeviceMark] as const
+const StoredRecords = [VaultProps, Lockbox, Lease, DeviceMark] as const
 
 describe("Stored record formats", () => {
   for (const schema of StoredRecords) {

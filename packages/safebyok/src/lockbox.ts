@@ -24,7 +24,7 @@ const isStableJsonText = (text: string): boolean => {
  * it was first stored and last written -- a locked vault may show. Nothing in this record opens
  * without the vaultKey.
  *
- * `revision_id` is minted fresh on every write and bound into both encryptions, so ciphertext
+ * `revision_tok` is minted fresh on every write and bound into both encryptions, so ciphertext
  * moved between revisions (or boxes, or vaults) refuses to open. So is every other field but the
  * two encrypted ones: an altered sidecar, time or codec refuses to open as well.
  *
@@ -36,9 +36,9 @@ const isStableJsonText = (text: string): boolean => {
 export const Lockbox = Z.object({
   format:                 Z.literal('safebyok-lockbox-v5'),
   boxlabel:               NameFloor,
-  revision_id:            Z.string().check(Z.minLength(1)),
+  revision_tok:           Z.string().check(Z.minLength(1)),
   /**
-   * Which vaultKey this lockbox's lockboxKey is wrapped under: the bundle's `vault_key_epoch` when
+   * Which vaultKey this lockbox's lockboxKey is wrapped under: the vault props' `vault_key_epoch` when
    * it was written. Public, so a locked vault's listing shows which lockboxes stand under which.
    */
   vault_key_epoch:        vaultKeyEpoch,

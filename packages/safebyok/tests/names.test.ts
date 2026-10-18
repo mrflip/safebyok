@@ -220,7 +220,7 @@ describe("Names.checkFloor", () => {
 
 describe("Names.sameScope", () => {
   it("is true for a record naming the same app, user and vault, whatever else it holds", () => {
-    expect(Names.sameScope(TH.bundleOf('u1'), TH.scopeOf('u1'))).to.be.true
+    expect(Names.sameScope(TH.vaultPropsOf('u1'), TH.scopeOf('u1'))).to.be.true
   })
 
   it("is false when any one of the three differs", () => {

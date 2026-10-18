@@ -10,12 +10,12 @@
  *   show a message, retry, or tell them to free room. `vault_locked`, `wrong_passphrase`,
  *   `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `absent_box`, `absent_vault`, `absent_wayin`,
  *   `whisper_too_large`, `lockbox_too_large`, `vault_full`, `too_many_wayins`, `last_wayin`,
- *   `corrupt_record`, `damaged_bundle`, `damaged_wayin`, `damaged_lockbox`, `newer_format`, `stale_write`,
+ *   `corrupt_record`, `damaged_vault`, `damaged_wayin`, `damaged_lockbox`, `newer_format`, `stale_write`,
  *   `rolled_back`, `not_permitted`, `identity_revoked`, `storage_unavailable`, `storage_blocked`.
  *
  * `vault_full` means a new lockbox in a vault already holding its `maxLockboxes` (a limit the
  * client keeps), and also that storage has no room for the write (a limit of the backend's own,
- * such as the Convex component's or the Postgres server's). Either way the user erases a lockbox,
+ * such as the Convex component's or the Postgres server's). Either way the user retires a lockbox,
  * or the host raises `maxLockboxes` where the backend allows. `whisper_too_large` is the user's value, with its
  * lockbox's sidecar, over `maxWhisperBytes`, so a condition, and `lockbox_too_large` the
  * user's whisper and sidecar together over what storage holds in one record. `bad_label` is a label the app passed that fails the
@@ -44,9 +44,9 @@
  *
  * `newer_format` is a stored vault in a form this version does not know, which a newer version of
  * safebyok may have written: the user's next move is to update the app, never to start over, so
- * it is told apart from `damaged_bundle`, and nothing erases it.
+ * it is told apart from `damaged_vault`, and nothing retires it.
  *
- * `rolled_back` is storage handing back an older copy of a vault's bundle than this device has
+ * `rolled_back` is storage handing back an older copy of a vault's props than this device has
  * already seen -- a backup restored over it, or storage tampered with -- which the vault refuses to
  * use, and locks, as for `identity_revoked`: nothing is unlocked from it and nothing written over it. Only a device that saw the newer
  * copy can tell, and only while its own storage keeps the mark of it.
@@ -85,10 +85,10 @@ export const VaultErrorKindVals = [
   'vault_full',          // a new lockbox in a vault already holding its maxLockboxes, or a write storage has no room for
   'too_many_wayins',     // a new wayin in a vault already holding MaxUnlocks
   'last_wayin',          // removing the vault's last passphrase, which would leave no sure way in
-  'bad_option',          // an option or argument out of its range: openVault's, mask's, argon2idDeriver's, a store()'s sidecar, a VaultDB write's record
+  'bad_option',          // an option or argument out of its range: openVault's, mask's, argon2idDeriver's, a storeBox()'s sidecar, a VaultDB write's record
   'vault_closed',        // the vault handle was closed and cannot be used again
   'corrupt_record',      // a stored record failed validation as storage read it back
-  'damaged_bundle',      // the vault's stored bundle failed its checks, so no way in can be tried
+  'damaged_vault',       // the vault's stored props failed their checks, so no way in can be tried
   'damaged_wayin',       // a way in is stored in a form this package never writes, so it cannot be tried
   'damaged_lockbox',     // a lockbox failed its checks, or would not open under the vault's own vaultKey
   'newer_format',        // a stored vault in a form this version does not know, which a newer one may have written
@@ -109,7 +109,7 @@ export type VaultErrorKind = typeof VaultErrorKindVals[number]
  * secret material -- not in the message, not as a property.
  *
  * @example
- *   try { await vault.read('ANTHROPIC_API_KEY') } catch (err) {
+ *   try { await vault.readBox('ANTHROPIC_API_KEY') } catch (err) {
  *     if (err instanceof VaultError && err.kind === 'vault_locked') { promptForPassphrase() }
  *   }
  */
@@ -168,7 +168,7 @@ export const VaultErrorFamilyForKind = {
   bad_option:          'misuse',
   vault_closed:        'misuse',
   corrupt_record:      'condition',
-  damaged_bundle:      'condition',
+  damaged_vault:       'condition',
   damaged_wayin:       'condition',
   damaged_lockbox:     'condition',
   newer_format:        'condition',
@@ -188,7 +188,7 @@ export const VaultErrorFamilyForKind = {
  * false, and belongs with an error boundary.
  *
  * @example
- *   try { await vault.store(boxlabel, whisper) } catch (err) {
+ *   try { await vault.storeBox(boxlabel, whisper) } catch (err) {
  *     if (! isVaultCondition(err)) { throw err }
  *     showGripe(err.message)
  *   }

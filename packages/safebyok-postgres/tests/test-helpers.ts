@@ -59,7 +59,7 @@ export const tablelessClient = (db: PGlite): PostgresClient => ({
 /** This file's database, its tables emptied. */
 export const emptyDatabase = async (): Promise<PGlite> => {
   const db = await database()
-  await db.exec('TRUNCATE safebyok_lockboxes, safebyok_bundles')
+  await db.exec('TRUNCATE safebyok_lockboxes, safebyok_vaults')
   return db
 }
 
