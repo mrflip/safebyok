@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Client, CombinedError, fetchExchange } from '@urql/core'
 import { executeExchange } from '@urql/exchange-execute'
 import { GraphQLError, buildSchema, type GraphQLSchema } from 'graphql'
-import { VaultError, memoryDeviceDB, openVault } from 'safebyok'
+import { VaultError, memoryDeviceDB } from 'safebyok'
 import { postgresVaultDB } from 'safebyok-postgres'
 import * as TH from './test-helpers'
 import { graphqlVaultDB } from '../src/index'
@@ -52,7 +52,7 @@ const u1 = TH.scopeOf('u1')
 const thisVault = { vault_id: 'vault-id-u1' }
 
 /** u1's main vault, opened by the core in a browser of its own, over graphqlVaultDB to `schema`. */
-const vaultIn = (schema: GraphQLSchema) => openVault({
+const vaultIn = (schema: GraphQLSchema) => TH.settledVault({
   applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: TH.browserFor(schema, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest,
 })
 
@@ -129,7 +129,7 @@ describe("graphqlVaultDB, a server's lockbox limit", () => {
   it("has a vault opened over it refuse a maxLockboxes above what it declares", async () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
     const vaultDB = graphqlVaultDB({ client: TH.urqlClientFor(schema, 'u1'), maxLockboxes: 3 })
-    const refusal = await TH.expectRefusal(openVault({
+    const refusal = await TH.expectRefusal(TH.settledVault({
       applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest, maxLockboxes: 4,
     }), 'bad_option')
     expect(refusal.message).to.include('3 lockboxes')

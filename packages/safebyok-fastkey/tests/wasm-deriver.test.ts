@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  Argon2idWebV1, VaultError, argon2idDeriver, argon2idWebV1Deriver, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, openVault,
+  Argon2idWebV1, VaultError, argon2idDeriver, argon2idWebV1Deriver, isVaultError, localVaultDB, memoryDeviceDB, memoryStore,
   type KeyDeriver, type KeyDeriverSpec,
 } from 'safebyok'
 import { anyPassphraseTest } from 'safebyok/testing'
@@ -216,14 +216,14 @@ describe("argon2idWasmDeriver's bounds", () => {
 /** Two devices sharing one vault store: each opens the vault through its own key deriver. */
 const twoDevices = (firstDeriver: KeyDeriver, secondDeriver: KeyDeriver) => {
   const vaultDB = localVaultDB({ store: memoryStore() })
-  const deviceOf = (keyDeriver: KeyDeriver) => openVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver, passphraseStrengthTest: anyPassphraseTest })
+  const deviceOf = (keyDeriver: KeyDeriver) => TH.settledVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver, passphraseStrengthTest: anyPassphraseTest })
   return { first: () => deviceOf(firstDeriver), second: () => deviceOf(secondDeriver) }
 }
 
 // Each runs the real Argon2id at the supplied spec on both devices.
 describe("a vault shared between the two derivers", () => {
-  it("is accepted by openVault under the supplied label", async () => {
-    const vault = await openVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: localVaultDB({ store: memoryStore() }), deviceDB: memoryDeviceDB(), keyDeriver: argon2idWasmWebV1Deriver, passphraseStrengthTest: anyPassphraseTest })
+  it("is accepted by Vault.make under the supplied label", async () => {
+    const vault = await TH.settledVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: localVaultDB({ store: memoryStore() }), deviceDB: memoryDeviceDB(), keyDeriver: argon2idWasmWebV1Deriver, passphraseStrengthTest: anyPassphraseTest })
     expect(vault.getSnapshot().state).to.eq('absent')
     vault.close()
   })

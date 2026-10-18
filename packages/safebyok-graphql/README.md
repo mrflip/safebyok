@@ -7,7 +7,7 @@ safebyok's storage over [GraphQL](https://graphql.org), in two halves:
   the signed-in user -- [`safebyok-postgres`](../safebyok-postgres)'s, or one of your own. They
   drop into any GraphQL server beside your own schema.
 * **In the browser**, `safebyok-graphql`: **`graphqlVaultDB({ client })`**, the VaultDB over your
-  app's [urql](https://commerce.nearform.com/open-source/urql/) Client, to hand `openVault`.
+  app's [urql](https://commerce.nearform.com/open-source/urql/) Client, to hand `Vault.make`.
 
 Your server and your database hold ciphertext and a few public fields; neither ever sees a
 whisper, a passphrase, or any key that opens one.
@@ -70,14 +70,14 @@ export { handleRequest as GET, handleRequest as POST }
 
 `signedInUserId` is your own: the user id from the request's verified session cookie, or null.
 
-The browser half, handed to `openVault` as its `vaultDB`:
+The browser half, handed to `Vault.make` as its `vaultDB`:
 
 ```ts
 import { Client, fetchExchange } from '@urql/core'
 import { graphqlVaultDB } from 'safebyok-graphql'
 
 const client = new Client({ url: '/api/graphql', exchanges: [fetchExchange], fetchSubscriptions: true })
-const vault = await openVault({ ...browserOpts(), applabel: 'acme', userId, vaultlabel: 'main', vaultDB: graphqlVaultDB({ client }) })
+const vault = Vault.make({ ...browserOpts(), applabel: 'acme', userId, vaultlabel: 'main', vaultDB: graphqlVaultDB({ client }) })
 ```
 
 Your app's own Client serves, cache exchange and all: every query the vault sends is
@@ -170,14 +170,14 @@ comparison lets a device still holding a replaced vaultKey seal a whisper under 
 * **It declares the lockbox limit your server holds a vault to**: none (`Infinity`), as the
   Postgres VaultDB sets none unless told, or the `maxLockboxes` you pass
   (`graphqlVaultDB({ client, maxLockboxes: 250 })`). Pass the number your server's
-  VaultDB enforces, so `openVault` refuses a vault asking for more up front; the server refuses a
+  VaultDB enforces, so `Vault.make` refuses a vault asking for more up front; the server refuses a
   new lockbox past its own with kind `vault_full` either way, and the refusal crosses.
 * **A subscription that fails** (the server refusing it, the socket dropping) is not retried. It
   is warned of through the `logger`, once, and calls the vault's listener, so the vault reads
   again and meets the trouble itself: a server's `identity_revoked` locks it. After that, the
   vault goes on refreshing after its own writes.
 * **`logger`**, when given, hears what the VaultDB has to say (`graphqlVaultDB({ client, logger
-  })`); left out, it is the one `openVault` is given, else the console.
+  })`); left out, it is the one `Vault.make` is given, else the console.
 * **Client and server move in step.** The browser half and `safebyok-graphql/server` are one
   version of one package: a client of one version against a server of another can fail every
   call on a field one of them does not know, and the user sees `storage_unavailable`, which

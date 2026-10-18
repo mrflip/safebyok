@@ -43,7 +43,7 @@ export type HeededVaultDB = Pick<VaultDB, 'readVaultProps' | 'fetchOrCreateVault
  * as the vault locks holds that call with it; the vaultKey is dropped before the device store is
  * asked anything, so nothing is held open meanwhile.
  *
- * @param vaultDB - The storage adapter the host passed to openVault.
+ * @param vaultDB - The storage adapter the host passed to Vault.make.
  * @param onRefusal - What the vault does about a refusal. Whatever it throws is dropped: the
  *   refusal is what the caller must hear.
  */

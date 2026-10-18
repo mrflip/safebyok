@@ -4,7 +4,7 @@ import { VaultError } from '../src/errors'
 import { DefaultLogger, asError, parseLogger, setDefaultLogger, type VaultLogger } from '../src/logger'
 import * as TH from './test-helpers'
 
-/** What a host might hand openVault as its logger that is not one. */
+/** What a host might hand Vault.make as its logger that is not one. */
 const NotLoggers = [
   [{},                                                         'an empty object'],
   [{ log: () => undefined, warn: () => undefined },            'a logger without error'],

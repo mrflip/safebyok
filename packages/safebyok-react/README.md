@@ -63,7 +63,7 @@ import { VaultProvider } from 'safebyok-react'
 </VaultProvider>
 ```
 
-The provider takes every `openVault` option as a prop. `browserOpts()` supplies the three a
+The provider takes every `Vault.make` option as a prop, and throws one it does not take -- a misspelling, or a name it no longer uses -- as `bad_option`, to the nearest error boundary. `browserOpts()` supplies the three a
 browser app answers like any other, `keyDeriver`, `deviceDB` and `passphraseStrengthTest`;
 `vaultDB` is your backend's adapter. It answers the same bag on every call, so it is safe in a
 render: the provider reopens the vault whenever a prop changes identity. So define a `logger`, a
@@ -76,31 +76,34 @@ was opened with for its life; one that is no function, or none at all, is thrown
 that has it, as `bad_option`, to the nearest error boundary. `validators` is the exception: the provider watches each schema in
 the bag rather than the bag, so `validators={{ boxlabel: BoxlabelCheck }}` is fine in the props, so
 long as `BoxlabelCheck` itself is built once, at module level. A bag with a field it does not know
-(`boxLabel`) is thrown, as `bad_option`, to the nearest error boundary, as `openVault` would refuse
+(`boxLabel`) is thrown, as `bad_option`, to the nearest error boundary, as `Vault.make` would refuse
 it.
 
 ## When opening fails
 
-What happens when `openVault` rejects depends on the error's family (safebyok's
+The provider makes the vault with `Vault.make` as soon as there is a signed-in user, and hands it
+down at once, its snapshot saying `opening` until its `hello()` has read storage. What happens
+when `Vault.make` throws, or the hello is refused, depends on the error's family (safebyok's
 `VaultErrorFamilyForKind`): who has to act. The `safebyok` README's *Errors* section lists every
 kind, its family, and what it means.
 
 **A condition stays in place.** Storage that cannot be reached (`storage_unavailable`), a user
 storage no longer serves (`identity_revoked`, as when signed out of the backend, or not yet
 signed in to it) or a vault whose stored props fail their checks (`damaged_vault`) arrives as
-`openError`, a `VaultError`, with `vault` still null. (A damaged lockbox never stops the open:
+`openError`, a `VaultError`: the snapshot's `trouble`, the vault still `opening`. (A damaged lockbox never stops the open:
 the snapshot lists it with `damaged: true`, for your UI to offer `retireBox()` or a fresh
 `storeBox()`; see the `safebyok` README's *Damaged lockboxes*.) Show it where the vault's UI
-would be, and offer `retryOpen()`, which clears it and opens again; a failed open leaves no
-storage watch behind, so retrying costs nothing. A browser that keeps the app from storing
+would be, and offer `retryOpen()`, which has the vault say hello again: `openError` clears once it
+settles, or names what the retry met. A browser that keeps the app from storing
 anything on this device (`storage_blocked`) is a condition too, but one a retry will not mend
 until the browser's settings or room change: say so, rather than offering `retryOpen()`.
 
 ```tsx
 const VaultPanel = () => {
   const { vault, openError, retryOpen } = useVault()
+  const { state } = useVaultSnapshot()
   if (openError !== null) { return <p>{"Can't reach your vault."} <button onClick={retryOpen}>Retry</button></p> }
-  if (vault === null) { return <p>Opening your vault…</p> }
+  if (vault === null || state === 'opening') { return <p>Opening your vault…</p> }
   return <Lockboxes vault={vault} />
 }
 ```
@@ -112,7 +115,7 @@ show.
 
 For a `damaged_vault`, the one way forward is to retire the vault and start over:
 `retireDamagedVault()` from `useVault()` does that (the `safebyok` README's *A vault that cannot be
-opened*) and opens again, with the provider's own options. The user's lockboxes in it are lost for
+opened*) and has the vault say hello again, finding it absent. The user's lockboxes in it are lost for
 good, so ask first:
 
 ```tsx
@@ -124,7 +127,7 @@ if (openError?.kind === 'damaged_vault') {
 
 It does nothing for any other `openError`, or none, and rejects with storage's refusal (say,
 `storage_unavailable`) if retiring it fails, leaving `openError` as it was. A `stale_write` means
-the vault was made anew meanwhile, so it opens again as well; any other refusal opens nothing
+the vault was made anew meanwhile, so it says hello again as well; any other refusal says nothing anew
 (`retryOpen()` will, should the vault read sound now).
 
 **A sign-out the app did not hear of** -- in another tab, or a session that expired -- reaches

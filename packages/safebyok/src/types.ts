@@ -92,7 +92,7 @@ export const MinuteMillis = 60_000
 /**
  * The lease a vault grants for "until `lock()`", in milliseconds: from {@link FarPast} to
  * {@link FarFuture}, so a deadline it sets from any instant the clock may read is
- * {@link FarFuture}. `leaseHours: Infinity` becomes this as `openVault` parses it, and a vault's
+ * {@link FarFuture}. `leaseHours: Infinity` becomes this as `Vault.make` parses it, and a vault's
  * `leaseMillis` reads as it then.
  *
  * @example vault.leaseMillis >= ForeverMillis - MinuteMillis           // true when opened with leaseHours: Infinity
@@ -476,7 +476,7 @@ export const LeaseHours = 168 // seven days
  * with a timer when the lease ends, and one timer reaches no further than 2^31 - 1 milliseconds,
  * about 24.8 days. A longer lease is `Infinity`, until `lock()`; anything between is refused.
  *
- * @example openVault({ ...opts, leaseHours: MaxLeaseHours })   // the longest that ends by itself
+ * @example Vault.make({ ...opts, leaseHours: MaxLeaseHours })   // the longest that ends by itself
  */
 export const MaxLeaseHours = 588
 
@@ -500,7 +500,7 @@ export const MaxLockboxes = 100
  * milliseconds, as `Date.now()` does, from {@link FarPast} to {@link FarFuture}; a fraction is
  * fine, and rounded down. The vault checks every reading, and refuses a clock that reads outside
  * those bounds -- counting in seconds or microseconds, say -- or throws, with kind 'bad_option':
- * at `openVault`, and at any later call that reads it so, which drops the vaultKey first.
+ * at `Vault.make`, and at any later call that reads it so, which drops the vaultKey first.
  */
 export type Clock = { now(): number }
 

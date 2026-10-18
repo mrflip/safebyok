@@ -25,11 +25,11 @@ the floor is stated in the core's *Where it runs*.
 ## Use
 
 ```ts
-import { openVault } from 'safebyok'
+import { Vault } from 'safebyok'
 import { browserOpts } from 'safebyok/browser'
 import { idbVaultDB } from 'safebyok-indexeddb'
 
-const vault = await openVault({
+const vault = Vault.make({
   applabel:   'acme',
   userId:     session.userId,
   vaultlabel: 'main',
@@ -42,7 +42,7 @@ const vault = await openVault({
   rows in `<dbName>:vault_db`, and, through `browserOpts`, the lease in
   `<dbName>:device_db`. Anything but non-empty text refuses with kind `bad_option`.
 * **`logger`**, when given, hears what the store has to say (a listener that threw, say); left
-  out, the store uses the one `openVault` is given, else the console.
+  out, the store uses the one `Vault.make` is given, else the console.
 * **Every verb is one IndexedDB transaction.** IndexedDB runs readwrite transactions over one
   store one after another, across every tab of the origin, so a write lands only while what it
   expects still stands, and refuses with kind `stale_write` otherwise. Two tabs creating a vault
@@ -51,7 +51,7 @@ const vault = await openVault({
   stays current in both. The bell says only that something changed; the vault reads again. Its
   channel is closed when the last vault listening to it closes.
 * **No limits of its own.** IndexedDB sets none per record or per vault, so `maxRecordBytes`,
-  `maxVaultBytes` and `maxLockboxes` are `Infinity`: a vault holds what `openVault`'s
+  `maxVaultBytes` and `maxLockboxes` are `Infinity`: a vault holds what `Vault.make`'s
   `maxLockboxes` allows (100 by default), the origin's storage quota bounds the whole database,
   and a write past it refuses with kind `storage_blocked`, IndexedDB's own error as its `cause`.
 * **Storage the browser withholds** -- site data blocked, a private window or frame that keeps

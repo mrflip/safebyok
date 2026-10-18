@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ForeverMillis, MinuteMillis, VaultError, openVault } from 'safebyok'
+import { ForeverMillis, MinuteMillis, VaultError } from 'safebyok'
 import { PassphraseModal, type PassphraseAdvice } from '../src/passphrase-modal'
 import * as TH from './test-helpers'
 
@@ -21,7 +21,7 @@ const wordingOf = (relative: string | null, creating: boolean) => {
 
 /** A vault made under 'pw', holding one lockbox, and locked, in memory. */
 const lockedVault = async () => {
-  const vault = await openVault(TH.memoryVaultOpts())
+  const vault = await TH.settledVault(TH.memoryVaultOpts())
   await vault.unlock('pw')
   await vault.storeBox('anthropic_api_key', 'sk-fake')
   await vault.lock()
@@ -213,18 +213,18 @@ describe("PassphraseModal", () => {
       [1.5,        "in 90 minutes",  'an hour and a half reads as minutes'],
     ] as const
 
-    // Each from a vault opened with the hours given, so the dialog reads what openVault made of
+    // Each from a vault opened with the hours given, so the dialog reads what Vault.make made of
     // them: one not yet created reads 'Locks on', one created and locked 'Locks again'.
     for (const [hours, relative, blurb] of WindowCases) {
       it(`${blurb}, while it creates the vault`, async () => {
-        const vault = await openVault(TH.memoryVaultOpts({ leaseHours: hours }))
+        const vault = await TH.settledVault(TH.memoryVaultOpts({ leaseHours: hours }))
         render(<PassphraseModal vault={vault} onDone={noop} />)
         expect(screen.queryByText(wordingOf(relative, true))).to.not.be.null
         vault.close()
       })
 
       it(`${blurb}, on an ordinary unlock`, async () => {
-        const vault = await openVault(TH.memoryVaultOpts({ leaseHours: hours }))
+        const vault = await TH.settledVault(TH.memoryVaultOpts({ leaseHours: hours }))
         await vault.unlock('pw')
         await vault.lock()
         render(<PassphraseModal vault={vault} onDone={noop} />)
@@ -290,10 +290,10 @@ describe("PassphraseModal", () => {
 
     it("follows the vault as it changes: one made on another device meanwhile turns 'choose' into 'unlock'", async () => {
       const opts = TH.memoryVaultOpts()
-      const vault = await openVault(opts)
+      const vault = await TH.settledVault(opts)
       render(<PassphraseModal vault={vault} onDone={noop} />)
       expect(screen.queryByText('Choose a vault passphrase')).to.not.be.null
-      const elsewhere = await openVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
+      const elsewhere = await TH.settledVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
       await act(async () => { await elsewhere.unlock('pw') })
       elsewhere.close()
       await waitFor(() => { expect(screen.queryByText('Unlock your vault')).to.not.be.null })
@@ -388,16 +388,16 @@ describe("PassphraseModal", () => {
 
     it("drops the question once the vault is retired elsewhere, and never asks it of a vault made after", async () => {
       const opts = TH.memoryVaultOpts()
-      const vault = await openVault(opts)
+      const vault = await TH.settledVault(opts)
       await vault.unlock('pw')
       await vault.lock()
       render(<PassphraseModal vault={vault} allowStartOver onDone={noop} />)
       fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
-      const retirer = await openVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
+      const retirer = await TH.settledVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
       await act(async () => { await retirer.retire() })
       retirer.close()
       await screen.findByText('Choose a vault passphrase')
-      const maker = await openVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
+      const maker = await TH.settledVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
       await act(async () => { await maker.unlock('another pw') })
       maker.close()
       await screen.findByText('Unlock your vault')
@@ -568,7 +568,7 @@ describe("PassphraseModal", () => {
 
     it("forgets what it said once the vault is made and retired elsewhere, and an answer still on its way with it", async () => {
       const opts = TH.memoryVaultOpts()
-      const vault = await openVault(opts)
+      const vault = await TH.settledVault(opts)
       const gate = TH.makeGate()
       const advice = async (typed: string) => {
         if (typed === 'slow') { await gate.pass() }
@@ -579,7 +579,7 @@ describe("PassphraseModal", () => {
       await waitFor(() => { expect(adviceRegion().textContent).to.eq('said of quick') })
       fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'slow' } })
       await gate.reached
-      const elsewhere = await openVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
+      const elsewhere = await TH.settledVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
       await act(async () => { await elsewhere.unlock('pw') })
       await screen.findByText('Unlock your vault')
       await act(async () => { await elsewhere.retire() })

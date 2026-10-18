@@ -19,7 +19,7 @@ type KeyDeriverBase = {
 
 /**
  * A key deriver running Argon2id: the whole {@link KeyDeriverSpec} beside its function, every
- * parameter present. `openVault` checks the spec as `argon2idDeriver` does, so one Argon2id
+ * parameter present. `Vault.make` checks the spec as `argon2idDeriver` does, so one Argon2id
  * cannot run is refused (kind 'bad_option') when the vault is opened, not at its first unlock.
  * What {@link argon2idDeriver}, {@link argon2idWebV1Deriver} and safebyok-fastkey's derivers are.
  */
@@ -28,7 +28,7 @@ export type Argon2idKeyDeriver = KeyDeriverSpec & KeyDeriverBase
 /**
  * A key deriver of any other algorithm, or of none declared: a label, a salt length and a
  * function, and optionally the `algorithm` it runs, named in the host's own words. It carries no
- * Argon2id parameters; `openVault` refuses one that declares `algorithm: 'argon2id'` without
+ * Argon2id parameters; `Vault.make` refuses one that declares `algorithm: 'argon2id'` without
  * them being a whole spec, and one whose label safebyok reserves (those beginning `argon2id_web_`).
  */
 export type CustomKeyDeriver = KeyDeriverBase & {
@@ -46,11 +46,11 @@ export type CustomKeyDeriver = KeyDeriverBase & {
  * A vault stores its deriver's `key_deriver_label`, and unlocks only through a deriver carrying
  * that same label: plugging in your own commits every one of your users' vaults to it. An
  * Argon2id deriver carries its whole keyDeriverSpec beside its function, and one that wears the
- * label of a spec safebyok supplies must carry exactly that spec's parameters, or openVault
+ * label of a spec safebyok supplies must carry exactly that spec's parameters, or Vault.make
  * refuses it (kind 'bad_option'); so does a label beginning `argon2id_web_` that is not one
  * safebyok supplies, those being reserved. Do not write your own derivation; if you must
  * substitute, use a vetted Argon2id implementation, spread the spec into it, keep the label, and
- * test that it derives the same bytes as the deriver it stands in for. openVault logs a warning
+ * test that it derives the same bytes as the deriver it stands in for. Vault.make logs a warning
  * for a label beginning `test_`, the mark of a deriver made cheap for tests.
  *
  * @example const wasmDeriver: KeyDeriver = { ...Argon2idWebV1, deriveKeyBytes: deriveWithWasm }
@@ -99,7 +99,7 @@ const deriverOf = (spec: KeyDeriverSpec): Argon2idKeyDeriver => {
 
 /**
  * The KeyDeriver to use: Argon2id at the supplied {@link Argon2idWebV1} spec. `browserOpts()`,
- * from `safebyok/browser`, hands it to openVault; outside a browser, pass it as `keyDeriver`
+ * from `safebyok/browser`, hands it to Vault.make; outside a browser, pass it as `keyDeriver`
  * yourself.
  *
  * @example

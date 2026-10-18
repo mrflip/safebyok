@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
 import type { Client, Pool, PoolClient } from 'pg'
-import { VaultError, memoryDeviceDB, openVault } from 'safebyok'
+import { VaultError, memoryDeviceDB } from 'safebyok'
 import type { VaultDB, VaultErrorKind } from 'safebyok'
 import * as TH from './test-helpers'
 import { VaultChangeChannel, postgresVaultDB } from '../src/index'
@@ -109,7 +109,7 @@ describe("postgresVaultDB, as the README has it", () => {
 
   it("stores and reads a real vault, made and opened by the core", async () => {
     const db = await TH.emptyDatabase()
-    const opened = () => openVault({
+    const opened = () => TH.settledVault({
       applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: TH.requestFor(db, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest,
     })
     const first = await opened()
@@ -461,7 +461,7 @@ describe("postgresVaultDB, its lockbox limit", () => {
 
   it("refuses as vault_full a storeBox() its vault's own count let through, when another device filled the vault unheard", async () => {
     const db = await TH.emptyDatabase()
-    const opened = () => openVault({
+    const opened = () => TH.settledVault({
       applabel: 'acme', userId: 'u1', vaultlabel: 'main', deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest,
       // No listen: neither vault hears the other's writes.
       vaultDB: postgresVaultDB({ client: db, userId: 'u1', maxLockboxes: 2 }),
@@ -485,8 +485,8 @@ describe("postgresVaultDB, its lockbox limit", () => {
       applabel: 'acme', userId: 'u1', vaultlabel: 'main', deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest,
       vaultDB: postgresVaultDB({ client: db, userId: 'u1', maxLockboxes: 3 }), maxLockboxes,
     })
-    await TH.expectRefusal(openVault(optsFor(4)), 'bad_option')
-    const vault = await openVault(optsFor())
+    await TH.expectRefusal(TH.settledVault(optsFor(4)), 'bad_option')
+    const vault = await TH.settledVault(optsFor())
     await vault.unlock('correct horse battery staple')
     for (const boxlabel of ['one', 'two', 'three']) { await vault.storeBox(boxlabel, `sk-fake-${boxlabel}`) }
     const refusal = await TH.expectRefusal(vault.storeBox('four', 'sk-fake-four'), 'vault_full')

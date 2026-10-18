@@ -13,7 +13,7 @@ reach says so, and says where it is proven instead.
 
 Three layers share the work, and each guarantee below belongs to one of them.
 
-* **The vault** (`openVault`) decides what to write. It reads a lockbox, seals a new revision over
+* **The vault** (`Vault.make`) decides what to write. It reads a lockbox, seals a new revision over
   it, and writes with an expectation of what it read. When storage refuses the write as stale, it
   catches up with storage once and refuses the store as `stale_write`, never trying again: what
   the other device wrote or retired stands, and the host hears that its write lost. It also holds the app's own lockbox limit (`maxLockboxes`, 100 by default): the alarm bell for an
@@ -27,7 +27,7 @@ Three layers share the work, and each guarantee below belongs to one of them.
   hands back that rejects, escapes -- each goes to the logger as an error -- and your unsubscribe
   runs once, however often the host calls it. It lists a vault's records whole for a server to
   serve (`listBoxRecords`), from your `doListBoxes`. It keeps the `logger`, as `this.logger`:
-  your adapter's own, else the one `openVault` hands it, else the console; and
+  your adapter's own, else the one `Vault.make` hands it, else the console; and
   `this.watchTrouble(message)` warns once for each failing streak of a live watch.
 * **Your adapter** (the `do*` methods) stores and returns records, and makes each write
   conditional: it checks the expectation and writes in one atomic step. It never resolves a
@@ -190,7 +190,7 @@ It compares the `vault_id` and nothing else, so a vault whose props are damaged 
 is still retired, and vault props rewritten under the same `vault_id` between a read and the
 retirement are retired with them: it is the same vault. A typed backend (Convex, Postgres) cannot
 hold damaged vault props, so there the hatch below has nothing to do: the vault's
-`retireDamagedVault`, the one way to clear a vault `openVault` refuses as `damaged_vault`, reads
+`retireDamagedVault`, the one way to clear a vault whose `hello()` refuses it as `damaged_vault`, reads
 the vault props through `doReadVaultProps` as stored, takes their `vault_id`, and aims this
 retirement at it. An adapter that hands each call on to another VaultDB's public verbs hands
 `retireDamagedVault` on too. Proven by the base class's own tests for a damaged record, which the

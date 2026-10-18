@@ -161,7 +161,7 @@ export async function POST(request: Request): Promise<Response> {
 A listing goes through `listBoxRecords`, not `listBoxes`: `listBoxes` hands back summaries, the
 shape a vault shows, and a VaultDB in the browser must hand back records as stored.
 
-The client half, a VaultDB over `fetch`, to hand `openVault` as its `vaultDB`:
+The client half, a VaultDB over `fetch`, to hand `Vault.make` as its `vaultDB`:
 
 ```ts
 import { VaultDB, VaultError, VaultErrorKindVals } from 'safebyok'
@@ -230,7 +230,7 @@ const isKind = (kind: unknown): kind is VaultErrorKind => (VaultErrorKindVals as
 * **A limit of the server's own, if you give one.** Pass `maxLockboxes` and this VaultDB holds
   every vault to that many lockboxes, whatever the browser asks: a new lockbox past it refuses
   with kind `vault_full`, and a lockbox replacing one already there never does. Declare the same
-  number as the browser VaultDB's `maxLockboxes`, so that `openVault` refuses a larger one up
+  number as the browser VaultDB's `maxLockboxes`, so that `Vault.make` refuses a larger one up
   front. A limit costs the statement that inserts a new lockbox one count of its vault; with
   none (`Infinity`, the default), nothing is counted, and how large a vault grows is yours to
   bound, by your own quotas. Nothing bounds a vault's bytes beyond that: your framework's request-size limit bounds

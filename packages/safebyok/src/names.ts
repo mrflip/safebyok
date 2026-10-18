@@ -35,7 +35,7 @@ const validatorsCheck = optionsCheck({
  * undefined. Kind 'bad_option' otherwise, so a misspelt field (`boxLabel`) is refused rather
  * than leaving the default check quietly in its place. Only the shape is checked: the schemas
  * are the host's.
- * openVault runs it on its `validators` option; a binding or wrapper that takes the bag apart
+ * Vault.make runs it on its `validators` option; a binding or wrapper that takes the bag apart
  * runs it first, once, on the bag it was handed.
  *
  * @example checkValidators({ boxlabel: z.string().max(200) })  // the same bag
@@ -78,7 +78,7 @@ export const check = (rules: NameRules, field: NameField, candidate: unknown): s
   // quote the candidate, so its refusal is never passed on.
   const said = OurChecks.has(rules[field]) ? verdict.error.issues[0]?.message : undefined
   if (said === undefined) {
-    throw new VaultError('bad_label', `That ${field} does not pass the ${field} check passed in openVault's validators.`)
+    throw new VaultError('bad_label', `That ${field} does not pass the ${field} check passed in Vault.make's validators.`)
   }
   throw new VaultError('bad_label', `That ${field} does not pass the vault's ${field} check. ${said}.`)
 }
@@ -121,7 +121,7 @@ const verdictOf = (rules: NameRules, field: NameField, candidate: string) => {
   try {
     return Z.safeParse(rules[field], candidate)
   } catch (err) {
-    throw Sanitizer.refusalFor(err, 'bad_option', `The ${field} check in openVault's validators threw rather than answering: each must be a Zod schema that checks synchronously, and returns its refusals rather than throwing them.`)
+    throw Sanitizer.refusalFor(err, 'bad_option', `The ${field} check in Vault.make's validators threw rather than answering: each must be a Zod schema that checks synchronously, and returns its refusals rather than throwing them.`)
   }
 }
 

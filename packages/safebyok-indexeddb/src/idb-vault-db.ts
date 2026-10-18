@@ -30,11 +30,11 @@ import { inOneTransaction, settle, withheldShelfOf } from './shelf'
  *
  * @param opts - Where to keep the records: `dbName`, default 'safebyok'; and optionally a
  *   `logger`, the default logger without one (a vault opened with no logger of its own hears it too).
- * @returns The VaultDB, to hand `openVault`. Kind 'bad_option' for a `dbName` that is not
+ * @returns The VaultDB, to hand `Vault.make`. Kind 'bad_option' for a `dbName` that is not
  *   non-empty text, or a `logger` that is not a VaultLogger. Nothing is opened until the first read or write.
  *
  * @example
- *   const vault = await openVault({ applabel: 'acme', userId, vaultlabel: 'main', vaultDB: idbVaultDB({ dbName: 'acme' }), ...browserOpts({ dbName: 'acme' }) })
+ *   const vault = Vault.make({ applabel: 'acme', userId, vaultlabel: 'main', vaultDB: idbVaultDB({ dbName: 'acme' }), ...browserOpts({ dbName: 'acme' }) })
  */
 export const idbVaultDB = (opts?: IdbVaultDBOpts): VaultDB => new IdbVaultDB(parseDbName(opts, 'idbVaultDB'), opts)
 

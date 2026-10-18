@@ -7,7 +7,7 @@ import * as Z from 'zod/mini'
  * exported from the main entry too.
  *
  * Two layers: the floor ({@link NameFloor}), which every name must pass whatever the host chose, and the defaults above it ({@link DefaultValidators}), which a host
- * replaces field by field with openVault's `validators` ({@link VaultValidators}).
+ * replaces field by field with Vault.make's `validators` ({@link VaultValidators}).
  */
 
 /** The most a name holds under any validators, in bytes of UTF-8: the floor's ceiling. */
@@ -87,7 +87,7 @@ export const LabelPattern = /^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$/
  * wayin's `wayinlabel`.
  * Lowercase words of letters and digits joined by single underscores, starting with a letter,
  * two to forty characters (STYLE.md's tag glossary). A host that wants other labels passes its own
- * schema in openVault's `validators`. (A scope's `user_id` is the host's auth identity,
+ * schema in Vault.make's `validators`. (A scope's `user_id` is the host's auth identity,
  * deliberately not a Label: see {@link UserId}.)
  *
  * @example Label.parse('anthropic_api_key')
@@ -117,7 +117,7 @@ export const UserIdPattern = /^[A-Za-z0-9_.:@+|-]+$/
  * Okta's, Apple's dotted `sub`, a DID -- and a practical email address, though the id should be
  * the provider's stable, opaque one: a vault is found by its user_id, and one that changes (an
  * email, a handle) orphans the vault. `^`, which key-value stores join names on, is in no name
- * at all (the floor), and `/`, a folder store's separator, in no default. `openVault` refuses a `userId` that fails it with kind 'bad_label'; a host whose
+ * at all (the floor), and `/`, a folder store's separator, in no default. `Vault.make` refuses a `userId` that fails it with kind 'bad_label'; a host whose
  * ids look otherwise passes its own schema as `validators.userId`.
  *
  * @example UserId.parse('auth0|5f7c8ec7c33c6c004bbafe82')
@@ -138,7 +138,7 @@ export const UserId = Z.string().check(
 export type NameValidator = Z.core.$ZodType<string>
 
 /**
- * The checks a vault runs on every name at its entry, as openVault's `validators` option:
+ * The checks a vault runs on every name at its entry, as Vault.make's `validators` option:
  * each field a host gives **replaces** ours, and each it leaves out keeps ours
  * ({@link DefaultValidators}). Build the bag once, at module level, not anew on each call or render.
  *
@@ -151,7 +151,7 @@ export type NameValidator = Z.core.$ZodType<string>
  *
  * | Check | Job | Runs | Fails as |
  * |---|---|---|---|
- * | These validators (`Label` and `UserId` by default) | an alarm for names your app never meant to use | at entry only: openVault (the scope), storeBox (the boxlabel), addPassphrase and addPasskey (the wayinlabel) | `bad_label` |
+ * | These validators (`Label` and `UserId` by default) | an alarm for names your app never meant to use | at entry only: Vault.make (the scope), storeBox (the boxlabel), addPassphrase and addPasskey (the wayinlabel) | `bad_label` |
  * | The floor ({@link NameFloor}) | what text must be for every client and store to agree (no `^` in a name, which key-value stores join names on) | beneath these at entry, whatever they are; at every storage verb; on every record read back | `bad_label` at entry; damaged on read |
  * | The record's shape, scope, boxlabel, ciphertext and expectations | what the design needs | when sent to storage and when read back | `bad_option` (a bug) when sent; damaged on read; `stale_write` |
  * | The storage's own limits (`maxRecordBytes`, `maxVaultBytes`, `maxLockboxes`, `maxNameBytes`) | facts about the backend | when sent to storage | `lockbox_too_large`, `vault_full`, `bad_label` |
@@ -174,7 +174,7 @@ export type NameValidator = Z.core.$ZodType<string>
  *     boxlabel: z.string().min(1).max(200),
  *     userId:   z.string().regex(/^user_[A-Za-z0-9]{27}$/),
  *   }
- *   const vault = await openVault({ applabel: 'acme', userId, vaultlabel: 'main', vaultDB, validators, ...browserOpts() })
+ *   const vault = Vault.make({ applabel: 'acme', userId, vaultlabel: 'main', vaultDB, validators, ...browserOpts() })
  */
 export type VaultValidators = {
   /** Checks the host application's label. Default: {@link Label}. */
@@ -208,8 +208,8 @@ export const DefaultValidators = Object.freeze({
  * up to {@link NameFloorBytes} of UTF-8, well-formed, in NFC, and free of control characters and
  * `^`. What a host keeping labels in any script may pass whole, or start from. Frozen.
  *
- * @example openVault({ ...opts, validators: AnyTextValidators })
- * @example openVault({ ...opts, validators: { ...AnyTextValidators, userId: UserId } })
+ * @example Vault.make({ ...opts, validators: AnyTextValidators })
+ * @example Vault.make({ ...opts, validators: { ...AnyTextValidators, userId: UserId } })
  * @example AnyTextValidators.boxlabel.safeParse('Work: מפתח API').success  // true
  * @example AnyTextValidators.boxlabel.safeParse('key \uD83D').success      // false: half of an emoji
  */

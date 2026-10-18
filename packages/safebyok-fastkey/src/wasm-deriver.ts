@@ -47,7 +47,7 @@ export const argon2idWasmDeriver = (spec: KeyDeriverSpec): Argon2idKeyDeriver =>
  * any `browserOpts()` spread, so it wins.
  *
  * @example
- *   const vault = await openVault({ ...browserOpts(), keyDeriver: argon2idWasmWebV1Deriver, applabel: 'acme', userId, vaultlabel: 'main', vaultDB })
+ *   const vault = Vault.make({ ...browserOpts(), keyDeriver: argon2idWasmWebV1Deriver, applabel: 'acme', userId, vaultlabel: 'main', vaultDB })
  * @example
  *   const keyBytes = await argon2idWasmWebV1Deriver.deriveKeyBytes('correct horse battery staple', passphraseSalt)
  *   keyBytes.length  // 32
@@ -60,7 +60,7 @@ const deriveWithWasm = async (spec: KeyDeriverSpec, passphrase: string, saltByte
   if (typeof WebAssembly === 'undefined') {
     throw new VaultError('bad_option', "This platform has no WebAssembly (React Native's Hermes has none), so the WebAssembly key deriver cannot run here: use argon2idWebV1Deriver, or argon2idDeriver, from safebyok.")
   }
-  // hash-wasm refuses an empty password with a plain Error; openVault never hands one over.
+  // hash-wasm refuses an empty password with a plain Error; a vault never hands one over.
   if (passphrase === '') { throw new VaultError('wrong_passphrase', "A passphrase can't be empty.") }
   try {
     return await argon2id({

@@ -69,7 +69,8 @@ export const VaultDashboard = () => {
       </p>
     )
   }
-  if (vault === null) { return <p className="quiet">Opening vault…</p> }
+  // The handle comes at once, and says it is opening until its hello has read storage.
+  if (vault === null || snapshot.state === 'opening') { return <p className="quiet">Opening vault…</p> }
 
   // A whisper is never null (the vault refuses a bare one), so null from withUnlockedVault can
   // only mean the user dismissed the passphrase dialog: the read needs no wrapping.

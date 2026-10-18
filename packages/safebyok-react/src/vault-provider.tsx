@@ -1,24 +1,31 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { checkStrengthTest, checkValidators, retireDamagedVault as retireStoredDamagedVault, isVaultCondition, isVaultError, openVault, parseLogger, type OpenVaultOpts, type PassphraseStrengthTest, type Vault, type VaultDB, type VaultError, type VaultLogger, type VaultScope, type VaultSnapshot, type VaultValidators } from 'safebyok'
+import { Vault, checkStrengthTest, checkValidators, retireDamagedVault as retireStoredDamagedVault, isVaultCondition, isVaultError, parseLogger, type MakeVaultOpts, type PassphraseStrengthTest, type VaultDB, type VaultError, type VaultLogger, type VaultScope, type VaultSnapshot, type VaultValidators } from 'safebyok'
 import { PassphraseModal, type PassphraseAdvice } from './passphrase-modal'
 
 /**
- * What the provider hands down: the vault handle (null while opening, signed out, or when the
- * open failed), why the open failed and a way to try again, and `withUnlockedVault`, which owns
- * the ask-for-the-passphrase-when-needed flow.
+ * What the provider hands down: the vault handle (null while signed out, or when its options were
+ * refused), why its hello failed and a way to try again, and `withUnlockedVault`, which owns the
+ * ask-for-the-passphrase-when-needed flow.
  */
 export type VaultContextShape = {
+  /**
+   * The vault handle, made as soon as there is a signed-in user: its snapshot says `opening` until
+   * its `hello()` has read storage, and every call on it waits for that first. Null while
+   * signed out, and when `Vault.make` refused the options, which the provider throws to the
+   * nearest error boundary.
+   */
   vault: Vault | null
   /**
-   * Why the vault could not be opened, when it is a condition the app can show in place:
-   * storage that cannot be reached (`storage_unavailable`), a user storage no longer serves
+   * Why the vault could not be opened, when it is a condition the app can show in place: the
+   * snapshot's `trouble` while the vault is still `opening`, its hello refused by storage that
+   * cannot be reached (`storage_unavailable`), a user storage no longer serves
    * (`identity_revoked`, as when signed out of the backend, or not yet signed in to it), a vault
    * whose stored props fail their checks (`damaged_vault`), a browser that will not let the app
-   * keep anything on this device (`storage_blocked`). Null while opening, once open, and while
-   * signed out. Misuse -- a bad label or option -- never lands here: the provider throws it to the
-   * nearest error boundary. Offer `retryOpen` only for one a retry may mend: never for
-   * `storage_blocked`, which holds until something outside the app changes (say why instead), nor
-   * for `damaged_vault`, which `retireDamagedVault` answers.
+   * keep anything on this device (`storage_blocked`). Null while the hello runs, once the vault
+   * has settled, and while signed out. Misuse -- a bad label or option -- never lands here: the
+   * provider throws it to the nearest error boundary. Offer `retryOpen` only for one a retry may
+   * mend: never for `storage_blocked`, which holds until something outside the app changes (say
+   * why instead), nor for `damaged_vault`, which `retireDamagedVault` answers.
    *
    * @example
    *   if (openError?.kind === 'storage_blocked') { return <p>{"This browser won't let the app keep your vault on this device."}</p> }
@@ -27,20 +34,21 @@ export type VaultContextShape = {
    */
   openError: VaultError | null
   /**
-   * Open the vault again after `openError`, clearing it while the new attempt runs. Does
-   * nothing while there is no openError to retry.
+   * Have the vault say hello to storage again after `openError` (`vault.hello()`): openError
+   * clears once the vault settles, or names what the new attempt met. Does nothing while there is
+   * no openError to retry.
    */
   retryOpen: () => void
   /**
    * Retire the stored vault that `openError` reports as `damaged_vault`, with this device's lease
-   * of it, and open again: a fresh, absent vault, for the user to make anew.
-   * The user's lockboxes in it are gone for good, so ask first. Resolves when the reopen is under
-   * way, and does nothing while `openError` is any other, or none. Rejects with storage's
+   * of it, and have the vault say hello again: a fresh, absent vault, for the user to make anew.
+   * The user's lockboxes in it are gone for good, so ask first. Resolves when the new hello is
+   * under way, and does nothing while `openError` is any other, or none. Rejects with storage's
    * refusal if retiring it fails, such as `storage_unavailable`, leaving `openError` as it was; the
    * `safebyok` package's `retireDamagedVault` says which refusals to expect. One of them,
-   * `stale_write`, means the vault was made anew meanwhile, so that one opens again as well, and
-   * still rejects. Any other refusal opens nothing: `bad_option` among them, which is misuse, or
-   * a vault that reads sound now, which `retryOpen()` then opens.
+   * `stale_write`, means the vault was made anew meanwhile, so that one says hello again as well,
+   * and still rejects. Any other refusal says nothing anew: `bad_option` among them, which is
+   * misuse, or a vault that reads sound now, which `retryOpen()` then opens.
    *
    * @example
    *   if (openError?.kind === 'damaged_vault') {
@@ -91,8 +99,15 @@ const emptySnapshot: VaultSnapshot = {
   askPassphraseAt: null,
   wayins:          [],
   syncing:         true,
+  trouble:         null,
 }
 const getEmptySnapshot = () => emptySnapshot
+const getNoTrouble = () => null
+
+/** What the provider hands down as `openError`: the snapshot's trouble while the vault is still opening, when it is a condition. */
+const openErrorOf = (snapshot: VaultSnapshot): VaultError | null => (
+  snapshot.state === 'opening' && isVaultCondition(snapshot.trouble) ? snapshot.trouble : null
+)
 const unsubscribeFromNothing = () => { /* nothing was heard */ }
 const subscribeToNothing = () => unsubscribeFromNothing
 
@@ -106,12 +121,12 @@ export const useVaultSnapshot = (): VaultSnapshot => {
 }
 
 /**
- * Every openVault option, passed through as given (an option left out gets openVault's default),
- * except that `userId` may be null; and three for the passphrase dialog: whether it offers a
- * forgetful user to start over, what a password manager files the passphrase under, and the advice
- * it shows as the user chooses one (`PassphraseModal` has each). In a browser, spread
- * `browserOpts()` from `safebyok/browser` for the `keyDeriver`, `deviceDB` and
- * `passphraseStrengthTest` openVault asks for. The vault reopens whenever an option changes
+ * Every Vault.make option, passed through as given (an option left out gets Vault.make's default,
+ * and one it does not take is refused, to the error boundary), except that `userId` may be null;
+ * and three for the passphrase dialog: whether it offers a forgetful user to start over, what a
+ * password manager files the passphrase under, and the advice it shows as the user chooses one
+ * (`PassphraseModal` has each). In a browser, spread `browserOpts()` from `safebyok/browser` for
+ * the `keyDeriver`, `deviceDB` and `passphraseStrengthTest` Vault.make asks for. The vault reopens whenever an option changes
  * identity, so build each once -- at module level, or memoized -- never inline in the props; each
  * schema in `validators` likewise, though the bag around them may be built in render, as the
  * provider watches each schema rather than the bag. A `logger`, `clock` or
@@ -119,7 +134,7 @@ export const useVaultSnapshot = (): VaultSnapshot => {
  * provider and the vault it opens say things through one logger: the `logger` given here, else
  * the one the `vaultDB` was made with (the default logger when it was given none).
  */
-export type VaultProviderProps = Omit<OpenVaultOpts, 'userId'> & {
+export type VaultProviderProps = Omit<MakeVaultOpts, 'userId'> & {
   /** The signed-in user from the host's auth, or null when nobody is: then there is no vault. */
   userId:              string | null
   /**
@@ -147,13 +162,13 @@ export type VaultProviderProps = Omit<OpenVaultOpts, 'userId'> & {
 /**
  * The one logger the provider and the vault it opens say things through: the host's `logger`,
  * else the one its `vaultDB` was made with, guarded. Undefined for a logger, or a vaultDB, that
- * openVault will refuse, to the error boundary.
+ * Vault.make will refuse, to the error boundary.
  */
 const settleLogger = (logger: VaultLogger | null | undefined, vaultDB: VaultDB): VaultLogger | undefined => {
   try {
     return parseLogger(logger ?? vaultDB.logger)
   } catch {
-    // openVault refuses the same logger or vaultDB, and the provider throws that to the error boundary.
+    // Vault.make refuses the same logger or vaultDB, and the provider throws that to the error boundary.
     return undefined
   }
 }
@@ -175,17 +190,18 @@ const adviceFrom = (strengthTest: PassphraseStrengthTest, scope: VaultScope): Pa
 }
 
 /**
- * Opens the vault for the signed-in user and keeps it matched to that identity: a null userId
- * closes the handle, a different userId opens a different vault. Renders the passphrase dialog
+ * Makes the vault for the signed-in user and keeps it matched to that identity: a null userId
+ * closes the handle, a different userId makes a different vault. Renders the passphrase dialog
  * when an action run through withUnlockedVault finds the vault locked. The dialog is unstyled markup under the
  * `modal-scrim` / `modal` class names; the host's stylesheet dresses it.
  *
- * If openVault rejects with a condition (`isVaultCondition` from safebyok) -- storage that
- * cannot be reached, a signed-out user, a damaged record, a browser withholding storage -- the
- * provider hands it down as `openError`, for the app to show in place, beside a `retryOpen`
- * button where a retry may mend it (not `storage_blocked`). Anything else it
- * rejects with -- misuse, such as a bad label or option, or a value that is no VaultError at
- * all -- the provider throws while rendering, for the nearest error boundary to catch.
+ * If the vault's `hello()` is refused with a condition (`isVaultCondition` from safebyok) --
+ * storage that cannot be reached, a signed-out user, a damaged record, a browser withholding
+ * storage -- the snapshot keeps it as its `trouble`, and the provider hands it down as
+ * `openError`, for the app to show in place, beside a `retryOpen` button where a retry may mend
+ * it (not `storage_blocked`). Misuse -- a bad label or option, which `Vault.make` throws, or a
+ * hello refused as misuse or with a value that is no VaultError at all -- the provider throws
+ * while rendering, for the nearest error boundary to catch.
  *
  * @example
  *   <VaultProvider {...browserOpts()} applabel="acme" vaultlabel="main" userId={session?.userId ?? null}
@@ -194,10 +210,13 @@ const adviceFrom = (strengthTest: PassphraseStrengthTest, scope: VaultScope): Pa
  *   </VaultProvider>
  */
 export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, passphraseAdvice, children, ...opts }: VaultProviderProps) => {
-  const { applabel, vaultlabel, vaultDB, deviceDB, leaseHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger, validators, passphraseStrengthTest } = opts
-  // The bag is taken apart below, so a misspelt field would be dropped unseen: refused here, as openVault refuses it.
+  const { applabel, vaultlabel, vaultDB, deviceDB, leaseHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger, validators, passphraseStrengthTest, ...unlisted } = opts
+  // Each prop Vault.make does not take, by name -- a misspelling, a retired name -- handed on to it,
+  // so it is refused, to the error boundary, rather than dropped here unseen.
+  const unlistedJson = JSON.stringify(Object.keys(unlisted))
+  // The bag is taken apart below, so a misspelt field would be dropped unseen: refused here, as Vault.make refuses it.
   checkValidators(validators)
-  // Checked at the first render that has it, as openVault checks it; the vault keeps it for its life.
+  // Checked at the first render that has it, as Vault.make checks it; the vault keeps it for its life.
   checkStrengthTest(passphraseStrengthTest)
   // The vault reopens when a check changes, never for a bag rebuilt in render around the same ones.
   const applabelCheck = validators?.applabel
@@ -218,9 +237,9 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
   const askingRounds = useRef(0)
   // Wrapped, so that a rejection carrying any value at all (null, say) still reads as "failed".
   const [openFailure, setOpenFailure] = useState<{ err: unknown } | null>(null)
-  const [openError, setOpenError] = useState<VaultError | null>(null)
-  // Bumped by retryOpen: a fresh value re-runs the open effect.
-  const [openAttempt, setOpenAttempt] = useState(0)
+  // The vault's own word on why its hello failed, read so the provider renders only when that changes.
+  const readOpenError = useCallback(() => (vault === null ? null : openErrorOf(vault.getSnapshot())), [vault])
+  const openError = useSyncExternalStore(vault === null ? subscribeToNothing : vault.subscribe, vault === null ? getNoTrouble : readOpenError)
   // Settled once for each logger and vaultDB, so the provider and every vault it opens share it.
   const heardBy = useMemo(() => settleLogger(logger, vaultDB), [logger, vaultDB])
   // The logger, clock and strength test the last render had, and whether a change of any was warned of yet.
@@ -252,59 +271,70 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
     for (const settle of ending.waiters) { settle(unlocked) }
   }, [])
 
+  /**
+   * Has `made` say hello, again when retried: a refusal that is misuse, or no VaultError at all, goes
+   * to the error boundary; a condition is the snapshot's trouble already, which openError reads.
+   * Nothing is heard from a vault the provider has let go.
+   */
+  const sayHello = useCallback(async (made: Vault) => {
+    try {
+      await made.hello()
+    } catch (err) {
+      if (vaultRef.current !== made || isVaultCondition(err)) { return }
+      setOpenFailure({ err })
+    }
+  }, [])
+
   useEffect(() => {
     if (userId === null) { return }
-    let handle: Vault | null = null
-    let gone = false
-    // Listed one by one so the effect re-runs on each; `satisfies` fails the build if an openVault
+    // Listed one by one so the effect re-runs on each; `satisfies` fails the build if a Vault.make
     // option is ever added and not passed through.
     const checks = { applabel: applabelCheck, vaultlabel: vaultlabelCheck, boxlabel: boxlabelCheck, userId: userIdCheck, wayinlabel: wayinlabelCheck } satisfies Record<keyof VaultValidators, unknown>
-    const openOpts = { applabel, vaultlabel, userId, vaultDB, deviceDB, leaseHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger: heardBy ?? logger, validators: checks, passphraseStrengthTest } satisfies Record<keyof OpenVaultOpts, unknown>
-    void openVault(openOpts).then((opened) => {
-      if (gone) { opened.close(); return }
-      handle = opened
-      vaultRef.current = opened
-      setVault(opened)
-    }).catch((err: unknown) => {
-      if (gone) { return }
-      if (isVaultCondition(err)) {
-        setOpenError(err)
-      } else {
-        setOpenFailure({ err })
-      }
-    })
+    const refusable = Object.fromEntries((JSON.parse(unlistedJson) as string[]).map((ckey) => [ckey, undefined]))
+    const makeOpts = { ...refusable, applabel, vaultlabel, userId, vaultDB, deviceDB, leaseHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger: heardBy ?? logger, validators: checks, passphraseStrengthTest } satisfies Record<keyof MakeVaultOpts, unknown>
+    // The handle is this effect's to make and to close, and the render hands it down: so the state
+    // is set here, once per handle, as Vault.make answers at once.
+    let made: Vault | null = null
+    try {
+      made = Vault.make(makeOpts)
+    } catch (err) {
+      setOpenFailure({ err }) // eslint-disable-line react-hooks/set-state-in-effect
+    }
+    if (made !== null) {
+      vaultRef.current = made
+      setVault(made)
+      void sayHello(made)
+    }
     return () => {
-      gone = true
       vaultRef.current = null
       // A dialog belongs to the vault it was opened over: when that handle goes -- a sign-out,
       // another user, a reopen, the provider unmounting -- its actions resolve null, and it closes.
       // Here and not in an effect on `vault`, whose cleanup from the render before the vault came
       // would end a dialog opened in the very commit that brought it.
       endAsking(askingRef.current, false)
-      handle?.close()
+      made?.close()
       setVault(null)
       setOpenFailure(null)
-      setOpenError(null)
     }
-  }, [userId, applabel, vaultlabel, vaultDB, deviceDB, leaseHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger, heardBy, passphraseStrengthTest, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, wayinlabelCheck, openAttempt, endAsking])
+  }, [userId, applabel, vaultlabel, vaultDB, deviceDB, leaseHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger, heardBy, passphraseStrengthTest, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, wayinlabelCheck, unlistedJson, endAsking, sayHello])
 
   const retryOpen = useCallback(() => {
-    if (openError !== null) { setOpenAttempt((prev) => prev + 1) }
-  }, [openError])
+    if (vault !== null && openError !== null) { void sayHello(vault) }
+  }, [vault, openError, sayHello])
 
   const retireDamagedVault = useCallback(async () => {
-    if (userId === null || ! isVaultError(openError, 'damaged_vault')) { return }
+    if (userId === null || vault === null || ! isVaultError(openError, 'damaged_vault')) { return }
     const validators = { applabel: applabelCheck, vaultlabel: vaultlabelCheck, boxlabel: boxlabelCheck, userId: userIdCheck, wayinlabel: wayinlabelCheck } satisfies Record<keyof VaultValidators, unknown>
     try {
       await retireStoredDamagedVault({ applabel, vaultlabel, userId, vaultDB, deviceDB, validators })
     } catch (err) {
-      // The vault was made anew, so what openError says is out of date: open again, and still tell
-      // the caller why nothing was retired. Misuse (bad_option) reopens nothing.
-      if (isVaultError(err, 'stale_write')) { setOpenAttempt((prev) => prev + 1) }
+      // The vault was made anew, so what openError says is out of date: say hello again, and still
+      // tell the caller why nothing was retired. Misuse (bad_option) says nothing anew.
+      if (isVaultError(err, 'stale_write')) { void sayHello(vault) }
       throw err
     }
-    setOpenAttempt((prev) => prev + 1)
-  }, [openError, userId, applabel, vaultlabel, vaultDB, deviceDB, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, wayinlabelCheck])
+    void sayHello(vault)
+  }, [openError, vault, userId, applabel, vaultlabel, vaultDB, deviceDB, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, wayinlabelCheck, sayHello])
 
   /**
    * Waits on the dialog showing over `ranOn` now, opening one if none is; settles false once

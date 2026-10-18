@@ -21,7 +21,7 @@ import type { DamagedLockbox, DeviceMark, Lease, LockboxSummary, PasskeyWayin, P
 import { stableJsonify } from '../src/stable-jsonify'
 import { NameFloorBytes } from '../src/validators'
 import { TestDeriverNotice } from '../src/key-deriver-spec'
-import type { OpenVaultOpts } from '../src/vault'
+import { Vault, type MakeVaultOpts } from '../src/vault'
 import { localVaultDB, type VaultDB, type VaultDBOpts } from '../src/vault-db'
 
 /**
@@ -30,7 +30,7 @@ import { localVaultDB, type VaultDB, type VaultDBOpts } from '../src/vault-db'
  * the real one, worthless against a brute-forcer -- which is why its label says `test`. Never
  * hand it to a vault that holds a real secret.
  *
- * @example openVault({ ...opts, keyDeriver: testDeriver })
+ * @example Vault.make({ ...opts, keyDeriver: testDeriver })
  */
 export const testDeriver: KeyDeriver = {
   key_deriver_label: 'test_digest_v0',
@@ -48,23 +48,23 @@ export const testDeriver: KeyDeriver = {
  * A passphraseStrengthTest for tests, admitting every passphrase, so a suite may unlock with a
  * short one such as 'pw'. Never hand it to a vault that holds a real secret.
  *
- * @example openVault({ ...opts, passphraseStrengthTest: anyPassphraseTest })
+ * @example Vault.make({ ...opts, passphraseStrengthTest: anyPassphraseTest })
  */
 export const anyPassphraseTest: PassphraseStrengthTest = () => StrongVerdict
 
 /**
- * Everything openVault needs, over stores in memory made fresh for each call: `u1`'s `main` vault
+ * Everything Vault.make needs, over stores in memory made fresh for each call: `u1`'s `main` vault
  * in the `acme` app (as {@link scopeOf} has it), deriving through {@link testDeriver}, and
  * admitting any passphrase ({@link anyPassphraseTest}). `overrides`
  * replace any of it -- a store of the test's own, a clock, a logger, another user.
  *
  * @param overrides - Options to use in place of the defaults.
- * @returns A complete bag of options for openVault, or (`userId` aside) for a VaultProvider.
+ * @returns A complete bag of options for Vault.make, or (`userId` aside) for a VaultProvider.
  *
- * @example const vault = await openVault(TH.memoryVaultOpts())
- * @example const vault = await openVault(TH.memoryVaultOpts({ userId: 'u2', vaultDB: myVaultDB }))
+ * @example const vault = await TH.settledVault(TH.memoryVaultOpts())
+ * @example const vault = await TH.settledVault(TH.memoryVaultOpts({ userId: 'u2', vaultDB: myVaultDB }))
  */
-export const memoryVaultOpts = (overrides: Partial<OpenVaultOpts> = {}): OpenVaultOpts => ({
+export const memoryVaultOpts = (overrides: Partial<MakeVaultOpts> = {}): MakeVaultOpts => ({
   applabel:   'acme',
   userId:     'u1',
   vaultlabel: 'main',
@@ -74,6 +74,27 @@ export const memoryVaultOpts = (overrides: Partial<OpenVaultOpts> = {}): OpenVau
   passphraseStrengthTest: anyPassphraseTest,
   ...overrides,
 })
+
+/**
+ * A vault made with `opts` and settled: `Vault.make(opts)`, then its `hello()` awaited, so its
+ * snapshot says `absent`, `locked` or `unlocked`. Throws as `Vault.make` does for misuse, and
+ * rejects as `hello()` does, leaving that handle open: a test that needs it closed makes the vault
+ * itself.
+ *
+ * @param opts - Everything Vault.make takes; {@link memoryVaultOpts} makes a bag of them.
+ * @returns The vault, settled.
+ *
+ * @example const vault = await TH.settledVault(TH.memoryVaultOpts())
+ * @example
+ *   // two devices over one vaultDB, each with a device store of its own
+ *   const here = await TH.settledVault({ ...opts, deviceDB: memoryDeviceDB() })
+ *   const there = await TH.settledVault({ ...opts, deviceDB: memoryDeviceDB() })
+ */
+export const settledVault = async (opts: MakeVaultOpts): Promise<Vault> => {
+  const vault = Vault.make(opts)
+  await vault.hello()
+  return vault
+}
 
 /**
  * A database name no other call has handed out, so each test of an IndexedDB adapter starts
@@ -534,7 +555,7 @@ export const holdNextCall = <Target extends object>(target: Target, verb: AsyncV
 
 /**
  * A count of the storage watches `vaultDB` opens and closes from here on, kept by spying on its
- * `subscribe`: for a test that a failed open, a close or a lock leaves no watch running that
+ * `subscribe`: for a test that a close or a lock leaves no watch running that
  * nobody could end. Each watch still reaches the adapter's own `subscribe`.
  *
  * A watch counts as closed the first time it is closed: closing it again changes nothing, so a
@@ -545,7 +566,9 @@ export const holdNextCall = <Target extends object>(target: Target, verb: AsyncV
  *
  * @example
  *   const tally = TH.tallyWatches(vaultDB)
- *   await TH.expectRefusal(openVault(opts), 'not_permitted')
+ *   const vault = Vault.make(opts)
+ *   await TH.expectRefusal(vault.hello(), 'not_permitted')
+ *   vault.close()
  *   expect(tally.opened - tally.closed).to.eq(0)
  */
 export const tallyWatches = (vaultDB: Pick<VaultDB, 'subscribe'>) => {
@@ -882,14 +905,14 @@ export type LoggedCall = {
 
 /**
  * A VaultLogger that logs nowhere and keeps every call it hears, in order, for a test to look at
- * -- bar the one notice `openVault` gives of a `test_` key deriver's label ({@link TestDeriverNotice}),
+ * -- bar the one notice `Vault.make` gives of a `test_` key deriver's label ({@link TestDeriverNotice}),
  * which every vault opened through {@link testDeriver} would otherwise add to every count.
  *
- * @returns The `logger` to hand openVault, and the `calls` it has heard so far.
+ * @returns The `logger` to hand Vault.make, and the `calls` it has heard so far.
  *
  * @example
  *   const spy = TH.spyLogger()
- *   const vault = await openVault({ ...opts, logger: spy.logger })
+ *   const vault = await TH.settledVault({ ...opts, logger: spy.logger })
  *   spy.calls.map((call) => call.level)  // => ['warn'], say
  */
 export const spyLogger = () => {
@@ -2508,7 +2531,7 @@ const NotRefused = Symbol('not refused')
  *
  * @example await TH.expectRefusal(vault.readBox('anthropic_api_key'), 'vault_locked')
  * @example
- *   const err = await TH.expectRefusal(openVault(TH.omitting(opts, 'keyDeriver')), 'bad_option')
+ *   const err = await TH.expectRefusal(TH.settledVault(TH.omitting(opts, 'keyDeriver')), 'bad_option')
  *   expect(err.message).to.include('safebyok/browser')
  */
 export const expectRefusal = async (operation: Promise<unknown>, kind: VaultErrorKind): Promise<VaultError> => {
@@ -2556,7 +2579,7 @@ export const expectSyncRefusal = (attempt: () => unknown, kind: VaultErrorKind):
  * @param ckey - The field to leave out.
  * @returns A copy of `bag` without that field.
  *
- * @example openVault(TH.omitting(opts, 'keyDeriver'))  // refuses: no keyDeriver
+ * @example TH.settledVault(TH.omitting(opts, 'keyDeriver'))  // refuses: no keyDeriver
  */
 export const omitting = <Bag extends object>(bag: Bag, ckey: keyof Bag): Bag => {
   const { [ckey]: _omitted, ...rest } = bag

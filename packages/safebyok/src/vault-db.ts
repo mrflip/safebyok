@@ -78,7 +78,7 @@ export type VaultDBOpts = {
   /**
    * Where the VaultDB says what it has nobody to throw to: a subscriber's listener that threw, a
    * watch that failed to start or dropped. Fixed when the VaultDB is made, and not the logger
-   * `openVault` is given, which is the vault's alone. A vault opened with no logger of its own
+   * `Vault.make` is given, which is the vault's alone. A vault opened with no logger of its own
    * uses this one, so give it here, once, to have one logger hear both. Without one (or with null),
    * the default logger. Kind 'bad_option' for anything else that is not a VaultLogger.
    */
@@ -201,7 +201,7 @@ export abstract class VaultDB {
    * Where this VaultDB says what it has nobody to throw to: always a logger, fixed when it is made,
    * and guarded, so a logger that throws breaks nothing. Read only, and kept off the VaultDB
    * itself, so a VaultDB logged, spread or compared never shows or copies a host's logger.
-   * `openVault` and `VaultProvider` use it when they are given no logger of their own.
+   * `Vault.make` and `VaultProvider` use it when they are given no logger of their own.
    */
   get logger(): VaultLogger { return this.#logger }
 
@@ -357,7 +357,7 @@ export abstract class VaultDB {
 
   /**
    * Remove a vault whose stored vault props fail their checks -- the one vault `readVaultProps`
-   * refuses as `corrupt_record`, which `openVault` says as `damaged_vault` -- and no other: the
+   * refuses as `corrupt_record`, which a vault's `hello()` says as `damaged_vault` -- and no other: the
    * escape hatch behind `retireDamagedVault`, for a vault that no handle can be opened on to
    * `retire()`. It reads the vault props as stored, takes the `vault_id` out of them, and removes
    * the vault props and every lockbox only while the standing vault props still have that
@@ -383,7 +383,7 @@ export abstract class VaultDB {
     if (raw === null || raw === undefined) { return }
     if (mayBeNewer(raw)) { throw newerVaultProps() }
     if (isSoundVaultProps(raw, asked)) {
-      throw new VaultError('bad_option', "That vault's stored props are sound, so it is not retired here: a vault that opens is retired through its handle's retire(). Only a vault that openVault refuses as damaged_vault is retired this way.")
+      throw new VaultError('bad_option', "That vault's stored props are sound, so it is not retired here: a vault that opens is retired through its handle's retire(). Only a vault whose hello() refuses it as damaged_vault is retired this way.")
     }
     const named = StoredVaultId.safeParse(raw)
     if (! named.success) { throw unnamedVaultProps() }
@@ -791,7 +791,7 @@ export type LocalVaultDBOpts = VaultDBOpts & {
  *
  * @param opts - The `store`, and optionally a `logger`. Kind 'bad_option' for a `store` that is
  *   not a StringStore, or a `logger` that is not a VaultLogger.
- * @returns The VaultDB, to hand `openVault`.
+ * @returns The VaultDB, to hand `Vault.make`.
  *
  * @example
  *   const vaultDB = localVaultDB({ store: memoryStore() })

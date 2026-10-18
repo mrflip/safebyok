@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { AnyTextValidators, Ckeys, Label, VaultError, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, openVault, type KeyDeriver, type PassphraseVerdict, type Vault, type VaultScope, type VaultValidators } from 'safebyok'
+import { AnyTextValidators, Ckeys, Label, VaultError, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, type KeyDeriver, type PassphraseVerdict, type Vault, type VaultScope, type VaultValidators } from 'safebyok'
 import * as TH from 'safebyok/testing'
 import { Component, useLayoutEffect, useState, type ErrorInfo, type ReactNode } from 'react'
 import { VaultProvider, useVault, useVaultSnapshot, type VaultProviderProps } from '../src/vault-provider'
@@ -90,7 +90,7 @@ const damagedWorld = async () => {
   const vaultDB = localVaultDB({ store })
   const deviceDB = memoryDeviceDB()
   const props = { applabel: 'acme', vaultlabel: 'main', vaultDB, deviceDB, keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest }
-  const made = await openVault({ ...props, userId: 'u1' })
+  const made = await TH.settledVault({ ...props, userId: 'u1' })
   await made.unlock('correct horse')
   await made.storeBox('anthropic_api_key', 'sk-fake')
   made.close()
@@ -149,7 +149,7 @@ const hushConsole = () => vi.spyOn(console, 'error').mockImplementation(() => { 
  */
 const lockedWorld = async () => {
   const world = makeWorld()
-  const maker = await openVault({ ...world.props, deviceDB: memoryDeviceDB(), userId: 'u1' })
+  const maker = await TH.settledVault({ ...world.props, deviceDB: memoryDeviceDB(), userId: 'u1' })
   await maker.unlock('pw')
   await maker.storeBox('anthropic_api_key', 'sk-fake')
   maker.close()
@@ -459,7 +459,7 @@ describe("VaultProvider", () => {
       const vault = await world.opened()
       const reading = watched(world.latest().withUnlockedVault(() => vault.readBox('anthropic_api_key')))
       await screen.findByPlaceholderText('vault passphrase')
-      const elsewhere = await openVault({ ...world.props, deviceDB: memoryDeviceDB(), userId: 'u1' })
+      const elsewhere = await TH.settledVault({ ...world.props, deviceDB: memoryDeviceDB(), userId: 'u1' })
       await elsewhere.unlock('pw')
       await elsewhere.storeBox('openai_api_key', 'sk-also-fake')
       elsewhere.close()
@@ -575,7 +575,7 @@ describe("VaultProvider", () => {
 
     it("leaves another user's dialog asking when the last user's cancelled unlock finishes late", async () => {
       const world = await lockedWorld()
-      const other = await openVault({ ...world.props, deviceDB: memoryDeviceDB(), userId: 'u2' })
+      const other = await TH.settledVault({ ...world.props, deviceDB: memoryDeviceDB(), userId: 'u2' })
       await other.unlock('pw2')
       await other.storeBox('anthropic_api_key', 'sk-other-fake')
       other.close()
@@ -606,11 +606,11 @@ describe("VaultProvider", () => {
     })
   })
 
-  it("asks for a keyDeriver outright, as openVault does", () => {
+  it("asks for a keyDeriver outright, as Vault.make does", () => {
     expectTypeOf<Pick<VaultProviderProps, 'keyDeriver'>>().toEqualTypeOf<{ keyDeriver: KeyDeriver }>()
   })
 
-  it("passes every openVault option through, as given", async () => {
+  it("passes every Vault.make option through, as given", async () => {
     // A fixed instant the vault accepts as a time: after 1981, before FarFuture.
     const ClockMillis = Date.UTC(2026, 9, 15)
     const { Grab, opened } = grabber()
@@ -919,7 +919,7 @@ describe("VaultProvider", () => {
     })
   })
 
-  describe("when openVault rejects", () => {
+  describe("when Vault.make or hello refuses", () => {
     it("throws a bad label to the error boundary, as the very VaultError", async () => {
       hushConsole()
       const caught: unknown[] = []
@@ -951,7 +951,7 @@ describe("VaultProvider", () => {
       expect((caught[0] as Error).message).to.include('spelling')
     })
 
-    it("throws a passphraseStrengthTest that is no function to the error boundary at render, as openVault would refuse it", () => {
+    it("throws a passphraseStrengthTest that is no function to the error boundary at render, as Vault.make would refuse it", () => {
       hushConsole()
       const caught: unknown[] = []
       const misfit = { strong: true } as unknown as VaultProviderProps['passphraseStrengthTest']
@@ -1012,7 +1012,7 @@ describe("VaultProvider", () => {
       })
     }
 
-    it("hands down the very VaultError, and no vault beside it", async () => {
+    it("hands down the very VaultError, beside the handle still opening, whose trouble it is", async () => {
       const world = makeWorld()
       const trouble = unreachable()
       vi.spyOn(world.vaultDB, 'readVaultProps').mockRejectedValueOnce(trouble)
@@ -1023,7 +1023,47 @@ describe("VaultProvider", () => {
         </VaultProvider>,
       )
       await waitFor(() => { expect(latest().openError).to.eq(trouble) })
-      expect(latest().vault).to.be.null
+      expect(latest().vault?.getSnapshot()).to.deep.include({ state: 'opening', trouble })
+    })
+
+    it("hands down the vault at once, still opening, while its hello reads storage, and no openError", async () => {
+      const world = makeWorld()
+      const gate = TH.holdNextCall(world.vaultDB, 'readVaultProps')
+      const { Grab, latest, opened } = grabber()
+      render(<VaultProvider {...world.props} userId="u1"><Grab /></VaultProvider>)
+      const vault = await opened()
+      await gate.reached
+      expect(vault.getSnapshot().state).to.eq('opening')
+      expect(latest().openError).to.be.null
+      gate.release()
+      await waitFor(() => { expect(vault.getSnapshot().state).to.eq('absent') })
+    })
+
+    it("throws a hello refused as misuse to the error boundary, as the very VaultError", async () => {
+      hushConsole()
+      const world = makeWorld()
+      const misuse = new VaultError('bad_option', 'Something the developer must fix.')
+      vi.spyOn(world.vaultDB, 'readVaultProps').mockRejectedValueOnce(misuse)
+      const caught: unknown[] = []
+      world.mount('u1', caught)
+      await expectShown('boundary')
+      expect(caught[0]).to.eq(misuse)
+    })
+
+    it("throws a prop Vault.make does not take to the error boundary, naming it and its new name, rather than drop it unseen", async () => {
+      hushConsole()
+      const caught: unknown[] = []
+      const retired = { forcePassphraseReentryHours: 1 } as Partial<VaultProviderProps>
+      render(
+        <CatchingBoundary caught={caught}>
+          <VaultProvider {...makeWorld().props} userId="u1" {...retired}>
+            <Probe />
+          </VaultProvider>
+        </CatchingBoundary>,
+      )
+      await expectShown('boundary')
+      expect(isVaultError(caught[0], 'bad_option')).to.be.true
+      expect((caught[0] as Error).message).to.include('forcePassphraseReentryHours (called leaseHours now)')
     })
 
     it("retryOpen opens again: once storage relents, the vault opens and openError clears", async () => {
@@ -1046,19 +1086,19 @@ describe("VaultProvider", () => {
       await expectShown('open error: not_permitted')
     })
 
-    it("leaves no storage watch behind a failed open: after a retry, exactly one is live", async () => {
+    it("retries on the same handle, its one storage watch kept throughout", async () => {
       const world = makeWorld()
       const tally = TH.tallyWatches(world.vaultDB)
-      vi.spyOn(world.vaultDB, 'readVaultProps').mockRejectedValueOnce(unreachable()).mockRejectedValueOnce(unreachable())
+      const reads = vi.spyOn(world.vaultDB, 'readVaultProps')
+      reads.mockRejectedValueOnce(unreachable()).mockRejectedValueOnce(unreachable())
       world.mount('u1')
       await expectShown('open error: storage_unavailable')
-      expect(tally).to.deep.equal({ opened: 1, closed: 1 })
       fireEvent.click(screen.getByText('Retry'))
-      await waitFor(() => { expect(tally.opened).to.eq(2) })
+      await waitFor(() => { expect(reads).toHaveBeenCalledTimes(2) })
       await expectShown('open error: storage_unavailable')
       fireEvent.click(screen.getByText('Retry'))
       await expectShown('absent')
-      expect(tally.opened - tally.closed).to.eq(1)
+      expect(tally).to.deep.equal({ opened: 1, closed: 0 })
     })
 
     it("retryOpen does nothing while there is no openError", async () => {

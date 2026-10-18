@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { VaultError, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, openVault, type WayinSummary, type Vault } from 'safebyok'
+import { VaultError, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, type WayinSummary, type Vault } from 'safebyok'
 import { createPasskey } from '../src/passkey'
 import { PasskeyUnlockButton } from '../src/passkey-unlock-button'
 import { PassphraseModal } from '../src/passphrase-modal'
@@ -10,7 +10,7 @@ import * as TH from './test-helpers'
 const lockedVaultWithPasskey = async () => {
   const authenticator = TH.installFakeAuthenticator()
   const vaultDB = localVaultDB({ store: memoryStore() })
-  const open = async () => await openVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest })
+  const open = async () => await TH.settledVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest })
   const maker = await open()
   await maker.unlock('pw')
   const wayinId = await maker.addPasskey('pw', () => createPasskey({ rp: { name: 'Acme' }, user: { name: 'ada@example.com', displayName: 'Ada' } }), { wayinlabel: 'laptop' })
@@ -69,7 +69,7 @@ describe("PasskeyUnlockButton", () => {
 
   it("follows the vault's snapshot: a passkey added meanwhile brings the button", async () => {
     TH.installFakeAuthenticator()
-    const vault = await openVault(TH.memoryVaultOpts())
+    const vault = await TH.settledVault(TH.memoryVaultOpts())
     await vault.unlock('pw')
     render(<PasskeyUnlockButton vault={vault} onDone={noop} onGripe={noop} />)
     expect(screen.queryByText('Use a passkey')).to.be.null

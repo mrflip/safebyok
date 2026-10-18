@@ -3,7 +3,7 @@
 // made in both.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { anyApi } from 'convex/server'
-import { VaultError, memoryDeviceDB, openVault } from 'safebyok'
+import { Vault, VaultError, memoryDeviceDB } from 'safebyok'
 import * as TH from './test-helpers'
 import { convexVaultDB } from '../src/index'
 import { MaxVaultLockboxes } from '../src/component/tallies'
@@ -344,7 +344,7 @@ describe("convexVaultDB.subscribe", () => {
 })
 
 /** The README's example: a vault opened over the app's own Convex client. */
-const openOver = (client: ConvexVaultClient, api: SafebyokApi) => openVault(TH.memoryVaultOpts({ vaultDB: convexVaultDB({ client, api }) }))
+const openOver = (client: ConvexVaultClient, api: SafebyokApi) => TH.settledVault(TH.memoryVaultOpts({ vaultDB: convexVaultDB({ client, api }) }))
 
 const resolvesNull = () => Promise.resolve(null)
 const unwatches = () => undefined
@@ -384,9 +384,13 @@ describe("convexVaultDB.subscribe, when its ConvexClient watch fails", () => {
 
 describe("a vault over convexVaultDB, opened before sign-in", () => {
   for (const [clientTitle, connect] of ClientCases) {
-    it(`is refused as identity_revoked over a ${clientTitle}, leaving no watch live on the deployment`, async () => {
+    it(`is refused as identity_revoked over a ${clientTitle}, still opening, and leaves no watch live on the deployment once closed`, async () => {
       const deployment = deploy()
-      await TH.expectRefusal(openOver(connect(deployment, null), deployment.api.safebyok), 'identity_revoked')
+      const vaultDB = convexVaultDB({ client: connect(deployment, null), api: deployment.api.safebyok })
+      const vault = Vault.make(TH.memoryVaultOpts({ vaultDB }))
+      await TH.expectRefusal(vault.hello(), 'identity_revoked')
+      expect(vault.getSnapshot().state).to.eq('opening')
+      vault.close()
       await vi.waitFor(() => { expect(deployment.watching()).to.deep.equal([]) })
     })
   }
@@ -399,13 +403,14 @@ describe("a vault over convexVaultDB, when its user signs out", () => {
       const spy = TH.spyLogger()
       const deviceDB = memoryDeviceDB()
       const vaultDB = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
-      const vault = await openVault(TH.memoryVaultOpts({ vaultDB, deviceDB, logger: spy.logger }))
+      const vault = await TH.settledVault(TH.memoryVaultOpts({ vaultDB, deviceDB, logger: spy.logger }))
       await vault.unlock(TH.RealPassphrase)
       await vault.storeBox('anthropic_api_key', 'sk-ant-test-not-a-real-key')
       deployment.signOut()
       await vi.waitFor(() => { expect(vault.getSnapshot().state).to.eq('locked') })
       expect(await deviceDB.readLease(u1)).to.be.null
-      await TH.expectRefusal(vault.readBox('anthropic_api_key'), 'vault_locked')
+      // Storage it cannot trust has the vault say hello afresh at its next call, refused as ever.
+      await TH.expectRefusal(vault.readBox('anthropic_api_key'), 'identity_revoked')
       await TH.expectRefusal(vault.unlock(TH.RealPassphrase), 'identity_revoked')
       expect(spy.calls.map((heard) => heard.level)).to.include('log')
       expect(await deployment.as('u1').query(deployment.api.safebyok.listBoxSummaries, { scope: u1 })).to.have.lengthOf(1)

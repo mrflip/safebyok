@@ -8,7 +8,7 @@ describe("the package's entry point", () => {
   it("exports exactly the public surface", () => {
     expect(Object.keys(safebyok)).to.have.members([
       'Argon2idWebV1', 'argon2idDeriver', 'argon2idWebV1Deriver', 'ensureSaltFits', 'parseKeyDeriverSpec',
-      'openVault', 'retireDamagedVault', 'parseLogger', 'DefaultLogger', 'setDefaultLogger', 'checkStrengthTest',
+      'Vault', 'retireDamagedVault', 'parseLogger', 'DefaultLogger', 'setDefaultLogger', 'checkStrengthTest',
       'Ciphered', 'EpochMillis', 'FarFuture', 'FarPast', 'LeaseHours', 'ForeverMillis', 'Lockbox', 'LockboxSummary', 'MaxLockboxes', 'MaxLeaseHours', 'MaxUnlocks', 'MaxWhisperBytes', 'MinuteMillis', 'PasskeyWayin', 'PasskeySaltBytes', 'PassphraseWayin', 'Sidecar', 'Wayin', 'WayinKindVals', 'VaultProps', 'VaultScope', 'Whisper', 'wallClock',
       'AnyTextValidators', 'DefaultValidators', 'Label', 'LabelPattern', 'MaxLabelChars', 'MaxUserIdChars', 'NameFloor', 'NameFloorBytes', 'UserId', 'UserIdPattern', 'checkValidators',
       'VaultError', 'VaultErrorFamilyForKind', 'VaultErrorFamilyVals', 'VaultErrorKindVals', 'isVaultCondition', 'isVaultError',
@@ -58,14 +58,14 @@ const bundleOf = async (imports: string): Promise<string> => {
   return built.output.map((piece) => (piece.type === 'chunk' ? piece.code : '')).join('\n')
 }
 
-// The supplied spec's label ships with openVault, which refuses a deriver wearing it without its
+// The supplied spec's label ships with Vault.make, which refuses a deriver wearing it without its
 // parameters; Argon2id's implementation shows by the variants it names, Argon2d among them.
 const Argon2Implementation = /argon2d/iu
 
 describe("the main entry's tree-shaking", () => {
-  it("leaves Argon2id out of an app that imports openVault alone", async () => {
-    const shipped = await bundleOf('openVault')
-    expect(shipped).to.include('openVault')
+  it("leaves Argon2id out of an app that imports Vault.make alone", async () => {
+    const shipped = await bundleOf('Vault')
+    expect(shipped).to.include('Vault.make')
     expect(shipped).to.include('argon2id_web_v1')
     expect(shipped).to.not.match(Argon2Implementation)
   }, 30_000)

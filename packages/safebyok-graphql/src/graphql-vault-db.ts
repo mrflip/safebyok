@@ -16,7 +16,7 @@ export type GraphqlVaultDBOpts = VaultDBOpts & {
   /**
    * The most lockboxes one vault holds, as the VaultDB behind your server enforces it: a whole
    * number above zero, or `Infinity` for a server that sets none. Default: `Infinity`, as the
-   * Postgres VaultDB sets none unless told. Declare your server's own, so that `openVault`
+   * Postgres VaultDB sets none unless told. Declare your server's own, so that `Vault.make`
    * refuses a vault asking for more up front, rather than the server at the first lockbox past it.
    */
   maxLockboxes?: number | undefined
@@ -29,7 +29,7 @@ const ServerMaxNameBytes = 640
  * safebyok's storage over GraphQL, in the browser: a VaultDB whose every verb is one operation,
  * sent through your app's urql Client to a server serving `VaultSchemaSdl` with `vaultResolvers`
  * (from `safebyok-graphql/server`), which runs each on a VaultDB made there for the signed-in
- * user. Hand it to `openVault` as its `vaultDB`.
+ * user. Hand it to `Vault.make` as its `vaultDB`.
  *
  * * **Every query goes to the network** (`requestPolicy: 'network-only'`): your Client's cache
  *   never answers for a vault.
@@ -52,7 +52,7 @@ const ServerMaxNameBytes = 640
  *
  * @example
  *   const vaultDB = graphqlVaultDB({ client: new Client({ url: '/api/graphql', exchanges: [fetchExchange] }) })
- *   const vault = await openVault({ ...browserOpts(), applabel: 'acme', userId, vaultlabel: 'main', vaultDB })
+ *   const vault = Vault.make({ ...browserOpts(), applabel: 'acme', userId, vaultlabel: 'main', vaultDB })
  * @example
  *   const vaultDB = graphqlVaultDB({ client, maxLockboxes: 250 })  // the server's postgresVaultDB holds 250
  */

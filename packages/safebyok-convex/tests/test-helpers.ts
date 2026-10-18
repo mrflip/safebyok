@@ -1,9 +1,9 @@
 import { anyApi, defineSchema } from 'convex/server'
 import { ConvexError } from 'convex/values'
 import { convexTest, defineTestApp } from 'convex-test'
-import { Lockbox, VaultProps, localVaultDB, memoryStore, openVault } from 'safebyok'
+import { Lockbox, VaultProps, localVaultDB, memoryStore } from 'safebyok'
 import type { Sidecar, StringStore, Whisper } from 'safebyok'
-import { boxOf, memoryVaultOpts } from 'safebyok/testing'
+import { boxOf, memoryVaultOpts, settledVault } from 'safebyok/testing'
 import type { ComponentApi } from '../src/component-api'
 import { SafebyokComponent } from '../src/server'
 import type { GetUserId, SafebyokErrorData } from '../src/server'
@@ -81,7 +81,7 @@ export const RealWhispers: Record<string, { whisper: Whisper, sidecar?: Sidecar 
 export const RealPassphrase = 'correct horse battery staple'
 
 /** Opens a vault for `userId` over `store` the way an app does, deriving through the cheap test deriver. */
-export const openOver = (store: StringStore, userId = 'u1') => openVault(memoryVaultOpts({ userId, vaultDB: localVaultDB({ store }) }))
+export const openOver = (store: StringStore, userId = 'u1') => settledVault(memoryVaultOpts({ userId, vaultDB: localVaultDB({ store }) }))
 
 /**
  * A real vault, made by the core's own code: vault props and a lockbox per {@link RealWhispers}

@@ -131,7 +131,7 @@ const reasonFor = (warning: string | null): string => {
  * @returns `{ strong: true }`, or `{ strong: false, reason }` saying what makes it weak and what to do.
  *
  * @example
- *   const vault = await openVault({ applabel: 'acme', userId, vaultlabel: 'main', vaultDB, ...browserOpts() })  // brings it in
+ *   const vault = Vault.make({ applabel: 'acme', userId, vaultlabel: 'main', vaultDB, ...browserOpts() })  // brings it in
  * @example await zxcvbnPassphraseTest('correct horse battery staple')  // { strong: true }
  * @example await zxcvbnPassphraseTest('password1234')                  // { strong: false, reason: 'That is very like a commonly used password: add a few more words, less common ones.' }
  * @example await zxcvbnPassphraseTest('hunter2')                       // { strong: false, reason: 'A passphrase needs at least 12 characters: ...' }

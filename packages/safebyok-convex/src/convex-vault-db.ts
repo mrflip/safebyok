@@ -53,7 +53,7 @@ export type ConvexVaultDBOpts = VaultDBOpts & {
 /**
  * safebyok's storage over Convex: a VaultDB whose every verb is one call to the safebyok functions
  * your app serves (see `safebyok-convex/server`), through the Convex client your app already has.
- * Hand it to `openVault` as its `vaultDB`.
+ * Hand it to `Vault.make` as its `vaultDB`.
  *
  * * **Who may reach a vault** is your Convex backend's call: a vault call made while signed out,
  *   or for another user's vault, refuses with a VaultError of kind `identity_revoked`, and the
@@ -79,7 +79,7 @@ export type ConvexVaultDBOpts = VaultDBOpts & {
  * @example
  *   import { api } from '../convex/_generated/api'
  *   const vaultDB = convexVaultDB({ client: convex, api: api.safebyok })
- *   const vault = await openVault({ applabel: 'acme', userId, vaultlabel: 'main', vaultDB, ...browserOpts() })
+ *   const vault = Vault.make({ applabel: 'acme', userId, vaultlabel: 'main', vaultDB, ...browserOpts() })
  */
 export const convexVaultDB = (opts: ConvexVaultDBOpts): VaultDB => {
   const { client, api } = (opts as Partial<ConvexVaultDBOpts> | null | undefined) ?? {}

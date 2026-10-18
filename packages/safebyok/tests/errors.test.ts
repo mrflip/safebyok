@@ -79,7 +79,7 @@ const FamilyCases = [
   // misuse: the host developer's code is wrong, and no user action fixes it
   ["bad_label",           "misuse",    'a label the app chose that breaks the rules is a bug'],
   ["bad_whisper",         "misuse",    'storing what JSON cannot carry is a bug'],
-  ["bad_option",          "misuse",    'an openVault option out of range is a bug'],
+  ["bad_option",          "misuse",    'an Vault.make option out of range is a bug'],
   ["vault_closed",        "misuse",    'using a handle after close() is a bug'],
   ["unknown_key_deriver", "misuse",    'opening with the wrong key deriver is a bug'],
   ["insecure_context",    "misuse",    'serving the app over plain http is a deployment bug'],

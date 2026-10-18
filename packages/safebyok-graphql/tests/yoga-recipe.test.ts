@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest'
 import { Client, fetchExchange } from '@urql/core'
 import { createSchema, createYoga } from 'graphql-yoga'
-import { memoryDeviceDB, openVault } from 'safebyok'
+import { memoryDeviceDB } from 'safebyok'
 import { postgresVaultDB } from 'safebyok-postgres'
 import type { PostgresClient, PostgresListen } from 'safebyok-postgres'
 import * as TH from './test-helpers'
@@ -83,7 +83,7 @@ TH.describeVaultDB('the README Yoga recipe, over postgresVaultDB', async () => {
 describe("the README Yoga recipe", () => {
   it("carries a real vault, made and opened by the core in the browser", async () => {
     const route = await routeOver()
-    const vault = await openVault({
+    const vault = await TH.settledVault({
       applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: browserFor(route, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest,
     })
     await vault.unlock('correct horse battery staple')

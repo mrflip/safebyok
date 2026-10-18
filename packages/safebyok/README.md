@@ -37,11 +37,11 @@ settles.
 ## Quickstart
 
 ```ts
-import { openVault } from 'safebyok'
+import { Vault } from 'safebyok'
 import { browserOpts } from 'safebyok/browser'
 import { idbVaultDB } from 'safebyok-indexeddb'
 
-const vault = await openVault({
+const vault = Vault.make({
   applabel:   'acme',
   userId:     session.userId,                 // your auth's stable, opaque id for the user; never an email
   vaultlabel: 'main',
@@ -49,6 +49,7 @@ const vault = await openVault({
   ...browserOpts({ dbName: 'acme' }),         // the key deriver, device store and passphrase strength test a browser wants
 })
 
+await vault.hello()               // reads storage and this device's lease; every call waits for it anyway
 vault.getSnapshot().state         // 'absent' | 'locked' | 'unlocked'
 await vault.unlock(passphrase)    // on an absent vault, this first unlock creates it
 await vault.storeBox('anthropic_api_key', 'sk-ant-...')
@@ -57,10 +58,17 @@ const answer = await vault.useBox('anthropic_api_key', (whisper) => callAnthropi
 ```
 
 The vault store is never among the defaults: where the vault lives is the one choice every app
-makes for itself. Any option you pass after the spread replaces the default it names.
+makes for itself. Any option you pass after the spread replaces the default it names, and an
+option `Vault.make` does not take -- a misspelling, or a name it no longer uses -- is refused with
+`bad_option` rather than quietly ignored.
+
+`Vault.make` answers at once, and the handle starts its own `hello()`: until that has read
+storage, the snapshot says `opening`, and any call made meanwhile waits for it. A hello that
+fails leaves the vault `opening`, saying why as the snapshot's `trouble` (and through the logger);
+`vault.hello()` tries again, and so does any other call.
 
 Serve the app over https: a browser withholds WebCrypto from a page served over plain http, so
-`openVault` refuses one at once, with kind `insecure_context` (`http://localhost` counts as
+`Vault.make` refuses one at once, with kind `insecure_context` (`http://localhost` counts as
 secure, for development).
 
 ## Where it runs
@@ -84,7 +92,7 @@ of the above supplies it.
 
 ## Entry points, and why the main one asks for everything
 
-* `safebyok` -- `openVault` and the types, errors and stores around it.
+* `safebyok` -- `Vault` (`Vault.make`) and the types, errors and stores around it.
 * `safebyok/browser` -- `browserOpts({ dbName }?)`: the pinned Argon2id key deriver
   (`argon2idWebV1Deriver`), the IndexedDB device store (`idbDeviceDB`) and the passphrase
   strength test (`zxcvbnPassphraseTest`), as a bag of options. The strength test's zxcvbn
@@ -99,8 +107,8 @@ of the above supplies it.
   form, a server or another library to check what the vault will, at a few kB. All are in the main entry too, with the record schemas (`Whisper`,
   `EpochMillis` and the rest).
 
-`openVault` takes its `keyDeriver`, `deviceDB` and `passphraseStrengthTest` from you, with no default behind them. A
-default would be imported by `openVault` itself, so every app would ship it, used or not: a
+`Vault.make` takes its `keyDeriver`, `deviceDB` and `passphraseStrengthTest` from you, with no default behind them. A
+default would be imported by `Vault.make` itself, so every app would ship it, used or not: a
 bundler drops only the code nothing imports. The key deriver is the choice an app most plausibly
 makes differently -- another implementation of the same Argon2id spec, in WebAssembly or native
 to its platform -- and such an app should not also ship this one (about 15 kB minified). So the
@@ -157,7 +165,7 @@ const validators = {
   boxlabel: z.string().min(1).max(200),                 // ...but box names of 1 to 200 characters
   userId:   z.string().regex(/^user_[A-Za-z0-9]{27}$/), // and Clerk's user ids
 }
-const vault = await openVault({ applabel: 'acme', userId, vaultlabel: 'main', vaultDB, validators, ...browserOpts() })
+const vault = Vault.make({ applabel: 'acme', userId, vaultlabel: 'main', vaultDB, validators, ...browserOpts() })
 await vault.storeBox('מפתח OpenAI: עבודה', 'sk-...', { sidecar: { note: 'the team account, billed monthly' } })
 ```
 
@@ -173,7 +181,7 @@ await vault.storeBox('מפתח OpenAI: עבודה', 'sk-...', { sidecar: { note:
   lowercases would otherwise send the same user to another vault. Nothing is normalized either:
   text not in NFC is refused, never composed for you.
 * **Your checks are an alarm at the door, not a promise about storage.** They run where a name
-  enters the vault: `openVault` (the scope), `storeBox()` (the boxlabel), `addPassphrase` and
+  enters the vault: `Vault.make` (the scope), `storeBox()` (the boxlabel), `addPassphrase` and
   `addPasskey` (the wayinlabel). A lockbox already stored under a name they refuse
   -- by another client, or before you narrowed them -- lists, reads and retires as any other, by
   the name it was stored under; `storeBox()` refuses only to write a new one under a refused name.
@@ -205,7 +213,7 @@ await vault.storeBox('מפתח OpenAI: עבודה', 'sk-...', { sidecar: { note:
 
 ## Your own storage adapter
 
-Extend `VaultDB` and implement its `do*` methods (`openVault` takes nothing but a `VaultDB`,
+Extend `VaultDB` and implement its `do*` methods (`Vault.make` takes nothing but a `VaultDB`,
 whose public verbs check every record your code sees): its doc block says what each one owes, the
 [VaultDB contract](VAULTDB.md) says what an adapter promises in all and what it may leave
 undone, and `describeVaultDB` from `safebyok/testing` checks it, a group of tests to each of the
@@ -272,11 +280,11 @@ vaults made on one device stop opening on another. There are three ways to choos
   WebAssembly, several times faster, deriving the same bytes. For one native to your platform,
   spread the spec into your deriver, `{ ...Argon2idWebV1, deriveKeyBytes }`, keeping its label,
   and test that it derives the same bytes as ours; `parseKeyDeriverSpec(spec)` checks a host's
-  spec exactly as `argon2idDeriver` does. `openVault` refuses a deriver that wears a supplied spec's label
+  spec exactly as `argon2idDeriver` does. `Vault.make` refuses a deriver that wears a supplied spec's label
   without carrying exactly its parameters; it cannot check the bytes, so that test is yours.
 
 Any `keyDeriver` needs a `salt_bytes` from 1 to 65536 (the most `crypto.getRandomValues` hands out
-at once), which `openVault` checks, and must hand back 32 bytes of memory of its own from
+at once), which `Vault.make` checks, and must hand back 32 bytes of memory of its own from
 `deriveKeyBytes`, derived afresh on every call -- a fresh `Uint8Array`, not a view over a
 `SharedArrayBuffer`, and not one it keeps: the vault zeroes the bytes once it has made the
 passphraseKey of them. `unlock()` and the calls that set a passphrase refuse anything else with
@@ -285,10 +293,10 @@ bytes it kept from an earlier call would. A deriver of ours refuses a salt of an
 its spec's.
 
 `KeyDeriver` is one of two types. An `Argon2idKeyDeriver` carries a whole keyDeriverSpec beside
-its function, as every deriver above does, and `openVault` checks the spec as `argon2idDeriver`
+its function, as every deriver above does, and `Vault.make` checks the spec as `argon2idDeriver`
 would, so one Argon2id cannot run is refused at open, not at the first unlock. A
 `CustomKeyDeriver` carries only `key_deriver_label`, `salt_bytes` and `deriveKeyBytes`, and may
-name its `algorithm`; it may not declare `'argon2id'` without being a whole spec. `openVault` logs
+name its `algorithm`; it may not declare `'argon2id'` without being a whole spec. `Vault.make` logs
 a warning (not a refusal) for a label beginning `test_`, the mark of a deriver made cheap for
 tests, such as `safebyok/testing`'s.
 
@@ -438,11 +446,11 @@ every error it hears, not only a sign-out. Both are the safe direction, and stay
 ## Logging
 
 Some things a vault cannot throw to anyone: they happen in the background, or in a call that
-must not fail. It says them to its logger, which `openVault` takes as `logger`, an object with
+must not fail. It says them to its logger, which `Vault.make` takes as `logger`, an object with
 three functions, each `(message?, story?, err?) => void`:
 
 ```ts
-const vault = await openVault({
+const vault = Vault.make({
   ...opts,
   logger: {
     log:   (message, story) => { telemetry.info(message, story) },
@@ -455,7 +463,7 @@ const vault = await openVault({
 With no logger anywhere, safebyok writes to the console, each message tagged `safebyok:` (null
 counts as none). Pass functions that do nothing for quiet, or `console` itself to drop the tag (it
 then prints a missing story or error as `undefined` or `null`). A logger that throws, or returns a
-promise that rejects, is ignored: logging never breaks a lock, an open or a store. Anything else is
+promise that rejects, is ignored: logging never breaks a lock, a hello or a store. Anything else is
 refused as `bad_option`.
 
 Most apps name their logger once, as the app starts:
@@ -470,7 +478,7 @@ That covers every storage adapter, vault, `VaultProvider` and store given no log
 whether it was made before the call or after. Name a logger a second time only to keep two apart,
 as a child logger would: give one to your storage adapter's factory (`idbVaultDB({ logger })`),
 and the adapter, every vault opened over it, and `VaultProvider` all use it, as one object; give
-one to `openVault` (or `VaultProvider`), and it is the vault's alone, the adapter keeping its own.
+one to `Vault.make` (or `VaultProvider`), and it is the vault's alone, the adapter keeping its own.
 Pass `logger: DefaultLogger` to have the vault use the default whatever its adapter was given.
 An adapter's logger is fixed when it is made: `vaultDB.logger` reads it, and nothing replaces it.
 
@@ -504,8 +512,9 @@ says these things:
   the vault, or grant its lease afresh. The change stands, and the call resolves.
 * `warn`: this device's mark of the vault could not be read, so its rollback check starts again
   from what storage holds now.
-* `error`: a failed `openVault`, closing its storage watch, found the adapter's unsubscribe
-  throwing. `openVault` still rejects with what stopped the open.
+* `warn`: the hello `Vault.make` starts was refused (`{ call: 'hello' }`, the refusal as its
+  error). The vault stays `opening`, saying why as its snapshot's `trouble`; `vault.hello()`, or
+  any other call, tries again.
 
 ## Several passphrases
 
@@ -554,7 +563,7 @@ lock them out with.
 ```ts
 import { browserOpts, zxcvbnPassphraseTest } from 'safebyok/browser'
 
-const vault = await openVault({ ...opts, ...browserOpts() })   // brings zxcvbnPassphraseTest
+const vault = Vault.make({ ...opts, ...browserOpts() })   // brings zxcvbnPassphraseTest
 await zxcvbnPassphraseTest('password1234')
 // { strong: false, reason: 'That is very like a commonly used password: ...' }
 await zxcvbnPassphraseTest('skylarkpinecone', { applabel: 'skylark', user_id: 'u1', vaultlabel: 'pinecone' })
@@ -562,7 +571,7 @@ await zxcvbnPassphraseTest('skylarkpinecone', { applabel: 'skylark', user_id: 'u
 ```
 
 * **There is no default in the core.** `passphraseStrengthTest` is required, as `keyDeriver` and
-  `deviceDB` are: `openVault` refuses to open without one (`bad_option`), and `checkStrengthTest`
+  `deviceDB` are: `Vault.make` refuses to make a vault without one (`bad_option`), and `checkStrengthTest`
   is the same check, for a wrapper that takes the options apart. A test of length alone is no
   test -- 'a' and eleven spaces is twelve characters -- so the package offers none.
 * **In a browser, `browserOpts()` brings `zxcvbnPassphraseTest`.** It asks for at least
@@ -586,7 +595,7 @@ await zxcvbnPassphraseTest('skylarkpinecone', { applabel: 'skylark', user_id: 'u
   promise; the reason is shown to the user, so write it calmly, say what to do, and never quote the
   passphrase. To ask for more, wrap ours:
   `async (typed, scope) => (typed.includes('acme') ? { strong: false, reason: 'Leave out the name of the app.' } : await zxcvbnPassphraseTest(typed, scope))`.
-  `openVault` refuses anything but a function, and a test that answers anything but a verdict,
+  `Vault.make` refuses anything but a function, and a test that answers anything but a verdict,
   with `bad_option`; whatever a test throws, the call throws.
 * **Build it once.** The vault keeps the test it was opened with for its life. A binding that
   reopens on a changed option (`safebyok-react`'s provider) reopens for a new test, so define it
@@ -655,17 +664,17 @@ The kinds fall into two families, told apart by who must act.
 ### Misuse: fix the code
 
 A programming error. Do not show it to the user and do not retry; let it reach an error boundary
-or the dev overlay (in React, `VaultProvider` rethrows an `openVault` that fails on misuse during
-render for that, and hands a condition down as `openError`).
+or the dev overlay (in React, `VaultProvider` rethrows misuse from `Vault.make` or its hello
+during render for that, and hands a condition down as `openError`).
 
 | Kind                  | What happened                                                    | What to do                                              |
 | --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |
 | `bad_label`           | a label (or the `userId`) that fails the vault's check: `Label` (or `UserId`) by default, or the host's own in `validators`; or a `wayinlabel` the vault already has | Pass labels the app chose; check a user-typed one first with the same check, and against the snapshot's `wayins` |
 | `bad_whisper`         | a whisper JSON cannot carry (`undefined`, a function, a class instance) | Store plain JSON; to empty a lockbox, `retireBox` it |
-| `bad_option`          | an option or argument out of its range: an `openVault` option, an `argon2idDeriver` spec, a `storeBox()`'s sidecar, a passphrase or callback of the wrong type, a record handed to a `VaultDB` write; a passkey's answer of the wrong shape, or one already a way in | Fix the call; the message names what it takes |
+| `bad_option`          | an option or argument out of its range: a `Vault.make` option, or one it does not take, an `argon2idDeriver` spec, a `storeBox()`'s sidecar, a passphrase or callback of the wrong type, a record handed to a `VaultDB` write; a passkey's answer of the wrong shape, or one already a way in | Fix the call; the message names what it takes |
 | `vault_closed`        | the vault handle was closed                                      | Open the vault again; do not use a handle after `close()` |
 | `unknown_key_deriver` | the vault names a key deriver this handle was not built with     | Update safebyok, or open the vault with the deriver that made it |
-| `insecure_context`    | `openVault` in a page that is not a secure context: served over plain http from anywhere but localhost, where the browser withholds WebCrypto | Serve the app over https |
+| `insecure_context`    | `Vault.make` in a page that is not a secure context: served over plain http from anywhere but localhost, where the browser withholds WebCrypto | Serve the app over https |
 
 ### Conditions: handle them at run time
 
@@ -687,10 +696,10 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `too_many_wayins`     | a passphrase or passkey added to a vault already holding `MaxUnlocks` (8) ways in | Tell the user to remove one first             |
 | `last_wayin`          | removing the vault's last passphrase: a vault always keeps one, since a passkey can be lost with its device | Add another passphrase first; to be rid of the vault, `retire()` it |
 | `corrupt_record`      | a stored record failed validation as storage read it back: storage's own word, from a `VaultDB` called directly. A vault call says what it means for the vault instead, as one of the three below | Nothing was changed. Do not retry; see a developer: the record is damaged, was moved, or came from a newer safebyok |
-| `damaged_vault`       | the vault's stored props failed their checks (not a shape this package writes, or naming another vault), so no way in can be tried: `openVault` refuses it | Nothing was changed, and a retry will not mend it. Tell the user the vault cannot be opened; restore its props from a backup, if there is one, or, if the user chooses to start over, `retireDamagedVault()` (see *A vault that cannot be opened*) |
+| `damaged_vault`       | the vault's stored props failed their checks (not a shape this package writes, or naming another vault), so no way in can be tried: `hello()` refuses it | Nothing was changed, and a retry will not mend it. Tell the user the vault cannot be opened; restore its props from a backup, if there is one, or, if the user chooses to start over, `retireDamagedVault()` (see *A vault that cannot be opened*) |
 | `damaged_wayin`       | a way in is stored in a form this package never writes (a salt of the wrong length, or not base64url), so it cannot be tried: the passkey asked for, the passphrase `wayinId` aims at, or every passphrase the vault has. Other ways in are still tried | Unlock another way, then `retireWayin()` the damaged one and add it again |
 | `damaged_lockbox`     | a lockbox failed its checks as read, or would not open under the vault's own vaultKey, or opened to no whisper: altered in storage, or moved there from elsewhere. A lockbox that will not open is named so only after the vault has caught up with storage once: one a vault made anew elsewhere wrote makes the call `vault_locked` instead | Nothing was changed. Offer `retireBox()`, or a fresh `storeBox()` over it (see *Damaged lockboxes*) |
-| `newer_format`        | the vault's stored props are in a form this version does not know -- a `format`, wayinkind or number of wayins -- which a newer safebyok may have written: `openVault` and `retireDamagedVault` refuse it | Nothing was changed. Tell the user to update the app; never offer to start over |
+| `newer_format`        | the vault's stored props are in a form this version does not know -- a `format`, wayinkind or number of wayins -- which a newer safebyok may have written: `hello()` and `retireDamagedVault` refuse it | Nothing was changed. Tell the user to update the app; never offer to start over |
 | `stale_write`         | storage changed since this device read it, so the write was refused and nothing was written: another device or tab wrote, created or retired the lockbox a `storeBox()` was writing; a `retireBox()` into a vault deleted or made anew elsewhere, its message saying the lockbox could not be retired because its vault is gone; and a write whose catch-up with storage then failed too (its `cause` says why; the snapshot reads `syncing: false`) -- unless the catch-up was refused as `identity_revoked`, `rolled_back` or `newer_format`, which the write throws as it came | The vault has caught up: show what stands now and, if the change still applies, repeat it (*Two devices storing at once*, below). Nothing is tried again by itself |
 | `rolled_back`         | this device has already seen a newer copy of the vault props than storage offers now (storage restored from a backup, or altered), so it won't use this one, and the vault locked: nothing was unlocked or written | Tell the user this device has seen a newer copy of the vault than storage holds. If the storage was restored from an older copy on purpose, accept it on this device (see *A vault rolled back*, below); otherwise the app's support should look at its storage |
 | `not_permitted`       | the storage backend refused the signed-in user, still the vault's own, this one call | Tell the user they may not; signing in again will not help |
@@ -698,11 +707,14 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `storage_unavailable` | the storage backend could not be reached, or failed; or this device's own store failed for a reason that may pass; or `zxcvbnPassphraseTest`'s word list could not be fetched | Try again shortly; the adapter's own error is the `cause`, unless it may quote the call (Convex's) |
 | `storage_blocked`     | this device's own store (its device store, or a vault kept on the device, as `safebyok-indexeddb`'s) refused for a reason that holds until something outside the app changes: the browser withholds storage from the page (site data blocked, a sandboxed frame), has no room for it (a quota of zero, as some private windows give, or a full disk), or offers no IndexedDB at all | Do not offer a retry: tell the user this browser is keeping the app from storing anything on this device. The app may open the vault again with `memoryDeviceDB()`, which keeps no lease here; the browser's own error is the `cause` |
 
-`openVault` itself can refuse with `bad_option`, `bad_label`, `insecure_context`, and, as it reads the vault from
-storage, `storage_unavailable`, `not_permitted`, `identity_revoked` or `damaged_vault` (a
-damaged lockbox never stops an open): the last four are conditions, though they surface at open.
-So is `storage_blocked`, from this device's own store or a vault store on it, which opening again will not mend.
-A refused open leaves nothing running behind it, so the host simply opens again.
+`Vault.make` itself throws `bad_option`, `bad_label` or `insecure_context`, at once. Its `hello()`,
+as it reads the vault from storage, can refuse with `storage_unavailable`, `not_permitted`,
+`identity_revoked` or `damaged_vault` (a damaged lockbox never stops it): conditions, which the
+snapshot keeps as its `trouble`, the vault still `opening`. So is `storage_blocked`, from this
+device's own store or a vault store on it, which saying hello again will not mend. A refused hello
+leaves the handle as it was, its storage watch live, so the host calls `hello()` again, or simply
+carries on: every call but `lock()`, `lockSoon()` and `close()` tries again first. Close the
+handle to let it go.
 
 ### Two devices storing at once
 
@@ -720,20 +732,21 @@ meets another device's write is refused as `stale_write` the same way, once caug
 
 ### A vault that cannot be opened
 
-Stored vault props that fail their checks make `openVault` refuse with `damaged_vault`, and
-`retire()` needs a handle that was never made. `retireDamagedVault` is the way to clear such a vault
-and start over. It takes the options `openVault` took (only the vault's names and its two stores
+Stored vault props that fail their checks make `hello()` refuse with `damaged_vault`, and
+`retire()` cannot reach a vault it cannot read. `retireDamagedVault` is the way to clear such a vault
+and start over. It takes the options `Vault.make` took (only the vault's names and its two stores
 matter) and retires that vault's stored props and lockboxes through the `VaultDB`, and this
 device's lease of it through the `DeviceDB`: what `retire()` does, for this one case. Whatever the
 vault held is gone for good, so ask the user first.
 
 ```ts
+const vault = Vault.make(opts)
 try {
-  vault = await openVault(opts)
+  await vault.hello()
 } catch (err) {
   if (! isVaultError(err, 'damaged_vault') || ! await userAgreesToStartOver()) { throw err }
   await retireDamagedVault(opts)
-  vault = await openVault(opts)   // absent: a new vault is made on the next unlock
+  await vault.hello()   // absent: a new vault is made on the next unlock
 }
 ```
 
@@ -745,7 +758,7 @@ still, with nothing removed: the backend's own tools can clear them (`localVault
 that are not JSON at all are one case). A record this version cannot read may instead have been written by a **newer**
 safebyok, which opens it; so one in a `format` this version does not know, with a
 `wayinkind` it does not know, or with more wayins than `MaxUnlocks`, is refused with a kind of its
-own, `newer_format`, by `openVault` and `retireDamagedVault` alike, nothing removed, with a message
+own, `newer_format`, by `hello()` and `retireDamagedVault` alike, nothing removed, with a message
 telling the user to update the app: never offer to start over on it. That is all this version can tell from damage, which rests on a rule: **any change to
 what a stored record may hold -- a field, a shape, or a range a check accepts -- bumps
 `format`**, so an older build can tell "newer" from "damaged". Where it cannot
@@ -770,18 +783,19 @@ copy, or whose site data was cleared, cannot tell, and takes the older copy as i
 When the vault's storage was restored from an older copy on purpose, each device that saw a
 newer one accepts it by forgetting its mark of the vault -- the one way out, by design: no verb
 puts forgetting the newer copy one call away -- through the `DeviceDB` it opens the vault
-with, and opening it again. Whether the restore was on purpose is for the app to know, from its
+with, and saying hello again. Whether the restore was on purpose is for the app to know, from its
 own backend or its operators, and not for the user to guess: storage that rolls a vault back on
 its own meets the user with the same refusal, so a prompt asking "was your vault restored?" turns
 the check off for whoever the check is there to stop.
 
 ```ts
+const vault = Vault.make(opts)
 try {
-  vault = await openVault(opts)
+  await vault.hello()
 } catch (err) {
   if (! isVaultError(err, 'rolled_back') || ! await storageWasRestoredOnPurpose()) { throw err }
   await opts.deviceDB.eraseMark({ applabel: opts.applabel, user_id: opts.userId, vaultlabel: opts.vaultlabel })
-  vault = await openVault(opts)
+  await vault.hello()
 }
 ```
 

@@ -85,7 +85,7 @@ export const VaultErrorKindVals = [
   'vault_full',          // a new lockbox in a vault already holding its maxLockboxes, or a write storage has no room for
   'too_many_wayins',     // a new wayin in a vault already holding MaxUnlocks
   'last_wayin',          // removing the vault's last passphrase, which would leave no sure way in
-  'bad_option',          // an option or argument out of its range: openVault's, mask's, argon2idDeriver's, a storeBox()'s sidecar, a VaultDB write's record
+  'bad_option',          // an option or argument out of its range: Vault.make's, mask's, argon2idDeriver's, a storeBox()'s sidecar, a VaultDB write's record
   'vault_closed',        // the vault handle was closed and cannot be used again
   'corrupt_record',      // a stored record failed validation as storage read it back
   'damaged_vault',       // the vault's stored props failed their checks, so no way in can be tried

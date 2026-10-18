@@ -4,7 +4,7 @@ import 'fake-indexeddb/auto'
 import { describe, expect, it, vi } from 'vitest'
 import { createStore, get, set } from 'idb-keyval'
 import type { UseStore } from 'idb-keyval'
-import { Ckeys, memoryDeviceDB, openVault, VaultError } from 'safebyok'
+import { Ckeys, memoryDeviceDB, VaultError } from 'safebyok'
 import { idbVaultDB } from '../src/idb-vault-db'
 import type { IdbVaultDBOpts } from '../src/idb-opts'
 import { inspectIdbVaultDB } from '../src/inspect-idb-vault-db'
@@ -218,12 +218,12 @@ describe("idbVaultDB", () => {
     }
   })
 
-  it("has openVault refuse as storage_blocked when the browser withholds the vault's storage", async () => {
+  it("has hello() refuse as storage_blocked when the browser withholds the vault's storage", async () => {
     const vaultDB = idbVaultDB({ dbName: TH.freshDbName() })
     const opts = { applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest, deviceDB: memoryDeviceDB() }
     const blocked = vi.spyOn(globalThis.indexedDB, 'open').mockImplementation(() => { throw new DOMException('The operation is insecure.', 'SecurityError') })
     try {
-      await TH.expectRefusal(openVault(opts), 'storage_blocked')
+      await TH.expectRefusal(TH.settledVault(opts), 'storage_blocked')
     } finally {
       blocked.mockRestore()
     }
@@ -248,14 +248,14 @@ describe("idbVaultDB", () => {
     expect(await vaultDB.readVaultProps(TH.scopeOf('u1'))).to.be.null
   })
 
-  it("serves openVault: a vault made, stored in and reopened over it", async () => {
+  it("serves Vault.make and hello(): a vault made, stored in and reopened over it", async () => {
     const dbName = TH.freshDbName()
     const opts = { applabel: 'acme', userId: 'u1', vaultlabel: 'main', keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest, deviceDB: memoryDeviceDB() }
-    const vault = await openVault({ ...opts, vaultDB: idbVaultDB({ dbName }) })
+    const vault = await TH.settledVault({ ...opts, vaultDB: idbVaultDB({ dbName }) })
     await vault.unlock('correct horse')
     await vault.storeBox('anthropic', 'sk-not-a-real-key')
     vault.close()
-    const reopened = await openVault({ ...opts, vaultDB: idbVaultDB({ dbName }) })
+    const reopened = await TH.settledVault({ ...opts, vaultDB: idbVaultDB({ dbName }) })
     await reopened.unlock('correct horse')
     expect(await reopened.readBox('anthropic')).to.eq('sk-not-a-real-key')
     reopened.close()
@@ -363,7 +363,7 @@ describe("idbVaultDB's subscribe", () => {
 
   it("closes the bell's channel when its vault closes", async () => {
     const dbName = TH.freshDbName()
-    const vault = await openVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest, deviceDB: memoryDeviceDB(), vaultDB: idbVaultDB({ dbName }) })
+    const vault = await TH.settledVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest, deviceDB: memoryDeviceDB(), vaultDB: idbVaultDB({ dbName }) })
     const closing = vi.spyOn(BroadcastChannel.prototype, 'close')
     try {
       vault.close()

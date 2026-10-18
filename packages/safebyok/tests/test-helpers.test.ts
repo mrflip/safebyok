@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
-import { localVaultDB, memoryStore, openVault, type StringStore } from '../src/index'
+import { Vault, localVaultDB, memoryDeviceDB, memoryStore, type StringStore } from '../src/index'
 import { Ciphered, fromB64, toB64 } from '../src/crypto'
 import { VaultError } from '../src/errors'
 import { Lockbox } from '../src/lockbox'
@@ -299,7 +299,7 @@ describe("holdNextCall", () => {
 
   it("lands a lock in the middle of an unlock, as its @example has it", async () => {
     const opts = TH.memoryVaultOpts()
-    const vault = await openVault(opts)
+    const vault = await TH.settledVault(opts)
     const gate = TH.holdNextCall(opts.vaultDB, 'readVaultProps')
     const unlocking = TH.expectRefusal(vault.unlock('pw'), 'vault_locked')
     await gate.reached
@@ -310,11 +310,33 @@ describe("holdNextCall", () => {
   })
 })
 
+describe("settledVault", () => {
+  it("makes a vault and awaits its hello, as its first example shows", async () => {
+    const vault = await TH.settledVault(TH.memoryVaultOpts())
+    expect(vault.getSnapshot().state).to.eq('absent')
+  })
+
+  it("makes two devices over one vaultDB, each with a device store of its own, as its second example shows", async () => {
+    const opts = TH.memoryVaultOpts()
+    const here = await TH.settledVault({ ...opts, deviceDB: memoryDeviceDB() })
+    await here.unlock('pw')
+    const there = await TH.settledVault({ ...opts, deviceDB: memoryDeviceDB() })
+    expect(there.getSnapshot().state).to.eq('locked')
+  })
+
+  it("rejects as hello does, and throws as Vault.make does for misuse", async () => {
+    const vaultDB = localVaultDB({ store: memoryStore() })
+    vi.spyOn(vaultDB, 'readVaultProps').mockRejectedValueOnce(new VaultError('not_permitted', 'Sign in to reach this vault.'))
+    await TH.expectRefusal(TH.settledVault(TH.memoryVaultOpts({ vaultDB })), 'not_permitted')
+    await TH.expectRefusal(TH.settledVault(TH.memoryVaultOpts({ applabel: 'not-a-label' })), 'bad_label')
+  })
+})
+
 describe("tallyWatches", () => {
   it("counts the watches opened and closed, each still reaching the adapter", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
     const tally = TH.tallyWatches(vaultDB)
-    const vault = await openVault(TH.memoryVaultOpts({ vaultDB }))
+    const vault = await TH.settledVault(TH.memoryVaultOpts({ vaultDB }))
     expect(tally).to.deep.equal({ opened: 1, closed: 0 })
     vault.close()
     expect(tally).to.deep.equal({ opened: 1, closed: 1 })
@@ -330,11 +352,13 @@ describe("tallyWatches", () => {
     expect(tally).to.deep.equal({ opened: 2, closed: 1 })
   })
 
-  it("shows no leak after a refused open, as its @example has it", async () => {
+  it("shows no leak once a refused vault is closed, as its @example has it", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
     vi.spyOn(vaultDB, 'readVaultProps').mockRejectedValue(new VaultError('not_permitted', "That vault belongs to someone else."))
     const tally = TH.tallyWatches(vaultDB)
-    await TH.expectRefusal(openVault(TH.memoryVaultOpts({ vaultDB })), 'not_permitted')
+    const vault = Vault.make(TH.memoryVaultOpts({ vaultDB }))
+    await TH.expectRefusal(vault.hello(), 'not_permitted')
+    vault.close()
     expect(tally.opened).to.eq(1)
     expect(tally.opened - tally.closed).to.eq(0)
   })
@@ -506,7 +530,7 @@ describe("memoryVaultOpts", () => {
   it("opens u1's main vault in acme over fresh stores, deriving through testDeriver", async () => {
     const opts = TH.memoryVaultOpts()
     expect(opts).to.include({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', keyDeriver: TH.testDeriver })
-    const vault = await openVault(opts)
+    const vault = await TH.settledVault(opts)
     await vault.unlock('pw')
     expect(await opts.vaultDB.readVaultProps(TH.scopeOf('u1'))).to.not.be.null
     expect(await opts.deviceDB.readLease(TH.scopeOf('u1'))).to.not.be.null
@@ -529,7 +553,7 @@ describe("freshDbName", () => {
 
 describe("testDeriver", () => {
   it("opens a vault, deterministic in passphrase and salt", async () => {
-    const vault = await openVault(TH.memoryVaultOpts())
+    const vault = await TH.settledVault(TH.memoryVaultOpts())
     await vault.unlock('correct horse battery staple')
     await vault.storeBox('anthropic_api_key', 'sk-ant-test-not-a-real-key')
     await vault.lock()
@@ -616,9 +640,9 @@ describe("spyLogger", () => {
     ])
   })
 
-  it("is a logger openVault takes", async () => {
+  it("is a logger Vault.make takes", async () => {
     const spy = TH.spyLogger()
-    const vault = await openVault(TH.memoryVaultOpts({ logger: spy.logger }))
+    const vault = await TH.settledVault(TH.memoryVaultOpts({ logger: spy.logger }))
     expect(vault.getSnapshot().state).to.eq('absent')
     expect(spy.calls).to.have.lengthOf(0)
   })
@@ -629,9 +653,9 @@ describe("loggedText", () => {
     const spy = TH.spyLogger()
     const deepest = new Error('deepest cause')
     const tagged = Object.assign(new Error('middle', { cause: deepest }), { detail: 'an own property' })
-    spy.logger.error('the message', { call: 'openVault' }, new Error('the error', { cause: tagged }))
+    spy.logger.error('the message', { call: 'make' }, new Error('the error', { cause: tagged }))
     const text = TH.loggedText(spy.calls)
-    for (const piece of ['error', 'the message', '"call":"openVault"', 'the error', 'middle', 'an own property', 'deepest cause']) {
+    for (const piece of ['error', 'the message', '"call":"make"', 'the error', 'middle', 'an own property', 'deepest cause']) {
       expect(text).to.include(piece)
     }
   })
@@ -726,7 +750,7 @@ describe("expectRefusal", () => {
   })
 
   it("lets a test look closer at what refused", async () => {
-    const vault = await openVault(TH.memoryVaultOpts())
+    const vault = await TH.settledVault(TH.memoryVaultOpts())
     const err = await TH.expectRefusal(vault.readBox('anthropic_api_key'), 'vault_locked')
     expect(err.message).to.be.a('string').and.not.be.empty
   })
@@ -743,7 +767,7 @@ describe("omitting", () => {
   })
 
   it("hands an entrypoint a bag short of a required option, with no cast", async () => {
-    const err = await TH.expectRefusal(openVault(TH.omitting(opts, 'keyDeriver')), 'bad_option')
+    const err = await TH.expectRefusal(TH.settledVault(TH.omitting(opts, 'keyDeriver')), 'bad_option')
     expect(err.message).to.include('safebyok/browser')
   })
 })

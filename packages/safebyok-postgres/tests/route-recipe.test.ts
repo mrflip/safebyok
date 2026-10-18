@@ -4,7 +4,7 @@
 // and the README changes with it.
 import { describe, expect, it } from 'vitest'
 import type { Client } from 'pg'
-import { VaultDB, VaultError, VaultErrorKindVals, memoryDeviceDB, openVault } from 'safebyok'
+import { VaultDB, VaultError, VaultErrorKindVals, memoryDeviceDB } from 'safebyok'
 import type { VaultPropsExpectation, RetireExpectation, Lockbox, LockboxExpectation, VaultProps, VaultErrorKind, VaultScope } from 'safebyok'
 import * as TH from './test-helpers'
 import { VaultChangeChannel, postgresVaultDB } from '../src/index'
@@ -183,7 +183,7 @@ TH.describeVaultDB('the README route recipe, over postgresVaultDB', async () => 
 describe("the README route recipe", () => {
   it("carries a real vault, made and opened by the core in the browser", async () => {
     const route = await routeOver()
-    const vault = await openVault({
+    const vault = await TH.settledVault({
       applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: browserFor(route, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest,
     })
     await vault.unlock('correct horse battery staple')
@@ -197,7 +197,7 @@ describe("the README route recipe", () => {
     const session: { userId: string | null } = { userId: 'u1' }
     const deviceDB = memoryDeviceDB()
     const opts = { applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: sessionedBrowser(route, session), deviceDB, keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest, logger: TH.spyLogger().logger }
-    const vault = await openVault(opts)
+    const vault = await TH.settledVault(opts)
     await vault.unlock('correct horse battery staple')
     await vault.storeBox('anthropic_api_key', 'sk-ant-test-not-a-real-key')
     session.userId = null

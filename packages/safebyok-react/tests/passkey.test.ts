@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { PasskeySaltBytes, VaultError, localVaultDB, memoryDeviceDB, memoryStore, openVault, type PasskeyProof, type WayinSummary, type VaultDB } from 'safebyok'
+import { PasskeySaltBytes, VaultError, localVaultDB, memoryDeviceDB, memoryStore, type PasskeyProof, type WayinSummary, type VaultDB } from 'safebyok'
 import { fromB64, toB64 } from 'safebyok/utils'
 import { askPasskey, createPasskey, passkeysAvailable } from '../src/passkey'
 import * as TH from './test-helpers'
@@ -29,7 +29,7 @@ const passphraseSummary: WayinSummary = { wayinkind: 'passphrase', wayin_id: 'wa
 /** A fresh vault in memory, made with the passphrase `pw` and unlocked, and an opener for another device on the same storage. */
 const vaultInMemory = async () => {
   const vaultDB: VaultDB = localVaultDB({ store: memoryStore() })
-  const open = async () => await openVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest })
+  const open = async () => await TH.settledVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest })
   const vault = await open()
   await vault.unlock('pw')
   return { vault, open }

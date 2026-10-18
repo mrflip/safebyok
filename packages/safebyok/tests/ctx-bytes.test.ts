@@ -4,7 +4,6 @@ import { cipherCtx, decipherBytes, deriveWrappingKey, fromB64, importWrappingKey
 import { memoryDeviceDB } from '../src/device-db'
 import { memoryStore } from '../src/string-store'
 import { localVaultDB } from '../src/vault-db'
-import { openVault } from '../src/vault'
 import * as Wayin from '../src/wayin'
 import * as TH from './test-helpers'
 
@@ -12,7 +11,7 @@ import * as TH from './test-helpers'
 // rename of the builders proves it moved nothing. A stored-field rename moves them on purpose:
 // update the literals here together with the tag, and with nothing else.
 //
-// A builder inside openVault, or the wayin's own, cannot be called from a test, so each is pinned
+// A builder inside Vault.make, or the wayin's own, cannot be called from a test, so each is pinned
 // through the narrowest path that reaches it: the ciphertext it made unwraps or deciphers under a
 // hand-written literal of the bytes expected, and under no other. The literal is the UTF-8 text of
 // the ctx's JSON; the values a vault draws afresh or stamps from its clock (vault_id, revision_tok,
@@ -59,7 +58,7 @@ describe("the ctx builders' output, byte for byte", () => {
   it("a lockbox's two wraps and the lease's open only under the ctx bytes they have always been made with", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
     const deviceDB = memoryDeviceDB()
-    const vault = await openVault({
+    const vault = await TH.settledVault({
       applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB, clock: { now: () => Date.parse('2026-10-14T12:00:00Z') },
       keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest, logger: TH.spyLogger().logger,
     })

@@ -2,7 +2,7 @@
  * safebyok's public surface: an end-to-end encrypted vault for API keys and other small secrets.
  * Whispers are encrypted on the user's device under keys that never leave it; the storage layer
  * holds ciphertext only. The IndexedDB device store lives in its own entry point, `safebyok/idb`,
- * the browser's defaults for openVault's options in another, `safebyok/browser` (among them
+ * the browser's defaults for Vault.make's options in another, `safebyok/browser` (among them
  * `zxcvbnPassphraseTest`, the passphrase strength test), the checks for
  * names, with their bounds, in `safebyok/validators` as well as here, and the IndexedDB
  * vault store in a package of its own, `safebyok-indexeddb`.
@@ -11,9 +11,9 @@ export { Argon2idWebV1, ensureSaltFits, parseKeyDeriverSpec } from './key-derive
 export type { KeyDeriverSpec } from './key-deriver-spec'
 export { argon2idDeriver, argon2idWebV1Deriver } from './key-deriver'
 export type { Argon2idKeyDeriver, CustomKeyDeriver, KeyDeriver } from './key-deriver'
-export { retireDamagedVault, openVault } from './vault'
+export { retireDamagedVault, Vault } from './vault'
 export type { PassphraseStrengthTest, PassphraseVerdict } from './passphrase-strength'
-export type { OpenVaultOpts, RetireDamagedVaultOpts, Vault, VaultSnapshot, VaultState } from './vault'
+export type { MakeVaultOpts, RetireDamagedVaultOpts, VaultSnapshot, VaultState } from './vault'
 export { DefaultLogger, parseLogger, setDefaultLogger } from './logger'
 export type { VaultLogger } from './logger'
 export { Lockbox } from './lockbox'
