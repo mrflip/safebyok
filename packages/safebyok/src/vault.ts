@@ -78,12 +78,12 @@ export type VaultSnapshot = {
    *
    * A first `hello()` that fails before the vault props are read -- storage unreachable, a user
    * not yet signed in, vault props damaged -- leaves the vault `opening`, saying why here: show the
-   * refusal in place, and offer a retry that calls `hello()` again where one may mend it (`isVaultCondition`,
-   * and not `storage_blocked`). Any other call tries again first, as it waits for `hello()`. One
-   * that fails after them, as this device's store refuses its lease, settles the state (`absent` or
-   * `locked`) with `trouble` beside it. Once the vault has settled, a failure never takes it back
-   * to `opening`: `state` says what it last
-   * read, and `trouble` beside it why that may be behind storage now.
+   * refusal in place, and offer a retry that calls `hello()` again where one may mend it
+   * (`isVaultCondition`, and not `storage_blocked`). Any other call tries again first, as it waits
+   * for `hello()`. One that fails after them, as this device's store refuses its lease, settles
+   * `locked` with `trouble` beside it. Once the vault has settled, a failure never takes it back to
+   * `opening`: `state` says what it last read, and `trouble` beside it why that may be behind
+   * storage now.
    *
    * @example
    *   const { state, trouble } = vault.getSnapshot()
@@ -251,8 +251,8 @@ export type Vault = {
    *
    * It refuses with storage's own error -- storage refusing a user not yet signed in, say -- and
    * the snapshot says the same as its `trouble`, its `state` the last it settled into: `opening`
-   * while the vault props were never read, `absent` or `locked` for a failure after them, as this
-   * device's store refusing its lease. Stored vault props that fail their checks are kind 'damaged_vault',
+   * while the vault props were never read, and `locked` for a first hello that fails after them,
+   * as this device's store refusing its lease. Stored vault props that fail their checks are kind 'damaged_vault',
    * which no retry mends (`retireDamagedVault` clears them); those a newer safebyok may have
    * written, kind 'newer_format': update the app; those older than this device has already seen
    * the vault at, kind 'rolled_back', which also forgets this device's lease (see the `Vault`'s
