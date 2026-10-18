@@ -425,8 +425,8 @@ describe("hello", () => {
   })
 
   const LockThatKeptItsLeaseCases = [
-    ["lock()",                     async (vault: Vault) => { await TH.expectRefusal(vault.lock(), 'storage_unavailable') }],
-    ["lockSoon()",                 async (vault: Vault) => { await TH.expectRefusal(vault.lockSoon(), 'storage_unavailable') }],
+    ["lock()",                       async (vault: Vault) => { await TH.expectRefusal(vault.lock(), 'storage_unavailable') }],
+    ["lockSoon()",                   async (vault: Vault) => { await TH.expectRefusal(vault.lockSoon(), 'storage_unavailable') }],
     ["a lock for untrusted storage", async (vault: Vault, world: ReturnType<typeof makeWorld>) => {
       vi.spyOn(world.vaultDB, 'readBox').mockRejectedValueOnce(new VaultError('identity_revoked', 'Signed out.'))
       await TH.expectRefusal(vault.readBox('anthropic'), 'identity_revoked')
