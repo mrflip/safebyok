@@ -65,7 +65,10 @@ const unlockedFor = (leaseMillis: number, creating: boolean): string => {
  *
  * A condition the unlock meets (storage that cannot be reached, a record that fails
  * verification) shows in the dialog in place, in the vault's own calm words, through a live
- * region a screen reader announces, and the user may try again or cancel. Anything else --
+ * region a screen reader announces, and the user may try again or cancel. A first unlock that
+ * lost the race to create the vault to another device (`created_elsewhere`) is shown as advice,
+ * in the `quiet` style rather than the `gripe` one -- it is no typo -- and the dialog, now an
+ * unlock of that vault, stays open for the passphrase chosen there. Anything else --
  * misuse, such as a closed vault handle, or a failure that is no VaultError -- never reaches the
  * host's page: the dialog shows a calm notice in its place, "Something went wrong", whose Close
  * (or Escape) calls `onDone(false)`, and React reports the error through the root's
@@ -176,7 +179,7 @@ const DialogTrouble = ({ onDone }: { onDone: (unlocked: boolean) => void }) => {
  * passphrase goes once the user types again; one about the passkey stays until the next submit,
  * or the next press of the passkey.
  */
-type Gripe = { text: string, fromPasskey: boolean }
+type Gripe = { text: string, fromPasskey: boolean, asAdvice: boolean }
 
 /** Whether the focus is inside `container`, read in the document or shadow root it lives in. */
 const holdsFocus = (container: HTMLElement | null): boolean => {
@@ -303,7 +306,7 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
 
   /** A refusal the user meets: a condition shown in place, misuse rethrown in render, for PassphraseModal's boundary. */
   const meet = (err: unknown) => {
-    if (isVaultCondition(err)) { setGripe({ text: err.message, fromPasskey: false }); return }
+    if (isVaultCondition(err)) { setGripe({ text: err.message, fromPasskey: false, asAdvice: err.kind === 'created_elsewhere' }); return }
     // Thrown from an event handler, it would miss every boundary.
     setFailure({ err })
   }
@@ -348,7 +351,7 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
   }
 
   const passkeyGripe = (text: string | null) => {
-    setGripe(text === null ? null : { text, fromPasskey: true })
+    setGripe(text === null ? null : { text, fromPasskey: true, asAdvice: false })
     // A passkey button that took itself away took the focus with it: back to the passphrase.
     if (text !== null && ! holdsFocus(formRef.current)) { fieldRef.current?.focus() }
   }
@@ -376,7 +379,7 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
             </>
           )}
         {/* A live region, mounted from the start, so that each word put in it is announced. */}
-        <div role="alert">{gripe !== null && <p className="gripe">{gripe.text}</p>}</div>
+        <div role="alert">{gripe !== null && <p className={gripe.asAdvice ? 'quiet' : 'gripe'}>{gripe.text}</p>}</div>
         {! askingStartOver && <p className="quiet">{windowLine}</p>}
         {askingStartOver
           ? (

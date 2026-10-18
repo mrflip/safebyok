@@ -126,6 +126,42 @@ describe("PassphraseModal", () => {
     })
   })
 
+  describe("a vault created on another device meanwhile", () => {
+    const Advice = 'A vault was just created for this label on another device, with a different passphrase than the one you entered. Enter the passphrase you chose there to unlock it.'
+    const createdElsewhere = () => TH.stubVault({
+      state:  'absent',
+      unlock: () => Promise.reject(new VaultError('created_elsewhere', Advice)),
+    })
+
+    it("shows the vault's message as advice, quiet and not a gripe, in the live region, and not as a wrong passphrase", async () => {
+      render(<PassphraseModal vault={createdElsewhere()} onDone={noop} />)
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw one' } })
+      fireEvent.click(screen.getByText('Create vault'))
+      await waitFor(() => { expect(screen.getByRole('alert').textContent).to.eq(Advice) })
+      const said = screen.getByText(Advice)
+      expect(said.className).to.eq('quiet')
+      expect(screen.queryByText(/didn't unlock|did not open/)).to.be.null
+    })
+
+    it("stays in the dialog for another try, not reporting done, and clears the advice once the user types again", async () => {
+      const heard: boolean[] = []
+      render(<PassphraseModal vault={createdElsewhere()} onDone={(unlocked) => { heard.push(unlocked) }} />)
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw one' } })
+      fireEvent.click(screen.getByText('Create vault'))
+      await waitFor(() => { expect(screen.queryByText(Advice)).to.not.be.null })
+      expect(heard).to.deep.equal([])
+      expect(screen.getByRole('dialog')).to.not.be.null
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw two' } })
+      expect(screen.queryByText(Advice)).to.be.null
+    })
+
+    it("shows a wrong passphrase as a gripe still", async () => {
+      render(<PassphraseModal vault={TH.wrong()} onDone={noop} />)
+      TH.submitPassphrase('pw wrong')
+      await waitFor(() => { expect(screen.getByText('That passphrase did not open the vault.').className).to.eq('gripe') })
+    })
+  })
+
   describe("any other failure of the unlock", () => {
     it("shows a condition in the dialog in place, as it does a wrong passphrase", async () => {
       const heard: boolean[] = []
