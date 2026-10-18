@@ -95,7 +95,7 @@ The Coach (2026-10-16), holding it: there should be a distinction between *lock 
 goons are here* and *it's time for a password refresh*. The proposal sounds like its own race
 condition; decide what guarantee we offer, and why, before writing more code.
 
-Where it stands today: the expiry ruling (section 5, on when a lease runs out, now in
+Where it stands today: the expiry ruling (section 5, on when a lease expires, now in
 `winboard/20261016-todo/20261016-todo-open.md`) says "in-flight work is never clawed back",
 and `lockSoon()` already gives a grace in which work started before it finishes -- the soft lock.
 `lock()` and a sign-out have no separate meaning yet. Decide: does `lock()` mean "now" (nothing
@@ -110,7 +110,7 @@ the caller must name which to replace (`wayinId`), or the call is refused rather
 The Coach (2026-10-16): "keep as built, but this is too complicated for a user to tolerate or a
 customer to implement UX for." Decide whether a vault should hold more than one passphrase at
 all, or exactly one, with passkeys the other wayins. The Gripefest doc's NOT YET row G530 asks the
-deeper question beside it: whether asking for the passphrase again whenever a lease runs out is still the right demand once a
+deeper question beside it: whether asking for the passphrase again whenever a lease expires is still the right demand once a
 vault has a passkey. Decide both before the wayin surface is 1.0.
 
 ### Identity should not be tied to the backing database
@@ -132,8 +132,8 @@ first; maintainability beats speed unless something is shown slow.
 
 From thread 4 ([#132](https://github.com/mrflip/safebyok/pull/132), `thread-4-refusals_and_catchup.md`,
 *A pre-existing race*): during a change to the wayins, this handle's own bell refresh can read the
-new vault props before `reviseWayins` sets it, judge the key `outlived`, drop it and erase the
-lease. `grantLease` restores the key in memory, but that erase can land after the
+new vault props before `reviseWayins` sets it, judge the key `outlived`, drop it and discard the
+lease. `grantLease` restores the key in memory, but that discard can land after the
 new record, so the next open asks for the passphrase. The direction is safe, and serializing the
 refreshes does not cure it. The Coach (2026-10-16): into the TODO, beside the multiple-passphrases
 question. The fix, small: do not judge `outlived` against vault props this handle wrote itself.

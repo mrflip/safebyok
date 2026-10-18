@@ -4,7 +4,7 @@ Reasonable tasks that we do not plan to do in the near term. Do not anticipate t
 implementation.
 
 * **Lock out a device: every wayin it added.** From another device, the user locks out a lost or
-  compromised one: its passkeys removed, its lease void, and nothing it holds reading
+  compromised one: its passkeys removed, its lease revoked, and nothing it holds reading
   what is written next. Vault-key rotation does the cryptography (not yet built; its design was
   removed on 2026-10-18 for a different plan); what waits is the UX, a device list, and, if the Coach
   wants rotation not to sign every other device out, a key pair per wayin (`TODO.md`, *Which wayins
