@@ -397,9 +397,10 @@ export const VaultBundle = Z.object({
 export type VaultBundle = Z.infer<typeof VaultBundle>
 
 /**
- * The device-local record of a lease: this browser's leaseKey (a non-extractable handle -- it cannot leave the device even through the code that made it) and
- * the vaultKey wrapped under it. Held only by structured-clone storage (IndexedDB) or memory;
- * it has no JSON form, and nothing in it ever goes to the backend.
+ * The device-local record of a lease: this browser's leaseKey (a non-extractable handle -- it
+ * cannot leave the device even through the code that made it) and the vaultKey wrapped under it.
+ * Held only by structured-clone storage (IndexedDB) or memory; it has no JSON form, and nothing
+ * in it ever goes to the backend.
  */
 export const Lease = Z.object({
   format:            Z.literal('safebyok-lease-v1'),

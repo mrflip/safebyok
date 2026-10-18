@@ -2388,8 +2388,9 @@ export const perUser = (vaultDBFor: (userId: string) => VaultDBVerbs): VaultDBVe
  * back, its leaseKey still a non-extractable CryptoKey; likewise a device mark, the newest
  * written in place of the one before but never at a lower lock generation; a lease written only
  * while its scope's mark stands at the lock generation expected; each scope kept to itself, and
- * marks apart from leases; and an erase of one, or of all. Run it against an adapter with a factory making a fresh,
- * empty one per test. For a DeviceDB's own tests, from `safebyok/testing`; it runs under vitest.
+ * marks apart from leases; and an erase of one, or of all. Run it against an adapter with a
+ * factory making a fresh, empty one per test. For a DeviceDB's own tests, from
+ * `safebyok/testing`; it runs under vitest.
  *
  * @param adapterTitle - The adapter under test, as the suite's titles name it.
  * @param makeDeviceDB - A fresh, empty adapter: no record in it, and none shared with another call.

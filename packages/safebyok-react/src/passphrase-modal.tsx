@@ -76,8 +76,9 @@ const unlockedFor = (leaseMillis: number, creating: boolean): string => {
  * How long a lease lasts it reads from the vault itself (its `leaseMillis`, the `leaseHours` it
  * was opened with): 'Locks again on this device in 7 days', 'in 15 minutes', 'Stays unlocked on
  * this device until you lock it' for `Infinity`; while it creates the vault, 'Locks on this
- * device in 7 days', with nothing yet to lock again. Nobody need tell the dialog the lease again. It needs `Intl.RelativeTimeFormat`, which a host on an engine without
- * it (Hermes, an older browser) supplies with the standard polyfill: the README says how.
+ * device in 7 days', with nothing yet to lock again. Nobody need tell the dialog the lease again.
+ * It needs `Intl.RelativeTimeFormat`, which a host on an engine without it (Hermes, an older
+ * browser) supplies with the standard polyfill: the README says how.
  *
  * With `allowStartOver`, a user who has forgotten the passphrase is offered a way out: "Forgot it?
  * Start a new vault" asks first, then erases the vault (`vault.destroy()`, on every device) and

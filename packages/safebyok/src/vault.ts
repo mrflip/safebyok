@@ -103,8 +103,8 @@ export type OpenVaultOpts = {
    * Lowering it takes hold on each device at its next open: a lease granted under the longer
    * setting, whose deadline lies past this many hours from then, is forgotten, and the vault
    * opens locked. Raising it lengthens no lease already granted. A device keeps one lease per
-   * vault, so two tabs opening a vault with different settings are one
-   * device with two settings, which is not supported (`notes/wontfix.md`): the lower one wins.
+   * vault, so two tabs opening a vault with different settings are one device with two settings,
+   * which is not supported (`notes/wontfix.md`): the lower one wins.
    */
   leaseHours?: number | undefined
   /**
@@ -199,8 +199,8 @@ export type Vault = {
   /**
    * How long a lease lasts on this device, in whole milliseconds: the `leaseHours` the vault was
    * opened with, its default (168 hours) when none was given. A vault that stays unlocked until
-   * `lock()` (`Infinity` hours) reads {@link ForeverMillis}. Fixed for the handle's life, so a UI can say how long an unlock lasts
-   * without being told the option again.
+   * `lock()` (`Infinity` hours) reads {@link ForeverMillis}. Fixed for the handle's life, so a UI
+   * can say how long an unlock lasts without being told the option again.
    *
    * @example vault.leaseMillis >= ForeverMillis - MinuteMillis ? 'until you lock it' : `for ${String(Math.round(vault.leaseMillis / MinuteMillis))} minutes`
    */
@@ -214,13 +214,13 @@ export type Vault = {
   subscribe: (listener: () => void) => () => void
 
   /**
-   * Open the vault with its passphrase, granting this device a lease for `leaseHours`. On an `absent` vault this first unlock creates it, with this
-   * passphrase as its one way in, labelled `passphrase` -- once the vault's
-   * `passphraseStrengthTest` passes it: kind 'weak_passphrase' otherwise, the test's reason its
-   * message, and nothing is created. A vault that stands is never refused its passphrase for
-   * weakness. A wrong passphrase throws kind
-   * 'wrong_passphrase' and changes nothing -- learned from the vaultKey wayin refusing to
-   * decrypt, never from a comparison. A passphrase that is not text is misuse: kind 'bad_option'.
+   * Open the vault with its passphrase, granting this device a lease for `leaseHours`. On an
+   * `absent` vault this first unlock creates it, with this passphrase as its one way in, labelled
+   * `passphrase` -- once the vault's `passphraseStrengthTest` passes it: kind 'weak_passphrase'
+   * otherwise, the test's reason its message, and nothing is created. A vault that stands is never
+   * refused its passphrase for weakness. A wrong passphrase throws kind 'wrong_passphrase' and
+   * changes nothing -- learned from the vaultKey wayin refusing to decrypt, never from a
+   * comparison. A passphrase that is not text is misuse: kind 'bad_option'.
    *
    * A vault with several passphrases tries this one against each in turn, one key derivation
    * apiece (with the browser's deriver, about half a second each), so a wrong passphrase takes
@@ -1838,9 +1838,10 @@ export type EraseDamagedVaultOpts = Pick<OpenVaultOpts, 'applabel' | 'userId' | 
 
 /**
  * Erase a vault that `openVault` refuses as `damaged_bundle`, and only that: its stored bundle and
- * every lockbox, through the VaultDB, and this device's lease of it and its device mark, through the DeviceDB -- what `destroy()` does for a vault that opens, and nothing else. A stored bundle that
- * fails its checks cannot be opened, so no handle exists to `destroy()`; this is the way to clear
- * it and start over. Whatever the vault held is gone for good, so ask the user first.
+ * every lockbox, through the VaultDB, and this device's lease of it and its device mark, through
+ * the DeviceDB -- what `destroy()` does for a vault that opens, and nothing else. A stored bundle
+ * that fails its checks cannot be opened, so no handle exists to `destroy()`; this is the way to
+ * clear it and start over. Whatever the vault held is gone for good, so ask the user first.
  *
  * It takes the options `openVault` took, and refuses a vault that is sound: kind 'bad_option' and
  * nothing erased, since a vault that opens is deleted with its handle's `destroy()`, which takes
