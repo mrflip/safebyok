@@ -15,6 +15,45 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
 
 ## Of Interest
 
+* 2026-10-18 (make_hello): **`openVault` is split into `Vault.make`, which returns a handle at
+  once, and `vault.hello()`, which reads storage and the lease.** `Vault.make(opts)` is synchronous:
+  it validates every option and starts `hello()` itself. `hello()` reads the vault props and this
+  device's lease and settles the snapshot from `opening` into `absent`, `locked` or `unlocked`.
+  Every method but `lock()`, `lockSoon()` and `close()` awaits it first (after its synchronous
+  argument checks), so a call made before storage answers waits; a call that touches a whisper
+  still needs the vault unlocked once `hello()` settles. Nothing that failed closed proceeds. No
+  construction, ctx, stored format or key handling changed. Five points to look at:
+  (1) **A lock does not wait for `hello()`.** `lock()` and `lockSoon()` act at once, storage
+  reachable or not. A `hello()` taking up the lease while a lock lands takes nothing up:
+  `takeUpLease` holds a counter (`forgetsSoFar`, raised by every hard lock and every `lockSoon()`)
+  noted before the vault props are read, and takes nothing up if it moved or the handle has closed.
+  Tests hold the lease read open while each lock lands.
+  (2) **`hello()` is memoised, and a lock for untrusted storage can be followed by a take-up on the
+  same handle.** Callers share one in-flight promise; a rejected one clears at once; a resolved one
+  stands until a read of storage fails, storage the vault cannot trust refuses it
+  (`identity_revoked`, `rolled_back`, `newer_format`, from any call, read or write), or the vault is
+  retired. The next call then reads storage and the lease again. If the lock for untrusted storage
+  could not erase the lease (the device store erroring), and storage now serves the user again,
+  that call takes up the surviving lease -- where before only a new open could. If storage still
+  refuses, the call meets the refusal again and the vault stays locked. A plain `lock()` does not
+  reset the memo and erases the lease in any case.
+  (3) **`Vault.make` refuses any option it does not take**, `bad_option`, by a strict Zod object
+  over the option names. Before, unknown keys were ignored, so a host still passing the retired
+  `forcePassphraseReentryHours` (now `leaseHours`) got the 7-day default lease: a longer unlock.
+  The refusal names the unknown keys (the host's own field names, never a value) and, from a small
+  table, the new name of a retired one. React's `VaultProvider` forwards the names of props it does
+  not know to `Vault.make`, so those reach the error boundary rather than being dropped.
+  (4) **A refused `hello()` no longer closes the handle.** The handle stands, its storage watch
+  live, until the host closes it; the snapshot carries the refusal in a new public field,
+  `trouble: VaultError | null` (cleared by the next successful read), and the vault's logger warns
+  of it. A `VaultError` carries no secret material, as before. While no `hello()` has succeeded, a
+  storage change bell runs `hello()` (lease take-up included) rather than a bare refresh.
+  (5) **A read of storage takes up the vault props, the device mark and the lockbox listing
+  together, only once the listing has been read**, so a read failing partway never leaves the vault
+  props of one read beside the lockboxes of another. When the fresh vault props show the vault
+  changed elsewhere, the vaultKey is still dropped and the lease erased before the listing is read,
+  as before.
+
 * 2026-10-18: **the context bytes of every way in changed spelling, not construction, with the
   rename to "wayin".** A wayin's wrap is bound to a context of the record's format tag, then its
   whole stored header, as key-sorted JSON (a passkey wayin's HKDF `info` is the same bytes); it now
