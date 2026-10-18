@@ -202,7 +202,7 @@ export const VaultDashboard = () => {
               />
             </label>
             <label>
-              note <span className="quiet">(kept in the sidecar, not encrypted: visible without the passphrase; left blank, the note stands)</span>
+              note <span className="quiet">(not encrypted: visible without the passphrase; left blank, the note stands)</span>
               <input
                 placeholder="personal account"
                 value={form.noteText}
