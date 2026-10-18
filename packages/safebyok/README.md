@@ -691,7 +691,7 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `damaged_unlock`      | a way in is stored in a form this package never writes (a salt of the wrong length, or not base64url), so it cannot be tried: the passkey asked for, the passphrase `unlockId` aims at, or every passphrase the vault has. Other ways in are still tried | Unlock another way, then `removeUnlock()` the damaged one and add it again |
 | `damaged_lockbox`     | a lockbox failed its checks as read, or would not open under the vault's own vaultKey, or opened to no whisper: altered in storage, or moved there from elsewhere. A lockbox that will not open is named so only after the vault has caught up with storage once: one a vault made anew elsewhere wrote makes the call `vault_locked` instead | Nothing was changed. Offer `erase()`, or a fresh `store()` over it (see *Damaged lockboxes*) |
 | `newer_format`        | the vault's stored bundle is in a form this version does not know -- a `format`, unlock method or number of unlocks -- which a newer safebyok may have written: `openVault` and `eraseDamagedVault` refuse it | Nothing was changed. Tell the user to update the app; never offer to start over |
-| `stale_write`         | storage changed since this device read it, so the write was refused. Also an erase elsewhere winning over a `store()`; an `erase()` into a vault deleted or made anew elsewhere, its message saying the lockbox could not be erased because its vault is gone; and a write whose catch-up with storage then failed too (its `cause` says why; the snapshot reads `syncing: false`) -- unless the catch-up was refused as `identity_revoked`, `rolled_back` or `newer_format`, which the write throws as it came | The vault has caught up: read again and, if it still applies, repeat. A `store()` retries by itself first |
+| `stale_write`         | storage changed since this device read it, so the write was refused and nothing was written: another device or tab wrote, created or erased the lockbox a `store()` was writing; an `erase()` into a vault deleted or made anew elsewhere, its message saying the lockbox could not be erased because its vault is gone; and a write whose catch-up with storage then failed too (its `cause` says why; the snapshot reads `syncing: false`) -- unless the catch-up was refused as `identity_revoked`, `rolled_back` or `newer_format`, which the write throws as it came | The vault has caught up: show what stands now and, if the change still applies, repeat it (*Two devices storing at once*, below). Nothing is tried again by itself |
 | `rolled_back`         | this device has already seen a newer copy of the vault's bundle than storage offers now (storage restored from a backup, or altered), so it won't use this one, and the vault locked: nothing was unlocked or written | Tell the user this device has seen a newer copy of the vault than storage holds. If the storage was restored from an older copy on purpose, accept it on this device (see *A vault rolled back*, below); otherwise the app's support should look at its storage |
 | `not_permitted`       | the storage backend refused the signed-in user, still the vault's own, this one call | Tell the user they may not; signing in again will not help |
 | `identity_revoked`    | the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in. The vault has locked itself (see *When the user signs out*) | Have the user sign in again, then open the vault for whoever that is |
@@ -703,6 +703,20 @@ storage, `storage_unavailable`, `not_permitted`, `identity_revoked` or `damaged_
 damaged lockbox never stops an open): the last four are conditions, though they surface at open.
 So is `storage_blocked`, from this device's own store or a vault store on it, which opening again will not mend.
 A refused open leaves nothing running behind it, so the host simply opens again.
+
+### Two devices storing at once
+
+A `store()` writes only over the revision of the lockbox it read (or over none, for a new one),
+in the vault and under the vaultKey it read. When another device or tab writes, creates or
+erases that lockbox in between, storage refuses the write, and `store()` catches up with storage
+once and throws `stale_write` at once, without waiting: nothing was written, and the snapshot
+shows the lockbox as storage now holds it. The vault never tries again by itself and never
+merges two writes -- in a store of secrets, a write that lost must be seen -- so show the user
+what is there now, and call `store()` again if their whisper should still replace it: the second
+call writes over what the catch-up brought in. Should the catch-up find the vault destroyed or
+made anew elsewhere, or its ways in changed, the device relocks, and `store()` throws
+`vault_locked` instead, writing nothing. An `erase()`, a passphrase change or a `destroy()` that
+meets another device's write is refused as `stale_write` the same way, once caught up.
 
 ### A vault that cannot be opened
 
@@ -813,8 +827,8 @@ refuses with `vault_locked` instead. `store()` starts afresh over any record it 
 lockbox -- every one the snapshot lists as damaged, and one missing or mangling a ciphered field --
 carrying nothing from it, neither its public bag nor when it was first stored. It writes over the
 revision the listing names, in one write that lands only while that record still stands, so a
-sound lockbox another device wrote there meanwhile is never erased: the store is refused, and
-tries again over it, as over any lockbox written meanwhile. Only a record that names no revision
+sound lockbox another device wrote there meanwhile is never erased: the store is refused as
+`stale_write`, as over any lockbox written meanwhile, and a second store writes over theirs. Only a record that names no revision
 is erased first and then written, and should that write fail, nothing stands under the boxlabel.
 A record that reads but will not decipher -- its ciphertext, bag or times altered -- is written
 over its revision, and carries nothing forward either: nothing vouches for its public fields, so

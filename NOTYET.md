@@ -38,9 +38,9 @@ implementation.
   as `e2e/README.md` says). The binding's tests run under jsdom, which announces nothing.
 * **A conflict handler.** The Coach (2026-10-16, thread 4,
   [#132](https://github.com/mrflip/safebyok/pull/132)), G499: "Leave conflict handler as NOTYET, so
-  that when the idea keeps coming up there's some place to point to." There is none today: an erase
-  wins, the last writer wins, and the vault never clears damage on its own, so `store()` over a
-  box is the handler (`packages/safebyok/VAULTDB.md`). A host may one day want the say on a lockbox
+  that when the idea keeps coming up there's some place to point to." There is none today: a write
+  that lost is refused as `stale_write`, never merged or tried again, and the vault never clears
+  damage on its own, so `store()` over a box is the handler (`packages/safebyok/VAULTDB.md`). A host may one day want the say on a lockbox
   too damaged to name its epoch, meeting a healthy store.
 * **The Postgres adapter's own tests on a real server.** The Coach (2026-10-16, thread 11,
   [#131](https://github.com/mrflip/safebyok/pull/131)): the adapter's own tests

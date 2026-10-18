@@ -146,8 +146,8 @@ Three tables, inside the component, beside nothing of your app's:
   when each vault and lockbox was first stored and each lockbox last written (`registered_at`,
   `written_at`, epoch milliseconds), and the length of every ciphertext.
 * **Never**: a whisper, a passphrase, any key in usable form, or the device-local remembered
-  unlock. No history: an update replaces its row, and the last writer winning is the vault's
-  policy ([`VAULTDB.md`](../safebyok/VAULTDB.md), *Who does what*). An app that wants history
+  unlock. No history: an update replaces its row, and a write made over a revision since replaced
+  is refused, never merged: the vault's policy ([`VAULTDB.md`](../safebyok/VAULTDB.md), *Who does what*). An app that wants history
   keeps it in its own backups; Convex's backups and exports keep what they keep.
 * `user_id` leads the bundle and lockbox indexes, so one user's rows are one range of each.
 * **Any text is a name** to the component: it never sees the vault's `validators`, which check

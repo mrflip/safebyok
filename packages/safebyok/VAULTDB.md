@@ -15,10 +15,8 @@ Three layers share the work, and each guarantee below belongs to one of them.
 
 * **The vault** (`openVault`) decides what to write. It reads a lockbox, seals a new revision over
   it, and writes with an expectation of what it read. When storage refuses the write as stale, it
-  catches up and tries again over what the other device wrote -- three attempts in all, a random
-  wait before each retry -- so that between two devices storing into one lockbox, *the last
-  writer wins*; and when it finds the lockbox erased meanwhile, it stops, so *an erase wins*. It
-  also holds the app's own lockbox limit (`maxLockboxes`, 100 by default): the alarm bell for an
+  catches up with storage once and refuses the store as `stale_write`, never trying again: what
+  the other device wrote or erased stands, and the host hears that its write lost. It also holds the app's own lockbox limit (`maxLockboxes`, 100 by default): the alarm bell for an
   app that is storing far more than it meant to.
 * **The base class** (`VaultDB`'s public verbs) checks every name, record and expectation on the
   way in and every record on the way out, refuses what is malformed before your code sees it,
@@ -46,15 +44,16 @@ validators has chosen that. A record a client's validators would refuse reads ba
 damage.
 
 So the versioned update is split: the adapter owns the atomic compare-and-write (lines 3.1 to
-3.5, and 3.8), and the vault owns the read before it and the retry after it. "Last write wins" is the
-vault's policy over the adapter's guarantee, not something an adapter implements.
+3.5, and 3.8), and the vault owns the read before it and the refusal after it. "The first write
+wins, and the second hears of it" is the vault's policy over the adapter's guarantee, not something
+an adapter implements.
 
-Only a lockbox write is retried. A change to the ways in, a `destroy()` or an erase that meets
+Nothing is retried. A lockbox write, a change to the ways in, a `destroy()` or an erase that meets
 someone else's is news the user must hear, refused once as `stale_write`. Before it names any
 refusal -- a stale write, or a lockbox that will not open -- the vault catches up with storage
 once, so a vault destroyed and made anew elsewhere relocks the device rather than reading as
-damage. There is no conflict handler beyond this, and no hook for one: an erase wins, the last
-writer wins, and a host that disagrees calls `store()` or `erase()` again. The vault never clears
+damage. There is no conflict handler beyond this, and no hook for one: whatever landed first
+stands, and a host that disagrees calls `store()` or `erase()` again. The vault never clears
 a damaged record on its own; the user's `erase()` or `store()` on its boxlabel does.
 
 The base class turns anything your code throws that is not a `VaultError` into
@@ -232,7 +231,7 @@ not to hold off a determined client, which is the host's to meter like any other
 **4.3. A replacement is never refused for the count.** A lockbox written over one already there
 is never refused as `vault_full`, however full the vault. A first write under a boxlabel that is
 already taken missed a lockbox it would replace, and refuses as `stale_write`, never as
-`vault_full`, so the vault's retry replaces it.
+`vault_full`, so the store that follows the catch-up replaces it.
 
 **4.4. Under the limit, a new lockbox lands.** Once a vault holds fewer lockboxes than its
 limit -- erases having made room, or brought back under it a vault that racing writers took past

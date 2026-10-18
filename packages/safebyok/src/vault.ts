@@ -10,7 +10,7 @@ import type { KeyDeriver } from './key-deriver'
 import { MaxSaltBytes, TestDeriverNotice, TestLabelPrefix, ensureSuppliedSpecKept, parseKeyDeriverSpec, type KeyDeriverSpec } from './key-deriver-spec'
 import {
   cipherBinding, cipherBytes, decipherBytes,
-  makeLocalUnlockKey, makeLockboxKey, makeVaultKey, randomBytes, randomId, wrapKeyUnder, unwrapKeyUnder,
+  makeLocalUnlockKey, makeLockboxKey, makeVaultKey, randomId, wrapKeyUnder, unwrapKeyUnder,
 } from './crypto'
 import * as Envelope from './envelope'
 import type { EnvelopeStamp, UnlockProof, VaultKeyPair } from './envelope'
@@ -288,10 +288,10 @@ export type Vault = {
    * minute it had left, and one past that is dropped at once. At once, the snapshot reads
    * `locked`, every read, use, store or erase called from now on throws kind 'vault_locked', and
    * this device forgets its remembered unlock. What the grace spares is work already past its
-   * start: a `read()`, a `store()` retrying after another device's write, or an `erase()`, still
-   * lands; and an `unlock()` or `changePassphrase()` still under way, in this tab or another on
-   * this device, finishes, leaving the vault unlocked again. An `unlock()` or `changePassphrase()`
-   * begun within the grace ends it too: the vault is unlocked again, and nothing is dropped.
+   * start: a `read()`, a `store()` or an `erase()` still lands; and an `unlock()` or
+   * `changePassphrase()` still under way, in this tab or another on this device, finishes, leaving
+   * the vault unlocked again. An `unlock()` or `changePassphrase()` begun within the grace ends it
+   * too: the vault is unlocked again, and nothing is dropped.
    *
    * `graceSeconds` is from 0 to 60, fractions too; kind 'bad_option' otherwise. 0 is `lock()`.
    * `close()` cuts the grace short. A clock reading out of bounds cannot time a grace: the vault
@@ -437,27 +437,24 @@ export type Vault = {
    * 'vault_full' by the vault's own limits, though a backend holding a limit of its own may refuse
    * a heavier replacement in a full vault as kind 'vault_full'.
    *
-   * The write lands only if storage still holds what this device last read: the same vault, and
-   * the same revision of this lockbox (or still none). When another device got in first, the
-   * store catches up with storage and tries again, over what that device wrote -- the last
-   * writer wins -- for three attempts in all, and throws kind 'stale_write' only when the third is
-   * refused too, the snapshot showing the box as it now stands. Each retry waits first, a random
-   * 1 to 2 seconds before the first and 2 to 4 before the second, so that two devices which
-   * collided do not collide again in step: a store that keeps losing can take up to about six
-   * seconds longer to give up. A box that stood when an attempt read it and is gone on the retry
-   * was erased elsewhere, and an erase wins: nothing is written, and the call throws kind
-   * 'stale_write' at once, without waiting. A retry that finds the vault destroyed or made anew
-   * elsewhere, or its unlocks changed -- or this device locked, as it may be during the wait --
-   * finds this device locked instead, and throws kind 'vault_locked' without writing: a stale
+   * The write lands only if storage still holds what this device last read: the same vault, under
+   * the same vaultKey, and the same revision of this lockbox (or still none). The store makes one
+   * attempt. When another device or tab got in first -- writing this lockbox, creating it, or
+   * erasing it -- storage refuses the write, and the call catches up with storage once and throws
+   * kind 'stale_write' at once, without waiting: nothing was written, and the snapshot now shows
+   * the lockbox as storage holds it. The vault merges nothing and decides nothing for the user: the
+   * app shows what is there now, and calls `store()` again if this whisper should still replace
+   * it. A catch-up that finds the vault destroyed or made anew elsewhere, or its ways in changed,
+   * relocks this device instead, and the call throws kind 'vault_locked' without writing: a stale
    * session never writes into a vault reborn under new keys.
+   *
+   * Should the catch-up after a refusal fail itself, the call throws kind 'stale_write', the
+   * catch-up's failure its cause, and the snapshot says `syncing: false` -- or, for a catch-up
+   * refused as 'identity_revoked', 'rolled_back' or 'newer_format', that refusal as it came.
    *
    * The lockbox keeps the time it was first stored as `registered_at`, and stamps `written_at`
    * with the time of this write: every store moves it, the same whisper stored again included, so
    * it says when the lockbox was last written, never whether its whisper changed.
-   *
-   * Should the catch-up after a refusal fail itself, the call throws kind 'stale_write' at once,
-   * the catch-up's failure its cause, and the snapshot says `syncing: false` -- or, for a catch-up
-   * refused as 'identity_revoked', 'rolled_back' or 'newer_format', that refusal as it came.
    *
    * A lockbox whose stored record cannot be read as one -- every lockbox the snapshot lists as
    * damaged, and also one that lists as sound but whose ciphered fields are missing or malformed
@@ -521,8 +518,7 @@ export type Vault = {
    * destroyed and made anew, elsewhere, nothing is erased and the call throws kind
    * 'stale_write', after catching up with storage -- which relocks this device -- its message
    * saying the lockbox could not be erased because the vault it was in is gone, and the
-   * adapter's refusal its cause. Unlike `store()`, an erase is never retried: that is its only
-   * expectation, and trying again could not meet it.
+   * adapter's refusal its cause.
    */
   erase(boxlabel: string): Promise<void>
 
@@ -1356,7 +1352,7 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   /**
    * The revision the snapshot's listing names for the lockbox under `boxlabel`, sound or damaged;
    * null for none listed, or a damaged record that holds none. Storage arbitrates a write that
-   * names it, so a listing gone stale costs a refusal and a retry, never a record.
+   * names it, so a listing gone stale costs a refusal and a second store, never a record.
    */
   const listedRevisionOf = (boxlabel: string): string | null => boxes.find((box) => box.boxlabel === boxlabel)?.revision_id ?? null
 
@@ -1485,22 +1481,30 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
 
   /**
    * Write `lockbox` over `expected`, as `store()` does, erasing what stands under its boxlabel
-   * first when `clearsFirst`. A refusal as stale has just caught this device up with storage: a
-   * device it relocked, or a box it shows gone that stood when the store began (`boxStood`), ends
-   * the store here -- 'erased', for the latter -- as the next attempt would end it, but without the
-   * wait before it that no retry could use. Work in hand, it may finish within a grace.
+   * first when `clearsFirst`. One attempt: a refusal is thrown as {@link refuseStaleStore} says.
+   * Work in hand, it may finish within a grace.
    */
-  const writeOver = async (lockbox: Lockbox, expected: LockboxExpectation, clearsFirst: boolean, boxStood: boolean): Promise<'written' | 'erased'> => {
+  const writeOver = async (lockbox: Lockbox, expected: LockboxExpectation, clearsFirst: boolean): Promise<void> => {
     try {
       if (clearsFirst) { await refreshOnStale(vaultDB.eraseBox(scope, lockbox.boxlabel, { vault_id: expected.vault_id }), 'store') }
       await refreshOnStale(vaultDB.updateBox(scope, lockbox, expected), 'store')
     } catch (err) {
-      if (! isVaultError(err, 'stale_write')) { throw err }
-      keyInHand()
-      if (boxStood && boxes.every((box) => box.boxlabel !== lockbox.boxlabel)) { return 'erased' }
-      throw err
+      refuseStaleStore(err)
     }
-    return 'written'
+  }
+
+  /**
+   * Throw `err`, what a `store()`'s write met, as the store's refusal. A refusal as stale that
+   * {@link refreshOnStale} has caught this device up after becomes kind 'stale_write', saying
+   * nothing was written and the vault now shows the lockbox as storage holds it, the adapter's
+   * refusal its cause -- or kind 'vault_locked', when that catch-up relocked this device (a vault
+   * reborn, or its ways in changed, elsewhere). Anything else, a catch-up that failed among it, is
+   * thrown as it came.
+   */
+  const refuseStaleStore = (err: unknown): never => {
+    if (! isCaughtUpStale(err)) { throw err }
+    keyInHand()
+    throw new VaultError('stale_write', 'That lockbox was written or erased on another device or tab while this one was storing into it, so nothing was written. This device has caught up with storage, and the vault now shows the lockbox as storage holds it: store again if this whisper should still replace what is there.', { cause: err })
   }
 
   const vault: Vault = {
@@ -1657,64 +1661,49 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
       }
       const whisperBytes = new TextEncoder().encode(stableJsonify(checked.data))
       ensureWhisperFits(whisperBytes, givenPublicJson ?? EmptyPublicJson)
-      // Each attempt reads the box afresh and seals the whisper anew, under a lockboxKey and a
-      // revision of its own; only the write that follows is ever repeated.
-      let boxStood = false
-      const outcome = await retryStale(isCaughtUpStale, async () => {
-        // A refusal as stale has just caught this device up with storage, which may have relocked
-        // it (a vault reborn, or its unlocks changed, elsewhere): then the retry ends here.
-        keyInHand()
-        const standing = await readBoxOrDamaged(label)
-        // Erase wins: a box this store began over, and now finds gone, was erased elsewhere, and
-        // a retry would silently undo that. The erase is already in the snapshot.
-        if (standing === null && boxStood) { return 'erased' }
-        // A damaged box is overwritten as a fresh store: nothing in it can be carried forward.
-        const prev = standing === 'damaged' ? null : standing
-        boxStood ||= prev !== null
-        await ensureRoomFor(label, prev)
-        // The key and the vault it belongs to, taken together after the last look at storage.
-        const unlockedKey = keyInHand()
-        const standingBundle = currentBundle()
-        const { vault_id: vaultId, vault_key_epoch: vaultKeyEpoch } = standingBundle
-        // Only a record that opens vouches for its public fields: one that will not, altered in
-        // storage, is written over as a fresh lockbox is, keeping neither its bag nor its
-        // registered_at, so a bag planted in storage is never sealed into a revision that reads clean.
-        const vouched = prev !== null && await recordOpens(unlockedKey, standingBundle, prev) ? prev : null
-        const publicJson = givenPublicJson ?? vouched?.public_json ?? EmptyPublicJson
-        ensureWhisperFits(whisperBytes, publicJson)
-        const revisionId = randomId()
-        const lockboxKey = await makeLockboxKey()
-        const now = clockNow()
-        // Lands only in the vault this whisper is sealed for, under the vaultKey that seals it, over
-        // the revision just read -- for a damaged box, the one the listing names -- : a vault reborn
-        // elsewhere, a vaultKey replaced, or a box written meanwhile by another device, refuses it.
-        const overRevision = standing === 'damaged' ? listedRevisionOf(label) : prev?.revision_id ?? null
-        // Only a box the listing shows damaged and naming no revision is erased first: one the
-        // listing does not show yet is written as over none, which storage refuses while it
-        // stands, and the catch-up lists it with its revision for the retry.
-        const clearsFirst = standing === 'damaged' && overRevision === null && isListedDamaged(label)
-        const expected = { vault_id: vaultId, revision_id: overRevision, vault_key_epoch: vaultKeyEpoch }
-        const header: LockboxHeader = {
-          boxlabel:               label,
-          revision_id:            revisionId,
-          vault_key_epoch:        vaultKeyEpoch,
-          whisper_codec:          'json_v1',
-          whisper_schema_version: 1,
-          public_json:            publicJson,
-          registered_at:          vouched?.registered_at ?? now,
-          written_at:             now,
-        }
-        const lockbox: Lockbox = {
-          format:              LockboxFormat,
-          ...header,
-          lockbox_key_wrapped: await wrapKeyUnder(unlockedKey, lockboxKey, boxBinding(vaultId, header, 'lockbox_key_wrapped')),
-          whisper_ciphered:    await cipherBytes(lockboxKey, whisperBytes, boxBinding(vaultId, header, 'whisper_ciphered')),
-        }
-        return await writeOver(lockbox, expected, clearsFirst, boxStood)
-      })
-      if (outcome === 'erased') {
-        throw new VaultError('stale_write', 'That lockbox was erased on another device while this one was storing into it, so nothing was written: an erase wins. Store it again if it should exist after all.')
+      const standing = await readBoxOrDamaged(label)
+      // A damaged box is overwritten as a fresh store: nothing in it can be carried forward.
+      const prev = standing === 'damaged' ? null : standing
+      await ensureRoomFor(label, prev)
+      // The key and the vault it belongs to, taken together after the last look at storage.
+      const unlockedKey = keyInHand()
+      const standingBundle = currentBundle()
+      const { vault_id: vaultId, vault_key_epoch: vaultKeyEpoch } = standingBundle
+      // Only a record that opens vouches for its public fields: one that will not, altered in
+      // storage, is written over as a fresh lockbox is, keeping neither its bag nor its
+      // registered_at, so a bag planted in storage is never sealed into a revision that reads clean.
+      const vouched = prev !== null && await recordOpens(unlockedKey, standingBundle, prev) ? prev : null
+      const publicJson = givenPublicJson ?? vouched?.public_json ?? EmptyPublicJson
+      ensureWhisperFits(whisperBytes, publicJson)
+      const revisionId = randomId()
+      const lockboxKey = await makeLockboxKey()
+      const now = clockNow()
+      // Lands only in the vault this whisper is sealed for, under the vaultKey that seals it, over
+      // the revision just read -- for a damaged box, the one the listing names -- : a vault reborn
+      // elsewhere, a vaultKey replaced, or a box written meanwhile by another device, refuses it.
+      const overRevision = standing === 'damaged' ? listedRevisionOf(label) : prev?.revision_id ?? null
+      // Only a box the listing shows damaged and naming no revision is erased first: one the
+      // listing does not show yet is written as over none, which storage refuses while it
+      // stands, and the catch-up lists it with its revision for the next store.
+      const clearsFirst = standing === 'damaged' && overRevision === null && isListedDamaged(label)
+      const expected = { vault_id: vaultId, revision_id: overRevision, vault_key_epoch: vaultKeyEpoch }
+      const header: LockboxHeader = {
+        boxlabel:               label,
+        revision_id:            revisionId,
+        vault_key_epoch:        vaultKeyEpoch,
+        whisper_codec:          'json_v1',
+        whisper_schema_version: 1,
+        public_json:            publicJson,
+        registered_at:          vouched?.registered_at ?? now,
+        written_at:             now,
       }
+      const lockbox: Lockbox = {
+        format:              LockboxFormat,
+        ...header,
+        lockbox_key_wrapped: await wrapKeyUnder(unlockedKey, lockboxKey, boxBinding(vaultId, header, 'lockbox_key_wrapped')),
+        whisper_ciphered:    await cipherBytes(lockboxKey, whisperBytes, boxBinding(vaultId, header, 'whisper_ciphered')),
+      }
+      await writeOver(lockbox, expected, clearsFirst)
       await refresh()
     },
 
@@ -1795,8 +1784,8 @@ export const openVault = async (opts: OpenVaultOpts): Promise<Vault> => {
   }
 
   /**
-   * True for a refusal as stale that the catch-up after it has caught up with: what `store()` tries
-   * again. A retry made blind, after a catch-up that failed, would meet the same trouble.
+   * True for a refusal as stale that the catch-up after it has caught up with: what `store()` and
+   * `erase()` say as what happened to the lockbox. One whose catch-up failed says that instead.
    */
   const isCaughtUpStale = (err: unknown) => isVaultError(err, 'stale_write') && syncing
 
@@ -2139,65 +2128,6 @@ const parseUnlocklabel = (rules: Names.NameRules, candidate: { unlocklabel: stri
     throw new VaultError('bad_label', `${call} needs an unlocklabel, what the user calls this way in, as text that is not empty.`)
   }
   return Names.check(rules, 'unlocklabel', unlocklabel)
-}
-
-/**
- * How many times `store()` tries its versioned write before it lets a `stale_write` through: this
- * many attempts in all, the first one included, so three means one try and two retries. Small,
- * because a box that three reads in a row find changed again is being written in earnest by
- * someone else, and the caller should hear of it. Each retry waits first (see `WriteRetryBaseMillis`),
- * so the limit also bounds how long a losing store can take: about six seconds longer.
- */
-const MaxWriteAttempts = 3
-
-/**
- * The shortest wait before `store()`'s first retry, in milliseconds; the retry after that waits
- * twice as long. Two devices that collide on a box would otherwise both retry at once and collide
- * again in lockstep -- a thundering herd -- so each waits a random time in
- * `[WriteRetryBaseMillis * 2^(n-1), WriteRetryBaseMillis * 2^n)` before retry n: 1 to 2 seconds before the
- * first, 2 to 4 before the second. The windows double, so the longer a box stays contested, the
- * further apart the contenders spread. Not a public option, and there is no conflict handler: an
- * erase wins, the last writer wins, and a host that disagrees with an outcome calls `store()` or
- * `erase()` again.
- */
-const WriteRetryBaseMillis = 1000
-
-/**
- * A random wait before retry number `retryNumber` (1 for the first), uniform over
- * `[WriteRetryBaseMillis * 2^(n-1), WriteRetryBaseMillis * 2^n)` milliseconds, a whole number.
- *
- * The jitter guards no secret -- it only spreads devices out in time -- so it needs nothing
- * stronger than spreading. It is drawn from `crypto.getRandomValues` all the same, because the
- * linter keeps `Math.random` out of `src/`, and one source of randomness is easier to review.
- */
-const retryDelayMillis = (retryNumber: number): number => {
-  const windowMillis = WriteRetryBaseMillis * (2 ** (retryNumber - 1))
-  const fraction = new DataView(randomBytes(4).buffer).getUint32(0) / (2 ** 32)
-  return windowMillis + Math.floor(fraction * windowMillis)
-}
-
-/** Resolve after `delayMillis`. `setTimeout` runs everywhere the package does. */
-const sleep = (delayMillis: number): Promise<void> => (
-  new Promise((resolve) => { setTimeout(resolve, delayMillis) })
-)
-
-/**
- * Run `attempt`, and run it again when it refuses as `retriable` says it may be tried again -- a
- * refusal as stale, once caught up -- up to `attemptsLeft` attempts in all; any other refusal, and
- * the last one, is thrown as it came. Before each retry it
- * waits a random, doubling time (`retryDelayMillis`); there is no wait before the first attempt, and
- * none after the last refusal, which is thrown at once. The attempt must do its own reading, for
- * each try to be made from what storage holds now -- and from whether this device is still
- * unlocked, so that a lock during the wait ends the retry without a write.
- */
-const retryStale = async <ResultT>(retriable: (err: unknown) => boolean, attempt: () => Promise<ResultT>, attemptsLeft = MaxWriteAttempts): Promise<ResultT> => {
-  try {
-    return await attempt()
-  } catch (err) {
-    if (attemptsLeft <= 1 || ! retriable(err)) { throw err }
-    await sleep(retryDelayMillis(MaxWriteAttempts - attemptsLeft + 1))
-    return await retryStale(retriable, attempt, attemptsLeft - 1)
-  }
 }
 
 // The refusal never quotes the boxlabel: a host's validators may admit any text, a mistaken paste among it.

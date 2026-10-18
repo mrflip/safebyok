@@ -4887,7 +4887,7 @@ const rebornWorld = async () => {
 }
 
 describe("a stale session cannot reach into a vault reborn elsewhere", () => {
-  it("store() is refused by storage as stale, and its retry finds the device relocked, instead of landing in the reborn vault", async () => {
+  it("store() is refused by storage as stale, and its catch-up finds the device relocked, instead of landing in the reborn vault", async () => {
     const { vaultOne, vaultTwo } = await rebornWorld()
     expect(vaultOne.getSnapshot().state).to.eq('unlocked')
     await TH.expectRefusal(vaultOne.store('anthropic', 'sk-ant-fake-stale'), 'vault_locked')
@@ -5040,12 +5040,12 @@ const rebornUnheard = async () => {
  * Two devices on one vault, and a way to slip `there`'s doings between `here`'s look at storage
  * and its write: `beforeNextWrite` runs once, inside the next call to the verb it names, before
  * the write itself reaches storage. `here` has a vaultDB of its own over the shared store, so
- * `hereDB` sees only its writes, whatever `there` does. `hereOpts` override `here`'s options.
+ * `hereDB` sees only its writes, whatever `there` does.
  */
-const twoDeviceWorld = async (hereOpts?: Partial<OpenVaultOpts>) => {
+const twoDeviceWorld = async () => {
   const world = makeWorld()
   const hereDB = localVaultDB({ store: world.dbStore })
-  const here = await world.openUnlocked('shared pw', { vaultDB: hereDB, ...hereOpts })
+  const here = await world.openUnlocked('shared pw', { vaultDB: hereDB })
   const there = await world.openUnlocked('shared pw', { deviceDB: memoryDeviceDB() })
   const beforeNextWrite = (verb: 'updateBox' | 'updateBundle', meanwhile: () => Promise<void>) => {
     TH.beforeNextCall(hereDB, verb, meanwhile)
@@ -5054,69 +5054,17 @@ const twoDeviceWorld = async (hereOpts?: Partial<OpenVaultOpts>) => {
 }
 
 /**
- * A retry waits seconds before it reads again; a test must not. These stand the clock still and
- * let a test hand it forward: `waits` records each delay `setTimeout` was asked for.
+ * Every timer a test sets, recorded: a store refused as stale must throw without waiting, so these
+ * stand the clock still, and `waits` records each delay `setTimeout` was asked for.
  */
 const stillClock = () => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
   return vi.spyOn(globalThis, 'setTimeout')
 }
 
-/** Let real work (WebCrypto, the stores) run one turn; the faked clock does not move. */
-const realTurn = () => new Promise<void>((resolve) => { setImmediate(resolve) })
-
-/** Run until `waits` holds a delay, i.e. until the operation under test is asleep. */
-const untilAsleep = async (waits: ReturnType<typeof stillClock>) => {
-  while (delaysAsked(waits).length === 0) { await realTurn() }
-}
-
-/** Hand the faked clock forward until `operation` settles, and hand back its result, or its refusal. */
-const drivenToEnd = async <ResultT>(operation: Promise<ResultT>): Promise<ResultT> => {
-  const progress = { settled: false }
-  const outcome = (async () => {
-    try {
-      return { result: await operation }
-    } catch (err) {
-      return { refusal: err }
-    } finally {
-      progress.settled = true
-    }
-  })()
-  while (! progress.settled) {
-    await vi.advanceTimersByTimeAsync(5 * 1000)
-    await realTurn()
-  }
-  const finished = await outcome
-  if ('refusal' in finished) { throw finished.refusal }
-  return finished.result
-}
-
-/** Pin the random word the retry's jitter is drawn from (its four bytes, big-endian); other draws are untouched. */
-const pinJitter = (word: number) => {
-  const original = crypto.getRandomValues.bind(crypto)
-  vi.spyOn(crypto, 'getRandomValues').mockImplementation(((filled: ArrayBufferView<ArrayBuffer>) => {
-    if (filled.byteLength !== 4) { return original(filled) }
-    new DataView(filled.buffer).setUint32(0, word)
-    return filled
-  }))
-}
-
-/** A rival gets in ahead of each of this device's writes, for as many as `losses` of them. */
-const rivalBeforeEachWrite = (world: Awaited<ReturnType<typeof twoDeviceWorld>>, losses: number) => {
-  const original = world.hereDB.updateBox.bind(world.hereDB)
-  const updateBox = vi.spyOn(world.hereDB, 'updateBox').mockImplementation(async (...args) => {
-    if (updateBox.mock.calls.length <= losses) {
-      await world.there.store('anthropic', `sk-ant-fake-theirs-${String(updateBox.mock.calls.length)}`)
-    }
-    await original(...args)
-  })
-  return updateBox
-}
-
-/** The delays `setTimeout` was asked for, in order. */
 /**
- * The waits a store asked for before its retries, in milliseconds: every timer set but those an
- * unlock arms to drop its key, which fall due a minute or more from when they are set.
+ * The waits an operation asked for, in milliseconds: every timer set but those an unlock arms to
+ * drop its key, which fall due a minute or more from when they are set.
  */
 const delaysAsked = (waits: ReturnType<typeof stillClock>) => (
   waits.mock.calls.map(([, delay = 0]) => delay).filter((delay) => delay < MinuteMillis)
@@ -5131,70 +5079,57 @@ describe("versioned updates: two devices writing at once", () => {
     vi.useRealTimers()
   })
 
-  it("a store over a box written meanwhile elsewhere is tried again, and lands over theirs", async () => {
-    const { hereDB, here, there, beforeNextWrite } = await twoDeviceWorld()
-    await here.store('anthropic', 'sk-ant-fake-one')
-    beforeNextWrite('updateBox', () => there.store('anthropic', 'sk-ant-fake-theirs'))
-    const updateBox = vi.spyOn(hereDB, 'updateBox')
-    await drivenToEnd(here.store('anthropic', 'sk-ant-fake-mine'))
-    expect(updateBox).toHaveBeenCalledTimes(2)  // the one that raced, and the retry
-    expect(await here.read('anthropic')).to.eq('sk-ant-fake-mine')
-    expect(await there.read('anthropic')).to.eq('sk-ant-fake-mine')
-    expect(here.getSnapshot().state).to.eq('unlocked')
-    expect(here.getSnapshot().boxes).to.have.lengthOf(1)
-  })
-
-  it("each attempt is sealed afresh: the retry carries its own revision and lockboxKey, and the first's is not stored", async () => {
-    const { hereDB, here, there, beforeNextWrite } = await twoDeviceWorld()
-    await here.store('anthropic', 'sk-ant-fake-one')
-    beforeNextWrite('updateBox', () => there.store('anthropic', 'sk-ant-fake-theirs'))
-    const updateBox = vi.spyOn(hereDB, 'updateBox')
-    await drivenToEnd(here.store('anthropic', 'sk-ant-fake-mine'))
-    const [raced, landed] = updateBox.mock.calls.map(([, lockbox]) => lockbox)
-    expect(landed?.revision_id).to.not.eq(raced?.revision_id)
-    expect(landed?.lockbox_key_wrapped).to.not.deep.eq(raced?.lockbox_key_wrapped)
-    const standing = await hereDB.readBox(TH.scopeOf('u1'), 'anthropic')
-    expect(standing?.revision_id).to.eq(landed?.revision_id)
-  })
-
-  it("a retry takes the public bag the box now stands with, as the winner left it", async () => {
-    const { here, there, beforeNextWrite } = await twoDeviceWorld()
+  it("a store over a box written meanwhile elsewhere is refused as stale once, without waiting: nothing written, the snapshot caught up, and a second store lands over theirs", async () => {
+    const world = makeWorld()
+    // Deaf to storage's change bells: only the catch-up after the refusal can bring theirs in.
+    const hereDB = world.deafVaultDB()
+    const here = await world.openUnlocked('shared pw', { vaultDB: hereDB })
+    const there = await world.openUnlocked('shared pw', { deviceDB: memoryDeviceDB() })
     await here.store('anthropic', 'sk-ant-fake-one', { public: { note: 'first' } })
-    beforeNextWrite('updateBox', () => there.store('anthropic', 'sk-ant-fake-theirs', { public: { note: 'theirs' } }))
-    await drivenToEnd(here.store('anthropic', 'sk-ant-fake-mine'))
-    expect(TH.summaryOf(here.getSnapshot().boxes[0])?.public).to.deep.equal({ note: 'theirs' })
+    TH.beforeNextCall(hereDB, 'updateBox', () => there.store('anthropic', 'sk-ant-fake-theirs', { public: { note: 'theirs' } }))
+    const updateBox = vi.spyOn(hereDB, 'updateBox')
+    const err = await TH.expectRefusal(here.store('anthropic', 'sk-ant-fake-mine'), 'stale_write')
+    expect(err.message).to.match(/^That lockbox was written or erased on another device or tab while this one was storing into it, so nothing was written\./)
+    expect(err.message).to.include('store again')
+    // A boxlabel is never quoted: a host's check may admit any text, a mistaken paste among it.
+    expect(err.message).to.not.include('anthropic')
+    expect(err.cause).to.be.an.instanceOf(VaultError).and.to.have.property('kind', 'stale_write')
+    expect(updateBox).toHaveBeenCalledTimes(1)
+    expect(delaysAsked(waits)).to.have.lengthOf(0)
+    const theirRevision = storedRowOf(world, 'anthropic')['revision_id']
+    const shown = TH.summaryOf(here.getSnapshot().boxes[0])
+    expect(shown).to.deep.include({ revision_id: theirRevision, public: { note: 'theirs' } })
+    expect(here.getSnapshot().state).to.eq('unlocked')
+    expect(await there.read('anthropic')).to.eq('sk-ant-fake-theirs')
+    await here.store('anthropic', 'sk-ant-fake-mine')
+    expect(updateBox).toHaveBeenCalledTimes(2)
+    expect(updateBox.mock.calls[1]?.[2].revision_id).to.eq(theirRevision)
     expect(await there.read('anthropic')).to.eq('sk-ant-fake-mine')
   })
 
-  it("a store that loses every attempt is refused as stale after exactly three, showing the box as it stands", async () => {
-    const { hereDB, here, there } = await twoDeviceWorld()
-    await here.store('anthropic', 'sk-ant-fake-one')
-    const original = hereDB.updateBox.bind(hereDB)
-    // A rival gets in ahead of each of this device's writes.
-    const updateBox = vi.spyOn(hereDB, 'updateBox').mockImplementation(async (...args) => {
-      await there.store('anthropic', `sk-ant-fake-theirs-${String(updateBox.mock.calls.length)}`)
-      await original(...args)
-    })
-    await TH.expectRefusal(drivenToEnd(here.store('anthropic', 'sk-ant-fake-mine')), 'stale_write')
-    expect(updateBox).toHaveBeenCalledTimes(3)
-    expect(here.getSnapshot().state).to.eq('unlocked')
-    expect(await here.read('anthropic')).to.eq('sk-ant-fake-theirs-3')
-  })
-
-  it("erase wins across a retry: a store over a box erased meanwhile is refused as stale, the box stays erased, and nothing is tried again", async () => {
+  it("a store over a box erased meanwhile elsewhere is refused as stale like any other: the box stays erased", async () => {
     const { hereDB, here, there, beforeNextWrite } = await twoDeviceWorld()
     await here.store('anthropic', 'sk-ant-fake-one')
     beforeNextWrite('updateBox', () => there.erase('anthropic'))
     const updateBox = vi.spyOn(hereDB, 'updateBox')
     await TH.expectRefusal(here.store('anthropic', 'sk-ant-fake-mine'), 'stale_write')
     expect(updateBox).toHaveBeenCalledTimes(1)
-    expect(delaysAsked(waits)).to.have.lengthOf(0)  // an erase is told of at once, not after a wait
     expect(here.getSnapshot().boxes).to.have.lengthOf(0)
     expect(here.getSnapshot().state).to.eq('unlocked')
     await TH.expectRefusal(there.read('anthropic'), 'absent_box')
   })
 
-  it("a store over a damaged box, a sound one written over it meanwhile elsewhere, never erases theirs: its write is refused, and tried again over theirs", async () => {
+  it("a store of a box that did not exist, and is created meanwhile elsewhere, is refused as stale: theirs stands", async () => {
+    const { hereDB, here, there, beforeNextWrite } = await twoDeviceWorld()
+    beforeNextWrite('updateBox', () => there.store('anthropic', 'sk-ant-fake-theirs'))
+    const updateBox = vi.spyOn(hereDB, 'updateBox')
+    await TH.expectRefusal(here.store('anthropic', 'sk-ant-fake-mine'), 'stale_write')
+    expect(updateBox).toHaveBeenCalledTimes(1)
+    expect(boxlabelsOf(here)).to.deep.equal(['anthropic'])
+    expect(await there.read('anthropic')).to.eq('sk-ant-fake-theirs')
+  })
+
+  it("a store over a damaged box, a sound one written over it meanwhile elsewhere, never erases theirs: its write is refused as stale, and the next store writes over theirs", async () => {
     const { world, hereDB, here, there, beforeNextWrite } = await twoDeviceWorld()
     await here.store('anthropic', 'sk-ant-fake-one')
     world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), written_at: 'later' }))
@@ -5206,14 +5141,16 @@ describe("versioned updates: two devices writing at once", () => {
     })
     const eraseBox = vi.spyOn(hereDB, 'eraseBox')
     const updateBox = vi.spyOn(hereDB, 'updateBox')
-    await drivenToEnd(here.store('anthropic', 'sk-ant-fake-mine'))
+    await TH.expectRefusal(here.store('anthropic', 'sk-ant-fake-mine'), 'stale_write')
     expect(eraseBox).not.toHaveBeenCalled()
-    expect(updateBox).toHaveBeenCalledTimes(2)
+    expect(updateBox).toHaveBeenCalledTimes(1)
+    expect(await there.read('anthropic')).to.eq('sk-ant-fake-theirs')
+    await here.store('anthropic', 'sk-ant-fake-mine')
     expect(updateBox.mock.calls[1]?.[2].revision_id).to.eq(theirs.revisionId)
     expect(await there.read('anthropic')).to.eq('sk-ant-fake-mine')
   })
 
-  it("a store over a damaged box its listing does not show yet never erases first: its write over none is refused, and tried again over the revision the catch-up lists", async () => {
+  it("a store over a damaged box its listing does not show yet never erases first: its write over none is refused as stale, and the next store writes over the revision the catch-up lists", async () => {
     const { world, hereDB, here, there } = await twoDeviceWorld()
     await here.store('anthropic', 'sk-ant-fake-one')
     // A listing gone stale: storage holds a damaged record the snapshot does not show.
@@ -5224,46 +5161,17 @@ describe("versioned updates: two devices writing at once", () => {
     const damagedRevision = storedRowOf(world, 'anthropic')['revision_id']
     const eraseBox = vi.spyOn(hereDB, 'eraseBox')
     const updateBox = vi.spyOn(hereDB, 'updateBox')
-    await drivenToEnd(here.store('anthropic', 'sk-ant-fake-mine'))
-    expect(eraseBox).not.toHaveBeenCalled()
-    expect(updateBox).toHaveBeenCalledTimes(2)
+    await TH.expectRefusal(here.store('anthropic', 'sk-ant-fake-mine'), 'stale_write')
+    expect(updateBox).toHaveBeenCalledTimes(1)
     expect(updateBox.mock.calls[0]?.[2].revision_id).to.be.null
+    expect(here.getSnapshot().boxes[0]).to.deep.include({ damaged: true, revision_id: damagedRevision })
+    await here.store('anthropic', 'sk-ant-fake-mine')
+    expect(eraseBox).not.toHaveBeenCalled()
     expect(updateBox.mock.calls[1]?.[2].revision_id).to.eq(damagedRevision)
     expect(await there.read('anthropic')).to.eq('sk-ant-fake-mine')
   })
 
-  it("a store of a box that did not exist, and is created meanwhile elsewhere, is tried again over theirs", async () => {
-    const { hereDB, here, there, beforeNextWrite } = await twoDeviceWorld()
-    beforeNextWrite('updateBox', () => there.store('anthropic', 'sk-ant-fake-theirs'))
-    const updateBox = vi.spyOn(hereDB, 'updateBox')
-    await drivenToEnd(here.store('anthropic', 'sk-ant-fake-mine'))
-    expect(updateBox).toHaveBeenCalledTimes(2)
-    expect(await there.read('anthropic')).to.eq('sk-ant-fake-mine')
-  })
-
-  it("a retry that finds its new box gone again counts the lockboxes afresh: refused as full, nothing written", async () => {
-    const { hereDB, here, there, beforeNextWrite } = await twoDeviceWorld({ maxLockboxes: 2 })
-    await here.store('anthropic', 'sk-ant-fake-one')
-    // Attempt one reads gemini as absent and room for it; before its write, a rival makes gemini
-    // and openai, so the write is refused as stale. Before the retry's read, the rival erases
-    // gemini: the retry meets an absent box in a vault already holding its two others.
-    beforeNextWrite('updateBox', async () => {
-      await there.store('gemini', 'sk-fake-theirs')
-      await there.store('openai', 'sk-fake-theirs')
-    })
-    const original = hereDB.readBox.bind(hereDB)
-    const readBox = vi.spyOn(hereDB, 'readBox').mockImplementation(async (...args) => {
-      if (readBox.mock.calls.length === 2) { await there.erase('gemini') }
-      return await original(...args)
-    })
-    const updateBox = vi.spyOn(hereDB, 'updateBox')
-    await TH.expectRefusal(drivenToEnd(here.store('gemini', 'sk-fake-mine')), 'vault_full')
-    expect(readBox).toHaveBeenCalledTimes(2)
-    expect(updateBox).toHaveBeenCalledTimes(1)
-    expect(boxlabelsOf(here)).to.have.members(['anthropic', 'openai'])
-  })
-
-  it("a retry that finds the passphrase changed elsewhere finds the device relocked, and writes nothing", async () => {
+  it("a store refused as stale whose catch-up finds the passphrase changed elsewhere relocks the device, and writes nothing", async () => {
     const { hereDB, here, there, beforeNextWrite } = await twoDeviceWorld()
     await here.store('anthropic', 'sk-ant-fake-one')
     beforeNextWrite('updateBox', async () => {
@@ -5273,14 +5181,14 @@ describe("versioned updates: two devices writing at once", () => {
     const updateBox = vi.spyOn(hereDB, 'updateBox')
     await TH.expectRefusal(here.store('anthropic', 'sk-ant-fake-mine'), 'vault_locked')
     expect(updateBox).toHaveBeenCalledTimes(1)
-    expect(delaysAsked(waits)).to.have.lengthOf(0)  // a relock is told of at once, not after a wait
+    expect(delaysAsked(waits)).to.have.lengthOf(0)
     expect(here.getSnapshot().state).to.eq('locked')
     await there.lock()
     await there.unlock('their pw')
     expect(await there.read('anthropic')).to.eq('sk-ant-fake-theirs')
   })
 
-  it("a store whose catch-up fails is refused as stale at once, the failure its cause, and never tried again blind", async () => {
+  it("a store whose catch-up fails is refused as stale, the failure its cause, saying so", async () => {
     const { world, hereDB, here, there, beforeNextWrite } = await twoDeviceWorld()
     await here.store('anthropic', 'sk-ant-fake-one')
     const down = new VaultError('storage_unavailable', 'The vault storage could not be reached.')
@@ -5374,119 +5282,16 @@ describe("versioned updates: two devices writing at once", () => {
     expect(await here.read('anthropic')).to.eq('sk-ant-fake-one')
   })
 
-  describe("the wait before each retry", () => {
-    it("a store that wins its first attempt waits for nothing", async () => {
-      const { here } = await twoDeviceWorld()
-      await here.store('anthropic', 'sk-ant-fake-one')
-      await here.store('anthropic', 'sk-ant-fake-two')
-      expect(delaysAsked(waits)).to.have.lengthOf(0)
+  it("a lockSoon() landing with the refusal leaves the store refused as stale, not as locked: work in hand ends as it would have", async () => {
+    const { here, there, beforeNextWrite } = await twoDeviceWorld()
+    await here.store('anthropic', 'sk-ant-fake-one')
+    beforeNextWrite('updateBox', async () => {
+      await there.store('anthropic', 'sk-ant-fake-theirs')
+      await here.lockSoon(30)
     })
-
-    it("a store that loses once waits 1 to 2 seconds, once, before its retry", async () => {
-      const world = await twoDeviceWorld()
-      await world.here.store('anthropic', 'sk-ant-fake-one')
-      const updateBox = rivalBeforeEachWrite(world, 1)
-      await drivenToEnd(world.here.store('anthropic', 'sk-ant-fake-mine'))
-      expect(updateBox).toHaveBeenCalledTimes(2)
-      expect(delaysAsked(waits)).to.have.lengthOf(1)
-      expect(delaysAsked(waits)[0]).toBeGreaterThanOrEqual(1000)
-      expect(delaysAsked(waits)[0]).toBeLessThan(2000)
-    })
-
-    it("a store that loses twice waits 1 to 2 seconds, then 2 to 4, and lands on its third attempt", async () => {
-      const world = await twoDeviceWorld()
-      await world.here.store('anthropic', 'sk-ant-fake-one')
-      const updateBox = rivalBeforeEachWrite(world, 2)
-      await drivenToEnd(world.here.store('anthropic', 'sk-ant-fake-mine'))
-      expect(updateBox).toHaveBeenCalledTimes(3)
-      const [first, second] = delaysAsked(waits)
-      expect(delaysAsked(waits)).to.have.lengthOf(2)
-      expect(first).toBeGreaterThanOrEqual(1000)
-      expect(first).toBeLessThan(2000)
-      expect(second).toBeGreaterThanOrEqual(2000)
-      expect(second).toBeLessThan(4000)
-      expect(await world.there.read('anthropic')).to.eq('sk-ant-fake-mine')
-    })
-
-    it("the windows are closed below: the lowest draw waits exactly the base, then double it", async () => {
-      const world = await twoDeviceWorld()
-      await world.here.store('anthropic', 'sk-ant-fake-one')
-      rivalBeforeEachWrite(world, 2)
-      pinJitter(0)
-      await drivenToEnd(world.here.store('anthropic', 'sk-ant-fake-mine'))
-      expect(delaysAsked(waits)).to.deep.eq([1000, 2000])
-    })
-
-    it("the windows are open above: the highest draw waits just under double the base, then just under four times it", async () => {
-      const world = await twoDeviceWorld()
-      await world.here.store('anthropic', 'sk-ant-fake-one')
-      rivalBeforeEachWrite(world, 2)
-      pinJitter((2 ** 32) - 1)
-      await drivenToEnd(world.here.store('anthropic', 'sk-ant-fake-mine'))
-      expect(delaysAsked(waits)).to.deep.eq([1999, 3999])
-    })
-
-    it("the third refusal is thrown at once: two waits in all, none after the last attempt", async () => {
-      const world = await twoDeviceWorld()
-      await world.here.store('anthropic', 'sk-ant-fake-one')
-      const updateBox = rivalBeforeEachWrite(world, 3)
-      await TH.expectRefusal(drivenToEnd(world.here.store('anthropic', 'sk-ant-fake-mine')), 'stale_write')
-      expect(updateBox).toHaveBeenCalledTimes(3)
-      expect(delaysAsked(waits)).to.have.lengthOf(2)
-    })
-
-    it("the retry waits before it reads: nothing is read or written while the store sleeps", async () => {
-      const world = await twoDeviceWorld()
-      await world.here.store('anthropic', 'sk-ant-fake-one')
-      const updateBox = rivalBeforeEachWrite(world, 1)
-      const readBox = vi.spyOn(world.hereDB, 'readBox')
-      const storing = world.here.store('anthropic', 'sk-ant-fake-mine')
-      await untilAsleep(waits)
-      expect(updateBox).toHaveBeenCalledTimes(1)
-      const readsWhileAsleep = readBox.mock.calls.length
-      await realTurn()
-      expect(readBox).toHaveBeenCalledTimes(readsWhileAsleep)
-      await drivenToEnd(storing)
-      expect(updateBox).toHaveBeenCalledTimes(2)
-    })
-
-    it("a vault locked during the wait is refused as locked when the store wakes, and nothing is written", async () => {
-      const world = await twoDeviceWorld()
-      await world.here.store('anthropic', 'sk-ant-fake-one')
-      const updateBox = rivalBeforeEachWrite(world, 1)
-      const refused = TH.expectRefusal(world.here.store('anthropic', 'sk-ant-fake-mine'), 'vault_locked')
-      await untilAsleep(waits)
-      await world.here.lock()
-      await drivenToEnd(refused)
-      expect(updateBox).toHaveBeenCalledTimes(1)
-      expect(world.here.getSnapshot().state).to.eq('locked')
-      expect(await world.there.read('anthropic')).to.eq('sk-ant-fake-theirs-1')
-    })
-
-    it("a lockSoon() landing with the refusal lets the retry finish within its grace: work in hand, not new work", async () => {
-      const { here, there, beforeNextWrite } = await twoDeviceWorld()
-      await here.store('anthropic', 'sk-ant-fake-one')
-      beforeNextWrite('updateBox', async () => {
-        await there.store('anthropic', 'sk-ant-fake-theirs')
-        await here.lockSoon(30)
-      })
-      await drivenToEnd(here.store('anthropic', 'sk-ant-fake-mine'))
-      expect(here.getSnapshot().state).to.eq('locked')
-      expect(await there.read('anthropic')).to.eq('sk-ant-fake-mine')
-    })
-
-    it("a box erased during the wait stays erased: the store is refused as stale when it wakes, with no further wait", async () => {
-      const world = await twoDeviceWorld()
-      await world.here.store('anthropic', 'sk-ant-fake-one')
-      const updateBox = rivalBeforeEachWrite(world, 1)
-      const refused = TH.expectRefusal(world.here.store('anthropic', 'sk-ant-fake-mine'), 'stale_write')
-      await untilAsleep(waits)
-      await world.there.erase('anthropic')
-      await drivenToEnd(refused)
-      expect(updateBox).toHaveBeenCalledTimes(1)
-      expect(delaysAsked(waits)).to.have.lengthOf(1)
-      await TH.expectRefusal(world.there.read('anthropic'), 'absent_box')
-    })
+    await TH.expectRefusal(here.store('anthropic', 'sk-ant-fake-mine'), 'stale_write')
+    expect(here.getSnapshot().state).to.eq('locked')
+    expect(await there.read('anthropic')).to.eq('sk-ant-fake-theirs')
   })
 })
 
