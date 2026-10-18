@@ -87,7 +87,7 @@ export const VaultDashboard = () => {
     if (whisper !== null) { setForm({ editing: boxlabel, boxlabelText: boxlabel, whisperText: editableWhisper(whisper), noteText }) }
   }
 
-  const erase = async (boxlabel: string) => {
+  const retireBox = async (boxlabel: string) => {
     if (! globalThis.confirm(`Delete the lockbox '${boxlabel}'?`)) { return }
     try {
       await withUnlockedVault(() => vault.retireBox(boxlabel))
@@ -148,7 +148,7 @@ export const VaultDashboard = () => {
                     <td colSpan={3} className="gripe">{"damaged: its stored record can't be read"}</td>
                     <td className="row">
                       <button className="mini" onClick={() => { setForm({ editing: box.boxlabel, boxlabelText: box.boxlabel, whisperText: '', noteText: '' }) }}>replace</button>
-                      <button className="mini danger" onClick={() => { void erase(box.boxlabel) }}>delete</button>
+                      <button className="mini danger" onClick={() => { void retireBox(box.boxlabel) }}>delete</button>
                     </td>
                   </tr>
                 )
@@ -167,7 +167,7 @@ export const VaultDashboard = () => {
                   <td className="row">
                     <button className="mini" onClick={() => { void applyWhisper(box.boxlabel) }}>use</button>
                     <button className="mini" onClick={() => { void edit(box.boxlabel, noteOf(box.sidecar)) }}>edit</button>
-                    <button className="mini danger" onClick={() => { void erase(box.boxlabel) }}>delete</button>
+                    <button className="mini danger" onClick={() => { void retireBox(box.boxlabel) }}>delete</button>
                   </td>
                 </tr>
               )
