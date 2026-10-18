@@ -7,7 +7,7 @@ medium. Threads at once: 2. Issued by: the Coach, from `reform-preplan.md` besid
 Sprint doc: https://claude.ai/code/artifact/b7fd117e-7a03-4f68-b2fa-b2c1e70e118b (*Open Matters*,
 *Progress*, *Resolved*).
 
-**Status:** threads 1 to 8 filed, in the line main → #159 → #160 → #161 → #162 → #163 → #164 → #165 → #166; thread 9 building.
+**Status:** threads 1 to 9 filed, in the line main → #159 → … → #167; thread 10 building.
 
 ## Read first
 
@@ -219,6 +219,8 @@ matters only at the start.
 > table gains the row.
 
 *Gloss:* *Touches* `vault.ts` (`settleUnlock`), `errors.ts` (`VaultErrorKindVals`, the message), `refusals.ts` if kinds are classed there, react `passphrase-modal.tsx`, README's refusals table, tests (two devices in `tests/vault.test.ts` over one `localVaultDB`). Reuse thread 2's catch-up step for "settles locked on the standing props". *Model*: `sonnet`. *Depends on*: 8. *Size*: small.
+
+*Review:* flagged (medium), then fixed on a second review. First review: one doc fix (`Gripe.asAdvice`); the core held (nothing secret quoted, only `wrong_passphrase` converted, untrusted-storage refusals rethrown, catch-up failure warned through the logger). Significant: after `created_elsewhere` the dialog kept the just-disproven passphrase, and the first keystroke wiped the advice. *Orchestrator:* resumed the builder (YOLO): the advice stays until the next submit; the field is emptied and focused. Second review (`29190bd9…4d92f2ff`): holds; three fixes (a test racing two real vaults through the dialog, a doc block, the changeset tells hosts of the focus change). Left: a screen-reader check (a *For coach* row), one flag for advice style and lifetime (taste), and three narrow edge cases in the PR comment.
 
 ### 10. `sweep`
 

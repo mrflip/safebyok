@@ -190,3 +190,16 @@ disagree. Workers look things up here; they do not write here (each keeps its
   raises `forgetsSoFar` before it erases. A first hello refused for untrusted storage counts as a
   lock. A page load still takes up a leftover lease.
 * A hello failing at the lease step settles `locked` with `trouble` set (never `absent`).
+
+### Thread 9, created_elsewhere (#167)
+
+* `created_elsewhere` is a condition (`VaultErrorKindVals`, `VaultErrorFamilyForKind`), raised by
+  `refuseCreatedElsewhere` in `settleUnlock`'s create branch when the standing vault has another
+  `vault_id` and the passphrase gives `wrong_passphrase` (its cause). It catches up with a full
+  `refresh()` and settles `locked`; a failing catch-up still gives `created_elsewhere`
+  (`syncing: false`, warned).
+* It fires only in the race: `unlock()` refreshes before `settleUnlock`, so a vault already standing
+  gives plain `wrong_passphrase`.
+* React `PassphraseModal` shows it in the `quiet` (advice) class, dialog open.
+* For thread 10: README/doc text that says "check for typos" beside `wrong_passphrase` now has a
+  sibling kind.
