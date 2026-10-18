@@ -166,3 +166,27 @@ disagree. Workers look things up here; they do not write here (each keeps its
   messages say "retire". Both rows in *Open Matters*.
 * `ctx-bytes.test.ts:32-33` (the encoding test) holds `revision_id` and `'safebyok-lockbox-v4'` as
   arbitrary input: thread 10.
+
+### Thread 8, make_hello (#166)
+
+* `export const Vault = { make }` beside `export type Vault` (no namespace: `no-namespace`, TS-only,
+  and a plain object tree-shakes). `Vault.make(opts)` is synchronous, refuses unknown options as
+  `bad_option` naming the key, and names a retired key's new name from a table
+  (`RenamedMakeVaultOpts` in `vault.ts`: `forcePassphraseReentryHours` → `leaseHours`; an allowed
+  grep survivor for thread 10).
+* `vault.hello()` is memoised per the thread text; `trouble: VaultError | null` on the snapshot.
+  Logger labels `'make'` and `'hello'`. `.size-limit.json` entry renamed `Vault` (27.88 of 31 kB);
+  `everything` 35.15 of 38 kB, `VaultProvider` 4.73 of 6.8 kB.
+* `lock()`, `lockSoon()`, `close()` don't wait for hello; `retire()` does. A lock mid-hello wins:
+  `takeUpLease` takes a `forgetsSoFar` count raised by every hard lock and `lockSoon()`.
+  `unlock` and wayin changes record their start before waiting.
+* **Thread 9**: `TH.settledVault(opts)` (in `safebyok/testing`) makes a vault and awaits `hello`;
+  its second `@example` is two devices over one vaultDB, each with its own `memoryDeviceDB()`.
+* React: the handle is handed down at once in state `opening`; `openError` derives from
+  `trouble`; `retryOpen()` and `retireDamagedVault()` call `hello()` on the same handle.
+* **Lease rule (after review)**: a handle takes up a lease only while it has never forgotten one
+  (`takeUpLease(forgetsThen)` returns unless `forgetsThen === 0`). Every lock path (`shut`, used by
+  `lock()`, `retire()`, `lockSoon(0)`, a failed clock and `heedRefusal`; and the graced `lockSoon`)
+  raises `forgetsSoFar` before it erases. A first hello refused for untrusted storage counts as a
+  lock. A page load still takes up a leftover lease.
+* A hello failing at the lease step settles `locked` with `trouble` set (never `absent`).

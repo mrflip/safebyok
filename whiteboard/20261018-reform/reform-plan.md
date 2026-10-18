@@ -7,7 +7,7 @@ medium. Threads at once: 2. Issued by: the Coach, from `reform-preplan.md` besid
 Sprint doc: https://claude.ai/code/artifact/b7fd117e-7a03-4f68-b2fa-b2c1e70e118b (*Open Matters*,
 *Progress*, *Resolved*).
 
-**Status:** threads 1 to 7 filed, in the line main → #159 → #160 → #161 → #162 → #163 → #164 → #165; thread 8 building.
+**Status:** threads 1 to 8 filed, in the line main → #159 → #160 → #161 → #162 → #163 → #164 → #165 → #166; thread 9 building.
 
 ## Read first
 
@@ -205,6 +205,8 @@ matters only at the start.
 > `unlock()` keep their shapes.
 
 *Gloss:* *Touches* `vault.ts` (the open path, `refresh`, `takeUpLease`), `types.ts` (`MakeVaultOpts`, the snapshot's `trouble`), `index.ts`, `browser.ts` (it names `OpenVaultOpts`), every doc block naming `openVault` (some fifteen files in core), react `vault-provider.tsx`, demos, e2e, README quick start, and `.size-limit.json`'s `openVault` entry (point its import at `Vault`, rename the entry; no limit changed). `Vault` is today an exported type; `Vault.make` makes it a value too. Choose the shape that keeps both the type and the value under one name, and say which in the PR. **`Vault.make` refuses unknown options** as `bad_option` (*Orchestrator:* YOLO ruling from thread 6's review: a host still passing the retired `forcePassphraseReentryHours` must not silently get the 7-day default). Validate `MakeVaultOpts` with a strict object, as `options.ts` does; check `VaultProvider`'s `...opts` spread passes only vault options. A public-surface addition (`trouble` on the snapshot) needs the doc block and an `@example` test. *Model*: default. *Depends on*: 7. *Grep*: `openVault|OpenVaultOpts`. *Look-ahead*: thread 9's two-device test opens two vaults with `Vault.make`. *Size*: medium; the reset/non-reset test matrix is most of it.
+
+*Review:* flagged (medium), then fixed on a second review. First review: two fixes (the demo's `KnockKnock` told a user with a stored key "No Anthropic API key yet" while the vault was opening; the suppression gained its reason) and one significant finding: a lock whose lease erase failed was undone on the same handle by a later hello, with no passphrase. *Orchestrator:* resumed the builder (YOLO): a handle takes up a lease only while it has never forgotten one; regression tests for `lock()`, `lockSoon()` and an untrusted-storage shut; `trouble`'s doc narrowed. Second review (`35fc0fbd...480023a1`): the hole is closed on every path and the tests fail without the guard; four fixes (lease-step docs say `locked`; two stale messages; internal comments; a test table). *Orchestrator:* the security note's last stale sentence was narrowed through a `sonnet` subagent (`caad9536`). Left for the Coach: the `react-hooks/set-state-in-effect` suppression (not pre-approved by CLAUDE.md); a page that has ever locked takes up no lease another tab writes later, until it reloads.
 
 ### 9. `created_elsewhere`
 
