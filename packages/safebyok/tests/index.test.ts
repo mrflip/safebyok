@@ -9,7 +9,7 @@ describe("the package's entry point", () => {
     expect(Object.keys(safebyok)).to.have.members([
       'Argon2idWebV1', 'argon2idDeriver', 'argon2idWebV1Deriver', 'ensureSaltFits', 'parseKeyDeriverSpec',
       'openVault', 'eraseDamagedVault', 'parseLogger', 'DefaultLogger', 'setDefaultLogger', 'checkStrengthTest',
-      'Ciphered', 'EpochMillis', 'FarFuture', 'FarPast', 'ForcePassphraseReentryHours', 'ForeverMillis', 'Lockbox', 'LockboxSummary', 'MaxLockboxes', 'MaxReentryHours', 'MaxUnlocks', 'MaxWhisperBytes', 'MinuteMillis', 'PasskeyWayin', 'PasskeySaltBytes', 'PassphraseWayin', 'PublicBag', 'Wayin', 'WayinKindVals', 'VaultBundle', 'VaultScope', 'Whisper', 'wallClock',
+      'Ciphered', 'EpochMillis', 'FarFuture', 'FarPast', 'ForcePassphraseReentryHours', 'ForeverMillis', 'Lockbox', 'LockboxSummary', 'MaxLockboxes', 'MaxReentryHours', 'MaxUnlocks', 'MaxWhisperBytes', 'MinuteMillis', 'PasskeyWayin', 'PasskeySaltBytes', 'PassphraseWayin', 'Sidecar', 'Wayin', 'WayinKindVals', 'VaultBundle', 'VaultScope', 'Whisper', 'wallClock',
       'AnyTextValidators', 'DefaultValidators', 'Label', 'LabelPattern', 'MaxLabelChars', 'MaxUserIdChars', 'NameFloor', 'NameFloorBytes', 'UserId', 'UserIdPattern', 'checkValidators',
       'VaultError', 'VaultErrorFamilyForKind', 'VaultErrorFamilyVals', 'VaultErrorKindVals', 'isVaultCondition', 'isVaultError',
       'VaultDB', 'Ckeys', 'Expectations', 'Refusals', 'Sanitizer', 'localVaultDB', 'memoryDeviceDB',

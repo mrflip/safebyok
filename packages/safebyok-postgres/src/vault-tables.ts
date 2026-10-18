@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS safebyok_bundles (
 
 -- One lockbox per boxlabel, beside its vault's scope and vault_id. A lockbox stands only while
 -- its vault's bundle does, under the same vault_id: erasing the bundle erases its lockboxes with
--- it, and no write can leave a lockbox in a vault made anew. The public bag is kept as the JSON
+-- it, and no write can leave a lockbox in a vault made anew. The sidecar is kept as the JSON
 -- text it was written as, never jsonb, which would rewrite it: that text is bound into the lockbox.
 CREATE TABLE IF NOT EXISTS safebyok_lockboxes (
   applabel               text   NOT NULL,
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS safebyok_lockboxes (
   whisper_ciphered       jsonb  NOT NULL,
   whisper_codec          text   NOT NULL,
   whisper_schema_version bigint NOT NULL,
-  public_json            text   NOT NULL,
+  sidecar_json           text   NOT NULL,
   registered_at          bigint NOT NULL,
   written_at             bigint NOT NULL,
   PRIMARY KEY (applabel, user_id, vaultlabel, boxlabel),

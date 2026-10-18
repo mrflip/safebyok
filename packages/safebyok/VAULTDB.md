@@ -117,7 +117,7 @@ Each refusal is `bad_label`, naming which name and which rule, and quoting none 
 **1.1. What is stored reads back whole.** A record reads back exactly as it was written, field
 for field: a field left out stays out (a bundle with no prior vaultKey has no `prior_vault_key`
 field, not a null one), and nothing is added. Text comes back as the exact text written: a
-lockbox's `public_json` is bound into its encryption as written, so a store that rewrites JSON
+lockbox's `sidecar_json` is bound into its encryption as written, so a store that rewrites JSON
 it holds (Postgres's `jsonb`, say) keeps that field as plain text. Before anything is written, a read finds nothing: `null`, never a
 default.
 
@@ -269,7 +269,7 @@ one: a lock timeout or a serialization failure is `storage_unavailable`, and und
 at the backend's default settings, there is none to report. Its test is line 3.7's.
 
 **5.3. A refusal quotes nothing it was handed.** No refusal's message or properties carry a
-record's ciphertext, a boxlabel or a public bag: the base class never quotes what it refuses, and an
+record's ciphertext, a boxlabel or a sidecar: the base class never quotes what it refuses, and an
 adapter's own messages name the vault's limits, never its contents. A `storage_unavailable`
 refusal's `cause` is the backend's own error, passed up as it came for debugging; it holds only
 what the backend holds, which is ciphertext and public fields.

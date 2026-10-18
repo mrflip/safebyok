@@ -61,7 +61,7 @@ export const LockboxFields = everyFieldOf<Lockbox>()([
   ['whisper_ciphered',       'ciphered'],
   ['whisper_codec',          'plain'],
   ['whisper_schema_version', 'plain'],
-  ['public_json',            'plain'],
+  ['sidecar_json',           'plain'],
   ['registered_at',          'plain'],
   ['written_at',             'plain'],
 ] as const)

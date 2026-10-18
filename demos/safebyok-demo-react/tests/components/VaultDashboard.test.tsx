@@ -180,7 +180,7 @@ describe("VaultDashboard, its lockboxes", () => {
     await waitFor(() => { expect(within(rowOf('anthropic_api_key')).queryByText('rotated')).to.not.be.null })
     const vault = await world.openUnlocked()
     expect(await vault.read('anthropic_api_key')).to.eq('sk-ant-test-replaced')
-    expect(vault.getSnapshot().boxes[0]).to.deep.include({ public: { note: 'rotated' } })
+    expect(vault.getSnapshot().boxes[0]).to.deep.include({ sidecar: { note: 'rotated' } })
   })
 
   it("keeps a lockbox's note when a new whisper is stored over it with the note left blank", async () => {

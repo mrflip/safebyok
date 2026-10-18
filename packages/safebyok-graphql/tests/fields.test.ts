@@ -8,7 +8,7 @@ describe("selectionOf", () => {
   })
 
   it("asks for a listed lockbox without either ciphered field", () => {
-    expect(selectionOf(ListedLockboxFields)).to.eq('format boxlabel revision_id vault_key_epoch whisper_codec whisper_schema_version public_json registered_at written_at')
+    expect(selectionOf(ListedLockboxFields)).to.eq('format boxlabel revision_id vault_key_epoch whisper_codec whisper_schema_version sidecar_json registered_at written_at')
   })
 })
 
@@ -35,9 +35,9 @@ describe("recordOf", () => {
     expect(recordOf(bundle, BundleFields)).to.not.have.property('prior_vault_key')
   })
 
-  it("carries a lockbox's public bag as the JSON text it was written as", () => {
-    const lockbox = TH.boxOf('openai', 'r1', { public_json: '{"b": 1, "a": "caf\u{E9}"}' })
-    expect(recordOf(lockbox, LockboxFields)).to.include({ public_json: '{"b": 1, "a": "caf\u{E9}"}' })
+  it("carries a lockbox's sidecar as the JSON text it was written as", () => {
+    const lockbox = TH.boxOf('openai', 'r1', { sidecar_json: '{"b": 1, "a": "caf\u{E9}"}' })
+    expect(recordOf(lockbox, LockboxFields)).to.include({ sidecar_json: '{"b": 1, "a": "caf\u{E9}"}' })
   })
 
   it("drops a field the record has not got", () => {

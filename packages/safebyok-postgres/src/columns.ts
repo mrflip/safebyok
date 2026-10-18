@@ -4,7 +4,7 @@ import type { Lockbox, VaultBundle } from 'safebyok'
  * How one field is stored: `text` as given, `bigint` for a whole number (a time, an epoch), and
  * `jsonb` for an opaque structured value -- a Ciphered, a bundle's prior vaultKey, or its list of
  * wayins -- whose ctx safebyok rebuilds from field values, so jsonb's reordering of
- * keys is harmless. A lockbox's `public_json` is `text`: its exact text is what is bound.
+ * keys is harmless. A lockbox's `sidecar_json` is `text`: its exact text is what is bound.
  */
 export type ColumnKind = 'text' | 'bigint' | 'jsonb'
 
@@ -56,7 +56,7 @@ export const LockboxColumns = everyFieldOf<Lockbox>()([
   ['whisper_ciphered',       'jsonb'],
   ['whisper_codec',          'text'],
   ['whisper_schema_version', 'bigint'],
-  ['public_json',            'text'],
+  ['sidecar_json',           'text'],
   ['registered_at',          'bigint'],
   ['written_at',             'bigint'],
 ] as const)

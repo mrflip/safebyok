@@ -115,8 +115,8 @@ when given (`convexVaultDB({ client, api, logger })`), hears what the VaultDB ha
   [`safebyok` README](../safebyok/README.md), which say what each means and what a host does.
   The Convex functions throw two, `identity_revoked` and `vault_full`; a write that came too late is
   a `stale_write`; and `storage_unavailable` is anything else Convex reported. It carries nothing
-  of Convex's own error, which on a dev deployment may quote the call's arguments (names, public
-  bags, ciphertext): your deployment's logs have it, or, for trouble before the call left, the browser
+  of Convex's own error, which on a dev deployment may quote the call's arguments (names,
+  sidecars, ciphertext): your deployment's logs have it, or, for trouble before the call left, the browser
   console, where the Convex client reports its connection.
 * **Offline, a call waits** for the connection, as every Convex call does, rather than failing.
   Convex resends a mutation when it reconnects, so a write may land after any timeout you set:
@@ -140,7 +140,7 @@ Three tables, inside the component, beside nothing of your app's:
 * **Encrypted**, as `{ cipher_iv_b64, ciphertext_b64 }`: each whisper (`whisper_ciphered`), each
   lockbox's lockboxKey (`lockbox_key_wrapped`), and the vaultKey once for each of the vault's
   ways in (each wayin's `vault_key_wayin_wrapped`, in the bundle's `wayins`).
-* **In the open**: the scope (`applabel`, `user_id`, `vaultlabel`), each `boxlabel` and public bag (`public_json`),
+* **In the open**: the scope (`applabel`, `user_id`, `vaultlabel`), each `boxlabel` and sidecar (`sidecar_json`),
   the `vault_id`, `unlock_epoch`, `revision_id`s, each way in's `wayinkind`, `wayin_id`,
   `wayinlabel`, passphraseSalt (`salt_b64`) and key deriver's label, how many ways in there are,
   when each vault and lockbox was first stored and each lockbox last written (`registered_at`,
@@ -177,7 +177,7 @@ modified client cannot grow a vault past what erasing can reach: **8,000 lockbox
 **7 MiB less 1 KiB** of them as Convex weighs a document (half the read budget, less a whole
 document for the bundle and room for the tally). A client within its own `maxLockboxes` stays
 well inside both, at the defaults far inside; at extreme settings (a small `maxWhisperBytes`,
-thousands of lockboxes, every public bag full) a client can meet the component's `vault_full`
+thousands of lockboxes, every sidecar full) a client can meet the component's `vault_full`
 just short of its own `maxLockboxes`. That is the design working: the component's limit is the
 authority beneath the client's estimate. A write that would take a vault past either, and leave it larger than it was
 -- a new lockbox, or a heavier replacement -- is refused with kind `vault_full`; a replacement no

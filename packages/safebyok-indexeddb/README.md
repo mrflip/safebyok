@@ -87,7 +87,7 @@ of every name, whatever a host's validators admit.
 
 * **Encrypted**: each whisper (`whisper_ciphered`), each lockbox's lockboxKey
   (`lockbox_key_wrapped`), and, inside the bundle, the vaultKey, wrapped under each passphrase.
-* **In the open**: the scope, each `boxlabel` and public bag (`public_json`), the `vault_id`, `unlock_epoch`,
+* **In the open**: the scope, each `boxlabel` and sidecar (`sidecar_json`), the `vault_id`, `unlock_epoch`,
   `revision_id`s, how each passphrase was made into a key (its key deriver's label and salt),
   when each vault and lockbox was first stored and each lockbox last written (epoch
   milliseconds), and the length of every ciphertext.

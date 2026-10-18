@@ -193,7 +193,7 @@ const refusing = async <ValT>(call: () => Promise<ValT>): Promise<ValT> => {
       throw Sanitizer.refusalFor(err, err.data.kind, err.data.message)
     }
     // On a dev deployment, Convex's own error -- its validator refusing the arguments, say --
-    // quotes the call's arguments: scope, names, public bags and ciphertext. The sanitizer drops it.
+    // quotes the call's arguments: scope, names, sidecars and ciphertext. The sanitizer drops it.
     throw Sanitizer.refusalFor(err, 'storage_unavailable', ConvexTroubleMessage)
   }
 }

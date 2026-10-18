@@ -930,7 +930,7 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
   clients cannot keep. `VaultDB` verbs no longer take a validators bag at all, so no server or
   wrapper can be handed the wrong one. Each adapter declares `maxNameBytes` (Postgres: 640, so a
   lockbox's four-name primary key fits a btree entry) and the base class refuses a longer name.
-* 2026-10-16: **a lockbox's note becomes a public bag of any JSON, bound; its whisper's codec
+* 2026-10-16; 2026-10-18: **a lockbox's note becomes a public bag of any JSON, bound; its whisper's codec
   and schema version are reserved, bound too** (push_to_100_a, thread 2; G023, G025, G040). The
   lockbox (`safebyok-lockbox-v3`) holds `public_json`, the host's bag as stable-serialized JSON
   text, always written (`{}` when the host gave none, so an absent bag and an empty one are one
@@ -956,7 +956,17 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
   refuses a record part holding a field set to `undefined` (`bad_option`) instead of dropping it
   as JSON would, so a field gone missing by mistake can never bind as if it were absent. The
   note's control-character floor (G177) goes with the note: the bag is the host's, and a host
-  that shows it checks what it shows.
+  that shows it checks what it shows. 2026-10-18 (branch `20261018-sidecar`, thread 5 of sprint
+  reform): the bag is renamed the "sidecar", `public_json` is now `sidecar_json`, and the format
+  tag moves from `safebyok-lockbox-v4` to `safebyok-lockbox-v5`. Both of a lockbox's encryptions
+  (the lockboxKey wrap and the whisper cipher) bind a context (`boxCtx`) of the format tag, the
+  vault's scope and `vault_id`, the purpose string, and the whole stored header as key-sorted JSON,
+  so those bytes follow the renamed field and the v5 tag, and the header now spells `sidecar_json`
+  after `revision_id` rather than after `boxlabel`. The construction is unchanged: same parts,
+  same order, same purpose strings, the sidecar in the header where the bag was. A v4 lockbox
+  lists as damaged and reads as `damaged_lockbox` on every adapter that reads it (a Convex
+  deployment refuses the new component schema until its tables are cleared), with no migration,
+  so no old ciphertext has to open under the new bytes.
 * 2026-10-16 (locks_and_expiry): **the unlock window has a hard edge, and a timer.** The
   threshold is the truth: every call that starts work checks `askPassphraseAt` against the host's
   clock, and past it throws `vault_locked`. A `setTimeout` enforces it: armed at each take-up of a

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as Z from 'zod/mini'
 import { Lockbox } from '../src/lockbox'
-import { DeviceMark, DeviceUnlock, EpochMillis, FarFuture, FarPast, ForeverMillis, LockboxSummary, MaxUnlocks, PublicBag, VaultBundle, VaultScope, Whisper } from '../src/types'
+import { DeviceMark, DeviceUnlock, EpochMillis, FarFuture, FarPast, ForeverMillis, LockboxSummary, MaxUnlocks, Sidecar, VaultBundle, VaultScope, Whisper } from '../src/types'
 import * as TH from './test-helpers'
 
 const WhisperCases = [
@@ -141,10 +141,10 @@ describe("VaultBundle", () => {
   }
 })
 
-const PublicBagCases = [
+const SidecarCases = [
   // any JSON value:
   [{ note: "work account" },          true,   'a plain object, the common case'],
-  [{},                                true,   'an empty bag'],
+  [{},                                true,   'an empty sidecar'],
   ["work account",                    true,   'a string'],
   [null,                              true,   'null, a JSON value'],
   [[1, "two", { three: 3 }],          true,   'an array, nested as deep as it likes'],
@@ -155,34 +155,34 @@ const PublicBagCases = [
   [() => 'nope',                      false,  'a function is not data'],
 ] as const
 
-describe("PublicBag", () => {
-  for (const [candidate, expected, blurb] of PublicBagCases) {
-    it(blurb, () => { expect(PublicBag.safeParse(candidate).success).to.eq(expected) })
+describe("Sidecar", () => {
+  for (const [candidate, expected, blurb] of SidecarCases) {
+    it(blurb, () => { expect(Sidecar.safeParse(candidate).success).to.eq(expected) })
   }
 
   it("passes the examples its doc block shows", () => {
-    expect(PublicBag.parse({ note: 'work account', project: 'atlas' })).to.deep.equal({ note: 'work account', project: 'atlas' })
-    expect(PublicBag.safeParse({ when: new Date() }).success).to.be.false
-    expect(PublicBag.safeParse(undefined).success).to.be.false
+    expect(Sidecar.parse({ note: 'work account', project: 'atlas' })).to.deep.equal({ note: 'work account', project: 'atlas' })
+    expect(Sidecar.safeParse({ when: new Date() }).success).to.be.false
+    expect(Sidecar.safeParse(undefined).success).to.be.false
   })
 })
 
-const wholeSummary = { boxlabel: 'anthropic', revision_id: 'r1', vault_key_epoch: 1, public: {}, registered_at: Date.UTC(2026, 9, 14), written_at: Date.UTC(2026, 9, 14) }
+const wholeSummary = { boxlabel: 'anthropic', revision_id: 'r1', vault_key_epoch: 1, sidecar: {}, registered_at: Date.UTC(2026, 9, 14), written_at: Date.UTC(2026, 9, 14) }
 
 describe("LockboxSummary", () => {
   it("marks a summary undamaged, as its example shows", () => {
     expect(LockboxSummary.parse(wholeSummary).damaged).to.be.false
   })
 
-  it("takes a public bag of any JSON, and refuses a summary without one", () => {
-    expect(LockboxSummary.safeParse({ ...wholeSummary, public: { note: 'work account' } }).success).to.be.true
-    expect(LockboxSummary.safeParse({ ...wholeSummary, public: [1, 2] }).success).to.be.true
-    expect(LockboxSummary.safeParse(TH.omitting(wholeSummary, 'public')).success).to.be.false
+  it("takes a sidecar of any JSON, and refuses a summary without one", () => {
+    expect(LockboxSummary.safeParse({ ...wholeSummary, sidecar: { note: 'work account' } }).success).to.be.true
+    expect(LockboxSummary.safeParse({ ...wholeSummary, sidecar: [1, 2] }).success).to.be.true
+    expect(LockboxSummary.safeParse(TH.omitting(wholeSummary, 'sidecar')).success).to.be.false
   })
 
   it("holds neither ciphered field, the format nor the codec: a whole lockbox is not a summary", () => {
-    const summary = LockboxSummary.parse({ ...TH.boxOf('anthropic_api_key', 'a1'), public: {} })
-    expect(Object.keys(summary)).to.have.members(['boxlabel', 'revision_id', 'vault_key_epoch', 'public', 'registered_at', 'written_at', 'damaged'])
+    const summary = LockboxSummary.parse({ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: {} })
+    expect(Object.keys(summary)).to.have.members(['boxlabel', 'revision_id', 'vault_key_epoch', 'sidecar', 'registered_at', 'written_at', 'damaged'])
   })
 })
 

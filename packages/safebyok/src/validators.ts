@@ -159,7 +159,7 @@ export type NameValidator = Z.core.$ZodType<string>
  * So a check of yours is an alarm, not a promise about what storage holds: a lockbox stored under a
  * name it refuses -- written by another client, or before you narrowed it -- lists, reads and
  * erases as any other, by the name it was stored under; only a name below the floor is damage.
- * A lockbox's public bag is never checked by the vault: a host checks its own before `store()`. A server holds names to the floor and its own limits, never to these (`VAULTDB.md`).
+ * A lockbox's sidecar is never checked by the vault: a host checks its own before `store()`. A server holds names to the floor and its own limits, never to these (`VAULTDB.md`).
  *
  * Widening with care. A name is stored and bound exactly as given, so a check admitting text
  * outside ASCII should require what the floor does, Unicode's composed form (NFC), and an app

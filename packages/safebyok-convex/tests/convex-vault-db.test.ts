@@ -197,7 +197,7 @@ describe("a record the deployment refused", () => {
   const quotableWayins = [TH.wayinOf('quotable_phrase', { vault_key_epoch: 52_874, device_id: 'device_quotable', registered_at: Date.UTC(2026, 8, 17) })]
   const standing = TH.bundleOf(subject, { ...scope, ...quotableKey, unlock_epoch: 52_871, wayins: quotableWayins })
   const nextBundle = { ...standing, unlock_epoch: 52_872, vault_key_passphrase_wrapped: TH.fakeCiphered('rewrapped_quotable') }
-  const lockbox = TH.boxOf('quotable_box', 'quotable_rev', { public_json: TH.publicJsonOf({ note: 'a quotable bag' }), vault_key_epoch: 52_874 })
+  const lockbox = TH.boxOf('quotable_box', 'quotable_rev', { sidecar_json: TH.sidecarJsonOf({ note: 'a quotable sidecar' }), vault_key_epoch: 52_874 })
   // The whisper's codec and schema version are the same in every lockbox, so nothing to quote.
   const { whisper_codec: _codec, whisper_schema_version: _version, ...quotableBox } = lockbox
 
@@ -206,7 +206,7 @@ describe("a record the deployment refused", () => {
   // same in every record, so finding it in a refusal is no leak; only what varies per record counts.
   const rivalScope = { applabel: 'rival_app', user_id: 'user_rival', vaultlabel: 'rival_vault' }
   const rivalBundle = TH.bundleOf('user_rival', { ...rivalScope, vault_key_epoch: 11, prior_vault_key: { vault_key_epoch: 10, vault_key_wrapped: TH.fakeCiphered('prior_rival') }, unlock_epoch: 7, wayins: [TH.wayinOf('rival_phrase', { vault_key_epoch: 11, device_id: 'device_rival', registered_at: Date.UTC(2026, 0, 2) })] })
-  const rivalBox = TH.boxOf('rival_box', 'rival_rev', { public_json: TH.publicJsonOf({ note: 'a rival note' }), vault_key_epoch: 11 })
+  const rivalBox = TH.boxOf('rival_box', 'rival_rev', { sidecar_json: TH.sidecarJsonOf({ note: 'a rival note' }), vault_key_epoch: 11 })
   const rivalLeaves = new Set(TH.leafTexts({ scope: rivalScope, record: [rivalBundle, { ...rivalBundle, unlock_epoch: 8, vault_key_passphrase_wrapped: TH.fakeCiphered('rewrapped_rival') }, rivalBox] }))
   const perRecordLeaves = (record: unknown) => TH.leafTexts({ scope, record }).filter((leaf) => ! rivalLeaves.has(leaf))
 
@@ -249,12 +249,12 @@ describe("a record the deployment refused", () => {
     const client = deployment.client(subject)
     await convexVaultDB({ client, api: deployment.api.safebyok }).createBundle(standing)
     const expected = { vault_id: standing.vault_id, revision_id: null, vault_key_epoch: lockbox.vault_key_epoch }
-    const quotedArgs = misbagged({ scope, lockbox, expected })
+    const quotedArgs = withSidecarNotText({ scope, lockbox, expected })
     await expect(client.mutation(deployment.api.safebyok.updateBox, quotedArgs)).rejects.toThrow('quoted_by_convex')
     const quoting: ConvexVaultClient = {
       query:    client.query.bind(client),
       onUpdate: client.onUpdate.bind(client),
-      mutation: (mutationRef, args) => client.mutation(mutationRef, misbagged(args)),
+      mutation: (mutationRef, args) => client.mutation(mutationRef, withSidecarNotText(args)),
     }
     const vaultDB = convexVaultDB({ client: quoting, api: deployment.api.safebyok })
     const refusal = await TH.expectRefusal(vaultDB.updateBox(scope, lockbox, expected), 'storage_unavailable')
@@ -264,8 +264,8 @@ describe("a record the deployment refused", () => {
   })
 })
 
-/** `args` with its lockbox's public bag not text, past the core's checks: convex-test's validator quotes it. */
-const misbagged = <ArgsT extends object>(args: ArgsT): ArgsT => ({ ...args, lockbox: { ...(args as { lockbox?: object }).lockbox, public_json: ['quoted_by_convex'] } })
+/** `args` with its lockbox's sidecar not text, past the core's checks: convex-test's validator quotes it. */
+const withSidecarNotText = <ArgsT extends object>(args: ArgsT): ArgsT => ({ ...args, lockbox: { ...(args as { lockbox?: object }).lockbox, sidecar_json: ['quoted_by_convex'] } })
 
 /** Resolves once every message already sent to `vaultDB`'s client has arrived: one round trip behind them. */
 const caughtUp = async (vaultDB: ReturnType<typeof convexVaultDB>) => { await vaultDB.readBundle(u1) }

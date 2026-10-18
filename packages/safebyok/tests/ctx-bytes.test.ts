@@ -69,9 +69,9 @@ describe("the ctx builders' output, byte for byte", () => {
     const lockbox = (await vaultDB.readBox(scope, 'anthropic'))!
     const unlock = (await deviceDB.readUnlock(scope))!
     const box = `"acme","u1","main","${bundle.vault_id}"`
-    const header = `{"boxlabel":"anthropic","public_json":"{}","registered_at":${String(lockbox.registered_at)},"revision_id":"${lockbox.revision_id}","vault_key_epoch":1,"whisper_codec":"json_v1","whisper_schema_version":1,"written_at":${String(lockbox.written_at)}}`
-    const keyCtx = textBytes(`["safebyok-lockbox-v4",${box},"lockbox_key_wrapped",${header}]`)
-    const whisperCtx = textBytes(`["safebyok-lockbox-v4",${box},"whisper_ciphered",${header}]`)
+    const header = `{"boxlabel":"anthropic","registered_at":${String(lockbox.registered_at)},"revision_id":"${lockbox.revision_id}","sidecar_json":"{}","vault_key_epoch":1,"whisper_codec":"json_v1","whisper_schema_version":1,"written_at":${String(lockbox.written_at)}}`
+    const keyCtx = textBytes(`["safebyok-lockbox-v5",${box},"lockbox_key_wrapped",${header}]`)
+    const whisperCtx = textBytes(`["safebyok-lockbox-v5",${box},"whisper_ciphered",${header}]`)
     const leaseCtx = textBytes(`["safebyok-unlock-v1",${box},${String(unlock.unlock_epoch)},${String(unlock.ask_passphrase_at)},"vault_key_local_wrapped"]`)
 
     const { sessionKey } = await Wayin.openWithPassphrase(TH.testDeriver, 'pw', scope, bundle)

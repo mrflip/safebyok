@@ -80,6 +80,6 @@ describe("Columns.recordOf", () => {
 
 describe("ListedLockboxColumns", () => {
   it("is every lockbox column but the two ciphered ones", () => {
-    expect(ListedLockboxColumns.map(([field]) => field)).to.deep.equal(['format', 'boxlabel', 'revision_id', 'vault_key_epoch', 'whisper_codec', 'whisper_schema_version', 'public_json', 'registered_at', 'written_at'])
+    expect(ListedLockboxColumns.map(([field]) => field)).to.deep.equal(['format', 'boxlabel', 'revision_id', 'vault_key_epoch', 'whisper_codec', 'whisper_schema_version', 'sidecar_json', 'registered_at', 'written_at'])
   })
 })

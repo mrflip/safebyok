@@ -149,33 +149,33 @@ export const vaultKeyEpoch = Z.int().check(Z.positive())
 const cryptoKeyHandle = Z.custom<CryptoKey>((val) => val instanceof CryptoKey, 'a CryptoKey handle')
 
 /**
- * A lockbox's public bag: any JSON value the host keeps beside the whisper -- what the user calls
- * the account, which project a key belongs to -- shown while the vault is locked, and never
- * interpreted by safebyok. It is stored in the clear, as its JSON (`public_json`), and bound into
- * the lockbox's encryption, so a bag altered or swapped in storage makes the lockbox refuse to
- * open. A host checks its own bag's shape before `store()`. Never put secret material in it.
+ * A lockbox's sidecar: your app's own plain data, riding beside the whisper, authenticated but
+ * not encrypted. Any JSON value -- what the user calls the account, which project a key belongs
+ * to -- shown while the vault is locked, and never interpreted by safebyok. It is stored in the clear, as its JSON (`sidecar_json`), and bound into
+ * the lockbox's encryption, so a sidecar altered or swapped in storage makes the lockbox refuse to
+ * open. A host checks its own sidecar's shape before `store()`. Never put secret material in it.
  *
- * @example PublicBag.parse({ note: 'work account', project: 'atlas' })
- * @example PublicBag.safeParse({ when: new Date() }).success   // false: JSON would flatten it to {}
- * @example PublicBag.safeParse(undefined).success              // false: undefined is not JSON
+ * @example Sidecar.parse({ note: 'work account', project: 'atlas' })
+ * @example Sidecar.safeParse({ when: new Date() }).success     // false: JSON would flatten it to {}
+ * @example Sidecar.safeParse(undefined).success                // false: undefined is not JSON
  */
-export const PublicBag: Z.ZodMiniType<WhisperJson> = whisperJson
-export type PublicBag = Z.infer<typeof PublicBag>
+export const Sidecar: Z.ZodMiniType<WhisperJson> = whisperJson
+export type Sidecar = Z.infer<typeof Sidecar>
 
 /**
- * The public face of a lockbox: its boxlabel, revision, vaultKey epoch and times, its public bag
+ * The public face of a lockbox: its boxlabel, revision, vaultKey epoch and times, its sidecar
  * as the JSON value the host stored (`{}` when it gave none), and `damaged` false. This, or a
  * {@link DamagedLockbox}, is what a VaultDB's `listBoxes` returns and a vault's snapshot holds,
- * readable while locked. The bag is shown as storage holds it: only `read()` opens the lockbox
+ * readable while locked. The sidecar is shown as storage holds it: only `read()` opens the lockbox
  * and so proves it unaltered.
  *
- * @example LockboxSummary.parse({ boxlabel: 'anthropic', revision_id: 'r1', vault_key_epoch: 1, public: {}, registered_at, written_at }).damaged  // false
+ * @example LockboxSummary.parse({ boxlabel: 'anthropic', revision_id: 'r1', vault_key_epoch: 1, sidecar: {}, registered_at, written_at }).damaged // false
  */
 export const LockboxSummary = Z.object({
   boxlabel:        NameFloor,
   revision_id:     Z.string().check(Z.minLength(1)),
   vault_key_epoch: vaultKeyEpoch,
-  public:          PublicBag,
+  sidecar:         Sidecar,
   registered_at:   EpochMillis,
   written_at:      EpochMillis,
   damaged:         Z._default(Z.literal(false), false),
@@ -193,7 +193,7 @@ export type LockboxSummary = Z.infer<typeof LockboxSummary>
  *
  * @example
  *   for (const box of snapshot.boxes) {
- *     if (box.damaged) { showRemovable(box.boxlabel) } else { showSummary(box.boxlabel, box.public) }
+ *     if (box.damaged) { showRemovable(box.boxlabel) } else { showSummary(box.boxlabel, box.sidecar) }
  *   }
  */
 export type DamagedLockbox = { boxlabel: string, damaged: true, revision_id: string | null }
@@ -483,7 +483,7 @@ export const MaxReentryHours = 588
 
 /**
  * The largest whisper a vault stores unless the caller says otherwise, in bytes of its JSON and
- * its lockbox's public bag's together: several times the beefiest credential (an RSA-8192 private key as PEM is about 6.4 KB), and
+ * its lockbox's sidecar's together: several times the beefiest credential (an RSA-8192 private key as PEM is about 6.4 KB), and
  * well inside what every storage backend can hold. A larger whisper is usually a sign that the
  * wrong value is being stored.
  */

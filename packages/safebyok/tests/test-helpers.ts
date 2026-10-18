@@ -17,7 +17,7 @@ import type { VaultLogger } from '../src/logger'
 import { StrongVerdict, type PassphraseStrengthTest } from '../src/passphrase-strength'
 import { memoryStore } from '../src/string-store'
 import type { Lockbox } from '../src/lockbox'
-import type { DamagedLockbox, DeviceMark, DeviceUnlock, LockboxSummary, PasskeyWayin, PasskeyProof, PassphraseWayin, PublicBag, SeenVault, VaultBundle, VaultScope } from '../src/types'
+import type { DamagedLockbox, DeviceMark, DeviceUnlock, LockboxSummary, PasskeyWayin, PasskeyProof, PassphraseWayin, Sidecar, SeenVault, VaultBundle, VaultScope } from '../src/types'
 import { stableJsonify } from '../src/stable-jsonify'
 import { NameFloorBytes } from '../src/validators'
 import { TestDeriverNotice } from '../src/key-deriver-spec'
@@ -204,13 +204,13 @@ export const rotatedBundleOf = (userId: string): VaultBundle => bundleOf(userId,
 
 /**
  * A shape-valid Lockbox for storage-layer tests, its ciphered fields fake: revision `rev-<tag>`,
- * sealed under the vault's first vaultKey, with the public bag `{ note: 'a test box' }` unless
+ * sealed under the vault's first vaultKey, with the sidecar `{ note: 'a test box' }` unless
  * `overrides` says otherwise.
  *
- * @example boxOf('anthropic_api_key', 'a1', { public_json: publicJsonOf({ note: 'work account' }) })
+ * @example boxOf('anthropic_api_key', 'a1', { sidecar_json: sidecarJsonOf({ note: 'work account' }) })
  */
 export const boxOf = (boxlabel: string, tag: string, overrides: Partial<Lockbox> = {}): Lockbox => ({
-  format:                 'safebyok-lockbox-v4',
+  format:                 'safebyok-lockbox-v5',
   boxlabel,
   revision_id:            `rev-${tag}`,
   vault_key_epoch:        1,
@@ -218,19 +218,19 @@ export const boxOf = (boxlabel: string, tag: string, overrides: Partial<Lockbox>
   whisper_ciphered:       fakeCiphered(`whisper-${tag}`),
   whisper_codec:          'json_v1',
   whisper_schema_version: 1,
-  public_json:            publicJsonOf({ note: 'a test box' }),
+  sidecar_json:           sidecarJsonOf({ note: 'a test box' }),
   registered_at:          Date.UTC(2026, 9, 14),
   written_at:             Date.UTC(2026, 9, 14),
   ...overrides,
 })
 
 /**
- * A public bag as a lockbox's `public_json` holds it: its JSON, every object's keys sorted, as the
+ * A sidecar as a lockbox's `sidecar_json` holds it: its JSON, every object's keys sorted, as the
  * vault writes it.
  *
- * @example publicJsonOf({ note: 'work account' })  // '{"note":"work account"}'
+ * @example sidecarJsonOf({ note: 'work account' }) // '{"note":"work account"}'
  */
-export const publicJsonOf = (bag: PublicBag): string => stableJsonify(bag) ?? ''
+export const sidecarJsonOf = (sidecar: Sidecar): string => stableJsonify(sidecar) ?? ''
 
 
 /**
@@ -248,7 +248,7 @@ export const OddLabels = Object.freeze([
  * damaged fails the test, naming its boxlabel. For a test reading a summary's fields out of a
  * listing or a snapshot, where TypeScript would otherwise have it ask after damage first.
  *
- * @example expect(TH.summaryOf(vault.getSnapshot().boxes[0])?.public).to.deep.equal({ note: 'work account' })
+ * @example expect(TH.summaryOf(vault.getSnapshot().boxes[0])?.sidecar).to.deep.equal({ note: 'work account' })
  */
 export const summaryOf = (box: LockboxSummary | DamagedLockbox | undefined): LockboxSummary | undefined => {
   if (box?.damaged === true) { throw new Error(`The lockbox '${box.boxlabel}' is listed as damaged, where a summary was expected.`) }
@@ -1165,22 +1165,22 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       expect(await vaultDB.readBox(scopeOf('u1'), 'anthropic')).to.deep.equal(boxOf('anthropic', 'one'))
     })
 
-    it("reads back a lockbox with an empty public bag as stored, and lists it with that bag", async () => {
+    it("reads back a lockbox with an empty sidecar as stored, and lists it with that sidecar", async () => {
       const vaultDB = await withBundle()
-      const bagless = boxOf('anthropic', 'one', { public_json: '{}' })
-      await vaultDB.updateBox(scopeOf('u1'), bagless, noBoxYet)
-      expect(await vaultDB.readBox(scopeOf('u1'), 'anthropic')).to.deep.equal(bagless)
+      const sidecarless = boxOf('anthropic', 'one', { sidecar_json: '{}' })
+      await vaultDB.updateBox(scopeOf('u1'), sidecarless, noBoxYet)
+      expect(await vaultDB.readBox(scopeOf('u1'), 'anthropic')).to.deep.equal(sidecarless)
       const [summary] = await vaultDB.listBoxes(scopeOf('u1'))
-      expect(summaryOf(summary)?.public).to.deep.equal({})
+      expect(summaryOf(summary)?.sidecar).to.deep.equal({})
     })
 
-    it("reads a public bag's JSON back exactly as written, as it is bound: accented letters, an emoji, a tab, a newline, quotes and backslashes", async () => {
+    it("reads a sidecar's JSON back exactly as written, as it is bound: accented letters, an emoji, a tab, a newline, quotes and backslashes", async () => {
       const vaultDB = await withBundle()
-      await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one', { public_json: publicJsonOf(LiteralBag) }), noBoxYet)
+      await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one', { sidecar_json: sidecarJsonOf(LiteralSidecar) }), noBoxYet)
       const lockbox = await vaultDB.readBox(scopeOf('u1'), 'anthropic')
-      expect(lockbox?.public_json).to.eq(publicJsonOf(LiteralBag))
+      expect(lockbox?.sidecar_json).to.eq(sidecarJsonOf(LiteralSidecar))
       const [summary] = await vaultDB.listBoxes(scopeOf('u1'))
-      expect(summaryOf(summary)?.public).to.deep.equal(LiteralBag)
+      expect(summaryOf(summary)?.sidecar).to.deep.equal(LiteralSidecar)
     })
 
     it("adds nothing it was handed beyond the record: a field safebyok never writes is left behind", async () => {
@@ -1299,7 +1299,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
         boxlabel:        'anthropic',
         revision_id:     'rev-one',
         vault_key_epoch: 1,
-        public:          { note: 'a test box' },
+        sidecar:         { note: 'a test box' },
         registered_at:   Date.UTC(2026, 9, 14),
         written_at:      Date.UTC(2026, 9, 14),
         damaged:         false,
@@ -1510,7 +1510,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
         [() => vaultDB.updateBundle(bundleOf('u1', { unlock_epoch: 3 }), { vault_id: 'vault-id-u1', unlock_epoch: 2 }),                 'stale_write'],
         [() => vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'late'), { vault_id: 'vault-id-u1', revision_id: 'rev-other', vault_key_epoch: 1 }),      'stale_write'],
         [() => vaultDB.updateBox(scopeOf('u1'), boxOf('mistral', 'late'), { vault_id: 'vault-id-gone', revision_id: null, vault_key_epoch: 1 }),             'stale_write'],
-        [() => vaultDB.updateBox(scopeOf('u1'), boxOf('mistral', 'late', { public_json: '{"note":' }), noBoxYet),                       'bad_option'],
+        [() => vaultDB.updateBox(scopeOf('u1'), boxOf('mistral', 'late', { sidecar_json: '{"note":' }), noBoxYet),                      'bad_option'],
         [() => vaultDB.eraseBox(scopeOf('u1'), 'anthropic', { vault_id: 'vault-id-gone' }),                                               'stale_write'],
         [() => vaultDB.eraseVault(scopeOf('u1'), { vault_id: 'vault-id-gone' }),                                                          'stale_write'],
       ] as const
@@ -1655,7 +1655,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
 
     it("refuses a malformed record or expectation, or a bundle under another vault_id, as bad_option, before storage sees it", async () => {
       const vaultDB = await withBundle()
-      const unparsable = boxOf('anthropic', 'one', { public_json: 'not json' })
+      const unparsable = boxOf('anthropic', 'one', { sidecar_json: 'not json' })
       await expectRefusal(vaultDB.updateBox(scopeOf('u1'), unparsable, noBoxYet), 'bad_option')
       await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), { vault_id: 'vault-id-u1', revision_id: '', vault_key_epoch: 1 }), 'bad_option')
       await expectRefusal(vaultDB.updateBundle(bundleOf('u1', { unlock_epoch: 0 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'bad_option')
@@ -1667,16 +1667,16 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
   })
 
   describe(lineTitle('5.3'), () => {
-    it("quotes no ciphertext, boxlabel or public bag of a write it refuses as stale", async () => {
+    it("quotes no ciphertext, boxlabel or sidecar of a write it refuses as stale", async () => {
       const vaultDB = await withBundle()
-      const lockbox = boxOf('secret_project_x', 'sk-fake-quoted', { public_json: publicJsonOf({ note: 'a bag never to be quoted' }) })
+      const lockbox = boxOf('secret_project_x', 'sk-fake-quoted', { sidecar_json: sidecarJsonOf({ note: 'a sidecar never to be quoted' }) })
       const refusal = await expectRefusal(vaultDB.updateBox(scopeOf('u1'), lockbox, { vault_id: 'vault-id-gone', revision_id: null, vault_key_epoch: 1 }), 'stale_write')
       expect(quotedOf(refusal, lockbox)).to.deep.equal([])
     })
 
-    it.runIf(capped)("quotes no ciphertext, boxlabel or public bag of a lockbox it refuses as vault_full", async () => {
+    it.runIf(capped)("quotes no ciphertext, boxlabel or sidecar of a lockbox it refuses as vault_full", async () => {
       const vaultDB = await cappedHolding(['anthropic', 'openai', 'mistral'])
-      const lockbox = boxOf('secret_project_x', 'sk-fake-quoted', { public_json: publicJsonOf({ note: 'a bag never to be quoted' }) })
+      const lockbox = boxOf('secret_project_x', 'sk-fake-quoted', { sidecar_json: sidecarJsonOf({ note: 'a sidecar never to be quoted' }) })
       const refusal = await expectRefusal(vaultDB.updateBox(scopeOf('u1'), lockbox, noBoxYet), 'vault_full')
       expect(quotedOf(refusal, lockbox)).to.deep.equal([])
     })
@@ -2287,10 +2287,10 @@ const everyVerbOn = (stranger: VaultDBVerbs) => [
 
 /** Text no normalization leaves alone: "café" with its accent composed, then decomposed, and a key. */
 /**
- * A public bag of accented letters, an emoji, a tab, a newline, quotes, backslashes, Hebrew, a
+ * A sidecar of accented letters, an emoji, a tab, a newline, quotes, backslashes, Hebrew, a
  * null and a fraction: JSON a store must hand back byte for byte as it was written, as it is bound.
  */
-const LiteralBag = Object.freeze({
+const LiteralSidecar = Object.freeze({
   note: 'caf\u{E9} na\u{EF}ve \u{1F511}\trotated\nin March',
   path: String.raw`C:\keys\"work"`,
   tags: ['\u{5D0}\u{5D1}', null, 1.5],
@@ -2334,10 +2334,10 @@ const settledKind = async (write: Promise<unknown>): Promise<string> => {
   }
 }
 
-/** Which of a lockbox's boxlabel, public bag and ciphertexts a refusal quotes anywhere. */
+/** Which of a lockbox's boxlabel, sidecar and ciphertexts a refusal quotes anywhere. */
 const quotedOf = (refusal: unknown, lockbox: Lockbox): string[] => {
   const told = thrownText(refusal)
-  const quotable = [lockbox.boxlabel, lockbox.public_json, ...leafTexts(lockbox.lockbox_key_wrapped), ...leafTexts(lockbox.whisper_ciphered)]
+  const quotable = [lockbox.boxlabel, lockbox.sidecar_json, ...leafTexts(lockbox.lockbox_key_wrapped), ...leafTexts(lockbox.whisper_ciphered)]
   return quotable.filter((text) => text !== '' && told.includes(text))
 }
 

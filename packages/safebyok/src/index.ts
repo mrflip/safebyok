@@ -17,7 +17,7 @@ export type { EraseDamagedVaultOpts, OpenVaultOpts, Vault, VaultSnapshot, VaultS
 export { DefaultLogger, parseLogger, setDefaultLogger } from './logger'
 export type { VaultLogger } from './logger'
 export { Lockbox } from './lockbox'
-export { EpochMillis, FarFuture, FarPast, ForcePassphraseReentryHours, ForeverMillis, LockboxSummary, MaxLockboxes, MaxReentryHours, MaxUnlocks, MaxWhisperBytes, MinuteMillis, PasskeySaltBytes, PasskeyWayin, PassphraseWayin, PublicBag, VaultBundle, VaultScope, Wayin, WayinKindVals, Whisper, wallClock } from './types'
+export { EpochMillis, FarFuture, FarPast, ForcePassphraseReentryHours, ForeverMillis, LockboxSummary, MaxLockboxes, MaxReentryHours, MaxUnlocks, MaxWhisperBytes, MinuteMillis, PasskeySaltBytes, PasskeyWayin, PassphraseWayin, Sidecar, VaultBundle, VaultScope, Wayin, WayinKindVals, Whisper, wallClock } from './types'
 export { AnyTextValidators, DefaultValidators, Label, LabelPattern, MaxLabelChars, MaxUserIdChars, NameFloor, NameFloorBytes, UserId, UserIdPattern } from './validators'
 export type { NameValidator, VaultValidators } from './validators'
 export { checkValidators } from './names'

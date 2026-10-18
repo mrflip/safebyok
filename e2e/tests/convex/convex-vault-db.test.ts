@@ -255,7 +255,7 @@ describe("a vault over convexVaultDB, on two devices", () => {
 
     // The laptop makes the vault and stores a whisper; the phone hears of both.
     await laptop.unlock(TH.RealPassphrase)
-    await laptop.store('anthropic_api_key', anthropicKey, { public: { note: 'work account' } })
+    await laptop.store('anthropic_api_key', anthropicKey, { sidecar: { note: 'work account' } })
     await vi.waitFor(() => {
       expect(phone.getSnapshot().state).to.eq('locked')
       expect(phone.getSnapshot().boxes.map((box) => box.boxlabel)).to.deep.equal(['anthropic_api_key'])

@@ -595,12 +595,12 @@ describe("the fixtures", () => {
   it("boxOf: a shape-valid Lockbox, with any field overridden", () => {
     expect(Lockbox.safeParse(TH.boxOf('anthropic_api_key', 'a1')).success).to.be.true
     expect(TH.boxOf('anthropic_api_key', 'a1').revision_id).to.eq('rev-a1')
-    expect(TH.boxOf('anthropic_api_key', 'a1', { public_json: '{}' }).public_json).to.eq('{}')
+    expect(TH.boxOf('anthropic_api_key', 'a1', { sidecar_json: '{}' }).sidecar_json).to.eq('{}')
   })
 
-  it("publicJsonOf: a public bag as a lockbox holds it, its keys sorted, as the example shows", () => {
-    expect(TH.publicJsonOf({ note: 'work account' })).to.eq('{"note":"work account"}')
-    expect(TH.publicJsonOf({ tier: 2, note: 'work' })).to.eq('{"note":"work","tier":2}')
+  it("sidecarJsonOf: a sidecar as a lockbox holds it, its keys sorted, as the example shows", () => {
+    expect(TH.sidecarJsonOf({ note: 'work account' })).to.eq('{"note":"work account"}')
+    expect(TH.sidecarJsonOf({ tier: 2, note: 'work' })).to.eq('{"note":"work","tier":2}')
   })
 })
 

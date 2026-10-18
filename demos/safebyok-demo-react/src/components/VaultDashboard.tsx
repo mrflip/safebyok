@@ -5,7 +5,7 @@ import { WhisperFieldAttributes } from 'safebyok/utils'
 import { asksAgain } from '../lib/asks-again'
 import { editableWhisper, parseWhisperText, showWhisper } from '../lib/whisper-text'
 import { PsstModal } from './PsstModal'
-import type { PublicBag, Whisper } from 'safebyok'
+import type { Sidecar, Whisper } from 'safebyok'
 
 /**
  * Direct manipulation of the vault's lockboxes: add, view, edit, delete, use. The lines that
@@ -18,12 +18,12 @@ type FormState = { editing: string | null, boxlabelText: string, whisperText: st
 const blankForm: FormState = { editing: null, boxlabelText: '', whisperText: '', noteText: '' }
 
 /**
- * The note this demo keeps in a lockbox's public bag, as `{ note }`: the vault never looks inside
- * the bag, so the app reads its own shape back out of it, and finds no note in any other.
+ * The note this demo keeps in a lockbox's sidecar, as `{ note }`: the vault never looks inside
+ * the sidecar, so the app reads its own shape back out of it, and finds no note in any other.
  */
-const noteOf = (bag: PublicBag): string => {
-  if (typeof bag !== 'object' || bag === null || Array.isArray(bag)) { return '' }
-  const { note } = bag
+const noteOf = (sidecar: Sidecar): string => {
+  if (typeof sidecar !== 'object' || sidecar === null || Array.isArray(sidecar)) { return '' }
+  const { note } = sidecar
   return typeof note === 'string' ? note : ''
 }
 
@@ -107,10 +107,10 @@ export const VaultDashboard = () => {
     try {
       const saved = await withUnlockedVault(async () => {
         // The cast hands validation to the vault: typing "null" in the box parses to a bare
-        // null, and the store's refusal lands in the gripe below. A blank note leaves the public
-        // bag out, so the lockbox keeps the one it has.
+        // null, and the store's refusal lands in the gripe below. A blank note leaves the
+        // sidecar out, so the lockbox keeps the one it has.
         const note = form.noteText.trim()
-        await vault.store(form.boxlabelText.trim(), parseWhisperText(form.whisperText)!, note === '' ? {} : { public: { note } })
+        await vault.store(form.boxlabelText.trim(), parseWhisperText(form.whisperText)!, note === '' ? {} : { sidecar: { note } })
         return true
       })
       if (saved !== null) { setForm(null) }
@@ -162,11 +162,11 @@ export const VaultDashboard = () => {
                       ? <><span className="quiet">••••••••</span> <button className="mini" onClick={() => { void view(box.boxlabel) }}>view</button></>
                       : <><code>{showWhisper(viewed)}</code> <button className="mini" onClick={() => { hide(box.boxlabel) }}>hide</button></>}
                   </td>
-                  <td className="quiet">{noteOf(box.public)}</td>
+                  <td className="quiet">{noteOf(box.sidecar)}</td>
                   <td className="quiet">{new Date(box.written_at).toLocaleString()}</td>
                   <td className="row">
                     <button className="mini" onClick={() => { void applyWhisper(box.boxlabel) }}>use</button>
-                    <button className="mini" onClick={() => { void edit(box.boxlabel, noteOf(box.public)) }}>edit</button>
+                    <button className="mini" onClick={() => { void edit(box.boxlabel, noteOf(box.sidecar)) }}>edit</button>
                     <button className="mini danger" onClick={() => { void erase(box.boxlabel) }}>delete</button>
                   </td>
                 </tr>
@@ -201,7 +201,7 @@ export const VaultDashboard = () => {
               />
             </label>
             <label>
-              note <span className="quiet">(public: visible without the passphrase; left blank, the note stands)</span>
+              note <span className="quiet">(kept in the sidecar, not encrypted: visible without the passphrase; left blank, the note stands)</span>
               <input
                 placeholder="personal account"
                 value={form.noteText}

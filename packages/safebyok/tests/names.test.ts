@@ -23,7 +23,7 @@ describe("Names.checkValidators", () => {
     expect(err.message).to.include('spelling')
   })
 
-  it("refuses a note check, as there is no note: a lockbox's public bag is the host's to check", () => {
+  it("refuses a note check, as there is no note: a lockbox's sidecar is the host's to check", () => {
     TH.expectSyncRefusal(() => Names.checkValidators({ note: ZClassic.string() } as never), 'bad_option')
   })
 

@@ -74,14 +74,14 @@ describe("getBox and updateBox", () => {
     expect(await CVX.query(TH.vaults.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })).to.deep.equal(TH.boxOf('anthropic_api_key', 'a1'))
   })
 
-  it("stores a lockbox's public bag as the JSON text it was handed, and reads it back so", async () => {
+  it("stores a lockbox's sidecar as the JSON text it was handed, and reads it back so", async () => {
     const CVX = await withBundle()
-    const bagged = TH.boxOf('anthropic_api_key', 'a1', { public_json: TH.publicJsonOf({ note: 'caf\u{E9} "quoted"', tags: [null] }) })
-    await CVX.mutation(TH.vaults.updateBox, { scope: u1, lockbox: bagged, expected: TH.noBoxYet })
+    const withSidecar = TH.boxOf('anthropic_api_key', 'a1', { sidecar_json: TH.sidecarJsonOf({ note: 'caf\u{E9} "quoted"', tags: [null] }) })
+    await CVX.mutation(TH.vaults.updateBox, { scope: u1, lockbox: withSidecar, expected: TH.noBoxYet })
     const { lockboxes } = await allRows(CVX)
     const [row] = lockboxes
-    expect(row).to.include({ public_json: bagged.public_json })
-    expect(await CVX.query(TH.vaults.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })).to.deep.equal(bagged)
+    expect(row).to.include({ sidecar_json: withSidecar.sidecar_json })
+    expect(await CVX.query(TH.vaults.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })).to.deep.equal(withSidecar)
   })
 })
 
@@ -174,10 +174,10 @@ describe("a real vault's records", () => {
     }
     const vault = await TH.openOver(memoryStoreHolding(real))
     const listed = await CVX.query(TH.vaults.listBoxSummaries, { scope: u1 })
-    // The core's summary drops `format` and the codec, and parses the public bag's JSON; the
+    // The core's summary drops `format` and the codec, and parses the sidecar's JSON; the
     // listing holds the record's fields as stored.
-    const summaries = listed.map(({ format: _format, whisper_codec: _codec, whisper_schema_version: _version, public_json: publicJson, ...shell }) => (
-      LockboxSummary.parse({ ...shell, public: JSON.parse(publicJson) as unknown })
+    const summaries = listed.map(({ format: _format, whisper_codec: _codec, whisper_schema_version: _version, sidecar_json: sidecarJson, ...shell }) => (
+      LockboxSummary.parse({ ...shell, sidecar: JSON.parse(sidecarJson) as unknown })
     ))
     expect(summaries).to.deep.equal(vault.getSnapshot().boxes)
     vault.close()

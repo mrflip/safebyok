@@ -1,6 +1,6 @@
 import * as Z from 'zod/mini'
 import { Lockbox } from './lockbox'
-import { MaxUnlocks, WayinKindVals, VaultBundle, VaultScope, type DamagedLockbox, type LockboxSummary, type PublicBag } from './types'
+import { MaxUnlocks, WayinKindVals, VaultBundle, VaultScope, type DamagedLockbox, type LockboxSummary, type Sidecar } from './types'
 import { VaultError, isVaultError } from './errors'
 import * as Names from './names'
 import { AnyTextValidators, NameFloor } from './validators'
@@ -137,7 +137,7 @@ export abstract class VaultDB {
    * `Infinity` when it sets no per-record limit. A vault refuses to open with a `maxWhisperBytes`
    * over half of it, leaving room for encoding and the record's other fields; and `updateBox`
    * refuses, with kind `lockbox_too_large`, a lockbox that with its scope weighs more than this
-   * as the UTF-8 bytes of its JSON -- a large public bag or long names can make one so.
+   * as the UTF-8 bytes of its JSON -- a large sidecar or long names can make one so.
    */
   abstract readonly maxRecordBytes: number
 
@@ -147,7 +147,7 @@ export abstract class VaultDB {
    * list and erase whole: a backend that reads a vault in one transaction under a read budget
    * declares the share of that budget its heaviest verb leaves. A vault refuses to open when its
    * `maxLockboxes` lockboxes might not fit in it, each counted at twice `maxWhisperBytes` (room
-   * for its whisper and public bag together, their encoding, and the backend's own counting) and
+   * for its whisper and sidecar together, their encoding, and the backend's own counting) and
    * 1 KiB for its other fields, which covers them at their largest under the default validators.
    * And since a host's validators may admit names of any length, each `store()` measures them: it
    * refuses, with kind `vault_full`, a new lockbox that would take the vault past this limit, each
@@ -263,7 +263,7 @@ export abstract class VaultDB {
   }
 
   /**
-   * Public faces of every lockbox in the vault -- ciphered fields stripped, the public bag as the
+   * Public faces of every lockbox in the vault -- ciphered fields stripped, the sidecar as the
    * JSON value it holds -- valid while locked, sorted by boxlabel, character by character (UTF-16
    * code unit, never by a locale), so every device lists in one order. A lockbox whose record does
    * not read back as one, or names another boxlabel than it is stored under, is listed as a
@@ -319,7 +319,7 @@ export abstract class VaultDB {
     }
     const recordBytes = jsonBytes({ ...asked, ...outgoing })
     if (recordBytes > this.maxRecordBytes) {
-      throw new VaultError('lockbox_too_large', `That lockbox weighs ${String(recordBytes)} bytes, over the ${String(this.maxRecordBytes)} its storage holds in one record, so nothing was written: store a smaller whisper or public bag, or under a shorter boxlabel.`)
+      throw new VaultError('lockbox_too_large', `That lockbox weighs ${String(recordBytes)} bytes, over the ${String(this.maxRecordBytes)} its storage holds in one record, so nothing was written: store a smaller whisper or sidecar, or under a shorter boxlabel.`)
     }
     const landed = await fromStorage(() => this.doUpdateBox(asked, outgoing, expectation))
     if (! landed) { throw Refusals.staleWrite('lockbox') }
@@ -582,12 +582,12 @@ const listedOrDamaged = ({ boxlabel, lockbox }: StoredLockbox): LockboxSummary |
 const StoredRevision = Z.object({ revision_id: Lockbox.shape.revision_id })
 
 /**
- * A listed lockbox's summary: its public fields, and its bag as the JSON value its record holds
- * (`public_json` is JSON text, as the record's check has found).
+ * A listed lockbox's summary: its public fields, and its sidecar as the JSON value its record holds
+ * (`sidecar_json` is JSON text, as the record's check has found).
  */
 const summaryOf = (listed: Z.infer<typeof ListedLockbox>): LockboxSummary => {
-  const { boxlabel, revision_id, vault_key_epoch, public_json, registered_at, written_at } = listed
-  return { boxlabel, revision_id, vault_key_epoch, public: JSON.parse(public_json) as PublicBag, registered_at, written_at, damaged: false }
+  const { boxlabel, revision_id, vault_key_epoch, sidecar_json, registered_at, written_at } = listed
+  return { boxlabel, revision_id, vault_key_epoch, sidecar: JSON.parse(sidecar_json) as Sidecar, registered_at, written_at, damaged: false }
 }
 
 /** Two names in one order on every device: character by character, by UTF-16 code unit, never by a locale. */

@@ -45,14 +45,14 @@ describe("cipherCtx", () => {
   })
 
   it("encodes a record part with its keys sorted, every field bound", () => {
-    const header = cipherCtx('safebyok-lockbox-v4', { revision_id: 'r1', boxlabel: 'anthropic', written_at: 1 })
-    expect(toB64(cipherCtx('safebyok-lockbox-v4', { boxlabel: 'anthropic', written_at: 1, revision_id: 'r1' }))).to.eq(toB64(header))
-    expect(toB64(cipherCtx('safebyok-lockbox-v4', { boxlabel: 'anthropic', written_at: 1, revision_id: 'r1', public_json: '{}' }))).to.not.eq(toB64(header))
+    const header = cipherCtx('safebyok-lockbox-v5', { revision_id: 'r1', boxlabel: 'anthropic', written_at: 1 })
+    expect(toB64(cipherCtx('safebyok-lockbox-v5', { boxlabel: 'anthropic', written_at: 1, revision_id: 'r1' }))).to.eq(toB64(header))
+    expect(toB64(cipherCtx('safebyok-lockbox-v5', { boxlabel: 'anthropic', written_at: 1, revision_id: 'r1', sidecar_json: '{}' }))).to.not.eq(toB64(header))
   })
 
   it("refuses a record part holding a field set to undefined as bad_option, rather than treating it as if it were not there", () => {
-    const holding = { boxlabel: 'anthropic', written_at: 1, revision_id: 'r1', public_json: undefined } as unknown as CipherCtxPart
-    TH.expectSyncRefusal(() => cipherCtx('safebyok-lockbox-v4', holding), 'bad_option')
+    const holding = { boxlabel: 'anthropic', written_at: 1, revision_id: 'r1', sidecar_json: undefined } as unknown as CipherCtxPart
+    TH.expectSyncRefusal(() => cipherCtx('safebyok-lockbox-v5', holding), 'bad_option')
   })
 
   it("refuses a part that is undefined or null as bad_option, rather than treating it as null", () => {

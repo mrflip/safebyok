@@ -5,7 +5,7 @@ import { EpochMillis, vaultKeyEpoch } from './types'
 import { NameFloor } from './validators'
 
 /**
- * True when `text` is a public bag's JSON exactly as the vault writes it: parsed and serialized
+ * True when `text` is a sidecar's JSON exactly as the vault writes it: parsed and serialized
  * again, keys sorted, it comes back the same. Text respaced, reordered, or nested too deep to
  * serialize is not, and the lockbox holding it reads as damaged, its refusal a calm one.
  */
@@ -20,13 +20,13 @@ const isStableJsonText = (text: string): boolean => {
 
 /**
  * One lockbox as the storage layer holds it: the whisper ciphered under its own lockboxKey, that
- * lockboxKey wrapped under the vaultKey, and the public shell -- boxlabel, public bag, the times
+ * lockboxKey wrapped under the vaultKey, and the public shell -- boxlabel, sidecar, the times
  * it was first stored and last written -- a locked vault may show. Nothing in this record opens
  * without the vaultKey.
  *
  * `revision_id` is minted fresh on every write and bound into both encryptions, so ciphertext
  * moved between revisions (or boxes, or vaults) refuses to open. So is every other field but the
- * two encrypted ones: an altered bag, time or codec refuses to open as well.
+ * two encrypted ones: an altered sidecar, time or codec refuses to open as well.
  *
  * Stored fields are underbar_case: this record is written to the storage layer as-is, and it is
  * plain JSON -- any backend that can hold text can hold it. Its boxlabel is checked here against
@@ -34,7 +34,7 @@ const isStableJsonText = (text: string): boolean => {
  * host hands it in.
  */
 export const Lockbox = Z.object({
-  format:                 Z.literal('safebyok-lockbox-v4'),
+  format:                 Z.literal('safebyok-lockbox-v5'),
   boxlabel:               NameFloor,
   revision_id:            Z.string().check(Z.minLength(1)),
   /**
@@ -51,10 +51,10 @@ export const Lockbox = Z.object({
   /** Which generation of the whisper's own shape this lockbox holds: 1, the only one so far. */
   whisper_schema_version: Z.literal(1),
   /**
-   * The lockbox's {@link PublicBag}, as JSON with every object's keys sorted and no spacing,
-   * exactly as `stableJsonify` writes it: `{}` when the host gave none. Always written, so a lockbox with no bag and one with an empty bag are one record.
+   * The lockbox's {@link Sidecar}, as JSON with every object's keys sorted and no spacing,
+   * exactly as `stableJsonify` writes it: `{}` when the host gave none. Always written, so a lockbox with no sidecar and one with an empty sidecar are one record.
    */
-  public_json:            Z.string().check(Z.refine(isStableJsonText, "public_json holds the lockbox's public bag as the JSON text the vault writes, keys sorted")),
+  sidecar_json:           Z.string().check(Z.refine(isStableJsonText, "sidecar_json holds the lockbox's sidecar as the JSON text the vault writes, keys sorted")),
   /** When this boxlabel was first stored, an {@link EpochMillis}: every later store carries it forward. */
   registered_at:          EpochMillis,
   /**

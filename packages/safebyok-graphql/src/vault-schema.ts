@@ -82,7 +82,7 @@ input SafebyokVaultBundleInput {
 
 """
 One lockbox, as stored: its whisper encrypted under its lockboxKey, that lockboxKey wrapped under
-the vaultKey, and its public shell. Times are epoch milliseconds; the public bag is the JSON text
+the vaultKey, and its public shell. Times are epoch milliseconds; the sidecar is the JSON text
 it was written as, which is bound into the lockbox's encryption.
 """
 type SafebyokLockbox {
@@ -94,12 +94,12 @@ type SafebyokLockbox {
   whisper_ciphered:       SafebyokCiphered!
   whisper_codec:          String!
   whisper_schema_version: Int!
-  public_json:            String!
+  sidecar_json:           String!
   registered_at:          Float!
   written_at:             Float!
 }
 
-"""One lockbox, as stored. Times are epoch milliseconds; the public bag is its JSON text."""
+"""One lockbox, as stored. Times are epoch milliseconds; the sidecar is its JSON text."""
 input SafebyokLockboxInput {
   format:                 String!
   boxlabel:               String!
@@ -109,7 +109,7 @@ input SafebyokLockboxInput {
   whisper_ciphered:       SafebyokCipheredInput!
   whisper_codec:          String!
   whisper_schema_version: Int!
-  public_json:            String!
+  sidecar_json:           String!
   registered_at:          Float!
   written_at:             Float!
 }
@@ -122,7 +122,7 @@ type SafebyokListedLockbox {
   vault_key_epoch:        Int!
   whisper_codec:          String!
   whisper_schema_version: Int!
-  public_json:            String!
+  sidecar_json:           String!
   registered_at:          Float!
   written_at:             Float!
 }

@@ -125,7 +125,7 @@ const ApiKeySlot = ({ haveKeyBox, damaged, savedAt }: { haveKeyBox: boolean, dam
     setGripe(null)
     try {
       const saved = await withUnlockedVault(async () => {
-        await vault.store(ApiKeyBoxlabel, keyText.trim(), { public: { note: 'feeds the knock-knock machine' } })
+        await vault.store(ApiKeyBoxlabel, keyText.trim(), { sidecar: { note: 'feeds the knock-knock machine' } })
         return true
       })
       if (saved !== null) {

@@ -142,7 +142,7 @@ describe("graphqlVaultDB, as the README has it", () => {
     const opened = () => vaultIn(schema)
     const first = await opened()
     await first.unlock('correct horse battery staple')
-    await first.store('anthropic_api_key', 'sk-ant-test-not-a-real-key', { public: { note: 'work account' } })
+    await first.store('anthropic_api_key', 'sk-ant-test-not-a-real-key', { sidecar: { note: 'work account' } })
     await first.store('openai_api_key', { apiKey: 'sk-test-not-a-real-key', orgId: null })
     first.close()
 
@@ -150,7 +150,7 @@ describe("graphqlVaultDB, as the README has it", () => {
     await second.unlock('correct horse battery staple')
     expect(await second.read('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
     expect(await second.read('openai_api_key')).to.deep.equal({ apiKey: 'sk-test-not-a-real-key', orgId: null })
-    expect(second.getSnapshot().boxes.map((box) => box.damaged ? null : box.public)).to.deep.equal([{ note: 'work account' }, {}])
+    expect(second.getSnapshot().boxes.map((box) => box.damaged ? null : box.sidecar)).to.deep.equal([{ note: 'work account' }, {}])
     await second.erase('openai_api_key')
     expect(second.getSnapshot().boxes.map((box) => box.boxlabel)).to.deep.equal(['anthropic_api_key'])
     second.close()

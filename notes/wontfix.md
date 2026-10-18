@@ -23,8 +23,8 @@ decide. Add an entry at the end of the list, dated, with the ruling or the row i
   every browser honours. The Coach: "put as WONTFIX." We keep the password-type field, which
   every browser masks, and turn away what the attributes can turn away (autofill and generators).
 * 2026-10-16 (the Coach, thread 2, [#133](https://github.com/mrflip/safebyok/pull/133)): **an own
-  `__proto__` key in a public bag or a whisper is undefined behaviour,** as `undefined` and
-  functions are. A bag or a whisper with an own `__proto__` key loses it on the way in, because
+  `__proto__` key in a sidecar or a whisper is undefined behaviour,** as `undefined` and
+  functions are. A sidecar or a whisper with an own `__proto__` key loses it on the way in, because
   Zod's record assigns it as the prototype: nothing leaks, but the host gets back less than it
   stored, the way it already does for `undefined` and functions, which JSON does not serialize.
   The Coach: "we check for a crazy edge case used by people who know exactly what they're doing or

@@ -107,32 +107,33 @@ to its platform -- and such an app should not also ship this one (about 15 kB mi
 main entry names no default and imports nothing from `safebyok/browser`, and the package is
 marked `sideEffects: false`: what you never import never ships.
 
-## A lockbox's public bag
+## A lockbox's sidecar
 
-Each lockbox carries a **public bag** beside its whisper: any JSON value your app keeps about it
--- what the user calls the account, which project a key belongs to, when it was last rotated --
-shown in the snapshot while the vault is locked, as `box.public`. The vault never looks inside it.
+Each lockbox carries a **sidecar**: your app's own plain data, riding beside the whisper,
+authenticated but not encrypted. It is any JSON value your app keeps about the lockbox -- what the
+user calls the account, which project a key belongs to, when it was last rotated -- shown in the
+snapshot while the vault is locked, as `box.sidecar`. The vault never looks inside it.
 
 ```ts
-await vault.store('anthropic_api_key', 'sk-ant-...', { public: { note: 'work account', project: 'atlas' } })
-await vault.store('anthropic_api_key', 'sk-ant-new')                  // keeps the bag it has
-await vault.store('anthropic_api_key', 'sk-ant-new', { public: {} })  // and empties it
-vault.getSnapshot().boxes[0]  // { boxlabel: 'anthropic_api_key', public: {}, damaged: false, ... }
+await vault.store('anthropic_api_key', 'sk-ant-...', { sidecar: { note: 'work account', project: 'atlas' } })
+await vault.store('anthropic_api_key', 'sk-ant-new')                  // keeps the sidecar it has
+await vault.store('anthropic_api_key', 'sk-ant-new', { sidecar: {} }) // and empties it
+vault.getSnapshot().boxes[0]  // { boxlabel: 'anthropic_api_key', sidecar: {}, damaged: false, ... }
 ```
 
-* **It is public.** It is stored in the clear, so never put secret material in it: a key, a
+* **It is not encrypted.** It is stored in the clear, so never put secret material in it: a key, a
   password, a recovery code. Anyone who can read your storage reads it.
-* **It is bound.** Its JSON, keys sorted, is bound into the lockbox's encryption with the rest of
-  the lockbox's public fields, so a bag altered or swapped in storage makes the lockbox refuse to
-  open (`damaged_lockbox`). The snapshot shows the bag as storage holds it; only `read()` proves
-  it unaltered. A bag stored other than as the vault writes it (respaced, reordered) lists the
+* **It is authenticated.** Its JSON, keys sorted, is bound into the lockbox's encryption with the rest of
+  the lockbox's public fields, so a sidecar altered or swapped in storage makes the lockbox refuse to
+  open (`damaged_lockbox`). The snapshot shows the sidecar as storage holds it; only `read()` proves
+  it unaltered. A sidecar stored other than as the vault writes it (respaced, reordered) lists the
   lockbox as damaged.
-* **Its shape is yours.** The vault checks only that it is JSON (`PublicBag`; anything else is
+* **Its shape is yours.** The vault checks only that it is JSON (`Sidecar`; anything else is
   `bad_option`): check its shape yourself, with your own schema, before `store()`. Left out of a
-  `store()`, the lockbox keeps the bag it has, once its record opens; a new lockbox's is `{}`, as
+  `store()`, the lockbox keeps the sidecar it has, once its record opens; a new lockbox's is `{}`, as
   is one written over a record that will not open.
-* **It shares the whisper's room.** `maxWhisperBytes` counts the whisper's JSON and the bag's
-  together, so a large bag leaves less room for the whisper. Its size shows in storage, as every
+* **It shares the whisper's room.** `maxWhisperBytes` counts the whisper's JSON and the
+  sidecar's together, so a large sidecar leaves less room for the whisper. Its size shows in storage, as every
   public field's does.
 
 ## Names, and your own checks
@@ -157,7 +158,7 @@ const validators = {
   userId:   z.string().regex(/^user_[A-Za-z0-9]{27}$/), // and Clerk's user ids
 }
 const vault = await openVault({ applabel: 'acme', userId, vaultlabel: 'main', vaultDB, validators, ...browserOpts() })
-await vault.store('מפתח OpenAI: עבודה', 'sk-...', { public: { note: 'the team account, billed monthly' } })
+await vault.store('מפתח OpenAI: עבודה', 'sk-...', { sidecar: { note: 'the team account, billed monthly' } })
 ```
 
 * **The floor holds beneath every check.** Whatever your schemas admit, a name is one character
@@ -190,11 +191,11 @@ await vault.store('מפתח OpenAI: עבודה', 'sk-...', { public: { note: 'th
 * **A misspelt field is refused**, as `bad_option`: `boxLabel` would otherwise leave the default
   check quietly in place. `checkValidators(bag)` runs that check alone, for a binding or wrapper
   that takes the bag apart (`VaultProvider` does).
-* **Sizes follow the names.** Each `store()` weighs its lockbox -- whisper, public bag and names
+* **Sizes follow the names.** Each `store()` weighs its lockbox -- whisper, sidecar and names
   -- and refuses one heavier than the backend holds in a record (`lockbox_too_large`), or a new
   one that would take the vault past what the backend holds of a vault (`vault_full`). The record
   is weighed as its real serialized bytes; the vault's total is a conservative estimate made
-  before the lockbox is sealed (each counted at twice `maxWhisperBytes` for its whisper and bag,
+  before the lockbox is sealed (each counted at twice `maxWhisperBytes` for its whisper and sidecar,
   with its names as measured), so at a `maxVaultBytes` set exactly tight it may refuse a write
   that would just fit. A replacement weighs what it replaces, and is never refused as full.
   `maxWhisperBytes` is checked as a whisper is stored, never as one is read, so lowering it
@@ -662,7 +663,7 @@ render for that, and hands a condition down as `openError`).
 | --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |
 | `bad_label`           | a label (or the `userId`) that fails the vault's check: `Label` (or `UserId`) by default, or the host's own in `validators`; or a `wayinlabel` the vault already has | Pass labels the app chose; check a user-typed one first with the same check, and against the snapshot's `wayins` |
 | `bad_whisper`         | a whisper JSON cannot carry (`undefined`, a function, a class instance) | Store plain JSON; to empty a lockbox, `erase` it |
-| `bad_option`          | an option or argument out of its range: an `openVault` option, an `argon2idDeriver` spec, a `store()`'s public bag, a passphrase or callback of the wrong type, a record handed to a `VaultDB` write; a passkey's answer of the wrong shape, or one already a way in | Fix the call; the message names what it takes |
+| `bad_option`          | an option or argument out of its range: an `openVault` option, an `argon2idDeriver` spec, a `store()`'s sidecar, a passphrase or callback of the wrong type, a record handed to a `VaultDB` write; a passkey's answer of the wrong shape, or one already a way in | Fix the call; the message names what it takes |
 | `vault_closed`        | the vault handle was closed                                      | Open the vault again; do not use a handle after `close()` |
 | `unknown_key_deriver` | the vault names a key deriver this handle was not built with     | Update safebyok, or open the vault with the deriver that made it |
 | `insecure_context`    | `openVault` in a page that is not a secure context: served over plain http from anywhere but localhost, where the browser withholds WebCrypto | Serve the app over https |
@@ -682,7 +683,7 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `absent_vault`        | the vault has never been created, or was deleted elsewhere, and the call will not create it | Unlock with a new passphrase to create it |
 | `absent_wayin`        | no way into the vault has that `wayin_id`, or is the passkey that answered: it may have been removed on another device | Look again at the snapshot's `wayins`, and ask the user which they mean |
 | `whisper_too_large`   | a whisper over the vault's `maxWhisperBytes`                     | Tell the user it is too large; a host that means to allow more passes a larger `maxWhisperBytes` |
-| `lockbox_too_large`   | a lockbox -- its whisper, public bag and boxlabel together, as the UTF-8 bytes of its JSON -- over its storage's `maxRecordBytes`; only a host whose validators admit long names, or a backend with small records, meets it | Tell the user to store a smaller whisper or bag |
+| `lockbox_too_large`   | a lockbox -- its whisper, sidecar and boxlabel together, as the UTF-8 bytes of its JSON -- over its storage's `maxRecordBytes`; only a host whose validators admit long names, or a backend with small records, meets it | Tell the user to store a smaller whisper or bag |
 | `vault_full`          | a new lockbox in a vault already holding its `maxLockboxes`, a new lockbox whose names would take the vault past its storage's `maxVaultBytes`, or a write the storage backend has no room for | Tell the user to erase a lockbox first; the host may raise `maxLockboxes` where the backend allows |
 | `too_many_wayins`     | a passphrase or passkey added to a vault already holding `MaxUnlocks` (8) ways in | Tell the user to remove one first             |
 | `last_wayin`          | removing the vault's last passphrase: a vault always keeps one, since a passkey can be lost with its device | Add another passphrase first; to be rid of the vault, `destroy()` it |
@@ -795,7 +796,7 @@ refusal on every device that saw a newer copy than the backup.
 
 ### Damaged lockboxes
 
-A lockbox whose stored record does not read back -- not JSON, a malformed time, a public bag
+A lockbox whose stored record does not read back -- not JSON, a malformed time, a sidecar
 that is not JSON, a record naming another boxlabel than the one it is stored under, one from a newer
 safebyok, or one sealed under a vaultKey the vault does not hold (its `vault_key_epoch` neither
 the bundle's nor the prior one's) -- is listed in the snapshot as damaged,
@@ -813,7 +814,7 @@ floor, which no call could reach, is not listed. Show it as removable:
 ```ts
 for (const box of vault.getSnapshot().boxes) {
   if (box.damaged) { showDamaged(box.boxlabel) }   // offer erase(box.boxlabel), or a fresh store()
-  else { showSummary(box.boxlabel, box.public, box.written_at) }
+  else { showSummary(box.boxlabel, box.sidecar, box.written_at) }
 }
 ```
 
@@ -825,14 +826,14 @@ as sound, `read()` refuses it with `damaged_lockbox`, and `erase()` removes it. 
 lockbox written by a vault destroyed and made anew elsewhere relocks this device, and the read
 refuses with `vault_locked` instead. `store()` starts afresh over any record it cannot read as a
 lockbox -- every one the snapshot lists as damaged, and one missing or mangling a ciphered field --
-carrying nothing from it, neither its public bag nor when it was first stored. It writes over the
+carrying nothing from it, neither its sidecar nor when it was first stored. It writes over the
 revision the listing names, in one write that lands only while that record still stands, so a
 sound lockbox another device wrote there meanwhile is never erased: the store is refused as
 `stale_write`, as over any lockbox written meanwhile, and a second store writes over theirs. Only a record that names no revision
 is erased first and then written, and should that write fail, nothing stands under the boxlabel.
-A record that reads but will not decipher -- its ciphertext, bag or times altered -- is written
+A record that reads but will not decipher -- its ciphertext, sidecar or times altered -- is written
 over its revision, and carries nothing forward either: nothing vouches for its public fields, so
-its bag becomes `{}` unless you give one, and its first-stored time is now. A storage adapter's `doListBoxes` hands up each lockbox as a
+its sidecar becomes `{}` unless you give one, and its first-stored time is now. A storage adapter's `doListBoxes` hands up each lockbox as a
 `StoredLockbox`, the boxlabel it is stored under beside its record exactly as stored, so a record
 too damaged to name itself is still listed under the boxlabel that reaches it.
 
