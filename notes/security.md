@@ -635,7 +635,7 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
   ID can ask the authenticator for the answer (with the user's touch), as it could read a typed
   passphrase. The credential's challenge is random and never verified, and no attestation is
   checked: the authenticator is the user's to trust.
-* 2026-10-15: **every field a record writes is bound, unless a reason below says not** (the
+* 2026-10-15; 2026-10-18: **every field a record writes is bound, unless a reason below says not** (the
   Coach: "make everything verifiable unless there's a good reason not to"). A passkey envelope's
   HKDF `info` is now its wrap's whole additional data -- format, scope, `vault_id`, the bundle's
   `registered_at`, purpose, and the envelope's public header (`method`, `unlock_id`,
@@ -663,6 +663,15 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
   record, so never bound. Were an Argon2 setting ever to go in, it would be as a difficulty
   measure -- a floor on the cost a vault accepts from its stored deriver label -- not as a binding
   (the Coach, 2026-10-16).
+  (2026-10-18, with the rename of the device record to the "lease": the device record's context
+  changed spelling, not construction. Its first part, the format, is now `safebyok-lease-v1`, and
+  its last, the purpose, `vault_key_lease_wrapped`; the parts between and their order are as
+  before, joined by the same `cipherCtx`, and the lockbox and wayin contexts did not move.
+  `tests/ctx-bytes.test.ts` pins the new bytes. A `safebyok-unlock-v1` record is not read: it fails
+  validation and is erased, and the IndexedDB device store, which now files leases under `lease^`
+  rather than `unlock^`, deletes the old row unread at its next lease read or erase. The user
+  proves once more on each device; there is no migration. The device mark (lock generation and
+  seen-vault record) is untouched.)
 * 2026-10-15: any way in proves any change. A passkey's answer is accepted as proof by
   `addPassphrase`, `addPasskey` and `removeUnlock`, so whoever holds one passkey can set a new
   passphrase and remove the user's others: the vault is as strong as its weakest way in. A vault
