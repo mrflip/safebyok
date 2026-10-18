@@ -144,7 +144,7 @@ describe("idbDeviceDB", () => {
     expect(rows.map((row) => row.ckey)).to.deep.equal([Ckeys.lease(TH.scopeOf('u2'))])
   })
 
-  it("drops a device's lease from before the rename, filed under unlock^, keeping its device mark: the user proves once more", async () => {
+  it("discards a device's lease from before the rename, filed under unlock^, keeping its device mark: the user proves once more", async () => {
     const dbName = TH.freshDbName()
     const shelf = createStore(`${dbName}:device_db`, 'records')
     const deviceDB = idbDeviceDB({ dbName })
