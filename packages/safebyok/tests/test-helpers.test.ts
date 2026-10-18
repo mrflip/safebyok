@@ -983,7 +983,8 @@ class RoundTripVaultDB extends VaultDB {
   private readonly ownListeners = new Set<() => void>()
 
   constructor(backend: RoundTripBackend, opts: RoundTripOpts) {
-    super(opts)
+    // Quiet unless the test hands it a logger: a spy's, kept out of the test output.
+    super({ ...opts, logger: opts.logger ?? TH.spyLogger().logger })
     this.backend = backend
     this.opts = opts
     this.maxLockboxes = opts.maxLockboxes ?? Infinity

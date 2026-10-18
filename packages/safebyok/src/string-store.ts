@@ -1,4 +1,5 @@
 import { VaultError } from './errors'
+import { DefaultLogger, asError } from './logger'
 import { reportToPlatform } from './report-error'
 
 /**
@@ -21,7 +22,8 @@ export type StringStore = {
  * Listener bookkeeping shared by both stores. A listener that is not a function is refused as it
  * subscribes, with kind 'bad_option', rather than breaking some later write that rings it. Each
  * listener is called in turn, as the write lands; one that throws stops no other and fails no
- * write, and what it threw goes to the platform's `reportError` where there is one.
+ * write, and what it threw goes to the default logger, and to the platform's `reportError` where
+ * there is one.
  */
 const makeBell = () => {
   const listeners = new Set<() => void>()
@@ -39,6 +41,7 @@ const callQuietly = (listener: () => void) => {
   try {
     listener()
   } catch (err) {
+    DefaultLogger.error("A listener of a string store threw. The write landed, and every other listener was called; the listener is its author's to mend.", { call: 'StringStore' }, asError(err))
     reportToPlatform(err)
   }
 }

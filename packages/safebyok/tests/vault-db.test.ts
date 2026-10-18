@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { memoryStore } from '../src/string-store'
 import { VaultDB, jsonBytes, localVaultDB, type BundleExpectation, type EraseExpectation, type LockboxExpectation, type StoredLockbox, type VaultDBOpts, type WatchTrouble } from '../src/vault-db'
 import { VaultError } from '../src/errors'
+import { DefaultLogger, parseLogger, type VaultLogger } from '../src/logger'
 import type { Lockbox } from '../src/lockbox'
 import type { VaultBundle, VaultScope } from '../src/types'
 import * as Ckeys from '../src/ckeys'
@@ -26,8 +27,10 @@ class MapVaultDB extends VaultDB {
   readonly maxNameBytes: number = Infinity
   readonly rows: Map<string, unknown>
 
-  constructor(maxLockboxes = Infinity, rows = new Map<string, unknown>(), vaultDBOpts: VaultDBOpts = {}) {
-    super(vaultDBOpts)
+  // What super() is handed: the options, quiet unless they carry a logger (a spy's, kept out of the
+  // test output), or `handed`, for a test of what the base class makes of it.
+  constructor(maxLockboxes = Infinity, rows = new Map<string, unknown>(), vaultDBOpts: VaultDBOpts = {}, handed?: VaultDBOpts) {
+    super(handed ?? { ...vaultDBOpts, logger: vaultDBOpts.logger ?? TH.spyLogger().logger })
     this.maxLockboxes = maxLockboxes
     this.rows = rows
   }
@@ -133,6 +136,9 @@ class RingingVaultDB extends MapVaultDB {
 
   /** The logger it says things through, as it stands. */
   loggerNow() { return this.logger }
+
+  /** Tries to put `logger` in place of it by assignment: true when that took. */
+  trySwapLogger(logger: VaultLogger) { return Reflect.set(this, 'logger', logger) }
 
   protected override doSubscribe(_scope: VaultScope, onChange: () => void) {
     this.trouble = this.watchTrouble("This vault's watch failed: other devices' changes may not show until its next read.")
@@ -763,48 +769,56 @@ describe("the abstract VaultDB, its logger", () => {
     expect(spy.calls.map((call) => call.level)).to.deep.equal(['error'])
   })
 
-  it("says it through the logger the vault it serves handed it, when it was made with none", () => {
+  it("is made with the default logger when its subclass hands super() options with none", () => {
+    for (const handed of [{}, { logger: undefined }, { logger: null }]) {
+      const vaultDB = new MapVaultDB(Infinity, new Map(), {}, handed)
+      expect(vaultDB.logger).to.eq(DefaultLogger)
+    }
+  })
+
+  it("is made with the host's logger, guarded, from the options its subclass hands super(), as VaultDBOpts's second example shows", () => {
     const spy = TH.spyLogger()
-    const vaultDB = failingListenerOn()
-    vaultDB.adoptLogger(spy.logger)
-    vaultDB.ring()
-    expect(spy.calls).to.have.lengthOf(1)
+    const vaultDB = new MapVaultDB(Infinity, new Map(), {}, { logger: spy.logger })
+    expect(vaultDB.logger).to.eq(parseLogger(spy.logger))
   })
 
-  it("keeps the logger it was made with over one handed it later", () => {
+  it("keeps its logger off the VaultDB itself, so it is neither listed nor copied", () => {
+    const vaultDB = failingListenerOn({ logger: TH.spyLogger().logger })
+    expect(Object.getOwnPropertyDescriptor(vaultDB, 'logger')).to.be.undefined
+    expect(Object.keys(vaultDB)).to.not.include('logger')
+    expect(Object.keys(Object.assign({}, vaultDB))).to.not.include('logger')
+    expect(JSON.stringify(vaultDB)).to.not.include('logger')
+  })
+
+  it("keeps the logger it was made with: one assigned in its place does not take", () => {
     const own = TH.spyLogger()
-    const handed = TH.spyLogger()
+    const swapped = TH.spyLogger()
     const vaultDB = failingListenerOn({ logger: own.logger })
-    vaultDB.adoptLogger(handed.logger)
+    expect(vaultDB.trySwapLogger(swapped.logger)).to.be.false
     vaultDB.ring()
-    expect(own.calls).to.have.lengthOf(1)
-    expect(handed.calls).to.have.lengthOf(0)
+    expect([own.calls.length, swapped.calls.length]).to.deep.equal([1, 0])
   })
 
-  it("keeps the latest logger handed it, serving several vaults", () => {
-    const first = TH.spyLogger()
-    const latest = TH.spyLogger()
-    const vaultDB = failingListenerOn()
-    vaultDB.adoptLogger(first.logger)
-    vaultDB.adoptLogger(latest.logger)
-    vaultDB.ring()
-    expect([first.calls.length, latest.calls.length]).to.deep.equal([0, 1])
-  })
-
-  it("says it to the console, tagged, when it has no logger at all", () => {
+  it("takes a null logger from its factory as none: the console", async () => {
     const consoleErrors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    failingListenerOn().ring()
+    const vaultDB = localVaultDB({ store: memoryStore(), logger: null })
+    vaultDB.subscribe(TH.scopeOf('u1'), () => { throw new Error('a listener that throws') })
+    await vaultDB.createBundle(TH.bundleOf('u1'))
     expect(consoleErrors).toHaveBeenCalledOnce()
-    expect(consoleErrors.mock.calls[0]?.[0]).to.match(/^safebyok: A listener passed to subscribe threw/)
   })
 
-  it("says each line to the console through the one logger, built once, rather than one built for each", () => {
-    const consoleErrors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+  it("keeps one logger, rather than one built for each line it says", () => {
     const vaultDB = failingListenerOn()
     expect(vaultDB.loggerNow()).to.eq(vaultDB.loggerNow())
-    vaultDB.ring()
-    vaultDB.ring()
-    expect(consoleErrors).to.have.callCount(2)
+  })
+
+  it("is the console, tagged, in the adapter whose factory was given no logger", async () => {
+    const consoleErrors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const vaultDB = localVaultDB({ store: memoryStore() })
+    vaultDB.subscribe(TH.scopeOf('u1'), () => { throw new Error('a listener that throws') })
+    await vaultDB.createBundle(TH.bundleOf('u1'))
+    expect(consoleErrors).toHaveBeenCalledOnce()
+    expect(consoleErrors.mock.calls[0]?.[0]).to.match(/^safebyok: A listener passed to subscribe threw/)
   })
 
   it("breaks nothing when its logger throws", () => {
@@ -815,13 +829,11 @@ describe("the abstract VaultDB, its logger", () => {
   const BadLoggers = [
     ["console.log",                 'a function, not a logger'],
     [{ log: () => undefined },      'a logger missing warn and error'],
-    [null,                          'null'],
   ] as const
 
   for (const [logger, blurb] of BadLoggers) {
-    it(`refuses ${blurb} as a logger with kind 'bad_option', made with it or handed it`, () => {
+    it(`refuses ${blurb} as a logger with kind 'bad_option', made with it`, () => {
       expect(() => new RingingVaultDB({ logger: logger as unknown as VaultDBOpts['logger'] })).to.throw(VaultError).with.property('kind', 'bad_option')
-      expect(() => { new RingingVaultDB().adoptLogger(logger as unknown as NonNullable<VaultDBOpts['logger']>) }).to.throw(VaultError).with.property('kind', 'bad_option')
     })
   }
 })

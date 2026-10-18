@@ -58,11 +58,11 @@ export class OutageVaultDB extends VaultDB {
   private readonly outage: Outage
 
   /**
-   * @param inner - The adapter that really stores the vault.
+   * @param inner - The adapter that really stores the vault, whose logger this one says things through.
    * @param outage - The switch that takes it down.
    */
   constructor(inner: VaultDB, outage: Outage) {
-    super()
+    super({ logger: inner.logger })
     this.inner = inner
     this.outage = outage
     this.maxRecordBytes = inner.maxRecordBytes

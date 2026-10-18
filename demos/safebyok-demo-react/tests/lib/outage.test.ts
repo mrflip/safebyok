@@ -41,6 +41,15 @@ describe("makeOutage", () => {
 TH.describeVaultDB('OutageVaultDB, while up', () => new OutageVaultDB(localVaultDB({ store: memoryStore() }), makeOutage()))
 
 describe("OutageVaultDB, while up", () => {
+  it("says things through the logger of the adapter it wraps, the very same one", () => {
+    const spy = TH.spyLogger()
+    const inner = localVaultDB({ store: memoryStore(), logger: spy.logger })
+    const vaultDB = new OutageVaultDB(inner, makeOutage())
+    expect(vaultDB.logger).to.eq(inner.logger)
+    vaultDB.logger.warn("heard by the inner adapter's logger")
+    expect(spy.calls.map((heard) => heard.level)).to.deep.equal(['warn'])
+  })
+
   it("lists a lockbox its inner adapter finds damaged as damaged, and the sound ones as they are", async () => {
     const store = memoryStore()
     const vaultDB = new OutageVaultDB(localVaultDB({ store }), makeOutage())

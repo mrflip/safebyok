@@ -14,7 +14,7 @@ export type { Argon2idKeyDeriver, CustomKeyDeriver, KeyDeriver } from './key-der
 export { eraseDamagedVault, openVault } from './vault'
 export type { PassphraseStrengthTest, PassphraseVerdict } from './passphrase-strength'
 export type { EraseDamagedVaultOpts, OpenVaultOpts, Vault, VaultSnapshot, VaultState } from './vault'
-export { parseLogger } from './logger'
+export { DefaultLogger, parseLogger, setDefaultLogger } from './logger'
 export type { VaultLogger } from './logger'
 export { Lockbox } from './lockbox'
 export { EpochMillis, FarFuture, FarPast, ForcePassphraseReentryHours, ForeverMillis, LockboxSummary, MaxLockboxes, MaxReentryHours, MaxUnlocks, MaxWhisperBytes, MinuteMillis, PasskeyEnvelope, PasskeySaltBytes, PassphraseEnvelope, PublicBag, UnlockEnvelope, UnlockMethodVals, VaultBundle, VaultScope, Whisper, wallClock } from './types'

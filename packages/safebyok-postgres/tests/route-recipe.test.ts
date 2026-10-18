@@ -80,7 +80,7 @@ class RouteVaultDB extends VaultDB {
   private readonly fetcher: Fetch
 
   constructor(fetcher: Fetch) {
-    super()
+    super({})
     this.fetcher = fetcher
   }
 

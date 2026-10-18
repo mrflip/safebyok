@@ -1,6 +1,11 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { domStore, memoryStore } from '../src/string-store'
 import { VaultError } from '../src/errors'
+import { setDefaultLogger } from '../src/logger'
+import * as TH from './test-helpers'
+
+/** A logger's every call, for a logger that fails: what it throws must break nothing. */
+const throwFromLogger = () => { throw new Error('a logger that throws') }
 
 describe("memoryStore", () => {
   it("reads back what was written, and null where nothing was", () => {
@@ -75,6 +80,59 @@ describe("domStore", () => {
 })
 
 describe("the stores' bell", () => {
+  // A listener that throws is said through the default logger: a spy's, kept out of the test output.
+  beforeEach(() => { setDefaultLogger(TH.spyLogger().logger) })
+  afterEach(() => { setDefaultLogger(undefined) })
+
+  it("tells the default logger of a listener that throws, from either store", () => {
+    const spy = TH.spyLogger()
+    setDefaultLogger(spy.logger)
+    const thrown = new Error('a listener that throws')
+    for (const store of [memoryStore(), domStore(mapStorage(), 'acme:')]) {
+      store.subscribe(() => { throw thrown })
+      store.write('greeting', 'hi')
+    }
+    expect(spy.calls.map((call) => [call.level, call.story, call.err])).to.deep.equal([
+      ['error', { call: 'StringStore' }, thrown],
+      ['error', { call: 'StringStore' }, thrown],
+    ])
+  })
+
+  it("tells the console of a listener that throws, when no default logger was set", () => {
+    setDefaultLogger(undefined)
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => { /* kept out of the test output */ })
+    try {
+      const store = memoryStore()
+      store.subscribe(() => { throw new Error('a listener that throws') })
+      store.write('greeting', 'hi')
+      expect(consoleError).toHaveBeenCalledOnce()
+      expect(String(consoleError.mock.calls[0]?.[0])).to.match(/^safebyok: A listener of a string store threw/)
+    } finally {
+      consoleError.mockRestore()
+    }
+  })
+
+  it("lands the write when the default logger throws too", () => {
+    setDefaultLogger({ log: throwFromLogger, warn: throwFromLogger, error: throwFromLogger })
+    const store = memoryStore()
+    store.subscribe(() => { throw new Error('a listener that throws') })
+    expect(() => { store.write('greeting', 'hi') }).to.not.throw()
+    expect(store.read('greeting')).to.eq('hi')
+  })
+
+  it("reports a listener that throws something other than an Error as it was thrown", () => {
+    const reported: unknown[] = []
+    vi.stubGlobal('reportError', (err: unknown) => { reported.push(err) })
+    try {
+      const store = memoryStore()
+      store.subscribe(() => { throw 'a string, thrown' }) // eslint-disable-line @typescript-eslint/only-throw-error
+      store.write('greeting', 'hi')
+      expect(reported).to.deep.equal(['a string, thrown'])
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it("rings every other listener, and lands the write, when one throws: what it threw goes to the platform's reportError", () => {
     const reported: unknown[] = []
     vi.stubGlobal('reportError', (err: unknown) => { reported.push(err) })

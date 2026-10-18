@@ -1209,21 +1209,74 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
   pinned by digest (`postgres:17@sha256:...`), the digest written in both files; Dependabot
   moves the compose file's, and the workflow's is moved by hand with it. `pg` (8.23) is a
   dev dependency of the private `safebyok-e2e` package, never a dependency of what we publish.
-* 2026-10-17 (thread 5b, store_base, [PR #139](https://github.com/mrflip/safebyok/pull/139)):
-  **host listener errors go to the platform's `reportError` as they are.** The `VaultDB` base
-  class (`vault-db.ts`, `subscribe`) and `ChangeBell` (`change-bell.ts`) call each host listener
-  so that what it throws, or a promise it returns that rejects, never escapes: it goes to the
-  logger as an error (the VaultDB) and to `globalThis.reportError` where the platform has one
-  (`report-error.ts`, looked up at call time). The error is the host's own and passed unredacted:
-  safebyok put nothing secret in it, and a host listener that puts a secret in its own error has
-  chosen to. In a browser such an error is reported twice, to the logger and to `reportError`, as
-  designed.
-* 2026-10-17 (thread 5b, store_base): **an adapter keeps its own logger over `openVault`'s.**
-  `openVault` hands its logger to the VaultDB through the public `VaultDB.adoptLogger`, and only
-  when the host passed a logger; a VaultDB made with its own `logger` keeps it, and one shared
-  between vaults keeps the latest logger handed it. A host that wants an adapter's messages kept
-  apart (a server-side redacting logger, say) passes that logger to the adapter directly. Every
-  logger call is guarded, so a throwing logger never breaks a verb.
+* 2026-10-17 (thread 5b, store_base, [PR #139](https://github.com/mrflip/safebyok/pull/139); revised
+  on branch 20261017-logger_contract): **host listener errors go to the platform's `reportError`
+  as they are, and to a logger.** The `VaultDB` base class (`vault-db.ts`, `subscribe`, which
+  already did both), `ChangeBell` (`change-bell.ts`) and the string stores (`string-store.ts`,
+  listener bookkeeping) call each host listener so that what it throws, or a promise it returns
+  that rejects, never escapes: it goes to a logger as an error and to `globalThis.reportError`
+  where the platform has one (`report-error.ts`, looked up at call time). The base class says it
+  through the VaultDB's own `logger`. `ChangeBell.listen(bellname, listener)`, `memoryStore()`,
+  `domStore(webStorage, prefix)`, `inspectIdbDeviceDB({ dbName })` and
+  `inspectIdbVaultDB({ dbName })` take no logger, and say it through `DefaultLogger`, the
+  page-wide default (next entry). `idbVaultDB`'s own watch passes the bell none: its listener is
+  the base class's guarded one, which never throws. A listener that throws goes to
+  `DefaultLogger.error(message, { call: 'ChangeBell' }, asError(err))` (`'StringStore'` for the
+  stores) and then to `reportToPlatform(err)`. `asError` passes an `Error` as itself and anything
+  else as `null`, so a logger only ever sees an `Error` or `null`, while `reportError` sees the raw
+  thrown value exactly as thrown. The error is the host's own and passed unredacted: safebyok put
+  nothing secret in it, and a host listener that puts a secret in its own error has chosen to. Every
+  logger is guarded, so a logger that throws cannot turn a listener failure in the bell's
+  `queueMicrotask` into an uncaught error. Until a host calls `setDefaultLogger` the default is the
+  console, so on Node and Bun a throwing listener is now printed to stderr (before, with no
+  `reportError` there, nobody heard it). In a browser such an error is reported twice, to the logger
+  and to `reportError`, as designed.
+* 2026-10-17 (thread 5b, store_base; revised on branch 20261017-logger_contract): **an adapter's
+  logger is fixed when it is made; `openVault`'s is not handed to it; the default logger is one
+  page-wide object, which any code on the page can redirect.** A `VaultDB` is made with a logger
+  and keeps it from then on: every adapter hands the host's `VaultDBOpts` to `super(opts)`, and the
+  base-class constructor runs `parseLogger(opts?.logger)` once, which answers `DefaultLogger` when
+  the host gave none (`undefined`, `null` meaning "none", an options bag without one, or, from a
+  JavaScript subclass, no argument at all) and refuses a non-logger as `bad_option`. The base class
+  keeps it in the ES private field `#logger`, set once in the constructor, and shows it through the
+  read-only getter `vaultDB.logger`. It is not an own property, so a VaultDB that is logged, spread
+  or JSON-stringified does not show or copy a host's logger, and assignment does not take (in strict
+  mode it throws a TypeError). A host's own VaultDB subclass could still override the getter, which
+  is why `openVault` still runs
+  `parseLogger` on `vaultDB.logger`. `openVault`'s `logger` is the vault's alone and is not handed
+  to the storage adapter: an adapter made with its own logger keeps it, and one made with none
+  uses `DefaultLogger`, whatever `openVault` is given. A vault opened with no `logger` of its own
+  uses its storage adapter's, so a logger a host gave only the adapter hears the vault's messages
+  too; a host that wants the vault on the default whatever the adapter was given passes
+  `DefaultLogger` to `openVault` or `VaultProvider`. `openVault` (`vault.ts`) runs
+  `parseLogger(opts.logger ?? givenVaultDB.logger)` inline, so a non-logger in either place is
+  refused `bad_option` at open, before storage is read, while `logger: null` passed to `openVault`
+  is "none" and the vaultDB's logger is used. `VaultProvider`
+  (`safebyok-react/src/vault-provider.tsx`, `settleLogger`, `parseLogger(logger ??
+  vaultDB.logger)`) settles one guarded logger per `logger` prop and `vaultDB`; its own warnings
+  and the vault it opens use that same object. If the logger or the vaultDB is malformed it warns
+  nowhere and passes the raw prop on, so `openVault` refuses it to the error boundary. A host that
+  wants one logger to hear both passes it to both; one that wants an adapter's messages apart
+  passes that adapter its own. Every logger call is guarded, so a throwing logger never breaks a
+  verb, and no host can opt a logger out of the guard. `parseLogger` keeps a module-private
+  `WeakSet` (`guardedOnes`) of every logger it has guarded, and a module-private `WeakMap`
+  (`guardedFor`) from each host logger to its guarded form: a logger in the set comes back as
+  itself, and the same host logger always comes back as the same guarded object. There is no mark
+  on the logger to read, so a property a logger carries, or inherits through `Object.create` of a
+  guarded logger, means nothing to it.
+  The default (`logger.ts`): `DefaultLogger` is one object, in `guardedOnes`, whose three calls
+  forward at call time to a module-private target (`defaults.target`): the guarded console logger
+  (`GuardedConsole`, each line tagged `safebyok:`) until a host calls `setDefaultLogger(logger)`.
+  That runs `parseLogger` on what it is given, so the target is always guarded, and a non-logger
+  is refused as `bad_option` with the previous target kept; `undefined` or `null` puts the console
+  back, and so does `setDefaultLogger(DefaultLogger)`, so the forwarder can never forward to
+  itself. `parseLogger(undefined | null)` answers `DefaultLogger`, so every fallback in every
+  adapter factory, `openVault` and `VaultProvider` holds the same forwarding object and follows a
+  later `setDefaultLogger`. It is page-wide mutable state: any code on the page that imports the
+  same copy of safebyok can call `setDefaultLogger` and receive what safebyok logs where no logger
+  was given. What safebyok logs carries no secret material by the `VaultLogger` contract, and a
+  host's own errors pass as the host made them, so this widens who can read log lines, not what
+  they contain. Two copies of safebyok in one bundle each have their own default.
 * 2026-10-17 (thread 5b, store_base): **Convex carries no cause on any refusal.** `convexVaultDB`
   (`safebyok-convex/src/convex-vault-db.ts`) refuses with no `cause` at all -- `identity_revoked`,
   `vault_full` and `storage_unavailable` alike -- because a Convex error on a dev deployment may

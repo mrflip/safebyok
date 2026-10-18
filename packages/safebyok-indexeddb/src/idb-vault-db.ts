@@ -29,7 +29,7 @@ import { inOneTransaction, settle, withheldShelfOf } from './shelf'
  * plainly that the vault lives only in this browser.
  *
  * @param opts - Where to keep the records: `dbName`, default 'safebyok'; and optionally a
- *   `logger`, which otherwise is the vault's.
+ *   `logger`, the default logger without one (a vault opened with no logger of its own hears it too).
  * @returns The VaultDB, to hand `openVault`. Kind 'bad_option' for a `dbName` that is not
  *   non-empty text, or a `logger` that is not a VaultLogger. Nothing is opened until the first read or write.
  *
@@ -47,7 +47,7 @@ class IdbVaultDB extends VaultDB {
   private readonly dbName: string
 
   constructor(dbName: string, opts: IdbVaultDBOpts | undefined) {
-    super(opts)
+    super(opts ?? {})
     this.dbName = dbName
   }
 

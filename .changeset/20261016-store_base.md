@@ -6,7 +6,7 @@
 "safebyok-graphql": minor
 ---
 
-**Every storage adapter takes one bag of options, a `logger` among them.** `localVaultDB(store)` is now `localVaultDB({ store, logger })`, `convexVaultDB(client, api)` is `convexVaultDB({ client, api, logger })`, and `graphqlVaultDB(client, { maxLockboxes })` is `graphqlVaultDB({ client, maxLockboxes, logger })`; `idbVaultDB` and `postgresVaultDB` take `logger` in the bags they had. A VaultDB made with no logger uses the one `openVault` was given (`VaultDB.adoptLogger`), else the console. A VaultDB of your own takes `VaultDBOpts` and hands them to `super(opts)`.
+**Every storage adapter takes one bag of options, a `logger` among them.** `localVaultDB(store)` is now `localVaultDB({ store, logger })`, `convexVaultDB(client, api)` is `convexVaultDB({ client, api, logger })`, and `graphqlVaultDB(client, { maxLockboxes })` is `graphqlVaultDB({ client, maxLockboxes, logger })`; `idbVaultDB` and `postgresVaultDB` take `logger` in the bags they had. A VaultDB made with no logger logs to the console. A VaultDB of your own takes `VaultDBOpts` and hands them to `super(opts)`.
 
 **`subscribe` guards its listeners.** A listener that throws, or returns a promise that rejects, no longer escapes into a write or the adapter: it is logged as an `error` (story `{ call: 'subscribe' }`) and handed to `reportError` where the platform has one, and every other listener is still called. An unsubscribed listener is never called again, and a second unsubscribe does nothing.
 

@@ -46,7 +46,7 @@ const ServerMaxNameBytes = 640
  *   server said, which may quote the variables.
  *
  * @param opts - Your app's urql `client`; optionally, the `maxLockboxes` your server holds a vault
- *   to, and a `logger`, which otherwise is the vault's.
+ *   to, and a `logger`, the default logger without one (a vault opened with no logger of its own hears it too).
  * @returns The VaultDB, holding at most 1 MiB in one record, as the Postgres VaultDB behind it
  *   does, and `maxLockboxes` lockboxes in one vault, setting no limit on a vault's bytes.
  *

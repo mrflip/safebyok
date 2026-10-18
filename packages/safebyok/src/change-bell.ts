@@ -1,3 +1,4 @@
+import { DefaultLogger, asError } from './logger'
 import { reportToPlatform } from './report-error'
 
 /**
@@ -21,7 +22,7 @@ const channels = new Map<string, BroadcastChannel>()
 // Each listener is called on its own, after the ringing code has run on, and one that leaves before
 // its turn comes is not called. One that throws silences no other, fails no write, and never
 // escapes as an uncaught error, which would end a Node or Bun process: what it threw goes to the
-// platform's `reportError`, where there is one (the bell has no logger).
+// default logger, and to the platform's `reportError` where there is one.
 const callEach = (listeners: Set<() => void> | undefined) => {
   listeners?.forEach((listener) => {
     queueMicrotask(() => {
@@ -29,6 +30,7 @@ const callEach = (listeners: Set<() => void> | undefined) => {
       try {
         listener()
       } catch (err) {
+        DefaultLogger.error("A listener of the change bell threw. The bell rang on, and every other listener was called; the listener is its author's to mend.", { call: 'ChangeBell' }, asError(err))
         reportToPlatform(err)
       }
     })
@@ -52,7 +54,9 @@ export const ring = (bellname: string): void => {
 
 /**
  * Calls `listener` whenever the bell named `bellname` rings, from this tab or another; returns the
- * unsubscribe. Where there is no BroadcastChannel, only this tab's rings are heard.
+ * unsubscribe. Where there is no BroadcastChannel, only this tab's rings are heard. What the
+ * listener throws goes to the default logger, as an error, and to the platform's `reportError`
+ * where there is one.
  *
  * @param bellname - The bell to listen to.
  * @param listener - What to call, with nothing, on each ring.

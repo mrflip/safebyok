@@ -1,12 +1,61 @@
 import { spawnSync } from 'node:child_process'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as ChangeBell from '../src/change-bell'
+import { setDefaultLogger } from '../src/logger'
 import * as TH from './test-helpers'
 
 /** A bell of its own for each test, named as an IndexedDB store's is. */
 const freshBell = () => `safebyok-idb:${TH.freshDbName()}:vault_db`
 
+/** A logger's every call, for a logger that fails: what it throws must break nothing. */
+const throwFromLogger = () => { throw new Error('a logger that throws') }
+
 describe("ChangeBell", () => {
+  // A listener that throws is said through the default logger: a spy's, kept out of the test output.
+  beforeEach(() => { setDefaultLogger(TH.spyLogger().logger) })
+  afterEach(() => { setDefaultLogger(undefined) })
+
+  it("tells the default logger of what a listener threw", async () => {
+    const spy = TH.spyLogger()
+    setDefaultLogger(spy.logger)
+    const bellname = freshBell()
+    const thrown = new Error('a listener that throws')
+    const stop = ChangeBell.listen(bellname, () => { throw thrown })
+    ChangeBell.ring(bellname)
+    await vi.waitFor(() => { expect(spy.calls).to.have.lengthOf(1) })
+    expect(spy.calls.map((call) => [call.level, call.story, call.err])).to.deep.equal([['error', { call: 'ChangeBell' }, thrown]])
+    stop()
+  })
+
+  it("tells the console of a listener that throws, when no default logger was set", async () => {
+    setDefaultLogger(undefined)
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => { /* kept out of the test output */ })
+    try {
+      const bellname = freshBell()
+      const stop = ChangeBell.listen(bellname, () => { throw new Error('a listener that throws') })
+      ChangeBell.ring(bellname)
+      await vi.waitFor(() => { expect(consoleError).toHaveBeenCalledOnce() })
+      expect(String(consoleError.mock.calls[0]?.[0])).to.match(/^safebyok: A listener of the change bell threw/)
+      stop()
+    } finally {
+      consoleError.mockRestore()
+    }
+  })
+
+  it("rings on, letting nothing escape, when the default logger throws too", async () => {
+    setDefaultLogger({ log: throwFromLogger, warn: throwFromLogger, error: throwFromLogger })
+    const bellname = freshBell()
+    const heard: string[] = []
+    const stops = [
+      ChangeBell.listen(bellname, () => { heard.push('one'); throw new Error('a listener that throws') }),
+      ChangeBell.listen(bellname, () => { heard.push('two') }),
+    ]
+    ChangeBell.ring(bellname)
+    await vi.waitFor(() => { expect(heard).to.deep.equal(['one', 'two']) })
+    await TH.wakeupAtNextTick()
+    for (const stop of stops) { stop() }
+  })
+
   it("calls every listener of the bell rung, and only that bell's", async () => {
     const bellname = freshBell()
     const heard: string[] = []
@@ -99,6 +148,21 @@ describe("ChangeBell", () => {
     }
   })
 
+  it("reports a listener that throws something other than an Error as it was thrown", async () => {
+    const reported: unknown[] = []
+    vi.stubGlobal('reportError', (err: unknown) => { reported.push(err) })
+    try {
+      const bellname = freshBell()
+      const stop = ChangeBell.listen(bellname, () => { throw 'a string, thrown' }) // eslint-disable-line @typescript-eslint/only-throw-error
+      ChangeBell.ring(bellname)
+      await vi.waitFor(() => { expect(reported).to.have.lengthOf(1) })
+      expect(reported).to.deep.equal(['a string, thrown'])
+      stop()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it("calls the other listeners when one throws, and lets nothing escape as an uncaught error", async () => {
     const bellname = freshBell()
     const heard: string[] = []
@@ -171,7 +235,7 @@ describe("ChangeBell", () => {
     }
   })
 
-  it("lets a Node process that rang it exit on its own, a throwing listener and all", () => {
+  it("lets a Node process that rang it exit on its own, a throwing listener and all, said on the console and nowhere uncaught", () => {
     const bellUrl = new URL('../src/change-bell.ts', import.meta.url).href
     const script = `
       const ChangeBell = await import(${JSON.stringify(bellUrl)})
@@ -180,7 +244,7 @@ describe("ChangeBell", () => {
     `
     const ran = spawnSync(process.execPath, ['--import', SourceImports, '--input-type=module', '--no-warnings', '--eval', script], { encoding: 'utf8', timeout: 10_000 })
     expect(ran.signal, 'the process was still running after ten seconds').to.be.null
-    expect(ran.stderr).to.eq('')
+    expect(ran.stderr).to.match(/^safebyok: A listener of the change bell threw\b/)
     expect(ran.status).to.eq(0)
   })
 })

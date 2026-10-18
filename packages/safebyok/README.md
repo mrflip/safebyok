@@ -452,11 +452,31 @@ const vault = await openVault({
 })
 ```
 
-With no logger, the vault writes to the console, each message tagged `safebyok:`. Pass functions
-that do nothing for quiet, or `console` itself to drop the tag (it then prints a missing story or
-error as `undefined` or `null`). A logger that throws, or returns
-a promise that rejects, is ignored: logging never breaks a lock, an open or a store. Anything
-else is refused as `bad_option`.
+With no logger anywhere, safebyok writes to the console, each message tagged `safebyok:` (null
+counts as none). Pass functions that do nothing for quiet, or `console` itself to drop the tag (it
+then prints a missing story or error as `undefined` or `null`). A logger that throws, or returns a
+promise that rejects, is ignored: logging never breaks a lock, an open or a store. Anything else is
+refused as `bad_option`.
+
+Most apps name their logger once, as the app starts:
+
+```ts
+import { setDefaultLogger } from 'safebyok'
+
+setDefaultLogger(telemetry)  // everything safebyok would have said to the console goes here instead
+```
+
+That covers every storage adapter, vault, `VaultProvider` and store given no logger of its own,
+whether it was made before the call or after. Name a logger a second time only to keep two apart,
+as a child logger would: give one to your storage adapter's factory (`idbVaultDB({ logger })`),
+and the adapter, every vault opened over it, and `VaultProvider` all use it, as one object; give
+one to `openVault` (or `VaultProvider`), and it is the vault's alone, the adapter keeping its own.
+Pass `logger: DefaultLogger` to have the vault use the default whatever its adapter was given.
+An adapter's logger is fixed when it is made: `vaultDB.logger` reads it, and nothing replaces it.
+
+An adapter of your own extends `VaultDB` and hands `super()` the host's options, `super(opts)`:
+the base class settles the logger from them, the host's or the default. It says what it has nobody
+to throw to through `this.logger`.
 
 Each call is a plain-language `message`; a `story` naming the vault call it happened in
 (`{ call: 'lockSoon' }`); and, when there is one, the error behind it, a `VaultError` or your own

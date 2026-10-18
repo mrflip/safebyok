@@ -65,20 +65,24 @@ const EraseExpectation = Z.object({
 export type StoredLockbox = { boxlabel: string, lockbox: unknown }
 
 /**
- * What every VaultDB is made with, beside its backend's own options: an adapter's factory takes
- * these in its one bag of options, and hands them to `super()`.
+ * What an adapter's factory takes from the host, beside its backend's own options: an optional
+ * `logger`. The adapter hands its options to `super()`, which settles the logger once, as the
+ * VaultDB is made: the host's, guarded, or the default logger when the host gave none.
  *
+ * @example
+ *   export type AcmeVaultDBOpts = VaultDBOpts & { client: AcmeClient }
  * @example
  *   constructor(opts: AcmeVaultDBOpts) { super(opts); this.client = opts.client }
  */
 export type VaultDBOpts = {
   /**
    * Where the VaultDB says what it has nobody to throw to: a subscriber's listener that threw, a
-   * watch that failed to start or dropped. Without one, it says it through the logger of the vault
-   * it serves, which `openVault` hands it, or else the console. Kind 'bad_option' for anything
-   * that is not a VaultLogger.
+   * watch that failed to start or dropped. Fixed when the VaultDB is made, and not the logger
+   * `openVault` is given, which is the vault's alone. A vault opened with no logger of its own
+   * uses this one, so give it here, once, to have one logger hear both. Without one (or with null),
+   * the default logger. Kind 'bad_option' for anything else that is not a VaultLogger.
    */
-  logger?: VaultLogger | undefined
+  logger?: VaultLogger | null | undefined
 }
 
 /**
@@ -113,8 +117,8 @@ export type VaultDBOpts = {
  * (your own error as its `cause`) for anything you throw that is not already a VaultError. They
  * also own what every adapter would otherwise write again: `subscribe` calls each listener so
  * that nothing it throws reaches your code, and its unsubscribe runs once; and `listBoxRecords`
- * lists a vault as stored, for a server to serve. Implement the `do*` methods, and hand your
- * factory's {@link VaultDBOpts} to `super()`; never override the public verbs, but for
+ * lists a vault as stored, for a server to serve. Implement the `do*` methods, and hand `super()`
+ * the host's {@link VaultDBOpts}; never override the public verbs, but for
  * `listBoxRecords` where your backend lists more cheaply. To refuse, throw what `Refusals` makes.
  * The package's `VAULTDB.md` is the whole contract, line by line, and `describeVaultDB` (from
  * `safebyok/testing`) tests it so.
@@ -180,43 +184,26 @@ export abstract class VaultDB {
    */
   abstract readonly maxNameBytes: number
 
-  // The logger this VaultDB was made with, if any; and the one the vault it serves handed it.
-  private readonly ownLogger: VaultLogger | null
-  private handedLogger: VaultLogger | null = null
-  // The console, guarded, for a VaultDB with neither: built once, not on every line said.
-  private readonly fallbackLogger = parseLogger(undefined)
+  /** The logger this VaultDB was made with, guarded: private, so that nothing can put another in its place. */
+  readonly #logger: VaultLogger
 
   /**
-   * @param opts - What every VaultDB is made with: an optional `logger`. Kind 'bad_option' for a
-   *   logger that is not a VaultLogger.
+   * @param opts - The host's options, as the adapter's factory was handed them: the base class reads
+   *   only `logger`, the default logger when there is none. Kind 'bad_option' for a `logger` that is
+   *   not a VaultLogger.
    */
-  constructor(opts?: VaultDBOpts) {
-    const given = (opts as VaultDBOpts | null | undefined)?.logger
-    this.ownLogger = given === undefined ? null : parseLogger(given)
+  constructor(opts: VaultDBOpts) {
+    // Generous to a subclass written in JavaScript that hands super() nothing.
+    this.#logger = parseLogger((opts as VaultDBOpts | null | undefined)?.logger)
   }
 
   /**
-   * Where this VaultDB says what it has nobody to throw to: the logger it was made with, else the
-   * one {@link adoptLogger} handed it, else the console. Each call is guarded: a logger that throws
-   * breaks nothing.
+   * Where this VaultDB says what it has nobody to throw to: always a logger, fixed when it is made,
+   * and guarded, so a logger that throws breaks nothing. Read only, and kept off the VaultDB
+   * itself, so a VaultDB logged, spread or compared never shows or copies a host's logger.
+   * `openVault` and `VaultProvider` use it when they are given no logger of their own.
    */
-  protected get logger(): VaultLogger {
-    return this.ownLogger ?? this.handedLogger ?? this.fallbackLogger
-  }
-
-  /**
-   * Has this VaultDB log through `logger`, unless it was made with a logger of its own, which wins.
-   * `openVault` calls it with the logger it was given, so one logger hears both the vault and its
-   * storage; a host rarely needs to. A VaultDB serving several vaults keeps the latest handed it.
-   * Kind 'bad_option' for anything that is not a VaultLogger.
-   *
-   * @param logger - The logger of the vault this VaultDB serves.
-   *
-   * @example vaultDB.adoptLogger(telemetryLogger)  // as openVault({ ...opts, vaultDB, logger: telemetryLogger }) does
-   */
-  adoptLogger(logger: VaultLogger): void {
-    this.handedLogger = parseLogger(logger)
-  }
+  get logger(): VaultLogger { return this.#logger }
 
   // ------------------------------------------------------------------- the verbs safebyok calls
 

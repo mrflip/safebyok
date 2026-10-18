@@ -11,7 +11,7 @@ import { memoryStore } from '../src/string-store'
 import { LockboxFieldsBytes, LockboxFixedBytes, StoredBytesPerWhisperByte, deviceTroubleAsConditions, eraseDamagedVault, openVault, type OpenVaultOpts, type Vault } from '../src/vault'
 import { cipherBinding, cipherBytes, fromB64, makeLockboxKey, makeVaultKey, randomBytes, toB64, wrapKeyUnder } from '../src/crypto'
 import type { CustomKeyDeriver, KeyDeriver } from '../src/key-deriver'
-import type { VaultLogger } from '../src/logger'
+import { DefaultLogger, setDefaultLogger, type VaultLogger } from '../src/logger'
 import { Argon2idWebV1, MaxSaltBytes, TestDeriverNotice } from '../src/key-deriver-spec'
 import * as Ckeys from '../src/ckeys'
 import type { PassphraseStrengthTest, PassphraseVerdict } from '../src/passphrase-strength'
@@ -5549,6 +5549,9 @@ const storedSecrets = (world: ReturnType<typeof makeWorld>): string[] => {
   return Array.from(everything.matchAll(/"(?:ciphertext_b64|salt_b64)":"([^"]+)"/g), (hit) => hit[1]!)
 }
 
+/** A logger's every call, for a logger that fails: what it throws must break nothing. */
+const throwFromLogger = () => { throw new Error('a logger that throws') }
+
 describe("the logger", () => {
   it("hears nothing from a vault going about its business", async () => {
     const world = makeWorld()
@@ -5582,16 +5585,7 @@ describe("the logger", () => {
     }
   })
 
-  it("is the vaultDB's too: what its storage has nobody to throw to, the vault's logger hears", async () => {
-    const world = makeWorld()
-    const vault = await world.open()
-    vault.subscribe(() => undefined)
-    world.vaultDB.subscribe(TH.scopeOf('u1'), () => { throw new Error('a listener of the host that throws') })
-    await vault.unlock('pw')
-    expect(world.logged.map((call) => [call.level, call.story])).to.deep.include(['error', { call: 'subscribe' }])
-  })
-
-  it("is not the vaultDB's when the vaultDB was made with a logger of its own, which it keeps", async () => {
+  it("is not the vaultDB's: what its storage has nobody to throw to goes to the logger the storage was made with", async () => {
     const world = makeWorld()
     const own = TH.spyLogger()
     const vaultDB = localVaultDB({ store: world.dbStore, logger: own.logger })
@@ -5602,19 +5596,113 @@ describe("the logger", () => {
     expect(world.logged).to.have.lengthOf(0)
   })
 
-  it("is handed to the vaultDB only when the host passes one: a vault opened with none leaves the vaultDB's as it was", async () => {
+  it("is not the vaultDB's when the vaultDB was made with none: that one logs to the console, whatever the vault is given", async () => {
     const world = makeWorld()
-    await world.open()
-    await world.open({ logger: undefined })
-    world.vaultDB.subscribe(TH.scopeOf('u1'), () => { throw new Error('a listener of the host that throws') })
-    await world.vaultDB.createBundle(TH.bundleOf('u1'))
+    const consoleErrors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const vaultDB = localVaultDB({ store: world.dbStore })
+    await world.open({ vaultDB })
+    vaultDB.subscribe(TH.scopeOf('u1'), () => { throw new Error('a listener of the host that throws') })
+    await vaultDB.createBundle(TH.bundleOf('u1'))
+    expect(consoleErrors).toHaveBeenCalledOnce()
+    expect(world.logged).to.have.lengthOf(0)
+    consoleErrors.mockRestore()
+  })
+
+  it("is the vaultDB's logger when the host passes the vault none: one given to the storage once hears both", async () => {
+    const world = makeWorld()
+    const own = TH.spyLogger()
+    const vaultDB = localVaultDB({ store: world.dbStore, logger: own.logger })
+    let reading = world.clock.now()
+    const vault = await world.openUnlocked('pw', { vaultDB, logger: undefined, clock: { now: () => reading } })
+    reading = world.clock.now() / 1000
+    await vault.lockSoon()
+    expect(own.calls.map((call) => [call.level, call.story])).to.deep.equal([['warn', { call: 'lockSoon' }]])
+    expect(world.logged).to.have.lengthOf(0)
+  })
+
+  it("guards the vaultDB's logger too: a VaultDB of the host's own whose logger throws breaks no lock", async () => {
+    const world = makeWorld()
+    const vaultDB = localVaultDB({ store: world.dbStore })
+    // As a subclass overriding the getter would: its logger is the host's to answer.
+    Object.defineProperty(vaultDB, 'logger', { value: { log: throwFromLogger, warn: throwFromLogger, error: throwFromLogger } })
+    let reading = world.clock.now()
+    const vault = await world.openUnlocked('pw', { vaultDB, logger: undefined, clock: { now: () => reading } })
+    reading = world.clock.now() / 1000
+    await vault.lockSoon()
+    expect(vault.getSnapshot().state).to.eq('locked')
+  })
+
+  it("refuses a vaultDB whose logger is not one, before reading storage, when the host passes the vault none", async () => {
+    const world = makeWorld()
+    const vaultDB = localVaultDB({ store: world.dbStore })
+    const readBundle = vi.spyOn(vaultDB, 'readBundle')
+    Object.defineProperty(vaultDB, 'logger', { value: { log: () => undefined } })
+    const err = await TH.expectRefusal(world.open({ vaultDB, logger: undefined }), 'bad_option')
+    expect(err.message).to.match(/log, warn and error functions/)
+    expect(readBundle).not.toHaveBeenCalled()
+  })
+
+  it("takes null as none: the vaultDB's logger", async () => {
+    const world = makeWorld()
+    const own = TH.spyLogger()
+    const vaultDB = localVaultDB({ store: world.dbStore, logger: own.logger })
+    let reading = world.clock.now()
+    const vault = await world.openUnlocked('pw', { vaultDB, logger: null, clock: { now: () => reading } })
+    reading = world.clock.now() / 1000
+    await vault.lockSoon()
+    expect(own.calls.map((call) => call.story)).to.deep.equal([{ call: 'lockSoon' }])
+  })
+
+  it("is the default logger, whatever the vaultDB was made with, when the host passes DefaultLogger, as its example shows", async () => {
+    const world = makeWorld()
+    const own = TH.spyLogger()
+    const telemetry = TH.spyLogger()
+    setDefaultLogger(telemetry.logger)
+    try {
+      const vaultDB = localVaultDB({ store: world.dbStore, logger: own.logger })
+      let reading = world.clock.now()
+      const vault = await world.openUnlocked('pw', { vaultDB, logger: DefaultLogger, clock: { now: () => reading } })
+      reading = world.clock.now() / 1000
+      await vault.lockSoon()
+      expect(telemetry.calls.map((call) => call.story)).to.deep.equal([{ call: 'lockSoon' }])
+      expect(own.calls).to.have.lengthOf(0)
+    } finally {
+      setDefaultLogger(undefined)
+    }
+  })
+
+  it("is the app's default, set once, when neither the host nor the vaultDB's factory was given one", async () => {
+    const world = makeWorld()
+    const telemetry = TH.spyLogger()
+    setDefaultLogger(telemetry.logger)
+    try {
+      const vaultDB = localVaultDB({ store: world.dbStore })
+      let reading = world.clock.now()
+      const vault = await world.openUnlocked('pw', { vaultDB, logger: undefined, clock: { now: () => reading } })
+      reading = world.clock.now() / 1000
+      await vault.lockSoon()
+      expect(telemetry.calls.map((call) => call.story)).to.deep.equal([{ call: 'lockSoon' }])
+    } finally {
+      setDefaultLogger(undefined)
+    }
+  })
+
+  it("is the host's own for the vault, when it passes one, whatever the vaultDB was made with", async () => {
+    const world = makeWorld()
+    const own = TH.spyLogger()
+    const vaultDB = localVaultDB({ store: world.dbStore, logger: own.logger })
+    let reading = world.clock.now()
+    const vault = await world.openUnlocked('pw', { vaultDB, clock: { now: () => reading } })
+    reading = world.clock.now() / 1000
+    await vault.lockSoon()
     expect(world.logged).to.have.lengthOf(1)
+    expect(own.calls).to.have.lengthOf(0)
   })
 
   it("refuses a logger that is not one, before reading storage", async () => {
     const world = makeWorld()
     const readBundle = vi.spyOn(world.vaultDB, 'readBundle')
-    for (const nonsense of [null, {}, { log: () => undefined, warn: () => undefined }, 'console']) {
+    for (const nonsense of [{}, { log: () => undefined, warn: () => undefined }, 'console']) {
       const err = await TH.expectRefusal(world.open({ logger: nonsense as unknown as OpenVaultOpts['logger'] }), 'bad_option')
       expect(err.message).to.match(/log, warn and error functions/)
     }
