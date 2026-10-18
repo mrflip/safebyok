@@ -210,6 +210,15 @@ describe('scripts/file-thread', () => {
       expect(existsSync(root)).to.eq(true)
     })
 
+    it('leaves the directory for a person when git refused the removal outright and still lists the worktree', () => {
+      cutAndBuild('origin/main')
+      git('worktree', 'lock', root)
+      const result = fileWithLeftovers({})
+      expect(result.status).to.eq(1)
+      expect(result.stderr).to.include('still lists it as a worktree')
+      expect(existsSync(path.join(root, 'shim.ts'))).to.eq(true)
+    })
+
     it('leaves the directory for a person when origin\'s branch is not at the tip', () => {
       cutAndBuild('origin/main')
       commit(root, 'review.ts', 'export {}\n')
