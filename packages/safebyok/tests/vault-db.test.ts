@@ -247,7 +247,7 @@ describe("localVaultDB", () => {
   it("refuses a mangled row with kind 'corrupt_record', quoting none of it", async () => {
     const store = memoryStore()
     const vaultDB = localVaultDB({ store })
-    store.write(u1BundleCkey, '{"format":"safebyok-vault-v2","shhh":"SUPERSECRET"}')
+    store.write(u1BundleCkey, '{"format":"safebyok-vault-v3","shhh":"SUPERSECRET"}')
     const refusal = await TH.expectRefusal(vaultDB.readBundle(TH.scopeOf('u1')), 'corrupt_record')
     expect(refusal).to.be.instanceOf(VaultError)
     expect(refusal.message).to.not.include('SUPERSECRET')
@@ -292,7 +292,7 @@ const ListedRecordCases = [
 describe("the abstract VaultDB, around an adapter's half", () => {
   it("validates what the adapter returns: a wrong-shaped record is refused, not repaired", async () => {
     const vaultDB = new MapVaultDB()
-    vaultDB.rows.set(Ckeys.bundle(TH.scopeOf('u1')), { format: 'safebyok-vault-v2' })
+    vaultDB.rows.set(Ckeys.bundle(TH.scopeOf('u1')), { format: 'safebyok-vault-v3' })
     const refusal = await TH.expectRefusal(vaultDB.readBundle(TH.scopeOf('u1')), 'corrupt_record')
     expect(refusal).to.be.instanceOf(VaultError)
     // Refused, never repaired or deleted: the record is still there for forensics.
@@ -404,7 +404,7 @@ describe("the abstract VaultDB, around an adapter's half", () => {
 const RefusedWrites = [
   // the records:
   ['bad_option', (vaultDB: VaultDB) => vaultDB.createBundle({ ...TH.bundleOf('u1'), unlock_epoch: 1.5 }),                              'a bundle with a fractional unlock_epoch'],
-  ['bad_option', (vaultDB: VaultDB) => vaultDB.createBundle({ ...TH.bundleOf('u1'), unlocks: [omit(TH.envelopeOf('passphrase'), ['vault_key_wrapped'])] } as VaultBundle), 'a bundle whose envelope is missing its wrapped vaultKey'],
+  ['bad_option', (vaultDB: VaultDB) => vaultDB.createBundle({ ...TH.bundleOf('u1'), wayins: [omit(TH.wayinOf('passphrase'), ['vault_key_wayin_wrapped'])] } as VaultBundle), 'a bundle whose wayin is missing its wrapped vaultKey'],
   ['bad_label',  (vaultDB: VaultDB) => vaultDB.createBundle({ ...TH.bundleOf('u1'), applabel: 'Ac\u{7}me' }),                         'a bundle whose applabel holds a control character'],
   ['bad_option', (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one', { public_json: 'not json' }), TH.noBoxYet), 'a lockbox whose public bag no read would accept'],
   ['bad_label',  (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('key\u{D83D}', 'one'), TH.noBoxYet),                  'a lockbox whose boxlabel is half of an emoji, whatever the checks'],
@@ -475,13 +475,13 @@ describe("the abstract VaultDB, erasing a vault whose bundle is damaged", () => 
     }
   })
 
-  const Envelope = TH.bundleOf('u1').unlocks[0]
+  const Wayin = TH.bundleOf('u1').wayins[0]
   const NewerRecords = [
-    [{ format: 'safebyok-vault-v3' },                                                      'a format this version does not know, whatever else it holds'],
-    [(bundle: VaultBundle) => ({ ...bundle, format: 'safebyok-vault-v3' }),                'a bundle that is otherwise sound but for its format'],
+    [{ format: 'safebyok-vault-v4' },                                                      'a format this version does not know, whatever else it holds'],
+    [(bundle: VaultBundle) => ({ ...bundle, format: 'safebyok-vault-v4' }),                'a bundle that is otherwise sound but for its format'],
     [(bundle: VaultBundle) => ({ ...bundle, format: 2 }),                                  'a format of another type'],
-    [(bundle: VaultBundle) => ({ ...bundle, unlocks: [...bundle.unlocks, { method: 'smartcard', unlock_id: 'x' }] }), 'an unlock method this version does not know'],
-    [(bundle: VaultBundle) => ({ ...bundle, unlocks: Array.from({ length: 9 }, () => Envelope) }), 'more unlocks than this version holds'],
+    [(bundle: VaultBundle) => ({ ...bundle, wayins: [...bundle.wayins, { wayinkind: 'smartcard', wayin_id: 'x' }] }), 'a wayinkind this version does not know'],
+    [(bundle: VaultBundle) => ({ ...bundle, wayins: Array.from({ length: 9 }, () => Wayin) }), 'more wayins than this version holds'],
   ] as const
 
   for (const [record, blurb] of NewerRecords) {
@@ -496,7 +496,7 @@ describe("the abstract VaultDB, erasing a vault whose bundle is damaged", () => 
   }
 
   it("still erases a bundle that fails for anything it can only take for damage: a known format and methods, in number", async () => {
-    const vaultDB = withDamagedBundle((bundle) => ({ ...bundle, unlocks: [{ ...Envelope, salt_b64: 7 }], registered_at: 'later' }))
+    const vaultDB = withDamagedBundle((bundle) => ({ ...bundle, wayins: [{ ...Wayin, salt_b64: 7 }], registered_at: 'later' }))
     await vaultDB.eraseDamagedVault(TH.scopeOf('u1'))
     expect(vaultDB.rows.size).to.eq(2)
   })

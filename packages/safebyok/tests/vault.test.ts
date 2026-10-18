@@ -636,7 +636,7 @@ const uncheckingDeviceDB = () => {
   return { deviceDB, rows, spoilRow }
 }
 
-const SpoiledUnlocks = [
+const SpoiledWayins = [
   [(row: Record<string, unknown>) => ({ ...row, format: 'byok-unlock-v1' }),                  'a record under the format tag before the rename'],
   [(row: Record<string, unknown>) => ({ ...row, ask_passphrase_at: '99999999999999' }),       'a deadline written as text, which would compare as a number'],
   [(row: Record<string, unknown>) => ({ ...row, ask_passphrase_at: Infinity }),               'a deadline that never comes'],
@@ -706,7 +706,7 @@ describe("the remembered unlock, from a host's own DeviceDB", () => {
     expect(await world.stateOnOpen({ deviceDB: device.deviceDB })).to.eq('unlocked')
   })
 
-  for (const [spoil, blurb] of SpoiledUnlocks) {
+  for (const [spoil, blurb] of SpoiledWayins) {
     it(`reads ${blurb} as no remembered unlock, and erases it`, async () => {
       const world = makeWorld()
       const device = uncheckingDeviceDB()
@@ -1602,66 +1602,66 @@ describe("the host's validators", () => {
     expect(boxlabelsOf(narrow)).to.deep.equal([])
   })
 
-  it("check each new way in's unlocklabel with the host's unlocklabel check, at addPassphrase and addPasskey", async () => {
-    const world = makeWorld({ validators: { unlocklabel: ZClassic.string().min(1).max(60) } })
+  it("check each new way in's wayinlabel with the host's wayinlabel check, at addPassphrase and addPasskey", async () => {
+    const world = makeWorld({ validators: { wayinlabel: ZClassic.string().min(1).max(60) } })
     const vault = await world.openUnlocked('pw')
-    await vault.addPassphrase('pw', 'pw two', { unlocklabel: 'Written down, in the drawer' })
-    await vault.addPasskey('pw', () => TH.passkeyOf('laptop'), { unlocklabel: 'Laptop: fingerprint' })
-    expect(unlocklabelsOf(vault)).to.deep.equal(['passphrase', 'Written down, in the drawer', 'Laptop: fingerprint'])
-    const err = await TH.expectRefusal(vault.addPassphrase('pw', 'pw three', { unlocklabel: 'u'.repeat(61) }), 'bad_label')
-    expect(err.message).to.include('unlocklabel')
+    await vault.addPassphrase('pw', 'pw two', { wayinlabel: 'Written down, in the drawer' })
+    await vault.addPasskey('pw', () => TH.passkeyOf('laptop'), { wayinlabel: 'Laptop: fingerprint' })
+    expect(wayinlabelsOf(vault)).to.deep.equal(['passphrase', 'Written down, in the drawer', 'Laptop: fingerprint'])
+    const err = await TH.expectRefusal(vault.addPassphrase('pw', 'pw three', { wayinlabel: 'u'.repeat(61) }), 'bad_label')
+    expect(err.message).to.include('wayinlabel')
     expect(err.message).to.not.include('uuu')
     const makePasskey = vi.fn(() => TH.passkeyOf('phone'))
-    await TH.expectRefusal(vault.addPasskey('pw', makePasskey, { unlocklabel: '' }), 'bad_label')
+    await TH.expectRefusal(vault.addPasskey('pw', makePasskey, { wayinlabel: '' }), 'bad_label')
     expect(makePasskey).not.toHaveBeenCalled()
-    expect(unlocklabelsOf(vault)).to.have.lengthOf(3)
+    expect(wayinlabelsOf(vault)).to.have.lengthOf(3)
   })
 
-  it("refuse a taken unlocklabel or passkey, under a host's check that admits any text, quoting no unlocklabel", async () => {
-    const vault = await makeWorld({ validators: { unlocklabel: ZClassic.string() } }).openUnlocked('pw')
-    await vault.addPassphrase('pw', 'pw two', { unlocklabel: 'sk-ant-fake-pasted-phrase' })
-    await vault.addPasskey('pw', () => TH.passkeyOf('laptop'), { unlocklabel: 'sk-ant-fake-pasted-passkey' })
-    const takenLabel = await TH.expectRefusal(vault.addPassphrase('pw', 'pw three', { unlocklabel: 'sk-ant-fake-pasted-phrase' }), 'bad_label')
+  it("refuse a taken wayinlabel or passkey, under a host's check that admits any text, quoting no wayinlabel", async () => {
+    const vault = await makeWorld({ validators: { wayinlabel: ZClassic.string() } }).openUnlocked('pw')
+    await vault.addPassphrase('pw', 'pw two', { wayinlabel: 'sk-ant-fake-pasted-phrase' })
+    await vault.addPasskey('pw', () => TH.passkeyOf('laptop'), { wayinlabel: 'sk-ant-fake-pasted-passkey' })
+    const takenLabel = await TH.expectRefusal(vault.addPassphrase('pw', 'pw three', { wayinlabel: 'sk-ant-fake-pasted-phrase' }), 'bad_label')
     expect(TH.thrownText(takenLabel)).to.not.include('sk-ant-fake')
-    const takenPasskey = await TH.expectRefusal(vault.addPasskey('pw', () => TH.passkeyOf('laptop'), { unlocklabel: 'laptop_again' }), 'bad_option')
+    const takenPasskey = await TH.expectRefusal(vault.addPasskey('pw', () => TH.passkeyOf('laptop'), { wayinlabel: 'laptop_again' }), 'bad_option')
     expect(TH.thrownText(takenPasskey)).to.not.include('sk-ant-fake')
-    expect(unlocklabelsOf(vault)).to.have.lengthOf(3)
+    expect(wayinlabelsOf(vault)).to.have.lengthOf(3)
   })
 
-  it("refuse an empty unlocklabel as bad_label, though the host's unlocklabel check admits it", async () => {
+  it("refuse an empty wayinlabel as bad_label, though the host's wayinlabel check admits it", async () => {
     const vault = await makeWorld({ validators: AnyTextValidators }).openUnlocked('pw')
-    await TH.expectRefusal(vault.addPassphrase('pw', 'pw two', { unlocklabel: '' }), 'bad_label')
+    await TH.expectRefusal(vault.addPassphrase('pw', 'pw two', { wayinlabel: '' }), 'bad_label')
     const makePasskey = vi.fn(() => TH.passkeyOf('phone'))
-    await TH.expectRefusal(vault.addPasskey('pw', makePasskey, { unlocklabel: '' }), 'bad_label')
+    await TH.expectRefusal(vault.addPasskey('pw', makePasskey, { wayinlabel: '' }), 'bad_label')
     expect(makePasskey).not.toHaveBeenCalled()
-    expect(unlocklabelsOf(vault)).to.deep.equal(['passphrase'])
+    expect(wayinlabelsOf(vault)).to.deep.equal(['passphrase'])
   })
 
-  it("check an unlocklabel with Label when the host gives no unlocklabel check, saying what was wrong", async () => {
+  it("check a wayinlabel with Label when the host gives no wayinlabel check, saying what was wrong", async () => {
     const vault = await makeWorld({ validators: AnyScript }).openUnlocked('pw')
-    const err = await TH.expectRefusal(vault.addPassphrase('pw', 'pw two', { unlocklabel: 'Written down' }), 'bad_label')
+    const err = await TH.expectRefusal(vault.addPassphrase('pw', 'pw two', { wayinlabel: 'Written down' }), 'bad_label')
     expect(err.message).to.include('lowercase')
-    expect(unlocklabelsOf(vault)).to.deep.equal(['passphrase'])
+    expect(wayinlabelsOf(vault)).to.deep.equal(['passphrase'])
   })
 
-  it("leave a way in stored under an unlocklabel narrowed checks refuse opening the vault, listed as it is", async () => {
+  it("leave a way in stored under a wayinlabel narrowed checks refuse opening the vault, listed as it is", async () => {
     const world = makeWorld()
-    const roomy = await world.openUnlocked('pw', { validators: { unlocklabel: ZClassic.string() } })
-    await roomy.addPassphrase('pw', 'home pw', { unlocklabel: 'Home phrase' })
+    const roomy = await world.openUnlocked('pw', { validators: { wayinlabel: ZClassic.string() } })
+    await roomy.addPassphrase('pw', 'home pw', { wayinlabel: 'Home phrase' })
     roomy.close()
     const narrow = await world.open({ deviceDB: memoryDeviceDB() })
-    expect(unlocklabelsOf(narrow)).to.deep.equal(['passphrase', 'Home phrase'])
+    expect(wayinlabelsOf(narrow)).to.deep.equal(['passphrase', 'Home phrase'])
     await narrow.unlock('home pw')
     expect(narrow.getSnapshot().state).to.eq('unlocked')
   })
 
-  it("name a vault's first way in 'passphrase' whatever the host's unlocklabel check, which checks only the ways in it adds", async () => {
-    const world = makeWorld({ validators: { unlocklabel: ZClassic.string().startsWith('my_') } })
+  it("name a vault's first way in 'passphrase' whatever the host's wayinlabel check, which checks only the ways in it adds", async () => {
+    const world = makeWorld({ validators: { wayinlabel: ZClassic.string().startsWith('my_') } })
     const vault = await world.openUnlocked('pw')
-    expect(unlocklabelsOf(vault)).to.deep.equal(['passphrase'])
-    await TH.expectRefusal(vault.addPassphrase('pw', 'pw two', { unlocklabel: 'spare' }), 'bad_label')
-    await vault.addPassphrase('pw', 'pw two', { unlocklabel: 'my_spare' })
-    expect(unlocklabelsOf(vault)).to.deep.equal(['passphrase', 'my_spare'])
+    expect(wayinlabelsOf(vault)).to.deep.equal(['passphrase'])
+    await TH.expectRefusal(vault.addPassphrase('pw', 'pw two', { wayinlabel: 'spare' }), 'bad_label')
+    await vault.addPassphrase('pw', 'pw two', { wayinlabel: 'my_spare' })
+    expect(wayinlabelsOf(vault)).to.deep.equal(['passphrase', 'my_spare'])
   })
 
   it("never list a row planted under a name below the floor, which no call could reach", async () => {
@@ -1978,7 +1978,7 @@ describe("eraseDamagedVault", () => {
 
   it("refuses a vault a newer safebyok may have written as newer_format, as openVault does: nothing erased, the remembered unlock kept", async () => {
     const world = await damagedVaultWorld()
-    const newer = JSON.stringify({ ...storedBundleOf(world), format: 'safebyok-vault-v3' })
+    const newer = JSON.stringify({ ...storedBundleOf(world), format: 'safebyok-vault-v4' })
     world.dbStore.write(u1BundleCkey, newer)
     const atOpen = await TH.expectRefusal(world.open(), 'newer_format')
     expect(atOpen.message).to.include('update the app')
@@ -2277,7 +2277,7 @@ describe("the snapshot and its subscribers", () => {
     expect(vault.getSnapshot()).to.not.eq(before)
   })
 
-  it("tells listeners about unlocks and stores, and unsubscribing silences it", async () => {
+  it("tells listeners when it unlocks and stores, and unsubscribing silences it", async () => {
     const world = makeWorld()
     const vault = await world.open()
     let heardCount = 0
@@ -2383,11 +2383,11 @@ describe("tampering", () => {
 
   it("a bundle that does not parse makes the open itself refuse as damaged_bundle, storage's refusal its cause, deleting nothing", async () => {
     const world = makeWorld()
-    world.dbStore.write(u1BundleCkey, '{"format":"safebyok-vault-v2"}')
+    world.dbStore.write(u1BundleCkey, '{"format":"safebyok-vault-v3"}')
     const err = await TH.expectRefusal(world.open(), 'damaged_bundle')
     expect(err.message).to.include("can't be opened")
     expect((err.cause as VaultError).kind).to.eq('corrupt_record')
-    expect(world.dbStore.read(u1BundleCkey)).to.eq('{"format":"safebyok-vault-v2"}')
+    expect(world.dbStore.read(u1BundleCkey)).to.eq('{"format":"safebyok-vault-v3"}')
   })
 
   it("a lockbox that will not open under the vault's own key is called damaged, with the remedy, never quoting its boxlabel", async () => {
@@ -2407,10 +2407,10 @@ describe("tampering", () => {
 })
 
 /** u1's stored bundle in `world`, its second way in spoiled by `spoil`. */
-const spoilSecondUnlock = (world: ReturnType<typeof makeWorld>, spoil: Record<string, unknown>) => {
-  const bundle = JSON.parse(world.dbStore.read(u1BundleCkey) ?? '{}') as { unlocks: Record<string, unknown>[] }
-  const unlocks = bundle.unlocks.map((envelope, ii) => (ii === 1 ? { ...envelope, ...spoil } : envelope))
-  world.dbStore.write(u1BundleCkey, JSON.stringify({ ...bundle, unlocks }))
+const spoilSecondWayin = (world: ReturnType<typeof makeWorld>, spoil: Record<string, unknown>) => {
+  const bundle = JSON.parse(world.dbStore.read(u1BundleCkey) ?? '{}') as { wayins: Record<string, unknown>[] }
+  const wayins = bundle.wayins.map((wayin, ii) => (ii === 1 ? { ...wayin, ...spoil } : wayin))
+  world.dbStore.write(u1BundleCkey, JSON.stringify({ ...bundle, wayins }))
 }
 
 /**
@@ -2421,8 +2421,8 @@ const vaultWithDamagedSpare = async () => {
   const world = makeWorld()
   const vault = await world.openUnlocked('pw')
   await vault.store('anthropic', 'sk-fake')
-  const spareId = await vault.addPassphrase('pw', 'spare', { unlocklabel: 'spare' })
-  spoilSecondUnlock(world, { salt_b64: 'c2FsdA' })
+  const spareId = await vault.addPassphrase('pw', 'spare', { wayinlabel: 'spare' })
+  spoilSecondWayin(world, { salt_b64: 'c2FsdA' })
   const fresh = await world.open({ deviceDB: memoryDeviceDB() })
   return { world, fresh, spareId }
 }
@@ -2442,20 +2442,20 @@ describe("a way in stored damaged", () => {
     expect(err.message).to.not.include('spare')
   })
 
-  it("refuses an unlock aimed at it as damaged_unlock, and is removed by a sound way in", async () => {
+  it("refuses an unlock aimed at it as damaged_wayin, and is removed by a sound way in", async () => {
     const { fresh, spareId } = await vaultWithDamagedSpare()
-    await TH.expectRefusal(fresh.unlock('spare', { unlockId: spareId }), 'damaged_unlock')
+    await TH.expectRefusal(fresh.unlock('spare', { wayinId: spareId }), 'damaged_wayin')
     expect(fresh.getSnapshot().state).to.eq('locked')
-    await fresh.removeUnlock('pw', spareId)
-    expect(unlocklabelsOf(fresh)).to.deep.equal(['passphrase'])
+    await fresh.retireWayin('pw', spareId)
+    expect(wayinlabelsOf(fresh)).to.deep.equal(['passphrase'])
   })
 
-  it("a passkey stored damaged refuses its answer as damaged_unlock, and the passphrase still opens", async () => {
+  it("a passkey stored damaged refuses its answer as damaged_wayin, and the passphrase still opens", async () => {
     const { world, laptop } = await vaultWithPasskey()
     const shortSalt = toB64(new Uint8Array(16))
-    spoilSecondUnlock(world, { prf_salt_b64: shortSalt })
+    spoilSecondWayin(world, { prf_salt_b64: shortSalt })
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })
-    const err = await TH.expectRefusal(fresh.unlock({ ...laptop, prfSaltB64: shortSalt }), 'damaged_unlock')
+    const err = await TH.expectRefusal(fresh.unlock({ ...laptop, prfSaltB64: shortSalt }), 'damaged_wayin')
     expect(err.message).to.include('Unlock with a passphrase')
     await fresh.unlock('pw')
     expect(fresh.getSnapshot().state).to.eq('unlocked')
@@ -2535,8 +2535,8 @@ describe("changePassphrase", () => {
   })
 })
 
-/** The unlocklabels a vault's snapshot lists, in order. */
-const unlocklabelsOf = (vault: Vault) => vault.getSnapshot().unlocks.map((summary) => summary.unlocklabel)
+/** The wayinlabels a vault's snapshot lists, in order. */
+const wayinlabelsOf = (vault: Vault) => vault.getSnapshot().wayins.map((summary) => summary.wayinlabel)
 
 /** A testDeriver that counts its derivations, for an open that should spend few. */
 const countingDeriver = () => {
@@ -2548,14 +2548,14 @@ describe("several passphrases", () => {
   it("a vault is made with one way in, labelled passphrase, listed while locked", async () => {
     const world = makeWorld()
     const vault = await world.open()
-    expect(vault.getSnapshot().unlocks).to.deep.equal([])
+    expect(vault.getSnapshot().wayins).to.deep.equal([])
     await vault.unlock('pw')
     await vault.lock()
-    const [only] = vault.getSnapshot().unlocks
+    const [only] = vault.getSnapshot().wayins
     expect(only).to.deep.equal({
-      method: 'passphrase', unlock_id: only?.unlock_id, unlocklabel: 'passphrase', device_id: only?.device_id, registered_at: Date.parse('2026-10-14T12:00:00Z'),
+      wayinkind: 'passphrase', wayin_id: only?.wayin_id, wayinlabel: 'passphrase', device_id: only?.device_id, registered_at: Date.parse('2026-10-14T12:00:00Z'),
     })
-    expect(only?.unlock_id).to.have.length.greaterThan(0)
+    expect(only?.wayin_id).to.have.length.greaterThan(0)
     expect(only?.device_id).to.have.length.greaterThan(0)
   })
 
@@ -2564,10 +2564,10 @@ describe("several passphrases", () => {
     const vault = await world.open()
     await vault.unlock('first passphrase')
     await vault.store('anthropic', 'sk-fake')
-    const unlockId = await vault.addPassphrase('first passphrase', 'second passphrase', { unlocklabel: 'written_down' })
+    const wayinId = await vault.addPassphrase('first passphrase', 'second passphrase', { wayinlabel: 'written_down' })
     expect(vault.getSnapshot().state).to.eq('unlocked')
-    expect(unlocklabelsOf(vault)).to.deep.equal(['passphrase', 'written_down'])
-    expect(vault.getSnapshot().unlocks[1]?.unlock_id).to.eq(unlockId)
+    expect(wayinlabelsOf(vault)).to.deep.equal(['passphrase', 'written_down'])
+    expect(vault.getSnapshot().wayins[1]?.wayin_id).to.eq(wayinId)
 
     for (const passphrase of ['first passphrase', 'second passphrase']) {
       const fresh = await world.open({ deviceDB: memoryDeviceDB() })
@@ -2580,11 +2580,11 @@ describe("several passphrases", () => {
     const world = makeWorld()
     const vault = await world.open()
     await vault.unlock('first passphrase')
-    const unlockId = await vault.addPassphrase('first passphrase', 'second passphrase', { unlocklabel: 'written_down' })
+    const wayinId = await vault.addPassphrase('first passphrase', 'second passphrase', { wayinlabel: 'written_down' })
     const { keyDeriver, derivations } = countingDeriver()
     const fresh = await world.open({ deviceDB: memoryDeviceDB(), keyDeriver })
-    await TH.expectRefusal(fresh.unlock('first passphrase', { unlockId }), 'wrong_passphrase')
-    await fresh.unlock('second passphrase', { unlockId })
+    await TH.expectRefusal(fresh.unlock('first passphrase', { wayinId }), 'wrong_passphrase')
+    await fresh.unlock('second passphrase', { wayinId })
     expect(derivations).toHaveBeenCalledTimes(2)
     expect(fresh.getSnapshot().state).to.eq('unlocked')
   })
@@ -2593,32 +2593,32 @@ describe("several passphrases", () => {
     const world = makeWorld()
     const vault = await world.open()
     await vault.unlock('pw one')
-    await vault.addPassphrase('pw one', 'pw two', { unlocklabel: 'two' })
-    await vault.addPassphrase('pw one', 'pw three', { unlocklabel: 'three' })
+    await vault.addPassphrase('pw one', 'pw two', { wayinlabel: 'two' })
+    await vault.addPassphrase('pw one', 'pw three', { wayinlabel: 'three' })
     const { keyDeriver, derivations } = countingDeriver()
     const fresh = await world.open({ deviceDB: memoryDeviceDB(), keyDeriver })
     await TH.expectRefusal(fresh.unlock('none of them'), 'wrong_passphrase')
     expect(derivations).toHaveBeenCalledTimes(3)
   })
 
-  it("an unlock aimed at an unlock_id the vault does not hold is refused as absent_unlock", async () => {
+  it("an unlock aimed at a wayin_id the vault does not hold is refused as absent_wayin", async () => {
     const world = makeWorld()
     const vault = await world.open()
     await vault.unlock('pw')
     await vault.lock()
-    await TH.expectRefusal(vault.unlock('pw', { unlockId: 'unlock-gone' }), 'absent_unlock')
-    await TH.expectRefusal(vault.unlock('pw', { unlockId: 42 as unknown as string }), 'bad_option')
+    await TH.expectRefusal(vault.unlock('pw', { wayinId: 'wayin-gone' }), 'absent_wayin')
+    await TH.expectRefusal(vault.unlock('pw', { wayinId: 42 as unknown as string }), 'bad_option')
   })
 
-  it("an unlock aimed at a vault destroyed elsewhere is refused as absent_unlock, and creates nothing", async () => {
+  it("an unlock aimed at a vault destroyed elsewhere is refused as absent_wayin, and creates nothing", async () => {
     const world = makeWorld()
     const here = await world.open()
     await here.unlock('pw')
     await here.lock()
-    const unlockId = here.getSnapshot().unlocks[0]?.unlock_id
+    const wayinId = here.getSnapshot().wayins[0]?.wayin_id
     const there = await world.open({ deviceDB: memoryDeviceDB() })
     await there.destroy()
-    await TH.expectRefusal(here.unlock('pw', { unlockId }), 'absent_unlock')
+    await TH.expectRefusal(here.unlock('pw', { wayinId }), 'absent_wayin')
     expect(here.getSnapshot().state).to.eq('absent')
     expect(await world.vaultDB.readBundle(TH.scopeOf('u1'))).to.be.null
   })
@@ -2627,24 +2627,24 @@ describe("several passphrases", () => {
     const world = makeWorld()
     const vault = await world.open()
     await vault.unlock('pw')
-    const err = await TH.expectRefusal(vault.addPassphrase('not the passphrase', 'sneaky', { unlocklabel: 'sneaky' }), 'wrong_passphrase')
+    const err = await TH.expectRefusal(vault.addPassphrase('not the passphrase', 'sneaky', { wayinlabel: 'sneaky' }), 'wrong_passphrase')
     expect(err.message).to.not.include('sneaky')
-    expect(unlocklabelsOf(vault)).to.deep.equal(['passphrase'])
+    expect(wayinlabelsOf(vault)).to.deep.equal(['passphrase'])
   })
 
   it("addPassphrase refuses a blank passphrase, a bad or taken label, and a vault at MaxUnlocks", async () => {
     const world = makeWorld()
     const vault = await world.open()
     await vault.unlock('pw')
-    await TH.expectRefusal(vault.addPassphrase('pw', ' '.repeat(3), { unlocklabel: 'blank' }), 'wrong_passphrase')
-    await TH.expectRefusal(vault.addPassphrase('pw', 'pw two', { unlocklabel: 'Not A Label' }), 'bad_label')
-    await TH.expectRefusal(vault.addPassphrase('pw', 'pw two', undefined as unknown as { unlocklabel: string }), 'bad_label')
-    await TH.expectRefusal(vault.addPassphrase('pw', 'pw two', { unlocklabel: 'passphrase' }), 'bad_label')
+    await TH.expectRefusal(vault.addPassphrase('pw', ' '.repeat(3), { wayinlabel: 'blank' }), 'wrong_passphrase')
+    await TH.expectRefusal(vault.addPassphrase('pw', 'pw two', { wayinlabel: 'Not A Label' }), 'bad_label')
+    await TH.expectRefusal(vault.addPassphrase('pw', 'pw two', undefined as unknown as { wayinlabel: string }), 'bad_label')
+    await TH.expectRefusal(vault.addPassphrase('pw', 'pw two', { wayinlabel: 'passphrase' }), 'bad_label')
     for (let ii = 1; ii < MaxUnlocks; ii += 1) {
-      await vault.addPassphrase('pw', `pw ${String(ii)}`, { unlocklabel: `phrase${String(ii)}` })
+      await vault.addPassphrase('pw', `pw ${String(ii)}`, { wayinlabel: `phrase${String(ii)}` })
     }
-    expect(vault.getSnapshot().unlocks).to.have.lengthOf(MaxUnlocks)
-    await TH.expectRefusal(vault.addPassphrase('pw', 'one too many', { unlocklabel: 'extra' }), 'too_many_unlocks')
+    expect(vault.getSnapshot().wayins).to.have.lengthOf(MaxUnlocks)
+    await TH.expectRefusal(vault.addPassphrase('pw', 'one too many', { wayinlabel: 'extra' }), 'too_many_wayins')
   })
 
   it("a blank passphrase offered as proof is refused at once, deriving nothing", async () => {
@@ -2652,10 +2652,10 @@ describe("several passphrases", () => {
     const { keyDeriver, derivations } = countingDeriver()
     const vault = await world.open({ keyDeriver })
     await vault.unlock('pw')
-    const unlockId = await vault.addPassphrase('pw', 'pw two', { unlocklabel: 'two' })
+    const wayinId = await vault.addPassphrase('pw', 'pw two', { wayinlabel: 'two' })
     derivations.mockClear()
-    await TH.expectRefusal(vault.addPassphrase(' '.repeat(2), 'pw three', { unlocklabel: 'three' }), 'wrong_passphrase')
-    await TH.expectRefusal(vault.removeUnlock('', unlockId), 'wrong_passphrase')
+    await TH.expectRefusal(vault.addPassphrase(' '.repeat(2), 'pw three', { wayinlabel: 'three' }), 'wrong_passphrase')
+    await TH.expectRefusal(vault.retireWayin('', wayinId), 'wrong_passphrase')
     await TH.expectRefusal(vault.changePassphrase('\t', 'pw four'), 'wrong_passphrase')
     expect(derivations).not.toHaveBeenCalled()
   })
@@ -2666,7 +2666,7 @@ describe("several passphrases", () => {
     const vault = await world.open({ keyDeriver })
     await vault.unlock('pw')
     derivations.mockClear()
-    await TH.expectRefusal(vault.addPassphrase('pw', 'pw two', { unlocklabel: 'passphrase' }), 'bad_label')
+    await TH.expectRefusal(vault.addPassphrase('pw', 'pw two', { wayinlabel: 'passphrase' }), 'bad_label')
     expect(derivations).not.toHaveBeenCalled()
   })
 
@@ -2674,10 +2674,10 @@ describe("several passphrases", () => {
     const world = makeWorld()
     const vault = await world.open()
     await vault.unlock('first')
-    await vault.addPassphrase('first', 'second', { unlocklabel: 'written_down' })
-    const before = vault.getSnapshot().unlocks
+    await vault.addPassphrase('first', 'second', { wayinlabel: 'written_down' })
+    const before = vault.getSnapshot().wayins
     await vault.changePassphrase('second', 'second, renewed')
-    expect(vault.getSnapshot().unlocks).to.deep.equal(before)  // same ids, same labels
+    expect(vault.getSnapshot().wayins).to.deep.equal(before)   // same ids, same labels
 
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })
     await TH.expectRefusal(fresh.unlock('second'), 'wrong_passphrase')
@@ -2691,22 +2691,22 @@ describe("several passphrases", () => {
     const world = makeWorld()
     const vault = await world.open()
     await vault.unlock('first')
-    const unlockId = await vault.addPassphrase('first', 'second', { unlocklabel: 'written_down' })
-    await TH.expectRefusal(vault.changePassphrase('first', 'whatever', { unlockId }), 'wrong_passphrase')
-    await vault.changePassphrase('second', 'renewed', { unlockId })
+    const wayinId = await vault.addPassphrase('first', 'second', { wayinlabel: 'written_down' })
+    await TH.expectRefusal(vault.changePassphrase('first', 'whatever', { wayinId }), 'wrong_passphrase')
+    await vault.changePassphrase('second', 'renewed', { wayinId })
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })
-    await fresh.unlock('renewed', { unlockId })
+    await fresh.unlock('renewed', { wayinId })
     expect(fresh.getSnapshot().state).to.eq('unlocked')
   })
 
-  it("removeUnlock takes one way in away, proven by any passphrase still standing", async () => {
+  it("retireWayin takes one way in away, proven by any passphrase still standing", async () => {
     const world = makeWorld()
     const vault = await world.open()
     await vault.unlock('first')
-    const unlockId = await vault.addPassphrase('first', 'second', { unlocklabel: 'written_down' })
+    const wayinId = await vault.addPassphrase('first', 'second', { wayinlabel: 'written_down' })
     await vault.store('anthropic', 'sk-fake')
-    await vault.removeUnlock('second', unlockId)  // the one going is proof enough
-    expect(unlocklabelsOf(vault)).to.deep.equal(['passphrase'])
+    await vault.retireWayin('second', wayinId)    // the one going is proof enough
+    expect(wayinlabelsOf(vault)).to.deep.equal(['passphrase'])
     expect(vault.getSnapshot().state).to.eq('unlocked')
 
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })
@@ -2715,24 +2715,24 @@ describe("several passphrases", () => {
     expect(await fresh.read('anthropic')).to.eq('sk-fake')
   })
 
-  it("removeUnlock never removes the last way in, nor one that is not there", async () => {
+  it("retireWayin never removes the last way in, nor one that is not there", async () => {
     const world = makeWorld()
     const vault = await world.open()
     await vault.unlock('pw')
-    const [only] = vault.getSnapshot().unlocks
-    await TH.expectRefusal(vault.removeUnlock('pw', only?.unlock_id ?? ''), 'last_unlock')
-    await TH.expectRefusal(vault.removeUnlock('pw', 'unlock-gone'), 'absent_unlock')
-    await TH.expectRefusal(vault.removeUnlock('pw', ''), 'bad_option')
-    expect(vault.getSnapshot().unlocks).to.have.lengthOf(1)
+    const [only] = vault.getSnapshot().wayins
+    await TH.expectRefusal(vault.retireWayin('pw', only?.wayin_id ?? ''), 'last_wayin')
+    await TH.expectRefusal(vault.retireWayin('pw', 'wayin-gone'), 'absent_wayin')
+    await TH.expectRefusal(vault.retireWayin('pw', ''), 'bad_option')
+    expect(vault.getSnapshot().wayins).to.have.lengthOf(1)
   })
 
-  it("removeUnlock wants a passphrase the vault opens with, and removes nothing on a wrong one", async () => {
+  it("retireWayin wants a passphrase the vault opens with, and removes nothing on a wrong one", async () => {
     const world = makeWorld()
     const vault = await world.open()
     await vault.unlock('first')
-    const unlockId = await vault.addPassphrase('first', 'second', { unlocklabel: 'written_down' })
-    await TH.expectRefusal(vault.removeUnlock('neither', unlockId), 'wrong_passphrase')
-    expect(vault.getSnapshot().unlocks).to.have.lengthOf(2)
+    const wayinId = await vault.addPassphrase('first', 'second', { wayinlabel: 'written_down' })
+    await TH.expectRefusal(vault.retireWayin('neither', wayinId), 'wrong_passphrase')
+    expect(vault.getSnapshot().wayins).to.have.lengthOf(2)
   })
 
   it("every change to the ways in moves the epoch: another device locks, and this one stays unlocked", async () => {
@@ -2742,12 +2742,12 @@ describe("several passphrases", () => {
     const there = await world.open({ deviceDB: memoryDeviceDB() })
     await there.unlock('first')
 
-    const unlockId = await here.addPassphrase('first', 'second', { unlocklabel: 'written_down' })
+    const wayinId = await here.addPassphrase('first', 'second', { wayinlabel: 'written_down' })
     await vi.waitFor(() => { expect(there.getSnapshot().state).to.eq('locked') })
-    expect(there.getSnapshot().unlocks).to.deep.equal(here.getSnapshot().unlocks)
+    expect(there.getSnapshot().wayins).to.deep.equal(here.getSnapshot().wayins)
     await there.unlock('second')
 
-    await here.removeUnlock('first', unlockId)
+    await here.retireWayin('first', wayinId)
     await vi.waitFor(() => { expect(there.getSnapshot().state).to.eq('locked') })
     expect(storedBundleOf(world)['unlock_epoch']).to.eq(3)
     expect(here.getSnapshot().state).to.eq('unlocked')
@@ -2757,7 +2757,7 @@ describe("several passphrases", () => {
     const world = makeWorld()
     const vault = await world.open()
     await vault.unlock('first')
-    await vault.addPassphrase('first', 'second', { unlocklabel: 'written_down' })
+    await vault.addPassphrase('first', 'second', { wayinlabel: 'written_down' })
     const reloaded = await world.open()
     expect(reloaded.getSnapshot().state).to.eq('unlocked')
   })
@@ -2771,27 +2771,27 @@ describe("several passphrases", () => {
     // `there` looks at the bundle before `here` writes, and writes after it.
     const realUpdate = world.vaultDB.updateBundle.bind(world.vaultDB)
     const spied = vi.spyOn(world.vaultDB, 'updateBundle').mockImplementationOnce(async (bundle, expected) => {
-      await here.addPassphrase('pw', 'here pw', { unlocklabel: 'here' })
+      await here.addPassphrase('pw', 'here pw', { wayinlabel: 'here' })
       await realUpdate(bundle, expected)
     })
-    await TH.expectRefusal(there.addPassphrase('pw', 'there pw', { unlocklabel: 'there' }), 'stale_write')
+    await TH.expectRefusal(there.addPassphrase('pw', 'there pw', { wayinlabel: 'there' }), 'stale_write')
     spied.mockRestore()
-    expect(unlocklabelsOf(there)).to.deep.equal(['passphrase', 'here'])
+    expect(wayinlabelsOf(there)).to.deep.equal(['passphrase', 'here'])
   })
 
   it("the backend holds no passphrase, of the first or of any added", async () => {
     const world = makeWorld()
     const vault = await world.open()
     await vault.unlock('a very memorable passphrase')
-    await vault.addPassphrase('a very memorable passphrase', 'another memorable passphrase', { unlocklabel: 'spare' })
+    await vault.addPassphrase('a very memorable passphrase', 'another memorable passphrase', { wayinlabel: 'spare' })
     const everything = world.dbStore.ckeys().map((ckey) => world.dbStore.read(ckey)).join('\n')
     expect(everything).to.not.include('memorable')
-    expect(everything).to.include('"unlocklabel":"spare"')
+    expect(everything).to.include('"wayinlabel":"spare"')
   })
 
-  it("a bundle in the shape before unlock envelopes reads as a damaged bundle, and is left as it is", async () => {
+  it("a bundle in the shape before wayins reads as a damaged bundle, and is left as it is", async () => {
     const world = makeWorld()
-    const { unlocks: _unlocks, ...rest } = TH.bundleOf('u1')
+    const { wayins: _wayins, ...rest } = TH.bundleOf('u1')
     const oldText = JSON.stringify({ ...rest, key_deriver_label: 'test_digest_v0', passphrase_salt_b64: 'c2FsdA', vault_key_passphrase_wrapped: TH.fakeCiphered('old') })
     const bundleCkey = Ckeys.bundle(TH.scopeOf('u1'))
     world.dbStore.write(bundleCkey, oldText)
@@ -2803,11 +2803,11 @@ describe("several passphrases", () => {
 /** A passkey maker whose authenticator answers `answer`, whatever it is: for a test of what addPasskey refuses. */
 const answering = (answer: unknown) => () => Promise.resolve(answer as PasskeyProof)
 
-/** The unlock_id of the passkey `laptop` that `vault` adds under the passphrase `pw`; fails the test when it adds none. */
+/** The wayin_id of the passkey `laptop` that `vault` adds under the passphrase `pw`; fails the test when it adds none. */
 const addLaptopPasskey = async (vault: Vault): Promise<string> => {
-  const unlockId = await vault.addPasskey('pw', () => TH.passkeyOf('laptop'), { unlocklabel: 'laptop' })
-  if (unlockId === null) { throw new Error('addPasskey added no passkey') }
-  return unlockId
+  const wayinId = await vault.addPasskey('pw', () => TH.passkeyOf('laptop'), { wayinlabel: 'laptop' })
+  if (wayinId === null) { throw new Error('addPasskey added no passkey') }
+  return wayinId
 }
 
 /** A vault in a fresh world, unlocked with `pw`, holding one lockbox and a passkey labelled `laptop`. */
@@ -2817,32 +2817,32 @@ const vaultWithPasskey = async () => {
   await vault.unlock('pw')
   await vault.store('anthropic', 'sk-fake')
   const laptop = await TH.passkeyOf('laptop')
-  const unlockId = await addLaptopPasskey(vault)
-  return { world, vault, laptop, unlockId }
+  const wayinId = await addLaptopPasskey(vault)
+  return { world, vault, laptop, wayinId }
 }
 
 describe("passkeys", () => {
   it("addPasskey gives a way in that opens the vault on any device, with no key derivation", async () => {
-    const { world, vault, laptop, unlockId } = await vaultWithPasskey()
+    const { world, vault, laptop, wayinId } = await vaultWithPasskey()
     expect(vault.getSnapshot().state).to.eq('unlocked')
-    expect(unlocklabelsOf(vault)).to.deep.equal(['passphrase', 'laptop'])
+    expect(wayinlabelsOf(vault)).to.deep.equal(['passphrase', 'laptop'])
     const { keyDeriver, derivations } = countingDeriver()
     const fresh = await world.open({ deviceDB: memoryDeviceDB(), keyDeriver })
     await fresh.unlock(laptop)
     expect(await fresh.read('anthropic')).to.eq('sk-fake')
     expect(derivations).not.toHaveBeenCalled()
     await fresh.lock()
-    await fresh.unlock(laptop, { unlockId })
+    await fresh.unlock(laptop, { wayinId })
     expect(fresh.getSnapshot().state).to.eq('unlocked')
   })
 
   it("a locked vault lists its passkeys with the credential and salt to ask them with", async () => {
-    const { world, laptop, unlockId } = await vaultWithPasskey()
+    const { world, laptop, wayinId } = await vaultWithPasskey()
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })
     expect(fresh.getSnapshot().state).to.eq('locked')
-    const listed = fresh.getSnapshot().unlocks[1]
+    const listed = fresh.getSnapshot().wayins[1]
     expect(listed).to.deep.equal({
-      method: 'passkey', unlock_id: unlockId, unlocklabel: 'laptop', device_id: listed?.device_id, registered_at: listed?.registered_at,
+      wayinkind: 'passkey', wayin_id: wayinId, wayinlabel: 'laptop', device_id: listed?.device_id, registered_at: listed?.registered_at,
       credential_id: laptop.credentialId, prf_salt_b64: laptop.prfSaltB64,
     })
     expect(listed?.device_id).to.have.length.greaterThan(0)
@@ -2864,9 +2864,9 @@ describe("passkeys", () => {
   it("an unlock refuses a passkey the vault does not hold, and a wrong answer, and stays locked", async () => {
     const { world, laptop } = await vaultWithPasskey()
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })
-    await TH.expectRefusal(fresh.unlock(await TH.passkeyOf('stranger')), 'absent_unlock')
+    await TH.expectRefusal(fresh.unlock(await TH.passkeyOf('stranger')), 'absent_wayin')
     await TH.expectRefusal(fresh.unlock({ ...laptop, prfBytes: new Uint8Array(32).fill(7) }), 'wrong_passkey')
-    const otherSalt = TH.passkeyEnvelopeOf('any').prf_salt_b64
+    const otherSalt = TH.passkeyWayinOf('any').prf_salt_b64
     await TH.expectRefusal(fresh.unlock(await TH.passkeyOf('laptop', otherSalt)), 'wrong_passkey')
     expect(fresh.getSnapshot().state).to.eq('locked')
   })
@@ -2891,33 +2891,33 @@ describe("passkeys", () => {
 
   it("addPasskey takes another passkey's answer as proof, and refuses a wrong proof, adding nothing", async () => {
     const { vault, laptop } = await vaultWithPasskey()
-    await vault.addPasskey(laptop, () => TH.passkeyOf('phone'), { unlocklabel: 'phone' })
-    expect(unlocklabelsOf(vault)).to.deep.equal(['passphrase', 'laptop', 'phone'])
-    await TH.expectRefusal(vault.addPasskey('not the passphrase', () => TH.passkeyOf('key'), { unlocklabel: 'key' }), 'wrong_passphrase')
-    await TH.expectRefusal(vault.addPasskey({ ...laptop, prfBytes: new Uint8Array(32) }, () => TH.passkeyOf('key'), { unlocklabel: 'key' }), 'wrong_passkey')
-    expect(unlocklabelsOf(vault)).to.deep.equal(['passphrase', 'laptop', 'phone'])
+    await vault.addPasskey(laptop, () => TH.passkeyOf('phone'), { wayinlabel: 'phone' })
+    expect(wayinlabelsOf(vault)).to.deep.equal(['passphrase', 'laptop', 'phone'])
+    await TH.expectRefusal(vault.addPasskey('not the passphrase', () => TH.passkeyOf('key'), { wayinlabel: 'key' }), 'wrong_passphrase')
+    await TH.expectRefusal(vault.addPasskey({ ...laptop, prfBytes: new Uint8Array(32) }, () => TH.passkeyOf('key'), { wayinlabel: 'key' }), 'wrong_passkey')
+    expect(wayinlabelsOf(vault)).to.deep.equal(['passphrase', 'laptop', 'phone'])
   })
 
   it("addPasskey makes its passkey only once the proof holds: a refused proof, label or room never asks the authenticator", async () => {
     const { vault, laptop } = await vaultWithPasskey()
     const makePasskey = vi.fn(() => TH.passkeyOf('phone'))
-    await TH.expectRefusal(vault.addPasskey('not the passphrase', makePasskey, { unlocklabel: 'phone' }), 'wrong_passphrase')
-    await TH.expectRefusal(vault.addPasskey(' '.repeat(3), makePasskey, { unlocklabel: 'phone' }), 'wrong_passphrase')
-    await TH.expectRefusal(vault.addPasskey({ ...laptop, prfBytes: new Uint8Array(32) }, makePasskey, { unlocklabel: 'phone' }), 'wrong_passkey')
-    await TH.expectRefusal(vault.addPasskey('pw', makePasskey, { unlocklabel: 'laptop' }), 'bad_label')
+    await TH.expectRefusal(vault.addPasskey('not the passphrase', makePasskey, { wayinlabel: 'phone' }), 'wrong_passphrase')
+    await TH.expectRefusal(vault.addPasskey(' '.repeat(3), makePasskey, { wayinlabel: 'phone' }), 'wrong_passphrase')
+    await TH.expectRefusal(vault.addPasskey({ ...laptop, prfBytes: new Uint8Array(32) }, makePasskey, { wayinlabel: 'phone' }), 'wrong_passkey')
+    await TH.expectRefusal(vault.addPasskey('pw', makePasskey, { wayinlabel: 'laptop' }), 'bad_label')
     for (let ii = 2; ii < MaxUnlocks; ii += 1) {
-      await vault.addPasskey('pw', () => TH.passkeyOf(`key${String(ii)}`), { unlocklabel: `key${String(ii)}` })
+      await vault.addPasskey('pw', () => TH.passkeyOf(`key${String(ii)}`), { wayinlabel: `key${String(ii)}` })
     }
-    await TH.expectRefusal(vault.addPasskey('pw', makePasskey, { unlocklabel: 'phone' }), 'too_many_unlocks')
+    await TH.expectRefusal(vault.addPasskey('pw', makePasskey, { wayinlabel: 'phone' }), 'too_many_wayins')
     expect(makePasskey).not.toHaveBeenCalled()
   })
 
   it("addPasskey adds nothing, and resolves null, when the passkey's prompt is dismissed", async () => {
     const { world, vault } = await vaultWithPasskey()
-    const unlocksThen = vault.getSnapshot().unlocks.length
+    const wayinsThen = vault.getSnapshot().wayins.length
     const bundleThen = await world.vaultDB.readBundle(TH.scopeOf('u1'))
-    expect(await vault.addPasskey('pw', () => Promise.resolve(null), { unlocklabel: 'phone' })).to.be.null
-    expect(vault.getSnapshot().unlocks).to.have.lengthOf(unlocksThen)
+    expect(await vault.addPasskey('pw', () => Promise.resolve(null), { wayinlabel: 'phone' })).to.be.null
+    expect(vault.getSnapshot().wayins).to.have.lengthOf(wayinsThen)
     expect(await world.vaultDB.readBundle(TH.scopeOf('u1'))).to.deep.equal(bundleThen)
     expect(vault.getSnapshot().state).to.eq('unlocked')
   })
@@ -2925,29 +2925,29 @@ describe("passkeys", () => {
   it("addPasskey throws what its passkey maker throws, adding nothing", async () => {
     const { vault } = await vaultWithPasskey()
     const unavailable = new VaultError('passkey_unavailable', 'No PRF here.')
-    const err = await TH.expectRefusal(vault.addPasskey('pw', () => Promise.reject(unavailable), { unlocklabel: 'phone' }), 'passkey_unavailable')
+    const err = await TH.expectRefusal(vault.addPasskey('pw', () => Promise.reject(unavailable), { wayinlabel: 'phone' }), 'passkey_unavailable')
     expect(err).to.equal(unavailable)
-    expect(unlocklabelsOf(vault)).to.deep.equal(['passphrase', 'laptop'])
+    expect(wayinlabelsOf(vault)).to.deep.equal(['passphrase', 'laptop'])
   })
 
   it("addPasskey refuses a malformed answer, a credential already in the vault, a taken label, and a full vault", async () => {
     const { vault, laptop } = await vaultWithPasskey()
     const phone = await TH.passkeyOf('phone')
     const shortSalt = toB64(new Uint8Array(16))
-    await TH.expectRefusal(vault.addPasskey('pw', answering({ ...phone, prfSaltB64: shortSalt }), { unlocklabel: 'phone' }), 'bad_option')
-    await TH.expectRefusal(vault.addPasskey('pw', answering({ ...phone, prfSaltB64: 'not base64url!' }), { unlocklabel: 'phone' }), 'bad_option')
+    await TH.expectRefusal(vault.addPasskey('pw', answering({ ...phone, prfSaltB64: shortSalt }), { wayinlabel: 'phone' }), 'bad_option')
+    await TH.expectRefusal(vault.addPasskey('pw', answering({ ...phone, prfSaltB64: 'not base64url!' }), { wayinlabel: 'phone' }), 'bad_option')
     const shortAnswer = new Uint8Array(16)
-    await TH.expectRefusal(vault.addPasskey('pw', answering({ ...phone, prfBytes: shortAnswer }), { unlocklabel: 'phone' }), 'bad_option')
-    await TH.expectRefusal(vault.addPasskey('pw', answering({ ...phone, credentialId: '' }), { unlocklabel: 'phone' }), 'bad_option')
-    await TH.expectRefusal(vault.addPasskey('pw', answering(undefined), { unlocklabel: 'phone' }), 'bad_option')
-    await TH.expectRefusal(vault.addPasskey('pw', answering(laptop), { unlocklabel: 'laptop_again' }), 'bad_option')
-    await TH.expectRefusal(vault.addPasskey('pw', answering(phone), { unlocklabel: 'laptop' }), 'bad_label')
-    await TH.expectRefusal(vault.addPasskey('pw', answering(phone), { unlocklabel: 'Phone' }), 'bad_label')
-    expect(unlocklabelsOf(vault)).to.deep.equal(['passphrase', 'laptop'])
+    await TH.expectRefusal(vault.addPasskey('pw', answering({ ...phone, prfBytes: shortAnswer }), { wayinlabel: 'phone' }), 'bad_option')
+    await TH.expectRefusal(vault.addPasskey('pw', answering({ ...phone, credentialId: '' }), { wayinlabel: 'phone' }), 'bad_option')
+    await TH.expectRefusal(vault.addPasskey('pw', answering(undefined), { wayinlabel: 'phone' }), 'bad_option')
+    await TH.expectRefusal(vault.addPasskey('pw', answering(laptop), { wayinlabel: 'laptop_again' }), 'bad_option')
+    await TH.expectRefusal(vault.addPasskey('pw', answering(phone), { wayinlabel: 'laptop' }), 'bad_label')
+    await TH.expectRefusal(vault.addPasskey('pw', answering(phone), { wayinlabel: 'Phone' }), 'bad_label')
+    expect(wayinlabelsOf(vault)).to.deep.equal(['passphrase', 'laptop'])
     for (let ii = 2; ii < MaxUnlocks; ii += 1) {
-      await vault.addPasskey('pw', () => TH.passkeyOf(`key${String(ii)}`), { unlocklabel: `key${String(ii)}` })
+      await vault.addPasskey('pw', () => TH.passkeyOf(`key${String(ii)}`), { wayinlabel: `key${String(ii)}` })
     }
-    await TH.expectRefusal(vault.addPasskey('pw', answering(phone), { unlocklabel: 'phone' }), 'too_many_unlocks')
+    await TH.expectRefusal(vault.addPasskey('pw', answering(phone), { wayinlabel: 'phone' }), 'too_many_wayins')
   })
 
   const NotMakers = [
@@ -2959,7 +2959,7 @@ describe("passkeys", () => {
   for (const [notMaker, blurb] of NotMakers) {
     it(`addPasskey refuses, as bad_option, ${blurb} in place of a passkey maker`, async () => {
       const { vault } = await vaultWithPasskey()
-      await TH.expectRefusal(vault.addPasskey('pw', notMaker as unknown as () => Promise<PasskeyProof>, { unlocklabel: 'phone' }), 'bad_option')
+      await TH.expectRefusal(vault.addPasskey('pw', notMaker as unknown as () => Promise<PasskeyProof>, { wayinlabel: 'phone' }), 'bad_option')
     })
   }
 
@@ -2968,17 +2968,17 @@ describe("passkeys", () => {
     const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
     await elsewhere.unlock('pw')
     const makePasskey = async () => {
-      await elsewhere.addPassphrase('pw', 'pw two', { unlocklabel: 'spare' })
+      await elsewhere.addPassphrase('pw', 'pw two', { wayinlabel: 'spare' })
       return await TH.passkeyOf('phone')
     }
-    await TH.expectRefusal(vault.addPasskey('pw', makePasskey, { unlocklabel: 'phone' }), 'stale_write')
-    expect(unlocklabelsOf(elsewhere)).to.deep.equal(['passphrase', 'laptop', 'spare'])
+    await TH.expectRefusal(vault.addPasskey('pw', makePasskey, { wayinlabel: 'phone' }), 'stale_write')
+    expect(wayinlabelsOf(elsewhere)).to.deep.equal(['passphrase', 'laptop', 'spare'])
   })
 
   it("a passkey's answer of the wrong shape is refused as misuse wherever it is a proof, never quoting it", async () => {
     const { vault, laptop } = await vaultWithPasskey()
     const misshapen = { ...laptop, prfBytes: [...laptop.prfBytes] } as unknown as PasskeyProof
-    for (const refused of [vault.unlock(misshapen), vault.addPassphrase(misshapen, 'pw two', { unlocklabel: 'two' }), vault.removeUnlock(misshapen, 'unlock-gone')]) {
+    for (const refused of [vault.unlock(misshapen), vault.addPassphrase(misshapen, 'pw two', { wayinlabel: 'two' }), vault.retireWayin(misshapen, 'wayin-gone')]) {
       const err = await TH.expectRefusal(refused, 'bad_option')
       expect(err.message).to.not.include(laptop.credentialId)
       expect(err.message).to.not.include(laptop.prfBytes.join(','))
@@ -2989,10 +2989,10 @@ describe("passkeys", () => {
   it("a passkey sets a new passphrase for a user who forgot theirs: add one, remove the old", async () => {
     const { world, vault, laptop } = await vaultWithPasskey()
     await vault.lock()
-    const forgotten = vault.getSnapshot().unlocks[0]?.unlock_id ?? ''
-    await vault.addPassphrase(laptop, 'a new passphrase', { unlocklabel: 'new_phrase' })
-    await vault.removeUnlock(laptop, forgotten)
-    expect(unlocklabelsOf(vault)).to.deep.equal(['laptop', 'new_phrase'])
+    const forgotten = vault.getSnapshot().wayins[0]?.wayin_id ?? ''
+    await vault.addPassphrase(laptop, 'a new passphrase', { wayinlabel: 'new_phrase' })
+    await vault.retireWayin(laptop, forgotten)
+    expect(wayinlabelsOf(vault)).to.deep.equal(['laptop', 'new_phrase'])
     expect(vault.getSnapshot().state).to.eq('unlocked')
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })
     await TH.expectRefusal(fresh.unlock('pw'), 'wrong_passphrase')
@@ -3003,55 +3003,55 @@ describe("passkeys", () => {
   it("changePassphrase takes a passkey's answer as proof, and changes the vault's one passphrase", async () => {
     const { world, vault, laptop } = await vaultWithPasskey()
     await vault.lock()
-    const [passphraseWay] = vault.getSnapshot().unlocks
+    const [passphraseWay] = vault.getSnapshot().wayins
     await vault.changePassphrase(laptop, 'a new passphrase')
     expect(vault.getSnapshot().state).to.eq('unlocked')
-    expect(unlocklabelsOf(vault)).to.deep.equal(['passphrase', 'laptop'])
+    expect(wayinlabelsOf(vault)).to.deep.equal(['passphrase', 'laptop'])
     // The passphrase's way in is the same one, as a changed passphrase's is.
-    expect(vault.getSnapshot().unlocks[0]?.unlock_id).to.eq(passphraseWay?.unlock_id)
+    expect(vault.getSnapshot().wayins[0]?.wayin_id).to.eq(passphraseWay?.wayin_id)
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })
     await TH.expectRefusal(fresh.unlock('pw'), 'wrong_passphrase')
     await fresh.unlock('a new passphrase')
     expect(await fresh.read('anthropic')).to.eq('sk-fake')
   })
 
-  it("changePassphrase with a passkey among several passphrases changes the one unlockId names, and refuses to guess", async () => {
+  it("changePassphrase with a passkey among several passphrases changes the one wayinId names, and refuses to guess", async () => {
     const { world, vault, laptop } = await vaultWithPasskey()
-    const spareId = await vault.addPassphrase('pw', 'spare pw', { unlocklabel: 'spare' })
-    const firstId = vault.getSnapshot().unlocks[0]?.unlock_id ?? ''
+    const spareId = await vault.addPassphrase('pw', 'spare pw', { wayinlabel: 'spare' })
+    const firstId = vault.getSnapshot().wayins[0]?.wayin_id ?? ''
     await TH.expectRefusal(vault.changePassphrase(laptop, 'new pw'), 'bad_option')
-    await vault.changePassphrase(laptop, 'new pw', { unlockId: spareId })
+    await vault.changePassphrase(laptop, 'new pw', { wayinId: spareId })
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })
     await TH.expectRefusal(fresh.unlock('spare pw'), 'wrong_passphrase')
     await fresh.unlock('new pw')
     await fresh.lock()
-    await fresh.unlock('pw', { unlockId: firstId })
-    expect(unlocklabelsOf(vault)).to.deep.equal(['passphrase', 'laptop', 'spare'])
+    await fresh.unlock('pw', { wayinId: firstId })
+    expect(wayinlabelsOf(vault)).to.deep.equal(['passphrase', 'laptop', 'spare'])
   })
 
-  it("changePassphrase with a passkey refuses an unlockId that is not one of the vault's passphrases, and a passkey that does not open it", async () => {
-    const { world, vault, laptop, unlockId } = await vaultWithPasskey()
-    await TH.expectRefusal(vault.changePassphrase(laptop, 'new pw', { unlockId }), 'absent_unlock')
-    await TH.expectRefusal(vault.changePassphrase(laptop, 'new pw', { unlockId: 'unlock-gone' }), 'absent_unlock')
+  it("changePassphrase with a passkey refuses a wayinId that is not one of the vault's passphrases, and a passkey that does not open it", async () => {
+    const { world, vault, laptop, wayinId } = await vaultWithPasskey()
+    await TH.expectRefusal(vault.changePassphrase(laptop, 'new pw', { wayinId }), 'absent_wayin')
+    await TH.expectRefusal(vault.changePassphrase(laptop, 'new pw', { wayinId: 'wayin-gone' }), 'absent_wayin')
     const stranger = await TH.passkeyOf('stranger')
-    await TH.expectRefusal(vault.changePassphrase(stranger, 'new pw'), 'absent_unlock')
+    await TH.expectRefusal(vault.changePassphrase(stranger, 'new pw'), 'absent_wayin')
     const wrongAnswer = { ...laptop, prfBytes: new Uint8Array(32).fill(7) }
     await TH.expectRefusal(vault.changePassphrase(wrongAnswer, 'new pw'), 'wrong_passkey')
     // Nothing changed through any of it: the old passphrase still opens the vault.
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })
     await fresh.unlock('pw')
-    expect(unlocklabelsOf(vault)).to.deep.equal(['passphrase', 'laptop'])
+    expect(wayinlabelsOf(vault)).to.deep.equal(['passphrase', 'laptop'])
   })
 
   it("changePassphrase with a passkey mends a passphrase stored at another vault_key_epoch: the new one opens", async () => {
     const { world, laptop } = await vaultWithPasskey()
-    const bundle = JSON.parse(world.dbStore.read(u1BundleCkey) ?? '{}') as { unlocks: Record<string, unknown>[] }
-    const unlocks = bundle.unlocks.map((envelope, ii) => (ii === 0 ? { ...envelope, vault_key_epoch: 2 } : envelope))
-    world.dbStore.write(u1BundleCkey, JSON.stringify({ ...bundle, unlocks }))
+    const bundle = JSON.parse(world.dbStore.read(u1BundleCkey) ?? '{}') as { wayins: Record<string, unknown>[] }
+    const wayins = bundle.wayins.map((wayin, ii) => (ii === 0 ? { ...wayin, vault_key_epoch: 2 } : wayin))
+    world.dbStore.write(u1BundleCkey, JSON.stringify({ ...bundle, wayins }))
     const vault = await world.open({ deviceDB: memoryDeviceDB() })
-    await TH.expectRefusal(vault.unlock('pw'), 'damaged_unlock')
+    await TH.expectRefusal(vault.unlock('pw'), 'damaged_wayin')
     await vault.changePassphrase(laptop, 'a new passphrase')
-    expect(storedUnlocksOf(world)[0]).to.deep.include({ vault_key_epoch: 1 })
+    expect(storedWayinsOf(world)[0]).to.deep.include({ vault_key_epoch: 1 })
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })
     await fresh.unlock('a new passphrase')
     expect(await fresh.read('anthropic')).to.eq('sk-fake')
@@ -3066,26 +3066,26 @@ describe("passkeys", () => {
     expect(err.message).to.not.include(laptop.prfBytes.join(','))
   })
 
-  it("changePassphrase with a passphrase of a vault that has a passkey still aims at the way in that opened, and refuses a passkey's unlock_id", async () => {
-    const { vault, unlockId } = await vaultWithPasskey()
-    await TH.expectRefusal(vault.changePassphrase('pw', 'new pw', { unlockId }), 'absent_unlock')
-    expect(unlocklabelsOf(vault)).to.deep.equal(['passphrase', 'laptop'])
+  it("changePassphrase with a passphrase of a vault that has a passkey still aims at the way in that opened, and refuses a passkey's wayin_id", async () => {
+    const { vault, wayinId } = await vaultWithPasskey()
+    await TH.expectRefusal(vault.changePassphrase('pw', 'new pw', { wayinId }), 'absent_wayin')
+    expect(wayinlabelsOf(vault)).to.deep.equal(['passphrase', 'laptop'])
   })
 
-  it("removeUnlock takes a passkey away: it no longer opens the vault", async () => {
-    const { world, vault, laptop, unlockId } = await vaultWithPasskey()
-    await vault.removeUnlock('pw', unlockId)
-    expect(unlocklabelsOf(vault)).to.deep.equal(['passphrase'])
+  it("retireWayin takes a passkey away: it no longer opens the vault", async () => {
+    const { world, vault, laptop, wayinId } = await vaultWithPasskey()
+    await vault.retireWayin('pw', wayinId)
+    expect(wayinlabelsOf(vault)).to.deep.equal(['passphrase'])
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })
-    await TH.expectRefusal(fresh.unlock(laptop), 'absent_unlock')
+    await TH.expectRefusal(fresh.unlock(laptop), 'absent_wayin')
   })
 
-  it("removeUnlock never removes the last passphrase, though passkeys remain", async () => {
+  it("retireWayin never removes the last passphrase, though passkeys remain", async () => {
     const { vault, laptop } = await vaultWithPasskey()
-    const passphraseId = vault.getSnapshot().unlocks[0]?.unlock_id ?? ''
-    await TH.expectRefusal(vault.removeUnlock(laptop, passphraseId), 'last_unlock')
-    await TH.expectRefusal(vault.removeUnlock('pw', passphraseId), 'last_unlock')
-    expect(unlocklabelsOf(vault)).to.deep.equal(['passphrase', 'laptop'])
+    const passphraseId = vault.getSnapshot().wayins[0]?.wayin_id ?? ''
+    await TH.expectRefusal(vault.retireWayin(laptop, passphraseId), 'last_wayin')
+    await TH.expectRefusal(vault.retireWayin('pw', passphraseId), 'last_wayin')
+    expect(wayinlabelsOf(vault)).to.deep.equal(['passphrase', 'laptop'])
   })
 
   it("every change of a passkey moves the epoch: another device locks, and this one stays unlocked", async () => {
@@ -3094,10 +3094,10 @@ describe("passkeys", () => {
     await here.unlock('pw')
     const there = await world.open({ deviceDB: memoryDeviceDB() })
     await there.unlock('pw')
-    const unlockId = await addLaptopPasskey(here)
+    const wayinId = await addLaptopPasskey(here)
     await vi.waitFor(() => { expect(there.getSnapshot().state).to.eq('locked') })
     await there.unlock(await TH.passkeyOf('laptop'))
-    await here.removeUnlock('pw', unlockId)
+    await here.retireWayin('pw', wayinId)
     await vi.waitFor(() => { expect(there.getSnapshot().state).to.eq('locked') })
     expect(storedBundleOf(world)['unlock_epoch']).to.eq(3)
     expect(here.getSnapshot().state).to.eq('unlocked')
@@ -3112,9 +3112,9 @@ describe("passkeys", () => {
   })
 
   it("removal is not revocation: a copy of the bundle from before still opens with the removed passkey", async () => {
-    const { world, vault, laptop, unlockId } = await vaultWithPasskey()
+    const { world, vault, laptop, wayinId } = await vaultWithPasskey()
     const kept = world.dbStore.read(Ckeys.bundle(TH.scopeOf('u1'))) ?? ''
-    await vault.removeUnlock('pw', unlockId)
+    await vault.retireWayin('pw', wayinId)
     const copy = makeWorld()
     copy.dbStore.write(Ckeys.bundle(TH.scopeOf('u1')), kept)
     const thief = await copy.open()
@@ -3275,7 +3275,7 @@ describe("a lock that lands while an unlock is under way", () => {
       await vault.lock()
       return await TH.passkeyOf('laptop')
     }
-    expect(await vault.addPasskey('pw', makePasskey, { unlocklabel: 'laptop' })).to.be.a('string')
+    expect(await vault.addPasskey('pw', makePasskey, { wayinlabel: 'laptop' })).to.be.a('string')
     expect(vault.getSnapshot().state).to.eq('locked')
     expect(await world.rememberedUnlock()).to.be.null
 
@@ -3843,8 +3843,8 @@ describe("the key deriver seam", () => {
       const world = makeWorld()
       await world.openUnlocked('pw', { keyDeriver: { ...TH.testDeriver, salt_bytes: saltBytes } })
       const stored = await world.vaultDB.readBundle(TH.scopeOf('u1'))
-      const [envelope] = stored?.unlocks ?? []
-      expect(fromB64(envelope?.method === 'passphrase' ? envelope.salt_b64 : '')).to.have.lengthOf(saltBytes)
+      const [wayin] = stored?.wayins ?? []
+      expect(fromB64(wayin?.wayinkind === 'passphrase' ? wayin.salt_b64 : '')).to.have.lengthOf(saltBytes)
     }
   })
 
@@ -3866,8 +3866,8 @@ describe("the key deriver seam", () => {
     const standIn: KeyDeriver = { ...Argon2idWebV1, deriveKeyBytes: cheapDerive }
     await world.openUnlocked('pw', { keyDeriver: standIn })
     const stored = await world.vaultDB.readBundle(TH.scopeOf('u1'))
-    const [envelope] = stored?.unlocks ?? []
-    expect(envelope?.method === 'passphrase' && envelope.key_deriver_label).to.eq('argon2id_web_v1')
+    const [wayin] = stored?.wayins ?? []
+    expect(wayin?.wayinkind === 'passphrase' && wayin.key_deriver_label).to.eq('argon2id_web_v1')
   })
 
   it("refuses a deriver that hands back anything but 32 key bytes, and makes no vault of it", async () => {
@@ -3912,7 +3912,7 @@ describe("the key deriver seam", () => {
   })
 
   describe("a deriver that declares Argon2id", () => {
-    it("opens, and unlocks, when its spec is one Argon2id can run", async () => {
+    it("opens, and wayins, when its spec is one Argon2id can run", async () => {
       const world = makeWorld()
       const vault = await world.openUnlocked('pw', { keyDeriver: handBuilt({ salt_bytes: 16 }) })
       expect(vault.getSnapshot().state).to.eq('unlocked')
@@ -3943,13 +3943,13 @@ describe("the key deriver seam", () => {
   })
 
   describe("a deriver of another algorithm, or none declared", () => {
-    it("opens and unlocks, declaring an algorithm of its own, with no Argon2id parameters to carry", async () => {
+    it("opens and wayins, declaring an algorithm of its own, with no Argon2id parameters to carry", async () => {
       const scrypt: CustomKeyDeriver = { ...TH.testDeriver, key_deriver_label: 'acme_scrypt_v1', algorithm: 'scrypt' }
       const vault = await makeWorld().openUnlocked('pw', { keyDeriver: scrypt })
       expect(vault.getSnapshot().state).to.eq('unlocked')
     })
 
-    it("opens and unlocks, declaring none, as the test deriver does", async () => {
+    it("opens and wayins, declaring none, as the test deriver does", async () => {
       expect(TH.testDeriver).to.not.have.property('algorithm')
       const vault = await makeWorld().openUnlocked('pw')
       expect(vault.getSnapshot().state).to.eq('unlocked')
@@ -4114,7 +4114,7 @@ describe("a new passphrase's strength", () => {
     const { keyDeriver, derivations } = countingDeriver()
     const vault = await world.open({ keyDeriver, passphraseStrengthTest: refusing('acme acme acme') })
     const before = await world.vaultDB.readBundle(TH.scopeOf('u1'))
-    await TH.expectRefusal(vault.addPassphrase('pw', 'acme acme acme', { unlocklabel: 'spare' }), 'weak_passphrase')
+    await TH.expectRefusal(vault.addPassphrase('pw', 'acme acme acme', { wayinlabel: 'spare' }), 'weak_passphrase')
     await TH.expectRefusal(vault.changePassphrase('pw', 'acme acme acme'), 'weak_passphrase')
     expect(derivations).not.toHaveBeenCalled()
     expect(await world.vaultDB.readBundle(TH.scopeOf('u1'))).to.deep.equal(before)
@@ -4328,8 +4328,8 @@ describe("a change to the ways in, once it has landed", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
     vi.spyOn(world.deviceDB, 'writeUnlock').mockRejectedValueOnce(new Error('device storage is full'))
-    const spareId = await vault.addPassphrase('pw one', 'spare pw', { unlocklabel: 'spare' })
-    expect(vault.getSnapshot().unlocks.map((unlock) => unlock.unlock_id)).to.include(spareId)
+    const spareId = await vault.addPassphrase('pw one', 'spare pw', { wayinlabel: 'spare' })
+    expect(vault.getSnapshot().wayins.map((wayin) => wayin.wayin_id)).to.include(spareId)
     expect(world.logged.map((heard) => [heard.level, heard.story])).to.deep.equal([['warn', { call: 'addPassphrase' }]])
     expect(await world.stateOnOpen()).to.eq('locked')
   })
@@ -4349,10 +4349,10 @@ describe("the unlock window, renewed", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
     world.advance(24 * HourMillis)
-    const spareId = await vault.addPassphrase('pw one', 'spare pw', { unlocklabel: 'spare' })
+    const spareId = await vault.addPassphrase('pw one', 'spare pw', { wayinlabel: 'spare' })
     expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + SevenDaysMillis)
     world.advance(24 * HourMillis)
-    await vault.removeUnlock('pw one', spareId)
+    await vault.retireWayin('pw one', spareId)
     expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + SevenDaysMillis)
   })
 
@@ -4360,7 +4360,7 @@ describe("the unlock window, renewed", () => {
     const { world, vault, laptop } = await vaultWithPasskey()
     const deadline = vault.getSnapshot().askPassphraseAt
     world.advance(24 * HourMillis)
-    await vault.addPassphrase(laptop, 'spare pw', { unlocklabel: 'spare' })
+    await vault.addPassphrase(laptop, 'spare pw', { wayinlabel: 'spare' })
     expect(vault.getSnapshot().state).to.eq('unlocked')
     expect(vault.getSnapshot().askPassphraseAt).to.eq(deadline)
     expect(await rememberedDeadlineOf(world)).to.eq(deadline)
@@ -4382,7 +4382,7 @@ describe("the unlock window, renewed", () => {
     const { world, vault, laptop } = await vaultWithPasskey()
     await vault.lock()
     world.advance(24 * HourMillis)
-    await vault.addPassphrase(laptop, 'spare pw', { unlocklabel: 'spare' })
+    await vault.addPassphrase(laptop, 'spare pw', { wayinlabel: 'spare' })
     expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + SevenDaysMillis)
   })
 
@@ -4781,7 +4781,7 @@ describe("a failed open", () => {
 
   it("ends its storage watch when the stored bundle does not parse", async () => {
     const world = makeWorld()
-    world.dbStore.write(u1BundleCkey, '{"format":"safebyok-vault-v2"}')
+    world.dbStore.write(u1BundleCkey, '{"format":"safebyok-vault-v3"}')
     const tally = TH.tallyWatches(world.vaultDB)
     await TH.expectRefusal(world.open(), 'damaged_bundle')
     expect(tally).to.deep.equal({ opened: 1, closed: 1 })
@@ -5327,7 +5327,7 @@ describe("refreshes, one at a time", () => {
     const vault = await world.openUnlocked('pw')
     expect(vault.getSnapshot().syncing).to.be.true
     const sound = world.dbStore.read(u1BundleCkey) ?? ''
-    world.dbStore.write(u1BundleCkey, '{"format":"safebyok-vault-v2"}')
+    world.dbStore.write(u1BundleCkey, '{"format":"safebyok-vault-v3"}')
     await TH.wakeupAtNextTick()
     for (const ii of [1, 2]) {
       world.dbStore.write('elsewhere', String(ii))
@@ -5579,7 +5579,7 @@ describe("the logger", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.store('anthropic', 'sk-fake')
-    world.dbStore.write(u1BundleCkey, '{"format":"safebyok-vault-v2"}')
+    world.dbStore.write(u1BundleCkey, '{"format":"safebyok-vault-v3"}')
     await TH.wakeupAtNextTick()
     expect(world.logged.map((heard) => heard.level)).to.deep.equal(['warn'])
     expect(world.logged[0]?.story).to.deep.equal({ call: 'refresh' })
@@ -5804,7 +5804,7 @@ const seenIn = async (world: ReturnType<typeof makeWorld>) => {
 }
 
 /** The stored bundle's ways in, as the backend holds them. */
-const storedUnlocksOf = (world: ReturnType<typeof makeWorld>) => storedBundleOf(world)['unlocks'] as Record<string, unknown>[]
+const storedWayinsOf = (world: ReturnType<typeof makeWorld>) => storedBundleOf(world)['wayins'] as Record<string, unknown>[]
 
 describe("the device mark", () => {
   it("is kept from the vault's making: its vault_id, the epoch seen, and an id of its own, which the first way in carries", async () => {
@@ -5814,7 +5814,7 @@ describe("the device mark", () => {
     const bundle = storedBundleOf(world)
     expect(mark).to.deep.include({ format: 'safebyok-mark-v3', ...TH.scopeOf('u1'), lock_generation: 0 })
     expect(mark?.seen).to.deep.include({ vault_id: bundle['vault_id'], unlock_epoch: 1, vault_key_epoch: 1 })
-    expect(storedUnlocksOf(world)[0]).to.deep.include({ device_id: mark?.seen?.device_id, vault_key_epoch: 1, registered_at: world.clock.now() })
+    expect(storedWayinsOf(world)[0]).to.deep.include({ device_id: mark?.seen?.device_id, vault_key_epoch: 1, registered_at: world.clock.now() })
   })
 
   it("is started under the id the first way in carries, though a refresh the vault's making set off gets there first", async () => {
@@ -5829,7 +5829,7 @@ describe("the device mark", () => {
     })
     await vault.unlock('pw')
     const seen = await seenIn(world)
-    expect(storedUnlocksOf(world)[0]?.['device_id']).to.eq(seen?.device_id)
+    expect(storedWayinsOf(world)[0]?.['device_id']).to.eq(seen?.device_id)
   })
 
   it("rises with each newer bundle, its own writes and another device's, and every way in this device adds carries its id", async () => {
@@ -5837,24 +5837,24 @@ describe("the device mark", () => {
     const vault = await world.openUnlocked('pw')
     const { device_id: deviceId } = await seenIn(world) ?? {}
     world.advance(HourMillis)
-    await vault.addPassphrase('pw', 'spare phrase', { unlocklabel: 'spare' })
+    await vault.addPassphrase('pw', 'spare phrase', { wayinlabel: 'spare' })
     expect(await seenIn(world)).to.deep.include({ device_id: deviceId, unlock_epoch: 2 })
-    expect(storedUnlocksOf(world)[1]).to.deep.include({ device_id: deviceId, registered_at: world.clock.now() })
+    expect(storedWayinsOf(world)[1]).to.deep.include({ device_id: deviceId, registered_at: world.clock.now() })
     const elsewhere = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
-    await elsewhere.addPassphrase('pw', 'third phrase', { unlocklabel: 'third' })
+    await elsewhere.addPassphrase('pw', 'third phrase', { wayinlabel: 'third' })
     await TH.wakeupAtNextTick()
     expect(await seenIn(world)).to.deep.include({ device_id: deviceId, unlock_epoch: 3 })
-    expect(storedUnlocksOf(world)[2]?.['device_id']).to.be.a('string').and.not.eq(deviceId)
+    expect(storedWayinsOf(world)[2]?.['device_id']).to.be.a('string').and.not.eq(deviceId)
   })
 
   it("keeps a way in's device and time when its passphrase changes", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const [before] = storedUnlocksOf(world)
+    const [before] = storedWayinsOf(world)
     world.advance(HourMillis)
     await vault.changePassphrase('pw', 'pw two')
-    const [after] = storedUnlocksOf(world)
-    expect(after).to.deep.include({ device_id: before?.['device_id'], registered_at: before?.['registered_at'], unlock_id: before?.['unlock_id'] })
+    const [after] = storedWayinsOf(world)
+    expect(after).to.deep.include({ device_id: before?.['device_id'], registered_at: before?.['registered_at'], wayin_id: before?.['wayin_id'] })
     expect(after?.['salt_b64']).to.not.eq(before?.['salt_b64'])
   })
 
@@ -5870,7 +5870,7 @@ describe("the device mark", () => {
   it("starts anew, under a new id, for a vault made anew under the scope", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    await vault.addPassphrase('pw', 'spare phrase', { unlocklabel: 'spare' })
+    await vault.addPassphrase('pw', 'spare phrase', { wayinlabel: 'spare' })
     const before = await seenIn(world)
     vault.close()
     const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
@@ -5921,9 +5921,9 @@ describe("the device mark", () => {
 const rolledBackWorld = async () => {
   const world = makeWorld()
   const vault = await world.openUnlocked('pw')
-  const spareId = await vault.addPassphrase('pw', 'spare phrase', { unlocklabel: 'spare' })
+  const spareId = await vault.addPassphrase('pw', 'spare phrase', { wayinlabel: 'spare' })
   const older = world.dbStore.read(u1BundleCkey) ?? ''
-  await vault.removeUnlock('pw', spareId)
+  await vault.retireWayin('pw', spareId)
   const newer = world.dbStore.read(u1BundleCkey) ?? ''
   return { world, vault, older, newer }
 }
@@ -5964,7 +5964,7 @@ describe("a bundle rolled back", () => {
     world.dbStore.write(u1BundleCkey, older)
     await TH.expectRefusal(deaf.unlock('spare phrase'), 'rolled_back')
     expect(deaf.getSnapshot().state).to.eq('locked')
-    expect(deaf.getSnapshot().unlocks.map((unlock) => unlock.unlocklabel)).to.deep.equal(['passphrase'])
+    expect(deaf.getSnapshot().wayins.map((wayin) => wayin.wayinlabel)).to.deep.equal(['passphrase'])
     expect(await world.rememberedUnlock()).to.be.null
   })
 
@@ -5974,7 +5974,7 @@ describe("a bundle rolled back", () => {
     world.dbStore.write(u1BundleCkey, older)
     await TH.wakeupAtNextTick()
     expect(vault.getSnapshot().state).to.eq('locked')
-    expect(vault.getSnapshot().unlocks).to.deep.equal(standing.unlocks)
+    expect(vault.getSnapshot().wayins).to.deep.equal(standing.wayins)
     expect(await world.rememberedUnlock()).to.be.null
     await TH.expectRefusal(vault.read('anthropic'), 'vault_locked')
     expect(world.logged.map((call) => [call.level, call.story, (call.err as VaultError | null | undefined)?.kind]))
@@ -5990,7 +5990,7 @@ describe("a bundle rolled back", () => {
     // There's next read is served at epoch 1, and handed back only once here's change has landed.
     vi.spyOn(slowVaultDB, 'readBundle').mockImplementationOnce(async (...args) => {
       const served = await readBundle(...args)
-      await here.addPassphrase('pw', 'spare phrase', { unlocklabel: 'spare' })
+      await here.addPassphrase('pw', 'spare phrase', { wayinlabel: 'spare' })
       return served
     })
     await there.unlock('pw')
@@ -6026,7 +6026,7 @@ describe("a bundle rolled back", () => {
     const reopened = await world.open()
     expect(reopened.getSnapshot().state).to.eq('locked')  // the refused open forgot the remembered unlock
     await reopened.unlock('pw')
-    expect(reopened.getSnapshot().unlocks.map((unlock) => unlock.unlocklabel)).to.deep.equal(['passphrase'])
+    expect(reopened.getSnapshot().wayins.map((wayin) => wayin.wayinlabel)).to.deep.equal(['passphrase'])
   })
 
   it("refuses an older copy at a lower vaultKey epoch as rolled_back, though storage raised its unlock epoch past the one seen", async () => {
@@ -6039,7 +6039,7 @@ describe("a bundle rolled back", () => {
       unlock_epoch:    2,
       vault_key_epoch: 2,
       prior_vault_key: { vault_key_epoch: 1, vault_key_wrapped: TH.fakeCiphered('prior') },
-      unlocks:         first.unlocks.map((envelope) => ({ ...envelope, vault_key_epoch: 2 })),
+      wayins:          first.wayins.map((wayin) => ({ ...wayin, vault_key_epoch: 2 })),
     }
     world.dbStore.write(u1BundleCkey, JSON.stringify(second))
     await world.open()
@@ -6063,7 +6063,7 @@ describe("a bundle rolled back", () => {
     vault.close()
     world.dbStore.write(u1BundleCkey, older)
     const reopened = await openAcceptingRestore(world.optsWith(), () => Promise.resolve(true))
-    expect(reopened.getSnapshot().unlocks.map((unlock) => unlock.unlocklabel)).to.deep.equal(['passphrase', 'spare'])
+    expect(reopened.getSnapshot().wayins.map((wayin) => wayin.wayinlabel)).to.deep.equal(['passphrase', 'spare'])
     expect(await seenIn(world)).to.deep.include({ unlock_epoch: 2 })
   })
 
@@ -6088,7 +6088,7 @@ describe("the vaultKey's epoch", () => {
   it("makes a vault at its first vaultKey, with no prior one", async () => {
     const world = makeWorld()
     await world.openUnlocked('pw')
-    expect(storedBundleOf(world)).to.deep.include({ format: 'safebyok-vault-v2', vault_key_epoch: 1 })
+    expect(storedBundleOf(world)).to.deep.include({ format: 'safebyok-vault-v3', vault_key_epoch: 1 })
     expect(storedBundleOf(world)).to.not.have.property('prior_vault_key')
   })
 
@@ -6120,7 +6120,7 @@ describe("the vaultKey's epoch", () => {
       unlock_epoch:    2,
       vault_key_epoch: 2,
       prior_vault_key: { vault_key_epoch: 1, vault_key_wrapped: TH.fakeCiphered('prior') },
-      unlocks:         standing.unlocks.map((envelope) => ({ ...envelope, vault_key_epoch: 2 })),
+      wayins:          standing.wayins.map((wayin) => ({ ...wayin, vault_key_epoch: 2 })),
     }
     await world.vaultDB.updateBundle(replaced, { vault_id: standing.vault_id, unlock_epoch: 1 })
     await TH.expectRefusal(stale.store('anthropic', 'sk-fake'), 'vault_locked')
@@ -6134,6 +6134,17 @@ describe("the vaultKey's epoch", () => {
     vault.close()
     const { vault_key_epoch: _epoch, ...older } = storedBundleOf(world)
     world.dbStore.write(u1BundleCkey, JSON.stringify({ ...older, format: 'safebyok-vault-v1' }))
+    await TH.expectRefusal(world.open(), 'damaged_bundle')
+    await eraseDamagedVault(world.optsWith())
+    expect(rowsOf(world, 'u1')).to.deep.equal([])
+  })
+
+  it("opens a vault stored under the format before wayins, safebyok-vault-v2, as damaged_bundle, never newer_format, which eraseDamagedVault clears", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.store('anthropic', 'sk-fake')
+    vault.close()
+    world.dbStore.write(u1BundleCkey, JSON.stringify({ ...storedBundleOf(world), format: 'safebyok-vault-v2' }))
     await TH.expectRefusal(world.open(), 'damaged_bundle')
     await eraseDamagedVault(world.optsWith())
     expect(rowsOf(world, 'u1')).to.deep.equal([])

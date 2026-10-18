@@ -15,7 +15,7 @@ describe("Names.checkValidators", () => {
     expect(Names.checkValidators(undefined)).to.be.undefined
     expect(Names.checkValidators({ boxlabel: undefined, userId: Z.string() })).to.have.property('userId')
     expect(Names.checkValidators(AnyTextValidators)).to.eq(AnyTextValidators)
-    expect(Names.checkValidators({ unlocklabel: Z.string() })).to.have.property('unlocklabel')
+    expect(Names.checkValidators({ wayinlabel: Z.string() })).to.have.property('wayinlabel')
   })
 
   it("refuses a misspelt field as 'bad_option', as its second example shows, rather than keep the default unseen", () => {
@@ -46,8 +46,8 @@ describe("Names.rulesOf", () => {
     expect(rules.boxlabel).to.eq(AnyBoxlabel)
     expect(rules.applabel).to.eq(Label)
     expect(rules.userId).to.eq(UserId)
-    expect(rules.unlocklabel).to.eq(Label)
-    expect(Names.rulesOf({ unlocklabel: AnyBoxlabel }).unlocklabel).to.eq(AnyBoxlabel)
+    expect(rules.wayinlabel).to.eq(Label)
+    expect(Names.rulesOf({ wayinlabel: AnyBoxlabel }).wayinlabel).to.eq(AnyBoxlabel)
   })
 
   it("refuses a misspelt field, as checkValidators does", () => {
@@ -128,7 +128,7 @@ describe("Names.check", () => {
       ['userId',   '',                         "can't be empty"],
       ['userId',   'sk-fake\u{D800}',          'lone surrogate'],
       ['boxlabel', 'sk-fak\u{E9}'.normalize('NFD'), 'NFC'],
-      ['unlocklabel', 'sk-fake\u{7}',          'no control characters'],
+      ['wayinlabel', 'sk-fake\u{7}',           'no control characters'],
       ['vaultlabel', 'sk-fake\u{DD11}',        'well-formed Unicode'],
     ] as const
     for (const [field, candidate, said] of cases) {

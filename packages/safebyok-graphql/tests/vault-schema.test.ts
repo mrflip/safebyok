@@ -53,11 +53,11 @@ describe("VaultSchemaSdl", () => {
     })
   }
 
-  it("carries a bundle's unlock envelopes as a list, each one opaque JSON", () => {
+  it("carries a bundle's wayins as a list, each one opaque JSON", () => {
     for (const typename of ['SafebyokVaultBundle', 'SafebyokVaultBundleInput']) {
-      const unlocks = fieldsOf(typename)['unlocks']!.type
-      expect(isNonNullType(unlocks) && isListType(unlocks.ofType)).to.be.true
-      expect(getNamedType(unlocks).name).to.eq('SafebyokUnlockEnvelope')
+      const wayins = fieldsOf(typename)['wayins']!.type
+      expect(isNonNullType(wayins) && isListType(wayins.ofType)).to.be.true
+      expect(getNamedType(wayins).name).to.eq('SafebyokWayin')
     }
   })
 

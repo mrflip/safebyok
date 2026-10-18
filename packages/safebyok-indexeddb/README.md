@@ -74,7 +74,7 @@ its own failures.
 One IndexedDB database per `dbName`, `<dbName>:vault_db`, holding one object store, `records`:
 **a row per record, each the record itself**, as safebyok wrote it, kept by structured clone
 field by field. Nothing is serialized, normalized or repaired: every field a record holds is
-bound into its encryption, but for the bundle's `unlock_epoch` and which envelopes its `unlocks`
+bound into its encryption, but for the bundle's `unlock_epoch` and which wayins its `wayins`
 list holds, so one changed in storage makes the record refuse to open.
 
 | ckey                                               | Row                       |

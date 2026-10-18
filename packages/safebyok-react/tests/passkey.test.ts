@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { PasskeySaltBytes, VaultError, localVaultDB, memoryDeviceDB, memoryStore, openVault, type PasskeyProof, type UnlockSummary, type VaultDB } from 'safebyok'
+import { PasskeySaltBytes, VaultError, localVaultDB, memoryDeviceDB, memoryStore, openVault, type PasskeyProof, type WayinSummary, type VaultDB } from 'safebyok'
 import { fromB64, toB64 } from 'safebyok/utils'
 import { askPasskey, createPasskey, passkeysAvailable } from '../src/passkey'
 import * as TH from './test-helpers'
@@ -19,12 +19,12 @@ const expectRefusal = async (operation: Promise<unknown>, kind: VaultError['kind
 }
 
 /** A passkey's way in as the snapshot lists it, for `proof`. */
-const summaryOf = (proof: PasskeyProof, unlocklabel: string): UnlockSummary => ({
-  method: 'passkey', unlock_id: `unlock-${unlocklabel}`, unlocklabel, device_id: 'device-one', registered_at: Date.UTC(2026, 9, 15),
+const summaryOf = (proof: PasskeyProof, wayinlabel: string): WayinSummary => ({
+  wayinkind: 'passkey', wayin_id: `wayin-${wayinlabel}`, wayinlabel, device_id: 'device-one', registered_at: Date.UTC(2026, 9, 15),
   credential_id: proof.credentialId, prf_salt_b64: proof.prfSaltB64,
 })
 
-const passphraseSummary: UnlockSummary = { method: 'passphrase', unlock_id: 'unlock-passphrase', unlocklabel: 'passphrase', device_id: 'device-one', registered_at: Date.UTC(2026, 9, 15) }
+const passphraseSummary: WayinSummary = { wayinkind: 'passphrase', wayin_id: 'wayin-passphrase', wayinlabel: 'passphrase', device_id: 'device-one', registered_at: Date.UTC(2026, 9, 15) }
 
 /** A fresh vault in memory, made with the passphrase `pw` and unlocked, and an opener for another device on the same storage. */
 const vaultInMemory = async () => {
@@ -120,13 +120,13 @@ describe("askPasskey", () => {
     expect(Object.keys(request?.extensions?.prf?.evalByCredential ?? {})).to.have.members([laptop.credentialId, phone.credentialId])
   })
 
-  it("refuses as absent_unlock a vault with no passkey, and as damaged_unlock one whose every passkey is stored damaged", async () => {
+  it("refuses as absent_wayin a vault with no passkey, and as damaged_wayin one whose every passkey is stored damaged", async () => {
     install()
-    await expectRefusal(askPasskey([passphraseSummary]), 'absent_unlock')
+    await expectRefusal(askPasskey([passphraseSummary]), 'absent_wayin')
     const damaged = { ...summaryOf(await TH.passkeyOf('laptop'), 'laptop'), credential_id: 'not base64url!' }
     const saltless = { ...summaryOf(await TH.passkeyOf('phone'), 'phone'), prf_salt_b64: 'not base64url!' }
     const shortSalted = { ...summaryOf(await TH.passkeyOf('tablet'), 'tablet'), prf_salt_b64: 'c2FsdA' }
-    await expectRefusal(askPasskey([passphraseSummary, damaged, saltless, shortSalted]), 'damaged_unlock')
+    await expectRefusal(askPasskey([passphraseSummary, damaged, saltless, shortSalted]), 'damaged_wayin')
   })
 
   it("leaves out a passkey stored damaged, and asks the others", async () => {
@@ -165,12 +165,12 @@ describe("a passkey unlock, end to end", () => {
     install()
     const { vault, open } = await vaultInMemory()
     await vault.store('anthropic', 'sk-fake')
-    const unlockId = await vault.addPasskey('pw', () => createPasskey(passkeyOpts), { unlocklabel: 'laptop' })
-    if (unlockId === null) { throw new Error('the fake authenticator made no passkey') }
+    const wayinId = await vault.addPasskey('pw', () => createPasskey(passkeyOpts), { wayinlabel: 'laptop' })
+    if (wayinId === null) { throw new Error('the fake authenticator made no passkey') }
 
     const elsewhere = await open()
     expect(elsewhere.getSnapshot().state).to.eq('locked')
-    const asked = await askPasskey(elsewhere.getSnapshot().unlocks)
+    const asked = await askPasskey(elsewhere.getSnapshot().wayins)
     if (asked === null) { throw new Error('the fake authenticator gave no answer') }
     await elsewhere.unlock(asked)
     expect(await elsewhere.read('anthropic')).to.eq('sk-fake')

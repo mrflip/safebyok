@@ -182,7 +182,7 @@ describe("postgresVaultDB, who may reach a vault", () => {
 })
 
 describe("postgresVaultDB, what it stores", () => {
-  it("stores a bundle a column to a field, its unlock envelopes as one jsonb", async () => {
+  it("stores a bundle a column to a field, its wayins as one jsonb", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
     await vaultDB.createBundle(TH.bundleOf('u1'))
@@ -191,26 +191,26 @@ describe("postgresVaultDB, what it stores", () => {
       applabel:         'acme',
       user_id:          'u1',
       vaultlabel:       'main',
-      format:           'safebyok-vault-v2',
+      format:           'safebyok-vault-v3',
       vault_id:         'vault-id-u1',
       unlock_epoch:     1,
       vault_key_epoch:  1,
       prior_vault_key:  null,
-      unlocks:          TH.bundleOf('u1').unlocks,
+      wayins:           TH.bundleOf('u1').wayins,
       registered_at:    Date.UTC(2026, 9, 14),
     }])
   })
 
-  it("keeps a bundle's envelopes whole and in their order, through an update", async () => {
+  it("keeps a bundle's wayins whole and in their order, through an update", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
     await vaultDB.createBundle(TH.bundleOf('u1'))
-    const unlocks = [TH.envelopeOf('work_phrase'), TH.envelopeOf('home_phrase'), TH.envelopeOf('passphrase')]
-    const next = TH.bundleOf('u1', { unlock_epoch: 2, unlocks })
+    const wayins = [TH.wayinOf('work_phrase'), TH.wayinOf('home_phrase'), TH.wayinOf('passphrase')]
+    const next = TH.bundleOf('u1', { unlock_epoch: 2, wayins })
     await vaultDB.updateBundle(next, { vault_id: 'vault-id-u1', unlock_epoch: 1 })
     const standing = await vaultDB.readBundle(u1)
     expect(standing).to.deep.equal(next)
-    expect(standing?.unlocks.map((envelope) => envelope.unlocklabel)).to.deep.equal(['work_phrase', 'home_phrase', 'passphrase'])
+    expect(standing?.wayins.map((wayin) => wayin.wayinlabel)).to.deep.equal(['work_phrase', 'home_phrase', 'passphrase'])
   })
 
   // The core never sends it -- its vault moves the epoch on with every update -- so it is a client
@@ -220,7 +220,7 @@ describe("postgresVaultDB, what it stores", () => {
     const vaultDB = TH.requestFor(db, 'u1')
     await vaultDB.createBundle(TH.bundleOf('u1', { unlock_epoch: 2 }))
     const atTwo = { vault_id: 'vault-id-u1', unlock_epoch: 2 }
-    const rewrapped = (unlockEpoch: number) => TH.bundleOf('u1', { unlock_epoch: unlockEpoch, unlocks: [TH.envelopeOf('home_phrase')] })
+    const rewrapped = (unlockEpoch: number) => TH.bundleOf('u1', { unlock_epoch: unlockEpoch, wayins: [TH.wayinOf('home_phrase')] })
     await TH.expectRefusal(vaultDB.updateBundle(rewrapped(2), atTwo), 'stale_write')
     await TH.expectRefusal(vaultDB.updateBundle(rewrapped(1), atTwo), 'stale_write')
     expect(await vaultDB.readBundle(u1)).to.deep.equal(TH.bundleOf('u1', { unlock_epoch: 2 }))
@@ -581,10 +581,10 @@ describe("postgresVaultDB, in trouble", () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
     await vaultDB.createBundle(TH.bundleOf('u1'))
-    await db.query(`UPDATE safebyok_bundles SET unlocks = '"not a list"'::jsonb`)
+    await db.query(`UPDATE safebyok_bundles SET wayins = '"not a list"'::jsonb`)
     await TH.expectRefusal(vaultDB.readBundle(u1), 'corrupt_record')
-    const { rows } = await db.query<{ unlocks: unknown }>('SELECT unlocks FROM safebyok_bundles')
-    expect(rows[0]?.unlocks).to.eq('not a list')
+    const { rows } = await db.query<{ wayins: unknown }>('SELECT wayins FROM safebyok_bundles')
+    expect(rows[0]?.wayins).to.eq('not a list')
   })
 })
 

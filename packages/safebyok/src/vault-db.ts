@@ -1,6 +1,6 @@
 import * as Z from 'zod/mini'
 import { Lockbox } from './lockbox'
-import { MaxUnlocks, UnlockMethodVals, VaultBundle, VaultScope, type DamagedLockbox, type LockboxSummary, type PublicBag } from './types'
+import { MaxUnlocks, WayinKindVals, VaultBundle, VaultScope, type DamagedLockbox, type LockboxSummary, type PublicBag } from './types'
 import { VaultError, isVaultError } from './errors'
 import * as Names from './names'
 import { AnyTextValidators, NameFloor } from './validators'
@@ -210,7 +210,7 @@ export abstract class VaultDB {
   /**
    * The vault's bundle, validated, or null when the vault has never been created. A stored bundle
    * that fails its checks is refused as `corrupt_record`, and one a newer safebyok may have
-   * written -- a `format`, unlock method or number of unlocks this version does not know -- as
+   * written -- a `format`, wayinkind or number of wayins this version does not know -- as
    * `newer_format`.
    */
   async readBundle(scope: VaultScope): Promise<VaultBundle | null> {
@@ -362,7 +362,7 @@ export abstract class VaultDB {
    * handle's `destroy()`; with kind `damaged_bundle`, erasing nothing, when the record is too
    * damaged to name the vault it belongs to (which only the backend's own tools can clear); with
    * kind `newer_format`, erasing nothing, when it may have been written by a newer safebyok, in a
-   * `format`, unlock method or number of unlocks this one does not know, and which a device on the
+   * `format`, wayinkind or number of wayins this one does not know, and which a device on the
    * newer version opens: it is told from damage by those three, and where it cannot be told, it
    * is refused; and with kind `stale_write` when the vault was replaced meanwhile. A bundle
    * rewritten under the same `vault_id` between the read and the erase is the same vault, and is
@@ -696,26 +696,26 @@ const newerBundle = () => new VaultError('newer_format', "This vault's stored re
  * The bundle formats earlier versions of this package wrote: a record in one is older, never newer,
  * and fails today's checks as damage does.
  */
-const OlderBundleFormats: ReadonlySet<unknown> = new Set(['safebyok-vault-v1'])
+const OlderBundleFormats: ReadonlySet<unknown> = new Set(['safebyok-vault-v1', 'safebyok-vault-v2'])
 
 /**
  * True when a record that fails this version's checks may be one a later version writes, which
  * is not damage: it names a `format` this version neither writes nor wrote before (of any type),
- * holds an unlock `method` it does not know, or holds more unlocks than {@link MaxUnlocks}. These
+ * holds a `wayinkind` it does not know, or holds more wayins than {@link MaxUnlocks}. These
  * are all this version can tell from damage; anything else that fails is taken for damage. Any
  * change to what a stored record may hold -- a field, a shape, or a range a check accepts --
  * therefore bumps `format`.
  */
 const mayBeNewer = (raw: unknown): boolean => {
   if (typeof raw !== 'object' || raw === null) { return false }
-  const { format, unlocks } = raw as { format?: unknown, unlocks?: unknown }
+  const { format, wayins } = raw as { format?: unknown, wayins?: unknown }
   const knownFormat = VaultBundle.shape.format.safeParse(format).success || OlderBundleFormats.has(format)
   if (format !== undefined && ! knownFormat) { return true }
-  if (! Array.isArray(unlocks)) { return false }
-  if (unlocks.length > MaxUnlocks) { return true }
-  return unlocks.some((envelope: unknown) => {
-    const { method } = (typeof envelope === 'object' && envelope !== null ? envelope : {}) as { method?: unknown }
-    return typeof method === 'string' && ! (UnlockMethodVals as readonly string[]).includes(method)
+  if (! Array.isArray(wayins)) { return false }
+  if (wayins.length > MaxUnlocks) { return true }
+  return wayins.some((wayin: unknown) => {
+    const { wayinkind } = (typeof wayin === 'object' && wayin !== null ? wayin : {}) as { wayinkind?: unknown }
+    return typeof wayinkind === 'string' && ! (WayinKindVals as readonly string[]).includes(wayinkind)
   })
 }
 

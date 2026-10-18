@@ -36,8 +36,8 @@ describe("optionsCheck", () => {
   })
 
   it("refuses a known field its schema refuses", () => {
-    const checkAim = optionsCheck({ unlockId: Z.optional(Z.string()) }, 'unlockId is text.')
-    expect(checkAim({ unlockId: 'u-1' })).to.deep.equal({ unlockId: 'u-1' })
-    TH.expectSyncRefusal(() => checkAim({ unlockId: 7 }), 'bad_option')
+    const checkAim = optionsCheck({ wayinId: Z.optional(Z.string()) }, 'wayinId is text.')
+    expect(checkAim({ wayinId: 'u-1' })).to.deep.equal({ wayinId: 'u-1' })
+    TH.expectSyncRefusal(() => checkAim({ wayinId: 7 }), 'bad_option')
   })
 })

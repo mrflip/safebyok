@@ -26,12 +26,12 @@ const validatorsCheck = optionsCheck({
   vaultlabel:  nameValidator,
   boxlabel:    nameValidator,
   userId:      nameValidator,
-  unlocklabel: nameValidator,
-}, 'validators is a bag of Zod schemas, each checking one of applabel, vaultlabel, boxlabel, userId and unlocklabel: leave out any field to keep its default check, and check the spelling of each one given.')
+  wayinlabel: nameValidator,
+}, 'validators is a bag of Zod schemas, each checking one of applabel, vaultlabel, boxlabel, userId and wayinlabel: leave out any field to keep its default check, and check the spelling of each one given.')
 
 /**
  * A host's `validators` bag, exactly as handed in, once its shape passes: each field one of
- * applabel, vaultlabel, boxlabel, userId and unlocklabel, and each a Zod schema or
+ * applabel, vaultlabel, boxlabel, userId and wayinlabel, and each a Zod schema or
  * undefined. Kind 'bad_option' otherwise, so a misspelt field (`boxLabel`) is refused rather
  * than leaving the default check quietly in its place. Only the shape is checked: the schemas
  * are the host's.
@@ -57,7 +57,7 @@ export const rulesOf = (validators: VaultValidators = {}): NameRules => {
     vaultlabel:  validators.vaultlabel ?? DefaultValidators.vaultlabel,
     boxlabel:    validators.boxlabel ?? DefaultValidators.boxlabel,
     userId:      validators.userId ?? DefaultValidators.userId,
-    unlocklabel: validators.unlocklabel ?? DefaultValidators.unlocklabel,
+    wayinlabel: validators.wayinlabel ?? DefaultValidators.wayinlabel,
   }
 }
 

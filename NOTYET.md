@@ -9,7 +9,7 @@ implementation.
   `whiteboard/20261016-rotation/rotation-design.md`, built as sprint matters' threads 14 and
   18-20); what waits is the UX, a device list, and, if the Coach wants rotation not to sign every
   other device out, a key pair per way in (that design's open question 1). The data it needs goes
-  in with rotation: a random `device_id` per vault per device, recorded on every envelope it adds.
+  in with rotation: a random `device_id` per vault per device, recorded on every wayin it adds.
   * **What we record now.** `device_id` is random, minted per vault per device, never derived from
     the device, so the backend can't link one device's vaults to each other. That reading follows
     Apple's ban on fingerprinting and Google's guidance to use a privately stored random ID; it is

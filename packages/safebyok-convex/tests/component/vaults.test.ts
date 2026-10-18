@@ -42,7 +42,7 @@ describe("getBundle and createBundle", () => {
 
 describe("updateBundle", () => {
   const ThisVaultAtOne = { vault_id: 'vault-id-u1', unlock_epoch: 1 }
-  const rewrapped = TH.bundleOf('u1', { unlock_epoch: 2, unlocks: [TH.envelopeOf('passphrase', { vault_key_wrapped: { cipher_iv_b64: 'iv-new', ciphertext_b64: 'ct-new' } })] })
+  const rewrapped = TH.bundleOf('u1', { unlock_epoch: 2, wayins: [TH.wayinOf('passphrase', { vault_key_wayin_wrapped: { cipher_iv_b64: 'iv-new', ciphertext_b64: 'ct-new' } })] })
 
   it("lands a bundle that keeps the vault_id and moves unlock_epoch forward", async () => {
     const CVX = await withBundle()
@@ -389,8 +389,8 @@ describe("a vault's weight limit", () => {
 const wholeDocumentBundle = () => {
   const bundle = TH.bundleOf('u1')
   const padding = 'a'.repeat(1_048_576 - getDocumentSize(bundle) - 64)
-  const envelope = TH.envelopeOf('passphrase', { vault_key_wrapped: TH.fakeCiphered('bundle-u1') })
-  return TH.bundleOf('u1', { unlocks: [{ ...envelope, salt_b64: envelope.salt_b64 + padding }] })
+  const wayin = TH.wayinOf('passphrase', { vault_key_wayin_wrapped: TH.fakeCiphered('bundle-u1') })
+  return TH.bundleOf('u1', { wayins: [{ ...wayin, salt_b64: wayin.salt_b64 + padding }] })
 }
 
 /**

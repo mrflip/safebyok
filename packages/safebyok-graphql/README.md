@@ -208,13 +208,13 @@ of its own.
   change to a vault's ways in, and `vault_key_epoch`. Past 2,147,483,647 the field fails on the
   wire and the browser sees `storage_unavailable`. That is accepted: two billion changes to
   the ways in is not a vault anyone keeps.
-* **The bundle's `unlocks`** is a list of `SafebyokUnlockEnvelope`, each one opaque JSON, its
-  `method` saying its shape: the adapter carries an envelope as it is, never looking inside, as
+* **The bundle's `wayins`** is a list of `SafebyokWayin`, each one opaque JSON, its
+  `wayinkind` saying its shape: the adapter carries a wayin as it is, never looking inside, as
   the Postgres table stores the list as one `jsonb`. A new way to unlock reaches the browser with
   no change here. That is by choice, not for want of a typed union: GraphQL has no input unions
   before graphql 17's `@oneOf`, and the adapter is a shelf.
 * **Encrypted**: each whisper (`whisper_ciphered`), each lockboxKey (`lockbox_key_wrapped`), and
-  the vaultKey under each way in (inside each envelope). **In the open**: everything else, as
+  the vaultKey under each way in (inside each wayin). **In the open**: everything else, as
   [`safebyok-postgres`](../safebyok-postgres#what-is-stored) lists it.
 
 ## Developing this package

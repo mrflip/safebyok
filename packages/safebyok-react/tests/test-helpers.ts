@@ -7,7 +7,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { Component, createElement, type ReactElement, type ReactNode } from 'react'
 import { onTestFinished, vi } from 'vitest'
-import { ForcePassphraseReentryHours, VaultError, type UnlockSummary, type Vault, type VaultState } from 'safebyok'
+import { ForcePassphraseReentryHours, VaultError, type WayinSummary, type Vault, type VaultState } from 'safebyok'
 import { scopeOf } from 'safebyok/testing'
 import { fromB64, toB64 } from 'safebyok/utils'
 
@@ -34,7 +34,7 @@ const unsubscribeFromNothing = () => { /* nothing ever changes */ }
 /** What a {@link stubVault} is made of: each part a test leaves out takes the stub's default. */
 export type StubVaultOpts = {
   state?:           VaultState
-  unlocks?:         UnlockSummary[]
+  wayins?:          WayinSummary[]
   reentryWindowMillis?: number
   unlock?:          Vault['unlock']
   destroy?:         Vault['destroy']
@@ -45,7 +45,7 @@ export const DefaultWindowMillis = ForcePassphraseReentryHours * 3_600_000
 
 /**
  * Just enough of a Vault for a component to render it: a snapshot that keeps its identity and
- * never changes (`state`, default 'locked'; `unlocks`, default none; the scope of `u1`'s `main`
+ * never changes (`state`, default 'locked'; `wayins`, default none; the scope of `u1`'s `main`
  * vault in the `acme` app, as `scopeOf` has it), a window (default seven days), a subscribe that
  * never calls back, and whichever calls the test hands it.
  *
@@ -53,7 +53,7 @@ export const DefaultWindowMillis = ForcePassphraseReentryHours * 3_600_000
  * @example const vault = TH.stubVault({ unlock: () => Promise.reject(new VaultError('wrong_passphrase', 'Not that one.')) })
  */
 export const stubVault = (opts: StubVaultOpts = {}): Vault => {
-  const snapshot = { state: opts.state ?? 'locked', unlocks: opts.unlocks ?? [], scope: scopeOf('u1') }
+  const snapshot = { state: opts.state ?? 'locked', wayins: opts.wayins ?? [], scope: scopeOf('u1') }
   return {
     getSnapshot:     () => snapshot,
     subscribe:       () => unsubscribeFromNothing,

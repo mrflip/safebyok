@@ -194,8 +194,8 @@ describe("a record the deployment refused", () => {
   const subject = 'user_quotable'
   const scope = { applabel: 'quotable_app', user_id: subject, vaultlabel: 'quotable_vault' }
   const quotableKey = { vault_key_epoch: 52_874, prior_vault_key: { vault_key_epoch: 52_873, vault_key_wrapped: TH.fakeCiphered('prior_quotable') } }
-  const quotableUnlocks = [TH.envelopeOf('quotable_phrase', { vault_key_epoch: 52_874, device_id: 'device_quotable', registered_at: Date.UTC(2026, 8, 17) })]
-  const standing = TH.bundleOf(subject, { ...scope, ...quotableKey, unlock_epoch: 52_871, unlocks: quotableUnlocks })
+  const quotableWayins = [TH.wayinOf('quotable_phrase', { vault_key_epoch: 52_874, device_id: 'device_quotable', registered_at: Date.UTC(2026, 8, 17) })]
+  const standing = TH.bundleOf(subject, { ...scope, ...quotableKey, unlock_epoch: 52_871, wayins: quotableWayins })
   const nextBundle = { ...standing, unlock_epoch: 52_872, vault_key_passphrase_wrapped: TH.fakeCiphered('rewrapped_quotable') }
   const lockbox = TH.boxOf('quotable_box', 'quotable_rev', { public_json: TH.publicJsonOf({ note: 'a quotable bag' }), vault_key_epoch: 52_874 })
   // The whisper's codec and schema version are the same in every lockbox, so nothing to quote.
@@ -205,7 +205,7 @@ describe("a record the deployment refused", () => {
   // with it -- the format literals, the test deriver's label, the fake salt -- is public and the
   // same in every record, so finding it in a refusal is no leak; only what varies per record counts.
   const rivalScope = { applabel: 'rival_app', user_id: 'user_rival', vaultlabel: 'rival_vault' }
-  const rivalBundle = TH.bundleOf('user_rival', { ...rivalScope, vault_key_epoch: 11, prior_vault_key: { vault_key_epoch: 10, vault_key_wrapped: TH.fakeCiphered('prior_rival') }, unlock_epoch: 7, unlocks: [TH.envelopeOf('rival_phrase', { vault_key_epoch: 11, device_id: 'device_rival', registered_at: Date.UTC(2026, 0, 2) })] })
+  const rivalBundle = TH.bundleOf('user_rival', { ...rivalScope, vault_key_epoch: 11, prior_vault_key: { vault_key_epoch: 10, vault_key_wrapped: TH.fakeCiphered('prior_rival') }, unlock_epoch: 7, wayins: [TH.wayinOf('rival_phrase', { vault_key_epoch: 11, device_id: 'device_rival', registered_at: Date.UTC(2026, 0, 2) })] })
   const rivalBox = TH.boxOf('rival_box', 'rival_rev', { public_json: TH.publicJsonOf({ note: 'a rival note' }), vault_key_epoch: 11 })
   const rivalLeaves = new Set(TH.leafTexts({ scope: rivalScope, record: [rivalBundle, { ...rivalBundle, unlock_epoch: 8, vault_key_passphrase_wrapped: TH.fakeCiphered('rewrapped_rival') }, rivalBox] }))
   const perRecordLeaves = (record: unknown) => TH.leafTexts({ scope, record }).filter((leaf) => ! rivalLeaves.has(leaf))

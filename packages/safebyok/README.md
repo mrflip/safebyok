@@ -137,7 +137,7 @@ vault.getSnapshot().boxes[0]  // { boxlabel: 'anthropic_api_key', public: {}, da
 
 ## Names, and your own checks
 
-By default a label (`applabel`, `vaultlabel`, `boxlabel`, and the `unlocklabel` of each way in
+By default a label (`applabel`, `vaultlabel`, `boxlabel`, and the `wayinlabel` of each way in
 you add) is lowercase words of letters and digits joined by single underscores, 2 to 40
 characters (`Label`); and a `userId` is 1 to 100 ASCII letters, digits and `-_.:@+|` (`UserId`),
 which holds every stable id an auth provider issues -- a UUID, Auth0's `provider|id`, Clerk's
@@ -173,7 +173,7 @@ await vault.store('מפתח OpenAI: עבודה', 'sk-...', { public: { note: 'th
   text not in NFC is refused, never composed for you.
 * **Your checks are an alarm at the door, not a promise about storage.** They run where a name
   enters the vault: `openVault` (the scope), `store()` (the boxlabel), `addPassphrase` and
-  `addPasskey` (the unlocklabel). A lockbox already stored under a name they refuse
+  `addPasskey` (the wayinlabel). A lockbox already stored under a name they refuse
   -- by another client, or before you narrowed them -- lists, reads and erases as any other, by
   the name it was stored under; `store()` refuses only to write a new one under a refused name.
   With nothing stored under it, a name they refuse is `bad_label` at `read()`, `use()` and
@@ -309,7 +309,7 @@ keeps the key for one more minute to finish, and then a timer drops it, with no 
 call. The timer is `unref`'d, so it never holds a Node or Bun process open.
 
 **The window starts again whenever the user types a passphrase and it proves**: an `unlock()`, a
-`changePassphrase()`, and an `addPassphrase()`, `addPasskey()` or `removeUnlock()` with a
+`changePassphrase()`, and an `addPassphrase()`, `addPasskey()` or `retireWayin()` with a
 passphrase as proof. An `unlock()` with a passkey sets it too. Nothing else moves it: not a read,
 a store or a refresh, nor a passkey proving a change on a vault already unlocked. The window
 running out while an `unlock()` or `changePassphrase()` is under way is no lock: the call ends
@@ -512,17 +512,17 @@ says these things:
 A vault may have up to `MaxUnlocks` (8) passphrases and passkeys together, each its own way in: a daily one, one
 written down at home, one a partner holds. Each wraps the same vaultKey under its own salt, no
 passphrase is ever stored, and adding or removing one rewrites no lockbox. The snapshot lists
-them, locked or not, as `unlocks`: each a `method` (`passphrase` or `passkey`), an `unlock_id`, the
-`unlocklabel` the user chose, and when it was added and by which device (`registered_at`,
+them, locked or not, as `wayins`: each a `wayinkind` (`passphrase` or `passkey`), a `wayin_id`, the
+`wayinlabel` the user chose, and when it was added and by which device (`registered_at`,
 `device_id`).
 
 ```ts
-vault.getSnapshot().unlocks       // [{ method: 'passphrase', unlock_id: '1b9d...', unlocklabel: 'passphrase', device_id: 'k3x9...', registered_at: 1760000000000 }]
+vault.getSnapshot().wayins        // [{ wayinkind: 'passphrase', wayin_id: '1b9d...', wayinlabel: 'passphrase', device_id: 'k3x9...', registered_at: 1760000000000 }]
 
-const spareId = await vault.addPassphrase(passphrase, spare, { unlocklabel: 'written_down' })
+const spareId = await vault.addPassphrase(passphrase, spare, { wayinlabel: 'written_down' })
 await vault.changePassphrase(spare, renewedSpare)       // changes that one; the first still opens
-await vault.removeUnlock(passphrase, spareId)           // never the last one: 'last_unlock'
-await vault.unlock(passphrase, { unlockId })            // aimed at one: a single key derivation
+await vault.retireWayin(passphrase, spareId)            // never the last one: 'last_wayin'
+await vault.unlock(passphrase, { wayinId })             // aimed at one: a single key derivation
 ```
 
 * **Every change asks for proof**, even on an unlocked vault: the vault keeps no copy of
@@ -530,14 +530,14 @@ await vault.unlock(passphrase, { unlockId })            // aimed at one: a singl
   way in. Any way in the vault has will do: a passphrase, or a passkey's answer. That includes
   `changePassphrase`, so a user who forgot their passphrase sets a new one with their
   fingerprint: `vault.changePassphrase(passkey, newPassphrase)`, naming which passphrase with
-  `{ unlockId }` when the vault has several.
+  `{ wayinId }` when the vault has several.
 * **Every change locks the other devices.** It moves the bundle's `unlock_epoch`, so each
   other device falls back to `locked` and must unlock with a passphrase still standing. This
   device stays unlocked.
 * **An unlock not aimed at one tries each in turn**, one key derivation apiece: about 0.6 s each
   with the browser's deriver, so a mistyped passphrase in a vault of eight takes about five
-  seconds to refuse. A host that knows which one the user means (a picker over `unlocks`) passes
-  its `unlockId`.
+  seconds to refuse. A host that knows which one the user means (a picker over `wayins`) passes
+  its `wayinId`.
 * **Removal is not revocation.** A removed passphrase stops opening the vault from here on, but
   whoever knew it and kept a copy of the bundle from before can still open that copy, and the
   vaultKey inside is the one the vault still uses. There is no key rotation yet.
@@ -607,25 +607,25 @@ framework's host can use them).
 
 ```ts
 // The vault checks the passphrase first, then calls createPasskey: a wrong one makes no passkey.
-const unlockId = await vault.addPasskey(passphrase, () => createPasskey({ rp: { name: 'Acme' }, user: { name: email, displayName } }), { unlocklabel: 'laptop' })
-// unlockId is null if the user dismissed the prompt
+const wayinId = await vault.addPasskey(passphrase, () => createPasskey({ rp: { name: 'Acme' }, user: { name: email, displayName } }), { wayinlabel: 'laptop' })
+// wayinId is null if the user dismissed the prompt
 
-vault.getSnapshot().unlocks       // [..., { method: 'passkey', unlock_id, unlocklabel: 'laptop', device_id, registered_at, credential_id, prf_salt_b64 }]
+vault.getSnapshot().wayins        // [..., { wayinkind: 'passkey', wayin_id, wayinlabel: 'laptop', device_id, registered_at, credential_id, prf_salt_b64 }]
 
-const answer = await askPasskey(vault.getSnapshot().unlocks)   // null if the user dismissed it
+const answer = await askPasskey(vault.getSnapshot().wayins)    // null if the user dismissed it
 if (answer !== null) { await vault.unlock(answer) }             // no key derivation to wait for
 ```
 
-* **A passkey is a way in like a passphrase.** Its envelope wraps the same vaultKey, under a key
+* **A passkey is a way in like a passphrase.** Its wayin wraps the same vaultKey, under a key
   made from the passkey's answer by HKDF-SHA256; an unlock with it is remembered on the device
   for `forcePassphraseReentryHours`, and `askPassphraseAt` applies, as for a passphrase. It counts
   toward `MaxUnlocks`.
 * **Adding one asks for proof**, a passphrase or another passkey's answer, as every change to the
-  ways in does; `addPassphrase` and `removeUnlock` take a passkey's answer as proof too.
+  ways in does; `addPassphrase` and `retireWayin` take a passkey's answer as proof too.
   `changePassphrase` changes a passphrase only.
 * **A passkey can stand in for a forgotten passphrase**: `addPassphrase(answer, fresh, {
-  unlocklabel })`, then `removeUnlock(answer, oldId)`. But **a vault always keeps a passphrase**:
-  removing the last one refuses with kind `last_unlock`, since a passkey can be lost with its
+  wayinlabel })`, then `retireWayin(answer, oldId)`. But **a vault always keeps a passphrase**:
+  removing the last one refuses with kind `last_wayin`, since a passkey can be lost with its
   device. A vault is created with a passphrase, too: a passkey's `unlock()` on an `absent` vault
   refuses with `absent_vault`.
 * **Where it works.** A passkey answers on the device that holds it: a platform passkey synced by
@@ -660,7 +660,7 @@ render for that, and hands a condition down as `openError`).
 
 | Kind                  | What happened                                                    | What to do                                              |
 | --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |
-| `bad_label`           | a label (or the `userId`) that fails the vault's check: `Label` (or `UserId`) by default, or the host's own in `validators`; or an `unlocklabel` the vault already has | Pass labels the app chose; check a user-typed one first with the same check, and against the snapshot's `unlocks` |
+| `bad_label`           | a label (or the `userId`) that fails the vault's check: `Label` (or `UserId`) by default, or the host's own in `validators`; or a `wayinlabel` the vault already has | Pass labels the app chose; check a user-typed one first with the same check, and against the snapshot's `wayins` |
 | `bad_whisper`         | a whisper JSON cannot carry (`undefined`, a function, a class instance) | Store plain JSON; to empty a lockbox, `erase` it |
 | `bad_option`          | an option or argument out of its range: an `openVault` option, an `argon2idDeriver` spec, a `store()`'s public bag, a passphrase or callback of the wrong type, a record handed to a `VaultDB` write; a passkey's answer of the wrong shape, or one already a way in | Fix the call; the message names what it takes |
 | `vault_closed`        | the vault handle was closed                                      | Open the vault again; do not use a handle after `close()` |
@@ -674,23 +674,23 @@ Part of normal operation. Each can reach the user; the app decides how.
 | Kind                  | What happened                                                    | What to do                                              |
 | --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |
 | `vault_locked`        | a whisper was asked for before the vault was unlocked            | Ask for the passphrase and `unlock()`, then retry (`safebyok-react`'s `withUnlockedVault` does) |
-| `wrong_passphrase`    | the passphrase did not unlock the vault, or was empty. A passphrase envelope altered in storage refuses its passphrase in just the same way, so the message says that the stored vault may be damaged | Ask again                                               |
+| `wrong_passphrase`    | the passphrase did not unlock the vault, or was empty. A passphrase wayin altered in storage refuses its passphrase in just the same way, so the message says that the stored vault may be damaged | Ask again                                                  |
 | `weak_passphrase`     | a new passphrase -- the one the first `unlock()` creates the vault with, or one `addPassphrase()` or `changePassphrase()` sets -- that the vault's `passphraseStrengthTest` finds too easy to guess. The message is the test's own reason. Never raised by an `unlock()` of a vault that stands | Show the message beside the field, and ask for another |
-| `wrong_passkey`       | the passkey's answer did not unlock the vault, or answered for another salt. An answer for the envelope's own salt that does not open it most likely means the envelope was altered in storage, and the message says so | Ask for a passphrase; if it works, the user may remove that passkey and add it again |
+| `wrong_passkey`       | the passkey's answer did not unlock the vault, or answered for another salt. An answer for the wayin's own salt that does not open it most likely means the wayin was altered in storage, and the message says so | Ask for a passphrase; if it works, the user may remove that passkey and add it again |
 | `passkey_unavailable` | this browser or authenticator cannot answer for a passkey unlock: no WebAuthn, or no PRF extension | Offer the passphrase instead; on `createPasskey`, tell the user this device cannot be a fingerprint unlock |
 | `absent_box`          | no lockbox under that label                                      | Offer to create it, or refresh the list: it may have been erased elsewhere |
 | `absent_vault`        | the vault has never been created, or was deleted elsewhere, and the call will not create it | Unlock with a new passphrase to create it |
-| `absent_unlock`       | no way into the vault has that `unlock_id`, or is the passkey that answered: it may have been removed on another device | Look again at the snapshot's `unlocks`, and ask the user which they mean |
+| `absent_wayin`        | no way into the vault has that `wayin_id`, or is the passkey that answered: it may have been removed on another device | Look again at the snapshot's `wayins`, and ask the user which they mean |
 | `whisper_too_large`   | a whisper over the vault's `maxWhisperBytes`                     | Tell the user it is too large; a host that means to allow more passes a larger `maxWhisperBytes` |
 | `lockbox_too_large`   | a lockbox -- its whisper, public bag and boxlabel together, as the UTF-8 bytes of its JSON -- over its storage's `maxRecordBytes`; only a host whose validators admit long names, or a backend with small records, meets it | Tell the user to store a smaller whisper or bag |
 | `vault_full`          | a new lockbox in a vault already holding its `maxLockboxes`, a new lockbox whose names would take the vault past its storage's `maxVaultBytes`, or a write the storage backend has no room for | Tell the user to erase a lockbox first; the host may raise `maxLockboxes` where the backend allows |
-| `too_many_unlocks`    | a passphrase or passkey added to a vault already holding `MaxUnlocks` (8) ways in | Tell the user to remove one first             |
-| `last_unlock`         | removing the vault's last passphrase: a vault always keeps one, since a passkey can be lost with its device | Add another passphrase first; to be rid of the vault, `destroy()` it |
+| `too_many_wayins`     | a passphrase or passkey added to a vault already holding `MaxUnlocks` (8) ways in | Tell the user to remove one first             |
+| `last_wayin`          | removing the vault's last passphrase: a vault always keeps one, since a passkey can be lost with its device | Add another passphrase first; to be rid of the vault, `destroy()` it |
 | `corrupt_record`      | a stored record failed validation as storage read it back: storage's own word, from a `VaultDB` called directly. A vault call says what it means for the vault instead, as one of the three below | Nothing was changed. Do not retry; see a developer: the record is damaged, was moved, or came from a newer safebyok |
 | `damaged_bundle`      | the vault's stored bundle failed its checks (not a shape this package writes, or naming another vault), so no way in can be tried: `openVault` refuses it | Nothing was changed, and a retry will not mend it. Tell the user the vault cannot be opened; restore its bundle from a backup, if there is one, or, if the user chooses to start over, `eraseDamagedVault()` (see *A vault that cannot be opened*) |
-| `damaged_unlock`      | a way in is stored in a form this package never writes (a salt of the wrong length, or not base64url), so it cannot be tried: the passkey asked for, the passphrase `unlockId` aims at, or every passphrase the vault has. Other ways in are still tried | Unlock another way, then `removeUnlock()` the damaged one and add it again |
+| `damaged_wayin`       | a way in is stored in a form this package never writes (a salt of the wrong length, or not base64url), so it cannot be tried: the passkey asked for, the passphrase `wayinId` aims at, or every passphrase the vault has. Other ways in are still tried | Unlock another way, then `retireWayin()` the damaged one and add it again |
 | `damaged_lockbox`     | a lockbox failed its checks as read, or would not open under the vault's own vaultKey, or opened to no whisper: altered in storage, or moved there from elsewhere. A lockbox that will not open is named so only after the vault has caught up with storage once: one a vault made anew elsewhere wrote makes the call `vault_locked` instead | Nothing was changed. Offer `erase()`, or a fresh `store()` over it (see *Damaged lockboxes*) |
-| `newer_format`        | the vault's stored bundle is in a form this version does not know -- a `format`, unlock method or number of unlocks -- which a newer safebyok may have written: `openVault` and `eraseDamagedVault` refuse it | Nothing was changed. Tell the user to update the app; never offer to start over |
+| `newer_format`        | the vault's stored bundle is in a form this version does not know -- a `format`, wayinkind or number of wayins -- which a newer safebyok may have written: `openVault` and `eraseDamagedVault` refuse it | Nothing was changed. Tell the user to update the app; never offer to start over |
 | `stale_write`         | storage changed since this device read it, so the write was refused and nothing was written: another device or tab wrote, created or erased the lockbox a `store()` was writing; an `erase()` into a vault deleted or made anew elsewhere, its message saying the lockbox could not be erased because its vault is gone; and a write whose catch-up with storage then failed too (its `cause` says why; the snapshot reads `syncing: false`) -- unless the catch-up was refused as `identity_revoked`, `rolled_back` or `newer_format`, which the write throws as it came | The vault has caught up: show what stands now and, if the change still applies, repeat it (*Two devices storing at once*, below). Nothing is tried again by itself |
 | `rolled_back`         | this device has already seen a newer copy of the vault's bundle than storage offers now (storage restored from a backup, or altered), so it won't use this one, and the vault locked: nothing was unlocked or written | Tell the user this device has seen a newer copy of the vault than storage holds. If the storage was restored from an older copy on purpose, accept it on this device (see *A vault rolled back*, below); otherwise the app's support should look at its storage |
 | `not_permitted`       | the storage backend refused the signed-in user, still the vault's own, this one call | Tell the user they may not; signing in again will not help |
@@ -743,8 +743,8 @@ remembered unlock, so a call cut short can be made again. It needs the stored re
 to aim the erase, so a bundle too damaged to show one is refused as `damaged_bundle` still, with
 nothing erased: the backend's own tools can clear it (`localVaultDB`'s bundle that is not JSON at
 all is one). A record this version cannot read may instead have been written by a **newer**
-safebyok, which opens it; so one in a `format` this version does not know, with an unlock
-`method` it does not know, or with more unlocks than `MaxUnlocks`, is refused with a kind of its
+safebyok, which opens it; so one in a `format` this version does not know, with a
+`wayinkind` it does not know, or with more wayins than `MaxUnlocks`, is refused with a kind of its
 own, `newer_format`, by `openVault` and `eraseDamagedVault` alike, nothing erased, with a message
 telling the user to update the app: never offer to start over on it. That is all this version can tell from damage, which rests on a rule: **any change to
 what a stored record may hold -- a field, a shape, or a range a check accepts -- bumps

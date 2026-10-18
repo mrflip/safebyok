@@ -572,11 +572,11 @@ describe("the fixtures", () => {
     expect(Object.isFrozen(TH.thisVault)).to.be.true
   })
 
-  it("passkeyEnvelopeOf: a shape-valid passkey envelope, with any field overridden", () => {
-    const bundle = TH.bundleOf('u1', { unlocks: [TH.envelopeOf('passphrase'), TH.passkeyEnvelopeOf('laptop')] })
+  it("passkeyWayinOf: a shape-valid passkey wayin, with any field overridden", () => {
+    const bundle = TH.bundleOf('u1', { wayins: [TH.wayinOf('passphrase'), TH.passkeyWayinOf('laptop')] })
     expect(VaultBundle.safeParse(bundle).success).to.be.true
-    expect(TH.passkeyEnvelopeOf('laptop')).to.include({ method: 'passkey', unlock_id: 'unlock-laptop', credential_id: 'cred-laptop' })
-    expect(TH.passkeyEnvelopeOf('laptop', { credential_id: 'other' }).credential_id).to.eq('other')
+    expect(TH.passkeyWayinOf('laptop')).to.include({ wayinkind: 'passkey', wayin_id: 'wayin-laptop', credential_id: 'cred-laptop' })
+    expect(TH.passkeyWayinOf('laptop', { credential_id: 'other' }).credential_id).to.eq('other')
   })
 
   it("passkeyOf: the same passkey and salt answer the same, another salt or passkey otherwise", async () => {

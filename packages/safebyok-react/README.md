@@ -321,12 +321,12 @@ import { askPasskey, createPasskey, passkeysAvailable } from 'safebyok-react'
 // mistyped passphrase leaves no passkey on the authenticator.
 const addFingerprint = async (passphrase: string) => {
   const makePasskey = () => createPasskey({ rp: { name: 'Acme' }, user: { name: email, displayName: fullName } })
-  const unlockId = await vault.addPasskey(passphrase, makePasskey, { unlocklabel: 'laptop_fingerprint' })
-  if (unlockId === null) { return }  // the user dismissed the prompt
+  const wayinId = await vault.addPasskey(passphrase, makePasskey, { wayinlabel: 'laptop_fingerprint' })
+  if (wayinId === null) { return }   // the user dismissed the prompt
 }
 
 // Unlocking: the browser offers each of the vault's passkeys, and the one touched answers.
-const passkey = await askPasskey(vault.getSnapshot().unlocks)
+const passkey = await askPasskey(vault.getSnapshot().wayins)
 if (passkey !== null) { await vault.unlock(passkey) }
 ```
 
@@ -360,8 +360,8 @@ if (passkey !== null) { await vault.unlock(passkey) }
   begins (what it said before no longer stands), each condition's message, and the button's
   word when it takes itself away.
 * **A passkey can stand in for a forgotten passphrase**: `vault.addPassphrase(passkey, fresh, {
-  unlocklabel })`, then `vault.removeUnlock(passkey, oldId)`. A vault always keeps one passphrase:
-  removing the last refuses with kind `last_unlock`.
+  wayinlabel })`, then `vault.retireWayin(passkey, oldId)`. A vault always keeps one passphrase:
+  removing the last refuses with kind `last_wayin`.
 
 ## Development
 

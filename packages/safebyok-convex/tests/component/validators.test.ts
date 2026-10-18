@@ -16,7 +16,7 @@ import * as TH from '../test-helpers'
 /**
  * A record's shape, as both validator libraries can be read: which fields, which optional, and
  * each field's base type. The literal a `format` field allows is part of its shape; so is each
- * member of a union of records, such as the unlock envelopes a bundle lists.
+ * member of a union of records, such as the wayins a bundle lists.
  */
 type Shape =
   | { kind: 'string' | 'number' }
@@ -73,7 +73,7 @@ const listedZod = Z.omit(Records.Lockbox, { lockbox_key_wrapped: true, whisper_c
 const ShapeCases = [
   [Records.Ciphered,     Ciphered,      'Ciphered: the shared encrypted-value shape'],
   [Records.VaultScope,   VaultScope,    'VaultScope: what names one vault'],
-  [Records.VaultBundle,  VaultBundle,   'VaultBundle: every field, each unlock envelope and its ciphered wrap nested'],
+  [Records.VaultBundle,  VaultBundle,   'VaultBundle: every field, each wayin and its ciphered wrap nested'],
   [Records.Lockbox,      Lockbox,       'Lockbox: every field, the public bag as JSON text, both ciphered fields nested'],
   [listedZod,            ListedLockbox, 'a listed lockbox: the record without its ciphered fields, format kept'],
 ] as const
@@ -120,9 +120,9 @@ const convexAccepts = async (call: Promise<unknown>): Promise<boolean> => {
 const { vault_id: _vaultId, ...bundleWithoutVaultId } = TH.bundleOf('u1')
 const { public_json: _publicJson, ...boxWithoutBag } = TH.boxOf('anthropic_api_key', 'a1')
 const { registered_at: _bundleTime, ...bundleWithoutTime } = TH.bundleOf('u1')
-const { unlocks: _unlocks, ...bundleWithoutUnlocks } = TH.bundleOf('u1')
-/** The three fields a bundle held its one passphrase in, before `unlocks`. */
-const OldEnvelopeFields = {
+const { wayins: _wayins, ...bundleWithoutWayins } = TH.bundleOf('u1')
+/** The three fields a bundle held its one passphrase in, before `wayins`. */
+const OldWayinFields = {
   key_deriver_label:            'test_digest_v0',
   // base64 of the literal text 'salt': a fake salt, public material anyway
   passphrase_salt_b64:          'c2FsdA',
@@ -137,16 +137,16 @@ const BundleCases = [
   // both accept:
   [TH.bundleOf('u1'),                                                        true,   true,   'a whole bundle'],
   // names are any text to both: the vault's validators check them, client side
-  [{ ...TH.bundleOf('u1'), unlocks: [TH.envelopeOf('passphrase'), TH.passkeyEnvelopeOf('laptop')] }, true, true, 'a bundle with a passphrase and a passkey'],
+  [{ ...TH.bundleOf('u1'), wayins: [TH.wayinOf('passphrase'), TH.passkeyWayinOf('laptop')] }, true, true, 'a bundle with a passphrase and a passkey'],
   // both refuse -- what Convex can see:
-  [{ ...TH.bundleOf('u1'), format: 'safebyok-vault-v3' },                    false,  false,  'a format this package does not know'],
+  [{ ...TH.bundleOf('u1'), format: 'safebyok-vault-v4' },                    false,  false,  'a format this package does not know'],
   [{ ...TH.bundleOf('u1'), format: 'safebyok-lockbox-v1' },                  false,  false,  "another record's format"],
   [bundleWithoutVaultId,                                                     false,  false,  'a bundle missing its vault_id'],
   [{ ...TH.bundleOf('u1'), unlock_epoch: '1' },                              false,  false,  'an epoch written as text'],
-  [{ ...TH.bundleOf('u1'), unlocks: [TH.envelopeOf('passphrase', { vault_key_wrapped: { cipher_iv_b64: 'iv' } as never })] }, false, false, 'a ciphered envelope missing its ciphertext'],
-  [{ ...TH.bundleOf('u1'), unlocks: [TH.envelopeOf('passphrase', { method: 'fingerprint' as never })] }, false, false, 'an unlock method this package does not know'],
-  [{ ...TH.bundleOf('u1'), unlocks: [TH.envelopeOf('passphrase', { method: 'passkey' as never })] }, false, false, "a passphrase's fields under the passkey method"],
-  [{ ...bundleWithoutUnlocks, ...OldEnvelopeFields },                     false,  false,  'a bundle from before its unlocks were a list of envelopes'],
+  [{ ...TH.bundleOf('u1'), wayins: [TH.wayinOf('passphrase', { vault_key_wayin_wrapped: { cipher_iv_b64: 'iv' } as never })] }, false, false, 'a ciphered wayin missing its ciphertext'],
+  [{ ...TH.bundleOf('u1'), wayins: [TH.wayinOf('passphrase', { wayinkind: 'fingerprint' as never })] }, false, false, 'a wayinkind this package does not know'],
+  [{ ...TH.bundleOf('u1'), wayins: [TH.wayinOf('passphrase', { wayinkind: 'passkey' as never })] }, false, false, "a passphrase's fields under the passkey wayinkind"],
+  [{ ...bundleWithoutWayins, ...OldWayinFields },                     false,  false,  'a bundle from before its wayins were a list'],
   [{ ...TH.bundleOf('u1'), registered_at: null },                            false,  false,  'a null registered_at'],
   [{ ...TH.bundleOf('u1'), registered_at: '2026-10-14T00:00:00.000Z' },      false,  false,  'a registered_at as an ISO string'],
   [{ ...bundleWithoutTime, created_at: OldIso, updated_at: OldIso },         false,  false,  'a bundle from before its time was named registered_at'],
@@ -157,9 +157,9 @@ const BundleCases = [
   [{ ...TH.bundleOf('u1'), unlock_epoch: 0 },                                false,  true,   'an epoch of zero'],
   [{ ...TH.bundleOf('u1'), unlock_epoch: 1.5 },                              false,  true,   'a fractional epoch'],
   [{ ...TH.bundleOf('u1'), registered_at: 1_792_022_400 },                   false,  true,   'a registered_at in epoch seconds, before 1981'],
-  [{ ...TH.bundleOf('u1'), unlocks: [] },                                    false,  true,   'a vault with no way in'],
-  [{ ...TH.bundleOf('u1'), unlocks: [TH.envelopeOf('one'), TH.envelopeOf('one', { unlock_id: 'unlock-two' })] }, false, true, 'two ways in sharing an unlocklabel'],
-  [{ ...TH.bundleOf('u1'), unlocks: [TH.passkeyEnvelopeOf('one'), TH.passkeyEnvelopeOf('two', { credential_id: 'cred-one' })] }, false, true, 'two passkeys for the same credential'],
+  [{ ...TH.bundleOf('u1'), wayins: [] },                                     false,  true,   'a vault with no way in'],
+  [{ ...TH.bundleOf('u1'), wayins: [TH.wayinOf('one'), TH.wayinOf('one', { wayin_id: 'wayin-two' })] }, false, true, 'two ways in sharing a wayinlabel'],
+  [{ ...TH.bundleOf('u1'), wayins: [TH.passkeyWayinOf('one'), TH.passkeyWayinOf('two', { credential_id: 'cred-one' })] }, false, true, 'two passkeys for the same credential'],
 ] as const
 
 const LockboxCases = [
@@ -175,7 +175,7 @@ const LockboxCases = [
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), format: 'safebyok-lockbox-v2' }, false, false,  'a lockbox from before the public bag'],
   [lockboxV3,                                                                false,  false,  'a lockbox from before written_at, holding changed_at'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), format: 'safebyok-vault-v1' },  false,  false,  "another record's format"],
-  [{ ...TH.boxOf('anthropic_api_key', 'a1'), whisper_ciphered: 'ct-flat' },  false,  false,  'a whisper ciphered as bare text, not an envelope'],
+  [{ ...TH.boxOf('anthropic_api_key', 'a1'), whisper_ciphered: 'ct-flat' },  false,  false,  'a whisper ciphered as bare text, not a wayin'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), written_at: '1792022400000' },  false,  false,  'a written_at written as text'],
   [{ ...boxWithoutTimes, created_at: OldIso, updated_at: OldIso },           false,  false,  'a lockbox from before its times were named registered_at and changed_at'],
   // Zod refuses, Convex accepts:

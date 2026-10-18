@@ -24,8 +24,8 @@ describe("recordOf", () => {
     expect(recordOf(answered, LockboxFields)).to.deep.equal(lockbox)
   })
 
-  it("gives back a bundle's unlock envelopes as they were, never looked inside", () => {
-    const bundle = TH.bundleOf('u1', { unlocks: [TH.envelopeOf('passphrase'), TH.envelopeOf('home_phrase')] })
+  it("gives back a bundle's wayins as they were, never looked inside", () => {
+    const bundle = TH.bundleOf('u1', { wayins: [TH.wayinOf('passphrase'), TH.wayinOf('home_phrase')] })
     expect(recordOf(bundle, BundleFields)).to.deep.equal(bundle)
   })
 

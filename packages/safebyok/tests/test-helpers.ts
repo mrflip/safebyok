@@ -17,7 +17,7 @@ import type { VaultLogger } from '../src/logger'
 import { StrongVerdict, type PassphraseStrengthTest } from '../src/passphrase-strength'
 import { memoryStore } from '../src/string-store'
 import type { Lockbox } from '../src/lockbox'
-import type { DamagedLockbox, DeviceMark, DeviceUnlock, LockboxSummary, PasskeyEnvelope, PasskeyProof, PassphraseEnvelope, PublicBag, SeenVault, VaultBundle, VaultScope } from '../src/types'
+import type { DamagedLockbox, DeviceMark, DeviceUnlock, LockboxSummary, PasskeyWayin, PasskeyProof, PassphraseWayin, PublicBag, SeenVault, VaultBundle, VaultScope } from '../src/types'
 import { stableJsonify } from '../src/stable-jsonify'
 import { NameFloorBytes } from '../src/validators'
 import { TestDeriverNotice } from '../src/key-deriver-spec'
@@ -26,7 +26,7 @@ import { localVaultDB, type VaultDB, type VaultDBOpts } from '../src/vault-db'
 
 /**
  * A cheap KeyDeriver for tests: one SHA-256 instead of 64 MiB of Argon2id, so a suite full of
- * unlocks runs in milliseconds. Deterministic in passphrase and salt, like the real one; unlike
+ * unlocking runs in milliseconds. Deterministic in passphrase and salt, like the real one; unlike
  * the real one, worthless against a brute-forcer -- which is why its label says `test`. Never
  * hand it to a vault that holds a real secret.
  *
@@ -102,46 +102,46 @@ export const fakeCiphered = (tag: string): Ciphered => ({
 export const scopeOf = (userId: string, vaultlabel = 'main'): VaultScope => ({ applabel: 'acme', user_id: userId, vaultlabel })
 
 /**
- * A shape-valid passphrase envelope labelled `unlocklabel`, its wrap fake: for storage-layer
- * tests, which never decrypt. Its unlock_id is `unlock-<unlocklabel>`; it wraps the vault's first
+ * A shape-valid passphrase wayin labelled `wayinlabel`, its wrap fake: for storage-layer
+ * tests, which never decrypt. Its wayin_id is `wayin-<wayinlabel>`; it wraps the vault's first
  * vaultKey, and was added by `device-one`.
  *
- * @example envelopeOf('passphrase')                                         // the one bundleOf holds
- * @example envelopeOf('home_phrase', { vault_key_wrapped: fakeCiphered('home') })
+ * @example wayinOf('passphrase')                                            // the one bundleOf holds
+ * @example wayinOf('home_phrase', { vault_key_wayin_wrapped: fakeCiphered('home') })
  */
-export const envelopeOf = (unlocklabel: string, overrides: Partial<PassphraseEnvelope> = {}): PassphraseEnvelope => ({
-  method:            'passphrase',
-  unlock_id:         `unlock-${unlocklabel}`,
-  unlocklabel,
-  key_deriver_label: 'test_digest_v0',
+export const wayinOf = (wayinlabel: string, overrides: Partial<PassphraseWayin> = {}): PassphraseWayin => ({
+  wayinkind:               'passphrase',
+  wayin_id:                `wayin-${wayinlabel}`,
+  wayinlabel,
+  key_deriver_label:       'test_digest_v0',
   // base64 of the literal text 'saltsaltsaltsalt': a fake salt, public material anyway
-  salt_b64:          'c2FsdHNhbHRzYWx0c2FsdA',
-  vault_key_epoch:   1,
-  device_id:         'device-one',
-  registered_at:     Date.UTC(2026, 9, 14),
-  vault_key_wrapped: fakeCiphered(`envelope-${unlocklabel}`),
+  salt_b64:                'c2FsdHNhbHRzYWx0c2FsdA',
+  vault_key_epoch:         1,
+  device_id:               'device-one',
+  registered_at:           Date.UTC(2026, 9, 14),
+  vault_key_wayin_wrapped: fakeCiphered(`wayin-${wayinlabel}`),
   ...overrides,
 })
 
 /**
- * A shape-valid passkey envelope labelled `unlocklabel`, its wrap fake: for storage-layer tests,
- * which never decrypt. Its unlock_id is `unlock-<unlocklabel>`, its credential_id
- * `cred-<unlocklabel>`; it wraps the vault's first vaultKey, and was added by `device-one`.
+ * A shape-valid passkey wayin labelled `wayinlabel`, its wrap fake: for storage-layer tests,
+ * which never decrypt. Its wayin_id is `wayin-<wayinlabel>`, its credential_id
+ * `cred-<wayinlabel>`; it wraps the vault's first vaultKey, and was added by `device-one`.
  *
- * @example passkeyEnvelopeOf('laptop')
- * @example bundleOf('u1', { unlocks: [envelopeOf('passphrase'), passkeyEnvelopeOf('laptop')] })
+ * @example passkeyWayinOf('laptop')
+ * @example bundleOf('u1', { wayins: [wayinOf('passphrase'), passkeyWayinOf('laptop')] })
  */
-export const passkeyEnvelopeOf = (unlocklabel: string, overrides: Partial<PasskeyEnvelope> = {}): PasskeyEnvelope => ({
-  method:            'passkey',
-  unlock_id:         `unlock-${unlocklabel}`,
-  unlocklabel,
-  credential_id:     `cred-${unlocklabel}`,
+export const passkeyWayinOf = (wayinlabel: string, overrides: Partial<PasskeyWayin> = {}): PasskeyWayin => ({
+  wayinkind:               'passkey',
+  wayin_id:                `wayin-${wayinlabel}`,
+  wayinlabel,
+  credential_id:           `cred-${wayinlabel}`,
   // base64 of the literal text 'prfsaltprfsaltprfsaltprfsaltprfs': a fake 32-byte salt, public material anyway
-  prf_salt_b64:      'cHJmc2FsdHByZnNhbHRwcmZzYWx0cHJmc2FsdHByZnM',
-  vault_key_epoch:   1,
-  device_id:         'device-one',
-  registered_at:     Date.UTC(2026, 9, 14),
-  vault_key_wrapped: fakeCiphered(`envelope-${unlocklabel}`),
+  prf_salt_b64:            'cHJmc2FsdHByZnNhbHRwcmZzYWx0cHJmc2FsdHByZnM',
+  vault_key_epoch:         1,
+  device_id:               'device-one',
+  registered_at:           Date.UTC(2026, 9, 14),
+  vault_key_wayin_wrapped: fakeCiphered(`wayin-${wayinlabel}`),
   ...overrides,
 })
 
@@ -157,7 +157,7 @@ const digestOf = async (text: string): Promise<Uint8Array> => (
  * passkey asked with the same salt answers the same, and with another salt answers otherwise, as
  * a real PRF does. Worthless as a secret: never hand it to a vault that holds a real one.
  *
- * @example await vault.addPasskey('pw', () => passkeyOf('laptop'), { unlocklabel: 'laptop' })
+ * @example await vault.addPasskey('pw', () => passkeyOf('laptop'), { wayinlabel: 'laptop' })
  * @example await vault.unlock(await passkeyOf('laptop'))
  * @example await passkeyOf('laptop', otherSaltB64)  // the same credential, answering another salt
  */
@@ -168,21 +168,21 @@ export const passkeyOf = async (tag: string, prfSaltB64?: string): Promise<Passk
 }
 
 /**
- * A shape-valid VaultBundle for `userId`'s `main` vault, its one envelope fake: for storage-layer
+ * A shape-valid VaultBundle for `userId`'s `main` vault, its one wayin fake: for storage-layer
  * tests, which never decrypt. Its vault_id is `vault-id-<userId>`, its unlock epoch and its
- * vaultKey's epoch both 1, and its one way in an {@link envelopeOf} labelled `passphrase` whose
+ * vaultKey's epoch both 1, and its one way in a {@link wayinOf} labelled `passphrase` whose
  * wrap is `bundle-<userId>`.
  *
  * @example bundleOf('u1', { unlock_epoch: 2 })
- * @example bundleOf('u1', { unlocks: [envelopeOf('passphrase'), envelopeOf('home_phrase')] })
+ * @example bundleOf('u1', { wayins: [wayinOf('passphrase'), wayinOf('home_phrase')] })
  */
 export const bundleOf = (userId: string, overrides: Partial<VaultBundle> = {}): VaultBundle => ({
-  format:              'safebyok-vault-v2',
+  format:              'safebyok-vault-v3',
   ...scopeOf(userId),
   vault_id:            `vault-id-${userId}`,
   unlock_epoch:        1,
   vault_key_epoch:     1,
-  unlocks:             [envelopeOf('passphrase', { vault_key_wrapped: fakeCiphered(`bundle-${userId}`) })],
+  wayins:              [wayinOf('passphrase', { vault_key_wayin_wrapped: fakeCiphered(`bundle-${userId}`) })],
   registered_at:       Date.UTC(2026, 9, 14),
   ...overrides,
 })
@@ -199,7 +199,7 @@ export const rotatedBundleOf = (userId: string): VaultBundle => bundleOf(userId,
   unlock_epoch:    2,
   vault_key_epoch: 2,
   prior_vault_key: { vault_key_epoch: 1, vault_key_wrapped: fakeCiphered(`prior-${userId}`) },
-  unlocks:         [envelopeOf('passphrase', { vault_key_epoch: 2, vault_key_wrapped: fakeCiphered(`rotated-${userId}`) })],
+  wayins:          [wayinOf('passphrase', { vault_key_epoch: 2, vault_key_wayin_wrapped: fakeCiphered(`rotated-${userId}`) })],
 })
 
 /**
@@ -1355,9 +1355,9 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
 
     it("refuses over an unlock_epoch since moved on, writing nothing", async () => {
       const vaultDB = await withBundle()
-      const theirs = { ...bundleOf('u1'), unlock_epoch: 2, unlocks: [envelopeOf('passphrase', { vault_key_wrapped: fakeCiphered('theirs') })] }
+      const theirs = { ...bundleOf('u1'), unlock_epoch: 2, wayins: [wayinOf('passphrase', { vault_key_wayin_wrapped: fakeCiphered('theirs') })] }
       await vaultDB.updateBundle(theirs, { vault_id: 'vault-id-u1', unlock_epoch: 1 })
-      const mine = { ...bundleOf('u1'), unlock_epoch: 2, unlocks: [envelopeOf('passphrase', { vault_key_wrapped: fakeCiphered('mine') })] }
+      const mine = { ...bundleOf('u1'), unlock_epoch: 2, wayins: [wayinOf('passphrase', { vault_key_wayin_wrapped: fakeCiphered('mine') })] }
       await expectRefusal(vaultDB.updateBundle(mine, { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'stale_write')
       expect(await vaultDB.readBundle(scopeOf('u1'))).to.deep.equal(theirs)
     })
@@ -1856,7 +1856,7 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
       title: `lands one of two updates of one bundle made at once ${fromTwo}, and refuses the other as stale_write, however they interleave`,
       runs:  true,
       check: async () => {
-        const rivals = [bundleOf('u1', { unlock_epoch: 2, unlocks: [envelopeOf('one')] }), bundleOf('u1', { unlock_epoch: 2, unlocks: [envelopeOf('two')] })]
+        const rivals = [bundleOf('u1', { unlock_epoch: 2, wayins: [wayinOf('one')] }), bundleOf('u1', { unlock_epoch: 2, wayins: [wayinOf('two')] })]
         await raceEveryWay({
           makeDevices: devicesFor(),
           setup:       withBundleFirst,
@@ -2439,7 +2439,7 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
       expect(await deviceDB.readMark(scopeOf('u1'))).to.deep.equal(markOf('u1', { seen: { unlock_epoch: 4 } }))
     })
 
-    it("keeps marks per vault, and apart from remembered unlocks: erasing one leaves the rest", async () => {
+    it("keeps marks per vault, and apart from remembered wayins: erasing one leaves the rest", async () => {
       const deviceDB = await makeDeviceDB()
       await deviceDB.writeUnlock(await unlockOf('u1'), NoLocks)
       await deviceDB.writeMark(markOf('u1'))

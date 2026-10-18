@@ -12,10 +12,10 @@
  * @example createSchema({ typeDefs: [appTypeDefs, VaultSchemaSdl], resolvers: [appResolvers, vaultResolvers({ vaultDBFor })] })
  */
 export const VaultSchemaSdl = `"""
-One unlock envelope of a vault, as safebyok stored it: JSON, its \`method\` saying its shape, its
-vaultKey wrapped (\`vault_key_wrapped\`). Carried as it is, never looked inside.
+One wayin of a vault, as safebyok stored it: JSON, its \`wayinkind\` saying its shape, its
+vaultKey wrapped (\`vault_key_wayin_wrapped\`). Carried as it is, never looked inside.
 """
-scalar SafebyokUnlockEnvelope
+scalar SafebyokWayin
 
 """
 The vaultKey before a vault's own, as safebyok stored it: JSON, its \`vault_key_epoch\` and that
@@ -50,7 +50,7 @@ input SafebyokVaultScopeInput {
 }
 
 """
-A vault's bundle, as stored: its scope, its vault_id, and its unlock envelopes, each wrapping the
+A vault's bundle, as stored: its scope, its vault_id, and its wayins, each wrapping the
 one vaultKey. Times are epoch milliseconds.
 """
 type SafebyokVaultBundle {
@@ -62,7 +62,7 @@ type SafebyokVaultBundle {
   unlock_epoch:     Int!
   vault_key_epoch:  Int!
   prior_vault_key:  SafebyokPriorVaultKey
-  unlocks:          [SafebyokUnlockEnvelope!]!
+  wayins:           [SafebyokWayin!]!
   registered_at:    Float!
 }
 
@@ -76,7 +76,7 @@ input SafebyokVaultBundleInput {
   unlock_epoch:     Int!
   vault_key_epoch:  Int!
   prior_vault_key:  SafebyokPriorVaultKey
-  unlocks:          [SafebyokUnlockEnvelope!]!
+  wayins:           [SafebyokWayin!]!
   registered_at:    Float!
 }
 

@@ -36,56 +36,56 @@ export const VaultScope = v.object({
 })
 
 /** The formats of a VaultBundle this package stores. */
-export const VaultBundleFormat = v.union(v.literal('safebyok-vault-v2'))
+export const VaultBundleFormat = v.union(v.literal('safebyok-vault-v3'))
 
 /** The formats of a Lockbox this package stores. */
 export const LockboxFormat = v.union(v.literal('safebyok-lockbox-v4'))
 
 /**
- * A passphrase's way into a vault: its `unlock_id` and `unlocklabel`, how its passphraseKey is
+ * A passphrase's way into a vault: its `wayin_id` and `wayinlabel`, how its passphraseKey is
  * derived (`key_deriver_label`, `salt_b64`), which vaultKey it wraps (`vault_key_epoch`), the
  * device and time that added it (`device_id`, `registered_at`), and the vaultKey wrapped under
  * that passphraseKey.
  *
- * @example { method: 'passphrase', unlock_id: '1b9d...', unlocklabel: 'passphrase', key_deriver_label: 'argon2id_web_v1', salt_b64: 'q83v...', vault_key_wrapped: { cipher_iv_b64, ciphertext_b64 } }
+ * @example { wayinkind: 'passphrase', wayin_id: '1b9d...', wayinlabel: 'passphrase', key_deriver_label: 'argon2id_web_v1', salt_b64: 'q83v...', vault_key_wayin_wrapped: { cipher_iv_b64, ciphertext_b64 } }
  */
-export const PassphraseEnvelope = v.object({
-  method:            v.literal('passphrase'),
-  unlock_id:         v.string(),
-  unlocklabel:       v.string(),
-  key_deriver_label: v.string(),
-  salt_b64:          v.string(),
-  vault_key_epoch:   v.number(),
-  device_id:         v.string(),
-  registered_at:     v.number(),
-  vault_key_wrapped: Ciphered,
+export const PassphraseWayin = v.object({
+  wayinkind:               v.literal('passphrase'),
+  wayin_id:                v.string(),
+  wayinlabel:              v.string(),
+  key_deriver_label:       v.string(),
+  salt_b64:                v.string(),
+  vault_key_epoch:         v.number(),
+  device_id:               v.string(),
+  registered_at:           v.number(),
+  vault_key_wayin_wrapped: Ciphered,
 })
 
 /**
- * A passkey's way into a vault: its `unlock_id` and `unlocklabel`, which WebAuthn credential to ask
+ * A passkey's way into a vault: its `wayin_id` and `wayinlabel`, which WebAuthn credential to ask
  * (`credential_id`) and the salt to ask its PRF with (`prf_salt_b64`), which vaultKey it wraps,
  * the device and time that added it, and the vaultKey wrapped under the key that answer makes.
  *
- * @example { method: 'passkey', unlock_id: '7c2e...', unlocklabel: 'laptop', credential_id: 'AXk3...', prf_salt_b64: 'q83v...', vault_key_wrapped: { cipher_iv_b64, ciphertext_b64 } }
+ * @example { wayinkind: 'passkey', wayin_id: '7c2e...', wayinlabel: 'laptop', credential_id: 'AXk3...', prf_salt_b64: 'q83v...', vault_key_wayin_wrapped: { cipher_iv_b64, ciphertext_b64 } }
  */
-export const PasskeyEnvelope = v.object({
-  method:            v.literal('passkey'),
-  unlock_id:         v.string(),
-  unlocklabel:       v.string(),
-  credential_id:     v.string(),
-  prf_salt_b64:      v.string(),
-  vault_key_epoch:   v.number(),
-  device_id:         v.string(),
-  registered_at:     v.number(),
-  vault_key_wrapped: Ciphered,
+export const PasskeyWayin = v.object({
+  wayinkind:               v.literal('passkey'),
+  wayin_id:                v.string(),
+  wayinlabel:              v.string(),
+  credential_id:           v.string(),
+  prf_salt_b64:            v.string(),
+  vault_key_epoch:         v.number(),
+  device_id:               v.string(),
+  registered_at:           v.number(),
+  vault_key_wayin_wrapped: Ciphered,
 })
 
 /**
- * One way into a vault, told apart by its `method`: a {@link PassphraseEnvelope} or a
- * {@link PasskeyEnvelope}. A new method widens this union, an additive deploy shipped with this
+ * One way into a vault, told apart by its `wayinkind`: a {@link PassphraseWayin} or a
+ * {@link PasskeyWayin}. A new wayinkind widens this union, an additive deploy shipped with this
  * package.
  */
-export const UnlockEnvelope = v.union(PassphraseEnvelope, PasskeyEnvelope)
+export const Wayin = v.union(PassphraseWayin, PasskeyWayin)
 
 /**
  * The vaultKey before a bundle's own, wrapped under its own, at its `vault_key_epoch`: absent
@@ -98,8 +98,8 @@ export const PriorVaultKey = v.object({
 
 /**
  * A vault's bundle: its scope, `vault_id`, `unlock_epoch`, which vaultKey its ways in wrap
- * (`vault_key_epoch`, and the one before as `prior_vault_key`), its ways in (`unlocks`, each the
- * vaultKey wrapped under a key one method makes), and when it was made (`registered_at`, epoch
+ * (`vault_key_epoch`, and the one before as `prior_vault_key`), its ways in (`wayins`, each the
+ * vaultKey wrapped under a wayinKey one kind of wayin makes), and when it was made (`registered_at`, epoch
  * milliseconds). Nothing in it opens without a passphrase or passkey. How many ways in, and that no two
  * share an id or label, are the client's rules.
  */
@@ -112,7 +112,7 @@ export const VaultBundle = v.object({
   unlock_epoch:     v.number(),
   vault_key_epoch:  v.number(),
   prior_vault_key:  v.optional(PriorVaultKey),
-  unlocks:          v.array(UnlockEnvelope),
+  wayins:           v.array(Wayin),
   registered_at:    v.number(),
 })
 

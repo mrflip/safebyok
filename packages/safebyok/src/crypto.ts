@@ -50,7 +50,7 @@ const IvBytes = 12
 
 /**
  * One part of a {@link cipherBinding}: a string or number, or a flat record of them -- the public
- * header of an unlock envelope or a lockbox, say -- encoded with its keys sorted. Every field of a
+ * header of a wayin or a lockbox, say -- encoded with its keys sorted. Every field of a
  * record is bound: one set to undefined is refused, never dropped as JSON would drop it.
  */
 export type CipherBindingPart = string | number | Readonly<Record<string, string | number>>
@@ -64,7 +64,7 @@ export type CipherBindingPart = string | number | Readonly<Record<string, string
  * as null; a missing field as no field at all), so nothing is encrypted or opened under it.
  *
  * @example cipherBinding('safebyok-unlock-v1', 'acme', 'u1', 'main', vaultId, 1, askPassphraseAt, 'vault_key_local_wrapped')
- * @example cipherBinding('safebyok-vault-v1', 'acme', 'u1', 'main', vaultId, registeredAt, 'vault_key_passphrase_wrapped', { method: 'passphrase', unlock_id, unlocklabel, key_deriver_label, salt_b64 })
+ * @example cipherBinding('safebyok-vault-v3', 'acme', 'u1', 'main', vaultId, registeredAt, 'vault_key_passphrase_wrapped', { wayinkind: 'passphrase', wayin_id, wayinlabel, key_deriver_label, salt_b64 })
  */
 export const cipherBinding = (...parts: readonly CipherBindingPart[]): Uint8Array => {
   if (parts.some((part) => isUnbound(part))) {
@@ -86,7 +86,7 @@ const isUnbound = (part: CipherBindingPart | null | undefined): boolean => (
  * A fresh random 256-bit AES-GCM key for wrapping and unwrapping other keys: a brand-new
  * vaultKey. Extractable, because a key must be to be wrapped (under the passphraseKey, under the
  * localUnlockKey) -- so this handle lives only inside the operation doing that wrapping, and the
- * handle a vault holds between operations is a separate non-extractable unwrap of the envelope.
+ * handle a vault holds between operations is a separate non-extractable unwrap of the wayin.
  */
 export const makeVaultKey = (): Promise<CryptoKey> => (
   crypto.subtle.generateKey(AesGcm, true, ['wrapKey', 'unwrapKey'])
@@ -123,7 +123,7 @@ export const importWrappingKeyBytes = (keyBytes: Uint8Array): Promise<CryptoKey>
  * bytes put to another use, or in another place, make another key: the passkeyKey. The bytes stay
  * with the caller; drop them promptly.
  *
- * @example await deriveWrappingKey(prfBytes, cipherBinding('safebyok-vault-v1', 'acme', 'u1', 'main', vaultId, registeredAt, 'vault_key_passkey_wrapped', header))
+ * @example await deriveWrappingKey(prfBytes, cipherBinding('safebyok-vault-v3', 'acme', 'u1', 'main', vaultId, registeredAt, 'vault_key_passkey_wrapped', header))
  */
 export const deriveWrappingKey = async (keyBytes: Uint8Array, info: Uint8Array): Promise<CryptoKey> => {
   const inputKey = await crypto.subtle.importKey('raw', keyBytes as BufferSource, 'HKDF', false, ['deriveKey'])
@@ -180,9 +180,9 @@ export const wrapKeyUnder = async (wrappingKey: CryptoKey, wrappedKey: CryptoKey
 }
 
 /**
- * The key back out of a wrapped envelope, verifying its tag and `binding`. Rejects (a
+ * The key back out of a wrapped wayin, verifying its tag and `binding`. Rejects (a
  * DOMException) on a wrong wrappingKey, a different binding, or altered ciphertext: for the
- * passphrase envelope that rejection IS how a wrong passphrase is learned -- never a comparison.
+ * passphrase wayin that rejection IS how a wrong passphrase is learned -- never a comparison.
  *
  * @param usages - What the recovered key may do; also sets extractability. Non-extractable is
  *   the default posture (a lockboxKey, the vaultKey handle a vault holds); an extractable unwrap

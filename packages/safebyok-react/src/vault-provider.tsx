@@ -89,7 +89,7 @@ const emptySnapshot: VaultSnapshot = {
   scope:           { applabel: 'none', user_id: 'none', vaultlabel: 'none' },
   boxes:           [],
   askPassphraseAt: null,
-  unlocks:         [],
+  wayins:          [],
   syncing:         true,
 }
 const getEmptySnapshot = () => emptySnapshot
@@ -204,7 +204,7 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
   const vaultlabelCheck = validators?.vaultlabel
   const boxlabelCheck = validators?.boxlabel
   const userIdCheck = validators?.userId
-  const unlocklabelCheck = validators?.unlocklabel
+  const wayinlabelCheck = validators?.wayinlabel
   const [vault, setVault] = useState<Vault | null>(null)
   // The dialog showing now, if any, and the actions waiting on it. The ref is what the callbacks
   // read, so that a dialog's outcome reaches its own waiters and no newer dialog's; the state
@@ -258,7 +258,7 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
     let gone = false
     // Listed one by one so the effect re-runs on each; `satisfies` fails the build if an openVault
     // option is ever added and not passed through.
-    const checks = { applabel: applabelCheck, vaultlabel: vaultlabelCheck, boxlabel: boxlabelCheck, userId: userIdCheck, unlocklabel: unlocklabelCheck } satisfies Record<keyof VaultValidators, unknown>
+    const checks = { applabel: applabelCheck, vaultlabel: vaultlabelCheck, boxlabel: boxlabelCheck, userId: userIdCheck, wayinlabel: wayinlabelCheck } satisfies Record<keyof VaultValidators, unknown>
     const openOpts = { applabel, vaultlabel, userId, vaultDB, deviceDB, forcePassphraseReentryHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger: heardBy ?? logger, validators: checks, passphraseStrengthTest } satisfies Record<keyof OpenVaultOpts, unknown>
     void openVault(openOpts).then((opened) => {
       if (gone) { opened.close(); return }
@@ -286,7 +286,7 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
       setOpenFailure(null)
       setOpenError(null)
     }
-  }, [userId, applabel, vaultlabel, vaultDB, deviceDB, forcePassphraseReentryHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger, heardBy, passphraseStrengthTest, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, unlocklabelCheck, openAttempt, endAsking])
+  }, [userId, applabel, vaultlabel, vaultDB, deviceDB, forcePassphraseReentryHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger, heardBy, passphraseStrengthTest, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, wayinlabelCheck, openAttempt, endAsking])
 
   const retryOpen = useCallback(() => {
     if (openError !== null) { setOpenAttempt((prev) => prev + 1) }
@@ -294,7 +294,7 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
 
   const eraseDamagedVault = useCallback(async () => {
     if (userId === null || ! isVaultError(openError, 'damaged_bundle')) { return }
-    const validators = { applabel: applabelCheck, vaultlabel: vaultlabelCheck, boxlabel: boxlabelCheck, userId: userIdCheck, unlocklabel: unlocklabelCheck } satisfies Record<keyof VaultValidators, unknown>
+    const validators = { applabel: applabelCheck, vaultlabel: vaultlabelCheck, boxlabel: boxlabelCheck, userId: userIdCheck, wayinlabel: wayinlabelCheck } satisfies Record<keyof VaultValidators, unknown>
     try {
       await eraseStoredDamagedVault({ applabel, vaultlabel, userId, vaultDB, deviceDB, validators })
     } catch (err) {
@@ -304,7 +304,7 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
       throw err
     }
     setOpenAttempt((prev) => prev + 1)
-  }, [openError, userId, applabel, vaultlabel, vaultDB, deviceDB, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, unlocklabelCheck])
+  }, [openError, userId, applabel, vaultlabel, vaultDB, deviceDB, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, wayinlabelCheck])
 
   /**
    * Waits on the dialog showing over `ranOn` now, opening one if none is; settles false once

@@ -57,12 +57,12 @@ Wanted; each has a design question to settle first, named here.
 ### Which ways in a rotation keeps
 
 From [#105](https://github.com/mrflip/safebyok/pull/105) (the rotation design, section 9). The
-first matter said rotation "re-wraps the remaining envelopes", but it can't: each way in's key
+first matter said rotation "re-wraps the remaining wayins", but it can't: each way in's key
 comes from a passphrase or a passkey touch the vault never keeps, and any shortcut would hand the
 new vaultKey to the way in being removed. So the design keeps only the ways in the user proves
 during the rotation and removes the rest -- which is also what locks out a lost phone's passkey,
 and signs every other device out until it is asked again. The alternative, a key pair per way in
-so rotation can re-wrap every envelope unasked (HPKE), is a new construction (the design's open
+so rotation can re-wrap every wayin unasked (HPKE), is a new construction (the design's open
 question 1).
 
 The Coach (2026-10-16): wants to understand this better; land the recommendation for now. **Landed
@@ -105,7 +105,7 @@ or does the whisper's decryption also need to be refused once the key is gone?
 
 From [#126](https://github.com/mrflip/safebyok/pull/126) (thread 6): `changePassphrase` takes any
 proof, a passkey's included, and when a vault has several passphrases and the proof is a passkey,
-the caller must name which to replace (`unlockId`), or the call is refused rather than guessing.
+the caller must name which to replace (`wayinId`), or the call is refused rather than guessing.
 The Coach (2026-10-16): "keep as built, but this is too complicated for a user to tolerate or a
 customer to implement UX for." Decide whether a vault should hold more than one passphrase at
 all, or exactly one, with passkeys the other ways in. The Gripefest doc's NOT YET row G530 asks the
@@ -131,7 +131,7 @@ first; maintainability beats speed unless something is shown slow.
 
 From thread 4 ([#132](https://github.com/mrflip/safebyok/pull/132), `thread-4-refusals_and_catchup.md`,
 *A pre-existing race*): during a change to the ways in, this handle's own bell refresh can read the
-new bundle before `reviseUnlocks` sets it, judge the key `outlived`, drop it and erase the
+new bundle before `reviseWayins` sets it, judge the key `outlived`, drop it and erase the
 remembered unlock. `takeUpUnlock` restores the key in memory, but that erase can land after the
 new record, so the next open asks for the passphrase. The direction is safe, and serializing the
 refreshes does not cure it. The Coach (2026-10-16): into the TODO, beside the multiple-passphrases

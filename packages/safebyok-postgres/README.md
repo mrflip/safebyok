@@ -329,10 +329,10 @@ subscriber: at worst, a refresh that finds nothing new.
 Two tables, each record **a column to a field**, exactly as safebyok wrote it: text as text, a
 time or a count as a `bigint`, and each structured value as one opaque `jsonb` -- an encrypted
 value (a cipherIv and its ciphertext, `{ cipher_iv_b64, ciphertext_b64 }`), or the bundle's
-`unlocks`, its list of unlock envelopes. A lockbox's public bag is `text`, never `jsonb`, which
+`wayins`, its list of wayins. A lockbox's public bag is `text`, never `jsonb`, which
 would rewrite it. Nothing is normalized: a public bag or a user id reads back byte for byte, as it
 must, since every field a record holds is bound into its encryption (all but the bundle's
-`unlock_epoch` and which envelopes its `unlocks` holds).
+`unlock_epoch` and which wayins its `wayins` holds).
 
 | Table                | One row per | Primary key                                     | Columns                                                                                                |
 | -------------------- | ----------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
@@ -340,10 +340,10 @@ must, since every field a record holds is bound into its encryption (all but the
 | `safebyok_lockboxes` | lockbox     | `applabel`, `user_id`, `vaultlabel`, `boxlabel` | the vault's scope and `vault_id`, then every field of the `Lockbox`; its public bag as `text`          |
 
 * **Encrypted**: each whisper (`whisper_ciphered`), each lockbox's lockboxKey
-  (`lockbox_key_wrapped`), and the vaultKey, once under each way into the vault (each unlock
-  envelope's `vault_key_wrapped`, inside the bundle's `unlocks`).
+  (`lockbox_key_wrapped`), and the vaultKey, once under each way into the vault (each
+  wayin's `vault_key_wayin_wrapped`, inside the bundle's `wayins`).
 * **In the open**: the scope, each `boxlabel` and public bag (`public_json`), each whisper's codec
-  and schema version, the `vault_id`, `unlock_epoch`, `revision_id`s, each unlock envelope's method, id, label, salt and key deriver's label, when
+  and schema version, the `vault_id`, `unlock_epoch`, `revision_id`s, each wayin's wayinkind, id, label, salt and key deriver's label, when
   each vault and lockbox was first stored and each lockbox last written (`registered_at`,
   `written_at`, epoch milliseconds), and the length of every ciphertext.
 * **Never**: a whisper, a passphrase, any key in usable form, or the device-local remembered
