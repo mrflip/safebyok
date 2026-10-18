@@ -8,7 +8,7 @@
  *   boundary or the dev overlay; do not show it to the user, and do not retry.
  * - **Condition**: something the app handles at run time, which may reach the user: ask again,
  *   show a message, retry, or tell them to free room. `vault_locked`, `wrong_passphrase`,
- *   `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `absent_box`, `absent_vault`, `absent_wayin`,
+ *   `created_elsewhere`, `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `absent_box`, `absent_vault`, `absent_wayin`,
  *   `whisper_too_large`, `lockbox_too_large`, `vault_full`, `too_many_wayins`, `last_wayin`,
  *   `corrupt_record`, `damaged_vault`, `damaged_wayin`, `damaged_lockbox`, `newer_format`, `stale_write`,
  *   `rolled_back`, `not_permitted`, `identity_revoked`, `storage_unavailable`, `storage_blocked`.
@@ -33,6 +33,13 @@
  * vault can know: a passphrase or passkey whose answer fails to open its way in is
  * `wrong_passphrase` or `wrong_passkey` even when the stored vault was altered, because the
  * decryption fails alike either way. Their messages say so.
+ *
+ * `created_elsewhere` is a first unlock that found the vault made on another device in the moment
+ * between this device's look at storage and its own write, under a passphrase other than the one
+ * given. Nothing was created here; the vault now stands as the other device made it, and shows
+ * `locked`. The user's next move is to enter the passphrase chosen there, so it is told apart
+ * from `wrong_passphrase`, which says "check for typos". A passphrase that does open that vault
+ * unlocks it as any unlock does, with no refusal at all.
  *
  * `weak_passphrase` is a new passphrase -- the one a vault is created with, one added, or one
  * changed to -- that the vault's `passphraseStrengthTest` finds too easy to guess; its message is
@@ -72,6 +79,7 @@
 export const VaultErrorKindVals = [
   'vault_locked',        // a whisper was asked for before the vault was unlocked
   'wrong_passphrase',    // the passphrase given did not unlock the vault
+  'created_elsewhere',   // a first unlock found the vault just made on another device, under another passphrase
   'weak_passphrase',     // a new passphrase the vault's passphraseStrengthTest finds too easy to guess
   'wrong_passkey',       // the passkey's answer did not unlock the vault, or was for another salt
   'passkey_unavailable', // this browser or authenticator cannot answer for a passkey unlock (no WebAuthn, or no PRF)
@@ -152,6 +160,7 @@ export type VaultErrorFamily = typeof VaultErrorFamilyVals[number]
 export const VaultErrorFamilyForKind = {
   vault_locked:        'condition',
   wrong_passphrase:    'condition',
+  created_elsewhere:   'condition',
   weak_passphrase:     'condition',
   wrong_passkey:       'condition',
   passkey_unavailable: 'condition',

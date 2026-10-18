@@ -286,6 +286,13 @@ export type Vault = {
    * passphrase is. A passphrase wayin altered in storage refuses its passphrase just as a typo
    * does, so 'wrong_passphrase' is all the vault can say of it; its message names both.
    *
+   * The first unlock of an `absent` vault can lose a race: another device creates the vault
+   * between this one's look at storage and its write. Storage then hands back that device's vault,
+   * and the passphrase given must open it like any other. If it does, the unlock goes ahead. If it
+   * does not, the refusal is kind 'created_elsewhere', not 'wrong_passphrase': nothing was
+   * created here, the vault now shows `locked` as the other device made it, and the user is to
+   * enter the passphrase chosen there.
+   *
    * The lease lasts until `askPassphraseAt`, `leaseHours` from now: from then
    * no new work starts, work in hand has a minute more to finish, and then the vaultKey is
    * dropped, by a timer and at the next look alike. Every later call in which the user types a
@@ -313,6 +320,10 @@ export type Vault = {
    * @example await vault.unlock(passphrase)
    * @example await vault.unlock(passphrase, { wayinId: chosen.wayin_id })    // chosen from getSnapshot().wayins
    * @example await vault.unlock(passkey)  // from askPasskey(vault.getSnapshot().wayins)
+   * @example
+   *   try { await vault.unlock(passphrase) } catch (err) {
+   *     if (isVaultError(err, 'created_elsewhere')) { showAdvice(err.message) }  // the vault now shows `locked`: ask again
+   *   }
    */
   unlock(proof: string | PasskeyProof, opts?: { wayinId?: string | undefined }): Promise<void>
   /**
@@ -1025,7 +1036,12 @@ const make = (opts: MakeVaultOpts): Vault => {
       if (settled.vault_id === draft.vault_id) { return { standing: settled, transientKey, sessionKey } }
       // Another device created the vault between our look and our write: the settled vault props are
       // theirs, and this passphrase must prove itself against them like any other.
-      return { standing: settled, ...await unwrapWith(settled, proof, wayinId) }
+      try {
+        return { standing: settled, ...await unwrapWith(settled, proof, wayinId) }
+      } catch (err) {
+        if (isVaultError(err, 'wrong_passphrase')) { await refuseCreatedElsewhere(err) }
+        throw err
+      }
     }
     const standing = vaultProps
     return { standing, ...await unwrapWith(standing, proof, wayinId) }
@@ -1635,6 +1651,23 @@ const make = (opts: MakeVaultOpts): Vault => {
     if (! isCaughtUpStale(err)) { throw err }
     keyInHand()
     throw new VaultError('stale_write', 'That lockbox was written or retired on another device or tab while this one was storing into it, so nothing was written. This device has caught up with storage, and the vault now shows the lockbox as storage holds it: call storeBox() again if this whisper should still replace what is there.', { cause: err })
+  }
+
+  /**
+   * Throw kind 'created_elsewhere', for a first unlock whose passphrase `wrong` refused against the
+   * vault another device created meanwhile. The vault props were taken up as storage handed them
+   * back; this catches the rest of the snapshot up with storage (its lockboxes), so that it shows
+   * the vault as that device made it, `locked`. A catch-up that fails is warned of, and the
+   * snapshot says `syncing: false`; but for one refused as untrusted storage, thrown as it came.
+   */
+  const refuseCreatedElsewhere = async (wrong: VaultError): Promise<never> => {
+    try {
+      await refresh()
+    } catch (err) {
+      logger.warn('A catch-up with storage, after a vault was found created on another device, failed: what the vault shows may lag behind storage (syncing: false) until a read succeeds.', { call: 'unlock' }, asError(err))
+      if (UntrustedStorageKinds.some((kind) => isVaultError(err, kind))) { throw err }
+    }
+    throw new VaultError('created_elsewhere', 'A vault was just created for this label on another device, with a different passphrase than the one you entered. Nothing was created on this device. Enter the passphrase you chose there to unlock it.', { cause: wrong })
   }
 
   const vault: Vault = {

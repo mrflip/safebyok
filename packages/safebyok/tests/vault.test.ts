@@ -3750,6 +3750,82 @@ describe("a read in flight when a lock lands", () => {
   })
 })
 
+/**
+ * Device B, open on an absent vault, and device A, another device on the same storage. A makes
+ * the vault with 'pw one' (and stores a lockbox) inside B's first unlock, between B's
+ * look at storage and B's write. B hears no bell from storage, so that only its own catch-up can
+ * bring A's vault in.
+ */
+const raceLostToPwOne = async () => {
+  const world = makeWorld()
+  const deafDB = world.deafVaultDB()
+  const there = await world.open({ vaultDB: deafDB })
+  const here = await world.open({ deviceDB: memoryDeviceDB() })
+  TH.beforeNextCall(deafDB, 'fetchOrCreateVaultProps', async () => {
+    await here.unlock('pw one')
+    await here.storeBox('anthropic', 'sk-ant-fake-theirs')
+  })
+  return { world, deafDB, there, here }
+}
+
+describe("a first unlock that loses the race to create the vault", () => {
+  it("refuses as created_elsewhere when the passphrase does not open the vault the other device made, as unlock's example shows", async () => {
+    const { there } = await raceLostToPwOne()
+    const err = await TH.expectRefusal(there.unlock('pw two'), 'created_elsewhere')
+    expect(err.message).to.match(/^A vault was just created for this label on another device, with a different passphrase/)
+    expect(err.message).to.include('Enter the passphrase you chose there')
+    expect(err.message).to.not.include('pw')
+    expect(err.cause).to.have.property('kind', 'wrong_passphrase')
+  })
+
+  it("settles locked on the standing vault, caught up with its lockboxes, and unlocks it with the passphrase chosen there", async () => {
+    const { world, there } = await raceLostToPwOne()
+    await TH.expectRefusal(there.unlock('pw two'), 'created_elsewhere')
+    const snapshot = there.getSnapshot()
+    expect(snapshot.state).to.eq('locked')
+    expect(snapshot.syncing).to.be.true
+    expect(snapshot.wayins.map((wayin) => wayin.wayinlabel)).to.deep.equal(['passphrase'])
+    expect(boxlabelsOf(there)).to.deep.equal(['anthropic'])
+    expect(await world.readLease()).to.be.null
+    await there.unlock('pw one')
+    expect(await there.readBox('anthropic')).to.eq('sk-ant-fake-theirs')
+  })
+
+  it("tells a second wrong passphrase as wrong_passphrase: the vault now stands, and created_elsewhere is only for the first unlock", async () => {
+    const { there } = await raceLostToPwOne()
+    await TH.expectRefusal(there.unlock('pw two'), 'created_elsewhere')
+    await TH.expectRefusal(there.unlock('pw three'), 'wrong_passphrase')
+  })
+
+  it("unlocks the vault the other device made when the passphrase opens it: no refusal at all", async () => {
+    const { world, there, here } = await raceLostToPwOne()
+    await there.unlock('pw one')
+    expect(there.getSnapshot().state).to.eq('unlocked')
+    expect(there.getSnapshot().wayins.map((wayin) => wayin.wayinlabel)).to.deep.equal(['passphrase'])
+    expect(storedWayinsOf(world)).to.have.lengthOf(1)
+    expect(await there.readBox('anthropic')).to.eq('sk-ant-fake-theirs')
+    expect(here.getSnapshot().state).to.eq('unlocked')
+  })
+
+  it("is still created_elsewhere when the catch-up after it fails, the snapshot saying it is not syncing, and the failure warned of", async () => {
+    const { world, deafDB, there } = await raceLostToPwOne()
+    vi.spyOn(deafDB, 'listBoxes').mockRejectedValueOnce(new VaultError('storage_unavailable', 'The vault storage could not be reached.'))
+    await TH.expectRefusal(there.unlock('pw two'), 'created_elsewhere')
+    expect(there.getSnapshot().state).to.eq('locked')
+    expect(there.getSnapshot().syncing).to.be.false
+    expect(world.logged.map((call) => call.level)).to.include('warn')
+  })
+
+  it("is plain wrong_passphrase when the other device's vault was in storage before this unlock looked: the look finds it", async () => {
+    const world = makeWorld()
+    const there = await world.open()
+    const here = await world.open({ deviceDB: memoryDeviceDB() })
+    await here.unlock('pw one')
+    await TH.expectRefusal(there.unlock('pw two'), 'wrong_passphrase')
+    expect(there.getSnapshot().state).to.eq('locked')
+  })
+})
+
 describe("a vault that moves elsewhere while an unlock is under way", () => {
   it("retired and made anew: the unlock takes up nothing, throws 'vault_locked', and can't seal into the new vault", async () => {
     const world = makeRacingWorld()
