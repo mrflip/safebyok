@@ -168,7 +168,7 @@ banned names. STYLE.md is the real source.
   `woodkind`. `type` is only a datatype; a menu choice is a `kind` or a `flavor`.
 * Stored fields are underbar_case (`salt_bytes`); everything else camelCase. Use integer
   UTC epoch milliseconds, not strings or `Date`s, for times.
-* A module of related verbs is star-imported under its Startcase name: `Envelope.swak(...)`.
+* A module of related verbs is star-imported under its Startcase name: `Wayin.open(...)`.
 * Every export has a doc block written for its caller. Each `@example` in it has a test whose
   title points back to it: `"refuses a misspelt field, as its second example shows"`.
 * Tests are chai-style (`expect(foo).to.eq(bar)`), their helpers star-imported as `TH`.

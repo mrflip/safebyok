@@ -16,8 +16,8 @@ is a bug.
   them, as the wider ecosystem does.
 * No barrel files beyond the package's entry points: import from the file that defines the thing.
 * **A module of related functions around one concern is imported whole**, under its Startcase
-  name: `import * as Envelope from './envelope'`, then `Envelope.swak(...)`. Its functions are
-  vigorous verbs: `swak`, not `envelopeSwak`.
+  name: `import * as Wayin from './wayin'`, then `Wayin.open(...)`. Its functions are
+  vigorous verbs: `open`, not `wayinOpen`.
 * **A module with one primary noun** is imported by name, its friends riding along:
   `import { Lockbox, LockboxKinds } from './lockbox'`.
 * When a list of type imports grows cumbersome, import the types whole under a short name ending
@@ -46,7 +46,7 @@ or `payload` for a variable or field we control: it is a whisper, or a whisperCi
 **Never bare `key`.** In this package a key is cryptographic until proven otherwise, so:
 
 * a **cryptographic key** is named for its role, as VOCABULARY.md has it: `passphraseKey`,
-  `vaultKey`, `lockboxKey`, `localUnlockKey`. Not `kek` or `dek`. A WebCrypto `CryptoKey` and its
+  `vaultKey`, `lockboxKey`, `leaseKey`. Not `kek` or `dek`. A WebCrypto `CryptoKey` and its
   raw bytes are told apart by a tag: `lockboxKey` is the `CryptoKey`, `lockboxKeyBytes` the
   `Uint8Array`.
 * a **map key** is a `ckey` (see *Tags*).
@@ -60,7 +60,7 @@ a menu choice is a `kind` or a `flavor`.
 **Stored fields are underbar_case** (`salt_bytes`, `memory_kib`): they are written to someone
 else's database, and stay one spelling from the wire to the code. Everything else is camelCase.
 That holds wherever the object is the stored record, the facades a record passes through
-included: a key deriver's `key_deriver_label` is written into the bundle as it is. The tag
+included: a key deriver's `key_deriver_label` is written into a wayin as it is. The tag
 smushing below is for a label that names a thing (`boxlabel`); `keyDeriverLabel` is the concept
 "the label of the key deriver", and stays camelCase.
 
@@ -81,6 +81,9 @@ Specificity is a virtue (`saltBytes` says it is bytes), but don't tag the obviou
 * `kind`, `flavor` -- an identifier picked from a fixed menu. `label`, `handle` -- an identifier
   freely chosen, usually by a user (`vaultlabel`, `boxlabel`). All four are strict: `\w` only,
   starting with a letter, ending with a letter or digit, two or more characters.
+* `_id`, `_tok` -- a stored `_id` is a hard identifier a record is found by (`vault_id`,
+  `wayin_id`); a value that changes on every write is a `_tok` (`revision_tok`). VOCABULARY.md
+  has the rule.
 * `bytes` -- a `Uint8Array`; `fooBytes` for a particular one. `b64` -- base64url text of bytes;
   `fooB64`.
 * `bag`, `foobag` -- a generic key-value map; `foos` for a map of foos keyed by something obvious.
