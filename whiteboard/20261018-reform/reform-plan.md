@@ -7,7 +7,7 @@ medium. Threads at once: 2. Issued by: the Coach, from `reform-preplan.md` besid
 Sprint doc: https://claude.ai/code/artifact/b7fd117e-7a03-4f68-b2fa-b2c1e70e118b (*Open Matters*,
 *Progress*, *Resolved*).
 
-**Status:** thread 1 filed (#159); thread 2 in review (#160).
+**Status:** threads 1 (#159) and 2 (#160) filed, in the line main → #159 → #160; thread 3 building.
 
 ## Read first
 
@@ -95,6 +95,8 @@ matters only at the start.
 > in a secret store; the retry hid it and merged nothing).
 
 *Gloss:* *Touches* `packages/safebyok/src/vault.ts` (store, `retryStale` and friends), `packages/safebyok/README.md` (the concurrency paragraph), `tests/vault.test.ts`, `notes/security.md` (through a `sonnet` subagent), a `minor` changeset (the retry is observable behaviour). Check react: `VaultProvider` or the demos may surface a stale write differently once it throws on the first conflict. *Model*: default. *Depends on*: nothing; cut from `origin/main`, rebased onto thread 1 by the orchestrator once both file. *Look-ahead*: thread 7 renames `store` to `storeBox` over this code; thread 9 copies its "one refusal, caught up" shape for `created_elsewhere`, so make the catch-up a small named step thread 9 can call, if the code allows it without contortion. *Size*: medium.
+
+*Review:* fixed (medium). One fix: `erase()`'s inline comment no longer contrasts it with the removed retry. Left: a same-tab overlap of two stores is worded as another device's write; a damaged box erased first and then refused is worded "nothing was written". Both are rows in *Open Matters*. Filed as #160, rebased onto #159.
 
 ### 3. `wayin`
 
