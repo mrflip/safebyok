@@ -71,13 +71,13 @@ added or folded into through the subagent, and no other entry changes.
   Callers share one in-flight promise; a rejected one clears at once; a resolved one stands until a
   read of storage fails, storage the vault cannot trust refuses it (`identity_revoked`,
   `rolled_back`, `newer_format`, from any call, read or write), or the vault is retired. The next
-  call then reads storage and the lease again, but a handle that has ever forgotten (the counter
+  call then reads storage and the lease again, but a handle on which a lock has revoked a lease (the counter
   above is not 0) takes up no lease: so a lock, hard, soft or for untrusted storage, stays locked
   on that handle even when the device store failed to erase the lease, and whispers stay refused as
   `vault_locked` until a proof unlocks it. A lease the lock could not erase is left for the next
   handle made (the next page load), as before. A handle whose first `hello()` was refused for
   untrusted storage has locked, so it takes up none; one whose first `hello()` failed otherwise
-  (storage unreachable, say) has forgotten nothing, so it still takes its lease up once a `hello()`
+  (storage unreachable, say) has revoked nothing, so it still takes its lease up once a `hello()`
   (or a storage change bell) succeeds; an unlocked handle holds its key and loses nothing. If storage still refuses, the call meets the
   refusal again and the vault stays locked. A plain `lock()` does not reset the memo and erases the
   lease in any case. Regression tests cover `lock()`, `lockSoon()` and the untrusted-storage case.
@@ -95,7 +95,7 @@ added or folded into through the subagent, and no other entry changes.
   (5) **A read of storage takes up the vault props, the device mark and the lockbox listing
   together, only once the listing has been read**, so a read failing partway never leaves the vault
   props of one read beside the lockboxes of another. When the fresh vault props show the vault
-  changed elsewhere, the vaultKey is still dropped and the lease erased before the listing is read,
+  changed elsewhere, the vaultKey is still dropped and the lease, outdated by the change, discarded before the listing is read,
   as before.
 
 * 2026-10-18: **the context bytes of every wayin changed spelling, not construction, with the
@@ -344,7 +344,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-15: a session holding keys for a vault since retired or recreated elsewhere cannot
   write a lockbox into the successor, retire one of its lockboxes, or retire it: `storeBox()`,
   `retireBox()` and `retire()` no longer look at the vault props first, and rely on the `vault_id`
-  expectation, checked by the backend, to refuse. A refused `retire()` has already forgotten
+  expectation, checked by the backend, to refuse. A refused `retire()` has already revoked
   this device's lease; a second `retire()`, now holding the successor's `vault_id`,
   retires the successor. On a vault the handle has never seen created, `retire()` removes only
   the device-local record: lockboxes orphaned without vault props are not reached.
@@ -424,16 +424,16 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-15: until 1.0.0 a stored-shape change carries no migration (the Coach's ruling). A
   lockbox or vault props written with `created_at`/`updated_at`, or a lease with
   `expires_at`, fails its schema: the vault refuses it as `corrupt_record` and leaves it as it
-  is (a lease is erased, and the user enters the passphrase again). A Convex deployment
+  is (a lease is discarded, and the user enters the passphrase again). A Convex deployment
   holding such rows refuses the new component schema at deploy until those rows are deleted.
 * 2026-10-15: lowering `leaseHours` reaches leases already granted. At each
   open, a lease whose deadline lies past now plus that open's setting was granted
-  under a longer one, and is treated as a record that does not fit: erased, and the vault opens
+  under a longer one, and is treated as a record that does not fit: discarded, and the vault opens
   locked. Raising the option lengthens no lease; an unchanged setting never trips it
   (the deadline set at unlock is always within now plus the setting), so it fires only when the
   host lowered the setting, or the clock went backward. There is deliberately no write-back of a
   shortened deadline: a blind write of the record read at the start of the open would bring back
-  a lease that another tab's `lock()` erased in between, and later opens would come
+  a lease that another tab's `lock()` revoked in between, and later opens would come
   up unlocked against the user's last act. Doing it safely would need an atomic "shorten if still
   present" on `DeviceDB`, an interface hosts implement. An erase cannot resurrect anything and
   cannot slide; racing another tab's fresh unlock, it only makes that device ask again. A stored
@@ -612,7 +612,7 @@ added or folded into through the subagent, and no other entry changes.
   `lockSoon(graceSeconds = 5)`, at most 60 seconds, closes the entry gate at once
   (`askPassphraseAt` cleared, so the snapshot reads `locked` and every operation started
   afterwards throws `vault_locked`; cleared rather than set to now, which a wall clock stepped
-  back would reopen), erases the lease at once, and moves the shut counter
+  back would reopen), revokes the lease at once, and moves the shut counter
   (an unlock under way loses); a `setTimeout` drops the in-memory vaultKey after the grace. In the
   grace, `retireBox()`'s second look checks only that the key is still held, not `askPassphraseAt` (amended
   2026-10-18: this once named `storeBox()`'s retries too; it now makes one attempt), so an operation begun before the gate closed finishes; under natural
@@ -646,7 +646,7 @@ added or folded into through the subagent, and no other entry changes.
   shows: a lockbox whose ciphered fields are damaged lists, and is refused at `readBox()`, so one
   damaged box never makes the vault fail to open; such a box cannot be stored over or retired
   either (both read it first), only retired along with its vault. A lease naming another
-  scope is forgotten before any unwrap; its `vault_key_lease_wrapped` ctx would refuse it
+  scope is discarded before any unwrap; its `vault_key_lease_wrapped` ctx would refuse it
   anyway. The vault-size check counts each lockbox at twice `maxWhisperBytes` plus 2 KiB for its
   other fields against the adapter's whole `maxVaultBytes`: the same outcomes as half the limit
   with 1 KiB, with the fields' allowance now covering them (a test builds the heaviest row) while
@@ -735,7 +735,7 @@ added or folded into through the subagent, and no other entry changes.
   checks them before a box is opened. The lease binds `ask_passphrase_at`, under its own
   format tag (`safebyok-lease-v1`; `safebyok-unlock-v1` was 0.3.0's tag, formerly the vault props', and a
   record under it is not read); a deadline moved on the device now
-  fails to open and is erased, so the forgetting is logged. No compatibility: every passkey
+  fails to open and is discarded, so the discarding is logged. No compatibility: every passkey
   wayin, lockbox and lease written before refuses to open (`wrong_passkey`,
   `corrupt_record`, a fresh passphrase prompt), and a passphrase wayin refuses its passphrase.
   **Left unbound, and why**: the vault props' `unlock_epoch` and the list of `wayins` (order, length,
@@ -890,7 +890,7 @@ added or folded into through the subagent, and no other entry changes.
   this way now; IndexedDB and `localVaultDB` never do. Every storage verb's refusal passes through
   one policy (`src/refusal-policy.ts`) on its way out of the vault, whichever call made it,
   a background refresh's included; for `identity_revoked` it locks at once, as `lock()` does:
-  the vaultKey dropped, the lease erased, a `lockSoon()` grace cut short, an unlock
+  the vaultKey dropped, the lease revoked, a `lockSoon()` grace cut short, an unlock
   under way defeated. It never retires the vault or a lockbox. `convexVaultDB`'s `ConvexClient`
   watch now calls `onChange` on a failed `watchVault` (as a `ConvexReactClient`'s watch already
   did), so an idle vault locks on a sign-out in another tab. **For review**: (1) the default is
@@ -898,7 +898,7 @@ added or folded into through the subagent, and no other entry changes.
   after a sign-out, as before; (2) the mismatched-user case is also `identity_revoked`, since a
   server cannot tell "the user changed" from "a host opened the wrong user's vault", and locking
   is the safe answer to both; (3) a vault opened before its backend's auth is ready meets
-  `identity_revoked` and erases its lease -- safe, but a host that races its auth
+  `identity_revoked` and revokes its lease -- safe, but a host that races its auth
   makes its users retype the passphrase (the READMEs say to open only once signed in);
   (4) an adapter that says `identity_revoked` for a passing fault locks the vault needlessly --
   the `VaultDB` contract says to use `storage_unavailable` for those.
@@ -1091,13 +1091,13 @@ added or folded into through the subagent, and no other entry changes.
   A passkey proving a change on an unlocked vault keeps the deadline standing (on a locked one it
   sets one, as `unlock()` by passkey would). Reads, stores, retirements and refreshes never move it.
   One place decides (`deadlineFor` in `vault.ts`), so a new kind of proof cannot slip past it.
-  Expiry is a soft lock (the strawman's two locks): the lease running out while an `unlock()` or
+  Expiry is a soft lock (the strawman's two locks): the lease expiring while an `unlock()` or
   `changePassphrase()` is under way does not defeat it; only a lock the user (or a sign-out)
   makes does. For review: a passkey's proof keeping, not renewing, the deadline is the weaker
   reading of "proves I am mrflip" (G530 asks the deeper question, NOT YET).
 * 2026-10-16 (locks_and_expiry; revised the same day by refusals_and_catchup, below: `lockSoon()` raises nothing, and the generation outlives a `retire()`): **a lock reaches every tab's unlock under way: the versioned
   erase.** The device mark gains `lock_generation` (format `safebyok-mark-v2` then; today's tag is `safebyok-mark-v3`). Every lock that
-  forgets the lease -- `lock()`, `lockSoon()`, a sign-out's lock, `retire()`'s --
+  revokes the lease -- `lock()`, `lockSoon()`, a sign-out's lock, `retire()`'s --
   raises it before erasing the record. An unlock (or a change to the wayins) reads it as it
   starts, and `DeviceDB.writeLease(lease, expected)` writes the lease only while
   the mark still stands at that generation, comparing and writing in one step (one IndexedDB
@@ -1125,13 +1125,13 @@ added or folded into through the subagent, and no other entry changes.
   takes nothing up, and a `readBox()` or `useBox()` under way refuses `vault_locked` after its last
   await, dropping the whisper it deciphered (one monotonic compare of the handle's shut count,
   which can only turn a success into a refusal). `lockSoon()` and expiry are soft: the door closes
-  at once and the lease is forgotten, but work in hand finishes -- an unlock or change
+  at once and the lease is revoked (by `lockSoon()`) or has expired, but work in hand finishes -- an unlock or change
   under way, in any tab, completes and leaves the vault unlocked -- and the generation is not
   raised. **For review**: a soft lock no longer stops another tab's unlock; a host wanting that
   calls `lock()`.
 * 2026-10-16 (refusals_and_catchup; the Coach on G119 and G516): **one rule for storage the vault
   cannot trust.** `identity_revoked` and `rolled_back` both lock the vault, hard, wherever they are
-  met -- a call, a catch-up, a background refresh, the open itself (which forgets the lease) -- decided in `refusal-policy.ts`'s `decide`, with no host option: `whenIdentityRevoked`
+  met -- a call, a catch-up, a background refresh, the open itself (which revokes the lease) -- decided in `refusal-policy.ts`'s `decide`, with no host option: `whenIdentityRevoked`
   and its `'stay'` are gone. An adapter that says `identity_revoked` for a passing fault breaks
   VAULTDB.md 5.5. After a deliberate restore, the README's `eraseMark` recipe stays the only way
   out (G513): no verb puts forgetting the newer copy one call away. **For review**: a storage
