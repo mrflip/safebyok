@@ -37,9 +37,10 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
   above is not 0) takes up no lease: so a lock, hard, soft or for untrusted storage, stays locked
   on that handle even when the device store failed to erase the lease, and whispers stay refused as
   `vault_locked` until a proof unlocks it. A lease the lock could not erase is left for the next
-  handle made (the next page load), as before. A handle whose first `hello()` failed has forgotten
-  nothing, so it still takes its lease up once a `hello()` (or a storage change bell) succeeds; an
-  unlocked handle holds its key and loses nothing. If storage still refuses, the call meets the
+  handle made (the next page load), as before. A handle whose first `hello()` was refused for
+  untrusted storage has locked, so it takes up none; one whose first `hello()` failed otherwise
+  (storage unreachable, say) has forgotten nothing, so it still takes its lease up once a `hello()`
+  (or a storage change bell) succeeds; an unlocked handle holds its key and loses nothing. If storage still refuses, the call meets the
   refusal again and the vault stays locked. A plain `lock()` does not reset the memo and erases the
   lease in any case. Regression tests cover `lock()`, `lockSoon()` and the untrusted-storage case.
   (3) **`Vault.make` refuses any option it does not take**, `bad_option`, by a strict Zod object
