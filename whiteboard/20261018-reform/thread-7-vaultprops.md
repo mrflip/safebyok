@@ -1,6 +1,6 @@
 # Thread 7: vaultprops (2026-10-18)
 
-Branch `20261018-vaultprops`, PR #TBD, stacked on #164 (line main → #159 → #160 → #161 → #162 →
+Branch `20261018-vaultprops`, PR [#165](https://github.com/mrflip/safebyok/pull/165), stacked on #164 (line main → #159 → #160 → #161 → #162 →
 #163 → #164). Justify: green -- core 2117 passed | 35 skipped; react 218; indexeddb 135 | 10;
 convex 258 | 8; postgres 246 | 14; graphql 239 | 14; fastkey 49; demo 190 | 16; e2e 81 | 89;
 root scripts 258.
@@ -58,3 +58,5 @@ root scripts 258.
   `.erase(` (core, demo), Convex's `app.use(`, and "bundle" in its build sense (bundler, tsdown,
   eslint configs, `bundleOf` measuring a JS bundle, notes/ci.md, STYLE.md). No `.store(`/`.read(`
   on a vault remains.
+* **For the Coach**: end-user copy keeps "Erase" (recommend keeping); refusal messages say
+  "retire" rather than "remove" (recommend retire); the derived names above (YOLO).
