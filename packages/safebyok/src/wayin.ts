@@ -334,7 +334,7 @@ export const open = async (
 )
 
 /**
- * The wayinKey a passkey's PRF answer makes: HKDF-SHA256 over the answer, its `info` the
+ * The passkeyKey a passkey's PRF answer makes: HKDF-SHA256 over the answer, its `info` the
  * wayin's whole binding -- the vault, the purpose, and every public field of the wayin,
  * the credential among them -- so the same answer put to any other use, or in any other vault,
  * makes another key.
