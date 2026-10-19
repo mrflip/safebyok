@@ -1,8 +1,7 @@
 import * as Names from './names'
-import { isStorageBlocked } from './refusals'
-import { VaultError, isVaultError } from './errors'
+import { VaultError } from './errors'
 import { valOf } from './outcome'
-import type { DeviceDB } from './device-db'
+import { deviceTroubleAsConditions } from './device-db'
 import { type MakeVaultOpts, isBag, parseVaultDB, parseDeviceDB } from './vault-opts'
 
 /** What {@link delDamagedVault} needs of Vault.make's options: which vault, and the two stores it lives in. */
@@ -53,63 +52,7 @@ export const delDamagedVault = async (opts: DelDamagedVaultOpts): Promise<void> 
   // The vault first: a sound one refuses, and then the device keeps what it remembers of it. A
   // retry after a failure here finds the vault gone, and still clears the device.
   valOf(await vaultDB.delDamagedVault(scope))
-  await deviceDB.delLease(scope)
-  await deviceDB.delMark(scope)
+  valOf(await deviceDB.delLease(scope))
+  valOf(await deviceDB.delMark(scope))
 }
 
-/**
- * `deviceDB`'s verbs, each with a failure that is no VaultError -- an IndexedDB error, say, or a
- * throw before the promise -- said as a condition, with the device store's own error as its cause
- * and a message naming what failed: 'storage_blocked' for a refusal the browser gives for a reason
- * that holds until something outside the app changes (`Refusals.isStorageBlocked`), which a host
- * shows without offering a retry, and 'storage_unavailable' for any other, which it shows in
- * place and offers to retry. A VaultError passes as it came. What a vault and
- * `delDamagedVault` call the device store through; not exported from the package.
- *
- * @param deviceDB - The device store a host handed in.
- * @returns The same verbs, each failure said as a condition.
- *
- * @example await deviceTroubleAsConditions(deviceDB).getMark(scope)  // a failing IndexedDB: 'storage_unavailable', "...failed reading its mark of this vault..."
- * @example await deviceTroubleAsConditions(deviceDB).getMark(scope)  // site data blocked (a SecurityError): 'storage_blocked', "...will not help until that changes..."
- */
-export const deviceTroubleAsConditions = (deviceDB: DeviceDB): DeviceDB => ({
-  getLease: async (...args) => await asCondition('getLease', () => deviceDB.getLease(...args)),
-  putLease: async (...args) => { await asCondition('putLease', () => deviceDB.putLease(...args)) },
-  delLease: async (...args) => { await asCondition('delLease', () => deviceDB.delLease(...args)) },
-  getMark:  async (...args) => await asCondition('getMark', () => deviceDB.getMark(...args)),
-  putMark:  async (...args) => { await asCondition('putMark', () => deviceDB.putMark(...args)) },
-  delMark:  async (...args) => { await asCondition('delMark', () => deviceDB.delMark(...args)) },
-  delAll:   async (...args) => { await asCondition('delAll', () => deviceDB.delAll(...args)) },
-})
-
-/**
- * What failed, for each device-store verb, and what it leaves undone: the heart of the message a
- * failure of that verb is said with; and, where there is one, what the user may do instead of
- * trying again, which holds whether a retry may mend it or not. None names a scope or quotes a
- * record.
- */
-const DeviceTroubleSaid: Record<keyof DeviceDB, { failed: string, instead?: string }> = {
-  getLease: { failed: "reading the lease it keeps for this vault, so the vault could not take it up", instead: "unlock with a passphrase or passkey" },
-  putLease: { failed: "writing the lease it keeps for this vault, so this device may ask for the passphrase again at the next open" },
-  delLease: { failed: "erasing the lease it keeps for this vault, so the next vault made on this device, as at the next page load, may still take it up" },
-  getMark:  { failed: "reading its mark of this vault (the newest copy of the vault it has seen, and how often it has locked), so the vault could not check storage against it" },
-  putMark:  { failed: "writing its mark of this vault (the newest copy of the vault it has seen, and how often it has locked), so it may not be kept" },
-  delMark:  { failed: "erasing its mark of this vault, so it still holds the newest copy of the vault it had seen" },
-  delAll:   { failed: "erasing everything it keeps for safebyok, so some of it may remain" },
-}
-
-/** What `call` to the device store's `verb` resolves to, or its failure, as {@link deviceTroubleAsConditions} says it. */
-const asCondition = async <ResultT>(verb: keyof DeviceDB, call: () => Promise<ResultT>): Promise<ResultT> => {
-  try {
-    return await call()
-  } catch (err) {
-    if (isVaultError(err)) { throw err }
-    const { failed, instead } = DeviceTroubleSaid[verb]
-    if (isStorageBlocked(err)) {
-      const meanwhile = instead === undefined ? '' : `: ${instead} instead`
-      throw new VaultError('storage_blocked', `This browser does not let the app keep anything on this device -- storage blocked for this site, a private window or frame that withholds it, or no room left -- so it failed ${failed}. Trying again will not help until that changes${meanwhile}. The device store's error is this error's cause.`, { cause: err })
-    }
-    const retry = instead === undefined ? 'try again' : `try again, or ${instead}`
-    throw new VaultError('storage_unavailable', `This device's own storage failed ${failed}: ${retry}. If it fails every time, this device may not let the app keep anything: storage blocked or full, or a private window. The device store's error is this error's cause.`, { cause: err })
-  }
-}

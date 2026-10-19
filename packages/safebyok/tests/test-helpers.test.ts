@@ -13,7 +13,7 @@ import { BoxRecord } from '../src/box'
 import { argon2idWebV1Deriver } from '../src/key-deriver'
 import { Proof } from '../src/proof'
 import { Wayin } from '../src/wayin'
-import { PasskeySaltBytes, VaultProps, VaultScope, type DeviceMark, type Lease } from '../src/types'
+import { PasskeySaltBytes, VaultProps, VaultScope, type DeviceMark, type LeaseRecord } from '../src/types'
 import * as Ckeys from '../src/ckeys'
 import * as Expectations from '../src/expectations'
 import * as RefusalPolicy from '../src/refusal-policy'
@@ -557,7 +557,7 @@ describe("memoryVaultOpts", () => {
     const vault = await TH.settledVault(opts)
     await vault.unlock('pw')
     expect(await TH.expectingGood(opts.vaultDB).getVaultProps(TH.scopeOf('u1'))).to.not.be.null
-    expect(await opts.deviceDB.getLease(TH.scopeOf('u1'))).to.not.be.null
+    expect(await TH.expectingGood(opts.deviceDB).getLease(TH.scopeOf('u1'))).to.not.be.null
   })
 
   it("makes new stores for each call, and takes any option in place of its own", () => {
@@ -902,16 +902,16 @@ describe("raceOutcomeOf", () => {
 const ckeyOf = (scope: VaultScope) => `${scope.applabel}:${scope.user_id}:${scope.vaultlabel}`
 
 TH.describeDeviceDB('describeDeviceDB, over the smallest honest DeviceDB', () => {
-  const rows = new Map<string, Lease>()
+  const rows = new Map<string, LeaseRecord>()
   const marks = new Map<string, DeviceMark>()
   return {
-    getLease: (scope) => Promise.resolve(rows.get(ckeyOf(scope)) ?? null),
-    putLease: (lease) => { rows.set(ckeyOf(lease), lease); return Promise.resolve() },
-    delLease: (scope) => { rows.delete(ckeyOf(scope)); return Promise.resolve() },
-    getMark:  (scope) => Promise.resolve(marks.get(ckeyOf(scope)) ?? null),
-    putMark:  (mark) => { marks.set(ckeyOf(mark), mark); return Promise.resolve() },
-    delMark:  (scope) => { marks.delete(ckeyOf(scope)); return Promise.resolve() },
-    delAll:   () => { rows.clear(); marks.clear(); return Promise.resolve() },
+    getLease: (scope) => { const kept = rows.get(ckeyOf(scope)) ?? null; return Promise.resolve(TH.good(kept)) },
+    putLease: (record) => { rows.set(ckeyOf(record), record); return Promise.resolve(TH.good(undefined)) },
+    delLease: (scope) => { rows.delete(ckeyOf(scope)); return Promise.resolve(TH.good(undefined)) },
+    getMark:  (scope) => { const kept = marks.get(ckeyOf(scope)) ?? null; return Promise.resolve(TH.good(kept)) },
+    putMark:  (mark) => { marks.set(ckeyOf(mark), mark); return Promise.resolve(TH.good(undefined)) },
+    delMark:  (scope) => { marks.delete(ckeyOf(scope)); return Promise.resolve(TH.good(undefined)) },
+    delAll:   () => { rows.clear(); marks.clear(); return Promise.resolve(TH.good(undefined)) },
   }
 })
 

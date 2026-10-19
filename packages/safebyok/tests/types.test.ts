@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as Z from 'zod/mini'
 import { BoxRecord } from '../src/box'
-import { DeviceMark, EpochMillis, FarFuture, FarPast, ForeverMillis, Lease, BoxSummary, MaxUnlocks, Sidecar, VaultProps, VaultScope, Whisper } from '../src/types'
+import { DeviceMark, EpochMillis, FarFuture, FarPast, ForeverMillis, LeaseRecord, BoxSummary, MaxUnlocks, Sidecar, VaultProps, VaultScope, Whisper } from '../src/types'
 import * as TH from './test-helpers'
 
 const WhisperCases = [
@@ -206,11 +206,11 @@ describe("ForeverMillis", () => {
   })
 })
 
-describe("Lease", () => {
+describe("LeaseRecord", () => {
   it("takes a user_id of any length, and refuses one that is not text", async () => {
     const lease = await TH.leaseOf('u'.repeat(1000))
-    expect(Lease.safeParse(lease).success).to.be.true
-    expect(Lease.safeParse({ ...lease, user_id: 42 }).success).to.be.false
+    expect(LeaseRecord.safeParse(lease).success).to.be.true
+    expect(LeaseRecord.safeParse({ ...lease, user_id: 42 }).success).to.be.false
   })
 })
 
@@ -298,7 +298,7 @@ describe("DeviceMark", () => {
 // obsolete: never update the snapshot of a format that stands. A refinement (a `Z.refine`, such
 // as the floor's character rules) renders as nothing, so this sees fields, types, optionality and
 // the ranges a check states, not every rule.
-const StoredRecords = [VaultProps, BoxRecord, Lease, DeviceMark] as const
+const StoredRecords = [VaultProps, BoxRecord, LeaseRecord, DeviceMark] as const
 
 describe("Stored record formats", () => {
   for (const schema of StoredRecords) {

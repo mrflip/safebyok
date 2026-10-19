@@ -386,10 +386,10 @@ describe("close", () => {
   it("leaves a lease and the device mark as they stood", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const markBefore = await world.deviceDB.getMark(TH.scopeOf('u1'))
+    const markBefore = await TH.expectGood(world.deviceDB.getMark(TH.scopeOf('u1')))
     vault.close()
     expect(await world.getLease()).to.not.be.null
-    expect(await world.deviceDB.getMark(TH.scopeOf('u1'))).to.deep.equal(markBefore)
+    expect(await TH.expectingGood(world.deviceDB).getMark(TH.scopeOf('u1'))).to.deep.equal(markBefore)
   })
 
   it("a second close does nothing: the storage watch is ended once", async () => {
@@ -509,10 +509,11 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
     const slowDeviceDB = {
       ...world.deviceDB,
       delLease: async (scope: Parameters<typeof world.deviceDB.delLease>[0]) => {
-        await world.deviceDB.delLease(scope)
+        const erased = await world.deviceDB.delLease(scope)
         const pending = meanwhile
         meanwhile = null
         if (pending !== null) { await pending() }
+        return erased
       },
     }
     const vaultOne = await world.openUnlocked('pw one', { deviceDB: slowDeviceDB })

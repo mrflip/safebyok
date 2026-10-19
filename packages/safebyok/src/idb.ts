@@ -1,7 +1,7 @@
 import { createStore, del, delMany, entries, get, keys, set, clear, type UseStore } from 'idb-keyval'
-import { DeviceMark, Lease } from './types'
+import { DeviceMark, LeaseRecord } from './types'
 import * as Ckeys from './ckeys'
-import type { DeviceDB } from './device-db'
+import { type DeviceDB, deviceOutcomeOf } from './device-db'
 import { parseDbName, type IdbOpts } from './idb-opts'
 import { VaultError } from './errors'
 import * as ChangeBell from './change-bell'
@@ -59,7 +59,7 @@ const bellnameOf = (dbName: string) => `safebyok-idb:${dbName}:device_db`
 
 /**
  * DeviceDB over this browser's IndexedDB: the real device storage. IndexedDB keeps the
- * {@link Lease} record by structured clone, which is the only way a browser persists the
+ * {@link LeaseRecord} by structured clone, which is the only way a browser persists the
  * non-extractable leaseKey -- as a handle, never as bytes. Device marks share its shelf.
  *
  * A record that will not read back (damaged, or written by another version) reads as "no
@@ -68,16 +68,17 @@ const bellnameOf = (dbName: string) => `safebyok-idb:${dbName}:device_db`
  * Its rows are filed under `Ckeys`, names joined on `^`, and a scope with a name holding one is
  * refused with kind 'bad_label'. Kind 'bad_option' for a `dbName` that is not non-empty text.
  *
- * Its failures are IndexedDB's own errors, which a vault says as conditions: one the browser gives
- * for storage withheld or full (a `SecurityError`, a `QuotaExceededError`) as 'storage_blocked',
- * and so a context with no IndexedDB at all, which this store refuses with a `NotSupportedError`
- * at its first use; any other as 'storage_unavailable'.
+ * Every verb resolves an Outcome. A failure of IndexedDB's own is said as a condition, the
+ * browser's error its cause: one the browser gives for storage withheld or full (a
+ * `SecurityError`, a `QuotaExceededError`) as 'storage_blocked', and so a context with no
+ * IndexedDB at all, which this store meets as a `NotSupportedError` at its first use; any other
+ * as 'storage_unavailable'.
  *
  * @example
  *   const deviceDB = idbDeviceDB()
- *   await deviceDB.getLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // null
+ *   await deviceDB.getLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // { ok: true, val: null }
  * @example
- *   await deviceDB.getMark({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })   // null
+ *   await deviceDB.getMark({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })   // { ok: true, val: null }
  */
 export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
   const dbName = parseDbName(opts, 'idbDeviceDB')
@@ -97,32 +98,32 @@ export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
   }
 
   return {
-    getLease: async (scope) => {
+    getLease: (scope) => deviceOutcomeOf('getLease', async () => {
       await sweepStrays()
       const raw: unknown = await get(Ckeys.lease(scope), shelf())
       if (raw === undefined || raw === null) { return null }
-      const checked = Lease.safeParse(raw)
+      const checked = LeaseRecord.safeParse(raw)
       if (! checked.success) {
         await del(Ckeys.lease(scope), shelf())
         ring()
         return null
       }
       return checked.data
-    },
+    }),
 
-    putLease: async (lease) => {
-      await set(Ckeys.lease(lease), lease, shelf())
+    putLease: (record) => deviceOutcomeOf('putLease', async () => {
+      await set(Ckeys.lease(record), record, shelf())
       ring()
-    },
+    }),
 
     // The scope's own lease goes first, so a sweep that fails never keeps a lock from revoking it.
-    delLease: async (scope) => {
+    delLease: (scope) => deviceOutcomeOf('delLease', async () => {
       await del(Ckeys.lease(scope), shelf())
       ring()
       await sweepStrays()
-    },
+    }),
 
-    getMark: async (scope) => {
+    getMark: (scope) => deviceOutcomeOf('getMark', async () => {
       const raw: unknown = await get(Ckeys.mark(scope), shelf())
       if (raw === undefined || raw === null) { return null }
       const checked = DeviceMark.safeParse(raw)
@@ -132,24 +133,24 @@ export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
         return null
       }
       return checked.data
-    },
+    }),
 
-    putMark: async (mark) => {
+    putMark: (mark) => deviceOutcomeOf('putMark', async () => {
       await set(Ckeys.mark(mark), mark, shelf())
       ring()
-    },
+    }),
 
-    delMark: async (scope) => {
+    delMark: (scope) => deviceOutcomeOf('delMark', async () => {
       await del(Ckeys.mark(scope), shelf())
       ring()
-    },
+    }),
 
     // The shelf holds leases and device marks and nothing else, so erasing them all
     // is clearing it: any row an earlier version filed under another ckey goes too.
-    delAll: async () => {
+    delAll: () => deviceOutcomeOf('delAll', async () => {
       await clear(shelf())
       ring()
-    },
+    }),
   }
 }
 

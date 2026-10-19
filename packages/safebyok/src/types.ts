@@ -392,9 +392,9 @@ export type VaultProps = Z.infer<typeof VaultProps>
  * The device-local record of a lease: this browser's leaseKey (a non-extractable handle -- it
  * cannot leave the device even through the code that made it) and the vaultKey wrapped under it.
  * Held only by structured-clone storage (IndexedDB) or memory; it has no JSON form, and nothing
- * in it ever goes to the backend.
+ * in it ever goes to the backend. What a `Lease` is made from, and gives back as its `props`.
  */
-export const Lease = Z.object({
+export const LeaseRecord = Z.object({
   format:            Z.literal('safebyok-lease-v1'),
   applabel:          NameFloor,
   user_id:           NameFloor,
@@ -409,7 +409,7 @@ export const Lease = Z.object({
   /** The instant from which the lease no longer counts, and the vault asks for the passphrase: an {@link EpochMillis}. */
   ask_passphrase_at: EpochMillis,
 })
-export type Lease = Z.infer<typeof Lease>
+export type LeaseRecord = Z.infer<typeof LeaseRecord>
 
 /**
  * What a device mark holds of the vault it has seen under its scope: the device's own random

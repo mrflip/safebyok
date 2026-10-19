@@ -27,10 +27,10 @@ describe("browserOpts", () => {
 
   it("keeps the device store's records in the database it names", async () => {
     const dbName = TH.freshDbName()
-    await browserOpts({ dbName }).deviceDB.putLease(await TH.leaseOf('u1'))
+    await TH.expectGood(browserOpts({ dbName }).deviceDB.putLease(await TH.leaseOf('u1')))
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
     expect(rows.map((row) => row.ckey)).to.deep.equal(['lease^acme^u1^main'])
-    expect(await browserOpts().deviceDB.getLease(TH.scopeOf('u1'))).to.be.null
+    expect(await TH.expectingGood(browserOpts().deviceDB).getLease(TH.scopeOf('u1'))).to.be.null
   })
 
   it("answers the same frozen bag for the same dbName, so a render may call it", () => {

@@ -42,7 +42,7 @@ describe("delDamagedVault", () => {
     await theirs.putBox('anthropic', 'theirs')
     await delDamagedVault(world.optsWith())
     expect(await theirs.getBox('anthropic')).to.eq('theirs')
-    expect(await world.deviceDB.getLease(TH.scopeOf('u2'))).to.not.be.null
+    expect(await TH.expectingGood(world.deviceDB).getLease(TH.scopeOf('u2'))).to.not.be.null
     expect(rowsOf(world, 'u2')).to.not.deep.equal([])
   })
 
@@ -89,7 +89,7 @@ describe("delDamagedVault", () => {
       ...world.deviceDB,
       delLease: async (scope) => {
         if (failures > 0) { failures -= 1; throw new Error('device store is busy') }
-        await world.deviceDB.delLease(scope)
+        return await world.deviceDB.delLease(scope)
       },
     }
     const err = await TH.expectRefusal(delDamagedVault(world.optsWith({ deviceDB: flakyDevice })), 'storage_unavailable')

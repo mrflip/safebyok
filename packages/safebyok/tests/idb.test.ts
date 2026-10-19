@@ -45,16 +45,6 @@ describe("the IndexedDB device store's options", () => {
   }
 })
 
-/** What `attempt` rejects with; it fails the test should it resolve. */
-const rejectionOf = async (attempt: Promise<unknown>): Promise<unknown> => {
-  try {
-    await attempt
-  } catch (err) {
-    return err
-  }
-  throw new Error('it resolved, where a rejection was expected')
-}
-
 describe("idbDeviceDB", () => {
   const NoIndexedDBCases = [
     [undefined,  'a runtime with no indexedDB global'],
@@ -62,11 +52,12 @@ describe("idbDeviceDB", () => {
   ] as const
 
   for (const [factory, blurb] of NoIndexedDBCases) {
-    it(`refuses at its first use with a NotSupportedError, in ${blurb}`, async () => {
+    it(`refuses at its first use as 'storage_blocked', a NotSupportedError its cause, in ${blurb}`, async () => {
       const deviceDB = idbDeviceDB({ dbName: TH.freshDbName() })
       vi.stubGlobal('indexedDB', factory)
       try {
-        await expect(deviceDB.getMark(TH.scopeOf('u1'))).rejects.toThrow(expect.objectContaining({ name: 'NotSupportedError' }))
+        const err = await TH.expectBad(deviceDB.getMark(TH.scopeOf('u1')), 'storage_blocked')
+        expect(err.cause).to.have.property('name', 'NotSupportedError')
       } finally {
         vi.unstubAllGlobals()
       }
@@ -84,27 +75,27 @@ describe("idbDeviceDB", () => {
     })
   }
 
-  it("refuses with a DOMException where the runtime has one", async () => {
+  it("refuses with a DOMException as its cause where the runtime has one", async () => {
     const deviceDB = idbDeviceDB({ dbName: TH.freshDbName() })
     vi.stubGlobal('indexedDB', undefined)
     try {
-      const err = await rejectionOf(deviceDB.getMark(TH.scopeOf('u1')))
-      expect(err).to.be.instanceOf(DOMException)
-      expect(err).to.have.property('name', 'NotSupportedError')
+      const { cause } = await TH.expectBad(deviceDB.getMark(TH.scopeOf('u1')), 'storage_blocked')
+      expect(cause).to.be.instanceOf(DOMException)
+      expect(cause).to.have.property('name', 'NotSupportedError')
     } finally {
       vi.unstubAllGlobals()
     }
   })
 
-  it("refuses with a plain Error named NotSupportedError where the runtime has no DOMException, as Hermes has none", async () => {
+  it("refuses with a plain Error named NotSupportedError as its cause where the runtime has no DOMException, as Hermes has none", async () => {
     const deviceDB = idbDeviceDB({ dbName: TH.freshDbName() })
     vi.stubGlobal('indexedDB', undefined)
     vi.stubGlobal('DOMException', undefined)
     try {
-      const err = await rejectionOf(deviceDB.getMark(TH.scopeOf('u1')))
-      expect(err).to.be.instanceOf(Error)
-      expect(err).to.have.property('name', 'NotSupportedError')
-      expect(err).to.have.property('message').that.includes('no IndexedDB')
+      const { cause } = await TH.expectBad(deviceDB.getMark(TH.scopeOf('u1')), 'storage_blocked')
+      expect(cause).to.be.instanceOf(Error)
+      expect(cause).to.have.property('name', 'NotSupportedError')
+      expect(cause).to.have.property('message').that.includes('no IndexedDB')
     } finally {
       vi.unstubAllGlobals()
     }
@@ -115,7 +106,7 @@ describe("idbDeviceDB", () => {
     const shelf = createStore(`${dbName}:device_db`, 'records')
     await set('unlock:acme:u1:main', await TH.leaseOf('u1'), shelf)
     await set(['unlock', 'acme', 'u1', 'main'], await TH.leaseOf('u1'), shelf)
-    const deviceDB = idbDeviceDB({ dbName })
+    const deviceDB = TH.expectingGood(idbDeviceDB({ dbName }))
     await deviceDB.putLease(await TH.leaseOf('u2'))
     const gets = vi.spyOn(IDBObjectStore.prototype, 'get')
     const getAlls = vi.spyOn(IDBObjectStore.prototype, 'getAll')
@@ -136,7 +127,7 @@ describe("idbDeviceDB", () => {
     const dbName = TH.freshDbName()
     const shelf = createStore(`${dbName}:device_db`, 'records')
     await set('unlock:acme:u1:main', await TH.leaseOf('u1'), shelf)
-    const deviceDB = idbDeviceDB({ dbName })
+    const deviceDB = TH.expectingGood(idbDeviceDB({ dbName }))
     await deviceDB.putLease(await TH.leaseOf('u2'))
     await deviceDB.delLease(TH.scopeOf('u3'))
     expect(await deviceDB.getLease(TH.scopeOf('u2'))).to.not.be.null
@@ -147,7 +138,7 @@ describe("idbDeviceDB", () => {
   it("discards a device's lease from before the rename, filed under unlock^, keeping its device mark: the user proves once more", async () => {
     const dbName = TH.freshDbName()
     const shelf = createStore(`${dbName}:device_db`, 'records')
-    const deviceDB = idbDeviceDB({ dbName })
+    const deviceDB = TH.expectingGood(idbDeviceDB({ dbName }))
     await deviceDB.putMark(TH.markOf('u1'))
     // Even a record that would read today is swept unread: its ckey is not one this version files.
     await set('unlock^acme^u1^main', await TH.leaseOf('u1'), shelf)
@@ -161,7 +152,7 @@ describe("idbDeviceDB", () => {
     const dbName = TH.freshDbName()
     const shelf = createStore(`${dbName}:device_db`, 'records')
     await set('unlock:acme:u1:main', await TH.leaseOf('u1'), shelf)
-    const deviceDB = idbDeviceDB({ dbName })
+    const deviceDB = TH.expectingGood(idbDeviceDB({ dbName }))
     await deviceDB.putMark(TH.markOf('u1'))
     await deviceDB.getLease(TH.scopeOf('u1'))
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
@@ -172,7 +163,7 @@ describe("idbDeviceDB", () => {
     const dbName = TH.freshDbName()
     const shelf = createStore(`${dbName}:device_db`, 'records')
     await set(Ckeys.mark(TH.scopeOf('u1')), { ...TH.markOf('u1'), seen: { ...TH.markOf('u1').seen, unlock_epoch: 'one' } }, shelf)
-    const deviceDB = idbDeviceDB({ dbName })
+    const deviceDB = TH.expectingGood(idbDeviceDB({ dbName }))
     expect(await deviceDB.getMark(TH.scopeOf('u1'))).to.be.null
     expect(await inspectIdbDeviceDB({ dbName }).rows()).to.have.lengthOf(0)
   })
@@ -181,7 +172,7 @@ describe("idbDeviceDB", () => {
     const dbName = TH.freshDbName()
     const shelf = createStore(`${dbName}:device_db`, 'records')
     await set('unlock:acme:u1:main', await TH.leaseOf('u1'), shelf)
-    const deviceDB = idbDeviceDB({ dbName })
+    const deviceDB = TH.expectingGood(idbDeviceDB({ dbName }))
     let heardCount = 0
     const unsubscribe = inspectIdbDeviceDB({ dbName }).subscribe(() => { heardCount += 1 })
     await deviceDB.getLease(TH.scopeOf('u2'))
@@ -207,11 +198,12 @@ describe("idbDeviceDB", () => {
 
   it("erases the scope's own lease even when the sweep fails", async () => {
     const dbName = TH.freshDbName()
-    const deviceDB = idbDeviceDB({ dbName })
-    await deviceDB.putLease(await TH.leaseOf('u1'))
+    const shelfDB = idbDeviceDB({ dbName })
+    await TH.expectGood(shelfDB.putLease(await TH.leaseOf('u1')))
     vi.spyOn(IDBObjectStore.prototype, 'getAllKeys').mockImplementation(() => { throw new Error('the shelf will not list') })
     try {
-      await expect(deviceDB.delLease(TH.scopeOf('u1'))).rejects.toThrow('the shelf will not list')
+      const { cause } = await TH.expectBad(shelfDB.delLease(TH.scopeOf('u1')), 'storage_unavailable')
+      expect(cause).to.have.property('message', 'the shelf will not list')
     } finally {
       vi.restoreAllMocks()
     }
@@ -222,7 +214,7 @@ describe("idbDeviceDB", () => {
     const dbName = TH.freshDbName()
     const shelf = createStore(`${dbName}:device_db`, 'records')
     await set('unlock:acme:u1:main', await TH.leaseOf('u1'), shelf)
-    const deviceDB = idbDeviceDB({ dbName })
+    const deviceDB = TH.expectingGood(idbDeviceDB({ dbName }))
     await deviceDB.putLease(await TH.leaseOf('u2'))
     await deviceDB.delAll()
     expect(await inspectIdbDeviceDB({ dbName }).rows()).to.have.lengthOf(0)
@@ -232,7 +224,7 @@ describe("idbDeviceDB", () => {
 describe("inspectIdbDeviceDB", () => {
   it("shows the raw rows of the device shelf, hears writes, and wipes it clean", async () => {
     const dbName = TH.freshDbName()
-    const deviceDB = idbDeviceDB({ dbName })
+    const deviceDB = TH.expectingGood(idbDeviceDB({ dbName }))
     const inspector = inspectIdbDeviceDB({ dbName })
     let heardCount = 0
     const unsubscribe = inspector.subscribe(() => { heardCount += 1 })

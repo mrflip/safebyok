@@ -4,7 +4,7 @@ import type { KeyDeriver } from '../../src/key-deriver'
 import { type PassphraseStrengthTest, StrongVerdict } from '../../src/passphrase-strength'
 import { memoryStore } from '../../src/string-store'
 import type { BoxRecord } from '../../src/box'
-import type { VaultScope, PassphraseWayinRecord, PasskeyWayinRecord, PasskeyAnswer, VaultProps, Sidecar, BoxSummary, DamagedBox, DeviceMark, SeenVault, Lease } from '../../src/types'
+import type { VaultScope, PassphraseWayinRecord, PasskeyWayinRecord, PasskeyAnswer, VaultProps, Sidecar, BoxSummary, DamagedBox, DeviceMark, SeenVault, LeaseRecord } from '../../src/types'
 import { stableJsonify } from '../../src/stable-jsonify'
 import { Vault } from '../../src/vault'
 import { type MakeVaultOpts } from '../../src/vault-opts'
@@ -326,8 +326,8 @@ export const markOf = (userId: string, overrides: MarkOverrides = {}): DeviceMar
   }
 }
 
-/** A real Lease for device-storage tests: a live non-extractable leaseKey around fake wrapped material. */
-export const leaseOf = async (userId: string): Promise<Lease> => ({
+/** A real lease record for device-storage tests: a live non-extractable leaseKey around fake wrapped material. */
+export const leaseOf = async (userId: string): Promise<LeaseRecord> => ({
   format:                  'safebyok-lease-v1',
   ...scopeOf(userId),
   vault_id:                `vault-id-${userId}`,

@@ -237,11 +237,11 @@ describe("VaultProvider", () => {
         const { Grab, latest } = grabber()
         render(<VaultProvider {...props} userId="u1"><Grab /><Probe /></VaultProvider>)
         await expectShown('open error: damaged_vault')
-        expect(await deviceDB.getLease(TH.scopeOf('u1'))).to.not.be.null
+        expect(await TH.expectingGood(deviceDB).getLease(TH.scopeOf('u1'))).to.not.be.null
         await act(async () => { await latest().delDamagedVault() })
         await expectShown('absent')
         expect(store.ckeys()).to.deep.equal([])
-        expect(await deviceDB.getLease(TH.scopeOf('u1'))).to.be.null
+        expect(await TH.expectingGood(deviceDB).getLease(TH.scopeOf('u1'))).to.be.null
         expect(latest().openError).to.be.null
       })
 

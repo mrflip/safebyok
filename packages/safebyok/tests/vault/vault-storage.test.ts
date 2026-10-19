@@ -7,7 +7,7 @@ import { Vault } from '../../src/vault'
 import { type MakeVaultOpts } from '../../src/vault-opts'
 import { delDamagedVault } from '../../src/del-damaged-vault'
 import { setDefaultLogger, DefaultLogger } from '../../src/logger'
-import { bad } from '../../src/outcome'
+import { bad, valOf } from '../../src/outcome'
 import * as TH from '../test-helpers'
 import { makeWorld, boxlabelsOf, isU1Box, u1BoxCkey, u1VaultPropsCkey, SevenDaysMillis, uncheckingDeviceDB, storedVaultPropsOf, storedWayinsOf, HourMillis, damagedVaultWorld, storedRowOf, rowsOf, rolledBackWorld } from './world'
 
@@ -591,7 +591,7 @@ describe("when storage says the user is no longer signed in", () => {
 })
 
 /** This device's mark for `u1`'s vault, as its deviceDB keeps it. */
-const markIn = (world: ReturnType<typeof makeWorld>) => world.deviceDB.getMark(TH.scopeOf('u1'))
+const markIn = (world: ReturnType<typeof makeWorld>) => TH.expectGood(world.deviceDB.getMark(TH.scopeOf('u1')))
 
 /** What this world's device mark for `u1`'s vault has seen of it; null with no mark, or none seen. */
 const seenIn = async (world: ReturnType<typeof makeWorld>) => {
@@ -681,7 +681,7 @@ describe("the device mark", () => {
     await world.openUnlocked('pw')
     const before = await seenIn(world)
     // Every read of the mark at this open hands back u2's: the one before the vault props, and the one after.
-    const misfiled = vi.spyOn(world.deviceDB, 'getMark').mockResolvedValue(TH.markOf('u2', { seen: { unlock_epoch: 9 } }))
+    const misfiled = vi.spyOn(world.deviceDB, 'getMark').mockResolvedValue(TH.good(TH.markOf('u2', { seen: { unlock_epoch: 9 } })))
     await world.open()
     misfiled.mockRestore()
     expect(world.logged.map((call) => call.level)).to.deep.equal(['warn'])
@@ -716,7 +716,7 @@ const openAcceptingRestore = async (opts: MakeVaultOpts, storageWasRestoredOnPur
     await vault.hello()
   } catch (err) {
     if (! isVaultError(err, 'rolled_back') || ! await storageWasRestoredOnPurpose()) { throw err }
-    await opts.deviceDB.delMark({ applabel: opts.applabel, user_id: opts.userId, vaultlabel: opts.vaultlabel })
+    valOf(await opts.deviceDB.delMark({ applabel: opts.applabel, user_id: opts.userId, vaultlabel: opts.vaultlabel }))
     await vault.hello()
   }
   return vault

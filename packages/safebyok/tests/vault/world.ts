@@ -1,4 +1,4 @@
-import { VaultScope, type Lease, type DeviceMark } from '../../src/types'
+import { VaultScope, type LeaseRecord, type DeviceMark } from '../../src/types'
 import { memoryDeviceDB, type DeviceDB } from '../../src/device-db'
 import { localVaultDB } from '../../src/local-vault-db'
 import { memoryStore } from '../../src/string-store'
@@ -47,7 +47,7 @@ export const makeWorld = (defaults?: Partial<MakeVaultOpts>) => {
     await vault.unlock(passphrase)
     return vault
   }
-  const getLease = () => deviceDB.getLease(TH.scopeOf('u1'))
+  const getLease = () => TH.expectGood(deviceDB.getLease(TH.scopeOf('u1')))
   const deafVaultDB = () => localVaultDB({ store: { ...dbStore, subscribe: neverRings } })
   const stateOnOpen = async (overrides?: Partial<MakeVaultOpts>) => {
     const vault = await open(overrides)
@@ -80,13 +80,13 @@ export const uncheckingDeviceDB = () => {
   const rows = new Map<string, unknown>()
   const marks = new Map<string, unknown>()
   const deviceDB: DeviceDB = {
-    getLease: (scope) => Promise.resolve((rows.get(ckeyOf(scope)) ?? null) as Lease | null),
-    putLease: (lease) => { rows.set(ckeyOf(lease), lease); return Promise.resolve() },
-    delLease: (scope) => { rows.delete(ckeyOf(scope)); return Promise.resolve() },
-    getMark:  (scope) => Promise.resolve((marks.get(ckeyOf(scope)) ?? null) as DeviceMark | null),
-    putMark:  (mark) => { marks.set(ckeyOf(mark), mark); return Promise.resolve() },
-    delMark:  (scope) => { marks.delete(ckeyOf(scope)); return Promise.resolve() },
-    delAll:   () => { rows.clear(); marks.clear(); return Promise.resolve() },
+    getLease: (scope) => { const kept = (rows.get(ckeyOf(scope)) ?? null) as LeaseRecord | null; return Promise.resolve(TH.good(kept)) },
+    putLease: (record) => { rows.set(ckeyOf(record), record); return Promise.resolve(TH.good(undefined)) },
+    delLease: (scope) => { rows.delete(ckeyOf(scope)); return Promise.resolve(TH.good(undefined)) },
+    getMark:  (scope) => { const kept = (marks.get(ckeyOf(scope)) ?? null) as DeviceMark | null; return Promise.resolve(TH.good(kept)) },
+    putMark:  (mark) => { marks.set(ckeyOf(mark), mark); return Promise.resolve(TH.good(undefined)) },
+    delMark:  (scope) => { marks.delete(ckeyOf(scope)); return Promise.resolve(TH.good(undefined)) },
+    delAll:   () => { rows.clear(); marks.clear(); return Promise.resolve(TH.good(undefined)) },
   }
   /** Rewrite the one stored row through `spoil`. */
   const spoilRow = (spoil: (row: Record<string, unknown>) => unknown) => {

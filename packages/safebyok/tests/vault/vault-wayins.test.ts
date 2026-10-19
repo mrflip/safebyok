@@ -74,7 +74,7 @@ describe("changePassphrase", () => {
 
     await here.changePassphrase('old passphrase', 'new passphrase')
     await vi.waitFor(() => { expect(there.getSnapshot().state).to.eq('locked') })
-    expect(await thereDeviceDB.getLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })).to.be.null
+    expect(await TH.expectGood(thereDeviceDB.getLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }))).to.be.null
   })
 })
 

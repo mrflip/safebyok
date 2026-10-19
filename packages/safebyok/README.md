@@ -295,8 +295,10 @@ another VaultDB's public verbs passes each call through as it came.
 
 A device store of your own (a `DeviceDB`, for a platform without IndexedDB) keeps its records as
 it is handed them: `putLease` and `putMark` each replace what the scope held, and `delMark`
-forgets the scope's mark (`del()` calls it). `describeDeviceDB` from `safebyok/testing` checks
-all of this.
+forgets the scope's mark (`del()` calls it). Each verb resolves an `Outcome`, as a VaultDB's do:
+`{ ok: true, val }`, the record or null for a read, or `{ ok: false, err }` holding a
+`VaultError`; `outcomeOf` makes one of a body that throws. `describeDeviceDB` from
+`safebyok/testing` checks all of this.
 
 Every refresh -- after each of the vault's own writes, and at each change your adapter's
 `subscribe` reports -- lists every box in the vault, one at a time per handle, so its cost
@@ -915,7 +917,7 @@ try {
   await vault.hello()
 } catch (err) {
   if (! isVaultError(err, 'rolled_back') || ! await storageWasRestoredOnPurpose()) { throw err }
-  await opts.deviceDB.delMark({ applabel: opts.applabel, user_id: opts.userId, vaultlabel: opts.vaultlabel })
+  valOf(await opts.deviceDB.delMark({ applabel: opts.applabel, user_id: opts.userId, vaultlabel: opts.vaultlabel }))
   await vault.hello()
 }
 ```

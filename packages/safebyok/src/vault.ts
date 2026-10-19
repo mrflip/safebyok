@@ -1,13 +1,11 @@
 import * as Z from 'zod/mini'
-import { isPlainBag, type Capacity, type Clock, type VaultScope, BoxSummary, type DamagedBox, type WayinSummary, type PasskeyAnswer, Whisper, Sidecar, VaultProps, DeviceMark, MaxUnlocks, Lease, type PassphraseWayinRecord, MinuteMillis, FarFuture, FarPast } from './types'
+import { isPlainBag, type Capacity, type Clock, type VaultScope, BoxSummary, type DamagedBox, type WayinSummary, type PasskeyAnswer, Whisper, Sidecar, VaultProps, DeviceMark, MaxUnlocks, type PassphraseWayinRecord, MinuteMillis, FarFuture, FarPast } from './types'
 import { Box, type BoxRecord, EmptySidecarJson, checkedBoxRecord, checkedSidecar, heldListing, planSeal, sealPlanned, whisperBytesOf } from './box'
 import * as Names from './names'
 import { optionsCheck } from './options'
 import { VaultError, isVaultError, type RefusalKind } from './errors'
 import { type Outcome, good, outcomeOf, unexpectedError, valOf } from './outcome'
-import {
-  cipherCtx, makeLeaseKey, makeVaultKey, randomId, wrapKeyUnder, unwrapKeyUnder,
-} from './crypto'
+import { makeVaultKey, randomId } from './crypto'
 import { Wayin, absentWayin, frozenRecord, type PasskeyWayin, type PassphraseWayin, type WayinStamp, type VaultKeyPair } from './wayin'
 import { Proof, PassphraseProof, PasskeyProof } from './proof'
 import { stableJsonify } from './stable-jsonify'
@@ -18,9 +16,9 @@ import * as RefusalPolicy from './refusal-policy'
 import { type PassphraseStrengthTest, checkStrongEnough } from './passphrase-strength'
 import { type BadNewsHandler, type MakeVaultOpts, parseMakeVaultOpts, parseRenewMinutes, parseStaleMinutes, readClock, StoredBytesPerWhisperByte, BoxFixedBytes } from './vault-opts'
 import { reportToPlatform } from './report-error'
-import type { DeviceDB } from './device-db'
+import { type DeviceDB, deviceTroubleAsConditions } from './device-db'
 import type { KeyDeriver } from './key-deriver'
-import { deviceTroubleAsConditions } from './del-damaged-vault'
+import { Lease } from './lease'
 import { Ask, type AskWhy, type GetProof, type RaisedAsk } from './ask'
 
 // == [Public types]: VaultState, VaultSnapshot
@@ -946,7 +944,7 @@ export class Vault {
       await this.#refreshOnStale(this.#vaultDB.delVault(this.#scope, { vault_id: doomed.vault_id }), 'del')
     }
     // This device forgets the vault it had seen, too: one made later under this scope is another.
-    await this.#deviceDB.delMark(this.#scope)
+    valOf(await this.#deviceDB.delMark(this.#scope))
     await this.#refresh()
     this.#forgetHello()
   })
@@ -1087,7 +1085,7 @@ export class Vault {
   }
   // --
 
-  // == [State and snapshot]: vaultProps, vaultKey, listeners, snapshot, picture, settle
+  // == [State and snapshot]: vaultProps, vaultKey, lease, unlockStands, listeners, snapshot, picture, settle
 
   #vaultProps: VaultProps | null | typeof UnreadVaultProps = UnreadVaultProps
   // This device's mark for the vault props in hand, set with them, so the two always name one vault.
@@ -1097,8 +1095,9 @@ export class Vault {
   // set off -- starts it under that id.
   #drafted: { vault_id: string, device_id: string } | null = null
   #boxes: readonly (BoxSummary | DamagedBox)[] = []
-  #askPassphraseAt: number | null = null
+  // The vaultKey this handle holds, and the lease it holds it under: set together, dropped together.
   #vaultKey: CryptoKey | null = null
+  #lease: Lease | null = null
   #closed = false
   // The timer that drops the vaultKey at askPassphraseAt. Null when no key is held, or the one
   // held lasts until lock().
@@ -1108,8 +1107,11 @@ export class Vault {
   #vaultState(): VaultState {
     if (this.#vaultProps === UnreadVaultProps) { return 'opening' }
     if (this.#vaultProps === null) { return 'absent' }
-    if (this.#vaultKey !== null && this.#askPassphraseAt !== null && this.#askPassphraseAt > this.#clockNow()) { return 'unlocked' }
-    return 'locked'
+    return this.#unlockStands() ? 'unlocked' : 'locked'
+  }
+  /** True while a vaultKey is held under a lease that has not ended, by the clock read now. */
+  #unlockStands(): boolean {
+    return this.#vaultKey !== null && this.#lease !== null && ! this.#lease.endsWithin(0)
   }
   // The ways in of each vault props record the vault has held, made once per record. Every record
   // the vault holds is frozen as it takes it up (see frozenVaultProps), so a way in's holder, a
@@ -1152,7 +1154,7 @@ export class Vault {
       state,
       boxes:           Object.freeze(this.#boxes.map((box) => Object.freeze(box))),
       capacity:        Object.freeze({ boxes: Object.freeze(boxes), bytes: Object.freeze(bytes) }),
-      askPassphraseAt: state === 'unlocked' ? this.#askPassphraseAt : null,
+      askPassphraseAt: state === 'unlocked' ? this.#lease?.ask_passphrase_at ?? null : null,
       trouble:         this.#trouble,
       syncing:         this.#syncing,
     })
@@ -1170,16 +1172,6 @@ export class Vault {
     if (next.trouble === this.#snapshot.trouble && stableJsonify({ ...next, trouble: null }) === stableJsonify({ ...this.#snapshot, trouble: null })) { return }
     this.#snapshot = next
     this.#listeners.forEach((listener) => { listener() })
-  }
-  // --
-
-  // == [Contexts]: leaseCtx
-
-  // The context each encryption is bound to; see VOCABULARY.md on ctx. A wayin's ctx is the
-  // Wayin module's, and a box's is the Box's. A lease's is bound to every field of its record but
-  // the key and the wrap, the scope, vault and epoch as this vault expects them.
-  #leaseCtx(vaultId: string, epoch: number, deadline: number) {
-    return cipherCtx('safebyok-lease-v1', this.#scope.applabel, this.#scope.user_id, this.#scope.vaultlabel, vaultId, epoch, deadline, 'vault_key_lease_wrapped')
   }
   // --
 
@@ -1214,7 +1206,7 @@ export class Vault {
     const readAt = this.#clockNow()
     // The mark the vault props are held to is read before them (see heedMark), and an older copy of a vault
     // this device has seen newer is refused before anything is taken from it.
-    const seenBefore = this.#checkedMark(await this.#deviceDB.getMark(this.#scope))
+    const seenBefore = this.#checkedMark(valOf(await this.#deviceDB.getMark(this.#scope)))
     const read = await damagedAs(this.#vaultDB.getVaultProps(this.#scope), damagedVaultProps)
     const fresh = read === null ? null : frozenVaultProps(read)
     const mark = fresh === null ? null : await this.#heedMark(fresh, { seenBefore, call: 'refresh' })
@@ -1231,7 +1223,7 @@ export class Vault {
       // Never another vault's boxes beside these vault props, should the listing below fail.
       if (fresh?.vault_id !== held.vault_id) { this.#boxes = [] }
       this.#dropKey()
-      if (wasUnlocked) { await this.#deviceDB.delLease(this.#scope) }
+      if (wasUnlocked) { valOf(await this.#deviceDB.delLease(this.#scope)) }
     }
     const listed = fresh === null ? [] : await this.#vaultDB.listBoxes(this.#scope)
     // Taken up together once all is read, so a read that fails partway leaves the snapshot's
@@ -1336,7 +1328,7 @@ export class Vault {
    * since the rollback check starts again from what storage holds now.
    */
   async #keptMark(call: VaultCall): Promise<DeviceMark | null> {
-    const kept = await this.#deviceDB.getMark(this.#scope)
+    const kept = valOf(await this.#deviceDB.getMark(this.#scope))
     if (kept === null) { return null }
     const checked = this.#checkedMark(kept)
     if (checked !== null) { return checked }
@@ -1380,7 +1372,7 @@ export class Vault {
    */
   async #raiseMark(kept: DeviceMark | null, fresh: VaultProps): Promise<DeviceMark> {
     const mark = this.#markSeeing(kept, fresh)
-    if (mark.seen !== kept?.seen) { await this.#deviceDB.putMark(mark) }
+    if (mark.seen !== kept?.seen) { valOf(await this.#deviceDB.putMark(mark)) }
     return mark
   }
 
@@ -1426,7 +1418,7 @@ export class Vault {
    */
   #checkUnlocked(): CryptoKey {
     this.#checkOpen()
-    if (this.#vaultKey !== null && this.#askPassphraseAt !== null && this.#askPassphraseAt > this.#clockNow()) { return this.#vaultKey }
+    if (this.#vaultKey !== null && this.#unlockStands()) { return this.#vaultKey }
     this.#dropKey()
     this.#settle()
     throw lockedError()
@@ -1475,13 +1467,12 @@ export class Vault {
   /** Why the vault must ask for a proof now: null while it is unlocked past `renewMillis` from now. */
   #whyAsk(renewMillis: number): AskWhy | null {
     if (this.#vaultProps === null) { return 'absent' }
-    const now = this.#clockNow()
-    if (this.#vaultKey === null || this.#askPassphraseAt === null || this.#askPassphraseAt <= now) {
+    if (this.#lease === null || ! this.#unlockStands()) {
       // The threshold is the truth: a key past its deadline goes now, should its timer run late.
       if (this.#vaultKey !== null) { this.#dropNow() }
       return 'locked'
     }
-    return this.#askPassphraseAt - now > renewMillis ? null : 'lease_ending'
+    return this.#lease.endsWithin(renewMillis) ? 'lease_ending' : null
   }
 
   /** Raise a prompt for `why`, up until it is answered or a lock lands. */
@@ -1585,7 +1576,7 @@ export class Vault {
       const { draft, transientKey, sessionKey } = await this.#draftVaultProps(proof, deviceId)
       this.#drafted = { vault_id: draft.vault_id, device_id: deviceId }
       // Another device's vault, if one was made meanwhile, is held to the mark as it was before it.
-      const seenBefore = this.#checkedMark(await this.#deviceDB.getMark(this.#scope))
+      const seenBefore = this.#checkedMark(valOf(await this.#deviceDB.getMark(this.#scope)))
       const settled = frozenVaultProps(await damagedAs(this.#vaultDB.ensureVaultProps(draft), damagedVaultProps))
       const mark = await this.#heedMark(settled, { seenBefore, call: 'unlock' })
       // Vault props a read took up meanwhile are not put back: should they differ, the grant that
@@ -1720,7 +1711,7 @@ export class Vault {
   /** Forget the unlock, in memory and on this device: every lock goes through here. */
   async #shut() {
     this.#dropKey()
-    await this.#deviceDB.delLease(this.#scope)
+    valOf(await this.#deviceDB.delLease(this.#scope))
   }
 
   /** {@link shut}, and the snapshot told, even when the device store fails: the key is dropped at once. */
@@ -1761,7 +1752,7 @@ export class Vault {
     this.#cancelPendingShut()
     this.#standDownTakeUp()
     this.#vaultKey = null
-    this.#askPassphraseAt = null
+    this.#lease = null
   }
 
   #cancelPendingShut() {
@@ -1797,7 +1788,7 @@ export class Vault {
   }
   // --
 
-  // == [Lease]: deadlineFor, grantLease, fetchLease, takeUp, standDownTakeUp, takeUpLease, discardUnreadableLease
+  // == [Lease]: deadlineFor, grantLease, fetchLease, takeUp, standDownTakeUp, takeUpLease, discardLease
 
   /**
    * The deadline of an unlock taken up now by `proof`, in `call`. The lease renews whenever the
@@ -1809,7 +1800,7 @@ export class Vault {
    */
   #deadlineFor(proof: Proof, call: 'unlock' | 'revise'): number {
     const now = this.#clockNow()
-    const standing = this.#vaultKey !== null && this.#askPassphraseAt !== null && this.#askPassphraseAt > now ? this.#askPassphraseAt : null
+    const standing = this.#lease !== null && this.#unlockStands() ? this.#lease.ask_passphrase_at : null
     const renews = call === 'unlock' || proof.kind === 'passphrase'
     return renews || standing === null ? deadlineAfter(now, this.#leaseMillis) : standing
   }
@@ -1818,9 +1809,10 @@ export class Vault {
    * Grant this device a lease and take up the vaultKey until `until`, arming the expiry anew --
    * unless the handle has closed, the vault props the key was proven against no longer stand, or
    * `overtaken` (an ask's attempt, which its prompt's end stands down) is aborted: then nothing is
-   * taken up, and an overtaken attempt's lease, should it have been written already, is erased. The lease is a fresh leaseKey and the vaultKey wrapped under it. A
-   * record already written stays: a close is no lock, and a record of vault props no longer
-   * standing opens nothing.
+   * taken up, and an overtaken attempt's lease, should it have been written already, is erased.
+   * The lease is `Lease.grant`'s, a fresh leaseKey and the vaultKey wrapped under it; the write is
+   * the vault's. A record already written stays: a close is no lock, and a record of vault props
+   * no longer standing opens nothing.
    *
    * @returns True when the vault is now unlocked.
    */
@@ -1833,30 +1825,21 @@ export class Vault {
     // older lease could otherwise erase this one as it discards that.
     this.#standDownTakeUp()
     // The transient's last act: wrapped into this device's lease, then dropped.
-    const leaseKey = await makeLeaseKey()
-    const wrapped = await wrapKeyUnder(leaseKey, unlocked.transientKey, this.#leaseCtx(standing.vault_id, standing.unlock_epoch, until))
+    const lease = await Lease.grant(this, standing, unlocked, until)
     // An ask's attempt asks again before the write: its prompt may have ended while the key was wrapped.
     if (isOvertaken()) { return false }
-    await this.#deviceDB.putLease({
-      format:                  'safebyok-lease-v1',
-      ...this.#scope,
-      vault_id:                standing.vault_id,
-      unlock_epoch:            standing.unlock_epoch,
-      lease_key:               leaseKey,
-      vault_key_lease_wrapped: wrapped,
-      ask_passphrase_at:       until,
-    })
+    valOf(await this.#deviceDB.putLease(lease.props))
     // A prompt that ended under an ask's attempt -- a lock, an answer -- wins on this device too: the
     // lease the attempt just wrote is erased, and a hello's take-up that may have read it meanwhile
     // stands down, taking nothing up.
     if (isOvertaken()) {
       this.#standDownTakeUp()
-      await this.#deviceDB.delLease(this.#scope)
+      valOf(await this.#deviceDB.delLease(this.#scope))
     }
     if (isOutrun()) { return false }
     this.#armExpiry(until, this.#clockNow())
     this.#vaultKey = unlocked.sessionKey
-    this.#askPassphraseAt = until
+    this.#lease = lease
     return true
   }
 
@@ -1911,53 +1894,42 @@ export class Vault {
     // Asked afresh after each wait: a key change, or a refresh bringing new vault props, may land
     // during any of them.
     const isOvertaken = () => overtaken.aborted || this.#outrun(standing)
-    const kept = await this.#deviceDB.getLease(this.#scope)
+    const kept = valOf(await this.#deviceDB.getLease(this.#scope))
     // A key change since the read began makes what was read no lease to take up, nor to discard:
     // the lease standing now may be the one that change wrote.
     if (kept === null || isOvertaken()) { return }
-    const checked = Lease.safeParse(kept)
-    // A record naming some other scope is out of place, as unreadable as a mangled one.
-    const readable = checked.success && Names.sameScope(checked.data, this.#scope)
-    const now = this.#clockNow()
-    const fits = readable
-      && checked.data.vault_id === standing.vault_id
-      && checked.data.unlock_epoch === standing.unlock_epoch
-      && checked.data.ask_passphrase_at > now
-      && checked.data.ask_passphrase_at <= deadlineAfter(now, this.#leaseMillis)
-    if (! fits) {
-      if (isOvertaken()) { return }
-      // Discarded. Expired, or outdated by a change to the wayins or a shorter setting, is routine; unreadable is worth a word.
-      if (readable) { await this.#deviceDB.delLease(this.#scope) } else { await this.#discardUnreadableLease() }
+    // A record that is no lease, or another vault's, is unreadable.
+    const made = await outcomeOf(() => Lease.make(this, kept), unexpectedError)
+    if (! made.ok) {
+      await this.#discardLease(made.err)
       return
     }
-    const lease = checked.data
-    try {
-      // Nothing on the lease's path ever re-wraps the vaultKey, so no extractable handle exists
-      // on it at all.
-      const unwrapped = await unwrapKeyUnder(
-        lease.lease_key,
-        lease.vault_key_lease_wrapped,
-        this.#leaseCtx(standing.vault_id, standing.unlock_epoch, lease.ask_passphrase_at),
-        { extractable: false, usage: ['wrapKey', 'unwrapKey'] },
-      )
-      if (isOvertaken()) { return }
-      this.#armExpiry(lease.ask_passphrase_at, now)
-      this.#vaultKey = unwrapped
-      this.#askPassphraseAt = lease.ask_passphrase_at
-    } catch {
-      // A lease that no longer opens reads as "no lease": the safe failure. One overtaken is
-      // left alone, as the lease standing now may be the overtaking change's own, and the next
-      // hello judges it against the vault props that stand then.
-      if (isOvertaken()) { return }
-      await this.#discardUnreadableLease()
+    const lease = made.val
+    // Granted under a longer leaseHours than this handle's: it does not fit. Otherwise the lease
+    // judges itself against the vault props standing, and the clock.
+    const opened = lease.endsWithin(this.#leaseMillis) ? await lease.tryOpen(standing) : null
+    // One overtaken is left alone, as the lease standing now may be the overtaking change's own,
+    // and the next hello judges it against the vault props that stand then.
+    if (isOvertaken()) { return }
+    if (! opened?.ok) {
+      await this.#discardLease(opened?.err ?? null)
+      return
     }
+    this.#armExpiry(lease.ask_passphrase_at, this.#clockNow())
+    this.#vaultKey = opened.val
+    this.#lease = lease
   }
 
-  // Discard a lease that would not read or open, and say so -- once the record is erased, so it
-  // never claims a discard that failed. Neither the record nor the reason it failed is told:
-  // the record holds key material, and its validator's issues may quote it.
-  async #discardUnreadableLease() {
-    await this.#deviceDB.delLease(this.#scope)
+  /**
+   * Discard this device's lease, which did not fit or open, as `refusal` says, or under a longer
+   * leaseHours (null). Expired, or outdated by a change to the wayins or a shorter setting, is
+   * routine; a lease that would not read or open is worth a word, said once the record is erased,
+   * so it never claims a discard that failed. Neither the record nor what it failed is told: the
+   * record holds key material.
+   */
+  async #discardLease(refusal: VaultError | null) {
+    valOf(await this.#deviceDB.delLease(this.#scope))
+    if (refusal === null || refusal.refusalkind === 'vault_locked') { return }
     this.#logger.warn("This device's lease could not be read or would not open, so it was discarded: the vault opens locked, and asks for the passphrase again.", { call: 'hello' })
   }
   // --
