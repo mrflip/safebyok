@@ -207,9 +207,10 @@ refuses as `stale_write`, whatever revision it names -- its adapter resolves `nu
 vault keeps its lockbox. Nothing of what is retired is kept: no tombstone.
 
 An adapter that keeps a typed revision column reports from its delete (Postgres's `RETURNING`, the
-row a Convex mutation deletes), and compares the revision it reads back with
-`Expectations.retirementOf`, as the listing reads it; a key-value store reads the row in the step
-that removes it, and compares it the same way. The base class refuses an answer
+row a Convex mutation deletes); a key-value store reads the row in the step that removes it. Each
+compares the revision as the listing reads it: Postgres and the key-value stores through
+`Expectations.retirementOf`, and the Convex component, which runs on Convex's servers apart from
+the core, in its own mutation. The base class refuses an answer
 in any other shape as `corrupt_record`, saying the retirement may have landed. *That refusal, and
 `retired` for a damaged record holding no revision, are proven by the base class's own tests* (the
 core's `vault-db.test.ts` and `expectations.test.ts`), which can have an adapter answer badly and
