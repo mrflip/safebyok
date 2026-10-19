@@ -22,7 +22,7 @@ import { stableJsonify } from '../src/stable-jsonify'
 import { NameFloorBytes } from '../src/validators'
 import { TestDeriverNotice } from '../src/key-deriver-spec'
 import { Vault, type MakeVaultOpts } from '../src/vault'
-import { localVaultDB, type VaultDB, type VaultDBOpts } from '../src/vault-db'
+import { localVaultDB, type LockboxRetireExpectation, type VaultDB, type VaultDBOpts } from '../src/vault-db'
 
 /**
  * A cheap KeyDeriver for tests: one SHA-256 instead of 64 MiB of Argon2id, so a suite full of
@@ -1736,8 +1736,9 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       expect(lockbox?.revision_tok).to.eq('rev-one')
     })
 
-    it("refuses a malformed record or expectation, or vault props under another vault_id, as bad_record, before storage sees it", async () => {
+    it("refuses a malformed record or expectation, vault props under another vault_id, or a lockbox under another vault_key_epoch, as bad_record, before storage sees it", async () => {
       const vaultDB = await withVaultProps()
+      await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'kept'), noBoxYet)
       const unparsable = boxOf('anthropic', 'one', { sidecar_json: 'not json' })
       await expectRefusal(vaultDB.fetchOrCreateVaultProps(vaultPropsOf('u1', { unlock_epoch: 0 })), 'bad_record')
       await expectRefusal(vaultDB.updateBox(scopeOf('u1'), unparsable, noBoxYet), 'bad_record')
@@ -1746,10 +1747,12 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       await expectRefusal(vaultDB.updateVaultProps(vaultPropsOf('u1', { unlock_epoch: 0 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'bad_record')
       await expectRefusal(vaultDB.updateVaultProps(vaultPropsOf('u1', { vault_id: 'vault-id-new', unlock_epoch: 2 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'bad_record')
       await expectRefusal(vaultDB.retireBox(scopeOf('u1'), 'anthropic', retiring('')), 'bad_record')
-      await expectRefusal(vaultDB.retireBox(scopeOf('u1'), 'anthropic', { vault_id: 'vault-id-u1' } as unknown as Parameters<VaultDB['retireBox']>[2]), 'bad_record')
+      await expectRefusal(vaultDB.retireBox(scopeOf('u1'), 'anthropic', { vault_id: 'vault-id-u1' } as LockboxRetireExpectation), 'bad_record')
       await expectRefusal(vaultDB.retireVault(scopeOf('u1'), { vault_id: '' }), 'bad_record')
       expect(await vaultDB.readVaultProps(scopeOf('u1'))).to.deep.equal(vaultPropsOf('u1'))
-      expect(await vaultDB.listBoxes(scopeOf('u1'))).to.have.lengthOf(0)
+      expect(await vaultDB.listBoxes(scopeOf('u1'))).to.have.lengthOf(1)
+      const kept = await vaultDB.readBox(scopeOf('u1'), 'anthropic')
+      expect(kept?.revision_tok).to.eq('rev-kept')
     })
   })
 
