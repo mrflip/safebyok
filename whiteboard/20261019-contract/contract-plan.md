@@ -16,7 +16,7 @@ this line.
   (56 kB; `grep -n '^#'` is its outline). The handoff says when a ruling has changed it since.
 * **Sprint doc:** https://claude.ai/code/artifact/362ec68d-5bf3-46aa-a379-59a9c8bfb548
   (*Open Matters*, *Resolved*, *Progress*).
-* **Status:** phase A filed; passes 1-2 done; B1 (#201) and `a_sec` (#203) in review; B3 (#202) reworking a flagged finding.
+* **Status:** B1 (#201) and B3 (#202) filed in line; `a_sec` (#203) in its second review; B2 cuts once `a_sec` is restacked onto B3.
 
 ## How this plan relates to the preplan
 
@@ -190,6 +190,15 @@ over `Object.keys(vault.snapshot)`; `created_elsewhere` and `damaged_wayin` prov
 
 *Orchestrator (line):* B's line is restacked as B1 → B3 → `a_sec` → B2 → B4 → B5: B3 and
 `a_sec` each go onto the line as they file, and B2 cuts from the top once both are in.
+
+*Review (B3, #202, `flagged` then `fixed`, high, two reviews):* crypto moved unchanged. Flagged:
+boxes read `vault_id`/`vault_key_epoch` off the lagging snapshot getters; reworked to take a
+`holder` (B1's shape) from one source. Fixed along the way: `tryOpen` on an uncreated vault,
+`vault.clock` frozen, the key checked before a stored box is made (a race refused `absent_vault`),
+size checked before any crypto. Left: openBox on a foreign record tells bad news (row);
+dual-package `instanceof` (row); private `#openBox` renamed at C4. *Restack onto B1:* the vault
+now freezes every props record it takes up (`frozenVaultProps`), and boxes, ways in and the
+snapshot share that one object (a2b45988, unreviewed: phase B's passes cover it).
 
 *Review (B1, #201, `fixed`, high):* crypto moved unchanged; the vault reads `proof.passphrase` only
 for a new passphrase's strength test. Fixed: `vault.wayins` typing; each way in's `holder` was the
