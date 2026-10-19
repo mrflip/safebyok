@@ -1105,8 +1105,7 @@ export class Vault {
   }
   // The ways in of each vault props record the vault has held, made once per record. Every record
   // the vault holds is frozen as it takes it up (see frozenVaultProps), so a way in's holder, a
-  // box's, the snapshot's props and the record the vault works from are one object, and a host
-  // holding it can change none of them.
+  // box's and the record the vault works from are one object, which nothing can change.
   readonly #modelled = new WeakMap<VaultProps, readonly (PassphraseWayin | PasskeyWayin)[]>()
   #wayinsOf(standing: VaultProps): readonly (PassphraseWayin | PasskeyWayin)[] {
     const known = this.#modelled.get(standing)
