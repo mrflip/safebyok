@@ -184,7 +184,12 @@ up for a poor name, or marks off a stanza that should be its own function is a s
 ## Tests
 
 Vitest, in each package's `tests/`, path for path with its `src/`: `src/foo/bar.ts` is tested in
-`tests/foo/bar.test.ts`. Test and build artifacts never land in `src/`.
+`tests/foo/bar.test.ts`. A test file that passes about 1,500 lines becomes a folder named for its
+module, `tests/foo/bar/`, of `bar-<theme>.test.ts` files whose themes are what a reader would look
+for (`bar-races`, `bar-refusals`), with the helpers two or more of them share in a `world.ts`
+beside them; no `bar.test.ts` stays outside the folder, and no `describe` title changes for the
+move. A module reached only through another's public verb (`vault-opts.ts` through `Vault.make`)
+is tested beside that verb. Test and build artifacts never land in `src/`.
 
 * **Test helpers live in one module, `tests/test-helpers.ts`, star-imported as `TH`**:
   `import * as TH from './test-helpers'`, then `TH.scopeOf('u1')`. It exports everything. The
