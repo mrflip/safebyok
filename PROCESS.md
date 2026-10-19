@@ -35,6 +35,8 @@ An ordered series of threads issued at once is a **sprint**, run by `/sprint`
 (`.claude/skills/sprint/SKILL.md`) through `thread-worker` and `thread-reviewer` agents.
 Open questions too many for chat go to a doc's **Open Matters** tab, run by `/turbochat`
 (`.claude/skills/turbochat/SKILL.md`): the Coach flips a row's state, and agents act on that.
+A set of open PRs is made one merge line by `/restacker` (`.claude/skills/restacker/SKILL.md`),
+which rebases in a clone of its own, tests once at the tip, and force-pushes only under named leases.
 
 ## The history we keep
 
