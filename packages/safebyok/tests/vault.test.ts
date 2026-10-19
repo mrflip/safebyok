@@ -2458,7 +2458,6 @@ describe("damaged lockboxes", () => {
       expect(boxlabelsOf(fresh)).to.deep.equal(['openai'])
       expect(await fresh.readBox('openai')).to.eq('sk-openai-fake')
     })
-
   }
 
   // The first names no revision, so a store over it is refused (below).
