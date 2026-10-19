@@ -13,4 +13,12 @@ they disagree. Workers look things up here; they do not write it.
 
 ## Discoveries
 
-(none yet)
+* *Thread 7 (#176, filed):* the sidecar is *server-readable* in VOCABULARY.md, README, the
+  `storeBox()` and `Sidecar` doc blocks and `checkStoreOpts`'s message. In `src/vault.ts` it
+  touched the `storeBox()` doc block's sidecar paragraph and one clause of its damaged-record
+  paragraph ("server-readable fields"), `recordOpens`' doc block, a comment in `storeBox`, and the
+  `checkStoreOpts` message; a fixture string in `tests/vault.test.ts`. Any thread rewriting
+  those lines meets it at the restack.
+* *#176 review:* `writeOver`'s clear-then-write over a damaged box naming no revision can lose a
+  write silently (A retires, A writes, B retires A's write, B writes). Thread 2's honor-and-warn
+  only logs it. It is with the Coach (bring back thread 4?).

@@ -5,7 +5,7 @@ Date: 2026-10-19. Issued by: the Coach (`/sprint reform2`, from the preplan besi
 Sprint branch: `20261019-reform2`. Sprint doc (Open Matters, Progress, Resolved):
 https://claude.ai/code/artifact/62febfc3-47ee-4a7c-b99e-ea494b4b169c
 
-**Status:** planned; threads 1 and 7 starting.
+**Status:** thread 7 filed (#176); thread 1 building.
 
 The Coach struck threads 3 (`one_look`), 4 (`no_clear`) and 5 (`newer_lockbox`) after issuing
 the preplan. Their text is kept in the preplan; this plan keeps their numbers so the preplan and
@@ -178,6 +178,15 @@ the root's docs). A changeset: `--empty` unless the doc-block wording reaches a 
 `.d.ts`, then a `patch`-sized `minor` entry saying the docs changed. Depends on nothing: cut from
 `origin/main`, beside thread 1. Size: small. Model: `sonnet`. Note the Coach's TODO speaks of
 the sidecar as "server accessible"; the preplan's word, *server-readable*, is the one to build.
+
+*Review:* `fixed` ([#176](https://github.com/mrflip/safebyok/pull/176)). Fixed: the
+concurrency paragraph named the *second* call as the refused one (it is whichever lands second);
+the overview read as though ciphertext were unreadable by the server. Then, by directive, the
+worker brought three leftover sentences (`checkStoreOpts`'s message, `recordOpens`, a `storeBox`
+comment) to *server-readable*. Left: the clear-then-write lost write over a damaged box naming
+no revision (old code; to the Coach, Rec bring back thread 4); "a usage count" as a sidecar
+example (to the Coach); "server-readable" names more than the sidecar (to the Coach, with the
+later "public fields" sweep). Filed at `4310fc27`.
 
 ---
 
