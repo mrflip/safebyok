@@ -10,19 +10,21 @@ Branch `20261019-box`, [PR #202](https://github.com/mrflip/safebyok/pull/202), s
     meaning: the signature names no key). Only `decorate` is used. **B1's pair wins at the restack.**
   * `box.ts` is the class. The Zod schema is **`BoxRecord`** (was `Box`; the stored format,
     `safebyok-box-v6`, unchanged), and **`Box`** is the model:
-    * `Box.make(vault, record)`: validates through `BoxRecord` (`bad_record`, quoting nothing, no
+    * `Box.make(vault, record, holder)`: validates through `BoxRecord` (`bad_record`, quoting nothing, no
       cause); `props` a frozen copy (its two `Ciphered` frozen too); the instance frozen; every
       stored field first-class, `sidecar` the parse of `sidecar_json`, frozen through by a
       `JSON.parse` reviver; `vault`, `props`, `summary` attached by `decorate`; `toJSON()` is `props`.
-    * `Box.seal(vault, boxlabel, whisper, vaultKey, { sidecar, over })`: `putBox`'s old sealing.
+    * `Box.seal(vault, boxlabel, whisper, holder, vaultKey, { sidecar, over })`: `putBox`'s old sealing,
+      now `planSeal` (vouch, settle the sidecar, no key made) then `sealPlanned` (the crypto).
       Fresh `boxKey` and `revision_tok`, `boxCtx` rebuilt from format, scope, `vault_id`, purpose
       and the whole visible header; `registered_at` and the sidecar carry forward from `over` only
       when it opens (the old `recordOpens`, now `(await over.tryOpen(key)).ok`, inside the seal).
       Ends in `Box.make`, so what it returns has passed the schema.
     * `box.tryOpen(vaultKey)` / `box.open(vaultKey)`: the old `decipherBox` and
       `unwrappingKeyFor`. `bad_option` for a non-CryptoKey, `absent_vault` with no vault id.
-    * `BoxVault = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_id' | 'vault_key_epoch' | 'clock'>`:
-      the slice a box reads; the tests' stub is typed as it. `heldListing`: a listing entry
+    * `BoxVault = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'clock'>`, the slice a box
+      reads (the tests' stub), and `BoxHolder = Pick<VaultProps, 'vault_id' | 'vault_key_epoch'>`,
+      the vault props it lies under, passed by the vault from `#vaultProps` at each call (B1's shape). `heldListing`: a listing entry
       copied and frozen through. `checkedWhisper`, `checkedSidecar`: the refusals moved from the vault.
   * `vault.ts` (reading, sealing and box sections only, plus three getters): `get logger()`,
     `get clock()`, `get keyDeriver()` beside `leaseMillis`; `#tryPutBox` seals through `Box.seal`
@@ -40,7 +42,6 @@ Branch `20261019-box`, [PR #202](https://github.com/mrflip/safebyok/pull/202), s
   * Tests: `tests/box.test.ts` (the record table, now `describe("BoxRecord")`, then `Box.make`,
     `Box.seal`, `box.tryOpen`, `box.open`), `tests/vault/vault-boxes.test.ts` (`vault.openBox`,
     `what a vault hands its boxes`), `tests/utils.test.ts`.
-  * Docs: VOCABULARY's box row, the core README's cast (`openBox`), `notes/security.md` (sonnet).
 * **Decisions taken**:
   * **The Contract's argument order**, `Box.make(vault, record)` and `Box.seal(vault, ...)`, over
     the thread text's `make(record)` and `seal(boxlabel, ..., vault, ...)`: the Contract is the spec.
@@ -68,11 +69,11 @@ Branch `20261019-box`, [PR #202](https://github.com/mrflip/safebyok/pull/202), s
   * **`isOutcomeShaped` is not moot**: it runs in the VaultDB base on an adapter's raw answer, before
     any `Box.make`, and gives the better message (unwrap with `valOf`). `Box.make` would refuse an
     Outcome-shaped record too, as `bad_record`, but never sees one from storage.
-  * A box reads `vault_id` and `vault_key_epoch` off the vault's snapshot getters. The private
-    vault props run ahead of the snapshot only inside a first unlock's awaits, when no key is in
-    hand; `putBox` reads its expectation and the seal reads the vault in one synchronous run. A
-    stale read could only make a box fail to open, never open wrongly.
-  * `box.ts` cannot import `vault-opts.ts` (`readClock`): `vault-opts` -> `vault-db` -> `box` is a cycle.
+  * **Review rework**: boxes first read `vault_id` and `vault_key_epoch` off the snapshot getters
+    while the write's expectation read `#vaultProps`: safe by timing only. Now `putBox` reads
+    `#vaultProps` once and hands that one object to the seal (`holder`) and the expectation; the
+    vouching opens `over` under the same holder; the kept sidecar is weighed before any key is
+    made (`planSeal` -> fit check -> `sealPlanned`), the whisper serialized once.
 * **For C1, C2, C4**: `putBox(expect, box)` takes `box.props`; the winner in `meta.box_stored` is a
   `BoxRecord` at the VaultDB, and `vault.openBox` opens it as it comes. `#getBoxOrThrow` already
   returns a `Box`, so C4's `getBox` returns it in place of `#decipherOrCatchUp`'s whisper.
