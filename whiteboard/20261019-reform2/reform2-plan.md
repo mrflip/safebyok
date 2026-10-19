@@ -67,6 +67,9 @@ The preplan's ground rules hold, verbatim:
 
 ## Order
 
+*Orchestrator:* threads 9 and 10 were added from the Coach's rulings; both stand on 8, and 10
+is restacked onto 9 at wrap-up, so the line is 1 → 2 → 6 → 7 → 8 → 9 → 10.
+
 Threads 1, 2 and 6 stack in one line from `origin/main`: 2 on 1, 6 on 2, since each touches
 `vault-db.ts` and `tests/test-helpers.ts` where the one before did. Thread 7 is documents only,
 starts from `origin/main`, runs beside 1, and joins the line at wrap-up. Thread 8 (the preplan's
@@ -226,18 +229,67 @@ line's tip once 7 is restacked onto 6. Size: small. Model: `sonnet`.
 
 ---
 
+Next thread: 9, `damaged_warning`
+
+*Orchestrator:* from the Coach's ruling (2026-10-19) on the retire-first mismatch: "yes. Once a
+record exists there must always be a record (tombstone or valid) while the vault exists.
+Clearing a damaged box with an old revision id should still warn, with something in there
+making clear it was a damaged record".
+
+Honor-and-warn stands. When a retire the vault makes finds another revision than it showed
+(`retired_other`) and the lockbox it showed was listed damaged, the warning says so: the
+`retireBox()` warning (today "The lockbox retired was not the revision this device showed...")
+says the lockbox this device showed was a damaged one, and both it and `writeOver`'s retire-first
+warning (which already says "Storing over a damaged lockbox...") carry `damaged: true` in the
+log context beside `call`, so a host can branch on it. Neither names a revision or a boxlabel.
+Tests: `retireBox()` over a damaged box meeting `retired_other` warns once with the damaged
+wording and `damaged: true`; over a sound box, without either; the #178 lost-write test checks
+the flag.
+
+Gloss: touches `vault.ts` (`retireBox`, `writeOver`), `tests/vault.test.ts`, README's
+honor-and-warn paragraph at the end of *Damaged lockboxes* if it quotes the warning, a
+changeset. Depends on 8 (the line's tip). Size: small. Model: `sonnet`. The invariant itself
+(always a record while the vault stands) is the deferred tombstones' work, not this thread's.
+
+---
+
+Next thread: 10, `visible`
+
+*Orchestrator:* from the Coach's rulings (2026-10-19): on the sidecar's word, "how about
+\"visible\"?"; on the record-general "public fields" wording, "yeah, visible, in a sweep -- you
+can leave intermediate rewordings as is if that's easiesst (i.e. it's ok if it changed and then
+is changed back)".
+
+The trust class is *visible*: authenticated (bound into the lockbox's or record's encryption
+context, so a change in storage makes it refuse to open) but never encrypted, readable by anyone
+who can read the database. VOCABULARY.md gives *visible* an entry of its own, naming the fields
+it covers (a lockbox's label, ids, times and sidecar; the like on vault props and wayins), and
+the sidecar's entry points to it. Sweep "server-readable" (thread 7's word) and the
+record-general "public fields / public face / public shell" in prose, doc blocks, error messages
+and the summary changeset to *visible*. Code identifiers stay (GraphQL's `'plain'` class in
+`fields.ts` is a separate, unruled matter).
+
+Gloss: touches VOCABULARY.md, the core and adapter READMEs, doc blocks in `vault.ts`, `types.ts`,
+`vault-db.ts`, `lockbox.ts`, `checkStoreOpts`'s message, the graphql `vault-schema.ts`
+descriptions, thread 8's summary changeset, and a changeset of its own. Grep `packages/` and the
+root's docs (`--exclude-dir={whiteboard,winboard,node_modules,dist}`) for `server-readable`,
+`public field`, `public face`, `public shell`, and "public" near "sidecar". Depends on 8; runs
+beside 9 and is restacked onto it. Size: small. Model: `sonnet`.
+
+---
+
 ## For the Coach
 
 Each is a row in the sprint doc's *Open Matters*; in YOLO the sprint builds the Rec meanwhile.
 
-* Thread 2's default on a revision mismatch is honor-and-warn through the logger, until the
-  bad-news mechanism exists to raise it as a condition. Confirm, or make it strict (refuse as
-  stale) for now.
-* Thread 6's kind name: `bad_record`. Say if another fits the family better.
-* With thread 4 struck, `writeOver` keeps its retire-then-write. Thread 2 gives a
-  `retired_other` in its middle the same honor-and-warn as `retireBox()`. Say if it should
-  refuse there instead.
+* Ruled 2026-10-19: honor-and-warn ("yes", both places); `bad_record` ("Fine for now").
+  The rest live in the sprint doc's *Open Matters*.
 
 ## Deferred
 
 The preplan's *Deferred* list, plus threads 3, 4 and 5.
+
+*Orchestrator:* the Coach's invariant for the tombstones work (2026-10-19): once a record exists
+there must always be a record, a tombstone or a valid one, while the vault exists. Today's
+clear-then-write over a damaged box naming no revision breaks it for the moment between its two
+calls.

@@ -7,9 +7,11 @@ they disagree. Workers look things up here; they do not write it.
 
 * 2026-10-19: planned. The Coach struck threads 3, 4 and 5. The line is 1 → 2 → 6 → 8; thread 7
   (documents) runs beside it from `origin/main` and joins the line at wrap-up.
-* YOLO decisions awaiting the Coach's word (sprint doc, *Open Matters*): thread 2's
-  honor-and-warn on `retired_other` (in `retireBox()` and in `writeOver`'s retire); thread 6's
-  kind name `bad_record`.
+* Coach's rulings, 2026-10-19: honor-and-warn stands, in both places; `bad_record` "fine for
+  now"; the trust class is *visible* (thread 10 sweeps it); the warning over a damaged box says
+  so (thread 9); each thread moves its own size budgets (sprint skill, #181, for later
+  sprints; this sprint keeps thread 8's `--write`). Invariant for the deferred tombstones:
+  once a record exists there is always a record (tombstone or valid) while the vault exists.
 
 ## Discoveries
 
