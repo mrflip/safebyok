@@ -2,6 +2,7 @@ import * as Z from 'zod/mini'
 import { deriveWrappingKey, fromB64, importWrappingKeyBytes } from './crypto'
 import { VaultError } from './errors'
 import type { KeyDeriver } from './key-deriver'
+import { hostThrewRefusal } from './outcome'
 import { PassphraseKeyBytes } from './key-deriver-spec'
 import type { PasskeyAnswer, WayinKind } from './types'
 import { decorate } from './utils'
@@ -208,10 +209,17 @@ const isAllZero = (bytes: Uint8Array): boolean => bytes.reduce((seen, byte) => s
  * a deriver handing back bytes it kept from an earlier call, wiped since, would. The bytes the
  * deriver handed back are zeroed once imported, whether or not the import succeeds, and when
  * refused for their length: they are ours the moment they are returned, and a copy lingering in
- * memory helps no one. Shared memory is refused untouched.
+ * memory helps no one. Shared memory is refused untouched. What the deriver throws is refused as
+ * {@link hostThrewRefusal} says: a condition as itself, anything else as 'unexpected_error'.
  */
 const passphraseKeyOf = async (keyDeriver: KeyDeriver, passphrase: string, saltBytes: Uint8Array): Promise<CryptoKey> => {
-  const handed: unknown = await keyDeriver.deriveKeyBytes(passphrase, saltBytes)
+  let handed: unknown
+  try {
+    handed = await keyDeriver.deriveKeyBytes(passphrase, saltBytes)
+  } catch (err) {
+    // The deriver heard the passphrase: what it threw may quote it.
+    throw hostThrewRefusal(err)
+  }
   if (! ArrayBuffer.isView(handed)) { throw notKeyBytes() }
   if (isSharedMemory(handed)) {
     throw new VaultError('bad_option', 'keyDeriver handed back key bytes in shared memory (a SharedArrayBuffer), which WebCrypto will not import and other threads could read: hand back a fresh Uint8Array.')

@@ -401,6 +401,27 @@ describe("PassphraseModal", () => {
       expect(told.cause).to.be.undefined
     })
 
+    it("reports to React nothing of a key deriver's or strength test's own VaultError, which heard the passphrase", async () => {
+      for (const quoting of ['keyDeriver', 'passphraseStrengthTest'] as const) {
+        const misuse = new VaultError('bad_option', 'pw-the-passphrase is not a passphrase I take.')
+        const opts = quoting === 'keyDeriver'
+          ? TH.memoryVaultOpts({ keyDeriver: { ...TH.testDeriver, deriveKeyBytes: () => Promise.reject(misuse) } })
+          : TH.memoryVaultOpts({ passphraseStrengthTest: () => Promise.reject(misuse) })
+        const vault = await TH.settledVault(opts)
+        const { reported, unmount } = TH.renderReporting(<PassphraseModal ask={TH.askOf(vault)} onDone={noop} />)
+        fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw-the-passphrase' } })
+        fireEvent.click(screen.getByText('Create vault'))
+        expect(await screen.findByText('Something went wrong')).to.not.be.null
+        expect(reported).to.have.lengthOf(1)
+        const told = reported[0] as VaultError
+        expect(told.refusalkind).to.eq('unexpected_error')
+        expect(told.message).to.not.include('pw-the-passphrase')
+        expect(told.cause).to.be.undefined
+        unmount()
+        vault.close()
+      }
+    })
+
     it("closes its trouble notice as a lock lands, answering declined once, whatever its Close says after", async () => {
       const landing = TH.held()
       const heard: ProofAnswer[] = []

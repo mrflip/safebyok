@@ -431,6 +431,28 @@ describe("the key deriver seam", () => {
     expect(fresh.getSnapshot().state).to.eq('locked')
   })
 
+  it("refuses unexpected_error for a deriver that throws, a VaultError of misuse included: what it threw the cause, never the refusal's message, as it heard the passphrase", async () => {
+    for (const thrown of [new Error('could not derive pw-the-passphrase'), new VaultError('bad_option', 'pw-the-passphrase is too short to derive from.')]) {
+      const world = makeWorld()
+      const throwing = { ...TH.testDeriver, deriveKeyBytes: () => Promise.reject(thrown) }
+      const vault = await world.open({ keyDeriver: throwing })
+      const err = await TH.expectRefusal(vault.unlock('pw-the-passphrase'), 'unexpected_error')
+      expect(err.cause).to.eq(thrown)
+      expect(err.message).to.not.include('pw-the-passphrase')
+      expect(vault.getSnapshot().state).to.eq('absent')
+    }
+  })
+
+  it("keeps a condition a deriver raises as it came, for the caller to show or retry", async () => {
+    const world = makeWorld()
+    await world.openUnlocked('pw')
+    const empty = new VaultError('wrong_passphrase', "A passphrase can't be empty.")
+    const refusing = { ...TH.testDeriver, deriveKeyBytes: () => Promise.reject(empty) }
+    const fresh = await world.open({ deviceDB: memoryDeviceDB(), keyDeriver: refusing })
+    const err = await TH.expectRefusal(fresh.unlock('pw'), 'wrong_passphrase')
+    expect(err).to.eq(empty)
+  })
+
   it("takes a key whose one nonzero byte is its last: only all zeros is refused", async () => {
     const world = makeWorld()
     const lastByteSet = new Uint8Array(32)

@@ -260,9 +260,12 @@ focus to the passphrase field. Your error boundary never sees it.
 **React reports it to you.** Each component catches such a failure in an error boundary of its
 own, so React hands the error to the root's `onCaughtError`: by default the console, with the
 component stack, in development and production alike. It arrives with nothing the user typed: a
-`VaultError` keeps its kind, message and meta but never its `cause` (a key deriver's or strength
-test's throw, which heard the passphrase), and anything else -- a `passphraseAdvice` that threw,
-say -- arrives as a fixed `unexpected_error` quoting none of it. Hook your error tracker there:
+`VaultError` keeps its kind, message and meta but never its `cause`; whatever a key deriver or
+strength test throws, a `VaultError` of its own included, is the vault's `unexpected_error` with
+that throw as the cause, as each heard the passphrase; and anything else -- a `passphraseAdvice`
+that threw, say -- arrives as a fixed `unexpected_error` quoting none of it. (A condition one of
+them raises, such as the strength test's word list failing to load, is shown in the dialog, and
+never reported.) Hook your error tracker there:
 
 ```tsx
 createRoot(rootElement, {

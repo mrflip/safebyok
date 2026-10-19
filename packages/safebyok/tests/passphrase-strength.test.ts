@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { StrongVerdict, checkStrengthTest, checkStrongEnough, type PassphraseStrengthTest, type PassphraseVerdict } from '../src/passphrase-strength'
 import { zxcvbnPassphraseTest } from '../src/zxcvbn-passphrase-test'
 import type { VaultScope } from '../src/types'
+import { VaultError } from '../src/errors'
 import * as TH from './test-helpers'
 
 /** The scope the tests hand a strength test. */
@@ -58,10 +59,27 @@ describe("checkStrongEnough", () => {
     })
   }
 
-  it("throws whatever the test throws", async () => {
-    const thrown = new Error('the strength service is down')
+  it("refuses unexpected_error for a test that throws, what it threw the cause and nothing of it in the message", async () => {
+    const thrown = new Error('could not judge acme acme acme')
     const broken: PassphraseStrengthTest = () => { throw thrown }
-    await expect(checkStrongEnough(broken, 'acme acme acme', scope)).rejects.toThrow(thrown)
+    const err = await TH.expectRefusal(checkStrongEnough(broken, 'acme acme acme', scope), 'unexpected_error')
+    expect(err.cause).to.eq(thrown)
+    expect(err.message).to.not.include('acme acme acme')
+  })
+
+  it("refuses unexpected_error for a test that throws a VaultError of misuse, so its message, which may quote the passphrase, is never the refusal's own", async () => {
+    const thrown = new VaultError('bad_option', 'acme acme acme is no passphrase I can judge.')
+    const broken: PassphraseStrengthTest = () => { throw thrown }
+    const err = await TH.expectRefusal(checkStrongEnough(broken, 'acme acme acme', scope), 'unexpected_error')
+    expect(err.cause).to.eq(thrown)
+    expect(err.message).to.not.include('acme acme acme')
+  })
+
+  it("keeps a condition the test raises as it came, for the caller to show or retry", async () => {
+    const thrown = new VaultError('storage_unavailable', 'The passphrase checker could not be loaded: try again shortly.')
+    const broken: PassphraseStrengthTest = () => Promise.reject(thrown)
+    const err = await TH.expectRefusal(checkStrongEnough(broken, 'acme acme acme', scope), 'storage_unavailable')
+    expect(err).to.eq(thrown)
   })
 })
 

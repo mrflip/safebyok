@@ -1,5 +1,6 @@
 import * as Z from 'zod/mini'
 import { VaultError } from './errors'
+import { hostThrewRefusal } from './outcome'
 import type { VaultScope } from './types'
 
 /**
@@ -44,10 +45,18 @@ const passphraseVerdict = Z.union([
 /**
  * `passphrase` put to `strengthTest` for the vault named by `scope`, refused with kind
  * 'weak_passphrase' and the test's reason when it finds it weak; kind 'bad_option' for a test that
- * answers anything but a verdict. Whatever the test throws, this throws.
+ * answers anything but a verdict. What the test throws is refused as `hostThrewRefusal` says: a
+ * condition (its word list out of reach) as itself, anything else as 'unexpected_error', the throw
+ * its cause, as the test heard the passphrase.
  */
 export const checkStrongEnough = async (strengthTest: PassphraseStrengthTest, passphrase: string, scope: VaultScope): Promise<void> => {
-  const checked = passphraseVerdict.safeParse(await strengthTest(passphrase, scope))
+  let verdict: unknown
+  try {
+    verdict = await strengthTest(passphrase, scope)
+  } catch (err) {
+    throw hostThrewRefusal(err)
+  }
+  const checked = passphraseVerdict.safeParse(verdict)
   if (! checked.success) {
     throw new VaultError('bad_option', 'passphraseStrengthTest answered something other than a verdict: { strong: true }, or { strong: false, reason } with the reason as non-empty text.')
   }

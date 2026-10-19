@@ -1,4 +1,4 @@
-import { VaultError, isVaultError } from './errors'
+import { RefusalFamilyForKind, VaultError, isVaultError } from './errors'
 import * as Refusals from './refusals'
 
 /**
@@ -76,6 +76,21 @@ export const outcomeOf = async <ValT>(thunk: () => ValT | Promise<ValT>, otherwi
  */
 export const unexpectedError = (thrown: unknown): VaultError => (
   new VaultError('unexpected_error', "Something went wrong that safebyok did not expect: a bug, in safebyok or in a function the app handed it (a key deriver, a passphrase test, a passkey maker). Nothing was retried, and a retry is unlikely to help; what was thrown is this error's cause.", { cause: thrown ?? new Error('Nothing was thrown with it.') })
+)
+
+/**
+ * The refusal in place of what a function the app handed the vault threw, when that function
+ * hears the passphrase -- the key deriver, the passphrase strength test: a condition it raised
+ * (its word list out of reach, an empty passphrase) as itself, from this copy of safebyok or
+ * another loaded beside it, for the caller to show or retry; anything else, a VaultError of misuse
+ * among them, as 'unexpected_error' with the throw as its cause, so that no message of its, which
+ * may quote the passphrase, is ever the refusal's own.
+ *
+ * @param thrown - What the function threw, as it came.
+ * @returns The refusal.
+ */
+export const hostThrewRefusal = (thrown: unknown): VaultError => (
+  isVaultError(thrown) && RefusalFamilyForKind[thrown.refusalkind] !== 'misuse' ? thrown : unexpectedError(thrown)
 )
 
 /**
