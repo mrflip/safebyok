@@ -1192,6 +1192,47 @@ describe("every data call, through ensureLease", () => {
     })
   }
 
+  it("reads storage once before refusing absent_box, so a box another device stored meanwhile is asked for, though storage pushes no changes", async () => {
+    const world = makeWorld()
+    const maker = await world.openUnlocked('pw')
+    await maker.lock()
+    maker.close()
+    const getProof = typingPw()
+    const vault = await world.open({ vaultDB: world.deafVaultDB(), getProof })
+    const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
+    await elsewhere.unlock('pw')
+    await elsewhere.putBox('anthropic', 'sk-fake')
+    world.advance(MinuteMillis)
+    expect(boxlabelsOf(vault)).to.deep.equal([])
+    expect(await TH.expectGood(vault.tryGetBox('anthropic'))).to.eq('sk-fake')
+    expect(getProof).toHaveBeenCalledOnce()
+  })
+
+  it("still refuses absent_box with no prompt once that one read finds nothing, and reads no more than once", async () => {
+    const getProof = typingPw()
+    const { world, vault } = await lockedVaultWith({ getProof })
+    const reads = vi.spyOn(world.vaultDB, 'getVaultProps')
+    await TH.expectRefusal(vault.getBox('openai'), 'absent_box')
+    await TH.expectRefusal(vault.delBox('openai'), 'absent_box')
+    expect(reads).toHaveBeenCalledTimes(2)
+    expect(getProof).not.toHaveBeenCalled()
+  })
+
+  it("asks for a box delBox finds in that one read, and removes it", async () => {
+    const world = makeWorld()
+    const maker = await world.openUnlocked('pw')
+    await maker.lock()
+    maker.close()
+    const getProof = typingPw()
+    const vault = await world.open({ vaultDB: world.deafVaultDB(), getProof })
+    const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
+    await elsewhere.unlock('pw')
+    await elsewhere.putBox('anthropic', 'sk-fake')
+    await TH.expectGood(vault.tryDelBox('anthropic'))
+    expect(getProof).toHaveBeenCalledOnce()
+    expect(boxlabelsOf(vault)).to.deep.equal([])
+  })
+
   it("refuses absent_box at once for a vault never made, rather than asking to make one only to find nothing in it", async () => {
     const world = makeWorld()
     const getProof = typingPw()
