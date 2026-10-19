@@ -214,8 +214,9 @@ the guidance of Part 4), #189 (Part 3, stacked). Where the work differs from the
   `tests/test-helpers/*.ts`, and `tests/test-helpers.test.ts` (1,318 lines) stayed whole, its
   doc block saying why, so no test file sits among the shipped parts.
 * **Part 3**: `src/vault-opts.ts` (416) and `src/retire-damaged-vault.ts` (115); `vault.ts` is
-  2,208 lines, not 1,900. `src/local-vault-db.ts` was not made: about a dozen importers changed
-  for 160 lines out of a 1,020-line file. `retireDamagedVault`'s tests, a public verb of their own,
+  2,208 lines, not 1,900. `src/local-vault-db.ts` (176) was made after all, the Coach being
+  content with a dozen importers changing: `vault-db.ts` is 854 lines, and its two `localVaultDB`
+  test blocks are `tests/local-vault-db.test.ts` (171). `retireDamagedVault`'s tests, a public verb of their own,
   became `tests/retire-damaged-vault.test.ts`.
 * **Part 4**: STYLE.md and CLAUDE.md edits ride in #188, in the commits they describe, at the
   Coach's word that guidance needs no PR of its own. Two empty changesets, one per PR.

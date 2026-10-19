@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { cipherCtx, decipherBytes, deriveWrappingKey, fromB64, importWrappingKeyBytes, makeVaultKey, unwrapKeyUnder } from '../src/crypto'
 import { memoryDeviceDB } from '../src/device-db'
 import { memoryStore } from '../src/string-store'
-import { localVaultDB } from '../src/vault-db'
+import { localVaultDB } from '../src/local-vault-db'
 import * as Wayin from '../src/wayin'
 import * as TH from './test-helpers'
 

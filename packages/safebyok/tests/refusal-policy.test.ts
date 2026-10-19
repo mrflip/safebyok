@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../src/errors'
-import { localVaultDB } from '../src/vault-db'
+import { localVaultDB } from '../src/local-vault-db'
 import { memoryStore } from '../src/string-store'
 import * as RefusalPolicy from '../src/refusal-policy'
 import * as TH from './test-helpers'
