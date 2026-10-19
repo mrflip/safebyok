@@ -24,8 +24,7 @@ import { expectBad, expectingGood } from './refusals'
  *   describeDeviceDB('memoryDeviceDB', () => memoryDeviceDB())
  * @example
  *   describeDeviceDB('idbDeviceDB', () => idbDeviceDB({ dbName: TH.freshDbName() }), () => {
- *     vi.stubGlobal('indexedDB', undefined)
- *     onTestFinished(() => { vi.unstubAllGlobals() })
+ *     failOpens()   // every indexedDB.open refused as a browser refuses storage it withholds, undone with onTestFinished
  *     return idbDeviceDB({ dbName: TH.freshDbName() })
  *   })
  */

@@ -9,12 +9,61 @@ import { VaultError } from '../src/errors'
 import * as Ckeys from '../src/ckeys'
 import * as TH from './test-helpers'
 
-// Each test gets its own database, so tests never see each other's rows.
-// Its blocked store is one in a context with no IndexedDB, as describeDeviceDB's second example runs it.
+/**
+ * Has every `indexedDB.open` fail as a browser fails it for storage it withholds (site data
+ * blocked, a sandboxed frame): the request it hands back fires `onerror`, its `error` a
+ * DOMException named `SecurityError`. Undone as the test ends.
+ */
+const failOpens = () => {
+  const opening = vi.spyOn(indexedDB, 'open').mockImplementation(() => {
+    const request: { error: DOMException, onerror: ((event: Event) => void) | null } = { error: new DOMException('The operation is insecure.', 'SecurityError'), onerror: null }
+    queueMicrotask(() => { request.onerror?.(new Event('error')) })
+    return request as unknown as IDBOpenDBRequest
+  })
+  onTestFinished(() => { opening.mockRestore() })
+}
+
+/**
+ * Has every write's transaction abort as a browser's does when the origin is out of room: its
+ * `error` a DOMException named `QuotaExceededError`, through fake-indexeddb's own abort. Reads
+ * and deletions go on. Undone as the test ends.
+ */
+const failWritesOverQuota = () => {
+  const put = Object.getOwnPropertyDescriptor(IDBObjectStore.prototype, 'put')?.value as IDBObjectStore['put']
+  const putting = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function overQuota(this: IDBObjectStore, ...args: Parameters<IDBObjectStore['put']>) {
+    const request = put.apply(this, args)
+    ;(this.transaction as unknown as { _abort: (errName: string) => void })._abort('QuotaExceededError')
+    return request
+  })
+  onTestFinished(() => { putting.mockRestore() })
+}
+
+// Each test gets its own database, so tests never see each other's rows. Its blocked store is one
+// whose every open the browser refuses as it refuses storage it withholds, as describeDeviceDB's
+// second example runs it.
 TH.describeDeviceDB('idbDeviceDB', () => idbDeviceDB({ dbName: TH.freshDbName() }), () => {
-  vi.stubGlobal('indexedDB', undefined)
-  onTestFinished(() => { vi.unstubAllGlobals() })
+  failOpens()
   return idbDeviceDB({ dbName: TH.freshDbName() })
+})
+
+describe("idbDeviceDB over storage the browser withholds", () => {
+  it("answers a write over quota as storage_blocked, the browser's QuotaExceededError its cause, and keeps nothing of it", async () => {
+    const deviceDB = idbDeviceDB({ dbName: TH.freshDbName() })
+    failWritesOverQuota()
+    const refused = await TH.expectBad(deviceDB.putLease(await TH.leaseOf('u1')), 'storage_blocked')
+    expect(refused.cause).to.have.property('name', 'QuotaExceededError')
+    await TH.expectBad(deviceDB.putMark(TH.markOf('u1')), 'storage_blocked')
+    const scope = TH.scopeOf('u1')
+    expect(await TH.expectGood(deviceDB.getLease(scope))).to.be.null
+    expect(await TH.expectGood(deviceDB.getMark(scope))).to.be.null
+  })
+
+  it("answers an open the browser refuses as storage_blocked, its SecurityError the cause", async () => {
+    const deviceDB = idbDeviceDB({ dbName: TH.freshDbName() })
+    failOpens()
+    const refused = await TH.expectBad(deviceDB.getLease(TH.scopeOf('u1')), 'storage_blocked')
+    expect(refused.cause).to.be.instanceOf(DOMException).and.to.have.property('name', 'SecurityError')
+  })
 })
 
 describe("safebyok/idb", () => {
