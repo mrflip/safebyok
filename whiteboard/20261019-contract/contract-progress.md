@@ -174,3 +174,12 @@ drift, once ruled (their rows). From 2026-10-19's rulings:
   (`Lease.grant(vault, holder, vaultKeyPair, askPassphraseAt)`, `lease.tryOpen(holder)`); the device
   store hands back records ("pojos from storage layers, vault makes them live instances"); a failed
   lease write refuses the unlock until the policy session says otherwise.
+* From B1's drift and B3's rows (ruled or culled 2026-10-19): `Wayin.tryOpenAmong`; what
+  `wayin.tryOpen` refuses (B1's drift file); `wayinCtx` and `isDamaged()` on a way in;
+  `meta.wayin_listed` in *Shapes*; `PassphraseProof.parse` parses a new passphrase too; a proof's
+  and a box's `vault` is a slice of `Vault`; the three sealing statics as built; `Box.make`/`seal`/
+  `tryOpen`'s refusals; `openBox` takes a Box or a record; models take the vault first, then holder;
+  `BoxRecord` the schema, `Box` the class; the vault's `logger`/`clock`/`keyDeriver` getters; a
+  box's `vault`/`props`/`summary` non-enumerable; `validators` in make's block;
+  `passkey_unavailable` moves to the passkey helper; `PasskeyAnswer` and `PasskeyProof` both.
+
