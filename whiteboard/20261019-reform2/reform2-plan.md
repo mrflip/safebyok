@@ -5,7 +5,7 @@ Date: 2026-10-19. Issued by: the Coach (`/sprint reform2`, from the preplan besi
 Sprint branch: `20261019-reform2`. Sprint doc (Open Matters, Progress, Resolved):
 https://claude.ai/code/artifact/62febfc3-47ee-4a7c-b99e-ea494b4b169c
 
-**Status:** every thread filed; wrap-up: the line main → #177 → #178 → #179 → #176 → #182 → #183 → #184 is being restacked onto today's main (thread 7 conflicts with #169/#170's wording).
+**Status:** the line main → #177 → #178 → #179 → #176 → #182 → #183 → #184 is restacked onto main `dbc3dfcc` and pushed; the Coach's late rulings start thread 4 (`no_clear`, revived) and thread 11 (`refusal_rulings`), both cut from #184's tip, side by side; the sprint PR waits for them.
 
 The Coach struck threads 3 (`one_look`), 4 (`no_clear`) and 5 (`newer_lockbox`) after issuing
 the preplan. Their text is kept in the preplan; this plan keeps their numbers so the preplan and
@@ -151,8 +151,15 @@ key-value stores' only (handed to thread 6). Real-Postgres e2e not run locally. 
 
 Thread 3, `one_look`: **struck by the Coach** (2026-10-19). Not built.
 
-Thread 4, `no_clear`: **struck by the Coach** (2026-10-19). Not built. `writeOver`'s
-retire-then-write stays.
+Thread 4, `no_clear`: **struck by the Coach** (2026-10-19), then **revived** at wrap-up:
+on the #176 review's lost write, the Coach ruled "the store mechanics will be changing to solve
+this, but go with your rec" (the Rec: bring back thread 4, or just its refusal). Built whole, as
+the preplan words it, cut from #184's tip (`330871ca`), beside thread 11.
+
+*Orchestrator:* It deletes the store-side honor-and-warn #178 put in `writeOver` and the
+`storeBox()` warning sentence the restack added (the Coach: "store will be losing its role in
+even thinking about removal so go with what's easiest"). `damaged_lockbox`, if new, is public
+surface: its family is a YOLO call. Size: medium. Restacked below thread 11 at the end.
 
 Thread 5, `newer_lockbox`: **struck by the Coach** (2026-10-19). Not built.
 
@@ -286,13 +293,31 @@ root's docs (`--exclude-dir={whiteboard,winboard,node_modules,dist}`) for `serve
 `public field`, `public face`, `public shell`, and "public" near "sidecar". Depends on 8; runs
 beside 9 and is restacked onto it. Size: small. Model: `sonnet`.
 
-*Review:* `fixed` ([#184](https://github.com/mrflip/safebyok/pull/184), still draft: the worker's
-`gh pr ready` was refused by the permission check, and is the Coach's). The classing was checked
+*Review:* `fixed` ([#184](https://github.com/mrflip/safebyok/pull/184); the worker's
+`gh pr ready` was refused by the permission check, and the Coach readied it). The classing was checked
 against `boxCtx`, `wayinCtxOf` and the schemas, and holds. Fixed: VOCABULARY's sidecar example;
 the *visible* list missed bound wayin and lockbox fields; the props' own `vault_key_epoch` was
 unclassed (it is *unencrypted*); a test title. Left: changeset level (sprint rule: `minor`);
 GraphQL's `'plain'` exception (noted in VOCABULARY at the restack); `prior_vault_key` unclassed
 and the README overview sentence (to the Coach). Filed at `f782962e`.
+
+---
+
+Thread 11, `refusal_rulings` (from the Coach's rulings, 2026-10-19):
+
+* **"Nothing was written" on a retire**: "if you know it's a retire, say "nothing was removed" --
+  that's the headline".
+* **Some bad records are still bad_label**: "go with what's natural. if something is validating
+  the label only it should throw bad_label without checking the rest. if something is validating
+  the record it should refuse bad_record even if it was only the label at fault".
+* **GraphQL says bad_option for the same mistake**: "if the record is at fault that should be
+  the refusal".
+
+*Orchestrator:* Plus a YOLO tidy: notes/security.md's "a new public field" for the snapshot's
+`trouble` becomes "a new snapshot field" (sonnet subagent). Touches `checkOutgoing`'s message,
+record validation at storeBox's entry and in the VaultDB verbs, the GraphQL client's error map,
+and the README's `bad_record` row (rewriting thread 8's clause). Cut from #184's tip beside
+thread 4, and kept off its lines. Size: small to medium.
 
 ---
 

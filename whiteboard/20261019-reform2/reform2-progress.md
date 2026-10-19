@@ -12,6 +12,13 @@ they disagree. Workers look things up here; they do not write it.
   so (thread 9); each thread moves its own size budgets (sprint skill, #181, for later
   sprints; this sprint keeps thread 8's `--write`). Invariant for the deferred tombstones:
   once a record exists there is always a record (tombstone or valid) while the vault exists.
+* *Orchestrator:* 2026-10-19, wrap-up: the line is restacked onto main `dbc3dfcc` (#180 merged),
+  tips 35b0f35e … 330871ca; thread 7's conflicts with main's #172 wording kept main's "guaranteed
+  unchanged" beside the sprint's *visible*/authenticated. Late rulings: thread 4 comes back whole
+  (the store stops clearing; a damaged box naming no revision is refused); thread 11 makes a
+  record check refuse `bad_record` even for a bad label, says "nothing was removed" on a retire,
+  and has GraphQL say `bad_record` when the record is at fault. `unlock_epoch` "will be removed as
+  a feature soon"; wayins can't be bound (the Coach).
 
 ## Discoveries
 
