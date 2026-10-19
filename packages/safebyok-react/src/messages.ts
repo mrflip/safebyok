@@ -33,8 +33,8 @@ export const Messages = {
 
   // Starting over, for a user who has forgotten the passphrase
   startOverButton:   'Forgot it? Start a new vault',
-  startOverQuestion: 'Erase this vault and start a new one? Every secret in it is lost for good, on every device, and you will enter them again.',
-  startOverConfirm:  'Erase and start over',
+  startOverQuestion: 'Remove this vault and start a new one? Every secret in it is lost for good, on every device, and you will enter them again.',
+  startOverConfirm:  'Remove and start over',
   startOverBack:     'Keep it',
 
   // What the dialog says once something not the user's to mend went wrong

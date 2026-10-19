@@ -134,7 +134,7 @@ export const updateBox = mutation({
       lockbox_bytes: Tallies.weigh(row, rowId) - standingBytes,
     })
     if (Tallies.refuses(reckoning.tally, growthAs(standing?._id))) {
-      throw new ConvexError<SafebyokErrorData>({ kind: 'vault_full', message: 'This vault is full: retire a lockbox to make room, then try again.' })
+      throw new ConvexError<SafebyokErrorData>({ kind: 'vault_full', message: 'This vault is full: remove a lockbox to make room, then try again.' })
     }
     const rowId = standing === null
       ? await ctx.db.insert('safebyok_lockboxes', row)

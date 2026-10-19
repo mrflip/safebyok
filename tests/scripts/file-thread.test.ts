@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
 import * as TH from '../test-helpers'
@@ -136,6 +136,115 @@ describe('scripts/file-thread', () => {
     expect(result.status).to.eq(1)
     expect(result.stderr).to.include('records no base')
     expect(existsSync(root)).to.eq(true)
+  })
+
+  describe("when git worktree remove fails and leaves its directory behind", () => {
+    let stubs: string
+    /** Runs the script with a git that does its worktree removal, then, as Finder does, leaves `leftovers` behind and fails */
+    const fileWithLeftovers = (leftovers: Record<string, string>, extraEnv: Record<string, string> = {}, prove = 'true') => {
+      writeFileSync(path.join(stubs, 'leftovers.json'), JSON.stringify(leftovers))
+      return spawnSync(Script, ['--prove', prove, root], {
+        cwd: main, encoding: 'utf8',
+        env: { ...isolatedEnv(scratch), PATH: `${stubs}${path.delimiter}${process.env['PATH'] ?? ''}`, FILE_THREAD_RETRY_PAUSE: '0', ...extraEnv },
+      })
+    }
+    beforeEach(() => {
+      stubs = path.join(scratch, 'stubs')
+      mkdirSync(stubs)
+      // eslint-disable-next-line sonarjs/no-os-command-from-path -- as above: the stubs wrap whichever git and rm the machine has
+      const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim()
+      // eslint-disable-next-line sonarjs/no-os-command-from-path -- as above
+      const realRm = execFileSync('sh', ['-c', 'command -v rm'], { encoding: 'utf8' }).trim()
+      writeFileSync(path.join(stubs, 'git'), [
+        '#!/bin/sh',
+        'case " $* " in',
+        '  *" push "*) if [ -n "$STUB_NOPUSH" ]; then exit 0; fi ;;',
+        '  *" worktree remove "*)',
+        `    ${realGit} "$@" || exit $?`,
+        `    node -e 'const [dir, file] = process.argv.slice(1); const fs = require("fs"), path = require("path"); const bag = JSON.parse(fs.readFileSync(file, "utf8")); for (const [name, body] of Object.entries(bag)) { fs.mkdirSync(path.dirname(path.join(dir, name)), { recursive: true }); fs.writeFileSync(path.join(dir, name), body) }' "${root}" "${stubs}/leftovers.json"`,
+        '    echo "error: failed to delete: Directory not empty" >&2',
+        '    exit 255 ;;',
+        'esac',
+        `exec ${realGit} "$@"`,
+      ].join('\n'))
+      // the first rm of a directory fails, as the second never did in the field
+      writeFileSync(path.join(stubs, 'rm'), [
+        '#!/bin/sh',
+        `case "$*" in *"${root}"*) if [ ! -e "${stubs}/rm-tried" ]; then touch "${stubs}/rm-tried"; exit 1; fi ;; esac`,
+        `exec ${realRm} "$@"`,
+      ].join('\n'))
+      chmodSync(path.join(stubs, 'git'), 0o755)
+      chmodSync(path.join(stubs, 'rm'), 0o755)
+    })
+
+    it("deletes the leftover directory, retrying, and prunes, when it holds only the tip, a .DS_Store and ignored files", () => {
+      writeFileSync(path.join(main, '.gitignore'), 'node_modules\ndist\n')
+      git('add', '.gitignore')
+      git('commit', '--quiet', '--message', 'docs: ignore')
+      git('push', '--quiet', 'origin', 'main')
+      git('fetch', '--quiet', 'origin')
+      cutAndBuild('origin/main')
+      const result = fileWithLeftovers({ 'shim.ts': 'export {}\n', '.DS_Store': 'x', 'src/.DS_Store': 'x', 'node_modules/pkg/index.js': 'x', 'dist/out.js': 'x' })
+      expect(result.status, result.stderr).to.eq(0)
+      expect(result.stderr).to.include('Directory not empty')
+      expect(result.stdout).to.include('its worktree removed, after its removal needed finishing by hand')
+      expect(existsSync(root)).to.eq(false)
+      expect(existsSync(path.join(stubs, 'rm-tried'))).to.eq(true)
+      expect(git('worktree', 'list', '--porcelain')).not.to.include(root)
+    })
+
+    it("knows a tracked file whose name is not ASCII as the tip's", () => {
+      cutAndBuild('origin/main')
+      commit(root, 'café.md', 'bonjour\n')
+      const result = fileWithLeftovers({ 'café.md': 'bonjour\n' })
+      expect(result.status, result.stderr).to.eq(0)
+      expect(existsSync(root)).to.eq(false)
+    })
+
+    it("leaves the directory for a person when it holds a file the tip does not, naming it", () => {
+      cutAndBuild('origin/main')
+      const result = fileWithLeftovers({ 'shim.ts': 'export {}\n', 'notes/scratch.txt': 'mine' })
+      expect(result.status).to.eq(1)
+      expect(result.stderr).to.include('notes/scratch.txt')
+      expect(result.stderr).to.include('left for a person to inspect')
+      expect(existsSync(path.join(root, 'notes/scratch.txt'))).to.eq(true)
+    })
+
+    it("leaves the directory for a person when it cannot finish checking what is left, rather than reading that as nothing", () => {
+      writeFileSync(path.join(stubs, 'comm'), ['#!/bin/sh', 'exit 2'].join('\n'))
+      chmodSync(path.join(stubs, 'comm'), 0o755)
+      cutAndBuild('origin/main')
+      const result = fileWithLeftovers({ 'shim.ts': 'export {}\n', 'notes/scratch.txt': 'mine' })
+      expect(result.status).to.eq(1)
+      expect(result.stderr).to.include('could not check what is left')
+      expect(existsSync(path.join(root, 'notes/scratch.txt'))).to.eq(true)
+    })
+
+    it("leaves the directory for a person when the worktree held uncommitted changes before the removal", () => {
+      cutAndBuild('origin/main')
+      const result = fileWithLeftovers({ 'shim.ts': 'export {}\n' }, {}, 'echo changed > shim.ts')
+      expect(result.status).to.eq(1)
+      expect(result.stderr).to.include('held uncommitted changes')
+      expect(existsSync(root)).to.eq(true)
+    })
+
+    it("leaves the directory for a person when git refused the removal outright and still lists the worktree", () => {
+      cutAndBuild('origin/main')
+      git('worktree', 'lock', root)
+      const result = fileWithLeftovers({})
+      expect(result.status).to.eq(1)
+      expect(result.stderr).to.include('still lists it as a worktree')
+      expect(existsSync(path.join(root, 'shim.ts'))).to.eq(true)
+    })
+
+    it("leaves the directory for a person when origin's branch is not at the tip", () => {
+      cutAndBuild('origin/main')
+      commit(root, 'review.ts', 'export {}\n')
+      const result = fileWithLeftovers({ 'shim.ts': 'export {}\n' }, { STUB_NOPUSH: '1' })
+      expect(result.status).to.eq(1)
+      expect(result.stderr).to.include('is not at')
+      expect(existsSync(root)).to.eq(true)
+    })
   })
 
   it('refuses the main checkout', () => {

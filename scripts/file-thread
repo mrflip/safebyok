@@ -13,7 +13,17 @@
 # * Push to origin's branch of the same name, with a lease on the SHA origin had, so a rebase
 #   replaces only what it was rebased from.
 # * Clean up: scripts/clear-ds-store.sh in the worktree (a Finder .DS_Store stops a removal half
-#   done), then `git worktree remove`.
+#   done), then `git worktree remove`. Finder can still write a new .DS_Store while git is
+#   deleting, and git then fails ("Directory not empty") with the worktree unregistered and its
+#   directory left behind. The push is proven by then, so the script finishes the job: it deletes
+#   that directory (retrying a few times) and prunes, but only when the worktree was clean before
+#   the removal, git no longer lists it (a refusal, such as a lock, deletes nothing and leaves it
+#   listed), origin's branch is the local tip, and nothing is left in the directory except
+#   what the tip holds, a .DS_Store, or what git ignores. Otherwise it stops and leaves the
+#   directory for a person.
+#
+# Environment: FILE_THREAD_RETRY_PAUSE, the seconds to wait between tries at deleting a leftover
+# directory (default 1).
 #
 # Usage: scripts/file-thread [--prove <command>] <worktree root>
 # Exits 0 when filed; 1 on a failure; 2 on arguments it does not understand; 3 on a rebase
@@ -66,6 +76,61 @@ if [[ -n "$pushed" ]]; then lease=("--force-with-lease=${branch}:${pushed}"); fi
 git -C "$root" -c credential.helper= -c credential.helper='!gh auth git-credential' \
   push --quiet ${lease[@]+"${lease[@]}"} origin "${branch}:${branch}"
 
+# Prints the files in directory $1 that are none of: in the tree of commit $2, a .DS_Store, the
+# stub of a .git file, or ignored by the main checkout's rules. node_modules is not entered.
+# Names are compared as lines, so a name with a newline in it is reported, which refuses safely.
+# Fails, printing nothing, when any step does (an unreadable folder, a full disk), so that a check
+# it could not make never reads as a clean one.
+leftover_strangers() {
+  local left="$1" tip="$2" work status=0
+  work="$(mktemp -d -t file-thread-left.XXXXXX)" || return 1
+  { (cd "$left" && find -P . -xdev -name node_modules -prune -o \( -type f -o -type l \) -print) \
+      | sed 's|^\./||' | awk '$0 != ".git" && $0 != ".DS_Store" && $0 !~ /\/\.DS_Store$/' \
+      | LC_ALL=C sort > "$work/found" \
+    && git -C "$main" -c core.quotePath=false ls-tree -r --name-only "$tip" | LC_ALL=C sort > "$work/tracked" \
+    && LC_ALL=C comm -23 "$work/found" "$work/tracked" > "$work/unlisted" \
+    && { tr '\n' '\0' < "$work/unlisted" \
+           | git -C "$main" check-ignore --no-index --stdin -z > "$work/ignored0" 2> /dev/null \
+         || [[ $? -eq 1 ]]; } \
+    && tr '\0' '\n' < "$work/ignored0" | LC_ALL=C sort > "$work/ignored" \
+    && LC_ALL=C comm -23 "$work/unlisted" "$work/ignored" > "$work/strangers"; } || status=1
+  if [[ "$status" -eq 0 ]]; then cat "$work/strangers"; fi
+  rm -rf -- "$work"
+  return "$status"
+}
+
+# Finishes a removal that `git worktree remove` left half done (see the header), or says why not.
+finish_removal() {
+  local removal="$1" tip="$2" dirty="$3" registered strangers attempt
+  echo "file-thread: git could not remove $root: $removal" >&2
+  [[ -e "$root" ]] || fail "$root is already gone; run \`git worktree prune\` to finish"
+  [[ -z "$dirty" ]] || fail "$root held uncommitted changes before the removal, so it is left for a person to inspect"
+  registered="$(git -C "$main" worktree list --porcelain)" || fail "git could not list its worktrees, so $root is left for a person to inspect"
+  if grep -Fqx "worktree $root" <<< "$registered"; then
+    fail "git refused to remove $root and still lists it as a worktree, so it is left for a person to inspect"
+  fi
+  [[ "$(git -C "$main" rev-parse --verify --quiet "refs/remotes/origin/${branch}")" == "$tip" ]] \
+    || fail "origin's $branch is not at $tip, so $root is left for a person to inspect"
+  strangers="$(leftover_strangers "$root" "$tip")" \
+    || fail "could not check what is left in $root, so it is left for a person to inspect"
+  if [[ -n "$strangers" ]]; then
+    head -n 10 <<< "$strangers" >&2
+    fail "$root holds the files above, which the thread's tip does not, so it is left for a person to inspect"
+  fi
+  for attempt in 1 2 3 4; do
+    if rm -rf -- "$root" 2> /dev/null && [[ ! -e "$root" ]]; then break; fi
+    sleep "${FILE_THREAD_RETRY_PAUSE:-1}"
+  done
+  [[ ! -e "$root" ]] || fail "$root would not delete after four tries; remove it by hand, then run \`git worktree prune\`"
+  git -C "$main" worktree prune
+}
+
 (cd "$root" && "$here/clear-ds-store.sh" > /dev/null)
-git -C "$main" worktree remove "$root"
-echo "file-thread: $branch filed: $caught, proved, pushed at $(git -C "$main" rev-parse --short "$branch"), its worktree removed."
+tip="$(git -C "$main" rev-parse "refs/heads/${branch}")"
+dirty="$(git -C "$root" status --porcelain)"
+tidied=""
+if ! removal="$(git -C "$main" worktree remove "$root" 2>&1)"; then
+  finish_removal "$removal" "$tip" "$dirty"
+  tidied=", after its removal needed finishing by hand"
+fi
+echo "file-thread: $branch filed: $caught, proved, pushed at $(git -C "$main" rev-parse --short "$branch"), its worktree removed${tidied}."

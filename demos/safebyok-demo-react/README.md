@@ -24,7 +24,7 @@ localStorage.
   inside `vault.useBox(...)` and sent browser-to-Anthropic (Claude Haiku, the cheapest model) for a
   punchline. No server of ours ever sees the key.
 * **Vault dashboard** ([src/components/VaultDashboard.tsx](src/components/VaultDashboard.tsx)) --
-  direct manipulation of the vault: add, view, edit, delete and *use* lockboxes. Whisper-touching
+  direct manipulation of the vault: add, view, edit, remove and *use* lockboxes. Whisper-touching
   actions summon the passphrase dialog only when the vault is actually locked; an unlock grants
   the device a lease of seven days. Signing out locks the vault.
 * **Ways in** ([src/components/WaysIn.tsx](src/components/WaysIn.tsx)) -- the vault's passphrases

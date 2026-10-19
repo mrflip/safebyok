@@ -781,7 +781,7 @@ describe("VaultProvider", () => {
     const vault = await world.opened()
     const reading = watched(world.latest().withUnlockedVault(() => vault.readBox('anthropic_api_key')))
     fireEvent.click(await screen.findByText('Forgot it? Start a new vault'))
-    fireEvent.click(screen.getByText('Erase and start over'))
+    fireEvent.click(screen.getByText('Remove and start over'))
     fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'a new pw' } })
     expect(screen.queryByText('Choose a vault passphrase')).to.not.be.null
     fireEvent.click(screen.getByText('Create vault'))

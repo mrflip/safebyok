@@ -16,7 +16,7 @@ use safebyok; if you do, the last column of each table gives the usual term.
 | **wayin**      | One way into a vault: a passphrase or a passkey, as the vault knows it. Each has a `wayinkind` (`passphrase` or `passkey`; `WayinKind`), a `wayin_id`, a `wayinlabel` the user chose to tell it from the others (`home_phrase`, `laptop_fingerprint`), and the `registered_at` and `device_id` of its adding; a passkey's also has the `credential_id` and `prf_salt_b64` to ask it with. The snapshot lists them, even while locked, as its `wayins`, each a `WayinSummary`. A vault holds up to `MaxUnlocks` wayins, never fewer than one: `addPassphrase` and `addPasskey` add one, `changePassphrase` changes one, `retireWayin` removes one. The intended policy, not yet landed, is a vault holding exactly one passphrase and at most one passkey. Stored as described under *Encrypted forms*. |
 | **proof**      | What the user presents to show a wayin is theirs (`Proof`): a passphrase, as a string, or a passkey proof. `unlock()` takes one, and so does every call that changes the wayins. It is as good as the wayin it opens, so it is dropped after the call. |
 | **passkey proof** | What a passkey answers when asked for its vault (`PasskeyProof`): the credential's id, the salt it was asked with, and 32 secret bytes. The host gets one from `safebyok-react`'s `createPasskey` or `askPasskey` and hands it to the vault as its proof. |
-| **lease**      | What lets this device unlock again without a proof, for a while (`Lease`): granted when a proof unlocks the vault, and taken up when the vault is next opened here, until its askPassphraseAt. It holds the leaseKey and the vaultKeyLeaseWrapped, and stays on the device. How long it lasts is `leaseHours`. |
+| **lease**      | What lets this device unlock again without a proof, for a while (`Lease`): granted when a proof unlocks the vault, and taken up when the vault is next opened here, until its askPassphraseAt. It holds the leaseKey and the vaultKeyLeaseWrapped, and stays on the device. How long it lasts is `leaseHours`. It expires at its askPassphraseAt, and the vaultKey goes a minute later. A lock revokes it: a hard lock raises the lock generation as it does, `lockSoon()`'s soft revocation does not, and a handle on which a lock has revoked a lease takes none up again. A lease that cannot be taken up -- expired, outdated by a change of wayins or a shorter `leaseHours`, unreadable -- is discarded, which is no revocation, and is not counted as one. A revocation and a discard each erase the record (the deviceDB's `eraseLease`). |
 | **mask**       | A function from `safebyok/utils` that shows a best-effort whiff of each end of a whisper, one plain line safe for a log or a reminder, so your UI can tell which API key a lockbox holds without revealing it. It is not a faithful copy: marks, invisible characters, bidirectional controls and spaces are dropped, though right-to-left letters are kept and may reorder their neighbours in a display. `mask` is intended for plain text; calling it with arbitrary blobs may give unusual behavior. Stripping every mark costs the vowels of scripts that write them as marks (Hindi `नमस्ते` comes out as `नमसत`); an API key is ASCII, and is untouched. Its result is public: show it, never trust it to hide more than it does. `mask(whisper, { head: 0, tail: 0 })` hides everything but the length. |
 
 ## Keys
@@ -106,13 +106,13 @@ well-formed Unicode in NFC, no control characters, no `^`, at most 1 KiB).
 | **wayinlabel**                  | The label of a wayin within its vault, chosen by the user. Stored as `wayinlabel`.                                                                                         |
 | **userId**                      | The signed-in user's stable, opaque id from your own auth, the one name in a scope that is not a label: by default 1 to 100 ASCII letters, digits and `-_.:@+\|` (`UserId`). Never an email or a handle, which can change. Stored as `user_id`. |
 | **scope**                       | An applabel, a userId and a vaultlabel together: it names one vault (`VaultScope`).                                                                                         |
-| **sidecar**                     | A lockbox's sidecar: your app's own plain data that rides beside the whisper, authenticated but not encrypted (`sidecar` at `storeBox()` and in the snapshot; `Sidecar`). Any JSON value -- a note, a project, a rotation date -- shown while the vault is locked. safebyok never looks inside it; your app checks its shape. Stored as its JSON, keys sorted (`sidecar_json`), always written (`{}` when there is none), and bound into the lockbox's boxCtx. It is never encrypted: never put a secret in it. Its size counts toward `maxWhisperBytes` with the whisper's. |
+| **sidecar**                     | A lockbox's sidecar: your app's own plain data that rides beside the whisper, not encrypted, but guaranteed unchanged once `readBox()` opens the lockbox: until then the snapshot shows it as storage holds it (`sidecar` at `storeBox()` and in the snapshot; `Sidecar`). Any JSON value -- a note, a project, a rotation date -- shown while the vault is locked. safebyok never looks inside it; your app checks its shape. Stored as its JSON, keys sorted (`sidecar_json`), always written (`{}` when there is none), and bound into the lockbox's boxCtx. It is never encrypted: never put a secret in it. Its size counts toward `maxWhisperBytes` with the whisper's. |
 | **whisper codec**, **whisper schema version** | How a lockbox's whisper became the bytes it ciphers (`whisper_codec`: `json_v1`, its JSON with keys sorted, as UTF-8), and which generation of the whisper's own shape it holds (`whisper_schema_version`: 1). Both are stored and bound; neither is anything to set yet. |
 | **damaged**                     | Said of a stored record that does not read back as what it should be, and told by the kind of refusal each earns. A **lockbox** is damaged (`damaged_lockbox`) when its record does not read back as one; so is one sealed under a vaultKey the vault does not hold. A **wayin** is damaged (`damaged_wayin`) when it is stored in a form this package never writes, so it cannot be tried; the other wayins still can be. The **vault props** are damaged (`damaged_vault`) when they fail their checks or name another vault, so no wayin can be tried at all, and `hello()` refuses. For a lockbox, the snapshot lists it as `{ boxlabel, damaged: true, revision_tok }` (`DamagedLockbox`, its revision null when the record holds none as text) beside the sound ones; `retireBox()` removes it, `storeBox()` writes a fresh lockbox over it, and `readBox()` refuses it. A lockbox stored under a name the vault's validators refuse is not damaged: it lists and reads as any other, and only `storeBox()` refuses the name. |
 | **vaultProps**                  | The one record per vault that every device syncs (`VaultProps`, format `safebyok-vault-v3`): the scope, the vaultId, the unlockEpoch and vaultKeyEpoch, the prior vaultKey once there is one, its `wayins`, and when it was made. Nothing in it opens without a proof. Its `vault_id` and `registered_at` together are its `VaultIdentity`. |
 | **lease**, as kept              | What a device keeps to unlock without a proof (`Lease`, format `safebyok-lease-v1`): the leaseKey, the vaultKeyLeaseWrapped, the vaultId, the unlockEpoch it was granted at and the askPassphraseAt. It stays on the device. |
 | **device mark**                 | What a device keeps of a vault's scope, locked or not (`DeviceMark`): its lock generation, and what it has `seen` of the vault there -- its own deviceId for the vault, the vaultId, the highest unlockEpoch and vaultKeyEpoch it has seen the vault props at -- or null for none. Nothing in it is secret; it stays on the device, `lock()` leaves it, and `retire()` forgets what it has seen, keeping the lock generation. |
-| **lock generation**             | How many locks on this device have forgotten a vault's lease (`lock_generation`, in the device mark): every hard lock raises it -- `lock()`, `retire()`, and a lock for storage the vault cannot trust -- but not `lockSoon()`, which lets work in hand finish. An unlock grants its lease only while the mark stands where the unlock found it, so a hard lock in one tab defeats an unlock under way in another. |
+| **lock generation**             | How many hard locks on this device have revoked a vault's lease (`lock_generation`, in the device mark): every hard lock raises it -- `lock()`, `retire()`, and a lock for storage the vault cannot trust -- but not `lockSoon()`, whose soft revocation lets work in hand finish. An unlock grants its lease only while the mark stands where the unlock found it, so a hard lock in one tab defeats an unlock under way in another. |
 | **rolled back**                 | Said of vault props storage hands back at a lower unlockEpoch, or a lower vaultKeyEpoch, than this device's mark has seen of the same vault. The vault refuses them (kind `rolled_back`), taking nothing from them, and locks. |
 | **rotation**                    | Replacing a vault's vaultKey with a new one and sealing every lockbox anew under it, so that a wayin retired beforehand opens nothing written afterwards. Each rotation moves the vaultKeyEpoch up by one, and keeps the vaultKey before as the prior vaultKey. |
 | **retire**                      | To remove from storage for good: `retireBox` a lockbox, `retireWayin` a way in, `retire()` the whole vault (and, on a VaultDB, `retireVault` and `retireDamagedVault`, under a `RetireExpectation`). Nothing of what is retired is kept. |
@@ -148,74 +148,5 @@ well-formed Unicode in NFC, no control characters, no `^`, at most 1 KiB).
 
 Stored records spell every name in underbar_case: `whisper_ciphered`, `key_deriver_label`.
 
-## Old names
-
-To be deleted at 1.0.0. Each retired name, and the one that replaced it.
-
-| Old                                                    | New                                                     |
-| ------------------------------------------------------ | ------------------------------------------------------- |
-| unlock envelope, `UnlockEnvelope`                      | wayin, `Wayin`                                          |
-| `PassphraseEnvelope`, `PasskeyEnvelope`                | `PassphraseWayin`, `PasskeyWayin`                       |
-| module `Envelope` (`src/envelope.ts`)                  | module `Wayin` (`src/wayin.ts`)                         |
-| `EnvelopeHeader`, `EnvelopeStamp`                      | `WayinHeader`, `WayinStamp`                             |
-| `bundle.unlocks`, the snapshot's `unlocks`             | `wayins`, on the vault props and the snapshot           |
-| unlock (as the snapshot lists it), `UnlockSummary`     | wayin, `WayinSummary`                                   |
-| `unlock_id`, `unlockId` (an option)                    | `wayin_id`, `wayinId`                                   |
-| `unlocklabel`                                          | `wayinlabel`                                            |
-| `method` (stored), `UnlockMethod`, `UnlockMethodVals`  | `wayinkind`, `WayinKind`, `WayinKindVals`               |
-| `UnlockProof`                                          | `Proof` (`PasskeyProof` stays)                          |
-| `passphraseKey`, `passkeyKey`, acting on the vaultKey  | `wayinKey` (the code that makes one keeps its name)     |
-| `vault_key_wrapped` on a way in                        | `vault_key_wayin_wrapped` (the prior vaultKey's stays)  |
-| vaultKeyPassphraseWrapped, vaultKeyPasskeyWrapped      | vaultKeyWayinWrapped                                    |
-| `removeUnlock`                                         | `retireWayin`                                           |
-| `absentUnlock`                                         | `absentWayin`                                           |
-| `absent_unlock`, `damaged_unlock`                      | `absent_wayin`, `damaged_wayin`                         |
-| `last_unlock`, `too_many_unlocks`                      | `last_wayin`, `too_many_wayins`                         |
-| cipherAdditionalData, binding                          | ctx                                                     |
-| `cipherBinding`, `CipherBindingPart`                   | `cipherCtx`, `CipherCtxPart`                            |
-| every `binding` parameter                              | `ctx`                                                   |
-| `envelopeBinding`                                      | `wayinCtx`                                              |
-| `boxBinding` (the lockbox's binding)                   | `boxCtx`                                                |
-| `localBinding`                                         | `leaseCtx`                                              |
-| public bag, `PublicBag`                                | sidecar, `Sidecar`                                      |
-| `public_json`, `publicJsonOf`                          | `sidecar_json`, `sidecarJsonOf`                         |
-| `store(..., { public })`, `.public` on a summary       | `storeBox(..., { sidecar })`, `.sidecar`                |
-| device unlock, remembered unlock, `DeviceUnlock`       | lease, `Lease`                                          |
-| format `safebyok-unlock-v1`                            | format `safebyok-lease-v1`                              |
-| `localUnlockKey`, `makeLocalUnlockKey`                 | `leaseKey`, `makeLeaseKey`                              |
-| `local_unlock_key`                                     | `lease_key`                                             |
-| `vault_key_local_wrapped`, vaultKeyLocalWrapped        | `vault_key_lease_wrapped`, vaultKeyLeaseWrapped         |
-| `readUnlock`, `writeUnlock`, `eraseUnlock`             | `readLease`, `writeLease`, `eraseLease`                 |
-| `UnlockExpectation`                                    | `LeaseExpectation`                                      |
-| `rememberDevice`                                       | `grantLease`                                            |
-| `rememberedUnlock`                                     | `takeUpLease`                                           |
-| `takeUpUnlock`                                         | `takeUpVaultKey`                                        |
-| `ForcePassphraseReentryHours`, `MaxReentryHours`       | `LeaseHours`, `MaxLeaseHours`                           |
-| `forcePassphraseReentryHours`                          | `leaseHours`                                            |
-| `reentryWindowMillis`                                  | `leaseMillis`                                           |
-| `Ckeys.unlock`, `Ckeys.isUnlock`, ckey `unlock^…`      | `Ckeys.lease`, `Ckeys.isLease`, ckey `lease^…`          |
-| bundle, `VaultBundle`                                  | vault props, `VaultProps`                               |
-| format `safebyok-vault-v2`                             | format `safebyok-vault-v3`                              |
-| format `safebyok-lockbox-v4`                           | format `safebyok-lockbox-v5`                            |
-| `BundleIdentity`, `BundleExpectation`                  | `VaultIdentity`, `VaultPropsExpectation`                |
-| `damaged_bundle`                                       | `damaged_vault`                                         |
-| `readBundle`                                           | `readVaultProps`                                        |
-| `createBundle`                                         | `fetchOrCreateVaultProps`                               |
-| `updateBundle`                                         | `updateVaultProps`                                      |
-| erase, `eraseBox`, `eraseVault`                        | retire, `retireBox`, `retireVault`                      |
-| `eraseDamagedVault`, `EraseDamagedVaultOpts`           | `retireDamagedVault`, `RetireDamagedVaultOpts`          |
-| `EraseExpectation`                                     | `RetireExpectation`                                     |
-| `vault.store`, `vault.read`, `vault.use`               | `vault.storeBox`, `vault.readBox`, `vault.useBox`       |
-| `vault.erase`, `vault.destroy`                         | `vault.retireBox`, `vault.retire`                       |
-| `openVault(opts)`, `OpenVaultOpts`                     | `Vault.make(opts)` and `vault.hello()`, `MakeVaultOpts` |
-| `revision_id`, revisionId                              | `revision_tok`, revisionTok                             |
-| `Ckeys.bundle`                                         | `Ckeys.vaultProps` (the stored ckey `vault^…` is unchanged) |
-| `TH.bundleOf`, `TH.rotatedBundleOf`                    | `TH.vaultPropsOf`, `TH.rotatedVaultPropsOf`             |
-| `Refusals.staleWrite('bundle' \| 'erase')`             | `Refusals.staleWrite('vaultProps' \| 'retire')`         |
-| Postgres `safebyok_bundles`, `safebyok_bundles_changed` | `safebyok_vaults`, `safebyok_vaults_changed`            |
-| GraphQL `SafebyokVaultBundle`, `SafebyokVaultBundleInput` | `SafebyokVaultProps`, `SafebyokVaultPropsInput`         |
-| GraphQL `SafebyokBundleExpectationInput`, `SafebyokEraseExpectationInput` | `SafebyokVaultPropsExpectationInput`, `SafebyokRetireExpectationInput` |
-| GraphQL `safebyok{Read,Create,Update}Bundle`, `safebyokErase{Box,Vault}` | `safebyok{Read,FetchOrCreate,Update}VaultProps`, `safebyokRetire{Box,Vault}` |
-| Convex `getBundle`, `createBundle`, `updateBundle`     | `getVaultProps`, `fetchOrCreateVaultProps`, `updateVaultProps` |
-| Convex `eraseBox`, `eraseVault`, args `{ bundle }`     | `retireBox`, `retireVault`, args `{ vaultProps }`       |
-| Convex table `safebyok_bundles`; tally `bundle_id`, `by_bundle` | `safebyok_vaults`; tally `vault_row_id`, `by_vault_row` |
+The names the reform of October 2026 retired are in `notes/old_vocabulary.md`, for reading older
+code and records. Nothing current uses them.

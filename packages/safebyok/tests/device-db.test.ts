@@ -6,7 +6,7 @@ import * as TH from './test-helpers'
 TH.describeDeviceDB('memoryDeviceDB', () => memoryDeviceDB())
 
 describe("memoryDeviceDB", () => {
-  it("treats a mangled record as no lease, and clears it", async () => {
+  it("treats a mangled record as no lease, and discards it", async () => {
     const deviceDB = memoryDeviceDB()
     const mangled = { ...(await TH.leaseOf('u1')), lease_key: 'not a key handle' }
     await deviceDB.writeLease(mangled as unknown as Lease, TH.NoLocks)
