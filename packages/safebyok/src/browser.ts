@@ -1,7 +1,7 @@
 import { argon2idWebV1Deriver } from './key-deriver'
 import { idbDeviceDB, type IdbOpts } from './idb'
 import { parseDbName } from './idb-opts'
-import type { MakeVaultOpts } from './vault'
+import type { MakeVaultOpts } from './vault-opts'
 import { zxcvbnPassphraseTest } from './zxcvbn-passphrase-test'
 
 export { MinPassphraseChars, MinZxcvbnScore, zxcvbnPassphraseTest } from './zxcvbn-passphrase-test'
