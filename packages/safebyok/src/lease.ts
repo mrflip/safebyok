@@ -35,16 +35,16 @@ const LeaseFormat = 'safebyok-lease-v1'
 /** The usages of the handle a lease hands back: what the vault keeps, wrapping and unwrapping boxKeys, never exported. */
 const SessionUsage = { extractable: false, usage: ['wrapKey', 'unwrapKey'] } as const
 
-/**
- * The ctx a lease's wrap is bound to: the scope of `vault`, the `vault_id` and `unlock_epoch` of
- * `holder`, the deadline, and the purpose. Every field of the record but the leaseKey and the wrap.
- */
 /** What {@link Lease.grant} is handed beside the vaultKey, held to what its record will hold. */
 const GrantArgs = Z.object({
   holder:          Z.pick(LeaseRecord, { vault_id: true, unlock_epoch: true }),
   askPassphraseAt: LeaseRecord.shape.ask_passphrase_at,
 })
 
+/**
+ * The ctx a lease's wrap is bound to: the scope of `vault`, the `vault_id` and `unlock_epoch` of
+ * `holder`, the deadline, and the purpose. Every field of the record but the leaseKey and the wrap.
+ */
 const leaseCtxOf = (vault: LeaseVault, holder: LeaseHolder, askPassphraseAt: number): Uint8Array => (
   cipherCtx(LeaseFormat, vault.applabel, vault.user_id, vault.vaultlabel, holder.vault_id, holder.unlock_epoch, askPassphraseAt, 'vault_key_lease_wrapped')
 )
