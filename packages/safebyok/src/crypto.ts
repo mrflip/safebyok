@@ -124,7 +124,7 @@ export const importWrappingKeyBytes = (keyBytes: Uint8Array): Promise<CryptoKey>
  * bytes put to another use, or in another place, make another key: the passkeyKey. The bytes stay
  * with the caller; drop them promptly.
  *
- * @example await deriveWrappingKey(prfBytes, cipherCtx('safebyok-vault-v4', 'acme', 'u1', 'main', vaultId, registeredAt, 'vault_key_passkey_wrapped', header))
+ * @example await deriveWrappingKey(prfBytes, cipherCtx('safebyok-vault-v5', 'acme', 'u1', 'main', vaultId, registeredAt, 'vault_key_passkey_wrapped', header))
  */
 export const deriveWrappingKey = async (keyBytes: Uint8Array, info: Uint8Array): Promise<CryptoKey> => {
   const inputKey = await crypto.subtle.importKey('raw', keyBytes as BufferSource, 'HKDF', false, ['deriveKey'])
