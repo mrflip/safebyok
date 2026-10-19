@@ -1009,7 +1009,8 @@ export class Vault {
   readonly #whisperByteLimit: number
   readonly #boxLimit: number
   readonly #vaultByteLimit: number
-  readonly #checkedClock: Clock = { now: () => this.#clockNow() }
+  // Frozen: `vault.clock` hands it out, and the vault's boxes stamp their times by it.
+  readonly #checkedClock: Clock = Object.freeze({ now: () => this.#clockNow() })
 
   /**
    * A handle on one user's vault, made at once, in state `opening`: its options checked, and

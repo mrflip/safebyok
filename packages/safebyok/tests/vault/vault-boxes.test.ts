@@ -1186,6 +1186,15 @@ describe("what a vault hands its boxes", () => {
     }
   })
 
+  it("hands out a clock no host can rewind: the one the vault's boxes stamp their times by", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    expect(Reflect.set(vault.clock, 'now', () => 0)).to.be.false
+    await vault.putBox('anthropic', 'sk-fake')
+    const { written_at: writtenAt } = await storedBoxOf(world)
+    expect(writtenAt).to.eq(world.clock.now())
+  })
+
   it("reads its clock checked: a reading that fails drops the vaultKey, as the vault's own readings do", async () => {
     const world = makeWorld()
     let broken = false
