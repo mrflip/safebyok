@@ -32,6 +32,28 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-19 (branch 20261019-retire_revision, on PR #177): **`VaultDB.retireBox` now takes the
+  revision the device read, and storage reports what it removed; the base class takes that report
+  as untrusted storage input.** The expectation is `{ vault_id, revision_tok }` (null for a
+  lockbox listed as damaged with no readable revision); `retireVault` and `retireDamagedVault`
+  keep the vault-only expectation. The arbitration is unchanged: the adapter compares only
+  `vault_id` and removes whatever lockbox stands under the boxlabel, in one atomic step, so a
+  retirement within the right vault still wins over any write; the revision never refuses. It only
+  lets the adapter answer `retired` (the revision named; for null, a record holding none that
+  reads as one, compared as the listing reads it), `retired_other` (another record, for instance
+  one written over the lockbox meanwhile) or `absent`; a vault mismatch is `null`, thrown as
+  `stale_write`. Each adapter reads that answer from the same atomic step as the delete (Postgres
+  `DELETE ... RETURNING`, one Convex mutation, one IndexedDB transaction, one synchronous turn in
+  `localVaultDB`, the GraphQL server's reply), never a second storage call. The base class keeps
+  only the `outcome` field, through the same `writtenBack` step `updateBox` uses, and refuses
+  anything else as `corrupt_record`, saying the retirement may have landed and quoting nothing.
+  The vault's `retireBox()` and `storeBox()`'s retire-first over a damaged record naming no
+  revision honor `retired_other` and warn through the host's logger, naming neither revision nor
+  boxlabel; the result stays void and the write goes on. Known residual: two devices both showing
+  a damaged lockbox with no revision can still lose a write, now logged where it was silent (A
+  retires and writes; B retires A's write, warned, and writes); closing it is undecided.
+  Honoring and warning, rather than refusing as stale, awaits a Coach's confirmation. Nothing
+  stored changes.
 * 2026-10-19 (returning): **`VaultDB.updateBox` now resolves the lockbox as storage holds it after
   the write lands, and the base class takes that answer as untrusted storage input.** Each
   adapter's `doUpdateBox` hands the lockbox back from the same atomic step as the conditional
