@@ -262,7 +262,7 @@ export abstract class VaultDB {
    * and with their own `vault_id`. A caller tells the two apart by comparing the `vault_id` it gets
    * back with the one it drafted. Vault props this package would not write -- a name in them below
    * the floor included -- are refused with kind `bad_record`, before storage sees them; a name in
-   * them longer than the backend holds, with kind `bad_label`.
+   * them the floor admits but longer than the backend holds, with kind `bad_label`.
    */
   async fetchOrCreateVaultProps(vaultProps: VaultProps): Promise<VaultProps> {
     const outgoing = checkOutgoing(VaultProps, vaultProps, 'vault props record')
@@ -345,9 +345,9 @@ export abstract class VaultDB {
    * backend's `maxRecordBytes` is refused with kind `lockbox_too_large` before storage sees it, and
    * a lockbox or an `expected` this package would not build with kind `bad_record`: a missing
    * lockbox, or one whose boxlabel is below the floor, included. A `scope` below the floor, or a
-   * name longer than the backend holds, is kind `bad_label`. A lockbox is written under the
-   * vaultKey it was sealed with, so its `vault_key_epoch` must be the one in `expected`: kind
-   * 'bad_record' otherwise.
+   * name the floor admits but longer than the backend holds, is kind `bad_label`. A lockbox is
+   * written under the vaultKey it was sealed with, so its `vault_key_epoch` must be the one in
+   * `expected`: kind 'bad_record' otherwise.
    *
    * Resolves the lockbox as storage now holds it, handed back by the same atomic step as the write
    * and held to the check `readBox` makes: field for field the one written, from an adapter that
