@@ -156,30 +156,10 @@ token when it joins or creates a vault): don't build one ahead of it.
 
 ## Owed to the Contract tab
 
-*Orchestrator:* rulings and drift not yet carried into the design doc's Contract tab; one helper
-pass carries them, then this list empties. Older: B1's, B3's, A6's review and phase A pass 1's
-drift, once ruled (their rows). From 2026-10-19's rulings:
-
-* hello: a failed hello is forgotten, so the next call reads afresh (Coach: "Add to contract").
-* hello no longer takes up the lease; unlock/`ensureLease` does (`lean_core`, ruled).
-* The strength checker returns a value saying good or bad; a throw is `unexpected_error` naming
-  the function, no metadata (B4 writes it).
-* `isVaultError` is the declared interface, inside and out.
-* putBox/delBox take the revision from the listing in hand and read nothing more (already so;
-  `lean_core` makes the code match). Every op uses the lazy hello (YOLO row).
-* Every op uses the lazy hello; a host wanting fresh state sets `staleMinutes` to 0 (the Coach:
-  "the essential thing is that our contract is clean").
-* *Lease* (B2, ruled): `tryOpen` may refuse `corrupt_record` (fits but will not open); the scope is
-  checked in `Lease.make`, not `tryOpen`; vault first, then holder, everywhere
-  (`Lease.grant(vault, holder, vaultKeyPair, askPassphraseAt)`, `lease.tryOpen(holder)`); the device
-  store hands back records ("pojos from storage layers, vault makes them live instances"); a failed
-  lease write refuses the unlock until the policy session says otherwise.
-* From B1's drift and B3's rows (ruled or culled 2026-10-19): `Wayin.tryOpenAmong`; what
-  `wayin.tryOpen` refuses (B1's drift file); `wayinCtx` and `isDamaged()` on a way in;
-  `meta.wayin_listed` in *Shapes*; `PassphraseProof.parse` parses a new passphrase too; a proof's
-  and a box's `vault` is a slice of `Vault`; the three sealing statics as built; `Box.make`/`seal`/
-  `tryOpen`'s refusals; `openBox` takes a Box or a record; models take the vault first, then holder;
-  `BoxRecord` the schema, `Box` the class; the vault's `logger`/`clock`/`keyDeriver` getters; a
-  box's `vault`/`props`/`summary` non-enumerable; `validators` in make's block;
-  `passkey_unavailable` moves to the passkey helper; `PasskeyAnswer` and `PasskeyProof` both.
-
+*Orchestrator:* carried 2026-10-19 (design doc rev ~2049): every ruling through B2's and B1/B3's
+drift. Written only as *Decided, not yet built* notes, for their threads to make true: the lease
+take-up leaving hello and the lazy hello everywhere (`lean_core`, a note in hello); the strength
+checker's contract (B4, a note in make); putBox/delBox reading nothing before the write
+(`lean_core`, a note in putBox). Left for the threads that build them: `putWayin` (the code has
+`changePassphrase`/`addPassphrase`/`addPasskey`/`delWayin`; B4), `strengthChecker` (B4),
+putBox's `over` and its returned Box (C2).
