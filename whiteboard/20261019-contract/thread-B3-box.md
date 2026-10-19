@@ -87,5 +87,6 @@ Branch `20261019-box`, [PR #202](https://github.com/mrflip/safebyok/pull/202), s
 * **Test counts** (vitest JSON reporter; total includes skipped): core 2378 (35 skipped) at base
   `19c0cc87`, 2439 (35) at the tip: `tests/box.test.ts` 28 to 72, `tests/utils.test.ts` 3 to 9,
   `tests/vault/vault-boxes.test.ts` 102 to 113 (1,197 lines); every other file and package the
-  same (one Convex validator test retitled `BoxRecord: ...`).
+  same (one Convex validator test retitled `BoxRecord: ...`). After the review's fixes (`829dd9df`,
+  2441) the rework tips at 2443 (35): `box.test.ts` 73 to 74, `vault-boxes.test.ts` 114 to 115.
 * **Size**: no line moved; `everything` 38.85 of 41 kB.
