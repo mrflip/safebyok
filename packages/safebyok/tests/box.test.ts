@@ -54,6 +54,11 @@ describe("BoxRecord", () => {
   it("keeps none of a field it does not know, such as the note a box once had", () => {
     expect(BoxRecord.parse({ ...wholeBox, note: 'work account' })).to.deep.equal(wholeBox)
   })
+
+  it("tells a row that is no box from one that is, as its example shows", () => {
+    expect(BoxRecord.safeParse(TH.vaultPropsOf('u1')).success).to.be.false
+    expect(BoxRecord.safeParse(wholeBox).success).to.be.true
+  })
 })
 
 // == [Box]: stubVault, the model, sealing, opening
