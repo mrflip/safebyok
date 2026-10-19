@@ -21,7 +21,7 @@ export type WhisperJson = string | number | boolean | null | WhisperJson[] | { [
 export type Whisper = Exclude<WhisperJson, null>
 
 /** True for a plain key-value object: one built by a literal or Object.create(null), nothing with its own prototype (a Date, a Map) that JSON would silently flatten. */
-const isPlainBag = (val: unknown): val is Record<string, unknown> => {
+export const isPlainBag = (val: unknown): val is Record<string, unknown> => {
   if (typeof val !== 'object' || val === null) { return false }
   const proto: unknown = Object.getPrototypeOf(val)
   return proto === Object.prototype || proto === null

@@ -684,10 +684,26 @@ user sets a new passphrase.
 
 ## Errors
 
-Every vault call that refuses throws a `VaultError` (`isVaultError(err, refusalkind?)` tests for one),
-with a calm message, a `refusalkind` to branch on, and the `family` it belongs to. A `VaultDB` verb
-throws nothing: it resolves an `Outcome`, `{ ok: true, val }` or `{ ok: false, err }`, its `err`
-that same `VaultError`; `outcomeOf(thunk)` makes one of any body that throws. The kinds are `RefusalKindVals`, and the
+Every vault call comes in two forms. `tryUnlock()`, `tryPutBox()`, `tryGetBox()` and the rest
+resolve to an `Outcome`, `{ ok: true, val }` or `{ ok: false, err }`, and never reject: the form
+for code that branches on the refusal. `unlock()`, `putBox()`, `getBox()` and the rest resolve to
+that `val` or throw that `err`: the form for code that reports failure by throwing, as a TanStack
+`queryFn` does. Either way the refusal is a `VaultError` (`isVaultError(err, refusalkind?)` tests
+for one), with a calm message, a `refusalkind` to branch on, and the `family` it belongs to; bad
+news is told to `onBadNews` once, whichever form met it. `getWhisper(boxlabel)` and `useBox()` come
+in the throwing form alone, and `subscribe()` and `Vault.make` throw their misuse at once.
+
+```ts
+const { ok, err } = await vault.tryUnlock(passphrase)
+if (! ok && err.refusalkind === 'wrong_passphrase') { askAgain(err.message) }
+
+const queryFn = () => vault.getWhisper('anthropic_api_key')   // throws its refusal, for TanStack Query
+```
+
+A retry predicate never retries `family: 'misuse'` or `vault_locked`, and may retry
+`storage_unavailable`. A `VaultDB` verb throws nothing either: it resolves an `Outcome`, its `err`
+that same `VaultError`; `outcomeOf(thunk)` makes one of any body that throws, and `valOf(outcome)`
+hands back its `val` or throws its `err`. The kinds are `RefusalKindVals`, and the
 whole list: the storage adapters (`safebyok-indexeddb`, `safebyok-convex`, `safebyok-postgres`,
 `safebyok-graphql`, your own) throw these same kinds, and no package has others. An error never
 carries a whisper, a passphrase or any other secret, in its message or as a property.
@@ -709,6 +725,7 @@ during render for that, and hands a condition down as `openError`).
 | `vault_closed`        | the vault handle was closed                                      | Open the vault again; do not use a handle after `close()` |
 | `unknown_key_deriver` | the vault names a key deriver this handle was not built with     | Update safebyok, or open the vault with the deriver that made it |
 | `insecure_context`    | `Vault.make` in a page that is not a secure context: served over plain http from anywhere but localhost, where the browser withholds WebCrypto | Serve the app over https |
+| `unexpected_error`    | something threw that is no refusal: a bug, in safebyok or in a function the app handed it (a key deriver, a passphrase test, a passkey maker that throws something other than a `VaultError`). What was thrown is its `cause`; the vault never logs it, as such a function may have been handed a passphrase | Do not retry; read the `cause`, and fix the function, or report the bug |
 
 ### Conditions: handle them at run time
 

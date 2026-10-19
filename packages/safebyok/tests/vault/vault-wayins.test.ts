@@ -743,13 +743,14 @@ describe("a new passphrase's strength", () => {
     await TH.expectRefusal(world.open({ passphraseStrengthTest: 12 as unknown as MakeVaultOpts['passphraseStrengthTest'] }), 'bad_option')
   })
 
-  it("refuses with kind 'bad_option' a test that answers no verdict, and throws what a test throws, creating nothing", async () => {
+  it("refuses with kind 'bad_option' a test that answers no verdict, and as 'unexpected_error' one that throws, what it threw the cause, creating nothing", async () => {
     const world = makeWorld()
     const misfit = await world.open({ passphraseStrengthTest: (() => 'weak') as unknown as MakeVaultOpts['passphraseStrengthTest'] })
     await TH.expectRefusal(misfit.unlock('pw'), 'bad_option')
     const thrown = new Error('the strength service is down')
     const broken = await world.open({ passphraseStrengthTest: () => { throw thrown } })
-    await expect(broken.unlock('pw')).rejects.toThrow(thrown)
+    const err = await TH.expectRefusal(broken.unlock('pw'), 'unexpected_error')
+    expect(err.cause).to.eq(thrown)
     expect(world.dbStore.ckeys()).to.have.lengthOf(0)
   })
 })

@@ -8,7 +8,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { Component, createElement, use, type ReactElement, type ReactNode } from 'react'
 import { onTestFinished, vi } from 'vitest'
-import { LeaseHours, VaultError, type WayinSummary, type Vault, type VaultState } from 'safebyok'
+import { LeaseHours, VaultError, outcomeOf, unexpectedError, type Outcome, type WayinSummary, type Vault, type VaultState } from 'safebyok'
 import { scopeOf } from 'safebyok/testing'
 import { fromB64, toB64 } from 'safebyok/utils'
 
@@ -44,11 +44,17 @@ export type StubVaultOpts = {
 /** The lease, in milliseconds, of a vault opened with the default leaseHours. */
 export const DefaultLeaseMillis = LeaseHours * 3_600_000
 
+/** `call`'s `try` form, as a vault makes it: its outcome, a throw that is no VaultError said as `unexpected_error`. */
+const trying = <ArgsT extends unknown[], ValT>(call: ((...args: ArgsT) => Promise<ValT>) | undefined) => (
+  call && ((...args: ArgsT): Promise<Outcome<ValT>> => outcomeOf(() => call(...args), unexpectedError))
+)
+
 /**
  * Just enough of a Vault for a component to render it: a snapshot that keeps its identity and
  * never changes (`state`, default 'locked'; `wayins`, default none; the scope of `u1`'s `main`
  * vault in the `acme` app, as `scopeOf` has it, its fields beside it), a window (default seven days), a subscribe that
- * never calls back, and whichever calls the test hands it.
+ * never calls back, and whichever calls the test hands it, each in both its forms: given as the
+ * throwing form, its `try` form answers the same as an Outcome.
  *
  * @example const vault = TH.stubVault({ state: 'absent' })
  * @example const vault = TH.stubVault({ unlock: () => Promise.reject(new VaultError('wrong_passphrase', 'Not that one.')) })
@@ -61,7 +67,9 @@ export const stubVault = (opts: StubVaultOpts = {}): Vault => {
     subscribe:       () => unsubscribeFromNothing,
     leaseMillis:     opts.leaseMillis ?? DefaultLeaseMillis,
     unlock:          opts.unlock,
+    tryUnlock:       trying(opts.unlock),
     del:             opts.del,
+    tryDel:          trying(opts.del),
   } as unknown as Vault
 }
 

@@ -326,34 +326,25 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
   const submit = async (evt: SubmitEvent) => {
     evt.preventDefault()
     setGripe(null)
-    try {
-      await vault.unlock(fieldRef.current?.value ?? '')
-      if (! isMounted()) { return }
-      onDone(true)
-    } catch (err) {
-      if (! isMounted()) { return }
-      // The vault was locked while this unlock was under way, and the lock wins: as if dismissed.
-      if (isVaultError(err, 'vault_locked')) { onDone(false); return }
-      meet(err)
-    }
+    const { ok, err } = await vault.tryUnlock(fieldRef.current?.value ?? '')
+    if (! isMounted()) { return }
+    if (ok) { onDone(true); return }
+    // The vault was locked while this unlock was under way, and the lock wins: as if dismissed.
+    if (isVaultError(err, 'vault_locked')) { onDone(false); return }
+    meet(err)
   }
 
   const startOver = async () => {
     setDeleting(true)
     setGripe(null)
-    try {
-      await vault.del()
-      if (! isMounted()) { return }
-      setStartingOver(false)
-    } catch (err) {
-      if (! isMounted()) { return }
-      // The vault the user agreed to delete was deleted already, or made anew, elsewhere: what
-      // stands now was never confirmed, so the question goes, to be asked afresh.
-      if (isVaultError(err, 'stale_write')) { setStartingOver(false) }
-      meet(err)
-    } finally {
-      if (isMounted()) { setDeleting(false) }
-    }
+    const { ok, err } = await vault.tryDel()
+    if (! isMounted()) { return }
+    setDeleting(false)
+    if (ok) { setStartingOver(false); return }
+    // The vault the user agreed to delete was deleted already, or made anew, elsewhere: what
+    // stands now was never confirmed, so the question goes, to be asked afresh.
+    if (isVaultError(err, 'stale_write')) { setStartingOver(false) }
+    meet(err)
   }
 
   /** Each change to the field: a complaint about what was typed before goes (a passkey's word, or a vault made elsewhere, stays till the next submit), and, while choosing, the host's advice is asked anew. */

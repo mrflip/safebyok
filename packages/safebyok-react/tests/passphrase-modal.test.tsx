@@ -277,20 +277,22 @@ describe("PassphraseModal", () => {
       expect(heard).to.deep.equal([false])
     })
 
-    it("meets a failure that is no VaultError the same way", async () => {
+    it("meets a failure that is no VaultError the same way, as the vault answers it: unexpected_error, what was thrown its cause", async () => {
       const fell = new TypeError('fell over')
       const { reported } = TH.renderReporting(<TH.Catcher><PassphraseModal vault={TH.vaultUnlockingWith(() => Promise.reject(fell))} onDone={noop} /></TH.Catcher>)
       TH.submitPassphrase('pw one')
       expect(await screen.findByText('Something went wrong')).to.not.be.null
-      expect(reported).to.deep.equal([fell])
+      expect(reported).to.have.lengthOf(1)
+      expect(reported[0]).to.include({ refusalkind: 'unexpected_error', cause: fell })
       expect(screen.queryByText(/caught:|fell over/)).to.be.null
     })
 
-    it("meets a rejection that is no Error at all the same way", async () => {
+    it("meets a rejection that is no Error at all the same way, as unexpected_error", async () => {
       const { reported } = TH.renderReporting(<TH.Catcher><PassphraseModal vault={TH.stubVault({ unlock: vi.fn().mockRejectedValue(null) })} onDone={noop} /></TH.Catcher>)
       TH.submitPassphrase('pw one')
       expect(await screen.findByText('Something went wrong')).to.not.be.null
-      expect(reported).to.deep.equal([null])
+      expect(reported).to.have.lengthOf(1)
+      expect(reported[0]).to.have.property('refusalkind', 'unexpected_error')
     })
   })
   // --

@@ -143,7 +143,7 @@ describe("PasskeyUnlockButton", () => {
     expect(vault.getSnapshot().state).to.eq('locked')
   })
 
-  it("meets a failure that is no VaultError the same way", async () => {
+  it("meets a failure that is no VaultError the same way, as the vault answers it: unexpected_error, what was thrown its cause", async () => {
     const { authenticator } = await lockedVaultWithPasskey()
     const [credentialId = ''] = authenticator.credentialIds()
     const fell = new TypeError('fell over')
@@ -151,7 +151,8 @@ describe("PasskeyUnlockButton", () => {
     const { reported } = TH.renderReporting(<PasskeyUnlockButton vault={vaultRefusing(fell, credentialId)} onDone={noop} onGripe={(gripe) => { gripes.push(gripe) }} />)
     fireEvent.click(screen.getByText('Use a passkey'))
     await waitFor(() => { expect(gripes).to.deep.equal([null, PasskeyTrouble]) })
-    expect(reported).to.deep.equal([fell])
+    expect(reported).to.have.lengthOf(1)
+    expect(reported[0]).to.include({ refusalkind: 'unexpected_error', cause: fell })
   })
 
   describe("once it has gone", () => {
@@ -202,7 +203,7 @@ describe("PasskeyUnlockButton", () => {
         answered.resolve(undefined)
         return credential
       })
-      const unlock = vi.spyOn(vault, 'unlock')
+      const unlock = vi.spyOn(vault, 'tryUnlock')
       const gripes: (string | null)[] = []
       const { unmount } = render(<PasskeyUnlockButton vault={vault} onDone={noop} onGripe={(gripe) => { gripes.push(gripe) }} />)
       fireEvent.click(screen.getByText('Use a passkey'))

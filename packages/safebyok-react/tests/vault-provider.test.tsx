@@ -1010,7 +1010,7 @@ describe("VaultProvider", () => {
       expect(isVaultError(caught[0], 'bad_option')).to.be.true
     })
 
-    it("throws a rejection that is no VaultError to the boundary: only a VaultError can be a condition", async () => {
+    it("throws a rejection that is no VaultError to the boundary, as the vault answers it: unexpected_error, misuse, what was thrown its cause", async () => {
       hushConsole()
       const world = makeWorld()
       // Mocked past VaultDB's public verb, which would wrap a raw throw as storage_unavailable.
@@ -1019,7 +1019,7 @@ describe("VaultProvider", () => {
       const caught: unknown[] = []
       world.mount('u1', caught)
       await expectShown('boundary')
-      expect(caught[0]).to.eq(stray)
+      expect(caught[0]).to.include({ refusalkind: 'unexpected_error', cause: stray })
     })
 
     const ConditionCases = [
@@ -1303,7 +1303,7 @@ describe("VaultProvider", () => {
       expect(screen.queryByText('Retry')).to.be.null
     })
 
-    it("throws a rejection of null too: the failure is held, not the value", async () => {
+    it("throws a rejection of null too, as unexpected_error: the failure is held, not the value", async () => {
       hushConsole()
       const world = makeWorld()
       vi.spyOn(world.vaultDB, 'getVaultProps').mockRejectedValueOnce(null)
@@ -1317,7 +1317,7 @@ describe("VaultProvider", () => {
       )
       await expectShown('boundary')
       expect(caught).to.have.length(1)
-      expect(caught[0]).to.be.null
+      expect(caught[0]).to.have.property('refusalkind', 'unexpected_error')
     })
 
     it("ignores a rejection that arrives after the user signed out", async () => {

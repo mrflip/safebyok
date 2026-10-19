@@ -70,19 +70,24 @@ const PasskeyPress = ({ vault, onDone, onGripe, rpId, autoFocus }: PasskeyUnlock
     try {
       const passkey = await askPasskey(snapshot.wayins, { rpId })
       if (passkey === null || ! isMounted()) { return }
-      await vault.unlock(passkey)
+      const { ok, err } = await vault.tryUnlock(passkey)
       if (! isMounted()) { return }
-      onDone(true)
+      if (ok) { onDone(true); return }
+      heard(err)
     } catch (err) {
-      if (! isMounted()) { return }
-      // The vault was locked while this unlock was under way, and the lock wins: as if dismissed.
-      if (isVaultError(err, 'vault_locked')) { onDone(false); return }
-      if (isVaultCondition(err)) { onGripe(err.message); return }
-      // Misuse, or no VaultError at all: rethrown in render, for PasskeyUnlockButton's boundary.
-      setFailure({ err })
+      if (isMounted()) { heard(err) }
     } finally {
       if (isMounted()) { setAsking(false) }
     }
+  }
+
+  /** What the unlock, or the authenticator asked before it, refused with. */
+  const heard = (err: unknown) => {
+    // The vault was locked while this unlock was under way, and the lock wins: as if dismissed.
+    if (isVaultError(err, 'vault_locked')) { onDone(false); return }
+    if (isVaultCondition(err)) { onGripe(err.message); return }
+    // Misuse, or no VaultError at all: rethrown in render, for PasskeyUnlockButton's boundary.
+    setFailure({ err })
   }
 
   return (

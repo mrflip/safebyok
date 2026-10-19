@@ -284,23 +284,19 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
 
   /**
    * Has `made` say hello, again when retried: the provider owns the vault's first hello. A refusal
-   * that is a condition is kept for openError, until a hello succeeds; one that is misuse, or no
-   * VaultError at all, goes to the error boundary. Nothing is heard from a vault the provider has
-   * let go.
+   * that is a condition is kept for openError, until a hello succeeds; one that is misuse goes to
+   * the error boundary. Nothing is heard from a vault the provider has let go.
    */
   const sayHello = useCallback(async (made: Vault) => {
-    try {
-      await made.hello()
-    } catch (err) {
-      if (vaultRef.current !== made) { return }
-      if (isVaultCondition(err)) {
-        setHelloRefusal({ vault: made, err })
-        return
-      }
+    const { ok, err } = await made.tryHello()
+    if (vaultRef.current !== made) { return }
+    if (ok) {
+      setHelloRefusal(null)
+    } else if (isVaultCondition(err)) {
+      setHelloRefusal({ vault: made, err })
+    } else {
       setOpenFailure({ err })
-      return
     }
-    if (vaultRef.current === made) { setHelloRefusal(null) }
   }, [])
 
   useEffect(() => {
