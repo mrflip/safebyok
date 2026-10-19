@@ -140,6 +140,13 @@ describe("Lease.make", () => {
     expect(err.message).to.not.include('someone_else')
   })
 
+  it("refuses a lease granted under another user's vault as 'corrupt_record': it can never reach tryOpen here", async () => {
+    const { vault } = leaseVaultOf('u2')
+    const theirs = await Lease.grant(vault, holder, await vaultKeyPairOf(), Deadline)
+    const { vault: mine } = leaseVaultOf('u1')
+    TH.expectSyncRefusal(() => Lease.make(mine, theirs.props), 'corrupt_record')
+  })
+
   it("refuses null and a bare string as 'corrupt_record'", () => {
     const { vault } = leaseVaultOf()
     TH.expectSyncRefusal(() => Lease.make(vault, null), 'corrupt_record')
@@ -212,13 +219,6 @@ describe("lease.tryOpen", () => {
       expect(err.cause).to.be.undefined
     })
   }
-
-  it("refuses another scope's vault: a lease made for u2 opens nothing for u1's props, as its wrap is bound to u2", async () => {
-    const { vault } = leaseVaultOf('u2')
-    const theirs = await Lease.grant(vault, holder, await vaultKeyPairOf(), Deadline)
-    const { vault: mine } = leaseVaultOf('u1')
-    TH.expectSyncRefusal(() => Lease.make(mine, theirs.props), 'corrupt_record')
-  })
 })
 
 describe("lease.endsWithin", () => {
