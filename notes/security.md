@@ -58,7 +58,18 @@ added or folded into through the subagent, and no other entry changes.
   whisper's bytes: it is internal, frozen and short-lived, and is never logged, stored or exported
   from the package. (4) `vault.openBox(box)` checks the record first (`bad_record`), then the key in
   hand (`vault_locked`), then re-makes the box under the vault's own props; `box.tryOpen` has no
-  `absent_vault` path any more, since a box cannot be made without vault props.
+  `absent_vault` path any more, since a box cannot be made without vault props. (5) A box read from
+  storage (in `getBox`, `putBox` and `delBox`) is made only while the vaultKey is in hand: the key is
+  checked first, so a call whose storage read answers after a refresh found the vault deleted
+  elsewhere refuses `vault_locked`, never `absent_vault` (the fix in commit 96f64d61 of the second
+  review). (6) Restacked on thread B1 (proof_wayin, [#201](https://github.com/mrflip/safebyok/pull/201)):
+  the vault freezes every vault props record as it takes it up (`frozenVaultProps` in
+  `packages/safebyok/src/vault.ts`: a copy, its `wayins` array and each wayin record and its
+  `vault_key_wayin_wrapped` frozen) at each of the three places it does so (a read in refresh, the
+  unlock that creates the vault, a change to the ways in). So the record the vault works from, the
+  snapshot's `props`, each wayin's `holder` and the `holder` each box is made or sealed under are one
+  frozen object; a host holding any of them cannot write to the vault's own record. (Each `Box` still
+  keeps its own frozen copy of the holder's `vault_id` and `vault_key_epoch`.)
 * 2026-10-19 (thread B3, box): **the stored box is a model class, `Box`, holding a back-reference to
   its vault; sealing and opening moved into it, and a box's enumerable fields are exactly its stored
   ones.** (1) The class (`packages/safebyok/src/box.ts`): the Zod schema once exported as `Box` is
