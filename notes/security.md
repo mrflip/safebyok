@@ -224,7 +224,7 @@ added or folded into through the subagent, and no other entry changes.
   message. An RLS policy that hides rows (USING) refuses nothing: Postgres filters them, so a vault
   reads as absent and a write over a hidden row as `stale_write`; only a refused insert or a
   missing privilege becomes `not_permitted`.
-* 2026-10-19 (thread A6, getproof): **`lockLanded`: a `lock()`, `close()` or `del()` landing while a
+* 2026-10-19 (thread A6, getproof); 2026-10-19 (a_sec, #203): **`lockLanded`: a `lock()`, `close()` or `del()` landing while a
   prompt is up aborts the ask's `AbortController`, and the lock wins over an `attempt()` under way.**
   Every waiter on the ask is refused `vault_locked` at once and `ask.lockLanded` settles, so the
   dialog closes; an `attempt()` after that refuses `vault_locked` without reading storage or deriving
@@ -236,10 +236,22 @@ added or folded into through the subagent, and no other entry changes.
   counters). The signal covers only `lock()`, `close()` and `del()`: other relocks
   (`identity_revoked`, `rolled_back`, a moved `unlock_epoch`, the lease expiring) do not land on the
   prompt, and `unlock()` outside a prompt keeps its earlier behaviour (a lock during it does not stop
-  it; TODO.md's lock-timing scenario 1, for the policy session). An attempt still under way when the
-  user cancels the dialog is not stood down: it may unlock the vault afterwards (the answer is
-  dropped, the unlock is not). Starting over from the dialog (`vault.del()`) lands as a lock and
-  closes the dialog.
+  it; TODO.md's lock-timing scenario 1, for the policy session). Starting over from the dialog
+  (`vault.del()`) lands as a lock and closes the dialog.
+  Amended 2026-10-19 (a_sec, #203; replacing the earlier statement that an attempt under way after
+  Cancel may unlock the vault afterwards): an ask's answer, whatever it is, now stands down every
+  attempt still under way on that ask. `Ask` holds a second `AbortController` (`#over`), aborted by a
+  lock landing and by the answer settling (before any waiter hears the answer), and that is the
+  signal the attempt's unlock checks before the lease wrap, before the lease write and after it. So an
+  attempt still running after Cancel, or a second submit's attempt still running after the first
+  answered `unlocked`, unlocks nothing, and a later `lock()` is never undone by it. `lockLanded` is
+  still settled only by a lock (the first controller). An attempt after the answer refuses
+  `vault_locked` without trying. Before, once answered, the ask was no longer tracked, so a `lock()`
+  after a Cancel could be followed by the attempt finishing and leaving the vault unlocked with a
+  lease. Edge: an answer landing exactly while an attempt is writing its lease under `lease_ending`
+  erases that lease (and so the one it overwrote), while the key already held in memory stays until
+  its deadline. An overtaken attempt stands down any lease take-up (`#standDownTakeUp`) as it erases
+  the lease it wrote, so a hello that read that lease in between takes nothing up.
 * 2026-10-19 (thread A6, getproof): **`Ask`: one per prompt, with one shared answer, and its
   `attempt(proof, { wayinId? })` runs the same unlock body as `unlock()`.** `Ask`
   (`packages/safebyok/src/ask.ts`; `Ask.raise` is the vault's) owns `why`, the vault handle,
@@ -271,7 +283,12 @@ added or folded into through the subagent, and no other entry changes.
   let go asks no one. It shows the dialog only while `navigator.userActivation.isActive` is not
   `false` (true where the browser does not say), so a timer's or background call is answered
   `declined` unasked, or `carry_on` under a lease ending, rather than popping a dialog the user did
-  not ask for.
+  not ask for. Amended 2026-10-19 (a_sec, #203): a vault the provider has let go tells no handler and
+  asks no one. The provider's refs to the host's `onBadNews` and `getProof` now move in passive
+  effects, not layout effects (replacing "layout effect" in the next entry); since React runs every
+  passive cleanup before any passive effect, the effect cleanup that closes the old vault's gate
+  always runs before the next user's handlers are installed, closing a sub-frame window in which the
+  last user's news (with a boxlabel in `meta.box_listed`) or ask could reach the next user's handler.
 * 2026-10-19 (thread A5, react_over_class): **`VaultProvider` holds `onBadNews` in a ref, defers its
   first `hello()` a microtask, and throws `Vault.make`'s refusal from the effect.** (1) The provider
   hands `Vault.make` one stable teller that calls whichever handler the last committed render passed
@@ -495,6 +512,13 @@ added or folded into through the subagent, and no other entry changes.
   record (the lease standing may be the overtaking change's own). Nothing else about lock timing
   versus work in flight changed: the policy owed before 1.0 (TODO.md, *Lock timing vs. work in
   flight*) is still open.
+  Amended 2026-10-19 (a_sec, #203): a hello's lease take-up also takes nothing up when the vault
+  props it fitted the lease against are outrun during its waits (`#outrun(standing)`: `vault_id` or
+  `unlock_epoch` moved, or the handle closed), even though no key is held for the "outlived" relock
+  to drop. Before, a passphrase change or wayin removal on another device (new `unlock_epoch`), or the
+  vault deleted and made anew elsewhere (new `vault_id`), landing during the unwrap left this device
+  unlocked under the new props with the old key, indefinitely, defeating the epoch's revocation. The
+  lease is left for the next hello, which discards it as not fitting.
 
 * 2026-10-18: **the context bytes of every wayin changed spelling, not construction, with the
   rename to "wayin".** A wayin's wrap is bound to a context of the record's format tag, then its
@@ -1324,12 +1348,22 @@ added or folded into through the subagent, and no other entry changes.
   `maxWhisperBytes`, 512 bytes for its fixed-size fields and its measured names and sidecar, would
   pass `maxVaultBytes` (`vault_full`). The vault's total is reckoned from the snapshot's listing,
   so a vault another device filled meanwhile is caught by the backend's own limit, as before.
-* 2026-10-15: `PassphraseModal` and `PasskeyUnlockButton` (`safebyok-react`) catch, in an error
+* 2026-10-15; 2026-10-19 (a_sec, #203): `PassphraseModal` and `PasskeyUnlockButton` (`safebyok-react`) catch, in an error
   boundary of their own, every failure that is not a condition (misuse, or anything that is no
   `VaultError`, whatever its value), and show the user fixed copy, never the error's message. React
   hands the very thrown value to the host root's `onCaughtError` (the console by default), as it
   would any error a boundary catches; before, it went to the host's boundary instead. The dialog's
   form, and the passphrase typed into its state, unmount with the failure.
+  Amended 2026-10-19 (a_sec, #203): everything rethrown now passes `forBoundary`
+  (`packages/safebyok-react/src/boundary.tsx`): a `VaultError` keeps kind, message and meta but never
+  its `cause` (which for `unexpected_error` can be a host key deriver's or strength test's throw,
+  handed the passphrase), and anything that is not a `VaultError` becomes a fixed `unexpected_error`
+  quoting nothing of it, so "the very thrown value" above no longer reaches `onCaughtError`. A host
+  `passphraseAdvice` that throws (it is handed every keystroke of a new passphrase) is replaced at its
+  source with a fixed refusal, so even a `VaultError` it threw carries nothing on. `meta` is passed
+  through as is. The dialog's fallback notice once misuse trips it ("Something went wrong") now shares
+  the dialog's one answer: a lock landing closes it answering `declined`, and a vault unlocked under
+  it answers `unlocked`; its Close no longer answers `declined` over a vault that has since unlocked.
 * 2026-10-16 (revised the same day by refusals_and_catchup, below: `whenIdentityRevoked` is gone, and `rolled_back` locks too): **a sign-out locks the vault.** An adapter whose backend knows who is signed in
   refuses a vault whose `user_id` is not that user -- signed out, or another user signed in --
   with kind `identity_revoked`, distinct from `not_permitted` (the vault's own user refused one
