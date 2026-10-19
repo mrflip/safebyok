@@ -1,7 +1,8 @@
 # Thread a_sec: phase A's security fix-up (2026-10-19)
 
-Branch `20261019-a_sec`, PR #TBD, stacked on [#195](https://github.com/mrflip/safebyok/pull/195)
-(`20261019-outcome_adapters`; to be restacked onto B1). Justify: TBD.
+Branch `20261019-a_sec`, [PR #203](https://github.com/mrflip/safebyok/pull/203), stacked on
+[#195](https://github.com/mrflip/safebyok/pull/195) (`20261019-outcome_adapters`; to be restacked
+onto B1). Justify: green; core 2384 (35 skipped), react 268, demo 215 (16 skipped), 0 failed.
 
 The findings are phase A's pass-2 security review (posted on the sprint PR #192): F1-F4, and
 three items queued from A6's review. Each fix has a regression test that fails without it
@@ -66,6 +67,19 @@ three items queued from A6's review. Each fix has a regression test that fails w
     attempt erases the lease it just wrote (as an overtaken attempt does), and with it the
     lease it overwrote; the key in memory stays until its deadline, and the next reload asks. The
     safe direction, and rare (the answer must land inside `putLease`).
+
+* **Test counts** (vitest totals including skipped), base `19c0cc87` to tip: core 2378 (35) to
+  2384 (35): `tests/vault/vault-lease.test.ts` 130 to 134 (F1), `vault-hello.test.ts` 92 to 94
+  (F2, epoch and remade vault). React 263 to 268: `passphrase-modal.test.tsx` 98 to 101 (F5 meta
+  and cause, F6 lock and unlock under the notice; F4's and a cause test rewritten),
+  `vault-provider-hooks` 12 to 13 and `vault-provider-dialog` 26 to 27 (F3; one dialog test
+  rewritten for F1), `passkey-unlock-button.test.tsx` 18 unchanged (one rewritten). Every new
+  test was run against the unfixed source and failed. Every other workspace unchanged.
+* **Size**: `pnpm size:budget --write`: `everything` 41 to 42 kB, `VaultProvider` 8.3 to 8.5,
+  `reactEverything` 8.7 to 9.
+* **Security notes**: six facts folded into four existing entries (A6 `lockLanded`, the A3
+  take-up amendment, A6 `getProof`'s gating, the 2026-10-15 boundary entry). The A5 entry still
+  says the provider's ref is "updated in a layout effect"; the new text says it replaces that.
 
 * **For the Coach** (Open Matters):
   * **Cancel now means cancel**: an attempt still running when the user cancels unlocks nothing
