@@ -2,7 +2,7 @@
 
 Branch `20261019-a_sec`, [PR #203](https://github.com/mrflip/safebyok/pull/203), stacked on
 [#195](https://github.com/mrflip/safebyok/pull/195) (`20261019-outcome_adapters`; to be restacked
-onto B1). Justify: green; core 2384 (35 skipped), react 268, demo 215 (16 skipped), 0 failed.
+onto B1). Justify: green; core 2392 (35 skipped), react 274, demo 215 (16 skipped), 0 failed.
 
 The findings are phase A's pass-2 security review (posted on the sprint PR #192): F1-F4, and
 three items queued from A6's review. Each fix has a regression test that fails without it
@@ -57,16 +57,29 @@ three items queued from A6's review. Each fix has a regression test that fails w
   attempts' signal, aborted by the same lock plus the answer. Nothing else about lock timing is
   pinned: `unlock()` outside a prompt racing `lock()` (TODO scenario 1) and the relocks that do not
   land as locks (`identity_revoked`, `rolled_back`) are untouched.
-* **Deviations**: none from the thread text.
+* **Rework after review** (on the reviewer's `4f342f43`): F2 now wins by construction in
+  `#takeStorage` (a read records outrunning props and drops the key before its next await), the
+  make and revise paths no longer write older props over them, and a key deriver's or strength
+  test's own misuse becomes `unexpected_error`. Details and counts, for the second reviewer and
+  whoever restacks: [thread-a_sec-rework.md](thread-a_sec-rework.md).
+* **Deviations**:
+  * **A condition from a deriver or strength test still passes through as it came** (the directive
+    said any throw, a VaultError included). Wrapping those would turn zxcvbn's `storage_unavailable`
+    (its word list failed to load: "try again shortly") and safebyok-fastkey's `wrong_passphrase`
+    for an empty passphrase into a trouble notice, and break the dialog's retry. Conditions never
+    reach `onCaughtError` (the dialog shows them in place or closes), so the README's "carries
+    nothing the user typed" holds. Another copy's VaultError (an ESM and a CJS build side by side)
+    is recognized as `outcomeOf` recognizes it. Open Matter below.
 * **Discoveries**:
   * **A dialog test pinned the old behaviour**: "lets an attempt finishing after Cancel unlock
     the vault, which answers a newer dialog too" is now "stands an attempt down when the user
     cancels during it: a newer dialog stays asking, and the vault stays locked". Three react tests
     that expected the boundary to see `cause` (or the advice's very throw) now expect it stripped.
-  * **An answer landing exactly while an attempt writes its lease, under `lease_ending`**: the
-    attempt erases the lease it just wrote (as an overtaken attempt does), and with it the
-    lease it overwrote; the key in memory stays until its deadline, and the next reload asks. The
-    safe direction, and rare (the answer must land inside `putLease`).
+  * **An answer landing exactly while an attempt writes its lease** erases the lease it just
+    wrote (as an overtaken attempt does), and with it the lease it overwrote. Under
+    `lease_ending`, and under `locked` with a double submit (the first attempt unlocks and answers;
+    the second, mid-write, erases the first's lease), the key in memory stays until its deadline
+    and the next reload asks. Both fail safe; kept as is.
 
 * **Test counts** (vitest totals including skipped), base `19c0cc87` to tip: core 2378 (35) to
   2384 (35): `tests/vault/vault-lease.test.ts` 130 to 134 (F1), `vault-hello.test.ts` 92 to 94
@@ -80,6 +93,7 @@ three items queued from A6's review. Each fix has a regression test that fails w
 * **Security notes**: six facts folded into four existing entries (A6 `lockLanded`, the A3
   take-up amendment, A6 `getProof`'s gating, the 2026-10-15 boundary entry). The A5 entry still
   says the provider's ref is "updated in a layout effect"; the new text says it replaces that.
+  The rework's two facts folded into the A3 take-up amendment and the A4 host-throw paragraph.
 
 * **For the Coach** (Open Matters):
   * **Cancel now means cancel**: an attempt still running when the user cancels unlocks nothing
@@ -88,3 +102,5 @@ three items queued from A6's review. Each fix has a regression test that fails w
   * **A host advice throw is reported as a fixed refusal**, not swallowed as the default
     `adviceFrom` swallows a strength test's throw. Recommend: keep reporting (a broken advice
     function is a bug the developer should see), with nothing of it quoted.
+  * **Conditions from a deriver or strength test pass through** (see *Deviations*). Recommend:
+    keep; the alternative breaks zxcvbn's retry and fastkey's empty-passphrase gripe.
