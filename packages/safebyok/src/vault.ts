@@ -1900,6 +1900,7 @@ export class Vault {
     if (kept === null || isOvertaken()) { return }
     // A record that is no lease, or another vault's, is unreadable.
     const made = await outcomeOf(() => Lease.make(this, kept), unexpectedError)
+    if (isOvertaken()) { return }
     if (! made.ok) {
       await this.#discardLease(made.err)
       return

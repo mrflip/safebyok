@@ -4,6 +4,7 @@ import { VaultError, isVaultError } from '../../src/errors'
 import { deviceTroubleAsConditions, memoryDeviceDB } from '../../src/device-db'
 import { localVaultDB } from '../../src/local-vault-db'
 import { Vault } from '../../src/vault'
+import { Lease } from '../../src/lease'
 import { delDamagedVault } from '../../src/del-damaged-vault'
 import { type Outcome, bad } from '../../src/outcome'
 import * as TH from '../test-helpers'
@@ -958,6 +959,20 @@ describe("a lease take-up a key change overtakes", () => {
     expect(vault.state).to.eq('unlocked')
     const standing = await world.getLease()
     expect(standing?.ask_passphrase_at).to.eq(vault.askPassphraseAt).and.to.eq(world.clock.now() + SevenDaysMillis)
+  })
+
+  it("leaves the lease it read as it stood when the handle closes while a hello's take-up makes it", async () => {
+    const world = makeWorld()
+    const before = await world.openUnlocked('pw')
+    before.close()
+    const kept = await world.getLease()
+    const vault = Vault.make(world.optsWith())
+    vi.spyOn(Lease, 'make').mockImplementationOnce(() => {
+      vault.close()
+      throw new VaultError('corrupt_record', "A lease this test will not read.")
+    })
+    await vault.hello()
+    expect(await world.getLease()).to.deep.equal(kept)
   })
 })
 
