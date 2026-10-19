@@ -191,8 +191,10 @@ beside them; no `bar.test.ts` stays outside the folder, and no `describe` title 
 move. A module reached only through another's public verb (`vault-opts.ts` through `Vault.make`)
 is tested beside that verb. Test and build artifacts never land in `src/`.
 
-* **Test helpers live in one module, `tests/test-helpers.ts`, star-imported as `TH`**:
-  `import * as TH from './test-helpers'`, then `TH.scopeOf('u1')`. It exports everything. The
+* **Test helpers are reached through one module, `tests/test-helpers.ts`, star-imported as `TH`**:
+  `import * as TH from './test-helpers'`, then `TH.scopeOf('u1')`. It exports everything, and
+  may re-export, by name, a folder of parts beside it (`tests/test-helpers/`: grep the door for the
+  part that holds a helper, then read that part). A new helper goes in its part and in the door. The
   core's is also published as `safebyok/testing`, so another package's tests reach the same
   helpers; a package with helpers of its own keeps them in its own `tests/test-helpers.ts`, which
   re-exports `safebyok/testing` beside them, so each test still has one `TH`.

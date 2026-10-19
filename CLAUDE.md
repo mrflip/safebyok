@@ -128,9 +128,9 @@ What you read stays in your context and is paid for again on every later turn, s
 task at hand, and never read again what is already there. Find with `grep -n`, then read the
 lines you need. Read a file whole when you will change it or need most of it.
 These are long enough to search instead, reading only the lines you need: in
-`packages/safebyok/`, `src/vault.ts`, `src/vault-db.ts`, `README.md`, `tests/test-helpers.ts`,
-`tests/test-helpers.test.ts`, `tests/vault-db.test.ts`, and the `tests/vault/` folder taken together
-(a theme per file: grep it, read the one file);
+`packages/safebyok/`, `src/vault.ts`, `src/vault-db.ts`, `README.md`, `tests/test-helpers.test.ts`,
+`tests/test-helpers/vault-db-conformance.ts`, `tests/vault-db.test.ts`, and the `tests/vault/`
+folder taken together (a theme per file: grep it, read the one file);
 `safebyok-react/tests/vault-provider.test.tsx`; `safebyok-postgres/tests/postgres-vault-db.test.ts`.
 The documents below are looked up by section, not read through.
 
