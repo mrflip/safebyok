@@ -8,7 +8,7 @@ import { PsstModal } from './PsstModal'
 import type { Sidecar, Whisper } from 'safebyok'
 
 /**
- * Direct manipulation of the vault's lockboxes: add, view, edit, delete, use. The lines that
+ * Direct manipulation of the vault's lockboxes: add, view, edit, remove, use. The lines that
  * matter are the one-liners inside each handler -- `vault.storeBox(...)`, `vault.readBox(...)`,
  * `vault.useBox(...)`, `vault.retireBox(...)`, each wrapped in `withUnlockedVault()` so a locked
  * vault summons the passphrase dialog and retries. Everything else is table furniture.
@@ -42,17 +42,17 @@ export const VaultDashboard = () => {
   // and start over, which asks first, as it takes every lockbox in the vault with it.
   if (openError?.kind === 'damaged_vault') {
     const startOver = async () => {
-      if (! globalThis.confirm("Erase this vault and start over? Every lockbox in it is lost for good.")) { return }
+      if (! globalThis.confirm("Remove this vault and start over? Every lockbox in it is lost for good.")) { return }
       setGripe(null)
       try {
         await retireDamagedVault()
       } catch (err) {
-        setGripe(err instanceof Error ? err.message : 'Could not erase the vault.')
+        setGripe(err instanceof Error ? err.message : 'Could not remove the vault.')
       }
     }
     return (
       <>
-        <p className="gripe">{"Your vault's stored record is damaged, so it can't be opened. "}{openError.message} <button onClick={() => { void startOver() }}>Erase and start over</button></p>
+        <p className="gripe">{"Your vault's stored record is damaged, so it can't be opened. "}{openError.message} <button onClick={() => { void startOver() }}>Remove and start over</button></p>
         {gripe !== null && <p className="gripe">{gripe}</p>}
       </>
     )
@@ -89,7 +89,7 @@ export const VaultDashboard = () => {
   }
 
   const retireBox = async (boxlabel: string) => {
-    if (! globalThis.confirm(`Delete the lockbox '${boxlabel}'?`)) { return }
+    if (! globalThis.confirm(`Remove the lockbox '${boxlabel}'?`)) { return }
     try {
       await withUnlockedVault(() => vault.retireBox(boxlabel))
     } catch (err) {
@@ -129,7 +129,7 @@ export const VaultDashboard = () => {
 
       <p className="quiet">
         This vault lives only in this browser: another browser, or another device, signed in as you
-        sees none of it, and clearing this site&apos;s data erases it.
+        sees none of it, and clearing this site&apos;s data removes it.
       </p>
 
       {snapshot.boxes.length === 0 && <p className="quiet">No lockboxes yet. Whispers you add live encrypted in the database (watch the inspector below) and open only on your device.</p>}
@@ -141,7 +141,7 @@ export const VaultDashboard = () => {
           </thead>
           <tbody>
             {snapshot.boxes.map((box) => {
-              // A damaged lockbox can't be read, used or edited -- only deleted, or stored over afresh.
+              // A damaged lockbox can't be read, used or edited -- only removed, or stored over afresh.
               if (box.damaged) {
                 return (
                   <tr key={box.boxlabel} className="damaged">
@@ -149,7 +149,7 @@ export const VaultDashboard = () => {
                     <td colSpan={3} className="gripe">{"damaged: its stored record can't be read"}</td>
                     <td className="row">
                       <button className="mini" onClick={() => { setForm({ editing: box.boxlabel, boxlabelText: box.boxlabel, whisperText: '', noteText: '' }) }}>replace</button>
-                      <button className="mini danger" onClick={() => { void retireBox(box.boxlabel) }}>delete</button>
+                      <button className="mini danger" onClick={() => { void retireBox(box.boxlabel) }}>remove</button>
                     </td>
                   </tr>
                 )
@@ -168,7 +168,7 @@ export const VaultDashboard = () => {
                   <td className="row">
                     <button className="mini" onClick={() => { void applyWhisper(box.boxlabel) }}>use</button>
                     <button className="mini" onClick={() => { void edit(box.boxlabel, noteOf(box.sidecar)) }}>edit</button>
-                    <button className="mini danger" onClick={() => { void retireBox(box.boxlabel) }}>delete</button>
+                    <button className="mini danger" onClick={() => { void retireBox(box.boxlabel) }}>remove</button>
                   </td>
                 </tr>
               )

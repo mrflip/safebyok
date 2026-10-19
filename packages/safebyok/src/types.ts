@@ -149,8 +149,8 @@ export const vaultKeyEpoch = Z.int().check(Z.positive())
 const cryptoKeyHandle = Z.custom<CryptoKey>((val) => val instanceof CryptoKey, 'a CryptoKey handle')
 
 /**
- * A lockbox's sidecar: your app's own plain data, riding beside the whisper, authenticated but
- * not encrypted. Any JSON value -- what the user calls the account, which project a key belongs
+ * A lockbox's sidecar: your app's own plain data, riding beside the whisper, not encrypted,
+ * but guaranteed unchanged. Any JSON value -- what the user calls the account, which project a key belongs
  * to -- shown while the vault is locked, and never interpreted by safebyok. It is stored in the clear, as its JSON (`sidecar_json`), and bound into
  * the lockbox's encryption, so a sidecar altered or swapped in storage makes the lockbox refuse to
  * open. A host checks its own sidecar's shape before `storeBox()`. Never put secret material in it.
@@ -439,7 +439,7 @@ export type SeenVault = Z.infer<typeof SeenVault>
 
 /**
  * What a device keeps of a vault's scope, locked or not, on its own storage: its `lock_generation`,
- * how many times a lock on this device has forgotten the lease, so that an unlock under way in
+ * how many times a hard lock on this device has revoked the lease, so that an unlock under way in
  * another tab when the lock lands is granted none; and what it has `seen` of the vault
  * standing under the scope (a {@link SeenVault}), or null when it has seen none. Nothing in it is
  * secret. One per scope: a vault made anew under the scope, with another `vault_id`, is seen
@@ -455,7 +455,8 @@ export const DeviceMark = Z.object({
   user_id:         NameFloor,
   vaultlabel:      NameFloor,
   /**
-   * How many locks on this device have forgotten the scope's lease: 0 at first, one more at each.
+   * How many hard locks on this device have revoked the scope's lease: 0 at first, one more at
+   * each. A soft lock's revocation (`lockSoon()`'s) leaves it be.
    * A lease is written only while the mark stands at the generation its unlock began under; see
    * `DeviceDB.writeLease`.
    */

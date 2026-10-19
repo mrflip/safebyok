@@ -114,7 +114,7 @@ describe("convexVaultDB, refusing", () => {
       const vaultDB = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
       await nearlyFull(vaultDB)
       const refusal = await TH.expectRefusal(vaultDB.updateBox(u1, TH.heavyBox('one_too_many', 200_000), TH.noBoxYet), 'vault_full')
-      expect(refusal.message).to.eq('This vault is full: retire a lockbox to make room, then try again.')
+      expect(refusal.message).to.eq('This vault is full: remove a lockbox to make room, then try again.')
       expect(refusal).to.not.have.property('cause')
       const listed = await vaultDB.listBoxes(u1)
       expect(listed.map((summary) => summary.boxlabel)).to.not.include('one_too_many')
@@ -225,7 +225,7 @@ describe("a vault over convexVaultDB, opened before sign-in", () => {
 
 describe("a vault over convexVaultDB, when its user signs out", () => {
   for (const [clientTitle, connect] of ClientCases) {
-    it(`locks over a ${clientTitle} while idle, forgetting its lease, and retires nothing`, async () => {
+    it(`locks over a ${clientTitle} while idle, revoking its lease, and retires nothing`, async () => {
       const deployment = deploy()
       const spy = TH.spyLogger()
       const deviceDB = memoryDeviceDB()

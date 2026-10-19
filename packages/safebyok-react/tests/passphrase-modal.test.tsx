@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { Suspense } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ForeverMillis, MinuteMillis, VaultError, localVaultDB, memoryDeviceDB, memoryStore } from 'safebyok'
 import { PassphraseModal, type PassphraseAdvice } from '../src/passphrase-modal'
@@ -424,7 +425,7 @@ describe("PassphraseModal", () => {
       const vault = await lockedVault()
       render(<PassphraseModal vault={vault} allowStartOver onDone={noop} />)
       fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
-      expect(screen.queryByText(/Erase this vault and start a new one\?/)).to.not.be.null
+      expect(screen.queryByText(/Remove this vault and start a new one\?/)).to.not.be.null
       expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null
       expect(document.activeElement).to.equal(screen.getByText('Keep it'))
       fireEvent.click(screen.getByText('Keep it'))
@@ -438,7 +439,7 @@ describe("PassphraseModal", () => {
       const heard: boolean[] = []
       render(<PassphraseModal vault={vault} allowStartOver onDone={(unlocked) => { heard.push(unlocked) }} />)
       fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
-      fireEvent.click(screen.getByText('Erase and start over'))
+      fireEvent.click(screen.getByText('Remove and start over'))
       await screen.findByText('Choose a vault passphrase')
       expect(vault.getSnapshot().state).to.eq('absent')
       fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'a new pw' } })
@@ -452,28 +453,59 @@ describe("PassphraseModal", () => {
       const retire = vi.fn().mockRejectedValue(new VaultError('storage_unavailable', 'Storage could not be reached; try again in a moment.'))
       render(<PassphraseModal vault={TH.stubVault({ retire })} allowStartOver onDone={noop} />)
       fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
-      fireEvent.click(screen.getByText('Erase and start over'))
+      fireEvent.click(screen.getByText('Remove and start over'))
       await screen.findByText('Storage could not be reached; try again in a moment.')
-      expect(screen.getByText('Erase and start over')).to.have.property('disabled', false)
+      expect(screen.getByText('Remove and start over')).to.have.property('disabled', false)
     })
 
     it("retires once for a double press, taking no second press while the retire runs", () => {
       const retire = vi.fn(() => new Promise<void>(() => { /* still retiring */ }))
       render(<PassphraseModal vault={TH.stubVault({ retire })} allowStartOver onDone={noop} />)
       fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
-      fireEvent.click(screen.getByText('Erase and start over'))
-      fireEvent.click(screen.getByText('Erase and start over'))
+      fireEvent.click(screen.getByText('Remove and start over'))
+      fireEvent.click(screen.getByText('Remove and start over'))
       expect(retire).toHaveBeenCalledOnce()
-      expect(screen.getByText('Erase and start over')).to.have.property('disabled', true)
+      expect(screen.getByText('Remove and start over')).to.have.property('disabled', true)
+    })
+
+    it("meets a retirement that settles while a Suspense boundary hides it, offering it again once shown", async () => {
+      const retiring = TH.held()
+      const vault = TH.stubVault({ retire: () => retiring.promise })
+      const hiding = TH.held()
+      const shown = (pending: Promise<undefined> | null) => (
+        <Suspense fallback={<p>Loading</p>}>
+          <TH.Hider hiding={pending} />
+          <PassphraseModal vault={vault} allowStartOver onDone={noop} />
+        </Suspense>
+      )
+      const { rerender } = render(shown(null))
+      fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
+      fireEvent.click(screen.getByText('Remove and start over'))
+      await act(async () => {
+        rerender(shown(hiding.promise))
+        await TH.wakeupAtNextTick()
+      })
+      expect(screen.getByText('Loading')).to.not.be.null
+      await act(async () => {
+        retiring.reject(new VaultError('storage_unavailable', 'Storage could not be reached; try again in a moment.'))
+        await TH.wakeupAtNextTick()
+      })
+      await act(async () => {
+        hiding.resolve(undefined)
+        await TH.wakeupAtNextTick()
+      })
+      expect(screen.queryByText('Loading')).to.be.null
+      expect(screen.getByText('Storage could not be reached; try again in a moment.')).to.not.be.null
+      expect(screen.getByText('Remove and start over')).to.have.property('disabled', false)
     })
 
     it("asks afresh once the vault it was asked of changed elsewhere, rather than retiring the one that stands", async () => {
       const retire = vi.fn().mockRejectedValue(new VaultError('stale_write', 'The vault changed in storage since this device read it.'))
       render(<PassphraseModal vault={TH.stubVault({ retire })} allowStartOver onDone={noop} />)
       fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
-      fireEvent.click(screen.getByText('Erase and start over'))
+      fireEvent.click(screen.getByText('Remove and start over'))
       await screen.findByText('The vault changed in storage since this device read it.')
-      expect(screen.queryByText('Erase and start over')).to.be.null
+      expect(screen.queryByText('Remove and start over')).to.be.null
       expect(screen.queryByPlaceholderText('vault passphrase')).to.not.be.null
       expect(retire).toHaveBeenCalledOnce()
     })
@@ -493,7 +525,7 @@ describe("PassphraseModal", () => {
       await act(async () => { await maker.unlock('another pw') })
       maker.close()
       await screen.findByText('Unlock your vault')
-      expect(screen.queryByText('Erase and start over')).to.be.null
+      expect(screen.queryByText('Remove and start over')).to.be.null
       expect(screen.queryByPlaceholderText('vault passphrase')).to.not.be.null
       vault.close()
     })
@@ -770,7 +802,7 @@ describe("PassphraseModal", () => {
         const heard: boolean[] = []
         const { reported, unmount } = TH.renderReporting(<PassphraseModal vault={TH.stubVault({ retire: () => retiring.promise })} allowStartOver onDone={(unlocked) => { heard.push(unlocked) }} />)
         fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
-        fireEvent.click(screen.getByText('Erase and start over'))
+        fireEvent.click(screen.getByText('Remove and start over'))
         unmount()
         const updates = TH.watchStateUpdates()
         await act(async () => {

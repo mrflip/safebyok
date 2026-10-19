@@ -7,7 +7,7 @@ import * as Validators from '../src/validators'
 describe("the package's entry point", () => {
   it("exports exactly the public surface", () => {
     expect(Object.keys(safebyok)).to.have.members([
-      'Argon2idWebV1', 'argon2idDeriver', 'argon2idWebV1Deriver', 'ensureSaltFits', 'parseKeyDeriverSpec',
+      'Argon2idWebV1', 'Argon2idKeyDeriver', 'KeyDeriver', 'argon2idDeriver', 'argon2idWebV1Deriver',
       'Vault', 'retireDamagedVault', 'parseLogger', 'DefaultLogger', 'setDefaultLogger', 'checkStrengthTest',
       'Ciphered', 'EpochMillis', 'FarFuture', 'FarPast', 'LeaseHours', 'ForeverMillis', 'Lockbox', 'LockboxSummary', 'MaxLockboxes', 'MaxLeaseHours', 'MaxUnlocks', 'MaxWhisperBytes', 'MinuteMillis', 'PasskeyWayin', 'PasskeySaltBytes', 'PassphraseWayin', 'Sidecar', 'Wayin', 'WayinKindVals', 'VaultProps', 'VaultScope', 'Whisper', 'wallClock',
       'AnyTextValidators', 'DefaultValidators', 'Label', 'LabelPattern', 'MaxLabelChars', 'MaxUserIdChars', 'NameFloor', 'NameFloorBytes', 'UserId', 'UserIdPattern', 'checkValidators',
@@ -74,9 +74,9 @@ describe("the main entry's tree-shaking", () => {
     expect(await bundleOf('argon2idWebV1Deriver')).to.match(Argon2Implementation)
   }, 30_000)
 
-  // A deriver over another Argon2id implementation (safebyok-fastkey) checks its spec this way.
-  it("leaves Argon2id out of an app that imports only the spec check", async () => {
-    const shipped = await bundleOf('parseKeyDeriverSpec')
+  // A deriver over another Argon2id implementation (safebyok-fastkey) extends this class.
+  it("leaves Argon2id out of an app that imports only the class another implementation extends", async () => {
+    const shipped = await bundleOf('Argon2idKeyDeriver')
     expect(shipped).to.include('keyDeriverSpec')
     expect(shipped).to.not.match(Argon2Implementation)
   }, 30_000)

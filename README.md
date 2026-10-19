@@ -32,20 +32,20 @@ This repository is a pnpm workspace. Its packages:
 ### Backend (VaultDB)
 
 Facade over a backing store (convex, postgres, etc) or another vaultDB (graphQL, etc).
-Holds vault​s and lockbox​es scoped by app, user_id, vaultlabel and boxlabel.
-* A lockbox holds a public​ bag under the app's control and an encrypted whisper​
-* verbs: vault: fetchOrCreate, update, retire, subscribe, listLockboxes; lockbox: fetchOrCreate, update, retire.
+Holds vault​s and lockbox​es scoped by applabel, userId, vaultlabel and boxlabel.
+* A lockbox holds a sidecar under the app's control and an encrypted whisper​
+* verbs: vault: readVaultProps, fetchOrCreateVaultProps, updateVaultProps, retireVault, subscribe, listBoxes; lockbox: readBox, updateBox, retireBox.
 
 ### Browser
 
 * a vault​ object
-  - Vault.make({ app, user_id, vaultlabel, requestPasskeyFunc, ... })​: Vault, non-async
-  - vault.hello (initial bookkeeping that doesn't bother the user)
-  - lock​, unlock​, changePassword​, view(boxlabel)​, store(boxlabel, whisper, { public? })​, retire(boxlabel)
+  - Vault.make({ applabel, userId, vaultlabel, vaultDB, deviceDB, keyDeriver, ... })​: Vault, non-async
+  - vault.hello() (initial bookkeeping that doesn't bother the user)
+  - lock​, unlock​, changePassphrase​, readBox(boxlabel)​, storeBox(boxlabel, whisper, { sidecar? })​, retireBox(boxlabel)
 * a pantry​ holding keys
 * a DeviceDB​ safely holding and managing access to the lockboxes (indexedDB)
 * a pluggable KDF (Argon2id wasm/native)
 
-assume initially that the app provides and guarantees the user_id, and that the vaultDB can access all and only the records needed to support this.
+assume initially that the app provides and guarantees the userId, and that the vaultDB can access all and only the records needed to support this.
 the app interface is to call  non-async At the app level, whisper is anything JSONable.
-for concreteness of discussion, assume a postgres backing store,d
+for concreteness of discussion, assume a postgres backing store,

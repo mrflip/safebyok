@@ -3,12 +3,12 @@
 Reasonable tasks that we do not plan to do in the near term. Do not anticipate them in your
 implementation.
 
-* **Lock out a device: every way in it added.** From another device, the user locks out a lost or
-  compromised one: its passkeys removed, its lease void, and nothing it holds reading
-  what is written next. Vault-key rotation does the cryptography (designed in
-  `whiteboard/20261016-rotation/rotation-design.md`, built as sprint matters' threads 14 and
-  18-20); what waits is the UX, a device list, and, if the Coach wants rotation not to sign every
-  other device out, a key pair per way in (that design's open question 1). The data it needs goes
+* **Lock out a device: every wayin it added.** From another device, the user locks out a lost or
+  compromised one: its passkeys removed, its lease revoked, and nothing it holds reading
+  what is written next. Vault-key rotation does the cryptography (not yet built; its design was
+  removed on 2026-10-18 for a different plan); what waits is the UX, a device list, and, if the Coach
+  wants rotation not to sign every other device out, a key pair per wayin (`TODO.md`, *Which wayins
+  a rotation keeps*). The data it needs goes
   in with rotation: a random `device_id` per vault per device, recorded on every wayin it adds.
   * **What we record now.** `device_id` is random, minted per vault per device, never derived from
     the device, so the backend can't link one device's vaults to each other. That reading follows
@@ -40,7 +40,7 @@ implementation.
   [#132](https://github.com/mrflip/safebyok/pull/132)), G499: "Leave conflict handler as NOTYET, so
   that when the idea keeps coming up there's some place to point to." There is none today: a write
   that lost is refused as `stale_write`, never merged or tried again, and the vault never clears
-  damage on its own, so `store()` over a box is the handler (`packages/safebyok/VAULTDB.md`). A host may one day want the say on a lockbox
+  damage on its own, so `storeBox()` over a box is the handler (`packages/safebyok/VAULTDB.md`). A host may one day want the say on a lockbox
   too damaged to name its epoch, meeting a healthy store.
 * **The Postgres adapter's own tests on a real server.** The Coach (2026-10-16, thread 11,
   [#131](https://github.com/mrflip/safebyok/pull/131)): the adapter's own tests
@@ -62,4 +62,6 @@ be bitten finds the ruling.
   [#134](https://github.com/mrflip/safebyok/pull/134)): "leave, file under RAGEBAIT." Under
   `--sequence.shuffle`, two App tests fail when they run after the click-through test, whose fake
   user stays signed in. In order they pass, so CI is green. Fix by resetting the fake sign-in in
-  `afterEach`, or by giving each test a fresh fake IndexedDB.
+  `afterEach`, or by giving each test a fresh fake IndexedDB. Asked again at thread 18 (2026-10-17,
+  58 of 96 shuffled runs failing), the Coach: "The solutions to the shuffling have all come with a
+  proposal that would make the code have long waits, and it's a demo app."

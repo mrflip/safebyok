@@ -157,7 +157,7 @@ marked `sideEffects: false`: what you never import never ships.
 ## A lockbox's sidecar
 
 Each lockbox carries a **sidecar**: your app's own plain data, riding beside the whisper,
-authenticated but not encrypted. It is any JSON value your app keeps about the lockbox -- what the
+not encrypted, but guaranteed unchanged. It is any JSON value your app keeps about the lockbox -- what the
 user calls the account, which project a key belongs to, when it was last rotated -- shown in the
 snapshot while the vault is locked, as `box.sidecar`. The vault never looks inside it.
 
@@ -170,10 +170,10 @@ vault.getSnapshot().boxes[0]  // { boxlabel: 'anthropic_api_key', sidecar: {}, d
 
 * **It is not encrypted.** It is stored in the clear, so never put secret material in it: a key, a
   password, a recovery code. Anyone who can read your storage reads it.
-* **It is authenticated.** Its JSON, keys sorted, is bound into the lockbox's encryption with the rest of
-  the lockbox's public fields, so a sidecar altered or swapped in storage makes the lockbox refuse to
-  open (`damaged_lockbox`). The snapshot shows the sidecar as storage holds it; only `readBox()` proves
-  it unaltered. A sidecar stored other than as the vault writes it (respaced, reordered) lists the
+* **It is guaranteed unchanged.** Its JSON, keys sorted, is bound into the lockbox's encryption with the
+  rest of the lockbox's public fields, so a sidecar altered or swapped in storage makes the lockbox refuse
+  to open (`damaged_lockbox`). The guarantee comes with `readBox()`: the snapshot shows the sidecar as
+  storage holds it, and only `readBox()` proves it unaltered. A sidecar stored other than as the vault writes it (respaced, reordered) lists the
   lockbox as damaged.
 * **Its shape is yours.** The vault checks only that it is JSON (`Sidecar`; anything else is
   `bad_option`): check its shape yourself, with your own schema, before `storeBox()`. Left out of a
@@ -297,9 +297,9 @@ doing better.
 
 ## Key derivation
 
-The passphraseKey is made by Argon2id at a keyDeriverSpec: its parameters under a
-`key_deriver_label`, which every vault stores. A label must always mean the same parameters, or
-vaults made on one device stop opening on another. There are three ways to choose:
+The passphraseKey is made by Argon2id at a keyDeriverSpec (an `Argon2idSpec`): its parameters
+under a `key_deriver_label`, which every vault stores. A label must always mean the same
+parameters, or vaults made on one device stop opening on another. There are three ways to choose:
 
 * **The supplied spec**, `Argon2idWebV1`: 64 MiB, 3 passes, 1 lane, a 16-byte salt and a 32-byte
   key. Its deriver, `argon2idWebV1Deriver`, is what `browserOpts()` hands over. Use it unless you
@@ -317,27 +317,52 @@ vaults made on one device stop opening on another. There are three ways to choos
   allows weak parameters that run: those are yours to judge.
 * **Another implementation of a spec**: `safebyok-fastkey` runs any of them through
   WebAssembly, several times faster, deriving the same bytes. For one native to your platform,
-  spread the spec into your deriver, `{ ...Argon2idWebV1, deriveKeyBytes }`, keeping its label,
-  and test that it derives the same bytes as ours; `parseKeyDeriverSpec(spec)` checks a host's
-  spec exactly as `argon2idDeriver` does. `Vault.make` refuses a deriver that wears a supplied spec's label
-  without carrying exactly its parameters; it cannot check the bytes, so that test is yours.
+  extend `Argon2idKeyDeriver` and make it with the spec, keeping its label; then test that it
+  derives the same bytes as ours (`deriveKeyBytes`, on each):
 
-Any `keyDeriver` needs a `salt_bytes` from 1 to 65536 (the most `crypto.getRandomValues` hands out
-at once), which `Vault.make` checks, and must hand back 32 bytes of memory of its own from
-`deriveKeyBytes`, derived afresh on every call -- a fresh `Uint8Array`, not a view over a
-`SharedArrayBuffer`, and not one it keeps: the vault zeroes the bytes once it has made the
-passphraseKey of them. `unlock()` and the calls that set a passphrase refuse anything else with
-`bad_option`, 32 zero bytes among it: a key anyone could rebuild, which a deriver handing back
-bytes it kept from an earlier call would. A deriver of ours refuses a salt of another length than
-its spec's.
+  ```ts
+  class NativeArgon2idDeriver extends Argon2idKeyDeriver {
+    protected doDeriveKeyBytes(passphrase: string, saltBytes: Uint8Array) {
+      const { memory_kib, iterations, parallelism, output_bytes } = this.spec
+      return nativeArgon2id({ passphrase, saltBytes, memory_kib, iterations, parallelism, output_bytes })
+    }
+  }
+  const keyDeriver = new NativeArgon2idDeriver(Argon2idWebV1)
+  ```
 
-`KeyDeriver` is one of two types. An `Argon2idKeyDeriver` carries a whole keyDeriverSpec beside
-its function, as every deriver above does, and `Vault.make` checks the spec as `argon2idDeriver`
-would, so one Argon2id cannot run is refused at open, not at the first unlock. A
-`CustomKeyDeriver` carries only `key_deriver_label`, `salt_bytes` and `deriveKeyBytes`, and may
-name its `algorithm`; it may not declare `'argon2id'` without being a whole spec. `Vault.make` logs
-a warning (not a refusal) for a label beginning `test_`, the mark of a deriver made cheap for
-tests, such as `safebyok/testing`'s.
+  It checks the spec exactly as `argon2idDeriver` does, and refuses one wearing a supplied spec's
+  label without carrying exactly its parameters; it cannot check the bytes, so that test is yours.
+
+Every key deriver is a `KeyDeriver`, an abstract class: `Vault.make` takes nothing else (a plain
+object with a `deriveKeyBytes`, as a deriver was before, is refused with `bad_option`). The vault
+calls one method on it, `passphraseKeyOf`, and the class does the work every deriver shares, so a
+subclass supplies only its runner, `doDeriveKeyBytes`:
+
+* **As it is made**, it checks its spec: an `algorithm`, a `key_deriver_label` and a `salt_bytes`
+  from 1 to 65536 (the most `crypto.getRandomValues` hands out at once), a label safebyok does not
+  reserve, and Argon2id's floors for an `Argon2idKeyDeriver`. Only that family may say
+  `algorithm: 'argon2id'`. So a spec that cannot run is refused (`bad_option`) where the deriver is
+  made, before any vault is opened with it.
+* **At each derivation**, it refuses a salt of another length than its spec's, and anything the
+  runner hands back but 32 bytes of memory of their own: a fresh `Uint8Array`, not a view over a
+  `SharedArrayBuffer`, and not one the runner keeps, since the class zeroes the bytes once it has
+  made the passphraseKey of them (`bad_option`). Thirty-two zero bytes are refused too: a key
+  anyone could rebuild, which a runner handing back bytes it kept from an earlier call would.
+
+A deriver of another algorithm is another subclass, with its own spec and its own check:
+
+```ts
+class ScryptDeriver extends KeyDeriver {
+  constructor() { super({ algorithm: 'scrypt', key_deriver_label: 'acme_scrypt_v1', salt_bytes: 16 }) }
+  protected doDeriveKeyBytes(passphrase: string, saltBytes: Uint8Array) {
+    return scryptAsync(passphrase, saltBytes, { N: 2 ** 17, r: 8, p: 1, dkLen: 32 })
+  }
+}
+```
+
+Run a vetted implementation, never a derivation of your own. `Vault.make` logs a warning (not a
+refusal) for a label beginning `test_`, the mark of a deriver made cheap for tests, such as
+`safebyok/testing`'s `TestDeriver`.
 
 ## Locking
 
@@ -360,14 +385,14 @@ call. The timer is `unref`'d, so it never holds a Node or Bun process open.
 `changePassphrase()`, and an `addPassphrase()`, `addPasskey()` or `retireWayin()` with a
 passphrase as proof. An `unlock()` with a passkey sets it too. Nothing else moves it: not a read,
 a store or a refresh, nor a passkey proving a change on a vault already unlocked. The lease
-running out while an `unlock()` or `changePassphrase()` is under way is no lock: the call ends
+expiring while an `unlock()` or `changePassphrase()` is under way is no lock: the call ends
 unlocked, with a lease of its own.
 
 Lowering the option later takes hold on each device at its next open: a lease granted under the
-longer setting, whose deadline lies past the new number of hours from then, is forgotten, and the
+longer setting, whose deadline lies past the new number of hours from then, is discarded, and the
 user types their passphrase again. Raising it lengthens no lease already granted. A device keeps
 one lease per vault, shared by its tabs, so open a vault with one setting on a device: two tabs
-opening it with different ones each forget the other's lease (`notes/wontfix.md`). A device clock
+opening it with different ones each discard the other's lease (`notes/wontfix.md`). A device clock
 stepped backwards does the same to a lease granted just before: it seems to last past its
 setting, and the user is asked again, the safe direction.
 
@@ -389,7 +414,7 @@ their passphrase again afterwards:
 * **`vault.lockSoon(graceSeconds = 5)`** is the soft lock: the bartender's stinkeye. Use it when
   the user steps away: a hidden tab, a sign-out. From the instant it is called the snapshot reads
   `locked`, every `readBox`, `useBox`, `storeBox` or `retireBox` called afterwards throws kind `vault_locked`, and this
-  device forgets its lease; but work already in hand finishes: a `readBox()` or a
+  device revokes its lease; but work already in hand finishes: a `readBox()` or a
   `storeBox()` under way, and an `unlock()` or `changePassphrase()` under way, here or in another tab,
   which leaves the vault unlocked again. The key is dropped `graceSeconds` later, or sooner when
   the lease would drop it sooner. An `unlock()` (or a `changePassphrase()`, which proves the
@@ -423,7 +448,7 @@ const lockWhenHidden = (vault: Vault) => {
     if (! document.hidden) { return }
     vault.lockSoon().catch((err: unknown) => {
       // A lockSoon() racing a close() is the one refusal to expect; any other, such as a device
-      // store that would not forget the lease, is worth a word.
+      // store that would not erase the lease, is worth a word.
       if (! isVaultError(err, 'vault_closed')) { console.warn('The vault did not lock cleanly', err) }
     })
   }
@@ -433,7 +458,7 @@ const lockWhenHidden = (vault: Vault) => {
 ```
 
 Call the function it returns when you close the vault. The `catch` quiets only a `lockSoon()`
-that races a `close()`, and lets a failure to forget the lease be heard: that vault
+that races a `close()`, and lets a failure to revoke the lease be heard: that vault
 is locked in this tab, but the next open may unlock without the passphrase. Chromium's Idle
 Detection API, behind a permission the user grants, is the only true screen-lock signal, and a
 locked screen is the user meaning it, so it calls `lock()`, quieted the same way:
@@ -463,7 +488,7 @@ another tab, a session that expired, another user signing in -- storage tells th
 adapter whose backend knows who is signed in refuses a vault whose user is no longer that one
 with kind `identity_revoked` (`safebyok-convex`, `safebyok-postgres` and `safebyok-graphql` do;
 `safebyok-indexeddb` and `localVaultDB` keep everything on the device, and never do). The vault
-then locks at once, as `lock()` does: it drops its vaultKey, this device forgets its lease, and
+then locks at once, as `lock()` does: it drops its vaultKey, this device revokes its lease, and
 the snapshot reads `locked`. It removes nothing stored. The call that met the refusal
 throws it, and the next unlock, once the user has signed in again, asks for the passphrase. A
 background refresh that meets it has nobody to throw to: it locks all the same, and tells the
@@ -476,10 +501,10 @@ stay unlocked: an adapter that refuses `identity_revoked` for a passing fault, r
 `storage_unavailable`, breaks its contract (VAULTDB.md, line 5.5), and is the bug to fix.
 
 Open the vault only once your backend knows who is signed in: a vault opened while its auth is
-still loading meets `identity_revoked` at once, and forgets the lease with it (safe:
+still loading meets `identity_revoked` at once, and revokes the lease with it (safe:
 the user types the passphrase again). A backend that tells "who are you?" from "you may not"
 refuses the second as `not_permitted`, which locks nothing. A call that meets the refusal in a tab
-closed meanwhile still forgets the lease; and the Convex adapter's watch refreshes on
+closed meanwhile still revokes the lease; and the Convex adapter's watch refreshes on
 every error it hears, not only a sign-out. Both are the safe direction, and stay.
 
 ## Logging
@@ -536,8 +561,8 @@ says these things:
 
 * `warn`: `lockSoon()` could not read the clock, so it locked at once, without a grace; or the
   clock failed as a lease ended (`{ call: 'expiry' }`), so the key went at once.
-* `warn`: this device's lease could not be read or would not open, so it was forgotten, and the
-  vault opened locked. A lease that simply ran out, or that a new
+* `warn`: this device's lease could not be read or would not open, so it was discarded, and the
+  vault opened locked. A lease that simply expired, or that a new
   passphrase outdated, is routine, and says nothing.
 * `warn`: a refresh rung by a change in storage failed, so the snapshot may lag behind storage
   (it reads `syncing: false`) until a read succeeds. Said once for a failing streak; then `log`,
@@ -546,7 +571,7 @@ says these things:
   `stale_write`, the catch-up's failure its `cause`, and the snapshot reads `syncing: false`.
 * `log`: storage the vault cannot trust -- its user signed out, or an older copy of the vault --
   locked it (`{ call: 'untrustedStorage' }`); `warn` when this device's lease could not then be
-  forgotten.
+  revoked.
 * `warn`: a change to the ways in landed in storage, but this device could not keep its mark of
   the vault, or grant its lease afresh. The change stands, and the call resolves.
 * `warn`: this device's mark of the vault could not be read, so its rollback check starts again
@@ -732,7 +757,7 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `absent_wayin`        | no way into the vault has that `wayin_id`, or is the passkey that answered: it may have been removed on another device | Look again at the snapshot's `wayins`, and ask the user which they mean |
 | `whisper_too_large`   | a whisper over the vault's `maxWhisperBytes`                     | Tell the user it is too large; a host that means to allow more passes a larger `maxWhisperBytes` |
 | `lockbox_too_large`   | a lockbox -- its whisper, sidecar and boxlabel together, as the UTF-8 bytes of its JSON -- over its storage's `maxRecordBytes`; only a host whose validators admit long names, or a backend with small records, meets it | Tell the user to store a smaller whisper or sidecar |
-| `vault_full`          | a new lockbox in a vault already holding its `maxLockboxes`, a new lockbox whose names would take the vault past its storage's `maxVaultBytes`, or a write the storage backend has no room for | Tell the user to retire a lockbox first; the host may raise `maxLockboxes` where the backend allows |
+| `vault_full`          | a new lockbox in a vault already holding its `maxLockboxes`, a new lockbox whose names would take the vault past its storage's `maxVaultBytes`, or a write the storage backend has no room for | Tell the user to remove a lockbox first; the host may raise `maxLockboxes` where the backend allows |
 | `too_many_wayins`     | a passphrase or passkey added to a vault already holding `MaxUnlocks` (8) ways in | Tell the user to remove one first             |
 | `last_wayin`          | removing the vault's last passphrase: a vault always keeps one, since a passkey can be lost with its device | Add another passphrase first; to be rid of the vault, `retire()` it |
 | `corrupt_record`      | a stored record failed validation as storage read it back: storage's own word, from a `VaultDB` called directly. A vault call says what it means for the vault instead, as one of the three below | Nothing was changed. Do not retry; see a developer: the record is damaged, was moved, or came from a newer safebyok |
@@ -740,7 +765,7 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `damaged_wayin`       | a way in is stored in a form this package never writes (a salt of the wrong length, or not base64url), so it cannot be tried: the passkey asked for, the passphrase `wayinId` aims at, or every passphrase the vault has. Other ways in are still tried | Unlock another way, then `retireWayin()` the damaged one and add it again |
 | `damaged_lockbox`     | a lockbox failed its checks as read, or would not open under the vault's own vaultKey, or opened to no whisper: altered in storage, or moved there from elsewhere. A lockbox that will not open is named so only after the vault has caught up with storage once: one a vault made anew elsewhere wrote makes the call `vault_locked` instead | Nothing was changed. Offer `retireBox()`, or a fresh `storeBox()` over it (see *Damaged lockboxes*) |
 | `newer_format`        | the vault's stored props are in a form this version does not know -- a `format`, wayinkind or number of wayins -- which a newer safebyok may have written: `hello()` and `retireDamagedVault` refuse it | Nothing was changed. Tell the user to update the app; never offer to start over |
-| `stale_write`         | storage changed since this device read it, so the write was refused and nothing was written: another device or tab wrote, created or retired the lockbox a `storeBox()` was writing; a `retireBox()` into a vault deleted or made anew elsewhere, its message saying the lockbox could not be retired because its vault is gone; and a write whose catch-up with storage then failed too (its `cause` says why; the snapshot reads `syncing: false`) -- unless the catch-up was refused as `identity_revoked`, `rolled_back` or `newer_format`, which the write throws as it came | The vault has caught up: show what stands now and, if the change still applies, repeat it (*Two devices storing at once*, below). Nothing is tried again by itself |
+| `stale_write`         | storage changed since this device read it, so the write was refused and nothing was written: another device or tab wrote, created or retired the lockbox a `storeBox()` was writing; a `retireBox()` into a vault deleted or made anew elsewhere, its message saying the lockbox could not be removed because its vault is gone; and a write whose catch-up with storage then failed too (its `cause` says why; the snapshot reads `syncing: false`) -- unless the catch-up was refused as `identity_revoked`, `rolled_back` or `newer_format`, which the write throws as it came | The vault has caught up: show what stands now and, if the change still applies, repeat it (*Two devices storing at once*, below). Nothing is tried again by itself |
 | `rolled_back`         | this device has already seen a newer copy of the vault props than storage offers now (storage restored from a backup, or altered), so it won't use this one, and the vault locked: nothing was unlocked or written | Tell the user this device has seen a newer copy of the vault than storage holds. If the storage was restored from an older copy on purpose, accept it on this device (see *A vault rolled back*, below); otherwise the app's support should look at its storage |
 | `not_permitted`       | the storage backend refused the signed-in user, still the vault's own, this one call | Tell the user they may not; signing in again will not help |
 | `identity_revoked`    | the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in. The vault has locked itself (see *When the user signs out*) | Have the user sign in again, then open the vault for whoever that is |

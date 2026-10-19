@@ -292,7 +292,7 @@ describe("VaultProvider", () => {
 
     // A tab whose build carries another key deriver than the one the vault was made with, as a
     // stale tab beside a newer deployment would: its unlock refuses with kind 'unknown_key_deriver'.
-    const otherDeriver = { ...TH.testDeriver, key_deriver_label: 'other_deriver' }
+    const otherDeriver = new TH.TestDeriver({ key_deriver_label: 'other_deriver' })
     const caught: unknown[] = []
     const reported: unknown[] = []
     render(
@@ -424,7 +424,7 @@ describe("VaultProvider", () => {
     it("an unlock finishing after Cancel closes a newer dialog too, and runs the actions waiting on it", async () => {
       const world = await lockedWorld()
       const gate = TH.makeGate()
-      const slowDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase: string, saltBytes: Uint8Array) => { await gate.pass(); return await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes) } }
+      const slowDeriver = new TH.TestDeriver({}, async (passphrase, saltBytes) => { await gate.pass(); return await TH.digestDerivation(passphrase, saltBytes) })
       render(world.tree('u1', slowDeriver))
       const vault = await world.opened()
       const first = world.latest().withUnlockedVault(() => vault.readBox('anthropic_api_key'))
@@ -580,7 +580,7 @@ describe("VaultProvider", () => {
       await other.storeBox('anthropic_api_key', 'sk-other-fake')
       other.close()
       const gate = TH.makeGate()
-      const slowDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase: string, saltBytes: Uint8Array) => { await gate.pass(); return await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes) } }
+      const slowDeriver = new TH.TestDeriver({}, async (passphrase, saltBytes) => { await gate.pass(); return await TH.digestDerivation(passphrase, saltBytes) })
       const { rerender } = render(world.tree('u1', slowDeriver))
       const vault = await world.opened()
       const first = world.latest().withUnlockedVault(() => vault.readBox('anthropic_api_key'))
@@ -669,7 +669,7 @@ describe("VaultProvider", () => {
     hushConsole()
     const caught: unknown[] = []
     const { passphraseStrengthTest: _admitsAny, ...props } = makeWorld().props
-    const lacking = props as VaultProviderProps
+    const lacking = props as unknown as VaultProviderProps
     render(<CatchingBoundary caught={caught}><VaultProvider {...lacking} userId="u1"><Probe /></VaultProvider></CatchingBoundary>)
     expect(shownState()).to.eq('boundary')
     expect(isVaultError(caught[0], 'bad_option')).to.be.true
@@ -781,7 +781,7 @@ describe("VaultProvider", () => {
     const vault = await world.opened()
     const reading = watched(world.latest().withUnlockedVault(() => vault.readBox('anthropic_api_key')))
     fireEvent.click(await screen.findByText('Forgot it? Start a new vault'))
-    fireEvent.click(screen.getByText('Erase and start over'))
+    fireEvent.click(screen.getByText('Remove and start over'))
     fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'a new pw' } })
     expect(screen.queryByText('Choose a vault passphrase')).to.not.be.null
     fireEvent.click(screen.getByText('Create vault'))

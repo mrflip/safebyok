@@ -12,7 +12,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { toB64, type Ciphered } from '../src/crypto'
 import { memoryDeviceDB, type DeviceDB, type LeaseExpectation } from '../src/device-db'
 import { VaultError, type VaultErrorKind } from '../src/errors'
-import type { KeyDeriver } from '../src/key-deriver'
+import { KeyDeriver } from '../src/key-deriver'
 import type { VaultLogger } from '../src/logger'
 import { StrongVerdict, type PassphraseStrengthTest } from '../src/passphrase-strength'
 import { memoryStore } from '../src/string-store'
@@ -20,29 +20,68 @@ import type { Lockbox } from '../src/lockbox'
 import type { DamagedLockbox, DeviceMark, Lease, LockboxSummary, PasskeyWayin, PasskeyProof, PassphraseWayin, Sidecar, SeenVault, VaultProps, VaultScope } from '../src/types'
 import { stableJsonify } from '../src/stable-jsonify'
 import { NameFloorBytes } from '../src/validators'
-import { TestDeriverNotice } from '../src/key-deriver-spec'
+import { TestDeriverNotice, type KeyDeriverSpec } from '../src/key-deriver-spec'
 import { Vault, type MakeVaultOpts } from '../src/vault'
 import { localVaultDB, type VaultDB, type VaultDBOpts } from '../src/vault-db'
 
+/** How a {@link TestDeriver} derives: a passphrase and its salt in, key bytes out. */
+export type Derivation = (passphrase: string, saltBytes: Uint8Array) => Promise<Uint8Array>
+
 /**
- * A cheap KeyDeriver for tests: one SHA-256 instead of 64 MiB of Argon2id, so a suite full of
- * unlocking runs in milliseconds. Deterministic in passphrase and salt, like the real one; unlike
- * the real one, worthless against a brute-forcer -- which is why its label says `test`. Never
- * hand it to a vault that holds a real secret.
+ * The test deriver's own derivation: one SHA-256 of the passphrase's UTF-8 and the salt.
+ * Deterministic in both, and worthless against a brute-forcer.
+ *
+ * @example const keyBytes = await TH.digestDerivation('pw', new Uint8Array(16))  // 32 bytes
+ */
+export const digestDerivation: Derivation = async (passphrase, saltBytes) => {
+  const passphraseBytes = new TextEncoder().encode(passphrase)
+  const joined = new Uint8Array(passphraseBytes.length + saltBytes.length)
+  joined.set(passphraseBytes)
+  joined.set(saltBytes, passphraseBytes.length)
+  return new Uint8Array(await crypto.subtle.digest('SHA-256', joined))
+}
+
+/** The spec every {@link TestDeriver} starts from: a one-digest algorithm under a `test_` label, with a 16-byte salt. */
+export const TestDeriverSpec: KeyDeriverSpec = Object.freeze({ algorithm: 'sha256', key_deriver_label: 'test_digest_v0', salt_bytes: 16 })
+
+/**
+ * A cheap KeyDeriver for tests: one SHA-256 ({@link digestDerivation}) instead of 64 MiB of
+ * Argon2id, so a suite full of unlocks runs in milliseconds. `spec` changes any of
+ * {@link TestDeriverSpec}, and `derivation` stands in for the digest -- to count derivations, to
+ * hold one at a gate, or to hand back something a real deriver never would. Like any KeyDeriver, it
+ * checks its spec as it is made and what its derivation hands back. Never hand one to a vault
+ * that holds a real secret: its label says `test` for that reason.
+ *
+ * @param spec - What to change of TestDeriverSpec: a label, a salt length, an algorithm.
+ * @param derivation - What derives in its place; the digest by default.
+ *
+ * @example const alienDeriver = new TH.TestDeriver({ key_deriver_label: 'someone_elses_deriver_v9' })
+ * @example const counting = new TH.TestDeriver({}, vi.fn(TH.digestDerivation))
+ */
+export class TestDeriver extends KeyDeriver {
+  readonly #derivation: Derivation
+
+  constructor(spec: Partial<KeyDeriverSpec> = {}, derivation: Derivation = digestDerivation) {
+    super({ ...TestDeriverSpec, ...spec })
+    this.#derivation = derivation
+  }
+
+  protected doDeriveKeyBytes(passphrase: string, saltBytes: Uint8Array): Promise<Uint8Array> {
+    return this.#derivation(passphrase, saltBytes)
+  }
+}
+
+/**
+ * The cheap KeyDeriver every test opens with, frozen so no test's spy lands on another's: a
+ * {@link TestDeriver} at {@link TestDeriverSpec}. Spy on a `new TH.TestDeriver()` of your own.
  *
  * @example Vault.make({ ...opts, keyDeriver: testDeriver })
  */
-export const testDeriver: KeyDeriver = {
-  key_deriver_label: 'test_digest_v0',
-  salt_bytes:        16,
-  deriveKeyBytes: async (passphrase, saltBytes) => {
-    const passphraseBytes = new TextEncoder().encode(passphrase)
-    const joined = new Uint8Array(passphraseBytes.length + saltBytes.length)
-    joined.set(passphraseBytes)
-    joined.set(saltBytes, passphraseBytes.length)
-    return new Uint8Array(await crypto.subtle.digest('SHA-256', joined))
-  },
-}
+export const testDeriver: TestDeriver = (() => {
+  const deriver = new TestDeriver()
+  Object.freeze(deriver)
+  return deriver
+})()
 
 /**
  * A passphraseStrengthTest for tests, admitting every passphrase, so a suite may unlock with a
@@ -449,7 +488,7 @@ export const liveWatch = async (vaultDB: Pick<VaultDB, 'subscribe'>, scope: Vaul
  *
  * @example
  *   const gate = TH.makeGate()
- *   const slowDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase, saltBytes) => { await gate.pass(); return await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes) } }
+ *   const slowDeriver = new TH.TestDeriver({}, async (passphrase, saltBytes) => { await gate.pass(); return await TH.digestDerivation(passphrase, saltBytes) })
  *   const unlocking = vault.unlock('pw')   // now waiting at the gate
  *   await gate.reached
  *   await vault.lock()                     // lands mid-unlock
@@ -2444,7 +2483,7 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
       expect(await deviceDB.readLease(scopeOf('u2'))).to.not.be.null
     })
 
-    it("eraseAll forgets every lease, and every device mark", async () => {
+    it("eraseAll erases every lease, and every device mark", async () => {
       const deviceDB = await makeDeviceDB()
       await deviceDB.writeLease(await leaseOf('u1'), NoLocks)
       await deviceDB.writeLease(await leaseOf('u2'), NoLocks)

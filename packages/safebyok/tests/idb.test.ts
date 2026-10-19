@@ -144,7 +144,7 @@ describe("idbDeviceDB", () => {
     expect(rows.map((row) => row.ckey)).to.deep.equal([Ckeys.lease(TH.scopeOf('u2'))])
   })
 
-  it("drops a device's lease from before the rename, filed under unlock^, keeping its device mark: the user proves once more", async () => {
+  it("discards a device's lease from before the rename, filed under unlock^, keeping its device mark: the user proves once more", async () => {
     const dbName = TH.freshDbName()
     const shelf = createStore(`${dbName}:device_db`, 'records')
     const deviceDB = idbDeviceDB({ dbName })
@@ -205,7 +205,7 @@ describe("idbDeviceDB", () => {
     }
   })
 
-  it("forgets the scope's own lease at an erase even when the sweep fails", async () => {
+  it("erases the scope's own lease even when the sweep fails", async () => {
     const dbName = TH.freshDbName()
     const deviceDB = idbDeviceDB({ dbName })
     await deviceDB.writeLease(await TH.leaseOf('u1'), TH.NoLocks)

@@ -39,8 +39,8 @@ export type StaleWrite = typeof StaleWriteVals[number]
 /** What each stale write says: what changed under the writer, and to read again. */
 const StaleWriteSaid: Readonly<Record<StaleWrite, string>> = {
   vaultProps: 'The vault changed in storage since this device read it -- its ways in were changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. Read the vault again before retrying.',
-  lockbox:    'That lockbox changed in storage since this device read it -- another device or tab wrote or retired it, or the vault was made anew -- so this write was refused and nothing was written. Read it again before retrying.',
-  retire:     'The vault changed in storage since this device read it -- it was deleted, or deleted and made anew, elsewhere -- so this retirement was refused and nothing was removed. Read the vault again before retrying.',
+  lockbox:    'That lockbox changed in storage since this device read it -- another device or tab wrote or removed it, or the vault was made anew -- so this write was refused and nothing was written. Read it again before retrying.',
+  retire:     'The vault changed in storage since this device read it -- it was deleted, or deleted and made anew, elsewhere -- so this removal was refused and nothing was removed. Read the vault again before retrying.',
 }
 
 /**
@@ -83,8 +83,8 @@ export const notPermitted = (message = "The vault's storage does not let the sig
  */
 export const vaultFull = (limit?: number, opts?: ErrorOptions): VaultError => {
   const message = limit === undefined
-    ? 'This vault is full: retire a lockbox to make room, then try again.'
-    : `This vault already holds the ${String(limit)} lockboxes its storage keeps in one vault: retire one before storing another.`
+    ? 'This vault is full: remove a lockbox to make room, then try again.'
+    : `This vault already holds the ${String(limit)} lockboxes its storage keeps in one vault: remove one before storing another.`
   return new VaultError('vault_full', message, optsOf(opts))
 }
 

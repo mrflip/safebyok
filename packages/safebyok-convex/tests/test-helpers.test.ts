@@ -4,7 +4,7 @@ import * as TH from './test-helpers'
 
 describe("convexRefusalOf", () => {
   it("hands back the data of the ConvexError the operation refused with", async () => {
-    const data = { kind: 'vault_full', message: 'This vault is full: retire a lockbox to make room, then try again.' }
+    const data = { kind: 'vault_full', message: 'This vault is full: remove a lockbox to make room, then try again.' }
     const refusal = await TH.convexRefusalOf(Promise.reject(new ConvexError(data)))
     expect(refusal).to.deep.equal(data)
   })
