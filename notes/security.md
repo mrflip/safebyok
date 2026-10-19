@@ -146,7 +146,7 @@ added or folded into through the subagent, and no other entry changes.
   old is ever decrypted by the new code, and nothing is rewritten in place. A Convex deployment
   refuses the new schema until its tables are cleared; Postgres hosts must run the summary
   changeset's Postgres steps before the new table SQL.
-* 2026-10-18 (make_hello); 2026-10-19 (20261019-softlock_gone, amending points 1 and 2); 2026-10-19 (20261019-fields_and_make, amending the opening and point 4): **`openVault` is split into `Vault.make`, which returns a handle at
+* 2026-10-18 (make_hello); 2026-10-19 (20261019-softlock_gone, amending points 1 and 2); 2026-10-19 (20261019-fields_and_make, amending the opening and points 1 and 4): **`openVault` is split into `Vault.make`, which returns a handle at
   once, and `vault.hello()`, which reads storage and the lease.** `Vault.make(opts)` is synchronous:
   it validates every option and returns the handle in state `opening`, reading no storage and starting
   no timer or watch; the first `hello()` reads (see the 2026-10-19 amendment below). `hello()` reads
@@ -158,9 +158,11 @@ added or folded into through the subagent, and no other entry changes.
   construction, ctx, stored format or key handling changed. Five points to look at:
   (1) **A lock does not wait for `hello()`.** `lock()` acts at once, storage reachable or not.
   Amended 2026-10-19 (20261019-softlock_gone): `lockSoon()` and the counter `revokesSoFar` are
-  gone, and a `lock()` landing while `hello()` reads the lease no longer stops the lease being
-  taken up: last writer wins, accepted as a user annoyance until the store reform, with a policy
-  owed before 1.0 (TODO.md, *Lock timing vs. work in flight*). Until then, a `hello()` taking up
+  gone. Corrected 2026-10-19 (20261019-fields_and_make, PR #197): a `lock()` landing while
+  `hello()` takes up the lease still wins, by another mechanism (each take-up is aborted by
+  whatever drops or replaces the key; see this entry's 2026-10-19 fields_and_make amendment
+  below), and the policy for lock timing versus other work in flight is still owed before 1.0
+  (TODO.md, *Lock timing vs. work in flight*). Until then, a `hello()` taking up
   the lease while a lock landed took nothing up:
   `fetchLease` returned at once unless the counter `revokesSoFar` (raised by every hard lock --
   `lock()`, `del()`, a lock for untrusted storage -- and every `lockSoon()`) was 0 when that
@@ -223,10 +225,12 @@ added or folded into through the subagent, and no other entry changes.
   `lock()` between the read and the install could be reversed (unlocked in memory, lease deleted),
   and an older lease could overwrite a fresher `unlock()`. Each take-up now holds an
   `AbortController`; whatever drops or replaces the key (`#dropKey`, called by lock, close, del, the
-  expiry timer and relocks; and `#grantLease`, as an unlock or wayin change installs its key) aborts
-  it. An aborted take-up installs nothing and discards no lease record (the lease standing may be
-  the overtaking change's own). Nothing else about lock timing versus work in flight changed: the
-  policy owed before 1.0 (TODO.md, *Lock timing vs. work in flight*) is still open.
+  expiry timer and relocks; and `#grantLease`, as an unlock or wayin change begins writing its
+  lease, before the write, so a take-up that read an older lease cannot erase the fresh one by
+  discarding the older) aborts it. An aborted take-up installs nothing and discards no lease
+  record (the lease standing may be the overtaking change's own). Nothing else about lock timing
+  versus work in flight changed: the policy owed before 1.0 (TODO.md, *Lock timing vs. work in
+  flight*) is still open.
 
 * 2026-10-18: **the context bytes of every wayin changed spelling, not construction, with the
   rename to "wayin".** A wayin's wrap is bound to a context of the record's format tag, then its
@@ -1298,16 +1302,17 @@ added or folded into through the subagent, and no other entry changes.
   `DeviceDB.putLease`'s expectation) are gone: they decided who wins when a lock lands while
   something is in flight, and now nothing decides; last writer wins. So a `lock()` landing during
   an unlock (this tab or another tab on the device) no longer stops it: the unlock finishes, the
-  vault ends unlocked, and a lease is written. A `lock()` landing while `hello()` reads the lease no
-  longer stops the lease being taken up. A lease that a lock failed to erase (the device store
-  threw) is taken up by the next `hello()` that reads afresh on the same handle, not only at the
-  next page load. A `getBox()` or `useBox()` still hands back nothing if no key is in hand when
-  storage answers or when the whisper has been deciphered, unless another unlock put a key back in
-  hand meanwhile. An unlock still takes nothing up when the handle has closed or the vault props it
-  proved against no longer stand (deleted, remade, wayins changed). **For review**: the Coach's
-  ruling is that these are accepted as user annoyances until the store reform is done; a policy is
-  owed before 1.0, recorded in TODO.md under *Lock timing vs. work in flight* with seven
-  scenarios. The device mark (format now `safebyok-mark-v4`) holds only the seen vault (rollback
+  vault ends unlocked, and a lease is written. A `lock()` landing while `hello()` takes up the
+  lease is the exception (corrected 2026-10-19, 20261019-fields_and_make, PR #197): any key change
+  landing then aborts the take-up, which installs nothing (see the `make_hello` entry). A lease that a lock
+  failed to erase (the device store threw) is taken up by the next `hello()` that reads afresh on
+  the same handle, not only at the next page load. A `getBox()` or `useBox()` still hands back
+  nothing if no key is in hand when storage answers or when the whisper has been deciphered, unless
+  another unlock put a key back in hand meanwhile. An unlock still takes nothing up when the handle
+  has closed or the vault props it proved against no longer stand (deleted, remade, wayins changed).
+  **For review**: the Coach's ruling is that these are accepted as user annoyances until the store
+  reform is done; a policy is owed before 1.0, recorded in TODO.md under *Lock timing vs. work in
+  flight* with seven scenarios. The device mark (format now `safebyok-mark-v4`) holds only the seen vault (rollback
   detection), never null, and `del()` erases it rather than writing a blank one; a
   `safebyok-mark-v3` record reads as no mark, so the device re-checks the vault from what storage
   holds now. What stood until 2026-10-19: `lock()`, `del()` and a lock for untrusted storage are hard: the key goes at once,
