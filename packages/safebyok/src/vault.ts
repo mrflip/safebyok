@@ -570,7 +570,7 @@ export class Vault {
       call:   'delWayin',
       check:  (standing) => {
         if (standing.passkey === null) {
-          throw new VaultError('absent_wayin', 'This vault has no passkey to remove: it may have been removed on another device. Nothing was changed.')
+          throw new VaultError('absent_wayin', "This vault has no passkey to remove: it may have been removed on another device. Nothing was changed.")
         }
       },
       revise: (standing) => ({ passphrase: standing.passphrase, passkey: null }),
@@ -1475,7 +1475,7 @@ export class Vault {
     const { passphrase, passkey } = this.#wayinsOf(standing)
     const wayin = proof.kind === 'passphrase' ? passphrase : passkey
     if (wayin === null) {
-      throw new VaultError('absent_wayin', 'This vault has no passkey: it may have been removed on another device. Unlock with the passphrase.')
+      throw new VaultError('absent_wayin', "This vault has no passkey: it may have been removed on another device. Unlock with the passphrase.")
     }
     return valOf(await wayin.tryOpen(proof))
   }
