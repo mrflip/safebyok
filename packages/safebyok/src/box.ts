@@ -196,7 +196,7 @@ export class Box {
   static make(vault: BoxVault, record: BoxRecord): Box {
     const given: unknown = vault
     if (typeof given !== 'object' || given === null) {
-      throw new VaultError('bad_option', 'Box.make needs the vault the box belongs to, as its first argument.')
+      throw new VaultError('bad_option', "Box.make needs the vault the box belongs to, as its first argument.")
     }
     const checked = BoxRecord.safeParse(record)
     // The refusal says nothing of the record: its fields could be anything a caller had in hand.
@@ -384,7 +384,7 @@ const parseJsonOrNull = (text: string): unknown => {
 const standingOf = (vault: BoxVault) => {
   const { vault_id: vaultId, vault_key_epoch: vaultKeyEpoch } = vault
   if (vaultId === null || vaultKeyEpoch === null) {
-    throw new VaultError('absent_vault', 'This vault has not been created yet, so no box can be sealed in it or opened from it: the first unlock() creates it.')
+    throw new VaultError('absent_vault', "This vault has not been created yet, so no box can be sealed in it or opened from it: the first unlock() creates it.")
   }
   return { vaultId, vaultKeyEpoch }
 }
@@ -393,7 +393,7 @@ const standingOf = (vault: BoxVault) => {
 export const checkedWhisper = (whisper: unknown): Whisper => {
   const checked = Whisper.safeParse(whisper)
   if (! checked.success) {
-    throw new VaultError('bad_whisper', 'A whisper must be a JSON value: a string, number, boolean, array, or plain object. A bare null or undefined cannot be stored -- to empty a box, delete it. (null inside an array or object is fine.)')
+    throw new VaultError('bad_whisper', "A whisper must be a JSON value: a string, number, boolean, array, or plain object. A bare null or undefined cannot be stored -- to empty a box, delete it. (null inside an array or object is fine.)")
   }
   return checked.data
 }
