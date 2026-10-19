@@ -42,7 +42,8 @@ const ServerMaxNameBytes = 640
  *   writes as before. A subscription that fails is not retried: it is logged, once for a failing
  *   streak, and calls `onChange`, so the vault reads again and meets the trouble itself.
  * * **Misuse crosses as misuse**: a record or expectation at fault is refused as `bad_record`,
- *   by this VaultDB before it is sent or by the server's own after, crossing by its kind. A
+ *   by this VaultDB before it is sent (an epoch past GraphQL's 32-bit `Int` included) or by the
+ *   server's own after, crossing by its kind. A
  *   GraphQL validation error (`BAD_USER_INPUT`, `GRAPHQL_VALIDATION_FAILED`) is therefore the
  *   server's schema at odds with what this version sends, never the record, and refuses with kind
  *   `bad_option`, quoting nothing of what the server said, which may quote the variables.
@@ -161,12 +162,15 @@ class UrqlVaultDB extends VaultDB {
   }
 
   protected async doFetchOrCreateVaultProps(vaultProps: VaultProps): Promise<unknown> {
+    checkInts('vault props record', vaultProps)
     const { safebyokFetchOrCreateVaultProps } = await this.told(FetchOrCreateVaultPropsDoc, { vaultProps: recordOf(vaultProps, VaultPropsFields) })
     return recordOf(safebyokFetchOrCreateVaultProps, VaultPropsFields)
   }
 
   // A stale write refuses on the server and crosses as its kind, so a write that answers landed.
   protected async doUpdateVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<boolean> {
+    checkInts('vault props record', vaultProps)
+    checkInts('vault props expectation', expected)
     const { vault_id, unlock_epoch } = expected
     await this.told(UpdateVaultPropsDoc, { vaultProps: recordOf(vaultProps, VaultPropsFields), expected: { vault_id, unlock_epoch } })
     return true
@@ -189,6 +193,7 @@ class UrqlVaultDB extends VaultDB {
   // A stale write refuses on the server and crosses as its kind, so a write that answers landed,
   // with the lockbox as the server's storage holds it.
   protected async doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<unknown> {
+    checkInts('lockbox', lockbox)
     const { vault_id, revision_tok, vault_key_epoch } = expected
     const { safebyokUpdateBox } = await this.told(UpdateBoxDoc, { scope: scopeOut(scope), lockbox: recordOf(lockbox, LockboxFields), expected: { vault_id, revision_tok, vault_key_epoch } })
     return recordOf(safebyokUpdateBox, LockboxFields)
@@ -234,6 +239,24 @@ class UrqlVaultDB extends VaultDB {
 
 const scopeOut = (scope: VaultScope) => recordOf(scope, ScopeFields)
 
+/** The most a GraphQL `Int` carries, a signed 32-bit integer, where the core takes any safe integer. */
+const GraphqlIntMax = 2_147_483_647
+
+/** The fields a record or expectation sends as an `Int!`, each a whole number above zero once the base class has checked it. */
+const IntFields = ['unlock_epoch', 'vault_key_epoch', 'whisper_schema_version'] as const
+
+/**
+ * `outgoing`, once each of its `Int!` fields fits a GraphQL `Int`: kind 'bad_record' otherwise,
+ * before it is sent, as no vault builds an epoch that large. A lockbox's expectation names the
+ * lockbox's own `vault_key_epoch`, so checking the lockbox checks it.
+ */
+const checkInts = (said: string, outgoing: Partial<Record<typeof IntFields[number], number>>) => {
+  const over = IntFields.find((field) => (outgoing[field] ?? 0) > GraphqlIntMax)
+  if (over !== undefined) {
+    throw new VaultError('bad_record', `Nothing was written: that ${said}'s ${over} is past ${String(GraphqlIntMax)}, the most GraphQL carries in an Int, and so not one a vault builds. Hand a VaultDB only the records and expectations a vault builds.`)
+  }
+}
+
 /** An operation's data, or what it was refused with: the server's VaultError, or urql's error. */
 const answerOf = (result: OperationResult): Record<string, unknown> => {
   if (result.error) { throw refusalOf(result.error) }
@@ -254,7 +277,8 @@ const refusalOf = (err: CombinedError): Error => {
     if (isKind(kind)) { return new VaultError(kind, refused.message) }
   }
   // Never the record's fault, nor 'bad_record': every variable has passed the base class's checks,
-  // the ones the server's VaultDB makes, so a validation error says the server serves another schema.
+  // the ones the server's VaultDB makes, and checkInts', so a validation error says the server
+  // serves another schema.
   if (err.graphQLErrors.some(({ extensions: { code } }) => typeof code === 'string' && MisuseCodes.has(code))) {
     return Sanitizer.refusalFor(err, 'bad_option', "The GraphQL server refused this operation's shape or variables: the schema it serves is not the one this version of safebyok-graphql sends. Serve VaultSchemaSdl from the same version.")
   }

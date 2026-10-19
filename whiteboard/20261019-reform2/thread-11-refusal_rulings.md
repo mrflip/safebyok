@@ -17,7 +17,10 @@ Branch `20261019-refusal_rulings`, PR [#185](https://github.com/mrflip/safebyok/
     lockbox whose boxlabel is below the floor, and vault props whose applabel, user_id or
     vaultlabel is below it, are `bad_record`. The README's `bad_record` row, `VAULTDB.md` *Names*
     and the `validators.ts` table say so.
-  - *GraphQL* (ruling 3): no change of kind; the doc block, a running comment, the README and two
+  - *GraphQL* (ruling 3): `graphqlVaultDB` refuses as `bad_record`, before sending, a record or
+    expectation whose `Int!` field (`unlock_epoch`, `vault_key_epoch`, `whisper_schema_version`)
+    is past GraphQL's 32-bit `Int`, which the core's safe-integer check admits (`checkInts`, from
+    the review). Otherwise no change of kind; the doc block, a running comment, the README and
     tests show that a record at fault is `bad_record` (refused before it is sent, or crossing from
     the server by its kind). See *Decisions*.
   - *notes/security.md* (item 4): "a new public field" is "a new snapshot field", by a `sonnet`
@@ -37,8 +40,8 @@ Branch `20261019-refusal_rulings`, PR [#185](https://github.com/mrflip/safebyok/
   - *GraphQL keeps `bad_option` for `BAD_USER_INPUT`.* The client could tell which variable was
     refused (graphql-js puts `Variable "$lockbox"` in the message, and a location in the
     document), but the record is never at fault there: `graphqlVaultDB` is a `VaultDB`, so every
-    variable has passed the base class's checks before it is sent, and those are the checks the
-    server's own VaultDB makes, which refuse as `bad_record` and cross by kind. A validation error
+    variable has passed the base class's checks and `checkInts` before it is sent, and those are
+    the checks the server's own VaultDB makes, which refuse as `bad_record` and cross by kind. A validation error
     therefore means the server serves another schema version, `bad_option`'s case.
 * **Discoveries**:
   - Through a vault, none of this is reachable: the vault checks every name at its entry and
