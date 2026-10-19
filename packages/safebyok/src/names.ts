@@ -97,7 +97,7 @@ export const checkFloor = (field: NameField, candidate: unknown): string => {
 
 /**
  * `scope`, once its three names pass the floor and their checks, as a frozen copy: whoever it is
- * handed to -- a host's strength test, a snapshot's reader -- cannot change it for everyone else.
+ * handed to -- a host's strength checker, a snapshot's reader -- cannot change it for everyone else.
  * Kind 'bad_label' otherwise.
  */
 export const checkScope = (rules: NameRules, scope: unknown): VaultScope => {

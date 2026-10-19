@@ -232,7 +232,7 @@ describe("a key deriver's bytes", () => {
 
   it("are zeroed after every try when opening, a wrong passphrase's included", async () => {
     const identity = TH.vaultPropsOf('u1')
-    const sealed = await Wayin.sealPassphrase(slice, PassphraseProof.parse(slice, 'first'), identity, stamp, await makeVaultKey())
+    const { wayin: sealed } = await Wayin.seal(slice, PassphraseProof.parse(slice, 'first'), identity, stamp, await makeVaultKey())
     const { keyDeriver, handed } = keepingDeriver()
     const opening = TH.vaultSliceOf('u1', keyDeriver)
     const wayin = Wayin.make(opening, sealed.props, identity)

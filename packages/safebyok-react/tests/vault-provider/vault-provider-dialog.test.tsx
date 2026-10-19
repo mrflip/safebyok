@@ -49,7 +49,7 @@ describe("VaultProvider", () => {
     const world = makeWorld()
     render(
       <VaultProvider applabel="acme" vaultlabel="main" userId="u1" vaultDB={world.vaultDB} deviceDB={world.deviceDB} keyDeriver={TH.testDeriver}
-        passphraseStrengthTest={TH.anyPassphraseTest} leaseHours={0.25}>
+        strengthChecker={TH.anyStrengthChecker} leaseHours={0.25}>
         <Probe />
       </VaultProvider>,
     )

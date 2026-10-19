@@ -28,12 +28,12 @@ describe("a lock that lands while an unlock or a change is under way", () => {
     expect(await world.getLease()).to.be.null
   })
 
-  it("during changePassphrase(): the passphrase still changes", async () => {
+  it("during putWayin(): the passphrase still changes", async () => {
     const world = makeRacingWorld()
     const vault = await world.openUnlocked('old passphrase')
     await vault.putBox('anthropic', 'sk-fake')
     const gate = world.holdNextDerive()
-    const changing = vault.changePassphrase('old passphrase', 'new passphrase')
+    const changing = vault.putWayin('old passphrase', 'new passphrase')
     await gate.reached
     await vault.lock()
     gate.release()
@@ -42,21 +42,6 @@ describe("a lock that lands while an unlock or a change is under way", () => {
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })
     await TH.expectRefusal(fresh.unlock('old passphrase'), 'wrong_passphrase')
     await fresh.unlock('new passphrase')
-    expect(await fresh.getBox('anthropic')).to.eq('sk-fake')
-  })
-
-  it("during addPasskey()'s prompt: the passkey still lands", async () => {
-    const world = makeRacingWorld()
-    const vault = await world.openUnlocked('pw')
-    await vault.putBox('anthropic', 'sk-fake')
-    const makePasskey = async () => {
-      await vault.lock()
-      return await TH.passkeyOf('laptop')
-    }
-    expect(await vault.addPasskey('pw', makePasskey)).to.be.true
-
-    const fresh = await world.open({ deviceDB: memoryDeviceDB() })
-    await fresh.unlock(await TH.passkeyOf('laptop'))
     expect(await fresh.getBox('anthropic')).to.eq('sk-fake')
   })
 
@@ -125,7 +110,7 @@ describe("a read in flight when a lock lands", () => {
     const gate = world.holdNextBoxRead()
     const reading = TH.expectRefusal(vault.getBox('anthropic'), 'vault_locked')
     await gate.reached
-    await there.changePassphrase('pw one', 'pw two')
+    await there.putWayin('pw one', 'pw two')
     // Let this handle's background refresh, rung by the write above, find its key outlived.
     await TH.wakeupAtNextTick()
     expect(vault.getSnapshot().state).to.eq('locked')
@@ -304,7 +289,7 @@ describe("a vault that moves elsewhere while an unlock is under way", () => {
     const gate = world.holdNextDerive()
     const unlocking = TH.expectRefusal(vault.unlock('pw one'), 'vault_locked')
     await gate.reached
-    await there.changePassphrase('pw one', 'pw two')
+    await there.putWayin('pw one', 'pw two')
     await TH.wakeupAtNextTick()
     gate.release()
     await unlocking
@@ -602,9 +587,9 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
     expect(await vaultTwo.getBox('anthropic')).to.eq('sk-ant-fake-new')
   })
 
-  it("changePassphrase() proves against the standing vault props, never burying the reborn vault's", async () => {
+  it("putWayin() proves against the standing vault props, never burying the reborn vault's", async () => {
     const { vaultOne, vaultTwo } = await rebornWorld()
-    await TH.expectRefusal(vaultOne.changePassphrase('pw one', 'pw three'), 'wrong_passphrase')
+    await TH.expectRefusal(vaultOne.putWayin('pw one', 'pw three'), 'wrong_passphrase')
     await vaultTwo.lock()
     await vaultTwo.unlock('pw two')
     expect(await vaultTwo.getBox('anthropic')).to.eq('sk-ant-fake-new')
@@ -799,7 +784,7 @@ describe("versioned updates: two devices writing at once", () => {
     await here.putBox('anthropic', 'sk-ant-fake-one')
     beforeNextWrite('putBox', async () => {
       await there.putBox('anthropic', 'sk-ant-fake-theirs')
-      await there.changePassphrase('shared pw', 'their pw')
+      await there.putWayin('shared pw', 'their pw')
     })
     const putBox = vi.spyOn(hereDB, 'putBox')
     await TH.expectRefusal(here.putBox('anthropic', 'sk-ant-fake-mine'), 'vault_locked')
@@ -984,8 +969,8 @@ describe("versioned updates: two devices writing at once", () => {
   it("a passphrase change racing another device's is refused as stale; theirs stands", async () => {
     const { here, there, beforeNextWrite } = await twoDeviceWorld()
     await here.putBox('anthropic', 'sk-ant-fake-one')
-    beforeNextWrite('putVaultProps', () => there.changePassphrase('shared pw', 'their pw'))
-    await TH.expectRefusal(here.changePassphrase('shared pw', 'my pw'), 'stale_write')
+    beforeNextWrite('putVaultProps', async () => { await there.putWayin('shared pw', 'their pw') })
+    await TH.expectRefusal(here.putWayin('shared pw', 'my pw'), 'stale_write')
     expect(here.getSnapshot().state).to.eq('locked')
     await TH.expectRefusal(here.unlock('my pw'), 'wrong_passphrase')
     await here.unlock('their pw')

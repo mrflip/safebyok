@@ -53,7 +53,7 @@ const thisVault = { vault_id: 'vault-id-u1' }
 
 /** u1's main vault, opened by the core in a browser of its own, over graphqlVaultDB to `schema`. */
 const vaultIn = (schema: GraphQLSchema) => TH.settledVault({
-  applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: TH.browserFor(schema, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest,
+  applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: TH.browserFor(schema, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker,
 })
 
 /** A fetch with no network behind it. */
@@ -130,7 +130,7 @@ describe("graphqlVaultDB, a server's box limit", () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
     const vaultDB = graphqlVaultDB({ client: TH.urqlClientFor(schema, 'u1'), maxBoxes: 3 })
     const refusal = await TH.expectRefusal(TH.settledVault({
-      applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest, maxBoxes: 4,
+      applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, maxBoxes: 4,
     }), 'bad_option')
     expect(refusal.message).to.include('3 boxes')
   })
@@ -180,7 +180,7 @@ describe("graphqlVaultDB, carrying a passkey's way in", () => {
     const first = await opened()
     await first.unlock('correct horse battery staple')
     await first.putBox('anthropic_api_key', 'sk-ant-test-not-a-real-key')
-    expect(await first.addPasskey('correct horse battery staple', () => Promise.resolve(laptop))).to.be.true
+    expect(await first.putWayin('correct horse battery staple', laptop)).to.eq(first)
     first.close()
 
     const second = await opened()

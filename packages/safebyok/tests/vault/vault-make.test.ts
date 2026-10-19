@@ -92,7 +92,7 @@ describe("Vault.make", () => {
 
   it("hands on every method alone, bound to its vault, as its examples show", async () => {
     const world = makeWorld()
-    const { subscribe, getSnapshot, hello, unlock, putBox, getBox, useBox, delBox, addPasskey, changePassphrase, delWayin, lock, del, close } = await world.open()
+    const { subscribe, getSnapshot, hello, unlock, putBox, getBox, useBox, delBox, putWayin, delWayin, lock, del, close } = await world.open()
     const heard = vi.fn()
     const unsubscribe = subscribe(heard)
     await hello()
@@ -101,8 +101,8 @@ describe("Vault.make", () => {
     expect(await getBox('anthropic_api_key')).to.eq('sk-ant-test')
     expect(await useBox('anthropic_api_key', (whisper) => typeof whisper)).to.eq('string')
     await delBox('anthropic_api_key')
-    await changePassphrase('correct horse', 'battery staple')
-    expect(await addPasskey('battery staple', () => TH.passkeyOf('laptop'))).to.be.true
+    await putWayin('correct horse', 'battery staple')
+    await putWayin('battery staple', await TH.passkeyOf('laptop'))
     await delWayin('battery staple')
     await lock()
     expect(getSnapshot().state).to.eq('locked')
@@ -128,7 +128,7 @@ describe("Vault.make's options", () => {
 
   it("makes a handle that settles once its hello is awaited, as its first two examples, and the Vault's own, show", async () => {
     const { vaultDB, deviceDB } = makeWorld()
-    const vault = Vault.make({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB, keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest })
+    const vault = Vault.make({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker })
     expect(vault.state).to.eq('opening')
     await vault.hello()
     expect(vault.state).to.eq('absent')
@@ -613,10 +613,10 @@ describe("Vault.make, by the Contract", () => {
     const vaultDBCalls = VaultDBVerbsUsed.map((verb) => vi.spyOn(world.vaultDB, verb))
     const deviceDBCalls = (Object.keys(world.deviceDB) as (keyof typeof world.deviceDB)[]).map((verb) => vi.spyOn(world.deviceDB, verb))
     const derivations = vi.spyOn(TH.testDeriver, 'deriveKeyBytes')
-    const strengthTests = vi.fn(TH.anyPassphraseTest)
+    const strengthTests = vi.fn(TH.anyStrengthChecker)
     vi.useFakeTimers()
     try {
-      Vault.make(world.optsWith({ passphraseStrengthTest: strengthTests }))
+      Vault.make(world.optsWith({ strengthChecker: strengthTests }))
       expect(vi.getTimerCount()).to.eq(0)
     } finally {
       vi.useRealTimers()

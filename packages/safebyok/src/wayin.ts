@@ -11,7 +11,7 @@ import type { Vault } from './vault'
  * two ways in -- its passphrase, and its passkey when it has one -- and one vaultKey behind both.
  * A {@link Wayin} is made from its stored record by `Wayin.make`, a {@link PassphraseWayin} or a
  * {@link PasskeyWayin}; `wayin.tryOpen(proof)` opens one, the proof making the key;
- * `Wayin.sealPassphrase` and `Wayin.sealPasskey` make one.
+ * `Wayin.seal(vault, proof, ...)` makes one.
  *
  * Each way in's wrap is bound to its vault -- the scope, and the fields of the vault props that
  * never change, `vault_id` and `registered_at` -- and to its own visible header (every field but
@@ -215,66 +215,36 @@ export abstract class Wayin {
   }
 
   /**
-   * A passphrase's way in around `vaultKey`, under a fresh passphraseSalt and the passphraseKey
-   * `proof` makes over it. What the key deriver refuses or throws is refused as `proof.wayinKeyFor`
-   * says: a condition as itself, anything else as 'unexpected_error', the throw its cause.
+   * A new way in around `vaultKey` for `proof`, and the session's handle on the vaultKey through
+   * it. For a passphrase, a fresh passphraseSalt and the passphraseKey the proof makes over it: one
+   * key derivation, whose refusals are `proof.wayinKeyFor`'s. For a passkey, the credential's id
+   * and the salt it answered over, kept so the vault can ask it again (never the answer), and the
+   * passkeyKey its answer makes: one HKDF. Refuses with kind 'bad_option' a passkey's answer over
+   * anything but a fresh salt of {@link PasskeySaltBytes} bytes, as `safebyok-react`'s
+   * `createPasskey` mints, before any key is made.
    *
-   * @param vault - The vault it is for: its scope is bound into the wrap, its key deriver makes the key and is named on the way in.
-   * @param proof - The passphrase the way in admits.
+   * @param vault - The vault it is for: its scope is bound into the wrap, its key deriver makes a passphrase's key and is named on the way in.
+   * @param proof - The passphrase the way in admits, or what the new passkey answered.
    * @param holder - The vault props it will be one of: their `vault_id` and `registered_at` are bound into the wrap.
    * @param stamp - Its {@link WayinStamp}: vaultKey epoch, device and time.
    * @param vaultKey - The vaultKey to wrap: extractable, as only such a key can be.
+   * @returns The way in, and a non-extractable handle on the vaultKey unwrapped from it, which a
+   *   vault's creating unlock keeps, and every later seal drops.
    *
-   * @example await Wayin.sealPassphrase(vault, PassphraseProof.parse(vault, chosen), vaultProps, stamp, proven.transientKey)
+   * @example const { wayin } = await Wayin.seal(vault, PassphraseProof.parse(vault, chosen), vaultProps, stamp, proven.transientKey)
+   * @example const { wayin } = await Wayin.seal(vault, PasskeyProof.parse(vault, await createPasskey(opts)), vaultProps, stamp, proven.transientKey)
+   * @example const { wayin, sessionKey } = await Wayin.seal(vault, proof, draft, stamp, freshKey)   // a new vault's first passphrase
    */
-  static async sealPassphrase(vault: WayinVault, proof: PassphraseProof, holder: WayinHolder, stamp: WayinStamp, vaultKey: CryptoKey): Promise<PassphraseWayin> {
-    const { wayin } = await sealUnderPassphrase(vault, proof, holder, stamp, vaultKey)
-    return wayin
-  }
-
-  /**
-   * A vault's first passphrase way in, as {@link Wayin.sealPassphrase} makes one, and the session's
-   * handle on the vaultKey through it: the creating unlock keeps that, where every later way in
-   * is for the vault's other devices.
-   *
-   * @returns The way in, and a non-extractable handle on the vaultKey unwrapped from it.
-   *
-   * @example const { wayin, sessionKey } = await Wayin.sealFirstPassphrase(vault, proof, draft, stamp, freshKey)
-   */
-  static async sealFirstPassphrase(vault: WayinVault, proof: PassphraseProof, holder: WayinHolder, stamp: WayinStamp, vaultKey: CryptoKey): Promise<{ wayin: PassphraseWayin, sessionKey: CryptoKey }> {
-    const { wayin, wayinKey } = await sealUnderPassphrase(vault, proof, holder, stamp, vaultKey)
-    const sessionKey = await unwrapKeyUnder(wayinKey, wayin.vault_key_wayin_wrapped, wayin.wayinCtx, SessionUsage)
-    return { wayin, sessionKey }
-  }
-
-  /**
-   * A passkey's way in around `vaultKey`, for the passkey whose answer `proof` holds. The way in
-   * keeps the credential's id and the salt it answered over, so the vault can ask it again; never
-   * the answer. Refuses with kind 'bad_option' an answer over anything but a fresh salt of
-   * {@link PasskeySaltBytes} bytes, as `safebyok-react`'s `createPasskey` mints.
-   *
-   * @param vault - The vault it is for: its scope is bound into the wrap and its key.
-   * @param proof - What the new passkey answered.
-   * @param holder - The vault props it will be one of: their `vault_id` and `registered_at` are bound into the wrap and its key.
-   * @param stamp - Its {@link WayinStamp}: vaultKey epoch, device and time.
-   * @param vaultKey - The vaultKey to wrap: extractable, as only such a key can be.
-   *
-   * @example await Wayin.sealPasskey(vault, PasskeyProof.parse(vault, await createPasskey(opts)), vaultProps, stamp, proven.transientKey)
-   */
-  static async sealPasskey(vault: WayinVault, proof: PasskeyProof, holder: WayinHolder, stamp: WayinStamp, vaultKey: CryptoKey): Promise<PasskeyWayin> {
-    if (saltBytesOf(proof.prfSaltB64)?.length !== PasskeySaltBytes) {
-      throw new VaultError('bad_option', `A new passkey answers over a fresh salt of ${String(PasskeySaltBytes)} random bytes, as base64url text: safebyok-react's createPasskey mints one.`)
-    }
-    const header = {
-      wayinkind:     'passkey',
-      ...stampOf(stamp),
-      credential_id: proof.credentialId,
-      prf_salt_b64:  proof.prfSaltB64,
-    } as const
+  static async seal(vault: WayinVault, proof: PassphraseProof, holder: WayinHolder, stamp: WayinStamp, vaultKey: CryptoKey): Promise<{ wayin: PassphraseWayin, sessionKey: CryptoKey }>
+  static async seal(vault: WayinVault, proof: PasskeyProof, holder: WayinHolder, stamp: WayinStamp, vaultKey: CryptoKey): Promise<{ wayin: PasskeyWayin, sessionKey: CryptoKey }>
+  static async seal(vault: WayinVault, proof: PassphraseProof | PasskeyProof, holder: WayinHolder, stamp: WayinStamp, vaultKey: CryptoKey): Promise<{ wayin: PassphraseWayin | PasskeyWayin, sessionKey: CryptoKey }>
+  static async seal(vault: WayinVault, proof: PassphraseProof | PasskeyProof, holder: WayinHolder, stamp: WayinStamp, vaultKey: CryptoKey): Promise<{ wayin: PassphraseWayin | PasskeyWayin, sessionKey: CryptoKey }> {
+    const { header, wayinKey } = proof instanceof PassphraseProof ? await passphraseKeying(vault, proof, stamp) : await passkeyKeying(vault, proof, holder, stamp)
     const wayinCtx = wayinCtxOf(vault, holder, header)
-    const wayinKey = await proof.wayinKeyFor({ wayinCtx })
-    const wrapped = await wrapKeyUnder(wayinKey, vaultKey, wayinCtx)
-    return new PasskeyWayin(vault, { ...header, vault_key_wayin_wrapped: wrapped }, holder)
+    const record = { ...header, vault_key_wayin_wrapped: await wrapKeyUnder(wayinKey, vaultKey, wayinCtx) }
+    const wayin = record.wayinkind === 'passphrase' ? new PassphraseWayin(vault, record, holder) : new PasskeyWayin(vault, record, holder)
+    const sessionKey = await unwrapKeyUnder(wayinKey, record.vault_key_wayin_wrapped, wayinCtx, SessionUsage)
+    return { wayin, sessionKey }
   }
 }
 
@@ -406,10 +376,10 @@ export class PasskeyWayin extends Wayin {
   }
 }
 
-// == [Sealing and refusals]: sealUnderPassphrase, wrongPassphrase, unknownKeyDeriver, damagedPassphrase, damagedPasskey
+// == [Sealing and refusals]: passphraseKeying, checkFreshSalt, passkeyKeying, wrongPassphrase, unknownKeyDeriver, damagedPassphrase, damagedPasskey
 
-/** The way in around `vaultKey` under `proof`'s key, and that key. */
-const sealUnderPassphrase = async (vault: WayinVault, proof: PassphraseProof, holder: WayinHolder, stamp: WayinStamp, vaultKey: CryptoKey) => {
+/** A new passphrase's way in's header, under a fresh salt for the vault's key deriver, and the key `proof` makes over it. */
+const passphraseKeying = async (vault: WayinVault, proof: PassphraseProof, stamp: WayinStamp) => {
   const { keyDeriver } = vault
   const header = {
     wayinkind:         'passphrase',
@@ -417,10 +387,32 @@ const sealUnderPassphrase = async (vault: WayinVault, proof: PassphraseProof, ho
     key_deriver_label: keyDeriver.key_deriver_label,
     salt_b64:          toB64(randomBytes(keyDeriver.salt_bytes)),
   } as const
-  const wayinKey = await proof.wayinKeyFor(header)
-  const wrapped = await wrapKeyUnder(wayinKey, vaultKey, wayinCtxOf(vault, holder, header))
-  const wayin = new PassphraseWayin(vault, { ...header, vault_key_wayin_wrapped: wrapped }, holder)
-  return { wayin, wayinKey }
+  return { header, wayinKey: await proof.wayinKeyFor(header) }
+}
+
+/**
+ * Refuse with kind 'bad_option' a new passkey's answer over anything but a fresh salt of
+ * {@link PasskeySaltBytes} bytes, as base64url text: no passkey's way in is sealed over another.
+ * The vault checks it at its door, before any key derivation; `Wayin.seal` checks it again.
+ *
+ * @example checkFreshSalt(PasskeyProof.parse(vault, await createPasskey(opts)))   // passes
+ */
+export const checkFreshSalt = (proof: PasskeyProof): void => {
+  if (saltBytesOf(proof.prfSaltB64)?.length !== PasskeySaltBytes) {
+    throw new VaultError('bad_option', `A new passkey answers over a fresh salt of ${String(PasskeySaltBytes)} random bytes, as base64url text: safebyok-react's createPasskey mints one.`)
+  }
+}
+
+/** A new passkey's way in's header, for the credential and salt `proof` answered over, and the key its answer makes. */
+const passkeyKeying = async (vault: WayinVault, proof: PasskeyProof, holder: WayinHolder, stamp: WayinStamp) => {
+  checkFreshSalt(proof)
+  const header = {
+    wayinkind:     'passkey',
+    ...stampOf(stamp),
+    credential_id: proof.credentialId,
+    prf_salt_b64:  proof.prfSaltB64,
+  } as const
+  return { header, wayinKey: await proof.wayinKeyFor({ wayinCtx: wayinCtxOf(vault, holder, header) }) }
 }
 
 /** The refusal of a passphrase that opened nothing. */

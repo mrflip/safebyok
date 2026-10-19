@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { Vault, type Ask, type GetProof, type ProofAnswer, checkStrengthTest, checkValidators, delDamagedVault as delStoredDamagedVault, isCondition, isVaultError, parseLogger, type BadNewsHandler, type MakeVaultOpts, type PassphraseStrengthTest, type VaultDB, type VaultError, type VaultLogger, type VaultScope, type VaultSnapshot, type VaultValidators } from 'safebyok'
+import { Vault, type Ask, type GetProof, type ProofAnswer, parseStrengthChecker, checkValidators, delDamagedVault as delStoredDamagedVault, isCondition, isVaultError, parseLogger, type BadNewsHandler, type MakeVaultOpts, type StrengthChecker, type VaultDB, type VaultError, type VaultLogger, type VaultScope, type VaultSnapshot, type VaultValidators } from 'safebyok'
 import { PassphraseModal, type PassphraseAdvice } from './passphrase-modal'
 
 // == [Hooks]: useVault, useVaultSnapshot, useOpenError, OpenErrorShape
@@ -128,7 +128,7 @@ type Showing = { round: number, ask: Ask, answer: (answer: ProofAnswer) => void 
  */
 const hasUserGesture = (): boolean => (globalThis.navigator as { userActivation?: { isActive: boolean } } | undefined)?.userActivation?.isActive !== false
 
-/** The scope of `vault`, as the strength test is handed it. */
+/** The scope of `vault`, as the strength checker is handed it. */
 const scopeOf = (vault: Vault): VaultScope => ({ applabel: vault.applabel, user_id: vault.user_id, vaultlabel: vault.vaultlabel })
 const getNotOpening = () => false
 
@@ -143,7 +143,7 @@ const rolledBackOf = (snapshot: VaultSnapshot | undefined): VaultError | null =>
  * and `getProof` left out means the provider's own passphrase dialog; and three for that dialog: whether it offers a forgetful user to start over, what a
  * password manager files the passphrase under, and the advice it shows as the user chooses one
  * (`PassphraseModal` has each). In a browser, spread `browserOpts()` from `safebyok/browser` for
- * the `keyDeriver`, `deviceDB` and `passphraseStrengthTest` Vault.make asks for. `VaultProvider`
+ * the `keyDeriver`, `deviceDB` and `strengthChecker` Vault.make asks for. `VaultProvider`
  * says which props make a new vault as they change, and which do not.
  */
 export type VaultProviderProps = Omit<MakeVaultOpts, 'userId'> & {
@@ -172,9 +172,9 @@ export type VaultProviderProps = Omit<MakeVaultOpts, 'userId'> & {
   passphraseUsername?: string | undefined
   /**
    * What to say beside the field as the user chooses a passphrase: `PassphraseModal`'s
-   * `passphraseAdvice`. Default: the `passphraseStrengthTest`'s reason for a passphrase it finds
+   * `passphraseAdvice`. Default: the `strengthChecker`'s reason for a passphrase it finds
    * weak, and nothing for one it admits, so the user hears why before pressing Create. Like the
-   * strength test, it hears the passphrase in plain text: keep it on the device.
+   * strength checker, it hears the passphrase in plain text: keep it on the device.
    */
   passphraseAdvice?:   PassphraseAdvice | undefined
   children:            ReactNode
@@ -195,17 +195,17 @@ const settleLogger = (logger: VaultLogger | null | undefined, vaultDB: VaultDB):
 }
 
 /**
- * The strength test as the dialog's advice: its reason for a passphrase it finds weak, and nothing
- * for one it admits, or for one it fails to judge -- its word list failing to load mid-typing,
- * say -- which Create, running the test again, then says as its own refusal. It runs on the
- * device, as the test does.
+ * The strength checker as the dialog's advice: its reason for a passphrase it finds weak, and
+ * nothing for one it admits, or for one it fails to judge -- a checker that throws, or answers no
+ * verdict -- which Create, running the checker again, then says as its own refusal. It runs on the
+ * device, as the checker does.
  */
-const adviceFrom = (strengthTest: PassphraseStrengthTest, scope: VaultScope): PassphraseAdvice => async (typed) => {
+const adviceFrom = (strengthChecker: StrengthChecker, scope: VaultScope): PassphraseAdvice => async (typed) => {
   try {
-    const verdict = await strengthTest(typed, scope)
+    const verdict = await strengthChecker(typed, scope)
     return verdict.strong ? null : verdict.reason
   } catch {
-    // Advice is a courtesy: a test that cannot answer now ends nothing, and Create asks it again.
+    // Advice is a courtesy: a checker that cannot answer now ends nothing, and Create asks it again.
     return null
   }
 }
@@ -216,10 +216,10 @@ const adviceFrom = (strengthTest: PassphraseStrengthTest, scope: VaultScope): Pa
  * (a null `userId`), and makes a new one, closing the last, when a prop that shapes the vault
  * changes -- the user, the scope (`applabel`, `vaultlabel`), the stores (`vaultDB`, `deviceDB`),
  * the `keyDeriver`, `leaseHours`, `staleMinutes`, `maxWhisperBytes`, `maxBoxes`, the `clock`, the
- * `logger`, the `passphraseStrengthTest`, or a schema in `validators`. So build each of those
+ * `logger`, the `strengthChecker`, or a schema in `validators`. So build each of those
  * once -- at module level, or memoized -- never inline in the props; each schema in `validators`
  * likewise, though the bag around them may be built in render. A `logger`, `clock` or
- * `passphraseStrengthTest` that changes identity is warned of once, through the logger. A handler
+ * `strengthChecker` that changes identity is warned of once, through the logger. A handler
  * makes no new vault: `onBadNews` and `getProof` may be written inline, and the vault calls
  * whichever the last render passed, for as long as the provider holds it. Under React's StrictMode, whose rehearsal
  * makes and closes a vault in development, that rehearsed vault reads nothing: only the vault kept
@@ -257,14 +257,15 @@ const adviceFrom = (strengthTest: PassphraseStrengthTest, scope: VaultScope): Pa
  *   if (! ok) { return null }   // dismissed: refused 'vault_locked'
  */
 export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, passphraseAdvice, children, ...opts }: VaultProviderProps) => {
-  const { applabel, vaultlabel, vaultDB, deviceDB, leaseHours, staleMinutes, onBadNews, getProof, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, validators, passphraseStrengthTest, ...unlisted } = opts
+  const { applabel, vaultlabel, vaultDB, deviceDB, leaseHours, staleMinutes, onBadNews, getProof, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, validators, strengthChecker, ...unlisted } = opts
   // Each prop Vault.make does not take, by name -- a misspelling, a deleted name -- handed on to it,
   // so it is refused, to the error boundary, rather than dropped here unseen.
   const unlistedJson = JSON.stringify(Object.keys(unlisted))
   // The bag is taken apart below, so a misspelt field would be dropped unseen: refused here, as Vault.make refuses it.
   checkValidators(validators)
   // Checked at the first render that has it, as Vault.make checks it; the vault keeps it for its life.
-  checkStrengthTest(passphraseStrengthTest)
+  // Left out, the advice is the unchosen checker's, as the vault's refusal will be.
+  const adviser = parseStrengthChecker(strengthChecker)
   // The vault is made anew when a check changes, never for a bag rebuilt in render around the same ones.
   const applabelCheck = validators?.applabel
   const vaultlabelCheck = validators?.vaultlabel
@@ -295,8 +296,8 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
   const openError = opening && helloRefusal !== null && helloRefusal.vault === vault ? helloRefusal.err : rolledBack
   // Settled once for each logger and vaultDB, so the provider and every vault it opens share it.
   const heardBy = useMemo(() => settleLogger(logger, vaultDB), [logger, vaultDB])
-  // The logger, clock and strength test the last render had, and whether a change of any was warned of yet.
-  const sinks = useRef({ logger, clock, passphraseStrengthTest })
+  // The logger, clock and strength checker the last render had, and whether a change of any was warned of yet.
+  const sinks = useRef({ logger, clock, strengthChecker })
   const toldOfSinks = useRef(false)
   // The host's onBadNews as of the last commit. The vault is handed a teller that keeps its
   // identity and calls whichever handler that is, so a handler written inline makes no new vault.
@@ -338,20 +339,20 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
   }, [askByDialog])
   const getProofOpt = getProof === undefined || getProof === null || typeof getProof === 'function' ? askProof : getProof
 
-  // A logger, clock or strength test written inline in the props is new at every render, and
+  // A logger, clock or strength checker written inline in the props is new at every render, and
   // makes a new vault each time: said once, the first time any changes.
   useEffect(() => {
     const last = sinks.current
-    sinks.current = { logger, clock, passphraseStrengthTest }
+    sinks.current = { logger, clock, strengthChecker }
     const changed = [
       ...(last.logger === logger ? [] : ['logger']),
       ...(last.clock === clock ? [] : ['clock']),
-      ...(last.passphraseStrengthTest === passphraseStrengthTest ? [] : ['passphraseStrengthTest']),
+      ...(last.strengthChecker === strengthChecker ? [] : ['strengthChecker']),
     ]
     if (toldOfSinks.current || changed.length === 0) { return }
     toldOfSinks.current = true
     heardBy?.warn(`VaultProvider reopened the vault because its ${changed.join(' and ')} changed identity between renders. Written inline in the props, it is new at every render, and reopens the vault each time: define it once, outside the component, or memoize it.`, { call: 'VaultProvider', props: changed })
-  }, [logger, clock, passphraseStrengthTest, heardBy])
+  }, [logger, clock, strengthChecker, heardBy])
 
   /**
    * Has `made` say hello, again when retried: the provider owns the vault's first hello. A refusal
@@ -382,7 +383,7 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
     const tellWhileHeld: BadNewsHandler = (news) => (kept.held ? tellBadNews(news) : undefined)
     // Likewise, a vault let go asks no one: the getProof now may be the next user's.
     const askWhileHeld: GetProof = (ask) => (kept.held ? askProof(ask) : 'declined')
-    const makeOpts = { ...refusable, applabel, vaultlabel, userId, vaultDB, deviceDB, leaseHours, staleMinutes, onBadNews: badNewsOpt === tellBadNews ? tellWhileHeld : badNewsOpt, getProof: getProofOpt === askProof ? askWhileHeld : getProofOpt, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger: heardBy ?? logger, validators: checks, passphraseStrengthTest } satisfies Record<keyof MakeVaultOpts, unknown>
+    const makeOpts = { ...refusable, applabel, vaultlabel, userId, vaultDB, deviceDB, leaseHours, staleMinutes, onBadNews: badNewsOpt === tellBadNews ? tellWhileHeld : badNewsOpt, getProof: getProofOpt === askProof ? askWhileHeld : getProofOpt, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger: heardBy ?? logger, validators: checks, strengthChecker } satisfies Record<keyof MakeVaultOpts, unknown>
     // The handle is this effect's to make and to close, and the render hands it down. A refused
     // option throws from here to the nearest error boundary, as the very VaultError.
     const made = Vault.make(makeOpts)
@@ -404,7 +405,7 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
       setHelloFailure(null)
       setHelloRefusal(null)
     }
-  }, [userId, applabel, vaultlabel, vaultDB, deviceDB, leaseHours, staleMinutes, badNewsOpt, getProofOpt, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, heardBy, passphraseStrengthTest, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, unlistedJson, tellBadNews, askProof, endShowing, sayHello])
+  }, [userId, applabel, vaultlabel, vaultDB, deviceDB, leaseHours, staleMinutes, badNewsOpt, getProofOpt, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, heardBy, strengthChecker, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, unlistedJson, tellBadNews, askProof, endShowing, sayHello])
 
   const retryOpen = useCallback(() => {
     if (vault !== null && openError !== null) { void sayHello(vault, { staleMinutes: 0 }) }
@@ -441,7 +442,7 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
           ask={showing.ask}
           allowStartOver={allowStartOver}
           passphraseUsername={passphraseUsername}
-          passphraseAdvice={passphraseAdvice ?? adviceFrom(passphraseStrengthTest, scopeOf(showing.ask.vault))}
+          passphraseAdvice={passphraseAdvice ?? adviceFrom(adviser, scopeOf(showing.ask.vault))}
           onDone={(answer) => { endShowing(showing, answer) }}
         />
       )}

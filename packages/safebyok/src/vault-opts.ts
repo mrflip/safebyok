@@ -7,7 +7,7 @@ import { MaxSaltBytes, parseKeyDeriverSpec, type KeyDeriverSpec, checkSuppliedSp
 import type { DeviceDB } from './device-db'
 import { VaultDB } from './vault-db'
 import { type VaultLogger, parseLogger } from './logger'
-import { type PassphraseStrengthTest, checkStrengthTest } from './passphrase-strength'
+import { type StrengthChecker, parseStrengthChecker } from './passphrase-strength'
 import * as Names from './names'
 import type { GetProof } from './ask'
 
@@ -136,18 +136,18 @@ export type MakeVaultOpts = {
    */
   validators?: VaultValidators | undefined
   /**
-   * The check every new passphrase must pass, as a {@link PassphraseStrengthTest}: the one the
-   * first `unlock()` creates the vault with, and each `changePassphrase()`
-   * sets, before any key derivation. It is handed the passphrase and the vault's scope, and a
-   * passphrase it finds weak is refused with kind 'weak_passphrase', the test's reason the
-   * message. It never runs on `unlock()` of a vault that stands. Required, as the vault has no
-   * test of its own: in a browser, `browserOpts()` from `safebyok/browser` supplies
-   * `zxcvbnPassphraseTest`, which turns away short passphrases, common passwords and patterns.
-   * The vault keeps the test it was opened with for its life. Kind 'bad_option' for anything but a
-   * function, and for a test that answers anything but a verdict; whatever it throws, the call
-   * throws.
+   * The check every new passphrase must pass, as a {@link StrengthChecker}: the one the first
+   * `unlock()` creates the vault with, and each `putWayin()` sets, before any key derivation. It is
+   * handed the passphrase and the vault's scope, and a passphrase it finds weak is refused with
+   * kind 'weak_passphrase', its reason the message. It never runs on `unlock()` of a vault that
+   * stands. In a browser, `browserOpts()` from `safebyok/browser` supplies `zxcvbnStrengthChecker`,
+   * which turns away short passphrases, common passwords and patterns. Left out, every new
+   * passphrase is refused as too weak, and the vault says once, through its logger, that a checker
+   * must be chosen (CUSTOMIZATION.md). The vault keeps the checker it was opened with for its life.
+   * Kind 'bad_option' for anything but a function, and for a checker that answers anything but a
+   * verdict; one that throws is 'unexpected_error', carrying nothing of what it threw.
    */
-  passphraseStrengthTest: PassphraseStrengthTest
+  strengthChecker?: StrengthChecker | undefined
 }
 
 const isFunction = (candidate: unknown) => typeof candidate === 'function'
@@ -178,12 +178,13 @@ const makeVaultOptsShape = Z.strictObject({
   maxBoxes:               anyOpt,
   logger:                 anyOpt,
   validators:             anyOpt,
-  passphraseStrengthTest: anyOpt,
+  strengthChecker:        anyOpt,
 } satisfies Record<keyof MakeVaultOpts, typeof anyOpt>)
 
 /** Each option Vault.make once took under another name, and the name it takes now (notes/old_vocabulary.md). */
 const RenamedMakeVaultOpts: ReadonlyMap<string, keyof MakeVaultOpts> = new Map([
   ['forcePassphraseReentryHours', 'leaseHours'],
+  ['passphraseStrengthTest', 'strengthChecker'],
 ])
 
 /**
@@ -531,7 +532,7 @@ export type ParsedVaultOpts = {
   logger:           VaultLogger
   clock:            Clock
   keyDeriver:       KeyDeriver
-  strengthTest:     PassphraseStrengthTest
+  strengthChecker:  StrengthChecker
   whisperByteLimit: number
   boxLimit:         number
   vaultByteLimit:   number
@@ -547,7 +548,7 @@ export type ParsedVaultOpts = {
  */
 export const parseMakeVaultOpts = (opts: MakeVaultOpts): ParsedVaultOpts => {
   checkSecureContext()
-  if (! isBag(opts)) { throw new VaultError('bad_option', 'Vault.make takes one bag of options: applabel, userId, vaultlabel, vaultDB, deviceDB, keyDeriver and passphraseStrengthTest at least.') }
+  if (! isBag(opts)) { throw new VaultError('bad_option', 'Vault.make takes one bag of options: applabel, userId, vaultlabel, vaultDB, deviceDB and keyDeriver at least.') }
   checkKnownOpts(opts)
   const rules = Names.rulesOf(opts.validators)
   const scope = Names.checkScope(rules, { applabel: opts.applabel, user_id: opts.userId, vaultlabel: opts.vaultlabel })
@@ -564,11 +565,11 @@ export const parseMakeVaultOpts = (opts: MakeVaultOpts): ParsedVaultOpts => {
   // wrong unit fails make rather than some later call.
   readClock(clock)
   const keyDeriver = parseKeyDeriver(opts.keyDeriver, logger)
-  const strengthTest = checkStrengthTest(opts.passphraseStrengthTest)
+  const strengthChecker = parseStrengthChecker(opts.strengthChecker)
   const whisperByteLimit = parseMaxWhisperBytes(opts.maxWhisperBytes)
   const boxLimit = parseMaxBoxes(opts.maxBoxes, parseDeclared(vaultDB, 'maxBoxes'))
   const vaultByteLimit = checkLimitsFit(vaultDB, whisperByteLimit, boxLimit)
-  return { scope, rules, vaultDB, deviceDB, leaseMillis, staleMillis, onBadNews, getProof, logger, clock, keyDeriver, strengthTest, whisperByteLimit, boxLimit, vaultByteLimit }
+  return { scope, rules, vaultDB, deviceDB, leaseMillis, staleMillis, onBadNews, getProof, logger, clock, keyDeriver, strengthChecker, whisperByteLimit, boxLimit, vaultByteLimit }
 }
 
 /**

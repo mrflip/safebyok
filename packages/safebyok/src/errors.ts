@@ -48,9 +48,9 @@ import type { Capacity, DamagedBox, WayinSummary } from './types'
  * from `wrong_passphrase`, which says "check for typos". A passphrase that does open that vault
  * unlocks it as any unlock does, with no refusal at all.
  *
- * `weak_passphrase` is a new passphrase -- the one a vault is created with, one added, or one
- * changed to -- that the vault's `passphraseStrengthTest` finds too easy to guess; its message is
- * the test's own reason, which a field can show beside the passphrase. Never raised by `unlock()`
+ * `weak_passphrase` is a new passphrase -- the one a vault is created with, or one `putWayin()`
+ * sets -- that the vault's `strengthChecker` finds too easy to guess, or that is blank; its message
+ * is the checker's own reason, which a field can show beside the passphrase. Never raised by `unlock()`
  * of a vault that stands: a passphrase already in use is the user's to replace, not to be refused.
  *
  * `insecure_context` is a page served over plain http (anywhere but localhost), where the browser
@@ -69,7 +69,7 @@ import type { Capacity, DamagedBox, WayinSummary } from './types'
  * trying again may help. `storage_unavailable` is a failure a retry may mend: a backend that could
  * not be reached, or an error from storage that names no lasting cause -- a device store's
  * transaction aborted, its connection closed under it, a failure the browser gives no reason
- * for -- or, as the nearest kind, `zxcvbnPassphraseTest`'s word list that could not be fetched. `storage_blocked` is this device's own store -- its device store, or a vault kept on the
+ * for. `storage_blocked` is this device's own store -- its device store, or a vault kept on the
  * device, as `safebyok-indexeddb`'s -- refusing for a reason that holds until
  * something outside the app changes, so that trying again cannot help until then: the browser
  * withholding storage from the page (site data blocked, a sandboxed frame, cookies turned off:
@@ -87,7 +87,7 @@ export const RefusalKindVals = [
   'vault_locked',        // a whisper was asked for before the vault was unlocked
   'wrong_passphrase',    // the passphrase given did not unlock the vault
   'created_elsewhere',   // a first unlock found the vault just made on another device, under another passphrase
-  'weak_passphrase',     // a new passphrase the vault's passphraseStrengthTest finds too easy to guess
+  'weak_passphrase',     // a new passphrase the vault's strengthChecker finds too easy to guess
   'wrong_passkey',       // the passkey's answer did not unlock the vault, or was for another salt
   'passkey_unavailable', // this browser or authenticator cannot answer for a passkey unlock (no WebAuthn, or no PRF)
   'absent_box',          // no box under that label

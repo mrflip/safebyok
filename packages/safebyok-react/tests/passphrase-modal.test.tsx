@@ -402,12 +402,12 @@ describe("PassphraseModal", () => {
       expect(told.cause).to.be.undefined
     })
 
-    it("reports to React nothing of a key deriver's or strength test's own VaultError, which heard the passphrase", async () => {
-      for (const quoting of ['keyDeriver', 'passphraseStrengthTest'] as const) {
+    it("reports to React nothing of a key deriver's or strength checker's own VaultError, which heard the passphrase", async () => {
+      for (const quoting of ['keyDeriver', 'strengthChecker'] as const) {
         const misuse = new VaultError('bad_option', 'pw-the-passphrase is not a passphrase I take.')
         const opts = quoting === 'keyDeriver'
           ? TH.memoryVaultOpts({ keyDeriver: { ...TH.testDeriver, deriveKeyBytes: () => Promise.reject(misuse) } })
-          : TH.memoryVaultOpts({ passphraseStrengthTest: () => Promise.reject(misuse) })
+          : TH.memoryVaultOpts({ strengthChecker: () => Promise.reject(misuse) })
         const vault = await TH.settledVault(opts)
         const { reported, unmount } = TH.renderReporting(<PassphraseModal ask={TH.askOf(vault)} onDone={noop} />)
         fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw-the-passphrase' } })

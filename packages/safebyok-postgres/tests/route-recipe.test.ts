@@ -177,7 +177,7 @@ describe("the README route recipe", () => {
   it("carries a real vault, made and opened by the core in the browser", async () => {
     const route = await routeOver()
     const vault = await TH.settledVault({
-      applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: browserFor(route, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest,
+      applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: browserFor(route, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker,
     })
     await vault.unlock('correct horse battery staple')
     await vault.putBox('anthropic_api_key', 'sk-ant-test-not-a-real-key')
@@ -189,7 +189,7 @@ describe("the README route recipe", () => {
     const route = await routeOver()
     const session: { userId: string | null } = { userId: 'u1' }
     const deviceDB = memoryDeviceDB()
-    const opts = { applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: sessionedBrowser(route, session), deviceDB, keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest, logger: TH.spyLogger().logger }
+    const opts = { applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: sessionedBrowser(route, session), deviceDB, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, logger: TH.spyLogger().logger }
     const vault = await TH.settledVault(opts)
     await vault.unlock('correct horse battery staple')
     await vault.putBox('anthropic_api_key', 'sk-ant-test-not-a-real-key')

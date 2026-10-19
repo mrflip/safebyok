@@ -8,7 +8,7 @@ import { damagedVaultWorld, makeWorld, vaultWithPasskey } from './world'
 // == [The pairs]: TwinCases, each X over its tryX
 
 /** Every call that comes in two forms, by its throwing name. */
-type TwinName = 'hello' | 'ensureLease' | 'unlock' | 'lock' | 'changePassphrase' | 'addPasskey' | 'delWayin' | 'putBox' | 'getBox' | 'delBox' | 'del'
+type TwinName = 'hello' | 'ensureLease' | 'unlock' | 'lock' | 'putWayin' | 'delWayin' | 'putBox' | 'getBox' | 'delBox' | 'del'
 
 /** A vault's calls by name, each taking any arguments: how a table row reaches either form. */
 type CallsByName = Record<string, (...args: unknown[]) => Promise<unknown>>
@@ -31,9 +31,8 @@ const TwinCases: readonly (readonly [TwinName, RefusalKind, (twin: Twin) => unkn
   ["ensureLease",      "bad_option",       () => [{ renewMinute: 5 }],                         () => [],                                          (val, { vault }) => { expect(val).to.eq(vault) }],
   ["unlock",           "wrong_passphrase", () => ['not it'],                                   () => ['pw'],                                      (val) => { expect(val).to.be.undefined }],
   ["lock",             "vault_closed",     ({ vault }) => { vault.close(); return [] },         () => [],                                          (val) => { expect(val).to.be.undefined }],
-  ["changePassphrase", "wrong_passphrase", () => ['not it', 'new phrase'],                     () => ['pw', 'new phrase'],                        (val) => { expect(val).to.be.undefined }],
-  ["addPasskey",       "wrong_passphrase", () => ['not it', () => TH.passkeyOf('phone')],      () => ['pw', () => TH.passkeyOf('phone')],         (val) => { expect(val).to.be.true }],
-  ["delWayin",         "wrong_passphrase", () => ['not it'],                                   () => ['pw'],                                      (val) => { expect(val).to.be.undefined }],
+  ["putWayin",         "wrong_passphrase", () => ['not it', 'new phrase'],                     () => ['pw', 'new phrase'],                        (val, { vault }) => { expect(val).to.eq(vault) }],
+  ["delWayin",         "wrong_passphrase", () => ['not it'],                                   () => ['pw'],                                      (val, { vault }) => { expect(val).to.eq(vault) }],
   ["putBox",           "bad_whisper",      () => ['openai', null],                             () => ['openai', 'sk-fake-two'],                   (val) => { expect(val).to.be.undefined }],
   ["getBox",           "absent_box",       () => ['openai'],                                   () => ['anthropic'],                               (val) => { expect(val).to.eq('sk-fake') }],
   ["delBox",           "absent_box",       () => ['openai'],                                   () => ['anthropic'],                               (val) => { expect(val).to.be.undefined }],
@@ -113,11 +112,14 @@ describe("each call's two forms (Contract: Shapes, Two forms of every call)", ()
 
 // == [Never rejects]: unexpected_error, what a host's function throws
 
+/** The test deriver, but throwing `thrown` at every derivation. */
+const throwingDeriver = (thrown: Error) => ({ ...TH.testDeriver, deriveKeyBytes: () => { throw thrown } })
+
 describe("a throw that is no refusal (Contract: Shapes)", () => {
   it("resolves, from a try form, as 'unexpected_error', misuse, what was thrown its cause", async () => {
     const world = makeWorld()
-    const thrown = new TypeError('the strength service is down')
-    const vault = await world.open({ passphraseStrengthTest: () => { throw thrown } })
+    const thrown = new TypeError('the key deriver is down')
+    const vault = await world.open({ keyDeriver: throwingDeriver(thrown) })
     const err = await TH.expectBad(vault.tryUnlock('pw'), 'unexpected_error')
     expect(err.family).to.eq('misuse')
     expect(err.cause).to.eq(thrown)
@@ -125,30 +127,19 @@ describe("a throw that is no refusal (Contract: Shapes)", () => {
 
   it("never logs what was thrown: a host's function that threw may have been handed the passphrase", async () => {
     const world = makeWorld()
-    const vault = await world.open({ passphraseStrengthTest: (passphrase) => { throw new TypeError(`cannot rate ${passphrase}`) } })
+    const vault = await world.open({ keyDeriver: { ...TH.testDeriver, deriveKeyBytes: (passphrase) => { throw new TypeError(`cannot derive ${passphrase}`) } } })
     await TH.expectBad(vault.tryUnlock('SUPERSECRET staple'), 'unexpected_error')
     expect(TH.loggedText(world.logged)).to.not.include('SUPERSECRET')
   })
 
   it("throws, from the throwing form, the same 'unexpected_error'", async () => {
     const world = makeWorld()
-    const thrown = new TypeError('the strength service is down')
-    const vault = await world.open({ passphraseStrengthTest: () => { throw thrown } })
+    const thrown = new TypeError('the key deriver is down')
+    const vault = await world.open({ keyDeriver: throwingDeriver(thrown) })
     const err = await TH.expectRefusal(vault.unlock('pw'), 'unexpected_error')
     expect(err.cause).to.eq(thrown)
   })
 
-  it("refuses a passkey maker's throw that is no VaultError as 'unexpected_error', and one that is as it came", async () => {
-    const { vault } = await twinVault()
-    const fell = new Error('the authenticator fell over')
-    const falling = () => Promise.reject(fell)
-    const err = await TH.expectBad(vault.tryAddPasskey('pw', falling), 'unexpected_error')
-    expect(err.cause).to.eq(fell)
-    const unavailable = new VaultError('passkey_unavailable', 'This device cannot answer for a passkey.')
-    const refusing = () => Promise.reject(unavailable)
-    const refusal = await TH.expectBad(vault.tryAddPasskey('pw', refusing), 'passkey_unavailable')
-    expect(refusal).to.eq(unavailable)
-  })
 })
 // --
 

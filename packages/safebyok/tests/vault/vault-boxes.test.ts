@@ -235,7 +235,7 @@ describe("the times a vault keeps", () => {
     const madeAt = world.clock.now()
     expect(storedVaultPropsOf(world)).to.include({ registered_at: madeAt })
     world.advance(60_000)
-    await vault.changePassphrase('pw one', 'pw two')
+    await vault.putWayin('pw one', 'pw two')
     expect(storedVaultPropsOf(world)).to.include({ registered_at: madeAt, unlock_epoch: 2 })
   })
 
@@ -843,7 +843,7 @@ describe("the host's validators", () => {
     const vault = await world.openUnlocked('pw one')
     await vault.putBox('anthropic', 'sk-fake')
     expect(await vault.getBox('anthropic')).to.eq('sk-fake')
-    await vault.changePassphrase('pw one', 'pw two')
+    await vault.putWayin('pw one', 'pw two')
     await vault.delBox('anthropic')
     await vault.del()
     for (const [ii, spy] of spies.entries()) {

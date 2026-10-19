@@ -6,7 +6,7 @@ import { VaultProvider, type VaultProviderProps } from '../../src/vault-provider
 import { Probe, grabber, makeWorld, refuseAcme, shownState, expectShown, CatchingBoundary, hushConsole, lockedWorld, providerOf, twelveOrMore } from './world'
 
 describe("VaultProvider", () => {
-  // == [Options passed through]: keyDeriver, Vault.make options, validators, passphraseStrengthTest, logger, allowStartOver, others
+  // == [Options passed through]: keyDeriver, Vault.make options, validators, strengthChecker, logger, allowStartOver, others
 
   it("asks for a keyDeriver outright, as Vault.make does", () => {
     expectTypeOf<Pick<VaultProviderProps, 'keyDeriver'>>().toEqualTypeOf<{ keyDeriver: KeyDeriver }>()
@@ -21,7 +21,7 @@ describe("VaultProvider", () => {
     const onBadNews = (news: VaultError) => { told.push(news) }
     render(
       <VaultProvider applabel="acme" vaultlabel="main" userId="u1" vaultDB={vaultDB} deviceDB={memoryDeviceDB()}
-        keyDeriver={TH.testDeriver} passphraseStrengthTest={TH.anyPassphraseTest} clock={{ now: () => ClockMillis }} leaseHours={1} maxWhisperBytes={8} maxBoxes={1}
+        keyDeriver={TH.testDeriver} strengthChecker={TH.anyStrengthChecker} clock={{ now: () => ClockMillis }} leaseHours={1} maxWhisperBytes={8} maxBoxes={1}
         staleMinutes={0} onBadNews={onBadNews}>
         <Grab />
       </VaultProvider>,
@@ -65,10 +65,10 @@ describe("VaultProvider", () => {
     expect(latest().vault?.getSnapshot().boxes.map((summary) => summary.boxlabel)).to.deep.equal(['Anthropic API key'])
   })
 
-  it("passes passphraseStrengthTest through: the vault it opens refuses a weak new passphrase with the test's reason", async () => {
+  it("passes strengthChecker through: the vault it opens refuses a weak new passphrase with the checker's reason", async () => {
     const { Grab, opened } = grabber()
     const { props } = makeWorld()
-    render(<VaultProvider {...props} userId="u1" passphraseStrengthTest={refuseAcme}><Grab /></VaultProvider>)
+    render(<VaultProvider {...props} userId="u1" strengthChecker={refuseAcme}><Grab /></VaultProvider>)
     const vault = await opened()
     const err = await TH.expectRefusal(vault.unlock('acme acme acme acme'), 'weak_passphrase')
     expect(err.message).to.eq('Not the name of the app, please.')
@@ -76,21 +76,31 @@ describe("VaultProvider", () => {
     expect(vault.getSnapshot().state).to.eq('unlocked')
   })
 
-  it("throws to the error boundary at the render that lacks a passphraseStrengthTest, before any open", () => {
-    hushConsole()
-    const caught: unknown[] = []
-    const { passphraseStrengthTest: _admitsAny, ...props } = makeWorld().props
+  it("opens without a strengthChecker, the advice and the vault alike then refusing every new passphrase as too weak", async () => {
+    const { strengthChecker: _admitsAny, ...props } = makeWorld().props
     const lacking = props as VaultProviderProps
-    render(<CatchingBoundary caught={caught}><VaultProvider {...lacking} userId="u1"><Probe /></VaultProvider></CatchingBoundary>)
-    expect(shownState()).to.eq('boundary')
-    expect(isVaultError(caught[0], 'bad_option')).to.be.true
-    expect((caught[0] as Error).message).to.match(/passphraseStrengthTest is required.*browserOpts/)
+    render(<VaultProvider {...lacking} userId="u1"><Probe /></VaultProvider>)
+    fireEvent.click(await screen.findByText('put'))
+    const field = await screen.findByPlaceholderText('vault passphrase')
+    fireEvent.change(field, { target: { value: 'correct horse battery staple' } })
+    await waitFor(() => { expect(screen.getByRole('status').textContent).to.match(/can't accept a new passphrase yet/) })
   })
 
-  it("keeps its vault for a passphraseStrengthTest that keeps its identity, the vault running that test", async () => {
+  it("throws to the error boundary at the render whose strengthChecker is no function, before any open", () => {
+    hushConsole()
+    const caught: unknown[] = []
+    const { props } = makeWorld()
+    const misfit = { ...props, strengthChecker: 12 } as unknown as VaultProviderProps
+    render(<CatchingBoundary caught={caught}><VaultProvider {...misfit} userId="u1"><Probe /></VaultProvider></CatchingBoundary>)
+    expect(shownState()).to.eq('boundary')
+    expect(isVaultError(caught[0], 'bad_option')).to.be.true
+    expect((caught[0] as Error).message).to.match(/strengthChecker is a function.*browserOpts/)
+  })
+
+  it("keeps its vault for a strengthChecker that keeps its identity, the vault running that checker", async () => {
     const { Grab, latest, opened } = grabber()
     const { props } = makeWorld()
-    const tree = () => <VaultProvider {...props} userId="u1" passphraseStrengthTest={refuseAcme}><Grab /></VaultProvider>
+    const tree = () => <VaultProvider {...props} userId="u1" strengthChecker={refuseAcme}><Grab /></VaultProvider>
     const { rerender } = render(tree())
     const first = await opened()
     rerender(tree())
@@ -98,11 +108,11 @@ describe("VaultProvider", () => {
     await TH.expectRefusal(first.unlock('acme acme acme acme'), 'weak_passphrase')
   })
 
-  it("reopens for a passphraseStrengthTest that changes identity, as for any option: the new vault runs the new test", async () => {
+  it("reopens for a strengthChecker that changes identity, as for any option: the new vault runs the new checker", async () => {
     const { Grab, latest, opened } = grabber()
     const { props } = makeWorld()
     const tree = (reason: string) => (
-      <VaultProvider {...props} userId="u1" passphraseStrengthTest={(_typed) => ({ strong: false, reason })}>
+      <VaultProvider {...props} userId="u1" strengthChecker={(_typed) => ({ strong: false, reason })}>
         <Grab />
       </VaultProvider>
     )
@@ -212,12 +222,12 @@ describe("VaultProvider", () => {
   })
   // --
 
-  // == [Advice and developer warnings]: advice from passphraseStrengthTest, warning the developer once
+  // == [Advice and developer warnings]: advice from strengthChecker, warning the developer once
 
-  describe("advice, by default, from the passphraseStrengthTest", () => {
-    it("says the test's reason as the user chooses a weak passphrase, and nothing for one it admits", async () => {
+  describe("advice, by default, from the strengthChecker", () => {
+    it("says the checker's reason as the user chooses a weak passphrase, and nothing for one it admits", async () => {
       const world = makeWorld()
-      render(<VaultProvider {...world.props} userId="u1" passphraseStrengthTest={refuseAcme}><Probe /></VaultProvider>)
+      render(<VaultProvider {...world.props} userId="u1" strengthChecker={refuseAcme}><Probe /></VaultProvider>)
       fireEvent.click(await screen.findByText('put'))
       const field = await screen.findByPlaceholderText('vault passphrase')
       fireEvent.change(field, { target: { value: 'acme forever' } })
@@ -227,11 +237,11 @@ describe("VaultProvider", () => {
       await waitFor(() => { expect(screen.getByRole('status').textContent).to.eq('') })
     })
 
-    it("says nothing for a test that fails to answer, as a word list failing to load mid-typing does, and keeps the dialog", async () => {
+    it("says nothing for a checker that fails to answer, throwing rather than answering a verdict, and keeps the dialog", async () => {
       const world = makeWorld()
       const caught: unknown[] = []
       const flaky = vi.fn(refuseAcme).mockRejectedValueOnce(new Error('Failed to fetch dynamically imported module'))
-      render(<CatchingBoundary caught={caught}><VaultProvider {...world.props} userId="u1" passphraseStrengthTest={flaky}><Probe /></VaultProvider></CatchingBoundary>)
+      render(<CatchingBoundary caught={caught}><VaultProvider {...world.props} userId="u1" strengthChecker={flaky}><Probe /></VaultProvider></CatchingBoundary>)
       fireEvent.click(await screen.findByText('put'))
       const field = await screen.findByPlaceholderText('vault passphrase')
       fireEvent.change(field, { target: { value: 'acme' } })
@@ -243,19 +253,19 @@ describe("VaultProvider", () => {
       expect(screen.queryByPlaceholderText('vault passphrase')).to.not.be.null
     })
 
-    it("hands the test the vault's scope, as the vault does", async () => {
+    it("hands the checker the vault's scope, as the vault does", async () => {
       const world = makeWorld()
       const heard = vi.fn((_typed: string, _scope: VaultScope): PassphraseVerdict => ({ strong: true }))
-      render(<VaultProvider {...world.props} userId="u1" passphraseStrengthTest={heard}><Probe /></VaultProvider>)
+      render(<VaultProvider {...world.props} userId="u1" strengthChecker={heard}><Probe /></VaultProvider>)
       fireEvent.click(await screen.findByText('put'))
       fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'some words' } })
       await waitFor(() => { expect(heard).toHaveBeenCalledWith('some words', TH.scopeOf('u1')) })
     })
 
-    it("gives way to the host's own passphraseAdvice, which the test never hears", async () => {
+    it("gives way to the host's own passphraseAdvice, which the checker never hears", async () => {
       const world = makeWorld()
       const heard = vi.fn(refuseAcme)
-      render(<VaultProvider {...world.props} userId="u1" passphraseStrengthTest={heard} passphraseAdvice={twelveOrMore}><Probe /></VaultProvider>)
+      render(<VaultProvider {...world.props} userId="u1" strengthChecker={heard} passphraseAdvice={twelveOrMore}><Probe /></VaultProvider>)
       fireEvent.click(await screen.findByText('put'))
       fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'acme' } })
       await waitFor(() => { expect(screen.getByRole('status').textContent).to.eq('Twelve characters or more, please.') })
@@ -264,8 +274,8 @@ describe("VaultProvider", () => {
 
     it("asks nothing while unlocking: the test runs only on a passphrase being chosen", async () => {
       const world = await lockedWorld()
-      const heard = vi.fn(TH.anyPassphraseTest)
-      render(<VaultProvider {...world.props} userId="u1" passphraseStrengthTest={heard}><world.Grab /></VaultProvider>)
+      const heard = vi.fn(TH.anyStrengthChecker)
+      render(<VaultProvider {...world.props} userId="u1" strengthChecker={heard}><world.Grab /></VaultProvider>)
       const vault = await world.opened()
       void vault.tryGetBox('anthropic_api_key')
       fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
@@ -304,18 +314,18 @@ describe("VaultProvider", () => {
       expect(warned[0]).to.match(/^safebyok: VaultProvider reopened the vault because its clock changed identity/)
     })
 
-    it("of a passphraseStrengthTest written inline, which reopens the vault at every render", async () => {
+    it("of a strengthChecker written inline, which reopens the vault at every render", async () => {
       const spy = TH.spyLogger()
       const world = makeWorld()
-      const { rerender } = render(providerOf(world, { logger: spy.logger, passphraseStrengthTest: () => ({ strong: true }) }))
+      const { rerender } = render(providerOf(world, { logger: spy.logger, strengthChecker: () => ({ strong: true }) }))
       await expectShown('absent')
-      rerender(providerOf(world, { logger: spy.logger, passphraseStrengthTest: () => ({ strong: true }) }))
+      rerender(providerOf(world, { logger: spy.logger, strengthChecker: () => ({ strong: true }) }))
       await expectShown('absent')
-      rerender(providerOf(world, { logger: spy.logger, passphraseStrengthTest: () => ({ strong: true }) }))
+      rerender(providerOf(world, { logger: spy.logger, strengthChecker: () => ({ strong: true }) }))
       await expectShown('absent')
       const warned = spy.calls.filter((heard) => heard.story?.['call'] === 'VaultProvider')
       expect(warned).to.have.lengthOf(1)
-      expect(warned[0]?.story).to.deep.equal({ call: 'VaultProvider', props: ['passphraseStrengthTest'] })
+      expect(warned[0]?.story).to.deep.equal({ call: 'VaultProvider', props: ['strengthChecker'] })
     })
 
     it("of nothing, for a logger and clock that keep their identity", async () => {

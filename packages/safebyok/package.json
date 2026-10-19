@@ -27,7 +27,8 @@
   "sideEffects": false,
   "files": [
     "dist",
-    "VAULTDB.md"
+    "VAULTDB.md",
+    "CUSTOMIZATION.md"
   ],
   "engines": {
     "node": ">=22"

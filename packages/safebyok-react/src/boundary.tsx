@@ -67,7 +67,7 @@ const LookFor: Record<BoundarySource, string> = {
  * What a component throws in render for its {@link Boundary}, in place of `err`, so that what
  * React reports through `onCaughtError` -- the console, an error tracker -- carries nothing the
  * user typed. A VaultError keeps its kind, message and meta, but never its `cause`: that may be a
- * host key deriver's or strength test's throw, which was handed the passphrase. Its message says
+ * host key deriver's throw, which was handed the passphrase. Its message says
  * that the cause was left out, should it point at one. One with no cause is thrown as itself.
  * Anything else becomes a fixed `unexpected_error` quoting nothing of it, naming `source`, the
  * component it came from, and where to look.

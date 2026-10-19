@@ -7,7 +7,7 @@ import { VaultError } from '../../src/errors'
 import { bad } from '../../src/outcome'
 import { toB64 } from '../../src/crypto'
 import type { MakeVaultOpts } from '../../src/vault-opts'
-import type { PassphraseStrengthTest } from '../../src/passphrase-strength'
+import type { StrengthChecker } from '../../src/passphrase-strength'
 import * as TH from '../test-helpers'
 import { makeWorld, SevenDaysMillis, HourMillis, uncheckingDeviceDB, makeRacingWorld, vaultWithPasskey, boxlabelsOf, spoilWayin } from './world'
 
@@ -177,7 +177,7 @@ describe("the lease", () => {
     it("holds through a passphrase change on this device, with the same deadline", async () => {
       const world = makeWorld()
       const vault = await world.openUnlocked('pw one', { leaseHours: Infinity })
-      await vault.changePassphrase('pw one', 'pw two')
+      await vault.putWayin('pw one', 'pw two')
       expect(vault.getSnapshot().state).to.eq('unlocked')
       expect(vault.getSnapshot().askPassphraseAt).to.eq(FarFuture)
       const lease = await world.getLease()
@@ -495,7 +495,7 @@ describe("natural expiry", () => {
     expect(vi.getTimerCount()).to.eq(1)
     await vault.putBox('anthropic', 'sk-fake')
     await vault.getBox('anthropic')
-    await vault.changePassphrase('pw one', 'pw two')
+    await vault.putWayin('pw one', 'pw two')
     expect(vi.getTimerCount()).to.eq(1)
   })
 
@@ -519,12 +519,12 @@ describe("natural expiry", () => {
     expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() - MinuteMillis + HourMillis)
   })
 
-  it("leaves a changePassphrase() under way when it falls due unlocked, under the new passphrase, with a new deadline: a timer is no lock", async () => {
+  it("leaves a putWayin() under way when it falls due unlocked, under the new passphrase, with a new deadline: a timer is no lock", async () => {
     const world = makeTimedWorld()
     const vault = await world.openUnlocked('old passphrase', { leaseHours: 1 })
     await vault.putBox('anthropic', 'sk-fake')
     const gate = world.holdNextDerive()
-    const changing = vault.changePassphrase('old passphrase', 'new passphrase')
+    const changing = vault.putWayin('old passphrase', 'new passphrase')
     await gate.reached
     world.pass(HourMillis + MinuteMillis)
     expect(vault.getSnapshot().state).to.eq('locked')
@@ -562,9 +562,9 @@ describe("a change to the ways in, once it has landed", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
     vi.spyOn(world.deviceDB, 'putMark').mockRejectedValueOnce(new Error('device storage is full'))
-    await vault.changePassphrase('pw one', 'pw two')
+    await vault.putWayin('pw one', 'pw two')
     expect(vault.getSnapshot().state).to.eq('unlocked')
-    expect(world.logged.map((heard) => [heard.level, heard.story])).to.deep.equal([['warn', { call: 'changePassphrase' }]])
+    expect(world.logged.map((heard) => [heard.level, heard.story])).to.deep.equal([['warn', { call: 'putWayin' }]])
     expect(world.logged[0]?.message).to.include('mark')
     await vault.lock()
     await vault.unlock('pw two')
@@ -574,9 +574,9 @@ describe("a change to the ways in, once it has landed", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
     vi.spyOn(world.deviceDB, 'putLease').mockRejectedValueOnce(new Error('device storage is full'))
-    expect(await vault.addPasskey('pw one', () => TH.passkeyOf('laptop'))).to.be.true
+    expect(await vault.putWayin('pw one', await TH.passkeyOf('laptop'))).to.eq(vault)
     expect(vault.getSnapshot().passkey).to.not.be.null
-    expect(world.logged.map((heard) => [heard.level, heard.story])).to.deep.equal([['warn', { call: 'addPasskey' }]])
+    expect(world.logged.map((heard) => [heard.level, heard.story])).to.deep.equal([['warn', { call: 'putWayin' }]])
     expect(await world.stateOnOpen()).to.eq('locked')
   })
 })
@@ -586,7 +586,7 @@ describe("the unlock window, renewed", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
     world.advance(24 * HourMillis)
-    await vault.changePassphrase('pw one', 'pw two')
+    await vault.putWayin('pw one', 'pw two')
     expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + SevenDaysMillis)
     expect(await leaseDeadlineOf(world)).to.eq(world.clock.now() + SevenDaysMillis)
   })
@@ -595,7 +595,7 @@ describe("the unlock window, renewed", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
     world.advance(24 * HourMillis)
-    await vault.addPasskey('pw one', () => TH.passkeyOf('laptop'))
+    await vault.putWayin('pw one', await TH.passkeyOf('laptop'))
     expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + SevenDaysMillis)
     world.advance(24 * HourMillis)
     await vault.delWayin('pw one')
@@ -675,12 +675,12 @@ describe("the session vaultKey is non-extractable", () => {
     expect(extractableUnwraps(spied)).to.have.lengthOf(0)
   })
 
-  it("changePassphrase asks for exactly one extractable transient, for the new wraps", async () => {
+  it("putWayin asks for exactly one extractable transient, for the new wraps", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
     await vault.putBox('anthropic', 'sk-ant-fake')
     const spied = watchUnwraps()
-    await vault.changePassphrase('pw one', 'pw two')
+    await vault.putWayin('pw one', 'pw two')
     expect(await vault.getBox('anthropic')).to.eq('sk-ant-fake')
     expect(extractableUnwraps(spied)).to.have.lengthOf(1)
   })
@@ -716,8 +716,8 @@ const heldPrompt = () => {
   return { getProof, asked, answer }
 }
 
-/** A strength test that finds `pw` weak, and every other passphrase strong. */
-const pwIsWeak: PassphraseStrengthTest = (passphrase) => (passphrase === 'pw' ? { strong: false, reason: 'Found in a breach: pick another.' } : { strong: true })
+/** A strength checker that finds `pw` weak, and every other passphrase strong. */
+const pwIsWeak: StrengthChecker = (passphrase) => (passphrase === 'pw' ? { strong: false, reason: 'Found in a breach: pick another.' } : { strong: true })
 
 /** A world whose `u1` vault stands, made with `pw`, with a vault handle on it opened locked under `opts`. */
 const lockedVaultWith = async (overrides: Partial<MakeVaultOpts>) => {
@@ -1335,7 +1335,7 @@ describe("getProof's attempt, by the Contract", () => {
   it("refuses weak_passphrase on absent, the checker's reason its message, creating nothing (Contract: getProof, attempt refuses: show in place)", async () => {
     const world = makeWorld()
     const prompt = heldPrompt()
-    const vault = await world.open({ getProof: prompt.getProof, passphraseStrengthTest: pwIsWeak })
+    const vault = await world.open({ getProof: prompt.getProof, strengthChecker: pwIsWeak })
     void vault.tryEnsureLease()
     const ask = await prompt.asked
     expect(ask.why).to.eq('absent')

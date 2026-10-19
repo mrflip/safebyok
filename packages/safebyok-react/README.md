@@ -63,16 +63,17 @@ import { VaultProvider } from 'safebyok-react'
 ```
 
 The provider takes every `Vault.make` option as a prop, and throws one it does not take -- a misspelling, or a name it no longer uses -- as `bad_option`, to the nearest error boundary. `browserOpts()` supplies the three a
-browser app answers like any other, `keyDeriver`, `deviceDB` and `passphraseStrengthTest`;
+browser app answers like any other, `keyDeriver`, `deviceDB` and `strengthChecker`;
 `vaultDB` is your backend's adapter. It answers the same bag on every call, so it is safe in a
 render: the provider reopens the vault whenever a prop changes identity. So define a `logger`, a
-`clock` or a `passphraseStrengthTest` of your own once, outside the component (or memoize it): a
+`clock` or a `strengthChecker` of your own once, outside the component (or memoize it): a
 function or object literal written in the props is a new one at every render, and reopens the
 vault each time, ending any dialog. The provider warns of it once, the first time any of them
 changes, through the one logger it and its vault share: your `logger` prop, or, when you pass
-none, the logger your `vaultDB` was made with (the default logger, if it was given none). The vault keeps the test it
-was opened with for its life; one that is no function, or none at all, is thrown at the render
-that has it, as `bad_option`, to the nearest error boundary. `validators` is the exception: the provider watches each schema in
+none, the logger your `vaultDB` was made with (the default logger, if it was given none). The vault keeps the checker it
+was opened with for its life; one that is no function is thrown at the render that has it, as
+`bad_option`, to the nearest error boundary. Leave it out and every new passphrase is refused as
+too weak, the dialog's advice saying so, until you choose one (the core's CUSTOMIZATION.md). `validators` is the exception: the provider watches each schema in
 the bag rather than the bag, so `validators={{ boxlabel: BoxlabelCheck }}` is fine in the props, so
 long as `BoxlabelCheck` itself is built once, at module level. A bag with a field it does not know
 (`boxLabel`) is thrown, as `bad_option`, to the nearest error boundary, as `Vault.make` would refuse
@@ -245,11 +246,11 @@ if (! ok) { return null }   // dismissed: refused 'vault_locked'
 stored damaged: each shows in the dialog in the vault's own calm words, to try again or cancel.
 Storage out of reach, a lock that won, or a refusal the dialog cannot mend closes it, answering
 `declined`, so the call that asked is refused `vault_locked`. So does a new passphrase too easy to guess (`weak_passphrase`): its message is the
-reason the vault's `passphraseStrengthTest` gave -- with `browserOpts()`, `zxcvbnPassphraseTest`,
+reason the vault's `strengthChecker` gave -- with `browserOpts()`, `zxcvbnStrengthChecker`,
 which asks for 12 characters and turns away common passwords, keyboard patterns and the vault's
-own names. The user hears the same reason before pressing Create, as advice (below). The test is
-a plain function of the passphrase and the vault's scope, so a field of your own can call the
-same one as the user types: `const verdict = await passphraseStrengthTest(typed, { applabel: vault.applabel, user_id: vault.user_id, vaultlabel: vault.vaultlabel })`,
+own names. The user hears the same reason before pressing Create, as advice (below). The checker
+is a plain function of the passphrase and the vault's scope, so a field of your own can call the
+same one as the user types: `const verdict = await strengthChecker(typed, { applabel: vault.applabel, user_id: vault.user_id, vaultlabel: vault.vaultlabel })`,
 then show `verdict.reason` while `verdict.strong` is false.
 
 **Anything else never takes your page down.** Misuse -- a closed vault handle, an `rpId` that
@@ -265,13 +266,12 @@ focus to the passphrase field. Your error boundary never sees it.
 **React reports it to you.** Each component catches such a failure in an error boundary of its
 own, so React hands the error to the root's `onCaughtError`: by default the console, with the
 component stack, in development and production alike. It arrives with nothing the user typed: a
-`VaultError` keeps its kind, message and meta but never its `cause`; whatever a key deriver or
-strength test throws, a `VaultError` of its own included, is the vault's `unexpected_error` with
-that throw as the cause, as each heard the passphrase; and anything else -- a `passphraseAdvice`
-that threw, say -- arrives as a fixed `unexpected_error` quoting none of it. (A condition one of
-them raises, such as the strength test's word list failing to load, is met as the same condition
-from storage is -- shown in the dialog, or closing it -- and never reported.) Hook your error
-tracker there:
+`VaultError` keeps its kind, message and meta but never its `cause`; whatever a key deriver
+throws, a `VaultError` of its own included, is the vault's `unexpected_error` with that throw as the
+cause, as it heard the passphrase; and anything else -- a `strengthChecker` or a
+`passphraseAdvice` that threw, say -- arrives as a fixed `unexpected_error` quoting none of it. (A
+condition a key deriver raises is met as the same condition from storage is -- shown in the
+dialog, or closing it -- and never reported.) Hook your error tracker there:
 
 ```tsx
 createRoot(rootElement, {
@@ -316,10 +316,10 @@ and is never capitalized, corrected or spell-checked, shown or hidden. Like `Whi
 uncontrolled: React never writes the passphrase into the page.
 
 **Advice while choosing.** By default the dialog `VaultProvider` renders says the
-`passphraseStrengthTest`'s reason as the user chooses a weak passphrase, and nothing once the test
+`strengthChecker`'s reason as the user chooses a weak passphrase, and nothing once the checker
 admits it, so they hear why before pressing Create; a `PassphraseModal` you render yourself says
 nothing unless you pass it `passphraseAdvice`. Pass `passphraseAdvice`, a function of what has
-been typed, to say something of your own instead (the test then goes unasked until Create); what
+been typed, to say something of your own instead (the checker then goes unasked until Create); what
 it answers shows beside the field as the user chooses a passphrase: tied to the field by
 `aria-describedby`, announced politely (`role="status"`), only the answer to the latest text kept.
 It answers a sentence, or null for nothing to say, and may answer through a promise. It is never
@@ -336,7 +336,7 @@ const passphraseAdvice = (typed: string) => (typed.length < 12 ? 'Twelve charact
 An advice function that throws, or rejects, shows the dialog's calm "Something went wrong", as any
 other failure inside it does.
 
-It hears the passphrase itself, in plain text, at every change -- and so does the strength test,
+It hears the passphrase itself, in plain text, at every change -- and so does the strength checker,
 when it gives the advice: keep both on the device. Never send the passphrase to a server, log it,
 or let an error tracker capture it as an argument or in a thrown error's message.
 
@@ -417,14 +417,13 @@ alike: a security key's `hmac-secret` is what PRF runs on).
 ```tsx
 import { askPasskey, createPasskey, passkeysAvailable } from 'safebyok-react'
 
-// Adding one asks for a passphrase as proof, even while unlocked: the vault keeps no copy of its
-// vaultKey to wrap anew. The vault checks it first, and only then calls createPasskey, so a
-// mistyped passphrase leaves no passkey on the authenticator. A vault holds at most one passkey:
-// adding another replaces it.
+// Putting one asks for the passphrase as proof, even while unlocked: the vault keeps no copy of
+// its vaultKey to wrap anew. Make the passkey first, then hand its answer to the vault. A vault
+// holds at most one passkey: putting another replaces it.
 const addFingerprint = async (passphrase: string) => {
-  const makePasskey = () => createPasskey({ rp: { name: 'Acme' }, user: { name: email, displayName: fullName } })
-  const added = await vault.addPasskey(passphrase, makePasskey)
-  if (! added) { return }   // the user dismissed the prompt
+  const answer = await createPasskey({ rp: { name: 'Acme' }, user: { name: email, displayName: fullName } })
+  if (answer === null) { return }   // the user dismissed the prompt
+  await vault.putWayin(passphrase, answer)
 }
 
 // Removing it, again with the passphrase as proof.
@@ -445,11 +444,10 @@ if (passkey !== null) { const { ok } = await ask.attempt(passkey) }
   touch (on authenticators that answer only when asked again) is dismissed, or whose authenticator
   has no PRF, has still made a passkey: it stays on the authenticator, useless to the vault, until
   the user deletes it.
-* **The passkey prompt comes after the proof.** `vault.addPasskey` checks the passphrase (a key
-  derivation, and a read of storage) before it calls `createPasskey`, so the browser asks for the
-  new passkey a moment after the click. Current browsers allow that; older Safari releases
-  wanted WebAuthn called straight from the click and refused it otherwise, which `createPasskey`
-  reports as a dismissal (null). Try it on the Safari versions you support.
+* **The passkey is made before the proof is checked.** `vault.putWayin` takes the passkey's
+  answer, so `createPasskey` runs first, straight from the click, as WebAuthn wants. A passphrase
+  the vault then refuses (a typo) leaves that passkey on the authenticator, a way into nothing:
+  the user deletes it there, and the next try makes another.
 * **The authenticator always checks the user.** `createPasskey` and `askPasskey` ask WebAuthn for
   `userVerification: 'required'`, so an authenticator answers only once the user has proved
   themselves to it -- a fingerprint, a face, or the device's PIN or passcode -- never for a mere
@@ -466,9 +464,9 @@ if (passkey !== null) { const { ok } = await ask.attempt(passkey) }
   `'declined'` for a refusal that closes the dialog; `onGripe` hears null as each press
   begins (what it said before no longer stands), each message to show in place, and the button's
   word when it takes itself away.
-* **A passkey unlocks; only the passphrase changes things.** `vault.changePassphrase(passphrase,
-  newPassphrase)`, `addPasskey` and `delWayin` each take the standing passphrase as proof, never a
-  passkey's answer (refused as `bad_option`). A user who forgot the passphrase can still unlock
+* **A passkey unlocks; only the passphrase changes things.** `vault.putWayin(passphrase,
+  newPassphrase)`, `vault.putWayin(passphrase, answer)` and `vault.delWayin(passphrase)` each take
+  the standing passphrase as proof, never a passkey's answer (refused as `bad_option`). A user who forgot the passphrase can still unlock
   with the passkey, but can set a new passphrase only by starting over (*Starting over*, above).
 
 ## Development

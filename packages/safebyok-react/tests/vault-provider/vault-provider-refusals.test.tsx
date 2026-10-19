@@ -40,20 +40,20 @@ describe("VaultProvider", () => {
       expect((caught[0] as Error).message).to.include('spelling')
     })
 
-    it("throws a passphraseStrengthTest that is no function to the error boundary at render, as Vault.make would refuse it", () => {
+    it("throws a strengthChecker that is no function to the error boundary at render, as Vault.make would refuse it", () => {
       hushConsole()
       const caught: unknown[] = []
-      const misfit = { strong: true } as unknown as VaultProviderProps['passphraseStrengthTest']
+      const misfit = { strong: true } as unknown as VaultProviderProps['strengthChecker']
       render(
         <CatchingBoundary caught={caught}>
-          <VaultProvider {...makeWorld().props} userId="u1" passphraseStrengthTest={misfit}>
+          <VaultProvider {...makeWorld().props} userId="u1" strengthChecker={misfit}>
             <Probe />
           </VaultProvider>
         </CatchingBoundary>,
       )
       expect(shownState()).to.eq('boundary')
       expect(isVaultError(caught[0], 'bad_option')).to.be.true
-      expect((caught[0] as Error).message).to.include('passphraseStrengthTest')
+      expect((caught[0] as Error).message).to.include('strengthChecker')
     })
 
     it("throws a bad option to the error boundary, as the very VaultError", async () => {
@@ -191,7 +191,7 @@ describe("VaultProvider", () => {
       const older = world.store.read(vaultPropsCkey) ?? ''
       // This device changes the passphrase, so its mark of the vault is newer than `older`.
       const changer = await TH.settledVault({ ...world.props, userId: 'u1' })
-      await changer.changePassphrase('correct horse', 'another horse')
+      await changer.putWayin('correct horse', 'another horse')
       changer.close()
       const { Grab, latest } = grabber()
       render(<VaultProvider {...world.props} userId="u1"><Grab /><Probe /></VaultProvider>)

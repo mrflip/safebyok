@@ -6,8 +6,12 @@ import * as TH from './test-helpers'
 
 const passkeyOpts = { rp: { name: 'Acme' }, user: { name: 'ada@example.com', displayName: 'Ada' } }
 
-/** A new passkey through the fake authenticator, as `vault.addPasskey` calls for it. */
-const makePasskey = () => createPasskey(passkeyOpts)
+/** A new passkey's answer from the fake authenticator; fails the test when it makes none. */
+const madePasskey = async () => {
+  const answer = await createPasskey(passkeyOpts)
+  if (answer === null) { throw new Error('the fake authenticator made no passkey') }
+  return answer
+}
 
 /** Expect `operation` to reject with a VaultError of `kind`; hands the error back for a closer look. */
 const expectRefusal = async (operation: Promise<unknown>, kind: VaultError['refusalkind']): Promise<VaultError> => {
@@ -30,7 +34,7 @@ const summaryOf = (proof: PasskeyAnswer): PasskeyWayinSummary => ({
 /** A fresh vault in memory, made with the passphrase `pw` and unlocked, and an opener for another device on the same storage. */
 const vaultInMemory = async () => {
   const vaultDB: VaultDB = localVaultDB({ store: memoryStore() })
-  const open = async () => await TH.settledVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest })
+  const open = async () => await TH.settledVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker })
   const vault = await open()
   await vault.unlock('pw')
   return { vault, open }
@@ -48,7 +52,7 @@ describe("passkeysAvailable", () => {
 })
 
 describe("createPasskey", () => {
-  it("makes a passkey and hands back its answer over a fresh salt, for the vault's addPasskey", async () => {
+  it("makes a passkey and hands back its answer over a fresh salt, for the vault's putWayin", async () => {
     install()
     const passkey = await createPasskey(passkeyOpts)
     expect(passkey).to.not.be.null
@@ -162,12 +166,13 @@ describe("askPasskey", () => {
 })
 
 describe("a passkey unlock, end to end", () => {
-  it("createPasskey's answer adds the vault's passkey, and askPasskey's opens the vault on another device, as their examples show", async () => {
+  it("createPasskey's answer puts the vault's passkey, and askPasskey's opens the vault on another device, as their examples show", async () => {
     install()
     const { vault, open } = await vaultInMemory()
     await vault.putBox('anthropic', 'sk-fake')
-    const added = await vault.addPasskey('pw', makePasskey)
-    expect(added).to.be.true
+    const answer = await createPasskey(passkeyOpts)
+    if (answer !== null) { await vault.putWayin('pw', answer) }
+    expect(vault.getSnapshot().passkey?.credential_id).to.eq(answer?.credentialId)
 
     const elsewhere = await open()
     expect(elsewhere.getSnapshot().state).to.eq('locked')
@@ -176,20 +181,22 @@ describe("a passkey unlock, end to end", () => {
     expect(await elsewhere.getBox('anthropic')).to.eq('sk-fake')
   })
 
-  it("addPasskey resolves false when the user dismisses createPasskey's prompt, as its example says, and the vault keeps no passkey", async () => {
+  it("createPasskey resolves null when the user dismisses its prompt, as its example says, so nothing reaches the vault", async () => {
     const fake = install()
     const { vault } = await vaultInMemory()
     fake.refuseNext('NotAllowedError')
-    expect(await vault.addPasskey('pw', makePasskey)).to.be.false
+    const answer = await createPasskey(passkeyOpts)
+    expect(answer).to.be.null
+    if (answer !== null) { await vault.putWayin('pw', answer) }
     expect(vault.getSnapshot().passkey).to.be.null
   })
 
   it("a passkey added again takes the first's place: askPasskey asks only the new one", async () => {
     const fake = install()
     const { vault, open } = await vaultInMemory()
-    await vault.addPasskey('pw', makePasskey)
+    await vault.putWayin('pw', await madePasskey())
     const [first = ''] = fake.credentialIds()
-    await vault.addPasskey('pw', makePasskey)
+    await vault.putWayin('pw', await madePasskey())
     const elsewhere = await open()
     const { passkey } = elsewhere.getSnapshot()
     expect(passkey?.credential_id).to.not.eq(first)

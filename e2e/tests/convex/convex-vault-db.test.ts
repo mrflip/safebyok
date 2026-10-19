@@ -293,7 +293,7 @@ describe("a vault over convexVaultDB, on two devices", () => {
 
     // The laptop changes the passphrase: the phone is locked out of its old unlock, and only the
     // new passphrase opens it again.
-    await laptop.changePassphrase(TH.RealPassphrase, NewPassphrase)
+    await laptop.putWayin(TH.RealPassphrase, NewPassphrase)
     await vi.waitFor(() => { expect(phone.getSnapshot().state).to.eq('locked') })
     await TH.expectRefusal(phone.unlock(TH.RealPassphrase), 'wrong_passphrase')
     await phone.unlock(NewPassphrase)

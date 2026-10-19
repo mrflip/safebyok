@@ -10,11 +10,12 @@ import * as TH from './test-helpers'
 const lockedVaultWithPasskey = async () => {
   const authenticator = TH.installFakeAuthenticator()
   const vaultDB = localVaultDB({ store: memoryStore() })
-  const open = async () => await TH.settledVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest })
+  const open = async () => await TH.settledVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker })
   const maker = await open()
   await maker.unlock('pw')
-  const added = await maker.addPasskey('pw', () => createPasskey({ rp: { name: 'Acme' }, user: { name: 'ada@example.com', displayName: 'Ada' } }))
-  if (! added) { throw new Error('the fake authenticator made no passkey') }
+  const answer = await createPasskey({ rp: { name: 'Acme' }, user: { name: 'ada@example.com', displayName: 'Ada' } })
+  if (answer === null) { throw new Error('the fake authenticator made no passkey') }
+  await maker.putWayin('pw', answer)
   return { authenticator, vault: await open() }
 }
 
@@ -74,7 +75,8 @@ describe("PasskeyUnlockButton", () => {
     render(<PasskeyUnlockButton ask={TH.askOf(vault)} onDone={noop} onGripe={noop} />)
     expect(screen.queryByText('Use a passkey')).to.be.null
     await act(async () => {
-      await vault.addPasskey('pw', () => createPasskey({ rp: { name: 'Acme' }, user: { name: 'ada@example.com', displayName: 'Ada' } }))
+      const answer = await createPasskey({ rp: { name: 'Acme' }, user: { name: 'ada@example.com', displayName: 'Ada' } })
+      if (answer !== null) { await vault.putWayin('pw', answer) }
     })
     expect(screen.queryByText('Use a passkey')).to.not.be.null
     vault.close()

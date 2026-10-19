@@ -113,7 +113,7 @@ describe("unexpectedError", () => {
   })
 })
 
-/** What a key deriver or strength test might throw, and what hostThrewRefusal makes of it: kept as it came, or wrapped. */
+/** What a key deriver might throw, and what hostThrewRefusal makes of it: kept as it came, or wrapped. */
 const HostThrowCases = [
   // a condition, for the caller to show or retry:
   [new VaultError('storage_unavailable', 'The word list could not be loaded: try again shortly.'), "kept",              'keeps a condition, its word list out of reach'],

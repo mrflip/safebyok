@@ -1006,7 +1006,7 @@ describe("a revocation read while a key is being taken up: a take-up, an unlock,
     const hello = vault.hello()
     await unwrapping.reached
     const listing = TH.holdNextCall(world.vaultDB, 'listBoxes')
-    await other.changePassphrase('pw', 'pw-new')
+    await other.putWayin('pw', 'pw-new')
     // The change bell's refresh has read epoch 2, and waits on the listing.
     await listing.reached
     unwrapping.release()
@@ -1033,10 +1033,10 @@ describe("a revocation read while a key is being taken up: a take-up, an unlock,
       if (marksRead === 3) { await noting.pass() }
       return await getMark(scope)
     })
-    const changing = vault.changePassphrase('pw', 'pw-two')
+    const changing = vault.putWayin('pw', 'pw-two')
     await noting.reached
     await other.unlock('pw-two')
-    await other.changePassphrase('pw-two', 'pw-three')
+    await other.putWayin('pw-two', 'pw-three')
     await vault.hello({ staleMinutes: 0 })
     expect(vault.unlock_epoch).to.eq(3)
     noting.release()
@@ -1061,7 +1061,7 @@ describe("a revocation read while a key is being taken up: a take-up, an unlock,
     const making = vault.tryUnlock('pw')
     await noting.reached
     await other.unlock('pw')
-    await other.changePassphrase('pw', 'pw-two')
+    await other.putWayin('pw', 'pw-two')
     await vault.hello({ staleMinutes: 0 })
     expect(vault.unlock_epoch).to.eq(2)
     noting.release()
@@ -1078,7 +1078,7 @@ describe("a revocation read while a key is being taken up: a take-up, an unlock,
     const unlocking = vault.tryUnlock('pw')
     await deriving.reached
     const erasing = TH.holdNextCall(world.deviceDB, 'delLease')
-    await other.changePassphrase('pw', 'pw-new')
+    await other.putWayin('pw', 'pw-new')
     // The change bell's refresh has read epoch 2, dropped the key, and waits on the lease's erasure.
     await erasing.reached
     deriving.release()
@@ -1093,7 +1093,7 @@ describe("a revocation read while a key is being taken up: a take-up, an unlock,
   it("stays locked when the passphrase changes on another device while a hello unwraps this device's lease", async () => {
     const { world, vault, hello, other, release } = await reloadHeldAtUnwrap()
     expect(vault.unlock_epoch).to.eq(1)
-    await other.changePassphrase('pw', 'pw-new')
+    await other.putWayin('pw', 'pw-new')
     // The change bell's refresh brings the new epoch while the unwrap is held.
     await TH.eventually(() => vault.unlock_epoch === 2)
     release()

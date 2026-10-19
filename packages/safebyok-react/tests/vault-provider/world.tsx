@@ -85,7 +85,7 @@ export const grabber = () => {
 export const makeWorld = () => {
   const vaultDB = localVaultDB({ store: memoryStore() })
   const deviceDB = memoryDeviceDB()
-  const props = { applabel: 'acme', vaultlabel: 'main', vaultDB, deviceDB, keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest }
+  const props = { applabel: 'acme', vaultlabel: 'main', vaultDB, deviceDB, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker }
   const tree = (userId: string | null, caught: unknown[] = []) => (
     <CatchingBoundary caught={caught}>
       <VaultProvider {...props} userId={userId}>
@@ -102,7 +102,7 @@ export const madeWorld = async () => {
   const store = memoryStore()
   const vaultDB = localVaultDB({ store })
   const deviceDB = memoryDeviceDB()
-  const props = { applabel: 'acme', vaultlabel: 'main', vaultDB, deviceDB, keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest }
+  const props = { applabel: 'acme', vaultlabel: 'main', vaultDB, deviceDB, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker }
   const made = await TH.settledVault({ ...props, userId: 'u1' })
   await made.unlock('correct horse')
   await made.putBox('anthropic_api_key', 'sk-fake')
@@ -122,7 +122,7 @@ export const damagedWorld = async () => {
   return world
 }
 
-/** A passphraseStrengthTest that refuses any passphrase holding the app's name. */
+/** A strengthChecker that refuses any passphrase holding the app's name. */
 export const refuseAcme = (typed: string): PassphraseVerdict => (typed.includes('acme') ? { strong: false, reason: 'Not the name of the app, please.' } : { strong: true })
 
 /** The state the Probe, or the boundary in its place, shows. */
@@ -197,7 +197,7 @@ export const watched = <ResultT,>(promise: Promise<ResultT>) => {
 }
 
 /** The provider over a world, with whatever logger and clock the render hands it. */
-export const providerOf = (world: ReturnType<typeof makeWorld>, sinks: Partial<Pick<VaultProviderProps, 'logger' | 'clock' | 'passphraseStrengthTest'>>) => (
+export const providerOf = (world: ReturnType<typeof makeWorld>, sinks: Partial<Pick<VaultProviderProps, 'logger' | 'clock' | 'strengthChecker'>>) => (
   <VaultProvider {...world.props} userId="u1" {...sinks}><Probe /></VaultProvider>
 )
 

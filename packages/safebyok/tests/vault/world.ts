@@ -39,7 +39,7 @@ export const makeWorld = (defaults?: Partial<MakeVaultOpts>) => {
   const advance = (byMillis: number) => { nowMillis += byMillis }
   const { logger, calls: logged } = TH.spyLogger()
   const optsWith = (overrides?: Partial<MakeVaultOpts>): MakeVaultOpts => (
-    { applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB, clock, keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest, logger, ...defaults, ...overrides }
+    { applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB, clock, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, logger, ...defaults, ...overrides }
   )
   const open = (overrides?: Partial<MakeVaultOpts>) => TH.settledVault(optsWith(overrides))
   const openUnlocked = async (passphrase: string, overrides?: Partial<MakeVaultOpts>) => {
@@ -130,10 +130,9 @@ export const damagedVaultWorld = async () => {
 /** The verbs Vault.make asks of a VaultDB, and so all a duck-typed one has. */
 export const VaultDBVerbsUsed = ['getVaultProps', 'ensureVaultProps', 'putVaultProps', 'getBox', 'listBoxes', 'putBox', 'delBox', 'delVault', 'subscribe'] as const
 
-/** The passkey `laptop`, added to `vault` under the passphrase `pw`; fails the test when it adds none. */
+/** The passkey `laptop`, put into `vault` under the passphrase `pw`. */
 export const addLaptopPasskey = async (vault: Vault): Promise<void> => {
-  const added = await vault.addPasskey('pw', () => TH.passkeyOf('laptop'))
-  if (! added) { throw new Error('addPasskey added no passkey') }
+  await vault.putWayin('pw', await TH.passkeyOf('laptop'))
 }
 
 /** A vault in a fresh world, unlocked with `pw`, holding one box and the passkey `laptop`. */

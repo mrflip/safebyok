@@ -3,7 +3,7 @@
  * Whispers are encrypted on the user's device under keys that never leave it; the storage layer
  * holds ciphertext only. The IndexedDB device store lives in its own entry point, `safebyok/idb`,
  * the browser's defaults for Vault.make's options in another, `safebyok/browser` (among them
- * `zxcvbnPassphraseTest`, the passphrase strength test), the checks for
+ * `zxcvbnStrengthChecker`, the passphrase strength checker), the checks for
  * names, with their bounds, in `safebyok/validators` as well as here, and the IndexedDB
  * vault store in a package of its own, `safebyok-indexeddb`.
  */
@@ -15,7 +15,7 @@ export { Vault } from './vault'
 export { Ask, AskWhyVals, ProofAnswerVals } from './ask'
 export type { AskWhy, GetProof, ProofAnswer } from './ask'
 export { delDamagedVault } from './del-damaged-vault'
-export type { PassphraseStrengthTest, PassphraseVerdict } from './passphrase-strength'
+export type { PassphraseVerdict, StrengthChecker } from './passphrase-strength'
 export type { VaultSnapshot, VaultState } from './vault'
 export type { BadNewsHandler, MakeVaultOpts } from './vault-opts'
 export type { DelDamagedVaultOpts } from './del-damaged-vault'
@@ -32,7 +32,7 @@ export type { Proof, PassphraseProof, PasskeyProof, ProofVault } from './proof'
 export { AnyTextValidators, DefaultValidators, Label, LabelPattern, MaxLabelChars, MaxUserIdChars, NameFloor, NameFloorBytes, UserId, UserIdPattern } from './validators'
 export type { NameValidator, VaultValidators } from './validators'
 export { checkValidators } from './names'
-export { checkStrengthTest } from './passphrase-strength'
+export { parseStrengthChecker } from './passphrase-strength'
 export type { Capacity, Clock, DamagedBox, DeviceMark, PasskeyAnswer, PasskeyWayinSummary, PassphraseWayinSummary, SeenVault, WayinKind, WayinSummary, WhisperJson } from './types'
 export { Ciphered } from './crypto'
 export { VaultError, RefusalFamilyForKind, RefusalFamilyVals, RefusalKindVals, isCondition, isVaultError } from './errors'

@@ -1,7 +1,7 @@
 import { type Ciphered, toB64 } from '../../src/crypto'
 import { memoryDeviceDB } from '../../src/device-db'
 import type { KeyDeriver } from '../../src/key-deriver'
-import { type PassphraseStrengthTest, StrongVerdict } from '../../src/passphrase-strength'
+import { type StrengthChecker, StrongVerdict } from '../../src/passphrase-strength'
 import { memoryStore } from '../../src/string-store'
 import type { BoxRecord } from '../../src/box'
 import type { VaultScope, PassphraseWayinRecord, PasskeyWayinRecord, PasskeyAnswer, VaultProps, Sidecar, BoxSummary, DamagedBox, DeviceMark, SeenVault, LeaseRecord } from '../../src/types'
@@ -44,17 +44,17 @@ export const vaultSliceOf = (userId: string, keyDeriver: KeyDeriver = testDerive
 )
 
 /**
- * A passphraseStrengthTest for tests, admitting every passphrase, so a suite may unlock with a
+ * A strengthChecker for tests, admitting every passphrase, so a suite may unlock with a
  * short one such as 'pw'. Never hand it to a vault that holds a real secret.
  *
- * @example Vault.make({ ...opts, passphraseStrengthTest: anyPassphraseTest })
+ * @example Vault.make({ ...opts, strengthChecker: anyStrengthChecker })
  */
-export const anyPassphraseTest: PassphraseStrengthTest = () => StrongVerdict
+export const anyStrengthChecker: StrengthChecker = () => StrongVerdict
 
 /**
  * Everything Vault.make needs, over stores in memory made fresh for each call: `u1`'s `main` vault
  * in the `acme` app (as {@link scopeOf} has it), deriving through {@link testDeriver}, and
- * admitting any passphrase ({@link anyPassphraseTest}). `overrides`
+ * admitting any passphrase ({@link anyStrengthChecker}). `overrides`
  * replace any of it -- a store of the test's own, a clock, a logger, another user.
  *
  * @param overrides - Options to use in place of the defaults.
@@ -70,7 +70,7 @@ export const memoryVaultOpts = (overrides: Partial<MakeVaultOpts> = {}): MakeVau
   vaultDB:    localVaultDB({ store: memoryStore() }),
   deviceDB:   memoryDeviceDB(),
   keyDeriver: testDeriver,
-  passphraseStrengthTest: anyPassphraseTest,
+  strengthChecker: anyStrengthChecker,
   ...overrides,
 })
 
@@ -172,7 +172,7 @@ const digestOf = async (text: string): Promise<Uint8Array> => (
  * passkey asked with the same salt answers the same, and with another salt answers otherwise, as
  * a real PRF does. Worthless as a secret: never hand it to a vault that holds a real one.
  *
- * @example await vault.addPasskey('pw', () => passkeyOf('laptop'))
+ * @example await vault.putWayin('pw', await passkeyOf('laptop'))
  * @example await vault.unlock(await passkeyOf('laptop'))
  * @example await passkeyOf('laptop', otherSaltB64)  // the same credential, answering another salt
  */

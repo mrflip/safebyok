@@ -213,7 +213,7 @@ describe("the logger", () => {
     const vault = await world.openUnlocked('pw')
     await vault.putBox('anthropic', 'sk-fake', { sidecar: { note: 'work account' } })
     await vault.getBox('anthropic')
-    await vault.changePassphrase('pw', 'pw two')
+    await vault.putWayin('pw', 'pw two')
     await vault.lock()
     await vault.unlock('pw two')
     await vault.delBox('anthropic')
@@ -393,7 +393,7 @@ describe("the logger", () => {
     expect(await world.stateOnOpen()).to.eq('locked')
     await vault.unlock('pw')
     const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
-    await elsewhere.changePassphrase('pw', 'pw two')
+    await elsewhere.putWayin('pw', 'pw two')
     expect(await world.stateOnOpen()).to.eq('locked')
     expect(world.logged).to.have.lengthOf(0)
   })
@@ -446,7 +446,7 @@ describe("the logger", () => {
     // every call site: a change whose mark could not be kept (its error carrying the device
     // store's as its cause), a lease unreadable, a background refresh refused
     vi.spyOn(device.deviceDB, 'putMark').mockRejectedValueOnce(new Error('the device store broke: disk full'))
-    await vault.changePassphrase(passphrase, `${passphrase} two`)
+    await vault.putWayin(passphrase, `${passphrase} two`)
     const secrets = storedSecrets(world)
     device.spoilRow((row) => ({ ...row, ask_passphrase_at: `${passphrase} ${whisper}` }))
     const reopened = await world.open({ deviceDB: device.deviceDB })
@@ -475,7 +475,7 @@ describe("when storage says the user is no longer signed in", () => {
     ['getBox()',           'getBox',        (vault) => vault.getBox('anthropic')],
     ['putBox()',           'putBox',        (vault) => vault.putBox('openai', 'sk-fake-two')],
     ['unlock()',           'getVaultProps', (vault) => vault.unlock('pw one')],
-    ['changePassphrase()', 'putVaultProps', (vault) => vault.changePassphrase('pw one', 'pw two')],
+    ['putWayin()', 'putVaultProps', (vault) => vault.putWayin('pw one', 'pw two')],
   ]
 
   for (const [callTitle, verb, call] of RevokedCallCases) {
@@ -606,7 +606,7 @@ describe("the device mark", () => {
     expect(await seenIn(world)).to.deep.include({ device_id: deviceId, unlock_epoch: 2 })
     expect(storedWayinOf(world, 'passkey')).to.deep.include({ device_id: deviceId, registered_at: world.clock.now() })
     const elsewhere = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
-    await elsewhere.addPasskey('pw', () => TH.passkeyOf('phone'))
+    await elsewhere.putWayin('pw', await TH.passkeyOf('phone'))
     await TH.wakeupAtNextTick()
     expect(await seenIn(world)).to.deep.include({ device_id: deviceId, unlock_epoch: 3 })
     expect(storedWayinOf(world, 'passkey')?.['device_id']).to.be.a('string').and.not.eq(deviceId)
@@ -618,7 +618,7 @@ describe("the device mark", () => {
     const before = storedWayinOf(world, 'passphrase')
     world.advance(HourMillis)
     const elsewhere = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
-    await elsewhere.changePassphrase('pw', 'pw two')
+    await elsewhere.putWayin('pw', 'pw two')
     const after = storedWayinOf(world, 'passphrase')
     expect(after).to.deep.include({ registered_at: world.clock.now() })
     expect(after?.['device_id']).to.be.a('string').and.not.eq(before?.['device_id'])
@@ -761,7 +761,7 @@ describe("vault props rolled back", () => {
     vi.spyOn(slowVaultDB, 'ensureVaultProps').mockImplementationOnce(async (...args) => {
       await there.unlock('pw')
       const settled = await ensureVaultProps(...args)
-      await there.changePassphrase('pw', 'pw two')
+      await there.putWayin('pw', 'pw two')
       return settled
     })
     await late.unlock('pw')
@@ -831,7 +831,7 @@ describe("vault props rolled back", () => {
     expect(vault.unlock_epoch).to.eq(2)
     expect(vault.passkey?.credential_id).to.eq(storedWayinOf(world, 'passkey')?.['credential_id'])
     await vault.unlock('pw')
-    await vault.changePassphrase('pw', 'pw two')
+    await vault.putWayin('pw', 'pw two')
     expect(vault.unlock_epoch).to.eq(3)
     expect(vault.state).to.eq('unlocked')
   })

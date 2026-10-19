@@ -9,7 +9,7 @@
  * runnable over an adapter made per signed-in user). For tests only, and under vitest: the
  * deriver is worthless against a brute-forcer.
  */
-export { testDeriver, vaultSliceOf, anyPassphraseTest, memoryVaultOpts, settledVault, freshDbName, fakeCiphered, scopeOf,
+export { testDeriver, vaultSliceOf, anyStrengthChecker, memoryVaultOpts, settledVault, freshDbName, fakeCiphered, scopeOf,
   wayinOf, passkeyWayinOf, passkeyOf, vaultPropsOf, vaultPropsAtEpochOf, boxOf, sidecarJsonOf, OddLabels,
   summaryOf, noBoxYet, thisVault, deleting, markOf, leaseOf, tweakB64 } from './test-helpers/builders'
 export type { MarkOverrides } from './test-helpers/builders'

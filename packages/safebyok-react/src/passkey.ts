@@ -5,7 +5,7 @@ import { Messages } from './messages'
 /**
  * The WebAuthn half of a passkey unlock, which the core leaves to the host: `createPasskey` makes a
  * new passkey and asks it for its first answer, `askPasskey` asks the vault's passkey for its
- * answer again. Both hand back a {@link PasskeyAnswer} for the vault (`addPasskey`, `unlock`), or
+ * answer again. Both hand back a {@link PasskeyAnswer} for the vault (`putWayin`, `unlock`), or
  * null when the user dismissed the prompt. Nothing here imports React: any framework's host may use
  * them.
  *
@@ -48,20 +48,20 @@ export type AskPasskeyOpts = {
 }
 
 /**
- * A new passkey, and its first answer over a fresh salt: what `vault.addPasskey` calls for, once
- * it has checked its proof, so a refused proof never leaves a passkey behind. The browser
- * asks the user to make the passkey (a fingerprint, a face, a security key), and, on authenticators
+ * A new passkey, and its first answer over a fresh salt: what `vault.putWayin` takes, beside the
+ * vault's passphrase, to put the vault's passkey. The browser asks the user to make the passkey (a fingerprint, a face, a security key), and, on authenticators
  * that answer only when asked again, to touch it once more.
  *
  * Resolves null when the user dismisses the prompt (or lets it time out). Refuses with kind
  * 'passkey_unavailable' when the browser has no WebAuthn, or the authenticator does not offer the
  * PRF extension, and 'bad_option' when the relying party's `id` does not fit this page. A passkey
  * made but never answered for -- no PRF, or the second touch dismissed -- is useless to the
- * vault, and stays on the authenticator until the user deletes it.
+ * vault, and stays on the authenticator until the user deletes it; so does one made for a
+ * `putWayin` that is then refused (a mistyped passphrase, say): make another to try again.
  *
  * @example
- *   const makePasskey = () => createPasskey({ rp: { name: 'Acme' }, user: { name: email, displayName: fullName } })
- *   const added = await vault.addPasskey(passphrase, makePasskey)    // false: dismissed
+ *   const answer = await createPasskey({ rp: { name: 'Acme' }, user: { name: email, displayName: fullName } })
+ *   if (answer !== null) { await vault.putWayin(passphrase, answer) }    // null: dismissed
  */
 export const createPasskey = async (opts: CreatePasskeyOpts): Promise<PasskeyAnswer | null> => {
   checkAvailable()

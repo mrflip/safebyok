@@ -4,10 +4,9 @@ import { createPasskey, passkeysAvailable, useVault, useVaultSnapshot } from 'sa
 /**
  * The vault's two ways in -- its one passphrase, and its passkey if it has one, shown even while
  * locked -- and a form to change them. Every change takes the passphrase as it stands as its
- * proof, even unlocked: `vault.changePassphrase(passphrase, newPassphrase)`;
- * `vault.addPasskey(passphrase, makePasskey)`, which checks the passphrase before it calls
- * `makePasskey`, `createPasskey()`, and replaces the passkey the vault had; and
- * `vault.delWayin(passphrase)`, which removes it. With a passkey, the passphrase dialog offers
+ * proof, even unlocked: `vault.putWayin(passphrase, newPassphrase)`; `vault.putWayin(passphrase,
+ * answer)`, with the answer of a passkey `createPasskey()` has just made, which replaces the
+ * passkey the vault had; and `vault.delWayin(passphrase)`, which removes it. With a passkey, the passphrase dialog offers
  * "Use a passkey".
  */
 export const WaysIn = () => {
@@ -29,16 +28,19 @@ export const WaysIn = () => {
   const press = async (change: (standing: string) => Promise<unknown>) => {
     setGripe(null)
     try {
-      // addPasskey resolves false when the user dismissed the prompt: nothing changed, so the fields stay.
-      if (await change(passphraseRef.current?.value ?? '') === false) { return }
+      // A change that resolves null made none -- the user dismissed the passkey prompt -- so the fields stay.
+      if (await change(passphraseRef.current?.value ?? '') === null) { return }
       formRef.current?.reset()
     } catch (err) {
       setGripe(err instanceof Error ? err.message : 'Could not make that change.')
     }
   }
-  const changePassphrase = () => press((standing) => vault.changePassphrase(standing, newPassphraseRef.current?.value ?? ''))
-  const makePasskey = () => createPasskey({ rp: { name: 'safebyok playground' }, user: { name: snapshot.user_id, displayName: snapshot.user_id } })
-  const addFingerprint = () => press((standing) => vault.addPasskey(standing, makePasskey))
+  const putPassphrase = () => press((standing) => vault.putWayin(standing, newPassphraseRef.current?.value ?? ''))
+  // The passkey is made first, straight from the click, as WebAuthn wants; then the vault checks the passphrase.
+  const addFingerprint = () => press(async (standing) => {
+    const answer = await createPasskey({ rp: { name: 'safebyok playground' }, user: { name: snapshot.user_id, displayName: snapshot.user_id } })
+    return answer === null ? null : await vault.putWayin(standing, answer)
+  })
   const removeFingerprint = () => press((standing) => vault.delWayin(standing))
 
   return (
@@ -65,7 +67,7 @@ export const WaysIn = () => {
         </label>
         {gripe !== null && <p className="gripe">{gripe}</p>}
         <div className="row">
-          <button type="button" onClick={() => { void changePassphrase() }}>Change passphrase</button>
+          <button type="button" onClick={() => { void putPassphrase() }}>Change passphrase</button>
           {passkeysAvailable() && (
             <button type="button" onClick={() => { void addFingerprint() }}>{passkey === null ? 'Add fingerprint' : 'Replace fingerprint'}</button>
           )}
