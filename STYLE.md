@@ -88,7 +88,7 @@ Specificity is a virtue (`saltBytes` says it is bytes), but don't tag the obviou
   freely chosen, usually by a user (`vaultlabel`, `boxlabel`). All four are strict: `\w` only,
   starting with a letter, ending with a letter or digit, two or more characters.
 * `_id`, `_tok` -- a stored `_id` is a hard identifier a record is found by (`vault_id`,
-  `wayin_id`); a value that changes on every write is a `_tok` (`revision_tok`). VOCABULARY.md
+  `device_id`); a value that changes on every write is a `_tok` (`revision_tok`). VOCABULARY.md
   has the rule.
 * `bytes` -- a `Uint8Array`; `fooBytes` for a particular one. `b64` -- base64url text of bytes;
   `fooB64`.

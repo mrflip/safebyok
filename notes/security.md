@@ -34,6 +34,44 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-19 (thread slots, B4a, branch 20261019-slots; the Coach's ruling): **the ways in are two slots,
+  and only the passphrase proves a change to them.** (1) Stored: vault props hold `passphrase` (a
+  passphrase wayin, required) and `passkey` (a passkey wayin, or null) where they held a list of one to
+  `MaxUnlocks` (8) wayins, each with a `wayin_id` and a `wayinlabel`. Format `safebyok-vault-v5`; v4 joins
+  the older formats, so every stored vault reads `damaged_vault` (no migration before 1.0.0).
+  `MaxUnlocks`, `wayin_id`, `wayinlabel`, its validator and the refusals `last_wayin` and
+  `too_many_wayins` are gone. (2) Each wrap's ctx is built as before (`cipherCtx(format, scope...,
+  vault_id, registered_at, purpose, header)`), its first part now `safebyok-vault-v5`; the header (every
+  field but the wrap, keys sorted) is `wayinkind`, `key_deriver_label` and `salt_b64` or `credential_id`
+  and `prf_salt_b64`, `vault_key_epoch`, `device_id`, `registered_at`. The passkey's HKDF info is that
+  same ctx. The purpose (`vault_key_passphrase_wrapped`, `vault_key_passkey_wrapped`) keeps one slot's
+  record from opening as the other's; which records fill the slots, and the `unlock_epoch`, are bound
+  into no ctx, as for the list, so storage can put an older record of the same vault in a slot. (3)
+  Opening: the vault picks the slot by the proof's kind and calls `wayin.tryOpen(proof)`, so a
+  passphrase costs exactly one key derivation (`Wayin.tryOpenAmong`, `openWithPassphrase`,
+  `openWithPasskey` and `Wayin.listOf` are gone, and with them the walk over up to eight). A passkey's
+  answer to a vault with no passkey refuses `absent_wayin`; one from another credential than the vault's
+  refuses `wrong_passkey` (it was `absent_wayin`). (4) Proving: `changePassphrase(passphrase,
+  newPassphrase)`, `addPasskey(passphrase, makePasskey)` and `delWayin(passphrase)` take the standing
+  passphrase only; a passkey's answer handed as the proof is refused `bad_option` before anything is
+  read or derived. Before, any wayin proved any change, so a passkey holder could reset the passphrase;
+  now a passkey opens the vault but cannot change who may. `addPassphrase` is gone. Consequence: a
+  forgotten passphrase can no longer be reset with the passkey, and a passphrase stored damaged cannot
+  be replaced. (5) A vault holds at most one passkey: `addPasskey` replaces the standing one (the old
+  credential no longer opens; the same credential again mends a damaged one, with a fresh wrap), and
+  `delWayin(passphrase)` removes the passkey, refusing `absent_wayin` when there is none; the passphrase
+  can never be removed. Removal is still not revocation. Every change still moves `unlock_epoch`,
+  relocking other devices, and is written conditionally on `vault_id` and `unlock_epoch`. (6) Every
+  change is proven by the passphrase, so each starts the lease again from now (`#deadlineFromNow()`;
+  before, a passkey-proven change kept the standing deadline). (7) `snapshot.wayins` is replaced by
+  `snapshot.passphrase` and `snapshot.passkey` (summaries: wayinkind, device_id, registered_at, and for
+  the passkey credential_id and prf_salt_b64); still no passphrase salt and no wrap reaches a host.
+  (8) `mayBeNewer` tells newer from damaged by `format` alone (it looked at unknown wayinkinds and
+  more wayins than `MaxUnlocks`); any change to a stored record bumps `format`. (9) The Convex
+  validators, Postgres (`passphrase jsonb NOT NULL`, `passkey jsonb` nullable) and GraphQL
+  (`passphrase: SafebyokWayin!`, `passkey: SafebyokWayin`) follow. Postgres and GraphQL used to drop a
+  null field on read; they now keep a null cell as a null field, else every vault without a passkey
+  would read damaged.
 * 2026-10-19 (thread a_sec2, PR [#206](https://github.com/mrflip/safebyok/pull/206)): **the create
   window closed.** A first unlock that creates the vault (`#settleUnlock`'s make path,
   `packages/safebyok/src/vault.ts`) while another device deletes it could leave this device unlocked
@@ -58,10 +96,12 @@ added or folded into through the subagent, and no other entry changes.
   `snapshot.props`, `vault.props` and `vault.wayins` (as `Wayin` models) carried each passphrase's
   salt and every wrapped vaultKey: everything an offline guess at a passphrase needs, into React
   state, devtools and error reporters. Now `VaultSnapshot.props` and `vault.props` are gone, and
-  `vault.wayins` is the snapshot's list of `WayinSummary` (kind, label, ids, dates; a passkey's
-  `credential_id` and `prf_salt_b64`, which an authenticator needs and which open nothing without
-  the passkey). The vault and its models keep the full records privately. Tests check that neither
-  the snapshot's JSON nor `vault.wayins` holds any stored salt or wrap. The Coach: "yes good call".
+  the snapshot carries summaries of the wayins: `snapshot.passphrase` and `snapshot.passkey` (amended
+  2026-10-19, slots: once a `wayins` list of `WayinSummary`) -- `wayinkind`, `device_id`,
+  `registered_at`, and for a passkey also `credential_id` and `prf_salt_b64`, which an
+  authenticator needs and which open nothing without the passkey. The vault and its models keep the
+  full records privately. Tests check that the snapshot's JSON holds no stored salt or wrap. The
+  Coach: "yes good call".
 * 2026-10-19 (thread a_sec2, #206): **no proof is kept after an unlock, and this is not tested.**
   The vault keeps no reference to a proof (a `PassphraseProof` or `PasskeyProof`) once an unlock or
   a change to the ways in settles: the proof lives in the call's locals only, and no field of the
@@ -179,8 +219,8 @@ added or folded into through the subagent, and no other entry changes.
   elsewhere refuses `vault_locked`, never `absent_vault` (the fix in commit 96f64d61 of the second
   review). (6) Restacked on thread B1 (proof_wayin, [#201](https://github.com/mrflip/safebyok/pull/201)):
   the vault freezes every vault props record as it takes it up (`frozenVaultProps` in
-  `packages/safebyok/src/vault.ts`: a copy, its `wayins` array and each wayin record and its
-  `vault_key_wayin_wrapped` frozen) at each of the three places it does so (a read in refresh, the
+  `packages/safebyok/src/vault.ts`: a copy, its `passphrase` and `passkey` wayin records and each
+  `vault_key_wayin_wrapped` frozen; amended 2026-10-19, slots: once a `wayins` array) at each of the three places it does so (a read in refresh, the
   unlock that creates the vault, a change to the ways in). So the record the vault works from, each
   wayin's `holder` and the `holder` each box is made or sealed under are one frozen object. Amended
   2026-10-19 (a_sec2, #206): `snapshot.props` is gone and the host no longer receives the record at
@@ -253,9 +293,9 @@ added or folded into through the subagent, and no other entry changes.
   (4) `wayin.tryOpen(proof)` returns an Outcome and never throws: a proof of the wrong kind is
   `bad_option`; a passphrase wayin made by another key deriver is `unknown_key_deriver`, and a damaged one
   `damaged_wayin`, each before deriving; a key deriver that throws anything but a VaultError becomes
-  `unexpected_error` with the throw as `cause`, and nothing is logged. `Wayin.tryOpenAmong`, the search
-  across a vault's wayins, stops at the first refusal other than `wrong_passphrase` instead of trying the
-  next wayin.
+  `unexpected_error` with the throw as `cause`, and nothing is logged. (Amended 2026-10-19, slots:
+  `Wayin.tryOpenAmong`, a search across a list of wayins, is gone; the vault picks the slot by the
+  proof's kind and calls `wayin.tryOpen(proof)`.)
 * 2026-10-19 (branch 20261019-outcome_adapters): **a refusal whose source cannot have quoted a record now
   carries that source as its `cause`, and `not_permitted` can come from the host and the driver.**
   (1) `convexVaultDB` (`refusing`, `safebyok-convex/src/convex-vault-db.ts`): a `ConvexError` whose
@@ -316,7 +356,8 @@ added or folded into through the subagent, and no other entry changes.
   its deadline. An overtaken attempt stands down any lease take-up (`#standDownTakeUp`) as it erases
   the lease it wrote, so a hello that read that lease in between takes nothing up.
 * 2026-10-19 (thread A6, getproof): **`Ask`: one per prompt, with one shared answer, and its
-  `attempt(proof, { wayinId? })` runs the same unlock body as `unlock()`.** `Ask`
+  `attempt(proof)` runs the same unlock body as `unlock()`** (amended 2026-10-19, slots: it once took
+  `{ wayinId? }`, an aim at one wayin, and `unlock()` likewise). `Ask`
   (`packages/safebyok/src/ask.ts`; `Ask.raise` is the vault's) owns `why`, the vault handle,
   `attempt`, `lockLanded` and the one answer: every call that needs the vault while a prompt is up
   awaits that same answer, so there is never more than one prompt. `attempt` proves against the vault
@@ -387,7 +428,7 @@ added or folded into through the subagent, and no other entry changes.
   `meta.box_stored` already does. 2026-10-19 (#201): a read of the vault props that finds a wayin
   `isDamaged()` tells `onBadNews` a `damaged_wayin` news whose `meta.wayin_listed` is that wayin's
   summary (no salt of a passphrase, no wrap), once per distinct stored record; the read still succeeds
-  and the other wayins open as before.
+  and the other slot's wayin opens as before.
 * 2026-10-19 (branch 20261019-vault_class); 2026-10-19 (branch 20261019-fields_and_make): **the vault's in-memory state, the vaultKey among it,
   lives in ES private fields.** `Vault` (`packages/safebyok/src/vault.ts`) is now a class, and
   `Vault.make(opts)` returns an instance; its state used to live in the closure of `make`. Every
@@ -404,7 +445,7 @@ added or folded into through the subagent, and no other entry changes.
   before anything else runs. Where to look: that no field holding key material is declared without
   `#`, and that later threads, which pull methods out into model classes holding a `vault`
   back-reference, do not widen the state into public fields to reach it. 2026-10-19
-  (20261019-fields_and_make): the public fields (`state`, `boxes`, `wayins`, `capacity`,
+  (20261019-fields_and_make): the public fields (`state`, `boxes`, `passphrase`, `passkey`, `capacity`,
   `askPassphraseAt`, `trouble`, `vault_id`, `unlock_epoch` and the rest) are getters with no setter,
   each reading the frozen snapshot that one private `#settle()` publishes; the snapshot, its arrays,
   their entries and `capacity` are `Object.freeze`d (a box's sidecar JSON inside a summary is not
@@ -413,15 +454,15 @@ added or folded into through the subagent, and no other entry changes.
   `Object.defineProperty`) changes nothing inside the vault; a test pins this. 2026-10-19
   (20261019-proof_wayin, #201); amended 2026-10-19 (a_sec2, #206): `vault.props` and `vault.wayins` exposed the stored
   vault props (frozen) and the `Wayin` instances to the host, wraps included. Now `vault.props` and
-  `VaultSnapshot.props` are gone, and `vault.wayins` is the snapshot's list of `WayinSummary`: no
-  passphrase salt and no wrapped vaultKey (a passkey's summary carries its `credential_id` and
-  `prf_salt_b64`); see the a_sec2 entry at the top of *Of Interest*. The vault also exposes
+  `VaultSnapshot.props` are gone, and the snapshot's `passphrase` and `passkey` are summaries (2026-10-19,
+  slots; once a `wayins` list of `WayinSummary`): no passphrase salt and no wrapped vaultKey (a
+  passkey's summary carries its `credential_id` and `prf_salt_b64`); see the a_sec2 entry at the top of *Of Interest*. The vault also exposes
   `keyDeriver`, `logger` and a checked `clock` as read-only getters, which the wayin models read.
 * 2026-10-19 (branch 20261019-softlock_gone, on PR #189): **the rotation schema is removed; no
   `rotateVaultKey` was ever built.** The vault props' `prior_vault_key` (the previous vaultKey wrapped
   under the current one), its `PriorVaultKey` schema and the `priorFits` refinement (a prior exactly
   one epoch below from epoch 2 on, none at epoch 1) are gone from the core and the Convex, Postgres
-  and GraphQL adapters' schemas, and the vault props moved to `safebyok-vault-v4`. That tag opens
+  and GraphQL adapters' schemas, and the vault props moved to `safebyok-vault-v4` (2026-10-19, slots: and on to `-v5`). That tag opens
   every wayin's wrap ctx, so v3 wayins no longer open; a stored v3 record reads as `damaged_vault`
   (never `newer_format`), `delDamagedVault` clears it, and nothing migrates. `vault_key_epoch`
   stays on every record, reserved at 1 and never written otherwise by safebyok, but the schema still
@@ -600,7 +641,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-18: **the context bytes of every wayin changed spelling, not construction, with the
   rename to "wayin".** A wayin's wrap is bound to a context of the record's format tag, then its
   whole stored header, as key-sorted JSON (a passkey wayin's HKDF `info` is the same bytes); it now
-  spells the renamed fields and begins `safebyok-vault-v3` (since 2026-10-19, `safebyok-vault-v4`, so v3 wayins no longer open). The construction and the purpose
+  spells the renamed fields and begins `safebyok-vault-v3` (since 2026-10-19, `safebyok-vault-v5`, so v3 and v4 wayins no longer open, and with a header that holds no `wayin_id` or `wayinlabel`: see the slots entry at the top). The construction and the purpose
   strings are unchanged. A `safebyok-vault-v2` record reads as `damaged_vault` on adapters that read
   it (a Convex deployment refuses the new schema until its tables are cleared), with no migration,
   so no old ciphertext has to open under the new bytes. Rejected: a translation back to the old
@@ -649,10 +690,10 @@ added or folded into through the subagent, and no other entry changes.
   wayin open, and the mark refuses one at a lower `vault_key_epoch` whatever its `unlock_epoch`:
   vault props from before a rotation, and with it the vaultKey the rotation replaced, are caught even
   so. What still passes is older vault props at the same `vault_key_epoch` under a forged higher
-  `unlock_epoch`: it can bring back only a wayin `delWayin` dropped, or a passphrase
+  `unlock_epoch`: it can bring back only a passkey `delWayin` dropped or `addPasskey` replaced, or a passphrase
   `changePassphrase` replaced, which still opens only the vaultKey the vault stands under, never a
   replaced one. (A device that opens such vault props through its lease opens no wayin:
-  it takes the vaultKey it already held, and lists the older copy's wayins.) The way out of a
+  it takes the vaultKey it already held, and shows the older copy's wayin summaries.) The way out of a
   refusal is the host's: it erases the device's mark (`valOf(await deviceDB.delMark(scope))`;
   amended 2026-10-19: once a bare `deviceDB.delMark(scope)`, before every DeviceDB verb resolved an
   `Outcome`) and opens again,
@@ -687,7 +728,7 @@ added or folded into through the subagent, and no other entry changes.
   user-chosen device label is stored. Clearing site data mints a new id; wayins keep the old.
 * 2026-10-16: the record formats moved on with these fields (to `safebyok-vault-v2`,
   `safebyok-lockbox-v2` and `safebyok-mark-v1`, since moved on again to today's `safebyok-vault-v3`,
-  `safebyok-box-v6` and `safebyok-mark-v3`; the mark moved to `safebyok-mark-v4` on 2026-10-19, and the vault props to `safebyok-vault-v4` the same day, so a stored `safebyok-vault-v3` record reads as `damaged_vault`, listed among the older formats), and each ctx's first part with
+  `safebyok-box-v6` and `safebyok-mark-v3`; the mark moved to `safebyok-mark-v4` on 2026-10-19, and the vault props to `safebyok-vault-v4` the same day and on to `safebyok-vault-v5` (slots), so a stored `safebyok-vault-v3` or `-v4` record reads as `damaged_vault`, listed among the older formats), and each ctx's first part with
   them. No vault written before reads: its vault props are `damaged_vault`, and `delDamagedVault`
   recognizes `safebyok-vault-v1` as an older format, not a possibly newer one, so it clears such a
   vault rather than asking the user to update the app.
@@ -864,7 +905,7 @@ added or folded into through the subagent, and no other entry changes.
   deletes the successor. On a vault the handle has never seen created, `del()` removes only
   the device-local record: boxes orphaned without vault props are not reached.
   `changePassphrase()` and `unlock()` re-read the vault props first, as they must to prove the
-  passphrase against it. A change to the wayins elsewhere (a passphrase or passkey added, removed or changed) does not stop a stale session's
+  passphrase against it. A change to the wayins elsewhere (the passphrase changed, or the passkey added, replaced or removed) does not stop a stale session's
   `putBox()` or `delBox()` (their expectations carry no epoch); the session relocks on its next
   look at the vault props.
 * 2026-10-14 (the option was named `rememberForMs` until its rename on 2026-10-15): the lease
@@ -987,7 +1028,7 @@ added or folded into through the subagent, and no other entry changes.
   filled it. Filled, it would have put every passphrase's salt and every wrapped vaultKey into a
   refusal's `meta`, and from there into `snapshot.trouble`, logs and error reporters; the Coach has
   ruled those out of the snapshot. A later refusal that wants to name the vault props storage holds
-  must carry a summary instead: `vault_id`, `unlock_epoch` and the wayin summaries.
+  must carry a summary instead: `vault_id`, `unlock_epoch` and the passphrase and passkey summaries.
   2026-10-19 (A4): every public vault call (`packages/safebyok/src/vault.ts`) now has a `tryX` form
   resolving an `Outcome` and an `X` form throwing the same `err` (`#trying`, `#throwing`). A throw
   inside a vault call that is not a `VaultError` -- a bug in safebyok, or a throw from a host
@@ -1014,8 +1055,8 @@ added or folded into through the subagent, and no other entry changes.
   `safebyok-react`'s `forBoundary` then strips the cause before React's `onCaughtError`. Bad news
   from a host function is never told to `onBadNews` or put in `snapshot.trouble`. A condition's
   message, if a host deriver or test wrote one quoting the passphrase, can reach the caller, and the
-  dialog shows it in place; it never reaches `onCaughtError`. On unlock, `openWithPassphrase`
-  (`src/wayin.ts`) turns any `wrong_passphrase` from a way in into the vault's own
+  dialog shows it in place; it never reaches `onCaughtError`. On unlock, `wayin.tryOpen`
+  (`src/wayin.ts`; amended 2026-10-19, slots: once `openWithPassphrase`, a walk over several passphrases) turns any `wrong_passphrase` from a way in into the vault's own
   `wrong_passphrase` (kind kept, message replaced), so a deriver's message, such as
   safebyok-fastkey's for an empty passphrase, never reaches the caller there; on the sealing paths
   (creating the vault, a new passphrase) a deriver's condition passes through as itself. The vault
@@ -1252,32 +1293,35 @@ added or folded into through the subagent, and no other entry changes.
   the bytes it derives: a stand-in is the host's to test against `argon2idWebV1Deriver`. A host's
   own label is not checked against anything, since a vault stores only the label; the host must
   never change a label's parameters. The stored format is unchanged.
-* 2026-10-15: vault props hold their `wayins`, a list of one to `MaxUnlocks` (8), each the one vaultKey wrapped under its own key. A passphrase wayin has its own
-  random `salt_b64` (never shared between wayins) and its own `wayin_id`, and its wrap's
+* 2026-10-15; 2026-10-19 (slots): vault props hold two slots, `passphrase` (required) and `passkey` (or null), each
+  the one vaultKey wrapped under its own key (until slots, a list of one to `MaxUnlocks` (8), each with a
+  `wayin_id` and a `wayinlabel`). The passphrase wayin has its own random `salt_b64`, and its wrap's
   additional data is the format, scope, `vault_id`, a purpose per wayinkind
   (`vault_key_passphrase_wrapped`), and the wayin's whole visible header (`wayinkind`,
-  `wayin_id`, `wayinlabel`, `key_deriver_label`, `salt_b64`) as key-sorted JSON (and, since
-  the sweep entry below, the vault props' `registered_at`). The
-  `unlock_epoch` is no longer in it, since a change to one wayin bumps the epoch and the
-  others, whose passphrases the device does not hold, must still open: a backend can therefore
-  splice a wayin from older vault props of the same vault (a removed passphrase's, or one from
-  before a change) into the current one, and that old passphrase opens the vault again, as it
-  always opens the older vault props themselves. The list's order and length, and the vault props' other
-  fields, are not bound.
-* 2026-10-15: removing a wayin (`delWayin`) is not revocation. Whoever knew the
+  `key_deriver_label`, `salt_b64`, `vault_key_epoch`, `device_id`, `registered_at`) as key-sorted
+  JSON (and, since the sweep entry below, the vault props' `registered_at`). The
+  `unlock_epoch` is not in it, since a change to one wayin bumps the epoch and the
+  other, whose key the device does not hold, must still open: a backend can therefore
+  splice a wayin from older vault props of the same vault (a replaced passphrase's, or a removed
+  passkey's) into the current one, and that old passphrase opens the vault again, as it
+  always opens the older vault props themselves. The purpose keeps one slot's record from opening as the
+  other's; which record fills a slot, and the vault props' other fields, are not bound.
+* 2026-10-15; 2026-10-19 (slots): removing a wayin (`delWayin`, which since slots removes the passkey,
+  refusing `absent_wayin` where there is none; the passphrase can never be removed) is not revocation. Whoever knew the
   removed passphrase and kept any earlier vault props holds the vaultKey, which never rotates; the
   removal bumps `unlock_epoch`, so devices unlocked under it lock at their next look, and the
-  vault refuses to remove its last wayin (`last_wayin`). Every change to the wayins
-  (`addPassphrase`, `delWayin`, `changePassphrase`) asks for a passphrase that opens one,
+  removal needs no `last_wayin` refusal, for the passphrase stays. Every change to the wayins
+  (`changePassphrase`, `addPasskey`, `delWayin`) asks for the standing passphrase (see the slots entry),
   even on an unlocked vault: the session's vaultKey handle is non-extractable, so wrapping it
   anew needs the extractable transient that a proof unwraps.
-* 2026-10-15: an `unlock()` or a proof not aimed at one wayin (`wayinId`) tries each
-  passphrase wayin in the vault props' order, one key derivation apiece, and stops at the first
-  that opens: a wrong passphrase costs as many derivations as there are wayins, at most
+* 2026-10-15; 2026-10-19 (slots): a passphrase costs exactly one key derivation to try. Until slots, an
+  `unlock()` or a proof not aimed at one wayin (`wayinId`) tried each passphrase wayin in the vault
+  props' order, one derivation apiece, a wrong passphrase costing as many as there were wayins, at most
   `MaxUnlocks` (8, about 4.8 s with the noble deriver in Node 24), a bound enforced on read, so a
-  backend cannot make one unlock derive more. Which wayin opened shows in how long the unlock
-  took, on the device only. Wayins made by a key deriver the vault was not opened with are
-  passed over, and refused as `unknown_key_deriver` only when no wayin is left to try.
+  backend could not make one unlock derive more, and how long the unlock took showed, on the device
+  only, which wayin opened. Now the vault picks the slot by the proof's kind and the one passphrase
+  wayin is tried; stored data cannot multiply the cost. A passphrase wayin made by a key deriver the
+  vault was not opened with refuses `unknown_key_deriver`.
 * 2026-10-15: a wayin may be a passkey (WebAuthn PRF extension; a security key's `hmac-secret`).
   Its wayin holds `credential_id` and `prf_salt_b64` (32 random bytes, minted by the React
   binding's `createPasskey` with `crypto.getRandomValues`, checked for length by the core). The
@@ -1302,8 +1346,9 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-15; 2026-10-18; 2026-10-19: **every field a record writes is bound, unless a reason below says not** (the
   Coach: "make everything verifiable unless there's a good reason not to"). A passkey wayin's
   HKDF `info` is now its wrap's whole additional data -- format, scope, `vault_id`, the vault props'
-  `registered_at`, purpose, and the wayin's visible header (`wayinkind`, `wayin_id`,
-  `wayinlabel`, `credential_id`, `prf_salt_b64`) -- so the passkeyKey itself, not only the wrap, belongs to one vault
+  `registered_at`, purpose, and the wayin's visible header (`wayinkind`, `credential_id`,
+  `prf_salt_b64`, `vault_key_epoch`, `device_id`, `registered_at`; until slots also `wayin_id` and
+  `wayinlabel`) -- so the passkeyKey itself, not only the wrap, belongs to one vault
   and one wayin; HKDF info and AES-GCM additional data are the same bytes, fed to different
   primitives. (2026-10-19, #201: `PasskeyProof.wayinKeyFor(wayin)` runs that HKDF over the PRF bytes with
   the wayin's whole wayinCtx as `info`.) Every wayin's wrap binds the vault props' `registered_at`. A box's two
@@ -1318,10 +1363,10 @@ added or folded into through the subagent, and no other entry changes.
   fails to open and is discarded, so the discarding is logged. No compatibility: every passkey
   wayin, box and lease written before refuses to open (`wrong_passkey`,
   `corrupt_record`, a fresh passphrase prompt), and a passphrase wayin refuses its passphrase.
-  **Left unbound, and why**: the vault props' `unlock_epoch` and the list of `wayins` (order, length,
-  membership), because each wayin's key is held only by its own wayin, and a change to one
-  must not rewrap the others (the 2026-10-15 wayin entry above: an old wayin can be spliced
-  back); the passphraseKey's derivation, which takes no context: its salt is fresh for every
+  **Left unbound, and why**: the vault props' `unlock_epoch` and which records fill the two slots
+  (until slots, the list's order, length and membership), because each wayin's key is held only by
+  its own wayin, and a change to one must not rewrap the other (the 2026-10-15 wayin entry above:
+  an old wayin can be spliced back); the passphraseKey's derivation, which takes no context: its salt is fresh for every
   wayin and bound in the wrap, so the key wraps exactly one thing, and binding it further would
   put Argon2's associated data into the host-pluggable `KeyDeriver` seam and every stand-in
   behind a label, for no added check; the PRF salt, which is random and already bound; and the
@@ -1339,11 +1384,14 @@ added or folded into through the subagent, and no other entry changes.
   proves once more on each device; there is no migration. The device mark (lock generation and
   seen-vault record) is untouched. Amended 2026-10-19: the lock generation is gone; the mark
   holds only the seen vault.)
-* 2026-10-15: any wayin proves any change. A passkey's answer is accepted as proof by
-  `addPassphrase`, `addPasskey` and `delWayin`, so whoever holds one passkey can set a new
-  passphrase and remove the user's others: the vault is as strong as its weakest wayin. A vault
-  always keeps one passphrase wayin (`last_wayin` refuses removing the last), and is created
-  with one. `createPasskey` registers each passkey under a random user handle, so it cannot replace
+* 2026-10-15; 2026-10-19 (slots, the Coach's ruling): **only the standing passphrase proves a change to
+  the ways in.** Until slots, any wayin proved any change: a passkey's answer was accepted by
+  `addPassphrase`, `addPasskey`, `delWayin` and `changePassphrase`, so whoever held one passkey could set a
+  new passphrase and remove the user's others, and the vault was as strong as its weakest wayin. Now
+  `changePassphrase(passphrase, ...)`, `addPasskey(passphrase, ...)` and `delWayin(passphrase)` take the
+  passphrase, and a passkey's answer handed as the proof is refused `bad_option` before anything is read or
+  derived. A passkey opens and reads the vault but cannot change who may. A vault always keeps its
+  passphrase wayin (it can never be removed), and is created with one. `createPasskey` registers each passkey under a random user handle, so it cannot replace
   a sign-in passkey on the same RP; removing a passkey from the vault does not delete it from the
   authenticator, and (as for passphrases) is not revocation.
 * 2026-10-15: `addPasskey` proves first and asks the authenticator after, so a refused proof
@@ -1446,9 +1494,7 @@ added or folded into through the subagent, and no other entry changes.
   bag, records read back included, so a stored row whose name the vault's checks refuse
   is `corrupt_record`, not trusted; the bag never reaches storage or the Convex server, which take
   any text. The stored records (`Box`, `VaultProps`, `LeaseRecord`, `VaultScope`) now check
-  names only as text, as does a wayin's `wayinlabel`: the `Label` grammar holds when a
-  wayin is added (`addPassphrase`, `addPasskey`), and a stored wayin under another label still
-  opens, since the host's validators have no slot for it. A host's schema runs on names only, never on a whisper, a sidecar or a
+  names only as text. (Until slots, so did a wayin's `wayinlabel`; wayins no longer carry one.) A host's schema runs on names only, never on a whisper, a sidecar or a
   passphrase. A host that admits any text (`AnyTextValidators`) shows its users labels that may
   carry bidirectional or invisible characters, a spoofing risk in its UI that is the host's to
   mind. **Sizes**: with names unbounded, the static 2 KiB allowance no longer bounds a
@@ -1507,9 +1553,9 @@ added or folded into through the subagent, and no other entry changes.
   whose salt its deriver could not have made (`damaged_wayin`); and a box that fails its
   schema, or will not open under the vault's vaultKey, or opens to no whisper (`damaged_box`)
   -- knowable because that vaultKey was proven by the wayin that gave it. **A damaged wayin
-  is passed over, no longer refused for the whole vault**: the others are tried as ever (no
-  derivation is spent on it, and the outcome still does not hang on order), and
-  `safebyok-react`'s `askPasskey` likewise offers only the passkeys it can ask. Considered and
+  is passed over, no longer refused for the whole vault**: the other slot's wayin opens as ever (no
+  derivation is spent on the damaged one; until slots, the others in a list were tried), and
+  `safebyok-react`'s `askPasskey` likewise offers only a passkey it can ask. Considered and
   refused: telling a wrong passphrase from an altered wayin by re-encrypting a held vaultKey
   under the derived key with the stored IV and comparing ciphertexts -- it works only against
   GCM's structure, needs the vaultKey's bytes, and is a construction of our own. Vault props that
@@ -1553,8 +1599,9 @@ added or folded into through the subagent, and no other entry changes.
   ones a *later* build writes and opens, and offering "delete" for it would delete, from a device
   on an old build, a vault every up-to-date device opens. So the hatch refuses (kind
   `damaged_vault`, a message to update the app, nothing deleted) a record with a `format` this
-  build does not know (of any type), a wayin `wayinkind` it does not know, or more wayins than
-  `MaxUnlocks`, and deletes only what fails otherwise. **The rule this rests on, which the Coach
+  build does not know (of any type), and deletes only what fails otherwise (until slots, it also
+  refused a wayin `wayinkind` it did not know, or more wayins than `MaxUnlocks`; now `format` alone
+  tells newer from damaged). **The rule this rests on, which the Coach
   has ruled (2026-10-16): any change to what a stored record may hold -- a field, a shape, or a
   range a check accepts -- bumps `format`**, so that an older build can tell newer from damaged. Where it cannot tell, it refuses: the hatch fails safe. Not routed through
   `RefusalPolicy.heed`: there is no handle to lock and no key in memory, so `whenIdentityRevoked`
@@ -1582,13 +1629,11 @@ added or folded into through the subagent, and no other entry changes.
   other server error but by its text, so all of them are dropped. The cost is debugging: the
   deployment's logs keep the full error. The other adapters still carry their client's error as
   `cause`, as above.
-* 2026-10-16: **`validators.wayinlabel`**, a sixth slot, checks the label of each wayin a host
-  adds (`addPassphrase`, `addPasskey`), `Label` by default, refused as `bad_label` without
-  quoting it, as the other names are. It is checked only there: a stored wayin's
-  `wayinlabel` is still read as plain text, so a wayin stored under a label a narrowed check
-  refuses still opens the vault and lists as it is. Refusing it on read would make the vault props
-  `corrupt_record` and lock the user out of their own vault, or hide a wayin they rely on. The
-  first wayin, named `passphrase` by the vault itself, is not checked.
+* 2026-10-16; 2026-10-19 (slots): **`validators.wayinlabel` is gone**, with the `wayinlabel` it checked. It
+  was a sixth slot that checked the label of each wayin a host added, `Label` by default, refused as
+  `bad_label` without quoting it, and only there: a stored wayin's `wayinlabel` was read as plain text,
+  since refusing it on read would have made the vault props `corrupt_record` and locked the user out of
+  their own vault. Wayins no longer carry a label, so no name enters the vault through a way in.
 * 2026-10-16: **ckeys are joined on `^`, and a name holding it is refused** (push_to_100_a, thread
   1). The key-value stores (`localVaultDB`, `idbVaultDB`, `idbDeviceDB`, `memoryDeviceDB`) file
   rows under `kind^applabel^user_id^vaultlabel[^boxlabel]` (`Ckeys`), replacing the JSON-tuple
@@ -1611,9 +1656,8 @@ added or folded into through the subagent, and no other entry changes.
   `snapshot.boxes` unchecked (a row stored under a name below it is not listed at all). A
   box's sidecar has no floor of its own: it is the host's, checked by the host. This bounds what storage can put in front
   of a host's UI whatever its validators: no control characters, no 1 MB label. The host's
-  `validators`, by contrast, now run only where a name enters the vault (`Vault.make`, `putBox`,
-  `addPassphrase`, `addPasskey`) and never on a record read back: a box stored under a name
-  they refuse lists, reads and deletes as sound, as a wayinlabel already did. They are an
+  `validators`, by contrast, now run only where a name enters the vault (`Vault.make`, `putBox`) and never on a record read back: a box stored under a name
+  they refuse lists, reads and deletes as sound (as a wayin's label did, until slots removed it). They are an
   alarm for the host's own use, not a promise about storage, which a server serving several
   clients cannot keep. `VaultDB` verbs no longer take a validators bag at all, so no server or
   wrapper can be handed the wrong one. Each adapter declares `maxNameBytes` (Postgres: 640, so a
@@ -1687,14 +1731,15 @@ added or folded into through the subagent, and no other entry changes.
   that exits drops the key with it. **The lease renews only on a typed passphrase that proves**
   (the Coach, 2026-10-16: "if I type in a password for any reason and prove I am mrflip, ... no
   need to type that password again for seven days"): `unlock()`, `changePassphrase()`, and any
-  change to the wayins proved by a passphrase. An `unlock()` by passkey also sets it, as it did.
-  A passkey proving a change on an unlocked vault keeps the deadline standing (on a locked one it
-  sets one, as `unlock()` by passkey would). Reads, stores, deletions and refreshes never move it.
-  One place decides (`deadlineFor` in `vault.ts`), so a new kind of proof cannot slip past it.
+  change to the wayins, each proved by the passphrase. An `unlock()` by passkey also sets it, as it did.
+  Amended 2026-10-19 (slots): since only the passphrase proves a change, every change starts the lease
+  again from now; before, a passkey-proven change on an unlocked vault kept the standing deadline.
+  Reads, stores, deletions and refreshes never move it.
+  One place decides (`#deadlineFromNow` in `vault.ts`; once `deadlineFor(proof, call)`), so a new kind of proof cannot slip past it.
   Expiry was a soft lock (the strawman's two locks); amended 2026-10-19: there is one kind of
   lock, which drops the key at once, and no lock, expiry included, defeats an `unlock()` or
-  `changePassphrase()` under way (see "one kind of lock" below). For review: a passkey's proof keeping, not renewing, the deadline is the weaker
-  reading of "proves I am mrflip" (G530 asks the deeper question, NOT YET).
+  `changePassphrase()` under way (see "one kind of lock" below). (The question G530 asked, whether a passkey's proof should only keep the
+  deadline, no longer arises: no passkey proves a change.)
 * 2026-10-16 (locks_and_expiry; revised the same day by refusals_and_catchup, below: `lockSoon()` raises nothing, and the generation outlives a `del()`; 2026-10-19, 20261019-softlock_gone: **the lock generation, `DeviceDB.putLease`'s expectation and this versioned erase are gone**, a lock reaches no unlock under way, and what follows describes what stood until then): **a lock reaches every tab's unlock under way: the versioned
   erase.** The device mark gains `lock_generation` (format `safebyok-mark-v2` then; today's tag is `safebyok-mark-v3`). Every lock that
   revokes the lease -- `lock()`, `lockSoon()`, a sign-out's lock, `del()`'s --
@@ -1823,7 +1868,7 @@ added or folded into through the subagent, and no other entry changes.
   http, which otherwise failed later as a `TypeError` with no kind. A runtime with no notion of
   one (Node, Bun, React Native: the global is absent) passes.
 * 2026-10-16 (secure_floor): **a new passphrase must pass `passphraseStrengthTest`** before any key
-  derivation: the one a vault is created with, and each one `addPassphrase` or `changePassphrase`
+  derivation: the one a vault is created with, and each one `changePassphrase`
   sets; never at `unlock`, so no user is locked out of a vault that stands by a test made
   stricter later. The default is NIST SP 800-63B's length and no composition rules, at 12 code
   points (the Coach's floor; SP 800-63B rev. 4 asks 15 of a password that is the only factor,
@@ -1836,7 +1881,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-16; 2026-10-19: **a key deriver's bytes are zeroed once imported.** `passphraseKeyOf`
   (`src/wayin.ts`; since 2026-10-19, #201, in `src/proof.ts`, called by `PassphraseProof.wayinKeyFor`, logic unchanged) `fill(0)`s the 32 bytes a `KeyDeriver` hands back as soon as
   `importWrappingKeyBytes` has made the non-extractable passphraseKey of them, whether or not the
-  import succeeded, on every path that derives (sealing, and each wayin tried in an unlock);
+  import succeeded, on every path that derives (sealing, and an unlock);
   a result of another length than 32, refused (`bad_option`), is zeroed likewise.
   Best effort, as it is in any JavaScript crypto: the deriver's own working memory (hash-wasm's
   and `@noble/hashes`' internals), the engine's copies and the passphrase string are not reached.
@@ -1861,22 +1906,23 @@ added or folded into through the subagent, and no other entry changes.
   best-effort signal, not a gate: a host that passes a `logger` doing nothing hears nothing, and a
   deriver as weak under another label is not noticed. The vault's records still name the label
   that sealed them.
-* 2026-10-16: **any wayin proves `changePassphrase`**, a passkey's answer included, as it
-  already proved `addPassphrase`, `addPasskey` and `delWayin`. A passkey's answer is as good
-  as a passphrase for its vault (VOCABULARY.md), so this opens nothing new: whoever holds the
-  authenticator and passes its user verification could already add a passphrase and remove the
-  old one in two calls, and now does it in one, as one write at one unlockEpoch. With several
-  passphrases the caller names which to replace (`wayinId`); the vault does not guess. The
-  vaultKey is untouched, so what the replaced passphrase's holder kept of earlier vault props still
+* 2026-10-16; 2026-10-19 (slots, the Coach's ruling): **`changePassphrase` is proved by the standing
+  passphrase only; a passkey's answer is refused `bad_option`.** On 2026-10-16 any wayin proved it, a
+  passkey's answer included, as it already proved `addPassphrase`, `addPasskey` and `delWayin`: whoever
+  held the authenticator and passed its user verification could set a new passphrase, in one write at
+  one unlockEpoch. Now a passkey cannot, so a forgotten passphrase can no longer be reset with the
+  passkey (which still opens and reads the vault), and a passphrase stored damaged cannot be replaced
+  either. The vaultKey is untouched, so what the replaced passphrase's holder kept of earlier vault props still
   opens that copy, as for any removal.
 * 2026-10-16: **`delWayin` and a vaultKey rotation stay separate verbs**, as the rotation
   design, since withdrawn, had them: `delWayin` is the
-  cheap removal and is not revocation, and `rotateVaultKey` is its own call. Removing a wayin
+  cheap removal and is not revocation, and `rotateVaultKey` is its own call. Removing a wayin (since slots, only the passkey)
   stops it opening the vault from here on and cannot take back what it opened; folding a rotation
   into every removal would rewrite every box for what is usually housekeeping, and make the
   common call the slow one. A host that removes a wayin because it was compromised rotates too.
-* 2026-10-16: **`WayinSummary` shows `device_id` and `registered_at`.** The snapshot of a locked
-  vault already listed each wayin; it now says too when it was added and by which device, so a
+* 2026-10-16; 2026-10-19 (slots): **the wayin summaries (`PassphraseWayinSummary`, `PasskeyWayinSummary`;
+  once one `WayinSummary` list) show `device_id` and `registered_at`.** The snapshot of a locked
+  vault already summarised each wayin; it now says too when it was added and by which device, so a
   user can spot a wayin they did not make. Both are visible fields of the wayin, bound into its
   wrap, and `device_id` is one random id per device per vault (the mark's `device_id`), so it
   links nothing the vault does not already link: not across vaults, not to the hardware.

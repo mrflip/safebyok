@@ -131,16 +131,13 @@ answers the question this entry replaces (*Lock NOW vs soft lock*, from
 [#106](https://github.com/mrflip/safebyok/pull/106)): whether `lock()` claws back a store already in
 flight.
 
-### Are we doing anyone a favor by accepting multiple passphrases?
+### Must the passphrase be asked again once a vault has a passkey?
 
-From [#126](https://github.com/mrflip/safebyok/pull/126) (thread 6): `changePassphrase` takes any
-proof, a passkey's included, and when a vault has several passphrases and the proof is a passkey,
-the caller must name which to replace (`wayinId`), or the call is refused rather than guessing.
-The Coach (2026-10-16): "keep as built, but this is too complicated for a user to tolerate or a
-customer to implement UX for." Decide whether a vault should hold more than one passphrase at
-all, or exactly one, with passkeys the other wayins. The Gripefest doc's NOT YET row G530 asks the
-deeper question beside it: whether asking for the passphrase again whenever a lease expires is still the right demand once a
-vault has a passkey. Decide both before the wayin surface is 1.0.
+The Gripefest doc's NOT YET row G530: whether asking for the passphrase again whenever a lease
+expires is still the right demand once a vault has a passkey. (The question beside it, whether a
+vault should hold several passphrases, was settled by the Coach on 2026-10-19: one passphrase and
+at most one passkey, built in `slots`, B4a of the contract sprint.) Decide before the wayin
+surface is 1.0.
 
 ### Identity should not be tied to the backing database
 
