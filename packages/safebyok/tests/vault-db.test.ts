@@ -666,6 +666,7 @@ class ForgetfulVaultDB extends MapVaultDB {
   protected override async doGetVaultProps(scope: VaultScope): Promise<unknown> { return good(await super.doGetVaultProps(scope)) }
   protected override async doGetBox(scope: VaultScope, boxlabel: string) { return good(await super.doGetBox(scope, boxlabel)) }
   protected override doPutVaultProps(): Promise<boolean> { return Promise.resolve(bad(Refusals.staleWrite('vaultProps')) as unknown as boolean) }
+  protected override doDelVault(): Promise<boolean> { return Promise.resolve(bad(Refusals.staleWrite('del')) as unknown as boolean) }
 }
 
 /** A MapVaultDB whose box reads it hands on to `inner`, unwrapping each answer as an adapter must. */
@@ -700,6 +701,7 @@ describe("the abstract VaultDB, by what threw", () => {
     vaultDB.rows.set(u1VaultPropsCkey, TH.vaultPropsOf('u1'))
     const expected = { vault_id: 'vault-id-u1', unlock_epoch: 1 }
     await TH.expectBad(vaultDB.putVaultProps({ ...TH.vaultPropsOf('u1'), unlock_epoch: 2 }, expected), 'bad_option')
+    await TH.expectBad(vaultDB.delVault(TH.scopeOf('u1'), { vault_id: 'vault-id-u1' }), 'bad_option')
   })
 
   it("says a throw in its own code, not the adapter's, as 'unexpected_error', never as storage_unavailable, which a host would retry", async () => {
