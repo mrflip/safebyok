@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { WhisperField, useVault, useVaultSnapshot } from 'safebyok-react'
+import { WhisperField, useVault, useVaultSnapshot, useWithUnlockedVault } from 'safebyok-react'
 import { gripeForJokeErr, tellKnockKnockJoke } from '../lib/anthropic'
 
 /**
@@ -18,7 +18,8 @@ const apiKeyOf = (whisper: unknown): string => {
 }
 
 export const KnockKnock = () => {
-  const { vault, withUnlockedVault } = useVault()
+  const vault = useVault()
+  const withUnlockedVault = useWithUnlockedVault()
   const snapshot = useVaultSnapshot()
   const [whosThere, setWhosThere] = useState('')
   const [joke, setJoke] = useState<string | null>(null)
@@ -26,7 +27,7 @@ export const KnockKnock = () => {
   const [gripe, setGripe] = useState<string | null>(null)
 
   // The handle comes at once, its boxes listed only once its hello has read storage.
-  if (vault === null || snapshot.state === 'opening') { return null }
+  if (vault === null || snapshot === null || snapshot.state === 'opening') { return null }
   const keyBox = snapshot.boxes.find((box) => box.boxlabel === ApiKeyBoxlabel)
   // The button and the Enter key alike: a sound key, someone at the door, and no joke underway.
   const canKnock = ! telling && whosThere.trim() !== '' && keyBox !== undefined && ! keyBox.damaged
@@ -85,7 +86,8 @@ export const SavedFlashMillis = 2000
  * same key saved again included.
  */
 const ApiKeySlot = ({ haveKeyBox, damaged, replaceable, savedAt }: { haveKeyBox: boolean, damaged: boolean, replaceable: boolean, savedAt?: number | undefined }) => {
-  const { vault, withUnlockedVault } = useVault()
+  const vault = useVault()
+  const withUnlockedVault = useWithUnlockedVault()
   const [editing, setEditing] = useState(false)
   const [keyText, setKeyText] = useState('')
   const [gripe, setGripe] = useState<string | null>(null)

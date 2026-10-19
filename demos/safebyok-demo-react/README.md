@@ -36,7 +36,7 @@ localStorage.
   machinery that never talks to the vault. The backend's panel has an outage switch
   ([src/lib/outage.ts](src/lib/outage.ts)): take the pretend backend down, sign out and back in,
   and the dashboard says "Can't reach your vault" in place, with a Retry button -- what
-  `safebyok-react` hands an app as `openError` and `retryOpen`. **To delete them:** remove the two tagged lines (and
+  `safebyok-react` hands an app as `useOpenError()`'s `openError` and `retryOpen`. **To delete them:** remove the two tagged lines (and
   imports) in [src/App.tsx](src/App.tsx), then delete `src/components/inspection/`. What remains
   is the app as a host would actually build it.
 

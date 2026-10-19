@@ -1,22 +1,28 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { AnyTextValidators, Ckeys, Label, VaultError, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, type KeyDeriver, type PassphraseVerdict, type Vault, type VaultScope, type VaultValidators } from 'safebyok'
+import { AnyTextValidators, Ckeys, Label, VaultError, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, type BadNewsHandler, type DeviceDB, type KeyDeriver, type PassphraseVerdict, type Vault, type VaultDB, type VaultScope, type VaultValidators } from 'safebyok'
 import * as TH from 'safebyok/testing'
-import { Component, useLayoutEffect, useState, type ErrorInfo, type ReactNode } from 'react'
-import { VaultProvider, useVault, useVaultSnapshot, type VaultProviderProps } from '../src/vault-provider'
+import { Component, StrictMode, useLayoutEffect, useState, type ErrorInfo, type ReactNode } from 'react'
+import { renderToString } from 'react-dom/server'
+import { VaultProvider, useOpenError, useVault, useVaultSnapshot, useWithUnlockedVault, type VaultProviderProps } from '../src/vault-provider'
 
-// == [Test helpers]: Probe, grabber, makeWorld, damagedWorld, lockedWorld, watched, providerOf, others
+// == [Test helpers]: useProvided, Probe, grabber, makeWorld, madeWorld, damagedWorld, lockedWorld, watched, providerOf, LockButton, BoxCount, countStoreCalls, others
+
+/** Everything the provider hands down, through each of its hooks, as one bag. */
+const useProvided = () => ({ vault: useVault(), ...useOpenError(), withUnlockedVault: useWithUnlockedVault() })
 
 /** A probe component exercising the binding the way a host app would. */
 const Probe = () => {
-  const { vault, openError, retryOpen, withUnlockedVault } = useVault()
+  const vault = useVault()
+  const { openError, retryOpen } = useOpenError()
+  const withUnlockedVault = useWithUnlockedVault()
   const snapshot = useVaultSnapshot()
   const [outcome, setOutcome] = useState('')
 
   if (openError !== null) {
     return <p><span data-testid="state">{`open error: ${openError.refusalkind}`}</span> <button onClick={retryOpen}>Retry</button></p>
   }
-  if (vault === null) { return <span data-testid="state">no vault</span> }
+  if (vault === null || snapshot === null) { return <span data-testid="state">no vault</span> }
 
   const put = () => {
     void withUnlockedVault(() => vault.putBox('anthropic_api_key', 'sk-fake'))
@@ -40,13 +46,13 @@ const Probe = () => {
 }
 
 /**
- * A component that keeps what useVault last handed it, and two ways to read that: `latest()`,
- * and `opened()`, a wait for the vault its provider opens.
+ * A component that keeps what the provider's hooks last handed it, and two ways to read that:
+ * `latest()`, and `opened()`, a wait for the vault its provider opens.
  */
 const grabber = () => {
-  const seen: { provided: ReturnType<typeof useVault> | null } = { provided: null }
+  const seen: { provided: ReturnType<typeof useProvided> | null } = { provided: null }
   const Grab = () => {
-    const provided = useVault()
+    const provided = useProvided()
     // A layout effect runs in the same task as the commit that changed the page, so whatever a
     // test waited to see on the page, latest() hands down from that same render. A passive effect
     // may run after the wait has returned -- on a loaded machine, often enough to fail in CI --
@@ -86,8 +92,8 @@ const makeWorld = () => {
   return { vaultDB, deviceDB, props, tree, mount }
 }
 
-/** A world whose `u1` vault was made, with a box, and then had its stored props spoiled. */
-const damagedWorld = async () => {
+/** A world whose `u1` vault was made, with a box, its lease kept on this device; `spoil()` breaks its stored props. */
+const madeWorld = async () => {
   const store = memoryStore()
   const vaultDB = localVaultDB({ store })
   const deviceDB = memoryDeviceDB()
@@ -96,10 +102,19 @@ const damagedWorld = async () => {
   await made.unlock('correct horse')
   await made.putBox('anthropic_api_key', 'sk-fake')
   made.close()
-  const vaultPropsCkey = Ckeys.vaultProps(TH.scopeOf('u1'))
-  const vaultProps = JSON.parse(store.read(vaultPropsCkey) ?? 'null') as object
-  store.write(vaultPropsCkey, JSON.stringify({ ...vaultProps, unlock_epoch: 'one' }))
-  return { store, vaultDB, deviceDB, props }
+  const spoil = () => {
+    const vaultPropsCkey = Ckeys.vaultProps(TH.scopeOf('u1'))
+    const vaultProps = JSON.parse(store.read(vaultPropsCkey) ?? 'null') as object
+    store.write(vaultPropsCkey, JSON.stringify({ ...vaultProps, unlock_epoch: 'one' }))
+  }
+  return { store, vaultDB, deviceDB, props, spoil }
+}
+
+/** A world whose `u1` vault was made, with a box, and then had its stored props spoiled. */
+const damagedWorld = async () => {
+  const world = await madeWorld()
+  world.spoil()
+  return world
 }
 
 /** A passphraseStrengthTest that refuses any passphrase holding the app's name. */
@@ -134,7 +149,7 @@ class CatchingBoundary extends Component<{ caught: unknown[], children: ReactNod
 
 /** openError's @example, as a host would write it. */
 const OpenErrorExample = () => {
-  const { openError, retryOpen } = useVault()
+  const { openError, retryOpen } = useOpenError()
   if (openError?.refusalkind === 'storage_blocked') { return <p>{"This browser won't let the app keep your vault on this device."}</p> }
   if (openError?.refusalkind === 'damaged_vault') { return <p>{"Your vault's stored record is damaged."}</p> }
   if (openError !== null) { return <p>{"Can't reach your vault."} <button onClick={retryOpen}>Retry</button></p> }
@@ -183,6 +198,28 @@ const providerOf = (world: ReturnType<typeof makeWorld>, sinks: Partial<Pick<Vau
 
 /** Advice on a passphrase being chosen: a word until it is twelve characters or more. */
 const twelveOrMore = (typed: string) => (typed.length < 12 ? 'Twelve characters or more, please.' : null)
+
+/** useVault's @example, as a host would write it. */
+const LockButton = () => {
+  const vault = useVault()
+  if (vault === null) { return <p>Sign in</p> }
+  return <button onClick={() => { void vault.lock() }}>Lock</button>
+}
+
+/** useVaultSnapshot's @example, as a host would write it. */
+const BoxCount = () => {
+  const snapshot = useVaultSnapshot()
+  if (snapshot === null || snapshot.state === 'opening') { return <p>Opening your vault…</p> }
+  return <p>{snapshot.boxes.length} keys stored</p>
+}
+
+/** Counts the calls a world's stores hear that a vault's hello makes: the storage watch, the props read, the mark read. */
+const countStoreCalls = (world: { vaultDB: VaultDB, deviceDB: DeviceDB }) => {
+  const subscribe = vi.spyOn(world.vaultDB, 'subscribe')
+  const getVaultProps = vi.spyOn(world.vaultDB, 'getVaultProps')
+  const getMark = vi.spyOn(world.deviceDB, 'getMark')
+  return () => ({ subscribe: subscribe.mock.calls.length, getVaultProps: getVaultProps.mock.calls.length, getMark: getMark.mock.calls.length })
+}
 
 /** Stands in for a function a test replaces before it is called. */
 const noop = () => { /* replaced before use */ }
@@ -244,7 +281,7 @@ describe("VaultProvider", () => {
     expect(screen.queryByText('Locks on this device in 7 days.')).to.not.be.null
   })
 
-  it("once unlocked, further actions run without the dialog", async () => {
+  it("once unlocked, further actions run without the dialog, as useWithUnlockedVault's example shows", async () => {
     const world = makeWorld()
     world.mount('u1')
     await expectShown('absent')
@@ -321,6 +358,149 @@ describe("VaultProvider", () => {
   })
   // --
 
+  // == [Hooks and lifecycle]: useVault, useVaultSnapshot, useOpenError, outside a provider, server render, StrictMode, onBadNews held
+
+  describe("its hooks", () => {
+    it("hands down null while signed out, then the vault, whose lock is a bare handler, as useVault's example shows", async () => {
+      const world = makeWorld()
+      const tree = (userId: string | null) => <VaultProvider {...world.props} userId={userId}><LockButton /><Probe /></VaultProvider>
+      const { rerender } = render(tree(null))
+      expect(screen.getByText('Sign in')).to.not.be.null
+      rerender(tree('u1'))
+      await expectShown('absent')
+      await putThroughNewVault('a fine passphrase')
+      expect(shownState()).to.eq('unlocked')
+      fireEvent.click(screen.getByText('Lock'))
+      await expectShown('locked')
+    })
+
+    it("hands down no snapshot while signed out, then the vault's as it changes, as useVaultSnapshot's example shows", async () => {
+      const world = makeWorld()
+      const tree = (userId: string | null) => <VaultProvider {...world.props} userId={userId}><BoxCount /><Probe /></VaultProvider>
+      const { rerender } = render(tree(null))
+      expect(screen.getByText('Opening your vault…')).to.not.be.null
+      rerender(tree('u1'))
+      expect(await screen.findByText('0 keys stored')).to.not.be.null
+      await putThroughNewVault('a fine passphrase')
+      expect(await screen.findByText('1 keys stored')).to.not.be.null
+    })
+
+    it("hands down a damaged record as openError, the very bad news the vault keeps as its trouble; storage out of reach is openError alone", async () => {
+      const damaged = await damagedWorld()
+      const told: VaultError[] = []
+      const grab = grabber()
+      const { unmount } = render(<VaultProvider {...damaged.props} userId="u1" onBadNews={(news) => { told.push(news) }}><grab.Grab /></VaultProvider>)
+      await waitFor(() => { expect(grab.latest().openError?.refusalkind).to.eq('damaged_vault') })
+      expect(grab.latest().vault?.trouble).to.eq(grab.latest().openError)
+      expect(told).to.deep.equal([grab.latest().openError])
+      unmount()
+
+      const world = makeWorld()
+      const refusal = unreachable()
+      vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(TH.bad(refusal))
+      const reach = grabber()
+      render(<VaultProvider {...world.props} userId="u1"><reach.Grab /></VaultProvider>)
+      await waitFor(() => { expect(reach.latest().openError).to.eq(refusal) })
+      expect(reach.latest().vault?.trouble).to.be.null
+    })
+
+    it("each throws, rendered with no VaultProvider above it, saying what it needs", () => {
+      hushConsole()
+      const hooks = [['useVault', useVault], ['useVaultSnapshot', useVaultSnapshot], ['useOpenError', useOpenError], ['useWithUnlockedVault', useWithUnlockedVault]] as const
+      for (const [hookname, useHook] of hooks) {
+        const Lone = () => {
+          useHook()
+          return null
+        }
+        expect(() => render(<Lone />)).to.throw(`${hookname} needs a <VaultProvider> above it.`)
+      }
+    })
+
+    it("renders on the server with no vault and no snapshot, as the client's first render has", () => {
+      const html = renderToString(<VaultProvider {...makeWorld().props} userId="u1"><BoxCount /><LockButton /></VaultProvider>)
+      expect(html).to.contain('Opening your vault…').and.contain('Sign in')
+    })
+  })
+
+  describe("under StrictMode", () => {
+    it("reads storage once: the vault its rehearsal makes and closes reads nothing, and only the vault kept says hello (Contract: getProof, in React)", async () => {
+      const world = makeWorld()
+      const counts = countStoreCalls(world)
+      const { Grab, opened } = grabber()
+      render(<StrictMode><VaultProvider {...world.props} userId="u1"><Grab /></VaultProvider></StrictMode>)
+      const vault = await opened()
+      await waitFor(() => { expect(vault.getSnapshot().state).to.eq('absent') })
+      await TH.wakeupAtNextTick()
+      expect(counts()).to.deep.equal({ subscribe: 1, getVaultProps: 1, getMark: 1 })
+    })
+
+    it("asks for the passphrase and runs the action again, as it does without", async () => {
+      const world = makeWorld()
+      render(<StrictMode>{world.tree('u1')}</StrictMode>)
+      await expectShown('absent')
+      await putThroughNewVault('a fine passphrase')
+      expect(shownState()).to.eq('unlocked')
+    })
+
+    it("closes the vault as the user signs out, and makes the next user's, reading once for each", async () => {
+      const world = makeWorld()
+      const counts = countStoreCalls(world)
+      const { Grab, opened, latest } = grabber()
+      const tree = (userId: string | null) => <StrictMode><VaultProvider {...world.props} userId={userId}><Grab /></VaultProvider></StrictMode>
+      const { rerender } = render(tree('u1'))
+      const first = await opened()
+      await waitFor(() => { expect(first.getSnapshot().state).to.eq('absent') })
+      rerender(tree(null))
+      expect(latest().vault).to.be.null
+      await TH.expectRefusal(first.hello(), 'vault_closed')
+      rerender(tree('u2'))
+      const second = await opened()
+      await waitFor(() => { expect(second.getSnapshot().state).to.eq('absent') })
+      expect(second.user_id).to.eq('u2')
+      expect(counts()).to.deep.equal({ subscribe: 2, getVaultProps: 2, getMark: 2 })
+    })
+  })
+
+  describe("onBadNews, held", () => {
+    it("keeps its vault as an onBadNews written inline comes and changes, telling the one the last render passed, as the second example shows", async () => {
+      const world = await madeWorld()
+      const spy = TH.spyLogger()
+      const told: string[] = []
+      const { Grab, opened, latest } = grabber()
+      const tree = (teller: string | null) => (
+        <VaultProvider {...world.props} logger={spy.logger} userId="u1" onBadNews={teller === null ? undefined : (news) => { told.push(`${teller}: ${news.refusalkind}`) }}>
+          <Grab />
+        </VaultProvider>
+      )
+      const { rerender } = render(tree(null))
+      const vault = await opened()
+      await waitFor(() => { expect(vault.getSnapshot().state).to.not.eq('opening') })
+      rerender(tree('first'))
+      rerender(tree('second'))
+      expect(latest().vault).to.eq(vault)
+      world.spoil()
+      await act(async () => { await TH.expectRefusal(vault.hello({ staleMinutes: 0 }), 'damaged_vault') })
+      // The ring from the spoiling write and the hello each meet it: both told to the latest handler.
+      expect([...new Set(told)]).to.deep.equal(['second: damaged_vault'])
+      expect(spy.calls.filter((heard) => heard.story?.['call'] === 'VaultProvider')).to.deep.equal([])
+    })
+
+    it("throws an onBadNews that is no function to the error boundary, as Vault.make refuses it", async () => {
+      hushConsole()
+      const world = makeWorld()
+      const caught: unknown[] = []
+      render(
+        <CatchingBoundary caught={caught}>
+          <VaultProvider {...world.props} userId="u1" onBadNews={'loudly' as unknown as BadNewsHandler}><Probe /></VaultProvider>
+        </CatchingBoundary>,
+      )
+      await expectShown('boundary')
+      expect(isVaultError(caught[0], 'bad_option')).to.be.true
+      expect((caught[0] as VaultError).message).to.match(/onBadNews is a function/)
+    })
+  })
+  // --
+
   // == [withUnlockedVault settling]: withUnlockedVault settles every call
 
   describe("withUnlockedVault settles every call", () => {
@@ -340,7 +520,8 @@ describe("VaultProvider", () => {
       // A layout effect runs in the commit itself, before React's passive effects -- among them the
       // provider's cleanup from the render before, the one with no vault yet -- have had their turn.
       const Eager = () => {
-        const { vault, withUnlockedVault } = useVault()
+        const vault = useVault()
+        const withUnlockedVault = useWithUnlockedVault()
         useLayoutEffect(() => {
           if (vault !== null) { eager.reading = watched(withUnlockedVault(() => vault.getBox('anthropic_api_key'))) }
         }, [vault, withUnlockedVault])
@@ -1264,7 +1445,7 @@ describe("VaultProvider", () => {
       expect(shownState()).to.eq('no vault')
     })
 
-    it("matches openError's @example: the message and its Retry button, in place", async () => {
+    it("matches openError's @example, and useOpenError's: the message and its Retry button, in place", async () => {
       const world = makeWorld()
       vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(TH.bad(unreachable()))
       render(

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { isVaultError } from 'safebyok'
-import { useVault, useVaultSnapshot } from 'safebyok-react'
+import { useOpenError, useVault, useVaultSnapshot, useWithUnlockedVault } from 'safebyok-react'
 import { WhisperFieldAttributes } from 'safebyok/utils'
 import { asksAgain } from '../lib/asks-again'
 import { editableWhisper, parseWhisperText, showWhisper } from '../lib/whisper-text'
@@ -28,7 +28,9 @@ const noteOf = (sidecar: Sidecar): string => {
 }
 
 export const VaultDashboard = () => {
-  const { vault, openError, retryOpen, delDamagedVault, withUnlockedVault } = useVault()
+  const vault = useVault()
+  const { openError, retryOpen, delDamagedVault } = useOpenError()
+  const withUnlockedVault = useWithUnlockedVault()
   const snapshot = useVaultSnapshot()
   const [form, setForm] = useState<FormState | null>(null)
   const [shown, setShown] = useState<Record<string, Whisper>>({})
@@ -70,7 +72,7 @@ export const VaultDashboard = () => {
     )
   }
   // The handle comes at once, and says it is opening until its hello has read storage.
-  if (vault === null || snapshot.state === 'opening') { return <p className="quiet">Opening vault…</p> }
+  if (vault === null || snapshot === null || snapshot.state === 'opening') { return <p className="quiet">Opening vault…</p> }
 
   // A whisper is never null (the vault refuses a bare one), so null from withUnlockedVault can
   // only mean the user dismissed the passphrase dialog: the read needs no wrapping.

@@ -3,19 +3,24 @@
 The thin React binding for safebyok: no vault logic, only the React-shaped plumbing a host app would
 otherwise write itself.
 
-* `VaultProvider` -- opens the vault for the signed-in user (`userId` prop from your auth) and
-  keeps it matched to that identity; renders the passphrase dialog when an action run through
+* `VaultProvider` -- makes the vault for the signed-in user (`userId` prop from your auth) from
+  `Vault.make`'s options, its props; says its first `hello()`; closes it as the user signs out,
+  and makes a new one for the next. It renders the passphrase dialog when an action run through
   `withUnlockedVault` finds the vault locked.
-* `useVault()` -- the vault handle and `withUnlockedVault()`, which wraps any action that touches
-  a whisper: on `vault_locked` it asks for the passphrase and retries, and resolves `null` if
+* `useVault()` -- the vault itself, or `null` while nobody is signed in. Its fields read live in
+  an event handler; render from the snapshot.
+* `useVaultSnapshot()` -- the vault's live snapshot, through
+  `useSyncExternalStore(vault.subscribe, vault.getSnapshot)`; `null` while nobody is signed in.
+* `useOpenError()` -- `openError`, `retryOpen()` and `delDamagedVault()`, for an open that failed
+  (below).
+* `useWithUnlockedVault()` -- `withUnlockedVault()`, which wraps any action that touches a
+  whisper: on `vault_locked` it asks for the passphrase and retries, and resolves `null` if
   dismissed (unambiguous for reads: a whisper is never null). Every call settles: calls that
   overlap wait on one dialog, and each resolves `null` if the vault goes while it is open (a
   sign-out, another user, the provider unmounting); so does a call whose action was still under
-  way when the provider closed its vault for one of those. A dialog still asking when the vault unlocks
-  by any other route -- an earlier, cancelled dialog's unlock finishing late -- closes, and its
-  calls run again. Beside them, `openError` and
-  `retryOpen()` for an open that failed (below).
-* `useVaultSnapshot()` -- the live snapshot via `useSyncExternalStore`.
+  way when the provider closed its vault for one of those. A dialog still asking when the vault
+  unlocks by any other route -- an earlier, cancelled dialog's unlock finishing late -- closes,
+  and its calls run again.
 * `PassphraseModal` -- the default dialog: unstyled markup under `modal-scrim` / `modal` class
   names for the host's stylesheet to dress. It says how long an unlock lasts on the device -- "Locks
   again on this device in 7 days", "in 15 minutes", "Stays unlocked ... until you lock it"
@@ -79,6 +84,36 @@ long as `BoxlabelCheck` itself is built once, at module level. A bag with a fiel
 (`boxLabel`) is thrown, as `bad_option`, to the nearest error boundary, as `Vault.make` would refuse
 it.
 
+A handler is the other exception: `onBadNews` makes no new vault as it changes, so it may be written
+inline. The vault calls whichever handler the last render passed:
+
+```tsx
+<VaultProvider {...browserOpts()} applabel="acme" vaultlabel="main" userId={userId} vaultDB={vaultDB}
+  onBadNews={(news) => { telemetry.report(news.refusalkind) }}>
+  <App />
+</VaultProvider>
+```
+
+The provider owns the vault it makes: a new user, a sign-out or a changed option closes it. Under
+React's `StrictMode`, whose rehearsal in development makes a vault and closes it again at once,
+that rehearsed vault reads nothing from storage: only the vault kept says hello.
+
+Read the vault with the hooks:
+
+```tsx
+const LockButton = () => {
+  const vault = useVault()
+  if (vault === null) { return <SignIn /> }
+  return <button onClick={() => { void vault.lock() }}>Lock</button>
+}
+
+const BoxCount = () => {
+  const snapshot = useVaultSnapshot()
+  if (snapshot === null || snapshot.state === 'opening') { return <p>Opening your vault…</p> }
+  return <p>{snapshot.boxes.length} keys stored</p>
+}
+```
+
 ## When opening fails
 
 The provider makes the vault with `Vault.make` as soon as there is a signed-in user, and hands it
@@ -100,10 +135,11 @@ until the browser's settings or room change: say so, rather than offering `retry
 
 ```tsx
 const VaultPanel = () => {
-  const { vault, openError, retryOpen } = useVault()
-  const { state } = useVaultSnapshot()
+  const vault = useVault()
+  const snapshot = useVaultSnapshot()
+  const { openError, retryOpen } = useOpenError()
   if (openError !== null) { return <p>{"Can't reach your vault."} <button onClick={retryOpen}>Retry</button></p> }
-  if (vault === null || state === 'opening') { return <p>Opening your vault…</p> }
+  if (vault === null || snapshot === null || snapshot.state === 'opening') { return <p>Opening your vault…</p> }
   return <Boxes vault={vault} />
 }
 ```
@@ -113,13 +149,19 @@ again, a `damaged_vault` will not mend on retry, and a `newer_format` vault was 
 newer version of the app: the user updates, and never deletes it. Its `message` is calm and safe to
 show.
 
+`openError` is not the vault's `trouble`. `trouble` (on the vault and its snapshot) is the latest
+bad news the vault met on any read, for as long as the vault stands -- a damaged record, a box
+listed damaged, storage rolled back -- and never a condition. `openError` is only why the
+provider's own hello could not open the vault, a condition among them, and clears once the vault
+opens. A damaged record is both: the very same error.
+
 For a `damaged_vault`, the one way forward is to delete the vault and start over:
-`delDamagedVault()` from `useVault()` does that (the `safebyok` README's *A vault that cannot be
+`delDamagedVault()` from `useOpenError()` does that (the `safebyok` README's *A vault that cannot be
 opened*) and has the vault say hello again, finding it absent. The user's boxes in it are lost for
 good, so ask first:
 
 ```tsx
-const { openError, delDamagedVault } = useVault()
+const { openError, delDamagedVault } = useOpenError()
 if (openError?.refusalkind === 'damaged_vault') {
   return <button onClick={() => { if (confirm('Remove your vault and start over?')) { void delDamagedVault() } }}>Start over</button>
 }

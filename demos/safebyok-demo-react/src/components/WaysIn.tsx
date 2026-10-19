@@ -9,7 +9,7 @@ import { createPasskey, passkeysAvailable, useVault, useVaultSnapshot } from 'sa
  * offers "Use a passkey".
  */
 export const WaysIn = () => {
-  const { vault } = useVault()
+  const vault = useVault()
   const snapshot = useVaultSnapshot()
   // The passphrase field is uncontrolled, so React never writes it into the page, and read at
   // submit, so a password manager's autofill counts even when it sends no input event.
@@ -18,7 +18,7 @@ export const WaysIn = () => {
   const [wayinlabel, setWayinlabel] = useState('laptop_fingerprint')
   const [gripe, setGripe] = useState<string | null>(null)
 
-  if (vault === null || snapshot.wayins.length === 0) { return null }
+  if (vault === null || snapshot === null || snapshot.wayins.length === 0) { return null }
 
   const addFingerprint = async (evt: SubmitEvent) => {
     evt.preventDefault()

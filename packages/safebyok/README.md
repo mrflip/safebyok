@@ -713,8 +713,8 @@ The kinds fall into three families, told apart by who handles them.
 ### Misuse: fix the code
 
 A programming error. Do not show it to the user and do not retry; let it reach an error boundary
-or the dev overlay (in React, `VaultProvider` rethrows misuse from `Vault.make` or its hello
-during render for that, and hands a condition down as `openError`).
+or the dev overlay (in React, `VaultProvider` throws misuse from `Vault.make` or its hello to the
+nearest error boundary, and hands a condition down as `useOpenError()`'s `openError`).
 
 | Kind                  | What happened                                                    | What to do                                              |
 | --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |
@@ -842,7 +842,7 @@ what a stored record may hold -- a field, a shape, or a range a check accepts --
 tell, it refuses rather than deletes. So is any backend that checks a record before
 it hands it over, as `safebyok-graphql`'s server does: there a damaged row is the backend's to
 clear; so is a typed backend's (Convex's, Postgres's), whose rows cannot hold damaged vault props.
-`safebyok-react` hands `delDamagedVault()` down beside `retryOpen`. A `VaultDB` that wraps
+`safebyok-react`'s `useOpenError()` hands `delDamagedVault()` down beside `retryOpen`. A `VaultDB` that wraps
 another's public verbs hands `VaultDB.delDamagedVault` on too (`VAULTDB.md`, line 3.5). The
 deletion aims at the stored `vault_id` alone, so vault props rewritten under that same
 `vault_id` between its read and the deletion go too: it is the same vault, the one the user

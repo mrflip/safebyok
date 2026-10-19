@@ -177,20 +177,6 @@ the vault). The Coach: "Yes add to TODO: version number on box." Give boxes a "n
 touch" state like the vault's `newer_format`: the format tag read as a version, so that a newer
 box lists as one to leave alone and an older, unreadable one still lists as damaged.
 
-## The react lifecycle
-
-`Vault.make` touches nothing, and `VaultProvider` owns the vault's first `hello()`, in the effect
-that makes the vault (the contract sprint, thread A3). `lock()` and `close()` acting without
-waiting for a hello is *Lock timing vs. work in flight*'s; a refused hello keeping its handle for a
-retry, and React's handle being non-null while `opening`, stand as designed. One item is open, for
-the provider's rework (A5, which makes the vault from props):
-
-* **The `react-hooks/set-state-in-effect` suppression in `vault-provider.tsx`.** `VaultProvider`
-  makes the vault in an effect, and `Vault.make` throws synchronously (`bad_option`, for one), so
-  the failure is set in the effect body. Making the vault in render doubles its side effects under
-  StrictMode, and deferring the failure brings back a late handle. A lifecycle redesign may remove
-  the need for the suppression. (#166, thread 8 and review)
-
 ## Accessibility
 
 The Coach (2026-10-18): "make a todo section for accessability, enter this there."
