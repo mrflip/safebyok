@@ -239,7 +239,7 @@ describe("VaultProvider", () => {
       await TH.expectBad(second, 'vault_locked')
     })
 
-    it("lets an attempt finishing after Cancel unlock the vault, which answers a newer dialog too", async () => {
+    it("stands an attempt down when the user cancels during it: a newer dialog stays asking, and the vault stays locked (Contract: getProof, attempt refuses: vault_locked)", async () => {
       const world = await lockedWorld()
       const gate = TH.makeGate()
       const slowDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase: string, saltBytes: Uint8Array) => { await gate.pass(); return await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes) } }
@@ -252,12 +252,16 @@ describe("VaultProvider", () => {
       fireEvent.click(screen.getByText('Cancel'))
       await TH.expectBad(first, 'vault_locked')
 
-      const second = watched(vault.getBox('anthropic_api_key'))
+      const second = watched(vault.tryGetBox('anthropic_api_key'))
       await screen.findByPlaceholderText('vault passphrase')
       expect(second.outcome).to.eq('pending')
       gate.release()
-      await waitFor(() => { expect(second.outcome).to.eq('sk-fake') })
-      expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null
+      await TH.wakeupAtNextTick()
+      expect(vault.getSnapshot().state).to.eq('locked')
+      expect(screen.queryByPlaceholderText('vault passphrase')).to.not.be.null
+      expect(second.outcome).to.eq('pending')
+      fireEvent.click(screen.getByText('Cancel'))
+      await waitFor(() => { expect(second.outcome).to.have.property('ok', false) })
     })
 
     it("closes a dialog the vault unlocks under without it, and the calls waiting on it go on", async () => {

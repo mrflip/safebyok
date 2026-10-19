@@ -962,7 +962,7 @@ describe("vault.ensureLease, by the Contract", () => {
     await vault.lock()
     gate.release()
     const err = await TH.expectBad(attempting, 'vault_locked')
-    expect(err.message).to.include('locked while this proof was being checked')
+    expect(err.message).to.include('while this proof was being checked')
     expect(vault.state).to.eq('locked')
     expect(await world.getLease()).to.be.null
     await TH.expectBad(ensuring, 'vault_locked')
@@ -1016,6 +1016,90 @@ describe("vault.ensureLease, by the Contract", () => {
     expect(vault.state).to.eq('locked')
     expect(await world.getLease()).to.be.null
     await TH.expectBad(ensuring, 'vault_locked')
+  })
+
+  it("stays locked, with no lease, when the user cancels during an attempt and the app then locks: the answer stands the attempt down (Contract: getProof, attempt refuses: vault_locked)", async () => {
+    const prompt = heldPrompt()
+    const world = makeRacingWorld()
+    const maker = await world.openUnlocked('pw')
+    await maker.lock()
+    maker.close()
+    const vault = await world.open({ getProof: prompt.getProof })
+    const ensuring = vault.tryEnsureLease()
+    const ask = await prompt.asked
+    const gate = world.holdNextDerive()
+    // Enter, then Escape while the passphrase is derived, then the app's own lock().
+    const attempting = ask.attempt('pw')
+    await gate.reached
+    prompt.answer('declined')
+    await TH.expectBad(ensuring, 'vault_locked')
+    await vault.lock()
+    gate.release()
+    const err = await TH.expectBad(attempting, 'vault_locked')
+    expect(err.message).to.include('while this proof was being checked')
+    expect(vault.state).to.eq('locked')
+    expect(await world.getLease()).to.be.null
+    expect(await world.stateOnOpen()).to.eq('locked')
+  })
+
+  it("erases the lease an attempt wrote when the user cancels as it writes it, so a reload opens locked (Contract: getProof, attempt refuses: vault_locked)", async () => {
+    const prompt = heldPrompt()
+    const world = makeRacingWorld()
+    const maker = await world.openUnlocked('pw')
+    await maker.lock()
+    maker.close()
+    const vault = await world.open({ getProof: prompt.getProof })
+    const ensuring = vault.tryEnsureLease()
+    const ask = await prompt.asked
+    const gate = world.holdNextLease()
+    const attempting = ask.attempt('pw')
+    await gate.reached
+    prompt.answer('declined')
+    await TH.expectBad(ensuring, 'vault_locked')
+    gate.release()
+    await TH.expectBad(attempting, 'vault_locked')
+    expect(vault.state).to.eq('locked')
+    expect(await world.getLease()).to.be.null
+    expect(await world.stateOnOpen()).to.eq('locked')
+  })
+
+  it("stands a second attempt down once the first has answered unlocked, so a lock after it wins (Contract: getProof, attempt refuses: vault_locked)", async () => {
+    const prompt = heldPrompt()
+    const world = makeRacingWorld()
+    const maker = await world.openUnlocked('pw')
+    await maker.lock()
+    maker.close()
+    const vault = await world.open({ getProof: prompt.getProof })
+    const ensuring = vault.tryEnsureLease()
+    const ask = await prompt.asked
+    // Enter pressed twice: the second attempt is held as it derives while the first unlocks.
+    await TH.expectGood(ask.attempt('pw'))
+    const gate = world.holdNextDerive()
+    const second = ask.attempt('pw')
+    await gate.reached
+    prompt.answer('unlocked')
+    await TH.expectGood(ensuring)
+    await vault.lock()
+    gate.release()
+    await TH.expectBad(second, 'vault_locked')
+    expect(vault.state).to.eq('locked')
+    expect(await world.getLease()).to.be.null
+  })
+
+  it("refuses an attempt after the ask is answered vault_locked at once, trying nothing (Contract: getProof, attempt refuses: vault_locked)", async () => {
+    const prompt = heldPrompt()
+    const { world, vault } = await lockedVaultWith({ getProof: prompt.getProof })
+    const ensuring = vault.tryEnsureLease()
+    const ask = await prompt.asked
+    prompt.answer('declined')
+    await TH.expectBad(ensuring, 'vault_locked')
+    const derive = vi.spyOn(TH.testDeriver, 'deriveKeyBytes')
+    const reads = vi.spyOn(world.vaultDB, 'getVaultProps')
+    const err = await TH.expectBad(ask.attempt('pw'), 'vault_locked')
+    expect(err.message).to.include('already answered')
+    expect(derive).not.toHaveBeenCalled()
+    expect(reads).not.toHaveBeenCalled()
+    expect(vault.state).to.eq('locked')
   })
 
   it("refuses bad_option when getProof answers carry_on outside lease_ending (Contract: ensureLease, Refuses: bad_option)", async () => {

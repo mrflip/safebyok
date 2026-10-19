@@ -375,7 +375,8 @@ const getProof: GetProof = async (ask) => {
 * **One prompt at a time.** Every call that needs the vault while a prompt is up waits on its one
   answer. A `lock()`, `close()` or `del()` landing while it is up refuses every one of them
   `vault_locked` and settles `ask.lockLanded`: close the dialog. An attempt under way then takes
-  nothing up, and one after refuses at once.
+  nothing up, and one after refuses at once. So it is once the ask is answered: an attempt still
+  running after a Cancel unlocks nothing, and a `lock()` after the Cancel stays locked.
 * **No `getProof`** means every ask is `declined`: the call refuses `vault_locked`, and your app
   prompts on its own and calls `vault.unlock(passphrase)`.
 

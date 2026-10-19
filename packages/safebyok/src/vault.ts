@@ -1492,7 +1492,7 @@ export class Vault {
     this.#asking = null
   }
 
-  /** An ask's `attempt`: one proof's unlock, standing down once `overtaken` is aborted by a lock landing. */
+  /** An ask's `attempt`: one proof's unlock, standing down once `overtaken` is aborted: the prompt over, by a lock or an answer. */
   readonly #tryAttempt = this.#trying(async (givenProof: string | PasskeyAnswer, attemptOpts: { wayinId?: string | undefined } | undefined, overtaken: AbortSignal): Promise<Vault> => {
     await this.#unlockWith(givenProof, attemptOpts, overtaken)
     return this
@@ -1501,7 +1501,7 @@ export class Vault {
   /**
    * Unlock with one proof, as `unlock()` and an ask's `attempt` do: proven against the vault props
    * as storage holds them now, creating the vault when absent, and a lease granted. One that the
-   * vault outruns -- closed, removed, its ways in changed, or `overtaken` aborted by a lock -- takes
+   * vault outruns -- closed, removed, its ways in changed, or `overtaken` aborted as its prompt ends -- takes
    * nothing up and refuses.
    */
   async #unlockWith(givenProof: string | PasskeyAnswer, unlockOpts: { wayinId?: string | undefined } | undefined, overtaken?: AbortSignal): Promise<void> {
@@ -1519,7 +1519,7 @@ export class Vault {
     // A close() meanwhile is said as such: the handle, not the vault, is what refuses now.
     this.#checkOpen()
     if (overtaken?.aborted === true) {
-      throw new VaultError('vault_locked', 'The vault was locked while this proof was being checked, and the lock wins: nothing was unlocked. Ask again when the user wants the vault.')
+      throw new VaultError('vault_locked', 'The prompt ended while this proof was being checked -- a lock landed, or it was answered -- and its end wins: nothing was unlocked. Ask again when the user wants the vault.')
     }
     throw new VaultError('vault_locked', 'The vault was removed, or its ways in changed, while this unlock was under way: nothing was unlocked, and this device keeps no lease. Unlock again to carry on.')
   }
@@ -1801,7 +1801,7 @@ export class Vault {
   /**
    * Grant this device a lease and take up the vaultKey until `until`, arming the expiry anew --
    * unless the handle has closed, the vault props the key was proven against no longer stand, or
-   * `overtaken` (an ask's attempt, which a lock landing stands down) is aborted: then nothing is
+   * `overtaken` (an ask's attempt, which its prompt's end stands down) is aborted: then nothing is
    * taken up, and an overtaken attempt's lease, should it have been written already, is erased. The lease is a fresh leaseKey and the vaultKey wrapped under it. A
    * record already written stays: a close is no lock, and a record of vault props no longer
    * standing opens nothing.
@@ -1819,7 +1819,7 @@ export class Vault {
     // The transient's last act: wrapped into this device's lease, then dropped.
     const leaseKey = await makeLeaseKey()
     const wrapped = await wrapKeyUnder(leaseKey, unlocked.transientKey, this.#leaseCtx(standing.vault_id, standing.unlock_epoch, until))
-    // An ask's attempt asks again before the write: a lock may have landed while the key was wrapped.
+    // An ask's attempt asks again before the write: its prompt may have ended while the key was wrapped.
     if (isOvertaken()) { return false }
     await this.#deviceDB.putLease({
       format:                  'safebyok-lease-v1',
@@ -1830,9 +1830,9 @@ export class Vault {
       vault_key_lease_wrapped: wrapped,
       ask_passphrase_at:       until,
     })
-    // A lock that landed under an ask's attempt wins on this device too: the lease the attempt just
-    // wrote is erased, as the lock erased the one before it, and a hello's take-up that may have
-    // read it meanwhile stands down, taking nothing up.
+    // A prompt that ended under an ask's attempt -- a lock, an answer -- wins on this device too: the
+    // lease the attempt just wrote is erased, and a hello's take-up that may have read it meanwhile
+    // stands down, taking nothing up.
     if (isOvertaken()) {
       this.#standDownTakeUp()
       await this.#deviceDB.delLease(this.#scope)

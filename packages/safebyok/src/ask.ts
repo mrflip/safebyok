@@ -37,7 +37,7 @@ export type ProofAnswer = typeof ProofAnswerVals[number]
  */
 export type GetProof = (ask: Ask) => ProofAnswer | Promise<ProofAnswer>
 
-/** The vault's own run of one proof, for {@link Ask}: its unlock, standing down once `overtaken` is aborted. */
+/** The vault's own run of one proof, for {@link Ask}: its unlock, standing down once `overtaken` is aborted (the prompt is over). */
 export type Attempter = (proof: string | PasskeyAnswer, opts: { wayinId?: string | undefined } | undefined, overtaken: AbortSignal) => Promise<Outcome<Vault>>
 
 /**
@@ -48,7 +48,7 @@ export type RaisedAsk = {
   ask:      Ask
   /** The one answer every caller waiting on this prompt shares: the answer, or why there is none. */
   answer:   Promise<Outcome<ProofAnswer>>
-  /** A lock landed while the prompt is up: refuse every waiter, settle `lockLanded`, and stand any attempt down. */
+  /** A lock landed while the prompt is up: refuse every waiter, settle `lockLanded`, and stand every attempt down. */
   landLock: () => void
 }
 
@@ -77,15 +77,18 @@ export class Ask {
    */
   readonly lockLanded: Promise<void>
   readonly #attempter: Attempter
-  // Aborted when a lock lands: lockLanded settles, an attempt under way takes nothing up, and a
-  // later one is refused.
+  // Aborted when a lock lands: lockLanded settles.
   readonly #landed: AbortController
+  // Aborted when the prompt is over -- a lock landed, or the ask was answered -- so an attempt
+  // under way takes nothing up, and a later one is refused.
+  readonly #over: AbortController
 
-  private constructor(why: AskWhy, vault: Vault, attempter: Attempter, landed: AbortController, lockLanded: Promise<void>) {
+  private constructor(why: AskWhy, vault: Vault, attempter: Attempter, landed: AbortController, over: AbortController, lockLanded: Promise<void>) {
     this.why = why
     this.vault = vault
     this.#attempter = attempter
     this.#landed = landed
+    this.#over = over
     this.lockLanded = lockLanded
   }
 
@@ -96,15 +99,17 @@ export class Ask {
    * in place and ask again (on `absent`, `weak_passphrase` and `created_elsewhere` too);
    * `absent_wayin` and `damaged_wayin` to offer another way in; and
    * `vault_locked` -- a lock won, under this attempt or before it -- `storage_unavailable`, or any
-   * other, to close the dialog, answering `declined`. Once `lockLanded` has settled, it refuses
-   * 'vault_locked' at once.
+   * other, to close the dialog, answering `declined`. Once the prompt is over -- `lockLanded`
+   * settled, or the ask answered -- it refuses 'vault_locked' at once, and an attempt still under
+   * way then unlocks nothing: a Cancel during it stays cancelled, and a lock after it wins.
    *
    * @example const { ok, err } = await ask.attempt(passphrase)
    * @example const { ok } = await ask.attempt(passkey)   // from askPasskey(ask.vault.wayins)
    */
   attempt = async (proof: string | PasskeyAnswer, opts?: { wayinId?: string | undefined }): Promise<Outcome<Vault>> => {
     if (this.#landed.signal.aborted) { return bad(lockLandedError()) }
-    return await this.#attempter(proof, opts, this.#landed.signal)
+    if (this.#over.signal.aborted) { return bad(answeredError()) }
+    return await this.#attempter(proof, opts, this.#over.signal)
   }
 
   /**
@@ -113,11 +118,20 @@ export class Ask {
    */
   static raise(why: AskWhy, vault: Vault, attempter: Attempter, getProof: GetProof | null): RaisedAsk {
     const landed = new AbortController()
-    const ask = new Ask(why, vault, attempter, landed, onAbort(landed.signal, () => undefined))
+    const over = new AbortController()
+    const ask = new Ask(why, vault, attempter, landed, over, onAbort(landed.signal, () => undefined))
     const lockedOut = onAbort(landed.signal, () => bad(lockLandedError()))
-    // Whichever comes first: an answer that comes after a lock is dropped.
-    const answer = Promise.race([outcomeOf(() => ask.#answerFrom(getProof), unexpectedError), lockedOut])
-    return { ask, answer, landLock: () => { landed.abort() } }
+    // Whichever comes first: an answer that comes after a lock is dropped. The answer ends the
+    // prompt for its attempts too, before any waiter hears it: an attempt still running once the
+    // vault stops tracking this ask -- after a Cancel, or a second submit -- could unlock the vault
+    // after a later lock() had returned, and none can now.
+    const answered = async () => {
+      const outcome = await Promise.race([outcomeOf(() => ask.#answerFrom(getProof), unexpectedError), lockedOut])
+      over.abort()
+      return outcome
+    }
+    const answer = answered()
+    return { ask, answer, landLock: () => { landed.abort(); over.abort() } }
   }
 
   /** What `getProof` answers, checked: anything but the three, or `carry_on` outside `lease_ending`, is misuse. */
@@ -145,5 +159,7 @@ export class Ask {
 const onAbort = <ValT>(signal: AbortSignal, settled: () => ValT): Promise<ValT> => new Promise((settle) => {
   signal.addEventListener('abort', () => { settle(settled()) }, { once: true })
 })
+
+const answeredError = () => new VaultError('vault_locked', 'This prompt was already answered, so this proof was not tried and nothing was unlocked. Ask again when the user wants the vault.')
 
 const lockLandedError = () => new VaultError('vault_locked', 'The vault was locked while it was asking for a proof, so nothing was unlocked and the prompt is over. Ask again when the user wants the vault.')
