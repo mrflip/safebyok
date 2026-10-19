@@ -16,7 +16,7 @@ this line.
   (56 kB; `grep -n '^#'` is its outline). The handoff says when a ruling has changed it since.
 * **Sprint doc:** https://claude.ai/code/artifact/362ec68d-5bf3-46aa-a379-59a9c8bfb548
   (*Open Matters*, *Resolved*, *Progress*).
-* **Status:** 0, A1, A1b, A2 filed (#193-#196); A3 (#197) reworking a flagged race.
+* **Status:** 0, A1, A1b, A2, A3 filed (#193-#197); A4 building.
 
 ## How this plan relates to the preplan
 
@@ -76,7 +76,7 @@ Filed as an *Open Matters* row so the Coach can close the PR and run it by hand 
 | A1b | `outcome-adapters` | A1 | default | medium + battery per adapter | Postgres needs the container; if Docker is unavailable, say so and run what can run. Notes how each backend does C1's one-statement write. |
 | A2 | `vault-class` | A1 | opus | low (preplan's checklist) | Runs beside A1b. Pure move; per-file test count unchanged; banners kept as B's seams. |
 | A3 | `fields-and-make` | A2 | opus | medium | `make` inert, first `hello()` reads, `settle()`, `onBadNews`, `staleMinutes`. |
-| A4 | `try-twins` | A3 | sonnet | low (preplan's checklist) | Every public call as `tryX`/`X`; thread file lists the pairs and which bodies still throw. *Orchestrator:* A3's `#tellingBadNews` wrapper is the seam to build the pairs on. Also: export `valOf` (or its successor) and drop the demo's `answered` shim; decide what `outcomeOf` does with a bug at the VaultDB base and the vault's boundary; a runtime guard refusing an Outcome-shaped record from a `do*` hook; `subscribe`'s synchronous throws; `hello` ignoring a non-options first argument (bare event handler). Each pending its Open Matters row. |
+| A4 | `try-twins` | A3 | default (was sonnet: it now carries five small decisions) | low (preplan's checklist) | Every public call as `tryX`/`X`; thread file lists the pairs and which bodies still throw. *Orchestrator:* A3's `#tellingBadNews` wrapper is the seam to build the pairs on. Also: export `valOf` (or its successor) and drop the demo's `answered` shim; decide what `outcomeOf` does with a bug at the VaultDB base and the vault's boundary; a runtime guard refusing an Outcome-shaped record from a `do*` hook; `subscribe`'s synchronous throws; `hello` ignoring a non-options first argument (bare event handler). Each pending its Open Matters row. |
 | A5 | `react-over-class` | A4 | default | medium + StrictMode | Provider makes the vault from props and owns the first `hello()`. *Orchestrator:* StrictMode still opens two vaults in development, each reading once (A3 review): defer the provider's first hello past StrictMode's cleanup. Hold `onBadNews` in a ref so an inline handler does not remake the vault each render. `openError` now comes from the provider's own hello (`helloRefusal`), since `trouble` is bad news only. |
 | A6 | `getproof` | A5 | opus | high | `ensureLease`, `Ask` class, `attempt`, `lockLanded`; react modal as `getProof`. |
 
@@ -107,7 +107,12 @@ the lease read. YOLO: the worker is resumed to make any key change cancel a take
 counter); a second review covers only the new commits. Minors: `trouble` sticks while a damaged
 box stands; bare `vault.hello` as an event handler (to A4); handler told before the snapshot moves
 and thenables unhandled (to the rework, if small); shallow freeze of `sidecar`; StrictMode's two
-vaults (to A5); capacity reckoned twice.
+vaults (to A5); capacity reckoned twice. *Second review (rework only, `fixed`):* the abort holds on every
+path; `#grantLease` now stands the take-up down before writing its lease (else a take-up could
+discard the fresh one); `notes/security.md` corrected in place in two entries. Left: a lease delete
+already sent is not called back on an unordered device store (fails safe; to the policy session);
+inside `onBadNews`, `vault.trouble` is one step behind. One `unicorn/no-thenable` suppression in a
+test, judged right.
 
 **Closing phase A:** passes 1 and 2 (opus, `high`, worktree-isolated agents, one lens each) over
 `origin/main...<A's tip>` while B1 and B3 build; findings filed as a comment on the sprint PR and

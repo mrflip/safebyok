@@ -6,7 +6,7 @@ they disagree. Workers look things up here; they do not write it.
 ## Line
 
 *Orchestrator:* 0 `rename_pass` #193 (905b75ec) → A1 `outcome` #194 (35fdadb7) → A2
-`vault_class` #196 (7b175db8) → A3 `fields_and_make` building. A1b `outcome_adapters` #195
+`vault_class` #196 (7b175db8) → A3 `fields_and_make` #197 (f924b90e) → A4 `try_twins` building. A1b `outcome_adapters` #195
 (15b238fc) stands on A1 beside A2; it joins the line at the restack before phase B.
 
 ## Decisions and discoveries
@@ -71,6 +71,24 @@ they disagree. Workers look things up here; they do not write it.
 * A hand-made object no longer type-checks as a `Vault` (test doubles cast).
 * Model classes (B1-B3) reach the vault's scope, clock, logger and deriver through accessors the
   vault grants; there is none yet.
+
+*Orchestrator:* from A3 (#197):
+
+* `make` touches nothing; the first `hello()` (the host's, or one any data call starts) reads,
+  starts the watch (marked begun before the adapter is asked: an adapter may ring synchronously)
+  and settles. `hello({ staleMinutes })`: default 1 minute from the last read by any call; `0`
+  forces; concurrent calls share one read.
+* Fields (the Contract's block plus `syncing`, `snapshot`, `leaseMillis`) are getters over a frozen
+  snapshot that only `#settle()` writes. `VaultSnapshot` swapped `scope` for `applabel`,
+  `user_id`, `vaultlabel`.
+* `onBadNews`: every public async method wrapped by `#tellingBadNews`; each `bad_news` told once,
+  before the call settles, never awaited; a throw or rejection (any thenable) lands in `trouble`.
+  `trouble` is the latest bad news only. A listing's damaged box is news with `meta.box_listed`.
+* **Lease take-up vs key change:** an `AbortController` per take-up (`#takeUp`), aborted by
+  `#dropKey` and by `#grantLease` before it writes. An aborted take-up installs nothing and deletes
+  no lease. This is the one place lock timing is decided before the policy session.
+* The hello theme lives in `tests/vault/vault-hello.test.ts`; `rolledBackWorld` moved to `world.ts`.
+* The react suite resolves `safebyok` through its `dist/`: rebuild the core first.
 
 ## Interim shims standing
 
