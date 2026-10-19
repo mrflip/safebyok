@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { VaultError, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, type WayinSummary, type Vault } from 'safebyok'
+import { VaultError, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, type WayinSummary } from 'safebyok'
 import { createPasskey } from '../src/passkey'
 import { PasskeyUnlockButton } from '../src/passkey-unlock-button'
 import { PassphraseModal } from '../src/passphrase-modal'
@@ -282,10 +282,13 @@ describe("PassphraseModal, for a vault with a passkey", () => {
     const { authenticator } = await lockedVaultWithPasskey()
     const [credentialId = ''] = authenticator.credentialIds()
     const unlocked: string[] = []
-    const misused = { ...vaultRefusing(new VaultError('vault_closed', 'This vault handle was closed.'), credentialId), unlock: (proof: unknown) => {
-      if (typeof proof === 'string') { unlocked.push(proof); return Promise.resolve() }
-      return Promise.reject(new VaultError('vault_closed', 'This vault handle was closed.'))
-    } } as unknown as Vault
+    const misused = TH.stubVault({
+      wayins: [TH.passkeyWayinOf('laptop', { credential_id: credentialId })] as unknown as WayinSummary[],
+      unlock: (proof) => {
+        if (typeof proof === 'string') { unlocked.push(proof); return Promise.resolve() }
+        return Promise.reject(new VaultError('vault_closed', 'This vault handle was closed.'))
+      },
+    })
     TH.renderReporting(<PassphraseModal vault={misused} onDone={noop} />)
     fireEvent.click(screen.getByText('Use a passkey'))
     await screen.findByText(PasskeyTrouble)

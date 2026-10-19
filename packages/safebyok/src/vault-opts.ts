@@ -1,13 +1,14 @@
 import * as Z from 'zod/mini'
-import { type Clock, MaxWhisperBytes, MinuteMillis, MaxLeaseHours, LeaseHours, ForeverMillis, wallClock, FarPast, FarFuture, MaxBoxes } from './types'
+import { type Clock, type VaultScope, MaxWhisperBytes, MinuteMillis, MaxLeaseHours, LeaseHours, ForeverMillis, wallClock, FarPast, FarFuture, MaxBoxes } from './types'
 import type { VaultValidators } from './validators'
 import { VaultError } from './errors'
 import type { KeyDeriver } from './key-deriver'
 import { MaxSaltBytes, parseKeyDeriverSpec, type KeyDeriverSpec, checkSuppliedSpecKept, TestLabelPrefix, TestDeriverNotice } from './key-deriver-spec'
 import type { DeviceDB } from './device-db'
 import { VaultDB } from './vault-db'
-import { type VaultLogger } from './logger'
-import { type PassphraseStrengthTest } from './passphrase-strength'
+import { type VaultLogger, parseLogger } from './logger'
+import { type PassphraseStrengthTest, checkStrengthTest } from './passphrase-strength'
+import * as Names from './names'
 
 export type MakeVaultOpts = {
   /** The host application's namespace: one backend can serve several apps without collision. */
@@ -412,4 +413,62 @@ export const checkLimitsFit = (vaultDB: VaultDB, whisperByteLimit: number, boxLi
     ? 'At that maxWhisperBytes, not even one box fits: pass a smaller maxWhisperBytes.'
     : `At that maxWhisperBytes, at most ${String(fitting)} boxes fit: pass a smaller maxBoxes or maxWhisperBytes.`
   throw new VaultError('bad_option', `${String(boxLimit)} boxes (maxBoxes) of up to ${String(whisperByteLimit)} bytes of whisper each (maxWhisperBytes) might not fit in the ${String(vaultBytes)} bytes this storage adapter holds of one vault (its maxVaultBytes), with room for each box's other fields. ${outcome}`)
+}
+
+/** Vault.make's options as {@link parseMakeVaultOpts} hands them back: each checked, and read into the form the vault keeps. */
+export type ParsedVaultOpts = {
+  scope:            VaultScope
+  rules:            Names.NameRules
+  vaultDB:          VaultDB
+  deviceDB:         DeviceDB
+  leaseMillis:      number
+  logger:           VaultLogger
+  clock:            Clock
+  keyDeriver:       KeyDeriver
+  strengthTest:     PassphraseStrengthTest
+  whisperByteLimit: number
+  boxLimit:         number
+  vaultByteLimit:   number
+}
+
+/**
+ * Vault.make's options, checked and read, before storage is touched: kind 'insecure_context'
+ * first, in a page the browser says is not a secure context; then kind 'bad_option' for anything
+ * but a bag, for an option the vault does not take, or for one out of its range, and 'bad_label'
+ * for a scope that fails its check (`validators`).
+ *
+ * @example const { scope, leaseMillis } = parseMakeVaultOpts(opts)
+ */
+export const parseMakeVaultOpts = (opts: MakeVaultOpts): ParsedVaultOpts => {
+  checkSecureContext()
+  if (! isBag(opts)) { throw new VaultError('bad_option', 'Vault.make takes one bag of options: applabel, userId, vaultlabel, vaultDB, deviceDB, keyDeriver and passphraseStrengthTest at least.') }
+  checkKnownOpts(opts)
+  const rules = Names.rulesOf(opts.validators)
+  const scope = Names.checkScope(rules, { applabel: opts.applabel, user_id: opts.userId, vaultlabel: opts.vaultlabel })
+  const vaultDB = parseVaultDB(opts.vaultDB)
+  const deviceDB = parseDeviceDB(opts.deviceDB)
+  const leaseMillis = parseLeaseHours(opts.leaseHours)
+  // The host's logger for the vault, else the one its storage was made with; guarded either way.
+  const logger = parseLogger(opts.logger ?? vaultDB.logger)
+  const clock = parseClock(opts.clock)
+  // Every reading of the host's clock is checked, this first one so that a clock counting in the
+  // wrong unit fails make rather than some later call.
+  readClock(clock)
+  const keyDeriver = parseKeyDeriver(opts.keyDeriver, logger)
+  const strengthTest = checkStrengthTest(opts.passphraseStrengthTest)
+  const whisperByteLimit = parseMaxWhisperBytes(opts.maxWhisperBytes)
+  const boxLimit = parseMaxBoxes(opts.maxBoxes, parseDeclared(vaultDB, 'maxBoxes'))
+  const vaultByteLimit = checkLimitsFit(vaultDB, whisperByteLimit, boxLimit)
+  return { scope, rules, vaultDB, deviceDB, leaseMillis, logger, clock, keyDeriver, strengthTest, whisperByteLimit, boxLimit, vaultByteLimit }
+}
+
+/**
+ * Refuse, with kind 'insecure_context', a page the platform says is not a secure context: plain
+ * http, anywhere but localhost, where a browser withholds WebCrypto and the vault would fail with
+ * a TypeError and no kind. A runtime with no such notion (Node, Bun, React Native) passes.
+ */
+const checkSecureContext = () => {
+  if ((globalThis as { isSecureContext?: unknown }).isSecureContext === false) {
+    throw new VaultError('insecure_context', 'This page is not a secure context -- it was served over plain http -- so the browser withholds the cryptography the vault needs: serve the app over https (http://localhost counts as secure, for development).')
+  }
 }

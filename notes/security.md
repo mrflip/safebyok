@@ -34,6 +34,22 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-19 (branch 20261019-vault_class): **the vault's in-memory state, the vaultKey among it,
+  lives in ES private fields.** `Vault` (`packages/safebyok/src/vault.ts`) is now a class, and
+  `Vault.make(opts)` returns an instance; its state used to live in the closure of `make`. Every
+  piece of it -- the vaultKey in hand, the vault props, the device mark, the stores, the logger,
+  the clock, the expiry timer -- is an ES private field (`#vaultKey` and so on), not a TypeScript
+  `private` one, which is an ordinary property at runtime: `vault['vaultKey']`, `Object.keys(vault)`,
+  `JSON.stringify(vault)` and a host's logging of the handle would all reach it. An ES private field
+  is reachable only from code inside the class body, as the closure's variables were, so nothing
+  outside the class, a host's script included, can read the key off the handle. The public methods
+  are arrow-function fields bound to the instance (so `useSyncExternalStore(vault.subscribe,
+  vault.getSnapshot)` and handing a method on alone work); they hold no secret and reach the state
+  only through the class body. The constructor is private: `Vault.make` is the only way to make
+  one, and it parses every option (`parseMakeVaultOpts`, `packages/safebyok/src/vault-opts.ts`)
+  before anything else runs. Where to look: that no field holding key material is declared without
+  `#`, and that later threads, which pull methods out into model classes holding a `vault`
+  back-reference, do not widen the state into public fields to reach it.
 * 2026-10-19 (branch 20261019-softlock_gone, on PR #189): **the rotation schema is removed; no
   `rotateVaultKey` was ever built.** The vault props' `prior_vault_key` (the previous vaultKey wrapped
   under the current one), its `PriorVaultKey` schema and the `priorFits` refinement (a prior exactly

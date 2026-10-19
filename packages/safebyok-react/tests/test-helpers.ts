@@ -65,11 +65,14 @@ export const stubVault = (opts: StubVaultOpts = {}): Vault => {
 }
 
 /**
- * A locked Vault whose unlock runs `unlock`, which gets the passphrase the dialog submits.
+ * A locked Vault whose unlock runs `unlock`, which gets the passphrase the dialog submits; a
+ * passkey's answer it refuses as 'wrong_passkey'.
  *
  * @example const vault = TH.vaultUnlockingWith((passphrase) => { given.push(passphrase); return Promise.resolve() })
  */
-export const vaultUnlockingWith = (unlock: (passphrase: string) => Promise<void>) => stubVault({ unlock })
+export const vaultUnlockingWith = (unlock: (passphrase: string) => Promise<void>) => stubVault({
+  unlock: (proof) => (typeof proof === 'string' ? unlock(proof) : Promise.reject(new VaultError('wrong_passkey', 'This stub vault opens with a passphrase only.'))),
+})
 
 /** A locked Vault whose every unlock is refused as a wrong passphrase. */
 export const wrong = () => vaultUnlockingWith(() => Promise.reject(new VaultError('wrong_passphrase', 'That passphrase did not open the vault.')))
