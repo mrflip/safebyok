@@ -74,7 +74,8 @@ session, birth one doc named for the sprint, with three tabs: *Open Matters* and
 `/turbochat` sets up, and *Progress*: a lead linking the plan and the progress document on GitHub
 (`https://github.com/mrflip/safebyok/blob/<branch>/<path>`), then one table row per thread,
 `Thread | Status | PR | Thread file | Review`, the thread file linked on the thread's branch.
-Give the Coach its link once in chat. Edit it cell by cell, as turbochat says, and never copy a
+Give the Coach its link once in chat. Load the docs skill and guides and edit it cell by cell,
+as turbochat says; never copy a
 file into it: link the file, and push it. No Docs tools: say so in one line, keep the status in
 chat, and carry on.
 
