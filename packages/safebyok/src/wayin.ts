@@ -108,9 +108,9 @@ const saltBytesOf = (saltB64: string): Uint8Array | null => {
  * `props` is the stored record, frozen, and `toJSON()` the same, so a log line shows the record
  * alone. It holds `vault` and `holder` (the vault props it is one of) too, neither enumerable.
  * `summary` is what a locked vault may show of it. The vault makes each from the vault props it
- * reads, and lists them as its `wayins`.
+ * reads, and lists their summaries, never the ways in themselves, as its `wayins`.
  *
- * @example vault.wayins.map((wayin) => wayin.wayinlabel)   // ['passphrase', 'laptop_fingerprint']
+ * @example Wayin.listOf(vault, vaultProps).map((wayin) => wayin.wayinlabel)   // ['passphrase', 'laptop_fingerprint']
  * @example JSON.stringify(wayin) === JSON.stringify(wayin.props)   // true
  */
 export abstract class Wayin {

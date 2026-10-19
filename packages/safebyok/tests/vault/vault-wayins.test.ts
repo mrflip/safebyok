@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { MaxUnlocks, type PasskeyAnswer, VaultScope, type WayinSummary } from '../../src/types'
+import { MaxUnlocks, type PasskeyAnswer, VaultProps, VaultScope, type WayinSummary } from '../../src/types'
 import { VaultError } from '../../src/errors'
 import { memoryDeviceDB } from '../../src/device-db'
 import { type MakeVaultOpts } from '../../src/vault-opts'
@@ -780,51 +780,49 @@ const newsKeeper = () => {
   return { told, onBadNews: (news: VaultError) => { told.push(news) } }
 }
 
+/** Every string a stored way in's salt and wrapped vaultKey hold: what an offline guess at its passphrase starts from. */
+const guessFodderOf = (world: ReturnType<typeof makeWorld>): string[] => storedWayinsOf(world).flatMap((record) => (
+  [record['salt_b64'], ...Object.values(record['vault_key_wayin_wrapped'] as Record<string, unknown>)].filter((val): val is string => typeof val === 'string')
+))
+
 describe("the vault's ways in, as models (Contract: Vault, Wayin)", () => {
-  it("lists each way in as a Wayin made from the vault props, its summary what the snapshot lists", async () => {
-    const { vault } = await vaultWithPasskey()
-    expect(vault.wayins.map((wayin) => wayin.constructor)).to.deep.equal([PassphraseWayin, PasskeyWayin])
-    expect(vault.wayins.every((wayin) => wayin instanceof Wayin && wayin.vault === vault)).to.be.true
-    expect(vault.wayins.map((wayin) => wayin.summary)).to.deep.equal(vault.getSnapshot().wayins)
-    expect(vault.wayins.map((wayin) => wayin.props)).to.deep.equal(vault.props?.wayins)
-  })
-
-  it("lists ways in a host tells apart by wayinkind and hands on as summaries, as the Wayin's, PassphraseWayin's and PasskeyWayin's examples show", async () => {
-    const { vault, laptop } = await vaultWithPasskey()
+  it("lists each way in as its summary, the snapshot's own, with no salt and no wrapped vaultKey", async () => {
+    const { world, vault } = await vaultWithPasskey()
+    expect(vault.wayins).to.eq(vault.getSnapshot().wayins)
     expect(kindsOf(vault.wayins)).to.deep.equal(['passphrase', 'passkey'])
-    expect(vault.wayins.map((wayin) => wayin.wayinlabel)).to.deep.equal(['passphrase', 'laptop'])
-    const told = vault.wayins.map((wayin) => (wayin.wayinkind === 'passphrase' ? wayin.key_deriver_label : wayin.credential_id))
-    expect(told).to.deep.equal([TH.testDeriver.key_deriver_label, laptop.credentialId])
-  })
-
-  it("hands each way in the props it shows as its holder, frozen, never the record it works from", async () => {
-    const world = makeWorld()
-    const vault = await world.openUnlocked('pw')
-    const holder = vault.wayins[0]?.holder ?? {}
-    expect(holder).to.eq(vault.props)
-    expect(Object.isFrozen(holder)).to.be.true
-    expect(Reflect.set(holder, 'vault_id', 'another')).to.be.false
-    expect(Object.isFrozen(vault.props?.wayins)).to.be.true
-    await vault.lock()
-    await vault.unlock('pw')
-    expect(vault.state).to.eq('unlocked')
-  })
-
-  it("holds every vault props record it takes up frozen through, and that one record is its ways in's holder, whether it made, read or rewrote the record", async () => {
-    const world = makeWorld()
-    const made = await world.openUnlocked('pw')
-    const read = await world.open()
-    await read.hello({ staleMinutes: 0 })
-    await made.addPassphrase('pw', 'spare passphrase', { wayinlabel: 'spare' })
-    for (const vault of [made, read]) {
-      const { props } = vault
-      expect(Object.isFrozen(props) && Object.isFrozen(props?.wayins)).to.be.true
-      expect(props?.wayins.every((record) => Object.isFrozen(record) && Object.isFrozen(record.vault_key_wayin_wrapped))).to.be.true
-      for (const wayin of vault.wayins) { expect(wayin.holder).to.eq(props) }
+    for (const summary of vault.wayins) {
+      expect(summary).to.not.be.instanceOf(Wayin)
+      expect(Object.keys(summary)).to.not.include.members(['salt_b64', 'vault_key_wayin_wrapped', 'props', 'holder'])
+    }
+    const fodder = guessFodderOf(world)
+    expect(fodder).to.have.lengthOf.at.least(4)
+    const shown = [JSON.stringify(vault.getSnapshot()), JSON.stringify(vault.wayins)]
+    for (const secretish of fodder) {
+      expect(shown.some((json) => json.includes(secretish)), secretish).to.be.false
     }
   })
 
-  it("keeps the same Wayins until the vault props change", async () => {
+  it("shows no vault props record, on the handle or in its snapshot: their ways in's salts and wraps are the vault's alone", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    expect('props' in vault.getSnapshot()).to.be.false
+    expect(Reflect.get(vault, 'props')).to.be.undefined
+    await vault.lock()
+    const fodder = guessFodderOf(world)
+    expect(fodder.some((secretish) => JSON.stringify(vault.getSnapshot()).includes(secretish))).to.be.false
+  })
+
+  it("lists ways in a host tells apart by wayinkind, from the vault props as storage holds them, as the Wayin's, PassphraseWayin's and PasskeyWayin's examples show", async () => {
+    const { world, vault, laptop } = await vaultWithPasskey()
+    const wayins = Wayin.listOf(vault, VaultProps.parse(storedVaultPropsOf(world)))
+    expect(wayins.map((wayin) => wayin.constructor)).to.deep.equal([PassphraseWayin, PasskeyWayin])
+    expect(wayins.map((wayin) => wayin.wayinlabel)).to.deep.equal(['passphrase', 'laptop'])
+    const told = wayins.map((wayin) => (wayin.wayinkind === 'passphrase' ? wayin.key_deriver_label : wayin.credential_id))
+    expect(told).to.deep.equal([TH.testDeriver.key_deriver_label, laptop.credentialId])
+    expect(wayins.map((wayin) => wayin.summary)).to.deep.equal(vault.wayins)
+  })
+
+  it("keeps the same ways in until the vault props change", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     const before = vault.wayins
@@ -835,19 +833,10 @@ describe("the vault's ways in, as models (Contract: Vault, Wayin)", () => {
     expect(vault.wayins).to.have.lengthOf(2)
   })
 
-  it("has no ways in, and no props, until a read finds a vault", async () => {
+  it("has no ways in until a read finds a vault", async () => {
     const world = makeWorld()
     const vault = await world.open()
     expect(vault.wayins).to.deep.equal([])
-    expect(vault.props).to.be.null
-  })
-
-  it("shows the vault props as storage holds them, one frozen record (Contract: Vault)", async () => {
-    const world = makeWorld()
-    const vault = await world.openUnlocked('pw')
-    expect(vault.props).to.deep.equal(storedVaultPropsOf(world))
-    expect(Object.isFrozen(vault.props)).to.be.true
-    expect(vault.props).to.eq(vault.getSnapshot().props)
   })
 
   it("lends its models its logger, its key deriver and a checked clock, none writable", async () => {
@@ -869,7 +858,7 @@ describe("the vault's ways in, as models (Contract: Vault, Wayin)", () => {
     const vault = await world.open({ onBadNews, deviceDB: memoryDeviceDB() })
     expect(vault.state).to.eq('locked')
     expect(told.map((news) => news.refusalkind)).to.deep.equal(['damaged_wayin'])
-    expect(told[0]?.meta?.wayin_listed).to.deep.equal(vault.wayins[1]?.summary)
+    expect(told[0]?.meta?.wayin_listed).to.deep.equal(vault.wayins[1])
     expect(told[0]?.family).to.eq('bad_news')
     expect(vault.trouble).to.eq(told[0])
     await vault.unlock('pw')

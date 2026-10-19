@@ -34,9 +34,9 @@ export type VaultState = 'opening' | 'absent' | 'locked' | 'unlocked'
 
 /**
  * The vault's picture, frozen: one plain object holding each field the vault shows, under the
- * same name and with the same value as the vault's own field -- but for `wayins`, which the vault
- * hands out as {@link Wayin}s and the snapshot as their summaries -- shaped for
- * `useSyncExternalStore`.
+ * same name and with the same value as the vault's own field, shaped for `useSyncExternalStore`.
+ * It holds nothing an offline guess at a passphrase could start from: the ways in are their
+ * summaries, never a salt or a wrapped vaultKey, and the stored vault props are the vault's alone.
  * It is replaced, whole, whenever any field changes, and is otherwise the same object, so a render
  * from it re-runs only when something did change. Box summaries (labels and other visible fields,
  * no whispers) are present even while locked -- that is the point of leaving them unencrypted.
@@ -67,12 +67,6 @@ export type VaultSnapshot = Readonly<{
    * Each is the `summary` of one of the vault's own {@link Wayin}s.
    */
   wayins:          readonly WayinSummary[]
-  /**
-   * The vault props as storage holds them, one frozen record, its ways in and their wraps among
-   * them: ciphertext and visible fields, nothing that opens without a proof. Null until a read
-   * finds a vault.
-   */
-  props:           VaultProps | null
   /** Where the vault stands: see {@link VaultState}. `opening` until a hello has read storage. */
   state:           VaultState
   /**
@@ -194,7 +188,7 @@ const NoWayins: readonly (PassphraseWayin | PasskeyWayin)[] = Object.freeze([])
  *   if (! ok && err.refusalkind === 'wrong_passphrase') { askAgain(err.message) }
  */
 export class Vault {
-  // == [Vault: fields]: applabel, user_id, vaultlabel, vault_id, registered_at, unlock_epoch, vault_key_epoch, wayins, props, state, boxes, capacity, askPassphraseAt, trouble, syncing, snapshot, getSnapshot, subscribe, leaseMillis, logger, clock, keyDeriver
+  // == [Vault: fields]: applabel, user_id, vaultlabel, vault_id, registered_at, unlock_epoch, vault_key_epoch, wayins, state, boxes, capacity, askPassphraseAt, trouble, syncing, snapshot, getSnapshot, subscribe, leaseMillis, logger, clock, keyDeriver
 
   // Each field reads the snapshot `#settle()` last published, so the fields and the snapshot always
   // agree. A getter with no setter: a host cannot write over one, and the vault never reads one back:
@@ -215,13 +209,8 @@ export class Vault {
   get unlock_epoch(): number | null { return this.#snapshot.unlock_epoch }
   /** Which vaultKey the ways in wrap: 1, reserved; null until a read finds a vault. */
   get vault_key_epoch(): VaultProps['vault_key_epoch'] | null { return this.#snapshot.vault_key_epoch }
-  /**
-   * The ways in, in the order the vault tries them: each a {@link Wayin}, made from the vault props
-   * the snapshot shows, its `summary` what the snapshot lists. Empty until a read finds a vault.
-   */
-  get wayins(): readonly (PassphraseWayin | PasskeyWayin)[] { return this.#snapshot.props === null ? NoWayins : this.#wayinsOf(this.#snapshot.props) }
-  /** The vault props as storage holds them, one frozen record; null until a read finds a vault. See {@link VaultSnapshot}. */
-  get props(): VaultProps | null { return this.#snapshot.props }
+  /** The ways in, in the order the vault tries them, each its summary: no salt, no wrapped vaultKey. See {@link VaultSnapshot}. */
+  get wayins(): readonly WayinSummary[] { return this.#snapshot.wayins }
   /** Where the vault stands: `opening` until a hello has read storage, then `absent`, `locked` or `unlocked`. */
   get state(): VaultState { return this.#snapshot.state }
   /** Every box, sound or damaged, sorted by boxlabel, no whisper among them. See {@link VaultSnapshot}. */
@@ -1137,6 +1126,9 @@ export class Vault {
   #greeting: Promise<void> | null = null
   #greeted = false
   #snapshot: VaultSnapshot
+  // The vault props the snapshot was last settled from, whose ways in it lists as summaries: the
+  // vault's alone, as their salts and wraps are what an offline guess at a passphrase needs.
+  #shownProps: VaultProps | null = null
 
   /** The picture the private state makes now, frozen, as the snapshot and every public field show it. */
   #picture(): VaultSnapshot {
@@ -1151,7 +1143,6 @@ export class Vault {
       unlock_epoch:    standing?.unlock_epoch ?? null,
       vault_key_epoch: standing?.vault_key_epoch ?? null,
       wayins:          Object.freeze(wayins.map((wayin) => Object.freeze(wayin.summary))),
-      props:           standing,
       state,
       boxes:           Object.freeze(this.#boxes.map((box) => Object.freeze(box))),
       capacity:        Object.freeze({ boxes: Object.freeze(boxes), bytes: Object.freeze(bytes) }),
@@ -1169,6 +1160,7 @@ export class Vault {
    * identity, as two refusals of one kind read alike as JSON.
    */
   #settle() {
+    this.#shownProps = this.#vaultProps === UnreadVaultProps ? null : this.#vaultProps
     const next = this.#picture()
     if (next.trouble === this.#snapshot.trouble && stableJsonify({ ...next, trouble: null }) === stableJsonify({ ...this.#snapshot, trouble: null })) { return }
     this.#snapshot = next
@@ -1224,7 +1216,7 @@ export class Vault {
       this.#deviceMark = mark
     }
     const shown = this.#boxes
-    const shownWayins = this.#snapshot.props === null ? NoWayins : this.#wayinsOf(this.#snapshot.props)
+    const shownWayins = this.#shownProps === null ? NoWayins : this.#wayinsOf(this.#shownProps)
     // A box under a vaultKey the vault does not hold lists as damaged from its epoch alone.
     this.#boxes = standing === null ? [] : listed.map((box) => heldListing(isUnderHeldKey(box, standing) ? box : asDamaged(box)))
     this.#syncing = true

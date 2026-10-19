@@ -609,9 +609,10 @@ written down at home, one a partner holds. Each wraps the same vaultKey under it
 passphrase is ever stored, and adding or removing one rewrites no box. The snapshot lists
 them, locked or not, as `wayins`: each a `wayinkind` (`passphrase` or `passkey`), a `wayin_id`, the
 `wayinlabel` the user chose, and when it was added and by which device (`registered_at`,
-`device_id`). The vault's own `vault.wayins` holds the same ways in as `Wayin`s
-(`PassphraseWayin`, `PasskeyWayin`): each stored field its own, `summary` what the snapshot lists,
-and `props` the stored record, frozen. A way in stored in a form this package never writes
+`device_id`); a passkey's carries its `credential_id` and `prf_salt_b64` too, for asking the
+authenticator. `vault.wayins` is the same list. Neither holds a passphrase's salt or any wrapped
+vaultKey -- what an offline guess at a passphrase starts from -- so a snapshot in React state,
+devtools or an error report gives none away; the vault keeps the stored records to itself. A way in stored in a form this package never writes
 cannot be tried, but the others still open the vault: the read that finds it succeeds, and
 `onBadNews` is told `damaged_wayin`, `meta.wayin_listed` naming it.
 
