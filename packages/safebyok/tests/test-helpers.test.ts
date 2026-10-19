@@ -790,7 +790,7 @@ describe("expectRefusal", () => {
 
   it("lets a test look closer at what refused", async () => {
     const vault = await TH.settledVault(TH.memoryVaultOpts())
-    const err = await TH.expectRefusal(vault.getBox('anthropic_api_key'), 'vault_locked')
+    const err = await TH.expectRefusal(vault.ensureLease(), 'vault_locked')
     expect(err.message).to.be.a('string').and.not.be.empty
   })
 })

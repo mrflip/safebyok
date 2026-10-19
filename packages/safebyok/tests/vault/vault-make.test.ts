@@ -265,7 +265,7 @@ describe("the host's clock", () => {
     expect(vault.getSnapshot().state).to.eq('locked')
     expect(await world.getLease()).to.be.null
     reading = world.clock.now()
-    await TH.expectRefusal(vault.getBox('anthropic'), 'vault_locked')
+    await TH.expectRefusal(vault.ensureLease(), 'vault_locked')
   })
 
   it("fails closed: a reading gone wrong while unlocked drops the vaultKey before it refuses the clock", async () => {

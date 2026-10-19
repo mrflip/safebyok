@@ -111,7 +111,7 @@ describe("the lease", () => {
     expect(await world.stateOnOpen({ leaseHours: 12 })).to.eq('unlocked')
     world.advance(1)
     expect(await world.stateOnOpen({ leaseHours: 12 })).to.eq('locked')
-    await TH.expectRefusal(vault.getBox('anthropic'), 'vault_locked')
+    await TH.expectRefusal(vault.ensureLease(), 'vault_locked')
   })
 
   it("takes fractions of an hour, kept as whole milliseconds", async () => {
@@ -169,7 +169,7 @@ describe("the lease", () => {
       await vault.lock()
       expect(vault.getSnapshot().state).to.eq('locked')
       expect(vault.getSnapshot().askPassphraseAt).to.be.null
-      await TH.expectRefusal(vault.getBox('anthropic'), 'vault_locked')
+      await TH.expectRefusal(vault.ensureLease(), 'vault_locked')
       expect(await world.stateOnOpen({ leaseHours: Infinity })).to.eq('locked')
     })
 
@@ -469,14 +469,14 @@ describe("natural expiry", () => {
     expect(vi.getTimerCount()).to.eq(0)
     expect(vault.getSnapshot().state).to.eq('locked')
     expect(vault.getSnapshot().askPassphraseAt).to.be.null
-    await TH.expectRefusal(vault.getBox('anthropic'), 'vault_locked')
+    await TH.expectRefusal(vault.ensureLease(), 'vault_locked')
   })
 
   it("drops a key whose timer has not run by its deadline at the next look: the threshold is the truth", async () => {
     const world = makeTimedWorld()
     const vault = await world.openUnlocked('pw one', { leaseHours: 1 })
     world.advance(HourMillis)  // the clock alone, as a device asleep would see it
-    await TH.expectRefusal(vault.getBox('anthropic'), 'vault_locked')
+    await TH.expectRefusal(vault.ensureLease(), 'vault_locked')
     expect(vi.getTimerCount()).to.eq(0)
     expect(vault.getSnapshot().state).to.eq('locked')
   })
@@ -546,7 +546,7 @@ describe("natural expiry", () => {
     expect(world.logged).to.have.lengthOf(0)
     broken = false
     expect(vault.getSnapshot().state).to.eq('locked')
-    await TH.expectRefusal(vault.getBox('anthropic'), 'vault_locked')
+    await TH.expectRefusal(vault.ensureLease(), 'vault_locked')
   })
 
 })
@@ -1169,6 +1169,45 @@ describe("every data call, through ensureLease", () => {
     await TH.expectRefusal(vault.putBox('openai', undefined as unknown as string), 'bad_whisper')
     await TH.expectRefusal(vault.putBox('no such label!', 'sk-fake'), 'bad_label')
     expect(getProof).not.toHaveBeenCalled()
+  })
+
+  for (const [call, blurb] of [
+    [(vault: Vault, boxlabel: string) => vault.getBox(boxlabel), 'getBox'],
+    [(vault: Vault, boxlabel: string) => vault.getWhisper(boxlabel), 'getWhisper'],
+    [(vault: Vault, boxlabel: string) => vault.useBox(boxlabel, (whisper) => whisper), 'useBox'],
+    [(vault: Vault, boxlabel: string) => vault.delBox(boxlabel), 'delBox'],
+  ] as const) {
+    it(`refuses bad_label and absent_box from what it holds, before asking for anything: ${blurb} (Contract: ensureLease, a call that cannot land never prompts)`, async () => {
+      const getProof = typingPw()
+      const { vault } = await lockedVaultWith({ getProof })
+      // Below the floor every name is held to; refused by the vault's own check; above both, but not listed.
+      await TH.expectRefusal(call(vault, 'tab\there'), 'bad_label')
+      await TH.expectRefusal(call(vault, 'no such label!'), 'bad_label')
+      await TH.expectRefusal(call(vault, 'openai'), 'absent_box')
+      expect(getProof).not.toHaveBeenCalled()
+      expect(vault.state).to.eq('locked')
+      // A box the listing shows is asked for as before.
+      await call(vault, 'anthropic')
+      expect(getProof).toHaveBeenCalledOnce()
+    })
+  }
+
+  it("refuses absent_box at once for a vault never made, rather than asking to make one only to find nothing in it", async () => {
+    const world = makeWorld()
+    const getProof = typingPw()
+    const vault = await world.open({ getProof })
+    await TH.expectRefusal(vault.getBox('anthropic'), 'absent_box')
+    await TH.expectRefusal(vault.delBox('anthropic'), 'absent_box')
+    expect(getProof).not.toHaveBeenCalled()
+    expect(vault.state).to.eq('absent')
+  })
+
+  it("reads storage for the box once unlocked, whatever the listing shows: the listing in hand only spares a prompt", async () => {
+    const { world, vault } = await lockedVaultWith({ getProof: typingPw() })
+    await vault.ensureLease()
+    const reads = vi.spyOn(world.vaultDB, 'getBox')
+    await TH.expectRefusal(vault.getBox('openai'), 'absent_box')
+    expect(reads).toHaveBeenCalledOnce()
   })
 })
 
