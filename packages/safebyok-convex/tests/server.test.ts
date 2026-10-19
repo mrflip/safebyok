@@ -25,7 +25,7 @@ const EveryCall: [string, (caller: Caller) => Promise<unknown>][] = [
   ['getBox',                  (caller) => caller.query(api.safebyok.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })],
   ['listBoxSummaries',        (caller) => caller.query(api.safebyok.listBoxSummaries, { scope: u1 })],
   ['updateBox',               (caller) => caller.mutation(api.safebyok.updateBox, { scope: u1, lockbox: TH.boxOf('anthropic_api_key', 'a2'), expected: { vault_id: 'vault-id-u1', revision_tok: 'rev-a1', vault_key_epoch: 1 } })],
-  ['retireBox',               (caller) => caller.mutation(api.safebyok.retireBox, { scope: u1, boxlabel: 'anthropic_api_key', expected: TH.thisVault })],
+  ['retireBox',               (caller) => caller.mutation(api.safebyok.retireBox, { scope: u1, boxlabel: 'anthropic_api_key', expected: TH.retiring('rev-a2') })],
   ['retireVault',             (caller) => caller.mutation(api.safebyok.retireVault, { scope: u1, expected: TH.thisVault })],
   ['watchVault',              (caller) => caller.query(api.safebyok.watchVault, { scope: u1 })],
 ]

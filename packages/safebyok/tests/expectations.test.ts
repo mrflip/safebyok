@@ -92,3 +92,30 @@ describe("Expectations.lockboxMeets, under a vaultKey replaced", () => {
     expect(Expectations.lockboxMeets(VaultProps, undefined, { vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 2 })).to.be.false
   })
 })
+
+const RetirementCases = [
+  // regular usage:
+  [Box,                                     "rev-one",  'retired',        'the revision the retiring device read'],
+  [Box,                                     "rev-two",  'retired_other',  'a revision written over the one read'],
+  [undefined,                               "rev-one",  'absent',         'no lockbox, retired meanwhile'],
+  [null,                                    null,       'absent',         'a null row, as a string store reads none'],
+  // a damaged lockbox, listed with no revision:
+  [{ boxlabel: "anthropic" },               null,       'retired',        'a damaged row that holds no revision, as listed'],
+  [{ ...Box, revision_tok: "" },            null,       'retired',        'a damaged row whose revision is empty, which the listing names as none'],
+  [{ ...Box, revision_tok: 7 },             null,       'retired',        'a damaged row whose revision is no text'],
+  ["not a lockbox",                         null,       'retired',        'a row that is no object'],
+  [Box,                                     null,       'retired_other',  'a lockbox written over the damaged one, holding a revision where none was expected'],
+  [{ boxlabel: "anthropic" },               "rev-one",  'retired_other',  'a damaged row where a revision was expected'],
+] as const
+
+describe("Expectations.retirementOf", () => {
+  for (const [standingBox, revisionTok, outcome, blurb] of RetirementCases) {
+    it(`reports ${outcome} for ${blurb}`, () => {
+      expect(Expectations.retirementOf(standingBox, { vault_id: 'vault-id-u1', revision_tok: revisionTok })).to.deep.equal({ outcome })
+    })
+  }
+
+  it("reports retired for a lockbox at its revision, as its example shows", () => {
+    expect(Expectations.retirementOf(TH.boxOf('anthropic', 'r7', { revision_tok: 'r7' }), { vault_id: 'v1', revision_tok: 'r7' })).to.deep.equal({ outcome: 'retired' })
+  })
+})

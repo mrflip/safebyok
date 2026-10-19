@@ -1,12 +1,13 @@
 import { omit } from 'es-toolkit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { memoryStore } from '../src/string-store'
-import { VaultDB, jsonBytes, localVaultDB, type VaultPropsExpectation, type RetireExpectation, type LockboxExpectation, type StoredLockbox, type VaultDBOpts, type WatchTrouble } from '../src/vault-db'
+import { VaultDB, jsonBytes, localVaultDB, type VaultPropsExpectation, type RetireExpectation, type LockboxExpectation, type LockboxRetireExpectation, type StoredLockbox, type VaultDBOpts, type WatchTrouble } from '../src/vault-db'
 import { VaultError } from '../src/errors'
 import { DefaultLogger, parseLogger, type VaultLogger } from '../src/logger'
 import type { Lockbox } from '../src/lockbox'
 import type { VaultProps, VaultScope } from '../src/types'
 import * as Ckeys from '../src/ckeys'
+import * as Expectations from '../src/expectations'
 import { NameFloorBytes } from '../src/validators'
 import * as TH from './test-helpers'
 
@@ -84,10 +85,11 @@ class MapVaultDB extends VaultDB {
     return held
   }
 
-  protected doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation) {
-    if (this.standingVaultProps(scope)?.vault_id !== expected.vault_id) { return Promise.resolve(false) }
+  protected doRetireBox(scope: VaultScope, boxlabel: string, expected: LockboxRetireExpectation): Promise<unknown> {
+    if (this.standingVaultProps(scope)?.vault_id !== expected.vault_id) { return Promise.resolve(null) }
+    const retirement = Expectations.retirementOf(this.rows.get(Ckeys.box(scope, boxlabel)), expected)
     this.rows.delete(Ckeys.box(scope, boxlabel))
-    return Promise.resolve(true)
+    return Promise.resolve(retirement)
   }
 
   protected doRetireVault(scope: VaultScope, expected: RetireExpectation) {
@@ -172,6 +174,81 @@ TH.describeVaultDB('the smallest honest adapter', (vaultDBOpts) => new MapVaultD
 const u1VaultPropsCkey = 'vault^acme^u1^main'
 const u1BoxCkey = (boxlabel: string) => `box^acme^u1^main^${boxlabel}`
 
+/** A MapVaultDB that retires each lockbox as it should, then answers `answer` in place of what it found. */
+class MisreportingVaultDB extends MapVaultDB {
+  private readonly answer: unknown
+
+  constructor(answer: unknown) {
+    super()
+    this.answer = answer
+  }
+
+  protected override async doRetireBox(scope: VaultScope, boxlabel: string, expected: LockboxRetireExpectation): Promise<unknown> {
+    const retirement = await super.doRetireBox(scope, boxlabel, expected)
+    return retirement === null ? null : this.answer
+  }
+}
+
+const MisreportedCases = [
+  [true,                          'the true an older adapter answered with'],
+  [false,                         'the false an older adapter refused with'],
+  [undefined,                     'nothing at all'],
+  ['retired',                     'the outcome bare, not in its record'],
+  [{ outcome: 'gone' },           'an outcome this package does not know'],
+  [{},                            'a record naming no outcome'],
+] as const
+
+describe("the abstract VaultDB, on the way back from a lockbox retirement", () => {
+  it("resolves what its adapter says it removed: the revision named, another, or none", async () => {
+    const vaultDB = new MapVaultDB()
+    await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
+    await vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet)
+    await vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('openai', 'two'), TH.noBoxYet)
+    expect(await vaultDB.retireBox(TH.scopeOf('u1'), 'anthropic', TH.retiring('rev-one'))).to.deep.equal({ outcome: 'retired' })
+    expect(await vaultDB.retireBox(TH.scopeOf('u1'), 'openai', TH.retiring('rev-one'))).to.deep.equal({ outcome: 'retired_other' })
+    expect(await vaultDB.retireBox(TH.scopeOf('u1'), 'openai', TH.retiring('rev-two'))).to.deep.equal({ outcome: 'absent' })
+  })
+
+  it("resolves the outcome, as its example shows", async () => {
+    const vaultDB = new MapVaultDB()
+    const vaultProps = TH.vaultPropsOf('u1')
+    await vaultDB.fetchOrCreateVaultProps(vaultProps)
+    await vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet)
+    const [listed] = await vaultDB.listBoxes(TH.scopeOf('u1'))
+    const { outcome } = await vaultDB.retireBox(TH.scopeOf('u1'), 'anthropic', { vault_id: vaultProps.vault_id, revision_tok: listed?.revision_tok ?? null })
+    expect(outcome).to.eq('retired')
+  })
+
+  it("refuses as stale, resolving nothing and removing nothing, a retirement whose adapter answers null", async () => {
+    const vaultDB = new MapVaultDB()
+    await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
+    await vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet)
+    await TH.expectRefusal(vaultDB.retireBox(TH.scopeOf('u1'), 'anthropic', { vault_id: 'vault-id-gone', revision_tok: 'rev-one' }), 'stale_write')
+    expect(vaultDB.rows.get(u1BoxCkey('anthropic'))).to.deep.equal(TH.boxOf('anthropic', 'one'))
+  })
+
+  it("keeps only the outcome of an answer carrying more, as a GraphQL client's __typename", async () => {
+    const vaultDB = new MisreportingVaultDB({ outcome: 'retired', __typename: 'SafebyokLockboxRetirement' })
+    await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
+    expect(await vaultDB.retireBox(TH.scopeOf('u1'), 'anthropic', TH.retiring(null))).to.deep.equal({ outcome: 'retired' })
+  })
+
+  for (const [answer, blurb] of MisreportedCases) {
+    it(`refuses as corrupt_record a landed retirement whose adapter answers ${blurb}, saying it may have landed`, async () => {
+      const vaultDB = new MisreportingVaultDB(answer)
+      await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
+      await vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet)
+      const refusal = await TH.expectRefusal(vaultDB.retireBox(TH.scopeOf('u1'), 'anthropic', TH.retiring('rev-one')), 'corrupt_record')
+      expect(refusal.message).to.match(/retirement landed/)
+      expect(refusal.message).to.match(/cannot read back/)
+      expect((refusal.cause as VaultError).kind).to.eq('corrupt_record')
+      expect(TH.thrownText(refusal)).to.not.include('anthropic')
+      // What the adapter removed stays removed: the refusal is about its answer, not its retirement.
+      expect(vaultDB.rows.has(u1BoxCkey('anthropic'))).to.be.false
+    })
+  }
+})
+
 describe("localVaultDB", () => {
   it("holds a mebibyte in one record, and sets no limit on a vault, in bytes or in lockboxes, or on a name", () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
@@ -232,6 +309,29 @@ describe("localVaultDB", () => {
     expect(listed[1]).to.include({ boxlabel: 'openai', revision_tok: 'rev-two', damaged: false })
     // Listed, never repaired: the row is still there for forensics.
     expect(store.read(Ckeys.box(scope, 'anthropic'))).to.eq('{"not": json')
+  })
+
+  it("retires a damaged row, JSON or not, holding no revision, as the one a retirement naming none means", async () => {
+    const store = memoryStore()
+    const scope = TH.scopeOf('u1')
+    store.write(Ckeys.vaultProps(scope), JSON.stringify(TH.vaultPropsOf('u1')))
+    store.write(Ckeys.box(scope, 'anthropic'), '{"not": json')
+    store.write(Ckeys.box(scope, 'openai'), JSON.stringify({ boxlabel: 'openai', revision_tok: '' }))
+    const vaultDB = localVaultDB({ store })
+    expect(await vaultDB.retireBox(scope, 'anthropic', TH.retiring(null))).to.deep.equal({ outcome: 'retired' })
+    expect(await vaultDB.retireBox(scope, 'openai', TH.retiring(null))).to.deep.equal({ outcome: 'retired' })
+    expect(await vaultDB.listBoxes(scope)).to.have.lengthOf(0)
+  })
+
+  it("retires a damaged row that holds a revision as another, for a retirement naming none", async () => {
+    const store = memoryStore()
+    const scope = TH.scopeOf('u1')
+    store.write(Ckeys.vaultProps(scope), JSON.stringify(TH.vaultPropsOf('u1')))
+    store.write(Ckeys.box(scope, 'anthropic'), JSON.stringify({ ...TH.boxOf('anthropic', 'one'), sidecar_json: 'not json' }))
+    const vaultDB = localVaultDB({ store })
+    expect(await vaultDB.listBoxes(scope)).to.deep.equal([{ boxlabel: 'anthropic', damaged: true, revision_tok: 'rev-one' }])
+    expect(await vaultDB.retireBox(scope, 'anthropic', TH.retiring(null))).to.deep.equal({ outcome: 'retired_other' })
+    expect(store.read(Ckeys.box(scope, 'anthropic'))).to.be.null
   })
 
   it("stores each record as its JSON, under its kind and scope joined on ^", async () => {
@@ -415,7 +515,10 @@ const RefusedWrites = [
   ['bad_option', (vaultDB: VaultDB) => vaultDB.updateVaultProps(TH.vaultPropsOf('u1'), undefined as unknown as VaultPropsExpectation), 'no expectation of the vault props at all'],
   ['bad_option', (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), { vault_id: 'vault-id-u1' } as LockboxExpectation), 'a lockbox expectation missing its revision_tok'],
   ['bad_option', (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), { vault_id: 'vault-id-u1', revision_tok: null } as LockboxExpectation), 'a lockbox expectation naming no vaultKey epoch'],
-  ['bad_option', (vaultDB: VaultDB) => vaultDB.retireBox(TH.scopeOf('u1'), 'anthropic', {} as RetireExpectation),                        'a retire expectation naming no vault'],
+  ['bad_option', (vaultDB: VaultDB) => vaultDB.retireBox(TH.scopeOf('u1'), 'anthropic', { revision_tok: null } as LockboxRetireExpectation), 'a retire expectation naming no vault'],
+  ['bad_option', (vaultDB: VaultDB) => vaultDB.retireBox(TH.scopeOf('u1'), 'anthropic', TH.thisVault as LockboxRetireExpectation),          'a lockbox retire expectation missing its revision_tok'],
+  ['bad_option', (vaultDB: VaultDB) => vaultDB.retireBox(TH.scopeOf('u1'), 'anthropic', TH.retiring('')),                                  'a lockbox retire expectation naming an empty revision_tok'],
+  ['bad_option', (vaultDB: VaultDB) => vaultDB.retireVault(TH.scopeOf('u1'), {} as RetireExpectation),                                     'a vault retire expectation naming no vault'],
   ['bad_option', (vaultDB: VaultDB) => vaultDB.retireVault(TH.scopeOf('u1'), { vault_id: '' }),                                         'a retire expectation naming an empty vault_id'],
   // the two together:
   ['bad_option', (vaultDB: VaultDB) => vaultDB.updateVaultProps(TH.vaultPropsOf('u1', { vault_id: 'vault-id-new', unlock_epoch: 2 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'an update of the vault props that would change the vault_id'],
@@ -585,7 +688,7 @@ describe("the abstract VaultDB, on the way in", () => {
     await vaultDB.updateBox(TH.scopeOf('u1'), emptied, TH.noBoxYet)
     expect(vaultDB.rows.get(u1BoxCkey('anthropic'))).to.deep.equal(emptied)
     await vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'two'), { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 1 })
-    await vaultDB.retireBox(TH.scopeOf('u1'), 'anthropic', TH.thisVault)
+    await vaultDB.retireBox(TH.scopeOf('u1'), 'anthropic', TH.retiring('rev-two'))
     expect(await vaultDB.listBoxes(TH.scopeOf('u1'))).to.have.lengthOf(0)
   })
 })
@@ -674,7 +777,7 @@ describe("the abstract VaultDB, holding names to the floor", () => {
     expect(lockbox?.revision_tok).to.eq('rev-one')
     const summaries = await vaultDB.listBoxes(scriptScope)
     expect(summaries.map((summary) => summary.boxlabel)).to.deep.equal(['مفتاح العمل'])
-    await vaultDB.retireBox(scriptScope, 'مفتاح العمل', TH.thisVault)
+    await vaultDB.retireBox(scriptScope, 'مفتاح العمل', TH.retiring('rev-one'))
     vaultDB.subscribe(scriptScope, unheard)()
     await vaultDB.retireVault(scriptScope, TH.thisVault)
     expect(await vaultDB.readVaultProps(scriptScope)).to.be.null
@@ -758,7 +861,7 @@ describe("the abstract VaultDB, holding names to what its adapter declares", () 
       const refusal = await TH.expectRefusal(vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf(candidate, 'one'), TH.noBoxYet), 'bad_label')
       expect(refusal.message).to.include('boxlabel')
       await TH.expectRefusal(vaultDB.readBox(TH.scopeOf('u1'), candidate), 'bad_label')
-      await TH.expectRefusal(vaultDB.retireBox(TH.scopeOf('u1'), candidate, TH.thisVault), 'bad_label')
+      await TH.expectRefusal(vaultDB.retireBox(TH.scopeOf('u1'), candidate, TH.retiring(null)), 'bad_label')
       expect([...vaultDB.rows]).to.deep.equal(before)
     })
   }

@@ -1,5 +1,5 @@
 import { Sanitizer, VaultDB, VaultError, VaultErrorKindVals } from 'safebyok'
-import type { VaultPropsExpectation, VaultDBOpts, RetireExpectation, Lockbox, LockboxExpectation, StoredLockbox, VaultProps, VaultErrorKind, VaultScope } from 'safebyok'
+import type { VaultPropsExpectation, VaultDBOpts, RetireExpectation, Lockbox, LockboxExpectation, LockboxRetireExpectation, StoredLockbox, VaultProps, VaultErrorKind, VaultScope } from 'safebyok'
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
 import { VaultPropsFields, ListedLockboxFields, LockboxFields, ScopeFields, recordOf, selectionOf } from './fields'
 
@@ -100,8 +100,8 @@ const UpdateVaultPropsDoc = `mutation SafebyokUpdateVaultProps($vaultProps: Safe
 const UpdateBoxDoc = `mutation SafebyokUpdateBox(${Scope}, $lockbox: SafebyokLockboxInput!, $expected: SafebyokLockboxExpectationInput!) {
   safebyokUpdateBox(scope: $scope, lockbox: $lockbox, expected: $expected) { ${selectionOf(LockboxFields)} }
 }`
-const RetireBoxDoc = `mutation SafebyokRetireBox(${Scope}, $boxlabel: String!, $expected: SafebyokRetireExpectationInput!) {
-  safebyokRetireBox(scope: $scope, boxlabel: $boxlabel, expected: $expected)
+const RetireBoxDoc = `mutation SafebyokRetireBox(${Scope}, $boxlabel: String!, $expected: SafebyokLockboxRetireExpectationInput!) {
+  safebyokRetireBox(scope: $scope, boxlabel: $boxlabel, expected: $expected) { outcome }
 }`
 const RetireVaultDoc = `mutation SafebyokRetireVault(${Scope}, $expected: SafebyokRetireExpectationInput!) {
   safebyokRetireVault(scope: $scope, expected: $expected)
@@ -192,9 +192,12 @@ class UrqlVaultDB extends VaultDB {
     return recordOf(safebyokUpdateBox, LockboxFields)
   }
 
-  protected async doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation): Promise<boolean> {
-    await this.told(RetireBoxDoc, { scope: scopeOut(scope), boxlabel, expected: { vault_id: expected.vault_id } })
-    return true
+  // A stale retire refuses on the server and crosses as its kind, so a retire that answers landed,
+  // with what the server's storage removed.
+  protected async doRetireBox(scope: VaultScope, boxlabel: string, expected: LockboxRetireExpectation): Promise<unknown> {
+    const { vault_id, revision_tok } = expected
+    const { safebyokRetireBox } = await this.told(RetireBoxDoc, { scope: scopeOut(scope), boxlabel, expected: { vault_id, revision_tok } })
+    return safebyokRetireBox
   }
 
   protected async doRetireVault(scope: VaultScope, expected: RetireExpectation): Promise<boolean> {

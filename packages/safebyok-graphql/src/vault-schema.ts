@@ -144,9 +144,31 @@ input SafebyokLockboxExpectationInput {
   vault_key_epoch: Int!
 }
 
-"""What a retire was aimed at: it lands only while the vault has that vault_id."""
+"""What a retire of a vault was aimed at: it lands only while the vault has that vault_id."""
 input SafebyokRetireExpectationInput {
   vault_id: String!
+}
+
+"""
+What a retire of a lockbox was aimed at: it lands only while the vault has that vault_id, and
+removes whatever lockbox stands; the revision_tok its writer read (null for a lockbox listed with
+none) only says whether what it removed was the one meant.
+"""
+input SafebyokLockboxRetireExpectationInput {
+  vault_id:     String!
+  revision_tok: String
+}
+
+"""What a lockbox retire removed: the revision it named, another (retired_other), or nothing (absent)."""
+enum SafebyokRetireOutcome {
+  retired
+  retired_other
+  absent
+}
+
+"""What a lockbox retire that landed found under its boxlabel, and removed."""
+type SafebyokLockboxRetirement {
+  outcome: SafebyokRetireOutcome!
 }
 
 type Query {
@@ -165,8 +187,8 @@ type Mutation {
   safebyokUpdateVaultProps(vaultProps: SafebyokVaultPropsInput!, expected: SafebyokVaultPropsExpectationInput!): Boolean!
   """Writes the lockbox under its boxlabel, only while what stands is what was expected, and answers with the lockbox as stored."""
   safebyokUpdateBox(scope: SafebyokVaultScopeInput!, lockbox: SafebyokLockboxInput!, expected: SafebyokLockboxExpectationInput!): SafebyokLockbox!
-  """Retires the lockbox under that boxlabel, removing it for good, only while the vault is the one expected."""
-  safebyokRetireBox(scope: SafebyokVaultScopeInput!, boxlabel: String!, expected: SafebyokRetireExpectationInput!): Boolean!
+  """Retires the lockbox under that boxlabel, removing it for good, only while the vault is the one expected, and answers with what it removed."""
+  safebyokRetireBox(scope: SafebyokVaultScopeInput!, boxlabel: String!, expected: SafebyokLockboxRetireExpectationInput!): SafebyokLockboxRetirement!
   """Retires the vault, its props and every lockbox, removing them for good, only while the vault is the one expected."""
   safebyokRetireVault(scope: SafebyokVaultScopeInput!, expected: SafebyokRetireExpectationInput!): Boolean!
 }

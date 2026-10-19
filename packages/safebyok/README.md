@@ -735,7 +735,7 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `vault_full`          | a new lockbox in a vault already holding its `maxLockboxes`, a new lockbox whose names would take the vault past its storage's `maxVaultBytes`, or a write the storage backend has no room for | Tell the user to remove a lockbox first; the host may raise `maxLockboxes` where the backend allows |
 | `too_many_wayins`     | a passphrase or passkey added to a vault already holding `MaxUnlocks` (8) ways in | Tell the user to remove one first             |
 | `last_wayin`          | removing the vault's last passphrase: a vault always keeps one, since a passkey can be lost with its device | Add another passphrase first; to be rid of the vault, `retire()` it |
-| `corrupt_record`      | a stored record failed validation as storage read it back: storage's own word, from a `VaultDB` called directly. A vault call says what it means for the vault instead, as one of the three below -- but for a `storeBox()` whose storage adapter answered its write with a record that fails its checks, a bug in that adapter | Nothing was changed, unless a write was answered so: then it may have landed. Do not retry; see a developer: the record is damaged, was moved, or came from a newer safebyok, or the adapter cannot read back what it writes |
+| `corrupt_record`      | a stored record failed validation as storage read it back: storage's own word, from a `VaultDB` called directly. A vault call says what it means for the vault instead, as one of the three below -- but for a `storeBox()` whose storage adapter answered its write with a record that fails its checks, or a `retireBox()` whose adapter answered in a shape this package does not know: a bug in that adapter | Nothing was changed, unless a write was answered so: then it may have landed. Do not retry; see a developer: the record is damaged, was moved, or came from a newer safebyok, or the adapter cannot read back what it writes or reports |
 | `damaged_vault`       | the vault's stored props failed their checks (not a shape this package writes, or naming another vault), so no way in can be tried: `hello()` refuses it | Nothing was changed, and a retry will not mend it. Tell the user the vault cannot be opened; restore its props from a backup, if there is one, or, if the user chooses to start over, `retireDamagedVault()` (see *A vault that cannot be opened*) |
 | `damaged_wayin`       | a way in is stored in a form this package never writes (a salt of the wrong length, or not base64url), so it cannot be tried: the passkey asked for, the passphrase `wayinId` aims at, or every passphrase the vault has. Other ways in are still tried | Unlock another way, then `retireWayin()` the damaged one and add it again |
 | `damaged_lockbox`     | a lockbox failed its checks as read, or would not open under the vault's own vaultKey, or opened to no whisper: altered in storage, or moved there from elsewhere. A lockbox that will not open is named so only after the vault has caught up with storage once: one a vault made anew elsewhere wrote makes the call `vault_locked` instead | Nothing was changed. Offer `retireBox()`, or a fresh `storeBox()` over it (see *Damaged lockboxes*) |
@@ -890,6 +890,13 @@ over its revision, and carries nothing forward either: nothing vouches for its p
 its sidecar becomes `{}` unless you give one, and its first-stored time is now. A storage adapter's `doListBoxes` hands up each lockbox as a
 `StoredLockbox`, the boxlabel it is stored under beside its record exactly as stored, so a record
 too damaged to name itself is still listed under the boxlabel that reaches it.
+
+A retirement within the vault wins over any revision, damaged or sound. A `retireBox()` that finds
+the lockbox written over since the snapshot showed it, on another device or tab, retires that
+write all the same; so does the retirement a `storeBox()` makes first over a record naming no
+revision, should another device have stored there meanwhile, and the store then writes its own.
+Either way the vault warns through your logger that a different revision than the one it showed
+was retired, naming neither: the other device's whisper is gone, and only the log says so.
 
 In code, `VaultErrorFamilyForKind` gives each kind's family (`VaultErrorFamilyVals`: `misuse`,
 `condition`), and `isVaultCondition(err)` is true for a `VaultError` of the condition family:

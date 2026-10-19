@@ -92,6 +92,20 @@ describe("getBox and updateBox", () => {
   })
 })
 
+describe("retireBox", () => {
+  it("resolves what it removed -- the revision named, another, or none -- and null, removing nothing, in another vault", async () => {
+    const CVX = await withVaultProps()
+    await CVX.mutation(TH.vaults.updateBox, { scope: u1, lockbox: TH.boxOf('anthropic_api_key', 'a1'), expected: TH.noBoxYet })
+    await CVX.mutation(TH.vaults.updateBox, { scope: u1, lockbox: TH.boxOf('openai_api_key', 'o1'), expected: TH.noBoxYet })
+    expect(await CVX.mutation(TH.vaults.retireBox, { scope: u1, boxlabel: 'anthropic_api_key', expected: { vault_id: 'vault-id-gone', revision_tok: 'rev-a1' } })).to.be.null
+    expect(await CVX.mutation(TH.vaults.retireBox, { scope: u1, boxlabel: 'anthropic_api_key', expected: TH.retiring('rev-a1') })).to.deep.equal({ outcome: 'retired' })
+    expect(await CVX.mutation(TH.vaults.retireBox, { scope: u1, boxlabel: 'openai_api_key', expected: TH.retiring(null) })).to.deep.equal({ outcome: 'retired_other' })
+    expect(await CVX.mutation(TH.vaults.retireBox, { scope: u1, boxlabel: 'openai_api_key', expected: TH.retiring('rev-o1') })).to.deep.equal({ outcome: 'absent' })
+    const { lockboxes } = await allRows(CVX)
+    expect(lockboxes).to.have.lengthOf(0)
+  })
+})
+
 describe("listBoxSummaries", () => {
   it("lists the vault's boxes in boxlabel order, without ciphered fields, keeping format", async () => {
     const CVX = await withVaultProps()
@@ -138,7 +152,7 @@ describe("watchVault", () => {
     await sign()
     await CVX.mutation(TH.vaults.updateVaultProps, { vaultProps: TH.vaultPropsOf('u1', { unlock_epoch: 2 }), expected: { vault_id: 'vault-id-u1', unlock_epoch: 1 } })
     await sign()
-    await CVX.mutation(TH.vaults.retireBox, { scope: u1, boxlabel: 'anthropic_api_key', expected: TH.thisVault })
+    await CVX.mutation(TH.vaults.retireBox, { scope: u1, boxlabel: 'anthropic_api_key', expected: TH.retiring('rev-a2') })
     await sign()
     await CVX.mutation(TH.vaults.retireVault, { scope: u1, expected: TH.thisVault })
     await sign()
@@ -241,8 +255,8 @@ describe("a vault's tally", () => {
       () => CVX.mutation(TH.vaults.updateBox, { scope: u1, lockbox: TH.heavyBox('anthropic_api_key', 5000, 'a2'), expected: over('a1') }),
       () => CVX.mutation(TH.vaults.updateBox, { scope: u1, lockbox: TH.boxOf('openai_api_key', 'o1'), expected: TH.noBoxYet }),
       () => CVX.mutation(TH.vaults.updateBox, { scope: u1, lockbox: TH.boxOf('anthropic_api_key', 'a3'), expected: over('a2') }),
-      () => CVX.mutation(TH.vaults.retireBox, { scope: u1, boxlabel: 'anthropic_api_key', expected: TH.thisVault }),
-      () => CVX.mutation(TH.vaults.retireBox, { scope: u1, boxlabel: 'never_stored', expected: TH.thisVault }),
+      () => CVX.mutation(TH.vaults.retireBox, { scope: u1, boxlabel: 'anthropic_api_key', expected: TH.retiring('rev-a3') }),
+      () => CVX.mutation(TH.vaults.retireBox, { scope: u1, boxlabel: 'never_stored', expected: TH.retiring(null) }),
     ]
     const counts = []
     for (const step of steps) {
@@ -258,7 +272,7 @@ describe("a vault's tally", () => {
     const CVX = await withVaultProps()
     const boxlabels = Array.from({ length: 12 }, (_, ii) => `box_${String(ii)}`)
     await Promise.all(boxlabels.map((boxlabel) => CVX.mutation(TH.vaults.updateBox, { scope: u1, lockbox: TH.boxOf(boxlabel, boxlabel), expected: TH.noBoxYet })))
-    await Promise.all(boxlabels.slice(0, 5).map((boxlabel) => CVX.mutation(TH.vaults.retireBox, { scope: u1, boxlabel, expected: TH.thisVault })))
+    await Promise.all(boxlabels.slice(0, 5).map((boxlabel) => CVX.mutation(TH.vaults.retireBox, { scope: u1, boxlabel, expected: TH.retiring(`rev-${boxlabel}`) })))
     expect(await keptTally(CVX)).to.deep.equal(await weighedTally(CVX))
     expect(await keptTally(CVX)).to.have.property('lockbox_count', 7)
   })
@@ -302,7 +316,7 @@ describe("a vault's tally", () => {
   it("is not counted by a retire, which never reads the whole vault", async () => {
     const CVX = await withVaultProps()
     await writeUntallied(CVX, [TH.boxOf('anthropic_api_key', 'a1'), TH.boxOf('openai_api_key', 'o1')])
-    await CVX.mutation(TH.vaults.retireBox, { scope: u1, boxlabel: 'anthropic_api_key', expected: TH.thisVault })
+    await CVX.mutation(TH.vaults.retireBox, { scope: u1, boxlabel: 'anthropic_api_key', expected: TH.retiring('rev-a1') })
     expect(await keptTally(CVX)).to.be.null
     await CVX.mutation(TH.vaults.updateBox, { scope: u1, lockbox: TH.boxOf('github_token', 'g1'), expected: TH.noBoxYet })
     expect(await keptTally(CVX)).to.deep.equal(await weighedTally(CVX))
@@ -359,7 +373,7 @@ describe("a vault's weight limit", () => {
     expect(await CVX.mutation(TH.vaults.updateBox, { scope: u1, lockbox: TH.heavyBox('heavy_0', 800_000, 'shrunk0'), expected: over('heavy_0') })).to.deep.equal(TH.heavyBox('heavy_0', 800_000, 'shrunk0'))
     expect(await keptTally(CVX)).to.be.null
     //
-    expect(await CVX.mutation(TH.vaults.retireBox, { scope: u1, boxlabel: 'heavy_1', expected: TH.thisVault })).to.be.true
+    expect(await CVX.mutation(TH.vaults.retireBox, { scope: u1, boxlabel: 'heavy_1', expected: TH.retiring('rev-heavy_1') })).to.deep.equal({ outcome: 'retired' })
     expect(await CVX.mutation(TH.vaults.updateBox, { scope: u1, lockbox: TH.boxOf('anthropic_api_key', 'a1'), expected: TH.noBoxYet })).to.deep.equal(TH.boxOf('anthropic_api_key', 'a1'))
     expect(await keptTally(CVX)).to.deep.equal(await weighedTally(CVX))
   })
@@ -374,7 +388,8 @@ describe("a vault's weight limit", () => {
     await expect(CVX.query(TH.vaults.listBoxSummaries, { scope: u1 })).rejects.toThrow(/Read too much data/)
     expect(await refusedWrite(CVX, TH.boxOf('anthropic_api_key', 'a1'), TH.noBoxYet)).to.deep.equal(VaultFull)
     for (let ii = 0; ii < 20; ii++) {
-      expect(await CVX.mutation(TH.vaults.retireBox, { scope: u1, boxlabel: `heavy_${String(ii)}`, expected: TH.thisVault })).to.be.true
+      const boxlabel = `heavy_${String(ii)}`
+      expect(await CVX.mutation(TH.vaults.retireBox, { scope: u1, boxlabel, expected: TH.retiring(`rev-${boxlabel}`) })).to.deep.equal({ outcome: 'retired' })
     }
     expect(await CVX.mutation(TH.vaults.retireVault, { scope: u1, expected: TH.thisVault })).to.be.true
     const { vaults, lockboxes } = await allRows(CVX)

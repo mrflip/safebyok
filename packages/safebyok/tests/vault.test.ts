@@ -5721,6 +5721,64 @@ describe("versioned updates: two devices writing at once", () => {
     expect(err.message).to.not.match(/vault it was in is gone/)
   })
 
+  it("a retirement names the revision its listing shows, and warns of nothing when that is what it retired", async () => {
+    const { world, hereDB, here } = await twoDeviceWorld()
+    await here.storeBox('anthropic', 'sk-ant-fake-one')
+    const shown = here.getSnapshot().boxes[0]?.revision_tok
+    const retireBox = vi.spyOn(hereDB, 'retireBox')
+    await here.retireBox('anthropic')
+    expect(retireBox.mock.calls[0]?.[2]).to.deep.equal({ vault_id: storedVaultPropsOf(world)['vault_id'], revision_tok: shown })
+    expect(world.logged.filter((heard) => heard.story?.['call'] === 'retireBox')).to.have.lengthOf(0)
+  })
+
+  it("a retirement over a box written meanwhile elsewhere retires theirs all the same, and warns that it was not the revision shown, naming neither", async () => {
+    const { world, hereDB, here, there } = await twoDeviceWorld()
+    await here.storeBox('anthropic', 'sk-ant-fake-one')
+    const shown = String(here.getSnapshot().boxes[0]?.revision_tok)
+    const theirs = { revisionTok: '' }
+    TH.beforeNextCall(hereDB, 'retireBox', async () => {
+      await there.storeBox('anthropic', 'sk-ant-fake-theirs')
+      theirs.revisionTok = String(storedRowOf(world, 'anthropic')['revision_tok'])
+    })
+    await here.retireBox('anthropic')
+    expect(world.dbStore.read(u1BoxCkey('anthropic'))).to.be.null
+    expect(here.getSnapshot().boxes).to.have.lengthOf(0)
+    const told = world.logged.filter((heard) => heard.story?.['call'] === 'retireBox')
+    expect(told).to.have.lengthOf(1)
+    expect(told[0]).to.deep.include({ level: 'warn' })
+    expect(told[0]?.message).to.match(/^The lockbox retired was not the revision this device showed/)
+    const text = TH.loggedText(told)
+    for (const unsaid of [shown, theirs.revisionTok, 'anthropic']) { expect(text).to.not.include(unsaid) }
+  })
+
+  it("a store over a damaged box naming no revision, written over meanwhile by a device that saw it damaged too, retires that write, warns, and stores its own", async () => {
+    // The lost write the warning is for: A retires the damaged box and writes; B, which saw the
+    // same damage, retires A's write and writes in its place.
+    const { world, hereDB, here, there } = await twoDeviceWorld()
+    await here.storeBox('anthropic', 'sk-ant-fake-one')
+    world.dbStore.write(u1BoxCkey('anthropic'), '{"not": json')
+    await vi.waitFor(() => {
+      expect(here.getSnapshot().boxes[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true, revision_tok: null })
+      expect(there.getSnapshot().boxes[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true, revision_tok: null })
+    })
+    const theirs = { revisionTok: '' }
+    TH.beforeNextCall(hereDB, 'retireBox', async () => {
+      await there.storeBox('anthropic', 'sk-ant-fake-theirs')
+      theirs.revisionTok = String(storedRowOf(world, 'anthropic')['revision_tok'])
+    })
+    const retireBox = vi.spyOn(hereDB, 'retireBox')
+    await here.storeBox('anthropic', 'sk-ant-fake-mine')
+    expect(retireBox.mock.calls[0]?.[2]).to.deep.include({ revision_tok: null })
+    expect(await there.readBox('anthropic')).to.eq('sk-ant-fake-mine')
+    // Theirs retired the damaged record it was shown, and so warned of nothing; this one, of theirs.
+    const told = world.logged.filter((heard) => heard.story?.['call'] === 'storeBox')
+    expect(told).to.have.lengthOf(1)
+    expect(told[0]).to.deep.include({ level: 'warn' })
+    expect(told[0]?.message).to.match(/^Storing over a damaged lockbox first retired what stood under its boxlabel, and that was not the damaged record this device showed/)
+    const text = TH.loggedText(told)
+    for (const unsaid of [theirs.revisionTok, 'anthropic']) { expect(text).to.not.include(unsaid) }
+  })
+
   it("a passphrase change racing another device's is refused as stale; theirs stands", async () => {
     const { here, there, beforeNextWrite } = await twoDeviceWorld()
     await here.storeBox('anthropic', 'sk-ant-fake-one')

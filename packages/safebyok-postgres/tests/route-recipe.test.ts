@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Client } from 'pg'
 import { VaultDB, VaultError, VaultErrorKindVals, memoryDeviceDB } from 'safebyok'
-import type { VaultPropsExpectation, RetireExpectation, Lockbox, LockboxExpectation, VaultProps, VaultErrorKind, VaultScope } from 'safebyok'
+import type { VaultPropsExpectation, RetireExpectation, Lockbox, LockboxExpectation, LockboxRetireExpectation, VaultProps, VaultErrorKind, VaultScope } from 'safebyok'
 import * as TH from './test-helpers'
 import { VaultChangeChannel, postgresVaultDB } from '../src/index'
 import type { PostgresClient, PostgresListen } from '../src/index'
@@ -29,7 +29,7 @@ const served = new Map<string, Served>([
   ['readBox',                 (vaultDB, [scope, boxlabel]) => vaultDB.readBox(scope as VaultScope, boxlabel as string)],
   ['listBoxes',               (vaultDB, [scope]) => vaultDB.listBoxRecords(scope as VaultScope)],
   ['updateBox',               (vaultDB, [scope, lockbox, expected]) => vaultDB.updateBox(scope as VaultScope, lockbox as Lockbox, expected as LockboxExpectation)],
-  ['retireBox',               (vaultDB, [scope, boxlabel, expected]) => vaultDB.retireBox(scope as VaultScope, boxlabel as string, expected as RetireExpectation)],
+  ['retireBox',               (vaultDB, [scope, boxlabel, expected]) => vaultDB.retireBox(scope as VaultScope, boxlabel as string, expected as LockboxRetireExpectation)],
   ['retireVault',             (vaultDB, [scope, expected]) => vaultDB.retireVault(scope as VaultScope, expected as RetireExpectation)],
 ])
 
@@ -96,17 +96,15 @@ class RouteVaultDB extends VaultDB {
     return lockboxes.map((lockbox) => ({ boxlabel: lockbox.boxlabel, lockbox }))
   }
   protected doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation) { return this.call('updateBox', scope, lockbox, expected) }
-  protected async doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation) {
-    await this.call('retireBox', scope, boxlabel, expected)
-    return true
-  }
+  protected doRetireBox(scope: VaultScope, boxlabel: string, expected: LockboxRetireExpectation) { return this.call('retireBox', scope, boxlabel, expected) }
   protected async doRetireVault(scope: VaultScope, expected: RetireExpectation) {
     await this.call('retireVault', scope, expected)
     return true
   }
 
   // A stale write refuses on the server and crosses as its kind, so a write that answers landed:
-  // a lockbox write answers with the lockbox as the server's storage holds it.
+  // a lockbox write answers with the lockbox as the server's storage holds it, and a lockbox
+  // retirement with what it removed.
   private async call(verb: string, ...args: unknown[]): Promise<unknown> {
     const response = await this.fetcher(VaultRouteUrl, {
       method:  'POST',

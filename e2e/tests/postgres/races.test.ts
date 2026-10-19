@@ -69,9 +69,9 @@ TH.describeOnPostgres('races', "postgresVaultDB's lockbox limit, over a real Pos
     await racer.query('COMMIT')
 
     await TH.expectRefusal(device.updateBox(u1, TH.boxOf('sixth', 'sk-fake'), TH.noBoxYet), 'vault_full')
-    await device.retireBox(u1, 'one', TH.thisVault)
+    await device.retireBox(u1, 'one', TH.retiring('rev-sk-fake-one'))
     await TH.expectRefusal(device.updateBox(u1, TH.boxOf('sixth', 'sk-fake'), TH.noBoxYet), 'vault_full')
-    await device.retireBox(u1, 'two', TH.thisVault)
+    await device.retireBox(u1, 'two', TH.retiring('rev-sk-fake-two'))
     await device.updateBox(u1, TH.boxOf('sixth', 'sk-fake'), TH.noBoxYet)
     expect(await TH.lockboxesStanding(db)).to.eq(Cap)
   })

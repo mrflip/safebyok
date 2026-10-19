@@ -1,5 +1,5 @@
 import { Refusals, VaultDB, VaultError, VaultScope } from 'safebyok'
-import type { VaultPropsExpectation, VaultDBOpts, RetireExpectation, Lockbox, LockboxExpectation, StoredLockbox, VaultProps } from 'safebyok'
+import type { VaultPropsExpectation, VaultDBOpts, RetireExpectation, Lockbox, LockboxExpectation, LockboxRetireExpectation, LockboxRetirement, StoredLockbox, VaultProps } from 'safebyok'
 import * as Columns from './columns'
 import { VaultPropsColumns, ListedLockboxColumns, LockboxColumns } from './columns'
 import { VaultChangeChannel } from './vault-tables'
@@ -214,12 +214,17 @@ const ReplaceBoxSql = `WITH vault AS (
     AND EXISTS (SELECT 1 FROM vault)
   RETURNING ${Columns.selected(LockboxColumns)}`
 
-// Lands while the vault props of that vault_id stand, whether or not there was a lockbox to retire.
+// Lands while the vault props of that vault_id stand, whether or not there was a lockbox to retire,
+// and answers one row then, saying what it removed: the revision_tok its DELETE returned, or null
+// for none (the column is NOT NULL, so null is only ever no lockbox). A lockbox written meanwhile
+// is one the DELETE waited on and then removed as it stands, its revision the one returned. No row
+// when the vault props did not stand.
 const RetireBoxSql = `WITH retired AS (
     DELETE FROM safebyok_lockboxes WHERE ${ScopeIs} AND boxlabel = $4::text AND vault_id = $5::text
       AND EXISTS (SELECT 1 FROM safebyok_vaults WHERE ${ScopeIs} AND vault_id = $5::text)
+    RETURNING revision_tok
   )
-  SELECT 1 AS landed FROM safebyok_vaults WHERE ${ScopeIs} AND vault_id = $5::text`
+  SELECT (SELECT revision_tok FROM retired) AS retired_tok FROM safebyok_vaults WHERE ${ScopeIs} AND vault_id = $5::text`
 
 // The lockboxes go with their vault props, by the foreign key's cascade, in the same statement.
 const RetireVaultSql = `DELETE FROM safebyok_vaults WHERE ${ScopeIs} AND vault_id = $4::text RETURNING 1 AS landed`
@@ -315,9 +320,14 @@ class TablesVaultDB extends VaultDB {
     }
   }
 
-  protected async doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation): Promise<boolean> {
+  // What it removed is what the statement that removed it returned.
+  protected async doRetireBox(scope: VaultScope, boxlabel: string, expected: LockboxRetireExpectation): Promise<LockboxRetirement | null> {
     this.mustReach(scope)
-    return landed(await this.client.query(RetireBoxSql, [...scopeParams(scope), boxlabel, expected.vault_id]))
+    const { rows } = await this.client.query(RetireBoxSql, [...scopeParams(scope), boxlabel, expected.vault_id])
+    if (rows.length === 0) { return null }
+    const { retired_tok: retiredTok } = rows[0] as { retired_tok: string | null }
+    if (retiredTok === null) { return { outcome: 'absent' } }
+    return { outcome: retiredTok === expected.revision_tok ? 'retired' : 'retired_other' }
   }
 
   protected async doRetireVault(scope: VaultScope, expected: RetireExpectation): Promise<boolean> {
