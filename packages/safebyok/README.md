@@ -774,9 +774,9 @@ made anew elsewhere, or its ways in changed, the device relocks, and `storeBox()
 meets another device's write is refused as `stale_write` the same way, once caught up.
 
 Do not overlap your own `storeBox()` calls on one lockbox: await the first before the second.
-Both would read the same revision, so the second is refused as `stale_write`, and its message
-words it as another device's write, because storage cannot tell your app's second call from
-another device's.
+Both would read the same revision, so whichever write lands second is refused as `stale_write`
+-- not always the call you made second -- and its message words it as another device's write,
+because storage cannot tell your app's other call from another device's.
 
 ### A vault that cannot be opened
 
