@@ -1,7 +1,7 @@
 # safebyok-convex
 
 safebyok's storage on [Convex](https://convex.dev): a Convex **component** that holds each vault's
-props and lockboxes, ciphertext and public fields only, in tables of its own, and
+props and lockboxes, ciphertext and unencrypted fields only, in tables of its own, and
 **`convexVaultDB`**, the client side a vault stores through. Your Convex backend never sees a
 whisper, a passphrase, or any key that opens one.
 
@@ -61,8 +61,10 @@ mistake for the first request.
   (`retireBox`, `retireVault`) carries what its writer expects to stand -- the vault's `vault_id`,
   and the vault props' `unlock_epoch`, or the lockbox's `revision_tok` and the vault props'
   `vault_key_epoch` (the vaultKey the lockbox was sealed under) -- and checks it in the same
-  transaction it writes in. When that no longer stands, it writes nothing and resolves `false`,
-  which the client turns into a `stale_write`. Not an error: no `ConvexError`, nothing in your logs.
+  transaction it writes in. When that no longer stands, it writes nothing and resolves `false`
+  (`updateBox` and `retireBox`, `null`), which the client turns into a `stale_write`. Not an error: no `ConvexError`, nothing in your logs.
+  A `retireBox` also carries the `revision_tok` its writer read, but only to say what it removed:
+  within the expected vault it removes whatever stands.
   An update of the vault props lands, too, only when the new vault props keep the vault's
   `vault_id` and move their `unlock_epoch` forward, as every safebyok client's does.
 * **A vault the component has no room for.** `updateBox` refuses, writing nothing, a lockbox
@@ -200,12 +202,14 @@ the core's own records, scopes and expectations.
 | `updateVaultProps`        | mutation | `{ vaultProps, expected: { vault_id, unlock_epoch } }`                      | `true` if written, `false` if not                                                          |
 | `getBox`                  | query    | `{ scope, boxlabel }`                                                       | the `Lockbox`, or null                                                                     |
 | `listBoxSummaries`        | query    | `{ scope }`                                                                 | each lockbox without its ciphered fields, `format` kept, in boxlabel order                 |
-| `updateBox`               | mutation | `{ scope, lockbox, expected: { vault_id, revision_tok, vault_key_epoch } }` | `true` if written, `false` if not; refuses `vault_full` past the vault's limits            |
-| `retireBox`               | mutation | `{ scope, boxlabel, expected: { vault_id } }`                               | `true` if the vault still stands (box or none), `false` if not                             |
+| `updateBox`               | mutation | `{ scope, lockbox, expected: { vault_id, revision_tok, vault_key_epoch } }` | the `Lockbox` as stored if written, null if not; refuses `vault_full` past the vault's limits |
+| `retireBox`               | mutation | `{ scope, boxlabel, expected: { vault_id, revision_tok } }`                 | `{ outcome }` if the vault still stands -- `retired`, `retired_other` or `absent` -- null if not |
 | `retireVault`             | mutation | `{ scope, expected: { vault_id } }`                                         | `true` if retired, `false` if not                                                          |
 | `watchVault`              | query    | `{ scope }`                                                                 | `{ vault_id, unlock_epoch, boxes: [[boxlabel, revision_tok]] }`, changing with every write |
 
-`scope` is `{ applabel, user_id, vaultlabel }`. A `revision_tok` of null expects no lockbox there.
+`scope` is `{ applabel, user_id, vaultlabel }`. A `revision_tok` of null expects no lockbox there; in a
+`retireBox`, it names a lockbox listed with none, so a lockbox it removes that holds a revision is
+`retired_other`.
 
 ## Testing your own functions
 

@@ -2,7 +2,7 @@
 
 safebyok's storage in [Postgres](https://www.postgresql.org): the SQL that makes the tables a
 vault is stored in, and **`postgresVaultDB`**, the VaultDB over them, which runs on your server.
-Your database holds ciphertext and a few public fields; it never sees a whisper, a passphrase, or
+Your database holds ciphertext and a few unencrypted fields; it never sees a whisper, a passphrase, or
 any key that opens one.
 
 It brings no database driver: it speaks through the one you already have -- a `pg` Pool, a
@@ -107,7 +107,7 @@ The server half, `app/api/safebyok/route.ts`:
 ```ts
 import { Pool } from 'pg'
 import { VaultError } from 'safebyok'
-import type { VaultPropsExpectation, RetireExpectation, Lockbox, LockboxExpectation, VaultProps, VaultScope } from 'safebyok'
+import type { VaultPropsExpectation, RetireExpectation, Lockbox, LockboxExpectation, LockboxRetireExpectation, VaultProps, VaultScope } from 'safebyok'
 import { postgresVaultDB } from 'safebyok-postgres'
 import type { VaultDB } from 'safebyok'
 
@@ -127,7 +127,7 @@ const served = new Map<string, Served>([
   ['readBox',      (vaultDB, [scope, boxlabel]) => vaultDB.readBox(scope as VaultScope, boxlabel as string)],
   ['listBoxes',    (vaultDB, [scope]) => vaultDB.listBoxRecords(scope as VaultScope)],
   ['updateBox',    (vaultDB, [scope, lockbox, expected]) => vaultDB.updateBox(scope as VaultScope, lockbox as Lockbox, expected as LockboxExpectation)],
-  ['retireBox',     (vaultDB, [scope, boxlabel, expected]) => vaultDB.retireBox(scope as VaultScope, boxlabel as string, expected as RetireExpectation)],
+  ['retireBox',     (vaultDB, [scope, boxlabel, expected]) => vaultDB.retireBox(scope as VaultScope, boxlabel as string, expected as LockboxRetireExpectation)],
   ['retireVault',   (vaultDB, [scope, expected]) => vaultDB.retireVault(scope as VaultScope, expected as RetireExpectation)],
 ])
 
@@ -167,7 +167,7 @@ The client half, a VaultDB over `fetch`, to hand `Vault.make` as its `vaultDB`:
 
 ```ts
 import { VaultDB, VaultError, VaultErrorKindVals } from 'safebyok'
-import type { VaultPropsExpectation, RetireExpectation, Lockbox, LockboxExpectation, VaultProps, VaultDBOpts, VaultErrorKind, VaultScope } from 'safebyok'
+import type { VaultPropsExpectation, RetireExpectation, Lockbox, LockboxExpectation, LockboxRetireExpectation, VaultProps, VaultDBOpts, VaultErrorKind, VaultScope } from 'safebyok'
 
 const VaultRouteUrl = '/api/safebyok'
 
@@ -191,20 +191,16 @@ export class RouteVaultDB extends VaultDB {
     const lockboxes = await this.call('listBoxes', scope) as { boxlabel: string }[]
     return lockboxes.map((lockbox) => ({ boxlabel: lockbox.boxlabel, lockbox }))
   }
-  protected async doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation) {
-    await this.call('updateBox', scope, lockbox, expected)
-    return true
-  }
-  protected async doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation) {
-    await this.call('retireBox', scope, boxlabel, expected)
-    return true
-  }
+  protected doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation) { return this.call('updateBox', scope, lockbox, expected) }
+  protected doRetireBox(scope: VaultScope, boxlabel: string, expected: LockboxRetireExpectation) { return this.call('retireBox', scope, boxlabel, expected) }
   protected async doRetireVault(scope: VaultScope, expected: RetireExpectation) {
     await this.call('retireVault', scope, expected)
     return true
   }
 
-  // A stale write refuses on the server and crosses as its kind, so a write that answers lands.
+  // A stale write refuses on the server and crosses as its kind, so a write that answers landed:
+  // a lockbox write answers with the lockbox as the server's storage holds it, and a lockbox
+  // retirement with what it removed.
   private async call(verb: string, ...args: unknown[]): Promise<unknown> {
     const response = await fetch(VaultRouteUrl, {
       method:  'POST',
@@ -387,11 +383,16 @@ IndexedDB adapter of a key-value store. To store vaults in another SQL database,
 shape of table, copy it, and keep to what makes it right:
 
 * **Extend `VaultDB` and write its `do*` methods**, never its public verbs: the base class checks
-  labels and scope on the way in, validates every record on the way out, and turns a `false`
-  into `stale_write` and anything you throw into `storage_unavailable`.
+  labels and scope on the way in, validates every record and answer on the way out, and turns a
+  `false` (from a lockbox write or retirement, a `null`) into `stale_write` and anything you
+  throw into `storage_unavailable`.
 * **One statement per verb**, so each is atomic without a transaction: the expectation goes in
   the `WHERE` (`UPDATE ... WHERE vault_id = $ AND unlock_epoch = $ RETURNING 1`), and a row
-  back means it landed. A create returns the row that stands with `ON CONFLICT ... DO UPDATE`
+  back means it landed. A lockbox write returns the row's columns (`RETURNING format, boxlabel,
+  ...`): the lockbox as stored, which the base class reads back as it would a read. A lockbox
+  retirement deletes whatever stands within the expected vault and returns its `revision_tok`
+  (`DELETE ... RETURNING revision_tok`), so it can say whether it removed the revision the device
+  named, another, or none. A create returns the row that stands with `ON CONFLICT ... DO UPDATE`
   (a no-op update), since `DO NOTHING` returns no row when another device got in first.
 * **Let the schema hold the vault together.** The lockbox's foreign key names its vault row down
   to the `vault_id`, so a lockbox cannot outlive its vault or land in one made anew, and retiring

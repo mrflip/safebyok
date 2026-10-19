@@ -241,6 +241,8 @@ describe("VaultDashboard, its lockboxes", () => {
     const damagedRow = rowOf('openai_api_key')
     expect(within(damagedRow).queryByRole('button', { name: 'view' })).to.be.null
     expect(within(damagedRow).queryByRole('button', { name: 'use' })).to.be.null
+    // Not JSON, it names no revision, so nothing can be stored over it until it is removed.
+    expect(within(damagedRow).queryByRole('button', { name: 'replace' })).to.be.null
     vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
     fireEvent.click(within(damagedRow).getByRole('button', { name: 'remove' }))
     await TH.answerPassphraseDialog()
@@ -249,11 +251,13 @@ describe("VaultDashboard, its lockboxes", () => {
     expect(screen.getByText('anthropic_api_key')).to.not.be.null
   })
 
-  it("replaces a damaged lockbox with a fresh whisper", async () => {
+  it("replaces a damaged lockbox that names its revision with a fresh whisper", async () => {
     const store = memoryStore()
     const world = TH.makeWorld({ vaultDB: localVaultDB({ store }) })
     await world.seed({ openai_api_key: 'sk-test-not-a-real-key' })
-    store.write(openaiCkey, '{"not": json')
+    // A sidecar that is not JSON: damaged, but its record still names its revision.
+    const row = JSON.parse(store.read(openaiCkey) ?? '{}') as object
+    store.write(openaiCkey, JSON.stringify({ ...row, sidecar_json: '{"note":' }))
     world.renderInVault(<VaultDashboard />)
     fireEvent.click(await screen.findByRole('button', { name: 'replace' }))
     expect(screen.getByLabelText<HTMLInputElement>(/^label/).disabled).to.be.true

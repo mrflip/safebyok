@@ -33,8 +33,8 @@ export type VaultState = 'opening' | 'absent' | 'locked' | 'unlocked'
 
 /**
  * Immutable picture of the vault for rendering, shaped for `useSyncExternalStore`: the object
- * keeps its identity until something changes. Lockbox summaries (labels and public metadata, no
- * whispers) are present even while locked -- that is the point of keeping metadata public.
+ * keeps its identity until something changes. Lockbox summaries (labels and other visible fields, no
+ * whispers) are present even while locked -- that is the point of leaving them unencrypted.
  */
 export type VaultSnapshot = {
   state:     VaultState
@@ -43,7 +43,7 @@ export type VaultSnapshot = {
    * Every lockbox in the vault, sorted by boxlabel: a {@link LockboxSummary} for each, or a
    * {@link DamagedLockbox} (`damaged: true`, its boxlabel and revision and nothing else) for one
    * whose stored record does not read back, or is sealed under a vaultKey the vault does not hold
-   * -- which `retireBox()` removes and `storeBox()` overwrites. The listing reads each record's shape and
+   * -- which `retireBox()` removes, and `storeBox()` overwrites while it names its revision. The listing reads each record's shape and
    * never opens its ciphertext: ciphertext altered in storage shows only when it is read.
    */
   boxes:     readonly (LockboxSummary | DamagedLockbox)[]
@@ -56,7 +56,7 @@ export type VaultSnapshot = {
    */
   askPassphraseAt: number | null
   /**
-   * The vault's ways in, public face only, in the order the vault tries them: one
+   * The vault's ways in, visible fields only, in the order the vault tries them: one
    * {@link WayinSummary} per passphrase or passkey, readable while locked, so a host can list
    * them, ask which one the user means, name one to `unlock()`, `changePassphrase()` or
    * `retireWayin()`, and ask a passkey's authenticator for its answer. Empty until the vault exists.
@@ -513,6 +513,13 @@ export type Vault = {
    * catch-up's failure its cause, and the snapshot says `syncing: false` -- or, for a catch-up
    * refused as 'identity_revoked', 'rolled_back' or 'newer_format', that refusal as it came.
    *
+   * A store can also throw after its write has landed. Once storage takes the write, the call reads
+   * storage again to show the new revision, and that read can fail as any read does: kind
+   * 'storage_unavailable', 'identity_revoked', 'rolled_back', 'newer_format' or 'damaged_vault'. A
+   * storage adapter that hands back a record it cannot read throws kind 'corrupt_record' the same
+   * way. Either way the lockbox may already hold this whisper, and calling `storeBox()` again
+   * writes the same whisper over itself, harmlessly.
+   *
    * The lockbox keeps the time it was first stored as `registered_at`, and stamps `written_at`
    * with the time of this write: every store moves it, the same whisper stored again included, so
    * it says when the lockbox was last written, never whether its whisper changed.
@@ -521,22 +528,25 @@ export type Vault = {
    * damaged, and also one that lists as sound but whose ciphered fields are missing or malformed
    * -- is overwritten as though it were new, with nothing carried from it, neither its sidecar
    * nor its `registered_at`: in one write over the revision the listing names, which another
-   * device's write meanwhile refuses, as for any lockbox. A record that names no revision is
-   * retired first, then written; should that write fail, the old record is gone and the call
-   * throws: calling `storeBox()` again writes the lockbox afresh. A record that reads but will not decipher --
+   * device's write meanwhile refuses, as for any lockbox. A store is that one write, always. A
+   * lockbox the snapshot lists as damaged naming no revision -- damaged beyond naming, as a record
+   * that is not JSON is -- has no revision to write over, so the store refuses it with kind
+   * 'damaged_lockbox', writing nothing: `retireBox()` it first, then store. A record that reads but will not decipher --
    * its ciphertext, its sidecar or a time altered in storage -- is written over its revision, but
-   * carries nothing forward either: nothing vouches for its public fields, so its sidecar becomes `{}`
+   * carries nothing forward either: nothing vouches for its visible fields, so its sidecar becomes `{}`
    * unless one is given, and its `registered_at` is now. A boxlabel the vault's check refuses is
    * kind 'bad_label', writing nothing, even where a lockbox stored under other checks stands under
    * it: that one reads and retires by its name, but is never written anew under it.
    *
-   * `opts.sidecar` is the lockbox's sidecar ({@link Sidecar}): your app's own plain data, riding
-   * beside the whisper, not encrypted, but guaranteed unchanged. Any JSON value, shown in the snapshot while locked, never interpreted by the vault -- kind 'bad_option' for anything JSON
+   * `opts.sidecar` is the lockbox's sidecar ({@link Sidecar}): your app's own data, riding
+   * beside the whisper, visible in storage -- authenticated, but never encrypted, so anyone who can
+   * read the database can read it. Any JSON value, shown in the snapshot while locked, never interpreted by the vault -- kind 'bad_option' for anything JSON
    * cannot carry. Check its shape yourself before storing it. It is the only option: any other
    * (a misspelt `sidcar`, or a `note` beside it) is kind 'bad_option', writing nothing. Left out, the lockbox keeps the sidecar
    * it has (when its record opens: see above), and a new lockbox gets `{}`; `{}` empties it. The sidecar is stored in the clear and
    * bound into the lockbox's encryption, so a sidecar altered in storage makes the lockbox refuse to
-   * open. Never put secret material in it. A lockbox heavier, whisper and names and sidecar together,
+   * open. Put in it what your app wants searchable server-side (a team, a rotation reminder,
+   * a count of the calls the app made to OpenRouter with this whisper), never secret material. A lockbox heavier, whisper and names and sidecar together,
    * than storage holds in one record is refused with kind 'lockbox_too_large'; one that would take
    * the vault past what its storage holds of one vault, with kind 'vault_full'.
    *
@@ -579,7 +589,11 @@ export type Vault = {
    * retired and made anew, elsewhere, nothing is removed and the call throws kind
    * 'stale_write', after catching up with storage -- which relocks this device -- its message
    * saying the lockbox could not be retired because the vault it was in is gone, and the
-   * adapter's refusal its cause.
+   * adapter's refusal its cause. Within that vault the retirement wins: when what stood was not the
+   * revision the snapshot shows -- another device or tab wrote over it meanwhile -- it is retired
+   * all the same, and the vault warns through its logger, naming neither revision. When the lockbox
+   * the snapshot showed was a damaged one, the warning says so and its story carries
+   * `damaged: true` beside `call`.
    */
   retireBox(boxlabel: string): Promise<void>
 
@@ -713,7 +727,7 @@ const make = (opts: MakeVaultOpts): Vault => {
     if (vaultKey !== null && askPassphraseAt !== null && askPassphraseAt > clockNow()) { return 'unlocked' }
     return 'locked'
   }
-  /** The public face of each way into the vault, once there is one. */
+  /** The visible fields of each way into the vault, once there is one. */
   const wayinSummaries = (): readonly WayinSummary[] => (
     vaultProps === UnreadVaultProps || vaultProps === null ? [] : vaultProps.wayins.map((wayin) => Wayin.summarize(wayin))
   )
@@ -745,7 +759,7 @@ const make = (opts: MakeVaultOpts): Vault => {
   const leaseCtx = (vaultId: string, epoch: number, deadline: number) => (
     cipherCtx('safebyok-lease-v1', applabel, scope.user_id, vaultlabel, vaultId, epoch, deadline, 'vault_key_lease_wrapped')
   )
-  // A lockbox's ctx binds its format, the vault it lies in, and its record's whole public header:
+  // A lockbox's ctx binds its format, the vault it lies in, and its record's whole visible header:
   // every field but the format, which leads, and the two encrypted ones, so a sidecar, a time, its
   // codec or its vaultKey's epoch altered in storage refuses to open.
   const boxCtx = (vaultId: string, header: LockboxHeader, purpose: 'lockbox_key_wrapped' | 'whisper_ciphered') => (
@@ -1613,7 +1627,7 @@ const make = (opts: MakeVaultOpts): Vault => {
   }
 
   /**
-   * True when `prev` opens under the vault's key, and so vouches for the public fields a store
+   * True when `prev` opens under the vault's key, and so vouches for the visible fields a store
    * carries forward from it; false for a record altered in storage, whose fields nothing vouches
    * for. What it holds is dropped unread: a store compares nothing.
    */
@@ -1628,13 +1642,12 @@ const make = (opts: MakeVaultOpts): Vault => {
   }
 
   /**
-   * Write `lockbox` over `expected`, as `storeBox()` does, retiring what stands under its boxlabel
-   * first when `clearsFirst`. One attempt: a refusal is thrown as {@link refuseStaleStoreBox} says.
-   * Work in hand, it may finish within a grace.
+   * Write `lockbox` over `expected`, as `storeBox()` does: one write, which storage refuses unless
+   * the revision `expected` names still stands. One attempt: a refusal is thrown as
+   * {@link refuseStaleStoreBox} says. Work in hand, it may finish within a grace.
    */
-  const writeOver = async (lockbox: Lockbox, expected: LockboxExpectation, clearsFirst: boolean): Promise<void> => {
+  const writeOver = async (lockbox: Lockbox, expected: LockboxExpectation): Promise<void> => {
     try {
-      if (clearsFirst) { await refreshOnStale(vaultDB.retireBox(scope, lockbox.boxlabel, { vault_id: expected.vault_id }), 'storeBox') }
       await refreshOnStale(vaultDB.updateBox(scope, lockbox, expected), 'storeBox')
     } catch (err) {
       refuseStaleStoreBox(err)
@@ -1835,6 +1848,10 @@ const make = (opts: MakeVaultOpts): Vault => {
       const whisperBytes = new TextEncoder().encode(stableJsonify(checked.data))
       ensureWhisperFits(whisperBytes, givenSidecarJson ?? EmptySidecarJson)
       const standing = await readBoxOrDamaged(label)
+      // A store is one write, over a revision storage arbitrates. A box listed damaged naming none
+      // could be cleared only by a retire before it, a second call another device's write could
+      // fall between and be lost: the user retires it, then stores.
+      if (standing === 'damaged' && isListedDamaged(label) && listedRevisionOf(label) === null) { throw damagedBeyondNaming() }
       // A damaged box is overwritten as a fresh store: nothing in it can be carried forward.
       const prev = standing === 'damaged' ? null : standing
       await ensureRoomFor(label, prev)
@@ -1842,7 +1859,7 @@ const make = (opts: MakeVaultOpts): Vault => {
       const unlockedKey = keyInHand()
       const standingVaultProps = currentVaultProps()
       const { vault_id: vaultId, vault_key_epoch: vaultKeyEpoch } = standingVaultProps
-      // Only a record that opens vouches for its public fields: one that will not, altered in
+      // Only a record that opens vouches for its visible fields: one that will not, altered in
       // storage, is written over as a fresh lockbox is, keeping neither its sidecar nor its
       // registered_at, so a sidecar planted in storage is never sealed into a revision that reads clean.
       const vouched = prev !== null && await recordOpens(unlockedKey, standingVaultProps, prev) ? prev : null
@@ -1855,10 +1872,8 @@ const make = (opts: MakeVaultOpts): Vault => {
       // the revision just read -- for a damaged box, the one the listing names -- : a vault reborn
       // elsewhere, a vaultKey replaced, or a box written meanwhile by another device, refuses it.
       const overRevision = standing === 'damaged' ? listedRevisionOf(label) : prev?.revision_tok ?? null
-      // Only a box the listing shows damaged and naming no revision is retired first: one the
-      // listing does not show yet is written as over none, which storage refuses while it
-      // stands, and the catch-up lists it with its revision for the next store.
-      const clearsFirst = standing === 'damaged' && overRevision === null && isListedDamaged(label)
+      // A damaged box the listing does not show yet is written as over none, which storage refuses
+      // while it stands; the catch-up lists it, with its revision for the next store.
       const expected = { vault_id: vaultId, revision_tok: overRevision, vault_key_epoch: vaultKeyEpoch }
       const header: LockboxHeader = {
         boxlabel:               label,
@@ -1876,7 +1891,7 @@ const make = (opts: MakeVaultOpts): Vault => {
         lockbox_key_wrapped: await wrapKeyUnder(unlockedKey, lockboxKey, boxCtx(vaultId, header, 'lockbox_key_wrapped')),
         whisper_ciphered:    await cipherBytes(lockboxKey, whisperBytes, boxCtx(vaultId, header, 'whisper_ciphered')),
       }
-      await writeOver(lockbox, expected, clearsFirst)
+      await writeOver(lockbox, expected)
       await refresh()
     },
 
@@ -1894,9 +1909,20 @@ const make = (opts: MakeVaultOpts): Vault => {
       const label = await checkStandingBoxlabel(boxlabel)
       keyInHand()
       // Lands only in the vault this device holds keys for, whatever revision of the box stands:
-      // a vault retired and made anew elsewhere refuses it. That is its only expectation.
+      // a vault retired and made anew elsewhere refuses it. The revision the listing shows only
+      // lets storage say whether it removed that one or another.
+      const expected = { vault_id: currentVaultProps().vault_id, revision_tok: listedRevisionOf(label) }
+      // Asked before the call: a catch-up on a stale answer re-lists, and what was shown is what counts.
+      const showedDamaged = isListedDamaged(label)
       try {
-        await refreshOnStale(vaultDB.retireBox(scope, label, { vault_id: currentVaultProps().vault_id }), 'retireBox')
+        const { outcome } = await refreshOnStale(vaultDB.retireBox(scope, label, expected), 'retireBox')
+        if (outcome === 'retired_other') {
+          if (showedDamaged) {
+            logger.warn("The lockbox this device showed was a damaged one, and the lockbox retired was not that record: another device or tab had written over it since. That write was retired all the same.", { call: 'retireBox', damaged: true })
+          } else {
+            logger.warn("The lockbox retired was not the revision this device showed: another device or tab had written over it since. That write was retired all the same.", { call: 'retireBox' })
+          }
+        }
       } catch (err) {
         // Said as what happened to the box, once caught up; a catch-up that failed says so instead.
         if (! isCaughtUpStale(err)) { throw err }
@@ -1945,11 +1971,12 @@ const make = (opts: MakeVaultOpts): Vault => {
    * reborn elsewhere, or its ways in changed, relocks this device. A catch-up that fails is
    * thrown as 'stale_write' too, its failure the cause, the snapshot saying `syncing: false` --
    * but for a catch-up refused as 'identity_revoked', 'rolled_back' or 'newer_format', which is
-   * thrown as it came: each asks something else of the caller than a stale write does.
+   * thrown as it came: each asks something else of the caller than a stale write does. A write
+   * that lands resolves as it came.
    */
-  const refreshOnStale = async (write: Promise<void>, call: VaultCall): Promise<void> => {
+  const refreshOnStale = async <WrittenT>(write: Promise<WrittenT>, call: VaultCall): Promise<WrittenT> => {
     try {
-      await write
+      return await write
     } catch (err) {
       if (! isVaultError(err, 'stale_write')) { throw err }
       await catchUp(err, call)
@@ -2136,6 +2163,8 @@ const damagedVaultProps = (opts: ErrorOptions) => new VaultError('damaged_vault'
 // The refusal never quotes the boxlabel: a host's validators may admit any text, a mistaken paste among it.
 const damagedLockbox = (opts: ErrorOptions) => new VaultError('damaged_lockbox', "That lockbox is stored damaged, so it can't be read. It was left as it is; remove it, or store its whisper again over it.", opts)
 
+const damagedBeyondNaming = () => new VaultError('damaged_lockbox', "That lockbox is damaged beyond naming: its stored record does not say which revision it is, so nothing can be written over it safely. Nothing was written. Remove it with retireBox() first, then store its whisper again.")
+
 const lockedError = () => new VaultError('vault_locked', 'The vault is locked: ask the user for their passphrase and call unlock().')
 
 const closedError = () => new VaultError('vault_closed', 'This vault handle was closed: make another with Vault.make.')
@@ -2228,7 +2257,7 @@ const LockboxFormat = 'safebyok-lockbox-v5'
 const UntrustedStorageKinds = ['identity_revoked', 'rolled_back', 'newer_format'] as const satisfies readonly VaultErrorKind[]
 
 /**
- * A lockbox's public header: every field of its record but its format, which leads each ctx,
+ * A lockbox's visible header: every field of its record but its format, which leads each ctx,
  * and the two encrypted ones. All of it is bound into both.
  */
 type LockboxHeader = Omit<Lockbox, 'format' | 'lockbox_key_wrapped' | 'whisper_ciphered'>
@@ -2237,7 +2266,7 @@ type LockboxHeader = Omit<Lockbox, 'format' | 'lockbox_key_wrapped' | 'whisper_c
 const EmptySidecarJson = '{}'
 
 /** What `storeBox()`'s options may hold: a sidecar, which {@link sidecarJsonOf} checks, and nothing else. */
-const checkStoreOpts = optionsCheck({ sidecar: Z.optional(Z.unknown()) }, "storeBox()'s only option is `sidecar`, the lockbox's own plain data: check its spelling, and leave out any other. A note is kept in the sidecar: { sidecar: { note } }.")
+const checkStoreOpts = optionsCheck({ sidecar: Z.optional(Z.unknown()) }, "storeBox()'s only option is `sidecar`, the lockbox's own visible data (it is authenticated but never encrypted): check its spelling, and leave out any other. A note is kept in the sidecar: { sidecar: { note } }.")
 
 /**
  * The sidecar a `storeBox()` was handed, as the JSON a lockbox keeps, keys sorted; undefined when

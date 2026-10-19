@@ -1,4 +1,4 @@
-import { VaultDB, VaultError, isVaultError, type VaultPropsExpectation, type RetireExpectation, type Lockbox, type LockboxExpectation, type StoredLockbox, type VaultProps, type VaultScope } from 'safebyok'
+import { VaultDB, VaultError, isVaultError, type VaultPropsExpectation, type RetireExpectation, type Lockbox, type LockboxExpectation, type LockboxRetireExpectation, type StoredLockbox, type VaultProps, type VaultScope } from 'safebyok'
 
 /**
  * DEMO JANK: a pretend backend outage, switched on and off from the backend inspection panel, so
@@ -114,16 +114,14 @@ export class OutageVaultDB extends VaultDB {
     }
   }
 
-  protected async doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<boolean> {
+  protected async doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<unknown> {
     this.refuseWhileDown()
-    await this.inner.updateBox(scope, lockbox, expected)
-    return true
+    return this.inner.updateBox(scope, lockbox, expected)
   }
 
-  protected async doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation): Promise<boolean> {
+  protected async doRetireBox(scope: VaultScope, boxlabel: string, expected: LockboxRetireExpectation): Promise<unknown> {
     this.refuseWhileDown()
-    await this.inner.retireBox(scope, boxlabel, expected)
-    return true
+    return this.inner.retireBox(scope, boxlabel, expected)
   }
 
   protected async doRetireVault(scope: VaultScope, expected: RetireExpectation): Promise<boolean> {

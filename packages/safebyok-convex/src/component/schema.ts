@@ -4,7 +4,7 @@ import { Lockbox, VaultProps, VaultScope } from './validators'
 
 /**
  * The component's own tables, isolated from the host app's. Each row is a record as the core
- * writes it, in typed columns: ciphertext and public fields only.
+ * writes it, in typed columns: ciphertext and unencrypted fields only.
  *
  * `user_id` leads both indexes: every call is one user's, and an account's rows are one range.
  */

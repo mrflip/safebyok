@@ -68,7 +68,7 @@ export const KnockKnock = () => {
       {telling && <p className="quiet">Claude is clearing its throat…</p>}
       {joke !== null && <blockquote className="joke">{joke}</blockquote>}
       {gripe !== null && <p className="gripe">{gripe}</p>}
-      <ApiKeySlot haveKeyBox={keyBox !== undefined} damaged={keyBox?.damaged === true} savedAt={keyBox?.damaged === false ? keyBox.written_at : undefined} />
+      <ApiKeySlot haveKeyBox={keyBox !== undefined} damaged={keyBox?.damaged === true} replaceable={keyBox?.revision_tok !== null} savedAt={keyBox?.damaged === false ? keyBox.written_at : undefined} />
     </section>
   )
 }
@@ -78,11 +78,13 @@ export const SavedFlashMillis = 2000
 
 /**
  * The facility for entering (or replacing) the Anthropic API key, stored as a lockbox. A damaged
- * key lockbox -- its stored record unreadable -- is offered for replacing: storing over it writes it afresh.
+ * key lockbox -- its stored record unreadable -- is offered for replacing while it names its
+ * revision: storing over it writes it afresh. One damaged beyond naming, which storeBox() refuses,
+ * is offered for removing instead, and then for adding anew.
  * A save flashes "saved" a moment, then relaxes to when the key was last saved -- any save, the
  * same key saved again included.
  */
-const ApiKeySlot = ({ haveKeyBox, damaged, savedAt }: { haveKeyBox: boolean, damaged: boolean, savedAt?: number | undefined }) => {
+const ApiKeySlot = ({ haveKeyBox, damaged, replaceable, savedAt }: { haveKeyBox: boolean, damaged: boolean, replaceable: boolean, savedAt?: number | undefined }) => {
   const { vault, withUnlockedVault } = useVault()
   const [editing, setEditing] = useState(false)
   const [keyText, setKeyText] = useState('')
@@ -105,11 +107,23 @@ const ApiKeySlot = ({ haveKeyBox, damaged, savedAt }: { haveKeyBox: boolean, dam
       </p>
     )
   }
+  const remove = async () => {
+    setGripe(null)
+    try {
+      await withUnlockedVault(() => vault.retireBox(ApiKeyBoxlabel))
+    } catch (err) {
+      setGripe(err instanceof Error ? err.message : 'Could not remove that key.')
+    }
+  }
+
   if (damaged && ! editing) {
     return (
       <p className="api-key-slot gripe">
         {"The stored Anthropic key is damaged and can't be read."}{' '}
-        <button className="mini" onClick={() => { setEditing(true) }}>replace it</button>
+        {replaceable
+          ? <button className="mini" onClick={() => { setEditing(true) }}>replace it</button>
+          : <button className="mini danger" onClick={() => { void remove() }}>remove it</button>}
+        {gripe !== null && <span> {gripe}</span>}
       </p>
     )
   }

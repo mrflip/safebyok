@@ -239,6 +239,54 @@ describe("graphqlVaultDB, its refusals", () => {
     })
   }
 
+  it("refuses a malformed lockbox as bad_record before it is sent, so the server never sees it", async () => {
+    let sent = 0
+    const answered = { toPromise: () => { sent += 1; return Promise.resolve({ data: {} }) } }
+    const counting = { query: () => answered, mutation: () => answered, subscription: () => answered }
+    const vaultDB = graphqlVaultDB({ client: counting as unknown as GraphqlVaultClient })
+    await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('open^ai', 'r1'), { ...thisVault, revision_tok: null, vault_key_epoch: 1 }), 'bad_record')
+    await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('openai', 'r1', { sidecar_json: 'not json' }), { ...thisVault, revision_tok: null, vault_key_epoch: 1 }), 'bad_record')
+    expect(sent).to.eq(0)
+  })
+
+  it("refuses as bad_record, before it is sent, a record or expectation whose epoch is past GraphQL's 32-bit Int", async () => {
+    let sent = 0
+    const answered = { toPromise: () => { sent += 1; return Promise.resolve({ data: {} }) } }
+    const counting = { query: () => answered, mutation: () => answered, subscription: () => answered }
+    const vaultDB = graphqlVaultDB({ client: counting as unknown as GraphqlVaultClient })
+    const past = 2 ** 31
+    const rotatedPast = TH.vaultPropsOf('u1', {
+      unlock_epoch:    2,
+      vault_key_epoch: past,
+      prior_vault_key: { vault_key_epoch: past - 1, vault_key_wrapped: TH.fakeCiphered('prior') },
+      wayins:          [TH.wayinOf('passphrase', { vault_key_epoch: past })],
+    })
+    const refusals = [
+      await TH.expectRefusal(vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1', { unlock_epoch: past })), 'bad_record'),
+      await TH.expectRefusal(vaultDB.updateVaultProps(TH.vaultPropsOf('u1', { unlock_epoch: 2 }), { ...thisVault, unlock_epoch: past }), 'bad_record'),
+      await TH.expectRefusal(vaultDB.updateVaultProps(rotatedPast, { ...thisVault, unlock_epoch: 1 }), 'bad_record'),
+      await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('openai', 'r1', { vault_key_epoch: past }), { ...thisVault, revision_tok: null, vault_key_epoch: past }), 'bad_record'),
+    ]
+    expect(refusals.map((refusal) => /^Nothing was written: .* past 2147483647/.test(refusal.message))).to.deep.equal([true, true, true, true])
+    expect(sent).to.eq(0)
+  })
+
+  it("sends an epoch of exactly the most a GraphQL Int carries", async () => {
+    const schema = TH.schemaOver(await TH.emptyDatabase())
+    const vaultDB = TH.browserFor(schema, 'u1')
+    const most = (2 ** 31) - 1
+    const created = await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1', { unlock_epoch: most }))
+    expect(created.unlock_epoch).to.eq(most)
+  })
+
+  it("carries the server's bad_record by its kind, for a record its own VaultDB refuses", async () => {
+    const refused = new GraphQLError('Nothing was written: that lockbox is not one this package builds. Hand a VaultDB only the records and expectations a vault builds.', { extensions: { kind: 'bad_record' } })
+    const answered = { toPromise: () => Promise.resolve({ error: new CombinedError({ graphQLErrors: [refused] }) }) }
+    const server = { query: () => answered, mutation: () => answered, subscription: () => answered }
+    const refusal = await TH.expectRefusal(graphqlVaultDB({ client: server as unknown as GraphqlVaultClient }).updateBox(u1, TH.boxOf('openai', 'r1'), { ...thisVault, revision_tok: null, vault_key_epoch: 1 }), 'bad_record')
+    expect(refusal.message).to.match(/^Nothing was written/)
+  })
+
   it("carries a server's refusal by its kind, though a validation code came before it", async () => {
     const misuse = new GraphQLError('Variable "$scope" got invalid value', { extensions: { code: 'BAD_USER_INPUT' } })
     const revoked = new GraphQLError('No one is signed in, so this vault cannot be reached: sign in, then try again.', { extensions: { kind: 'identity_revoked' } })
@@ -264,7 +312,7 @@ describe("graphqlVaultDB, hearing other writes", () => {
     await elsewhere.updateBox(u1, TH.boxOf('openai', 'r1'), { ...thisVault, revision_tok: null, vault_key_epoch: 1 })
     await TH.eventually(() => heard.count === 1)
     unsubscribe()
-    await elsewhere.retireBox(u1, 'openai', thisVault)
+    await elsewhere.retireBox(u1, 'openai', TH.retiring('rev-r1'))
     await TH.aWhile()
     expect(heard.count).to.eq(1)
   })

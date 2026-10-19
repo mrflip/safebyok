@@ -118,7 +118,7 @@ export const VaultProps = v.object({
 
 /**
  * One lockbox: its whisper ciphered under its own lockboxKey, that lockboxKey wrapped under the
- * vaultKey, and the public shell -- boxlabel, revision, which vaultKey (`vault_key_epoch`), the
+ * vaultKey, and the visible fields -- boxlabel, revision, which vaultKey (`vault_key_epoch`), the
  * whisper's codec and schema version, the sidecar as JSON text (`sidecar_json`, always
  * written), and the epoch-millisecond times it was first stored (`registered_at`) and this
  * revision written (`written_at`).
@@ -168,14 +168,38 @@ export const LockboxExpectation = v.object({
 })
 
 /**
- * What a retire was meant for: the vault it lands in. A retire lands only while the scope's
- * vault props have this `vault_id`, whatever revision any lockbox stands at -- so a stale session
- * never retires anything from a vault made anew elsewhere.
+ * What a retire of a vault was meant for: the vault it lands in. A retire lands only while the
+ * scope's vault props have this `vault_id` -- so a stale session never retires a vault made anew
+ * elsewhere.
  *
  * @example { vault_id: vaultProps.vault_id }
  */
 export const RetireExpectation = v.object({
   vault_id: v.string(),
+})
+
+/**
+ * What a retire of a lockbox was meant for: the vault it lands in, and the `revision_tok` its
+ * writer read for the lockbox, or null for one listed damaged with none. It lands only while the
+ * scope's vault props have this `vault_id`, whatever revision stands -- so a stale session never
+ * retires anything from a vault made anew elsewhere -- and the revision only says whether what it
+ * removed was the one meant (a {@link LockboxRetirement}).
+ *
+ * @example { vault_id: vaultProps.vault_id, revision_tok: listed.revision_tok }
+ */
+export const LockboxRetireExpectation = v.object({
+  vault_id:     v.string(),
+  revision_tok: v.nullable(v.string()),
+})
+
+/**
+ * What a lockbox retire that landed removed: `retired`, the revision it named; `retired_other`,
+ * another (written over meanwhile, or one where it named none); `absent`, nothing.
+ *
+ * @example { outcome: 'retired' }
+ */
+export const LockboxRetirement = v.object({
+  outcome: v.union(v.literal('retired'), v.literal('retired_other'), v.literal('absent')),
 })
 
 /**

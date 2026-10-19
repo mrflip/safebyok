@@ -17,7 +17,7 @@ export const StorageTroubleMessage = "The vault's storage could not be reached, 
 /**
  * A `storage_unavailable` refusal: the backend could not be reached, or failed. `cause` is the
  * backend's own error, kept for debugging; it holds only what the backend holds, ciphertext and
- * public fields.
+ * unencrypted fields.
  *
  * @param cause - What the backend threw, as it came.
  * @param message - What failed and what to do, when there is more to say than that storage failed:

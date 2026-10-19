@@ -42,16 +42,47 @@ const LockboxExpectation = Z.object({
 })
 
 /**
- * What a retirement was aimed at: the vault whose lockbox, or whole self, the caller means to
- * remove. The retirement lands only while the scope's standing vault props have that `vault_id`, so
- * a device that missed a vault being retired and made anew never retires the successor. It names
- * no revision: a retirement wins over any write. Plain JSON, so it crosses any wire as-is.
+ * What the retirement of a vault was aimed at: the vault the caller means to remove whole. The
+ * retirement lands only while the scope's standing vault props have that `vault_id`, so a device
+ * that missed a vault being retired and made anew never retires the successor. Plain JSON, so it
+ * crosses any wire as-is.
  *
  * @example { vault_id: vaultProps.vault_id }
  */
 export type RetireExpectation = Z.infer<typeof RetireExpectation>
 const RetireExpectation = Z.object({
   vault_id: VaultProps.shape.vault_id,
+})
+
+/**
+ * What the retirement of a lockbox was aimed at: the vault it stands in, and the `revision_tok`
+ * the retiring device read for it -- or null, for a lockbox listed as damaged with none it could
+ * read. The retirement lands only while the scope's standing vault props have that `vault_id`, and
+ * then removes whatever lockbox stands under the boxlabel: within the right vault, a retirement
+ * wins over any write. The revision only lets storage say whether what it removed was the one the
+ * device meant (a {@link LockboxRetirement}). Plain JSON, so it crosses any wire as-is.
+ *
+ * @example { vault_id: vaultProps.vault_id, revision_tok: listed.revision_tok }
+ */
+export type LockboxRetireExpectation = Z.infer<typeof LockboxRetireExpectation>
+const LockboxRetireExpectation = Z.object({
+  vault_id:     VaultProps.shape.vault_id,
+  revision_tok: Z.nullable(Lockbox.shape.revision_tok),
+})
+
+/**
+ * What a lockbox retirement that landed found under its boxlabel, as storage reports it from the
+ * same atomic step as the removal: `retired`, the revision its {@link LockboxRetireExpectation}
+ * named (or, for a null one, a record holding none it could read); `retired_other`, a record that
+ * was not that revision -- written over meanwhile, or holding one where none was expected -- which
+ * was removed all the same; or `absent`, nothing to remove. Plain JSON, so it crosses any wire
+ * as-is.
+ *
+ * @example { outcome: 'retired_other' }
+ */
+export type LockboxRetirement = Z.infer<typeof LockboxRetirement>
+const LockboxRetirement = Z.object({
+  outcome: Z.enum(['retired', 'retired_other', 'absent']),
 })
 
 /**
@@ -94,12 +125,15 @@ export type VaultDBOpts = {
  *    fields are base64url text), so any backend that can hold JSON can hold a vault, as-is.
  *  * **Never look inside.** Every secret field arrives encrypted; nothing you hold can open a
  *    vault, and nothing safebyok does ever needs you to understand a record -- only to compare a
- *    few public fields (`vault_id`, `unlock_epoch`, `vault_key_epoch`, `revision_tok`) before a
+ *    few unencrypted fields (`vault_id`, `unlock_epoch`, `vault_key_epoch`, `revision_tok`) before a
  *    write.
  *  * **Write only as expected.** Every update and retirement carries an expectation of what
  *    stands in storage, and writes only if it still does: check and write in one atomic step (a
- *    transaction, a conditional write), and resolve `false` when the expectation fails. A
- *    retirement's names only the vault, never a revision: within the right vault, a retirement wins.
+ *    transaction, a conditional write), and resolve `false` when the expectation fails. A lockbox
+ *    write resolves `null` instead, and when it lands, the record as you now hold it, read back in
+ *    the same step. A lockbox retirement resolves `null` too, and when it lands, what it removed
+ *    (a {@link LockboxRetirement}): within the right vault, a retirement wins over any revision,
+ *    and only reports whether the one it removed was the one it named.
  *  * **Enforce who may reach which rows.** Your backend should let a signed-in user reach only
  *    their own records: safebyok's encryption protects the contents, your authorization decides
  *    who may fetch or overwrite them at all. When no one is signed in, or someone other than the
@@ -226,11 +260,13 @@ export abstract class VaultDB {
    * the given ones when this call created them, or, when the vault already existed -- made by
    * another device, perhaps in the same moment -- the standing ones, exactly as stored, untouched
    * and with their own `vault_id`. A caller tells the two apart by comparing the `vault_id` it gets
-   * back with the one it drafted.
+   * back with the one it drafted. Vault props this package would not write -- a name in them below
+   * the floor included -- are refused with kind `bad_record`, before storage sees them; a name in
+   * them the floor admits but longer than the backend holds, with kind `bad_label`.
    */
   async fetchOrCreateVaultProps(vaultProps: VaultProps): Promise<VaultProps> {
-    const asked = heldScope(this, vaultProps)
     const outgoing = checkOutgoing(VaultProps, vaultProps, 'vault props record')
+    const asked = heldScope(this, outgoing)
     const raw = await fromStorage(() => this.doFetchOrCreateVaultProps(outgoing))
     return checkVaultProps(raw, asked)
   }
@@ -238,15 +274,17 @@ export abstract class VaultDB {
   /**
    * Replace the vault props with `vaultProps`, only while the standing ones still have the
    * `vault_id` and `unlock_epoch` in `expected`. Refuses with kind `stale_write` otherwise --
-   * including when no vault props stand at all -- and writes nothing. A vault's `vault_id` never
-   * changes, so `vaultProps` must carry the one in `expected`: kind 'bad_option' otherwise.
+   * including when no vault props stand at all -- and writes nothing. Vault props or an `expected`
+   * this package would not build are refused with kind `bad_record`, before storage sees them, as
+   * `fetchOrCreateVaultProps` refuses them. A vault's `vault_id` never changes, so `vaultProps` must
+   * carry the one in `expected`: kind 'bad_record' otherwise.
    */
   async updateVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<void> {
-    heldScope(this, vaultProps)
     const outgoing = checkOutgoing(VaultProps, vaultProps, 'vault props record')
+    heldScope(this, outgoing)
     const expectation = checkOutgoing(VaultPropsExpectation, expected, 'vault props expectation')
     if (outgoing.vault_id !== expectation.vault_id) {
-      throw new VaultError('bad_option', "updateVaultProps replaces a vault's props within that vault: the vault props' vault_id must be the expected one, as a vault_id never changes.")
+      throw new VaultError('bad_record', "updateVaultProps replaces a vault's props within that vault: the vault props' vault_id must be the expected one, as a vault_id never changes.")
     }
     const landed = await fromStorage(() => this.doUpdateVaultProps(outgoing, expectation))
     if (! landed) { throw Refusals.staleWrite('vaultProps') }
@@ -258,16 +296,11 @@ export abstract class VaultDB {
     const label = heldBoxlabel(this, boxlabel)
     const raw = await fromStorage(() => this.doReadBox(asked, label))
     if (raw === null || raw === undefined) { return null }
-    const lockbox = checkRecord(Lockbox, raw, 'lockbox')
-    // A record that names some other boxlabel is a record out of place, wherever it came from.
-    if (lockbox.boxlabel !== label) {
-      throw new VaultError('corrupt_record', 'The stored lockbox names a different boxlabel than the one asked for. It was left as it is.')
-    }
-    return lockbox
+    return checkLockbox(raw, label)
   }
 
   /**
-   * Public faces of every lockbox in the vault -- ciphered fields stripped, the sidecar as the
+   * Visible fields of every lockbox in the vault -- ciphered fields stripped, the sidecar as the
    * JSON value it holds -- valid while locked, sorted by boxlabel, character by character (UTF-16
    * code unit, never by a locale), so every device lists in one order. A lockbox whose record does
    * not read back as one, or names another boxlabel than it is stored under, is listed as a
@@ -309,48 +342,68 @@ export abstract class VaultDB {
    * (or, for null, there is none). Refuses with kind `stale_write` otherwise -- including when the
    * scope holds no vault props -- and writes nothing. A backend that holds each vault to a limit of
    * its own refuses a write past it with kind `vault_full`, writing nothing. A lockbox heavier than the
-   * backend's `maxRecordBytes` is refused with kind `lockbox_too_large` before storage sees it. A
-   * lockbox is written under the vaultKey it was sealed with, so its `vault_key_epoch` must be the
-   * one in `expected`: kind 'bad_option' otherwise.
+   * backend's `maxRecordBytes` is refused with kind `lockbox_too_large` before storage sees it, and
+   * a lockbox or an `expected` this package would not build with kind `bad_record`: a missing
+   * lockbox, or one whose boxlabel is below the floor, included. A `scope` below the floor, or a
+   * name the floor admits but longer than the backend holds, is kind `bad_label`. A lockbox is
+   * written under the vaultKey it was sealed with, so its `vault_key_epoch` must be the one in
+   * `expected`: kind 'bad_record' otherwise.
+   *
+   * Resolves the lockbox as storage now holds it, handed back by the same atomic step as the write
+   * and held to the check `readBox` makes: field for field the one written, from an adapter that
+   * keeps its contract. One that fails that check is refused as `corrupt_record`, though the write
+   * may have landed: the adapter wrote something it cannot read back.
    */
-  async updateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<void> {
+  async updateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<Lockbox> {
     const asked = heldScope(this, scope)
-    heldBoxlabel(this, LabelledBox.safeParse(lockbox).data?.boxlabel)
     const outgoing = checkOutgoing(Lockbox, lockbox, 'lockbox')
+    heldBoxlabel(this, outgoing.boxlabel)
     const expectation = checkOutgoing(LockboxExpectation, expected, 'lockbox expectation')
     if (outgoing.vault_key_epoch !== expectation.vault_key_epoch) {
-      throw new VaultError('bad_option', "updateBox writes a lockbox under the vaultKey it was sealed with: the lockbox's vault_key_epoch must be the expected one.")
+      throw new VaultError('bad_record', "updateBox writes a lockbox under the vaultKey it was sealed with: the lockbox's vault_key_epoch must be the expected one.")
     }
     const recordBytes = jsonBytes({ ...asked, ...outgoing })
     if (recordBytes > this.maxRecordBytes) {
       throw new VaultError('lockbox_too_large', `That lockbox weighs ${String(recordBytes)} bytes, over the ${String(this.maxRecordBytes)} its storage holds in one record, so nothing was written: store a smaller whisper or sidecar, or under a shorter boxlabel.`)
     }
-    const landed = await fromStorage(() => this.doUpdateBox(asked, outgoing, expectation))
-    if (! landed) { throw Refusals.staleWrite('lockbox') }
+    const stored = await fromStorage(() => this.doUpdateBox(asked, outgoing, expectation))
+    if (stored === null) { throw Refusals.staleWrite('lockbox') }
+    return writtenBack('a lockbox write', () => checkLockbox(stored, outgoing.boxlabel))
   }
 
   /**
    * Remove the lockbox under `boxlabel`, whatever revision stands, only while the scope's standing
-   * vault props have the `vault_id` in `expected`; quiet when there is no such lockbox. Refuses with
-   * kind `stale_write` otherwise -- including when the scope holds no vault props -- and removes
-   * nothing.
+   * vault props have the `vault_id` in `expected`. Refuses with kind `stale_write` otherwise --
+   * including when the scope holds no vault props -- and removes nothing. An `expected` this
+   * package would not build is refused with kind `bad_record`, removing nothing.
+   *
+   * Resolves what storage found, from the same atomic step as the removal: `retired` when it
+   * removed the revision `expected` names (for a null `revision_tok`, a record holding none it could
+   * read), `retired_other` when it removed some other record, and `absent` when there was none. An
+   * answer in any other shape is refused as `corrupt_record`, though the retirement may have
+   * landed.
+   *
+   * @example
+   *   const { outcome } = await vaultDB.retireBox(scope, 'anthropic', { vault_id: vaultProps.vault_id, revision_tok: listed.revision_tok })
    */
-  async retireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation): Promise<void> {
+  async retireBox(scope: VaultScope, boxlabel: string, expected: LockboxRetireExpectation): Promise<LockboxRetirement> {
     const asked = heldScope(this, scope)
     const label = heldBoxlabel(this, boxlabel)
-    const expectation = checkOutgoing(RetireExpectation, expected, 'retire expectation')
-    const landed = await fromStorage(() => this.doRetireBox(asked, label, expectation))
-    if (! landed) { throw Refusals.staleWrite('retire') }
+    const expectation = checkOutgoing(LockboxRetireExpectation, expected, 'retire expectation', 'removed')
+    const retirement = await fromStorage(() => this.doRetireBox(asked, label, expectation))
+    if (retirement === null) { throw Refusals.staleWrite('retire') }
+    return writtenBack('a retirement', () => checkAnswer(LockboxRetirement, retirement, 'a retirement'))
   }
 
   /**
    * Remove the vault props and every lockbox -- the backend's part of deleting a vault -- only while
    * the standing vault props have the `vault_id` in `expected`. Refuses with kind `stale_write`
-   * otherwise -- including when the scope holds no vault props -- and removes nothing.
+   * otherwise -- including when the scope holds no vault props -- and removes nothing. An
+   * `expected` this package would not build is refused with kind `bad_record`, removing nothing.
    */
   async retireVault(scope: VaultScope, expected: RetireExpectation): Promise<void> {
     const asked = heldScope(this, scope)
-    const expectation = checkOutgoing(RetireExpectation, expected, 'retire expectation')
+    const expectation = checkOutgoing(RetireExpectation, expected, 'retire expectation', 'removed')
     const landed = await fromStorage(() => this.doRetireVault(asked, expectation))
     if (! landed) { throw Refusals.staleWrite('retire') }
   }
@@ -482,15 +535,21 @@ export abstract class VaultDB {
    * Store `lockbox` under its boxlabel if, and only if, the scope's standing vault props have
    * `expected.vault_id` and `expected.vault_key_epoch`, and the standing lockbox has
    * `expected.revision_tok` -- or, when that is null, no lockbox stands there: all compared in the
-   * same atomic step as the write. True when it was written; false, writing nothing, otherwise.
+   * same atomic step as the write. Resolves the record as stored once written, read back in that
+   * same step (a `RETURNING`, a mutation's return value, a read in the transaction), exactly as a
+   * `doReadBox` would hand it up; null, writing nothing, otherwise.
    */
-  protected abstract doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<boolean>
+  protected abstract doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<unknown>
   /**
-   * Remove the lockbox under `boxlabel` if, and only if, the scope's standing vault props have
-   * `expected.vault_id`. True when those vault props stand, whether or not there was a lockbox to
-   * remove; false, removing nothing, otherwise.
+   * Remove the lockbox under `boxlabel`, whatever revision stands, if, and only if, the scope's
+   * standing vault props have `expected.vault_id`: compared in the same atomic step as the removal.
+   * Resolves, once those vault props stand, a {@link LockboxRetirement} saying what that step
+   * removed -- `{ outcome: 'retired' }` for a record at `expected.revision_tok` (for null, one
+   * holding no revision a read could take as one: `Expectations.retirementOf` compares as the
+   * listing reads), `{ outcome: 'retired_other' }` for any other record, `{ outcome: 'absent' }`
+   * when there was none; null, removing nothing, otherwise.
    */
-  protected abstract doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation): Promise<boolean>
+  protected abstract doRetireBox(scope: VaultScope, boxlabel: string, expected: LockboxRetireExpectation): Promise<unknown>
   /**
    * Remove the vault props and every lockbox of `scope` if, and only if, the standing vault props
    * have `expected.vault_id` -- in one transaction, where the backend has them. True when removed;
@@ -586,7 +645,7 @@ const listedOrDamaged = ({ boxlabel, lockbox }: StoredLockbox): LockboxSummary |
 const StoredRevision = Z.object({ revision_tok: Lockbox.shape.revision_tok })
 
 /**
- * A listed lockbox's summary: its public fields, and its sidecar as the JSON value its record holds
+ * A listed lockbox's summary: its visible fields, and its sidecar as the JSON value its record holds
  * (`sidecar_json` is JSON text, as the record's check has found).
  */
 const summaryOf = (listed: Z.infer<typeof ListedLockbox>): LockboxSummary => {
@@ -637,7 +696,7 @@ const heldName = (facts: NameFacts, said: string, part: string): string => {
 /**
  * The adapter's half of a verb, with anything it throws that is not already a VaultError turned
  * into a calm one: a caller branches on `kind`, whatever the backend. The adapter's own error
- * rides along as `cause`, for debugging; adapters hold only ciphertext and public fields.
+ * rides along as `cause`, for debugging; adapters hold only ciphertext and unencrypted fields.
  */
 const fromStorage = async <ValT>(attempt: () => Promise<ValT>): Promise<ValT> => {
   try {
@@ -649,10 +708,6 @@ const fromStorage = async <ValT>(attempt: () => Promise<ValT>): Promise<ValT> =>
 
 /** What an adapter threw, as a VaultError: its own VaultError untouched, anything else wrapped. */
 const asStorageTrouble = (err: unknown): VaultError => (err instanceof VaultError ? err : Refusals.storageUnavailable(err))
-
-// The label a lockbox is written under, checked before the rest of the record is, so a refusal
-// says which.
-const LabelledBox = Z.object({ boxlabel: Z.string() })
 
 const checkListener = (onChange: unknown) => {
   if (typeof onChange !== 'function') {
@@ -673,11 +728,12 @@ const checked = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, candidate: unkno
 
 /**
  * A record or expectation a write verb was handed, as this package writes one. One that is not
- * is refused before storage sees it, as misuse, so that nothing is ever written that a read would
- * refuse as corrupt.
+ * -- the names in it included, held to the floor by its schema -- is refused before storage sees
+ * it, as misuse, so that nothing is ever written that a read would refuse as corrupt. The refusal
+ * leads with what was spared: nothing `written`, or for a retire, nothing `removed`.
  */
-const checkOutgoing = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, candidate: unknown, said: string): RecordT => checked(recordSchema, candidate, () => (
-  new VaultError('bad_option', `That ${said} is not one this package writes, so nothing was written: a VaultDB writes only the records and expectations a vault builds.`)
+const checkOutgoing = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, candidate: unknown, said: string, spared: 'written' | 'removed' = 'written'): RecordT => checked(recordSchema, candidate, () => (
+  new VaultError('bad_record', `Nothing was ${spared}: that ${said} is not one this package builds. Hand a VaultDB only the records and expectations a vault builds.`)
 ))
 
 const checkVaultProps = (raw: unknown, scope: VaultScope): VaultProps => {
@@ -750,6 +806,36 @@ const isSoundVaultProps = (raw: unknown, scope: VaultScope): boolean => {
 
 /** The one field of stored vault props a retirement needs, as the vault's own check has it. */
 const StoredVaultId = Z.object({ vault_id: VaultProps.shape.vault_id })
+
+/** A stored lockbox, as `readBox` holds it: a lockbox's shape, under the boxlabel it was asked for. */
+const checkLockbox = (raw: unknown, boxlabel: string): Lockbox => {
+  const lockbox = checkRecord(Lockbox, raw, 'lockbox')
+  // A record that names some other boxlabel is a record out of place, wherever it came from.
+  if (lockbox.boxlabel !== boxlabel) {
+    throw new VaultError('corrupt_record', 'The stored lockbox names a different boxlabel than the one asked for. It was left as it is.')
+  }
+  return lockbox
+}
+
+/**
+ * What an adapter handed back from `said`, a write that landed, through `check`: for a record, the
+ * check a read of it would make. What fails that check is refused as `corrupt_record`, the check's
+ * own refusal as its cause, saying the write may have landed: storage answered with what its
+ * adapter cannot read back.
+ */
+const writtenBack = <ResultT>(said: string, check: () => ResultT): ResultT => {
+  try {
+    return check()
+  } catch (err) {
+    if (! isVaultError(err, 'corrupt_record')) { throw err }
+    throw new VaultError('corrupt_record', `Storage says ${said} landed, but answered with what this package cannot read back: its adapter wrote or reported something it should not have. Reading the vault again shows what stands; the storage adapter needs a developer's look.`, { cause: err })
+  }
+}
+
+/** Storage's answer to `said`, a write, through `answerSchema`: one in another shape is `corrupt_record`, quoting none of it. */
+const checkAnswer = <AnswerT>(answerSchema: Z.ZodMiniType<AnswerT>, raw: unknown, said: string): AnswerT => checked(answerSchema, raw, () => (
+  new VaultError('corrupt_record', `Storage answered ${said} in a shape this package does not know.`)
+))
 
 /**
  * A stored record through its validator, with failure as a calm VaultError: storage is someone
@@ -876,21 +962,25 @@ class StringStoreVaultDB extends VaultDB {
     ))
   }
 
-  protected doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<boolean> {
+  protected doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<unknown> {
     return soon(() => {
+      const ckey = Ckeys.box(scope, lockbox.boxlabel)
       const standingVaultProps = readJson(this.store, Ckeys.vaultProps(scope))
-      const standingBox = readJson(this.store, Ckeys.box(scope, lockbox.boxlabel))
-      if (! Expectations.lockboxMeets(standingVaultProps, standingBox, expected)) { return false }
-      this.store.write(Ckeys.box(scope, lockbox.boxlabel), JSON.stringify(lockbox))
-      return true
+      if (! Expectations.lockboxMeets(standingVaultProps, readJson(this.store, ckey), expected)) { return null }
+      this.store.write(ckey, JSON.stringify(lockbox))
+      return readJson(this.store, ckey)
     })
   }
 
-  protected doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation): Promise<boolean> {
+  protected doRetireBox(scope: VaultScope, boxlabel: string, expected: LockboxRetireExpectation): Promise<unknown> {
     return soon(() => {
-      if (! Expectations.vaultMeets(readJson(this.store, Ckeys.vaultProps(scope)), expected)) { return false }
-      this.store.erase(Ckeys.box(scope, boxlabel))
-      return true
+      if (! Expectations.vaultMeets(readJson(this.store, Ckeys.vaultProps(scope)), expected)) { return null }
+      const ckey = Ckeys.box(scope, boxlabel)
+      // A row that is not JSON is still retired, and reported as holding no revision.
+      const text = this.store.read(ckey)
+      const retirement = Expectations.retirementOf(text === null ? null : jsonOrText(text), expected)
+      this.store.erase(ckey)
+      return retirement
     })
   }
 

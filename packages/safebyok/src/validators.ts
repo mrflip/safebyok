@@ -152,8 +152,8 @@ export type NameValidator = Z.core.$ZodType<string>
  * | Check | Job | Runs | Fails as |
  * |---|---|---|---|
  * | These validators (`Label` and `UserId` by default) | an alarm for names your app never meant to use | at entry only: Vault.make (the scope), storeBox (the boxlabel), addPassphrase and addPasskey (the wayinlabel) | `bad_label` |
- * | The floor ({@link NameFloor}) | what text must be for every client and store to agree (no `^` in a name, which key-value stores join names on) | beneath these at entry, whatever they are; at every storage verb; on every record read back | `bad_label` at entry; damaged on read |
- * | The record's shape, scope, boxlabel, ciphertext and expectations | what the design needs | when sent to storage and when read back | `bad_option` (a bug) when sent; damaged on read; `stale_write` |
+ * | The floor ({@link NameFloor}) | what text must be for every client and store to agree (no `^` in a name, which key-value stores join names on) | beneath these at entry, whatever they are; at every storage verb; on every record read back | `bad_label` at entry and for a verb's own names; `bad_record` in a record sent; damaged on read |
+ * | The record's shape, scope, boxlabel, ciphertext and expectations | what the design needs | when sent to storage and when read back | `bad_record` (a bug) when sent; damaged on read; `stale_write` |
  * | The storage's own limits (`maxRecordBytes`, `maxVaultBytes`, `maxLockboxes`, `maxNameBytes`) | facts about the backend | when sent to storage | `lockbox_too_large`, `vault_full`, `bad_label` |
  *
  * So a check of yours is an alarm, not a promise about what storage holds: a lockbox stored under a

@@ -102,7 +102,18 @@ describe("vaultResolvers, in a host's schema", () => {
     const db = await TH.emptyDatabase()
     await TH.requestFor(db, 'u1').fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
     const result = await asked(TH.schemaOver(db), VaultOperations.safebyokUpdateBox, { scope: u1, lockbox: TH.boxOf('openai', 'r1'), expected: { vault_id: 'vault-id-u1', vault_key_epoch: 1 } })
-    expect(result).to.deep.equal({ data: { safebyokUpdateBox: true } })
+    expect(result).to.deep.equal({ data: { safebyokUpdateBox: TH.boxOf('openai', 'r1') } })
+  })
+
+  it("answers a lockbox retire with what it removed, and takes one that leaves out its null revision_tok as one that means it", async () => {
+    const db = await TH.emptyDatabase()
+    await TH.requestFor(db, 'u1').fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
+    await TH.requestFor(db, 'u1').updateBox(u1, TH.boxOf('openai', 'r1'), { vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 1 })
+    await TH.requestFor(db, 'u1').updateBox(u1, TH.boxOf('mistral', 'm1'), { vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 1 })
+    const named = await asked(TH.schemaOver(db), VaultOperations.safebyokRetireBox, { scope: u1, boxlabel: 'openai', expected: { vault_id: 'vault-id-u1', revision_tok: 'rev-r1' } })
+    expect(named).to.deep.equal({ data: { safebyokRetireBox: { outcome: 'retired' } } })
+    const unnamed = await asked(TH.schemaOver(db), VaultOperations.safebyokRetireBox, { scope: u1, boxlabel: 'mistral', expected: { vault_id: 'vault-id-u1' } })
+    expect(unnamed).to.deep.equal({ data: { safebyokRetireBox: { outcome: 'retired_other' } } })
   })
 })
 

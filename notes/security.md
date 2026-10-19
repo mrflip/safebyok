@@ -32,6 +32,48 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-19 (branch 20261019-retire_revision, on PR #177); 2026-10-19 (branch 20261019-no_clear): **`VaultDB.retireBox` now takes the
+  revision the device read, and storage reports what it removed; the base class takes that report
+  as untrusted storage input.** The expectation is `{ vault_id, revision_tok }` (null for a
+  lockbox listed as damaged with no readable revision); `retireVault` and `retireDamagedVault`
+  keep the vault-only expectation. The arbitration is unchanged: the adapter compares only
+  `vault_id` and removes whatever lockbox stands under the boxlabel, in one atomic step, so a
+  retirement within the right vault still wins over any write; the revision never refuses. It only
+  lets the adapter answer `retired` (the revision named; for null, a record holding none that
+  reads as one, compared as the listing reads it), `retired_other` (another record, for instance
+  one written over the lockbox meanwhile) or `absent`; a vault mismatch is `null`, thrown as
+  `stale_write`. Each adapter reads that answer from the same atomic step as the delete (Postgres
+  `DELETE ... RETURNING`, one Convex mutation, one IndexedDB transaction, one synchronous turn in
+  `localVaultDB`, the GraphQL server's reply), never a second storage call. The base class keeps
+  only the `outcome` field, through the same `writtenBack` step `updateBox` uses, and refuses
+  anything else as `corrupt_record`, saying the retirement may have landed and quoting nothing.
+  The vault's `retireBox()` honors `retired_other` and warns through the host's logger, naming
+  neither revision nor boxlabel; the result stays void. Honoring and warning, rather than refusing
+  as stale, awaits a Coach's confirmation. Amended 2026-10-19 (20261019-no_clear): `storeBox()` no
+  longer retires first and logs no `retired_other` of its own; a store is always one conditional
+  `updateBox`. A lockbox listed damaged that names a revision is written over in that one write; one
+  that names no revision is refused as `damaged_lockbox`, writing nothing, its message telling the
+  user to `retireBox()` it first. This closes the race inside `storeBox()` (A retires and writes;
+  B retires A's write and writes; neither throws), and the gap between the two calls in which a
+  refused write could say nothing was written after the retire had removed a record. The race
+  still runs through an explicit `retireBox()`: both devices list the box damaged with
+  `revision_tok` null; A calls `retireBox()` and then `storeBox()`; B, its listing still stale,
+  calls `retireBox()` naming null and removes A's fresh write. B is warned only through the host's
+  logger, as `retired_other` with `damaged: true`, because a retirement within the vault wins over
+  any revision. That stays the stated residual until the tombstone rework. Nothing stored
+  changes.
+* 2026-10-19 (returning): **`VaultDB.updateBox` now resolves the lockbox as storage holds it after
+  the write lands, and the base class takes that answer as untrusted storage input.** Each
+  adapter's `doUpdateBox` hands the lockbox back from the same atomic step as the conditional
+  write (Postgres `RETURNING`, the Convex mutation's return value, a read inside the same
+  IndexedDB transaction or `localVaultDB` synchronous turn, the GraphQL mutation payload), never a
+  second storage call, so the compare-and-write stays one event. The base class holds the answer
+  to the check `readBox` makes (the Lockbox schema, and the boxlabel matching the one written)
+  and refuses a malformed one as `corrupt_record`; its message says the write may have landed and
+  quotes nothing of the record, and its cause is the inner `corrupt_record` refusal, which quotes
+  nothing either. A refused write (`null` from the adapter) throws `stale_write` and carries no
+  record: returned state is data, never a thrown value's property. No stored shape changed, and
+  the vault does not yet use the returned value; `storeBox` still refreshes after its write.
 * 2026-10-18 (sprint reform): **three stored-format tags changed in the renaming, none with a
   migration.** Against the last release (0.3.0), the vault props format `safebyok-vault-v2` became
   `safebyok-vault-v3` (the unlock envelope became the "wayin", with the field renames that follow;
@@ -88,7 +130,7 @@ added or folded into through the subagent, and no other entry changes.
   table, the new name of a retired one. React's `VaultProvider` forwards the names of props it does
   not know to `Vault.make`, so those reach the error boundary rather than being dropped.
   (4) **A refused `hello()` no longer closes the handle.** The handle stands, its storage watch
-  live, until the host closes it; the snapshot carries the refusal in a new public field,
+  live, until the host closes it; the snapshot carries the refusal in a new snapshot field,
   `trouble: VaultError | null` (cleared by the next successful read), and the vault's logger warns
   of it. A `VaultError` carries no secret material, as before. While no `hello()` has succeeded, a
   storage change bell runs `hello()` (lease take-up included) rather than a bare refresh.
@@ -211,7 +253,11 @@ added or folded into through the subagent, and no other entry changes.
   store. What one who can write storage could already do -- delete or replace any row -- is
   unchanged; what is new is that planting junk under a boxlabel shows the user a damaged box where
   a refused open used to show, and that the user's next `storeBox()` to that boxlabel clears the junk
-  rather than refusing. `readBox()` and `useBox()` still refuse a damaged box.
+  rather than refusing. `readBox()` and `useBox()` still refuse a damaged box. (Amended
+  2026-10-19, 20261019-no_clear: the retire-first is gone. `storeBox()` is one conditional
+  `updateBox`; a damaged lockbox naming a revision is written over in it, carrying nothing forward,
+  and one naming no revision is refused as `damaged_lockbox`, writing nothing, until the user calls
+  `retireBox()`; the two-step and removal behaviors described here no longer exist.)
 
 * 2026-10-15: `retireBox(boxlabel)` removes a lockbox whose stored record fails validation or
   verification (`corrupt_record`), rather than refusing it: it reads the record only to tell an
@@ -447,7 +493,7 @@ added or folded into through the subagent, and no other entry changes.
   kept: they existed only in development and demo storage, never in a published version.
 * 2026-10-15: `VaultDB`'s public verbs turn any failure from an adapter that is not already a
   `VaultError` into kind `storage_unavailable`, with the adapter's own error attached as the
-  standard `cause`. Adapters see only ciphertext and public record fields, but that cause is
+  standard `cause`. Adapters see only ciphertext and unencrypted record fields, but that cause is
   whatever the backend's client threw, unfiltered.
 * 2026-10-15: `localVaultDB` and `idbVaultDB` key rows by `applabel:user_id:vaultlabel`, and
   `user_id` may hold a colon, so one user's rows can share another scope's ckey prefix. Listing
@@ -676,7 +722,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-15: vault props hold their `wayins`, a list of one to `MaxUnlocks` (8), each the one vaultKey wrapped under its own key. A passphrase wayin has its own
   random `salt_b64` (never shared between wayins) and its own `wayin_id`, and its wrap's
   additional data is the format, scope, `vault_id`, a purpose per wayinkind
-  (`vault_key_passphrase_wrapped`), and the wayin's whole public header (`wayinkind`,
+  (`vault_key_passphrase_wrapped`), and the wayin's whole visible header (`wayinkind`,
   `wayin_id`, `wayinlabel`, `key_deriver_label`, `salt_b64`) as key-sorted JSON (and, since
   the sweep entry below, the vault props' `registered_at`). The
   `unlock_epoch` is no longer in it, since a change to one wayin bumps the epoch and the
@@ -706,7 +752,7 @@ added or folded into through the subagent, and no other entry changes.
   `["safebyok-vault-v1", "vault_key_passkey_wrapped", credential_id]` as JSON when first written, under the older tag `safebyok-vault-v1` (since the sweep
   entry below, the wrap's whole additional data); the wrap's additional
   data is the format, scope, `vault_id`, purpose `vault_key_passkey_wrapped` and the wayin's
-  public header, as for a passphrase wayin. A stored salt that is not base64url of 32 bytes
+  visible header, as for a passphrase wayin. A stored salt that is not base64url of 32 bytes
   refuses as `corrupt_record` (since 2026-10-16, `damaged_wayin`: see that entry), checked at unlock rather than in the schema (the size budget, as for
   passphrase salts). The core never calls WebAuthn and never stores the answer; the answer passes
   through host JavaScript as a `Uint8Array` the vault does not wipe.
@@ -723,11 +769,11 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-15; 2026-10-18: **every field a record writes is bound, unless a reason below says not** (the
   Coach: "make everything verifiable unless there's a good reason not to"). A passkey wayin's
   HKDF `info` is now its wrap's whole additional data -- format, scope, `vault_id`, the vault props'
-  `registered_at`, purpose, and the wayin's public header (`wayinkind`, `wayin_id`,
+  `registered_at`, purpose, and the wayin's visible header (`wayinkind`, `wayin_id`,
   `wayinlabel`, `credential_id`, `prf_salt_b64`) -- so the passkeyKey itself, not only the wrap, belongs to one vault
   and one wayin; HKDF info and AES-GCM additional data are the same bytes, fed to different
   primitives. Every wayin's wrap binds the vault props' `registered_at`. A lockbox's two
-  encryptions bind its whole public header (`format`, `boxlabel`, `revision_tok`, `sidecar_json`,
+  encryptions bind its whole visible header (`format`, `boxlabel`, `revision_tok`, `sidecar_json`,
   `registered_at`, `written_at`: every field but the two ciphered ones, as Zod's parse leaves the
   record), so a backend that alters a sidecar or a time
   makes `readBox()` refuse `corrupt_record`; a future field is bound the day it is added to the
@@ -798,7 +844,7 @@ added or folded into through the subagent, and no other entry changes.
   stack and `cause` to the browser. Anything a VaultDB throws that is not a VaultError crosses as
   `storage_unavailable`. Wayins cross as opaque JSON that GraphQL does not check; only
   the core's VaultDB validation does, so a user can write a malformed wayin into their own
-  vault and no one else's. The browser's urql Client may keep vault records (ciphertext and public
+  vault and no one else's. The browser's urql Client may keep vault records (ciphertext and unencrypted
   fields) in its document cache, though every vault query is `network-only` and never answered
   from it. A subscription's user is fixed when it starts (over a websocket, when the connection
   opened), so a session revoked meanwhile keeps hearing the vault's scope -- never a record --
@@ -1042,7 +1088,7 @@ added or folded into through the subagent, and no other entry changes.
   storage is never sealed into a fresh revision that reads clean (found in review). What the sidecar reveals: everything in
   it, in the clear, to anyone who reads storage, and its size; the vault never interprets it,
   checks only that it is JSON, and the snapshot shows it unverified until the box is opened, as
-  every public field is. Its size is capped only with the whisper's (`maxWhisperBytes` counts
+  every visible field is. Its size is capped only with the whisper's (`maxWhisperBytes` counts
   both), so a host cannot put a sidecar of megabytes in front of the listing through the vault.
   Reserving the codec fields now means a later codec (padding, G026) or a whisper shape version
   changes no bound field set and re-encrypts nothing. Two ctx fixes ride along: the lockbox's
@@ -1157,7 +1203,9 @@ added or folded into through the subagent, and no other entry changes.
   `storeBox()` writes over that revision under contract line 3.3, so a sound lockbox another device
   wrote meanwhile refuses the write and is never retired, and the refusal is thrown as `stale_write`
   after one catch-up (amended 2026-10-18: the store once retried over it, last writer wins, until [#160](https://github.com/mrflip/safebyok/pull/160) removed the retry). The revision is untrusted text used only as an expectation storage compares. Only
-  a record naming no revision is retired first, which leaves a gap P6 accepts. A lockbox under a
+  a record naming no revision is retired first, which leaves a gap P6 accepts (amended 2026-10-19,
+  20261019-no_clear: the retire-first is gone; `storeBox()` refuses a damaged lockbox naming no
+  revision as `damaged_lockbox`, writing nothing, and the gap with it). A lockbox under a
   vaultKey epoch neither the vault props' nor the prior's lists as damaged from its epoch alone (G063);
   the listing still never opens ciphertext (G121).
 * 2026-10-16 (refusals_and_catchup): **`Vault.make` takes only a `VaultDB`** (G122): a duck-typed
@@ -1252,7 +1300,7 @@ added or folded into through the subagent, and no other entry changes.
   common call the slow one. A host that removes a wayin because it was compromised rotates too.
 * 2026-10-16: **`WayinSummary` shows `device_id` and `registered_at`.** The snapshot of a locked
   vault already listed each wayin; it now says too when it was added and by which device, so a
-  user can spot a wayin they did not make. Both are public fields of the wayin, bound into its
+  user can spot a wayin they did not make. Both are visible fields of the wayin, bound into its
   wrap, and `device_id` is one random id per device per vault (the mark's `device_id`), so it
   links nothing the vault does not already link: not across vaults, not to the hardware.
 
@@ -1489,7 +1537,7 @@ added or folded into through the subagent, and no other entry changes.
   (`Lockbox` and `LockboxSummary`, `types.ts`); v3 records fail validation and list as damaged,
   with no migration.
 * 2026-10-17 (thread 17, written_at, [#141](https://github.com/mrflip/safebyok/pull/141)): **`storeBox()`
-  still deciphers the old record before carrying its public fields forward.** A store that leaves
+  still deciphers the old record before carrying its visible fields forward.** A store that leaves
   out the sidecar carries the old record's `sidecar_json` and `registered_at` forward only from
   a record that opens under the vault's key (`recordOpens`, `vault.ts`, formerly
   `openedWhisperOf`), so a sidecar or time planted in storage is not sealed into a fresh revision that

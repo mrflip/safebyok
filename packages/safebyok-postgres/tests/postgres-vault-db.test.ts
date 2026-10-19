@@ -139,7 +139,7 @@ describe("postgresVaultDB, who may reach a vault", () => {
     ['listBoxes',               (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.listBoxes(u2)],
     ['listBoxRecords',          (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.listBoxRecords(u2)],
     ['updateBox',               (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.updateBox(u2, TH.boxOf('anthropic', 'one'), { vault_id: 'vault-id-u2', revision_tok: null, vault_key_epoch: 1 })],
-    ['retireBox',               (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.retireBox(u2, 'anthropic', { vault_id: 'vault-id-u2' })],
+    ['retireBox',               (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.retireBox(u2, 'anthropic', { vault_id: 'vault-id-u2', revision_tok: null })],
     ['retireVault',             (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.retireVault(u2, { vault_id: 'vault-id-u2' })],
     ['subscribe',               (vaultDB: ReturnType<typeof postgresVaultDB>) => new Promise<void>((resolve) => { vaultDB.subscribe(u2, TH.changeCounter().onChange); resolve() })],
   ] as const
@@ -277,7 +277,7 @@ describe("postgresVaultDB, what it stores", () => {
     await vaultDB.updateBox(u1, TH.boxOf('anthropic', 'one'), noBoxYet)
     await vaultDB.updateBox(u1, TH.boxOf('anthropic', 'two'), { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 1 })
     await vaultDB.readBox(u1, 'anthropic')
-    await vaultDB.retireBox(u1, 'anthropic', thisVault)
+    expect(await vaultDB.retireBox(u1, 'anthropic', TH.retiring('rev-two'))).to.deep.equal({ outcome: 'retired' })
     await vaultDB.retireVault(u1, thisVault)
     expect(spy.sent).to.have.lengthOf(7)
   })
@@ -391,7 +391,7 @@ describe("postgresVaultDB, its lockbox limit", () => {
     await vaultDB.updateBox(u1, TH.boxOf('anthropic', 'sk-fake'), noBoxYet)
     await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('mistral', 'sk-fake'), noBoxYet), 'vault_full')
     await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('mistral', 'sk-fake'), { vault_id: 'vault-id-gone', revision_tok: null, vault_key_epoch: 1 }), 'stale_write')
-    await vaultDB.retireBox(u1, 'anthropic', thisVault)
+    await vaultDB.retireBox(u1, 'anthropic', TH.retiring('rev-sk-fake'))
     expect(spy.sent).to.have.lengthOf(4)
     for (const { text } of spy.sent) {
       expect(text).to.not.match(/FOR (NO KEY )?UPDATE|FOR KEY SHARE|lockbox_count/)
@@ -434,9 +434,9 @@ describe("postgresVaultDB, its lockbox limit", () => {
     const racer = await vaultDB.readBox(u1, 'mistral')
     expect(racer?.boxlabel).to.eq('mistral')
     await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('gemini', 'sk-fake'), noBoxYet), 'vault_full')
-    await vaultDB.retireBox(u1, 'openai', thisVault)
+    await vaultDB.retireBox(u1, 'openai', TH.retiring('rev-sk-fake-openai'))
     await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('gemini', 'sk-fake'), noBoxYet), 'vault_full')
-    await vaultDB.retireBox(u1, 'anthropic', thisVault)
+    await vaultDB.retireBox(u1, 'anthropic', TH.retiring('rev-sk-fake-anthropic'))
     await vaultDB.updateBox(u1, TH.boxOf('gemini', 'sk-fake'), noBoxYet)
     expect(await boxlabelsIn(vaultDB)).to.have.members(['mistral', 'gemini'])
   })
@@ -585,6 +585,17 @@ describe("postgresVaultDB, in trouble", () => {
     await TH.expectRefusal(vaultDB.readVaultProps(u1), 'corrupt_record')
     const { rows } = await db.query<{ wayins: unknown }>('SELECT wayins FROM safebyok_vaults')
     expect(rows[0]?.wayins).to.eq('not a list')
+  })
+
+  it("retires a row whose revision the database holds empty, listed with none, as the one a retirement naming none means", async () => {
+    const db = await TH.emptyDatabase()
+    const vaultDB = TH.requestFor(db, 'u1')
+    await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
+    await vaultDB.updateBox(u1, TH.boxOf('anthropic', 'one'), noBoxYet)
+    await db.query(`UPDATE safebyok_lockboxes SET revision_tok = ''`)
+    expect(await vaultDB.listBoxes(u1)).to.deep.equal([{ boxlabel: 'anthropic', damaged: true, revision_tok: null }])
+    expect(await vaultDB.retireBox(u1, 'anthropic', TH.retiring(null))).to.deep.equal({ outcome: 'retired' })
+    expect(await vaultDB.listBoxes(u1)).to.have.lengthOf(0)
   })
 })
 

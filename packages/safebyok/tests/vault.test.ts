@@ -2115,7 +2115,7 @@ describe("while locked", () => {
     await TH.expectRefusal(warm.retireBox('anthropic'), 'vault_locked')
   })
 
-  it("lockbox summaries stay readable: that is what public metadata is for", async () => {
+  it("lockbox summaries stay readable: that is what their visible fields are for", async () => {
     const world = makeWorld()
     const warm = await world.openUnlocked('pw')
     await warm.storeBox('anthropic', 'sk-fake', { sidecar: { note: 'visible while locked' } })
@@ -2414,6 +2414,9 @@ describe("retireDamagedVault", () => {
   })
 })
 
+/** The VaultDB verbs that write to storage, so a test can count every write a call makes. */
+const WriteVerbs = ['fetchOrCreateVaultProps', 'updateVaultProps', 'updateBox', 'retireBox', 'retireVault', 'retireDamagedVault'] as const
+
 /** Ways a stored lockbox row can be spoiled that the listing sees, so that it lists as damaged. */
 const DamagedListings = [
   [() => '{"not": json',                                                                          'that is not JSON at all'],
@@ -2455,7 +2458,10 @@ describe("damaged lockboxes", () => {
       expect(boxlabelsOf(fresh)).to.deep.equal(['openai'])
       expect(await fresh.readBox('openai')).to.eq('sk-openai-fake')
     })
+  }
 
+  // The first names no revision, so a store over it is refused (below).
+  for (const [spoil, blurb] of DamagedListings.slice(1)) {
     it(`storeBox over a lockbox ${blurb} writes it afresh, carrying nothing from it`, async () => {
       const { world, vault } = await worldWithDamagedBox(spoil)
       world.advance(60_000)
@@ -2496,31 +2502,38 @@ describe("damaged lockboxes", () => {
     expect(vault.getSnapshot().boxes[0]).to.deep.include({ boxlabel: 'anthropic', damaged: true })
   })
 
-  it("storeBox over a damaged lockbox whose record names its revision replaces it in one write, never retiring it first", async () => {
+  it("storeBox over a damaged lockbox whose record names its revision is a single write to storage, over that revision", async () => {
     const [spoil] = DamagedListings[2]
     const { world, vault } = await worldWithDamagedBox(spoil)
     const revisionTok = storedRowOf(world, 'anthropic')['revision_tok']
     await TH.wakeupAtNextTick()
     expect(vault.getSnapshot().boxes[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true, revision_tok: revisionTok })
-    const retireBox = vi.spyOn(world.vaultDB, 'retireBox')
+    const writes = WriteVerbs.map((verb) => [verb, vi.spyOn(world.vaultDB, verb)] as const)
     const updateBox = vi.spyOn(world.vaultDB, 'updateBox')
     await vault.storeBox('anthropic', 'sk-ant-new')
-    expect(retireBox).not.toHaveBeenCalled()
+    const callsOf = Object.fromEntries(writes.map(([verb, spy]) => [verb, spy.mock.calls.length]))
+    expect(callsOf).to.deep.equal({ fetchOrCreateVaultProps: 0, updateVaultProps: 0, updateBox: 1, retireBox: 0, retireVault: 0, retireDamagedVault: 0 })
     expect(updateBox.mock.calls[0]?.[2]).to.deep.include({ revision_tok: revisionTok })
     expect(await vault.readBox('anthropic')).to.eq('sk-ant-new')
     vi.restoreAllMocks()
   })
 
-  it("storeBox over a damaged lockbox whose record names no revision retires it first, then writes afresh", async () => {
+  it("storeBox over a damaged lockbox whose record names no revision refuses it as 'damaged_lockbox', writing nothing; once retired, the store lands", async () => {
     const [spoil] = DamagedListings[0]
     const { world, vault } = await worldWithDamagedBox(spoil)
     await TH.wakeupAtNextTick()
     expect(vault.getSnapshot().boxes[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true, revision_tok: null })
-    const retireBox = vi.spyOn(world.vaultDB, 'retireBox')
-    await vault.storeBox('anthropic', 'sk-ant-new')
-    expect(retireBox).toHaveBeenCalledOnce()
-    expect(await vault.readBox('anthropic')).to.eq('sk-ant-new')
+    const spoiled = world.dbStore.read(u1BoxCkey('anthropic'))
+    const writes = WriteVerbs.map((verb) => vi.spyOn(world.vaultDB, verb))
+    const refusal = await TH.expectRefusal(vault.storeBox('anthropic', 'sk-ant-new'), 'damaged_lockbox')
+    expect(refusal.message).to.match(/damaged beyond naming.*Nothing was written\. Remove it with retireBox\(\) first/)
+    expect(refusal.message).to.not.include('anthropic')
+    for (const spy of writes) { expect(spy).not.toHaveBeenCalled() }
+    expect(world.dbStore.read(u1BoxCkey('anthropic'))).to.eq(spoiled)
     vi.restoreAllMocks()
+    await vault.retireBox('anthropic')
+    await vault.storeBox('anthropic', 'sk-ant-new')
+    expect(await vault.readBox('anthropic')).to.eq('sk-ant-new')
   })
 
   it("lists a lockbox under a vaultKey the vault does not hold as damaged from its epoch alone, its revision kept, and storeBox() replaces it", async () => {
@@ -2555,7 +2568,7 @@ describe("damaged lockboxes", () => {
   })
 
   it("storeBox over a damaged lockbox in a full vault replaces it, never refused by maxLockboxes", async () => {
-    const [spoil] = DamagedListings[0]
+    const [spoil] = DamagedListings[2]
     const { vault } = await worldWithDamagedBox(spoil, { maxLockboxes: 2 })
     await vault.storeBox('anthropic', 'sk-ant-new')
     expect(await vault.readBox('anthropic')).to.eq('sk-ant-new')
@@ -2651,11 +2664,11 @@ describe("what the backend sees", () => {
   it("stores no whisper and no passphrase in the clear, anywhere", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('a very memorable passphrase')
-    await vault.storeBox('anthropic', 'sk-ant-api03-fake-but-secret', { sidecar: { note: 'sidecars are public' } })
+    await vault.storeBox('anthropic', 'sk-ant-api03-fake-but-secret', { sidecar: { note: 'sidecars are visible in storage' } })
     const everything = world.dbStore.ckeys().map((ckey) => world.dbStore.read(ckey)).join('\n')
     expect(everything).to.not.include('sk-ant-api03-fake-but-secret')
     expect(everything).to.not.include('a very memorable passphrase')
-    expect(everything).to.include('sidecars are public') // the sidecar is public by design
+    expect(everything).to.include('sidecars are visible in storage') // the sidecar is visible by design
     expect(everything).to.include('whisper_ciphered')
   })
 
@@ -2670,7 +2683,7 @@ describe("what the backend sees", () => {
   })
 })
 
-/** A lockbox row's public fields altered in storage, each a field its encryptions bind. */
+/** A lockbox row's visible fields altered in storage, each a field its encryptions bind. */
 const SpoiledShells = [
   [(row: Record<string, unknown>) => ({ ...row, sidecar_json: '{"note":"personal account"}' }),         'its sidecar swapped for another'],
   [(row: Record<string, unknown>) => ({ ...row, sidecar_json: '{}' }),                                    'its sidecar emptied'],
@@ -2704,7 +2717,7 @@ describe("tampering", () => {
   })
 
   for (const [spoil, blurb] of SpoiledShells) {
-    it(`a lockbox with ${blurb} refuses to open, and is left as it is: its whole public header is bound`, async () => {
+    it(`a lockbox with ${blurb} refuses to open, and is left as it is: its whole visible header is bound`, async () => {
       const world = makeWorld()
       const vault = await world.openUnlocked('pw')
       await vault.storeBox('anthropic', 'sk-fake', { sidecar: { note: 'work account' } })
@@ -5600,7 +5613,7 @@ describe("versioned updates: two devices writing at once", () => {
     expect(await there.readBox('anthropic')).to.eq('sk-ant-fake-mine')
   })
 
-  it("a store over a damaged box its listing does not show yet never retires it first: its write over none is refused as stale, and the next store writes over the revision the catch-up lists", async () => {
+  it("a store over a damaged box its listing does not show yet writes over none, refused as stale, and the next store writes over the revision the catch-up lists", async () => {
     const { world, hereDB, here, there } = await twoDeviceWorld()
     await here.storeBox('anthropic', 'sk-ant-fake-one')
     // A listing gone stale: storage holds a damaged record the snapshot does not show.
@@ -5719,6 +5732,93 @@ describe("versioned updates: two devices writing at once", () => {
     expect(err.cause).to.eq(down)
     expect(err.message).to.include('Catching up with storage afterwards failed too')
     expect(err.message).to.not.match(/vault it was in is gone/)
+  })
+
+  it("a retirement names the revision its listing shows, and warns of nothing when that is what it retired", async () => {
+    const { world, hereDB, here } = await twoDeviceWorld()
+    await here.storeBox('anthropic', 'sk-ant-fake-one')
+    const shown = here.getSnapshot().boxes[0]?.revision_tok
+    const retireBox = vi.spyOn(hereDB, 'retireBox')
+    await here.retireBox('anthropic')
+    expect(retireBox.mock.calls[0]?.[2]).to.deep.equal({ vault_id: storedVaultPropsOf(world)['vault_id'], revision_tok: shown })
+    expect(world.logged.filter((heard) => heard.story?.['call'] === 'retireBox')).to.have.lengthOf(0)
+  })
+
+  it("a retirement over a box written meanwhile elsewhere retires theirs all the same, and warns that it was not the revision shown, naming neither", async () => {
+    const { world, hereDB, here, there } = await twoDeviceWorld()
+    await here.storeBox('anthropic', 'sk-ant-fake-one')
+    const shown = String(here.getSnapshot().boxes[0]?.revision_tok)
+    const theirs = { revisionTok: '' }
+    TH.beforeNextCall(hereDB, 'retireBox', async () => {
+      await there.storeBox('anthropic', 'sk-ant-fake-theirs')
+      theirs.revisionTok = String(storedRowOf(world, 'anthropic')['revision_tok'])
+    })
+    await here.retireBox('anthropic')
+    expect(world.dbStore.read(u1BoxCkey('anthropic'))).to.be.null
+    expect(here.getSnapshot().boxes).to.have.lengthOf(0)
+    const told = world.logged.filter((heard) => heard.story?.['call'] === 'retireBox')
+    expect(told).to.have.lengthOf(1)
+    expect(told[0]).to.deep.include({ level: 'warn' })
+    expect(told[0]?.message).to.match(/^The lockbox retired was not the revision this device showed/)
+    expect(told[0]?.message).to.not.match(/damaged/)
+    expect(told[0]?.story).to.not.have.property('damaged')
+    const text = TH.loggedText(told)
+    for (const unsaid of [shown, theirs.revisionTok, 'anthropic']) { expect(text).to.not.include(unsaid) }
+  })
+
+  it("a retirement over a damaged box written over meanwhile elsewhere retires theirs all the same, and warns that the box shown was a damaged one, with damaged: true, naming neither", async () => {
+    const { world, hereDB, here, there } = await twoDeviceWorld()
+    await here.storeBox('anthropic', 'sk-ant-fake-one')
+    world.dbStore.write(u1BoxCkey('anthropic'), '{"not": json')
+    await vi.waitFor(() => {
+      expect(here.getSnapshot().boxes[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true, revision_tok: null })
+      expect(there.getSnapshot().boxes[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true, revision_tok: null })
+    })
+    const theirs = { revisionTok: '' }
+    TH.beforeNextCall(hereDB, 'retireBox', async () => {
+      // A store over a box damaged beyond naming is refused, so theirs retires it first.
+      await there.retireBox('anthropic')
+      await there.storeBox('anthropic', 'sk-ant-fake-theirs')
+      theirs.revisionTok = String(storedRowOf(world, 'anthropic')['revision_tok'])
+    })
+    await here.retireBox('anthropic')
+    expect(world.dbStore.read(u1BoxCkey('anthropic'))).to.be.null
+    expect(here.getSnapshot().boxes).to.have.lengthOf(0)
+    // Theirs retired the damaged record it was shown, and so warned of nothing; this one, of theirs.
+    const told = world.logged.filter((heard) => heard.story?.['call'] === 'retireBox')
+    expect(told).to.have.lengthOf(1)
+    expect(told[0]).to.deep.include({ level: 'warn' })
+    expect(told[0]?.message).to.match(/^The lockbox this device showed was a damaged one/)
+    expect(told[0]?.story).to.deep.include({ call: 'retireBox', damaged: true })
+    const text = TH.loggedText(told)
+    for (const unsaid of [theirs.revisionTok, 'anthropic', 'sk-ant-fake-one', 'sk-ant-fake-theirs']) { expect(text).to.not.include(unsaid) }
+  })
+
+  it("a retirement over a box listed damaged with a readable revision, written over meanwhile elsewhere, retires theirs all the same, and warns of the damaged box shown with damaged: true, naming neither", async () => {
+    const { world, hereDB, here, there } = await twoDeviceWorld()
+    await here.storeBox('anthropic', 'sk-ant-fake-one')
+    world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), written_at: 'later' }))
+    const damagedRevision = String(storedRowOf(world, 'anthropic')['revision_tok'])
+    await vi.waitFor(() => {
+      expect(here.getSnapshot().boxes[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true, revision_tok: damagedRevision })
+      expect(there.getSnapshot().boxes[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true, revision_tok: damagedRevision })
+    })
+    const theirs = { revisionTok: '' }
+    TH.beforeNextCall(hereDB, 'retireBox', async () => {
+      await there.storeBox('anthropic', 'sk-ant-fake-theirs')
+      theirs.revisionTok = String(storedRowOf(world, 'anthropic')['revision_tok'])
+    })
+    const retireBox = vi.spyOn(hereDB, 'retireBox')
+    await here.retireBox('anthropic')
+    expect(retireBox.mock.calls[0]?.[2]).to.deep.include({ revision_tok: damagedRevision })
+    expect(world.dbStore.read(u1BoxCkey('anthropic'))).to.be.null
+    const told = world.logged.filter((heard) => heard.story?.['call'] === 'retireBox')
+    expect(told).to.have.lengthOf(1)
+    expect(told[0]).to.deep.include({ level: 'warn' })
+    expect(told[0]?.message).to.match(/^The lockbox this device showed was a damaged one/)
+    expect(told[0]?.story).to.deep.include({ call: 'retireBox', damaged: true })
+    const text = TH.loggedText(told)
+    for (const unsaid of [damagedRevision, theirs.revisionTok, 'anthropic', 'sk-ant-fake-one', 'sk-ant-fake-theirs']) { expect(text).to.not.include(unsaid) }
   })
 
   it("a passphrase change racing another device's is refused as stale; theirs stands", async () => {

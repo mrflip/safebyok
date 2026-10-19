@@ -143,6 +143,16 @@ describe("idbVaultDB", () => {
     expect(listed[1]).to.include({ boxlabel: 'openai', damaged: false })
   })
 
+  it("retires a row that is no lockbox, listed with no revision, as the one a retirement naming none means", async () => {
+    const dbName = TH.freshDbName()
+    await set(Ckeys.vaultProps(TH.scopeOf('u1')), TH.vaultPropsOf('u1'), rawShelf(dbName))
+    await set(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), 'not a lockbox', rawShelf(dbName))
+    const vaultDB = idbVaultDB({ dbName })
+    expect(await vaultDB.retireBox(TH.scopeOf('u1'), 'anthropic', TH.retiring(null))).to.deep.equal({ outcome: 'retired' })
+    const ckey = Ckeys.box(TH.scopeOf('u1'), 'anthropic')
+    expect(await get(ckey, rawShelf(dbName))).to.be.undefined
+  })
+
   it("refuses damaged vault props as corrupt_record, and leaves them as they are", async () => {
     const dbName = TH.freshDbName()
     await set(Ckeys.vaultProps(TH.scopeOf('u1')), { vault_id: 'vault-id-u1', unlock_epoch: 'one' }, rawShelf(dbName))
@@ -321,6 +331,21 @@ describe("idbVaultDB's subscribe", () => {
     await TH.expectRefusal(vaultDB.updateVaultProps(TH.vaultPropsOf('u1'), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'stale_write')
     await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
     await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1', { vault_id: 'too-late' }))
+    await TH.wakeupAtNextTick()
+    expect(heardCount).to.eq(1)
+  })
+
+  it("rings for a retirement that removed a lockbox, and for none that found nothing to remove", async () => {
+    const vaultDB = idbVaultDB({ dbName: TH.freshDbName() })
+    await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
+    await vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet)
+    await TH.wakeupAtNextTick()
+    let heardCount = 0
+    vaultDB.subscribe(TH.scopeOf('u1'), () => { heardCount += 1 })
+    expect(await vaultDB.retireBox(TH.scopeOf('u1'), 'anthropic', TH.retiring('rev-one'))).to.deep.equal({ outcome: 'retired' })
+    await TH.wakeupAtNextTick()
+    expect(heardCount).to.eq(1)
+    expect(await vaultDB.retireBox(TH.scopeOf('u1'), 'anthropic', TH.retiring('rev-one'))).to.deep.equal({ outcome: 'absent' })
     await TH.wakeupAtNextTick()
     expect(heardCount).to.eq(1)
   })

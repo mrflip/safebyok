@@ -19,8 +19,10 @@ Three layers share the work, and each guarantee below belongs to one of them.
   the other device wrote or retired stands, and the host hears that its write lost. It also holds the app's own lockbox limit (`maxLockboxes`, 100 by default): the alarm bell for an
   app that is storing far more than it meant to.
 * **The base class** (`VaultDB`'s public verbs) checks every name, record and expectation on the
-  way in and every record on the way out, refuses what is malformed before your code sees it,
-  turns a `false` from you into `stale_write`, and turns anything you throw that is not a
+  way in and every record on the way out -- the lockbox a write hands back among them, and what a
+  lockbox retirement reports -- refuses what is malformed before your code sees it, turns a
+  `false` from you (from a lockbox write or retirement, a `null`) into `stale_write`, and turns
+  anything you throw that is not a
   `VaultError` into `storage_unavailable`, your error as its cause. It holds every name to the
   floor and to what your adapter declares (*Names*, below), never to a host's own validators.
   It guards `subscribe`: each listener is called so that nothing it throws, and no promise it
@@ -32,7 +34,9 @@ Three layers share the work, and each guarantee below belongs to one of them.
 * **Your adapter** (the `do*` methods) stores and returns records, and makes each write
   conditional: it checks the expectation and writes in one atomic step. It never resolves a
   conflict itself, never merges two writes, and never retries one: a write whose expectation
-  failed resolves `false`, and the vault decides what happens next.
+  failed resolves `false` (a lockbox write or retirement, `null`), and the vault decides what
+  happens next. A lockbox write that lands resolves the record as you now hold it, read back in
+  the same atomic step as the write; a lockbox retirement that lands, what it removed (line 3.4).
 
 A server that serves these verbs to browsers -- the Convex component, the Postgres route recipe,
 the GraphQL resolvers -- checks who may reach which vault (line 5.4), makes each write atomic, and
@@ -54,7 +58,10 @@ refusal -- a stale write, or a lockbox that will not open -- the vault catches u
 once, so a vault retired and made anew elsewhere relocks the device rather than reading as
 damage. There is no conflict handler beyond this, and no hook for one: whatever landed first
 stands, and a host that disagrees calls `storeBox()` or `retireBox()` again. The vault never clears
-a damaged record on its own; the user's `retireBox()` or `storeBox()` on its boxlabel does.
+a damaged record on its own; the user's `retireBox()` on its boxlabel does, or a `storeBox()` over
+one that names its revision, in its one `updateBox`: a store never retires. A `retireBox()` that
+storage says removed another revision than the one the vault showed stands too, as a retirement
+within its vault does (line 3.4): the vault warns through its logger, naming neither revision.
 
 The base class turns anything your code throws that is not a `VaultError` into
 `storage_unavailable` -- a bug in your adapter among it, which it cannot tell from a driver's
@@ -111,7 +118,11 @@ within it. Every name a verb is handed passes, before the adapter sees it:
   name that one store holds every other does too.
 * **What the adapter declares** (line 7.3): no more bytes than `maxNameBytes`.
 
-Each refusal is `bad_label`, naming which name and which rule, and quoting none of it.
+A name handed to a verb on its own or in a scope, and a name the floor admits but over
+`maxNameBytes` wherever it is, is refused as `bad_label`, naming which name and which rule, and
+quoting none of it. A name below the floor inside a record -- the vault props' scope, a lockbox's
+boxlabel -- makes that record one this package does not build, refused whole as `bad_record`,
+naming the record and quoting none of it.
 
 ## 1. Records
 
@@ -174,12 +185,39 @@ under that boxlabel. Otherwise it refuses as `stale_write`: over a revision it n
 scope with no vault props, or into a vault retired and made anew under another `vault_id`, even
 where no lockbox stands in either.
 
-**3.4. A retirement wins, within its vault.** `retireBox` removes the lockbox under its boxlabel,
-whatever revision stands, while the scope's standing vault props have the expected `vault_id`; it is
-quiet when there is no such lockbox. A write over a revision retired meanwhile refuses, and the
-lockbox stays gone. A retirement aimed at a vault since retired and made anew refuses as
-`stale_write`, and the new vault keeps its lockbox. Nothing of what is retired is kept: no
-tombstone.
+A write that lands resolves the lockbox as storage now holds it, field for field the one written
+(line 1.1), and the adapter hands it back from the same atomic step as the write: a `RETURNING`
+(Postgres), the mutation's return value (Convex, and over GraphQL its payload), a read in the
+write's transaction (IndexedDB) or synchronous turn (`localVaultDB`), never a second call. A
+refused write resolves nothing: its adapter resolves `null`, and the base class throws
+`stale_write`, carrying no record. The base class holds what comes back to the check a `readBox`
+makes, and refuses one that fails it as `corrupt_record`, saying the write may have landed: the
+adapter wrote something it cannot read back. *That refusal is proven by the base class's own
+tests* (the core's `vault-db.test.ts`), which can have an adapter answer with a malformed record;
+the battery, through an adapter that keeps this line, cannot.
+
+**3.4. A retirement wins, within its vault, and says what it removed.** `retireBox` removes the
+lockbox under its boxlabel, whatever revision stands, while the scope's standing vault props have
+the expected `vault_id`, and resolves what it found there, reported from the same atomic step as
+the removal: `retired` for the revision its expectation names (its `revision_tok`, the one the
+retiring device read; for null, which names a damaged lockbox listed with none, a record holding
+none that reads as one), `retired_other` for any other record -- one written over the revision
+named, or holding one where none was named -- and `absent` where no lockbox stands. The revision
+only reports, and never refuses: a retirement naming another revision removes what stands all the
+same, and the vault decides what to tell its user. A write over a revision retired meanwhile
+refuses, and the lockbox stays gone. A retirement aimed at a vault since retired and made anew
+refuses as `stale_write`, whatever revision it names -- its adapter resolves `null` -- and the new
+vault keeps its lockbox. Nothing of what is retired is kept: no tombstone.
+
+An adapter that keeps a typed revision column reports from its delete (Postgres's `RETURNING`, the
+row a Convex mutation deletes); a key-value store reads the row in the step that removes it. Each
+compares the revision as the listing reads it: Postgres and the key-value stores through
+`Expectations.retirementOf`, and the Convex component, which runs on Convex's servers apart from
+the core, in its own mutation. The base class refuses an answer
+in any other shape as `corrupt_record`, saying the retirement may have landed. *That refusal, and
+`retired` for a damaged record holding no revision, are proven by the base class's own tests* (the
+core's `vault-db.test.ts` and `expectations.test.ts`), which can have an adapter answer badly and
+plant a damaged record; the battery, through public verbs that do neither, cannot.
 
 **3.5. A vault is retired whole, and alone.** `retireVault` removes the vault props and every
 lockbox of its scope, and nothing of any other scope, while the standing vault props have the
@@ -210,7 +248,7 @@ then line 3.3 or 3.4 says which wins.
 **3.8. A lockbox write lands only under the vaultKey that stands.** A lockbox carries the
 `vault_key_epoch` of the vaultKey its lockboxKey is wrapped under, and its write's expectation
 names the same one (the base class refuses a lockbox whose epoch is not the expected one, as
-`bad_option`, before the adapter sees it). `updateBox` writes only while the scope's standing
+`bad_record`, before the adapter sees it). `updateBox` writes only while the scope's standing
 vault props have that `vault_key_epoch`, as well as the `vault_id` and revision of line 3.3,
 compared in the same atomic step as the write; otherwise it refuses as `stale_write` and writes
 nothing. So a lockbox only ever lands sealed under the vaultKey its vault props stand for. The
@@ -253,18 +291,19 @@ refuses at that limit as `vault_full`, and declares a `maxLockboxes` well inside
 for a backend with no such limit enforces none beyond line 4.2's best effort, unless the host
 opts in to one and pays what it costs. *Not tested by the battery*: each adapter tests its own.
 
-A write that lands resolves with nothing: it reports no count of the vault's lockboxes. The vault
-already learns the count from the listing it reads after every write, and asking every adapter for
-one would put a count into every adapter's write path. An adapter that enforces a limit says, in
+A write that lands reports no count of the vault's lockboxes: a lockbox write resolves its record
+(line 3.3), and nothing more. The vault already learns the count from the listing it reads after
+every write, and asking every adapter for one would put a count into every adapter's write path. An adapter that enforces a limit says, in
 its README, what its count is as of: the start of the write's statement, say, or its commit.
 
 ## 5. Errors
 
 **5.1. Every refusal is a VaultError whose kind says what to do.** An adapter refuses with a
-`VaultError`: `stale_write` (by resolving `false`; the base class throws it), `vault_full`,
+`VaultError`: `stale_write` (by resolving `false`, or `null` from a lockbox write or retirement;
+the base class throws it), `vault_full`,
 `identity_revoked`, `not_permitted`, or anything it throws otherwise, which becomes
 `storage_unavailable`. The base
-class refuses `bad_label`, `bad_option`, `lockbox_too_large` and `corrupt_record` itself, before
+class refuses `bad_label`, `bad_record`, `bad_option`, `lockbox_too_large` and `corrupt_record` itself, before
 the adapter is asked or after it answers. Each message says calmly what went wrong and what to do
 about it, and a caller branches on the kind, never the message.
 
@@ -277,7 +316,7 @@ at the backend's default settings, there is none to report. Its test is line 3.7
 record's ciphertext, a boxlabel or a sidecar: the base class never quotes what it refuses, and an
 adapter's own messages name the vault's limits, never its contents. A `storage_unavailable`
 refusal's `cause` is the backend's own error, passed up as it came for debugging; it holds only
-what the backend holds, which is ciphertext and public fields.
+what the backend holds, which is ciphertext and unencrypted fields.
 
 **5.4. Only the signed-in user reaches their vaults.** An adapter whose backend knows who is
 signed in (a server's, made per request) refuses every verb on a scope whose `user_id` is not the

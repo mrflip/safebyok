@@ -6,7 +6,8 @@ import { VaultError } from '../src/errors'
 import { Lockbox } from '../src/lockbox'
 import { PasskeySaltBytes, VaultProps, VaultScope, type DeviceMark, type Lease } from '../src/types'
 import * as Ckeys from '../src/ckeys'
-import { VaultDB, type VaultPropsExpectation, type RetireExpectation, type LockboxExpectation, type StoredLockbox, type VaultDBOpts } from '../src/vault-db'
+import * as Expectations from '../src/expectations'
+import { VaultDB, type VaultPropsExpectation, type RetireExpectation, type LockboxExpectation, type LockboxRetireExpectation, type StoredLockbox, type VaultDBOpts } from '../src/vault-db'
 import * as TH from './test-helpers'
 
 
@@ -596,6 +597,14 @@ describe("the fixtures", () => {
     expect(Object.isFrozen(TH.thisVault)).to.be.true
   })
 
+  it("retiring: the expectation a retirement of u1's lockbox meets, naming the revision boxOf gave it, as its example shows", async () => {
+    const vaultDB = localVaultDB({ store: memoryStore() })
+    await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
+    await vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet)
+    expect(await vaultDB.retireBox(TH.scopeOf('u1'), 'anthropic', TH.retiring('rev-one'))).to.deep.equal({ outcome: 'retired' })
+    expect(TH.retiring(null)).to.deep.equal({ vault_id: 'vault-id-u1', revision_tok: null })
+  })
+
   it("passkeyWayinOf: a shape-valid passkey wayin, with any field overridden", () => {
     const vaultProps = TH.vaultPropsOf('u1', { wayins: [TH.wayinOf('passphrase'), TH.passkeyWayinOf('laptop')] })
     expect(VaultProps.safeParse(vaultProps).success).to.be.true
@@ -818,8 +827,8 @@ const servingOnly = (userId: string | null, store: StringStore): TH.VaultDBVerbs
     readBox:                 async (scope, boxlabel) => { permitted(scope); return await shared.readBox(scope, boxlabel) },
     listBoxes:               async (scope) => { permitted(scope); return await shared.listBoxes(scope) },
     listBoxRecords:          async (scope) => { permitted(scope); return await shared.listBoxRecords(scope) },
-    updateBox:               async (scope, lockbox, expected) => { permitted(scope); await shared.updateBox(scope, lockbox, expected) },
-    retireBox:               async (scope, boxlabel, expected) => { permitted(scope); await shared.retireBox(scope, boxlabel, expected) },
+    updateBox:               async (scope, lockbox, expected) => { permitted(scope); return await shared.updateBox(scope, lockbox, expected) },
+    retireBox:               async (scope, boxlabel, expected) => { permitted(scope); return await shared.retireBox(scope, boxlabel, expected) },
     retireVault:             async (scope, expected) => { permitted(scope); await shared.retireVault(scope, expected) },
     retireDamagedVault:      async (scope) => { permitted(scope); await shared.retireDamagedVault(scope) },
     subscribe:               (scope, onChange) => { permitted(scope); return shared.subscribe(scope, onChange) },
@@ -861,7 +870,7 @@ describe("perUser", () => {
     await vaultDB.updateBox(TH.scopeOf('u2'), TH.boxOf('anthropic', 'two'), { vault_id: 'vault-id-u2', revision_tok: null, vault_key_epoch: 1 })
     await vaultDB.updateVaultProps({ ...TH.vaultPropsOf('u2'), unlock_epoch: 2 }, { vault_id: 'vault-id-u2', unlock_epoch: 1 })
     vaultDB.subscribe(TH.scopeOf('u2'), () => undefined)()
-    await vaultDB.retireBox(TH.scopeOf('u2'), 'anthropic', { vault_id: 'vault-id-u2' })
+    await vaultDB.retireBox(TH.scopeOf('u2'), 'anthropic', { vault_id: 'vault-id-u2', revision_tok: 'rev-two' })
     expect(await servingOnly('u2', store).listBoxes(TH.scopeOf('u2'))).to.have.lengthOf(0)
     await vaultDB.retireVault(TH.scopeOf('u2'), { vault_id: 'vault-id-u2' })
     expect(await servingOnly('u2', store).readVaultProps(TH.scopeOf('u2'))).to.be.null
@@ -1054,11 +1063,19 @@ class RoundTripVaultDB extends VaultDB {
       }
       return true
     }
-    return await this.step({ check: meets, write: (rows) => { rows.set(ckey, lockbox) } })
+    // What it set is what it holds: its rows keep each record as it was handed them.
+    return await this.step({ check: meets, write: (rows) => { rows.set(ckey, lockbox) } }) ? lockbox : null
   }
 
-  protected doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation) {
-    return this.step({ check: (rows) => vaultIs(rows, scope, expected), write: (rows) => { rows.delete(Ckeys.box(scope, boxlabel)) } })
+  // What it removed is what the write found standing, in the same step.
+  protected async doRetireBox(scope: VaultScope, boxlabel: string, expected: LockboxRetireExpectation) {
+    const ckey = Ckeys.box(scope, boxlabel)
+    const removed: { box?: unknown } = {}
+    const retire = (rows: Rows) => {
+      removed.box = rows.get(ckey)
+      rows.delete(ckey)
+    }
+    return await this.step({ check: (rows) => vaultIs(rows, scope, expected), write: retire }) ? Expectations.retirementOf(removed.box, expected) : null
   }
 
   protected doRetireVault(scope: VaultScope, expected: RetireExpectation) {

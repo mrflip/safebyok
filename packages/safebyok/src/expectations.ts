@@ -1,11 +1,13 @@
-import type { LockboxExpectation, RetireExpectation, VaultPropsExpectation } from './vault-db'
+import { Lockbox } from './lockbox'
+import type { LockboxExpectation, LockboxRetireExpectation, LockboxRetirement, RetireExpectation, VaultPropsExpectation } from './vault-db'
 
 /**
  * Whether what stands in storage is what a write expects: the comparisons a key-value adapter
- * makes, inside its one atomic step, before a versioned write lands. They compare the few public
+ * makes, inside its one atomic step, before a versioned write lands. They compare the few unencrypted
  * fields an adapter compares (`vault_id`, `unlock_epoch`, `vault_key_epoch`, `revision_tok`) and
  * nothing else, reading the standing row as it is, unvalidated: a row too damaged to show a field
- * fails the comparison, so nothing lands on it. The expectation itself is clean -- `VaultDB`'s
+ * fails the comparison, so nothing lands on it ({@link retirementOf}, which reports rather than
+ * decides, reads a damaged one as the listing does). The expectation itself is clean -- `VaultDB`'s
  * verbs checked it before the adapter saw it. `localVaultDB` and `idbVaultDB` use them; a
  * key-value backend of your own uses them as they are. Import it whole:
  * `import { Expectations } from 'safebyok'`, then `Expectations.vaultPropsMeets(standing, expected)`.
@@ -74,4 +76,23 @@ export const lockboxMeets = (standingVaultProps: unknown, standingBox: unknown, 
   if (! vaultMeets(standingVaultProps, expected) || fieldOf(standingVaultProps, 'vault_key_epoch') !== expected.vault_key_epoch) { return false }
   if (standingBox === undefined || standingBox === null) { return expected.revision_tok === null }
   return expected.revision_tok !== null && fieldOf(standingBox, 'revision_tok') === expected.revision_tok
+}
+
+/**
+ * What a lockbox retirement reports, removing `standingBox`, the row standing under its boxlabel:
+ * `retired` when that row is at the revision `expected` names -- or, for a null `revision_tok`,
+ * holds none that reads as one, as the listing names no revision for a damaged lockbox that holds
+ * none -- `retired_other` for any other row, and `absent` for none. It decides nothing: a
+ * retirement in the right vault ({@link vaultMeets}) removes whatever stands (line 3.4), and this
+ * says what that was, from inside the same atomic step.
+ *
+ * @param standingBox - The lockbox row standing under the boxlabel, or undefined (or null) when there is none.
+ * @param expected - The vault the retirement is aimed at, and the revision the retiring device read.
+ *
+ * @example Expectations.retirementOf(standingBox, { vault_id: 'v1', revision_tok: 'r7' })  // { outcome: 'retired' } while r7 stands
+ */
+export const retirementOf = (standingBox: unknown, expected: LockboxRetireExpectation): LockboxRetirement => {
+  if (standingBox === undefined || standingBox === null) { return { outcome: 'absent' } }
+  const standingRevision = Lockbox.shape.revision_tok.safeParse(fieldOf(standingBox, 'revision_tok')).data ?? null
+  return { outcome: standingRevision === expected.revision_tok ? 'retired' : 'retired_other' }
 }

@@ -2,7 +2,7 @@ import { getFunctionName } from 'convex/server'
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server'
 import { ConvexError } from 'convex/values'
 import { Sanitizer, VaultDB, VaultError } from 'safebyok'
-import type { VaultPropsExpectation, VaultDBOpts, RetireExpectation, Lockbox, LockboxExpectation, StoredLockbox, VaultProps, VaultScope } from 'safebyok'
+import type { VaultPropsExpectation, VaultDBOpts, RetireExpectation, Lockbox, LockboxExpectation, LockboxRetireExpectation, StoredLockbox, VaultProps, VaultScope } from 'safebyok'
 import { MaxVaultLockboxes } from './component/tallies'
 import { isSafebyokErrorData } from './refusals'
 import type { SafebyokApi } from './server'
@@ -134,11 +134,11 @@ class ConvexVaultDB extends VaultDB {
     return rows.map((row) => ({ boxlabel: row.boxlabel, lockbox: row }))
   }
 
-  protected doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<boolean> {
+  protected doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<unknown> {
     return refusing(() => this.client.mutation(this.api.updateBox, { scope, lockbox, expected }))
   }
 
-  protected doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation): Promise<boolean> {
+  protected doRetireBox(scope: VaultScope, boxlabel: string, expected: LockboxRetireExpectation): Promise<unknown> {
     return refusing(() => this.client.mutation(this.api.retireBox, { scope, boxlabel, expected }))
   }
 

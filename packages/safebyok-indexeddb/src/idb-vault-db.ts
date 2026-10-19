@@ -1,5 +1,5 @@
 import { Ckeys, Expectations, VaultDB } from 'safebyok'
-import type { VaultPropsExpectation, RetireExpectation, Lockbox, LockboxExpectation, StoredLockbox, VaultProps, VaultScope } from 'safebyok'
+import type { VaultPropsExpectation, RetireExpectation, Lockbox, LockboxExpectation, LockboxRetireExpectation, LockboxRetirement, StoredLockbox, VaultProps, VaultScope } from 'safebyok'
 import { ChangeBell } from 'safebyok/idb'
 import { boxRange } from './ckeys'
 import { bellnameOf, parseDbName, type IdbVaultDBOpts } from './idb-opts'
@@ -91,22 +91,29 @@ class IdbVaultDB extends VaultDB {
       .filter((stored): stored is StoredLockbox => stored.boxlabel !== null)
   }
 
-  protected async doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<boolean> {
+  // The lockbox handed back is the row as the put left it, read in the same transaction.
+  protected async doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<unknown> {
     return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {
-      const [standingVaultProps, standingBox] = await Promise.all([rowAt(store, Ckeys.vaultProps(scope)), rowAt(store, Ckeys.box(scope, lockbox.boxlabel))])
-      if (! Expectations.lockboxMeets(standingVaultProps, standingBox, expected)) { return false }
-      store.put(lockbox, Ckeys.box(scope, lockbox.boxlabel))
-      return true
+      const ckey = Ckeys.box(scope, lockbox.boxlabel)
+      const [standingVaultProps, standingBox] = await Promise.all([rowAt(store, Ckeys.vaultProps(scope)), rowAt(store, ckey)])
+      if (! Expectations.lockboxMeets(standingVaultProps, standingBox, expected)) { return null }
+      store.put(lockbox, ckey)
+      return rowAt(store, ckey)
     }))
   }
 
-  protected async doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation): Promise<boolean> {
-    return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {
-      const standing = await rowAt(store, Ckeys.vaultProps(scope))
-      if (! Expectations.vaultMeets(standing, expected)) { return false }
-      store.delete(Ckeys.box(scope, boxlabel))
-      return true
-    }))
+  // What it removed is the row read in the transaction that deletes it. A retirement that found
+  // nothing to remove changed nothing, and rings no other tab.
+  protected async doRetireBox(scope: VaultScope, boxlabel: string, expected: LockboxRetireExpectation): Promise<LockboxRetirement | null> {
+    const retirement = await inOneTransaction(this.shelf, async (store) => {
+      const ckey = Ckeys.box(scope, boxlabel)
+      const [standingVaultProps, standingBox] = await Promise.all([rowAt(store, Ckeys.vaultProps(scope)), rowAt(store, ckey)])
+      if (! Expectations.vaultMeets(standingVaultProps, expected)) { return null }
+      store.delete(ckey)
+      return Expectations.retirementOf(standingBox, expected)
+    })
+    if (retirement !== null && retirement.outcome !== 'absent') { this.ring() }
+    return retirement
   }
 
   // The look at the vault props and every deletion (the lockboxes by their key range, then the
@@ -129,8 +136,9 @@ class IdbVaultDB extends VaultDB {
 
   private ring() { ChangeBell.ring(bellnameOf(this.dbName)) }
 
-  private ringIfLanded(landed: boolean): boolean {
-    if (landed) { this.ring() }
+  /** Rings once a write lands: `true`, or what it handed back; never for `false` or `null`, a write that did not. */
+  private ringIfLanded<LandedT>(landed: LandedT): LandedT {
+    if (landed !== false && landed !== null) { this.ring() }
     return landed
   }
 }
