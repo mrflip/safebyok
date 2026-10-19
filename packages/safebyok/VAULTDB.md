@@ -67,8 +67,14 @@ within its vault does (line 3.4): the vault warns through its logger, naming nei
 
 The base class turns anything your code throws that is not a `VaultError` into
 `storage_unavailable` -- a bug in your adapter among it, which it cannot tell from a driver's
-failure: the `cause` carries your error, and an adapter that means a kind throws a `VaultError` of
-it. Whatever your code throws reaches the caller as a bad `Outcome`'s `err`, never as a rejection.
+failure (a `fetch` says the network failed with a `TypeError`): the `cause` carries your error, and
+an adapter that means a kind throws a `VaultError` of it. Whatever your code throws reaches the
+caller as a bad `Outcome`'s `err`, never as a rejection. A throw from the base class's own code
+that is not a `VaultError` is a bug in safebyok, not an outage: `unexpected_error`, never to be
+retried. An adapter that hands its calls on to another VaultDB unwraps each answer with `valOf`,
+returning its `val` and throwing its `err`: an answer handed back still wrapped as an `Outcome` is
+refused as `bad_option`, never read as a record. `subscribe`, which answers at once with the
+unsubscribe, is the one verb that throws its refusal rather than resolving it.
 
 ## The baseline
 

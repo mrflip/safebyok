@@ -7,7 +7,7 @@ import { AnyTextValidators, NameFloor } from './validators'
 import * as Refusals from './refusals'
 import { asError, parseLogger, type VaultLogger } from './logger'
 import { reportToPlatform } from './report-error'
-import { type Outcome, outcomeOf } from './outcome'
+import { type Outcome, isOutcomeShaped, outcomeOf, unexpectedError } from './outcome'
 
 // == [Expectations and records]: VaultPropsExpectation, BoxExpectation, VaultDelExpectation, BoxDelExpectation, BoxDeletion, StoredBox
 
@@ -159,14 +159,16 @@ export type VaultDBOpts = {
  * every record on the way out, `stale_write` for a failed expectation, and `storage_unavailable`
  * (your own error as its `cause`) for anything you throw that is not already a VaultError. Each
  * resolves an {@link Outcome} and never rejects: its answer as `val`, or every refusal -- the
- * base's own, and whatever your `do*` method throws -- as `err`, a VaultError. They also own what
+ * base's own, and whatever your `do*` method throws -- as `err`, a VaultError. A throw from the
+ * base's own code that is no VaultError is a bug, not an outage: it is `unexpected_error`
+ * (misuse), never to be retried. They also own what
  * every adapter would otherwise write again: `subscribe` calls each listener so that nothing it
  * throws reaches your code, and its unsubscribe runs once; and `listBoxRecords` lists a vault as
  * stored, for a server to serve. Implement the `do*` methods, and hand `super()` the host's
  * {@link VaultDBOpts}; never override the public verbs, but for `listBoxRecords` where your
  * backend lists more cheaply. To refuse, throw what `Refusals` makes. A `do*` method that hands
- * its call on to another VaultDB's verb returns that verb's `val` and throws its `err`: an Outcome
- * handed back whole reads as a damaged record.
+ * its call on to another VaultDB's verb returns that verb's `val` and throws its `err`, as
+ * `valOf` does: an Outcome handed back whole is refused as `bad_option`.
  * The package's `VAULTDB.md` is the whole contract, line by line, and `describeVaultDB` (from
  * `safebyok/testing`) tests it so.
  *
@@ -256,6 +258,7 @@ export abstract class VaultDB {
    * `Vault.make` and `VaultProvider` use it when they are given no logger of their own.
    */
   get logger(): VaultLogger { return this.#logger }
+
   // --
 
   // == [Vault props verbs]: getVaultProps, ensureVaultProps, putVaultProps
@@ -269,9 +272,9 @@ export abstract class VaultDB {
    * `newer_format`.
    */
   getVaultProps(scope: VaultScope): Promise<Outcome<VaultProps | null>> {
-    return outcomeOf(async () => {
+    return answering(async () => {
       const asked = heldScope(this, scope)
-      const raw = await this.doGetVaultProps(asked)
+      const raw = await adapterAnswer('doGetVaultProps', () => this.doGetVaultProps(asked))
       if (raw === null || raw === undefined) { return null }
       return checkVaultProps(raw, asked)
     })
@@ -288,10 +291,10 @@ export abstract class VaultDB {
    * them the floor admits but longer than the backend holds, with kind `bad_label`.
    */
   ensureVaultProps(vaultProps: VaultProps): Promise<Outcome<VaultProps>> {
-    return outcomeOf(async () => {
+    return answering(async () => {
       const outgoing = checkOutgoing(VaultProps, vaultProps, 'vault props record')
       const asked = heldScope(this, outgoing)
-      const raw = await this.doEnsureVaultProps(outgoing)
+      const raw = await adapterAnswer('doEnsureVaultProps', () => this.doEnsureVaultProps(outgoing))
       return checkVaultProps(raw, asked)
     })
   }
@@ -305,14 +308,14 @@ export abstract class VaultDB {
    * carry the one in `expected`: kind 'bad_record' otherwise.
    */
   putVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<Outcome<void>> {
-    return outcomeOf(async () => {
+    return answering(async () => {
       const outgoing = checkOutgoing(VaultProps, vaultProps, 'vault props record')
       heldScope(this, outgoing)
       const expectation = checkOutgoing(VaultPropsExpectation, expected, 'vault props expectation')
       if (outgoing.vault_id !== expectation.vault_id) {
         throw new VaultError('bad_record', "putVaultProps replaces a vault's props within that vault: the vault props' vault_id must be the expected one, as a vault_id never changes.")
       }
-      const landed = await this.doPutVaultProps(outgoing, expectation)
+      const landed = await adapterAnswer('doPutVaultProps', () => this.doPutVaultProps(outgoing, expectation))
       if (! landed) { throw Refusals.staleWrite('vaultProps') }
     })
   }
@@ -322,10 +325,10 @@ export abstract class VaultDB {
 
   /** One box, validated, or null when there is none under that boxlabel. */
   getBox(scope: VaultScope, boxlabel: string): Promise<Outcome<Box | null>> {
-    return outcomeOf(async () => {
+    return answering(async () => {
       const asked = heldScope(this, scope)
       const label = heldBoxlabel(this, boxlabel)
-      const raw = await this.doGetBox(asked, label)
+      const raw = await adapterAnswer('doGetBox', () => this.doGetBox(asked, label))
       if (raw === null || raw === undefined) { return null }
       return checkStoredBox(raw, label)
     })
@@ -340,9 +343,9 @@ export abstract class VaultDB {
    * stored under a name below the floor, which no verb could reach, is not listed at all.
    */
   listBoxes(scope: VaultScope): Promise<Outcome<(BoxSummary | DamagedBox)[]>> {
-    return outcomeOf(async () => {
+    return answering(async () => {
       const asked = heldScope(this, scope)
-      const stored = await this.doListBoxes(asked)
+      const stored = await adapterAnswer('doListBoxes', () => this.doListBoxes(asked))
       return stored
         .filter((entry) => isNameable(entry))
         .map((entry) => listedOrDamaged(entry))
@@ -365,9 +368,9 @@ export abstract class VaultDB {
    *   return val
    */
   listBoxRecords(scope: VaultScope): Promise<Outcome<unknown[]>> {
-    return outcomeOf(async () => {
+    return answering(async () => {
       const asked = heldScope(this, scope)
-      const stored = await this.doListBoxes(asked)
+      const stored = await adapterAnswer('doListBoxes', () => this.doListBoxes(asked))
       return stored
         .filter((entry) => isNameable(entry))
         .map(({ box }) => withoutCiphered(box))
@@ -393,7 +396,7 @@ export abstract class VaultDB {
    * may have landed: the adapter wrote something it cannot read back.
    */
   putBox(scope: VaultScope, box: Box, expected: BoxExpectation): Promise<Outcome<Box>> {
-    return outcomeOf(async () => {
+    return answering(async () => {
       const asked = heldScope(this, scope)
       const outgoing = checkOutgoing(Box, box, 'box')
       heldBoxlabel(this, outgoing.boxlabel)
@@ -405,7 +408,7 @@ export abstract class VaultDB {
       if (recordBytes > this.maxRecordBytes) {
         throw new VaultError('box_too_large', `That box weighs ${String(recordBytes)} bytes, over the ${String(this.maxRecordBytes)} its storage holds in one record, so nothing was written: store a smaller whisper or sidecar, or under a shorter boxlabel.`)
       }
-      const stored = await this.doPutBox(asked, outgoing, expectation)
+      const stored = await adapterAnswer('doPutBox', () => this.doPutBox(asked, outgoing, expectation))
       if (stored === null) { throw Refusals.staleWrite('box') }
       return writtenBack('a box write', () => checkStoredBox(stored, outgoing.boxlabel))
     })
@@ -432,11 +435,11 @@ export abstract class VaultDB {
    *   if (ok && val.outcome === 'deleted_other') { await refresh() }
    */
   delBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<Outcome<BoxDeletion>> {
-    return outcomeOf(async () => {
+    return answering(async () => {
       const asked = heldScope(this, scope)
       const label = heldBoxlabel(this, boxlabel)
       const expectation = checkOutgoing(BoxDelExpectation, expected, 'delete expectation', 'removed')
-      const deletion = await this.doDelBox(asked, label, expectation)
+      const deletion = await adapterAnswer('doDelBox', () => this.doDelBox(asked, label, expectation))
       if (deletion === null) { throw Refusals.staleWrite('del') }
       return writtenBack('a deletion', () => checkAnswer(BoxDeletion, deletion, 'a deletion'))
     })
@@ -449,10 +452,10 @@ export abstract class VaultDB {
    * `expected` this package would not build is refused with kind `bad_record`, removing nothing.
    */
   delVault(scope: VaultScope, expected: VaultDelExpectation): Promise<Outcome<void>> {
-    return outcomeOf(async () => {
+    return answering(async () => {
       const asked = heldScope(this, scope)
       const expectation = checkOutgoing(VaultDelExpectation, expected, 'delete expectation', 'removed')
-      const landed = await this.doDelVault(asked, expectation)
+      const landed = await adapterAnswer('doDelVault', () => this.doDelVault(asked, expectation))
       if (! landed) { throw Refusals.staleWrite('del') }
     })
   }
@@ -480,9 +483,9 @@ export abstract class VaultDB {
    * reads, as `safebyok-graphql`'s: there a damaged record is the backend's own to clear.
    */
   delDamagedVault(scope: VaultScope): Promise<Outcome<void>> {
-    return outcomeOf(async () => {
+    return answering(async () => {
       const asked = heldScope(this, scope)
-      const raw = await readStoredVaultProps(() => this.doGetVaultProps(asked))
+      const raw = await readStoredVaultProps(() => adapterAnswer('doGetVaultProps', () => this.doGetVaultProps(asked)))
       if (raw === null || raw === undefined) { return }
       if (mayBeNewer(raw)) { throw newerVaultProps() }
       if (isSoundVaultProps(raw, asked)) {
@@ -490,7 +493,7 @@ export abstract class VaultDB {
       }
       const named = StoredVaultId.safeParse(raw)
       if (! named.success) { throw unnamedVaultProps() }
-      const landed = await this.doDelVault(asked, { vault_id: named.data.vault_id })
+      const landed = await adapterAnswer('doDelVault', () => this.doDelVault(asked, { vault_id: named.data.vault_id }))
       if (! landed) { throw Refusals.staleWrite('del') }
     })
   }
@@ -509,6 +512,11 @@ export abstract class VaultDB {
    * and every other listener is still called. Once unsubscribed, `onChange` is never called again,
    * whatever the backend delivers late. The unsubscribe ends the watch once: a second call does
    * nothing, and one the adapter's own unsubscribe throws from is logged, never thrown.
+   *
+   * The one verb that answers at once, with the unsubscribe, and so the one that throws rather than
+   * resolving an Outcome: kind 'bad_label' for a scope below the floor, 'bad_option' for an
+   * `onChange` that is no function, and what the adapter's watch refuses to start with (a
+   * `storage_unavailable` around what it threw, or its own VaultError, such as `identity_revoked`).
    */
   subscribe(scope: VaultScope, onChange: () => void): () => void {
     const asked = heldScope(this, scope)
@@ -760,10 +768,35 @@ const heldName = (facts: NameFacts, said: string, part: string): string => {
 }
 // --
 
-// == [Storage and listener guards]: asStorageTrouble, checkListener, checked, checkOutgoing
+// == [Storage and listener guards]: answering, asStorageTrouble, adapterAnswer, checkListener, checked, checkOutgoing
+
+/**
+ * `body`'s outcome, as each verb answers. What the adapter throws reaches it a VaultError already
+ * (`adapterAnswer`), so any other throw is the base's own bug: `unexpected_error`, never
+ * `storage_unavailable`, which a host would retry.
+ */
+const answering = <ValT>(body: () => Promise<ValT>): Promise<Outcome<ValT>> => outcomeOf(body, unexpectedError)
 
 /** What an adapter threw, as a VaultError: its own VaultError untouched, anything else wrapped. */
 const asStorageTrouble = (err: unknown): VaultError => (err instanceof VaultError ? err : Refusals.storageUnavailable(err))
+
+/**
+ * What the adapter's `hook` answers: what it throws said as storage trouble, and an answer still
+ * wrapped as an Outcome -- a VaultDB handing on another's verb, which forgot to unwrap it --
+ * refused as `bad_option`, never read as a damaged record.
+ */
+const adapterAnswer = async <AnswerT>(hookname: string, hook: () => Promise<AnswerT>): Promise<AnswerT> => {
+  let answer: AnswerT
+  try {
+    answer = await hook()
+  } catch (err) {
+    throw asStorageTrouble(err)
+  }
+  if (isOutcomeShaped(answer)) {
+    throw new VaultError('bad_option', `The storage adapter's ${hookname} answered with an Outcome, { ok, val } or { ok, err }, where it owes the answer itself: an adapter that hands its call on to another VaultDB's verb must unwrap what that verb resolves, with valOf(...), returning its val and throwing its err.`)
+  }
+  return answer
+}
 
 const checkListener = (onChange: unknown) => {
   if (typeof onChange !== 'function') {

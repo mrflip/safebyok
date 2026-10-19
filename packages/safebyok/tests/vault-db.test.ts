@@ -4,6 +4,8 @@ import { memoryStore } from '../src/string-store'
 import { VaultDB, jsonBytes, type VaultPropsExpectation, type VaultDelExpectation, type BoxExpectation, type BoxDelExpectation, type StoredBox, type VaultDBOpts, type WatchTrouble } from '../src/vault-db'
 import { localVaultDB } from '../src/local-vault-db'
 import { VaultError } from '../src/errors'
+import { bad, good, valOf } from '../src/outcome'
+import * as Refusals from '../src/refusals'
 import { DefaultLogger, parseLogger, type VaultLogger } from '../src/logger'
 import type { Box } from '../src/box'
 import type { VaultProps, VaultScope } from '../src/types'
@@ -544,7 +546,7 @@ describe("the abstract VaultDB, deleting a vault whose vault props are damaged",
 })
 // --
 
-// == [Answers from the adapter]: on the way in, MisansweringVaultDB, box write, listing
+// == [Answers from the adapter]: on the way in, MisansweringVaultDB, box write, ForgetfulVaultDB, by what threw, listing
 
 describe("the abstract VaultDB, on the way in", () => {
   for (const [kind, write, blurb] of RefusedWrites) {
@@ -653,6 +655,67 @@ describe("the abstract VaultDB, on the way back from a box write", () => {
     const refusal = await TH.expectBad(vaultDB.putBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet), 'corrupt_record')
     expect(refusal.message).to.not.include('SUPERSECRET')
     expect(refusal.message).to.not.include('anthropic')
+  })
+})
+
+/**
+ * A MapVaultDB written as a VaultDB that hands each call on to another and forgets to unwrap the
+ * answer: each hook hands back `good` of what it would answer, or, for a write, `bad` of a stale one.
+ */
+class ForgetfulVaultDB extends MapVaultDB {
+  protected override async doGetVaultProps(scope: VaultScope): Promise<unknown> { return good(await super.doGetVaultProps(scope)) }
+  protected override async doGetBox(scope: VaultScope, boxlabel: string) { return good(await super.doGetBox(scope, boxlabel)) }
+  protected override doPutVaultProps(): Promise<boolean> { return Promise.resolve(bad(Refusals.staleWrite('vaultProps')) as unknown as boolean) }
+}
+
+/** A MapVaultDB whose box reads it hands on to `inner`, unwrapping each answer as an adapter must. */
+class ForwardingVaultDB extends MapVaultDB {
+  readonly inner = new MapVaultDB()
+
+  protected override async doGetBox(scope: VaultScope, boxlabel: string) {
+    return valOf(await this.inner.getBox(scope, boxlabel))
+  }
+}
+
+describe("the abstract VaultDB, by what threw", () => {
+  it("takes the answer of a VaultDB handing its call on, unwrapped with valOf, and its refusal thrown, as valOf's second example shows", async () => {
+    const vaultDB = new ForwardingVaultDB()
+    vaultDB.inner.rows.set(u1AnthropicBoxCkey, TH.boxOf('anthropic', 'one'))
+    expect(await TH.expectingGood(vaultDB).getBox(TH.scopeOf('u1'), 'anthropic')).to.deep.equal(TH.boxOf('anthropic', 'one'))
+    vaultDB.inner.rows.set(u1AnthropicBoxCkey, 'not a box')
+    await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic'), 'corrupt_record')
+  })
+
+  it("refuses an answer still wrapped as an Outcome as 'bad_option', saying to unwrap it with valOf, never reading it as a record", async () => {
+    const vaultDB = new ForgetfulVaultDB()
+    vaultDB.rows.set(u1VaultPropsCkey, TH.vaultPropsOf('u1'))
+    const refusal = await TH.expectBad(vaultDB.getVaultProps(TH.scopeOf('u1')), 'bad_option')
+    expect(refusal.message).to.match(/doGetVaultProps answered with an Outcome/)
+    expect(refusal.message).to.match(/valOf/)
+    await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic'), 'bad_option')
+  })
+
+  it("refuses a write answered with a refusal still wrapped, which reads as true, rather than taking it as landed", async () => {
+    const vaultDB = new ForgetfulVaultDB()
+    vaultDB.rows.set(u1VaultPropsCkey, TH.vaultPropsOf('u1'))
+    const expected = { vault_id: 'vault-id-u1', unlock_epoch: 1 }
+    await TH.expectBad(vaultDB.putVaultProps({ ...TH.vaultPropsOf('u1'), unlock_epoch: 2 }, expected), 'bad_option')
+  })
+
+  it("says a throw in its own code, not the adapter's, as 'unexpected_error', never as storage_unavailable, which a host would retry", async () => {
+    const vaultDB = new MapVaultDB()
+    const thrown = new TypeError('the scope fell over')
+    const scope = { ...TH.scopeOf('u1'), get vaultlabel(): string { throw thrown } }
+    const refusal = await TH.expectBad(vaultDB.getVaultProps(scope), 'unexpected_error')
+    expect(refusal.family).to.eq('misuse')
+    expect(refusal.cause).to.eq(thrown)
+  })
+
+  it("still says the adapter's own throw as storage_unavailable, whatever it threw: a TypeError is how fetch says the network failed", async () => {
+    const networkDown = new TypeError('Failed to fetch')
+    const vaultDB = new TroubledVaultDB(() => { throw networkDown })
+    const refusal = await TH.expectBad(vaultDB.getVaultProps(TH.scopeOf('u1')), 'storage_unavailable')
+    expect(refusal.cause).to.eq(networkDown)
   })
 })
 
