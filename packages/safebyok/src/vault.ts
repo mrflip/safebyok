@@ -1988,7 +1988,7 @@ export class Vault {
   }
   // --
 
-  // == [Reading boxes]: checkStandingBoxlabel, getBoxOrThrow, openBox, decipherOrCatchUp
+  // == [Reading boxes]: checkStandingBoxlabel, getBoxOrThrow, boxFrom, openBox, decipherOrCatchUp
 
   /**
    * `boxlabel`, once a box stands under it, for delBox(), which reaches a box by the name it
@@ -2016,7 +2016,7 @@ export class Vault {
   async #getBoxOrDamaged(boxlabel: string): Promise<Box | 'damaged' | null> {
     try {
       const record = await this.#vaultDB.getBox(this.#scope, boxlabel)
-      return record === null ? null : Box.make(this, record, this.#currentVaultProps())
+      return record === null ? null : this.#boxFrom(record)
     } catch (err) {
       if (! isVaultError(err, 'corrupt_record')) { throw err }
       return 'damaged'
@@ -2027,6 +2027,16 @@ export class Vault {
     const label = Names.checkFloor('boxlabel', boxlabel)
     const record = await damagedAs(this.#vaultDB.getBox(this.#scope, label), damagedBox)
     if (record === null) { throw this.#nothingUnder(label) }
+    return this.#boxFrom(record)
+  }
+
+  /**
+   * The box `record` makes, under the vault props in hand, for a call that holds the key: a
+   * refresh that found the vault gone while storage was read took the key with them, and the
+   * call refuses as locked, never as absent.
+   */
+  #boxFrom(record: BoxRecord): Box {
+    this.#checkUnlocked()
     return Box.make(this, record, this.#currentVaultProps())
   }
 

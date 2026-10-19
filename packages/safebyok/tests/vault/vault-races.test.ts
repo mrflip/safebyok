@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest'
 import { MinuteMillis } from '../../src/types'
 import { VaultError } from '../../src/errors'
+import type { Vault } from '../../src/vault'
 import { memoryDeviceDB } from '../../src/device-db'
 import { localVaultDB } from '../../src/local-vault-db'
 import { bad, good } from '../../src/outcome'
@@ -131,6 +132,31 @@ describe("a read in flight when a lock lands", () => {
     gate.release()
     await reading
   })
+
+  const ReadsOfABox = [
+    ['getBox', (vault: Vault) => vault.getBox('anthropic'),              'a read'],
+    ['putBox', (vault: Vault) => vault.putBox('anthropic', 'sk-fake-2'), 'a store'],
+    ['delBox', (vault: Vault) => vault.delBox('anthropic'),              'a deletion'],
+  ] as const
+
+  for (const [verb, calling, blurb] of ReadsOfABox) {
+    it(`refuses ${blurb} as locked, never absent, when a refresh finds the vault deleted elsewhere while storage reads the box (${verb})`, async () => {
+      const world = makeRacingWorld()
+      const vault = await world.openUnlocked('pw one')
+      await vault.putBox('anthropic', 'sk-fake')
+      const there = await world.openUnlocked('pw one', { deviceDB: memoryDeviceDB() })
+      const getBox = world.vaultDB.getBox.bind(world.vaultDB)
+      // Storage answers with the box, but only once the vault is gone and this handle has heard.
+      vi.spyOn(world.vaultDB, 'getBox').mockImplementationOnce(async (...args) => {
+        const answer = await getBox(...args)
+        await there.del()
+        await TH.wakeupAtNextTick()
+        return answer
+      })
+      await TH.expectRefusal(calling(vault), 'vault_locked')
+      expect(vault.getSnapshot().state).to.eq('absent')
+    })
+  }
 
   it("refuses as locked when a refresh finds the vault deleted elsewhere while the whisper is deciphered", async () => {
     const world = makeRacingWorld()
