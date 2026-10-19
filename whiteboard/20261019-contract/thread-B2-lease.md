@@ -1,6 +1,6 @@
 # Thread B2: lease (2026-10-19)
 
-Branch `20261019-lease`, [PR #205](https://github.com/mrflip/safebyok/pull/205), stacked on [#203](https://github.com/mrflip/safebyok/pull/203) (`a_sec`). Justify: green; core 2630 tests (35 skipped; 2583 before), every package green; budgets `Vault` 36 -> 37 kB and `idbDeviceDB` 14 -> 15 kB, set by `pnpm size:budget --write`.
+Branch `20261019-lease`, [PR #205](https://github.com/mrflip/safebyok/pull/205), stacked on [#203](https://github.com/mrflip/safebyok/pull/203) (`a_sec`). Justify: green at the rework's tip; core 2640 tests (35 skipped; 2583 before the thread), react 274, indexeddb 154, postgres 281, convex 280, graphql 276, fastkey 49, demo 215, e2e 185, root 265; budgets `Vault` 36 -> 37 kB and `idbDeviceDB` 14 -> 15 kB, set by `pnpm size:budget --write`.
 
 * **Built**:
   * `src/lease.ts`, the class. The Zod schema is **`LeaseRecord`** (was `Lease`, in `types.ts`;
@@ -36,7 +36,16 @@ Branch `20261019-lease`, [PR #205](https://github.com/mrflip/safebyok/pull/205),
     `deviceOutcomeOf`), the battery's new "every verb a good Outcome" case; elsewhere reads go
     through `TH.expectingGood(deviceDB)` / `TH.expectGood`, idb's failures are `expectBad` with the
     DOMException as `cause`. `index.ts` exports `Lease`, `LeaseRecord`, `LeaseHolder`, `LeaseVault`.
-  * README: a DeviceDB of your own answers Outcomes; the rolled-back recipe unwraps `delMark`.
+  * README: a DeviceDB of your own answers each verb through `deviceOutcomeOf`; the rolled-back
+    recipe unwraps `delMark`.
+  * **Review rework** (after the reviewer's four fixes, to 91764c56): `deviceOutcomeOf` exported
+    beside `outcomeOf` (the Coach's ruling), its doc written for a host's own store, with tests for
+    both examples and a table of what a store may throw; `describeDeviceDB(title, make,
+    makeBlocked?)` checks, given an adapter over a withheld store, that every verb resolves
+    `storage_blocked` and never rejects (idb runs it with no `indexedDB`; `test-helpers.test.ts`'s
+    host-shaped DeviceDB, now written through `deviceOutcomeOf`, with a `SecurityError`);
+    VOCABULARY's "lease, as kept" names `LeaseRecord`; the security note's restore recipe unwraps
+    `delMark`; the misfiled `tryOpen` test now stands under `Lease.make`.
 * **Decisions taken**:
   * **`holder` second, keys after**: `Lease.grant(vault, holder, vaultKeyPair, askPassphraseAt)`,
     as B1's `Wayin.sealPasskey(vault, proof, holder, ...)` and B3's `Box.seal(vault, ..., holder,
@@ -56,8 +65,6 @@ Branch `20261019-lease`, [PR #205](https://github.com/mrflip/safebyok/pull/205),
   * **Pulled forward: the mark verbs and `delAll` resolve Outcomes too.** The thread named the
     lease verbs; a DeviceDB half of each kind would ask every adapter author to know which. One
     helper serves all seven.
-  * `deviceOutcomeOf` is not exported from the package: a host's own DeviceDB can use
-    `outcomeOf`, and the vault's guard says a throw as a condition anyway.
 * **Discoveries**:
   * The idb entry grew past its budget: `device-db.ts`'s helpers bring `outcome.ts` and
     `refusals.ts` into `safebyok/idb`.
@@ -78,10 +85,13 @@ Branch `20261019-lease`, [PR #205](https://github.com/mrflip/safebyok/pull/205),
   * *Returns* says a failed lease write leaves the vault unlocked for the session: an `unlock()`
     whose `putLease` fails refuses and stays locked, as before this thread (a change to the ways in
     logs and carries on). Unchanged here: when to ask is the policy session's.
-* **For the Coach** (the PR's open questions):
-  * **Mark verbs pulled forward**: keep all seven DeviceDB verbs on Outcomes (recommended).
-  * **`tryOpen`'s `corrupt_record`**: keep it, and amend the Contract (recommended).
-  * **The scope check at `make`**: keep it (recommended).
-  * **`Lease.grant`'s order**, `holder` second as in B1/B3: keep it (recommended).
-  * **`deviceOutcomeOf` not exported**: keep it internal until a host asks (recommended).
-  * **A failed lease write on `unlock()`**: it refuses and stays locked, where the Contract says the vault stays unlocked. This is for the policy session.
+* **The Coach's rulings (2026-10-19)**, all as recommended but one: all seven device verbs on
+  Outcomes; `tryOpen`'s `corrupt_record`; the scope check in `make`; vault first, then holder;
+  the device store hands back records; a failed lease write refuses the unlock until the policy
+  session; and `deviceOutcomeOf` **exported** (done in the rework).
+* **Minors left as they are** (the orchestrator's word): `Lease.grant` validates neither
+  `askPassphraseAt` nor `holder` (the reviewer's `endsWithin` fix covers the fail-open); every
+  first-party device call passes through `outcomeOf` twice (the adapter's, then the vault's
+  guard), and `Lease.make` re-parses a record the store already parsed; `#discardLease` decides
+  warn-or-not by `refusalkind === 'vault_locked'`, so a new `tryOpen` refusal kind would change the
+  logging quietly.
