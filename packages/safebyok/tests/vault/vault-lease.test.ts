@@ -968,6 +968,26 @@ describe("vault.ensureLease, by the Contract", () => {
     await TH.expectBad(ensuring, 'vault_locked')
   })
 
+  it("erases the lease an attempt wrote when a lock lands as it writes it: the lock wins across a reload too (Contract: getProof, attempt refuses: vault_locked)", async () => {
+    const prompt = heldPrompt()
+    const world = makeRacingWorld()
+    const maker = await world.openUnlocked('pw')
+    await maker.lock()
+    maker.close()
+    const vault = await world.open({ getProof: prompt.getProof })
+    const ensuring = vault.tryEnsureLease()
+    const ask = await prompt.asked
+    const gate = world.holdNextLease()
+    const attempting = ask.attempt('pw')
+    await gate.reached
+    await vault.lock()
+    gate.release()
+    await TH.expectBad(attempting, 'vault_locked')
+    expect(await world.getLease()).to.be.null
+    expect(await world.stateOnOpen()).to.eq('locked')
+    await TH.expectBad(ensuring, 'vault_locked')
+  })
+
   it("refuses bad_option when getProof answers carry_on outside lease_ending (Contract: ensureLease, Refuses: bad_option)", async () => {
     const { vault } = await lockedVaultWith({ getProof: () => Promise.resolve('carry_on') })
     const err = await TH.expectRefusal(vault.ensureLease(), 'bad_option')

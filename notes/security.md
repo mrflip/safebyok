@@ -34,6 +34,54 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-19 (thread A6, getproof): **`lockLanded`: a `lock()`, `close()` or `del()` landing while a
+  prompt is up aborts the ask's `AbortController`, and the lock wins over an `attempt()` under way.**
+  Every waiter on the ask is refused `vault_locked` at once and `ask.lockLanded` settles, so the
+  dialog closes; an `attempt()` after that refuses `vault_locked` without reading storage or deriving
+  a key. An attempt already under way is stood down in `#grantLease`, which asks the signal after the
+  vault props are checked, again after the vaultKey is wrapped under the new leaseKey, and again
+  after `putLease`: before the write it installs no key and writes no lease; if the abort came during
+  the write it erases the lease it just wrote (`delLease`), so the lock holds across a reload; either
+  way `#vaultKey` is not set. This follows thread A3's take-up `AbortController` pattern (no
+  counters). The signal covers only `lock()`, `close()` and `del()`: other relocks
+  (`identity_revoked`, `rolled_back`, a moved `unlock_epoch`, the lease expiring) do not land on the
+  prompt, and `unlock()` outside a prompt keeps its earlier behaviour (a lock during it does not stop
+  it; TODO.md's lock-timing scenario 1, for the policy session). An attempt still under way when the
+  user cancels the dialog is not stood down: it may unlock the vault afterwards (the answer is
+  dropped, the unlock is not). Starting over from the dialog (`vault.del()`) lands as a lock and
+  closes the dialog.
+* 2026-10-19 (thread A6, getproof): **`Ask`: one per prompt, with one shared answer, and its
+  `attempt(proof, { wayinId? })` runs the same unlock body as `unlock()`.** `Ask`
+  (`packages/safebyok/src/ask.ts`; `Ask.raise` is the vault's) owns `why`, the vault handle,
+  `attempt`, `lockLanded` and the one answer: every call that needs the vault while a prompt is up
+  awaits that same answer, so there is never more than one prompt. `attempt` proves against the vault
+  props as storage holds them now (a refresh first); a wrong passphrase is learned from the wayin's
+  decrypt failing, never a comparison. The ask hands the dialog the live vault handle (`ask.vault`),
+  whose public surface is the host's anyway. In `safebyok-react`, the dialog groups `attempt`'s
+  refusals as the Contract does (`attempt-refusals.ts`): wrong passphrase or passkey, weak passphrase
+  and wayin problems are shown in place; `created_elsewhere` as advice; `vault_locked`,
+  `storage_unavailable` and any refusal not named close the dialog, answering `declined`; misuse and
+  anything that is no `VaultError` go to the dialog's error boundary (reported through React's
+  `onCaughtError`, the page untouched), whose Close answers `declined`.
+* 2026-10-19 (thread A6, getproof): **`Vault.make` takes `getProof`, the host's method that asks the
+  user for a proof, and every data call now goes through `ensureLease()` to it.** `putBox`, `getBox`,
+  `useBox` and `delBox` call `#ensureLease()`, which, when the vault is locked, absent or its lease
+  ending, hands an `Ask` to `getProof` and waits. The host's `getProof`, and the dialog it shows,
+  handle the passphrase. (1) Whatever `getProof` throws, or its promise rejects with, becomes kind
+  `unexpected_error` (misuse) with the throw as `cause`; it is never logged, never told to
+  `onBadNews`, never put in a message. (2) An answer that is not one of `'unlocked'`, `'declined'` or
+  `'carry_on'` is refused `bad_option` without quoting the answer (a buggy `getProof` could hand back
+  the passphrase); `'carry_on'` is accepted only when the ask's `why` is `lease_ending`. (3) With no
+  `getProof` every ask is `declined` and the call refuses `vault_locked`, as before. (4) After
+  `'unlocked'` or `'carry_on'` the vault still checks that a lease stands (`#checkUnlocked`), so a
+  `getProof` that lies, or a lease that ended while the prompt was up, still refuses `vault_locked`.
+  (5) `putBox` validates its whisper, boxlabel and sidecar before it asks, so a call that cannot land
+  never prompts. (6) In `safebyok-react`, `VaultProvider` is the default `getProof` (its
+  `PassphraseModal`), held by a ref as `onBadNews` is, and gated per vault so a vault the provider
+  let go asks no one. It shows the dialog only while `navigator.userActivation.isActive` is not
+  `false` (true where the browser does not say), so a timer's or background call is answered
+  `declined` unasked, or `carry_on` under a lease ending, rather than popping a dialog the user did
+  not ask for.
 * 2026-10-19 (thread A5, react_over_class): **`VaultProvider` holds `onBadNews` in a ref, defers its
   first `hello()` a microtask, and throws `Vault.make`'s refusal from the effect.** (1) The provider
   hands `Vault.make` one stable teller that calls whichever handler the last committed render passed

@@ -1745,15 +1745,16 @@ export class Vault {
    * Grant this device a lease and take up the vaultKey until `until`, arming the expiry anew --
    * unless the handle has closed, the vault props the key was proven against no longer stand, or
    * `overtaken` (an ask's attempt, which a lock landing stands down) is aborted: then nothing is
-   * taken up. The lease is a fresh leaseKey and the vaultKey wrapped under it. A
+   * taken up, and an overtaken attempt's lease, should it have been written already, is erased. The lease is a fresh leaseKey and the vaultKey wrapped under it. A
    * record already written stays: a close is no lock, and a record of vault props no longer
    * standing opens nothing.
    *
    * @returns True when the vault is now unlocked.
    */
   async #grantLease(unlocked: VaultKeyPair, standing: VaultProps, until: number, overtaken?: AbortSignal): Promise<boolean> {
-    // Asked afresh after the wait: a lock may land during it.
-    const isOutrun = () => this.#outrun(standing) || overtaken?.aborted === true
+    // Asked afresh after each wait: a lock may land during any of them.
+    const isOvertaken = () => overtaken?.aborted === true
+    const isOutrun = () => this.#outrun(standing) || isOvertaken()
     if (isOutrun()) { return false }
     // A take-up under way stands down before this lease is written, not after: one that read an
     // older lease could otherwise erase this one as it discards that.
@@ -1761,6 +1762,8 @@ export class Vault {
     // The transient's last act: wrapped into this device's lease, then dropped.
     const leaseKey = await makeLeaseKey()
     const wrapped = await wrapKeyUnder(leaseKey, unlocked.transientKey, this.#leaseCtx(standing.vault_id, standing.unlock_epoch, until))
+    // An ask's attempt asks again before the write: a lock may have landed while the key was wrapped.
+    if (isOvertaken()) { return false }
     await this.#deviceDB.putLease({
       format:                  'safebyok-lease-v1',
       ...this.#scope,
@@ -1770,6 +1773,9 @@ export class Vault {
       vault_key_lease_wrapped: wrapped,
       ask_passphrase_at:       until,
     })
+    // A lock that landed under an ask's attempt wins on this device too: the lease the attempt just
+    // wrote is erased, as the lock erased the one before it.
+    if (isOvertaken()) { await this.#deviceDB.delLease(this.#scope) }
     if (isOutrun()) { return false }
     this.#armExpiry(until, this.#clockNow())
     this.#vaultKey = unlocked.sessionKey
