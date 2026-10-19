@@ -5,8 +5,9 @@ they disagree. Workers look things up here; they do not write it.
 
 ## Line
 
-*Orchestrator:* 0 `rename_pass` filed (#193, 905b75ec); A1 `outcome` filed (#194, 35fdadb7). A1b
-`outcome_adapters` and A2 `vault_class` building beside each other from A1's tip.
+*Orchestrator:* 0 `rename_pass` #193 (905b75ec) → A1 `outcome` #194 (35fdadb7) → A2
+`vault_class` #196 (7b175db8) → A3 `fields_and_make` building. A1b `outcome_adapters` #195
+(15b238fc) stands on A1 beside A2; it joins the line at the restack before phase B.
 
 ## Decisions and discoveries
 
@@ -43,6 +44,34 @@ they disagree. Workers look things up here; they do not write it.
 * Count tests as totals including skipped, per file, with a JSON reporter: passed-only figures
   look like a fall.
 
+*Orchestrator:* from A1b (#195):
+
+* Auth refusals pass through with `cause`: Postgres `42501` → `not_permitted`; a Convex host's
+  `getUserId` may throw a `ConvexError` of kind `not_permitted`; GraphQL `FORBIDDEN` →
+  `not_permitted`, and `vaultDBFor` may throw `not_permitted`/`identity_revoked`. `UNAUTHENTICATED`
+  and 401/403 stay `storage_unavailable` (VAULTDB.md 5.5). The wire carries `kind`, not `family`.
+* A Postgres driver error as `cause` carries PGlite's `query` and `params` (ciphertext); it stays on
+  the server. Never let a `cause` cross a wire: the route recipe and GraphQL's `crossing` send only
+  kind and message.
+* **For C1:** `thread-A1b-c1-putbox.md` (on #195's branch) is how each backend does the one-statement
+  conditional `putBox`: Postgres `UPDATE ... SET = CASE` / `ON CONFLICT DO UPDATE` with `RETURNING`
+  (as `EnsureVaultPropsSql` does); Convex one mutation; GraphQL the winner as
+  `extensions.meta.box_stored`.
+* The battery runs here over PGlite (Postgres), the fake deployment (Convex, both clients), and
+  GraphQL with PGlite behind it; that is the adapter proof this machine can give.
+
+*Orchestrator:* from A2 (#196):
+
+* `export class Vault` with `static make`, a private constructor, `parseMakeVaultOpts(opts)` (in
+  `vault-opts.ts`) its first line. Public methods are bound arrow-function fields; private state is
+  ES `#` fields and `#methods`. Section banners all kept (`[The handle]`, `[The Vault value]` gone).
+* **The vault never reads its own state back through a public, writable property**: the review
+  found `this.leaseMillis` and `this.hello()` read internally, which a host could overwrite on the
+  handle; now `#leaseMillis` and `#hello()`. Every later thread keeps this discipline.
+* A hand-made object no longer type-checks as a `Vault` (test doubles cast).
+* Model classes (B1-B3) reach the vault's scope, clock, logger and deriver through accessors the
+  vault grants; there is none yet.
+
 ## Interim shims standing
 
 *Orchestrator:* each is listed until a later thread removes it.
@@ -50,5 +79,6 @@ they disagree. Workers look things up here; they do not write it.
 * `RefusalPolicy.heed` (`refusal-policy.ts`): every vault.ts store call goes through it, turning
   an Outcome back into a throw. A4 / phase C.
 * `del-damaged-vault.ts` unwraps via `valOf`.
-* GraphQL resolvers' `served`; the Postgres README route recipe and its test copy; the demo's
-  `OutageVaultDB` `answered` helper. A1b removes what it can.
+* The demo's `OutageVaultDB` `answered` helper, until `valOf` (or its successor) is exported (A4).
+* GraphQL's `served` and the Postgres route recipe are not shims (A1b): a resolver reports failure
+  only by throwing, and the route turns an Outcome into JSON by design.

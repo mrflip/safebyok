@@ -16,7 +16,7 @@ this line.
   (56 kB; `grep -n '^#'` is its outline). The handoff says when a ruling has changed it since.
 * **Sprint doc:** https://claude.ai/code/artifact/362ec68d-5bf3-46aa-a379-59a9c8bfb548
   (*Open Matters*, *Resolved*, *Progress*).
-* **Status:** 0 and A1 filed (#193, #194); A1b and A2 building.
+* **Status:** 0, A1, A2 filed (#193, #194, #196); A1b filing (#195); A3 building.
 
 ## How this plan relates to the preplan
 
@@ -89,6 +89,16 @@ counts did not fall (the worker reported passed-only). Left: the demo's
 `outcomeOf` in the base maps a bug to `storage_unavailable` (an Open Matters row, A4);
 `RefusalMeta` fields unfilled until C1; unused `settledKind` in e2e; the battery's "never a
 rejection" covers only the base's refusals. Live-backend e2e (96) not run: A1b's reviewer runs them.
+
+*Review (A1b, #195, `clean`):* battery green over PGlite, Convex's fake deployment and GraphQL with
+PGlite; e2e Postgres (88) not run, no Docker. Side doors checked: driver `cause` stays server-side.
+Left (minor): in-process GraphQL `cause` chain reaches the driver error (Open Matters row); a lost
+GRANT reads `not_permitted` (row); VAULTDB.md 5.6's RLS wording broader than the behaviour; the
+`not_permitted` wording restated in two adapters; new error strings use `'` like their neighbours.
+
+*Review (A2, #196, `fixed`):* the vault read `this.leaseMillis` and called `this.hello()` internally,
+both writable by a host on the handle; now `#leaseMillis` and `#hello()`. Regression test carried
+into A3.
 
 **Closing phase A:** passes 1 and 2 (opus, `high`, worktree-isolated agents, one lens each) over
 `origin/main...<A's tip>` while B1 and B3 build; findings filed as a comment on the sprint PR and
