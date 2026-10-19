@@ -164,7 +164,9 @@ export type VaultDBOpts = {
  * throws reaches your code, and its unsubscribe runs once; and `listBoxRecords` lists a vault as
  * stored, for a server to serve. Implement the `do*` methods, and hand `super()` the host's
  * {@link VaultDBOpts}; never override the public verbs, but for `listBoxRecords` where your
- * backend lists more cheaply. To refuse, throw what `Refusals` makes.
+ * backend lists more cheaply. To refuse, throw what `Refusals` makes. A `do*` method that hands
+ * its call on to another VaultDB's verb returns that verb's `val` and throws its `err`: an Outcome
+ * handed back whole reads as a damaged record.
  * The package's `VAULTDB.md` is the whole contract, line by line, and `describeVaultDB` (from
  * `safebyok/testing`) tests it so.
  *
