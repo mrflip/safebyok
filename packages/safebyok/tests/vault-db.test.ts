@@ -505,11 +505,13 @@ const RefusedWrites = [
   // the records:
   ['bad_record', (vaultDB: VaultDB) => vaultDB.fetchOrCreateVaultProps({ ...TH.vaultPropsOf('u1'), unlock_epoch: 1.5 }),                              'vault props with a fractional unlock_epoch'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.fetchOrCreateVaultProps({ ...TH.vaultPropsOf('u1'), wayins: [omit(TH.wayinOf('passphrase'), ['vault_key_wayin_wrapped'])] } as VaultProps), 'vault props whose wayin is missing its wrapped vaultKey'],
-  ['bad_label',  (vaultDB: VaultDB) => vaultDB.fetchOrCreateVaultProps({ ...TH.vaultPropsOf('u1'), applabel: 'Ac\u{7}me' }),                         'vault props whose applabel holds a control character'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.fetchOrCreateVaultProps({ ...TH.vaultPropsOf('u1'), applabel: 'Ac\u{7}me' }),                         'vault props whose applabel holds a control character, the record at fault though only its label failed'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.updateVaultProps({ ...TH.vaultPropsOf('u1'), user_id: 'u^1' }, { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'an update of the vault props whose user_id holds a ^'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one', { sidecar_json: 'not json' }), TH.noBoxYet), 'a lockbox whose sidecar no read would accept'],
-  ['bad_label',  (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('key\u{D83D}', 'one'), TH.noBoxYet),                  'a lockbox whose boxlabel is half of an emoji, whatever the checks'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('key\u{D83D}', 'one'), TH.noBoxYet),                  'a lockbox whose boxlabel is half of an emoji, the lockbox at fault though only its label failed'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one', { written_at: 1_792_022_400 }), TH.noBoxYet), 'a lockbox time in epoch seconds'],
-  ['bad_label',  (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), undefined as unknown as Lockbox, TH.noBoxYet),               'no lockbox at all'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), undefined as unknown as Lockbox, TH.noBoxYet),               'no lockbox at all'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), { boxlabel: 'anthropic' } as Lockbox, TH.noBoxYet),           'a lockbox holding nothing but its boxlabel'],
   // the expectations:
   ['bad_record', (vaultDB: VaultDB) => vaultDB.updateVaultProps(TH.vaultPropsOf('u1'), { vault_id: 'vault-id-u1', unlock_epoch: 0 }),          'an expectation of the vault props at epoch zero'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.updateVaultProps(TH.vaultPropsOf('u1'), undefined as unknown as VaultPropsExpectation), 'no expectation of the vault props at all'],
@@ -667,6 +669,18 @@ describe("the abstract VaultDB, on the way in", () => {
     })
   }
 
+  it("leads a refused retire's message with nothing removed, and a refused write's with nothing written", async () => {
+    const vaultDB = new MapVaultDB()
+    const retireBox = await TH.expectRefusal(vaultDB.retireBox(TH.scopeOf('u1'), 'anthropic', TH.retiring('')), 'bad_record')
+    const retireVault = await TH.expectRefusal(vaultDB.retireVault(TH.scopeOf('u1'), { vault_id: '' }), 'bad_record')
+    const updateBox = await TH.expectRefusal(vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one', { revision_tok: '' }), TH.noBoxYet), 'bad_record')
+    const fetchOrCreate = await TH.expectRefusal(vaultDB.fetchOrCreateVaultProps({ ...TH.vaultPropsOf('u1'), unlock_epoch: 0 }), 'bad_record')
+    expect(retireBox.message).to.match(/^Nothing was removed: that retire expectation/)
+    expect(retireVault.message).to.match(/^Nothing was removed: that retire expectation/)
+    expect(updateBox.message).to.match(/^Nothing was written: that lockbox /)
+    expect(fetchOrCreate.message).to.match(/^Nothing was written: that vault props record /)
+  })
+
   it("never quotes a record it refuses", async () => {
     const vaultDB = new MapVaultDB()
     const sneaky = TH.boxOf('anthropic', 'one', { whisper_ciphered: TH.fakeCiphered('SUPERSECRET'), revision_tok: '' })
@@ -794,11 +808,13 @@ describe("the abstract VaultDB, holding names to the floor", () => {
   ] as const
 
   for (const [candidate, blurb] of BelowTheFloor) {
-    it(`refuses ${blurb} as bad_label, as a boxlabel and in a scope, before its adapter's half sees it`, async () => {
+    it(`refuses ${blurb} as bad_label as a boxlabel and in a scope, and as bad_record in a record, before its adapter's half sees it`, async () => {
       const vaultDB = new MapVaultDB()
       await TH.expectRefusal(vaultDB.readVaultProps({ ...TH.scopeOf('u1'), vaultlabel: candidate }), 'bad_label')
       await TH.expectRefusal(vaultDB.readBox(TH.scopeOf('u1'), candidate), 'bad_label')
-      await TH.expectRefusal(vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf(candidate, 'one'), TH.noBoxYet), 'bad_label')
+      await TH.expectRefusal(vaultDB.updateBox({ ...TH.scopeOf('u1'), applabel: candidate }, TH.boxOf('anthropic', 'one'), TH.noBoxYet), 'bad_label')
+      await TH.expectRefusal(vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf(candidate, 'one'), TH.noBoxYet), 'bad_record')
+      await TH.expectRefusal(vaultDB.fetchOrCreateVaultProps({ ...TH.vaultPropsOf('u1'), vaultlabel: candidate }), 'bad_record')
       expect(vaultDB.rows.size).to.eq(0)
     })
   }

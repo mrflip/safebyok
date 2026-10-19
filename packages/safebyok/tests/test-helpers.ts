@@ -1272,7 +1272,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       const [composed, decomposed] = ['caf\u{E9}', 'cafe\u{301}']
       await vaultDB.fetchOrCreateVaultProps(vaultPropsOf(composed))
       expect(await vaultDB.readVaultProps(scopeOf(composed))).to.deep.equal(vaultPropsOf(composed))
-      await expectRefusal(vaultDB.fetchOrCreateVaultProps(vaultPropsOf(decomposed)), 'bad_label')
+      await expectRefusal(vaultDB.fetchOrCreateVaultProps(vaultPropsOf(decomposed)), 'bad_record')
       await expectRefusal(vaultDB.readVaultProps(scopeOf(decomposed)), 'bad_label')
     })
 
@@ -1706,24 +1706,24 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
   })
 
   describe(lineTitle('5.1'), () => {
-    it("refuses a scope or boxlabel below the floor every name is held to as bad_label, before storage sees it", async () => {
+    it("refuses a scope or boxlabel below the floor every name is held to as bad_label, and a lockbox holding one as bad_record, before storage sees it", async () => {
       const vaultDB = await withVaultProps()
       await expectRefusal(vaultDB.readVaultProps({ ...scopeOf('u1'), vaultlabel: '' }), 'bad_label')
       await expectRefusal(vaultDB.readBox(scopeOf('u1'), 'tab\there'), 'bad_label')
-      await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('cafe\u{301}', 'one'), noBoxYet), 'bad_label')
+      await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('cafe\u{301}', 'one'), noBoxYet), 'bad_record')
       await expectRefusal(vaultDB.retireBox({ ...scopeOf('u1'), user_id: 'u1\u{D800}' }, 'anthropic', retiring(null)), 'bad_label')
       const overlong = 'u'.repeat(NameFloorBytes + 1)
       await expectRefusal(vaultDB.listBoxes(scopeOf(overlong)), 'bad_label')
       expect(await vaultDB.listBoxes(scopeOf('u1'))).to.have.lengthOf(0)
     })
 
-    it("refuses a name holding ^, which key-value stores join names on, as bad_label in every place a name goes, whatever the store, writing nothing", async () => {
+    it("refuses a name holding ^, which key-value stores join names on, in every place a name goes, whatever the store, writing nothing: as bad_label, and in a record as bad_record", async () => {
       const vaultDB = await withVaultProps()
       const holding = 'a^b'
-      await expectRefusal(vaultDB.fetchOrCreateVaultProps(vaultPropsOf(holding)), 'bad_label')
+      await expectRefusal(vaultDB.fetchOrCreateVaultProps(vaultPropsOf(holding)), 'bad_record')
       await expectRefusal(vaultDB.readVaultProps({ ...scopeOf('u1'), applabel: holding }), 'bad_label')
       await expectRefusal(vaultDB.listBoxes({ ...scopeOf('u1'), vaultlabel: holding }), 'bad_label')
-      await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf(holding, 'one'), noBoxYet), 'bad_label')
+      await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf(holding, 'one'), noBoxYet), 'bad_record')
       await expectRefusal(vaultDB.readBox(scopeOf('u1'), holding), 'bad_label')
       await expectRefusal(vaultDB.retireBox(scopeOf('u1'), holding, retiring(null)), 'bad_label')
       expect(await vaultDB.listBoxes(scopeOf('u1'))).to.have.lengthOf(0)

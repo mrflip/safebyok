@@ -119,7 +119,10 @@ within it. Every name a verb is handed passes, before the adapter sees it:
   name that one store holds every other does too.
 * **What the adapter declares** (line 7.3): no more bytes than `maxNameBytes`.
 
-Each refusal is `bad_label`, naming which name and which rule, and quoting none of it.
+A name handed to a verb on its own or in a scope, and a name over `maxNameBytes` wherever it is,
+is refused as `bad_label`, naming which name and which rule, and quoting none of it. A name below
+the floor inside a record -- the vault props' scope, a lockbox's boxlabel -- makes that record one
+this package does not build, refused whole as `bad_record`, naming the record and quoting none of it.
 
 ## 1. Records
 
