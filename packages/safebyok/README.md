@@ -397,7 +397,8 @@ const getProof: GetProof = async (ask) => {
 
 `vault.ensureLease()` itself unlocks ahead of time, on a button; `ensureLease({ renewMinutes: 60 })`
 asks now when the lease ends within the hour. A call that cannot land -- a whisper JSON cannot
-carry, a label the vault's check refuses -- is refused before anything is asked.
+carry, a label the vault's check refuses, a box the listing in hand does not show -- is refused
+before anything is asked.
 
 ## Locking
 

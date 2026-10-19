@@ -1276,7 +1276,7 @@ describe("every data call, through ensureLease", () => {
     })
   }
 
-  it("reads storage once before refusing absent_box, so a box another device stored meanwhile is asked for, though storage pushes no changes", async () => {
+  it("refuses absent_box from the listing in hand, reading nothing more, though another device stored the box meanwhile: the listing is as fresh as staleMinutes keeps it", async () => {
     const world = makeWorld()
     const maker = await world.openUnlocked('pw')
     await maker.lock()
@@ -1287,48 +1287,18 @@ describe("every data call, through ensureLease", () => {
     await elsewhere.unlock('pw')
     await elsewhere.putBox('anthropic', 'sk-fake')
     world.advance(MinuteMillis)
-    expect(boxlabelsOf(vault)).to.deep.equal([])
+    const reads = vi.spyOn(world.vaultDB, 'getVaultProps')
+    await TH.expectRefusal(vault.getBox('anthropic'), 'absent_box')
+    await TH.expectRefusal(vault.delBox('anthropic'), 'absent_box')
+    expect(reads).not.toHaveBeenCalled()
+    expect(getProof).not.toHaveBeenCalled()
+    // Once staleMinutes have passed, the call's own hello reads, and the box is asked for.
+    world.advance(StaleMinutes * MinuteMillis)
     expect(await TH.expectGood(vault.tryGetBox('anthropic'))).to.eq('sk-fake')
     expect(getProof).toHaveBeenCalledOnce()
   })
 
-  it("still refuses absent_box with no prompt once that one read finds nothing, and reads no more than once", async () => {
-    const getProof = typingPw()
-    const { world, vault } = await lockedVaultWith({ getProof })
-    const reads = vi.spyOn(world.vaultDB, 'getVaultProps')
-    await TH.expectRefusal(vault.getBox('openai'), 'absent_box')
-    expect(reads).toHaveBeenCalledOnce()
-    await TH.expectRefusal(vault.delBox('openai'), 'absent_box')
-    expect(reads).toHaveBeenCalledTimes(2)
-    expect(getProof).not.toHaveBeenCalled()
-  })
-
-  it("refuses with that read's own refusal when storage cannot be reached, never absent_box, and asks for nothing", async () => {
-    const getProof = typingPw()
-    const { world, vault } = await lockedVaultWith({ getProof })
-    vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
-    await TH.expectRefusal(vault.getBox('openai'), 'storage_unavailable')
-    expect(getProof).not.toHaveBeenCalled()
-    await TH.expectRefusal(vault.getBox('openai'), 'absent_box')
-  })
-
-  it("asks for a box delBox finds in that one read, and removes it", async () => {
-    const world = makeWorld()
-    const maker = await world.openUnlocked('pw')
-    await maker.lock()
-    maker.close()
-    const getProof = typingPw()
-    const vault = await world.open({ vaultDB: world.deafVaultDB(), getProof })
-    const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
-    await elsewhere.unlock('pw')
-    await elsewhere.putBox('anthropic', 'sk-fake')
-    expect(boxlabelsOf(vault)).to.deep.equal([])
-    await TH.expectGood(vault.tryDelBox('anthropic'))
-    expect(getProof).toHaveBeenCalledOnce()
-    expect(boxlabelsOf(vault)).to.deep.equal([])
-  })
-
-  it("asks to unlock, not to make a vault, when that one read finds the vault another device made since, with the box in it", async () => {
+  it("asks to unlock, not to make a vault, when its hello, past staleMinutes, finds the vault another device made since, with the box in it", async () => {
     const world = makeWorld()
     const getProof = typingPw()
     const vault = await world.open({ vaultDB: world.deafVaultDB(), getProof })
@@ -1336,6 +1306,8 @@ describe("every data call, through ensureLease", () => {
     const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
     await elsewhere.unlock('pw')
     await elsewhere.putBox('anthropic', 'sk-fake')
+    await TH.expectRefusal(vault.getBox('anthropic'), 'absent_box')
+    world.advance(StaleMinutes * MinuteMillis)
     expect(await TH.expectGood(vault.tryGetBox('anthropic'))).to.eq('sk-fake')
     expect(getProof).toHaveBeenCalledOnce()
     expect(getProof.mock.calls[0]?.[0].why).to.eq('locked')

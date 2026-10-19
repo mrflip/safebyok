@@ -806,9 +806,9 @@ export class Vault {
   /**
    * The whisper in `boxlabel`. Needs the vault unlocked, through `ensureLease()`, which asks
    * `getProof` when it is not, and refuses 'vault_locked' when that is declined -- asked only once
-   * storage shows a box under `boxlabel`, so a call that cannot land never prompts: a locked vault
-   * refuses a name storage holds nothing under, reading storage once more first when its listing
-   * shows nothing there. Kind 'absent_box' when there is none, and
+   * the listing in hand shows a box under `boxlabel`, so a call that cannot land never prompts: a
+   * locked vault refuses a name its listing shows nothing under, reading nothing more (the listing
+   * is as fresh as `staleMinutes` keeps it). Kind 'absent_box' when there is none, and
    * 'damaged_box' when its stored record fails its checks, or will not open under the vault's
    * key: `delBox()` it, or `putBox()` over it. A box that will not open is named so only
    * after one catch-up with storage: one a vault deleted and made anew elsewhere wrote relocks this
@@ -878,7 +878,7 @@ export class Vault {
     this.#checkOpen()
     const floored = Names.checkFloor('boxlabel', boxlabel)
     // Checked before the user is asked for anything: a call that cannot land never prompts.
-    await this.#ensureLease(0, () => this.#checkListed(floored))
+    await this.#ensureLease(0, () => { this.#checkListed(floored) })
     const label = await this.#checkStandingBoxlabel(floored)
     this.#checkUnlocked()
     // Lands only in the vault this device holds keys for, whatever revision of the box stands:
@@ -1458,19 +1458,14 @@ export class Vault {
    * otherwise once the prompt -- the one up, or one raised now -- answers. See `Vault.ensureLease`.
    * `beforeAsking` runs only when the vault must ask, once storage is read and before any prompt:
    * a call checks there what it can know without the key, so a call that cannot land never prompts.
-   * Why the vault asks is read again after it, as it may read storage.
    */
-  async #ensureLease(renewMillis: number, beforeAsking?: () => Promise<void>): Promise<Vault> {
+  async #ensureLease(renewMillis: number, beforeAsking?: () => void): Promise<Vault> {
     await this.#helloWithin(this.#staleMillis)
     // A close() during the hello: no ask is raised over a closed handle.
     this.#checkOpen()
-    let why = this.#whyAsk(renewMillis)
-    if (why !== null && beforeAsking !== undefined) {
-      await beforeAsking()
-      this.#checkOpen()
-      why = this.#whyAsk(renewMillis)
-    }
+    const why = this.#whyAsk(renewMillis)
     if (why === null) { return this }
+    beforeAsking?.()
     const answer = valOf(await (this.#asking ?? this.#raiseAsk(why)).answer)
     if (answer === 'declined') { throw declinedError(this.#getProof !== null) }
     if (answer === 'unlocked') { await this.#helloWithin(this.#staleMillis) }
@@ -2025,7 +2020,7 @@ export class Vault {
   }
   // --
 
-  // == [Reading boxes]: checkStandingBoxlabel, checkListed, isListed, getBoxOrThrow, boxFrom, openBox, decipherOrCatchUp
+  // == [Reading boxes]: checkStandingBoxlabel, checkListed, getBoxOrThrow, boxFrom, openBox, decipherOrCatchUp
 
   /**
    * `boxlabel`, once a box stands under it, for delBox(), which reaches a box by the name it
@@ -2050,20 +2045,14 @@ export class Vault {
   #isListedDamaged(boxlabel: string): boolean { return this.#boxes.some((box) => box.boxlabel === boxlabel && box.damaged) }
 
   /**
-   * Refuses `boxlabel`, a name above the floor, when storage shows no box under it, as
-   * {@link #nothingUnder} says: what a locked vault can know before it asks for a proof. The
-   * listing in hand answers when it shows the box; when it does not, storage is read once more
-   * before the refusal, as a store that pushes no changes leaves the listing up to `staleMinutes`
-   * behind a box made on another device.
+   * Refuses `boxlabel`, a name above the floor, when the listing in hand shows no box under it,
+   * sound or damaged, as {@link #nothingUnder} says: what a locked vault can know before it asks
+   * for a proof. Storage is not read again: the listing is as fresh as the host's `staleMinutes`
+   * keeps it.
    */
-  async #checkListed(boxlabel: string) {
-    if (this.#isListed(boxlabel)) { return }
-    await this.#refresh()
-    if (! this.#isListed(boxlabel)) { throw this.#nothingUnder(boxlabel) }
+  #checkListed(boxlabel: string) {
+    if (this.#boxes.every((box) => box.boxlabel !== boxlabel)) { throw this.#nothingUnder(boxlabel) }
   }
-
-  /** True when the listing in hand shows a box, sound or damaged, under `boxlabel`. */
-  #isListed(boxlabel: string): boolean { return this.#boxes.some((box) => box.boxlabel === boxlabel) }
 
   /** The box under `boxlabel`; null when there is none, and 'damaged' when its record fails verification. */
   async #getBoxOrDamaged(boxlabel: string): Promise<Box | 'damaged' | null> {
@@ -2113,7 +2102,7 @@ export class Vault {
     this.#checkOpen()
     const label = Names.checkFloor('boxlabel', boxlabel)
     // Checked before the user is asked for anything: a call that cannot land never prompts.
-    await this.#ensureLease(0, () => this.#checkListed(label))
+    await this.#ensureLease(0, () => { this.#checkListed(label) })
     const box = await this.#getBoxOrThrow(label)
     const whisper = await this.#decipherOrCatchUp(this.#checkUnlocked(), box)
     this.#checkUnlocked()
