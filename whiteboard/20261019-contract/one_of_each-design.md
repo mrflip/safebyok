@@ -96,6 +96,9 @@ surface in B4 only to tear it out later.
    the passkey's main recovery value. *Recommend:* any standing way in proves either verb (a
    passkey holder can already open the vault; they gain only locking the owner out of the
    passphrase).
+   *Coach (2026-10-19):* "The standard default must be to provide old passphrase to get new
+   passkey or new passphrase. Don't know why, but it's how it's done everywhere else, and we don't
+   invent crypto." Only the standing passphrase proves either change.
 2. **A second passkey:** refuse (`too_many_wayins`) or replace the first? *Recommend: replace*,
    with the dialog warning "this replaces the passkey added on <date> from another device"; every
    other device relocks anyway as `unlock_epoch` moves.
