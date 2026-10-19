@@ -714,18 +714,18 @@ describe("vault props rolled back", () => {
     const deaf = await world.open({ vaultDB: world.deafVaultDB() })
     world.dbStore.write(u1VaultPropsCkey, older)
     await TH.expectRefusal(deaf.unlock('spare phrase'), 'rolled_back')
-    expect(deaf.getSnapshot().state).to.eq('locked')
-    expect(deaf.getSnapshot().wayins.map((wayin) => wayin.wayinlabel)).to.deep.equal(['passphrase'])
+    // Nothing of the vault is held until the host accepts the older copy, or storage is mended.
+    expect(deaf.getSnapshot().state).to.eq('opening')
+    expect(deaf.getSnapshot().wayins).to.deep.equal([])
     expect(await world.getLease()).to.be.null
   })
 
-  it("locks on an older copy met by a background refresh, taking nothing from it, and says so through the logger", async () => {
+  it("locks on an older copy met by a background refresh, taking nothing from it and forgetting the vault props it held, and says so through the logger", async () => {
     const { world, vault, older } = await rolledBackWorld()
-    const standing = vault.getSnapshot()
     world.dbStore.write(u1VaultPropsCkey, older)
     await TH.wakeupAtNextTick()
-    expect(vault.getSnapshot().state).to.eq('locked')
-    expect(vault.getSnapshot().wayins).to.deep.equal(standing.wayins)
+    expect(vault.getSnapshot().state).to.eq('opening')
+    expect(vault.getSnapshot().wayins).to.deep.equal([])
     expect(await world.getLease()).to.be.null
     // The next call says hello afresh, and meets the older copy again.
     await TH.expectRefusal(vault.getBox('anthropic'), 'rolled_back')
@@ -816,6 +816,23 @@ describe("vault props rolled back", () => {
     const reopened = await openAcceptingRestore(world.optsWith(), () => Promise.resolve(true))
     expect(reopened.getSnapshot().wayins.map((wayin) => wayin.wayinlabel)).to.deep.equal(['passphrase', 'spare'])
     expect(await seenIn(world)).to.deep.include({ unlock_epoch: 2 })
+  })
+
+  it("is accepted on the very handle that refused it, its mark erased and hello said again, as the Vault's class doc says: unlock and a change to the ways in then land", async () => {
+    const { world, vault, older } = await rolledBackWorld()
+    world.dbStore.write(u1VaultPropsCkey, older)
+    await TH.expectRefusal(vault.hello({ staleMinutes: 0 }), 'rolled_back')
+    expect(vault.state).to.eq('opening')
+    expect(vault.vault_id).to.be.null
+    expect(vault.boxes).to.deep.equal([])
+    await TH.expectGood(world.deviceDB.delMark(TH.scopeOf('u1')))
+    await vault.hello({ staleMinutes: 0 })
+    expect(vault.unlock_epoch).to.eq(2)
+    expect(vault.wayins.map((wayin) => wayin.wayinlabel)).to.deep.equal(['passphrase', 'spare'])
+    await vault.unlock('pw')
+    await vault.addPassphrase('pw', 'another phrase', { wayinlabel: 'another' })
+    expect(vault.unlock_epoch).to.eq(3)
+    expect(vault.state).to.eq('unlocked')
   })
 
   it("is still refused by the README's recipe when the host knows of no restore", async () => {

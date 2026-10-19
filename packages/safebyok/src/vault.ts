@@ -155,7 +155,9 @@ const NoWayins: readonly (PassphraseWayin | PasskeyWayin)[] = Object.freeze([])
  * refusal of kind 'identity_revoked' does. A host that knows its storage was restored from an
  * older copy on purpose accepts it on this device by erasing the device's mark of the vault
  * (`valOf(await deviceDB.delMark(scope))`, which throws should the erase fail) and calling
- * `hello()` again.
+ * `hello()` again: a handle refused as 'rolled_back' holds no vault props until then, its state
+ * `opening`. A handle that goes on refusing changes to the ways in as 'stale_write' after a restore
+ * -- as one may whose device mark could not be written -- is to be closed, and a new one opened.
  *
  * Storage alone settles a race. When it refuses a write as stale, or a box will not open, the
  * vault catches up with storage once before it names the refusal: a vault deleted and made
@@ -1723,7 +1725,7 @@ export class Vault {
   }
   // --
 
-  // == [Locking and expiry]: shut, heedRefusal, dropKey, armExpiry, outrun, others
+  // == [Locking and expiry]: shut, heedRefusal, forgetVaultProps, dropKey, armExpiry, outrun, others
 
   /** Forget the unlock, in memory and on this device: every lock goes through here. */
   async #shut() {
@@ -1753,6 +1755,10 @@ export class Vault {
       ? 'Storage handed back an older copy of the vault than this device has seen'
       : 'Storage no longer serves the user this vault was opened for -- signed out, or another user signed in --'
     const wasUnlocked = this.#vaultKey !== null
+    // An older copy refused, the vault props in hand are forgotten too, before any wait: the next
+    // hello takes up what storage holds, once the host has accepted it (see the class doc). The
+    // older copy is never taken for a stale read of these.
+    if (refusal.refusalkind === 'rolled_back') { this.#forgetVaultProps() }
     try {
       await this.#shut()
     } catch (err) {
@@ -1762,6 +1768,17 @@ export class Vault {
     if (wasUnlocked) {
       this.#logger.log(`${why} so the vault locked, as it always does when storage cannot be trusted with it. It asks for the passphrase again once storage is sound.`, { call: 'untrustedStorage' })
     }
+  }
+
+  /**
+   * Forget the vault props in hand, as though storage had not been read, with their mark and their
+   * boxes; any first unlock's make stands down, so puts none back.
+   */
+  #forgetVaultProps() {
+    this.#vaultProps = UnreadVaultProps
+    this.#deviceMark = null
+    this.#boxes = []
+    this.#standDownMakes()
   }
 
   /** Forget the unlock in memory, and the timer left to do so; a lease take-up under way stands down. */

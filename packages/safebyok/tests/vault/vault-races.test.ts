@@ -833,7 +833,7 @@ describe("versioned updates: two devices writing at once", () => {
   // A catch-up refusal that asks the caller for something else than a stale write passes as it came.
   const CatchUpRefusals = [
     [new VaultError('identity_revoked', 'Signed out.'), "locked",   'the user signed out: the vault locks, and the user signs in again'],
-    [new VaultError('rolled_back', 'An older copy.'),   "locked",   'storage handed back an older copy: the vault locks, and storage wants looking at'],
+    [new VaultError('rolled_back', 'An older copy.'),   "opening",  'storage handed back an older copy: the vault locks, forgetting its vault props, and storage wants looking at'],
     [new VaultError('newer_format', 'A newer build.'),  "unlocked", 'a newer build wrote the vault: the app wants updating'],
   ] as const
 
