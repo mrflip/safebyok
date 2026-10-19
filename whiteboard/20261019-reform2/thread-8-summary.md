@@ -1,6 +1,6 @@
 # Thread 8: size budget and the sprint's summary changeset (2026-10-19)
 
-Branch `20261019-summary`, PR to be stacked on #176, in the line main -> #177 -> #178 -> #179 -> #176 -> (this PR). Justify: see PR.
+Branch `20261019-summary`, stacked on #176, in the line main -> #177 -> #178 -> #179 -> #176 -> (this PR). Justify: green (core 2225 passed, 35 skipped; indexeddb 142; postgres 257; convex 267; graphql 250; react 228; e2e 86).
 
 * **Built**:
   * `.changeset/20261019-summary.md`, five packages minor (core, indexeddb, postgres, convex, graphql; react ships nothing in the four PRs): what a host does who uses one of our adapters, writes its own VaultDB, or catches refusal kinds, and that nothing stored changes. Cautions on the sidecar's trust class and overlapping `storeBox()` calls close it.
