@@ -1,11 +1,11 @@
 # Thread A3: test counts per file, base and tip
 
-For the reviewer of [thread A3](thread-A3-fields_and_make.md): every test file in the workspace, counted with vitest's JSON reporter at the base (`7b175db8`) and at the tip (`9e629043`). *Total* counts every test, skipped included; *skipped* are the live-backend suites. Rows in bold moved. `vault-hello.test.ts` took 52 tests out of `vault-make.test.ts` unchanged (commit `fcf6acee`); at the tip `vault-make.test.ts` holds 72 of its own and 21 new, `vault-hello.test.ts` the 52 and 35 new.
+For the reviewer of [thread A3](thread-A3-fields_and_make.md): every test file in the workspace, counted with vitest's JSON reporter at the base (`7b175db8`) and at the tip (`9e629043`). *Total* counts every test, skipped included; *skipped* are the live-backend suites. Rows in bold moved. `vault-hello.test.ts` took 52 tests out of `vault-make.test.ts` unchanged (commit `fcf6acee`); at the first tip `vault-make.test.ts` held 72 of its own and 21 new, `vault-hello.test.ts` the 52 and 35 new. The review rework (after `cf405f13`) added one to `vault-make.test.ts` (the reviewer's) and four to `vault-hello.test.ts`: the rows below, and the safebyok and all totals, are as of the rework, from `pnpm justify`'s counts.
 
 | Workspace | Base total (skipped) | Tip total (skipped) |
 | --- | ---: | ---: |
 | root | 265 (0) | 265 (0) |
-| safebyok | 2219 (35) | 2275 (35) |
+| safebyok | 2219 (35) | 2280 (35) |
 | safebyok-convex | 277 (8) | 277 (8) |
 | safebyok-fastkey | 49 (0) | 49 (0) |
 | safebyok-graphql | 271 (14) | 271 (14) |
@@ -14,7 +14,7 @@ For the reviewer of [thread A3](thread-A3-fields_and_make.md): every test file i
 | safebyok-react | 230 (0) | 231 (0) |
 | safebyok-demo-react | 215 (16) | 215 (16) |
 | e2e | 184 (96) | 184 (96) |
-| **all** | **4142 (193)** | **4199 (193)** |
+| **all** | **4142 (193)** | **4204 (193)** |
 
 | File | Base total | Base skipped | Tip total | Tip skipped |
 | --- | ---: | ---: | ---: | ---: |
@@ -115,9 +115,9 @@ For the reviewer of [thread A3](thread-A3-fields_and_make.md): every test file i
 | `packages/safebyok/tests/vault-db.test.ts` | 291 | 17 | 291 | 17 |
 | `packages/safebyok/tests/vault/vault-boxes.test.ts` | 102 | 0 | 102 | 0 |
 | `packages/safebyok/tests/vault/vault-del.test.ts` | 47 | 0 | 47 | 0 |
-| **`packages/safebyok/tests/vault/vault-hello.test.ts`** | 0 | 0 | 87 | 0 |
+| **`packages/safebyok/tests/vault/vault-hello.test.ts`** | 0 | 0 | 91 | 0 |
 | `packages/safebyok/tests/vault/vault-lease.test.ts` | 84 | 0 | 84 | 0 |
-| **`packages/safebyok/tests/vault/vault-make.test.ts`** | 124 | 0 | 93 | 0 |
+| **`packages/safebyok/tests/vault/vault-make.test.ts`** | 124 | 0 | 94 | 0 |
 | `packages/safebyok/tests/vault/vault-races.test.ts` | 61 | 0 | 61 | 0 |
 | `packages/safebyok/tests/vault/vault-storage.test.ts` | 74 | 0 | 74 | 0 |
 | `packages/safebyok/tests/vault/vault-wayins.test.ts` | 64 | 0 | 64 | 0 |

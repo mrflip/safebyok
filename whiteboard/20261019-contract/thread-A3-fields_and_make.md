@@ -1,6 +1,6 @@
 # Thread A3: fields_and_make (2026-10-19)
 
-Branch `20261019-fields_and_make`, [PR #197](https://github.com/mrflip/safebyok/pull/197), stacked on [#196](https://github.com/mrflip/safebyok/pull/196) (`20261019-vault_class`). Justify: green; 4199 tests, 4006 passed, 193 skipped (live backends), 0 failed.
+Branch `20261019-fields_and_make`, [PR #197](https://github.com/mrflip/safebyok/pull/197), stacked on [#196](https://github.com/mrflip/safebyok/pull/196) (`20261019-vault_class`). Justify: green; 4204 tests, 4011 passed, 193 skipped (live backends), 0 failed (after the review rework).
 
 * **Built**:
   * `packages/safebyok/src/vault.ts`:
@@ -66,37 +66,35 @@ Branch `20261019-fields_and_make`, [PR #197](https://github.com/mrflip/safebyok/
   * **A first hello's condition is no longer in the snapshot**: the react provider holds it.
 * **Discoveries**:
   * The react suite resolves `safebyok` through its `dist/`: rebuild the core before running it.
+* **Review rework** (on the reviewer's `cf405f13`):
+  * **A lock during a lease take-up wins.** A stale `hello()` re-runs `#fetchLease`, so a `lock()`
+    landing between its lease read and its install was undone (unlocked in memory, lease gone), and
+    an older lease could overwrite a fresher `unlock()`. Each take-up now holds an
+    `AbortController` (`#takeUp`); `#dropKey` (lock, close, del, expiry, relocks) and `#grantLease`
+    (as an unlock or wayin change installs its key) abort it through `#standDownTakeUp`, and an
+    aborted take-up installs nothing and discards no lease record. Chosen over a counter because the
+    preplan's policy session wants "the key being gone, nothing else: no counters"; the signal is
+    the idiomatic "this work was overtaken", scoped to the one take-up, and leaves no state behind.
+    Tests: "stays locked when a lock lands while a hello is taking up the lease", "keeps a fresher
+    unlock's lease when a hello's take-up of the older one finishes after it". TODO's *Lock timing*
+    scenario 1 notes the exception; nothing else about lock timing is pinned.
+  * **Listing news after the listing is published**, so a handler reading `vault.boxes` sees it.
+  * **Any thenable answer** from `onBadNews` is heard (`await Promise.resolve(answer)`), not only a
+    `Promise`. Its test carries an `eslint-disable-next-line unicorn/no-thenable`: the case is a
+    thenable.
 * **For the Coach**:
   * **`trouble` as the Contract writes it** costs the snapshot its word on why a read failed:
     `syncing: false` stays, the reason goes to the caller (react: the provider's `openError`).
     Recommend: keep.
   * **Default `staleMinutes` of 1** (the Contract names none). Recommend: keep.
-  * **Contract drift**, seven items below. Recommend: carry each into the tab.
+  * **Contract drift**, seven items, with proposed text, in
+    [thread-A3-fields_and_make-drift.md](thread-A3-fields_and_make-drift.md), for whoever carries
+    rulings into the Contract tab. Recommend: carry each.
 * **Test counts** (vitest JSON reporter; *total* includes skipped): 4142 (193 skipped) at base,
-  4199 (193) at tip; per workspace and per file in
+  4199 (193) at the first tip, 4204 (193) after the review (the reviewer's one test, in
+  `vault-make.test.ts`, now 94, and this rework's four, in `vault-hello.test.ts`, now 91); per workspace and per file in
   [thread-A3-fields_and_make-counts.md](thread-A3-fields_and_make-counts.md). Moved: core
   `vault-make.test.ts` 124 to 93 and `vault-hello.test.ts` 0 to 87 (52 moved, 56 new across the
   two), react `vault-provider.test.tsx` 79 to 80.
 * **Size**: `pnpm size:budget --write` set four lines to the rule: `everything` 39 to 40 kB,
   `Vault` 32 to 33, `VaultProvider` 7.2 to 7.5, `reactEverything` 8.3 to 8.4.
-
-## Contract drift (proposed text)
-
-Built to the Contract as written; each item is where it was silent, or says less than the code does.
-
-1. **`Vault.make`, Refuses** says `bad_option`, "nothing else". Make also throws `bad_label` (a
-   label or `userId` failing its check) and `insecure_context` (plain http), both misuse. Propose:
-   "*Fix the code:* `bad_option`, `bad_label`, `insecure_context`. Nothing else can arise here."
-2. **`syncing`** is not in the `Vault` block. Propose, under *this device's picture*:
-   `syncing: boolean // false while the last read of storage failed: what it shows may be behind`.
-3. **`trouble` never clears** in the Contract. Propose: `// the latest bad news, or what your
-   onBadNews threw; null once a read finds nothing amiss`.
-4. **`staleMinutes`' default and origin.** Propose for `Vault.make`: `staleMinutes?: number, //
-   hello()'s default: 1 (StaleMinutes). Infinity: read only when what was read no longer stands`;
-   and for `vault.hello`: "within it of the vault's last read of storage, by any call".
-5. **`meta.box_listed`** (Shapes): `box_listed?: DamagedBox // damaged_box told of a listing: the
-   box as listed`, the handle a default handler deletes by.
-6. **The handler's type**: `onBadNews?: (news: VaultError) => void | Promise<void>`, "a promise it
-   returns is not awaited; what it rejects with lands in `trouble`, as a throw does".
-7. **A forced hello while one runs**: "`0` forces a read, unless one is under way: it shares it".
-
