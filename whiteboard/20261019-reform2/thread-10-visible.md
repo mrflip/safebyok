@@ -1,0 +1,20 @@
+# Thread 10: visible (2026-10-19)
+
+Branch `20261019-visible`, PR to follow (base `main`; stacked on #182, to be restacked onto thread 9's PR). Justify: green (core 2225 passed, 35 skipped; indexeddb 142; postgres 257; convex 267; graphql 250; react 228; e2e 86).
+
+* **Built**: two entries in VOCABULARY.md, **visible** (unencrypted and authenticated: bound into the record's ctx) and **unencrypted** (not encrypted, authentication unsaid), beside the sidecar entry, which points to *visible*; a bullet under *Words safebyok does not use*. Then a sweep of "server-readable", "public fields", "public face", "public shell" and "public header" in prose, doc blocks, READMEs, one error message (`checkStoreOpts`), test titles and fixture strings, the three changesets that said "server-readable", and `notes/security.md` (13 phrases, by a `sonnet` subagent). New changeset `.changeset/20261019-visible.md`, minor, for core, indexeddb, postgres, convex, graphql (docs reach their READMEs or `.d.ts`).
+* **Sidecar example**: per the Coach, "a usage count" is now "a count of the calls the app made to OpenRouter with this whisper" in the three places (VOCABULARY.md; the core README's *A lockbox's sidecar*; the `storeBox()` doc block). (VOCABULARY.md's entry carried it; the sweep edited that row in place.)
+* **Decisions taken**:
+  * **Classing, checked against the code** (`Wayin.wayinCtxOf` in wayin.ts; `boxCtx` in vault.ts; the `VaultProps` schema in types.ts). *Visible* (bound into a ctx): every lockbox field but the two ciphered ones (`format` leads the ctx; boxlabel, revision_tok, vault_key_epoch, whisper codec and schema version, sidecar_json, times), every wayin field but its wrap (the whole header is in the wayin's ctx), and the vault props' scope, `vault_id` and `registered_at` (also in the wayin ctx). *Unencrypted* only: the vault props' `unlock_epoch` and their `wayins` list as a list (wayin.ts says so itself: neither is in the ctx), hence every backend-general "ciphertext and public fields" sentence (convex README and schema, graphql, indexeddb and postgres READMEs, VAULTDB.md, `refusals.ts`, `vault-db.ts` twice, `expectations.ts`) became "unencrypted fields".
+  * Where a sentence is about a stored lockbox or wayin I wrote *visible*; where it could read as UI visibility (README overview of the sidecar) "visible in storage". The README overview's "only labels, ids, times and sidecars are not [ciphertext]" is about vault props and lockboxes together, so says *unencrypted*.
+  * The sidecar doc block and `storeBox()` say "visible in storage", the entry itself and the README's definition say "visible".
+  * Code comments that said "public header" (`boxCtx`, `wayinCtxOf`, `HeaderOf`, `crypto.ts` CipherCtxPart, a test title) say "visible header". Two sentences about "keeping metadata public" (vault.ts snapshot doc) became "labels and other visible fields ... leaving them unencrypted".
+  * Left alone as asked: the two warnings in `retireBox()`/`writeOver` and README's honor-and-warn paragraph (thread 9); GraphQL's `'plain'` class in `fields.ts`; the older changesets' history ("public bag"); "public verb/package/surface" (the API sense); `mask`'s "The result is public"; `idb-opts.ts`.
+* **Deviations**: none. `notes/security.md` was swept through a `sonnet` subagent, as its header asks; it added no entry.
+* **Discoveries**: `security.md` line 1424 (a Convex error may quote "visible bags") names the sidecar in a backend-general sentence; `unencrypted bags` would also fit. VOCABULARY.md's *Old names* table still lists `PublicBag` etc. on purpose.
+* **For the Coach**: one sentence to confirm below.
+
+## Open matters
+
+* **"visible in storage" in doc blocks** (decision taken): used where a sentence could read as screen visibility; plain "visible" in the vocabulary entries and definitions.
+* **unlock_epoch and the wayins list are unencrypted, not visible** (decision taken): they are not bound into any ctx, so a store could alter them undetected by AEAD (the wayins' own wraps still refuse). Is that gap intended? It is documented in wayin.ts; no change made.
