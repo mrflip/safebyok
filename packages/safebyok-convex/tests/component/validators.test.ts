@@ -7,9 +7,10 @@ import type { GenericValidator, Infer } from 'convex/values'
 import * as Records from 'safebyok'
 import type {
   VaultPropsExpectation as CoreVaultPropsExpectation, RetireExpectation as CoreRetireExpectation, LockboxExpectation as CoreLockboxExpectation,
+  LockboxRetireExpectation as CoreLockboxRetireExpectation, LockboxRetirement as CoreLockboxRetirement,
 } from 'safebyok'
 import {
-  VaultPropsExpectation, Ciphered, RetireExpectation, ListedLockbox, Lockbox, LockboxExpectation, VaultProps, VaultScope,
+  VaultPropsExpectation, Ciphered, RetireExpectation, ListedLockbox, Lockbox, LockboxExpectation, LockboxRetireExpectation, LockboxRetirement, VaultProps, VaultScope,
 } from '../../src/component/validators'
 import * as TH from '../test-helpers'
 
@@ -95,6 +96,8 @@ describe("the Convex validators, field for field with the core's Zod records", (
     expectTypeOf<Infer<typeof VaultPropsExpectation>>().toEqualTypeOf<CoreVaultPropsExpectation>()
     expectTypeOf<Infer<typeof LockboxExpectation>>().toEqualTypeOf<CoreLockboxExpectation>()
     expectTypeOf<Infer<typeof RetireExpectation>>().toEqualTypeOf<CoreRetireExpectation>()
+    expectTypeOf<Infer<typeof LockboxRetireExpectation>>().toEqualTypeOf<CoreLockboxRetireExpectation>()
+    expectTypeOf<Infer<typeof LockboxRetirement>>().toEqualTypeOf<CoreLockboxRetirement>()
   })
 })
 

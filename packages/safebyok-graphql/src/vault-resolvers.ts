@@ -1,6 +1,6 @@
 import { GraphQLError } from 'graphql'
 import { Refusals, VaultError } from 'safebyok'
-import type { VaultPropsExpectation, RetireExpectation, Lockbox, LockboxExpectation, VaultProps, VaultDB, VaultScope } from 'safebyok'
+import type { VaultPropsExpectation, RetireExpectation, Lockbox, LockboxExpectation, LockboxRetireExpectation, VaultProps, VaultDB, VaultScope } from 'safebyok'
 import { VaultPropsFields, LockboxFields, ScopeFields, recordOf } from './fields'
 
 /**
@@ -129,10 +129,7 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
         return true
       }),
       safebyokUpdateBox: served((vaultDB, args) => vaultDB.updateBox(scopeIn(args), recordOf(args.lockbox, LockboxFields) as Lockbox, lockboxExpectationIn(args))),
-      safebyokRetireBox: served(async (vaultDB, args) => {
-        await vaultDB.retireBox(scopeIn(args), args.boxlabel as string, retireExpectationIn(args))
-        return true
-      }),
+      safebyokRetireBox: served((vaultDB, args) => vaultDB.retireBox(scopeIn(args), args.boxlabel as string, lockboxRetireExpectationIn(args))),
       safebyokRetireVault: served(async (vaultDB, args) => {
         await vaultDB.retireVault(scopeIn(args), retireExpectationIn(args))
         return true
@@ -175,6 +172,12 @@ const lockboxExpectationIn = (args: VaultFieldArgs): LockboxExpectation => {
 const retireExpectationIn = (args: VaultFieldArgs): RetireExpectation => {
   const { vault_id } = args.expected as RetireExpectation
   return { vault_id }
+}
+
+// A revision_tok left out, as for a lockbox write, is the null it means.
+const lockboxRetireExpectationIn = (args: VaultFieldArgs): LockboxRetireExpectation => {
+  const { vault_id, revision_tok = null } = args.expected as { vault_id: string, revision_tok?: string | null }
+  return { vault_id, revision_tok }
 }
 
 /**

@@ -145,7 +145,7 @@ describe("convexVaultDB, refusing", () => {
     await client.mutation(deployment.api.safebyok.updateBox, { scope: u1, lockbox, expected: TH.noBoxYet })
     const listed = await vaultDB.listBoxes(u1)
     expect(listed.map((box) => [box.boxlabel, box.damaged])).to.deep.equal([['anthropic', true], ['openai', false]])
-    await vaultDB.retireBox(u1, 'anthropic', { vault_id: 'vault-id-u1' })
+    expect(await vaultDB.retireBox(u1, 'anthropic', TH.retiring('rev-one'))).to.deep.equal({ outcome: 'retired' })
     expect(await vaultDB.listBoxes(u1)).to.have.lengthOf(1)
   })
 

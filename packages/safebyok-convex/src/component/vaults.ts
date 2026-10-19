@@ -6,7 +6,7 @@ import type { DatabaseReader, DatabaseWriter } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 import * as Tallies from './tallies'
 import {
-  VaultPropsExpectation, RetireExpectation, ListedLockbox, Lockbox, LockboxExpectation, VaultProps, VaultScope, VaultSignature,
+  VaultPropsExpectation, RetireExpectation, ListedLockbox, Lockbox, LockboxExpectation, LockboxRetireExpectation, LockboxRetirement, VaultProps, VaultScope, VaultSignature,
 } from './validators'
 
 /**
@@ -18,8 +18,8 @@ import {
  * mutations serializably, so the check holds for real. A failed expectation writes nothing and
  * resolves `false` -- for a lockbox write, `null` -- which the client refuses as `stale_write`; it
  * is not an error. A lockbox write that lands resolves the lockbox as stored, read back in its
- * own transaction. A retire expects
- * only the vault: it wins over any lockbox revision, but never lands in a vault made anew.
+ * own transaction. A retire lands only in the vault it expects: it wins over any lockbox revision,
+ * but never lands in a vault made anew. A lockbox retire that lands resolves what it removed.
  *
  * Every vault is held to the limits in `./tallies`, whatever its client asks, so that it can
  * always be retired whole: a lockbox write that would take the vault past one is refused with a
@@ -150,21 +150,21 @@ export const updateBox = mutation({
 
 /**
  * Remove the lockbox under `boxlabel`, whatever revision stands, only while the scope's vault props
- * have `expected.vault_id`. True when that holds -- also when there was no lockbox to remove;
- * false, removing nothing, otherwise -- including when the scope holds no vault props.
+ * have `expected.vault_id`. Resolves what it removed when that holds -- `retired` for a lockbox at
+ * `expected.revision_tok`, `retired_other` for any other, `absent` for none; null, removing
+ * nothing, otherwise -- including when the scope holds no vault props.
  */
 export const retireBox = mutation({
-  args:    { scope: VaultScope, boxlabel: v.string(), expected: RetireExpectation },
-  returns: v.boolean(),
-  handler: async (ctx, { scope, boxlabel, expected }) => {
+  args:    { scope: VaultScope, boxlabel: v.string(), expected: LockboxRetireExpectation },
+  returns: v.nullable(LockboxRetirement),
+  handler: async (ctx, { scope, boxlabel, expected }): Promise<Infer<typeof LockboxRetirement> | null> => {
     const vaultProps = await findVaultPropsRow(ctx.db, scope)
-    if (vaultProps?.vault_id !== expected.vault_id) { return false }
+    if (vaultProps?.vault_id !== expected.vault_id) { return null }
     const standing = await findBoxRow(ctx.db, scope, boxlabel)
-    if (standing) {
-      await ctx.db.delete('safebyok_lockboxes', standing._id)
-      await Tallies.forget(ctx.db, vaultProps._id, standing)
-    }
-    return true
+    if (! standing) { return { outcome: 'absent' } }
+    await ctx.db.delete('safebyok_lockboxes', standing._id)
+    await Tallies.forget(ctx.db, vaultProps._id, standing)
+    return { outcome: standing.revision_tok === expected.revision_tok ? 'retired' : 'retired_other' }
   },
 })
 

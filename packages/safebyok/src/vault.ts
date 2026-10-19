@@ -586,7 +586,9 @@ export type Vault = {
    * retired and made anew, elsewhere, nothing is removed and the call throws kind
    * 'stale_write', after catching up with storage -- which relocks this device -- its message
    * saying the lockbox could not be retired because the vault it was in is gone, and the
-   * adapter's refusal its cause.
+   * adapter's refusal its cause. Within that vault the retirement wins: when what stood was not the
+   * revision the snapshot shows -- another device or tab wrote over it meanwhile -- it is retired
+   * all the same, and the vault warns through its logger, naming neither revision.
    */
   retireBox(boxlabel: string): Promise<void>
 
@@ -1634,12 +1636,19 @@ const make = (opts: MakeVaultOpts): Vault => {
 
   /**
    * Write `lockbox` over `expected`, as `storeBox()` does, retiring what stands under its boxlabel
-   * first when `clearsFirst`. One attempt: a refusal is thrown as {@link refuseStaleStoreBox} says.
-   * Work in hand, it may finish within a grace.
+   * first when `clearsFirst`, naming the revision `expected` names. A retirement that removed
+   * another record than that one -- a lockbox another device wrote over the damaged one meanwhile --
+   * is warned of, and the write goes on. One attempt: a refusal is thrown as
+   * {@link refuseStaleStoreBox} says. Work in hand, it may finish within a grace.
    */
   const writeOver = async (lockbox: Lockbox, expected: LockboxExpectation, clearsFirst: boolean): Promise<void> => {
     try {
-      if (clearsFirst) { await refreshOnStale(vaultDB.retireBox(scope, lockbox.boxlabel, { vault_id: expected.vault_id }), 'storeBox') }
+      if (clearsFirst) {
+        const { outcome } = await refreshOnStale(vaultDB.retireBox(scope, lockbox.boxlabel, { vault_id: expected.vault_id, revision_tok: expected.revision_tok }), 'storeBox')
+        if (outcome === 'retired_other') {
+          logger.warn("Storing over a damaged lockbox first retired what stood under its boxlabel, and that was not the damaged record this device showed: another device or tab had written there since. Its write was retired, and this one stored in its place.", { call: 'storeBox' })
+        }
+      }
       await refreshOnStale(vaultDB.updateBox(scope, lockbox, expected), 'storeBox')
     } catch (err) {
       refuseStaleStoreBox(err)
@@ -1898,9 +1907,14 @@ const make = (opts: MakeVaultOpts): Vault => {
       const label = await checkStandingBoxlabel(boxlabel)
       keyInHand()
       // Lands only in the vault this device holds keys for, whatever revision of the box stands:
-      // a vault retired and made anew elsewhere refuses it. That is its only expectation.
+      // a vault retired and made anew elsewhere refuses it. The revision the listing shows only
+      // lets storage say whether it removed that one or another.
+      const expected = { vault_id: currentVaultProps().vault_id, revision_tok: listedRevisionOf(label) }
       try {
-        await refreshOnStale(vaultDB.retireBox(scope, label, { vault_id: currentVaultProps().vault_id }), 'retireBox')
+        const { outcome } = await refreshOnStale(vaultDB.retireBox(scope, label, expected), 'retireBox')
+        if (outcome === 'retired_other') {
+          logger.warn("The lockbox retired was not the revision this device showed: another device or tab had written over it since. That write was retired all the same.", { call: 'retireBox' })
+        }
       } catch (err) {
         // Said as what happened to the box, once caught up; a catch-up that failed says so instead.
         if (! isCaughtUpStale(err)) { throw err }

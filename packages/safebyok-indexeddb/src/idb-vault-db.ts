@@ -1,5 +1,5 @@
 import { Ckeys, Expectations, VaultDB } from 'safebyok'
-import type { VaultPropsExpectation, RetireExpectation, Lockbox, LockboxExpectation, StoredLockbox, VaultProps, VaultScope } from 'safebyok'
+import type { VaultPropsExpectation, RetireExpectation, Lockbox, LockboxExpectation, LockboxRetireExpectation, LockboxRetirement, StoredLockbox, VaultProps, VaultScope } from 'safebyok'
 import { ChangeBell } from 'safebyok/idb'
 import { boxRange } from './ckeys'
 import { bellnameOf, parseDbName, type IdbVaultDBOpts } from './idb-opts'
@@ -102,13 +102,18 @@ class IdbVaultDB extends VaultDB {
     }))
   }
 
-  protected async doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation): Promise<boolean> {
-    return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {
-      const standing = await rowAt(store, Ckeys.vaultProps(scope))
-      if (! Expectations.vaultMeets(standing, expected)) { return false }
-      store.delete(Ckeys.box(scope, boxlabel))
-      return true
-    }))
+  // What it removed is the row read in the transaction that deletes it. A retirement that found
+  // nothing to remove changed nothing, and rings no other tab.
+  protected async doRetireBox(scope: VaultScope, boxlabel: string, expected: LockboxRetireExpectation): Promise<LockboxRetirement | null> {
+    const retirement = await inOneTransaction(this.shelf, async (store) => {
+      const ckey = Ckeys.box(scope, boxlabel)
+      const [standingVaultProps, standingBox] = await Promise.all([rowAt(store, Ckeys.vaultProps(scope)), rowAt(store, ckey)])
+      if (! Expectations.vaultMeets(standingVaultProps, expected)) { return null }
+      store.delete(ckey)
+      return Expectations.retirementOf(standingBox, expected)
+    })
+    if (retirement !== null && retirement.outcome !== 'absent') { this.ring() }
+    return retirement
   }
 
   // The look at the vault props and every deletion (the lockboxes by their key range, then the

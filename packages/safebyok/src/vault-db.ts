@@ -42,16 +42,47 @@ const LockboxExpectation = Z.object({
 })
 
 /**
- * What a retirement was aimed at: the vault whose lockbox, or whole self, the caller means to
- * remove. The retirement lands only while the scope's standing vault props have that `vault_id`, so
- * a device that missed a vault being retired and made anew never retires the successor. It names
- * no revision: a retirement wins over any write. Plain JSON, so it crosses any wire as-is.
+ * What the retirement of a vault was aimed at: the vault the caller means to remove whole. The
+ * retirement lands only while the scope's standing vault props have that `vault_id`, so a device
+ * that missed a vault being retired and made anew never retires the successor. Plain JSON, so it
+ * crosses any wire as-is.
  *
  * @example { vault_id: vaultProps.vault_id }
  */
 export type RetireExpectation = Z.infer<typeof RetireExpectation>
 const RetireExpectation = Z.object({
   vault_id: VaultProps.shape.vault_id,
+})
+
+/**
+ * What the retirement of a lockbox was aimed at: the vault it stands in, and the `revision_tok`
+ * the retiring device read for it -- or null, for a lockbox listed as damaged with none it could
+ * read. The retirement lands only while the scope's standing vault props have that `vault_id`, and
+ * then removes whatever lockbox stands under the boxlabel: within the right vault, a retirement
+ * wins over any write. The revision only lets storage say whether what it removed was the one the
+ * device meant (a {@link LockboxRetirement}). Plain JSON, so it crosses any wire as-is.
+ *
+ * @example { vault_id: vaultProps.vault_id, revision_tok: listed.revision_tok }
+ */
+export type LockboxRetireExpectation = Z.infer<typeof LockboxRetireExpectation>
+const LockboxRetireExpectation = Z.object({
+  vault_id:     VaultProps.shape.vault_id,
+  revision_tok: Z.nullable(Lockbox.shape.revision_tok),
+})
+
+/**
+ * What a lockbox retirement that landed found under its boxlabel, as storage reports it from the
+ * same atomic step as the removal: `retired`, the revision its {@link LockboxRetireExpectation}
+ * named (or, for a null one, a record holding none it could read); `retired_other`, a record that
+ * was not that revision -- written over meanwhile, or holding one where none was expected -- which
+ * was removed all the same; or `absent`, nothing to remove. Plain JSON, so it crosses any wire
+ * as-is.
+ *
+ * @example { outcome: 'retired_other' }
+ */
+export type LockboxRetirement = Z.infer<typeof LockboxRetirement>
+const LockboxRetirement = Z.object({
+  outcome: Z.enum(['retired', 'retired_other', 'absent']),
 })
 
 /**
@@ -100,8 +131,9 @@ export type VaultDBOpts = {
  *    stands in storage, and writes only if it still does: check and write in one atomic step (a
  *    transaction, a conditional write), and resolve `false` when the expectation fails. A lockbox
  *    write resolves `null` instead, and when it lands, the record as you now hold it, read back in
- *    the same step. A retirement names only the vault, never a revision: within the right vault, a
- *    retirement wins.
+ *    the same step. A lockbox retirement resolves `null` too, and when it lands, what it removed
+ *    (a {@link LockboxRetirement}): within the right vault, a retirement wins over any revision,
+ *    and only reports whether the one it removed was the one it named.
  *  * **Enforce who may reach which rows.** Your backend should let a signed-in user reach only
  *    their own records: safebyok's encryption protects the contents, your authorization decides
  *    who may fetch or overwrite them at all. When no one is signed in, or someone other than the
@@ -334,16 +366,25 @@ export abstract class VaultDB {
 
   /**
    * Remove the lockbox under `boxlabel`, whatever revision stands, only while the scope's standing
-   * vault props have the `vault_id` in `expected`; quiet when there is no such lockbox. Refuses with
-   * kind `stale_write` otherwise -- including when the scope holds no vault props -- and removes
-   * nothing.
+   * vault props have the `vault_id` in `expected`. Refuses with kind `stale_write` otherwise --
+   * including when the scope holds no vault props -- and removes nothing.
+   *
+   * Resolves what storage found, from the same atomic step as the removal: `retired` when it
+   * removed the revision `expected` names (for a null `revision_tok`, a record holding none it could
+   * read), `retired_other` when it removed some other record, and `absent` when there was none. An
+   * answer in any other shape is refused as `corrupt_record`, though the retirement may have
+   * landed.
+   *
+   * @example
+   *   const { outcome } = await vaultDB.retireBox(scope, 'anthropic', { vault_id: vaultProps.vault_id, revision_tok: listed.revision_tok })
    */
-  async retireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation): Promise<void> {
+  async retireBox(scope: VaultScope, boxlabel: string, expected: LockboxRetireExpectation): Promise<LockboxRetirement> {
     const asked = heldScope(this, scope)
     const label = heldBoxlabel(this, boxlabel)
-    const expectation = checkOutgoing(RetireExpectation, expected, 'retire expectation')
-    const landed = await fromStorage(() => this.doRetireBox(asked, label, expectation))
-    if (! landed) { throw Refusals.staleWrite('retire') }
+    const expectation = checkOutgoing(LockboxRetireExpectation, expected, 'retire expectation')
+    const retirement = await fromStorage(() => this.doRetireBox(asked, label, expectation))
+    if (retirement === null) { throw Refusals.staleWrite('retire') }
+    return writtenBack('a retirement', () => checkAnswer(LockboxRetirement, retirement, 'a retirement'))
   }
 
   /**
@@ -491,11 +532,15 @@ export abstract class VaultDB {
    */
   protected abstract doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<unknown>
   /**
-   * Remove the lockbox under `boxlabel` if, and only if, the scope's standing vault props have
-   * `expected.vault_id`. True when those vault props stand, whether or not there was a lockbox to
-   * remove; false, removing nothing, otherwise.
+   * Remove the lockbox under `boxlabel`, whatever revision stands, if, and only if, the scope's
+   * standing vault props have `expected.vault_id`: compared in the same atomic step as the removal.
+   * Resolves, once those vault props stand, a {@link LockboxRetirement} saying what that step
+   * removed -- `{ outcome: 'retired' }` for a record at `expected.revision_tok` (for null, one
+   * holding no revision a read could take as one: `Expectations.retirementOf` compares as the
+   * listing reads), `{ outcome: 'retired_other' }` for any other record, `{ outcome: 'absent' }`
+   * when there was none; null, removing nothing, otherwise.
    */
-  protected abstract doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation): Promise<boolean>
+  protected abstract doRetireBox(scope: VaultScope, boxlabel: string, expected: LockboxRetireExpectation): Promise<unknown>
   /**
    * Remove the vault props and every lockbox of `scope` if, and only if, the standing vault props
    * have `expected.vault_id` -- in one transaction, where the backend has them. True when removed;
@@ -767,18 +812,24 @@ const checkLockbox = (raw: unknown, boxlabel: string): Lockbox => {
 }
 
 /**
- * What an adapter handed back from `said`, a write that landed, through `check`, the check a read
- * of it would make. What fails that check is refused as `corrupt_record`, the check's own refusal
- * as its cause, saying the write may have landed: storage holds what its adapter cannot read back.
+ * What an adapter handed back from `said`, a write that landed, through `check`: for a record, the
+ * check a read of it would make. What fails that check is refused as `corrupt_record`, the check's
+ * own refusal as its cause, saying the write may have landed: storage answered with what its
+ * adapter cannot read back.
  */
 const writtenBack = <ResultT>(said: string, check: () => ResultT): ResultT => {
   try {
     return check()
   } catch (err) {
     if (! isVaultError(err, 'corrupt_record')) { throw err }
-    throw new VaultError('corrupt_record', `Storage says ${said} landed, but handed back what this package cannot read: its adapter wrote something it cannot read back. Reading the vault again shows what stands; the storage adapter needs a developer's look.`, { cause: err })
+    throw new VaultError('corrupt_record', `Storage says ${said} landed, but answered with what this package cannot read back: its adapter wrote or reported something it should not have. Reading the vault again shows what stands; the storage adapter needs a developer's look.`, { cause: err })
   }
 }
+
+/** Storage's answer to `said`, a write, through `answerSchema`: one in another shape is `corrupt_record`, quoting none of it. */
+const checkAnswer = <AnswerT>(answerSchema: Z.ZodMiniType<AnswerT>, raw: unknown, said: string): AnswerT => checked(answerSchema, raw, () => (
+  new VaultError('corrupt_record', `Storage answered ${said} in a shape this package does not know.`)
+))
 
 /**
  * A stored record through its validator, with failure as a calm VaultError: storage is someone
@@ -915,11 +966,15 @@ class StringStoreVaultDB extends VaultDB {
     })
   }
 
-  protected doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation): Promise<boolean> {
+  protected doRetireBox(scope: VaultScope, boxlabel: string, expected: LockboxRetireExpectation): Promise<unknown> {
     return soon(() => {
-      if (! Expectations.vaultMeets(readJson(this.store, Ckeys.vaultProps(scope)), expected)) { return false }
-      this.store.erase(Ckeys.box(scope, boxlabel))
-      return true
+      if (! Expectations.vaultMeets(readJson(this.store, Ckeys.vaultProps(scope)), expected)) { return null }
+      const ckey = Ckeys.box(scope, boxlabel)
+      // A row that is not JSON is still retired, and reported as holding no revision.
+      const text = this.store.read(ckey)
+      const retirement = Expectations.retirementOf(text === null ? null : jsonOrText(text), expected)
+      this.store.erase(ckey)
+      return retirement
     })
   }
 

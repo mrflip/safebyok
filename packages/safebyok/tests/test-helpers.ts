@@ -285,13 +285,21 @@ export const summaryOf = (box: LockboxSummary | DamagedLockbox | undefined): Loc
 export const noBoxYet = Object.freeze({ vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 1 } as const)
 
 /**
- * What a retirement of {@link vaultPropsOf}('u1')'s vault, or of a lockbox in it, expects: that
- * vault.
+ * What a retirement of {@link vaultPropsOf}('u1')'s vault expects: that vault.
  * Frozen, since every test shares it.
  *
  * @example vaultDB.retireVault(TH.scopeOf('u1'), TH.thisVault)
  */
 export const thisVault = Object.freeze({ vault_id: 'vault-id-u1' } as const)
+
+/**
+ * What a retirement of a lockbox in {@link vaultPropsOf}('u1')'s vault expects: that vault, and
+ * the revision the retiring device read -- `rev-` and its tag, for a lockbox {@link boxOf} made --
+ * or null, for one listed with none.
+ *
+ * @example vaultDB.retireBox(TH.scopeOf('u1'), 'anthropic', TH.retiring('rev-one'))
+ */
+export const retiring = (revisionTok: string | null) => ({ vault_id: 'vault-id-u1', revision_tok: revisionTok })
 
 /** What {@link markOf} may change of its mark: any field of its own, and any of what it has seen, or null for nothing seen. */
 export type MarkOverrides = Partial<Omit<DeviceMark, 'seen'>> & { seen?: Partial<SeenVault> | null }
@@ -1012,7 +1020,7 @@ export const VaultDBContract = Object.freeze({
   '3.1': 'Vault props are created once',
   '3.2': 'An update of the vault props lands only over the props it read',
   '3.3': 'A lockbox write lands only over the lockbox it read, in the vault it was sealed for',
-  '3.4': 'A retirement wins, within its vault',
+  '3.4': 'A retirement wins, within its vault, and says what it removed',
   '3.5': 'A vault is retired whole, and alone',
   '3.6': 'A refused write wrote nothing',
   '3.7': 'Writes that do not collide all land',
@@ -1294,7 +1302,8 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
         const lockbox = await vaultDB.readBox(scopeOf('u1'), boxlabel)
         expect(lockbox?.revision_tok).to.eq(`rev-of-${String(ii)}`)
       }
-      await vaultDB.retireBox(scopeOf('u1'), 'main"', thisVault)
+      const quoted = OddLabels.indexOf('main"')
+      await vaultDB.retireBox(scopeOf('u1'), 'main"', retiring(`rev-of-${String(quoted)}`))
       const remaining = await vaultDB.listBoxes(scopeOf('u1'))
       expect(remaining).to.have.lengthOf(OddLabels.length - 1)
     })
@@ -1311,7 +1320,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       expect(await revisionsNow()).to.deep.equal({ read: 'rev-one', listed: ['rev-one'] })
       await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'two'), { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 1 })
       expect(await revisionsNow()).to.deep.equal({ read: 'rev-two', listed: ['rev-two'] })
-      await vaultDB.retireBox(scopeOf('u1'), 'anthropic', thisVault)
+      await vaultDB.retireBox(scopeOf('u1'), 'anthropic', retiring('rev-two'))
       expect(await revisionsNow()).to.deep.equal({ read: null, listed: [] })
     })
 
@@ -1472,37 +1481,61 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
   })
 
   describe(lineTitle('3.4'), () => {
-    it("removes one box without touching its neighbours, and is quiet when there is none", async () => {
+    it("removes one box without touching its neighbours, saying it retired the revision named, and then that there is none", async () => {
       const vaultDB = await withVaultProps()
       await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), noBoxYet)
       await vaultDB.updateBox(scopeOf('u1'), boxOf('openai', 'two'), noBoxYet)
-      await vaultDB.retireBox(scopeOf('u1'), 'anthropic', thisVault)
-      await vaultDB.retireBox(scopeOf('u1'), 'anthropic', thisVault)
+      expect(await vaultDB.retireBox(scopeOf('u1'), 'anthropic', retiring('rev-one'))).to.deep.equal({ outcome: 'retired' })
+      expect(await vaultDB.retireBox(scopeOf('u1'), 'anthropic', retiring('rev-one'))).to.deep.equal({ outcome: 'absent' })
       expect(await vaultDB.readBox(scopeOf('u1'), 'anthropic')).to.be.null
       expect(await vaultDB.readBox(scopeOf('u1'), 'openai')).to.not.be.null
+    })
+
+    it("removes a box written over the revision it names all the same, saying it retired another", async () => {
+      const vaultDB = await withVaultProps()
+      await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), noBoxYet)
+      await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'two'), { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 1 })
+      expect(await vaultDB.retireBox(scopeOf('u1'), 'anthropic', retiring('rev-one'))).to.deep.equal({ outcome: 'retired_other' })
+      expect(await vaultDB.readBox(scopeOf('u1'), 'anthropic')).to.be.null
+      expect(await vaultDB.listBoxes(scopeOf('u1'))).to.have.lengthOf(0)
+    })
+
+    it("removes a box holding a revision where it names none, saying it retired another", async () => {
+      const vaultDB = await withVaultProps()
+      await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), noBoxYet)
+      expect(await vaultDB.retireBox(scopeOf('u1'), 'anthropic', retiring(null))).to.deep.equal({ outcome: 'retired_other' })
+      expect(await vaultDB.readBox(scopeOf('u1'), 'anthropic')).to.be.null
+    })
+
+    it("says there is none for a box never written, whatever revision it names, and writes nothing", async () => {
+      const vaultDB = await withVaultProps()
+      expect(await vaultDB.retireBox(scopeOf('u1'), 'anthropic', retiring(null))).to.deep.equal({ outcome: 'absent' })
+      expect(await vaultDB.retireBox(scopeOf('u1'), 'anthropic', retiring('rev-one'))).to.deep.equal({ outcome: 'absent' })
+      expect(await vaultDB.listBoxes(scopeOf('u1'))).to.have.lengthOf(0)
     })
 
     it("wins over a write: a write over a revision retired meanwhile refuses, and the box stays gone", async () => {
       const vaultDB = await withVaultProps()
       await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), noBoxYet)
-      await vaultDB.retireBox(scopeOf('u1'), 'anthropic', thisVault)
+      await vaultDB.retireBox(scopeOf('u1'), 'anthropic', retiring('rev-one'))
       await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'two'), { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 1 }), 'stale_write')
       expect(await vaultDB.readBox(scopeOf('u1'), 'anthropic')).to.be.null
     })
 
-    it("refuses from a stale handle: a vault retired and made anew keeps its box", async () => {
+    it("refuses from a stale handle, even naming the revision that stands: a vault retired and made anew keeps its box", async () => {
       const vaultDB = await withVaultProps()
       await vaultDB.retireVault(scopeOf('u1'), thisVault)
       await vaultDB.fetchOrCreateVaultProps({ ...vaultPropsOf('u1'), vault_id: 'vault-id-reborn' })
       await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'reborn'), { vault_id: 'vault-id-reborn', revision_tok: null, vault_key_epoch: 1 })
-      await expectRefusal(vaultDB.retireBox(scopeOf('u1'), 'anthropic', thisVault), 'stale_write')
+      await expectRefusal(vaultDB.retireBox(scopeOf('u1'), 'anthropic', retiring('rev-reborn')), 'stale_write')
+      await expectRefusal(vaultDB.retireBox(scopeOf('u1'), 'anthropic', retiring(null)), 'stale_write')
       const kept = await vaultDB.readBox(scopeOf('u1'), 'anthropic')
       expect(kept?.revision_tok).to.eq('rev-reborn')
     })
 
     it("refuses in a scope that holds no vault props, even with no box to retire", async () => {
       const vaultDB = await makeVaultDB()
-      await expectRefusal(vaultDB.retireBox(scopeOf('u1'), 'anthropic', thisVault), 'stale_write')
+      await expectRefusal(vaultDB.retireBox(scopeOf('u1'), 'anthropic', retiring(null)), 'stale_write')
     })
 
     timingTestsOf('3.4')
@@ -1561,7 +1594,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
         [() => vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'late'), { vault_id: 'vault-id-u1', revision_tok: 'rev-other', vault_key_epoch: 1 }),     'stale_write'],
         [() => vaultDB.updateBox(scopeOf('u1'), boxOf('mistral', 'late'), { vault_id: 'vault-id-gone', revision_tok: null, vault_key_epoch: 1 }),            'stale_write'],
         [() => vaultDB.updateBox(scopeOf('u1'), boxOf('mistral', 'late', { sidecar_json: '{"note":' }), noBoxYet),                      'bad_option'],
-        [() => vaultDB.retireBox(scopeOf('u1'), 'anthropic', { vault_id: 'vault-id-gone' }),                                              'stale_write'],
+        [() => vaultDB.retireBox(scopeOf('u1'), 'anthropic', { vault_id: 'vault-id-gone', revision_tok: 'rev-anthropic' }),               'stale_write'],
         [() => vaultDB.retireVault(scopeOf('u1'), { vault_id: 'vault-id-gone' }),                                                         'stale_write'],
       ] as const
       for (const [refuse, kind] of refusals) {
@@ -1661,7 +1694,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
     it("lands a new lockbox once retiring one has made room", async () => {
       const vaultDB = await cappedHolding(['anthropic', 'openai', 'mistral'])
       await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('gemini', 'gemini'), noBoxYet), 'vault_full')
-      await vaultDB.retireBox(scopeOf('u1'), 'openai', thisVault)
+      await vaultDB.retireBox(scopeOf('u1'), 'openai', retiring('rev-openai'))
       await vaultDB.updateBox(scopeOf('u1'), boxOf('gemini', 'gemini'), noBoxYet)
       const listed = await vaultDB.listBoxes(scopeOf('u1'))
       expect(listed.map((box) => box.boxlabel)).to.deep.equal(['anthropic', 'gemini', 'mistral'])
@@ -1678,7 +1711,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       await expectRefusal(vaultDB.readVaultProps({ ...scopeOf('u1'), vaultlabel: '' }), 'bad_label')
       await expectRefusal(vaultDB.readBox(scopeOf('u1'), 'tab\there'), 'bad_label')
       await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('cafe\u{301}', 'one'), noBoxYet), 'bad_label')
-      await expectRefusal(vaultDB.retireBox({ ...scopeOf('u1'), user_id: 'u1\u{D800}' }, 'anthropic', thisVault), 'bad_label')
+      await expectRefusal(vaultDB.retireBox({ ...scopeOf('u1'), user_id: 'u1\u{D800}' }, 'anthropic', retiring(null)), 'bad_label')
       const overlong = 'u'.repeat(NameFloorBytes + 1)
       await expectRefusal(vaultDB.listBoxes(scopeOf(overlong)), 'bad_label')
       expect(await vaultDB.listBoxes(scopeOf('u1'))).to.have.lengthOf(0)
@@ -1692,7 +1725,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       await expectRefusal(vaultDB.listBoxes({ ...scopeOf('u1'), vaultlabel: holding }), 'bad_label')
       await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf(holding, 'one'), noBoxYet), 'bad_label')
       await expectRefusal(vaultDB.readBox(scopeOf('u1'), holding), 'bad_label')
-      await expectRefusal(vaultDB.retireBox(scopeOf('u1'), holding, thisVault), 'bad_label')
+      await expectRefusal(vaultDB.retireBox(scopeOf('u1'), holding, retiring(null)), 'bad_label')
       expect(await vaultDB.listBoxes(scopeOf('u1'))).to.have.lengthOf(0)
     })
 
@@ -1878,7 +1911,7 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
         expect(await two.readVaultProps(scopeOf('u1'))).to.deep.equal(vaultPropsOf('u1'))
         await one.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), noBoxYet)
         expect({ read: await revisionIn(two, 'anthropic'), listed: await listedRevisions(two) }).to.deep.equal({ read: 'rev-one', listed: ['rev-one'] })
-        await two.retireBox(scopeOf('u1'), 'anthropic', thisVault)
+        await two.retireBox(scopeOf('u1'), 'anthropic', retiring('rev-one'))
         expect({ read: await revisionIn(one, 'anthropic'), listed: await listedRevisions(one) }).to.deep.equal({ read: null, listed: [] })
         await two.retireVault(scopeOf('u1'), thisVault)
         expect(await one.readVaultProps(scopeOf('u1'))).to.be.null
@@ -1963,10 +1996,12 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
         await raceEveryWay({
           makeDevices: devicesFor(),
           setup:       holdingFirst(['anthropic']),
-          moves:       [(one) => one.retireBox(scopeOf('u1'), 'anthropic', thisVault), (two) => two.updateBox(scopeOf('u1'), boxOf('anthropic', 'next'), over('rev-anthropic'))],
+          moves:       [(one) => one.retireBox(scopeOf('u1'), 'anthropic', retiring('rev-anthropic')), (two) => two.updateBox(scopeOf('u1'), boxOf('anthropic', 'next'), over('rev-anthropic'))],
           verdict:     async ([erased, written], racers) => {
             expect(erased?.kind).to.eq('landed')
             expect(['landed', 'stale_write']).to.include(written?.kind)
+            // A replacement that landed went first, so the retirement removed it, and says so.
+            expect(erased?.val).to.deep.equal({ outcome: written?.kind === 'landed' ? 'retired_other' : 'retired' })
             for (const racer of racers) { expect(await racer.readBox(scopeOf('u1'), 'anthropic')).to.be.null }
           },
         })
@@ -2013,7 +2048,7 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
         await raceEveryWay({
           makeDevices: devicesFor(),
           setup:       holdingFirst(['anthropic', 'openai']),
-          moves:       [(one) => one.updateBox(scopeOf('u1'), boxOf('anthropic', 'next'), over('rev-anthropic')), (two) => two.retireBox(scopeOf('u1'), 'openai', thisVault)],
+          moves:       [(one) => one.updateBox(scopeOf('u1'), boxOf('anthropic', 'next'), over('rev-anthropic')), (two) => two.retireBox(scopeOf('u1'), 'openai', retiring('rev-openai'))],
           verdict:     async (outcomes, racers) => {
             expect(kindsOf(outcomes)).to.deep.equal(['landed', 'landed'])
             for (const racer of racers) {
@@ -2045,7 +2080,7 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
             expect(found).to.deep.equal(racers.map((boxlabel, ii) => (outcomes[ii]?.kind === 'landed' ? `rev-${boxlabel}` : null)))
             // Back under the limit, keeping one racer that landed: the listing is whole again.
             const [kept, ...others] = landed
-            for (const boxlabel of ['anthropic', 'openai', ...others]) { await first.retireBox(scopeOf('u1'), boxlabel, thisVault) }
+            for (const boxlabel of ['anthropic', 'openai', ...others]) { await first.retireBox(scopeOf('u1'), boxlabel, retiring(`rev-${boxlabel}`)) }
             const listed = await first.listBoxes(scopeOf('u1'))
             expect(listed.map((box) => box.boxlabel)).to.deep.equal([kept])
           },
@@ -2071,7 +2106,7 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
         await expectRefusal(tight.updateBox(scopeOf('u1'), boxOf('groq', 'groq'), noBoxYet), 'vault_full')
         expect(await standingVault(tight, [...held, 'groq'])).to.deep.equal(before)
         await tight.updateBox(scopeOf('u1'), boxOf('openai', 'next'), over('rev-openai'))
-        for (const boxlabel of ['anthropic', 'mistral', 'gemini']) { await tight.retireBox(scopeOf('u1'), boxlabel, thisVault) }
+        for (const boxlabel of ['anthropic', 'mistral', 'gemini']) { await tight.retireBox(scopeOf('u1'), boxlabel, retiring(`rev-${boxlabel}`)) }
         await tight.updateBox(scopeOf('u1'), boxOf('groq', 'groq'), noBoxYet)
         expect(await listedRevisions(tight)).to.deep.equal(['rev-cohere', 'rev-groq', 'rev-next'])
       },
@@ -2181,7 +2216,7 @@ export const expectRoundTripsThroughTurnstile = async (makeDevices: MakeVaultDBD
     ['fetchOrCreateVaultProps', () => device.fetchOrCreateVaultProps(vaultPropsOf('u1'))],
     ['updateVaultProps',        () => device.updateVaultProps(vaultPropsOf('u1', { unlock_epoch: 2 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 })],
     ['updateBox',               () => device.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), noBoxYet)],
-    ['retireBox',               () => device.retireBox(scopeOf('u1'), 'anthropic', thisVault)],
+    ['retireBox',               () => device.retireBox(scopeOf('u1'), 'anthropic', retiring('rev-one'))],
     ['retireVault',             () => device.retireVault(scopeOf('u1'), thisVault)],
   ] as const
   for (const [verb, write] of writes) {
@@ -2314,7 +2349,7 @@ const expectEachWriteHeard = async (pair: () => Promise<[VaultDBVerbs, VaultDBVe
     () => writer.updateBox(scopeOf('u1'), boxOf('anthropic', 'anthropic'), noBoxYet),
     () => writer.updateBox(scopeOf('u1'), boxOf('openai', 'openai'), noBoxYet),
     () => writer.updateBox(scopeOf('u1'), boxOf('anthropic', 'next'), { vault_id: 'vault-id-u1', revision_tok: 'rev-anthropic', vault_key_epoch: 1 }),
-    () => writer.retireBox(scopeOf('u1'), 'anthropic', thisVault),
+    () => writer.retireBox(scopeOf('u1'), 'anthropic', retiring('rev-next')),
     () => writer.retireVault(scopeOf('u1'), thisVault),
     () => writer.fetchOrCreateVaultProps(vaultPropsOf('u1', { vault_id: 'vault-id-anew' })),
   ]
@@ -2331,7 +2366,7 @@ const everyVerbOn = (stranger: VaultDBVerbs) => [
   () => stranger.listBoxes(scopeOf('u1')),
   () => stranger.updateBox(scopeOf('u1'), boxOf('anthropic', 'theirs'), { vault_id: 'vault-id-u1', revision_tok: 'rev-anthropic', vault_key_epoch: 1 }),
   () => stranger.updateBox(scopeOf('u1'), boxOf('mistral', 'theirs'), noBoxYet),
-  () => stranger.retireBox(scopeOf('u1'), 'openai', thisVault),
+  () => stranger.retireBox(scopeOf('u1'), 'openai', retiring('rev-openai')),
   () => stranger.retireVault(scopeOf('u1'), thisVault),
 ]
 

@@ -264,7 +264,7 @@ describe("graphqlVaultDB, hearing other writes", () => {
     await elsewhere.updateBox(u1, TH.boxOf('openai', 'r1'), { ...thisVault, revision_tok: null, vault_key_epoch: 1 })
     await TH.eventually(() => heard.count === 1)
     unsubscribe()
-    await elsewhere.retireBox(u1, 'openai', thisVault)
+    await elsewhere.retireBox(u1, 'openai', TH.retiring('rev-r1'))
     await TH.aWhile()
     expect(heard.count).to.eq(1)
   })
