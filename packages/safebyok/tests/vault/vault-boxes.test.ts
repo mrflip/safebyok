@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import * as ZClassic from 'zod'
 import * as Z from 'zod/mini'
-import { Lockbox } from '../../src/lockbox'
+import { Lockbox } from '../../src/box'
 import { type Whisper, MaxWhisperBytes, type Sidecar, FarFuture, MaxLockboxes, VaultScope } from '../../src/types'
 import { AnyTextValidators, MaxUserIdChars, NameFloorBytes } from '../../src/validators'
 import { memoryDeviceDB } from '../../src/device-db'

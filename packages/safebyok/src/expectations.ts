@@ -1,4 +1,4 @@
-import { Lockbox } from './lockbox'
+import { Lockbox } from './box'
 import type { LockboxExpectation, LockboxRetireExpectation, LockboxRetirement, RetireExpectation, VaultPropsExpectation } from './vault-db'
 
 /**

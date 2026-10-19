@@ -1,5 +1,5 @@
 import * as Z from 'zod/mini'
-import { Lockbox } from './lockbox'
+import { Lockbox } from './box'
 import { MaxUnlocks, WayinKindVals, VaultProps, VaultScope, type DamagedLockbox, type LockboxSummary, type Sidecar } from './types'
 import { VaultError, isVaultError } from './errors'
 import * as Names from './names'

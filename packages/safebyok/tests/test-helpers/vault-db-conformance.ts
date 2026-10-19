@@ -1,5 +1,5 @@
 import { it, describe, expect, vi } from 'vitest'
-import type { Lockbox } from '../../src/lockbox'
+import type { Lockbox } from '../../src/box'
 import type { VaultProps, LockboxSummary, DamagedLockbox } from '../../src/types'
 import { NameFloorBytes } from '../../src/validators'
 import { type VaultDB, type VaultDBOpts, type LockboxRetireExpectation } from '../../src/vault-db'

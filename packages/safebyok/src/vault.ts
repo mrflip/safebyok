@@ -1,6 +1,6 @@
 import * as Z from 'zod/mini'
 import { type VaultScope, LockboxSummary, type DamagedLockbox, type WayinSummary, type PasskeyProof, Whisper, Sidecar, VaultProps, DeviceMark, MaxUnlocks, Lease, PasskeySaltBytes, type PassphraseWayin, MinuteMillis, FarFuture } from './types'
-import type { Lockbox } from './lockbox'
+import type { Lockbox } from './box'
 import * as Names from './names'
 import { optionsCheck } from './options'
 import { VaultError, isVaultError, type VaultErrorKind } from './errors'
@@ -17,7 +17,7 @@ import { parseLogger, asError } from './logger'
 import * as RefusalPolicy from './refusal-policy'
 import { checkStrengthTest, ensureStrongEnough } from './passphrase-strength'
 import { type MakeVaultOpts, isBag, ensureKnownOpts, parseVaultDB, parseDeviceDB, parseLeaseHours, parseClock, readClock, parseKeyDeriver, parseMaxWhisperBytes, parseMaxLockboxes, parseDeclared, ensureLimitsFit, StoredBytesPerWhisperByte, LockboxFixedBytes } from './vault-opts'
-import { deviceTroubleAsConditions } from './retire-damaged-vault'
+import { deviceTroubleAsConditions } from './del-damaged-vault'
 
 // == [Public types]: VaultState, VaultSnapshot
 

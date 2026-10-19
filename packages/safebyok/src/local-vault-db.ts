@@ -1,5 +1,5 @@
 import * as Z from 'zod/mini'
-import { Lockbox } from './lockbox'
+import { Lockbox } from './box'
 import { VaultScope, VaultProps } from './types'
 import { VaultError } from './errors'
 import type { StringStore } from './string-store'

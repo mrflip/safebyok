@@ -5,7 +5,7 @@ import { VaultDB, jsonBytes, type VaultPropsExpectation, type RetireExpectation,
 import { localVaultDB } from '../src/local-vault-db'
 import { VaultError } from '../src/errors'
 import { DefaultLogger, parseLogger, type VaultLogger } from '../src/logger'
-import type { Lockbox } from '../src/lockbox'
+import type { Lockbox } from '../src/box'
 import type { VaultProps, VaultScope } from '../src/types'
 import * as Ckeys from '../src/ckeys'
 import * as Expectations from '../src/expectations'

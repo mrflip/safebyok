@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Lockbox } from '../src/lockbox'
+import { Lockbox } from '../src/box'
 import { FarFuture } from '../src/types'
 import * as TH from './test-helpers'
 

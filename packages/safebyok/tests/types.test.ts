@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as Z from 'zod/mini'
-import { Lockbox } from '../src/lockbox'
+import { Lockbox } from '../src/box'
 import { DeviceMark, EpochMillis, FarFuture, FarPast, ForeverMillis, Lease, LockboxSummary, MaxUnlocks, Sidecar, VaultProps, VaultScope, Whisper } from '../src/types'
 import * as TH from './test-helpers'
 
