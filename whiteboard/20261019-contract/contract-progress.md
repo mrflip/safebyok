@@ -153,3 +153,17 @@ token when it joins or creates a vault): don't build one ahead of it.
 * `del-damaged-vault.ts` unwraps via `valOf`.
 * GraphQL's `served` and the Postgres route recipe are not shims (A1b): a resolver reports failure
   only by throwing, and the route turns an Outcome into JSON by design.
+
+## Owed to the Contract tab
+
+*Orchestrator:* rulings and drift not yet carried into the design doc's Contract tab; one helper
+pass carries them, then this list empties. Older: B1's, B3's, A6's review and phase A pass 1's
+drift, once ruled (their rows). From 2026-10-19's rulings:
+
+* hello: a failed hello is forgotten, so the next call reads afresh (Coach: "Add to contract").
+* hello no longer takes up the lease; unlock/`ensureLease` does (`lean_core`, ruled).
+* The strength checker returns a value saying good or bad; a throw is `unexpected_error` naming
+  the function, no metadata (B4 writes it).
+* `isVaultError` is the declared interface, inside and out.
+* putBox/delBox take the revision from the listing in hand and read nothing more (already so;
+  `lean_core` makes the code match). Every op uses the lazy hello (YOLO row).
