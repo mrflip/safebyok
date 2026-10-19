@@ -6,7 +6,7 @@ they disagree. Workers look things up here; they do not write it.
 ## Line
 
 *Orchestrator:* main → #193 → #194 → #196 → #197 → #198 → #199 → #200 → #195 (phase A) → #201
-B1 `proof_wayin` → #202 B3 `box` → #204 `a_fixes` → #203 `a_sec` (9e5ed329). B2 `lease` builds from it. `a_sec` was restacked onto #204
+B1 `proof_wayin` → #202 B3 `box` → #204 `a_fixes` → #203 `a_sec` → #205 B2 `lease` (725ca1ef). `a_sec2` (#206) in review; B4 waits on the one-passphrase-one-passkey ruling. `a_sec` was restacked onto #204
 (ruled 2026-10-19: file as it stands); B2 cuts from it; `a_sec2` follows B2 and closes the create
 window. Cross-device invalidation will come from a proper mechanism (each device authenticates a
 token when it joins or creates a vault): don't build one ahead of it.
@@ -164,3 +164,4 @@ checker's contract (B4, a note in make); putBox/delBox reading nothing before th
 `changePassphrase`/`addPassphrase`/`addPasskey`/`delWayin`; B4), `strengthChecker` (B4),
 putBox's `over` and its returned Box (C2).
 * *Owed again (2026-10-19):* `adorn(obj, ckey, val)` wherever the Contract shows `adorn`; once a_sec2 lands, `isVaultError` without the cross-copy mark (Shapes' paragraph).
+* From a_sec2 (#206): `VaultSnapshot` and the handle lose `props`; `vault.wayins` is `WayinSummary[]`; `isVaultError` is `instanceof` plus the kind (no cross-copy recognition); `Lease.grant` throws on input a lease record cannot hold.
