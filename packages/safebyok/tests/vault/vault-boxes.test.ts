@@ -409,6 +409,21 @@ describe("the sidecar", () => {
     expect(TH.summaryOf(vault.getSnapshot().boxes[0])?.sidecar).to.deep.equal({ note: 'n'.repeat(20) })
   })
 
+  it("weighs a sidecar kept from the box before any key is made for the new one (Contract: vault.putBox, Does)", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw', { maxWhisperBytes: 64 })
+    await vault.putBox('anthropic', 'w'.repeat(30), { sidecar: { note: 'n'.repeat(20) } })
+    const generateKey = vi.spyOn(crypto.subtle, 'generateKey')
+    const encrypt = vi.spyOn(crypto.subtle, 'encrypt')
+    try {
+      await TH.expectRefusal(vault.putBox('anthropic', 'w'.repeat(32)), 'whisper_too_large')
+      expect(generateKey).not.toHaveBeenCalled()
+      expect(encrypt).not.toHaveBeenCalled()
+    } finally {
+      vi.restoreAllMocks()
+    }
+  })
+
   it("is shown while locked, the stored sidecar as storage holds it", async () => {
     const world = makeWorld()
     const warm = await world.openUnlocked('pw')
@@ -1109,7 +1124,7 @@ describe("vault.openBox", () => {
     const getProof = vi.fn<GetProof>(() => 'declined')
     const vault = await world.openUnlocked('pw', { getProof })
     await vault.putBox('anthropic', 'sk-fake', { sidecar: { note: 'work account' } })
-    const box = Box.make(vault, await storedBoxOf(world))
+    const box = Box.make(vault, await storedBoxOf(world), TH.vaultPropsOf('u1'))
     const reads = (['getBox', 'listBoxes', 'getVaultProps'] as const).map((verb) => vi.spyOn(world.vaultDB, verb))
     expect(await vault.openBox(box)).to.eq('sk-fake')
     for (const read of reads) { expect(read).not.toHaveBeenCalled() }
@@ -1123,7 +1138,8 @@ describe("vault.openBox", () => {
     const record = await storedBoxOf(world)
     const elsewhere = await makeWorld().open({ userId: 'u2' })
     expect(await vault.openBox(record)).to.eq('sk-fake')
-    expect(await vault.openBox(Box.make(elsewhere, record))).to.eq('sk-fake')
+    const foreign = Box.make(elsewhere, record, TH.vaultPropsOf('u2'))
+    expect(await vault.openBox(foreign)).to.eq('sk-fake')
   })
 
   it("resolves the whisper as an Outcome's val from tryOpenBox", async () => {

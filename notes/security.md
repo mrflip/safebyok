@@ -34,6 +34,31 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-19 (thread B3 rework, box holder): **a box takes the vault props it lies under explicitly,
+  as `holder`, and no longer reads `vault_id` and the vaultKey epoch off the vault's published
+  snapshot; sealing is split so a store too large is refused before any key is made.** This replaces
+  part (5) of the entry above (thread B3, box), whose snapshot-lag reasoning no longer applies.
+  (1) `BoxHolder = Pick<VaultProps, 'vault_id' | 'vault_key_epoch'>` (`packages/safebyok/src/box.ts`):
+  `Box.make(vault, record, holder)` and `Box.seal(vault, boxlabel, whisper, holder, vaultKey, opts)`.
+  The vault passes its private `#vaultProps` at each call, and in `putBox` the same object, read
+  once, supplies both the seal's `holder` and the write's expectation (`vault_id`,
+  `vault_key_epoch`), so the ctx a box is sealed under and the vault its write is aimed at agree by
+  construction, not by timing. `BoxVault` is now only the scope (`applabel`, `user_id`, `vaultlabel`,
+  fixed for the handle's life) and the clock. `holder` is copied, frozen, and attached
+  non-enumerable like `vault`; a holder missing either field is `bad_option`. (2) Vouching for the
+  box being replaced (`over`) opens it under the seal's own `holder`, not the one `over` was made
+  under, so the carry-forward of `registered_at` and the sidecar is vouched by the same vault props
+  the new box is sealed under. (3) Internally, sealing is `planSeal` and `sealPlanned`. `planSeal`
+  (the caller has done the checks) vouches for `over` and settles the sidecar JSON and
+  `registered_at`; it makes no key and ciphers nothing. `sealPlanned` makes the fresh boxKey and
+  fresh revision, then wraps and ciphers under the rebuilt ctx. Between the two, `putBox` checks the
+  whisper plus the kept sidecar against `maxWhisperBytes`, so a store that is too large is refused
+  before any key is generated or anything enciphered (a test spies `generateKey` and `encrypt` to
+  show neither runs). The whisper is serialized once per put (`whisperBytesOf`). The plan holds the
+  whisper's bytes: it is internal, frozen and short-lived, and is never logged, stored or exported
+  from the package. (4) `vault.openBox(box)` checks the record first (`bad_record`), then the key in
+  hand (`vault_locked`), then re-makes the box under the vault's own props; `box.tryOpen` has no
+  `absent_vault` path any more, since a box cannot be made without vault props.
 * 2026-10-19 (thread B3, box): **the stored box is a model class, `Box`, holding a back-reference to
   its vault; sealing and opening moved into it, and a box's enumerable fields are exactly its stored
   ones.** (1) The class (`packages/safebyok/src/box.ts`): the Zod schema once exported as `Box` is

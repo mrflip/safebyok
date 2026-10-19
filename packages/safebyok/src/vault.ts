@@ -1,6 +1,6 @@
 import * as Z from 'zod/mini'
 import { isPlainBag, type Capacity, type Clock, type VaultScope, BoxSummary, type DamagedBox, type WayinSummary, type PasskeyAnswer, Whisper, Sidecar, VaultProps, DeviceMark, MaxUnlocks, Lease, type PassphraseWayinRecord, MinuteMillis, FarFuture, FarPast } from './types'
-import { Box, type BoxRecord, EmptySidecarJson, checkedSidecar, checkedWhisper, heldListing } from './box'
+import { Box, type BoxRecord, EmptySidecarJson, checkedBoxRecord, checkedSidecar, heldListing, planSeal, sealPlanned, whisperBytesOf } from './box'
 import * as Names from './names'
 import { optionsCheck } from './options'
 import { VaultError, isVaultError, type RefusalKind } from './errors'
@@ -198,7 +198,9 @@ export class Vault {
   // == [Vault: fields]: applabel, user_id, vaultlabel, vault_id, registered_at, unlock_epoch, vault_key_epoch, wayins, props, state, boxes, capacity, askPassphraseAt, trouble, syncing, snapshot, getSnapshot, subscribe, leaseMillis, logger, clock, keyDeriver
 
   // Each field reads the snapshot `#settle()` last published, so the fields and the snapshot always
-  // agree. A getter with no setter: a host cannot write over one, and the vault never reads one back.
+  // agree. A getter with no setter: a host cannot write over one, and the vault never reads one back:
+  // nor do its boxes, which read only the scope, fixed for the handle's life, and take the vault
+  // props they lie under from the vault at each call.
 
   /** The scope's app: where the vault is found. Fixed for the handle's life. */
   get applabel(): string { return this.#snapshot.applabel }
@@ -691,7 +693,7 @@ export class Vault {
     const label = Names.check(this.#rules, 'boxlabel', boxlabel)
     const givenSidecarJson = sidecarJsonOf(storeOpts)
     // The refusal never quotes its input: a whisper stays out of error messages.
-    const whisperBytes = new TextEncoder().encode(stableJsonify(checkedWhisper(whisper)))
+    const whisperBytes = whisperBytesOf(whisper)
     this.#checkWhisperFits(whisperBytes, givenSidecarJson ?? EmptySidecarJson)
     // Checked before the user is asked for anything: a call that cannot land never prompts.
     await this.#ensureLease(0)
@@ -705,7 +707,9 @@ export class Vault {
     await this.#checkRoomFor(label, prev)
     // The key and the vault it belongs to, taken together after the last look at storage.
     const unlockedKey = this.#checkUnlocked()
-    const { vault_id: vaultId, vault_key_epoch: vaultKeyEpoch } = this.#currentVaultProps()
+    // The vault props the box is sealed under are the ones its write names: one object, read once.
+    const standingVaultProps = this.#currentVaultProps()
+    const { vault_id: vaultId, vault_key_epoch: vaultKeyEpoch } = standingVaultProps
     // Lands only in the vault this whisper is sealed for, under the vaultKey that seals it, over
     // the revision just read -- for a damaged box, the one the listing names -- : a vault reborn
     // elsewhere, a vaultKey replaced, or a box written meanwhile by another device, refuses it.
@@ -714,9 +718,10 @@ export class Vault {
     // while it stands; the catch-up lists it, with its revision for the next store.
     const expected = { vault_id: vaultId, revision_tok: overRevision, vault_key_epoch: vaultKeyEpoch }
     // The sidecar a store keeps from the box it replaces, when none is given, counts toward the
-    // limit too: known once the box is sealed, and checked before anything is written.
-    const box = await Box.seal(this, label, whisper, unlockedKey, { sidecar: storeOpts?.sidecar, over: prev })
-    this.#checkWhisperFits(whisperBytes, box.props.sidecar_json)
+    // limit too: known once the plan has vouched for that box, and weighed before any key is made.
+    const plan = await planSeal(this, standingVaultProps, unlockedKey, { boxlabel: label, whisperBytes, sidecarJson: givenSidecarJson, over: prev })
+    this.#checkWhisperFits(plan.whisperBytes, plan.sidecarJson)
+    const box = await sealPlanned(this, standingVaultProps, unlockedKey, plan)
     await this.#writeOver(box, expected)
     await this.#refresh()
   })
@@ -842,9 +847,11 @@ export class Vault {
 
   readonly #tryOpenBox = this.#trying(async (box: Box | BoxRecord): Promise<Whisper> => {
     this.#checkOpen()
-    // Made anew for this vault: a box opens under this vault's scope and id, whichever it came from.
-    const held = Box.make(this, box instanceof Box ? box.props : box)
-    const whisper = valOf(await held.tryOpen(this.#checkUnlocked()))
+    const record = box instanceof Box ? box.props : checkedBoxRecord(box)
+    const unlockedKey = this.#checkUnlocked()
+    // Made anew for this vault: a box opens under this vault's scope and the props it holds, whichever it came from.
+    const held = Box.make(this, record, this.#currentVaultProps())
+    const whisper = valOf(await held.tryOpen(unlockedKey))
     this.#checkUnlocked()
     return whisper
   })
@@ -2009,7 +2016,7 @@ export class Vault {
   async #getBoxOrDamaged(boxlabel: string): Promise<Box | 'damaged' | null> {
     try {
       const record = await this.#vaultDB.getBox(this.#scope, boxlabel)
-      return record === null ? null : Box.make(this, record)
+      return record === null ? null : Box.make(this, record, this.#currentVaultProps())
     } catch (err) {
       if (! isVaultError(err, 'corrupt_record')) { throw err }
       return 'damaged'
@@ -2020,7 +2027,7 @@ export class Vault {
     const label = Names.checkFloor('boxlabel', boxlabel)
     const record = await damagedAs(this.#vaultDB.getBox(this.#scope, label), damagedBox)
     if (record === null) { throw this.#nothingUnder(label) }
-    return Box.make(this, record)
+    return Box.make(this, record, this.#currentVaultProps())
   }
 
   /**
