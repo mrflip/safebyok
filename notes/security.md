@@ -978,9 +978,8 @@ added or folded into through the subagent, and no other entry changes.
   `rolled_back`, `identity_revoked`) was `condition`, and `isCondition` is true for both. It
   also gains `meta?` (`box_stored`, `capacity`; amended 2026-10-19, a_sec2, #206: `vault_props_stored`
   is removed, see below): stored records as storage holds them (ciphertext and visible fields) and
-  counts only, never secret material; no refusal filled it at first (amended 2026-10-19, a_sec2,
-  #206: `box_stored` is now filled, a `stale_write` from a box write carries the winning box record,
-  as stored). The vault still locks
+  counts only, never secret material; no refusal fills `box_stored` yet (an earlier amendment of
+  2026-10-19, a_sec2, #206, which said it was filled, was mistaken). The vault still locks
   on `identity_revoked` and `rolled_back` from storage: `RefusalPolicy.heed` unwraps each Outcome,
   hands every bad `err` to the vault's refusal handler and awaits it, then throws it, as before --
   an interim shim until the vault's own calls are Outcome-shaped.
