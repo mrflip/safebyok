@@ -87,7 +87,7 @@ code, the stored records and these docs all use its words.
   wraps a fresh **lockboxKey** for every stored whisper, and the lockboxKey encrypts the whisper.
   The wayins live in the **vault props**, the one record per vault that every device syncs. The
   backend holds those and the lockboxes, nothing else: every key and whisper in them is
-  ciphertext, and only their labels, ids, times and sidecars are readable by the server.
+  ciphertext; only their labels, ids, times and sidecars are not, and those are server-readable.
 * A **lease** lets this device unlock again without a proof for a while: when a proof unlocks the
   vault, the device keeps the vaultKey wrapped under a key the browser cannot export, until
   `leaseHours` run out. It never leaves the device.
