@@ -36,16 +36,34 @@ describe("memoryDeviceDB", () => {
 })
 
 describe("deviceOutcomeOf", () => {
-  it("answers what the body returns as a good Outcome, as its first example shows", async () => {
+  it("answers what the body returns as a good Outcome, a record or null, as its first example shows", async () => {
     expect(await deviceOutcomeOf('getMark', () => TH.markOf('u1'))).to.deep.equal({ ok: true, val: TH.markOf('u1') })
+    expect(await deviceOutcomeOf('getMark', () => Promise.resolve(null))).to.deep.equal({ ok: true, val: null })
   })
 
-  it("says a SecurityError as 'storage_blocked', the store's error its cause, as its second example shows", async () => {
+  it("says a SecurityError as 'storage_blocked', the store's error its cause, never rejecting, as its second example shows", async () => {
     const blocked = new DOMException('The operation is insecure.', 'SecurityError')
-    const err = await TH.expectBad(deviceOutcomeOf('getMark', () => Promise.reject(blocked)), 'storage_blocked')
+    const err = await TH.expectBad(deviceOutcomeOf('putMark', () => Promise.reject(blocked)), 'storage_blocked')
     expect(err.cause).to.eq(blocked)
+    expect(err.message).to.match(/writing its mark of this vault/)
     expect(err.message).to.match(/will not help until that changes/)
   })
+
+  const ThrownCases = [
+    // what a host's own store may throw, and what the vault hears:
+    [new DOMException('No room.', 'QuotaExceededError'),     "storage_blocked",      'no room, as a private window or a full disk gives'],
+    [new DOMException('Gone.', 'NotSupportedError'),          "storage_blocked",      'no such storage at all'],
+    [{ name: 'SecurityError', message: 'from another frame' }, "storage_blocked",      'a refusal told by its name alone, from another frame'],
+    [new Error('socket closed'),                              "storage_unavailable",  'any other failure, which a retry may mend'],
+    ["a bare string",                                         "storage_unavailable",  'a thrown value that is no Error'],
+  ] as const
+
+  for (const [thrown, refusalkind, blurb] of ThrownCases) {
+    it(`says ${blurb} as '${refusalkind}', what was thrown its cause`, async () => {
+      const err = await TH.expectBad(deviceOutcomeOf('getLease', vi.fn<() => Promise<null>>().mockRejectedValue(thrown)), refusalkind)
+      expect(err.cause).to.eq(thrown)
+    })
+  }
 
   it("passes a VaultError through as it came", async () => {
     const refusal = new VaultError('bad_label', 'no such label')

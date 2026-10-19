@@ -297,8 +297,21 @@ A device store of your own (a `DeviceDB`, for a platform without IndexedDB) keep
 it is handed them: `putLease` and `putMark` each replace what the scope held, and `delMark`
 forgets the scope's mark (`del()` calls it). Each verb resolves an `Outcome`, as a VaultDB's do:
 `{ ok: true, val }`, the record or null for a read, or `{ ok: false, err }` holding a
-`VaultError`; `outcomeOf` makes one of a body that throws. `describeDeviceDB` from
-`safebyok/testing` checks all of this.
+`VaultError`, and never rejects. Answer each through `deviceOutcomeOf`, which says what your
+store throws as the vault's conditions: a browser's refusal that holds until something outside
+the app changes (`SecurityError`, `QuotaExceededError`, `NotSupportedError`) as `storage_blocked`,
+which a host shows without offering a retry, and anything else as `storage_unavailable`:
+
+```ts
+const deviceDB: DeviceDB = {
+  getLease: (scope) => deviceOutcomeOf('getLease', () => myStore.read(leaseCkeyOf(scope))),
+  putLease: (record) => deviceOutcomeOf('putLease', () => myStore.write(leaseCkeyOf(record), record)),
+  // ...and the rest of the seven verbs alike
+}
+```
+
+`describeDeviceDB` from `safebyok/testing` checks all of this; hand it a second factory, an
+adapter over a store the browser withholds, and it checks each verb answers `storage_blocked`.
 
 Every refresh -- after each of the vault's own writes, and at each change your adapter's
 `subscribe` reports -- lists every box in the vault, one at a time per handle, so its cost

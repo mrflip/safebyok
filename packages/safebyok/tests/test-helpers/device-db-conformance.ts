@@ -1,25 +1,50 @@
 import { describe, it, expect } from 'vitest'
 import { type DeviceDB } from '../../src/device-db'
 import { scopeOf, leaseOf, markOf } from './builders'
-import { expectingGood } from './refusals'
+import { expectBad, expectingGood } from './refusals'
 
 
 /**
  * The behaviour every DeviceDB owes, written once: every verb answering a good Outcome; no lease
  * until one is written, then that record back, its leaseKey still a non-extractable CryptoKey;
  * likewise a device mark, the newest written in place of the one before; each scope kept to
- * itself, and marks apart from leases; and an erase of one, or of all. Run it against an adapter with a
- * factory making a fresh, empty one per test. For a DeviceDB's own tests, from
+ * itself, and marks apart from leases; and an erase of one, or of all. Given a second factory, an
+ * adapter over a store the browser withholds, it checks too that every verb then resolves a bad
+ * Outcome of 'storage_blocked', never a rejection, as `deviceOutcomeOf` answers. Run it against
+ * an adapter with a factory making a fresh, empty one per test. For a DeviceDB's own tests, from
  * `safebyok/testing`; it runs under vitest.
  *
  * @param adapterTitle - The adapter under test, as the suite's titles name it.
  * @param makeDeviceDB - A fresh, empty adapter: no record in it, and none shared with another call.
+ * @param makeBlockedDeviceDB - Optional: the adapter over a store the browser withholds -- site
+ *   data blocked, no room, no such storage -- so each of its verbs meets that refusal. Called within
+ *   the test, so it may stub a global there, undoing it with vitest's `onTestFinished`.
  *
  * @example
  *   describeDeviceDB('memoryDeviceDB', () => memoryDeviceDB())
+ * @example
+ *   describeDeviceDB('idbDeviceDB', () => idbDeviceDB({ dbName: TH.freshDbName() }), () => {
+ *     vi.stubGlobal('indexedDB', undefined)
+ *     onTestFinished(() => { vi.unstubAllGlobals() })
+ *     return idbDeviceDB({ dbName: TH.freshDbName() })
+ *   })
  */
-export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => DeviceDB | Promise<DeviceDB>) => {
+export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => DeviceDB | Promise<DeviceDB>, makeBlockedDeviceDB?: () => DeviceDB | Promise<DeviceDB>) => {
   describe(`${adapterTitle}, as a DeviceDB`, () => {
+    if (makeBlockedDeviceDB !== undefined) {
+      it("answers every verb over a store the browser withholds with a bad Outcome of 'storage_blocked', never a rejection", async () => {
+        const deviceDB = await makeBlockedDeviceDB()
+        const lease = await leaseOf('u1')
+        await expectBad(deviceDB.getLease(scopeOf('u1')), 'storage_blocked')
+        await expectBad(deviceDB.putLease(lease), 'storage_blocked')
+        await expectBad(deviceDB.delLease(scopeOf('u1')), 'storage_blocked')
+        await expectBad(deviceDB.getMark(scopeOf('u1')), 'storage_blocked')
+        await expectBad(deviceDB.putMark(markOf('u1')), 'storage_blocked')
+        await expectBad(deviceDB.delMark(scopeOf('u1')), 'storage_blocked')
+        await expectBad(deviceDB.delAll(), 'storage_blocked')
+      })
+    }
+
     it("answers every verb with a good Outcome, never a bare record", async () => {
       const deviceDB = await makeDeviceDB()
       const lease = await leaseOf('u1')

@@ -2,7 +2,7 @@
 // exercise real IndexedDB semantics (structured clone included) without a browser.
 import 'fake-indexeddb/auto'
 import { createStore, set } from 'idb-keyval'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { idbDeviceDB, inspectIdbDeviceDB, type IdbOpts } from '../src/idb'
 import * as Entry from '../src/idb'
 import { VaultError } from '../src/errors'
@@ -10,7 +10,12 @@ import * as Ckeys from '../src/ckeys'
 import * as TH from './test-helpers'
 
 // Each test gets its own database, so tests never see each other's rows.
-TH.describeDeviceDB('idbDeviceDB', () => idbDeviceDB({ dbName: TH.freshDbName() }))
+// Its blocked store is one in a context with no IndexedDB, as describeDeviceDB's second example runs it.
+TH.describeDeviceDB('idbDeviceDB', () => idbDeviceDB({ dbName: TH.freshDbName() }), () => {
+  vi.stubGlobal('indexedDB', undefined)
+  onTestFinished(() => { vi.unstubAllGlobals() })
+  return idbDeviceDB({ dbName: TH.freshDbName() })
+})
 
 describe("safebyok/idb", () => {
   it("exports the device store, its inspector and the change bell, and no vault store: that is safebyok-indexeddb's", () => {

@@ -5,7 +5,7 @@
  */
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
-import { Vault, localVaultDB, memoryDeviceDB, memoryStore, type StringStore } from '../src/index'
+import { Vault, deviceOutcomeOf, localVaultDB, memoryDeviceDB, memoryStore, type DeviceDB, type StringStore } from '../src/index'
 import { Ciphered, fromB64, toB64 } from '../src/crypto'
 import { VaultError, isVaultError } from '../src/errors'
 import { type Outcome, bad, good } from '../src/outcome'
@@ -901,19 +901,27 @@ describe("raceOutcomeOf", () => {
 
 const ckeyOf = (scope: VaultScope) => `${scope.applabel}:${scope.user_id}:${scope.vaultlabel}`
 
-TH.describeDeviceDB('describeDeviceDB, over the smallest honest DeviceDB', () => {
+/**
+ * The smallest honest DeviceDB, as the README's recipe writes a host's own: two maps, each verb
+ * answered through `deviceOutcomeOf`. Given `withheld`, every touch of its maps throws that, as a
+ * browser's store does when it withholds itself.
+ */
+const hostDeviceDB = (withheld?: Error): DeviceDB => {
   const rows = new Map<string, LeaseRecord>()
   const marks = new Map<string, DeviceMark>()
+  const touch = () => { if (withheld !== undefined) { throw withheld } }
   return {
-    getLease: (scope) => { const kept = rows.get(ckeyOf(scope)) ?? null; return Promise.resolve(TH.good(kept)) },
-    putLease: (record) => { rows.set(ckeyOf(record), record); return Promise.resolve(TH.good(undefined)) },
-    delLease: (scope) => { rows.delete(ckeyOf(scope)); return Promise.resolve(TH.good(undefined)) },
-    getMark:  (scope) => { const kept = marks.get(ckeyOf(scope)) ?? null; return Promise.resolve(TH.good(kept)) },
-    putMark:  (mark) => { marks.set(ckeyOf(mark), mark); return Promise.resolve(TH.good(undefined)) },
-    delMark:  (scope) => { marks.delete(ckeyOf(scope)); return Promise.resolve(TH.good(undefined)) },
-    delAll:   () => { rows.clear(); marks.clear(); return Promise.resolve(TH.good(undefined)) },
+    getLease: (scope) => deviceOutcomeOf('getLease', () => { touch(); return rows.get(ckeyOf(scope)) ?? null }),
+    putLease: (record) => deviceOutcomeOf('putLease', () => { touch(); rows.set(ckeyOf(record), record) }),
+    delLease: (scope) => deviceOutcomeOf('delLease', () => { touch(); rows.delete(ckeyOf(scope)) }),
+    getMark:  (scope) => deviceOutcomeOf('getMark', () => { touch(); return marks.get(ckeyOf(scope)) ?? null }),
+    putMark:  (mark) => deviceOutcomeOf('putMark', () => { touch(); marks.set(ckeyOf(mark), mark) }),
+    delMark:  (scope) => deviceOutcomeOf('delMark', () => { touch(); marks.delete(ckeyOf(scope)) }),
+    delAll:   () => deviceOutcomeOf('delAll', () => { touch(); rows.clear(); marks.clear() }),
   }
-})
+}
+
+TH.describeDeviceDB('describeDeviceDB, over the smallest honest DeviceDB', () => hostDeviceDB(), () => hostDeviceDB(new DOMException('The operation is insecure.', 'SecurityError')))
 
 /**
  * A server's VaultDB for one signed-in user, over a store every user's vaults share: it refuses

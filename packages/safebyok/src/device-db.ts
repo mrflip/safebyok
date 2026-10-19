@@ -105,20 +105,23 @@ export const memoryDeviceDB = (): DeviceDB => {
 // == [Device trouble]: deviceOutcomeOf, deviceTroubleAsConditions, DeviceTroubleSaid, deviceTrouble
 
 /**
- * The outcome of `body`, one device-store verb's work, for an adapter to answer with: what it
- * returns as a good outcome; a VaultError it throws as it came; and any other failure -- an
- * IndexedDB error, say -- said as a condition, with the store's own error as its cause and a
- * message naming what failed: 'storage_blocked' for a refusal the browser gives for a reason that
- * holds until something outside the app changes (`Refusals.isStorageBlocked`), which a host shows
- * without offering a retry, and 'storage_unavailable' for any other, which it shows in place and
- * offers to retry. Never rejects. Neither message names a scope or quotes a record.
+ * The answer of one verb of a device store you write yourself: wrap each verb's body in it, and
+ * the store answers as a {@link DeviceDB} must, an Outcome that never rejects. What the body
+ * returns is a good outcome; a VaultError it throws passes as it came; and anything else it
+ * throws -- your storage's own error -- is said as the vault's condition, that error its `cause`
+ * and the message naming what failed: 'storage_blocked' for a refusal the browser gives for a
+ * reason that holds until something outside the app changes (an error named `SecurityError`,
+ * `QuotaExceededError` or `NotSupportedError`: site data blocked, no room, no such storage),
+ * which a host shows without offering a retry; 'storage_unavailable' for any other, which it shows
+ * in place and offers to retry. Neither message names a scope or quotes a record. `memoryDeviceDB`
+ * and `idbDeviceDB` answer through it.
  *
  * @param verb - The DeviceDB verb answering, which the message names.
  * @param body - Its work, sync or async.
  * @returns Its outcome.
  *
- * @example getMark: (scope) => deviceOutcomeOf('getMark', () => get(Ckeys.mark(scope), shelf()))
- * @example await deviceOutcomeOf('getMark', failingRead)   // site data blocked (a SecurityError): 'storage_blocked', "...will not help until that changes..."
+ * @example getMark: (scope) => deviceOutcomeOf('getMark', () => myStore.read(markCkeyOf(scope)))   // { ok: true, val: the record, or null }
+ * @example await deviceOutcomeOf('putMark', () => myStore.write(ckey, mark))   // site data blocked (a SecurityError): { ok: false, err } of 'storage_blocked', "...will not help until that changes..."
  */
 export const deviceOutcomeOf = <ValT>(verb: DeviceVerb, body: () => ValT | Promise<ValT>): Promise<Outcome<ValT>> => (
   outcomeOf(body, (thrown) => deviceTrouble(verb, thrown))
