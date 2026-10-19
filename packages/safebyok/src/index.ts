@@ -29,7 +29,7 @@ export type { Capacity, Clock, DamagedBox, DeviceMark, Lease, PasskeyProof, Seen
 export { Ciphered } from './crypto'
 export { VaultError, RefusalFamilyForKind, RefusalFamilyVals, RefusalKindVals, isVaultCondition, isVaultError } from './errors'
 export type { RefusalFamily, RefusalKind, RefusalMeta, VaultErrorOpts } from './errors'
-export { outcomeOf } from './outcome'
+export { outcomeOf, unexpectedError, valOf } from './outcome'
 export type { BadOutcome, GoodOutcome, Outcome } from './outcome'
 export { VaultDB } from './vault-db'
 export { localVaultDB } from './local-vault-db'

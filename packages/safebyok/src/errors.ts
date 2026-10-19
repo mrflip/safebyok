@@ -8,7 +8,7 @@ import type { Capacity, DamagedBox, VaultProps } from './types'
  *
  * - **Misuse**: a programming error, the host developer's to fix, and loud. `bad_label`,
  *   `bad_whisper`, `bad_option`, `bad_record`, `vault_closed`, `unknown_key_deriver`,
- *   `insecure_context`. Let it reach an error boundary or the dev overlay; do not show it to the
+ *   `insecure_context`, `unexpected_error`. Let it reach an error boundary or the dev overlay; do not show it to the
  *   user, and do not retry.
  * - **Condition**: something the app handles at run time, which may reach the user: ask again,
  *   show a message, retry, or tell them to free room. `vault_locked`, `wrong_passphrase`,
@@ -110,6 +110,7 @@ export const RefusalKindVals = [
   'newer_format',        // a stored vault in a form this version does not know, which a newer one may have written
   'unknown_key_deriver', // the vault names a key deriver this handle was not built with
   'insecure_context',    // the page is not a secure context (plain http), where the browser withholds WebCrypto
+  'unexpected_error',    // something threw that is no refusal: a bug, in safebyok or in a function the app handed it
   'stale_write',         // storage changed since this device read it, so the write was refused
   'rolled_back',         // storage handed back an older copy of the vault than this device has seen, which it refuses to use
   'not_permitted',       // the storage backend refused the signed-in user this call: not theirs to make
@@ -166,6 +167,7 @@ export const RefusalFamilyForKind = {
   newer_format:        'bad_news',
   unknown_key_deriver: 'misuse',
   insecure_context:    'misuse',
+  unexpected_error:    'misuse',
   stale_write:         'condition',
   rolled_back:         'bad_news',
   not_permitted:       'condition',

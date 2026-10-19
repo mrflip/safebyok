@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { VaultError } from '../src/errors'
-import { type Outcome, bad, good, outcomeOf, valOf } from '../src/outcome'
+import { type Outcome, bad, good, isOutcomeShaped, outcomeOf, unexpectedError, valOf } from '../src/outcome'
 import * as Refusals from '../src/refusals'
 
 /** An app's own call, which rejects: what outcomeOf's first example wraps. */
@@ -81,6 +81,71 @@ describe("outcomeOf", () => {
     expect(ok).to.be.false
     expect(val).to.be.undefined
     expect(err?.message).to.not.include('main')
+  })
+})
+
+/** A VaultError as another copy of safebyok makes one: a class of its own, named and kinded alike. */
+class OtherVaultError extends Error {
+  readonly refusalkind: string
+
+  constructor(refusalkind: string) {
+    super('Refused by another copy of safebyok.')
+    this.name = 'VaultError'
+    this.refusalkind = refusalkind
+  }
+}
+
+describe("outcomeOf, told otherwise", () => {
+  it("turns a throw that is no VaultError into what otherwise makes of it, as its third example shows", async () => {
+    const parseImport = (file: string): string => { throw new TypeError(`cannot parse ${file}`) }
+    const { err } = await outcomeOf(() => parseImport('backup.json'), unexpectedError)
+    expect(err?.refusalkind).to.eq('unexpected_error')
+    expect(err?.family).to.eq('misuse')
+    expect(err?.cause).to.be.instanceOf(TypeError)
+  })
+
+  it("keeps a VaultError as it came, whatever otherwise would make", async () => {
+    const refusal = new VaultError('absent_box', 'No box under that label.')
+    const kept = await outcomeOf(() => { throw refusal }, unexpectedError)
+    expect(kept.err).to.eq(refusal)
+  })
+
+  it("keeps a VaultError of another copy of safebyok, one class per copy, told by its name and kind", async () => {
+    const foreign = new OtherVaultError('not_permitted')
+    const kept = await outcomeOf(() => { throw foreign })
+    expect(kept.err).to.eq(foreign)
+    const impostor = new OtherVaultError('no_such_kind')
+    const wrapped = await outcomeOf(() => { throw impostor })
+    expect(wrapped.err?.refusalkind).to.eq('storage_unavailable')
+  })
+})
+
+describe("unexpectedError", () => {
+  it("makes a misuse refusal of a bug, the thrown value its cause, as its example shows", () => {
+    const thrown = new TypeError("Cannot read properties of undefined (reading 'wayins')")
+    const err = unexpectedError(thrown)
+    expect(err).to.include({ refusalkind: 'unexpected_error', family: 'misuse', cause: thrown })
+    expect(err.message).to.match(/did not expect/)
+  })
+
+  it("keeps a cause that is never null, for a throw of nothing", () => {
+    expect(unexpectedError(undefined).cause).to.be.instanceOf(Error)
+  })
+})
+
+describe("isOutcomeShaped", () => {
+  it("knows an answer handed up still wrapped, as its example shows", () => {
+    const answered = good({ vault_id: 'vault-id-u1' })
+    const refused = bad(Refusals.staleWrite('box'))
+    expect(isOutcomeShaped(answered)).to.be.true
+    expect(isOutcomeShaped(refused)).to.be.true
+  })
+
+  it("takes no record for one: a record, null, a boolean, a bag with ok alone", () => {
+    expect(isOutcomeShaped({ vault_id: 'vault-id-u1' })).to.be.false
+    expect(isOutcomeShaped(null)).to.be.false
+    expect(isOutcomeShaped(true)).to.be.false
+    expect(isOutcomeShaped({ ok: true })).to.be.false
   })
 })
 
