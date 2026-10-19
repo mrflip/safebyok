@@ -1,13 +1,10 @@
 # Thread B3: box (2026-10-19)
 
-Branch `20261019-box`, [PR #202](https://github.com/mrflip/safebyok/pull/202), stacked on [#195](https://github.com/mrflip/safebyok/pull/195) (`20261019-outcome_adapters`). Justify: green; core 2439 tests (35 skipped), every package green, size within every line.
+Branch `20261019-box`, [PR #202](https://github.com/mrflip/safebyok/pull/202), stacked on [#201](https://github.com/mrflip/safebyok/pull/201) (`20261019-proof_wayin`, B1) since the restack. Justify: green; core 2524 tests (35 skipped), react 263, every package green, size within every line.
 
 * **Built**:
-  * `utils.ts`: `adorn<VT>(obj, val: VT): VT` and `decorate<OT>(obj: OT, props: Partial<OT>): OT`,
-    their own commit, exported from `safebyok/utils`. `decorate` defines each own entry of `props`
-    on `obj` with `Object.defineProperty`: non-enumerable, non-writable, non-configurable; returns
-    `obj`. `adorn` does the same with `val`'s entries and returns `val` (a guess at the Coach's
-    meaning: the signature names no key). Only `decorate` is used. **B1's pair wins at the restack.**
+  * `utils.ts`'s `adorn` and `decorate` were B3's first commit; B1 took the same form, and the
+    commit dropped out at the restack.
   * `box.ts` is the class. The Zod schema is **`BoxRecord`** (was `Box`; the stored format,
     `safebyok-box-v6`, unchanged), and **`Box`** is the model:
     * `Box.make(vault, record, holder)`: validates through `BoxRecord` (`bad_record`, quoting nothing, no
@@ -47,7 +44,7 @@ Branch `20261019-box`, [PR #202](https://github.com/mrflip/safebyok/pull/202), s
     the thread text's `make(record)` and `seal(boxlabel, ..., vault, ...)`: the Contract is the spec.
   * **`vault.clock` is the vault's checked clock** (`{ now: () => this.#clockNow() }`), not the
     host's raw one: a box reading a clock that fails drops the key as the vault's own readings do.
-    Same shape as B1's `get clock()`; at the restack keep this body.
+    Frozen since the first review; kept over B1's at the restack.
   * **`props` and `summary` hidden like `vault`**: `Object.keys(box)` is exactly the stored fields
     (sidecar parsed), so a log line shows each once; `JSON.stringify(box)` is the record.
   * **`box.vault` typed `BoxVault`**, the slice, not `Vault`: what a box may lean on is explicit,
@@ -62,8 +59,7 @@ Branch `20261019-box`, [PR #202](https://github.com/mrflip/safebyok/pull/202), s
     freezes every node as the platform's parse builds it; the listing re-parses the sidecar's
     stable JSON the same way. No hand-rolled walker, no dependency.
 * **Deviations**:
-  * The `openBox` example `vault.openBox(err.meta.box_stored)` is left out: no layer fills
-    `box_stored` yet (C1).
+  * `openBox`'s example `vault.openBox(err.meta.box_stored)` is left out: no layer fills it yet (C1).
   * `vault.openBox` accepts a `BoxRecord` as well as a `Box`, so a VaultDB's answer opens as it comes.
 * **Discoveries**:
   * **`isOutcomeShaped` is not moot**: it runs in the VaultDB base on an adapter's raw answer, before
@@ -80,13 +76,22 @@ Branch `20261019-box`, [PR #202](https://github.com/mrflip/safebyok/pull/202), s
   `heldListing` is where a tombstone would be filtered out of `vault.boxes`.
 * **For the Coach**:
   * **`Box` -> `BoxRecord`** for the schema, in every adapter and the Convex mirror. Rec: keep.
-  * **`adorn`'s meaning** was a guess; B1's pair replaces mine. Rec: B1's wins.
   * **`vault.clock` checked** rather than the host's raw clock. Rec: keep.
   * **`box.vault` typed as the slice `BoxVault`**; **`props`, `summary` hidden**. Rec: keep both.
   * **Contract drift**, nine items, in [thread-B3-box-drift.md](thread-B3-box-drift.md). Rec: carry each.
-* **Test counts** (vitest JSON reporter; total includes skipped): core 2378 (35 skipped) at base
-  `19c0cc87`, 2439 (35) at the tip: `tests/box.test.ts` 28 to 72, `tests/utils.test.ts` 3 to 9,
-  `tests/vault/vault-boxes.test.ts` 102 to 113 (1,197 lines); every other file and package the
-  same (one Convex validator test retitled `BoxRecord: ...`). After the review's fixes (`829dd9df`,
-  2441) the rework tips at 2443 (35): `box.test.ts` 73 to 74, `vault-boxes.test.ts` 114 to 115.
+* **Restack onto B1** ([#201](https://github.com/mrflip/safebyok/pull/201), 2026-10-19). B3's
+  `adorn`/`decorate` commit dropped out empty (B1's pair is byte-identical). Conflicts: imports
+  (B1's `*Record` wayin names and `PasskeyAnswer`, B3's `BoxRecord` and box helpers), `index.ts`
+  and its test (both sets of exports), the vault's proofs section (B1 moved it to `proof.ts`), the
+  vocabulary banner (B3's), `notes/security.md` (both entries). One copy of each getter; `clock`
+  is B3's frozen one. **One props source**: the vault freezes every vault props record as it takes
+  it up (`frozenVaultProps`, at the refresh's read, the creating unlock, and a change to the ways
+  in), so `#vaultProps` is both authoritative and frozen: boxes take it through
+  `#currentVaultProps()`, ways in are made over it (`#wayinsOf`, one per record), and the
+  snapshot's `props` is it. B1's separate frozen copy (`#modelsOf`) is gone. New test in
+  `tests/vault/vault-wayins.test.ts`: frozen through, and each way in's holder, whether the vault
+  made, read or rewrote the record.
+* **Test counts** (total includes skipped): core 2378 (35 skipped) at base `19c0cc87`; B3's own
+  tip 2445: `box.test.ts` 28 to 74, `utils.test.ts` 3 to 9, `vault-boxes.test.ts` 102 to 115+.
+  Restacked on B1: 2524 (35).
 * **Size**: no line moved; `everything` 38.85 of 41 kB.
