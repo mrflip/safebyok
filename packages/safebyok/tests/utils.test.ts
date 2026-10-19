@@ -17,63 +17,56 @@ describe("the utils entry point", () => {
   })
 })
 
-describe("adorn", () => {
-  it("hands back what it attached, which JSON.stringify then leaves out, as its example shows", () => {
-    const vault = { vaultlabel: 'main' }
-    const wayin = { wayin_id: 'w1' }
-    expect(utils.adorn(wayin, 'vault', vault)).to.eq(vault)
-    expect((wayin as { vault?: unknown }).vault).to.eq(vault)
-    expect(JSON.stringify(wayin)).to.eq('{"wayin_id":"w1"}')
+type Handle = { label: string, vault?: { vault_id: string } }
+
+const decorated = () => utils.decorate<Handle>({ label: 'anthropic' }, { vault: { vault_id: 'v1' } })
+
+describe("decorate", () => {
+  it("attaches each entry, readable by name, and hands the object back, as its example shows", () => {
+    const handle: Handle = { label: 'anthropic' }
+    expect(utils.decorate(handle, { vault: { vault_id: 'v1' } })).to.equal(handle)
+    expect(handle.vault).to.deep.equal({ vault_id: 'v1' })
   })
 
-  it("hides the property from Object.keys and a spread, and keeps it out of a for-in", () => {
-    const thing = { seen: 1 }
-    utils.adorn(thing, 'hidden', 2)
-    const walked: string[] = []
-    for (const ckey in thing) { walked.push(ckey) }
-    expect(Object.keys(thing)).to.deep.equal(['seen'])
-    expect({ ...thing }).to.deep.equal({ seen: 1 })
-    expect(walked).to.deep.equal(['seen'])
+  it("hides what it attaches from keys, a spread and JSON, as its example shows", () => {
+    const handle = decorated()
+    expect(Object.keys(handle)).to.deep.equal(['label'])
+    expect({ ...handle }).to.deep.equal({ label: 'anthropic' })
+    expect(JSON.stringify(handle)).to.eq('{"label":"anthropic"}')
   })
 
-  it("makes the property read-only: an assignment throws, and the value stands", () => {
-    const thing = {}
-    utils.adorn(thing, 'vault', 'the vault')
-    expect(() => { (thing as { vault: string }).vault = 'another' }).to.throw(TypeError)
-    expect((thing as { vault: string }).vault).to.eq('the vault')
+  it("keeps an object that refers back to its owner out of a circle when serialized", () => {
+    const owner = { label: 'vault' }
+    const handle = utils.decorate<{ label: string, owner?: unknown }>({ label: 'box' }, { owner })
+    utils.decorate<{ label: string, handle?: unknown }>(owner, { handle })
+    expect(JSON.stringify(handle)).to.eq('{"label":"box"}')
   })
 
-  it("leaves the property configurable, so a later adorn stands a double in", () => {
-    const thing = {}
-    utils.adorn(thing, 'clock', 'real')
-    utils.adorn(thing, 'clock', 'double')
-    expect((thing as { clock: string }).clock).to.eq('double')
-    expect(Object.getOwnPropertyDescriptor(thing, 'clock')).to.deep.equal({ value: 'double', enumerable: false, writable: false, configurable: true })
+  it("lets nothing write over, or delete, what it attached", () => {
+    const handle = decorated()
+    expect(Reflect.set(handle, 'vault', { vault_id: 'v2' })).to.be.false
+    expect(Reflect.deleteProperty(handle, 'vault')).to.be.false
+    expect(Reflect.defineProperty(handle, 'vault', { value: null })).to.be.false
+    // A module is strict code, where an assignment to a fixed property throws.
+    expect(() => { (handle as { vault: unknown }).vault = null }).to.throw(TypeError)
+    expect(handle.vault).to.deep.equal({ vault_id: 'v1' })
+  })
+
+  it("leaves the object as it was for an empty set of entries", () => {
+    const handle: Handle = { label: 'anthropic' }
+    utils.decorate(handle, {})
+    expect(Object.getOwnPropertyNames(handle)).to.deep.equal(['label'])
   })
 })
 
-describe("decorate", () => {
-  it("attaches every entry hidden, and hands back the object, as its example shows", () => {
-    class Model { declare readonly vault: string; declare readonly props: { wayin_id: string }; readonly wayin_id = 'w1' }
-    const model = new Model()
-    const record = Object.freeze({ wayin_id: 'w1' })
-    expect(utils.decorate(model, { vault: 'the vault', props: record })).to.eq(model)
-    expect(model.vault).to.eq('the vault')
-    expect(model.props).to.eq(record)
-    expect(Object.keys(model)).to.deep.equal(['wayin_id'])
-    expect(JSON.stringify(model)).to.eq('{"wayin_id":"w1"}')
-  })
-
-  it("makes each read-only, as adorn does", () => {
-    const thing: { logger?: string } = {}
-    utils.decorate(thing, { logger: 'quiet' })
-    expect(() => { thing.logger = 'loud' }).to.throw(TypeError)
-    expect(thing.logger).to.eq('quiet')
-  })
-
-  it("attaches nothing for an empty bag", () => {
-    const thing = { seen: 1 }
-    utils.decorate(thing, {})
-    expect(Object.getOwnPropertyNames(thing)).to.deep.equal(['seen'])
+describe("adorn", () => {
+  it("attaches each entry hidden and fixed, and hands back the entries, as its example shows", () => {
+    const handle = { label: 'anthropic' }
+    const logger = { log: () => undefined }
+    const adorned = utils.adorn(handle, { logger })
+    expect(adorned.logger).to.equal(logger)
+    expect((handle as { logger?: unknown }).logger).to.equal(logger)
+    expect({ ...handle }).to.deep.equal({ label: 'anthropic' })
+    expect(Reflect.set(handle, 'logger', null)).to.be.false
   })
 })
