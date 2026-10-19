@@ -300,7 +300,7 @@ describe("hello", () => {
     })
   }
 
-  it("reads afresh once the vault is retired", async () => {
+  it("reads afresh once the vault is deleted", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.del()
@@ -849,10 +849,10 @@ describe("a hello that fails", () => {
 
   const DeviceVerbCases = [
     // what each verb's failure says it was doing:
-    ["getLease",    /reading the lease it keeps/,         'reading the lease'],
+    ["getLease",   /reading the lease it keeps/,         'reading the lease'],
     ["putLease",   /writing the lease it keeps/,         'writing the lease'],
     ["delLease",   /erasing the lease it keeps/,         'erasing the lease'],
-    ["getMark",     /reading its mark of this vault/,     "reading the device's mark"],
+    ["getMark",    /reading its mark of this vault/,     "reading the device's mark"],
     ["putMark",    /writing its mark of this vault/,     "writing the device's mark"],
     ["delMark",    /erasing its mark of this vault/,     "erasing the device's mark"],
     ["delAll",     /erasing everything it keeps/,        'erasing everything'],

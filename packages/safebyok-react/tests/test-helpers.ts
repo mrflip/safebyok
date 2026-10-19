@@ -38,7 +38,7 @@ export type StubVaultOpts = {
   wayins?:          WayinSummary[]
   leaseMillis?:     number
   unlock?:          Vault['unlock']
-  del?:          Vault['del']
+  del?:             Vault['del']
 }
 
 /** The lease, in milliseconds, of a vault opened with the default leaseHours. */
@@ -60,7 +60,7 @@ export const stubVault = (opts: StubVaultOpts = {}): Vault => {
     subscribe:       () => unsubscribeFromNothing,
     leaseMillis:     opts.leaseMillis ?? DefaultLeaseMillis,
     unlock:          opts.unlock,
-    del:          opts.del,
+    del:             opts.del,
   } as unknown as Vault
 }
 

@@ -143,7 +143,7 @@ describe("idbVaultDB", () => {
     expect(listed[1]).to.include({ boxlabel: 'openai', damaged: false })
   })
 
-  it("retires a row that is no box, listed with no revision, as the one a retirement naming none means", async () => {
+  it("deletes a row that is no box, listed with no revision, as the one a deletion naming none means", async () => {
     const dbName = TH.freshDbName()
     await set(Ckeys.vaultProps(TH.scopeOf('u1')), TH.vaultPropsOf('u1'), rawShelf(dbName))
     await set(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), 'not a box', rawShelf(dbName))
@@ -166,7 +166,7 @@ describe("idbVaultDB", () => {
     await TH.expectRefusal(idbVaultDB({ dbName }).putVaultProps(TH.vaultPropsOf('u1', { unlock_epoch: 2 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'stale_write')
   })
 
-  it("retires a vault whose vault props are damaged -- delDamagedVault reads its vault_id as stored -- and only that vault", async () => {
+  it("deletes a vault whose vault props are damaged -- delDamagedVault reads its vault_id as stored -- and only that vault", async () => {
     const dbName = TH.freshDbName()
     const vaultDB = idbVaultDB({ dbName })
     for (const user of ['u1', 'u2']) {
@@ -275,7 +275,7 @@ describe("idbVaultDB", () => {
 describe("idbVaultDB, every verb one transaction", () => {
   const scope = TH.scopeOf('u1')
 
-  it("retires a vault's boxes by a key range over its prefix, leaving every other vault's rows", async () => {
+  it("deletes a vault's boxes by a key range over its prefix, leaving every other vault's rows", async () => {
     const dbName = TH.freshDbName()
     const vaultDB = idbVaultDB({ dbName })
     const lookalike = TH.scopeOf('u1","main')
@@ -301,7 +301,7 @@ describe("idbVaultDB, every verb one transaction", () => {
     ].toSorted((one, two) => one.localeCompare(two)))
   })
 
-  it("retires a whole vault or none of it: a deletion failing midway undoes the ones before it", async () => {
+  it("deletes a whole vault or none of it: a deletion failing midway undoes the ones before it", async () => {
     const dbName = TH.freshDbName()
     const vaultDB = idbVaultDB({ dbName })
     await vaultDB.ensureVaultProps(TH.vaultPropsOf('u1'))
@@ -335,7 +335,7 @@ describe("idbVaultDB's subscribe", () => {
     expect(heardCount).to.eq(1)
   })
 
-  it("rings for a retirement that removed a box, and for none that found nothing to remove", async () => {
+  it("rings for a deletion that removed a box, and for none that found nothing to remove", async () => {
     const vaultDB = idbVaultDB({ dbName: TH.freshDbName() })
     await vaultDB.ensureVaultProps(TH.vaultPropsOf('u1'))
     await vaultDB.putBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet)

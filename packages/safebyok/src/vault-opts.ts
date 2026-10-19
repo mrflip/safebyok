@@ -116,7 +116,7 @@ const anyOpt = Z.optional(Z.unknown())
 /**
  * Every option Vault.make takes, each checked by a parse of its own: this check refuses any other.
  * An option quietly ignored could leave the vault less safe than the host asked -- a lease setting
- * under its retired name would leave the default seven days -- so a misspelt option, or one this
+ * under its deleted name would leave the default seven days -- so a misspelt option, or one this
  * version no longer takes, is refused instead.
  */
 const makeVaultOptsShape = Z.strictObject({
@@ -129,7 +129,7 @@ const makeVaultOptsShape = Z.strictObject({
   leaseHours:             anyOpt,
   clock:                  anyOpt,
   maxWhisperBytes:        anyOpt,
-  maxBoxes:           anyOpt,
+  maxBoxes:               anyOpt,
   logger:                 anyOpt,
   validators:             anyOpt,
   passphraseStrengthTest: anyOpt,
@@ -163,15 +163,15 @@ export const checkKnownOpts = (opts: object) => {
  * keeps the adapter.
  */
 const vaultDBShape = Z.object({
-  getVaultProps:          Z.custom(isFunction),
+  getVaultProps:    Z.custom(isFunction),
   ensureVaultProps: Z.custom(isFunction),
-  putVaultProps:        Z.custom(isFunction),
-  getBox:                 Z.custom(isFunction),
-  listBoxes:               Z.custom(isFunction),
-  putBox:               Z.custom(isFunction),
-  delBox:               Z.custom(isFunction),
-  delVault:             Z.custom(isFunction),
-  subscribe:               Z.custom(isFunction),
+  putVaultProps:    Z.custom(isFunction),
+  getBox:           Z.custom(isFunction),
+  listBoxes:        Z.custom(isFunction),
+  putBox:           Z.custom(isFunction),
+  delBox:           Z.custom(isFunction),
+  delVault:         Z.custom(isFunction),
+  subscribe:        Z.custom(isFunction),
 })
 
 export const parseVaultDB = (candidate: VaultDB): VaultDB => {
@@ -183,10 +183,10 @@ export const parseVaultDB = (candidate: VaultDB): VaultDB => {
 
 /** What a DeviceDB must carry. Checked only: Vault.make keeps the device store it was handed. */
 const deviceDBShape = Z.object({
-  getLease:  Z.custom(isFunction),
+  getLease: Z.custom(isFunction),
   putLease: Z.custom(isFunction),
   delLease: Z.custom(isFunction),
-  getMark:   Z.custom(isFunction),
+  getMark:  Z.custom(isFunction),
   putMark:  Z.custom(isFunction),
   delMark:  Z.custom(isFunction),
   delAll:   Z.custom(isFunction),
@@ -262,7 +262,7 @@ const declaredBoxes = Z.pipe(someBoxes, Z.transform((count: number) => Math.min(
 const DeclaredLimitFor = {
   maxRecordBytes: declaredBytes,
   maxVaultBytes:  declaredBytes,
-  maxBoxes:   declaredBoxes,
+  maxBoxes:       declaredBoxes,
 } as const
 
 const HourMillis = 60 * MinuteMillis
@@ -395,7 +395,7 @@ export const parseDeclared = (vaultDB: VaultDB, limitname: keyof typeof Declared
 
 /**
  * Refuse limits the storage adapter might not honour: a whisper too large for one of its records,
- * or a vault too large for it to hold, list and retire whole.
+ * or a vault too large for it to hold, list and delete whole.
  *
  * @returns The most the adapter holds of one vault, in the finite form the vault keeps.
  */

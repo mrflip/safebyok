@@ -28,7 +28,7 @@ export type VaultFieldArgs = {
   scope?:    unknown
   boxlabel?: unknown
   vaultProps?: unknown
-  box?:  unknown
+  box?:      unknown
   expected?: unknown
 }
 
@@ -41,16 +41,16 @@ export type VaultFieldResolver<ContextT> = (parent: unknown, args: VaultFieldArg
  */
 export type VaultResolvers<ContextT> = {
   Query: {
-    safebyokGetVaultProps: VaultFieldResolver<ContextT>
-    safebyokGetBox:        VaultFieldResolver<ContextT>
-    safebyokListBoxes:      VaultFieldResolver<ContextT>
+    safebyokGetVaultProps:    VaultFieldResolver<ContextT>
+    safebyokGetBox:           VaultFieldResolver<ContextT>
+    safebyokListBoxes:        VaultFieldResolver<ContextT>
   }
   Mutation: {
     safebyokEnsureVaultProps: VaultFieldResolver<ContextT>
-    safebyokPutVaultProps:        VaultFieldResolver<ContextT>
-    safebyokPutBox:               VaultFieldResolver<ContextT>
-    safebyokDelBox:               VaultFieldResolver<ContextT>
-    safebyokDelVault:             VaultFieldResolver<ContextT>
+    safebyokPutVaultProps:    VaultFieldResolver<ContextT>
+    safebyokPutBox:           VaultFieldResolver<ContextT>
+    safebyokDelBox:           VaultFieldResolver<ContextT>
+    safebyokDelVault:         VaultFieldResolver<ContextT>
   }
   Subscription: {
     safebyokVaultChanged: {

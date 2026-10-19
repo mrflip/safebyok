@@ -20,15 +20,15 @@ export default defineSchema({
     .index('by_box', ['user_id', 'applabel', 'vaultlabel', 'boxlabel']),
   /**
    * One tally per vault: how many boxes it holds and what they weigh as Convex counts bytes,
-   * kept in step by every box write and retire, so a write checks the vault's limits without
+   * kept in step by every box write and delete, so a write checks the vault's limits without
    * reading the vault. Filed under its vault row, so a vault made anew starts a tally of its
    * own. A vault with no tally yet -- one written before tallies were kept -- is counted at its
    * next box write.
    */
   safebyok_vault_tallies: defineTable({
-    vault_row_id:  v.id('safebyok_vaults'),
-    box_count: v.number(),
-    box_bytes: v.number(),
+    vault_row_id: v.id('safebyok_vaults'),
+    box_count:    v.number(),
+    box_bytes:    v.number(),
   })
     .index('by_vault_row', ['vault_row_id']),
 })

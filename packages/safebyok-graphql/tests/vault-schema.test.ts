@@ -17,9 +17,9 @@ const RecordTypes = [
   ['SafebyokVaultScopeInput',    VaultScope,  []],
   ['SafebyokVaultProps',         VaultProps, []],
   ['SafebyokVaultPropsInput',    VaultProps, []],
-  ['SafebyokBox',            Box,     []],
-  ['SafebyokBoxInput',       Box,     []],
-  ['SafebyokListedBox',      Box,     ['box_key_wrapped', 'whisper_ciphered']],
+  ['SafebyokBox',                Box,         []],
+  ['SafebyokBoxInput',           Box,         []],
+  ['SafebyokListedBox',          Box,         ['box_key_wrapped', 'whisper_ciphered']],
   ['SafebyokCiphered',           Ciphered,    []],
   ['SafebyokCipheredInput',      Ciphered,    []],
 ] as const

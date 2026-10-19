@@ -225,7 +225,7 @@ describe("a vault over convexVaultDB, opened before sign-in", () => {
 
 describe("a vault over convexVaultDB, when its user signs out", () => {
   for (const [clientTitle, connect] of ClientCases) {
-    it(`locks over a ${clientTitle} while idle, revoking its lease, and retires nothing`, async () => {
+    it(`locks over a ${clientTitle} while idle, revoking its lease, and deletes nothing`, async () => {
       const deployment = deploy()
       const spy = TH.spyLogger()
       const deviceDB = memoryDeviceDB()
@@ -252,7 +252,7 @@ describe("a vault over convexVaultDB, on two devices", () => {
   const anthropicKey = 'sk-ant-test-not-a-real-key'
   const openaiKey = { apiKey: 'sk-test-not-a-real-key', orgId: null }
 
-  it("is made on one device, written, read on another, re-passphrased, and retired, each device hearing the other", async () => {
+  it("is made on one device, written, read on another, re-passphrased, and deleted, each device hearing the other", async () => {
     const deployment = deploy()
     const laptop = await openOver(deployment.client('u1'), deployment.api.safebyok)
     const phone = await openOver(connectReact(deployment, 'u1'), deployment.api.safebyok)
@@ -288,7 +288,7 @@ describe("a vault over convexVaultDB, on two devices", () => {
     await phone.unlock(NewPassphrase)
     expect(await phone.getBox('anthropic_api_key')).to.deep.equal(anthropicKey)
 
-    // The phone retires the vault; the laptop hears it gone.
+    // The phone deletes the vault; the laptop hears it gone.
     await phone.del()
     await vi.waitFor(() => { expect(laptop.getSnapshot().state).to.eq('absent') })
     laptop.close()

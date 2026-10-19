@@ -200,7 +200,7 @@ export class RouteVaultDB extends VaultDB {
 
   // A stale write refuses on the server and crosses as its kind, so a write that answers landed:
   // a box write answers with the box as the server's storage holds it, and a box
-  // retirement with what it removed.
+  // deletion with what it removed.
   private async call(verb: string, ...args: unknown[]): Promise<unknown> {
     const response = await fetch(VaultRouteUrl, {
       method:  'POST',
@@ -239,11 +239,11 @@ const isKind = (kind: unknown): kind is VaultErrorKind => (VaultErrorKindVals as
     past its limit. Writers racing for the last places may each count room and all land: with
     `N` racers one place short of the limit, up to `N - 1` more than it, never an unbounded
     number. That is what the limit is for -- stopping a runaway loop, and keeping a vault inside
-    what can be listed and retired -- and not for holding off a determined client, whose quota is
+    what can be listed and deleted -- and not for holding off a determined client, whose quota is
     yours to meter like any other abuse.
   * **A refused write stored nothing.** The refusal is the `WHERE` of one atomic statement.
   * **No box is lost.** Every box that landed reads back by its boxlabel and appears in
-    the listing, past the limit as under it; retiring boxes brings the vault back under, and a
+    the listing, past the limit as under it; deleting boxes brings the vault back under, and a
     new box lands again.
   * **The count a write checks is the vault's, as of the start of its statement.** A write reports
     no count; the vault learns it from the listing it reads after every write.
@@ -283,7 +283,7 @@ Its trigger sends a notification on the channel `VaultChangeChannel` (`safebyok_
 after every write that changes a vault, its payload the vault's scope as JSON: no record, nothing
 ciphered. **Why a trigger**: Postgres tells another connection of a write only by `NOTIFY`, and a
 trigger sends one from inside every write to the two tables, whatever made it -- any of your
-servers, another version of this adapter, your own SQL, a retired vault's cascade -- and Postgres
+servers, another version of this adapter, your own SQL, a deleted vault's cascade -- and Postgres
 delivers it only once that write commits. It is the one trigger this package ships; the hard cap
 above is one you would write and own. A `listen` without the trigger hears nothing, by design,
 and says nothing of it; the trigger without a `listen` costs a notification nobody hears. A
@@ -337,10 +337,10 @@ would rewrite it. Nothing is normalized: a sidecar or a user id reads back byte 
 must, since every field a record holds is bound into its encryption (all but the vault props'
 `unlock_epoch` and which wayins their `wayins` holds).
 
-| Table                | One row per | Primary key                                     | Columns                                                                                                |
-| -------------------- | ----------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `safebyok_vaults`    | vault       | `applabel`, `user_id`, `vaultlabel`             | every field of the `VaultProps`                                                                        |
-| `safebyok_boxes` | box     | `applabel`, `user_id`, `vaultlabel`, `boxlabel` | the vault's scope and `vault_id`, then every field of the `Box`; its sidecar as `text`             |
+| Table             | One row per | Primary key                                     | Columns                                                                                |
+| ----------------- | ----------- | ----------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `safebyok_vaults` | vault       | `applabel`, `user_id`, `vaultlabel`             | every field of the `VaultProps`                                                        |
+| `safebyok_boxes`  | box         | `applabel`, `user_id`, `vaultlabel`, `boxlabel` | the vault's scope and `vault_id`, then every field of the `Box`; its sidecar as `text` |
 
 * **Encrypted**: each whisper (`whisper_ciphered`), each box's boxKey
   (`box_key_wrapped`), and the vaultKey, once under each way into the vault (each
@@ -352,8 +352,8 @@ must, since every field a record holds is bound into its encryption (all but the
 * **Never**: a whisper, a passphrase, any key in usable form, or the device-local lease. No history: an update replaces its row (your database's backups and WAL keep what
   they keep).
 * **A box stands only beside its vault props**, under the same `vault_id`: the foreign key
-  retires a vault's boxes with its props, in one statement, and refuses a box written for
-  a vault since retired and made anew.
+  deletes a vault's boxes with its props, in one statement, and refuses a box written for
+  a vault since deleted and made anew.
 * **Row-level security is on, with no policy**: the tables' owner -- the role your server
   connects as -- reaches them as before, and every other role reaches no row. To serve the
   tables to another role, give it a policy of your own, or connect as their owner.
@@ -384,18 +384,18 @@ shape of table, copy it, and keep to what makes it right:
 
 * **Extend `VaultDB` and write its `do*` methods**, never its public verbs: the base class checks
   labels and scope on the way in, validates every record and answer on the way out, and turns a
-  `false` (from a box write or retirement, a `null`) into `stale_write` and anything you
+  `false` (from a box write or deletion, a `null`) into `stale_write` and anything you
   throw into `storage_unavailable`.
 * **One statement per verb**, so each is atomic without a transaction: the expectation goes in
   the `WHERE` (`UPDATE ... WHERE vault_id = $ AND unlock_epoch = $ RETURNING 1`), and a row
   back means it landed. A box write returns the row's columns (`RETURNING format, boxlabel,
   ...`): the box as stored, which the base class reads back as it would a read. A box
-  retirement deletes whatever stands within the expected vault and returns its `revision_tok`
+  deletion deletes whatever stands within the expected vault and returns its `revision_tok`
   (`DELETE ... RETURNING revision_tok`), so it can say whether it removed the revision the device
   named, another, or none. A create returns the row that stands with `ON CONFLICT ... DO UPDATE`
   (a no-op update), since `DO NOTHING` returns no row when another device got in first.
 * **Let the schema hold the vault together.** The box's foreign key names its vault row down
-  to the `vault_id`, so a box cannot outlive its vault or land in one made anew, and retiring
+  to the `vault_id`, so a box cannot outlive its vault or land in one made anew, and deleting
   a vault is one `DELETE` of its vault row.
 * **Store each record a column to a field**, and compare only the scope, `boxlabel`, `vault_id`,
   `unlock_epoch`, `vault_key_epoch` and `revision_tok`. `src/columns.ts` names each record's columns once, the
@@ -408,7 +408,7 @@ shape of table, copy it, and keep to what makes it right:
   all land. The contract allows that (line 4.2), and costs nothing. Have the insert answer, from
   its one snapshot, why it missed -- the vault stood, the boxlabel was already taken, the vault
   was full -- so that no second read is needed to tell a full vault from a stale writer. And
-  map a foreign key violation (`23503`) on the insert to `stale_write`: a vault retired after the
+  map a foreign key violation (`23503`) on the insert to `stale_write`: a vault deleted after the
   statement's snapshot, before its foreign key check, is only a stale writer.
 * **Read the vault row `FOR SHARE` in a box write, and know why.** A box write compares
   the vault props' `vault_key_epoch` (contract line 3.8), a column no foreign key covers, and a

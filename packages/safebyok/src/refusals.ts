@@ -40,7 +40,7 @@ export type StaleWrite = typeof StaleWriteVals[number]
 const StaleWriteSaid: Readonly<Record<StaleWrite, string>> = {
   vaultProps: 'The vault changed in storage since this device read it -- its ways in were changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. Read the vault again before retrying.',
   box:    'That box changed in storage since this device read it -- another device or tab wrote or removed it, or the vault was made anew -- so this write was refused and nothing was written. Read it again before retrying.',
-  del:     'The vault changed in storage since this device read it -- it was deleted, or deleted and made anew, elsewhere -- so this removal was refused and nothing was removed. Read the vault again before retrying.',
+  del:    'The vault changed in storage since this device read it -- it was deleted, or deleted and made anew, elsewhere -- so this removal was refused and nothing was removed. Read the vault again before retrying.',
 }
 
 /**
@@ -48,7 +48,7 @@ const StaleWriteSaid: Readonly<Record<StaleWrite, string>> = {
  * base class throws it for an adapter's `false`; an adapter that hands each call on to another
  * VaultDB meets it as it is.
  *
- * @param what - The write refused: an update of the vault props, a box write, or a retirement.
+ * @param what - The write refused: an update of the vault props, a box write, or a deletion.
  * @returns The refusal, to throw.
  *
  * @example throw Refusals.staleWrite('box')
@@ -72,7 +72,7 @@ export const notPermitted = (message = "The vault's storage does not let the sig
 
 /**
  * A `vault_full` refusal: a box write past a limit the backend keeps on a vault, which wrote
- * nothing. The user retires a box, or the host raises the limit where the backend allows.
+ * nothing. The user deletes a box, or the host raises the limit where the backend allows.
  *
  * @param limit - The most boxes the backend keeps in one vault, when that is the limit met.
  * @param opts - `cause`: the backend's own refusal, when there is one.

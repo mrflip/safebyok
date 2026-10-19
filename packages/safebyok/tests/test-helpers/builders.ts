@@ -223,7 +223,7 @@ export const boxOf = (boxlabel: string, tag: string, overrides: Partial<Box> = {
   boxlabel,
   revision_tok:           `rev-${tag}`,
   vault_key_epoch:        1,
-  box_key_wrapped:    fakeCiphered(`boxkey-${tag}`),
+  box_key_wrapped:        fakeCiphered(`boxkey-${tag}`),
   whisper_ciphered:       fakeCiphered(`whisper-${tag}`),
   whisper_codec:          'json_v1',
   whisper_schema_version: 1,
@@ -272,7 +272,7 @@ export const summaryOf = (box: BoxSummary | DamagedBox | undefined): BoxSummary 
 export const noBoxYet = Object.freeze({ vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 1 } as const)
 
 /**
- * What a retirement of {@link vaultPropsOf}('u1')'s vault expects: that vault.
+ * What a deletion of {@link vaultPropsOf}('u1')'s vault expects: that vault.
  * Frozen, since every test shares it.
  *
  * @example vaultDB.delVault(TH.scopeOf('u1'), TH.thisVault)
@@ -280,8 +280,8 @@ export const noBoxYet = Object.freeze({ vault_id: 'vault-id-u1', revision_tok: n
 export const thisVault = Object.freeze({ vault_id: 'vault-id-u1' } as const)
 
 /**
- * What a retirement of a box in {@link vaultPropsOf}('u1')'s vault expects: that vault, and
- * the revision the retiring device read -- `rev-` and its tag, for a box {@link boxOf} made --
+ * What a deletion of a box in {@link vaultPropsOf}('u1')'s vault expects: that vault, and
+ * the revision the deleting device read -- `rev-` and its tag, for a box {@link boxOf} made --
  * or null, for one listed with none.
  *
  * @example vaultDB.delBox(TH.scopeOf('u1'), 'anthropic', TH.deleting('rev-one'))

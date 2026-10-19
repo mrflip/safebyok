@@ -19,15 +19,15 @@ type Caller = ReturnType<ReturnType<typeof createTest>['withIdentity']>
 
 /** One call of each of the nine functions, on `u1`'s vault, as `caller`. */
 const EveryCall: [string, (caller: Caller) => Promise<unknown>][] = [
-  ['getVaultProps',           (caller) => caller.query(api.safebyok.getVaultProps, { scope: u1 })],
+  ['getVaultProps',    (caller) => caller.query(api.safebyok.getVaultProps, { scope: u1 })],
   ['ensureVaultProps', (caller) => caller.mutation(api.safebyok.ensureVaultProps, { vaultProps: TH.vaultPropsOf('u1') })],
-  ['putVaultProps',        (caller) => caller.mutation(api.safebyok.putVaultProps, { vaultProps: TH.vaultPropsOf('u1', { unlock_epoch: 2 }), expected: { vault_id: 'vault-id-u1', unlock_epoch: 1 } })],
-  ['getBox',                  (caller) => caller.query(api.safebyok.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })],
-  ['listBoxSummaries',        (caller) => caller.query(api.safebyok.listBoxSummaries, { scope: u1 })],
-  ['putBox',               (caller) => caller.mutation(api.safebyok.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a2'), expected: { vault_id: 'vault-id-u1', revision_tok: 'rev-a1', vault_key_epoch: 1 } })],
-  ['delBox',               (caller) => caller.mutation(api.safebyok.delBox, { scope: u1, boxlabel: 'anthropic_api_key', expected: TH.deleting('rev-a2') })],
-  ['delVault',             (caller) => caller.mutation(api.safebyok.delVault, { scope: u1, expected: TH.thisVault })],
-  ['watchVault',              (caller) => caller.query(api.safebyok.watchVault, { scope: u1 })],
+  ['putVaultProps',    (caller) => caller.mutation(api.safebyok.putVaultProps, { vaultProps: TH.vaultPropsOf('u1', { unlock_epoch: 2 }), expected: { vault_id: 'vault-id-u1', unlock_epoch: 1 } })],
+  ['getBox',           (caller) => caller.query(api.safebyok.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })],
+  ['listBoxSummaries', (caller) => caller.query(api.safebyok.listBoxSummaries, { scope: u1 })],
+  ['putBox',           (caller) => caller.mutation(api.safebyok.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a2'), expected: { vault_id: 'vault-id-u1', revision_tok: 'rev-a1', vault_key_epoch: 1 } })],
+  ['delBox',           (caller) => caller.mutation(api.safebyok.delBox, { scope: u1, boxlabel: 'anthropic_api_key', expected: TH.deleting('rev-a2') })],
+  ['delVault',         (caller) => caller.mutation(api.safebyok.delVault, { scope: u1, expected: TH.thisVault })],
+  ['watchVault',       (caller) => caller.query(api.safebyok.watchVault, { scope: u1 })],
 ]
 
 describe("SafebyokComponent.api, for the vault's own user", () => {

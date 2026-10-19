@@ -71,7 +71,7 @@ describe("convexVaultDB, as it is made", () => {
     expect(convexVaultDB({ client: deployment.client('u1'), api: deployment.api.safebyok }).maxRecordBytes).to.eq(1_048_576)
   })
 
-  it("holds at most half of what one Convex function may read in one vault, since retiring reads it twice", () => {
+  it("holds at most half of what one Convex function may read in one vault, since deleting reads it twice", () => {
     const deployment = deploy()
     expect(convexVaultDB({ client: deployment.client('u1'), api: deployment.api.safebyok }).maxVaultBytes).to.eq(8 * 1024 * 1024)
   })

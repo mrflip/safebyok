@@ -8,20 +8,20 @@ import { type MakeVaultOpts, isBag, parseVaultDB, parseDeviceDB } from './vault-
 export type DelDamagedVaultOpts = Pick<MakeVaultOpts, 'applabel' | 'userId' | 'vaultlabel' | 'vaultDB' | 'deviceDB' | 'validators'>
 
 /**
- * Retire a vault whose `hello()` refuses it as `damaged_vault`, and only that: its stored vault props
+ * Delete a vault whose `hello()` refuses it as `damaged_vault`, and only that: its stored vault props
  * and every box, through the VaultDB, and this device's lease of it and its device mark,
  * through the DeviceDB -- what `del()` does for a vault that opens, and nothing else. Vault
  * props that fail their checks cannot be opened, so no handle exists to `del()`; this is the
  * way to clear them and start over. Whatever the vault held is gone for good, so ask the user first.
  *
  * It takes the options `Vault.make` took, and refuses a vault that is sound: kind 'bad_option' and
- * nothing removed, since a vault that opens is retired with its handle's `del()`, which takes
+ * nothing removed, since a vault that opens is deleted with its handle's `del()`, which takes
  * the care of a handle that has seen the vault it deletes. With no vault stored it erases only the
  * device's lease and mark, so a call that was cut short can be made again. Kind 'damaged_vault'
  * when the record is too damaged to say which vault it is, which only the backend's own tools can
  * clear; 'stale_write' when the vault was replaced elsewhere meanwhile. Other refusals are
  * storage's: 'storage_unavailable', 'identity_revoked', 'not_permitted'. The device store failing
- * after the vault is retired is 'storage_unavailable' too, saying what failed: call again to finish
+ * after the vault is deleted is 'storage_unavailable' too, saying what failed: call again to finish
  * clearing the device -- or 'storage_blocked', which calling again cannot mend until the
  * browser lets the device keep its storage. Misuse is refused before
  * storage is touched, as `Vault.make` does: 'bad_label' for a label that fails its check, and
@@ -72,10 +72,10 @@ export const delDamagedVault = async (opts: DelDamagedVaultOpts): Promise<void> 
  * @example await deviceTroubleAsConditions(deviceDB).getMark(scope)  // site data blocked (a SecurityError): 'storage_blocked', "...will not help until that changes..."
  */
 export const deviceTroubleAsConditions = (deviceDB: DeviceDB): DeviceDB => ({
-  getLease:  async (...args) => await asCondition('getLease', () => deviceDB.getLease(...args)),
+  getLease: async (...args) => await asCondition('getLease', () => deviceDB.getLease(...args)),
   putLease: async (...args) => { await asCondition('putLease', () => deviceDB.putLease(...args)) },
   delLease: async (...args) => { await asCondition('delLease', () => deviceDB.delLease(...args)) },
-  getMark:   async (...args) => await asCondition('getMark', () => deviceDB.getMark(...args)),
+  getMark:  async (...args) => await asCondition('getMark', () => deviceDB.getMark(...args)),
   putMark:  async (...args) => { await asCondition('putMark', () => deviceDB.putMark(...args)) },
   delMark:  async (...args) => { await asCondition('delMark', () => deviceDB.delMark(...args)) },
   delAll:   async (...args) => { await asCondition('delAll', () => deviceDB.delAll(...args)) },
@@ -88,10 +88,10 @@ export const deviceTroubleAsConditions = (deviceDB: DeviceDB): DeviceDB => ({
  * record.
  */
 const DeviceTroubleSaid: Record<keyof DeviceDB, { failed: string, instead?: string }> = {
-  getLease:  { failed: "reading the lease it keeps for this vault, so the vault could not take it up", instead: "unlock with a passphrase or passkey" },
+  getLease: { failed: "reading the lease it keeps for this vault, so the vault could not take it up", instead: "unlock with a passphrase or passkey" },
   putLease: { failed: "writing the lease it keeps for this vault, so this device may ask for the passphrase again at the next open" },
   delLease: { failed: "erasing the lease it keeps for this vault, so the next vault made on this device, as at the next page load, may still take it up" },
-  getMark:   { failed: "reading its mark of this vault (the newest copy of the vault it has seen, and how often it has locked), so the vault could not check storage against it" },
+  getMark:  { failed: "reading its mark of this vault (the newest copy of the vault it has seen, and how often it has locked), so the vault could not check storage against it" },
   putMark:  { failed: "writing its mark of this vault (the newest copy of the vault it has seen, and how often it has locked), so it may not be kept" },
   delMark:  { failed: "erasing its mark of this vault, so it still holds the newest copy of the vault it had seen" },
   delAll:   { failed: "erasing everything it keeps for safebyok, so some of it may remain" },

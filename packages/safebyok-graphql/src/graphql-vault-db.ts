@@ -123,15 +123,15 @@ const VaultChangedDoc = `subscription SafebyokVaultChanged(${Scope}) {
  *   for (const document of Object.values(VaultOperations)) { allowlist.register(document) }
  */
 export const VaultOperations = {
-  safebyokGetVaultProps:          GetVaultPropsDoc,
-  safebyokGetBox:                 GetBoxDoc,
-  safebyokListBoxes:               ListBoxesDoc,
+  safebyokGetVaultProps:    GetVaultPropsDoc,
+  safebyokGetBox:           GetBoxDoc,
+  safebyokListBoxes:        ListBoxesDoc,
   safebyokEnsureVaultProps: EnsureVaultPropsDoc,
-  safebyokPutVaultProps:        PutVaultPropsDoc,
-  safebyokPutBox:               PutBoxDoc,
-  safebyokDelBox:               DelBoxDoc,
-  safebyokDelVault:             DelVaultDoc,
-  safebyokVaultChanged:            VaultChangedDoc,
+  safebyokPutVaultProps:    PutVaultPropsDoc,
+  safebyokPutBox:           PutBoxDoc,
+  safebyokDelBox:           DelBoxDoc,
+  safebyokDelVault:         DelVaultDoc,
+  safebyokVaultChanged:     VaultChangedDoc,
 } as const
 
 // ------------------------------------------------------------------------------------ the adapter
@@ -199,7 +199,7 @@ class UrqlVaultDB extends VaultDB {
     return recordOf(safebyokPutBox, BoxFields)
   }
 
-  // A stale retire refuses on the server and crosses as its kind, so a retire that answers landed,
+  // A stale delete refuses on the server and crosses as its kind, so a delete that answers landed,
   // with what the server's storage removed.
   protected async doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<unknown> {
     const { vault_id, revision_tok } = expected

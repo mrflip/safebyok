@@ -112,7 +112,7 @@ export type VaultSnapshot = {
  * (`deviceDB.delMark(scope)`) and calling `hello()` again.
  *
  * Storage alone settles a race. When it refuses a write as stale, or a box will not open, the
- * vault catches up with storage once before it names the refusal: a vault retired and made
+ * vault catches up with storage once before it names the refusal: a vault deleted and made
  * anew, or its ways in changed, elsewhere relocks this device. A catch-up that fails leaves the
  * snapshot saying `syncing: false` until a read succeeds; a write whose catch-up fails throws
  * 'stale_write', the catch-up's failure its cause -- unless that failure is 'identity_revoked',
@@ -152,7 +152,7 @@ export type Vault = {
    * Once is enough. Every call while a hello is under way shares its promise, and once one has
    * succeeded each later call resolves at once -- until what it read may no longer stand: a read
    * of storage that fails (saying so in the snapshot's `trouble`), storage the vault cannot trust
-   * (`identity_revoked`, `rolled_back`, `newer_format`), or the vault retired. The next hello then
+   * (`identity_revoked`, `rolled_back`, `newer_format`), or the vault deleted. The next hello then
    * reads afresh, and clears `trouble` once it succeeds. A hello that fails may be called again at
    * once. A lock leaves it standing; after `close()` it refuses with kind 'vault_closed'.
    *
@@ -209,7 +209,7 @@ export type Vault = {
    * added or removed with a passphrase as proof -- starts the lease again from then; nothing else
    * moves it.
    *
-   * A vault retired, made anew, or with its wayins changed, here or on another device, while the
+   * A vault deleted, made anew, or with its wayins changed, here or on another device, while the
    * unlock is under way is not unlocked: the passphrase was proven against a vault that no longer
    * stands as it was. This device is granted no lease, and the call throws kind 'vault_locked'.
    * A vault the unlock was creating stays created, locked, under this passphrase. A `lock()`
@@ -276,7 +276,7 @@ export type Vault = {
    * 'absent_wayin', changing nothing. A passkey's answer with several passphrases to choose
    * from and no `opts.wayinId` throws kind 'bad_option', and an `opts.wayinId` that names no
    * passphrase of the vault 'absent_wayin'. If another device changes the vault's ways in (or
-   * retires the vault) between this device's look and its write, nothing is written and the
+   * deletes the vault) between this device's look and its write, nothing is written and the
    * call throws kind 'stale_write', after catching up with storage.
    *
    * Leaves the vault unlocked under the new passphrase, the lease starting again from now when a
@@ -382,7 +382,7 @@ export type Vault = {
    * Write a whisper into the box `boxlabel`, creating or replacing it. Requires unlocked;
    * kind 'whisper_too_large' when its JSON and the box's sidecar's together are over the
    * vault's `maxWhisperBytes`, and kind 'vault_full' when `boxlabel` is new and the vault already
-   * holds its `maxBoxes` -- retire one first. A sidecar left out, and so kept from the box,
+   * holds its `maxBoxes` -- delete one first. A sidecar left out, and so kept from the box,
    * counts toward `maxWhisperBytes` as one given does. Replacing a box is never refused as
    * 'vault_full' by the vault's own limits, though a backend holding a limit of its own may refuse
    * a heavier replacement in a full vault as kind 'vault_full'.
@@ -390,11 +390,11 @@ export type Vault = {
    * The write lands only if storage still holds what this device last read: the same vault, under
    * the same vaultKey, and the same revision of this box (or still none). The store makes one
    * attempt. When another device or tab got in first -- writing this box, creating it, or
-   * retiring it -- storage refuses the write, and the call catches up with storage once and throws
+   * deleting it -- storage refuses the write, and the call catches up with storage once and throws
    * kind 'stale_write' at once, without waiting: nothing was written, and the snapshot now shows
    * the box as storage holds it. The vault merges nothing and decides nothing for the user: the
    * app shows what is there now, and calls `putBox()` again if this whisper should still replace
-   * it. A catch-up that finds the vault retired or made anew elsewhere, or its ways in changed,
+   * it. A catch-up that finds the vault deleted or made anew elsewhere, or its ways in changed,
    * relocks this device instead, and the call throws kind 'vault_locked' without writing: a stale
    * session never writes into a vault reborn under new keys.
    *
@@ -425,7 +425,7 @@ export type Vault = {
    * carries nothing forward either: nothing vouches for its visible fields, so its sidecar becomes `{}`
    * unless one is given, and its `registered_at` is now. A boxlabel the vault's check refuses is
    * kind 'bad_label', writing nothing, even where a box stored under other checks stands under
-   * it: that one reads and retires by its name, but is never written anew under it.
+   * it: that one reads and deletes by its name, but is never written anew under it.
    *
    * `opts.sidecar` is the box's sidecar ({@link Sidecar}): your app's own data, riding
    * beside the whisper, visible in storage -- authenticated, but never encrypted, so anyone who can
@@ -448,7 +448,7 @@ export type Vault = {
    * The whisper in `boxlabel`. Requires unlocked; kind 'absent_box' when there is none, and
    * 'damaged_box' when its stored record fails its checks, or will not open under the vault's
    * key: `delBox()` it, or `putBox()` over it. A box that will not open is named so only
-   * after one catch-up with storage: one a vault retired and made anew elsewhere wrote relocks this
+   * after one catch-up with storage: one a vault deleted and made anew elsewhere wrote relocks this
    * device, and the call throws kind 'vault_locked'; a catch-up that fails throws its own
    * refusal. A lock landing while storage is read refuses the call once storage answers, handing
    * nothing back -- kind 'vault_locked' for a `lock()`, a `del()`, the lease ending, or a
@@ -472,31 +472,33 @@ export type Vault = {
   /**
    * Remove the box `boxlabel` entirely, whatever revision of it stands -- even one whose
    * stored record fails verification, which the snapshot lists as damaged and reading refuses as
-   * 'damaged_box': retiring it needs nothing from it, and is the remedy for it. A box
+   * 'damaged_box': deleting it needs nothing from it, and is the remedy for it. A box
    * stored under a boxlabel the vault's check refuses is reached by that name too. Requires
    * unlocked; kind 'absent_box' when absent, and 'bad_label' for a refused name with nothing
-   * under it. The retirement lands only in the vault this device last read: if it was retired, or
-   * retired and made anew, elsewhere, nothing is removed and the call throws kind
+   * under it. The deletion lands only in the vault this device last read: if it was deleted, or
+   * deleted and made anew, elsewhere, nothing is removed and the call throws kind
    * 'stale_write', after catching up with storage -- which relocks this device -- its message
-   * saying the box could not be retired because the vault it was in is gone, and the
-   * adapter's refusal its cause. Within that vault the retirement wins: when what stood was not the
-   * revision the snapshot shows -- another device or tab wrote over it meanwhile -- it is retired
+   * saying the box could not be deleted because the vault it was in is gone, and the
+   * adapter's refusal its cause. Within that vault the deletion wins: when what stood was not the
+   * revision the snapshot shows -- another device or tab wrote over it meanwhile -- it is deleted
    * all the same, and the vault warns through its logger, naming neither revision. When the box
    * the snapshot showed was a damaged one, the warning says so and its story carries
-   * `damaged: true` beside `call`.
+   * `damaged: true` beside `call`. Deleted is gone: nothing of the box is kept, and a put from a
+   * device that never saw the delete names a revision that no longer stands, so it is refused as
+   * stale.
    */
   delBox(boxlabel: string): Promise<void>
   // --
 
-  // == [Vault: retiring and closing]: retire, close
+  // == [Vault: deleting and closing]: del, close
 
   /**
-   * Retire the vault: delete its every stored record, remote and device-local, the vault half of
+   * Delete the vault: delete its every stored record, remote and device-local, the vault half of
    * deleting an account. No tombstone is kept. Deliberately does NOT require unlock -- an authenticated owner can always delete
    * their own rows server-side, and requiring unlock here would only look like protection.
    *
-   * Deletes the vault this handle last read, and only that one: if it was retired, or
-   * retired and made anew, elsewhere since, storage keeps what stands there now and the call
+   * Deletes the vault this handle last read, and only that one: if it was deleted, or
+   * deleted and made anew, elsewhere since, storage keeps what stands there now and the call
    * throws kind 'stale_write', after catching up -- so a second del(), the user asking again,
    * deletes the vault that then stands, the one the snapshot shows. A handle that has seen no
    * vault reads storage first, and deletes whatever vault stands there: "delete my vault" never
@@ -1113,7 +1115,7 @@ const make = (opts: MakeVaultOpts): Vault => {
 
   /**
    * True when the handle has closed, or the vault props standing now are no longer the ones
-   * `standing` proved a passphrase against: retired, made anew, or their wayins changed, here or
+   * `standing` proved a passphrase against: deleted, made anew, or their wayins changed, here or
    * elsewhere.
    */
   const outrun = (standing: VaultProps) => (
@@ -1326,7 +1328,7 @@ const make = (opts: MakeVaultOpts): Vault => {
    * Why nothing stands under `boxlabel`, a name above the floor: kind 'bad_label' when the vault's
    * boxlabel check refuses it -- the name was never one this app would store under -- and
    * 'absent_box' otherwise. The host's check runs here, once, only when storage holds nothing
-   * under the name: a box stored under a name it refuses reads and retires as any other.
+   * under the name: a box stored under a name it refuses reads and deletes as any other.
    */
   const nothingUnder = (boxlabel: string): VaultError => {
     Names.check(rules, 'boxlabel', boxlabel)
@@ -1349,7 +1351,7 @@ const make = (opts: MakeVaultOpts): Vault => {
 
   /**
    * The whisper `box` holds, or -- for one that will not open under the key in hand -- one
-   * catch-up with storage before the kind is named: a vault retired and made anew elsewhere, or
+   * catch-up with storage before the kind is named: a vault deleted and made anew elsewhere, or
    * its ways in changed, relocks this device, and the call refuses as 'vault_locked'; otherwise
    * the box is 'damaged_box'. A catch-up that fails is thrown as it came: whether the box
    * is damaged is not known.
@@ -1468,7 +1470,7 @@ const make = (opts: MakeVaultOpts): Vault => {
   }
   // --
 
-  // == [The handle]: the Vault object: getSnapshot, subscribe, unlock ... retire, close
+  // == [The handle]: the Vault object: getSnapshot, subscribe, unlock ... del, close
 
   const vault: Vault = {
     leaseMillis,
@@ -1489,7 +1491,7 @@ const make = (opts: MakeVaultOpts): Vault => {
       const wayinId = parseAim(unlockOpts)
       await hello()
       // Sync with the backend first: the passphrase proves itself against the vault props as they
-      // stand there now, not against a cached copy a retire or recreate may have outdated.
+      // stand there now, not against a cached copy a delete or recreate may have outdated.
       await refresh()
       const unlocked = closed ? null : await settleUnlock(proof, wayinId)
       const tookUp = unlocked !== null && await grantLease(unlocked, unlocked.standing, deadlineFor(proof, 'unlock'))
@@ -1591,20 +1593,20 @@ const make = (opts: MakeVaultOpts): Vault => {
       await hello()
       checkUnlocked()
       // A name the check refuses is never written anew, even where a box stored under other
-      // checks stands under it: reading and retiring reach that one.
+      // checks stands under it: reading and deleting reach that one.
       const label = Names.check(rules, 'boxlabel', boxlabel)
       const givenSidecarJson = sidecarJsonOf(storeOpts)
       const checked = Whisper.safeParse(whisper)
       // The refusal never quotes its input: a whisper stays out of error messages.
       if (! checked.success) {
-        throw new VaultError('bad_whisper', 'A whisper must be a JSON value: a string, number, boolean, array, or plain object. A bare null or undefined cannot be stored -- to empty a box, retire it. (null inside an array or object is fine.)')
+        throw new VaultError('bad_whisper', 'A whisper must be a JSON value: a string, number, boolean, array, or plain object. A bare null or undefined cannot be stored -- to empty a box, delete it. (null inside an array or object is fine.)')
       }
       const whisperBytes = new TextEncoder().encode(stableJsonify(checked.data))
       checkWhisperFits(whisperBytes, givenSidecarJson ?? EmptySidecarJson)
       const standing = await getBoxOrDamaged(label)
       // A store is one write, over a revision storage arbitrates. A box listed damaged naming none
-      // could be cleared only by a retire before it, a second call another device's write could
-      // fall between and be lost: the user retires it, then stores.
+      // could be cleared only by a delete before it, a second call another device's write could
+      // fall between and be lost: the user deletes it, then stores.
       if (standing === 'damaged' && isListedDamaged(label) && listedRevisionOf(label) === null) { throw damagedBeyondNaming() }
       // A damaged box is overwritten as a fresh store: nothing in it can be carried forward.
       const prev = standing === 'damaged' ? null : standing
@@ -1640,10 +1642,10 @@ const make = (opts: MakeVaultOpts): Vault => {
         written_at:             now,
       }
       const box: Box = {
-        format:              BoxFormat,
+        format:           BoxFormat,
         ...header,
-        box_key_wrapped: await wrapKeyUnder(unlockedKey, boxKey, boxCtx(vaultId, header, 'box_key_wrapped')),
-        whisper_ciphered:    await cipherBytes(boxKey, whisperBytes, boxCtx(vaultId, header, 'whisper_ciphered')),
+        box_key_wrapped:  await wrapKeyUnder(unlockedKey, boxKey, boxCtx(vaultId, header, 'box_key_wrapped')),
+        whisper_ciphered: await cipherBytes(boxKey, whisperBytes, boxCtx(vaultId, header, 'whisper_ciphered')),
       }
       await writeOver(box, expected)
       await refresh()
@@ -1663,7 +1665,7 @@ const make = (opts: MakeVaultOpts): Vault => {
       const label = await checkStandingBoxlabel(boxlabel)
       checkUnlocked()
       // Lands only in the vault this device holds keys for, whatever revision of the box stands:
-      // a vault retired and made anew elsewhere refuses it. The revision the listing shows only
+      // a vault deleted and made anew elsewhere refuses it. The revision the listing shows only
       // lets storage say whether it removed that one or another.
       const expected = { vault_id: currentVaultProps().vault_id, revision_tok: listedRevisionOf(label) }
       // Asked before the call: a catch-up on a stale answer re-lists, and what was shown is what counts.
@@ -1672,9 +1674,9 @@ const make = (opts: MakeVaultOpts): Vault => {
         const { outcome } = await refreshOnStale(vaultDB.delBox(scope, label, expected), 'delBox')
         if (outcome === 'deleted_other') {
           if (showedDamaged) {
-            logger.warn("The box this device showed was a damaged one, and the box retired was not that record: another device or tab had written over it since. That write was retired all the same.", { call: 'delBox', damaged: true })
+            logger.warn("The box this device showed was a damaged one, and the box deleted was not that record: another device or tab had written over it since. That write was deleted all the same.", { call: 'delBox', damaged: true })
           } else {
-            logger.warn("The box retired was not the revision this device showed: another device or tab had written over it since. That write was retired all the same.", { call: 'delBox' })
+            logger.warn("The box deleted was not the revision this device showed: another device or tab had written over it since. That write was deleted all the same.", { call: 'delBox' })
           }
         }
       } catch (err) {
@@ -1689,7 +1691,7 @@ const make = (opts: MakeVaultOpts): Vault => {
       await hello()
       // A handle that has seen no vault looks first: "delete my vault" must not report success
       // over one standing. Otherwise only the vault this handle had read when called: one
-      // retired and made anew since refuses, even if a background refresh brings it in while
+      // deleted and made anew since refuses, even if a background refresh brings it in while
       // this awaits.
       if (vaultProps === null) { await refresh() }
       const doomed = vaultProps

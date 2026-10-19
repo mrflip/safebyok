@@ -5,12 +5,12 @@ import type { DatabaseReader, DatabaseWriter } from './_generated/server'
 
 /**
  * Each vault's tally, and the limits the component holds every vault to, so that any vault it
- * takes in can be retired whole. Retiring a vault (`delVault`, which `del()` calls) reads
+ * takes in can be deleted whole. Deleting a vault (`delVault`, which `del()` calls) reads
  * every row of it twice in one transaction -- once to find it, once to delete it -- and a Convex
  * transaction may read 16 MiB and 32,000 documents, and write 16,000. A client keeps its vault far
  * smaller (`maxBoxes`, under `convexVaultDB`'s `maxVaultBytes`), but a modified client need
  * not, so the component checks these limits itself on every box write, against a tally kept in
- * step with each write and retire rather than by reading the vault.
+ * step with each write and delete rather than by reading the vault.
  */
 
 /** Convex's most for one document, in bytes: 1 MiB. */
@@ -22,20 +22,20 @@ const ConvexTransactionReadBytes = 16_777_216
 /** Convex's most documents for one transaction to write. */
 const ConvexTransactionWrittenDocuments = 16_000
 
-/** Room for the vault's tally row, which a retire reads twice as well: several times its weight. */
+/** Room for the vault's tally row, which a delete reads twice as well: several times its weight. */
 const TallyReserveBytes = 1024
 
 /**
  * The most boxes one vault holds: half the documents a Convex transaction may write, so that
- * a retire -- a deletion and two reads per box -- stays well inside every per-transaction
+ * a delete -- a deletion and two reads per box -- stays well inside every per-transaction
  * limit. Twice the most any client's `maxBoxes` can be over `convexVaultDB`.
  */
 export const MaxVaultBoxes = ConvexTransactionWrittenDocuments / 2
 
 /**
  * The most one vault's boxes weigh together, in bytes as Convex counts a document: half of
- * what a transaction may read, as a retire reads every row twice, less a whole document for the
- * vault's props and room for its tally, which the retire reads twice too. 7 MiB less 1 KiB.
+ * what a transaction may read, as a delete reads every row twice, less a whole document for the
+ * vault's props and room for its tally, which the delete reads twice too. 7 MiB less 1 KiB.
  */
 export const MaxVaultBoxBytes = (ConvexTransactionReadBytes / 2) - ConvexDocumentBytes - TallyReserveBytes
 
@@ -74,7 +74,7 @@ export const weigh = (row: Record<string, Value>, rowId?: Id<'safebyok_boxes'>):
  * The vault's tally as it stands, for a box write to check: the one kept, or -- for a vault
  * with none yet -- counted afresh from its rows, reading them once. Counting stops at the first
  * row past a limit, so it never reads much more than a vault may hold; the tally then comes back
- * null, and the vault is refused anything that adds to it until retired boxes bring it back in.
+ * null, and the vault is refused anything that adds to it until deleted boxes bring it back in.
  *
  * @param db - The transaction's database.
  * @param vaultRowId - The vault row, which its tally is filed under.
@@ -131,8 +131,8 @@ export const record = async (db: DatabaseWriter, vaultRowId: Id<'safebyok_vaults
 }
 
 /**
- * Take a retired box off its vault's tally, when the vault has one. A retire never counts a
- * vault that has none: a vault too large to read whole must still be retirable, a box at a time.
+ * Take a deleted box off its vault's tally, when the vault has one. A delete never counts a
+ * vault that has none: a vault too large to read whole must still be deletable, a box at a time.
  */
 export const forget = async (db: DatabaseWriter, vaultRowId: Id<'safebyok_vaults'>, deleted: Doc<'safebyok_boxes'>): Promise<void> => {
   const kept = await findTallyRow(db, vaultRowId)
@@ -140,7 +140,7 @@ export const forget = async (db: DatabaseWriter, vaultRowId: Id<'safebyok_vaults
   await db.patch('safebyok_vault_tallies', kept._id, plus(kept, { box_count: -1, box_bytes: -weigh(deleted) }))
 }
 
-/** Remove the vault's tally, when it has one: its vault is being retired. */
+/** Remove the vault's tally, when it has one: its vault is being deleted. */
 export const drop = async (db: DatabaseWriter, vaultRowId: Id<'safebyok_vaults'>): Promise<void> => {
   const kept = await findTallyRow(db, vaultRowId)
   if (kept) { await db.delete('safebyok_vault_tallies', kept._id) }

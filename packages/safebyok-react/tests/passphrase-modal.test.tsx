@@ -419,7 +419,7 @@ describe("PassphraseModal", () => {
   })
   // --
 
-  // == [Starting over]: forgotten passphrase, start over, retire
+  // == [Starting over]: forgotten passphrase, start over, delete
 
   describe("for a user who has forgotten the passphrase", () => {
     it("offers no way to start over unless asked to", () => {
@@ -432,7 +432,7 @@ describe("PassphraseModal", () => {
       expect(screen.queryByText('Forgot it? Start a new vault')).to.be.null
     })
 
-    it("asks first, and keeping the vault goes back to the passphrase, retiring nothing", async () => {
+    it("asks first, and keeping the vault goes back to the passphrase, deleting nothing", async () => {
       const vault = await lockedVault()
       render(<PassphraseModal vault={vault} allowStartOver onDone={noop} />)
       fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
@@ -445,7 +445,7 @@ describe("PassphraseModal", () => {
       vault.close()
     })
 
-    it("retires the vault once confirmed, and asks the user to choose a passphrase for a new one", async () => {
+    it("deletes the vault once confirmed, and asks the user to choose a passphrase for a new one", async () => {
       const vault = await lockedVault()
       const heard: boolean[] = []
       render(<PassphraseModal vault={vault} allowStartOver onDone={(unlocked) => { heard.push(unlocked) }} />)
@@ -460,7 +460,7 @@ describe("PassphraseModal", () => {
       vault.close()
     })
 
-    it("shows a condition the retire meets in place, to try again", async () => {
+    it("shows a condition the delete meets in place, to try again", async () => {
       const del = vi.fn().mockRejectedValue(new VaultError('storage_unavailable', 'Storage could not be reached; try again in a moment.'))
       render(<PassphraseModal vault={TH.stubVault({ del })} allowStartOver onDone={noop} />)
       fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
@@ -469,8 +469,8 @@ describe("PassphraseModal", () => {
       expect(screen.getByText('Remove and start over')).to.have.property('disabled', false)
     })
 
-    it("retires once for a double press, taking no second press while the retire runs", () => {
-      const del = vi.fn(() => new Promise<void>(() => { /* still retiring */ }))
+    it("deletes once for a double press, taking no second press while the delete runs", () => {
+      const del = vi.fn(() => new Promise<void>(() => { /* still deleting */ }))
       render(<PassphraseModal vault={TH.stubVault({ del })} allowStartOver onDone={noop} />)
       fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
       fireEvent.click(screen.getByText('Remove and start over'))
@@ -479,7 +479,7 @@ describe("PassphraseModal", () => {
       expect(screen.getByText('Remove and start over')).to.have.property('disabled', true)
     })
 
-    it("meets a retirement that settles while a Suspense boundary hides it, offering it again once shown", async () => {
+    it("meets a deletion that settles while a Suspense boundary hides it, offering it again once shown", async () => {
       const deleting = TH.held()
       const vault = TH.stubVault({ del: () => deleting.promise })
       const hiding = TH.held()
@@ -510,7 +510,7 @@ describe("PassphraseModal", () => {
       expect(screen.getByText('Remove and start over')).to.have.property('disabled', false)
     })
 
-    it("asks afresh once the vault it was asked of changed elsewhere, rather than retiring the one that stands", async () => {
+    it("asks afresh once the vault it was asked of changed elsewhere, rather than deleting the one that stands", async () => {
       const del = vi.fn().mockRejectedValue(new VaultError('stale_write', 'The vault changed in storage since this device read it.'))
       render(<PassphraseModal vault={TH.stubVault({ del })} allowStartOver onDone={noop} />)
       fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
@@ -521,16 +521,16 @@ describe("PassphraseModal", () => {
       expect(del).toHaveBeenCalledOnce()
     })
 
-    it("drops the question once the vault is retired elsewhere, and never asks it of a vault made after", async () => {
+    it("drops the question once the vault is deleted elsewhere, and never asks it of a vault made after", async () => {
       const opts = TH.memoryVaultOpts()
       const vault = await TH.settledVault(opts)
       await vault.unlock('pw')
       await vault.lock()
       render(<PassphraseModal vault={vault} allowStartOver onDone={noop} />)
       fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
-      const retirer = await TH.settledVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
-      await act(async () => { await retirer.del() })
-      retirer.close()
+      const deleter = await TH.settledVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
+      await act(async () => { await deleter.del() })
+      deleter.close()
       await screen.findByText('Choose a vault passphrase')
       const maker = await TH.settledVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
       await act(async () => { await maker.unlock('another pw') })
@@ -704,7 +704,7 @@ describe("PassphraseModal", () => {
       expect(adviceRegion().textContent).to.eq('said of fast')
     })
 
-    it("forgets what it said once the vault is made and retired elsewhere, and an answer still on its way with it", async () => {
+    it("forgets what it said once the vault is made and deleted elsewhere, and an answer still on its way with it", async () => {
       const opts = TH.memoryVaultOpts()
       const vault = await TH.settledVault(opts)
       const gate = TH.makeGate()
@@ -807,10 +807,10 @@ describe("PassphraseModal", () => {
     })
 
     const DelOutcomes = [
-      [null,                                                                   'a retire that succeeds'],
-      [new VaultError('stale_write', 'The vault changed in storage.'),         'a retire refused: the vault changed elsewhere'],
-      [new VaultError('storage_unavailable', 'Storage could not be reached.'), 'a retire that meets a condition'],
-      [new VaultError('vault_closed', 'This vault handle was closed.'),        'a retire that meets misuse: a closed handle'],
+      [null,                                                                   'a delete that succeeds'],
+      [new VaultError('stale_write', 'The vault changed in storage.'),         'a delete refused: the vault changed elsewhere'],
+      [new VaultError('storage_unavailable', 'Storage could not be reached.'), 'a delete that meets a condition'],
+      [new VaultError('vault_closed', 'This vault handle was closed.'),        'a delete that meets misuse: a closed handle'],
     ] as const
 
     for (const [refusal, blurb] of DelOutcomes) {

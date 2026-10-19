@@ -459,7 +459,7 @@ export const MaxWhisperBytes = 40_444 // searchable: 40444
 /**
  * The most boxes a vault holds unless the caller says otherwise: room for every API key a
  * person plausibly keeps, at the largest default whisper, inside what every in-tree storage
- * adapter can hold and still retire in one go. A vault that needs more raises its `maxBoxes`.
+ * adapter can hold and still delete in one go. A vault that needs more raises its `maxBoxes`.
  */
 export const MaxBoxes = 100
 

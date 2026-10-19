@@ -460,7 +460,7 @@ const heaviestRowOf = async (whisperBytes: number, sidecar: Sidecar = {}) => {
     boxlabel:               'b'.repeat(40),
     revision_tok:           crypto.randomUUID(),
     vault_key_epoch:        Number.MAX_SAFE_INTEGER,
-    box_key_wrapped:    await wrapKeyUnder(await makeVaultKey(), boxKey, ctx),
+    box_key_wrapped:        await wrapKeyUnder(await makeVaultKey(), boxKey, ctx),
     whisper_ciphered:       await cipherBytes(boxKey, randomBytes(whisperBytes), ctx),
     whisper_codec:          'json_v1',
     whisper_schema_version: 1,
@@ -509,7 +509,7 @@ describe("the box limit", () => {
     expect(await vault.getBox('openai')).to.eq('sk-fake-new')
   })
 
-  it("retiring a box makes room for the next new one", async () => {
+  it("deleting a box makes room for the next new one", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw', { maxBoxes: 1 })
     await vault.putBox('openai', 'sk-fake-one')
@@ -865,7 +865,7 @@ describe("the host's validators", () => {
     expect(boxlabelsOf(narrow)).to.deep.equal(['anthropic'])
   })
 
-  it("delBox() reads storage once for the box it retires, under a refused boxlabel or a passing one", async () => {
+  it("delBox() reads storage once for the box it deletes, under a refused boxlabel or a passing one", async () => {
     const world = makeWorld()
     const roomy = await world.openUnlocked('pw', { validators: AnyScript })
     await roomy.putBox('OpenAI: work', 'sk-fake')

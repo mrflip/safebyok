@@ -46,7 +46,7 @@ const vault = Vault.make({
 * **Every verb is one IndexedDB transaction.** IndexedDB runs readwrite transactions over one
   store one after another, across every tab of the origin, so a write lands only while what it
   expects still stands, and refuses with kind `stale_write` otherwise. Two tabs creating a vault
-  at once settle on one; retiring a vault takes its every box with it, or none of them.
+  at once settle on one; deleting a vault takes its every box with it, or none of them.
 * **Other tabs' writes** ring `subscribe`, over a BroadcastChannel, so a vault open in two tabs
   stays current in both. The bell says only that something changed; the vault reads again. Its
   channel is closed when the last vault listening to it closes.
@@ -77,10 +77,10 @@ field by field. Nothing is serialized, normalized or repaired: every field a rec
 bound into its encryption, but for the vault props' `unlock_epoch` and which wayins their `wayins`
 list holds, so one changed in storage makes the record refuse to open.
 
-| ckey                                               | Row                       |
-| -------------------------------------------------- | ------------------------- |
-| `vault^<applabel>^<user_id>^<vaultlabel>`          | the vault's `VaultProps`  |
-| `box^<applabel>^<user_id>^<vaultlabel>^<boxlabel>` | one `Box`             |
+| ckey                                               | Row                      |
+| -------------------------------------------------- | ------------------------ |
+| `vault^<applabel>^<user_id>^<vaultlabel>`          | the vault's `VaultProps` |
+| `box^<applabel>^<user_id>^<vaultlabel>^<boxlabel>` | one `Box`                |
 
 The names are joined on `^` (the core's `Ckeys`), which the floor every name is held to keeps out
 of every name, whatever a host's validators admit.

@@ -18,12 +18,12 @@ import {
  * mutations serializably, so the check holds for real. A failed expectation writes nothing and
  * resolves `false` -- for a box write, `null` -- which the client refuses as `stale_write`; it
  * is not an error. A box write that lands resolves the box as stored, read back in its
- * own transaction. A retire lands only in the vault it expects: it wins over any box revision,
- * but never lands in a vault made anew. A box retire that lands resolves what it removed.
+ * own transaction. A delete lands only in the vault it expects: it wins over any box revision,
+ * but never lands in a vault made anew. A box delete that lands resolves what it removed.
  *
  * Every vault is held to the limits in `./tallies`, whatever its client asks, so that it can
- * always be retired whole: a box write that would take the vault past one is refused with a
- * `ConvexError` of kind `vault_full`. A retire is never refused for room.
+ * always be deleted whole: a box write that would take the vault past one is refused with a
+ * `ConvexError` of kind `vault_full`. A delete is never refused for room.
  */
 
 // ------------------------------------------------------------------------------- the vault props
@@ -150,7 +150,7 @@ export const putBox = mutation({
 
 /**
  * Remove the box under `boxlabel`, whatever revision stands, only while the scope's vault props
- * have `expected.vault_id`. Resolves what it removed when that holds -- `retired` for a box at
+ * have `expected.vault_id`. Resolves what it removed when that holds -- `deleted` for a box at
  * `expected.revision_tok` (for null, one holding none the client reads as one), `deleted_other` for
  * any other, `absent` for none; null, removing nothing, otherwise -- including when the scope holds
  * no vault props.
@@ -194,10 +194,10 @@ export const delVault = mutation({
 
 /**
  * The vault's change signature, for a client to subscribe to: it changes when, and only when, a
- * write lands in the vault -- the vault props replaced, a box written or retired, the vault
- * retired. It reads each box document whole, ciphertext and all, for its revision: a Convex
+ * write lands in the vault -- the vault props replaced, a box written or deleted, the vault
+ * deleted. It reads each box document whole, ciphertext and all, for its revision: a Convex
  * query cannot read some of a document's fields. So each run reads the vault, within the read
- * limits a listing and a retire keep it to.
+ * limits a listing and a delete keep it to.
  */
 export const watchVault = query({
   args:    { scope: VaultScope },

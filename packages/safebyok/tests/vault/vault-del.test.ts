@@ -20,7 +20,7 @@ const SpoiledBoxes = [
   [() => '{"not": json',                                                                         'that is not JSON at all'],
 ] as const
 
-describe("delBox and retire", () => {
+describe("delBox and del()", () => {
   for (const [spoil, blurb] of SpoiledBoxes) {
     it(`delBox removes a box ${blurb}, and leaves the vault's other boxes as they were`, async () => {
       const world = makeWorld()
@@ -58,7 +58,7 @@ describe("delBox and retire", () => {
     await TH.expectRefusal(vault.delBox('anthropic'), 'absent_box')
   })
 
-  it("retire removes every trace of this vault, and only this vault", async () => {
+  it("del() removes every trace of this vault, and only this vault", async () => {
     const world = makeWorld()
     const mine = await world.openUnlocked('my pw')
     await mine.putBox('anthropic', 'mine')
@@ -71,7 +71,7 @@ describe("delBox and retire", () => {
     expect(await theirs.getBox('anthropic')).to.eq('theirs')
   })
 
-  it("retire works on a locked vault: owning the account is enough to delete it", async () => {
+  it("del() works on a locked vault: owning the account is enough to delete it", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox('anthropic', 'sk-fake')
@@ -80,7 +80,7 @@ describe("delBox and retire", () => {
     expect(vault.getSnapshot().state).to.eq('absent')
   })
 
-  it("retire on a handle that has seen no vault looks first, and retires the one made elsewhere since: 'delete my vault' never reports success over one standing", async () => {
+  it("del() on a handle that has seen no vault looks first, and deletes the one made elsewhere since: 'delete my vault' never reports success over one standing", async () => {
     const world = makeWorld()
     const handle = await world.open({ vaultDB: world.deafVaultDB() })
     expect(handle.getSnapshot().state).to.eq('absent')
@@ -91,7 +91,7 @@ describe("delBox and retire", () => {
     expect(rowsOf(world, 'u1')).to.deep.equal([])
   })
 
-  it("retire on a vault already gone is quiet: a second retire finds nothing to refuse", async () => {
+  it("del() on a vault already gone is quiet: a second del() finds nothing to refuse", async () => {
     const world = makeWorld()
     const vault = await world.open()
     await vault.del()
@@ -138,7 +138,7 @@ describe("damaged boxes", () => {
       expect(world.logged).to.have.lengthOf(0)
     })
 
-    it(`a freshly opened vault retires a box ${blurb}, and keeps the rest`, async () => {
+    it(`a freshly opened vault deletes a box ${blurb}, and keeps the rest`, async () => {
       const { world } = await worldWithDamagedBox(spoil)
       const fresh = await world.open()
       await fresh.delBox('anthropic')
@@ -206,7 +206,7 @@ describe("damaged boxes", () => {
     vi.restoreAllMocks()
   })
 
-  it("putBox over a damaged box whose record names no revision refuses it as 'damaged_box', writing nothing; once retired, the store lands", async () => {
+  it("putBox over a damaged box whose record names no revision refuses it as 'damaged_box', writing nothing; once deleted, the store lands", async () => {
     const [spoil] = DamagedListings[0]
     const { world, vault } = await worldWithDamagedBox(spoil)
     await TH.wakeupAtNextTick()

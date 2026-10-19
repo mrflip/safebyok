@@ -13,7 +13,7 @@ fact into that entry, keeping its date and adding the new one beside it ("2026-1
 ..."), and changes no other entry. Otherwise it writes a new dated entry at the top of *Of
 Interest*. Either way it keeps the voice above, and returns the lines it changed.
 
-**A one-time rename (2026-10-18; extended 2026-10-18).** With the Coach's approval, the entries
+**A one-time rename (2026-10-18; extended 2026-10-18, 2026-10-19).** With the Coach's approval, the entries
 below had their retired words changed to the reform's cast in one mechanical pass (VOCABULARY.md;
 the retired names are in `notes/old_vocabulary.md`), so that a search for a current name finds
 the entries that discuss it. Only names moved. A second pass, on the Coach's word "use the modern
@@ -27,7 +27,9 @@ stored-key strings that describe what an older version wrote (`safebyok-vault-v2
 `safebyok-unlock-v1`, `unlock^`), each now marked as an older version's where it could be read as
 today's, and the entries that narrate the renaming itself. Old records are not read, and no
 entry here promises that they will be. Four statements that `putBox()` retried were corrected,
-each marked "amended 2026-10-18". This leaves the rule above as it was: from here on, an entry is
+each marked "amended 2026-10-18". A third pass, 2026-10-19 (the rename pass), moved the names again:
+lockbox became box, in stored names too; the store verbs became get, put and del on every layer; retire
+became delete; and `VaultError.kind` became `refusalkind`. This leaves the rule above as it was: from here on, an entry is
 added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
@@ -45,34 +47,34 @@ added or folded into through the subagent, and no other entry changes.
   still have a wayin open, and the rollback check still refuses vault props at a lower
   `vault_key_epoch` than the device has seen. A box lists as under the held key only when its
   epoch equals the vault props'; any other lists as damaged.
-* 2026-10-19 (branch 20261019-retire_revision, on PR #177); 2026-10-19 (branch 20261019-no_clear): **`VaultDB.delBox` now takes the
+* 2026-10-19 (branch 20261019-delete_revision, on PR #177); 2026-10-19 (branch 20261019-no_clear): **`VaultDB.delBox` now takes the
   revision the device read, and storage reports what it removed; the base class takes that report
   as untrusted storage input.** The expectation is `{ vault_id, revision_tok }` (null for a
   box listed as damaged with no readable revision); `delVault` and `delDamagedVault`
   keep the vault-only expectation. The arbitration is unchanged: the adapter compares only
   `vault_id` and removes whatever box stands under the boxlabel, in one atomic step, so a
-  retirement within the right vault still wins over any write; the revision never refuses. It only
-  lets the adapter answer `retired` (the revision named; for null, a record holding none that
+  deletion within the right vault still wins over any write; the revision never refuses. It only
+  lets the adapter answer `deleted` (the revision named; for null, a record holding none that
   reads as one, compared as the listing reads it), `deleted_other` (another record, for instance
   one written over the box meanwhile) or `absent`; a vault mismatch is `null`, thrown as
   `stale_write`. Each adapter reads that answer from the same atomic step as the delete (Postgres
   `DELETE ... RETURNING`, one Convex mutation, one IndexedDB transaction, one synchronous turn in
   `localVaultDB`, the GraphQL server's reply), never a second storage call. The base class keeps
   only the `outcome` field, through the same `writtenBack` step `putBox` uses, and refuses
-  anything else as `corrupt_record`, saying the retirement may have landed and quoting nothing.
+  anything else as `corrupt_record`, saying the deletion may have landed and quoting nothing.
   The vault's `delBox()` honors `deleted_other` and warns through the host's logger, naming
   neither revision nor boxlabel; the result stays void. Honoring and warning, rather than refusing
   as stale, awaits a Coach's confirmation. Amended 2026-10-19 (20261019-no_clear): `putBox()` no
-  longer retires first and logs no `deleted_other` of its own; a store is always one conditional
+  longer deletes first and logs no `deleted_other` of its own; a store is always one conditional
   `putBox`. A box listed damaged that names a revision is written over in that one write; one
   that names no revision is refused as `damaged_box`, writing nothing, its message telling the
-  user to `delBox()` it first. This closes the race inside `putBox()` (A retires and writes;
-  B retires A's write and writes; neither throws), and the gap between the two calls in which a
-  refused write could say nothing was written after the retire had removed a record. The race
+  user to `delBox()` it first. This closes the race inside `putBox()` (A deletes and writes;
+  B deletes A's write and writes; neither throws), and the gap between the two calls in which a
+  refused write could say nothing was written after the delete had removed a record. The race
   still runs through an explicit `delBox()`: both devices list the box damaged with
   `revision_tok` null; A calls `delBox()` and then `putBox()`; B, its listing still stale,
   calls `delBox()` naming null and removes A's fresh write. B is warned only through the host's
-  logger, as `deleted_other` with `damaged: true`, because a retirement within the vault wins over
+  logger, as `deleted_other` with `damaged: true`, because a deletion within the vault wins over
   any revision. That stays the stated residual until the tombstone rework. Nothing stored
   changes.
 * 2026-10-19 (returning): **`VaultDB.putBox` now resolves the box as storage holds it after
@@ -90,8 +92,8 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-18 (sprint reform): **three stored-format tags changed in the renaming, none with a
   migration.** Against the last release (0.3.0), the vault props format `safebyok-vault-v2` became
   `safebyok-vault-v3` (the unlock envelope became the "wayin", with the field renames that follow;
-  vault props never carried a `revision_id`); the box format `safebyok-box-v2` became
-  `safebyok-box-v6` (`note` became the sidecar, `sidecar_json`, beside the new `whisper_codec`
+  vault props never carried a `revision_id`); the box format `safebyok-lockbox-v2` became
+  `safebyok-lockbox-v5` (`note` became the sidecar, `sidecar_json`, beside the new `whisper_codec`
   and `whisper_schema_version`; `changed_at` became `written_at`; `revision_id` became
   `revision_tok`; `-v3` and `-v4` were only ever on `main`, never released); the device lease
   format `safebyok-unlock-v1` became `safebyok-lease-v1`. A 0.3.0 device store holds JSON-tuple
@@ -133,7 +135,7 @@ added or folded into through the subagent, and no other entry changes.
   counter, and of a lock staying locked on its handle, describes what stood until then.
   Callers share one in-flight promise; a rejected one clears at once; a resolved one stands until a
   read of storage fails, storage the vault cannot trust refuses it (`identity_revoked`,
-  `rolled_back`, `newer_format`, from any call, read or write), or the vault is retired. The next
+  `rolled_back`, `newer_format`, from any call, read or write), or the vault is deleted. The next
   call then reads storage and the lease again, but a handle on which a lock has revoked a lease (the counter
   above is not 0) takes up no lease: so a lock, hard, soft or for untrusted storage, stays locked
   on that handle even when the device store failed to erase the lease, and whispers stay refused as
@@ -193,7 +195,7 @@ added or folded into through the subagent, and no other entry changes.
   not yet, and the battery holds them to it as a pending test until they do. Every vault is at
   epoch 1 today: nothing replaces a vaultKey yet (2026-10-19: the rotation schema is gone, so the
   comparison now guards a box built wrong, and stays so a later rotation needs no new
-  contract). Retirements name no epoch. A box whose epoch is
+  contract). Deletions name no epoch. A box whose epoch is
   not the vault props' reads as `damaged_box`, its key never tried.
 * 2026-10-16: **the rollback check.** Each device keeps a device mark per scope in its deviceDB:
   the vault's `vault_id` and the highest `unlock_epoch` and `vault_key_epoch` it has seen the
@@ -204,7 +206,7 @@ added or folded into through the subagent, and no other entry changes.
   stood. Its reach: only a device that saw the newer vault props, and only while its local storage
   lasts (clearing site data, a damaged mark, or another `vault_id` -- a vault made anew -- starts
   a new mark). Its blind spot: vault props cannot be ordered across `vault_id`s, so storage serving an
-  old, retired vault in place of the current one is not caught, nor is anything on a device
+  old, deleted vault in place of the current one is not caught, nor is anything on a device
   that never saw the newer vault props. A mark holds one vault per scope, so storage that hands back
   another vault's vault props even once moves the mark to that vault, and an older copy of the first is
   then taken as it stands. `unlock_epoch` is bound into no encryption, so storage can serve an
@@ -240,7 +242,7 @@ added or folded into through the subagent, and no other entry changes.
   vaults, or between users on one device. It is visible to the server in the clear. No
   user-chosen device label is stored. Clearing site data mints a new id; wayins keep the old.
 * 2026-10-16: the record formats moved on with these fields (to `safebyok-vault-v2`,
-  `safebyok-box-v2` and `safebyok-mark-v1`, since moved on again to today's `safebyok-vault-v3`,
+  `safebyok-lockbox-v2` and `safebyok-mark-v1`, since moved on again to today's `safebyok-vault-v3`,
   `safebyok-box-v6` and `safebyok-mark-v3`; the mark moved to `safebyok-mark-v4` on 2026-10-19, and the vault props to `safebyok-vault-v4` the same day, so a stored `safebyok-vault-v3` record reads as `damaged_vault`, listed among the older formats), and each ctx's first part with
   them. No vault written before reads: its vault props are `damaged_vault`, and `delDamagedVault`
   recognizes `safebyok-vault-v1` as an older format, not a possibly newer one, so it clears such a
@@ -267,17 +269,17 @@ added or folded into through the subagent, and no other entry changes.
   the host's check, so it refuses a refused name (`bad_label`, writing nothing) even over a box
   standing under it. `putBox()` over a
   box whose record fails validation (any listed as damaged, and one whose ciphered fields are
-  missing or malformed) now retires it (`delBox`, expecting only the `vault_id`) and then writes
+  missing or malformed) now deletes it (`delBox`, expecting only the `vault_id`) and then writes
   a fresh box expecting no revision, carrying neither its sidecar nor its `registered_at`; two
-  steps, so a failure between them leaves the box retired. Since that retirement names no revision, it
+  steps, so a failure between them leaves the box deleted. Since that deletion names no revision, it
   also removes a sound box another device stored under the boxlabel after this store read the
   damaged one (this store's write then stands in its place, but should the write fail, neither stands;
-  amended 2026-10-18: this once said "as a retried store's would", before `putBox()` stopped retrying), and a retirement of the damaged box elsewhere does not stop this
+  amended 2026-10-18: this once said "as a retried store's would", before `putBox()` stopped retrying), and a deletion of the damaged box elsewhere does not stop this
   store. What one who can write storage could already do -- delete or replace any row -- is
   unchanged; what is new is that planting junk under a boxlabel shows the user a damaged box where
   a refused open used to show, and that the user's next `putBox()` to that boxlabel clears the junk
   rather than refusing. `getBox()` and `useBox()` still refuse a damaged box. (Amended
-  2026-10-19, 20261019-no_clear: the retire-first is gone. `putBox()` is one conditional
+  2026-10-19, 20261019-no_clear: the delete-first is gone. `putBox()` is one conditional
   `putBox`; a damaged box naming a revision is written over in it, carrying nothing forward,
   and one naming no revision is refused as `damaged_box`, writing nothing, until the user calls
   `delBox()`; the two-step and removal behaviors described here no longer exist.)
@@ -287,7 +289,7 @@ added or folded into through the subagent, and no other entry changes.
   absent box (`absent_box`) from a present one, and a damaged record counts as present. It still
   needs the vault unlocked, still names the boxlabel the caller gave, and still lands only in the
   vault this device holds keys for (its `vault_id` expectation). `getBox()`, `useBox()` and the
-  background refresh still leave a damaged record in place; only an explicit retirement of that
+  background refresh still leave a damaged record in place; only an explicit deletion of that
   boxlabel deletes it.
 * 2026-10-15: a scope's `user_id` is text of 1 to 100 characters (`UserId`), checked at
   `Vault.make`, by every `VaultDB` verb, and in every stored record that names a scope; a refusal
@@ -385,19 +387,19 @@ added or folded into through the subagent, and no other entry changes.
   scope's standing vault props have that `vault_id` and the standing box that `revision_tok` (or
   there is none); a scope with no vault props refuse. A failed expectation refuses with kind
   `stale_write`, writes nothing, and `putBox()` / `changePassphrase()` / `delBox()` / `del()`
-  surface it on the first failure, with no retry. Retirements (`delBox`, `delVault`) carry a
+  surface it on the first failure, with no retry. Deletions (`delBox`, `delVault`) carry a
   `vault_id`-only expectation (the Coach's ruling): they land only while the scope's standing
   vault props have that `vault_id`, refuse where no vault props stand, and expect no revision, so within
-  its vault a retirement wins over a concurrent update; retiring an absent box is quiet. The
+  its vault a deletion wins over a concurrent update; deleting an absent box is quiet. The
   atomicity of check-and-write is each adapter's: `localVaultDB` checks and saves in one
   synchronous step; the Convex component checks inside the transaction of the mutation that
   writes (below).
-* 2026-10-15: `idbVaultDB` performs its versioned updates, its retirements and `ensureVaultProps` as a
+* 2026-10-15: `idbVaultDB` performs its versioned updates, its deletions and `ensureVaultProps` as a
   read, then a separate write, in separate IndexedDB transactions: another tab writing in
   between can still be buried, two tabs can each create vault props, and a vault another tab
-  retires and makes anew in between can still lose a box (`delBox`) or be retired whole
+  deletes and makes anew in between can still lose a box (`delBox`) or be deleted whole
   (`delVault`). Its `delVault` also lists the vault's rows in one transaction and deletes
-  them in another: a box another tab writes in between survives the retirement, orphaned without
+  them in another: a box another tab writes in between survives the deletion, orphaned without
   vault props. Doing these inside one IndexedDB transaction is a ruled TODO, not yet built. (Built
   when the store moved to `safebyok-indexeddb`: see the entry on it below.)
 * 2026-10-14: a box's ciphertext length reveals its whisper's length to the backend: there is
@@ -410,12 +412,12 @@ added or folded into through the subagent, and no other entry changes.
   kept.
 * 2026-10-14: `pnpm-workspace.yaml` denies `esbuild`'s install script (`esbuild: false`); esbuild
   arrives with `convex` and vite, and runs from its platform binary package without it.
-* 2026-10-15: a session holding keys for a vault since retired or recreated elsewhere cannot
-  write a box into the successor, retire one of its boxes, or retire it: `putBox()`,
+* 2026-10-15: a session holding keys for a vault since deleted or recreated elsewhere cannot
+  write a box into the successor, delete one of its boxes, or delete it: `putBox()`,
   `delBox()` and `del()` no longer look at the vault props first, and rely on the `vault_id`
   expectation, checked by the backend, to refuse. A refused `del()` has already revoked
   this device's lease; a second `del()`, now holding the successor's `vault_id`,
-  retires the successor. On a vault the handle has never seen created, `del()` removes only
+  deletes the successor. On a vault the handle has never seen created, `del()` removes only
   the device-local record: boxes orphaned without vault props are not reached.
   `changePassphrase()` and `unlock()` re-read the vault props first, as they must to prove the
   passphrase against it. A change to the wayins elsewhere (a passphrase or passkey added, removed or changed) does not stop a stale session's
@@ -434,7 +436,7 @@ added or folded into through the subagent, and no other entry changes.
   `FarFuture` (see the next entry), and the stored `ask_passphrase_at` is a finite number; no schema
   past that parse, and no stored field, accepts `Infinity`. What still ends such a lease: `lock()`
   (memory and lease), a change to the wayins on another device (the next look at the vault props
-  sees a new epoch), and the vault being retired or made anew (a new `vault_id`). Nothing else
+  sees a new epoch), and the vault being deleted or made anew (a new `vault_id`). Nothing else
   does: no timer, and no idle detection. Two consequences: an open handle sees that new epoch only
   when it next reads the vault props (an unlock, a write, or a change the vaultDB pushes), so a handle
   that only reads whispers, on storage that pushes nothing, keeps its vaultKey in memory until then;
@@ -510,7 +512,7 @@ added or folded into through the subagent, and no other entry changes.
   and is erased first (the entry above). A handle already open keeps the deadline it opened
   with: the option is read at `Vault.make`.
 * 2026-10-14: the package was renamed `byok` → `safebyok` before any release, and its stored
-  format tags with it (`safebyok-vault-v1`, `safebyok-box-v1`, `safebyok-unlock-v1`). The
+  format tags with it (`safebyok-vault-v1`, `safebyok-lockbox-v1`, `safebyok-unlock-v1`). The
   tags are also the first element of every encryption's additional data, so a record written
   under a `byok-*-v1` tag would neither validate nor decrypt. No reader for the old tags is
   kept: they existed only in development and demo storage, never in a published version.
@@ -520,7 +522,7 @@ added or folded into through the subagent, and no other entry changes.
   whatever the backend's client threw, unfiltered.
 * 2026-10-15: `localVaultDB` and `idbVaultDB` key rows by `applabel:user_id:vaultlabel`, and
   `user_id` may hold a colon, so one user's rows can share another scope's ckey prefix. Listing
-  and retiring a vault now take only ckeys whose remainder after the prefix is a bare boxlabel
+  and deleting a vault now take only ckeys whose remainder after the prefix is a bare boxlabel
   (no colon); before, a prefix match alone listed a colon-holding user's boxes in another
   user's vault. Exact ckeys cannot collide.
 * 2026-10-15: the string-keyed adapters (`localVaultDB`, `idbVaultDB`, `idbDeviceDB`,
@@ -552,7 +554,7 @@ added or folded into through the subagent, and no other entry changes.
   `unlock_epoch` and a sidecar's length are checked by the client's Zod records, not on the
   server. A signed-in user can therefore store malformed rows in their own vaults, which their
   own clients then refuse as `corrupt_record`.
-* 2026-10-15: the Convex component checks each update's and retirement's expectation by reading the
+* 2026-10-15: the Convex component checks each update's and deletion's expectation by reading the
   standing rows inside the same mutation that writes, relying on Convex's serializable
   transactions; a failed expectation resolves `false` rather than throwing. `ensureVaultProps` is a
   find-or-insert in one mutation; the indexes are not unique, and a second vault props row for one
@@ -589,15 +591,15 @@ added or folded into through the subagent, and no other entry changes.
   (reading every row twice, beside vault props of up to one 1 MiB document) always fits; neither the
   client nor the host can change them. `putBox` checks them against a per-vault tally row
   (`safebyok_vault_tallies`, keyed by the vault props' row `_id`) updated in the same transaction as
-  each box write and retirement, and refuses, writing nothing, a write that leaves the vault over a
+  each box write and deletion, and refuses, writing nothing, a write that leaves the vault over a
   limit and larger than before, with `ConvexError` kind `vault_full` and fixed text. Replacements
-  no heavier and all retirements are never refused. A vault with no tally (written before tallies) is
+  no heavier and all deletions are never refused. A vault with no tally (written before tallies) is
   counted at its next `putBox`, reading its rows only until a limit is passed; an over-limit
-  vault keeps no tally and refuses all growth until retirements bring it back. The tally is trusted as
+  vault keeps no tally and refuses all growth until deletions bring it back. The tally is trusted as
   kept: a rollback to a component version without tallies, followed by a roll forward, leaves
   tallies stale for vaults written meanwhile (deleting the table's rows makes every vault
   recount). Before this, a vault grown past the client's cap (by a modified client, or many
-  overshoots) could become impossible to retire whole: the vault half of deleting an account.
+  overshoots) could become impossible to delete whole: the vault half of deleting an account.
 * 2026-10-15: records crossing into the core are checked where they cross, and trusted past it.
   A host's `putBox()` sidecar is checked against the stored box's own schema before anything is
   written (an unchecked over-long sidecar once made every later `hello()` refuse the vault as
@@ -643,13 +645,13 @@ added or folded into through the subagent, and no other entry changes.
   the adapter's refusal is the `cause`); a catch-up that relocks the device (vault reborn, or its
   wayins changed) throws `vault_locked` with nothing written, and one that fails throws as it came
   (`stale_write` with the failure as cause, `identity_revoked`, `rolled_back`, `newer_format`). A
-  box retired elsewhere is now just a stale write. So no whisper is sealed over what another device
+  box deleted elsewhere is now just a stale write. So no whisper is sealed over what another device
   wrote without the caller's say, and no jittered wait or `crypto.getRandomValues` draw remains in
   the path. Until 2026-10-18 a refused store tried up to three times (waits of 1-2 s, then 2-4 s,
   jittered), each attempt sealing anew under its own boxKey and `revision_tok`, and overwrote
-  the other device's box (last writer wins) unless it found the box retired (a retirement wins). Still
-  load-bearing: the versioned write (a stale tab cannot resurrect a retired box, and a
-  box sealed under a retired vaultKey never lands) and the damaged-box handling below; `delBox()` is
+  the other device's box (last writer wins) unless it found the box deleted (a deletion wins). Still
+  load-bearing: the versioned write (a stale tab cannot resurrect a deleted box, and a
+  box sealed under a deleted vaultKey never lands) and the damaged-box handling below; `delBox()` is
   never retried.
 * 2026-10-15: the published package has a `safebyok/testing` entry point of test helpers
   (the `TH` namespace of its tests), among them `testDeriver`, a KeyDeriver that is one SHA-256
@@ -678,7 +680,7 @@ added or folded into through the subagent, and no other entry changes.
   on the same handle; that device then asks for the passphrase at its next open. An unlock (or
   the unlock after a passphrase change) also takes up nothing, and throws `vault_locked`, when the
   vault props standing at its end are not the ones its passphrase was proven against, by `vault_id` and
-  `unlock_epoch`: a vault retired, remade, or re-keyed elsewhere while the passphrase was
+  `unlock_epoch`: a vault deleted, remade, or re-keyed elsewhere while the passphrase was
   being checked. Without that, the old vault's vaultKey was taken up against the new vault props, and a
   `putBox()` sealed boxes into the new vault that its owner could never open.
 * 2026-10-15 (`close()` and the timer revised 2026-10-16 by locks_and_expiry, below); 2026-10-19
@@ -720,8 +722,8 @@ added or folded into through the subagent, and no other entry changes.
   Zod strips a field it does not know, so none reaches storage. `putVaultProps` refuses vault props
   whose `vault_id` differs from the expected one. Listing still validates only what a listing
   shows: a box whose ciphered fields are damaged lists, and is refused at `getBox()`, so one
-  damaged box never makes the vault fail to open; such a box cannot be stored over or retired
-  either (both read it first), only retired along with its vault. A lease naming another
+  damaged box never makes the vault fail to open; such a box cannot be stored over or deleted
+  either (both read it first), only deleted along with its vault. A lease naming another
   scope is discarded before any unwrap; its `vault_key_lease_wrapped` ctx would refuse it
   anyway. The vault-size check counts each box at twice `maxWhisperBytes` plus 2 KiB for its
   other fields against the adapter's whole `maxVaultBytes`: the same outcomes as half the limit
@@ -914,7 +916,7 @@ added or folded into through the subagent, and no other entry changes.
   the expectation, and writes; a failure anywhere in it aborts it, writing nothing. IndexedDB runs
   readwrite transactions over one store one after another, across the origin's tabs, so the
   windows the `idbVaultDB` entry above records are closed: no write lands over a row another tab
-  changed meanwhile, two tabs creating a vault settle on one, and no box outlives a retired
+  changed meanwhile, two tabs creating a vault settle on one, and no box outlives a deleted
   vault. The guarantee rests on the work inside awaiting only IndexedDB's own requests (awaiting
   anything else lets the browser commit the transaction early, and the next request throws);
   `src/shelf.ts`'s `inOneTransaction` says so. Its rows, ckeys and database name are unchanged,
@@ -969,7 +971,7 @@ added or folded into through the subagent, and no other entry changes.
   one policy (`src/refusal-policy.ts`) on its way out of the vault, whichever call made it,
   a background refresh's included; for `identity_revoked` it locks at once, as `lock()` does:
   the vaultKey dropped, the lease revoked (amended 2026-10-19: `lockSoon()`'s grace and the defeat
-  of an unlock under way are gone, see "one kind of lock" below). It never retires the vault or a box. `convexVaultDB`'s `ConvexClient`
+  of an unlock under way are gone, see "one kind of lock" below). It never deletes the vault or a box. `convexVaultDB`'s `ConvexClient`
   watch now calls `onChange` on a failed `watchVault` (as a `ConvexReactClient`'s watch already
   did), so an idle vault locks on a sign-out in another tab. **For review**: (1) the default is
   `'lock'`, but `Vault.make`'s `whenIdentityRevoked: 'stay'` lets a host keep the vault unlocked
@@ -997,7 +999,7 @@ added or folded into through the subagent, and no other entry changes.
   refused: telling a wrong passphrase from an altered wayin by re-encrypting a held vaultKey
   under the derived key with the stored IV and comparing ciphertexts -- it works only against
   GCM's structure, needs the vaultKey's bytes, and is a construction of our own. Vault props that
-  fails its checks cannot be retired through a vault handle (`hello()` refuses it, and `del()`
+  fails its checks cannot be deleted through a vault handle (`hello()` refuses it, and `del()`
   needs a handle); it is left in place, as every damaged remote record is, until the host calls
   `delDamagedVault` (the entry below).
 * 2026-10-16: `postgresVaultDB`'s box limit is a best effort (VaultDB contract, lines 4.2 to
@@ -1016,29 +1018,29 @@ added or folded into through the subagent, and no other entry changes.
   The notify trigger is no longer installed by `VaultTablesSql`: a host opts in with
   `VaultNotifySql`, and without it nothing is pushed (the vault refreshes after its own writes).
   Not run against concurrent connections: the tests are on PGlite, one statement at a time.
-* 2026-10-16 (revised the same day by refusals_and_catchup, below: a vault that may be newer is `newer_format`): **`delDamagedVault`, the one way to retire a vault without a handle** (the Coach:
+* 2026-10-16 (revised the same day by refusals_and_catchup, below: a vault that may be newer is `newer_format`): **`delDamagedVault`, the one way to delete a vault without a handle** (the Coach:
   "yes"). `del()` deliberately needs no unlock ("owning the account is enough"), but needs a
   handle the vault's own reading made; vault props that fail their checks gave none. The new call
-  retires a vault `hello()` refuses as `damaged_vault` and no other: it refuses (`bad_option`,
-  nothing retired) vault props that read back sound, so it cannot become a way round `del()`'s
-  care, and it retires through `VaultDB.delDamagedVault`, which reads the record as stored,
+  deletes a vault `hello()` refuses as `damaged_vault` and no other: it refuses (`bad_option`,
+  nothing deleted) vault props that read back sound, so it cannot become a way round `del()`'s
+  care, and it deletes through `VaultDB.delDamagedVault`, which reads the record as stored,
   takes its `vault_id`, and aims the adapter's `doDelVault` at that one vault, so a vault made
   anew meanwhile survives as `stale_write`. Like `del()` it needs no passphrase, and it is as
-  strong as the backend's own authorization of who may retire that user's rows (the contract's
-  5.4): a user can already retire their own vault by `del()`, so it widens nothing for them,
+  strong as the backend's own authorization of who may delete that user's rows (the contract's
+  5.4): a user can already delete their own vault by `del()`, so it widens nothing for them,
   and widens nothing for anyone else. It also erases the lease, on this device only.
-  **For review**: (1) the retirement's expectation is the `vault_id` read from a record that is, by
-  definition, untrusted; it can only aim the retirement at the row it read, in the caller's own
-  scope, so a forged `vault_id` in a damaged row retires that row and nothing else; (2) `localVaultDB`
-  and `idbVaultDB` now retire a whole vault on the `vault_id` alone (the contract's line 3.5 always
+  **For review**: (1) the deletion's expectation is the `vault_id` read from a record that is, by
+  definition, untrusted; it can only aim the deletion at the row it read, in the caller's own
+  scope, so a forged `vault_id` in a damaged row deletes that row and nothing else; (2) `localVaultDB`
+  and `idbVaultDB` now delete a whole vault on the `vault_id` alone (the contract's line 3.5 always
   said so), where they had also required a readable `unlock_epoch`, which kept exactly the
-  damaged vaults from being retired; box writes and `delBox` still need the epoch.
+  damaged vaults from being deleted; box writes and `delBox` still need the epoch.
   **Newer is not damaged** (review of the above): vault props that fail this build's checks may be
-  ones a *later* build writes and opens, and offering "retire" for it would retire, from a device
+  ones a *later* build writes and opens, and offering "delete" for it would delete, from a device
   on an old build, a vault every up-to-date device opens. So the hatch refuses (kind
-  `damaged_vault`, a message to update the app, nothing retired) a record with a `format` this
+  `damaged_vault`, a message to update the app, nothing deleted) a record with a `format` this
   build does not know (of any type), a wayin `wayinkind` it does not know, or more wayins than
-  `MaxUnlocks`, and retires only what fails otherwise. **The rule this rests on, which the Coach
+  `MaxUnlocks`, and deletes only what fails otherwise. **The rule this rests on, which the Coach
   has ruled (2026-10-16): any change to what a stored record may hold -- a field, a shape, or a
   range a check accepts -- bumps `format`**, so that an older build can tell newer from damaged. Where it cannot tell, it refuses: the hatch fails safe. Not routed through
   `RefusalPolicy.heed`: there is no handle to lock and no key in memory, so `whenIdentityRevoked`
@@ -1097,12 +1099,12 @@ added or folded into through the subagent, and no other entry changes.
   of a host's UI whatever its validators: no control characters, no 1 MB label. The host's
   `validators`, by contrast, now run only where a name enters the vault (`Vault.make`, `putBox`,
   `addPassphrase`, `addPasskey`) and never on a record read back: a box stored under a name
-  they refuse lists, reads and retires as sound, as a wayinlabel already did. They are an
+  they refuse lists, reads and deletes as sound, as a wayinlabel already did. They are an
   alarm for the host's own use, not a promise about storage, which a server serving several
   clients cannot keep. `VaultDB` verbs no longer take a validators bag at all, so no server or
   wrapper can be handed the wrong one. Each adapter declares `maxNameBytes` (Postgres: 640, so a
   box's four-name primary key fits a btree entry) and the base class refuses a longer name.
-* 2026-10-16; 2026-10-18: **a box's sidecar is any JSON, bound; its whisper's codec
+* 2026-10-16; 2026-10-18; 2026-10-19: **a box's sidecar is any JSON, bound; its whisper's codec
   and schema version are reserved, bound too** (push_to_100_a, thread 2; G023, G025, G040). The
   box (`safebyok-box-v6`) holds `sidecar_json`, the host's sidecar as stable-serialized JSON
   text, always written (`{}` when the host gave none, so an absent sidecar and an empty one are one
@@ -1131,7 +1133,7 @@ added or folded into through the subagent, and no other entry changes.
   that shows it checks what it shows. 2026-10-18 (branch `20261018-sidecar`, thread 5 of sprint
   reform): the host's field, first the box's "note" and then its "public bag", was renamed the
   "sidecar", `public_json` became `sidecar_json`, and the format
-  tag moved from `safebyok-box-v4` to `safebyok-box-v6`. Both of a box's encryptions
+  tag moved from `safebyok-lockbox-v4` to `safebyok-lockbox-v5`. Both of a box's encryptions
   (the boxKey wrap and the whisper cipher) bind a context (`boxCtx`) of the format tag, the
   vault's scope and `vault_id`, the purpose string, and the whole stored header as key-sorted JSON,
   so those bytes follow the renamed field and the v5 tag, and the header now spells `sidecar_json`
@@ -1143,10 +1145,15 @@ added or folded into through the subagent, and no other entry changes.
   `20261018-vaultprops`): the box's stored field `revision_id` is renamed `revision_tok` (a
   `_tok` names a value that changes on every write), and `boxCtx` follows it, so the field name in
   the bound header changes; the construction is unchanged, the same parts in the same order, and
-  `revision_tok` sorts where `revision_id` did. It rides the format bump to `safebyok-box-v6`
+  `revision_tok` sorts where `revision_id` did. It rides the format bump to `safebyok-lockbox-v5`
   already in this release, so there is no second bump, and a box in an older format lists as
   damaged, as before, with no migration. The wayin's and the lease's contexts bind no field the
-  rename touches, so their bytes do not move. `tests/ctx-bytes.test.ts` pins the box's bytes.
+  rename touches, so their bytes do not move. `tests/ctx-bytes.test.ts` pins the box's bytes. 2026-10-19 (branch 20261019-rename_pass, on
+  [PR #193](https://github.com/mrflip/safebyok/pull/193)): the box record's format tag, which leads its ctx, moved
+  from `safebyok-lockbox-v5` to `safebyok-box-v6`, and the purpose string that binds a wrapped boxKey
+  moved from `lockbox_key_wrapped` to `box_key_wrapped`. Both are still distinct from every other format
+  tag and purpose string. A box stored under the old names fails schema validation before any
+  decryption is tried, and is listed as damaged.
 * 2026-10-16 (locks_and_expiry); 2026-10-19 (20261019-softlock_gone): **the lease has a hard edge, and a timer.** The
   threshold is the truth: every call that starts work checks `askPassphraseAt` against the host's
   clock, and past it throws `vault_locked`. A `setTimeout` enforces it: armed at each take-up of a
@@ -1168,7 +1175,7 @@ added or folded into through the subagent, and no other entry changes.
   need to type that password again for seven days"): `unlock()`, `changePassphrase()`, and any
   change to the wayins proved by a passphrase. An `unlock()` by passkey also sets it, as it did.
   A passkey proving a change on an unlocked vault keeps the deadline standing (on a locked one it
-  sets one, as `unlock()` by passkey would). Reads, stores, retirements and refreshes never move it.
+  sets one, as `unlock()` by passkey would). Reads, stores, deletions and refreshes never move it.
   One place decides (`deadlineFor` in `vault.ts`), so a new kind of proof cannot slip past it.
   Expiry was a soft lock (the strawman's two locks); amended 2026-10-19: there is one kind of
   lock, which drops the key at once, and no lock, expiry included, defeats an `unlock()` or
@@ -1189,7 +1196,7 @@ added or folded into through the subagent, and no other entry changes.
   `describeDeviceDB` battery checks it); a lock on a device with no mark for the vault (one that
   never read it, or whose mark would not read) has nothing to raise; and `del()` erases the
   mark, so its generation starts again from 0, and an unlock under way in another tab that began
-  at 0 may write a record of the retired vault, which opens nothing and is erased at the next
+  at 0 may write a record of the deleted vault, which opens nothing and is erased at the next
   open of a vault under the scope. `close()` is no lock: it erases nothing, raises nothing, and a
   record an unlock under way wrote before the close stays (G126). The undoing erase of a losing
   unlock now runs only for a lock in its own handle (which may have erased before the record
@@ -1215,7 +1222,7 @@ added or folded into through the subagent, and no other entry changes.
   next page load. A `getBox()` or `useBox()` still hands back nothing if no key is in hand when
   storage answers or when the whisper has been deciphered, unless another unlock put a key back in
   hand meanwhile. An unlock still takes nothing up when the handle has closed or the vault props it
-  proved against no longer stand (retired, remade, wayins changed). **For review**: the Coach's
+  proved against no longer stand (deleted, remade, wayins changed). **For review**: the Coach's
   ruling is that these are accepted as user annoyances until the store reform is done; a policy is
   owed before 1.0, recorded in TODO.md under *Lock timing vs. work in flight* with seven
   scenarios. The device mark (format now `safebyok-mark-v4`) holds only the seen vault (rollback
@@ -1247,19 +1254,19 @@ added or folded into through the subagent, and no other entry changes.
   the generation; neither runs with a handle that could be unlocking that vault.
 * 2026-10-16 (refusals_and_catchup): **one catch-up before a kind is named.** A write storage
   refuses as stale, or a box that will not open, gets one refresh before the vault names it: a
-  vault retired and made anew, or its wayins changed, elsewhere relocks the device (P4: never on
+  vault deleted and made anew, or its wayins changed, elsewhere relocks the device (P4: never on
   no evidence), so a successor vault's box reads as `vault_locked`, not `damaged_box`. A
   catch-up that fails is thrown as `stale_write` with the failure as cause, never retried blind,
   and the snapshot says `syncing: false`. Refreshes are serialized per handle (one in flight, one
   queued), so two reads never interleave their snapshot updates. None retries: `putBox()`, a change
-  to the wayins, `delBox()` and `del()` each refuse once (amended 2026-10-18: this said only `putBox()` retries, until [#160](https://github.com/mrflip/safebyok/pull/160) removed that retry; see the 2026-10-15; 2026-10-18 entry above). There is no conflict hook: a retirement wins.
+  to the wayins, `delBox()` and `del()` each refuse once (amended 2026-10-18: this said only `putBox()` retries, until [#160](https://github.com/mrflip/safebyok/pull/160) removed that retry; see the 2026-10-15; 2026-10-18 entry above). There is no conflict hook: a deletion wins.
 * 2026-10-16 (refusals_and_catchup, G498): **a damaged box is replaced in one conditional
   write.** The listing keeps a damaged record's `revision_tok` when it holds one as text, and
   `putBox()` writes over that revision under contract line 3.3, so a sound box another device
-  wrote meanwhile refuses the write and is never retired, and the refusal is thrown as `stale_write`
+  wrote meanwhile refuses the write and is never deleted, and the refusal is thrown as `stale_write`
   after one catch-up (amended 2026-10-18: the store once retried over it, last writer wins, until [#160](https://github.com/mrflip/safebyok/pull/160) removed the retry). The revision is untrusted text used only as an expectation storage compares. Only
-  a record naming no revision is retired first, which leaves a gap P6 accepts (amended 2026-10-19,
-  20261019-no_clear: the retire-first is gone; `putBox()` refuses a damaged box naming no
+  a record naming no revision is deleted first, which leaves a gap P6 accepts (amended 2026-10-19,
+  20261019-no_clear: the delete-first is gone; `putBox()` refuses a damaged box naming no
   revision as `damaged_box`, writing nothing, and the gap with it). A box under a
   vaultKey epoch neither the vault props' nor the prior's lists as damaged from its epoch alone (G063);
   the listing still never opens ciphertext (G121).
@@ -1267,7 +1274,7 @@ added or folded into through the subagent, and no other entry changes.
   object would skip the base class's checks of every record and expectation. `instanceof` holds
   within one copy of the package, as `VaultError`'s does; the peer dependency keeps it one. And a
   vault a newer safebyok may have written is `newer_format`, never `damaged_vault`, so no UI
-  offers to retire it (G120).
+  offers to delete it (G120).
 * 2026-10-16 (epoch_expectation, G065, G138): **every in-tree adapter now compares the
   `vault_key_epoch` expectation** (line 3.8), and the battery holds every adapter to it, with no
   opt-out (`describeVaultDB` no longer takes `comparesVaultKeyEpoch`). IndexedDB compares in the
@@ -1370,7 +1377,7 @@ added or folded into through the subagent, and no other entry changes.
   manager may honor none, and Chrome ignores `off` on a `type="password"` field, so it may still
   offer a saved password there.
 * 2026-10-16: **Starting over from the passphrase dialog** (`allowStartOver` on `VaultProvider`
-  and `PassphraseModal`, off by default) retires the vault on every device through
+  and `PassphraseModal`, off by default) deletes the vault on every device through
   `vault.del()`, which by design needs no passphrase. It asks first, in the dialog, and focus
   lands on "Keep it". Anyone at an unlocked session could already do the same through the handle;
   the option only puts it in the user's reach.
@@ -1588,7 +1595,7 @@ added or folded into through the subagent, and no other entry changes.
   store now stamps `written_at` with the time of the write and the field claims nothing about
   whether the whisper changed, so storage can no longer tell from a standing timestamp that the
   same whisper was stored again. The field is bound into both of the box's encryptions with the
-  rest of its header, and the stored format moves from `safebyok-box-v3` to `-v4` (today's is `-v5`)
+  rest of its header, and the stored format moves from `safebyok-lockbox-v3` to `-v4` (today's is `safebyok-box-v6`)
   (`Box` and `BoxSummary`, `types.ts`); v3 records fail validation and list as damaged,
   with no migration.
 * 2026-10-17 (thread 17, written_at, [#141](https://github.com/mrflip/safebyok/pull/141)): **`putBox()`
@@ -1609,7 +1616,7 @@ added or folded into through the subagent, and no other entry changes.
   catch-up failures are still wrapped.
 * 2026-10-17 (thread 17, written_at, [#141](https://github.com/mrflip/safebyok/pull/141)): **`delBox()`
   into a vault reborn elsewhere keeps kind `stale_write` and says why, quoting no boxlabel.** The
-  message says the box's contents could not be retired because the vault it was in is gone
+  message says the box's contents could not be deleted because the vault it was in is gone
   (deleted, or deleted and made anew, on another device), and the adapter's refusal is its
   `cause`. It names no boxlabel, since a host's boxlabel check may admit any text. It is said only
   after a successful catch-up; a failed catch-up keeps its own message.

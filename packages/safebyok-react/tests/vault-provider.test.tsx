@@ -1084,10 +1084,10 @@ describe("VaultProvider", () => {
     it("throws a prop Vault.make does not take to the error boundary, naming it and its new name, rather than drop it unseen", async () => {
       hushConsole()
       const caught: unknown[] = []
-      const retired = { forcePassphraseReentryHours: 1 } as Partial<VaultProviderProps>
+      const deleted = { forcePassphraseReentryHours: 1 } as Partial<VaultProviderProps>
       render(
         <CatchingBoundary caught={caught}>
-          <VaultProvider {...makeWorld().props} userId="u1" {...retired}>
+          <VaultProvider {...makeWorld().props} userId="u1" {...deleted}>
             <Probe />
           </VaultProvider>
         </CatchingBoundary>,
@@ -1153,7 +1153,7 @@ describe("VaultProvider", () => {
     })
 
     describe("delDamagedVault", () => {
-      it("retires the vault openError says is damaged, with this device's lease, and opens a fresh one", async () => {
+      it("deletes the vault openError says is damaged, with this device's lease, and opens a fresh one", async () => {
         const { store, deviceDB, props } = await damagedWorld()
         const { Grab, latest } = grabber()
         render(<VaultProvider {...props} userId="u1"><Grab /><Probe /></VaultProvider>)
@@ -1189,7 +1189,7 @@ describe("VaultProvider", () => {
         expect(shownState()).to.eq('absent')
       })
 
-      it("opens again, and still rejects, when retiring finds the vault made anew", async () => {
+      it("opens again, and still rejects, when deleting finds the vault made anew", async () => {
         const { vaultDB, props } = await damagedWorld()
         vi.spyOn(vaultDB, 'delDamagedVault').mockRejectedValueOnce(new VaultError('stale_write', 'Storage changed.'))
         // The vault is made anew behind the provider's back: the reopen finds it sound.

@@ -34,11 +34,11 @@ export const vaultPropsMeets = (standing: unknown, expected: VaultPropsExpectati
 
 /**
  * True when the vault props standing belong to the vault `expected` names, at any epoch: what
- * retiring a box, and the vault props' half of a box write, compare. Vault props that show
+ * deleting a box, and the vault props' half of a box write, compare. Vault props that show
  * no epoch are too damaged to compare, as for {@link vaultPropsMeets}.
  *
  * @param standing - The vault props' row standing in storage, or undefined (or null) when there is none.
- * @param expected - The vault the write or retirement is aimed at.
+ * @param expected - The vault the write or deletion is aimed at.
  *
  * @example Expectations.vaultMeets(standing, { vault_id: 'v1' })
  */
@@ -49,11 +49,11 @@ export const vaultMeets = (standing: unknown, expected: VaultDelExpectation): bo
 
 /**
  * True when the vault props standing name the vault `expected` names, and nothing more is
- * compared: what retiring a whole vault needs, so that a vault whose props are too damaged to show
- * an epoch can still be retired (line 3.5).
+ * compared: what deleting a whole vault needs, so that a vault whose props are too damaged to show
+ * an epoch can still be deleted (line 3.5).
  *
  * @param standing - The vault props' row standing in storage, or undefined (or null) when there is none.
- * @param expected - The vault the retirement is aimed at.
+ * @param expected - The vault the deletion is aimed at.
  *
  * @example Expectations.vaultIdMeets({ vault_id: 'v1', unlock_epoch: 'garbled' }, { vault_id: 'v1' })  // true
  */
@@ -79,15 +79,15 @@ export const boxMeets = (standingVaultProps: unknown, standingBox: unknown, expe
 }
 
 /**
- * What a box retirement reports, removing `standingBox`, the row standing under its boxlabel:
- * `retired` when that row is at the revision `expected` names -- or, for a null `revision_tok`,
+ * What a box deletion reports, removing `standingBox`, the row standing under its boxlabel:
+ * `deleted` when that row is at the revision `expected` names -- or, for a null `revision_tok`,
  * holds none that reads as one, as the listing names no revision for a damaged box that holds
  * none -- `deleted_other` for any other row, and `absent` for none. It decides nothing: a
- * retirement in the right vault ({@link vaultMeets}) removes whatever stands (line 3.4), and this
+ * deletion in the right vault ({@link vaultMeets}) removes whatever stands (line 3.4), and this
  * says what that was, from inside the same atomic step.
  *
  * @param standingBox - The box row standing under the boxlabel, or undefined (or null) when there is none.
- * @param expected - The vault the retirement is aimed at, and the revision the retiring device read.
+ * @param expected - The vault the deletion is aimed at, and the revision the deleting device read.
  *
  * @example Expectations.deletionOf(standingBox, { vault_id: 'v1', revision_tok: 'r7' })  // { outcome: 'deleted' } while r7 stands
  */

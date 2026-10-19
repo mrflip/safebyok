@@ -83,7 +83,7 @@ code, the stored records and these docs all use its words.
   the signed-in user's id and a `vaultlabel`.
 * The vault is unlocked by a **proof** of one of its **wayins**: a passphrase, or a passkey's
   answer. Each wayin holds the one **vaultKey** (the vault's random master key) wrapped under a key
-  made from that proof, so adding, changing or retiring a wayin rewrites no box. The vaultKey
+  made from that proof, so adding, changing or deleting a wayin rewrites no box. The vaultKey
   wraps a fresh **boxKey** for every stored whisper, and the boxKey encrypts the whisper.
   The wayins live in the **vault props**, the one record per vault that every device syncs. The
   backend holds those and the boxes, nothing else: every key and whisper in them is
@@ -224,7 +224,7 @@ await vault.putBox('מפתח OpenAI: עבודה', 'sk-...', { sidecar: { note: '
 * **Your checks are an alarm at the door, not a promise about storage.** They run where a name
   enters the vault: `Vault.make` (the scope), `putBox()` (the boxlabel), `addPassphrase` and
   `addPasskey` (the wayinlabel). A box already stored under a name they refuse
-  -- by another client, or before you narrowed them -- lists, reads and retires as any other, by
+  -- by another client, or before you narrowed them -- lists, reads and deletes as any other, by
   the name it was stored under; `putBox()` refuses only to write a new one under a refused name.
   With nothing stored under it, a name they refuse is `bad_label` at `getBox()`, `useBox()` and
   `delBox()`. The first way in, which the vault names `passphrase`, is not checked.
@@ -712,7 +712,7 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `weak_passphrase`     | a new passphrase -- the one the first `unlock()` creates the vault with, or one `addPassphrase()` or `changePassphrase()` sets -- that the vault's `passphraseStrengthTest` finds too easy to guess. The message is the test's own reason. Never raised by an `unlock()` of a vault that stands | Show the message beside the field, and ask for another |
 | `wrong_passkey`       | the passkey's answer did not unlock the vault, or answered for another salt. An answer for the wayin's own salt that does not open it most likely means the wayin was altered in storage, and the message says so | Ask for a passphrase; if it works, the user may remove that passkey and add it again |
 | `passkey_unavailable` | this browser or authenticator cannot answer for a passkey unlock: no WebAuthn, or no PRF extension | Offer the passphrase instead; on `createPasskey`, tell the user this device cannot be a fingerprint unlock |
-| `absent_box`          | no box under that label                                      | Offer to create it, or refresh the list: it may have been retired elsewhere |
+| `absent_box`          | no box under that label                                      | Offer to create it, or refresh the list: it may have been deleted elsewhere |
 | `absent_vault`        | the vault has never been created, or was deleted elsewhere, and the call will not create it | Unlock with a new passphrase to create it |
 | `absent_wayin`        | no way into the vault has that `wayin_id`, or is the passkey that answered: it may have been removed on another device | Look again at the snapshot's `wayins`, and ask the user which they mean |
 | `whisper_too_large`   | a whisper over the vault's `maxWhisperBytes`                     | Tell the user it is too large; a host that means to allow more passes a larger `maxWhisperBytes` |
@@ -725,7 +725,7 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `damaged_wayin`       | a way in is stored in a form this package never writes (a salt of the wrong length, or not base64url), so it cannot be tried: the passkey asked for, the passphrase `wayinId` aims at, or every passphrase the vault has. Other ways in are still tried | Unlock another way, then `delWayin()` the damaged one and add it again |
 | `damaged_box`     | a box failed its checks as read, or would not open under the vault's own vaultKey, or opened to no whisper: altered in storage, or moved there from elsewhere. A `putBox()` refuses so a box listed damaged that names no revision, damaged beyond naming, writing nothing. A box that will not open is named so only after the vault has caught up with storage once: one a vault made anew elsewhere wrote makes the call `vault_locked` instead | Nothing was changed. Offer `delBox()`, or a fresh `putBox()` over it while it names a revision (see *Damaged boxes*) |
 | `newer_format`        | the vault's stored props are in a form this version does not know -- a `format`, wayinkind or number of wayins -- which a newer safebyok may have written: `hello()` and `delDamagedVault` refuse it | Nothing was changed. Tell the user to update the app; never offer to start over |
-| `stale_write`         | storage changed since this device read it, so the write was refused and nothing was written: another device or tab wrote, created or retired the box a `putBox()` was writing; a `delBox()` into a vault deleted or made anew elsewhere, its message saying the box could not be removed because its vault is gone; and a write whose catch-up with storage then failed too (its `cause` says why; the snapshot reads `syncing: false`) -- unless the catch-up was refused as `identity_revoked`, `rolled_back` or `newer_format`, which the write throws as it came | The vault has caught up: show what stands now and, if the change still applies, repeat it (*Two devices storing at once*, below). Nothing is tried again by itself |
+| `stale_write`         | storage changed since this device read it, so the write was refused and nothing was written: another device or tab wrote, created or deleted the box a `putBox()` was writing; a `delBox()` into a vault deleted or made anew elsewhere, its message saying the box could not be removed because its vault is gone; and a write whose catch-up with storage then failed too (its `cause` says why; the snapshot reads `syncing: false`) -- unless the catch-up was refused as `identity_revoked`, `rolled_back` or `newer_format`, which the write throws as it came | The vault has caught up: show what stands now and, if the change still applies, repeat it (*Two devices storing at once*, below). Nothing is tried again by itself |
 | `rolled_back`         | this device has already seen a newer copy of the vault props than storage offers now (storage restored from a backup, or altered), so it won't use this one, and the vault locked: nothing was unlocked or written | Tell the user this device has seen a newer copy of the vault than storage holds. If the storage was restored from an older copy on purpose, accept it on this device (see *A vault rolled back*, below); otherwise the app's support should look at its storage |
 | `not_permitted`       | the storage backend refused the signed-in user, still the vault's own, this one call | Tell the user they may not; signing in again will not help |
 | `identity_revoked`    | the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in. The vault has locked itself (see *When the user signs out*) | Have the user sign in again, then open the vault for whoever that is |
@@ -745,12 +745,12 @@ handle to let it go.
 
 A `putBox()` writes only over the revision of the box it read (or over none, for a new one),
 in the vault and under the vaultKey it read. When another device or tab writes, creates or
-retires that box in between, storage refuses the write, and `putBox()` catches up with storage
+deletes that box in between, storage refuses the write, and `putBox()` catches up with storage
 once and throws `stale_write` at once, without waiting: nothing was written, and the snapshot
 shows the box as storage now holds it. The vault never tries again by itself and never
 merges two writes -- in a store of secrets, a write that lost must be seen -- so show the user
 what is there now, and call `putBox()` again if their whisper should still replace it: the second
-call writes over what the catch-up brought in. Should the catch-up find the vault retired or
+call writes over what the catch-up brought in. Should the catch-up find the vault deleted or
 made anew elsewhere, or its ways in changed, the device relocks, and `putBox()` throws
 `vault_locked` instead, writing nothing. A `delBox()`, a passphrase change or a `del()` that
 meets another device's write is refused as `stale_write` the same way, once caught up.
@@ -765,7 +765,7 @@ because storage cannot tell your app's other call from another device's.
 Stored vault props that fail their checks make `hello()` refuse with `damaged_vault`, and
 `del()` cannot reach a vault it cannot read. `delDamagedVault` is the way to clear such a vault
 and start over. It takes the options `Vault.make` took (only the vault's names and its two stores
-matter) and retires that vault's stored props and boxes through the `VaultDB`, and this
+matter) and deletes that vault's stored props and boxes through the `VaultDB`, and this
 device's lease of it through the `DeviceDB`: what `del()` does, for this one case. Whatever the
 vault held is gone for good, so ask the user first.
 
@@ -781,9 +781,9 @@ try {
 ```
 
 It refuses a vault that is sound, with `bad_option` and nothing removed: a vault that opens is
-retired through its handle's `del()`. With no vault stored it erases only the device's
+deleted through its handle's `del()`. With no vault stored it erases only the device's
 lease, so a call cut short can be made again. It needs the stored record's `vault_id`
-to aim the retirement, so vault props too damaged to show one are refused as `damaged_vault`
+to aim the deletion, so vault props too damaged to show one are refused as `damaged_vault`
 still, with nothing removed: the backend's own tools can clear them (`localVaultDB`'s vault props
 that are not JSON at all are one case). A record this version cannot read may instead have been written by a **newer**
 safebyok, which opens it; so one in a `format` this version does not know, with a
@@ -792,14 +792,14 @@ own, `newer_format`, by `hello()` and `delDamagedVault` alike, nothing removed, 
 telling the user to update the app: never offer to start over on it. That is all this version can tell from damage, which rests on a rule: **any change to
 what a stored record may hold -- a field, a shape, or a range a check accepts -- bumps
 `format`**, so an older build can tell "newer" from "damaged". Where it cannot
-tell, it refuses rather than retires. So is any backend that checks a record before
+tell, it refuses rather than deletes. So is any backend that checks a record before
 it hands it over, as `safebyok-graphql`'s server does: there a damaged row is the backend's to
 clear; so is a typed backend's (Convex's, Postgres's), whose rows cannot hold damaged vault props.
 `safebyok-react` hands `delDamagedVault()` down beside `retryOpen`. A `VaultDB` that wraps
 another's public verbs hands `VaultDB.delDamagedVault` on too (`VAULTDB.md`, line 3.5). The
-retirement aims at the stored `vault_id` alone, so vault props rewritten under that same
-`vault_id` between its read and the retirement go too: it is the same vault, the one the user
-asked to retire.
+deletion aims at the stored `vault_id` alone, so vault props rewritten under that same
+`vault_id` between its read and the deletion go too: it is the same vault, the one the user
+asked to delete.
 
 ### A vault rolled back
 
@@ -867,16 +867,16 @@ shows only when the box is read: the listing reads each record's shape and never
 ciphertext, which would cost deciphering the whole vault at every refresh. Such a box lists
 as sound, `getBox()` refuses it with `damaged_box`, and `delBox()` removes it. Before it says
 `damaged_box` of a box that will not open, the vault catches up with storage once: a
-box written by a vault retired and made anew elsewhere relocks this device, and the read
+box written by a vault deleted and made anew elsewhere relocks this device, and the read
 refuses with `vault_locked` instead. `putBox()` starts afresh over any record it cannot read as a
 box -- every one the snapshot lists as damaged, and one missing or mangling a ciphered field --
 carrying nothing from it, neither its sidecar nor when it was first stored. It writes over the
 revision the listing names, in one write that lands only while that record still stands, so a
-sound box another device wrote there meanwhile is never retired: the store is refused as
+sound box another device wrote there meanwhile is never deleted: the store is refused as
 `stale_write`, as over any box written meanwhile, and a second store writes over theirs. A store
 is that one write, always. A record the snapshot lists as damaged naming no revision -- one that is
 not JSON, say -- is damaged beyond naming: there is no revision to write over, so `putBox()`
-refuses it with `damaged_box`, writing nothing: the user retires it with `delBox()`, then
+refuses it with `damaged_box`, writing nothing: the user deletes it with `delBox()`, then
 stores again.
 A record that reads but will not decipher -- its ciphertext, sidecar or times altered -- is written
 over its revision, and carries nothing forward either: nothing vouches for its visible fields, so
@@ -884,10 +884,10 @@ its sidecar becomes `{}` unless you give one, and its first-stored time is now. 
 `StoredBox`, the boxlabel it is stored under beside its record exactly as stored, so a record
 too damaged to name itself is still listed under the boxlabel that reaches it.
 
-A retirement within the vault wins over any revision, damaged or sound. A `delBox()` that finds
-the box written over since the snapshot showed it, on another device or tab, retires that
+A deletion within the vault wins over any revision, damaged or sound. A `delBox()` that finds
+the box written over since the snapshot showed it, on another device or tab, deletes that
 write all the same, and the vault warns through your logger that a different revision than the
-one it showed was retired, naming neither: the other device's whisper is gone, and only the log
+one it showed was deleted, naming neither: the other device's whisper is gone, and only the log
 says so. When the box the vault showed was a damaged one, the warning says that, and its story
 carries `damaged: true` beside `call`, so a host can branch on it.
 

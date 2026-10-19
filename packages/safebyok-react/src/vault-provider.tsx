@@ -40,11 +40,11 @@ export type VaultContextShape = {
    */
   retryOpen: () => void
   /**
-   * Retire the stored vault that `openError` reports as `damaged_vault`, with this device's lease
+   * Delete the stored vault that `openError` reports as `damaged_vault`, with this device's lease
    * of it, and have the vault say hello again: a fresh, absent vault, for the user to make anew.
    * The user's boxes in it are gone for good, so ask first. Resolves when the new hello is
    * under way, and does nothing while `openError` is any other, or none. Rejects with storage's
-   * refusal if retiring it fails, such as `storage_unavailable`, leaving `openError` as it was; the
+   * refusal if deleting it fails, such as `storage_unavailable`, leaving `openError` as it was; the
    * `safebyok` package's `delDamagedVault` says which refusals to expect. One of them,
    * `stale_write`, means the vault was made anew meanwhile, so that one says hello again as well,
    * and still rejects. Any other refusal says nothing anew: `bad_option` among them, which is
@@ -138,7 +138,7 @@ export type VaultProviderProps = Omit<MakeVaultOpts, 'userId'> & {
   /** The signed-in user from the host's auth, or null when nobody is: then there is no vault. */
   userId:              string | null
   /**
-   * Whether the passphrase dialog offers a user who has forgotten the passphrase to retire the
+   * Whether the passphrase dialog offers a user who has forgotten the passphrase to delete the
    * vault, on every device, and start a new one: `PassphraseModal`'s `allowStartOver`. Off by
    * default.
    */
@@ -211,7 +211,7 @@ const adviceFrom = (strengthTest: PassphraseStrengthTest, scope: VaultScope): Pa
  */
 export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, passphraseAdvice, children, ...opts }: VaultProviderProps) => {
   const { applabel, vaultlabel, vaultDB, deviceDB, leaseHours, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, validators, passphraseStrengthTest, ...unlisted } = opts
-  // Each prop Vault.make does not take, by name -- a misspelling, a retired name -- handed on to it,
+  // Each prop Vault.make does not take, by name -- a misspelling, a deleted name -- handed on to it,
   // so it is refused, to the error boundary, rather than dropped here unseen.
   const unlistedJson = JSON.stringify(Object.keys(unlisted))
   // The bag is taken apart below, so a misspelt field would be dropped unseen: refused here, as Vault.make refuses it.
@@ -329,7 +329,7 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
       await delStoredDamagedVault({ applabel, vaultlabel, userId, vaultDB, deviceDB, validators })
     } catch (err) {
       // The vault was made anew, so what openError says is out of date: say hello again, and still
-      // tell the caller why nothing was retired. Misuse (bad_option) says nothing anew.
+      // tell the caller why nothing was deleted. Misuse (bad_option) says nothing anew.
       if (isVaultError(err, 'stale_write')) { void sayHello(vault) }
       throw err
     }

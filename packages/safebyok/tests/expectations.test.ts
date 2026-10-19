@@ -61,7 +61,7 @@ const BoxCases = [
   [VaultProps, Box,                           "rev-one",  true,   'a write over the revision read'],
   [VaultProps, Box,                           "rev-two",  false,  'a write over a revision never read'],
   [VaultProps, Box,                           null,       false,  'a first write where a box now stands'],
-  [VaultProps, undefined,                     "rev-one",  false,  'a write over a box since retired'],
+  [VaultProps, undefined,                     "rev-one",  false,  'a write over a box since deleted'],
   // the vault props half:
   [undefined,  undefined,                     null,       false,  'a write into a scope with no vault props'],
   [TH.vaultPropsOf('u1', { vault_id: 'reborn' }), Box, "rev-one",  false,  'a write sealed for a vault since made anew'],
@@ -95,15 +95,15 @@ describe("Expectations.boxMeets, across vaultKey epochs", () => {
 
 const DeletionCases = [
   // regular usage:
-  [Box,                                     "rev-one",  'deleted',        'the revision the retiring device read'],
+  [Box,                                     "rev-one",  'deleted',        'the revision the deleting device read'],
   [Box,                                     "rev-two",  'deleted_other',  'a revision written over the one read'],
-  [undefined,                               "rev-one",  'absent',         'no box, retired meanwhile'],
+  [undefined,                               "rev-one",  'absent',         'no box, deleted meanwhile'],
   [null,                                    null,       'absent',         'a null row, as a string store reads none'],
   // a damaged box, listed with no revision:
   [{ boxlabel: "anthropic" },               null,       'deleted',        'a damaged row that holds no revision, as listed'],
   [{ ...Box, revision_tok: "" },            null,       'deleted',        'a damaged row whose revision is empty, which the listing names as none'],
   [{ ...Box, revision_tok: 7 },             null,       'deleted',        'a damaged row whose revision is no text'],
-  ["not a box",                         null,       'deleted',        'a row that is no object'],
+  ["not a box",                             null,       'deleted',        'a row that is no object'],
   [Box,                                     null,       'deleted_other',  'a box written over the damaged one, holding a revision where none was expected'],
   [{ boxlabel: "anthropic" },               "rev-one",  'deleted_other',  'a damaged row where a revision was expected'],
 ] as const
@@ -115,7 +115,7 @@ describe("Expectations.deletionOf", () => {
     })
   }
 
-  it("reports retired for a box at its revision, as its example shows", () => {
+  it("reports deleted for a box at its revision, as its example shows", () => {
     expect(Expectations.deletionOf(TH.boxOf('anthropic', 'r7', { revision_tok: 'r7' }), { vault_id: 'v1', revision_tok: 'r7' })).to.deep.equal({ outcome: 'deleted' })
   })
 })

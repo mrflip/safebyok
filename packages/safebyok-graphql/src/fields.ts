@@ -56,7 +56,7 @@ export const BoxFields = everyFieldOf<Box>()([
   ['boxlabel',               'plain'],
   ['revision_tok',           'plain'],
   ['vault_key_epoch',        'plain'],
-  ['box_key_wrapped',    'ciphered'],
+  ['box_key_wrapped',        'ciphered'],
   ['whisper_ciphered',       'ciphered'],
   ['whisper_codec',          'plain'],
   ['whisper_schema_version', 'plain'],

@@ -155,7 +155,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
 
-  # The VaultDB battery, its races and the lockbox limit's, run over a real
+  # The VaultDB battery, its races and the box limit's, run over a real
   # Postgres: PGlite, which every other Postgres test uses, runs one statement at a time and cannot
   # race (packages/safebyok/VAULTDB.md, Proving the races). The role is a superuser with no
   # password, the container reachable on this runner alone, and each test file makes a database

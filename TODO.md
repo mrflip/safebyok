@@ -89,9 +89,9 @@ comparison of a box's epoch against the vault props'.
 ### `del()`'s edge cases
 
 From the Convex sprint ([#18](https://github.com/mrflip/safebyok/pull/18)): a handle that never
-saw vault props resolves `del()` without retiring anything, even if a vault has since appeared elsewhere, so
+saw vault props resolves `del()` without deleting anything, even if a vault has since appeared elsewhere, so
 "delete account" can report success while a vault stands. And after a refused `del()`, an
-app's automatic retry retires the vault that was made again in between. The Coach (2026-10-16):
+app's automatic retry deletes the vault that was made again in between. The Coach (2026-10-16):
 assess these once the contract is tight and the tests unified -- that is, against
 `packages/safebyok/VAULTDB.md` ([#107](https://github.com/mrflip/safebyok/pull/107)) and the
 shared battery ([#114](https://github.com/mrflip/safebyok/pull/114)), after the Convex tests settle
@@ -170,7 +170,7 @@ question. The fix, small: do not judge `outlived` against vault props this handl
 From [#163](https://github.com/mrflip/safebyok/pull/163) (thread 5 and its review): a box has
 no format version to read ahead of, so it has no newer-format state. A box in any format but
 today's lists as damaged, and an app on an older safebyok shows a box written by a newer one as
-damaged, where the user may retire it or store over it (only on the user's own action, never by
+damaged, where the user may delete it or store over it (only on the user's own action, never by
 the vault). The Coach: "Yes add to TODO: version number on box." Give boxes a "newer, don't
 touch" state like the vault's `newer_format`: the format tag read as a version, so that a newer
 box lists as one to leave alone and an older, unreadable one still lists as damaged.

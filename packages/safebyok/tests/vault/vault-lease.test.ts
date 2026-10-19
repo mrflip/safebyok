@@ -626,7 +626,7 @@ describe("the unlock window, renewed", () => {
     expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + SevenDaysMillis)
   })
 
-  it("never by a read, a store, a retirement, or a change pushed from storage", async () => {
+  it("never by a read, a store, a deletion, or a change pushed from storage", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
     const deadline = vault.getSnapshot().askPassphraseAt

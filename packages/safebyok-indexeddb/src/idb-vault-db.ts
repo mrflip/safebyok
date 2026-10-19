@@ -102,22 +102,22 @@ class IdbVaultDB extends VaultDB {
     }))
   }
 
-  // What it removed is the row read in the transaction that deletes it. A retirement that found
+  // What it removed is the row read in the transaction that deletes it. A deletion that found
   // nothing to remove changed nothing, and rings no other tab.
   protected async doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<BoxDeletion | null> {
-    const retirement = await inOneTransaction(this.shelf, async (store) => {
+    const deletion = await inOneTransaction(this.shelf, async (store) => {
       const ckey = Ckeys.box(scope, boxlabel)
       const [standingVaultProps, standingBox] = await Promise.all([rowAt(store, Ckeys.vaultProps(scope)), rowAt(store, ckey)])
       if (! Expectations.vaultMeets(standingVaultProps, expected)) { return null }
       store.delete(ckey)
       return Expectations.deletionOf(standingBox, expected)
     })
-    if (retirement !== null && retirement.outcome !== 'absent') { this.ring() }
-    return retirement
+    if (deletion !== null && deletion.outcome !== 'absent') { this.ring() }
+    return deletion
   }
 
   // The look at the vault props and every deletion (the boxes by their key range, then the
-  // vault props) are one transaction: a box another tab writes waits for the retire and then
+  // vault props) are one transaction: a box another tab writes waits for the delete and then
   // finds no vault props, so no box outlives its vault.
   protected async doDelVault(scope: VaultScope, expected: VaultDelExpectation): Promise<boolean> {
     return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {

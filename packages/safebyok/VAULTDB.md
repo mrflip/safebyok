@@ -16,12 +16,12 @@ Three layers share the work, and each guarantee below belongs to one of them.
 * **The vault** (`Vault.make`) decides what to write. It reads a box, seals a new revision over
   it, and writes with an expectation of what it read. When storage refuses the write as stale, it
   catches up with storage once and refuses the store as `stale_write`, never trying again: what
-  the other device wrote or retired stands, and the host hears that its write lost. It also holds the app's own box limit (`maxBoxes`, 100 by default): the alarm bell for an
+  the other device wrote or deleted stands, and the host hears that its write lost. It also holds the app's own box limit (`maxBoxes`, 100 by default): the alarm bell for an
   app that is storing far more than it meant to.
 * **The base class** (`VaultDB`'s public verbs) checks every name, record and expectation on the
   way in and every record on the way out -- the box a write hands back among them, and what a
-  box retirement reports -- refuses what is malformed before your code sees it, turns a
-  `false` from you (from a box write or retirement, a `null`) into `stale_write`, and turns
+  box deletion reports -- refuses what is malformed before your code sees it, turns a
+  `false` from you (from a box write or deletion, a `null`) into `stale_write`, and turns
   anything you throw that is not a
   `VaultError` into `storage_unavailable`, your error as its cause. It holds every name to the
   floor and to what your adapter declares (*Names*, below), never to a host's own validators.
@@ -34,9 +34,9 @@ Three layers share the work, and each guarantee below belongs to one of them.
 * **Your adapter** (the `do*` methods) stores and returns records, and makes each write
   conditional: it checks the expectation and writes in one atomic step. It never resolves a
   conflict itself, never merges two writes, and never retries one: a write whose expectation
-  failed resolves `false` (a box write or retirement, `null`), and the vault decides what
+  failed resolves `false` (a box write or deletion, `null`), and the vault decides what
   happens next. A box write that lands resolves the record as you now hold it, read back in
-  the same atomic step as the write; a box retirement that lands, what it removed (line 3.4).
+  the same atomic step as the write; a box deletion that lands, what it removed (line 3.4).
 
 A server that serves these verbs to browsers -- the Convex component, the Postgres route recipe,
 the GraphQL resolvers -- checks who may reach which vault (line 5.4), makes each write atomic, and
@@ -55,12 +55,12 @@ an adapter implements.
 Nothing is retried. A box write, a change to the ways in, a `del()` or a `delBox()` that
 meets someone else's is news the user must hear, refused once as `stale_write`. Before it names any
 refusal -- a stale write, or a box that will not open -- the vault catches up with storage
-once, so a vault retired and made anew elsewhere relocks the device rather than reading as
+once, so a vault deleted and made anew elsewhere relocks the device rather than reading as
 damage. There is no conflict handler beyond this, and no hook for one: whatever landed first
 stands, and a host that disagrees calls `putBox()` or `delBox()` again. The vault never clears
 a damaged record on its own; the user's `delBox()` on its boxlabel does, or a `putBox()` over
-one that names its revision, in its one `putBox`: a store never retires. A `delBox()` that
-storage says removed another revision than the one the vault showed stands too, as a retirement
+one that names its revision, in its one `putBox`: a store never deletes. A `delBox()` that
+storage says removed another revision than the one the vault showed stands too, as a deletion
 within its vault does (line 3.4): the vault warns through its logger, naming neither revision.
 
 The base class turns anything your code throws that is not a `VaultError` into
@@ -133,12 +133,12 @@ it holds (Postgres's `jsonb`, say) keeps that field as plain text. Before anythi
 default.
 
 **1.2. Each vault keeps to itself.** Two scopes that differ anywhere, by however little (a
-colon, a quote, a bracket, a script), never share a record, a listing or a retirement, whatever names
+colon, a quote, a bracket, a script), never share a record, a listing or a deletion, whatever names
 above the floor and within the adapter's declared limits they hold (*Names*, above).
 
 **1.3. Nothing is repaired, and nothing is dropped.** An adapter hands up every record as it is
 stored, damaged or not; the base class decides what is damaged, and the vault lists a damaged
-box so that the user can retire it. *Proven by the base class's own tests* (the core's
+box so that the user can delete it. *Proven by the base class's own tests* (the core's
 `vault-db.test.ts`), which can plant a damaged record; the battery cannot, through public verbs
 that refuse to write one.
 
@@ -146,7 +146,7 @@ that refuse to write one.
 
 **2.1. A write that resolved is seen by every read after it.** Once a write's promise resolves,
 every read that starts afterwards -- `getVaultProps`, `getBox`, `listBoxes`, on any device -- sees
-it, and once a retirement resolves, none sees what it retired. Normal use gives the same answer from
+it, and once a deletion resolves, none sees what it deleted. Normal use gives the same answer from
 every device.
 
 **2.2. Every box stored can be read by its boxlabel.** `getBox` reaches each box the
@@ -158,7 +158,7 @@ sample, or the first so many. Asked twice with nothing written between, it gives
 listing, sorted by boxlabel. There is no limit to ask for; a listing that takes one would also say
 which boxes it keeps, and none does. Within the limits the adapter declares (section 7 and
 line 4.1) a listing succeeds; past them, a backend that cannot read so many boxes at once
-refuses the listing with an error rather than return part of it, and once retirements bring the vault
+refuses the listing with an error rather than return part of it, and once deletions bring the vault
 back within its limits, the listing is whole again.
 
 ## 3. Versioned writes
@@ -181,7 +181,7 @@ do). The core always sends the standing
 `putBox` writes only while the scope's standing vault props have the expected `vault_id` and the
 standing box has the expected `revision_tok` -- or, for a null revision, no box stands
 under that boxlabel. Otherwise it refuses as `stale_write`: over a revision it never read, in a
-scope with no vault props, or into a vault retired and made anew under another `vault_id`, even
+scope with no vault props, or into a vault deleted and made anew under another `vault_id`, even
 where no box stands in either.
 
 A write that lands resolves the box as storage now holds it, field for field the one written
@@ -195,43 +195,43 @@ adapter wrote something it cannot read back. *That refusal is proven by the base
 tests* (the core's `vault-db.test.ts`), which can have an adapter answer with a malformed record;
 the battery, through an adapter that keeps this line, cannot.
 
-**3.4. A retirement wins, within its vault, and says what it removed.** `delBox` removes the
+**3.4. A deletion wins, within its vault, and says what it removed.** `delBox` removes the
 box under its boxlabel, whatever revision stands, while the scope's standing vault props have
 the expected `vault_id`, and resolves what it found there, reported from the same atomic step as
-the removal: `retired` for the revision its expectation names (its `revision_tok`, the one the
-retiring device read; for null, which names a damaged box listed with none, a record holding
+the removal: `deleted` for the revision its expectation names (its `revision_tok`, the one the
+deleting device read; for null, which names a damaged box listed with none, a record holding
 none that reads as one), `deleted_other` for any other record -- one written over the revision
 named, or holding one where none was named -- and `absent` where no box stands. The revision
-only reports, and never refuses: a retirement naming another revision removes what stands all the
-same, and the vault decides what to tell its user. A write over a revision retired meanwhile
-refuses, and the box stays gone. A retirement aimed at a vault since retired and made anew
+only reports, and never refuses: a deletion naming another revision removes what stands all the
+same, and the vault decides what to tell its user. A write over a revision deleted meanwhile
+refuses, and the box stays gone. A deletion aimed at a vault since deleted and made anew
 refuses as `stale_write`, whatever revision it names -- its adapter resolves `null` -- and the new
-vault keeps its box. Nothing of what is retired is kept: no tombstone.
+vault keeps its box. Nothing of what is deleted is kept: no tombstone.
 
 An adapter that keeps a typed revision column reports from its delete (Postgres's `RETURNING`, the
 row a Convex mutation deletes); a key-value store reads the row in the step that removes it. Each
 compares the revision as the listing reads it: Postgres and the key-value stores through
 `Expectations.deletionOf`, and the Convex component, which runs on Convex's servers apart from
 the core, in its own mutation. The base class refuses an answer
-in any other shape as `corrupt_record`, saying the retirement may have landed. *That refusal, and
-`retired` for a damaged record holding no revision, are proven by the base class's own tests* (the
+in any other shape as `corrupt_record`, saying the deletion may have landed. *That refusal, and
+`deleted` for a damaged record holding no revision, are proven by the base class's own tests* (the
 core's `vault-db.test.ts` and `expectations.test.ts`), which can have an adapter answer badly and
 plant a damaged record; the battery, through public verbs that do neither, cannot.
 
-**3.5. A vault is retired whole, and alone.** `delVault` removes the vault props and every
+**3.5. A vault is deleted whole, and alone.** `delVault` removes the vault props and every
 box of its scope, and nothing of any other scope, while the standing vault props have the
 expected `vault_id`; otherwise it refuses as `stale_write` and removes nothing, so a vault made anew
 survives a device that missed its predecessor's end.
 
 It compares the `vault_id` and nothing else, so a vault whose props are damaged in any other field
-is still retired, and vault props rewritten under the same `vault_id` between a read and the
-retirement are retired with them: it is the same vault. A typed backend (Convex, Postgres) cannot
+is still deleted, and vault props rewritten under the same `vault_id` between a read and the
+deletion are deleted with them: it is the same vault. A typed backend (Convex, Postgres) cannot
 hold damaged vault props, so there the hatch below has nothing to do: the vault's
 `delDamagedVault`, the one way to clear a vault whose `hello()` refuses it as `damaged_vault`, reads
 the vault props through `doGetVaultProps` as stored, takes their `vault_id`, and aims this
-retirement at it. An adapter that hands each call on to another VaultDB's public verbs hands
+deletion at it. An adapter that hands each call on to another VaultDB's public verbs hands
 `delDamagedVault` on too. Proven by the base class's own tests for a damaged record, which the
-battery cannot plant, and by the battery for a sound vault, which it refuses to retire.
+battery cannot plant, and by the battery for a sound vault, which it refuses to delete.
 
 **3.6. A refused write wrote nothing.** Whatever the refusal -- `stale_write`, `vault_full`,
 `box_too_large`, a malformed record -- the vault stands afterwards exactly as it stood before:
@@ -241,7 +241,7 @@ all, and the vault's next read shows which.
 
 **3.7. Writes that do not collide all land.** Writes to different boxes in one vault, made at
 once from different devices, all land: none refuses as `stale_write`, none fails for contention,
-and no host retries. Only writes to one box -- or a retirement of the vault -- can collide, and
+and no host retries. Only writes to one box -- or a deletion of the vault -- can collide, and
 then line 3.3 or 3.4 says which wins.
 
 **3.8. A box write lands only under the vaultKey that stands.** A box carries the
@@ -255,7 +255,7 @@ vault carries `vault_key_epoch` 1 today, the epoch reserved for a rotation of th
 built, so for now the comparison refuses a record built wrong. It is kept so that rotation needs
 no new contract: the vault does not read the vault props before each write, so only storage can
 refuse a device that still holds a vaultKey since replaced and has not looked at the vault props
-meanwhile. Retirements name no `vault_key_epoch` (line 3.4): a retirement reveals nothing.
+meanwhile. Deletions name no `vault_key_epoch` (line 3.4): a deletion reveals nothing.
 
 ## 4. The box limit
 
@@ -268,7 +268,7 @@ open with a larger `maxBoxes` of its own.
 refuses a new box in a vault already holding that many, with kind `vault_full`. Its check is
 a best effort: writes made one after another never take a vault past the limit, but writers racing
 for the last places may each find room and all land, taking it a few past. That is the limit's
-job -- to stop a runaway loop, and to keep a vault inside what its backend can list and retire --
+job -- to stop a runaway loop, and to keep a vault inside what its backend can list and delete --
 not to hold off a determined client, which is the host's to meter like any other abuse.
 
 **4.3. A replacement is never refused for the count.** A box written over one already there
@@ -277,12 +277,12 @@ already taken missed a box it would replace, and refuses as `stale_write`, never
 `vault_full`, so the store that follows the catch-up replaces it.
 
 **4.4. Under the limit, a new box lands.** Once a vault holds fewer boxes than its
-limit -- retirements having made room, or brought back under it a vault that racing writers took past
+limit -- deletions having made room, or brought back under it a vault that racing writers took past
 -- a new one lands.
 
 **4.5. Past the limit, nothing is lost.** A vault taken past its limit by racing writers keeps
 every box that landed, each readable by its boxlabel (line 2.2), and every write refused as
-`vault_full` left nothing behind (line 3.6). Retirements bring it back under the limit, and its listing
+`vault_full` left nothing behind (line 3.6). Deletions bring it back under the limit, and its listing
 is whole again (line 2.3).
 
 **4.6. A hard limit is the backend's, or opt-in.** A backend that cannot hold more than some
@@ -299,7 +299,7 @@ its README, what its count is as of: the start of the write's statement, say, or
 ## 5. Errors
 
 **5.1. Every refusal is a VaultError whose kind says what to do.** An adapter refuses with a
-`VaultError`: `stale_write` (by resolving `false`, or `null` from a box write or retirement;
+`VaultError`: `stale_write` (by resolving `false`, or `null` from a box write or deletion;
 the base class throws it), `vault_full`,
 `identity_revoked`, `not_permitted`, or anything it throws otherwise, which becomes
 `storage_unavailable`. The base
@@ -371,7 +371,7 @@ class refuses a heavier box (`box_too_large`) before the adapter sees it, and a 
 refuses to open with a `maxWhisperBytes` over half of it.
 
 **7.2. The most it holds of one vault.** `maxVaultBytes`, no less than one record, or `Infinity`:
-what the backend can still list and retire whole. A vault refuses to open when its `maxBoxes`
+what the backend can still list and delete whole. A vault refuses to open when its `maxBoxes`
 boxes might not fit in it.
 
 **7.3. The most it holds in one name.** `maxNameBytes`, a whole number above zero, or `Infinity`
@@ -390,7 +390,7 @@ writes at once through one adapter, over a backend that runs one call at a time,
 they came out, not that they raced. So `describeVaultDB` races them.
 
 **What the battery runs, for every adapter.** Each race -- two creates of one vault, two updates
-of one vault, two first writes or two replacements of one box, a retirement against a write, two
+of one vault, two first writes or two replacements of one box, a deletion against a write, two
 writes that do not collide, four writers for a vault's last place -- runs under every schedule
 `raceEveryWay` makes, each over a fresh backend, and its outcome is checked after each: the two
 moves made together; one started one to three microtasks, then one and two ticks, after the other,
@@ -424,7 +424,7 @@ against a real server: `e2e/tests/postgres/` runs this battery, with a pool and 
 connection to each device, against `postgres:17` (a CI job, and `e2e/compose.yaml` on a contributor's
 machine; `pnpm justify` needs neither and skips those tests where `SAFEBYOK_PG_URL` is unset). Its
 other files race what the battery's turnstile cannot hold: writers for a vault's last places, with no
-turnstile and no PGlite to take turns; a foreign key violation (`23503`) from a vault retired while
+turnstile and no PGlite to take turns; a foreign key violation (`23503`) from a vault deleted while
 an insert waited on the foreign key. Of the one-statement writes -- a conditional `UPDATE`
 re-checking the row it waited on, `INSERT ... ON CONFLICT`, the foreign key read against the vault
 row that stands -- the races and that run show how they came out on that server and no other; which

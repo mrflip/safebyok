@@ -5,7 +5,7 @@ import { SafebyokErrorKindVals, isSafebyokErrorData } from '../src/refusals'
 const ErrorDataCases = [
   // safebyok's own refusals:
   [{ kind: "identity_revoked", message: "Sign in, then try again." }, true,   'an identity_revoked refusal with its message'],
-  [{ kind: "vault_full", message: "Retire a box, then try again." },  true,   'a vault_full refusal with its message'],
+  [{ kind: "vault_full", message: "Delete a box, then try again." },  true,   'a vault_full refusal with its message'],
   // anything else a ConvexError may carry:
   [{ kind: "stale_write", message: "Read it again." },               false,  'a VaultError kind the functions never throw'],
   [{ kind: "not_permitted", message: "Not yours." },                 false,  'not_permitted, which the functions no longer throw'],

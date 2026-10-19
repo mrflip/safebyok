@@ -82,7 +82,7 @@ type SafebyokBox {
   boxlabel:               String!
   revision_tok:           String!
   vault_key_epoch:        Int!
-  box_key_wrapped:    SafebyokCiphered!
+  box_key_wrapped:        SafebyokCiphered!
   whisper_ciphered:       SafebyokCiphered!
   whisper_codec:          String!
   whisper_schema_version: Int!
@@ -97,7 +97,7 @@ input SafebyokBoxInput {
   boxlabel:               String!
   revision_tok:           String!
   vault_key_epoch:        Int!
-  box_key_wrapped:    SafebyokCipheredInput!
+  box_key_wrapped:        SafebyokCipheredInput!
   whisper_ciphered:       SafebyokCipheredInput!
   whisper_codec:          String!
   whisper_schema_version: Int!
@@ -136,13 +136,13 @@ input SafebyokBoxExpectationInput {
   vault_key_epoch: Int!
 }
 
-"""What a retire of a vault was aimed at: it lands only while the vault has that vault_id."""
+"""What a delete of a vault was aimed at: it lands only while the vault has that vault_id."""
 input SafebyokVaultDelExpectationInput {
   vault_id: String!
 }
 
 """
-What a retire of a box was aimed at: it lands only while the vault has that vault_id, and
+What a delete of a box was aimed at: it lands only while the vault has that vault_id, and
 removes whatever box stands; the revision_tok its writer read (null for a box listed with
 none) only says whether what it removed was the one meant.
 """
@@ -151,14 +151,14 @@ input SafebyokBoxDelExpectationInput {
   revision_tok: String
 }
 
-"""What a box retire removed: the revision it named, another (deleted_other), or nothing (absent)."""
+"""What a box delete removed: the revision it named, another (deleted_other), or nothing (absent)."""
 enum SafebyokDelOutcome {
   deleted
   deleted_other
   absent
 }
 
-"""What a box retire that landed found under its boxlabel, and removed."""
+"""What a box delete that landed found under its boxlabel, and removed."""
 type SafebyokBoxDeletion {
   outcome: SafebyokDelOutcome!
 }
@@ -179,9 +179,9 @@ type Mutation {
   safebyokPutVaultProps(vaultProps: SafebyokVaultPropsInput!, expected: SafebyokVaultPropsExpectationInput!): Boolean!
   """Writes the box under its boxlabel, only while what stands is what was expected, and answers with the box as stored."""
   safebyokPutBox(scope: SafebyokVaultScopeInput!, box: SafebyokBoxInput!, expected: SafebyokBoxExpectationInput!): SafebyokBox!
-  """Retires the box under that boxlabel, removing it for good, only while the vault is the one expected, and answers with what it removed."""
+  """Deletes the box under that boxlabel, removing it for good, only while the vault is the one expected, and answers with what it removed."""
   safebyokDelBox(scope: SafebyokVaultScopeInput!, boxlabel: String!, expected: SafebyokBoxDelExpectationInput!): SafebyokBoxDeletion!
-  """Retires the vault, its props and every box, removing them for good, only while the vault is the one expected."""
+  """Deletes the vault, its props and every box, removing them for good, only while the vault is the one expected."""
   safebyokDelVault(scope: SafebyokVaultScopeInput!, expected: SafebyokVaultDelExpectationInput!): Boolean!
 }
 

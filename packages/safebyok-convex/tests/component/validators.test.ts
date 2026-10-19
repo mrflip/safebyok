@@ -72,11 +72,11 @@ const convexShape = (validator: GenericValidator): Shape => {
 const listedZod = Z.omit(Records.Box, { box_key_wrapped: true, whisper_ciphered: true })
 
 const ShapeCases = [
-  [Records.Ciphered,     Ciphered,      'Ciphered: the shared encrypted-value shape'],
-  [Records.VaultScope,   VaultScope,    'VaultScope: what names one vault'],
+  [Records.Ciphered,     Ciphered,   'Ciphered: the shared encrypted-value shape'],
+  [Records.VaultScope,   VaultScope, 'VaultScope: what names one vault'],
   [Records.VaultProps,   VaultProps,   'VaultProps: every field, each wayin and its ciphered wrap nested'],
-  [Records.Box,      Box,       'Box: every field, the sidecar as JSON text, both ciphered fields nested'],
-  [listedZod,            ListedBox, 'a listed box: the record without its ciphered fields, format kept'],
+  [Records.Box,          Box,        'Box: every field, the sidecar as JSON text, both ciphered fields nested'],
+  [listedZod,            ListedBox,  'a listed box: the record without its ciphered fields, format kept'],
 ] as const
 
 describe("the Convex validators, field for field with the core's Zod records", () => {
@@ -142,10 +142,10 @@ const VaultPropsCases = [
   // names are any text to both: the vault's validators check them, client side
   [{ ...TH.vaultPropsOf('u1'), wayins: [TH.wayinOf('passphrase'), TH.passkeyWayinOf('laptop')] }, true, true, 'vault props with a passphrase and a passkey'],
   // both refuse -- what Convex can see:
-  [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v5' },                false,  false,  'a format this package does not know'],
-  [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-box-v1' },              false,  false,  "another record's format"],
-  [vaultPropsWithoutVaultId,                                                 false,  false,  'vault props missing their vault_id'],
-  [{ ...TH.vaultPropsOf('u1'), unlock_epoch: '1' },                          false,  false,  'an epoch written as text'],
+  [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v5' },              false,  false,  'a format this package does not know'],
+  [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-box-v1' },                false,  false,  "another record's format"],
+  [vaultPropsWithoutVaultId,                                               false,  false,  'vault props missing their vault_id'],
+  [{ ...TH.vaultPropsOf('u1'), unlock_epoch: '1' },                        false,  false,  'an epoch written as text'],
   [{ ...TH.vaultPropsOf('u1'), wayins: [TH.wayinOf('passphrase', { vault_key_wayin_wrapped: { cipher_iv_b64: 'iv' } as never })] }, false, false, 'a ciphered wayin missing its ciphertext'],
   [{ ...TH.vaultPropsOf('u1'), wayins: [TH.wayinOf('passphrase', { wayinkind: 'fingerprint' as never })] }, false, false, 'a wayinkind this package does not know'],
   [{ ...TH.vaultPropsOf('u1'), wayins: [TH.wayinOf('passphrase', { wayinkind: 'passkey' as never })] }, false, false, "a passphrase's fields under the passkey wayinkind"],
@@ -175,8 +175,8 @@ const BoxCases = [
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar_json: { note: 'x' } },  false,  false,  'a sidecar stored as an object, not its JSON'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), whisper_codec: 'json_v2' },     false,  false,  'a whisper codec neither knows'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), whisper_schema_version: 2 },    false,  false,  'a whisper schema version neither knows'],
-  [{ ...TH.boxOf('anthropic_api_key', 'a1'), format: 'safebyok-box-v2' }, false, false,  'a box from before the sidecar'],
-  [boxV3,                                                                false,  false,  'a box from before written_at, holding changed_at'],
+  [{ ...TH.boxOf('anthropic_api_key', 'a1'), format: 'safebyok-box-v2' },    false,  false,  'a box from before the sidecar'],
+  [boxV3,                                                                    false,  false,  'a box from before written_at, holding changed_at'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), format: 'safebyok-vault-v1' },  false,  false,  "another record's format"],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), whisper_ciphered: 'ct-flat' },  false,  false,  'a whisper ciphered as bare text, not a wayin'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), written_at: '1792022400000' },  false,  false,  'a written_at written as text'],

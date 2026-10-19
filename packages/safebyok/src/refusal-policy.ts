@@ -57,15 +57,15 @@ export const heed = (vaultDB: VaultDB, onRefusal: (refusal: VaultError) => Promi
     }
   }
   return {
-    getVaultProps:          (...args) => heeding(() => vaultDB.getVaultProps(...args)),
+    getVaultProps:    (...args) => heeding(() => vaultDB.getVaultProps(...args)),
     ensureVaultProps: (...args) => heeding(() => vaultDB.ensureVaultProps(...args)),
-    putVaultProps:        (...args) => heeding(() => vaultDB.putVaultProps(...args)),
-    getBox:                 (...args) => heeding(() => vaultDB.getBox(...args)),
-    listBoxes:               (...args) => heeding(() => vaultDB.listBoxes(...args)),
-    putBox:               (...args) => heeding(() => vaultDB.putBox(...args)),
-    delBox:               (...args) => heeding(() => vaultDB.delBox(...args)),
-    delVault:             (...args) => heeding(() => vaultDB.delVault(...args)),
-    subscribe:               (...args) => vaultDB.subscribe(...args),
+    putVaultProps:    (...args) => heeding(() => vaultDB.putVaultProps(...args)),
+    getBox:           (...args) => heeding(() => vaultDB.getBox(...args)),
+    listBoxes:        (...args) => heeding(() => vaultDB.listBoxes(...args)),
+    putBox:           (...args) => heeding(() => vaultDB.putBox(...args)),
+    delBox:           (...args) => heeding(() => vaultDB.delBox(...args)),
+    delVault:         (...args) => heeding(() => vaultDB.delVault(...args)),
+    subscribe:        (...args) => vaultDB.subscribe(...args),
   }
 }
 

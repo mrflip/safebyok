@@ -15,7 +15,7 @@
  *
  * `vault_full` means a new box in a vault already holding its `maxBoxes` (a limit the
  * client keeps), and also that storage has no room for the write (a limit of the backend's own,
- * such as the Convex component's or the Postgres server's). Either way the user retires a box,
+ * such as the Convex component's or the Postgres server's). Either way the user deletes a box,
  * or the host raises `maxBoxes` where the backend allows. `whisper_too_large` is the user's value, with its
  * box's sidecar, over `maxWhisperBytes`, so a condition, and `box_too_large` the
  * user's whisper and sidecar together over what storage holds in one record. `bad_label` is a label the app passed that fails the
@@ -51,7 +51,7 @@
  *
  * `newer_format` is a stored vault in a form this version does not know, which a newer version of
  * safebyok may have written: the user's next move is to update the app, never to start over, so
- * it is told apart from `damaged_vault`, and nothing retires it.
+ * it is told apart from `damaged_vault`, and nothing deletes it.
  *
  * `rolled_back` is storage handing back an older copy of a vault's props than this device has
  * already seen -- a backup restored over it, or storage tampered with -- which the vault refuses to
@@ -89,7 +89,7 @@ export const VaultErrorKindVals = [
   'bad_label',           // a label, or the userId, that fails the vault's check for it
   'bad_whisper',         // a whisper JSON cannot carry (undefined, a function, a class), or a non-string
   'whisper_too_large',   // a whisper, with its box's sidecar, over the vault's maxWhisperBytes
-  'box_too_large',   // a box -- whisper, names and sidecar together -- over what storage holds in one record
+  'box_too_large',       // a box -- whisper, names and sidecar together -- over what storage holds in one record
   'vault_full',          // a new box in a vault already holding its maxBoxes, or a write storage has no room for
   'too_many_wayins',     // a new wayin in a vault already holding MaxUnlocks
   'last_wayin',          // removing the vault's last passphrase, which would leave no sure way in
@@ -99,7 +99,7 @@ export const VaultErrorKindVals = [
   'corrupt_record',      // a stored record failed validation as storage read it back
   'damaged_vault',       // the vault's stored props failed their checks, so no way in can be tried
   'damaged_wayin',       // a way in is stored in a form this package never writes, so it cannot be tried
-  'damaged_box',     // a box failed its checks, or would not open under the vault's own vaultKey, or names no revision to store over
+  'damaged_box',         // a box failed its checks, or would not open under the vault's own vaultKey, or names no revision to store over
   'newer_format',        // a stored vault in a form this version does not know, which a newer one may have written
   'unknown_key_deriver', // the vault names a key deriver this handle was not built with
   'insecure_context',    // the page is not a secure context (plain http), where the browser withholds WebCrypto
@@ -172,7 +172,7 @@ export const VaultErrorFamilyForKind = {
   bad_label:           'misuse',
   bad_whisper:         'misuse',
   whisper_too_large:   'condition',
-  box_too_large:   'condition',
+  box_too_large:       'condition',
   vault_full:          'condition',
   too_many_wayins:     'condition',
   last_wayin:          'condition',
@@ -182,7 +182,7 @@ export const VaultErrorFamilyForKind = {
   corrupt_record:      'condition',
   damaged_vault:       'condition',
   damaged_wayin:       'condition',
-  damaged_box:     'condition',
+  damaged_box:         'condition',
   newer_format:        'condition',
   unknown_key_deriver: 'misuse',
   insecure_context:    'misuse',

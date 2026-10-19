@@ -73,7 +73,7 @@ export type ConvexVaultDBOpts = VaultDBOpts & {
  * @param opts - Your app's Convex `client`, the safebyok functions as its `api`, and optionally a
  *   `logger`, the default logger without one (a vault opened with no logger of its own hears it too): it hears a ConvexClient watch that fails.
  * @returns The VaultDB, holding at most 1 MiB in one record, Convex's document limit, and 8 MiB
- *   in one vault, half of what one Convex function may read (retiring a vault reads it twice), in
+ *   in one vault, half of what one Convex function may read (deleting a vault reads it twice), in
  *   at most 8,000 boxes, the component's own limit.
  *
  * @example
@@ -95,8 +95,8 @@ export const convexVaultDB = (opts: ConvexVaultDBOpts): VaultDB => {
 /** Each verb one call to the function of the same purpose; the base class validates both ways. */
 class ConvexVaultDB extends VaultDB {
   readonly maxRecordBytes = ConvexDocumentBytes
-  // Listing, watching and retiring each read the whole vault in one transaction, and retiring reads
-  // every row twice: half the read budget is what a vault can hold and still be retired whole.
+  // Listing, watching and deleting each read the whole vault in one transaction, and deleting reads
+  // every row twice: half the read budget is what a vault can hold and still be deleted whole.
   readonly maxVaultBytes = ConvexTransactionReadBytes / 2
   // The component's own limit, which it enforces whatever a client asks.
   readonly maxBoxes = MaxVaultBoxes

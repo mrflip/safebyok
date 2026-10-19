@@ -22,7 +22,7 @@ describe("changePassphrase", () => {
     await world.openUnlocked('old passphrase', { deviceDB: memoryDeviceDB() })
   })
 
-  it("retires the old passphrase, admits the new, and keeps every box readable", async () => {
+  it("deletes the old passphrase, admits the new, and keeps every box readable", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('old passphrase')
     await vault.putBox('anthropic', 'sk-fake')
@@ -149,7 +149,7 @@ describe("several passphrases", () => {
     await TH.expectRefusal(vault.unlock('pw', { wayinId: 42 as unknown as string }), 'bad_option')
   })
 
-  it("an unlock aimed at a vault retired elsewhere is refused as absent_wayin, and creates nothing", async () => {
+  it("an unlock aimed at a vault deleted elsewhere is refused as absent_wayin, and creates nothing", async () => {
     const world = makeWorld()
     const here = await world.open()
     await here.unlock('pw')

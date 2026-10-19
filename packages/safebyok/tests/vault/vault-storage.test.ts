@@ -471,9 +471,9 @@ describe("the logger", () => {
 describe("when storage says the user is no longer signed in", () => {
   /** Each vault call that reaches storage, the storage verb it reaches, and the call. */
   const RevokedCallCases: readonly (readonly [string, 'getVaultProps' | 'getBox' | 'putBox' | 'putVaultProps', (vault: Vault) => Promise<unknown>])[] = [
-    ['getBox()',          'getBox',          (vault) => vault.getBox('anthropic')],
-    ['putBox()',         'putBox',        (vault) => vault.putBox('openai', 'sk-fake-two')],
-    ['unlock()',           'getVaultProps',   (vault) => vault.unlock('pw one')],
+    ['getBox()',           'getBox',        (vault) => vault.getBox('anthropic')],
+    ['putBox()',           'putBox',        (vault) => vault.putBox('openai', 'sk-fake-two')],
+    ['unlock()',           'getVaultProps', (vault) => vault.unlock('pw one')],
     ['changePassphrase()', 'putVaultProps', (vault) => vault.changePassphrase('pw one', 'pw two')],
   ]
 

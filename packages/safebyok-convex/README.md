@@ -57,7 +57,7 @@ mistake for the first request.
   `ConvexError` whose `data` is `{ kind: 'identity_revoked', message }`: the user the vault was
   opened for is not the one signed in. The kind is the safebyok `VaultError` kind of the same
   name, on which a vault locks itself. The message names no user and quotes no record.
-* **Writes that come too late.** An update (`putVaultProps`, `putBox`) or a retire
+* **Writes that come too late.** An update (`putVaultProps`, `putBox`) or a delete
   (`delBox`, `delVault`) carries what its writer expects to stand -- the vault's `vault_id`,
   and the vault props' `unlock_epoch`, or the box's `revision_tok` and the vault props'
   `vault_key_epoch` (the vaultKey the box was sealed under) -- and checks it in the same
@@ -133,10 +133,10 @@ when given (`convexVaultDB({ client, api, logger })`), hears what the VaultDB ha
 
 Three tables, inside the component, beside nothing of your app's:
 
-| Table                    | One row per | Columns                                                          | Index                                                     |
-| ------------------------ | ----------- | ---------------------------------------------------------------- | --------------------------------------------------------- |
-| `safebyok_vaults`        | vault       | the `VaultProps` record as-is                                    | `by_scope`: `user_id`, `applabel`, `vaultlabel`           |
-| `safebyok_boxes`     | box     | the `Box` record as-is, and its vault's scope columns        | `by_box`: `user_id`, `applabel`, `vaultlabel`, `boxlabel` |
+| Table                    | One row per | Columns                                                  | Index                                                     |
+| ------------------------ | ----------- | -------------------------------------------------------- | --------------------------------------------------------- |
+| `safebyok_vaults`        | vault       | the `VaultProps` record as-is                            | `by_scope`: `user_id`, `applabel`, `vaultlabel`           |
+| `safebyok_boxes`         | box         | the `Box` record as-is, and its vault's scope columns    | `by_box`: `user_id`, `applabel`, `vaultlabel`, `boxlabel` |
 | `safebyok_vault_tallies` | vault       | `vault_row_id` (its vault row), `box_count`, `box_bytes` | `by_vault_row`: `vault_row_id`                            |
 
 * **Encrypted**, as `{ cipher_iv_b64, ciphertext_b64 }`: each whisper (`whisper_ciphered`), each
@@ -157,24 +157,24 @@ Three tables, inside the component, beside nothing of your app's:
   not store: a lone surrogate (half of a character, which Convex's documentation forbids in a
   string), a control character, text not in NFC, a name over 1 KiB.
 * **A vault's tally** counts its boxes and their bytes as Convex weighs them, kept in step
-  by every box write and retire in the same transaction. A vault written before tallies
+  by every box write and delete in the same transaction. A vault written before tallies
   were kept has none, and reads as ever: its next box write counts it, reading the vault
-  once (and no further than its limits). A retire never counts a vault.
+  once (and no further than its limits). A delete never counts a vault.
 
-**How big a vault can be.** Listing a vault, watching it and retiring it each read the whole vault
+**How big a vault can be.** Listing a vault, watching it and deleting it each read the whole vault
 in one Convex transaction -- watching reads each box whole, ciphertext and all, to sign it by
 its revision, since a Convex query cannot read some of a document's fields -- which may read 16 MiB and 32,000 documents, and write 16,000 documents;
-retiring reads it twice, so `convexVaultDB` declares a `maxVaultBytes` of 8 MiB. A vault holds 100 boxes by default, raised with
+deleting reads it twice, so `convexVaultDB` declares a `maxVaultBytes` of 8 MiB. A vault holds 100 boxes by default, raised with
 `maxBoxes` as far as `maxVaultBytes` allows: `Vault.make` refuses, with kind `bad_option`, a
 `maxBoxes` whose boxes at `maxWhisperBytes` each might not fit, and its message says how
 many would. At the default `maxWhisperBytes` (40444) that is at most 102; at a `maxWhisperBytes`
 of 2048, ample for API keys, it is 1638. A store past the limit is refused with kind
-`vault_full`, until a box is retired. Each record must also fit Convex's 1 MiB document limit,
+`vault_full`, until a box is deleted. Each record must also fit Convex's 1 MiB document limit,
 which the core's `maxWhisperBytes` keeps well inside. `convexVaultDB` declares the component's own
 8,000 as its `maxBoxes`, so `Vault.make` also refuses a `maxBoxes` above that.
 
 The component holds every vault to limits of its own, whatever its client asks, so that even a
-modified client cannot grow a vault past what retiring can reach: **8,000 boxes**, and
+modified client cannot grow a vault past what deleting can reach: **8,000 boxes**, and
 **7 MiB less 1 KiB** of them as Convex weighs a document (half the read budget, less a whole
 document for the vault props and room for the tally). A client within its own `maxBoxes` stays
 well inside both, at the defaults far inside; at extreme settings (a small `maxWhisperBytes`,
@@ -182,8 +182,8 @@ thousands of boxes, every sidecar full) a client can meet the component's `vault
 just short of its own `maxBoxes`. That is the design working: the component's limit is the
 authority beneath the client's estimate. A write that would take a vault past either, and leave it larger than it was
 -- a new box, or a heavier replacement -- is refused with kind `vault_full`; a replacement no
-heavier, and every retire, always lands, so a vault over its limits (written before they were
-kept) can always shrink, and be retired a box at a time even when it is too large to retire
+heavier, and every delete, always lands, so a vault over its limits (written before they were
+kept) can always shrink, and be deleted a box at a time even when it is too large to delete
 whole.
 
 These limits are the component's constants; a host has no knob for them. Deploying client-side
@@ -203,8 +203,8 @@ the core's own records, scopes and expectations.
 | `getBox`                  | query    | `{ scope, boxlabel }`                                                       | the `Box`, or null                                                                     |
 | `listBoxSummaries`        | query    | `{ scope }`                                                                 | each box without its ciphered fields, `format` kept, in boxlabel order                 |
 | `putBox`               | mutation | `{ scope, box, expected: { vault_id, revision_tok, vault_key_epoch } }` | the `Box` as stored if written, null if not; refuses `vault_full` past the vault's limits |
-| `delBox`               | mutation | `{ scope, boxlabel, expected: { vault_id, revision_tok } }`                 | `{ outcome }` if the vault still stands -- `retired`, `deleted_other` or `absent` -- null if not |
-| `delVault`             | mutation | `{ scope, expected: { vault_id } }`                                         | `true` if retired, `false` if not                                                          |
+| `delBox`               | mutation | `{ scope, boxlabel, expected: { vault_id, revision_tok } }`                 | `{ outcome }` if the vault still stands -- `deleted`, `deleted_other` or `absent` -- null if not |
+| `delVault`             | mutation | `{ scope, expected: { vault_id } }`                                         | `true` if deleted, `false` if not                                                          |
 | `watchVault`              | query    | `{ scope }`                                                                 | `{ vault_id, unlock_epoch, boxes: [[boxlabel, revision_tok]] }`, changing with every write |
 
 `scope` is `{ applabel, user_id, vaultlabel }`. A `revision_tok` of null expects no box there; in a

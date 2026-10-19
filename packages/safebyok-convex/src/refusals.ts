@@ -6,7 +6,7 @@ import type { VaultErrorKind } from 'safebyok'
  * `VaultErrorKindVals`: `identity_revoked`, for a caller who is signed out or is not the vault's
  * user, on which the vault locks itself; `vault_full`, for a box write that would take the
  * vault past the component's limits.
- * A failed expectation is not a refusal: the update or retire resolves `false`.
+ * A failed expectation is not a refusal: the update or delete resolves `false`.
  */
 export const SafebyokErrorKindVals = ['identity_revoked', 'vault_full'] as const satisfies readonly VaultErrorKind[]
 export type SafebyokErrorKind = typeof SafebyokErrorKindVals[number]

@@ -71,7 +71,7 @@ const damagedWorld = async () => {
 }
 
 describe("VaultDashboard, a vault stored damaged", () => {
-  it("retires it and opens a fresh one, once the user confirms", async () => {
+  it("deletes it and opens a fresh one, once the user confirms", async () => {
     const { store, world } = await damagedWorld()
     const confirming = vi.spyOn(globalThis, 'confirm').mockReturnValue(false)
     world.renderInVault(<VaultDashboard />)
@@ -84,7 +84,7 @@ describe("VaultDashboard, a vault stored damaged", () => {
     expect(store.ckeys()).to.deep.equal([])
   })
 
-  it("says why retiring it failed, and keeps offering it", async () => {
+  it("says why deleting it failed, and keeps offering it", async () => {
     const { world } = await damagedWorld()
     vi.spyOn(world.vaultDB, 'delDamagedVault').mockRejectedValueOnce(new VaultError('storage_unavailable', 'The vault storage could not be reached: try again shortly.'))
     vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
@@ -215,7 +215,7 @@ describe("VaultDashboard, its boxes", () => {
     expect(screen.getByText('anthropic_api_key')).to.not.be.null
   })
 
-  it("removes a box retired elsewhere while it asked for the passphrase as removed, quietly", async () => {
+  it("removes a box deleted elsewhere while it asked for the passphrase as removed, quietly", async () => {
     const world = TH.makeWorld()
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key', openai_api_key: 'sk-test-not-a-real-key' })
     world.renderInVault(<VaultDashboard />)

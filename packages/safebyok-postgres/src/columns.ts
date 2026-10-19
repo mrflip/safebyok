@@ -50,7 +50,7 @@ export const BoxColumns = everyFieldOf<Box>()([
   ['boxlabel',               'text'],
   ['revision_tok',           'text'],
   ['vault_key_epoch',        'bigint'],
-  ['box_key_wrapped',    'jsonb'],
+  ['box_key_wrapped',        'jsonb'],
   ['whisper_ciphered',       'jsonb'],
   ['whisper_codec',          'text'],
   ['whisper_schema_version', 'bigint'],

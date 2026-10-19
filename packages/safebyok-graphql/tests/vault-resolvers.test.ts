@@ -34,15 +34,15 @@ const refusalBehind = (crossed: GraphQLError | undefined): VaultError => (crosse
 const fakeServed = (answer: () => Promise<unknown>) => {
   const heard: { onChange?: () => void, unsubscribed: number } = { unsubscribed: 0 }
   const served: ServedVaultDB = {
-    getVaultProps:          answer as ServedVaultDB['getVaultProps'],
+    getVaultProps:    answer as ServedVaultDB['getVaultProps'],
     ensureVaultProps: answer as ServedVaultDB['ensureVaultProps'],
-    putVaultProps:        answer as ServedVaultDB['putVaultProps'],
-    getBox:                 answer as ServedVaultDB['getBox'],
-    listBoxRecords:          answer as ServedVaultDB['listBoxRecords'],
-    putBox:               answer as ServedVaultDB['putBox'],
-    delBox:               answer as ServedVaultDB['delBox'],
-    delVault:             answer as ServedVaultDB['delVault'],
-    subscribe:               (_scope, onChange) => {
+    putVaultProps:    answer as ServedVaultDB['putVaultProps'],
+    getBox:           answer as ServedVaultDB['getBox'],
+    listBoxRecords:   answer as ServedVaultDB['listBoxRecords'],
+    putBox:           answer as ServedVaultDB['putBox'],
+    delBox:           answer as ServedVaultDB['delBox'],
+    delVault:         answer as ServedVaultDB['delVault'],
+    subscribe:        (_scope, onChange) => {
       heard.onChange = onChange
       return () => { heard.unsubscribed += 1 }
     },
@@ -105,7 +105,7 @@ describe("vaultResolvers, in a host's schema", () => {
     expect(result).to.deep.equal({ data: { safebyokPutBox: TH.boxOf('openai', 'r1') } })
   })
 
-  it("answers a box retire with what it removed, and takes one that leaves out its null revision_tok as one that means it", async () => {
+  it("answers a box delete with what it removed, and takes one that leaves out its null revision_tok as one that means it", async () => {
     const db = await TH.emptyDatabase()
     await TH.requestFor(db, 'u1').ensureVaultProps(TH.vaultPropsOf('u1'))
     await TH.requestFor(db, 'u1').putBox(u1, TH.boxOf('openai', 'r1'), { vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 1 })

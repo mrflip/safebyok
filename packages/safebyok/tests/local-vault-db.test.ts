@@ -72,7 +72,7 @@ describe("localVaultDB", () => {
     expect(store.read(Ckeys.box(scope, 'anthropic'))).to.eq('{"not": json')
   })
 
-  it("retires a damaged row, JSON or not, holding no revision, as the one a retirement naming none means", async () => {
+  it("deletes a damaged row, JSON or not, holding no revision, as the one a deletion naming none means", async () => {
     const store = memoryStore()
     const scope = TH.scopeOf('u1')
     store.write(Ckeys.vaultProps(scope), JSON.stringify(TH.vaultPropsOf('u1')))
@@ -84,7 +84,7 @@ describe("localVaultDB", () => {
     expect(await vaultDB.listBoxes(scope)).to.have.lengthOf(0)
   })
 
-  it("retires a damaged row that holds a revision as another, for a retirement naming none", async () => {
+  it("deletes a damaged row that holds a revision as another, for a deletion naming none", async () => {
     const store = memoryStore()
     const scope = TH.scopeOf('u1')
     store.write(Ckeys.vaultProps(scope), JSON.stringify(TH.vaultPropsOf('u1')))

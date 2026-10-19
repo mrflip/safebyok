@@ -118,7 +118,7 @@ export const Box = v.object({
   boxlabel:               v.string(),
   revision_tok:           v.string(),
   vault_key_epoch:        v.number(),
-  box_key_wrapped:    Ciphered,
+  box_key_wrapped:        Ciphered,
   whisper_ciphered:       Ciphered,
   whisper_codec:          v.literal('json_v1'),
   whisper_schema_version: v.literal(1),
@@ -158,8 +158,8 @@ export const BoxExpectation = v.object({
 })
 
 /**
- * What a retire of a vault was meant for: the vault it lands in. A retire lands only while the
- * scope's vault props have this `vault_id` -- so a stale session never retires a vault made anew
+ * What a delete of a vault was meant for: the vault it lands in. A delete lands only while the
+ * scope's vault props have this `vault_id` -- so a stale session never deletes a vault made anew
  * elsewhere.
  *
  * @example { vault_id: vaultProps.vault_id }
@@ -169,10 +169,10 @@ export const VaultDelExpectation = v.object({
 })
 
 /**
- * What a retire of a box was meant for: the vault it lands in, and the `revision_tok` its
+ * What a delete of a box was meant for: the vault it lands in, and the `revision_tok` its
  * writer read for the box, or null for one listed damaged with none. It lands only while the
  * scope's vault props have this `vault_id`, whatever revision stands -- so a stale session never
- * retires anything from a vault made anew elsewhere -- and the revision only says whether what it
+ * deletes anything from a vault made anew elsewhere -- and the revision only says whether what it
  * removed was the one meant (a {@link BoxDeletion}).
  *
  * @example { vault_id: vaultProps.vault_id, revision_tok: listed.revision_tok }
@@ -183,7 +183,7 @@ export const BoxDelExpectation = v.object({
 })
 
 /**
- * What a box retire that landed removed: `retired`, the revision it named; `deleted_other`,
+ * What a box delete that landed removed: `deleted`, the revision it named; `deleted_other`,
  * another (written over meanwhile, or one where it named none); `absent`, nothing.
  *
  * @example { outcome: 'deleted' }

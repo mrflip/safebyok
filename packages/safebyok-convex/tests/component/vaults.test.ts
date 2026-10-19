@@ -15,8 +15,8 @@ const withVaultProps = async () => {
 
 /** Every row of both tables, system fields and all: what is really stored. */
 const allRows = (CVX: ReturnType<typeof TH.componentTest>) => CVX.run(async (ctx) => ({
-  vaults:    await ctx.db.query('safebyok_vaults').collect(),
-  boxes: await ctx.db.query('safebyok_boxes').collect(),
+  vaults: await ctx.db.query('safebyok_vaults').collect(),
+  boxes:  await ctx.db.query('safebyok_boxes').collect(),
 }))
 
 // The verbs' contract -- lines 1.1 to 3.8 of VAULTDB.md -- is the battery's, run over this
@@ -105,7 +105,7 @@ describe("delBox", () => {
     expect(boxes).to.have.lengthOf(0)
   })
 
-  it("resolves retired for a box holding an empty revision, which the client lists with none, when it names none", async () => {
+  it("resolves deleted for a box holding an empty revision, which the client lists with none, when it names none", async () => {
     const CVX = await withVaultProps()
     await CVX.run(async (ctx) => { await ctx.db.insert('safebyok_boxes', { ...u1, ...TH.boxOf('anthropic_api_key', 'a1'), revision_tok: '' }) })
     expect(await CVX.mutation(TH.vaults.delBox, { scope: u1, boxlabel: 'anthropic_api_key', expected: TH.deleting(null) })).to.deep.equal({ outcome: 'deleted' })
@@ -256,7 +256,7 @@ const VaultFull = { kind: 'vault_full', message: 'This vault is full: remove a b
 const over = (tag: string) => ({ vault_id: 'vault-id-u1', revision_tok: `rev-${tag}`, vault_key_epoch: 1 })
 
 describe("a vault's tally", () => {
-  it("stays true across new boxes, replacements and retires", async () => {
+  it("stays true across new boxes, replacements and deletes", async () => {
     const CVX = await withVaultProps()
     const steps = [
       () => CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a1'), expected: TH.noBoxYet }),
@@ -276,7 +276,7 @@ describe("a vault's tally", () => {
     expect(counts).to.deep.equal([1, 1, 2, 2, 1, 1])
   })
 
-  it("stays true across writes and retires running at once", async () => {
+  it("stays true across writes and deletes running at once", async () => {
     const CVX = await withVaultProps()
     const boxlabels = Array.from({ length: 12 }, (_, ii) => `box_${String(ii)}`)
     await Promise.all(boxlabels.map((boxlabel) => CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.boxOf(boxlabel, boxlabel), expected: TH.noBoxYet })))
@@ -285,7 +285,7 @@ describe("a vault's tally", () => {
     expect(await keptTally(CVX)).to.have.property('box_count', 7)
   })
 
-  it("goes with its vault when the vault is retired, and a vault made anew keeps one of its own", async () => {
+  it("goes with its vault when the vault is deleted, and a vault made anew keeps one of its own", async () => {
     const CVX = await withVaultProps()
     await CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a1'), expected: TH.noBoxYet })
     await CVX.mutation(TH.vaults.delVault, { scope: u1, expected: TH.thisVault })
@@ -321,7 +321,7 @@ describe("a vault's tally", () => {
     expect(await keptTally(CVX)).to.have.property('box_count', 2)
   })
 
-  it("is not counted by a retire, which never reads the whole vault", async () => {
+  it("is not counted by a delete, which never reads the whole vault", async () => {
     const CVX = await withVaultProps()
     await writeUntallied(CVX, [TH.boxOf('anthropic_api_key', 'a1'), TH.boxOf('openai_api_key', 'o1')])
     await CVX.mutation(TH.vaults.delBox, { scope: u1, boxlabel: 'anthropic_api_key', expected: TH.deleting('rev-a1') })
@@ -370,7 +370,7 @@ describe("a vault's weight limit", () => {
     expect(await keptTally(CVX)).to.deep.equal(await weighedTally(CVX))
   })
 
-  it("refuses a vault past it nothing that shrinks it, and lets it be retired a box at a time", async () => {
+  it("refuses a vault past it nothing that shrinks it, and lets it be deleted a box at a time", async () => {
     const CVX = TH.componentTest(true)
     await CVX.mutation(TH.vaults.ensureVaultProps, { vaultProps: TH.vaultPropsOf('u1') })
     // Nine of 900,000 bytes, written before tallies were kept: past the limit, still readable whole.
@@ -386,7 +386,7 @@ describe("a vault's weight limit", () => {
     expect(await keptTally(CVX)).to.deep.equal(await weighedTally(CVX))
   })
 
-  it("keeps a vault already too large to read whole retirable, a box at a time, its writes refused as full", async () => {
+  it("keeps a vault already too large to read whole deletable, a box at a time, its writes refused as full", async () => {
     const CVX = TH.componentTest(true)
     await CVX.mutation(TH.vaults.ensureVaultProps, { vaultProps: TH.vaultPropsOf('u1') })
     // Twenty of 900,000 bytes, more than one transaction may read: four writes, each within its limits.
@@ -406,16 +406,16 @@ describe("a vault's weight limit", () => {
 })
 
 // A Convex transaction may read 16 MiB and 32,000 documents, and write 16,000 documents. Listing
-// and signing read the vault once, but retiring it reads every row twice (each delete reads its row
+// and signing read the vault once, but deleting it reads every row twice (each delete reads its row
 // again). So the component holds every vault to MaxVaultBoxes boxes and
 // MaxVaultBoxBytes bytes of them, whatever its client asks, and convexVaultDB declares half the
 // read budget, 8 MiB, as its maxVaultBytes. Vault.make admits a maxBoxes only while that many
 // boxes, each counted at twice maxWhisperBytes plus 1 KiB for its other fields, fit in the
 // 8 MiB: at most 102 of the largest default whisper (40444 bytes of JSON, about 54 KB stored),
 // and at most 1638 of 2 KiB whispers. The tests below fill a vault to each of those, and to each
-// of the component's own limits, with the longest labels, and retire it.
+// of the component's own limits, with the longest labels, and delete it.
 
-/** Vault props as heavy as a Convex document may be, near enough: the most a retire reads beside the boxes. */
+/** Vault props as heavy as a Convex document may be, near enough: the most a delete reads beside the boxes. */
 const wholeDocumentVaultProps = () => {
   const vaultProps = TH.vaultPropsOf('u1')
   const padding = 'a'.repeat(1_048_576 - getDocumentSize(vaultProps) - 64)
@@ -450,7 +450,7 @@ const landsOrIsFull = async (CVX: ReturnType<typeof TH.componentTest>, box: Retu
   }
 }
 
-/** What listing, watching and retiring the `u1` vault find: each a whole transaction over it. */
+/** What listing, watching and deleting the `u1` vault find: each a whole transaction over it. */
 const listWatchDel = async (CVX: ReturnType<typeof TH.componentTest>) => {
   const listed = await CVX.query(TH.vaults.listBoxSummaries, { scope: u1 })
   const { boxes } = await CVX.query(TH.vaults.watchVault, { scope: u1 })
@@ -460,19 +460,19 @@ const listWatchDel = async (CVX: ReturnType<typeof TH.componentTest>) => {
 }
 
 describe("a large vault, within Convex's per-transaction limits", () => {
-  it("lists, signs and retires the 102 of the largest boxes the core admits", async () => {
+  it("lists, signs and deletes the 102 of the largest boxes the core admits", async () => {
     const { CVX, filledCount } = await fillVault(102, 40_444)
     expect(filledCount).to.eq(102)
     expect(await listWatchDel(CVX)).to.deep.equal({ listedCount: 102, watchedCount: 102, deleted: true, leftCount: 0 })
   })
 
-  it("lists, signs and retires the 1638 boxes of 2 KiB whispers the core admits", async () => {
+  it("lists, signs and deletes the 1638 boxes of 2 KiB whispers the core admits", async () => {
     const { CVX, filledCount } = await fillVault(1638, 2048)
     expect(filledCount).to.eq(1638)
     expect(await listWatchDel(CVX)).to.deep.equal({ listedCount: 1638, watchedCount: 1638, deleted: true, leftCount: 0 })
   }, 120_000) // landing 1638 boxes, a mutation each, is the work, past vitest's 30 s default under CI's coverage
 
-  it("refuses the largest boxes past its weight limit, and retires the vault so filled beside vault props of a whole document", async () => {
+  it("refuses the largest boxes past its weight limit, and deletes the vault so filled beside vault props of a whole document", async () => {
     const { CVX, filledCount } = await fillVault(200, 40_444, wholeDocumentVaultProps())
     expect(filledCount).to.be.within(102, 199)
     const kept = await keptTally(CVX)
@@ -481,7 +481,7 @@ describe("a large vault, within Convex's per-transaction limits", () => {
     expect(await listWatchDel(CVX)).to.deep.equal({ listedCount: filledCount, watchedCount: filledCount, deleted: true, leftCount: 0 })
   })
 
-  it("refuses a box past its count limit, never a replacement, and retires the vault so filled", async () => {
+  it("refuses a box past its count limit, never a replacement, and deletes the vault so filled", async () => {
     const CVX = TH.componentTest(true)
     await CVX.mutation(TH.vaults.ensureVaultProps, { vaultProps: TH.vaultPropsOf('u1') })
     await writeUntallied(CVX, Array.from({ length: MaxVaultBoxes }, (_, ii) => TH.boxOf(`b${String(ii).padStart(4, '0')}`, String(ii))))

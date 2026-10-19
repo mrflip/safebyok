@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS safebyok_vaults (
 );
 
 -- One box per boxlabel, beside its vault's scope and vault_id. A box stands only while
--- its vault's props do, under the same vault_id: retiring the vault retires its boxes with
+-- its vault's props do, under the same vault_id: deleting the vault deletes its boxes with
 -- it, and no write can leave a box in a vault made anew. The sidecar is kept as the JSON
 -- text it was written as, never jsonb, which would rewrite it: that text is bound into the box.
 CREATE TABLE IF NOT EXISTS safebyok_boxes (
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS safebyok_boxes (
   boxlabel               text   NOT NULL,
   revision_tok           text   NOT NULL,
   vault_key_epoch        bigint NOT NULL,
-  box_key_wrapped    jsonb  NOT NULL,
+  box_key_wrapped        jsonb  NOT NULL,
   whisper_ciphered       jsonb  NOT NULL,
   whisper_codec          text   NOT NULL,
   whisper_schema_version bigint NOT NULL,
@@ -62,8 +62,8 @@ CREATE TABLE IF NOT EXISTS safebyok_boxes (
 -- Row-level security on, with no policy: the tables' owner -- the role your server connects as --
 -- reaches them as before, and every other role reaches no row at all. On Supabase, that keeps
 -- them out of the Data API's reach.
-ALTER TABLE safebyok_vaults    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE safebyok_boxes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE safebyok_vaults ENABLE ROW LEVEL SECURITY;
+ALTER TABLE safebyok_boxes  ENABLE ROW LEVEL SECURITY;
 `
 
 /**

@@ -38,7 +38,7 @@ export const VaultDashboard = () => {
   // A condition that stopped the vault opening -- storage unreachable, signed out of the
   // backend -- is shown here, in place, with a way to try again. (Misuse would have gone to an
   // error boundary instead.)
-  // A damaged record will not mend on retry, so it gets no Retry button: only a way to retire it
+  // A damaged record will not mend on retry, so it gets no Retry button: only a way to delete it
   // and start over, which asks first, as it takes every box in the vault with it.
   if (openError?.refusalkind === 'damaged_vault') {
     const startOver = async () => {
@@ -93,7 +93,7 @@ export const VaultDashboard = () => {
     try {
       await withUnlockedVault(() => vault.delBox(boxlabel))
     } catch (err) {
-      // Gone already -- from another device, or with the vault the user retired to start over from
+      // Gone already -- from another device, or with the vault the user deleted to start over from
       // the passphrase dialog -- is what was asked for.
       if (! isVaultError(err, 'absent_box')) { throw err }
     }

@@ -132,11 +132,11 @@ class StringStoreVaultDB extends VaultDB {
     return soon(() => {
       if (! Expectations.vaultMeets(readJson(this.store, Ckeys.vaultProps(scope)), expected)) { return null }
       const ckey = Ckeys.box(scope, boxlabel)
-      // A row that is not JSON is still retired, and reported as holding no revision.
+      // A row that is not JSON is still deleted, and reported as holding no revision.
       const text = this.store.read(ckey)
-      const retirement = Expectations.deletionOf(text === null ? null : jsonOrText(text), expected)
+      const deletion = Expectations.deletionOf(text === null ? null : jsonOrText(text), expected)
       this.store.erase(ckey)
-      return retirement
+      return deletion
     })
   }
 

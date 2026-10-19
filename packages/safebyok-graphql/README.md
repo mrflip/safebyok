@@ -193,13 +193,13 @@ comparison lets a device still holding a replaced vaultKey seal a whisper under 
 Every record crosses **field by field**, each its own GraphQL field under the name it is stored
 by, exactly as safebyok wrote it:
 
-| Type                    | Carries                                                                     |
-| ----------------------- | --------------------------------------------------------------------------- |
-| `SafebyokVaultProps`    | every field of the `VaultProps`                                             |
-| `SafebyokBox`       | every field of the `Box`; its sidecar as JSON text, as written          |
-| `SafebyokListedBox` | a box as a listing has it: every field but the two encrypted ones       |
-| `SafebyokCiphered`      | an encrypted value: its `cipher_iv_b64` and its `ciphertext_b64`            |
-| `SafebyokVaultScope`    | which vault: `applabel`, `user_id`, `vaultlabel`                            |
+| Type                 | Carries                                                           |
+| -------------------- | ----------------------------------------------------------------- |
+| `SafebyokVaultProps` | every field of the `VaultProps`                                   |
+| `SafebyokBox`        | every field of the `Box`; its sidecar as JSON text, as written    |
+| `SafebyokListedBox`  | a box as a listing has it: every field but the two encrypted ones |
+| `SafebyokCiphered`   | an encrypted value: its `cipher_iv_b64` and its `ciphertext_b64`  |
+| `SafebyokVaultScope` | which vault: `applabel`, `user_id`, `vaultlabel`                  |
 
 Each has an input type twin (`SafebyokVaultPropsInput`, and so on), and each expectation one
 of its own.

@@ -604,7 +604,7 @@ describe("the fixtures", () => {
     expect(TH.vaultPropsOf('u1', { unlock_epoch: 2 })).to.deep.equal({ ...TH.vaultPropsOf('u1'), unlock_epoch: 2 })
   })
 
-  it("noBoxYet and thisVault: the expectations u1's vault meets, before its first box and for a retirement", async () => {
+  it("noBoxYet and thisVault: the expectations u1's vault meets, before its first box and for a deletion", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
     await vaultDB.ensureVaultProps(TH.vaultPropsOf('u1'))
     await vaultDB.putBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet)
@@ -614,7 +614,7 @@ describe("the fixtures", () => {
     expect(Object.isFrozen(TH.thisVault)).to.be.true
   })
 
-  it("retiring: the expectation a retirement of u1's box meets, naming the revision boxOf gave it, as its example shows", async () => {
+  it("deleting: the expectation a deletion of u1's box meets, naming the revision boxOf gave it, as its example shows", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
     await vaultDB.ensureVaultProps(TH.vaultPropsOf('u1'))
     await vaultDB.putBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet)
@@ -810,10 +810,10 @@ TH.describeDeviceDB('describeDeviceDB, over the smallest honest DeviceDB', () =>
   const rows = new Map<string, Lease>()
   const marks = new Map<string, DeviceMark>()
   return {
-    getLease:  (scope) => Promise.resolve(rows.get(ckeyOf(scope)) ?? null),
+    getLease: (scope) => Promise.resolve(rows.get(ckeyOf(scope)) ?? null),
     putLease: (lease) => { rows.set(ckeyOf(lease), lease); return Promise.resolve() },
     delLease: (scope) => { rows.delete(ckeyOf(scope)); return Promise.resolve() },
-    getMark:   (scope) => Promise.resolve(marks.get(ckeyOf(scope)) ?? null),
+    getMark:  (scope) => Promise.resolve(marks.get(ckeyOf(scope)) ?? null),
     putMark:  (mark) => { marks.set(ckeyOf(mark), mark); return Promise.resolve() },
     delMark:  (scope) => { marks.delete(ckeyOf(scope)); return Promise.resolve() },
     delAll:   () => { rows.clear(); marks.clear(); return Promise.resolve() },
@@ -832,21 +832,21 @@ const servingOnly = (userId: string | null, store: StringStore): TH.VaultDBVerbs
     if (userId === null || userId === '' || user_id !== userId) { throw new VaultError('identity_revoked', "That vault belongs to someone other than the user signed in.") }
   }
   return {
-    maxRecordBytes:          shared.maxRecordBytes,
-    maxVaultBytes:           shared.maxVaultBytes,
-    maxBoxes:            shared.maxBoxes,
-    maxNameBytes:            shared.maxNameBytes,
-    getVaultProps:          async (scope) => { permitted(scope); return await shared.getVaultProps(scope) },
+    maxRecordBytes:   shared.maxRecordBytes,
+    maxVaultBytes:    shared.maxVaultBytes,
+    maxBoxes:         shared.maxBoxes,
+    maxNameBytes:     shared.maxNameBytes,
+    getVaultProps:    async (scope) => { permitted(scope); return await shared.getVaultProps(scope) },
     ensureVaultProps: async (vaultProps) => { permitted(vaultProps); return await shared.ensureVaultProps(vaultProps) },
-    putVaultProps:        async (vaultProps, expected) => { permitted(vaultProps); await shared.putVaultProps(vaultProps, expected) },
-    getBox:                 async (scope, boxlabel) => { permitted(scope); return await shared.getBox(scope, boxlabel) },
-    listBoxes:               async (scope) => { permitted(scope); return await shared.listBoxes(scope) },
-    listBoxRecords:          async (scope) => { permitted(scope); return await shared.listBoxRecords(scope) },
-    putBox:               async (scope, box, expected) => { permitted(scope); return await shared.putBox(scope, box, expected) },
-    delBox:               async (scope, boxlabel, expected) => { permitted(scope); return await shared.delBox(scope, boxlabel, expected) },
-    delVault:             async (scope, expected) => { permitted(scope); await shared.delVault(scope, expected) },
-    delDamagedVault:      async (scope) => { permitted(scope); await shared.delDamagedVault(scope) },
-    subscribe:               (scope, onChange) => { permitted(scope); return shared.subscribe(scope, onChange) },
+    putVaultProps:    async (vaultProps, expected) => { permitted(vaultProps); await shared.putVaultProps(vaultProps, expected) },
+    getBox:           async (scope, boxlabel) => { permitted(scope); return await shared.getBox(scope, boxlabel) },
+    listBoxes:        async (scope) => { permitted(scope); return await shared.listBoxes(scope) },
+    listBoxRecords:   async (scope) => { permitted(scope); return await shared.listBoxRecords(scope) },
+    putBox:           async (scope, box, expected) => { permitted(scope); return await shared.putBox(scope, box, expected) },
+    delBox:           async (scope, boxlabel, expected) => { permitted(scope); return await shared.delBox(scope, boxlabel, expected) },
+    delVault:         async (scope, expected) => { permitted(scope); await shared.delVault(scope, expected) },
+    delDamagedVault:  async (scope) => { permitted(scope); await shared.delDamagedVault(scope) },
+    subscribe:        (scope, onChange) => { permitted(scope); return shared.subscribe(scope, onChange) },
   }
 }
 
@@ -913,7 +913,7 @@ describe("perUser", () => {
       ...servingOnly(userId, store),
       maxRecordBytes: userId === 'anyone' ? 4096 : 1,
       maxVaultBytes:  userId === 'anyone' ? 65_536 : 1,
-      maxBoxes:   userId === 'anyone' ? 250 : 1,
+      maxBoxes:       userId === 'anyone' ? 250 : 1,
     })
     expect(TH.perUser(limitedBy)).to.include({ maxRecordBytes: 4096, maxVaultBytes: 65_536, maxBoxes: 250 })
   })
@@ -1003,7 +1003,7 @@ const checkThenWriteUnder = (lock: ReturnType<typeof sharedLock>): Stepping => (
 
 /** How a {@link RoundTripVaultDB} is made: its stepping, and the ways it may be wrong beside that. */
 type RoundTripOpts = VaultDBOpts & {
-  stepping:         Stepping
+  stepping:     Stepping
   maxBoxes?:    number | undefined
   /** Counts the vault in a round trip of its own, before a new box's write: honest, and best effort. */
   countsApart?:     boolean

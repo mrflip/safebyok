@@ -80,10 +80,10 @@ export const uncheckingDeviceDB = () => {
   const rows = new Map<string, unknown>()
   const marks = new Map<string, unknown>()
   const deviceDB: DeviceDB = {
-    getLease:  (scope) => Promise.resolve((rows.get(ckeyOf(scope)) ?? null) as Lease | null),
+    getLease: (scope) => Promise.resolve((rows.get(ckeyOf(scope)) ?? null) as Lease | null),
     putLease: (lease) => { rows.set(ckeyOf(lease), lease); return Promise.resolve() },
     delLease: (scope) => { rows.delete(ckeyOf(scope)); return Promise.resolve() },
-    getMark:   (scope) => Promise.resolve((marks.get(ckeyOf(scope)) ?? null) as DeviceMark | null),
+    getMark:  (scope) => Promise.resolve((marks.get(ckeyOf(scope)) ?? null) as DeviceMark | null),
     putMark:  (mark) => { marks.set(ckeyOf(mark), mark); return Promise.resolve() },
     delMark:  (scope) => { marks.delete(ckeyOf(scope)); return Promise.resolve() },
     delAll:   () => { rows.clear(); marks.clear(); return Promise.resolve() },

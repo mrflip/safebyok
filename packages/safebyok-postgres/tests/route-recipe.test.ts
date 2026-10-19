@@ -23,14 +23,14 @@ type Served = (vaultDB: VaultDB, args: unknown[]) => Promise<unknown>
  * VaultDB validates.
  */
 const served = new Map<string, Served>([
-  ['getVaultProps',          (vaultDB, [scope]) => vaultDB.getVaultProps(scope as VaultScope)],
+  ['getVaultProps',    (vaultDB, [scope]) => vaultDB.getVaultProps(scope as VaultScope)],
   ['ensureVaultProps', (vaultDB, [vaultProps]) => vaultDB.ensureVaultProps(vaultProps as VaultProps)],
-  ['putVaultProps',        (vaultDB, [vaultProps, expected]) => vaultDB.putVaultProps(vaultProps as VaultProps, expected as VaultPropsExpectation)],
-  ['getBox',                 (vaultDB, [scope, boxlabel]) => vaultDB.getBox(scope as VaultScope, boxlabel as string)],
-  ['listBoxes',               (vaultDB, [scope]) => vaultDB.listBoxRecords(scope as VaultScope)],
-  ['putBox',               (vaultDB, [scope, box, expected]) => vaultDB.putBox(scope as VaultScope, box as Box, expected as BoxExpectation)],
-  ['delBox',               (vaultDB, [scope, boxlabel, expected]) => vaultDB.delBox(scope as VaultScope, boxlabel as string, expected as BoxDelExpectation)],
-  ['delVault',             (vaultDB, [scope, expected]) => vaultDB.delVault(scope as VaultScope, expected as VaultDelExpectation)],
+  ['putVaultProps',    (vaultDB, [vaultProps, expected]) => vaultDB.putVaultProps(vaultProps as VaultProps, expected as VaultPropsExpectation)],
+  ['getBox',           (vaultDB, [scope, boxlabel]) => vaultDB.getBox(scope as VaultScope, boxlabel as string)],
+  ['listBoxes',        (vaultDB, [scope]) => vaultDB.listBoxRecords(scope as VaultScope)],
+  ['putBox',           (vaultDB, [scope, box, expected]) => vaultDB.putBox(scope as VaultScope, box as Box, expected as BoxExpectation)],
+  ['delBox',           (vaultDB, [scope, boxlabel, expected]) => vaultDB.delBox(scope as VaultScope, boxlabel as string, expected as BoxDelExpectation)],
+  ['delVault',         (vaultDB, [scope, expected]) => vaultDB.delVault(scope as VaultScope, expected as VaultDelExpectation)],
 ])
 
 /** What a request posts: its verb and arguments, or nothing when its body is not a JSON object. */
@@ -104,7 +104,7 @@ class RouteVaultDB extends VaultDB {
 
   // A stale write refuses on the server and crosses as its kind, so a write that answers landed:
   // a box write answers with the box as the server's storage holds it, and a box
-  // retirement with what it removed.
+  // deletion with what it removed.
   private async call(verb: string, ...args: unknown[]): Promise<unknown> {
     const response = await this.fetcher(VaultRouteUrl, {
       method:  'POST',

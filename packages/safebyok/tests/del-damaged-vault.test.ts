@@ -26,7 +26,7 @@ describe("delDamagedVault", () => {
     expect(await fresh.getBox('anthropic')).to.eq('sk-new-fake')
   })
 
-  it("says the device store failing as it clears this device as 'storage_unavailable', naming what failed, the vault already retired", async () => {
+  it("says the device store failing as it clears this device as 'storage_unavailable', naming what failed, the vault already deleted", async () => {
     const world = await damagedVaultWorld()
     const trouble = new Error('device storage is unavailable')
     vi.spyOn(world.deviceDB, 'delMark').mockRejectedValueOnce(trouble)
@@ -36,7 +36,7 @@ describe("delDamagedVault", () => {
     expect(rowsOf(world, 'u1')).to.deep.equal([])
   })
 
-  it("retires that vault alone: another user's vault, and this device's lease of it, stay", async () => {
+  it("deletes that vault alone: another user's vault, and this device's lease of it, stay", async () => {
     const world = await damagedVaultWorld()
     const theirs = await world.openUnlocked('their pw', { userId: 'u2' })
     await theirs.putBox('anthropic', 'theirs')
@@ -69,7 +69,7 @@ describe("delDamagedVault", () => {
     expect(await world.getLease()).to.not.be.null
   })
 
-  it("refuses a vault a newer safebyok may have written as newer_format, as hello() does: nothing retired, the lease kept", async () => {
+  it("refuses a vault a newer safebyok may have written as newer_format, as hello() does: nothing deleted, the lease kept", async () => {
     const world = await damagedVaultWorld()
     const newer = JSON.stringify({ ...storedVaultPropsOf(world), format: 'safebyok-vault-v5' })
     world.dbStore.write(u1VaultPropsCkey, newer)

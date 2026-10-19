@@ -39,10 +39,10 @@ describe("recordOf", () => {
   })
 
   const NotRecords = [
-    [null,           'null'],
-    [undefined,      'undefined'],
-    ["a box",    'text'],
-    [[1, 2],         'a list'],
+    [null,         'null'],
+    [undefined,    'undefined'],
+    ["a box",      'text'],
+    [[1, 2],       'a list'],
   ] as const
 
   for (const [sent, blurb] of NotRecords) {

@@ -1,5 +1,5 @@
 // @vitest-environment node
-// The `23503` the postgres README maps to `stale_write`: a box whose vault is retired after the
+// The `23503` the postgres README maps to `stale_write`: a box whose vault is deleted after the
 // insert's statement began. PGlite cannot raise it between two statements; here one device's
 // insert is held at its foreign key check by another's uncommitted delete of the vault row, and
 // meets the foreign key's own verdict when that delete commits.
@@ -11,7 +11,7 @@ const u1 = TH.scopeOf('u1')
 
 TH.describeOnPostgres('foreign key', "postgresVaultDB's first write, over a real Postgres", () => {
   // The insert's own count sees the vault standing, so only the foreign key's `23503` can refuse it here.
-  it("refuses as stale_write a box whose vault another connection retired while its insert waited on the foreign key, and stores nothing", async () => {
+  it("refuses as stale_write a box whose vault another connection deleted while its insert waited on the foreign key, and stores nothing", async () => {
     const db = getDb()
     await db.empty()
     const device = TH.deviceOver(db, undefined, {})('u1')

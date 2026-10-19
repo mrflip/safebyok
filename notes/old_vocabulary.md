@@ -6,6 +6,9 @@ the current cast does not use. Nothing current uses these names: not the code, t
 stored records or the tests, and a new thing is never named from this page. The current cast is
 VOCABULARY.md.
 
+A name in the New column that also stands in the Old one was renamed again, by the rename pass of
+2026-10-19 (Box everywhere; get, put and del on every layer; `check` for a check): follow it down.
+
 To be deleted at 1.0.0.
 
 | Old                                                    | New                                                     |
@@ -75,3 +78,34 @@ To be deleted at 1.0.0.
 | Convex `getBundle`, `createBundle`, `updateBundle`     | `getVaultProps`, `fetchOrCreateVaultProps`, `updateVaultProps` |
 | Convex `eraseBox`, `eraseVault`, args `{ bundle }`     | `retireBox`, `retireVault`, args `{ vaultProps }`       |
 | Convex table `safebyok_bundles`; tally `bundle_id`, `by_bundle` | `safebyok_vaults`; tally `vault_row_id`, `by_vault_row` |
+| lockbox, `Lockbox`                                     | box, `Box`                                              |
+| `LockboxSummary`, `DamagedLockbox`, `StoredLockbox`    | `BoxSummary`, `DamagedBox`, `StoredBox`                 |
+| `LockboxExpectation`                                   | `BoxExpectation`                                        |
+| `LockboxRetireExpectation`                             | `BoxDelExpectation`                                     |
+| `LockboxRetirement`; outcomes `retired`, `retired_other` | `BoxDeletion`; outcomes `deleted`, `deleted_other`      |
+| `RetireExpectation`                                    | `VaultDelExpectation`                                   |
+| `LockboxFormat`, `LockboxFieldsBytes`, `LockboxFixedBytes`, `LockboxHeader` | `BoxFormat`, `BoxFieldsBytes`, `BoxFixedBytes`, `BoxHeader` |
+| lockboxKey, lockboxKeyWrapped, `lockboxKeyBytes`       | boxKey, boxKeyWrapped, `boxKeyBytes`                    |
+| `lockbox_key_wrapped` (stored)                         | `box_key_wrapped`                                       |
+| format `safebyok-lockbox-v5`                           | format `safebyok-box-v6`                                |
+| `damaged_lockbox`, `lockbox_too_large`                 | `damaged_box`, `box_too_large`                          |
+| `maxLockboxes`, `MaxLockboxes`, the capacity `lockboxes` | `maxBoxes`, `MaxBoxes`, `boxes`                         |
+| `storeBox` (the vault), `updateBox` (a VaultDB)        | `putBox`, on both                                       |
+| `readBox`                                              | `getBox`                                                |
+| retire, `retireBox`, `retireWayin`, `retire()`         | del, `delBox`, `delWayin`, `del()`                      |
+| `retireVault`, `retireDamagedVault`, `RetireDamagedVaultOpts` | `delVault`, `delDamagedVault`, `DelDamagedVaultOpts`    |
+| `retireIfIncoherent`, `Expectations.retirementOf`      | `delIfIncoherent`, `Expectations.deletionOf`            |
+| `Expectations.lockboxMeets`, `TH.retiring`             | `Expectations.boxMeets`, `TH.deleting`                  |
+| `Refusals.staleWrite('lockbox' \| 'retire')`           | `Refusals.staleWrite('box' \| 'del')`                   |
+| `fetchOrCreateVaultProps`                              | `ensureVaultProps`                                      |
+| `readVaultProps`, `updateVaultProps`                   | `getVaultProps`, `putVaultProps`                        |
+| `readLease`, `writeLease`, `eraseLease`                | `getLease`, `putLease`, `delLease`                      |
+| `readMark`, `writeMark`, `eraseMark`, `eraseAll`       | `getMark`, `putMark`, `delMark`, `delAll`               |
+| `ensureOpen`, `ensureUnlocked`, `ensureSaltFits` and every `ensure` that only checks | `checkOpen`, `checkUnlocked`, `checkSaltFits`: a `check` |
+| `VaultError.kind`, `isVaultError(err, kind)`           | `VaultError.refusalkind`, `isVaultError(err, refusalkind)` |
+| Postgres `safebyok_lockboxes`, `safebyok_lockboxes_changed` | `safebyok_boxes`, `safebyok_boxes_changed`              |
+| Convex table `safebyok_lockboxes`; tally `lockbox_count`, `lockbox_bytes` | `safebyok_boxes`; tally `box_count`, `box_bytes`        |
+| GraphQL `SafebyokLockbox`, `SafebyokListedLockbox`, `SafebyokLockboxRetirement` | `SafebyokBox`, `SafebyokListedBox`, `SafebyokBoxDeletion` |
+| GraphQL `safebyok{Read,Update,Retire}Box`, `safebyok{Read,FetchOrCreate,Update}VaultProps`, `safebyokRetireVault` | `safebyok{Get,Put,Del}Box`, `safebyok{Get,Ensure,Put}VaultProps`, `safebyokDelVault` |
+| Convex `fetchOrCreateVaultProps`, `updateVaultProps`, `updateBox`, `retireBox`, `retireVault` | `ensureVaultProps`, `putVaultProps`, `putBox`, `delBox`, `delVault` |
+| files `lockbox.ts`, `retire-damaged-vault.ts`          | `box.ts`, `del-damaged-vault.ts`                        |

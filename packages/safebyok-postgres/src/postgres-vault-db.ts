@@ -182,7 +182,7 @@ const ExpectedVaultSql = `SELECT applabel, user_id, vaultlabel, vault_id FROM sa
 // last places each count from their own snapshot, may each find room, and all land: the vault goes
 // a few past its limit (by at most one less than the number of racers), which the contract allows,
 // and a refused write inserted nothing, since the refusal is the WHERE of one atomic statement. A
-// vault retired after the statement began is met by the vault row's FOR SHARE read, which finds it
+// vault deleted after the statement began is met by the vault row's FOR SHARE read, which finds it
 // gone, or by the foreign key, which reads the vault row that stands now: that failure is caught as
 // a stale writer (see insertBox), and no box ever lands in a vault but its own.
 const InsertBoxSql = `WITH vault AS (
@@ -214,7 +214,7 @@ const ReplaceBoxSql = `WITH vault AS (
     AND EXISTS (SELECT 1 FROM vault)
   RETURNING ${Columns.selected(BoxColumns)}`
 
-// Lands while the vault props of that vault_id stand, whether or not there was a box to retire,
+// Lands while the vault props of that vault_id stand, whether or not there was a box to delete,
 // and answers one row then, saying what it removed: the revision_tok its DELETE returned, or null
 // for none (the column is NOT NULL, so null is only ever no box). A box written meanwhile
 // is one the DELETE waited on and then removed as it stands, its revision the one returned. No row
@@ -308,7 +308,7 @@ class TablesVaultDB extends VaultDB {
   }
 
   // Runs InsertBoxSql and reads its one row; null for the one failure that is only a stale writer:
-  // its vault retired between the statement's snapshot and the foreign key's check, which reads the
+  // its vault deleted between the statement's snapshot and the foreign key's check, which reads the
   // vault row as it stands then.
   private async insertBox(params: unknown[]): Promise<InsertBoxOutcome | null> {
     try {

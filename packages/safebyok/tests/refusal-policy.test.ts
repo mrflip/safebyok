@@ -18,7 +18,7 @@ describe("RefusalPolicy.decide", () => {
     [new VaultError('storage_unavailable', 'Down.'),                    "none",  'does nothing more for storage that could not be reached'],
     [new VaultError('vault_full', 'Full.'),                             "none",  'does nothing more for a full vault'],
     // what is no refusal of storage's:
-    [new Error('identity_revoked'),                                     "none",  'does nothing for a plain Error naming the kind'],
+    [new Error('identity_revoked'),                                            "none",  'does nothing for a plain Error naming the kind'],
     [{ refusalkind: 'identity_revoked', message: 'Signed out.' },              "none",  'does nothing for an object shaped like the refusal'],
   ] as const
 
@@ -44,14 +44,14 @@ describe("RefusalPolicy.heed", () => {
 
   /** Each heeded verb, and the arguments a vault hands it. */
   const VerbArgsCases = [
-    ['getVaultProps',          [scope]],
+    ['getVaultProps',    [scope]],
     ['ensureVaultProps', [TH.vaultPropsOf('u1')]],
-    ['putVaultProps',        [TH.vaultPropsOf('u1'), TH.thisVault]],
-    ['getBox',                 [scope, 'anthropic']],
-    ['listBoxes',               [scope]],
-    ['putBox',               [scope, 'anthropic', TH.thisVault]],
-    ['delBox',               [scope, 'anthropic', TH.thisVault]],
-    ['delVault',             [scope, TH.thisVault]],
+    ['putVaultProps',    [TH.vaultPropsOf('u1'), TH.thisVault]],
+    ['getBox',           [scope, 'anthropic']],
+    ['listBoxes',        [scope]],
+    ['putBox',           [scope, 'anthropic', TH.thisVault]],
+    ['delBox',           [scope, 'anthropic', TH.thisVault]],
+    ['delVault',         [scope, TH.thisVault]],
   ] as const
 
   for (const [verb, args] of VerbArgsCases) {

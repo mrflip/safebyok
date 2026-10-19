@@ -95,7 +95,7 @@ export class OutageVaultDB extends VaultDB {
   }
 
   // The inner list hands back public summaries, without the `format` this adapter's own list
-  // verb checks for, so each box is read whole; one retired between the list and its read is
+  // verb checks for, so each box is read whole; one deleted between the list and its read is
   // simply gone. One the inner verbs refuse as damaged goes up as a stand-in that no box
   // matches, so this adapter's own list marks it damaged too.
   protected async doListBoxes(scope: VaultScope): Promise<StoredBox[]> {
@@ -130,7 +130,7 @@ export class OutageVaultDB extends VaultDB {
     return true
   }
 
-  // The one public verb this adapter hands on itself: retiring a vault whose props are damaged
+  // The one public verb this adapter hands on itself: deleting a vault whose props are damaged
   // needs the record as stored, which this adapter's own doGetVaultProps never sees, as the inner
   // verbs refuse it. The inner adapter does the checking and the deleting.
   override async delDamagedVault(scope: VaultScope): Promise<void> {

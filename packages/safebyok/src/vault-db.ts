@@ -43,9 +43,9 @@ const BoxExpectation = Z.object({
 })
 
 /**
- * What the retirement of a vault was aimed at: the vault the caller means to remove whole. The
- * retirement lands only while the scope's standing vault props have that `vault_id`, so a device
- * that missed a vault being retired and made anew never retires the successor. Plain JSON, so it
+ * What the deletion of a vault was aimed at: the vault the caller means to remove whole. The
+ * deletion lands only while the scope's standing vault props have that `vault_id`, so a device
+ * that missed a vault being deleted and made anew never deletes the successor. Plain JSON, so it
  * crosses any wire as-is.
  *
  * @example { vault_id: vaultProps.vault_id }
@@ -57,10 +57,10 @@ const VaultDelExpectation = Z.object({
 })
 
 /**
- * What the retirement of a box was aimed at: the vault it stands in, and the `revision_tok`
- * the retiring device read for it -- or null, for a box listed as damaged with none it could
- * read. The retirement lands only while the scope's standing vault props have that `vault_id`, and
- * then removes whatever box stands under the boxlabel: within the right vault, a retirement
+ * What the deletion of a box was aimed at: the vault it stands in, and the `revision_tok`
+ * the deleting device read for it -- or null, for a box listed as damaged with none it could
+ * read. The deletion lands only while the scope's standing vault props have that `vault_id`, and
+ * then removes whatever box stands under the boxlabel: within the right vault, a deletion
  * wins over any write. The revision only lets storage say whether what it removed was the one the
  * device meant (a {@link BoxDeletion}). Plain JSON, so it crosses any wire as-is.
  *
@@ -74,8 +74,8 @@ const BoxDelExpectation = Z.object({
 })
 
 /**
- * What a box retirement that landed found under its boxlabel, as storage reports it from the
- * same atomic step as the removal: `retired`, the revision its {@link BoxDelExpectation}
+ * What a box deletion that landed found under its boxlabel, as storage reports it from the
+ * same atomic step as the removal: `deleted`, the revision its {@link BoxDelExpectation}
  * named (or, for a null one, a record holding none it could read); `deleted_other`, a record that
  * was not that revision -- written over meanwhile, or holding one where none was expected -- which
  * was removed all the same; or `absent`, nothing to remove. Plain JSON, so it crosses any wire
@@ -93,7 +93,7 @@ const BoxDeletion = Z.object({
  * One box as a VaultDB's `doListBoxes` hands it up: the boxlabel it is stored under -- the
  * one `doGetBox` and `doDelBox` reach it by -- and its record exactly as stored, damaged or
  * not. The listing checks the record; the boxlabel is what lets a damaged one still be named, and
- * so retired or overwritten.
+ * so deleted or overwritten.
  *
  * @example { boxlabel: 'anthropic', box: storedRecord }
  */
@@ -135,12 +135,12 @@ export type VaultDBOpts = {
  *    vault, and nothing safebyok does ever needs you to understand a record -- only to compare a
  *    few unencrypted fields (`vault_id`, `unlock_epoch`, `vault_key_epoch`, `revision_tok`) before a
  *    write.
- *  * **Write only as expected.** Every update and retirement carries an expectation of what
+ *  * **Write only as expected.** Every update and deletion carries an expectation of what
  *    stands in storage, and writes only if it still does: check and write in one atomic step (a
  *    transaction, a conditional write), and resolve `false` when the expectation fails. A box
  *    write resolves `null` instead, and when it lands, the record as you now hold it, read back in
- *    the same step. A box retirement resolves `null` too, and when it lands, what it removed
- *    (a {@link BoxDeletion}): within the right vault, a retirement wins over any revision,
+ *    the same step. A box deletion resolves `null` too, and when it lands, what it removed
+ *    (a {@link BoxDeletion}): within the right vault, a deletion wins over any revision,
  *    and only reports whether the one it removed was the one it named.
  *  * **Enforce who may reach which rows.** Your backend should let a signed-in user reach only
  *    their own records: safebyok's encryption protects the contents, your authorization decides
@@ -188,7 +188,7 @@ export abstract class VaultDB {
   /**
    * The most this backend holds of one vault in all, in bytes as stored -- every box
    * together -- or `Infinity` when it sets no such limit. Declare what the backend can still
-   * list and retire whole: a backend that reads a vault in one transaction under a read budget
+   * list and delete whole: a backend that reads a vault in one transaction under a read budget
    * declares the share of that budget its heaviest verb leaves. A vault refuses to open when its
    * `maxBoxes` boxes might not fit in it, each counted at twice `maxWhisperBytes` (room
    * for its whisper and sidecar together, their encoding, and the backend's own counting) and
@@ -391,7 +391,7 @@ export abstract class VaultDB {
   }
   // --
 
-  // == [Retire verbs]: delBox, delVault, delDamagedVault
+  // == [Delete verbs]: delBox, delVault, delDamagedVault
 
   /**
    * Remove the box under `boxlabel`, whatever revision stands, only while the scope's standing
@@ -399,11 +399,12 @@ export abstract class VaultDB {
    * including when the scope holds no vault props -- and removes nothing. An `expected` this
    * package would not build is refused with kind `bad_record`, removing nothing.
    *
-   * Resolves what storage found, from the same atomic step as the removal: `retired` when it
+   * Resolves what storage found, from the same atomic step as the removal: `deleted` when it
    * removed the revision `expected` names (for a null `revision_tok`, a record holding none it could
    * read), `deleted_other` when it removed some other record, and `absent` when there was none. An
-   * answer in any other shape is refused as `corrupt_record`, though the retirement may have
-   * landed.
+   * answer in any other shape is refused as `corrupt_record`, though the deletion may have
+   * landed. Deleted is gone: nothing of the record is kept, and a `putBox` expecting the revision
+   * it removed is refused with kind `stale_write`.
    *
    * @example
    *   const { outcome } = await vaultDB.delBox(scope, 'anthropic', { vault_id: vaultProps.vault_id, revision_tok: listed.revision_tok })
@@ -411,10 +412,10 @@ export abstract class VaultDB {
   async delBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<BoxDeletion> {
     const asked = heldScope(this, scope)
     const label = heldBoxlabel(this, boxlabel)
-    const expectation = checkOutgoing(BoxDelExpectation, expected, 'retire expectation', 'removed')
-    const retirement = await fromStorage(() => this.doDelBox(asked, label, expectation))
-    if (retirement === null) { throw Refusals.staleWrite('del') }
-    return writtenBack('a retirement', () => checkAnswer(BoxDeletion, retirement, 'a retirement'))
+    const expectation = checkOutgoing(BoxDelExpectation, expected, 'delete expectation', 'removed')
+    const deletion = await fromStorage(() => this.doDelBox(asked, label, expectation))
+    if (deletion === null) { throw Refusals.staleWrite('del') }
+    return writtenBack('a deletion', () => checkAnswer(BoxDeletion, deletion, 'a deletion'))
   }
 
   /**
@@ -425,7 +426,7 @@ export abstract class VaultDB {
    */
   async delVault(scope: VaultScope, expected: VaultDelExpectation): Promise<void> {
     const asked = heldScope(this, scope)
-    const expectation = checkOutgoing(VaultDelExpectation, expected, 'retire expectation', 'removed')
+    const expectation = checkOutgoing(VaultDelExpectation, expected, 'delete expectation', 'removed')
     const landed = await fromStorage(() => this.doDelVault(asked, expectation))
     if (! landed) { throw Refusals.staleWrite('del') }
   }
@@ -438,14 +439,14 @@ export abstract class VaultDB {
    * the vault props and every box only while the standing vault props still have that
    * `vault_id` (`delVault`'s own expectation). Resolves quietly when the scope holds no vault
    * props. Refuses with kind `bad_option` when the vault props stand sound, and removes nothing,
-   * since a sound vault is retired through its handle's `del()`; with kind `damaged_vault`,
+   * since a sound vault is deleted through its handle's `del()`; with kind `damaged_vault`,
    * removing nothing, when the record is too damaged to name the vault it belongs to (which only
    * the backend's own tools can clear); with kind `newer_format`, removing nothing, when it may
    * have been written by a newer safebyok, in a `format`, wayinkind or number of wayins this one
    * does not know, and which a device on the newer version opens: it is told from damage by those
    * three, and where it cannot be told, it is refused; and with kind `stale_write` when the vault
    * was replaced meanwhile. Vault props rewritten under the same `vault_id` between the read and
-   * the retirement are the same vault, and are retired with it (line 3.5).
+   * the deletion are the same vault, and are deleted with it (line 3.5).
    *
    * An adapter that hands each call on to another VaultDB's public verbs hands this one on too:
    * its `doGetVaultProps` would meet the inner adapter's refusal of the damaged record, never the
@@ -458,7 +459,7 @@ export abstract class VaultDB {
     if (raw === null || raw === undefined) { return }
     if (mayBeNewer(raw)) { throw newerVaultProps() }
     if (isSoundVaultProps(raw, asked)) {
-      throw new VaultError('bad_option', "That vault's stored props are sound, so it is not retired here: a vault that opens is retired through its handle's del(). Only a vault whose hello() refuses it as damaged_vault is retired this way.")
+      throw new VaultError('bad_option', "That vault's stored props are sound, so it is not deleted here: a vault that opens is deleted through its handle's del(). Only a vault whose hello() refuses it as damaged_vault is deleted this way.")
     }
     const named = StoredVaultId.safeParse(raw)
     if (! named.success) { throw unnamedVaultProps() }
@@ -658,7 +659,7 @@ const ListedBox = Z.omit(Box, { box_key_wrapped: true, whisper_ciphered: true })
 
 /**
  * True when a listed box is stored under a name above the floor, which a verb can reach
- * whatever the vault's checks: a vault retires a box by the name it was stored under.
+ * whatever the vault's checks: a vault deletes a box by the name it was stored under.
  */
 const isNameable = (stored: StoredBox): boolean => NameFloor.safeParse((stored as { boxlabel?: unknown }).boxlabel).success
 
@@ -770,7 +771,7 @@ const checked = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, candidate: unkno
  * A record or expectation a write verb was handed, as this package writes one. One that is not
  * -- the names in it included, held to the floor by its schema -- is refused before storage sees
  * it, as misuse, so that nothing is ever written that a read would refuse as corrupt. The refusal
- * leads with what was spared: nothing `written`, or for a retire, nothing `removed`.
+ * leads with what was spared: nothing `written`, or for a delete, nothing `removed`.
  */
 const checkOutgoing = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, candidate: unknown, said: string, spared: 'written' | 'removed' = 'written'): RecordT => checked(recordSchema, candidate, () => (
   new VaultError('bad_record', `Nothing was ${spared}: that ${said} is not one this package builds. Hand a VaultDB only the records and expectations a vault builds.`)
@@ -847,7 +848,7 @@ const isSoundVaultProps = (raw: unknown, scope: VaultScope): boolean => {
   }
 }
 
-/** The one field of stored vault props a retirement needs, as the vault's own check has it. */
+/** The one field of stored vault props a deletion needs, as the vault's own check has it. */
 const StoredVaultId = Z.object({ vault_id: VaultProps.shape.vault_id })
 // --
 

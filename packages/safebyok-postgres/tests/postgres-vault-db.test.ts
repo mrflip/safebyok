@@ -134,16 +134,16 @@ describe("postgresVaultDB, as the README has it", () => {
 describe("postgresVaultDB, who may reach a vault", () => {
   const u2 = TH.scopeOf('u2')
   const EveryVerb = [
-    ['getVaultProps',          (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.getVaultProps(u2)],
+    ['getVaultProps',    (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.getVaultProps(u2)],
     ['ensureVaultProps', (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.ensureVaultProps(TH.vaultPropsOf('u2'))],
-    ['putVaultProps',        (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.putVaultProps(TH.vaultPropsOf('u2'), { vault_id: 'vault-id-u2', unlock_epoch: 1 })],
-    ['getBox',                 (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.getBox(u2, 'anthropic')],
-    ['listBoxes',               (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.listBoxes(u2)],
-    ['listBoxRecords',          (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.listBoxRecords(u2)],
-    ['putBox',               (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.putBox(u2, TH.boxOf('anthropic', 'one'), { vault_id: 'vault-id-u2', revision_tok: null, vault_key_epoch: 1 })],
-    ['delBox',               (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.delBox(u2, 'anthropic', { vault_id: 'vault-id-u2', revision_tok: null })],
-    ['delVault',             (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.delVault(u2, { vault_id: 'vault-id-u2' })],
-    ['subscribe',               (vaultDB: ReturnType<typeof postgresVaultDB>) => new Promise<void>((resolve) => { vaultDB.subscribe(u2, TH.changeCounter().onChange); resolve() })],
+    ['putVaultProps',    (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.putVaultProps(TH.vaultPropsOf('u2'), { vault_id: 'vault-id-u2', unlock_epoch: 1 })],
+    ['getBox',           (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.getBox(u2, 'anthropic')],
+    ['listBoxes',        (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.listBoxes(u2)],
+    ['listBoxRecords',   (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.listBoxRecords(u2)],
+    ['putBox',           (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.putBox(u2, TH.boxOf('anthropic', 'one'), { vault_id: 'vault-id-u2', revision_tok: null, vault_key_epoch: 1 })],
+    ['delBox',           (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.delBox(u2, 'anthropic', { vault_id: 'vault-id-u2', revision_tok: null })],
+    ['delVault',         (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.delVault(u2, { vault_id: 'vault-id-u2' })],
+    ['subscribe',        (vaultDB: ReturnType<typeof postgresVaultDB>) => new Promise<void>((resolve) => { vaultDB.subscribe(u2, TH.changeCounter().onChange); resolve() })],
   ] as const
 
   for (const [verb, call] of EveryVerb) {
@@ -250,7 +250,7 @@ describe("postgresVaultDB, what it stores", () => {
       boxlabel:               'anthropic',
       revision_tok:           'rev-one',
       vault_key_epoch:        1,
-      box_key_wrapped:    TH.fakeCiphered('boxkey-one'),
+      box_key_wrapped:        TH.fakeCiphered('boxkey-one'),
       whisper_ciphered:       TH.fakeCiphered('whisper-one'),
       whisper_codec:          'json_v1',
       whisper_schema_version: 1,
@@ -286,7 +286,7 @@ describe("postgresVaultDB, what it stores", () => {
     expect(spy.sent).to.have.lengthOf(7)
   })
 
-  it("leaves no box standing when its vault props go: retiring the vault takes them in the same statement", async () => {
+  it("leaves no box standing when its vault props go: deleting the vault takes them in the same statement", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
     await vaultDB.ensureVaultProps(TH.vaultPropsOf('u1'))
@@ -320,7 +320,7 @@ const missedBecause = (why: { vault_stands: boolean, box_stood: boolean, was_ful
 const foreignKeyViolation = Object.assign(new Error('insert or update on table "safebyok_boxes" violates foreign key constraint'), { code: '23503' })
 
 // A replacement in a full vault, and a first write over a boxlabel taken there, are the battery's
-// line 4.3; a box landing once a retired box has made room, its line 4.4: run over makeCappedVaultDB.
+// line 4.3; a box landing once a deleted box has made room, its line 4.4: run over makeCappedVaultDB.
 describe("postgresVaultDB, its box limit", () => {
   it("refuses a new box past maxBoxes as vault_full, writing nothing and naming no boxlabel", async () => {
     const db = await TH.emptyDatabase()
@@ -365,7 +365,7 @@ describe("postgresVaultDB, its box limit", () => {
     })
   }
 
-  it("refuses as stale_write a foreign key violation on the insert: its vault was retired after the statement began", async () => {
+  it("refuses as stale_write a foreign key violation on the insert: its vault was deleted after the statement began", async () => {
     const db = await TH.emptyDatabase()
     await filledTo(db, 5, [])
     const spy = TH.spyClient(db, (text) => (text.includes('INSERT INTO safebyok_boxes') ? Promise.reject(foreignKeyViolation) : undefined))
@@ -400,7 +400,7 @@ describe("postgresVaultDB, its box limit", () => {
     for (const { text } of spy.sent) {
       expect(text).to.not.match(/FOR (NO KEY )?UPDATE|FOR KEY SHARE|box_count/)
     }
-    // Each box write reads its vault row FOR SHARE, once; the retire locks nothing.
+    // Each box write reads its vault row FOR SHARE, once; the delete locks nothing.
     expect(spy.sent.map(({ text }) => text.match(/FOR SHARE/g)?.length ?? 0)).to.deep.equal([1, 1, 1, 0])
   })
 
@@ -427,7 +427,7 @@ describe("postgresVaultDB, its box limit", () => {
     expect(await boxlabelsIn(vaultDB)).to.have.lengthOf(2)
   })
 
-  it("keeps every box of a vault racing writers took past its limit, readable by its boxlabel, and lands a new one once retired boxes make room", async () => {
+  it("keeps every box of a vault racing writers took past its limit, readable by its boxlabel, and lands a new one once deleted boxes make room", async () => {
     // As racing writers may leave a vault, by the README: past its limit, here by a writer holding
     // a higher one.
     const db = await TH.emptyDatabase()
@@ -594,7 +594,7 @@ describe("postgresVaultDB, in trouble", () => {
     expect(rows[0]?.wayins).to.eq('not a list')
   })
 
-  it("retires a row whose revision the database holds empty, listed with none, as the one a retirement naming none means", async () => {
+  it("deletes a row whose revision the database holds empty, listed with none, as the one a deletion naming none means", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
     await vaultDB.ensureVaultProps(TH.vaultPropsOf('u1'))
@@ -655,7 +655,7 @@ describe("postgresVaultDB, subscribe", () => {
     unsubscribe()
   })
 
-  it("hears a retired vault once, its boxes and all, and a create that changed nothing not at all", async () => {
+  it("hears a deleted vault once, its boxes and all, and a create that changed nothing not at all", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
     await vaultDB.ensureVaultProps(TH.vaultPropsOf('u1'))

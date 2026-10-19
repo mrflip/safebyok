@@ -57,7 +57,7 @@ TH.describeOnPostgres('races', "postgresVaultDB's box limit, over a real Postgre
     expect(await device.getBox(u1, 'fifth_in_flight')).to.not.be.null
   })
 
-  it("keeps every box that landed past the limit readable, refuses a new one until retired boxes make room, and then lands it", async () => {
+  it("keeps every box that landed past the limit readable, refuses a new one until deleted boxes make room, and then lands it", async () => {
     const db = getDb()
     await db.empty()
     const device = TH.deviceOver(db, undefined, { maxBoxes: Cap })('u1')
