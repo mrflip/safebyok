@@ -32,7 +32,7 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
-* 2026-10-19 (branch 20261019-retire_revision, on PR #177): **`VaultDB.retireBox` now takes the
+* 2026-10-19 (branch 20261019-retire_revision, on PR #177); 2026-10-19 (branch 20261019-no_clear): **`VaultDB.retireBox` now takes the
   revision the device read, and storage reports what it removed; the base class takes that report
   as untrusted storage input.** The expectation is `{ vault_id, revision_tok }` (null for a
   lockbox listed as damaged with no readable revision); `retireVault` and `retireDamagedVault`
@@ -47,13 +47,16 @@ added or folded into through the subagent, and no other entry changes.
   `localVaultDB`, the GraphQL server's reply), never a second storage call. The base class keeps
   only the `outcome` field, through the same `writtenBack` step `updateBox` uses, and refuses
   anything else as `corrupt_record`, saying the retirement may have landed and quoting nothing.
-  The vault's `retireBox()` and `storeBox()`'s retire-first over a damaged record naming no
-  revision honor `retired_other` and warn through the host's logger, naming neither revision nor
-  boxlabel; the result stays void and the write goes on. Known residual: two devices both showing
-  a damaged lockbox with no revision can still lose a write, now logged where it was silent (A
-  retires and writes; B retires A's write, warned, and writes); closing it is undecided.
-  Honoring and warning, rather than refusing as stale, awaits a Coach's confirmation. Nothing
-  stored changes.
+  The vault's `retireBox()` honors `retired_other` and warns through the host's logger, naming
+  neither revision nor boxlabel; the result stays void. Honoring and warning, rather than refusing
+  as stale, awaits a Coach's confirmation. Amended 2026-10-19 (20261019-no_clear): `storeBox()` no
+  longer retires first and logs no `retired_other` of its own; a store is always one conditional
+  `updateBox`. A lockbox listed damaged that names a revision is written over in that one write; one
+  that names no revision is refused as `damaged_lockbox`, writing nothing, its message telling the
+  user to `retireBox()` it first. This closes the residual this entry recorded (A retires and
+  writes; B retires A's write and writes; neither throws), and the gap between the two calls in
+  which a refused write could say nothing was written after the retire had removed a record.
+  Nothing stored changes.
 * 2026-10-19 (returning): **`VaultDB.updateBox` now resolves the lockbox as storage holds it after
   the write lands, and the base class takes that answer as untrusted storage input.** Each
   adapter's `doUpdateBox` hands the lockbox back from the same atomic step as the conditional
@@ -245,7 +248,11 @@ added or folded into through the subagent, and no other entry changes.
   store. What one who can write storage could already do -- delete or replace any row -- is
   unchanged; what is new is that planting junk under a boxlabel shows the user a damaged box where
   a refused open used to show, and that the user's next `storeBox()` to that boxlabel clears the junk
-  rather than refusing. `readBox()` and `useBox()` still refuse a damaged box.
+  rather than refusing. `readBox()` and `useBox()` still refuse a damaged box. (Amended
+  2026-10-19, 20261019-no_clear: the retire-first is gone. `storeBox()` is one conditional
+  `updateBox`; a damaged lockbox naming a revision is written over in it, carrying nothing forward,
+  and one naming no revision is refused as `damaged_lockbox`, writing nothing, until the user calls
+  `retireBox()`; the two-step and removal behaviors described here no longer exist.)
 
 * 2026-10-15: `retireBox(boxlabel)` removes a lockbox whose stored record fails validation or
   verification (`corrupt_record`), rather than refusing it: it reads the record only to tell an
@@ -1191,7 +1198,9 @@ added or folded into through the subagent, and no other entry changes.
   `storeBox()` writes over that revision under contract line 3.3, so a sound lockbox another device
   wrote meanwhile refuses the write and is never retired, and the refusal is thrown as `stale_write`
   after one catch-up (amended 2026-10-18: the store once retried over it, last writer wins, until [#160](https://github.com/mrflip/safebyok/pull/160) removed the retry). The revision is untrusted text used only as an expectation storage compares. Only
-  a record naming no revision is retired first, which leaves a gap P6 accepts. A lockbox under a
+  a record naming no revision is retired first, which leaves a gap P6 accepts (amended 2026-10-19,
+  20261019-no_clear: the retire-first is gone; `storeBox()` refuses a damaged lockbox naming no
+  revision as `damaged_lockbox`, writing nothing, and the gap with it). A lockbox under a
   vaultKey epoch neither the vault props' nor the prior's lists as damaged from its epoch alone (G063);
   the listing still never opens ciphertext (G121).
 * 2026-10-16 (refusals_and_catchup): **`Vault.make` takes only a `VaultDB`** (G122): a duck-typed

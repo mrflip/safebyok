@@ -58,11 +58,10 @@ refusal -- a stale write, or a lockbox that will not open -- the vault catches u
 once, so a vault retired and made anew elsewhere relocks the device rather than reading as
 damage. There is no conflict handler beyond this, and no hook for one: whatever landed first
 stands, and a host that disagrees calls `storeBox()` or `retireBox()` again. The vault never clears
-a damaged record on its own; the user's `retireBox()` or `storeBox()` on its boxlabel does. A
-retirement that storage says removed another revision than the one the vault showed -- a
-`retireBox()`, or the one a `storeBox()` makes first over a damaged record that names none -- stands
-too, as a retirement within its vault does (line 3.4): the vault warns through its logger, naming
-neither revision, and the store goes on to its write.
+a damaged record on its own; the user's `retireBox()` on its boxlabel does, or a `storeBox()` over
+one that names its revision, in its one `updateBox`: a store never retires. A `retireBox()` that
+storage says removed another revision than the one the vault showed stands too, as a retirement
+within its vault does (line 3.4): the vault warns through its logger, naming neither revision.
 
 The base class turns anything your code throws that is not a `VaultError` into
 `storage_unavailable` -- a bug in your adapter among it, which it cannot tell from a driver's

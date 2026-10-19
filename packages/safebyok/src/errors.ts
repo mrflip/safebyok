@@ -99,7 +99,7 @@ export const VaultErrorKindVals = [
   'corrupt_record',      // a stored record failed validation as storage read it back
   'damaged_vault',       // the vault's stored props failed their checks, so no way in can be tried
   'damaged_wayin',       // a way in is stored in a form this package never writes, so it cannot be tried
-  'damaged_lockbox',     // a lockbox failed its checks, or would not open under the vault's own vaultKey
+  'damaged_lockbox',     // a lockbox failed its checks, or would not open under the vault's own vaultKey, or names no revision to store over
   'newer_format',        // a stored vault in a form this version does not know, which a newer one may have written
   'unknown_key_deriver', // the vault names a key deriver this handle was not built with
   'insecure_context',    // the page is not a secure context (plain http), where the browser withholds WebCrypto

@@ -91,8 +91,8 @@ kind, its family, and what it means.
 storage no longer serves (`identity_revoked`, as when signed out of the backend, or not yet
 signed in to it) or a vault whose stored props fail their checks (`damaged_vault`) arrives as
 `openError`, a `VaultError`: the snapshot's `trouble`, the vault still `opening`. (A damaged lockbox never stops the open:
-the snapshot lists it with `damaged: true`, for your UI to offer `retireBox()` or a fresh
-`storeBox()`; see the `safebyok` README's *Damaged lockboxes*.) Show it where the vault's UI
+the snapshot lists it with `damaged: true`, for your UI to offer `retireBox()` or, while it
+names its `revision_tok`, a fresh `storeBox()`; see the `safebyok` README's *Damaged lockboxes*.) Show it where the vault's UI
 would be, and offer `retryOpen()`, which has the vault say hello again: `openError` clears once it
 settles, or names what the retry met. A browser that keeps the app from storing
 anything on this device (`storage_blocked`) is a condition too, but one a retry will not mend

@@ -43,7 +43,7 @@ export type VaultSnapshot = {
    * Every lockbox in the vault, sorted by boxlabel: a {@link LockboxSummary} for each, or a
    * {@link DamagedLockbox} (`damaged: true`, its boxlabel and revision and nothing else) for one
    * whose stored record does not read back, or is sealed under a vaultKey the vault does not hold
-   * -- which `retireBox()` removes and `storeBox()` overwrites. The listing reads each record's shape and
+   * -- which `retireBox()` removes, and `storeBox()` overwrites while it names its revision. The listing reads each record's shape and
    * never opens its ciphertext: ciphertext altered in storage shows only when it is read.
    */
   boxes:     readonly (LockboxSummary | DamagedLockbox)[]
@@ -528,12 +528,10 @@ export type Vault = {
    * damaged, and also one that lists as sound but whose ciphered fields are missing or malformed
    * -- is overwritten as though it were new, with nothing carried from it, neither its sidecar
    * nor its `registered_at`: in one write over the revision the listing names, which another
-   * device's write meanwhile refuses, as for any lockbox. A record that names no revision is
-   * retired first, then written; should that write fail, the old record is gone and the call
-   * throws: calling `storeBox()` again writes the lockbox afresh. When that retirement comes
-   * back `retired_other` -- what it removed was not the damaged record the snapshot showed, another
-   * device or tab having written there meanwhile -- the write goes on, and the vault warns through
-   * its logger, its story carrying `damaged: true` beside `call`. A record that reads but will not decipher --
+   * device's write meanwhile refuses, as for any lockbox. A store is that one write, always. A
+   * lockbox the snapshot lists as damaged naming no revision -- damaged beyond naming, as a record
+   * that is not JSON is -- has no revision to write over, so the store refuses it with kind
+   * 'damaged_lockbox', writing nothing: `retireBox()` it first, then store. A record that reads but will not decipher --
    * its ciphertext, its sidecar or a time altered in storage -- is written over its revision, but
    * carries nothing forward either: nothing vouches for its visible fields, so its sidecar becomes `{}`
    * unless one is given, and its `registered_at` is now. A boxlabel the vault's check refuses is
@@ -1644,20 +1642,12 @@ const make = (opts: MakeVaultOpts): Vault => {
   }
 
   /**
-   * Write `lockbox` over `expected`, as `storeBox()` does, retiring what stands under its boxlabel
-   * first when `clearsFirst`, naming the revision `expected` names. A retirement that removed
-   * another record than that one -- a lockbox another device wrote over the damaged one meanwhile --
-   * is warned of, and the write goes on. One attempt: a refusal is thrown as
+   * Write `lockbox` over `expected`, as `storeBox()` does: one write, which storage refuses unless
+   * the revision `expected` names still stands. One attempt: a refusal is thrown as
    * {@link refuseStaleStoreBox} says. Work in hand, it may finish within a grace.
    */
-  const writeOver = async (lockbox: Lockbox, expected: LockboxExpectation, clearsFirst: boolean): Promise<void> => {
+  const writeOver = async (lockbox: Lockbox, expected: LockboxExpectation): Promise<void> => {
     try {
-      if (clearsFirst) {
-        const { outcome } = await refreshOnStale(vaultDB.retireBox(scope, lockbox.boxlabel, { vault_id: expected.vault_id, revision_tok: expected.revision_tok }), 'storeBox')
-        if (outcome === 'retired_other') {
-          logger.warn("Storing over a damaged lockbox first retired what stood under its boxlabel, and that was not the damaged record this device showed: another device or tab had written there since. Its write was retired, and this one stored in its place.", { call: 'storeBox', damaged: true })
-        }
-      }
       await refreshOnStale(vaultDB.updateBox(scope, lockbox, expected), 'storeBox')
     } catch (err) {
       refuseStaleStoreBox(err)
@@ -1858,6 +1848,10 @@ const make = (opts: MakeVaultOpts): Vault => {
       const whisperBytes = new TextEncoder().encode(stableJsonify(checked.data))
       ensureWhisperFits(whisperBytes, givenSidecarJson ?? EmptySidecarJson)
       const standing = await readBoxOrDamaged(label)
+      // A store is one write, over a revision storage arbitrates. A box listed damaged naming none
+      // could be cleared only by a retire before it, a second call another device's write could
+      // fall between and be lost: the user retires it, then stores.
+      if (standing === 'damaged' && isListedDamaged(label) && listedRevisionOf(label) === null) { throw damagedBeyondNaming() }
       // A damaged box is overwritten as a fresh store: nothing in it can be carried forward.
       const prev = standing === 'damaged' ? null : standing
       await ensureRoomFor(label, prev)
@@ -1878,10 +1872,8 @@ const make = (opts: MakeVaultOpts): Vault => {
       // the revision just read -- for a damaged box, the one the listing names -- : a vault reborn
       // elsewhere, a vaultKey replaced, or a box written meanwhile by another device, refuses it.
       const overRevision = standing === 'damaged' ? listedRevisionOf(label) : prev?.revision_tok ?? null
-      // Only a box the listing shows damaged and naming no revision is retired first: one the
-      // listing does not show yet is written as over none, which storage refuses while it
-      // stands, and the catch-up lists it with its revision for the next store.
-      const clearsFirst = standing === 'damaged' && overRevision === null && isListedDamaged(label)
+      // A damaged box the listing does not show yet is written as over none, which storage refuses
+      // while it stands; the catch-up lists it, with its revision for the next store.
       const expected = { vault_id: vaultId, revision_tok: overRevision, vault_key_epoch: vaultKeyEpoch }
       const header: LockboxHeader = {
         boxlabel:               label,
@@ -1899,7 +1891,7 @@ const make = (opts: MakeVaultOpts): Vault => {
         lockbox_key_wrapped: await wrapKeyUnder(unlockedKey, lockboxKey, boxCtx(vaultId, header, 'lockbox_key_wrapped')),
         whisper_ciphered:    await cipherBytes(lockboxKey, whisperBytes, boxCtx(vaultId, header, 'whisper_ciphered')),
       }
-      await writeOver(lockbox, expected, clearsFirst)
+      await writeOver(lockbox, expected)
       await refresh()
     },
 
@@ -2170,6 +2162,8 @@ const damagedVaultProps = (opts: ErrorOptions) => new VaultError('damaged_vault'
 
 // The refusal never quotes the boxlabel: a host's validators may admit any text, a mistaken paste among it.
 const damagedLockbox = (opts: ErrorOptions) => new VaultError('damaged_lockbox', "That lockbox is stored damaged, so it can't be read. It was left as it is; remove it, or store its whisper again over it.", opts)
+
+const damagedBeyondNaming = () => new VaultError('damaged_lockbox', "That lockbox is damaged beyond naming: its stored record does not say which revision it is, so nothing can be written over it safely. Nothing was written. Remove it with retireBox() first, then store its whisper again.")
 
 const lockedError = () => new VaultError('vault_locked', 'The vault is locked: ask the user for their passphrase and call unlock().')
 
