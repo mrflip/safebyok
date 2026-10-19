@@ -311,11 +311,11 @@ export class Box {
 
   async #open(vaultKey: CryptoKey): Promise<Whisper> {
     checkVaultKey(vaultKey, 'Opening a box')
-    if (this.vault_key_epoch !== this.vault.vault_key_epoch) {
+    const { vaultId, vaultKeyEpoch } = standingOf(this.vault)
+    if (this.vault_key_epoch !== vaultKeyEpoch) {
       // Quotes no boxlabel, as no refusal here does: a host's boxlabel check may admit any text.
       throw new VaultError('damaged_box', "That box is damaged: it says it was sealed under a vaultKey this vault does not hold, so it can't be opened. It was left as it is; remove it, or store its whisper again over it.")
     }
-    const { vaultId } = standingOf(this.vault)
     const { format: _format, box_key_wrapped: boxKeyWrapped, whisper_ciphered: whisperCiphered, ...header } = this.props
     let whisperBytes: Uint8Array
     try {

@@ -369,6 +369,8 @@ describe("box.tryOpen", () => {
     const { box } = await sealedOf()
     await TH.expectBad(box.tryOpen('not a key' as unknown as CryptoKey), 'bad_option')
     await TH.expectBad(Box.make(stubVault({ vault_id: null }), box.props).tryOpen(await makeVaultKey()), 'absent_vault')
+    // As a vault not yet created shows itself: no id, and no vaultKey epoch either.
+    await TH.expectBad(Box.make(stubVault({ vault_id: null, vault_key_epoch: null }), box.props).tryOpen(await makeVaultKey()), 'absent_vault')
   })
 })
 
