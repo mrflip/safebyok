@@ -16,7 +16,7 @@ this line.
   (56 kB; `grep -n '^#'` is its outline). The handoff says when a ruling has changed it since.
 * **Sprint doc:** https://claude.ai/code/artifact/362ec68d-5bf3-46aa-a379-59a9c8bfb548
   (*Open Matters*, *Resolved*, *Progress*).
-* **Status:** phase A filed (#193-#200); restacking A1b onto A6, then B1, B3 and passes 1-2.
+* **Status:** phase A filed (#193-#200, #195 on top); passes 1-2 done; B1, B3 and `a_sec` building.
 
 ## How this plan relates to the preplan
 
@@ -138,6 +138,13 @@ check-before-prompt, the boundary's `cause`, `DialogTrouble` (to `a-fixes`); a s
 may still create the vault; a synchronous `lock()` inside `getProof` is missed (host misuse);
 `Ask.raise` public (row, B5).
 
+**`a_sec`** (*Orchestrator:* added after phase A's pass 2): phase A's security fix-up, cut from
+19c0cc87 beside B1 and B3, opus, review `high`. F1 (a lock after Cancel misses the ask's attempt),
+F2 (a take-up in flight survives a revocation elsewhere), F3 (React gates close late), F4 (a
+`passphraseAdvice` throw unstripped), plus the queued boundary-`cause`, `DialogTrouble` and two
+security-note lines (moved here from `a-fixes`). Restacked on top of B1 when B1 files; B2 cuts
+from it.
+
 **Closing phase A:** passes 1 and 2 (opus, `high`, worktree-isolated agents, one lens each) over
 `origin/main...<A's tip>` while B1 and B3 build; findings filed as a comment on the sprint PR and
 fixed in a small thread `a-fixes` (on B's line, after B4), with the `a-shims` grep folded in.
@@ -177,7 +184,7 @@ over `Object.keys(vault.snapshot)`; `created_elsewhere` and `damaged_wayin` prov
 |---|---|---|---|---|---|
 | B1 | `proof-wayin` | A's line (A1b restacked in) | opus | high | Adds `adorn`/`decorate` to `utils.ts` first. *Orchestrator:* settles the passkey proof's name (the Contract's `Ask.attempt` says `PasskeyAnswer`, the code `PasskeyProof`). Also: A3 left `props` unbuilt and `damaged_wayin` news from a listing unbuilt (summaries flag no damaged wayin yet); both are B1's. |
 | B3 | `box` | A's line | opus | high | Beside B1. |
-| B2 | `lease` | B1 | opus | high | |
+| B2 | `lease` | B1 + `a_sec` restacked | opus | high | *Orchestrator:* stands on `a_sec`, whose F2 fix lives in the lease take-up B2 extracts. |
 | B4 | `put-wayin` | B2 | opus | medium | Writes its Contract section to the thread file first; YOLO builds to the brief. |
 | B5 | `placement` | B3 + B4 restacked | opus | low | *Orchestrator:* the preplan stacks B5 on B4 only, but B5 reads all four model classes, so B3 joins the line first. |
 
