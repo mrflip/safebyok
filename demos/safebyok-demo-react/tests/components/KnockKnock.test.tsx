@@ -172,11 +172,14 @@ describe("KnockKnock", () => {
     expect(await vault.readBox('anthropic_api_key')).to.eq('sk-ant-test-replaced')
   })
 
-  it("won't knock with a damaged key, and replaces it afresh", async () => {
+  it("won't knock with a damaged key, and replaces one that names its revision afresh", async () => {
     const store = memoryStore()
     const world = TH.makeWorld({ vaultDB: localVaultDB({ store }) })
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
-    store.write(Ckeys.box(TH.scopeOf('u1'), 'anthropic_api_key'), '{"not": json')
+    const ckey = Ckeys.box(TH.scopeOf('u1'), 'anthropic_api_key')
+    // A sidecar that is not JSON: damaged, but its record still names its revision.
+    const row = JSON.parse(store.read(ckey) ?? '{}') as object
+    store.write(ckey, JSON.stringify({ ...row, sidecar_json: '{"note":' }))
     world.renderInVault(<KnockKnock />)
     await screen.findByText(/stored Anthropic key is damaged/)
     fireEvent.change(screen.getByPlaceholderText('Banana'), { target: { value: 'Banana' } })
@@ -190,6 +193,21 @@ describe("KnockKnock", () => {
     await screen.findByText(/Anthropic key saved/)
     const vault = await world.openUnlocked()
     expect(await vault.readBox('anthropic_api_key')).to.eq('sk-ant-test-replaced')
+  })
+
+  it("offers a key damaged beyond naming only for removing, and then for adding anew", async () => {
+    const store = memoryStore()
+    const world = TH.makeWorld({ vaultDB: localVaultDB({ store }) })
+    await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
+    const ckey = Ckeys.box(TH.scopeOf('u1'), 'anthropic_api_key')
+    store.write(ckey, '{"not": json')
+    world.renderInVault(<KnockKnock />)
+    await screen.findByText(/stored Anthropic key is damaged/)
+    expect(screen.queryByRole('button', { name: 'replace it' })).to.be.null
+    fireEvent.click(screen.getByRole('button', { name: 'remove it' }))
+    await TH.answerPassphraseDialog()
+    fireEvent.click(await screen.findByRole('button', { name: 'add your key' }))
+    expect(store.read(ckey)).to.be.null
   })
 
   it("shows a refused save beside the key form: here, a key over the vault's limit", async () => {
