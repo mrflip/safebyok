@@ -585,7 +585,8 @@ added or folded into through the subagent, and no other entry changes.
   tags are also the first element of every encryption's additional data, so a record written
   under a `byok-*-v1` tag would neither validate nor decrypt. No reader for the old tags is
   kept: they existed only in development and demo storage, never in a published version.
-* 2026-10-15; 2026-10-19 (thread A1 `outcome`, sprint contract, branch 20261019-outcome):
+* 2026-10-15; 2026-10-19 (thread A1 `outcome`, sprint contract, branch 20261019-outcome); 2026-10-19 (thread A4, sprint
+  contract, branch 20261019-try_twins):
   `VaultDB`'s public verbs turn any failure from an adapter that is not already a
   `VaultError` into kind `storage_unavailable`, with the adapter's own error attached as the
   standard `cause`. Adapters see only ciphertext and unencrypted record fields, but that cause is
@@ -606,6 +607,24 @@ added or folded into through the subagent, and no other entry changes.
   on `identity_revoked` and `rolled_back` from storage: `RefusalPolicy.heed` unwraps each Outcome,
   hands every bad `err` to the vault's refusal handler and awaits it, then throws it, as before --
   an interim shim until the vault's own calls are Outcome-shaped.
+  2026-10-19 (A4): every public vault call (`packages/safebyok/src/vault.ts`) now has a `tryX` form
+  resolving an `Outcome` and an `X` form throwing the same `err` (`#trying`, `#throwing`). A throw
+  inside a vault call that is not a `VaultError` -- a bug in safebyok, or a throw from a host
+  function such as the passphrase strength test, the key deriver or `addPasskey`'s `makePasskey`,
+  several of which are handed the passphrase -- becomes a `VaultError` of kind `unexpected_error`
+  (family `misuse`) carrying the thrown value as `cause`; it is deliberately never logged and never
+  reported to the platform, since the thrown value may quote secret material, and the cause still
+  reaches the caller (before, the raw throw propagated). In the `VaultDB` base
+  (`src/vault-db.ts`), a non-`VaultError` throw from the adapter's `do*` hook stays
+  `storage_unavailable` (retryable), while a throw from the base's own checks becomes
+  `unexpected_error` (not retryable). A `do*` hook that returns an `Outcome`-shaped value (a wrapper
+  `VaultDB` that forgot to unwrap another's answer, `valOf`) is refused as `bad_option`; before, a
+  wrapped refusal from `doPutVaultProps` or `doDelVault` was a truthy object and read as "landed".
+  `outcomeOf`, so every vault and `VaultDB` boundary, now keeps as it is an error from another copy
+  of safebyok loaded beside this one (ESM and CJS builds): any `Error` whose `name` is `VaultError`
+  and whose `refusalkind` is a known kind. That object passes as a refusal without being an
+  `instanceof` this copy's `VaultError`, so code past the boundary that uses `instanceof` or
+  `isVaultError` (for instance `RefusalPolicy`'s lock on `identity_revoked`) does not recognize it.
 * 2026-10-15: `localVaultDB` and `idbVaultDB` key rows by `applabel:user_id:vaultlabel`, and
   `user_id` may hold a colon, so one user's rows can share another scope's ckey prefix. Listing
   and deleting a vault now take only ckeys whose remainder after the prefix is a bare boxlabel
