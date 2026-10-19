@@ -22,3 +22,11 @@ they disagree. Workers look things up here; they do not write it.
 * *#176 review:* `writeOver`'s clear-then-write over a damaged box naming no revision can lose a
   write silently (A retires, A writes, B retires A's write, B writes). Thread 2's honor-and-warn
   only logs it. It is with the Coach (bring back thread 4?).
+* *Thread 1 (#177, filed):* `doUpdateBox` resolves the stored lockbox or `null`; only `null` is
+  stale, any other malformed answer is `corrupt_record`. `writtenBack(said, check)` in
+  `vault-db.ts` validates an adapter's answer; `refreshOnStale` and IndexedDB's `ringIfLanded`
+  are generic. Beyond the adapters, a VaultDB verb change reaches the demo's
+  `src/lib/outage.ts`, the Postgres README route recipe (and its test copy) and authoring
+  bullets, the Convex README table and the core README's refusal table. The malformed-answer
+  case is tested in the core's `tests/vault-db.test.ts`, not `describeVaultDB` (which cannot make
+  an adapter misbehave).

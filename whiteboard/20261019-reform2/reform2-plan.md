@@ -5,7 +5,7 @@ Date: 2026-10-19. Issued by: the Coach (`/sprint reform2`, from the preplan besi
 Sprint branch: `20261019-reform2`. Sprint doc (Open Matters, Progress, Resolved):
 https://claude.ai/code/artifact/62febfc3-47ee-4a7c-b99e-ea494b4b169c
 
-**Status:** thread 7 filed (#176); thread 1 building.
+**Status:** threads 1 (#177) and 7 (#176) filed; thread 2 building.
 
 The Coach struck threads 3 (`one_look`), 4 (`no_clear`) and 5 (`newer_lockbox`) after issuing
 the preplan. Their text is kept in the preplan; this plan keeps their numbers so the preplan and
@@ -101,6 +101,13 @@ changeset. Depends on nothing: cut from `origin/main`. Size: medium, mechanical.
 thread 2 changes `retireBox` the same way, so shape the base class's "validate what came back"
 step so `retireBox`'s outcome can use it beside; thread 6 then makes `checkOutgoing`'s refusal
 its own kind, so leave `checkOutgoing` as it is. Model: the default.
+
+*Review:* `fixed` ([#177](https://github.com/mrflip/safebyok/pull/177)). Fixed: VAULTDB.md said a
+`false` from `doUpdateBox` is stale (it is `corrupt_record`); two `return await` outside a `try`
+(IndexedDB, the demo's outage wrapper). Left: a `corrupt_record` answer skips `storeBox`'s
+refresh (to the Coach, Rec: with the deferred fold); Postgres `InsertBoxOutcome` loosely typed
+(to the Coach, Rec: next time Postgres is touched); Convex's read-back `&&` (noted only);
+`writtenBack` and `damagedAs` near twins (noted only). Filed at `73d665e1`.
 
 ---
 
