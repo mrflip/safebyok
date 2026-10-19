@@ -610,7 +610,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
   })
   // --
 
-  // == [Refused and independent writes]: 3.6 refused wrote nothing, 3.7 independent writes, 3.8 vaultKey, rotatedHolding
+  // == [Refused and independent writes]: 3.6 refused wrote nothing, 3.7 independent writes, 3.8 vaultKey
 
   describe(lineTitle('3.6'), () => {
     it("leaves the whole vault as it stood after each refusal: vault props, boxes and listing", async () => {

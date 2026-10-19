@@ -174,7 +174,7 @@ export type Vault = {
   hello(): Promise<void>
   // --
 
-  // == [Vault: locking]: unlock, lock, lockSoon
+  // == [Vault: locking]: unlock, lock
 
   /**
    * Open the vault with its passphrase, granting this device a lease for `leaseHours`. On an
@@ -587,7 +587,7 @@ const make = (opts: MakeVaultOpts): Vault => {
   const vaultDB = RefusalPolicy.heed(givenVaultDB, async (refusal) => { await heedRefusal(refusal) })
   // --
 
-  // == [State and snapshot]: vaultProps, vaultKey, counters, listeners, snapshot, bump
+  // == [State and snapshot]: vaultProps, vaultKey, listeners, snapshot, bump
 
   let vaultProps: VaultProps | null | typeof UnreadVaultProps = UnreadVaultProps
   // This device's mark for the vault props in hand, set with them, so the two always name one vault.
@@ -751,7 +751,7 @@ const make = (opts: MakeVaultOpts): Vault => {
   }
   // --
 
-  // == [Mark]: checkedMark, keptMark, heedMark, raiseMark, markSeeing, blankMark, deviceIdFor
+  // == [Mark]: checkedMark, keptMark, heedMark, raiseMark, markSeeing, deviceIdFor
 
   /** `kept`, a mark the deviceDB handed back, when it passes its check and is of this scope; null otherwise. */
   const checkedMark = (kept: unknown): DeviceMark | null => {
@@ -843,7 +843,7 @@ const make = (opts: MakeVaultOpts): Vault => {
   }
   // --
 
-  // == [Guards]: ensureOpen, ensureUnlocked, keyInHand, currentVaultProps
+  // == [Guards]: ensureOpen, ensureUnlocked, currentVaultProps
 
   const ensureOpen = () => {
     if (closed) { throw closedError() }
@@ -1041,7 +1041,7 @@ const make = (opts: MakeVaultOpts): Vault => {
   }
   // --
 
-  // == [Locking and expiry]: shut, hardRevokeLease, noteStart, heedRefusal, dropKey, armExpiry, outrun, others
+  // == [Locking and expiry]: shut, heedRefusal, dropKey, armExpiry, outrun, others
 
   /** Forget the unlock, in memory and on this device: every lock goes through here. */
   const shut = async () => {
@@ -1868,7 +1868,7 @@ const parseNewPasskey = (candidate: PasskeyProof): PasskeyProof => {
 }
 // --
 
-// == [Vocabulary]: isUnderHeldKey, UnlockStart, SeenMark, MarkFormat, VaultCall, LockboxFormat, LockboxHeader
+// == [Vocabulary]: isUnderHeldKey, MarkFormat, VaultCall, LockboxFormat, LockboxHeader
 
 /**
  * True when `box` lists as damaged already, or stands under the vaultKey `standing` holds. A
@@ -2013,7 +2013,7 @@ const parsePassphrase = (candidate: string, said: 'changePassphrase' | 'addPassp
 }
 // --
 
-// == [Timers and grace]: ExpiryGraceMillis, isFarFuture, unrefTimeout, parseGraceSeconds, deadlineAfter, parseJsonOrNull
+// == [Timers and grace]: isFarFuture, unrefTimeout, deadlineAfter, parseJsonOrNull
 
 /**
  * True for an instant within a minute of {@link FarFuture}: a deadline that never comes. Never

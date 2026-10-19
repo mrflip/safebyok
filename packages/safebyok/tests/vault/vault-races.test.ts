@@ -150,7 +150,7 @@ describe("a read in flight when a lock lands", () => {
 })
 // --
 
-// == [Creation and moved vaults]: raceLostToPwOne, first unlock loses race, vault moves elsewhere, other handle, lock generation
+// == [Creation and moved vaults]: raceLostToPwOne, first unlock loses race, vault moves elsewhere, other handle
 
 /**
  * Device B, open on an absent vault, and device A, another device on the same storage. A makes
