@@ -1,6 +1,6 @@
 {
   "name": "safebyok",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Bring-your-own-key vault: end-to-end encrypted, browser-side storage for API keys and other small secrets, over a pluggable database layer",
   "keywords": [
     "safebyok",
