@@ -5,7 +5,7 @@ Date: 2026-10-19. Issued by: the Coach (`/sprint reform2`, from the preplan besi
 Sprint branch: `20261019-reform2`. Sprint doc (Open Matters, Progress, Resolved):
 https://claude.ai/code/artifact/62febfc3-47ee-4a7c-b99e-ea494b4b169c
 
-**Status:** threads 1 (#177) and 7 (#176) filed; thread 2 building.
+**Status:** threads 1 (#177), 2 (#178) and 7 (#176) filed; thread 6 building.
 
 The Coach struck threads 3 (`one_look`), 4 (`no_clear`) and 5 (`newer_lockbox`) after issuing
 the preplan. Their text is kept in the preplan; this plan keeps their numbers so the preplan and
@@ -135,6 +135,14 @@ stays now that thread 4 is struck: it passes the revision it read and, on `retir
 warns as `retireBox()` does and goes on to its write, the same honor-and-warn), a changeset. Depends on 1: cut from thread 1's tip once
 filed. Size: medium. Model: the default. *Orchestrator:* the honor-and-warn default is a
 YOLO decision pending the Coach's word (Open Matters); build it as written.
+
+*Review:* `fixed` ([#178](https://github.com/mrflip/safebyok/pull/178)). Fixed: Postgres and
+Convex compared the removed `revision_tok` raw, so a row holding `''` (listed with none) retired
+as `retired_other` with a false warning; Postgres now uses `Expectations.retirementOf`, Convex
+an inline equivalent; the battery's odd-labels retire now checks its outcome. Left: the outcome
+rule lives twice (core helper, Convex inline; noted); VAULTDB.md 3.4 names the helper as the
+key-value stores' only (handed to thread 6). Real-Postgres e2e not run locally. Filed at
+`3141cc10`.
 
 ---
 

@@ -30,3 +30,10 @@ they disagree. Workers look things up here; they do not write it.
   bullets, the Convex README table and the core README's refusal table. The malformed-answer
   case is tested in the core's `tests/vault-db.test.ts`, not `describeVaultDB` (which cannot make
   an adapter misbehave).
+* *Thread 2 (#178, filed):* a lockbox retire takes `LockboxRetireExpectation` (with
+  `revision_tok`) and resolves `LockboxRetirement` (`retired | retired_other | absent`);
+  `RetireExpectation` stays vault-only. `Expectations.retirementOf` decides the outcome (the
+  Convex component inlines it, as it imports nothing from `safebyok`). An empty `revision_tok`
+  reads as none everywhere. `retireBox()` and `writeOver`'s retire warn on `retired_other`
+  and carry on; the #176 lost-write sequence has a test showing exactly one warning. IndexedDB
+  no longer rings for an `absent` retire. GraphQL: enum `SafebyokRetireOutcome`.
