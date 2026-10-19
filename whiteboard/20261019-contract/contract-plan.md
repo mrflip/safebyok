@@ -166,6 +166,10 @@ A6 `lockLanded` entry: an overtaken attempt stands down any lease take-up as it 
 "a throwing `getProof` is always `unexpected_error`: allow more specificity" and "changing scope
 requires a new vault from scratch: `vault_id`, `applabel`, `user_id`, `vaultlabel` are
 immutable" (a Coach note).
+*Orchestrator:* from phase A's pass 1 (conformance; comment on #192), `a-fixes` also: an
+`ensureLease` row in `vault-twins.test.ts`'s `TwinCases`; the scope-fields immutability test loops
+over `Object.keys(vault.snapshot)`; `created_elsewhere` and `damaged_wayin` provoked through
+`ask.attempt` in `vault-lease.test.ts`; `Ask.attempt`'s doc block drops `passkey_unavailable`.
 
 ### Phase B: `models`
 
@@ -183,7 +187,7 @@ immutable" (a Coach note).
 
 | # | Label | Base | Model | Review | Gloss |
 |---|---|---|---|---|---|
-| C1 | `putbox-store` | B's line | opus | high | One atomic conditional write per adapter; battery's races. *Orchestrator:* `meta.box_stored` is typed `Box | null` until now: widen it (C3 adds the tombstone). A1b's `thread-A1b-c1-putbox.md` has each backend's one-statement write. |
+| C1 | `putbox-store` | B's line | opus | high | One atomic conditional write per adapter; battery's races. *Orchestrator:* `meta.box_stored` is typed `Box | null` until now: widen it (C3 adds the tombstone). A1b's `thread-A1b-c1-putbox.md` has each backend's one-statement write. Adds the refusal kinds `vault_mismatch` (condition) and `invalid_box` (pass 1: in the Contract's Refusals table, absent from `RefusalKindVals`), with `FamilyCases` rows and the README table. |
 | C2 | `putbox-vault` | C1 | default | medium | |
 | C7 | `vault-props-verbs` | C1 | default | medium | Beside C2, as the preplan allows. |
 | C3 | `delbox-tombstones` | C2 + C7 restacked | opus | high | *Orchestrator:* C3 and C7 both rewrite every adapter and the battery, so C3 waits for C7 in the line rather than conflicting at the restack. Proposes `delIfIncoherent`'s fate. Writes the line under each `del` doc block that a tombstone stands (thread 0's row, ruled). |
