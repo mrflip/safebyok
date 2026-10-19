@@ -132,12 +132,12 @@ describe("unexpectedError", () => {
 const HostThrowCases = [
   // a condition, for the caller to show or retry:
   [new VaultError('storage_unavailable', 'The word list could not be loaded: try again shortly.'), "kept",              'keeps a condition, its word list out of reach'],
-  [new OtherVaultError('wrong_passphrase'),                                                         "kept",              'keeps a condition of another copy of safebyok'],
+  [TH.foreignRefusal('wrong_passphrase', 'Refused by another copy of safebyok.'),                 "kept",              'keeps a condition of another copy of safebyok'],
   // anything else, which may quote the passphrase:
   [new VaultError('bad_option', 'acme acme acme is no passphrase I can judge.'),                    "unexpected_error",  'wraps a VaultError of misuse'],
   [new VaultError('damaged_vault', 'acme acme acme broke me.'),                                     "unexpected_error",  'wraps a VaultError of bad news, never to be told to onBadNews'],
-  [new OtherVaultError('bad_option'),                                                               "unexpected_error",  'wraps misuse of another copy of safebyok'],
-  [new OtherVaultError('no_such_kind'),                                                             "unexpected_error",  'wraps an impostor of an unknown kind'],
+  [TH.foreignRefusal('bad_option', 'Refused by another copy of safebyok.'),                       "unexpected_error",  'wraps misuse of another copy of safebyok'],
+  [TH.lookalikeRefusal('wrong_passphrase', 'Refused, says a server.'),                           "unexpected_error",  'wraps a lookalike of a condition, which no VaultError made'],
   [new TypeError('could not judge acme acme acme'),                                                 "unexpected_error",  'wraps a throw that is no VaultError'],
 ] as const
 

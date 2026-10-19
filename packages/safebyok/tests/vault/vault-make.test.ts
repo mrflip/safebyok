@@ -449,11 +449,11 @@ describe("the key deriver seam", () => {
   it("keeps a condition a deriver raises as it came, for the caller to show or retry", async () => {
     const world = makeWorld()
     await world.openUnlocked('pw')
-    const empty = new VaultError('wrong_passphrase', "A passphrase can't be empty.")
-    const refusing = { ...TH.testDeriver, deriveKeyBytes: () => Promise.reject(empty) }
+    const unreachable = new VaultError('storage_unavailable', "The key deriver's module could not be loaded: try again shortly.")
+    const refusing = { ...TH.testDeriver, deriveKeyBytes: () => Promise.reject(unreachable) }
     const fresh = await world.open({ deviceDB: memoryDeviceDB(), keyDeriver: refusing })
-    const err = await TH.expectRefusal(fresh.unlock('pw'), 'wrong_passphrase')
-    expect(err).to.eq(empty)
+    const err = await TH.expectRefusal(fresh.unlock('pw'), 'storage_unavailable')
+    expect(err).to.eq(unreachable)
   })
 
   it("takes a key whose one nonzero byte is its last: only all zeros is refused", async () => {

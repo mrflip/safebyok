@@ -179,10 +179,11 @@ describe("passphraseProof.wayinKeyFor", () => {
     await expect(wrapsAlike(wayinKey, await PassphraseProof.parse(slice, 'pw').wayinKeyFor(otherSalt))).rejects.toThrow()
   })
 
-  it("throws through what a key deriver throws", async () => {
+  it("refuses what a key deriver throws as unexpected_error, the throw its cause", async () => {
     const thrown = new Error('the deriver fell over')
     const proof = PassphraseProof.parse(sliceWith({ ...TH.testDeriver, deriveKeyBytes: () => Promise.reject(thrown) }), 'pw')
-    await expect(proof.wayinKeyFor({ salt_b64: saltB64 })).rejects.toBe(thrown)
+    const err = await TH.expectRefusal(proof.wayinKeyFor({ salt_b64: saltB64 }), 'unexpected_error')
+    expect(err.cause).to.eq(thrown)
   })
 })
 
