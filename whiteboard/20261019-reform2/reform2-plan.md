@@ -5,7 +5,7 @@ Date: 2026-10-19. Issued by: the Coach (`/sprint reform2`, from the preplan besi
 Sprint branch: `20261019-reform2`. Sprint doc (Open Matters, Progress, Resolved):
 https://claude.ai/code/artifact/62febfc3-47ee-4a7c-b99e-ea494b4b169c
 
-**Status:** threads 1 (#177), 2 (#178) and 7 (#176) filed; thread 6 building.
+**Status:** threads 1, 2, 6 and 7 filed; 7 restacked onto 6 (line: main → #177 → #178 → #179 → #176); thread 8 building.
 
 The Coach struck threads 3 (`one_look`), 4 (`no_clear`) and 5 (`newer_lockbox`) after issuing
 the preplan. Their text is kept in the preplan; this plan keeps their numbers so the preplan and
@@ -170,6 +170,15 @@ Gloss: touches `errors.ts`, `vault-db.ts` (`checkOutgoing`), `tests/test-helpers
 once filed. Its `describeVaultDB` cases cover thread 2's new `revision_tok` in the retire
 expectation. Size: small. Model: `sonnet`. *Orchestrator:* the kind's name is a YOLO decision
 pending the Coach's word.
+
+*Review:* `fixed` ([#179](https://github.com/mrflip/safebyok/pull/179)). Fixed: VAULTDB.md 3.4
+said Convex compares through `retirementOf` (it compares inline); the README row pointed at
+`Vault.make` for building records; two write verbs' doc blocks under-named `bad_record`; the
+battery's `bad_record` case retired in a vault holding no lockbox (now stores one first), its
+title and a cast. Left: `checkOutgoing`'s "nothing was written" reads oddly for the retire verbs
+(to the Coach, with the name); a missing lockbox or a failing applabel is still `bad_label`
+(handed to thread 8 as a README clause); GraphQL's client maps BAD_USER_INPUT to `bad_option`
+(to the Coach). Filed at `bac8218c`.
 
 ---
 

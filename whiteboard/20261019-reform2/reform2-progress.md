@@ -37,3 +37,9 @@ they disagree. Workers look things up here; they do not write it.
   reads as none everywhere. `retireBox()` and `writeOver`'s retire warn on `retired_other`
   and carry on; the #176 lost-write sequence has a test showing exactly one warning. IndexedDB
   no longer rings for an `absent` retire. GraphQL: enum `SafebyokRetireOutcome`.
+* *Thread 6 (#179, filed):* kind `bad_record` (misuse) for whatever `checkOutgoing` throws and
+  for the two record-versus-expectation mismatches; `retireDamagedVault`'s sound-vault refusal,
+  the GraphQL client's BAD_USER_INPUT mapping and the Postgres route recipe stay `bad_option`.
+  A missing lockbox or failing applabel is still `bad_label` (those checks run first).
+* *Restack (orchestrator):* thread 7 rebased cleanly onto #179 at `47d66578`; #176's body says
+  so. Thread 8 is cut from there.
