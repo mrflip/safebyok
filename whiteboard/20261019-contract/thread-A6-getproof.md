@@ -1,6 +1,6 @@
 # Thread A6: getproof (2026-10-19)
 
-Branch `20261019-getproof`, PR (link below once opened), stacked on
+Branch `20261019-getproof`, [PR #200](https://github.com/mrflip/safebyok/pull/200), stacked on
 [#199](https://github.com/mrflip/safebyok/pull/199) (`20261019-react_over_class`). Justify: green;
 core 2375 (35 skipped), react 263, demo 215 (16 skipped), 0 failed.
 
