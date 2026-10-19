@@ -518,7 +518,18 @@ added or folded into through the subagent, and no other entry changes.
   to drop. Before, a passphrase change or wayin removal on another device (new `unlock_epoch`), or the
   vault deleted and made anew elsewhere (new `vault_id`), landing during the unwrap left this device
   unlocked under the new props with the old key, indefinitely, defeating the epoch's revocation. The
-  lease is left for the next hello, which discards it as not fitting.
+  lease is left for the next hello, which discards it as not fitting. Also 2026-10-19 (a_sec, #203):
+  a storage read (`#takeStorage`) that finds the vault props changed from those held (a new
+  `unlock_epoch` or `vault_id`, or the vault gone) now takes them up at once, together with the mark,
+  before any further await: it drops the key, stands down any take-up, and (for a different
+  `vault_id`) empties the box listing; only then does it erase the lease and list the boxes. Before,
+  it decided "outlived" first and assigned the new props only after awaiting `delLease` and
+  `listBoxes`, so a take-up or an unlock's lease grant that finished inside those waits still saw the
+  old props through `#outrun`, installed a key fitted to them, and was never relocked. A revocation
+  now wins by construction, not by timing. Two other writes of vault props no longer write older
+  props over newer ones a read took up meanwhile: an unlock that creates the vault (`#settleUnlock`)
+  and a change to the wayins (`#reviseWayins`); in both, the lease grant that follows finds its props
+  outrun and takes nothing up.
 
 * 2026-10-18: **the context bytes of every wayin changed spelling, not construction, with the
   rename to "wayin".** A wayin's wrap is bound to a context of the record's format tag, then its
@@ -874,7 +885,7 @@ added or folded into through the subagent, and no other entry changes.
   under a `byok-*-v1` tag would neither validate nor decrypt. No reader for the old tags is
   kept: they existed only in development and demo storage, never in a published version.
 * 2026-10-15; 2026-10-19 (thread A1 `outcome`, sprint contract, branch 20261019-outcome); 2026-10-19 (thread A4, sprint
-  contract, branch 20261019-try_twins):
+  contract, branch 20261019-try_twins); 2026-10-19 (a_sec, #203):
   `VaultDB`'s public verbs turn any failure from an adapter that is not already a
   `VaultError` into kind `storage_unavailable`, with the adapter's own error attached as the
   standard `cause`. Adapters see only ciphertext and unencrypted record fields, but that cause is
@@ -910,6 +921,17 @@ added or folded into through the subagent, and no other entry changes.
   wrapped refusal from `doPutVaultProps` or `doDelVault` was a truthy object and read as "landed".
   `outcomeOf` kept a `VaultError` of another copy of safebyok as it came; how a foreign
   `VaultError` is now told, and where, is in the 2026-10-19 (thread a_fixes) entry.
+  Amended 2026-10-19 (a_sec, #203): what a key deriver (`deriveKeyBytes`) or a passphrase strength
+  test throws, both handed the passphrase, now goes through `hostThrewRefusal` (`src/outcome.ts`). A
+  `VaultError` of misuse among them (`bad_option`, say), or any non-`VaultError`, becomes
+  `unexpected_error` with the throw as its `cause`, the treatment A6 gave `getProof`, so the throw's
+  own message is never the refusal's, and `safebyok-react`'s `forBoundary` then strips the cause before
+  React's `onCaughtError`. A `VaultError` of the condition or bad_news family, from this copy of
+  safebyok or another loaded beside it, passes through as it came: zxcvbn's `storage_unavailable` when
+  its word list fails to load, and safebyok-fastkey's `wrong_passphrase` for an empty passphrase. Its
+  message, if a host deriver or test wrote one quoting the passphrase, can reach the caller, and the
+  dialog shows it in place; it never reaches `onCaughtError`. Before, `checkStrongEnough` rethrew
+  whatever the test threw, and any `VaultError` from a deriver passed through with its message.
 * 2026-10-15: `localVaultDB` and `idbVaultDB` key rows by `applabel:user_id:vaultlabel`, and
   `user_id` may hold a colon, so one user's rows can share another scope's ckey prefix. Listing
   and deleting a vault now take only ckeys whose remainder after the prefix is a bare boxlabel
