@@ -988,6 +988,36 @@ describe("vault.ensureLease, by the Contract", () => {
     await TH.expectBad(ensuring, 'vault_locked')
   })
 
+  it("takes up nothing from the lease a stood-down attempt wrote, though a hello reads it before it is erased (Contract: getProof, attempt refuses: vault_locked)", async () => {
+    const prompt = heldPrompt()
+    const world = makeRacingWorld()
+    const maker = await world.openUnlocked('pw')
+    await maker.lock()
+    maker.close()
+    const vault = await world.open({ getProof: prompt.getProof })
+    const ensuring = vault.tryEnsureLease()
+    const ask = await prompt.asked
+    const writing = world.holdNextLease()
+    const attempting = ask.attempt('pw')
+    await writing.reached
+    await vault.lock()
+    // The attempt's erasure, and a hello's read of the device store, each held at the door.
+    const erasing = TH.holdNextCall(world.deviceDB, 'delLease')
+    const fetching = TH.holdNextCall(world.deviceDB, 'getLease')
+    const hello = vault.hello({ staleMinutes: 0 })
+    await fetching.reached
+    writing.release()
+    await erasing.reached
+    // The hello reads the attempt's lease, written and not yet erased.
+    fetching.release()
+    await hello
+    erasing.release()
+    await TH.expectBad(attempting, 'vault_locked')
+    expect(vault.state).to.eq('locked')
+    expect(await world.getLease()).to.be.null
+    await TH.expectBad(ensuring, 'vault_locked')
+  })
+
   it("refuses bad_option when getProof answers carry_on outside lease_ending (Contract: ensureLease, Refuses: bad_option)", async () => {
     const { vault } = await lockedVaultWith({ getProof: () => Promise.resolve('carry_on') })
     const err = await TH.expectRefusal(vault.ensureLease(), 'bad_option')

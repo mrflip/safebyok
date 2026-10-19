@@ -1774,8 +1774,12 @@ export class Vault {
       ask_passphrase_at:       until,
     })
     // A lock that landed under an ask's attempt wins on this device too: the lease the attempt just
-    // wrote is erased, as the lock erased the one before it.
-    if (isOvertaken()) { await this.#deviceDB.delLease(this.#scope) }
+    // wrote is erased, as the lock erased the one before it, and a hello's take-up that may have
+    // read it meanwhile stands down, taking nothing up.
+    if (isOvertaken()) {
+      this.#standDownTakeUp()
+      await this.#deviceDB.delLease(this.#scope)
+    }
     if (isOutrun()) { return false }
     this.#armExpiry(until, this.#clockNow())
     this.#vaultKey = unlocked.sessionKey
