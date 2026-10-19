@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { AnyTextValidators, Ckeys, Label, VaultError, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, type BadNewsHandler, type DeviceDB, type KeyDeriver, type PassphraseVerdict, type Vault, type VaultDB, type VaultScope, type VaultValidators } from 'safebyok'
 import * as TH from 'safebyok/testing'
-import { Component, StrictMode, useLayoutEffect, useState, type ErrorInfo, type ReactNode } from 'react'
+import { Activity, Component, StrictMode, useLayoutEffect, useState, type ErrorInfo, type ReactNode } from 'react'
 import { renderToString } from 'react-dom/server'
 import { VaultProvider, useOpenError, useVault, useVaultSnapshot, useWithUnlockedVault, type VaultProviderProps } from '../src/vault-provider'
 
@@ -458,6 +458,21 @@ describe("VaultProvider", () => {
       await waitFor(() => { expect(second.getSnapshot().state).to.eq('absent') })
       expect(second.user_id).to.eq('u2')
       expect(counts()).to.deep.equal({ subscribe: 2, getVaultProps: 2, getMark: 2 })
+    })
+
+    it("makes a fresh vault when a hidden <Activity> shows again, never using the one it closed", async () => {
+      const world = makeWorld()
+      const { Grab, opened, latest } = grabber()
+      const tree = (mode: 'visible' | 'hidden') => <StrictMode><Activity mode={mode}><VaultProvider {...world.props} userId="u1"><Grab /></VaultProvider></Activity></StrictMode>
+      const { rerender } = render(tree('visible'))
+      const first = await opened()
+      await waitFor(() => { expect(first.getSnapshot().state).to.eq('absent') })
+      rerender(tree('hidden'))
+      await TH.expectRefusal(first.hello(), 'vault_closed')
+      rerender(tree('visible'))
+      await waitFor(() => { expect(latest().vault).to.not.be.null.and.not.eq(first) })
+      const second = latest().vault
+      await waitFor(() => { expect(second?.getSnapshot().state).to.eq('absent') })
     })
   })
 
