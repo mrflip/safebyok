@@ -11,7 +11,7 @@ this line.
   `*Review:*` lines win over this header). **At once:** 3.
 * **The spec:** the design doc's **Contract** tab,
   https://claude.ai/code/artifact/8ac26722-33ee-4082-a76f-f4c9b6722b70 (tab id `7474ec29-37d9`).
-  A markdown export of rev 2015 sits at
+  A markdown export of rev 2025 (after the first batch of rulings) sits at
   `/tmp/claude-1000/-workspace-byok/23ac0f81-dcca-476b-9702-e252de19ef92/scratchpad/contract/contract.md`
   (56 kB; `grep -n '^#'` is its outline). The handoff says when a ruling has changed it since.
 * **Sprint doc:** https://claude.ai/code/artifact/362ec68d-5bf3-46aa-a379-59a9c8bfb548
