@@ -15,7 +15,6 @@ describe("Names.checkValidators", () => {
     expect(Names.checkValidators(undefined)).to.be.undefined
     expect(Names.checkValidators({ boxlabel: undefined, userId: Z.string() })).to.have.property('userId')
     expect(Names.checkValidators(AnyTextValidators)).to.eq(AnyTextValidators)
-    expect(Names.checkValidators({ wayinlabel: Z.string() })).to.have.property('wayinlabel')
   })
 
   it("refuses a misspelt field as 'bad_option', as its second example shows, rather than keep the default unseen", () => {
@@ -25,6 +24,10 @@ describe("Names.checkValidators", () => {
 
   it("refuses a note check, as there is no note: a box's sidecar is the host's to check", () => {
     TH.expectSyncRefusal(() => Names.checkValidators({ note: ZClassic.string() } as never), 'bad_option')
+  })
+
+  it("refuses a wayinlabel check as 'bad_option', as a vault's ways in have no labels", () => {
+    TH.expectSyncRefusal(() => Names.checkValidators({ wayinlabel: ZClassic.string() } as never), 'bad_option')
   })
 
   it("refuses a bag of anything but schemas, or no bag at all, as 'bad_option'", () => {
@@ -46,8 +49,7 @@ describe("Names.rulesOf", () => {
     expect(rules.boxlabel).to.eq(AnyBoxlabel)
     expect(rules.applabel).to.eq(Label)
     expect(rules.userId).to.eq(UserId)
-    expect(rules.wayinlabel).to.eq(Label)
-    expect(Names.rulesOf({ wayinlabel: AnyBoxlabel }).wayinlabel).to.eq(AnyBoxlabel)
+    expect(rules.vaultlabel).to.eq(Label)
   })
 
   it("refuses a misspelt field, as checkValidators does", () => {
@@ -128,7 +130,7 @@ describe("Names.check", () => {
       ['userId',   '',                         "can't be empty"],
       ['userId',   'sk-fake\u{D800}',          'lone surrogate'],
       ['boxlabel', 'sk-fak\u{E9}'.normalize('NFD'), 'NFC'],
-      ['wayinlabel', 'sk-fake\u{7}',           'no control characters'],
+      ['applabel', 'sk-fake\u{7}',             'no control characters'],
       ['vaultlabel', 'sk-fake\u{DD11}',        'well-formed Unicode'],
     ] as const
     for (const [field, candidate, said] of cases) {

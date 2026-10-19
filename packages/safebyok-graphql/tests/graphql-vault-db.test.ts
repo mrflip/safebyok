@@ -166,9 +166,9 @@ describe("graphqlVaultDB, as the README has it", () => {
 })
 
 describe("graphqlVaultDB, carrying a passkey's way in", () => {
-  it("stores vault props holding a passkey wayin and reads them back exactly, with no change to the schema", async () => {
+  it("stores vault props holding a passkey and reads them back exactly", async () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
-    const withPasskey = TH.vaultPropsOf('u1', { wayins: [TH.wayinOf('passphrase'), TH.passkeyWayinOf('laptop')] })
+    const withPasskey = TH.vaultPropsOf('u1', { passkey: TH.passkeyWayinOf('laptop') })
     await TH.expectGood(TH.browserFor(schema, 'u1').ensureVaultProps(withPasskey))
     expect(await TH.expectGood(TH.browserFor(schema, 'u1').getVaultProps(u1))).to.deep.equal(withPasskey)
   })
@@ -180,12 +180,12 @@ describe("graphqlVaultDB, carrying a passkey's way in", () => {
     const first = await opened()
     await first.unlock('correct horse battery staple')
     await first.putBox('anthropic_api_key', 'sk-ant-test-not-a-real-key')
-    const wayinId = await first.addPasskey('correct horse battery staple', () => Promise.resolve(laptop), { wayinlabel: 'laptop' })
+    expect(await first.addPasskey('correct horse battery staple', () => Promise.resolve(laptop))).to.be.true
     first.close()
 
     const second = await opened()
-    expect(second.getSnapshot().wayins.find((wayin) => wayin.wayin_id === wayinId)).to.deep.include({
-      wayinkind: 'passkey', wayin_id: wayinId, wayinlabel: 'laptop', credential_id: laptop.credentialId, prf_salt_b64: laptop.prfSaltB64,
+    expect(second.getSnapshot().passkey).to.deep.include({
+      wayinkind: 'passkey', credential_id: laptop.credentialId, prf_salt_b64: laptop.prfSaltB64,
     })
     await second.unlock(laptop)
     expect(await second.getBox('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')

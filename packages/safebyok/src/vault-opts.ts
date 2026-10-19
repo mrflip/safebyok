@@ -127,7 +127,7 @@ export type MakeVaultOpts = {
   logger?: VaultLogger | null | undefined
   /**
    * The checks for the vault's names where they enter it, as a {@link VaultValidators} bag: each
-   * field given replaces ours (`Label` for each label, a wayin's `wayinlabel` among them,
+   * field given replaces ours (`Label` for each label,
    * `UserId` for the user, from `safebyok/validators`), and each left out keeps ours. Each is a Zod
    * schema that checks synchronously, and only checks: what passes is kept exactly as given.
    * Beneath every one, the floor (`NameFloor`) holds whatever the bag says. Kind 'bad_option' for
@@ -137,7 +137,7 @@ export type MakeVaultOpts = {
   validators?: VaultValidators | undefined
   /**
    * The check every new passphrase must pass, as a {@link PassphraseStrengthTest}: the one the
-   * first `unlock()` creates the vault with, and each `addPassphrase()` or `changePassphrase()`
+   * first `unlock()` creates the vault with, and each `changePassphrase()`
    * sets, before any key derivation. It is handed the passphrase and the vault's scope, and a
    * passphrase it finds weak is refused with kind 'weak_passphrase', the test's reason the
    * message. It never runs on `unlock()` of a vault that stands. Required, as the vault has no

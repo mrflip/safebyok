@@ -7,10 +7,10 @@ import { useIsMounted } from './is-mounted'
 import { askPasskey, passkeysAvailable } from './passkey'
 
 /**
- * A button that answers an {@link Ask} with one of the vault's passkeys: rendered only when the
+ * A button that answers an {@link Ask} with the vault's passkey: rendered only when the
  * vault has one and the browser offers WebAuthn, so a dialog can place it beside its passphrase
  * field unconditionally. `PassphraseModal` does, first, ahead of the field. A press asks the user
- * to touch a passkey -- the press is the user gesture WebAuthn needs -- then hands its answer to
+ * to touch the passkey -- the press is the user gesture WebAuthn needs -- then hands its answer to
  * `ask.attempt`. It follows the vault's snapshot as it changes: a passkey added on another device
  * brings the button, one removed takes it away. Handed another ask, it starts afresh. Taken away,
  * it lets go: a press still under way finishes unheard, calling `onDone` and `onGripe` no more.
@@ -51,9 +51,9 @@ type PasskeyUnlockButtonProps = {
   autoFocus?: boolean | undefined
 }
 
-/** Whether the button shows for a vault in this state: the browser offers WebAuthn, and the vault lists a passkey. */
+/** Whether the button shows for a vault in this state: the browser offers WebAuthn, and the vault has a passkey. */
 export const offersPasskey = (snapshot: VaultSnapshot): boolean => (
-  passkeysAvailable() && snapshot.wayins.some((wayin) => wayin.wayinkind === 'passkey')
+  passkeysAvailable() && snapshot.passkey !== null
 )
 
 /** The button itself, inside PasskeyUnlockButton's boundary. */
@@ -72,7 +72,7 @@ const PasskeyPress = ({ ask, onDone, onGripe, rpId, autoFocus }: PasskeyUnlockBu
     setAsking(true)
     onGripe(null)
     try {
-      const passkey = await askPasskey(snapshot.wayins, { rpId })
+      const passkey = await askPasskey(snapshot.passkey, { rpId })
       if (passkey === null || ! isMounted()) { return }
       const { ok, err } = await ask.attempt(passkey)
       if (! isMounted()) { return }

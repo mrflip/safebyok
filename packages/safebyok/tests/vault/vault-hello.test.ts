@@ -8,7 +8,7 @@ import { Lease } from '../../src/lease'
 import { delDamagedVault } from '../../src/del-damaged-vault'
 import { type Outcome, bad } from '../../src/outcome'
 import * as TH from '../test-helpers'
-import { makeWorld, makeRacingWorld, damagedVaultWorld, u1VaultPropsCkey, u1BoxCkey, storedRowOf, storedVaultPropsOf, storedWayinsOf, boxlabelsOf, rolledBackWorld, HourMillis, SevenDaysMillis } from './world'
+import { makeWorld, makeRacingWorld, damagedVaultWorld, u1VaultPropsCkey, u1BoxCkey, storedRowOf, storedVaultPropsOf, storedWayinOf, boxlabelsOf, rolledBackWorld, HourMillis, SevenDaysMillis } from './world'
 
 
 // == [hello]: seedVault, hello
@@ -301,7 +301,7 @@ describe("a hello that fails", () => {
         refusal = err
       }
       expect(refusal).to.eq(planted)
-      expect(vault.getSnapshot()).to.deep.include({ state: 'opening', syncing: false, trouble: null, boxes: [], wayins: [] })
+      expect(vault.getSnapshot()).to.deep.include({ state: 'opening', syncing: false, trouble: null, boxes: [], passphrase: null, passkey: null })
     })
   }
 
@@ -430,7 +430,7 @@ describe("a hello that fails", () => {
 
   it("says stored vault props that do not parse as damaged_vault, which the snapshot keeps as its trouble", async () => {
     const world = makeWorld()
-    world.dbStore.write(u1VaultPropsCkey, '{"format":"safebyok-vault-v4"}')
+    world.dbStore.write(u1VaultPropsCkey, '{"format":"safebyok-vault-v5"}')
     const vault = Vault.make(world.optsWith())
     const err = await TH.expectRefusal(vault.hello(), 'damaged_vault')
     expect(vault.getSnapshot().trouble).to.eq(err)
@@ -522,7 +522,7 @@ describe("vault.hello, by the Contract", () => {
     await vault.hello()
     expect(propsReads).toHaveBeenCalledTimes(1)
     expect(listings).toHaveBeenCalledTimes(1)
-    expect(vault.wayins).to.have.lengthOf(1)
+    expect(vault.passphrase).to.not.be.null
     expect(boxlabelsOf(vault)).to.deep.equal(['anthropic'])
   })
 
@@ -642,7 +642,8 @@ describe("vault.hello, by the Contract", () => {
     const vault = Vault.make(world.optsWith({ deviceDB: memoryDeviceDB() }))
     await vault.hello()
     expect(vault).to.deep.include({ vault_id: stored['vault_id'], registered_at: stored['registered_at'], unlock_epoch: stored['unlock_epoch'], vault_key_epoch: stored['vault_key_epoch'] })
-    expect(vault.wayins.map((wayin) => wayin.wayin_id)).to.deep.equal(storedWayinsOf(world).map((wayin) => wayin['wayin_id']))
+    expect(vault.passphrase).to.deep.include({ device_id: storedWayinOf(world, 'passphrase')?.['device_id'], registered_at: storedWayinOf(world, 'passphrase')?.['registered_at'] })
+    expect(vault.passkey).to.be.null
     expect(boxlabelsOf(vault)).to.deep.equal(['anthropic', 'openai'])
     expect(vault.capacity.boxes.used).to.eq(2)
   })
@@ -827,7 +828,7 @@ describe("onBadNews, by the Contract", () => {
     const world = makeWorld()
     const { told, onBadNews } = newsKeeper()
     await world.open({ onBadNews })
-    world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ format: 'safebyok-vault-v4', unlock_epoch: 'one' }))
+    world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ format: 'safebyok-vault-v5', unlock_epoch: 'one' }))
     await vi.waitFor(() => { expect(told.map((news) => news.refusalkind)).to.deep.equal(['damaged_vault']) })
   })
 
@@ -837,7 +838,7 @@ describe("onBadNews, by the Contract", () => {
     const deaf = world.deafVaultDB()
     const vault = await world.openUnlocked('pw', { onBadNews, vaultDB: deaf })
     vi.spyOn(deaf, 'putBox').mockResolvedValueOnce(bad(new VaultError('stale_write', 'Someone else wrote first.')))
-    world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ format: 'safebyok-vault-v4', unlock_epoch: 'one' }))
+    world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ format: 'safebyok-vault-v5', unlock_epoch: 'one' }))
     const err = await TH.expectRefusal(vault.putBox('anthropic', 'sk-fake'), 'stale_write')
     expect(told.map((news) => news.refusalkind)).to.deep.equal(['damaged_vault'])
     expect(err.cause).to.eq(told[0])

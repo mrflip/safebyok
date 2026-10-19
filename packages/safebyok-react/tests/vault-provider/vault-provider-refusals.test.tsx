@@ -1,9 +1,9 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { AnyTextValidators, VaultError, isVaultError, memoryDeviceDB, type VaultValidators } from 'safebyok'
+import { AnyTextValidators, Ckeys, VaultError, isVaultError, memoryDeviceDB, type VaultValidators } from 'safebyok'
 import * as TH from 'safebyok/testing'
 import { VaultProvider, type VaultProviderProps } from '../../src/vault-provider'
-import { Probe, grabber, makeWorld, damagedWorld, shownState, expectShown, unreachable, CatchingBoundary, OpenErrorExample, hushConsole, noop } from './world'
+import { Probe, grabber, makeWorld, madeWorld, damagedWorld, shownState, expectShown, unreachable, CatchingBoundary, OpenErrorExample, hushConsole, noop } from './world'
 
 describe("VaultProvider", () => {
   // == [Refusals on open]: when Vault.make or hello refuses, delDamagedVault
@@ -183,6 +183,24 @@ describe("VaultProvider", () => {
       const elsewhere = await TH.settledVault({ ...world.props, userId: 'u1', deviceDB: memoryDeviceDB() })
       await elsewhere.unlock('correct horse battery staple')
       await expectShown('locked')
+    })
+
+    it("hands down a rolled_back that a later read met as openError, the vault sent back to opening, rather than sit at opening with none", async () => {
+      const world = await madeWorld()
+      const vaultPropsCkey = Ckeys.vaultProps(TH.scopeOf('u1'))
+      const older = world.store.read(vaultPropsCkey) ?? ''
+      // This device changes the passphrase, so its mark of the vault is newer than `older`.
+      const changer = await TH.settledVault({ ...world.props, userId: 'u1' })
+      await changer.changePassphrase('correct horse', 'another horse')
+      changer.close()
+      const { Grab, latest } = grabber()
+      render(<VaultProvider {...world.props} userId="u1"><Grab /><Probe /></VaultProvider>)
+      await expectShown('locked')
+      // Storage hands back the older copy; the vault's watch reads it, refuses it, and opens again.
+      world.store.write(vaultPropsCkey, older)
+      await expectShown('open error: rolled_back')
+      expect(latest().openError).to.eq(latest().vault?.trouble)
+      expect(latest().vault?.state).to.eq('opening')
     })
 
     it("a retry that fails again hands down the fresh error", async () => {

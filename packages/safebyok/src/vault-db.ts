@@ -1,6 +1,6 @@
 import * as Z from 'zod/mini'
 import { BoxRecord } from './box'
-import { MaxUnlocks, WayinKindVals, VaultProps, VaultScope, type DamagedBox, type BoxSummary, type Sidecar } from './types'
+import { VaultProps, VaultScope, type DamagedBox, type BoxSummary, type Sidecar } from './types'
 import { VaultError, isVaultError } from './errors'
 import * as Names from './names'
 import { AnyTextValidators, NameFloor } from './validators'
@@ -268,8 +268,7 @@ export abstract class VaultDB {
   /**
    * The vault props, validated, or null when the vault has never been created. Stored vault props
    * that fail their checks are refused as `corrupt_record`, and those a newer safebyok may have
-   * written -- a `format`, wayinkind or number of wayins this version does not know -- as
-   * `newer_format`.
+   * written -- a `format` this version does not know -- as `newer_format`.
    */
   getVaultProps(scope: VaultScope): Promise<Outcome<VaultProps | null>> {
     return answering(async () => {
@@ -471,9 +470,9 @@ export abstract class VaultDB {
    * since a sound vault is deleted through its handle's `del()`; with kind `damaged_vault`,
    * removing nothing, when the record is too damaged to name the vault it belongs to (which only
    * the backend's own tools can clear); with kind `newer_format`, removing nothing, when it may
-   * have been written by a newer safebyok, in a `format`, wayinkind or number of wayins this one
-   * does not know, and which a device on the newer version opens: it is told from damage by those
-   * three, and where it cannot be told, it is refused; and with kind `stale_write` when the vault
+   * have been written by a newer safebyok, in a `format` this one does not know, and which a
+   * device on the newer version opens: it is told from damage by that, and where it cannot be
+   * told, it is refused; and with kind `stale_write` when the vault
    * was replaced meanwhile. Vault props rewritten under the same `vault_id` between the read and
    * the deletion are the same vault, and are deleted with it (line 3.5).
    *
@@ -848,27 +847,20 @@ const newerVaultProps = () => new VaultError('newer_format', "This vault's store
  * The vault props formats earlier versions of this package wrote: a record in one is older, never
  * newer, and fails today's checks as damage does.
  */
-const OlderVaultPropsFormats: ReadonlySet<unknown> = new Set(['safebyok-vault-v1', 'safebyok-vault-v2', 'safebyok-vault-v3'])
+const OlderVaultPropsFormats: ReadonlySet<unknown> = new Set(['safebyok-vault-v1', 'safebyok-vault-v2', 'safebyok-vault-v3', 'safebyok-vault-v4'])
 
 /**
  * True when a record that fails this version's checks may be one a later version writes, which
- * is not damage: it names a `format` this version neither writes nor wrote before (of any type),
- * holds a `wayinkind` it does not know, or holds more wayins than {@link MaxUnlocks}. These
- * are all this version can tell from damage; anything else that fails is taken for damage. Any
- * change to what a stored record may hold -- a field, a shape, or a range a check accepts --
- * therefore bumps `format`.
+ * is not damage: it names a `format` this version neither writes nor wrote before (of any type).
+ * That is all this version can tell from damage; anything else that fails is taken for damage.
+ * Any change to what a stored record may hold -- a field, a shape, a kind of way in, or a range a
+ * check accepts -- therefore bumps `format`.
  */
 const mayBeNewer = (raw: unknown): boolean => {
   if (typeof raw !== 'object' || raw === null) { return false }
-  const { format, wayins } = raw as { format?: unknown, wayins?: unknown }
+  const { format } = raw as { format?: unknown }
   const knownFormat = VaultProps.shape.format.safeParse(format).success || OlderVaultPropsFormats.has(format)
-  if (format !== undefined && ! knownFormat) { return true }
-  if (! Array.isArray(wayins)) { return false }
-  if (wayins.length > MaxUnlocks) { return true }
-  return wayins.some((wayin: unknown) => {
-    const { wayinkind } = (typeof wayin === 'object' && wayin !== null ? wayin : {}) as { wayinkind?: unknown }
-    return typeof wayinkind === 'string' && ! (WayinKindVals as readonly string[]).includes(wayinkind)
-  })
+  return format !== undefined && ! knownFormat
 }
 
 /**

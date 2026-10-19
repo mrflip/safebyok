@@ -15,11 +15,15 @@ export type OpenErrorShape = {
    * -- storage that cannot be reached (`storage_unavailable`), a user storage no longer serves
    * (`identity_revoked`, as when signed out of the backend, or not yet signed in to it), a vault
    * whose stored props fail their checks (`damaged_vault`), a browser that will not let the app
-   * keep anything on this device (`storage_blocked`). Null while the hello runs, once the vault
-   * has settled, and while signed out. Misuse -- a bad label or option -- never lands here: the
-   * provider throws it to the nearest error boundary. Offer `retryOpen` only for one a retry may
-   * mend: never for `storage_blocked`, which holds until something outside the app changes (say
-   * why instead), nor for `damaged_vault`, which `delDamagedVault` answers.
+   * keep anything on this device (`storage_blocked`). And a vault opened once may be sent back to
+   * `opening` by a later read, refused as `rolled_back` (storage handed back an older copy of the
+   * vault than this device has seen): that refusal, the snapshot's `trouble`, lands here too.
+   * Null while the hello runs, once the vault has settled, and while signed out. Misuse -- a bad
+   * label or option -- never lands here: the provider throws it to the nearest error boundary.
+   * Offer `retryOpen` only for one a retry may mend: never for `storage_blocked`, which holds
+   * until something outside the app changes (say why instead), nor for `damaged_vault`, which
+   * `delDamagedVault` answers, nor for `rolled_back`, which holds until the host accepts the older
+   * copy (the `safebyok` README's *A vault rolled back* says how).
    *
    * It is not the vault's `trouble`: `trouble` is the latest bad news the vault met on any read,
    * for as long as the vault stands, and never a condition; `openError` is only why the vault is
@@ -127,6 +131,11 @@ const hasUserGesture = (): boolean => (globalThis.navigator as { userActivation?
 /** The scope of `vault`, as the strength test is handed it. */
 const scopeOf = (vault: Vault): VaultScope => ({ applabel: vault.applabel, user_id: vault.user_id, vaultlabel: vault.vaultlabel })
 const getNotOpening = () => false
+
+/** The snapshot's trouble when it is a 'rolled_back' refusal that holds the vault opening; null otherwise. */
+const rolledBackOf = (snapshot: VaultSnapshot | undefined): VaultError | null => (
+  snapshot?.state === 'opening' && isVaultError(snapshot.trouble, 'rolled_back') ? snapshot.trouble : null
+)
 
 /**
  * Every Vault.make option, passed through as given (an option left out gets Vault.make's default,
@@ -261,7 +270,6 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
   const vaultlabelCheck = validators?.vaultlabel
   const boxlabelCheck = validators?.boxlabel
   const userIdCheck = validators?.userId
-  const wayinlabelCheck = validators?.wayinlabel
   const [vault, setVault] = useState<Vault | null>(null)
   // The dialog showing now, if any. The ref is what the callbacks read, so that a dialog's answer
   // reaches its own ask and no newer one's; the state renders it.
@@ -279,8 +287,12 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
   // Whether the vault is still opening, read so the provider renders only when that changes.
   const readOpening = useCallback(() => vault?.getSnapshot().state === 'opening', [vault])
   const opening = useSyncExternalStore(vault === null ? subscribeToNothing : vault.subscribe, vault === null ? getNotOpening : readOpening, getNotOpening)
+  // A read after the provider's hello refused as 'rolled_back' sends the vault back to opening,
+  // and only its trouble says why: read so the provider renders only when that changes.
+  const readRolledBack = useCallback(() => rolledBackOf(vault?.getSnapshot()), [vault])
+  const rolledBack = useSyncExternalStore(vault === null ? subscribeToNothing : vault.subscribe, vault === null ? getNothing : readRolledBack, getNothing)
   // A refusal says why the vault is not open only while it is not: a ring from storage that settles it clears it.
-  const openError = opening && helloRefusal !== null && helloRefusal.vault === vault ? helloRefusal.err : null
+  const openError = opening && helloRefusal !== null && helloRefusal.vault === vault ? helloRefusal.err : rolledBack
   // Settled once for each logger and vaultDB, so the provider and every vault it opens share it.
   const heardBy = useMemo(() => settleLogger(logger, vaultDB), [logger, vaultDB])
   // The logger, clock and strength test the last render had, and whether a change of any was warned of yet.
@@ -362,7 +374,7 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
     if (userId === null) { return }
     // Listed one by one so the effect re-runs on each; `satisfies` fails the build if a Vault.make
     // option is ever added and not passed through.
-    const checks = { applabel: applabelCheck, vaultlabel: vaultlabelCheck, boxlabel: boxlabelCheck, userId: userIdCheck, wayinlabel: wayinlabelCheck } satisfies Record<keyof VaultValidators, unknown>
+    const checks = { applabel: applabelCheck, vaultlabel: vaultlabelCheck, boxlabel: boxlabelCheck, userId: userIdCheck } satisfies Record<keyof VaultValidators, unknown>
     const refusable = Object.fromEntries((JSON.parse(unlistedJson) as string[]).map((ckey) => [ckey, undefined]))
     // Bad news a vault meets once the provider has let it go -- a read under way as the user
     // changed -- is told to no one: the handler now may be the next user's.
@@ -392,7 +404,7 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
       setHelloFailure(null)
       setHelloRefusal(null)
     }
-  }, [userId, applabel, vaultlabel, vaultDB, deviceDB, leaseHours, staleMinutes, badNewsOpt, getProofOpt, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, heardBy, passphraseStrengthTest, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, wayinlabelCheck, unlistedJson, tellBadNews, askProof, endShowing, sayHello])
+  }, [userId, applabel, vaultlabel, vaultDB, deviceDB, leaseHours, staleMinutes, badNewsOpt, getProofOpt, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, heardBy, passphraseStrengthTest, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, unlistedJson, tellBadNews, askProof, endShowing, sayHello])
 
   const retryOpen = useCallback(() => {
     if (vault !== null && openError !== null) { void sayHello(vault, { staleMinutes: 0 }) }
@@ -400,7 +412,7 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
 
   const delDamagedVault = useCallback(async () => {
     if (userId === null || vault === null || ! isVaultError(openError, 'damaged_vault')) { return }
-    const validators = { applabel: applabelCheck, vaultlabel: vaultlabelCheck, boxlabel: boxlabelCheck, userId: userIdCheck, wayinlabel: wayinlabelCheck } satisfies Record<keyof VaultValidators, unknown>
+    const validators = { applabel: applabelCheck, vaultlabel: vaultlabelCheck, boxlabel: boxlabelCheck, userId: userIdCheck } satisfies Record<keyof VaultValidators, unknown>
     try {
       await delStoredDamagedVault({ applabel, vaultlabel, userId, vaultDB, deviceDB, validators })
     } catch (err) {
@@ -410,7 +422,7 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
       throw err
     }
     void sayHello(vault, { staleMinutes: 0 })
-  }, [openError, vault, userId, applabel, vaultlabel, vaultDB, deviceDB, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, wayinlabelCheck, sayHello])
+  }, [openError, vault, userId, applabel, vaultlabel, vaultDB, deviceDB, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, sayHello])
 
   const opened = useMemo(() => ({ openError, retryOpen, delDamagedVault }), [openError, retryOpen, delDamagedVault])
   const provided = useMemo(() => ({ vault, opened }), [vault, opened])

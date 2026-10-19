@@ -42,7 +42,7 @@ describe("getVaultProps and ensureVaultProps", () => {
 
 describe("putVaultProps", () => {
   const ThisVaultAtOne = { vault_id: 'vault-id-u1', unlock_epoch: 1 }
-  const rewrapped = TH.vaultPropsOf('u1', { unlock_epoch: 2, wayins: [TH.wayinOf('passphrase', { vault_key_wayin_wrapped: { cipher_iv_b64: 'iv-new', ciphertext_b64: 'ct-new' } })] })
+  const rewrapped = TH.vaultPropsOf('u1', { unlock_epoch: 2, passphrase: TH.wayinOf('passphrase', { vault_key_wayin_wrapped: { cipher_iv_b64: 'iv-new', ciphertext_b64: 'ct-new' } }) })
 
   it("lands vault props that keep the vault_id and move unlock_epoch forward", async () => {
     const CVX = await withVaultProps()
@@ -419,8 +419,8 @@ describe("a vault's weight limit", () => {
 const wholeDocumentVaultProps = () => {
   const vaultProps = TH.vaultPropsOf('u1')
   const padding = 'a'.repeat(1_048_576 - getDocumentSize(vaultProps) - 64)
-  const wayin = TH.wayinOf('passphrase', { vault_key_wayin_wrapped: TH.fakeCiphered('vault-u1') })
-  return TH.vaultPropsOf('u1', { wayins: [{ ...wayin, salt_b64: wayin.salt_b64 + padding }] })
+  const passphrase = TH.wayinOf('passphrase', { vault_key_wayin_wrapped: TH.fakeCiphered('vault-u1') })
+  return TH.vaultPropsOf('u1', { passphrase: { ...passphrase, salt_b64: passphrase.salt_b64 + padding } })
 }
 
 /**

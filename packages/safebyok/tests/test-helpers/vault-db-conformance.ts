@@ -427,9 +427,9 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
 
     it("refuses over an unlock_epoch since moved on, writing nothing", async () => {
       const vaultDB = await withVaultProps()
-      const theirs = { ...vaultPropsOf('u1'), unlock_epoch: 2, wayins: [wayinOf('passphrase', { vault_key_wayin_wrapped: fakeCiphered('theirs') })] }
+      const theirs = { ...vaultPropsOf('u1'), unlock_epoch: 2, passphrase: wayinOf('passphrase', { vault_key_wayin_wrapped: fakeCiphered('theirs') }) }
       await expectingGood(vaultDB).putVaultProps(theirs, { vault_id: 'vault-id-u1', unlock_epoch: 1 })
-      const mine = { ...vaultPropsOf('u1'), unlock_epoch: 2, wayins: [wayinOf('passphrase', { vault_key_wayin_wrapped: fakeCiphered('mine') })] }
+      const mine = { ...vaultPropsOf('u1'), unlock_epoch: 2, passphrase: wayinOf('passphrase', { vault_key_wayin_wrapped: fakeCiphered('mine') }) }
       await expectBad(vaultDB.putVaultProps(mine, { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'stale_write')
       expect(await expectingGood(vaultDB).getVaultProps(scopeOf('u1'))).to.deep.equal(theirs)
     })
@@ -1021,7 +1021,7 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
       title: `lands one of two updates of one vault record made at once ${fromTwo}, and refuses the other as stale_write, however they interleave`,
       runs:  true,
       check: async () => {
-        const rivals = [vaultPropsOf('u1', { unlock_epoch: 2, wayins: [wayinOf('one')] }), vaultPropsOf('u1', { unlock_epoch: 2, wayins: [wayinOf('two')] })]
+        const rivals = [vaultPropsOf('u1', { unlock_epoch: 2, passphrase: wayinOf('one') }), vaultPropsOf('u1', { unlock_epoch: 2, passphrase: wayinOf('two') })]
         await raceEveryWay({
           makeDevices: devicesFor(),
           setup:       withVaultPropsFirst,

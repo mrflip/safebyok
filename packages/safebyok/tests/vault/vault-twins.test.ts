@@ -3,27 +3,21 @@ import { Vault } from '../../src/vault'
 import { VaultError, type RefusalKind } from '../../src/errors'
 import type { Outcome } from '../../src/outcome'
 import * as TH from '../test-helpers'
-import { damagedVaultWorld, makeWorld } from './world'
+import { damagedVaultWorld, makeWorld, vaultWithPasskey } from './world'
 
 // == [The pairs]: TwinCases, each X over its tryX
 
 /** Every call that comes in two forms, by its throwing name. */
-type TwinName = 'hello' | 'ensureLease' | 'unlock' | 'lock' | 'changePassphrase' | 'addPassphrase' | 'addPasskey' | 'delWayin' | 'putBox' | 'getBox' | 'delBox' | 'del'
+type TwinName = 'hello' | 'ensureLease' | 'unlock' | 'lock' | 'changePassphrase' | 'addPasskey' | 'delWayin' | 'putBox' | 'getBox' | 'delBox' | 'del'
 
 /** A vault's calls by name, each taking any arguments: how a table row reaches either form. */
 type CallsByName = Record<string, (...args: unknown[]) => Promise<unknown>>
 
 /**
- * A vault unlocked with `pw`, holding the box `anthropic` and a second passphrase, `spare`: a
- * vault every pair can be both refused and answered on.
+ * A vault unlocked with `pw`, holding the box `anthropic` and the passkey `laptop`: a vault every
+ * pair can be both refused and answered on.
  */
-const twinVault = async () => {
-  const world = makeWorld()
-  const vault = await world.openUnlocked('pw')
-  await vault.putBox('anthropic', 'sk-fake')
-  const spareId = await vault.addPassphrase('pw', 'spare phrase', { wayinlabel: 'spare' })
-  return { world, vault, spareId }
-}
+const twinVault = vaultWithPasskey
 
 type Twin = Awaited<ReturnType<typeof twinVault>>
 
@@ -38,9 +32,8 @@ const TwinCases: readonly (readonly [TwinName, RefusalKind, (twin: Twin) => unkn
   ["unlock",           "wrong_passphrase", () => ['not it'],                                   () => ['pw'],                                      (val) => { expect(val).to.be.undefined }],
   ["lock",             "vault_closed",     ({ vault }) => { vault.close(); return [] },         () => [],                                          (val) => { expect(val).to.be.undefined }],
   ["changePassphrase", "wrong_passphrase", () => ['not it', 'new phrase'],                     () => ['pw', 'new phrase'],                        (val) => { expect(val).to.be.undefined }],
-  ["addPassphrase",    "bad_label",        () => ['pw', 'third phrase', { wayinlabel: 'spare' }], () => ['pw', 'third phrase', { wayinlabel: 'third' }], (val) => { expect(val).to.be.a('string') }],
-  ["addPasskey",       "wrong_passphrase", () => ['not it', () => TH.passkeyOf('laptop'), { wayinlabel: 'laptop' }], () => ['pw', () => TH.passkeyOf('laptop'), { wayinlabel: 'laptop' }], (val) => { expect(val).to.be.a('string') }],
-  ["delWayin",         "absent_wayin",     () => ['pw', 'no-such-wayin'],                      ({ spareId }) => ['pw', spareId],                  (val) => { expect(val).to.be.undefined }],
+  ["addPasskey",       "wrong_passphrase", () => ['not it', () => TH.passkeyOf('phone')],      () => ['pw', () => TH.passkeyOf('phone')],         (val) => { expect(val).to.be.true }],
+  ["delWayin",         "wrong_passphrase", () => ['not it'],                                   () => ['pw'],                                      (val) => { expect(val).to.be.undefined }],
   ["putBox",           "bad_whisper",      () => ['openai', null],                             () => ['openai', 'sk-fake-two'],                   (val) => { expect(val).to.be.undefined }],
   ["getBox",           "absent_box",       () => ['openai'],                                   () => ['anthropic'],                               (val) => { expect(val).to.eq('sk-fake') }],
   ["delBox",           "absent_box",       () => ['openai'],                                   () => ['anthropic'],                               (val) => { expect(val).to.be.undefined }],
@@ -149,11 +142,11 @@ describe("a throw that is no refusal (Contract: Shapes)", () => {
     const { vault } = await twinVault()
     const fell = new Error('the authenticator fell over')
     const falling = () => Promise.reject(fell)
-    const err = await TH.expectBad(vault.tryAddPasskey('pw', falling, { wayinlabel: 'laptop' }), 'unexpected_error')
+    const err = await TH.expectBad(vault.tryAddPasskey('pw', falling), 'unexpected_error')
     expect(err.cause).to.eq(fell)
     const unavailable = new VaultError('passkey_unavailable', 'This device cannot answer for a passkey.')
     const refusing = () => Promise.reject(unavailable)
-    const refusal = await TH.expectBad(vault.tryAddPasskey('pw', refusing, { wayinlabel: 'laptop' }), 'passkey_unavailable')
+    const refusal = await TH.expectBad(vault.tryAddPasskey('pw', refusing), 'passkey_unavailable')
     expect(refusal).to.eq(unavailable)
   })
 })

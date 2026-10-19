@@ -43,14 +43,14 @@ export abstract class Proof {
   /**
    * A proof as a host hands one in, checked: text is a passphrase, anything else a passkey's
    * answer. Refuses a blank passphrase (empty, or only spaces) as kind 'wrong_passphrase' before
-   * any derivation, since it opens nothing and trying it would cost one per way in; and a passkey's
+   * any derivation, since it opens nothing and trying it would cost one; and a passkey's
    * answer of the wrong shape as 'bad_option'. Neither refusal quotes what it was handed.
    *
    * @param vault - The vault the proof is for.
    * @param given - What the host handed in: the passphrase typed, or a {@link PasskeyAnswer}.
    *
    * @example Proof.parse(vault, 'correct horse battery staple')   // a PassphraseProof
-   * @example Proof.parse(vault, await askPasskey(vault.wayins))   // a PasskeyProof
+   * @example Proof.parse(vault, await askPasskey(vault.passkey))   // a PasskeyProof
    * @example Proof.parse(vault, '   ')   // throws 'wrong_passphrase'
    */
   static parse(vault: ProofVault, given: unknown): PassphraseProof | PasskeyProof {
@@ -133,7 +133,7 @@ const passkeyAnswerShape = Z.object({
  * its 32-byte PRF answer. The answer is the one secret field, and is not enumerable; the
  * credential and salt are visible fields of the way in already.
  *
- * @example const proof = PasskeyProof.parse(vault, await askPasskey(vault.wayins))
+ * @example const proof = PasskeyProof.parse(vault, await askPasskey(vault.passkey))
  * @example JSON.stringify(proof)   // '{"kind":"passkey"}'
  */
 export class PasskeyProof extends Proof {

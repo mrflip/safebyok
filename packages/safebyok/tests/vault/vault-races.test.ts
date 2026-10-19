@@ -6,7 +6,7 @@ import { memoryDeviceDB } from '../../src/device-db'
 import { localVaultDB } from '../../src/local-vault-db'
 import { bad, good } from '../../src/outcome'
 import * as TH from '../test-helpers'
-import { makeRacingWorld, makeWorld, boxlabelsOf, storedWayinsOf, storedVaultPropsOf, storedRowOf, u1BoxCkey, u1VaultPropsCkey } from './world'
+import { makeRacingWorld, makeWorld, boxlabelsOf, storedWayinOf, storedVaultPropsOf, storedRowOf, u1BoxCkey, u1VaultPropsCkey, addLaptopPasskey } from './world'
 
 
 // == [Lock against unlock and read]: a lock that lands while an unlock, read in flight
@@ -53,7 +53,7 @@ describe("a lock that lands while an unlock or a change is under way", () => {
       await vault.lock()
       return await TH.passkeyOf('laptop')
     }
-    expect(await vault.addPasskey('pw', makePasskey, { wayinlabel: 'laptop' })).to.be.a('string')
+    expect(await vault.addPasskey('pw', makePasskey)).to.be.true
 
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })
     await fresh.unlock(await TH.passkeyOf('laptop'))
@@ -213,7 +213,8 @@ describe("a first unlock that loses the race to create the vault", () => {
     const snapshot = there.getSnapshot()
     expect(snapshot.state).to.eq('locked')
     expect(snapshot.syncing).to.be.true
-    expect(snapshot.wayins.map((wayin) => wayin.wayinlabel)).to.deep.equal(['passphrase'])
+    expect(snapshot.passphrase?.device_id).to.eq(storedWayinOf(world, 'passphrase')?.['device_id'])
+    expect(snapshot.passkey).to.be.null
     expect(boxlabelsOf(there)).to.deep.equal(['anthropic'])
     expect(await world.getLease()).to.be.null
     await there.unlock('pw one')
@@ -230,8 +231,8 @@ describe("a first unlock that loses the race to create the vault", () => {
     const { world, there, here } = await raceLostToPwOne()
     await there.unlock('pw one')
     expect(there.getSnapshot().state).to.eq('unlocked')
-    expect(there.getSnapshot().wayins.map((wayin) => wayin.wayinlabel)).to.deep.equal(['passphrase'])
-    expect(storedWayinsOf(world)).to.have.lengthOf(1)
+    expect(there.getSnapshot().passphrase?.device_id).to.eq(storedWayinOf(world, 'passphrase')?.['device_id'])
+    expect(storedWayinOf(world, 'passkey')).to.be.null
     expect(await there.getBox('anthropic')).to.eq('sk-ant-fake-theirs')
     expect(here.getSnapshot().state).to.eq('unlocked')
   })
@@ -389,12 +390,12 @@ describe("a read that began before this device's own change to the ways in lande
       reading = vault.hello({ staleMinutes: 0 })
       await listing.reached
     })
-    await vault.addPassphrase('pw', 'spare phrase', { wayinlabel: 'spare' })
+    await addLaptopPasskey(vault)
     expect(vault.unlock_epoch).to.eq(2)
     listing?.release()
     await reading
     expect(vault.unlock_epoch).to.eq(2)
-    expect(vault.wayins.map((wayin) => wayin.wayinlabel)).to.include('spare')
+    expect(vault.passkey).to.not.be.null
     expect(vault.state).to.eq('unlocked')
     await vault.hello({ staleMinutes: 0 })
     expect(vault.state).to.eq('unlocked')
@@ -1025,7 +1026,7 @@ describe("refreshes, one at a time", () => {
     const vault = await world.openUnlocked('pw')
     expect(vault.getSnapshot().syncing).to.be.true
     const sound = world.dbStore.read(u1VaultPropsCkey) ?? ''
-    world.dbStore.write(u1VaultPropsCkey, '{"format":"safebyok-vault-v4"}')
+    world.dbStore.write(u1VaultPropsCkey, '{"format":"safebyok-vault-v5"}')
     await TH.wakeupAtNextTick()
     for (const ii of [1, 2]) {
       world.dbStore.write('elsewhere', String(ii))

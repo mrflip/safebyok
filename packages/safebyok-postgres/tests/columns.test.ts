@@ -40,8 +40,9 @@ describe("Columns.selected", () => {
 })
 
 describe("Columns.paramsOf", () => {
-  it("is the record's values in column order, a missing field as null", () => {
-    expect(Columns.paramsOf({ vault_id: 'v1', wayins: undefined }, [['vault_id', 'text'], ['wayins', 'jsonb']])).to.deep.equal(['v1', null])
+  it("is the record's values in column order, a null or missing field as null, as its example shows", () => {
+    expect(Columns.paramsOf({ vault_id: 'v1', passkey: null }, [['vault_id', 'text'], ['passkey', 'jsonb']])).to.deep.equal(['v1', null])
+    expect(Columns.paramsOf({ vault_id: 'v1' }, [['vault_id', 'text'], ['passkey', 'jsonb']])).to.deep.equal(['v1', null])
   })
 
   it("sends a jsonb value as its JSON text", () => {
@@ -56,8 +57,12 @@ describe("Columns.paramsOf", () => {
 })
 
 describe("Columns.recordOf", () => {
-  it("leaves a null column out of the record", () => {
-    expect(Columns.recordOf({ vault_id: 'v1', wayins: null }, [['vault_id', 'text'], ['wayins', 'jsonb']])).to.deep.equal({ vault_id: 'v1' })
+  it("reads a null column as a null field, as its example shows", () => {
+    expect(Columns.recordOf({ vault_id: 'v1', passkey: null }, [['vault_id', 'text'], ['passkey', 'jsonb']])).to.deep.equal({ vault_id: 'v1', passkey: null })
+  })
+
+  it("leaves a column the row lacks out of the record", () => {
+    expect(Columns.recordOf({ vault_id: 'v1' }, [['vault_id', 'text'], ['passkey', 'jsonb']])).to.deep.equal({ vault_id: 'v1' })
   })
 
   it("parses a jsonb column's text, and leaves one a driver already parsed as it is", () => {

@@ -14,7 +14,7 @@ import type { Capacity, DamagedBox, WayinSummary } from './types'
  *   show a message, retry, or tell them to free room. `vault_locked`, `wrong_passphrase`,
  *   `created_elsewhere`, `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `absent_box`,
  *   `absent_vault`, `absent_wayin`, `whisper_too_large`, `box_too_large`, `vault_full`,
- *   `too_many_wayins`, `last_wayin`, `corrupt_record`, `stale_write`, `not_permitted`,
+ *   `corrupt_record`, `stale_write`, `not_permitted`,
  *   `storage_unavailable`, `storage_blocked`.
  * - **Bad news**: something the app is told about whether or not the call was refused, and
  *   may show the user. `damaged_vault`, `damaged_wayin`, `damaged_box`, `newer_format`,
@@ -92,14 +92,12 @@ export const RefusalKindVals = [
   'passkey_unavailable', // this browser or authenticator cannot answer for a passkey unlock (no WebAuthn, or no PRF)
   'absent_box',          // no box under that label
   'absent_vault',        // the vault has never been created, and this call will not create it
-  'absent_wayin',        // no wayin of that wayin_id, or none of the wayinkind asked for
+  'absent_wayin',        // the vault has no passkey, and one was asked for: to unlock with, or to remove
   'bad_label',           // a label, or the userId, that fails the vault's check for it
   'bad_whisper',         // a whisper JSON cannot carry (undefined, a function, a class), or a non-string
   'whisper_too_large',   // a whisper, with its box's sidecar, over the vault's maxWhisperBytes
   'box_too_large',       // a box -- whisper, names and sidecar together -- over what storage holds in one record
   'vault_full',          // a new box in a vault already holding its maxBoxes, or a write storage has no room for
-  'too_many_wayins',     // a new wayin in a vault already holding MaxUnlocks
-  'last_wayin',          // removing the vault's last passphrase, which would leave no sure way in
   'bad_option',          // an option or argument out of its range: Vault.make's, mask's, argon2idDeriver's, a putBox()'s sidecar
   'bad_record',          // a record or expectation handed to a VaultDB verb that is not one this package builds
   'vault_closed',        // the vault handle was closed and cannot be used again
@@ -155,8 +153,6 @@ export const RefusalFamilyForKind = {
   whisper_too_large:   'condition',
   box_too_large:       'condition',
   vault_full:          'condition',
-  too_many_wayins:     'condition',
-  last_wayin:          'condition',
   bad_option:          'misuse',
   bad_record:          'misuse',
   vault_closed:        'misuse',
@@ -188,7 +184,7 @@ export type RefusalMeta = {
   capacity?:     Capacity
   /** `damaged_box` told of a listing: the box as the listing shows it, its boxlabel and the revision it names. */
   box_listed?:   DamagedBox
-  /** `damaged_wayin` told of a read of the vault props: the way in as the snapshot lists it. */
+  /** `damaged_wayin` told of a read of the vault props: the way in as the snapshot shows it. */
   wayin_listed?: WayinSummary
 }
 

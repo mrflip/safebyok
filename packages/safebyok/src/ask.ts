@@ -38,7 +38,7 @@ export type ProofAnswer = typeof ProofAnswerVals[number]
 export type GetProof = (ask: Ask) => ProofAnswer | Promise<ProofAnswer>
 
 /** The vault's own run of one proof, for {@link Ask}: its unlock, standing down once `overtaken` is aborted (the prompt is over). */
-export type Attempter = (proof: string | PasskeyAnswer, opts: { wayinId?: string | undefined } | undefined, overtaken: AbortSignal) => Promise<Outcome<Vault>>
+export type Attempter = (proof: string | PasskeyAnswer, overtaken: AbortSignal) => Promise<Outcome<Vault>>
 
 /**
  * One prompt, raised: the {@link Ask} handed to `getProof`, and the vault's handles on it. The
@@ -94,22 +94,22 @@ export class Ask {
 
   /**
    * Try one proof: the passphrase the user typed, or a passkey's answer (`safebyok-react`'s
-   * `askPasskey` gets one), aimed at one way in by `opts.wayinId` when given. Resolves the vault,
+   * `askPasskey` gets one). Resolves the vault,
    * unlocked, or the refusal, as `unlock()` refuses: `wrong_passphrase` and `wrong_passkey` to show
    * in place and ask again (on `absent`, `weak_passphrase` and `created_elsewhere` too);
-   * `absent_wayin` and `damaged_wayin` to offer another way in; and
+   * `absent_wayin` and `damaged_wayin` to offer the other way in; and
    * `vault_locked` -- a lock won, under this attempt or before it -- `storage_unavailable`, or any
    * other, to close the dialog, answering `declined`. Once the prompt is over -- `lockLanded`
    * settled, or the ask answered -- it refuses 'vault_locked' at once, and an attempt still under
    * way then unlocks nothing: a Cancel during it stays cancelled, and a lock after it wins.
    *
    * @example const { ok, err } = await ask.attempt(passphrase)
-   * @example const { ok } = await ask.attempt(passkey)   // from askPasskey(ask.vault.wayins)
+   * @example const { ok } = await ask.attempt(passkey)   // from askPasskey(ask.vault.passkey)
    */
-  attempt = async (proof: string | PasskeyAnswer, opts?: { wayinId?: string | undefined }): Promise<Outcome<Vault>> => {
+  attempt = async (proof: string | PasskeyAnswer): Promise<Outcome<Vault>> => {
     if (this.#landed.signal.aborted) { return bad(lockLandedError()) }
     if (this.#over.signal.aborted) { return bad(answeredError()) }
-    return await this.#attempter(proof, opts, this.#over.signal)
+    return await this.#attempter(proof, this.#over.signal)
   }
 
   /**

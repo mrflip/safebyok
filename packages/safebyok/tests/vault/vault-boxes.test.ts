@@ -7,12 +7,11 @@ import type { GetProof } from '../../src/ask'
 import { valOf } from '../../src/outcome'
 import { type Whisper, MaxWhisperBytes, type Sidecar, FarFuture, MaxBoxes, VaultScope } from '../../src/types'
 import { AnyTextValidators, MaxUserIdChars, NameFloorBytes } from '../../src/validators'
-import { memoryDeviceDB } from '../../src/device-db'
 import { type VaultDB, jsonBytes } from '../../src/vault-db'
 import { StoredBytesPerWhisperByte, BoxFieldsBytes, type MakeVaultOpts, BoxFixedBytes } from '../../src/vault-opts'
 import { cipherCtx, makeBoxKey, wrapKeyUnder, makeVaultKey, cipherBytes, randomBytes } from '../../src/crypto'
 import * as TH from '../test-helpers'
-import { makeWorld, boxlabelsOf, storedRowOf, u1BoxCkey, storedVaultPropsOf, u1VaultPropsCkey, isU1Box, wayinlabelsOf } from './world'
+import { makeWorld, boxlabelsOf, storedRowOf, u1BoxCkey, storedVaultPropsOf, u1VaultPropsCkey, isU1Box } from './world'
 
 
 // == [Storing and reading]: RoundTrips, putBox and getBox, times a vault keeps
@@ -900,66 +899,10 @@ describe("the host's validators", () => {
     expect(boxlabelsOf(narrow)).to.deep.equal([])
   })
 
-  it("check each new way in's wayinlabel with the host's wayinlabel check, at addPassphrase and addPasskey", async () => {
-    const world = makeWorld({ validators: { wayinlabel: ZClassic.string().min(1).max(60) } })
-    const vault = await world.openUnlocked('pw')
-    await vault.addPassphrase('pw', 'pw two', { wayinlabel: 'Written down, in the drawer' })
-    await vault.addPasskey('pw', () => TH.passkeyOf('laptop'), { wayinlabel: 'Laptop: fingerprint' })
-    expect(wayinlabelsOf(vault)).to.deep.equal(['passphrase', 'Written down, in the drawer', 'Laptop: fingerprint'])
-    const err = await TH.expectRefusal(vault.addPassphrase('pw', 'pw three', { wayinlabel: 'u'.repeat(61) }), 'bad_label')
-    expect(err.message).to.include('wayinlabel')
-    expect(err.message).to.not.include('uuu')
-    const makePasskey = vi.fn(() => TH.passkeyOf('phone'))
-    await TH.expectRefusal(vault.addPasskey('pw', makePasskey, { wayinlabel: '' }), 'bad_label')
-    expect(makePasskey).not.toHaveBeenCalled()
-    expect(wayinlabelsOf(vault)).to.have.lengthOf(3)
-  })
-
-  it("refuse a taken wayinlabel or passkey, under a host's check that admits any text, quoting no wayinlabel", async () => {
-    const vault = await makeWorld({ validators: { wayinlabel: ZClassic.string() } }).openUnlocked('pw')
-    await vault.addPassphrase('pw', 'pw two', { wayinlabel: 'sk-ant-fake-pasted-phrase' })
-    await vault.addPasskey('pw', () => TH.passkeyOf('laptop'), { wayinlabel: 'sk-ant-fake-pasted-passkey' })
-    const takenLabel = await TH.expectRefusal(vault.addPassphrase('pw', 'pw three', { wayinlabel: 'sk-ant-fake-pasted-phrase' }), 'bad_label')
-    expect(TH.thrownText(takenLabel)).to.not.include('sk-ant-fake')
-    const takenPasskey = await TH.expectRefusal(vault.addPasskey('pw', () => TH.passkeyOf('laptop'), { wayinlabel: 'laptop_again' }), 'bad_option')
-    expect(TH.thrownText(takenPasskey)).to.not.include('sk-ant-fake')
-    expect(wayinlabelsOf(vault)).to.have.lengthOf(3)
-  })
-
-  it("refuse an empty wayinlabel as bad_label, though the host's wayinlabel check admits it", async () => {
-    const vault = await makeWorld({ validators: AnyTextValidators }).openUnlocked('pw')
-    await TH.expectRefusal(vault.addPassphrase('pw', 'pw two', { wayinlabel: '' }), 'bad_label')
-    const makePasskey = vi.fn(() => TH.passkeyOf('phone'))
-    await TH.expectRefusal(vault.addPasskey('pw', makePasskey, { wayinlabel: '' }), 'bad_label')
-    expect(makePasskey).not.toHaveBeenCalled()
-    expect(wayinlabelsOf(vault)).to.deep.equal(['passphrase'])
-  })
-
-  it("check a wayinlabel with Label when the host gives no wayinlabel check, saying what was wrong", async () => {
-    const vault = await makeWorld({ validators: AnyScript }).openUnlocked('pw')
-    const err = await TH.expectRefusal(vault.addPassphrase('pw', 'pw two', { wayinlabel: 'Written down' }), 'bad_label')
-    expect(err.message).to.include('lowercase')
-    expect(wayinlabelsOf(vault)).to.deep.equal(['passphrase'])
-  })
-
-  it("leave a way in stored under a wayinlabel narrowed checks refuse opening the vault, listed as it is", async () => {
+  it("refuse a wayinlabel check as bad_option, as a vault's ways in carry no labels", async () => {
     const world = makeWorld()
-    const roomy = await world.openUnlocked('pw', { validators: { wayinlabel: ZClassic.string() } })
-    await roomy.addPassphrase('pw', 'home pw', { wayinlabel: 'Home phrase' })
-    roomy.close()
-    const narrow = await world.open({ deviceDB: memoryDeviceDB() })
-    expect(wayinlabelsOf(narrow)).to.deep.equal(['passphrase', 'Home phrase'])
-    await narrow.unlock('home pw')
-    expect(narrow.getSnapshot().state).to.eq('unlocked')
-  })
-
-  it("name a vault's first way in 'passphrase' whatever the host's wayinlabel check, which checks only the ways in it adds", async () => {
-    const world = makeWorld({ validators: { wayinlabel: ZClassic.string().startsWith('my_') } })
-    const vault = await world.openUnlocked('pw')
-    expect(wayinlabelsOf(vault)).to.deep.equal(['passphrase'])
-    await TH.expectRefusal(vault.addPassphrase('pw', 'pw two', { wayinlabel: 'spare' }), 'bad_label')
-    await vault.addPassphrase('pw', 'pw two', { wayinlabel: 'my_spare' })
-    expect(wayinlabelsOf(vault)).to.deep.equal(['passphrase', 'my_spare'])
+    const err = await TH.expectRefusal(world.open({ validators: { wayinlabel: ZClassic.string() } as never }), 'bad_option')
+    expect(err.message).to.include('validators')
   })
 
   it("never list a row planted under a name below the floor, which no call could reach", async () => {

@@ -8,7 +8,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { Component, createElement, use, type ReactElement, type ReactNode } from 'react'
 import { onTestFinished, vi } from 'vitest'
-import { LeaseHours, VaultError, outcomeOf, unexpectedError, type Ask, type AskWhy, type MakeVaultOpts, type Outcome, type ProofAnswer, type WayinSummary, type Vault, type VaultState } from 'safebyok'
+import { LeaseHours, VaultError, outcomeOf, unexpectedError, type Ask, type AskWhy, type MakeVaultOpts, type Outcome, type PasskeyWayinSummary, type ProofAnswer, type Vault, type VaultState } from 'safebyok'
 import { eventually, scopeOf, settledVault } from 'safebyok/testing'
 import { fromB64, toB64 } from 'safebyok/utils'
 
@@ -35,7 +35,7 @@ const unsubscribeFromNothing = () => { /* nothing ever changes */ }
 /** What a {@link stubVault} is made of: each part a test leaves out takes the stub's default. */
 export type StubVaultOpts = {
   state?:           VaultState
-  wayins?:          WayinSummary[]
+  passkey?:         PasskeyWayinSummary | null
   leaseMillis?:     number
   unlock?:          Vault['unlock']
   del?:             Vault['del']
@@ -51,7 +51,7 @@ const trying = <ArgsT extends unknown[], ValT>(call: ((...args: ArgsT) => Promis
 
 /**
  * Just enough of a Vault for a component to render it: a snapshot that keeps its identity and
- * never changes (`state`, default 'locked'; `wayins`, default none; the scope of `u1`'s `main`
+ * never changes (`state`, default 'locked'; `passkey`, default none; the scope of `u1`'s `main`
  * vault in the `acme` app, as `scopeOf` has it, its fields beside it), a window (default seven days), a subscribe that
  * never calls back, and whichever calls the test hands it, each in both its forms: given as the
  * throwing form, its `try` form answers the same as an Outcome.
@@ -60,7 +60,7 @@ const trying = <ArgsT extends unknown[], ValT>(call: ((...args: ArgsT) => Promis
  * @example const vault = TH.stubVault({ unlock: () => Promise.reject(new VaultError('wrong_passphrase', 'Not that one.')) })
  */
 export const stubVault = (opts: StubVaultOpts = {}): Vault => {
-  const snapshot = { state: opts.state ?? 'locked', wayins: opts.wayins ?? [], ...scopeOf('u1') }
+  const snapshot = { state: opts.state ?? 'locked', passkey: opts.passkey ?? null, ...scopeOf('u1') }
   return {
     ...scopeOf('u1'),
     getSnapshot:     () => snapshot,

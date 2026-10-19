@@ -11,7 +11,7 @@ import type { KeyDeriver, CustomKeyDeriver } from '../../src/key-deriver'
 import { type VaultLogger } from '../../src/logger'
 import { Argon2idWebV1, MaxSaltBytes, TestDeriverNotice } from '../../src/key-deriver-spec'
 import * as TH from '../test-helpers'
-import { makeWorld, MisfitStores, VaultDBVerbsUsed, uncheckingDeviceDB, HourMillis, isU1Box } from './world'
+import { makeWorld, MisfitStores, VaultDBVerbsUsed, uncheckingDeviceDB, HourMillis, isU1Box, vaultWithPasskey, addLaptopPasskey } from './world'
 
 
 // == [Making a vault]: Vault.make, options
@@ -92,7 +92,7 @@ describe("Vault.make", () => {
 
   it("hands on every method alone, bound to its vault, as its examples show", async () => {
     const world = makeWorld()
-    const { subscribe, getSnapshot, hello, unlock, putBox, getBox, useBox, delBox, addPassphrase, addPasskey, changePassphrase, delWayin, lock, del, close } = await world.open()
+    const { subscribe, getSnapshot, hello, unlock, putBox, getBox, useBox, delBox, addPasskey, changePassphrase, delWayin, lock, del, close } = await world.open()
     const heard = vi.fn()
     const unsubscribe = subscribe(heard)
     await hello()
@@ -101,10 +101,9 @@ describe("Vault.make", () => {
     expect(await getBox('anthropic_api_key')).to.eq('sk-ant-test')
     expect(await useBox('anthropic_api_key', (whisper) => typeof whisper)).to.eq('string')
     await delBox('anthropic_api_key')
-    const spareId = await addPassphrase('correct horse', 'battery staple', { wayinlabel: 'spare' })
-    await changePassphrase('battery staple', 'staple battery', { wayinId: spareId })
-    await delWayin('staple battery', spareId)
-    expect(await addPasskey('correct horse', () => TH.passkeyOf('laptop'), { wayinlabel: 'laptop' })).to.be.a('string')
+    await changePassphrase('correct horse', 'battery staple')
+    expect(await addPasskey('battery staple', () => TH.passkeyOf('laptop'))).to.be.true
+    await delWayin('battery staple')
     await lock()
     expect(getSnapshot().state).to.eq('locked')
     await del()
@@ -371,8 +370,7 @@ describe("the key deriver seam", () => {
       const world = makeWorld()
       await world.openUnlocked('pw', { keyDeriver: { ...TH.testDeriver, salt_bytes: saltBytes } })
       const stored = await TH.expectingGood(world.vaultDB).getVaultProps(TH.scopeOf('u1'))
-      const [wayin] = stored?.wayins ?? []
-      expect(fromB64(wayin?.wayinkind === 'passphrase' ? wayin.salt_b64 : '')).to.have.lengthOf(saltBytes)
+      expect(fromB64(stored?.passphrase.salt_b64 ?? '')).to.have.lengthOf(saltBytes)
     }
   })
 
@@ -394,8 +392,7 @@ describe("the key deriver seam", () => {
     const standIn: KeyDeriver = { ...Argon2idWebV1, deriveKeyBytes: cheapDerive }
     await world.openUnlocked('pw', { keyDeriver: standIn })
     const stored = await TH.expectingGood(world.vaultDB).getVaultProps(TH.scopeOf('u1'))
-    const [wayin] = stored?.wayins ?? []
-    expect(wayin?.wayinkind === 'passphrase' && wayin.key_deriver_label).to.eq('argon2id_web_v1')
+    expect(stored?.passphrase.key_deriver_label).to.eq('argon2id_web_v1')
   })
 
   it("refuses a deriver that hands back anything but 32 key bytes, and makes no vault of it", async () => {
@@ -605,7 +602,8 @@ describe("Vault.make, by the Contract", () => {
     const vault = Vault.make(world.optsWith())
     expect(vault).to.be.instanceOf(Vault)
     expect(vault.snapshot).to.deep.include({ state: 'opening', vault_id: null, registered_at: null, unlock_epoch: null, vault_key_epoch: null, askPassphraseAt: null, trouble: null, syncing: true })
-    expect(vault.wayins).to.have.lengthOf(0)
+    expect(vault.passphrase).to.be.null
+    expect(vault.passkey).to.be.null
     expect(vault.boxes).to.have.lengthOf(0)
     expect(vault.capacity.boxes.used).to.eq(0)
   })
@@ -729,27 +727,28 @@ describe("the vault's fields, by the Contract", () => {
   })
 
   it("reads the live fields in a handler, as the Vault's second example shows", async () => {
-    const world = makeWorld()
-    const elsewhere = await world.openUnlocked('pw')
+    const { world, vault: elsewhere } = await vaultWithPasskey()
     await elsewhere.lock()
     const vault = await world.open()
     const asked: unknown[] = []
-    const askForPassphrase = (wayins: unknown) => { asked.push(wayins) }
-    if (vault.state === 'locked') { askForPassphrase(vault.wayins) }
-    expect(asked).to.deep.equal([vault.wayins])
+    const askForProof = (passkey: unknown) => { asked.push(passkey) }
+    if (vault.state === 'locked') { askForProof(vault.passkey) }
+    expect(vault.passkey).to.not.be.null
+    expect(asked).to.deep.equal([vault.passkey])
   })
 
   it("lets no host write over a field: each is a getter with no setter, and the snapshot is frozen", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox('anthropic', 'sk-fake')
+    await addLaptopPasskey(vault)
     // Every field the snapshot shows, the scope's among them, and those only the handle has.
     for (const field of [...Object.keys(vault.snapshot), 'snapshot', 'leaseMillis', 'logger', 'clock', 'keyDeriver']) {
       expect(Reflect.set(vault, field, null), field).to.be.false
     }
     expect(vault.state).to.eq('unlocked')
     const { snapshot } = vault
-    for (const part of [snapshot, snapshot.boxes, snapshot.boxes[0], snapshot.wayins, snapshot.wayins[0], snapshot.capacity, snapshot.capacity.boxes, snapshot.capacity.bytes]) {
+    for (const part of [snapshot, snapshot.boxes, snapshot.boxes[0], snapshot.passphrase, snapshot.passkey, snapshot.capacity, snapshot.capacity.boxes, snapshot.capacity.bytes]) {
       expect(Object.isFrozen(part)).to.be.true
     }
   })

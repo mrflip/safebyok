@@ -142,6 +142,11 @@ settles, or names what the retry met. A browser that keeps the app from storing
 anything on this device (`storage_blocked`) is a condition too, but one a retry will not mend
 until the browser's settings or room change: say so, rather than offering `retryOpen()`.
 
+A vault already open can come back to this. Should a later read find storage handing back an older
+copy of the vault than this device has seen (`rolled_back`), the vault locks, forgets what it
+held, and reads `opening` again; that refusal, the vault's `trouble`, is `openError` then. A retry
+will not mend it until you accept the older copy (the `safebyok` README's *A vault rolled back*).
+
 ```tsx
 const VaultPanel = () => {
   const vault = useVault()
@@ -162,7 +167,7 @@ show.
 bad news the vault met on any read, for as long as the vault stands -- a damaged record, a box
 listed damaged, storage rolled back -- and never a condition. `openError` is only why the
 provider's own hello could not open the vault, a condition among them, and clears once the vault
-opens. A damaged record is both: the very same error.
+opens. A damaged record is both, as is a vault rolled back: the very same error.
 
 For a `damaged_vault`, the one way forward is to delete the vault and start over:
 `delDamagedVault()` from `useOpenError()` does that (the `safebyok` README's *A vault that cannot be
@@ -285,8 +290,8 @@ user starts a new one. `<VaultProvider allowStartOver ...>` (or `<PassphraseModa
 vault on every device (`vault.del()`, which needs no passphrase). A delete lands as a lock does,
 so the dialog closes and the call that summoned it is refused `vault_locked`; the next call that
 needs the vault asks the user to choose a passphrase for the new one. It is off by default:
-a vault with another way in (a second passphrase, a passkey) may not need it, and starting over
-loses every box.
+a vault with a passkey still unlocks with it (though neither the passphrase nor the passkey can
+be changed without the passphrase), and starting over loses every box.
 
 ## The passphrase field
 
@@ -404,8 +409,8 @@ callback)`, which hands it to your callback and keeps it out of state altogether
 
 ## Fingerprint unlock (passkeys)
 
-A vault may let the user in with a passkey -- a fingerprint, a face, a phone, a security key --
-beside their passphrase. The core takes the passkey's answer as bytes and never calls WebAuthn;
+A vault may let the user in with one passkey -- a fingerprint, a face, a phone, a security key --
+beside its one passphrase. The core takes the passkey's answer as bytes and never calls WebAuthn;
 these helpers make the calls, through the WebAuthn PRF extension (passkeys and security keys
 alike: a security key's `hmac-secret` is what PRF runs on).
 
@@ -414,16 +419,20 @@ import { askPasskey, createPasskey, passkeysAvailable } from 'safebyok-react'
 
 // Adding one asks for a passphrase as proof, even while unlocked: the vault keeps no copy of its
 // vaultKey to wrap anew. The vault checks it first, and only then calls createPasskey, so a
-// mistyped passphrase leaves no passkey on the authenticator.
+// mistyped passphrase leaves no passkey on the authenticator. A vault holds at most one passkey:
+// adding another replaces it.
 const addFingerprint = async (passphrase: string) => {
   const makePasskey = () => createPasskey({ rp: { name: 'Acme' }, user: { name: email, displayName: fullName } })
-  const wayinId = await vault.addPasskey(passphrase, makePasskey, { wayinlabel: 'laptop_fingerprint' })
-  if (wayinId === null) { return }   // the user dismissed the prompt
+  const added = await vault.addPasskey(passphrase, makePasskey)
+  if (! added) { return }   // the user dismissed the prompt
 }
 
-// Unlocking, inside a getProof of your own: the browser offers each of the vault's passkeys,
-// and the one touched answers.
-const passkey = await askPasskey(ask.vault.wayins)
+// Removing it, again with the passphrase as proof.
+const removeFingerprint = async (passphrase: string) => { await vault.delWayin(passphrase) }
+
+// Unlocking, inside a getProof of your own: the browser asks the user to touch the vault's
+// passkey, and it answers.
+const passkey = await askPasskey(ask.vault.passkey)
 if (passkey !== null) { const { ok } = await ask.attempt(passkey) }
 ```
 
@@ -432,7 +441,7 @@ if (passkey !== null) { const { ok } = await ask.attempt(passkey) }
   `createPasskey` refuses with kind `passkey_unavailable` when it does not (as do older
   browsers, and some authenticators). Offer the passphrase then.
 * **A dismissed prompt resolves null**, from either helper: WebAuthn reports a dismissal, a timeout
-  and "none of these passkeys is on this device" alike, on purpose. A `createPasskey` whose second
+  and "that passkey is not on this device" alike, on purpose. A `createPasskey` whose second
   touch (on authenticators that answer only when asked again) is dismissed, or whose authenticator
   has no PRF, has still made a passkey: it stays on the authenticator, useless to the vault, until
   the user deletes it.
@@ -450,16 +459,17 @@ if (passkey !== null) { const { ok } = await ask.attempt(passkey) }
   never replaces a passkey your sign-in uses; its challenge is random and nothing on your server
   checks it. If you pass `rp.id` to `createPasskey`, pass the same `rpId` to `askPasskey` (and to
   `PasskeyUnlockButton`): a passkey answers only under the relying party it was made for.
-* **The dialog.** `PassphraseModal` shows `PasskeyUnlockButton` first when the vault lists a
+* **The dialog.** `PassphraseModal` shows `PasskeyUnlockButton` first when the vault has a
   passkey and the browser offers WebAuthn, under the page's own relying party. A dialog of your
   own can place `<PasskeyUnlockButton ask={ask} onDone={answer} onGripe={setGripe} />` beside
   its field (`autoFocus` to make it the first choice); `onDone` hears `'unlocked'`, or
   `'declined'` for a refusal that closes the dialog; `onGripe` hears null as each press
   begins (what it said before no longer stands), each message to show in place, and the button's
   word when it takes itself away.
-* **A passkey can stand in for a forgotten passphrase**: `vault.addPassphrase(passkey, fresh, {
-  wayinlabel })`, then `vault.delWayin(passkey, oldId)`. A vault always keeps one passphrase:
-  removing the last refuses with kind `last_wayin`.
+* **A passkey unlocks; only the passphrase changes things.** `vault.changePassphrase(passphrase,
+  newPassphrase)`, `addPasskey` and `delWayin` each take the standing passphrase as proof, never a
+  passkey's answer (refused as `bad_option`). A user who forgot the passphrase can still unlock
+  with the passkey, but can set a new passphrase only by starting over (*Starting over*, above).
 
 ## Development
 

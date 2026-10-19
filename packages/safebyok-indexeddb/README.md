@@ -74,8 +74,10 @@ its own failures.
 One IndexedDB database per `dbName`, `<dbName>:vault_db`, holding one object store, `records`:
 **a row per record, each the record itself**, as safebyok wrote it, kept by structured clone
 field by field. Nothing is serialized, normalized or repaired: every field a record holds is
-bound into its encryption, but for the vault props' `unlock_epoch` and which wayins their `wayins`
-list holds, so one changed in storage makes the record refuse to open.
+bound into its encryption, but for the vault props' `unlock_epoch` and, for each of their two ways
+in (`passphrase` and `passkey`), the other one beside it, so one changed in storage makes the
+record refuse to open. A vault stored in the format before (`safebyok-vault-v4`, its ways in a
+`wayins` list) reads as damaged, to be made anew.
 
 | ckey                                               | Row                      |
 | -------------------------------------------------- | ------------------------ |

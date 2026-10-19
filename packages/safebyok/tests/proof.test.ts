@@ -201,7 +201,7 @@ describe("passkeyProof.wayinKeyFor", () => {
 })
 
 /** What a way in labelled `wayinlabel` is stamped with. */
-const stamp = (wayinlabel: string) => ({ wayin_id: `wayin-${wayinlabel}`, wayinlabel, vault_key_epoch: 1, device_id: 'device-one', registered_at: Date.UTC(2026, 9, 15) })
+const stamp = { vault_key_epoch: 1, device_id: 'device-one', registered_at: Date.UTC(2026, 9, 15) }
 
 /** A deriver whose handed-back bytes the test keeps hold of, to look at after the proof is through with them. */
 const keepingDeriver = () => {
@@ -231,15 +231,13 @@ describe("a key deriver's bytes", () => {
   })
 
   it("are zeroed after every try when opening, a wrong passphrase's included", async () => {
-    const vaultKey = await makeVaultKey()
     const identity = TH.vaultPropsOf('u1')
-    const one = await Wayin.sealPassphrase(slice, PassphraseProof.parse(slice, 'first'), identity, stamp('one'), vaultKey)
-    const two = await Wayin.sealPassphrase(slice, PassphraseProof.parse(slice, 'second'), identity, stamp('two'), vaultKey)
+    const sealed = await Wayin.sealPassphrase(slice, PassphraseProof.parse(slice, 'first'), identity, stamp, await makeVaultKey())
     const { keyDeriver, handed } = keepingDeriver()
     const opening = TH.vaultSliceOf('u1', keyDeriver)
-    const vaultProps = TH.vaultPropsOf('u1', { wayins: [one.props, two.props] })
-    const wayins = Wayin.listOf(opening, vaultProps)
-    await TH.expectBad(Wayin.tryOpenAmong(wayins, Proof.parse(opening, 'neither')), 'wrong_passphrase')
+    const wayin = Wayin.make(opening, sealed.props, identity)
+    await TH.expectBad(wayin.tryOpen(Proof.parse(opening, 'wrong')), 'wrong_passphrase')
+    await TH.expectGood(wayin.tryOpen(Proof.parse(opening, 'first')))
     expect(handed).to.have.lengthOf(2)
     for (const bytes of handed) { expect(bytes.every((byte) => byte === 0)).to.be.true }
   })

@@ -151,11 +151,12 @@ Three tables, inside the component, beside nothing of your app's:
 
 * **Encrypted**, as `{ cipher_iv_b64, ciphertext_b64 }`: each whisper (`whisper_ciphered`), each
   box's boxKey (`box_key_wrapped`), and the vaultKey once for each of the vault's
-  ways in (each wayin's `vault_key_wayin_wrapped`, in the vault props' `wayins`).
+  ways in (the `vault_key_wayin_wrapped` of the vault props' `passphrase`, and of its `passkey`
+  when it has one).
 * **In the open**: the scope (`applabel`, `user_id`, `vaultlabel`), each `boxlabel` and sidecar (`sidecar_json`),
-  the `vault_id`, `unlock_epoch`, `revision_tok`s, each way in's `wayinkind`, `wayin_id`,
-  `wayinlabel`, passphraseSalt (`salt_b64`) and key deriver's label, how many ways in there are,
-  when each vault and box was first stored and each box last written (`registered_at`,
+  the `vault_id`, `unlock_epoch`, `revision_tok`s, each way in's `wayinkind`, `device_id` and
+  `registered_at`, the passphrase's passphraseSalt (`salt_b64`) and key deriver's label, whether
+  the vault has a passkey, and its `credential_id` and `prf_salt_b64`, when each vault and box was first stored and each box last written (`registered_at`,
   `written_at`, epoch milliseconds), and the length of every ciphertext.
 * **Never**: a whisper, a passphrase, any key in usable form, or the device-local lease. No history: an update replaces its row, and a write made over a revision since replaced
   is refused, never merged: the vault's policy ([`VAULTDB.md`](../safebyok/VAULTDB.md), *Who does what*). An app that wants history
@@ -170,6 +171,12 @@ Three tables, inside the component, beside nothing of your app's:
   by every box write and delete in the same transaction. A vault written before tallies
   were kept has none, and reads as ever: its next box write counts it, reading the vault
   once (and no further than its limits). A delete never counts a vault.
+
+**Upgrading from a version that stored `wayins`.** The vault props now hold their two ways in as
+`passphrase` and `passkey` (format `safebyok-vault-v5`, in place of v4's list of `wayins`), and no
+older vault is read: each one reads as damaged, its boxes with it. Convex refuses to deploy a
+schema its documents do not match, so clear the component's three tables before you deploy (on
+the dashboard's Data page, pick the `safebyok` component); each user then makes their vault anew.
 
 **How big a vault can be.** Listing a vault, watching it and deleting it each read the whole vault
 in one Convex transaction -- watching reads each box whole, ciphertext and all, to sign it by

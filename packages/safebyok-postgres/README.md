@@ -28,6 +28,16 @@ what is missing, and never changes the columns or keys of a table already there.
 is no migration: a release that changes the tables says so in its changelog, and you drop them
 and run it again.
 
+**Upgrading from a release whose `safebyok_vaults` has a `wayins` column**: its vault props now
+hold their two ways in as the columns `passphrase` and `passkey` (null when the vault has none).
+No vault stored before is read (each reads as damaged, its boxes with it), so drop both tables --
+the boxes too, or the new vaults table would stand without their foreign key -- and run
+`VaultTablesSql` again; each user then makes their vault anew.
+
+```sql
+DROP TABLE safebyok_boxes, safebyok_vaults;
+```
+
 ```ts
 import { VaultTablesSql } from 'safebyok-postgres'
 
@@ -334,11 +344,11 @@ subscriber: at worst, a refresh that finds nothing new.
 
 Two tables, each record **a column to a field**, exactly as safebyok wrote it: text as text, a
 time or a count as a `bigint`, and each structured value as one opaque `jsonb` -- an encrypted
-value (a cipherIv and its ciphertext, `{ cipher_iv_b64, ciphertext_b64 }`), or the vault props'
-`wayins`, their list of wayins. A box's sidecar is `text`, never `jsonb`, which
+value (a cipherIv and its ciphertext, `{ cipher_iv_b64, ciphertext_b64 }`), or one of the vault
+props' two ways in, `passphrase` and `passkey` (a SQL null when the vault has no passkey). A box's sidecar is `text`, never `jsonb`, which
 would rewrite it. Nothing is normalized: a sidecar or a user id reads back byte for byte, as it
 must, since every field a record holds is bound into its encryption (all but the vault props'
-`unlock_epoch` and which wayins their `wayins` holds).
+`unlock_epoch`, and, for each way in, the other one beside it).
 
 | Table             | One row per | Primary key                                     | Columns                                                                                |
 | ----------------- | ----------- | ----------------------------------------------- | -------------------------------------------------------------------------------------- |
@@ -346,10 +356,13 @@ must, since every field a record holds is bound into its encryption (all but the
 | `safebyok_boxes`  | box         | `applabel`, `user_id`, `vaultlabel`, `boxlabel` | the vault's scope and `vault_id`, then every field of the `BoxRecord`; its sidecar as `text` |
 
 * **Encrypted**: each whisper (`whisper_ciphered`), each box's boxKey
-  (`box_key_wrapped`), and the vaultKey, once under each way into the vault (each
-  wayin's `vault_key_wayin_wrapped`, inside the vault props' `wayins`).
+  (`box_key_wrapped`), and the vaultKey, once under each way into the vault (the
+  `vault_key_wayin_wrapped` inside the vault props' `passphrase`, and inside their `passkey` when
+  they have one).
 * **In the open**: the scope, each `boxlabel` and sidecar (`sidecar_json`), each whisper's codec
-  and schema version, the `vault_id`, `unlock_epoch`, `revision_tok`s, each wayin's wayinkind, id, label, salt and key deriver's label, when
+  and schema version, the `vault_id`, `unlock_epoch`, `revision_tok`s, each way in's `wayinkind`, `device_id` and `registered_at`, the passphrase's
+  salt and key deriver's label, whether the vault has a passkey, and its `credential_id` and
+  `prf_salt_b64`, when
   each vault and box was first stored and each box last written (`registered_at`,
   `written_at`, epoch milliseconds), and the length of every ciphertext.
 * **Never**: a whisper, a passphrase, any key in usable form, or the device-local lease. No history: an update replaces its row (your database's backups and WAL keep what

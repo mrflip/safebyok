@@ -3,7 +3,7 @@ import { memoryDeviceDB } from '../../src/device-db'
 import { type MakeVaultOpts } from '../../src/vault-opts'
 import { toB64 } from '../../src/crypto'
 import * as TH from '../test-helpers'
-import { makeWorld, u1BoxCkey, storedRowOf, boxlabelsOf, rowsOf, u1VaultPropsCkey, wayinlabelsOf, vaultWithPasskey, spoilSecondWayin } from './world'
+import { makeWorld, u1BoxCkey, storedRowOf, boxlabelsOf, rowsOf, u1VaultPropsCkey, vaultWithPasskey, spoilWayin } from './world'
 
 /** A stored box row, as text, with its whisper's ciphertext bent a little. */
 const withTweakedCiphertext = (row: Record<string, unknown>): string => {
@@ -289,51 +289,50 @@ describe("damaged boxes", () => {
 })
 
 /**
- * A vault of passphrases `pw` and `spare`, the spare's salt spoiled in storage, freshly opened
- * locked. 'c2FsdA' decodes, so passes the schema, but to four bytes: no 16-byte deriver made it.
+ * A vault of the passphrase `pw` and the passkey `laptop`, the passkey's salt spoiled in storage,
+ * freshly opened locked: the salt decodes, so passes the schema, but to 16 bytes, not the 32 a
+ * passkey's salt has. Hands back the spoiled answer `laptop` gives for it.
  */
-const vaultWithDamagedSpare = async () => {
-  const world = makeWorld()
-  const vault = await world.openUnlocked('pw')
-  await vault.putBox('anthropic', 'sk-fake')
-  const spareId = await vault.addPassphrase('pw', 'spare', { wayinlabel: 'spare' })
-  spoilSecondWayin(world, { salt_b64: 'c2FsdA' })
+const vaultWithDamagedPasskey = async () => {
+  const { world, laptop } = await vaultWithPasskey()
+  const shortSalt = toB64(new Uint8Array(16))
+  spoilWayin(world, 'passkey', { prf_salt_b64: shortSalt })
   const fresh = await world.open({ deviceDB: memoryDeviceDB() })
-  return { world, fresh, spareId }
+  return { world, fresh, spoiledLaptop: { ...laptop, prfSaltB64: shortSalt } }
 }
 
 describe("a way in stored damaged", () => {
 
   it("shuts out no other: the vault's sound passphrase still opens it", async () => {
-    const { fresh } = await vaultWithDamagedSpare()
+    const { fresh } = await vaultWithDamagedPasskey()
     await fresh.unlock('pw')
     expect(await fresh.getBox('anthropic')).to.eq('sk-fake')
   })
 
-  it("refuses its own passphrase as wrong_passphrase, saying a damaged way in went untried", async () => {
-    const { fresh } = await vaultWithDamagedSpare()
-    const err = await TH.expectRefusal(fresh.unlock('spare'), 'wrong_passphrase')
-    expect(err.message).to.include('stored damaged')
-    expect(err.message).to.not.include('spare')
-  })
-
-  it("refuses an unlock aimed at it as damaged_wayin, and is removed by a sound way in", async () => {
-    const { fresh, spareId } = await vaultWithDamagedSpare()
-    await TH.expectRefusal(fresh.unlock('spare', { wayinId: spareId }), 'damaged_wayin')
-    expect(fresh.getSnapshot().state).to.eq('locked')
-    await fresh.delWayin('pw', spareId)
-    expect(wayinlabelsOf(fresh)).to.deep.equal(['passphrase'])
-  })
-
   it("a passkey stored damaged refuses its answer as damaged_wayin, and the passphrase still opens", async () => {
-    const { world, laptop } = await vaultWithPasskey()
-    const shortSalt = toB64(new Uint8Array(16))
-    spoilSecondWayin(world, { prf_salt_b64: shortSalt })
-    const fresh = await world.open({ deviceDB: memoryDeviceDB() })
-    const err = await TH.expectRefusal(fresh.unlock({ ...laptop, prfSaltB64: shortSalt }), 'damaged_wayin')
-    expect(err.message).to.include('Unlock with a passphrase')
+    const { fresh, spoiledLaptop } = await vaultWithDamagedPasskey()
+    const err = await TH.expectRefusal(fresh.unlock(spoiledLaptop), 'damaged_wayin')
+    expect(err.message).to.include('Unlock with the passphrase')
     await fresh.unlock('pw')
     expect(fresh.getSnapshot().state).to.eq('unlocked')
+  })
+
+  it("a passphrase stored damaged refuses it as damaged_wayin, quoting nothing, and the passkey still opens", async () => {
+    const { world, laptop } = await vaultWithPasskey()
+    spoilWayin(world, 'passphrase', { salt_b64: 'c2FsdA' })
+    const fresh = await world.open({ deviceDB: memoryDeviceDB() })
+    const err = await TH.expectRefusal(fresh.unlock('pw'), 'damaged_wayin')
+    expect(TH.thrownText(err)).to.not.include('c2FsdA')
+    await fresh.unlock(laptop)
+    expect(await fresh.getBox('anthropic')).to.eq('sk-fake')
+  })
+
+  it("a passkey stored damaged is removed by the passphrase, leaving the vault no passkey", async () => {
+    const { fresh, spoiledLaptop } = await vaultWithDamagedPasskey()
+    await TH.expectRefusal(fresh.unlock(spoiledLaptop), 'damaged_wayin')
+    expect(fresh.getSnapshot().state).to.eq('locked')
+    await fresh.delWayin('pw')
+    expect(fresh.getSnapshot().passkey).to.be.null
   })
 
   it("a passkey whose answer no longer opens vault props altered in storage is told that its way in may be damaged", async () => {

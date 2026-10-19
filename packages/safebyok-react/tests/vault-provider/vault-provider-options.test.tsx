@@ -134,19 +134,6 @@ describe("VaultProvider", () => {
     await expectShown('locked')
   })
 
-  it("passes the wayinlabel check through: a way in labelled as the host's check allows is added", async () => {
-    const { Grab, opened } = grabber()
-    render(
-      <VaultProvider {...makeWorld().props} userId="u1" validators={{ wayinlabel: AnyTextValidators.wayinlabel }}>
-        <Grab />
-      </VaultProvider>,
-    )
-    const vault = await opened()
-    await vault.unlock('correct horse battery staple')
-    await vault.addPassphrase('correct horse battery staple', 'a spare passphrase', { wayinlabel: 'Written down, in the drawer' })
-    expect(vault.getSnapshot().wayins.map((wayin) => wayin.wayinlabel)).to.deep.equal(['passphrase', 'Written down, in the drawer'])
-  })
-
   it("passes the logger through: what the vault has nobody to throw to reaches it", async () => {
     const spy = TH.spyLogger()
     const store = memoryStore()

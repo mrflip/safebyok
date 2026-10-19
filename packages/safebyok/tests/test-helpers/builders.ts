@@ -122,46 +122,41 @@ export const fakeCiphered = (tag: string): Ciphered => ({
 export const scopeOf = (userId: string, vaultlabel = 'main'): VaultScope => ({ applabel: 'acme', user_id: userId, vaultlabel })
 
 /**
- * A shape-valid passphrase wayin labelled `wayinlabel`, its wrap fake: for storage-layer
- * tests, which never decrypt. Its wayin_id is `wayin-<wayinlabel>`; it wraps the vault's first
- * vaultKey, and was added by `device-one`.
+ * A shape-valid passphrase wayin, its wrap fake (`wayin-<tag>`): for storage-layer tests, which
+ * never decrypt. It wraps the vault's first vaultKey, and was sealed by `device-one`.
  *
- * @example wayinOf('passphrase')                                            // the one vaultPropsOf holds
- * @example wayinOf('home_phrase', { vault_key_wayin_wrapped: fakeCiphered('home') })
+ * @example wayinOf('passphrase')                                            // as vaultPropsOf's, but for its wrap
+ * @example wayinOf('home_phrase', { registered_at: Date.UTC(2026, 9, 15) })
  */
-export const wayinOf = (wayinlabel: string, overrides: Partial<PassphraseWayinRecord> = {}): PassphraseWayinRecord => ({
+export const wayinOf = (tag: string, overrides: Partial<PassphraseWayinRecord> = {}): PassphraseWayinRecord => ({
   wayinkind:               'passphrase',
-  wayin_id:                `wayin-${wayinlabel}`,
-  wayinlabel,
   key_deriver_label:       'test_digest_v0',
   // base64 of the literal text 'saltsaltsaltsalt': a fake salt, public material anyway
   salt_b64:                'c2FsdHNhbHRzYWx0c2FsdA',
   vault_key_epoch:         1,
   device_id:               'device-one',
   registered_at:           Date.UTC(2026, 9, 14),
-  vault_key_wayin_wrapped: fakeCiphered(`wayin-${wayinlabel}`),
+  vault_key_wayin_wrapped: fakeCiphered(`wayin-${tag}`),
   ...overrides,
 })
 
 /**
- * A shape-valid passkey wayin labelled `wayinlabel`, its wrap fake: for storage-layer tests,
- * which never decrypt. Its wayin_id is `wayin-<wayinlabel>`, its credential_id
- * `cred-<wayinlabel>`; it wraps the vault's first vaultKey, and was added by `device-one`.
+ * A shape-valid passkey wayin, its wrap fake (`wayin-<tag>`) and its credential_id `cred-<tag>`:
+ * for storage-layer tests, which never decrypt. It wraps the vault's first vaultKey, and was added
+ * by `device-one`.
  *
  * @example passkeyWayinOf('laptop')
- * @example vaultPropsOf('u1', { wayins: [wayinOf('passphrase'), passkeyWayinOf('laptop')] })
+ * @example vaultPropsOf('u1', { passkey: passkeyWayinOf('laptop') })
  */
-export const passkeyWayinOf = (wayinlabel: string, overrides: Partial<PasskeyWayinRecord> = {}): PasskeyWayinRecord => ({
+export const passkeyWayinOf = (tag: string, overrides: Partial<PasskeyWayinRecord> = {}): PasskeyWayinRecord => ({
   wayinkind:               'passkey',
-  wayin_id:                `wayin-${wayinlabel}`,
-  wayinlabel,
-  credential_id:           `cred-${wayinlabel}`,
+  credential_id:           `cred-${tag}`,
   // base64 of the literal text 'prfsaltprfsaltprfsaltprfsaltprfs': a fake 32-byte salt, public material anyway
   prf_salt_b64:            'cHJmc2FsdHByZnNhbHRwcmZzYWx0cHJmc2FsdHByZnM',
   vault_key_epoch:         1,
   device_id:               'device-one',
   registered_at:           Date.UTC(2026, 9, 14),
-  vault_key_wayin_wrapped: fakeCiphered(`wayin-${wayinlabel}`),
+  vault_key_wayin_wrapped: fakeCiphered(`wayin-${tag}`),
   ...overrides,
 })
 
@@ -177,7 +172,7 @@ const digestOf = async (text: string): Promise<Uint8Array> => (
  * passkey asked with the same salt answers the same, and with another salt answers otherwise, as
  * a real PRF does. Worthless as a secret: never hand it to a vault that holds a real one.
  *
- * @example await vault.addPasskey('pw', () => passkeyOf('laptop'), { wayinlabel: 'laptop' })
+ * @example await vault.addPasskey('pw', () => passkeyOf('laptop'))
  * @example await vault.unlock(await passkeyOf('laptop'))
  * @example await passkeyOf('laptop', otherSaltB64)  // the same credential, answering another salt
  */
@@ -188,21 +183,22 @@ export const passkeyOf = async (tag: string, prfSaltB64?: string): Promise<Passk
 }
 
 /**
- * A shape-valid VaultProps for `userId`'s `main` vault, its one wayin fake: for storage-layer
- * tests, which never decrypt. Its vault_id is `vault-id-<userId>`, its unlock epoch and its
- * vaultKey's epoch both 1, and its one way in a {@link wayinOf} labelled `passphrase` whose
- * wrap is `vault-<userId>`.
+ * A shape-valid VaultProps for `userId`'s `main` vault, its passphrase's wrap fake and no passkey:
+ * for storage-layer tests, which never decrypt. Its vault_id is `vault-id-<userId>`, its unlock
+ * epoch and its vaultKey's epoch both 1, and its passphrase a {@link wayinOf} whose wrap is
+ * `vault-<userId>`.
  *
  * @example vaultPropsOf('u1', { unlock_epoch: 2 })
- * @example vaultPropsOf('u1', { wayins: [wayinOf('passphrase'), wayinOf('home_phrase')] })
+ * @example vaultPropsOf('u1', { passkey: passkeyWayinOf('laptop') })
  */
 export const vaultPropsOf = (userId: string, overrides: Partial<VaultProps> = {}): VaultProps => ({
-  format:              'safebyok-vault-v4',
+  format:              'safebyok-vault-v5',
   ...scopeOf(userId),
   vault_id:            `vault-id-${userId}`,
   unlock_epoch:        1,
   vault_key_epoch:     1,
-  wayins:              [wayinOf('passphrase', { vault_key_wayin_wrapped: fakeCiphered(`vault-${userId}`) })],
+  passphrase:          wayinOf(`vault-${userId}`, { vault_key_wayin_wrapped: fakeCiphered(`vault-${userId}`) }),
+  passkey:             null,
   registered_at:       Date.UTC(2026, 9, 14),
   ...overrides,
 })
@@ -219,7 +215,7 @@ export const vaultPropsAtEpochOf = (userId: string, vaultKeyEpoch: number): Vaul
   return vaultPropsOf(userId, {
     unlock_epoch:    2,
     vault_key_epoch: vaultKeyEpoch,
-    wayins:          [wayinOf('passphrase', { vault_key_epoch: vaultKeyEpoch, vault_key_wayin_wrapped: wrapped })],
+    passphrase:      wayinOf('passphrase', { vault_key_epoch: vaultKeyEpoch, vault_key_wayin_wrapped: wrapped }),
   })
 }
 

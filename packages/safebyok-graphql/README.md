@@ -217,13 +217,17 @@ of its own.
   change to a vault's ways in, and `vault_key_epoch`. Past 2,147,483,647 the field fails on the
   wire and the browser sees `storage_unavailable`. That is accepted: two billion changes to
   the ways in is not a vault anyone keeps.
-* **The vault props' `wayins`** is a list of `SafebyokWayin`, each one opaque JSON, its
-  `wayinkind` saying its shape: the adapter carries a wayin as it is, never looking inside, as
-  the Postgres table stores the list as one `jsonb`. A new way to unlock reaches the browser with
-  no change here. That is by choice, not for want of a typed union: GraphQL has no input unions
-  before graphql 17's `@oneOf`, and the adapter is a shelf.
+* **The vault props' two ways in**, `passphrase` (always there) and `passkey` (null when the
+  vault has none), are each a `SafebyokWayin`, one opaque JSON, its `wayinkind` saying its shape:
+  the adapter carries a way in as it is, never looking inside, as the Postgres table stores each
+  as one `jsonb`. A change inside a way in reaches the browser with no change here. That is by
+  choice, not for want of a typed union: GraphQL has no input unions before graphql 17's
+  `@oneOf`, and the adapter is a shelf. They replace the `wayins` list of the vault format before
+  (`safebyok-vault-v4`): deploy client and server together, and every vault stored before reads
+  as damaged, to be made anew (with `safebyok-postgres` behind your server, drop and recreate its
+  tables).
 * **Encrypted**: each whisper (`whisper_ciphered`), each boxKey (`box_key_wrapped`), and
-  the vaultKey under each way in (inside each wayin). **In the open**: everything else, as
+  the vaultKey under each way in (inside `passphrase` and `passkey`). **In the open**: everything else, as
   [`safebyok-postgres`](../safebyok-postgres#what-is-stored) lists it.
 
 ## Developing this package

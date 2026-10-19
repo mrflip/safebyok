@@ -1,10 +1,10 @@
-import { PasskeySaltBytes, VaultError, type PasskeyAnswer, type WayinSummary } from 'safebyok'
+import { PasskeySaltBytes, VaultError, type PasskeyAnswer, type PasskeyWayinSummary } from 'safebyok'
 import { fromB64, toB64 } from 'safebyok/utils'
 import { Messages } from './messages'
 
 /**
  * The WebAuthn half of a passkey unlock, which the core leaves to the host: `createPasskey` makes a
- * new passkey and asks it for its first answer, `askPasskey` asks one of a vault's passkeys for its
+ * new passkey and asks it for its first answer, `askPasskey` asks the vault's passkey for its
  * answer again. Both hand back a {@link PasskeyAnswer} for the vault (`addPasskey`, `unlock`), or
  * null when the user dismissed the prompt. Nothing here imports React: any framework's host may use
  * them.
@@ -61,7 +61,7 @@ export type AskPasskeyOpts = {
  *
  * @example
  *   const makePasskey = () => createPasskey({ rp: { name: 'Acme' }, user: { name: email, displayName: fullName } })
- *   const wayinId = await vault.addPasskey(passphrase, makePasskey, { wayinlabel: 'laptop_fingerprint' })    // null: dismissed
+ *   const added = await vault.addPasskey(passphrase, makePasskey)    // false: dismissed
  */
 export const createPasskey = async (opts: CreatePasskeyOpts): Promise<PasskeyAnswer | null> => {
   checkAvailable()
@@ -102,63 +102,59 @@ export const createPasskey = async (opts: CreatePasskeyOpts): Promise<PasskeyAns
 }
 
 /**
- * The answer of whichever of a vault's passkeys the user touches: what `vault.unlock` (or any
- * change's proof) takes. `wayins` is the snapshot's list, whole; the browser offers the user each
- * passkey in it, and asks the one chosen for its answer over that passkey's own salt. A passkey
- * stored damaged -- its `credential_id` or `prf_salt_b64` not base64url, or its salt not
- * `PasskeySaltBytes` long, which the vault would refuse -- is left out, and the others offered as
- * ever.
+ * The answer of the vault's one passkey: what `vault.unlock` (or `ask.attempt`) takes. `passkey`
+ * is the snapshot's, as it stands (`vault.getSnapshot().passkey`); the browser asks the user to
+ * touch it, and asks it for its answer over its own salt.
  *
- * Resolves null when the user dismisses the prompt (or lets it time out, or has none of these
- * passkeys at hand). Refuses with kind 'absent_wayin' when `wayins` holds no passkey,
- * 'damaged_wayin' when every one it holds is stored damaged,
- * 'passkey_unavailable' when the browser has no WebAuthn or the passkey gives no PRF answer, and
+ * Resolves null when the user dismisses the prompt (or lets it time out, or has not that passkey
+ * at hand). Refuses with kind 'absent_wayin' when `passkey` is null, the vault having none;
+ * 'damaged_wayin' when it is stored damaged -- its `credential_id` or `prf_salt_b64` not
+ * base64url, or its salt not `PasskeySaltBytes` long, which the vault would refuse;
+ * 'passkey_unavailable' when the browser has no WebAuthn or the passkey gives no PRF answer; and
  * 'bad_option' when `opts.rpId` does not fit this page.
  *
  * @example
- *   const passkey = await askPasskey(vault.getSnapshot().wayins)
+ *   const passkey = await askPasskey(vault.getSnapshot().passkey)
  *   if (passkey !== null) { await vault.unlock(passkey) }
  */
-export const askPasskey = async (wayins: readonly WayinSummary[], opts: AskPasskeyOpts = {}): Promise<PasskeyAnswer | null> => {
+export const askPasskey = async (passkey: PasskeyWayinSummary | null, opts: AskPasskeyOpts = {}): Promise<PasskeyAnswer | null> => {
   checkAvailable()
-  const listed = wayins.filter((wayin) => wayin.wayinkind === 'passkey')
-  if (listed.length === 0) {
+  if (passkey === null) {
     throw new VaultError('absent_wayin', Messages.noPasskeyToAsk)
   }
-  const passkeys = listed.flatMap((wayin) => askable(wayin) ?? [])
-  if (passkeys.length === 0) {
-    throw new VaultError('damaged_wayin', Messages.passkeysDamaged)
+  const asking = askable(passkey)
+  if (asking === null) {
+    throw new VaultError('damaged_wayin', Messages.passkeyDamaged)
   }
   const asked = await askAuthenticator(() => navigator.credentials.get({
     publicKey: {
       challenge:        crypto.getRandomValues(new Uint8Array(32)),
       ...optional('rpId', opts.rpId),
-      allowCredentials: passkeys.map(({ credentialBytes }) => ({ type: 'public-key', id: credentialBytes })),
+      allowCredentials: [{ type: 'public-key', id: asking.credentialBytes }],
       userVerification: 'required',
       ...optional('timeout', opts.timeout),
-      extensions:       { prf: { evalByCredential: Object.fromEntries(passkeys.map(({ credentialId, saltBytes }) => [credentialId, { first: saltBytes }])) } },
+      extensions:       { prf: { evalByCredential: { [asking.credentialId]: { first: asking.saltBytes } } } },
     },
   }))
   if (asked === null) { return null }
   const credentialId = toB64(new Uint8Array(asked.rawId))
-  const answering = passkeys.find((passkey) => passkey.credentialId === credentialId)
   const answer = asked.getClientExtensionResults().prf?.results?.first
-  // A browser answers only for a credential it was offered; one that does not has nothing to unlock.
-  if (answering === undefined || answer === undefined) { throw noPrf() }
-  return answerOf(credentialId, answering.saltBytes, answer)
+  // A browser answers only for the credential it was offered; one that does not has nothing to unlock.
+  if (answer === undefined || credentialId !== asking.credentialId) { throw noPrf() }
+  return answerOf(credentialId, asking.saltBytes, answer)
 }
 
 /**
- * A passkey of the vault's, its credential id and salt as bytes for WebAuthn; null when either is
+ * The vault's passkey, its credential id and salt as bytes for WebAuthn; null when either is
  * not base64url, or the salt is not `PasskeySaltBytes` long.
  */
-const askable = (wayin: WayinSummary & { wayinkind: 'passkey' }) => {
+const askable = (passkey: PasskeyWayinSummary) => {
   try {
-    const saltBytes = fromB64(wayin.prf_salt_b64) as Uint8Array<ArrayBuffer>
+    const saltBytes = fromB64(passkey.prf_salt_b64) as Uint8Array<ArrayBuffer>
     if (saltBytes.length !== PasskeySaltBytes) { return null }
     return {
-      credentialId:    wayin.credential_id,
-      credentialBytes: fromB64(wayin.credential_id) as Uint8Array<ArrayBuffer>,
+      credentialId:    passkey.credential_id,
+      credentialBytes: fromB64(passkey.credential_id) as Uint8Array<ArrayBuffer>,
       saltBytes,
     }
   } catch {

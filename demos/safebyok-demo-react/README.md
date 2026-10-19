@@ -27,10 +27,13 @@ localStorage.
   direct manipulation of the vault: add, view, edit, remove and *use* boxes. Whisper-touching
   actions summon the passphrase dialog only when the vault is actually locked; an unlock grants
   the device a lease of seven days. Signing out locks the vault.
-* **Ways in** ([src/components/WaysIn.tsx](src/components/WaysIn.tsx)) -- the vault's passphrases
-  and passkeys, listed even while locked, and an "Add fingerprint" button: `vault.addPasskey()` checks your
-  passphrase, then has `createPasskey()` make the passkey and adds it, and the passphrase dialog then
-  offers "Use a passkey". Needs a browser and authenticator with the WebAuthn PRF extension.
+* **Ways in** ([src/components/WaysIn.tsx](src/components/WaysIn.tsx)) -- the vault's one
+  passphrase and its passkey, if it has one, shown even while locked, and buttons to change them,
+  each taking your passphrase as proof: "Change passphrase" (`vault.changePassphrase()`); "Add
+  fingerprint", or "Replace fingerprint" once there is one: `vault.addPasskey()` checks your
+  passphrase, then has `createPasskey()` make the passkey, which takes the place of any the vault
+  had, and the passphrase dialog then offers "Use a passkey"; and "Remove fingerprint"
+  (`vault.delWayin()`). A passkey needs a browser and authenticator with the WebAuthn PRF extension.
 * **Inspection panels** ([src/components/inspection/](src/components/inspection/)) -- the raw
   rows of the pretend-backend store and the device-local store, rendered straight from storage by
   machinery that never talks to the vault. The backend's panel has an outage switch

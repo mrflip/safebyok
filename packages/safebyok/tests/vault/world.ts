@@ -111,11 +111,10 @@ export const rowsOf = (world: ReturnType<typeof makeWorld>, userId: string) => (
   world.dbStore.ckeys().filter((ckey) => ckey === Ckeys.vaultProps(TH.scopeOf(userId)) || Ckeys.isBoxIn(TH.scopeOf(userId))(ckey))
 )
 
-/** u1's stored vault props in `world`, their second way in spoiled by `spoil`. */
-export const spoilSecondWayin = (world: ReturnType<typeof makeWorld>, spoil: Record<string, unknown>) => {
-  const vaultProps = JSON.parse(world.dbStore.read(u1VaultPropsCkey) ?? '{}') as { wayins: Record<string, unknown>[] }
-  const wayins = vaultProps.wayins.map((wayin, ii) => (ii === 1 ? { ...wayin, ...spoil } : wayin))
-  world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...vaultProps, wayins }))
+/** u1's stored vault props in `world`, their way in of `wayinkind` spoiled by `spoil`. */
+export const spoilWayin = (world: ReturnType<typeof makeWorld>, wayinkind: 'passphrase' | 'passkey', spoil: Record<string, unknown>) => {
+  const vaultProps = JSON.parse(world.dbStore.read(u1VaultPropsCkey) ?? '{}') as Record<string, Record<string, unknown>>
+  world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...vaultProps, [wayinkind]: { ...vaultProps[wayinkind], ...spoil } }))
 }
 
 /** A world whose `u1` vault, with a box and a lease, has had its stored vault props spoiled. */
@@ -131,25 +130,21 @@ export const damagedVaultWorld = async () => {
 /** The verbs Vault.make asks of a VaultDB, and so all a duck-typed one has. */
 export const VaultDBVerbsUsed = ['getVaultProps', 'ensureVaultProps', 'putVaultProps', 'getBox', 'listBoxes', 'putBox', 'delBox', 'delVault', 'subscribe'] as const
 
-/** The wayinlabels a vault's snapshot lists, in order. */
-export const wayinlabelsOf = (vault: Vault) => vault.getSnapshot().wayins.map((summary) => summary.wayinlabel)
-
-/** The wayin_id of the passkey `laptop` that `vault` adds under the passphrase `pw`; fails the test when it adds none. */
-export const addLaptopPasskey = async (vault: Vault): Promise<string> => {
-  const wayinId = await vault.addPasskey('pw', () => TH.passkeyOf('laptop'), { wayinlabel: 'laptop' })
-  if (wayinId === null) { throw new Error('addPasskey added no passkey') }
-  return wayinId
+/** The passkey `laptop`, added to `vault` under the passphrase `pw`; fails the test when it adds none. */
+export const addLaptopPasskey = async (vault: Vault): Promise<void> => {
+  const added = await vault.addPasskey('pw', () => TH.passkeyOf('laptop'))
+  if (! added) { throw new Error('addPasskey added no passkey') }
 }
 
-/** A vault in a fresh world, unlocked with `pw`, holding one box and a passkey labelled `laptop`. */
+/** A vault in a fresh world, unlocked with `pw`, holding one box and the passkey `laptop`. */
 export const vaultWithPasskey = async () => {
   const world = makeWorld()
   const vault = await world.open()
   await vault.unlock('pw')
   await vault.putBox('anthropic', 'sk-fake')
   const laptop = await TH.passkeyOf('laptop')
-  const wayinId = await addLaptopPasskey(vault)
-  return { world, vault, laptop, wayinId }
+  await addLaptopPasskey(vault)
+  return { world, vault, laptop }
 }
 
 /**
@@ -168,19 +163,19 @@ export const makeRacingWorld = (defaults?: Partial<MakeVaultOpts>) => {
   return { ...world, holdNextLook, holdNextDerive, holdNextLease, holdNextBoxRead }
 }
 
-/** The stored vault props' ways in, as the backend holds them. */
-export const storedWayinsOf = (world: ReturnType<typeof makeWorld>) => storedVaultPropsOf(world)['wayins'] as Record<string, unknown>[]
+/** The stored vault props' way in of `wayinkind`, as the backend holds it: null for no passkey. */
+export const storedWayinOf = (world: ReturnType<typeof makeWorld>, wayinkind: 'passphrase' | 'passkey') => storedVaultPropsOf(world)[wayinkind] as Record<string, unknown> | null
 
 /**
- * A world whose `u1` vault has moved on past a copy of its props: `older`, as stored before a way
- * in was added and removed, and `newer`, as stored now, which this device has seen.
+ * A world whose `u1` vault has moved on past a copy of its props: `older`, as stored once a
+ * passkey was added, and `newer`, as stored now, the passkey removed, which this device has seen.
  */
 export const rolledBackWorld = async () => {
   const world = makeWorld()
   const vault = await world.openUnlocked('pw')
-  const spareId = await vault.addPassphrase('pw', 'spare phrase', { wayinlabel: 'spare' })
+  await addLaptopPasskey(vault)
   const older = world.dbStore.read(u1VaultPropsCkey) ?? ''
-  await vault.delWayin('pw', spareId)
+  await vault.delWayin('pw')
   const newer = world.dbStore.read(u1VaultPropsCkey) ?? ''
   return { world, vault, older, newer }
 }

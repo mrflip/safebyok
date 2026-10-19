@@ -8,8 +8,8 @@ const FlavorCases: readonly (readonly [RefusalKind, string, string])[] = [
   ["wrong_passkey",       'in_place',          'a passkey that did not open the vault is shown in place'],
   ["weak_passphrase",     'in_place',          "a weak new passphrase is shown in place, the checker's reason its message"],
   // another way in:
-  ["absent_wayin",        'in_place',          'a way in gone is shown in place, the others still offered'],
-  ["damaged_wayin",       'in_place',          'a damaged way in is shown in place, the others still offered'],
+  ["absent_wayin",        'in_place',          'a passkey gone is shown in place, the passphrase still offered'],
+  ["damaged_wayin",       'in_place',          'a passkey stored damaged is shown in place, the passphrase still offered'],
   ["passkey_unavailable", 'in_place',          'a browser that cannot ask a passkey is shown in place, the passphrase still offered'],
   // advice:
   ["created_elsewhere",   'created_elsewhere', 'a vault made first on another device is advice'],

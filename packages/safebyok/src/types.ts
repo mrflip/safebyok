@@ -139,7 +139,7 @@ export const VaultScope = Z.object({
 export type VaultScope = Z.infer<typeof VaultScope>
 
 /**
- * Which vaultKey a record stands for. The vault props' `vault_key_epoch` is their wayins' vaultKey;
+ * Which vaultKey a record stands for. The vault props' `vault_key_epoch` is their ways in's vaultKey;
  * a box's, the vaultKey its boxKey is wrapped under. Reserved for a rotation of the
  * vaultKey that does not exist yet: every vault safebyok makes, and every record in it, carries 1.
  */
@@ -213,44 +213,31 @@ export type Capacity = {
 /**
  * The ways into a vault, each a {@link WayinRecord}'s `wayinkind`: a `passphrase` the user types,
  * or a `passkey` the user touches (a fingerprint, a face, a security key). Each wayinkind has a
- * wayin shape of its own, and the vault tells them apart by this field.
+ * wayin shape of its own, and its own slot in the vault props: `passphrase` and `passkey`.
  */
 export const WayinKindVals = ['passphrase', 'passkey'] as const
 export type WayinKind = typeof WayinKindVals[number]
 
 /**
- * The most wayins a vault holds, passphrases and passkeys together: room for every way
- * in a person plausibly keeps (a daily passphrase, one written down at home, a fingerprint on
- * each of their devices), and a bound on how long an unlock can take. An unlock not aimed at one wayin tries each passphrase wayin in turn,
- * one key derivation apiece, so a wrong passphrase costs up to this many. Stored vault props with
- * more fail validation.
- */
-export const MaxUnlocks = 8
-
-/**
- * A passphrase's way into the vault: the vaultKey wrapped under the passphraseKey that this
- * wayin's passphrase and its own passphraseSalt make. Every field but `vault_key_wayin_wrapped` is
- * visible, and all of them are bound into that wrap, so a wayin altered or moved to another
- * vault refuses to open.
+ * A passphrase's way into the vault: the vaultKey wrapped under the passphraseKey that the vault's
+ * passphrase and this wayin's own passphraseSalt make. Every field but `vault_key_wayin_wrapped`
+ * is visible, and all of them are bound into that wrap, so a wayin altered or moved to another
+ * vault refuses to open. A vault holds exactly one, as its props' `passphrase`.
  */
 export const PassphraseWayinRecord = Z.object({
   wayinkind:               Z.literal('passphrase'),
-  /** Random id minted when the wayin is added, and kept when its passphrase changes. */
-  wayin_id:                Z.string().check(Z.minLength(1)),
-  /** What the user calls this way in, so they can tell one from another: `home_phrase`, say. */
-  wayinlabel:              NameFloor,
   /** Which keyDeriverSpec made the passphraseKey: `argon2id_web_v1`, or a host's own label. */
   key_deriver_label:       Z.string().check(Z.minLength(1)),
-  /** This wayin's passphraseSalt: fresh for every wayin, and for every change of its passphrase. */
+  /** This wayin's passphraseSalt: fresh for every passphrase the vault takes. */
   salt_b64:                Z.string().check(Z.minLength(1)),
   /** The `vault_key_epoch` of the vaultKey this wayin wraps: in sound vault props, the props' own. */
   vault_key_epoch:         vaultKeyEpoch,
   /**
-   * The id the device that added this way in keeps for the vault in its device mark: random, one
-   * per vault per device, never drawn from the device itself. Kept when the wayin is sealed anew.
+   * The id the device that sealed this way in keeps for the vault in its device mark: random, one
+   * per vault per device, never drawn from the device itself.
    */
   device_id:               Z.string().check(Z.minLength(1)),
-  /** When this way in was added, an {@link EpochMillis}. Kept when the wayin is sealed anew. */
+  /** When this way in was sealed, an {@link EpochMillis}: a new passphrase stamps it afresh. */
   registered_at:           EpochMillis,
   /** The vaultKey, wrapped under the passphraseKey: decrypting this IS the passphrase check. */
   vault_key_wayin_wrapped: Ciphered,
@@ -269,14 +256,11 @@ export const PasskeySaltBytes = 32
  * passkey's authenticator answers, through the WebAuthn PRF extension, when asked to evaluate its
  * PRF over this wayin's own salt. The authenticator holds the secret; the wayin holds only
  * which credential to ask (`credential_id`) and what to ask it (`prf_salt_b64`). Every field but
- * `vault_key_wayin_wrapped` is visible, and all of them are bound into that wrap.
+ * `vault_key_wayin_wrapped` is visible, and all of them are bound into that wrap. A vault holds at
+ * most one, as its props' `passkey`.
  */
 export const PasskeyWayinRecord = Z.object({
   wayinkind:               Z.literal('passkey'),
-  /** Random id minted when the wayin is added. */
-  wayin_id:                Z.string().check(Z.minLength(1)),
-  /** What the user calls this way in, so they can tell one from another: `laptop_fingerprint`, say. */
-  wayinlabel:              NameFloor,
   /** The WebAuthn credential's id, base64url, as `PublicKeyCredential.id` gives it: which passkey to ask. */
   credential_id:           Z.string().check(Z.minLength(1)),
   /** The salt the passkey's PRF is evaluated over: {@link PasskeySaltBytes} random bytes, fresh for every wayin. */
@@ -285,10 +269,10 @@ export const PasskeyWayinRecord = Z.object({
   vault_key_epoch:         vaultKeyEpoch,
   /**
    * The id the device that added this way in keeps for the vault in its device mark: random, one
-   * per vault per device, never drawn from the device itself. Kept when the wayin is sealed anew.
+   * per vault per device, never drawn from the device itself.
    */
   device_id:               Z.string().check(Z.minLength(1)),
-  /** When this way in was added, an {@link EpochMillis}. Kept when the wayin is sealed anew. */
+  /** When this way in was added, an {@link EpochMillis}. */
   registered_at:           EpochMillis,
   /** The vaultKey, wrapped under the passkeyKey: decrypting this IS the passkey check. */
   vault_key_wayin_wrapped: Ciphered,
@@ -304,45 +288,32 @@ export type PasskeyWayinRecord = Z.infer<typeof PasskeyWayinRecord>
 export const WayinRecord = Z.discriminatedUnion('wayinkind', [PassphraseWayinRecord, PasskeyWayinRecord])
 export type WayinRecord = Z.infer<typeof WayinRecord>
 
-/** True when no two of `wayins` share `field`. */
-const distinctIn = (wayins: readonly WayinRecord[], field: 'wayin_id' | 'wayinlabel'): boolean => (
-  new Set(wayins.map((wayin) => wayin[field])).size === wayins.length
-)
-
-/** True when no two of `wayins`' passkeys are the same credential. */
-const distinctCredentials = (wayins: readonly WayinRecord[]): boolean => {
-  const credentialIds = wayins
-    .filter((wayin): wayin is PasskeyWayinRecord => wayin.wayinkind === 'passkey')
-    .map((wayin) => wayin.credential_id)
-  return new Set(credentialIds).size === credentialIds.length
-}
-
-/** The vault props' wayins: at least one, at most {@link MaxUnlocks}, no id, label or credential twice. */
-const wayinList = Z.array(WayinRecord).check(
-  Z.minLength(1, "A vault has at least one way in"),
-  Z.maxLength(MaxUnlocks, `A vault holds at most ${String(MaxUnlocks)} wayins`),
-  Z.refine((wayins) => distinctIn(wayins, 'wayin_id'), "No two wayins share a wayin_id"),
-  Z.refine((wayins) => distinctIn(wayins, 'wayinlabel'), "No two wayins share a wayinlabel"),
-  Z.refine(distinctCredentials, "No two passkey wayins share a credential_id"),
-)
+/**
+ * The visible fields of a vault's passphrase, as its snapshot shows them even while locked: its
+ * `wayinkind`, and when it was sealed (`registered_at`) and by which device (`device_id`, this
+ * vault's id for that device: one per device per vault, so it links nothing the vault does not
+ * already link). Never its salt, never its wrap.
+ *
+ * @example vault.getSnapshot().passphrase   // { wayinkind: 'passphrase', device_id: 'k3x9...', registered_at: 1760000000000 }
+ */
+export type PassphraseWayinSummary = Pick<PassphraseWayinRecord, 'wayinkind' | 'device_id' | 'registered_at'>
 
 /**
- * The visible fields of one way into a vault, as a vault's snapshot lists it even while locked:
- * what a host shows the user, and what it names when it aims `unlock()` or `delWayin()` at
- * one. Every way in shows its `wayinkind`, `wayin_id` and `wayinlabel`, and when it was added
- * (`registered_at`) and by which device (`device_id`, this vault's id for that device: one per
- * device per vault, so it links nothing the vault does not already link), so the user can tell
- * the way in they made last week from one made on a phone they do not recognise; a passkey also shows its
- * `credential_id` and `prf_salt_b64`, which a host needs before unlocking, to ask the
- * authenticator (`safebyok-react`'s `askPasskey` takes the list whole). Never a salt of a
- * passphrase, never a wrap.
+ * The visible fields of a vault's passkey, as its snapshot shows them even while locked: its
+ * `wayinkind`, when it was added and by which device, as for {@link PassphraseWayinSummary}, and
+ * the `credential_id` and `prf_salt_b64` a host needs before unlocking, to ask the authenticator
+ * (`safebyok-react`'s `askPasskey` takes this summary). Never its wrap.
  *
- * @example vault.getSnapshot().wayins   // [{ wayinkind: 'passphrase', wayin_id: '1b9d...', wayinlabel: 'passphrase', device_id: 'k3x9...', registered_at: 1760000000000 }]
- * @example vault.getSnapshot().wayins.filter((wayin) => wayin.wayinkind === 'passkey') // [{ wayinkind: 'passkey', wayin_id, wayinlabel: 'laptop', device_id, registered_at, credential_id: 'AXk3...', prf_salt_b64: 'q83v...' }]
+ * @example vault.getSnapshot().passkey   // { wayinkind: 'passkey', device_id, registered_at, credential_id: 'AXk3...', prf_salt_b64: 'q83v...' }, or null
  */
-export type WayinSummary =
-  | Pick<PassphraseWayinRecord, 'wayinkind' | 'wayin_id' | 'wayinlabel' | 'device_id' | 'registered_at'>
-  | Pick<PasskeyWayinRecord, 'wayinkind' | 'wayin_id' | 'wayinlabel' | 'device_id' | 'registered_at' | 'credential_id' | 'prf_salt_b64'>
+export type PasskeyWayinSummary = Pick<PasskeyWayinRecord, 'wayinkind' | 'device_id' | 'registered_at' | 'credential_id' | 'prf_salt_b64'>
+
+/**
+ * The visible fields of one way into a vault, either kind: a {@link PassphraseWayinSummary} or a
+ * {@link PasskeyWayinSummary}, told apart by `wayinkind`. What a `damaged_wayin` refusal's
+ * `meta.wayin_listed` holds.
+ */
+export type WayinSummary = PassphraseWayinSummary | PasskeyWayinSummary
 
 /**
  * What a passkey answers when asked for a vault's PRF, as a host hands it to the vault: which
@@ -353,7 +324,7 @@ export type WayinSummary =
  * `safebyok-react`'s `createPasskey` and `askPasskey` make one.
  *
  * @example
- *   const passkey = await askPasskey(vault.getSnapshot().wayins)   // null when the user dismissed it
+ *   const passkey = await askPasskey(vault.getSnapshot().passkey)   // null when the user dismissed it
  *   if (passkey !== null) { await vault.unlock(passkey) }
  */
 export type PasskeyAnswer = {
@@ -364,25 +335,28 @@ export type PasskeyAnswer = {
 
 /**
  * The per-vault record the storage layer holds so any device can unlock the vault: its scope,
- * its `vault_id`, and its `wayins`, each a {@link WayinRecord} wrapping the one vaultKey.
- * All of it is safe in the open; none of it opens without a passphrase or a passkey.
+ * its `vault_id`, and its two ways in, each wrapping the one vaultKey: the `passphrase`, which
+ * every vault has, and the `passkey`, which it may have (null when it has none). All of it is
+ * safe in the open; none of it opens without the passphrase or the passkey.
  *
- * `unlock_epoch` goes up by one on every change to the wayins -- a passphrase or passkey
- * added, removed or changed -- so other devices and leases know to ask again.
- * `vault_key_epoch` says which vaultKey the wayins wrap: 1, reserved for a rotation not yet built.
+ * `unlock_epoch` goes up by one on every change to the ways in -- the passphrase changed, a
+ * passkey added, replaced or removed -- so other devices and leases know to ask again.
+ * `vault_key_epoch` says which vaultKey the ways in wrap: 1, reserved for a rotation not yet built.
  */
 export const VaultProps = Z.object({
-  format:              Z.literal('safebyok-vault-v4'),
+  format:              Z.literal('safebyok-vault-v5'),
   applabel:            NameFloor,
   user_id:             NameFloor,
   vaultlabel:          NameFloor,
   /** Random id minted when the vault is made, and never changed; bound into every encryption. */
   vault_id:            Z.string().check(Z.minLength(1)),
   unlock_epoch:        Z.int().check(Z.positive()),
-  /** Which vaultKey the wayins wrap: see {@link vaultKeyEpoch}. */
+  /** Which vaultKey the ways in wrap: see {@link vaultKeyEpoch}. */
   vault_key_epoch:     vaultKeyEpoch,
-  /** The ways into the vault, each wrapping the one vaultKey: see {@link WayinRecord}. */
-  wayins:              wayinList,
+  /** The vault's passphrase: its one way in by a passphrase, which every vault has. */
+  passphrase:          PassphraseWayinRecord,
+  /** The vault's passkey, or null when it has none: at most one. */
+  passkey:             Z.nullable(PasskeyWayinRecord),
   /** When the vault was made, an {@link EpochMillis}; never changed. */
   registered_at:       EpochMillis,
 })

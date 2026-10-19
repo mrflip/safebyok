@@ -230,7 +230,7 @@ describe(`postgresVaultDB, 5.6: ${TH.VaultDBContract['5.6']}`, () => {
 // == [What it stores and its limit]: what it stores, boxlabelsIn, filledTo, missedBecause, foreignKeyViolation, box limit
 
 describe("postgresVaultDB, what it stores", () => {
-  it("stores the vault props a column to a field, their wayins as one jsonb", async () => {
+  it("stores the vault props a column to a field, each way in as one jsonb, and no passkey as null", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
@@ -240,24 +240,25 @@ describe("postgresVaultDB, what it stores", () => {
       user_id:          'u1',
       vaultlabel:       'main',
       vault_id:         'vault-id-u1',
-      format:           'safebyok-vault-v4',
+      format:           'safebyok-vault-v5',
       unlock_epoch:     1,
       vault_key_epoch:  1,
-      wayins:           TH.vaultPropsOf('u1').wayins,
+      passphrase:       TH.vaultPropsOf('u1').passphrase,
+      passkey:          null,
       registered_at:    Date.UTC(2026, 9, 14),
     }])
   })
 
-  it("keeps the vault props' wayins whole and in their order, through an update", async () => {
+  it("keeps the vault props' passphrase and passkey whole through an update, and reads a passkey removed as null", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
-    const wayins = [TH.wayinOf('work_phrase'), TH.wayinOf('home_phrase'), TH.wayinOf('passphrase')]
-    const next = TH.vaultPropsOf('u1', { unlock_epoch: 2, wayins })
-    await TH.expectingGood(vaultDB).putVaultProps(next, { vault_id: 'vault-id-u1', unlock_epoch: 1 })
-    const standing = await TH.expectingGood(vaultDB).getVaultProps(u1)
-    expect(standing).to.deep.equal(next)
-    expect(standing?.wayins.map((wayin) => wayin.wayinlabel)).to.deep.equal(['work_phrase', 'home_phrase', 'passphrase'])
+    const withPasskey = TH.vaultPropsOf('u1', { unlock_epoch: 2, passphrase: TH.wayinOf('home_phrase'), passkey: TH.passkeyWayinOf('laptop') })
+    await TH.expectingGood(vaultDB).putVaultProps(withPasskey, { vault_id: 'vault-id-u1', unlock_epoch: 1 })
+    expect(await TH.expectingGood(vaultDB).getVaultProps(u1)).to.deep.equal(withPasskey)
+    const withoutPasskey = { ...withPasskey, unlock_epoch: 3, passkey: null }
+    await TH.expectingGood(vaultDB).putVaultProps(withoutPasskey, { vault_id: 'vault-id-u1', unlock_epoch: 2 })
+    expect(await TH.expectingGood(vaultDB).getVaultProps(u1)).to.deep.equal(withoutPasskey)
   })
 
   // The core never sends it -- its vault moves the epoch on with every update -- so it is a client
@@ -267,7 +268,7 @@ describe("postgresVaultDB, what it stores", () => {
     const vaultDB = TH.requestFor(db, 'u1')
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1', { unlock_epoch: 2 }))
     const atTwo = { vault_id: 'vault-id-u1', unlock_epoch: 2 }
-    const rewrapped = (unlockEpoch: number) => TH.vaultPropsOf('u1', { unlock_epoch: unlockEpoch, wayins: [TH.wayinOf('home_phrase')] })
+    const rewrapped = (unlockEpoch: number) => TH.vaultPropsOf('u1', { unlock_epoch: unlockEpoch, passphrase: TH.wayinOf('home_phrase') })
     await TH.expectBad(vaultDB.putVaultProps(rewrapped(2), atTwo), 'stale_write')
     await TH.expectBad(vaultDB.putVaultProps(rewrapped(1), atTwo), 'stale_write')
     expect(await TH.expectingGood(vaultDB).getVaultProps(u1)).to.deep.equal(TH.vaultPropsOf('u1', { unlock_epoch: 2 }))
@@ -631,10 +632,10 @@ describe("postgresVaultDB, in trouble", () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
-    await db.query(`UPDATE safebyok_vaults SET wayins = '"not a list"'::jsonb`)
+    await db.query(`UPDATE safebyok_vaults SET passphrase = '"not a wayin"'::jsonb`)
     await TH.expectBad(vaultDB.getVaultProps(u1), 'corrupt_record')
-    const { rows } = await db.query<{ wayins: unknown }>('SELECT wayins FROM safebyok_vaults')
-    expect(rows[0]?.wayins).to.eq('not a list')
+    const { rows } = await db.query<{ passphrase: unknown }>('SELECT passphrase FROM safebyok_vaults')
+    expect(rows[0]?.passphrase).to.eq('not a wayin')
   })
 
   it("deletes a row whose revision the database holds empty, listed with none, as the one a deletion naming none means", async () => {

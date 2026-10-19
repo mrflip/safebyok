@@ -1,12 +1,12 @@
 import * as Z from 'zod/mini'
-import { isPlainBag, type Capacity, type Clock, type VaultScope, BoxSummary, type DamagedBox, type WayinSummary, type PasskeyAnswer, Whisper, Sidecar, VaultProps, DeviceMark, MaxUnlocks, type PassphraseWayinRecord, MinuteMillis, FarFuture, FarPast } from './types'
+import { isPlainBag, type Capacity, type Clock, type VaultScope, BoxSummary, type DamagedBox, type PasskeyWayinSummary, type PassphraseWayinSummary, type PasskeyAnswer, Whisper, Sidecar, VaultProps, DeviceMark, MinuteMillis, FarFuture, FarPast } from './types'
 import { Box, type BoxRecord, EmptySidecarJson, checkedBoxRecord, checkedSidecar, heldListing, planSeal, sealPlanned, whisperBytesOf } from './box'
 import * as Names from './names'
 import { optionsCheck } from './options'
 import { VaultError, isVaultError, type RefusalKind } from './errors'
 import { type Outcome, good, outcomeOf, unexpectedError, valOf } from './outcome'
 import { makeVaultKey, randomId } from './crypto'
-import { Wayin, absentWayin, frozenRecord, type PasskeyWayin, type PassphraseWayin, type WayinStamp, type VaultKeyPair } from './wayin'
+import { Wayin, frozenRecord, type PasskeyWayin, type PassphraseWayin, type WayinStamp, type VaultKeyPair } from './wayin'
 import { Proof, PassphraseProof, PasskeyProof } from './proof'
 import { stableJsonify } from './stable-jsonify'
 import { oneAtATime } from './one-at-a-time'
@@ -25,7 +25,9 @@ import { Ask, type AskWhy, type GetProof, type RaisedAsk } from './ask'
 
 /**
  * Where the vault stands, as the UI branches on it:
- *  * `opening`  -- no hello has read storage yet; show nothing yet
+ *  * `opening`  -- no hello has read storage yet; show nothing yet. Also after a read refused
+ *                  `rolled_back`, which forgets the vault props in hand: the snapshot's `trouble`
+ *                  says so, until the host accepts the older copy (see the `Vault`'s doc)
  *  * `absent`   -- never created; the first proof, through getProof or unlock(), chooses its passphrase
  *  * `locked`   -- exists, summaries readable, whispers not; a proof opens it
  *  * `unlocked` -- whispers readable until askPassphraseAt or lock()
@@ -61,13 +63,18 @@ export type VaultSnapshot = Readonly<{
   /** Which vaultKey the stored vault's ways in wrap: 1, reserved; null until a read finds a vault. */
   vault_key_epoch: VaultProps['vault_key_epoch'] | null
   /**
-   * The vault's ways in, visible fields only, in the order the vault tries them: one
-   * {@link WayinSummary} per passphrase or passkey, readable while locked, so a host can list
-   * them, ask which one the user means, name one to `unlock()`, `changePassphrase()` or
-   * `delWayin()`, and ask a passkey's authenticator for its answer. Empty until the vault exists.
-   * Each is the `summary` of one of the vault's own {@link Wayin}s.
+   * The vault's passphrase, visible fields only ({@link PassphraseWayinSummary}): when it was set,
+   * and from which device. Never its salt, never its wrap. Null until a read finds a vault. The
+   * `summary` of the vault's own passphrase {@link Wayin}.
    */
-  wayins:          readonly WayinSummary[]
+  passphrase:      PassphraseWayinSummary | null
+  /**
+   * The vault's passkey, visible fields only ({@link PasskeyWayinSummary}), readable while locked,
+   * so a host can offer it and ask its authenticator for an answer (`safebyok-react`'s
+   * `askPasskey` takes it), and say which passkey a new one would replace. Null while the vault
+   * has none, or until a read finds a vault.
+   */
+  passkey:         PasskeyWayinSummary | null
   /** Where the vault stands: see {@link VaultState}. `opening` until a hello has read storage. */
   state:           VaultState
   /**
@@ -129,13 +136,13 @@ export type VaultSnapshot = Readonly<{
  */
 const UnreadVaultProps = Symbol.for('safebyok.unread_vault_props')
 
-/** The ways in of a vault not yet read, or not yet made: none, and the same none each time. */
-const NoWayins: readonly (PassphraseWayin | PasskeyWayin)[] = Object.freeze([])
+/** The ways in of vault props, as the vault holds them: the passphrase's, and the passkey's or null. */
+type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin | null }>
 
 /**
  * A user's vault of boxes. All reading and writing of whispers goes through here. One instance
  * stands for one vault for as long as the app holds it: `Vault.make` returns it, touching nothing,
- * and its first `hello()` reads storage. Its fields -- `state`, `boxes`, `wayins`, `capacity`,
+ * and its first `hello()` reads storage. Its fields -- `state`, `boxes`, `passkey`, `capacity`,
  * `trouble` and the rest -- are live and read-only: read `vault.state` in an event handler and it
  * is current. A UI renders from `getSnapshot()`, the same fields frozen in one object, and
  * re-renders on `subscribe()`.
@@ -181,7 +188,7 @@ const NoWayins: readonly (PassphraseWayin | PasskeyWayin)[] = Object.freeze([])
  * as an event handler, or taken out of the vault by name.
  *
  * @example const snapshot = useSyncExternalStore(vault.subscribe, vault.getSnapshot)
- * @example if (vault.state === 'locked') { askForPassphrase(vault.wayins) }
+ * @example if (vault.state === 'locked') { askForProof(vault.passkey) }
  * @example
  *   const { unlock, getBox } = vault
  *   await unlock(passphrase)
@@ -191,7 +198,7 @@ const NoWayins: readonly (PassphraseWayin | PasskeyWayin)[] = Object.freeze([])
  *   if (! ok && err.refusalkind === 'wrong_passphrase') { askAgain(err.message) }
  */
 export class Vault {
-  // == [Vault: fields]: applabel, user_id, vaultlabel, vault_id, registered_at, unlock_epoch, vault_key_epoch, wayins, state, boxes, capacity, askPassphraseAt, trouble, syncing, snapshot, getSnapshot, subscribe, leaseMillis, logger, clock, keyDeriver
+  // == [Vault: fields]: applabel, user_id, vaultlabel, vault_id, registered_at, unlock_epoch, vault_key_epoch, passphrase, passkey, state, boxes, capacity, askPassphraseAt, trouble, syncing, snapshot, getSnapshot, subscribe, leaseMillis, logger, clock, keyDeriver
 
   // Each field reads the snapshot `#settle()` last published, so the fields and the snapshot always
   // agree. A getter with no setter: a host cannot write over one, and the vault never reads one back:
@@ -212,8 +219,10 @@ export class Vault {
   get unlock_epoch(): number | null { return this.#snapshot.unlock_epoch }
   /** Which vaultKey the ways in wrap: 1, reserved; null until a read finds a vault. */
   get vault_key_epoch(): VaultProps['vault_key_epoch'] | null { return this.#snapshot.vault_key_epoch }
-  /** The ways in, in the order the vault tries them, each its summary: no passphrase's salt, no wrapped vaultKey. See {@link VaultSnapshot}. */
-  get wayins(): readonly WayinSummary[] { return this.#snapshot.wayins }
+  /** The vault's passphrase, its summary: no salt, no wrapped vaultKey; null until a read finds a vault. See {@link VaultSnapshot}. */
+  get passphrase(): PassphraseWayinSummary | null { return this.#snapshot.passphrase }
+  /** The vault's passkey, its summary: no wrapped vaultKey; null while it has none. See {@link VaultSnapshot}. */
+  get passkey(): PasskeyWayinSummary | null { return this.#snapshot.passkey }
   /** Where the vault stands: `opening` until a hello has read storage, then `absent`, `locked` or `unlocked`. */
   get state(): VaultState { return this.#snapshot.state }
   /** Every box, sound or damaged, sorted by boxlabel, no whisper among them. See {@link VaultSnapshot}. */
@@ -356,7 +365,7 @@ export class Vault {
 
   // == [Vault: locking]: unlock, lock
 
-  readonly #tryUnlock = this.#trying((givenProof: string | PasskeyAnswer, unlockOpts?: { wayinId?: string | undefined }): Promise<void> => this.#unlockWith(givenProof, unlockOpts))
+  readonly #tryUnlock = this.#trying((givenProof: string | PasskeyAnswer): Promise<void> => this.#unlockWith(givenProof))
   /**
    * {@link Vault.unlock}, resolving to an {@link Outcome}: what it answers as `val`, what it refuses
    * with as `err`, never thrown.
@@ -366,22 +375,16 @@ export class Vault {
    * Open the vault with its passphrase, granting this device a lease for `leaseHours`: the proof
    * an ask's `attempt` tries, called outside any prompt -- how an app with no `getProof` unlocks
    * once it has asked the user itself. On an
-   * `absent` vault this first unlock creates it, with this passphrase as its one way in, labelled
-   * `passphrase` -- once the vault's `passphraseStrengthTest` passes it: kind 'weak_passphrase'
-   * otherwise, the test's reason its message, and nothing is created. A vault that stands is never
-   * refused its passphrase for weakness. A wrong passphrase throws kind 'wrong_passphrase' and
-   * changes nothing -- learned from the vaultKey wayin refusing to decrypt, never from a
-   * comparison. A passphrase that is not text is misuse: kind 'bad_option'.
+   * `absent` vault this first unlock creates it, with this passphrase as its way in -- once the
+   * vault's `passphraseStrengthTest` passes it: kind 'weak_passphrase' otherwise, the test's
+   * reason its message, and nothing is created. A vault that stands is never refused its
+   * passphrase for weakness. A wrong passphrase throws kind 'wrong_passphrase' and changes nothing
+   * -- learned from the vaultKey wayin refusing to decrypt, never from a comparison: one key
+   * derivation (with the browser's deriver, about half a second). A passphrase that is not text
+   * is misuse: kind 'bad_option'.
    *
-   * A vault with several passphrases tries this one against each in turn, one key derivation
-   * apiece (with the browser's deriver, about half a second each), so a wrong passphrase takes
-   * longest. `opts.wayinId`, from the snapshot's `wayins`, aims it at that passphrase alone:
-   * one derivation, and kind 'absent_wayin' when the vault has no such passphrase. An aimed
-   * unlock never creates the vault: on an `absent` one, it too refuses as 'absent_wayin'.
-   *
-   * A way in stored in a form this package never writes is damaged, and passed over: the others
-   * are tried as ever. Kind 'damaged_wayin' when the unlock is aimed at a damaged one, or every
-   * passphrase is. A passphrase wayin altered in storage refuses its passphrase just as a typo
+   * A passphrase stored in a form this package never writes is damaged, and not tried: kind
+   * 'damaged_wayin'. A passphrase wayin altered in storage refuses its passphrase just as a typo
    * does, so 'wrong_passphrase' is all the vault can say of it; its message names both.
    *
    * The first unlock of an `absent` vault can lose a race: another device creates the vault
@@ -393,11 +396,10 @@ export class Vault {
    *
    * The lease lasts until `askPassphraseAt`, `leaseHours` from now: then the vaultKey is dropped
    * and the vault locks, work in hand or not, by a timer and at the next look alike. Every later
-   * call in which the user types a passphrase and it proves -- `changePassphrase()`, or a way in
-   * added or removed with a passphrase as proof -- starts the lease again from then; nothing else
-   * moves it.
+   * call in which the user types the passphrase and it proves -- `changePassphrase()`, or a
+   * passkey added or removed -- starts the lease again from then; nothing else moves it.
    *
-   * A vault deleted, made anew, or with its wayins changed, here or on another device, while the
+   * A vault deleted, made anew, or with its ways in changed, here or on another device, while the
    * unlock is under way is not unlocked: the passphrase was proven against a vault that no longer
    * stands as it was. This device is granted no lease, and the call throws kind 'vault_locked'.
    * A vault the unlock was creating stays created, locked, under this passphrase. A `lock()`
@@ -405,16 +407,15 @@ export class Vault {
    * unlocked, with a lease. A wrong passphrase is still told as 'wrong_passphrase'.
    *
    * `proof` may instead be a passkey's answer, a {@link PasskeyAnswer} (`safebyok-react`'s
-   * `askPasskey` gets one): it opens the passkey wayin of the credential that answered, with
-   * no key derivation to wait for, and grants this device a lease for `leaseHours` as a
-   * passphrase does. It refuses with kind 'absent_wayin' when no
-   * way in is that passkey's, 'wrong_passkey' when its answer does not open the vault (its
-   * message saying that the way in may be damaged), 'damaged_wayin' when its wayin is stored
-   * damaged, and 'absent_vault' on an `absent` vault: a vault is created with a passphrase.
+   * `askPasskey` gets one): it opens the vault's passkey, with no key derivation to wait for, and
+   * grants this device a lease for `leaseHours` as a passphrase does. It refuses with kind
+   * 'absent_wayin' when the vault has no passkey, 'wrong_passkey' when the answer is another
+   * credential's, or does not open the vault (its message saying that the way in may be damaged),
+   * 'damaged_wayin' when its wayin is stored damaged, and 'absent_vault' on an `absent` vault: a
+   * vault is created with a passphrase.
    *
    * @example await vault.unlock(passphrase)
-   * @example await vault.unlock(passphrase, { wayinId: chosen.wayin_id })    // chosen from getSnapshot().wayins
-   * @example await vault.unlock(passkey)  // from askPasskey(vault.getSnapshot().wayins)
+   * @example await vault.unlock(passkey)  // from askPasskey(vault.getSnapshot().passkey)
    * @example
    *   try { await vault.unlock(passphrase) } catch (err) {
    *     if (isVaultError(err, 'created_elsewhere')) { showAdvice(err.message) }  // the vault now shows `locked`: ask again
@@ -453,27 +454,20 @@ export class Vault {
   lock = this.#throwing(this.#tryLock)
   // --
 
-  // == [Vault: ways in]: changePassphrase, addPassphrase, addPasskey, delWayin
+  // == [Vault: ways in]: changePassphrase, addPasskey, delWayin
 
-  readonly #tryChangePassphrase = this.#trying(async (givenProof: string | PasskeyAnswer, newPassphrase: string, changeOpts?: { wayinId?: string | undefined }): Promise<void> => {
+  readonly #tryChangePassphrase = this.#trying(async (passphrase: string, newPassphrase: string): Promise<void> => {
     this.#checkOpen()
-    const proof = Proof.parse(this, givenProof)
+    const proof = standingPassphraseOf(this, passphrase, 'changePassphrase')
     const newProof = PassphraseProof.parse(this, newPassphrase)
-    const wayinId = parseAim(changeOpts)
-    // A passphrase proves the way in it opens, and that is the one it changes; a passkey proves
-    // the user, and which passphrase to change is then the caller's to say (or the only one).
-    const byPasskey = proof.kind === 'passkey'
     await checkStrongEnough(this.#strengthTest, newProof.passphrase, this.#scope)
-    await this.#reviseWayins(proof, byPasskey ? undefined : wayinId, {
+    await this.#reviseWayins(proof, {
       call:   'changePassphrase',
-      // The passphrase's way in takes the new one, keeping its stamp: its id and label, and the
-      // device and time that added it. Its vault_key_epoch is the vault props', whatever the
-      // replaced wayin's: a passkey can mend a passphrase stored at another.
-      revise: async (standing, proven) => {
-        const replaced = passphraseToReplace(standing, byPasskey ? wayinId : proven.wayinId)
-        const sealed = await this.#sealFor(standing, newProof, { ...replaced, vault_key_epoch: standing.vault_key_epoch }, proven)
-        return standing.wayins.map((wayin) => (wayin === replaced ? sealed : wayin))
-      },
+      // The new passphrase is stamped afresh: this device, now.
+      revise: async (standing, proven, deviceId) => ({
+        passphrase: await this.#sealFor(standing, newProof, this.#newStamp(standing, deviceId), proven),
+        passkey:    standing.passkey,
+      }),
     })
   })
   /**
@@ -482,112 +476,50 @@ export class Vault {
    */
   tryChangePassphrase = this.#tryChangePassphrase
   /**
-   * Re-wrap the vaultKey under a new passphrase, in place of the old one: the passphrase's way
-   * in keeps its `wayin_id` and `wayinlabel`, and takes a fresh passphraseSalt. The vault's
-   * other ways in are untouched, and still open it. Boxes are untouched too -- their
-   * boxKeys stay wrapped under the unchanged vaultKey -- so this is cheap no matter how many
-   * there are. Every other device's unlock (a lease or in hand) lapses: the vault props'
-   * unlockEpoch moves, and they fall back to `locked` on their next look.
+   * Re-wrap the vaultKey under a new passphrase, in place of the old one, under a fresh
+   * passphraseSalt, stamped with this device and this moment. The vault's passkey, if it has one,
+   * is untouched, and still opens it. Boxes are untouched too -- their boxKeys stay wrapped under
+   * the unchanged vaultKey -- so this is cheap no matter how many there are. Every other device's
+   * unlock (a lease or in hand) lapses: the vault props' unlockEpoch moves, and they fall back to
+   * `locked` on their next look.
+   *
+   * `passphrase` is the vault's passphrase as it stands: only it proves a change to the vault's
+   * ways in, never a passkey, as is done everywhere else. Given anything but text -- a passkey's
+   * answer among it -- it refuses with kind 'bad_option'.
    *
    * A `newPassphrase` the vault's `passphraseStrengthTest` finds weak is refused first, before any
    * key derivation, with kind 'weak_passphrase', the test's reason its message.
    *
-   * `proof` is any way in the vault has: the passphrase being replaced, another passphrase, or
-   * a passkey's answer ({@link PasskeyAnswer}) -- any way in proves any change, so a user who
-   * forgot their passphrase sets a new one with their fingerprint. Given a passphrase, the way
-   * in it opens is the one replaced (`opts.wayinId` aims it at one way in, as `unlock()` is
-   * aimed). Given a passkey's answer, which passphrase to replace is `opts.wayinId`'s to say,
-   * unless the vault has only one.
-   *
    * Works locked or unlocked, since the proof is proof enough. A wrong passphrase throws kind
-   * 'wrong_passphrase', and a passkey's answer that does not open the vault 'wrong_passkey' or
-   * 'absent_wayin', changing nothing. A passkey's answer with several passphrases to choose
-   * from and no `opts.wayinId` throws kind 'bad_option', and an `opts.wayinId` that names no
-   * passphrase of the vault 'absent_wayin'. If another device changes the vault's ways in (or
+   * 'wrong_passphrase', changing nothing. If another device changes the vault's ways in (or
    * deletes the vault) between this device's look and its write, nothing is written and the
    * call throws kind 'stale_write', after catching up with storage.
    *
-   * Leaves the vault unlocked under the new passphrase, the lease starting again from now when a
-   * passphrase proved the change, since the user just typed who they are; a passkey's answer
-   * keeps the lease standing on an unlocked vault, and grants one on a locked vault, as
-   * `unlock()` by passkey would. A `lock()`, or the lease expiring, while the change is under way
-   * does not stop it: the vault ends unlocked, with its new lease. Once the change has landed
+   * Leaves the vault unlocked under the new passphrase, the lease starting again from now, since
+   * the user just typed who they are. A `lock()`, or the lease expiring, while the change is under
+   * way does not stop it: the vault ends unlocked, with its new lease. Once the change has landed
    * in storage, the call resolves: should this device then fail to keep its own records of it,
    * the logger says so, and the vault asks for the passphrase at its next open.
    *
    * @example await vault.changePassphrase(oldPassphrase, newPassphrase)
-   * @example await vault.changePassphrase(passkey, newPassphrase)  // forgot the old one: a passkey's answer proves it
-   * @example await vault.changePassphrase(passkey, newPassphrase, { wayinId: homePhraseId })   // a vault of several passphrases
    */
   changePassphrase = this.#throwing(this.#tryChangePassphrase)
 
-  readonly #tryAddPassphrase = this.#trying(async (givenProof: string | PasskeyAnswer, newPassphrase: string, labelling: { wayinlabel: string }): Promise<string> => {
+  readonly #tryAddPasskey = this.#trying(async (passphrase: string, makePasskey: () => Promise<PasskeyAnswer | null>): Promise<boolean> => {
     this.#checkOpen()
-    const newProof = PassphraseProof.parse(this, newPassphrase)
-    const proof = Proof.parse(this, givenProof)
-    const wayinlabel = parseWayinlabel(this.#rules, labelling, 'addPassphrase')
-    await checkStrongEnough(this.#strengthTest, newProof.passphrase, this.#scope)
-    const naming = { wayin_id: randomId(), wayinlabel }
-    await this.#reviseWayins(proof, undefined, {
-      call:   'addPassphrase',
-      check:  (standing) => { this.#checkRoomForWayin(standing, wayinlabel) },
-      revise: async (standing, proven, deviceId) => [...standing.wayins, await this.#sealFor(standing, newProof, this.#newStamp(standing, naming, deviceId), proven)],
-    })
-    return naming.wayin_id
-  })
-  /**
-   * {@link Vault.addPassphrase}, resolving to an {@link Outcome}: what it answers as `val`, what it refuses
-   * with as `err`, never thrown.
-   */
-  tryAddPassphrase = this.#tryAddPassphrase
-  /**
-   * Give the vault another way in: a second passphrase (a third, ...), which opens it as the
-   * first does, on any device. `proof`, a passphrase the vault already opens with or a passkey's
-   * answer ({@link PasskeyAnswer}), proves the user may -- asked for even while unlocked, since the
-   * vault keeps no copy of its vaultKey it could wrap anew. A passkey as proof is how a user who
-   * forgot their passphrase sets a new one. `opts.wayinlabel` is what the user calls the new one
-   * (`home_phrase`), a label no other way into this vault already has.
-   *
-   * Refuses with kind 'wrong_passphrase' when `proof` opens nothing (or `newPassphrase` is
-   * empty), 'wrong_passkey' or 'absent_wayin' for a passkey's answer that does not open the
-   * vault, 'bad_label' for a wayinlabel that fails the vault's wayinlabel check (by default
-   * `Label`; a host's own in Vault.make's `validators`), is empty or is already taken,
-   * 'weak_passphrase' for a `newPassphrase` the vault's `passphraseStrengthTest` finds weak (the
-   * test's reason the message, before any key derivation), and
-   * 'too_many_wayins' when the vault already holds {@link MaxUnlocks}: remove one first. Like
-   * `changePassphrase()`, it moves the unlockEpoch, so every other device locks; it leaves
-   * this one unlocked, and throws kind 'stale_write' when another device changed the vault's ways
-   * in meanwhile. A passphrase as proof starts the lease again from now; a passkey's
-   * keeps the deadline that stands, or, on a vault locked, sets one as `unlock()` by passkey
-   * would. So does every change to the ways in.
-   *
-   * @returns The new way in's `wayin_id`.
-   *
-   * @example const wayinId = await vault.addPassphrase(passphrase, spare, { wayinlabel: 'written_down' })
-   * @example const wayinId = await vault.addPassphrase(passkey, remembered, { wayinlabel: 'new_phrase' })    // forgot the old one
-   */
-  addPassphrase = this.#throwing(this.#tryAddPassphrase)
-
-  readonly #tryAddPasskey = this.#trying(async (givenProof: string | PasskeyAnswer, makePasskey: () => Promise<PasskeyAnswer | null>, labelling: { wayinlabel: string }): Promise<string | null> => {
-    this.#checkOpen()
-    const proof = Proof.parse(this, givenProof)
+    const proof = standingPassphraseOf(this, passphrase, 'addPasskey')
     parsePasskeyMaker(makePasskey)
-    const wayinlabel = parseWayinlabel(this.#rules, labelling, 'addPasskey')
-    const naming = { wayin_id: randomId(), wayinlabel }
-    const added = await this.#reviseWayins(proof, undefined, {
+    return await this.#reviseWayins(proof, {
       call:   'addPasskey',
-      check:  (standing) => { this.#checkRoomForWayin(standing, wayinlabel) },
       // The authenticator is asked only now, the proof proven: a refusal before leaves no passkey behind.
       revise: async (standing, proven, deviceId) => {
         const answered = await makePasskey()
         if (answered === null) { return null }
         const passkey = PasskeyProof.parse(this, answered)
-        this.#checkNewCredential(standing, passkey)
-        const sealed = await Wayin.sealPasskey(this, passkey, standing, this.#newStamp(standing, naming, deviceId), proven.transientKey)
-        return [...standing.wayins, sealed.props]
+        const sealed = await Wayin.sealPasskey(this, passkey, standing, this.#newStamp(standing, deviceId), proven.transientKey)
+        return { passphrase: standing.passphrase, passkey: sealed.props }
       },
     })
-    return added ? naming.wayin_id : null
   })
   /**
    * {@link Vault.addPasskey}, resolving to an {@link Outcome}: what it answers as `val`, what it refuses
@@ -596,24 +528,24 @@ export class Vault {
   tryAddPasskey = this.#tryAddPasskey
   /**
    * Give the vault a passkey as a way in: a fingerprint, a face, or a security key, whose
-   * authenticator answers for the vault through the WebAuthn PRF extension. `proof`, a passphrase
-   * the vault opens with or another passkey's answer, proves the user may, as for
-   * `addPassphrase()`. Only once it has, the vault calls `makePasskey`, which asks the
-   * authenticator for the new passkey and resolves with its answer over a fresh salt
-   * ({@link PasskeyAnswer}), or null when the user dismissed the prompt: `safebyok-react`'s
-   * `createPasskey` is one, and the core never calls WebAuthn itself. So a proof refused, a label
-   * taken, or a vault already full leaves no passkey behind on the authenticator, opening nothing.
-   * `opts.wayinlabel` is what the user calls it (`laptop_fingerprint`).
+   * authenticator answers for the vault through the WebAuthn PRF extension. A vault holds one
+   * passkey at most, so a new one replaces the passkey the vault had, if any: the snapshot's
+   * `passkey` says which, and when and from which device it was added, for a host to warn the user
+   * before asking. `passphrase`, the vault's passphrase as it stands, proves the user may: only it
+   * proves a change to the vault's ways in, never a passkey. Only once it has, the vault calls
+   * `makePasskey`, which asks the authenticator for the new passkey and resolves with its answer
+   * over a fresh salt ({@link PasskeyAnswer}), or null when the user dismissed the prompt:
+   * `safebyok-react`'s `createPasskey` is one, and the core never calls WebAuthn itself. So a proof
+   * refused leaves no passkey behind on the authenticator, opening nothing.
    *
    * The passkey then unlocks the vault on any device where its authenticator can answer: the one
    * it was made on, or, for a passkey synced by the platform (iCloud Keychain, Google Password
    * Manager), any device signed in to that account; a security key, wherever it is plugged in.
    *
-   * Refuses as `addPassphrase()` does for the proof, the label, and a vault already holding
-   * {@link MaxUnlocks}, all before `makePasskey` is called; and with kind 'bad_option' for a
-   * `makePasskey` that is not a function, or whose answer is not one over a
-   * fresh salt of {@link PasskeySaltBytes} bytes, or whose credential is already a way into
-   * this vault. Moves the unlockEpoch, so every other device locks; leaves this one unlocked.
+   * Refuses as `changePassphrase()` does for the proof, before `makePasskey` is called; and with
+   * kind 'bad_option' for a `makePasskey` that is not a function, or whose answer is not one over a
+   * fresh salt of {@link PasskeySaltBytes} bytes. Moves the unlockEpoch, so every other device
+   * locks; leaves this one unlocked, the lease starting again from now.
    *
    * A refusal `makePasskey` throws, `addPasskey` refuses with as it came (`createPasskey`'s
    * 'passkey_unavailable', say), adding nothing; anything else it throws, as 'unexpected_error',
@@ -623,32 +555,25 @@ export class Vault {
    * device at once, but the passkey is still added, as every change to the ways in lands once
    * begun.
    *
-   * @returns The new way in's `wayin_id`, or null when `makePasskey` resolved null: nothing was added.
+   * @returns True once the passkey is added; false when `makePasskey` resolved null: nothing was added.
    *
    * @example
    *   const makePasskey = () => createPasskey({ rp: { name: 'Acme' }, user: { name: email, displayName } })
-   *   const wayinId = await vault.addPasskey(passphrase, makePasskey, { wayinlabel: 'laptop_fingerprint' })
+   *   const added = await vault.addPasskey(passphrase, makePasskey)
    */
   addPasskey = this.#throwing(this.#tryAddPasskey)
 
-  readonly #tryDelWayin = this.#trying(async (givenProof: string | PasskeyAnswer, wayinId: string): Promise<void> => {
+  readonly #tryDelWayin = this.#trying(async (passphrase: string): Promise<void> => {
     this.#checkOpen()
-    const proof = Proof.parse(this, givenProof)
-    const doomedId = parseWayinId(wayinId)
-    await this.#reviseWayins(proof, undefined, {
-      call:  'delWayin',
-      check: (standing) => {
-        const doomed = standing.wayins.find((wayin) => wayin.wayin_id === doomedId)
-        if (doomed === undefined) {
-          throw absentWayin()
-        }
-        const remaining = standing.wayins.filter((wayin) => wayin !== doomed)
-        if (remaining.length === 0 || (doomed.wayinkind === 'passphrase' && remaining.every((wayin) => wayin.wayinkind !== 'passphrase'))) {
-          throw new VaultError('last_wayin', "That is this vault's last passphrase, and a vault always keeps one: a passkey can be lost with its device, and every way in with it. Add another passphrase first, or remove the vault if that is what's meant.")
+    const proof = standingPassphraseOf(this, passphrase, 'delWayin')
+    await this.#reviseWayins(proof, {
+      call:   'delWayin',
+      check:  (standing) => {
+        if (standing.passkey === null) {
+          throw new VaultError('absent_wayin', 'This vault has no passkey to remove: it may have been removed on another device. Nothing was changed.')
         }
       },
-      // Any way in still standing is proof enough, the one going included.
-      revise: (standing) => standing.wayins.filter((wayin) => wayin.wayin_id !== doomedId),
+      revise: (standing) => ({ passphrase: standing.passphrase, passkey: null }),
     })
   })
   /**
@@ -657,20 +582,18 @@ export class Vault {
    */
   tryDelWayin = this.#tryDelWayin
   /**
-   * Take away one way in, a passphrase or a passkey, named by its `wayin_id` from the snapshot's
-   * `wayins`. `proof`, a passphrase the vault opens with or a passkey's answer -- the one going,
-   * or another -- proves the user may. Refuses with kind 'absent_wayin' when there is no such way
-   * in, and 'last_wayin' when it is the vault's last passphrase: a vault always keeps one, since
-   * a passkey can be lost with its device. Like `changePassphrase()`, it moves the
-   * unlockEpoch, so every other device locks and must unlock again with a way in still
-   * standing; it leaves this one unlocked.
+   * Take away the vault's passkey. `passphrase`, the vault's passphrase as it stands, proves the
+   * user may; the passphrase itself is never removed, as a vault always keeps it. Refuses with kind
+   * 'absent_wayin' when the vault has no passkey, and as `changePassphrase()` does for the proof.
+   * Like `changePassphrase()`, it moves the unlockEpoch, so every other device locks and must
+   * unlock again with the passphrase; it leaves this one unlocked.
    *
-   * Removal is not revocation: whoever knew the removed passphrase, or holds the removed passkey,
-   * and kept a copy of the vault as it was can still open that copy, and the vaultKey inside it is
-   * the one the vault still uses. Removing a way in stops it opening the vault from here on; it
-   * cannot take back what it opened before.
+   * Removal is not revocation: whoever holds the removed passkey, and kept a copy of the vault as
+   * it was, can still open that copy, and the vaultKey inside it is the one the vault still uses.
+   * Removing the passkey stops it opening the vault from here on; it cannot take back what it
+   * opened before.
    *
-   * @example await vault.delWayin(passphrase, leaked.wayin_id)
+   * @example await vault.delWayin(passphrase)   // the passkey is gone
    */
   delWayin = this.#throwing(this.#tryDelWayin)
   // --
@@ -1109,13 +1032,22 @@ export class Vault {
   // The ways in of each vault props record the vault has held, made once per record. Every record
   // the vault holds is frozen as it takes it up (see frozenVaultProps), so a way in's holder, a
   // box's and the record the vault works from are one object, which nothing can change.
-  readonly #modelled = new WeakMap<VaultProps, readonly (PassphraseWayin | PasskeyWayin)[]>()
-  #wayinsOf(standing: VaultProps): readonly (PassphraseWayin | PasskeyWayin)[] {
+  readonly #modelled = new WeakMap<VaultProps, HeldWayins>()
+  #wayinsOf(standing: VaultProps): HeldWayins {
     const known = this.#modelled.get(standing)
     if (known !== undefined) { return known }
-    const wayins = Object.freeze(Wayin.listOf(this, standing))
+    const wayins = Object.freeze({
+      passphrase: Wayin.make(this, standing.passphrase, standing),
+      passkey:    standing.passkey === null ? null : Wayin.make(this, standing.passkey, standing),
+    })
     this.#modelled.set(standing, wayins)
     return wayins
+  }
+  /** The ways in of `standing`, the passphrase's first, as a list: none for no vault props. */
+  #wayinListOf(standing: VaultProps | null): readonly (PassphraseWayin | PasskeyWayin)[] {
+    if (standing === null) { return [] }
+    const { passphrase, passkey } = this.#wayinsOf(standing)
+    return passkey === null ? [passphrase] : [passphrase, passkey]
   }
   // Whether the last read of storage succeeded, as the snapshot says; and whether the storage
   // watch has warned of a failing streak it has not yet seen end.
@@ -1128,7 +1060,7 @@ export class Vault {
   #greeting: Promise<void> | null = null
   #greeted = false
   #snapshot: VaultSnapshot
-  // The vault props the snapshot was last settled from, whose ways in it lists as summaries: the
+  // The vault props the snapshot was last settled from, whose ways in it shows as summaries: the
   // vault's alone, as their salts and wraps are what an offline guess at a passphrase needs.
   #shownProps: VaultProps | null = null
 
@@ -1136,7 +1068,7 @@ export class Vault {
   #picture(): VaultSnapshot {
     const state = this.#vaultState()
     const standing = this.#vaultProps === UnreadVaultProps ? null : this.#vaultProps
-    const wayins = standing === null ? NoWayins : this.#wayinsOf(standing)
+    const wayins = standing === null ? null : this.#wayinsOf(standing)
     const { boxes, bytes } = this.#capacity()
     return Object.freeze({
       ...this.#scope,
@@ -1144,7 +1076,8 @@ export class Vault {
       registered_at:   standing?.registered_at ?? null,
       unlock_epoch:    standing?.unlock_epoch ?? null,
       vault_key_epoch: standing?.vault_key_epoch ?? null,
-      wayins:          Object.freeze(wayins.map((wayin) => Object.freeze(wayin.summary))),
+      passphrase:      wayins === null ? null : Object.freeze(wayins.passphrase.summary),
+      passkey:         wayins?.passkey ? Object.freeze(wayins.passkey.summary) : null,
       state,
       boxes:           Object.freeze(this.#boxes.map((box) => Object.freeze(box))),
       capacity:        Object.freeze({ boxes: Object.freeze(boxes), bytes: Object.freeze(bytes) }),
@@ -1218,14 +1151,14 @@ export class Vault {
       this.#deviceMark = mark
     }
     const shown = this.#boxes
-    const shownWayins = this.#shownProps === null ? NoWayins : this.#wayinsOf(this.#shownProps)
+    const shownWayins = this.#wayinListOf(this.#shownProps)
     // A box under a vaultKey the vault does not hold lists as damaged from its epoch alone.
     this.#boxes = standing === null ? [] : listed.map((box) => heldListing(isUnderHeldKey(box, standing) ? box : asDamaged(box)))
     this.#syncing = true
     this.#readAt = readAt
     // A read with no damaged box or way in clears the trouble: nothing amiss stands. The listing is
     // published before its news is told, so a handler reading the vault sees what it lists.
-    const damagedWayins = standing === null ? [] : this.#wayinsOf(standing).filter((wayin) => wayin.isDamaged())
+    const damagedWayins = this.#wayinListOf(standing).filter((wayin) => wayin.isDamaged())
     if (this.#boxes.every((box) => ! box.damaged) && damagedWayins.length === 0) { this.#trouble = null }
     this.#settle()
     this.#tellListingNews(shown)
@@ -1500,8 +1433,8 @@ export class Vault {
   }
 
   /** An ask's `attempt`: one proof's unlock, standing down once `overtaken` is aborted: the prompt over, by a lock or an answer. */
-  readonly #tryAttempt = this.#trying(async (givenProof: string | PasskeyAnswer, attemptOpts: { wayinId?: string | undefined } | undefined, overtaken: AbortSignal): Promise<Vault> => {
-    await this.#unlockWith(givenProof, attemptOpts, overtaken)
+  readonly #tryAttempt = this.#trying(async (givenProof: string | PasskeyAnswer, overtaken: AbortSignal): Promise<Vault> => {
+    await this.#unlockWith(givenProof, overtaken)
     return this
   })
 
@@ -1511,16 +1444,15 @@ export class Vault {
    * vault outruns -- closed, removed, its ways in changed, or `overtaken` aborted as its prompt ends -- takes
    * nothing up and refuses.
    */
-  async #unlockWith(givenProof: string | PasskeyAnswer, unlockOpts: { wayinId?: string | undefined } | undefined, overtaken?: AbortSignal): Promise<void> {
+  async #unlockWith(givenProof: string | PasskeyAnswer, overtaken?: AbortSignal): Promise<void> {
     this.#checkOpen()
     const proof = Proof.parse(this, givenProof)
-    const wayinId = parseAim(unlockOpts)
     await this.#hello()
     // Sync with the backend first: the passphrase proves itself against the vault props as they
     // stand there now, not against a cached copy a delete or recreate may have outdated.
     await this.#refresh()
-    const unlocked = this.#closed ? null : await this.#settleUnlock(proof, wayinId)
-    const tookUp = unlocked !== null && await this.#grantLease(unlocked, unlocked.standing, this.#deadlineFor(proof, 'unlock'), overtaken)
+    const unlocked = this.#closed ? null : await this.#settleUnlock(proof)
+    const tookUp = unlocked !== null && await this.#grantLease(unlocked, unlocked.standing, this.#deadlineFromNow(), overtaken)
     this.#settle()
     if (tookUp) { return }
     // A close() meanwhile is said as such: the handle, not the vault, is what refuses now.
@@ -1532,53 +1464,55 @@ export class Vault {
   }
   // --
 
-  // == [Unlock and ways in]: unwrapWith, draftVaultProps, settleUnlock, standDownMakes, reviseWayins, sealFor, others
+  // == [Unlock and ways in]: unwrapWith, draftVaultProps, settleUnlock, standDownMakes, reviseWayins, sealFor, newStamp
 
   /**
-   * The vaultKey out of whichever of `standing`'s ways in `proof` opens, or the one `wayinId`
-   * names; its refusal IS the passphrase (or passkey) check.
+   * The vaultKey out of `standing`'s way in of `proof`'s kind -- the passphrase, or the passkey --
+   * whose refusal IS the passphrase (or passkey) check. Kind 'absent_wayin' for a passkey's answer
+   * to a vault with no passkey.
    */
-  async #unwrapWith(standing: VaultProps, proof: Proof, wayinId?: string) {
-    return valOf(await Wayin.tryOpenAmong(this.#wayinsOf(standing), proof, wayinId))
+  async #unwrapWith(standing: VaultProps, proof: Proof): Promise<VaultKeyPair> {
+    const { passphrase, passkey } = this.#wayinsOf(standing)
+    const wayin = proof.kind === 'passphrase' ? passphrase : passkey
+    if (wayin === null) {
+      throw new VaultError('absent_wayin', 'This vault has no passkey: it may have been removed on another device. Unlock with the passphrase.')
+    }
+    return valOf(await wayin.tryOpen(proof))
   }
 
   /**
    * Brand-new vault props around a brand-new vaultKey, wrapped under `passphrase`: their one way
-   * in, added by this device under `deviceId`.
+   * in, sealed by this device under `deviceId`; no passkey.
    */
   async #draftVaultProps(passphrase: PassphraseProof, deviceId: string): Promise<{ draft: VaultProps } & VaultKeyPair> {
     const identity = { vault_id: randomId(), registered_at: this.#clockNow(), vault_key_epoch: FirstVaultKeyEpoch }
     const freshKey = await makeVaultKey()
     const stamp: WayinStamp = {
-      wayin_id:        randomId(),
-      wayinlabel:      FirstWayinlabel,
       vault_key_epoch: FirstVaultKeyEpoch,
       device_id:       deviceId,
       registered_at:   identity.registered_at,
     }
     const { wayin, sessionKey } = await Wayin.sealFirstPassphrase(this, passphrase, identity, stamp, freshKey)
     const draft: VaultProps = {
-      format:              'safebyok-vault-v4',
+      format:              'safebyok-vault-v5',
       ...this.#scope,
       ...identity,
       unlock_epoch:        1,
-      wayins:              [wayin.props],
+      passphrase:          wayin.props,
+      passkey:             null,
     }
     return { draft, transientKey: freshKey, sessionKey }
   }
 
   /**
    * The vaultKey for an unlock, and the vault props it was proven against: creating the vault when
-   * absent, proving the proof when not. An unlock aimed at one way in never creates: the vault it
-   * named no longer stands. Nor does a passkey's: a vault is created with a passphrase.
+   * absent, proving the proof when not. A passkey's never creates: a vault is created with a
+   * passphrase.
    */
-  async #settleUnlock(proof: Proof, wayinId: string | undefined): Promise<{ standing: VaultProps } & VaultKeyPair> {
+  async #settleUnlock(proof: Proof): Promise<{ standing: VaultProps } & VaultKeyPair> {
     if (this.#vaultProps === null || this.#vaultProps === UnreadVaultProps) {
       if (! (proof instanceof PassphraseProof)) {
         throw new VaultError('absent_vault', 'This vault has not been created yet, so no passkey opens it: the first unlock(), with a passphrase, creates it.')
-      }
-      if (wayinId !== undefined) {
-        throw new VaultError('absent_wayin', "This vault has no way in with that wayin_id: it does not exist, and may have been removed on another device. Unlock without a wayinId to create it anew.")
       }
       await checkStrongEnough(this.#strengthTest, proof.passphrase, this.#scope)
       const deviceId = randomId()
@@ -1601,14 +1535,14 @@ export class Vault {
       // Another device created the vault between our look and our write: the settled vault props are
       // theirs, and this passphrase must prove itself against them like any other.
       try {
-        return { standing: settled, ...await this.#unwrapWith(settled, proof, wayinId) }
+        return { standing: settled, ...await this.#unwrapWith(settled, proof) }
       } catch (err) {
         if (isVaultError(err, 'wrong_passphrase')) { await this.#refuseCreatedElsewhere(err) }
         throw err
       }
     }
     const standing = this.#vaultProps
-    return { standing, ...await this.#unwrapWith(standing, proof, wayinId) }
+    return { standing, ...await this.#unwrapWith(standing, proof) }
   }
 
   // Aborted, and made anew, at each revocation a read takes up (see takeStorage): a first unlock's
@@ -1624,23 +1558,25 @@ export class Vault {
   }
 
   /**
-   * Rewrite the vault's ways in: prove `proof` against the vault props as storage holds them now (or
-   * against the one way in `wayinId` names), write the wayins `revise` makes of the standing ones
-   * under the next unlock epoch, and take up the unlock under it. `check` runs first, on the
-   * standing vault props, so a change refused for what it asks costs no key derivation.
+   * Rewrite the vault's ways in: prove `proof`, the standing passphrase, against the vault props as
+   * storage holds them now, write the ways in `revise` makes of the standing ones under the next
+   * unlock epoch, and take up the unlock under it, the lease starting again from now. `check` runs
+   * first, on the standing vault props, so a change refused for what it asks costs no key
+   * derivation.
    *
-   * Every change to the wayins goes through here: the proof first, and the write only if no other
+   * Every change to the ways in goes through here: the proof first, and the write only if no other
    * device changed them meanwhile.
+   *
+   * @returns False when `revise` abandoned the change, writing nothing; true once it landed.
    */
   async #reviseWayins(
-    proof: Proof,
-    wayinId: string | undefined,
+    proof: PassphraseProof,
     plan: {
-      call:    'changePassphrase' | 'addPassphrase' | 'addPasskey' | 'delWayin'
+      call:    'changePassphrase' | 'addPasskey' | 'delWayin'
       check?:  (standing: VaultProps) => void
       // Runs once the proof holds, given this device's id for the vault; resolving null abandons
       // the change, writing nothing.
-      revise:  (standing: VaultProps, proven: VaultKeyPair & { wayinId: string }, deviceId: string) => VaultProps['wayins'] | Promise<VaultProps['wayins'] | null>
+      revise:  (standing: VaultProps, proven: VaultKeyPair, deviceId: string) => StandingWayins | Promise<StandingWayins | null>
     },
   ): Promise<boolean> {
     await this.#hello()
@@ -1650,13 +1586,13 @@ export class Vault {
     const standing = this.#currentVaultProps()
     const deviceId = this.#deviceIdFor(standing)
     plan.check?.(standing)
-    const proven = await this.#unwrapWith(standing, proof, wayinId)
+    const proven = await this.#unwrapWith(standing, proof)
     const wayins = await plan.revise(standing, proven, deviceId)
     if (wayins === null) { return false }
     const next = frozenVaultProps({
       ...standing,
       unlock_epoch:     standing.unlock_epoch + 1,
-      wayins,
+      ...wayins,
     })
     await this.#refreshOnStale(this.#vaultDB.putVaultProps(next, { vault_id: standing.vault_id, unlock_epoch: standing.unlock_epoch }), plan.call)
     // The change has landed, whatever happens now: what follows is this device's own, and a
@@ -1669,7 +1605,7 @@ export class Vault {
       this.#vaultProps = next
     }
     try {
-      await this.#grantLease(proven, next, this.#deadlineFor(proof, 'revise'))
+      await this.#grantLease(proven, next, this.#deadlineFromNow())
     } catch (err) {
       this.#logger.warn("The change to the vault's ways in landed in storage, but this device could not take up its unlock afresh: it stands as it stood here, and asks for the passphrase at its next open.", { call: plan.call }, asError(err))
     }
@@ -1699,33 +1635,14 @@ export class Vault {
   }
 
   /**
-   * The stamp of a way in this device adds to `standing` now, named `naming`: around the vaultKey
-   * the vault props stand for, under this device's id for the vault.
+   * The stamp of a way in this device seals into `standing` now: around the vaultKey the vault
+   * props stand for, under this device's id for the vault.
    */
-  #newStamp(standing: VaultProps, naming: { wayin_id: string, wayinlabel: string }, deviceId: string): WayinStamp {
+  #newStamp(standing: VaultProps, deviceId: string): WayinStamp {
     return {
-      ...naming,
       vault_key_epoch: standing.vault_key_epoch,
       device_id:       deviceId,
       registered_at:   this.#clockNow(),
-    }
-  }
-
-  /** Refuse a new passkey whose credential is already one of `standing`'s ways in. */
-  #checkNewCredential(standing: VaultProps, passkey: PasskeyProof) {
-    // Neither refusal here quotes a wayinlabel: a host's wayinlabel check may admit any text.
-    if (standing.wayins.some((wayin) => wayin.wayinkind === 'passkey' && wayin.credential_id === passkey.credentialId)) {
-      throw new VaultError('bad_option', "That passkey is already a way into this vault: the snapshot's wayins list each passkey's credential_id, beside its wayinlabel.")
-    }
-  }
-
-  /** Refuse a new way in labelled `wayinlabel` that `standing` has no room or label for. */
-  #checkRoomForWayin(standing: VaultProps, wayinlabel: string) {
-    if (standing.wayins.some((wayin) => wayin.wayinlabel === wayinlabel)) {
-      throw new VaultError('bad_label', "This vault already has a way in under that wayinlabel: pick another. The snapshot's wayins list the labels taken.")
-    }
-    if (standing.wayins.length >= MaxUnlocks) {
-      throw new VaultError('too_many_wayins', `This vault already holds its limit of ${String(MaxUnlocks)} ways in: remove one before adding another.`)
     }
   }
   // --
@@ -1827,21 +1744,16 @@ export class Vault {
   }
   // --
 
-  // == [Lease]: deadlineFor, grantLease, fetchLease, takeUp, standDownTakeUp, takeUpLease, discardLease
+  // == [Lease]: deadlineFromNow, grantLease, fetchLease, takeUp, standDownTakeUp, takeUpLease, discardLease
 
   /**
-   * The deadline of an unlock taken up now by `proof`, in `call`. The lease renews whenever the
-   * user proves who they are by typing a passphrase, in any call: an `unlock()`, a change of
-   * passphrase, a way in added or removed. An `unlock()` by passkey sets it too, as it unlocks. A
-   * passkey proving a change to the ways in keeps the deadline that stands, when the vault is
-   * unlocked, and sets one only when it is not. Every proof passes through here, and nothing else
+   * The deadline of an unlock taken up now: `leaseHours` from now. The lease renews whenever the
+   * user proves who they are, in any call: an `unlock()` by passphrase or passkey, or a change to
+   * the ways in, which the passphrase proves. Every proof passes through here, and nothing else
    * -- a read, a store, a refresh -- moves the deadline.
    */
-  #deadlineFor(proof: Proof, call: 'unlock' | 'revise'): number {
-    const now = this.#clockNow()
-    const standing = this.#lease !== null && this.#unlockStands() ? this.#lease.ask_passphrase_at : null
-    const renews = call === 'unlock' || proof.kind === 'passphrase'
-    return renews || standing === null ? deadlineAfter(now, this.#leaseMillis) : standing
+  #deadlineFromNow(): number {
+    return deadlineAfter(this.#clockNow(), this.#leaseMillis)
   }
 
   /**
@@ -2330,14 +2242,14 @@ export class Vault {
    * Tell each of `damaged`, the ways in a read of the vault props found damaged, that `shown`, the
    * ways in published before it, did not already show damaged as stored alike: one `damaged_wayin`
    * news apiece, `meta.wayin_listed` its summary, and the trouble published once all are told. The
-   * read that found them succeeds all the same, and the other ways in open as ever.
+   * read that found them succeeds all the same, and the other way in, if any, opens as ever.
    */
   #tellWayinNews(damaged: readonly Wayin[], shown: readonly Wayin[]) {
     const wasShown = new Set(shown.filter((wayin) => wayin.isDamaged()).map((wayin) => stableJsonify(wayin.props)))
     const news = damaged.filter((wayin) => ! wasShown.has(stableJsonify(wayin.props)))
     if (news.length === 0) { return }
     for (const wayin of news) {
-      this.#tellBadNews(new VaultError('damaged_wayin', "A way into this vault is stored damaged, so it can't be tried: this error's meta.wayin_listed names it. The other ways in still open the vault; remove it with delWayin(), then add it again.", { meta: { wayin_listed: wayin.summary } }))
+      this.#tellBadNews(new VaultError('damaged_wayin', "A way into this vault is stored damaged, so it can't be tried: this error's meta.wayin_listed names it. The other way in, if the vault has one, still opens it. A damaged passkey is mended by adding the passkey again; a damaged passphrase only by removing the vault and making it again.", { meta: { wayin_listed: wayin.summary } }))
     }
     this.#settle()
   }
@@ -2390,11 +2302,14 @@ const closedError = () => new VaultError('vault_closed', 'This vault handle was 
  * A copy of `props`, frozen through its ways in: what the vault holds as its vault props, so the
  * very object its ways in and boxes lie under, and its snapshot shows, is one no host can write to.
  */
-const frozenVaultProps = (props: VaultProps): VaultProps => {
-  const wayins = props.wayins.map((record) => frozenRecord(record))
-  Object.freeze(wayins)
-  return Object.freeze({ ...props, wayins })
-}
+const frozenVaultProps = (props: VaultProps): VaultProps => Object.freeze({
+  ...props,
+  passphrase: frozenRecord(props.passphrase),
+  passkey:    props.passkey === null ? null : frozenRecord(props.passkey),
+})
+
+/** The ways in of vault props, as a change to them writes them anew. */
+type StandingWayins = Pick<VaultProps, 'passphrase' | 'passkey'>
 
 /**
  * True when `box` lists as damaged already, or stands under the vaultKey `standing` holds. A
@@ -2423,10 +2338,7 @@ const MarkFormat = 'safebyok-mark-v4'
 
 /** The vault call, or the moment, a logger's story names: where what it hears happened. */
 type VaultCall = 'make' | 'hello' | 'refresh' | 'unlock' | 'del' | 'untrustedStorage'
-  | 'changePassphrase' | 'addPassphrase' | 'addPasskey' | 'delWayin' | 'putBox' | 'delBox' | 'getBox'
-
-/** The `wayinlabel` of the way in a vault is created with, by its first `unlock()`. */
-const FirstWayinlabel = 'passphrase'
+  | 'changePassphrase' | 'addPasskey' | 'delWayin' | 'putBox' | 'delBox' | 'getBox'
 
 /** The `vault_key_epoch` of a vault's first vaultKey, the one it is created with. */
 const FirstVaultKeyEpoch = 1
@@ -2441,7 +2353,7 @@ const FirstVaultKeyEpoch = 1
 const UntrustedStorageKinds = ['identity_revoked', 'rolled_back', 'newer_format'] as const satisfies readonly RefusalKind[]
 // --
 
-// == [Argument parsers]: checkHelloOpts, asEnsureLeaseOpts, checkStoreOpts, sidecarJsonOf, parseAim, parseWayinId, parseWayinlabel, parsePasskeyMaker, others
+// == [Argument parsers]: checkHelloOpts, asEnsureLeaseOpts, checkStoreOpts, sidecarJsonOf, standingPassphraseOf, parsePasskeyMaker, absentBox
 
 /** What `hello()`'s options may hold: `staleMinutes`, which `parseStaleMinutes` checks, and nothing else. */
 const checkHelloOpts = optionsCheck({ staleMinutes: Z.optional(Z.unknown()) }, "hello()'s only option is `staleMinutes`, how many minutes it trusts the vault's last read of storage: check its spelling, and leave out any other.")
@@ -2484,59 +2396,16 @@ const sidecarJsonOf = (storeOpts: { sidecar?: Sidecar | undefined } | undefined)
   return stableJsonify(checkedSidecar(storeOpts.sidecar))
 }
 
-/** A wayin_id as a host hands one back: the id of one of the snapshot's `wayins`. */
-const wayinIdShape = Z.string().check(Z.minLength(1))
-
-/** The options that aim an `unlock()` or `changePassphrase()` at one way in. */
-const aimShape = Z.optional(Z.object({ wayinId: Z.optional(wayinIdShape) }))
-
-const parseAim = (candidate: { wayinId?: string | undefined } | undefined): string | undefined => {
-  const checked = aimShape.safeParse(candidate)
-  if (! checked.success) {
-    throw new VaultError('bad_option', "wayinId is the wayin_id of one of the snapshot's wayins, as text; leave it out to try every passphrase.")
-  }
-  return checked.data?.wayinId
-}
-
 /**
- * The passphrase wayin of `standing` that a change replaces: the one `wayinId` names, or --
- * given none, as when a passkey proves the change -- the vault's only passphrase.
+ * The proof of a change to the ways in, `call`'s: the vault's standing passphrase, as text. Kind
+ * 'bad_option' for anything else, a passkey's answer among it, and as {@link PassphraseProof.parse}
+ * refuses.
  */
-const passphraseToReplace = (standing: VaultProps, wayinId: string | undefined): PassphraseWayinRecord => {
-  const passphrases = standing.wayins.filter((wayin) => wayin.wayinkind === 'passphrase')
-  if (wayinId !== undefined) {
-    const named = passphrases.find((wayin) => wayin.wayin_id === wayinId)
-    if (named !== undefined) { return named }
-    throw new VaultError('absent_wayin', "None of this vault's passphrases has that wayin_id: it may have been removed on another device, or be a passkey's, which changePassphrase does not replace. Look again at the snapshot's wayins.")
+const standingPassphraseOf = (vault: Vault, given: unknown, call: 'changePassphrase' | 'addPasskey' | 'delWayin'): PassphraseProof => {
+  if (typeof given !== 'string') {
+    throw new VaultError('bad_option', `${call} takes the vault's passphrase as it stands, as the text the user typed: only the passphrase proves a change to the vault's ways in, never a passkey.`)
   }
-  const [only, ...others] = passphrases
-  if (only === undefined) {
-    throw new VaultError('absent_wayin', 'This vault has no passphrase to replace: add one with addPassphrase.')
-  }
-  if (others.length > 0) {
-    throw new VaultError('bad_option', "This vault has several passphrases, and a passkey does not say which to replace: pass the wayin_id of one of the snapshot's wayins as opts.wayinId.")
-  }
-  return only
-}
-
-const parseWayinId = (candidate: string): string => {
-  const checked = wayinIdShape.safeParse(candidate)
-  if (! checked.success) {
-    throw new VaultError('bad_option', "delWayin names the way in to remove by its wayin_id, from the snapshot's wayins.")
-  }
-  return checked.data
-}
-
-/**
- * `opts.wayinlabel`, once it passes the vault's wayinlabel check: kind 'bad_label' otherwise.
- * Never empty, whatever the check admits, as a stored way in has a label.
- */
-const parseWayinlabel = (rules: Names.NameRules, candidate: { wayinlabel: string } | undefined, call: 'addPassphrase' | 'addPasskey'): string => {
-  const wayinlabel: unknown = candidate?.wayinlabel
-  if (typeof wayinlabel !== 'string' || wayinlabel === '') {
-    throw new VaultError('bad_label', `${call} needs a wayinlabel, what the user calls this way in, as text that is not empty.`)
-  }
-  return Names.check(rules, 'wayinlabel', wayinlabel)
+  return PassphraseProof.parse(vault, given)
 }
 
 // The refusal never quotes the boxlabel: a host's validators may admit any text, a mistaken paste among it.

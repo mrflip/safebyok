@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { PasskeySaltBytes, VaultError, localVaultDB, memoryDeviceDB, memoryStore, type PasskeyAnswer, type WayinSummary, type VaultDB } from 'safebyok'
+import { PasskeySaltBytes, VaultError, localVaultDB, memoryDeviceDB, memoryStore, type PasskeyAnswer, type PasskeyWayinSummary, type VaultDB } from 'safebyok'
 import { fromB64, toB64 } from 'safebyok/utils'
 import { askPasskey, createPasskey, passkeysAvailable } from '../src/passkey'
 import * as TH from './test-helpers'
 
 const passkeyOpts = { rp: { name: 'Acme' }, user: { name: 'ada@example.com', displayName: 'Ada' } }
+
+/** A new passkey through the fake authenticator, as `vault.addPasskey` calls for it. */
+const makePasskey = () => createPasskey(passkeyOpts)
 
 /** Expect `operation` to reject with a VaultError of `kind`; hands the error back for a closer look. */
 const expectRefusal = async (operation: Promise<unknown>, kind: VaultError['refusalkind']): Promise<VaultError> => {
@@ -18,13 +21,11 @@ const expectRefusal = async (operation: Promise<unknown>, kind: VaultError['refu
   throw new Error(`expected a VaultError of kind '${kind}', but nothing was thrown`)
 }
 
-/** A passkey's way in as the snapshot lists it, for `proof`. */
-const summaryOf = (proof: PasskeyAnswer, wayinlabel: string): WayinSummary => ({
-  wayinkind: 'passkey', wayin_id: `wayin-${wayinlabel}`, wayinlabel, device_id: 'device-one', registered_at: Date.UTC(2026, 9, 15),
+/** The vault's passkey as its snapshot has it, for `proof`. */
+const summaryOf = (proof: PasskeyAnswer): PasskeyWayinSummary => ({
+  wayinkind: 'passkey', device_id: 'device-one', registered_at: Date.UTC(2026, 9, 15),
   credential_id: proof.credentialId, prf_salt_b64: proof.prfSaltB64,
 })
-
-const passphraseSummary: WayinSummary = { wayinkind: 'passphrase', wayin_id: 'wayin-passphrase', wayinlabel: 'passphrase', device_id: 'device-one', registered_at: Date.UTC(2026, 9, 15) }
 
 /** A fresh vault in memory, made with the passphrase `pw` and unlocked, and an opener for another device on the same storage. */
 const vaultInMemory = async () => {
@@ -105,74 +106,94 @@ describe("createPasskey", () => {
 })
 
 describe("askPasskey", () => {
-  it("offers every passkey of the vault, each with its own salt, and hands back the one touched", async () => {
+  it("asks the vault's passkey over its own salt, and hands back its answer", async () => {
     const fake = install()
     const laptop = await createPasskey(passkeyOpts)
-    const phone = await createPasskey(passkeyOpts)
-    if (laptop === null || phone === null) { throw new Error('the fake authenticator made no passkey') }
-    fake.touch(phone.credentialId)
-    const answered = await askPasskey([passphraseSummary, summaryOf(laptop, 'laptop'), summaryOf(phone, 'phone')], { rpId: 'acme.example' })
-    expect(answered).to.deep.equal(phone)
+    if (laptop === null) { throw new Error('the fake authenticator made no passkey') }
+    const answered = await askPasskey(summaryOf(laptop), { rpId: 'acme.example' })
+    expect(answered).to.deep.equal(laptop)
     const request = fake.calls.get[0]?.publicKey
-    expect(request?.allowCredentials).to.have.lengthOf(2)
+    expect(request?.allowCredentials).to.have.lengthOf(1)
     expect(request?.rpId).to.eq('acme.example')
     expect(request?.userVerification).to.eq('required')
-    expect(Object.keys(request?.extensions?.prf?.evalByCredential ?? {})).to.have.members([laptop.credentialId, phone.credentialId])
+    expect(Object.keys(request?.extensions?.prf?.evalByCredential ?? {})).to.deep.equal([laptop.credentialId])
   })
 
-  it("refuses as absent_wayin a vault with no passkey, and as damaged_wayin one whose every passkey is stored damaged", async () => {
-    install()
-    await expectRefusal(askPasskey([passphraseSummary]), 'absent_wayin')
-    const damaged = { ...summaryOf(await TH.passkeyOf('laptop'), 'laptop'), credential_id: 'not base64url!' }
-    const saltless = { ...summaryOf(await TH.passkeyOf('phone'), 'phone'), prf_salt_b64: 'not base64url!' }
-    const shortSalted = { ...summaryOf(await TH.passkeyOf('tablet'), 'tablet'), prf_salt_b64: 'c2FsdA' }
-    await expectRefusal(askPasskey([passphraseSummary, damaged, saltless, shortSalted]), 'damaged_wayin')
-  })
-
-  it("leaves out a passkey stored damaged, and asks the others", async () => {
+  it("refuses as absent_wayin a vault with no passkey, before the browser is asked", async () => {
     const fake = install()
-    const phone = await createPasskey(passkeyOpts)
-    if (phone === null) { throw new Error('the fake authenticator made no passkey') }
-    fake.touch(phone.credentialId)
-    const damaged = { ...summaryOf(await TH.passkeyOf('laptop'), 'laptop'), credential_id: 'not base64url!' }
-    expect(await askPasskey([damaged, summaryOf(phone, 'phone')])).to.deep.equal(phone)
-    expect(Object.keys(fake.calls.get[0]?.publicKey?.extensions?.prf?.evalByCredential ?? {})).to.deep.equal([phone.credentialId])
+    await expectRefusal(askPasskey(null), 'absent_wayin')
+    expect(fake.calls.get).to.have.lengthOf(0)
   })
 
-  it("resolves null when the user dismisses the prompt, or has none of the passkeys at hand", async () => {
+  const DamagedCases = [
+    ["credential_id", "not base64url!", 'a credential id that is not base64url'],
+    ["prf_salt_b64",  "not base64url!", 'a salt that is not base64url'],
+    ["prf_salt_b64",  "c2FsdA",         'a salt short of PasskeySaltBytes'],
+  ] as const
+
+  for (const [field, val, blurb] of DamagedCases) {
+    it(`refuses as damaged_wayin a passkey stored with ${blurb}, before the browser is asked`, async () => {
+      const fake = install()
+      const damaged = { ...summaryOf(await TH.passkeyOf('laptop')), [field]: val }
+      await expectRefusal(askPasskey(damaged), 'damaged_wayin')
+      expect(fake.calls.get).to.have.lengthOf(0)
+    })
+  }
+
+  it("resolves null when the user dismisses the prompt, or has not the passkey at hand", async () => {
     const fake = install()
     const laptop = await createPasskey(passkeyOpts)
     if (laptop === null) { throw new Error('the fake authenticator made no passkey') }
     fake.refuseNext('NotAllowedError')
-    expect(await askPasskey([summaryOf(laptop, 'laptop')])).to.be.null
+    expect(await askPasskey(summaryOf(laptop))).to.be.null
     const elsewhere = await TH.passkeyOf('elsewhere')
-    expect(await askPasskey([summaryOf(elsewhere, 'elsewhere')])).to.be.null
+    expect(await askPasskey(summaryOf(elsewhere))).to.be.null
   })
 
   it("refuses as passkey_unavailable a passkey that gives no answer, and a browser without WebAuthn", async () => {
     const laptop = await TH.passkeyOf('laptop')
-    await expectRefusal(askPasskey([summaryOf(laptop, 'laptop')]), 'passkey_unavailable')
+    await expectRefusal(askPasskey(summaryOf(laptop)), 'passkey_unavailable')
     const fake = install({ prf: false })
     await expectRefusal(createPasskey(passkeyOpts), 'passkey_unavailable')
     const [credentialId = ''] = fake.credentialIds()
     const stray = { ...await TH.passkeyOf('stray'), credentialId }
-    await expectRefusal(askPasskey([summaryOf(stray, 'stray')]), 'passkey_unavailable')
+    await expectRefusal(askPasskey(summaryOf(stray)), 'passkey_unavailable')
   })
 })
 
 describe("a passkey unlock, end to end", () => {
-  it("createPasskey's answer adds a way in, and askPasskey's opens the vault on another device", async () => {
+  it("createPasskey's answer adds the vault's passkey, and askPasskey's opens the vault on another device, as their examples show", async () => {
     install()
     const { vault, open } = await vaultInMemory()
     await vault.putBox('anthropic', 'sk-fake')
-    const wayinId = await vault.addPasskey('pw', () => createPasskey(passkeyOpts), { wayinlabel: 'laptop' })
-    if (wayinId === null) { throw new Error('the fake authenticator made no passkey') }
+    const added = await vault.addPasskey('pw', makePasskey)
+    expect(added).to.be.true
 
     const elsewhere = await open()
     expect(elsewhere.getSnapshot().state).to.eq('locked')
-    const asked = await askPasskey(elsewhere.getSnapshot().wayins)
-    if (asked === null) { throw new Error('the fake authenticator gave no answer') }
-    await elsewhere.unlock(asked)
+    const passkey = await askPasskey(elsewhere.getSnapshot().passkey)
+    if (passkey !== null) { await elsewhere.unlock(passkey) }
     expect(await elsewhere.getBox('anthropic')).to.eq('sk-fake')
+  })
+
+  it("addPasskey resolves false when the user dismisses createPasskey's prompt, as its example says, and the vault keeps no passkey", async () => {
+    const fake = install()
+    const { vault } = await vaultInMemory()
+    fake.refuseNext('NotAllowedError')
+    expect(await vault.addPasskey('pw', makePasskey)).to.be.false
+    expect(vault.getSnapshot().passkey).to.be.null
+  })
+
+  it("a passkey added again takes the first's place: askPasskey asks only the new one", async () => {
+    const fake = install()
+    const { vault, open } = await vaultInMemory()
+    await vault.addPasskey('pw', makePasskey)
+    const [first = ''] = fake.credentialIds()
+    await vault.addPasskey('pw', makePasskey)
+    const elsewhere = await open()
+    const { passkey } = elsewhere.getSnapshot()
+    expect(passkey?.credential_id).to.not.eq(first)
+    const asked = await askPasskey(passkey)
+    expect(asked?.credentialId).to.eq(passkey?.credential_id)
   })
 })

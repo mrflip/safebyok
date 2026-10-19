@@ -634,9 +634,9 @@ describe("the fixtures", () => {
   })
 
   it("passkeyWayinOf: a shape-valid passkey wayin, with any field overridden", () => {
-    const vaultProps = TH.vaultPropsOf('u1', { wayins: [TH.wayinOf('passphrase'), TH.passkeyWayinOf('laptop')] })
+    const vaultProps = TH.vaultPropsOf('u1', { passkey: TH.passkeyWayinOf('laptop') })
     expect(VaultProps.safeParse(vaultProps).success).to.be.true
-    expect(TH.passkeyWayinOf('laptop')).to.include({ wayinkind: 'passkey', wayin_id: 'wayin-laptop', credential_id: 'cred-laptop' })
+    expect(TH.passkeyWayinOf('laptop')).to.include({ wayinkind: 'passkey', credential_id: 'cred-laptop' })
     expect(TH.passkeyWayinOf('laptop', { credential_id: 'other' }).credential_id).to.eq('other')
   })
 

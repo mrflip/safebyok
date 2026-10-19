@@ -36,23 +36,20 @@ export const VaultScope = v.object({
 })
 
 /** The VaultProps formats this package stores. */
-export const VaultPropsFormat = v.union(v.literal('safebyok-vault-v4'))
+export const VaultPropsFormat = v.union(v.literal('safebyok-vault-v5'))
 
 /** The formats of a BoxRecord this package stores. */
 export const BoxFormat = v.union(v.literal('safebyok-box-v6'))
 
 /**
- * A passphrase's way into a vault: its `wayin_id` and `wayinlabel`, how its passphraseKey is
- * derived (`key_deriver_label`, `salt_b64`), which vaultKey it wraps (`vault_key_epoch`), the
- * device and time that added it (`device_id`, `registered_at`), and the vaultKey wrapped under
- * that passphraseKey.
+ * A passphrase's way into a vault: how its passphraseKey is derived (`key_deriver_label`,
+ * `salt_b64`), which vaultKey it wraps (`vault_key_epoch`), the device and time that added it
+ * (`device_id`, `registered_at`), and the vaultKey wrapped under that passphraseKey.
  *
- * @example { wayinkind: 'passphrase', wayin_id: '1b9d...', wayinlabel: 'passphrase', key_deriver_label: 'argon2id_web_v1', salt_b64: 'q83v...', vault_key_wayin_wrapped: { cipher_iv_b64, ciphertext_b64 } }
+ * @example { wayinkind: 'passphrase', key_deriver_label: 'argon2id_web_v1', salt_b64: 'q83v...', vault_key_wayin_wrapped: { cipher_iv_b64, ciphertext_b64 } }
  */
 export const PassphraseWayin = v.object({
   wayinkind:               v.literal('passphrase'),
-  wayin_id:                v.string(),
-  wayinlabel:              v.string(),
   key_deriver_label:       v.string(),
   salt_b64:                v.string(),
   vault_key_epoch:         v.number(),
@@ -62,16 +59,14 @@ export const PassphraseWayin = v.object({
 })
 
 /**
- * A passkey's way into a vault: its `wayin_id` and `wayinlabel`, which WebAuthn credential to ask
- * (`credential_id`) and the salt to ask its PRF with (`prf_salt_b64`), which vaultKey it wraps,
- * the device and time that added it, and the vaultKey wrapped under the key that answer makes.
+ * A passkey's way into a vault: which WebAuthn credential to ask (`credential_id`) and the salt
+ * to ask its PRF with (`prf_salt_b64`), which vaultKey it wraps, the device and time that added
+ * it, and the vaultKey wrapped under the key that answer makes.
  *
- * @example { wayinkind: 'passkey', wayin_id: '7c2e...', wayinlabel: 'laptop', credential_id: 'AXk3...', prf_salt_b64: 'q83v...', vault_key_wayin_wrapped: { cipher_iv_b64, ciphertext_b64 } }
+ * @example { wayinkind: 'passkey', credential_id: 'AXk3...', prf_salt_b64: 'q83v...', vault_key_wayin_wrapped: { cipher_iv_b64, ciphertext_b64 } }
  */
 export const PasskeyWayin = v.object({
   wayinkind:               v.literal('passkey'),
-  wayin_id:                v.string(),
-  wayinlabel:              v.string(),
   credential_id:           v.string(),
   prf_salt_b64:            v.string(),
   vault_key_epoch:         v.number(),
@@ -81,18 +76,11 @@ export const PasskeyWayin = v.object({
 })
 
 /**
- * One way into a vault, told apart by its `wayinkind`: a {@link PassphraseWayin} or a
- * {@link PasskeyWayin}. A new wayinkind widens this union, an additive deploy shipped with this
- * package.
- */
-export const Wayin = v.union(PassphraseWayin, PasskeyWayin)
-
-/**
  * A vault's props: its scope, `vault_id`, `unlock_epoch`, which vaultKey its ways in wrap
- * (`vault_key_epoch`, always 1: reserved for a rotation not yet built), its ways in (`wayins`, each the
- * vaultKey wrapped under a wayinKey one kind of wayin makes), and when it was made (`registered_at`, epoch
- * milliseconds). Nothing in it opens without a passphrase or passkey. How many ways in, and that no two
- * share an id or label, are the client's rules.
+ * (`vault_key_epoch`, always 1: reserved for a rotation not yet built), its two ways in -- the
+ * `passphrase` every vault has, and the `passkey` it may have (null when it has none), each the
+ * vaultKey wrapped under a wayinKey -- and when it was made (`registered_at`, epoch milliseconds).
+ * Nothing in it opens without a passphrase or passkey.
  */
 export const VaultProps = v.object({
   format:           VaultPropsFormat,
@@ -102,7 +90,8 @@ export const VaultProps = v.object({
   vault_id:         v.string(),
   unlock_epoch:     v.number(),
   vault_key_epoch:  v.number(),
-  wayins:           v.array(Wayin),
+  passphrase:       PassphraseWayin,
+  passkey:          v.nullable(PasskeyWayin),
   registered_at:    v.number(),
 })
 

@@ -1,8 +1,8 @@
 import type { BoxRecord, VaultProps, VaultScope } from 'safebyok'
 
 /**
- * How one field crosses the wire: `plain`, as it is -- text, a number, or the vault props' prior
- * vaultKey and their list of wayins, each one opaque JSON -- or `ciphered`, a Ciphered sent as its
+ * How one field crosses the wire: `plain`, as it is -- text, a number, or one of the vault props'
+ * two ways in, `passphrase` and `passkey`, each one opaque JSON -- or `ciphered`, a Ciphered sent as its
  * own two fields, `cipher_iv_b64` and `ciphertext_b64`.
  */
 export type FieldKind = 'plain' | 'ciphered'
@@ -43,7 +43,8 @@ export const VaultPropsFields = everyFieldOf<VaultProps>()([
   ['vault_id',         'plain'],
   ['unlock_epoch',     'plain'],
   ['vault_key_epoch',  'plain'],
-  ['wayins',           'plain'],
+  ['passphrase',       'plain'],
+  ['passkey',          'plain'],
   ['registered_at',    'plain'],
 ] as const)
 
@@ -81,18 +82,19 @@ export const selectionOf = (fields: readonly Field[]): string => fields.map(([fi
 )).join(' ')
 
 /**
- * The record `sent` carries, field by field: each of `fields`, a null or missing one left out, and a ciphered one as its two halves -- so
+ * The record `sent` carries, field by field: each of `fields`, a null one as null (the vault props' `passkey`, when the vault has none),
+ * a missing one left out, and a ciphered one as its two halves -- so
  * whatever else rode along, a GraphQL client's `__typename` or a stray field, stays behind. Nothing is checked here: the
  * VaultDB on each side validates what it is handed. What is not an object comes back as it is,
  * for that validation to refuse.
  *
- * @example recordOf({ vault_id: 'v1', wayins: null, __typename: 'SafebyokVaultProps' }, [['vault_id', 'plain'], ['wayins', 'plain']])   // { vault_id: 'v1' }
+ * @example recordOf({ vault_id: 'v1', passkey: null, __typename: 'SafebyokVaultProps' }, [['vault_id', 'plain'], ['passkey', 'plain']])   // { vault_id: 'v1', passkey: null }
  */
 export const recordOf = (sent: unknown, fields: readonly Field[]): unknown => {
   if (! isBag(sent)) { return sent }
   return Object.fromEntries(fields.flatMap(([field, kind]) => {
     const val = sent[field]
-    if (val === null || val === undefined) { return [] }
+    if (val === undefined) { return [] }
     return [[field, kind === 'ciphered' ? halvesOf(val) : val]]
   }))
 }

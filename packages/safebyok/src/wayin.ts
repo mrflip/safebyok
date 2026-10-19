@@ -2,25 +2,25 @@ import { cipherCtx, fromB64, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder, t
 import { VaultError } from './errors'
 import { type Outcome, outcomeOf, unexpectedError } from './outcome'
 import { PasskeyProof, PassphraseProof, type Proof } from './proof'
-import { PasskeySaltBytes, WayinRecord, type PasskeyWayinRecord, type PassphraseWayinRecord, type VaultProps, type WayinKind, type WayinSummary } from './types'
+import { PasskeySaltBytes, WayinRecord, type PasskeyWayinRecord, type PasskeyWayinSummary, type PassphraseWayinRecord, type PassphraseWayinSummary, type VaultProps, type WayinKind, type WayinSummary } from './types'
 import { decorate } from './utils'
 import type { Vault } from './vault'
 
 /**
  * Ways in: each the vaultKey wrapped under a wayinKey one kind of way in makes, so a vault has
- * several ways in and one vaultKey behind them all. A {@link Wayin} is made from its stored record
- * by `Wayin.make`, a {@link PassphraseWayin} or a {@link PasskeyWayin}; `wayin.tryOpen(proof)`
- * opens one, the proof making the key; `Wayin.sealPassphrase` and `Wayin.sealPasskey` make one.
+ * two ways in -- its passphrase, and its passkey when it has one -- and one vaultKey behind both.
+ * A {@link Wayin} is made from its stored record by `Wayin.make`, a {@link PassphraseWayin} or a
+ * {@link PasskeyWayin}; `wayin.tryOpen(proof)` opens one, the proof making the key;
+ * `Wayin.sealPassphrase` and `Wayin.sealPasskey` make one.
  *
  * Each way in's wrap is bound to its vault -- the scope, and the fields of the vault props that
  * never change, `vault_id` and `registered_at` -- and to its own visible header (every field but
  * the wrap itself, encoded with its keys sorted: its `vault_key_epoch`, `device_id` and
  * `registered_at` among them), under a purpose its wayinkind names. A passkey's key is made with
- * that same context as its HKDF `info`. The vault props' `unlock_epoch` and the list of ways in are
- * not in it: a change to one way in bumps the epoch and rewrites the list, and the others, whose
- * passphrases this device does not hold, must still open. A way in whose `vault_key_epoch` is not
- * the vault props' is damaged, so one spliced in from older vault props never hands over its older
- * vaultKey as theirs.
+ * that same context as its HKDF `info`. The vault props' `unlock_epoch` and the other way in are
+ * not in it: a change to one way in bumps the epoch, and the other must still open. A way in whose
+ * `vault_key_epoch` is not the vault props' is damaged, so one spliced in from older vault props
+ * never hands over its older vaultKey as theirs.
  */
 
 /**
@@ -47,15 +47,14 @@ type HeaderOf<RecordT> = RecordT extends unknown ? Omit<RecordT, 'vault_key_wayi
 export type WayinHeader = HeaderOf<WayinRecord>
 
 /**
- * What a way in is stamped with besides its wayinkind's own fields: its `wayin_id` and
- * `wayinlabel`, the `vault_key_epoch` of the vaultKey it wraps, and the `device_id` and
- * `registered_at` of the device and the time that added it. A way in sealed anew keeps its stamp;
- * a way in is one.
+ * What a way in is stamped with besides its wayinkind's own fields: the `vault_key_epoch` of the
+ * vaultKey it wraps, and the `device_id` and `registered_at` of the device and the time that
+ * sealed it. A way in is one.
  */
-export type WayinStamp = Pick<WayinRecord, 'wayin_id' | 'wayinlabel' | 'vault_key_epoch' | 'device_id' | 'registered_at'>
+export type WayinStamp = Pick<WayinRecord, 'vault_key_epoch' | 'device_id' | 'registered_at'>
 
 /** The ctx's first part: the vault props' format, under which every way in's wrap is bound. */
-const VaultPropsFormat = 'safebyok-vault-v4'
+const VaultPropsFormat = 'safebyok-vault-v5'
 
 /** The ctx purpose of each wayinkind's wrap, so no kind of way in opens as another. */
 const PurposeForWayinkind = {
@@ -77,9 +76,9 @@ const wayinCtxOf = (vault: WayinVault, holder: Pick<WayinHolder, 'vault_id' | 'r
   cipherCtx(VaultPropsFormat, vault.applabel, vault.user_id, vault.vaultlabel, holder.vault_id, holder.registered_at, PurposeForWayinkind[header.wayinkind], header)
 )
 
-/** The stamp's own fields, and nothing else of whatever carries them: a way in sealed anew passes itself. */
-const stampOf = ({ wayin_id, wayinlabel, vault_key_epoch, device_id, registered_at }: WayinStamp): WayinStamp => (
-  { wayin_id, wayinlabel, vault_key_epoch, device_id, registered_at }
+/** The stamp's own fields, and nothing else of whatever carries them. */
+const stampOf = ({ vault_key_epoch, device_id, registered_at }: WayinStamp): WayinStamp => (
+  { vault_key_epoch, device_id, registered_at }
 )
 
 /** `record` without its wrap. */
@@ -89,9 +88,10 @@ const headerOf = (record: WayinRecord): WayinHeader => {
 }
 
 /** `record`, a frozen copy, its wrap frozen with it: what a way in hands back as its `props`. */
-export const frozenRecord = (record: WayinRecord): WayinRecord => (
-  Object.freeze({ ...record, vault_key_wayin_wrapped: Object.freeze({ ...record.vault_key_wayin_wrapped }) })
-)
+export const frozenRecord = <RecordT extends WayinRecord>(record: RecordT): RecordT => {
+  const frozen: RecordT = { ...record, vault_key_wayin_wrapped: Object.freeze({ ...record.vault_key_wayin_wrapped }) }
+  return Object.freeze(frozen)
+}
 
 /** A way in's salt as bytes, or null when its base64url text is not base64url. */
 const saltBytesOf = (saltB64: string): Uint8Array | null => {
@@ -108,9 +108,10 @@ const saltBytesOf = (saltB64: string): Uint8Array | null => {
  * `props` is the stored record, frozen, and `toJSON()` the same, so a log line shows the record
  * alone. It holds `vault` and `holder` (the vault props it is one of) too, neither enumerable.
  * `summary` is what a locked vault may show of it. The vault makes each from the vault props it
- * reads, and lists their summaries, never the ways in themselves, as its `wayins`.
+ * reads, and shows their summaries, never the ways in themselves, as its `passphrase` and
+ * `passkey`.
  *
- * @example Wayin.listOf(vault, vaultProps).map((wayin) => wayin.wayinlabel)   // ['passphrase', 'laptop_fingerprint']
+ * @example Wayin.make(vault, vaultProps.passphrase, vaultProps).wayinkind   // 'passphrase'
  * @example JSON.stringify(wayin) === JSON.stringify(wayin.props)   // true
  */
 export abstract class Wayin {
@@ -123,13 +124,9 @@ export abstract class Wayin {
 
   /** `passphrase` or `passkey`: which kind of proof opens it. */
   readonly wayinkind: WayinKind
-  /** Random id minted when the way in is added, and kept when it is sealed anew. */
-  readonly wayin_id: string
-  /** What the user calls this way in: `home_phrase`, `laptop_fingerprint`. */
-  readonly wayinlabel: string
-  /** This vault's id for the device that added the way in. */
+  /** This vault's id for the device that sealed the way in. */
   readonly device_id: string
-  /** When the way in was added, in epoch milliseconds. */
+  /** When the way in was sealed, in epoch milliseconds. */
   readonly registered_at: number
   /** The epoch of the vaultKey it wraps: in sound vault props, the props' own. */
   readonly vault_key_epoch: number
@@ -139,8 +136,6 @@ export abstract class Wayin {
   protected constructor(vault: WayinVault, record: WayinRecord, holder: WayinHolder) {
     decorate<Wayin>(this, { vault, holder, props: frozenRecord(record) })
     this.wayinkind = record.wayinkind
-    this.wayin_id = record.wayin_id
-    this.wayinlabel = record.wayinlabel
     this.device_id = record.device_id
     this.registered_at = record.registered_at
     this.vault_key_epoch = record.vault_key_epoch
@@ -157,25 +152,18 @@ export abstract class Wayin {
    * @param record - The way in as the vault props store it.
    * @param holder - The vault props it is one of.
    *
-   * @example Wayin.make(vault, vaultProps.wayins[0], vaultProps)   // a PassphraseWayin
-   * @example Wayin.make(vault, { ...record, wayin_id: '' }, vaultProps)   // throws 'damaged_wayin'
+   * @example Wayin.make(vault, vaultProps.passphrase, vaultProps)   // a PassphraseWayin
+   * @example Wayin.make(vault, { ...record, device_id: '' }, vaultProps)   // throws 'damaged_wayin'
    */
+  static make(vault: WayinVault, record: PassphraseWayinRecord, holder: WayinHolder): PassphraseWayin
+  static make(vault: WayinVault, record: PasskeyWayinRecord, holder: WayinHolder): PasskeyWayin
+  static make(vault: WayinVault, record: unknown, holder: WayinHolder): PassphraseWayin | PasskeyWayin
   static make(vault: WayinVault, record: unknown, holder: WayinHolder): PassphraseWayin | PasskeyWayin {
     const checked = WayinRecord.safeParse(record)
     if (! checked.success) {
-      throw new VaultError('damaged_wayin', "A way into this vault is stored in a form this package never writes, so it can't be tried. The other ways in still can.", { cause: checked.error })
+      throw new VaultError('damaged_wayin', "A way into this vault is stored in a form this package never writes, so it can't be tried. The other way in, if the vault has one, still can.", { cause: checked.error })
     }
     return checked.data.wayinkind === 'passphrase' ? new PassphraseWayin(vault, checked.data, holder) : new PasskeyWayin(vault, checked.data, holder)
-  }
-
-  /**
-   * Every way in of `vaultProps`, made as {@link Wayin.make} makes each, in the order the vault
-   * tries them.
-   *
-   * @example Wayin.listOf(vault, vaultProps).map((wayin) => wayin.wayinkind)   // ['passphrase', 'passkey']
-   */
-  static listOf(vault: WayinVault, vaultProps: VaultProps): (PassphraseWayin | PasskeyWayin)[] {
-    return vaultProps.wayins.map((record) => this.make(vault, record, vaultProps))
   }
 
   /** What a locked vault may show of this way in: every field but its wrap and, for a passphrase, its salt. */
@@ -227,32 +215,6 @@ export abstract class Wayin {
   }
 
   /**
-   * The vaultKey out of whichever of `wayins` `proof` opens -- or, given `wayinId`, out of that one
-   * only: a passphrase tried against each passphrase's way in in turn, one derivation apiece, the
-   * first that opens ending the search; a passkey's answer against its credential's way in. A way
-   * in that is damaged, or made by another key deriver, is passed over before the first
-   * derivation, so the outcome never hangs on order, and one damaged way in shuts out no other.
-   *
-   * Refuses with kind 'absent_wayin' when `wayinId` names no way in of the proof's kind, or no
-   * passkey's way in is the answering credential's; 'unknown_key_deriver' when every passphrase it
-   * would try was made by another key deriver; 'damaged_wayin' when every one it would try is
-   * damaged; and as {@link Wayin.tryOpen} refuses when none it tried opens, its message then
-   * saying what was passed over.
-   *
-   * @returns Both lives of the vaultKey, and the `wayin_id` of the way in that opened.
-   *
-   * @example await Wayin.tryOpenAmong(Wayin.listOf(vault, vaultProps), proof)
-   * @example await Wayin.tryOpenAmong(wayins, proof, chosen.wayin_id)   // that way in alone
-   */
-  static async tryOpenAmong(wayins: readonly Wayin[], proof: Proof, wayinId?: string): Promise<Outcome<VaultKeyPair & { wayinId: string }>> {
-    return await outcomeOf(async () => {
-      if (proof instanceof PassphraseProof) { return await openWithPassphrase(wayins, proof, wayinId) }
-      if (proof instanceof PasskeyProof) { return await openWithPasskey(wayins, proof, wayinId) }
-      throw new VaultError('bad_option', "A proof is a passphrase or a passkey's answer, as Proof.parse makes one.")
-    }, unexpectedError)
-  }
-
-  /**
    * A passphrase's way in around `vaultKey`, under a fresh passphraseSalt and the passphraseKey
    * `proof` makes over it. What the key deriver refuses or throws is refused as `proof.wayinKeyFor`
    * says: a condition as itself, anything else as 'unexpected_error', the throw its cause.
@@ -260,7 +222,7 @@ export abstract class Wayin {
    * @param vault - The vault it is for: its scope is bound into the wrap, its key deriver makes the key and is named on the way in.
    * @param proof - The passphrase the way in admits.
    * @param holder - The vault props it will be one of: their `vault_id` and `registered_at` are bound into the wrap.
-   * @param stamp - Its {@link WayinStamp}: id, label, vaultKey epoch, device and time.
+   * @param stamp - Its {@link WayinStamp}: vaultKey epoch, device and time.
    * @param vaultKey - The vaultKey to wrap: extractable, as only such a key can be.
    *
    * @example await Wayin.sealPassphrase(vault, PassphraseProof.parse(vault, chosen), vaultProps, stamp, proven.transientKey)
@@ -294,7 +256,7 @@ export abstract class Wayin {
    * @param vault - The vault it is for: its scope is bound into the wrap and its key.
    * @param proof - What the new passkey answered.
    * @param holder - The vault props it will be one of: their `vault_id` and `registered_at` are bound into the wrap and its key.
-   * @param stamp - Its {@link WayinStamp}: id, label, vaultKey epoch, device and time.
+   * @param stamp - Its {@link WayinStamp}: vaultKey epoch, device and time.
    * @param vaultKey - The vaultKey to wrap: extractable, as only such a key can be.
    *
    * @example await Wayin.sealPasskey(vault, PasskeyProof.parse(vault, await createPasskey(opts)), vaultProps, stamp, proven.transientKey)
@@ -327,7 +289,7 @@ export class PassphraseWayin extends Wayin {
   declare readonly props: PassphraseWayinRecord
   /** Which key deriver made the passphraseKey: `argon2id_web_v1`, or a host's own label. */
   readonly key_deriver_label: string
-  /** This way in's passphraseSalt: fresh for every way in, and for every change of its passphrase. */
+  /** This way in's passphraseSalt: fresh for every passphrase the vault takes. */
   readonly salt_b64: string
 
   /** The way in `record` stands for: made by {@link Wayin.make}, which checks the record first. */
@@ -338,10 +300,10 @@ export class PassphraseWayin extends Wayin {
     Object.freeze(this)
   }
 
-  /** Its kind, id, label, and the device and time that added it: never its salt, never its wrap. */
-  get summary(): WayinSummary {
-    const { wayinkind, wayin_id, wayinlabel, device_id, registered_at } = this
-    return { wayinkind, wayin_id, wayinlabel, device_id, registered_at }
+  /** Its kind, and the device and time that sealed it: never its salt, never its wrap. */
+  get summary(): PassphraseWayinSummary {
+    const { wayinkind, device_id, registered_at } = this
+    return { wayinkind, device_id, registered_at }
   }
 
   /**
@@ -372,7 +334,7 @@ export class PassphraseWayin extends Wayin {
       if (this.key_deriver_label !== this.vault.keyDeriver.key_deriver_label) { throw unknownKeyDeriver() }
       if (this.isDamaged()) { throw damagedPassphrase() }
       const opened = await this.unwrapUnder(await proof.wayinKeyFor(this))
-      if (opened === null) { throw wrongPassphrase('') }
+      if (opened === null) { throw wrongPassphrase() }
       return opened
     }, unexpectedError)
   }
@@ -384,7 +346,7 @@ export class PassphraseWayin extends Wayin {
  * PRF over this way in's own salt. The authenticator holds the secret; the way in holds only which
  * credential to ask and what to ask it.
  *
- * @example if (wayin.wayinkind === 'passkey') { await askPasskey([wayin]) }
+ * @example if (wayin.wayinkind === 'passkey') { await askPasskey(wayin.summary) }
  */
 export class PasskeyWayin extends Wayin {
   declare readonly wayinkind: 'passkey'
@@ -402,10 +364,10 @@ export class PasskeyWayin extends Wayin {
     Object.freeze(this)
   }
 
-  /** Its kind, id, label, the device and time that added it, and the credential and salt a host asks its authenticator with: never its wrap. */
-  get summary(): WayinSummary {
-    const { wayinkind, wayin_id, wayinlabel, device_id, registered_at, credential_id, prf_salt_b64 } = this
-    return { wayinkind, wayin_id, wayinlabel, device_id, registered_at, credential_id, prf_salt_b64 }
+  /** Its kind, the device and time that added it, and the credential and salt a host asks its authenticator with: never its wrap. */
+  get summary(): PasskeyWayinSummary {
+    const { wayinkind, device_id, registered_at, credential_id, prf_salt_b64 } = this
+    return { wayinkind, device_id, registered_at, credential_id, prf_salt_b64 }
   }
 
   /** True at another vaultKey epoch than its vault props, or with a salt that is not base64url of {@link PasskeySaltBytes} bytes. */
@@ -430,68 +392,21 @@ export class PasskeyWayin extends Wayin {
       }
       if (this.isDamaged()) { throw damagedPasskey() }
       if (proof.credentialId !== this.credential_id) {
-        throw new VaultError('wrong_passkey', "That passkey is not this way in's: ask the credential the snapshot's wayins list for it.")
+        throw new VaultError('wrong_passkey', "That passkey is not this vault's: it may have been replaced or removed on another device, or belong to another vault. Ask the credential the snapshot's passkey names.")
       }
       if (proof.prfSaltB64 !== this.prf_salt_b64) {
-        throw new VaultError('wrong_passkey', "The passkey answered for a different salt than this vault keeps for it: ask it again with the prf_salt_b64 the snapshot's wayins list.")
+        throw new VaultError('wrong_passkey', "The passkey answered for a different salt than this vault keeps for it: ask it again with the prf_salt_b64 the snapshot's passkey names.")
       }
       const opened = await this.unwrapUnder(await proof.wayinKeyFor(this))
       if (opened === null) {
-        throw new VaultError('wrong_passkey', "That passkey answered, but its answer didn't unlock the vault: its stored way in may be damaged. Unlock with a passphrase; if that works, remove this passkey and add it again.")
+        throw new VaultError('wrong_passkey', "That passkey answered, but its answer didn't unlock the vault: its stored way in may be damaged. Unlock with the passphrase; if that works, add the passkey again, which replaces it.")
       }
       return opened
     }, unexpectedError)
   }
 }
 
-// == [Opening among several]: openWithPassphrase, openWithPasskey, sealUnderPassphrase, refusals
-
-/** The vaultKey out of whichever of `wayins`' passphrases `proof` opens: see {@link Wayin.tryOpenAmong}. */
-const openWithPassphrase = async (wayins: readonly Wayin[], proof: PassphraseProof, wayinId: string | undefined): Promise<VaultKeyPair & { wayinId: string }> => {
-  const passphrases = wayins.filter((wayin): wayin is PassphraseWayin => wayin instanceof PassphraseWayin)
-  const aimed = wayinId === undefined ? passphrases : passphrases.filter((wayin) => wayin.wayin_id === wayinId)
-  if (aimed.length === 0) { throw absentWayin() }
-  const derivable = aimed.filter((wayin) => wayin.key_deriver_label === proof.vault.keyDeriver.key_deriver_label)
-  if (derivable.length === 0) { throw unknownKeyDeriver() }
-  // Sorted out before the first derivation, so the outcome never hangs on order.
-  const sound = derivable.filter((wayin) => ! wayin.isDamaged())
-  if (sound.length === 0) {
-    if (wayinId !== undefined) { throw damagedPassphrase() }
-    const told = derivable.length < aimed.length
-      ? "Every passphrase of this vault that this package can try is stored damaged, and the others were made with a key deriver this package does not carry. Update safebyok, or open the vault where it was made. The vault was left as it is."
-      : "Every passphrase of this vault is stored damaged, so none could be tried. Unlock with a passkey, if the vault has one, then add a new passphrase. The vault was left as it is."
-    throw new VaultError('damaged_wayin', told)
-  }
-  for (const wayin of sound) {
-    const opened = await wayin.tryOpen(proof)
-    if (opened.ok) { return { ...opened.val, wayinId: wayin.wayin_id } }
-    if (opened.err.refusalkind !== 'wrong_passphrase') { throw opened.err }
-  }
-  const skipped = aimed.length - derivable.length
-  const elsewhere = skipped === 0 ? '' : ` ${skippedByOtherDeriver(skipped)}`
-  if (sound.length < derivable.length) {
-    throw new VaultError('wrong_passphrase', `That passphrase didn't unlock the vault, and one of its passphrases is stored damaged, so could not be tried. Check for typos and try again; if it was that one, unlock another way.${elsewhere}`)
-  }
-  throw wrongPassphrase(elsewhere)
-}
-
-/**
- * The vaultKey out of the passkey's way in of the credential that answered `proof` -- given
- * `wayinId`, only if that is the way in it names. Nothing to try in turn: a credential has at most
- * one way into a vault.
- */
-const openWithPasskey = async (wayins: readonly Wayin[], proof: PasskeyProof, wayinId: string | undefined): Promise<VaultKeyPair & { wayinId: string }> => {
-  const wayin = wayins.find((candidate) => (
-    candidate instanceof PasskeyWayin && candidate.credential_id === proof.credentialId
-    && (wayinId === undefined || candidate.wayin_id === wayinId)
-  ))
-  if (wayin === undefined) {
-    throw new VaultError('absent_wayin', "None of this vault's passkeys is the one that answered: it may have been removed on another device, or be a passkey for another vault. Look again at the snapshot's wayins.")
-  }
-  const opened = await wayin.tryOpen(proof)
-  if (! opened.ok) { throw opened.err }
-  return { ...opened.val, wayinId: wayin.wayin_id }
-}
+// == [Sealing and refusals]: sealUnderPassphrase, wrongPassphrase, unknownKeyDeriver, damagedPassphrase, damagedPasskey
 
 /** The way in around `vaultKey` under `proof`'s key, and that key. */
 const sealUnderPassphrase = async (vault: WayinVault, proof: PassphraseProof, holder: WayinHolder, stamp: WayinStamp, vaultKey: CryptoKey) => {
@@ -508,26 +423,12 @@ const sealUnderPassphrase = async (vault: WayinVault, proof: PassphraseProof, ho
   return { wayin, wayinKey }
 }
 
-/** What a wrong passphrase adds when `count` of the vault's passphrases were passed over for another key deriver's. */
-const skippedByOtherDeriver = (count: number): string => {
-  const [subject, verb, which] = count === 1
-    ? ["One of this vault's passphrases was", 'it was', 'that one']
-    : [`${String(count)} of this vault's passphrases were`, 'they were', 'one of those']
-  return `${subject} made with a key deriver this package does not carry, so ${verb} not tried: if the passphrase you typed is ${which}, open the vault where it was made.`
-}
-
-/** The refusal of a passphrase that opened nothing, `elsewhere` saying what else was passed over. */
-const wrongPassphrase = (elsewhere: string) => new VaultError('wrong_passphrase', `That passphrase didn't unlock the vault. Check for typos and try again. If you're sure it's right, the stored vault may be damaged.${elsewhere}`)
+/** The refusal of a passphrase that opened nothing. */
+const wrongPassphrase = () => new VaultError('wrong_passphrase', "That passphrase didn't unlock the vault. Check for typos and try again. If you're sure it's right, the stored vault may be damaged.")
 
 const unknownKeyDeriver = () => new VaultError('unknown_key_deriver', 'This vault was made with a key deriver this package does not carry: update safebyok, or open the vault where it was made.')
 
-const damagedPassphrase = () => new VaultError('damaged_wayin', "That passphrase's way into the vault is stored damaged, so it could not be tried. Unlock another way, then remove it and add the passphrase again. The vault was left as it is.")
+const damagedPassphrase = () => new VaultError('damaged_wayin', "This vault's passphrase is stored damaged, so it could not be tried. If the vault has a passkey, unlock with it to read what it holds; a damaged passphrase can't be replaced, so the vault is then to be removed and made again. The vault was left as it is.")
 
-const damagedPasskey = () => new VaultError('damaged_wayin', "This passkey's way into the vault is stored damaged, so it could not be tried. Unlock with a passphrase, then remove this passkey and add it again. The vault was left as it is.")
-
-/**
- * The refusal for a `wayin_id` that names no way in of the vault props: it may have been removed on
- * another device. Never quotes the id.
- */
-export const absentWayin = () => new VaultError('absent_wayin', "This vault has no way in with that wayin_id: it may have been removed on another device. Look again at the snapshot's wayins.")
+const damagedPasskey = () => new VaultError('damaged_wayin', "This vault's passkey is stored damaged, so it could not be tried. Unlock with the passphrase, then add the passkey again, which replaces it. The vault was left as it is.")
 // --

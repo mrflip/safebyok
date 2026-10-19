@@ -13,8 +13,12 @@ describe("selectionOf", () => {
 })
 
 describe("recordOf", () => {
-  it("keeps the fields asked for, leaving out a null one and a GraphQL client's __typename", () => {
-    expect(recordOf({ vault_id: 'v1', wayins: null, __typename: 'SafebyokVaultProps' }, [['vault_id', 'plain'], ['wayins', 'plain']])).to.deep.equal({ vault_id: 'v1' })
+  it("keeps the fields asked for, a null one as null, leaving out a GraphQL client's __typename, as its example shows", () => {
+    expect(recordOf({ vault_id: 'v1', passkey: null, __typename: 'SafebyokVaultProps' }, [['vault_id', 'plain'], ['passkey', 'plain']])).to.deep.equal({ vault_id: 'v1', passkey: null })
+  })
+
+  it("leaves out a field asked for that was not sent", () => {
+    expect(recordOf({ vault_id: 'v1' }, [['vault_id', 'plain'], ['passkey', 'plain']])).to.deep.equal({ vault_id: 'v1' })
   })
 
   it("gives back a whole box as it was, and a ciphered field as its two halves alone", () => {
@@ -24,9 +28,10 @@ describe("recordOf", () => {
     expect(recordOf(answered, BoxFields)).to.deep.equal(box)
   })
 
-  it("gives back the vault props' wayins as they were, never looked inside", () => {
-    const vaultProps = TH.vaultPropsOf('u1', { wayins: [TH.wayinOf('passphrase'), TH.wayinOf('home_phrase')] })
+  it("gives back the vault props' passphrase and passkey as they were, never looked inside", () => {
+    const vaultProps = TH.vaultPropsOf('u1', { passphrase: TH.wayinOf('home_phrase'), passkey: TH.passkeyWayinOf('laptop') })
     expect(recordOf(vaultProps, VaultPropsFields)).to.deep.equal(vaultProps)
+    expect(recordOf(TH.vaultPropsOf('u1'), VaultPropsFields)).to.deep.equal(TH.vaultPropsOf('u1'))
   })
 
   it("carries a box's sidecar as the JSON text it was written as", () => {

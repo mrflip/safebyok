@@ -392,7 +392,7 @@ describe("the abstract VaultDB, around an adapter's half", () => {
 const RefusedWrites = [
   // the records:
   ['bad_record', (vaultDB: VaultDB) => vaultDB.ensureVaultProps({ ...TH.vaultPropsOf('u1'), unlock_epoch: 1.5 }),                              'vault props with a fractional unlock_epoch'],
-  ['bad_record', (vaultDB: VaultDB) => vaultDB.ensureVaultProps({ ...TH.vaultPropsOf('u1'), wayins: [omit(TH.wayinOf('passphrase'), ['vault_key_wayin_wrapped'])] } as VaultProps), 'vault props whose wayin is missing its wrapped vaultKey'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.ensureVaultProps({ ...TH.vaultPropsOf('u1'), passphrase: omit(TH.wayinOf('passphrase'), ['vault_key_wayin_wrapped']) } as VaultProps), 'vault props whose passphrase is missing its wrapped vaultKey'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.ensureVaultProps({ ...TH.vaultPropsOf('u1'), applabel: 'Ac\u{7}me' }),                         'vault props whose applabel holds a control character, the record at fault though only its label failed'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.putVaultProps({ ...TH.vaultPropsOf('u1'), user_id: 'u^1' }, { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'an update of the vault props whose user_id holds a ^'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.putBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one', { sidecar_json: 'not json' }), TH.noBoxYet), 'a box whose sidecar no read would accept'],
@@ -468,13 +468,10 @@ describe("the abstract VaultDB, deleting a vault whose vault props are damaged",
     }
   })
 
-  const Wayin = TH.vaultPropsOf('u1').wayins[0]
   const NewerRecords = [
-    [{ format: 'safebyok-vault-v5' },                                                      'a format this version does not know, whatever else it holds'],
-    [(vaultProps: VaultProps) => ({ ...vaultProps, format: 'safebyok-vault-v5' }),                'vault props that are otherwise sound but for their format'],
+    [{ format: 'safebyok-vault-v6' },                                                      'a format this version does not know, whatever else it holds'],
+    [(vaultProps: VaultProps) => ({ ...vaultProps, format: 'safebyok-vault-v6' }),         'vault props that are otherwise sound but for their format'],
     [(vaultProps: VaultProps) => ({ ...vaultProps, format: 2 }),                           'a format of another type'],
-    [(vaultProps: VaultProps) => ({ ...vaultProps, wayins: [...vaultProps.wayins, { wayinkind: 'smartcard', wayin_id: 'x' }] }), 'a wayinkind this version does not know'],
-    [(vaultProps: VaultProps) => ({ ...vaultProps, wayins: Array.from({ length: 9 }, () => Wayin) }), 'more wayins than this version holds'],
   ] as const
 
   for (const [record, blurb] of NewerRecords) {
@@ -488,16 +485,29 @@ describe("the abstract VaultDB, deleting a vault whose vault props are damaged",
     })
   }
 
-  it("still deletes vault props that fail for anything it can only take for damage: a known format and methods, in number", async () => {
-    const vaultDB = withDamagedVaultProps((vaultProps) => ({ ...vaultProps, wayins: [{ ...Wayin, salt_b64: 7 }], registered_at: 'later' }))
-    await TH.expectingGood(vaultDB).delDamagedVault(TH.scopeOf('u1'))
-    expect(vaultDB.rows.size).to.eq(2)
+  it("still deletes vault props that fail for anything it can only take for damage: a known format, whatever its ways in hold", async () => {
+    const spoilers = [
+      (vaultProps: VaultProps) => ({ ...vaultProps, passphrase: { ...vaultProps.passphrase, salt_b64: 7 }, registered_at: 'later' }),
+      (vaultProps: VaultProps) => ({ ...vaultProps, passkey: { ...TH.passkeyWayinOf('laptop'), wayinkind: 'smartcard' } }),
+    ]
+    for (const spoil of spoilers) {
+      const vaultDB = withDamagedVaultProps(spoil)
+      await TH.expectingGood(vaultDB).delDamagedVault(TH.scopeOf('u1'))
+      expect(vaultDB.rows.size).to.eq(2)
+    }
   })
 
   it("deletes vault props in a format an earlier version wrote, which is older, never newer", async () => {
-    const vaultDB = withDamagedVaultProps(({ vault_key_epoch: _epoch, ...vaultProps }) => ({ ...vaultProps, format: 'safebyok-vault-v1' }))
-    await TH.expectingGood(vaultDB).delDamagedVault(TH.scopeOf('u1'))
-    expect(vaultDB.rows.size).to.eq(2)
+    const { passphrase, passkey: _passkey, ...vaultPropsWithoutSlots } = TH.vaultPropsOf('u1')
+    const olders = [
+      ({ vault_key_epoch: _epoch, ...vaultProps }: VaultProps) => ({ ...vaultProps, format: 'safebyok-vault-v1' }),
+      () => ({ ...vaultPropsWithoutSlots, format: 'safebyok-vault-v4', wayins: [{ ...passphrase, wayin_id: 'wayin-passphrase', wayinlabel: 'passphrase' }] }),
+    ]
+    for (const older of olders) {
+      const vaultDB = withDamagedVaultProps(older)
+      await TH.expectingGood(vaultDB).delDamagedVault(TH.scopeOf('u1'))
+      expect(vaultDB.rows.size).to.eq(2)
+    }
   })
 
   it("aims the deletion at the vault_id it read, so a vault made anew meanwhile survives as stale_write", async () => {

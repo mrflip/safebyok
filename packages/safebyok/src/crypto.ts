@@ -65,7 +65,7 @@ export type CipherCtxPart = string | number | Readonly<Record<string, string | n
  * field as no field at all), so nothing is encrypted or opened under it.
  *
  * @example cipherCtx('safebyok-lease-v1', 'acme', 'u1', 'main', vaultId, 1, askPassphraseAt, 'vault_key_lease_wrapped')
- * @example cipherCtx('safebyok-vault-v4', 'acme', 'u1', 'main', vaultId, registeredAt, 'vault_key_passphrase_wrapped', { wayinkind: 'passphrase', wayin_id, wayinlabel, key_deriver_label, salt_b64 })
+ * @example cipherCtx('safebyok-vault-v5', 'acme', 'u1', 'main', vaultId, registeredAt, 'vault_key_passphrase_wrapped', { wayinkind: 'passphrase', key_deriver_label, salt_b64, vault_key_epoch, device_id, registered_at })
  */
 export const cipherCtx = (...parts: readonly CipherCtxPart[]): Uint8Array => {
   if (parts.some((part) => isUnbound(part))) {

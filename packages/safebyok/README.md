@@ -72,7 +72,7 @@ settles it. A hello that fails reading storage refuses to its caller and leaves 
 within `staleMinutes` (five minutes, unless `Vault.make` or the call says otherwise) reads nothing
 anew; call `hello()` on `visibilitychange`, and `hello({ staleMinutes: 0 })` to read now.
 
-The vault's fields -- `state`, `boxes`, `wayins`, `capacity`, `askPassphraseAt`, `trouble`,
+The vault's fields -- `state`, `boxes`, `passphrase`, `passkey`, `capacity`, `askPassphraseAt`, `trouble`,
 `vault_id` and the rest -- are live and read-only: read them in an event handler and they are
 current. React renders from `getSnapshot()`, the same fields frozen in one object.
 
@@ -89,13 +89,14 @@ code, the stored records and these docs all use its words.
   one whisper, encrypted, with its `boxlabel` and its **sidecar**, your app's own data that
   rides beside it, visible in storage: authenticated, never encrypted. A **vault** is one user's set of boxes, named by your `applabel`,
   the signed-in user's id and a `vaultlabel`.
-* The vault is unlocked by a **proof** of one of its **wayins**: a passphrase, or a passkey's
-  answer. Each wayin holds the one **vaultKey** (the vault's random master key) wrapped under a key
-  made from that proof, so adding, changing or deleting a wayin rewrites no box. The vaultKey
-  wraps a fresh **boxKey** for every stored whisper, and the boxKey encrypts the whisper.
-  The wayins live in the **vault props**, the one record per vault that every device syncs. The
-  backend holds those and the boxes, nothing else: every key and whisper in them is
-  ciphertext; only their labels, ids, times and sidecars are not, and those are unencrypted, readable by anyone who can read your database.
+* The vault is unlocked by a **proof** of one of its two **wayins**: its passphrase, which every
+  vault has, or its passkey's answer, if it has one. Each wayin holds the one **vaultKey** (the
+  vault's random master key) wrapped under a key made from that proof, so changing the
+  passphrase, or adding or removing the passkey, rewrites no box. The vaultKey wraps a fresh
+  **boxKey** for every stored whisper, and the boxKey encrypts the whisper. The wayins live in
+  the **vault props**, the one record per vault that every device syncs. The backend holds those
+  and the boxes, nothing else: every key and whisper in them is ciphertext; only their labels,
+  ids, times and sidecars are not, and those are unencrypted, readable by anyone who can read your database.
 * A **lease** lets this device unlock again without a proof for a while: when a proof unlocks the
   vault, the device keeps the vaultKey wrapped under a key the browser cannot export, until
   `leaseHours` run out. It never leaves the device.
@@ -197,8 +198,7 @@ vault.getSnapshot().boxes[0]  // { boxlabel: 'anthropic_api_key', sidecar: {}, d
 
 ## Names, and your own checks
 
-By default a label (`applabel`, `vaultlabel`, `boxlabel`, and the `wayinlabel` of each way in
-you add) is lowercase words of letters and digits joined by single underscores, 2 to 40
+By default a label (`applabel`, `vaultlabel`, `boxlabel`) is lowercase words of letters and digits joined by single underscores, 2 to 40
 characters (`Label`); and a `userId` is 1 to 100 ASCII letters, digits and `-_.:@+|` (`UserId`),
 which holds every stable id an auth provider issues -- a UUID, Auth0's `provider|id`, Clerk's
 `user_...`, a DID -- and pass your provider's stable, opaque id, never an email or a handle,
@@ -232,12 +232,11 @@ await vault.putBox('מפתח OpenAI: עבודה', 'sk-...', { sidecar: { note: '
   lowercases would otherwise send the same user to another vault. Nothing is normalized either:
   text not in NFC is refused, never composed for you.
 * **Your checks are an alarm at the door, not a promise about storage.** They run where a name
-  enters the vault: `Vault.make` (the scope), `putBox()` (the boxlabel), `addPassphrase` and
-  `addPasskey` (the wayinlabel). A box already stored under a name they refuse
+  enters the vault: `Vault.make` (the scope) and `putBox()` (the boxlabel). A box already stored under a name they refuse
   -- by another client, or before you narrowed them -- lists, reads and deletes as any other, by
   the name it was stored under; `putBox()` refuses only to write a new one under a refused name.
   With nothing stored under it, a name they refuse is `bad_label` at `getBox()`, `useBox()` and
-  `delBox()`. The first way in, which the vault names `passphrase`, is not checked.
+  `delBox()`.
 * **Widen with care.** A check admitting text outside ASCII should require NFC, as the floor
   does, and widen only once every client you serve runs the wider check: an older one refuses at
   its door the names a newer one stores.
@@ -379,10 +378,10 @@ const getProof: GetProof = async (ask) => {
 
 * **`ask.why`** is `absent` (this passphrase makes the vault: offer strength advice), `locked`,
   or `lease_ending` (the call asked `ensureLease({ renewMinutes })` minutes ahead).
-* **`ask.attempt(proof, { wayinId? })`** tries one passphrase, or a passkey's answer, and
+* **`ask.attempt(proof)`** tries the passphrase, or the passkey's answer, and
   resolves an `Outcome`. The retry loop lives in your dialog: `wrong_passphrase`,
   `wrong_passkey`, `weak_passphrase` and `created_elsewhere` are shown in place to ask again;
-  `absent_wayin`, `damaged_wayin` and `passkey_unavailable` offer another way in;
+  `absent_wayin`, `damaged_wayin` and `passkey_unavailable` offer the other way in;
   `vault_locked` (a lock won), `storage_unavailable` and anything else close the dialog.
 * **Answer** `'unlocked'` once an attempt is ok, `'declined'` when the user dismisses it, and
   `'carry_on'` -- only for `lease_ending` -- to go on under the lease that stands. Anything else
@@ -417,10 +416,9 @@ with no call needed: the snapshot reads `locked`, and every call that needs the 
 `vault_locked`, work already under way included. A timer that runs late, as one may on a device
 that slept, is caught at the next call. The timer is `unref`'d, so it never holds a Node or Bun process open.
 
-**The lease starts again whenever the user types a passphrase and it proves**: an `unlock()`, a
-`changePassphrase()`, and an `addPassphrase()`, `addPasskey()` or `delWayin()` with a
-passphrase as proof. An `unlock()` with a passkey sets it too. Nothing else moves it: not a read,
-a store or a refresh, nor a passkey proving a change on a vault already unlocked. The lease
+**The lease starts again whenever the user proves who they are**: an `unlock()`, by passphrase
+or passkey, and a `changePassphrase()`, `addPasskey()` or `delWayin()`, each proven by the
+passphrase. Nothing else moves it: not a read, a store or a refresh. The lease
 expiring while an `unlock()` or `changePassphrase()` is under way is no lock: the call ends
 unlocked, with a lease of its own.
 
@@ -602,50 +600,44 @@ says these things:
   (`{ call: 'onBadNews' }`, what it threw as its error). It goes to the platform's `reportError`
   too, where there is one, and the vault's `trouble` keeps it.
 
-## Several passphrases
+## The passphrase and the passkey
 
-A vault may have up to `MaxUnlocks` (8) passphrases and passkeys together, each its own way in: a daily one, one
-written down at home, one a partner holds. Each wraps the same vaultKey under its own salt, no
-passphrase is ever stored, and adding or removing one rewrites no box. The snapshot lists
-them, locked or not, as `wayins`: each a `wayinkind` (`passphrase` or `passkey`), a `wayin_id`, the
-`wayinlabel` the user chose, and when it was added and by which device (`registered_at`,
-`device_id`); a passkey's carries its `credential_id` and `prf_salt_b64` too, for asking the
-authenticator. `vault.wayins` is the same list. Neither holds a passphrase's salt or any wrapped
-vaultKey -- what an offline guess at a passphrase starts from -- so a snapshot in React state,
-devtools or an error report gives none away; the vault keeps the stored records to itself. A way in stored in a form this package never writes
-cannot be tried, but the others still open the vault: the read that finds it succeeds, and
-`onBadNews` is told `damaged_wayin`, `meta.wayin_listed` naming it.
+A vault has exactly one passphrase, and at most one passkey. Each wraps the same vaultKey under
+its own salt, no passphrase is ever stored, and changing either rewrites no box. The snapshot
+shows them, locked or not, as `passphrase` and `passkey` (null while the vault has none): each a
+`wayinkind`, and when it was set and by which device (`registered_at`, `device_id`); the
+passkey's carries its `credential_id` and `prf_salt_b64` too, for asking the authenticator.
+`vault.passphrase` and `vault.passkey` are the same. Neither holds the passphrase's salt or any
+wrapped vaultKey -- what an offline guess at a passphrase starts from -- so a snapshot in React
+state, devtools or an error report gives none away; the vault keeps the stored records to itself.
+A way in stored in a form this package never writes cannot be tried, but the other still opens
+the vault: the read that finds it succeeds, and `onBadNews` is told `damaged_wayin`,
+`meta.wayin_listed` naming it.
 
 ```ts
-vault.getSnapshot().wayins        // [{ wayinkind: 'passphrase', wayin_id: '1b9d...', wayinlabel: 'passphrase', device_id: 'k3x9...', registered_at: 1760000000000 }]
+vault.getSnapshot().passphrase    // { wayinkind: 'passphrase', device_id: 'k3x9...', registered_at: 1760000000000 }
+vault.getSnapshot().passkey       // null, until one is added
 
-const spareId = await vault.addPassphrase(passphrase, spare, { wayinlabel: 'written_down' })
-await vault.changePassphrase(spare, renewedSpare)       // changes that one; the first still opens
-await vault.delWayin(passphrase, spareId)            // never the last one: 'last_wayin'
-await vault.unlock(passphrase, { wayinId })             // aimed at one: a single key derivation
+await vault.changePassphrase(passphrase, newPassphrase)   // stamped afresh: this device, now
 ```
 
-* **Every change asks for proof**, even on an unlocked vault: the vault keeps no copy of
-  its vaultKey it could wrap anew, and a walked-away unlocked screen should not be able to add a
-  way in. Any way in the vault has will do: a passphrase, or a passkey's answer. That includes
-  `changePassphrase`, so a user who forgot their passphrase sets a new one with their
-  fingerprint: `vault.changePassphrase(passkey, newPassphrase)`, naming which passphrase with
-  `{ wayinId }` when the vault has several.
+* **Every change asks for the passphrase**, even on an unlocked vault: the vault keeps no copy of
+  its vaultKey it could wrap anew, and a walked-away unlocked screen should not be able to change
+  a way in. Only the standing passphrase proves a change -- a new passphrase, a passkey added or
+  removed -- never a passkey's answer, which is refused `bad_option`: this is how it is done
+  everywhere else. A passkey opens the vault; it does not change who may.
 * **Every change locks the other devices.** It moves the vault props' `unlock_epoch`, so each
-  other device falls back to `locked` and must unlock with a passphrase still standing. This
-  device stays unlocked.
-* **An unlock not aimed at one tries each in turn**, one key derivation apiece: about 0.6 s each
-  with the browser's deriver, so a mistyped passphrase in a vault of eight takes about five
-  seconds to refuse. A host that knows which one the user means (a picker over `wayins`) passes
-  its `wayinId`.
-* **Removal is not revocation.** A removed passphrase stops opening the vault from here on, but
-  whoever knew it and kept a copy of the vault props from before can still open that copy, and the
-  vaultKey inside is the one the vault still uses. There is no key rotation yet.
+  other device falls back to `locked` and must unlock again. This device stays unlocked.
+* **An unlock tries the one passphrase**: one key derivation, about 0.6 s with the browser's
+  deriver.
+* **Removal is not revocation.** An old passphrase, or a removed passkey, stops opening the vault
+  from here on, but whoever knew it and kept a copy of the vault props from before can still open
+  that copy, and the vaultKey inside is the one the vault still uses. There is no key rotation yet.
 
 ## A new passphrase's strength
 
 Every passphrase about to become a way in -- the one the first `unlock()` creates the vault
-with, and each `addPassphrase()` or `changePassphrase()` sets -- is put to the vault's
+with, and each `changePassphrase()` sets -- is put to the vault's
 `passphraseStrengthTest` first, before any key derivation. One it finds weak is refused with kind
 `weak_passphrase`, the test's reason the message. An `unlock()` of a vault that stands is never
 refused for weakness: a passphrase already in use is the user's to change, not the vault's to
@@ -699,7 +691,7 @@ await zxcvbnPassphraseTest('skylarkpinecone', { applabel: 'skylark', user_id: 'u
 
 ## Fingerprint unlock (passkeys)
 
-A vault's ways in may include passkeys: a fingerprint, a face, a phone or a security key, whose
+A vault may have one passkey: a fingerprint, a face, a phone or a security key, whose
 authenticator answers for the vault through the WebAuthn PRF extension. The core never calls
 WebAuthn: it takes the answer as a `PasskeyAnswer` (`{ credentialId, prfSaltB64, prfBytes }`),
 which `safebyok-react`'s `createPasskey` and `askPasskey` make (they import no React, so any
@@ -707,40 +699,42 @@ framework's host can use them).
 
 ```ts
 // The vault checks the passphrase first, then calls createPasskey: a wrong one makes no passkey.
-const wayinId = await vault.addPasskey(passphrase, () => createPasskey({ rp: { name: 'Acme' }, user: { name: email, displayName } }), { wayinlabel: 'laptop' })
-// wayinId is null if the user dismissed the prompt
+const added = await vault.addPasskey(passphrase, () => createPasskey({ rp: { name: 'Acme' }, user: { name: email, displayName } }))
+// added is false if the user dismissed the prompt
 
-vault.getSnapshot().wayins        // [..., { wayinkind: 'passkey', wayin_id, wayinlabel: 'laptop', device_id, registered_at, credential_id, prf_salt_b64 }]
+vault.getSnapshot().passkey       // { wayinkind: 'passkey', device_id, registered_at, credential_id, prf_salt_b64 }
 
-const answer = await askPasskey(vault.getSnapshot().wayins)    // null if the user dismissed it
+const answer = await askPasskey(vault.getSnapshot().passkey)   // null if the user dismissed it
 if (answer !== null) { await vault.unlock(answer) }             // no key derivation to wait for
+
+await vault.delWayin(passphrase)                                // the passkey is gone
 ```
 
-* **A passkey is a way in like a passphrase.** Its wayin wraps the same vaultKey, under a key
+* **A passkey is a way in like the passphrase.** Its wayin wraps the same vaultKey, under a key
   made from the passkey's answer by HKDF-SHA256; an unlock with it grants this device a lease
-  for `leaseHours`, and `askPassphraseAt` applies, as for a passphrase. It counts
-  toward `MaxUnlocks`.
-* **Adding one asks for proof**, a passphrase or another passkey's answer, as every change to the
-  ways in does; `addPassphrase` and `delWayin` take a passkey's answer as proof too.
-  `changePassphrase` changes a passphrase only.
-* **A passkey can stand in for a forgotten passphrase**: `addPassphrase(answer, fresh, {
-  wayinlabel })`, then `delWayin(answer, oldId)`. But **a vault always keeps a passphrase**:
-  removing the last one refuses with kind `last_wayin`, since a passkey can be lost with its
-  device. A vault is created with a passphrase, too: a passkey's `unlock()` on an `absent` vault
-  refuses with `absent_vault`.
+  for `leaseHours`, and `askPassphraseAt` applies, as for the passphrase.
+* **One passkey per vault.** Adding one replaces the passkey the vault had, if any: the snapshot's
+  `passkey` says which it is, when it was added and from which device, so warn the user before
+  asking ("this replaces the passkey added on 3 Oct from another device"). Adding the same
+  passkey again mends one stored damaged.
+* **Adding or removing one asks for the passphrase**, as every change to the ways in does; a
+  passkey's answer proves neither. `delWayin` on a vault with no passkey refuses `absent_wayin`,
+  and so does a passkey's `unlock()`. A vault is created with a passphrase, too: a passkey's
+  `unlock()` on an `absent` vault refuses with `absent_vault`.
 * **Where it works.** A passkey answers on the device that holds it: a platform passkey synced by
   iCloud Keychain or Google Password Manager on every device signed in to that account, a security
   key wherever it is plugged in. Browsers and authenticators without PRF refuse with kind
   `passkey_unavailable`; offer the passphrase then.
-* **Removal is not revocation**, here as for a passphrase: a removed passkey still opens a copy of
-  the vault props kept from before.
+* **Removal is not revocation**, here as for the passphrase: a removed passkey still opens a copy
+  of the vault props kept from before.
 
 ## No recovery
 
 There is no recovery path, on purpose. A forgotten passphrase means an unrecoverable vault: the
 user re-enters their API keys, which is annoying, not catastrophic. Say so in your UI; the React
-binding's passphrase dialog does. A passkey added beforehand is the one way back in: with it the
-user sets a new passphrase.
+binding's passphrase dialog does. A passkey added beforehand still opens the vault, so the user
+can read what it holds; but it cannot set a new passphrase, which only the old one proves, so a
+vault whose passphrase is forgotten is, in the end, removed and made again.
 
 ## Errors
 
@@ -778,7 +772,7 @@ nearest error boundary, and hands a condition down as `useOpenError()`'s `openEr
 
 | Kind                  | What happened                                                    | What to do                                              |
 | --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |
-| `bad_label`           | a label (or the `userId`) that fails the vault's check: `Label` (or `UserId`) by default, or the host's own in `validators`; or a `wayinlabel` the vault already has | Pass labels the app chose; check a user-typed one first with the same check, and against the snapshot's `wayins` |
+| `bad_label`           | a label (or the `userId`) that fails the vault's check: `Label` (or `UserId`) by default, or the host's own in `validators` | Pass labels the app chose; check a user-typed one first with the same check |
 | `bad_whisper`         | a whisper JSON cannot carry (`undefined`, a function, a class instance) | Store plain JSON; to empty a box, `delBox` it |
 | `bad_option`          | an option or argument out of its range: a `Vault.make` option, or one it does not take, an `argon2idDeriver` spec, a `putBox()`'s sidecar, a passphrase or callback of the wrong type; a passkey's answer of the wrong shape, or one already a way in | Fix the call; the message names what it takes |
 | `bad_record`          | a record or expectation handed to a `VaultDB` verb that is not one this package builds: a malformed box or vault props, a name in one below the floor and a store handed no box at all included, an expectation missing a field, or a record and its expectation that disagree about the `vault_id` or `vault_key_epoch` (a name handed to a verb on its own or in a scope is `bad_label`, and so is a name the floor admits but longer than the storage holds, in a record or not) | A bug in a hand-built record or a custom adapter's caller: hand a `VaultDB` only the records and expectations a vault builds; the message names which |
@@ -796,17 +790,15 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `vault_locked`        | the vault is locked and no proof came: the `getProof` prompt was declined, there is no `getProof`, or a lock won while the call ran | Nothing to retry: the user said no, or locked it. With no `getProof`, ask for the passphrase and `unlock()`, then call again |
 | `wrong_passphrase`    | the passphrase did not unlock the vault, or was empty. A passphrase wayin altered in storage refuses its passphrase in just the same way, so the message says that the stored vault may be damaged | Ask again, with a hint to check for typos. If your handling says "check for typos", treat `created_elsewhere` alongside it, with its own advice |
 | `created_elsewhere`   | a first `unlock()` on an `absent` vault lost a race: another device created the vault between this one's look at storage and its write, and the passphrase given does not open that vault. Nothing was created here, and the vault now shows `locked` as the other device made it. A passphrase that does open it unlocks as usual | Show the message as advice, not as a typo: the user enters the passphrase chosen on the other device |
-| `weak_passphrase`     | a new passphrase -- the one the first `unlock()` creates the vault with, or one `addPassphrase()` or `changePassphrase()` sets -- that the vault's `passphraseStrengthTest` finds too easy to guess. The message is the test's own reason. Never raised by an `unlock()` of a vault that stands | Show the message beside the field, and ask for another |
-| `wrong_passkey`       | the passkey's answer did not unlock the vault, or answered for another salt. An answer for the wayin's own salt that does not open it most likely means the wayin was altered in storage, and the message says so | Ask for a passphrase; if it works, the user may remove that passkey and add it again |
+| `weak_passphrase`     | a new passphrase -- the one the first `unlock()` creates the vault with, or one `changePassphrase()` sets -- that the vault's `passphraseStrengthTest` finds too easy to guess. The message is the test's own reason. Never raised by an `unlock()` of a vault that stands | Show the message beside the field, and ask for another |
+| `wrong_passkey`       | the passkey's answer did not unlock the vault, or answered for another salt. An answer for the wayin's own salt that does not open it most likely means the wayin was altered in storage, and the message says so | Ask for the passphrase; if it works, the user may add the passkey again, which replaces it |
 | `passkey_unavailable` | this browser or authenticator cannot answer for a passkey unlock: no WebAuthn, or no PRF extension | Offer the passphrase instead; on `createPasskey`, tell the user this device cannot be a fingerprint unlock |
 | `absent_box`          | no box under that label                                      | Offer to create it, or refresh the list: it may have been deleted elsewhere |
 | `absent_vault`        | the vault has never been created, or was deleted elsewhere, and the call will not create it | Unlock with a new passphrase to create it |
-| `absent_wayin`        | no way into the vault has that `wayin_id`, or is the passkey that answered: it may have been removed on another device | Look again at the snapshot's `wayins`, and ask the user which they mean |
+| `absent_wayin`        | a passkey was asked for -- to unlock with, or to remove -- and the vault has none: it may have been removed on another device | Offer the passphrase; the snapshot's `passkey` is null |
 | `whisper_too_large`   | a whisper over the vault's `maxWhisperBytes`                     | Tell the user it is too large; a host that means to allow more passes a larger `maxWhisperBytes` |
 | `box_too_large`   | a box -- its whisper, sidecar and boxlabel together, as the UTF-8 bytes of its JSON -- over its storage's `maxRecordBytes`; only a host whose validators admit long names, or a backend with small records, meets it | Tell the user to store a smaller whisper or sidecar |
 | `vault_full`          | a new box in a vault already holding its `maxBoxes`, a new box whose names would take the vault past its storage's `maxVaultBytes`, or a write the storage backend has no room for | Tell the user to remove a box first; the host may raise `maxBoxes` where the backend allows |
-| `too_many_wayins`     | a passphrase or passkey added to a vault already holding `MaxUnlocks` (8) ways in | Tell the user to remove one first             |
-| `last_wayin`          | removing the vault's last passphrase: a vault always keeps one, since a passkey can be lost with its device | Add another passphrase first; to be rid of the vault, `del()` it |
 | `corrupt_record`      | a stored record failed validation as storage read it back: storage's own word, from a `VaultDB` called directly. A vault call says what it means for the vault instead, as one of the three below -- but for a `putBox()` whose storage adapter answered its write with a record that fails its checks, or a `delBox()` whose adapter answered in a shape this package does not know: a bug in that adapter | Nothing was changed, unless a write was answered so: then it may have landed. Do not retry; see a developer: the record is damaged, was moved, or came from a newer safebyok, or the adapter cannot read back what it writes or reports |
 | `stale_write`         | storage changed since this device read it, so the write was refused and nothing was written: another device or tab wrote, created or deleted the box a `putBox()` was writing; a `delBox()` into a vault deleted or made anew elsewhere, its message saying the box could not be removed because its vault is gone; and a write whose catch-up with storage then failed too (its `cause` says why; the snapshot reads `syncing: false`) -- unless the catch-up was refused as `identity_revoked`, `rolled_back` or `newer_format`, which the write throws as it came | The vault has caught up: show what stands now and, if the change still applies, repeat it (*Two devices storing at once*, below). Nothing is tried again by itself |
 | `not_permitted`       | the storage backend refused the signed-in user, still the vault's own, this one call | Tell the user they may not; signing in again will not help |
@@ -832,9 +824,9 @@ const vault = Vault.make({ ...opts, onBadNews: (news) => { telemetry.report(news
 | Kind                  | What happened                                                    | What to do                                              |
 | --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |
 | `damaged_vault`       | the vault's stored props failed their checks (not a shape this package writes, or naming another vault), so no way in can be tried: `hello()` refuses it | Nothing was changed, and a retry will not mend it. Tell the user the vault cannot be opened; restore its props from a backup, if there is one, or, if the user chooses to start over, `delDamagedVault()` (see *A vault that cannot be opened*) |
-| `damaged_wayin`       | a way in is stored in a form this package never writes (a salt of the wrong length, or not base64url), so it cannot be tried: the passkey asked for, the passphrase `wayinId` aims at, or every passphrase the vault has. Other ways in are still tried | Unlock another way, then `delWayin()` the damaged one and add it again |
+| `damaged_wayin`       | a way in is stored in a form this package never writes (a salt of the wrong length, or not base64url), so it cannot be tried: the passphrase, or the passkey. The other is still tried | A damaged passkey: unlock with the passphrase, and add the passkey again. A damaged passphrase: unlock with the passkey, if there is one, to read what the vault holds; it cannot be changed, so the vault is then removed and made again |
 | `damaged_box`     | a box failed its checks as read, or would not open under the vault's own vaultKey, or opened to no whisper: altered in storage, or moved there from elsewhere. A `putBox()` refuses so a box listed damaged that names no revision, damaged beyond naming, writing nothing. A box that will not open is named so only after the vault has caught up with storage once: one a vault made anew elsewhere wrote makes the call `vault_locked` instead | Nothing was changed. Offer `delBox()`, or a fresh `putBox()` over it while it names a revision (see *Damaged boxes*) |
-| `newer_format`        | the vault's stored props are in a form this version does not know -- a `format`, wayinkind or number of wayins -- which a newer safebyok may have written: `hello()` and `delDamagedVault` refuse it | Nothing was changed. Tell the user to update the app; never offer to start over |
+| `newer_format`        | the vault's stored props are in a form this version does not know -- a `format` -- which a newer safebyok may have written: `hello()` and `delDamagedVault` refuse it | Nothing was changed. Tell the user to update the app; never offer to start over |
 | `rolled_back`         | this device has already seen a newer copy of the vault props than storage offers now (storage restored from a backup, or altered), so it won't use this one, and the vault locked: nothing was unlocked or written | Tell the user this device has seen a newer copy of the vault than storage holds. If the storage was restored from an older copy on purpose, accept it on this device (see *A vault rolled back*, below); otherwise the app's support should look at its storage |
 | `identity_revoked`    | the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in. The vault has locked itself (see *When the user signs out*) | Have the user sign in again, then open the vault for whoever that is |
 
@@ -893,8 +885,7 @@ lease, so a call cut short can be made again. It needs the stored record's `vaul
 to aim the deletion, so vault props too damaged to show one are refused as `damaged_vault`
 still, with nothing removed: the backend's own tools can clear them (`localVaultDB`'s vault props
 that are not JSON at all are one case). A record this version cannot read may instead have been written by a **newer**
-safebyok, which opens it; so one in a `format` this version does not know, with a
-`wayinkind` it does not know, or with more wayins than `MaxUnlocks`, is refused with a kind of its
+safebyok, which opens it; so one in a `format` this version does not know is refused with a kind of its
 own, `newer_format`, by `hello()` and `delDamagedVault` alike, nothing removed, with a message
 telling the user to update the app: never offer to start over on it. That is all this version can tell from damage, which rests on a rule: **any change to
 what a stored record may hold -- a field, a shape, or a range a check accepts -- bumps

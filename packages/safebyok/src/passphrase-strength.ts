@@ -16,7 +16,7 @@ export type PassphraseVerdict = { strong: true } | { strong: false, reason: stri
  * and the vaultlabel, words a guesser who knows the user tries first -- it answers a
  * {@link PassphraseVerdict}, at once or as a promise. The vault runs it on every passphrase about
  * to become a way in -- the one the first `unlock()` creates a vault with, and each
- * `addPassphrase()` or `changePassphrase()` sets -- before any key derivation, and refuses a weak
+ * `changePassphrase()` sets -- before any key derivation, and refuses a weak
  * one with kind 'weak_passphrase', the verdict's reason its message. It never runs on `unlock()`
  * of a vault that stands.
  *

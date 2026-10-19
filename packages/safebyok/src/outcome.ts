@@ -71,7 +71,7 @@ export const outcomeOf = async <ValT>(thunk: () => ValT | Promise<ValT>, otherwi
  * @param thrown - What was thrown, as it came.
  * @returns The refusal.
  *
- * @example unexpectedError(new TypeError("Cannot read properties of undefined (reading 'wayins')"))
+ * @example unexpectedError(new TypeError("Cannot read properties of undefined (reading 'passkey')"))
  */
 export const unexpectedError = (thrown: unknown): VaultError => (
   new VaultError('unexpected_error', "Something went wrong that safebyok did not expect: a bug, in safebyok or in a function the app handed it (a key deriver, a passphrase test, a passkey maker). Nothing was retried, and a retry is unlikely to help; what was thrown is this error's cause.", { cause: thrown ?? new Error('Nothing was thrown with it.') })

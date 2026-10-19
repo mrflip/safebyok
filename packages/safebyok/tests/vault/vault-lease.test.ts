@@ -5,10 +5,11 @@ import { Vault } from '../../src/vault'
 import { Ask, type GetProof, type ProofAnswer } from '../../src/ask'
 import { VaultError } from '../../src/errors'
 import { bad } from '../../src/outcome'
+import { toB64 } from '../../src/crypto'
 import type { MakeVaultOpts } from '../../src/vault-opts'
 import type { PassphraseStrengthTest } from '../../src/passphrase-strength'
 import * as TH from '../test-helpers'
-import { makeWorld, SevenDaysMillis, HourMillis, uncheckingDeviceDB, makeRacingWorld, vaultWithPasskey, boxlabelsOf, spoilSecondWayin } from './world'
+import { makeWorld, SevenDaysMillis, HourMillis, uncheckingDeviceDB, makeRacingWorld, vaultWithPasskey, boxlabelsOf, spoilWayin } from './world'
 
 
 // == [Unlock, lock and the lease]: unlock and lock, the lease, OutOfBoundsDeadlines
@@ -573,9 +574,9 @@ describe("a change to the ways in, once it has landed", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
     vi.spyOn(world.deviceDB, 'putLease').mockRejectedValueOnce(new Error('device storage is full'))
-    const spareId = await vault.addPassphrase('pw one', 'spare pw', { wayinlabel: 'spare' })
-    expect(vault.getSnapshot().wayins.map((wayin) => wayin.wayin_id)).to.include(spareId)
-    expect(world.logged.map((heard) => [heard.level, heard.story])).to.deep.equal([['warn', { call: 'addPassphrase' }]])
+    expect(await vault.addPasskey('pw one', () => TH.passkeyOf('laptop'))).to.be.true
+    expect(vault.getSnapshot().passkey).to.not.be.null
+    expect(world.logged.map((heard) => [heard.level, heard.story])).to.deep.equal([['warn', { call: 'addPasskey' }]])
     expect(await world.stateOnOpen()).to.eq('locked')
   })
 })
@@ -590,44 +591,14 @@ describe("the unlock window, renewed", () => {
     expect(await leaseDeadlineOf(world)).to.eq(world.clock.now() + SevenDaysMillis)
   })
 
-  it("by a way in added or removed with a passphrase as proof", async () => {
+  it("by a passkey added or removed with the passphrase as proof", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
     world.advance(24 * HourMillis)
-    const spareId = await vault.addPassphrase('pw one', 'spare pw', { wayinlabel: 'spare' })
+    await vault.addPasskey('pw one', () => TH.passkeyOf('laptop'))
     expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + SevenDaysMillis)
     world.advance(24 * HourMillis)
-    await vault.delWayin('pw one', spareId)
-    expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + SevenDaysMillis)
-  })
-
-  it("not by a passkey proving a change on an unlocked vault: the deadline standing stays, here and on the device", async () => {
-    const { world, vault, laptop } = await vaultWithPasskey()
-    const deadline = vault.getSnapshot().askPassphraseAt
-    world.advance(24 * HourMillis)
-    await vault.addPassphrase(laptop, 'spare pw', { wayinlabel: 'spare' })
-    expect(vault.getSnapshot().state).to.eq('unlocked')
-    expect(vault.getSnapshot().askPassphraseAt).to.eq(deadline)
-    expect(await leaseDeadlineOf(world)).to.eq(deadline)
-    expect(await world.stateOnOpen()).to.eq('unlocked')
-  })
-
-  it("not by a passkey proving a passphrase change on an unlocked vault: the new passphrase lands, the deadline stays", async () => {
-    const { world, vault, laptop } = await vaultWithPasskey()
-    const deadline = vault.getSnapshot().askPassphraseAt
-    world.advance(24 * HourMillis)
-    await vault.changePassphrase(laptop, 'pw renewed')
-    expect(vault.getSnapshot().askPassphraseAt).to.eq(deadline)
-    expect(await leaseDeadlineOf(world)).to.eq(deadline)
-    await vault.lock()
-    await vault.unlock('pw renewed')
-  })
-
-  it("by a passkey proving a change on a locked vault, which it unlocks as unlock() by passkey would", async () => {
-    const { world, vault, laptop } = await vaultWithPasskey()
-    await vault.lock()
-    world.advance(24 * HourMillis)
-    await vault.addPassphrase(laptop, 'spare pw', { wayinlabel: 'spare' })
+    await vault.delWayin('pw one')
     expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + SevenDaysMillis)
   })
 
@@ -788,7 +759,7 @@ describe("vault.ensureLease, by the Contract", () => {
     expect(await vault.ensureLease()).to.eq(vault)
     expect(getProof.mock.calls[0]?.[0].why).to.eq('absent')
     expect(vault.state).to.eq('unlocked')
-    expect(vault.wayins).to.have.lengthOf(1)
+    expect(vault.passphrase).to.not.be.null
   })
 
   it("asks why 'locked' of a vault that stands, with no lease on this device (Contract: ensureLease, Does 3)", async () => {
@@ -1376,7 +1347,7 @@ describe("getProof's attempt, by the Contract", () => {
   })
 
   it("refuses wrong_passkey for a passkey's answer that does not open the vault, and opens with the right one, as attempt's second example shows (Contract: getProof, attempt refuses: show in place)", async () => {
-    const { world, vault: maker, wayinId } = await vaultWithPasskey()
+    const { world, vault: maker } = await vaultWithPasskey()
     await maker.lock()
     maker.close()
     const prompt = heldPrompt()
@@ -1384,7 +1355,7 @@ describe("getProof's attempt, by the Contract", () => {
     void vault.tryEnsureLease()
     const ask = await prompt.asked
     const stranger = { ...await TH.passkeyOf('laptop'), prfBytes: new Uint8Array(32).fill(7) }
-    await TH.expectBad(ask.attempt(stranger, { wayinId }), 'wrong_passkey')
+    await TH.expectBad(ask.attempt(stranger), 'wrong_passkey')
     await TH.expectGood(ask.attempt(await TH.passkeyOf('laptop')))
     prompt.answer('unlocked')
   })
@@ -1406,28 +1377,27 @@ describe("getProof's attempt, by the Contract", () => {
     expect(await TH.expectGood(ensuring)).to.eq(vault)
   })
 
-  it("refuses damaged_wayin for a way in stored damaged, aimed at by its wayinId, to offer another way in (Contract: getProof, attempt refuses: offer another way in)", async () => {
-    const world = makeWorld()
-    const maker = await world.openUnlocked('pw')
-    const spareId = await maker.addPassphrase('pw', 'spare phrase', { wayinlabel: 'spare' })
+  it("refuses damaged_wayin for a passkey stored damaged, to offer another way in (Contract: getProof, attempt refuses: offer another way in)", async () => {
+    const { world, vault: maker, laptop } = await vaultWithPasskey()
     await maker.lock()
     maker.close()
-    spoilSecondWayin(world, { salt_b64: 'c2FsdA' })
+    const shortSalt = toB64(new Uint8Array(16))
+    spoilWayin(world, 'passkey', { prf_salt_b64: shortSalt })
     const prompt = heldPrompt()
     const vault = await world.open({ getProof: prompt.getProof, deviceDB: memoryDeviceDB() })
     void vault.tryEnsureLease()
     const ask = await prompt.asked
-    await TH.expectBad(ask.attempt('spare phrase', { wayinId: spareId }), 'damaged_wayin')
+    await TH.expectBad(ask.attempt({ ...laptop, prfSaltB64: shortSalt }), 'damaged_wayin')
     await TH.expectGood(ask.attempt('pw'))
     prompt.answer('unlocked')
   })
 
-  it("refuses absent_wayin for a wayinId the vault has not, to offer another way in (Contract: getProof, attempt refuses: offer another way in)", async () => {
+  it("refuses absent_wayin for a passkey's answer on a vault with no passkey, to offer another way in (Contract: getProof, attempt refuses: offer another way in)", async () => {
     const prompt = heldPrompt()
     const { vault } = await lockedVaultWith({ getProof: prompt.getProof })
     void vault.tryEnsureLease()
     const ask = await prompt.asked
-    await TH.expectBad(ask.attempt('pw', { wayinId: 'no-such-way-in' }), 'absent_wayin')
+    await TH.expectBad(ask.attempt(await TH.passkeyOf('laptop')), 'absent_wayin')
     prompt.answer('declined')
   })
 

@@ -27,8 +27,8 @@ export type DelDamagedVaultOpts = Pick<MakeVaultOpts, 'applabel' | 'userId' | 'v
  * storage is touched, as `Vault.make` does: 'bad_label' for a label that fails its check, and
  * 'bad_option' for an option missing.
  *
- * A record this version cannot read may be one a newer safebyok wrote and opens, so a `format`,
- * wayinkind or number of wayins it does not know is refused too, as 'newer_format', with
+ * A record this version cannot read may be one a newer safebyok wrote and opens, so a `format`
+ * it does not know is refused too, as 'newer_format', with
  * nothing removed and a message to update the app, as `hello()` refuses it: any change to what a stored record may hold --
  * a field, a shape, or a range a check accepts -- bumps `format`, so that newer can be told from
  * damaged. There is no handle to lock, so a storage refusal such as 'identity_revoked' is thrown
