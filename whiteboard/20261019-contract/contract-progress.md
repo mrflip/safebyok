@@ -163,3 +163,4 @@ checker's contract (B4, a note in make); putBox/delBox reading nothing before th
 (`lean_core`, a note in putBox). Left for the threads that build them: `putWayin` (the code has
 `changePassphrase`/`addPassphrase`/`addPasskey`/`delWayin`; B4), `strengthChecker` (B4),
 putBox's `over` and its returned Box (C2).
+* *Owed again (2026-10-19):* `adorn(obj, ckey, val)` wherever the Contract shows `adorn`; once a_sec2 lands, `isVaultError` without the cross-copy mark (Shapes' paragraph).
