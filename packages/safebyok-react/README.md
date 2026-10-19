@@ -264,8 +264,9 @@ component stack, in development and production alike. It arrives with nothing th
 strength test throws, a `VaultError` of its own included, is the vault's `unexpected_error` with
 that throw as the cause, as each heard the passphrase; and anything else -- a `passphraseAdvice`
 that threw, say -- arrives as a fixed `unexpected_error` quoting none of it. (A condition one of
-them raises, such as the strength test's word list failing to load, is shown in the dialog, and
-never reported.) Hook your error tracker there:
+them raises, such as the strength test's word list failing to load, is met as the same condition
+from storage is -- shown in the dialog, or closing it -- and never reported.) Hook your error
+tracker there:
 
 ```tsx
 createRoot(rootElement, {
