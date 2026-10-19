@@ -1,3 +1,8 @@
+/**
+ * Tests of every part of `tests/test-helpers/`, as reached through the front door, `TH`. The
+ * parts are source for `safebyok/testing`, not tests, so by exception these tests stay in one file
+ * named for the door, not a folder: at this length they are easier found whole than split.
+ */
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { Vault, localVaultDB, memoryDeviceDB, memoryStore, type StringStore } from '../src/index'

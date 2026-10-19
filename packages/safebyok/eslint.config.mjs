@@ -189,12 +189,12 @@ export default defineConfig([
   // decides what may be logged. A stray debug line is how a key ends up in someone's log drain.
   // The one exception is src/console-logger.ts, the fallback when a host passes no logger, which
   // disables no-console for itself alone. The helpers published as `safebyok/testing`
-  // (tests/test-helpers.ts) ship to hosts too, so they keep the rules of src/ in this section and
-  // in 3c, besides the rules of the tests.
+  // (tests/test-helpers.ts and the parts it re-exports, in tests/test-helpers/) ship to hosts too,
+  // so they keep the rules of src/ in this section and in 3c, besides the rules of the tests.
   // Randomness is the platform's CSPRNG (`crypto.getRandomValues`), never Math.random.
   {
     name: 'safebyok/secret-keeping',
-    files: ['src/**/*.ts', 'tests/test-helpers.ts'],
+    files: ['src/**/*.ts', 'tests/test-helpers.ts', 'tests/test-helpers/*.ts'],
     rules: {
       'no-console':              'error',
       'no-eval':                 'error',
@@ -212,7 +212,7 @@ export default defineConfig([
   // under Node, so the TS project types Node's globals for them, and only this rule keeps src/ clean.
   {
     name: 'safebyok/platform-neutral',
-    files: ['src/**/*.ts', 'tests/test-helpers.ts'],
+    files: ['src/**/*.ts', 'tests/test-helpers.ts', 'tests/test-helpers/*.ts'],
     rules: {
       'import-x/no-nodejs-modules': 'error',
       'no-restricted-globals': ['error', ...['Buffer', 'process', 'global', 'require', '__dirname', '__filename', 'setImmediate'].map((nodeGlobal) => ({
@@ -227,7 +227,7 @@ export default defineConfig([
   // would put all of it in every host's bundle.
   {
     name: 'safebyok/tree-shaking',
-    files: ['src/**/*.ts', 'tests/test-helpers.ts'],
+    files: ['src/**/*.ts', 'tests/test-helpers.ts', 'tests/test-helpers/*.ts'],
     rules: {
       'no-restricted-imports': ['error', {
         // `zod/v4` is classic too, under its version path, and `zod/v3` the classic before it.
