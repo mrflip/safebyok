@@ -8,6 +8,8 @@ import * as Refusals from './refusals'
 import { asError, parseLogger, type VaultLogger } from './logger'
 import { reportToPlatform } from './report-error'
 
+// == [Expectations and records]: VaultPropsExpectation, LockboxExpectation, RetireExpectation, LockboxRetireExpectation, LockboxRetirement, StoredLockbox
+
 /**
  * What an update of the vault props was proven against: the vault and the unlock epoch of the
  * vault props the writer read. The update lands only while the standing vault props still have
@@ -96,6 +98,9 @@ const LockboxRetirement = Z.object({
  * @example { boxlabel: 'anthropic', lockbox: storedRecord }
  */
 export type StoredLockbox = { boxlabel: string, lockbox: unknown }
+// --
+
+// == [Options]: VaultDBOpts
 
 /**
  * What an adapter's factory takes from the host, beside its backend's own options: an optional
@@ -117,6 +122,7 @@ export type VaultDBOpts = {
    */
   logger?: VaultLogger | null | undefined
 }
+// --
 
 /**
  * Remote storage for vault records, as the host application plugs it in: extend this class and
@@ -168,6 +174,8 @@ export type VaultDBOpts = {
  * hands each call on to another VaultDB's public verbs passes each name through as it came.
  */
 export abstract class VaultDB {
+  // == [Backend limits]: maxRecordBytes, maxVaultBytes, maxLockboxes, maxNameBytes
+
   /**
    * The most this backend holds in one record, in bytes: a plain fact about the backend, or
    * `Infinity` when it sets no per-record limit. A vault refuses to open with a `maxWhisperBytes`
@@ -219,6 +227,9 @@ export abstract class VaultDB {
    * declares its share of the key's limit.
    */
   abstract readonly maxNameBytes: number
+  // --
+
+  // == [Constructor and logger]: #logger, constructor, logger
 
   /** The logger this VaultDB was made with, guarded: private, so that nothing can put another in its place. */
   readonly #logger: VaultLogger
@@ -240,6 +251,9 @@ export abstract class VaultDB {
    * `Vault.make` and `VaultProvider` use it when they are given no logger of their own.
    */
   get logger(): VaultLogger { return this.#logger }
+  // --
+
+  // == [Vault props verbs]: readVaultProps, fetchOrCreateVaultProps, updateVaultProps
 
   // ------------------------------------------------------------------- the verbs safebyok calls
 
@@ -291,6 +305,9 @@ export abstract class VaultDB {
     const landed = await fromStorage(() => this.doUpdateVaultProps(outgoing, expectation))
     if (! landed) { throw Refusals.staleWrite('vaultProps') }
   }
+  // --
+
+  // == [Lockbox verbs]: readBox, listBoxes, listBoxRecords, updateBox
 
   /** One lockbox, validated, or null when there is none under that boxlabel. */
   async readBox(scope: VaultScope, boxlabel: string): Promise<Lockbox | null> {
@@ -372,6 +389,9 @@ export abstract class VaultDB {
     if (stored === null) { throw Refusals.staleWrite('lockbox') }
     return writtenBack('a lockbox write', () => checkLockbox(stored, outgoing.boxlabel))
   }
+  // --
+
+  // == [Retire verbs]: retireBox, retireVault, retireDamagedVault
 
   /**
    * Remove the lockbox under `boxlabel`, whatever revision stands, only while the scope's standing
@@ -445,6 +465,9 @@ export abstract class VaultDB {
     const landed = await fromStorage(() => this.doRetireVault(asked, { vault_id: named.data.vault_id }))
     if (! landed) { throw Refusals.staleWrite('retire') }
   }
+  // --
+
+  // == [Watching]: subscribe, listenerFailed, watchTrouble
 
   /**
    * Calls `onChange` after any write touching `scope`, from this device or another; returns the
@@ -507,6 +530,9 @@ export abstract class VaultDB {
       delivered: () => { warned = false },
     }
   }
+  // --
+
+  // == [The half you write]: doReadVaultProps, doFetchOrCreateVaultProps, doRetireVault, doSubscribe, others
 
   // --------------------------------------------------------------------------- the half you write
 
@@ -565,7 +591,10 @@ export abstract class VaultDB {
   protected doSubscribe(_scope: VaultScope, _onChange: () => void): () => void {
     return noUnsubscribing
   }
+  // --
 }
+
+// == [Watch helpers]: noUnsubscribing, WatchTrouble, startedWatch, heedListener, heedRejection
 
 const noUnsubscribing = (): void => undefined
 
@@ -609,6 +638,9 @@ const heedRejection = async (returned: unknown, failed: (err: unknown) => void):
     failed(err)
   }
 }
+// --
+
+// == [Listing helpers]: withoutCiphered, ListedLockbox, isNameable, listedOrDamaged, summaryOf, byCodeUnit
 
 /** A stored lockbox as {@link VaultDB.listBoxRecords} hands it on: its two ciphered fields left out, anything else as it came. */
 const withoutCiphered = (lockbox: unknown): unknown => {
@@ -660,6 +692,9 @@ const byCodeUnit = (one: string, two: string): number => {
   if (one === two) { return 0 }
   return one < two ? -1 : 1
 }
+// --
+
+// == [Name checks]: FloorRules, heldScope, heldBoxlabel, heldName
 
 /** The checks a public verb runs on a name: the floor beneath every name, and nothing a host chose. */
 const FloorRules: Names.NameRules = Names.rulesOf(AnyTextValidators)
@@ -694,6 +729,9 @@ const heldName = (facts: NameFacts, said: string, part: string): string => {
   }
   return part
 }
+// --
+
+// == [Storage and listener guards]: fromStorage, asStorageTrouble, checkListener, checked, checkOutgoing
 
 /**
  * The adapter's half of a verb, with anything it throws that is not already a VaultError turned
@@ -737,6 +775,9 @@ const checked = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, candidate: unkno
 const checkOutgoing = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, candidate: unknown, said: string, spared: 'written' | 'removed' = 'written'): RecordT => checked(recordSchema, candidate, () => (
   new VaultError('bad_record', `Nothing was ${spared}: that ${said} is not one this package builds. Hand a VaultDB only the records and expectations a vault builds.`)
 ))
+// --
+
+// == [Vault props checks]: checkVaultProps, unnamedVaultProps, newerVaultProps, mayBeNewer, readStoredVaultProps, isSoundVaultProps, others
 
 const checkVaultProps = (raw: unknown, scope: VaultScope): VaultProps => {
   // A later safebyok may write what this one cannot read, which is no damage: it is said apart.
@@ -808,6 +849,9 @@ const isSoundVaultProps = (raw: unknown, scope: VaultScope): boolean => {
 
 /** The one field of stored vault props a retirement needs, as the vault's own check has it. */
 const StoredVaultId = Z.object({ vault_id: VaultProps.shape.vault_id })
+// --
+
+// == [Lockbox and answer checks]: checkLockbox, writtenBack, checkAnswer, checkRecord, jsonBytes
 
 /** A stored lockbox, as `readBox` holds it: a lockbox's shape, under the boxlabel it was asked for. */
 const checkLockbox = (raw: unknown, boxlabel: string): Lockbox => {
@@ -852,3 +896,4 @@ const checkRecord = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, raw: unknown
  * storage's limits. Every in-tree backend counts a record as no heavier.
  */
 export const jsonBytes = (val: unknown): number => new TextEncoder().encode(JSON.stringify(val)).length
+// --

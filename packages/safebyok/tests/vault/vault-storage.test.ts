@@ -11,6 +11,8 @@ import * as TH from '../test-helpers'
 import { makeWorld, boxlabelsOf, isU1Box, u1BoxCkey, u1VaultPropsCkey, SevenDaysMillis, uncheckingDeviceDB, storedVaultPropsOf, makeRacingWorld, storedWayinsOf, HourMillis, damagedVaultWorld, storedRowOf, rowsOf } from './world'
 
 
+// == [Scoping, snapshot, tampering]: scoping, snapshot and subscribers, what the backend sees, SpoiledShells, tampering
+
 describe("scoping", () => {
   it("two users each keep a box by the same label, unseen by the other", async () => {
     const world = makeWorld()
@@ -177,6 +179,9 @@ describe("tampering", () => {
     expect(boxlabelsOf(vault)).to.deep.equal([])
   })
 })
+// --
+
+// == [The logger]: drainDown, throwingLogger, storedSecrets, throwFromLogger, the logger
 
 const drainDown = (): never => { throw new Error('the log drain is down') }
 
@@ -483,6 +488,9 @@ describe("the logger", () => {
     for (const secret of secrets) { expect(text).to.not.include(secret) }
   })
 })
+// --
+
+// == [Signed out and the device mark]: signedOut, no longer signed in, markIn, seenIn, the device mark
 
 /** A refusal of kind identity_revoked, as an adapter says a user signed out. */
 const signedOut = () => new VaultError('identity_revoked', 'No one is signed in, so this vault cannot be reached: sign in, then try again.')
@@ -731,6 +739,9 @@ describe("the device mark", () => {
     expect(await markIn(world)).to.be.null
   })
 })
+// --
+
+// == [Rollback and epoch]: rolledBackWorld, openAcceptingRestore, vault props rolled back, vaultKey epoch
 
 /**
  * A world whose `u1` vault had a way in, `spare`, removed, and the text of its vault props from
@@ -971,3 +982,4 @@ describe("the vaultKey's epoch", () => {
     expect(rowsOf(world, 'u1')).to.deep.equal([])
   })
 })
+// --

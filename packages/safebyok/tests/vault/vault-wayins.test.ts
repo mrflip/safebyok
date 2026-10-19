@@ -11,6 +11,8 @@ import * as TH from '../test-helpers'
 import { makeWorld, wayinlabelsOf, storedVaultPropsOf, vaultWithPasskey, SevenDaysMillis, u1VaultPropsCkey, storedWayinsOf, addLaptopPasskey } from './world'
 
 
+// == [Passphrases]: changePassphrase, countingDeriver, several passphrases
+
 describe("changePassphrase", () => {
   it("refuses an old or new passphrase that is not text with kind 'bad_option', changing nothing", async () => {
     const world = makeWorld()
@@ -336,6 +338,9 @@ describe("several passphrases", () => {
     expect(world.dbStore.read(vaultPropsCkey)).to.eq(oldText)
   })
 })
+// --
+
+// == [Passkeys]: answering, passkeys
 
 /** A passkey maker whose authenticator answers `answer`, whatever it is: for a test of what addPasskey refuses. */
 const answering = (answer: unknown) => () => Promise.resolve(answer as PasskeyProof)
@@ -641,6 +646,9 @@ describe("passkeys", () => {
     expect(thief.getSnapshot().state).to.eq('unlocked')
   })
 })
+// --
+
+// == [Passphrase strength]: refusing, refusingTinyLater, a new passphrase's strength
 
 /** A passphraseStrengthTest that refuses `weakOne` and admits the rest, counting its calls. */
 const refusing = (weakOne: string) => vi.fn((passphrase: string): PassphraseVerdict => (
@@ -745,3 +753,4 @@ describe("a new passphrase's strength", () => {
     expect(world.dbStore.ckeys()).to.have.lengthOf(0)
   })
 })
+// --

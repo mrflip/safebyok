@@ -177,6 +177,11 @@ between columns lets the editor align them (see *Tests*).
   open, as its owner named it.`
 * The first line must stand alone when folded in an editor: `/** Brief statement */`, or a
   sentence that continues on the following lines.
+* **A file past about 40 KB is sectioned.** `// == [Mark]: heedMark, markSeeing, others` opens a
+  section (its name, then the names a reader would grep for), `// --` closes it, both at the
+  section's indentation; sections are flat, never nested. `grep -n '// == '` is the file's table
+  of contents. A banner groups declarations; it does not excuse a file that should be split, and
+  it moves with the code it names.
 
 Well-named, short functions rarely need running comments. A comment that narrates the code, makes
 up for a poor name, or marks off a stanza that should be its own function is a sign to rewrite.
