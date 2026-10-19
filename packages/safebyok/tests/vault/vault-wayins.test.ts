@@ -797,6 +797,19 @@ describe("the vault's ways in, as models (Contract: Vault, Wayin)", () => {
     expect(told).to.deep.equal([TH.testDeriver.key_deriver_label, laptop.credentialId])
   })
 
+  it("hands each way in the props it shows as its holder, frozen, never the record it works from", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    const holder = vault.wayins[0]?.holder ?? {}
+    expect(holder).to.eq(vault.props)
+    expect(Object.isFrozen(holder)).to.be.true
+    expect(Reflect.set(holder, 'vault_id', 'another')).to.be.false
+    expect(Object.isFrozen(vault.props?.wayins)).to.be.true
+    await vault.lock()
+    await vault.unlock('pw')
+    expect(vault.state).to.eq('unlocked')
+  })
+
   it("keeps the same Wayins until the vault props change", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')

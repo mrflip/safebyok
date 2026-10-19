@@ -88,8 +88,8 @@ const headerOf = (record: WayinRecord): WayinHeader => {
   return header
 }
 
-/** `record`, frozen, its wrap with it: what a way in hands back as its `props`. */
-const frozenRecord = (record: WayinRecord): WayinRecord => (
+/** `record`, a frozen copy, its wrap frozen with it: what a way in hands back as its `props`. */
+export const frozenRecord = (record: WayinRecord): WayinRecord => (
   Object.freeze({ ...record, vault_key_wayin_wrapped: Object.freeze({ ...record.vault_key_wayin_wrapped }) })
 )
 

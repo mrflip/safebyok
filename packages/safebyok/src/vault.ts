@@ -9,7 +9,7 @@ import {
   cipherCtx, cipherBytes, decipherBytes,
   makeLeaseKey, makeBoxKey, makeVaultKey, randomId, wrapKeyUnder, unwrapKeyUnder,
 } from './crypto'
-import { Wayin, absentWayin, type PasskeyWayin, type PassphraseWayin, type WayinStamp, type VaultKeyPair } from './wayin'
+import { Wayin, absentWayin, frozenRecord, type PasskeyWayin, type PassphraseWayin, type WayinStamp, type VaultKeyPair } from './wayin'
 import { Proof, PassphraseProof, PasskeyProof } from './proof'
 import { stableJsonify } from './stable-jsonify'
 import { oneAtATime } from './one-at-a-time'
@@ -1101,16 +1101,18 @@ export class Vault {
     return 'locked'
   }
   // The models of each vault props record the vault has held, made once per record: the props
-  // frozen, as the snapshot shows them, and their ways in. Keyed by the record as read and by its
-  // frozen copy alike, so `wayins` finds the models of the props the snapshot shows.
+  // frozen, as the snapshot shows them, and their ways in, made over that frozen copy: a way in's
+  // holder is in the host's hands, so it is never the record the vault works from. Keyed by the
+  // record as read and by its frozen copy alike, so `wayins` finds the models of the props the
+  // snapshot shows.
   readonly #modelled = new WeakMap<VaultProps, { props: VaultProps, wayins: readonly (PassphraseWayin | PasskeyWayin)[] }>()
   #modelsOf(standing: VaultProps): { props: VaultProps, wayins: readonly (PassphraseWayin | PasskeyWayin)[] } {
     const known = this.#modelled.get(standing)
     if (known !== undefined) { return known }
-    const wayins = Object.freeze(Wayin.listOf(this, standing))
-    const records = wayins.map((wayin) => wayin.props)
+    const records = standing.wayins.map((record) => frozenRecord(record))
     Object.freeze(records)
-    const models = { props: Object.freeze({ ...standing, wayins: records }), wayins }
+    const props = Object.freeze({ ...standing, wayins: records })
+    const models = { props, wayins: Object.freeze(Wayin.listOf(this, props)) }
     this.#modelled.set(standing, models)
     this.#modelled.set(models.props, models)
     return models
