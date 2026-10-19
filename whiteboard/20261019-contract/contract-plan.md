@@ -16,7 +16,7 @@ this line.
   (56 kB; `grep -n '^#'` is its outline). The handoff says when a ruling has changed it since.
 * **Sprint doc:** https://claude.ai/code/artifact/362ec68d-5bf3-46aa-a379-59a9c8bfb548
   (*Open Matters*, *Resolved*, *Progress*).
-* **Status:** thread 0 filed (#193); A1 building.
+* **Status:** thread 0 filed (#193); A1 built (#194), in review.
 
 ## How this plan relates to the preplan
 
@@ -105,7 +105,7 @@ fixed in a small thread `a-fixes` (on B's line, after B4), with the `a-shims` gr
 | C1 | `putbox-store` | B's line | opus | high | One atomic conditional write per adapter; battery's races. |
 | C2 | `putbox-vault` | C1 | default | medium | |
 | C7 | `vault-props-verbs` | C1 | default | medium | Beside C2, as the preplan allows. |
-| C3 | `delbox-tombstones` | C2 + C7 restacked | opus | high | *Orchestrator:* C3 and C7 both rewrite every adapter and the battery, so C3 waits for C7 in the line rather than conflicting at the restack. Proposes `delIfIncoherent`'s fate. |
+| C3 | `delbox-tombstones` | C2 + C7 restacked | opus | high | *Orchestrator:* C3 and C7 both rewrite every adapter and the battery, so C3 waits for C7 in the line rather than conflicting at the restack. Proposes `delIfIncoherent`'s fate. Writes the line under each `del` doc block that a tombstone stands (thread 0's row, ruled). |
 | C4 | `getbox` | C2 + C7 line | default | medium | Beside C3. Writes `getBox`/`openBox` nesting first. |
 | C5 | `lock-close-del` | C3 + C4 restacked | opus | medium | Rewrites the Contract's first guess; files the rewrite as an *Open Matters* row. |
 | C6 | `subscriptions` | C5 | default | medium | |
@@ -124,7 +124,7 @@ Not on the runner's path (preplan). Nothing waits for it.
 | D3 | `customer-docs` | C's line | opus | none (pass 4) | Beside D1. |
 | D2 | `batteries-react` | D1 | default | medium | |
 | D4 | `demo-and-e2e` | D2 | sonnet | low | |
-| D5 | `sweep` | D4 + D3 line | sonnet | low | Lowers every size line to the rule. |
+| D5 | `sweep` | D4 + D3 line | sonnet | low | Lowers every size line to the rule. Writes a TODO entry: `StringStore`'s `read`/`write`/`erase` to the trio, a quiet-tree rename after the sprint (thread 0's row, ruled). |
 
 **Closing phase D:** passes 1 to 5.
 
