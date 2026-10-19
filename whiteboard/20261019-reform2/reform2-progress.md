@@ -52,3 +52,20 @@ they disagree. Workers look things up here; they do not write it.
   A missing lockbox or failing applabel is still `bad_label` (those checks run first).
 * *Restack (orchestrator):* thread 7 rebased cleanly onto #179 at `47d66578`; #176's body says
   so. Thread 8 is cut from there.
+* *Orchestrator, thread 8 (#182, filed):* the summary changeset `.changeset/20261019-summary.md`;
+  the README's `bad_record` row says `bad_label` still comes first (thread 11 rewrites that).
+* *Orchestrator, thread 9 (#183, filed):* `retireBox()` logs its own damaged-specific warning
+  when what it removed was not the damaged record the snapshot showed; both `retired_other`
+  warnings carry `damaged: true` in the logger's story. Thread 4 removes the store-side one.
+* *Orchestrator, thread 10 (#184, filed):* VOCABULARY's *visible* (strictly unencrypted and
+  authenticated) and *unencrypted* (authentication unsaid). `unlock_epoch`, the props' own
+  `vault_key_epoch` and the wayins list are *unencrypted*; GraphQL's `'plain'` field class keeps
+  its name as a code identifier. The sidecar's example is the OpenRouter call count.
+* *Orchestrator, restack onto `dbc3dfcc`:* main's #172 calls the sidecar "guaranteed unchanged";
+  both phrases stand (README bullet title, VOCABULARY's guarantee sentence).
+* *Orchestrator, threads 4 (#186) and 11 (#185), side by side on #184:* thread 4 makes a store
+  one `updateBox`, refusing a damaged box naming no revision as `damaged_lockbox` (it touched
+  the demo and threads 2's and 9's changesets). Thread 11 makes a record check refuse
+  `bad_record` even for its label (a name over a backend's byte limit stays `bad_label`), leads a
+  retire's refusal with "Nothing was removed", and keeps GraphQL's BAD_USER_INPUT `bad_option`
+  (a record at fault never reaches the server). Restack: 4, then 11.

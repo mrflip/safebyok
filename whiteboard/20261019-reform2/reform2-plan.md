@@ -5,7 +5,7 @@ Date: 2026-10-19. Issued by: the Coach (`/sprint reform2`, from the preplan besi
 Sprint branch: `20261019-reform2`. Sprint doc (Open Matters, Progress, Resolved):
 https://claude.ai/code/artifact/62febfc3-47ee-4a7c-b99e-ea494b4b169c
 
-**Status:** the line main → #177 → #178 → #179 → #176 → #182 → #183 → #184 is restacked onto main `dbc3dfcc` and pushed; the Coach's late rulings start thread 4 (`no_clear`, revived) and thread 11 (`refusal_rulings`), both cut from #184's tip, side by side; the sprint PR waits for them.
+**Status:** done. Every thread filed, in one line on main `dbc3dfcc`: main → #177 → #178 → #179 → #176 → #182 → #183 → #184 → #186 → #185 → #175 (the sprint PR, the top). Threads 3 and 5 struck; 4 revived.
 
 The Coach struck threads 3 (`one_look`), 4 (`no_clear`) and 5 (`newer_lockbox`) after issuing
 the preplan. Their text is kept in the preplan; this plan keeps their numbers so the preplan and
@@ -160,6 +160,16 @@ the preplan words it, cut from #184's tip (`330871ca`), beside thread 11.
 `storeBox()` warning sentence the restack added (the Coach: "store will be losing its role in
 even thinking about removal so go with what's easiest"). `damaged_lockbox`, if new, is public
 surface: its family is a YOLO call. Size: medium. Restacked below thread 11 at the end.
+
+*Review:* `fixed` ([#186](https://github.com/mrflip/safebyok/pull/186)). Fixed: a stray blank
+line in the damaged-lockbox tests. Sent back (YOLO): notes/security.md said the race was closed
+outright; it now says it closes inside `storeBox()` and still runs through an explicit
+`retireBox()` naming `null`, the stated residual until tombstones. Left: `readBox()`'s message,
+doc block and the `stale_write` retry still advise a store over any damaged box (to the Coach);
+the refusal reads the listing, not the record (tampering only); the demo's "remove it" has no
+confirm; a doubled spy; the full-vault test now uses a spoil naming a revision. Declared beyond
+the letter: the demo and threads 2's and 9's changesets (to the Coach). `damaged_lockbox`
+already existed (family `condition`). Filed at `7149ec88`.
 
 Thread 5, `newer_lockbox`: **struck by the Coach** (2026-10-19). Not built.
 
@@ -318,6 +328,17 @@ Thread 11, `refusal_rulings` (from the Coach's rulings, 2026-10-19):
 record validation at storeBox's entry and in the VaultDB verbs, the GraphQL client's error map,
 and the README's `bad_record` row (rewriting thread 8's clause). Cut from #184's tip beside
 thread 4, and kept off its lines. Size: small to medium.
+
+*Review:* `fixed`, twice ([#185](https://github.com/mrflip/safebyok/pull/185)). The first fixed
+the `maxNameBytes` wording: a record name past the 1 KiB floor is `bad_record`, one the floor
+admits but the backend cannot hold stays `bad_label`. Sent back (YOLO): GraphQL's 32-bit `Int!`
+epochs let a record at fault reach the server as `bad_option`; `checkInts` now refuses it as
+`bad_record` before sending. The second review, over that commit, fixed `checkInts`' doc block.
+Left: the name floor checked twice; the README's `bad_label` row narrow; epochs as `Float!`
+instead; a huge epoch read back is `storage_unavailable`; the lockbox expectation's epoch checked
+by proxy; check order in `updateBox`; ragged wraps (rows to the Coach for the first five).
+GraphQL's BAD_USER_INPUT stays `bad_option`: a record at fault never reaches the server. Restacked
+onto thread 4 (#186). Filed at `c7cf2ce6`.
 
 ---
 
