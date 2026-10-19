@@ -850,6 +850,21 @@ describe("vault props rolled back", () => {
     await TH.expectRefusal(late.hello(), 'rolled_back')
   })
 
+  it("met while a del() waits on the hello, refuses that del() as rolled_back, deleting nothing and keeping the mark", async () => {
+    const { world, vault, older } = await rolledBackWorld()
+    vault.close()
+    const late = Vault.make(world.optsWith())
+    const gate = TH.holdNextCall(world.deviceDB, 'getLease')
+    const deleting = late.del()
+    await gate.reached
+    world.dbStore.write(u1VaultPropsCkey, older)
+    await TH.wakeupAtNextTick()
+    gate.release()
+    await TH.expectRefusal(deleting, 'rolled_back')
+    expect(world.dbStore.read(u1VaultPropsCkey)).to.eq(older)
+    expect(await seenIn(world)).to.deep.include({ unlock_epoch: 3 })
+  })
+
   it("is still refused by the README's recipe when the host knows of no restore", async () => {
     const { world, vault, older } = await rolledBackWorld()
     vault.close()

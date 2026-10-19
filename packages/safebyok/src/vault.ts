@@ -925,11 +925,11 @@ export class Vault {
 
   readonly #tryDel = this.#trying(async (): Promise<void> => {
     await this.#hello()
-    // A handle that has seen no vault looks first: "delete my vault" must not report success
-    // over one standing. Otherwise only the vault this handle had read when called: one
-    // deleted and made anew since refuses, even if a background refresh brings it in while
-    // this awaits.
-    if (this.#vaultProps === null) { await this.#refresh() }
+    // A handle that holds no vault -- it has seen none, or forgot one refused as an older copy
+    // while the hello ran -- looks first: "delete my vault" must not report success over one
+    // standing. Otherwise only the vault this handle had read when called: one deleted and made
+    // anew since refuses, even if a background refresh brings it in while this awaits.
+    if (this.#vaultProps === null || this.#vaultProps === UnreadVaultProps) { await this.#refresh() }
     const doomed = this.#vaultProps
     this.#landLock()
     await this.#shut()
