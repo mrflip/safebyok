@@ -425,7 +425,7 @@ const wholeDocumentVaultProps = () => {
 
 /**
  * A CVX whose `u1` vault holds `count` lockboxes, each a whisper of `whisperBytes` and the
- * heaviest public shell -- or as many as the component lets in before it refuses one as full.
+ * heaviest visible fields -- or as many as the component lets in before it refuses one as full.
  */
 const fillVault = async (count: number, whisperBytes: number, vaultProps = TH.vaultPropsOf('u1')) => {
   const CVX = TH.componentTest(true)

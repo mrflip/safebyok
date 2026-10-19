@@ -20,7 +20,7 @@ const isStableJsonText = (text: string): boolean => {
 
 /**
  * One lockbox as the storage layer holds it: the whisper ciphered under its own lockboxKey, that
- * lockboxKey wrapped under the vaultKey, and the public shell -- boxlabel, sidecar, the times
+ * lockboxKey wrapped under the vaultKey, and the visible fields -- boxlabel, sidecar, the times
  * it was first stored and last written -- a locked vault may show. Nothing in this record opens
  * without the vaultKey.
  *
@@ -39,7 +39,7 @@ export const Lockbox = Z.object({
   revision_tok:           Z.string().check(Z.minLength(1)),
   /**
    * Which vaultKey this lockbox's lockboxKey is wrapped under: the vault props' `vault_key_epoch` when
-   * it was written. Public, so a locked vault's listing shows which lockboxes stand under which.
+   * it was written. Visible, so a locked vault's listing shows which lockboxes stand under which.
    */
   vault_key_epoch:        vaultKeyEpoch,
   /** This lockbox's lockboxKey, wrapped under the vaultKey. */

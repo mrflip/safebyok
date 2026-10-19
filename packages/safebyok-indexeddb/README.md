@@ -3,7 +3,7 @@
 safebyok's storage in this browser's [IndexedDB](https://developer.mozilla.org/docs/Web/API/IndexedDB_API):
 **`idbVaultDB`**, the VaultDB for an app with no backend. Everything a synced backend would hold
 is kept on this device instead, so the app's whispers are encrypted at rest all the same: the rows
-are ciphertext and a few public fields, and nothing in them opens a vault without its passphrase.
+are ciphertext and a few unencrypted fields, and nothing in them opens a vault without its passphrase.
 
 It is also the example of a key-value backend: to store vaults in another key-value store, copy
 this package and type in the three places *Writing an adapter of your own* names.

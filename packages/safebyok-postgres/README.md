@@ -2,7 +2,7 @@
 
 safebyok's storage in [Postgres](https://www.postgresql.org): the SQL that makes the tables a
 vault is stored in, and **`postgresVaultDB`**, the VaultDB over them, which runs on your server.
-Your database holds ciphertext and a few public fields; it never sees a whisper, a passphrase, or
+Your database holds ciphertext and a few unencrypted fields; it never sees a whisper, a passphrase, or
 any key that opens one.
 
 It brings no database driver: it speaks through the one you already have -- a `pg` Pool, a

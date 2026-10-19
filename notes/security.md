@@ -481,7 +481,7 @@ added or folded into through the subagent, and no other entry changes.
   kept: they existed only in development and demo storage, never in a published version.
 * 2026-10-15: `VaultDB`'s public verbs turn any failure from an adapter that is not already a
   `VaultError` into kind `storage_unavailable`, with the adapter's own error attached as the
-  standard `cause`. Adapters see only ciphertext and public record fields, but that cause is
+  standard `cause`. Adapters see only ciphertext and unencrypted record fields, but that cause is
   whatever the backend's client threw, unfiltered.
 * 2026-10-15: `localVaultDB` and `idbVaultDB` key rows by `applabel:user_id:vaultlabel`, and
   `user_id` may hold a colon, so one user's rows can share another scope's ckey prefix. Listing
@@ -710,7 +710,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-15: vault props hold their `wayins`, a list of one to `MaxUnlocks` (8), each the one vaultKey wrapped under its own key. A passphrase wayin has its own
   random `salt_b64` (never shared between wayins) and its own `wayin_id`, and its wrap's
   additional data is the format, scope, `vault_id`, a purpose per wayinkind
-  (`vault_key_passphrase_wrapped`), and the wayin's whole public header (`wayinkind`,
+  (`vault_key_passphrase_wrapped`), and the wayin's whole visible header (`wayinkind`,
   `wayin_id`, `wayinlabel`, `key_deriver_label`, `salt_b64`) as key-sorted JSON (and, since
   the sweep entry below, the vault props' `registered_at`). The
   `unlock_epoch` is no longer in it, since a change to one wayin bumps the epoch and the
@@ -740,7 +740,7 @@ added or folded into through the subagent, and no other entry changes.
   `["safebyok-vault-v1", "vault_key_passkey_wrapped", credential_id]` as JSON when first written, under the older tag `safebyok-vault-v1` (since the sweep
   entry below, the wrap's whole additional data); the wrap's additional
   data is the format, scope, `vault_id`, purpose `vault_key_passkey_wrapped` and the wayin's
-  public header, as for a passphrase wayin. A stored salt that is not base64url of 32 bytes
+  visible header, as for a passphrase wayin. A stored salt that is not base64url of 32 bytes
   refuses as `corrupt_record` (since 2026-10-16, `damaged_wayin`: see that entry), checked at unlock rather than in the schema (the size budget, as for
   passphrase salts). The core never calls WebAuthn and never stores the answer; the answer passes
   through host JavaScript as a `Uint8Array` the vault does not wipe.
@@ -757,11 +757,11 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-15; 2026-10-18: **every field a record writes is bound, unless a reason below says not** (the
   Coach: "make everything verifiable unless there's a good reason not to"). A passkey wayin's
   HKDF `info` is now its wrap's whole additional data -- format, scope, `vault_id`, the vault props'
-  `registered_at`, purpose, and the wayin's public header (`wayinkind`, `wayin_id`,
+  `registered_at`, purpose, and the wayin's visible header (`wayinkind`, `wayin_id`,
   `wayinlabel`, `credential_id`, `prf_salt_b64`) -- so the passkeyKey itself, not only the wrap, belongs to one vault
   and one wayin; HKDF info and AES-GCM additional data are the same bytes, fed to different
   primitives. Every wayin's wrap binds the vault props' `registered_at`. A lockbox's two
-  encryptions bind its whole public header (`format`, `boxlabel`, `revision_tok`, `sidecar_json`,
+  encryptions bind its whole visible header (`format`, `boxlabel`, `revision_tok`, `sidecar_json`,
   `registered_at`, `written_at`: every field but the two ciphered ones, as Zod's parse leaves the
   record), so a backend that alters a sidecar or a time
   makes `readBox()` refuse `corrupt_record`; a future field is bound the day it is added to the
@@ -832,7 +832,7 @@ added or folded into through the subagent, and no other entry changes.
   stack and `cause` to the browser. Anything a VaultDB throws that is not a VaultError crosses as
   `storage_unavailable`. Wayins cross as opaque JSON that GraphQL does not check; only
   the core's VaultDB validation does, so a user can write a malformed wayin into their own
-  vault and no one else's. The browser's urql Client may keep vault records (ciphertext and public
+  vault and no one else's. The browser's urql Client may keep vault records (ciphertext and unencrypted
   fields) in its document cache, though every vault query is `network-only` and never answered
   from it. A subscription's user is fixed when it starts (over a websocket, when the connection
   opened), so a session revoked meanwhile keeps hearing the vault's scope -- never a record --
@@ -1076,7 +1076,7 @@ added or folded into through the subagent, and no other entry changes.
   storage is never sealed into a fresh revision that reads clean (found in review). What the sidecar reveals: everything in
   it, in the clear, to anyone who reads storage, and its size; the vault never interprets it,
   checks only that it is JSON, and the snapshot shows it unverified until the box is opened, as
-  every public field is. Its size is capped only with the whisper's (`maxWhisperBytes` counts
+  every visible field is. Its size is capped only with the whisper's (`maxWhisperBytes` counts
   both), so a host cannot put a sidecar of megabytes in front of the listing through the vault.
   Reserving the codec fields now means a later codec (padding, G026) or a whisper shape version
   changes no bound field set and re-encrypts nothing. Two ctx fixes ride along: the lockbox's
@@ -1286,7 +1286,7 @@ added or folded into through the subagent, and no other entry changes.
   common call the slow one. A host that removes a wayin because it was compromised rotates too.
 * 2026-10-16: **`WayinSummary` shows `device_id` and `registered_at`.** The snapshot of a locked
   vault already listed each wayin; it now says too when it was added and by which device, so a
-  user can spot a wayin they did not make. Both are public fields of the wayin, bound into its
+  user can spot a wayin they did not make. Both are visible fields of the wayin, bound into its
   wrap, and `device_id` is one random id per device per vault (the mark's `device_id`), so it
   links nothing the vault does not already link: not across vaults, not to the hardware.
 
@@ -1523,7 +1523,7 @@ added or folded into through the subagent, and no other entry changes.
   (`Lockbox` and `LockboxSummary`, `types.ts`); v3 records fail validation and list as damaged,
   with no migration.
 * 2026-10-17 (thread 17, written_at, [#141](https://github.com/mrflip/safebyok/pull/141)): **`storeBox()`
-  still deciphers the old record before carrying its public fields forward.** A store that leaves
+  still deciphers the old record before carrying its visible fields forward.** A store that leaves
   out the sidecar carries the old record's `sidecar_json` and `registered_at` forward only from
   a record that opens under the vault's key (`recordOpens`, `vault.ts`, formerly
   `openedWhisperOf`), so a sidecar or time planted in storage is not sealed into a fresh revision that

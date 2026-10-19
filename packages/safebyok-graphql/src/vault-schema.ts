@@ -82,7 +82,7 @@ input SafebyokVaultPropsInput {
 
 """
 One lockbox, as stored: its whisper encrypted under its lockboxKey, that lockboxKey wrapped under
-the vaultKey, and its public shell. Times are epoch milliseconds; the sidecar is the JSON text
+the vaultKey, and its visible fields. Times are epoch milliseconds; the sidecar is the JSON text
 it was written as, which is bound into the lockbox's encryption.
 """
 type SafebyokLockbox {

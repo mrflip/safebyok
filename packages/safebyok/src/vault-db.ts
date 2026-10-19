@@ -125,7 +125,7 @@ export type VaultDBOpts = {
  *    fields are base64url text), so any backend that can hold JSON can hold a vault, as-is.
  *  * **Never look inside.** Every secret field arrives encrypted; nothing you hold can open a
  *    vault, and nothing safebyok does ever needs you to understand a record -- only to compare a
- *    few public fields (`vault_id`, `unlock_epoch`, `vault_key_epoch`, `revision_tok`) before a
+ *    few unencrypted fields (`vault_id`, `unlock_epoch`, `vault_key_epoch`, `revision_tok`) before a
  *    write.
  *  * **Write only as expected.** Every update and retirement carries an expectation of what
  *    stands in storage, and writes only if it still does: check and write in one atomic step (a
@@ -299,7 +299,7 @@ export abstract class VaultDB {
   }
 
   /**
-   * Public faces of every lockbox in the vault -- ciphered fields stripped, the sidecar as the
+   * Visible fields of every lockbox in the vault -- ciphered fields stripped, the sidecar as the
    * JSON value it holds -- valid while locked, sorted by boxlabel, character by character (UTF-16
    * code unit, never by a locale), so every device lists in one order. A lockbox whose record does
    * not read back as one, or names another boxlabel than it is stored under, is listed as a
@@ -642,7 +642,7 @@ const listedOrDamaged = ({ boxlabel, lockbox }: StoredLockbox): LockboxSummary |
 const StoredRevision = Z.object({ revision_tok: Lockbox.shape.revision_tok })
 
 /**
- * A listed lockbox's summary: its public fields, and its sidecar as the JSON value its record holds
+ * A listed lockbox's summary: its visible fields, and its sidecar as the JSON value its record holds
  * (`sidecar_json` is JSON text, as the record's check has found).
  */
 const summaryOf = (listed: Z.infer<typeof ListedLockbox>): LockboxSummary => {
@@ -693,7 +693,7 @@ const heldName = (facts: NameFacts, said: string, part: string): string => {
 /**
  * The adapter's half of a verb, with anything it throws that is not already a VaultError turned
  * into a calm one: a caller branches on `kind`, whatever the backend. The adapter's own error
- * rides along as `cause`, for debugging; adapters hold only ciphertext and public fields.
+ * rides along as `cause`, for debugging; adapters hold only ciphertext and unencrypted fields.
  */
 const fromStorage = async <ValT>(attempt: () => Promise<ValT>): Promise<ValT> => {
   try {

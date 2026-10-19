@@ -2651,11 +2651,11 @@ describe("what the backend sees", () => {
   it("stores no whisper and no passphrase in the clear, anywhere", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('a very memorable passphrase')
-    await vault.storeBox('anthropic', 'sk-ant-api03-fake-but-secret', { sidecar: { note: 'sidecars are server-readable' } })
+    await vault.storeBox('anthropic', 'sk-ant-api03-fake-but-secret', { sidecar: { note: 'sidecars are visible in storage' } })
     const everything = world.dbStore.ckeys().map((ckey) => world.dbStore.read(ckey)).join('\n')
     expect(everything).to.not.include('sk-ant-api03-fake-but-secret')
     expect(everything).to.not.include('a very memorable passphrase')
-    expect(everything).to.include('sidecars are server-readable') // the sidecar is server-readable by design
+    expect(everything).to.include('sidecars are visible in storage') // the sidecar is visible by design
     expect(everything).to.include('whisper_ciphered')
   })
 
@@ -2670,7 +2670,7 @@ describe("what the backend sees", () => {
   })
 })
 
-/** A lockbox row's public fields altered in storage, each a field its encryptions bind. */
+/** A lockbox row's visible fields altered in storage, each a field its encryptions bind. */
 const SpoiledShells = [
   [(row: Record<string, unknown>) => ({ ...row, sidecar_json: '{"note":"personal account"}' }),         'its sidecar swapped for another'],
   [(row: Record<string, unknown>) => ({ ...row, sidecar_json: '{}' }),                                    'its sidecar emptied'],
@@ -2704,7 +2704,7 @@ describe("tampering", () => {
   })
 
   for (const [spoil, blurb] of SpoiledShells) {
-    it(`a lockbox with ${blurb} refuses to open, and is left as it is: its whole public header is bound`, async () => {
+    it(`a lockbox with ${blurb} refuses to open, and is left as it is: its whole visible header is bound`, async () => {
       const world = makeWorld()
       const vault = await world.openUnlocked('pw')
       await vault.storeBox('anthropic', 'sk-fake', { sidecar: { note: 'work account' } })

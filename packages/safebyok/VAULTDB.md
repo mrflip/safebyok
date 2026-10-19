@@ -313,7 +313,7 @@ at the backend's default settings, there is none to report. Its test is line 3.7
 record's ciphertext, a boxlabel or a sidecar: the base class never quotes what it refuses, and an
 adapter's own messages name the vault's limits, never its contents. A `storage_unavailable`
 refusal's `cause` is the backend's own error, passed up as it came for debugging; it holds only
-what the backend holds, which is ciphertext and public fields.
+what the backend holds, which is ciphertext and unencrypted fields.
 
 **5.4. Only the signed-in user reaches their vaults.** An adapter whose backend knows who is
 signed in (a server's, made per request) refuses every verb on a scope whose `user_id` is not the

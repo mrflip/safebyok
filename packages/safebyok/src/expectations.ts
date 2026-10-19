@@ -3,7 +3,7 @@ import type { LockboxExpectation, LockboxRetireExpectation, LockboxRetirement, R
 
 /**
  * Whether what stands in storage is what a write expects: the comparisons a key-value adapter
- * makes, inside its one atomic step, before a versioned write lands. They compare the few public
+ * makes, inside its one atomic step, before a versioned write lands. They compare the few unencrypted
  * fields an adapter compares (`vault_id`, `unlock_epoch`, `vault_key_epoch`, `revision_tok`) and
  * nothing else, reading the standing row as it is, unvalidated: a row too damaged to show a field
  * fails the comparison, so nothing lands on it ({@link retirementOf}, which reports rather than

@@ -149,7 +149,7 @@ export const vaultKeyEpoch = Z.int().check(Z.positive())
 const cryptoKeyHandle = Z.custom<CryptoKey>((val) => val instanceof CryptoKey, 'a CryptoKey handle')
 
 /**
- * A lockbox's sidecar: your app's own data, riding beside the whisper, server-readable --
+ * A lockbox's sidecar: your app's own data, riding beside the whisper, visible in storage --
  * authenticated, but never encrypted, so anyone who can read the database can read it. Any JSON value -- what the user calls the account, which project a key belongs
  * to, what your app wants searchable server-side -- shown while the vault is locked, and never interpreted by safebyok. It is stored in the clear, as its JSON (`sidecar_json`), and bound into
  * the lockbox's encryption, so a sidecar altered or swapped in storage makes the lockbox refuse to
@@ -163,7 +163,7 @@ export const Sidecar: Z.ZodMiniType<WhisperJson> = whisperJson
 export type Sidecar = Z.infer<typeof Sidecar>
 
 /**
- * The public face of a lockbox: its boxlabel, revision, vaultKey epoch and times, its sidecar
+ * The visible fields of a lockbox: its boxlabel, revision, vaultKey epoch and times, its sidecar
  * as the JSON value the host stored (`{}` when it gave none), and `damaged` false. This, or a
  * {@link DamagedLockbox}, is what a VaultDB's `listBoxes` returns and a vault's snapshot holds,
  * readable while locked. The sidecar is shown as storage holds it: only `readBox()` opens the lockbox
@@ -218,7 +218,7 @@ export const MaxUnlocks = 8
 /**
  * A passphrase's way into the vault: the vaultKey wrapped under the passphraseKey that this
  * wayin's passphrase and its own passphraseSalt make. Every field but `vault_key_wayin_wrapped` is
- * public, and all of them are bound into that wrap, so a wayin altered or moved to another
+ * visible, and all of them are bound into that wrap, so a wayin altered or moved to another
  * vault refuses to open.
  */
 export const PassphraseWayin = Z.object({
@@ -257,7 +257,7 @@ export const PasskeySaltBytes = 32
  * passkey's authenticator answers, through the WebAuthn PRF extension, when asked to evaluate its
  * PRF over this wayin's own salt. The authenticator holds the secret; the wayin holds only
  * which credential to ask (`credential_id`) and what to ask it (`prf_salt_b64`). Every field but
- * `vault_key_wayin_wrapped` is public, and all of them are bound into that wrap.
+ * `vault_key_wayin_wrapped` is visible, and all of them are bound into that wrap.
  */
 export const PasskeyWayin = Z.object({
   wayinkind:               Z.literal('passkey'),
@@ -285,7 +285,7 @@ export type PasskeyWayin = Z.infer<typeof PasskeyWayin>
 
 /**
  * One way into a vault: the vaultKey, wrapped under a key that one {@link WayinKind} makes,
- * with the public fields that kind needs. Told apart by `wayinkind`: a {@link PassphraseWayin}
+ * with the visible fields that kind needs. Told apart by `wayinkind`: a {@link PassphraseWayin}
  * or a {@link PasskeyWayin}.
  */
 export const Wayin = Z.discriminatedUnion('wayinkind', [PassphraseWayin, PasskeyWayin])
@@ -314,7 +314,7 @@ const wayinList = Z.array(Wayin).check(
 )
 
 /**
- * The public face of one way into a vault, as a vault's snapshot lists it even while locked:
+ * The visible fields of one way into a vault, as a vault's snapshot lists it even while locked:
  * what a host shows the user, and what it names when it aims `unlock()` or `retireWayin()` at
  * one. Every way in shows its `wayinkind`, `wayin_id` and `wayinlabel`, and when it was added
  * (`registered_at`) and by which device (`device_id`, this vault's id for that device: one per

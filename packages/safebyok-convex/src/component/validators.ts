@@ -118,7 +118,7 @@ export const VaultProps = v.object({
 
 /**
  * One lockbox: its whisper ciphered under its own lockboxKey, that lockboxKey wrapped under the
- * vaultKey, and the public shell -- boxlabel, revision, which vaultKey (`vault_key_epoch`), the
+ * vaultKey, and the visible fields -- boxlabel, revision, which vaultKey (`vault_key_epoch`), the
  * whisper's codec and schema version, the sidecar as JSON text (`sidecar_json`, always
  * written), and the epoch-millisecond times it was first stored (`registered_at`) and this
  * revision written (`written_at`).
