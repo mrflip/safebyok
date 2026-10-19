@@ -1079,6 +1079,22 @@ describe("vault.ensureLease, by the Contract", () => {
     vault.close()
     await TH.expectRefusal(vault.ensureLease(), 'vault_closed')
   })
+
+  it("refuses vault_closed for a close() landing during its hello, asking getProof nothing", async () => {
+    const getProof = typingPw()
+    const world = makeRacingWorld()
+    const maker = await world.openUnlocked('pw')
+    await maker.lock()
+    maker.close()
+    const vault = Vault.make(world.optsWith({ getProof }))
+    const looking = world.holdNextLook()
+    const ensuring = vault.ensureLease()
+    await looking.reached
+    vault.close()
+    looking.release()
+    await TH.expectRefusal(ensuring, 'vault_closed')
+    expect(getProof).not.toHaveBeenCalled()
+  })
 })
 
 describe("Vault.make's getProof", () => {

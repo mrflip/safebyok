@@ -1398,6 +1398,8 @@ export class Vault {
    */
   async #ensureLease(renewWithinMillis: number): Promise<Vault> {
     await this.#helloWithin(this.#staleMillis)
+    // A close() during the hello: no ask is raised over a closed handle.
+    this.#checkOpen()
     const why = this.#whyAsk(renewWithinMillis)
     if (why === null) { return this }
     const answer = valOf(await (this.#asking ?? this.#raiseAsk(why)).answer)
