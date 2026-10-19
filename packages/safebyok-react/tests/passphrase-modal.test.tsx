@@ -5,6 +5,8 @@ import { ForeverMillis, MinuteMillis, VaultError, localVaultDB, memoryDeviceDB, 
 import { PassphraseModal, type PassphraseAdvice } from '../src/passphrase-modal'
 import * as TH from './test-helpers'
 
+// == [Test helpers]: vaultInState, noop, Trouble, wordingOf, lockedVault, usernameField, renderUnlocking, others
+
 /** Just enough of a Vault for the dialog to read its state and window (the default, unless given). */
 const vaultInState = (state: 'absent' | 'locked', leaseMillis = TH.DefaultLeaseMillis) => TH.stubVault({ state, leaseMillis })
 
@@ -55,8 +57,11 @@ const renderUnlocking = (unlocking: Promise<undefined>) => {
 }
 
 afterEach(cleanup)
+// --
 
 describe("PassphraseModal", () => {
+  // == [Basic flow and unlock failures]: a wrong passphrase, vault created on another device, any other failure
+
   it("tells a user choosing a passphrase that nobody can recover it", () => {
     render(<PassphraseModal vault={vaultInState('absent')} onDone={noop} />)
     expect(screen.queryByText('Choose a vault passphrase')).to.not.be.null
@@ -288,6 +293,9 @@ describe("PassphraseModal", () => {
       expect(reported).to.deep.equal([null])
     })
   })
+  // --
+
+  // == [Window wording and the dialog]: how long an unlock lasts, ForeverMillis, as a dialog
 
   describe("how long it says an unlock lasts", () => {
     const WindowCases = [
@@ -409,6 +417,9 @@ describe("PassphraseModal", () => {
       expect(screen.queryByPlaceholderText('vault passphrase')).to.not.be.null
     })
   })
+  // --
+
+  // == [Starting over]: forgotten passphrase, start over, retire
 
   describe("for a user who has forgotten the passphrase", () => {
     it("offers no way to start over unless asked to", () => {
@@ -530,6 +541,9 @@ describe("PassphraseModal", () => {
       vault.close()
     })
   })
+  // --
+
+  // == [Password manager and advice]: password manager, username field, advice while choosing
 
   describe("for a password manager", () => {
     it("asks for a new password in a real form while it creates the vault", () => {
@@ -727,6 +741,9 @@ describe("PassphraseModal", () => {
       expect(field.getAttribute('aria-describedby')).to.eq(adviceRegion().id)
     })
   })
+  // --
+
+  // == [After it has gone]: once it has gone
 
   describe("once it has gone", () => {
     // Each call is held under way while the dialog unmounts -- its host took it away, or the test
@@ -836,4 +853,5 @@ describe("PassphraseModal", () => {
       })
     }
   })
+  // --
 })

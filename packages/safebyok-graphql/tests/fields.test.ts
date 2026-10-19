@@ -14,7 +14,7 @@ describe("selectionOf", () => {
 
 describe("recordOf", () => {
   it("keeps the fields asked for, leaving out a null one and a GraphQL client's __typename", () => {
-    expect(recordOf({ vault_id: 'v1', prior_vault_key: null, __typename: 'SafebyokVaultProps' }, [['vault_id', 'plain'], ['prior_vault_key', 'plain']])).to.deep.equal({ vault_id: 'v1' })
+    expect(recordOf({ vault_id: 'v1', wayins: null, __typename: 'SafebyokVaultProps' }, [['vault_id', 'plain'], ['wayins', 'plain']])).to.deep.equal({ vault_id: 'v1' })
   })
 
   it("gives back a whole lockbox as it was, and a ciphered field as its two halves alone", () => {
@@ -27,12 +27,6 @@ describe("recordOf", () => {
   it("gives back the vault props' wayins as they were, never looked inside", () => {
     const vaultProps = TH.vaultPropsOf('u1', { wayins: [TH.wayinOf('passphrase'), TH.wayinOf('home_phrase')] })
     expect(recordOf(vaultProps, VaultPropsFields)).to.deep.equal(vaultProps)
-  })
-
-  it("leaves out the vault props' prior vaultKey when it is missing or undefined", () => {
-    const vaultProps = TH.vaultPropsOf('u1')
-    expect(recordOf({ ...vaultProps, prior_vault_key: undefined }, VaultPropsFields)).to.deep.equal(vaultProps)
-    expect(recordOf(vaultProps, VaultPropsFields)).to.not.have.property('prior_vault_key')
   })
 
   it("carries a lockbox's sidecar as the JSON text it was written as", () => {

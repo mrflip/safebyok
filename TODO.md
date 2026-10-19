@@ -9,6 +9,16 @@ What is reasonable but deferred is in `NOTYET.md`: do not anticipate it in your 
 
 Small irritants, each a few lines, picked up by whoever is nearby.
 
+* **Postgres `InsertBoxOutcome` typed loosely.** From the reform2 sprint
+  ([#177](https://github.com/mrflip/safebyok/pull/177)'s review; the Coach: "add as todo"):
+  `insertBox` in `safebyok-postgres/src/postgres-vault-db.ts` casts its row to a type naming only
+  the four flags, its lockbox columns untyped beside them. Type them, or return the lockbox as
+  one `row_to_json` column, next time Postgres is touched.
+* **GraphQL's `'plain'` field class.** From the reform2 sprint
+  ([#176](https://github.com/mrflip/safebyok/pull/176); the Coach: "yes", leave it for a later
+  sweep): `safebyok-graphql/src/fields.ts` classes `sidecar_json` as `'plain'`, a code name that
+  disagrees with VOCABULARY.md's *visible* (which notes the exception). Rename the class with
+  the next GraphQL change.
 * **`postgres` a required check, once it has run a while.** Ruled 2026-10-16
   ([#131](https://github.com/mrflip/safebyok/pull/131), the Postgres container): CI's `postgres`
   job runs the VaultDB battery, its races and the `23503` case over a real server, and is not
@@ -71,6 +81,11 @@ as recommended**: thread 19 (`rotateVaultKey`, not yet built) keeps only the way
 the rotation.
 Revisit before 1.0 if rotation signing every other device out is too blunt.
 
+`softlock_gone` (2026-10-19) removed the schema rotation would have written: the vault props'
+`prior_vault_key` (the vaultKey before, wrapped under the current one) and the check that it sat
+one epoch below theirs. `vault_key_epoch` stays on every record, reserved at 1, with storage's
+comparison of a lockbox's epoch against the vault props'.
+
 ### `retire()`'s edge cases
 
 From the Convex sprint ([#18](https://github.com/mrflip/safebyok/pull/18)): a handle that never
@@ -83,24 +98,36 @@ shared battery ([#114](https://github.com/mrflip/safebyok/pull/114)), after the 
 in their home ([#111](https://github.com/mrflip/safebyok/pull/111)). First check whether big_feats
 changed either.
 
-### Lock NOW vs soft lock
+### Lock timing vs. work in flight: a policy is owed before 1.0
 
-From [#106](https://github.com/mrflip/safebyok/pull/106): a `readBox()` or `useBox()` that started
-while the vault was unlocked still hands back its whisper if the vault locks (a sign-out, or
-`lock()`) while it waits on storage. It has always been so for `lock()`; a sign-out makes it
-likelier. The orchestrator proposed that reads check again after storage answers and refuse with
-`vault_locked`.
+**`softlock_gone` (2026-10-19) removed the soft lock (`lockSoon()`), the minute past
+`askPassphraseAt`, the in-handle lock counters and the device mark's lock generation.** Each decided
+who wins when a lock lands while something is in flight. Today nothing decides: the last writer
+wins, and the user may be surprised. The Coach's ruling: let these be annoyances until the store
+reform is done, then write one defensible policy and tests to it, rather than re-deriving a
+mechanism per case now. The scenarios, each with today's outcome:
 
-The Coach (2026-10-16), holding it: there should be a distinction between *lock the phone, the
-goons are here* and *it's time for a password refresh*. The proposal sounds like its own race
-condition; decide what guarantee we offer, and why, before writing more code.
+1. `lock()` lands during an unlock's derivation or its lease write, same handle: the unlock
+   finishes; the vault is unlocked and a lease written. A `lock()` while a `hello()` reads the
+   lease likewise: the hello takes it up.
+2. The same, the lock in another tab on this device: as 1; the lease write is no longer refused.
+3. A read's fetch or decipher straddles a lock: refused `vault_locked` if no key is in hand when
+   the whisper is ready; handed back if another unlock has put a key in hand meanwhile.
+4. A store sealed before a lock lands after it: it lands (it needs no key after sealing).
+5. The lease ends at `askPassphraseAt` mid-operation: as 3 and 4, with no grace; a store not yet
+   sealed is refused.
+6. The device store throws when a lock erases the lease: the lease survives; the next hello that
+   reads afresh, or the next page load, takes it up.
+7. A sign-out with an unlock in flight in another tab: as 2; harmless, since a lease is scoped by
+   user id.
 
-Where it stands today: the expiry ruling (section 5, on when a lease expires, now in
-`winboard/20261016-todo/20261016-todo-open.md`) says "in-flight work is never clawed back",
-and `lockSoon()` already gives a grace in which work started before it finishes -- the soft lock.
-`lock()` and a sign-out have no separate meaning yet. Decide: does `lock()` mean "now" (nothing
-started before it hands back a whisper after it), and if so, is a re-check after storage enough,
-or does the whisper's decryption also need to be refused once the key is gone?
+The policy session decides, for each, what the vault promises, and writes the test first. The
+tests this removal deleted, verbatim and by theme, each with the lesson it carried, are its
+checklist: `softlock_gone-removed-tests.md` in the thread's folder (`20261019-softlock_gone/`,
+under `whiteboard/` or, once closed, `winboard/`). It also
+answers the question this entry replaces (*Lock NOW vs soft lock*, from
+[#106](https://github.com/mrflip/safebyok/pull/106)): whether `lock()` claws back a store already in
+flight.
 
 ### Are we doing anyone a favor by accepting multiple passphrases?
 
@@ -155,9 +182,9 @@ to a todo section for all of the below, hello and make and react lifecycle." Fou
 came with `Vault.make` and `hello()` ([#166](https://github.com/mrflip/safebyok/pull/166)); each
 works as built, and a redesign of the lifecycle may change all four.
 
-* **`lock()`, `lockSoon()` and `close()` don't wait for `hello()`.** Every other method waits for
-  storage to answer first; these three act at once, and a lock made while `hello()` runs wins over
-  taking up the lease. `retire()` waits. (#166, thread 8)
+* **`lock()` and `close()` don't wait for `hello()`.** Every other method waits for storage to
+  answer first; these two act at once. A lock made while `hello()` runs no longer wins over taking
+  up the lease (*Lock timing vs. work in flight*, scenario 1). `retire()` waits. (#166, thread 8)
 * **A failed `hello()` keeps the handle alive.** A refused `hello()` no longer closes the storage
   watch, so the same handle can retry; after an untrusted-storage refusal the next call meets that
   refusal again rather than `vault_locked`. (#166, thread 8)

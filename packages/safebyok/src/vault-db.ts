@@ -4,12 +4,11 @@ import { MaxUnlocks, WayinKindVals, VaultProps, VaultScope, type DamagedLockbox,
 import { VaultError, isVaultError } from './errors'
 import * as Names from './names'
 import { AnyTextValidators, NameFloor } from './validators'
-import type { StringStore } from './string-store'
-import * as Ckeys from './ckeys'
-import * as Expectations from './expectations'
 import * as Refusals from './refusals'
 import { asError, parseLogger, type VaultLogger } from './logger'
 import { reportToPlatform } from './report-error'
+
+// == [Expectations and records]: VaultPropsExpectation, LockboxExpectation, RetireExpectation, LockboxRetireExpectation, LockboxRetirement, StoredLockbox
 
 /**
  * What an update of the vault props was proven against: the vault and the unlock epoch of the
@@ -19,6 +18,7 @@ import { reportToPlatform } from './report-error'
  * @example { vault_id: standing.vault_id, unlock_epoch: standing.unlock_epoch }
  */
 export type VaultPropsExpectation = Z.infer<typeof VaultPropsExpectation>
+
 const VaultPropsExpectation = Z.object({
   vault_id:         VaultProps.shape.vault_id,
   unlock_epoch:     VaultProps.shape.unlock_epoch,
@@ -35,6 +35,7 @@ const VaultPropsExpectation = Z.object({
  * @example { vault_id: vaultProps.vault_id, revision_tok: prev?.revision_tok ?? null, vault_key_epoch: vaultProps.vault_key_epoch }
  */
 export type LockboxExpectation = Z.infer<typeof LockboxExpectation>
+
 const LockboxExpectation = Z.object({
   vault_id:        VaultProps.shape.vault_id,
   revision_tok:    Z.nullable(Lockbox.shape.revision_tok),
@@ -50,6 +51,7 @@ const LockboxExpectation = Z.object({
  * @example { vault_id: vaultProps.vault_id }
  */
 export type RetireExpectation = Z.infer<typeof RetireExpectation>
+
 const RetireExpectation = Z.object({
   vault_id: VaultProps.shape.vault_id,
 })
@@ -65,6 +67,7 @@ const RetireExpectation = Z.object({
  * @example { vault_id: vaultProps.vault_id, revision_tok: listed.revision_tok }
  */
 export type LockboxRetireExpectation = Z.infer<typeof LockboxRetireExpectation>
+
 const LockboxRetireExpectation = Z.object({
   vault_id:     VaultProps.shape.vault_id,
   revision_tok: Z.nullable(Lockbox.shape.revision_tok),
@@ -81,6 +84,7 @@ const LockboxRetireExpectation = Z.object({
  * @example { outcome: 'retired_other' }
  */
 export type LockboxRetirement = Z.infer<typeof LockboxRetirement>
+
 const LockboxRetirement = Z.object({
   outcome: Z.enum(['retired', 'retired_other', 'absent']),
 })
@@ -94,6 +98,9 @@ const LockboxRetirement = Z.object({
  * @example { boxlabel: 'anthropic', lockbox: storedRecord }
  */
 export type StoredLockbox = { boxlabel: string, lockbox: unknown }
+// --
+
+// == [Options]: VaultDBOpts
 
 /**
  * What an adapter's factory takes from the host, beside its backend's own options: an optional
@@ -115,6 +122,7 @@ export type VaultDBOpts = {
    */
   logger?: VaultLogger | null | undefined
 }
+// --
 
 /**
  * Remote storage for vault records, as the host application plugs it in: extend this class and
@@ -166,6 +174,8 @@ export type VaultDBOpts = {
  * hands each call on to another VaultDB's public verbs passes each name through as it came.
  */
 export abstract class VaultDB {
+  // == [Backend limits]: maxRecordBytes, maxVaultBytes, maxLockboxes, maxNameBytes
+
   /**
    * The most this backend holds in one record, in bytes: a plain fact about the backend, or
    * `Infinity` when it sets no per-record limit. A vault refuses to open with a `maxWhisperBytes`
@@ -217,6 +227,9 @@ export abstract class VaultDB {
    * declares its share of the key's limit.
    */
   abstract readonly maxNameBytes: number
+  // --
+
+  // == [Constructor and logger]: #logger, constructor, logger
 
   /** The logger this VaultDB was made with, guarded: private, so that nothing can put another in its place. */
   readonly #logger: VaultLogger
@@ -238,6 +251,9 @@ export abstract class VaultDB {
    * `Vault.make` and `VaultProvider` use it when they are given no logger of their own.
    */
   get logger(): VaultLogger { return this.#logger }
+  // --
+
+  // == [Vault props verbs]: readVaultProps, fetchOrCreateVaultProps, updateVaultProps
 
   // ------------------------------------------------------------------- the verbs safebyok calls
 
@@ -289,6 +305,9 @@ export abstract class VaultDB {
     const landed = await fromStorage(() => this.doUpdateVaultProps(outgoing, expectation))
     if (! landed) { throw Refusals.staleWrite('vaultProps') }
   }
+  // --
+
+  // == [Lockbox verbs]: readBox, listBoxes, listBoxRecords, updateBox
 
   /** One lockbox, validated, or null when there is none under that boxlabel. */
   async readBox(scope: VaultScope, boxlabel: string): Promise<Lockbox | null> {
@@ -370,6 +389,9 @@ export abstract class VaultDB {
     if (stored === null) { throw Refusals.staleWrite('lockbox') }
     return writtenBack('a lockbox write', () => checkLockbox(stored, outgoing.boxlabel))
   }
+  // --
+
+  // == [Retire verbs]: retireBox, retireVault, retireDamagedVault
 
   /**
    * Remove the lockbox under `boxlabel`, whatever revision stands, only while the scope's standing
@@ -443,6 +465,9 @@ export abstract class VaultDB {
     const landed = await fromStorage(() => this.doRetireVault(asked, { vault_id: named.data.vault_id }))
     if (! landed) { throw Refusals.staleWrite('retire') }
   }
+  // --
+
+  // == [Watching]: subscribe, listenerFailed, watchTrouble
 
   /**
    * Calls `onChange` after any write touching `scope`, from this device or another; returns the
@@ -505,6 +530,9 @@ export abstract class VaultDB {
       delivered: () => { warned = false },
     }
   }
+  // --
+
+  // == [The half you write]: doReadVaultProps, doFetchOrCreateVaultProps, doRetireVault, doSubscribe, others
 
   // --------------------------------------------------------------------------- the half you write
 
@@ -563,7 +591,10 @@ export abstract class VaultDB {
   protected doSubscribe(_scope: VaultScope, _onChange: () => void): () => void {
     return noUnsubscribing
   }
+  // --
 }
+
+// == [Watch helpers]: noUnsubscribing, WatchTrouble, startedWatch, heedListener, heedRejection
 
 const noUnsubscribing = (): void => undefined
 
@@ -607,6 +638,9 @@ const heedRejection = async (returned: unknown, failed: (err: unknown) => void):
     failed(err)
   }
 }
+// --
+
+// == [Listing helpers]: withoutCiphered, ListedLockbox, isNameable, listedOrDamaged, summaryOf, byCodeUnit
 
 /** A stored lockbox as {@link VaultDB.listBoxRecords} hands it on: its two ciphered fields left out, anything else as it came. */
 const withoutCiphered = (lockbox: unknown): unknown => {
@@ -658,6 +692,9 @@ const byCodeUnit = (one: string, two: string): number => {
   if (one === two) { return 0 }
   return one < two ? -1 : 1
 }
+// --
+
+// == [Name checks]: FloorRules, heldScope, heldBoxlabel, heldName
 
 /** The checks a public verb runs on a name: the floor beneath every name, and nothing a host chose. */
 const FloorRules: Names.NameRules = Names.rulesOf(AnyTextValidators)
@@ -692,6 +729,9 @@ const heldName = (facts: NameFacts, said: string, part: string): string => {
   }
   return part
 }
+// --
+
+// == [Storage and listener guards]: fromStorage, asStorageTrouble, checkListener, checked, checkOutgoing
 
 /**
  * The adapter's half of a verb, with anything it throws that is not already a VaultError turned
@@ -735,6 +775,9 @@ const checked = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, candidate: unkno
 const checkOutgoing = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, candidate: unknown, said: string, spared: 'written' | 'removed' = 'written'): RecordT => checked(recordSchema, candidate, () => (
   new VaultError('bad_record', `Nothing was ${spared}: that ${said} is not one this package builds. Hand a VaultDB only the records and expectations a vault builds.`)
 ))
+// --
+
+// == [Vault props checks]: checkVaultProps, unnamedVaultProps, newerVaultProps, mayBeNewer, readStoredVaultProps, isSoundVaultProps, others
 
 const checkVaultProps = (raw: unknown, scope: VaultScope): VaultProps => {
   // A later safebyok may write what this one cannot read, which is no damage: it is said apart.
@@ -756,7 +799,7 @@ const newerVaultProps = () => new VaultError('newer_format', "This vault's store
  * The vault props formats earlier versions of this package wrote: a record in one is older, never
  * newer, and fails today's checks as damage does.
  */
-const OlderVaultPropsFormats: ReadonlySet<unknown> = new Set(['safebyok-vault-v1', 'safebyok-vault-v2'])
+const OlderVaultPropsFormats: ReadonlySet<unknown> = new Set(['safebyok-vault-v1', 'safebyok-vault-v2', 'safebyok-vault-v3'])
 
 /**
  * True when a record that fails this version's checks may be one a later version writes, which
@@ -806,6 +849,9 @@ const isSoundVaultProps = (raw: unknown, scope: VaultScope): boolean => {
 
 /** The one field of stored vault props a retirement needs, as the vault's own check has it. */
 const StoredVaultId = Z.object({ vault_id: VaultProps.shape.vault_id })
+// --
+
+// == [Lockbox and answer checks]: checkLockbox, writtenBack, checkAnswer, checkRecord, jsonBytes
 
 /** A stored lockbox, as `readBox` holds it: a lockbox's shape, under the boxlabel it was asked for. */
 const checkLockbox = (raw: unknown, boxlabel: string): Lockbox => {
@@ -850,171 +896,4 @@ const checkRecord = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, raw: unknown
  * storage's limits. Every in-tree backend counts a record as no heavier.
  */
 export const jsonBytes = (val: unknown): number => new TextEncoder().encode(JSON.stringify(val)).length
-
-/** `fn`'s result (or failure) as a promise: a sync throw becomes a rejection, never an escape. */
-const soon = async <ValT>(fn: () => ValT | Promise<ValT>): Promise<ValT> => await fn()
-
-/** What {@link localVaultDB} is made with. */
-export type LocalVaultDBOpts = VaultDBOpts & {
-  /** Where the rows live: `domStore(localStorage, prefix)`, `memoryStore()`, or a StringStore of your own. */
-  store: StringStore
-}
-
-/**
- * VaultDB over a {@link StringStore}: rows as JSON text under the ckeys `Ckeys` gives, names
- * joined on `^`. A host backs one with localStorage, for a vault that lives on this device alone;
- * tests back one with a Map. Every secret field in what it stores is ciphertext; what it lacks is
- * reach -- rows stay on this device instead of syncing through a shared database.
- *
- * * **One tab.** Each write checks what stands and saves in one synchronous step, so nothing else
- *   in this tab runs in between: that is its atomic step. Two tabs sharing one localStorage are
- *   not held apart -- browsers do not lock it across tabs -- so a vault two tabs write at once may
- *   lose a write. For a vault several tabs keep, use `idbVaultDB` from `safebyok-indexeddb`, whose
- *   every write is one IndexedDB transaction.
- * * **No limits but a record's**: a mebibyte in one record, and none on a vault. The origin's
- *   storage quota bounds the whole store: a write past it is refused as `storage_unavailable`, the
- *   browser's own error (a `QuotaExceededError`) its cause, and nothing is written.
- *
- * @param opts - The `store`, and optionally a `logger`. Kind 'bad_option' for a `store` that is
- *   not a StringStore, or a `logger` that is not a VaultLogger.
- * @returns The VaultDB, to hand `Vault.make`.
- *
- * @example
- *   const vaultDB = localVaultDB({ store: memoryStore() })
- *   await vaultDB.readVaultProps({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // null
- * @example
- *   const vaultDB = localVaultDB({ store: domStore(localStorage, 'acme:db:'), logger })
- */
-export const localVaultDB = (opts: LocalVaultDBOpts): VaultDB => {
-  if (! localVaultDBOptsShape.safeParse(opts).success) {
-    throw new VaultError('bad_option', 'localVaultDB takes one bag of options: a `store` (a StringStore, such as memoryStore() or domStore(localStorage, prefix)), and optionally a `logger`.')
-  }
-  return new StringStoreVaultDB(opts)
-}
-
-const isFunction = (candidate: unknown) => typeof candidate === 'function'
-
-/** What localVaultDB must be handed: a store carrying a StringStore's five calls. Checked only. */
-const localVaultDBOptsShape = Z.object({
-  store: Z.object({
-    read:      Z.custom(isFunction),
-    write:     Z.custom(isFunction),
-    erase:     Z.custom(isFunction),
-    ckeys:     Z.custom(isFunction),
-    subscribe: Z.custom(isFunction),
-  }),
-})
-
-class StringStoreVaultDB extends VaultDB {
-  // localStorage holds about five megabytes per origin, in all: a mebibyte is this adapter's
-  // most for any one record.
-  readonly maxRecordBytes = 1024 * 1024
-  // Nothing here reads a whole vault under a budget; the store's own quota refuses a write past it.
-  readonly maxVaultBytes = Infinity
-  // Nor does it count lockboxes: the vault's own maxLockboxes is the only limit.
-  readonly maxLockboxes = Infinity
-  // A ckey holds a name of any length the floor admits.
-  readonly maxNameBytes = Infinity
-
-  private readonly store: StringStore
-
-  constructor(opts: LocalVaultDBOpts) {
-    super(opts)
-    this.store = opts.store
-  }
-
-  // Work is deferred into the promise even though the store is synchronous: a storage fault must
-  // reject the returned promise, never throw before the caller has one in hand. And each write
-  // checks and saves in one synchronous step, so nothing else in this tab runs in between.
-  protected doReadVaultProps(scope: VaultScope): Promise<unknown> {
-    return soon(() => readJson(this.store, Ckeys.vaultProps(scope)))
-  }
-
-  protected doFetchOrCreateVaultProps(vaultProps: VaultProps): Promise<unknown> {
-    return soon(() => {
-      const standing = readJson(this.store, Ckeys.vaultProps(vaultProps))
-      if (standing !== null) { return standing }
-      this.store.write(Ckeys.vaultProps(vaultProps), JSON.stringify(vaultProps))
-      return vaultProps
-    })
-  }
-
-  protected doUpdateVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<boolean> {
-    return soon(() => {
-      if (! Expectations.vaultPropsMeets(readJson(this.store, Ckeys.vaultProps(vaultProps)), expected)) { return false }
-      this.store.write(Ckeys.vaultProps(vaultProps), JSON.stringify(vaultProps))
-      return true
-    })
-  }
-
-  protected doReadBox(scope: VaultScope, boxlabel: string): Promise<unknown> {
-    return soon(() => readJson(this.store, Ckeys.box(scope, boxlabel)))
-  }
-
-  protected doListBoxes(scope: VaultScope): Promise<StoredLockbox[]> {
-    return soon(() => (
-      this.store.ckeys()
-        .filter(Ckeys.isBoxIn(scope))
-        .map((ckey) => ({ boxlabel: Ckeys.boxlabelOf(ckey), text: this.store.read(ckey) }))
-        // A row erased since the ckeys were read is gone; one that is not JSON goes up as its text.
-        .filter((row): row is { boxlabel: string, text: string } => row.boxlabel !== null && row.text !== null)
-        .map(({ boxlabel, text }) => ({ boxlabel, lockbox: jsonOrText(text) }))
-    ))
-  }
-
-  protected doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<unknown> {
-    return soon(() => {
-      const ckey = Ckeys.box(scope, lockbox.boxlabel)
-      const standingVaultProps = readJson(this.store, Ckeys.vaultProps(scope))
-      if (! Expectations.lockboxMeets(standingVaultProps, readJson(this.store, ckey), expected)) { return null }
-      this.store.write(ckey, JSON.stringify(lockbox))
-      return readJson(this.store, ckey)
-    })
-  }
-
-  protected doRetireBox(scope: VaultScope, boxlabel: string, expected: LockboxRetireExpectation): Promise<unknown> {
-    return soon(() => {
-      if (! Expectations.vaultMeets(readJson(this.store, Ckeys.vaultProps(scope)), expected)) { return null }
-      const ckey = Ckeys.box(scope, boxlabel)
-      // A row that is not JSON is still retired, and reported as holding no revision.
-      const text = this.store.read(ckey)
-      const retirement = Expectations.retirementOf(text === null ? null : jsonOrText(text), expected)
-      this.store.erase(ckey)
-      return retirement
-    })
-  }
-
-  protected doRetireVault(scope: VaultScope, expected: RetireExpectation): Promise<boolean> {
-    return soon(() => {
-      if (! Expectations.vaultIdMeets(readJson(this.store, Ckeys.vaultProps(scope)), expected)) { return false }
-      const doomed = this.store.ckeys().filter(Ckeys.isBoxIn(scope))
-      for (const ckey of [...doomed, Ckeys.vaultProps(scope)]) { this.store.erase(ckey) }
-      return true
-    })
-  }
-
-  // The store's bell rings on every write, not only ones in scope: a spurious refresh is
-  // harmless here, and a real adapter (Convex) subscribes precisely.
-  protected override doSubscribe(_scope: VaultScope, onChange: () => void): () => void {
-    return this.store.subscribe(onChange)
-  }
-}
-
-/** Stored text as the JSON it holds, or as itself when it holds none: a damaged row, for the listing to mark. */
-const jsonOrText = (text: string): unknown => {
-  try {
-    return JSON.parse(text)
-  } catch {
-    return text
-  }
-}
-
-const readJson = (store: StringStore, ckey: string): unknown => {
-  const text = store.read(ckey)
-  if (text === null) { return null }
-  try {
-    return JSON.parse(text)
-  } catch {
-    throw new VaultError('corrupt_record', 'A stored record did not read back as JSON. It may be damaged; it was left as it is.')
-  }
-}
+// --

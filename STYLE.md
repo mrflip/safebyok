@@ -177,6 +177,11 @@ between columns lets the editor align them (see *Tests*).
   open, as its owner named it.`
 * The first line must stand alone when folded in an editor: `/** Brief statement */`, or a
   sentence that continues on the following lines.
+* **A file past about 40 KB is sectioned.** `// == [Mark]: heedMark, markSeeing, others` opens a
+  section (its name, then the names a reader would grep for), `// --` closes it, both at the
+  section's indentation; sections are flat, never nested. `grep -n '// == '` is the file's table
+  of contents. A banner groups declarations; it does not excuse a file that should be split, and
+  it moves with the code it names.
 
 Well-named, short functions rarely need running comments. A comment that narrates the code, makes
 up for a poor name, or marks off a stanza that should be its own function is a sign to rewrite.
@@ -184,10 +189,17 @@ up for a poor name, or marks off a stanza that should be its own function is a s
 ## Tests
 
 Vitest, in each package's `tests/`, path for path with its `src/`: `src/foo/bar.ts` is tested in
-`tests/foo/bar.test.ts`. Test and build artifacts never land in `src/`.
+`tests/foo/bar.test.ts`. A test file that passes about 1,500 lines becomes a folder named for its
+module, `tests/foo/bar/`, of `bar-<theme>.test.ts` files whose themes are what a reader would look
+for (`bar-races`, `bar-refusals`), with the helpers two or more of them share in a `world.ts`
+beside them; no `bar.test.ts` stays outside the folder, and no `describe` title changes for the
+move. A module reached only through another's public verb (`vault-opts.ts` through `Vault.make`)
+is tested beside that verb. Test and build artifacts never land in `src/`.
 
-* **Test helpers live in one module, `tests/test-helpers.ts`, star-imported as `TH`**:
-  `import * as TH from './test-helpers'`, then `TH.scopeOf('u1')`. It exports everything. The
+* **Test helpers are reached through one module, `tests/test-helpers.ts`, star-imported as `TH`**:
+  `import * as TH from './test-helpers'`, then `TH.scopeOf('u1')`. It exports everything, and
+  may re-export, by name, a folder of parts beside it (`tests/test-helpers/`: grep the door for the
+  part that holds a helper, then read that part). A new helper goes in its part and in the door. The
   core's is also published as `safebyok/testing`, so another package's tests reach the same
   helpers; a package with helpers of its own keeps them in its own `tests/test-helpers.ts`, which
   re-exports `safebyok/testing` beside them, so each test still has one `TH`.

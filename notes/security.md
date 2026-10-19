@@ -32,6 +32,19 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-19 (branch 20261019-softlock_gone, on PR #189): **the rotation schema is removed; no
+  `rotateVaultKey` was ever built.** The vault props' `prior_vault_key` (the previous vaultKey wrapped
+  under the current one), its `PriorVaultKey` schema and the `priorFits` refinement (a prior exactly
+  one epoch below from epoch 2 on, none at epoch 1) are gone from the core and the Convex, Postgres
+  and GraphQL adapters' schemas, and the vault props moved to `safebyok-vault-v4`. That tag opens
+  every wayin's wrap ctx, so v3 wayins no longer open; a stored v3 record reads as `damaged_vault`
+  (never `newer_format`), `retireDamagedVault` clears it, and nothing migrates. `vault_key_epoch`
+  stays on every record, reserved at 1 and never written otherwise by safebyok, but the schema still
+  admits any positive epoch on vault props and checks none against a prior. It remains bound into each
+  wayin's HKDF info / wrap ctx and held equal to the vault props', so storage cannot raise it and
+  still have a wayin open, and the rollback check still refuses vault props at a lower
+  `vault_key_epoch` than the device has seen. A lockbox lists as under the held key only when its
+  epoch equals the vault props'; any other lists as damaged.
 * 2026-10-19 (branch 20261019-retire_revision, on PR #177); 2026-10-19 (branch 20261019-no_clear): **`VaultDB.retireBox` now takes the
   revision the device read, and storage reports what it removed; the base class takes that report
   as untrusted storage input.** The expectation is `{ vault_id, revision_tok }` (null for a
@@ -95,21 +108,29 @@ added or folded into through the subagent, and no other entry changes.
   old is ever decrypted by the new code, and nothing is rewritten in place. A Convex deployment
   refuses the new schema until its tables are cleared; Postgres hosts must run the summary
   changeset's Postgres steps before the new table SQL.
-* 2026-10-18 (make_hello): **`openVault` is split into `Vault.make`, which returns a handle at
+* 2026-10-18 (make_hello); 2026-10-19 (20261019-softlock_gone, amending points 1 and 2): **`openVault` is split into `Vault.make`, which returns a handle at
   once, and `vault.hello()`, which reads storage and the lease.** `Vault.make(opts)` is synchronous:
   it validates every option and starts `hello()` itself. `hello()` reads the vault props and this
   device's lease and settles the snapshot from `opening` into `absent`, `locked` or `unlocked`.
-  Every method but `lock()`, `lockSoon()` and `close()` awaits it first (after its synchronous
+  Every method but `lock()` and `close()` awaits it first (amended 2026-10-19: `lockSoon()` is gone) (after its synchronous
   argument checks), so a call made before storage answers waits; a call that touches a whisper
   still needs the vault unlocked once `hello()` settles. Nothing that failed closed proceeds. No
   construction, ctx, stored format or key handling changed. Five points to look at:
-  (1) **A lock does not wait for `hello()`.** `lock()` and `lockSoon()` act at once, storage
-  reachable or not. A `hello()` taking up the lease while a lock lands takes nothing up:
-  `fetchLease` returns at once unless the counter `revokesSoFar` (raised by every hard lock --
+  (1) **A lock does not wait for `hello()`.** `lock()` acts at once, storage reachable or not.
+  Amended 2026-10-19 (20261019-softlock_gone): `lockSoon()` and the counter `revokesSoFar` are
+  gone, and a `lock()` landing while `hello()` reads the lease no longer stops the lease being
+  taken up: last writer wins, accepted as a user annoyance until the store reform, with a policy
+  owed before 1.0 (TODO.md, *Lock timing vs. work in flight*). Until then, a `hello()` taking up
+  the lease while a lock landed took nothing up:
+  `fetchLease` returned at once unless the counter `revokesSoFar` (raised by every hard lock --
   `lock()`, `retire()`, a lock for untrusted storage -- and every `lockSoon()`) was 0 when that
-  hello started, and it takes nothing up if the counter has moved by the time the lease opens or
-  the handle has closed. Tests hold the lease read open while each lock lands.
-  (2) **`hello()` is memoised, and a lock is never undone on its handle by a later `hello()`.**
+  hello started, and it took nothing up if the counter had moved by the time the lease opened or
+  the handle had closed. Tests held the lease read open while each lock landed.
+  (2) **`hello()` is memoised.** Amended 2026-10-19 (20261019-softlock_gone): a lock is no longer
+  kept from being undone on its handle by a later `hello()`; with the counter gone, a lease that a
+  lock failed to erase (the device store threw) is taken up by the next `hello()` that reads afresh
+  on the same handle, not only at the next page load. What the rest of this point says of the
+  counter, and of a lock staying locked on its handle, describes what stood until then.
   Callers share one in-flight promise; a rejected one clears at once; a resolved one stands until a
   read of storage fails, storage the vault cannot trust refuses it (`identity_revoked`,
   `rolled_back`, `newer_format`, from any call, read or write), or the vault is retired. The next
@@ -122,7 +143,7 @@ added or folded into through the subagent, and no other entry changes.
   (storage unreachable, say) has revoked nothing, so it still takes its lease up once a `hello()`
   (or a storage change bell) succeeds; an unlocked handle holds its key and loses nothing. If storage still refuses, the call meets the
   refusal again and the vault stays locked. A plain `lock()` does not reset the memo and erases the
-  lease in any case. Regression tests cover `lock()`, `lockSoon()` and the untrusted-storage case.
+  lease in any case. Regression tests then covered `lock()`, `lockSoon()` and the untrusted-storage case.
   (3) **`Vault.make` refuses any option it does not take**, `bad_option`, by a strict Zod object
   over the option names. Before, unknown keys were ignored, so a host still passing the retired
   `forcePassphraseReentryHours` (now `leaseHours`) got the 7-day default lease: a longer unlock.
@@ -143,7 +164,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-18: **the context bytes of every wayin changed spelling, not construction, with the
   rename to "wayin".** A wayin's wrap is bound to a context of the record's format tag, then its
   whole stored header, as key-sorted JSON (a passkey wayin's HKDF `info` is the same bytes); it now
-  spells the renamed fields and begins `safebyok-vault-v3`. The construction and the purpose
+  spells the renamed fields and begins `safebyok-vault-v3` (since 2026-10-19, `safebyok-vault-v4`, so v3 wayins no longer open). The construction and the purpose
   strings are unchanged. A `safebyok-vault-v2` record reads as `damaged_vault` on adapters that read
   it (a Convex deployment refuses the new schema until its tables are cleared), with no migration,
   so no old ciphertext has to open under the new bytes. Rejected: a translation back to the old
@@ -160,7 +181,7 @@ added or folded into through the subagent, and no other entry changes.
   run over an in-memory backend, not over each real one. Separately, `postgresVaultDB` now calls a
   subscriber once as its listen begins (6.1), so a vault reads a write that landed while its watch
   was starting, which it missed before.
-* 2026-10-16: **the `vault_key_epoch` expectation** (`VAULTDB.md` line 3.8). Every lockbox carries
+* 2026-10-16; 2026-10-19: **the `vault_key_epoch` expectation** (`VAULTDB.md` line 3.8). Every lockbox carries
   the `vault_key_epoch` of the vaultKey its lockboxKey is wrapped under (bound into both its
   encryptions with the rest of its header), and `updateBox` lands only while the scope's standing
   vault props have that epoch, compared by the adapter in the same atomic step as `vault_id` and
@@ -170,7 +191,9 @@ added or folded into through the subagent, and no other entry changes.
   An adapter that skips the comparison lets that device write a lockbox the replaced vaultKey
   opens. `localVaultDB` compares it now; IndexedDB, Convex, Postgres (and GraphQL through it) do
   not yet, and the battery holds them to it as a pending test until they do. Every vault is at
-  epoch 1 today: nothing replaces a vaultKey yet. Retirements name no epoch. A lockbox whose epoch is
+  epoch 1 today: nothing replaces a vaultKey yet (2026-10-19: the rotation schema is gone, so the
+  comparison now guards a lockbox built wrong, and stays so a later rotation needs no new
+  contract). Retirements name no epoch. A lockbox whose epoch is
   not the vault props' reads as `damaged_lockbox`, its key never tried.
 * 2026-10-16: **the rollback check.** Each device keeps a device mark per scope in its deviceDB:
   the vault's `vault_id` and the highest `unlock_epoch` and `vault_key_epoch` it has seen the
@@ -218,7 +241,7 @@ added or folded into through the subagent, and no other entry changes.
   user-chosen device label is stored. Clearing site data mints a new id; wayins keep the old.
 * 2026-10-16: the record formats moved on with these fields (to `safebyok-vault-v2`,
   `safebyok-lockbox-v2` and `safebyok-mark-v1`, since moved on again to today's `safebyok-vault-v3`,
-  `safebyok-lockbox-v5` and `safebyok-mark-v3`), and each ctx's first part with
+  `safebyok-lockbox-v5` and `safebyok-mark-v3`; the mark moved to `safebyok-mark-v4` on 2026-10-19, and the vault props to `safebyok-vault-v4` the same day, so a stored `safebyok-vault-v3` record reads as `damaged_vault`, listed among the older formats), and each ctx's first part with
   them. No vault written before reads: its vault props are `damaged_vault`, and `retireDamagedVault`
   recognizes `safebyok-vault-v1` as an older format, not a possibly newer one, so it clears such a
   vault rather than asking the user to update the app.
@@ -417,7 +440,7 @@ added or folded into through the subagent, and no other entry changes.
   that only reads whispers, on storage that pushes nothing, keeps its vaultKey in memory until then;
   and lowering the option later ends a lease a device already holds only at its next open (see
   the entry below).
-* 2026-10-15 (revised the same day by clean_times): every time the package stores is an
+* 2026-10-15 (revised the same day by clean_times); 2026-10-19 (20261019-softlock_gone): every time the package stores is an
   `EpochMillis`: epoch ms from `FarPast` (1981-01-01T00:00:00Z) to `FarFuture`, the microsecond
   epochalypse (`Math.floor(Number.MAX_SAFE_INTEGER / 1000)`, 2255-06-05T23:47:34.740Z) -- the
   lease's `ask_passphrase_at` (named `expires_at` until then), and the lockbox's and
@@ -433,14 +456,14 @@ added or folded into through the subagent, and no other entry changes.
   reading), and one that fails **fails closed**: the vaultKey is dropped before the call throws
   `bad_option`, so a clock gone wrong never mints a deadline or a stored time, and leaves the vault
   locked in memory (the lease stays). A lock never waits on the clock: `lock()` reads
-  none, and `lockSoon()`, unable to time its grace, locks at once and returns normally, with a
-  warning to the vault's logger (below). A clock that goes wrong in the middle of a `storeBox()`,
+  none. (Amended 2026-10-19: `lockSoon()`, which locked at once on a clock it could not read,
+  with a warning to the vault's logger, is gone.) A clock that goes wrong in the middle of a `storeBox()`,
   `retireBox()` or `changePassphrase()` lets the write land, then throws `bad_option` from the refresh
   after it. A clock in bounds but wrong (set a year ahead, say) is not detected.
-* 2026-10-15: `Vault.make` takes a host's `logger` (`log`, `warn`, `error`, each
+* 2026-10-15; 2026-10-19 (20261019-softlock_gone): `Vault.make` takes a host's `logger` (`log`, `warn`, `error`, each
   `(message?, story?, err?)`), checked at the door (`bad_option`) and wrapped so that whatever it
-  throws or rejects with is dropped. The vault calls it in four places: `lockSoon()` locking
-  without its grace on a bad clock; a lease that fails its schema or will not unwrap,
+  throws or rejects with is dropped. The vault calls it in three places (amended 2026-10-19: a fourth, `lockSoon()` locking
+  without its grace on a bad clock, went with `lockSoon()`): a lease that fails its schema or will not unwrap,
   erased; a background refresh that fails; and an adapter's unsubscribe throwing while a failed
   open cleans up. Messages are fixed text; a story is `{ call }` alone, naming the vault call, so
   no scope, label, `userId` or other option value goes to the logger; an `err` is the
@@ -638,7 +661,11 @@ added or folded into through the subagent, and no other entry changes.
   `src/`, for the workspace's own tooling; `pnpm pack` ships `publishConfig.exports` (dist only)
   instead. `scripts/release.ts` refuses a tarball that still carries the condition, and each
   public package's `prepublishOnly` refuses a publish not run by pnpm.
-* 2026-10-15 (across tabs and on `close()`, revised 2026-10-16 by locks_and_expiry, below): a
+* 2026-10-15 (across tabs and on `close()`, revised 2026-10-16 by locks_and_expiry, below); 2026-10-19
+  (20261019-softlock_gone: **the per-handle lock counter described here is gone, and a lock no longer
+  defeats an `unlock()` or `changePassphrase()` under way, in this tab or another; last writer wins,
+  see "one kind of lock" below; an unlock still takes up nothing when the handle has closed or the vault
+  props it proved against no longer stand; the rest describes what stood until then**): a
   `lock()` (or `retire()`) called while an `unlock()` or `changePassphrase()` is
   still under way wins. Each lock moves a per-handle counter; the unlock reads it at its start
   and again after each wait (the vault props read, the key derivation, the lease's write),
@@ -654,7 +681,10 @@ added or folded into through the subagent, and no other entry changes.
   `unlock_epoch`: a vault retired, remade, or re-keyed elsewhere while the passphrase was
   being checked. Without that, the old vault's vaultKey was taken up against the new vault props, and a
   `storeBox()` sealed boxes into the new vault that its owner could never open.
-* 2026-10-15 (`close()` and the timer revised 2026-10-16 by locks_and_expiry, below):
+* 2026-10-15 (`close()` and the timer revised 2026-10-16 by locks_and_expiry, below); 2026-10-19
+  (20261019-softlock_gone: **`lockSoon()`, its grace and the shut counter are gone**; the one lock
+  drops the key at once, and an unlock under way on a closed handle still takes up nothing; the
+  rest describes what stood until then):
   `lockSoon(graceSeconds = 5)`, at most 60 seconds, closes the entry gate at once
   (`askPassphraseAt` cleared, so the snapshot reads `locked` and every operation started
   afterwards throws `vault_locked`; cleared rather than set to now, which a wall clock stepped
@@ -803,7 +833,8 @@ added or folded into through the subagent, and no other entry changes.
   validation and is erased, and the IndexedDB device store, which now files leases under `lease^`
   rather than `unlock^`, deletes the old row unread at its next lease read or erase. The user
   proves once more on each device; there is no migration. The device mark (lock generation and
-  seen-vault record) is untouched.)
+  seen-vault record) is untouched. Amended 2026-10-19: the lock generation is gone; the mark
+  holds only the seen vault.)
 * 2026-10-15: any wayin proves any change. A passkey's answer is accepted as proof by
   `addPassphrase`, `addPasskey` and `retireWayin`, so whoever holds one passkey can set a new
   passphrase and remove the user's others: the vault is as strong as its weakest wayin. A vault
@@ -822,7 +853,8 @@ added or folded into through the subagent, and no other entry changes.
   (`createPasskey`'s option, or the browser's default, minutes) ends it, a dismissal or a refusal
   drops the reference, and the change then writes nothing. A `lock()` during the prompt does not
   cut it short: the passkey still lands and the vault stays locked, as for any change to the ways
-  in.
+  in (amended 2026-10-19: no lock counter now decides who wins when a lock lands during a change
+  to the wayins; last writer wins, see "one kind of lock" below).
 * 2026-10-15: `safebyok-postgres` authorizes on the server, per request: `postgresVaultDB` is
   made with the `userId` the host's auth verified, and refuses (`not_permitted`) any other user's
   scope, or any while signed out, before querying; that check is the whole of the authorization.
@@ -936,8 +968,8 @@ added or folded into through the subagent, and no other entry changes.
   this way now; IndexedDB and `localVaultDB` never do. Every storage verb's refusal passes through
   one policy (`src/refusal-policy.ts`) on its way out of the vault, whichever call made it,
   a background refresh's included; for `identity_revoked` it locks at once, as `lock()` does:
-  the vaultKey dropped, the lease revoked, a `lockSoon()` grace cut short, an unlock
-  under way defeated. It never retires the vault or a lockbox. `convexVaultDB`'s `ConvexClient`
+  the vaultKey dropped, the lease revoked (amended 2026-10-19: `lockSoon()`'s grace and the defeat
+  of an unlock under way are gone, see "one kind of lock" below). It never retires the vault or a lockbox. `convexVaultDB`'s `ConvexClient`
   watch now calls `onChange` on a failed `watchVault` (as a `ConvexReactClient`'s watch already
   did), so an idle vault locks on a sign-out in another tab. **For review**: (1) the default is
   `'lock'`, but `Vault.make`'s `whenIdentityRevoked: 'stay'` lets a host keep the vault unlocked
@@ -1115,16 +1147,17 @@ added or folded into through the subagent, and no other entry changes.
   already in this release, so there is no second bump, and a lockbox in an older format lists as
   damaged, as before, with no migration. The wayin's and the lease's contexts bind no field the
   rename touches, so their bytes do not move. `tests/ctx-bytes.test.ts` pins the lockbox's bytes.
-* 2026-10-16 (locks_and_expiry): **the lease has a hard edge, and a timer.** The
+* 2026-10-16 (locks_and_expiry); 2026-10-19 (20261019-softlock_gone): **the lease has a hard edge, and a timer.** The
   threshold is the truth: every call that starts work checks `askPassphraseAt` against the host's
   clock, and past it throws `vault_locked`. A `setTimeout` enforces it: armed at each take-up of a
   key (an unlock, a lease at open, a change to the wayins), it rings at
-  `askPassphraseAt`, so the snapshot says `locked`, and 60 s later, the grace work in hand gets,
-  drops the vaultKey with no call made. Every look at the key
+  `askPassphraseAt`, the one timer, and drops the vaultKey with no call made (amended 2026-10-19:
+  it once rang at `askPassphraseAt` to close the gate, and again 60 s later, the grace work in hand
+  got, to drop the key; the minute is gone). Every look at the key
   (`ensureUnlocked`, and the second look of work in hand) also drops it once that shut time has
-  passed by the clock, so a timer that runs late, on a device asleep, is not depended on. A shut
-  time only moves earlier: `lockSoon()` takes the lesser of its grace and what the lease has
-  left, and on a key already past its shut time drops it at once. To make one timer always reach,
+  passed by the clock, so a timer that runs late, on a device asleep, is not depended on. (Amended 2026-10-19:
+  `lockSoon()`, which took the lesser of its grace and what the lease had left, is gone; a key
+  past `askPassphraseAt` whose timer ran late is dropped at the next call that looks.) To make one timer always reach,
   `leaseHours` is now at most 588 hours (24.5 days; 588 h + 60 s is under
   `setTimeout`'s 2^31 - 1 ms) or `Infinity`, which arms no timer; a finite number past 588 is
   refused (`bad_option`), where it used to be clamped to "forever" -- a host that meant "very
@@ -1137,11 +1170,11 @@ added or folded into through the subagent, and no other entry changes.
   A passkey proving a change on an unlocked vault keeps the deadline standing (on a locked one it
   sets one, as `unlock()` by passkey would). Reads, stores, retirements and refreshes never move it.
   One place decides (`deadlineFor` in `vault.ts`), so a new kind of proof cannot slip past it.
-  Expiry is a soft lock (the strawman's two locks): the lease expiring while an `unlock()` or
-  `changePassphrase()` is under way does not defeat it; only a lock the user (or a sign-out)
-  makes does. For review: a passkey's proof keeping, not renewing, the deadline is the weaker
+  Expiry was a soft lock (the strawman's two locks); amended 2026-10-19: there is one kind of
+  lock, which drops the key at once, and no lock, expiry included, defeats an `unlock()` or
+  `changePassphrase()` under way (see "one kind of lock" below). For review: a passkey's proof keeping, not renewing, the deadline is the weaker
   reading of "proves I am mrflip" (G530 asks the deeper question, NOT YET).
-* 2026-10-16 (locks_and_expiry; revised the same day by refusals_and_catchup, below: `lockSoon()` raises nothing, and the generation outlives a `retire()`): **a lock reaches every tab's unlock under way: the versioned
+* 2026-10-16 (locks_and_expiry; revised the same day by refusals_and_catchup, below: `lockSoon()` raises nothing, and the generation outlives a `retire()`; 2026-10-19, 20261019-softlock_gone: **the lock generation, `DeviceDB.writeLease`'s expectation and this versioned erase are gone**, a lock reaches no unlock under way, and what follows describes what stood until then): **a lock reaches every tab's unlock under way: the versioned
   erase.** The device mark gains `lock_generation` (format `safebyok-mark-v2` then; today's tag is `safebyok-mark-v3`). Every lock that
   revokes the lease -- `lock()`, `lockSoon()`, a sign-out's lock, `retire()`'s --
   raises it before erasing the record. An unlock (or a change to the wayins) reads it as it
@@ -1165,8 +1198,30 @@ added or folded into through the subagent, and no other entry changes.
   this reads as none (the format moved), so on its first open after upgrading a device restarts
   its rollback check from the copy storage holds then, once; before 1.0 that is the stated cost
   of a format change.
-* 2026-10-16 (refusals_and_catchup; the Coach: "lockSoon is a soft lock"): **two locks, hard and
-  soft.** `lock()`, `retire()` and a lock for untrusted storage are hard: the key goes at once,
+* 2026-10-16 (refusals_and_catchup; the Coach: "lockSoon is a soft lock"); 2026-10-19
+  (20261019-softlock_gone, on PR #189): **one kind of lock, and nothing decides who wins when a
+  lock lands with work in flight; formerly two locks, hard and soft.** The soft lock is gone:
+  `lockSoon()` and its grace no longer exist, nor the minute past `askPassphraseAt` during which
+  work in hand kept the vaultKey. There is one kind of lock, and it drops the key at once; the
+  lease's expiry is one timer at `askPassphraseAt` that drops the key, and a key past its deadline
+  whose timer ran late is dropped at the next call that looks. The three in-handle lock counters
+  (`shutsSoFar`, `hardLocksSoFar`, `revokesSoFar`) and the device mark's `lock_generation` (with
+  `DeviceDB.writeLease`'s expectation) are gone: they decided who wins when a lock lands while
+  something is in flight, and now nothing decides; last writer wins. So a `lock()` landing during
+  an unlock (this tab or another tab on the device) no longer stops it: the unlock finishes, the
+  vault ends unlocked, and a lease is written. A `lock()` landing while `hello()` reads the lease no
+  longer stops the lease being taken up. A lease that a lock failed to erase (the device store
+  threw) is taken up by the next `hello()` that reads afresh on the same handle, not only at the
+  next page load. A `readBox()` or `useBox()` still hands back nothing if no key is in hand when
+  storage answers or when the whisper has been deciphered, unless another unlock put a key back in
+  hand meanwhile. An unlock still takes nothing up when the handle has closed or the vault props it
+  proved against no longer stand (retired, remade, wayins changed). **For review**: the Coach's
+  ruling is that these are accepted as user annoyances until the store reform is done; a policy is
+  owed before 1.0, recorded in TODO.md under *Lock timing vs. work in flight* with seven
+  scenarios. The device mark (format now `safebyok-mark-v4`) holds only the seen vault (rollback
+  detection), never null, and `retire()` erases it rather than writing a blank one; a
+  `safebyok-mark-v3` record reads as no mark, so the device re-checks the vault from what storage
+  holds now. What stood until 2026-10-19: `lock()`, `retire()` and a lock for untrusted storage are hard: the key goes at once,
   the device mark's lock generation rises, an unlock or change under way anywhere on the device
   takes nothing up, and a `readBox()` or `useBox()` under way refuses `vault_locked` after its last
   await, dropping the whisper it deciphered (one monotonic compare of the handle's shut count,
@@ -1176,15 +1231,15 @@ added or folded into through the subagent, and no other entry changes.
   raised. **For review**: a soft lock no longer stops another tab's unlock; a host wanting that
   calls `lock()`.
 * 2026-10-16 (refusals_and_catchup; the Coach on G119 and G516): **one rule for storage the vault
-  cannot trust.** `identity_revoked` and `rolled_back` both lock the vault, hard, wherever they are
+  cannot trust.** `identity_revoked` and `rolled_back` both lock the vault at once (amended 2026-10-19: once called hard, before there was one kind of lock), wherever they are
   met -- a call, a catch-up, a background refresh, the open itself (which revokes the lease) -- decided in `refusal-policy.ts`'s `decide`, with no host option: `whenIdentityRevoked`
   and its `'stay'` are gone. An adapter that says `identity_revoked` for a passing fault breaks
   VAULTDB.md 5.5. After a deliberate restore, the README's `eraseMark` recipe stays the only way
   out (G513): no verb puts forgetting the newer copy one call away. **For review**: a storage
   replica that briefly serves an older copy now makes every device that saw the newer one ask for
   the passphrase again.
-* 2026-10-16 (refusals_and_catchup): **the lock generation outlives `retire()`, and a lock with
-  no mark still counts.** The device mark (now `safebyok-mark-v3`) holds what it has `seen` of the
+* 2026-10-16 (refusals_and_catchup); 2026-10-19 (20261019-softlock_gone: **the generation is gone, and `retire()` erases the mark again; the mark, now `safebyok-mark-v4`, holds only the seen vault, never null**; the rest describes what stood until then): **the lock generation outlives `retire()`, and a lock with
+  no mark still counts.** The device mark (then `safebyok-mark-v3`) holds what it has `seen` of the
   scope's vault, or null; `retire()` writes it with nothing seen at its raised generation, rather
   than erasing it, and a lock on a scope with no readable mark writes one at generation 1. So an
   unlock under way elsewhere at generation 0 loses to a `retire()`, and a vault-creating first unlock
@@ -1226,7 +1281,7 @@ added or folded into through the subagent, and no other entry changes.
   each holding the shared lock. The real-Postgres race that proves the lock waits on thread 11's
   container suite. The 2026-10-16 entry above that says IndexedDB, Convex and Postgres "do not yet"
   is superseded.
-* 2026-10-16 (epoch_expectation, the Coach's ruling on thread 4's review): **`close()` and a key
+* 2026-10-16 (epoch_expectation, the Coach's ruling on thread 4's review); 2026-10-19 (20261019-softlock_gone: **the counts are gone**: a `readBox()` or `useBox()` hands back nothing if no key is in hand when storage answers or when the whisper has been deciphered, unless another unlock put a key back in hand meanwhile; the rest describes what stood until then): **`close()` and a key
   outlived by a refresh are hard locks for a read in flight.** A `readBox()` or `useBox()` notes a
   per-handle count of hard locks when it starts (every shut, a `close()`, a refresh that drops the
   key because the wayins changed or the vault went) and hands back nothing if it moved meanwhile:

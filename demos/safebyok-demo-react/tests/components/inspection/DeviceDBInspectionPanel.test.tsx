@@ -18,7 +18,7 @@ describe("DeviceDBInspectionPanel", () => {
   it("shows this device's lease as it lands, its leaseKey a handle", async () => {
     render(<DeviceDBInspectionPanel />)
     const lease = { ...(await TH.leaseOf('u1')), applabel: Applabel }
-    await act(() => idbDeviceDB({ dbName: Applabel }).writeLease(lease, TH.NoLocks))
+    await act(() => idbDeviceDB({ dbName: Applabel }).writeLease(lease))
     await waitFor(() => { expect(screen.getAllByText('🔑 non-extractable key')).to.have.lengthOf(1) })
     expect(screen.getByText(/«CryptoKey non-extractable handle»/)).to.not.be.null
   })

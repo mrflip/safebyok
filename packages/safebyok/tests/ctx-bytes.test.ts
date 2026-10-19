@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { cipherCtx, decipherBytes, deriveWrappingKey, fromB64, importWrappingKeyBytes, makeVaultKey, unwrapKeyUnder } from '../src/crypto'
 import { memoryDeviceDB } from '../src/device-db'
 import { memoryStore } from '../src/string-store'
-import { localVaultDB } from '../src/vault-db'
+import { localVaultDB } from '../src/local-vault-db'
 import * as Wayin from '../src/wayin'
 import * as TH from './test-helpers'
 
@@ -37,7 +37,7 @@ describe("the ctx builders' output, byte for byte", () => {
     const vaultKey = await makeVaultKey()
     const wayin = await Wayin.sealPassphrase(TH.testDeriver, 'pw', scope, identity, stamp('passphrase'), vaultKey)
     const ctx = textBytes(
-      '["safebyok-vault-v3","acme","u1","main","vault-id-u1",' + String(identity.registered_at) + ',"vault_key_passphrase_wrapped",'
+      '["safebyok-vault-v4","acme","u1","main","vault-id-u1",' + String(identity.registered_at) + ',"vault_key_passphrase_wrapped",'
       + `{"device_id":"device-one","key_deriver_label":"test_digest_v0","registered_at":${String(Date.UTC(2026, 9, 15))},"salt_b64":"${wayin.salt_b64}","vault_key_epoch":1,"wayin_id":"wayin-passphrase","wayinkind":"passphrase","wayinlabel":"passphrase"}]`,
     )
     const wayinKey = await importWrappingKeyBytes(await TH.testDeriver.deriveKeyBytes('pw', fromB64(wayin.salt_b64)))
@@ -48,7 +48,7 @@ describe("the ctx builders' output, byte for byte", () => {
     const passkey = await TH.passkeyOf('laptop')
     const wayin = await Wayin.sealPasskey(passkey, scope, identity, stamp('laptop'), await makeVaultKey())
     const ctx = textBytes(
-      '["safebyok-vault-v3","acme","u1","main","vault-id-u1",' + String(identity.registered_at) + ',"vault_key_passkey_wrapped",'
+      '["safebyok-vault-v4","acme","u1","main","vault-id-u1",' + String(identity.registered_at) + ',"vault_key_passkey_wrapped",'
       + `{"credential_id":"${wayin.credential_id}","device_id":"device-one","prf_salt_b64":"${wayin.prf_salt_b64}","registered_at":${String(Date.UTC(2026, 9, 15))},"vault_key_epoch":1,"wayin_id":"wayin-laptop","wayinkind":"passkey","wayinlabel":"laptop"}]`,
     )
     const passkeyKey = await deriveWrappingKey(passkey.prfBytes, ctx)

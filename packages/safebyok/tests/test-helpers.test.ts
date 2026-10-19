@@ -1,3 +1,8 @@
+/**
+ * Tests of every part of `tests/test-helpers/`, as reached through the front door, `TH`. The
+ * parts are source for `safebyok/testing`, not tests, so by exception these tests stay in one file
+ * named for the door, not a folder: at this length they are easier found whole than split.
+ */
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { Vault, localVaultDB, memoryDeviceDB, memoryStore, type StringStore } from '../src/index'
@@ -10,6 +15,8 @@ import * as Expectations from '../src/expectations'
 import { VaultDB, type VaultPropsExpectation, type RetireExpectation, type LockboxExpectation, type LockboxRetireExpectation, type StoredLockbox, type VaultDBOpts } from '../src/vault-db'
 import * as TH from './test-helpers'
 
+
+// == [Tweaks and timing]: tweakB64, wakeupAtNextTick, aWhile, eventually, changeCounter, liveWatch
 
 const TweakCases = [
   // regular usage:
@@ -140,6 +147,9 @@ describe("liveWatch", () => {
     expect(unsubscribe.mock.calls).to.have.lengthOf(1)
   })
 })
+// --
+
+// == [Gates and call hooks]: makeGate, beforeNextCall, holdNextCall, settledVault, tallyWatches
 
 describe("makeGate", () => {
   it("holds a pass until released, and says when something reached it", async () => {
@@ -302,12 +312,13 @@ describe("holdNextCall", () => {
     const opts = TH.memoryVaultOpts()
     const vault = await TH.settledVault(opts)
     const gate = TH.holdNextCall(opts.vaultDB, 'readVaultProps')
-    const unlocking = TH.expectRefusal(vault.unlock('pw'), 'vault_locked')
+    let settled = false
+    const unlocking = (async () => { await vault.unlock('pw'); settled = true })()
     await gate.reached
     await vault.lock()
+    expect(settled).to.be.false
     gate.release()
     await unlocking
-    expect(vault.getSnapshot().state).to.not.eq('unlocked')
   })
 })
 
@@ -364,6 +375,9 @@ describe("tallyWatches", () => {
     expect(tally.opened - tally.closed).to.eq(0)
   })
 })
+// --
+
+// == [Turnstile and races]: throughTurnstile, raceEveryWay, loggingDevice
 
 /**
  * A device for the race driver's own tests: each move makes `roundTrips` round trips through the
@@ -526,6 +540,9 @@ describe("raceEveryWay", () => {
     await expect(TH.raceEveryWay({ makeDevices: () => noDevice, moves: [() => Promise.resolve()], verdict: () => undefined })).rejects.toThrow(TypeError)
   })
 })
+// --
+
+// == [Builders and fixtures]: memoryVaultOpts, freshDbName, testDeriver, the fixtures
 
 describe("memoryVaultOpts", () => {
   it("opens u1's main vault in acme over fresh stores, deriving through testDeriver", async () => {
@@ -636,6 +653,9 @@ describe("the fixtures", () => {
     expect(TH.sidecarJsonOf({ tier: 2, note: 'work' })).to.eq('{"note":"work","tier":2}')
   })
 })
+// --
+
+// == [Logging and refusals]: spyLogger, loggedText, thrownText, leafTexts, expectRefusal, omitting
 
 describe("spyLogger", () => {
   it("keeps every call it hears, in order, with what it was handed", () => {
@@ -780,26 +800,21 @@ describe("omitting", () => {
     expect(err.message).to.include('safebyok/browser')
   })
 })
+// --
+
+// == [perUser]: perUser, ckeyOf, servingOnly, counted
 
 const ckeyOf = (scope: VaultScope) => `${scope.applabel}:${scope.user_id}:${scope.vaultlabel}`
 
 TH.describeDeviceDB('describeDeviceDB, over the smallest honest DeviceDB', () => {
   const rows = new Map<string, Lease>()
   const marks = new Map<string, DeviceMark>()
-  const lockGenerationOf = (scope: VaultScope) => marks.get(ckeyOf(scope))?.lock_generation ?? 0
   return {
     readLease:  (scope) => Promise.resolve(rows.get(ckeyOf(scope)) ?? null),
-    writeLease: (lease, expected) => {
-      if (lockGenerationOf(lease) !== expected.lock_generation) { return Promise.reject(new VaultError('stale_write', 'A lock came first.')) }
-      rows.set(ckeyOf(lease), lease)
-      return Promise.resolve()
-    },
+    writeLease: (lease) => { rows.set(ckeyOf(lease), lease); return Promise.resolve() },
     eraseLease: (scope) => { rows.delete(ckeyOf(scope)); return Promise.resolve() },
     readMark:   (scope) => Promise.resolve(marks.get(ckeyOf(scope)) ?? null),
-    writeMark:  (mark) => {
-      marks.set(ckeyOf(mark), { ...mark, lock_generation: Math.max(mark.lock_generation, lockGenerationOf(mark)) })
-      return Promise.resolve()
-    },
+    writeMark:  (mark) => { marks.set(ckeyOf(mark), mark); return Promise.resolve() },
     eraseMark:  (scope) => { marks.delete(ckeyOf(scope)); return Promise.resolve() },
     eraseAll:   () => { rows.clear(); marks.clear(); return Promise.resolve() },
   }
@@ -911,6 +926,9 @@ describe("perUser", () => {
 })
 
 // ------------------------------------------------- the races, against adapters that do not guard
+// --
+
+// == [Unguarded adapters]: RoundTripBackend, Stepping, inOneStep, checkThenWrite, RoundTripOpts, roundTripDevices, checksOver, others
 
 type Rows = Map<string, unknown>
 
@@ -1170,6 +1188,9 @@ const expectToHold = (check: TH.VaultDBTimingCheck): Promise<void> => check.chec
 
 /** The checks of the battery over an adapter, by handle. */
 const checksOver = (opts: RoundTripOpts & { overTheWire?: boolean, unwired?: boolean, slowSecond?: boolean }) => TH.vaultDBTimingChecks(...roundTripBattery(opts))
+// --
+
+// == [Conformance checks]: expectRoundTripsThroughTurnstile, vaultDBTimingChecks, VaultDBContract
 
 describe("expectRoundTripsThroughTurnstile", () => {
   it("passes devices that send every write through the turnstile", async () => {
@@ -1316,3 +1337,4 @@ describe("VaultDBContract", () => {
     expect(`postgresVaultDB, 5.5: ${TH.VaultDBContract['5.5']}`).to.eq('postgresVaultDB, 5.5: identity_revoked means the user is gone')
   })
 })
+// --

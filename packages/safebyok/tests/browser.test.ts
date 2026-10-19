@@ -10,7 +10,7 @@ import { VaultError } from '../src/errors'
 import { argon2idWebV1Deriver } from '../src/key-deriver'
 import { inspectIdbDeviceDB } from '../src/idb'
 import { memoryStore } from '../src/string-store'
-import { localVaultDB } from '../src/vault-db'
+import { localVaultDB } from '../src/local-vault-db'
 import * as TH from './test-helpers'
 
 describe("browserOpts", () => {
@@ -27,7 +27,7 @@ describe("browserOpts", () => {
 
   it("keeps the device store's records in the database it names", async () => {
     const dbName = TH.freshDbName()
-    await browserOpts({ dbName }).deviceDB.writeLease(await TH.leaseOf('u1'), TH.NoLocks)
+    await browserOpts({ dbName }).deviceDB.writeLease(await TH.leaseOf('u1'))
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
     expect(rows.map((row) => row.ckey)).to.deep.equal(['lease^acme^u1^main'])
     expect(await browserOpts().deviceDB.readLease(TH.scopeOf('u1'))).to.be.null

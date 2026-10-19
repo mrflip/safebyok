@@ -139,9 +139,9 @@ export const VaultScope = Z.object({
 export type VaultScope = Z.infer<typeof VaultScope>
 
 /**
- * Which vaultKey a record stands for: 1 for a vault's first, and one more for each vaultKey that
- * replaces the one before. The vault props' `vault_key_epoch` is their wayins' vaultKey; a lockbox's,
- * the vaultKey its lockboxKey is wrapped under.
+ * Which vaultKey a record stands for. The vault props' `vault_key_epoch` is their wayins' vaultKey;
+ * a lockbox's, the vaultKey its lockboxKey is wrapped under. Reserved for a rotation of the
+ * vaultKey that does not exist yet: every vault safebyok makes, and every record in it, carries 1.
  */
 export const vaultKeyEpoch = Z.int().check(Z.positive())
 
@@ -349,51 +349,29 @@ export type PasskeyProof = {
 }
 
 /**
- * The vaultKey before the vault props' own, wrapped under their own: `vault_key_wrapped` opens only under
- * the vaultKey that replaced it, so a holder of the older vaultKey gains nothing from it.
- */
-const PriorVaultKey = Z.object({
-  vault_key_epoch:   vaultKeyEpoch,
-  vault_key_wrapped: Ciphered,
-})
-
-/** True when vault props hold the vaultKey just before their own as their prior, from their second vaultKey on, and no prior before then. */
-const priorFits = (vaultProps: { vault_key_epoch: number, prior_vault_key?: { vault_key_epoch: number } }): boolean => (
-  vaultProps.prior_vault_key === undefined
-    ? vaultProps.vault_key_epoch === 1
-    : vaultProps.prior_vault_key.vault_key_epoch === vaultProps.vault_key_epoch - 1
-)
-
-/**
  * The per-vault record the storage layer holds so any device can unlock the vault: its scope,
  * its `vault_id`, and its `wayins`, each a {@link Wayin} wrapping the one vaultKey.
  * All of it is safe in the open; none of it opens without a passphrase or a passkey.
  *
  * `unlock_epoch` goes up by one on every change to the wayins -- a passphrase or passkey
  * added, removed or changed -- so other devices and leases know to ask again.
- * `vault_key_epoch` says which vaultKey the wayins wrap, and from a vault's second vaultKey on,
- * `prior_vault_key` holds the one before it.
+ * `vault_key_epoch` says which vaultKey the wayins wrap: 1, reserved for a rotation not yet built.
  */
 export const VaultProps = Z.object({
-  format:              Z.literal('safebyok-vault-v3'),
+  format:              Z.literal('safebyok-vault-v4'),
   applabel:            NameFloor,
   user_id:             NameFloor,
   vaultlabel:          NameFloor,
   /** Random id minted when the vault is made, and never changed; bound into every encryption. */
   vault_id:            Z.string().check(Z.minLength(1)),
   unlock_epoch:        Z.int().check(Z.positive()),
-  /** Which vaultKey the wayins wrap: 1 for the vault's first, one more for each that replaces it. */
+  /** Which vaultKey the wayins wrap: see {@link vaultKeyEpoch}. */
   vault_key_epoch:     vaultKeyEpoch,
-  /**
-   * The vaultKey before this one, wrapped under this one, at the `vault_key_epoch` just below the
-   * vault props' own: absent while theirs is 1, and present from then on.
-   */
-  prior_vault_key:     Z.exactOptional(PriorVaultKey),
   /** The ways into the vault, each wrapping the one vaultKey: see {@link Wayin}. */
   wayins:              wayinList,
   /** When the vault was made, an {@link EpochMillis}; never changed. */
   registered_at:       EpochMillis,
-}).check(Z.refine(priorFits, "Vault props hold the vaultKey just before their own as prior_vault_key, from their second vaultKey on, and none before then"))
+})
 export type VaultProps = Z.infer<typeof VaultProps>
 
 /**
@@ -438,31 +416,20 @@ export const SeenVault = Z.object({
 export type SeenVault = Z.infer<typeof SeenVault>
 
 /**
- * What a device keeps of a vault's scope, locked or not, on its own storage: its `lock_generation`,
- * how many times a hard lock on this device has revoked the lease, so that an unlock under way in
- * another tab when the lock lands is granted none; and what it has `seen` of the vault
- * standing under the scope (a {@link SeenVault}), or null when it has seen none. Nothing in it is
- * secret. One per scope: a vault made anew under the scope, with another `vault_id`, is seen
- * afresh, under a new `device_id`, and the lock generation counts on. `lock()` leaves the mark,
- * raising its lock generation; `retire()` raises it too, and forgets what was seen.
+ * What a device keeps of a vault's scope, locked or not, on its own storage: what it has `seen` of
+ * the vault standing under the scope, a {@link SeenVault}. Nothing in it is secret. One per scope:
+ * a vault made anew under the scope, with another `vault_id`, is seen afresh, under a new
+ * `device_id`. `lock()` leaves the mark; `retire()` erases it.
  *
- * @example { format: 'safebyok-mark-v3', ...scope, lock_generation: 0, seen: { device_id, vault_id, unlock_epoch: 1, vault_key_epoch: 1 } }
- * @example { format: 'safebyok-mark-v3', ...scope, lock_generation: 2, seen: null }  // locked twice, the vault since retired
+ * @example { format: 'safebyok-mark-v4', ...scope, seen: { device_id, vault_id, unlock_epoch: 1, vault_key_epoch: 1 } }
  */
 export const DeviceMark = Z.object({
-  format:          Z.literal('safebyok-mark-v3'),
-  applabel:        NameFloor,
-  user_id:         NameFloor,
-  vaultlabel:      NameFloor,
-  /**
-   * How many hard locks on this device have revoked the scope's lease: 0 at first, one more at
-   * each. A soft lock's revocation (`lockSoon()`'s) leaves it be.
-   * A lease is written only while the mark stands at the generation its unlock began under; see
-   * `DeviceDB.writeLease`.
-   */
-  lock_generation: Z.int().check(Z.gte(0)),
-  /** The vault this device has seen under the scope, or null for none. */
-  seen:            Z.nullable(SeenVault),
+  format:     Z.literal('safebyok-mark-v4'),
+  applabel:   NameFloor,
+  user_id:    NameFloor,
+  vaultlabel: NameFloor,
+  /** The vault this device has seen under the scope. */
+  seen:       SeenVault,
 })
 export type DeviceMark = Z.infer<typeof DeviceMark>
 

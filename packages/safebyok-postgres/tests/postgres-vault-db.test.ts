@@ -7,6 +7,8 @@ import * as TH from './test-helpers'
 import { VaultChangeChannel, postgresVaultDB } from '../src/index'
 import type { PostgresClient, PostgresListen, PostgresVaultDBOpts } from '../src/index'
 
+// == [Devices, options and access]: devicesOverPGlite, u1, thisVault, options, README, who may reach a vault
+
 TH.bootDatabaseFirst()
 
 /**
@@ -180,6 +182,9 @@ describe("postgresVaultDB, who may reach a vault", () => {
     expect(refusal.message).to.not.include('mallory')
   })
 })
+// --
+
+// == [What it stores and its limit]: what it stores, boxlabelsIn, filledTo, missedBecause, foreignKeyViolation, lockbox limit
 
 describe("postgresVaultDB, what it stores", () => {
   it("stores the vault props a column to a field, their wayins as one jsonb", async () => {
@@ -192,10 +197,9 @@ describe("postgresVaultDB, what it stores", () => {
       user_id:          'u1',
       vaultlabel:       'main',
       vault_id:         'vault-id-u1',
-      format:           'safebyok-vault-v3',
+      format:           'safebyok-vault-v4',
       unlock_epoch:     1,
       vault_key_epoch:  1,
-      prior_vault_key:  null,
       wayins:           TH.vaultPropsOf('u1').wayins,
       registered_at:    Date.UTC(2026, 9, 14),
     }])
@@ -494,6 +498,9 @@ describe("postgresVaultDB, its lockbox limit", () => {
     vault.close()
   })
 })
+// --
+
+// == [Listing and trouble]: listBoxRecords, in trouble
 
 describe("postgresVaultDB, listBoxRecords", () => {
   it("lists each lockbox as stored, ciphered fields left out, format kept, the sidecar as its JSON text", async () => {
@@ -598,6 +605,9 @@ describe("postgresVaultDB, in trouble", () => {
     expect(await vaultDB.listBoxes(u1)).to.have.lengthOf(0)
   })
 })
+// --
+
+// == [Subscribe and drivers]: throwsClosed, UnlistenCases, subscribe, PostgresClient, PostgresListen
 
 const throwsClosed = () => { throw new Error('already closed') }
 const unlistened = () => undefined
@@ -749,3 +759,4 @@ describe("PostgresClient and PostgresListen, as the drivers have them", () => {
     expectTypeOf<PGlite['listen']>().toExtend<PostgresListen>()
   })
 })
+// --

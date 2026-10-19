@@ -33,8 +33,8 @@ const sealed = async (passphrase: string, wayinlabel: string, vaultKey: CryptoKe
 /** Vault props of `wayins`, validated as storage would read it back. */
 const vaultPropsWith = (wayins: VaultProps['wayins']): VaultProps => VaultProps.parse(TH.vaultPropsOf('u1', { wayins }))
 
-/** Vault props of `wayins` at its second vaultKey, the first kept as its prior, validated as storage would read it back. */
-const secondKeyVaultPropsWith = (wayins: VaultProps['wayins']): VaultProps => VaultProps.parse({ ...TH.rotatedVaultPropsOf('u1'), wayins })
+/** Vault props of `wayins` at vaultKey epoch 2, validated as storage would read it back. */
+const epochTwoVaultPropsWith = (wayins: VaultProps['wayins']): VaultProps => VaultProps.parse({ ...TH.vaultPropsAtEpochOf('u1', 2), wayins })
 
 /** Expect `operation` to reject with a VaultError of `kind`. */
 const expectRefusal = async (operation: Promise<unknown>, kind: VaultError['kind']): Promise<VaultError> => {
@@ -288,7 +288,7 @@ describe("Wayin.openWithPassphrase", () => {
 
     it("refuses as damaged_wayin when every passphrase is at another vaultKey epoch than the vault props'", async () => {
       const vaultKey = await makeVaultKey()
-      const vaultProps = secondKeyVaultPropsWith([await sealed('first', 'one', vaultKey)])
+      const vaultProps = epochTwoVaultPropsWith([await sealed('first', 'one', vaultKey)])
       const err = await expectRefusal(Wayin.openWithPassphrase(TH.testDeriver, 'first', scope, vaultProps), 'damaged_wayin')
       expect(err.message).to.include('Every passphrase')
     })
@@ -342,7 +342,7 @@ describe("a wayin's ctx", () => {
 
   it("refuses to open with its vault_key_epoch moved, though the vault props' is moved with it", async () => {
     const vaultKey = await makeVaultKey()
-    const vaultProps = secondKeyVaultPropsWith([{ ...await sealed('pw', 'passphrase', vaultKey), vault_key_epoch: 2 }])
+    const vaultProps = epochTwoVaultPropsWith([{ ...await sealed('pw', 'passphrase', vaultKey), vault_key_epoch: 2 }])
     await expectRefusal(Wayin.openWithPassphrase(TH.testDeriver, 'pw', scope, vaultProps), 'wrong_passphrase')
   })
 
@@ -526,7 +526,7 @@ describe("a passkey wayin's key", () => {
     const laptop = await TH.passkeyOf('laptop')
     const wayin = await sealedPasskey(laptop, 'laptop', await makeVaultKey())
     const { vault_key_wayin_wrapped: _wrapped, ...header } = wayin
-    const ctx = cipherCtx('safebyok-vault-v3', 'acme', 'u1', 'main', 'vault-id-u1', identity.registered_at, 'vault_key_passkey_wrapped', header)
+    const ctx = cipherCtx('safebyok-vault-v4', 'acme', 'u1', 'main', 'vault-id-u1', identity.registered_at, 'vault_key_passkey_wrapped', header)
     expect(await unwrapsUnder(wayin, laptop.prfBytes, ctx, ctx)).to.be.instanceOf(CryptoKey)
   })
 
@@ -534,8 +534,8 @@ describe("a passkey wayin's key", () => {
     const laptop = await TH.passkeyOf('laptop')
     const wayin = await sealedPasskey(laptop, 'laptop', await makeVaultKey())
     const { vault_key_wayin_wrapped: _wrapped, ...header } = wayin
-    const ctx = cipherCtx('safebyok-vault-v3', 'acme', 'u1', 'main', 'vault-id-u1', identity.registered_at, 'vault_key_passkey_wrapped', header)
-    const vaultlessInfo = cipherCtx('safebyok-vault-v3', 'vault_key_passkey_wrapped', laptop.credentialId)
+    const ctx = cipherCtx('safebyok-vault-v4', 'acme', 'u1', 'main', 'vault-id-u1', identity.registered_at, 'vault_key_passkey_wrapped', header)
+    const vaultlessInfo = cipherCtx('safebyok-vault-v4', 'vault_key_passkey_wrapped', laptop.credentialId)
     await expect(unwrapsUnder(wayin, laptop.prfBytes, vaultlessInfo, ctx)).rejects.toThrow()
   })
 })

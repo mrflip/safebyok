@@ -17,12 +17,6 @@ vaultKey wrapped (\`vault_key_wayin_wrapped\`). Carried as it is, never looked i
 """
 scalar SafebyokWayin
 
-"""
-The vaultKey before a vault's own, as safebyok stored it: JSON, its \`vault_key_epoch\` and that
-vaultKey wrapped under the vault's own (\`vault_key_wrapped\`). Carried as it is, never looked inside.
-"""
-scalar SafebyokPriorVaultKey
-
 """An encrypted value: its cipherIv and its ciphertext, each base64url text."""
 type SafebyokCiphered {
   cipher_iv_b64:  String!
@@ -61,7 +55,6 @@ type SafebyokVaultProps {
   vault_id:         String!
   unlock_epoch:     Int!
   vault_key_epoch:  Int!
-  prior_vault_key:  SafebyokPriorVaultKey
   wayins:           [SafebyokWayin!]!
   registered_at:    Float!
 }
@@ -75,7 +68,6 @@ input SafebyokVaultPropsInput {
   vault_id:         String!
   unlock_epoch:     Int!
   vault_key_epoch:  Int!
-  prior_vault_key:  SafebyokPriorVaultKey
   wayins:           [SafebyokWayin!]!
   registered_at:    Float!
 }

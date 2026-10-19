@@ -1,7 +1,8 @@
 import { omit } from 'es-toolkit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { memoryStore } from '../src/string-store'
-import { VaultDB, jsonBytes, localVaultDB, type VaultPropsExpectation, type RetireExpectation, type LockboxExpectation, type LockboxRetireExpectation, type StoredLockbox, type VaultDBOpts, type WatchTrouble } from '../src/vault-db'
+import { VaultDB, jsonBytes, type VaultPropsExpectation, type RetireExpectation, type LockboxExpectation, type LockboxRetireExpectation, type StoredLockbox, type VaultDBOpts, type WatchTrouble } from '../src/vault-db'
+import { localVaultDB } from '../src/local-vault-db'
 import { VaultError } from '../src/errors'
 import { DefaultLogger, parseLogger, type VaultLogger } from '../src/logger'
 import type { Lockbox } from '../src/lockbox'
@@ -11,6 +12,7 @@ import * as Expectations from '../src/expectations'
 import { NameFloorBytes } from '../src/validators'
 import * as TH from './test-helpers'
 
+// == [Test adapters]: MapVaultDB, TroubledVaultDB, RingingVaultDB, MisreportingVaultDB, MisreportedCases
 
 /**
  * The smallest honest adapter: a Map of records, each check-and-write in one synchronous step.
@@ -172,7 +174,7 @@ TH.describeVaultDB('the smallest honest adapter', (vaultDBOpts) => new MapVaultD
 
 // The ckeys u1's main vault is filed under, spelled out rather than computed: they are stored.
 const u1VaultPropsCkey = 'vault^acme^u1^main'
-const u1BoxCkey = (boxlabel: string) => `box^acme^u1^main^${boxlabel}`
+const u1AnthropicBoxCkey = 'box^acme^u1^main^anthropic'
 
 /** A MapVaultDB that retires each lockbox as it should, then answers `answer` in place of what it found. */
 class MisreportingVaultDB extends MapVaultDB {
@@ -197,6 +199,9 @@ const MisreportedCases = [
   [{ outcome: 'gone' },           'an outcome this package does not know'],
   [{},                            'a record naming no outcome'],
 ] as const
+// --
+
+// == [Retirement answers and the adapter's half]: lockbox retirement, ListedRecordCases, an adapter's half
 
 describe("the abstract VaultDB, on the way back from a lockbox retirement", () => {
   it("resolves what its adapter says it removed: the revision named, another, or none", async () => {
@@ -224,7 +229,7 @@ describe("the abstract VaultDB, on the way back from a lockbox retirement", () =
     await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
     await vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet)
     await TH.expectRefusal(vaultDB.retireBox(TH.scopeOf('u1'), 'anthropic', { vault_id: 'vault-id-gone', revision_tok: 'rev-one' }), 'stale_write')
-    expect(vaultDB.rows.get(u1BoxCkey('anthropic'))).to.deep.equal(TH.boxOf('anthropic', 'one'))
+    expect(vaultDB.rows.get(u1AnthropicBoxCkey)).to.deep.equal(TH.boxOf('anthropic', 'one'))
   })
 
   it("keeps only the outcome of an answer carrying more, as a GraphQL client's __typename", async () => {
@@ -244,131 +249,9 @@ describe("the abstract VaultDB, on the way back from a lockbox retirement", () =
       expect((refusal.cause as VaultError).kind).to.eq('corrupt_record')
       expect(TH.thrownText(refusal)).to.not.include('anthropic')
       // What the adapter removed stays removed: the refusal is about its answer, not its retirement.
-      expect(vaultDB.rows.has(u1BoxCkey('anthropic'))).to.be.false
+      expect(vaultDB.rows.has(u1AnthropicBoxCkey)).to.be.false
     })
   }
-})
-
-describe("localVaultDB", () => {
-  it("holds a mebibyte in one record, and sets no limit on a vault, in bytes or in lockboxes, or on a name", () => {
-    const vaultDB = localVaultDB({ store: memoryStore() })
-    expect(vaultDB.maxRecordBytes).to.eq(1_048_576)
-    expect(vaultDB.maxVaultBytes).to.eq(Infinity)
-    expect(vaultDB.maxLockboxes).to.eq(Infinity)
-    expect(vaultDB.maxNameBytes).to.eq(Infinity)
-  })
-
-  it("reads rows filed under the ckeys of earlier versions as absent, and leaves them be", async () => {
-    const store = memoryStore()
-    const earlier = ['vault:acme:u1:main', 'box:acme:u1:main:anthropic', '["vault","acme","u1","main"]', '["box","acme","u1","main","anthropic"]']
-    for (const ckey of earlier) {
-      store.write(ckey, JSON.stringify(ckey.includes('box') ? TH.boxOf('anthropic', 'one') : TH.vaultPropsOf('u1')))
-    }
-    const vaultDB = localVaultDB({ store })
-    expect(await vaultDB.readVaultProps(TH.scopeOf('u1'))).to.be.null
-    expect(await vaultDB.readBox(TH.scopeOf('u1'), 'anthropic')).to.be.null
-    expect(await vaultDB.listBoxes(TH.scopeOf('u1'))).to.have.lengthOf(0)
-    expect(store.ckeys()).to.have.members(earlier)
-  })
-
-  it("reads lockboxes as written today, with a sidecar and with an empty one, and writes them back the same", async () => {
-    // A stored vault is a contract: these rows are byte for byte what storeBox() writes today.
-    const store = memoryStore()
-    const emptied = TH.boxOf('openai', 'two', { sidecar_json: '{}' })
-    const sidecarRow = JSON.stringify(TH.boxOf('anthropic', 'one'))
-    const emptiedRow = JSON.stringify(emptied)
-    store.write(u1VaultPropsCkey, JSON.stringify(TH.vaultPropsOf('u1')))
-    store.write(u1BoxCkey('anthropic'), sidecarRow)
-    store.write(u1BoxCkey('openai'), emptiedRow)
-    const vaultDB = localVaultDB({ store })
-    const summaries = await vaultDB.listBoxes(TH.scopeOf('u1'))
-    expect(summaries.map((box) => TH.summaryOf(box)?.sidecar)).to.deep.equal([{ note: 'a test box' }, {}])
-    const prev = await vaultDB.readBox(TH.scopeOf('u1'), 'openai')
-    expect(prev).to.deep.equal(emptied)
-    await vaultDB.updateBox(TH.scopeOf('u1'), emptied, { vault_id: 'vault-id-u1', revision_tok: 'rev-two', vault_key_epoch: 1 })
-    expect(store.read(u1BoxCkey('openai'))).to.eq(emptiedRow)
-  })
-
-  it("lists a lockbox written before the sidecar, with a note, as damaged: no earlier record is read", async () => {
-    const store = memoryStore()
-    const { sidecar_json: _sidecarJson, whisper_codec: _codec, whisper_schema_version: _version, ...rest } = TH.boxOf('anthropic', 'one')
-    store.write(u1VaultPropsCkey, JSON.stringify(TH.vaultPropsOf('u1')))
-    store.write(u1BoxCkey('anthropic'), JSON.stringify({ ...rest, format: 'safebyok-lockbox-v2', note: 'a test box' }))
-    const vaultDB = localVaultDB({ store })
-    expect(await vaultDB.listBoxes(TH.scopeOf('u1'))).to.deep.equal([{ boxlabel: 'anthropic', damaged: true, revision_tok: 'rev-one' }])
-  })
-
-  it("lists a row that is not JSON as damaged, under the boxlabel it is stored under, beside the sound ones", async () => {
-    const store = memoryStore()
-    const scope = TH.scopeOf('u1')
-    store.write(Ckeys.vaultProps(scope), JSON.stringify(TH.vaultPropsOf('u1')))
-    store.write(Ckeys.box(scope, 'openai'), JSON.stringify(TH.boxOf('openai', 'two')))
-    store.write(Ckeys.box(scope, 'anthropic'), '{"not": json')
-    const listed = await localVaultDB({ store }).listBoxes(scope)
-    expect(listed[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true, revision_tok: null })
-    expect(listed[1]).to.include({ boxlabel: 'openai', revision_tok: 'rev-two', damaged: false })
-    // Listed, never repaired: the row is still there for forensics.
-    expect(store.read(Ckeys.box(scope, 'anthropic'))).to.eq('{"not": json')
-  })
-
-  it("retires a damaged row, JSON or not, holding no revision, as the one a retirement naming none means", async () => {
-    const store = memoryStore()
-    const scope = TH.scopeOf('u1')
-    store.write(Ckeys.vaultProps(scope), JSON.stringify(TH.vaultPropsOf('u1')))
-    store.write(Ckeys.box(scope, 'anthropic'), '{"not": json')
-    store.write(Ckeys.box(scope, 'openai'), JSON.stringify({ boxlabel: 'openai', revision_tok: '' }))
-    const vaultDB = localVaultDB({ store })
-    expect(await vaultDB.retireBox(scope, 'anthropic', TH.retiring(null))).to.deep.equal({ outcome: 'retired' })
-    expect(await vaultDB.retireBox(scope, 'openai', TH.retiring(null))).to.deep.equal({ outcome: 'retired' })
-    expect(await vaultDB.listBoxes(scope)).to.have.lengthOf(0)
-  })
-
-  it("retires a damaged row that holds a revision as another, for a retirement naming none", async () => {
-    const store = memoryStore()
-    const scope = TH.scopeOf('u1')
-    store.write(Ckeys.vaultProps(scope), JSON.stringify(TH.vaultPropsOf('u1')))
-    store.write(Ckeys.box(scope, 'anthropic'), JSON.stringify({ ...TH.boxOf('anthropic', 'one'), sidecar_json: 'not json' }))
-    const vaultDB = localVaultDB({ store })
-    expect(await vaultDB.listBoxes(scope)).to.deep.equal([{ boxlabel: 'anthropic', damaged: true, revision_tok: 'rev-one' }])
-    expect(await vaultDB.retireBox(scope, 'anthropic', TH.retiring(null))).to.deep.equal({ outcome: 'retired_other' })
-    expect(store.read(Ckeys.box(scope, 'anthropic'))).to.be.null
-  })
-
-  it("stores each record as its JSON, under its kind and scope joined on ^", async () => {
-    const store = memoryStore()
-    const vaultDB = localVaultDB({ store })
-    await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
-    await vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet)
-    expect(store.read(u1VaultPropsCkey)).to.eq(JSON.stringify(TH.vaultPropsOf('u1')))
-    expect(store.read(u1BoxCkey('anthropic'))).to.eq(JSON.stringify(TH.boxOf('anthropic', 'one')))
-    expect(store.ckeys()).to.have.members([u1VaultPropsCkey, u1BoxCkey('anthropic')])
-  })
-
-  it("refuses a mangled row with kind 'corrupt_record', quoting none of it", async () => {
-    const store = memoryStore()
-    const vaultDB = localVaultDB({ store })
-    store.write(u1VaultPropsCkey, '{"format":"safebyok-vault-v3","shhh":"SUPERSECRET"}')
-    const refusal = await TH.expectRefusal(vaultDB.readVaultProps(TH.scopeOf('u1')), 'corrupt_record')
-    expect(refusal).to.be.instanceOf(VaultError)
-    expect(refusal.message).to.not.include('SUPERSECRET')
-  })
-
-  it("refuses a row that is not JSON at all, quoting none of it", async () => {
-    const store = memoryStore()
-    const vaultDB = localVaultDB({ store })
-    store.write(u1BoxCkey('anthropic'), 'SUPERSECRET{')
-    await expect(vaultDB.readBox(TH.scopeOf('u1'), 'anthropic')).rejects.toThrow(/did not read back as JSON/)
-  })
-
-  it("refuses a record that names a scope or label other than the one asked for", async () => {
-    const store = memoryStore()
-    const vaultDB = localVaultDB({ store })
-    // u2's vault props smuggled into u1's slot, and a lockbox row moved under another label.
-    store.write(u1VaultPropsCkey, JSON.stringify(TH.vaultPropsOf('u2')))
-    await expect(vaultDB.readVaultProps(TH.scopeOf('u1'))).rejects.toThrow(/different app, user, or vault/)
-    store.write(u1BoxCkey('other_box'), JSON.stringify(TH.boxOf('anthropic', 'one')))
-    await expect(vaultDB.readBox(TH.scopeOf('u1'), 'other_box')).rejects.toThrow(/different boxlabel/)
-  })
 })
 
 /** Records an adapter may hand up from its listing, under the boxlabel each is stored under, and how each lists. */
@@ -499,6 +382,9 @@ describe("the abstract VaultDB, around an adapter's half", () => {
       .to.throw(VaultError, /onChange function/).with.property('kind', 'bad_option')
   })
 })
+// --
+
+// == [Retiring a damaged vault]: RefusedWrites, withDamagedVaultProps, retiring a vault whose props are damaged
 
 /** Writes a VaultDB refuses before its adapter's half sees them: none is one a vault builds. */
 const RefusedWrites = [
@@ -582,8 +468,8 @@ describe("the abstract VaultDB, retiring a vault whose vault props are damaged",
 
   const Wayin = TH.vaultPropsOf('u1').wayins[0]
   const NewerRecords = [
-    [{ format: 'safebyok-vault-v4' },                                                      'a format this version does not know, whatever else it holds'],
-    [(vaultProps: VaultProps) => ({ ...vaultProps, format: 'safebyok-vault-v4' }),                'vault props that are otherwise sound but for their format'],
+    [{ format: 'safebyok-vault-v5' },                                                      'a format this version does not know, whatever else it holds'],
+    [(vaultProps: VaultProps) => ({ ...vaultProps, format: 'safebyok-vault-v5' }),                'vault props that are otherwise sound but for their format'],
     [(vaultProps: VaultProps) => ({ ...vaultProps, format: 2 }),                           'a format of another type'],
     [(vaultProps: VaultProps) => ({ ...vaultProps, wayins: [...vaultProps.wayins, { wayinkind: 'smartcard', wayin_id: 'x' }] }), 'a wayinkind this version does not know'],
     [(vaultProps: VaultProps) => ({ ...vaultProps, wayins: Array.from({ length: 9 }, () => Wayin) }), 'more wayins than this version holds'],
@@ -656,6 +542,9 @@ describe("the abstract VaultDB, retiring a vault whose vault props are damaged",
     await TH.expectRefusal(new MapVaultDB().retireDamagedVault({ ...TH.scopeOf('u1'), applabel: '' }), 'bad_label')
   })
 })
+// --
+
+// == [Answers from the adapter]: on the way in, MisansweringVaultDB, lockbox write, listing
 
 describe("the abstract VaultDB, on the way in", () => {
   for (const [kind, write, blurb] of RefusedWrites) {
@@ -700,7 +589,7 @@ describe("the abstract VaultDB, on the way in", () => {
     await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
     const emptied = TH.boxOf('anthropic', 'one', { sidecar_json: '{}' })
     await vaultDB.updateBox(TH.scopeOf('u1'), emptied, TH.noBoxYet)
-    expect(vaultDB.rows.get(u1BoxCkey('anthropic'))).to.deep.equal(emptied)
+    expect(vaultDB.rows.get(u1AnthropicBoxCkey)).to.deep.equal(emptied)
     await vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'two'), { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 1 })
     await vaultDB.retireBox(TH.scopeOf('u1'), 'anthropic', TH.retiring('rev-two'))
     expect(await vaultDB.listBoxes(TH.scopeOf('u1'))).to.have.lengthOf(0)
@@ -742,7 +631,7 @@ describe("the abstract VaultDB, on the way back from a lockbox write", () => {
     await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
     await vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet)
     await TH.expectRefusal(vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'two'), TH.noBoxYet), 'stale_write')
-    expect(vaultDB.rows.get(u1BoxCkey('anthropic'))).to.deep.equal(TH.boxOf('anthropic', 'one'))
+    expect(vaultDB.rows.get(u1AnthropicBoxCkey)).to.deep.equal(TH.boxOf('anthropic', 'one'))
   })
 
   for (const [handedBack, blurb] of MisansweredCases) {
@@ -754,7 +643,7 @@ describe("the abstract VaultDB, on the way back from a lockbox write", () => {
       expect(refusal.message).to.match(/cannot read back/)
       expect((refusal.cause as VaultError).kind).to.eq('corrupt_record')
       // What the adapter stored stands: the refusal is about its answer, not its write.
-      expect(vaultDB.rows.get(u1BoxCkey('anthropic'))).to.deep.equal(TH.boxOf('anthropic', 'one'))
+      expect(vaultDB.rows.get(u1AnthropicBoxCkey)).to.deep.equal(TH.boxOf('anthropic', 'one'))
     })
   }
 
@@ -778,6 +667,9 @@ describe("the abstract VaultDB, listing", () => {
     await expect(vaultDB.readBox(TH.scopeOf('u1'), 'anthropic')).rejects.toThrow(/did not read back in a shape/)
   })
 })
+// --
+
+// == [Names and sizes]: scriptScope, holding names, NarrowNamesVaultDB, SmallRecordVaultDB, weighing, jsonBytes
 
 /** A scope no default check admits, which every verb takes: names above the floor. */
 const scriptScope = { applabel: 'Acme: אקמה', user_id: 'u1', vaultlabel: 'ราก' } as const
@@ -931,6 +823,9 @@ describe("jsonBytes", () => {
     it(blurb, () => { expect(jsonBytes(val)).to.eq(expected) })
   }
 })
+// --
+
+// == [Logger and watching]: logger, subscriber's listener, watchTrouble, listBoxRecords
 
 /** A RingingVaultDB made with `vaultDBOpts`, with one watch on u1's vault whose listener throws. */
 const failingListenerOn = (vaultDBOpts: VaultDBOpts = {}) => {
@@ -1158,41 +1053,6 @@ describe("VaultDB.listBoxRecords", () => {
     await TH.expectRefusal(new DownVaultDB().listBoxRecords(TH.scopeOf('u1')), 'storage_unavailable')
   })
 })
+// --
 
-describe("localVaultDB, as it is made", () => {
-  const BadOpts = [
-    [undefined,                                          'nothing at all'],
-    [{},                                                 'a bag with no store'],
-    [{ store: { read: () => null } },                    'a store missing four of its five calls'],
-    [{ store: memoryStore(), logger: 'console' },        'a logger that is not a VaultLogger'],
-  ] as const
 
-  for (const [opts, blurb] of BadOpts) {
-    it(`refuses ${blurb} with kind 'bad_option'`, () => {
-      expect(() => localVaultDB(opts as unknown as Parameters<typeof localVaultDB>[0])).to.throw(VaultError).with.property('kind', 'bad_option')
-    })
-  }
-
-  it("takes a store bare of a bag, by mistake, as no store: kind 'bad_option'", () => {
-    expect(() => localVaultDB(memoryStore() as unknown as Parameters<typeof localVaultDB>[0])).to.throw(VaultError, /one bag of options/)
-  })
-
-  it("logs a listener that throws through its logger, the write it heard of landed", async () => {
-    const spy = TH.spyLogger()
-    const vaultDB = localVaultDB({ store: memoryStore(), logger: spy.logger })
-    vaultDB.subscribe(TH.scopeOf('u1'), () => { throw new Error('a listener that throws') })
-    await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
-    expect(await vaultDB.readVaultProps(TH.scopeOf('u1'))).to.deep.equal(TH.vaultPropsOf('u1'))
-    expect(spy.calls.map((call) => call.level)).to.deep.equal(['error'])
-  })
-
-  it("refuses a write past the store's quota as storage_unavailable, the store's own error its cause, writing nothing", async () => {
-    const quota = new Error('The quota has been exceeded.')
-    const store = memoryStore()
-    const full = { ...store, write: () => { throw quota } }
-    const vaultDB = localVaultDB({ store: full })
-    const refusal = await TH.expectRefusal(vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1')), 'storage_unavailable')
-    expect(refusal.cause).to.eq(quota)
-    expect(store.ckeys()).to.have.lengthOf(0)
-  })
-})
