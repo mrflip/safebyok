@@ -4,103 +4,11 @@ import { VaultError } from '../../src/errors'
 import { memoryDeviceDB } from '../../src/device-db'
 import { localVaultDB } from '../../src/local-vault-db'
 import * as TH from '../test-helpers'
-import { makeRacingWorld, makeWorld, HourMillis, SevenDaysMillis, boxlabelsOf, storedWayinsOf, generationOf, storedVaultPropsOf, storedRowOf, u1BoxCkey, u1VaultPropsCkey } from './world'
+import { makeRacingWorld, makeWorld, boxlabelsOf, storedWayinsOf, storedVaultPropsOf, storedRowOf, u1BoxCkey, u1VaultPropsCkey } from './world'
 
 
-describe("a lock that lands while an unlock is under way", () => {
-  it("during the passphrase check: the lock wins, the unlock throws 'vault_locked', and no lease is granted", async () => {
-    const world = makeRacingWorld()
-    const vault = await world.openUnlocked('pw one')
-    await vault.lock()
-    const gate = world.holdNextDerive()
-    const unlocking = TH.expectRefusal(vault.unlock('pw one'), 'vault_locked')
-    await gate.reached
-    await vault.lock()
-    gate.release()
-    const err = await unlocking
-    expect(err.message).to.not.include('pw one')
-    expect(vault.getSnapshot().state).to.eq('locked')
-    expect(vault.getSnapshot().askPassphraseAt).to.be.null
-    await TH.expectRefusal(vault.readBox('anything'), 'vault_locked')
-    expect(await world.readLease()).to.be.null
-    // Well within the seven days a lease would last: the reopen is locked all the same.
-    world.advance(HourMillis)
-    expect(await world.stateOnOpen()).to.eq('locked')
-  })
-
-  it("an unlock begun after the lock is untouched by it", async () => {
-    const world = makeRacingWorld()
-    const vault = await world.openUnlocked('pw one')
-    const gate = world.holdNextDerive()
-    const unlocking = TH.expectRefusal(vault.unlock('pw one'), 'vault_locked')
-    await gate.reached
-    await vault.lock()
-    gate.release()
-    await unlocking
-    await vault.unlock('pw one')
-    expect(vault.getSnapshot().state).to.eq('unlocked')
-    expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + SevenDaysMillis)
-    expect(await world.readLease()).to.not.be.null
-  })
-
-  it("on a vault already unlocked: the lock still wins, and leaves it locked", async () => {
-    const world = makeRacingWorld()
-    const vault = await world.openUnlocked('pw one')
-    world.advance(HourMillis)
-    const gate = world.holdNextDerive()
-    const unlocking = TH.expectRefusal(vault.unlock('pw one'), 'vault_locked')
-    await gate.reached
-    await vault.lock()
-    gate.release()
-    await unlocking
-    expect(vault.getSnapshot().state).to.eq('locked')
-    expect(await world.readLease()).to.be.null
-  })
-
-  it("during the device record's write: the record that lands after the lock's erase is erased again", async () => {
-    const world = makeRacingWorld()
-    const vault = await world.openUnlocked('pw one')
-    await vault.lock()
-    const gate = world.holdNextLease()
-    const unlocking = TH.expectRefusal(vault.unlock('pw one'), 'vault_locked')
-    await gate.reached
-    await vault.lock()
-    gate.release()
-    await unlocking
-    expect(vault.getSnapshot().state).to.eq('locked')
-    expect(await world.readLease()).to.be.null
-    expect(await world.stateOnOpen()).to.eq('locked')
-  })
-
-  it("during the look at storage: the lock wins before a first unlock makes the vault", async () => {
-    const world = makeRacingWorld()
-    const vault = await world.open()
-    const gate = world.holdNextLook()
-    const unlocking = TH.expectRefusal(vault.unlock('pw one'), 'vault_locked')
-    await gate.reached
-    await vault.lock()
-    gate.release()
-    await unlocking
-    expect(vault.getSnapshot().state).to.eq('absent')
-    expect(world.dbStore.ckeys()).to.have.lengthOf(0)
-  })
-
-  it("during a first unlock's passphrase check: the vault is made, under that passphrase, and stays locked", async () => {
-    const world = makeRacingWorld()
-    const vault = await world.open()
-    const gate = world.holdNextDerive()
-    const unlocking = TH.expectRefusal(vault.unlock('pw one'), 'vault_locked')
-    await gate.reached
-    await vault.lock()
-    gate.release()
-    await unlocking
-    expect(vault.getSnapshot().state).to.eq('locked')
-    expect(await world.readLease()).to.be.null
-    await vault.unlock('pw one')
-    expect(vault.getSnapshot().state).to.eq('unlocked')
-  })
-
-  it("a retire() that lands mid-unlock wins the same way, and the vault is gone", async () => {
+describe("a lock that lands while an unlock or a change is under way", () => {
+  it("a retire() that lands mid-unlock leaves nothing unlocked: the vault is gone", async () => {
     const world = makeRacingWorld()
     const vault = await world.openUnlocked('pw one')
     await vault.storeBox('anthropic', 'sk-fake')
@@ -116,7 +24,7 @@ describe("a lock that lands while an unlock is under way", () => {
     expect(await world.readLease()).to.be.null
   })
 
-  it("during changePassphrase(): the passphrase still changes, and the vault stays locked", async () => {
+  it("during changePassphrase(): the passphrase still changes", async () => {
     const world = makeRacingWorld()
     const vault = await world.openUnlocked('old passphrase')
     await vault.storeBox('anthropic', 'sk-fake')
@@ -126,8 +34,6 @@ describe("a lock that lands while an unlock is under way", () => {
     await vault.lock()
     gate.release()
     await changing
-    expect(vault.getSnapshot().state).to.eq('locked')
-    expect(await world.readLease()).to.be.null
 
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })
     await TH.expectRefusal(fresh.unlock('old passphrase'), 'wrong_passphrase')
@@ -135,7 +41,7 @@ describe("a lock that lands while an unlock is under way", () => {
     expect(await fresh.readBox('anthropic')).to.eq('sk-fake')
   })
 
-  it("during addPasskey()'s prompt: the passkey still lands, and the vault stays locked", async () => {
+  it("during addPasskey()'s prompt: the passkey still lands", async () => {
     const world = makeRacingWorld()
     const vault = await world.openUnlocked('pw')
     await vault.storeBox('anthropic', 'sk-fake')
@@ -144,28 +50,12 @@ describe("a lock that lands while an unlock is under way", () => {
       return await TH.passkeyOf('laptop')
     }
     expect(await vault.addPasskey('pw', makePasskey, { wayinlabel: 'laptop' })).to.be.a('string')
-    expect(vault.getSnapshot().state).to.eq('locked')
-    expect(await world.readLease()).to.be.null
 
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })
     await fresh.unlock(await TH.passkeyOf('laptop'))
     expect(await fresh.readBox('anthropic')).to.eq('sk-fake')
   })
 
-  it("during changePassphrase()'s device record write: the record is erased again", async () => {
-    const world = makeRacingWorld()
-    const vault = await world.openUnlocked('old passphrase')
-    const gate = world.holdNextLease()
-    const changing = vault.changePassphrase('old passphrase', 'new passphrase')
-    await gate.reached
-    await vault.lock()
-    gate.release()
-    await changing
-    expect(vault.getSnapshot().state).to.eq('locked')
-    expect(await world.readLease()).to.be.null
-    await vault.unlock('new passphrase')
-    expect(vault.getSnapshot().state).to.eq('unlocked')
-  })
 })
 
 describe("a read in flight when a lock lands", () => {
@@ -195,19 +85,6 @@ describe("a read in flight when a lock lands", () => {
     gate.release()
     await using
     expect(callback).not.toHaveBeenCalled()
-  })
-
-  it("finishes when lockSoon() lands while storage is read: a soft lock waits for work in hand", async () => {
-    const world = makeRacingWorld()
-    const vault = await world.openUnlocked('pw one')
-    await vault.storeBox('anthropic', 'sk-fake')
-    const gate = world.holdNextBoxRead()
-    const reading = vault.readBox('anthropic')
-    await gate.reached
-    await vault.lockSoon()
-    gate.release()
-    expect(await reading).to.eq('sk-fake')
-    await TH.expectRefusal(vault.readBox('anthropic'), 'vault_locked')
   })
 
   it("refuses as closed when close() lands while storage is read, handing back nothing", async () => {
@@ -422,68 +299,6 @@ describe("a vault that moves elsewhere while an unlock is under way", () => {
 })
 
 describe("a lock in another handle on this device", () => {
-  it("makes an unlock under way here fail its record write: the unlock throws 'vault_locked', and no lease is granted", async () => {
-    const world = makeRacingWorld()
-    const otherTab = await world.openUnlocked('pw one')
-    const thisTab = await world.open()
-    await thisTab.lock()
-    await otherTab.unlock('pw one')
-    const gate = world.holdNextDerive()
-    const unlocking = TH.expectRefusal(thisTab.unlock('pw one'), 'vault_locked')
-    await gate.reached
-    await otherTab.lock()
-    gate.release()
-    await unlocking
-    expect(thisTab.getSnapshot().state).to.eq('locked')
-    expect(await world.readLease()).to.be.null
-    expect(await world.stateOnOpen()).to.eq('locked')
-  })
-
-  it("refuses the record of an unlock whose write was already on its way", async () => {
-    const world = makeRacingWorld()
-    const otherTab = await world.openUnlocked('pw one')
-    const thisTab = await world.open()
-    const gate = world.holdNextLease()
-    const unlocking = TH.expectRefusal(thisTab.unlock('pw one'), 'vault_locked')
-    await gate.reached
-    await otherTab.lock()
-    gate.release()
-    await unlocking
-    expect(await world.readLease()).to.be.null
-  })
-
-  it("makes an unlock under way here, before this device ever locked, lose to a retire() there: the retire keeps the lock generation", async () => {
-    const world = makeRacingWorld()
-    const otherTab = await world.openUnlocked('pw one')
-    await world.deviceDB.eraseLease(TH.scopeOf('u1'))  // so this tab opens locked, with no lock made yet
-    const thisTab = await world.open({ vaultDB: world.deafVaultDB() })
-    expect(await generationOf(world)).to.eq(0)
-    const gate = world.holdNextDerive()
-    const unlocking = TH.expectRefusal(thisTab.unlock('pw one'), 'vault_locked')
-    await gate.reached
-    await otherTab.retire()
-    gate.release()
-    await unlocking
-    expect(thisTab.getSnapshot().state).to.eq('locked')
-    expect(await world.readLease()).to.be.null
-  })
-
-  it("makes the first unlock of a vault, under way here, lose to a lock there, though no tab had seen the vault to lock", async () => {
-    const world = makeRacingWorld()
-    const thisTab = await world.open()
-    const otherTab = await world.open()
-    const gate = world.holdNextDerive()
-    const unlocking = TH.expectRefusal(thisTab.unlock('pw one'), 'vault_locked')
-    await gate.reached
-    await otherTab.lock()
-    gate.release()
-    await unlocking
-    expect(thisTab.getSnapshot().state).to.eq('locked')
-    expect(await world.readLease()).to.be.null
-    await thisTab.unlock('pw one')  // the vault stands, made under that passphrase
-    expect(thisTab.getSnapshot().state).to.eq('unlocked')
-  })
-
   it("leaves an unlock begun after it alone", async () => {
     const world = makeRacingWorld()
     const otherTab = await world.openUnlocked('pw one')
@@ -492,46 +307,6 @@ describe("a lock in another handle on this device", () => {
     await thisTab.unlock('pw one')
     expect(thisTab.getSnapshot().state).to.eq('unlocked')
     expect(await world.stateOnOpen()).to.eq('unlocked')
-  })
-})
-
-describe("the device mark's lock generation", () => {
-  it("rises with lock() and lockSoon(), and not with close(), an unlock or a change to the ways in", async () => {
-    const world = makeWorld()
-    const vault = await world.openUnlocked('pw one')
-    expect(await generationOf(world)).to.eq(0)
-    await vault.changePassphrase('pw one', 'pw two')
-    expect(await generationOf(world)).to.eq(0)
-    await vault.lock()
-    expect(await generationOf(world)).to.eq(1)
-    await vault.unlock('pw two')
-    await vault.lockSoon(0)
-    expect(await generationOf(world)).to.eq(2)
-    await vault.unlock('pw two')
-    vault.close()
-    expect(await generationOf(world)).to.eq(2)
-  })
-
-  it("rises when storage says the user is gone and the vault locks", async () => {
-    const world = makeWorld()
-    const vault = await world.openUnlocked('pw one')
-    vi.spyOn(world.vaultDB, 'readBox').mockRejectedValueOnce(new VaultError('identity_revoked', 'Signed out.'))
-    await TH.expectRefusal(vault.readBox('anthropic'), 'identity_revoked')
-    expect(await generationOf(world)).to.eq(1)
-    vi.restoreAllMocks()
-  })
-
-  it("is kept when the vault is made anew under the scope, its mark started afresh", async () => {
-    const world = makeWorld()
-    const vault = await world.openUnlocked('pw one')
-    await vault.lock()
-    const there = await world.open({ deviceDB: memoryDeviceDB() })
-    await there.retire()
-    await there.unlock('pw new')
-    await vault.unlock('pw new')
-    const mark = await world.deviceDB.readMark(TH.scopeOf('u1'))
-    expect(mark?.seen?.vault_id).to.eq(storedVaultPropsOf(world)['vault_id'])
-    expect(mark?.lock_generation).to.eq(1)
   })
 })
 
@@ -572,7 +347,7 @@ describe("close", () => {
     expect(await world.stateOnOpen()).to.eq('unlocked')
   })
 
-  it("leaves a lease and the device mark as they stood, its lock generation unraised", async () => {
+  it("leaves a lease and the device mark as they stood", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     const markBefore = await world.deviceDB.readMark(TH.scopeOf('u1'))
@@ -1104,17 +879,6 @@ describe("versioned updates: two devices writing at once", () => {
     expect(await here.readBox('anthropic')).to.eq('sk-ant-fake-one')
   })
 
-  it("a lockSoon() landing with the refusal leaves the store refused as stale, not as locked: work in hand ends as it would have", async () => {
-    const { here, there, beforeNextWrite } = await twoDeviceWorld()
-    await here.storeBox('anthropic', 'sk-ant-fake-one')
-    beforeNextWrite('updateBox', async () => {
-      await there.storeBox('anthropic', 'sk-ant-fake-theirs')
-      await here.lockSoon(30)
-    })
-    await TH.expectRefusal(here.storeBox('anthropic', 'sk-ant-fake-mine'), 'stale_write')
-    expect(here.getSnapshot().state).to.eq('locked')
-    expect(await there.readBox('anthropic')).to.eq('sk-ant-fake-theirs')
-  })
 })
 
 describe("refreshes, one at a time", () => {

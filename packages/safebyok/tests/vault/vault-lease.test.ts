@@ -183,7 +183,7 @@ describe("the lease", () => {
       await world.openUnlocked('pw one')
       const written = await world.readLease()
       if (written === null) { throw new Error('expected a lease on the device') }
-      await world.deviceDB.writeLease({ ...written, ask_passphrase_at: written.ask_passphrase_at + shiftMillis }, TH.NoLocks)
+      await world.deviceDB.writeLease({ ...written, ask_passphrase_at: written.ask_passphrase_at + shiftMillis })
       // Under Infinity no window check refuses it, and an hour either way stays in bounds: only the ctx can.
       const reopened = await world.open({ leaseHours: Infinity })
       expect(reopened.getSnapshot().state).to.eq('locked')
@@ -198,7 +198,7 @@ describe("the lease", () => {
       await world.openUnlocked('pw one')
       const written = await world.readLease()
       if (written === null) { throw new Error('expected a lease on the device') }
-      await world.deviceDB.writeLease({ ...written, ask_passphrase_at: askPassphraseAt }, TH.NoLocks)
+      await world.deviceDB.writeLease({ ...written, ask_passphrase_at: askPassphraseAt })
       // Under Infinity no window check refuses it: only the bounds can.
       const reopened = await world.open({ leaseHours: Infinity })
       expect(reopened.getSnapshot().state).to.eq('locked')
@@ -216,9 +216,9 @@ describe("the lease", () => {
     }
   })
 
-  it("is MaxLeaseHours at most, short of what one timer reaches, with a minute's grace to spare", () => {
+  it("is MaxLeaseHours at most, short of what one timer reaches", () => {
     expect(MaxLeaseHours).to.eq(588)
-    expect((MaxLeaseHours * HourMillis) + MinuteMillis).to.be.below((2 ** 31) - 1)
+    expect(MaxLeaseHours * HourMillis).to.be.below((2 ** 31) - 1)
   })
 
   it("makes a deadline of whole milliseconds from a clock that returns fractions, and a reopen reads it back", async () => {
@@ -443,64 +443,29 @@ describe("natural expiry", () => {
   beforeEach(() => { fakeTheClock() })
   afterEach(() => { vi.useRealTimers() })
 
-  it("says 'locked' to subscribers at askPassphraseAt, and drops the vaultKey a minute later, with no call made", async () => {
+  it("says 'locked' to subscribers at askPassphraseAt, dropping the vaultKey then, with no call made", async () => {
     const world = makeTimedWorld()
     const vault = await world.openUnlocked('pw one', { leaseHours: 1 })
     const listener = vi.fn()
     vault.subscribe(listener)
     world.pass(HourMillis - 1)
     expect(listener).not.toHaveBeenCalled()
-    world.pass(1)
-    expect(listener).toHaveBeenCalledTimes(1)
-    expect(vault.getSnapshot().state).to.eq('locked')
-    expect(vault.getSnapshot().askPassphraseAt).to.be.null
-    world.pass(MinuteMillis - 1)
     expect(vi.getTimerCount()).to.eq(1)
     world.pass(1)
-    expect(vi.getTimerCount()).to.eq(0)
     expect(listener).toHaveBeenCalledTimes(1)
-  })
-
-  it("refuses new work from askPassphraseAt on, while work in hand keeps the key to finish within the minute", async () => {
-    const world = makeTimedWorld()
-    const vault = await world.openUnlocked('pw one', { leaseHours: 1 })
-    const gate = world.holdNextBoxRead()
-    const storing = vault.storeBox('anthropic', 'sk-fake')
-    await gate.reached
-    world.pass(HourMillis)
-    await TH.expectRefusal(vault.readBox('anthropic'), 'vault_locked')
-    expect(vault.getSnapshot().state).to.eq('locked')
-    gate.release()
-    await storing
-    await vault.unlock('pw one')
-    expect(await vault.readBox('anthropic')).to.eq('sk-fake')
-  })
-
-  it("drops the key by its timer for work still in hand when the minute runs out: that work is refused, and writes nothing", async () => {
-    const world = makeTimedWorld()
-    const vault = await world.openUnlocked('pw one', { leaseHours: 1 })
-    const gate = world.holdNextBoxRead()
-    const storing = TH.expectRefusal(vault.storeBox('anthropic', 'sk-fake'), 'vault_locked')
-    await gate.reached
-    world.pass(HourMillis)
-    await TH.expectRefusal(vault.readBox('anthropic'), 'vault_locked')
-    world.pass(MinuteMillis)
-    gate.release()
-    await storing
-    await vault.unlock('pw one')
-    await TH.expectRefusal(vault.readBox('anthropic'), 'absent_box')
-  })
-
-  it("drops a key whose timer has not run by its shut time at the next look: the threshold is the truth", async () => {
-    const world = makeTimedWorld()
-    const vault = await world.openUnlocked('pw one', { leaseHours: 1 })
-    const gate = world.holdNextBoxRead()
-    const storing = TH.expectRefusal(vault.storeBox('anthropic', 'sk-fake'), 'vault_locked')
-    await gate.reached
-    world.advance(HourMillis + MinuteMillis)  // the clock alone, as a device asleep would see it
-    gate.release()
-    await storing
     expect(vi.getTimerCount()).to.eq(0)
+    expect(vault.getSnapshot().state).to.eq('locked')
+    expect(vault.getSnapshot().askPassphraseAt).to.be.null
+    await TH.expectRefusal(vault.readBox('anthropic'), 'vault_locked')
+  })
+
+  it("drops a key whose timer has not run by its deadline at the next look: the threshold is the truth", async () => {
+    const world = makeTimedWorld()
+    const vault = await world.openUnlocked('pw one', { leaseHours: 1 })
+    world.advance(HourMillis)  // the clock alone, as a device asleep would see it
+    await TH.expectRefusal(vault.readBox('anthropic'), 'vault_locked')
+    expect(vi.getTimerCount()).to.eq(0)
+    expect(vault.getSnapshot().state).to.eq('locked')
   })
 
   it("arms no timer for a vault unlocked until lock()", async () => {
@@ -557,30 +522,7 @@ describe("natural expiry", () => {
     expect(await leaseDeadlineOf(world)).to.eq(world.clock.now() + HourMillis)
   })
 
-  it("gives lockSoon() on a key past its deadline no more than the minute it had left: a shut time only moves earlier", async () => {
-    const world = makeTimedWorld()
-    const vault = await world.openUnlocked('pw one', { leaseHours: 1 })
-    world.pass(HourMillis + (MinuteMillis / 2))
-    await vault.lockSoon(60)
-    world.pass((MinuteMillis / 2) - 1)
-    expect(vi.getTimerCount()).to.eq(1)
-    world.pass(1)
-    expect(vi.getTimerCount()).to.eq(0)
-  })
-
-  it("drops the key at its shut time though the deadline's timer rang late: the drop waits only for what is left of the minute", async () => {
-    const world = makeTimedWorld()
-    const vault = await world.openUnlocked('pw one', { leaseHours: 1 })
-    world.advance(MinuteMillis / 2)  // the device sleeps half a minute: its timers ring that much late
-    world.pass(HourMillis)
-    expect(vault.getSnapshot().state).to.eq('locked')
-    world.pass((MinuteMillis / 2) - 1)
-    expect(vi.getTimerCount()).to.eq(1)
-    world.pass(1)
-    expect(vi.getTimerCount()).to.eq(0)
-  })
-
-  it("drops the key at once, and says so through the logger, when the clock fails as the window ends", async () => {
+  it("drops the key at the deadline though the clock fails as the window ends: its timer reads no clock", async () => {
     const world = makeTimedWorld()
     let broken = false
     const clock = { now: () => { if (broken) { throw new Error('the host clock broke: battery flat') } return Date.now() } }
@@ -588,20 +530,12 @@ describe("natural expiry", () => {
     broken = true
     world.pass(HourMillis)
     expect(vi.getTimerCount()).to.eq(0)
-    expect(world.logged.map((heard) => [heard.level, heard.story])).to.deep.equal([['warn', { call: 'expiry' }]])
+    expect(world.logged).to.have.lengthOf(0)
     broken = false
     expect(vault.getSnapshot().state).to.eq('locked')
     await TH.expectRefusal(vault.readBox('anthropic'), 'vault_locked')
   })
 
-  it("has lockSoon() drop a key past its shut time at once, its timer late", async () => {
-    const world = makeTimedWorld()
-    const vault = await world.openUnlocked('pw one', { leaseHours: 1 })
-    world.advance(HourMillis + (2 * MinuteMillis))
-    await vault.lockSoon(30)
-    expect(vi.getTimerCount()).to.eq(0)
-    expect(await world.readLease()).to.be.null
-  })
 })
 
 describe("a change to the ways in, once it has landed", () => {

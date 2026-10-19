@@ -171,7 +171,7 @@ exports[`Stored record formats > safebyok-lockbox-v5 1`] = `
 }
 `;
 
-exports[`Stored record formats > safebyok-mark-v3 1`] = `
+exports[`Stored record formats > safebyok-mark-v4 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -182,50 +182,38 @@ exports[`Stored record formats > safebyok-mark-v3 1`] = `
       "type": "string",
     },
     "format": {
-      "const": "safebyok-mark-v3",
+      "const": "safebyok-mark-v4",
       "type": "string",
     },
-    "lock_generation": {
-      "maximum": 9007199254740991,
-      "minimum": 0,
-      "type": "integer",
-    },
     "seen": {
-      "anyOf": [
-        {
-          "additionalProperties": false,
-          "properties": {
-            "device_id": {
-              "minLength": 1,
-              "type": "string",
-            },
-            "unlock_epoch": {
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991,
-              "type": "integer",
-            },
-            "vault_id": {
-              "minLength": 1,
-              "type": "string",
-            },
-            "vault_key_epoch": {
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991,
-              "type": "integer",
-            },
-          },
-          "required": [
-            "device_id",
-            "vault_id",
-            "unlock_epoch",
-            "vault_key_epoch",
-          ],
-          "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "device_id": {
+          "minLength": 1,
+          "type": "string",
         },
-        {
-          "type": "null",
+        "unlock_epoch": {
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "type": "integer",
         },
+        "vault_id": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "vault_key_epoch": {
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "type": "integer",
+        },
+      },
+      "required": [
+        "device_id",
+        "vault_id",
+        "unlock_epoch",
+        "vault_key_epoch",
       ],
+      "type": "object",
     },
     "user_id": {
       "maxLength": 1024,
@@ -243,7 +231,6 @@ exports[`Stored record formats > safebyok-mark-v3 1`] = `
     "applabel",
     "user_id",
     "vaultlabel",
-    "lock_generation",
     "seen",
   ],
   "type": "object",

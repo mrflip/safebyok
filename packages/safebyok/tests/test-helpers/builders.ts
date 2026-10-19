@@ -1,5 +1,5 @@
 import { type Ciphered, toB64 } from '../../src/crypto'
-import { memoryDeviceDB, type LeaseExpectation } from '../../src/device-db'
+import { memoryDeviceDB } from '../../src/device-db'
 import type { KeyDeriver } from '../../src/key-deriver'
 import { type PassphraseStrengthTest, StrongVerdict } from '../../src/passphrase-strength'
 import { memoryStore } from '../../src/string-store'
@@ -287,26 +287,23 @@ export const thisVault = Object.freeze({ vault_id: 'vault-id-u1' } as const)
  */
 export const retiring = (revisionTok: string | null) => ({ vault_id: 'vault-id-u1', revision_tok: revisionTok })
 
-/** What {@link markOf} may change of its mark: any field of its own, and any of what it has seen, or null for nothing seen. */
-export type MarkOverrides = Partial<Omit<DeviceMark, 'seen'>> & { seen?: Partial<SeenVault> | null }
+/** What {@link markOf} may change of its mark: any field of its own, and any of what it has seen. */
+export type MarkOverrides = Partial<Omit<DeviceMark, 'seen'>> & { seen?: Partial<SeenVault> }
 
 /**
  * A shape-valid DeviceMark for device-storage tests: `userId`'s `main` vault as {@link vaultPropsOf}
- * has it, seen at unlock epoch 1 and vaultKey epoch 1, by the device `device-one`, never locked.
+ * has it, seen at unlock epoch 1 and vaultKey epoch 1, by the device `device-one`.
  *
  * @example await deviceDB.writeMark(TH.markOf('u1'))
  * @example TH.markOf('u1', { seen: { unlock_epoch: 3 } })  // a device that has seen the vault at epoch 3
- * @example TH.markOf('u1', { lock_generation: 2 })         // a device that has locked the vault twice
- * @example TH.markOf('u1', { seen: null })                 // a device that has seen no vault there
  */
 export const markOf = (userId: string, overrides: MarkOverrides = {}): DeviceMark => {
   const { seen, ...head } = overrides
   return {
-    format:          'safebyok-mark-v3',
+    format: 'safebyok-mark-v4',
     ...scopeOf(userId),
-    lock_generation: 0,
     ...head,
-    seen:            seen === null ? null : {
+    seen:   {
       device_id:       'device-one',
       vault_id:        `vault-id-${userId}`,
       unlock_epoch:    1,
@@ -315,14 +312,6 @@ export const markOf = (userId: string, overrides: MarkOverrides = {}): DeviceMar
     },
   }
 }
-
-/**
- * The expectation a lease is written under on a device that has never locked its
- * vault: the lock generation of a scope with no mark, or a mark from {@link markOf}.
- *
- * @example await deviceDB.writeLease(await TH.leaseOf('u1'), TH.NoLocks)
- */
-export const NoLocks: LeaseExpectation = Object.freeze({ lock_generation: 0 })
 
 /** A real Lease for device-storage tests: a live non-extractable leaseKey around fake wrapped material. */
 export const leaseOf = async (userId: string): Promise<Lease> => ({

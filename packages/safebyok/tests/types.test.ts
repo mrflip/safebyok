@@ -277,20 +277,17 @@ const MarkCases = [
   // regular usage:
   [TH.markOf('u1'),                                               true,   'a whole mark'],
   [TH.markOf('u1', { seen: { unlock_epoch: 40 } }),               true,   'a mark of a vault seen at a later epoch'],
-  [TH.markOf('u1', { lock_generation: 7 }),                       true,   'a mark of a device that has locked the vault seven times'],
-  [TH.markOf('u1', { seen: null, lock_generation: 2 }),           true,   'a mark that has seen no vault, kept for its lock generation'],
   // refused, as a damaged or foreign record:
-  [TH.markOf('u1', { format: 'safebyok-mark-v4' as never }),      false,  'a format this version does not know'],
+  [TH.markOf('u1', { format: 'safebyok-mark-v5' as never }),      false,  'a format this version does not know'],
+  [{ ...TH.markOf('u1', { format: 'safebyok-mark-v3' as never }), lock_generation: 0 }, false, 'a mark from before the lock generation went, which reads as none'],
   [TH.markOf('u1', { format: 'safebyok-mark-v2' as never }),      false,  'a mark from before a mark could see no vault, which reads as none'],
-  [TH.omitting(TH.markOf('u1'), 'lock_generation'),               false,  'a mark missing its lock generation'],
-  [TH.omitting(TH.markOf('u1'), 'seen'),                          false,  'a mark missing what it has seen, even as null'],
-  [TH.markOf('u1', { lock_generation: -1 }),                      false,  'a lock generation below zero'],
-  [TH.markOf('u1', { lock_generation: 1.5 }),                     false,  'a lock generation that is no whole number'],
+  [TH.omitting(TH.markOf('u1'), 'seen'),                          false,  'a mark missing what it has seen'],
+  [{ ...TH.markOf('u1'), seen: null },                            false,  'a mark that has seen no vault: the device keeps none'],
   [TH.markOf('u1', { seen: { device_id: '' } }),                  false,  'an empty device_id'],
   [TH.markOf('u1', { seen: { vault_id: '' } }),                   false,  'an empty vault_id'],
   [TH.markOf('u1', { seen: { unlock_epoch: 0 } }),                false,  'an epoch starts at one'],
   [TH.markOf('u1', { seen: { vault_key_epoch: 0 } }),             false,  'a vaultKey epoch starts at one'],
-  [{ ...TH.markOf('u1', { seen: null }), seen: { device_id: 'device-one', vault_id: 'vault-id-u1', unlock_epoch: 1 } }, false, 'a mark missing the vaultKey epoch it has seen'],
+  [{ ...TH.markOf('u1'), seen: { device_id: 'device-one', vault_id: 'vault-id-u1', unlock_epoch: 1 } }, false, 'a mark missing the vaultKey epoch it has seen'],
 ] as const
 
 describe("DeviceMark", () => {

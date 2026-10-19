@@ -9,7 +9,7 @@ describe("memoryDeviceDB", () => {
   it("treats a mangled record as no lease, and discards it", async () => {
     const deviceDB = memoryDeviceDB()
     const mangled = { ...(await TH.leaseOf('u1')), lease_key: 'not a key handle' }
-    await deviceDB.writeLease(mangled as unknown as Lease, TH.NoLocks)
+    await deviceDB.writeLease(mangled as unknown as Lease)
     expect(await deviceDB.readLease(TH.scopeOf('u1'))).to.be.null
     expect(await deviceDB.readLease(TH.scopeOf('u1'))).to.be.null  // stays gone
   })

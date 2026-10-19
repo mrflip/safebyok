@@ -116,7 +116,7 @@ describe("idbDeviceDB", () => {
     await set('unlock:acme:u1:main', await TH.leaseOf('u1'), shelf)
     await set(['unlock', 'acme', 'u1', 'main'], await TH.leaseOf('u1'), shelf)
     const deviceDB = idbDeviceDB({ dbName })
-    await deviceDB.writeLease(await TH.leaseOf('u2'), TH.NoLocks)
+    await deviceDB.writeLease(await TH.leaseOf('u2'))
     const gets = vi.spyOn(IDBObjectStore.prototype, 'get')
     const getAlls = vi.spyOn(IDBObjectStore.prototype, 'getAll')
     const cursors = vi.spyOn(IDBObjectStore.prototype, 'openCursor')
@@ -137,7 +137,7 @@ describe("idbDeviceDB", () => {
     const shelf = createStore(`${dbName}:device_db`, 'records')
     await set('unlock:acme:u1:main', await TH.leaseOf('u1'), shelf)
     const deviceDB = idbDeviceDB({ dbName })
-    await deviceDB.writeLease(await TH.leaseOf('u2'), TH.NoLocks)
+    await deviceDB.writeLease(await TH.leaseOf('u2'))
     await deviceDB.eraseLease(TH.scopeOf('u3'))
     expect(await deviceDB.readLease(TH.scopeOf('u2'))).to.not.be.null
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
@@ -171,7 +171,7 @@ describe("idbDeviceDB", () => {
   it("reads a mark that does not pass its check as none, and drops it", async () => {
     const dbName = TH.freshDbName()
     const shelf = createStore(`${dbName}:device_db`, 'records')
-    await set(Ckeys.mark(TH.scopeOf('u1')), { ...TH.markOf('u1', { seen: null }), seen: { ...TH.markOf('u1').seen, unlock_epoch: 'one' } }, shelf)
+    await set(Ckeys.mark(TH.scopeOf('u1')), { ...TH.markOf('u1'), seen: { ...TH.markOf('u1').seen, unlock_epoch: 'one' } }, shelf)
     const deviceDB = idbDeviceDB({ dbName })
     expect(await deviceDB.readMark(TH.scopeOf('u1'))).to.be.null
     expect(await inspectIdbDeviceDB({ dbName }).rows()).to.have.lengthOf(0)
@@ -208,7 +208,7 @@ describe("idbDeviceDB", () => {
   it("erases the scope's own lease even when the sweep fails", async () => {
     const dbName = TH.freshDbName()
     const deviceDB = idbDeviceDB({ dbName })
-    await deviceDB.writeLease(await TH.leaseOf('u1'), TH.NoLocks)
+    await deviceDB.writeLease(await TH.leaseOf('u1'))
     vi.spyOn(IDBObjectStore.prototype, 'getAllKeys').mockImplementation(() => { throw new Error('the shelf will not list') })
     try {
       await expect(deviceDB.eraseLease(TH.scopeOf('u1'))).rejects.toThrow('the shelf will not list')
@@ -223,7 +223,7 @@ describe("idbDeviceDB", () => {
     const shelf = createStore(`${dbName}:device_db`, 'records')
     await set('unlock:acme:u1:main', await TH.leaseOf('u1'), shelf)
     const deviceDB = idbDeviceDB({ dbName })
-    await deviceDB.writeLease(await TH.leaseOf('u2'), TH.NoLocks)
+    await deviceDB.writeLease(await TH.leaseOf('u2'))
     await deviceDB.eraseAll()
     expect(await inspectIdbDeviceDB({ dbName }).rows()).to.have.lengthOf(0)
   })
@@ -237,7 +237,7 @@ describe("inspectIdbDeviceDB", () => {
     let heardCount = 0
     const unsubscribe = inspector.subscribe(() => { heardCount += 1 })
 
-    await deviceDB.writeLease(await TH.leaseOf('u1'), TH.NoLocks)
+    await deviceDB.writeLease(await TH.leaseOf('u1'))
     const rows = await inspector.rows()
     expect(rows.map((row) => row.ckey)).to.deep.equal(['lease^acme^u1^main'])
     await vi.waitFor(() => { expect(heardCount).to.be.greaterThan(0) })
@@ -252,7 +252,7 @@ describe("inspectIdbDeviceDB", () => {
     const dbName = TH.freshDbName()
     const inspector = inspectIdbDeviceDB({ dbName })
     expect(() => inspector.subscribe('not a listener' as unknown as () => void)).to.throw(VaultError, /listener function/)
-    await idbDeviceDB({ dbName }).writeLease(await TH.leaseOf('u1'), TH.NoLocks)
+    await idbDeviceDB({ dbName }).writeLease(await TH.leaseOf('u1'))
     expect(await inspector.rows()).to.have.lengthOf(1)
   })
 })

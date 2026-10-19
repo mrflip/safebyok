@@ -71,8 +71,8 @@ export type MakeVaultOpts = {
    */
   maxLockboxes?: number | undefined
   /**
-   * Where the vault says what it has nobody to throw to -- a lock that skipped its grace, a
-   * background refresh that failed, a lease it could not read -- as a
+   * Where the vault says what it has nobody to throw to -- a background refresh that failed, a
+   * lease it could not read -- as a
    * {@link VaultLogger}: `log`, `warn` and `error` functions. The vault hands
    * it no secret material or option's value (a host's own error goes as the host made it); whatever
    * it throws is ignored. Pass functions that do nothing for quiet. Default (none, or null): the

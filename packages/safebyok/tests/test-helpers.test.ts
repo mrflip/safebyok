@@ -307,12 +307,13 @@ describe("holdNextCall", () => {
     const opts = TH.memoryVaultOpts()
     const vault = await TH.settledVault(opts)
     const gate = TH.holdNextCall(opts.vaultDB, 'readVaultProps')
-    const unlocking = TH.expectRefusal(vault.unlock('pw'), 'vault_locked')
+    let settled = false
+    const unlocking = (async () => { await vault.unlock('pw'); settled = true })()
     await gate.reached
     await vault.lock()
+    expect(settled).to.be.false
     gate.release()
     await unlocking
-    expect(vault.getSnapshot().state).to.not.eq('unlocked')
   })
 })
 
@@ -791,20 +792,12 @@ const ckeyOf = (scope: VaultScope) => `${scope.applabel}:${scope.user_id}:${scop
 TH.describeDeviceDB('describeDeviceDB, over the smallest honest DeviceDB', () => {
   const rows = new Map<string, Lease>()
   const marks = new Map<string, DeviceMark>()
-  const lockGenerationOf = (scope: VaultScope) => marks.get(ckeyOf(scope))?.lock_generation ?? 0
   return {
     readLease:  (scope) => Promise.resolve(rows.get(ckeyOf(scope)) ?? null),
-    writeLease: (lease, expected) => {
-      if (lockGenerationOf(lease) !== expected.lock_generation) { return Promise.reject(new VaultError('stale_write', 'A lock came first.')) }
-      rows.set(ckeyOf(lease), lease)
-      return Promise.resolve()
-    },
+    writeLease: (lease) => { rows.set(ckeyOf(lease), lease); return Promise.resolve() },
     eraseLease: (scope) => { rows.delete(ckeyOf(scope)); return Promise.resolve() },
     readMark:   (scope) => Promise.resolve(marks.get(ckeyOf(scope)) ?? null),
-    writeMark:  (mark) => {
-      marks.set(ckeyOf(mark), { ...mark, lock_generation: Math.max(mark.lock_generation, lockGenerationOf(mark)) })
-      return Promise.resolve()
-    },
+    writeMark:  (mark) => { marks.set(ckeyOf(mark), mark); return Promise.resolve() },
     eraseMark:  (scope) => { marks.delete(ckeyOf(scope)); return Promise.resolve() },
     eraseAll:   () => { rows.clear(); marks.clear(); return Promise.resolve() },
   }
