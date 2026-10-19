@@ -1,4 +1,4 @@
-import { Box } from './box'
+import { BoxRecord } from './box'
 import type { BoxExpectation, BoxDelExpectation, BoxDeletion, VaultDelExpectation, VaultPropsExpectation } from './vault-db'
 
 /**
@@ -93,6 +93,6 @@ export const boxMeets = (standingVaultProps: unknown, standingBox: unknown, expe
  */
 export const deletionOf = (standingBox: unknown, expected: BoxDelExpectation): BoxDeletion => {
   if (standingBox === undefined || standingBox === null) { return { outcome: 'absent' } }
-  const standingRevision = Box.shape.revision_tok.safeParse(fieldOf(standingBox, 'revision_tok')).data ?? null
+  const standingRevision = BoxRecord.shape.revision_tok.safeParse(fieldOf(standingBox, 'revision_tok')).data ?? null
   return { outcome: standingRevision === expected.revision_tok ? 'deleted' : 'deleted_other' }
 }

@@ -1,5 +1,5 @@
 import { Expectations, Refusals, VaultDB, VaultError, VaultScope } from 'safebyok'
-import type { VaultPropsExpectation, VaultDBOpts, VaultDelExpectation, Box, BoxExpectation, BoxDelExpectation, BoxDeletion, StoredBox, VaultProps } from 'safebyok'
+import type { VaultPropsExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, StoredBox, VaultProps } from 'safebyok'
 import * as Columns from './columns'
 import { VaultPropsColumns, ListedBoxColumns, BoxColumns } from './columns'
 import { VaultChangeChannel } from './vault-tables'
@@ -291,7 +291,7 @@ class TablesVaultDB extends VaultDB {
   }
 
   // The box handed back is the row as the statement that wrote it returned it.
-  protected async doPutBox(scope: VaultScope, box: Box, expected: BoxExpectation): Promise<unknown> {
+  protected async doPutBox(scope: VaultScope, box: BoxRecord, expected: BoxExpectation): Promise<unknown> {
     this.mustReach(scope)
     const boxParams = Columns.paramsOf(box, BoxColumns)
     if (expected.revision_tok !== null) {

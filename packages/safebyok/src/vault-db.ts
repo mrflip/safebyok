@@ -1,5 +1,5 @@
 import * as Z from 'zod/mini'
-import { Box } from './box'
+import { BoxRecord } from './box'
 import { MaxUnlocks, WayinKindVals, VaultProps, VaultScope, type DamagedBox, type BoxSummary, type Sidecar } from './types'
 import { VaultError, isVaultError } from './errors'
 import * as Names from './names'
@@ -39,7 +39,7 @@ export type BoxExpectation = Z.infer<typeof BoxExpectation>
 
 const BoxExpectation = Z.object({
   vault_id:        VaultProps.shape.vault_id,
-  revision_tok:    Z.nullable(Box.shape.revision_tok),
+  revision_tok:    Z.nullable(BoxRecord.shape.revision_tok),
   vault_key_epoch: VaultProps.shape.vault_key_epoch,
 })
 
@@ -71,7 +71,7 @@ export type BoxDelExpectation = Z.infer<typeof BoxDelExpectation>
 
 const BoxDelExpectation = Z.object({
   vault_id:     VaultProps.shape.vault_id,
-  revision_tok: Z.nullable(Box.shape.revision_tok),
+  revision_tok: Z.nullable(BoxRecord.shape.revision_tok),
 })
 
 /**
@@ -324,7 +324,7 @@ export abstract class VaultDB {
   // == [Box verbs]: getBox, listBoxes, listBoxRecords, putBox
 
   /** One box, validated, or null when there is none under that boxlabel. */
-  getBox(scope: VaultScope, boxlabel: string): Promise<Outcome<Box | null>> {
+  getBox(scope: VaultScope, boxlabel: string): Promise<Outcome<BoxRecord | null>> {
     return answering(async () => {
       const asked = heldScope(this, scope)
       const label = heldBoxlabel(this, boxlabel)
@@ -395,10 +395,10 @@ export abstract class VaultDB {
    * keeps its contract. One that fails that check is refused as `corrupt_record`, though the write
    * may have landed: the adapter wrote something it cannot read back.
    */
-  putBox(scope: VaultScope, box: Box, expected: BoxExpectation): Promise<Outcome<Box>> {
+  putBox(scope: VaultScope, box: BoxRecord, expected: BoxExpectation): Promise<Outcome<BoxRecord>> {
     return answering(async () => {
       const asked = heldScope(this, scope)
-      const outgoing = checkOutgoing(Box, box, 'box')
+      const outgoing = checkOutgoing(BoxRecord, box, 'box')
       heldBoxlabel(this, outgoing.boxlabel)
       const expectation = checkOutgoing(BoxExpectation, expected, 'box expectation')
       if (outgoing.vault_key_epoch !== expectation.vault_key_epoch) {
@@ -604,7 +604,7 @@ export abstract class VaultDB {
    * same step (a `RETURNING`, a mutation's return value, a read in the transaction), exactly as a
    * `doGetBox` would hand it up; null, writing nothing, otherwise.
    */
-  protected abstract doPutBox(scope: VaultScope, box: Box, expected: BoxExpectation): Promise<unknown>
+  protected abstract doPutBox(scope: VaultScope, box: BoxRecord, expected: BoxExpectation): Promise<unknown>
   /**
    * Remove the box under `boxlabel`, whatever revision stands, if, and only if, the scope's
    * standing vault props have `expected.vault_id`: compared in the same atomic step as the removal.
@@ -691,7 +691,7 @@ const withoutCiphered = (box: unknown): unknown => {
  * ones, `format` included, so a backend that projects server-side is validated like one that
  * returns whole records (whose ciphered fields this strips).
  */
-const ListedBox = Z.omit(Box, { box_key_wrapped: true, whisper_ciphered: true })
+const ListedBox = Z.omit(BoxRecord, { box_key_wrapped: true, whisper_ciphered: true })
 
 /**
  * True when a listed box is stored under a name above the floor, which a verb can reach
@@ -713,7 +713,7 @@ const listedOrDamaged = ({ boxlabel, box }: StoredBox): BoxSummary | DamagedBox 
 }
 
 /** The one field of a damaged box the listing keeps, when the record holds it as text: what a write over it names. */
-const StoredRevision = Z.object({ revision_tok: Box.shape.revision_tok })
+const StoredRevision = Z.object({ revision_tok: BoxRecord.shape.revision_tok })
 
 /**
  * A listed box's summary: its visible fields, and its sidecar as the JSON value its record holds
@@ -903,8 +903,8 @@ const StoredVaultId = Z.object({ vault_id: VaultProps.shape.vault_id })
 // == [Box and answer checks]: checkStoredBox, writtenBack, checkAnswer, checkRecord, jsonBytes
 
 /** A stored box, as `getBox` holds it: a box's shape, under the boxlabel it was asked for. */
-const checkStoredBox = (raw: unknown, boxlabel: string): Box => {
-  const box = checkRecord(Box, raw, 'box')
+const checkStoredBox = (raw: unknown, boxlabel: string): BoxRecord => {
+  const box = checkRecord(BoxRecord, raw, 'box')
   // A record that names some other boxlabel is a record out of place, wherever it came from.
   if (box.boxlabel !== boxlabel) {
     throw new VaultError('corrupt_record', 'The stored box names a different boxlabel than the one asked for. It was left as it is.')

@@ -80,7 +80,7 @@ list holds, so one changed in storage makes the record refuse to open.
 | ckey                                               | Row                      |
 | -------------------------------------------------- | ------------------------ |
 | `vault^<applabel>^<user_id>^<vaultlabel>`          | the vault's `VaultProps` |
-| `box^<applabel>^<user_id>^<vaultlabel>^<boxlabel>` | one `Box`                |
+| `box^<applabel>^<user_id>^<vaultlabel>^<boxlabel>` | one `BoxRecord`          |
 
 The names are joined on `^` (the core's `Ckeys`), which the floor every name is held to keeps out
 of every name, whatever a host's validators admit.

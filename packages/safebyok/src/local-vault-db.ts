@@ -1,5 +1,5 @@
 import * as Z from 'zod/mini'
-import { Box } from './box'
+import { BoxRecord } from './box'
 import { VaultScope, VaultProps } from './types'
 import { VaultError } from './errors'
 import type { StringStore } from './string-store'
@@ -118,7 +118,7 @@ class StringStoreVaultDB extends VaultDB {
     ))
   }
 
-  protected doPutBox(scope: VaultScope, box: Box, expected: BoxExpectation): Promise<unknown> {
+  protected doPutBox(scope: VaultScope, box: BoxRecord, expected: BoxExpectation): Promise<unknown> {
     return soon(() => {
       const ckey = Ckeys.box(scope, box.boxlabel)
       const standingVaultProps = readJson(this.store, Ckeys.vaultProps(scope))

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as Z from 'zod/mini'
-import { Box } from '../src/box'
+import { BoxRecord } from '../src/box'
 import { DeviceMark, EpochMillis, FarFuture, FarPast, ForeverMillis, Lease, BoxSummary, MaxUnlocks, Sidecar, VaultProps, VaultScope, Whisper } from '../src/types'
 import * as TH from './test-helpers'
 
@@ -298,7 +298,7 @@ describe("DeviceMark", () => {
 // obsolete: never update the snapshot of a format that stands. A refinement (a `Z.refine`, such
 // as the floor's character rules) renders as nothing, so this sees fields, types, optionality and
 // the ranges a check states, not every rule.
-const StoredRecords = [VaultProps, Box, Lease, DeviceMark] as const
+const StoredRecords = [VaultProps, BoxRecord, Lease, DeviceMark] as const
 
 describe("Stored record formats", () => {
   for (const schema of StoredRecords) {

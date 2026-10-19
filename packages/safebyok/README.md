@@ -105,7 +105,9 @@ code, the stored records and these docs all use its words.
 * The vault is made with `Vault.make(opts)`, which answers at once, and `hello()` reads what
   storage and this device hold of it, so the snapshot's `state` is `absent`, `locked` or
   `unlocked`. Its boxes are written with `putBox`, read with `getBox` and `useBox`, and
-  removed with `delBox`; `del()` removes the whole vault. Two devices that write at once
+  removed with `delBox`; `del()` removes the whole vault. A box in hand -- a `Box`, or the
+  `BoxRecord` storage holds -- opens with `openBox(box)`, under the key in hand, reading nothing.
+  A `Box` holds its stored record as `box.props`, and serializes as it. Two devices that write at once
   cannot both win: the late one is refused as `stale_write` (see *Two devices storing at once*),
   and a first unlock that loses the race to create the vault, and whose passphrase does not open
   the vault made there, is `created_elsewhere`.

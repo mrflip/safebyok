@@ -1,6 +1,6 @@
 import { defineSchema, defineTable } from 'convex/server'
 import { v } from 'convex/values'
-import { Box, VaultProps, VaultScope } from './validators'
+import { BoxRecord, VaultProps, VaultScope } from './validators'
 
 /**
  * The component's own tables, isolated from the host app's. Each row is a record as the core
@@ -16,7 +16,7 @@ export default defineSchema({
    * One Box per boxlabel, as-is, with its vault's scope columns beside it: added on write,
    * stripped on read. `by_box` serves one box (all four fields) and a vault's boxes (the first three).
    */
-  safebyok_boxes: defineTable(Box.extend(VaultScope.fields))
+  safebyok_boxes: defineTable(BoxRecord.extend(VaultScope.fields))
     .index('by_box', ['user_id', 'applabel', 'vaultlabel', 'boxlabel']),
   /**
    * One tally per vault: how many boxes it holds and what they weigh as Convex counts bytes,

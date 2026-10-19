@@ -111,7 +111,7 @@ The server half, `app/api/safebyok/route.ts`:
 
 ```ts
 import { Pool } from 'pg'
-import type { Outcome, VaultPropsExpectation, VaultDelExpectation, Box, BoxExpectation, BoxDelExpectation, VaultProps, VaultScope } from 'safebyok'
+import type { Outcome, VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, VaultProps, VaultScope } from 'safebyok'
 import { postgresVaultDB } from 'safebyok-postgres'
 import type { VaultDB } from 'safebyok'
 
@@ -130,7 +130,7 @@ const served = new Map<string, Served>([
   ['putVaultProps', (vaultDB, [vaultProps, expected]) => vaultDB.putVaultProps(vaultProps as VaultProps, expected as VaultPropsExpectation)],
   ['getBox',      (vaultDB, [scope, boxlabel]) => vaultDB.getBox(scope as VaultScope, boxlabel as string)],
   ['listBoxes',    (vaultDB, [scope]) => vaultDB.listBoxRecords(scope as VaultScope)],
-  ['putBox',    (vaultDB, [scope, box, expected]) => vaultDB.putBox(scope as VaultScope, box as Box, expected as BoxExpectation)],
+  ['putBox',    (vaultDB, [scope, box, expected]) => vaultDB.putBox(scope as VaultScope, box as BoxRecord, expected as BoxExpectation)],
   ['delBox',     (vaultDB, [scope, boxlabel, expected]) => vaultDB.delBox(scope as VaultScope, boxlabel as string, expected as BoxDelExpectation)],
   ['delVault',   (vaultDB, [scope, expected]) => vaultDB.delVault(scope as VaultScope, expected as VaultDelExpectation)],
 ])
@@ -168,7 +168,7 @@ The client half, a VaultDB over `fetch`, to hand `Vault.make` as its `vaultDB`:
 
 ```ts
 import { VaultDB, VaultError, RefusalKindVals } from 'safebyok'
-import type { VaultPropsExpectation, VaultDelExpectation, Box, BoxExpectation, BoxDelExpectation, VaultProps, VaultDBOpts, RefusalKind, VaultScope } from 'safebyok'
+import type { VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, VaultProps, VaultDBOpts, RefusalKind, VaultScope } from 'safebyok'
 
 const VaultRouteUrl = '/api/safebyok'
 
@@ -192,7 +192,7 @@ export class RouteVaultDB extends VaultDB {
     const boxes = await this.call('listBoxes', scope) as { boxlabel: string }[]
     return boxes.map((box) => ({ boxlabel: box.boxlabel, box }))
   }
-  protected doPutBox(scope: VaultScope, box: Box, expected: BoxExpectation) { return this.call('putBox', scope, box, expected) }
+  protected doPutBox(scope: VaultScope, box: BoxRecord, expected: BoxExpectation) { return this.call('putBox', scope, box, expected) }
   protected doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation) { return this.call('delBox', scope, boxlabel, expected) }
   protected async doDelVault(scope: VaultScope, expected: VaultDelExpectation) {
     await this.call('delVault', scope, expected)
@@ -341,7 +341,7 @@ must, since every field a record holds is bound into its encryption (all but the
 | Table             | One row per | Primary key                                     | Columns                                                                                |
 | ----------------- | ----------- | ----------------------------------------------- | -------------------------------------------------------------------------------------- |
 | `safebyok_vaults` | vault       | `applabel`, `user_id`, `vaultlabel`             | every field of the `VaultProps`                                                        |
-| `safebyok_boxes`  | box         | `applabel`, `user_id`, `vaultlabel`, `boxlabel` | the vault's scope and `vault_id`, then every field of the `Box`; its sidecar as `text` |
+| `safebyok_boxes`  | box         | `applabel`, `user_id`, `vaultlabel`, `boxlabel` | the vault's scope and `vault_id`, then every field of the `BoxRecord`; its sidecar as `text` |
 
 * **Encrypted**: each whisper (`whisper_ciphered`), each box's boxKey
   (`box_key_wrapped`), and the vaultKey, once under each way into the vault (each

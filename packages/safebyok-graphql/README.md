@@ -203,7 +203,7 @@ by, exactly as safebyok wrote it:
 | Type                 | Carries                                                           |
 | -------------------- | ----------------------------------------------------------------- |
 | `SafebyokVaultProps` | every field of the `VaultProps`                                   |
-| `SafebyokBox`        | every field of the `Box`; its sidecar as JSON text, as written    |
+| `SafebyokBox`        | every field of the `BoxRecord`; its sidecar as JSON text, as written    |
 | `SafebyokListedBox`  | a box as a listing has it: every field but the two encrypted ones |
 | `SafebyokCiphered`   | an encrypted value: its `cipher_iv_b64` and its `ciphertext_b64`  |
 | `SafebyokVaultScope` | which vault: `applabel`, `user_id`, `vaultlabel`                  |

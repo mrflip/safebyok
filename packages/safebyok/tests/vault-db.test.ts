@@ -7,7 +7,7 @@ import { VaultError } from '../src/errors'
 import { bad, good, valOf } from '../src/outcome'
 import * as Refusals from '../src/refusals'
 import { DefaultLogger, parseLogger, type VaultLogger } from '../src/logger'
-import type { Box } from '../src/box'
+import type { BoxRecord } from '../src/box'
 import type { VaultProps, VaultScope } from '../src/types'
 import * as Ckeys from '../src/ckeys'
 import * as Expectations from '../src/expectations'
@@ -64,8 +64,8 @@ class MapVaultDB extends VaultDB {
     return Promise.resolve(listed.filter((stored): stored is StoredBox => stored.boxlabel !== null))
   }
 
-  protected doPutBox(scope: VaultScope, box: Box, expected: BoxExpectation) {
-    const standingBox = this.rows.get(Ckeys.box(scope, box.boxlabel)) as Box | undefined
+  protected doPutBox(scope: VaultScope, box: BoxRecord, expected: BoxExpectation) {
+    const standingBox = this.rows.get(Ckeys.box(scope, box.boxlabel)) as BoxRecord | undefined
     const standingVaultProps = this.standingVaultProps(scope)
     const meets = standingVaultProps?.vault_id === expected.vault_id && standingVaultProps.vault_key_epoch === expected.vault_key_epoch
       && (standingBox?.revision_tok ?? null) === expected.revision_tok
@@ -398,8 +398,8 @@ const RefusedWrites = [
   ['bad_record', (vaultDB: VaultDB) => vaultDB.putBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one', { sidecar_json: 'not json' }), TH.noBoxYet), 'a box whose sidecar no read would accept'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.putBox(TH.scopeOf('u1'), TH.boxOf('key\u{D83D}', 'one'), TH.noBoxYet),                  'a box whose boxlabel is half of an emoji, the box at fault though only its label failed'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.putBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one', { written_at: 1_792_022_400 }), TH.noBoxYet), 'a box time in epoch seconds'],
-  ['bad_record', (vaultDB: VaultDB) => vaultDB.putBox(TH.scopeOf('u1'), undefined as unknown as Box, TH.noBoxYet),               'no box at all'],
-  ['bad_record', (vaultDB: VaultDB) => vaultDB.putBox(TH.scopeOf('u1'), { boxlabel: 'anthropic' } as Box, TH.noBoxYet),           'a box holding nothing but its boxlabel'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.putBox(TH.scopeOf('u1'), undefined as unknown as BoxRecord, TH.noBoxYet),               'no box at all'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.putBox(TH.scopeOf('u1'), { boxlabel: 'anthropic' } as BoxRecord, TH.noBoxYet),           'a box holding nothing but its boxlabel'],
   // the expectations:
   ['bad_record', (vaultDB: VaultDB) => vaultDB.putVaultProps(TH.vaultPropsOf('u1'), { vault_id: 'vault-id-u1', unlock_epoch: 0 }),          'an expectation of the vault props at epoch zero'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.putVaultProps(TH.vaultPropsOf('u1'), undefined as unknown as VaultPropsExpectation), 'no expectation of the vault props at all'],
@@ -607,7 +607,7 @@ class MisansweringVaultDB extends MapVaultDB {
     this.handedBack = handedBack
   }
 
-  protected override async doPutBox(scope: VaultScope, box: Box, expected: BoxExpectation): Promise<unknown> {
+  protected override async doPutBox(scope: VaultScope, box: BoxRecord, expected: BoxExpectation): Promise<unknown> {
     const stored = await super.doPutBox(scope, box, expected)
     return stored === null ? null : this.handedBack
   }

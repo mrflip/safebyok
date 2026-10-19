@@ -9,7 +9,7 @@ import { Vault, localVaultDB, memoryDeviceDB, memoryStore, type StringStore } fr
 import { Ciphered, fromB64, toB64 } from '../src/crypto'
 import { VaultError } from '../src/errors'
 import { type Outcome, bad, good } from '../src/outcome'
-import { Box } from '../src/box'
+import { BoxRecord } from '../src/box'
 import { argon2idWebV1Deriver } from '../src/key-deriver'
 import { Proof } from '../src/proof'
 import { Wayin } from '../src/wayin'
@@ -652,8 +652,8 @@ describe("the fixtures", () => {
     expect(phone.prfBytes).to.not.deep.equal(laptop.prfBytes)
   })
 
-  it("boxOf: a shape-valid Box, with any field overridden", () => {
-    expect(Box.safeParse(TH.boxOf('anthropic_api_key', 'a1')).success).to.be.true
+  it("boxOf: a shape-valid BoxRecord, with any field overridden", () => {
+    expect(BoxRecord.safeParse(TH.boxOf('anthropic_api_key', 'a1')).success).to.be.true
     expect(TH.boxOf('anthropic_api_key', 'a1').revision_tok).to.eq('rev-a1')
     expect(TH.boxOf('anthropic_api_key', 'a1', { sidecar_json: '{}' }).sidecar_json).to.eq('{}')
   })
@@ -1134,7 +1134,7 @@ class RoundTripVaultDB extends VaultDB {
     return this.opts.listsToLimit ? listed.slice(0, this.maxBoxes) : listed
   }
 
-  protected async doPutBox(scope: VaultScope, box: Box, expected: BoxExpectation) {
+  protected async doPutBox(scope: VaultScope, box: BoxRecord, expected: BoxExpectation) {
     const ckey = Ckeys.box(scope, box.boxlabel)
     const isNew = expected.revision_tok === null
     const full = (rows: Rows) => isNew && boxesIn(rows, scope).length >= this.maxBoxes
@@ -1142,7 +1142,7 @@ class RoundTripVaultDB extends VaultDB {
       throw vaultFull()
     }
     const meets = (rows: Rows) => {
-      const standingRevision = (rows.get(ckey) as Box | undefined)?.revision_tok ?? null
+      const standingRevision = (rows.get(ckey) as BoxRecord | undefined)?.revision_tok ?? null
       if (! vaultIs(rows, scope, expected) || ! vaultKeyIs(rows, scope, expected) || standingRevision !== expected.revision_tok) { return false }
       if (! this.opts.countsApart && full(rows)) {
         if (this.opts.keepsRefused) { rows.set(ckey, box) }

@@ -3,7 +3,7 @@ import { memoryDeviceDB } from '../../src/device-db'
 import type { KeyDeriver } from '../../src/key-deriver'
 import { type PassphraseStrengthTest, StrongVerdict } from '../../src/passphrase-strength'
 import { memoryStore } from '../../src/string-store'
-import type { Box } from '../../src/box'
+import type { BoxRecord } from '../../src/box'
 import type { VaultScope, PassphraseWayinRecord, PasskeyWayinRecord, PasskeyAnswer, VaultProps, Sidecar, BoxSummary, DamagedBox, DeviceMark, SeenVault, Lease } from '../../src/types'
 import { stableJsonify } from '../../src/stable-jsonify'
 import { Vault } from '../../src/vault'
@@ -224,13 +224,13 @@ export const vaultPropsAtEpochOf = (userId: string, vaultKeyEpoch: number): Vaul
 }
 
 /**
- * A shape-valid Box for storage-layer tests, its ciphered fields fake: revision `rev-<tag>`,
+ * A shape-valid BoxRecord for storage-layer tests, its ciphered fields fake: revision `rev-<tag>`,
  * sealed under the vault's first vaultKey, with the sidecar `{ note: 'a test box' }` unless
  * `overrides` says otherwise.
  *
  * @example boxOf('anthropic_api_key', 'a1', { sidecar_json: sidecarJsonOf({ note: 'work account' }) })
  */
-export const boxOf = (boxlabel: string, tag: string, overrides: Partial<Box> = {}): Box => ({
+export const boxOf = (boxlabel: string, tag: string, overrides: Partial<BoxRecord> = {}): BoxRecord => ({
   format:                 'safebyok-box-v6',
   boxlabel,
   revision_tok:           `rev-${tag}`,

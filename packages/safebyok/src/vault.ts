@@ -1,13 +1,12 @@
 import * as Z from 'zod/mini'
 import { isPlainBag, type Capacity, type Clock, type VaultScope, BoxSummary, type DamagedBox, type WayinSummary, type PasskeyAnswer, Whisper, Sidecar, VaultProps, DeviceMark, MaxUnlocks, Lease, type PassphraseWayinRecord, MinuteMillis, FarFuture, FarPast } from './types'
-import type { Box } from './box'
+import { Box, type BoxRecord, EmptySidecarJson, checkedSidecar, checkedWhisper, heldListing } from './box'
 import * as Names from './names'
 import { optionsCheck } from './options'
 import { VaultError, isVaultError, type RefusalKind } from './errors'
 import { type Outcome, good, outcomeOf, unexpectedError, valOf } from './outcome'
 import {
-  cipherCtx, cipherBytes, decipherBytes,
-  makeLeaseKey, makeBoxKey, makeVaultKey, randomId, wrapKeyUnder, unwrapKeyUnder,
+  cipherCtx, makeLeaseKey, makeVaultKey, randomId, wrapKeyUnder, unwrapKeyUnder,
 } from './crypto'
 import { Wayin, absentWayin, frozenRecord, type PasskeyWayin, type PassphraseWayin, type WayinStamp, type VaultKeyPair } from './wayin'
 import { Proof, PassphraseProof, PasskeyProof } from './proof'
@@ -683,7 +682,7 @@ export class Vault {
   delWayin = this.#throwing(this.#tryDelWayin)
   // --
 
-  // == [Vault: boxes]: putBox, getBox, useBox, delBox
+  // == [Vault: boxes]: putBox, getBox, useBox, openBox, delBox
 
   readonly #tryPutBox = this.#trying(async (boxlabel: string, whisper: Whisper, storeOpts?: { sidecar?: Sidecar | undefined }): Promise<void> => {
     this.#checkOpen()
@@ -691,12 +690,8 @@ export class Vault {
     // checks stands under it: reading and deleting reach that one.
     const label = Names.check(this.#rules, 'boxlabel', boxlabel)
     const givenSidecarJson = sidecarJsonOf(storeOpts)
-    const checked = Whisper.safeParse(whisper)
     // The refusal never quotes its input: a whisper stays out of error messages.
-    if (! checked.success) {
-      throw new VaultError('bad_whisper', 'A whisper must be a JSON value: a string, number, boolean, array, or plain object. A bare null or undefined cannot be stored -- to empty a box, delete it. (null inside an array or object is fine.)')
-    }
-    const whisperBytes = new TextEncoder().encode(stableJsonify(checked.data))
+    const whisperBytes = new TextEncoder().encode(stableJsonify(checkedWhisper(whisper)))
     this.#checkWhisperFits(whisperBytes, givenSidecarJson ?? EmptySidecarJson)
     // Checked before the user is asked for anything: a call that cannot land never prompts.
     await this.#ensureLease(0)
@@ -710,17 +705,7 @@ export class Vault {
     await this.#checkRoomFor(label, prev)
     // The key and the vault it belongs to, taken together after the last look at storage.
     const unlockedKey = this.#checkUnlocked()
-    const standingVaultProps = this.#currentVaultProps()
-    const { vault_id: vaultId, vault_key_epoch: vaultKeyEpoch } = standingVaultProps
-    // Only a record that opens vouches for its visible fields: one that will not, altered in
-    // storage, is written over as a fresh box is, keeping neither its sidecar nor its
-    // registered_at, so a sidecar planted in storage is never sealed into a revision that reads clean.
-    const vouched = prev !== null && await this.#recordOpens(unlockedKey, standingVaultProps, prev) ? prev : null
-    const sidecarJson = givenSidecarJson ?? vouched?.sidecar_json ?? EmptySidecarJson
-    this.#checkWhisperFits(whisperBytes, sidecarJson)
-    const revisionTok = randomId()
-    const boxKey = await makeBoxKey()
-    const now = this.#clockNow()
+    const { vault_id: vaultId, vault_key_epoch: vaultKeyEpoch } = this.#currentVaultProps()
     // Lands only in the vault this whisper is sealed for, under the vaultKey that seals it, over
     // the revision just read -- for a damaged box, the one the listing names -- : a vault reborn
     // elsewhere, a vaultKey replaced, or a box written meanwhile by another device, refuses it.
@@ -728,22 +713,10 @@ export class Vault {
     // A damaged box the listing does not show yet is written as over none, which storage refuses
     // while it stands; the catch-up lists it, with its revision for the next store.
     const expected = { vault_id: vaultId, revision_tok: overRevision, vault_key_epoch: vaultKeyEpoch }
-    const header: BoxHeader = {
-      boxlabel:               label,
-      revision_tok:           revisionTok,
-      vault_key_epoch:        vaultKeyEpoch,
-      whisper_codec:          'json_v1',
-      whisper_schema_version: 1,
-      sidecar_json:           sidecarJson,
-      registered_at:          vouched?.registered_at ?? now,
-      written_at:             now,
-    }
-    const box: Box = {
-      format:           BoxFormat,
-      ...header,
-      box_key_wrapped:  await wrapKeyUnder(unlockedKey, boxKey, this.#boxCtx(vaultId, header, 'box_key_wrapped')),
-      whisper_ciphered: await cipherBytes(boxKey, whisperBytes, this.#boxCtx(vaultId, header, 'whisper_ciphered')),
-    }
+    // The sidecar a store keeps from the box it replaces, when none is given, counts toward the
+    // limit too: known once the box is sealed, and checked before anything is written.
+    const box = await Box.seal(this, label, whisper, unlockedKey, { sidecar: storeOpts?.sidecar, over: prev })
+    this.#checkWhisperFits(whisperBytes, box.props.sidecar_json)
     await this.#writeOver(box, expected)
     await this.#refresh()
   })
@@ -866,6 +839,31 @@ export class Vault {
     const whisper = valOf(await this.#tryGetBox(boxlabel))
     return await callback(whisper)
   }
+
+  readonly #tryOpenBox = this.#trying(async (box: Box | BoxRecord): Promise<Whisper> => {
+    this.#checkOpen()
+    // Made anew for this vault: a box opens under this vault's scope and id, whichever it came from.
+    const held = Box.make(this, box instanceof Box ? box.props : box)
+    const whisper = valOf(await held.tryOpen(this.#checkUnlocked()))
+    this.#checkUnlocked()
+    return whisper
+  })
+  /**
+   * {@link Vault.openBox}, resolving to an {@link Outcome}: what it answers as `val`, what it refuses
+   * with as `err`, never thrown.
+   */
+  tryOpenBox = this.#tryOpenBox
+  /**
+   * The whisper `box` holds, opened under the vaultKey in hand: a box already in hand, or its
+   * stored record, is deciphered and checked, and nothing is read from storage and nobody is
+   * asked for a proof. Refuses kind 'vault_locked' when no key is in hand -- `ensureLease()`
+   * first -- or when a lock lands while the box opens; 'damaged_box' for a box that will not open
+   * under this vault's key, as `box.tryOpen` says, told to `onBadNews` as well; 'bad_record' for a
+   * record this package does not write; 'vault_closed' after `close()`.
+   *
+   * @example const whisper = await vault.openBox(box)
+   */
+  openBox = this.#throwing(this.#tryOpenBox)
 
   readonly #tryDelBox = this.#trying(async (boxlabel: string): Promise<void> => {
     this.#checkOpen()
@@ -1167,19 +1165,13 @@ export class Vault {
   }
   // --
 
-  // == [Contexts]: leaseCtx, boxCtx
+  // == [Contexts]: leaseCtx
 
-  // The context each encryption is bound to; see VOCABULARY.md on ctx. A
-  // wayin's ctx is the Wayin module's. A lease's is bound to every field of its record but the
-  // key and the wrap, the scope, vault and epoch as this vault expects them.
+  // The context each encryption is bound to; see VOCABULARY.md on ctx. A wayin's ctx is the
+  // Wayin module's, and a box's is the Box's. A lease's is bound to every field of its record but
+  // the key and the wrap, the scope, vault and epoch as this vault expects them.
   #leaseCtx(vaultId: string, epoch: number, deadline: number) {
     return cipherCtx('safebyok-lease-v1', this.#scope.applabel, this.#scope.user_id, this.#scope.vaultlabel, vaultId, epoch, deadline, 'vault_key_lease_wrapped')
-  }
-  // A box's ctx binds its format, the vault it lies in, and its record's whole visible header:
-  // every field but the format, which leads, and the two encrypted ones, so a sidecar, a time, its
-  // codec or its vaultKey's epoch altered in storage refuses to open.
-  #boxCtx(vaultId: string, header: BoxHeader, purpose: 'box_key_wrapped' | 'whisper_ciphered') {
-    return cipherCtx(BoxFormat, this.#scope.applabel, this.#scope.user_id, this.#scope.vaultlabel, vaultId, purpose, header)
   }
   // --
 
@@ -1234,7 +1226,7 @@ export class Vault {
     const shown = this.#boxes
     const shownWayins = this.#snapshot.props === null ? NoWayins : this.#modelsOf(this.#snapshot.props).wayins
     // A box under a vaultKey the vault does not hold lists as damaged from its epoch alone.
-    this.#boxes = fresh === null ? [] : listed.map((box) => (isUnderHeldKey(box, fresh) ? box : asDamaged(box)))
+    this.#boxes = fresh === null ? [] : listed.map((box) => heldListing(isUnderHeldKey(box, fresh) ? box : asDamaged(box)))
     this.#syncing = true
     this.#readAt = readAt
     // A read with no damaged box or way in clears the trouble: nothing amiss stands. The listing is
@@ -1988,7 +1980,7 @@ export class Vault {
   }
   // --
 
-  // == [Reading boxes]: checkStandingBoxlabel, getBoxOrThrow, openBox, decipherBox, recordOpens
+  // == [Reading boxes]: checkStandingBoxlabel, getBoxOrThrow, openBox, decipherOrCatchUp
 
   /**
    * `boxlabel`, once a box stands under it, for delBox(), which reaches a box by the name it
@@ -2015,18 +2007,19 @@ export class Vault {
   /** The box under `boxlabel`; null when there is none, and 'damaged' when its record fails verification. */
   async #getBoxOrDamaged(boxlabel: string): Promise<Box | 'damaged' | null> {
     try {
-      return await this.#vaultDB.getBox(this.#scope, boxlabel)
+      const record = await this.#vaultDB.getBox(this.#scope, boxlabel)
+      return record === null ? null : Box.make(this, record)
     } catch (err) {
       if (! isVaultError(err, 'corrupt_record')) { throw err }
       return 'damaged'
     }
   }
 
-  async #getBoxOrThrow(boxlabel: string) {
+  async #getBoxOrThrow(boxlabel: string): Promise<Box> {
     const label = Names.checkFloor('boxlabel', boxlabel)
-    const box = await damagedAs(this.#vaultDB.getBox(this.#scope, label), damagedBox)
-    if (box === null) { throw this.#nothingUnder(label) }
-    return box
+    const record = await damagedAs(this.#vaultDB.getBox(this.#scope, label), damagedBox)
+    if (record === null) { throw this.#nothingUnder(label) }
+    return Box.make(this, record)
   }
 
   /**
@@ -2062,69 +2055,12 @@ export class Vault {
    * is damaged is not known.
    */
   async #decipherOrCatchUp(unlockedKey: CryptoKey, box: Box): Promise<Whisper> {
-    try {
-      return await this.#decipherBox(unlockedKey, this.#currentVaultProps(), box)
-    } catch (err) {
-      if (! isVaultError(err, 'damaged_box')) { throw err }
-      await this.#refresh()
-      this.#checkUnlocked()
-      throw err
-    }
-  }
-
-  /**
-   * The key a box's boxKey is unwrapped under, chosen by its `vault_key_epoch`: the
-   * session's vaultKey for a box under the vault props' own. Kind 'damaged_box' for a box
-   * under any other, which no key this vault holds opens.
-   */
-  #unwrappingKeyFor(unlockedKey: CryptoKey, standing: VaultProps, box: Box): CryptoKey {
-    if (box.vault_key_epoch === standing.vault_key_epoch) { return unlockedKey }
-    // Quotes no boxlabel, as no refusal here does: a host's boxlabel check may admit any text.
-    throw new VaultError('damaged_box', "That box is damaged: it says it was sealed under a vaultKey this vault does not hold, so it can't be opened. It was left as it is; remove it, or store its whisper again over it.")
-  }
-
-  /**
-   * Unwrap a box's boxKey under the vaultKey, decipher its whisper, and hand it back
-   * validated: kind 'damaged_box' when the record will not open, or opens to no whisper.
-   * The vaultKey is the vault's own, proven by the way in that gave it, so a box that will not
-   * open under it is one altered in storage, or moved there from somewhere else.
-   */
-  async #decipherBox(unlockedKey: CryptoKey, standing: VaultProps, box: Box): Promise<Whisper> {
-    let whisperBytes: Uint8Array
-    const { format: _format, box_key_wrapped: boxKeyWrapped, whisper_ciphered: whisperCiphered, ...header } = box
-    const vaultId = standing.vault_id
-    const unwrappingKey = this.#unwrappingKeyFor(unlockedKey, standing, box)
-    try {
-      const boxKey = await unwrapKeyUnder(
-        unwrappingKey,
-        boxKeyWrapped,
-        this.#boxCtx(vaultId, header, 'box_key_wrapped'),
-        { extractable: false, usage: ['decrypt'] },
-      )
-      whisperBytes = await decipherBytes(boxKey, whisperCiphered, this.#boxCtx(vaultId, header, 'whisper_ciphered'))
-    } catch {
-      throw new VaultError('damaged_box', "That box is damaged: it would not open under this vault's key, as if altered in storage or moved there from somewhere else. It was left as it is; remove it, or store its whisper again over it.")
-    }
-    const checked = Whisper.safeParse(parseJsonOrNull(new TextDecoder().decode(whisperBytes)))
-    if (! checked.success) {
-      throw new VaultError('damaged_box', "That box opened, but what was inside is not a whisper this package knows, so it is damaged. It was left as it is; remove it, or store its whisper again over it.")
-    }
-    return checked.data
-  }
-
-  /**
-   * True when `prev` opens under the vault's key, and so vouches for the visible fields a store
-   * carries forward from it; false for a record altered in storage, whose fields nothing vouches
-   * for. What it holds is dropped unread: a store compares nothing.
-   */
-  async #recordOpens(unlockedKey: CryptoKey, standing: VaultProps, prev: Box): Promise<boolean> {
-    try {
-      await this.#decipherBox(unlockedKey, standing, prev)
-      return true
-    } catch {
-      // decipherBox refuses only as damaged_box: a record that will not open.
-      return false
-    }
+    const { ok, val: whisper, err } = await box.tryOpen(unlockedKey)
+    if (ok) { return whisper }
+    if (err.refusalkind !== 'damaged_box') { throw err }
+    await this.#refresh()
+    this.#checkUnlocked()
+    throw err
   }
   // --
 
@@ -2137,7 +2073,7 @@ export class Vault {
    */
   async #writeOver(box: Box, expected: BoxExpectation): Promise<void> {
     try {
-      await this.#refreshOnStale(this.#vaultDB.putBox(this.#scope, box, expected), 'putBox')
+      await this.#refreshOnStale(this.#vaultDB.putBox(this.#scope, box.props, expected), 'putBox')
     } catch (err) {
       this.#refuseStalePutBox(err)
     }
@@ -2372,7 +2308,7 @@ const declinedError = (asked: boolean) => new VaultError('vault_locked', asked
 const closedError = () => new VaultError('vault_closed', 'This vault handle was closed: make another with Vault.make.')
 // --
 
-// == [Vocabulary]: isUnderHeldKey, MarkFormat, VaultCall, BoxFormat, BoxHeader
+// == [Vocabulary]: isUnderHeldKey, asDamaged, MarkFormat, VaultCall, UntrustedStorageKinds
 
 /**
  * True when `box` lists as damaged already, or stands under the vaultKey `standing` holds. A
@@ -2398,9 +2334,6 @@ const FirstWayinlabel = 'passphrase'
 /** The `vault_key_epoch` of a vault's first vaultKey, the one it is created with. */
 const FirstVaultKeyEpoch = 1
 
-/** The box's format, as each record carries it and each of its ctxs begins. */
-const BoxFormat = 'safebyok-box-v6'
-
 /**
  * The refusals that say storage cannot be trusted as it stands, each asking the caller for
  * something a stale write does not -- the user to sign in again ('identity_revoked'; the vault has
@@ -2409,15 +2342,6 @@ const BoxFormat = 'safebyok-box-v6'
  * 'stale_write'; and each, whichever call met it, has the next hello read afresh.
  */
 const UntrustedStorageKinds = ['identity_revoked', 'rolled_back', 'newer_format'] as const satisfies readonly RefusalKind[]
-
-/**
- * A box's visible header: every field of its record but its format, which leads each ctx,
- * and the two encrypted ones. All of it is bound into both.
- */
-type BoxHeader = Omit<Box, 'format' | 'box_key_wrapped' | 'whisper_ciphered'>
-
-/** The JSON of an empty sidecar: what a box given none holds. */
-const EmptySidecarJson = '{}'
 // --
 
 // == [Argument parsers]: checkHelloOpts, asEnsureLeaseOpts, checkStoreOpts, sidecarJsonOf, parseAim, parseWayinId, parseWayinlabel, parsePasskeyMaker, others
@@ -2460,11 +2384,7 @@ const checkStoreOpts = optionsCheck({ sidecar: Z.optional(Z.unknown()) }, "putBo
 const sidecarJsonOf = (storeOpts: { sidecar?: Sidecar | undefined } | undefined): string | undefined => {
   checkStoreOpts(storeOpts)
   if (storeOpts?.sidecar === undefined) { return undefined }
-  const checked = Sidecar.safeParse(storeOpts.sidecar)
-  if (! checked.success) {
-    throw new VaultError('bad_option', "A box's sidecar must be a JSON value: a string, number, boolean, null, array, or plain object, with nothing JSON cannot carry (undefined, a function, a Date) inside it.")
-  }
-  return stableJsonify(checked.data)
+  return stableJsonify(checkedSidecar(storeOpts.sidecar))
 }
 
 /** A wayin_id as a host hands one back: the id of one of the snapshot's `wayins`. */
@@ -2533,7 +2453,7 @@ const parsePasskeyMaker = (candidate: unknown) => {
 }
 // --
 
-// == [Timers and grace]: isFarFuture, unrefTimeout, deadlineAfter, parseJsonOrNull
+// == [Timers and grace]: isFarFuture, unrefTimeout, deadlineAfter
 
 /**
  * True for an instant within a minute of {@link FarFuture}: a deadline that never comes. Never
@@ -2555,13 +2475,4 @@ const unrefTimeout = (callback: () => void, delayMillis: number): ReturnType<typ
 
 /** The deadline for a lease granted at `nowMillis`: `leaseMillis` later, in whole ms, but never past {@link FarFuture}. */
 const deadlineAfter = (nowMillis: number, leaseMillis: number): number => Math.min(Math.floor(nowMillis + leaseMillis), FarFuture)
-
-/** JSON text parsed, or null on text that is not JSON -- which Whisper's validator then refuses. */
-const parseJsonOrNull = (text: string): unknown => {
-  try {
-    return JSON.parse(text)
-  } catch {
-    return null
-  }
-}
 // --

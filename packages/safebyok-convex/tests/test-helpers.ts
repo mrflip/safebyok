@@ -1,7 +1,7 @@
 import { anyApi, defineSchema } from 'convex/server'
 import { ConvexError } from 'convex/values'
 import { convexTest, defineTestApp } from 'convex-test'
-import { Box, VaultProps, localVaultDB, memoryStore } from 'safebyok'
+import { BoxRecord, VaultProps, localVaultDB, memoryStore } from 'safebyok'
 import type { Sidecar, StringStore, Whisper } from 'safebyok'
 import { boxOf, memoryVaultOpts, settledVault } from 'safebyok/testing'
 import type { ComponentApi } from '../src/component-api'
@@ -114,7 +114,7 @@ export const realRecords = async (userId = 'u1') => {
     vaultPropsCkey: vaultPropsRow.ckey,
     vaultProps:     VaultProps.parse(vaultPropsRow.record),
     boxes:          rows.flatMap((row) => {
-      const checked = Box.safeParse(row.record)
+      const checked = BoxRecord.safeParse(row.record)
       return checked.success ? { ckey: row.ckey, box: checked.data } : []
     }),
   }

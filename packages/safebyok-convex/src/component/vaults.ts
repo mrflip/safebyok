@@ -6,7 +6,7 @@ import type { DatabaseReader, DatabaseWriter } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 import * as Tallies from './tallies'
 import {
-  VaultPropsExpectation, VaultDelExpectation, ListedBox, Box, BoxExpectation, BoxDelExpectation, BoxDeletion, VaultProps, VaultScope, VaultSignature,
+  VaultPropsExpectation, VaultDelExpectation, ListedBox, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, VaultProps, VaultScope, VaultSignature,
 } from './validators'
 
 /**
@@ -82,7 +82,7 @@ export const putVaultProps = mutation({
 /** One box, exactly as stored, or null when there is none under `boxlabel`. */
 export const getBox = query({
   args:    { scope: VaultScope, boxlabel: v.string() },
-  returns: v.nullable(Box),
+  returns: v.nullable(BoxRecord),
   handler: async (ctx, { scope, boxlabel }) => {
     const row = await findBoxRow(ctx.db, scope, boxlabel)
     return row && boxOfRow(row)
@@ -119,8 +119,8 @@ export const listBoxSummaries = query({
  * A vault with no tally yet is counted first, reading it once.
  */
 export const putBox = mutation({
-  args:    { scope: VaultScope, box: Box, expected: BoxExpectation },
-  returns: v.nullable(Box),
+  args:    { scope: VaultScope, box: BoxRecord, expected: BoxExpectation },
+  returns: v.nullable(BoxRecord),
   handler: async (ctx, { scope, box, expected }) => {
     const vaultProps = await findVaultPropsRow(ctx.db, scope)
     if (vaultProps?.vault_id !== expected.vault_id || vaultProps.vault_key_epoch !== expected.vault_key_epoch) { return null }
@@ -217,7 +217,7 @@ export const watchVault = query({
 
 type VaultScope = Infer<typeof VaultScope>
 type VaultProps = Infer<typeof VaultProps>
-type Box = Infer<typeof Box>
+type BoxRecord = Infer<typeof BoxRecord>
 
 const scopeOfVaultProps = ({ applabel, user_id, vaultlabel }: VaultProps): VaultScope => ({ applabel, user_id, vaultlabel })
 
@@ -254,10 +254,10 @@ const replaceBoxRow = async (db: DatabaseWriter, rowId: Id<'safebyok_boxes'>, ro
 const vaultPropsOfRow = ({ _id, _creationTime, ...vaultProps }: Doc<'safebyok_vaults'>): VaultProps => vaultProps
 
 /** A box row as the record it holds: system fields and scope columns stripped. */
-const boxOfRow = (row: Doc<'safebyok_boxes'>): Box => {
+const boxOfRow = (row: Doc<'safebyok_boxes'>): BoxRecord => {
   const { _id, _creationTime, applabel: _applabel, user_id: _userId, vaultlabel: _vaultlabel, ...box } = row
   return box
 }
 
 /** The row a box is stored as: its scope columns added. */
-const boxRowOf = (scope: VaultScope, box: Box) => ({ ...scope, ...box })
+const boxRowOf = (scope: VaultScope, box: BoxRecord) => ({ ...scope, ...box })

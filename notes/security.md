@@ -34,6 +34,54 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-19 (thread B3, box): **the stored box is a model class, `Box`, holding a back-reference to
+  its vault; sealing and opening moved into it, and a box's enumerable fields are exactly its stored
+  ones.** (1) The class (`packages/safebyok/src/box.ts`): the Zod schema once exported as `Box` is
+  now `BoxRecord`, the stored contract, unchanged (`safebyok-box-v6`). `Box.make(vault, record)`
+  validates through `BoxRecord` and refuses `bad_record`, quoting nothing and carrying no cause. The
+  record is kept as `box.props`: a copy, frozen, its two `Ciphered` objects frozen too, so a caller's
+  later change to its own record reaches nothing in the box; the instance is frozen. `box.sidecar` is
+  the parse of `sidecar_json` with a reviver that freezes every object and array as it builds them.
+  `vault`, `props` and `summary` are attached by `decorate` (`utils.ts`: `Object.defineProperty`,
+  non-enumerable, non-writable, non-configurable), so a spread, `Object.keys`, a log line or
+  `JSON.stringify` never reaches the vault; `toJSON()` returns `props`. (2) What a log line of a box
+  shows: the visible fields and the two ciphered ones (`box_key_wrapped`, `whisper_ciphered`). The
+  record holds no secret: the whisper is ciphered under a boxKey, the boxKey wrapped under the
+  vaultKey, and neither key is in it; it is what the backend already holds. The vault never logs a
+  box, and a refusal from opening carries no cause and no meta, and names nothing of the box (no
+  label, revision, sidecar or ciphertext). (3) `Box.seal(vault, boxlabel, whisper, vaultKey, {
+  sidecar, over })` is the sealing that sat in the vault's `putBox`, the construction unchanged: a
+  fresh boxKey from WebCrypto `generateKey` per seal (a test spies `generateKey` and `wrapKey` to
+  show one fresh key per seal, wrapped under the vaultKey), a fresh `revision_tok`
+  (`crypto.randomUUID`), the whisper's stable JSON ciphered under the boxKey and the boxKey wrapped
+  under the vaultKey, both bound to `boxCtx`: the format, the scope (applabel, user_id, vaultlabel),
+  the vault's `vault_id`, the purpose, and every visible header field, rebuilt on every seal and open
+  and never stored. `registered_at` and the sidecar carry forward from `over` only when `over` opens
+  under the vaultKey, so a sidecar planted in storage is never sealed into a revision that reads
+  clean. Inputs are checked at the door (`bad_whisper`, `bad_option`, `bad_label`, `absent_vault`),
+  quoting nothing; the seal ends in `Box.make`, so what it returns has passed the record schema, and
+  it writes nothing. (4) `box.tryOpen(vaultKey)` (an Outcome; `open` throws) is the old
+  `decipherBox`: a vaultKey that is no CryptoKey is `bad_option`; a box whose `vault_key_epoch` is
+  not the vault's is `damaged_box`; the boxKey is unwrapped non-extractable and decrypt-only under
+  the rebuilt ctx; WebCrypto's own failure is dropped, with no cause, and said as `damaged_box`; the
+  plaintext is parsed and validated as a whisper, else `damaged_box`. Nothing partial is returned. A
+  box re-made for another scope, another `vault_id` (a vault made anew) or another label, or with any
+  visible field altered, refuses; a test goes field by field. (5) What a box reads off its vault is
+  `BoxVault = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_id' | 'vault_key_epoch' |
+  'clock'>`. The vault gains read-only getters `logger`, `clock` and `keyDeriver`; `vault.clock` is
+  the vault's checked clock, so a box's reading that fails drops the vaultKey as the vault's own
+  readings do. `vault_id` and `vault_key_epoch` come off the vault's snapshot getters, which can lag
+  the vault's private vault props only inside a first unlock's awaits, before any key is in hand;
+  `putBox`'s expectation and the seal read them in one synchronous run. A stale read can only make a
+  box fail to open. (6) `vault.openBox(box)` and `tryOpenBox` take a `Box` or a `BoxRecord` and
+  re-make it under this vault (`Box.make(this, props)`), so it opens under this vault's scope and id
+  whatever vault the box was made for; they need the key in hand (`vault_locked` otherwise), ask for
+  no proof and read no storage, re-check the key after the open, and tell `onBadNews` of
+  `damaged_box`. (7) `vault.boxes` entries are copies, frozen through (the sidecar re-parsed with the
+  freezing reviver) when the vault takes a listing up, so nothing a host is handed shares an object
+  with what the vault holds. This closes the note, in the entry on the vault's private fields below,
+  that a summary's sidecar was not deep-frozen, and the A3 review's note that summaries' sidecars
+  were shared with the vault's private listing.
 * 2026-10-19 (branch 20261019-proof_wayin, [#201](https://github.com/mrflip/safebyok/pull/201)): **what a host hands in to prove itself is
   checked at the vault's door into a `Proof`, and a wayin opens only under one.** (1) `Proof.parse`
   (`packages/safebyok/src/proof.ts`) turns a passphrase string, or a passkey's answer `{ credentialId,

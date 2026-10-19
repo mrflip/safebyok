@@ -1,4 +1,4 @@
-import type { Box, VaultProps, VaultScope } from 'safebyok'
+import type { BoxRecord, VaultProps, VaultScope } from 'safebyok'
 
 /**
  * How one field crosses the wire: `plain`, as it is -- text, a number, or the vault props' prior
@@ -48,10 +48,10 @@ export const VaultPropsFields = everyFieldOf<VaultProps>()([
 ] as const)
 
 /**
- * Every field of a Box, as `SafebyokBox` has them: the one place that names the
+ * Every field of a BoxRecord, as `SafebyokBox` has them: the one place that names the
  * box's fields for the wire. The compiler holds it to the box's shape.
  */
-export const BoxFields = everyFieldOf<Box>()([
+export const BoxFields = everyFieldOf<BoxRecord>()([
   ['format',                 'plain'],
   ['boxlabel',               'plain'],
   ['revision_tok',           'plain'],

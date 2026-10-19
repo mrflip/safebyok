@@ -1,4 +1,4 @@
-import type { Box } from './box'
+import type { BoxRecord } from './box'
 import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types'
 
 /**
@@ -183,7 +183,7 @@ export const RefusalFamilyForKind = {
  */
 export type RefusalMeta = {
   /** `stale_write`: the box that won, as stored; null when nothing stands under the boxlabel. */
-  box_stored?:         Box | null
+  box_stored?:         BoxRecord | null
   /** `vault_locked` after a relock: the vault props storage holds, or null when the vault is gone. */
   vault_props_stored?: VaultProps | null
   /** `box_too_large`, `vault_full`: how much room there is. */

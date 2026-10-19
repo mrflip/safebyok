@@ -38,7 +38,7 @@ export const VaultScope = v.object({
 /** The VaultProps formats this package stores. */
 export const VaultPropsFormat = v.union(v.literal('safebyok-vault-v4'))
 
-/** The formats of a Box this package stores. */
+/** The formats of a BoxRecord this package stores. */
 export const BoxFormat = v.union(v.literal('safebyok-box-v6'))
 
 /**
@@ -113,7 +113,7 @@ export const VaultProps = v.object({
  * written), and the epoch-millisecond times it was first stored (`registered_at`) and this
  * revision written (`written_at`).
  */
-export const Box = v.object({
+export const BoxRecord = v.object({
   format:                 BoxFormat,
   boxlabel:               v.string(),
   revision_tok:           v.string(),
@@ -131,7 +131,7 @@ export const Box = v.object({
  * A box as a listing returns it: every field but the two ciphered ones, `format` kept, so the
  * client validates it as it would a whole record.
  */
-export const ListedBox = Box.omit('box_key_wrapped', 'whisper_ciphered')
+export const ListedBox = BoxRecord.omit('box_key_wrapped', 'whisper_ciphered')
 
 /**
  * What an update of the vault props was proven against: it lands only while the vault props

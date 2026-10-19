@@ -1,7 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
 import * as ZClassic from 'zod'
 import * as Z from 'zod/mini'
-import { Box } from '../../src/box'
+import { Box, BoxRecord } from '../../src/box'
+import type { VaultError } from '../../src/errors'
+import type { GetProof } from '../../src/ask'
+import { valOf } from '../../src/outcome'
 import { type Whisper, MaxWhisperBytes, type Sidecar, FarFuture, MaxBoxes, VaultScope } from '../../src/types'
 import { AnyTextValidators, MaxUserIdChars, NameFloorBytes } from '../../src/validators'
 import { memoryDeviceDB } from '../../src/device-db'
@@ -591,7 +594,7 @@ describe("the box limit", () => {
     it(`counts room enough for a box of ${String(limitBytes)} whisper and sidecar bytes, its other fields at their largest`, async () => {
       for (const { whisperBytes, sidecar } of heaviestSplitsOf(limitBytes)) {
         const row = await heaviestRowOf(whisperBytes, sidecar)
-        expect(Box.safeParse(row).success).to.be.true
+        expect(BoxRecord.safeParse(row).success).to.be.true
         expect(VaultScope.safeParse(row).success).to.be.true
         const rowBytes = new TextEncoder().encode(JSON.stringify(row)).length
         expect(rowBytes).to.be.at.most((limitBytes * StoredBytesPerWhisperByte) + BoxFieldsBytes)
@@ -1086,6 +1089,137 @@ describe("useBox", () => {
     const vault = await world.open()
     const err = await TH.expectRefusal(vault.useBox('anthropic', 'not a callback' as unknown as () => void), 'bad_option')
     expect(err.message).to.include('callback function')
+  })
+})
+// --
+
+
+// == [Opening a box]: vault.openBox, what a vault hands its boxes
+
+/** The record storage holds for `u1`'s box `anthropic`, as the world's VaultDB hands it back. */
+const storedBoxOf = async (world: ReturnType<typeof makeWorld>): Promise<BoxRecord> => {
+  const record = valOf(await world.vaultDB.getBox(TH.scopeOf('u1'), 'anthropic'))
+  expect(record, 'no box stored under anthropic').to.not.be.null
+  return record!
+}
+
+describe("vault.openBox", () => {
+  it("opens a box with the key in hand, reading no storage and asking for no proof, as its example shows", async () => {
+    const world = makeWorld()
+    const getProof = vi.fn<GetProof>(() => 'declined')
+    const vault = await world.openUnlocked('pw', { getProof })
+    await vault.putBox('anthropic', 'sk-fake', { sidecar: { note: 'work account' } })
+    const box = Box.make(vault, await storedBoxOf(world))
+    const reads = (['getBox', 'listBoxes', 'getVaultProps'] as const).map((verb) => vi.spyOn(world.vaultDB, verb))
+    expect(await vault.openBox(box)).to.eq('sk-fake')
+    for (const read of reads) { expect(read).not.toHaveBeenCalled() }
+    expect(getProof).not.toHaveBeenCalled()
+  })
+
+  it("opens a stored record, or a box made for another vault, as this vault's own", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.putBox('anthropic', 'sk-fake')
+    const record = await storedBoxOf(world)
+    const elsewhere = await makeWorld().open({ userId: 'u2' })
+    expect(await vault.openBox(record)).to.eq('sk-fake')
+    expect(await vault.openBox(Box.make(elsewhere, record))).to.eq('sk-fake')
+  })
+
+  it("resolves the whisper as an Outcome's val from tryOpenBox", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.putBox('anthropic', { apiKey: 'sk-fake' })
+    const { ok, val: whisper } = await vault.tryOpenBox(await storedBoxOf(world))
+    expect(ok).to.be.true
+    expect(whisper).to.deep.equal({ apiKey: 'sk-fake' })
+  })
+
+  it("refuses 'vault_locked' with no key in hand, asking for no proof (Contract: box.tryOpen, Refuses)", async () => {
+    const world = makeWorld()
+    const getProof = vi.fn<GetProof>(() => 'declined')
+    const vault = await world.openUnlocked('pw', { getProof })
+    await vault.putBox('anthropic', 'sk-fake')
+    await vault.lock()
+    await TH.expectRefusal(vault.openBox(await storedBoxOf(world)), 'vault_locked')
+    expect(getProof).not.toHaveBeenCalled()
+  })
+
+  it("refuses a box that will not open as 'damaged_box', told to onBadNews and returned (Contract: box.tryOpen, Refuses)", async () => {
+    const world = makeWorld()
+    const told: VaultError[] = []
+    const vault = await world.openUnlocked('pw', { onBadNews: (news) => { told.push(news) } })
+    await vault.putBox('anthropic', 'sk-fake', { sidecar: { note: 'work account' } })
+    const planted = { ...await storedBoxOf(world), sidecar_json: '{"note":"planted"}' }
+    const err = await TH.expectBad(vault.tryOpenBox(planted), 'damaged_box')
+    expect(told).to.deep.equal([err])
+    expect(err.message).to.not.include('sk-fake')
+  })
+
+  it("refuses what is no box record as 'bad_record', before it looks for a key", async () => {
+    const world = makeWorld()
+    const vault = await world.open()
+    await TH.expectRefusal(vault.openBox({ boxlabel: 'anthropic' } as unknown as BoxRecord), 'bad_record')
+  })
+
+  it("refuses 'vault_closed' once the vault is closed", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.putBox('anthropic', 'sk-fake')
+    const record = await storedBoxOf(world)
+    vault.close()
+    await TH.expectRefusal(vault.openBox(record), 'vault_closed')
+  })
+})
+
+describe("what a vault hands its boxes", () => {
+  it("exposes the logger, clock and key deriver it was made with, read-only", async () => {
+    const world = makeWorld()
+    const vault = await world.open()
+    expect(vault.keyDeriver).to.equal(TH.testDeriver)
+    expect(vault.clock.now()).to.eq(world.clock.now())
+    vault.logger.warn('a word from a box', { call: 'getBox' })
+    expect(world.logged.map((call) => call.message)).to.include('a word from a box')
+    for (const field of ['logger', 'clock', 'keyDeriver'] as const) {
+      expect(Reflect.set(vault, field, null), field).to.be.false
+      expect(Object.keys(vault), field).to.not.include(field)
+    }
+  })
+
+  it("reads its clock checked: a reading that fails drops the vaultKey, as the vault's own readings do", async () => {
+    const world = makeWorld()
+    let broken = false
+    const clock = { now: () => (broken ? NaN : world.clock.now()) }
+    const vault = await world.openUnlocked('pw', { clock })
+    broken = true
+    TH.expectSyncRefusal(() => vault.clock.now(), 'bad_option')
+    broken = false
+    expect(vault.state).to.eq('locked')
+  })
+
+  it("lists summaries frozen through, so a host changing one reaches nothing the vault holds, as heldListing's example shows", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.putBox('anthropic', 'sk-fake', { sidecar: { note: 'work account', tags: ['team'] } })
+    const summary = TH.summaryOf(vault.boxes[0])
+    const sidecar = summary?.sidecar as { note: string, tags: string[] }
+    expect(() => { sidecar.note = 'changed' }).to.throw(TypeError)
+    expect(() => { sidecar.tags.push('mallory') }).to.throw(TypeError)
+    await vault.hello({ staleMinutes: 0 })
+    expect(TH.summaryOf(vault.boxes[0])?.sidecar).to.deep.equal({ note: 'work account', tags: ['team'] })
+  })
+
+  it("seals every put under a fresh boxKey and revision, the same whisper twice included (Contract: vault.putBox, Guarantees)", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.putBox('anthropic', 'sk-fake')
+    const first = await storedBoxOf(world)
+    await vault.putBox('anthropic', 'sk-fake')
+    const second = await storedBoxOf(world)
+    expect(second.revision_tok).to.not.eq(first.revision_tok)
+    expect(second.box_key_wrapped).to.not.deep.equal(first.box_key_wrapped)
+    expect(second.whisper_ciphered.ciphertext_b64).to.not.eq(first.whisper_ciphered.ciphertext_b64)
+    expect(JSON.stringify(second)).to.not.include('sk-fake')
   })
 })
 // --

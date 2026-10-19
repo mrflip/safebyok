@@ -10,7 +10,7 @@ import type {
   BoxDelExpectation as CoreBoxDelExpectation, BoxDeletion as CoreBoxDeletion,
 } from 'safebyok'
 import {
-  VaultPropsExpectation, Ciphered, VaultDelExpectation, ListedBox, Box, BoxExpectation, BoxDelExpectation, BoxDeletion, VaultProps, VaultScope,
+  VaultPropsExpectation, Ciphered, VaultDelExpectation, ListedBox, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, VaultProps, VaultScope,
 } from '../../src/component/validators'
 import * as TH from '../test-helpers'
 
@@ -69,13 +69,13 @@ const convexShape = (validator: GenericValidator): Shape => {
   }
 }
 
-const listedZod = Z.omit(Records.Box, { box_key_wrapped: true, whisper_ciphered: true })
+const listedZod = Z.omit(Records.BoxRecord, { box_key_wrapped: true, whisper_ciphered: true })
 
 const ShapeCases = [
   [Records.Ciphered,     Ciphered,   'Ciphered: the shared encrypted-value shape'],
   [Records.VaultScope,   VaultScope, 'VaultScope: what names one vault'],
   [Records.VaultProps,   VaultProps,   'VaultProps: every field, each wayin and its ciphered wrap nested'],
-  [Records.Box,          Box,        'Box: every field, the sidecar as JSON text, both ciphered fields nested'],
+  [Records.BoxRecord,    BoxRecord,  'BoxRecord: every field, the sidecar as JSON text, both ciphered fields nested'],
   [listedZod,            ListedBox,  'a listed box: the record without its ciphered fields, format kept'],
 ] as const
 
@@ -89,10 +89,10 @@ describe("the Convex validators, field for field with the core's Zod records", (
   it("type the same records, expectations and summaries as the core", () => {
     expectTypeOf<Infer<typeof VaultProps>>().toEqualTypeOf<Records.VaultProps>()
     expectTypeOf<Infer<typeof VaultScope>>().toEqualTypeOf<Records.VaultScope>()
-    expectTypeOf<Infer<typeof Box>>().toEqualTypeOf<Records.Box>()
+    expectTypeOf<Infer<typeof BoxRecord>>().toEqualTypeOf<Records.BoxRecord>()
     // A listing is the stored record less its ciphered fields; the core's summary of it parses
     // the sidecar's JSON, so it is the stored record's shape a listing must meet.
-    expectTypeOf<Infer<typeof ListedBox>>().toEqualTypeOf<Omit<Records.Box, 'box_key_wrapped' | 'whisper_ciphered'>>()
+    expectTypeOf<Infer<typeof ListedBox>>().toEqualTypeOf<Omit<Records.BoxRecord, 'box_key_wrapped' | 'whisper_ciphered'>>()
     expectTypeOf<Infer<typeof VaultPropsExpectation>>().toEqualTypeOf<CoreVaultPropsExpectation>()
     expectTypeOf<Infer<typeof BoxExpectation>>().toEqualTypeOf<CoreBoxExpectation>()
     expectTypeOf<Infer<typeof VaultDelExpectation>>().toEqualTypeOf<CoreVaultDelExpectation>()
@@ -107,7 +107,7 @@ const probeApp = defineTestApp({ schema: defineSchema({}) })
 const { api: probeApi, createTest } = probeApp.defineModules({
   probe: {
     takeVaultProps: probeApp.mutation({ args: { vaultProps: VaultProps }, returns: v.null(), handler: () => null }),
-    takeBox: probeApp.mutation({ args: { box: Box }, returns: v.null(), handler: () => null }),
+    takeBox: probeApp.mutation({ args: { box: BoxRecord }, returns: v.null(), handler: () => null }),
   },
 })
 
@@ -197,7 +197,7 @@ describe("the Convex validators, against the core's Zod records, record by recor
 
   for (const [box, zodOk, convexOk, blurb] of BoxCases) {
     it(`box: ${blurb}`, async () => {
-      expect(Records.Box.safeParse(box).success).to.eq(zodOk)
+      expect(Records.BoxRecord.safeParse(box).success).to.eq(zodOk)
       expect(await convexAccepts(createTest().mutation(probeApi.probe.takeBox, { box: box as never }))).to.eq(convexOk)
     })
   }

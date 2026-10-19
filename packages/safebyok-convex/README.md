@@ -146,7 +146,7 @@ Three tables, inside the component, beside nothing of your app's:
 | Table                    | One row per | Columns                                                  | Index                                                     |
 | ------------------------ | ----------- | -------------------------------------------------------- | --------------------------------------------------------- |
 | `safebyok_vaults`        | vault       | the `VaultProps` record as-is                            | `by_scope`: `user_id`, `applabel`, `vaultlabel`           |
-| `safebyok_boxes`         | box         | the `Box` record as-is, and its vault's scope columns    | `by_box`: `user_id`, `applabel`, `vaultlabel`, `boxlabel` |
+| `safebyok_boxes`         | box         | the `BoxRecord` as-is, and its vault's scope columns   | `by_box`: `user_id`, `applabel`, `vaultlabel`, `boxlabel` |
 | `safebyok_vault_tallies` | vault       | `vault_row_id` (its vault row), `box_count`, `box_bytes` | `by_vault_row`: `vault_row_id`                            |
 
 * **Encrypted**, as `{ cipher_iv_b64, ciphertext_b64 }`: each whisper (`whisper_ciphered`), each
@@ -210,9 +210,9 @@ the core's own records, scopes and expectations.
 | `getVaultProps`           | query    | `{ scope }`                                                                 | the `VaultProps`, or null                                                                  |
 | `ensureVaultProps` | mutation | `{ vaultProps }`                                                            | the vault props standing afterwards: these, or another device's already standing           |
 | `putVaultProps`        | mutation | `{ vaultProps, expected: { vault_id, unlock_epoch } }`                      | `true` if written, `false` if not                                                          |
-| `getBox`                  | query    | `{ scope, boxlabel }`                                                       | the `Box`, or null                                                                     |
+| `getBox`                  | query    | `{ scope, boxlabel }`                                                       | the `BoxRecord`, or null                                                               |
 | `listBoxSummaries`        | query    | `{ scope }`                                                                 | each box without its ciphered fields, `format` kept, in boxlabel order                 |
-| `putBox`               | mutation | `{ scope, box, expected: { vault_id, revision_tok, vault_key_epoch } }` | the `Box` as stored if written, null if not; refuses `vault_full` past the vault's limits |
+| `putBox`               | mutation | `{ scope, box, expected: { vault_id, revision_tok, vault_key_epoch } }` | the `BoxRecord` as stored if written, null if not; refuses `vault_full` past the vault's limits |
 | `delBox`               | mutation | `{ scope, boxlabel, expected: { vault_id, revision_tok } }`                 | `{ outcome }` if the vault still stands -- `deleted`, `deleted_other` or `absent` -- null if not |
 | `delVault`             | mutation | `{ scope, expected: { vault_id } }`                                         | `true` if deleted, `false` if not                                                          |
 | `watchVault`              | query    | `{ scope }`                                                                 | `{ vault_id, unlock_epoch, boxes: [[boxlabel, revision_tok]] }`, changing with every write |

@@ -5,7 +5,7 @@ import { VaultError } from 'safebyok'
 import type { ComponentApi } from './component-api'
 import type { SafebyokErrorData } from './refusals'
 import {
-  VaultPropsExpectation, VaultDelExpectation, ListedBox, Box, BoxExpectation, BoxDelExpectation, BoxDeletion, VaultProps, VaultScope, VaultSignature,
+  VaultPropsExpectation, VaultDelExpectation, ListedBox, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, VaultProps, VaultScope, VaultSignature,
 } from './component/validators'
 
 export type { ComponentApi } from './component-api'
@@ -133,7 +133,7 @@ export class SafebyokComponent {
       }),
       getBox: publicQuery({
         args:    { scope: VaultScope, boxlabel: v.string() },
-        returns: v.nullable(Box),
+        returns: v.nullable(BoxRecord),
         handler: async (ctx, args) => {
           await mustBe(ctx, args.scope.user_id)
           return await ctx.runQuery(vaults.getBox, args)
@@ -148,8 +148,8 @@ export class SafebyokComponent {
         },
       }),
       putBox: publicMutation({
-        args:    { scope: VaultScope, box: Box, expected: BoxExpectation },
-        returns: v.nullable(Box),
+        args:    { scope: VaultScope, box: BoxRecord, expected: BoxExpectation },
+        returns: v.nullable(BoxRecord),
         handler: async (ctx, args) => {
           await mustBe(ctx, args.scope.user_id)
           return await ctx.runMutation(vaults.putBox, args)

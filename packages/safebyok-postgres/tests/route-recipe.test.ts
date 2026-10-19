@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Client } from 'pg'
 import { VaultDB, VaultError, RefusalKindVals, memoryDeviceDB } from 'safebyok'
-import type { Outcome, VaultPropsExpectation, VaultDelExpectation, Box, BoxExpectation, BoxDelExpectation, VaultProps, RefusalKind, VaultScope } from 'safebyok'
+import type { Outcome, VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, VaultProps, RefusalKind, VaultScope } from 'safebyok'
 import * as TH from './test-helpers'
 import { VaultChangeChannel, postgresVaultDB } from '../src/index'
 import type { PostgresClient, PostgresListen } from '../src/index'
@@ -28,7 +28,7 @@ const served = new Map<string, Served>([
   ['putVaultProps',    (vaultDB, [vaultProps, expected]) => vaultDB.putVaultProps(vaultProps as VaultProps, expected as VaultPropsExpectation)],
   ['getBox',           (vaultDB, [scope, boxlabel]) => vaultDB.getBox(scope as VaultScope, boxlabel as string)],
   ['listBoxes',        (vaultDB, [scope]) => vaultDB.listBoxRecords(scope as VaultScope)],
-  ['putBox',           (vaultDB, [scope, box, expected]) => vaultDB.putBox(scope as VaultScope, box as Box, expected as BoxExpectation)],
+  ['putBox',           (vaultDB, [scope, box, expected]) => vaultDB.putBox(scope as VaultScope, box as BoxRecord, expected as BoxExpectation)],
   ['delBox',           (vaultDB, [scope, boxlabel, expected]) => vaultDB.delBox(scope as VaultScope, boxlabel as string, expected as BoxDelExpectation)],
   ['delVault',         (vaultDB, [scope, expected]) => vaultDB.delVault(scope as VaultScope, expected as VaultDelExpectation)],
 ])
@@ -92,7 +92,7 @@ class RouteVaultDB extends VaultDB {
     const boxes = await this.call('listBoxes', scope) as { boxlabel: string }[]
     return boxes.map((box) => ({ boxlabel: box.boxlabel, box }))
   }
-  protected doPutBox(scope: VaultScope, box: Box, expected: BoxExpectation) { return this.call('putBox', scope, box, expected) }
+  protected doPutBox(scope: VaultScope, box: BoxRecord, expected: BoxExpectation) { return this.call('putBox', scope, box, expected) }
   protected doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation) { return this.call('delBox', scope, boxlabel, expected) }
   protected async doDelVault(scope: VaultScope, expected: VaultDelExpectation) {
     await this.call('delVault', scope, expected)

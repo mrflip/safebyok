@@ -1,4 +1,4 @@
-import type { Box, VaultProps } from 'safebyok'
+import type { BoxRecord, VaultProps } from 'safebyok'
 
 /**
  * How one field is stored: `text` as given, `bigint` for a whole number (a time, an epoch), and
@@ -41,11 +41,11 @@ export const VaultPropsColumns = everyFieldOf<VaultProps>()([
 ] as const)
 
 /**
- * Every field of a Box, in `safebyok_boxes`'s order after the four columns the adapter
+ * Every field of a BoxRecord, in `safebyok_boxes`'s order after the four columns the adapter
  * adds (the vault's scope and `vault_id`, never part of the record). The compiler holds it to the
  * box's shape.
  */
-export const BoxColumns = everyFieldOf<Box>()([
+export const BoxColumns = everyFieldOf<BoxRecord>()([
   ['format',                 'text'],
   ['boxlabel',               'text'],
   ['revision_tok',           'text'],

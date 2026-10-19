@@ -1,5 +1,5 @@
 import { it, describe, expect, vi } from 'vitest'
-import type { Box } from '../../src/box'
+import type { BoxRecord } from '../../src/box'
 import type { Outcome } from '../../src/outcome'
 import type { VaultProps, BoxSummary, DamagedBox } from '../../src/types'
 import { NameFloorBytes } from '../../src/validators'
@@ -235,7 +235,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
     it("adds nothing it was handed beyond the record: a field safebyok never writes is left behind", async () => {
       const vaultDB = await makeVaultDB()
       await expectingGood(vaultDB).ensureVaultProps({ ...vaultPropsOf('u1'), stray_field: 'never stored' } as VaultProps)
-      const written = await expectingGood(vaultDB).putBox(scopeOf('u1'), { ...boxOf('anthropic', 'one'), stray_field: 'never stored' } as Box, noBoxYet)
+      const written = await expectingGood(vaultDB).putBox(scopeOf('u1'), { ...boxOf('anthropic', 'one'), stray_field: 'never stored' } as BoxRecord, noBoxYet)
       expect(await expectingGood(vaultDB).getVaultProps(scopeOf('u1'))).to.deep.equal(vaultPropsOf('u1'))
       expect(await expectingGood(vaultDB).getBox(scopeOf('u1'), 'anthropic')).to.deep.equal(boxOf('anthropic', 'one'))
       expect(written).to.deep.equal(boxOf('anthropic', 'one'))
@@ -1518,7 +1518,7 @@ const settledKind = async (write: Promise<Outcome<unknown>>): Promise<string> =>
 }
 
 /** Which of a box's boxlabel, sidecar and ciphertexts a refusal quotes anywhere. */
-const quotedOf = (refusal: unknown, box: Box): string[] => {
+const quotedOf = (refusal: unknown, box: BoxRecord): string[] => {
   const told = thrownText(refusal)
   const quotable = [box.boxlabel, box.sidecar_json, ...leafTexts(box.box_key_wrapped), ...leafTexts(box.whisper_ciphered)]
   return quotable.filter((text) => text !== '' && told.includes(text))
