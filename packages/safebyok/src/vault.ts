@@ -1054,8 +1054,11 @@ export class Vault {
     this.#boxes = fresh === null ? [] : listed.map((box) => (isUnderHeldKey(box, fresh) ? box : asDamaged(box)))
     this.#syncing = true
     this.#readAt = readAt
-    this.#tellListingNews(shown)
+    // A listing with no damaged box clears the trouble: nothing amiss stands. The listing is
+    // published before its news is told, so a handler reading the vault sees what it lists.
+    if (this.#boxes.every((box) => ! box.damaged)) { this.#trouble = null }
     this.#settle()
+    this.#tellListingNews(shown)
   }
 
   // When the last read of storage to succeed began, by the vault's clock: what a hello's
@@ -1459,9 +1462,10 @@ export class Vault {
     }
   }
 
-  /** Forget the unlock in memory, and the timer left to do so. */
+  /** Forget the unlock in memory, and the timer left to do so; a lease take-up under way stands down. */
   #dropKey() {
     this.#cancelPendingShut()
+    this.#standDownTakeUp()
     this.#vaultKey = null
     this.#askPassphraseAt = null
   }
@@ -1499,7 +1503,7 @@ export class Vault {
   }
   // --
 
-  // == [Lease]: deadlineFor, grantLease, fetchLease, discardUnreadableLease
+  // == [Lease]: deadlineFor, grantLease, fetchLease, takeUp, standDownTakeUp, takeUpLease, discardUnreadableLease
 
   /**
    * The deadline of an unlock taken up now by `proof`, in `call`. The lease renews whenever the
@@ -1540,6 +1544,7 @@ export class Vault {
       ask_passphrase_at:       until,
     })
     if (this.#outrun(standing)) { return false }
+    this.#standDownTakeUp()
     this.#armExpiry(until, this.#clockNow())
     this.#vaultKey = unlocked.sessionKey
     this.#askPassphraseAt = until
@@ -1558,12 +1563,41 @@ export class Vault {
    * under a longer setting, and does not fit either: lowering the option has each device ask
    * again at its next hello, and raising it lengthens no lease already granted. Nothing on this
    * path writes a record, so it can never bring back one that another tab's lock() erased
-   * meanwhile. A handle closed while the lease opens takes nothing up.
+   * meanwhile. A handle closed while the lease opens takes nothing up, and neither does one whose
+   * key was dropped or replaced meanwhile -- a lock(), del(), an unlock, the expiry -- which also
+   * leaves the lease standing now alone: the key change that landed during the read wins.
    */
   async #fetchLease() {
+    this.#standDownTakeUp()
+    const takeUp = new AbortController()
+    this.#takeUp = takeUp
+    try {
+      await this.#takeUpLease(takeUp.signal)
+    } finally {
+      if (this.#takeUp === takeUp) { this.#takeUp = null }
+    }
+  }
+
+  // The lease take-up under way, if any. Whatever drops or replaces the key -- a lock(), close(),
+  // del(), an unlock, the expiry -- aborts it, and an aborted take-up writes nothing: the key change
+  // that landed while the lease was read wins.
+  #takeUp: AbortController | null = null
+
+  /** Have a lease take-up under way stand down: a key change has landed since it began. */
+  #standDownTakeUp() {
+    this.#takeUp?.abort()
+    this.#takeUp = null
+  }
+
+  /** {@link fetchLease}'s work, writing nothing once `overtaken` is aborted. */
+  async #takeUpLease(overtaken: AbortSignal) {
     if (this.#vaultProps === UnreadVaultProps || this.#vaultProps === null) { return }
+    // Asked afresh after each wait: a key change may land during any of them.
+    const isOvertaken = () => overtaken.aborted
     const kept = await this.#deviceDB.getLease(this.#scope)
-    if (kept === null) { return }
+    // A key change since the read began makes what was read no lease to take up, nor to discard:
+    // the lease standing now may be the one that change wrote.
+    if (kept === null || isOvertaken()) { return }
     const checked = Lease.safeParse(kept)
     // A record naming some other scope is out of place, as unreadable as a mangled one.
     const readable = checked.success && Names.sameScope(checked.data, this.#scope)
@@ -1574,6 +1608,7 @@ export class Vault {
       && checked.data.ask_passphrase_at > now
       && checked.data.ask_passphrase_at <= deadlineAfter(now, this.#leaseMillis)
     if (! fits) {
+      if (isOvertaken()) { return }
       // Discarded. Expired, or outdated by a change to the wayins or a shorter setting, is routine; unreadable is worth a word.
       if (readable) { await this.#deviceDB.delLease(this.#scope) } else { await this.#discardUnreadableLease() }
       return
@@ -1588,12 +1623,14 @@ export class Vault {
         this.#leaseCtx(this.#vaultProps.vault_id, this.#vaultProps.unlock_epoch, lease.ask_passphrase_at),
         { extractable: false, usage: ['wrapKey', 'unwrapKey'] },
       )
-      if (this.#closed) { return }
+      if (this.#closed || isOvertaken()) { return }
       this.#armExpiry(lease.ask_passphrase_at, now)
       this.#vaultKey = unwrapped
       this.#askPassphraseAt = lease.ask_passphrase_at
     } catch {
-      // A lease that no longer opens reads as "no lease": the safe failure.
+      // A lease that no longer opens reads as "no lease": the safe failure. One overtaken is
+      // left alone, as the lease standing now may be the overtaking change's own.
+      if (isOvertaken()) { return }
       await this.#discardUnreadableLease()
     }
   }
@@ -1953,17 +1990,17 @@ export class Vault {
     this.#trouble = news
     if (this.#onBadNews === null) { return }
     try {
-      const answer = this.#onBadNews(news)
-      if (answer instanceof Promise) { void this.#heedLateThrow(answer) }
+      // Any answer is heard out, a thenable or another realm's promise among them: none is awaited.
+      void this.#heedLateThrow(this.#onBadNews(news))
     } catch (err) {
       this.#handlerThrew(err)
     }
   }
 
-  /** What an async handler's promise rejects with, once it does, kept as the trouble and published. */
-  async #heedLateThrow(answer: Promise<unknown>) {
+  /** What an async handler's answer rejects with, once it does, kept as the trouble and published. */
+  async #heedLateThrow(answer: unknown) {
     try {
-      await answer
+      await Promise.resolve(answer)
     } catch (err) {
       this.#handlerThrew(err)
       this.#settle()
@@ -1971,20 +2008,19 @@ export class Vault {
   }
 
   /**
-   * Tell each box the listing now shows damaged that `shown`, the listing before it, did not show
-   * damaged at the same revision: one `damaged_box` news apiece, `meta.box_listed` the box. The
-   * read that lists them succeeds all the same. A listing with no damaged box clears the trouble:
-   * nothing amiss stands.
+   * Tell each box the listing, published already, shows damaged that `shown`, the listing before
+   * it, did not show damaged at the same revision: one `damaged_box` news apiece, `meta.box_listed`
+   * the box, and the trouble published once all are told. The read that lists them succeeds all
+   * the same.
    */
   #tellListingNews(shown: readonly (BoxSummary | DamagedBox)[]) {
-    const damaged = this.#boxes.filter((box): box is DamagedBox => box.damaged)
-    if (damaged.length === 0) { this.#trouble = null }
     const wasShown = (box: DamagedBox) => shown.some((was) => was.damaged && was.boxlabel === box.boxlabel && was.revision_tok === box.revision_tok)
-    for (const box of damaged) {
-      if (! wasShown(box)) {
-        this.#tellBadNews(new VaultError('damaged_box', "A box in this vault is stored damaged, so it can't be read: this error's meta.box_listed names it. It was left as it is; remove it with delBox(), or store its whisper again over it.", { meta: { box_listed: box } }))
-      }
+    const news = this.#boxes.filter((box): box is DamagedBox => box.damaged && ! wasShown(box))
+    if (news.length === 0) { return }
+    for (const box of news) {
+      this.#tellBadNews(new VaultError('damaged_box', "A box in this vault is stored damaged, so it can't be read: this error's meta.box_listed names it. It was left as it is; remove it with delBox(), or store its whisper again over it.", { meta: { box_listed: box } }))
     }
+    this.#settle()
   }
 
   /** What the host's `onBadNews` threw, kept as the trouble, and told to the logger and the platform. */

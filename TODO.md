@@ -109,7 +109,9 @@ mechanism per case now. The scenarios, each with today's outcome:
 
 1. `lock()` lands during an unlock's derivation or its lease write, same handle: the unlock
    finishes; the vault is unlocked and a lease written. A `lock()` while a `hello()` reads the
-   lease likewise: the hello takes it up.
+   lease is the exception: since the contract sprint's A3 (a stale hello re-reads the lease, so
+   this became routine) a key dropped or replaced during a lease take-up aborts it, and the hello
+   takes nothing up.
 2. The same, the lock in another tab on this device: as 1; the lease write is no longer refused.
 3. A read's fetch or decipher straddles a lock: refused `vault_locked` if no key is in hand when
    the whisper is ready; handed back if another unlock has put a key in hand meanwhile.

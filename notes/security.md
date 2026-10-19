@@ -216,6 +216,17 @@ added or folded into through the subagent, and no other entry changes.
   damaged box; a condition such as `storage_unavailable` reaches only its caller (a refused
   `hello()` rejects to whoever called it) and the snapshot's `syncing: false`, so a background
   read's failure shows in the snapshot only as `syncing: false` (and the logger's warning).
+  Amended 2026-10-19 (20261019-fields_and_make, PR #197; amending point 1): **a `lock()` landing
+  while a `hello()` takes up this device's lease is no longer undone.** A take-up (`#fetchLease`)
+  reads the lease record, checks it fits, unwraps the vaultKey under the leaseKey, then installs the
+  key and deadline; as the default one-minute `staleMinutes` makes a routine `hello()` re-run it, a
+  `lock()` between the read and the install could be reversed (unlocked in memory, lease deleted),
+  and an older lease could overwrite a fresher `unlock()`. Each take-up now holds an
+  `AbortController`; whatever drops or replaces the key (`#dropKey`, called by lock, close, del, the
+  expiry timer and relocks; and `#grantLease`, as an unlock or wayin change installs its key) aborts
+  it. An aborted take-up installs nothing and discards no lease record (the lease standing may be
+  the overtaking change's own). Nothing else about lock timing versus work in flight changed: the
+  policy owed before 1.0 (TODO.md, *Lock timing vs. work in flight*) is still open.
 
 * 2026-10-18: **the context bytes of every wayin changed spelling, not construction, with the
   rename to "wayin".** A wayin's wrap is bound to a context of the record's format tag, then its

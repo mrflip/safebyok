@@ -6,7 +6,7 @@ import { Vault } from '../../src/vault'
 import { delDamagedVault, deviceTroubleAsConditions } from '../../src/del-damaged-vault'
 import { bad } from '../../src/outcome'
 import * as TH from '../test-helpers'
-import { makeWorld, damagedVaultWorld, u1VaultPropsCkey, u1BoxCkey, storedRowOf, storedVaultPropsOf, storedWayinsOf, boxlabelsOf, rolledBackWorld, HourMillis } from './world'
+import { makeWorld, makeRacingWorld, damagedVaultWorld, u1VaultPropsCkey, u1BoxCkey, storedRowOf, storedVaultPropsOf, storedWayinsOf, boxlabelsOf, rolledBackWorld, HourMillis, SevenDaysMillis } from './world'
 
 
 // == [hello]: seedVault, hello
@@ -867,6 +867,84 @@ describe("onBadNews, by the Contract", () => {
     const vault = Vault.make({ ...world.optsWith(), onBadNews: (news) => { telemetry.report(news.refusalkind) } })
     await TH.expectRefusal(vault.hello(), 'damaged_vault')
     expect(reports).to.deep.equal(['damaged_vault'])
+  })
+})
+// --
+
+// == [A take-up overtaken]: holdLeaseAfterRead, a lease take-up a key change overtakes
+
+/** Holds this device's next read of its lease once the store has answered, until released. */
+const holdLeaseAfterRead = (world: ReturnType<typeof makeWorld>) => {
+  const gate = TH.makeGate()
+  const read = world.deviceDB.getLease.bind(world.deviceDB)
+  vi.spyOn(world.deviceDB, 'getLease').mockImplementationOnce(async (scope) => {
+    const kept = await read(scope)
+    await gate.pass()
+    return kept
+  })
+  return gate
+}
+
+describe("a lease take-up a key change overtakes", () => {
+  it("stays locked when a lock lands while a hello is taking up the lease", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    world.advance(StaleMinutes * MinuteMillis)
+    const leaseRead = holdLeaseAfterRead(world)
+    const hello = vault.hello()
+    await leaseRead.reached
+    await vault.lock()
+    leaseRead.release()
+    await hello
+    expect(vault.state).to.eq('locked')
+    expect(vault.askPassphraseAt).to.be.null
+    expect(await world.getLease()).to.be.null
+  })
+
+  it("keeps a fresher unlock's lease when a hello's take-up of the older one finishes after it", async () => {
+    const world = makeRacingWorld()
+    const vault = await world.openUnlocked('pw')
+    const older = vault.askPassphraseAt
+    world.advance(StaleMinutes * MinuteMillis)
+    const deriving = world.holdNextDerive()
+    const unlocking = vault.unlock('pw')
+    await deriving.reached
+    const leaseRead = holdLeaseAfterRead(world)
+    // The unlock's own read is a moment old: a hello within staleMinutes of it would read nothing.
+    const hello = vault.hello({ staleMinutes: 0 })
+    await leaseRead.reached
+    deriving.release()
+    await unlocking
+    const fresher = vault.askPassphraseAt
+    expect(fresher).to.eq(world.clock.now() + SevenDaysMillis)
+    leaseRead.release()
+    await hello
+    expect(vault.askPassphraseAt).to.eq(fresher).and.to.not.eq(older)
+    const standing = await world.getLease()
+    expect(standing?.ask_passphrase_at).to.eq(fresher)
+  })
+})
+// --
+
+// == [Telling, in order]: the listing published first, an answer that is only a thenable
+
+describe("onBadNews, as it is told", () => {
+  it("sees the listing that told it: the vault shows the damaged box before the handler hears of it", async () => {
+    const world = await damagedBoxWorld()
+    const seen: string[][] = []
+    const vault: Vault = Vault.make(world.optsWith({ onBadNews: () => { seen.push(boxlabelsOf(vault)) } }))
+    await vault.hello()
+    expect(seen).to.deep.equal([['anthropic']])
+  })
+
+  it("lands a rejection in trouble from an answer that is only a thenable, no Promise", async () => {
+    const world = await damagedVaultWorld()
+    const thrown = new Error('the handler broke, by a thenable')
+    // eslint-disable-next-line unicorn/no-thenable -- the case under test is an answer that is a thenable and no Promise
+    const thenable = { then: (_resolve: unknown, reject: (err: unknown) => void) => { reject(thrown) } }
+    const vault = Vault.make(world.optsWith({ onBadNews: () => thenable as unknown as Promise<void> }))
+    await TH.expectRefusal(vault.hello(), 'damaged_vault')
+    await vi.waitFor(() => { expect(vault.trouble).to.deep.include({ refusalkind: 'bad_option', cause: thrown }) })
   })
 })
 // --
