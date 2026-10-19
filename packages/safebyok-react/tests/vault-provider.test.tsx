@@ -1121,7 +1121,7 @@ describe("VaultProvider", () => {
       const world = makeWorld()
       const tally = TH.tallyWatches(world.vaultDB)
       const reads = vi.spyOn(world.vaultDB, 'getVaultProps')
-      reads.mockRejectedValueOnce(unreachable()).mockRejectedValueOnce(unreachable())
+      reads.mockResolvedValueOnce(TH.bad(unreachable())).mockResolvedValueOnce(TH.bad(unreachable()))
       world.mount('u1')
       await expectShown('open error: storage_unavailable')
       fireEvent.click(screen.getByText('Retry'))
