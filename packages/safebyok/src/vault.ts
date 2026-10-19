@@ -1113,7 +1113,16 @@ export class Vault {
 
   /** Start the vault's watch on storage, once: the first hello does. `close()` ends it. */
   #watchStorage() {
-    this.#unsubscribeDB ??= this.#vaultDB.subscribe(this.#scope, () => { void this.#watchRefresh() })
+    if (this.#watching) { return }
+    // Marked before the adapter is asked: one that rings as it subscribes has that ring's hello
+    // find the watch begun, rather than subscribe again, and again. One that throws is asked anew.
+    this.#watching = true
+    try {
+      this.#unsubscribeDB = this.#vaultDB.subscribe(this.#scope, () => { void this.#watchRefresh() })
+    } catch (err) {
+      this.#watching = false
+      throw err
+    }
   }
   // --
 
@@ -1901,8 +1910,10 @@ export class Vault {
       this.#logger.warn('Storage rang with a change the vault could not read, so what it shows may lag behind storage (syncing: false). It says nothing more of this until a read succeeds; its next call meets the same trouble, and throws it.', { call: 'refresh' }, asError(err))
     }
   }
-  // The adapter's watch on the vault, which the first hello starts and close() ends.
+  // The adapter's watch on the vault, which the first hello starts and close() ends, and whether
+  // it was begun.
   #unsubscribeDB: (() => void) | null = null
+  #watching = false
   // --
 
   // == [Bad news]: tellingBadNews, hearBadNews, tellBadNews, tellListingNews, handlerThrew

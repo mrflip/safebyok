@@ -3,6 +3,7 @@ import { LeaseHours, FarFuture, ForeverMillis, MinuteMillis } from '../../src/ty
 import { MaxUserIdChars } from '../../src/validators'
 import { VaultError } from '../../src/errors'
 import { memoryDeviceDB } from '../../src/device-db'
+import { localVaultDB } from '../../src/local-vault-db'
 import { Vault } from '../../src/vault'
 import { type MakeVaultOpts, parseStaleMinutes } from '../../src/vault-opts'
 import { fromB64 } from '../../src/crypto'
@@ -612,6 +613,23 @@ describe("Vault.make, by the Contract", () => {
     expect(vault.state).to.eq('absent')
     await vault.hello({ staleMinutes: 0 })
     expect(tally.opened).to.eq(1)
+  })
+
+  it("starts the watch once, and reads once, over a store that rings as it is subscribed to", async () => {
+    const world = makeWorld()
+    const subscribe = world.dbStore.subscribe.bind(world.dbStore)
+    const ringingAtOnce = { ...world.dbStore, subscribe: (listener: () => void) => {
+      listener()
+      return subscribe(listener)
+    } }
+    const vaultDB = localVaultDB({ store: ringingAtOnce })
+    const tally = TH.tallyWatches(vaultDB)
+    const propsReads = vi.spyOn(vaultDB, 'getVaultProps')
+    const vault = Vault.make(world.optsWith({ vaultDB }))
+    await vault.hello()
+    expect(tally).to.deep.equal({ opened: 1, closed: 0 })
+    expect(propsReads).toHaveBeenCalledTimes(1)
+    expect(vault.state).to.eq('absent')
   })
 
   it("has a data call's own first hello read and settle, as the host's would (Contract: Vault.make, Guarantees)", async () => {
