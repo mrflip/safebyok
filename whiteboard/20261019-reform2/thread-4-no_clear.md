@@ -1,6 +1,6 @@
 # Thread 4: no_clear (2026-10-19)
 
-Branch `20261019-no_clear`, PR [#185](https://github.com/mrflip/safebyok/pull/185), stacked on [#184](https://github.com/mrflip/safebyok/pull/184), in the line main -> #177 -> #178 -> #179 -> #176 -> #182 -> #183 -> #184. Justify: green (core 2225 passed, 35 skipped; indexeddb 142; postgres 260; convex 267; graphql 250; react 230; fastkey 49; demo 197; e2e 86). No size line moved (`pnpm size:budget` matches the rule on every line).
+Branch `20261019-no_clear`, PR [#186](https://github.com/mrflip/safebyok/pull/186), stacked on [#184](https://github.com/mrflip/safebyok/pull/184), in the line main -> #177 -> #178 -> #179 -> #176 -> #182 -> #183 -> #184. Justify: green (core 2225 passed, 35 skipped; indexeddb 142; postgres 260; convex 267; graphql 250; react 230; fastkey 49; demo 197; e2e 86). No size line moved (`pnpm size:budget` matches the rule on every line).
 
 Brought back by the Coach after the #176 review's lost write (A retires, A writes, B retires A's write, B writes; neither throws).
 
