@@ -6,7 +6,8 @@ import { memoryStore } from '../../src/string-store'
 import type { Lockbox } from '../../src/lockbox'
 import type { VaultScope, PassphraseWayin, PasskeyWayin, PasskeyProof, VaultProps, Sidecar, LockboxSummary, DamagedLockbox, DeviceMark, SeenVault, Lease } from '../../src/types'
 import { stableJsonify } from '../../src/stable-jsonify'
-import { type MakeVaultOpts, Vault } from '../../src/vault'
+import { Vault } from '../../src/vault'
+import { type MakeVaultOpts } from '../../src/vault-opts'
 import { localVaultDB } from '../../src/vault-db'
 
 
