@@ -230,9 +230,10 @@ export class Box {
    * vault puts the box. Nothing of the boxKey outlives the call.
    *
    * Throws kind 'bad_whisper' for a whisper JSON cannot carry, 'bad_option' for a sidecar JSON
-   * cannot carry, a `vaultKey` that is no CryptoKey, an `over` that is no box under this
-   * boxlabel, or any other option, and 'bad_label' for a boxlabel below the floor every name is
-   * held to, or a missing `holder`. Each quotes none of what it was handed.
+   * cannot carry, a `holder` missing its vault id or vaultKey epoch, a `vaultKey` that is no
+   * CryptoKey, an `over` that is no box under this boxlabel, or any other option, and
+   * 'bad_label' for a boxlabel below the floor every name is held to. Each quotes none of what
+   * it was handed.
    *
    * @param vault - The vault the box belongs to: its scope and clock.
    * @param boxlabel - The box's label, already through the vault's own checks.
