@@ -196,9 +196,9 @@ budget lives here. size-limit's `kB` is 1000 bytes, and it measures minified and
 The rule sets a budget; it may lower one as well as raise it. A bundle that shrank gets the
 smaller budget the rule gives, so a budget never sits looser than its measure earns.
 
-A sprint's first thread raises the budgets for the whole sprint, so the stacked PRs agree, and a
-late thread lowers them to the rule (`.claude/skills/sprint/SKILL.md`). Anyone else raising a
-budget follows the same rule, and says in the PR why the bundle grew. How an entry is measured is
+In a sprint, each thread moves the budgets its own change moves, up or down, with
+`pnpm size:budget --write` (`.claude/skills/sprint/SKILL.md`, *Size budgets*). Anyone else
+raising a budget follows the same rule, and says in the PR why the bundle grew. How an entry is measured is
 `notes/ci.md`, *Size checks*.
 
 ## Where things are written
