@@ -151,8 +151,9 @@ export const updateBox = mutation({
 /**
  * Remove the lockbox under `boxlabel`, whatever revision stands, only while the scope's vault props
  * have `expected.vault_id`. Resolves what it removed when that holds -- `retired` for a lockbox at
- * `expected.revision_tok`, `retired_other` for any other, `absent` for none; null, removing
- * nothing, otherwise -- including when the scope holds no vault props.
+ * `expected.revision_tok` (for null, one holding none the client reads as one), `retired_other` for
+ * any other, `absent` for none; null, removing nothing, otherwise -- including when the scope holds
+ * no vault props.
  */
 export const retireBox = mutation({
   args:    { scope: VaultScope, boxlabel: v.string(), expected: LockboxRetireExpectation },
@@ -164,7 +165,9 @@ export const retireBox = mutation({
     if (! standing) { return { outcome: 'absent' } }
     await ctx.db.delete('safebyok_lockboxes', standing._id)
     await Tallies.forget(ctx.db, vaultProps._id, standing)
-    return { outcome: standing.revision_tok === expected.revision_tok ? 'retired' : 'retired_other' }
+    // An empty revision reads as none, as the client lists a damaged lockbox holding one.
+    const standingRevision = standing.revision_tok === '' ? null : standing.revision_tok
+    return { outcome: standingRevision === expected.revision_tok ? 'retired' : 'retired_other' }
   },
 })
 
