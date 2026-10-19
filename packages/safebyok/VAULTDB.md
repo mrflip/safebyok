@@ -127,8 +127,7 @@ naming the record and quoting none of it.
 ## 1. Records
 
 **1.1. What is stored reads back whole.** A record reads back exactly as it was written, field
-for field: a field left out stays out (vault props with no prior vaultKey have no `prior_vault_key`
-field, not a null one), and nothing is added. Text comes back as the exact text written: a
+for field, and nothing is added. Text comes back as the exact text written: a
 lockbox's `sidecar_json` is bound into its encryption as written, so a store that rewrites JSON
 it holds (Postgres's `jsonb`, say) keeps that field as plain text. Before anything is written, a read finds nothing: `null`, never a
 default.
@@ -251,11 +250,12 @@ names the same one (the base class refuses a lockbox whose epoch is not the expe
 `bad_record`, before the adapter sees it). `updateBox` writes only while the scope's standing
 vault props have that `vault_key_epoch`, as well as the `vault_id` and revision of line 3.3,
 compared in the same atomic step as the write; otherwise it refuses as `stale_write` and writes
-nothing. So a lockbox only ever lands sealed under the vaultKey its vault props stand for. The
-vault does not read the vault props before each write, so only storage can refuse a device that
-still holds a vaultKey since replaced and has not looked at the vault props meanwhile: an adapter
-that skips this comparison lets that device seal a new whisper that whoever held the replaced
-vaultKey can open. Retirements name no `vault_key_epoch` (line 3.4): a retirement reveals nothing.
+nothing. So a lockbox only ever lands sealed under the vaultKey its vault props stand for. Every
+vault carries `vault_key_epoch` 1 today, the epoch reserved for a rotation of the vaultKey not yet
+built, so for now the comparison refuses a record built wrong. It is kept so that rotation needs
+no new contract: the vault does not read the vault props before each write, so only storage can
+refuse a device that still holds a vaultKey since replaced and has not looked at the vault props
+meanwhile. Retirements name no `vault_key_epoch` (line 3.4): a retirement reveals nothing.
 
 ## 4. The lockbox limit
 
