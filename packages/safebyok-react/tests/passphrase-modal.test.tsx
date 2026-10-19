@@ -49,6 +49,9 @@ const usernameField = () => {
 /** The passphraseAdvice @example: a word until the passphrase is twelve characters or more. */
 const twelveOrMore = (typed: string) => (typed.length < 12 ? 'Twelve characters or more, please.' : null)
 
+/** Advice that breaks, quoting what it was handed: as a host's might. */
+const quotingAdvice = (typed: string) => { throw new Error(`could not judge ${typed}`) }
+
 /** The polite region beside the field, which says the advice. */
 const adviceRegion = () => screen.getByRole('status')
 
@@ -374,14 +377,58 @@ describe("PassphraseModal", () => {
       expect(heard).to.deep.equal(['declined'])
     })
 
-    it("meets a failure that is no VaultError the same way, as the vault answers it: unexpected_error, what was thrown its cause", async () => {
+    it("meets a failure that is no VaultError the same way, as the vault answers it: unexpected_error, reported to React without what was thrown, its cause", async () => {
       const fell = new TypeError('fell over')
       const { reported } = TH.renderReporting(<TH.Catcher><PassphraseModal ask={TH.askOf(TH.vaultUnlockingWith(() => Promise.reject(fell)))} onDone={noop} /></TH.Catcher>)
       TH.submitPassphrase('pw one')
       expect(await screen.findByText('Something went wrong')).to.not.be.null
       expect(reported).to.have.lengthOf(1)
-      expect(reported[0]).to.include({ refusalkind: 'unexpected_error', cause: fell })
+      expect(reported[0]).to.include({ refusalkind: 'unexpected_error' })
+      expect((reported[0] as Error).cause).to.be.undefined
       expect(screen.queryByText(/caught:|fell over/)).to.be.null
+    })
+
+    it("reports misuse to React with its kind, message and meta, but not its cause: a host key deriver's throw, which heard the passphrase", async () => {
+      const meta = { capacity: { boxes: { used: 1, max: 100 }, bytes: { used: 48, max: 1000 } } }
+      const misuse = new VaultError('unexpected_error', 'The key deriver threw.', { cause: new Error('could not derive from pw-the-passphrase'), meta })
+      const { reported } = TH.renderReporting(<PassphraseModal ask={TH.askOf(TH.vaultUnlockingWith(() => Promise.reject(misuse)))} onDone={noop} />)
+      TH.submitPassphrase('pw-the-passphrase')
+      expect(await screen.findByText('Something went wrong')).to.not.be.null
+      expect(reported).to.have.lengthOf(1)
+      const told = reported[0] as VaultError
+      expect(told).to.include({ refusalkind: 'unexpected_error', message: 'The key deriver threw.' })
+      expect(told.meta).to.deep.equal(meta)
+      expect(told.cause).to.be.undefined
+    })
+
+    it("closes its trouble notice as a lock lands, answering declined once, whatever its Close says after", async () => {
+      const landing = TH.held()
+      const heard: ProofAnswer[] = []
+      const vault = TH.vaultUnlockingWith(() => Promise.reject(new VaultError('bad_option', 'A bad option.')))
+      TH.renderReporting(<PassphraseModal ask={TH.askOf(vault, { lockLanded: landing.promise })} onDone={(answer) => { heard.push(answer) }} />)
+      TH.submitPassphrase('pw one')
+      await screen.findByText('Something went wrong')
+      await act(async () => {
+        landing.resolve(undefined)
+        await TH.wakeupAtNextTick()
+      })
+      expect(heard).to.deep.equal(['declined'])
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+      expect(heard).to.deep.equal(['declined'])
+    })
+
+    it("answers its trouble notice unlocked when the vault comes to be unlocked under it, and its Close then says nothing more", async () => {
+      const vault = await lockedVault()
+      vi.spyOn(vault, 'tryUnlock').mockResolvedValueOnce({ ok: false, err: new VaultError('bad_option', 'A bad option.') })
+      const heard: ProofAnswer[] = []
+      TH.renderReporting(<PassphraseModal ask={TH.askOf(vault)} onDone={(answer) => { heard.push(answer) }} />)
+      TH.submitPassphrase('pw')
+      await screen.findByText('Something went wrong')
+      await act(async () => { await vault.unlock('pw') })
+      expect(heard).to.deep.equal(['unlocked'])
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+      expect(heard).to.deep.equal(['unlocked'])
+      vault.close()
     })
 
     it("meets a rejection that is no Error at all the same way, as unexpected_error", async () => {
@@ -776,12 +823,15 @@ describe("PassphraseModal", () => {
       await waitFor(() => { expect(given).to.deep.equal(['pw']) })
     })
 
-    it("meets advice that throws with the calm trouble notice, and reports the very error to React", async () => {
-      const broken = new Error('the advice broke')
-      const { reported } = TH.renderReporting(<PassphraseModal ask={TH.askOf(vaultInState('absent'))} passphraseAdvice={() => { throw broken }} onDone={noop} />)
-      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
+    it("meets advice that throws with the calm trouble notice, and reports to React a fixed unexpected_error quoting nothing of the throw, which heard the passphrase", async () => {
+      const { reported } = TH.renderReporting(<PassphraseModal ask={TH.askOf(vaultInState('absent'))} passphraseAdvice={quotingAdvice} onDone={noop} />)
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw-the-passphrase' } })
       expect(await screen.findByText(Trouble)).to.not.be.null
-      expect(reported).to.deep.equal([broken])
+      expect(reported).to.have.lengthOf(1)
+      const told = reported[0] as VaultError
+      expect(told).to.include({ refusalkind: 'unexpected_error' })
+      expect(told.message).to.include('passphraseAdvice').and.not.include('pw-the-passphrase')
+      expect(told.cause).to.be.undefined
     })
 
     it("lets a superseded call's failure pass unseen: only the latest call can fail the dialog", async () => {

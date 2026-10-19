@@ -258,8 +258,11 @@ instead; `PassphraseModal` announces that, keeps it on screen until the next sub
 focus to the passphrase field. Your error boundary never sees it.
 
 **React reports it to you.** Each component catches such a failure in an error boundary of its
-own, so React hands the very error to the root's `onCaughtError`: by default the console, with the
-component stack, in development and production alike. Hook your error tracker there:
+own, so React hands the error to the root's `onCaughtError`: by default the console, with the
+component stack, in development and production alike. It arrives with nothing the user typed: a
+`VaultError` keeps its kind, message and meta but never its `cause` (a key deriver's or strength
+test's throw, which heard the passphrase), and anything else -- a `passphraseAdvice` that threw,
+say -- arrives as a fixed `unexpected_error` quoting none of it. Hook your error tracker there:
 
 ```tsx
 createRoot(rootElement, {

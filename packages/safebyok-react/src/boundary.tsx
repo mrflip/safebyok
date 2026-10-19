@@ -1,4 +1,5 @@
 import { Component, useState, type ReactNode } from 'react'
+import { Sanitizer, VaultError, isVaultError } from 'safebyok'
 
 /** What a {@link Boundary} is handed: what to show once something broke, and whom to tell. */
 export type BoundaryProps = {
@@ -18,7 +19,8 @@ export type BoundaryProps = {
  * and an error tracker hooked there receives it.
  *
  * An error from an event handler or a promise reaches it only when it is rethrown while
- * rendering, held in state and thrown on the next render, as `PassphraseModal` does.
+ * rendering, held in state and thrown on the next render, as `PassphraseModal` does -- through
+ * {@link forBoundary}, so that what React reports carries nothing the user typed.
  *
  * @example
  *   <Boundary fallback={<p>Something went wrong.</p>}>
@@ -50,4 +52,21 @@ export const useRoundFor = (handle: object): number => {
   const round = served.round + 1
   setServed({ handle, round })
   return round
+}
+
+/**
+ * What a component throws in render for its {@link Boundary}, in place of `err`, so that what
+ * React reports through `onCaughtError` -- the console, an error tracker -- carries nothing the
+ * user typed. A VaultError keeps its kind, message and meta, but never its `cause`: that may be a
+ * host key deriver's or strength test's throw, which was handed the passphrase. One with no cause
+ * is thrown as itself. Anything else becomes a fixed `unexpected_error` quoting nothing of it.
+ *
+ * @example if (failure !== null) { throw forBoundary(failure.err) }
+ */
+export const forBoundary = (err: unknown): VaultError => {
+  if (! isVaultError(err)) {
+    return Sanitizer.refusalFor(err, 'unexpected_error', "Something inside safebyok-react's dialog failed with an error that was not the vault's own. It is left out of this report, as it may quote what the user typed: check the functions the app handed the dialog.")
+  }
+  if (err.cause === undefined) { return err }
+  return new VaultError(err.refusalkind, err.message, err.meta === undefined ? undefined : { meta: err.meta })
 }

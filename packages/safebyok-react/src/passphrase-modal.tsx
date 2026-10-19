@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type Ref, type SubmitEvent } from 'react'
-import { ForeverMillis, MinuteMillis, isCondition, isVaultError, type Ask, type ProofAnswer } from 'safebyok'
+import { ForeverMillis, MinuteMillis, Sanitizer, isCondition, isVaultError, type Ask, type ProofAnswer } from 'safebyok'
 import { attemptRefusalFlavor } from './attempt-refusals'
-import { Boundary, useRoundFor } from './boundary'
+import { Boundary, forBoundary, useRoundFor } from './boundary'
 import { Locale, Messages } from './messages'
 import { PasskeyUnlockButton, offersPasskey } from './passkey-unlock-button'
 import { useIsMounted } from './is-mounted'
@@ -78,7 +78,8 @@ const unlockedFor = (leaseMillis: number, creating: boolean): string => {
  * there, and the advice stays, through typing, until the next submit. Anything else --
  * misuse, such as a closed vault handle, or a failure that is no VaultError -- never reaches the
  * host's page: the dialog shows a calm notice in its place, "Something went wrong", whose Close
- * (or Escape) calls `onDone('declined')`, and React reports the error through the root's
+ * (or Escape) calls `onDone('declined')` -- unless a lock lands or the vault unlocks under it first,
+ * as for the form -- and React reports the error, carrying nothing typed, through the root's
  * `onCaughtError` (the console, by default, with the component stack), where the developer and an
  * error tracker meet it. A passkey that fails that way takes its button away and leaves the
  * passphrase.
@@ -119,10 +120,24 @@ const unlockedFor = (leaseMillis: number, creating: boolean): string => {
  * @example <PassphraseModal ask={ask} passphraseAdvice={(typed) => (typed.length < 12 ? 'Twelve characters or more, please.' : null)} onDone={answer} />
  */
 export const PassphraseModal = (props: PassphraseModalProps) => (
-  <Boundary key={useRoundFor(props.ask)} fallback={<DialogTrouble onDone={props.onDone} />}>
-    <UnlockForm {...props} />
-  </Boundary>
+  <AnsweringOnce key={useRoundFor(props.ask)} {...props} />
 )
+
+/**
+ * The dialog's one answer, kept above its boundary, so that the notice shown once something went
+ * wrong follows the ask as the form did: a lock landing closes it, answering `declined`, and a vault
+ * unlocked under it answers `unlocked`, once, whatever its Close says later.
+ */
+const AnsweringOnce = (props: PassphraseModalProps) => {
+  const { ask, onDone } = props
+  const snapshot = useSyncExternalStore(ask.vault.subscribe, ask.vault.getSnapshot)
+  const done = useAnswerOnce(ask, onDone, snapshot.state === 'unlocked')
+  return (
+    <Boundary fallback={<DialogTrouble onDone={done} />}>
+      <UnlockForm {...props} onDone={done} />
+    </Boundary>
+  )
+}
 
 /**
  * What a host says of a passphrase as the user chooses it: a sentence to show beside the field, or
@@ -147,6 +162,9 @@ export type PassphraseModalProps = {
   /** What to say beside the field as the user chooses a passphrase. Default: nothing. */
   passphraseAdvice?:   PassphraseAdvice | undefined
 }
+
+/** The refusal for a host's `passphraseAdvice` that threw: it heard the passphrase, so nothing of its throw goes on. */
+const adviceFailed = (thrown: unknown) => Sanitizer.refusalFor(thrown, 'unexpected_error', "The passphraseAdvice handed to the dialog threw rather than answering. What it threw is left out of this report, as it may quote the passphrase: have it answer a sentence or null, and catch its own failures.")
 
 /** Escape, from anywhere in a dialog, cancels it, and goes no further: a host's own Escape handler never hears it too. */
 const cancelOnEscape = (onDone: (answer: ProofAnswer) => void) => (evt: KeyboardEvent) => {
@@ -314,11 +332,10 @@ const useAnswerOnce = (ask: Ask, onDone: (answer: ProofAnswer) => void, unlocked
   return done
 }
 
-/** The dialog itself, inside PassphraseModal's boundary. */
-const UnlockForm = ({ ask, onDone, allowStartOver, passphraseUsername, passphraseAdvice }: PassphraseModalProps) => {
+/** The dialog itself, inside PassphraseModal's boundary: its `onDone` is the one answer, `AnsweringOnce`'s. */
+const UnlockForm = ({ ask, onDone: done, allowStartOver, passphraseUsername, passphraseAdvice }: PassphraseModalProps) => {
   const { vault } = ask
   const snapshot = useSyncExternalStore(vault.subscribe, vault.getSnapshot)
-  const done = useAnswerOnce(ask, onDone, snapshot.state === 'unlocked')
   const [gripe, setGripe] = useState<Gripe | null>(null)
   const [startingOver, setStartingOver] = useState(false)
   // While a delete runs, so that a second press never starts another.
@@ -332,8 +349,9 @@ const UnlockForm = ({ ask, onDone, allowStartOver, passphraseUsername, passphras
   const blurbId = useId()
   // Wrapped, so that a failure carrying any value at all still reads as "failed".
   const [failure, setFailure] = useState<{ err: unknown } | null>(null)
-  const advice = useAdvice(passphraseAdvice, snapshot.state === 'absent', (err) => { setFailure({ err }) })
-  if (failure !== null) { throw failure.err }
+  // The host's advice heard the passphrase: what it threw may quote it, so none of it goes on.
+  const advice = useAdvice(passphraseAdvice, snapshot.state === 'absent', (err) => { setFailure({ err: adviceFailed(err) }) })
+  if (failure !== null) { throw forBoundary(failure.err) }
   const creating = snapshot.state === 'absent'
   const passkeyFirst = ! creating && offersPasskey(snapshot)
   const windowLine = unlockedFor(vault.leaseMillis, creating)

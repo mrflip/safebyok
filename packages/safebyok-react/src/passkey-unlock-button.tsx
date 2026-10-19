@@ -1,7 +1,7 @@
 import { useState, useSyncExternalStore } from 'react'
 import type { Ask, ProofAnswer, VaultSnapshot } from 'safebyok'
 import { attemptRefusalFlavor } from './attempt-refusals'
-import { Boundary, useRoundFor } from './boundary'
+import { Boundary, forBoundary, useRoundFor } from './boundary'
 import { Messages } from './messages'
 import { useIsMounted } from './is-mounted'
 import { askPasskey, passkeysAvailable } from './passkey'
@@ -23,7 +23,7 @@ import { askPasskey, passkeysAvailable } from './passkey'
  * Anything else -- misuse, such as an `rpId` that does not fit the page or a closed vault handle,
  * or a failure that is no VaultError -- never reaches the host's page: the button
  * takes itself away, `onGripe` hears "Your passkey can't be used here just now. Unlock with your
- * passphrase instead.", and React reports the error through the root's `onCaughtError` (the
+ * passphrase instead.", and React reports the error, carrying nothing typed, through the root's `onCaughtError` (the
  * console, by default, with the component stack), where the developer and an error tracker meet
  * it. Focus the button held falls to the page then: a dialog of the host's own moves it to its
  * passphrase field, as `PassphraseModal` does.
@@ -65,7 +65,7 @@ const PasskeyPress = ({ ask, onDone, onGripe, rpId, autoFocus }: PasskeyUnlockBu
   // Asked after each await: a button gone meanwhile -- its dialog went, or another vault remounted
   // it -- unlocks nothing, and touches neither its state nor its dialog's callbacks again.
   const isMounted = useIsMounted()
-  if (failure !== null) { throw failure.err }
+  if (failure !== null) { throw forBoundary(failure.err) }
   if (! offersPasskey(snapshot)) { return null }
 
   const press = async () => {

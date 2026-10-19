@@ -143,7 +143,7 @@ describe("PasskeyUnlockButton", () => {
     expect(vault.getSnapshot().state).to.eq('locked')
   })
 
-  it("meets a failure that is no VaultError the same way, as the vault answers it: unexpected_error, what was thrown its cause", async () => {
+  it("meets a failure that is no VaultError the same way, as the vault answers it: unexpected_error, reported to React without what was thrown, its cause", async () => {
     const { authenticator } = await lockedVaultWithPasskey()
     const [credentialId = ''] = authenticator.credentialIds()
     const fell = new TypeError('fell over')
@@ -152,7 +152,8 @@ describe("PasskeyUnlockButton", () => {
     fireEvent.click(screen.getByText('Use a passkey'))
     await waitFor(() => { expect(gripes).to.deep.equal([null, PasskeyTrouble]) })
     expect(reported).to.have.lengthOf(1)
-    expect(reported[0]).to.include({ refusalkind: 'unexpected_error', cause: fell })
+    expect(reported[0]).to.include({ refusalkind: 'unexpected_error' })
+    expect((reported[0] as Error).cause).to.be.undefined
   })
 
   describe("once it has gone", () => {
