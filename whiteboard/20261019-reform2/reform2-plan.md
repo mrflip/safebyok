@@ -5,7 +5,7 @@ Date: 2026-10-19. Issued by: the Coach (`/sprint reform2`, from the preplan besi
 Sprint branch: `20261019-reform2`. Sprint doc (Open Matters, Progress, Resolved):
 https://claude.ai/code/artifact/62febfc3-47ee-4a7c-b99e-ea494b4b169c
 
-**Status:** threads 1, 2, 6 and 7 filed; 7 restacked onto 6 (line: main → #177 → #178 → #179 → #176); thread 8 building.
+**Status:** every thread filed; wrap-up: the line main → #177 → #178 → #179 → #176 → #182 → #183 → #184 is being restacked onto today's main (thread 7 conflicts with #169/#170's wording).
 
 The Coach struck threads 3 (`one_look`), 4 (`no_clear`) and 5 (`newer_lockbox`) after issuing
 the preplan. Their text is kept in the preplan; this plan keeps their numbers so the preplan and
@@ -227,6 +227,9 @@ line that moved. (d) One changeset summarising the sprint for the release note.
 Gloss: touches `.size-limit.json` and one changeset file. Depends on 6 and on 7: cut from the
 line's tip once 7 is restacked onto 6. Size: small. Model: `sonnet`.
 
+*Review:* none: no code (a changeset and one README clause). [#182](https://github.com/mrflip/safebyok/pull/182).
+`pnpm size:budget --write` moved no line. Filed at `e387f809`.
+
 ---
 
 Next thread: 9, `damaged_warning`
@@ -250,6 +253,13 @@ Gloss: touches `vault.ts` (`retireBox`, `writeOver`), `tests/vault.test.ts`, REA
 honor-and-warn paragraph at the end of *Damaged lockboxes* if it quotes the warning, a
 changeset. Depends on 8 (the line's tip). Size: small. Model: `sonnet`. The invariant itself
 (always a record while the vault stands) is the deferred tombstones' work, not this thread's.
+
+*Review:* `fixed` ([#183](https://github.com/mrflip/safebyok/pull/183)). Fixed: "context" became the
+logger's "story"; the new test checks no whisper reaches the log; the reviewer's `patch`
+changeset went back to the sprint's `minor`. By directive: README's logger list names both
+`retired_other` warnings; a test for a damaged box with a readable revision. Left: the
+`storeBox()` doc block lacks the warning (added at the restack); the two-messages decision
+stands. Filed at `b4fe9cc5`.
 
 ---
 
@@ -275,6 +285,14 @@ descriptions, thread 8's summary changeset, and a changeset of its own. Grep `pa
 root's docs (`--exclude-dir={whiteboard,winboard,node_modules,dist}`) for `server-readable`,
 `public field`, `public face`, `public shell`, and "public" near "sidecar". Depends on 8; runs
 beside 9 and is restacked onto it. Size: small. Model: `sonnet`.
+
+*Review:* `fixed` ([#184](https://github.com/mrflip/safebyok/pull/184), still draft: the worker's
+`gh pr ready` was refused by the permission check, and is the Coach's). The classing was checked
+against `boxCtx`, `wayinCtxOf` and the schemas, and holds. Fixed: VOCABULARY's sidecar example;
+the *visible* list missed bound wayin and lockbox fields; the props' own `vault_key_epoch` was
+unclassed (it is *unencrypted*); a test title. Left: changeset level (sprint rule: `minor`);
+GraphQL's `'plain'` exception (noted in VOCABULARY at the restack); `prior_vault_key` unclassed
+and the README overview sentence (to the Coach). Filed at `f782962e`.
 
 ---
 
