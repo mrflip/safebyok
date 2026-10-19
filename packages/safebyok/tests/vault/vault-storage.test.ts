@@ -835,6 +835,21 @@ describe("vault props rolled back", () => {
     expect(vault.state).to.eq('unlocked')
   })
 
+  it("met by a background refresh while a hello takes up the lease, is met again by the next hello, which reads afresh", async () => {
+    const { world, vault, older } = await rolledBackWorld()
+    vault.close()
+    const late = Vault.make(world.optsWith())
+    const gate = TH.holdNextCall(world.deviceDB, 'getLease')
+    const saying = late.hello()
+    await gate.reached
+    world.dbStore.write(u1VaultPropsCkey, older)
+    await TH.wakeupAtNextTick()
+    gate.release()
+    await saying
+    expect(late.state).to.eq('opening')
+    await TH.expectRefusal(late.hello(), 'rolled_back')
+  })
+
   it("is still refused by the README's recipe when the host knows of no restore", async () => {
     const { world, vault, older } = await rolledBackWorld()
     vault.close()

@@ -1292,8 +1292,9 @@ export class Vault {
 
   /**
    * One hello: storage read, then this device's lease taken up. One that fails says so in the
-   * snapshot and forgets itself, so the next hello reads afresh. No other hello can start while one
-   * runs (see forgetHello), so the one this ends is always the one in `greeting`.
+   * snapshot and forgets itself, so the next hello reads afresh; so does one whose vault props a
+   * refusal of an older copy forgot while it ran (see forgetVaultProps). No other hello can start
+   * while one runs (see forgetHello), so the one this ends is always the one in `greeting`.
    */
   async #greet(): Promise<void> {
     try {
@@ -1304,7 +1305,11 @@ export class Vault {
       this.#settle()
       throw err
     }
-    this.#greeted = true
+    if (this.#vaultProps === UnreadVaultProps) {
+      this.#greeting = null
+    } else {
+      this.#greeted = true
+    }
     this.#settle()
   }
 
