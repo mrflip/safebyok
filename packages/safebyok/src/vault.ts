@@ -1622,7 +1622,7 @@ const make = (opts: MakeVaultOpts): Vault => {
   }
 
   /**
-   * True when `prev` opens under the vault's key, and so vouches for the public fields a store
+   * True when `prev` opens under the vault's key, and so vouches for the server-readable fields a store
    * carries forward from it; false for a record altered in storage, whose fields nothing vouches
    * for. What it holds is dropped unread: a store compares nothing.
    */
@@ -1857,7 +1857,7 @@ const make = (opts: MakeVaultOpts): Vault => {
       const unlockedKey = keyInHand()
       const standingVaultProps = currentVaultProps()
       const { vault_id: vaultId, vault_key_epoch: vaultKeyEpoch } = standingVaultProps
-      // Only a record that opens vouches for its public fields: one that will not, altered in
+      // Only a record that opens vouches for its server-readable fields: one that will not, altered in
       // storage, is written over as a fresh lockbox is, keeping neither its sidecar nor its
       // registered_at, so a sidecar planted in storage is never sealed into a revision that reads clean.
       const vouched = prev !== null && await recordOpens(unlockedKey, standingVaultProps, prev) ? prev : null
@@ -2258,7 +2258,7 @@ type LockboxHeader = Omit<Lockbox, 'format' | 'lockbox_key_wrapped' | 'whisper_c
 const EmptySidecarJson = '{}'
 
 /** What `storeBox()`'s options may hold: a sidecar, which {@link sidecarJsonOf} checks, and nothing else. */
-const checkStoreOpts = optionsCheck({ sidecar: Z.optional(Z.unknown()) }, "storeBox()'s only option is `sidecar`, the lockbox's own plain data: check its spelling, and leave out any other. A note is kept in the sidecar: { sidecar: { note } }.")
+const checkStoreOpts = optionsCheck({ sidecar: Z.optional(Z.unknown()) }, "storeBox()'s only option is `sidecar`, the lockbox's own server-readable data (it is never encrypted): check its spelling, and leave out any other. A note is kept in the sidecar: { sidecar: { note } }.")
 
 /**
  * The sidecar a `storeBox()` was handed, as the JSON a lockbox keeps, keys sorted; undefined when

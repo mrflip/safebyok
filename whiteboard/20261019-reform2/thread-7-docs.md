@@ -35,6 +35,7 @@ Branch `20261019-docs`, PR #176 against main (no stack). Justify: green (core 21
 * **Deviations**: the `Sidecar` doc block in `types.ts` and the one clause in the `storeBox()`
   damaged-record paragraph were touched beyond "the sidecar paragraph" because each said "plain"
   or "public" of the sidecar.
+* **Review follow-up**: three more sentences about the sidecar now say server-readable, not "plain" or "public": the `checkStoreOpts` error message ("the lockbox's own server-readable data (it is never encrypted)"; its test pins only the prefix), the `recordOpens` doc block and a comment in `storeBox`. "A usage count" stays as the Coach's example.
 * **Discoveries**: the `stale_write` message for a lockbox write (`Refusals.staleWrite`) already
   says "another device or tab wrote or retired it", so the README paragraph describes the
   message as it is.
