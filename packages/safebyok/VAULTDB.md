@@ -207,8 +207,9 @@ refuses as `stale_write`, whatever revision it names -- its adapter resolves `nu
 vault keeps its lockbox. Nothing of what is retired is kept: no tombstone.
 
 An adapter that keeps a typed revision column reports from its delete (Postgres's `RETURNING`, the
-row a Convex mutation deletes); a key-value store reads the row in the step that removes it, and
-`Expectations.retirementOf` compares it as the listing reads it. The base class refuses an answer
+row a Convex mutation deletes), and compares the revision it reads back with
+`Expectations.retirementOf`, as the listing reads it; a key-value store reads the row in the step
+that removes it, and compares it the same way. The base class refuses an answer
 in any other shape as `corrupt_record`, saying the retirement may have landed. *That refusal, and
 `retired` for a damaged record holding no revision, are proven by the base class's own tests* (the
 core's `vault-db.test.ts` and `expectations.test.ts`), which can have an adapter answer badly and
@@ -243,7 +244,7 @@ then line 3.3 or 3.4 says which wins.
 **3.8. A lockbox write lands only under the vaultKey that stands.** A lockbox carries the
 `vault_key_epoch` of the vaultKey its lockboxKey is wrapped under, and its write's expectation
 names the same one (the base class refuses a lockbox whose epoch is not the expected one, as
-`bad_option`, before the adapter sees it). `updateBox` writes only while the scope's standing
+`bad_record`, before the adapter sees it). `updateBox` writes only while the scope's standing
 vault props have that `vault_key_epoch`, as well as the `vault_id` and revision of line 3.3,
 compared in the same atomic step as the write; otherwise it refuses as `stale_write` and writes
 nothing. So a lockbox only ever lands sealed under the vaultKey its vault props stand for. The
@@ -298,7 +299,7 @@ its README, what its count is as of: the start of the write's statement, say, or
 the base class throws it), `vault_full`,
 `identity_revoked`, `not_permitted`, or anything it throws otherwise, which becomes
 `storage_unavailable`. The base
-class refuses `bad_label`, `bad_option`, `lockbox_too_large` and `corrupt_record` itself, before
+class refuses `bad_label`, `bad_record`, `bad_option`, `lockbox_too_large` and `corrupt_record` itself, before
 the adapter is asked or after it answers. Each message says calmly what went wrong and what to do
 about it, and a caller branches on the kind, never the message.
 

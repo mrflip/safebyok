@@ -1,0 +1,5 @@
+---
+"safebyok": minor
+---
+
+A VaultDB verb handed a record or expectation this package does not build now refuses with its own kind, `bad_record`, where it refused with `bad_option`. It is misuse (family `misuse`, beside `bad_option`): a malformed lockbox or vault props record, an expectation missing a field or holding an empty one, or a record and its expectation that disagree about the `vault_id` or `vault_key_epoch`, from `fetchOrCreateVaultProps`, `updateVaultProps`, `updateBox`, `retireBox` or `retireVault`. The message is unchanged, and quotes nothing of the record. `bad_option` keeps every other use. A host that branches on `bad_option` to catch a bad record from a VaultDB it calls directly adds `bad_record`; `isVaultCondition` is false for both, so an error boundary treats them alike, and `VaultErrorKindVals` and `VaultErrorFamilyForKind` gain the kind. `describeVaultDB` now expects `bad_record` of an adapter's wrapper, and the README's refusals table has the row. Nothing stored changes.

@@ -4,7 +4,7 @@
  * families, told apart by who must act:
  *
  * - **Misuse**: a programming error, the host developer's to fix, and loud. `bad_label`,
- *   `bad_whisper`, `bad_option`, `vault_closed`, `unknown_key_deriver`, `insecure_context`. Let it reach an error
+ *   `bad_whisper`, `bad_option`, `bad_record`, `vault_closed`, `unknown_key_deriver`, `insecure_context`. Let it reach an error
  *   boundary or the dev overlay; do not show it to the user, and do not retry.
  * - **Condition**: something the app handles at run time, which may reach the user: ask again,
  *   show a message, retry, or tell them to free room. `vault_locked`, `wrong_passphrase`,
@@ -93,7 +93,8 @@ export const VaultErrorKindVals = [
   'vault_full',          // a new lockbox in a vault already holding its maxLockboxes, or a write storage has no room for
   'too_many_wayins',     // a new wayin in a vault already holding MaxUnlocks
   'last_wayin',          // removing the vault's last passphrase, which would leave no sure way in
-  'bad_option',          // an option or argument out of its range: Vault.make's, mask's, argon2idDeriver's, a storeBox()'s sidecar, a VaultDB write's record
+  'bad_option',          // an option or argument out of its range: Vault.make's, mask's, argon2idDeriver's, a storeBox()'s sidecar
+  'bad_record',          // a record or expectation handed to a VaultDB verb that is not one this package builds
   'vault_closed',        // the vault handle was closed and cannot be used again
   'corrupt_record',      // a stored record failed validation as storage read it back
   'damaged_vault',       // the vault's stored props failed their checks, so no way in can be tried
@@ -155,6 +156,7 @@ export type VaultErrorFamily = typeof VaultErrorFamilyVals[number]
  * Which family each kind belongs to: every kind in {@link VaultErrorKindVals}, exactly once.
  *
  * @example VaultErrorFamilyForKind.bad_option           // 'misuse'
+ * @example VaultErrorFamilyForKind.bad_record           // 'misuse'
  * @example VaultErrorFamilyForKind.storage_unavailable  // 'condition'
  */
 export const VaultErrorFamilyForKind = {
@@ -175,6 +177,7 @@ export const VaultErrorFamilyForKind = {
   too_many_wayins:     'condition',
   last_wayin:          'condition',
   bad_option:          'misuse',
+  bad_record:          'misuse',
   vault_closed:        'misuse',
   corrupt_record:      'condition',
   damaged_vault:       'condition',

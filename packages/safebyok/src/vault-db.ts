@@ -260,7 +260,8 @@ export abstract class VaultDB {
    * the given ones when this call created them, or, when the vault already existed -- made by
    * another device, perhaps in the same moment -- the standing ones, exactly as stored, untouched
    * and with their own `vault_id`. A caller tells the two apart by comparing the `vault_id` it gets
-   * back with the one it drafted.
+   * back with the one it drafted. Vault props this package would not write are refused with kind
+   * `bad_record`, before storage sees them.
    */
   async fetchOrCreateVaultProps(vaultProps: VaultProps): Promise<VaultProps> {
     const asked = heldScope(this, vaultProps)
@@ -273,14 +274,14 @@ export abstract class VaultDB {
    * Replace the vault props with `vaultProps`, only while the standing ones still have the
    * `vault_id` and `unlock_epoch` in `expected`. Refuses with kind `stale_write` otherwise --
    * including when no vault props stand at all -- and writes nothing. A vault's `vault_id` never
-   * changes, so `vaultProps` must carry the one in `expected`: kind 'bad_option' otherwise.
+   * changes, so `vaultProps` must carry the one in `expected`: kind 'bad_record' otherwise.
    */
   async updateVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<void> {
     heldScope(this, vaultProps)
     const outgoing = checkOutgoing(VaultProps, vaultProps, 'vault props record')
     const expectation = checkOutgoing(VaultPropsExpectation, expected, 'vault props expectation')
     if (outgoing.vault_id !== expectation.vault_id) {
-      throw new VaultError('bad_option', "updateVaultProps replaces a vault's props within that vault: the vault props' vault_id must be the expected one, as a vault_id never changes.")
+      throw new VaultError('bad_record', "updateVaultProps replaces a vault's props within that vault: the vault props' vault_id must be the expected one, as a vault_id never changes.")
     }
     const landed = await fromStorage(() => this.doUpdateVaultProps(outgoing, expectation))
     if (! landed) { throw Refusals.staleWrite('vaultProps') }
@@ -340,7 +341,7 @@ export abstract class VaultDB {
    * its own refuses a write past it with kind `vault_full`, writing nothing. A lockbox heavier than the
    * backend's `maxRecordBytes` is refused with kind `lockbox_too_large` before storage sees it. A
    * lockbox is written under the vaultKey it was sealed with, so its `vault_key_epoch` must be the
-   * one in `expected`: kind 'bad_option' otherwise.
+   * one in `expected`: kind 'bad_record' otherwise.
    *
    * Resolves the lockbox as storage now holds it, handed back by the same atomic step as the write
    * and held to the check `readBox` makes: field for field the one written, from an adapter that
@@ -353,7 +354,7 @@ export abstract class VaultDB {
     const outgoing = checkOutgoing(Lockbox, lockbox, 'lockbox')
     const expectation = checkOutgoing(LockboxExpectation, expected, 'lockbox expectation')
     if (outgoing.vault_key_epoch !== expectation.vault_key_epoch) {
-      throw new VaultError('bad_option', "updateBox writes a lockbox under the vaultKey it was sealed with: the lockbox's vault_key_epoch must be the expected one.")
+      throw new VaultError('bad_record', "updateBox writes a lockbox under the vaultKey it was sealed with: the lockbox's vault_key_epoch must be the expected one.")
     }
     const recordBytes = jsonBytes({ ...asked, ...outgoing })
     if (recordBytes > this.maxRecordBytes) {
@@ -367,7 +368,8 @@ export abstract class VaultDB {
   /**
    * Remove the lockbox under `boxlabel`, whatever revision stands, only while the scope's standing
    * vault props have the `vault_id` in `expected`. Refuses with kind `stale_write` otherwise --
-   * including when the scope holds no vault props -- and removes nothing.
+   * including when the scope holds no vault props -- and removes nothing. An `expected` this
+   * package would not build is refused with kind `bad_record`.
    *
    * Resolves what storage found, from the same atomic step as the removal: `retired` when it
    * removed the revision `expected` names (for a null `revision_tok`, a record holding none it could
@@ -390,7 +392,8 @@ export abstract class VaultDB {
   /**
    * Remove the vault props and every lockbox -- the backend's part of deleting a vault -- only while
    * the standing vault props have the `vault_id` in `expected`. Refuses with kind `stale_write`
-   * otherwise -- including when the scope holds no vault props -- and removes nothing.
+   * otherwise -- including when the scope holds no vault props -- and removes nothing. An
+   * `expected` this package would not build is refused with kind `bad_record`.
    */
   async retireVault(scope: VaultScope, expected: RetireExpectation): Promise<void> {
     const asked = heldScope(this, scope)
@@ -727,7 +730,7 @@ const checked = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, candidate: unkno
  * refuse as corrupt.
  */
 const checkOutgoing = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, candidate: unknown, said: string): RecordT => checked(recordSchema, candidate, () => (
-  new VaultError('bad_option', `That ${said} is not one this package writes, so nothing was written: a VaultDB writes only the records and expectations a vault builds.`)
+  new VaultError('bad_record', `That ${said} is not one this package writes, so nothing was written: a VaultDB writes only the records and expectations a vault builds.`)
 ))
 
 const checkVaultProps = (raw: unknown, scope: VaultScope): VaultProps => {

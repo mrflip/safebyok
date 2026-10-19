@@ -503,26 +503,26 @@ describe("the abstract VaultDB, around an adapter's half", () => {
 /** Writes a VaultDB refuses before its adapter's half sees them: none is one a vault builds. */
 const RefusedWrites = [
   // the records:
-  ['bad_option', (vaultDB: VaultDB) => vaultDB.fetchOrCreateVaultProps({ ...TH.vaultPropsOf('u1'), unlock_epoch: 1.5 }),                              'vault props with a fractional unlock_epoch'],
-  ['bad_option', (vaultDB: VaultDB) => vaultDB.fetchOrCreateVaultProps({ ...TH.vaultPropsOf('u1'), wayins: [omit(TH.wayinOf('passphrase'), ['vault_key_wayin_wrapped'])] } as VaultProps), 'vault props whose wayin is missing its wrapped vaultKey'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.fetchOrCreateVaultProps({ ...TH.vaultPropsOf('u1'), unlock_epoch: 1.5 }),                              'vault props with a fractional unlock_epoch'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.fetchOrCreateVaultProps({ ...TH.vaultPropsOf('u1'), wayins: [omit(TH.wayinOf('passphrase'), ['vault_key_wayin_wrapped'])] } as VaultProps), 'vault props whose wayin is missing its wrapped vaultKey'],
   ['bad_label',  (vaultDB: VaultDB) => vaultDB.fetchOrCreateVaultProps({ ...TH.vaultPropsOf('u1'), applabel: 'Ac\u{7}me' }),                         'vault props whose applabel holds a control character'],
-  ['bad_option', (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one', { sidecar_json: 'not json' }), TH.noBoxYet), 'a lockbox whose sidecar no read would accept'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one', { sidecar_json: 'not json' }), TH.noBoxYet), 'a lockbox whose sidecar no read would accept'],
   ['bad_label',  (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('key\u{D83D}', 'one'), TH.noBoxYet),                  'a lockbox whose boxlabel is half of an emoji, whatever the checks'],
-  ['bad_option', (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one', { written_at: 1_792_022_400 }), TH.noBoxYet), 'a lockbox time in epoch seconds'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one', { written_at: 1_792_022_400 }), TH.noBoxYet), 'a lockbox time in epoch seconds'],
   ['bad_label',  (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), undefined as unknown as Lockbox, TH.noBoxYet),               'no lockbox at all'],
   // the expectations:
-  ['bad_option', (vaultDB: VaultDB) => vaultDB.updateVaultProps(TH.vaultPropsOf('u1'), { vault_id: 'vault-id-u1', unlock_epoch: 0 }),          'an expectation of the vault props at epoch zero'],
-  ['bad_option', (vaultDB: VaultDB) => vaultDB.updateVaultProps(TH.vaultPropsOf('u1'), undefined as unknown as VaultPropsExpectation), 'no expectation of the vault props at all'],
-  ['bad_option', (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), { vault_id: 'vault-id-u1' } as LockboxExpectation), 'a lockbox expectation missing its revision_tok'],
-  ['bad_option', (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), { vault_id: 'vault-id-u1', revision_tok: null } as LockboxExpectation), 'a lockbox expectation naming no vaultKey epoch'],
-  ['bad_option', (vaultDB: VaultDB) => vaultDB.retireBox(TH.scopeOf('u1'), 'anthropic', { revision_tok: null } as LockboxRetireExpectation), 'a retire expectation naming no vault'],
-  ['bad_option', (vaultDB: VaultDB) => vaultDB.retireBox(TH.scopeOf('u1'), 'anthropic', TH.thisVault as LockboxRetireExpectation),          'a lockbox retire expectation missing its revision_tok'],
-  ['bad_option', (vaultDB: VaultDB) => vaultDB.retireBox(TH.scopeOf('u1'), 'anthropic', TH.retiring('')),                                  'a lockbox retire expectation naming an empty revision_tok'],
-  ['bad_option', (vaultDB: VaultDB) => vaultDB.retireVault(TH.scopeOf('u1'), {} as RetireExpectation),                                     'a vault retire expectation naming no vault'],
-  ['bad_option', (vaultDB: VaultDB) => vaultDB.retireVault(TH.scopeOf('u1'), { vault_id: '' }),                                         'a retire expectation naming an empty vault_id'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.updateVaultProps(TH.vaultPropsOf('u1'), { vault_id: 'vault-id-u1', unlock_epoch: 0 }),          'an expectation of the vault props at epoch zero'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.updateVaultProps(TH.vaultPropsOf('u1'), undefined as unknown as VaultPropsExpectation), 'no expectation of the vault props at all'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), { vault_id: 'vault-id-u1' } as LockboxExpectation), 'a lockbox expectation missing its revision_tok'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), { vault_id: 'vault-id-u1', revision_tok: null } as LockboxExpectation), 'a lockbox expectation naming no vaultKey epoch'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.retireBox(TH.scopeOf('u1'), 'anthropic', { revision_tok: null } as LockboxRetireExpectation), 'a retire expectation naming no vault'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.retireBox(TH.scopeOf('u1'), 'anthropic', TH.thisVault as LockboxRetireExpectation),          'a lockbox retire expectation missing its revision_tok'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.retireBox(TH.scopeOf('u1'), 'anthropic', TH.retiring('')),                                  'a lockbox retire expectation naming an empty revision_tok'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.retireVault(TH.scopeOf('u1'), {} as RetireExpectation),                                     'a vault retire expectation naming no vault'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.retireVault(TH.scopeOf('u1'), { vault_id: '' }),                                         'a retire expectation naming an empty vault_id'],
   // the two together:
-  ['bad_option', (vaultDB: VaultDB) => vaultDB.updateVaultProps(TH.vaultPropsOf('u1', { vault_id: 'vault-id-new', unlock_epoch: 2 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'an update of the vault props that would change the vault_id'],
-  ['bad_option', (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one', { vault_key_epoch: 2 }), TH.noBoxYet), 'a lockbox sealed under another vaultKey than the expected one'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.updateVaultProps(TH.vaultPropsOf('u1', { vault_id: 'vault-id-new', unlock_epoch: 2 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'an update of the vault props that would change the vault_id'],
+  ['bad_record', (vaultDB: VaultDB) => vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one', { vault_key_epoch: 2 }), TH.noBoxYet), 'a lockbox sealed under another vaultKey than the expected one'],
 ] as const
 
 /** A vault in `u1`'s slot with a lockbox, its vault props spoiled by `spoil`, and a sound neighbour beside it. */
@@ -670,7 +670,7 @@ describe("the abstract VaultDB, on the way in", () => {
   it("never quotes a record it refuses", async () => {
     const vaultDB = new MapVaultDB()
     const sneaky = TH.boxOf('anthropic', 'one', { whisper_ciphered: TH.fakeCiphered('SUPERSECRET'), revision_tok: '' })
-    const refusal = await TH.expectRefusal(vaultDB.updateBox(TH.scopeOf('u1'), sneaky, TH.noBoxYet), 'bad_option')
+    const refusal = await TH.expectRefusal(vaultDB.updateBox(TH.scopeOf('u1'), sneaky, TH.noBoxYet), 'bad_record')
     expect(refusal.message).to.not.include('SUPERSECRET')
     expect(refusal.message).to.not.include('anthropic')
   })
@@ -803,11 +803,11 @@ describe("the abstract VaultDB, holding names to the floor", () => {
     })
   }
 
-  it("refuses, as 'bad_option', a lockbox whose sidecar is not JSON, writing nothing", async () => {
+  it("refuses, as 'bad_record', a lockbox whose sidecar is not JSON, writing nothing", async () => {
     const vaultDB = new MapVaultDB()
     await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
     const unparsable = TH.boxOf('anthropic', 'one', { sidecar_json: '{"note":' })
-    await TH.expectRefusal(vaultDB.updateBox(TH.scopeOf('u1'), unparsable, TH.noBoxYet), 'bad_option')
+    await TH.expectRefusal(vaultDB.updateBox(TH.scopeOf('u1'), unparsable, TH.noBoxYet), 'bad_record')
     expect(await vaultDB.readBox(TH.scopeOf('u1'), 'anthropic')).to.be.null
   })
 
