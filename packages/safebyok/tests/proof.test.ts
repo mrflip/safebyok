@@ -200,7 +200,7 @@ describe("passkeyProof.wayinKeyFor", () => {
   })
 })
 
-/** What a way in labelled `wayinlabel` is stamped with. */
+/** What a way in is stamped with: its vaultKey epoch, and the device and time that sealed it. */
 const stamp = { vault_key_epoch: 1, device_id: 'device-one', registered_at: Date.UTC(2026, 9, 15) }
 
 /** A deriver whose handed-back bytes the test keeps hold of, to look at after the proof is through with them. */
