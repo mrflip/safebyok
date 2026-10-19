@@ -49,7 +49,7 @@ const AesGcm = { name: 'AES-GCM', length: 256 } as const
 const IvBytes = 12
 
 /**
- * One part of a {@link cipherCtx} (one string or number, or a flat record of them -- the public
+ * One part of a {@link cipherCtx} (one string or number, or a flat record of them -- the visible
  * header of a wayin or a lockbox, say) encoded with its keys sorted. Every field of a
  * record is bound: one set to undefined is refused, never dropped as JSON would drop it.
  */

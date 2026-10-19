@@ -1,7 +1,7 @@
 # safebyok-convex
 
 safebyok's storage on [Convex](https://convex.dev): a Convex **component** that holds each vault's
-props and lockboxes, ciphertext and public fields only, in tables of its own, and
+props and lockboxes, ciphertext and unencrypted fields only, in tables of its own, and
 **`convexVaultDB`**, the client side a vault stores through. Your Convex backend never sees a
 whisper, a passphrase, or any key that opens one.
 

@@ -9,7 +9,7 @@ safebyok's storage over [GraphQL](https://graphql.org), in two halves:
 * **In the browser**, `safebyok-graphql`: **`graphqlVaultDB({ client })`**, the VaultDB over your
   app's [urql](https://commerce.nearform.com/open-source/urql/) Client, to hand `Vault.make`.
 
-Your server and your database hold ciphertext and a few public fields; neither ever sees a
+Your server and your database hold ciphertext and a few unencrypted fields; neither ever sees a
 whisper, a passphrase, or any key that opens one.
 
 ## Install

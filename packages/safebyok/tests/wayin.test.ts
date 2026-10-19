@@ -321,7 +321,7 @@ describe("Wayin.openWithPassphrase", () => {
   })
 })
 
-/** Each of a wayin's public fields altered: every one is in its wrap's ctx. */
+/** Each of a wayin's visible fields altered: every one is in its wrap's ctx. */
 const TamperCases: readonly (readonly [Partial<PassphraseWayin>, string])[] = [
   [{ wayin_id: 'wayin-elsewhere' },              'its wayin_id swapped'],
   [{ wayinlabel: 'relabelled' },                 'its wayinlabel swapped'],

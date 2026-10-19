@@ -8,10 +8,10 @@ import { PasskeySaltBytes, type PasskeyWayin, type PasskeyProof, type Passphrase
  * Wayins: each the vaultKey wrapped under a wayinKey one kind of wayin makes, so a vault has several
  * ways in and one vaultKey behind them all. Imported whole, as `Wayin`: `Wayin.sealPassphrase`
  * and `Wayin.sealPasskey` make one, `Wayin.open` finds the one a passphrase or a passkey
- * opens, `Wayin.summarize` gives its public face. Internal to the package; the vault calls it.
+ * opens, `Wayin.summarize` gives its visible fields. Internal to the package; the vault calls it.
  *
  * Each wayin's wrap is bound to its vault -- the scope, and the fields of the vault props that never
- * change, `vault_id` and `registered_at` -- and to its own public header (every field but the wrap
+ * change, `vault_id` and `registered_at` -- and to its own visible header (every field but the wrap
  * itself, encoded with its keys sorted: its `vault_key_epoch`, `device_id` and `registered_at`
  * among them), under a purpose its wayinkind names. A passkey wayin's key is made with that same
  * context as its HKDF `info`. The vault props' `unlock_epoch` and the list of wayins are not in it:
@@ -31,7 +31,7 @@ export type VaultKeyPair = { transientKey: CryptoKey, sessionKey: CryptoKey }
 
 /** `WayinT` with every field but its wrap, member by member of a union. */
 type HeaderOf<WayinT> = WayinT extends unknown ? Omit<WayinT, 'vault_key_wayin_wrapped'> : never
-/** A wayin's public header, every field but its wrap: what the wrap is bound to. */
+/** A wayin's visible header, every field but its wrap: what the wrap is bound to. */
 export type WayinHeader = HeaderOf<Wayin>
 
 /**
@@ -65,7 +65,7 @@ const TransientUsage = { extractable: true, usage: ['wrapKey'] } as const
 
 /**
  * The context a wayin's wrap is bound to (and, for a passkey, its key made with): the vault it
- * lets into, and its own public header.
+ * lets into, and its own visible header.
  */
 const wayinCtxOf = (scope: VaultScope, vaultProps: VaultIdentity, header: WayinHeader): Uint8Array => (
   cipherCtx(VaultPropsFormat, scope.applabel, scope.user_id, scope.vaultlabel, vaultProps.vault_id, vaultProps.registered_at, PurposeForWayinkind[header.wayinkind], header)
@@ -304,7 +304,7 @@ const tryUnwrap = async (wayinKey: CryptoKey, wayinCtx: Uint8Array, wrapped: Cip
 }
 
 /**
- * The public face of a wayin, as a locked vault may show it: its wayinkind, id, label, and the
+ * The visible fields of a wayin, as a locked vault may show them: its wayinkind, id, label, and the
  * device and time that added it, and for a passkey the credential and salt a host asks its
  * authenticator with; never a passphrase's salt, never a wrap.
  *
@@ -335,7 +335,7 @@ export const open = async (
 
 /**
  * The passkeyKey a passkey's PRF answer makes: HKDF-SHA256 over the answer, its `info` the
- * wayin's whole ctx -- the vault, the purpose, and every public field of the wayin,
+ * wayin's whole ctx -- the vault, the purpose, and every visible field of the wayin,
  * the credential among them -- so the same answer put to any other use, or in any other vault,
  * makes another key.
  */

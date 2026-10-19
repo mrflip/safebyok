@@ -460,7 +460,7 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
   kept: they existed only in development and demo storage, never in a published version.
 * 2026-10-15: `VaultDB`'s public verbs turn any failure from an adapter that is not already a
   `VaultError` into kind `storage_unavailable`, with the adapter's own error attached as the
-  standard `cause`. Adapters see only ciphertext and public record fields, but that cause is
+  standard `cause`. Adapters see only ciphertext and unencrypted record fields, but that cause is
   whatever the backend's client threw, unfiltered.
 * 2026-10-15: `localVaultDB` and `idbVaultDB` key rows by `applabel:user_id:vaultlabel`, and
   `user_id` may hold a colon, so one user's rows can share another scope's ckey prefix. Listing
@@ -691,7 +691,7 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
   envelopes, each the one vaultKey wrapped under its own key. A passphrase envelope has its own
   random `salt_b64` (never shared between envelopes) and its own `unlock_id`, and its wrap's
   additional data is the format, scope, `vault_id`, a purpose per method
-  (`vault_key_passphrase_wrapped`), and the envelope's whole public header (`method`,
+  (`vault_key_passphrase_wrapped`), and the envelope's whole visible header (`method`,
   `unlock_id`, `unlocklabel`, `key_deriver_label`, `salt_b64`) as key-sorted JSON (and, since
   the sweep entry below, the bundle's `registered_at`). The
   `unlock_epoch` is no longer in it, since a change to one envelope bumps the epoch and the
@@ -721,7 +721,7 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
   `["safebyok-vault-v1", "vault_key_passkey_wrapped", credential_id]` as JSON (since the sweep
   entry below, the wrap's whole additional data); the wrap's additional
   data is the format, scope, `vault_id`, purpose `vault_key_passkey_wrapped` and the envelope's
-  public header, as for a passphrase envelope. A stored salt that is not base64url of 32 bytes
+  visible header, as for a passphrase envelope. A stored salt that is not base64url of 32 bytes
   refuses as `corrupt_record` (since 2026-10-16, `damaged_unlock`: see that entry), checked at unlock rather than in the schema (the size budget, as for
   passphrase salts). The core never calls WebAuthn and never stores the answer; the answer passes
   through host JavaScript as a `Uint8Array` the vault does not wipe.
@@ -738,11 +738,11 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
 * 2026-10-15; 2026-10-18: **every field a record writes is bound, unless a reason below says not** (the
   Coach: "make everything verifiable unless there's a good reason not to"). A passkey envelope's
   HKDF `info` is now its wrap's whole additional data -- format, scope, `vault_id`, the bundle's
-  `registered_at`, purpose, and the envelope's public header (`method`, `unlock_id`,
+  `registered_at`, purpose, and the envelope's visible header (`method`, `unlock_id`,
   `unlocklabel`, `credential_id`, `prf_salt_b64`) -- so the passkeyKey itself, not only the wrap, belongs to one vault
   and one envelope; HKDF info and AES-GCM additional data are the same bytes, fed to different
   primitives. Every unlock envelope's wrap binds the bundle's `registered_at`. A lockbox's two
-  encryptions bind its whole public header (`format`, `boxlabel`, `revision_id`, `note`,
+  encryptions bind its whole visible header (`format`, `boxlabel`, `revision_id`, `note`,
   `registered_at`, `changed_at`: every field but the two ciphered ones, as Zod's parse leaves the
   record; an absent or undefined note is left out alike), so a backend that alters a note or a time
   makes `read()` refuse `corrupt_record`; a future field is bound the day it is added to the
@@ -812,7 +812,7 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
   stack and `cause` to the browser. Anything a VaultDB throws that is not a VaultError crosses as
   `storage_unavailable`. Unlock envelopes cross as opaque JSON that GraphQL does not check; only
   the core's VaultDB validation does, so a user can write a malformed envelope into their own
-  vault and no one else's. The browser's urql Client may keep vault records (ciphertext and public
+  vault and no one else's. The browser's urql Client may keep vault records (ciphertext and unencrypted
   fields) in its document cache, though every vault query is `network-only` and never answered
   from it. A subscription's user is fixed when it starts (over a websocket, when the connection
   opened), so a session revoked meanwhile keeps hearing the vault's scope -- never a record --
@@ -1039,7 +1039,7 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
   clients cannot keep. `VaultDB` verbs no longer take a validators bag at all, so no server or
   wrapper can be handed the wrong one. Each adapter declares `maxNameBytes` (Postgres: 640, so a
   lockbox's four-name primary key fits a btree entry) and the base class refuses a longer name.
-* 2026-10-16; 2026-10-18: **a lockbox's note becomes a public bag of any JSON, bound; its whisper's codec
+* 2026-10-16; 2026-10-18: **a lockbox's note becomes a visible bag of any JSON, bound; its whisper's codec
   and schema version are reserved, bound too** (push_to_100_a, thread 2; G023, G025, G040). The
   lockbox (`safebyok-lockbox-v3`) holds `public_json`, the host's bag as stable-serialized JSON
   text, always written (`{}` when the host gave none, so an absent bag and an empty one are one
@@ -1057,7 +1057,7 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
   storage is never sealed into a fresh revision that reads clean (found in review). What the bag reveals: everything in
   it, in the clear, to anyone who reads storage, and its size; the vault never interprets it,
   checks only that it is JSON, and the snapshot shows it unverified until the box is opened, as
-  every public field is. Its size is capped only with the whisper's (`maxWhisperBytes` counts
+  every visible field is. Its size is capped only with the whisper's (`maxWhisperBytes` counts
   both), so a host cannot put a bag of megabytes in front of the listing through the vault.
   Reserving the codec fields now means a later codec (padding, G026) or a whisper shape version
   changes no bound field set and re-encrypts nothing. Two binding fixes ride along: the lockbox's
@@ -1267,7 +1267,7 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
   common call the slow one. A host that removes a way in because it was compromised rotates too.
 * 2026-10-16: **`UnlockSummary` shows `device_id` and `registered_at`.** The snapshot of a locked
   vault already listed each way in; it now says too when it was added and by which device, so a
-  user can spot a way in they did not make. Both are public fields of the envelope, bound into its
+  user can spot a way in they did not make. Both are visible fields of the envelope, bound into its
   wrap, and `device_id` is one random id per device per vault (the mark's `device_id`), so it
   links nothing the vault does not already link: not across vaults, not to the hardware.
 
@@ -1421,7 +1421,7 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
 * 2026-10-17 (thread 5b, store_base): **Convex carries no cause on any refusal.** `convexVaultDB`
   (`safebyok-convex/src/convex-vault-db.ts`) refuses with no `cause` at all -- `identity_revoked`,
   `vault_full` and `storage_unavailable` alike -- because a Convex error on a dev deployment may
-  quote the call's arguments (names, public bags, ciphertext). Its refusals are made through
+  quote the call's arguments (names, visible bags, ciphertext). Its refusals are made through
   `Sanitizer.refusalFor`, and the message points the developer to the deployment's logs and the
   browser console instead.
 * 2026-10-17 (thread 5b, store_base, G304): **GraphQL errors cross with no server text where they
@@ -1504,8 +1504,8 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
   (`Lockbox` and `LockboxSummary`, `types.ts`); v3 records fail validation and list as damaged,
   with no migration.
 * 2026-10-17 (thread 17, written_at, [#141](https://github.com/mrflip/safebyok/pull/141)): **`store()`
-  still deciphers the old record before carrying its public fields forward.** A store that leaves
-  out the public bag carries the old record's `public_json` and `registered_at` forward only from
+  still deciphers the old record before carrying its visible fields forward.** A store that leaves
+  out the visible bag carries the old record's `public_json` and `registered_at` forward only from
   a record that opens under the vault's key (`recordOpens`, `vault.ts`, formerly
   `openedWhisperOf`), so a bag or time planted in storage is not sealed into a fresh revision that
   reads clean; the function returns only a boolean and the deciphered whisper is dropped unread.
@@ -1583,7 +1583,7 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
   **`store()` refuses unknown option keys with `bad_option`.** `optionsCheck`
   (`packages/safebyok/src/options.ts`, shared with the strict check of `openVault`'s `validators`)
   refuses a key it does not know. A caller still passing the retired `{ note }`, beside or instead
-  of `{ public }`, is told at once rather than silently storing no public bag. The refusal never
+  of `{ public }`, is told at once rather than silently storing no visible bag. The refusal never
   quotes the options.
 * 2026-10-17 (PR [#6](https://github.com/mrflip/safebyok/pull/6)): **the non-extractable vaultKey
   is not a defence against code running in the page while the vault is unlocked.** The session's

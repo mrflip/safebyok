@@ -33,8 +33,8 @@ export type VaultState = 'opening' | 'absent' | 'locked' | 'unlocked'
 
 /**
  * Immutable picture of the vault for rendering, shaped for `useSyncExternalStore`: the object
- * keeps its identity until something changes. Lockbox summaries (labels and public metadata, no
- * whispers) are present even while locked -- that is the point of keeping metadata public.
+ * keeps its identity until something changes. Lockbox summaries (labels and other visible fields, no
+ * whispers) are present even while locked -- that is the point of leaving them unencrypted.
  */
 export type VaultSnapshot = {
   state:     VaultState
@@ -56,7 +56,7 @@ export type VaultSnapshot = {
    */
   askPassphraseAt: number | null
   /**
-   * The vault's ways in, public face only, in the order the vault tries them: one
+   * The vault's ways in, visible fields only, in the order the vault tries them: one
    * {@link WayinSummary} per passphrase or passkey, readable while locked, so a host can list
    * them, ask which one the user means, name one to `unlock()`, `changePassphrase()` or
    * `retireWayin()`, and ask a passkey's authenticator for its answer. Empty until the vault exists.
@@ -532,20 +532,20 @@ export type Vault = {
    * retired first, then written; should that write fail, the old record is gone and the call
    * throws: calling `storeBox()` again writes the lockbox afresh. A record that reads but will not decipher --
    * its ciphertext, its sidecar or a time altered in storage -- is written over its revision, but
-   * carries nothing forward either: nothing vouches for its server-readable fields, so its sidecar becomes `{}`
+   * carries nothing forward either: nothing vouches for its visible fields, so its sidecar becomes `{}`
    * unless one is given, and its `registered_at` is now. A boxlabel the vault's check refuses is
    * kind 'bad_label', writing nothing, even where a lockbox stored under other checks stands under
    * it: that one reads and retires by its name, but is never written anew under it.
    *
    * `opts.sidecar` is the lockbox's sidecar ({@link Sidecar}): your app's own data, riding
-   * beside the whisper, server-readable -- authenticated, but never encrypted, so anyone who can
+   * beside the whisper, visible in storage -- authenticated, but never encrypted, so anyone who can
    * read the database can read it. Any JSON value, shown in the snapshot while locked, never interpreted by the vault -- kind 'bad_option' for anything JSON
    * cannot carry. Check its shape yourself before storing it. It is the only option: any other
    * (a misspelt `sidcar`, or a `note` beside it) is kind 'bad_option', writing nothing. Left out, the lockbox keeps the sidecar
    * it has (when its record opens: see above), and a new lockbox gets `{}`; `{}` empties it. The sidecar is stored in the clear and
    * bound into the lockbox's encryption, so a sidecar altered in storage makes the lockbox refuse to
-   * open. Put in it what your app wants searchable server-side (a team, a rotation reminder, a
-   * usage count), never secret material. A lockbox heavier, whisper and names and sidecar together,
+   * open. Put in it what your app wants searchable server-side (a team, a rotation reminder,
+   * a count of the calls the app made to OpenRouter with this whisper), never secret material. A lockbox heavier, whisper and names and sidecar together,
    * than storage holds in one record is refused with kind 'lockbox_too_large'; one that would take
    * the vault past what its storage holds of one vault, with kind 'vault_full'.
    *
@@ -723,7 +723,7 @@ const make = (opts: MakeVaultOpts): Vault => {
     if (vaultKey !== null && askPassphraseAt !== null && askPassphraseAt > clockNow()) { return 'unlocked' }
     return 'locked'
   }
-  /** The public face of each way into the vault, once there is one. */
+  /** The visible fields of each way into the vault, once there is one. */
   const wayinSummaries = (): readonly WayinSummary[] => (
     vaultProps === UnreadVaultProps || vaultProps === null ? [] : vaultProps.wayins.map((wayin) => Wayin.summarize(wayin))
   )
@@ -755,7 +755,7 @@ const make = (opts: MakeVaultOpts): Vault => {
   const leaseCtx = (vaultId: string, epoch: number, deadline: number) => (
     cipherCtx('safebyok-lease-v1', applabel, scope.user_id, vaultlabel, vaultId, epoch, deadline, 'vault_key_lease_wrapped')
   )
-  // A lockbox's ctx binds its format, the vault it lies in, and its record's whole public header:
+  // A lockbox's ctx binds its format, the vault it lies in, and its record's whole visible header:
   // every field but the format, which leads, and the two encrypted ones, so a sidecar, a time, its
   // codec or its vaultKey's epoch altered in storage refuses to open.
   const boxCtx = (vaultId: string, header: LockboxHeader, purpose: 'lockbox_key_wrapped' | 'whisper_ciphered') => (
@@ -1622,7 +1622,7 @@ const make = (opts: MakeVaultOpts): Vault => {
   }
 
   /**
-   * True when `prev` opens under the vault's key, and so vouches for the server-readable fields a store
+   * True when `prev` opens under the vault's key, and so vouches for the visible fields a store
    * carries forward from it; false for a record altered in storage, whose fields nothing vouches
    * for. What it holds is dropped unread: a store compares nothing.
    */
@@ -1857,7 +1857,7 @@ const make = (opts: MakeVaultOpts): Vault => {
       const unlockedKey = keyInHand()
       const standingVaultProps = currentVaultProps()
       const { vault_id: vaultId, vault_key_epoch: vaultKeyEpoch } = standingVaultProps
-      // Only a record that opens vouches for its server-readable fields: one that will not, altered in
+      // Only a record that opens vouches for its visible fields: one that will not, altered in
       // storage, is written over as a fresh lockbox is, keeping neither its sidecar nor its
       // registered_at, so a sidecar planted in storage is never sealed into a revision that reads clean.
       const vouched = prev !== null && await recordOpens(unlockedKey, standingVaultProps, prev) ? prev : null
@@ -2249,7 +2249,7 @@ const LockboxFormat = 'safebyok-lockbox-v5'
 const UntrustedStorageKinds = ['identity_revoked', 'rolled_back', 'newer_format'] as const satisfies readonly VaultErrorKind[]
 
 /**
- * A lockbox's public header: every field of its record but its format, which leads each ctx,
+ * A lockbox's visible header: every field of its record but its format, which leads each ctx,
  * and the two encrypted ones. All of it is bound into both.
  */
 type LockboxHeader = Omit<Lockbox, 'format' | 'lockbox_key_wrapped' | 'whisper_ciphered'>
@@ -2258,7 +2258,7 @@ type LockboxHeader = Omit<Lockbox, 'format' | 'lockbox_key_wrapped' | 'whisper_c
 const EmptySidecarJson = '{}'
 
 /** What `storeBox()`'s options may hold: a sidecar, which {@link sidecarJsonOf} checks, and nothing else. */
-const checkStoreOpts = optionsCheck({ sidecar: Z.optional(Z.unknown()) }, "storeBox()'s only option is `sidecar`, the lockbox's own server-readable data (it is never encrypted): check its spelling, and leave out any other. A note is kept in the sidecar: { sidecar: { note } }.")
+const checkStoreOpts = optionsCheck({ sidecar: Z.optional(Z.unknown()) }, "storeBox()'s only option is `sidecar`, the lockbox's own visible data (it is authenticated but never encrypted): check its spelling, and leave out any other. A note is kept in the sidecar: { sidecar: { note } }.")
 
 /**
  * The sidecar a `storeBox()` was handed, as the JSON a lockbox keeps, keys sorted; undefined when
