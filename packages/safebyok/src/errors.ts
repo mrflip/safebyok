@@ -1,5 +1,5 @@
 import type { BoxRecord } from './box'
-import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types'
+import type { Capacity, DamagedBox, WayinSummary } from './types'
 
 /**
  * Every way a vault call can refuse, as a caller branches on them -- and every refusalkind any
@@ -183,15 +183,13 @@ export const RefusalFamilyForKind = {
  */
 export type RefusalMeta = {
   /** `stale_write`: the box that won, as stored; null when nothing stands under the boxlabel. */
-  box_stored?:         BoxRecord | null
-  /** `vault_locked` after a relock: the vault props storage holds, or null when the vault is gone. */
-  vault_props_stored?: VaultProps | null
+  box_stored?:   BoxRecord | null
   /** `box_too_large`, `vault_full`: how much room there is. */
-  capacity?:           Capacity
+  capacity?:     Capacity
   /** `damaged_box` told of a listing: the box as the listing shows it, its boxlabel and the revision it names. */
-  box_listed?:         DamagedBox
+  box_listed?:   DamagedBox
   /** `damaged_wayin` told of a read of the vault props: the way in as the snapshot lists it. */
-  wayin_listed?:       WayinSummary
+  wayin_listed?: WayinSummary
 }
 
 /** What a VaultError is made with beside its refusalkind and message: the `cause` behind it, and its `meta`. */
