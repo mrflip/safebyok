@@ -148,8 +148,10 @@ added or folded into through the subagent, and no other entry changes.
   changeset's Postgres steps before the new table SQL.
 * 2026-10-18 (make_hello); 2026-10-19 (20261019-softlock_gone, amending points 1 and 2); 2026-10-19 (20261019-fields_and_make, amending the opening and point 4): **`openVault` is split into `Vault.make`, which returns a handle at
   once, and `vault.hello()`, which reads storage and the lease.** `Vault.make(opts)` is synchronous:
-  it validates every option and starts `hello()` itself. `hello()` reads the vault props and this
-  device's lease and settles the snapshot from `opening` into `absent`, `locked` or `unlocked`.
+  it validates every option and returns the handle in state `opening`, reading no storage and starting
+  no timer or watch; the first `hello()` reads (see the 2026-10-19 amendment below). `hello()` reads
+  the vault props and this device's lease and settles the snapshot from `opening` into `absent`,
+  `locked` or `unlocked`.
   Every method but `lock()` and `close()` awaits it first (amended 2026-10-19: `lockSoon()` is gone) (after its synchronous
   argument checks), so a call made before storage answers waits; a call that touches a whisper
   still needs the vault unlocked once `hello()` settles. Nothing that failed closed proceeds. No
