@@ -20,8 +20,8 @@ Three layers share the work, and each guarantee below belongs to one of them.
   app that is storing far more than it meant to.
 * **The base class** (`VaultDB`'s public verbs) checks every name, record and expectation on the
   way in and every record on the way out -- the lockbox a write hands back among them -- refuses
-  what is malformed before your code sees it, turns a `false` or `null` from you into
-  `stale_write`, and turns anything you throw that is not a
+  what is malformed before your code sees it, turns a `false` from you (from a lockbox write, a
+  `null`) into `stale_write`, and turns anything you throw that is not a
   `VaultError` into `storage_unavailable`, your error as its cause. It holds every name to the
   floor and to what your adapter declares (*Names*, below), never to a host's own validators.
   It guards `subscribe`: each listener is called so that nothing it throws, and no promise it
