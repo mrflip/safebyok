@@ -34,6 +34,39 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-19 (thread B2 `lease`, branch 20261019-lease): **the lease is a class, `Lease`, and its
+  crypto lives apart from the vault's decisions.** `Lease` (`packages/safebyok/src/lease.ts`) holds
+  the lease's fields and its wrap and unwrap; when to grant, when to ask, and every write to the
+  device store stay in the vault (`#grantLease`, `#takeUpLease` in `vault.ts`). `Lease.grant(vault,
+  holder, vaultKeyPair, askPassphraseAt)` makes a fresh AES-GCM 256 leaseKey, `extractable: false`,
+  usages wrapKey and unwrapKey only, and wraps the vaultKey's extractable transient handle under it,
+  bound to leaseCtx; it keeps no reference to either handle of the pair (a test checks that nothing on
+  the lease or its record is that key), and writes nothing: the vault puts `lease.props` through
+  `deviceDB.putLease`. leaseCtx is unchanged byte for byte (`cipherCtx('safebyok-lease-v1',
+  applabel, user_id, vaultlabel, vault_id, unlock_epoch, ask_passphrase_at,
+  'vault_key_lease_wrapped')`, pinned by `tests/ctx-bytes.test.ts`), so leases already on a device
+  still open. `Lease.make(vault, record)` checks a record through the `LeaseRecord` Zod schema
+  (renamed from `Lease`) and refuses one this package does not write, or one naming another app,
+  user or vault than its vault's, as `corrupt_record`, quoting nothing of it. `lease.tryOpen(holder)`
+  refuses `vault_locked` before any unwrap when the holder's `vault_id` or `unlock_epoch` differ from
+  the lease's, or the vault's clock is at or past `ask_passphrase_at`; it then unwraps under a ctx
+  rebuilt from the vault's own scope and the holder's `vault_id` and `unlock_epoch` (what the vault
+  expects, not the record's own fields), into a non-extractable handle (wrapKey, unwrapKey). An
+  unwrap that fails (a tampered wrap, a moved deadline, a swapped leaseKey) is `corrupt_record`, with
+  no cause attached. The vault erases the lease on either refusal, and warns through the logger only
+  for `corrupt_record`, as before. The `leaseHours` fit check (a lease ending further off than this
+  handle's `leaseHours` allows is discarded) stays in the vault, as `! lease.endsWithin(leaseMillis)`
+  before `tryOpen`; `ensureLease`'s renew threshold is `lease.endsWithin(renewMillis)`; the vault holds
+  the `Lease` beside the vaultKey in place of a bare `askPassphraseAt`. **`DeviceDB`'s verbs
+  (`getLease`, `putLease`, `delLease`, `getMark`, `putMark`, `delMark`, `delAll`) now resolve an
+  `Outcome` and never reject.** `deviceOutcomeOf(verb, body)` (`src/device-db.ts`) turns an adapter's
+  failure into `storage_blocked` or `storage_unavailable`, the store's error as `cause`, the message
+  naming no scope and quoting no record. `deviceTroubleAsConditions`, moved there from
+  `del-damaged-vault.ts`, is the vault's guard on a host's own `DeviceDB`: a throw, or a bad Outcome
+  whose `err` is no `VaultError`, is said the same way, and an answer that is no Outcome is refused
+  `bad_option`. Unchanged: every abort and outrun check from `a_sec` around the take-up and the grant
+  (the take-up's AbortController, the grant standing a take-up down before it writes, an overtaken
+  grant erasing its own lease) is where it was, in the vault.
 * 2026-10-19 (thread a_fixes): **one shared check for a refusal from another copy of safebyok.**
   `isVaultError(err, refusalkind?)` (`packages/safebyok/src/errors.ts`) is now the one test for a
   refusal, and it recognizes a `VaultError` made by another copy of safebyok loaded beside this one
@@ -1016,7 +1049,7 @@ added or folded into through the subagent, and no other entry changes.
   A host's `putBox()` sidecar is checked against the stored box's own schema before anything is
   written (an unchecked over-long sidecar once made every later `hello()` refuse the vault as
   `corrupt_record`). Whatever a `DeviceDB` hands back -- the host may supply its own -- is checked
-  against `Lease` by the vault, and one that does not pass is erased and reads as no
+  against `LeaseRecord` by the vault (through `Lease.make`, amended 2026-10-19), and one that does not pass is erased and reads as no
   lease. `VaultDB`'s write verbs check labels and scope only, not the records the
   vault builds. A lease's `ask_passphrase_at` is not bound into its encryption, so
   whoever can write this device's IndexedDB can extend it (to any finite number of milliseconds).
@@ -1356,7 +1389,7 @@ added or folded into through the subagent, and no other entry changes.
   **Every name is checked everywhere**: the vault and every `VaultDB` verb check with the same
   bag, records read back included, so a stored row whose name the vault's checks refuse
   is `corrupt_record`, not trusted; the bag never reaches storage or the Convex server, which take
-  any text. The stored records (`Box`, `VaultProps`, `Lease`, `VaultScope`) now check
+  any text. The stored records (`Box`, `VaultProps`, `LeaseRecord`, `VaultScope`) now check
   names only as text, as does a wayin's `wayinlabel`: the `Label` grammar holds when a
   wayin is added (`addPassphrase`, `addPasskey`), and a stored wayin under another label still
   opens, since the host's validators have no slot for it. A host's schema runs on names only, never on a whisper, a sidecar or a
@@ -2048,7 +2081,7 @@ added or folded into through the subagent, and no other entry changes.
   after a successful catch-up; a failed catch-up keeps its own message.
 * 2026-10-17 (thread 17, written_at, [#141](https://github.com/mrflip/safebyok/pull/141)): **new
   kind `storage_blocked`, told from `storage_unavailable` by the browser error's `name`.** The
-  device-store wrapper (`deviceTroubleAsConditions` / `asCondition`, `vault.ts`) says a failure
+  device-store wrapper (`deviceOutcomeOf` and `deviceTroubleAsConditions`, `device-db.ts`; amended 2026-10-19: they were in `vault.ts`, then `del-damaged-vault.ts`) says a failure
   named `SecurityError`, `QuotaExceededError` or `NotSupportedError` as `storage_blocked` (no
   retry mends it) and every other non-VaultError failure as `storage_unavailable`. The check is
   duck-typed on `name`, not `instanceof`, so a DOMException from another frame is told alike; it
