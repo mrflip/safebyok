@@ -273,8 +273,10 @@ export abstract class VaultDB {
   /**
    * Replace the vault props with `vaultProps`, only while the standing ones still have the
    * `vault_id` and `unlock_epoch` in `expected`. Refuses with kind `stale_write` otherwise --
-   * including when no vault props stand at all -- and writes nothing. A vault's `vault_id` never
-   * changes, so `vaultProps` must carry the one in `expected`: kind 'bad_record' otherwise.
+   * including when no vault props stand at all -- and writes nothing. Vault props or an `expected`
+   * this package would not build are refused with kind `bad_record`, before storage sees them. A
+   * vault's `vault_id` never changes, so `vaultProps` must carry the one in `expected`: kind
+   * 'bad_record' otherwise.
    */
   async updateVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<void> {
     heldScope(this, vaultProps)
@@ -339,9 +341,10 @@ export abstract class VaultDB {
    * (or, for null, there is none). Refuses with kind `stale_write` otherwise -- including when the
    * scope holds no vault props -- and writes nothing. A backend that holds each vault to a limit of
    * its own refuses a write past it with kind `vault_full`, writing nothing. A lockbox heavier than the
-   * backend's `maxRecordBytes` is refused with kind `lockbox_too_large` before storage sees it. A
-   * lockbox is written under the vaultKey it was sealed with, so its `vault_key_epoch` must be the
-   * one in `expected`: kind 'bad_record' otherwise.
+   * backend's `maxRecordBytes` is refused with kind `lockbox_too_large` before storage sees it, and
+   * a lockbox or an `expected` this package would not build with kind `bad_record`. A lockbox is
+   * written under the vaultKey it was sealed with, so its `vault_key_epoch` must be the one in
+   * `expected`: kind 'bad_record' otherwise.
    *
    * Resolves the lockbox as storage now holds it, handed back by the same atomic step as the write
    * and held to the check `readBox` makes: field for field the one written, from an adapter that
