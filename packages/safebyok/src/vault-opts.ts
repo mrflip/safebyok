@@ -56,7 +56,7 @@ export type MakeVaultOpts = {
   /**
    * How many minutes `hello()` trusts the vault's last read of storage, when its own call says
    * nothing: a hello within that many minutes of the last read reads nothing anew, and only
-   * settles the picture it has. Default: {@link StaleMinutes}, 1. Any number from zero up,
+   * settles the picture it has. Default: {@link StaleMinutes}, 5. Any number from zero up,
    * fractions too (0.5 is thirty seconds); `0` has every hello read, and `Infinity` has a hello
    * read only when no read has succeeded yet, or what it read may no longer stand. Kind
    * 'bad_option' for anything else.

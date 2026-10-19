@@ -669,18 +669,18 @@ describe("Vault.make, by the Contract", () => {
   it("reads half a minute as thirty seconds, and Infinity as forever, as parseStaleMinutes's example shows", () => {
     expect(parseStaleMinutes(0.5, 'Vault.make')).to.eq(30_000)
     expect(parseStaleMinutes(Infinity, 'hello')).to.eq(ForeverMillis)
-    expect(parseStaleMinutes(undefined, 'hello')).to.eq(MinuteMillis)
+    expect(parseStaleMinutes(undefined, 'hello')).to.eq(5 * MinuteMillis)
   })
 
-  it("has hello read at most every five minutes, as StaleMinutes's example shows", async () => {
+  it("has hello read at most once a minute, as StaleMinutes's example shows", async () => {
     const world = makeWorld()
-    const vault = Vault.make({ ...world.optsWith(), staleMinutes: 5 })   // hello() reads at most every five minutes
+    const vault = Vault.make({ ...world.optsWith(), staleMinutes: 1 })   // hello() reads at most once a minute
     await vault.hello()
     const propsReads = vi.spyOn(world.vaultDB, 'getVaultProps')
-    world.advance(4 * MinuteMillis)
+    world.advance(MinuteMillis - 1)
     await vault.hello()
     expect(propsReads).not.toHaveBeenCalled()
-    world.advance(MinuteMillis)
+    world.advance(1)
     await vault.hello()
     expect(propsReads).toHaveBeenCalledTimes(1)
   })

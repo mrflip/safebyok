@@ -69,7 +69,7 @@ but `lock()` and `close()` starts and waits for -- reads storage, starts its wat
 settles it. A hello that fails reading storage refuses to its caller and leaves the vault
 `opening`; one that fails after it, as this device's store refuses its lease, settles `locked`.
 `vault.hello()` tries again, and so does any other call. Once a hello has read storage, another
-within `staleMinutes` (a minute, unless `Vault.make` or the call says otherwise) reads nothing
+within `staleMinutes` (five minutes, unless `Vault.make` or the call says otherwise) reads nothing
 anew; call `hello()` on `visibilitychange`, and `hello({ staleMinutes: 0 })` to read now.
 
 The vault's fields -- `state`, `boxes`, `wayins`, `capacity`, `askPassphraseAt`, `trouble`,

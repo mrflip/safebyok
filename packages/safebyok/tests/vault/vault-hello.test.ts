@@ -572,11 +572,11 @@ describe("vault.hello, by the Contract", () => {
     expect(vault.state).to.eq('locked')
   })
 
-  it("takes its staleMinutes from make, a minute by default (Contract: vault.hello, staleMinutes)", async () => {
+  it("takes its staleMinutes from make, five minutes by default (Contract: vault.hello, staleMinutes)", async () => {
     const world = makeWorld()
     const vault = await world.open()
     const propsReads = vi.spyOn(world.vaultDB, 'getVaultProps')
-    world.advance((StaleMinutes * MinuteMillis) - 1)
+    world.advance((5 * MinuteMillis) - 1)
     await vault.hello()
     expect(propsReads).toHaveBeenCalledTimes(0)
     world.advance(1)

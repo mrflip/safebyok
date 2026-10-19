@@ -455,12 +455,12 @@ export const LeaseHours = 168 // seven days
 
 /**
  * How many minutes a `hello()` trusts the vault's last read of storage, unless the caller says
- * otherwise: within one minute of it, a hello reads nothing anew, so a burst of hellos -- each
+ * otherwise: within five minutes of it, a hello reads nothing anew, so a burst of hellos -- each
  * component that mounts calling one -- costs one read.
  *
- * @example Vault.make({ ...opts, staleMinutes: 5 })   // hello() reads at most every five minutes
+ * @example Vault.make({ ...opts, staleMinutes: 1 })   // hello() reads at most once a minute
  */
-export const StaleMinutes = 1
+export const StaleMinutes = 5
 
 /**
  * The longest finite `leaseHours` a vault takes: 588 hours, 24.5 days. The vault drops its key

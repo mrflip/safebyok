@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { FarFuture, FarPast, LeaseHours, MaxLeaseHours, MinuteMillis, ForeverMillis } from '../../src/types'
+import { FarFuture, FarPast, LeaseHours, MaxLeaseHours, MinuteMillis, ForeverMillis, StaleMinutes } from '../../src/types'
 import { memoryDeviceDB } from '../../src/device-db'
 import { Vault } from '../../src/vault'
 import { Ask, type GetProof, type ProofAnswer } from '../../src/ask'
@@ -866,7 +866,7 @@ describe("vault.ensureLease, by the Contract", () => {
     const getProof = typingPw()
     const { world, vault } = await lockedVaultWith({ getProof })
     const reads = vi.spyOn(world.vaultDB, 'getVaultProps')
-    world.advance(2 * MinuteMillis)
+    world.advance((StaleMinutes + 1) * MinuteMillis)
     expect(await vault.ensureLease()).to.eq(vault)
     expect(vault.state).to.eq('unlocked')
     // The hello before the ask, the attempt's own read, and the hello after, once staleMinutes have passed.

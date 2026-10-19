@@ -297,7 +297,7 @@ export class Vault {
    *
    * Calls under way share one read. Once a hello has read storage, a later one within
    * `opts.staleMinutes` of the vault's last read -- by default the `staleMinutes` the vault was
-   * made with, a minute unless it said otherwise -- reads nothing, and only settles the picture it
+   * made with, five minutes unless it said otherwise -- reads nothing, and only settles the picture it
    * has (a lease run out shows as `locked`); `staleMinutes: 0` has it read. It reads afresh,
    * whatever the minutes, when what was read may no longer stand: a read of storage that failed,
    * storage the vault cannot trust (`identity_revoked`, `rolled_back`, `newer_format`), or the
