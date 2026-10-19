@@ -553,6 +553,11 @@ says these things:
   the vault, or grant its lease afresh. The change stands, and the call resolves.
 * `warn`: this device's mark of the vault could not be read, so its rollback check starts again
   from what storage holds now.
+* `warn`: a retirement removed another revision than the one the snapshot showed, because another
+  device or tab wrote over the lockbox meanwhile -- `retireBox()` (`{ call: 'retireBox' }`), or the
+  retirement a `storeBox()` makes first over a damaged lockbox naming no revision
+  (`{ call: 'storeBox' }`). The call carries on. When the lockbox shown was damaged, the message
+  says so and the story adds `damaged: true`. It names no revision or boxlabel.
 * `warn`: the hello `Vault.make` starts was refused (`{ call: 'hello' }`, the refusal as its
   error). The vault stays `opening`, saying why as its snapshot's `trouble`; `vault.hello()`, or
   any other call, tries again.
