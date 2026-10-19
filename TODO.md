@@ -111,7 +111,10 @@ mechanism per case now. The scenarios, each with today's outcome:
 7. A sign-out with an unlock in flight in another tab: as 2; harmless, since a lease is scoped by
    user id.
 
-The policy session decides, for each, what the vault promises, and writes the test first. It also
+The policy session decides, for each, what the vault promises, and writes the test first. The
+tests this removal deleted, verbatim and by theme, each with the lesson it carried, are its
+checklist: `softlock_gone-removed-tests.md` in the thread's folder (`20261019-softlock_gone/`,
+under `whiteboard/` or, once closed, `winboard/`). It also
 answers the question this entry replaces (*Lock NOW vs soft lock*, from
 [#106](https://github.com/mrflip/safebyok/pull/106)): whether `lock()` claws back a store already in
 flight.
