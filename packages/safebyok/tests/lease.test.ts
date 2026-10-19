@@ -241,6 +241,20 @@ describe("lease.endsWithin", () => {
     expect(lease.endsWithin(60 * MinuteMillis)).to.be.true
   })
 
+  it("counts the lease as ended when the clock reads no number, and opens nothing", async () => {
+    const { lease, setNow } = await grantedLease()
+    setNow(NaN)
+    expect(lease.endsWithin(0)).to.be.true
+    await TH.expectBad(lease.tryOpen(holder), 'vault_locked')
+  })
+
+  it("counts a lease granted with a deadline that is no number as ended", async () => {
+    const { vault } = leaseVaultOf()
+    const lease = await Lease.grant(vault, holder, await vaultKeyPairOf(), NaN)
+    expect(lease.endsWithin(0)).to.be.true
+    expect(lease.endsWithin(HourMillis)).to.be.true
+  })
+
   it("reads the vault's clock at each call, never a time it kept", async () => {
     const { lease, setNow } = await grantedLease()
     expect(lease.endsWithin(HourMillis)).to.be.false

@@ -197,7 +197,9 @@ export class Lease {
    * @example lease.endsWithin(60 * MinuteMillis)   // true when it ends within the hour
    */
   endsWithin(millis: number): boolean {
-    return this.ask_passphrase_at - this.vault.clock.now() <= millis
+    const remaining = this.ask_passphrase_at - this.vault.clock.now()
+    // A deadline or a clock reading that is no number counts as ended, never as standing.
+    return remaining <= millis || Number.isNaN(remaining)
   }
 
   /** The record, as `JSON.stringify` and a log line show this lease: its leaseKey as `{}`. */
