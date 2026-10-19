@@ -49,6 +49,9 @@ first guesses* and *Note to the orchestrator* hold for every thread and are not 
 * Contract drift goes to the thread file and the report's *Open matters*; the orchestrator files
   the row and carries rulings into the Contract tab. Workers do not edit the design doc.
 * Phase boundaries are not pauses: phase B cuts from A's restacked tip as soon as A6 files.
+* **Live-backend e2e** (the Coach, 2026-10-19): "If they are passing in ci that's good enough for
+  now. Don't wait on the ci run, but if you see a calamity look into it on a later thread." No
+  thread waits on CI; a CI failure on a pushed branch becomes a small thread of its own.
 
 ## Threads
 
@@ -135,12 +138,19 @@ refusal from another copy of safebyok, used at every `instanceof` site (`asStora
 thread file's "Throwing alone" list gains `delDamagedVault` (its `try` form is phase C's, C5). From A5's review: one sentence in
 `notes/security.md`'s A5 entry, through the sonnet subagent: a vault the provider has let go
 tells no handler.
+*Orchestrator:* from the Coach's rulings (2026-10-19), `a-fixes` also: rename `isVaultCondition`
+to `isCondition` (core and react); `staleMinutes` defaults to **5**; reopen TODO.md's react
+lifecycle / `set-state-in-effect` section ("Leave the todo, this is a big problem. Don't need a
+fix, do need the caveat") and write the caveat for hosts in safebyok-react's README; TODO entries
+"redact with batteries included opts" (a refusal's `cause` chain, in-process GraphQL) and "should
+tryClose really be a promise"; a Postgres README sentence telling operators to check grants when
+users see `not_permitted`. The `hello` example as `tryHello` waits on its row (explain).
 
 ### Phase B: `models`
 
 | # | Label | Base | Model | Review | Gloss |
 |---|---|---|---|---|---|
-| B1 | `proof-wayin` | A's line (A1b restacked in) | opus | high | Adds `adorn`/`decorate` to `utils.ts` first. *Orchestrator:* A3 left `props` unbuilt and `damaged_wayin` news from a listing unbuilt (summaries flag no damaged wayin yet); both are B1's. |
+| B1 | `proof-wayin` | A's line (A1b restacked in) | opus | high | Adds `adorn`/`decorate` to `utils.ts` first. *Orchestrator:* settles the passkey proof's name (the Contract's `Ask.attempt` says `PasskeyAnswer`, the code `PasskeyProof`). Also: A3 left `props` unbuilt and `damaged_wayin` news from a listing unbuilt (summaries flag no damaged wayin yet); both are B1's. |
 | B3 | `box` | A's line | opus | high | Beside B1. |
 | B2 | `lease` | B1 | opus | high | |
 | B4 | `put-wayin` | B2 | opus | medium | Writes its Contract section to the thread file first; YOLO builds to the brief. |
@@ -152,11 +162,11 @@ tells no handler.
 
 | # | Label | Base | Model | Review | Gloss |
 |---|---|---|---|---|---|
-| C1 | `putbox-store` | B's line | opus | high | One atomic conditional write per adapter; battery's races. |
+| C1 | `putbox-store` | B's line | opus | high | One atomic conditional write per adapter; battery's races. *Orchestrator:* `meta.box_stored` is typed `Box | null` until now: widen it (C3 adds the tombstone). A1b's `thread-A1b-c1-putbox.md` has each backend's one-statement write. |
 | C2 | `putbox-vault` | C1 | default | medium | |
 | C7 | `vault-props-verbs` | C1 | default | medium | Beside C2, as the preplan allows. |
 | C3 | `delbox-tombstones` | C2 + C7 restacked | opus | high | *Orchestrator:* C3 and C7 both rewrite every adapter and the battery, so C3 waits for C7 in the line rather than conflicting at the restack. Proposes `delIfIncoherent`'s fate. Writes the line under each `del` doc block that a tombstone stands (thread 0's row, ruled). |
-| C4 | `getbox` | C2 + C7 line | default | medium | Beside C3. Writes `getBox`/`openBox` nesting first. |
+| C4 | `getbox` | C2 + C7 line | default | medium | Beside C3. Writes `getBox`/`openBox` nesting first. *Orchestrator:* removes the vault's own `useBox(boxlabel, callback)` (ruled). |
 | C5 | `lock-close-del` | C3 + C4 restacked | opus | medium | Rewrites the Contract's first guess; files the rewrite as an *Open Matters* row. |
 | C6 | `subscriptions` | C5 | default | medium | |
 
@@ -170,9 +180,9 @@ Not on the runner's path (preplan). Nothing waits for it.
 
 | # | Label | Base | Model | Review | Gloss |
 |---|---|---|---|---|---|
-| D1 | `batteries-core` | C's line | default | medium | `p-retry` as optional peer: the Coach ruled it (dependency yes). |
+| D1 | `batteries-core` | C's line | default | medium | `p-retry` as optional peer: the Coach ruled it (dependency yes). *Orchestrator:* the default `onBadNews` is idempotent: the same `damaged_vault` can be told twice (ruled). |
 | D3 | `customer-docs` | C's line | opus | none (pass 4) | Beside D1. |
-| D2 | `batteries-react` | D1 | default | medium | |
+| D2 | `batteries-react` | D1 | default | medium | *Orchestrator:* A6 pulled forward the shipped dialog as the provider's default `getProof` (`getProof={null}` asks no one); D2 keeps TanStack and `useBox`. |
 | D4 | `demo-and-e2e` | D2 | sonnet | low | |
 | D5 | `sweep` | D4 + D3 line | sonnet | low | Lowers every size line to the rule. Writes a TODO entry: `StringStore`'s `read`/`write`/`erase` to the trio, a quiet-tree rename after the sprint (thread 0's row, ruled). |
 
