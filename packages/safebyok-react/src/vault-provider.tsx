@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { Vault, type Ask, type GetProof, type ProofAnswer, checkStrengthTest, checkValidators, delDamagedVault as delStoredDamagedVault, isVaultCondition, isVaultError, parseLogger, type BadNewsHandler, type MakeVaultOpts, type PassphraseStrengthTest, type VaultDB, type VaultError, type VaultLogger, type VaultScope, type VaultSnapshot, type VaultValidators } from 'safebyok'
+import { Vault, type Ask, type GetProof, type ProofAnswer, checkStrengthTest, checkValidators, delDamagedVault as delStoredDamagedVault, isCondition, isVaultError, parseLogger, type BadNewsHandler, type MakeVaultOpts, type PassphraseStrengthTest, type VaultDB, type VaultError, type VaultLogger, type VaultScope, type VaultSnapshot, type VaultValidators } from 'safebyok'
 import { PassphraseModal, type PassphraseAdvice } from './passphrase-modal'
 
 // == [Hooks]: useVault, useVaultSnapshot, useOpenError, OpenErrorShape
@@ -225,7 +225,7 @@ const adviceFrom = (strengthTest: PassphraseStrengthTest, scope: VaultScope): Pa
  * dialog, and goes on once it unlocks; dismissed, it refuses with kind 'vault_locked'. A lock, a
  * sign-out or another user closes the dialog, its calls refused likewise.
  *
- * If the first `hello()` is refused with a condition (`isVaultCondition` from safebyok) or bad
+ * If the first `hello()` is refused with a condition (`isCondition` from safebyok) or bad
  * news -- storage that cannot be reached, a signed-out user, a damaged record, a browser
  * withholding storage -- the provider keeps the refusal, while the vault is still opening, and
  * hands it down as `openError`, for the app to show in place, beside a `retryOpen` button where a
@@ -349,7 +349,7 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
     if (vaultRef.current !== made) { return }
     if (ok) {
       setHelloRefusal(null)
-    } else if (isVaultCondition(err)) {
+    } else if (isCondition(err)) {
       setHelloRefusal({ vault: made, err })
     } else {
       setHelloFailure({ err })

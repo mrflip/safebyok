@@ -981,5 +981,5 @@ says so. When the box the vault showed was a damaged one, the warning says that,
 carries `damaged: true` beside `call`, so a host can branch on it.
 
 In code, `err.family` is each kind's family, as `RefusalFamilyForKind` gives it (`RefusalFamilyVals`:
-`misuse`, `condition`, `bad_news`), and `isVaultCondition(err)` is true for a `VaultError` of the
+`misuse`, `condition`, `bad_news`), and `isCondition(err)` is true for a `VaultError` of the
 condition or bad news family: show or retry those, and let anything else reach an error boundary.

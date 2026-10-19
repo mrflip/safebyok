@@ -248,10 +248,10 @@ export const isVaultError = (err: unknown, refusalkind?: RefusalKind): err is Va
  *
  * @example
  *   try { await vault.putBox(boxlabel, whisper) } catch (err) {
- *     if (! isVaultCondition(err)) { throw err }
+ *     if (! isCondition(err)) { throw err }
  *     showGripe(err.message)
  *   }
  */
-export const isVaultCondition = (err: unknown): err is VaultError => (
+export const isCondition = (err: unknown): err is VaultError => (
   isVaultError(err) && err.family !== 'misuse'
 )

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { VaultError, RefusalFamilyForKind, RefusalFamilyVals, RefusalKindVals, isVaultCondition, isVaultError } from '../src/errors'
+import { VaultError, RefusalFamilyForKind, RefusalFamilyVals, RefusalKindVals, isCondition, isVaultError } from '../src/errors'
 
 const readmeText = readFileSync(new URL('../README.md', import.meta.url), 'utf8')
 const errorsSource = readFileSync(new URL('../src/errors.ts', import.meta.url), 'utf8')
@@ -173,14 +173,14 @@ const ConditionCases = [
   ['storage_unavailable',                                                                  false, 'a thrown string'],
 ] as const
 
-describe("isVaultCondition", () => {
+describe("isCondition", () => {
   for (const [thrown, expected, blurb] of ConditionCases) {
-    it(`is ${String(expected)} for ${blurb}`, () => { expect(isVaultCondition(thrown)).to.eq(expected) })
+    it(`is ${String(expected)} for ${blurb}`, () => { expect(isCondition(thrown)).to.eq(expected) })
   }
 
   it("narrows to a VaultError, so the caller can read its kind and message", () => {
     const err: unknown = new VaultError('storage_unavailable', 'The vault storage could not be reached.')
-    if (! isVaultCondition(err)) { throw new Error('expected a condition') }
+    if (! isCondition(err)) { throw new Error('expected a condition') }
     expect(err.refusalkind).to.eq('storage_unavailable')
     expect(err.message).to.eq('The vault storage could not be reached.')
   })
@@ -188,7 +188,7 @@ describe("isVaultCondition", () => {
   it("matches the @example: a condition is shown, anything else is rethrown", () => {
     const shown: string[] = []
     const handle = (err: unknown) => {
-      if (! isVaultCondition(err)) { throw err }
+      if (! isCondition(err)) { throw err }
       shown.push(err.message)
     }
     handle(new VaultError('whisper_too_large', 'That whisper is over the limit.'))

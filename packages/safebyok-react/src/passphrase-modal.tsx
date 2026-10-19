@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type Ref, type SubmitEvent } from 'react'
-import { ForeverMillis, MinuteMillis, isVaultCondition, isVaultError, type Ask, type ProofAnswer } from 'safebyok'
+import { ForeverMillis, MinuteMillis, isCondition, isVaultError, type Ask, type ProofAnswer } from 'safebyok'
 import { attemptRefusalFlavor } from './attempt-refusals'
 import { Boundary, useRoundFor } from './boundary'
 import { Locale, Messages } from './messages'
@@ -381,7 +381,7 @@ const UnlockForm = ({ ask, onDone, allowStartOver, passphraseUsername, passphras
     // stands now was never confirmed, so the question goes, to be asked afresh.
     if (isVaultError(err, 'stale_write')) { setStartingOver(false) }
     // A condition the delete meets is shown in place, to try again; misuse goes to the boundary.
-    if (isVaultCondition(err)) { setGripe({ text: err.message, fromPasskey: false, asAdvice: false }); return }
+    if (isCondition(err)) { setGripe({ text: err.message, fromPasskey: false, asAdvice: false }); return }
     setFailure({ err })
   }
 
