@@ -32,6 +32,18 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-19 (returning): **`VaultDB.updateBox` now resolves the lockbox as storage holds it after
+  the write lands, and the base class takes that answer as untrusted storage input.** Each
+  adapter's `doUpdateBox` hands the lockbox back from the same atomic step as the conditional
+  write (Postgres `RETURNING`, the Convex mutation's return value, a read inside the same
+  IndexedDB transaction or `localVaultDB` synchronous turn, the GraphQL mutation payload), never a
+  second storage call, so the compare-and-write stays one event. The base class holds the answer
+  to the check `readBox` makes (the Lockbox schema, and the boxlabel matching the one written)
+  and refuses a malformed one as `corrupt_record`; its message says the write may have landed and
+  quotes nothing of the record, and its cause is the inner `corrupt_record` refusal, which quotes
+  nothing either. A refused write (`null` from the adapter) throws `stale_write` and carries no
+  record: returned state is data, never a thrown value's property. No stored shape changed, and
+  the vault does not yet use the returned value; `storeBox` still refreshes after its write.
 * 2026-10-18 (sprint reform): **three stored-format tags changed in the renaming, none with a
   migration.** Against the last release (0.3.0), the vault props format `safebyok-vault-v2` became
   `safebyok-vault-v3` (the unlock envelope became the "wayin", with the field renames that follow;
