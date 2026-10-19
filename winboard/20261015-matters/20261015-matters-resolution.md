@@ -1,0 +1,145 @@
+# 20261015-matters: resolution
+
+The matters sprint acted on the Coach's Open Matters answers from the big_feats sprint doc in two parts, the second in YOLO mode, and closed on 2026-10-16 with 22 threads merged or handed on. Release age [#96](https://github.com/mrflip/safebyok/pull/96), the HKDF info and every written field bound [#97](https://github.com/mrflip/safebyok/pull/97), the passkey button and dialog [#98](https://github.com/mrflip/safebyok/pull/98), the small sweep and size rule [#99](https://github.com/mrflip/safebyok/pull/99), the rotation design [#105](https://github.com/mrflip/safebyok/pull/105), `identity_revoked` [#106](https://github.com/mrflip/safebyok/pull/106), the VaultDB contract [#107](https://github.com/mrflip/safebyok/pull/107), damaged records [#108](https://github.com/mrflip/safebyok/pull/108), IndexedDB fixes [#109](https://github.com/mrflip/safebyok/pull/109), the late unlock [#110](https://github.com/mrflip/safebyok/pull/110), `safebyok-convex/testing` and `e2e/` [#111](https://github.com/mrflip/safebyok/pull/111), the Postgres soft cap [#113](https://github.com/mrflip/safebyok/pull/113), the battery audit [#114](https://github.com/mrflip/safebyok/pull/114), `eraseDamagedVault` [#115](https://github.com/mrflip/safebyok/pull/115), CI flakes [#118](https://github.com/mrflip/safebyok/pull/118), the race driver [#119](https://github.com/mrflip/safebyok/pull/119) and rotation's stored shape with the rollback check [#120](https://github.com/mrflip/safebyok/pull/120). Threads 18 to 20 (the rest of rotation) and thread 5's remainder went to new sprints through the doc's *Big Feats Next* tab; thread 17 was left unstarted. Gripes from its thread files, plan, progress, matter and -human files, its PRs, and the doc's *Sprint matters*, *Open Matters* and *Big Feats Next* tabs (`raw_gripes-matters.md`, `wins-matters.md`, and the earlier `whiteboard_gripes`, `prs_80_main` and `prs_open` lines on the same sources), as consolidated in `whiteboard/20261016-gripes_boogaloo/` (2026-10-16).
+
+134 gripes: 71 unresolved (20 awaiting a Coach decision, 47 open, 4 deferred), 63 resolved.
+
+## Unresolved
+
+- G062 **Decide:** rotation's open names and shapes: `rolled_back` kind, `vault_key_epoch`, `prior_vault_key`, `DeviceMark`, `device_id`; `removeUnlock({ rotate })` vs separate `rotateVaultKey` — prs_80_main, whiteboard_gripes
+- G063 **Decide:** whether the listing marks damaged a lockbox under an unknown `vault_key_epoch`, and whether the snapshot counts boxes still to re-encrypt — prs_80_main, whiteboard_gripes
+- G116 **Decide:** `destroy()` on a handle that never saw a bundle resolving without erasing, a retry after a refused `destroy()` taking the reborn vault, and `destroy()` needing no unlock — todo_gripes, old_gripes, humans_gripes, whiteboard_gripes
+- G119 **Decide:** whether `whenIdentityRevoked: 'stay'` should exist, and whether a lock withholds a whisper already on its way out of `read()` — prs_80_main, whiteboard_gripes
+- G120 **Decide:** whether "may be newer" (eraseDamagedVault refusal) and "sound vault" (`bad_option`) want kinds of their own apart from `damaged_bundle` — prs_80_main, whiteboard_gripes
+- G203 **Decide:** add a CI job against a real Postgres (service container, a `pg` Pool per device) to test lines 3.x under concurrent statements; rec yes, own thread — prs_open, prs_80_main, whiteboard_gripes
+- G204 **Decide:** keep #119's 6.1 change (a watch calls once as it goes live: one extra `onChange` a host may count); rec keep — prs_open, whiteboard_gripes
+- G205 **Decide:** whether a write should return a best-effort count (contract deviation; changes every adapter's `updateBox` and the GraphQL wire) — prs_80_main, whiteboard_gripes
+- G206 **Decide:** whether VAULTDB.md ships in the npm tarball (it does now) or lives on GitHub — prs_80_main, whiteboard_gripes
+- G285 **Decide:** whether 1000 is the right default `maxLockboxes` for Postgres and GraphQL (big_feats recommended no practical limit) — bigfeats_doc, prs_80_main, whiteboard_gripes
+- G321 **Decide:** add an `onError` prop to the dialog components (React 19's `onCaughtError` is the one place today); rec none until a host asks — prs_80_main, whiteboard_gripes
+- G355 **Decide:** the wording of the demo's "Erase and start over" confirm text and button (placeholders for the Coach) — prs_80_main
+- G373 **Decide:** what level of e2e testing is appropriate, and whether to automate the Coach's by-hand acceptance tests on real authenticators and backends — todo_gripes
+- G401 **Decide:** whether the size-budget rule may lower budgets as well as raise them — prs_80_main, whiteboard_gripes
+- G437 **Decide:** whether a README-only package change carries an empty or a patch changeset (patch bumps the whole lockstep group) — prs_80_main
+- G510 **Decide:** rename `vaultDBTimingChecks`'s snake_case handles (`rival_first_writes` ...) to camelCase before release, in one commit (thread 5b); rec rename — matters
+- G511 **Decide:** a host `onChange` that throws at Postgres's watch start becomes an unhandled rejection (#119's fire-and-forget start call; no adapter guards `onChange`); rec fold into the logger sweep (G210) — matters
+- G512 **Decide:** make `scripts/git-survey.sh` (`/branch-sweep`) skip any worktree whose branch has an open PR or unpushed commits (a sweep unregistered four live sprint worktrees); rec yes — matters
+- G513 **Decide:** a way out of `rolled_back` after a legitimate restore: keep the `deviceDB.eraseMark(scope)` recipe for 1.0, a hatch (`eraseDamagedVault` accepting `rolled_back`, or a sibling) only if a host asks; rec keep — matters
+- G514 **Decide:** a failed device-mark write after a ways-in change landed rejects a change that landed (`takeUpUnlock`'s device write likewise); rec best-effort, log and don't reject — matters
+- G040 `CipherBindingPart` silently drops a field set to `undefined` by mistake; the lockbox format tag is bound twice — prs_80_main, whiteboard_gripes
+- G064 Build rotation_shape (thread 14): `vault_key_epoch`/`prior_vault_key` on bundle, epoch and random `device_id` on envelopes, epoch on lockbox, `DeviceMark` rollback check — bigfeats_doc, prs_80_main, whiteboard_gripes, humans_gripes
+- G065 Build rotation_adapters (thread 18): the `vault_key_epoch` comparison in IndexedDB, Convex, Postgres (bundle row FOR SHARE in the insert) and GraphQL — bigfeats_doc, prs_80_main, whiteboard_gripes
+- G066 Build rotation_verb (thread 19): `rotateVaultKey(keep)` with its resumable lockbox walk, reads through the prior key, fault-injecting tests — bigfeats_doc, whiteboard_gripes
+- G067 Build rotation_docs (thread 20): README "Rotating the vaultKey", adapter-author note, demo "remove and lock out" button, VOCABULARY rows, notes/security.md entries — bigfeats_doc, whiteboard_gripes
+- G068 Detect rollback: a device should refuse a bundle whose epoch went backwards (today `refresh()` takes up any changed epoch) — bigfeats_doc, prs_80_main, whiteboard_gripes
+- G069 Try passkeys on real authenticators (Chrome platform passkey, Safari, a security key), incl. addPasskey's prompt after Argon2 on slow devices/older Safari — todo_gripes, bigfeats_doc, prs_60_80, prs_80_main, humans_gripes, whiteboard_gripes
+- G073 Plain `wrong_passphrase` beside envelopes another deriver made does not mention the deriver — prs_60_80, prs_80_main, whiteboard_gripes
+- G145 `eraseDamagedVault` aims at `vault_id` alone, so a same-id rewrite between its read and erase is erased too (fix touches VAULTDB.md 3.5) — prs_80_main
+- G146 The damaged-bundle hatch cannot reach Convex, Postgres or GraphQL, and a local bundle that is not JSON cannot be cleared — prs_80_main, whiteboard_gripes
+- G147 `damagedAs` maps only a rejected promise (a synchronously throwing VaultDB still says `corrupt_record`); decipher messages quote the stored boxlabel — prs_80_main
+- G148 `heed` waits on the device store's erase before rethrowing, so a never-settling device store hangs the refused call — prs_80_main, whiteboard_gripes
+- G179 Record "label grammar on the server" in TODO's validator-guarantees section (thread 17), and move the label/user-id entries under it — bigfeats_doc, whiteboard_gripes
+- G215 Race tests made core tests ~2 s → ~17 s and Convex ~5 s → ~11 s by waiting out 2 s deadlines on purpose — prs_open, whiteboard_gripes
+- G238 Rebuild #111 as the Coach's option (b): client-pairing tests back in `safebyok-convex` via a `/testing` entry; settle `fakeDeployment(host)` and convex-test as optional peer — bigfeats_doc, prs_80_main, whiteboard_gripes
+- G239 Write the Convex client-pairing loop bodies once (not per client), and make a coverage report measure `convex-vault-db.ts` again — bigfeats_doc, whiteboard_gripes
+- G240 Convex battery follow-ups: pass `pushes: true` and `makeVaultDBFor`, drop tests repeating lines 1.1-3.5, 5.4, 6.1 — prs_80_main, whiteboard_gripes
+- G241 Give Convex a capped battery factory (MaxVaultLockboxes 8,000 is a server constant no test can lower) — prs_80_main, whiteboard_gripes
+- G273 IndexedDB leftovers: `settle` replaces any non-Error rejection; `doListBoxes` makes two requests where one cursor would do; a listenerless tab opens a channel per write — prs_80_main, whiteboard_gripes
+- G274 `inspectIdbVaultDB` still uses idb-keyval `entries`/`clear` directly — whiteboard_gripes
+- G288 Run Postgres races (overshoot, 23503, hard-cap trigger per isolation level) on a real multi-connection Postgres; PGlite runs one statement at a time — prs_60_80, prs_80_main, prs_open, whiteboard_gripes
+- G291 Hard-cap trigger docs: old tables keeping the count trigger can deadlock `eraseBox` against `eraseVault` (changeset should say "must" drop it); its refusal is `storage_unavailable` — prs_80_main, whiteboard_gripes
+- G292 README leftovers: `listen` without `VaultNotifySql` is silent by design (say so); miss reasons computed on a landed write; a `kind as 'vault_full'` cast — prs_80_main
+- G293 The pending `20261015-store_vault_cap` changeset still announces `lockbox_count`, which #113 removed — prs_80_main
+- G326 Accessibility: the gripe's `role="alert"` mounts with text (not re-announced); Escape on the notice does not stop propagation; focus check misses shadow roots — prs_80_main, whiteboard_gripes
+- G327 Give the passphrase form itself dialog semantics, and drop a passkey gripe once a later passkey press is dismissed — prs_80_main, whiteboard_gripes
+- G328 `withUnlockedVault` races: a lock between the shared unlock and retries throws `vault_locked` to every waiter; a rejection just after unlock opens a second dialog — prs_80_main, whiteboard_gripes
+- G329 Tie each dialog to its vault: a stale action's late `vault_locked` joins a dialog over the next vault; one between `vault_locked` and its catch opens over an unlocked vault — prs_80_main, whiteboard_gripes
+- G330 A late unlock silently closes a dialog the user is typing in — prs_80_main, whiteboard_gripes
+- G331 Reset the Boundary when a hand-rendered dialog's vault changes — whiteboard_gripes
+- G333 VaultProvider reopens on any `bad_option`, misuse included — prs_80_main
+- G380 Helpers sweep: adapters' `refusalOf` to `TH.expectRefusal` (argon2-wasm duplicates it), plus `eventually`, `changeCounter`, `aWhile` into `safebyok/testing` — bigfeats_doc, prs_60_80, prs_80_main, whiteboard_gripes
+- G382 The demo's 5 s / 15 s ceilings can mask slowdowns and misreport a hang as a timeout; the layout-effect test relies on a refusal within microtasks — prs_80_main
+- G402 Remove the `convex-test@0.0.61` `minimumReleaseAgeExclude` after 2026-10-16T23:01Z: delete it, pin `^0.0.61`, strike the notes/security.md line — prs_80_main, whiteboard_gripes
+- G403 Bump dependency floors to the newest mature releases once tsdown 0.23.1 ages (deprecated `@yuku-*` subdependencies warn) — whiteboard_gripes
+- G415 Check `dist/` is byte-identical after the tsdown move to 0.23.0 — prs_80_main
+- G466 Widen VOCABULARY's "damaged" row from lockboxes to a way in and a bundle — prs_80_main
+- G482 Add a snapshot test rendering each stored-record schema (toJSONSchema) keyed by its `format` literal, failing with "bump format" when one changes unbumped — bigfeats_doc, prs_80_main
+- G515 Show `device_id` and `registered_at` in the snapshot's `unlocks` (#120 left them out) so a host can show which device added which way in — handed on to a new sprint (thread 20) — matters
+- G516 #120 rollback-check leftovers: a background refresh meeting `rolled_back` leaves the vault unlocked; the message names `eraseMark`; two tabs may each mint a `device_id` after the recipe; a decoy `vault_id` clears a mark; `keptMark` warns only for a host's DeviceDB; redundant reads and parses — matters
+- G517 #119 race-driver leftovers: one counted turnstile pass per write; `push_from_the_start` gives up after 20 ticks silently; no deadlines in `holding`/`crowding`; `expectHeard` credits by timing; two device-factory shapes — matters
+- G518 #111 leftovers: e2e's `test:coverage` measures one file (the packages come from `dist/`); a filtered install of `safebyok-convex` still downloads `react` — matters
+- G519 Trim the three Postgres cap tests that repeat battery lines 4.3 and 4.4 — handed on to a new sprint (thread 5a) — matters
+- G520 Re-set the `validators` (8.5 kB) and `DefaultValidators` (4 kB) size budgets by the written rule, and note the rule's 5 kB cliff (argon2idWebV1Deriver) — matters
+- G521 The tsconfig lib stops at ES2023, so #118 added an `eslint-disable-next-line unicorn/prefer-promise-with-resolvers` in a VaultProvider test (reported; see G399) — matters
+- G522 #106 leftovers: a closed handle's in-flight `identity_revoked` still erases the remembered unlock; every `ConvexClient` watch error refreshes; opening before auth is ready erases the remembered unlock — matters
+- G523 Battery leftovers: the capped Postgres/GraphQL factories omit `listen`; `MapVaultDB` counts by copying every row; IndexedDB's stray-field check is a base-class test, not a battery test over `idbVaultDB` — matters
+- G494 A key pair per way in (HPKE) so rotation does not sign every other device out — NOT YET, Coach moved it to TODO — todo_gripes, bigfeats_doc, whiteboard_gripes *(deferred)*
+- G495 Lock out a lost device (every way in it added; device list, UX) and decide what may be retained to name a device under Apple/Google privacy rules — NOTYET, data stored meanwhile — todo_gripes, bigfeats_doc, prs_80_main, whiteboard_gripes *(deferred)*
+- G506 Delete the leftover worktree directories and `git worktree prune` (look first at byok-strict_configs and byok-passkey_unlock, which hold unpushed work) — Coach: the Coach will, when things settle down — gripes_1_doc, bigfeats_doc, humans_gripes, prs_80_main, old_gripes, whiteboard_gripes *(deferred)*
+- G524 One test container for every backend — side quest; the Coach: close out the PRs first, for the push to 1.0.0 — matters *(deferred)*
+
+## Resolved
+
+- G013 Passkey HKDF `info` should add `vault_id` and scope → Coach "make everything verifiable"; info is the full binding (PR#97)
+- G014 Bind the whole public header (note, times) instead of a positional array; stored times were unbound → every written field bound, lockbox header and envelope `registered_at` included (PR#97)
+- G015 A remembered unlock's deadline sits outside its encryption, so tampering can extend it → `ask_passphrase_at` bound under `safebyok-unlock-v1` (PR#97), and a deadline past this open's window is erased (PR#58)
+- G016 Should the passphraseKey's Argon2 derivation be bound too? → Coach: leave the settings out, relegate to notes/security.md (Coach ruling, PR#108)
+- G017 Keep the epoch out of the envelope binding? → kept out by design; notes/security.md lists what stays unbound and why (PR#97)
+- G018 A tampered bundle reads as wrong_passphrase, not corrupt_record → message says the vault may be damaged; telling them apart by re-encrypting refused as a home-made construction (PR#108)
+- G055 One damaged passkey envelope made `askPasskey` fail for every passkey; a damaged envelope blocked the rest → damaged envelopes passed over, `damaged_unlock` when all are (PR#108)
+- G057 What real revocation looks like; should the server sign the vaultKey? → Coach: "Yes, do (a)": rotate the vaultKey on way-in removal; no server signing (Coach ruling, PR#105)
+- G058 What rotation does with the other ways in: keep only those proven, or a key pair per way in (HPKE)? → Coach: TODO it and land best-for-now; design keeps only proven ways in (Coach ruling, Sprint big_feats Open Matters)
+- G059 Write the rotation design → whiteboard/20261016-rotation/rotation-design.md, threads 14 and 18-20 (PR#105)
+- G084 A failed `openVault` leaks its storage watch (a live Convex watch per boundary reset) → handle closes itself, rejects with the original error (PR#61)
+- G087 Should a vault lock itself when storage says the user signed out (`not_permitted`)? → `identity_revoked` kind and `whenIdentityRevoked` policy, default lock (Coach ruling, PR#106)
+- G088 Default sign-out policy for the remembered unlock → sign-out locks; identity_revoked erases the remembered unlock (PR#106)
+- G107 A damaged bundle/envelope/lockbox should get its own calm message → `damaged_bundle`, `damaged_unlock`, `damaged_lockbox` (Coach ruling, PR#108)
+- G108 A vault that reads as corrupt (e.g. old field names) cannot be destroyed → `eraseDamagedVault` (Coach ruling, PR#115)
+- G109 Who bumps `format`? → Coach: whoever edits a stored record's schema bumps it (Coach ruling, Sprint big_feats Open Matters)
+- G191 Is the app's `maxLockboxes` a guarantee? → Coach: an alarm bell; the guarantee is each store's choice, best effort (Coach ruling, PR#89, PR#107)
+- G192 Write the contract down: transactionless-friendly baseline, which layer owns versioned updates, stronger guarantees opt-in → VAULTDB.md, 26 numbered lines (PR#107)
+- G193 Listing guarantees (a LIMIT, which records, every record past the soft max) → VAULTDB.md: no limit to ask for; the listing holds every lockbox (PR#107)
+- G194 Can a backend with no atomic step keep the contract? → no; single-record CAS keeps 3.1/3.2 only, recorded (PR#107)
+- G195 Audit every adapter against the contract; move hand-proven contract tests into `TH.describeVaultDB`; trim bespoke tests → done (PR#107, PR#114)
+- G196 Run cap tests only on stores declaring a finite limit → `makeCappedVaultDB` option (PR#107)
+- G198 Give `safebyok/testing` a race helper: two writers interleaved under every schedule → `raceEveryWay`, `Turnstile`, wired for every adapter (PR#119, open)
+- G199 Push tests give a leaked listener one tick; race tests prove outcomes, not races → probe writes and turnstile schedules (PR#119, open)
+- G200 A late-starting watch misses a write made as it starts → `postgresVaultDB` calls once as its listen begins; VAULTDB.md 6.1 asks it (PR#119, open)
+- G202 VAULTDB.md carried an HTML comment pointing at a whiteboard file → gone from VAULTDB.md on main (packages/safebyok/VAULTDB.md)
+- G217 Make `safebyok` a peer of `safebyok-convex` (two copies break `instanceof VaultError`) → done (PR#41)
+- G224 Accept the first-`watchVault`-emit deviation? → Coach: accepted as built (Coach ruling, PR#105 TODO)
+- G225 Keep the Convex tests' `react` dev dependency? → Coach NOTED; kept (Coach ruling, Sprint big_feats)
+- G228 A Convex deployment holding old bundles refuses the new schema until rows are deleted; say so → no back-compat before 1.0; the changeset says what a host sees (Coach ruling, PR#84)
+- G229 A failing Convex watch did nothing → a `ConvexClient` watch error makes the vault look again (PR#106)
+- G231 Where do Convex's client-pairing tests live? → Coach: (b) a `safebyok-convex/testing` entry (Coach ruling, Sprint big_feats Open Matters); also "yes" to a private e2e package (PR#111, open)
+- G264 A failed write's cause can be null (`request.error` on abort) → the browser's own error kept; "failed for an unknown reason" otherwise (PR#109)
+- G265 `listBoxes` and `eraseVault` read every user's rows → key range over the vault's lockbox prefix (PR#109)
+- G266 The bell's channel is never closed → closes when the last listener leaves (PR#109)
+- G277 A signed-in user can grow their own Postgres vault without bound → server-side `vault_full` (PR#89), then a one-statement soft cap (PR#113)
+- G278 Should Postgres guarantee `maxLockboxes` (counter, trigger, row lock, second read, serialization failures at REPEATABLE READ)? → Coach: declare and enforce best effort; lock-free counting insert, machinery removed (Coach ruling, PR#113)
+- G279 Does a one-statement counting insert meet the contract? → yes at READ COMMITTED, racers may overshoot; README names the isolation level (PR#107, PR#113)
+- G280 Split the NOTIFY trigger out of `VaultTablesSql` so push is opt-in → `VaultNotifySql` (PR#113)
+- G281 Offer a stronger guarantee as "vaya con dios" instructions → unsupported, tested hard-cap trigger in the README (Coach ruling, PR#113)
+- G283 The Supabase section is untested → README says so plainly (PR#99)
+- G284 Add an upgrade note for the `passphrase_epoch` to `unlock_epoch` column rename → no back-compat before 1.0; the changeset says what a host sees (Coach ruling, PR#84)
+- G298 Pin days-old dev deps `graphql-yoga`, `@graphql-tools/schema` to a release two weeks old → pinned (PR#86), then ranges under the seven-day `minimumReleaseAge` (PR#96)
+- G312 `PassphraseModal` rethrows non-`wrong_passphrase` errors into a voided promise → conditions shown in place (PR#67); failures not the user's contained with a notice (PR#98)
+- G313 A misuse unlock never settles the `withUnlockedVault` promise → every call settles, resolving null (PR#98); Coach: #98's way stands (Coach ruling, PR#100)
+- G314 Use `react-error-boundary`? → Coach: skip it, keep the hand-written boundary (Coach ruling, PR#98)
+- G315 Should the dialog swap its form for a notice on a failure not the user's? → Coach: LGTM (Coach ruling, PR#98)
+- G317 A late unlock leaves a newer dialog asking over an unlocked vault → any unlock closes it and its waiters retry (PR#110)
+- G318 A dialog an action opened in the commit that brought the vault was closed by the previous render's cleanup → ended in the open effect's cleanup instead (PR#118)
+- G319 A held `vault_locked` refusal across a sign-out left a dialog over the next user's vault → resolves null at once while there is no vault (PR#118)
+- G320 Hand down `eraseDamagedVault` from `useVault()` → done (PR#115)
+- G351 Offer to erase a damaged vault and start over → "Erase and start over" after a confirm (PR#115)
+- G353 The demo's dialog tests flaked under load → `waitFor`, 5 s waits and 15 s per test; a provider race fixed (PR#99, PR#118)
+- G388 `justify:root` is defined and never used → runs lint, typecheck and test and fails if any failed (PR#99)
+- G393 Size budgets need a rule rather than ad-hoc bumps → measured + 3 kB (≥5 kB) or +50% (min 1 kB), two significant figures, in PROCESS.md (PR#99)
+- G394 Enforce the "two weeks old" dependency rule with tooling → pnpm `minimumReleaseAge` seven days, Dependabot cooldown (Coach ruling, PR#96)
+- G398 Make the release script refuse a public package under `e2e/` as under `demos/` → done with a test (PR#111, open)
+- G450 Promote the proposed README to `packages/safebyok/README.md`, write the root README front page, and an adapter author's guide → core README, root README, VAULTDB.md and "Your own storage adapter" (PR#33, PR#77, PR#107)
+- G525 Land the `safebyok-argon2-wasm` → `safebyok-fastkey` rename (a commit on the main checkout's branch) as its own PR before cutting the next sprint's threads → renamed (PR#122)
+- G526 Should a hot release be pinned more or less specifically than normal? → more: the exact version, excluded by name and version, recorded in notes/security.md the same day, removed once seven days old, never for convenience (Coach ruling, PR#96)
+- G527 Have a sprint orchestrator watch the size budgets so stacked threads don't fight over them → the sprint skill: guess the target up front, the first thread raises the budgets, a late thread lowers them to the rule (Coach ruling, PR#99)
+- G528 Explain or fix Convex's `--no-error-on-unmatched-pattern` and the demo's coverage with no `include` → both already fixed on main, struck from TODO after checking (PR#99)
+- G529 Worktrees share one git stash and one rerere cache (a worker used `git stash`; rerere replayed a stale resolution into #119) → ground rules: never `git stash`; diff each resolved file after a conflicted rebase (matters-plan.md; Big Feats Next)

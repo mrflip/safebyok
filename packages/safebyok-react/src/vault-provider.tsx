@@ -52,7 +52,7 @@ export type VaultContextShape = {
    *
    * @example
    *   if (openError?.kind === 'damaged_vault') {
-   *     return <button onClick={() => { if (confirm('Erase your vault and start over?')) { void retireDamagedVault() } }}>Start over</button>
+   *     return <button onClick={() => { if (confirm('Remove your vault and start over?')) { void retireDamagedVault() } }}>Start over</button>
    *   }
    */
   retireDamagedVault: () => Promise<void>

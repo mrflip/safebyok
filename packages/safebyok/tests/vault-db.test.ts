@@ -68,7 +68,7 @@ class MapVaultDB extends VaultDB {
       return Promise.resolve(false)
     }
     if (standingBox === undefined && this.boxCount(scope) >= this.maxLockboxes) {
-      return Promise.reject(new VaultError('vault_full', 'This vault is full: retire a lockbox to make room, then try again.'))
+      return Promise.reject(new VaultError('vault_full', 'This vault is full: remove a lockbox to make room, then try again.'))
     }
     this.rows.set(Ckeys.box(scope, lockbox.boxlabel), lockbox)
     return Promise.resolve(true)

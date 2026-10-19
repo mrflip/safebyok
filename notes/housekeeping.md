@@ -121,6 +121,14 @@ stays, and what git sees never changes. It follows no symlink, crosses into no o
 and skips `.git` and `node_modules`. Finder may write a new one a moment later; if git still
 balks, run it once more.
 
+`scripts/file-thread` runs it before removing a filed thread's worktree, and finishes the job if
+Finder writes a new one mid-removal. Git then fails with "Directory not empty", unregistered, its
+directory left behind. Once the push is proven, the script deletes that directory (four tries) and
+prunes, but only if the worktree was clean before the removal, git no longer lists it, origin's
+branch is the local tip, and the directory holds nothing but the tip's files, `.DS_Store` files,
+`node_modules` and what the main checkout's `.gitignore` covers. Otherwise it names the strays and leaves the directory.
+By hand: confirm those same things, `rm -rf` it, `git worktree prune`.
+
 ## CLAUDE.md's long-file list
 
 CLAUDE.md's *Reading* names the files long enough that an agent should search them rather than

@@ -1,7 +1,7 @@
 # 2026-10-16: Sprint matters closed -- 22 threads merged or handed on, eleven questions open
 
 The sprint ran in two parts on the Coach's Open Matters "proceed" rows. Part 2 ran in YOLO mode,
-with its two-way calls listed in `whiteboard/20261015-matters/matters-plan.md` (*Decisions taken
+with its two-way calls listed in `winboard/20261015-matters/matters-plan.md` (*Decisions taken
 in YOLO*). Everything ready merged to main as of `5428b3b`.
 
 ## What landed

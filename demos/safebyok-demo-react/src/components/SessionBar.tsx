@@ -50,7 +50,7 @@ export const SessionBar = ({ auth }: { auth: Auth }) => {
   }
 
   const deleteAccount = async () => {
-    if (! globalThis.confirm('Delete this account and its vault? The stored lockboxes are gone for good.')) { return }
+    if (! globalThis.confirm('Delete this account and remove its vault? The stored lockboxes are gone for good.')) { return }
     await vault?.retire()
     await auth.deleteAccount()
   }
