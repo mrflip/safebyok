@@ -1,7 +1,7 @@
 {
   "name": "safebyok-fastkey",
   "private": false,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A WebAssembly key deriver for safebyok: Argon2id through hash-wasm, under the same keyDeriverSpecs and labels as the core's pure-JavaScript deriver, deriving the same bytes.",
   "keywords": [
     "safebyok",
