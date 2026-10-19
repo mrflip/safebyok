@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
-import { isVaultError, memoryDeviceDB, type GetProof, type VaultError } from 'safebyok'
+import { describe, expect, it, vi } from 'vitest'
+import { Vault, isVaultError, memoryDeviceDB, type Ask, type GetProof, type VaultError } from 'safebyok'
 import { useLayoutEffect } from 'react'
 import * as TH from 'safebyok/testing'
 import { VaultProvider, useVault } from '../../src/vault-provider'
@@ -375,6 +375,36 @@ describe("VaultProvider", () => {
       expect(await vault.getBox('anthropic_api_key')).to.eq('sk-fake')
       expect(heard).to.deep.equal(['second: locked'])
       expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null
+    })
+
+    it("hands the next user's getProof no ask the last user's vault raises in the commit that brings the next user, before its passive effects", async () => {
+      const world = await lockedWorld()
+      const asked: string[] = []
+      const answers: unknown[] = []
+      const made = vi.spyOn(Vault, 'make')
+      // Rendered after the provider, so its layout effect runs after the provider's in the same
+      // commit: it asks through the getProof u1's vault was handed, as an ask raised then would.
+      const LateAsk = ({ userId }: { userId: string }) => {
+        useLayoutEffect(() => {
+          const [opts] = made.mock.calls[0] ?? []
+          if (userId === 'u2' && typeof opts?.getProof === 'function') { answers.push(opts.getProof({ why: 'locked' } as Ask)) }
+        }, [userId])
+        return null
+      }
+      const tree = (userId: string) => (
+        <>
+          <VaultProvider {...world.props} userId={userId} getProof={() => { asked.push(userId); return 'declined' }}>
+            <Probe />
+          </VaultProvider>
+          <LateAsk userId={userId} />
+        </>
+      )
+      const { rerender } = render(tree('u1'))
+      await expectShown('locked')
+      rerender(tree('u2'))
+      await TH.wakeupAtNextTick()
+      expect(answers).to.have.lengthOf(1)
+      expect(asked).to.not.include('u2')
     })
 
     it("asks no one with getProof null: a call is refused vault_locked, and no dialog shows (Contract: getProof, with none configured)", async () => {

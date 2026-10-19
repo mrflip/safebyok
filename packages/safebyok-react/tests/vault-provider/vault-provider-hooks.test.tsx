@@ -1,8 +1,8 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { VaultError, isVaultError, type BadNewsHandler } from 'safebyok'
+import { Vault, VaultError, isVaultError, type BadNewsHandler } from 'safebyok'
 import * as TH from 'safebyok/testing'
-import { Activity, StrictMode } from 'react'
+import { Activity, StrictMode, useLayoutEffect } from 'react'
 import { renderToString } from 'react-dom/server'
 import { VaultProvider, useOpenError, useVault, useVaultSnapshot } from '../../src/vault-provider'
 import { Probe, grabber, makeWorld, madeWorld, damagedWorld, shownState, expectShown, putThroughNewVault, unreachable, CatchingBoundary, hushConsole, LockButton, BoxCount, countStoreCalls } from './world'
@@ -173,6 +173,35 @@ describe("VaultProvider", () => {
       await waitFor(() => { expect(second.getSnapshot().state).to.eq('absent') })
       await TH.wakeupAtNextTick()
       expect(told).to.deep.equal([])
+    })
+
+    it("tells the next user's handler nothing the last user's vault meets in the commit that brings the next user, before its passive effects", async () => {
+      const world = await madeWorld()
+      const told: string[] = []
+      const made = vi.spyOn(Vault, 'make')
+      const { Grab, opened } = grabber()
+      const news = new VaultError('damaged_box', "A box in the vault is damaged: it can't be read.")
+      // Rendered after the provider, so its layout effect runs after the provider's in the same
+      // commit: it tells news through the handler u1's vault was handed, as a read landing then would.
+      const LateNews = ({ userId }: { userId: string }) => {
+        useLayoutEffect(() => {
+          if (userId === 'u2') { void made.mock.calls[0]?.[0].onBadNews?.(news) }
+        }, [userId])
+        return null
+      }
+      const tree = (userId: string) => (
+        <>
+          <VaultProvider {...world.props} userId={userId} onBadNews={(heard) => { told.push(`${userId}: ${heard.refusalkind}`) }}>
+            <Grab />
+          </VaultProvider>
+          <LateNews userId={userId} />
+        </>
+      )
+      const { rerender } = render(tree('u1'))
+      await opened()
+      rerender(tree('u2'))
+      await TH.wakeupAtNextTick()
+      expect(told.filter((line) => line.startsWith('u2'))).to.deep.equal([])
     })
 
     it("throws an onBadNews that is no function to the error boundary, as Vault.make refuses it", async () => {

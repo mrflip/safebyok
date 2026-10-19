@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { Vault, type Ask, type GetProof, type ProofAnswer, checkStrengthTest, checkValidators, delDamagedVault as delStoredDamagedVault, isCondition, isVaultError, parseLogger, type BadNewsHandler, type MakeVaultOpts, type PassphraseStrengthTest, type VaultDB, type VaultError, type VaultLogger, type VaultScope, type VaultSnapshot, type VaultValidators } from 'safebyok'
 import { PassphraseModal, type PassphraseAdvice } from './passphrase-modal'
 
@@ -288,8 +288,10 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
   const toldOfSinks = useRef(false)
   // The host's onBadNews as of the last commit. The vault is handed a teller that keeps its
   // identity and calls whichever handler that is, so a handler written inline makes no new vault.
+  // Moved in a passive effect: React runs every passive cleanup before any passive effect, so the
+  // open effect below has closed the last vault's gate before the next user's handler is here.
   const badNewsRef = useRef(onBadNews)
-  useLayoutEffect(() => { badNewsRef.current = onBadNews })
+  useEffect(() => { badNewsRef.current = onBadNews })
   const tellBadNews = useCallback<BadNewsHandler>((news) => badNewsRef.current?.(news), [])
   // Anything but a function, or none, is misuse: handed to Vault.make as it came, to be refused.
   const badNewsOpt = onBadNews === undefined || onBadNews === null || typeof onBadNews === 'function' ? tellBadNews : onBadNews
@@ -314,9 +316,9 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
   }), [])
 
   // The host's getProof as of the last commit, held as onBadNews is: the vault is handed one asker
-  // that keeps its identity, so a getProof written inline makes no new vault.
+  // that keeps its identity, so a getProof written inline makes no new vault. Moved as badNewsRef is.
   const hostAskerRef = useRef(getProof)
-  useLayoutEffect(() => { hostAskerRef.current = getProof })
+  useEffect(() => { hostAskerRef.current = getProof })
   const askProof = useCallback<GetProof>((ask) => {
     const hosts = hostAskerRef.current
     if (hosts === undefined) { return askByDialog(ask) }
