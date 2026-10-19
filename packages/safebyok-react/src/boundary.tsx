@@ -54,19 +54,34 @@ export const useRoundFor = (handle: object): number => {
   return round
 }
 
+/** The safebyok-react component a {@link forBoundary} report comes from, which its message names. */
+export type BoundarySource = 'PassphraseModal' | 'PasskeyUnlockButton'
+
+/** Where to look, by the component, for an error that was not the vault's own. */
+const LookFor: Record<BoundarySource, string> = {
+  PassphraseModal:     "It is left out of this report, as it may quote what the user typed: check the functions the app handed the dialog, such as passphraseAdvice.",
+  PasskeyUnlockButton: "It is left out of this report, as every error a safebyok-react component reports is: the passkey prompt is the likeliest source, so call askPasskey and vault.unlock yourself to see it.",
+}
+
 /**
  * What a component throws in render for its {@link Boundary}, in place of `err`, so that what
  * React reports through `onCaughtError` -- the console, an error tracker -- carries nothing the
  * user typed. A VaultError keeps its kind, message and meta, but never its `cause`: that may be a
- * host key deriver's or strength test's throw, which was handed the passphrase. One with no cause
- * is thrown as itself. Anything else becomes a fixed `unexpected_error` quoting nothing of it.
+ * host key deriver's or strength test's throw, which was handed the passphrase. Its message says
+ * that the cause was left out, should it point at one. One with no cause is thrown as itself.
+ * Anything else becomes a fixed `unexpected_error` quoting nothing of it, naming `source`, the
+ * component it came from, and where to look.
  *
- * @example if (failure !== null) { throw forBoundary(failure.err) }
+ * @param err - What the component's call failed with.
+ * @param source - The component reporting it.
+ *
+ * @example if (failure !== null) { throw forBoundary(failure.err, 'PassphraseModal') }
  */
-export const forBoundary = (err: unknown): VaultError => {
+export const forBoundary = (err: unknown, source: BoundarySource): VaultError => {
   if (! isVaultError(err)) {
-    return Sanitizer.refusalFor(err, 'unexpected_error', "Something inside safebyok-react's dialog failed with an error that was not the vault's own. It is left out of this report, as it may quote what the user typed: check the functions the app handed the dialog.")
+    return Sanitizer.refusalFor(err, 'unexpected_error', `Something inside safebyok-react's ${source} failed with an error that was not the vault's own. ${LookFor[source]}`)
   }
   if (err.cause === undefined) { return err }
-  return new VaultError(err.refusalkind, err.message, err.meta === undefined ? undefined : { meta: err.meta })
+  const message = `${err.message} (safebyok-react's ${source} left this error's cause out of its report to React: it may quote what the user typed.)`
+  return new VaultError(err.refusalkind, message, err.meta === undefined ? undefined : { meta: err.meta })
 }

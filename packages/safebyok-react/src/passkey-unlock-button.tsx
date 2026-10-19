@@ -65,7 +65,7 @@ const PasskeyPress = ({ ask, onDone, onGripe, rpId, autoFocus }: PasskeyUnlockBu
   // Asked after each await: a button gone meanwhile -- its dialog went, or another vault remounted
   // it -- unlocks nothing, and touches neither its state nor its dialog's callbacks again.
   const isMounted = useIsMounted()
-  if (failure !== null) { throw forBoundary(failure.err) }
+  if (failure !== null) { throw forBoundary(failure.err, 'PasskeyUnlockButton') }
   if (! offersPasskey(snapshot)) { return null }
 
   const press = async () => {

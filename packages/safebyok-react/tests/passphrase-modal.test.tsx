@@ -396,7 +396,8 @@ describe("PassphraseModal", () => {
       expect(await screen.findByText('Something went wrong')).to.not.be.null
       expect(reported).to.have.lengthOf(1)
       const told = reported[0] as VaultError
-      expect(told).to.include({ refusalkind: 'unexpected_error', message: 'The key deriver threw.' })
+      expect(told).to.include({ refusalkind: 'unexpected_error' })
+      expect(told.message).to.match(/^The key deriver threw\. \(safebyok-react's PassphraseModal left this error's cause out/)
       expect(told.meta).to.deep.equal(meta)
       expect(told.cause).to.be.undefined
     })

@@ -80,7 +80,7 @@ describe("useRoundFor", () => {
 })
 
 /** A child that fails as the dialog does: `err` thrown in render through forBoundary. */
-const ForBoundaryThrower = ({ err }: { err: unknown }) => { throw forBoundary(err) }
+const ForBoundaryThrower = ({ err }: { err: unknown }) => { throw forBoundary(err, 'PassphraseModal') }
 
 describe("forBoundary", () => {
   const meta = { capacity: { boxes: { used: 1, max: 100 }, bytes: { used: 48, max: 1000 } } }
@@ -91,14 +91,15 @@ describe("forBoundary", () => {
     expect(screen.queryByText('Something went wrong.')).to.not.be.null
     expect(reported).to.have.lengthOf(1)
     const told = reported[0] as VaultError
-    expect(told).to.be.instanceOf(VaultError).and.to.include({ refusalkind: 'bad_option', message: 'A bad option.' })
+    expect(told).to.be.instanceOf(VaultError).and.to.include({ refusalkind: 'bad_option' })
+    expect(told.message).to.match(/^A bad option\. \(safebyok-react's PassphraseModal left this error's cause out of its report to React/)
     expect(told.meta).to.deep.equal(meta)
     expect(told.cause).to.be.undefined
   })
 
   it("hands back a VaultError with no cause as itself", () => {
     const misuse = new VaultError('bad_option', 'A bad option.', { meta })
-    expect(forBoundary(misuse)).to.equal(misuse)
+    expect(forBoundary(misuse, 'PasskeyUnlockButton')).to.equal(misuse)
   })
 
   const ForeignCases = [
@@ -109,10 +110,17 @@ describe("forBoundary", () => {
 
   for (const [thrown, blurb] of ForeignCases) {
     it(blurb, () => {
-      const told = forBoundary(thrown)
+      const told = forBoundary(thrown, 'PassphraseModal')
       expect(told).to.be.instanceOf(VaultError).and.to.include({ refusalkind: 'unexpected_error' })
       expect(told.message).to.not.include('pw-the-passphrase')
       expect(told.cause).to.be.undefined
     })
   }
+
+  it("names the component a foreign throw came from, and where to look: the dialog's functions, or the passkey prompt", () => {
+    const fromDialog = forBoundary(new TypeError('fell over'), 'PassphraseModal').message
+    const fromButton = forBoundary(new TypeError('fell over'), 'PasskeyUnlockButton').message
+    expect(fromDialog).to.include("safebyok-react's PassphraseModal").and.to.include('the functions the app handed the dialog')
+    expect(fromButton).to.include("safebyok-react's PasskeyUnlockButton").and.to.include('askPasskey').and.to.not.include('handed the dialog')
+  })
 })

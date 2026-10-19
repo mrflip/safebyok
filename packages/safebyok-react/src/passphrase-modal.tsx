@@ -351,7 +351,7 @@ const UnlockForm = ({ ask, onDone: done, allowStartOver, passphraseUsername, pas
   const [failure, setFailure] = useState<{ err: unknown } | null>(null)
   // The host's advice heard the passphrase: what it threw may quote it, so none of it goes on.
   const advice = useAdvice(passphraseAdvice, snapshot.state === 'absent', (err) => { setFailure({ err: adviceFailed(err) }) })
-  if (failure !== null) { throw forBoundary(failure.err) }
+  if (failure !== null) { throw forBoundary(failure.err, 'PassphraseModal') }
   const creating = snapshot.state === 'absent'
   const passkeyFirst = ! creating && offersPasskey(snapshot)
   const windowLine = unlockedFor(vault.leaseMillis, creating)
