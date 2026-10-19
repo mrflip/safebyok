@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { cipherCtx, deriveWrappingKey, makeBoxKey, makeVaultKey, toB64, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
+import { cipherCtx, deriveWrappingKey, fromB64, makeBoxKey, makeVaultKey, toB64, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
 import type { KeyDeriver } from '../src/key-deriver'
 import { valOf } from '../src/outcome'
 import { PasskeyProof, PassphraseProof, Proof } from '../src/proof'
@@ -224,6 +224,33 @@ describe("Wayin.sealPassphrase", () => {
     const wayin = await Wayin.sealPassphrase(slice, PassphraseProof.parse(slice, 'hunter2-hunter2'), identity, stampOf('passphrase'), await makeVaultKey())
     expect(JSON.stringify(wayin)).to.not.include('hunter2')
     expect(Object.values(wayin)).to.not.include('hunter2-hunter2')
+  })
+})
+
+describe("each field of a way in, as sealed (Contract: Wayin, How each field is made)", () => {
+  it("makes a passphrase's salt 16 fresh random bytes, names its key deriver, and keeps the stamp it was given", async () => {
+    const wayin = await Wayin.sealPassphrase(slice, PassphraseProof.parse(slice, 'pw'), identity, stampOf('passphrase'), await makeVaultKey())
+    expect(fromB64(wayin.salt_b64)).to.have.lengthOf(16)
+    expect(wayin.key_deriver_label).to.eq(TH.testDeriver.key_deriver_label)
+    expect(wayin).to.include(stampOf('passphrase'))
+    const again = await Wayin.sealPassphrase(slice, PassphraseProof.parse(slice, 'pw'), identity, stampOf('passphrase'), await makeVaultKey())
+    expect(again.salt_b64).to.not.eq(wayin.salt_b64)
+  })
+
+  it("keeps a passkey's 32-byte salt and credential as the answer brings them, and no key deriver", async () => {
+    const answer = await TH.passkeyOf('laptop')
+    const wayin = await Wayin.sealPasskey(slice, PasskeyProof.parse(slice, answer), identity, stampOf('laptop'), await makeVaultKey())
+    expect(fromB64(wayin.prf_salt_b64)).to.have.lengthOf(32)
+    expect(wayin).to.include({ credential_id: answer.credentialId, prf_salt_b64: answer.prfSaltB64 })
+    expect(wayin).to.not.have.property('key_deriver_label')
+  })
+
+  it("wraps the vaultKey under the wayinKey, bound to wayinCtx: the proof's key unwraps it under that ctx", async () => {
+    const vaultKey = await makeVaultKey()
+    const proof = PassphraseProof.parse(slice, 'pw')
+    const wayin = await Wayin.sealPassphrase(slice, proof, identity, stampOf('passphrase'), vaultKey)
+    const unwrapped = await unwrapKeyUnder(await proof.wayinKeyFor(wayin), wayin.vault_key_wayin_wrapped, wayin.wayinCtx, { extractable: true, usage: ['wrapKey'] })
+    expect(await rawOf(unwrapped)).to.eq(await rawOf(vaultKey))
   })
 })
 

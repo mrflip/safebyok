@@ -34,6 +34,28 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-19 (branch 20261019-proof_wayin, [#201](https://github.com/mrflip/safebyok/pull/201)): **what a host hands in to prove itself is
+  checked at the vault's door into a `Proof`, and a wayin opens only under one.** (1) `Proof.parse`
+  (`packages/safebyok/src/proof.ts`) turns a passphrase string, or a passkey's answer `{ credentialId,
+  prfSaltB64, prfBytes }` (typed `PasskeyAnswer`), into a `PassphraseProof` or `PasskeyProof`. The secret
+  (the passphrase; the 32 PRF bytes) is a non-enumerable, non-writable, non-configurable property of a
+  frozen instance, and `toJSON()` returns `{ kind }` only, so JSON, `Object.keys`, a spread and Node's
+  inspect do not show it. The passkey's PRF bytes are held by reference to the host's `Uint8Array`, not
+  copied. The vault itself still reads `proof.passphrase` to give a new passphrase to the host's strength
+  test. (2) `proof.wayinKeyFor(wayin)` derives the wayinKey, reading only the wayin's `salt_b64`
+  (passphrase) or `wayinCtx` (passkey). (3) A `Wayin` (`PassphraseWayin`, `PasskeyWayin`) is made by
+  `Wayin.make(vault, record, holder)`, which re-validates the stored record through its Zod schema
+  (refusing `damaged_wayin`), freezes a copy as `props`, and is itself frozen. Its wayinCtx binds the
+  vault's scope (the vault's public applabel, user_id and vaultlabel getters) and the `vault_id` and
+  `registered_at` of the `holder`, the vault props record it was made from, passed explicitly because the
+  vault's public fields lag its private state until it publishes. `isDamaged()` (another vaultKey epoch
+  than the holder's, or a salt of a length its kind never writes) is checked before any derivation.
+  (4) `wayin.tryOpen(proof)` returns an Outcome and never throws: a proof of the wrong kind is
+  `bad_option`; a passphrase wayin made by another key deriver is `unknown_key_deriver`, and a damaged one
+  `damaged_wayin`, each before deriving; a key deriver that throws anything but a VaultError becomes
+  `unexpected_error` with the throw as `cause`, and nothing is logged. `Wayin.tryOpenAmong`, the search
+  across a vault's wayins, stops at the first refusal other than `wrong_passphrase` instead of trying the
+  next wayin.
 * 2026-10-19 (branch 20261019-outcome_adapters): **a refusal whose source cannot have quoted a record now
   carries that source as its `cause`, and `not_permitted` can come from the host and the driver.**
   (1) `convexVaultDB` (`refusing`, `safebyok-convex/src/convex-vault-db.ts`): a `ConvexError` whose
@@ -133,7 +155,7 @@ added or folded into through the subagent, and no other entry changes.
   news), cleared once it opens; the snapshot's `trouble` is the latest bad news on any read, never a
   condition; a damaged record is both, the very same error object. `retryOpen()` and the re-hello
   after `delDamagedVault()` call `vault.tryHello({ staleMinutes: 0 })`, a fresh read of storage.
-* 2026-10-19 (branch 20261019-fields_and_make): **`Vault.make` takes a host function, `onBadNews(news)`,
+* 2026-10-19 (branch 20261019-fields_and_make); 2026-10-19 (branch 20261019-proof_wayin, #201): **`Vault.make` takes a host function, `onBadNews(news)`,
   called with every `bad_news` refusal.** The family (`damaged_vault`, `rolled_back`,
   `identity_revoked`, `newer_format`, `damaged_box`, `damaged_wayin`) is told synchronously, before
   the public call's promise settles, for each refusal a public vault call meets; also for bad news a
@@ -145,7 +167,10 @@ added or folded into through the subagent, and no other entry changes.
   vault's logger (`error`) and the platform's `reportError`. It cannot change what the caller gets.
   The news carries no secret material; `meta.box_listed` carries a boxlabel, which the vault never
   quotes in a message (a host's validators may admit any text) but does carry in meta, as
-  `meta.box_stored` already does.
+  `meta.box_stored` already does. 2026-10-19 (#201): a read of the vault props that finds a wayin
+  `isDamaged()` tells `onBadNews` a `damaged_wayin` news whose `meta.wayin_listed` is that wayin's
+  summary (no salt of a passphrase, no wrap), once per distinct stored record; the read still succeeds
+  and the other wayins open as before.
 * 2026-10-19 (branch 20261019-vault_class); 2026-10-19 (branch 20261019-fields_and_make): **the vault's in-memory state, the vaultKey among it,
   lives in ES private fields.** `Vault` (`packages/safebyok/src/vault.ts`) is now a class, and
   `Vault.make(opts)` returns an instance; its state used to live in the closure of `make`. Every
@@ -168,7 +193,10 @@ added or folded into through the subagent, and no other entry changes.
   their entries and `capacity` are `Object.freeze`d (a box's sidecar JSON inside a summary is not
   deep-frozen). The vault never reads its own state back through a public property, only through
   `#` fields, so a host writing over a handle's property (`hello`, or shadowing `leaseMillis` with
-  `Object.defineProperty`) changes nothing inside the vault; a test pins this.
+  `Object.defineProperty`) changes nothing inside the vault; a test pins this. 2026-10-19
+  (20261019-proof_wayin, #201): `vault.props` and `vault.wayins` expose the stored vault props (frozen) and
+  the `Wayin` instances to the host, wraps included (ciphertext and visible fields); the vault also exposes
+  `keyDeriver`, `logger` and a checked `clock` as read-only getters, which the wayin models read.
 * 2026-10-19 (branch 20261019-softlock_gone, on PR #189): **the rotation schema is removed; no
   `rotateVaultKey` was ever built.** The vault props' `prior_vault_key` (the previous vaultKey wrapped
   under the current one), its `PriorVaultKey` schema and the `priorFits` refinement (a prior exactly
@@ -1002,13 +1030,14 @@ added or folded into through the subagent, and no other entry changes.
   ID can ask the authenticator for the answer (with the user's touch), as it could read a typed
   passphrase. The credential's challenge is random and never verified, and no attestation is
   checked: the authenticator is the user's to trust.
-* 2026-10-15; 2026-10-18: **every field a record writes is bound, unless a reason below says not** (the
+* 2026-10-15; 2026-10-18; 2026-10-19: **every field a record writes is bound, unless a reason below says not** (the
   Coach: "make everything verifiable unless there's a good reason not to"). A passkey wayin's
   HKDF `info` is now its wrap's whole additional data -- format, scope, `vault_id`, the vault props'
   `registered_at`, purpose, and the wayin's visible header (`wayinkind`, `wayin_id`,
   `wayinlabel`, `credential_id`, `prf_salt_b64`) -- so the passkeyKey itself, not only the wrap, belongs to one vault
   and one wayin; HKDF info and AES-GCM additional data are the same bytes, fed to different
-  primitives. Every wayin's wrap binds the vault props' `registered_at`. A box's two
+  primitives. (2026-10-19, #201: `PasskeyProof.wayinKeyFor(wayin)` runs that HKDF over the PRF bytes with
+  the wayin's whole wayinCtx as `info`.) Every wayin's wrap binds the vault props' `registered_at`. A box's two
   encryptions bind its whole visible header (`format`, `boxlabel`, `revision_tok`, `sidecar_json`,
   `registered_at`, `written_at`: every field but the two ciphered ones, as Zod's parse leaves the
   record), so a backend that alters a sidecar or a time
@@ -1500,8 +1529,8 @@ added or folded into through the subagent, and no other entry changes.
   the deciphered whisper is dropped, never returned. It is a separate count from the one unlocks
   race against, so a refresh an `unlock()` makes for itself does not defeat that unlock. Not hard
   locks, by design: a `lockSoon()` grace running out, and a clock that cannot be read.
-* 2026-10-16 (secure_floor, G032): **an all-zero passphraseKey is refused.** `passphraseKeyOf`
-  (`wayin.ts`), the one place the core receives any key deriver's output, refuses 32 zero
+* 2026-10-16 (secure_floor, G032); 2026-10-19: **an all-zero passphraseKey is refused.** `passphraseKeyOf`
+  (`wayin.ts`; since 2026-10-19, #201, `proof.ts`), the one place the core receives any key deriver's output, refuses 32 zero
   bytes as `bad_option`, at create, unlock and every change to the wayins alike. No derivation
   makes them; a host deriver that kept its output and handed back bytes since wiped would, and
   the vault would seal under a key anyone can rebuild. The check reads every byte, OR-ing them
@@ -1523,8 +1552,8 @@ added or folded into through the subagent, and no other entry changes.
   `@zxcvbn-ts/language-common` (runtime dependencies at the Coach's yes): the length floor, then a
   zxcvbn score of at least 3, which is its blocklist of common passwords (NIST's other ask) and its
   pattern matchers. It keeps nothing of a passphrase between calls.
-* 2026-10-16: **a key deriver's bytes are zeroed once imported.** `passphraseKeyOf`
-  (`src/wayin.ts`) `fill(0)`s the 32 bytes a `KeyDeriver` hands back as soon as
+* 2026-10-16; 2026-10-19: **a key deriver's bytes are zeroed once imported.** `passphraseKeyOf`
+  (`src/wayin.ts`; since 2026-10-19, #201, in `src/proof.ts`, called by `PassphraseProof.wayinKeyFor`, logic unchanged) `fill(0)`s the 32 bytes a `KeyDeriver` hands back as soon as
   `importWrappingKeyBytes` has made the non-extractable passphraseKey of them, whether or not the
   import succeeded, on every path that derives (sealing, and each wayin tried in an unlock);
   a result of another length than 32, refused (`bad_option`), is zeroed likewise.
