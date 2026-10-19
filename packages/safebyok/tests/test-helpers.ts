@@ -1593,7 +1593,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
         [() => vaultDB.updateVaultProps(vaultPropsOf('u1', { unlock_epoch: 3 }), { vault_id: 'vault-id-u1', unlock_epoch: 2 }),         'stale_write'],
         [() => vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'late'), { vault_id: 'vault-id-u1', revision_tok: 'rev-other', vault_key_epoch: 1 }),     'stale_write'],
         [() => vaultDB.updateBox(scopeOf('u1'), boxOf('mistral', 'late'), { vault_id: 'vault-id-gone', revision_tok: null, vault_key_epoch: 1 }),            'stale_write'],
-        [() => vaultDB.updateBox(scopeOf('u1'), boxOf('mistral', 'late', { sidecar_json: '{"note":' }), noBoxYet),                      'bad_option'],
+        [() => vaultDB.updateBox(scopeOf('u1'), boxOf('mistral', 'late', { sidecar_json: '{"note":' }), noBoxYet),                      'bad_record'],
         [() => vaultDB.retireBox(scopeOf('u1'), 'anthropic', { vault_id: 'vault-id-gone', revision_tok: 'rev-anthropic' }),               'stale_write'],
         [() => vaultDB.retireVault(scopeOf('u1'), { vault_id: 'vault-id-gone' }),                                                         'stale_write'],
       ] as const
@@ -1736,14 +1736,18 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       expect(lockbox?.revision_tok).to.eq('rev-one')
     })
 
-    it("refuses a malformed record or expectation, or vault props under another vault_id, as bad_option, before storage sees it", async () => {
+    it("refuses a malformed record or expectation, or vault props under another vault_id, as bad_record, before storage sees it", async () => {
       const vaultDB = await withVaultProps()
       const unparsable = boxOf('anthropic', 'one', { sidecar_json: 'not json' })
-      await expectRefusal(vaultDB.updateBox(scopeOf('u1'), unparsable, noBoxYet), 'bad_option')
-      await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), { vault_id: 'vault-id-u1', revision_tok: '', vault_key_epoch: 1 }), 'bad_option')
-      await expectRefusal(vaultDB.updateVaultProps(vaultPropsOf('u1', { unlock_epoch: 0 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'bad_option')
-      await expectRefusal(vaultDB.updateVaultProps(vaultPropsOf('u1', { vault_id: 'vault-id-new', unlock_epoch: 2 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'bad_option')
-      await expectRefusal(vaultDB.retireVault(scopeOf('u1'), { vault_id: '' }), 'bad_option')
+      await expectRefusal(vaultDB.fetchOrCreateVaultProps(vaultPropsOf('u1', { unlock_epoch: 0 })), 'bad_record')
+      await expectRefusal(vaultDB.updateBox(scopeOf('u1'), unparsable, noBoxYet), 'bad_record')
+      await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), { vault_id: 'vault-id-u1', revision_tok: '', vault_key_epoch: 1 }), 'bad_record')
+      await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one', { vault_key_epoch: 2 }), noBoxYet), 'bad_record')
+      await expectRefusal(vaultDB.updateVaultProps(vaultPropsOf('u1', { unlock_epoch: 0 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'bad_record')
+      await expectRefusal(vaultDB.updateVaultProps(vaultPropsOf('u1', { vault_id: 'vault-id-new', unlock_epoch: 2 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'bad_record')
+      await expectRefusal(vaultDB.retireBox(scopeOf('u1'), 'anthropic', retiring('')), 'bad_record')
+      await expectRefusal(vaultDB.retireBox(scopeOf('u1'), 'anthropic', { vault_id: 'vault-id-u1' } as unknown as Parameters<VaultDB['retireBox']>[2]), 'bad_record')
+      await expectRefusal(vaultDB.retireVault(scopeOf('u1'), { vault_id: '' }), 'bad_record')
       expect(await vaultDB.readVaultProps(scopeOf('u1'))).to.deep.equal(vaultPropsOf('u1'))
       expect(await vaultDB.listBoxes(scopeOf('u1'))).to.have.lengthOf(0)
     })

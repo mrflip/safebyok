@@ -1050,6 +1050,17 @@ describe("VaultProvider", () => {
       expect(caught[0]).to.eq(misuse)
     })
 
+    it("throws a hello refused as bad_record to the error boundary too, as misuse like bad_option", async () => {
+      hushConsole()
+      const world = makeWorld()
+      const misuse = new VaultError('bad_record', 'A record the developer built wrongly.')
+      vi.spyOn(world.vaultDB, 'readVaultProps').mockRejectedValueOnce(misuse)
+      const caught: unknown[] = []
+      world.mount('u1', caught)
+      await expectShown('boundary')
+      expect(caught[0]).to.eq(misuse)
+    })
+
     it("throws a prop Vault.make does not take to the error boundary, naming it and its new name, rather than drop it unseen", async () => {
       hushConsole()
       const caught: unknown[] = []

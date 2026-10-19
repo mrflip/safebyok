@@ -71,6 +71,7 @@ describe("VaultErrorFamilyForKind", () => {
 
   it("matches the @examples", () => {
     expect(VaultErrorFamilyForKind.bad_option).to.eq('misuse')
+    expect(VaultErrorFamilyForKind.bad_record).to.eq('misuse')
     expect(VaultErrorFamilyForKind.storage_unavailable).to.eq('condition')
   })
 })
@@ -80,6 +81,7 @@ const FamilyCases = [
   ["bad_label",           "misuse",    'a label the app chose that breaks the rules is a bug'],
   ["bad_whisper",         "misuse",    'storing what JSON cannot carry is a bug'],
   ["bad_option",          "misuse",    'an Vault.make option out of range is a bug'],
+  ["bad_record",          "misuse",    'handing a VaultDB a record this package does not build is a bug'],
   ["vault_closed",        "misuse",    'using a handle after close() is a bug'],
   ["unknown_key_deriver", "misuse",    'opening with the wrong key deriver is a bug'],
   ["insecure_context",    "misuse",    'serving the app over plain http is a deployment bug'],
