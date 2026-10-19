@@ -10,6 +10,8 @@ import { unheard, ticks, wakeupAtNextTick } from './timing'
 import { spyLogger, thrownText, leafTexts } from './logging'
 
 
+// == [Contract and types]: VaultDBContract, VaultDBContractLine, VaultDBVerbs, MakeVaultDB, DescribeVaultDBOpts, MakeVaultDBDevices, others
+
 /**
  * The numbered lines of the VaultDB contract (the core's `VAULTDB.md`), each by its number and
  * short title, as the document has them: {@link describeVaultDB} titles each of its groups by one,
@@ -115,6 +117,7 @@ export type MakeVaultDBDevices = MakeDevices<VaultDBVerbs, VaultDBDeviceOpts>
 
 /** The lockbox limit {@link describeVaultDB} asks a capped adapter for. */
 const CappedLockboxes = 3
+// --
 
 /**
  * The behaviour every VaultDB owes, written once: the VaultDB contract (the core's `VAULTDB.md`),
@@ -143,6 +146,8 @@ const CappedLockboxes = 3
  *   })
  */
 export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, opts: DescribeVaultDBOpts = {}) => {
+  // == [Setup]: makeVaultDB, lineTitle, timing, withVaultProps, servedHolding, cappedHolding
+
   const { makeCappedVaultDB, makeVaultDBFor } = opts
   /** A fresh adapter, made with no VaultDBOpts: the battery's own lines hear nothing it logs. */
   const makeVaultDB = () => makeAdapter({})
@@ -189,6 +194,9 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
     await storeEach(vaultDB, boxlabels)
     return vaultDB
   }
+  // --
+
+  // == [Reading back and isolation]: 1.1 reads back whole, 1.2 keeps to itself
 
   describe(lineTitle('1.1'), () => {
     it("has no vault props until they are created, then reads them back whole", async () => {
@@ -316,6 +324,9 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       expect(remaining).to.have.lengthOf(OddLabels.length - 1)
     })
   })
+  // --
+
+  // == [Reads after writes]: 2.1 seen by later reads, 2.2 by boxlabel, 2.3 listings
 
   describe(lineTitle('2.1'), () => {
     it("shows each write to the very next read and listing, and each retirement likewise", async () => {
@@ -389,6 +400,9 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       expect(await vaultDB.listBoxRecords(scopeOf('u3'))).to.deep.equal([])
     })
   })
+  // --
+
+  // == [Creating and updating]: 3.1 created once, 3.2 vault props update, 3.3 lockbox write
 
   describe(lineTitle('3.1'), () => {
     it("yields to vault props already standing: the second device gets the first's back", async () => {
@@ -487,6 +501,9 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
 
     timingTestsOf('3.3')
   })
+  // --
+
+  // == [Retiring]: 3.4 box retirement, 3.5 vault retirement
 
   describe(lineTitle('3.4'), () => {
     it("removes one box without touching its neighbours, saying it retired the revision named, and then that there is none", async () => {
@@ -591,6 +608,9 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
     })
     timingTestsOf('3.5')
   })
+  // --
+
+  // == [Refused and independent writes]: 3.6 refused wrote nothing, 3.7 independent writes, 3.8 vaultKey, rotatedHolding
 
   describe(lineTitle('3.6'), () => {
     it("leaves the whole vault as it stood after each refusal: vault props, boxes and listing", async () => {
@@ -655,6 +675,9 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       expect(summaryOf(listed)?.vault_key_epoch).to.eq(2)
     })
   })
+  // --
+
+  // == [Lockbox limits]: 4.1 declared, 4.2 refused, 4.3 replacement, 4.4 under, 4.5 nothing lost
 
   describe(lineTitle('4.1'), () => {
     it("declares a whole number of lockboxes above zero, or Infinity", async () => {
@@ -712,6 +735,9 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
   describe(lineTitle('4.5'), () => {
     timingTestsOf('4.5')
   })
+  // --
+
+  // == [Refusals and access]: 5.1 VaultError kinds, 5.3 quotes nothing, 5.4 signed-in user
 
   describe(lineTitle('5.1'), () => {
     it("refuses a scope or boxlabel below the floor every name is held to as bad_label, and a lockbox holding one as bad_record, before storage sees it", async () => {
@@ -797,6 +823,9 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       expect(await standingVault(owner, ['anthropic', 'openai', 'mistral'])).to.deep.equal(before)
     })
   })
+  // --
+
+  // == [Subscribe and size limits]: 6.1 subscribe, 7.1 record, 7.2 vault, 7.3 name
 
   describe(lineTitle('6.1'), () => {
     it("hands back an unsubscribe that can be called", async () => {
@@ -851,6 +880,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       expect(await vaultDB.listBoxes(scopeOf('u1'))).to.have.lengthOf(0)
     })
   })
+  // --
 }
 
 /** The longest a race or push test may take: a race runs a score of schedules, each over a fresh backend. */
@@ -881,6 +911,8 @@ export type VaultDBTimingCheck = { line: VaultDBContractLine, title: string, run
  * @example await TH.vaultDBTimingChecks(() => new MyVaultDB(), { makeDevices }).rivalFirstWrites.check()
  */
 export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaultDBOpts = {}) => {
+  // == [Timing setup]: makeVaultDB, devicesFor, cappedAdapter, twoDevices, sameAdapterTwice
+
   const { makeCappedVaultDB, makeDevices, pushes = false } = opts
   /** A fresh adapter, made with `vaultDBOpts`, or with none. */
   const makeVaultDB = (vaultDBOpts: VaultDBOpts = {}) => makeAdapter(vaultDBOpts)
@@ -914,7 +946,10 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
     const vaultDB = await makeVaultDB()
     return [vaultDB, vaultDB]
   }
+  // --
   return {
+    // == [Cross-device and creation races]: seenAcrossDevices, rivalCreates, rivalVaultPropsUpdates, rivalFirstWrites, rivalReplacements
+
     seenAcrossDevices: {
       line:  '2.1',
       title: "shows a write made on one device to the very next read and listing on another, and a retirement likewise",
@@ -1003,6 +1038,9 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
         })
       },
     },
+    // --
+    // == [Retirement and disjoint-write races]: retireBeatsReplacement, vaultRetireBeatsWrite, apartNewLockboxes, apartReplaceAndRetire
+
     retireBeatsReplacement: {
       line:  '3.4',
       title: `lands a retirement made at once ${fromTwo} with a replacement of its lockbox, which is gone afterwards, however they interleave`,
@@ -1074,6 +1112,9 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
         })
       },
     },
+    // --
+    // == [Lockbox limit races]: crowdForLastPlace, pastLimitFromRoomierDevice
+
     crowdForLastPlace: {
       line:  '4.5',
       title: `keeps every lockbox that landed when four writers race for the last place, ${fromEach}, and leaves nothing of those refused, however they interleave`,
@@ -1126,6 +1167,9 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
         expect(await listedRevisions(tight)).to.deep.equal(['rev-cohere', 'rev-groq', 'rev-next'])
       },
     },
+    // --
+    // == [Push checks]: pushEachWrite, pushFromAnotherDevice, pushFromTheStart, pushPastAFailingListener, pushEndsOnUnsubscribe
+
     pushEachWrite: {
       line:  '6.1',
       title: "calls onChange after each kind of write to the vault, a read on each call seeing the write, once its watch is live",
@@ -1207,8 +1251,11 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
         stays.unsubscribe()
       },
     },
+    // --
   } satisfies Record<string, VaultDBTimingCheck>
 }
+
+// == [Turnstile check]: expectRoundTripsThroughTurnstile
 
 /**
  * That a device from `makeDevices` passes the turnstile it was made with before each of its writes
@@ -1240,6 +1287,9 @@ export const expectRoundTripsThroughTurnstile = async (makeDevices: MakeVaultDBD
     expect(tally.passes - before, `${verb} reached the backend without passing the turnstile: makeDevices gives its devices a client that does not go through it`).to.be.greaterThan(0)
   }
 }
+// --
+
+// == [Race helpers]: expectToHold, withVaultPropsFirst, holdingFirst, kindsOf, expectWholeOrRefused, glimpseOf
 
 /** A timing check run as a test: it rejects, failing the test, when what it checks does not hold. */
 const expectToHold = (check: VaultDBTimingCheck): Promise<void> => check.check()
@@ -1276,6 +1326,9 @@ const glimpseOf = async (vaultDB: VaultDBVerbs) => {
   const listed = await vaultDB.listBoxes(scopeOf('u1'))
   return { vaultProps, listed: listed.map((box) => [box.boxlabel, summaryOf(box)?.revision_tok]) }
 }
+// --
+
+// == [Watch helpers]: readingWatch, expectHeard, untilLive, expectEachWriteHeard
 
 /**
  * A watch on u1's vault through `watcher` that, each time it is called, reads the vault, as a vault
@@ -1372,6 +1425,9 @@ const expectEachWriteHeard = async (pair: () => Promise<[VaultDBVerbs, VaultDBVe
   for (const write of writes) { await expectHeard(watch, writer, write) }
   watch.unsubscribe()
 }
+// --
+
+// == [Fixtures and stranger helpers]: everyVerbOn, LiteralSidecar, ManyBoxlabels, storeEach, standingVault, revisionIn, others
 
 /** Every verb a stranger might try on `u1`'s vault, each as a thunk. */
 const everyVerbOn = (stranger: VaultDBVerbs) => [
@@ -1441,6 +1497,9 @@ const quotedOf = (refusal: unknown, lockbox: Lockbox): string[] => {
   const quotable = [lockbox.boxlabel, lockbox.sidecar_json, ...leafTexts(lockbox.lockbox_key_wrapped), ...leafTexts(lockbox.whisper_ciphered)]
   return quotable.filter((text) => text !== '' && told.includes(text))
 }
+// --
+
+// == [perUser]: perUser
 
 /**
  * One adapter reaching every user's vaults, made of a VaultDB per user: for
@@ -1483,3 +1542,4 @@ export const perUser = (vaultDBFor: (userId: string) => VaultDBVerbs): VaultDBVe
     subscribe:               (scope, onChange) => as(scope).subscribe(scope, onChange),
   }
 }
+// --

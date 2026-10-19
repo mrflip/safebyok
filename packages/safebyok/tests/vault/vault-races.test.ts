@@ -7,6 +7,8 @@ import * as TH from '../test-helpers'
 import { makeRacingWorld, makeWorld, HourMillis, SevenDaysMillis, boxlabelsOf, storedWayinsOf, generationOf, storedVaultPropsOf, storedRowOf, u1BoxCkey, u1VaultPropsCkey } from './world'
 
 
+// == [Lock against unlock and read]: a lock that lands while an unlock, read in flight
+
 describe("a lock that lands while an unlock is under way", () => {
   it("during the passphrase check: the lock wins, the unlock throws 'vault_locked', and no lease is granted", async () => {
     const world = makeRacingWorld()
@@ -269,6 +271,9 @@ describe("a read in flight when a lock lands", () => {
     expect(callback).not.toHaveBeenCalled()
   })
 })
+// --
+
+// == [Creation and moved vaults]: raceLostToPwOne, first unlock loses race, vault moves elsewhere, other handle, lock generation
 
 /**
  * Device B, open on an absent vault, and device A, another device on the same storage. A makes
@@ -534,6 +539,9 @@ describe("the device mark's lock generation", () => {
     expect(mark?.lock_generation).to.eq(1)
   })
 })
+// --
+
+// == [Close and reborn vaults]: close, rebornWorld, stale session, rebornUnheard
 
 describe("close", () => {
   it("a closed handle refuses everything thereafter", async () => {
@@ -770,6 +778,9 @@ const rebornUnheard = async () => {
   await there.storeBox('anthropic', 'sk-ant-fake-new')
   return { world, hereDB, here, there }
 }
+// --
+
+// == [Two devices and refreshes]: twoDeviceWorld, stillClock, delaysAsked, versioned updates, refreshes
 
 /**
  * Two devices on one vault, and a way to slip `there`'s doings between `here`'s look at storage
@@ -1165,3 +1176,4 @@ describe("refreshes, one at a time", () => {
     expect(world.logged[1]?.message).to.match(/reads again/)
   })
 })
+// --

@@ -14,6 +14,8 @@ import * as TH from '../test-helpers'
 import { makeWorld, MisfitStores, VaultDBVerbsUsed, uncheckingDeviceDB, HourMillis, damagedVaultWorld, isU1Box, u1VaultPropsCkey } from './world'
 
 
+// == [Making a vault]: Vault.make, options
+
 describe("Vault.make", () => {
   it("settles into 'absent' against an empty backend, prompting nobody", async () => {
     const world = makeWorld()
@@ -143,6 +145,9 @@ describe("Vault.make's options", () => {
     expect(vault.leaseMillis).to.eq(LeaseHours * HourMillis)
   })
 })
+// --
+
+// == [hello]: seedVault, hello
 
 /** Makes the vault, with a lockbox in it, and closes the handle: what a later open will find. */
 const seedVault = async (world: ReturnType<typeof makeWorld>) => {
@@ -435,6 +440,9 @@ describe("hello", () => {
     expect(await world.readLease()).to.not.be.null
   })
 })
+// --
+
+// == [Host environment]: secure context, host's clock, OutOfBoundsReadings
 
 describe("a page that is not a secure context", () => {
   afterEach(() => { vi.unstubAllGlobals() })
@@ -581,6 +589,9 @@ describe("the host's clock", () => {
     expect(world.dbStore.ckeys().filter((ckey) => isU1Box(ckey))).to.have.lengthOf(0)
   })
 })
+// --
+
+// == [Key deriver seam]: cheapDerive, handBuilt, hearingEverything, key deriver
 
 /** The testDeriver's derivation, to put in a deriver of another shape. */
 const cheapDerive: KeyDeriver['deriveKeyBytes'] = (passphrase, saltBytes) => TH.testDeriver.deriveKeyBytes(passphrase, saltBytes)
@@ -814,6 +825,9 @@ describe("the key deriver seam", () => {
     expect(vault.getSnapshot().state).to.eq('unlocked')
   })
 })
+// --
+
+// == [Failed hello]: FailedOpenCases, a hello that fails
 
 // Each arranges for one storage call during the open to fail, and hands back the error it planted
 // (or a promise of it, for an arrangement that first seeds the vault).
@@ -1044,3 +1058,4 @@ describe("a hello that fails", () => {
     expect(world.logged).to.have.lengthOf(0)
   })
 })
+// --

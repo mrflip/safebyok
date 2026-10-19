@@ -12,6 +12,8 @@ import * as TH from '../test-helpers'
 import { makeWorld, boxlabelsOf, storedRowOf, u1BoxCkey, storedVaultPropsOf, u1VaultPropsCkey, isU1Box, wayinlabelsOf } from './world'
 
 
+// == [Storing and reading]: RoundTrips, storeBox and readBox, times a vault keeps
+
 const RoundTrips: readonly (readonly [Whisper, string])[] = [
   ["sk-ant-api03-fake",            'a string'],
   [42,                             'a number'],
@@ -302,6 +304,9 @@ describe("the times a vault keeps", () => {
     expect(world.dbStore.read(u1VaultPropsCkey)).to.eq(olden)
   })
 })
+// --
+
+// == [Sidecar]: the sidecar
 
 describe("the sidecar", () => {
   it("is {} in the summary and the stored row of a lockbox given none", async () => {
@@ -418,6 +423,9 @@ describe("the sidecar", () => {
     expect(storedRowOf(world, 'anthropic')).to.include({ format: 'safebyok-lockbox-v5', whisper_codec: 'json_v1', whisper_schema_version: 1 })
   })
 })
+// --
+
+// == [Lockbox limit]: declaringVaultBytes, declaringLockboxes, heaviestRowOf, the lockbox limit
 
 /**
  * `vaultDB` declaring `maxVaultBytes` as given, and otherwise itself: the in-tree local adapters
@@ -677,6 +685,9 @@ describe("the lockbox limit", () => {
     expect(err.message).to.not.include('at most 0')
   })
 })
+// --
+
+// == [Host validators]: AnyScript, ScriptLabels, the host's validators
 
 /**
  * What a host keeping labels in any script might pass: any text of 1 to 200 characters for each
@@ -960,6 +971,9 @@ describe("the host's validators", () => {
     expect(world.dbStore.read(u1BoxCkey('Other: box'))).to.be.null
   })
 })
+// --
+
+// == [Weight, locked, useBox]: LongScope, declaringRecordBytes, what a lockbox weighs, while locked, useBox
 
 /** A scope of names a kibibyte long, which only a host's validators admit: heavier than the default fields' plan. */
 const LongScope = { applabel: 'a'.repeat(1000), vaultlabel: 'v'.repeat(1000) } as const
@@ -1074,3 +1088,4 @@ describe("useBox", () => {
     expect(err.message).to.include('callback function')
   })
 })
+// --

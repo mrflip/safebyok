@@ -19,6 +19,8 @@ import { checkStrengthTest, ensureStrongEnough } from './passphrase-strength'
 import { type MakeVaultOpts, isBag, ensureKnownOpts, parseVaultDB, parseDeviceDB, parseLeaseHours, parseClock, readClock, parseKeyDeriver, parseMaxWhisperBytes, parseMaxLockboxes, parseDeclared, ensureLimitsFit, StoredBytesPerWhisperByte, LockboxFixedBytes } from './vault-opts'
 import { deviceTroubleAsConditions } from './retire-damaged-vault'
 
+// == [Public types]: VaultState, VaultSnapshot
+
 /**
  * Where the vault stands, as the UI branches on it:
  *  * `opening`  -- still reading the vault props and device cache; show nothing yet
@@ -88,6 +90,7 @@ export type VaultSnapshot = {
    */
   trouble:   VaultError | null
 }
+// --
 
 /**
  * A user's vault of lockboxes. All reading and writing of whispers goes through here; the UI
@@ -116,6 +119,8 @@ export type VaultSnapshot = {
  * 'rolled_back' or 'newer_format', which the write throws as it came.
  */
 export type Vault = {
+  // == [Vault: observing]: leaseMillis, getSnapshot, subscribe
+
   /**
    * How long a lease lasts on this device, in whole milliseconds: the `leaseHours` the vault was
    * opened with, its default (168 hours) when none was given. A vault that stays unlocked until
@@ -132,6 +137,9 @@ export type Vault = {
    * a listener that is not a function.
    */
   subscribe: (listener: () => void) => () => void
+  // --
+
+  // == [Vault: opening]: hello
 
   /**
    * Read the vault props from storage and this device's lease, and settle the snapshot from
@@ -164,6 +172,9 @@ export type Vault = {
    *   }
    */
   hello(): Promise<void>
+  // --
+
+  // == [Vault: locking]: unlock, lock, lockSoon
 
   /**
    * Open the vault with its passphrase, granting this device a lease for `leaseHours`. On an
@@ -263,6 +274,9 @@ export type Vault = {
    * @example await vault.lockSoon(0)  // the same as await vault.lock()
    */
   lockSoon(graceSeconds?: number): Promise<void>
+  // --
+
+  // == [Vault: ways in]: changePassphrase, addPassphrase, addPasskey, retireWayin
 
   /**
    * Re-wrap the vaultKey under a new passphrase, in place of the old one: the passphrase's way
@@ -387,6 +401,9 @@ export type Vault = {
    * @example await vault.retireWayin(passphrase, leaked.wayin_id)
    */
   retireWayin(proof: string | PasskeyProof, wayinId: string): Promise<void>
+  // --
+
+  // == [Vault: lockboxes]: storeBox, readBox, useBox, retireBox
 
   /**
    * Write a whisper into the lockbox `boxlabel`, creating or replacing it. Requires unlocked;
@@ -495,6 +512,9 @@ export type Vault = {
    * `damaged: true` beside `call`.
    */
   retireBox(boxlabel: string): Promise<void>
+  // --
+
+  // == [Vault: retiring and closing]: retire, close
 
   /**
    * Retire the vault: delete its every stored record, remote and device-local, the vault half of
@@ -519,6 +539,7 @@ export type Vault = {
    * lock. A second `close()` does nothing.
    */
   close(): void
+  // --
 }
 
 /**
@@ -555,6 +576,8 @@ const UnreadVaultProps = Symbol.for('safebyok.unread_vault_props')
  * @example Vault.make({ ...opts, forcePassphraseReentryHours: 1 })  // throws 'bad_option': it is called leaseHours now
  */
 const make = (opts: MakeVaultOpts): Vault => {
+  // == [Options and setup]: scope, parsed options, limits, vaultDB
+
   ensureSecureContext()
   if (! isBag(opts)) { throw new VaultError('bad_option', 'Vault.make takes one bag of options: applabel, userId, vaultlabel, vaultDB, deviceDB, keyDeriver and passphraseStrengthTest at least.') }
   ensureKnownOpts(opts)
@@ -588,6 +611,9 @@ const make = (opts: MakeVaultOpts): Vault => {
   const vaultByteLimit = ensureLimitsFit(givenVaultDB, whisperByteLimit, lockboxLimit)
   // Every storage refusal, whichever call met it, passes by the refusal policy on its way out.
   const vaultDB = RefusalPolicy.heed(givenVaultDB, async (refusal) => { await heedRefusal(refusal) })
+  // --
+
+  // == [State and snapshot]: vaultProps, vaultKey, counters, listeners, snapshot, bump
 
   let vaultProps: VaultProps | null | typeof UnreadVaultProps = UnreadVaultProps
   // This device's mark for the vault props in hand, set with them, so the two always name one vault.
@@ -651,6 +677,9 @@ const make = (opts: MakeVaultOpts): Vault => {
     snapshot = next
     listeners.forEach((listener) => { listener() })
   }
+  // --
+
+  // == [Contexts]: leaseCtx, boxCtx
 
   // The context each encryption is bound to; see VOCABULARY.md on ctx. A
   // wayin's ctx is the Wayin module's. A lease's is bound to every field of its record but the
@@ -664,6 +693,9 @@ const make = (opts: MakeVaultOpts): Vault => {
   const boxCtx = (vaultId: string, header: LockboxHeader, purpose: 'lockbox_key_wrapped' | 'whisper_ciphered') => (
     cipherCtx(LockboxFormat, applabel, scope.user_id, vaultlabel, vaultId, purpose, header)
   )
+  // --
+
+  // == [Reading storage]: refresh, readStorage, takeStorage, noteTrouble, hello, greet
 
   /**
    * Bring the snapshot up to what storage holds now, one read at a time: a refresh asked for while
@@ -761,6 +793,9 @@ const make = (opts: MakeVaultOpts): Vault => {
     greeted = true
     bump()
   }
+  // --
+
+  // == [Mark]: checkedMark, keptMark, heedMark, raiseMark, markSeeing, blankMark, deviceIdFor
 
   /** `kept`, a mark the deviceDB handed back, when it passes its check and is of this scope; null otherwise. */
   const checkedMark = (kept: unknown): DeviceMark | null => {
@@ -855,6 +890,9 @@ const make = (opts: MakeVaultOpts): Vault => {
     if (deviceMark?.seen.vault_id === standing.vault_id) { return deviceMark.seen.device_id }
     throw new VaultError('stale_write', 'The vault changed in storage while this device was reading it -- it was deleted or made anew elsewhere -- so nothing was written. Read the vault again before retrying.')
   }
+  // --
+
+  // == [Guards]: ensureOpen, ensureUnlocked, keyInHand, currentVaultProps
 
   const ensureOpen = () => {
     if (closed) { throw closedError() }
@@ -891,6 +929,9 @@ const make = (opts: MakeVaultOpts): Vault => {
     }
     return vaultProps
   }
+  // --
+
+  // == [Unlock and ways in]: unwrapWith, draftVaultProps, settleUnlock, reviseWayins, sealFor, others
 
   /**
    * The vaultKey out of whichever of `standing`'s ways in `proof` opens, or the one `wayinId`
@@ -1063,6 +1104,9 @@ const make = (opts: MakeVaultOpts): Vault => {
       throw new VaultError('too_many_wayins', `This vault already holds its limit of ${String(MaxUnlocks)} ways in: remove one before adding another.`)
     }
   }
+  // --
+
+  // == [Locking and expiry]: shut, hardRevokeLease, noteStart, heedRefusal, dropKey, armExpiry, outrun, others
 
   /**
    * Forget the unlock, in memory and on this device: the hard lock, whose revocation of the lease
@@ -1219,6 +1263,9 @@ const make = (opts: MakeVaultOpts): Vault => {
     closed || shutSince(shutsThen) || vaultProps === null || vaultProps === UnreadVaultProps
     || vaultProps.vault_id !== standing.vault_id || vaultProps.unlock_epoch !== standing.unlock_epoch
   )
+  // --
+
+  // == [Lease]: deadlineFor, grantLease, fetchLease, discardUnreadableLease
 
   /**
    * The deadline of an unlock taken up now by `proof`, in `call`. The lease renews whenever the
@@ -1348,6 +1395,9 @@ const make = (opts: MakeVaultOpts): Vault => {
     await deviceDB.eraseLease(scope)
     logger.warn("This device's lease could not be read or would not open, so it was discarded: the vault opens locked, and asks for the passphrase again.", { call: 'hello' })
   }
+  // --
+
+  // == [Lockbox limits]: lockboxWeight, ensureWhisperFits, ensureRoomFor
 
   /**
    * What one lockbox counts for against the vault's storage: room for a whisper and sidecar of
@@ -1396,6 +1446,9 @@ const make = (opts: MakeVaultOpts): Vault => {
       throw new VaultError('vault_full', `This vault has no room for that lockbox in the ${String(vaultByteLimit)} bytes its storage holds of one vault, counting each lockbox's boxlabel and room for a whisper and sidecar of maxWhisperBytes: remove a lockbox, or store under a shorter boxlabel.`)
     }
   }
+  // --
+
+  // == [Reading lockboxes]: checkStandingBoxlabel, readBoxOrThrow, openBox, decipherLockbox, recordOpens
 
   /**
    * `boxlabel`, once a lockbox stands under it, for retireBox(), which reaches a lockbox by the name it
@@ -1539,6 +1592,9 @@ const make = (opts: MakeVaultOpts): Vault => {
       return false
     }
   }
+  // --
+
+  // == [Writing lockboxes]: writeOver, refuseStaleStoreBox, refuseCreatedElsewhere
 
   /**
    * Write `lockbox` over `expected`, as `storeBox()` does: one write, which storage refuses unless
@@ -1583,6 +1639,9 @@ const make = (opts: MakeVaultOpts): Vault => {
     }
     throw new VaultError('created_elsewhere', 'A vault was just created for this label on another device, with a different passphrase than the one you entered. Nothing was created on this device. Enter the passphrase you chose there to unlock it.', { cause: wrong })
   }
+  // --
+
+  // == [The handle]: the Vault object: getSnapshot, subscribe, unlock ... retire, close
 
   const vault: Vault = {
     leaseMillis,
@@ -1863,6 +1922,9 @@ const make = (opts: MakeVaultOpts): Vault => {
       listeners.clear()
     },
   }
+  // --
+
+  // == [Catching up]: refreshOnStale, catchUp, watchRefresh, the first hello
 
   /**
    * `write`, with a refusal as stale catching this device up with storage before it is thrown --
@@ -1923,8 +1985,11 @@ const make = (opts: MakeVaultOpts): Vault => {
     if (closed) { return }
     logger.warn("The vault could not read what storage and this device hold of it, so it is still opening: its snapshot's trouble says why. Call vault.hello() to try again; any other call on the vault tries again first.", { call: 'hello' }, asError(err))
   })
+  // --
   return vault
 }
+
+// == [The Vault value]: Vault.make
 
 /**
  * The vault's maker, beside the `Vault` type its handles have: `Vault.make(opts)` makes one, which
@@ -1933,6 +1998,9 @@ const make = (opts: MakeVaultOpts): Vault => {
  * @example const vault = Vault.make({ applabel: 'acme', userId: session.userId, vaultlabel: 'main', vaultDB, ...browserOpts() })
  */
 export const Vault = { make }
+// --
+
+// == [Refusals]: damagedAs, damagedVaultProps, damagedLockbox, lockedError, closedError
 
 /**
  * What `reading` resolves to, with storage's refusal of the record as corrupt said instead as
@@ -1958,6 +2026,9 @@ const damagedBeyondNaming = () => new VaultError('damaged_lockbox', "That lockbo
 const lockedError = () => new VaultError('vault_locked', 'The vault is locked: ask the user for their passphrase and call unlock().')
 
 const closedError = () => new VaultError('vault_closed', 'This vault handle was closed: make another with Vault.make.')
+// --
+
+// == [Proofs and passkeys]: parseProof, passkeyShape, parsePasskey, parsePasskeyMaker, parseNewPasskey
 
 /**
  * A proof as a host hands one in, checked: a blank passphrase is refused at once, as it could open
@@ -2003,6 +2074,9 @@ const parseNewPasskey = (candidate: PasskeyProof): PasskeyProof => {
   }
   return passkey
 }
+// --
+
+// == [Vocabulary]: isUnderHeldKey, UnlockStart, SeenMark, MarkFormat, VaultCall, LockboxFormat, LockboxHeader
 
 /**
  * True when `box` lists as damaged already, or stands under a vaultKey `standing` holds: its own,
@@ -2054,6 +2128,9 @@ type LockboxHeader = Omit<Lockbox, 'format' | 'lockbox_key_wrapped' | 'whisper_c
 
 /** The JSON of an empty sidecar: what a lockbox given none holds. */
 const EmptySidecarJson = '{}'
+// --
+
+// == [Argument parsers]: checkStoreOpts, sidecarJsonOf, parseAim, parseWayinId, parseWayinlabel, parsePassphrase, others
 
 /** What `storeBox()`'s options may hold: a sidecar, which {@link sidecarJsonOf} checks, and nothing else. */
 const checkStoreOpts = optionsCheck({ sidecar: Z.optional(Z.unknown()) }, "storeBox()'s only option is `sidecar`, the lockbox's own visible data (it is authenticated but never encrypted): check its spelling, and leave out any other. A note is kept in the sidecar: { sidecar: { note } }.")
@@ -2148,6 +2225,9 @@ const parsePassphrase = (candidate: string, said: 'changePassphrase' | 'addPassp
     throw new VaultError('bad_option', `${said} takes each passphrase as a string: the text the user typed.`)
   }
 }
+// --
+
+// == [Timers and grace]: ExpiryGraceMillis, isFarFuture, unrefTimeout, parseGraceSeconds, deadlineAfter, parseJsonOrNull
 
 /**
  * How long past `askPassphraseAt` the vaultKey stays for work already in hand, as a `lockSoon()`
@@ -2205,3 +2285,4 @@ const parseJsonOrNull = (text: string): unknown => {
     return null
   }
 }
+// --

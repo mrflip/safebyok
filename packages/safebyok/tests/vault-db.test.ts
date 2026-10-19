@@ -12,6 +12,8 @@ import * as Expectations from '../src/expectations'
 import { NameFloorBytes } from '../src/validators'
 import * as TH from './test-helpers'
 
+// == [Test adapters]: MapVaultDB, TroubledVaultDB, RingingVaultDB, MisreportingVaultDB, MisreportedCases
+
 /**
  * The smallest honest adapter: a Map of records, each check-and-write in one synchronous step.
  * What an adapter author writes; the validation around it comes from the base class. Given a
@@ -197,6 +199,9 @@ const MisreportedCases = [
   [{ outcome: 'gone' },           'an outcome this package does not know'],
   [{},                            'a record naming no outcome'],
 ] as const
+// --
+
+// == [Retirement answers and the adapter's half]: lockbox retirement, ListedRecordCases, an adapter's half
 
 describe("the abstract VaultDB, on the way back from a lockbox retirement", () => {
   it("resolves what its adapter says it removed: the revision named, another, or none", async () => {
@@ -377,6 +382,9 @@ describe("the abstract VaultDB, around an adapter's half", () => {
       .to.throw(VaultError, /onChange function/).with.property('kind', 'bad_option')
   })
 })
+// --
+
+// == [Retiring a damaged vault]: RefusedWrites, withDamagedVaultProps, retiring a vault whose props are damaged
 
 /** Writes a VaultDB refuses before its adapter's half sees them: none is one a vault builds. */
 const RefusedWrites = [
@@ -534,6 +542,9 @@ describe("the abstract VaultDB, retiring a vault whose vault props are damaged",
     await TH.expectRefusal(new MapVaultDB().retireDamagedVault({ ...TH.scopeOf('u1'), applabel: '' }), 'bad_label')
   })
 })
+// --
+
+// == [Answers from the adapter]: on the way in, MisansweringVaultDB, lockbox write, listing
 
 describe("the abstract VaultDB, on the way in", () => {
   for (const [kind, write, blurb] of RefusedWrites) {
@@ -656,6 +667,9 @@ describe("the abstract VaultDB, listing", () => {
     await expect(vaultDB.readBox(TH.scopeOf('u1'), 'anthropic')).rejects.toThrow(/did not read back in a shape/)
   })
 })
+// --
+
+// == [Names and sizes]: scriptScope, holding names, NarrowNamesVaultDB, SmallRecordVaultDB, weighing, jsonBytes
 
 /** A scope no default check admits, which every verb takes: names above the floor. */
 const scriptScope = { applabel: 'Acme: אקמה', user_id: 'u1', vaultlabel: 'ราก' } as const
@@ -809,6 +823,9 @@ describe("jsonBytes", () => {
     it(blurb, () => { expect(jsonBytes(val)).to.eq(expected) })
   }
 })
+// --
+
+// == [Logger and watching]: logger, subscriber's listener, watchTrouble, listBoxRecords
 
 /** A RingingVaultDB made with `vaultDBOpts`, with one watch on u1's vault whose listener throws. */
 const failingListenerOn = (vaultDBOpts: VaultDBOpts = {}) => {
@@ -1036,5 +1053,6 @@ describe("VaultDB.listBoxRecords", () => {
     await TH.expectRefusal(new DownVaultDB().listBoxRecords(TH.scopeOf('u1')), 'storage_unavailable')
   })
 })
+// --
 
 
