@@ -28,7 +28,9 @@ sprint directory on in full, since workers read it from theirs.
 
 * A header: date, mode (normal or YOLO, §4), the review level (`medium` unless the Coach named
   another, or `none`), how many threads may run at once (3 unless the Coach named another), who
-  issued it, and a status line you keep current.
+  issued it, and a status line you keep current. A thread's entry may name its own review level
+  (`none`, `low`, `medium`, `high`) and reviewer model; those override the header's for that
+  thread, and a `low` entry says what the reviewer checks.
 * *Read first*: the notes and files every worker needs beyond CLAUDE.md, by section where a
   section will do.
 * *Ground rules*: only what is particular to this sprint.
@@ -118,7 +120,8 @@ handoffs: put it in the next ones. A background worker whose tools were refused 
 could not ask for) is re-run in the foreground, alone.
 
 **Review.** When the worker reports `ready`, spawn one `thread-reviewer` in the background with
-`isolation: "worktree"` -- unless the review level is `none` or the thread's diff holds no code,
+`isolation: "worktree"` -- at the thread's own review level if its entry names one, else the
+header's -- unless that level is `none` or the thread's diff holds no code,
 in which case say so and go straight to filing. Isolated, the reviewer and every agent it starts
 work in a worktree of their own, kept by the harness from the main checkout.
 

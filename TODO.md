@@ -30,6 +30,23 @@ Small irritants, each a few lines, picked up by whoever is nearby.
   floor (`engines`), and only reports on the newest Node. A workflow cannot make a check
   required; the ruleset is the Coach's to change.
 
+## Things that are buggiing coach
+
+* "misuse" -> "halting"
+* consolidate crypto-related code into Pantry
+
+## Audits
+
+* where are errors thrown? Are we maintaining good hygeine of "always succeed and report" vs
+  "look at reports and panic accordingly"?
+
+* Sidecar data isn't "Public", it's "server accessible". We currently have too loose a treatment of it in our documentation and
+  that is, in places, leaking into the design
+
+* VaultDB implementations are encouraged to store sidecar data as readable ('jsonb' not json-encoded-by-us text)
+
+* revisiontoks - signed?
+
 ## Roadmapped
 
 In order. A later item that depends on an earlier one says so.

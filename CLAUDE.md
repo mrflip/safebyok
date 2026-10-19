@@ -172,6 +172,12 @@ The documents below are looked up by section, not read through.
   leans on one, say so. Keep questions about the content for yourself: haiku fetches reliably
   but misreads.
 
+* **Claude Docs: read as markdown.** If you only need to read a Claude Doc and not to edit or
+  restructure it, don't use `read` or the docs skill (the XML output costs far more tokens
+  than the text). Instead, `export` each tab you need with `format: "markdown"`. Note that
+  this snapshot drops embedded diagrams, charts, highlights and comment anchors: if the doc
+  leans on a picture or a marked passage, report it.
+
 ## Conventions At A Glance
 
 The house conventions a writer gets wrong unless told: the linter does not catch these, or they
