@@ -554,6 +554,17 @@ describe("VaultProvider", () => {
       expect(await reading).to.be.null
     })
 
+    it("resolves a read to null when the user dismisses the dialog, as WithUnlockedVault's example shows", async () => {
+      const world = await lockedWorld()
+      render(world.tree('u1'))
+      const vault = await world.opened()
+      const whisper = world.latest().withUnlockedVault(() => vault.getBox('anthropic_api_key'))
+      await screen.findByPlaceholderText('vault passphrase')
+      fireEvent.click(screen.getByText('Cancel'))
+      expect(await whisper).to.be.null
+      expect(vault.getSnapshot().state).to.eq('locked')
+    })
+
     it("keeps a dialog an action opens in the very commit that gave the provider its vault", async () => {
       const world = await lockedWorld()
       const eager: { reading: { outcome: unknown } } = { reading: { outcome: 'pending' } }
