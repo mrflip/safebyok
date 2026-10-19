@@ -146,4 +146,4 @@ If the Coach leans toward C, the timing is the same: `passkey` becomes `passkeys
 
 ## Coach thoughts
 
--
+- *Orchestrator:* ruled 2026-10-19: option A, carried on the vault for now. The Coach's words are in `ruling-one_of_each.md`; built by thread B4a.
