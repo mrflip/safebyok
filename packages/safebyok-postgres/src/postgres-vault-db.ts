@@ -1,4 +1,4 @@
-import { Refusals, VaultDB, VaultError, VaultScope } from 'safebyok'
+import { Expectations, Refusals, VaultDB, VaultError, VaultScope } from 'safebyok'
 import type { VaultPropsExpectation, VaultDBOpts, RetireExpectation, Lockbox, LockboxExpectation, LockboxRetireExpectation, LockboxRetirement, StoredLockbox, VaultProps } from 'safebyok'
 import * as Columns from './columns'
 import { VaultPropsColumns, ListedLockboxColumns, LockboxColumns } from './columns'
@@ -320,14 +320,15 @@ class TablesVaultDB extends VaultDB {
     }
   }
 
-  // What it removed is what the statement that removed it returned.
+  // What it removed is what the statement that removed it returned, compared as the listing reads
+  // it: a column holding no revision that reads as one (an empty one) is the none a damaged
+  // lockbox is listed with.
   protected async doRetireBox(scope: VaultScope, boxlabel: string, expected: LockboxRetireExpectation): Promise<LockboxRetirement | null> {
     this.mustReach(scope)
     const { rows } = await this.client.query(RetireBoxSql, [...scopeParams(scope), boxlabel, expected.vault_id])
     if (rows.length === 0) { return null }
     const { retired_tok: retiredTok } = rows[0] as { retired_tok: string | null }
-    if (retiredTok === null) { return { outcome: 'absent' } }
-    return { outcome: retiredTok === expected.revision_tok ? 'retired' : 'retired_other' }
+    return Expectations.retirementOf(retiredTok === null ? null : { revision_tok: retiredTok }, expected)
   }
 
   protected async doRetireVault(scope: VaultScope, expected: RetireExpectation): Promise<boolean> {

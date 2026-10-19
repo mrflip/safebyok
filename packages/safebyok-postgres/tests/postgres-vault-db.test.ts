@@ -586,6 +586,17 @@ describe("postgresVaultDB, in trouble", () => {
     const { rows } = await db.query<{ wayins: unknown }>('SELECT wayins FROM safebyok_vaults')
     expect(rows[0]?.wayins).to.eq('not a list')
   })
+
+  it("retires a row whose revision the database holds empty, listed with none, as the one a retirement naming none means", async () => {
+    const db = await TH.emptyDatabase()
+    const vaultDB = TH.requestFor(db, 'u1')
+    await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
+    await vaultDB.updateBox(u1, TH.boxOf('anthropic', 'one'), noBoxYet)
+    await db.query(`UPDATE safebyok_lockboxes SET revision_tok = ''`)
+    expect(await vaultDB.listBoxes(u1)).to.deep.equal([{ boxlabel: 'anthropic', damaged: true, revision_tok: null }])
+    expect(await vaultDB.retireBox(u1, 'anthropic', TH.retiring(null))).to.deep.equal({ outcome: 'retired' })
+    expect(await vaultDB.listBoxes(u1)).to.have.lengthOf(0)
+  })
 })
 
 const throwsClosed = () => { throw new Error('already closed') }
