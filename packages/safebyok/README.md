@@ -283,14 +283,10 @@ floor and to your adapter's declared `maxNameBytes`, and takes no
 validators of the host's, which are the vault's own. So an adapter that hands its calls on to
 another VaultDB's public verbs passes each call through as it came.
 
-A device store of your own (a `DeviceDB`, for a platform without IndexedDB) owes two things beyond
-keeping its records, each the compare and the write in one step: `writeLease(lease, expected)`
-writes only while the scope's device mark stands at `expected.lock_generation` (0 with no mark),
-and otherwise writes nothing and refuses with `stale_write`; and `writeMark` keeps the higher
-`lock_generation` of the mark it writes and the one it replaces. That is how a lock in one tab
-stops an unlock under way in another. A mark may hold no vault (`seen: null`): a lock where no
-vault was seen, and `retire()`, leave one, keeping the count. `describeDeviceDB` from
-`safebyok/testing` checks all of this.
+A device store of your own (a `DeviceDB`, for a platform without IndexedDB) keeps its records as
+it is handed them: `writeLease` and `writeMark` each replace what the scope held, and `eraseMark`
+forgets the scope's mark (`retire()` calls it). `describeDeviceDB` from `safebyok/testing` checks
+all of this.
 
 Every refresh -- after each of the vault's own writes, and at each change your adapter's
 `subscribe` reports -- lists every lockbox in the vault, one at a time per handle, so its cost
@@ -353,10 +349,10 @@ never compare a time for equality. The vault reports the lease it was opened wit
 reads as the exported `ForeverMillis`), so a UI can say how long an unlock lasts without being
 told the option again.
 
-The deadline is the truth, and a timer enforces it. From `askPassphraseAt` the snapshot reads
-`locked` and every call that would start new work throws `vault_locked`; work already under way
-keeps the key for one more minute to finish, and then a timer drops it, with no call needed. A timer that runs late, as one may on a device that slept, is caught at the next
-call. The timer is `unref`'d, so it never holds a Node or Bun process open.
+The deadline is the truth, and a timer enforces it. At `askPassphraseAt` a timer drops the key,
+with no call needed: the snapshot reads `locked`, and every call that needs the key throws
+`vault_locked`, work already under way included. A timer that runs late, as one may on a device
+that slept, is caught at the next call. The timer is `unref`'d, so it never holds a Node or Bun process open.
 
 **The lease starts again whenever the user types a passphrase and it proves**: an `unlock()`, a
 `changePassphrase()`, and an `addPassphrase()`, `addPasskey()` or `retireWayin()` with a
@@ -373,34 +369,18 @@ opening it with different ones each discard the other's lease (`notes/wontfix.md
 stepped backwards does the same to a lease granted just before: it seems to last past its
 setting, and the user is asked again, the safe direction.
 
-Two calls lock, and each forgets the unlock in memory and on this device alike, so the user types
-their passphrase again afterwards:
-
-* **`vault.lock()`** is the hard lock: the goons are at the door. Use it for a real lock signal: a
-  Lock button, or a locked screen. The key is dropped at once, and the lock wins over everything
-  under way, in this tab or in another on the same device: an `unlock()` or `changePassphrase()`
-  still under way is granted no lease and leaves the vault locked (the `unlock()` throws kind
-  `vault_locked`; a wrong passphrase is still told as `wrong_passphrase`, the more useful news),
-  and a `readBox()` or `useBox()` under way refuses with `vault_locked`, the whisper it had deciphered
-  dropped, never handed back. A write already sent to storage lands. Across tabs this rides on the
-  device mark's `lock_generation`, which every hard lock raises and an unlock's record write
-  compares. `retire()` locks the same way, and so does storage the vault cannot trust (below).
-  A refresh that finds the vault's ways in changed on another device, or the vault gone, drops
-  the key the same way for this handle: a `readBox()` or `useBox()` under way refuses with
-  `vault_locked`.
-* **`vault.lockSoon(graceSeconds = 5)`** is the soft lock: the bartender's stinkeye. Use it when
-  the user steps away: a hidden tab, a sign-out. From the instant it is called the snapshot reads
-  `locked`, every `readBox`, `useBox`, `storeBox` or `retireBox` called afterwards throws kind `vault_locked`, and this
-  device revokes its lease; but work already in hand finishes: a `readBox()` or a
-  `storeBox()` under way, and an `unlock()` or `changePassphrase()` under way, here or in another tab,
-  which leaves the vault unlocked again. The key is dropped `graceSeconds` later, or sooner when
-  the lease would drop it sooner. An `unlock()` (or a `changePassphrase()`, which proves the
-  passphrase too) within the grace ends it. The grace is at most 60 seconds; `lockSoon(0)` is
-  `lock()`.
+**`vault.lock()`** forgets the unlock in memory and on this device alike, so the user types their
+passphrase again afterwards. Use it for a real lock signal: a Lock button, a locked screen, a
+sign-out. The key is dropped at once, and every call that needs it throws kind `vault_locked`. A
+`readBox()` or `useBox()` under way refuses with `vault_locked` too, handing nothing back, unless an
+unlock has put a key back in hand by the time its whisper is ready. An `unlock()` or
+`changePassphrase()` under way is not stopped: it finishes, and leaves the vault unlocked. A write
+already sent to storage lands. `retire()` locks the same way, and so does storage the vault cannot
+trust (below). A refresh that finds the vault's ways in changed on another device, or the vault
+gone, drops the key the same way for this handle.
 
 `close()` is not a lock: the lease stays, for the next open, along with any an unlock under way
-granted before the close; it ends a `lockSoon()` grace at once, an unlock under way on
-the closed handle takes nothing up, and a `readBox()` or `useBox()` under way hands back nothing,
+granted before the close; an unlock under way on the closed handle takes nothing up, and a `readBox()` or `useBox()` under way hands back nothing,
 refusing with `vault_closed`.
 
 A host clock that turns bad partway through a call (it throws, or reads outside 1981 to 2255)
@@ -416,15 +396,15 @@ for the passphrase again. Lock on the signals your users mean as "lock it".
 The core cannot watch for a locked screen or a hidden tab (it runs where there is no
 `document`), so locking on those signals is a few lines in the host app. `visibilitychange`
 fires when the user switches tabs or the screen locks, which is as close to a screen-lock signal
-as every browser offers; it also fires for a tab merely switched away from, so it calls the
-gentle one:
+as every browser offers; it also fires for a tab merely switched away from, so use it only where
+a tab left behind should ask for the passphrase again:
 
 ```ts
 const lockWhenHidden = (vault: Vault) => {
   const onChange = () => {
     if (! document.hidden) { return }
-    vault.lockSoon().catch((err: unknown) => {
-      // A lockSoon() racing a close() is the one refusal to expect; any other, such as a device
+    vault.lock().catch((err: unknown) => {
+      // A lock() racing a close() is the one refusal to expect; any other, such as a device
       // store that would not erase the lease, is worth a word.
       if (! isVaultError(err, 'vault_closed')) { console.warn('The vault did not lock cleanly', err) }
     })
@@ -434,11 +414,11 @@ const lockWhenHidden = (vault: Vault) => {
 }
 ```
 
-Call the function it returns when you close the vault. The `catch` quiets only a `lockSoon()`
+Call the function it returns when you close the vault. The `catch` quiets only a `lock()`
 that races a `close()`, and lets a failure to revoke the lease be heard: that vault
 is locked in this tab, but the next open may unlock without the passphrase. Chromium's Idle
 Detection API, behind a permission the user grants, is the only true screen-lock signal, and a
-locked screen is the user meaning it, so it calls `lock()`, quieted the same way:
+locked screen is the user meaning it, so it calls `lock()` too, quieted the same way:
 
 ```ts
 const aborter = new AbortController()   // aborter.abort() when you close the vault
@@ -455,8 +435,8 @@ if (await IdleDetector.requestPermission() === 'granted') {   // from a click: i
 TypeScript's DOM types do not carry `IdleDetector` yet; declare it, or take it from a types
 package, before this compiles.
 
-For a sign-out, call `lockSoon()` first, then close the handle (in React, unmount the provider)
-once what was under way has settled: closing ends the grace at once.
+For a sign-out, call `lock()`, then close the handle (in React, unmount the provider): the lock
+revokes the lease, and the close lets the handle go.
 
 ### When the user signs out
 
@@ -528,7 +508,7 @@ the base class settles the logger from them, the host's or the default. It says 
 to throw to through `this.logger`.
 
 Each call is a plain-language `message`; a `story` naming the vault call it happened in
-(`{ call: 'lockSoon' }`); and, when there is one, the error behind it, a `VaultError` or your own
+(`{ call: 'refresh' }`); and, when there is one, the error behind it, a `VaultError` or your own
 (your clock's, your storage adapter's). The vault puts no whisper, passphrase, key, ciphertext or
 option's value in any of the three, not even the `userId` or the labels: a host with several
 vaults gives each its own logger, bound to whatever context it wants in its logs. An error of your
@@ -536,8 +516,6 @@ own goes as your code made it, as itself or as a `VaultError`'s `cause`, so what
 storage client's error may quote the request it failed) is yours to keep clean. Today a vault
 says these things:
 
-* `warn`: `lockSoon()` could not read the clock, so it locked at once, without a grace; or the
-  clock failed as a lease ended (`{ call: 'expiry' }`), so the key went at once.
 * `warn`: this device's lease could not be read or would not open, so it was discarded, and the
   vault opened locked. A lease that simply expired, or that a new
   passphrase outdated, is routine, and says nothing.
@@ -760,7 +738,7 @@ as it reads the vault from storage, can refuse with `storage_unavailable`, `not_
 snapshot keeps as its `trouble`, the vault still `opening`. So is `storage_blocked`, from this
 device's own store or a vault store on it, which saying hello again will not mend. A refused hello
 leaves the handle as it was, its storage watch live, so the host calls `hello()` again, or simply
-carries on: every call but `lock()`, `lockSoon()` and `close()` tries again first. Close the
+carries on: every call but `lock()` and `close()` tries again first. Close the
 handle to let it go.
 
 ### Two devices storing at once
