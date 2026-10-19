@@ -1244,6 +1244,19 @@ describe("every data call, through ensureLease", () => {
     expect(boxlabelsOf(vault)).to.deep.equal([])
   })
 
+  it("asks to unlock, not to make a vault, when that one read finds the vault another device made since, with the box in it", async () => {
+    const world = makeWorld()
+    const getProof = typingPw()
+    const vault = await world.open({ vaultDB: world.deafVaultDB(), getProof })
+    expect(vault.state).to.eq('absent')
+    const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
+    await elsewhere.unlock('pw')
+    await elsewhere.putBox('anthropic', 'sk-fake')
+    expect(await TH.expectGood(vault.tryGetBox('anthropic'))).to.eq('sk-fake')
+    expect(getProof).toHaveBeenCalledOnce()
+    expect(getProof.mock.calls[0]?.[0].why).to.eq('locked')
+  })
+
   it("refuses absent_box at once for a vault never made, rather than asking to make one only to find nothing in it", async () => {
     const world = makeWorld()
     const getProof = typingPw()
