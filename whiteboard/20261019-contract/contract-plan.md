@@ -188,6 +188,15 @@ over `Object.keys(vault.snapshot)`; `created_elsewhere` and `damaged_wayin` prov
 | B4 | `put-wayin` | B2 | opus | medium | Writes its Contract section to the thread file first; YOLO builds to the brief. |
 | B5 | `placement` | B3 + B4 restacked | opus | low | *Orchestrator:* the preplan stacks B5 on B4 only, but B5 reads all four model classes, so B3 joins the line first. |
 
+*Orchestrator (line):* B's line is restacked as B1 → B3 → `a_sec` → B2 → B4 → B5: B3 and
+`a_sec` each go onto the line as they file, and B2 cuts from the top once both are in.
+
+*Review (B1, #201, `fixed`, high):* crypto moved unchanged; the vault reads `proof.passphrase` only
+for a new passphrase's strength test. Fixed: `vault.wayins` typing; each way in's `holder` was the
+vault's own unfrozen props (now the frozen snapshot props). Left: salts and wrapped keys in the
+snapshot (row); Wayin subclasses public constructors (row, B5); a lingering damaged way in pins
+`trouble`; two publishes per read; double parsing; examples without pointing tests.
+
 **Closing phase B:** passes 1 and 2 again, as C1 builds; fixes in `b-fixes`.
 
 ### Phase C: `calls`
