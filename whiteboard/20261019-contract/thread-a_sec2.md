@@ -1,38 +1,60 @@
 # Thread a_sec2: security follow-up to a_sec (2026-10-19)
 
-Branch `20261019-a_sec2`, PR (draft, number on push), stacked on #205 (B2 `lease`). Justify: green
-at the first milestone (core 2640 incl. 35 skipped).
+Branch `20261019-a_sec2`, PR [#206](https://github.com/mrflip/safebyok/pull/206), stacked on #205
+(B2 `lease`). Justify: green (core 2626 incl. 35 skipped, react 275, indexeddb 154, postgres 281,
+convex 280, graphql 275, fastkey 49, demo 215, e2e 185 incl. 96 skipped).
 
-* **Built** (so far):
+* **Built**:
   * **The create window** (`src/vault.ts`). A first unlock's make captures `#makesStandDown`'s
-    signal as it writes its vault props; a read's revocation (now `#heedRevocation`, split out of
-    `#takeStorage`) aborts it and makes a new one (`#standDownMakes`), so one signal serves every
-    make in flight. An aborted make puts no vault props back; the grant then finds its props
-    outrun, takes nothing up and writes no lease; the unlock refuses `vault_locked`. Race test in
-    `tests/vault/vault-races.test.ts` (*a first unlock's make, and a read that finds the vault gone
-    while it is under way*), failing at base.
-  * **The stale-read rollback**: `isNewerCopy(inHand, fresh)` (same `vault_id`, a lower
-    `unlock_epoch` or `vault_key_epoch` read) is no revocation, and never replaces the props in
-    hand at the read's end. Race test: *a read that began before this device's own change to the
-    ways in landed*, failing at base. No new reads.
+    signal just before `ensureVaultProps`; a read's revocation (`#heedRevocation`, split out of
+    `#takeStorage`) aborts it and makes a new one (`#standDownMakes`). An aborted make puts no
+    vault props back, so the grant finds its props outrun, takes nothing up and writes no lease;
+    the unlock refuses `vault_locked`. Race test in `tests/vault/vault-races.test.ts`, failing at
+    base. TODO.md *Soonish*: cross-device invalidation, by a token each device authenticates.
+  * **The stale-read rollback**: `isNewerCopy(inHand, fresh)` (same `vault_id`, lower epoch read)
+    is no revocation and never replaces the props in hand. Race test, failing at base. No new reads.
   * **`#checkListed` reads nothing**: synchronous, from the listing in hand; `#ensureLease`'s
-    `beforeAsking` is synchronous and `why` is not read twice. Tests reworked in
-    `vault-lease.test.ts` (the listing is as fresh as `staleMinutes` keeps it); the a_fixes
-    changeset's sentence edited to match.
-  * TODO.md *Soonish*: cross-device invalidation, by a token each device authenticates.
+    `beforeAsking` is synchronous. Tests reworked (the listing is as fresh as `staleMinutes`
+    keeps it); the a_fixes changeset edited to match.
+  * **No salt or wrapped key in the snapshot** (Coach's ruling, mid-thread): `VaultSnapshot.props`
+    and `vault.props` gone; `vault.wayins` is the snapshot's `WayinSummary[]`. The vault keeps the
+    record it last settled from as `#shownProps`, for telling damaged-wayin news once.
+  * **`Lease.grant` validates** `holder` and `askPassphraseAt` with `LeaseRecord`'s Zod checks
+    (`GrantArgs`), throwing a ZodError as misuse.
+  * **The cross-copy mark is gone** (Coach's ruling): `isVaultError` is `instanceof` plus the
+    kind; `TH.foreignRefusal`/`TH.lookalikeRefusal` and their tests removed, one lookalike table
+    and one other-copy test kept in `tests/errors.test.ts`. The only `instanceof VaultError` in
+    core and react src is `isVaultError`'s own.
+  * **idbDeviceDB blocked as a browser blocks it**: the conformance blocked store now fails every
+    `indexedDB.open` with a request whose `onerror` fires a `SecurityError`; a write over quota (a
+    transaction aborted with `QuotaExceededError`, via fake-indexeddb's `_abort`) is
+    `storage_blocked`, keeping nothing (`tests/idb.test.ts`).
+  * **Docs**: `Wayin.sealPassphrase`'s doc; fastkey's README (`unexpected_error`, the vault's own
+    `wrong_passphrase`); react's `forBoundary(err, source)` names the component, says where to look,
+    and says when a cause was left out; CLAUDE.md's star-import example (`Names.checkFloor`);
+    `.vitest/` ignored; `notes/security.md` through a sonnet subagent.
 * **Decisions taken**:
-  * One shared stand-down signal, replaced at each revocation, rather than a field per make (as
-    `#takeUp` has): two unlocks may make at once on one handle, and a single field would let one
-    overwrite the other's.
-  * The make captures the signal just before `ensureVaultProps`, not at the start of the make: a
-    revocation before the write cannot be of the vault it writes.
-  * The stale read is told by epochs (same vault, lower epoch), not a read sequence: storage never
-    takes a vault's epochs back (the mark refuses one that does), so the comparison is obviously
-    right, and no counter is added. The read's box listing is still taken.
+  * One shared make stand-down signal, replaced at each revocation, not a field per make as
+    `#takeUp` has: two unlocks may make at once on one handle.
+  * The stale read is told by epochs, not a read sequence: storage never takes a vault's epochs
+    back (the mark refuses one that does), so no counter is needed. Its listing is still taken.
+  * The zxcvbn load test makes its vault from the same fresh module copy as the strength test,
+    since another copy's VaultError is now a foreign throw.
+  * idbVaultDB's blocked tests (safebyok-indexeddb) throw `SecurityError` synchronously from
+    `open`, which is also what a browser does for an opaque origin: left as they are.
+* **Deviations**:
+  * Item 5's test pinning the mark's invisibility: dropped, the mark being gone (ruled).
+  * No fastkey changeset exists to correct (its `bad_option` text is in a released CHANGELOG);
+    the README is corrected, and the thread's changeset does not repeat it.
+  * Tests that a host could not write over the props it held went with the props.
 * **Discoveries**:
   * A make stood down by a revocation of *another* device's vault (V0 made and deleted elsewhere
-    while this make wrote V1) refuses `vault_locked` though V1 stands. Fails safe: the next read
-    takes V1 up, and the next unlock opens it.
-  * The stale-read fix covers the same vault only. A read that began before the make's write and
-    resolves `null` after the make put its props in hand still revokes them (the make then
-    refuses `vault_locked`); fails safe, and catching it needs a read sequence.
+    while this make wrote V1) refuses `vault_locked` though V1 stands. Fails safe.
+  * A read that began before the make's write and resolves `null` after the make put its props in
+    hand still revokes them (the make refuses); fails safe, and catching it needs a read sequence.
+  * TODO.md's *A wayin change racing this handle's own refresh* (the reverse race: a read of the
+    new props before `#reviseWayins` sets them) stands; this thread did not touch it.
+* **For the Coach** (Contract drift, for the Contract tab): `VaultSnapshot` loses `props`; the
+  handle loses `props`; `vault.wayins` is `readonly WayinSummary[]`, the snapshot's own (the
+  Contract's *Vault* named `Wayin` models there). `isVaultError` no longer knows another copy's
+  refusal. `Lease.grant` throws on input a lease record cannot hold.
