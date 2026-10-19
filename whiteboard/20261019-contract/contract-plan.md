@@ -16,7 +16,7 @@ this line.
   (56 kB; `grep -n '^#'` is its outline). The handoff says when a ruling has changed it since.
 * **Sprint doc:** https://claude.ai/code/artifact/362ec68d-5bf3-46aa-a379-59a9c8bfb548
   (*Open Matters*, *Resolved*, *Progress*).
-* **Status:** B1 (#201) and B3 (#202) filed in line; `a_sec` (#203) in its second review; B2 cuts once `a_sec` is restacked onto B3.
+* **Status:** B1 (#201) and B3 (#202) filed in line. `a_sec` (#203) held for the Coach after its second review flagged one window (row). `a_fixes` building on #202. B2 waits on `a_sec`.
 
 ## How this plan relates to the preplan
 
@@ -205,6 +205,12 @@ for a new passphrase's strength test. Fixed: `vault.wayins` typing; each way in'
 vault's own unfrozen props (now the frozen snapshot props). Left: salts and wrapped keys in the
 snapshot (row); Wayin subclasses public constructors (row, B5); a lingering damaged way in pins
 `trouble`; two publishes per read; double parsing; examples without pointing tests.
+
+*Orchestrator:* `a_sec`'s second review (comment on #203) left one significant window, the Coach's:
+a create racing a deletion elsewhere can leave this device unlocked on the deleted vault until its
+next read. Proposed: file `a_sec` as it stands and open `a_sec2` (a stand-down for the create; the
+stale-read rollback; the `notes/security.md` host-throw sentence, condition only; fastkey's README
+lines 72-80 and the changeset). `a_fixes` was cut meanwhile from #202, the one independent thread.
 
 **Closing phase B:** passes 1 and 2 again, as C1 builds; fixes in `b-fixes`.
 
