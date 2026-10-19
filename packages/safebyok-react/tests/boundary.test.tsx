@@ -1,7 +1,8 @@
 import { screen } from '@testing-library/react'
 import { Component, type ReactNode } from 'react'
 import { describe, expect, it } from 'vitest'
-import { Boundary, useRoundFor } from '../src/boundary'
+import { VaultError } from 'safebyok'
+import { Boundary, forBoundary, useRoundFor } from '../src/boundary'
 import * as TH from './test-helpers'
 
 /** A child that throws `failure.err` while rendering, or shows "fine" when it has no failure. */
@@ -76,4 +77,42 @@ describe("useRoundFor", () => {
     rerender(<Served handle={second} failing={first} />)
     expect(screen.queryByText('fine')).to.not.be.null
   })
+})
+
+/** A child that fails as the dialog does: `err` thrown in render through forBoundary. */
+const ForBoundaryThrower = ({ err }: { err: unknown }) => { throw forBoundary(err) }
+
+describe("forBoundary", () => {
+  const meta = { capacity: { boxes: { used: 1, max: 100 }, bytes: { used: 48, max: 1000 } } }
+
+  it("hands React a VaultError's kind, message and meta but not its cause, thrown in render, as its example shows", () => {
+    const misuse = new VaultError('bad_option', 'A bad option.', { cause: new Error('could not derive from pw-the-passphrase'), meta })
+    const { reported } = TH.renderReporting(<Boundary fallback={<p>Something went wrong.</p>}><ForBoundaryThrower err={misuse} /></Boundary>)
+    expect(screen.queryByText('Something went wrong.')).to.not.be.null
+    expect(reported).to.have.lengthOf(1)
+    const told = reported[0] as VaultError
+    expect(told).to.be.instanceOf(VaultError).and.to.include({ refusalkind: 'bad_option', message: 'A bad option.' })
+    expect(told.meta).to.deep.equal(meta)
+    expect(told.cause).to.be.undefined
+  })
+
+  it("hands back a VaultError with no cause as itself", () => {
+    const misuse = new VaultError('bad_option', 'A bad option.', { meta })
+    expect(forBoundary(misuse)).to.equal(misuse)
+  })
+
+  const ForeignCases = [
+    [new TypeError('could not judge pw-the-passphrase'),  'turns an Error that quotes what it was handed into a fixed unexpected_error quoting none of it'],
+    ["pw-the-passphrase",                                 'turns a bare string into a fixed unexpected_error quoting none of it'],
+    [null,                                                'turns null into a fixed unexpected_error'],
+  ] as const
+
+  for (const [thrown, blurb] of ForeignCases) {
+    it(blurb, () => {
+      const told = forBoundary(thrown)
+      expect(told).to.be.instanceOf(VaultError).and.to.include({ refusalkind: 'unexpected_error' })
+      expect(told.message).to.not.include('pw-the-passphrase')
+      expect(told.cause).to.be.undefined
+    })
+  }
 })
