@@ -98,7 +98,7 @@ class IdbVaultDB extends VaultDB {
       const [standingVaultProps, standingBox] = await Promise.all([rowAt(store, Ckeys.vaultProps(scope)), rowAt(store, ckey)])
       if (! Expectations.lockboxMeets(standingVaultProps, standingBox, expected)) { return null }
       store.put(lockbox, ckey)
-      return await rowAt(store, ckey)
+      return rowAt(store, ckey)
     }))
   }
 
