@@ -246,8 +246,8 @@ const GraphqlIntMax = 2_147_483_647
 const IntFields = ['unlock_epoch', 'vault_key_epoch', 'whisper_schema_version'] as const
 
 /**
- * `outgoing`, once each of its `Int!` fields fits a GraphQL `Int`: kind 'bad_record' otherwise,
- * before it is sent, as no vault builds an epoch that large. A lockbox's expectation names the
+ * Refuses `outgoing` with kind 'bad_record', before it is sent, unless each of its `Int!` fields
+ * fits a GraphQL `Int`, as no vault builds an epoch that large. A lockbox's expectation names the
  * lockbox's own `vault_key_epoch`, so checking the lockbox checks it.
  */
 const checkInts = (said: string, outgoing: Partial<Record<typeof IntFields[number], number>>) => {
