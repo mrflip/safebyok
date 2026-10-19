@@ -1,6 +1,6 @@
 # Thread A2: vault_class (2026-10-19)
 
-Branch `20261019-vault_class`, PR #PRNUM, stacked on [#194](https://github.com/mrflip/safebyok/pull/194) (`20261019-outcome`). Justify: green; 4142 tests, 3949 passed, 193 skipped (live backends), 0 failed.
+Branch `20261019-vault_class`, [PR #196](https://github.com/mrflip/safebyok/pull/196), stacked on [#194](https://github.com/mrflip/safebyok/pull/194) (`20261019-outcome`). Justify: green; 4142 tests, 3949 passed, 193 skipped (live backends), 0 failed.
 
 * **Built**:
   * `packages/safebyok/src/vault.ts`: `export class Vault`. `Vault.make(opts)` is `static make`,
