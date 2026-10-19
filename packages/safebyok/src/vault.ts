@@ -1531,6 +1531,9 @@ export class Vault {
    */
   async #grantLease(unlocked: VaultKeyPair, standing: VaultProps, until: number): Promise<boolean> {
     if (this.#outrun(standing)) { return false }
+    // A take-up under way stands down before this lease is written, not after: one that read an
+    // older lease could otherwise erase this one as it discards that.
+    this.#standDownTakeUp()
     // The transient's last act: wrapped into this device's lease, then dropped.
     const leaseKey = await makeLeaseKey()
     const wrapped = await wrapKeyUnder(leaseKey, unlocked.transientKey, this.#leaseCtx(standing.vault_id, standing.unlock_epoch, until))
@@ -1544,7 +1547,6 @@ export class Vault {
       ask_passphrase_at:       until,
     })
     if (this.#outrun(standing)) { return false }
-    this.#standDownTakeUp()
     this.#armExpiry(until, this.#clockNow())
     this.#vaultKey = unlocked.sessionKey
     this.#askPassphraseAt = until

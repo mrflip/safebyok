@@ -885,6 +885,17 @@ const holdLeaseAfterRead = (world: ReturnType<typeof makeWorld>) => {
   return gate
 }
 
+/** Holds this device's next write of its lease once the store has taken it, until released. */
+const holdLeaseAfterWrite = (world: ReturnType<typeof makeWorld>) => {
+  const gate = TH.makeGate()
+  const write = world.deviceDB.putLease.bind(world.deviceDB)
+  vi.spyOn(world.deviceDB, 'putLease').mockImplementationOnce(async (lease) => {
+    await write(lease)
+    await gate.pass()
+  })
+  return gate
+}
+
 describe("a lease take-up a key change overtakes", () => {
   it("stays locked when a lock lands while a hello is taking up the lease", async () => {
     const world = makeWorld()
@@ -922,6 +933,29 @@ describe("a lease take-up a key change overtakes", () => {
     expect(vault.askPassphraseAt).to.eq(fresher).and.to.not.eq(older)
     const standing = await world.getLease()
     expect(standing?.ask_passphrase_at).to.eq(fresher)
+  })
+
+  it("keeps a fresher unlock's lease when a hello's take-up discards the run-out one while it is written", async () => {
+    const world = makeRacingWorld()
+    const vault = await world.openUnlocked('pw')
+    world.advance(SevenDaysMillis + (StaleMinutes * MinuteMillis))
+    const deriving = world.holdNextDerive()
+    const unlocking = vault.unlock('pw')
+    await deriving.reached
+    const leaseRead = holdLeaseAfterRead(world)
+    const hello = vault.hello({ staleMinutes: 0 })
+    await leaseRead.reached
+    const leaseWritten = holdLeaseAfterWrite(world)
+    deriving.release()
+    await leaseWritten.reached
+    // The fresh lease is in the store; the take-up goes on with the run-out one it read.
+    leaseRead.release()
+    await hello
+    leaseWritten.release()
+    await unlocking
+    expect(vault.state).to.eq('unlocked')
+    const standing = await world.getLease()
+    expect(standing?.ask_passphrase_at).to.eq(vault.askPassphraseAt).and.to.eq(world.clock.now() + SevenDaysMillis)
   })
 })
 // --
