@@ -16,7 +16,7 @@ this line.
   (56 kB; `grep -n '^#'` is its outline). The handoff says when a ruling has changed it since.
 * **Sprint doc:** https://claude.ai/code/artifact/362ec68d-5bf3-46aa-a379-59a9c8bfb548
   (*Open Matters*, *Resolved*, *Progress*).
-* **Status:** running. The Coach ruled `a_sec` (2026-10-19): file as it stands; `a_sec2` after B2. `a_sec` is being restacked onto #204; B2 cuts from it.
+* **Status:** running. `a_sec` (#203) restacked onto #204 and filed at 9e5ed329 after a third, restack review (the Coach's leave). B2 `lease` building from it.
 
 ## How this plan relates to the preplan
 
@@ -214,6 +214,8 @@ a create racing a deletion elsewhere can leave this device unlocked on the delet
 next read. Proposed: file `a_sec` as it stands and open `a_sec2` (a stand-down for the create; the
 stale-read rollback; the `notes/security.md` host-throw sentence, condition only; fastkey's README
 lines 72-80 and the changeset). `a_fixes` was cut meanwhile from #202, the one independent thread.
+
+*Review (`a_sec`, #203, `flagged` twice, then the Coach's ruling; a third, restack review `fixed`, high):* the restack onto #204 moved the deriver wrap into `passphraseKeyOf` (`src/proof.ts`); every fix held. Fixed: `wayinKeyFor`'s doc. Left, to `a_sec2` (rows): `wayin.ts`'s sealing doc; the security note's deriver paragraph; the boundary's bug message; `.vitest/` in `.gitignore`. Left as is (row): a lease written for new props goes unused until the next real read.
 
 *Review (`a_fixes`, #204, `flagged` then `fixed`, medium, two reviews):* the cross-copy mark
 (`Symbol.for('safebyok.VaultError')`) holds; flagged: a locked vault refused `absent_box` from a

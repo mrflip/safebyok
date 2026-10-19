@@ -6,7 +6,7 @@ they disagree. Workers look things up here; they do not write it.
 ## Line
 
 *Orchestrator:* main → #193 → #194 → #196 → #197 → #198 → #199 → #200 → #195 (phase A) → #201
-B1 `proof_wayin` → #202 B3 `box` → #204 `a_fixes` (50b15c25). `a_sec` (#203) is restacked onto #204
+B1 `proof_wayin` → #202 B3 `box` → #204 `a_fixes` → #203 `a_sec` (9e5ed329). B2 `lease` builds from it. `a_sec` was restacked onto #204
 (ruled 2026-10-19: file as it stands); B2 cuts from it; `a_sec2` follows B2 and closes the create
 window. Cross-device invalidation will come from a proper mechanism (each device authenticates a
 token when it joins or creates a vault): don't build one ahead of it.
