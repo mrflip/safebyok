@@ -1,6 +1,6 @@
 # Thread A5: react_over_class (2026-10-19)
 
-Branch `20261019-react_over_class`, PR #PRNUM, stacked on [#198](https://github.com/mrflip/safebyok/pull/198) (`20261019-try_twins`). Justify: green; 4266 tests, 193 skipped (live backends), 0 failed.
+Branch `20261019-react_over_class`, [PR #199](https://github.com/mrflip/safebyok/pull/199), stacked on [#198](https://github.com/mrflip/safebyok/pull/198) (`20261019-try_twins`). Justify: green; 4266 tests, 193 skipped (live backends), 0 failed.
 
 * **Built** (`packages/safebyok-react/src/vault-provider.tsx`, sectioned `[Hooks]`, `[VaultProvider]`):
   * **`useVault()` returns the vault** (`Vault | null`, null while signed out), as the thread and
