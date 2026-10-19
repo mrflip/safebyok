@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { VaultError } from '../src/errors'
-import { type Outcome, bad, good, isOutcomeShaped, outcomeOf, unexpectedError, valOf } from '../src/outcome'
+import { type Outcome, bad, good, hostThrewRefusal, isOutcomeShaped, outcomeOf, unexpectedError, valOf } from '../src/outcome'
 import * as Refusals from '../src/refusals'
 import * as TH from './test-helpers'
 
@@ -126,6 +126,31 @@ describe("unexpectedError", () => {
   it("keeps a cause that is never null, for a throw of nothing", () => {
     expect(unexpectedError(undefined).cause).to.be.instanceOf(Error)
   })
+})
+
+/** What a key deriver or strength test might throw, and what hostThrewRefusal makes of it: kept as it came, or wrapped. */
+const HostThrowCases = [
+  // a condition, for the caller to show or retry:
+  [new VaultError('storage_unavailable', 'The word list could not be loaded: try again shortly.'), "kept",              'keeps a condition, its word list out of reach'],
+  [new OtherVaultError('wrong_passphrase'),                                                         "kept",              'keeps a condition of another copy of safebyok'],
+  // anything else, which may quote the passphrase:
+  [new VaultError('bad_option', 'acme acme acme is no passphrase I can judge.'),                    "unexpected_error",  'wraps a VaultError of misuse'],
+  [new VaultError('damaged_vault', 'acme acme acme broke me.'),                                     "unexpected_error",  'wraps a VaultError of bad news, never to be told to onBadNews'],
+  [new OtherVaultError('bad_option'),                                                               "unexpected_error",  'wraps misuse of another copy of safebyok'],
+  [new OtherVaultError('no_such_kind'),                                                             "unexpected_error",  'wraps an impostor of an unknown kind'],
+  [new TypeError('could not judge acme acme acme'),                                                 "unexpected_error",  'wraps a throw that is no VaultError'],
+] as const
+
+describe("hostThrewRefusal", () => {
+  for (const [thrown, expected, blurb] of HostThrowCases) {
+    it(blurb, () => {
+      const refusal = hostThrewRefusal(thrown)
+      expect(refusal === thrown ? 'kept' : refusal.refusalkind).to.eq(expected)
+      // Wrapped, the throw is the cause, and none of its message is the refusal's.
+      expect(refusal === thrown || refusal.cause === thrown).to.be.true
+      expect(refusal.message).to.not.include('acme')
+    })
+  }
 })
 
 describe("isOutcomeShaped", () => {

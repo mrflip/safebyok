@@ -83,14 +83,14 @@ export const unexpectedError = (thrown: unknown): VaultError => (
  * hears the passphrase -- the key deriver, the passphrase strength test: a condition it raised
  * (its word list out of reach, an empty passphrase) as itself, from this copy of safebyok or
  * another loaded beside it, for the caller to show or retry; anything else, a VaultError of misuse
- * among them, as 'unexpected_error' with the throw as its cause, so that no message of its, which
- * may quote the passphrase, is ever the refusal's own.
+ * or of bad news among them, as 'unexpected_error' with the throw as its cause, so that no message
+ * of its, which may quote the passphrase, is ever the refusal's own, nor told to `onBadNews`.
  *
  * @param thrown - What the function threw, as it came.
  * @returns The refusal.
  */
 export const hostThrewRefusal = (thrown: unknown): VaultError => (
-  isVaultError(thrown) && RefusalFamilyForKind[thrown.refusalkind] !== 'misuse' ? thrown : unexpectedError(thrown)
+  isVaultError(thrown) && RefusalFamilyForKind[thrown.refusalkind] === 'condition' ? thrown : unexpectedError(thrown)
 )
 
 /**
