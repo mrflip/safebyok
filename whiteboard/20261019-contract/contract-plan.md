@@ -161,6 +161,11 @@ passphrase, and `onCaughtError` logs the chain); `getBox`/`useBox`/`delBox` chec
 and the box's existence before `#ensureLease` prompts; `DialogTrouble` follows the ask (lift
 `useAnswerOnce` above the boundary so `lockLanded` closes it); a `notes/security.md` line on the
 A6 `lockLanded` entry: an overtaken attempt stands down any lease take-up as it erases its lease.
+*Orchestrator:* the Coach's second batch (2026-10-19) adds to `a-fixes`: rename `ensureLease`'s
+`renewWithin` to **`renewMinutes`** ("Use the unit it is dangerous to get wrong"); TODO entries
+"a throwing `getProof` is always `unexpected_error`: allow more specificity" and "changing scope
+requires a new vault from scratch: `vault_id`, `applabel`, `user_id`, `vaultlabel` are
+immutable" (a Coach note).
 
 ### Phase B: `models`
 
