@@ -198,6 +198,14 @@ export type RefusalMeta = {
 export type VaultErrorOpts = ErrorOptions & { meta?: RefusalMeta }
 
 /**
+ * The mark every VaultError carries, whichever copy of safebyok made it: `Symbol.for`, so an ESM
+ * and a CJS build loaded side by side, each with a VaultError class of its own, mark alike. A
+ * symbol-keyed property travels through no JSON, structured clone or `postMessage`, so an error
+ * rebuilt from what a server or storage sent never carries it, whatever it names itself.
+ */
+const VaultErrorMark = Symbol.for('safebyok.VaultError')
+
+/**
  * Every refusal any safebyok call makes: a calm message saying what went wrong and what to do, a
  * `refusalkind` to branch on, and the `family` that says who handles it. It never carries a
  * whisper, a passphrase, or any other secret material -- not in the message, its `cause` or its
@@ -205,7 +213,7 @@ export type VaultErrorOpts = ErrorOptions & { meta?: RefusalMeta }
  *
  * @example
  *   try { await vault.getBox('ANTHROPIC_API_KEY') } catch (err) {
- *     if (err instanceof VaultError && err.refusalkind === 'vault_locked') { promptForPassphrase() }
+ *     if (isVaultError(err, 'vault_locked')) { promptForPassphrase() }
  *   }
  * @example
  *   const { ok, val, err } = await vaultDB.getVaultProps(scope)
@@ -233,13 +241,35 @@ export class VaultError extends Error {
     this.refusalkind = refusalkind
     this.family = RefusalFamilyForKind[refusalkind]
     if (meta !== undefined) { this.meta = meta }
+    Object.defineProperty(this, VaultErrorMark, { value: true })
   }
 }
 
-/** True when `err` is a VaultError, and of the given `refusalkind` when one is given. */
+/**
+ * True when `err` is a VaultError, and of the given `refusalkind` when one is given: one this copy
+ * of safebyok made, or one from another copy loaded beside it (an ESM and a CJS build, side by
+ * side), told by the mark every VaultError's constructor sets and a refusalkind this copy knows.
+ * Every place safebyok branches on a refusal asks this, never `instanceof`, so a refusal from a
+ * storage adapter or host function built on the other copy is told, heard and acted on alike. An
+ * error that only names itself `VaultError` and carries a `refusalkind` -- one rebuilt from a
+ * server's JSON, say -- is not one, nor is any object that is no Error.
+ *
+ * @example
+ *   try { await vault.getBox('ANTHROPIC_API_KEY') } catch (err) {
+ *     if (isVaultError(err, 'vault_locked')) { promptForPassphrase() }
+ *   }
+ */
 export const isVaultError = (err: unknown, refusalkind?: RefusalKind): err is VaultError => (
-  err instanceof VaultError && (refusalkind === undefined || err.refusalkind === refusalkind)
+  isMarked(err) && (refusalkind === undefined || err.refusalkind === refusalkind)
 )
+
+/** True for a VaultError of this copy, or an Error another copy's VaultError marked, of a refusalkind this copy knows. */
+const isMarked = (err: unknown): err is VaultError => {
+  if (err instanceof VaultError) { return true }
+  if (! (err instanceof Error) || ! Object.hasOwn(err, VaultErrorMark)) { return false }
+  const { refusalkind } = err as { refusalkind?: unknown }
+  return typeof refusalkind === 'string' && Object.hasOwn(RefusalFamilyForKind, refusalkind)
+}
 
 /**
  * True when `err` is a VaultError the app may show the user, or retry: one of the `condition`

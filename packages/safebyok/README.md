@@ -731,7 +731,8 @@ resolve to an `Outcome`, `{ ok: true, val }` or `{ ok: false, err }`, and never 
 for code that branches on the refusal. `unlock()`, `putBox()`, `getBox()` and the rest resolve to
 that `val` or throw that `err`: the form for code that reports failure by throwing, as a TanStack
 `queryFn` does. Either way the refusal is a `VaultError` (`isVaultError(err, refusalkind?)` tests
-for one), with a calm message, a `refusalkind` to branch on, and the `family` it belongs to; bad
+for one, made by this copy of safebyok or another loaded beside it, as an ESM and a CJS build
+side by side are: test with it, not `instanceof`), with a calm message, a `refusalkind` to branch on, and the `family` it belongs to; bad
 news is told to `onBadNews` once, whichever form met it. `getWhisper(boxlabel)` and `useBox()` come
 in the throwing form alone, and `subscribe()` and `Vault.make` throw their misuse at once.
 

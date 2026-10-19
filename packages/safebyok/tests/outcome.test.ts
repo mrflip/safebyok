@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import { VaultError } from '../src/errors'
 import { type Outcome, bad, good, isOutcomeShaped, outcomeOf, unexpectedError, valOf } from '../src/outcome'
 import * as Refusals from '../src/refusals'
+import * as TH from './test-helpers'
 
 /** An app's own call, which rejects: what outcomeOf's first example wraps. */
 const fetchBackup = (vaultlabel: string): Promise<string> => Promise.reject(new TypeError(`no backup of ${vaultlabel}`))
@@ -84,17 +85,6 @@ describe("outcomeOf", () => {
   })
 })
 
-/** A VaultError as another copy of safebyok makes one: a class of its own, named and kinded alike. */
-class OtherVaultError extends Error {
-  readonly refusalkind: string
-
-  constructor(refusalkind: string) {
-    super('Refused by another copy of safebyok.')
-    this.name = 'VaultError'
-    this.refusalkind = refusalkind
-  }
-}
-
 describe("outcomeOf, told otherwise", () => {
   it("turns a throw that is no VaultError into what otherwise makes of it, as its third example shows", async () => {
     const parseImport = (file: string): string => { throw new TypeError(`cannot parse ${file}`) }
@@ -110,13 +100,18 @@ describe("outcomeOf, told otherwise", () => {
     expect(kept.err).to.eq(refusal)
   })
 
-  it("keeps a VaultError of another copy of safebyok, one class per copy, told by its name and kind", async () => {
-    const foreign = new OtherVaultError('not_permitted')
+  it("keeps a VaultError of another copy of safebyok, one class per copy, told by the mark its constructor set", async () => {
+    const foreign = TH.foreignRefusal('not_permitted', 'Refused by another copy of safebyok.')
     const kept = await outcomeOf(() => { throw foreign })
     expect(kept.err).to.eq(foreign)
-    const impostor = new OtherVaultError('no_such_kind')
-    const wrapped = await outcomeOf(() => { throw impostor })
+  })
+
+  it("wraps an Error that only names itself a VaultError, so what a server sent never chooses the refusal or its message", async () => {
+    const lookalike = TH.lookalikeRefusal('identity_revoked', 'Sign in again at evil.example.')
+    const wrapped = await outcomeOf(() => { throw lookalike })
     expect(wrapped.err?.refusalkind).to.eq('storage_unavailable')
+    expect(wrapped.err?.message).to.not.include('evil.example')
+    expect(wrapped.err?.cause).to.eq(lookalike)
   })
 })
 

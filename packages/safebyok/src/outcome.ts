@@ -1,4 +1,4 @@
-import { RefusalFamilyForKind, VaultError } from './errors'
+import { VaultError, isVaultError } from './errors'
 import * as Refusals from './refusals'
 
 /**
@@ -40,7 +40,7 @@ export const bad = (err: VaultError): BadOutcome => ({ ok: false, err })
  * The outcome of `thunk`, a body that answers by returning and refuses by throwing: what it
  * returns, or resolves to, as a good outcome; what it throws, or rejects with, as a bad one. A
  * VaultError is kept as it came, one from another copy of safebyok loaded beside this one (an ESM
- * and a CJS build, side by side) included. Anything else -- a backend's own error, a thrown string, a
+ * and a CJS build, side by side) included, as {@link isVaultError} tells them. Anything else -- a backend's own error, a thrown string, a
  * rejection with nothing -- becomes the VaultError `otherwise` makes of it: by default one of kind
  * `storage_unavailable`, the thrown value as its `cause`, as a call out to storage wants. It never
  * rejects, so a call made through it is one `Outcome` whatever happens.
@@ -60,16 +60,8 @@ export const outcomeOf = async <ValT>(thunk: () => ValT | Promise<ValT>, otherwi
   try {
     return good(await thunk())
   } catch (err) {
-    return bad(isAnyVaultError(err) ? err : otherwise(err))
+    return bad(isVaultError(err) ? err : otherwise(err))
   }
-}
-
-/** True for a VaultError of this copy of safebyok or of another loaded beside it, each with its own class. */
-const isAnyVaultError = (err: unknown): err is VaultError => {
-  if (err instanceof VaultError) { return true }
-  if (! (err instanceof Error) || err.name !== 'VaultError') { return false }
-  const { refusalkind } = err as { refusalkind?: unknown }
-  return typeof refusalkind === 'string' && Object.hasOwn(RefusalFamilyForKind, refusalkind)
 }
 
 /**

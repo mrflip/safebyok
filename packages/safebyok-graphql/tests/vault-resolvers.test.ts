@@ -184,6 +184,14 @@ describe("vaultResolvers, refusing", () => {
     }
   })
 
+  it("sends the host's refusal as it is when it comes from another copy of safebyok, as server code on a CJS build beside the ESM one throws it", async () => {
+    const schema = TH.schemaOver(await TH.database(), () => { throw TH.foreignRefusal('not_permitted', 'Guests may not keep a vault.') })
+    const read = await asked(schema, VaultOperations.safebyokGetVaultProps, { scope: u1 })
+    const [crossed] = read.errors!
+    expect(crossed!.extensions).to.deep.equal({ kind: 'not_permitted' })
+    expect(crossed!.message).to.eq('Guests may not keep a vault.')
+  })
+
   it("sends anything else vaultDBFor throws as bad_option too, before subscribing as before reading", async () => {
     const oops = new Error('AUTH_SECRET is not set')
     const schema = TH.schemaOver(await TH.database(), () => { throw oops })

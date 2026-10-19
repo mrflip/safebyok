@@ -1,5 +1,5 @@
 import { GraphQLError } from 'graphql'
-import { Refusals, VaultError } from 'safebyok'
+import { Refusals, VaultError, isVaultError } from 'safebyok'
 import type { Outcome, RefusalKind, VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, VaultProps, VaultDB, VaultScope } from 'safebyok'
 import { VaultPropsFields, BoxFields, ScopeFields, recordOf } from './fields'
 
@@ -110,7 +110,7 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
     try {
       return vaultDBFor(context)
     } catch (err) {
-      if (err instanceof VaultError && HostRefusalKinds.has(err.refusalkind)) { throw err }
+      if (isVaultError(err) && HostRefusalKinds.has(err.refusalkind)) { throw err }
       throw new VaultError('bad_option', MisconfiguredMessage, { cause: err })
     }
   }
@@ -237,7 +237,7 @@ const noUnsubscribing = (): void => undefined
  * an Error's own cause is, for the server's logs: no GraphQL server sends a cause.
  */
 const crossing = (err: unknown): GraphQLError => {
-  const refusal = err instanceof VaultError ? err : Refusals.storageUnavailable(err)
+  const refusal = isVaultError(err) ? err : Refusals.storageUnavailable(err)
   const crossed = new GraphQLError(refusal.message, { extensions: { kind: refusal.refusalkind } })
   // Set after, never as the constructor's `cause` or `originalError`: either becomes the error's
   // originalError, and Yoga masks a GraphQLError whose originalError is not a GraphQLError too.

@@ -158,14 +158,7 @@ describe("a throw that is no refusal (Contract: Shapes)", () => {
 
   it("keeps a VaultError from another copy of safebyok, as an ESM and a CJS build loaded side by side make, as it came", async () => {
     const world = makeWorld()
-    class OtherVaultError extends Error {
-      readonly refusalkind = 'storage_unavailable'
-      constructor() {
-        super('The strength service could not be reached.')
-        this.name = 'VaultError'
-      }
-    }
-    const foreign = new OtherVaultError()
+    const foreign = TH.foreignRefusal('storage_unavailable', 'The strength service could not be reached.')
     const vault = await world.open({ passphraseStrengthTest: () => { throw foreign } })
     const { ok, err } = await vault.tryUnlock('pw')
     expect(ok).to.be.false

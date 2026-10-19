@@ -1,5 +1,5 @@
 import { expect } from 'vitest'
-import { type RefusalKind, VaultError } from '../../src/errors'
+import { type RefusalKind, RefusalFamilyForKind, VaultError } from '../../src/errors'
 import type { Outcome } from '../../src/outcome'
 
 export { good, bad } from '../../src/outcome'
@@ -144,4 +144,60 @@ export const expectSyncRefusal = (attempt: () => unknown, refusalkind: RefusalKi
 export const omitting = <Bag extends object>(bag: Bag, ckey: keyof Bag): Bag => {
   const { [ckey]: _omitted, ...rest } = bag
   return rest as Bag
+}
+
+/** Another copy's VaultError, in its fields and its mark: the class behind {@link foreignRefusal}. */
+class ForeignVaultError extends Error {
+  readonly refusalkind: RefusalKind
+  readonly family: string
+
+  constructor(refusalkind: RefusalKind, message: string) {
+    super(message)
+    this.name = 'VaultError'
+    this.refusalkind = refusalkind
+    this.family = RefusalFamilyForKind[refusalkind]
+    Object.defineProperty(this, Symbol.for('safebyok.VaultError'), { value: true })
+  }
+}
+
+/**
+ * A VaultError as another copy of safebyok makes one -- an ESM and a CJS build loaded side by
+ * side, each with a VaultError class of its own: an Error of a class this copy never made, named,
+ * kinded and marked (`Symbol.for('safebyok.VaultError')`) as every VaultError's constructor marks
+ * it. `instanceof VaultError` is false for it; `isVaultError` is true.
+ *
+ * @param refusalkind - Its `refusalkind`.
+ * @param message - Its message.
+ * @returns The foreign refusal.
+ *
+ * @example vi.spyOn(vaultDB, 'getBox').mockResolvedValueOnce(TH.bad(TH.foreignRefusal('identity_revoked', 'Signed out.')))
+ */
+export const foreignRefusal = (refusalkind: RefusalKind, message: string): VaultError => (
+  new ForeignVaultError(refusalkind, message) as unknown as VaultError
+)
+
+/**
+ * An Error that names itself a VaultError and carries a `refusalkind`, but that no VaultError's
+ * constructor made, so it lacks the mark: as a GraphQL or fetch client rebuilds an error from what
+ * a server sent. `isVaultError` is false for it.
+ *
+ * @param refusalkind - The `refusalkind` it claims.
+ * @param message - Its message.
+ * @returns The lookalike.
+ *
+ * @example expect(RefusalPolicy.decide(TH.lookalikeRefusal('identity_revoked', 'Signed out.'))).to.eq('none')
+ */
+export const lookalikeRefusal = (refusalkind: RefusalKind, message: string): Error => new LookalikeError(refusalkind, message)
+
+/** An Error that names itself a VaultError, unmarked: the class behind {@link lookalikeRefusal}. */
+class LookalikeError extends Error {
+  override readonly name = 'VaultError'
+  readonly refusalkind: RefusalKind
+  readonly family: string
+
+  constructor(refusalkind: RefusalKind, message: string) {
+    super(message)
+    this.refusalkind = refusalkind
+    this.family = RefusalFamilyForKind[refusalkind]
+  }
 }
