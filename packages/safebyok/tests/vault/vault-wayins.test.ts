@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { MaxUnlocks, type PasskeyAnswer, VaultScope } from '../../src/types'
+import { MaxUnlocks, type PasskeyAnswer, VaultScope, type WayinSummary } from '../../src/types'
 import { VaultError } from '../../src/errors'
 import { memoryDeviceDB } from '../../src/device-db'
 import { type MakeVaultOpts } from '../../src/vault-opts'
@@ -771,6 +771,9 @@ const damagedWayinWorld = async () => {
   return world
 }
 
+/** The wayinkind of each of `wayins`, as a host's function taking summaries reads them. */
+const kindsOf = (wayins: readonly WayinSummary[]) => wayins.map((wayin) => wayin.wayinkind)
+
 /** An onBadNews that keeps what it is told. */
 const newsKeeper = () => {
   const told: VaultError[] = []
@@ -784,6 +787,14 @@ describe("the vault's ways in, as models (Contract: Vault, Wayin)", () => {
     expect(vault.wayins.every((wayin) => wayin instanceof Wayin && wayin.vault === vault)).to.be.true
     expect(vault.wayins.map((wayin) => wayin.summary)).to.deep.equal(vault.getSnapshot().wayins)
     expect(vault.wayins.map((wayin) => wayin.props)).to.deep.equal(vault.props?.wayins)
+  })
+
+  it("lists ways in a host tells apart by wayinkind and hands on as summaries, as the Wayin's, PassphraseWayin's and PasskeyWayin's examples show", async () => {
+    const { vault, laptop } = await vaultWithPasskey()
+    expect(kindsOf(vault.wayins)).to.deep.equal(['passphrase', 'passkey'])
+    expect(vault.wayins.map((wayin) => wayin.wayinlabel)).to.deep.equal(['passphrase', 'laptop'])
+    const told = vault.wayins.map((wayin) => (wayin.wayinkind === 'passphrase' ? wayin.key_deriver_label : wayin.credential_id))
+    expect(told).to.deep.equal([TH.testDeriver.key_deriver_label, laptop.credentialId])
   })
 
   it("keeps the same Wayins until the vault props change", async () => {

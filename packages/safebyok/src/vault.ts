@@ -9,7 +9,7 @@ import {
   cipherCtx, cipherBytes, decipherBytes,
   makeLeaseKey, makeBoxKey, makeVaultKey, randomId, wrapKeyUnder, unwrapKeyUnder,
 } from './crypto'
-import { Wayin, absentWayin, type WayinStamp, type VaultKeyPair } from './wayin'
+import { Wayin, absentWayin, type PasskeyWayin, type PassphraseWayin, type WayinStamp, type VaultKeyPair } from './wayin'
 import { Proof, PassphraseProof, PasskeyProof } from './proof'
 import { stableJsonify } from './stable-jsonify'
 import { oneAtATime } from './one-at-a-time'
@@ -138,7 +138,7 @@ export type VaultSnapshot = Readonly<{
 const UnreadVaultProps = Symbol.for('safebyok.unread_vault_props')
 
 /** The ways in of a vault not yet read, or not yet made: none, and the same none each time. */
-const NoWayins: readonly Wayin[] = Object.freeze([])
+const NoWayins: readonly (PassphraseWayin | PasskeyWayin)[] = Object.freeze([])
 
 /**
  * A user's vault of boxes. All reading and writing of whispers goes through here. One instance
@@ -219,7 +219,7 @@ export class Vault {
    * The ways in, in the order the vault tries them: each a {@link Wayin}, made from the vault props
    * the snapshot shows, its `summary` what the snapshot lists. Empty until a read finds a vault.
    */
-  get wayins(): readonly Wayin[] { return this.#snapshot.props === null ? NoWayins : this.#modelsOf(this.#snapshot.props).wayins }
+  get wayins(): readonly (PassphraseWayin | PasskeyWayin)[] { return this.#snapshot.props === null ? NoWayins : this.#modelsOf(this.#snapshot.props).wayins }
   /** The vault props as storage holds them, one frozen record; null until a read finds a vault. See {@link VaultSnapshot}. */
   get props(): VaultProps | null { return this.#snapshot.props }
   /** Where the vault stands: `opening` until a hello has read storage, then `absent`, `locked` or `unlocked`. */
@@ -1103,8 +1103,8 @@ export class Vault {
   // The models of each vault props record the vault has held, made once per record: the props
   // frozen, as the snapshot shows them, and their ways in. Keyed by the record as read and by its
   // frozen copy alike, so `wayins` finds the models of the props the snapshot shows.
-  readonly #modelled = new WeakMap<VaultProps, { props: VaultProps, wayins: readonly Wayin[] }>()
-  #modelsOf(standing: VaultProps): { props: VaultProps, wayins: readonly Wayin[] } {
+  readonly #modelled = new WeakMap<VaultProps, { props: VaultProps, wayins: readonly (PassphraseWayin | PasskeyWayin)[] }>()
+  #modelsOf(standing: VaultProps): { props: VaultProps, wayins: readonly (PassphraseWayin | PasskeyWayin)[] } {
     const known = this.#modelled.get(standing)
     if (known !== undefined) { return known }
     const wayins = Object.freeze(Wayin.listOf(this, standing))
