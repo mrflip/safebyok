@@ -532,18 +532,20 @@ export type Vault = {
    * retired first, then written; should that write fail, the old record is gone and the call
    * throws: calling `storeBox()` again writes the lockbox afresh. A record that reads but will not decipher --
    * its ciphertext, its sidecar or a time altered in storage -- is written over its revision, but
-   * carries nothing forward either: nothing vouches for its public fields, so its sidecar becomes `{}`
+   * carries nothing forward either: nothing vouches for its server-readable fields, so its sidecar becomes `{}`
    * unless one is given, and its `registered_at` is now. A boxlabel the vault's check refuses is
    * kind 'bad_label', writing nothing, even where a lockbox stored under other checks stands under
    * it: that one reads and retires by its name, but is never written anew under it.
    *
-   * `opts.sidecar` is the lockbox's sidecar ({@link Sidecar}): your app's own plain data, riding
-   * beside the whisper, not encrypted, but guaranteed unchanged. Any JSON value, shown in the snapshot while locked, never interpreted by the vault -- kind 'bad_option' for anything JSON
+   * `opts.sidecar` is the lockbox's sidecar ({@link Sidecar}): your app's own data, riding
+   * beside the whisper, server-readable -- authenticated, but never encrypted, so anyone who can
+   * read the database can read it. Any JSON value, shown in the snapshot while locked, never interpreted by the vault -- kind 'bad_option' for anything JSON
    * cannot carry. Check its shape yourself before storing it. It is the only option: any other
    * (a misspelt `sidcar`, or a `note` beside it) is kind 'bad_option', writing nothing. Left out, the lockbox keeps the sidecar
    * it has (when its record opens: see above), and a new lockbox gets `{}`; `{}` empties it. The sidecar is stored in the clear and
    * bound into the lockbox's encryption, so a sidecar altered in storage makes the lockbox refuse to
-   * open. Never put secret material in it. A lockbox heavier, whisper and names and sidecar together,
+   * open. Put in it what your app wants searchable server-side (a team, a rotation reminder, a
+   * usage count), never secret material. A lockbox heavier, whisper and names and sidecar together,
    * than storage holds in one record is refused with kind 'lockbox_too_large'; one that would take
    * the vault past what its storage holds of one vault, with kind 'vault_full'.
    *
