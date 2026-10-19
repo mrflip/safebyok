@@ -212,6 +212,11 @@ next read. Proposed: file `a_sec` as it stands and open `a_sec2` (a stand-down f
 stale-read rollback; the `notes/security.md` host-throw sentence, condition only; fastkey's README
 lines 72-80 and the changeset). `a_fixes` was cut meanwhile from #202, the one independent thread.
 
+*Review (`a_fixes`, #204, `flagged` then `fixed`, medium, two reviews):* the cross-copy mark
+(`Symbol.for('safebyok.VaultError')`) holds; flagged: a locked vault refused `absent_box` from a
+stale listing; reworked to read once on a miss. Left: a stale hello plus a miss reads twice; a
+`close()` during that read answers `absent_box`; a host's `instanceof` misses another copy.
+
 **Closing phase B:** passes 1 and 2 again, as C1 builds; fixes in `b-fixes`.
 
 ### Phase C: `calls`

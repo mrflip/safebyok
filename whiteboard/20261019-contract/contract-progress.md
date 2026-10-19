@@ -5,11 +5,9 @@ they disagree. Workers look things up here; they do not write it.
 
 ## Line
 
-*Orchestrator:* phase A is filed as one line: main → #193 `rename_pass` → #194 `outcome` → #196
-`vault_class` → #197 `fields_and_make` → #198 `try_twins` → #199 `react_over_class` → #200
-`getproof` → #195 `outcome_adapters` (A1b, restacked on top: tip 19c0cc87). Phase B builds from
-19c0cc87: B1 `proof_wayin` and B3 `box` beside each other; phase A's review passes 1 and 2 run
-alongside; `a-fixes` comes on B's line once the passes report.
+*Orchestrator:* main → #193 → #194 → #196 → #197 → #198 → #199 → #200 → #195 (phase A) → #201
+B1 `proof_wayin` → #202 B3 `box` → #204 `a_fixes` (50b15c25). `a_sec` (#203, 370baed6, cut from
+#195) waits on the Coach; it is restacked onto #204 when ruled, and B2 cuts from it. **Paused.**
 
 ## Decisions and discoveries
 
@@ -119,6 +117,30 @@ alongside; `a-fixes` comes on B's line once the passes report.
 * The shipped dialog is the provider's default `getProof` (`getProof={null}` declines); it asks
   only while a user gesture is in hand. The provider tests live in `tests/vault-provider/`.
 * Proof parsing is still at the vault's edge (`parseProof`), for B1 to lift.
+
+*Orchestrator:* from phase B so far (B1 #201, B3 #202) and the fix-ups:
+
+* `src/proof.ts`: `Proof`, `PassphraseProof`, `PasskeyProof` (secret hidden on a frozen instance,
+  `toJSON()` → `{ kind }`; `proof.wayinKeyFor(wayin)` derives into a non-extractable key, bytes
+  zeroed). `PasskeyAnswer` is what a host hands in, `PasskeyProof` the checked class.
+* `src/wayin.ts`: `Wayin` (`PassphraseWayin`, `PasskeyWayin`), `Wayin.make(vault, record, holder)`,
+  statics `listOf`, `tryOpenAmong`, `sealPassphrase`, `sealFirstPassphrase`, `sealPasskey`
+  (`(vault, proof, holder, stamp, vaultKey)`), `wayin.tryOpen(proof)`. `damaged_wayin` bad news
+  with `meta.wayin_listed`.
+* `src/box.ts`: `Box.make(vault, record, holder)`, `Box.seal(vault, boxlabel, whisper, holder,
+  vaultKey, opts)` (internally `planSeal` then `sealPlanned`: the size check runs before any key
+  is made), `box.tryOpen(vaultKey)`; the Zod schema is `BoxRecord`; `vault.openBox(box)`.
+* **Models take the vault first and the props as `holder`.** The vault freezes every props record
+  as it takes it up (`frozenVaultProps`); `holder`, `vault.props` and the snapshot's `props` are
+  that one object. Never read `vault_id`/epochs off the public getters (they lag). The vault has
+  public getters `logger`, `clock` (frozen, checked) and `keyDeriver`.
+* `adorn`/`decorate` in `utils.ts` (the form of `adorn` awaits the Coach).
+* `a_fixes`: `isCondition`, `renewMinutes`, `staleMinutes` 5; `isVaultError` knows another copy's
+  refusal by a `Symbol.for('safebyok.VaultError')` mark; a locked vault refuses `bad_label` /
+  `absent_box` before prompting, reading once on a listing miss.
+* `a_sec` (unfiled): an ask's answer stands its attempts down (`#over`); a read that sees outrunning
+  props takes them up at once and drops the key; host deriver/strength-test throws become
+  `unexpected_error` (conditions pass through); react's `forBoundary` strips `cause`.
 
 ## Interim shims standing
 
