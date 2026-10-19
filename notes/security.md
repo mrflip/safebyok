@@ -34,6 +34,37 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-19 (branch 20261019-outcome_adapters): **a refusal whose source cannot have quoted a record now
+  carries that source as its `cause`, and `not_permitted` can come from the host and the driver.**
+  (1) `convexVaultDB` (`refusing`, `safebyok-convex/src/convex-vault-db.ts`): a `ConvexError` whose
+  `data` is `{ kind, message }` with kind `identity_revoked`, `not_permitted` or `vault_full`
+  becomes a VaultError of that kind and message with the `ConvexError` as `cause` (before: nothing of
+  it, through `Sanitizer.refusalFor`). Its text is `[CONVEX M(<function>)] <message> Called by client`
+  and its data was written by safebyok's server or the host's `getUserId`: function name, request id
+  and that data, never the call's arguments. Every other Convex failure (`storage_unavailable`)
+  still carries nothing of Convex's error, since a dev deployment's validator error quotes the
+  arguments. Residual: a host that puts something sensitive in its own `ConvexError` data sees it
+  ride as the cause. `SafebyokErrorKindVals` gains `not_permitted`: `getUserId` may throw
+  `ConvexError({ kind: 'not_permitted', message })` to refuse a signed-in user (locks nothing) or
+  `identity_revoked` (locks the vault). (2) `graphqlVaultDB` (`refusalOf`, `safebyok-graphql/src/graphql-vault-db.ts`):
+  a server refusal with `extensions.kind` becomes the VaultError with the client-side GraphQL error
+  as `cause` (before: none); it holds the calm message, `kind`, path and locations, what the
+  server's `crossing` already limits the wire to. A GraphQL error with `extensions.code`
+  `FORBIDDEN` (a host's auth layer) is now `not_permitted` with a fixed message and that error as
+  cause; `UNAUTHENTICATED` stays `storage_unavailable` on purpose (VAULTDB.md 5.5: a token expired
+  mid-refresh is a passing fault, and `identity_revoked` would lock the vault). (3) `vaultResolvers`
+  (`vaultDBOf`, `vault-resolvers.ts`): a VaultError thrown by the host's `vaultDBFor` of kind
+  `not_permitted` or `identity_revoked` now crosses to the browser as it is, kind and message (the
+  host chose the message); any other throw, VaultErrors of other kinds included (`postgresVaultDB`'s
+  `bad_option` naming its setup), still crosses as a generic `bad_option`, its own message kept on
+  the server as cause. (4) `postgresVaultDB` (`sent`, `safebyok-postgres/src/postgres-vault-db.ts`):
+  a driver error with code `42501` (insufficient privilege, or a row-level security WITH CHECK
+  violation) is now `not_permitted` with the driver's error as cause, not `storage_unavailable`.
+  That cause may quote the statement's parameters (`query`/`params` on a PGlite or pg error) as
+  before, and stays on the server: the README route recipe and the resolvers send only kind and
+  message. An RLS policy that hides rows (USING) refuses nothing: Postgres filters them, so a vault
+  reads as absent and a write over a hidden row as `stale_write`; only a refused insert or a
+  missing privilege becomes `not_permitted`.
 * 2026-10-19 (thread A6, getproof): **`lockLanded`: a `lock()`, `close()` or `del()` landing while a
   prompt is up aborts the ask's `AbortController`, and the lock wins over an `attempt()` under way.**
   Every waiter on the ask is refused `vault_locked` at once and `ask.lockLanded` settles, so the
@@ -1687,7 +1718,8 @@ added or folded into through the subagent, and no other entry changes.
   was given. What safebyok logs carries no secret material by the `VaultLogger` contract, and a
   host's own errors pass as the host made them, so this widens who can read log lines, not what
   they contain. Two copies of safebyok in one bundle each have their own default.
-* 2026-10-17 (thread 5b, store_base): **Convex carries no cause on any refusal.** `convexVaultDB`
+* 2026-10-17 (thread 5b, store_base; amended 2026-10-19: only `storage_unavailable` carries no cause now,
+  see the outcome_adapters entry at the top): **Convex carries no cause on any refusal.** `convexVaultDB`
   (`safebyok-convex/src/convex-vault-db.ts`) refuses with no `cause` at all -- `identity_revoked`,
   `vault_full` and `storage_unavailable` alike -- because a Convex error on a dev deployment may
   quote the call's arguments (names, sidecars, ciphertext). Its refusals are made through
@@ -1698,6 +1730,7 @@ added or folded into through the subagent, and no other entry changes.
   refuses a server's `BAD_USER_INPUT` or `GRAPHQL_VALIDATION_FAILED` as `bad_option` with a fixed
   message and no cause, since such errors may quote the variables, which are records. On the
   server, `vaultResolvers` (`vault-resolvers.ts`) sends a `vaultDBFor` that throws as `bad_option`
+  (amended 2026-10-19: except a VaultError of kind `not_permitted` or `identity_revoked`, which crosses as it is)
   with a generic "the server's setup is wrong" message; its own message, which may name the host's
   setup or the env var names of secrets, is kept only server-side, as the non-enumerable `cause`
   of the GraphQL error.

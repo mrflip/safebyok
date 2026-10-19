@@ -57,6 +57,13 @@ mistake for the first request.
   `ConvexError` whose `data` is `{ kind: 'identity_revoked', message }`: the user the vault was
   opened for is not the one signed in. The kind is the safebyok `VaultError` kind of the same
   name, on which a vault locks itself. The message names no user and quotes no record.
+* **Refusing by your own rules.** To refuse a signed-in user a vault -- a suspended account, a
+  guest -- have `getUserId` throw a `ConvexError` whose `data` is `{ kind: 'not_permitted',
+  message }` (the type is `SafebyokErrorData`, from `safebyok-convex/server`). It reaches the
+  client as a `VaultError` of that kind and message, which locks nothing: the vault stays
+  unlocked, and its next call is asked again. `identity_revoked` thrown the same way locks the
+  vault: throw it only for a user your app knows is gone. Anything else `getUserId` throws -- an
+  auth provider that is down -- reaches the client as `storage_unavailable`, a passing fault.
 * **Writes that come too late.** An update (`putVaultProps`, `putBox`) or a delete
   (`delBox`, `delVault`) carries what its writer expects to stand -- the vault's `vault_id`,
   and the vault props' `unlock_epoch`, or the box's `revision_tok` and the vault props'
@@ -114,13 +121,15 @@ when given (`convexVaultDB({ client, api, logger })`), hears what the VaultDB ha
   Close the vault when your user signs out all the same: in React, pass `userId={null}` to the provider.
 * **Other devices' writes arrive live.** The vault watches `watchVault` and refreshes whenever
   it changes, so its snapshot (and a React render) follows writes from anywhere.
-* **Refusals** are `VaultError`s, of the kinds in the *Errors* tables of the
-  [`safebyok` README](../safebyok/README.md), which say what each means and what a host does.
-  The Convex functions throw two, `identity_revoked` and `vault_full`; a write that came too late is
-  a `stale_write`; and `storage_unavailable` is anything else Convex reported. It carries nothing
-  of Convex's own error, which on a dev deployment may quote the call's arguments (names,
-  sidecars, ciphertext): your deployment's logs have it, or, for trouble before the call left, the browser
-  console, where the Convex client reports its connection.
+* **Refusals** are `VaultError`s, each the `err` of the `Outcome` a call resolves, of the kinds in
+  the *Errors* tables of the [`safebyok` README](../safebyok/README.md), which say what each means
+  and what a host does. The Convex functions throw three, `identity_revoked`, `not_permitted` (your
+  `getUserId`'s) and `vault_full`, each arriving with the `ConvexError` it came as for its
+  `cause`; a write that came too late is a `stale_write`; and `storage_unavailable` is anything
+  else Convex reported. That one carries nothing of Convex's own error, which on a dev deployment
+  may quote the call's arguments (names, sidecars, ciphertext): your deployment's logs have it,
+  or, for trouble before the call left, the browser console, where the Convex client reports its
+  connection.
 * **Offline, a call waits** for the connection, as every Convex call does, rather than failing.
   Convex resends a mutation when it reconnects, so a write may land after any timeout you set:
   show progress, but don't report it failed. The adapter sets no timeout of its own: a write that

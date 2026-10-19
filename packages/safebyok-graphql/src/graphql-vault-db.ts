@@ -1,4 +1,4 @@
-import { Sanitizer, VaultDB, VaultError, RefusalKindVals } from 'safebyok'
+import { Refusals, Sanitizer, VaultDB, VaultError, RefusalKindVals } from 'safebyok'
 import type { VaultPropsExpectation, VaultDBOpts, VaultDelExpectation, Box, BoxExpectation, BoxDelExpectation, StoredBox, VaultProps, RefusalKind, VaultScope } from 'safebyok'
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
 import { VaultPropsFields, ListedBoxFields, BoxFields, ScopeFields, recordOf, selectionOf } from './fields'
@@ -34,8 +34,11 @@ const ServerMaxNameBytes = 640
  * * **Every query goes to the network** (`requestPolicy: 'network-only'`): your Client's cache
  *   never answers for a vault.
  * * **A refusal crosses**: the server's VaultError comes back as the same VaultError, kind and
- *   message. Anything else that goes wrong -- the network, a server that is not serving the
- *   schema -- refuses with kind `storage_unavailable`, urql's own error as its `cause`.
+ *   message, the GraphQL error it crossed as for its `cause`. A GraphQL error your server's own
+ *   auth raises with `extensions.code` `FORBIDDEN` refuses with kind `not_permitted`, which locks
+ *   nothing; one with `UNAUTHENTICATED` is `storage_unavailable`, as a token expired mid-refresh
+ *   is not a user gone. Anything else that goes wrong -- the network, a server that is not serving
+ *   the schema -- refuses with kind `storage_unavailable`, urql's own error as its `cause`.
  * * **Other writes** reach `subscribe` through the `safebyokVaultChanged` subscription, when your
  *   Client has a way to send subscriptions (a `subscriptionExchange` over graphql-ws, say, or
  *   `fetchSubscriptions`); without one, nothing is pushed, and the vault refreshes after its own
@@ -267,15 +270,18 @@ const answerOf = (result: OperationResult): Record<string, unknown> => {
 }
 
 /**
- * The server's refusal as the VaultError it was, when one carries a kind; a GraphQL validation
- * error as misuse, quoting nothing of it, as it may quote the variables; otherwise urql's error, as
- * it is, which the base class says as storage trouble.
+ * The server's refusal as the VaultError it was, when one carries a kind, the GraphQL error as its
+ * cause; a GraphQL server's own `FORBIDDEN` as `not_permitted`, likewise; a GraphQL validation
+ * error as misuse, quoting nothing of it, as it may quote the variables; otherwise urql's error,
+ * as it is, which the base class says as storage trouble.
  */
 const refusalOf = (err: CombinedError): Error => {
   for (const refused of err.graphQLErrors) {
     const { kind } = refused.extensions
-    if (isKind(kind)) { return new VaultError(kind, refused.message) }
+    if (isKind(kind)) { return new VaultError(kind, refused.message, { cause: refused }) }
   }
+  const forbidden = err.graphQLErrors.find(({ extensions: { code } }) => code === 'FORBIDDEN')
+  if (forbidden) { return Refusals.notPermitted(ForbiddenMessage, { cause: forbidden }) }
   // Never the record's fault, nor 'bad_record': every variable has passed the base class's checks,
   // the ones the server's VaultDB makes, and checkInts', so a validation error says the server
   // serves another schema.
@@ -284,6 +290,12 @@ const refusalOf = (err: CombinedError): Error => {
   }
   return err
 }
+
+/**
+ * What a GraphQL server's own `FORBIDDEN` says: its message is the host's, and may say more, so it
+ * rides along as the cause.
+ */
+const ForbiddenMessage = "The vault's GraphQL server refused the signed-in user this call by a rule of the app's own. Signing in again will not help: the app's own rules decide who may."
 
 /** The `extensions.code`s a GraphQL server marks a malformed operation or variable with. */
 const MisuseCodes: ReadonlySet<string> = new Set(['BAD_USER_INPUT', 'GRAPHQL_VALIDATION_FAILED'])

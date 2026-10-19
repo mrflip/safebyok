@@ -128,7 +128,7 @@ describe("VaultTablesSql", () => {
       await db.exec('SET ROLE stranger')
       const { rows } = await db.query('SELECT * FROM safebyok_vaults')
       expect(rows).to.have.lengthOf(0)
-      await TH.expectBad(TH.requestFor(db, 'u2').ensureVaultProps(TH.vaultPropsOf('u2')), 'storage_unavailable')
+      await TH.expectBad(TH.requestFor(db, 'u2').ensureVaultProps(TH.vaultPropsOf('u2')), 'not_permitted')
     } finally {
       await db.exec('RESET ROLE; DROP OWNED BY stranger; DROP ROLE stranger')
     }

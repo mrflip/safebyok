@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Client, CombinedError, fetchExchange } from '@urql/core'
 import { executeExchange } from '@urql/exchange-execute'
 import { GraphQLError, buildSchema, type GraphQLSchema } from 'graphql'
-import { VaultError, memoryDeviceDB } from 'safebyok'
+import { Refusals, VaultError, memoryDeviceDB } from 'safebyok'
 import { postgresVaultDB } from 'safebyok-postgres'
 import * as TH from './test-helpers'
 import { graphqlVaultDB } from '../src/index'
@@ -194,11 +194,35 @@ describe("graphqlVaultDB, carrying a passkey's way in", () => {
 })
 
 describe("graphqlVaultDB, its refusals", () => {
-  it("carries the server's refusal across as the same VaultError, kind and message", async () => {
+  it("carries the server's refusal across as the same VaultError, kind and message, the GraphQL error it crossed as its cause", async () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
     const notMine = await TH.expectBad(TH.browserFor(schema, 'u1').getVaultProps(TH.scopeOf('u2')), 'identity_revoked')
     expect(notMine.message).to.eq('This vault belongs to another user than the one signed in: a signed-in user reaches only their own vaults. If the user changed, open the vault for the new one.')
-    expect(notMine.cause).to.be.undefined
+    expect(notMine.cause).to.include({ message: notMine.message }).and.to.have.nested.property('extensions.kind', 'identity_revoked')
+  })
+
+  it("carries the host's not_permitted across, kind and message, locking nothing (Contract: VaultDB, What an adapter must do)", async () => {
+    const schema = TH.schemaOver(await TH.database(), () => { throw Refusals.notPermitted('Guests may not keep a vault.') })
+    const refusal = await TH.expectBad(TH.browserFor(schema, 'u1').ensureVaultProps(TH.vaultPropsOf('u1')), 'not_permitted')
+    expect(refusal.message).to.eq('Guests may not keep a vault.')
+    expect(refusal.family).to.eq('condition')
+    expect(refusal.cause).to.have.nested.property('extensions.kind', 'not_permitted')
+  })
+
+  it("refuses a GraphQL server's own FORBIDDEN as not_permitted, its error as the cause", async () => {
+    const forbidden = new GraphQLError('Guests may not keep a vault.', { extensions: { code: 'FORBIDDEN' } })
+    const answered = { toPromise: () => Promise.resolve({ error: new CombinedError({ graphQLErrors: [forbidden] }) }) }
+    const guarded = { query: () => answered, mutation: () => answered, subscription: () => answered }
+    const refusal = await TH.expectBad(graphqlVaultDB({ client: guarded as unknown as GraphqlVaultClient }).getVaultProps(u1), 'not_permitted')
+    expect(refusal.message).to.include("by a rule of the app's own")
+    expect(refusal.cause).to.include({ message: 'Guests may not keep a vault.' })
+  })
+
+  it("refuses a GraphQL server's own UNAUTHENTICATED as storage_unavailable, which locks nothing: a token mid-refresh is not a user gone", async () => {
+    const unauthenticated = new GraphQLError('Your session has expired.', { extensions: { code: 'UNAUTHENTICATED' } })
+    const answered = { toPromise: () => Promise.resolve({ error: new CombinedError({ graphQLErrors: [unauthenticated] }) }) }
+    const guarded = { query: () => answered, mutation: () => answered, subscription: () => answered }
+    await TH.expectBad(graphqlVaultDB({ client: guarded as unknown as GraphqlVaultClient }).getVaultProps(u1), 'storage_unavailable')
   })
 
   it("refuses with storage_unavailable when the database is down, never saying what the driver said", async () => {

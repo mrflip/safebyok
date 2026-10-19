@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { makeExecutableSchema } from '@graphql-tools/schema'
 import { GraphQLError, graphql, parse, subscribe } from 'graphql'
 import type { ExecutionResult, GraphQLSchema } from 'graphql'
-import { VaultError } from 'safebyok'
+import { Refusals, VaultError } from 'safebyok'
 import { postgresVaultDB } from 'safebyok-postgres'
 import * as TH from './test-helpers'
 import { VaultSchemaSdl, vaultResolvers } from '../src/server'
@@ -172,6 +172,16 @@ describe("vaultResolvers, refusing", () => {
     const ownRefusal = refusalBehind(crossed).cause as VaultError
     expect(ownRefusal.refusalkind).to.eq('bad_option')
     expect(ownRefusal.message).to.include('client')
+  })
+
+  it("sends a VaultError vaultDBFor throws as it is, kind and message: the host refusing the request", async () => {
+    const schema = TH.schemaOver(await TH.database(), () => { throw Refusals.notPermitted('Guests may not keep a vault.') })
+    const read = await asked(schema, VaultOperations.safebyokGetVaultProps, { scope: u1 })
+    const watched = await subscribe({ schema, document: parse(VaultOperations.safebyokVaultChanged), variableValues: { scope: u1 }, contextValue: { userId: 'u1' } }) as ExecutionResult
+    for (const crossed of [read.errors![0], watched.errors![0]]) {
+      expect(crossed!.extensions).to.deep.equal({ kind: 'not_permitted' })
+      expect(crossed!.message).to.eq('Guests may not keep a vault.')
+    }
   })
 
   it("sends anything else vaultDBFor throws as bad_option too, before subscribing as before reading", async () => {

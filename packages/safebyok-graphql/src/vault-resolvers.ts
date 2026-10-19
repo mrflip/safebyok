@@ -1,6 +1,6 @@
 import { GraphQLError } from 'graphql'
 import { Refusals, VaultError } from 'safebyok'
-import type { Outcome, VaultPropsExpectation, VaultDelExpectation, Box, BoxExpectation, BoxDelExpectation, VaultProps, VaultDB, VaultScope } from 'safebyok'
+import type { Outcome, RefusalKind, VaultPropsExpectation, VaultDelExpectation, Box, BoxExpectation, BoxDelExpectation, VaultProps, VaultDB, VaultScope } from 'safebyok'
 import { VaultPropsFields, BoxFields, ScopeFields, recordOf } from './fields'
 
 /**
@@ -16,9 +16,12 @@ export type VaultResolversOpts<ContextT> = {
   /**
    * The VaultDB for one request, made from your server's context for it: for the user your own
    * auth signed in, never one the request names. Called for every vault field resolved, so it
-   * should be cheap -- `postgresVaultDB` is, connecting to nothing. Whatever it throws is the
-   * server's own setup gone wrong, never the request's: it crosses as `bad_option` with a generic
-   * message, and the VaultDB, not this, refuses a signed-out request.
+   * should be cheap -- `postgresVaultDB` is, connecting to nothing. To refuse the request by a
+   * rule of your own, it throws a VaultError of kind `not_permitted` (`Refusals.notPermitted()`),
+   * or `identity_revoked` for a user your app knows is gone, which crosses as it is, kind and
+   * message. Anything else it throws is the server's own setup gone wrong, never the request's:
+   * it crosses as `bad_option` with a generic message. The VaultDB, not this, refuses a
+   * signed-out request.
    */
   vaultDBFor: (context: ContextT) => ServedVaultDB
 }
@@ -73,8 +76,10 @@ export type VaultResolvers<ContextT> = {
  *   which may name your database. That stays on the server, as the GraphQL error's `cause`, for
  *   your own logs. Anything else a VaultDB throws crosses as `storage_unavailable`, what it threw
  *   kept as that VaultError's cause.
- * * **A `vaultDBFor` that throws** crosses as `bad_option` saying only that the server is
- *   misconfigured: its own message, which may name your setup, stays on the server as the cause.
+ * * **A `vaultDBFor` that throws** a VaultError of kind `not_permitted` or `identity_revoked` --
+ *   the host refusing the request's user -- crosses as that refusal. Anything else it throws crosses as
+ *   `bad_option` saying only that the server is misconfigured: its own message, which may name
+ *   your setup, stays on the server as the cause.
  * * **`safebyokVaultChanged`** sends the vault's scope after every write to it, as the VaultDB's
  *   `subscribe` hears them -- for `postgresVaultDB`, through its `listen` -- and stops listening
  *   when the subscriber goes. Changes that come while the subscriber is still busy with the last
@@ -97,11 +102,15 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
   // The server holds a name only to the floor every name is held to and to its storage's limits,
   // which every VaultDB verb checks: what text a name may be beyond that is each browser vault's
   // own validators' to say, at its entry. The server's job is to keep each user to their own vault.
-  /** The request's VaultDB, or the refusal that says the server could not make one. */
+  /**
+   * The request's VaultDB; or the host's refusal of the request, as it came; or the refusal that
+   * says the server could not make one.
+   */
   const vaultDBOf = (context: ContextT): ServedVaultDB => {
     try {
       return vaultDBFor(context)
     } catch (err) {
+      if (err instanceof VaultError && HostRefusalKinds.has(err.refusalkind)) { throw err }
       throw new VaultError('bad_option', MisconfiguredMessage, { cause: err })
     }
   }
@@ -148,6 +157,12 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
     },
   }
 }
+
+/**
+ * The refusals a `vaultDBFor` throws that cross as they are: the host refusing the request's user,
+ * by its own rules or as gone. Any other is the server's setup gone wrong.
+ */
+const HostRefusalKinds: ReadonlySet<RefusalKind> = new Set(['not_permitted', 'identity_revoked'])
 
 /** What a browser hears when `vaultDBFor` throws: the server's own message stays on the server. */
 const MisconfiguredMessage = "The vault's server could not serve this request: its own setup is wrong, not the request. Retrying will not help until it is fixed; the server's logs say what is wrong."

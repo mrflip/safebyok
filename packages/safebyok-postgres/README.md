@@ -91,6 +91,11 @@ const vaultDB = postgresVaultDB({ client: pool, userId: session.userId })
   each browser vault's own `validators`, checked where a name enters it, the other the host's.
   A host whose clients run different validators has chosen that, and a client reads a record
   another's validators let through as any other, never as damage.
+* **Your database's own rules.** A statement your database refuses for want of a privilege, or
+  by a row-level security policy (Postgres's `42501`), refuses with kind `not_permitted`, which
+  locks nothing, your driver's error as its `cause`: a role that may read a vault's boxes but not
+  write them, say. A policy that hides rows refuses nothing: Postgres filters them, so the vault
+  reads as absent and a write over a hidden row as `stale_write`.
 * **Trouble** refuses with kind `storage_unavailable`, your driver's own error as its `cause`.
   Every refusal is a `VaultError`, and its `refusalkind` and message are safe to send to the browser;
   its `cause` is not, being your driver's, and may name your database.
@@ -397,7 +402,8 @@ shape of table, copy it, and keep to what makes it right:
   `unlock_epoch`, `vault_key_epoch` and `revision_tok`. `src/columns.ts` names each record's columns once, the
   compiler holding the list to the record's fields both ways, and builds every statement from it.
 * **Authorize in the adapter**: made per request for one user, it refuses every other user's
-  scope with `identity_revoked`.
+  scope with `identity_revoked`, and passes the database's own refusal of a call (`42501`) up as
+  `not_permitted`, its error as the `cause`.
 * **Enforce the box limit in the write itself, as a best effort.** A count read in one
   statement and checked in the next lets writes slip through between them; a `count(*)` inside
   the insert narrows that to writers whose statements overlap, which may each count room and

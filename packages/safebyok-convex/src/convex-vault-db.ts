@@ -58,7 +58,9 @@ export type ConvexVaultDBOpts = VaultDBOpts & {
  * * **Who may reach a vault** is your Convex backend's call: a vault call made while signed out,
  *   or for another user's vault, refuses with a VaultError of kind `identity_revoked`, and the
  *   vault locks itself. A sign-out reaches an open vault through its live `watchVault` query, so
- *   it locks even while idle. Close it when your user signs out all the same.
+ *   it locks even while idle. Close it when your user signs out all the same. A refusal your
+ *   `getUserId` throws (`not_permitted`, say) arrives as a VaultError of its kind; each carries
+ *   the `ConvexError` it came as for its `cause`.
  * * **Other devices' writes** reach this one live: the vault subscribes to the safebyok function
  *   `watchVault`, and refreshes when it changes.
  * * **A full vault**: the component holds every vault to limits of its own, whatever a client
@@ -180,17 +182,19 @@ const ConvexTroubleMessage = "The vault's storage could not be reached, or faile
 
 /**
  * `call`, with a refusal from safebyok's functions -- a `ConvexError` carrying one of its kinds --
- * turned into the VaultError of that kind, and anything else into `storage_unavailable`, carrying
- * nothing of Convex's error. A thunk, since a client may throw before it hands back a promise:
- * `ConvexReactClient.query` throws at once a refusal it already holds for that query.
+ * turned into the VaultError of that kind and message, the `ConvexError` as its `cause`, and
+ * anything else into `storage_unavailable`, carrying nothing of Convex's error. A thunk, since a
+ * client may throw before it hands back a promise: `ConvexReactClient.query` throws at once a
+ * refusal it already holds for that query.
  */
 const refusing = async <ValT>(call: () => Promise<ValT>): Promise<ValT> => {
   try {
     return await call()
   } catch (err) {
+    // A refusal's ConvexError carries the function's name, the request's id and the data it was
+    // thrown with, written by safebyok's functions or the host's getUserId: never the call's arguments.
     if (err instanceof ConvexError && isSafebyokErrorData(err.data)) {
-      // Rebuilt by the sanitizer too: one rule, and nothing of Convex's error rides along.
-      throw Sanitizer.refusalFor(err, err.data.kind, err.data.message)
+      throw new VaultError(err.data.kind, err.data.message, { cause: err })
     }
     // On a dev deployment, Convex's own error -- its validator refusing the arguments, say --
     // quotes the call's arguments: scope, names, sidecars and ciphertext. The sanitizer drops it.

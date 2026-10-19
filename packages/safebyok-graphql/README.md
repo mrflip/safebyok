@@ -101,9 +101,12 @@ vaultResolvers({ vaultDBFor: (context) => postgresVaultDB({ client: pool, userId
 * **`vaultDBFor(context)`** makes the VaultDB for one request, from your server's context for it.
   It is called for every vault field resolved, so keep it cheap: `postgresVaultDB` connects to
   nothing. Over a websocket, the context is the connection's, so its user is the one signed in
-  when it opened. Whatever it throws is your server's setup gone wrong, and crosses as
-  `bad_option` saying only that: its own message stays on your server, as the cause. Let the
-  VaultDB, not `vaultDBFor`, refuse a request signed out.
+  when it opened. To refuse a signed-in user by a rule of your own, throw
+  `Refusals.notPermitted('...')` (from `safebyok`) here: it crosses as it is, kind and message,
+  and locks nothing; a `VaultError` of kind `identity_revoked` crosses likewise, and locks the
+  vault, so throw it only for a user your app knows is gone. Anything else it throws is your
+  server's setup gone wrong, and crosses as `bad_option` saying only that: its own message stays
+  on your server, as the cause. Let the VaultDB, not `vaultDBFor`, refuse a request signed out.
 * **Who may reach a vault** is the VaultDB's to say. `postgresVaultDB`, made for the signed-in
   user, refuses every other user's vault, and any while signed out, before asking the database
   anything.
@@ -156,7 +159,11 @@ comparison lets a device still holding a replaced vaultKey seal a whisper under 
 `graphqlVaultDB({ client })` is a VaultDB, each verb one operation through `client`.
 
 * **A refusal crosses**: the server's VaultError comes back as the same VaultError, kind and
-  message. A record or expectation at fault is `bad_record`, refused before it is sent (an epoch
+  message, the GraphQL error it crossed as for its `cause`. A GraphQL error your server's own auth
+  raises with `extensions.code` `FORBIDDEN` (Apollo's convention) refuses with kind
+  `not_permitted`, which locks nothing, its error the `cause`; one with `UNAUTHENTICATED` refuses
+  with kind `storage_unavailable`, since a token expired mid-refresh is not a user gone, and
+  `identity_revoked` would lock the vault. A record or expectation at fault is `bad_record`, refused before it is sent (an epoch
   past GraphQL's 32-bit `Int` included), or by the server's VaultDB, crossing by its kind. So a server that refuses the operation's shape or
   variables (`extensions.code` `BAD_USER_INPUT` or `GRAPHQL_VALIDATION_FAILED`) is serving a
   schema of another version, and refuses with kind `bad_option`, quoting nothing of it, since such

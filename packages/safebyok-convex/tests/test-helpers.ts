@@ -58,6 +58,18 @@ export const convexRefusalOf = async (operation: Promise<unknown>): Promise<Safe
   throw new Error('the call was not refused')
 }
 
+/**
+ * `GetUserId`'s second example: the signed-in identity's subject, refusing a suspended one
+ * `not_permitted`.
+ */
+export const unlessSuspended: GetUserId = async (ctx) => {
+  const identity = await ctx.auth.getUserIdentity()
+  if (identity?.['suspended'] === true) {
+    throw new ConvexError<SafebyokErrorData>({ kind: 'not_permitted', message: 'This account is suspended: its vault is closed to it.' })
+  }
+  return identity?.subject ?? null
+}
+
 /** The README's getUserId: the signed-in identity's subject, or null when no one is. */
 export const bySubject: GetUserId = async (ctx) => {
   const identity = await ctx.auth.getUserIdentity()

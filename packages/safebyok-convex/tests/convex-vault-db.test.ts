@@ -3,13 +3,14 @@
 // made in both.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { anyApi } from 'convex/server'
+import { ConvexError } from 'convex/values'
 import { Vault, VaultError, memoryDeviceDB } from 'safebyok'
 import type { Outcome } from 'safebyok'
 import * as TH from './test-helpers'
 import { convexVaultDB } from '../src/index'
 import { MaxVaultBoxes } from '../src/component/tallies'
 import type { ConvexVaultClient, SafebyokApi } from '../src/index'
-import type { GetUserId } from '../src/server'
+import type { GetUserId, SafebyokErrorData } from '../src/server'
 import { fakeDeployment } from '../src/testing'
 import type { FakeDeployment } from '../src/testing'
 
@@ -117,23 +118,49 @@ const nearlyFull = async (vaultDB: ReturnType<typeof convexVaultDB>) => {
 describe("convexVaultDB, refusing", () => {
   // Every verb's identity_revoked is the battery's line 5.4: these are what Convex's own says.
   for (const [clientTitle, connect] of ClientCases) {
-    it(`refuses over a ${clientTitle} as identity_revoked when no one is signed in, saying so, with no cause`, async () => {
+    it(`refuses over a ${clientTitle} as identity_revoked when no one is signed in, saying so, its ConvexError as the cause`, async () => {
       const deployment = deploy()
       const vaultDB = convexVaultDB({ client: connect(deployment, null), api: deployment.api.safebyok })
       const refusal = await TH.expectBad(vaultDB.getVaultProps(u1), 'identity_revoked')
       expect(refusal).to.be.instanceOf(VaultError)
       expect(refusal.message).to.eq('No one is signed in, so this vault cannot be reached: sign in, then try again.')
-      expect(refusal).to.not.have.property('cause')
+      expect(refusal.cause).to.be.instanceOf(ConvexError).with.deep.property('data', { kind: 'identity_revoked', message: refusal.message })
     })
 
-    it(`refuses over a ${clientTitle} as identity_revoked for another user's vault, saying so, with no cause`, async () => {
+    it(`refuses over a ${clientTitle} as identity_revoked for another user's vault, saying so, its ConvexError as the cause`, async () => {
       const deployment = deploy()
       const vaultDB = convexVaultDB({ client: connect(deployment, 'u2'), api: deployment.api.safebyok })
       const refusal = await TH.expectBad(vaultDB.putBox(u1, TH.boxOf('anthropic_api_key', 'a1'), TH.noBoxYet), 'identity_revoked')
       expect(refusal.message).to.eq('This vault belongs to another user than the one signed in: a signed-in user reaches only their own vaults. If the user changed, open the vault for the new one.')
-      expect(refusal).to.not.have.property('cause')
+      expect(refusal.cause).to.be.instanceOf(ConvexError).with.nested.property('data.kind', 'identity_revoked')
+    })
+
+    it(`refuses over a ${clientTitle} as not_permitted what the host's getUserId refuses so, its ConvexError as the cause (Contract: VaultDB, What an adapter must do)`, async () => {
+      const deployment = deploy(() => { throw new ConvexError<SafebyokErrorData>({ kind: 'not_permitted', message: 'Guests may not keep a vault.' }) })
+      const vaultDB = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
+      const refusal = await TH.expectBad(vaultDB.ensureVaultProps(TH.vaultPropsOf('u1')), 'not_permitted')
+      expect(refusal.message).to.eq('Guests may not keep a vault.')
+      expect(refusal.family).to.eq('condition')
+      expect(refusal.cause).to.be.instanceOf(ConvexError).with.nested.property('data.kind', 'not_permitted')
     })
   }
+
+  it("leaves a vault refused not_permitted unlocked, and its next call answered: the refusal locks nothing", async () => {
+    const refusing = { now: false }
+    const deployment = deploy(async (ctx) => {
+      if (refusing.now) { throw new ConvexError<SafebyokErrorData>({ kind: 'not_permitted', message: 'Writes are paused for this account.' }) }
+      return await TH.bySubject(ctx)
+    })
+    const vault = await openOver(deployment.client('u1'), deployment.api.safebyok)
+    await vault.unlock(TH.RealPassphrase)
+    await vault.putBox('anthropic_api_key', 'sk-ant-test-not-a-real-key')
+    refusing.now = true
+    await TH.expectRefusal(vault.putBox('openai_api_key', 'sk-test-not-a-real-key'), 'not_permitted')
+    expect(vault.getSnapshot().state).to.eq('unlocked')
+    refusing.now = false
+    expect(await vault.getBox('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
+    vault.close()
+  })
 
   it("lists a box the component holds but safebyok would never write as damaged, under its boxlabel", async () => {
     const deployment = deploy()
@@ -157,7 +184,7 @@ describe("convexVaultDB, refusing", () => {
       await nearlyFull(vaultDB)
       const refusal = await TH.expectBad(vaultDB.putBox(u1, TH.heavyBox('one_too_many', 200_000), TH.noBoxYet), 'vault_full')
       expect(refusal.message).to.eq('This vault is full: remove a box to make room, then try again.')
-      expect(refusal).to.not.have.property('cause')
+      expect(refusal.cause).to.be.instanceOf(ConvexError).with.nested.property('data.kind', 'vault_full')
       const listed = await TH.expectingGood(vaultDB).listBoxes(u1)
       expect(listed.map((summary) => summary.boxlabel)).to.not.include('one_too_many')
     })

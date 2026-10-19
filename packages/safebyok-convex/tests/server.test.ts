@@ -132,6 +132,14 @@ describe("SafebyokComponent.api, with the host's getUserId", () => {
     })
   }
 
+  it("passes on a refusal getUserId throws, as GetUserId's second example shows", async () => {
+    const host = TH.hostWith(TH.unlessSuspended)
+    const CVX = host.createTest()
+    await CVX.withIdentity({ subject: 'u1' }).mutation(host.api.safebyok.ensureVaultProps, { vaultProps: TH.vaultPropsOf('u1') })
+    const refusal = await TH.convexRefusalOf(CVX.withIdentity({ subject: 'u1', suspended: true }).query(host.api.safebyok.getVaultProps, { scope: u1 }))
+    expect(refusal).to.deep.equal({ kind: 'not_permitted', message: 'This account is suspended: its vault is closed to it.' })
+  })
+
   it("lets the host map identities to user ids its own way", async () => {
     const host = TH.hostWith(async (ctx) => {
       const identity = await ctx.auth.getUserIdentity()

@@ -85,8 +85,12 @@ export type PostgresVaultDBOpts = VaultDBOpts & {
  *   `subscribe` hears every write to the vault, from any server and any device, and calls once as
  *   its listen begins, so a write made while it began is read too; without either, nothing is
  *   pushed.
- * * **Trouble**: anything the driver throws refuses with kind `storage_unavailable`, the driver's
- *   own error as its `cause`. Every refusal is a VaultError, whose `kind` a wire can carry.
+ * * **Your database's own rules**: a statement it refuses for want of a privilege, or by a
+ *   row-level security policy (Postgres's `42501`), refuses with kind `not_permitted`, which locks
+ *   nothing, the driver's error as its `cause`.
+ * * **Trouble**: anything else the driver throws refuses with kind `storage_unavailable`, the
+ *   driver's own error as its `cause`. Every refusal is a VaultError, whose `refusalkind` a wire
+ *   can carry.
  *
  * @param opts - The `client`, the `userId` this request is for, an optional `listen`, an
  *   optional `maxBoxes`, and an optional `logger`, which hears a `listen` that fails (the default logger without one; a vault opened with no logger of its own hears it too).
@@ -257,32 +261,32 @@ class TablesVaultDB extends VaultDB {
 
   protected async doGetVaultProps(scope: VaultScope): Promise<unknown> {
     this.mustReach(scope)
-    const { rows } = await this.client.query(GetVaultPropsSql, scopeParams(scope))
+    const { rows } = await this.sent(GetVaultPropsSql, scopeParams(scope))
     return rows.length === 0 ? null : Columns.recordOf(rows[0], VaultPropsColumns)
   }
 
   protected async doEnsureVaultProps(vaultProps: VaultProps): Promise<unknown> {
     this.mustReach(vaultProps)
-    const { rows } = await this.client.query(EnsureVaultPropsSql, Columns.paramsOf(vaultProps, VaultPropsColumns))
+    const { rows } = await this.sent(EnsureVaultPropsSql, Columns.paramsOf(vaultProps, VaultPropsColumns))
     return Columns.recordOf(rows[0], VaultPropsColumns)
   }
 
   protected async doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<boolean> {
     this.mustReach(vaultProps)
     const params = [...Columns.paramsOf(vaultProps, VaultPropsColumns), expected.vault_id, expected.unlock_epoch]
-    return landed(await this.client.query(PutVaultPropsSql, params))
+    return landed(await this.sent(PutVaultPropsSql, params))
   }
 
   protected async doGetBox(scope: VaultScope, boxlabel: string): Promise<unknown> {
     this.mustReach(scope)
-    const { rows } = await this.client.query(GetBoxSql, [...scopeParams(scope), boxlabel])
+    const { rows } = await this.sent(GetBoxSql, [...scopeParams(scope), boxlabel])
     return rows.length === 0 ? null : Columns.recordOf(rows[0], BoxColumns)
   }
 
   // Each row is stored under its own boxlabel column, so that is the boxlabel it is listed under.
   protected async doListBoxes(scope: VaultScope): Promise<StoredBox[]> {
     this.mustReach(scope)
-    const { rows } = await this.client.query(ListBoxesSql, scopeParams(scope))
+    const { rows } = await this.sent(ListBoxesSql, scopeParams(scope))
     return rows.map((row) => ({ boxlabel: (row as { boxlabel: string }).boxlabel, box: Columns.recordOf(row, ListedBoxColumns) }))
   }
 
@@ -292,7 +296,7 @@ class TablesVaultDB extends VaultDB {
     const boxParams = Columns.paramsOf(box, BoxColumns)
     if (expected.revision_tok !== null) {
       const params = [...scopeParams(scope), expected.vault_id, expected.vault_key_epoch, expected.revision_tok, ...boxParams]
-      const { rows } = await this.client.query(ReplaceBoxSql, params)
+      const { rows } = await this.sent(ReplaceBoxSql, params)
       return rows.length === 0 ? null : Columns.recordOf(rows[0], BoxColumns)
     }
     const outcome = await this.insertBox([...scopeParams(scope), expected.vault_id, expected.vault_key_epoch, this.maxBoxes === Infinity ? null : this.maxBoxes, ...boxParams])
@@ -312,7 +316,7 @@ class TablesVaultDB extends VaultDB {
   // vault row as it stands then.
   private async insertBox(params: unknown[]): Promise<InsertBoxOutcome | null> {
     try {
-      const { rows } = await this.client.query(InsertBoxSql, params)
+      const { rows } = await this.sent(InsertBoxSql, params)
       return rows[0] as InsertBoxOutcome
     } catch (err) {
       if ((err as { code?: unknown } | null)?.code === ForeignKeyViolation) { return null }
@@ -325,7 +329,7 @@ class TablesVaultDB extends VaultDB {
   // box is listed with.
   protected async doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<BoxDeletion | null> {
     this.mustReach(scope)
-    const { rows } = await this.client.query(DelBoxSql, [...scopeParams(scope), boxlabel, expected.vault_id])
+    const { rows } = await this.sent(DelBoxSql, [...scopeParams(scope), boxlabel, expected.vault_id])
     if (rows.length === 0) { return null }
     const { deleted_tok: deletedTok } = rows[0] as { deleted_tok: string | null }
     return Expectations.deletionOf(deletedTok === null ? null : { revision_tok: deletedTok }, expected)
@@ -333,7 +337,7 @@ class TablesVaultDB extends VaultDB {
 
   protected async doDelVault(scope: VaultScope, expected: VaultDelExpectation): Promise<boolean> {
     this.mustReach(scope)
-    return landed(await this.client.query(DelVaultSql, [...scopeParams(scope), expected.vault_id]))
+    return landed(await this.sent(DelVaultSql, [...scopeParams(scope), expected.vault_id]))
   }
 
   protected override doSubscribe(scope: VaultScope, onChange: () => void): () => void {
@@ -349,6 +353,22 @@ class TablesVaultDB extends VaultDB {
     // calls no subscriber once unsubscribed, and unsubscribes once.
     void onceListening(unlistening, onChange)
     return () => { void endListen(unlistening, (err) => { this.logger.error("A Postgres unlisten failed, so its listen may still hear notifications. Nothing else is affected.", { call: 'subscribe' }, err instanceof Error ? err : null) }) }
+  }
+
+  /**
+   * Sends one statement. The database refusing it by a rule of the host's -- a privilege this
+   * connection's role lacks, or a row-level security policy -- refuses the call as
+   * `not_permitted`, the driver's error as its `cause`; anything else it throws goes up as it came.
+   */
+  private async sent(text: string, params: unknown[]): Promise<{ rows: unknown[] }> {
+    try {
+      return await this.client.query(text, params)
+    } catch (err) {
+      if ((err as { code?: unknown } | null)?.code === InsufficientPrivilege) {
+        throw Refusals.notPermitted(NotPermittedMessage, { cause: err })
+      }
+      throw err
+    }
   }
 
   /** Refuses unless the signed-in user is the one `scope` names. */
@@ -370,6 +390,14 @@ type InsertBoxOutcome = { landed: boolean, vault_stands: boolean, box_stood: boo
 
 /** Postgres's error code for a foreign key violation: `23503`. */
 const ForeignKeyViolation = '23503'
+
+/**
+ * Postgres's error code for a privilege refused, `42501`: a table or column the connection's role
+ * may not reach, or a row a row-level security policy refuses.
+ */
+const InsufficientPrivilege = '42501'
+
+const NotPermittedMessage = "The vault's database refused this call by a rule of the app's own -- a privilege, or a row-level security policy -- so nothing was read or written. Signing in again will not help: the app's own rules decide who may."
 
 /**
  * The most bytes of UTF-8 a Postgres-backed name holds: a box's primary key is its applabel,

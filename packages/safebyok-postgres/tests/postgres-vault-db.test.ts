@@ -7,7 +7,7 @@ import * as TH from './test-helpers'
 import { VaultChangeChannel, postgresVaultDB } from '../src/index'
 import type { PostgresClient, PostgresListen, PostgresVaultDBOpts } from '../src/index'
 
-// == [Devices, options and access]: devicesOverPGlite, u1, thisVault, options, README, who may reach a vault
+// == [Devices, options and access]: devicesOverPGlite, u1, thisVault, options, README, who may reach a vault, not_permitted
 
 TH.bootDatabaseFirst()
 
@@ -180,6 +180,49 @@ describe("postgresVaultDB, who may reach a vault", () => {
     const refusal = await TH.expectBad(vaultDB.getVaultProps(TH.scopeOf('mallory@example.test')), 'identity_revoked')
     expect(refusal.message).to.not.include('alice')
     expect(refusal.message).to.not.include('mallory')
+  })
+})
+
+describe(`postgresVaultDB, 5.6: ${TH.VaultDBContract['5.6']}`, () => {
+  it("refuses a box write the connection's role has no privilege for as not_permitted, the driver's 42501 as its cause, writing nothing (Contract: VaultDB, What an adapter must do)", async () => {
+    const db = await TH.emptyDatabase()
+    await TH.expectingGood(TH.requestFor(db, 'u1')).ensureVaultProps(TH.vaultPropsOf('u1'))
+    const vaultDB = postgresVaultDB({ client: await TH.roleClient(db, 'safebyok_reader'), userId: 'u1' })
+    expect(await TH.expectingGood(vaultDB).getVaultProps(u1)).to.deep.equal(TH.vaultPropsOf('u1'))
+    const refusal = await TH.expectBad(vaultDB.putBox(u1, TH.boxOf('anthropic', 'one'), noBoxYet), 'not_permitted')
+    expect(refusal.family).to.eq('condition')
+    expect(refusal.message).to.include('Signing in again will not help')
+    expect(refusal.cause).to.include({ code: '42501' })
+    await TH.expectBad(vaultDB.delBox(u1, 'anthropic', TH.deleting(null)), 'not_permitted')
+    expect(await TH.expectingGood(vaultDB).listBoxes(u1)).to.deep.equal([])
+  })
+
+  it("refuses a box a row-level security policy keeps out as not_permitted, the driver's 42501 as its cause, writing nothing", async () => {
+    const db = await TH.emptyDatabase()
+    await TH.expectingGood(TH.requestFor(db, 'u1')).ensureVaultProps(TH.vaultPropsOf('u1'))
+    const vaultDB = postgresVaultDB({ client: await TH.roleClient(db, 'safebyok_viewer'), userId: 'u1' })
+    const refusal = await TH.expectBad(vaultDB.putBox(u1, TH.boxOf('anthropic', 'one'), noBoxYet), 'not_permitted')
+    expect(refusal.cause).to.include({ code: '42501' })
+    expect(await TH.expectingGood(vaultDB).listBoxes(u1)).to.deep.equal([])
+  })
+
+  it("leaves a vault refused not_permitted unlocked, its boxes still readable: the refusal locks nothing", async () => {
+    const db = await TH.emptyDatabase()
+    const opened = async (vaultDB: VaultDB) => {
+      const vault = await TH.settledVault({
+        applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest,
+      })
+      await vault.unlock('correct horse battery staple')
+      return vault
+    }
+    const owner = await opened(TH.requestFor(db, 'u1'))
+    await owner.putBox('anthropic_api_key', 'sk-ant-test-not-a-real-key')
+    owner.close()
+    const reader = await opened(postgresVaultDB({ client: await TH.roleClient(db, 'safebyok_reader'), userId: 'u1' }))
+    await TH.expectRefusal(reader.putBox('openai_api_key', 'sk-test-not-a-real-key'), 'not_permitted')
+    expect(reader.getSnapshot().state).to.eq('unlocked')
+    expect(await reader.getBox('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
+    reader.close()
   })
 })
 // --

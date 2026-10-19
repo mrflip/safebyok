@@ -6,9 +6,9 @@ const ErrorDataCases = [
   // safebyok's own refusals:
   [{ kind: "identity_revoked", message: "Sign in, then try again." }, true,   'an identity_revoked refusal with its message'],
   [{ kind: "vault_full", message: "Delete a box, then try again." },  true,   'a vault_full refusal with its message'],
+  [{ kind: "not_permitted", message: "Not yours." },                 true,   "a not_permitted refusal, as a host's getUserId throws it"],
   // anything else a ConvexError may carry:
   [{ kind: "stale_write", message: "Read it again." },               false,  'a VaultError kind the functions never throw'],
-  [{ kind: "not_permitted", message: "Not yours." },                 false,  'not_permitted, which the functions no longer throw'],
   [{ kind: "identity_revoked" },                                     false,  'a known kind without a message'],
   [{ kind: "identity_revoked", message: 42 },                        false,  'a message that is not text'],
   [{ message: "Sign in, then try again." },                          false,  'a message without a kind'],
@@ -22,8 +22,8 @@ describe("isSafebyokErrorData", () => {
     it(`answers ${String(expected)} for ${blurb}`, () => { expect(isSafebyokErrorData(data)).to.eq(expected) })
   }
 
-  it("knows exactly the kinds the functions throw", () => {
-    expect(SafebyokErrorKindVals).to.deep.equal(['identity_revoked', 'vault_full'])
+  it("knows exactly the kinds the functions and a host's getUserId throw", () => {
+    expect(SafebyokErrorKindVals).to.deep.equal(['identity_revoked', 'not_permitted', 'vault_full'])
   })
 })
 

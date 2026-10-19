@@ -345,8 +345,10 @@ the battery cannot make a fault.
 
 **5.6. not_permitted refuses one call, and locks nothing.** The scope's own user, still signed
 in, whom the host's backend refuses this call by a rule of its own, is refused with kind
-`not_permitted`; signing in again would not help. No adapter in this repository has such a rule:
-the kind is a host backend's. *Tested per adapter*.
+`not_permitted`; signing in again would not help. No adapter in this repository has such a rule
+of its own: the kind is a host backend's, and each passes its host's through, its error as the
+`cause` -- Postgres's `42501` (a privilege, or a row-level security policy), a Convex host's
+`getUserId`, a GraphQL server's `FORBIDDEN` or its `vaultDBFor`. *Tested per adapter*.
 
 **5.7. An adapter with no notion of identity says neither.** One that serves whoever holds it --
 `localVaultDB`, IndexedDB -- never refuses `identity_revoked` or `not_permitted`. *Tested per

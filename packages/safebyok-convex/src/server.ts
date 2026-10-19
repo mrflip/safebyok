@@ -15,8 +15,21 @@ export type { SafebyokErrorData, SafebyokErrorKind } from './refusals'
 /**
  * The host app's answer to "who is calling?": the signed-in user's id, as the vault scopes it, or
  * null (or undefined, or empty) when no one is signed in. Runs first in every safebyok function.
+ * To refuse a signed-in user by a rule of the app's own, it throws a `ConvexError` whose `data` is
+ * `{ kind: 'not_permitted', message }` ({@link SafebyokErrorData}), which reaches the client's
+ * vault as a refusal of that kind, locking nothing; `identity_revoked` likewise, which locks the
+ * vault, for a user the app knows is gone. Anything else it throws is the client's
+ * `storage_unavailable`, as a passing fault.
  *
  * @example async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null
+ * @example
+ *   async (ctx) => {
+ *     const identity = await ctx.auth.getUserIdentity()
+ *     if (identity?.['suspended'] === true) {
+ *       throw new ConvexError<SafebyokErrorData>({ kind: 'not_permitted', message: 'This account is suspended: its vault is closed to it.' })
+ *     }
+ *     return identity?.subject ?? null
+ *   }
  */
 export type GetUserId<DataModel extends GenericDataModel = GenericDataModel> =
   (ctx: GenericQueryCtx<DataModel>) => Promise<string | null | undefined> | string | null | undefined
@@ -63,7 +76,8 @@ export class SafebyokComponent {
    * The nine public functions a client's `convexVaultDB` calls, one per storage verb. Each first
    * resolves `getUserId(ctx)`, and refuses with a `ConvexError` of kind `identity_revoked` when
    * it is null, or when the vault's `user_id` is someone else's -- the user the vault was opened
-   * for is not the one signed in, and the vault locks itself -- then it calls the component.
+   * for is not the one signed in, and the vault locks itself -- then it calls the component. A
+   * refusal `getUserId` throws itself goes to the client as it was thrown.
    *
    * @param opts - `getUserId`: who is calling, from the host's own auth.
    * @returns The functions, to export under these names from one module of the host's `convex/`.
