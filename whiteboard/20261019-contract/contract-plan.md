@@ -16,7 +16,7 @@ this line.
   (56 kB; `grep -n '^#'` is its outline). The handoff says when a ruling has changed it since.
 * **Sprint doc:** https://claude.ai/code/artifact/362ec68d-5bf3-46aa-a379-59a9c8bfb548
   (*Open Matters*, *Resolved*, *Progress*).
-* **Status:** 0, A1, A1b, A2-A5 filed (#193-#199); A6 building.
+* **Status:** phase A filed (#193-#200); restacking A1b onto A6, then B1, B3 and passes 1-2.
 
 ## How this plan relates to the preplan
 
@@ -128,6 +128,16 @@ closed in cleanup. Tests added for `<Activity>` and `WithUnlockedVault`'s exampl
 snapshot for `useVault()` (as at base); the deferred first hello assumes StrictMode's rehearsal is
 one task; the security note line (to `a-fixes`); `vault-provider.test.tsx` ~1,597 lines (A6 splits).
 
+*Review (A6, #200, `fixed`, at high, opus):* every Does/Guarantees/Refuses line of *ensureLease* and
+*getProof* has a test. Fixed: a hello's take-up could take up an overtaken attempt's lease before
+it was erased (now stood down first); a `close()` during a data call's hello still raised an ask;
+a `VaultError` thrown by `getProof` reached waiters with its own kind (now `unexpected_error`);
+doc blocks pointed hosts at the Contract. Left: start over loses a failed delete (row); Cancel on
+`lease_ending` declines (row); the gesture is checked after the hello (row, policy session);
+check-before-prompt, the boundary's `cause`, `DialogTrouble` (to `a-fixes`); a stood-down attempt
+may still create the vault; a synchronous `lock()` inside `getProof` is missed (host misuse);
+`Ask.raise` public (row, B5).
+
 **Closing phase A:** passes 1 and 2 (opus, `high`, worktree-isolated agents, one lens each) over
 `origin/main...<A's tip>` while B1 and B3 build; findings filed as a comment on the sprint PR and
 fixed in a small thread `a-fixes` (on B's line, after B4), with the `a-shims` grep folded in.
@@ -145,6 +155,12 @@ fix, do need the caveat") and write the caveat for hosts in safebyok-react's REA
 "redact with batteries included opts" (a refusal's `cause` chain, in-process GraphQL) and "should
 tryClose really be a promise"; a Postgres README sentence telling operators to check grants when
 users see `not_permitted`. The `hello` example as `tryHello` waits on its row (explain).
+*Orchestrator:* from A6's review (#200), `a-fixes` also: strip `cause` before the dialog rethrows
+misuse to React's error boundary (a host key deriver's or strength test's throw may quote the
+passphrase, and `onCaughtError` logs the chain); `getBox`/`useBox`/`delBox` check the label floor
+and the box's existence before `#ensureLease` prompts; `DialogTrouble` follows the ask (lift
+`useAnswerOnce` above the boundary so `lockLanded` closes it); a `notes/security.md` line on the
+A6 `lockLanded` entry: an overtaken attempt stands down any lease take-up as it erases its lease.
 
 ### Phase B: `models`
 
