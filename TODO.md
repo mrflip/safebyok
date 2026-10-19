@@ -150,6 +150,41 @@ storage adapter reads from the host's own auth (a Convex subject, a Postgres `us
 context); the question is what a vault's identity is, so that a host can change its database
 without orphaning vaults.
 
+### Changing a vault's scope means a new vault
+
+The Coach (2026-10-19, sprint contract): "changing scope requires a new vault from scratch:
+vault_id, applabel, user_id, vaultlabel are immutable." A vault's scope fields are fixed for its
+life (a test holds every field its snapshot shows read-only), so renaming a vault, or moving it to
+a new `user_id` -- an auth provider changed, accounts merged -- means making a new vault and
+storing each whisper again, the old one's passphrase in hand. Decide whether safebyok offers that
+move as a call, or documents it as the host's, alongside *Identity should not be tied to the
+backing database*.
+
+### A throwing `getProof` is always `unexpected_error`
+
+The Coach (2026-10-19, sprint contract): "a throwing getProof is always unexpected_error: we need
+to allow more specificity." Today the answer is checked once, in `Ask.raise` (`src/ask.ts`): a
+throw from the host's `getProof` becomes `unexpected_error` (misuse), whatever it threw, so a
+dialog that fails for a reason the host could name -- a lost user gesture, a passkey the platform
+refused -- cannot say so. Decide what a `getProof` may refuse with: a `VaultError` it throws kept
+as it came (as `outcomeOf` keeps one elsewhere), a fourth answer, or a short list of kinds.
+
+### Should `tryClose` be a promise?
+
+The Coach (2026-10-19, sprint contract): "should tryClose really be a promise." Every `try` form
+resolves its `Outcome`, but `tryClose()` answers one at once, because `close()` stays synchronous
+for React's effect cleanup (thread A4). Decide with phase C's close (C5): whether `tryClose`
+resolves, as its twins do, and whether a close waits for the calls it refuses.
+
+### Redaction, batteries included
+
+The Coach (2026-10-19, sprint contract): "redact with batteries included opts." A refusal's
+`cause` chain carries a storage driver's own errors, which may name the database, a statement or a
+parameter: `safebyok-graphql` hands the refusal on as its `GraphQLError`'s `cause`, for the
+server's logs, so an in-process GraphQL host logs the chain whole. Offer options that redact it
+-- a `cause` dropped, or cut to its class and message, at `vaultResolvers` or the logger -- on by
+default, so a host gets the safe log without writing a formatter of its own.
+
 ### Call-time work that could be composed once or memoized
 
 The Coach (2026-10-16), on thread 5b: `reportError` is checked at call time and stands, but review
@@ -176,6 +211,20 @@ damaged, where the user may delete it or store over it (only on the user's own a
 the vault). The Coach: "Yes add to TODO: version number on box." Give boxes a "newer, don't
 touch" state like the vault's `newer_format`: the format tag read as a version, so that a newer
 box lists as one to leave alone and an older, unreadable one still lists as damaged.
+
+## The react lifecycle
+
+`VaultProvider` makes its vault in an effect and hands it down with `setVault` from that effect,
+under a `react-hooks/set-state-in-effect` suppression (`safebyok-react/src/vault-provider.tsx`).
+Thread A5 of the contract sprint ([#199](https://github.com/mrflip/safebyok/pull/199)) moved the
+suppression to `setVault` and closed this section; the Coach (2026-10-19) reopened it: "Leave the
+todo, this is a big problem. Don't need a fix, do need the caveat." The caveat for hosts is in
+`safebyok-react`'s README (*Use*): the vault one render late, `null` on the first render and on the
+server, a second render of the subtree per vault made, and calls on the old vault refused
+`vault_closed` as a prop changes. Making the vault in render doubles its side effects under
+StrictMode, and deferring a refused `Vault.make` brings back a late handle; a lifecycle redesign
+(a store outside React that the provider subscribes to, say) may remove the need. (#166, thread 8
+and review; a_fixes)
 
 ## Accessibility
 

@@ -95,7 +95,9 @@ const vaultDB = postgresVaultDB({ client: pool, userId: session.userId })
   by a row-level security policy (Postgres's `42501`), refuses with kind `not_permitted`, which
   locks nothing, your driver's error as its `cause`: a role that may read a vault's boxes but not
   write them, say. A policy that hides rows refuses nothing: Postgres filters them, so the vault
-  reads as absent and a write over a hidden row as `stale_write`.
+  reads as absent and a write over a hidden row as `stale_write`. So when users who should reach
+  their vaults see `not_permitted`, check the grants of the role your server connects as: a
+  `GRANT` lost in a migration, or a table made by another role, reads exactly so.
 * **Trouble** refuses with kind `storage_unavailable`, your driver's own error as its `cause`.
   Every refusal is a `VaultError`, and its `refusalkind` and message are safe to send to the browser;
   its `cause` is not, being your driver's, and may name your database.

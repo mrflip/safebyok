@@ -92,6 +92,21 @@ The provider owns the vault it makes: a new user, a sign-out or a changed option
 React's `StrictMode`, whose rehearsal in development makes a vault and closes it again at once,
 that rehearsed vault reads nothing from storage: only the vault kept says hello.
 
+**The vault arrives one render after the props that make it.** The provider makes its vault in an
+effect and hands it down by setting state from that effect -- what React's `set-state-in-effect`
+lint rule warns of, done here on purpose: a vault made during render would be made twice under
+`StrictMode`, and one of the two never closed. For your app:
+
+* `useVault()` and `useVaultSnapshot()` are `null` for the first render after a user signs in,
+  and on the server, just as while nobody is signed in. Tell "signed out" from "not here yet" by
+  your own session, so that first frame shows a spinner rather than a sign-in prompt.
+* Each vault made renders everything under the provider a second time. A prop that is a new
+  object at every render (above) makes a vault, and that second render, at every render.
+* A changed prop or a new user closes the old vault as the new one is made, and a call still under
+  way on the old one is refused: `vault_locked` if it was waiting on the dialog, `vault_closed`
+  otherwise. Where your code catches refusals around a sign-out or a changed option, expect
+  `vault_closed` there, though anywhere else it is misuse.
+
 Read the vault with the hooks:
 
 ```tsx
