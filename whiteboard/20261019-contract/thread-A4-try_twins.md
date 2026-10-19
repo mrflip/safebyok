@@ -44,7 +44,8 @@ Branch `20261019-try_twins`, [PR #198](https://github.com/mrflip/safebyok/pull/1
   | `tryClose()` | `close` | `void`, synchronous | no | C5 |
 
   Throwing alone: `getWhisper` (over `#tryGetBox`), `useBox` (callback), `subscribe` (answers at
-  once), `Vault.make` (no vault to answer from).
+  once), `Vault.make` (no vault to answer from), `delDamagedVault` (a free function; its `try`
+  form is phase C's).
 * **The five carried decisions**, each built to its Rec, each easy to reverse:
   1. **`valOf` exported** under that name, beside `unexpectedError`; the demo's `answered` is gone.
   2. **`outcomeOf` and bugs.** Rule: *a throw that is no VaultError is `storage_unavailable` only
