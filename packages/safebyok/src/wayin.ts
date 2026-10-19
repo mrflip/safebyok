@@ -254,7 +254,8 @@ export abstract class Wayin {
 
   /**
    * A passphrase's way in around `vaultKey`, under a fresh passphraseSalt and the passphraseKey
-   * `proof` makes over it. Throws what the key deriver refuses or throws.
+   * `proof` makes over it. What the key deriver refuses or throws is refused as `proof.wayinKeyFor`
+   * says: a condition as itself, anything else as 'unexpected_error', the throw its cause.
    *
    * @param vault - The vault it is for: its scope is bound into the wrap, its key deriver makes the key and is named on the way in.
    * @param proof - The passphrase the way in admits.

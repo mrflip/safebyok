@@ -70,16 +70,20 @@ supplied one, consider running the vault's unlock where a pause does not show.
   fetched.
 
 Where WebAssembly is missing or will not compile, `deriveKeyBytes` refuses with `bad_option` (the
-host's to fix), saying which; the vault's `unlock()` passes the refusal on. It never falls back to
-the core's deriver on its own: choose one per platform yourself, as `keyDeriver`.
+host's to fix), saying which. The vault, having handed the deriver a passphrase, passes on no
+deriver's misuse as its own: its `unlock()` refuses `unexpected_error`, the deriver's `bad_option`
+its `cause` (which `safebyok-react` strips before React's error handlers hear it). It never falls
+back to the core's deriver on its own: choose one per platform yourself, as `keyDeriver`.
 
 ## Errors
 
 * `bad_option` -- from `argon2idWasmDeriver(spec)`, a spec it cannot run (the message names the
-  field); from `deriveKeyBytes`, no WebAssembly here, or a Content-Security-Policy without
-  `'wasm-unsafe-eval'` (the platform's `CompileError` is its `cause`).
+  field); from `deriveKeyBytes` called directly, no WebAssembly here, or a Content-Security-Policy
+  without `'wasm-unsafe-eval'` (the platform's `CompileError` is its `cause`). Through the vault,
+  this arrives as `unexpected_error`, the `bad_option` its `cause`.
 * `wrong_passphrase` -- an empty passphrase handed straight to `deriveKeyBytes`. The vault refuses
-  one before it reaches a deriver.
+  one before it reaches a deriver; should one reach it on unlock, the vault answers with its own
+  `wrong_passphrase`, never the deriver's message.
 
-Any other failure (a device without the memory a spec asks for, say) is passed on as the platform
-raised it.
+Any other failure (a device without the memory a spec asks for, say) is thrown as the platform
+raised it; through the vault, it too arrives as `unexpected_error`, what was thrown its `cause`.
