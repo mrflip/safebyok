@@ -193,11 +193,7 @@ export class Vault {
    *     if (isVaultError(err, 'damaged_vault') && userConfirmedStartingOver()) { await delDamagedVault(opts) }
    *   }
    */
-  hello = (): Promise<void> => {
-    if (this.#closed) { return Promise.reject(closedError()) }
-    this.#greeting ??= this.#greet()
-    return this.#greeting
-  }
+  hello = (): Promise<void> => this.#hello()
   // --
 
   // == [Vault: locking]: unlock, lock
@@ -262,7 +258,7 @@ export class Vault {
     this.#checkOpen()
     const proof = parseProof(givenProof)
     const wayinId = parseAim(unlockOpts)
-    await this.hello()
+    await this.#hello()
     // Sync with the backend first: the passphrase proves itself against the vault props as they
     // stand there now, not against a cached copy a delete or recreate may have outdated.
     await this.#refresh()
@@ -562,7 +558,7 @@ export class Vault {
    * @example await vault.putBox('anthropic_api_key', 'sk-ant-...', { sidecar: {} }) // and empties it
    */
   putBox = async (boxlabel: string, whisper: Whisper, storeOpts?: { sidecar?: Sidecar | undefined }): Promise<void> => {
-    await this.hello()
+    await this.#hello()
     this.#checkUnlocked()
     // A name the check refuses is never written anew, even where a box stored under other
     // checks stands under it: reading and deleting reach that one.
@@ -670,7 +666,7 @@ export class Vault {
    * stale.
    */
   delBox = async (boxlabel: string): Promise<void> => {
-    await this.hello()
+    await this.#hello()
     this.#checkUnlocked()
     const label = await this.#checkStandingBoxlabel(boxlabel)
     this.#checkUnlocked()
@@ -714,7 +710,7 @@ export class Vault {
    * the vault.
    */
   del = async (): Promise<void> => {
-    await this.hello()
+    await this.#hello()
     // A handle that has seen no vault looks first: "delete my vault" must not report success
     // over one standing. Otherwise only the vault this handle had read when called: one
     // deleted and made anew since refuses, even if a background refresh brings it in while
@@ -758,6 +754,9 @@ export class Vault {
   readonly #vaultDB: RefusalPolicy.HeededVaultDB
   // Every failure of the device's own storage reaches the vault's callers as a condition, with a kind.
   readonly #deviceDB: DeviceDB
+  // The lease length the vault itself reads. The public `leaseMillis` is the host's copy, so a host
+  // writing over it (or over `hello`, which calls `#hello`) changes nothing inside the vault.
+  readonly #leaseMillis: number
   readonly #logger: VaultLogger
   readonly #clock: Clock
   readonly #keyDeriver: KeyDeriver
@@ -803,6 +802,7 @@ export class Vault {
     this.#rules = parsed.rules
     this.#vaultDB = RefusalPolicy.heed(parsed.vaultDB, async (refusal) => { await this.#heedRefusal(refusal) })
     this.#deviceDB = deviceTroubleAsConditions(parsed.deviceDB)
+    this.#leaseMillis = parsed.leaseMillis
     this.leaseMillis = parsed.leaseMillis
     this.#logger = parsed.logger
     this.#clock = parsed.clock
@@ -895,7 +895,7 @@ export class Vault {
   }
   // --
 
-  // == [Reading storage]: refresh, readStorage, takeStorage, noteTrouble, forgetHello, greet
+  // == [Reading storage]: refresh, readStorage, takeStorage, noteTrouble, hello, greet
 
   /**
    * Bring the snapshot up to what storage holds now, one read at a time: a refresh asked for while
@@ -963,6 +963,13 @@ export class Vault {
     if (! this.#greeted) { return }
     this.#greeting = null
     this.#greeted = false
+  }
+
+  /** The hello `Vault.hello` promises, shared while it runs and kept once it succeeds; see there. */
+  #hello(): Promise<void> {
+    if (this.#closed) { return Promise.reject(closedError()) }
+    this.#greeting ??= this.#greet()
+    return this.#greeting
   }
 
   /**
@@ -1196,7 +1203,7 @@ export class Vault {
       revise:  (standing: VaultProps, proven: VaultKeyPair & { wayinId: string }, deviceId: string) => VaultProps['wayins'] | Promise<VaultProps['wayins'] | null>
     },
   ): Promise<boolean> {
-    await this.hello()
+    await this.#hello()
     // The proof is made against the vault props as the backend holds them now: a cached copy could
     // bury props written elsewhere under a different vault_id entirely.
     await this.#refresh()
@@ -1372,7 +1379,7 @@ export class Vault {
     const now = this.#clockNow()
     const standing = this.#vaultKey !== null && this.#askPassphraseAt !== null && this.#askPassphraseAt > now ? this.#askPassphraseAt : null
     const renews = call === 'unlock' || typeof proof === 'string'
-    return renews || standing === null ? deadlineAfter(now, this.leaseMillis) : standing
+    return renews || standing === null ? deadlineAfter(now, this.#leaseMillis) : standing
   }
 
   /**
@@ -1431,7 +1438,7 @@ export class Vault {
       && checked.data.vault_id === this.#vaultProps.vault_id
       && checked.data.unlock_epoch === this.#vaultProps.unlock_epoch
       && checked.data.ask_passphrase_at > now
-      && checked.data.ask_passphrase_at <= deadlineAfter(now, this.leaseMillis)
+      && checked.data.ask_passphrase_at <= deadlineAfter(now, this.#leaseMillis)
     if (! fits) {
       // Discarded. Expired, or outdated by a change to the wayins or a shorter setting, is routine; unreadable is worth a word.
       if (readable) { await this.#deviceDB.delLease(this.#scope) } else { await this.#discardUnreadableLease() }
@@ -1575,7 +1582,7 @@ export class Vault {
    * close() that has taken the key meanwhile refuses the call as locked, or as closed.
    */
   async #openBox(boxlabel: string): Promise<Whisper> {
-    await this.hello()
+    await this.#hello()
     this.#checkUnlocked()
     const box = await this.#getBoxOrThrow(boxlabel)
     const whisper = await this.#decipherOrCatchUp(this.#checkUnlocked(), box)
@@ -1749,7 +1756,7 @@ export class Vault {
   // trouble, and warns once for a failing streak; the next read that succeeds says so once.
   async #watchRefresh() {
     try {
-      await (this.#greeting === null ? this.hello() : this.#refresh())
+      await (this.#greeting === null ? this.#hello() : this.#refresh())
     } catch (err) {
       if (this.#watchWarned) { return }
       this.#watchWarned = true
@@ -1763,7 +1770,7 @@ export class Vault {
   // snapshot's trouble, and the logger's to tell: never an unhandled rejection. A handle closed
   // meanwhile has nobody left to tell.
   #sayFirstHello() {
-    void this.hello().catch((err: unknown) => {
+    void this.#hello().catch((err: unknown) => {
       if (this.#closed) { return }
       this.#logger.warn("The vault could not read what storage and this device hold of it, so it is still opening: its snapshot's trouble says why. Call vault.hello() to try again; any other call on the vault tries again first.", { call: 'hello' }, asError(err))
     })
