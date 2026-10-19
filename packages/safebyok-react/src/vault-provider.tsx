@@ -231,8 +231,9 @@ const adviceFrom = (strengthTest: PassphraseStrengthTest, scope: VaultScope): Pa
  * likewise, though the bag around them may be built in render. A `logger`, `clock` or
  * `passphraseStrengthTest` that changes identity is warned of once, through the logger. A handler
  * makes no new vault: `onBadNews` may be written inline, and the vault tells whichever the last
- * render passed. Under React's StrictMode, whose rehearsal makes and closes a vault in
- * development, that rehearsed vault reads nothing: only the vault kept says hello.
+ * render passed, for as long as the provider holds it. Under React's StrictMode, whose rehearsal
+ * makes and closes a vault in development, that rehearsed vault reads nothing: only the vault kept
+ * says hello.
  *
  * The provider and its vault say things through one logger: the `logger` given here, else the one
  * the `vaultDB` was made with (the default logger when it was given none). It renders the
@@ -354,7 +355,11 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
     // option is ever added and not passed through.
     const checks = { applabel: applabelCheck, vaultlabel: vaultlabelCheck, boxlabel: boxlabelCheck, userId: userIdCheck, wayinlabel: wayinlabelCheck } satisfies Record<keyof VaultValidators, unknown>
     const refusable = Object.fromEntries((JSON.parse(unlistedJson) as string[]).map((ckey) => [ckey, undefined]))
-    const makeOpts = { ...refusable, applabel, vaultlabel, userId, vaultDB, deviceDB, leaseHours, staleMinutes, onBadNews: badNewsOpt, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger: heardBy ?? logger, validators: checks, passphraseStrengthTest } satisfies Record<keyof MakeVaultOpts, unknown>
+    // Bad news a vault meets once the provider has let it go -- a read under way as the user
+    // changed -- is told to no one: the handler now may be the next user's.
+    const kept = { held: true }
+    const tellWhileHeld: BadNewsHandler = (news) => (kept.held ? tellBadNews(news) : undefined)
+    const makeOpts = { ...refusable, applabel, vaultlabel, userId, vaultDB, deviceDB, leaseHours, staleMinutes, onBadNews: badNewsOpt === tellBadNews ? tellWhileHeld : badNewsOpt, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger: heardBy ?? logger, validators: checks, passphraseStrengthTest } satisfies Record<keyof MakeVaultOpts, unknown>
     // The handle is this effect's to make and to close, and the render hands it down. A refused
     // option throws from here to the nearest error boundary, as the very VaultError.
     const made = Vault.make(makeOpts)
@@ -366,6 +371,7 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
       if (vaultRef.current === made) { void sayHello(made) }
     })
     return () => {
+      kept.held = false
       vaultRef.current = null
       // A dialog belongs to the vault it was opened over: when that handle goes -- a sign-out,
       // another user, a reopen, the provider unmounting -- its actions resolve null, and it closes.
@@ -377,7 +383,7 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
       setHelloFailure(null)
       setHelloRefusal(null)
     }
-  }, [userId, applabel, vaultlabel, vaultDB, deviceDB, leaseHours, staleMinutes, badNewsOpt, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, heardBy, passphraseStrengthTest, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, wayinlabelCheck, unlistedJson, endAsking, sayHello])
+  }, [userId, applabel, vaultlabel, vaultDB, deviceDB, leaseHours, staleMinutes, badNewsOpt, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, heardBy, passphraseStrengthTest, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, wayinlabelCheck, unlistedJson, tellBadNews, endAsking, sayHello])
 
   const retryOpen = useCallback(() => {
     if (vault !== null && openError !== null) { void sayHello(vault, { staleMinutes: 0 }) }

@@ -485,6 +485,31 @@ describe("VaultProvider", () => {
       expect(spy.calls.filter((heard) => heard.story?.['call'] === 'VaultProvider')).to.deep.equal([])
     })
 
+    it("tells the next user's handler nothing a closed vault meets", async () => {
+      const world = await madeWorld()
+      const told: string[] = []
+      const { Grab, opened } = grabber()
+      const tree = (userId: string) => (
+        <VaultProvider {...world.props} userId={userId} onBadNews={(news) => { told.push(`${userId}: ${news.refusalkind}`) }}>
+          <Grab />
+        </VaultProvider>
+      )
+      const { rerender } = render(tree('u1'))
+      const first = await opened()
+      await waitFor(() => { expect(first.getSnapshot().state).to.not.eq('opening') })
+      // A read under way on u1's vault as u2 signs in meets u1's damaged record after the switch.
+      world.spoil()
+      const hello = first.tryHello({ staleMinutes: 0 })
+      rerender(tree('u2'))
+      const { ok } = await hello
+      expect(ok).to.be.false
+      const second = await opened()
+      expect(second.user_id).to.eq('u2')
+      await waitFor(() => { expect(second.getSnapshot().state).to.eq('absent') })
+      await TH.wakeupAtNextTick()
+      expect(told).to.deep.equal([])
+    })
+
     it("throws an onBadNews that is no function to the error boundary, as Vault.make refuses it", async () => {
       hushConsole()
       const world = makeWorld()
