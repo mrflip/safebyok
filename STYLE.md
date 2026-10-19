@@ -174,8 +174,8 @@ between columns lets the editor align them (see *Tests*).
   mature** (the Coach, 2026-10-19). "We must not allow complicated interactions in the critical
   path. If that leads to a horrible user experience, we'll use that as evidence for a flawed
   design, outside the scope of current work; until then the code is safe and users will have to
-  deal." No retry, refresh, re-read or "if X then try Y" in the core: it is hello, then unlock,
-  then the operation.
+  deal." Add no retry, refresh, re-read or "if X then try Y" to the core: it is hello, then
+  unlock, then the operation.
 * **Generate refusal and logging statements that are safe, specific, actionable, empathetic to
   the customer (failures) or the user (conditions)** (the Coach, 2026-10-19). Safe: no secret
   material, in the message, a `cause` or `meta` (*Validation*). Specific: what went wrong, and a
