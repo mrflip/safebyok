@@ -34,6 +34,45 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-19 (thread a_sec2, PR [#206](https://github.com/mrflip/safebyok/pull/206)): **the create
+  window closed.** A first unlock that creates the vault (`#settleUnlock`'s make path,
+  `packages/safebyok/src/vault.ts`) while another device deletes it could leave this device unlocked
+  on the deleted vault, holding a lease, until its next read (found in #203's second review). Now
+  the make captures a stand-down signal (`#makesStandDown`) just before it writes its vault props; a
+  read that finds the vault props in hand deleted or replaced (`#heedRevocation`) aborts it, and an
+  aborted make puts no vault props back, so the grant (`#grantLease`) finds its props outrun, takes
+  nothing up and writes no lease; the unlock refuses `vault_locked`. A race test in
+  `packages/safebyok/tests/vault/vault-races.test.ts` fails without the fix. Known residue, failing
+  safe: a make stood down by the deletion of *another* device's vault refuses although its own vault
+  stands (the next read takes it up, the next unlock opens it). Cross-device invalidation in general
+  (a device learning of a deletion before its next read) is left to a coming mechanism, a token each
+  device authenticates when it joins or creates a vault (TODO.md); until then, a device learns at
+  its next read and fails safe there. Also 2026-10-19 (a_sec2): **an older read never rolls the
+  vault props back.** A read that began before this device's own change to the ways in landed could
+  hand back the older copy and put it over the change's, which the vault then took as a revocation
+  and locked. Now a read whose vault props are the same vault at a lower `unlock_epoch` or
+  `vault_key_epoch` than those in hand (`isNewerCopy`) neither revokes nor replaces them: storage
+  never takes a vault's epochs back (the device mark refuses as `rolled_back` a store that does), so
+  such a read is stale by construction.
+* 2026-10-19 (thread a_sec2, #206): **no salt or wrapped key in the snapshot.** Since thread B1,
+  `snapshot.props`, `vault.props` and `vault.wayins` (as `Wayin` models) carried each passphrase's
+  salt and every wrapped vaultKey: everything an offline guess at a passphrase needs, into React
+  state, devtools and error reporters. Now `VaultSnapshot.props` and `vault.props` are gone, and
+  `vault.wayins` is the snapshot's list of `WayinSummary` (kind, label, ids, dates; a passkey's
+  `credential_id` and `prf_salt_b64`, which an authenticator needs and which open nothing without
+  the passkey). The vault and its models keep the full records privately. Tests check that neither
+  the snapshot's JSON nor `vault.wayins` holds any stored salt or wrap. The Coach: "yes good call".
+* 2026-10-19 (thread a_sec2, #206): **no proof is kept after an unlock, and this is not tested.**
+  The vault keeps no reference to a proof (a `PassphraseProof` or `PasskeyProof`) once an unlock or
+  a change to the ways in settles: the proof lives in the call's locals only, and no field of the
+  vault or its ask holds one. No test could observe this without depending on garbage collection,
+  which would be flaky; the Coach's ruling: "note it in security md, don't write a test we can't
+  write".
+* 2026-10-19 (thread a_sec2, #206): **`Lease.grant` validates its input.** `Lease.grant(vault,
+  holder, vaultKeyPair, askPassphraseAt)` parses `holder`'s `vault_id` and `unlock_epoch` and
+  `askPassphraseAt` with `LeaseRecord`'s own Zod checks at entry and lets a bad input throw as
+  misuse (the Coach: "run a good zod validator but don't catch"). A deadline that is no number used
+  to grant a lease that never opened.
 * 2026-10-19 (thread B2 `lease`, branch 20261019-lease): **the lease is a class, `Lease`, and its
   crypto lives apart from the vault's decisions.** `Lease` (`packages/safebyok/src/lease.ts`) holds
   the lease's fields and its wrap and unwrap; when to grant, when to ask, and every write to the
@@ -67,43 +106,32 @@ added or folded into through the subagent, and no other entry changes.
   `bad_option`. Unchanged: every abort and outrun check from `a_sec` around the take-up and the grant
   (the take-up's AbortController, the grant standing a take-up down before it writes, an overtaken
   grant erasing its own lease) is where it was, in the vault.
-* 2026-10-19 (thread a_fixes): **one shared check for a refusal from another copy of safebyok.**
-  `isVaultError(err, refusalkind?)` (`packages/safebyok/src/errors.ts`) is now the one test for a
-  refusal, and it recognizes a `VaultError` made by another copy of safebyok loaded beside this one
-  (an ESM and a CJS build side by side, each with its own `VaultError` class). Every `VaultError`'s
-  constructor sets a non-enumerable, non-writable own property keyed by
-  `Symbol.for('safebyok.VaultError')` (the "mark"). `isVaultError` is true for an `instanceof` this
-  copy's `VaultError`, or for an object that is `instanceof Error`, carries the mark as an own
-  property, and has a `refusalkind` this copy knows (a key of `RefusalFamilyForKind`). Every site
-  that branches on a refusal now uses it instead of `instanceof`: `outcomeOf` (`src/outcome.ts`,
-  which used to test `name === 'VaultError'` plus a known `refusalkind`), the `VaultDB` base's
-  `asStorageTrouble` (`src/vault-db.ts`: a foreign `VaultError` thrown by an adapter's `do*` hook was
-  wrapped as `storage_unavailable`, so a foreign `identity_revoked` did not lock), the vault's
+* 2026-10-19 (thread a_fixes); amended 2026-10-19 (a_sec2, #206): **one test for a refusal, and a
+  refusal from another copy of safebyok is a foreign throw.** `isVaultError(err, refusalkind?)`
+  (`packages/safebyok/src/errors.ts`) is `err instanceof VaultError` plus the kind check, the one
+  declared test for a refusal. Every site that branches on a refusal uses it: `outcomeOf`
+  (`src/outcome.ts`), the `VaultDB` base's `asStorageTrouble` (`src/vault-db.ts`), the vault's
   bad-news hearing (`#hearBadNews`), `RefusalPolicy.decide` (`identity_revoked` and `rolled_back`
-  lock), `isCondition`, and `safebyok-graphql`'s resolvers (`vaultDBOf` passing a host's refusal
-  through, and `crossing`). So a foreign refusal is kept, told to `onBadNews`, and locks the vault,
-  as this copy's own does. Why a mark and not duck typing on `name` and `refusalkind`: a
-  symbol-keyed property survives no JSON, structured clone or postMessage, so an error rebuilt from
-  what a server or storage sent (a GraphQL or fetch client turning a response into an `Error` named
-  `VaultError` with `refusalkind` `identity_revoked`) never carries it. Under the old name-and-kind
-  test, such a remote error was kept "as it came", so a backend could choose the refusal's kind
-  (lock the vault, raise bad news) and the message the app shows the user. Now it is wrapped as
-  `storage_unavailable`, safebyok's own message, the error as its `cause`. safebyok's own clients,
-  `safebyok-graphql`'s `graphqlVaultDB` and `safebyok-convex`'s `convexVaultDB`, deliberately rebuild
-  a real `VaultError` from their server's kind and message (`new VaultError(kind, message, { cause })`),
-  so through them the server (the package's own server code: `vaultResolvers`, the Convex component)
-  still chooses both the kind and the message; the mark protects only against an error a host's own
-  client rebuilds by name. A plain object (not an
-  `Error`) never passes, even carrying the mark. The mark is not a defence against code running in
-  the page, which could construct a `VaultError` directly anyway; it marks "made by a `VaultError`
-  constructor in this process", which is what `instanceof` meant, across copies. Tests:
-  `packages/safebyok/tests/errors.test.ts` ("isVaultError, for a VaultError of another copy of
-  safebyok": a real fresh copy of the module via `vi.resetModules`, the hand-made one tests use, and
-  impostors: a lookalike `Error`, JSON, `structuredClone`, plain objects with and without the mark,
-  an unknown kind), `outcome.test.ts`, `refusal-policy.test.ts`, `vault-db.test.ts`,
-  `tests/vault/vault-storage.test.ts` (a foreign `identity_revoked` locks and is told; a lookalike
-  thrown by an adapter is `storage_unavailable`, locks nothing, tells nothing), and
-  `safebyok-graphql/tests/vault-resolvers.test.ts`.
+  lock), `isCondition`, and `safebyok-graphql`'s resolvers (`vaultDBOf` and `crossing`). a_fixes
+  made it also recognize a `VaultError` of another copy of safebyok loaded beside this one (an ESM
+  and a CJS build side by side, each with its own class), by a symbol-keyed mark,
+  `Symbol.for('safebyok.VaultError')`, that every constructor set, and an `isMarked` check; that
+  mark is gone (a_sec2, #206). The Coach's ruling, 2026-10-19: "Whatever leads to the least amount
+  of logic I'm for. It's a weird dangerous situation that should be dealt with brutally." A refusal
+  from another copy is now a foreign throw, met as any foreign throw is where it lands: from a
+  storage adapter's `do*` hook it becomes `storage_unavailable`, elsewhere `unexpected_error`, its
+  message safebyok's own, the throw its `cause`. So it is not told to `onBadNews`, and a foreign
+  `identity_revoked` does not lock the vault. An Error that only names itself `VaultError`, as a
+  GraphQL or fetch client rebuilds one from a server's JSON, is no refusal either (nor is JSON, a
+  `structuredClone` or a plain object), so a backend cannot choose a refusal's kind or the message
+  the app shows the user through one; before a_fixes such an error was kept "as it came". safebyok's
+  own clients, `safebyok-graphql`'s `graphqlVaultDB` and `safebyok-convex`'s `convexVaultDB`,
+  deliberately rebuild a real `VaultError` from their server's kind and message (`new
+  VaultError(kind, message, { cause })`), so through them the server (the package's own server code:
+  `vaultResolvers`, the Convex component) still chooses both the kind and the message. Tests:
+  `packages/safebyok/tests/errors.test.ts` ("isVaultError": false for a `VaultError` of a fresh copy
+  of the module made with `vi.resetModules`, and for impostors: a lookalike `Error`, JSON,
+  `structuredClone`, plain objects), and the tests of each site above.
   2026-10-19 (thread a_fixes): **a call that cannot land never prompts.** On a locked vault,
   `getBox`, `getWhisper`, `useBox` and `delBox` (`packages/safebyok/src/vault.ts`, `#openBox`,
   `#tryDelBox`, `#checkListed`, and a `beforeAsking` callback on `#ensureLease`) now refuse
@@ -620,7 +648,9 @@ added or folded into through the subagent, and no other entry changes.
   `changePassphrase` replaced, which still opens only the vaultKey the vault stands under, never a
   replaced one. (A device that opens such vault props through its lease opens no wayin:
   it takes the vaultKey it already held, and lists the older copy's wayins.) The way out of a
-  refusal is the host's: it erases the device's mark (`valOf(await deviceDB.delMark(scope))`; amended 2026-10-19: once a bare `deviceDB.delMark(scope)`, before every DeviceDB verb resolved an `Outcome`) and opens again,
+  refusal is the host's: it erases the device's mark (`valOf(await deviceDB.delMark(scope))`;
+  amended 2026-10-19: once a bare `deviceDB.delMark(scope)`, before every DeviceDB verb resolved an
+  `Outcome`) and opens again,
   taking the older copy as it stands, the core README's recipe. The README has the host decide that
   from its own knowledge of a restore, never from the user's answer: storage that rolls back on its
   own would ask the user the same, and the user cannot tell the two apart. `del()` and
@@ -954,16 +984,23 @@ added or folded into through the subagent, and no other entry changes.
   wrapped refusal from `doPutVaultProps` or `doDelVault` was a truthy object and read as "landed".
   `outcomeOf` kept a `VaultError` of another copy of safebyok as it came; how a foreign
   `VaultError` is now told, and where, is in the 2026-10-19 (thread a_fixes) entry.
-  Amended 2026-10-19 (a_sec, #203): what a key deriver (`deriveKeyBytes`) or a passphrase strength
-  test throws, both handed the passphrase, now goes through `hostThrewRefusal` (`src/outcome.ts`). A
-  `VaultError` of misuse among them (`bad_option`, say), or any non-`VaultError`, becomes
-  `unexpected_error` with the throw as its `cause`, the treatment A6 gave `getProof`, so the throw's
-  own message is never the refusal's, and `safebyok-react`'s `forBoundary` then strips the cause before
-  React's `onCaughtError`. A `VaultError` of the condition or bad_news family, from this copy of
-  safebyok or another loaded beside it, passes through as it came: zxcvbn's `storage_unavailable` when
-  its word list fails to load, and safebyok-fastkey's `wrong_passphrase` for an empty passphrase. Its
+  Amended 2026-10-19 (a_sec, #203; corrected 2026-10-19, a_sec2, #206): what a key deriver
+  (`deriveKeyBytes`) or a passphrase strength test throws, both handed the passphrase, goes through
+  `hostThrewRefusal` (`src/outcome.ts`), applied in `passphraseKeyOf` (`src/proof.ts`). Only a
+  `VaultError` of the `condition` family passes through as itself: zxcvbn's `storage_unavailable`
+  when its word list fails to load, say. Everything else becomes `unexpected_error` with the throw
+  as its `cause`, the treatment A6 gave `getProof`: a `VaultError` of misuse (`bad_option`, say),
+  bad news, a refusal of another loaded copy of safebyok (a foreign throw, see the a_fixes entry
+  above), and any non-`VaultError`. So the throw's own message is never the refusal's, and
+  `safebyok-react`'s `forBoundary` then strips the cause before React's `onCaughtError`. Bad news
+  from a host function is never told to `onBadNews` or put in `snapshot.trouble`. A condition's
   message, if a host deriver or test wrote one quoting the passphrase, can reach the caller, and the
-  dialog shows it in place; it never reaches `onCaughtError`. Before, `checkStrongEnough` rethrew
+  dialog shows it in place; it never reaches `onCaughtError`. On unlock, `openWithPassphrase`
+  (`src/wayin.ts`) turns any `wrong_passphrase` from a way in into the vault's own
+  `wrong_passphrase` (kind kept, message replaced), so a deriver's message, such as
+  safebyok-fastkey's for an empty passphrase, never reaches the caller there; on the sealing paths
+  (creating the vault, a new passphrase) a deriver's condition passes through as itself. The vault
+  refuses an empty passphrase before any deriver sees it anyway. Before, `checkStrongEnough` rethrew
   whatever the test threw, and any `VaultError` from a deriver passed through with its message.
 * 2026-10-15: `localVaultDB` and `idbVaultDB` key rows by `applabel:user_id:vaultlabel`, and
   `user_id` may hold a colon, so one user's rows can share another scope's ckey prefix. Listing
@@ -1415,8 +1452,10 @@ added or folded into through the subagent, and no other entry changes.
   handed the passphrase), and anything that is not a `VaultError` becomes a fixed `unexpected_error`
   quoting nothing of it, so "the very thrown value" above no longer reaches `onCaughtError`. A host
   `passphraseAdvice` that throws (it is handed every keystroke of a new passphrase) is replaced at its
-  source with a fixed refusal, so even a `VaultError` it threw carries nothing on. `meta` is passed
-  through as is. The dialog's fallback notice once misuse trips it ("Something went wrong") now shares
+  source with a fixed refusal, so even a `VaultError` it threw carries nothing on. The report names
+  its component (`PassphraseModal` or `PasskeyUnlockButton`) and, for a `VaultError` whose cause was
+  stripped, says in its message that the cause was left out. `meta` is passed through as is. The
+  dialog's fallback notice once misuse trips it ("Something went wrong") now shares
   the dialog's one answer: a lock landing closes it answering `declined`, and a vault unlocked under
   it answers `unlocked`; its Close no longer answers `declined` over a vault that has since unlocked.
 * 2026-10-16 (revised the same day by refusals_and_catchup, below: `whenIdentityRevoked` is gone, and `rolled_back` locks too): **a sign-out locks the vault.** An adapter whose backend knows who is signed in
