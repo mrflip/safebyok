@@ -198,6 +198,13 @@ describe("Box.make", () => {
   it("refuses a missing vault as 'bad_option'", () => {
     TH.expectSyncRefusal(() => Box.make(undefined as unknown as BoxVault, TH.boxOf('anthropic_api_key', 'a1'), holderOf()), 'bad_option')
   })
+
+  it("refuses missing vault props, or props missing their vault id or vaultKey epoch, as 'bad_option'", () => {
+    const record = TH.boxOf('anthropic_api_key', 'a1')
+    TH.expectSyncRefusal(() => Box.make(stubVault(), record, undefined as unknown as BoxHolder), 'bad_option')
+    TH.expectSyncRefusal(() => Box.make(stubVault(), record, { vault_key_epoch: 1 } as unknown as BoxHolder), 'bad_option')
+    TH.expectSyncRefusal(() => Box.make(stubVault(), record, { vault_id: null, vault_key_epoch: null } as unknown as BoxHolder), 'bad_option')
+  })
 })
 
 describe("Box.seal", () => {
