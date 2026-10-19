@@ -1219,6 +1219,15 @@ describe("every data call, through ensureLease", () => {
     expect(getProof).not.toHaveBeenCalled()
   })
 
+  it("refuses with that read's own refusal when storage cannot be reached, never absent_box, and asks for nothing", async () => {
+    const getProof = typingPw()
+    const { world, vault } = await lockedVaultWith({ getProof })
+    vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
+    await TH.expectRefusal(vault.getBox('openai'), 'storage_unavailable')
+    expect(getProof).not.toHaveBeenCalled()
+    await TH.expectRefusal(vault.getBox('openai'), 'absent_box')
+  })
+
   it("asks for a box delBox finds in that one read, and removes it", async () => {
     const world = makeWorld()
     const maker = await world.openUnlocked('pw')
