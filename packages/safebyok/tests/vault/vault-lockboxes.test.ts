@@ -6,7 +6,7 @@ import { type Whisper, MaxWhisperBytes, type Sidecar, FarFuture, MaxLockboxes, V
 import { AnyTextValidators, MaxUserIdChars, NameFloorBytes } from '../../src/validators'
 import { memoryDeviceDB } from '../../src/device-db'
 import { type VaultDB, jsonBytes } from '../../src/vault-db'
-import { StoredBytesPerWhisperByte, LockboxFieldsBytes, type MakeVaultOpts, LockboxFixedBytes } from '../../src/vault'
+import { StoredBytesPerWhisperByte, LockboxFieldsBytes, type MakeVaultOpts, LockboxFixedBytes } from '../../src/vault-opts'
 import { cipherCtx, makeLockboxKey, wrapKeyUnder, makeVaultKey, cipherBytes, randomBytes } from '../../src/crypto'
 import * as TH from '../test-helpers'
 import { makeWorld, boxlabelsOf, storedRowOf, u1BoxCkey, storedVaultPropsOf, u1VaultPropsCkey, isU1Box, wayinlabelsOf } from './world'
