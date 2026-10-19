@@ -1,6 +1,6 @@
 # Thread 7: docs, the sidecar's trust class and overlapping stores (2026-10-19)
 
-Branch `20261019-docs`, PR to be filed against main (no stack). Justify: green (core 2161 passed, 35 skipped; indexeddb 135; postgres 246; react 227).
+Branch `20261019-docs`, PR #176 against main (no stack). Justify: green (core 2161 passed, 35 skipped; indexeddb 135; postgres 246; react 227).
 
 * **Built**:
   * VOCABULARY.md, the *sidecar* entry: its trust class is **server-readable** -- authenticated
