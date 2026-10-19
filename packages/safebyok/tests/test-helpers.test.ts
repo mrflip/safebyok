@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { Vault, localVaultDB, memoryDeviceDB, memoryStore, type StringStore } from '../src/index'
 import { Ciphered, fromB64, toB64 } from '../src/crypto'
-import { VaultError } from '../src/errors'
+import { VaultError, isVaultError } from '../src/errors'
 import { type Outcome, bad, good } from '../src/outcome'
 import { BoxRecord } from '../src/box'
 import { argon2idWebV1Deriver } from '../src/key-deriver'
@@ -16,6 +16,7 @@ import { Wayin } from '../src/wayin'
 import { PasskeySaltBytes, VaultProps, VaultScope, type DeviceMark, type Lease } from '../src/types'
 import * as Ckeys from '../src/ckeys'
 import * as Expectations from '../src/expectations'
+import * as RefusalPolicy from '../src/refusal-policy'
 import { VaultDB, type VaultPropsExpectation, type VaultDelExpectation, type BoxExpectation, type BoxDelExpectation, type StoredBox, type VaultDBOpts } from '../src/vault-db'
 import * as TH from './test-helpers'
 
@@ -665,7 +666,7 @@ describe("the fixtures", () => {
 })
 // --
 
-// == [Logging and refusals]: spyLogger, loggedText, thrownText, leafTexts, expectRefusal, omitting
+// == [Logging and refusals]: spyLogger, loggedText, thrownText, leafTexts, expectRefusal, omitting, foreignRefusal, lookalikeRefusal
 
 describe("spyLogger", () => {
   it("keeps every call it hears, in order, with what it was handed", () => {
@@ -859,6 +860,27 @@ describe("omitting", () => {
   it("hands an entrypoint a bag short of a required option, with no cast", async () => {
     const err = await TH.expectRefusal(TH.settledVault(TH.omitting(opts, 'keyDeriver')), 'bad_option')
     expect(err.message).to.include('safebyok/browser')
+  })
+})
+
+describe("foreignRefusal", () => {
+  it("has a storage adapter answer with another copy's refusal, as its example shows", async () => {
+    const vaultDB = localVaultDB({ store: memoryStore() })
+    vi.spyOn(vaultDB, 'getBox').mockResolvedValueOnce(TH.bad(TH.foreignRefusal('identity_revoked', 'Signed out.')))
+    const { ok, err } = await vaultDB.getBox(TH.scopeOf('u1'), 'anthropic')
+    expect(ok).to.be.false
+    expect(err instanceof VaultError).to.be.false
+    expect(isVaultError(err, 'identity_revoked')).to.be.true
+    expect(err).to.include({ name: 'VaultError', refusalkind: 'identity_revoked', family: 'bad_news', message: 'Signed out.' })
+  })
+})
+
+describe("lookalikeRefusal", () => {
+  it("is no refusal to the vault, though it names itself one, as its example shows", () => {
+    const lookalike = TH.lookalikeRefusal('identity_revoked', 'Signed out.')
+    expect(RefusalPolicy.decide(lookalike)).to.eq('none')
+    expect(isVaultError(lookalike)).to.be.false
+    expect(lookalike).to.include({ name: 'VaultError', refusalkind: 'identity_revoked', message: 'Signed out.' })
   })
 })
 // --
