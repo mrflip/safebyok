@@ -36,7 +36,8 @@ export type VaultState = 'opening' | 'absent' | 'locked' | 'unlocked'
  * The vault's picture, frozen: one plain object holding each field the vault shows, under the
  * same name and with the same value as the vault's own field, shaped for `useSyncExternalStore`.
  * It holds nothing an offline guess at a passphrase could start from: the ways in are their
- * summaries, never a salt or a wrapped vaultKey, and the stored vault props are the vault's alone.
+ * summaries, never a passphrase's salt or a wrapped vaultKey (a passkey's shows its PRF salt,
+ * which the authenticator is asked with), and the stored vault props are the vault's alone.
  * It is replaced, whole, whenever any field changes, and is otherwise the same object, so a render
  * from it re-runs only when something did change. Box summaries (labels and other visible fields,
  * no whispers) are present even while locked -- that is the point of leaving them unencrypted.
@@ -209,7 +210,7 @@ export class Vault {
   get unlock_epoch(): number | null { return this.#snapshot.unlock_epoch }
   /** Which vaultKey the ways in wrap: 1, reserved; null until a read finds a vault. */
   get vault_key_epoch(): VaultProps['vault_key_epoch'] | null { return this.#snapshot.vault_key_epoch }
-  /** The ways in, in the order the vault tries them, each its summary: no salt, no wrapped vaultKey. See {@link VaultSnapshot}. */
+  /** The ways in, in the order the vault tries them, each its summary: no passphrase's salt, no wrapped vaultKey. See {@link VaultSnapshot}. */
   get wayins(): readonly WayinSummary[] { return this.#snapshot.wayins }
   /** Where the vault stands: `opening` until a hello has read storage, then `absent`, `locked` or `unlocked`. */
   get state(): VaultState { return this.#snapshot.state }
