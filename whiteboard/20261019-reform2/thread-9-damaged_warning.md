@@ -1,6 +1,6 @@
 # Thread 9: damaged_warning (2026-10-19)
 
-Branch `20261019-damaged_warning`, PR pending (filed against `main`), stacked on [#182](https://github.com/mrflip/safebyok/pull/182), in the line main -> #177 -> #178 -> #179 -> #176 -> #182. Justify: green (core 2226 passed, 35 skipped; indexeddb 142; postgres 257; convex 267; graphql 250; react 228; e2e 86). No size line moved.
+Branch `20261019-damaged_warning`, PR [#183](https://github.com/mrflip/safebyok/pull/183), stacked on [#182](https://github.com/mrflip/safebyok/pull/182), in the line main -> #177 -> #178 -> #179 -> #176 -> #182. Justify: green (core 2226 passed, 35 skipped; indexeddb 142; postgres 257; convex 267; graphql 250; react 228; e2e 86). No size line moved.
 
 * **Built**:
   * `Vault.retireBox()` (`packages/safebyok/src/vault.ts`): when the retirement meets `retired_other` and the lockbox the snapshot showed was listed damaged (asked before the call, so a catch-up cannot change the answer), it warns "The lockbox this device showed was a damaged one, and the lockbox retired was not that record: ...", context `{ call: 'retireBox', damaged: true }`. Over a sound box the message and context are as before, with no `damaged` field.
