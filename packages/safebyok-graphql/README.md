@@ -156,8 +156,8 @@ comparison lets a device still holding a replaced vaultKey seal a whisper under 
 `graphqlVaultDB({ client })` is a VaultDB, each verb one operation through `client`.
 
 * **A refusal crosses**: the server's VaultError comes back as the same VaultError, kind and
-  message. A record or expectation at fault is `bad_record`, refused before it is sent, or by the
-  server's VaultDB, crossing by its kind. So a server that refuses the operation's shape or
+  message. A record or expectation at fault is `bad_record`, refused before it is sent (an epoch
+  past GraphQL's 32-bit `Int` included), or by the server's VaultDB, crossing by its kind. So a server that refuses the operation's shape or
   variables (`extensions.code` `BAD_USER_INPUT` or `GRAPHQL_VALIDATION_FAILED`) is serving a
   schema of another version, and refuses with kind `bad_option`, quoting nothing of it, since such
   an error may quote the variables. Anything else
