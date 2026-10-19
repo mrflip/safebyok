@@ -5,6 +5,8 @@ import * as TH from 'safebyok/testing'
 import { Component, useLayoutEffect, useState, type ErrorInfo, type ReactNode } from 'react'
 import { VaultProvider, useVault, useVaultSnapshot, type VaultProviderProps } from '../src/vault-provider'
 
+// == [Test helpers]: Probe, grabber, makeWorld, damagedWorld, lockedWorld, watched, providerOf, others
+
 /** A probe component exercising the binding the way a host app would. */
 const Probe = () => {
   const { vault, openError, retryOpen, withUnlockedVault } = useVault()
@@ -184,8 +186,11 @@ const twelveOrMore = (typed: string) => (typed.length < 12 ? 'Twelve characters 
 
 /** Stands in for a function a test replaces before it is called. */
 const noop = () => { /* replaced before use */ }
+// --
 
 describe("VaultProvider", () => {
+  // == [Opening and the dialog]: no vault without a user, withUnlockedVault summons the dialog, dismissing, misuse
+
   it("provides no vault without a signed-in user", () => {
     const world = makeWorld()
     world.mount(null)
@@ -314,6 +319,9 @@ describe("VaultProvider", () => {
     expect(reported).to.have.lengthOf(1)
     expect(isVaultError(reported[0], 'unknown_key_deriver')).to.be.true
   })
+  // --
+
+  // == [withUnlockedVault settling]: withUnlockedVault settles every call
 
   describe("withUnlockedVault settles every call", () => {
     it("resolves null when the provider unmounts with the dialog open", async () => {
@@ -605,6 +613,9 @@ describe("VaultProvider", () => {
       await waitFor(() => { expect(second.outcome).to.be.null })
     })
   })
+  // --
+
+  // == [Options passed through]: keyDeriver, Vault.make options, validators, passphraseStrengthTest, logger, allowStartOver, others
 
   it("asks for a keyDeriver outright, as Vault.make does", () => {
     expectTypeOf<Pick<VaultProviderProps, 'keyDeriver'>>().toEqualTypeOf<{ keyDeriver: KeyDeriver }>()
@@ -802,6 +813,9 @@ describe("VaultProvider", () => {
     fireEvent.change(field, { target: { value: 'short' } })
     expect(await screen.findByText('Twelve characters or more, please.')).to.not.be.null
   })
+  // --
+
+  // == [Advice and developer warnings]: advice from passphraseStrengthTest, warning the developer once
 
   describe("advice, by default, from the passphraseStrengthTest", () => {
     it("says the test's reason as the user chooses a weak passphrase, and nothing for one it admits", async () => {
@@ -918,6 +932,9 @@ describe("VaultProvider", () => {
       expect(spy.calls).to.deep.equal([])
     })
   })
+  // --
+
+  // == [Refusals on open]: when Vault.make or hello refuses, retireDamagedVault
 
   describe("when Vault.make or hello refuses", () => {
     it("throws a bad label to the error boundary, as the very VaultError", async () => {
@@ -1320,4 +1337,5 @@ describe("VaultProvider", () => {
       expect(caught).to.have.length(0)
     })
   })
+  // --
 })

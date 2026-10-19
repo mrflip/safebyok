@@ -16,6 +16,8 @@ import { VaultDB, type VaultPropsExpectation, type RetireExpectation, type Lockb
 import * as TH from './test-helpers'
 
 
+// == [Tweaks and timing]: tweakB64, wakeupAtNextTick, aWhile, eventually, changeCounter, liveWatch
+
 const TweakCases = [
   // regular usage:
   ["Zm9v",  "am9v",  'swaps the first character for an a'],
@@ -145,6 +147,9 @@ describe("liveWatch", () => {
     expect(unsubscribe.mock.calls).to.have.lengthOf(1)
   })
 })
+// --
+
+// == [Gates and call hooks]: makeGate, beforeNextCall, holdNextCall, settledVault, tallyWatches
 
 describe("makeGate", () => {
   it("holds a pass until released, and says when something reached it", async () => {
@@ -369,6 +374,9 @@ describe("tallyWatches", () => {
     expect(tally.opened - tally.closed).to.eq(0)
   })
 })
+// --
+
+// == [Turnstile and races]: throughTurnstile, raceEveryWay, loggingDevice
 
 /**
  * A device for the race driver's own tests: each move makes `roundTrips` round trips through the
@@ -531,6 +539,9 @@ describe("raceEveryWay", () => {
     await expect(TH.raceEveryWay({ makeDevices: () => noDevice, moves: [() => Promise.resolve()], verdict: () => undefined })).rejects.toThrow(TypeError)
   })
 })
+// --
+
+// == [Builders and fixtures]: memoryVaultOpts, freshDbName, testDeriver, the fixtures
 
 describe("memoryVaultOpts", () => {
   it("opens u1's main vault in acme over fresh stores, deriving through testDeriver", async () => {
@@ -641,6 +652,9 @@ describe("the fixtures", () => {
     expect(TH.sidecarJsonOf({ tier: 2, note: 'work' })).to.eq('{"note":"work","tier":2}')
   })
 })
+// --
+
+// == [Logging and refusals]: spyLogger, loggedText, thrownText, leafTexts, expectRefusal, omitting
 
 describe("spyLogger", () => {
   it("keeps every call it hears, in order, with what it was handed", () => {
@@ -785,6 +799,9 @@ describe("omitting", () => {
     expect(err.message).to.include('safebyok/browser')
   })
 })
+// --
+
+// == [perUser]: perUser, ckeyOf, servingOnly, counted
 
 const ckeyOf = (scope: VaultScope) => `${scope.applabel}:${scope.user_id}:${scope.vaultlabel}`
 
@@ -916,6 +933,9 @@ describe("perUser", () => {
 })
 
 // ------------------------------------------------- the races, against adapters that do not guard
+// --
+
+// == [Unguarded adapters]: RoundTripBackend, Stepping, inOneStep, checkThenWrite, RoundTripOpts, roundTripDevices, checksOver, others
 
 type Rows = Map<string, unknown>
 
@@ -1175,6 +1195,9 @@ const expectToHold = (check: TH.VaultDBTimingCheck): Promise<void> => check.chec
 
 /** The checks of the battery over an adapter, by handle. */
 const checksOver = (opts: RoundTripOpts & { overTheWire?: boolean, unwired?: boolean, slowSecond?: boolean }) => TH.vaultDBTimingChecks(...roundTripBattery(opts))
+// --
+
+// == [Conformance checks]: expectRoundTripsThroughTurnstile, vaultDBTimingChecks, VaultDBContract
 
 describe("expectRoundTripsThroughTurnstile", () => {
   it("passes devices that send every write through the turnstile", async () => {
@@ -1321,3 +1344,4 @@ describe("VaultDBContract", () => {
     expect(`postgresVaultDB, 5.5: ${TH.VaultDBContract['5.5']}`).to.eq('postgresVaultDB, 5.5: identity_revoked means the user is gone')
   })
 })
+// --

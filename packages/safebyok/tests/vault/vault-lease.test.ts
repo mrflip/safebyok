@@ -6,6 +6,8 @@ import * as TH from '../test-helpers'
 import { makeWorld, SevenDaysMillis, HourMillis, uncheckingDeviceDB, makeRacingWorld, vaultWithPasskey, boxlabelsOf } from './world'
 
 
+// == [Unlock, lock and the lease]: unlock and lock, the lease, OutOfBoundsDeadlines
+
 describe("unlock and lock", () => {
   it("the first unlock creates the vault, with that passphrase, unlocked for seven days", async () => {
     const world = makeWorld()
@@ -237,6 +239,9 @@ describe("the lease", () => {
     expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() + (MaxLeaseHours * HourMillis))
   })
 })
+// --
+
+// == [Lease and host settings]: leaseHours, leaseMillis, DeviceDB, SpoiledWayins, leaseDeadlineOf
 
 /** The deadline of this world's device's lease, or null when it keeps none. */
 const leaseDeadlineOf = async (world: ReturnType<typeof makeWorld>): Promise<number | null> => {
@@ -418,6 +423,9 @@ describe("the lease, from a host's own DeviceDB", () => {
     expect(world.logged[0]?.message).to.include('could not be read')
   })
 })
+// --
+
+// == [Natural expiry]: makeTimedWorld, fakeTheClock, natural expiry, others
 
 /**
  * A racing world whose clock and timers move together, as a real device's do: its clock reads the
@@ -603,6 +611,9 @@ describe("natural expiry", () => {
     expect(await world.readLease()).to.be.null
   })
 })
+// --
+
+// == [Renewal, timer and key]: change to the ways in, window renewed, timer, non-extractable, others
 
 describe("a change to the ways in, once it has landed", () => {
   afterEach(() => { vi.restoreAllMocks() })
@@ -764,3 +775,4 @@ describe("the session vaultKey is non-extractable", () => {
     expect(extractableUnwraps(spied)).to.have.lengthOf(1)
   })
 })
+// --
