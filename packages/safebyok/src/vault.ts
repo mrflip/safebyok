@@ -530,7 +530,10 @@ export type Vault = {
    * nor its `registered_at`: in one write over the revision the listing names, which another
    * device's write meanwhile refuses, as for any lockbox. A record that names no revision is
    * retired first, then written; should that write fail, the old record is gone and the call
-   * throws: calling `storeBox()` again writes the lockbox afresh. A record that reads but will not decipher --
+   * throws: calling `storeBox()` again writes the lockbox afresh. When that retirement comes
+   * back `retired_other` -- what it removed was not the damaged record the snapshot showed, another
+   * device or tab having written there meanwhile -- the write goes on, and the vault warns through
+   * its logger, its story carrying `damaged: true` beside `call`. A record that reads but will not decipher --
    * its ciphertext, its sidecar or a time altered in storage -- is written over its revision, but
    * carries nothing forward either: nothing vouches for its visible fields, so its sidecar becomes `{}`
    * unless one is given, and its `registered_at` is now. A boxlabel the vault's check refuses is
