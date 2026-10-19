@@ -78,8 +78,8 @@ safebyok names each thing once; [VOCABULARY.md](../../VOCABULARY.md) is the dict
 code, the stored records and these docs all use its words.
 
 * A **whisper** is the secret you store: any JSON value, such as an API key. A **lockbox** holds
-  one whisper, encrypted, with its `boxlabel` and its **sidecar**, your app's own plain data that
-  rides beside it unencrypted. A **vault** is one user's set of lockboxes, named by your `applabel`,
+  one whisper, encrypted, with its `boxlabel` and its **sidecar**, your app's own data that
+  rides beside it, server-readable: authenticated, never encrypted. A **vault** is one user's set of lockboxes, named by your `applabel`,
   the signed-in user's id and a `vaultlabel`.
 * The vault is unlocked by a **proof** of one of its **wayins**: a passphrase, or a passkey's
   answer. Each wayin holds the one **vaultKey** (the vault's random master key) wrapped under a key
@@ -87,7 +87,7 @@ code, the stored records and these docs all use its words.
   wraps a fresh **lockboxKey** for every stored whisper, and the lockboxKey encrypts the whisper.
   The wayins live in the **vault props**, the one record per vault that every device syncs. The
   backend holds those and the lockboxes, nothing else: every key and whisper in them is
-  ciphertext, and only their labels, ids, times and sidecars are plain.
+  ciphertext, and only their labels, ids, times and sidecars are readable by the server.
 * A **lease** lets this device unlock again without a proof for a while: when a proof unlocks the
   vault, the device keeps the vaultKey wrapped under a key the browser cannot export, until
   `leaseHours` run out. It never leaves the device.
@@ -156,10 +156,12 @@ marked `sideEffects: false`: what you never import never ships.
 
 ## A lockbox's sidecar
 
-Each lockbox carries a **sidecar**: your app's own plain data, riding beside the whisper,
-authenticated but not encrypted. It is any JSON value your app keeps about the lockbox -- what the
-user calls the account, which project a key belongs to, when it was last rotated -- shown in the
-snapshot while the vault is locked, as `box.sidecar`. The vault never looks inside it.
+Each lockbox carries a **sidecar**: your app's own data, riding beside the whisper,
+**server-readable** -- authenticated, but never encrypted, so anyone who can read your database can
+read it. It is any JSON value your app keeps about the lockbox -- what the user calls the account,
+which project a key belongs to, when it was last rotated -- or whatever your app wants searchable
+server-side (a team, a rotation reminder, a usage count). It shows in the snapshot while the vault
+is locked, as `box.sidecar`. The vault never looks inside it.
 
 ```ts
 await vault.storeBox('anthropic_api_key', 'sk-ant-...', { sidecar: { note: 'work account', project: 'atlas' } })
@@ -168,10 +170,10 @@ await vault.storeBox('anthropic_api_key', 'sk-ant-new', { sidecar: {} }) // and 
 vault.getSnapshot().boxes[0]  // { boxlabel: 'anthropic_api_key', sidecar: {}, damaged: false, ... }
 ```
 
-* **It is not encrypted.** It is stored in the clear, so never put secret material in it: a key, a
+* **It is never encrypted.** It is stored in the clear, so never put secret material in it: a key, a
   password, a recovery code. Anyone who can read your storage reads it.
 * **It is authenticated.** Its JSON, keys sorted, is bound into the lockbox's encryption with the rest of
-  the lockbox's public fields, so a sidecar altered or swapped in storage makes the lockbox refuse to
+  the lockbox's server-readable fields, so a sidecar altered or swapped in storage makes the lockbox refuse to
   open (`damaged_lockbox`). The snapshot shows the sidecar as storage holds it; only `readBox()` proves
   it unaltered. A sidecar stored other than as the vault writes it (respaced, reordered) lists the
   lockbox as damaged.
@@ -181,7 +183,7 @@ vault.getSnapshot().boxes[0]  // { boxlabel: 'anthropic_api_key', sidecar: {}, d
   is one written over a record that will not open.
 * **It shares the whisper's room.** `maxWhisperBytes` counts the whisper's JSON and the
   sidecar's together, so a large sidecar leaves less room for the whisper. Its size shows in storage, as every
-  public field's does.
+  server-readable field's does.
 
 ## Names, and your own checks
 
@@ -770,6 +772,11 @@ made anew elsewhere, or its ways in changed, the device relocks, and `storeBox()
 `vault_locked` instead, writing nothing. A `retireBox()`, a passphrase change or a `retire()` that
 meets another device's write is refused as `stale_write` the same way, once caught up.
 
+Do not overlap your own `storeBox()` calls on one lockbox: await the first before the second.
+Both would read the same revision, so the second is refused as `stale_write`, and its message
+words it as another device's write, because storage cannot tell your app's second call from
+another device's.
+
 ### A vault that cannot be opened
 
 Stored vault props that fail their checks make `hello()` refuse with `damaged_vault`, and
@@ -886,7 +893,7 @@ sound lockbox another device wrote there meanwhile is never retired: the store i
 `stale_write`, as over any lockbox written meanwhile, and a second store writes over theirs. Only a record that names no revision
 is retired first and then written, and should that write fail, nothing stands under the boxlabel.
 A record that reads but will not decipher -- its ciphertext, sidecar or times altered -- is written
-over its revision, and carries nothing forward either: nothing vouches for its public fields, so
+over its revision, and carries nothing forward either: nothing vouches for its server-readable fields, so
 its sidecar becomes `{}` unless you give one, and its first-stored time is now. A storage adapter's `doListBoxes` hands up each lockbox as a
 `StoredLockbox`, the boxlabel it is stored under beside its record exactly as stored, so a record
 too damaged to name itself is still listed under the boxlabel that reaches it.
