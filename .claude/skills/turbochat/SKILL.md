@@ -20,9 +20,10 @@ they conflict with this file.
 ## The tab
 
 It lives in the doc the session already keeps (usually a sprint's), ordered first, so it is the
-tab that opens. With no doc in the session, birth one named for the work. Load the Docs guide
-(`topic.index`, `topic.editing`, `topic.tabs`) before the first write of a session: the surface
-moves.
+tab that opens. With no doc in the session, birth one named for the work. Editing or interacting
+with a doc: load the docs skill and the Docs guides `topic.index`, `topic.tabs`, and (if needed)
+`topic.editing`, before the first write of a session: the surface moves. Reading only: spawn
+`doc-tab-reader`.
 
 * **A lead**, a few lines long, saying what each state does.
 * **The matters table**: `Coach answer | State | Matter`. *Coach Answer* is the Coach's and starts
@@ -135,7 +136,7 @@ When a matter is ruled (`proceed`, or an answer in chat), beside acting on it:
 ## An elevated matter's tab
 
 Written for an agent in another session that has the repo and this tab and nothing else; it
-reads the tab with the Claude Docs tools, given the doc's link. Text and bullet points, no
+reads the tab with `doc-tab-reader`, given the doc's link. Text and bullet points, no
 tables, so the Coach can write between the lines:
 
 * **Where it stands**: what the tab assumes (usually main, after a named merge), with paths, line

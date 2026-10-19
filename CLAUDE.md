@@ -153,6 +153,15 @@ The documents below are looked up by section, not read through.
 * `tsconfig.base.json` -- every compiler strictness flag, extended by every tsconfig, which adds
   only its runtime (lib, types, jsx). Its `@safebyok/source` condition has tsc, the editor and
   lint read a sibling package's `src/`, never a stale `dist/`.
+* **Claude Docs.** Editing or interacting with a doc: load the docs skill and the Docs guides
+  `topic.index`, `topic.tabs`, and (if needed) `topic.editing`. Reading only (a
+  `claude.ai/.../artifact/<id>#<tab>` link): spawn the `doc-tab-reader` agent (haiku) with the
+  URL. It `export`s the tab as markdown into the scratchpad and returns the path, byte count and
+  outline; you `grep -n` and read only the lines you need. For a read, skip the docs skill, don't
+  `read` the doc (its XML costs far more), and don't `export` yourself (base64 you would have
+  to retype). The markdown drops diagrams, charts, highlights and comment anchors: if the doc
+  leans on one, say so. Keep questions about the content for yourself: haiku fetches reliably
+  but misreads.
 
 ## Conventions At A Glance
 
