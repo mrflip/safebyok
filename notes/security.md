@@ -132,22 +132,23 @@ added or folded into through the subagent, and no other entry changes.
   `packages/safebyok/tests/errors.test.ts` ("isVaultError": false for a `VaultError` of a fresh copy
   of the module made with `vi.resetModules`, and for impostors: a lookalike `Error`, JSON,
   `structuredClone`, plain objects), and the tests of each site above.
-  2026-10-19 (thread a_fixes): **a call that cannot land never prompts.** On a locked vault,
-  `getBox`, `getWhisper`, `useBox` and `delBox` (`packages/safebyok/src/vault.ts`, `#openBox`,
-  `#tryDelBox`, `#checkListed`, and a `beforeAsking` callback on `#ensureLease`) now refuse
-  `bad_label` (the name's floor, and the vault's own `boxlabel` check when nothing is listed under
-  it) and `absent_box` from the box listing in hand, after the hello and before `getProof` is asked;
+  2026-10-19 (thread a_fixes); amended 2026-10-19 (a_sec2, #206): **a call that cannot land never
+  prompts.** On a locked vault, `getBox`, `getWhisper`, `useBox` and `delBox`
+  (`packages/safebyok/src/vault.ts`, `#openBox`, `#tryDelBox`, `#checkListed`, and a `beforeAsking`
+  callback on `#ensureLease`) now refuse `bad_label` (the name's floor, and the vault's own
+  `boxlabel` check when nothing is listed under it) and `absent_box` from the box listing in hand,
+  after the hello and before `getProof` is asked;
   `putBox` already checked label, sidecar and whisper first. The check runs only when the vault must
   ask; an unlocked vault reads storage for the box as before. The listing (boxlabels, visible
   metadata) is already shown while locked, so refusing `absent_box` without a prompt discloses
-  nothing new. The listing in hand is not the last word: when it shows nothing under the name, the
-  vault reads storage once more (`#refresh()`, inside `#checkListed`, which is async;
-  `#ensureLease`'s `beforeAsking` is async too, and the reason to ask is read again after it), and
-  refuses `absent_box` only if that read also shows nothing. With a store that pushes no changes, the
-  listing may lag storage by up to `staleMinutes`, so a miss costs one read of storage before the
-  refusal, and a box another device stored meanwhile is asked for as any other; a box truly absent is
-  still refused with no prompt. Tests: `tests/vault/vault-lease.test.ts`, "every data call, through
-  `ensureLease`", and its tests that the vault "reads storage once before refusing absent_box ...".
+  nothing new. Amended 2026-10-19 (a_sec2, #206): the listing in hand is the last word. `#checkListed`
+  is now synchronous and refuses `absent_box` from that listing alone, reading nothing (it was async,
+  read storage once more with `#refresh()` on a miss, and refused only if that read also showed
+  nothing; `ensureLease`'s `beforeAsking` was async too and is now a plain callback). The listing is
+  as fresh as the host's `staleMinutes` keeps it, so a box another device stored since the last read
+  is refused `absent_box` until the next read. Tests: `tests/vault/vault-lease.test.ts`, "every data
+  call, through `ensureLease`", and its test that the vault "refuses absent_box from the listing in
+  hand, reading nothing more, though another device stored the box meanwhile ...".
 * 2026-10-19 (thread B3 rework, box holder): **a box takes the vault props it lies under explicitly,
   as `holder`, and no longer reads `vault_id` and the vaultKey epoch off the vault's published
   snapshot; sealing is split so a store too large is refused before any key is made.** This replaces
@@ -180,10 +181,11 @@ added or folded into through the subagent, and no other entry changes.
   the vault freezes every vault props record as it takes it up (`frozenVaultProps` in
   `packages/safebyok/src/vault.ts`: a copy, its `wayins` array and each wayin record and its
   `vault_key_wayin_wrapped` frozen) at each of the three places it does so (a read in refresh, the
-  unlock that creates the vault, a change to the ways in). So the record the vault works from, the
-  snapshot's `props`, each wayin's `holder` and the `holder` each box is made or sealed under are one
-  frozen object; a host holding any of them cannot write to the vault's own record. (Each `Box` still
-  keeps its own frozen copy of the holder's `vault_id` and `vault_key_epoch`.)
+  unlock that creates the vault, a change to the ways in). So the record the vault works from, each
+  wayin's `holder` and the `holder` each box is made or sealed under are one frozen object. Amended
+  2026-10-19 (a_sec2, #206): `snapshot.props` is gone and the host no longer receives the record at
+  all (see the a_sec2 entry at the top of *Of Interest*); a box's `holder` is itself reduced to
+  `vault_id` and `vault_key_epoch`, kept as its own frozen copy in each `Box`.
 * 2026-10-19 (thread B3, box): **the stored box is a model class, `Box`, holding a back-reference to
   its vault; sealing and opening moved into it, and a box's enumerable fields are exactly its stored
   ones.** (1) The class (`packages/safebyok/src/box.ts`): the Zod schema once exported as `Box` is
@@ -409,8 +411,11 @@ added or folded into through the subagent, and no other entry changes.
   deep-frozen). The vault never reads its own state back through a public property, only through
   `#` fields, so a host writing over a handle's property (`hello`, or shadowing `leaseMillis` with
   `Object.defineProperty`) changes nothing inside the vault; a test pins this. 2026-10-19
-  (20261019-proof_wayin, #201): `vault.props` and `vault.wayins` expose the stored vault props (frozen) and
-  the `Wayin` instances to the host, wraps included (ciphertext and visible fields); the vault also exposes
+  (20261019-proof_wayin, #201); amended 2026-10-19 (a_sec2, #206): `vault.props` and `vault.wayins` exposed the stored
+  vault props (frozen) and the `Wayin` instances to the host, wraps included. Now `vault.props` and
+  `VaultSnapshot.props` are gone, and `vault.wayins` is the snapshot's list of `WayinSummary`: no
+  passphrase salt and no wrapped vaultKey (a passkey's summary carries its `credential_id` and
+  `prf_salt_b64`); see the a_sec2 entry at the top of *Of Interest*. The vault also exposes
   `keyDeriver`, `logger` and a checked `clock` as read-only getters, which the wayin models read.
 * 2026-10-19 (branch 20261019-softlock_gone, on PR #189): **the rotation schema is removed; no
   `rotateVaultKey` was ever built.** The vault props' `prior_vault_key` (the previous vaultKey wrapped
