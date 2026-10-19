@@ -111,6 +111,13 @@ export const rowsOf = (world: ReturnType<typeof makeWorld>, userId: string) => (
   world.dbStore.ckeys().filter((ckey) => ckey === Ckeys.vaultProps(TH.scopeOf(userId)) || Ckeys.isBoxIn(TH.scopeOf(userId))(ckey))
 )
 
+/** u1's stored vault props in `world`, their second way in spoiled by `spoil`. */
+export const spoilSecondWayin = (world: ReturnType<typeof makeWorld>, spoil: Record<string, unknown>) => {
+  const vaultProps = JSON.parse(world.dbStore.read(u1VaultPropsCkey) ?? '{}') as { wayins: Record<string, unknown>[] }
+  const wayins = vaultProps.wayins.map((wayin, ii) => (ii === 1 ? { ...wayin, ...spoil } : wayin))
+  world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...vaultProps, wayins }))
+}
+
 /** A world whose `u1` vault, with a box and a lease, has had its stored vault props spoiled. */
 export const damagedVaultWorld = async () => {
   const world = makeWorld()

@@ -8,7 +8,7 @@ import { bad } from '../../src/outcome'
 import type { MakeVaultOpts } from '../../src/vault-opts'
 import type { PassphraseStrengthTest } from '../../src/passphrase-strength'
 import * as TH from '../test-helpers'
-import { makeWorld, SevenDaysMillis, HourMillis, uncheckingDeviceDB, makeRacingWorld, vaultWithPasskey, boxlabelsOf } from './world'
+import { makeWorld, SevenDaysMillis, HourMillis, uncheckingDeviceDB, makeRacingWorld, vaultWithPasskey, boxlabelsOf, spoilSecondWayin } from './world'
 
 
 // == [Unlock, lock and the lease]: unlock and lock, the lease, OutOfBoundsDeadlines
@@ -1265,6 +1265,39 @@ describe("getProof's attempt, by the Contract", () => {
     const stranger = { ...await TH.passkeyOf('laptop'), prfBytes: new Uint8Array(32).fill(7) }
     await TH.expectBad(ask.attempt(stranger, { wayinId }), 'wrong_passkey')
     await TH.expectGood(ask.attempt(await TH.passkeyOf('laptop')))
+    prompt.answer('unlocked')
+  })
+
+  it("refuses created_elsewhere on absent when another device made the vault meanwhile under another passphrase, to show in place and ask again (Contract: getProof, attempt refuses: show in place)", async () => {
+    const world = makeWorld()
+    const deafDB = world.deafVaultDB()
+    const prompt = heldPrompt()
+    const vault = await world.open({ vaultDB: deafDB, getProof: prompt.getProof })
+    const ensuring = vault.tryEnsureLease()
+    const ask = await prompt.asked
+    expect(ask.why).to.eq('absent')
+    const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
+    TH.beforeNextCall(deafDB, 'ensureVaultProps', async () => { await elsewhere.unlock('pw one') })
+    await TH.expectBad(ask.attempt('pw two'), 'created_elsewhere')
+    expect(vault.state).to.eq('locked')
+    await TH.expectGood(ask.attempt('pw one'))
+    prompt.answer('unlocked')
+    expect(await TH.expectGood(ensuring)).to.eq(vault)
+  })
+
+  it("refuses damaged_wayin for a way in stored damaged, aimed at by its wayinId, to offer another way in (Contract: getProof, attempt refuses: offer another way in)", async () => {
+    const world = makeWorld()
+    const maker = await world.openUnlocked('pw')
+    const spareId = await maker.addPassphrase('pw', 'spare phrase', { wayinlabel: 'spare' })
+    await maker.lock()
+    maker.close()
+    spoilSecondWayin(world, { salt_b64: 'c2FsdA' })
+    const prompt = heldPrompt()
+    const vault = await world.open({ getProof: prompt.getProof, deviceDB: memoryDeviceDB() })
+    void vault.tryEnsureLease()
+    const ask = await prompt.asked
+    await TH.expectBad(ask.attempt('spare phrase', { wayinId: spareId }), 'damaged_wayin')
+    await TH.expectGood(ask.attempt('pw'))
     prompt.answer('unlocked')
   })
 

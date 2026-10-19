@@ -3,7 +3,7 @@ import { memoryDeviceDB } from '../../src/device-db'
 import { type MakeVaultOpts } from '../../src/vault-opts'
 import { toB64 } from '../../src/crypto'
 import * as TH from '../test-helpers'
-import { makeWorld, u1BoxCkey, storedRowOf, boxlabelsOf, rowsOf, u1VaultPropsCkey, wayinlabelsOf, vaultWithPasskey } from './world'
+import { makeWorld, u1BoxCkey, storedRowOf, boxlabelsOf, rowsOf, u1VaultPropsCkey, wayinlabelsOf, vaultWithPasskey, spoilSecondWayin } from './world'
 
 /** A stored box row, as text, with its whisper's ciphertext bent a little. */
 const withTweakedCiphertext = (row: Record<string, unknown>): string => {
@@ -287,13 +287,6 @@ describe("damaged boxes", () => {
     expect(JSON.stringify(fresh.getSnapshot())).to.not.include('FAKESECRET')
   })
 })
-
-/** u1's stored vault props in `world`, their second way in spoiled by `spoil`. */
-const spoilSecondWayin = (world: ReturnType<typeof makeWorld>, spoil: Record<string, unknown>) => {
-  const vaultProps = JSON.parse(world.dbStore.read(u1VaultPropsCkey) ?? '{}') as { wayins: Record<string, unknown>[] }
-  const wayins = vaultProps.wayins.map((wayin, ii) => (ii === 1 ? { ...wayin, ...spoil } : wayin))
-  world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...vaultProps, wayins }))
-}
 
 /**
  * A vault of passphrases `pw` and `spare`, the spare's salt spoiled in storage, freshly opened

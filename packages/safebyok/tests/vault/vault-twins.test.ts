@@ -8,7 +8,7 @@ import { damagedVaultWorld, makeWorld } from './world'
 // == [The pairs]: TwinCases, each X over its tryX
 
 /** Every call that comes in two forms, by its throwing name. */
-type TwinName = 'hello' | 'unlock' | 'lock' | 'changePassphrase' | 'addPassphrase' | 'addPasskey' | 'delWayin' | 'putBox' | 'getBox' | 'delBox' | 'del'
+type TwinName = 'hello' | 'ensureLease' | 'unlock' | 'lock' | 'changePassphrase' | 'addPassphrase' | 'addPasskey' | 'delWayin' | 'putBox' | 'getBox' | 'delBox' | 'del'
 
 /** A vault's calls by name, each taking any arguments: how a table row reaches either form. */
 type CallsByName = Record<string, (...args: unknown[]) => Promise<unknown>>
@@ -34,6 +34,7 @@ type Twin = Awaited<ReturnType<typeof twinVault>>
  */
 const TwinCases: readonly (readonly [TwinName, RefusalKind, (twin: Twin) => unknown[], (twin: Twin) => unknown[], (val: unknown, twin: Twin) => void])[] = [
   ["hello",            "bad_option",       () => [{ staleMinute: 0 }],                         () => [],                                          (val, { vault }) => { expect(val).to.eq(vault) }],
+  ["ensureLease",      "bad_option",       () => [{ renewMinute: 5 }],                         () => [],                                          (val, { vault }) => { expect(val).to.eq(vault) }],
   ["unlock",           "wrong_passphrase", () => ['not it'],                                   () => ['pw'],                                      (val) => { expect(val).to.be.undefined }],
   ["lock",             "vault_closed",     ({ vault }) => { vault.close(); return [] },         () => [],                                          (val) => { expect(val).to.be.undefined }],
   ["changePassphrase", "wrong_passphrase", () => ['not it', 'new phrase'],                     () => ['pw', 'new phrase'],                        (val) => { expect(val).to.be.undefined }],

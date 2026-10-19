@@ -720,7 +720,8 @@ describe("the vault's fields, by the Contract", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox('anthropic', 'sk-fake')
-    for (const field of ['state', 'boxes', 'wayins', 'props', 'capacity', 'trouble', 'vault_id', 'applabel', 'askPassphraseAt', 'snapshot', 'leaseMillis', 'logger', 'clock', 'keyDeriver']) {
+    // Every field the snapshot shows, the scope's among them, and those only the handle has.
+    for (const field of [...Object.keys(vault.snapshot), 'snapshot', 'leaseMillis', 'logger', 'clock', 'keyDeriver']) {
       expect(Reflect.set(vault, field, null), field).to.be.false
     }
     expect(vault.state).to.eq('unlocked')

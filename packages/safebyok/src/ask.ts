@@ -94,7 +94,7 @@ export class Ask {
    * `askPasskey` gets one), aimed at one way in by `opts.wayinId` when given. Resolves the vault,
    * unlocked, or the refusal, as `unlock()` refuses: `wrong_passphrase` and `wrong_passkey` to show
    * in place and ask again (on `absent`, `weak_passphrase` and `created_elsewhere` too);
-   * `absent_wayin`, `damaged_wayin` and `passkey_unavailable` to offer another way in; and
+   * `absent_wayin` and `damaged_wayin` to offer another way in; and
    * `vault_locked` -- a lock won, under this attempt or before it -- `storage_unavailable`, or any
    * other, to close the dialog, answering `declined`. Once `lockLanded` has settled, it refuses
    * 'vault_locked' at once.
