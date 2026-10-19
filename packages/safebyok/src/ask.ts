@@ -123,7 +123,13 @@ export class Ask {
   /** What `getProof` answers, checked: anything but the three, or `carry_on` outside `lease_ending`, is misuse. */
   async #answerFrom(getProof: GetProof | null): Promise<ProofAnswer> {
     if (getProof === null) { return 'declined' }
-    const answered: unknown = await getProof(this)
+    let answered: unknown
+    try {
+      answered = await getProof(this)
+    } catch (err) {
+      // A bug in getProof, a VaultError it let escape too: never a refusal of the call that asked.
+      throw unexpectedError(err)
+    }
     // Neither refusal quotes the answer: a getProof gone wrong could hand back the passphrase.
     if (! ProofAnswerVals.includes(answered as ProofAnswer)) {
       throw new VaultError('bad_option', "getProof answers one of 'unlocked', 'declined' or 'carry_on': fix the getProof passed to Vault.make.")

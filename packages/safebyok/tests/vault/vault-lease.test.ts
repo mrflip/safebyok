@@ -1044,6 +1044,17 @@ describe("vault.ensureLease, by the Contract", () => {
     expect(onBadNews).not.toHaveBeenCalled()
   })
 
+  it("refuses unexpected_error for a VaultError getProof lets escape, never with its kind, nor telling it as bad news (Contract: ensureLease, Refuses)", async () => {
+    for (const kind of ['wrong_passphrase', 'damaged_vault'] as const) {
+      const thrown = new VaultError(kind, 'A refusal met inside getProof.')
+      const onBadNews = vi.fn()
+      const { vault } = await lockedVaultWith({ getProof: () => Promise.reject(thrown), onBadNews })
+      const err = await TH.expectRefusal(vault.ensureLease(), 'unexpected_error')
+      expect(err.cause).to.eq(thrown)
+      expect(onBadNews).not.toHaveBeenCalled()
+    }
+  })
+
   it("refuses a renewWithin that is not zero or more minutes, and a misspelt option, as bad_option", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
