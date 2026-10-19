@@ -631,7 +631,7 @@ added or folded into through the subagent, and no other entry changes.
   comparison now guards a box built wrong, and stays so a later rotation needs no new
   contract). Deletions name no epoch. A box whose epoch is
   not the vault props' reads as `damaged_box`, its key never tried.
-* 2026-10-16: **the rollback check.** Each device keeps a device mark per scope in its deviceDB:
+* 2026-10-16; 2026-10-19 (a_sec2, #206): **the rollback check.** Each device keeps a device mark per scope in its deviceDB:
   the vault's `vault_id` and the highest `unlock_epoch` and `vault_key_epoch` it has seen the
   vault props at, raised on every read of newer vault props and after its own writes. Vault props of the same
   `vault_id` at a lower `unlock_epoch`, or a lower `vault_key_epoch`, are refused as `rolled_back`
@@ -656,7 +656,15 @@ added or folded into through the subagent, and no other entry changes.
   refusal is the host's: it erases the device's mark (`valOf(await deviceDB.delMark(scope))`;
   amended 2026-10-19: once a bare `deviceDB.delMark(scope)`, before every DeviceDB verb resolved an
   `Outcome`) and opens again,
-  taking the older copy as it stands, the core README's recipe. The README has the host decide that
+  taking the older copy as it stands, the core README's recipe. Amended 2026-10-19 (a_sec2, #206): a
+  handle that locks as `rolled_back` now also forgets the vault props it holds (its state reads
+  `opening`), so the recipe works on the very handle that refused. It used to keep the newer vault
+  props, and a later read's older copy was then taken for a stale read and declined; the handle kept
+  the newer epoch, and every change to the wayins refused `stale_write`. A test runs the recipe on
+  one open handle. A known corner, with no mechanism added: suppose this device's own write of its
+  mark failed after a change to the wayins (logged by `#raiseMarkAfter`), and storage was then
+  restored; the handle may go on refusing `stale_write`. The class doc tells the host to close the
+  handle and open a new one. The README has the host decide that
   from its own knowledge of a restore, never from the user's answer: storage that rolls back on its
   own would ask the user the same, and the user cannot tell the two apart. `del()` and
   `delDamagedVault` erase the mark. Two tabs of one device
@@ -953,7 +961,7 @@ added or folded into through the subagent, and no other entry changes.
   under a `byok-*-v1` tag would neither validate nor decrypt. No reader for the old tags is
   kept: they existed only in development and demo storage, never in a published version.
 * 2026-10-15; 2026-10-19 (thread A1 `outcome`, sprint contract, branch 20261019-outcome); 2026-10-19 (thread A4, sprint
-  contract, branch 20261019-try_twins); 2026-10-19 (a_sec, #203):
+  contract, branch 20261019-try_twins); 2026-10-19 (a_sec, #203); 2026-10-19 (a_sec2, #206):
   `VaultDB`'s public verbs turn any failure from an adapter that is not already a
   `VaultError` into kind `storage_unavailable`, with the adapter's own error attached as the
   standard `cause`. Adapters see only ciphertext and unencrypted record fields, but that cause is
@@ -968,12 +976,19 @@ added or folded into through the subagent, and no other entry changes.
   `family` (`misuse`, `condition`, `bad_news`), read from `refusalkind` through one table and never
   set by a caller; `bad_news` (`damaged_vault`, `damaged_wayin`, `damaged_box`, `newer_format`,
   `rolled_back`, `identity_revoked`) was `condition`, and `isCondition` is true for both. It
-  also gains `meta?` (`box_stored`, `vault_props_stored`, `capacity`): stored records as storage
-  holds them (ciphertext and visible fields) and counts only, never secret material; no refusal
-  fills it yet (a later thread, C1, will fill `box_stored` on `stale_write`). The vault still locks
+  also gains `meta?` (`box_stored`, `capacity`; amended 2026-10-19, a_sec2, #206: `vault_props_stored`
+  is removed, see below): stored records as storage holds them (ciphertext and visible fields) and
+  counts only, never secret material; no refusal filled it at first (amended 2026-10-19, a_sec2,
+  #206: `box_stored` is now filled, a `stale_write` from a box write carries the winning box record,
+  as stored). The vault still locks
   on `identity_revoked` and `rolled_back` from storage: `RefusalPolicy.heed` unwraps each Outcome,
   hands every bad `err` to the vault's refusal handler and awaits it, then throws it, as before --
   an interim shim until the vault's own calls are Outcome-shaped.
+  2026-10-19 (a_sec2, #206): `vault_props_stored` is removed from `RefusalMeta`. Nothing ever
+  filled it. Filled, it would have put every passphrase's salt and every wrapped vaultKey into a
+  refusal's `meta`, and from there into `snapshot.trouble`, logs and error reporters; the Coach has
+  ruled those out of the snapshot. A later refusal that wants to name the vault props storage holds
+  must carry a summary instead: `vault_id`, `unlock_epoch` and the wayin summaries.
   2026-10-19 (A4): every public vault call (`packages/safebyok/src/vault.ts`) now has a `tryX` form
   resolving an `Outcome` and an `X` form throwing the same `err` (`#trying`, `#throwing`). A throw
   inside a vault call that is not a `VaultError` -- a bug in safebyok, or a throw from a host
