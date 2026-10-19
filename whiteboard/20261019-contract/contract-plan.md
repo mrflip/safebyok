@@ -16,7 +16,7 @@ this line.
   (56 kB; `grep -n '^#'` is its outline). The handoff says when a ruling has changed it since.
 * **Sprint doc:** https://claude.ai/code/artifact/362ec68d-5bf3-46aa-a379-59a9c8bfb548
   (*Open Matters*, *Resolved*, *Progress*).
-* **Status:** phase A filed (#193-#200, #195 on top); passes 1-2 done; B1, B3 and `a_sec` building.
+* **Status:** phase A filed; passes 1-2 done; B1 (#201) and `a_sec` (#203) in review; B3 (#202) reworking a flagged finding.
 
 ## How this plan relates to the preplan
 
@@ -198,7 +198,7 @@ over `Object.keys(vault.snapshot)`; `created_elsewhere` and `damaged_wayin` prov
 | C2 | `putbox-vault` | C1 | default | medium | |
 | C7 | `vault-props-verbs` | C1 | default | medium | Beside C2, as the preplan allows. |
 | C3 | `delbox-tombstones` | C2 + C7 restacked | opus | high | *Orchestrator:* C3 and C7 both rewrite every adapter and the battery, so C3 waits for C7 in the line rather than conflicting at the restack. Proposes `delIfIncoherent`'s fate. Writes the line under each `del` doc block that a tombstone stands (thread 0's row, ruled). |
-| C4 | `getbox` | C2 + C7 line | default | medium | Beside C3. Writes `getBox`/`openBox` nesting first. *Orchestrator:* removes the vault's own `useBox(boxlabel, callback)` (ruled). |
+| C4 | `getbox` | C2 + C7 line | default | medium | Beside C3. Writes `getBox`/`openBox` nesting first. *Orchestrator:* removes the vault's own `useBox(boxlabel, callback)` (ruled); renames the private `#openBox(boxlabel)`, which reads storage and asks, unlike the public `openBox(box)` (B3 review). |
 | C5 | `lock-close-del` | C3 + C4 restacked | opus | medium | Rewrites the Contract's first guess; files the rewrite as an *Open Matters* row. |
 | C6 | `subscriptions` | C5 | default | medium | |
 
