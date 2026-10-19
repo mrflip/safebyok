@@ -1,7 +1,7 @@
 # Thread a_fixes: phase A's fix-ups (2026-10-19)
 
 Branch `20261019-a_fixes`, [PR #204](https://github.com/mrflip/safebyok/pull/204), stacked on
-[#202](https://github.com/mrflip/safebyok/pull/202) (`20261019-box`). Justify: green; core 2554
+[#202](https://github.com/mrflip/safebyok/pull/202) (`20261019-box`). Justify: green; core 2560
 (35 skipped), react 263, graphql 276 (14), demo 215 (16), 0 failed.
 
 * **Built**:
@@ -20,8 +20,10 @@ Branch `20261019-a_fixes`, [PR #204](https://github.com/mrflip/safebyok/pull/204
      `safebyok/testing`).
   5. **Check before prompting.** `#ensureLease(renewMillis, beforeAsking?)`: `beforeAsking` runs
      after the hello, only when the vault must ask. `#openBox` (getBox, getWhisper, useBox) and
-     `#tryDelBox` pass `#checkListed(label)`: the floor first, then `#nothingUnder` (`bad_label`
-     by the host's check, else `absent_box`) when the listing in hand shows nothing.
+     `#tryDelBox` pass `#checkListed(label)`: the floor first; when the listing in hand shows
+     nothing under the name, one `#refresh()`, then `#nothingUnder` (`bad_label` by the host's
+     check, else `absent_box`) if storage shows nothing either. `beforeAsking` is async, and
+     `#ensureLease` reads why it asks again after it.
   6. **Tests**: an `ensureLease` row in `TwinCases`; the write-proof test loops over
      `Object.keys(vault.snapshot)` plus the handle-only fields; `created_elsewhere` and
      `damaged_wayin` through `ask.attempt` (`spoilSecondWayin` moved to `tests/vault/world.ts`);
@@ -42,9 +44,10 @@ Branch `20261019-a_fixes`, [PR #204](https://github.com/mrflip/safebyok/pull/204
     anyway: it means "a VaultError constructor made this", as `instanceof` did, across copies.
     `Symbol.for`'s key is now a contract between versions.
   * **The listing only spares a prompt.** The check runs only when the vault would ask; an
-    unlocked vault reads storage for the box as before, so a stale listing never refuses a box an
-    unlocked vault could read. Locked, a listing up to `staleMinutes` old may say `absent_box` for
-    a box another device just made; the next hello lists it.
+    unlocked vault reads storage for the box as before. Locked, a listing miss reads storage once
+    before refusing (the review's finding: with a store that pushes nothing, the listing lags up to
+    `staleMinutes`, and a box another device stored read `absent_box` until `ensureLease()`). One
+    read, only on the refusal path; a box in the listing costs nothing.
   * **A vault never made** refuses `absent_box` from `getBox`/`delBox` with no prompt (before, it
     asked `absent`, to create a vault, then refused `absent_box`).
   * **`vault_locked` tests now provoke it with `ensureLease()`** where they used `getBox` on an
@@ -62,6 +65,12 @@ Branch `20261019-a_fixes`, [PR #204](https://github.com/mrflip/safebyok/pull/204
   `hostThrewRefusal`.
 * **Discoveries**:
   * `tryOpenBox` (B3) has no row in `TwinCases` either.
+  * The conformance battery (`vault-db-conformance.ts`) and `racing.ts` told a refusal by its name
+    or `instanceof`; both use `isVaultError` now (review). `raceOutcomeOf`'s test imports it from
+    `tests/test-helpers/racing` directly, as it is not in the door.
+  * Through `graphqlVaultDB` and `convexVaultDB`, safebyok's own server code still chooses a
+    refusal's kind and message: those clients rebuild a real `VaultError` on purpose (changeset and
+    security note say so).
   * `TH.expectRefusal`/`expectBad` refuse a foreign VaultError on purpose (`instanceOf`); a test of
     one reads the Outcome by hand.
 * **For the Coach**:
@@ -72,8 +81,9 @@ Branch `20261019-a_fixes`, [PR #204](https://github.com/mrflip/safebyok/pull/204
     `damaged_box`. Recommend: leave it, since the listing's damage is a verdict on the record, and
     "will not open" needs the key.
 * **Test counts** (vitest JSON; total includes skipped), base `6953b2c8` to tip: core 2524 (35)
-  to 2554 (35): `errors` 59 to 72, `outcome` 17 to 18, `refusal-policy` 21 to 24, `vault-db`
-  296 (17) to 297 (17), `vault/vault-lease` 130 to 138, `vault/vault-storage` 74 to 76,
+  to 2560 (35): `errors` 59 to 72, `outcome` 17 to 18, `refusal-policy` 21 to 24, `vault-db`
+  296 (17) to 297 (17), `test-helpers` 375 (18) to 378 (18) (two of them the reviewer's),
+  `vault/vault-lease` 130 to 141, `vault/vault-storage` 74 to 76,
   `vault/vault-twins` 38 to 40. Graphql 275 (14) to 276 (14): `vault-resolvers` 21 to 22. React
   263, demo 215 (16), convex 280 (8), indexeddb 154 (10), postgres 281 (14), fastkey 49: unchanged.
 * **Looked up**: nothing in the plan or progress doc beyond this thread's name (`a-fixes`, line 12)
