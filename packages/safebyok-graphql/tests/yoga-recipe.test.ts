@@ -111,7 +111,7 @@ describe("the README Yoga recipe", () => {
     const route = await routeOver()
     const elsewhere = browserFor(route, 'u1')
     const { heard, unsubscribe } = await TH.liveWatch(browserFor(route, 'u1'), TH.scopeOf('u1'))
-    await elsewhere.ensureVaultProps(TH.vaultPropsOf('u1'))
+    await TH.expectingGood(elsewhere).ensureVaultProps(TH.vaultPropsOf('u1'))
     await TH.eventually(() => heard.count > 0)
     unsubscribe()
     expect(heard.count).to.eq(1)

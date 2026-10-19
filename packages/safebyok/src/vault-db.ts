@@ -7,6 +7,7 @@ import { AnyTextValidators, NameFloor } from './validators'
 import * as Refusals from './refusals'
 import { asError, parseLogger, type VaultLogger } from './logger'
 import { reportToPlatform } from './report-error'
+import { type Outcome, outcomeOf } from './outcome'
 
 // == [Expectations and records]: VaultPropsExpectation, BoxExpectation, VaultDelExpectation, BoxDelExpectation, BoxDeletion, StoredBox
 
@@ -156,8 +157,9 @@ export type VaultDBOpts = {
  * The public verbs -- `getVaultProps`, `putBox` and the rest -- wrap your `do*` methods with the
  * checks every adapter owes: names, scope, records and expectations on the way in, the shape of
  * every record on the way out, `stale_write` for a failed expectation, and `storage_unavailable`
- * (your own error as its `cause`) for anything you throw that is not already a VaultError. They
- * also own what every adapter would otherwise write again: `subscribe` calls each listener so
+ * (your own error as its `cause`) for anything you throw that is not already a VaultError. Each
+ * resolves an {@link Outcome} and never rejects: its answer as `val`, or every refusal -- the
+ * base's own, and whatever your `do*` method throws -- as `err`, a VaultError. They also own what every adapter would otherwise write again: `subscribe` calls each listener so
  * that nothing it throws reaches your code, and its unsubscribe runs once; and `listBoxRecords`
  * lists a vault as stored, for a server to serve. Implement the `do*` methods, and hand `super()`
  * the host's {@link VaultDBOpts}; never override the public verbs, but for
@@ -263,11 +265,13 @@ export abstract class VaultDB {
    * written -- a `format`, wayinkind or number of wayins this version does not know -- as
    * `newer_format`.
    */
-  async getVaultProps(scope: VaultScope): Promise<VaultProps | null> {
-    const asked = heldScope(this, scope)
-    const raw = await fromStorage(() => this.doGetVaultProps(asked))
-    if (raw === null || raw === undefined) { return null }
-    return checkVaultProps(raw, asked)
+  getVaultProps(scope: VaultScope): Promise<Outcome<VaultProps | null>> {
+    return outcomeOf(async () => {
+      const asked = heldScope(this, scope)
+      const raw = await this.doGetVaultProps(asked)
+      if (raw === null || raw === undefined) { return null }
+      return checkVaultProps(raw, asked)
+    })
   }
 
   /**
@@ -280,11 +284,13 @@ export abstract class VaultDB {
    * the floor included -- are refused with kind `bad_record`, before storage sees them; a name in
    * them the floor admits but longer than the backend holds, with kind `bad_label`.
    */
-  async ensureVaultProps(vaultProps: VaultProps): Promise<VaultProps> {
-    const outgoing = checkOutgoing(VaultProps, vaultProps, 'vault props record')
-    const asked = heldScope(this, outgoing)
-    const raw = await fromStorage(() => this.doEnsureVaultProps(outgoing))
-    return checkVaultProps(raw, asked)
+  ensureVaultProps(vaultProps: VaultProps): Promise<Outcome<VaultProps>> {
+    return outcomeOf(async () => {
+      const outgoing = checkOutgoing(VaultProps, vaultProps, 'vault props record')
+      const asked = heldScope(this, outgoing)
+      const raw = await this.doEnsureVaultProps(outgoing)
+      return checkVaultProps(raw, asked)
+    })
   }
 
   /**
@@ -295,27 +301,31 @@ export abstract class VaultDB {
    * `ensureVaultProps` refuses them. A vault's `vault_id` never changes, so `vaultProps` must
    * carry the one in `expected`: kind 'bad_record' otherwise.
    */
-  async putVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<void> {
-    const outgoing = checkOutgoing(VaultProps, vaultProps, 'vault props record')
-    heldScope(this, outgoing)
-    const expectation = checkOutgoing(VaultPropsExpectation, expected, 'vault props expectation')
-    if (outgoing.vault_id !== expectation.vault_id) {
-      throw new VaultError('bad_record', "putVaultProps replaces a vault's props within that vault: the vault props' vault_id must be the expected one, as a vault_id never changes.")
-    }
-    const landed = await fromStorage(() => this.doPutVaultProps(outgoing, expectation))
-    if (! landed) { throw Refusals.staleWrite('vaultProps') }
+  putVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<Outcome<void>> {
+    return outcomeOf(async () => {
+      const outgoing = checkOutgoing(VaultProps, vaultProps, 'vault props record')
+      heldScope(this, outgoing)
+      const expectation = checkOutgoing(VaultPropsExpectation, expected, 'vault props expectation')
+      if (outgoing.vault_id !== expectation.vault_id) {
+        throw new VaultError('bad_record', "putVaultProps replaces a vault's props within that vault: the vault props' vault_id must be the expected one, as a vault_id never changes.")
+      }
+      const landed = await this.doPutVaultProps(outgoing, expectation)
+      if (! landed) { throw Refusals.staleWrite('vaultProps') }
+    })
   }
   // --
 
   // == [Box verbs]: getBox, listBoxes, listBoxRecords, putBox
 
   /** One box, validated, or null when there is none under that boxlabel. */
-  async getBox(scope: VaultScope, boxlabel: string): Promise<Box | null> {
-    const asked = heldScope(this, scope)
-    const label = heldBoxlabel(this, boxlabel)
-    const raw = await fromStorage(() => this.doGetBox(asked, label))
-    if (raw === null || raw === undefined) { return null }
-    return checkStoredBox(raw, label)
+  getBox(scope: VaultScope, boxlabel: string): Promise<Outcome<Box | null>> {
+    return outcomeOf(async () => {
+      const asked = heldScope(this, scope)
+      const label = heldBoxlabel(this, boxlabel)
+      const raw = await this.doGetBox(asked, label)
+      if (raw === null || raw === undefined) { return null }
+      return checkStoredBox(raw, label)
+    })
   }
 
   /**
@@ -326,13 +336,15 @@ export abstract class VaultDB {
    * {@link DamagedBox} rather than refused, so one bad record never hides the rest. A row
    * stored under a name below the floor, which no verb could reach, is not listed at all.
    */
-  async listBoxes(scope: VaultScope): Promise<(BoxSummary | DamagedBox)[]> {
-    const asked = heldScope(this, scope)
-    const stored = await fromStorage(() => this.doListBoxes(asked))
-    return stored
-      .filter((entry) => isNameable(entry))
-      .map((entry) => listedOrDamaged(entry))
-      .toSorted((one, two) => byCodeUnit(one.boxlabel, two.boxlabel))
+  listBoxes(scope: VaultScope): Promise<Outcome<(BoxSummary | DamagedBox)[]>> {
+    return outcomeOf(async () => {
+      const asked = heldScope(this, scope)
+      const stored = await this.doListBoxes(asked)
+      return stored
+        .filter((entry) => isNameable(entry))
+        .map((entry) => listedOrDamaged(entry))
+        .toSorted((one, two) => byCodeUnit(one.boxlabel, two.boxlabel))
+    })
   }
 
   /**
@@ -345,14 +357,18 @@ export abstract class VaultDB {
    * query may override it.
    *
    * @example
-   *   const resolvers = { safebyokListBoxes: (_parent, { scope }, ctx) => vaultDBFor(ctx).listBoxRecords(scope) }
+   *   const { ok, val, err } = await vaultDB.listBoxRecords(scope)
+   *   if (! ok) { throw err }
+   *   return val
    */
-  async listBoxRecords(scope: VaultScope): Promise<unknown[]> {
-    const asked = heldScope(this, scope)
-    const stored = await fromStorage(() => this.doListBoxes(asked))
-    return stored
-      .filter((entry) => isNameable(entry))
-      .map(({ box }) => withoutCiphered(box))
+  listBoxRecords(scope: VaultScope): Promise<Outcome<unknown[]>> {
+    return outcomeOf(async () => {
+      const asked = heldScope(this, scope)
+      const stored = await this.doListBoxes(asked)
+      return stored
+        .filter((entry) => isNameable(entry))
+        .map(({ box }) => withoutCiphered(box))
+    })
   }
 
   /**
@@ -373,21 +389,23 @@ export abstract class VaultDB {
    * keeps its contract. One that fails that check is refused as `corrupt_record`, though the write
    * may have landed: the adapter wrote something it cannot read back.
    */
-  async putBox(scope: VaultScope, box: Box, expected: BoxExpectation): Promise<Box> {
-    const asked = heldScope(this, scope)
-    const outgoing = checkOutgoing(Box, box, 'box')
-    heldBoxlabel(this, outgoing.boxlabel)
-    const expectation = checkOutgoing(BoxExpectation, expected, 'box expectation')
-    if (outgoing.vault_key_epoch !== expectation.vault_key_epoch) {
-      throw new VaultError('bad_record', "putBox writes a box under the vaultKey it was sealed with: the box's vault_key_epoch must be the expected one.")
-    }
-    const recordBytes = jsonBytes({ ...asked, ...outgoing })
-    if (recordBytes > this.maxRecordBytes) {
-      throw new VaultError('box_too_large', `That box weighs ${String(recordBytes)} bytes, over the ${String(this.maxRecordBytes)} its storage holds in one record, so nothing was written: store a smaller whisper or sidecar, or under a shorter boxlabel.`)
-    }
-    const stored = await fromStorage(() => this.doPutBox(asked, outgoing, expectation))
-    if (stored === null) { throw Refusals.staleWrite('box') }
-    return writtenBack('a box write', () => checkStoredBox(stored, outgoing.boxlabel))
+  putBox(scope: VaultScope, box: Box, expected: BoxExpectation): Promise<Outcome<Box>> {
+    return outcomeOf(async () => {
+      const asked = heldScope(this, scope)
+      const outgoing = checkOutgoing(Box, box, 'box')
+      heldBoxlabel(this, outgoing.boxlabel)
+      const expectation = checkOutgoing(BoxExpectation, expected, 'box expectation')
+      if (outgoing.vault_key_epoch !== expectation.vault_key_epoch) {
+        throw new VaultError('bad_record', "putBox writes a box under the vaultKey it was sealed with: the box's vault_key_epoch must be the expected one.")
+      }
+      const recordBytes = jsonBytes({ ...asked, ...outgoing })
+      if (recordBytes > this.maxRecordBytes) {
+        throw new VaultError('box_too_large', `That box weighs ${String(recordBytes)} bytes, over the ${String(this.maxRecordBytes)} its storage holds in one record, so nothing was written: store a smaller whisper or sidecar, or under a shorter boxlabel.`)
+      }
+      const stored = await this.doPutBox(asked, outgoing, expectation)
+      if (stored === null) { throw Refusals.staleWrite('box') }
+      return writtenBack('a box write', () => checkStoredBox(stored, outgoing.boxlabel))
+    })
   }
   // --
 
@@ -407,15 +425,18 @@ export abstract class VaultDB {
    * it removed is refused with kind `stale_write`.
    *
    * @example
-   *   const { outcome } = await vaultDB.delBox(scope, 'anthropic', { vault_id: vaultProps.vault_id, revision_tok: listed.revision_tok })
+   *   const { ok, val, err } = await vaultDB.delBox(scope, 'anthropic', { vault_id: vaultProps.vault_id, revision_tok: listed.revision_tok })
+   *   if (ok && val.outcome === 'deleted_other') { await refresh() }
    */
-  async delBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<BoxDeletion> {
-    const asked = heldScope(this, scope)
-    const label = heldBoxlabel(this, boxlabel)
-    const expectation = checkOutgoing(BoxDelExpectation, expected, 'delete expectation', 'removed')
-    const deletion = await fromStorage(() => this.doDelBox(asked, label, expectation))
-    if (deletion === null) { throw Refusals.staleWrite('del') }
-    return writtenBack('a deletion', () => checkAnswer(BoxDeletion, deletion, 'a deletion'))
+  delBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<Outcome<BoxDeletion>> {
+    return outcomeOf(async () => {
+      const asked = heldScope(this, scope)
+      const label = heldBoxlabel(this, boxlabel)
+      const expectation = checkOutgoing(BoxDelExpectation, expected, 'delete expectation', 'removed')
+      const deletion = await this.doDelBox(asked, label, expectation)
+      if (deletion === null) { throw Refusals.staleWrite('del') }
+      return writtenBack('a deletion', () => checkAnswer(BoxDeletion, deletion, 'a deletion'))
+    })
   }
 
   /**
@@ -424,11 +445,13 @@ export abstract class VaultDB {
    * otherwise -- including when the scope holds no vault props -- and removes nothing. An
    * `expected` this package would not build is refused with kind `bad_record`, removing nothing.
    */
-  async delVault(scope: VaultScope, expected: VaultDelExpectation): Promise<void> {
-    const asked = heldScope(this, scope)
-    const expectation = checkOutgoing(VaultDelExpectation, expected, 'delete expectation', 'removed')
-    const landed = await fromStorage(() => this.doDelVault(asked, expectation))
-    if (! landed) { throw Refusals.staleWrite('del') }
+  delVault(scope: VaultScope, expected: VaultDelExpectation): Promise<Outcome<void>> {
+    return outcomeOf(async () => {
+      const asked = heldScope(this, scope)
+      const expectation = checkOutgoing(VaultDelExpectation, expected, 'delete expectation', 'removed')
+      const landed = await this.doDelVault(asked, expectation)
+      if (! landed) { throw Refusals.staleWrite('del') }
+    })
   }
 
   /**
@@ -453,18 +476,20 @@ export abstract class VaultDB {
    * record, and so could not name the vault. So does a backend whose server validates what it
    * reads, as `safebyok-graphql`'s: there a damaged record is the backend's own to clear.
    */
-  async delDamagedVault(scope: VaultScope): Promise<void> {
-    const asked = heldScope(this, scope)
-    const raw = await readStoredVaultProps(() => this.doGetVaultProps(asked))
-    if (raw === null || raw === undefined) { return }
-    if (mayBeNewer(raw)) { throw newerVaultProps() }
-    if (isSoundVaultProps(raw, asked)) {
-      throw new VaultError('bad_option', "That vault's stored props are sound, so it is not deleted here: a vault that opens is deleted through its handle's del(). Only a vault whose hello() refuses it as damaged_vault is deleted this way.")
-    }
-    const named = StoredVaultId.safeParse(raw)
-    if (! named.success) { throw unnamedVaultProps() }
-    const landed = await fromStorage(() => this.doDelVault(asked, { vault_id: named.data.vault_id }))
-    if (! landed) { throw Refusals.staleWrite('del') }
+  delDamagedVault(scope: VaultScope): Promise<Outcome<void>> {
+    return outcomeOf(async () => {
+      const asked = heldScope(this, scope)
+      const raw = await readStoredVaultProps(() => this.doGetVaultProps(asked))
+      if (raw === null || raw === undefined) { return }
+      if (mayBeNewer(raw)) { throw newerVaultProps() }
+      if (isSoundVaultProps(raw, asked)) {
+        throw new VaultError('bad_option', "That vault's stored props are sound, so it is not deleted here: a vault that opens is deleted through its handle's del(). Only a vault whose hello() refuses it as damaged_vault is deleted this way.")
+      }
+      const named = StoredVaultId.safeParse(raw)
+      if (! named.success) { throw unnamedVaultProps() }
+      const landed = await this.doDelVault(asked, { vault_id: named.data.vault_id })
+      if (! landed) { throw Refusals.staleWrite('del') }
+    })
   }
   // --
 
@@ -732,20 +757,7 @@ const heldName = (facts: NameFacts, said: string, part: string): string => {
 }
 // --
 
-// == [Storage and listener guards]: fromStorage, asStorageTrouble, checkListener, checked, checkOutgoing
-
-/**
- * The adapter's half of a verb, with anything it throws that is not already a VaultError turned
- * into a calm one: a caller branches on `kind`, whatever the backend. The adapter's own error
- * rides along as `cause`, for debugging; adapters hold only ciphertext and unencrypted fields.
- */
-const fromStorage = async <ValT>(attempt: () => Promise<ValT>): Promise<ValT> => {
-  try {
-    return await attempt()
-  } catch (err) {
-    throw asStorageTrouble(err)
-  }
-}
+// == [Storage and listener guards]: asStorageTrouble, checkListener, checked, checkOutgoing
 
 /** What an adapter threw, as a VaultError: its own VaultError untouched, anything else wrapped. */
 const asStorageTrouble = (err: unknown): VaultError => (err instanceof VaultError ? err : Refusals.storageUnavailable(err))
@@ -830,7 +842,7 @@ const mayBeNewer = (raw: unknown): boolean => {
  */
 const readStoredVaultProps = async (reading: () => Promise<unknown>): Promise<unknown> => {
   try {
-    return await fromStorage(reading)
+    return await reading()
   } catch (err) {
     if (isVaultError(err, 'corrupt_record')) { throw unnamedVaultProps({ cause: err }) }
     throw err

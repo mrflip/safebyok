@@ -3,6 +3,7 @@ import { MinuteMillis } from '../../src/types'
 import { VaultError } from '../../src/errors'
 import { memoryDeviceDB } from '../../src/device-db'
 import { localVaultDB } from '../../src/local-vault-db'
+import { bad, good } from '../../src/outcome'
 import * as TH from '../test-helpers'
 import { makeRacingWorld, makeWorld, boxlabelsOf, storedWayinsOf, storedVaultPropsOf, storedRowOf, u1BoxCkey, u1VaultPropsCkey } from './world'
 
@@ -211,7 +212,7 @@ describe("a first unlock that loses the race to create the vault", () => {
 
   it("is still created_elsewhere when the catch-up after it fails, the snapshot saying it is not syncing, and the failure warned of", async () => {
     const { world, deafDB, there } = await raceLostToPwOne()
-    vi.spyOn(deafDB, 'listBoxes').mockRejectedValueOnce(new VaultError('storage_unavailable', 'The vault storage could not be reached.'))
+    vi.spyOn(deafDB, 'listBoxes').mockResolvedValueOnce(bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
     await TH.expectRefusal(there.unlock('pw two'), 'created_elsewhere')
     expect(there.getSnapshot().state).to.eq('locked')
     expect(there.getSnapshot().syncing).to.be.false
@@ -444,7 +445,7 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
     const row = storedRowOf(world, 'anthropic')
     world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...row, revision_tok: 'tampered' }))
     const down = new VaultError('storage_unavailable', 'The vault storage could not be reached.')
-    vi.spyOn(deafDB, 'getVaultProps').mockRejectedValueOnce(down)
+    vi.spyOn(deafDB, 'getVaultProps').mockResolvedValueOnce(bad(down))
     expect(await TH.expectRefusal(vault.getBox('anthropic'), 'storage_unavailable')).to.eq(down)
     expect(vault.getSnapshot().syncing).to.be.false
     await TH.expectRefusal(vault.getBox('anthropic'), 'damaged_box')
@@ -676,7 +677,7 @@ describe("versioned updates: two devices writing at once", () => {
     const { world, hereDB, here, there } = await twoDeviceWorld()
     await here.putBox('anthropic', 'sk-ant-fake-one')
     // A listing gone stale: storage holds a damaged record the snapshot does not show.
-    const listBoxes = vi.spyOn(hereDB, 'listBoxes').mockResolvedValue([])
+    const listBoxes = vi.spyOn(hereDB, 'listBoxes').mockResolvedValue(good([]))
     world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), written_at: 'later' }))
     await vi.waitFor(() => { expect(here.getSnapshot().boxes).to.have.lengthOf(0) })
     listBoxes.mockRestore()
@@ -716,7 +717,7 @@ describe("versioned updates: two devices writing at once", () => {
     const down = new VaultError('storage_unavailable', 'The vault storage could not be reached.')
     beforeNextWrite('putBox', async () => {
       await there.putBox('anthropic', 'sk-ant-fake-theirs')
-      vi.spyOn(hereDB, 'getVaultProps').mockRejectedValue(down)
+      vi.spyOn(hereDB, 'getVaultProps').mockResolvedValue(bad(down))
     })
     const putBox = vi.spyOn(hereDB, 'putBox')
     const err = await TH.expectRefusal(here.putBox('anthropic', 'sk-ant-fake-mine'), 'stale_write')
@@ -743,7 +744,7 @@ describe("versioned updates: two devices writing at once", () => {
       await here.putBox('anthropic', 'sk-ant-fake-one')
       beforeNextWrite('putBox', async () => {
         await there.putBox('anthropic', 'sk-ant-fake-theirs')
-        vi.spyOn(hereDB, 'getVaultProps').mockRejectedValue(refusal)
+        vi.spyOn(hereDB, 'getVaultProps').mockResolvedValue(bad(refusal))
       })
       const putBox = vi.spyOn(hereDB, 'putBox')
       const err = await TH.expectRefusal(here.putBox('anthropic', 'sk-ant-fake-mine'), refusal.refusalkind)
@@ -755,7 +756,7 @@ describe("versioned updates: two devices writing at once", () => {
 
     it(`a deletion whose catch-up is refused as ${refusal.refusalkind} throws that refusal as it came, never as stale`, async () => {
       const { hereDB, here } = await rebornUnheard()
-      vi.spyOn(hereDB, 'getVaultProps').mockRejectedValue(refusal)
+      vi.spyOn(hereDB, 'getVaultProps').mockResolvedValue(bad(refusal))
       const err = await TH.expectRefusal(here.delBox('anthropic'), refusal.refusalkind)
       expect(err).to.eq(refusal)
     })
@@ -786,7 +787,7 @@ describe("versioned updates: two devices writing at once", () => {
   it("a deletion whose catch-up fails says so, the failure its cause, rather than that the vault is gone", async () => {
     const { hereDB, here } = await rebornUnheard()
     const down = new VaultError('storage_unavailable', 'The vault storage could not be reached.')
-    vi.spyOn(hereDB, 'getVaultProps').mockRejectedValue(down)
+    vi.spyOn(hereDB, 'getVaultProps').mockResolvedValue(bad(down))
     const err = await TH.expectRefusal(here.delBox('anthropic'), 'stale_write')
     expect(err.cause).to.eq(down)
     expect(err.message).to.include('Catching up with storage afterwards failed too')

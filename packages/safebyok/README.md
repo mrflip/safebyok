@@ -677,12 +677,14 @@ user sets a new passphrase.
 ## Errors
 
 Every vault call that refuses throws a `VaultError` (`isVaultError(err, refusalkind?)` tests for one),
-with a calm message and a `refusalkind` to branch on. The kinds are `VaultErrorKindVals`, and the
+with a calm message, a `refusalkind` to branch on, and the `family` it belongs to. A `VaultDB` verb
+throws nothing: it resolves an `Outcome`, `{ ok: true, val }` or `{ ok: false, err }`, its `err`
+that same `VaultError`; `outcomeOf(thunk)` makes one of any body that throws. The kinds are `RefusalKindVals`, and the
 whole list: the storage adapters (`safebyok-indexeddb`, `safebyok-convex`, `safebyok-postgres`,
 `safebyok-graphql`, your own) throw these same kinds, and no package has others. An error never
 carries a whisper, a passphrase or any other secret, in its message or as a property.
 
-The kinds fall into two families, told apart by who must act.
+The kinds fall into three families, told apart by who handles them.
 
 ### Misuse: fix the code
 
@@ -721,20 +723,28 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `too_many_wayins`     | a passphrase or passkey added to a vault already holding `MaxUnlocks` (8) ways in | Tell the user to remove one first             |
 | `last_wayin`          | removing the vault's last passphrase: a vault always keeps one, since a passkey can be lost with its device | Add another passphrase first; to be rid of the vault, `del()` it |
 | `corrupt_record`      | a stored record failed validation as storage read it back: storage's own word, from a `VaultDB` called directly. A vault call says what it means for the vault instead, as one of the three below -- but for a `putBox()` whose storage adapter answered its write with a record that fails its checks, or a `delBox()` whose adapter answered in a shape this package does not know: a bug in that adapter | Nothing was changed, unless a write was answered so: then it may have landed. Do not retry; see a developer: the record is damaged, was moved, or came from a newer safebyok, or the adapter cannot read back what it writes or reports |
+| `stale_write`         | storage changed since this device read it, so the write was refused and nothing was written: another device or tab wrote, created or deleted the box a `putBox()` was writing; a `delBox()` into a vault deleted or made anew elsewhere, its message saying the box could not be removed because its vault is gone; and a write whose catch-up with storage then failed too (its `cause` says why; the snapshot reads `syncing: false`) -- unless the catch-up was refused as `identity_revoked`, `rolled_back` or `newer_format`, which the write throws as it came | The vault has caught up: show what stands now and, if the change still applies, repeat it (*Two devices storing at once*, below). Nothing is tried again by itself |
+| `not_permitted`       | the storage backend refused the signed-in user, still the vault's own, this one call | Tell the user they may not; signing in again will not help |
+| `storage_unavailable` | the storage backend could not be reached, or failed; or this device's own store failed for a reason that may pass; or `zxcvbnPassphraseTest`'s word list could not be fetched | Try again shortly; the adapter's own error is the `cause`, unless it may quote the call (Convex's) |
+| `storage_blocked`     | this device's own store (its device store, or a vault kept on the device, as `safebyok-indexeddb`'s) refused for a reason that holds until something outside the app changes: the browser withholds storage from the page (site data blocked, a sandboxed frame), has no room for it (a quota of zero, as some private windows give, or a full disk), or offers no IndexedDB at all | Do not offer a retry: tell the user this browser is keeping the app from storing anything on this device. The app may open the vault again with `memoryDeviceDB()`, which keeps no lease here; the browser's own error is the `cause` |
+
+### Bad news: tell the user
+
+Something the app is told whether or not the call was refused: storage found damaged, a copy older
+than this device has seen, a user signed out. Each may reach the user; none is the code's to fix.
+
+| Kind                  | What happened                                                    | What to do                                              |
+| --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |
 | `damaged_vault`       | the vault's stored props failed their checks (not a shape this package writes, or naming another vault), so no way in can be tried: `hello()` refuses it | Nothing was changed, and a retry will not mend it. Tell the user the vault cannot be opened; restore its props from a backup, if there is one, or, if the user chooses to start over, `delDamagedVault()` (see *A vault that cannot be opened*) |
 | `damaged_wayin`       | a way in is stored in a form this package never writes (a salt of the wrong length, or not base64url), so it cannot be tried: the passkey asked for, the passphrase `wayinId` aims at, or every passphrase the vault has. Other ways in are still tried | Unlock another way, then `delWayin()` the damaged one and add it again |
 | `damaged_box`     | a box failed its checks as read, or would not open under the vault's own vaultKey, or opened to no whisper: altered in storage, or moved there from elsewhere. A `putBox()` refuses so a box listed damaged that names no revision, damaged beyond naming, writing nothing. A box that will not open is named so only after the vault has caught up with storage once: one a vault made anew elsewhere wrote makes the call `vault_locked` instead | Nothing was changed. Offer `delBox()`, or a fresh `putBox()` over it while it names a revision (see *Damaged boxes*) |
 | `newer_format`        | the vault's stored props are in a form this version does not know -- a `format`, wayinkind or number of wayins -- which a newer safebyok may have written: `hello()` and `delDamagedVault` refuse it | Nothing was changed. Tell the user to update the app; never offer to start over |
-| `stale_write`         | storage changed since this device read it, so the write was refused and nothing was written: another device or tab wrote, created or deleted the box a `putBox()` was writing; a `delBox()` into a vault deleted or made anew elsewhere, its message saying the box could not be removed because its vault is gone; and a write whose catch-up with storage then failed too (its `cause` says why; the snapshot reads `syncing: false`) -- unless the catch-up was refused as `identity_revoked`, `rolled_back` or `newer_format`, which the write throws as it came | The vault has caught up: show what stands now and, if the change still applies, repeat it (*Two devices storing at once*, below). Nothing is tried again by itself |
 | `rolled_back`         | this device has already seen a newer copy of the vault props than storage offers now (storage restored from a backup, or altered), so it won't use this one, and the vault locked: nothing was unlocked or written | Tell the user this device has seen a newer copy of the vault than storage holds. If the storage was restored from an older copy on purpose, accept it on this device (see *A vault rolled back*, below); otherwise the app's support should look at its storage |
-| `not_permitted`       | the storage backend refused the signed-in user, still the vault's own, this one call | Tell the user they may not; signing in again will not help |
 | `identity_revoked`    | the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in. The vault has locked itself (see *When the user signs out*) | Have the user sign in again, then open the vault for whoever that is |
-| `storage_unavailable` | the storage backend could not be reached, or failed; or this device's own store failed for a reason that may pass; or `zxcvbnPassphraseTest`'s word list could not be fetched | Try again shortly; the adapter's own error is the `cause`, unless it may quote the call (Convex's) |
-| `storage_blocked`     | this device's own store (its device store, or a vault kept on the device, as `safebyok-indexeddb`'s) refused for a reason that holds until something outside the app changes: the browser withholds storage from the page (site data blocked, a sandboxed frame), has no room for it (a quota of zero, as some private windows give, or a full disk), or offers no IndexedDB at all | Do not offer a retry: tell the user this browser is keeping the app from storing anything on this device. The app may open the vault again with `memoryDeviceDB()`, which keeps no lease here; the browser's own error is the `cause` |
 
 `Vault.make` itself throws `bad_option`, `bad_label` or `insecure_context`, at once. Its `hello()`,
 as it reads the vault from storage, can refuse with `storage_unavailable`, `not_permitted`,
-`identity_revoked` or `damaged_vault` (a damaged box never stops it): conditions, which the
+`identity_revoked` or `damaged_vault` (a damaged box never stops it): conditions and bad news, which the
 snapshot keeps as its `trouble`, the vault still `opening`. So is `storage_blocked`, from this
 device's own store or a vault store on it, which saying hello again will not mend. A refused hello
 leaves the handle as it was, its storage watch live, so the host calls `hello()` again, or simply
@@ -891,6 +901,6 @@ one it showed was deleted, naming neither: the other device's whisper is gone, a
 says so. When the box the vault showed was a damaged one, the warning says that, and its story
 carries `damaged: true` beside `call`, so a host can branch on it.
 
-In code, `VaultErrorFamilyForKind` gives each kind's family (`VaultErrorFamilyVals`: `misuse`,
-`condition`), and `isVaultCondition(err)` is true for a `VaultError` of the condition family:
-show or retry those, and let anything else reach an error boundary.
+In code, `err.family` is each kind's family, as `RefusalFamilyForKind` gives it (`RefusalFamilyVals`:
+`misuse`, `condition`, `bad_news`), and `isVaultCondition(err)` is true for a `VaultError` of the
+condition or bad news family: show or retry those, and let anything else reach an error boundary.

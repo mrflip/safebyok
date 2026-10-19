@@ -1,6 +1,6 @@
 import { GraphQLError } from 'graphql'
 import { Refusals, VaultError } from 'safebyok'
-import type { VaultPropsExpectation, VaultDelExpectation, Box, BoxExpectation, BoxDelExpectation, VaultProps, VaultDB, VaultScope } from 'safebyok'
+import type { Outcome, VaultPropsExpectation, VaultDelExpectation, Box, BoxExpectation, BoxDelExpectation, VaultProps, VaultDB, VaultScope } from 'safebyok'
 import { VaultPropsFields, BoxFields, ScopeFields, recordOf } from './fields'
 
 /**
@@ -105,11 +105,16 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
       throw new VaultError('bad_option', MisconfiguredMessage, { cause: err })
     }
   }
-  /** A resolver calling `verb` on the request's VaultDB, any refusal made one a wire can carry. */
-  const served = (verb: (vaultDB: ServedVaultDB, args: VaultFieldArgs) => Promise<unknown>): VaultFieldResolver<ContextT> => (
+  /**
+   * A resolver calling `verb` on the request's VaultDB: its outcome's `val`, as `answered` hands
+   * it to the wire, or its refusal made one a wire can carry.
+   */
+  const served = (verb: (vaultDB: ServedVaultDB, args: VaultFieldArgs) => Promise<Outcome<unknown>>, answered: (val: unknown) => unknown = (val) => val): VaultFieldResolver<ContextT> => (
     async (_parent, args, context) => {
       try {
-        return await verb(vaultDBOf(context), args)
+        const { ok, val, err } = await verb(vaultDBOf(context), args)
+        if (! ok) { throw err }
+        return answered(val)
       } catch (err) {
         throw crossing(err)
       }
@@ -124,16 +129,10 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
     },
     Mutation: {
       safebyokEnsureVaultProps: served((vaultDB, args) => vaultDB.ensureVaultProps(vaultPropsIn(args))),
-      safebyokPutVaultProps: served(async (vaultDB, args) => {
-        await vaultDB.putVaultProps(vaultPropsIn(args), vaultPropsExpectationIn(args))
-        return true
-      }),
+      safebyokPutVaultProps: served((vaultDB, args) => vaultDB.putVaultProps(vaultPropsIn(args), vaultPropsExpectationIn(args)), () => true),
       safebyokPutBox: served((vaultDB, args) => vaultDB.putBox(scopeIn(args), recordOf(args.box, BoxFields) as Box, boxExpectationIn(args))),
       safebyokDelBox: served((vaultDB, args) => vaultDB.delBox(scopeIn(args), args.boxlabel as string, boxDelExpectationIn(args))),
-      safebyokDelVault: served(async (vaultDB, args) => {
-        await vaultDB.delVault(scopeIn(args), vaultDelExpectationIn(args))
-        return true
-      }),
+      safebyokDelVault: served((vaultDB, args) => vaultDB.delVault(scopeIn(args), vaultDelExpectationIn(args)), () => true),
     },
     Subscription: {
       safebyokVaultChanged: {

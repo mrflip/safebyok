@@ -3,6 +3,7 @@ import { VaultError } from '../src/errors'
 import { localVaultDB } from '../src/local-vault-db'
 import { memoryStore } from '../src/string-store'
 import * as RefusalPolicy from '../src/refusal-policy'
+import { bad, good } from '../src/outcome'
 import * as TH from './test-helpers'
 
 const signedOut = () => new VaultError('identity_revoked', 'No one is signed in, so this vault cannot be reached: sign in, then try again.')
@@ -57,7 +58,7 @@ describe("RefusalPolicy.heed", () => {
   for (const [verb, args] of VerbArgsCases) {
     it(`passes ${verb} every argument it is given`, async () => {
       const vaultDB = localVaultDB({ store: memoryStore() })
-      const spied = vi.spyOn(vaultDB, verb).mockResolvedValue(undefined)
+      const spied = vi.spyOn(vaultDB, verb).mockResolvedValue(good(undefined))
       const heeded = RefusalPolicy.heed(vaultDB, () => Promise.resolve())
       await (heeded[verb] as (...given: readonly unknown[]) => Promise<unknown>)(...args)
       expect(spied).toHaveBeenCalledWith(...args)
@@ -67,7 +68,7 @@ describe("RefusalPolicy.heed", () => {
   it("hands a refusal to onRefusal, waits for it, then rejects with that very refusal", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
     const refusal = signedOut()
-    vi.spyOn(vaultDB, 'getBox').mockRejectedValueOnce(refusal)
+    vi.spyOn(vaultDB, 'getBox').mockResolvedValueOnce(bad(refusal))
     const heard: string[] = []
     const heeded = RefusalPolicy.heed(vaultDB, async (given) => {
       await TH.wakeupAtNextTick()
@@ -85,20 +86,10 @@ describe("RefusalPolicy.heed", () => {
     expect(onRefusal).toHaveBeenCalledTimes(1)
   })
 
-  it("hands on nothing that is not a VaultError, and rejects with it as it came", async () => {
-    const vaultDB = localVaultDB({ store: memoryStore() })
-    const odd = new Error('not a refusal')
-    vi.spyOn(vaultDB, 'delVault').mockRejectedValueOnce(odd)
-    const onRefusal = vi.fn(() => Promise.resolve())
-    const heeded = RefusalPolicy.heed(vaultDB, onRefusal)
-    await expect(heeded.delVault(scope, TH.thisVault)).rejects.toThrow(odd)
-    expect(onRefusal).not.toHaveBeenCalled()
-  })
-
   it("rejects with the refusal even when onRefusal throws", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
     const refusal = signedOut()
-    vi.spyOn(vaultDB, 'getVaultProps').mockRejectedValueOnce(refusal)
+    vi.spyOn(vaultDB, 'getVaultProps').mockResolvedValueOnce(bad(refusal))
     const heeded = RefusalPolicy.heed(vaultDB, () => Promise.reject(new Error('the device store is broken')))
     expect(await TH.expectRefusal(heeded.getVaultProps(scope), 'identity_revoked')).to.eq(refusal)
   })

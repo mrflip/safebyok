@@ -37,7 +37,7 @@ export type LocalVaultDBOpts = VaultDBOpts & {
  *
  * @example
  *   const vaultDB = localVaultDB({ store: memoryStore() })
- *   await vaultDB.getVaultProps({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // null
+ *   await vaultDB.getVaultProps({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // { ok: true, val: null }
  * @example
  *   const vaultDB = localVaultDB({ store: domStore(localStorage, 'acme:db:'), logger })
  */

@@ -729,7 +729,7 @@ describe("VaultProvider", () => {
     const vault = await opened()
     await vault.unlock('correct horse battery staple')
     await expectShown('unlocked')
-    vi.spyOn(vaultDB, 'getBox').mockRejectedValueOnce(new VaultError('identity_revoked', 'No one is signed in: sign in, then try again.'))
+    vi.spyOn(vaultDB, 'getBox').mockResolvedValueOnce(TH.bad(new VaultError('identity_revoked', 'No one is signed in: sign in, then try again.')))
     await TH.expectRefusal(vault.getBox('anthropic_api_key'), 'identity_revoked')
     await expectShown('locked')
   })
@@ -760,7 +760,7 @@ describe("VaultProvider", () => {
     const vault = await opened()
     await vault.unlock('correct horse battery staple')
     // A change pushed from storage that the vault cannot read: its background refresh warns.
-    vi.spyOn(vaultDB, 'getVaultProps').mockRejectedValueOnce(new VaultError('storage_unavailable', 'The vault storage could not be reached.'))
+    vi.spyOn(vaultDB, 'getVaultProps').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
     store.write('elsewhere', '{}')
     await waitFor(() => { expect(spy.calls.map((heard) => heard.level)).to.deep.equal(['warn']) })
     expect(spy.calls[0]?.story).to.deep.equal({ call: 'refresh' })
@@ -783,7 +783,7 @@ describe("VaultProvider", () => {
     await waitFor(() => { expect(spy.calls.map((heard) => heard.story?.['call'])).to.include('VaultProvider') })
     const vault = await opened()
     await vault.unlock('correct horse battery staple')
-    vi.spyOn(vaultDB, 'getVaultProps').mockRejectedValueOnce(new VaultError('storage_unavailable', 'The vault storage could not be reached.'))
+    vi.spyOn(vaultDB, 'getVaultProps').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
     store.write('elsewhere', '{}')
     await waitFor(() => { expect(spy.calls).to.have.lengthOf(2) })
     expect(spy.calls.map((heard) => [heard.level, heard.story?.['call']])).to.deep.equal([['warn', 'VaultProvider'], ['warn', 'refresh']])
@@ -1024,7 +1024,7 @@ describe("VaultProvider", () => {
       it(`hands down ${blurb} as openError, in place, leaving the boundary alone`, async () => {
         const world = makeWorld()
         const condition = new VaultError(kind, 'Something the app can tell the user about.')
-        vi.spyOn(world.vaultDB, 'getVaultProps').mockRejectedValueOnce(condition)
+        vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(TH.bad(condition))
         const caught: unknown[] = []
         world.mount('u1', caught)
         await expectShown(`open error: ${kind}`)
@@ -1035,7 +1035,7 @@ describe("VaultProvider", () => {
     it("hands down the very VaultError, beside the handle still opening, whose trouble it is", async () => {
       const world = makeWorld()
       const trouble = unreachable()
-      vi.spyOn(world.vaultDB, 'getVaultProps').mockRejectedValueOnce(trouble)
+      vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(TH.bad(trouble))
       const { Grab, latest } = grabber()
       render(
         <VaultProvider {...world.props} userId="u1">
@@ -1063,7 +1063,7 @@ describe("VaultProvider", () => {
       hushConsole()
       const world = makeWorld()
       const misuse = new VaultError('bad_option', 'Something the developer must fix.')
-      vi.spyOn(world.vaultDB, 'getVaultProps').mockRejectedValueOnce(misuse)
+      vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(TH.bad(misuse))
       const caught: unknown[] = []
       world.mount('u1', caught)
       await expectShown('boundary')
@@ -1074,7 +1074,7 @@ describe("VaultProvider", () => {
       hushConsole()
       const world = makeWorld()
       const misuse = new VaultError('bad_record', 'A record the developer built wrongly.')
-      vi.spyOn(world.vaultDB, 'getVaultProps').mockRejectedValueOnce(misuse)
+      vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(TH.bad(misuse))
       const caught: unknown[] = []
       world.mount('u1', caught)
       await expectShown('boundary')
@@ -1099,7 +1099,7 @@ describe("VaultProvider", () => {
 
     it("retryOpen opens again: once storage relents, the vault opens and openError clears", async () => {
       const world = makeWorld()
-      vi.spyOn(world.vaultDB, 'getVaultProps').mockRejectedValueOnce(unreachable())
+      vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(TH.bad(unreachable()))
       world.mount('u1')
       await expectShown('open error: storage_unavailable')
       fireEvent.click(screen.getByText('Retry'))
@@ -1110,7 +1110,7 @@ describe("VaultProvider", () => {
       const world = makeWorld()
       const first = unreachable()
       const second = new VaultError('not_permitted', 'Sign in to reach this vault.')
-      vi.spyOn(world.vaultDB, 'getVaultProps').mockRejectedValueOnce(first).mockRejectedValueOnce(second)
+      vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(TH.bad(first)).mockResolvedValueOnce(TH.bad(second))
       world.mount('u1')
       await expectShown('open error: storage_unavailable')
       fireEvent.click(screen.getByText('Retry'))
@@ -1169,7 +1169,7 @@ describe("VaultProvider", () => {
       it("does nothing for an openError that is not damaged_vault", async () => {
         const world = makeWorld()
         const deleting = vi.spyOn(world.vaultDB, 'delDamagedVault')
-        vi.spyOn(world.vaultDB, 'getVaultProps').mockRejectedValueOnce(unreachable())
+        vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(TH.bad(unreachable()))
         const { Grab, latest } = grabber()
         render(<VaultProvider {...world.props} userId="u1"><Grab /><Probe /></VaultProvider>)
         await expectShown('open error: storage_unavailable')
@@ -1191,13 +1191,13 @@ describe("VaultProvider", () => {
 
       it("opens again, and still rejects, when deleting finds the vault made anew", async () => {
         const { vaultDB, props } = await damagedWorld()
-        vi.spyOn(vaultDB, 'delDamagedVault').mockRejectedValueOnce(new VaultError('stale_write', 'Storage changed.'))
+        vi.spyOn(vaultDB, 'delDamagedVault').mockResolvedValueOnce(TH.bad(new VaultError('stale_write', 'Storage changed.')))
         // The vault is made anew behind the provider's back: the reopen finds it sound.
         const reads = vi.spyOn(vaultDB, 'getVaultProps')
         const { Grab, latest } = grabber()
         render(<VaultProvider {...props} userId="u1"><Grab /><Probe /></VaultProvider>)
         await expectShown('open error: damaged_vault')
-        reads.mockResolvedValueOnce(null)
+        reads.mockResolvedValueOnce(TH.good(null))
         await act(async () => {
           await expect(latest().delDamagedVault()).rejects.toMatchObject({ refusalkind: 'stale_write' })
         })
@@ -1207,7 +1207,7 @@ describe("VaultProvider", () => {
       it("rejects misuse (bad_option) without opening again, leaving openError for retryOpen", async () => {
         const { vaultDB, props } = await damagedWorld()
         const misuse = new VaultError('bad_option', 'That vault reads sound.')
-        vi.spyOn(vaultDB, 'delDamagedVault').mockRejectedValueOnce(misuse)
+        vi.spyOn(vaultDB, 'delDamagedVault').mockResolvedValueOnce(TH.bad(misuse))
         const reads = vi.spyOn(vaultDB, 'getVaultProps')
         const { Grab, latest } = grabber()
         render(<VaultProvider {...props} userId="u1"><Grab /><Probe /></VaultProvider>)
@@ -1223,7 +1223,7 @@ describe("VaultProvider", () => {
 
       it("rejects with storage's refusal, leaving the damaged openError in place", async () => {
         const { vaultDB, props } = await damagedWorld()
-        vi.spyOn(vaultDB, 'delDamagedVault').mockRejectedValueOnce(unreachable())
+        vi.spyOn(vaultDB, 'delDamagedVault').mockResolvedValueOnce(TH.bad(unreachable()))
         const { Grab, latest } = grabber()
         render(<VaultProvider {...props} userId="u1"><Grab /><Probe /></VaultProvider>)
         await expectShown('open error: damaged_vault')
@@ -1238,7 +1238,7 @@ describe("VaultProvider", () => {
 
     it("clears openError when the user signs out", async () => {
       const world = makeWorld()
-      vi.spyOn(world.vaultDB, 'getVaultProps').mockRejectedValueOnce(unreachable())
+      vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(TH.bad(unreachable()))
       const { rerender } = world.mount('u1')
       await expectShown('open error: storage_unavailable')
       rerender(world.tree(null))
@@ -1247,7 +1247,7 @@ describe("VaultProvider", () => {
 
     it("matches openError's @example: the message and its Retry button, in place", async () => {
       const world = makeWorld()
-      vi.spyOn(world.vaultDB, 'getVaultProps').mockRejectedValueOnce(unreachable())
+      vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(TH.bad(unreachable()))
       render(
         <VaultProvider {...world.props} userId="u1">
           <OpenErrorExample />
@@ -1274,7 +1274,7 @@ describe("VaultProvider", () => {
 
     it("matches openError's @example for a damaged record: no Retry, which cannot mend it", async () => {
       const world = makeWorld()
-      vi.spyOn(world.vaultDB, 'getVaultProps').mockRejectedValue(new VaultError('corrupt_record', 'The stored vault failed its checks.'))
+      vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValue(TH.bad(new VaultError('corrupt_record', 'The stored vault failed its checks.')))
       render(
         <VaultProvider {...world.props} userId="u1">
           <OpenErrorExample />

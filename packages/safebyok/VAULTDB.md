@@ -23,7 +23,9 @@ Three layers share the work, and each guarantee below belongs to one of them.
   box deletion reports -- refuses what is malformed before your code sees it, turns a
   `false` from you (from a box write or deletion, a `null`) into `stale_write`, and turns
   anything you throw that is not a
-  `VaultError` into `storage_unavailable`, your error as its cause. It holds every name to the
+  `VaultError` into `storage_unavailable`, your error as its cause. Every verb resolves an
+  `Outcome` and never rejects: `{ ok: true, val }`, or `{ ok: false, err }` with the refusal as
+  a `VaultError`, whether the base class refused or your code threw. It holds every name to the
   floor and to what your adapter declares (*Names*, below), never to a host's own validators.
   It guards `subscribe`: each listener is called so that nothing it throws, and no promise it
   hands back that rejects, escapes -- each goes to the logger as an error -- and your unsubscribe
@@ -66,7 +68,7 @@ within its vault does (line 3.4): the vault warns through its logger, naming nei
 The base class turns anything your code throws that is not a `VaultError` into
 `storage_unavailable` -- a bug in your adapter among it, which it cannot tell from a driver's
 failure: the `cause` carries your error, and an adapter that means a kind throws a `VaultError` of
-it.
+it. Whatever your code throws reaches the caller as a bad `Outcome`'s `err`, never as a rejection.
 
 ## The baseline
 
@@ -188,7 +190,7 @@ A write that lands resolves the box as storage now holds it, field for field the
 (line 1.1), and the adapter hands it back from the same atomic step as the write: a `RETURNING`
 (Postgres), the mutation's return value (Convex, and over GraphQL its payload), a read in the
 write's transaction (IndexedDB) or synchronous turn (`localVaultDB`), never a second call. A
-refused write resolves nothing: its adapter resolves `null`, and the base class throws
+refused write resolves nothing: its adapter resolves `null`, and the base class refuses it as
 `stale_write`, carrying no record. The base class holds what comes back to the check a `getBox`
 makes, and refuses one that fails it as `corrupt_record`, saying the write may have landed: the
 adapter wrote something it cannot read back. *That refusal is proven by the base class's own
@@ -300,12 +302,13 @@ its README, what its count is as of: the start of the write's statement, say, or
 
 **5.1. Every refusal is a VaultError whose kind says what to do.** An adapter refuses with a
 `VaultError`: `stale_write` (by resolving `false`, or `null` from a box write or deletion;
-the base class throws it), `vault_full`,
+the base class refuses with it), `vault_full`,
 `identity_revoked`, `not_permitted`, or anything it throws otherwise, which becomes
 `storage_unavailable`. The base
 class refuses `bad_label`, `bad_record`, `bad_option`, `box_too_large` and `corrupt_record` itself, before
 the adapter is asked or after it answers. Each message says calmly what went wrong and what to do
-about it, and a caller branches on the kind, never the message.
+about it, and a caller branches on the kind, never the message. Every verb resolves an `Outcome`
+and never rejects: the refusal is its `err`, whoever made it.
 
 **5.2. A stale write means an expectation failed, and nothing else.** `stale_write` says the vault
 changed under the writer, and the writer should read it again. Contention is never dressed up as

@@ -20,7 +20,7 @@ describe("Sanitizer.refusalFor", () => {
   it("carries nothing of the foreign error: no cause, no property, no text of it", () => {
     const refusal = Sanitizer.refusalFor(quotingError(), 'bad_option', 'The note check threw.')
     expect(refusal.cause).to.be.undefined
-    expect(Object.getOwnPropertyNames(refusal)).to.have.members(['stack', 'message', 'name', 'refusalkind'])
+    expect(Object.getOwnPropertyNames(refusal)).to.have.members(['stack', 'message', 'name', 'refusalkind', 'family'])
     expect(TH.thrownText(refusal)).to.not.include('sk-ant-fake')
   })
 

@@ -1,17 +1,24 @@
+import type { Box } from './box'
+import type { Capacity, VaultProps } from './types'
+
 /**
- * Every way a vault call can refuse, as a caller branches on them -- and every kind any safebyok
- * package throws: the storage adapters' kinds are these same strings. Each belongs to one of two
- * families, told apart by who must act:
+ * Every way a vault call can refuse, as a caller branches on them -- and every refusalkind any
+ * safebyok package refuses with: the storage adapters' kinds are these same strings. Each belongs
+ * to one of three families, told apart by who handles it:
  *
  * - **Misuse**: a programming error, the host developer's to fix, and loud. `bad_label`,
- *   `bad_whisper`, `bad_option`, `bad_record`, `vault_closed`, `unknown_key_deriver`, `insecure_context`. Let it reach an error
- *   boundary or the dev overlay; do not show it to the user, and do not retry.
+ *   `bad_whisper`, `bad_option`, `bad_record`, `vault_closed`, `unknown_key_deriver`,
+ *   `insecure_context`. Let it reach an error boundary or the dev overlay; do not show it to the
+ *   user, and do not retry.
  * - **Condition**: something the app handles at run time, which may reach the user: ask again,
  *   show a message, retry, or tell them to free room. `vault_locked`, `wrong_passphrase`,
- *   `created_elsewhere`, `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `absent_box`, `absent_vault`, `absent_wayin`,
- *   `whisper_too_large`, `box_too_large`, `vault_full`, `too_many_wayins`, `last_wayin`,
- *   `corrupt_record`, `damaged_vault`, `damaged_wayin`, `damaged_box`, `newer_format`, `stale_write`,
- *   `rolled_back`, `not_permitted`, `identity_revoked`, `storage_unavailable`, `storage_blocked`.
+ *   `created_elsewhere`, `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `absent_box`,
+ *   `absent_vault`, `absent_wayin`, `whisper_too_large`, `box_too_large`, `vault_full`,
+ *   `too_many_wayins`, `last_wayin`, `corrupt_record`, `stale_write`, `not_permitted`,
+ *   `storage_unavailable`, `storage_blocked`.
+ * - **Bad news**: something the app is told about whether or not the call was refused, and
+ *   may show the user. `damaged_vault`, `damaged_wayin`, `damaged_box`, `newer_format`,
+ *   `rolled_back`, `identity_revoked`.
  *
  * `vault_full` means a new box in a vault already holding its `maxBoxes` (a limit the
  * client keeps), and also that storage has no room for the write (a limit of the backend's own,
@@ -76,7 +83,7 @@
  *
  * The package README's *Errors* section lists what each kind means and what to do about it.
  */
-export const VaultErrorKindVals = [
+export const RefusalKindVals = [
   'vault_locked',        // a whisper was asked for before the vault was unlocked
   'wrong_passphrase',    // the passphrase given did not unlock the vault
   'created_elsewhere',   // a first unlock found the vault just made on another device, under another passphrase
@@ -110,56 +117,29 @@ export const VaultErrorKindVals = [
   'storage_unavailable', // the storage backend could not be reached, or failed: a retry may mend it
   'storage_blocked',     // this device's own store refuses until something outside the app changes: storage blocked, or no room
 ] as const
-export type VaultErrorKind = typeof VaultErrorKindVals[number]
+export type RefusalKind = typeof RefusalKindVals[number]
 
 /**
- * Error thrown by every vault operation that refuses: a calm message saying what went wrong and
- * what to do, and a `refusalkind` to branch on. It never carries a whisper, a passphrase, or any other
- * secret material -- not in the message, not as a property.
- *
- * @example
- *   try { await vault.getBox('ANTHROPIC_API_KEY') } catch (err) {
- *     if (err instanceof VaultError && err.refusalkind === 'vault_locked') { promptForPassphrase() }
- *   }
- */
-export class VaultError extends Error {
-  readonly refusalkind: VaultErrorKind
-
-  /**
-   * @param refusalkind - What went wrong, from {@link VaultErrorKindVals}: what a caller branches on.
-   * @param message - What went wrong and what to do, calmly. Never quotes secret material.
-   * @param opts - `cause`: the lower-level failure behind this one, such as a storage adapter's
-   *   own error, kept for debugging. Never a value that holds secret material.
-   */
-  constructor(refusalkind: VaultErrorKind, message: string, opts?: ErrorOptions) {
-    super(message, opts)
-    this.name = 'VaultError'
-    this.refusalkind = refusalkind
-  }
-}
-
-/** True when `err` is a VaultError, and of the given `refusalkind` when one is given. */
-export const isVaultError = (err: unknown, refusalkind?: VaultErrorKind): err is VaultError => (
-  err instanceof VaultError && (refusalkind === undefined || err.refusalkind === refusalkind)
-)
-
-/**
- * The two families a VaultError kind belongs to, told apart by who must act. `misuse` is a
+ * The three families a refusalkind belongs to, told apart by who handles it. `misuse` is a
  * programming error, the host developer's to fix: let it reach an error boundary or the dev
  * overlay, never show it to the user, never retry. `condition` is something the app handles at
- * run time, which may reach the user: ask again, show a message, retry.
+ * run time, which may reach the user: ask again, show a message, retry. `bad_news` is something
+ * the app is told whether or not the call was refused -- damage found, storage that went back in
+ * time, a user signed out -- which it may show the user.
  */
-export const VaultErrorFamilyVals = ['misuse', 'condition'] as const
-export type VaultErrorFamily = typeof VaultErrorFamilyVals[number]
+export const RefusalFamilyVals = ['misuse', 'condition', 'bad_news'] as const
+export type RefusalFamily = typeof RefusalFamilyVals[number]
 
 /**
- * Which family each kind belongs to: every kind in {@link VaultErrorKindVals}, exactly once.
+ * Which family each refusalkind belongs to: every kind in {@link RefusalKindVals}, exactly once.
+ * A VaultError's `family` is read from it.
  *
- * @example VaultErrorFamilyForKind.bad_option           // 'misuse'
- * @example VaultErrorFamilyForKind.bad_record           // 'misuse'
- * @example VaultErrorFamilyForKind.storage_unavailable  // 'condition'
+ * @example RefusalFamilyForKind.bad_option           // 'misuse'
+ * @example RefusalFamilyForKind.bad_record           // 'misuse'
+ * @example RefusalFamilyForKind.storage_unavailable  // 'condition'
+ * @example RefusalFamilyForKind.damaged_box          // 'bad_news'
  */
-export const VaultErrorFamilyForKind = {
+export const RefusalFamilyForKind = {
   vault_locked:        'condition',
   wrong_passphrase:    'condition',
   created_elsewhere:   'condition',
@@ -180,24 +160,85 @@ export const VaultErrorFamilyForKind = {
   bad_record:          'misuse',
   vault_closed:        'misuse',
   corrupt_record:      'condition',
-  damaged_vault:       'condition',
-  damaged_wayin:       'condition',
-  damaged_box:         'condition',
-  newer_format:        'condition',
+  damaged_vault:       'bad_news',
+  damaged_wayin:       'bad_news',
+  damaged_box:         'bad_news',
+  newer_format:        'bad_news',
   unknown_key_deriver: 'misuse',
   insecure_context:    'misuse',
   stale_write:         'condition',
-  rolled_back:         'condition',
+  rolled_back:         'bad_news',
   not_permitted:       'condition',
-  identity_revoked:    'condition',
+  identity_revoked:    'bad_news',
   storage_unavailable: 'condition',
   storage_blocked:     'condition',
-} as const satisfies Readonly<Record<VaultErrorKind, VaultErrorFamily>>
+} as const satisfies Readonly<Record<RefusalKind, RefusalFamily>>
 
 /**
- * True when `err` is a VaultError of the `condition` family: one the app may show the user, or
- * retry. Anything else -- misuse, an error that is not a VaultError, a thrown non-error -- is
- * false, and belongs with an error boundary.
+ * What a refusal learned, each fact under its own name. Each is filled only by the refusals that
+ * name it, and holds records as storage holds them -- ciphertext and visible fields -- never
+ * secret material.
+ */
+export type RefusalMeta = {
+  /** `stale_write`: the box that won, as stored; null when nothing stands under the boxlabel. */
+  box_stored?:         Box | null
+  /** `vault_locked` after a relock: the vault props storage holds, or null when the vault is gone. */
+  vault_props_stored?: VaultProps | null
+  /** `box_too_large`, `vault_full`: how much room there is. */
+  capacity?:           Capacity
+}
+
+/** What a VaultError is made with beside its refusalkind and message: the `cause` behind it, and its `meta`. */
+export type VaultErrorOpts = ErrorOptions & { meta?: RefusalMeta }
+
+/**
+ * Every refusal any safebyok call makes: a calm message saying what went wrong and what to do, a
+ * `refusalkind` to branch on, and the `family` that says who handles it. It never carries a
+ * whisper, a passphrase, or any other secret material -- not in the message, its `cause` or its
+ * `meta`, not as a property.
+ *
+ * @example
+ *   try { await vault.getBox('ANTHROPIC_API_KEY') } catch (err) {
+ *     if (err instanceof VaultError && err.refusalkind === 'vault_locked') { promptForPassphrase() }
+ *   }
+ * @example
+ *   const { ok, val, err } = await vaultDB.getVaultProps(scope)
+ *   if (! ok && err.family === 'misuse') { throw err }
+ */
+export class VaultError extends Error {
+  /** What went wrong, from {@link RefusalKindVals}: what a caller branches on. */
+  readonly refusalkind:  RefusalKind
+  /** Who handles it, read from {@link RefusalFamilyForKind}: `misuse`, `condition` or `bad_news`. */
+  readonly family:       RefusalFamily
+  /** What the refusal learned, each fact under its own name, when it learned any. */
+  declare readonly meta?: RefusalMeta
+
+  /**
+   * @param refusalkind - What went wrong, from {@link RefusalKindVals}: what a caller branches on.
+   * @param message - What went wrong and what to do, calmly. Never quotes secret material.
+   * @param opts - `cause`: the lower-level failure behind this one, such as a storage adapter's
+   *   own error, kept for debugging. `meta`: what the refusal learned, as {@link RefusalMeta}
+   *   names it. Never a value that holds secret material.
+   */
+  constructor(refusalkind: RefusalKind, message: string, opts?: VaultErrorOpts) {
+    const { meta, ...errorOpts } = opts ?? {}
+    super(message, errorOpts)
+    this.name = 'VaultError'
+    this.refusalkind = refusalkind
+    this.family = RefusalFamilyForKind[refusalkind]
+    if (meta !== undefined) { this.meta = meta }
+  }
+}
+
+/** True when `err` is a VaultError, and of the given `refusalkind` when one is given. */
+export const isVaultError = (err: unknown, refusalkind?: RefusalKind): err is VaultError => (
+  err instanceof VaultError && (refusalkind === undefined || err.refusalkind === refusalkind)
+)
+
+/**
+ * True when `err` is a VaultError the app may show the user, or retry: one of the `condition`
+ * family, or of `bad_news`. Anything else -- misuse, an error that is not a VaultError, a thrown
+ * non-error -- is false, and belongs with an error boundary.
  *
  * @example
  *   try { await vault.putBox(boxlabel, whisper) } catch (err) {
@@ -206,5 +247,5 @@ export const VaultErrorFamilyForKind = {
  *   }
  */
 export const isVaultCondition = (err: unknown): err is VaultError => (
-  isVaultError(err) && VaultErrorFamilyForKind[err.refusalkind] === 'condition'
+  isVaultError(err) && err.family !== 'misuse'
 )

@@ -3,8 +3,8 @@ import { Client, Pool } from 'pg'
 import type { PoolConfig } from 'pg'
 import { VaultChangeChannel, VaultNotifySql, VaultTablesSql, postgresVaultDB } from 'safebyok-postgres'
 import type { PostgresListen } from 'safebyok-postgres'
-import type { VaultDBOpts } from 'safebyok'
-import { boxOf, vaultPropsOf, noBoxYet, perUser, scopeOf, throughTurnstile } from 'safebyok/testing'
+import type { Outcome, VaultDBOpts } from 'safebyok'
+import { boxOf, vaultPropsOf, noBoxYet, perUser, scopeOf, throughTurnstile, expectingGood } from 'safebyok/testing'
 import type { MakeVaultDBDevices, Turnstile, VaultDBVerbs } from 'safebyok/testing'
 
 // Everything the core's tests use too, so a test here star-imports this one module as TH.
@@ -267,8 +267,8 @@ export const FirstWriteStatement = '%INSERT INTO safebyok_boxes%'
 
 /** Makes the u1 vault the helpers' vault props stand for, through `vaultDB`, and writes a box under each of `boxlabels`. */
 export const filled = async (vaultDB: VaultDBVerbs, boxlabels: readonly string[]): Promise<void> => {
-  await vaultDB.ensureVaultProps(vaultPropsOf('u1'))
-  for (const boxlabel of boxlabels) { await vaultDB.putBox(scopeOf('u1'), boxOf(boxlabel, `sk-fake-${boxlabel}`), noBoxYet) }
+  await expectingGood(vaultDB).ensureVaultProps(vaultPropsOf('u1'))
+  for (const boxlabel of boxlabels) { await expectingGood(vaultDB).putBox(scopeOf('u1'), boxOf(boxlabel, `sk-fake-${boxlabel}`), noBoxYet) }
 }
 
 /**
@@ -289,13 +289,8 @@ export const boxesStanding = async (db: FileDatabase): Promise<number> => {
   return (rows[0] as { standing: number }).standing
 }
 
-/** How a write settled, never rejecting: `landed`, or the kind it was refused with (`unknown` for none). */
-export const outcomeOf = async (write: Promise<unknown>): Promise<{ kind: string }> => {
-  try {
-    await write
-    return { kind: 'landed' }
-  } catch (err) {
-    const { refusalkind } = (err ?? {}) as { refusalkind?: unknown }
-    return { kind: typeof refusalkind === 'string' ? refusalkind : 'unknown' }
-  }
+/** How a write settled: `landed`, or the refusalkind it was refused with. */
+export const settledKind = async (write: Promise<Outcome<unknown>>): Promise<{ kind: string }> => {
+  const { ok, err } = await write
+  return { kind: ok ? 'landed' : err.refusalkind }
 }

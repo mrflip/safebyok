@@ -1,5 +1,5 @@
-import { Sanitizer, VaultDB, VaultError, VaultErrorKindVals } from 'safebyok'
-import type { VaultPropsExpectation, VaultDBOpts, VaultDelExpectation, Box, BoxExpectation, BoxDelExpectation, StoredBox, VaultProps, VaultErrorKind, VaultScope } from 'safebyok'
+import { Sanitizer, VaultDB, VaultError, RefusalKindVals } from 'safebyok'
+import type { VaultPropsExpectation, VaultDBOpts, VaultDelExpectation, Box, BoxExpectation, BoxDelExpectation, StoredBox, VaultProps, RefusalKind, VaultScope } from 'safebyok'
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
 import { VaultPropsFields, ListedBoxFields, BoxFields, ScopeFields, recordOf, selectionOf } from './fields'
 
@@ -288,4 +288,4 @@ const refusalOf = (err: CombinedError): Error => {
 /** The `extensions.code`s a GraphQL server marks a malformed operation or variable with. */
 const MisuseCodes: ReadonlySet<string> = new Set(['BAD_USER_INPUT', 'GRAPHQL_VALIDATION_FAILED'])
 
-const isKind = (kind: unknown): kind is VaultErrorKind => (VaultErrorKindVals as readonly unknown[]).includes(kind)
+const isKind = (kind: unknown): kind is RefusalKind => (RefusalKindVals as readonly unknown[]).includes(kind)

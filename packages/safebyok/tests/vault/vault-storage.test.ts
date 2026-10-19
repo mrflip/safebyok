@@ -7,6 +7,7 @@ import { Vault } from '../../src/vault'
 import { type MakeVaultOpts } from '../../src/vault-opts'
 import { delDamagedVault } from '../../src/del-damaged-vault'
 import { setDefaultLogger, DefaultLogger } from '../../src/logger'
+import { bad } from '../../src/outcome'
 import * as TH from '../test-helpers'
 import { makeWorld, boxlabelsOf, isU1Box, u1BoxCkey, u1VaultPropsCkey, SevenDaysMillis, uncheckingDeviceDB, storedVaultPropsOf, storedWayinsOf, HourMillis, damagedVaultWorld, storedRowOf, rowsOf } from './world'
 
@@ -243,7 +244,7 @@ describe("the logger", () => {
     const vaultDB = localVaultDB({ store: world.dbStore, logger: own.logger })
     await world.open({ vaultDB })
     vaultDB.subscribe(TH.scopeOf('u1'), () => { throw new Error('a listener of the host that throws') })
-    await vaultDB.ensureVaultProps(TH.vaultPropsOf('u1'))
+    await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
     expect(own.calls).to.have.lengthOf(1)
     expect(world.logged).to.have.lengthOf(0)
   })
@@ -254,7 +255,7 @@ describe("the logger", () => {
     const vaultDB = localVaultDB({ store: world.dbStore })
     await world.open({ vaultDB })
     vaultDB.subscribe(TH.scopeOf('u1'), () => { throw new Error('a listener of the host that throws') })
-    await vaultDB.ensureVaultProps(TH.vaultPropsOf('u1'))
+    await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
     expect(consoleErrors).toHaveBeenCalledOnce()
     expect(world.logged).to.have.lengthOf(0)
     consoleErrors.mockRestore()
@@ -276,7 +277,7 @@ describe("the logger", () => {
     // As a subclass overriding the getter would: its logger is the host's to answer.
     Object.defineProperty(vaultDB, 'logger', { value: { log: throwFromLogger, warn: throwFromLogger, error: throwFromLogger } })
     const vault = await world.openUnlocked('pw', { vaultDB, logger: undefined })
-    vi.spyOn(vaultDB, 'getBox').mockRejectedValueOnce(signedOut())
+    vi.spyOn(vaultDB, 'getBox').mockResolvedValueOnce(bad(signedOut()))
     await TH.expectRefusal(vault.getBox('anthropic'), 'identity_revoked')
     expect(vault.getSnapshot().state).to.eq('locked')
   })
@@ -423,7 +424,7 @@ describe("the logger", () => {
     await TH.wakeupAtNextTick()
     world.dbStore.write(u1BoxCkey('anthropic'), row)
     // a lock for storage that no longer serves the user
-    vi.spyOn(world.vaultDB, 'getBox').mockRejectedValueOnce(signedOut())
+    vi.spyOn(world.vaultDB, 'getBox').mockResolvedValueOnce(bad(signedOut()))
     await TH.expectRefusal(vault.getBox('anthropic'), 'identity_revoked')
     expect(vault.getSnapshot().state).to.eq('locked')
     // an open that discards an unreadable lease
@@ -431,7 +432,7 @@ describe("the logger", () => {
     device.spoilRow(() => 'not a record')
     expect(await world.stateOnOpen({ logger, deviceDB: device.deviceDB, clock })).to.eq('locked')
     // a hello refused, which make's own hello tells the logger of
-    vi.spyOn(world.vaultDB, 'getVaultProps').mockRejectedValueOnce(new VaultError('not_permitted', 'Sign in to reach this vault.'))
+    vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(bad(new VaultError('not_permitted', 'Sign in to reach this vault.')))
     await TH.expectRefusal(world.open({ logger }), 'not_permitted')
   })
 
@@ -452,7 +453,7 @@ describe("the logger", () => {
     reopened.close()
     world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...storedVaultPropsOf(world), registered_at: whisper }))
     await TH.wakeupAtNextTick()
-    vi.spyOn(world.vaultDB, 'getVaultProps').mockRejectedValueOnce(new VaultError('not_permitted', 'Sign in to reach this vault.'))
+    vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(bad(new VaultError('not_permitted', 'Sign in to reach this vault.')))
     await TH.expectRefusal(world.open(), 'not_permitted')
     expect(world.logged.map((heard) => heard.level)).to.deep.equal(['warn', 'warn', 'warn', 'warn'])
     expect((world.logged[0]?.err?.cause as Error).message).to.match(/disk full/)
@@ -483,7 +484,7 @@ describe("when storage says the user is no longer signed in", () => {
       const vault = await world.openUnlocked('pw one')
       await vault.putBox('anthropic', 'sk-fake-one')
       const refusal = signedOut()
-      vi.spyOn(world.vaultDB, verb).mockRejectedValueOnce(refusal)
+      vi.spyOn(world.vaultDB, verb).mockResolvedValueOnce(bad(refusal))
       expect(await TH.expectRefusal(call(vault), 'identity_revoked')).to.eq(refusal)
       expect(vault.getSnapshot().state).to.eq('locked')
       expect(vault.getSnapshot().askPassphraseAt).to.be.null
@@ -498,7 +499,7 @@ describe("when storage says the user is no longer signed in", () => {
   it("locks when a background refresh meets it, and tells the logger, having nobody to throw to", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
-    vi.spyOn(world.vaultDB, 'getVaultProps').mockRejectedValue(signedOut())
+    vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValue(bad(signedOut()))
     // Any write rings the store's change bell, and the vault looks.
     world.dbStore.write('elsewhere', '{}')
     await vi.waitFor(() => { expect(vault.getSnapshot().state).to.eq('locked') })
@@ -513,7 +514,7 @@ describe("when storage says the user is no longer signed in", () => {
     const vault = await world.openUnlocked('pw one')
     const heard: string[] = []
     vault.subscribe(() => { heard.push(vault.getSnapshot().state) })
-    vi.spyOn(world.vaultDB, 'getBox').mockRejectedValueOnce(signedOut())
+    vi.spyOn(world.vaultDB, 'getBox').mockResolvedValueOnce(bad(signedOut()))
     await TH.expectRefusal(vault.getBox('anthropic'), 'identity_revoked')
     expect(heard).to.deep.equal(['locked'])
   })
@@ -523,7 +524,7 @@ describe("when storage says the user is no longer signed in", () => {
     const first = await world.openUnlocked('pw one')
     first.close()
     expect(await world.getLease()).to.not.be.null
-    vi.spyOn(world.vaultDB, 'getVaultProps').mockRejectedValueOnce(signedOut())
+    vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(bad(signedOut()))
     await TH.expectRefusal(world.open(), 'identity_revoked')
     expect(await world.getLease()).to.be.null
     expect(await world.stateOnOpen()).to.eq('locked')
@@ -538,7 +539,7 @@ describe("when storage says the user is no longer signed in", () => {
   it("locks nothing for not_permitted: the vault's own user, refused one call", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
-    vi.spyOn(world.vaultDB, 'getBox').mockRejectedValueOnce(new VaultError('not_permitted', 'You may not read this vault.'))
+    vi.spyOn(world.vaultDB, 'getBox').mockResolvedValueOnce(bad(new VaultError('not_permitted', 'You may not read this vault.')))
     await TH.expectRefusal(vault.getBox('anthropic'), 'not_permitted')
     expect(vault.getSnapshot().state).to.eq('unlocked')
     expect(await world.getLease()).to.not.be.null
@@ -549,7 +550,7 @@ describe("when storage says the user is no longer signed in", () => {
     const vault = await world.openUnlocked('pw one')
     const stuck = new Error('the device store is read-only')
     vi.spyOn(world.deviceDB, 'delLease').mockRejectedValueOnce(stuck)
-    vi.spyOn(world.vaultDB, 'getBox').mockRejectedValueOnce(signedOut())
+    vi.spyOn(world.vaultDB, 'getBox').mockResolvedValueOnce(bad(signedOut()))
     await TH.expectRefusal(vault.getBox('anthropic'), 'identity_revoked')
     expect(vault.getSnapshot().state).to.eq('locked')
     expect(await world.getLease()).to.not.be.null
@@ -878,7 +879,7 @@ describe("the vaultKey's epoch", () => {
       vault_key_epoch: 2,
       wayins:          standing.wayins.map((wayin) => ({ ...wayin, vault_key_epoch: 2 })),
     }
-    await world.vaultDB.putVaultProps(replaced, { vault_id: standing.vault_id, unlock_epoch: 1 })
+    await TH.expectingGood(world.vaultDB).putVaultProps(replaced, { vault_id: standing.vault_id, unlock_epoch: 1 })
     await TH.expectRefusal(stale.putBox('anthropic', 'sk-fake'), 'vault_locked')
     expect(world.dbStore.read(u1BoxCkey('anthropic'))).to.be.null
   })

@@ -199,6 +199,18 @@ export type BoxSummary = Z.infer<typeof BoxSummary>
 export type DamagedBox = { boxlabel: string, damaged: true, revision_tok: string | null }
 
 /**
+ * How much room a vault has, as this device reckons it from its last read: boxes against the most
+ * the vault holds, and bytes against the most its storage holds. Storage checks again on every
+ * write, and its answer wins.
+ *
+ * @example { boxes: { used: 12, max: 100 }, bytes: { used: 48_000, max: 1_000_000 } }
+ */
+export type Capacity = {
+  boxes: { used: number, max: number }
+  bytes: { used: number, max: number }
+}
+
+/**
  * The ways into a vault, each a {@link Wayin}'s `wayinkind`: a `passphrase` the user types,
  * or a `passkey` the user touches (a fingerprint, a face, a security key). Each wayinkind has a
  * wayin shape of its own, and the vault tells them apart by this field.

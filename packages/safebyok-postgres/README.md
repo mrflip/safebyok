@@ -106,14 +106,13 @@ The server half, `app/api/safebyok/route.ts`:
 
 ```ts
 import { Pool } from 'pg'
-import { VaultError } from 'safebyok'
-import type { VaultPropsExpectation, VaultDelExpectation, Box, BoxExpectation, BoxDelExpectation, VaultProps, VaultScope } from 'safebyok'
+import type { Outcome, VaultPropsExpectation, VaultDelExpectation, Box, BoxExpectation, BoxDelExpectation, VaultProps, VaultScope } from 'safebyok'
 import { postgresVaultDB } from 'safebyok-postgres'
 import type { VaultDB } from 'safebyok'
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 
-type Served = (vaultDB: VaultDB, args: unknown[]) => Promise<unknown>
+type Served = (vaultDB: VaultDB, args: unknown[]) => Promise<Outcome<unknown>>
 
 // The verbs a browser's vault may call -- VaultDB's own, and nothing else -- each passed to the
 // VaultDB, which refuses another user's vault, and holds each record to its shape and each name
@@ -149,13 +148,10 @@ export async function POST(request: Request): Promise<Response> {
   }
   // Made per request, for the user your own auth signed in -- never one the request names.
   const vaultDB = postgresVaultDB({ client: pool, userId: await signedInUserId(request) })
-  try {
-    return Response.json({ result: (await serve(vaultDB, args)) ?? null })
-  } catch (err) {
-    if (! (err instanceof VaultError)) { throw err }
-    // A refusal crosses as its kind and its calm message; never its cause, the driver's own error.
-    return Response.json({ refusal: { kind: err.refusalkind, message: err.message } })
-  }
+  const { ok, val = null, err } = await serve(vaultDB, args)
+  // A refusal crosses as its kind and its calm message; never its cause, the driver's own error.
+  if (! ok) { return Response.json({ refusal: { kind: err.refusalkind, message: err.message } }) }
+  return Response.json({ result: val })
 }
 ```
 
@@ -166,8 +162,8 @@ shape a vault shows, and a VaultDB in the browser must hand back records as stor
 The client half, a VaultDB over `fetch`, to hand `Vault.make` as its `vaultDB`:
 
 ```ts
-import { VaultDB, VaultError, VaultErrorKindVals } from 'safebyok'
-import type { VaultPropsExpectation, VaultDelExpectation, Box, BoxExpectation, BoxDelExpectation, VaultProps, VaultDBOpts, VaultErrorKind, VaultScope } from 'safebyok'
+import { VaultDB, VaultError, RefusalKindVals } from 'safebyok'
+import type { VaultPropsExpectation, VaultDelExpectation, Box, BoxExpectation, BoxDelExpectation, VaultProps, VaultDBOpts, RefusalKind, VaultScope } from 'safebyok'
 
 const VaultRouteUrl = '/api/safebyok'
 
@@ -216,7 +212,7 @@ export class RouteVaultDB extends VaultDB {
   }
 }
 
-const isKind = (kind: unknown): kind is VaultErrorKind => (VaultErrorKindVals as readonly unknown[]).includes(kind)
+const isKind = (kind: unknown): kind is RefusalKind => (RefusalKindVals as readonly unknown[]).includes(kind)
 ```
 
 * **Authenticate by your session**, the cookie `fetch` sends to its own origin, and never by a

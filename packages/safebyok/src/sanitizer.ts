@@ -1,4 +1,4 @@
-import { VaultError, type VaultErrorKind } from './errors'
+import { VaultError, type RefusalKind } from './errors'
 
 /**
  * Where safebyok decides what of a foreign error rides along on the refusal it throws in that
@@ -23,4 +23,4 @@ import { VaultError, type VaultErrorKind } from './errors'
  *     throw Sanitizer.refusalFor(err, 'storage_unavailable', "The vault's storage failed: try again shortly.")
  *   }
  */
-export const refusalFor = (_foreign: unknown, kind: VaultErrorKind, message: string): VaultError => new VaultError(kind, message)
+export const refusalFor = (_foreign: unknown, kind: RefusalKind, message: string): VaultError => new VaultError(kind, message)

@@ -4,8 +4,8 @@
 // and the README changes with it.
 import { describe, expect, it } from 'vitest'
 import type { Client } from 'pg'
-import { VaultDB, VaultError, VaultErrorKindVals, memoryDeviceDB } from 'safebyok'
-import type { VaultPropsExpectation, VaultDelExpectation, Box, BoxExpectation, BoxDelExpectation, VaultProps, VaultErrorKind, VaultScope } from 'safebyok'
+import { VaultDB, VaultError, RefusalKindVals, memoryDeviceDB } from 'safebyok'
+import type { Outcome, VaultPropsExpectation, VaultDelExpectation, Box, BoxExpectation, BoxDelExpectation, VaultProps, RefusalKind, VaultScope } from 'safebyok'
 import * as TH from './test-helpers'
 import { VaultChangeChannel, postgresVaultDB } from '../src/index'
 import type { PostgresClient, PostgresListen } from '../src/index'
@@ -13,7 +13,7 @@ import type { PostgresClient, PostgresListen } from '../src/index'
 // ------------------------------------------------------------------------- the server half
 
 /** One verb a browser's vault may call, as the route serves it from the arguments the browser sent. */
-type Served = (vaultDB: VaultDB, args: unknown[]) => Promise<unknown>
+type Served = (vaultDB: VaultDB, args: unknown[]) => Promise<Outcome<unknown>>
 
 /**
  * The verbs a browser's vault may call -- VaultDB's own, and nothing else -- each passed to the
@@ -53,13 +53,10 @@ const vaultRoute = (pool: PostgresClient, signedInUserId: (request: Request) => 
     }
     // Made per request, for the user your own auth signed in -- never one the request names.
     const vaultDB = postgresVaultDB({ client: pool, userId: await signedInUserId(request) })
-    try {
-      return Response.json({ result: (await serve(vaultDB, args)) ?? null })
-    } catch (err) {
-      if (! (err instanceof VaultError)) { throw err }
-      // A refusal crosses as its kind and its calm message; never its cause, the driver's own error.
-      return Response.json({ refusal: { kind: err.refusalkind, message: err.message } })
-    }
+    const { ok, val = null, err } = await serve(vaultDB, args)
+    // A refusal crosses as its kind and its calm message; never its cause, the driver's own error.
+    if (! ok) { return Response.json({ refusal: { kind: err.refusalkind, message: err.message } }) }
+    return Response.json({ result: val })
   }
 )
 
@@ -120,7 +117,7 @@ class RouteVaultDB extends VaultDB {
   }
 }
 
-const isKind = (kind: unknown): kind is VaultErrorKind => (VaultErrorKindVals as readonly unknown[]).includes(kind)
+const isKind = (kind: unknown): kind is RefusalKind => (RefusalKindVals as readonly unknown[]).includes(kind)
 
 // ------------------------------------------------------------------- the listen fan-out, for pg
 
@@ -216,7 +213,7 @@ describe("the README route recipe", () => {
     const notJson = await route(new Request(`https://app.example.test${VaultRouteUrl}`, { method: 'POST', body: '{"verb": "getVaultProps", ' }))
     expect(notJson.status).to.eq(400)
     const broken = new RouteVaultDB(() => Promise.resolve(Response.json({}, { status: 502 })))
-    await TH.expectRefusal(broken.getVaultProps(TH.scopeOf('u1')), 'storage_unavailable')
+    await TH.expectBad(broken.getVaultProps(TH.scopeOf('u1')), 'storage_unavailable')
   })
 
   it("never sends the driver's own error to the browser", async () => {

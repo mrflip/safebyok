@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { VaultErrorKindVals } from 'safebyok'
+import { RefusalKindVals } from 'safebyok'
 import { SafebyokErrorKindVals, isSafebyokErrorData } from '../src/refusals'
 
 const ErrorDataCases = [
@@ -28,7 +28,7 @@ describe("isSafebyokErrorData", () => {
 })
 
 describe("SafebyokErrorKindVals", () => {
-  it("names only kinds the core's VaultErrorKindVals lists", () => {
-    for (const kind of SafebyokErrorKindVals) { expect(VaultErrorKindVals).to.include(kind) }
+  it("names only kinds the core's RefusalKindVals lists", () => {
+    for (const kind of SafebyokErrorKindVals) { expect(RefusalKindVals).to.include(kind) }
   })
 })

@@ -86,7 +86,7 @@ describe("Names.check, against a host's check", () => {
     const err = TH.expectSyncRefusal(() => Names.check(quotingThrow, 'boxlabel', 'sk-ant-fake-pasted-by-mistake'), 'bad_option')
     expect(err.message).to.include('boxlabel')
     expect(err.cause).to.be.undefined
-    expect(Object.getOwnPropertyNames(err)).to.have.members(['stack', 'message', 'name', 'refusalkind'])
+    expect(Object.getOwnPropertyNames(err)).to.have.members(['stack', 'message', 'name', 'refusalkind', 'family'])
     expect(TH.thrownText(err)).to.not.include('sk-ant-fake')
     expect(TH.leafTexts(err).join(' ')).to.not.include('sk-ant-fake')
   })

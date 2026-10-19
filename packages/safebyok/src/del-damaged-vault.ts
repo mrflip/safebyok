@@ -1,6 +1,7 @@
 import * as Names from './names'
 import { isStorageBlocked } from './refusals'
 import { VaultError, isVaultError } from './errors'
+import { valOf } from './outcome'
 import type { DeviceDB } from './device-db'
 import { type MakeVaultOpts, isBag, parseVaultDB, parseDeviceDB } from './vault-opts'
 
@@ -51,7 +52,7 @@ export const delDamagedVault = async (opts: DelDamagedVaultOpts): Promise<void> 
   const deviceDB = deviceTroubleAsConditions(parseDeviceDB(opts.deviceDB))
   // The vault first: a sound one refuses, and then the device keeps what it remembers of it. A
   // retry after a failure here finds the vault gone, and still clears the device.
-  await vaultDB.delDamagedVault(scope)
+  valOf(await vaultDB.delDamagedVault(scope))
   await deviceDB.delLease(scope)
   await deviceDB.delMark(scope)
 }

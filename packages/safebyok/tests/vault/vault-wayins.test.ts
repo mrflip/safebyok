@@ -159,7 +159,7 @@ describe("several passphrases", () => {
     await there.del()
     await TH.expectRefusal(here.unlock('pw', { wayinId }), 'absent_wayin')
     expect(here.getSnapshot().state).to.eq('absent')
-    expect(await world.vaultDB.getVaultProps(TH.scopeOf('u1'))).to.be.null
+    expect(await TH.expectingGood(world.vaultDB).getVaultProps(TH.scopeOf('u1'))).to.be.null
   })
 
   it("addPassphrase wants a passphrase the vault opens with as proof, even while unlocked", async () => {
@@ -311,7 +311,7 @@ describe("several passphrases", () => {
     const realUpdate = world.vaultDB.putVaultProps.bind(world.vaultDB)
     const spied = vi.spyOn(world.vaultDB, 'putVaultProps').mockImplementationOnce(async (vaultProps, expected) => {
       await here.addPassphrase('pw', 'here pw', { wayinlabel: 'here' })
-      await realUpdate(vaultProps, expected)
+      return await realUpdate(vaultProps, expected)
     })
     await TH.expectRefusal(there.addPassphrase('pw', 'there pw', { wayinlabel: 'there' }), 'stale_write')
     spied.mockRestore()
@@ -400,7 +400,7 @@ describe("passkeys", () => {
     const vault = await world.open()
     await TH.expectRefusal(vault.unlock(await TH.passkeyOf('laptop')), 'absent_vault')
     expect(vault.getSnapshot().state).to.eq('absent')
-    expect(await world.vaultDB.getVaultProps(TH.scopeOf('u1'))).to.be.null
+    expect(await TH.expectingGood(world.vaultDB).getVaultProps(TH.scopeOf('u1'))).to.be.null
   })
 
   it("an unlock with a passphrase passes over the passkeys: one derivation per passphrase", async () => {
@@ -439,10 +439,10 @@ describe("passkeys", () => {
   it("addPasskey adds nothing, and resolves null, when the passkey's prompt is dismissed", async () => {
     const { world, vault } = await vaultWithPasskey()
     const wayinsThen = vault.getSnapshot().wayins.length
-    const vaultPropsThen = await world.vaultDB.getVaultProps(TH.scopeOf('u1'))
+    const vaultPropsThen = await TH.expectingGood(world.vaultDB).getVaultProps(TH.scopeOf('u1'))
     expect(await vault.addPasskey('pw', () => Promise.resolve(null), { wayinlabel: 'phone' })).to.be.null
     expect(vault.getSnapshot().wayins).to.have.lengthOf(wayinsThen)
-    expect(await world.vaultDB.getVaultProps(TH.scopeOf('u1'))).to.deep.equal(vaultPropsThen)
+    expect(await TH.expectingGood(world.vaultDB).getVaultProps(TH.scopeOf('u1'))).to.deep.equal(vaultPropsThen)
     expect(vault.getSnapshot().state).to.eq('unlocked')
   })
 
@@ -723,11 +723,11 @@ describe("a new passphrase's strength", () => {
     await world.openUnlocked('pw')
     const { keyDeriver, derivations } = countingDeriver()
     const vault = await world.open({ keyDeriver, passphraseStrengthTest: refusing('acme acme acme') })
-    const before = await world.vaultDB.getVaultProps(TH.scopeOf('u1'))
+    const before = await TH.expectingGood(world.vaultDB).getVaultProps(TH.scopeOf('u1'))
     await TH.expectRefusal(vault.addPassphrase('pw', 'acme acme acme', { wayinlabel: 'spare' }), 'weak_passphrase')
     await TH.expectRefusal(vault.changePassphrase('pw', 'acme acme acme'), 'weak_passphrase')
     expect(derivations).not.toHaveBeenCalled()
-    expect(await world.vaultDB.getVaultProps(TH.scopeOf('u1'))).to.deep.equal(before)
+    expect(await TH.expectingGood(world.vaultDB).getVaultProps(TH.scopeOf('u1'))).to.deep.equal(before)
   })
 
   it("awaits a host's test that answers a promise", async () => {

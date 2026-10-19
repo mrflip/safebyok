@@ -24,4 +24,5 @@ export { VaultDBContract, describeVaultDB, vaultDBTimingChecks, expectRoundTrips
 export type { VaultDBContractLine, VaultDBVerbs, MakeVaultDB, DescribeVaultDBOpts, VaultDBDeviceOpts,
   MakeVaultDBDevices, VaultDBTimingCheck } from './test-helpers/vault-db-conformance'
 export { describeDeviceDB } from './test-helpers/device-db-conformance'
-export { expectRefusal, expectSyncRefusal, omitting } from './test-helpers/refusals'
+export { expectRefusal, expectSyncRefusal, expectGood, expectingGood, expectBad, good, bad, omitting } from './test-helpers/refusals'
+export type { ExpectingGood } from './test-helpers/refusals'

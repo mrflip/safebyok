@@ -3,7 +3,7 @@ import { type VaultScope, BoxSummary, type DamagedBox, type WayinSummary, type P
 import type { Box } from './box'
 import * as Names from './names'
 import { optionsCheck } from './options'
-import { VaultError, isVaultError, type VaultErrorKind } from './errors'
+import { VaultError, isVaultError, type RefusalKind } from './errors'
 import {
   cipherCtx, cipherBytes, decipherBytes,
   makeLeaseKey, makeBoxKey, makeVaultKey, randomId, wrapKeyUnder, unwrapKeyUnder,
@@ -1906,7 +1906,7 @@ const BoxFormat = 'safebyok-box-v6'
  * ('newer_format'). A write's catch-up with storage throws each as it came, never as
  * 'stale_write'; and each, whichever call met it, has the next hello read afresh.
  */
-const UntrustedStorageKinds = ['identity_revoked', 'rolled_back', 'newer_format'] as const satisfies readonly VaultErrorKind[]
+const UntrustedStorageKinds = ['identity_revoked', 'rolled_back', 'newer_format'] as const satisfies readonly RefusalKind[]
 
 /**
  * A box's visible header: every field of its record but its format, which leads each ctx,

@@ -84,10 +84,10 @@ it.
 The provider makes the vault with `Vault.make` as soon as there is a signed-in user, and hands it
 down at once, its snapshot saying `opening` until its `hello()` has read storage. What happens
 when `Vault.make` throws, or the hello is refused, depends on the error's family (safebyok's
-`VaultErrorFamilyForKind`): who has to act. The `safebyok` README's *Errors* section lists every
+`RefusalFamilyForKind`): who has to act. The `safebyok` README's *Errors* section lists every
 kind, its family, and what it means.
 
-**A condition stays in place.** Storage that cannot be reached (`storage_unavailable`), a user
+**A condition or bad news stays in place.** Storage that cannot be reached (`storage_unavailable`), a user
 storage no longer serves (`identity_revoked`, as when signed out of the backend, or not yet
 signed in to it) or a vault whose stored props fail their checks (`damaged_vault`) arrives as
 `openError`, a `VaultError`: the snapshot's `trouble`, the vault still `opening`. (A damaged box never stops the open:

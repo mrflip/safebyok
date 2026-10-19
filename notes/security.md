@@ -516,10 +516,27 @@ added or folded into through the subagent, and no other entry changes.
   tags are also the first element of every encryption's additional data, so a record written
   under a `byok-*-v1` tag would neither validate nor decrypt. No reader for the old tags is
   kept: they existed only in development and demo storage, never in a published version.
-* 2026-10-15: `VaultDB`'s public verbs turn any failure from an adapter that is not already a
+* 2026-10-15; 2026-10-19 (thread A1 `outcome`, sprint contract, branch 20261019-outcome):
+  `VaultDB`'s public verbs turn any failure from an adapter that is not already a
   `VaultError` into kind `storage_unavailable`, with the adapter's own error attached as the
   standard `cause`. Adapters see only ciphertext and unencrypted record fields, but that cause is
-  whatever the backend's client threw, unfiltered.
+  whatever the backend's client threw, unfiltered. As of 2026-10-19 every public verb
+  (`getVaultProps`, `ensureVaultProps`, `putVaultProps`, `delVault`, `delDamagedVault`,
+  `listBoxes`, `listBoxRecords`, `getBox`, `putBox`, `delBox`) resolves an `Outcome`
+  (`{ ok: true, val }` or `{ ok: false, err }`) and never rejects; the adapter's `do*` hooks still
+  throw, and the one catch is `outcomeOf` (`src/outcome.ts`), which makes the same
+  `storage_unavailable`-with-`cause` conversion. `outcomeOf` is exported for an app wrapping its
+  own calls: whatever such a body throws that is not a `VaultError` is kept, as it came, as the
+  `cause`, so an app must not throw secret material from a body it wraps. `VaultError` gains
+  `family` (`misuse`, `condition`, `bad_news`), read from `refusalkind` through one table and never
+  set by a caller; `bad_news` (`damaged_vault`, `damaged_wayin`, `damaged_box`, `newer_format`,
+  `rolled_back`, `identity_revoked`) was `condition`, and `isVaultCondition` is true for both. It
+  also gains `meta?` (`box_stored`, `vault_props_stored`, `capacity`): stored records as storage
+  holds them (ciphertext and visible fields) and counts only, never secret material; no refusal
+  fills it yet (a later thread, C1, will fill `box_stored` on `stale_write`). The vault still locks
+  on `identity_revoked` and `rolled_back` from storage: `RefusalPolicy.heed` unwraps each Outcome,
+  hands every bad `err` to the vault's refusal handler and awaits it, then throws it, as before --
+  an interim shim until the vault's own calls are Outcome-shaped.
 * 2026-10-15: `localVaultDB` and `idbVaultDB` key rows by `applabel:user_id:vaultlabel`, and
   `user_id` may hold a colon, so one user's rows can share another scope's ckey prefix. Listing
   and deleting a vault now take only ckeys whose remainder after the prefix is a bare boxlabel
