@@ -6,7 +6,7 @@ they disagree. Workers look things up here; they do not write it.
 ## Line
 
 *Orchestrator:* main → #193 → #194 → #196 → #197 → #198 → #199 → #200 → #195 (phase A) → #201
-B1 `proof_wayin` → #202 B3 `box` → #204 `a_fixes` → #203 `a_sec` → #205 B2 `lease` → #206 `a_sec2` (ab07fec0). B4a `slots` builds from #206 (the Coach ruled one passphrase, one passkey as slots on the vault props: `ruling-one_of_each.md`); B4 follows it. `a_sec` was restacked onto #204
+B1 `proof_wayin` → #202 B3 `box` → #204 `a_fixes` → #203 `a_sec` → #205 B2 `lease` → #206 `a_sec2` → #207 B4a `slots` (048238e0: one passphrase, one passkey as slots on the vault props, format v5; `ruling-one_of_each.md`). B4 `put_wayin` builds from #207. `a_sec` was restacked onto #204
 (ruled 2026-10-19: file as it stands); B2 cuts from it; `a_sec2` follows B2 and closes the create
 window. Cross-device invalidation will come from a proper mechanism (each device authenticates a
 token when it joins or creates a vault): don't build one ahead of it.
@@ -166,3 +166,4 @@ putBox's `over` and its returned Box (C2).
 * *Owed again (2026-10-19):* `adorn(obj, ckey, val)` wherever the Contract shows `adorn`; once a_sec2 lands, `isVaultError` without the cross-copy mark (Shapes' paragraph).
 * From a_sec2 (#206): `VaultSnapshot` and the handle lose `props`; `vault.wayins` is `WayinSummary[]`; `isVaultError` is `instanceof` plus the kind (no cross-copy recognition); `Lease.grant` throws on input a lease record cannot hold.
 * From a_sec2's rework (#206): `RefusalMeta.vault_props_stored` removed; a handle refused `rolled_back` forgets its vault props and reads `opening` (row); `del()` refuses `rolled_back` after a forget (row). Storage's refusals and the host's share `VaultError`, so props never ride on `meta` (lean_core's path: `ensureVaultProps`'s good value; a VaultDB-level answer for a stale write).
+* From B4a (#207): the vault props hold `passphrase` and `passkey | null` (v5); `last_wayin`, `too_many_wayins`, `wayin_id`, `wayinlabel` gone (strike from *Wayin*, *The policy*, *Refusals*); `absent_wayin` means only no passkey; another passkey's answer is `wrong_passkey`; the snapshot's `wayins` is `passphrase`/`passkey` summaries; only the standing passphrase proves a change.
