@@ -1,104 +1,114 @@
 # Thread B4: put_wayin (2026-10-19)
 
-Branch `20261019-put_wayin`, PR pending, stacked on #207 (`slots`). Justify: not yet run.
+Branch `20261019-put_wayin`, PR [#208](https://github.com/mrflip/safebyok/pull/208), stacked on
+#207 (`slots`). Justify: green. Per package: core 2538 passed, 35 skipped; react 280; convex 274 (8 skipped); postgres 268 (14 skipped); graphql 262 (14 skipped); indexeddb 144 (10 skipped); fastkey 49; demo 203 (16 skipped); e2e 89 (96 skipped); root 265. Size check green; `Vault` budget raised to 36 kB by the rule.
 
-Built in YOLO to the section below, written before the build as the plan's B4 row asks. Its
-drift from the Contract tab is listed under *Open matters*.
+Built in YOLO to its Contract section, written before the build as the plan's B4 row asks, on
+B4a's slots: [`thread-B4-put_wayin-contract.md`](thread-B4-put_wayin-contract.md), for the
+orchestrator carrying it into the Contract tab. Its drift from the tab is under *Open matters*.
 
-## The Contract section, as built
+* **Built**:
+  * **`putWayin` and `delWayin`** (`vault.ts`, *Vault: ways in*): `putWayin(passphrase, newProof)`
+    replaces `changePassphrase` and `addPasskey`; a new passphrase as text replaces the
+    passphrase, a `PasskeyAnswer` puts the passkey (replacing any). Both verbs, and `tryPutWayin`,
+    `tryDelWayin`, resolve the vault. `newProofOf` checks the new proof at the door: a blank
+    passphrase `weak_passphrase`, a passkey's salt by `checkFreshSalt`, both before any derivation.
+    `#reviseWayins` lost its abandon path (no maker, no null) and resolves nothing.
+    `parsePasskeyMaker` is gone.
+  * **One `Wayin.seal`** (`wayin.ts`): `sealPassphrase`, `sealFirstPassphrase` and `sealPasskey`
+    became `Wayin.seal(vault, proof, holder, stamp, vaultKey)`, overloaded by the proof's class,
+    resolving `{ wayin, sessionKey }`. The two kinds' differences sit lined up in two helpers,
+    `passphraseKeying` and `passkeyKeying`, each making the header and the wayinKey; the wrap,
+    the instance and the session handle are shared. `checkFreshSalt` is exported for the vault's
+    door.
+  * **The strength checker** (`passphrase-strength.ts`), as ruled: the option is
+    `strengthChecker` (type `StrengthChecker`), optional. Left out, `UnchosenStrengthChecker`
+    refuses every passphrase as too weak, and the vault logs `UnchosenCheckerSaid` once per handle,
+    at error level, when it first consults it (`{ call: 'unlock' | 'putWayin' }`). A throw from a
+    checker is `unexpected_error` naming it, with no kind, meta or cause of the throw.
+    `parseStrengthChecker` (was `checkStrengthTest`) hands back the default for none.
+    `zxcvbnStrengthChecker` (was `zxcvbnPassphraseTest`; file `zxcvbn-strength-checker.ts`)
+    answers weak when its dictionary fails to load, since a checker never throws.
+    `RenamedMakeVaultOpts` names `passphraseStrengthTest` as `strengthChecker` now.
+  * **CUSTOMIZATION.md** (`packages/safebyok/`, shipped in `files`): *Pluggable Passphrase
+    Strength Checker*, with the shipped checker "good but useless without its dictionary", and the
+    AI prompt, its last reason verbatim; a test holds both the heading the log names and that line.
+  * **React**: the provider's advice runs the parsed checker, so with none the dialog shows the
+    unchosen reason as the user types; `createPasskey`'s doc and the README's passkey section make
+    the passkey first and hand its answer to `putWayin`. The demo's *Ways in* does the same.
+  * **Docs**: the core README (*The passphrase and the passkey* lists both calls' refusals,
+    *A new passphrase's strength*, the passkey section, the error table), VOCABULARY.md, STYLE.md's
+    `check` example, the root README's surface list, TODO.md (*A passkey made for a refused
+    `putWayin`*), `notes/security.md` (by a `sonnet` subagent).
+  * **Tests**: `vault-wayins.test.ts` rewritten around the two calls, each Does step, Guarantee
+    and Refuses bullet titled `(Contract: putWayin, ...)` or `(Contract: delWayin, ...)`;
+    `wayin.test.ts`'s sealing tests to `Wayin.seal`; strength tests for the default, the log and
+    the throw rule.
 
-### vault.putWayin(proof, newProof)
+* **Decisions taken**:
+  * **`putWayin` takes a passkey's answer, not a maker.** The Contract's brief has
+    `putWayin(proof, newProof)`, and its *getProof* says data calls never contain UI; B4a's
+    `addPasskey(passphrase, makePasskey)` called host code (the authenticator prompt) inside the
+    change. The cost: a passphrase refused after the passkey was made leaves that passkey on the
+    authenticator, opening nothing. Written into the README, `createPasskey`'s doc and TODO.md.
+  * **Names follow the option**: `StrengthChecker`, `parseStrengthChecker` (it hands back a value,
+    so a `parse`), `zxcvbnStrengthChecker`, `safebyok/testing`'s `anyStrengthChecker`.
+  * **The default logs at first use, not at make**, once per handle: `make` stays inert, and an
+    app that only opens a standing vault never needs a checker.
+  * **`Wayin.seal` always resolves a session handle** (one more AES-KW unwrap per seal), so the
+    three statics are one; only the creating unlock keeps it.
+  * **A blank new passphrase is `weak_passphrase`**, not `wrong_passphrase` (which a blank proof
+    still is): it is a new passphrase no checker should admit, refused before the checker runs.
+  * **The race test "during addPasskey()'s prompt" is dropped**: there is no prompt now, and the
+    plan says no thread pins lock timing; the passphrase one stays as it was.
 
-```typescript
-vault.putWayin(proof: string, newProof: string | PasskeyAnswer): Promise<Outcome<Vault>>
-// a new passphrase replaces the passphrase; a passkey's answer puts the passkey, replacing the one standing
-```
+* **Deviations**:
+  * `notes/security.md`: the `sonnet` subagent amended the entries the renames made false in
+    place, each marked "amended 2026-10-19 (put_wayin)", as B4a's did (its open matter stands),
+    added a clause to the header's rename paragraph, and fixed the two passages the plan named
+    (~731's "today's v3"; ~1407's lock during `addPasskey`'s prompt, which never left the vault
+    locked). It left one already-stale line (~1903, secure_floor's "the default is NIST's 12 code
+    points": the core has never had such a default).
+  * The preplan's B4 list policy (ids, labels, `too_many_wayins`, `last_wayin`) is superseded by
+    B4a, as the plan's row says; nothing of it was built.
 
-Works locked or unlocked: the standing passphrase is proof enough. For a passkey, make it first
-(`createPasskey(...)` in `safebyok-react`), then hand its answer here: the call holds no UI.
+* **Discoveries**:
+  * `#reviseWayins` reads storage afresh before the proof (`hello`, then `refresh`) and catches up
+    after a `stale_write` (`#refreshOnStale`): both stood before this thread; the second is a
+    re-read on a miss, for `lean_core` or the policy session to weigh.
+  * `TH.makeWorld` passes `strengthChecker` by default, so a test of the unchosen default passes
+    `strengthChecker: undefined` explicitly.
 
-**Does**
+* **For the Coach**: the open matters below; the first two most need a look.
 
-1. Validates the inputs. Synchronous; the only refusals before any await: `proof` is the
-   standing passphrase as text; `newProof` is a new passphrase as text, or a passkey's answer
-   over a fresh salt of 32 bytes.
-2. Puts a new passphrase to the `strengthChecker`, before any key derivation.
-3. `hello()`, then reads the vault props as storage holds them now, as `attempt` does.
-4. Proves `proof` against the vault's passphrase: one key derivation.
-5. Seals the new way in around the vaultKey: a passphrase under a fresh salt (one more
-   derivation), a passkey under its answer. Stamped with this device and the clock.
-6. VaultDB: `putVaultProps`, one conditional write of the vault props with the new way in and
-   `unlock_epoch` moved on, expecting the props step 4 proved against.
-7. Raises this device's mark and grants this device a lease from now. Neither refuses: the change
-   has landed, and a failure here goes to the logger; the vault then asks at its next open.
+## Open matters
 
-**Guarantees**
-
-- Only the standing passphrase proves a change. A passkey unlocks, but never changes a way in.
-- Nothing is written unless the vault props proven against are the ones standing.
-- Every other device's unlock lapses: `unlock_epoch` moved, so each asks at its next `hello()`.
-- No box is rewritten: the vaultKey is unchanged. So a replaced passphrase or passkey still
-  opens a copy of the vault props taken before; replacing is not revoking.
-- The passphrases are never stored or logged, and the passkey's answer is not kept.
-
-**Returns** `{ ok: true, val: vault }`, unlocked under the new way in, its lease starting now.
-
-**Refuses**
-
-- *Fix the code:* `bad_option` (a `proof` that is not text, a passkey's answer among it; a
-  `newProof` of neither shape; an answer over anything but a fresh 32-byte salt; a strength
-  checker answering no verdict), `unknown_key_deriver`, `vault_closed`; `unexpected_error` when
-  the strength checker or the key deriver throws, carrying nothing of what it threw.
-- *Show in place, ask again:* `wrong_passphrase` (the standing passphrase did not open the vault,
-  or is blank); `weak_passphrase` (the new one, the checker's reason the message; a blank one
-  too).
-- *The state already says it:* `absent_vault`: there is no vault yet; the first unlock makes it.
-- *Nothing to retry:* `damaged_wayin`, the passphrase stored damaged: nothing can prove a change,
-  so the vault is to be removed and made again.
-- *Read again, then decide:* `stale_write`: another device changed the vault between step 3 and
-  step 6. Nothing was written; a passkey made for the call stays on its authenticator, a way into
-  nothing.
-- *Try again later:* `storage_unavailable`.
-- *Bad news, told to `onBadNews` and returned:* `damaged_vault`, `rolled_back`,
-  `identity_revoked`, `newer_format`, as `hello()` returns them.
-
-### vault.delWayin(proof)
-
-```typescript
-vault.delWayin(proof: string): Promise<Outcome<Vault>>   // the passkey only: the passphrase stays
-```
-
-**Does**
-
-1. Validates `proof`, the standing passphrase as text. Synchronous.
-2. `hello()`, then reads the vault props as storage holds them now.
-3. Refuses `absent_wayin` when the vault has no passkey, before any key derivation.
-4. Proves `proof` against the vault's passphrase: one key derivation.
-5. VaultDB: `putVaultProps` with `passkey: null` and `unlock_epoch` moved on, as `putWayin` does.
-6. Raises this device's mark and grants it a lease from now, as `putWayin` does.
-
-**Guarantees** as `putWayin`'s, and that the passphrase is never removed. Removing the passkey
-stops it opening the vault from here on; it cannot take back what it opened before, nor a copy of
-the vault props taken before.
-
-**Returns** `{ ok: true, val: vault }`, unlocked, with no passkey.
-
-**Refuses** as `putWayin` does, but for `weak_passphrase`, and:
-
-- *Nothing to do, the state already says it:* `absent_wayin`, no passkey to remove (it may have
-  been removed on another device).
-
-### Vault.make: `strengthChecker`
-
-```typescript
-strengthChecker?: (passphrase: string, scope: VaultScope) => PassphraseVerdict | Promise<PassphraseVerdict>
-type PassphraseVerdict = { strong: true } | { strong: false, reason: string }
-```
-
-Optional. The checker's contract is to answer a verdict, good or bad. It runs on every new
-passphrase: the one the first unlock creates the vault with, and each `putWayin` sets. Left out,
-the default refuses every passphrase as too weak, and logs once per vault, through the host's
-logger, that the customer must choose a checker (CUSTOMIZATION.md, *Pluggable Passphrase
-Strength Checker*). `safebyok/browser` exports `zxcvbnStrengthChecker`, which `browserOpts()`
-supplies. A throw from the checker is `unexpected_error`, naming it, carrying none of the thrown
-value's kind, meta or cause; an answer that is no verdict is `bad_option`.
+* **YOLO: `putWayin` takes a `PasskeyAnswer`, not a passkey maker.** A mistyped passphrase now
+  leaves an orphan passkey on the authenticator. Recommend: keep, per *simple control flow
+  first*; TODO.md holds the UX question.
+* **YOLO: names** `StrengthChecker`, `parseStrengthChecker`, `zxcvbnStrengthChecker`,
+  `anyStrengthChecker`, and the file `zxcvbn-strength-checker.ts`, following the ruled option
+  name. Recommend: keep.
+* **YOLO: the default logs at error level, once per handle, at first use**, quoting no passphrase.
+  Recommend: keep.
+* **YOLO: `zxcvbnStrengthChecker` answers weak when its dictionary fails to load**, where it
+  rejected `storage_unavailable`, to keep the checker's contract (never throw). Recommend: keep.
+* **YOLO: a blank new passphrase is `weak_passphrase`.** Recommend: keep.
+* **YOLO: `Wayin.seal` resolves `{ wayin, sessionKey }` for every seal.** Recommend: keep; B5 may
+  weigh it.
+* **Contract drift: the signatures.** `putWayin(proof: string, newProof: string | PasskeyAnswer):
+  Promise<Outcome<Vault>>` and `delWayin(proof: string): Promise<Outcome<Vault>>`: no `{
+  wayinlabel }`, no `wayinId`. The full nesting is in the contract file; the brief's "Their full
+  nesting is written when they are specified" and *Not in this contract yet*'s `putWayin`/`delWayin`
+  line go.
+* **Contract drift: *The policy*.** "with a passkey it adds one, or is refused `too_many_wayins`"
+  becomes "puts the passkey, replacing the one standing"; "deleting the passphrase is refused
+  `last_wayin`" becomes "the passphrase is never deleted" (B4a's drift, carried).
+* **Contract drift: `Wayin.seal`.** The class block's `static seal(vault, proof: Proof, vaultKey,
+  stamp): Promise<Wayin>` is `static seal(vault, proof, holder, stamp, vaultKey): Promise<{ wayin,
+  sessionKey }>`.
+* **Contract drift: `weak_passphrase`'s row** adds "or a blank one".
+* **Contract drift: `unexpected_error` from a strength checker carries no `cause`**, against
+  *Shapes*' "`cause?`: the lower failure as it came". Proposed: *Shapes* adds "never a host
+  function's throw that heard a passphrase".
+* **Contract drift: *Vault.make*'s `strengthChecker`** gets the contract file's last section.
