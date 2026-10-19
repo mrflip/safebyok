@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest'
 import { MinuteMillis } from '../../src/types'
 import { VaultError } from '../../src/errors'
 import { memoryDeviceDB } from '../../src/device-db'
-import { localVaultDB } from '../../src/vault-db'
+import { localVaultDB } from '../../src/local-vault-db'
 import * as TH from '../test-helpers'
 import { makeRacingWorld, makeWorld, HourMillis, SevenDaysMillis, boxlabelsOf, storedWayinsOf, generationOf, storedVaultPropsOf, storedRowOf, u1BoxCkey, u1VaultPropsCkey } from './world'
 

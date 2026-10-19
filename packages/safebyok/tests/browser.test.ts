@@ -10,7 +10,7 @@ import { VaultError } from '../src/errors'
 import { argon2idWebV1Deriver } from '../src/key-deriver'
 import { inspectIdbDeviceDB } from '../src/idb'
 import { memoryStore } from '../src/string-store'
-import { localVaultDB } from '../src/vault-db'
+import { localVaultDB } from '../src/local-vault-db'
 import * as TH from './test-helpers'
 
 describe("browserOpts", () => {

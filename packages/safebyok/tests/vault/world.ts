@@ -1,6 +1,6 @@
 import { VaultScope, type Lease, type DeviceMark } from '../../src/types'
 import { memoryDeviceDB, type DeviceDB } from '../../src/device-db'
-import { localVaultDB } from '../../src/vault-db'
+import { localVaultDB } from '../../src/local-vault-db'
 import { memoryStore } from '../../src/string-store'
 import { Vault } from '../../src/vault'
 import { type MakeVaultOpts } from '../../src/vault-opts'

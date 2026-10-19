@@ -8,7 +8,7 @@ import type { VaultScope, PassphraseWayin, PasskeyWayin, PasskeyProof, VaultProp
 import { stableJsonify } from '../../src/stable-jsonify'
 import { Vault } from '../../src/vault'
 import { type MakeVaultOpts } from '../../src/vault-opts'
-import { localVaultDB } from '../../src/vault-db'
+import { localVaultDB } from '../../src/local-vault-db'
 
 
 /**
