@@ -1,8 +1,33 @@
 # Thread a_sec: phase A's security fix-up (2026-10-19)
 
 Branch `20261019-a_sec`, [PR #203](https://github.com/mrflip/safebyok/pull/203), stacked on
-[#195](https://github.com/mrflip/safebyok/pull/195) (`20261019-outcome_adapters`; to be restacked
-onto B1). Justify: green; core 2392 (35 skipped), react 274, demo 215 (16 skipped), 0 failed.
+[#204](https://github.com/mrflip/safebyok/pull/204) (`a_fixes`, tip `50b15c25`), restacked
+2026-10-19 from [#195](https://github.com/mrflip/safebyok/pull/195). Justify: green; core 2583
+(35 skipped), react 274, demo 215 (16 skipped), 0 failed. The Coach: file as it stands; the
+create-racing-a-deletion window goes to `a_sec2` after B2.
+
+* **Restack onto #204** (over B1 #201, B3 #202, `a_fixes` #204): each `a_sec` fix kept on the
+  new shapes, `a_fixes`'s renames applied. Conflicts, and how each went:
+  * `ask.ts`, `vault.ts` (`Attempter`, `#tryAttempt`): `a_sec`'s `#over` wording, B1's
+    `PasskeyAnswer` type.
+  * `vault-provider.tsx`, `passphrase-modal.tsx` imports: `a_sec`'s (no `useLayoutEffect`;
+    `Sanitizer`, `forBoundary`), with `isCondition`.
+  * `wayin.ts`: B1's side whole; the deriver's `try`/`hostThrewRefusal` moved to where B1 put
+    `passphraseKeyOf`, `src/proof.ts`.
+  * `outcome.ts` `hostThrewRefusal`: `a_fixes`'s `isVaultError` (the mark) in place of
+    `isAnyVaultError`, `a_sec`'s condition-family-only test.
+  * `.size-limit.json`: `a_fixes`'s core budgets, then `everything` 43 to 44 kB by the rule.
+  * `notes/security.md`: both sides' entries, merged by a sonnet subagent (`a_fixes`'s pointer
+    to its mark entry, then `a_sec`'s host-throw amendment).
+  * Tests, in one repair commit: `OtherVaultError` (gone with `a_fixes`) is `TH.foreignRefusal`,
+    the unknown-kind impostor `TH.lookalikeRefusal`; B1's `proof.test.ts` "throws through what a
+    key deriver throws" now expects the `unexpected_error` wrap.
+  * **A deriver's `wrong_passphrase` no longer comes through as it came**: B1's
+    `openWithPassphrase` reads any `wrong_passphrase` from a way in as "this one did not open"
+    and refuses its own. Kind unchanged, message replaced; the vault refuses a blank passphrase
+    before deriving, so fastkey's empty-passphrase gripe cannot reach there. The vault-make test
+    keeping a condition as it came now uses `storage_unavailable`. *Deviations* below and the
+    security note still name fastkey's case.
 
 The findings are phase A's pass-2 security review (posted on the sprint PR #192): F1-F4, and
 three items queued from A6's review. Each fix has a regression test that fails without it
