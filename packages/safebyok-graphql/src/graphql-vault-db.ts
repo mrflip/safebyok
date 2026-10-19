@@ -41,9 +41,11 @@ const ServerMaxNameBytes = 640
  *   `fetchSubscriptions`); without one, nothing is pushed, and the vault refreshes after its own
  *   writes as before. A subscription that fails is not retried: it is logged, once for a failing
  *   streak, and calls `onChange`, so the vault reads again and meets the trouble itself.
- * * **Misuse crosses as misuse**: a GraphQL validation error (`BAD_USER_INPUT`,
- *   `GRAPHQL_VALIDATION_FAILED`) refuses with kind `bad_option`, quoting nothing of what the
- *   server said, which may quote the variables.
+ * * **Misuse crosses as misuse**: a record or expectation at fault is refused as `bad_record`,
+ *   by this VaultDB before it is sent or by the server's own after, crossing by its kind. A
+ *   GraphQL validation error (`BAD_USER_INPUT`, `GRAPHQL_VALIDATION_FAILED`) is therefore the
+ *   server's schema at odds with what this version sends, never the record, and refuses with kind
+ *   `bad_option`, quoting nothing of what the server said, which may quote the variables.
  *
  * @param opts - Your app's urql `client`; optionally, the `maxLockboxes` your server holds a vault
  *   to, and a `logger`, the default logger without one (a vault opened with no logger of its own hears it too).
@@ -251,6 +253,8 @@ const refusalOf = (err: CombinedError): Error => {
     const { kind } = refused.extensions
     if (isKind(kind)) { return new VaultError(kind, refused.message) }
   }
+  // Never the record's fault, nor 'bad_record': every variable has passed the base class's checks,
+  // the ones the server's VaultDB makes, so a validation error says the server serves another schema.
   if (err.graphQLErrors.some(({ extensions: { code } }) => typeof code === 'string' && MisuseCodes.has(code))) {
     return Sanitizer.refusalFor(err, 'bad_option', "The GraphQL server refused this operation's shape or variables: the schema it serves is not the one this version of safebyok-graphql sends. Serve VaultSchemaSdl from the same version.")
   }

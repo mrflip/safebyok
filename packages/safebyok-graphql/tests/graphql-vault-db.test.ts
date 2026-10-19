@@ -239,6 +239,24 @@ describe("graphqlVaultDB, its refusals", () => {
     })
   }
 
+  it("refuses a malformed lockbox as bad_record before it is sent, so the server never sees it", async () => {
+    let sent = 0
+    const answered = { toPromise: () => { sent += 1; return Promise.resolve({ data: {} }) } }
+    const counting = { query: () => answered, mutation: () => answered, subscription: () => answered }
+    const vaultDB = graphqlVaultDB({ client: counting as unknown as GraphqlVaultClient })
+    await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('open^ai', 'r1'), { ...thisVault, revision_tok: null, vault_key_epoch: 1 }), 'bad_record')
+    await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('openai', 'r1', { sidecar_json: 'not json' }), { ...thisVault, revision_tok: null, vault_key_epoch: 1 }), 'bad_record')
+    expect(sent).to.eq(0)
+  })
+
+  it("carries the server's bad_record by its kind, for a record its own VaultDB refuses", async () => {
+    const refused = new GraphQLError('Nothing was written: that lockbox is not one this package builds. Hand a VaultDB only the records and expectations a vault builds.', { extensions: { kind: 'bad_record' } })
+    const answered = { toPromise: () => Promise.resolve({ error: new CombinedError({ graphQLErrors: [refused] }) }) }
+    const server = { query: () => answered, mutation: () => answered, subscription: () => answered }
+    const refusal = await TH.expectRefusal(graphqlVaultDB({ client: server as unknown as GraphqlVaultClient }).updateBox(u1, TH.boxOf('openai', 'r1'), { ...thisVault, revision_tok: null, vault_key_epoch: 1 }), 'bad_record')
+    expect(refusal.message).to.match(/^Nothing was written/)
+  })
+
   it("carries a server's refusal by its kind, though a validation code came before it", async () => {
     const misuse = new GraphQLError('Variable "$scope" got invalid value', { extensions: { code: 'BAD_USER_INPUT' } })
     const revoked = new GraphQLError('No one is signed in, so this vault cannot be reached: sign in, then try again.', { extensions: { kind: 'identity_revoked' } })
