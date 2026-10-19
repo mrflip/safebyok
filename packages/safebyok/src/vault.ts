@@ -1858,7 +1858,9 @@ export class Vault {
    * path writes a record, so it can never bring back one that another tab's lock() erased
    * meanwhile. A handle closed while the lease opens takes nothing up, and neither does one whose
    * key was dropped or replaced meanwhile -- a lock(), del(), an unlock, the expiry -- which also
-   * leaves the lease standing now alone: the key change that landed during the read wins.
+   * leaves the lease standing now alone: the key change that landed during the read wins. Nor does
+   * one whose vault props were outrun meanwhile -- the vault deleted or made anew, or its ways in
+   * changed, elsewhere -- though no key was held for that change to drop.
    */
   async #fetchLease() {
     this.#standDownTakeUp()
@@ -1882,11 +1884,17 @@ export class Vault {
     this.#takeUp = null
   }
 
-  /** {@link fetchLease}'s work, writing nothing once `overtaken` is aborted. */
+  /**
+   * {@link fetchLease}'s work, against the vault props standing as it begins: writing nothing once
+   * `overtaken` is aborted, or once those props no longer stand -- the vault deleted or made anew,
+   * or its ways in changed (a new unlock_epoch), here or elsewhere, while no key is held to drop.
+   */
   async #takeUpLease(overtaken: AbortSignal) {
-    if (this.#vaultProps === UnreadVaultProps || this.#vaultProps === null) { return }
-    // Asked afresh after each wait: a key change may land during any of them.
-    const isOvertaken = () => overtaken.aborted
+    const standing = this.#vaultProps
+    if (standing === UnreadVaultProps || standing === null) { return }
+    // Asked afresh after each wait: a key change, or a refresh bringing new vault props, may land
+    // during any of them.
+    const isOvertaken = () => overtaken.aborted || this.#outrun(standing)
     const kept = await this.#deviceDB.getLease(this.#scope)
     // A key change since the read began makes what was read no lease to take up, nor to discard:
     // the lease standing now may be the one that change wrote.
@@ -1896,8 +1904,8 @@ export class Vault {
     const readable = checked.success && Names.sameScope(checked.data, this.#scope)
     const now = this.#clockNow()
     const fits = readable
-      && checked.data.vault_id === this.#vaultProps.vault_id
-      && checked.data.unlock_epoch === this.#vaultProps.unlock_epoch
+      && checked.data.vault_id === standing.vault_id
+      && checked.data.unlock_epoch === standing.unlock_epoch
       && checked.data.ask_passphrase_at > now
       && checked.data.ask_passphrase_at <= deadlineAfter(now, this.#leaseMillis)
     if (! fits) {
@@ -1913,16 +1921,17 @@ export class Vault {
       const unwrapped = await unwrapKeyUnder(
         lease.lease_key,
         lease.vault_key_lease_wrapped,
-        this.#leaseCtx(this.#vaultProps.vault_id, this.#vaultProps.unlock_epoch, lease.ask_passphrase_at),
+        this.#leaseCtx(standing.vault_id, standing.unlock_epoch, lease.ask_passphrase_at),
         { extractable: false, usage: ['wrapKey', 'unwrapKey'] },
       )
-      if (this.#closed || isOvertaken()) { return }
+      if (isOvertaken()) { return }
       this.#armExpiry(lease.ask_passphrase_at, now)
       this.#vaultKey = unwrapped
       this.#askPassphraseAt = lease.ask_passphrase_at
     } catch {
       // A lease that no longer opens reads as "no lease": the safe failure. One overtaken is
-      // left alone, as the lease standing now may be the overtaking change's own.
+      // left alone, as the lease standing now may be the overtaking change's own, and the next
+      // hello judges it against the vault props that stand then.
       if (isOvertaken()) { return }
       await this.#discardUnreadableLease()
     }

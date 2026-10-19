@@ -958,6 +958,57 @@ describe("a lease take-up a key change overtakes", () => {
     expect(standing?.ask_passphrase_at).to.eq(vault.askPassphraseAt).and.to.eq(world.clock.now() + SevenDaysMillis)
   })
 })
+
+/**
+ * A world whose `u1` vault stands, made with `pw`, this device holding a lease of it, and a handle
+ * opened anew on it (a reload) whose first hello is held as it unwraps that lease: `outrun` is
+ * there for the test to change the vault elsewhere meanwhile, through `other`, a second device.
+ */
+const reloadHeldAtUnwrap = async () => {
+  const world = makeWorld()
+  const before = await world.openUnlocked('pw')
+  before.close()
+  const other = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
+  const unwrapping = TH.holdNextCall(crypto.subtle, 'unwrapKey')
+  const vault = Vault.make(world.optsWith())
+  const hello = vault.hello()
+  await unwrapping.reached
+  return { world, vault, hello, other, release: unwrapping.release }
+}
+
+describe("a lease take-up the vault props outrun", () => {
+  it("stays locked when the passphrase changes on another device while a hello unwraps this device's lease", async () => {
+    const { world, vault, hello, other, release } = await reloadHeldAtUnwrap()
+    expect(vault.unlock_epoch).to.eq(1)
+    await other.changePassphrase('pw', 'pw-new')
+    // The change bell's refresh brings the new epoch while the unwrap is held.
+    await TH.eventually(() => vault.unlock_epoch === 2)
+    release()
+    await hello
+    expect(vault.state).to.eq('locked')
+    expect(vault.askPassphraseAt).to.be.null
+    // The next hello finds the old epoch's lease outdated, and discards it.
+    await vault.hello({ staleMinutes: 0 })
+    expect(vault.state).to.eq('locked')
+    expect(await world.getLease()).to.be.null
+  })
+
+  it("stays locked when the vault is deleted and made anew on another device while a hello unwraps this device's lease", async () => {
+    const { world, vault, hello, other, release } = await reloadHeldAtUnwrap()
+    const formerId = vault.vault_id
+    await other.del()
+    const remaker = await world.openUnlocked('pw-new', { deviceDB: memoryDeviceDB() })
+    await TH.eventually(() => vault.vault_id !== null && vault.vault_id !== formerId)
+    release()
+    await hello
+    expect(remaker.vault_id).to.eq(vault.vault_id)
+    expect(vault.state).to.eq('locked')
+    expect(vault.askPassphraseAt).to.be.null
+    await vault.hello({ staleMinutes: 0 })
+    expect(vault.state).to.eq('locked')
+    expect(await world.getLease()).to.be.null
+  })
+})
 // --
 
 // == [Telling, in order]: the listing published first, an answer that is only a thenable
