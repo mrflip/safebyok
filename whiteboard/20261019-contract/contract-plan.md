@@ -16,7 +16,7 @@ this line.
   (56 kB; `grep -n '^#'` is its outline). The handoff says when a ruling has changed it since.
 * **Sprint doc:** https://claude.ai/code/artifact/362ec68d-5bf3-46aa-a379-59a9c8bfb548
   (*Open Matters*, *Resolved*, *Progress*).
-* **Status:** B1 (#201) and B3 (#202) filed in line. `a_sec` (#203) held for the Coach after its second review flagged one window (row). `a_fixes` building on #202. B2 waits on `a_sec`.
+* **Status:** running. The Coach ruled `a_sec` (2026-10-19): file as it stands; `a_sec2` after B2. `a_sec` is being restacked onto #204; B2 cuts from it.
 
 ## How this plan relates to the preplan
 
@@ -185,11 +185,12 @@ over `Object.keys(vault.snapshot)`; `created_elsewhere` and `damaged_wayin` prov
 | B1 | `proof-wayin` | A's line (A1b restacked in) | opus | high | Adds `adorn`/`decorate` to `utils.ts` first. *Orchestrator:* settles the passkey proof's name (the Contract's `Ask.attempt` says `PasskeyAnswer`, the code `PasskeyProof`). Also: A3 left `props` unbuilt and `damaged_wayin` news from a listing unbuilt (summaries flag no damaged wayin yet); both are B1's. |
 | B3 | `box` | A's line | opus | high | Beside B1. |
 | B2 | `lease` | B1 + `a_sec` restacked | opus | high | *Orchestrator:* stands on `a_sec`, whose F2 fix lives in the lease take-up B2 extracts. |
-| B4 | `put-wayin` | B2 | opus | medium | Writes its Contract section to the thread file first; YOLO builds to the brief. |
+| `a_sec2` | `a_sec2` | B2 | opus | high | *Orchestrator:* the Coach's ruling (2026-10-19): close the create window `a_sec`'s second review left (a create racing a deletion elsewhere leaves this device unlocked on the deleted vault until its next read) in B2's lease shape; the stale-read rollback; `notes/security.md`'s host-throw sentence (condition only), through the sonnet subagent; fastkey's README lines 72-80 and changeset (`bad_option` is now `unexpected_error`). A TODO entry: cross-device invalidation comes from a proper mechanism, each device authenticating a token when it joins or creates a vault. |
+| B4 | `put-wayin` | `a_sec2` | opus | medium | Writes its Contract section to the thread file first; YOLO builds to the brief. *Orchestrator:* the Coach's ruling (2026-10-19): the strength checker's contract is "return a value saying good or bad"; any throw from it (or from react's `passphraseAdvice`) is an `unexpected_error` naming the function, carrying none of the thrown value's kind, meta or cause (today a thrown condition passes through). |
 | B5 | `placement` | B3 + B4 restacked | opus | low | *Orchestrator:* the preplan stacks B5 on B4 only, but B5 reads all four model classes, so B3 joins the line first. |
 
-*Orchestrator (line):* B's line is restacked as B1 → B3 → `a_sec` → B2 → B4 → B5: B3 and
-`a_sec` each go onto the line as they file, and B2 cuts from the top once both are in.
+*Orchestrator (line):* B's line is B1 → B3 → `a_fixes` → `a_sec` → B2 → `a_sec2` → B4 → B5.
+`a_sec` is restacked onto #204 (ruled 2026-10-19), and B2 cuts from it.
 
 *Review (B3, #202, `flagged` then `fixed`, high, two reviews):* crypto moved unchanged. Flagged:
 boxes read `vault_id`/`vault_key_epoch` off the lagging snapshot getters; reworked to take a
