@@ -24,7 +24,9 @@ import { expectBad, expectingGood } from './refusals'
  *   describeDeviceDB('memoryDeviceDB', () => memoryDeviceDB())
  * @example
  *   describeDeviceDB('idbDeviceDB', () => idbDeviceDB({ dbName: TH.freshDbName() }), () => {
- *     failOpens()   // every indexedDB.open refused as a browser refuses storage it withholds, undone with onTestFinished
+ *     // Every open refused as a browser refuses one from an opaque origin, until the test ends.
+ *     const opening = vi.spyOn(indexedDB, 'open').mockImplementation(() => { throw new DOMException('The operation is insecure.', 'SecurityError') })
+ *     onTestFinished(() => { opening.mockRestore() })
  *     return idbDeviceDB({ dbName: TH.freshDbName() })
  *   })
  */

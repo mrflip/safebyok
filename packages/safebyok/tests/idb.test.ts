@@ -39,10 +39,11 @@ const failWritesOverQuota = () => {
 }
 
 // Each test gets its own database, so tests never see each other's rows. Its blocked store is one
-// whose every open the browser refuses as it refuses storage it withholds, as describeDeviceDB's
-// second example runs it.
+// whose every open the browser refuses, as describeDeviceDB's second example runs it.
 TH.describeDeviceDB('idbDeviceDB', () => idbDeviceDB({ dbName: TH.freshDbName() }), () => {
-  failOpens()
+  // Every open refused as a browser refuses one from an opaque origin, until the test ends.
+  const opening = vi.spyOn(indexedDB, 'open').mockImplementation(() => { throw new DOMException('The operation is insecure.', 'SecurityError') })
+  onTestFinished(() => { opening.mockRestore() })
   return idbDeviceDB({ dbName: TH.freshDbName() })
 })
 
@@ -58,11 +59,18 @@ describe("idbDeviceDB over storage the browser withholds", () => {
     expect(await TH.expectGood(deviceDB.getMark(scope))).to.be.null
   })
 
-  it("answers an open the browser refuses as storage_blocked, its SecurityError the cause", async () => {
+  it("answers every verb as storage_blocked when the browser refuses each open through its request's onerror, its SecurityError the cause", async () => {
     const deviceDB = idbDeviceDB({ dbName: TH.freshDbName() })
     failOpens()
-    const refused = await TH.expectBad(deviceDB.getLease(TH.scopeOf('u1')), 'storage_blocked')
+    const scope = TH.scopeOf('u1')
+    const refused = await TH.expectBad(deviceDB.getLease(scope), 'storage_blocked')
     expect(refused.cause).to.be.instanceOf(DOMException).and.to.have.property('name', 'SecurityError')
+    await TH.expectBad(deviceDB.putLease(await TH.leaseOf('u1')), 'storage_blocked')
+    await TH.expectBad(deviceDB.delLease(scope), 'storage_blocked')
+    await TH.expectBad(deviceDB.getMark(scope), 'storage_blocked')
+    await TH.expectBad(deviceDB.putMark(TH.markOf('u1')), 'storage_blocked')
+    await TH.expectBad(deviceDB.delMark(scope), 'storage_blocked')
+    await TH.expectBad(deviceDB.delAll(), 'storage_blocked')
   })
 })
 
