@@ -123,8 +123,8 @@ export class Ask {
     const lockedOut = onAbort(landed.signal, () => bad(lockLandedError()))
     // Whichever comes first: an answer that comes after a lock is dropped. The answer ends the
     // prompt for its attempts too, before any waiter hears it: an attempt still running once the
-    // vault stops tracking this ask -- after a Cancel, or a second submit -- could unlock the vault
-    // after a later lock() had returned, and none can now.
+    // vault stops tracking this ask -- after a Cancel, or a second submit -- would otherwise unlock
+    // the vault after a later lock() had returned.
     const answered = async () => {
       const outcome = await Promise.race([outcomeOf(() => ask.#answerFrom(getProof), unexpectedError), lockedOut])
       over.abort()
