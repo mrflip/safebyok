@@ -102,7 +102,7 @@ describe("vaultResolvers, in a host's schema", () => {
     const db = await TH.emptyDatabase()
     await TH.requestFor(db, 'u1').fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
     const result = await asked(TH.schemaOver(db), VaultOperations.safebyokUpdateBox, { scope: u1, lockbox: TH.boxOf('openai', 'r1'), expected: { vault_id: 'vault-id-u1', vault_key_epoch: 1 } })
-    expect(result).to.deep.equal({ data: { safebyokUpdateBox: true } })
+    expect(result).to.deep.equal({ data: { safebyokUpdateBox: TH.boxOf('openai', 'r1') } })
   })
 })
 

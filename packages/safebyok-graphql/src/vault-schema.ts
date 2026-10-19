@@ -163,8 +163,8 @@ type Mutation {
   safebyokFetchOrCreateVaultProps(vaultProps: SafebyokVaultPropsInput!): SafebyokVaultProps!
   """Replaces the vault props, only while those standing are the ones expected."""
   safebyokUpdateVaultProps(vaultProps: SafebyokVaultPropsInput!, expected: SafebyokVaultPropsExpectationInput!): Boolean!
-  """Writes the lockbox under its boxlabel, only while what stands is what was expected."""
-  safebyokUpdateBox(scope: SafebyokVaultScopeInput!, lockbox: SafebyokLockboxInput!, expected: SafebyokLockboxExpectationInput!): Boolean!
+  """Writes the lockbox under its boxlabel, only while what stands is what was expected, and answers with the lockbox as stored."""
+  safebyokUpdateBox(scope: SafebyokVaultScopeInput!, lockbox: SafebyokLockboxInput!, expected: SafebyokLockboxExpectationInput!): SafebyokLockbox!
   """Retires the lockbox under that boxlabel, removing it for good, only while the vault is the one expected."""
   safebyokRetireBox(scope: SafebyokVaultScopeInput!, boxlabel: String!, expected: SafebyokRetireExpectationInput!): Boolean!
   """Retires the vault, its props and every lockbox, removing them for good, only while the vault is the one expected."""

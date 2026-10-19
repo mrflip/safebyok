@@ -98,8 +98,10 @@ export type VaultDBOpts = {
  *    write.
  *  * **Write only as expected.** Every update and retirement carries an expectation of what
  *    stands in storage, and writes only if it still does: check and write in one atomic step (a
- *    transaction, a conditional write), and resolve `false` when the expectation fails. A
- *    retirement's names only the vault, never a revision: within the right vault, a retirement wins.
+ *    transaction, a conditional write), and resolve `false` when the expectation fails. A lockbox
+ *    write resolves `null` instead, and when it lands, the record as you now hold it, read back in
+ *    the same step. A retirement names only the vault, never a revision: within the right vault, a
+ *    retirement wins.
  *  * **Enforce who may reach which rows.** Your backend should let a signed-in user reach only
  *    their own records: safebyok's encryption protects the contents, your authorization decides
  *    who may fetch or overwrite them at all. When no one is signed in, or someone other than the
@@ -258,12 +260,7 @@ export abstract class VaultDB {
     const label = heldBoxlabel(this, boxlabel)
     const raw = await fromStorage(() => this.doReadBox(asked, label))
     if (raw === null || raw === undefined) { return null }
-    const lockbox = checkRecord(Lockbox, raw, 'lockbox')
-    // A record that names some other boxlabel is a record out of place, wherever it came from.
-    if (lockbox.boxlabel !== label) {
-      throw new VaultError('corrupt_record', 'The stored lockbox names a different boxlabel than the one asked for. It was left as it is.')
-    }
-    return lockbox
+    return checkLockbox(raw, label)
   }
 
   /**
@@ -312,8 +309,13 @@ export abstract class VaultDB {
    * backend's `maxRecordBytes` is refused with kind `lockbox_too_large` before storage sees it. A
    * lockbox is written under the vaultKey it was sealed with, so its `vault_key_epoch` must be the
    * one in `expected`: kind 'bad_option' otherwise.
+   *
+   * Resolves the lockbox as storage now holds it, handed back by the same atomic step as the write
+   * and held to the check `readBox` makes: field for field the one written, from an adapter that
+   * keeps its contract. One that fails that check is refused as `corrupt_record`, though the write
+   * may have landed: the adapter wrote something it cannot read back.
    */
-  async updateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<void> {
+  async updateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<Lockbox> {
     const asked = heldScope(this, scope)
     heldBoxlabel(this, LabelledBox.safeParse(lockbox).data?.boxlabel)
     const outgoing = checkOutgoing(Lockbox, lockbox, 'lockbox')
@@ -325,8 +327,9 @@ export abstract class VaultDB {
     if (recordBytes > this.maxRecordBytes) {
       throw new VaultError('lockbox_too_large', `That lockbox weighs ${String(recordBytes)} bytes, over the ${String(this.maxRecordBytes)} its storage holds in one record, so nothing was written: store a smaller whisper or sidecar, or under a shorter boxlabel.`)
     }
-    const landed = await fromStorage(() => this.doUpdateBox(asked, outgoing, expectation))
-    if (! landed) { throw Refusals.staleWrite('lockbox') }
+    const stored = await fromStorage(() => this.doUpdateBox(asked, outgoing, expectation))
+    if (stored === null) { throw Refusals.staleWrite('lockbox') }
+    return writtenBack('a lockbox write', () => checkLockbox(stored, outgoing.boxlabel))
   }
 
   /**
@@ -482,9 +485,11 @@ export abstract class VaultDB {
    * Store `lockbox` under its boxlabel if, and only if, the scope's standing vault props have
    * `expected.vault_id` and `expected.vault_key_epoch`, and the standing lockbox has
    * `expected.revision_tok` -- or, when that is null, no lockbox stands there: all compared in the
-   * same atomic step as the write. True when it was written; false, writing nothing, otherwise.
+   * same atomic step as the write. Resolves the record as stored once written, read back in that
+   * same step (a `RETURNING`, a mutation's return value, a read in the transaction), exactly as a
+   * `doReadBox` would hand it up; null, writing nothing, otherwise.
    */
-  protected abstract doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<boolean>
+  protected abstract doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<unknown>
   /**
    * Remove the lockbox under `boxlabel` if, and only if, the scope's standing vault props have
    * `expected.vault_id`. True when those vault props stand, whether or not there was a lockbox to
@@ -751,6 +756,30 @@ const isSoundVaultProps = (raw: unknown, scope: VaultScope): boolean => {
 /** The one field of stored vault props a retirement needs, as the vault's own check has it. */
 const StoredVaultId = Z.object({ vault_id: VaultProps.shape.vault_id })
 
+/** A stored lockbox, as `readBox` holds it: a lockbox's shape, under the boxlabel it was asked for. */
+const checkLockbox = (raw: unknown, boxlabel: string): Lockbox => {
+  const lockbox = checkRecord(Lockbox, raw, 'lockbox')
+  // A record that names some other boxlabel is a record out of place, wherever it came from.
+  if (lockbox.boxlabel !== boxlabel) {
+    throw new VaultError('corrupt_record', 'The stored lockbox names a different boxlabel than the one asked for. It was left as it is.')
+  }
+  return lockbox
+}
+
+/**
+ * What an adapter handed back from `said`, a write that landed, through `check`, the check a read
+ * of it would make. What fails that check is refused as `corrupt_record`, the check's own refusal
+ * as its cause, saying the write may have landed: storage holds what its adapter cannot read back.
+ */
+const writtenBack = <ResultT>(said: string, check: () => ResultT): ResultT => {
+  try {
+    return check()
+  } catch (err) {
+    if (! isVaultError(err, 'corrupt_record')) { throw err }
+    throw new VaultError('corrupt_record', `Storage says ${said} landed, but handed back what this package cannot read: its adapter wrote something it cannot read back. Reading the vault again shows what stands; the storage adapter needs a developer's look.`, { cause: err })
+  }
+}
+
 /**
  * A stored record through its validator, with failure as a calm VaultError: storage is someone
  * else's database, and a record may be damaged or written by another version of this package.
@@ -876,13 +905,13 @@ class StringStoreVaultDB extends VaultDB {
     ))
   }
 
-  protected doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<boolean> {
+  protected doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<unknown> {
     return soon(() => {
+      const ckey = Ckeys.box(scope, lockbox.boxlabel)
       const standingVaultProps = readJson(this.store, Ckeys.vaultProps(scope))
-      const standingBox = readJson(this.store, Ckeys.box(scope, lockbox.boxlabel))
-      if (! Expectations.lockboxMeets(standingVaultProps, standingBox, expected)) { return false }
-      this.store.write(Ckeys.box(scope, lockbox.boxlabel), JSON.stringify(lockbox))
-      return true
+      if (! Expectations.lockboxMeets(standingVaultProps, readJson(this.store, ckey), expected)) { return null }
+      this.store.write(ckey, JSON.stringify(lockbox))
+      return readJson(this.store, ckey)
     })
   }
 

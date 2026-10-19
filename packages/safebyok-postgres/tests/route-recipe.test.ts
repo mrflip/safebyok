@@ -95,10 +95,7 @@ class RouteVaultDB extends VaultDB {
     const lockboxes = await this.call('listBoxes', scope) as { boxlabel: string }[]
     return lockboxes.map((lockbox) => ({ boxlabel: lockbox.boxlabel, lockbox }))
   }
-  protected async doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation) {
-    await this.call('updateBox', scope, lockbox, expected)
-    return true
-  }
+  protected doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation) { return this.call('updateBox', scope, lockbox, expected) }
   protected async doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation) {
     await this.call('retireBox', scope, boxlabel, expected)
     return true
@@ -108,7 +105,8 @@ class RouteVaultDB extends VaultDB {
     return true
   }
 
-  // A stale write refuses on the server and crosses as its kind, so a write that answers lands.
+  // A stale write refuses on the server and crosses as its kind, so a write that answers landed:
+  // a lockbox write answers with the lockbox as the server's storage holds it.
   private async call(verb: string, ...args: unknown[]): Promise<unknown> {
     const response = await this.fetcher(VaultRouteUrl, {
       method:  'POST',

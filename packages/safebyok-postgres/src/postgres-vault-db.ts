@@ -174,7 +174,8 @@ const ExpectedVaultSql = `SELECT applabel, user_id, vaultlabel, vault_id FROM sa
 // limit, when nothing is counted: Postgres runs the count, an uncorrelated subquery, only when the
 // CASE asks for it. It answers one row that says why it did or did not land: whether it landed,
 // whether the vault props it expects stood, whether the boxlabel was already taken, and whether
-// the vault was already at its limit.
+// the vault was already at its limit -- and, when it landed, the lockbox's columns as the insert
+// stored them, from its RETURNING, null otherwise.
 //
 // Nothing is counted in advance: the limit is the count of the vault's lockboxes at the start of
 // this statement, a best effort. Under READ COMMITTED, Postgres's default, writers racing for the
@@ -193,14 +194,17 @@ const InsertBoxSql = `WITH vault AS (
     SELECT applabel, user_id, vaultlabel, vault_id, ${Columns.placeholders(LockboxColumns, LockboxParamsFrom)}
     FROM vault, counted WHERE $6::bigint IS NULL OR counted.standing < $6::bigint
     ON CONFLICT (applabel, user_id, vaultlabel, boxlabel) DO NOTHING
-    RETURNING 1
+    RETURNING ${Columns.selected(LockboxColumns)}
   )
   SELECT EXISTS (SELECT 1 FROM inserted) AS landed,
          EXISTS (SELECT 1 FROM vault) AS vault_stands,
          EXISTS (SELECT 1 FROM safebyok_lockboxes WHERE ${ScopeIs} AND boxlabel = ${Columns.placeholderOf(LockboxColumns, 'boxlabel', LockboxParamsFrom)}) AS box_stood,
-         COALESCE((SELECT standing FROM counted) >= $6::bigint, false) AS was_full`
+         COALESCE((SELECT standing FROM counted) >= $6::bigint, false) AS was_full,
+         inserted.*
+  FROM (SELECT 1) AS answer LEFT JOIN inserted ON true`
 
-// A lockbox over the revision read, beside the vault props it expects.
+// A lockbox over the revision read, beside the vault props it expects, answering with its columns
+// as the update stored them: no row when it did not land.
 const ReplaceBoxSql = `WITH vault AS (
     ${ExpectedVaultSql}
   )
@@ -208,7 +212,7 @@ const ReplaceBoxSql = `WITH vault AS (
   WHERE ${ScopeIs} AND vault_id = $4::text AND revision_tok = $6::text
     AND boxlabel = ${Columns.placeholderOf(LockboxColumns, 'boxlabel', LockboxParamsFrom)}
     AND EXISTS (SELECT 1 FROM vault)
-  RETURNING 1 AS landed`
+  RETURNING ${Columns.selected(LockboxColumns)}`
 
 // Lands while the vault props of that vault_id stand, whether or not there was a lockbox to retire.
 const RetireBoxSql = `WITH retired AS (
@@ -277,22 +281,24 @@ class TablesVaultDB extends VaultDB {
     return rows.map((row) => ({ boxlabel: (row as { boxlabel: string }).boxlabel, lockbox: Columns.recordOf(row, ListedLockboxColumns) }))
   }
 
-  protected async doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<boolean> {
+  // The lockbox handed back is the row as the statement that wrote it returned it.
+  protected async doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<unknown> {
     this.mustReach(scope)
     const boxParams = Columns.paramsOf(lockbox, LockboxColumns)
     if (expected.revision_tok !== null) {
       const params = [...scopeParams(scope), expected.vault_id, expected.vault_key_epoch, expected.revision_tok, ...boxParams]
-      return landed(await this.client.query(ReplaceBoxSql, params))
+      const { rows } = await this.client.query(ReplaceBoxSql, params)
+      return rows.length === 0 ? null : Columns.recordOf(rows[0], LockboxColumns)
     }
     const outcome = await this.insertBox([...scopeParams(scope), expected.vault_id, expected.vault_key_epoch, this.maxLockboxes === Infinity ? null : this.maxLockboxes, ...boxParams])
-    if (outcome === null) { return false }
-    if (outcome.landed) { return true }
+    if (outcome === null) { return null }
+    if (outcome.landed) { return Columns.recordOf(outcome, LockboxColumns) }
     // A vault gone or made anew, or its vaultKey replaced, or a boxlabel already taken (a lockbox
     // the writer missed, which it would replace, and which is never refused for the count), is a
     // stale writer. Otherwise
     // the vault was at its limit when the statement began; and if it was not, a writer racing for
     // this boxlabel got in after the snapshot, and this one is only stale as well.
-    if (! outcome.vault_stands || outcome.box_stood || ! outcome.was_full) { return false }
+    if (! outcome.vault_stands || outcome.box_stood || ! outcome.was_full) { return null }
     throw Refusals.vaultFull(this.maxLockboxes)
   }
 
@@ -345,7 +351,10 @@ class TablesVaultDB extends VaultDB {
   }
 }
 
-/** The one row {@link InsertBoxSql} answers: why a first lockbox write did, or did not, land. */
+/**
+ * The one row {@link InsertBoxSql} answers: why a first lockbox write did, or did not, land, beside
+ * the lockbox's columns as inserted, null where it did not.
+ */
 type InsertBoxOutcome = { landed: boolean, vault_stands: boolean, box_stood: boolean, was_full: boolean }
 
 /** Postgres's error code for a foreign key violation: `23503`. */

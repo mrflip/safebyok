@@ -189,10 +189,7 @@ export class RouteVaultDB extends VaultDB {
     const lockboxes = await this.call('listBoxes', scope) as { boxlabel: string }[]
     return lockboxes.map((lockbox) => ({ boxlabel: lockbox.boxlabel, lockbox }))
   }
-  protected async doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation) {
-    await this.call('updateBox', scope, lockbox, expected)
-    return true
-  }
+  protected doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation) { return this.call('updateBox', scope, lockbox, expected) }
   protected async doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation) {
     await this.call('retireBox', scope, boxlabel, expected)
     return true
@@ -202,7 +199,8 @@ export class RouteVaultDB extends VaultDB {
     return true
   }
 
-  // A stale write refuses on the server and crosses as its kind, so a write that answers lands.
+  // A stale write refuses on the server and crosses as its kind, so a write that answers landed:
+  // a lockbox write answers with the lockbox as the server's storage holds it.
   private async call(verb: string, ...args: unknown[]): Promise<unknown> {
     const response = await fetch(VaultRouteUrl, {
       method:  'POST',
@@ -381,10 +379,12 @@ shape of table, copy it, and keep to what makes it right:
 
 * **Extend `VaultDB` and write its `do*` methods**, never its public verbs: the base class checks
   labels and scope on the way in, validates every record on the way out, and turns a `false`
-  into `stale_write` and anything you throw into `storage_unavailable`.
+  (from a lockbox write, a `null`) into `stale_write` and anything you throw into
+  `storage_unavailable`.
 * **One statement per verb**, so each is atomic without a transaction: the expectation goes in
   the `WHERE` (`UPDATE ... WHERE vault_id = $ AND unlock_epoch = $ RETURNING 1`), and a row
-  back means it landed. A create returns the row that stands with `ON CONFLICT ... DO UPDATE`
+  back means it landed. A lockbox write returns the row's columns (`RETURNING format, boxlabel,
+  ...`): the lockbox as stored, which the base class reads back as it would a read. A create returns the row that stands with `ON CONFLICT ... DO UPDATE`
   (a no-op update), since `DO NOTHING` returns no row when another device got in first.
 * **Let the schema hold the vault together.** The lockbox's foreign key names its vault row down
   to the `vault_id`, so a lockbox cannot outlive its vault or land in one made anew, and retiring

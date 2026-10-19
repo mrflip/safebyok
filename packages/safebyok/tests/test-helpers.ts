@@ -1210,9 +1210,24 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
     it("adds nothing it was handed beyond the record: a field safebyok never writes is left behind", async () => {
       const vaultDB = await makeVaultDB()
       await vaultDB.fetchOrCreateVaultProps({ ...vaultPropsOf('u1'), stray_field: 'never stored' } as VaultProps)
-      await vaultDB.updateBox(scopeOf('u1'), { ...boxOf('anthropic', 'one'), stray_field: 'never stored' } as Lockbox, noBoxYet)
+      const written = await vaultDB.updateBox(scopeOf('u1'), { ...boxOf('anthropic', 'one'), stray_field: 'never stored' } as Lockbox, noBoxYet)
       expect(await vaultDB.readVaultProps(scopeOf('u1'))).to.deep.equal(vaultPropsOf('u1'))
       expect(await vaultDB.readBox(scopeOf('u1'), 'anthropic')).to.deep.equal(boxOf('anthropic', 'one'))
+      expect(written).to.deep.equal(boxOf('anthropic', 'one'))
+    })
+
+    it("hands back from a lockbox write the record as stored, field for field the one written and the one a read then finds", async () => {
+      const vaultDB = await withVaultProps()
+      const writes = [
+        [boxOf('anthropic', 'one'),                                                   noBoxYet],
+        [boxOf('anthropic', 'two', { sidecar_json: sidecarJsonOf(LiteralSidecar) }), { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 1 }],
+        [boxOf('openai', 'one', { sidecar_json: '{}' }),                              noBoxYet],
+      ] as const
+      for (const [lockbox, expected] of writes) {
+        const written = await vaultDB.updateBox(scopeOf('u1'), lockbox, expected)
+        expect(written).to.deep.equal(lockbox)
+        expect(await vaultDB.readBox(scopeOf('u1'), lockbox.boxlabel)).to.deep.equal(written)
+      }
     })
   })
 
@@ -1417,6 +1432,17 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'two'), noBoxYet), 'stale_write')
       await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'two'), { vault_id: 'vault-id-u1', revision_tok: 'rev-other', vault_key_epoch: 1 }), 'stale_write')
       expect(await vaultDB.readBox(scopeOf('u1'), 'anthropic')).to.deep.equal(boxOf('anthropic', 'one'))
+    })
+
+    it("hands back the lockbox it wrote over the revision it read, and nothing from a write refused as stale", async () => {
+      const vaultDB = await withVaultProps()
+      await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'one'), noBoxYet)
+      const landed = await vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'two'), { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 1 })
+      expect(landed).to.deep.equal(boxOf('anthropic', 'two'))
+      // Refused, it rejects: there is no record to resolve, and none is carried on the refusal.
+      const refusal = await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'three'), { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 1 }), 'stale_write')
+      expect(quotedOf(refusal, landed)).to.deep.equal([])
+      expect(await vaultDB.readBox(scopeOf('u1'), 'anthropic')).to.deep.equal(landed)
     })
 
     it("refuses a write into a scope that holds no vault props", async () => {

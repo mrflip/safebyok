@@ -16,7 +16,9 @@ import {
  *
  * Every update checks its expectation in the same transaction it writes in, and Convex runs
  * mutations serializably, so the check holds for real. A failed expectation writes nothing and
- * resolves `false` (the client refuses it as `stale_write`); it is not an error. A retire expects
+ * resolves `false` -- for a lockbox write, `null` -- which the client refuses as `stale_write`; it
+ * is not an error. A lockbox write that lands resolves the lockbox as stored, read back in its
+ * own transaction. A retire expects
  * only the vault: it wins over any lockbox revision, but never lands in a vault made anew.
  *
  * Every vault is held to the limits in `./tallies`, whatever its client asks, so that it can
@@ -107,8 +109,9 @@ export const listBoxSummaries = query({
 /**
  * Write `lockbox` under its boxlabel, only while the scope's vault props have `expected.vault_id`
  * and `expected.vault_key_epoch` -- they stand for the vaultKey the lockbox was sealed under -- and
- * the standing lockbox has `expected.revision_tok` -- or, for null, there is none. True when
- * written; false, writing nothing, otherwise -- including when the scope holds no vault props.
+ * the standing lockbox has `expected.revision_tok` -- or, for null, there is none. Resolves the
+ * lockbox as stored once written, read back in this same transaction; null, writing nothing,
+ * otherwise -- including when the scope holds no vault props.
  *
  * Refuses, writing nothing, with a `ConvexError` of kind `vault_full` a write that would take the
  * vault past {@link Tallies.MaxVaultLockboxes} lockboxes or {@link Tallies.MaxVaultLockboxBytes}
@@ -117,13 +120,13 @@ export const listBoxSummaries = query({
  */
 export const updateBox = mutation({
   args:    { scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation },
-  returns: v.boolean(),
+  returns: v.nullable(Lockbox),
   handler: async (ctx, { scope, lockbox, expected }) => {
     const vaultProps = await findVaultPropsRow(ctx.db, scope)
-    if (vaultProps?.vault_id !== expected.vault_id || vaultProps.vault_key_epoch !== expected.vault_key_epoch) { return false }
+    if (vaultProps?.vault_id !== expected.vault_id || vaultProps.vault_key_epoch !== expected.vault_key_epoch) { return null }
     const standing = await findBoxRow(ctx.db, scope, lockbox.boxlabel)
     const standingRevisionTok = standing?.revision_tok ?? null
-    if (standingRevisionTok !== expected.revision_tok) { return false }
+    if (standingRevisionTok !== expected.revision_tok) { return null }
     //
     const row = boxRowOf(scope, lockbox)
     const reckoning = await Tallies.reckon(ctx.db, vaultProps._id, vaultBoxQuery(ctx.db, scope))
@@ -140,7 +143,8 @@ export const updateBox = mutation({
       ? await ctx.db.insert('safebyok_lockboxes', row)
       : await replaceBoxRow(ctx.db, standing._id, row)
     await Tallies.record(ctx.db, vaultProps._id, reckoning, growthAs(rowId))
-    return true
+    const stored = await ctx.db.get('safebyok_lockboxes', rowId)
+    return stored && lockboxOfRow(stored)
   },
 })
 
