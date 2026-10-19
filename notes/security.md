@@ -34,6 +34,26 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-19 (thread A5, react_over_class): **`VaultProvider` holds `onBadNews` in a ref, defers its
+  first `hello()` a microtask, and throws `Vault.make`'s refusal from the effect.** (1) The provider
+  hands `Vault.make` one stable teller that calls whichever handler the last committed render passed
+  (updated in a layout effect), so a handler written inline makes no new vault. Bad news (a
+  `VaultError`, never secret material) may therefore reach a handler from a later render than the one
+  that made the vault; with no handler the teller does nothing, as `Vault.make`'s own default (null)
+  does; the vault still keeps a handler's throw as `trouble`, as before. A handler that is anything
+  but a function (or none) is passed to `Vault.make` as it came, which refuses it `bad_option`.
+  (2) The provider's first `hello()` runs one microtask after the effect that makes the vault, and is
+  skipped if the provider has let that vault go by then. StrictMode's development rehearsal makes a
+  vault and closes it in the same task, so the rehearsed vault never subscribes or reads storage (a
+  test counts `subscribe`, `getVaultProps` and `getMark`: one each); `Vault.make` is inert, so the
+  rehearsed handle holds nothing. (3) `Vault.make`'s throw (misuse, `bad_option`) is thrown from the
+  effect itself, which React delivers to the nearest error boundary as the very `VaultError`, rather
+  than held in state and rethrown in render; a `hello()` refused as misuse, or with a value that is no
+  `VaultError`, is still held and thrown in render. (4) `useOpenError().openError` is what the
+  provider's own `hello()` was refused with while the vault is still `opening` (a condition or bad
+  news), cleared once it opens; the snapshot's `trouble` is the latest bad news on any read, never a
+  condition; a damaged record is both, the very same error object. `retryOpen()` and the re-hello
+  after `delDamagedVault()` call `vault.tryHello({ staleMinutes: 0 })`, a fresh read of storage.
 * 2026-10-19 (branch 20261019-fields_and_make): **`Vault.make` takes a host function, `onBadNews(news)`,
   called with every `bad_news` refusal.** The family (`damaged_vault`, `rolled_back`,
   `identity_revoked`, `newer_format`, `damaged_box`, `damaged_wayin`) is told synchronously, before
