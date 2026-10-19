@@ -208,7 +208,8 @@ the core's own records, scopes and expectations.
 | `watchVault`              | query    | `{ scope }`                                                                 | `{ vault_id, unlock_epoch, boxes: [[boxlabel, revision_tok]] }`, changing with every write |
 
 `scope` is `{ applabel, user_id, vaultlabel }`. A `revision_tok` of null expects no lockbox there; in a
-`retireBox`, it names a lockbox listed with none, so any lockbox it removes is `retired_other`.
+`retireBox`, it names a lockbox listed with none, so a lockbox it removes that holds a revision is
+`retired_other`.
 
 ## Testing your own functions
 

@@ -104,6 +104,14 @@ describe("retireBox", () => {
     const { lockboxes } = await allRows(CVX)
     expect(lockboxes).to.have.lengthOf(0)
   })
+
+  it("resolves retired for a lockbox holding an empty revision, which the client lists with none, when it names none", async () => {
+    const CVX = await withVaultProps()
+    await CVX.run(async (ctx) => { await ctx.db.insert('safebyok_lockboxes', { ...u1, ...TH.boxOf('anthropic_api_key', 'a1'), revision_tok: '' }) })
+    expect(await CVX.mutation(TH.vaults.retireBox, { scope: u1, boxlabel: 'anthropic_api_key', expected: TH.retiring(null) })).to.deep.equal({ outcome: 'retired' })
+    const { lockboxes } = await allRows(CVX)
+    expect(lockboxes).to.have.lengthOf(0)
+  })
 })
 
 describe("listBoxSummaries", () => {
