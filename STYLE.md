@@ -19,7 +19,7 @@ is a bug.
   name: `import * as Wayin from './wayin'`, then `Wayin.open(...)`. Its functions are
   vigorous verbs: `open`, not `wayinOpen`.
 * **A module with one primary noun** is imported by name, its friends riding along:
-  `import { Lockbox, LockboxKinds } from './lockbox'`.
+  `import { Box, BoxKinds } from './box'`.
 * When a list of type imports grows cumbersome, import the types whole under a short name ending
   in `T`: `import type * as VT from './vault-types'`.
 * Follow a library's own import conventions where it has one: `import * as Z from 'zod/mini'` is ours
@@ -39,15 +39,15 @@ always a salient prefix: `vaultlabel`, `profilename`. The linter refuses these, 
 variable, parameter or destructured name; a property spelled that way (`{ name: 'AES-GCM' }`)
 is someone else's interface, and fine.
 
-**The cast is named in VOCABULARY.md** -- whisper, lockbox, vault, passphrase, each key and its
+**The cast is named in VOCABULARY.md** -- whisper, box, vault, passphrase, each key and its
 encrypted form -- and those names are used as written, never a synonym. Never `data`, `contents`
 or `payload` for a variable or field we control: it is a whisper, or a whisperCiphered.
 
 **Never bare `key`.** In this package a key is cryptographic until proven otherwise, so:
 
 * a **cryptographic key** is named for its role, as VOCABULARY.md has it: `passphraseKey`,
-  `vaultKey`, `lockboxKey`, `leaseKey`. Not `kek` or `dek`. A WebCrypto `CryptoKey` and its
-  raw bytes are told apart by a tag: `lockboxKey` is the `CryptoKey`, `lockboxKeyBytes` the
+  `vaultKey`, `boxKey`, `leaseKey`. Not `kek` or `dek`. A WebCrypto `CryptoKey` and its
+  raw bytes are told apart by a tag: `boxKey` is the `CryptoKey`, `boxKeyBytes` the
   `Uint8Array`.
 * a **map key** is a `ckey` (see *Tags*).
 
@@ -159,8 +159,8 @@ between columns lets the editor align them (see *Tests*).
   functions, its limits checks: `Z.optional(Z.string().check(Z.maxLength(256)))` where classic
   reads `z.string().max(256).optional()`. A test playing a host may import classic, as a host
   would.
-* Enumerations lead with their values, then the type: `export const LockboxKindVals = [...] as
-  const`, `export type LockboxKind = typeof LockboxKindVals[number]`.
+* Enumerations lead with their values, then the type: `export const BoxKindVals = [...] as
+  const`, `export type BoxKind = typeof BoxKindVals[number]`.
 * Name a schema after what it checks, in the same case: the field `salt_bytes` has the validator
   `salt_bytes`.
 * **A validation error must never quote a secret.** Zod's issues can carry the input they
@@ -176,10 +176,10 @@ between columns lets the editor align them (see *Tests*).
   what it is and how to use it, never how it came to be, what's next, or how it works inside. A
   caveat for future authors is a running comment by the code it concerns.
 * Lead with what the thing *is* or *returns*, skipping "Creates" and "Calculates" and articles
-  that add nothing: `One lockbox's whisper, ciphered under its lockboxKey`.
+  that add nothing: `One box's whisper, ciphered under its boxKey`.
 * Order: header, `@param`, `@returns`, a blank line, then `@example`s -- don't be stingy with
   those. A short example on one line; a long one on following lines, indented two spaces.
-* A `@param` is the parameter's role, an entry in the playbill: `@param boxlabel - Lockbox to
+* A `@param` is the parameter's role, an entry in the playbill: `@param boxlabel - Box to
   open, as its owner named it.`
 * The first line must stand alone when folded in an editor: `/** Brief statement */`, or a
   sentence that continues on the following lines.

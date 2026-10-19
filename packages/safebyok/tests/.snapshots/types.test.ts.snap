@@ -1,5 +1,103 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`Stored record formats > safebyok-box-v6 1`] = `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "box_key_wrapped": {
+      "additionalProperties": false,
+      "properties": {
+        "cipher_iv_b64": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "ciphertext_b64": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "cipher_iv_b64",
+        "ciphertext_b64",
+      ],
+      "type": "object",
+    },
+    "boxlabel": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "type": "string",
+    },
+    "format": {
+      "const": "safebyok-box-v6",
+      "type": "string",
+    },
+    "registered_at": {
+      "maximum": 9007199254740,
+      "minimum": 347155200000,
+      "type": "integer",
+    },
+    "revision_tok": {
+      "minLength": 1,
+      "type": "string",
+    },
+    "sidecar_json": {
+      "type": "string",
+    },
+    "vault_key_epoch": {
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991,
+      "type": "integer",
+    },
+    "whisper_ciphered": {
+      "additionalProperties": false,
+      "properties": {
+        "cipher_iv_b64": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "ciphertext_b64": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "cipher_iv_b64",
+        "ciphertext_b64",
+      ],
+      "type": "object",
+    },
+    "whisper_codec": {
+      "const": "json_v1",
+      "type": "string",
+    },
+    "whisper_schema_version": {
+      "const": 1,
+      "type": "number",
+    },
+    "written_at": {
+      "maximum": 9007199254740,
+      "minimum": 347155200000,
+      "type": "integer",
+    },
+  },
+  "required": [
+    "format",
+    "boxlabel",
+    "revision_tok",
+    "vault_key_epoch",
+    "box_key_wrapped",
+    "whisper_ciphered",
+    "whisper_codec",
+    "whisper_schema_version",
+    "sidecar_json",
+    "registered_at",
+    "written_at",
+  ],
+  "type": "object",
+}
+`;
+
 exports[`Stored record formats > safebyok-lease-v1 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -68,104 +166,6 @@ exports[`Stored record formats > safebyok-lease-v1 1`] = `
     "lease_key",
     "vault_key_lease_wrapped",
     "ask_passphrase_at",
-  ],
-  "type": "object",
-}
-`;
-
-exports[`Stored record formats > safebyok-lockbox-v5 1`] = `
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "additionalProperties": false,
-  "properties": {
-    "boxlabel": {
-      "maxLength": 1024,
-      "minLength": 1,
-      "type": "string",
-    },
-    "format": {
-      "const": "safebyok-lockbox-v5",
-      "type": "string",
-    },
-    "lockbox_key_wrapped": {
-      "additionalProperties": false,
-      "properties": {
-        "cipher_iv_b64": {
-          "minLength": 1,
-          "type": "string",
-        },
-        "ciphertext_b64": {
-          "minLength": 1,
-          "type": "string",
-        },
-      },
-      "required": [
-        "cipher_iv_b64",
-        "ciphertext_b64",
-      ],
-      "type": "object",
-    },
-    "registered_at": {
-      "maximum": 9007199254740,
-      "minimum": 347155200000,
-      "type": "integer",
-    },
-    "revision_tok": {
-      "minLength": 1,
-      "type": "string",
-    },
-    "sidecar_json": {
-      "type": "string",
-    },
-    "vault_key_epoch": {
-      "exclusiveMinimum": 0,
-      "maximum": 9007199254740991,
-      "type": "integer",
-    },
-    "whisper_ciphered": {
-      "additionalProperties": false,
-      "properties": {
-        "cipher_iv_b64": {
-          "minLength": 1,
-          "type": "string",
-        },
-        "ciphertext_b64": {
-          "minLength": 1,
-          "type": "string",
-        },
-      },
-      "required": [
-        "cipher_iv_b64",
-        "ciphertext_b64",
-      ],
-      "type": "object",
-    },
-    "whisper_codec": {
-      "const": "json_v1",
-      "type": "string",
-    },
-    "whisper_schema_version": {
-      "const": 1,
-      "type": "number",
-    },
-    "written_at": {
-      "maximum": 9007199254740,
-      "minimum": 347155200000,
-      "type": "integer",
-    },
-  },
-  "required": [
-    "format",
-    "boxlabel",
-    "revision_tok",
-    "vault_key_epoch",
-    "lockbox_key_wrapped",
-    "whisper_ciphered",
-    "whisper_codec",
-    "whisper_schema_version",
-    "sidecar_json",
-    "registered_at",
-    "written_at",
   ],
   "type": "object",
 }

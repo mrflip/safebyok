@@ -12,7 +12,7 @@ Small irritants, each a few lines, picked up by whoever is nearby.
 * **Postgres `InsertBoxOutcome` typed loosely.** From the reform2 sprint
   ([#177](https://github.com/mrflip/safebyok/pull/177)'s review; the Coach: "add as todo"):
   `insertBox` in `safebyok-postgres/src/postgres-vault-db.ts` casts its row to a type naming only
-  the four flags, its lockbox columns untyped beside them. Type them, or return the lockbox as
+  the four flags, its box columns untyped beside them. Type them, or return the box as
   one `row_to_json` column, next time Postgres is touched.
 * **GraphQL's `'plain'` field class.** From the reform2 sprint
   ([#176](https://github.com/mrflip/safebyok/pull/176); the Coach: "yes", leave it for a later
@@ -84,13 +84,13 @@ Revisit before 1.0 if rotation signing every other device out is too blunt.
 `softlock_gone` (2026-10-19) removed the schema rotation would have written: the vault props'
 `prior_vault_key` (the vaultKey before, wrapped under the current one) and the check that it sat
 one epoch below theirs. `vault_key_epoch` stays on every record, reserved at 1, with storage's
-comparison of a lockbox's epoch against the vault props'.
+comparison of a box's epoch against the vault props'.
 
-### `retire()`'s edge cases
+### `del()`'s edge cases
 
 From the Convex sprint ([#18](https://github.com/mrflip/safebyok/pull/18)): a handle that never
-saw vault props resolves `retire()` without retiring anything, even if a vault has since appeared elsewhere, so
-"delete account" can report success while a vault stands. And after a refused `retire()`, an
+saw vault props resolves `del()` without retiring anything, even if a vault has since appeared elsewhere, so
+"delete account" can report success while a vault stands. And after a refused `del()`, an
 app's automatic retry retires the vault that was made again in between. The Coach (2026-10-16):
 assess these once the contract is tight and the tests unified -- that is, against
 `packages/safebyok/VAULTDB.md` ([#107](https://github.com/mrflip/safebyok/pull/107)) and the
@@ -165,15 +165,15 @@ new record, so the next open asks for the passphrase. The direction is safe, and
 refreshes does not cure it. The Coach (2026-10-16): into the TODO, beside the multiple-passphrases
 question. The fix, small: do not judge `outlived` against vault props this handle wrote itself.
 
-### A "newer, don't touch" state for lockboxes
+### A "newer, don't touch" state for boxes
 
-From [#163](https://github.com/mrflip/safebyok/pull/163) (thread 5 and its review): a lockbox has
-no format version to read ahead of, so it has no newer-format state. A lockbox in any format but
-today's lists as damaged, and an app on an older safebyok shows a lockbox written by a newer one as
+From [#163](https://github.com/mrflip/safebyok/pull/163) (thread 5 and its review): a box has
+no format version to read ahead of, so it has no newer-format state. A box in any format but
+today's lists as damaged, and an app on an older safebyok shows a box written by a newer one as
 damaged, where the user may retire it or store over it (only on the user's own action, never by
-the vault). The Coach: "Yes add to TODO: version number on lockbox." Give lockboxes a "newer, don't
+the vault). The Coach: "Yes add to TODO: version number on box." Give boxes a "newer, don't
 touch" state like the vault's `newer_format`: the format tag read as a version, so that a newer
-lockbox lists as one to leave alone and an older, unreadable one still lists as damaged.
+box lists as one to leave alone and an older, unreadable one still lists as damaged.
 
 ## hello, make and the react lifecycle
 
@@ -184,7 +184,7 @@ works as built, and a redesign of the lifecycle may change all four.
 
 * **`lock()` and `close()` don't wait for `hello()`.** Every other method waits for storage to
   answer first; these two act at once. A lock made while `hello()` runs no longer wins over taking
-  up the lease (*Lock timing vs. work in flight*, scenario 1). `retire()` waits. (#166, thread 8)
+  up the lease (*Lock timing vs. work in flight*, scenario 1). `del()` waits. (#166, thread 8)
 * **A failed `hello()` keeps the handle alive.** A refused `hello()` no longer closes the storage
   watch, so the same handle can retry; after an untrusted-storage refusal the next call meets that
   refusal again rather than `vault_locked`. (#166, thread 8)

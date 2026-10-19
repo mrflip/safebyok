@@ -5,7 +5,7 @@ import { VaultError } from 'safebyok'
 import type { ComponentApi } from './component-api'
 import type { SafebyokErrorData } from './refusals'
 import {
-  VaultPropsExpectation, RetireExpectation, ListedLockbox, Lockbox, LockboxExpectation, LockboxRetireExpectation, LockboxRetirement, VaultProps, VaultScope, VaultSignature,
+  VaultPropsExpectation, VaultDelExpectation, ListedBox, Box, BoxExpectation, BoxDelExpectation, BoxDeletion, VaultProps, VaultScope, VaultSignature,
 } from './component/validators'
 
 export type { ComponentApi } from './component-api'
@@ -38,8 +38,8 @@ export type SafebyokApiOpts<DataModel extends GenericDataModel = GenericDataMode
  *   import { components } from './_generated/api'
  *
  *   export const {
- *     getVaultProps, fetchOrCreateVaultProps, updateVaultProps, getBox, listBoxSummaries,
- *     updateBox, retireBox, retireVault, watchVault,
+ *     getVaultProps, ensureVaultProps, putVaultProps, getBox, listBoxSummaries,
+ *     putBox, delBox, delVault, watchVault,
  *   } = new SafebyokComponent(components.safebyok).api({
  *     getUserId: async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null,
  *   })
@@ -101,25 +101,25 @@ export class SafebyokComponent {
           return await ctx.runQuery(vaults.getVaultProps, args)
         },
       }),
-      fetchOrCreateVaultProps: publicMutation({
+      ensureVaultProps: publicMutation({
         args:    { vaultProps: VaultProps },
         returns: VaultProps,
         handler: async (ctx, args) => {
           await mustBe(ctx, args.vaultProps.user_id)
-          return await ctx.runMutation(vaults.fetchOrCreateVaultProps, args)
+          return await ctx.runMutation(vaults.ensureVaultProps, args)
         },
       }),
-      updateVaultProps: publicMutation({
+      putVaultProps: publicMutation({
         args:    { vaultProps: VaultProps, expected: VaultPropsExpectation },
         returns: v.boolean(),
         handler: async (ctx, args) => {
           await mustBe(ctx, args.vaultProps.user_id)
-          return await ctx.runMutation(vaults.updateVaultProps, args)
+          return await ctx.runMutation(vaults.putVaultProps, args)
         },
       }),
       getBox: publicQuery({
         args:    { scope: VaultScope, boxlabel: v.string() },
-        returns: v.nullable(Lockbox),
+        returns: v.nullable(Box),
         handler: async (ctx, args) => {
           await mustBe(ctx, args.scope.user_id)
           return await ctx.runQuery(vaults.getBox, args)
@@ -127,34 +127,34 @@ export class SafebyokComponent {
       }),
       listBoxSummaries: publicQuery({
         args:    { scope: VaultScope },
-        returns: v.array(ListedLockbox),
+        returns: v.array(ListedBox),
         handler: async (ctx, args) => {
           await mustBe(ctx, args.scope.user_id)
           return await ctx.runQuery(vaults.listBoxSummaries, args)
         },
       }),
-      updateBox: publicMutation({
-        args:    { scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation },
-        returns: v.nullable(Lockbox),
+      putBox: publicMutation({
+        args:    { scope: VaultScope, box: Box, expected: BoxExpectation },
+        returns: v.nullable(Box),
         handler: async (ctx, args) => {
           await mustBe(ctx, args.scope.user_id)
-          return await ctx.runMutation(vaults.updateBox, args)
+          return await ctx.runMutation(vaults.putBox, args)
         },
       }),
-      retireBox: publicMutation({
-        args:    { scope: VaultScope, boxlabel: v.string(), expected: LockboxRetireExpectation },
-        returns: v.nullable(LockboxRetirement),
+      delBox: publicMutation({
+        args:    { scope: VaultScope, boxlabel: v.string(), expected: BoxDelExpectation },
+        returns: v.nullable(BoxDeletion),
         handler: async (ctx, args) => {
           await mustBe(ctx, args.scope.user_id)
-          return await ctx.runMutation(vaults.retireBox, args)
+          return await ctx.runMutation(vaults.delBox, args)
         },
       }),
-      retireVault: publicMutation({
-        args:    { scope: VaultScope, expected: RetireExpectation },
+      delVault: publicMutation({
+        args:    { scope: VaultScope, expected: VaultDelExpectation },
         returns: v.boolean(),
         handler: async (ctx, args) => {
           await mustBe(ctx, args.scope.user_id)
-          return await ctx.runMutation(vaults.retireVault, args)
+          return await ctx.runMutation(vaults.delVault, args)
         },
       }),
       watchVault: publicQuery({

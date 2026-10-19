@@ -151,15 +151,15 @@ export type NameValidator = Z.core.$ZodType<string>
  *
  * | Check | Job | Runs | Fails as |
  * |---|---|---|---|
- * | These validators (`Label` and `UserId` by default) | an alarm for names your app never meant to use | at entry only: Vault.make (the scope), storeBox (the boxlabel), addPassphrase and addPasskey (the wayinlabel) | `bad_label` |
+ * | These validators (`Label` and `UserId` by default) | an alarm for names your app never meant to use | at entry only: Vault.make (the scope), putBox (the boxlabel), addPassphrase and addPasskey (the wayinlabel) | `bad_label` |
  * | The floor ({@link NameFloor}) | what text must be for every client and store to agree (no `^` in a name, which key-value stores join names on) | beneath these at entry, whatever they are; at every storage verb; on every record read back | `bad_label` at entry and for a verb's own names; `bad_record` in a record sent; damaged on read |
  * | The record's shape, scope, boxlabel, ciphertext and expectations | what the design needs | when sent to storage and when read back | `bad_record` (a bug) when sent; damaged on read; `stale_write` |
- * | The storage's own limits (`maxRecordBytes`, `maxVaultBytes`, `maxLockboxes`, `maxNameBytes`) | facts about the backend | when sent to storage | `lockbox_too_large`, `vault_full`, `bad_label` |
+ * | The storage's own limits (`maxRecordBytes`, `maxVaultBytes`, `maxBoxes`, `maxNameBytes`) | facts about the backend | when sent to storage | `box_too_large`, `vault_full`, `bad_label` |
  *
- * So a check of yours is an alarm, not a promise about what storage holds: a lockbox stored under a
+ * So a check of yours is an alarm, not a promise about what storage holds: a box stored under a
  * name it refuses -- written by another client, or before you narrowed it -- lists, reads and
  * retires as any other, by the name it was stored under; only a name below the floor is damage.
- * A lockbox's sidecar is never checked by the vault: a host checks its own before `storeBox()`. A server holds names to the floor and its own limits, never to these (`VAULTDB.md`).
+ * A box's sidecar is never checked by the vault: a host checks its own before `putBox()`. A server holds names to the floor and its own limits, never to these (`VAULTDB.md`).
  *
  * Widening with care. A name is stored and bound exactly as given, so a check admitting text
  * outside ASCII should require what the floor does, Unicode's composed form (NFC), and an app
@@ -181,7 +181,7 @@ export type VaultValidators = {
   applabel?:    NameValidator | undefined
   /** Checks the vault's label. Default: {@link Label}. */
   vaultlabel?:  NameValidator | undefined
-  /** Checks each lockbox's label. Default: {@link Label}. */
+  /** Checks each box's label. Default: {@link Label}. */
   boxlabel?:    NameValidator | undefined
   /** Checks the signed-in user's id. Default: {@link UserId}. */
   userId?:      NameValidator | undefined

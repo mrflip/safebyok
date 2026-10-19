@@ -111,8 +111,8 @@ export type Race<DeviceT> = {
  * @example
  *   await TH.raceEveryWay({
  *     makeDevices: (turnstile) => () => postgresVaultDB({ client: TH.throughTurnstile(turnstile, db, ['query']), userId: 'u1' }),
- *     setup:       (first) => first.fetchOrCreateVaultProps(TH.vaultPropsOf('u1')),
- *     moves:       [(one) => one.retireVault(TH.scopeOf('u1'), TH.thisVault), (two) => two.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet)],
+ *     setup:       (first) => first.ensureVaultProps(TH.vaultPropsOf('u1')),
+ *     moves:       [(one) => one.delVault(TH.scopeOf('u1'), TH.thisVault), (two) => two.putBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet)],
  *     verdict:     async (outcomes, [one]) => { expect(await one.listBoxes(TH.scopeOf('u1'))).to.have.lengthOf(0) },
  *   })
  */
@@ -193,8 +193,8 @@ export const outcomeOf = async (move: Promise<unknown>): Promise<RaceOutcome> =>
   try {
     return { kind: 'landed', val: await move }
   } catch (err) {
-    const { kind } = (err ?? {}) as { kind?: unknown }
-    return { kind: typeof kind === 'string' ? kind : 'unknown', val: err }
+    const { refusalkind } = (err ?? {}) as { refusalkind?: unknown }
+    return { kind: typeof refusalkind === 'string' ? refusalkind : 'unknown', val: err }
   }
 }
 

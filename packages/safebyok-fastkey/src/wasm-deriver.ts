@@ -1,5 +1,5 @@
 import { argon2id } from 'hash-wasm'
-import { Argon2idWebV1, VaultError, ensureSaltFits, parseKeyDeriverSpec, type Argon2idKeyDeriver, type KeyDeriverSpec } from 'safebyok'
+import { Argon2idWebV1, VaultError, checkSaltFits, parseKeyDeriverSpec, type Argon2idKeyDeriver, type KeyDeriverSpec } from 'safebyok'
 
 /** A frozen deriver of a spec already checked: Argon2idWebV1, or one parseKeyDeriverSpec passed. */
 const deriverOf = (spec: KeyDeriverSpec): Argon2idKeyDeriver => Object.freeze({
@@ -56,7 +56,7 @@ export const argon2idWasmWebV1Deriver = /* @__PURE__ */ deriverOf(Argon2idWebV1)
 
 /** 32 key bytes from hash-wasm's Argon2id at `spec`; its failures to run come back as VaultErrors. */
 const deriveWithWasm = async (spec: KeyDeriverSpec, passphrase: string, saltBytes: Uint8Array): Promise<Uint8Array> => {
-  ensureSaltFits(spec, saltBytes)
+  checkSaltFits(spec, saltBytes)
   if (typeof WebAssembly === 'undefined') {
     throw new VaultError('bad_option', "This platform has no WebAssembly (React Native's Hermes has none), so the WebAssembly key deriver cannot run here: use argon2idWebV1Deriver, or argon2idDeriver, from safebyok.")
   }

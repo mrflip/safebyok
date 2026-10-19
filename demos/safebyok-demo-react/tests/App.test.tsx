@@ -39,7 +39,7 @@ describe("App", () => {
     render(<App />)
     fireEvent.change(screen.getByPlaceholderText('username'), { target: { value: 'margo' } })
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
-    await screen.findByText(/No lockboxes yet/)
+    await screen.findByText(/No boxes yet/)
     expect(screen.getByText('The Knock-Knock Machine')).to.not.be.null
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
     await screen.findByPlaceholderText('username')
@@ -53,7 +53,7 @@ describe("App", () => {
     expect(await screen.findByText(/This vault lives only in this browser/)).to.not.be.null
 
     // Set: the first store asks for a new vault's passphrase.
-    fireEvent.click(await screen.findByRole('button', { name: 'Add a lockbox' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Add a box' }))
     fireEvent.change(screen.getByPlaceholderText('anthropic_api_key'), { target: { value: 'anthropic_api_key' } })
     fireEvent.change(screen.getByPlaceholderText('sk-ant-...'), { target: { value: 'sk-ant-test-not-a-real-key' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -61,7 +61,7 @@ describe("App", () => {
     fireEvent.change(within(choosing).getByPlaceholderText('vault passphrase'), { target: { value: 'correct horse one' } })
     fireEvent.click(within(choosing).getByRole('button', { name: 'Create vault' }))
     await screen.findByText(/🔓 unlocked until/)
-    // The save runs again once the vault unlocks: its lockbox is listed before the lock below,
+    // The save runs again once the vault unlocks: its box is listed before the lock below,
     // which would otherwise win the race and refuse the save (withUnlockedVault's doc block).
     await screen.findByRole('button', { name: 'view' })
 
@@ -85,7 +85,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole('button', { name: 'Unlock' }))
     await screen.findByText('sk-ant-test-not-a-real-key')
 
-    // Forgot it: start a new vault from the dialog, emptied of every lockbox.
+    // Forgot it: start a new vault from the dialog, emptied of every box.
     fireEvent.click(screen.getByRole('button', { name: 'lock now' }))
     await screen.findByText('🔒 locked')
     vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
@@ -95,11 +95,11 @@ describe("App", () => {
     fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'correct horse two' } })
     expect(screen.getByRole('dialog', { name: 'Choose a vault passphrase' })).to.not.be.null
     fireEvent.click(screen.getByRole('button', { name: 'Create vault' }))
-    // The emptied vault lists no lockboxes the moment it is retired, before the new one is made:
+    // The emptied vault lists no boxes the moment it is retired, before the new one is made:
     // the test waits for the unlock it started to land, and the dialog to close, rather than end
     // with it under way.
     await screen.findByText(/🔓 unlocked until/)
     await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })
-    expect(screen.getByText(/No lockboxes yet/)).to.not.be.null
+    expect(screen.getByText(/No boxes yet/)).to.not.be.null
   })
 })

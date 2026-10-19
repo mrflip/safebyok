@@ -12,27 +12,27 @@ import * as Ckeys from './ckeys'
  * An adapter may answer a damaged or unreadable record with null rather than an error: losing a
  * lease only means asking for the passphrase again, and losing a device mark only
  * means the device checks the vault from what storage holds now, as on a device that never saw
- * it. Both are the safe failure. The vault checks whatever `readLease` and `readMark` hand back
+ * it. Both are the safe failure. The vault checks whatever `getLease` and `getMark` hand back
  * all the same, so an adapter that returns a record exactly as it stored it is never trusted
  * blindly.
  */
 export interface DeviceDB {
   /** The lease for one vault, or null when there is none. Expiry is the vault's call. */
-  readLease(scope: VaultScope): Promise<Lease | null>
+  getLease(scope: VaultScope): Promise<Lease | null>
   /** Keep `lease` as the lease of its vault, in place of any before. */
-  writeLease(lease: Lease): Promise<void>
-  eraseLease(scope: VaultScope): Promise<void>
+  putLease(lease: Lease): Promise<void>
+  delLease(scope: VaultScope): Promise<void>
   /** This device's mark for one vault, or null when there is none. What it says is the vault's to judge. */
-  readMark(scope: VaultScope): Promise<DeviceMark | null>
+  getMark(scope: VaultScope): Promise<DeviceMark | null>
   /** Keep `mark` as this device's mark for its vault, in place of any it kept before. */
-  writeMark(mark: DeviceMark): Promise<void>
+  putMark(mark: DeviceMark): Promise<void>
   /**
-   * Forget this device's mark for one vault: `retire()` calls it, and so does a host accepting
-   * storage restored on purpose, and `retireDamagedVault`.
+   * Forget this device's mark for one vault: `del()` calls it, and so does a host accepting
+   * storage restored on purpose, and `delDamagedVault`.
    */
-  eraseMark(scope: VaultScope): Promise<void>
+  delMark(scope: VaultScope): Promise<void>
   /** Remove every lease and device mark on this device: the device's part of a full reset. */
-  eraseAll(): Promise<void>
+  delAll(): Promise<void>
 }
 
 /**
@@ -43,15 +43,15 @@ export interface DeviceDB {
  *
  * @example
  *   const deviceDB = memoryDeviceDB()
- *   await deviceDB.readLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // null
+ *   await deviceDB.getLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // null
  * @example
- *   await deviceDB.readMark({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })   // null
+ *   await deviceDB.getMark({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })   // null
  */
 export const memoryDeviceDB = (): DeviceDB => {
   const leases = new Map<string, Lease>()
   const marks = new Map<string, DeviceMark>()
   return {
-    readLease: (scope) => {
+    getLease: (scope) => {
       const kept = leases.get(Ckeys.lease(scope))
       if (kept === undefined) { return Promise.resolve(null) }
       const checked = Lease.safeParse(kept)
@@ -63,17 +63,17 @@ export const memoryDeviceDB = (): DeviceDB => {
       return Promise.resolve(checked.data)
     },
 
-    writeLease: (lease) => {
+    putLease: (lease) => {
       leases.set(Ckeys.lease(lease), lease)
       return Promise.resolve()
     },
 
-    eraseLease: (scope) => {
+    delLease: (scope) => {
       leases.delete(Ckeys.lease(scope))
       return Promise.resolve()
     },
 
-    readMark: (scope) => {
+    getMark: (scope) => {
       const kept = marks.get(Ckeys.mark(scope))
       if (kept === undefined) { return Promise.resolve(null) }
       const checked = DeviceMark.safeParse(kept)
@@ -85,17 +85,17 @@ export const memoryDeviceDB = (): DeviceDB => {
       return Promise.resolve(checked.data)
     },
 
-    writeMark: (mark) => {
+    putMark: (mark) => {
       marks.set(Ckeys.mark(mark), mark)
       return Promise.resolve()
     },
 
-    eraseMark: (scope) => {
+    delMark: (scope) => {
       marks.delete(Ckeys.mark(scope))
       return Promise.resolve()
     },
 
-    eraseAll: () => {
+    delAll: () => {
       leases.clear()
       marks.clear()
       return Promise.resolve()

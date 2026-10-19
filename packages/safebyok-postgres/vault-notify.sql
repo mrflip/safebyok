@@ -30,6 +30,6 @@ CREATE OR REPLACE TRIGGER safebyok_vaults_changed
   AFTER INSERT OR UPDATE OR DELETE ON safebyok_vaults
   FOR EACH ROW EXECUTE FUNCTION safebyok_vault_changed();
 
-CREATE OR REPLACE TRIGGER safebyok_lockboxes_changed
-  AFTER INSERT OR UPDATE OR DELETE ON safebyok_lockboxes
+CREATE OR REPLACE TRIGGER safebyok_boxes_changed
+  AFTER INSERT OR UPDATE OR DELETE ON safebyok_boxes
   FOR EACH ROW EXECUTE FUNCTION safebyok_vault_changed();

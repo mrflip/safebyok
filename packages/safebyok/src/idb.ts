@@ -75,9 +75,9 @@ const bellnameOf = (dbName: string) => `safebyok-idb:${dbName}:device_db`
  *
  * @example
  *   const deviceDB = idbDeviceDB()
- *   await deviceDB.readLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // null
+ *   await deviceDB.getLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // null
  * @example
- *   await deviceDB.readMark({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })   // null
+ *   await deviceDB.getMark({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })   // null
  */
 export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
   const dbName = parseDbName(opts, 'idbDeviceDB')
@@ -97,7 +97,7 @@ export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
   }
 
   return {
-    readLease: async (scope) => {
+    getLease: async (scope) => {
       await sweepStrays()
       const raw: unknown = await get(Ckeys.lease(scope), shelf())
       if (raw === undefined || raw === null) { return null }
@@ -110,19 +110,19 @@ export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
       return checked.data
     },
 
-    writeLease: async (lease) => {
+    putLease: async (lease) => {
       await set(Ckeys.lease(lease), lease, shelf())
       ring()
     },
 
     // The scope's own lease goes first, so a sweep that fails never keeps a lock from revoking it.
-    eraseLease: async (scope) => {
+    delLease: async (scope) => {
       await del(Ckeys.lease(scope), shelf())
       ring()
       await sweepStrays()
     },
 
-    readMark: async (scope) => {
+    getMark: async (scope) => {
       const raw: unknown = await get(Ckeys.mark(scope), shelf())
       if (raw === undefined || raw === null) { return null }
       const checked = DeviceMark.safeParse(raw)
@@ -134,19 +134,19 @@ export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
       return checked.data
     },
 
-    writeMark: async (mark) => {
+    putMark: async (mark) => {
       await set(Ckeys.mark(mark), mark, shelf())
       ring()
     },
 
-    eraseMark: async (scope) => {
+    delMark: async (scope) => {
       await del(Ckeys.mark(scope), shelf())
       ring()
     },
 
     // The shelf holds leases and device marks and nothing else, so erasing them all
     // is clearing it: any row an earlier version filed under another ckey goes too.
-    eraseAll: async () => {
+    delAll: async () => {
       await clear(shelf())
       ring()
     },

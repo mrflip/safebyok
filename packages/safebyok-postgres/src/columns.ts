@@ -1,9 +1,9 @@
-import type { Lockbox, VaultProps } from 'safebyok'
+import type { Box, VaultProps } from 'safebyok'
 
 /**
  * How one field is stored: `text` as given, `bigint` for a whole number (a time, an epoch), and
  * `jsonb` for an opaque structured value -- a Ciphered, or the vault props' list of wayins -- whose ctx safebyok rebuilds from field values, so jsonb's reordering of keys is
- * harmless. A lockbox's `sidecar_json` is `text`: its exact text is what is bound.
+ * harmless. A box's `sidecar_json` is `text`: its exact text is what is bound.
  */
 export type ColumnKind = 'text' | 'bigint' | 'jsonb'
 
@@ -41,16 +41,16 @@ export const VaultPropsColumns = everyFieldOf<VaultProps>()([
 ] as const)
 
 /**
- * Every field of a Lockbox, in `safebyok_lockboxes`'s order after the four columns the adapter
+ * Every field of a Box, in `safebyok_boxes`'s order after the four columns the adapter
  * adds (the vault's scope and `vault_id`, never part of the record). The compiler holds it to the
- * lockbox's shape.
+ * box's shape.
  */
-export const LockboxColumns = everyFieldOf<Lockbox>()([
+export const BoxColumns = everyFieldOf<Box>()([
   ['format',                 'text'],
   ['boxlabel',               'text'],
   ['revision_tok',           'text'],
   ['vault_key_epoch',        'bigint'],
-  ['lockbox_key_wrapped',    'jsonb'],
+  ['box_key_wrapped',    'jsonb'],
   ['whisper_ciphered',       'jsonb'],
   ['whisper_codec',          'text'],
   ['whisper_schema_version', 'bigint'],
@@ -59,8 +59,8 @@ export const LockboxColumns = everyFieldOf<Lockbox>()([
   ['written_at',             'bigint'],
 ] as const)
 
-/** A lockbox as a listing reads it: every column but the two ciphered ones. */
-export const ListedLockboxColumns = LockboxColumns.filter(([field]) => field !== 'lockbox_key_wrapped' && field !== 'whisper_ciphered')
+/** A box as a listing reads it: every column but the two ciphered ones. */
+export const ListedBoxColumns = BoxColumns.filter(([field]) => field !== 'box_key_wrapped' && field !== 'whisper_ciphered')
 
 
 /**

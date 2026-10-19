@@ -2,8 +2,8 @@ import { getFunctionName } from 'convex/server'
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server'
 import { ConvexError } from 'convex/values'
 import { Sanitizer, VaultDB, VaultError } from 'safebyok'
-import type { VaultPropsExpectation, VaultDBOpts, RetireExpectation, Lockbox, LockboxExpectation, LockboxRetireExpectation, StoredLockbox, VaultProps, VaultScope } from 'safebyok'
-import { MaxVaultLockboxes } from './component/tallies'
+import type { VaultPropsExpectation, VaultDBOpts, VaultDelExpectation, Box, BoxExpectation, BoxDelExpectation, StoredBox, VaultProps, VaultScope } from 'safebyok'
+import { MaxVaultBoxes } from './component/tallies'
 import { isSafebyokErrorData } from './refusals'
 import type { SafebyokApi } from './server'
 
@@ -63,7 +63,7 @@ export type ConvexVaultDBOpts = VaultDBOpts & {
  *   `watchVault`, and refreshes when it changes.
  * * **A full vault**: the component holds every vault to limits of its own, whatever a client
  *   asks, and refuses a write past them with kind `vault_full`. A vault within its
- *   `maxLockboxes` stays well inside them.
+ *   `maxBoxes` stays well inside them.
  * * **Offline**, a call waits for the connection, as every Convex call does, rather than failing.
  *   A failure Convex reports (a deployment missing the safebyok functions, say) refuses with kind
  *   `storage_unavailable`, carrying nothing of Convex's own error, which on a dev deployment may
@@ -74,7 +74,7 @@ export type ConvexVaultDBOpts = VaultDBOpts & {
  *   `logger`, the default logger without one (a vault opened with no logger of its own hears it too): it hears a ConvexClient watch that fails.
  * @returns The VaultDB, holding at most 1 MiB in one record, Convex's document limit, and 8 MiB
  *   in one vault, half of what one Convex function may read (retiring a vault reads it twice), in
- *   at most 8,000 lockboxes, the component's own limit.
+ *   at most 8,000 boxes, the component's own limit.
  *
  * @example
  *   import { api } from '../convex/_generated/api'
@@ -99,7 +99,7 @@ class ConvexVaultDB extends VaultDB {
   // every row twice: half the read budget is what a vault can hold and still be retired whole.
   readonly maxVaultBytes = ConvexTransactionReadBytes / 2
   // The component's own limit, which it enforces whatever a client asks.
-  readonly maxLockboxes = MaxVaultLockboxes
+  readonly maxBoxes = MaxVaultBoxes
   // Each name is a field of its own, any text Convex holds: the floor's 1 KiB bounds them.
   readonly maxNameBytes = Infinity
 
@@ -112,38 +112,38 @@ class ConvexVaultDB extends VaultDB {
     this.api    = opts.api
   }
 
-  protected doReadVaultProps(scope: VaultScope): Promise<unknown> {
+  protected doGetVaultProps(scope: VaultScope): Promise<unknown> {
     return refusing(() => this.client.query(this.api.getVaultProps, { scope }))
   }
 
-  protected doFetchOrCreateVaultProps(vaultProps: VaultProps): Promise<unknown> {
-    return refusing(() => this.client.mutation(this.api.fetchOrCreateVaultProps, { vaultProps }))
+  protected doEnsureVaultProps(vaultProps: VaultProps): Promise<unknown> {
+    return refusing(() => this.client.mutation(this.api.ensureVaultProps, { vaultProps }))
   }
 
-  protected doUpdateVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<boolean> {
-    return refusing(() => this.client.mutation(this.api.updateVaultProps, { vaultProps, expected }))
+  protected doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<boolean> {
+    return refusing(() => this.client.mutation(this.api.putVaultProps, { vaultProps, expected }))
   }
 
-  protected doReadBox(scope: VaultScope, boxlabel: string): Promise<unknown> {
+  protected doGetBox(scope: VaultScope, boxlabel: string): Promise<unknown> {
     return refusing(() => this.client.query(this.api.getBox, { scope, boxlabel }))
   }
 
   // Each row is stored under its own boxlabel column, so that is the boxlabel it is listed under.
-  protected async doListBoxes(scope: VaultScope): Promise<StoredLockbox[]> {
+  protected async doListBoxes(scope: VaultScope): Promise<StoredBox[]> {
     const rows = await refusing(() => this.client.query(this.api.listBoxSummaries, { scope }))
-    return rows.map((row) => ({ boxlabel: row.boxlabel, lockbox: row }))
+    return rows.map((row) => ({ boxlabel: row.boxlabel, box: row }))
   }
 
-  protected doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<unknown> {
-    return refusing(() => this.client.mutation(this.api.updateBox, { scope, lockbox, expected }))
+  protected doPutBox(scope: VaultScope, box: Box, expected: BoxExpectation): Promise<unknown> {
+    return refusing(() => this.client.mutation(this.api.putBox, { scope, box, expected }))
   }
 
-  protected doRetireBox(scope: VaultScope, boxlabel: string, expected: LockboxRetireExpectation): Promise<unknown> {
-    return refusing(() => this.client.mutation(this.api.retireBox, { scope, boxlabel, expected }))
+  protected doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<unknown> {
+    return refusing(() => this.client.mutation(this.api.delBox, { scope, boxlabel, expected }))
   }
 
-  protected doRetireVault(scope: VaultScope, expected: RetireExpectation): Promise<boolean> {
-    return refusing(() => this.client.mutation(this.api.retireVault, { scope, expected }))
+  protected doDelVault(scope: VaultScope, expected: VaultDelExpectation): Promise<boolean> {
+    return refusing(() => this.client.mutation(this.api.delVault, { scope, expected }))
   }
 
   // Every result `watchVault` delivers calls `onChange`, the first included. The vault subscribes
@@ -206,7 +206,7 @@ const isConvexClient = (client: unknown): client is ConvexVaultClient => {
 }
 
 const SafebyokFnNames = [
-  'getVaultProps', 'fetchOrCreateVaultProps', 'updateVaultProps', 'getBox', 'listBoxSummaries', 'updateBox', 'retireBox', 'retireVault', 'watchVault',
+  'getVaultProps', 'ensureVaultProps', 'putVaultProps', 'getBox', 'listBoxSummaries', 'putBox', 'delBox', 'delVault', 'watchVault',
 ] as const
 
 // Each function must name itself as `<module>:<function>`. The whole generated `api` answers any

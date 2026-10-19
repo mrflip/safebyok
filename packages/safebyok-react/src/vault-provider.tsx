@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { Vault, checkStrengthTest, checkValidators, retireDamagedVault as retireStoredDamagedVault, isVaultCondition, isVaultError, parseLogger, type MakeVaultOpts, type PassphraseStrengthTest, type VaultDB, type VaultError, type VaultLogger, type VaultScope, type VaultSnapshot, type VaultValidators } from 'safebyok'
+import { Vault, checkStrengthTest, checkValidators, delDamagedVault as delStoredDamagedVault, isVaultCondition, isVaultError, parseLogger, type MakeVaultOpts, type PassphraseStrengthTest, type VaultDB, type VaultError, type VaultLogger, type VaultScope, type VaultSnapshot, type VaultValidators } from 'safebyok'
 import { PassphraseModal, type PassphraseAdvice } from './passphrase-modal'
 
 /**
@@ -25,11 +25,11 @@ export type VaultContextShape = {
    * has settled, and while signed out. Misuse -- a bad label or option -- never lands here: the
    * provider throws it to the nearest error boundary. Offer `retryOpen` only for one a retry may
    * mend: never for `storage_blocked`, which holds until something outside the app changes (say
-   * why instead), nor for `damaged_vault`, which `retireDamagedVault` answers.
+   * why instead), nor for `damaged_vault`, which `delDamagedVault` answers.
    *
    * @example
-   *   if (openError?.kind === 'storage_blocked') { return <p>{"This browser won't let the app keep your vault on this device."}</p> }
-   *   if (openError?.kind === 'damaged_vault') { return <p>{"Your vault's stored record is damaged."}</p> }
+   *   if (openError?.refusalkind === 'storage_blocked') { return <p>{"This browser won't let the app keep your vault on this device."}</p> }
+   *   if (openError?.refusalkind === 'damaged_vault') { return <p>{"Your vault's stored record is damaged."}</p> }
    *   if (openError !== null) { return <p>{"Can't reach your vault."} <button onClick={retryOpen}>Retry</button></p> }
    */
   openError: VaultError | null
@@ -42,20 +42,20 @@ export type VaultContextShape = {
   /**
    * Retire the stored vault that `openError` reports as `damaged_vault`, with this device's lease
    * of it, and have the vault say hello again: a fresh, absent vault, for the user to make anew.
-   * The user's lockboxes in it are gone for good, so ask first. Resolves when the new hello is
+   * The user's boxes in it are gone for good, so ask first. Resolves when the new hello is
    * under way, and does nothing while `openError` is any other, or none. Rejects with storage's
    * refusal if retiring it fails, such as `storage_unavailable`, leaving `openError` as it was; the
-   * `safebyok` package's `retireDamagedVault` says which refusals to expect. One of them,
+   * `safebyok` package's `delDamagedVault` says which refusals to expect. One of them,
    * `stale_write`, means the vault was made anew meanwhile, so that one says hello again as well,
    * and still rejects. Any other refusal says nothing anew: `bad_option` among them, which is
    * misuse, or a vault that reads sound now, which `retryOpen()` then opens.
    *
    * @example
-   *   if (openError?.kind === 'damaged_vault') {
-   *     return <button onClick={() => { if (confirm('Remove your vault and start over?')) { void retireDamagedVault() } }}>Start over</button>
+   *   if (openError?.refusalkind === 'damaged_vault') {
+   *     return <button onClick={() => { if (confirm('Remove your vault and start over?')) { void delDamagedVault() } }}>Start over</button>
    *   }
    */
-  retireDamagedVault: () => Promise<void>
+  delDamagedVault: () => Promise<void>
   /**
    * Run an action that may need the vault unlocked. If it refuses with kind 'vault_locked', the
    * passphrase dialog opens; after a successful unlock the action runs again. Resolves null when
@@ -74,7 +74,7 @@ export type VaultContextShape = {
    * landing between the unlock and the runs again is the user's word, and wins: those runs meet
    * `vault_locked`, which reaches their callers.
    *
-   * @example const whisper = await withUnlockedVault(() => vault.readBox('anthropic_api_key'))
+   * @example const whisper = await withUnlockedVault(() => vault.getBox('anthropic_api_key'))
    *          // whisper === null: the user dismissed the dialog
    */
   withUnlockedVault: <ResultT>(action: () => Promise<ResultT>) => Promise<ResultT | null>
@@ -111,7 +111,7 @@ const openErrorOf = (snapshot: VaultSnapshot): VaultError | null => (
 const unsubscribeFromNothing = () => { /* nothing was heard */ }
 const subscribeToNothing = () => unsubscribeFromNothing
 
-/** The vault's live snapshot: lockbox summaries, lock state, when it next asks for the passphrase. */
+/** The vault's live snapshot: box summaries, lock state, when it next asks for the passphrase. */
 export const useVaultSnapshot = (): VaultSnapshot => {
   const { vault } = useVault()
   return useSyncExternalStore(
@@ -210,7 +210,7 @@ const adviceFrom = (strengthTest: PassphraseStrengthTest, scope: VaultScope): Pa
  *   </VaultProvider>
  */
 export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, passphraseAdvice, children, ...opts }: VaultProviderProps) => {
-  const { applabel, vaultlabel, vaultDB, deviceDB, leaseHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger, validators, passphraseStrengthTest, ...unlisted } = opts
+  const { applabel, vaultlabel, vaultDB, deviceDB, leaseHours, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, validators, passphraseStrengthTest, ...unlisted } = opts
   // Each prop Vault.make does not take, by name -- a misspelling, a retired name -- handed on to it,
   // so it is refused, to the error boundary, rather than dropped here unseen.
   const unlistedJson = JSON.stringify(Object.keys(unlisted))
@@ -291,7 +291,7 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
     // option is ever added and not passed through.
     const checks = { applabel: applabelCheck, vaultlabel: vaultlabelCheck, boxlabel: boxlabelCheck, userId: userIdCheck, wayinlabel: wayinlabelCheck } satisfies Record<keyof VaultValidators, unknown>
     const refusable = Object.fromEntries((JSON.parse(unlistedJson) as string[]).map((ckey) => [ckey, undefined]))
-    const makeOpts = { ...refusable, applabel, vaultlabel, userId, vaultDB, deviceDB, leaseHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger: heardBy ?? logger, validators: checks, passphraseStrengthTest } satisfies Record<keyof MakeVaultOpts, unknown>
+    const makeOpts = { ...refusable, applabel, vaultlabel, userId, vaultDB, deviceDB, leaseHours, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger: heardBy ?? logger, validators: checks, passphraseStrengthTest } satisfies Record<keyof MakeVaultOpts, unknown>
     // The handle is this effect's to make and to close, and the render hands it down: so the state
     // is set here, once per handle, as Vault.make answers at once.
     let made: Vault | null = null
@@ -316,17 +316,17 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
       setVault(null)
       setOpenFailure(null)
     }
-  }, [userId, applabel, vaultlabel, vaultDB, deviceDB, leaseHours, clock, keyDeriver, maxWhisperBytes, maxLockboxes, logger, heardBy, passphraseStrengthTest, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, wayinlabelCheck, unlistedJson, endAsking, sayHello])
+  }, [userId, applabel, vaultlabel, vaultDB, deviceDB, leaseHours, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, heardBy, passphraseStrengthTest, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, wayinlabelCheck, unlistedJson, endAsking, sayHello])
 
   const retryOpen = useCallback(() => {
     if (vault !== null && openError !== null) { void sayHello(vault) }
   }, [vault, openError, sayHello])
 
-  const retireDamagedVault = useCallback(async () => {
+  const delDamagedVault = useCallback(async () => {
     if (userId === null || vault === null || ! isVaultError(openError, 'damaged_vault')) { return }
     const validators = { applabel: applabelCheck, vaultlabel: vaultlabelCheck, boxlabel: boxlabelCheck, userId: userIdCheck, wayinlabel: wayinlabelCheck } satisfies Record<keyof VaultValidators, unknown>
     try {
-      await retireStoredDamagedVault({ applabel, vaultlabel, userId, vaultDB, deviceDB, validators })
+      await delStoredDamagedVault({ applabel, vaultlabel, userId, vaultDB, deviceDB, validators })
     } catch (err) {
       // The vault was made anew, so what openError says is out of date: say hello again, and still
       // tell the caller why nothing was retired. Misuse (bad_option) says nothing anew.
@@ -398,7 +398,7 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
   if (openFailure !== null) { throw openFailure.err }
 
   return (
-    <VaultContext.Provider value={{ vault, openError, retryOpen, retireDamagedVault, withUnlockedVault }}>
+    <VaultContext.Provider value={{ vault, openError, retryOpen, delDamagedVault, withUnlockedVault }}>
       {children}
       {asking !== null && asking.vault === vault && (
         <PassphraseModal

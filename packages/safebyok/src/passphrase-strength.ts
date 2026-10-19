@@ -46,7 +46,7 @@ const passphraseVerdict = Z.union([
  * 'weak_passphrase' and the test's reason when it finds it weak; kind 'bad_option' for a test that
  * answers anything but a verdict. Whatever the test throws, this throws.
  */
-export const ensureStrongEnough = async (strengthTest: PassphraseStrengthTest, passphrase: string, scope: VaultScope): Promise<void> => {
+export const checkStrongEnough = async (strengthTest: PassphraseStrengthTest, passphrase: string, scope: VaultScope): Promise<void> => {
   const checked = passphraseVerdict.safeParse(await strengthTest(passphrase, scope))
   if (! checked.success) {
     throw new VaultError('bad_option', 'passphraseStrengthTest answered something other than a verdict: { strong: true }, or { strong: false, reason } with the reason as non-empty text.')

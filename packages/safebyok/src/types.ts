@@ -9,11 +9,11 @@ import { NameFloor } from './validators'
 export type WhisperJson = string | number | boolean | null | WhisperJson[] | { [ckey: string]: WhisperJson }
 
 /**
- * The secret kept in a lockbox: a JSON value -- a string, number, boolean, array or plain object.
+ * The secret kept in a box: a JSON value -- a string, number, boolean, array or plain object.
  * Two shapes are refused rather than silently mangled:
  *  * `undefined`, anywhere in the value: JSON cannot carry it.
  *  * a bare `null` as the whole whisper: nobody's secret is "nothing here", and emptying a
- *    lockbox is `retireBox`'s job. (`null` inside a structure is fine: {@link WhisperJson}.)
+ *    box is `delBox`'s job. (`null` inside a structure is fine: {@link WhisperJson}.)
  *
  * @example 'sk-ant-api03-...'
  * @example { apiKey: 'sk-ant-...', orgId: null }
@@ -46,7 +46,7 @@ const whisperArr = Z.array(whisperJson)
  * @example Whisper.parse('sk-ant-...')                  // a string passes through
  * @example Whisper.safeParse(new Date()).success        // false: JSON would flatten it to {}
  * @example Whisper.safeParse(undefined).success         // false: undefined cannot be stored
- * @example Whisper.safeParse(null).success              // false: emptying a lockbox is retireBox's job
+ * @example Whisper.safeParse(null).success              // false: emptying a box is delBox's job
  * @example Whisper.safeParse({ orgId: null }).success   // true: null inside a structure is JSON
  */
 export const Whisper: Z.ZodMiniType<Whisper> = Z.union([
@@ -102,7 +102,7 @@ export const ForeverMillis = FarFuture - FarPast
 
 /**
  * Validator for an instant as whole UTC epoch milliseconds, from {@link FarPast} (1981) to
- * {@link FarFuture} (2255), both included. Every time the package keeps is one -- a lockbox's
+ * {@link FarFuture} (2255), both included. Every time the package keeps is one -- a box's
  * `registered_at` and `written_at`, the vault props' `registered_at`, a lease's
  * `ask_passphrase_at` -- and a stored record holding anything else fails validation. A host can
  * check its own times with it.
@@ -140,7 +140,7 @@ export type VaultScope = Z.infer<typeof VaultScope>
 
 /**
  * Which vaultKey a record stands for. The vault props' `vault_key_epoch` is their wayins' vaultKey;
- * a lockbox's, the vaultKey its lockboxKey is wrapped under. Reserved for a rotation of the
+ * a box's, the vaultKey its boxKey is wrapped under. Reserved for a rotation of the
  * vaultKey that does not exist yet: every vault safebyok makes, and every record in it, carries 1.
  */
 export const vaultKeyEpoch = Z.int().check(Z.positive())
@@ -149,11 +149,11 @@ export const vaultKeyEpoch = Z.int().check(Z.positive())
 const cryptoKeyHandle = Z.custom<CryptoKey>((val) => val instanceof CryptoKey, 'a CryptoKey handle')
 
 /**
- * A lockbox's sidecar: your app's own data, riding beside the whisper, visible in storage --
+ * A box's sidecar: your app's own data, riding beside the whisper, visible in storage --
  * authenticated, but never encrypted, so anyone who can read the database can read it. Any JSON value -- what the user calls the account, which project a key belongs
  * to, what your app wants searchable server-side -- shown while the vault is locked, and never interpreted by safebyok. It is stored in the clear, as its JSON (`sidecar_json`), and bound into
- * the lockbox's encryption, so a sidecar altered or swapped in storage makes the lockbox refuse to
- * open. A host checks its own sidecar's shape before `storeBox()`. Never put secret material in it.
+ * the box's encryption, so a sidecar altered or swapped in storage makes the box refuse to
+ * open. A host checks its own sidecar's shape before `putBox()`. Never put secret material in it.
  *
  * @example Sidecar.parse({ note: 'work account', project: 'atlas' })
  * @example Sidecar.safeParse({ when: new Date() }).success     // false: JSON would flatten it to {}
@@ -163,15 +163,15 @@ export const Sidecar: Z.ZodMiniType<WhisperJson> = whisperJson
 export type Sidecar = Z.infer<typeof Sidecar>
 
 /**
- * The visible fields of a lockbox: its boxlabel, revision, vaultKey epoch and times, its sidecar
+ * The visible fields of a box: its boxlabel, revision, vaultKey epoch and times, its sidecar
  * as the JSON value the host stored (`{}` when it gave none), and `damaged` false. This, or a
- * {@link DamagedLockbox}, is what a VaultDB's `listBoxes` returns and a vault's snapshot holds,
- * readable while locked. The sidecar is shown as storage holds it: only `readBox()` opens the lockbox
+ * {@link DamagedBox}, is what a VaultDB's `listBoxes` returns and a vault's snapshot holds,
+ * readable while locked. The sidecar is shown as storage holds it: only `getBox()` opens the box
  * and so proves it unaltered.
  *
- * @example LockboxSummary.parse({ boxlabel: 'anthropic', revision_tok: 'r1', vault_key_epoch: 1, sidecar: {}, registered_at, written_at }).damaged // false
+ * @example BoxSummary.parse({ boxlabel: 'anthropic', revision_tok: 'r1', vault_key_epoch: 1, sidecar: {}, registered_at, written_at }).damaged // false
  */
-export const LockboxSummary = Z.object({
+export const BoxSummary = Z.object({
   boxlabel:        NameFloor,
   revision_tok:    Z.string().check(Z.minLength(1)),
   vault_key_epoch: vaultKeyEpoch,
@@ -180,23 +180,23 @@ export const LockboxSummary = Z.object({
   written_at:      EpochMillis,
   damaged:         Z._default(Z.literal(false), false),
 })
-export type LockboxSummary = Z.infer<typeof LockboxSummary>
+export type BoxSummary = Z.infer<typeof BoxSummary>
 
 /**
- * A lockbox whose stored record does not read back as one -- damaged, tampered with, written by
+ * A box whose stored record does not read back as one -- damaged, tampered with, written by
  * another version of safebyok, or sealed under a vaultKey the vault does not hold -- listed under
  * the boxlabel it is stored under, with nothing else from it trusted but its `revision_tok`, when
  * it holds one as text (null otherwise), which only names the record for a write over it. It
- * sits in a vault's snapshot beside the {@link LockboxSummary}s, sorted among them, so a UI can
- * offer to remove it: `retireBox()` removes it and `storeBox()` writes a fresh lockbox over it,
- * while `readBox()` and `useBox()` refuse it with kind 'damaged_lockbox'.
+ * sits in a vault's snapshot beside the {@link BoxSummary}s, sorted among them, so a UI can
+ * offer to remove it: `delBox()` removes it and `putBox()` writes a fresh box over it,
+ * while `getBox()` and `useBox()` refuse it with kind 'damaged_box'.
  *
  * @example
  *   for (const box of snapshot.boxes) {
  *     if (box.damaged) { showRemovable(box.boxlabel) } else { showSummary(box.boxlabel, box.sidecar) }
  *   }
  */
-export type DamagedLockbox = { boxlabel: string, damaged: true, revision_tok: string | null }
+export type DamagedBox = { boxlabel: string, damaged: true, revision_tok: string | null }
 
 /**
  * The ways into a vault, each a {@link Wayin}'s `wayinkind`: a `passphrase` the user types,
@@ -315,7 +315,7 @@ const wayinList = Z.array(Wayin).check(
 
 /**
  * The visible fields of one way into a vault, as a vault's snapshot lists it even while locked:
- * what a host shows the user, and what it names when it aims `unlock()` or `retireWayin()` at
+ * what a host shows the user, and what it names when it aims `unlock()` or `delWayin()` at
  * one. Every way in shows its `wayinkind`, `wayin_id` and `wayinlabel`, and when it was added
  * (`registered_at`) and by which device (`device_id`, this vault's id for that device: one per
  * device per vault, so it links nothing the vault does not already link), so the user can tell
@@ -419,7 +419,7 @@ export type SeenVault = Z.infer<typeof SeenVault>
  * What a device keeps of a vault's scope, locked or not, on its own storage: what it has `seen` of
  * the vault standing under the scope, a {@link SeenVault}. Nothing in it is secret. One per scope:
  * a vault made anew under the scope, with another `vault_id`, is seen afresh, under a new
- * `device_id`. `lock()` leaves the mark; `retire()` erases it.
+ * `device_id`. `lock()` leaves the mark; `del()` erases it.
  *
  * @example { format: 'safebyok-mark-v4', ...scope, seen: { device_id, vault_id, unlock_epoch: 1, vault_key_epoch: 1 } }
  */
@@ -450,18 +450,18 @@ export const MaxLeaseHours = 588
 
 /**
  * The largest whisper a vault stores unless the caller says otherwise, in bytes of its JSON and
- * its lockbox's sidecar's together: several times the beefiest credential (an RSA-8192 private key as PEM is about 6.4 KB), and
+ * its box's sidecar's together: several times the beefiest credential (an RSA-8192 private key as PEM is about 6.4 KB), and
  * well inside what every storage backend can hold. A larger whisper is usually a sign that the
  * wrong value is being stored.
  */
 export const MaxWhisperBytes = 40_444 // searchable: 40444
 
 /**
- * The most lockboxes a vault holds unless the caller says otherwise: room for every API key a
+ * The most boxes a vault holds unless the caller says otherwise: room for every API key a
  * person plausibly keeps, at the largest default whisper, inside what every in-tree storage
- * adapter can hold and still retire in one go. A vault that needs more raises its `maxLockboxes`.
+ * adapter can hold and still retire in one go. A vault that needs more raises its `maxBoxes`.
  */
-export const MaxLockboxes = 100
+export const MaxBoxes = 100
 
 /**
  * Injected time source, so expiry is testable; defaults to the wall clock. `now()` returns epoch

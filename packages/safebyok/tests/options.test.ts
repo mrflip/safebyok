@@ -3,7 +3,7 @@ import * as Z from 'zod/mini'
 import { optionsCheck } from '../src/options'
 import * as TH from './test-helpers'
 
-const Said = "storeBox()'s only option is `sidecar`."
+const Said = "putBox()'s only option is `sidecar`."
 const checkStoreOpts = optionsCheck({ sidecar: Z.optional(Z.unknown()) }, Said)
 
 describe("optionsCheck", () => {

@@ -35,7 +35,7 @@ describe("the IndexedDB device store's options", () => {
   for (const [makerTitle, make] of Makers) {
     for (const [opts, blurb] of BadIdbOpts) {
       it(`${makerTitle} refuses ${blurb} with kind 'bad_option'`, () => {
-        expect(() => make(opts as unknown as IdbOpts)).to.throw(VaultError, /dbName/).with.property('kind', 'bad_option')
+        expect(() => make(opts as unknown as IdbOpts)).to.throw(VaultError, /dbName/).with.property('refusalkind', 'bad_option')
       })
     }
     it(`${makerTitle} keeps its records in 'safebyok' given no options, or no dbName`, () => {
@@ -66,7 +66,7 @@ describe("idbDeviceDB", () => {
       const deviceDB = idbDeviceDB({ dbName: TH.freshDbName() })
       vi.stubGlobal('indexedDB', factory)
       try {
-        await expect(deviceDB.readMark(TH.scopeOf('u1'))).rejects.toThrow(expect.objectContaining({ name: 'NotSupportedError' }))
+        await expect(deviceDB.getMark(TH.scopeOf('u1'))).rejects.toThrow(expect.objectContaining({ name: 'NotSupportedError' }))
       } finally {
         vi.unstubAllGlobals()
       }
@@ -88,7 +88,7 @@ describe("idbDeviceDB", () => {
     const deviceDB = idbDeviceDB({ dbName: TH.freshDbName() })
     vi.stubGlobal('indexedDB', undefined)
     try {
-      const err = await rejectionOf(deviceDB.readMark(TH.scopeOf('u1')))
+      const err = await rejectionOf(deviceDB.getMark(TH.scopeOf('u1')))
       expect(err).to.be.instanceOf(DOMException)
       expect(err).to.have.property('name', 'NotSupportedError')
     } finally {
@@ -101,7 +101,7 @@ describe("idbDeviceDB", () => {
     vi.stubGlobal('indexedDB', undefined)
     vi.stubGlobal('DOMException', undefined)
     try {
-      const err = await rejectionOf(deviceDB.readMark(TH.scopeOf('u1')))
+      const err = await rejectionOf(deviceDB.getMark(TH.scopeOf('u1')))
       expect(err).to.be.instanceOf(Error)
       expect(err).to.have.property('name', 'NotSupportedError')
       expect(err).to.have.property('message').that.includes('no IndexedDB')
@@ -116,12 +116,12 @@ describe("idbDeviceDB", () => {
     await set('unlock:acme:u1:main', await TH.leaseOf('u1'), shelf)
     await set(['unlock', 'acme', 'u1', 'main'], await TH.leaseOf('u1'), shelf)
     const deviceDB = idbDeviceDB({ dbName })
-    await deviceDB.writeLease(await TH.leaseOf('u2'))
+    await deviceDB.putLease(await TH.leaseOf('u2'))
     const gets = vi.spyOn(IDBObjectStore.prototype, 'get')
     const getAlls = vi.spyOn(IDBObjectStore.prototype, 'getAll')
     const cursors = vi.spyOn(IDBObjectStore.prototype, 'openCursor')
     try {
-      expect(await deviceDB.readLease(TH.scopeOf('u1'))).to.be.null
+      expect(await deviceDB.getLease(TH.scopeOf('u1'))).to.be.null
       expect(gets.mock.calls.map(([ckey]) => ckey)).to.deep.equal([Ckeys.lease(TH.scopeOf('u1'))])
       expect(getAlls).to.have.callCount(0)
       expect(cursors).to.have.callCount(0)
@@ -137,9 +137,9 @@ describe("idbDeviceDB", () => {
     const shelf = createStore(`${dbName}:device_db`, 'records')
     await set('unlock:acme:u1:main', await TH.leaseOf('u1'), shelf)
     const deviceDB = idbDeviceDB({ dbName })
-    await deviceDB.writeLease(await TH.leaseOf('u2'))
-    await deviceDB.eraseLease(TH.scopeOf('u3'))
-    expect(await deviceDB.readLease(TH.scopeOf('u2'))).to.not.be.null
+    await deviceDB.putLease(await TH.leaseOf('u2'))
+    await deviceDB.delLease(TH.scopeOf('u3'))
+    expect(await deviceDB.getLease(TH.scopeOf('u2'))).to.not.be.null
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
     expect(rows.map((row) => row.ckey)).to.deep.equal([Ckeys.lease(TH.scopeOf('u2'))])
   })
@@ -148,13 +148,13 @@ describe("idbDeviceDB", () => {
     const dbName = TH.freshDbName()
     const shelf = createStore(`${dbName}:device_db`, 'records')
     const deviceDB = idbDeviceDB({ dbName })
-    await deviceDB.writeMark(TH.markOf('u1'))
+    await deviceDB.putMark(TH.markOf('u1'))
     // Even a record that would read today is swept unread: its ckey is not one this version files.
     await set('unlock^acme^u1^main', await TH.leaseOf('u1'), shelf)
-    expect(await deviceDB.readLease(TH.scopeOf('u1'))).to.be.null
+    expect(await deviceDB.getLease(TH.scopeOf('u1'))).to.be.null
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
     expect(rows.map((row) => row.ckey)).to.deep.equal(['mark^acme^u1^main'])
-    expect(await deviceDB.readMark(TH.scopeOf('u1'))).to.deep.equal(TH.markOf('u1'))
+    expect(await deviceDB.getMark(TH.scopeOf('u1'))).to.deep.equal(TH.markOf('u1'))
   })
 
   it("keeps every device mark through a sweep: a mark's ckey is one this version files", async () => {
@@ -162,8 +162,8 @@ describe("idbDeviceDB", () => {
     const shelf = createStore(`${dbName}:device_db`, 'records')
     await set('unlock:acme:u1:main', await TH.leaseOf('u1'), shelf)
     const deviceDB = idbDeviceDB({ dbName })
-    await deviceDB.writeMark(TH.markOf('u1'))
-    await deviceDB.readLease(TH.scopeOf('u1'))
+    await deviceDB.putMark(TH.markOf('u1'))
+    await deviceDB.getLease(TH.scopeOf('u1'))
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
     expect(rows.map((row) => row.ckey)).to.deep.equal([Ckeys.mark(TH.scopeOf('u1'))])
   })
@@ -173,7 +173,7 @@ describe("idbDeviceDB", () => {
     const shelf = createStore(`${dbName}:device_db`, 'records')
     await set(Ckeys.mark(TH.scopeOf('u1')), { ...TH.markOf('u1'), seen: { ...TH.markOf('u1').seen, unlock_epoch: 'one' } }, shelf)
     const deviceDB = idbDeviceDB({ dbName })
-    expect(await deviceDB.readMark(TH.scopeOf('u1'))).to.be.null
+    expect(await deviceDB.getMark(TH.scopeOf('u1'))).to.be.null
     expect(await inspectIdbDeviceDB({ dbName }).rows()).to.have.lengthOf(0)
   })
 
@@ -184,9 +184,9 @@ describe("idbDeviceDB", () => {
     const deviceDB = idbDeviceDB({ dbName })
     let heardCount = 0
     const unsubscribe = inspectIdbDeviceDB({ dbName }).subscribe(() => { heardCount += 1 })
-    await deviceDB.readLease(TH.scopeOf('u2'))
+    await deviceDB.getLease(TH.scopeOf('u2'))
     expect(heardCount).to.equal(1)
-    await deviceDB.readLease(TH.scopeOf('u2'))
+    await deviceDB.getLease(TH.scopeOf('u2'))
     expect(heardCount).to.equal(1)
     unsubscribe()
   })
@@ -198,7 +198,7 @@ describe("idbDeviceDB", () => {
     const otherHeard: unknown[] = []
     otherTab.addEventListener('message', (event) => { otherHeard.push(event.data) })
     try {
-      await idbDeviceDB({ dbName }).eraseLease(TH.scopeOf('u1'))
+      await idbDeviceDB({ dbName }).delLease(TH.scopeOf('u1'))
       await vi.waitFor(() => { expect(otherHeard).to.deep.equal(['changed']) })
     } finally {
       otherTab.close()
@@ -208,23 +208,23 @@ describe("idbDeviceDB", () => {
   it("erases the scope's own lease even when the sweep fails", async () => {
     const dbName = TH.freshDbName()
     const deviceDB = idbDeviceDB({ dbName })
-    await deviceDB.writeLease(await TH.leaseOf('u1'))
+    await deviceDB.putLease(await TH.leaseOf('u1'))
     vi.spyOn(IDBObjectStore.prototype, 'getAllKeys').mockImplementation(() => { throw new Error('the shelf will not list') })
     try {
-      await expect(deviceDB.eraseLease(TH.scopeOf('u1'))).rejects.toThrow('the shelf will not list')
+      await expect(deviceDB.delLease(TH.scopeOf('u1'))).rejects.toThrow('the shelf will not list')
     } finally {
       vi.restoreAllMocks()
     }
     expect(await inspectIdbDeviceDB({ dbName }).rows()).to.have.lengthOf(0)
   })
 
-  it("clears the whole shelf at eraseAll, a lease filed under the colon-joined ckey of 0.2 and before included", async () => {
+  it("clears the whole shelf at delAll, a lease filed under the colon-joined ckey of 0.2 and before included", async () => {
     const dbName = TH.freshDbName()
     const shelf = createStore(`${dbName}:device_db`, 'records')
     await set('unlock:acme:u1:main', await TH.leaseOf('u1'), shelf)
     const deviceDB = idbDeviceDB({ dbName })
-    await deviceDB.writeLease(await TH.leaseOf('u2'))
-    await deviceDB.eraseAll()
+    await deviceDB.putLease(await TH.leaseOf('u2'))
+    await deviceDB.delAll()
     expect(await inspectIdbDeviceDB({ dbName }).rows()).to.have.lengthOf(0)
   })
 })
@@ -237,14 +237,14 @@ describe("inspectIdbDeviceDB", () => {
     let heardCount = 0
     const unsubscribe = inspector.subscribe(() => { heardCount += 1 })
 
-    await deviceDB.writeLease(await TH.leaseOf('u1'))
+    await deviceDB.putLease(await TH.leaseOf('u1'))
     const rows = await inspector.rows()
     expect(rows.map((row) => row.ckey)).to.deep.equal(['lease^acme^u1^main'])
     await vi.waitFor(() => { expect(heardCount).to.be.greaterThan(0) })
 
     await inspector.wipe()
     expect(await inspector.rows()).to.have.lengthOf(0)
-    expect(await deviceDB.readLease(TH.scopeOf('u1'))).to.be.null
+    expect(await deviceDB.getLease(TH.scopeOf('u1'))).to.be.null
     unsubscribe()
   })
 
@@ -252,7 +252,7 @@ describe("inspectIdbDeviceDB", () => {
     const dbName = TH.freshDbName()
     const inspector = inspectIdbDeviceDB({ dbName })
     expect(() => inspector.subscribe('not a listener' as unknown as () => void)).to.throw(VaultError, /listener function/)
-    await idbDeviceDB({ dbName }).writeLease(await TH.leaseOf('u1'))
+    await idbDeviceDB({ dbName }).putLease(await TH.leaseOf('u1'))
     expect(await inspector.rows()).to.have.lengthOf(1)
   })
 })

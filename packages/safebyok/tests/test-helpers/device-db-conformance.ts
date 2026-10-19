@@ -21,10 +21,10 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
   describe(`${adapterTitle}, as a DeviceDB`, () => {
     it("has no lease until one is written, then keeps it whole, leaseKey handle and all", async () => {
       const deviceDB = await makeDeviceDB()
-      expect(await deviceDB.readLease(scopeOf('u1'))).to.be.null
+      expect(await deviceDB.getLease(scopeOf('u1'))).to.be.null
       const lease = await leaseOf('u1')
-      await deviceDB.writeLease(lease)
-      const kept = await deviceDB.readLease(scopeOf('u1'))
+      await deviceDB.putLease(lease)
+      const kept = await deviceDB.getLease(scopeOf('u1'))
       expect(kept).to.deep.equal(lease)
       expect(kept?.lease_key).to.be.instanceOf(CryptoKey)
       expect(kept?.lease_key.extractable).to.be.false
@@ -32,44 +32,44 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
 
     it("keeps leases per user: erasing one leaves the other", async () => {
       const deviceDB = await makeDeviceDB()
-      await deviceDB.writeLease(await leaseOf('u1'))
-      await deviceDB.writeLease(await leaseOf('u2'))
-      await deviceDB.eraseLease(scopeOf('u1'))
-      expect(await deviceDB.readLease(scopeOf('u1'))).to.be.null
-      expect(await deviceDB.readLease(scopeOf('u2'))).to.not.be.null
+      await deviceDB.putLease(await leaseOf('u1'))
+      await deviceDB.putLease(await leaseOf('u2'))
+      await deviceDB.delLease(scopeOf('u1'))
+      expect(await deviceDB.getLease(scopeOf('u1'))).to.be.null
+      expect(await deviceDB.getLease(scopeOf('u2'))).to.not.be.null
     })
 
-    it("eraseAll erases every lease, and every device mark", async () => {
+    it("delAll erases every lease, and every device mark", async () => {
       const deviceDB = await makeDeviceDB()
-      await deviceDB.writeLease(await leaseOf('u1'))
-      await deviceDB.writeLease(await leaseOf('u2'))
-      await deviceDB.writeMark(markOf('u1'))
-      await deviceDB.eraseAll()
-      expect(await deviceDB.readLease(scopeOf('u1'))).to.be.null
-      expect(await deviceDB.readLease(scopeOf('u2'))).to.be.null
-      expect(await deviceDB.readMark(scopeOf('u1'))).to.be.null
+      await deviceDB.putLease(await leaseOf('u1'))
+      await deviceDB.putLease(await leaseOf('u2'))
+      await deviceDB.putMark(markOf('u1'))
+      await deviceDB.delAll()
+      expect(await deviceDB.getLease(scopeOf('u1'))).to.be.null
+      expect(await deviceDB.getLease(scopeOf('u2'))).to.be.null
+      expect(await deviceDB.getMark(scopeOf('u1'))).to.be.null
     })
 
     it("has no device mark until one is written, then keeps it whole, and the newest in place of the one before", async () => {
       const deviceDB = await makeDeviceDB()
-      expect(await deviceDB.readMark(scopeOf('u1'))).to.be.null
-      await deviceDB.writeMark(markOf('u1'))
-      expect(await deviceDB.readMark(scopeOf('u1'))).to.deep.equal(markOf('u1'))
-      await deviceDB.writeMark(markOf('u1', { seen: { unlock_epoch: 4 } }))
-      expect(await deviceDB.readMark(scopeOf('u1'))).to.deep.equal(markOf('u1', { seen: { unlock_epoch: 4 } }))
+      expect(await deviceDB.getMark(scopeOf('u1'))).to.be.null
+      await deviceDB.putMark(markOf('u1'))
+      expect(await deviceDB.getMark(scopeOf('u1'))).to.deep.equal(markOf('u1'))
+      await deviceDB.putMark(markOf('u1', { seen: { unlock_epoch: 4 } }))
+      expect(await deviceDB.getMark(scopeOf('u1'))).to.deep.equal(markOf('u1', { seen: { unlock_epoch: 4 } }))
     })
 
     it("keeps marks per vault, and apart from leases: erasing one leaves the rest", async () => {
       const deviceDB = await makeDeviceDB()
-      await deviceDB.writeLease(await leaseOf('u1'))
-      await deviceDB.writeMark(markOf('u1'))
-      await deviceDB.writeMark(markOf('u2'))
-      await deviceDB.eraseMark(scopeOf('u1'))
-      expect(await deviceDB.readMark(scopeOf('u1'))).to.be.null
-      expect(await deviceDB.readMark(scopeOf('u2'))).to.deep.equal(markOf('u2'))
-      expect(await deviceDB.readLease(scopeOf('u1'))).to.not.be.null
-      await deviceDB.eraseLease(scopeOf('u2'))
-      expect(await deviceDB.readMark(scopeOf('u2'))).to.deep.equal(markOf('u2'))
+      await deviceDB.putLease(await leaseOf('u1'))
+      await deviceDB.putMark(markOf('u1'))
+      await deviceDB.putMark(markOf('u2'))
+      await deviceDB.delMark(scopeOf('u1'))
+      expect(await deviceDB.getMark(scopeOf('u1'))).to.be.null
+      expect(await deviceDB.getMark(scopeOf('u2'))).to.deep.equal(markOf('u2'))
+      expect(await deviceDB.getLease(scopeOf('u1'))).to.not.be.null
+      await deviceDB.delLease(scopeOf('u2'))
+      expect(await deviceDB.getMark(scopeOf('u2'))).to.deep.equal(markOf('u2'))
     })
   })
 }

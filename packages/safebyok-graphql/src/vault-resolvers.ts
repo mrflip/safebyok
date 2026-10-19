@@ -1,15 +1,15 @@
 import { GraphQLError } from 'graphql'
 import { Refusals, VaultError } from 'safebyok'
-import type { VaultPropsExpectation, RetireExpectation, Lockbox, LockboxExpectation, LockboxRetireExpectation, VaultProps, VaultDB, VaultScope } from 'safebyok'
-import { VaultPropsFields, LockboxFields, ScopeFields, recordOf } from './fields'
+import type { VaultPropsExpectation, VaultDelExpectation, Box, BoxExpectation, BoxDelExpectation, VaultProps, VaultDB, VaultScope } from 'safebyok'
+import { VaultPropsFields, BoxFields, ScopeFields, recordOf } from './fields'
 
 /**
  * What the resolvers need of the VaultDB they serve: the verbs a browser's vault calls, and
- * `listBoxRecords`, which lists a vault's lockboxes as stored records -- what the browser's
+ * `listBoxRecords`, which lists a vault's boxes as stored records -- what the browser's
  * VaultDB must hand back from its own listing -- where a VaultDB's `listBoxes` gives the
  * summaries a vault shows. Every VaultDB is one: `safebyok-postgres`'s, or one of your own.
  */
-export type ServedVaultDB = Pick<VaultDB, 'readVaultProps' | 'fetchOrCreateVaultProps' | 'updateVaultProps' | 'readBox' | 'listBoxRecords' | 'updateBox' | 'retireBox' | 'retireVault' | 'subscribe'>
+export type ServedVaultDB = Pick<VaultDB, 'getVaultProps' | 'ensureVaultProps' | 'putVaultProps' | 'getBox' | 'listBoxRecords' | 'putBox' | 'delBox' | 'delVault' | 'subscribe'>
 
 /** What {@link vaultResolvers} is made with, once, at your server's start. */
 export type VaultResolversOpts<ContextT> = {
@@ -28,7 +28,7 @@ export type VaultFieldArgs = {
   scope?:    unknown
   boxlabel?: unknown
   vaultProps?: unknown
-  lockbox?:  unknown
+  box?:  unknown
   expected?: unknown
 }
 
@@ -41,16 +41,16 @@ export type VaultFieldResolver<ContextT> = (parent: unknown, args: VaultFieldArg
  */
 export type VaultResolvers<ContextT> = {
   Query: {
-    safebyokReadVaultProps: VaultFieldResolver<ContextT>
-    safebyokReadBox:        VaultFieldResolver<ContextT>
+    safebyokGetVaultProps: VaultFieldResolver<ContextT>
+    safebyokGetBox:        VaultFieldResolver<ContextT>
     safebyokListBoxes:      VaultFieldResolver<ContextT>
   }
   Mutation: {
-    safebyokFetchOrCreateVaultProps: VaultFieldResolver<ContextT>
-    safebyokUpdateVaultProps:        VaultFieldResolver<ContextT>
-    safebyokUpdateBox:               VaultFieldResolver<ContextT>
-    safebyokRetireBox:               VaultFieldResolver<ContextT>
-    safebyokRetireVault:             VaultFieldResolver<ContextT>
+    safebyokEnsureVaultProps: VaultFieldResolver<ContextT>
+    safebyokPutVaultProps:        VaultFieldResolver<ContextT>
+    safebyokPutBox:               VaultFieldResolver<ContextT>
+    safebyokDelBox:               VaultFieldResolver<ContextT>
+    safebyokDelVault:             VaultFieldResolver<ContextT>
   }
   Subscription: {
     safebyokVaultChanged: {
@@ -117,21 +117,21 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
   )
   return {
     Query: {
-      safebyokReadVaultProps: served((vaultDB, args) => vaultDB.readVaultProps(scopeIn(args))),
-      safebyokReadBox:        served((vaultDB, args) => vaultDB.readBox(scopeIn(args), args.boxlabel as string)),
+      safebyokGetVaultProps: served((vaultDB, args) => vaultDB.getVaultProps(scopeIn(args))),
+      safebyokGetBox:        served((vaultDB, args) => vaultDB.getBox(scopeIn(args), args.boxlabel as string)),
       // As stored records, which the browser's VaultDB validates: not listBoxes' summaries.
       safebyokListBoxes:  served((vaultDB, args) => vaultDB.listBoxRecords(scopeIn(args))),
     },
     Mutation: {
-      safebyokFetchOrCreateVaultProps: served((vaultDB, args) => vaultDB.fetchOrCreateVaultProps(vaultPropsIn(args))),
-      safebyokUpdateVaultProps: served(async (vaultDB, args) => {
-        await vaultDB.updateVaultProps(vaultPropsIn(args), vaultPropsExpectationIn(args))
+      safebyokEnsureVaultProps: served((vaultDB, args) => vaultDB.ensureVaultProps(vaultPropsIn(args))),
+      safebyokPutVaultProps: served(async (vaultDB, args) => {
+        await vaultDB.putVaultProps(vaultPropsIn(args), vaultPropsExpectationIn(args))
         return true
       }),
-      safebyokUpdateBox: served((vaultDB, args) => vaultDB.updateBox(scopeIn(args), recordOf(args.lockbox, LockboxFields) as Lockbox, lockboxExpectationIn(args))),
-      safebyokRetireBox: served((vaultDB, args) => vaultDB.retireBox(scopeIn(args), args.boxlabel as string, lockboxRetireExpectationIn(args))),
-      safebyokRetireVault: served(async (vaultDB, args) => {
-        await vaultDB.retireVault(scopeIn(args), retireExpectationIn(args))
+      safebyokPutBox: served((vaultDB, args) => vaultDB.putBox(scopeIn(args), recordOf(args.box, BoxFields) as Box, boxExpectationIn(args))),
+      safebyokDelBox: served((vaultDB, args) => vaultDB.delBox(scopeIn(args), args.boxlabel as string, boxDelExpectationIn(args))),
+      safebyokDelVault: served(async (vaultDB, args) => {
+        await vaultDB.delVault(scopeIn(args), vaultDelExpectationIn(args))
         return true
       }),
     },
@@ -164,18 +164,18 @@ const vaultPropsExpectationIn = (args: VaultFieldArgs): VaultPropsExpectation =>
 }
 
 // A revision_tok left out, as a GraphQL client may leave out a null, is the null it means.
-const lockboxExpectationIn = (args: VaultFieldArgs): LockboxExpectation => {
+const boxExpectationIn = (args: VaultFieldArgs): BoxExpectation => {
   const { vault_id, revision_tok = null, vault_key_epoch } = args.expected as { vault_id: string, revision_tok?: string | null, vault_key_epoch: number }
   return { vault_id, revision_tok, vault_key_epoch }
 }
 
-const retireExpectationIn = (args: VaultFieldArgs): RetireExpectation => {
-  const { vault_id } = args.expected as RetireExpectation
+const vaultDelExpectationIn = (args: VaultFieldArgs): VaultDelExpectation => {
+  const { vault_id } = args.expected as VaultDelExpectation
   return { vault_id }
 }
 
-// A revision_tok left out, as for a lockbox write, is the null it means.
-const lockboxRetireExpectationIn = (args: VaultFieldArgs): LockboxRetireExpectation => {
+// A revision_tok left out, as for a box write, is the null it means.
+const boxDelExpectationIn = (args: VaultFieldArgs): BoxDelExpectation => {
   const { vault_id, revision_tok = null } = args.expected as { vault_id: string, revision_tok?: string | null }
   return { vault_id, revision_tok }
 }
@@ -224,7 +224,7 @@ const noUnsubscribing = (): void => undefined
  */
 const crossing = (err: unknown): GraphQLError => {
   const refusal = err instanceof VaultError ? err : Refusals.storageUnavailable(err)
-  const crossed = new GraphQLError(refusal.message, { extensions: { kind: refusal.kind } })
+  const crossed = new GraphQLError(refusal.message, { extensions: { kind: refusal.refusalkind } })
   // Set after, never as the constructor's `cause` or `originalError`: either becomes the error's
   // originalError, and Yoga masks a GraphQLError whose originalError is not a GraphQLError too.
   Object.defineProperty(crossed, 'cause', { value: refusal, configurable: true, writable: true })

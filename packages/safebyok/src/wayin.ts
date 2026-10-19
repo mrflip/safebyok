@@ -57,7 +57,7 @@ const PurposeForWayinkind = {
   passkey:    'vault_key_passkey_wrapped',
 } as const satisfies Readonly<Record<WayinKind, string>>
 
-/** The usages of the handle a vault keeps: it wraps a lockboxKey and unwraps one, nothing else. */
+/** The usages of the handle a vault keeps: it wraps a boxKey and unwraps one, nothing else. */
 const SessionUsage = { extractable: false, usage: ['wrapKey', 'unwrapKey'] } as const
 // The transient is only ever the wrapped argument of a wrap; WebCrypto refuses an empty usage
 // list, so it carries the narrowest one.

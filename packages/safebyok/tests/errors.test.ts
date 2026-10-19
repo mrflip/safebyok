@@ -44,7 +44,7 @@ describe("VaultErrorKindVals", () => {
 describe("VaultError", () => {
   it("carries its kind, and isVaultError tells it apart", () => {
     const err = new VaultError('vault_full', 'This vault is full.')
-    expect(err.kind).to.eq('vault_full')
+    expect(err.refusalkind).to.eq('vault_full')
     expect(isVaultError(err)).to.be.true
     expect(isVaultError(err, 'vault_full')).to.be.true
     expect(isVaultError(err, 'stale_write')).to.be.false
@@ -92,18 +92,18 @@ const FamilyCases = [
   ["weak_passphrase",     "condition", 'a passphrase too easy to guess asks the user for another'],
   ["wrong_passkey",       "condition", 'a passkey that does not open the vault asks again, or for a passphrase'],
   ["passkey_unavailable", "condition", 'a browser or authenticator without PRF falls back to the passphrase'],
-  ["absent_box",          "condition", 'a lockbox retired elsewhere is a fact of syncing'],
+  ["absent_box",          "condition", 'a box retired elsewhere is a fact of syncing'],
   ["absent_vault",        "condition", 'a vault never made is made by the first unlock'],
   ["absent_wayin",        "condition", 'a passphrase removed on another device is a fact of syncing'],
   ["whisper_too_large",   "condition", "an oversized whisper is the user's value, not the code"],
-  ["lockbox_too_large",   "condition", "a lockbox too heavy for one record is the user's whisper and note, not the code"],
-  ["vault_full",          "condition", 'a full vault tells the user to remove a lockbox'],
+  ["box_too_large",   "condition", "a box too heavy for one record is the user's whisper and note, not the code"],
+  ["vault_full",          "condition", 'a full vault tells the user to remove a box'],
   ["too_many_wayins",     "condition", 'a vault holding its limit of passphrases tells the user to remove one'],
   ["last_wayin",          "condition", 'removing the last passphrase is refused, and the user told why'],
   ["corrupt_record",      "condition", 'a damaged record is told to the user, not thrown at the developer'],
   ["damaged_vault",       "condition", 'a vault stored damaged is told to the user, who cannot open it'],
   ["damaged_wayin",       "condition", 'a way in stored damaged sends the user to another way in'],
-  ["damaged_lockbox",     "condition", 'a lockbox stored damaged is told to the user, who may remove it'],
+  ["damaged_box",     "condition", 'a box stored damaged is told to the user, who may remove it'],
   ["newer_format",        "condition", 'a vault a newer version wrote is told to the user, who updates the app'],
   ["stale_write",         "condition", 'another device writing first is a fact of syncing'],
   ["rolled_back",         "condition", 'storage handing back an older copy of the vault is a fact a user can be told'],
@@ -130,7 +130,7 @@ const ConditionCases = [
   [new VaultError('bad_label', 'A label is 2-40 lowercase letters.'),                false, 'a misuse VaultError'],
   [new VaultError('vault_closed', 'This vault handle was closed.'),                  false, 'a closed handle, misuse too'],
   [new Error('storage_unavailable'),                                                false, 'a plain Error, even one whose message names a condition'],
-  [{ kind: 'storage_unavailable', message: 'down' },                                false, 'an object shaped like a VaultError, but not one'],
+  [{ refusalkind: 'storage_unavailable', message: 'down' },                                false, 'an object shaped like a VaultError, but not one'],
   [null,                                                                            false, 'a thrown null'],
   [undefined,                                                                       false, 'a thrown undefined'],
   ['storage_unavailable',                                                           false, 'a thrown string'],
@@ -144,7 +144,7 @@ describe("isVaultCondition", () => {
   it("narrows to a VaultError, so the caller can read its kind and message", () => {
     const err: unknown = new VaultError('storage_unavailable', 'The vault storage could not be reached.')
     if (! isVaultCondition(err)) { throw new Error('expected a condition') }
-    expect(err.kind).to.eq('storage_unavailable')
+    expect(err.refusalkind).to.eq('storage_unavailable')
     expect(err.message).to.eq('The vault storage could not be reached.')
   })
 

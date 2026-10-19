@@ -167,7 +167,7 @@ describe("zxcvbnPassphraseTest's loading", () => {
     const { fresh } = await freshModule(true)
     const passphrase = 'SUPERSECRET staple horse'
     const err = await rejectionOf(fresh.zxcvbnPassphraseTest(passphrase))
-    expect(err).to.include({ kind: 'storage_unavailable', name: 'VaultError' })
+    expect(err).to.include({ refusalkind: 'storage_unavailable', name: 'VaultError' })
     expect((err as Error).message).to.match(/Try again shortly/)
     expect((err as Error).cause).to.be.instanceOf(Error)
     expect(TH.thrownText(err)).to.not.include('SUPERSECRET')
@@ -178,7 +178,7 @@ describe("zxcvbnPassphraseTest's loading", () => {
     const vault = await TH.settledVault(TH.memoryVaultOpts({ passphraseStrengthTest: fresh.zxcvbnPassphraseTest }))
     try {
       // The fresh module's VaultError is a class of its own: told by kind.
-      await expect(vault.unlock('correct horse battery staple')).rejects.toThrow(expect.objectContaining({ kind: 'storage_unavailable' }))
+      await expect(vault.unlock('correct horse battery staple')).rejects.toThrow(expect.objectContaining({ refusalkind: 'storage_unavailable' }))
       expect(vault.getSnapshot().state).to.eq('absent')
       await vault.unlock('correct horse battery staple')
       expect(vault.getSnapshot().state).to.eq('unlocked')

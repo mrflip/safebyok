@@ -14,7 +14,7 @@ import { VaultError } from './errors'
  * @returns The check, which hands back the bag it was given.
  *
  * @example
- *   const checkStoreOpts = optionsCheck({ sidecar: Z.optional(Z.unknown()) }, "storeBox()'s only option is `sidecar`.")
+ *   const checkStoreOpts = optionsCheck({ sidecar: Z.optional(Z.unknown()) }, "putBox()'s only option is `sidecar`.")
  *   checkStoreOpts({ sidecar: { note: 'work' } }) // the same bag
  *   checkStoreOpts({ note: 'work' })              // throws: bad_option
  */

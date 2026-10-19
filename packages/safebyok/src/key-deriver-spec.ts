@@ -72,7 +72,7 @@ export const ReservedLabelPrefix = 'argon2id_web_'
  *
  * @param candidate - A key deriver or spec as a host hands it over: its label, and the parameters it carries.
  */
-export const ensureSuppliedSpecKept = (candidate: Readonly<Record<string, unknown>> & { readonly key_deriver_label: string }) => {
+export const checkSuppliedSpecKept = (candidate: Readonly<Record<string, unknown>> & { readonly key_deriver_label: string }) => {
   const supplied = SuppliedSpecs.find((spec) => spec.key_deriver_label === candidate.key_deriver_label)
   if (supplied === undefined) {
     if (candidate.key_deriver_label.toLowerCase().startsWith(ReservedLabelPrefix)) {
@@ -95,10 +95,10 @@ export const ensureSuppliedSpecKept = (candidate: Readonly<Record<string, unknow
  * @param spec - The spec the deriver runs: its `salt_bytes` is the length asked.
  * @param saltBytes - The passphraseSalt a deriver was handed.
  *
- * @example ensureSaltFits(Argon2idWebV1, randomBytes(16))  // returns
- * @example ensureSaltFits(Argon2idWebV1, new Uint8Array(15))  // throws 'bad_option': a salt of 16 bytes is asked
+ * @example checkSaltFits(Argon2idWebV1, randomBytes(16))  // returns
+ * @example checkSaltFits(Argon2idWebV1, new Uint8Array(15))  // throws 'bad_option': a salt of 16 bytes is asked
  */
-export const ensureSaltFits = (spec: { readonly salt_bytes: number }, saltBytes: Uint8Array) => {
+export const checkSaltFits = (spec: { readonly salt_bytes: number }, saltBytes: Uint8Array) => {
   if (saltBytes.length !== spec.salt_bytes) {
     throw new VaultError('bad_option', `This key deriver takes a passphraseSalt of ${String(spec.salt_bytes)} bytes, and was handed one of ${String(saltBytes.length)}: a salt made by another deriver, or a stored salt that has been damaged.`)
   }
@@ -170,7 +170,7 @@ export const parseKeyDeriverSpec = (candidate: KeyDeriverSpec): KeyDeriverSpec =
       : 'It needs every field of a KeyDeriverSpec: algorithm, key_deriver_label, memory_kib, iterations, parallelism, salt_bytes and output_bytes.'
     throw new VaultError('bad_option', `Argon2id cannot run that keyDeriverSpec. ${limit}`)
   }
-  ensureSuppliedSpecKept(checked.data)
+  checkSuppliedSpecKept(checked.data)
   return checked.data
 }
 

@@ -31,8 +31,8 @@ The core's browser paths run in jsdom and a fake IndexedDB in CI; this is where 
 real thing. Chrome, Firefox and Safari, a current release of each, on a desktop, and Safari on an
 iPhone.
 
-* [ ] Create a vault, store a lockbox, reload: the vault is locked, then unlocks with the
-  passphrase, and the lockbox reads back (IndexedDB device store and vault store, `argon2idWebV1Deriver`).
+* [ ] Create a vault, store a box, reload: the vault is locked, then unlocks with the
+  passphrase, and the box reads back (IndexedDB device store and vault store, `argon2idWebV1Deriver`).
 * [ ] The device remembers the unlock for its window and forgets it after: lock it, reload.
 * [ ] A second tab: unlock in one, the other follows; sign out in one, both lock (the device
   shelf's cross-tab erase).

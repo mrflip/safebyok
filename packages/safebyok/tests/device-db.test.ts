@@ -9,15 +9,15 @@ describe("memoryDeviceDB", () => {
   it("treats a mangled record as no lease, and discards it", async () => {
     const deviceDB = memoryDeviceDB()
     const mangled = { ...(await TH.leaseOf('u1')), lease_key: 'not a key handle' }
-    await deviceDB.writeLease(mangled as unknown as Lease)
-    expect(await deviceDB.readLease(TH.scopeOf('u1'))).to.be.null
-    expect(await deviceDB.readLease(TH.scopeOf('u1'))).to.be.null  // stays gone
+    await deviceDB.putLease(mangled as unknown as Lease)
+    expect(await deviceDB.getLease(TH.scopeOf('u1'))).to.be.null
+    expect(await deviceDB.getLease(TH.scopeOf('u1'))).to.be.null  // stays gone
   })
 
   it("treats a mangled mark as no mark, and clears it", async () => {
     const deviceDB = memoryDeviceDB()
-    await deviceDB.writeMark(TH.markOf('u1', { seen: { device_id: '' } }))
-    expect(await deviceDB.readMark(TH.scopeOf('u1'))).to.be.null
-    expect(await deviceDB.readMark(TH.scopeOf('u1'))).to.be.null  // stays gone
+    await deviceDB.putMark(TH.markOf('u1', { seen: { device_id: '' } }))
+    expect(await deviceDB.getMark(TH.scopeOf('u1'))).to.be.null
+    expect(await deviceDB.getMark(TH.scopeOf('u1'))).to.be.null  // stays gone
   })
 })

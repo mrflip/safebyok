@@ -25,7 +25,7 @@ export const bySubject: GetUserId = async (ctx) => {
 }
 
 /**
- * A lockbox whose whisper's ciphertext is `bytes` long. Its tag goes into three of its fields, so
+ * A box whose whisper's ciphertext is `bytes` long. Its tag goes into three of its fields, so
  * a replacement weighs exactly `bytes` more or less only under a tag as long as the one it replaces.
  */
 export const heavyBox = (boxlabel: string, bytes: number, tag = boxlabel) => (

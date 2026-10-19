@@ -14,17 +14,17 @@ const Probe = () => {
   const [outcome, setOutcome] = useState('')
 
   if (openError !== null) {
-    return <p><span data-testid="state">{`open error: ${openError.kind}`}</span> <button onClick={retryOpen}>Retry</button></p>
+    return <p><span data-testid="state">{`open error: ${openError.refusalkind}`}</span> <button onClick={retryOpen}>Retry</button></p>
   }
   if (vault === null) { return <span data-testid="state">no vault</span> }
 
   const put = () => {
-    void withUnlockedVault(() => vault.storeBox('anthropic_api_key', 'sk-fake'))
+    void withUnlockedVault(() => vault.putBox('anthropic_api_key', 'sk-fake'))
       .then((stored) => { setOutcome(stored === null ? 'dismissed' : 'stored') })
   }
   // A whisper is never null, so null from withUnlockedVault can only mean "dismissed".
   const grab = () => {
-    void withUnlockedVault(() => vault.readBox('anthropic_api_key'))
+    void withUnlockedVault(() => vault.getBox('anthropic_api_key'))
       .then((whisper) => { setOutcome(whisper === null ? 'dismissed' : `read:${JSON.stringify(whisper)}`) })
   }
 
@@ -86,7 +86,7 @@ const makeWorld = () => {
   return { vaultDB, deviceDB, props, tree, mount }
 }
 
-/** A world whose `u1` vault was made, with a lockbox, and then had its stored props spoiled. */
+/** A world whose `u1` vault was made, with a box, and then had its stored props spoiled. */
 const damagedWorld = async () => {
   const store = memoryStore()
   const vaultDB = localVaultDB({ store })
@@ -94,7 +94,7 @@ const damagedWorld = async () => {
   const props = { applabel: 'acme', vaultlabel: 'main', vaultDB, deviceDB, keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest }
   const made = await TH.settledVault({ ...props, userId: 'u1' })
   await made.unlock('correct horse')
-  await made.storeBox('anthropic_api_key', 'sk-fake')
+  await made.putBox('anthropic_api_key', 'sk-fake')
   made.close()
   const vaultPropsCkey = Ckeys.vaultProps(TH.scopeOf('u1'))
   const vaultProps = JSON.parse(store.read(vaultPropsCkey) ?? 'null') as object
@@ -114,7 +114,7 @@ const expectShown = (state: string) => waitFor(() => { expect(shownState()).to.e
 /** Waits until the Probe shows `outcome` for its last action, failing if it never does. */
 const expectOutcome = (outcome: string) => waitFor(() => { expect(screen.getByTestId('outcome').textContent).to.eq(outcome) })
 
-/** Puts a lockbox through the Probe into a vault not yet made, choosing `passphrase` for it. */
+/** Puts a box through the Probe into a vault not yet made, choosing `passphrase` for it. */
 const putThroughNewVault = async (passphrase: string) => {
   fireEvent.click(screen.getByText('put'))
   fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
@@ -135,8 +135,8 @@ class CatchingBoundary extends Component<{ caught: unknown[], children: ReactNod
 /** openError's @example, as a host would write it. */
 const OpenErrorExample = () => {
   const { openError, retryOpen } = useVault()
-  if (openError?.kind === 'storage_blocked') { return <p>{"This browser won't let the app keep your vault on this device."}</p> }
-  if (openError?.kind === 'damaged_vault') { return <p>{"Your vault's stored record is damaged."}</p> }
+  if (openError?.refusalkind === 'storage_blocked') { return <p>{"This browser won't let the app keep your vault on this device."}</p> }
+  if (openError?.refusalkind === 'damaged_vault') { return <p>{"Your vault's stored record is damaged."}</p> }
   if (openError !== null) { return <p>{"Can't reach your vault."} <button onClick={retryOpen}>Retry</button></p> }
   return <span>opened</span>
 }
@@ -153,7 +153,7 @@ const lockedWorld = async () => {
   const world = makeWorld()
   const maker = await TH.settledVault({ ...world.props, deviceDB: memoryDeviceDB(), userId: 'u1' })
   await maker.unlock('pw')
-  await maker.storeBox('anthropic_api_key', 'sk-fake')
+  await maker.putBox('anthropic_api_key', 'sk-fake')
   maker.close()
   const grab = grabber()
   const tree = (userId: string | null, keyDeriver: KeyDeriver = TH.testDeriver) => (
@@ -263,7 +263,7 @@ describe("VaultProvider", () => {
     first.unmount()
 
     // A fresh mount after the lease is gone: lock it by clearing the device side.
-    await world.deviceDB.eraseAll()
+    await world.deviceDB.delAll()
     world.mount('u1')
     await expectShown('locked')
     fireEvent.click(screen.getByText('grab'))
@@ -328,7 +328,7 @@ describe("VaultProvider", () => {
       const world = await lockedWorld()
       const { unmount } = render(world.tree('u1'))
       const vault = await world.opened()
-      const reading = world.latest().withUnlockedVault(() => vault.readBox('anthropic_api_key'))
+      const reading = world.latest().withUnlockedVault(() => vault.getBox('anthropic_api_key'))
       await screen.findByPlaceholderText('vault passphrase')
       unmount()
       expect(await reading).to.be.null
@@ -342,7 +342,7 @@ describe("VaultProvider", () => {
       const Eager = () => {
         const { vault, withUnlockedVault } = useVault()
         useLayoutEffect(() => {
-          if (vault !== null) { eager.reading = watched(withUnlockedVault(() => vault.readBox('anthropic_api_key'))) }
+          if (vault !== null) { eager.reading = watched(withUnlockedVault(() => vault.getBox('anthropic_api_key'))) }
         }, [vault, withUnlockedVault])
         return null
       }
@@ -356,7 +356,7 @@ describe("VaultProvider", () => {
       const world = await lockedWorld()
       const { rerender } = render(world.tree('u1'))
       const vault = await world.opened()
-      const reading = world.latest().withUnlockedVault(() => vault.readBox('anthropic_api_key'))
+      const reading = world.latest().withUnlockedVault(() => vault.getBox('anthropic_api_key'))
       await screen.findByPlaceholderText('vault passphrase')
       rerender(world.tree('u2'))
       expect(await reading).to.be.null
@@ -369,7 +369,7 @@ describe("VaultProvider", () => {
       const world = await lockedWorld()
       const { rerender } = render(world.tree('u1'))
       const vault = await world.opened()
-      const reading = world.latest().withUnlockedVault(() => vault.readBox('anthropic_api_key'))
+      const reading = world.latest().withUnlockedVault(() => vault.getBox('anthropic_api_key'))
       await screen.findByPlaceholderText('vault passphrase')
       rerender(world.tree(null))
       expect(await reading).to.be.null
@@ -385,7 +385,7 @@ describe("VaultProvider", () => {
       // A host action that holds its refusal back a while, as one that logs it first might.
       const reading = watched(world.latest().withUnlockedVault(async () => {
         try {
-          return await vault.readBox('anthropic_api_key')
+          return await vault.getBox('anthropic_api_key')
         } catch (err) {
           await held
           throw err
@@ -405,9 +405,9 @@ describe("VaultProvider", () => {
       const world = await lockedWorld()
       render(world.tree('u1'))
       const vault = await world.opened()
-      const first = world.latest().withUnlockedVault(() => vault.readBox('anthropic_api_key'))
+      const first = world.latest().withUnlockedVault(() => vault.getBox('anthropic_api_key'))
       await screen.findByPlaceholderText('vault passphrase')
-      const second = world.latest().withUnlockedVault(() => vault.readBox('anthropic_api_key'))
+      const second = world.latest().withUnlockedVault(() => vault.getBox('anthropic_api_key'))
       await TH.wakeupAtNextTick()
       expect(screen.getAllByPlaceholderText('vault passphrase')).to.have.lengthOf(1)
       fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
@@ -420,9 +420,9 @@ describe("VaultProvider", () => {
       const world = await lockedWorld()
       render(world.tree('u1'))
       const vault = await world.opened()
-      const first = world.latest().withUnlockedVault(() => vault.readBox('anthropic_api_key'))
+      const first = world.latest().withUnlockedVault(() => vault.getBox('anthropic_api_key'))
       await screen.findByPlaceholderText('vault passphrase')
-      const second = world.latest().withUnlockedVault(() => vault.readBox('anthropic_api_key'))
+      const second = world.latest().withUnlockedVault(() => vault.getBox('anthropic_api_key'))
       await TH.wakeupAtNextTick()
       fireEvent.click(screen.getByText('Cancel'))
       expect(await first).to.be.null
@@ -435,14 +435,14 @@ describe("VaultProvider", () => {
       const slowDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase: string, saltBytes: Uint8Array) => { await gate.pass(); return await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes) } }
       render(world.tree('u1', slowDeriver))
       const vault = await world.opened()
-      const first = world.latest().withUnlockedVault(() => vault.readBox('anthropic_api_key'))
+      const first = world.latest().withUnlockedVault(() => vault.getBox('anthropic_api_key'))
       fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
       fireEvent.click(screen.getByText('Unlock'))
       await gate.reached
       fireEvent.click(screen.getByText('Cancel'))
       expect(await first).to.be.null
 
-      const second = watched(world.latest().withUnlockedVault(() => vault.readBox('anthropic_api_key')))
+      const second = watched(world.latest().withUnlockedVault(() => vault.getBox('anthropic_api_key')))
       await screen.findByPlaceholderText('vault passphrase')
       expect(second.outcome).to.eq('pending')
       gate.release()
@@ -454,22 +454,22 @@ describe("VaultProvider", () => {
       const world = await lockedWorld()
       render(world.tree('u1'))
       const vault = await world.opened()
-      const reading = world.latest().withUnlockedVault(() => vault.readBox('anthropic_api_key'))
+      const reading = world.latest().withUnlockedVault(() => vault.getBox('anthropic_api_key'))
       await screen.findByPlaceholderText('vault passphrase')
       await vault.unlock('pw')
       expect(await reading).to.eq('sk-fake')
       await waitFor(() => { expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null })
     })
 
-    it("keeps a dialog asking through a change that is no unlock: a lockbox arriving, a lock", async () => {
+    it("keeps a dialog asking through a change that is no unlock: a box arriving, a lock", async () => {
       const world = await lockedWorld()
       render(world.tree('u1'))
       const vault = await world.opened()
-      const reading = watched(world.latest().withUnlockedVault(() => vault.readBox('anthropic_api_key')))
+      const reading = watched(world.latest().withUnlockedVault(() => vault.getBox('anthropic_api_key')))
       await screen.findByPlaceholderText('vault passphrase')
       const elsewhere = await TH.settledVault({ ...world.props, deviceDB: memoryDeviceDB(), userId: 'u1' })
       await elsewhere.unlock('pw')
-      await elsewhere.storeBox('openai_api_key', 'sk-also-fake')
+      await elsewhere.putBox('openai_api_key', 'sk-also-fake')
       elsewhere.close()
       await waitFor(() => { expect(vault.getSnapshot().boxes).to.have.lengthOf(2) })
       await vault.lock()
@@ -488,9 +488,9 @@ describe("VaultProvider", () => {
       // The refusal is met while locked, and the unlock lands before withUnlockedVault hears it.
       const reading = watched(world.latest().withUnlockedVault(async () => {
         tries += 1
-        if (tries > 1) { return await vault.readBox('anthropic_api_key') }
+        if (tries > 1) { return await vault.getBox('anthropic_api_key') }
         try {
-          return await vault.readBox('anthropic_api_key')
+          return await vault.getBox('anthropic_api_key')
         } catch (err) {
           await vault.unlock('pw')
           throw err
@@ -509,7 +509,7 @@ describe("VaultProvider", () => {
       const held = new Promise<void>((resolve) => { release = resolve })
       const reading = watched(world.latest().withUnlockedVault(async () => {
         try {
-          return await vault.readBox('anthropic_api_key')
+          return await vault.getBox('anthropic_api_key')
         } catch (err) {
           await held
           throw err
@@ -532,11 +532,11 @@ describe("VaultProvider", () => {
       const reading = world.latest().withUnlockedVault(async () => {
         tries += 1
         if (tries > 1) { await vault.lock() }
-        return await vault.readBox('anthropic_api_key')
+        return await vault.getBox('anthropic_api_key')
       })
       fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
       fireEvent.click(screen.getByText('Unlock'))
-      await expect(reading).rejects.toMatchObject({ kind: 'vault_locked' })
+      await expect(reading).rejects.toMatchObject({ refusalkind: 'vault_locked' })
       await TH.wakeupAtNextTick()
       expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null
     })
@@ -548,7 +548,7 @@ describe("VaultProvider", () => {
       let tries = 0
       const reading = world.latest().withUnlockedVault(async () => {
         tries += 1
-        const read = vault.readBox('anthropic_api_key')
+        const read = vault.getBox('anthropic_api_key')
         // The page goes as the run again starts, and the provider closes the vault under the read.
         if (tries > 1) { unmount() }
         return await read
@@ -565,7 +565,7 @@ describe("VaultProvider", () => {
       const vault = await world.opened()
       await vault.unlock('pw')
       const reading = world.latest().withUnlockedVault(async () => {
-        const read = vault.readBox('anthropic_api_key')
+        const read = vault.getBox('anthropic_api_key')
         unmount()
         return await read
       })
@@ -578,20 +578,20 @@ describe("VaultProvider", () => {
       const vault = await world.opened()
       await vault.unlock('pw')
       vault.close()
-      await TH.expectRefusal(world.latest().withUnlockedVault(() => vault.readBox('anthropic_api_key')), 'vault_closed')
+      await TH.expectRefusal(world.latest().withUnlockedVault(() => vault.getBox('anthropic_api_key')), 'vault_closed')
     })
 
     it("leaves another user's dialog asking when the last user's cancelled unlock finishes late", async () => {
       const world = await lockedWorld()
       const other = await TH.settledVault({ ...world.props, deviceDB: memoryDeviceDB(), userId: 'u2' })
       await other.unlock('pw2')
-      await other.storeBox('anthropic_api_key', 'sk-other-fake')
+      await other.putBox('anthropic_api_key', 'sk-other-fake')
       other.close()
       const gate = TH.makeGate()
       const slowDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase: string, saltBytes: Uint8Array) => { await gate.pass(); return await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes) } }
       const { rerender } = render(world.tree('u1', slowDeriver))
       const vault = await world.opened()
-      const first = world.latest().withUnlockedVault(() => vault.readBox('anthropic_api_key'))
+      const first = world.latest().withUnlockedVault(() => vault.getBox('anthropic_api_key'))
       fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
       fireEvent.click(screen.getByText('Unlock'))
       await gate.reached
@@ -602,7 +602,7 @@ describe("VaultProvider", () => {
       await waitFor(() => { expect(world.latest().vault).to.not.be.null })
       const vault2 = world.latest().vault
       if (vault2 === null || vault2 === vault) { throw new Error('the provider opened no vault for u2') }
-      const second = watched(world.latest().withUnlockedVault(() => vault2.readBox('anthropic_api_key')))
+      const second = watched(world.latest().withUnlockedVault(() => vault2.getBox('anthropic_api_key')))
       await screen.findByPlaceholderText('vault passphrase')
       gate.release()
       await TH.wakeupAtNextTick()
@@ -627,7 +627,7 @@ describe("VaultProvider", () => {
     const { Grab, opened } = grabber()
     render(
       <VaultProvider applabel="acme" vaultlabel="main" userId="u1" vaultDB={localVaultDB({ store: memoryStore() })} deviceDB={memoryDeviceDB()}
-        keyDeriver={TH.testDeriver} passphraseStrengthTest={TH.anyPassphraseTest} clock={{ now: () => ClockMillis }} leaseHours={1} maxWhisperBytes={8} maxLockboxes={1}>
+        keyDeriver={TH.testDeriver} passphraseStrengthTest={TH.anyPassphraseTest} clock={{ now: () => ClockMillis }} leaseHours={1} maxWhisperBytes={8} maxBoxes={1}>
         <Grab />
       </VaultProvider>,
     )
@@ -637,10 +637,10 @@ describe("VaultProvider", () => {
     // One hour, 3,600,000 ms, after the clock's time.
     expect(vault.getSnapshot().askPassphraseAt).to.eq(ClockMillis + 3_600_000)
     // 'sk-fake' is nine bytes of JSON, one over the limit given.
-    await TH.expectRefusal(vault.storeBox('anthropic_api_key', 'sk-fake'), 'whisper_too_large')
-    // One lockbox fills the vault: a second is refused for room.
-    await vault.storeBox('openai_api_key', 'sk')
-    await TH.expectRefusal(vault.storeBox('mistral_api_key', 'sk'), 'vault_full')
+    await TH.expectRefusal(vault.putBox('anthropic_api_key', 'sk-fake'), 'whisper_too_large')
+    // One box fills the vault: a second is refused for room.
+    await vault.putBox('openai_api_key', 'sk')
+    await TH.expectRefusal(vault.putBox('mistral_api_key', 'sk'), 'vault_full')
   })
 
   it("passes the validators through, reopening for a changed check but not for a bag rebuilt around the same ones", async () => {
@@ -655,7 +655,7 @@ describe("VaultProvider", () => {
     const { rerender } = render(tree(AnyTextValidators.boxlabel))
     const first = await opened()
     await first.unlock('correct horse battery staple')
-    await first.storeBox('Anthropic API key', 'sk-fake')
+    await first.putBox('Anthropic API key', 'sk-fake')
     rerender(tree(AnyTextValidators.boxlabel))
     expect(latest().vault).to.eq(first)
     // Another schema, a narrower one: a new check, so a new vault handle, which lists what is
@@ -729,8 +729,8 @@ describe("VaultProvider", () => {
     const vault = await opened()
     await vault.unlock('correct horse battery staple')
     await expectShown('unlocked')
-    vi.spyOn(vaultDB, 'readBox').mockRejectedValueOnce(new VaultError('identity_revoked', 'No one is signed in: sign in, then try again.'))
-    await TH.expectRefusal(vault.readBox('anthropic_api_key'), 'identity_revoked')
+    vi.spyOn(vaultDB, 'getBox').mockRejectedValueOnce(new VaultError('identity_revoked', 'No one is signed in: sign in, then try again.'))
+    await TH.expectRefusal(vault.getBox('anthropic_api_key'), 'identity_revoked')
     await expectShown('locked')
   })
 
@@ -760,7 +760,7 @@ describe("VaultProvider", () => {
     const vault = await opened()
     await vault.unlock('correct horse battery staple')
     // A change pushed from storage that the vault cannot read: its background refresh warns.
-    vi.spyOn(vaultDB, 'readVaultProps').mockRejectedValueOnce(new VaultError('storage_unavailable', 'The vault storage could not be reached.'))
+    vi.spyOn(vaultDB, 'getVaultProps').mockRejectedValueOnce(new VaultError('storage_unavailable', 'The vault storage could not be reached.'))
     store.write('elsewhere', '{}')
     await waitFor(() => { expect(spy.calls.map((heard) => heard.level)).to.deep.equal(['warn']) })
     expect(spy.calls[0]?.story).to.deep.equal({ call: 'refresh' })
@@ -783,7 +783,7 @@ describe("VaultProvider", () => {
     await waitFor(() => { expect(spy.calls.map((heard) => heard.story?.['call'])).to.include('VaultProvider') })
     const vault = await opened()
     await vault.unlock('correct horse battery staple')
-    vi.spyOn(vaultDB, 'readVaultProps').mockRejectedValueOnce(new VaultError('storage_unavailable', 'The vault storage could not be reached.'))
+    vi.spyOn(vaultDB, 'getVaultProps').mockRejectedValueOnce(new VaultError('storage_unavailable', 'The vault storage could not be reached.'))
     store.write('elsewhere', '{}')
     await waitFor(() => { expect(spy.calls).to.have.lengthOf(2) })
     expect(spy.calls.map((heard) => [heard.level, heard.story?.['call']])).to.deep.equal([['warn', 'VaultProvider'], ['warn', 'refresh']])
@@ -793,14 +793,14 @@ describe("VaultProvider", () => {
     const world = await lockedWorld()
     render(<VaultProvider {...world.props} userId="u1" allowStartOver><world.Grab /></VaultProvider>)
     const vault = await world.opened()
-    const reading = watched(world.latest().withUnlockedVault(() => vault.readBox('anthropic_api_key')))
+    const reading = watched(world.latest().withUnlockedVault(() => vault.getBox('anthropic_api_key')))
     fireEvent.click(await screen.findByText('Forgot it? Start a new vault'))
     fireEvent.click(screen.getByText('Remove and start over'))
     fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'a new pw' } })
     expect(screen.queryByText('Choose a vault passphrase')).to.not.be.null
     fireEvent.click(screen.getByText('Create vault'))
-    // The action runs again, in the new vault, where there is no such lockbox.
-    await expect(reading.settled).rejects.toMatchObject({ kind: 'absent_box' })
+    // The action runs again, in the new vault, where there is no such box.
+    await expect(reading.settled).rejects.toMatchObject({ refusalkind: 'absent_box' })
   })
 
   it("passes passphraseUsername and passphraseAdvice to the dialog: what a password manager files it under, and what is said as the user chooses", async () => {
@@ -873,7 +873,7 @@ describe("VaultProvider", () => {
       const heard = vi.fn(TH.anyPassphraseTest)
       render(<VaultProvider {...world.props} userId="u1" passphraseStrengthTest={heard}><world.Grab /></VaultProvider>)
       const vault = await world.opened()
-      void world.latest().withUnlockedVault(() => vault.readBox('anthropic_api_key'))
+      void world.latest().withUnlockedVault(() => vault.getBox('anthropic_api_key'))
       fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
       expect(screen.queryByRole('status')).to.be.null
       expect(heard).not.toHaveBeenCalled()
@@ -937,7 +937,7 @@ describe("VaultProvider", () => {
   })
   // --
 
-  // == [Refusals on open]: when Vault.make or hello refuses, retireDamagedVault
+  // == [Refusals on open]: when Vault.make or hello refuses, delDamagedVault
 
   describe("when Vault.make or hello refuses", () => {
     it("throws a bad label to the error boundary, as the very VaultError", async () => {
@@ -992,7 +992,7 @@ describe("VaultProvider", () => {
       const caught: unknown[] = []
       render(
         <CatchingBoundary caught={caught}>
-          <VaultProvider {...makeWorld().props} userId="u1" maxLockboxes={0}>
+          <VaultProvider {...makeWorld().props} userId="u1" maxBoxes={0}>
             <Probe />
           </VaultProvider>
         </CatchingBoundary>,
@@ -1006,7 +1006,7 @@ describe("VaultProvider", () => {
       const world = makeWorld()
       // Mocked past VaultDB's public verb, which would wrap a raw throw as storage_unavailable.
       const stray = new TypeError('something is not a function')
-      vi.spyOn(world.vaultDB, 'readVaultProps').mockRejectedValueOnce(stray)
+      vi.spyOn(world.vaultDB, 'getVaultProps').mockRejectedValueOnce(stray)
       const caught: unknown[] = []
       world.mount('u1', caught)
       await expectShown('boundary')
@@ -1024,7 +1024,7 @@ describe("VaultProvider", () => {
       it(`hands down ${blurb} as openError, in place, leaving the boundary alone`, async () => {
         const world = makeWorld()
         const condition = new VaultError(kind, 'Something the app can tell the user about.')
-        vi.spyOn(world.vaultDB, 'readVaultProps').mockRejectedValueOnce(condition)
+        vi.spyOn(world.vaultDB, 'getVaultProps').mockRejectedValueOnce(condition)
         const caught: unknown[] = []
         world.mount('u1', caught)
         await expectShown(`open error: ${kind}`)
@@ -1035,7 +1035,7 @@ describe("VaultProvider", () => {
     it("hands down the very VaultError, beside the handle still opening, whose trouble it is", async () => {
       const world = makeWorld()
       const trouble = unreachable()
-      vi.spyOn(world.vaultDB, 'readVaultProps').mockRejectedValueOnce(trouble)
+      vi.spyOn(world.vaultDB, 'getVaultProps').mockRejectedValueOnce(trouble)
       const { Grab, latest } = grabber()
       render(
         <VaultProvider {...world.props} userId="u1">
@@ -1048,7 +1048,7 @@ describe("VaultProvider", () => {
 
     it("hands down the vault at once, still opening, while its hello reads storage, and no openError", async () => {
       const world = makeWorld()
-      const gate = TH.holdNextCall(world.vaultDB, 'readVaultProps')
+      const gate = TH.holdNextCall(world.vaultDB, 'getVaultProps')
       const { Grab, latest, opened } = grabber()
       render(<VaultProvider {...world.props} userId="u1"><Grab /></VaultProvider>)
       const vault = await opened()
@@ -1063,7 +1063,7 @@ describe("VaultProvider", () => {
       hushConsole()
       const world = makeWorld()
       const misuse = new VaultError('bad_option', 'Something the developer must fix.')
-      vi.spyOn(world.vaultDB, 'readVaultProps').mockRejectedValueOnce(misuse)
+      vi.spyOn(world.vaultDB, 'getVaultProps').mockRejectedValueOnce(misuse)
       const caught: unknown[] = []
       world.mount('u1', caught)
       await expectShown('boundary')
@@ -1074,7 +1074,7 @@ describe("VaultProvider", () => {
       hushConsole()
       const world = makeWorld()
       const misuse = new VaultError('bad_record', 'A record the developer built wrongly.')
-      vi.spyOn(world.vaultDB, 'readVaultProps').mockRejectedValueOnce(misuse)
+      vi.spyOn(world.vaultDB, 'getVaultProps').mockRejectedValueOnce(misuse)
       const caught: unknown[] = []
       world.mount('u1', caught)
       await expectShown('boundary')
@@ -1099,7 +1099,7 @@ describe("VaultProvider", () => {
 
     it("retryOpen opens again: once storage relents, the vault opens and openError clears", async () => {
       const world = makeWorld()
-      vi.spyOn(world.vaultDB, 'readVaultProps').mockRejectedValueOnce(unreachable())
+      vi.spyOn(world.vaultDB, 'getVaultProps').mockRejectedValueOnce(unreachable())
       world.mount('u1')
       await expectShown('open error: storage_unavailable')
       fireEvent.click(screen.getByText('Retry'))
@@ -1110,7 +1110,7 @@ describe("VaultProvider", () => {
       const world = makeWorld()
       const first = unreachable()
       const second = new VaultError('not_permitted', 'Sign in to reach this vault.')
-      vi.spyOn(world.vaultDB, 'readVaultProps').mockRejectedValueOnce(first).mockRejectedValueOnce(second)
+      vi.spyOn(world.vaultDB, 'getVaultProps').mockRejectedValueOnce(first).mockRejectedValueOnce(second)
       world.mount('u1')
       await expectShown('open error: storage_unavailable')
       fireEvent.click(screen.getByText('Retry'))
@@ -1120,7 +1120,7 @@ describe("VaultProvider", () => {
     it("retries on the same handle, its one storage watch kept throughout", async () => {
       const world = makeWorld()
       const tally = TH.tallyWatches(world.vaultDB)
-      const reads = vi.spyOn(world.vaultDB, 'readVaultProps')
+      const reads = vi.spyOn(world.vaultDB, 'getVaultProps')
       reads.mockRejectedValueOnce(unreachable()).mockRejectedValueOnce(unreachable())
       world.mount('u1')
       await expectShown('open error: storage_unavailable')
@@ -1134,7 +1134,7 @@ describe("VaultProvider", () => {
 
     it("retryOpen does nothing while there is no openError", async () => {
       const world = makeWorld()
-      const reads = vi.spyOn(world.vaultDB, 'readVaultProps')
+      const reads = vi.spyOn(world.vaultDB, 'getVaultProps')
       const { Grab, latest } = grabber()
       render(
         <VaultProvider {...world.props} userId="u1">
@@ -1152,54 +1152,54 @@ describe("VaultProvider", () => {
       expect(shownState()).to.eq('absent')
     })
 
-    describe("retireDamagedVault", () => {
+    describe("delDamagedVault", () => {
       it("retires the vault openError says is damaged, with this device's lease, and opens a fresh one", async () => {
         const { store, deviceDB, props } = await damagedWorld()
         const { Grab, latest } = grabber()
         render(<VaultProvider {...props} userId="u1"><Grab /><Probe /></VaultProvider>)
         await expectShown('open error: damaged_vault')
-        expect(await deviceDB.readLease(TH.scopeOf('u1'))).to.not.be.null
-        await act(async () => { await latest().retireDamagedVault() })
+        expect(await deviceDB.getLease(TH.scopeOf('u1'))).to.not.be.null
+        await act(async () => { await latest().delDamagedVault() })
         await expectShown('absent')
         expect(store.ckeys()).to.deep.equal([])
-        expect(await deviceDB.readLease(TH.scopeOf('u1'))).to.be.null
+        expect(await deviceDB.getLease(TH.scopeOf('u1'))).to.be.null
         expect(latest().openError).to.be.null
       })
 
       it("does nothing for an openError that is not damaged_vault", async () => {
         const world = makeWorld()
-        const retiring = vi.spyOn(world.vaultDB, 'retireDamagedVault')
-        vi.spyOn(world.vaultDB, 'readVaultProps').mockRejectedValueOnce(unreachable())
+        const deleting = vi.spyOn(world.vaultDB, 'delDamagedVault')
+        vi.spyOn(world.vaultDB, 'getVaultProps').mockRejectedValueOnce(unreachable())
         const { Grab, latest } = grabber()
         render(<VaultProvider {...world.props} userId="u1"><Grab /><Probe /></VaultProvider>)
         await expectShown('open error: storage_unavailable')
-        await act(async () => { await latest().retireDamagedVault() })
-        expect(retiring).not.toHaveBeenCalled()
+        await act(async () => { await latest().delDamagedVault() })
+        expect(deleting).not.toHaveBeenCalled()
         expect(shownState()).to.eq('open error: storage_unavailable')
       })
 
       it("does nothing while the vault is open, however sound", async () => {
         const world = makeWorld()
-        const retiring = vi.spyOn(world.vaultDB, 'retireDamagedVault')
+        const deleting = vi.spyOn(world.vaultDB, 'delDamagedVault')
         const { Grab, latest } = grabber()
         render(<VaultProvider {...world.props} userId="u1"><Grab /><Probe /></VaultProvider>)
         await expectShown('absent')
-        await act(async () => { await latest().retireDamagedVault() })
-        expect(retiring).not.toHaveBeenCalled()
+        await act(async () => { await latest().delDamagedVault() })
+        expect(deleting).not.toHaveBeenCalled()
         expect(shownState()).to.eq('absent')
       })
 
       it("opens again, and still rejects, when retiring finds the vault made anew", async () => {
         const { vaultDB, props } = await damagedWorld()
-        vi.spyOn(vaultDB, 'retireDamagedVault').mockRejectedValueOnce(new VaultError('stale_write', 'Storage changed.'))
+        vi.spyOn(vaultDB, 'delDamagedVault').mockRejectedValueOnce(new VaultError('stale_write', 'Storage changed.'))
         // The vault is made anew behind the provider's back: the reopen finds it sound.
-        const reads = vi.spyOn(vaultDB, 'readVaultProps')
+        const reads = vi.spyOn(vaultDB, 'getVaultProps')
         const { Grab, latest } = grabber()
         render(<VaultProvider {...props} userId="u1"><Grab /><Probe /></VaultProvider>)
         await expectShown('open error: damaged_vault')
         reads.mockResolvedValueOnce(null)
         await act(async () => {
-          await expect(latest().retireDamagedVault()).rejects.toMatchObject({ kind: 'stale_write' })
+          await expect(latest().delDamagedVault()).rejects.toMatchObject({ refusalkind: 'stale_write' })
         })
         await expectShown('absent')
       })
@@ -1207,14 +1207,14 @@ describe("VaultProvider", () => {
       it("rejects misuse (bad_option) without opening again, leaving openError for retryOpen", async () => {
         const { vaultDB, props } = await damagedWorld()
         const misuse = new VaultError('bad_option', 'That vault reads sound.')
-        vi.spyOn(vaultDB, 'retireDamagedVault').mockRejectedValueOnce(misuse)
-        const reads = vi.spyOn(vaultDB, 'readVaultProps')
+        vi.spyOn(vaultDB, 'delDamagedVault').mockRejectedValueOnce(misuse)
+        const reads = vi.spyOn(vaultDB, 'getVaultProps')
         const { Grab, latest } = grabber()
         render(<VaultProvider {...props} userId="u1"><Grab /><Probe /></VaultProvider>)
         await expectShown('open error: damaged_vault')
         const readsBefore = reads.mock.calls.length
         await act(async () => {
-          await expect(latest().retireDamagedVault()).rejects.toMatchObject({ kind: 'bad_option' })
+          await expect(latest().delDamagedVault()).rejects.toMatchObject({ refusalkind: 'bad_option' })
         })
         await TH.wakeupAtNextTick()
         expect(reads.mock.calls.length).to.eq(readsBefore)
@@ -1223,22 +1223,22 @@ describe("VaultProvider", () => {
 
       it("rejects with storage's refusal, leaving the damaged openError in place", async () => {
         const { vaultDB, props } = await damagedWorld()
-        vi.spyOn(vaultDB, 'retireDamagedVault').mockRejectedValueOnce(unreachable())
+        vi.spyOn(vaultDB, 'delDamagedVault').mockRejectedValueOnce(unreachable())
         const { Grab, latest } = grabber()
         render(<VaultProvider {...props} userId="u1"><Grab /><Probe /></VaultProvider>)
         await expectShown('open error: damaged_vault')
         await act(async () => {
-          await expect(latest().retireDamagedVault()).rejects.toMatchObject({ kind: 'storage_unavailable' })
+          await expect(latest().delDamagedVault()).rejects.toMatchObject({ refusalkind: 'storage_unavailable' })
         })
         expect(shownState()).to.eq('open error: damaged_vault')
-        await act(async () => { await latest().retireDamagedVault() })
+        await act(async () => { await latest().delDamagedVault() })
         await expectShown('absent')
       })
     })
 
     it("clears openError when the user signs out", async () => {
       const world = makeWorld()
-      vi.spyOn(world.vaultDB, 'readVaultProps').mockRejectedValueOnce(unreachable())
+      vi.spyOn(world.vaultDB, 'getVaultProps').mockRejectedValueOnce(unreachable())
       const { rerender } = world.mount('u1')
       await expectShown('open error: storage_unavailable')
       rerender(world.tree(null))
@@ -1247,7 +1247,7 @@ describe("VaultProvider", () => {
 
     it("matches openError's @example: the message and its Retry button, in place", async () => {
       const world = makeWorld()
-      vi.spyOn(world.vaultDB, 'readVaultProps').mockRejectedValueOnce(unreachable())
+      vi.spyOn(world.vaultDB, 'getVaultProps').mockRejectedValueOnce(unreachable())
       render(
         <VaultProvider {...world.props} userId="u1">
           <OpenErrorExample />
@@ -1262,7 +1262,7 @@ describe("VaultProvider", () => {
 
     it("matches openError's @example for a browser that withholds storage: it says why, and offers no Retry", async () => {
       const world = makeWorld()
-      vi.spyOn(world.props.deviceDB, 'readMark').mockRejectedValue(new DOMException('The operation is insecure.', 'SecurityError'))
+      vi.spyOn(world.props.deviceDB, 'getMark').mockRejectedValue(new DOMException('The operation is insecure.', 'SecurityError'))
       render(
         <VaultProvider {...world.props} userId="u1">
           <OpenErrorExample />
@@ -1274,7 +1274,7 @@ describe("VaultProvider", () => {
 
     it("matches openError's @example for a damaged record: no Retry, which cannot mend it", async () => {
       const world = makeWorld()
-      vi.spyOn(world.vaultDB, 'readVaultProps').mockRejectedValue(new VaultError('corrupt_record', 'The stored vault failed its checks.'))
+      vi.spyOn(world.vaultDB, 'getVaultProps').mockRejectedValue(new VaultError('corrupt_record', 'The stored vault failed its checks.'))
       render(
         <VaultProvider {...world.props} userId="u1">
           <OpenErrorExample />
@@ -1287,7 +1287,7 @@ describe("VaultProvider", () => {
     it("throws a rejection of null too: the failure is held, not the value", async () => {
       hushConsole()
       const world = makeWorld()
-      vi.spyOn(world.vaultDB, 'readVaultProps').mockRejectedValueOnce(null)
+      vi.spyOn(world.vaultDB, 'getVaultProps').mockRejectedValueOnce(null)
       const caught: unknown[] = []
       render(
         <CatchingBoundary caught={caught}>
@@ -1305,7 +1305,7 @@ describe("VaultProvider", () => {
       hushConsole()
       const world = makeWorld()
       let rejectRead: (err: unknown) => void = noop
-      const readVaultProps = vi.spyOn(world.vaultDB, 'readVaultProps').mockReturnValueOnce(new Promise((_resolve, reject) => { rejectRead = reject }))
+      const getVaultProps = vi.spyOn(world.vaultDB, 'getVaultProps').mockReturnValueOnce(new Promise((_resolve, reject) => { rejectRead = reject }))
       const caught: unknown[] = []
       const tree = (userId: string | null) => (
         <CatchingBoundary caught={caught}>
@@ -1315,7 +1315,7 @@ describe("VaultProvider", () => {
         </CatchingBoundary>
       )
       const { rerender } = render(tree('u1'))
-      await waitFor(() => { expect(readVaultProps).toHaveBeenCalledOnce() })
+      await waitFor(() => { expect(getVaultProps).toHaveBeenCalledOnce() })
       rerender(tree(null))
       await act(async () => {
         rejectRead(new VaultError('storage_unavailable', 'The vault storage could not be reached.'))

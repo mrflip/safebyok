@@ -14,7 +14,7 @@ const listed = async (vaultDBFor: ReturnType<typeof TH.deviceOver>): Promise<str
   return boxes.map((box) => box.boxlabel)
 }
 
-TH.describeOnPostgres('races', "postgresVaultDB's lockbox limit, over a real Postgres", () => {
+TH.describeOnPostgres('races', "postgresVaultDB's box limit, over a real Postgres", () => {
   const Cap = 5
   const Racers = 8
   const Rounds = 5
@@ -24,55 +24,55 @@ TH.describeOnPostgres('races', "postgresVaultDB's lockbox limit, over a real Pos
     for (let round = 0; round < Rounds; round += 1) {
       await db.endDevices()
       await db.empty()
-      const first = TH.deviceOver(db, undefined, { maxLockboxes: Cap })
+      const first = TH.deviceOver(db, undefined, { maxBoxes: Cap })
       await TH.filled(first('u1'), ['standing_one', 'standing_two', 'standing_three', 'standing_four'])
-      const racers = Array.from({ length: Racers }, (_, idx) => ({ boxlabel: `racer_${String(idx)}`, vaultDB: TH.deviceOver(db, undefined, { maxLockboxes: Cap })('u1') }))
+      const racers = Array.from({ length: Racers }, (_, idx) => ({ boxlabel: `racer_${String(idx)}`, vaultDB: TH.deviceOver(db, undefined, { maxBoxes: Cap })('u1') }))
 
-      const outcomes = await Promise.allSettled(racers.map(({ boxlabel, vaultDB }) => vaultDB.updateBox(u1, TH.boxOf(boxlabel, 'sk-fake'), TH.noBoxYet)))
+      const outcomes = await Promise.allSettled(racers.map(({ boxlabel, vaultDB }) => vaultDB.putBox(u1, TH.boxOf(boxlabel, 'sk-fake'), TH.noBoxYet)))
 
       const landed = racers.filter((_, idx) => outcomes[idx]?.status === 'fulfilled')
       const refusedKinds = outcomes.flatMap((outcome) => (outcome.status === 'rejected' ? (outcome.reason as { kind?: string }).kind : []))
       expect(landed.length).to.be.within(1, Racers)
       expect(refusedKinds.filter((kind) => kind !== 'vault_full')).to.deep.equal([])
-      expect(await TH.lockboxesStanding(db)).to.eq(4 + landed.length)
-      for (const { boxlabel } of landed) { expect(await first('u1').readBox(u1, boxlabel)).to.not.be.null }
+      expect(await TH.boxesStanding(db)).to.eq(4 + landed.length)
+      for (const { boxlabel } of landed) { expect(await first('u1').getBox(u1, boxlabel)).to.not.be.null }
       expect(await listed(first)).to.have.lengthOf(4 + landed.length)
     }
   })
 
-  it("lets a write past the limit land, as the README says it may: a writer whose count began before another's lockbox committed", async () => {
+  it("lets a write past the limit land, as the README says it may: a writer whose count began before another's box committed", async () => {
     const db = getDb()
     await db.empty()
-    const device = TH.deviceOver(db, undefined, { maxLockboxes: Cap })('u1')
+    const device = TH.deviceOver(db, undefined, { maxBoxes: Cap })('u1')
     await TH.filled(device, ['one', 'two', 'three', 'four'])
     const racer = await db.client()
     await racer.query('BEGIN')
     await TH.insertRawBox(racer, 'fifth_in_flight', 'one')
 
-    await device.updateBox(u1, TH.boxOf('also_fifth', 'sk-fake'), TH.noBoxYet)
+    await device.putBox(u1, TH.boxOf('also_fifth', 'sk-fake'), TH.noBoxYet)
     await racer.query('COMMIT')
 
-    expect(await TH.lockboxesStanding(db)).to.eq(Cap + 1)
-    expect(await device.readBox(u1, 'also_fifth')).to.not.be.null
-    expect(await device.readBox(u1, 'fifth_in_flight')).to.not.be.null
+    expect(await TH.boxesStanding(db)).to.eq(Cap + 1)
+    expect(await device.getBox(u1, 'also_fifth')).to.not.be.null
+    expect(await device.getBox(u1, 'fifth_in_flight')).to.not.be.null
   })
 
-  it("keeps every lockbox that landed past the limit readable, refuses a new one until retired lockboxes make room, and then lands it", async () => {
+  it("keeps every box that landed past the limit readable, refuses a new one until retired boxes make room, and then lands it", async () => {
     const db = getDb()
     await db.empty()
-    const device = TH.deviceOver(db, undefined, { maxLockboxes: Cap })('u1')
+    const device = TH.deviceOver(db, undefined, { maxBoxes: Cap })('u1')
     await TH.filled(device, ['one', 'two', 'three', 'four'])
     const racer = await db.client()
     await racer.query('BEGIN')
     await TH.insertRawBox(racer, 'fifth_in_flight', 'one')
-    await device.updateBox(u1, TH.boxOf('also_fifth', 'sk-fake'), TH.noBoxYet)
+    await device.putBox(u1, TH.boxOf('also_fifth', 'sk-fake'), TH.noBoxYet)
     await racer.query('COMMIT')
 
-    await TH.expectRefusal(device.updateBox(u1, TH.boxOf('sixth', 'sk-fake'), TH.noBoxYet), 'vault_full')
-    await device.retireBox(u1, 'one', TH.retiring('rev-sk-fake-one'))
-    await TH.expectRefusal(device.updateBox(u1, TH.boxOf('sixth', 'sk-fake'), TH.noBoxYet), 'vault_full')
-    await device.retireBox(u1, 'two', TH.retiring('rev-sk-fake-two'))
-    await device.updateBox(u1, TH.boxOf('sixth', 'sk-fake'), TH.noBoxYet)
-    expect(await TH.lockboxesStanding(db)).to.eq(Cap)
+    await TH.expectRefusal(device.putBox(u1, TH.boxOf('sixth', 'sk-fake'), TH.noBoxYet), 'vault_full')
+    await device.delBox(u1, 'one', TH.deleting('rev-sk-fake-one'))
+    await TH.expectRefusal(device.putBox(u1, TH.boxOf('sixth', 'sk-fake'), TH.noBoxYet), 'vault_full')
+    await device.delBox(u1, 'two', TH.deleting('rev-sk-fake-two'))
+    await device.putBox(u1, TH.boxOf('sixth', 'sk-fake'), TH.noBoxYet)
+    expect(await TH.boxesStanding(db)).to.eq(Cap)
   })
 })

@@ -19,7 +19,7 @@ describe("RefusalPolicy.decide", () => {
     [new VaultError('vault_full', 'Full.'),                             "none",  'does nothing more for a full vault'],
     // what is no refusal of storage's:
     [new Error('identity_revoked'),                                     "none",  'does nothing for a plain Error naming the kind'],
-    [{ kind: 'identity_revoked', message: 'Signed out.' },              "none",  'does nothing for an object shaped like the refusal'],
+    [{ refusalkind: 'identity_revoked', message: 'Signed out.' },              "none",  'does nothing for an object shaped like the refusal'],
   ] as const
 
   for (const [refusal, expected, blurb] of DecideCases) {
@@ -33,25 +33,25 @@ describe("RefusalPolicy.heed", () => {
   it("answers each verb as the VaultDB does, passing on every argument", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
     const heeded = RefusalPolicy.heed(vaultDB, () => Promise.resolve())
-    const readVaultProps = vi.spyOn(vaultDB, 'readVaultProps')
+    const getVaultProps = vi.spyOn(vaultDB, 'getVaultProps')
     const listBoxes = vi.spyOn(vaultDB, 'listBoxes')
-    await heeded.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
-    expect(await heeded.readVaultProps(scope)).to.deep.equal(TH.vaultPropsOf('u1'))
-    expect(readVaultProps).toHaveBeenCalledWith(scope)
+    await heeded.ensureVaultProps(TH.vaultPropsOf('u1'))
+    expect(await heeded.getVaultProps(scope)).to.deep.equal(TH.vaultPropsOf('u1'))
+    expect(getVaultProps).toHaveBeenCalledWith(scope)
     expect(await heeded.listBoxes(scope)).to.deep.equal([])
     expect(listBoxes).toHaveBeenCalledWith(scope)
   })
 
   /** Each heeded verb, and the arguments a vault hands it. */
   const VerbArgsCases = [
-    ['readVaultProps',          [scope]],
-    ['fetchOrCreateVaultProps', [TH.vaultPropsOf('u1')]],
-    ['updateVaultProps',        [TH.vaultPropsOf('u1'), TH.thisVault]],
-    ['readBox',                 [scope, 'anthropic']],
+    ['getVaultProps',          [scope]],
+    ['ensureVaultProps', [TH.vaultPropsOf('u1')]],
+    ['putVaultProps',        [TH.vaultPropsOf('u1'), TH.thisVault]],
+    ['getBox',                 [scope, 'anthropic']],
     ['listBoxes',               [scope]],
-    ['updateBox',               [scope, 'anthropic', TH.thisVault]],
-    ['retireBox',               [scope, 'anthropic', TH.thisVault]],
-    ['retireVault',             [scope, TH.thisVault]],
+    ['putBox',               [scope, 'anthropic', TH.thisVault]],
+    ['delBox',               [scope, 'anthropic', TH.thisVault]],
+    ['delVault',             [scope, TH.thisVault]],
   ] as const
 
   for (const [verb, args] of VerbArgsCases) {
@@ -67,13 +67,13 @@ describe("RefusalPolicy.heed", () => {
   it("hands a refusal to onRefusal, waits for it, then rejects with that very refusal", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
     const refusal = signedOut()
-    vi.spyOn(vaultDB, 'readBox').mockRejectedValueOnce(refusal)
+    vi.spyOn(vaultDB, 'getBox').mockRejectedValueOnce(refusal)
     const heard: string[] = []
     const heeded = RefusalPolicy.heed(vaultDB, async (given) => {
       await TH.wakeupAtNextTick()
-      heard.push(given.kind)
+      heard.push(given.refusalkind)
     })
-    expect(await TH.expectRefusal(heeded.readBox(scope, 'anthropic_api_key'), 'identity_revoked')).to.eq(refusal)
+    expect(await TH.expectRefusal(heeded.getBox(scope, 'anthropic_api_key'), 'identity_revoked')).to.eq(refusal)
     expect(heard).to.deep.equal(['identity_revoked'])
   })
 
@@ -81,26 +81,26 @@ describe("RefusalPolicy.heed", () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
     const onRefusal = vi.fn(() => Promise.resolve())
     const heeded = RefusalPolicy.heed(vaultDB, onRefusal)
-    await TH.expectRefusal(heeded.updateVaultProps(TH.vaultPropsOf('u1'), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'stale_write')
+    await TH.expectRefusal(heeded.putVaultProps(TH.vaultPropsOf('u1'), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'stale_write')
     expect(onRefusal).toHaveBeenCalledTimes(1)
   })
 
   it("hands on nothing that is not a VaultError, and rejects with it as it came", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
     const odd = new Error('not a refusal')
-    vi.spyOn(vaultDB, 'retireVault').mockRejectedValueOnce(odd)
+    vi.spyOn(vaultDB, 'delVault').mockRejectedValueOnce(odd)
     const onRefusal = vi.fn(() => Promise.resolve())
     const heeded = RefusalPolicy.heed(vaultDB, onRefusal)
-    await expect(heeded.retireVault(scope, TH.thisVault)).rejects.toThrow(odd)
+    await expect(heeded.delVault(scope, TH.thisVault)).rejects.toThrow(odd)
     expect(onRefusal).not.toHaveBeenCalled()
   })
 
   it("rejects with the refusal even when onRefusal throws", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
     const refusal = signedOut()
-    vi.spyOn(vaultDB, 'readVaultProps').mockRejectedValueOnce(refusal)
+    vi.spyOn(vaultDB, 'getVaultProps').mockRejectedValueOnce(refusal)
     const heeded = RefusalPolicy.heed(vaultDB, () => Promise.reject(new Error('the device store is broken')))
-    expect(await TH.expectRefusal(heeded.readVaultProps(scope), 'identity_revoked')).to.eq(refusal)
+    expect(await TH.expectRefusal(heeded.getVaultProps(scope), 'identity_revoked')).to.eq(refusal)
   })
 
   it("passes subscribe through, its unsubscribe the VaultDB's own", () => {

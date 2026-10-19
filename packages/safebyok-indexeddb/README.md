@@ -46,13 +46,13 @@ const vault = Vault.make({
 * **Every verb is one IndexedDB transaction.** IndexedDB runs readwrite transactions over one
   store one after another, across every tab of the origin, so a write lands only while what it
   expects still stands, and refuses with kind `stale_write` otherwise. Two tabs creating a vault
-  at once settle on one; retiring a vault takes its every lockbox with it, or none of them.
+  at once settle on one; retiring a vault takes its every box with it, or none of them.
 * **Other tabs' writes** ring `subscribe`, over a BroadcastChannel, so a vault open in two tabs
   stays current in both. The bell says only that something changed; the vault reads again. Its
   channel is closed when the last vault listening to it closes.
 * **No limits of its own.** IndexedDB sets none per record or per vault, so `maxRecordBytes`,
-  `maxVaultBytes` and `maxLockboxes` are `Infinity`: a vault holds what `Vault.make`'s
-  `maxLockboxes` allows (100 by default), the origin's storage quota bounds the whole database,
+  `maxVaultBytes` and `maxBoxes` are `Infinity`: a vault holds what `Vault.make`'s
+  `maxBoxes` allows (100 by default), the origin's storage quota bounds the whole database,
   and a write past it refuses with kind `storage_blocked`, IndexedDB's own error as its `cause`.
 * **Storage the browser withholds** -- site data blocked, a private window or frame that keeps
   none, no room left, or no IndexedDB at all -- refuses with kind `storage_blocked`, which a retry
@@ -80,16 +80,16 @@ list holds, so one changed in storage makes the record refuse to open.
 | ckey                                               | Row                       |
 | -------------------------------------------------- | ------------------------- |
 | `vault^<applabel>^<user_id>^<vaultlabel>`          | the vault's `VaultProps`  |
-| `box^<applabel>^<user_id>^<vaultlabel>^<boxlabel>` | one `Lockbox`             |
+| `box^<applabel>^<user_id>^<vaultlabel>^<boxlabel>` | one `Box`             |
 
 The names are joined on `^` (the core's `Ckeys`), which the floor every name is held to keeps out
 of every name, whatever a host's validators admit.
 
-* **Encrypted**: each whisper (`whisper_ciphered`), each lockbox's lockboxKey
-  (`lockbox_key_wrapped`), and, inside the vault props, the vaultKey, wrapped under each passphrase.
+* **Encrypted**: each whisper (`whisper_ciphered`), each box's boxKey
+  (`box_key_wrapped`), and, inside the vault props, the vaultKey, wrapped under each passphrase.
 * **In the open**: the scope, each `boxlabel` and sidecar (`sidecar_json`), the `vault_id`, `unlock_epoch`,
   `revision_tok`s, how each passphrase was made into a key (its key deriver's label and salt),
-  when each vault and lockbox was first stored and each lockbox last written (epoch
+  when each vault and box was first stored and each box last written (epoch
   milliseconds), and the length of every ciphertext.
 * **Never**: a whisper, a passphrase, any key in usable form. The lease lives in the device
   store's database, not here.
@@ -112,9 +112,9 @@ browser store, a native one in an app shell, a key-value service -- copy it, and
 places:
 
 1. **`src/ckeys.ts`: where each record lives.** A ckey per record, built from its scope, so a
-   read is one lookup and a vault's lockboxes are the rows under its prefix, read as a key range
+   read is one lookup and a vault's boxes are the rows under its prefix, read as a key range
    (`boxRange`) rather than by scanning the shelf. The core's `Ckeys` joins on `^`, which no name
-   holds, so a vault's prefix (`box^acme^u1^main^`) begins its own lockboxes' ckeys and no
+   holds, so a vault's prefix (`box^acme^u1^main^`) begins its own boxes' ckeys and no
    other's. If your store has columns or namespaces, use them instead.
 2. **`src/idb-vault-db.ts`: each verb, in one transaction of your store.** Extend `VaultDB` and
    write its `do*` methods, never its public verbs: the base class checks labels, scope, records
@@ -135,10 +135,10 @@ places:
 And keep, as they are:
 
 * **`Expectations`, from `safebyok`**: the comparisons each write makes before it lands
-  (`Expectations.vaultPropsMeets`, `lockboxMeets`, `vaultMeets`, `vaultIdMeets`). An adapter
+  (`Expectations.vaultPropsMeets`, `boxMeets`, `vaultMeets`, `vaultIdMeets`). An adapter
   compares only the scope, `boxlabel`, `vault_id`, `unlock_epoch`, `vault_key_epoch` and
   `revision_tok`, and a standing row too damaged to show one of them fails the comparison. A
-  lockbox write compares the vault props' `vault_key_epoch` too, in the same transaction: skip it,
+  box write compares the vault props' `vault_key_epoch` too, in the same transaction: skip it,
   and a device still holding a vaultKey since replaced can seal a whisper under it.
 * **Store each record as itself, field by field**, exactly as handed to you, and return it
   exactly as stored, or null for none. Never look inside a ciphered field, never repair a

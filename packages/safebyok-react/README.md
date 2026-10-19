@@ -90,9 +90,9 @@ kind, its family, and what it means.
 **A condition stays in place.** Storage that cannot be reached (`storage_unavailable`), a user
 storage no longer serves (`identity_revoked`, as when signed out of the backend, or not yet
 signed in to it) or a vault whose stored props fail their checks (`damaged_vault`) arrives as
-`openError`, a `VaultError`: the snapshot's `trouble`, the vault still `opening`. (A damaged lockbox never stops the open:
-the snapshot lists it with `damaged: true`, for your UI to offer `retireBox()` or, while it
-names its `revision_tok`, a fresh `storeBox()`; see the `safebyok` README's *Damaged lockboxes*.) Show it where the vault's UI
+`openError`, a `VaultError`: the snapshot's `trouble`, the vault still `opening`. (A damaged box never stops the open:
+the snapshot lists it with `damaged: true`, for your UI to offer `delBox()` or, while it
+names its `revision_tok`, a fresh `putBox()`; see the `safebyok` README's *Damaged boxes*.) Show it where the vault's UI
 would be, and offer `retryOpen()`, which has the vault say hello again: `openError` clears once it
 settles, or names what the retry met. A browser that keeps the app from storing
 anything on this device (`storage_blocked`) is a condition too, but one a retry will not mend
@@ -104,24 +104,24 @@ const VaultPanel = () => {
   const { state } = useVaultSnapshot()
   if (openError !== null) { return <p>{"Can't reach your vault."} <button onClick={retryOpen}>Retry</button></p> }
   if (vault === null || state === 'opening') { return <p>Opening your vault…</p> }
-  return <Lockboxes vault={vault} />
+  return <Boxes vault={vault} />
 }
 ```
 
-Branch on `openError.kind` for a better message: an `identity_revoked` user should sign in
+Branch on `openError.refusalkind` for a better message: an `identity_revoked` user should sign in
 again, a `damaged_vault` will not mend on retry, and a `newer_format` vault was written by a
 newer version of the app: the user updates, and never retires it. Its `message` is calm and safe to
 show.
 
 For a `damaged_vault`, the one way forward is to retire the vault and start over:
-`retireDamagedVault()` from `useVault()` does that (the `safebyok` README's *A vault that cannot be
-opened*) and has the vault say hello again, finding it absent. The user's lockboxes in it are lost for
+`delDamagedVault()` from `useVault()` does that (the `safebyok` README's *A vault that cannot be
+opened*) and has the vault say hello again, finding it absent. The user's boxes in it are lost for
 good, so ask first:
 
 ```tsx
-const { openError, retireDamagedVault } = useVault()
-if (openError?.kind === 'damaged_vault') {
-  return <button onClick={() => { if (confirm('Remove your vault and start over?')) { void retireDamagedVault() } }}>Start over</button>
+const { openError, delDamagedVault } = useVault()
+if (openError?.refusalkind === 'damaged_vault') {
+  return <button onClick={() => { if (confirm('Remove your vault and start over?')) { void delDamagedVault() } }}>Start over</button>
 }
 ```
 
@@ -189,10 +189,10 @@ opening fails*, above), where it fires on every load, before any user has typed 
 A forgotten passphrase cannot be recovered: the vault and its whispers are gone with it, and the
 user starts a new one. `<VaultProvider allowStartOver ...>` (or `<PassphraseModal allowStartOver
 ... />`) has the dialog offer that: "Forgot it? Start a new vault" asks first, then retires the
-vault on every device (`vault.retire()`, which needs no passphrase) and becomes "Choose a vault
+vault on every device (`vault.del()`, which needs no passphrase) and becomes "Choose a vault
 passphrase" for the new one; the action that summoned it runs again there. It is off by default:
 a vault with another way in (a second passphrase, a passkey) may not need it, and starting over
-loses every lockbox.
+loses every box.
 
 ## The passphrase field
 
@@ -362,7 +362,7 @@ if (passkey !== null) { await vault.unlock(passkey) }
   begins (what it said before no longer stands), each condition's message, and the button's
   word when it takes itself away.
 * **A passkey can stand in for a forgotten passphrase**: `vault.addPassphrase(passkey, fresh, {
-  wayinlabel })`, then `vault.retireWayin(passkey, oldId)`. A vault always keeps one passphrase:
+  wayinlabel })`, then `vault.delWayin(passkey, oldId)`. A vault always keeps one passphrase:
   removing the last refuses with kind `last_wayin`.
 
 ## Development

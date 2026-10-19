@@ -28,9 +28,9 @@ const stamp = (wayinlabel: string): Wayin.WayinStamp => (
 
 describe("the ctx builders' output, byte for byte", () => {
   it("cipherCtx's encoding of strings, numbers and a record with its keys sorted is pinned byte for byte", () => {
-    const ctx = cipherCtx('safebyok-lockbox-v5', 'acme', 'u1', 'main', 'vid', 1, 'whisper_ciphered', { written_at: 2, boxlabel: 'anthropic', revision_tok: 'r1' })
-    expect(new TextDecoder().decode(ctx)).to.eq('["safebyok-lockbox-v5","acme","u1","main","vid",1,"whisper_ciphered",{"boxlabel":"anthropic","revision_tok":"r1","written_at":2}]')
-    expect(hex.encode(ctx)).to.eq('5b227361666562796f6b2d6c6f636b626f782d7635222c2261636d65222c227531222c226d61696e222c22766964222c312c22776869737065725f6369706865726564222c7b22626f786c6162656c223a22616e7468726f706963222c227265766973696f6e5f746f6b223a227231222c227772697474656e5f6174223a327d5d')
+    const ctx = cipherCtx('safebyok-box-v6', 'acme', 'u1', 'main', 'vid', 1, 'whisper_ciphered', { written_at: 2, boxlabel: 'anthropic', revision_tok: 'r1' })
+    expect(new TextDecoder().decode(ctx)).to.eq('["safebyok-box-v6","acme","u1","main","vid",1,"whisper_ciphered",{"boxlabel":"anthropic","revision_tok":"r1","written_at":2}]')
+    expect(hex.encode(ctx)).to.eq('5b227361666562796f6b2d626f782d7636222c2261636d65222c227531222c226d61696e222c22766964222c312c22776869737065725f6369706865726564222c7b22626f786c6162656c223a22616e7468726f706963222c227265766973696f6e5f746f6b223a227231222c227772697474656e5f6174223a327d5d')
   })
 
   it("a passphrase wayin's wrap is bound to the vault, the purpose and its whole header, byte for byte", async () => {
@@ -55,7 +55,7 @@ describe("the ctx builders' output, byte for byte", () => {
     expect(await unwrapKeyUnder(passkeyKey, wayin.vault_key_wayin_wrapped, ctx, { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)
   })
 
-  it("a lockbox's two wraps and the lease's open only under the ctx bytes they have always been made with", async () => {
+  it("a box's two wraps and the lease's open only under the ctx bytes they have always been made with", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
     const deviceDB = memoryDeviceDB()
     const vault = await TH.settledVault({
@@ -63,19 +63,19 @@ describe("the ctx builders' output, byte for byte", () => {
       keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest, logger: TH.spyLogger().logger,
     })
     await vault.unlock('pw')
-    await vault.storeBox('anthropic', 'sk-fake')
-    const vaultProps = (await vaultDB.readVaultProps(scope))!
-    const lockbox = (await vaultDB.readBox(scope, 'anthropic'))!
-    const lease = (await deviceDB.readLease(scope))!
-    const box = `"acme","u1","main","${vaultProps.vault_id}"`
-    const header = `{"boxlabel":"anthropic","registered_at":${String(lockbox.registered_at)},"revision_tok":"${lockbox.revision_tok}","sidecar_json":"{}","vault_key_epoch":1,"whisper_codec":"json_v1","whisper_schema_version":1,"written_at":${String(lockbox.written_at)}}`
-    const keyCtx = textBytes(`["safebyok-lockbox-v5",${box},"lockbox_key_wrapped",${header}]`)
-    const whisperCtx = textBytes(`["safebyok-lockbox-v5",${box},"whisper_ciphered",${header}]`)
-    const leaseCtx = textBytes(`["safebyok-lease-v1",${box},${String(lease.unlock_epoch)},${String(lease.ask_passphrase_at)},"vault_key_lease_wrapped"]`)
+    await vault.putBox('anthropic', 'sk-fake')
+    const vaultProps = (await vaultDB.getVaultProps(scope))!
+    const box = (await vaultDB.getBox(scope, 'anthropic'))!
+    const lease = (await deviceDB.getLease(scope))!
+    const scopeText = `"acme","u1","main","${vaultProps.vault_id}"`
+    const header = `{"boxlabel":"anthropic","registered_at":${String(box.registered_at)},"revision_tok":"${box.revision_tok}","sidecar_json":"{}","vault_key_epoch":1,"whisper_codec":"json_v1","whisper_schema_version":1,"written_at":${String(box.written_at)}}`
+    const keyCtx = textBytes(`["safebyok-box-v6",${scopeText},"box_key_wrapped",${header}]`)
+    const whisperCtx = textBytes(`["safebyok-box-v6",${scopeText},"whisper_ciphered",${header}]`)
+    const leaseCtx = textBytes(`["safebyok-lease-v1",${scopeText},${String(lease.unlock_epoch)},${String(lease.ask_passphrase_at)},"vault_key_lease_wrapped"]`)
 
     const { sessionKey } = await Wayin.openWithPassphrase(TH.testDeriver, 'pw', scope, vaultProps)
-    const lockboxKey = await unwrapKeyUnder(sessionKey, lockbox.lockbox_key_wrapped, keyCtx, { extractable: false, usage: ['decrypt'] })
-    expect(new TextDecoder().decode(await decipherBytes(lockboxKey, lockbox.whisper_ciphered, whisperCtx))).to.include('sk-fake')
+    const boxKey = await unwrapKeyUnder(sessionKey, box.box_key_wrapped, keyCtx, { extractable: false, usage: ['decrypt'] })
+    expect(new TextDecoder().decode(await decipherBytes(boxKey, box.whisper_ciphered, whisperCtx))).to.include('sk-fake')
     expect(await unwrapKeyUnder(lease.lease_key, lease.vault_key_lease_wrapped, leaseCtx, { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)
   })
 })

@@ -30,7 +30,7 @@ export const decide = (refusal: unknown): RefusalResponse => (
 )
 
 /** The verbs a vault calls on its VaultDB. */
-export type HeededVaultDB = Pick<VaultDB, 'readVaultProps' | 'fetchOrCreateVaultProps' | 'updateVaultProps' | 'readBox' | 'listBoxes' | 'updateBox' | 'retireBox' | 'retireVault' | 'subscribe'>
+export type HeededVaultDB = Pick<VaultDB, 'getVaultProps' | 'ensureVaultProps' | 'putVaultProps' | 'getBox' | 'listBoxes' | 'putBox' | 'delBox' | 'delVault' | 'subscribe'>
 
 /**
  * `vaultDB`'s verbs, each handing any VaultError it rejects with to `onRefusal`, and waiting for
@@ -57,14 +57,14 @@ export const heed = (vaultDB: VaultDB, onRefusal: (refusal: VaultError) => Promi
     }
   }
   return {
-    readVaultProps:          (...args) => heeding(() => vaultDB.readVaultProps(...args)),
-    fetchOrCreateVaultProps: (...args) => heeding(() => vaultDB.fetchOrCreateVaultProps(...args)),
-    updateVaultProps:        (...args) => heeding(() => vaultDB.updateVaultProps(...args)),
-    readBox:                 (...args) => heeding(() => vaultDB.readBox(...args)),
+    getVaultProps:          (...args) => heeding(() => vaultDB.getVaultProps(...args)),
+    ensureVaultProps: (...args) => heeding(() => vaultDB.ensureVaultProps(...args)),
+    putVaultProps:        (...args) => heeding(() => vaultDB.putVaultProps(...args)),
+    getBox:                 (...args) => heeding(() => vaultDB.getBox(...args)),
     listBoxes:               (...args) => heeding(() => vaultDB.listBoxes(...args)),
-    updateBox:               (...args) => heeding(() => vaultDB.updateBox(...args)),
-    retireBox:               (...args) => heeding(() => vaultDB.retireBox(...args)),
-    retireVault:             (...args) => heeding(() => vaultDB.retireVault(...args)),
+    putBox:               (...args) => heeding(() => vaultDB.putBox(...args)),
+    delBox:               (...args) => heeding(() => vaultDB.delBox(...args)),
+    delVault:             (...args) => heeding(() => vaultDB.delVault(...args)),
     subscribe:               (...args) => vaultDB.subscribe(...args),
   }
 }

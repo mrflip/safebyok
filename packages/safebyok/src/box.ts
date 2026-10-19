@@ -7,7 +7,7 @@ import { NameFloor } from './validators'
 /**
  * True when `text` is a sidecar's JSON exactly as the vault writes it: parsed and serialized
  * again, keys sorted, it comes back the same. Text respaced, reordered, or nested too deep to
- * serialize is not, and the lockbox holding it reads as damaged, its refusal a calm one.
+ * serialize is not, and the box holding it reads as damaged, its refusal a calm one.
  */
 const isStableJsonText = (text: string): boolean => {
   try {
@@ -19,8 +19,8 @@ const isStableJsonText = (text: string): boolean => {
 }
 
 /**
- * One lockbox as the storage layer holds it: the whisper ciphered under its own lockboxKey, that
- * lockboxKey wrapped under the vaultKey, and the visible fields -- boxlabel, sidecar, the times
+ * One box as the storage layer holds it: the whisper ciphered under its own boxKey, that
+ * boxKey wrapped under the vaultKey, and the visible fields -- boxlabel, sidecar, the times
  * it was first stored and last written -- a locked vault may show. Nothing in this record opens
  * without the vaultKey.
  *
@@ -33,28 +33,28 @@ const isStableJsonText = (text: string): boolean => {
  * the floor every name is held to (`NameFloor`); the vault's validators check it only where a
  * host hands it in.
  */
-export const Lockbox = Z.object({
-  format:                 Z.literal('safebyok-lockbox-v5'),
+export const Box = Z.object({
+  format:                 Z.literal('safebyok-box-v6'),
   boxlabel:               NameFloor,
   revision_tok:           Z.string().check(Z.minLength(1)),
   /**
-   * Which vaultKey this lockbox's lockboxKey is wrapped under: the vault props' `vault_key_epoch` when
-   * it was written. Visible, so a locked vault's listing shows which lockboxes stand under which.
+   * Which vaultKey this box's boxKey is wrapped under: the vault props' `vault_key_epoch` when
+   * it was written. Visible, so a locked vault's listing shows which boxes stand under which.
    */
   vault_key_epoch:        vaultKeyEpoch,
-  /** This lockbox's lockboxKey, wrapped under the vaultKey. */
-  lockbox_key_wrapped:    Ciphered,
-  /** The whisper, ciphered under this lockbox's lockboxKey. */
+  /** This box's boxKey, wrapped under the vaultKey. */
+  box_key_wrapped:    Ciphered,
+  /** The whisper, ciphered under this box's boxKey. */
   whisper_ciphered:       Ciphered,
   /** How the whisper became the bytes ciphered: `json_v1`, its JSON with every object's keys sorted, as UTF-8. */
   whisper_codec:          Z.literal('json_v1'),
-  /** Which generation of the whisper's own shape this lockbox holds: 1, the only one so far. */
+  /** Which generation of the whisper's own shape this box holds: 1, the only one so far. */
   whisper_schema_version: Z.literal(1),
   /**
-   * The lockbox's {@link Sidecar}, as JSON with every object's keys sorted and no spacing,
-   * exactly as `stableJsonify` writes it: `{}` when the host gave none. Always written, so a lockbox with no sidecar and one with an empty sidecar are one record.
+   * The box's {@link Sidecar}, as JSON with every object's keys sorted and no spacing,
+   * exactly as `stableJsonify` writes it: `{}` when the host gave none. Always written, so a box with no sidecar and one with an empty sidecar are one record.
    */
-  sidecar_json:           Z.string().check(Z.refine(isStableJsonText, "sidecar_json holds the lockbox's sidecar as the JSON text the vault writes, keys sorted")),
+  sidecar_json:           Z.string().check(Z.refine(isStableJsonText, "sidecar_json holds the box's sidecar as the JSON text the vault writes, keys sorted")),
   /** When this boxlabel was first stored, an {@link EpochMillis}: every later store carries it forward. */
   registered_at:          EpochMillis,
   /**
@@ -63,4 +63,4 @@ export const Lockbox = Z.object({
    */
   written_at:             EpochMillis,
 })
-export type Lockbox = Z.infer<typeof Lockbox>
+export type Box = Z.infer<typeof Box>

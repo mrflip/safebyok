@@ -73,16 +73,16 @@ input SafebyokVaultPropsInput {
 }
 
 """
-One lockbox, as stored: its whisper encrypted under its lockboxKey, that lockboxKey wrapped under
+One box, as stored: its whisper encrypted under its boxKey, that boxKey wrapped under
 the vaultKey, and its visible fields. Times are epoch milliseconds; the sidecar is the JSON text
-it was written as, which is bound into the lockbox's encryption.
+it was written as, which is bound into the box's encryption.
 """
-type SafebyokLockbox {
+type SafebyokBox {
   format:                 String!
   boxlabel:               String!
   revision_tok:           String!
   vault_key_epoch:        Int!
-  lockbox_key_wrapped:    SafebyokCiphered!
+  box_key_wrapped:    SafebyokCiphered!
   whisper_ciphered:       SafebyokCiphered!
   whisper_codec:          String!
   whisper_schema_version: Int!
@@ -91,13 +91,13 @@ type SafebyokLockbox {
   written_at:             Float!
 }
 
-"""One lockbox, as stored. Times are epoch milliseconds; the sidecar is its JSON text."""
-input SafebyokLockboxInput {
+"""One box, as stored. Times are epoch milliseconds; the sidecar is its JSON text."""
+input SafebyokBoxInput {
   format:                 String!
   boxlabel:               String!
   revision_tok:           String!
   vault_key_epoch:        Int!
-  lockbox_key_wrapped:    SafebyokCipheredInput!
+  box_key_wrapped:    SafebyokCipheredInput!
   whisper_ciphered:       SafebyokCipheredInput!
   whisper_codec:          String!
   whisper_schema_version: Int!
@@ -106,8 +106,8 @@ input SafebyokLockboxInput {
   written_at:             Float!
 }
 
-"""A lockbox as a listing has it: every field but the two encrypted ones."""
-type SafebyokListedLockbox {
+"""A box as a listing has it: every field but the two encrypted ones."""
+type SafebyokListedBox {
   format:                 String!
   boxlabel:               String!
   revision_tok:           String!
@@ -126,63 +126,63 @@ input SafebyokVaultPropsExpectationInput {
 }
 
 """
-What a lockbox write was written for and read: it lands only while the vault has that vault_id
-and that vault_key_epoch, and the lockbox that revision_tok, or, for a null revision_tok, while
-there is no lockbox there.
+What a box write was written for and read: it lands only while the vault has that vault_id
+and that vault_key_epoch, and the box that revision_tok, or, for a null revision_tok, while
+there is no box there.
 """
-input SafebyokLockboxExpectationInput {
+input SafebyokBoxExpectationInput {
   vault_id:        String!
   revision_tok:    String
   vault_key_epoch: Int!
 }
 
 """What a retire of a vault was aimed at: it lands only while the vault has that vault_id."""
-input SafebyokRetireExpectationInput {
+input SafebyokVaultDelExpectationInput {
   vault_id: String!
 }
 
 """
-What a retire of a lockbox was aimed at: it lands only while the vault has that vault_id, and
-removes whatever lockbox stands; the revision_tok its writer read (null for a lockbox listed with
+What a retire of a box was aimed at: it lands only while the vault has that vault_id, and
+removes whatever box stands; the revision_tok its writer read (null for a box listed with
 none) only says whether what it removed was the one meant.
 """
-input SafebyokLockboxRetireExpectationInput {
+input SafebyokBoxDelExpectationInput {
   vault_id:     String!
   revision_tok: String
 }
 
-"""What a lockbox retire removed: the revision it named, another (retired_other), or nothing (absent)."""
-enum SafebyokRetireOutcome {
-  retired
-  retired_other
+"""What a box retire removed: the revision it named, another (deleted_other), or nothing (absent)."""
+enum SafebyokDelOutcome {
+  deleted
+  deleted_other
   absent
 }
 
-"""What a lockbox retire that landed found under its boxlabel, and removed."""
-type SafebyokLockboxRetirement {
-  outcome: SafebyokRetireOutcome!
+"""What a box retire that landed found under its boxlabel, and removed."""
+type SafebyokBoxDeletion {
+  outcome: SafebyokDelOutcome!
 }
 
 type Query {
   """The vault's props, or null when the vault has never been made."""
-  safebyokReadVaultProps(scope: SafebyokVaultScopeInput!): SafebyokVaultProps
-  """One lockbox, or null when there is none under that boxlabel."""
-  safebyokReadBox(scope: SafebyokVaultScopeInput!, boxlabel: String!): SafebyokLockbox
-  """Every lockbox in the vault, in any order, without its encrypted fields."""
-  safebyokListBoxes(scope: SafebyokVaultScopeInput!): [SafebyokListedLockbox!]!
+  safebyokGetVaultProps(scope: SafebyokVaultScopeInput!): SafebyokVaultProps
+  """One box, or null when there is none under that boxlabel."""
+  safebyokGetBox(scope: SafebyokVaultScopeInput!, boxlabel: String!): SafebyokBox
+  """Every box in the vault, in any order, without its encrypted fields."""
+  safebyokListBoxes(scope: SafebyokVaultScopeInput!): [SafebyokListedBox!]!
 }
 
 type Mutation {
   """Stores the vault props if their vault has none, and answers with whichever vault props stand there afterwards: these, or another device's already standing."""
-  safebyokFetchOrCreateVaultProps(vaultProps: SafebyokVaultPropsInput!): SafebyokVaultProps!
+  safebyokEnsureVaultProps(vaultProps: SafebyokVaultPropsInput!): SafebyokVaultProps!
   """Replaces the vault props, only while those standing are the ones expected."""
-  safebyokUpdateVaultProps(vaultProps: SafebyokVaultPropsInput!, expected: SafebyokVaultPropsExpectationInput!): Boolean!
-  """Writes the lockbox under its boxlabel, only while what stands is what was expected, and answers with the lockbox as stored."""
-  safebyokUpdateBox(scope: SafebyokVaultScopeInput!, lockbox: SafebyokLockboxInput!, expected: SafebyokLockboxExpectationInput!): SafebyokLockbox!
-  """Retires the lockbox under that boxlabel, removing it for good, only while the vault is the one expected, and answers with what it removed."""
-  safebyokRetireBox(scope: SafebyokVaultScopeInput!, boxlabel: String!, expected: SafebyokLockboxRetireExpectationInput!): SafebyokLockboxRetirement!
-  """Retires the vault, its props and every lockbox, removing them for good, only while the vault is the one expected."""
-  safebyokRetireVault(scope: SafebyokVaultScopeInput!, expected: SafebyokRetireExpectationInput!): Boolean!
+  safebyokPutVaultProps(vaultProps: SafebyokVaultPropsInput!, expected: SafebyokVaultPropsExpectationInput!): Boolean!
+  """Writes the box under its boxlabel, only while what stands is what was expected, and answers with the box as stored."""
+  safebyokPutBox(scope: SafebyokVaultScopeInput!, box: SafebyokBoxInput!, expected: SafebyokBoxExpectationInput!): SafebyokBox!
+  """Retires the box under that boxlabel, removing it for good, only while the vault is the one expected, and answers with what it removed."""
+  safebyokDelBox(scope: SafebyokVaultScopeInput!, boxlabel: String!, expected: SafebyokBoxDelExpectationInput!): SafebyokBoxDeletion!
+  """Retires the vault, its props and every box, removing them for good, only while the vault is the one expected."""
+  safebyokDelVault(scope: SafebyokVaultScopeInput!, expected: SafebyokVaultDelExpectationInput!): Boolean!
 }
 
 type Subscription {

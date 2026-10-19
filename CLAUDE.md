@@ -141,7 +141,7 @@ The documents below are looked up by section, not read through.
 
 * `PROCESS.md` -- threads, branches, commits, PRs, changesets, dependencies. **Read the section
   you need before any git operation beyond a commit, and before adding a dependency.**
-* `VOCABULARY.md` -- the cast: whisper, lockbox, vault, passphrase, each key by role, and their
+* `VOCABULARY.md` -- the cast: whisper, box, vault, passphrase, each key by role, and their
   encrypted forms. Its names are the only names for those things, in code, docs and stored fields.
   The code already speaks it: **look up a term you do not recognize**, or before naming a new
   thing in the cast.
@@ -177,8 +177,8 @@ banned names. STYLE.md is the real source.
   `} else if (...) {`, `} catch (err) {`. Parenthesize and space every negation: `if (! approved)`.
 * `"` for prose, error messages, and `describe`/`it` titles. Otherwise use `'`.
 * No single-letter names, even in a lambda: `(row) => row.label`. `ii`, `jj` for a loop counter.
-* The cast keeps VOCABULARY.md's names -- whisper, lockbox, vault -- never `data` or `payload`. A
-  cryptographic key is named for its role (`vaultKey`, `lockboxKey`); a map key is a `ckey`.
+* The cast keeps VOCABULARY.md's names -- whisper, box, vault -- never `data` or `payload`. A
+  cryptographic key is named for its role (`vaultKey`, `boxKey`); a map key is a `ckey`.
 * Smush the tags `name`, `kind`, `label`, `path` and `bag` into one word: `vaultlabel`,
   `woodkind`. `type` is only a datatype; a menu choice is a `kind` or a `flavor`.
 * Stored fields are underbar_case (`salt_bytes`); everything else camelCase. Use integer

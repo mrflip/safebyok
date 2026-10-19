@@ -43,7 +43,7 @@ export const WaysIn = () => {
       </ul>
       {passkeysAvailable()
         ? (
-          <form ref={formRef} className="lockbox-form" onSubmit={(evt) => { void addFingerprint(evt) }}>
+          <form ref={formRef} className="box-form" onSubmit={(evt) => { void addFingerprint(evt) }}>
             {/* What a password manager files the passphrase under, as the passphrase dialog names it. */}
             <input type="text" name="username" autoComplete="username" value={`${snapshot.scope.user_id} (${snapshot.scope.vaultlabel} vault)`} readOnly hidden style={{ display: 'none' }} />
             <label>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildSchema, getNamedType, isInputObjectType, isListType, isNonNullType, isObjectType, parse, validate } from 'graphql'
 import type { GraphQLInputField, GraphQLField } from 'graphql'
-import { Ciphered, Lockbox, VaultProps, VaultScope } from 'safebyok'
+import { Ciphered, Box, VaultProps, VaultScope } from 'safebyok'
 import { VaultSchemaSdl } from '../src/vault-schema'
 import { VaultOperations } from '../src/graphql-vault-db'
 
@@ -17,9 +17,9 @@ const RecordTypes = [
   ['SafebyokVaultScopeInput',    VaultScope,  []],
   ['SafebyokVaultProps',         VaultProps, []],
   ['SafebyokVaultPropsInput',    VaultProps, []],
-  ['SafebyokLockbox',            Lockbox,     []],
-  ['SafebyokLockboxInput',       Lockbox,     []],
-  ['SafebyokListedLockbox',      Lockbox,     ['lockbox_key_wrapped', 'whisper_ciphered']],
+  ['SafebyokBox',            Box,     []],
+  ['SafebyokBoxInput',       Box,     []],
+  ['SafebyokListedBox',      Box,     ['box_key_wrapped', 'whisper_ciphered']],
   ['SafebyokCiphered',           Ciphered,    []],
   ['SafebyokCipheredInput',      Ciphered,    []],
 ] as const
@@ -62,9 +62,9 @@ describe("VaultSchemaSdl", () => {
   })
 
   it("names one root field for each VaultDB verb a browser's vault calls, and one subscription", () => {
-    expect(Object.keys(schema.getQueryType()!.getFields())).to.have.members(['safebyokReadVaultProps', 'safebyokReadBox', 'safebyokListBoxes'])
+    expect(Object.keys(schema.getQueryType()!.getFields())).to.have.members(['safebyokGetVaultProps', 'safebyokGetBox', 'safebyokListBoxes'])
     expect(Object.keys(schema.getMutationType()!.getFields())).to.have.members([
-      'safebyokFetchOrCreateVaultProps', 'safebyokUpdateVaultProps', 'safebyokUpdateBox', 'safebyokRetireBox', 'safebyokRetireVault',
+      'safebyokEnsureVaultProps', 'safebyokPutVaultProps', 'safebyokPutBox', 'safebyokDelBox', 'safebyokDelVault',
     ])
     expect(Object.keys(schema.getSubscriptionType()!.getFields())).to.have.members(['safebyokVaultChanged'])
   })

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { StrongVerdict, checkStrengthTest, ensureStrongEnough, type PassphraseStrengthTest, type PassphraseVerdict } from '../src/passphrase-strength'
+import { StrongVerdict, checkStrengthTest, checkStrongEnough, type PassphraseStrengthTest, type PassphraseVerdict } from '../src/passphrase-strength'
 import { zxcvbnPassphraseTest } from '../src/zxcvbn-passphrase-test'
 import type { VaultScope } from '../src/types'
 import * as TH from './test-helpers'
@@ -24,19 +24,19 @@ describe("StrongVerdict", () => {
   })
 })
 
-describe("ensureStrongEnough", () => {
+describe("checkStrongEnough", () => {
   it("refuses one the test finds weak with kind 'weak_passphrase', the test's reason its message", async () => {
-    const err = await TH.expectRefusal(ensureStrongEnough(neverStrong, 'acme acme acme', scope), 'weak_passphrase')
+    const err = await TH.expectRefusal(checkStrongEnough(neverStrong, 'acme acme acme', scope), 'weak_passphrase')
     expect(err.message).to.eq('Pick a phrase nobody would guess.')
   })
 
   it("awaits a test that answers a promise", async () => {
-    await TH.expectRefusal(ensureStrongEnough(breachedLater, 'acme acme acme', scope), 'weak_passphrase')
+    await TH.expectRefusal(checkStrongEnough(breachedLater, 'acme acme acme', scope), 'weak_passphrase')
   })
 
   it("passes a passphrase the test admits, handing it the passphrase exactly as given and the vault's scope", async () => {
     const test = vi.fn((_passphrase: string, _scope: VaultScope): PassphraseVerdict => StrongVerdict)
-    await ensureStrongEnough(test, '  Spaced Out Phrase  ', scope)
+    await checkStrongEnough(test, '  Spaced Out Phrase  ', scope)
     expect(test).toHaveBeenCalledWith('  Spaced Out Phrase  ', { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })
   })
 
@@ -52,7 +52,7 @@ describe("ensureStrongEnough", () => {
   for (const [answer, blurb] of Misanswers) {
     it(`refuses a test answering ${blurb} with kind 'bad_option'`, async () => {
       const misfit = (() => answer) as unknown as PassphraseStrengthTest
-      const err = await TH.expectRefusal(ensureStrongEnough(misfit, 'acme acme acme', scope), 'bad_option')
+      const err = await TH.expectRefusal(checkStrongEnough(misfit, 'acme acme acme', scope), 'bad_option')
       expect(err.message).to.match(/passphraseStrengthTest/)
       expect(err.message).to.not.include('acme acme acme')
     })
@@ -61,7 +61,7 @@ describe("ensureStrongEnough", () => {
   it("throws whatever the test throws", async () => {
     const thrown = new Error('the strength service is down')
     const broken: PassphraseStrengthTest = () => { throw thrown }
-    await expect(ensureStrongEnough(broken, 'acme acme acme', scope)).rejects.toThrow(thrown)
+    await expect(checkStrongEnough(broken, 'acme acme acme', scope)).rejects.toThrow(thrown)
   })
 })
 
@@ -76,12 +76,12 @@ describe("checkStrengthTest", () => {
 
   it("refuses a missing test with kind 'bad_option', as its example says, naming where a good one is", () => {
     const missing = undefined as unknown as PassphraseStrengthTest
-    expect(() => checkStrengthTest(missing)).to.throw(/passphraseStrengthTest is required.*browserOpts/).with.property('kind', 'bad_option')
+    expect(() => checkStrengthTest(missing)).to.throw(/passphraseStrengthTest is required.*browserOpts/).with.property('refusalkind', 'bad_option')
   })
 
   it("refuses anything but a function with kind 'bad_option'", () => {
     for (const misfit of [null, 12, 'zxcvbn', { strong: true }]) {
-      expect(() => checkStrengthTest(misfit as unknown as PassphraseStrengthTest)).to.throw(/passphraseStrengthTest/).with.property('kind', 'bad_option')
+      expect(() => checkStrengthTest(misfit as unknown as PassphraseStrengthTest)).to.throw(/passphraseStrengthTest/).with.property('refusalkind', 'bad_option')
     }
   })
 })

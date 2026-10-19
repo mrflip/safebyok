@@ -85,7 +85,7 @@ const unlockedFor = (leaseMillis: number, creating: boolean): string => {
  * browser) supplies with the standard polyfill: the README says how.
  *
  * With `allowStartOver`, a user who has forgotten the passphrase is offered a way out: "Forgot it?
- * Start a new vault" asks first, then retires the vault (`vault.retire()`, on every device) and
+ * Start a new vault" asks first, then retires the vault (`vault.del()`, on every device) and
  * turns the dialog into "Choose a vault passphrase" for the new one. Off by default.
  *
  * The passphrase field is made for password managers, so that a user may keep a long, strong
@@ -287,7 +287,7 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
   const [gripe, setGripe] = useState<Gripe | null>(null)
   const [startingOver, setStartingOver] = useState(false)
   // While a retire runs, so that a second press never starts another.
-  const [retiring, setRetiring] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
   const fieldRef = useRef<HTMLInputElement>(null)
   // Asked after each await: a dialog gone meanwhile -- its host took it away, another vault
@@ -302,7 +302,7 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
   const creating = snapshot.state === 'absent'
   const passkeyFirst = ! creating && offersPasskey(snapshot)
   const windowLine = unlockedFor(vault.leaseMillis, creating)
-  // Asked only of a vault there is to retire: one retired meanwhile has the user choose anew, and
+  // Asked only of a vault there is to del: one retired meanwhile has the user choose anew, and
   // ends the question, so that a vault made after it is never asked of. React's "adjusting state
   // while rendering": it renders again at once, before committing this.
   if (startingOver && creating) { setStartingOver(false) }
@@ -339,10 +339,10 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
   }
 
   const startOver = async () => {
-    setRetiring(true)
+    setDeleting(true)
     setGripe(null)
     try {
-      await vault.retire()
+      await vault.del()
       if (! isMounted()) { return }
       setStartingOver(false)
     } catch (err) {
@@ -352,7 +352,7 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
       if (isVaultError(err, 'stale_write')) { setStartingOver(false) }
       meet(err)
     } finally {
-      if (isMounted()) { setRetiring(false) }
+      if (isMounted()) { setDeleting(false) }
     }
   }
 
@@ -396,7 +396,7 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
         {askingStartOver
           ? (
             <div className="row" key="start-over">
-              <button type="button" disabled={retiring} onClick={() => { void startOver() }}>{Messages.startOverConfirm}</button>
+              <button type="button" disabled={deleting} onClick={() => { void startOver() }}>{Messages.startOverConfirm}</button>
               {/* eslint-disable-next-line jsx-a11y/no-autofocus -- the button that held focus is gone; it moves to the choice that loses nothing */}
               <button type="button" autoFocus onClick={() => { setStartingOver(false); setGripe(null) }}>{Messages.startOverBack}</button>
             </div>

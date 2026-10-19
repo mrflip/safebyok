@@ -2,17 +2,17 @@ import { describe, expect, it } from 'vitest'
 import { getDocumentSize } from 'convex/values'
 import * as TH from '../test-helpers'
 import type { Id } from '../../src/component/_generated/dataModel'
-import { MaxVaultLockboxBytes, MaxVaultLockboxes, refuses, weigh } from '../../src/component/tallies'
+import { MaxVaultBoxBytes, MaxVaultBoxes, refuses, weigh } from '../../src/component/tallies'
 
 const MiB = 1024 * 1024
 
 describe("the limits every vault is held to", () => {
-  it("holds at most 8000 lockboxes, half the documents a Convex transaction may write", () => {
-    expect(MaxVaultLockboxes).to.eq(8000)
+  it("holds at most 8000 boxes, half the documents a Convex transaction may write", () => {
+    expect(MaxVaultBoxes).to.eq(8000)
   })
 
-  it("holds at most 7 MiB less 1 KiB of lockboxes: half the read budget, less a whole document of vault props and room for the tally", () => {
-    expect(MaxVaultLockboxBytes).to.eq((7 * MiB) - 1024)
+  it("holds at most 7 MiB less 1 KiB of boxes: half the read budget, less a whole document of vault props and room for the tally", () => {
+    expect(MaxVaultBoxBytes).to.eq((7 * MiB) - 1024)
   })
 })
 
@@ -22,8 +22,8 @@ describe("weigh", () => {
   it("weighs a stored row as Convex counts the document it reads", async () => {
     const CVX = TH.componentTest()
     const stored = await CVX.run(async (ctx) => {
-      const rowId = await ctx.db.insert('safebyok_lockboxes', row)
-      return await ctx.db.get('safebyok_lockboxes', rowId)
+      const rowId = await ctx.db.insert('safebyok_boxes', row)
+      return await ctx.db.get('safebyok_boxes', rowId)
     })
     if (stored === null) { throw new Error('the row was not stored') }
     expect(weigh(stored)).to.eq(getDocumentSize(stored))
@@ -32,8 +32,8 @@ describe("weigh", () => {
   it("weighs a row just inserted, by the _id it was given, as its stored document will weigh", async () => {
     const CVX = TH.componentTest()
     const { rowId, stored } = await CVX.run(async (ctx) => {
-      const insertedId = await ctx.db.insert('safebyok_lockboxes', row)
-      return { rowId: insertedId, stored: await ctx.db.get('safebyok_lockboxes', insertedId) }
+      const insertedId = await ctx.db.insert('safebyok_boxes', row)
+      return { rowId: insertedId, stored: await ctx.db.get('safebyok_boxes', insertedId) }
     })
     if (stored === null) { throw new Error('the row was not stored') }
     expect(weigh(row, rowId)).to.eq(weigh(stored))
@@ -41,7 +41,7 @@ describe("weigh", () => {
 
   it("weighs a row not yet stored with Convex's estimate of its _id", () => {
     expect(weigh(row)).to.eq(getDocumentSize(row))
-    expect(weigh(row)).to.eq(weigh(row, 'k'.repeat(32) as Id<'safebyok_lockboxes'>))
+    expect(weigh(row)).to.eq(weigh(row, 'k'.repeat(32) as Id<'safebyok_boxes'>))
   })
 
   it("weighs a heavier whisper heavier, byte for byte", () => {
@@ -52,27 +52,27 @@ describe("weigh", () => {
 })
 
 describe("refuses", () => {
-  const full = { lockbox_count: MaxVaultLockboxes, lockbox_bytes: 4096 }
-  const heavy = { lockbox_count: 10, lockbox_bytes: MaxVaultLockboxBytes - 100 }
+  const full = { box_count: MaxVaultBoxes, box_bytes: 4096 }
+  const heavy = { box_count: 10, box_bytes: MaxVaultBoxBytes - 100 }
 
   const RefusalCases = [
     // the @examples:
-    [full,  { lockbox_count: 1, lockbox_bytes: 512 },    true,   'refuses a new lockbox in a vault holding its most'],
-    [full,  { lockbox_count: 0, lockbox_bytes: 512 },    false,  'never refuses a replacement for count, even in a full vault'],
+    [full,  { box_count: 1, box_bytes: 512 },    true,   'refuses a new box in a vault holding its most'],
+    [full,  { box_count: 0, box_bytes: 512 },    false,  'never refuses a replacement for count, even in a full vault'],
     // by count:
-    [{ lockbox_count: MaxVaultLockboxes - 1, lockbox_bytes: 4096 }, { lockbox_count: 1, lockbox_bytes: 512 }, false, 'lets the last lockbox in'],
-    [{ lockbox_count: MaxVaultLockboxes + 5, lockbox_bytes: 4096 }, { lockbox_count: 0, lockbox_bytes: -512 }, false, 'lets a vault already over its count shrink'],
+    [{ box_count: MaxVaultBoxes - 1, box_bytes: 4096 }, { box_count: 1, box_bytes: 512 }, false, 'lets the last box in'],
+    [{ box_count: MaxVaultBoxes + 5, box_bytes: 4096 }, { box_count: 0, box_bytes: -512 }, false, 'lets a vault already over its count shrink'],
     // by weight:
-    [heavy, { lockbox_count: 1, lockbox_bytes: 100 },    false,  'lets in a new lockbox that fills the vault to its weight exactly'],
-    [heavy, { lockbox_count: 1, lockbox_bytes: 101 },    true,   'refuses a new lockbox one byte past the vault weight'],
-    [heavy, { lockbox_count: 0, lockbox_bytes: 101 },    true,   'refuses a replacement that grows the vault past its weight'],
-    [heavy, { lockbox_count: 0, lockbox_bytes: 99 },     false,  'lets a replacement grow the vault within its weight'],
-    [{ lockbox_count: 10, lockbox_bytes: MaxVaultLockboxBytes + 5000 }, { lockbox_count: 0, lockbox_bytes: -10 }, false, 'lets a replacement shrink a vault already past its weight'],
-    [{ lockbox_count: 10, lockbox_bytes: MaxVaultLockboxBytes + 5000 }, { lockbox_count: 0, lockbox_bytes: 0 },   false, 'lets a replacement of the same weight into a vault past its weight'],
+    [heavy, { box_count: 1, box_bytes: 100 },    false,  'lets in a new box that fills the vault to its weight exactly'],
+    [heavy, { box_count: 1, box_bytes: 101 },    true,   'refuses a new box one byte past the vault weight'],
+    [heavy, { box_count: 0, box_bytes: 101 },    true,   'refuses a replacement that grows the vault past its weight'],
+    [heavy, { box_count: 0, box_bytes: 99 },     false,  'lets a replacement grow the vault within its weight'],
+    [{ box_count: 10, box_bytes: MaxVaultBoxBytes + 5000 }, { box_count: 0, box_bytes: -10 }, false, 'lets a replacement shrink a vault already past its weight'],
+    [{ box_count: 10, box_bytes: MaxVaultBoxBytes + 5000 }, { box_count: 0, box_bytes: 0 },   false, 'lets a replacement of the same weight into a vault past its weight'],
     // a vault counted only as far as a limit:
-    [null,  { lockbox_count: 1, lockbox_bytes: 512 },    true,   'refuses a new lockbox in a vault past a limit, uncounted'],
-    [null,  { lockbox_count: 0, lockbox_bytes: 1 },      true,   'refuses a heavier replacement in a vault past a limit, uncounted'],
-    [null,  { lockbox_count: 0, lockbox_bytes: -512 },   false,  'lets a lighter replacement into a vault past a limit, uncounted'],
+    [null,  { box_count: 1, box_bytes: 512 },    true,   'refuses a new box in a vault past a limit, uncounted'],
+    [null,  { box_count: 0, box_bytes: 1 },      true,   'refuses a heavier replacement in a vault past a limit, uncounted'],
+    [null,  { box_count: 0, box_bytes: -512 },   false,  'lets a lighter replacement into a vault past a limit, uncounted'],
   ] as const
 
   for (const [tally, growth, expected, blurb] of RefusalCases) {

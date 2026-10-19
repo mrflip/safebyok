@@ -1,7 +1,7 @@
 import { anyApi, defineSchema } from 'convex/server'
 import { ConvexError } from 'convex/values'
 import { convexTest, defineTestApp } from 'convex-test'
-import { Lockbox, VaultProps, localVaultDB, memoryStore } from 'safebyok'
+import { Box, VaultProps, localVaultDB, memoryStore } from 'safebyok'
 import type { Sidecar, StringStore, Whisper } from 'safebyok'
 import { boxOf, memoryVaultOpts, settledVault } from 'safebyok/testing'
 import type { ComponentApi } from '../src/component-api'
@@ -65,7 +65,7 @@ export const bySubject: GetUserId = async (ctx) => {
 }
 
 /**
- * A lockbox whose whisper's ciphertext is `bytes` long. Its tag goes into three of its fields, so
+ * A box whose whisper's ciphertext is `bytes` long. Its tag goes into three of its fields, so
  * a replacement weighs exactly `bytes` more or less only under a tag as long as the one it replaces.
  */
 export const heavyBox = (boxlabel: string, bytes: number, tag = boxlabel) => (
@@ -84,7 +84,7 @@ export const RealPassphrase = 'correct horse battery staple'
 export const openOver = (store: StringStore, userId = 'u1') => settledVault(memoryVaultOpts({ userId, vaultDB: localVaultDB({ store }) }))
 
 /**
- * A real vault, made by the core's own code: vault props and a lockbox per {@link RealWhispers}
+ * A real vault, made by the core's own code: vault props and a box per {@link RealWhispers}
  * entry, each record exactly as the core stores it, read back from its in-memory store by ckey.
  */
 export const realRecords = async (userId = 'u1') => {
@@ -92,7 +92,7 @@ export const realRecords = async (userId = 'u1') => {
   const vault = await openOver(store, userId)
   await vault.unlock(RealPassphrase)
   for (const [boxlabel, { whisper, sidecar }] of Object.entries(RealWhispers)) {
-    await vault.storeBox(boxlabel, whisper, { sidecar })
+    await vault.putBox(boxlabel, whisper, { sidecar })
   }
   vault.close()
   const rows = store.ckeys().map((ckey) => ({ ckey, record: JSON.parse(store.read(ckey) ?? 'null') as unknown }))
@@ -102,8 +102,8 @@ export const realRecords = async (userId = 'u1') => {
     vaultPropsCkey: vaultPropsRow.ckey,
     vaultProps:     VaultProps.parse(vaultPropsRow.record),
     boxes:          rows.flatMap((row) => {
-      const checked = Lockbox.safeParse(row.record)
-      return checked.success ? { ckey: row.ckey, lockbox: checked.data } : []
+      const checked = Box.safeParse(row.record)
+      return checked.success ? { ckey: row.ckey, box: checked.data } : []
     }),
   }
 }

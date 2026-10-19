@@ -3,8 +3,8 @@ import { memoryDeviceDB } from '../../src/device-db'
 import type { KeyDeriver } from '../../src/key-deriver'
 import { type PassphraseStrengthTest, StrongVerdict } from '../../src/passphrase-strength'
 import { memoryStore } from '../../src/string-store'
-import type { Lockbox } from '../../src/box'
-import type { VaultScope, PassphraseWayin, PasskeyWayin, PasskeyProof, VaultProps, Sidecar, LockboxSummary, DamagedLockbox, DeviceMark, SeenVault, Lease } from '../../src/types'
+import type { Box } from '../../src/box'
+import type { VaultScope, PassphraseWayin, PasskeyWayin, PasskeyProof, VaultProps, Sidecar, BoxSummary, DamagedBox, DeviceMark, SeenVault, Lease } from '../../src/types'
 import { stableJsonify } from '../../src/stable-jsonify'
 import { Vault } from '../../src/vault'
 import { type MakeVaultOpts } from '../../src/vault-opts'
@@ -197,10 +197,10 @@ export const vaultPropsOf = (userId: string, overrides: Partial<VaultProps> = {}
 
 /**
  * {@link vaultPropsOf}'s vault at a vaultKey epoch other than 1, at unlock epoch 2, its one way in
- * sealed at that epoch: what a lockbox write sealed under epoch 1 meets when the vault props stand
+ * sealed at that epoch: what a box write sealed under epoch 1 meets when the vault props stand
  * for another. No vault safebyok makes stands at any epoch but 1; storage may still hand one back.
  *
- * @example await vaultDB.updateVaultProps(TH.vaultPropsAtEpochOf('u1', 2), { vault_id: 'vault-id-u1', unlock_epoch: 1 })
+ * @example await vaultDB.putVaultProps(TH.vaultPropsAtEpochOf('u1', 2), { vault_id: 'vault-id-u1', unlock_epoch: 1 })
  */
 export const vaultPropsAtEpochOf = (userId: string, vaultKeyEpoch: number): VaultProps => {
   const wrapped = fakeCiphered(`epoch-${String(vaultKeyEpoch)}-${userId}`)
@@ -212,18 +212,18 @@ export const vaultPropsAtEpochOf = (userId: string, vaultKeyEpoch: number): Vaul
 }
 
 /**
- * A shape-valid Lockbox for storage-layer tests, its ciphered fields fake: revision `rev-<tag>`,
+ * A shape-valid Box for storage-layer tests, its ciphered fields fake: revision `rev-<tag>`,
  * sealed under the vault's first vaultKey, with the sidecar `{ note: 'a test box' }` unless
  * `overrides` says otherwise.
  *
  * @example boxOf('anthropic_api_key', 'a1', { sidecar_json: sidecarJsonOf({ note: 'work account' }) })
  */
-export const boxOf = (boxlabel: string, tag: string, overrides: Partial<Lockbox> = {}): Lockbox => ({
-  format:                 'safebyok-lockbox-v5',
+export const boxOf = (boxlabel: string, tag: string, overrides: Partial<Box> = {}): Box => ({
+  format:                 'safebyok-box-v6',
   boxlabel,
   revision_tok:           `rev-${tag}`,
   vault_key_epoch:        1,
-  lockbox_key_wrapped:    fakeCiphered(`boxkey-${tag}`),
+  box_key_wrapped:    fakeCiphered(`boxkey-${tag}`),
   whisper_ciphered:       fakeCiphered(`whisper-${tag}`),
   whisper_codec:          'json_v1',
   whisper_schema_version: 1,
@@ -234,7 +234,7 @@ export const boxOf = (boxlabel: string, tag: string, overrides: Partial<Lockbox>
 })
 
 /**
- * A sidecar as a lockbox's `sidecar_json` holds it: its JSON, every object's keys sorted, as the
+ * A sidecar as a box's `sidecar_json` holds it: its JSON, every object's keys sorted, as the
  * vault writes it.
  *
  * @example sidecarJsonOf({ note: 'work account' }) // '{"note":"work account"}'
@@ -252,22 +252,22 @@ export const OddLabels = Object.freeze([
 ] as const)
 
 /**
- * A listed lockbox as the summary it should be: undefined stays undefined, and one listed as
+ * A listed box as the summary it should be: undefined stays undefined, and one listed as
  * damaged fails the test, naming its boxlabel. For a test reading a summary's fields out of a
  * listing or a snapshot, where TypeScript would otherwise have it ask after damage first.
  *
  * @example expect(TH.summaryOf(vault.getSnapshot().boxes[0])?.sidecar).to.deep.equal({ note: 'work account' })
  */
-export const summaryOf = (box: LockboxSummary | DamagedLockbox | undefined): LockboxSummary | undefined => {
-  if (box?.damaged === true) { throw new Error(`The lockbox '${box.boxlabel}' is listed as damaged, where a summary was expected.`) }
+export const summaryOf = (box: BoxSummary | DamagedBox | undefined): BoxSummary | undefined => {
+  if (box?.damaged === true) { throw new Error(`The box '${box.boxlabel}' is listed as damaged, where a summary was expected.`) }
   return box
 }
 
 /**
- * What a write into {@link vaultPropsOf}('u1')'s vault expects when its lockbox is not there yet:
+ * What a write into {@link vaultPropsOf}('u1')'s vault expects when its box is not there yet:
  * that vault, under its first vaultKey, and no revision. Frozen, since every test shares it.
  *
- * @example vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet)
+ * @example vaultDB.putBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet)
  */
 export const noBoxYet = Object.freeze({ vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 1 } as const)
 
@@ -275,18 +275,18 @@ export const noBoxYet = Object.freeze({ vault_id: 'vault-id-u1', revision_tok: n
  * What a retirement of {@link vaultPropsOf}('u1')'s vault expects: that vault.
  * Frozen, since every test shares it.
  *
- * @example vaultDB.retireVault(TH.scopeOf('u1'), TH.thisVault)
+ * @example vaultDB.delVault(TH.scopeOf('u1'), TH.thisVault)
  */
 export const thisVault = Object.freeze({ vault_id: 'vault-id-u1' } as const)
 
 /**
- * What a retirement of a lockbox in {@link vaultPropsOf}('u1')'s vault expects: that vault, and
- * the revision the retiring device read -- `rev-` and its tag, for a lockbox {@link boxOf} made --
+ * What a retirement of a box in {@link vaultPropsOf}('u1')'s vault expects: that vault, and
+ * the revision the retiring device read -- `rev-` and its tag, for a box {@link boxOf} made --
  * or null, for one listed with none.
  *
- * @example vaultDB.retireBox(TH.scopeOf('u1'), 'anthropic', TH.retiring('rev-one'))
+ * @example vaultDB.delBox(TH.scopeOf('u1'), 'anthropic', TH.deleting('rev-one'))
  */
-export const retiring = (revisionTok: string | null) => ({ vault_id: 'vault-id-u1', revision_tok: revisionTok })
+export const deleting = (revisionTok: string | null) => ({ vault_id: 'vault-id-u1', revision_tok: revisionTok })
 
 /** What {@link markOf} may change of its mark: any field of its own, and any of what it has seen. */
 export type MarkOverrides = Partial<Omit<DeviceMark, 'seen'>> & { seen?: Partial<SeenVault> }
@@ -295,7 +295,7 @@ export type MarkOverrides = Partial<Omit<DeviceMark, 'seen'>> & { seen?: Partial
  * A shape-valid DeviceMark for device-storage tests: `userId`'s `main` vault as {@link vaultPropsOf}
  * has it, seen at unlock epoch 1 and vaultKey epoch 1, by the device `device-one`.
  *
- * @example await deviceDB.writeMark(TH.markOf('u1'))
+ * @example await deviceDB.putMark(TH.markOf('u1'))
  * @example TH.markOf('u1', { seen: { unlock_epoch: 3 } })  // a device that has seen the vault at epoch 3
  */
 export const markOf = (userId: string, overrides: MarkOverrides = {}): DeviceMark => {

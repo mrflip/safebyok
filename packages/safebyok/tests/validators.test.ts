@@ -248,7 +248,7 @@ describe("DefaultValidators", () => {
 })
 
 describe("the default validators, inside a host's own Zod", () => {
-  // A host on classic Zod holds them in its own schemas, as a form checking a lockbox might.
+  // A host on classic Zod holds them in its own schemas, as a form checking a box might.
   const BoxForm = ZClassic.object({ scope: VaultScope, boxlabel: Label, userId: ZClassic.optional(UserId) })
 
   it("compose into a classic Zod schema and check as they do alone", () => {

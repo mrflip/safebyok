@@ -16,7 +16,7 @@ describe("makeWorld", () => {
     const world = TH.makeWorld({ vaultDB })
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
     expect(world.vaultDB).to.eq(vaultDB)
-    expect(await vaultDB.readVaultProps(TH.scopeOf('u1'))).to.not.be.null
+    expect(await vaultDB.getVaultProps(TH.scopeOf('u1'))).to.not.be.null
   })
 
   it("renders no vault for a signed-out page", () => {
@@ -45,8 +45,8 @@ describe("makeWorld", () => {
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
     const vault = await world.open()
     await vault.unlock(TH.Passphrase)
-    expect(await vault.readBox('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
-    expect(await world.vaultDB.readVaultProps(TH.scopeOf('u1'))).to.not.be.null
+    expect(await vault.getBox('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
+    expect(await world.vaultDB.getVaultProps(TH.scopeOf('u1'))).to.not.be.null
   })
 
   it("opens the vault from outside the page already unlocked, with the tests' passphrase", async () => {
@@ -54,7 +54,7 @@ describe("makeWorld", () => {
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
     const vault = await world.openUnlocked()
     expect(vault.getSnapshot().state).to.eq('unlocked')
-    expect(await vault.readBox('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
+    expect(await vault.getBox('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
   })
 })
 

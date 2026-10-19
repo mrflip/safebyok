@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { PsstModal } from '../../src/components/PsstModal'
 
 describe("PsstModal", () => {
-  it("shows the whisper and the lockbox it came from", () => {
+  it("shows the whisper and the box it came from", () => {
     render(<PsstModal boxlabel="anthropic_api_key" whisperShown="sk-ant-test-not-a-real-key" onClose={vi.fn()} />)
     expect(screen.getByRole('heading').textContent).to.include('sk-ant-test-not-a-real-key')
     expect(screen.getByText('anthropic_api_key')).to.not.be.null

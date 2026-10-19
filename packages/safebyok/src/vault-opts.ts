@@ -1,9 +1,9 @@
 import * as Z from 'zod/mini'
-import { type Clock, MaxWhisperBytes, MinuteMillis, MaxLeaseHours, LeaseHours, ForeverMillis, wallClock, FarPast, FarFuture, MaxLockboxes } from './types'
+import { type Clock, MaxWhisperBytes, MinuteMillis, MaxLeaseHours, LeaseHours, ForeverMillis, wallClock, FarPast, FarFuture, MaxBoxes } from './types'
 import type { VaultValidators } from './validators'
 import { VaultError } from './errors'
 import type { KeyDeriver } from './key-deriver'
-import { MaxSaltBytes, parseKeyDeriverSpec, type KeyDeriverSpec, ensureSuppliedSpecKept, TestLabelPrefix, TestDeriverNotice } from './key-deriver-spec'
+import { MaxSaltBytes, parseKeyDeriverSpec, type KeyDeriverSpec, checkSuppliedSpecKept, TestLabelPrefix, TestDeriverNotice } from './key-deriver-spec'
 import type { DeviceDB } from './device-db'
 import { VaultDB } from './vault-db'
 import { type VaultLogger } from './logger'
@@ -55,21 +55,21 @@ export type MakeVaultOpts = {
    */
   clock?: Clock | undefined
   /**
-   * The largest whisper `storeBox()` accepts, in bytes of its JSON and its lockbox's sidecar's
+   * The largest whisper `putBox()` accepts, in bytes of its JSON and its box's sidecar's
    * together. Default: {@link MaxWhisperBytes}, 40444. Checked on write only, so lowering it never
    * strands a whisper already stored. At most half the vaultDB's `maxRecordBytes`: Vault.make
    * refuses more with kind 'bad_option'.
    */
   maxWhisperBytes?: number | undefined
   /**
-   * The most lockboxes the vault holds. Default: {@link MaxLockboxes}, 100, or the vaultDB's own
-   * `maxLockboxes` when that is smaller. `storeBox()` refuses a new lockbox past it with kind
+   * The most boxes the vault holds. Default: {@link MaxBoxes}, 100, or the vaultDB's own
+   * `maxBoxes` when that is smaller. `putBox()` refuses a new box past it with kind
    * 'vault_full'; replacing one already there is always allowed, and lowering it strands nothing
    * already stored. Raise this or `maxWhisperBytes` freely while this stays within the vaultDB's
-   * `maxLockboxes` and the two fit its `maxVaultBytes`: Vault.make refuses otherwise, with kind
+   * `maxBoxes` and the two fit its `maxVaultBytes`: Vault.make refuses otherwise, with kind
    * 'bad_option'.
    */
-  maxLockboxes?: number | undefined
+  maxBoxes?: number | undefined
   /**
    * Where the vault says what it has nobody to throw to -- a background refresh that failed, a
    * lease it could not read -- as a
@@ -88,7 +88,7 @@ export type MakeVaultOpts = {
    * `UserId` for the user, from `safebyok/validators`), and each left out keeps ours. Each is a Zod
    * schema that checks synchronously, and only checks: what passes is kept exactly as given.
    * Beneath every one, the floor (`NameFloor`) holds whatever the bag says. Kind 'bad_option' for
-   * a bag holding anything else, or a field it does not know (a `note` among them: a lockbox's
+   * a bag holding anything else, or a field it does not know (a `note` among them: a box's
    * sidecar is the host's to check).
    */
   validators?: VaultValidators | undefined
@@ -129,7 +129,7 @@ const makeVaultOptsShape = Z.strictObject({
   leaseHours:             anyOpt,
   clock:                  anyOpt,
   maxWhisperBytes:        anyOpt,
-  maxLockboxes:           anyOpt,
+  maxBoxes:           anyOpt,
   logger:                 anyOpt,
   validators:             anyOpt,
   passphraseStrengthTest: anyOpt,
@@ -145,7 +145,7 @@ const RenamedMakeVaultOpts: ReadonlyMap<string, keyof MakeVaultOpts> = new Map([
  * each such option, and the name a renamed one goes by now. It quotes the bag's field names, the
  * host's own code, and never a value.
  */
-export const ensureKnownOpts = (opts: object) => {
+export const checkKnownOpts = (opts: object) => {
   const checked = makeVaultOptsShape.safeParse(opts)
   if (checked.success) { return }
   const unknownCkeys = checked.error.issues.flatMap((issue) => (issue.code === 'unrecognized_keys' ? issue.keys : []))
@@ -163,14 +163,14 @@ export const ensureKnownOpts = (opts: object) => {
  * keeps the adapter.
  */
 const vaultDBShape = Z.object({
-  readVaultProps:          Z.custom(isFunction),
-  fetchOrCreateVaultProps: Z.custom(isFunction),
-  updateVaultProps:        Z.custom(isFunction),
-  readBox:                 Z.custom(isFunction),
+  getVaultProps:          Z.custom(isFunction),
+  ensureVaultProps: Z.custom(isFunction),
+  putVaultProps:        Z.custom(isFunction),
+  getBox:                 Z.custom(isFunction),
   listBoxes:               Z.custom(isFunction),
-  updateBox:               Z.custom(isFunction),
-  retireBox:               Z.custom(isFunction),
-  retireVault:             Z.custom(isFunction),
+  putBox:               Z.custom(isFunction),
+  delBox:               Z.custom(isFunction),
+  delVault:             Z.custom(isFunction),
   subscribe:               Z.custom(isFunction),
 })
 
@@ -183,13 +183,13 @@ export const parseVaultDB = (candidate: VaultDB): VaultDB => {
 
 /** What a DeviceDB must carry. Checked only: Vault.make keeps the device store it was handed. */
 const deviceDBShape = Z.object({
-  readLease:  Z.custom(isFunction),
-  writeLease: Z.custom(isFunction),
-  eraseLease: Z.custom(isFunction),
-  readMark:   Z.custom(isFunction),
-  writeMark:  Z.custom(isFunction),
-  eraseMark:  Z.custom(isFunction),
-  eraseAll:   Z.custom(isFunction),
+  getLease:  Z.custom(isFunction),
+  putLease: Z.custom(isFunction),
+  delLease: Z.custom(isFunction),
+  getMark:   Z.custom(isFunction),
+  putMark:  Z.custom(isFunction),
+  delMark:  Z.custom(isFunction),
+  delAll:   Z.custom(isFunction),
 })
 
 export const parseDeviceDB = (candidate: DeviceDB): DeviceDB => {
@@ -209,28 +209,28 @@ export const parseDeviceDB = (candidate: DeviceDB): DeviceDB => {
 export const StoredBytesPerWhisperByte = 2
 
 /**
- * The room Vault.make plans for a lockbox's stored fields besides its whisper and sidecar, in
- * bytes of their JSON, when it checks that `maxLockboxes` lockboxes fit the storage's
- * `maxVaultBytes`: its format, boxlabel, revision, codec, times, wrapped lockboxKey, the cipherIv
+ * The room Vault.make plans for a box's stored fields besides its whisper and sidecar, in
+ * bytes of their JSON, when it checks that `maxBoxes` boxes fit the storage's
+ * `maxVaultBytes`: its format, boxlabel, revision, codec, times, wrapped boxKey, the cipherIv
  * and tag of its whisperCiphered, and the scope a backend files it under. Under the default
  * validators, at their largest -- a forty-character boxlabel, applabel and vaultlabel and a
  * user_id of 100, each unit at three UTF-8 bytes -- they take under 1000. A host's validators may
- * admit longer names, so each store also weighs its lockbox as it is ({@link LockboxFixedBytes});
+ * admit longer names, so each store also weighs its box as it is ({@link BoxFixedBytes});
  * this is only the plan.
  */
-export const LockboxFieldsBytes = 1024
+export const BoxFieldsBytes = 1024
 
 /**
- * Room for the stored fields every lockbox has at the same size, in bytes of their JSON: its
- * format, revision, codec, times, wrapped lockboxKey, and the cipherIv and tag of its
- * whisperCiphered, with every field's name. A store weighs a lockbox as this, its whisper and
+ * Room for the stored fields every box has at the same size, in bytes of their JSON: its
+ * format, revision, codec, times, wrapped boxKey, and the cipherIv and tag of its
+ * whisperCiphered, with every field's name. A store weighs a box as this, its whisper and
  * sidecar's room, and its scope and boxlabel as measured.
  */
-export const LockboxFixedBytes = 512
+export const BoxFixedBytes = 512
 
 const maxWhisperBytes = Z._default(Z.int().check(Z.positive()), MaxWhisperBytes)
 
-const maxLockboxes = Z.optional(Z.int().check(Z.positive()))
+const maxBoxes = Z.optional(Z.int().check(Z.positive()))
 
 /**
  * The largest limit in bytes the vault keeps. An adapter's `Infinity`, its way of saying it sets
@@ -248,21 +248,21 @@ const byteLimit = Z.number().check(Z.positive(), Z.lte(UnlimitedBytes))
 const declaredBytes = Z.pipe(Z.pipe(someBytes, bytesKept), byteLimit)
 
 /**
- * The most lockboxes the vault keeps as a limit. An adapter's `Infinity`, its way of saying it
+ * The most boxes the vault keeps as a limit. An adapter's `Infinity`, its way of saying it
  * counts none, becomes this as Vault.make reads it: past that read, no limit is infinite.
  */
-const UnlimitedLockboxes = Number.MAX_SAFE_INTEGER
+const UnlimitedBoxes = Number.MAX_SAFE_INTEGER
 
-/** A count of lockboxes as an adapter declares one, a whole number or `Infinity` for none, to the finite form the vault keeps. */
-const someLockboxes = Z.union([Z.int().check(Z.positive()), Z.literal(Infinity)])
+/** A count of boxes as an adapter declares one, a whole number or `Infinity` for none, to the finite form the vault keeps. */
+const someBoxes = Z.union([Z.int().check(Z.positive()), Z.literal(Infinity)])
 
-const declaredLockboxes = Z.pipe(someLockboxes, Z.transform((count: number) => Math.min(count, UnlimitedLockboxes)))
+const declaredBoxes = Z.pipe(someBoxes, Z.transform((count: number) => Math.min(count, UnlimitedBoxes)))
 
 /** How Vault.make reads each limit an adapter declares. */
 const DeclaredLimitFor = {
   maxRecordBytes: declaredBytes,
   maxVaultBytes:  declaredBytes,
-  maxLockboxes:   declaredLockboxes,
+  maxBoxes:   declaredBoxes,
 } as const
 
 const HourMillis = 60 * MinuteMillis
@@ -335,17 +335,17 @@ export const parseMaxWhisperBytes = (candidate: number | undefined): number => {
 }
 
 /**
- * The vault's `maxLockboxes`: as given, or by default the smaller of {@link MaxLockboxes} and
- * `storeLockboxes`, the most the vaultDB holds in one vault -- which a given one may not exceed.
+ * The vault's `maxBoxes`: as given, or by default the smaller of {@link MaxBoxes} and
+ * `storeBoxes`, the most the vaultDB holds in one vault -- which a given one may not exceed.
  */
-export const parseMaxLockboxes = (candidate: number | undefined, storeLockboxes: number): number => {
-  const checked = maxLockboxes.safeParse(candidate)
+export const parseMaxBoxes = (candidate: number | undefined, storeBoxes: number): number => {
+  const checked = maxBoxes.safeParse(candidate)
   if (! checked.success) {
-    throw new VaultError('bad_option', 'maxLockboxes is a whole number of lockboxes, greater than zero.')
+    throw new VaultError('bad_option', 'maxBoxes is a whole number of boxes, greater than zero.')
   }
-  if (checked.data === undefined) { return Math.min(MaxLockboxes, storeLockboxes) }
-  if (checked.data > storeLockboxes) {
-    throw new VaultError('bad_option', `maxLockboxes is over the ${String(storeLockboxes)} lockboxes this storage adapter holds in one vault (its own maxLockboxes): pass ${String(storeLockboxes)} or fewer.`)
+  if (checked.data === undefined) { return Math.min(MaxBoxes, storeBoxes) }
+  if (checked.data > storeBoxes) {
+    throw new VaultError('bad_option', `maxBoxes is over the ${String(storeBoxes)} boxes this storage adapter holds in one vault (its own maxBoxes): pass ${String(storeBoxes)} or fewer.`)
   }
   return checked.data
 }
@@ -373,7 +373,7 @@ export const parseKeyDeriver = (candidate: KeyDeriver | undefined, logger: Vault
   // A deriver declaring Argon2id must be one Argon2id can run: its refusal here, with a kind, is
   // the one it would otherwise make at the first unlock, as a plain Error from the library.
   if (candidate.algorithm === 'argon2id') { parseKeyDeriverSpec(candidate as KeyDeriverSpec) }
-  ensureSuppliedSpecKept(candidate)
+  checkSuppliedSpecKept(candidate)
   if (candidate.key_deriver_label.startsWith(TestLabelPrefix)) {
     logger.warn(TestDeriverNotice, { call: 'make' })
   }
@@ -382,7 +382,7 @@ export const parseKeyDeriver = (candidate: KeyDeriver | undefined, logger: Vault
 
 /**
  * One of the adapter's declared limits, in the finite form the vault keeps: `Infinity` becomes
- * {@link UnlimitedBytes} or {@link UnlimitedLockboxes}.
+ * {@link UnlimitedBytes} or {@link UnlimitedBoxes}.
  */
 export const parseDeclared = (vaultDB: VaultDB, limitname: keyof typeof DeclaredLimitFor): number => {
   const checked = DeclaredLimitFor[limitname].safeParse(vaultDB[limitname])
@@ -399,17 +399,17 @@ export const parseDeclared = (vaultDB: VaultDB, limitname: keyof typeof Declared
  *
  * @returns The most the adapter holds of one vault, in the finite form the vault keeps.
  */
-export const ensureLimitsFit = (vaultDB: VaultDB, whisperByteLimit: number, lockboxLimit: number): number => {
+export const checkLimitsFit = (vaultDB: VaultDB, whisperByteLimit: number, boxLimit: number): number => {
   const recordBytes = parseDeclared(vaultDB, 'maxRecordBytes')
   if (whisperByteLimit * StoredBytesPerWhisperByte > recordBytes) {
     throw new VaultError('bad_option', `maxWhisperBytes is over half of the ${String(recordBytes)} bytes this storage adapter holds in one record, so a whisper that large might not store: pass a smaller maxWhisperBytes.`)
   }
   const vaultBytes = parseDeclared(vaultDB, 'maxVaultBytes')
-  const lockboxBytes = (whisperByteLimit * StoredBytesPerWhisperByte) + LockboxFieldsBytes
-  if (lockboxLimit * lockboxBytes <= vaultBytes) { return vaultBytes }
-  const fitting = Math.floor(vaultBytes / lockboxBytes)
+  const boxBytes = (whisperByteLimit * StoredBytesPerWhisperByte) + BoxFieldsBytes
+  if (boxLimit * boxBytes <= vaultBytes) { return vaultBytes }
+  const fitting = Math.floor(vaultBytes / boxBytes)
   const outcome = fitting === 0
-    ? 'At that maxWhisperBytes, not even one lockbox fits: pass a smaller maxWhisperBytes.'
-    : `At that maxWhisperBytes, at most ${String(fitting)} lockboxes fit: pass a smaller maxLockboxes or maxWhisperBytes.`
-  throw new VaultError('bad_option', `${String(lockboxLimit)} lockboxes (maxLockboxes) of up to ${String(whisperByteLimit)} bytes of whisper each (maxWhisperBytes) might not fit in the ${String(vaultBytes)} bytes this storage adapter holds of one vault (its maxVaultBytes), with room for each lockbox's other fields. ${outcome}`)
+    ? 'At that maxWhisperBytes, not even one box fits: pass a smaller maxWhisperBytes.'
+    : `At that maxWhisperBytes, at most ${String(fitting)} boxes fit: pass a smaller maxBoxes or maxWhisperBytes.`
+  throw new VaultError('bad_option', `${String(boxLimit)} boxes (maxBoxes) of up to ${String(whisperByteLimit)} bytes of whisper each (maxWhisperBytes) might not fit in the ${String(vaultBytes)} bytes this storage adapter holds of one vault (its maxVaultBytes), with room for each box's other fields. ${outcome}`)
 }

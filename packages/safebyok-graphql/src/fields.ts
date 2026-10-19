@@ -1,4 +1,4 @@
-import type { Lockbox, VaultProps, VaultScope } from 'safebyok'
+import type { Box, VaultProps, VaultScope } from 'safebyok'
 
 /**
  * How one field crosses the wire: `plain`, as it is -- text, a number, or the vault props' prior
@@ -48,15 +48,15 @@ export const VaultPropsFields = everyFieldOf<VaultProps>()([
 ] as const)
 
 /**
- * Every field of a Lockbox, as `SafebyokLockbox` has them: the one place that names the
- * lockbox's fields for the wire. The compiler holds it to the lockbox's shape.
+ * Every field of a Box, as `SafebyokBox` has them: the one place that names the
+ * box's fields for the wire. The compiler holds it to the box's shape.
  */
-export const LockboxFields = everyFieldOf<Lockbox>()([
+export const BoxFields = everyFieldOf<Box>()([
   ['format',                 'plain'],
   ['boxlabel',               'plain'],
   ['revision_tok',           'plain'],
   ['vault_key_epoch',        'plain'],
-  ['lockbox_key_wrapped',    'ciphered'],
+  ['box_key_wrapped',    'ciphered'],
   ['whisper_ciphered',       'ciphered'],
   ['whisper_codec',          'plain'],
   ['whisper_schema_version', 'plain'],
@@ -65,8 +65,8 @@ export const LockboxFields = everyFieldOf<Lockbox>()([
   ['written_at',             'plain'],
 ] as const)
 
-/** A lockbox as a listing carries it, as `SafebyokListedLockbox` has it: every field but the two ciphered ones. */
-export const ListedLockboxFields = LockboxFields.filter(([_field, kind]) => kind !== 'ciphered')
+/** A box as a listing carries it, as `SafebyokListedBox` has it: every field but the two ciphered ones. */
+export const ListedBoxFields = BoxFields.filter(([_field, kind]) => kind !== 'ciphered')
 
 /** The two halves of a Ciphered, as `SafebyokCiphered` has them. */
 const CipheredHalves = ['cipher_iv_b64', 'ciphertext_b64'] as const

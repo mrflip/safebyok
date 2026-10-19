@@ -77,13 +77,13 @@ describe("SessionBar", () => {
     signInAs('margo')
     await screen.findByText('margo')
     await TH.expectProbeState('locked')
-    expect(await world.vaultDB.readVaultProps(TH.scopeOf('u1'))).to.not.be.null
+    expect(await world.vaultDB.getVaultProps(TH.scopeOf('u1'))).to.not.be.null
     vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
     fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
     await screen.findByPlaceholderText('username')
     expect(auth.getSnapshot()).to.be.null
     expect(dbStore.read('account:acme:margo')).to.be.null
-    expect(await world.vaultDB.readVaultProps(TH.scopeOf('u1'))).to.be.null
+    expect(await world.vaultDB.getVaultProps(TH.scopeOf('u1'))).to.be.null
   })
 
   it("keeps the account when the user thinks better of deleting it", async () => {

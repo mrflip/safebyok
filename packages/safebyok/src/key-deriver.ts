@@ -1,5 +1,5 @@
 import { argon2idAsync } from '@noble/hashes/argon2.js'
-import { Argon2idWebV1, ensureSaltFits, parseKeyDeriverSpec, type KeyDeriverSpec } from './key-deriver-spec'
+import { Argon2idWebV1, checkSaltFits, parseKeyDeriverSpec, type KeyDeriverSpec } from './key-deriver-spec'
 
 /**
  * What every key deriver carries, whatever its algorithm: the label a vault stores, the salt
@@ -91,7 +91,7 @@ const deriverOf = (spec: KeyDeriverSpec): Argon2idKeyDeriver => {
   return Object.freeze({
     ...spec,
     deriveKeyBytes: async (passphrase: string, saltBytes: Uint8Array) => {
-      ensureSaltFits(spec, saltBytes)
+      checkSaltFits(spec, saltBytes)
       return await argon2idAsync(passphrase, saltBytes, argonOpts)
     },
   })

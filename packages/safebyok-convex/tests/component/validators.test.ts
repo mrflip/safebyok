@@ -6,11 +6,11 @@ import * as Z from 'zod/mini'
 import type { GenericValidator, Infer } from 'convex/values'
 import * as Records from 'safebyok'
 import type {
-  VaultPropsExpectation as CoreVaultPropsExpectation, RetireExpectation as CoreRetireExpectation, LockboxExpectation as CoreLockboxExpectation,
-  LockboxRetireExpectation as CoreLockboxRetireExpectation, LockboxRetirement as CoreLockboxRetirement,
+  VaultPropsExpectation as CoreVaultPropsExpectation, VaultDelExpectation as CoreVaultDelExpectation, BoxExpectation as CoreBoxExpectation,
+  BoxDelExpectation as CoreBoxDelExpectation, BoxDeletion as CoreBoxDeletion,
 } from 'safebyok'
 import {
-  VaultPropsExpectation, Ciphered, RetireExpectation, ListedLockbox, Lockbox, LockboxExpectation, LockboxRetireExpectation, LockboxRetirement, VaultProps, VaultScope,
+  VaultPropsExpectation, Ciphered, VaultDelExpectation, ListedBox, Box, BoxExpectation, BoxDelExpectation, BoxDeletion, VaultProps, VaultScope,
 } from '../../src/component/validators'
 import * as TH from '../test-helpers'
 
@@ -69,14 +69,14 @@ const convexShape = (validator: GenericValidator): Shape => {
   }
 }
 
-const listedZod = Z.omit(Records.Lockbox, { lockbox_key_wrapped: true, whisper_ciphered: true })
+const listedZod = Z.omit(Records.Box, { box_key_wrapped: true, whisper_ciphered: true })
 
 const ShapeCases = [
   [Records.Ciphered,     Ciphered,      'Ciphered: the shared encrypted-value shape'],
   [Records.VaultScope,   VaultScope,    'VaultScope: what names one vault'],
   [Records.VaultProps,   VaultProps,   'VaultProps: every field, each wayin and its ciphered wrap nested'],
-  [Records.Lockbox,      Lockbox,       'Lockbox: every field, the sidecar as JSON text, both ciphered fields nested'],
-  [listedZod,            ListedLockbox, 'a listed lockbox: the record without its ciphered fields, format kept'],
+  [Records.Box,      Box,       'Box: every field, the sidecar as JSON text, both ciphered fields nested'],
+  [listedZod,            ListedBox, 'a listed box: the record without its ciphered fields, format kept'],
 ] as const
 
 describe("the Convex validators, field for field with the core's Zod records", () => {
@@ -89,15 +89,15 @@ describe("the Convex validators, field for field with the core's Zod records", (
   it("type the same records, expectations and summaries as the core", () => {
     expectTypeOf<Infer<typeof VaultProps>>().toEqualTypeOf<Records.VaultProps>()
     expectTypeOf<Infer<typeof VaultScope>>().toEqualTypeOf<Records.VaultScope>()
-    expectTypeOf<Infer<typeof Lockbox>>().toEqualTypeOf<Records.Lockbox>()
+    expectTypeOf<Infer<typeof Box>>().toEqualTypeOf<Records.Box>()
     // A listing is the stored record less its ciphered fields; the core's summary of it parses
     // the sidecar's JSON, so it is the stored record's shape a listing must meet.
-    expectTypeOf<Infer<typeof ListedLockbox>>().toEqualTypeOf<Omit<Records.Lockbox, 'lockbox_key_wrapped' | 'whisper_ciphered'>>()
+    expectTypeOf<Infer<typeof ListedBox>>().toEqualTypeOf<Omit<Records.Box, 'box_key_wrapped' | 'whisper_ciphered'>>()
     expectTypeOf<Infer<typeof VaultPropsExpectation>>().toEqualTypeOf<CoreVaultPropsExpectation>()
-    expectTypeOf<Infer<typeof LockboxExpectation>>().toEqualTypeOf<CoreLockboxExpectation>()
-    expectTypeOf<Infer<typeof RetireExpectation>>().toEqualTypeOf<CoreRetireExpectation>()
-    expectTypeOf<Infer<typeof LockboxRetireExpectation>>().toEqualTypeOf<CoreLockboxRetireExpectation>()
-    expectTypeOf<Infer<typeof LockboxRetirement>>().toEqualTypeOf<CoreLockboxRetirement>()
+    expectTypeOf<Infer<typeof BoxExpectation>>().toEqualTypeOf<CoreBoxExpectation>()
+    expectTypeOf<Infer<typeof VaultDelExpectation>>().toEqualTypeOf<CoreVaultDelExpectation>()
+    expectTypeOf<Infer<typeof BoxDelExpectation>>().toEqualTypeOf<CoreBoxDelExpectation>()
+    expectTypeOf<Infer<typeof BoxDeletion>>().toEqualTypeOf<CoreBoxDeletion>()
   })
 })
 
@@ -107,7 +107,7 @@ const probeApp = defineTestApp({ schema: defineSchema({}) })
 const { api: probeApi, createTest } = probeApp.defineModules({
   probe: {
     takeVaultProps: probeApp.mutation({ args: { vaultProps: VaultProps }, returns: v.null(), handler: () => null }),
-    takeLockbox: probeApp.mutation({ args: { lockbox: Lockbox }, returns: v.null(), handler: () => null }),
+    takeBox: probeApp.mutation({ args: { box: Box }, returns: v.null(), handler: () => null }),
   },
 })
 
@@ -132,7 +132,7 @@ const OldWayinFields = {
   vault_key_passphrase_wrapped: TH.fakeCiphered('old'),
 }
 const { registered_at: _boxRegistered, written_at: _boxWritten, ...boxWithoutTimes } = TH.boxOf('anthropic_api_key', 'a1')
-const lockboxV3 = { ...boxWithoutTimes, format: 'safebyok-lockbox-v3', registered_at: Date.UTC(2026, 9, 14), changed_at: Date.UTC(2026, 9, 14) }
+const boxV3 = { ...boxWithoutTimes, format: 'safebyok-box-v3', registered_at: Date.UTC(2026, 9, 14), changed_at: Date.UTC(2026, 9, 14) }
 /** An ISO time, as records stored them before every time became epoch milliseconds. */
 const OldIso = '2026-10-14T00:00:00.000Z'
 
@@ -143,7 +143,7 @@ const VaultPropsCases = [
   [{ ...TH.vaultPropsOf('u1'), wayins: [TH.wayinOf('passphrase'), TH.passkeyWayinOf('laptop')] }, true, true, 'vault props with a passphrase and a passkey'],
   // both refuse -- what Convex can see:
   [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v5' },                false,  false,  'a format this package does not know'],
-  [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-lockbox-v1' },              false,  false,  "another record's format"],
+  [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-box-v1' },              false,  false,  "another record's format"],
   [vaultPropsWithoutVaultId,                                                 false,  false,  'vault props missing their vault_id'],
   [{ ...TH.vaultPropsOf('u1'), unlock_epoch: '1' },                          false,  false,  'an epoch written as text'],
   [{ ...TH.vaultPropsOf('u1'), wayins: [TH.wayinOf('passphrase', { vault_key_wayin_wrapped: { cipher_iv_b64: 'iv' } as never })] }, false, false, 'a ciphered wayin missing its ciphertext'],
@@ -165,22 +165,22 @@ const VaultPropsCases = [
   [{ ...TH.vaultPropsOf('u1'), wayins: [TH.passkeyWayinOf('one'), TH.passkeyWayinOf('two', { credential_id: 'cred-one' })] }, false, true, 'two passkeys for the same credential'],
 ] as const
 
-const LockboxCases = [
+const BoxCases = [
   // both accept:
-  [TH.boxOf('anthropic_api_key', 'a1'),                                      true,   true,   'a whole lockbox'],
-  [{ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar_json: '{}' },          true,   true,   'a lockbox with an empty sidecar'],
+  [TH.boxOf('anthropic_api_key', 'a1'),                                      true,   true,   'a whole box'],
+  [{ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar_json: '{}' },          true,   true,   'a box with an empty sidecar'],
   [{ ...TH.boxOf('مفتاح العمل', 'a1') },                                    true,   true,   'a boxlabel of any text'],
   // both refuse:
-  [boxWithoutSidecar,                                                        false,  false,  'a lockbox with no sidecar: one is always written'],
+  [boxWithoutSidecar,                                                        false,  false,  'a box with no sidecar: one is always written'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar_json: { note: 'x' } },  false,  false,  'a sidecar stored as an object, not its JSON'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), whisper_codec: 'json_v2' },     false,  false,  'a whisper codec neither knows'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), whisper_schema_version: 2 },    false,  false,  'a whisper schema version neither knows'],
-  [{ ...TH.boxOf('anthropic_api_key', 'a1'), format: 'safebyok-lockbox-v2' }, false, false,  'a lockbox from before the sidecar'],
-  [lockboxV3,                                                                false,  false,  'a lockbox from before written_at, holding changed_at'],
+  [{ ...TH.boxOf('anthropic_api_key', 'a1'), format: 'safebyok-box-v2' }, false, false,  'a box from before the sidecar'],
+  [boxV3,                                                                false,  false,  'a box from before written_at, holding changed_at'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), format: 'safebyok-vault-v1' },  false,  false,  "another record's format"],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), whisper_ciphered: 'ct-flat' },  false,  false,  'a whisper ciphered as bare text, not a wayin'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), written_at: '1792022400000' },  false,  false,  'a written_at written as text'],
-  [{ ...boxWithoutTimes, created_at: OldIso, updated_at: OldIso },           false,  false,  'a lockbox from before its times were named registered_at and changed_at'],
+  [{ ...boxWithoutTimes, created_at: OldIso, updated_at: OldIso },           false,  false,  'a box from before its times were named registered_at and changed_at'],
   // Zod refuses, Convex accepts:
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar_json: '{"note":' },     false,  true,   'a sidecar that is not JSON'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), revision_tok: '' },             false,  true,   'an empty revision_tok'],
@@ -195,10 +195,10 @@ describe("the Convex validators, against the core's Zod records, record by recor
     })
   }
 
-  for (const [lockbox, zodOk, convexOk, blurb] of LockboxCases) {
-    it(`lockbox: ${blurb}`, async () => {
-      expect(Records.Lockbox.safeParse(lockbox).success).to.eq(zodOk)
-      expect(await convexAccepts(createTest().mutation(probeApi.probe.takeLockbox, { lockbox: lockbox as never }))).to.eq(convexOk)
+  for (const [box, zodOk, convexOk, blurb] of BoxCases) {
+    it(`box: ${blurb}`, async () => {
+      expect(Records.Box.safeParse(box).success).to.eq(zodOk)
+      expect(await convexAccepts(createTest().mutation(probeApi.probe.takeBox, { box: box as never }))).to.eq(convexOk)
     })
   }
 })

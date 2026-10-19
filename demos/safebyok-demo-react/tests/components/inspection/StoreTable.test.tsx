@@ -62,10 +62,10 @@ describe("useStoreRows", () => {
 
 describe("useIdbRows", () => {
   it("fetches a shelf's rows as display text, and again when the shelf rings", async () => {
-    const shelf = fakeInspector([{ ckey: 'vault:acme', row: { lockbox_key_wrapped: { ciphertext_b64: 'ct' } } }])
+    const shelf = fakeInspector([{ ckey: 'vault:acme', row: { box_key_wrapped: { ciphertext_b64: 'ct' } } }])
     const { result } = renderHook(() => useIdbRows(shelf.inspector))
     await waitFor(() => { expect(result.current).to.have.lengthOf(1) })
-    expect(result.current[0]).to.deep.equal({ ckey: 'vault:acme', text: '{"lockbox_key_wrapped":{"ciphertext_b64":"ct"}}', flavor: 'ciphered' })
+    expect(result.current[0]).to.deep.equal({ ckey: 'vault:acme', text: '{"box_key_wrapped":{"ciphertext_b64":"ct"}}', flavor: 'ciphered' })
     act(() => { shelf.put({ ckey: 'note:acme', row: 'plain text' }) })
     await waitFor(() => { expect(result.current).to.have.lengthOf(2) })
   })

@@ -133,7 +133,7 @@ it meets nothing of yours.
 ### Serving a VaultDB of your own
 
 The resolvers need a **`ServedVaultDB`**: the VaultDB verbs a browser's vault calls, and
-`listBoxRecords(scope)`, which lists a vault's lockboxes as stored records, its two ciphered
+`listBoxRecords(scope)`, which lists a vault's boxes as stored records, its two ciphered
 fields left out. A VaultDB's own `listBoxes` gives summaries instead -- the shape a vault shows,
 without `format` -- which the browser's VaultDB may not hand back from its own listing.
 `safebyok-postgres`'s VaultDB is a ServedVaultDB as it stands; nothing here is tied to Postgres.
@@ -145,8 +145,8 @@ store of your own keeps every field it was handed.
 
 The resolvers decide nothing: every expectation crosses whole, and the VaultDB you serve keeps
 [the VaultDB contract](https://github.com/mrflip/safebyok/blob/main/packages/safebyok/VAULTDB.md)
-for the browser. Its line 3.8 in particular: a lockbox write's expectation names the
-`vault_key_epoch` the lockbox was sealed under, and your VaultDB lands it only while the vault's
+for the browser. Its line 3.8 in particular: a box write's expectation names the
+`vault_key_epoch` the box was sealed under, and your VaultDB lands it only while the vault's
 props stand at that epoch, compared in the same atomic step as the write. One that skips the
 comparison lets a device still holding a replaced vaultKey seal a whisper under it.
 `tests/yoga-recipe.test.ts` runs the shared suite through the recipe, that line included.
@@ -168,12 +168,12 @@ comparison lets a device still holding a replaced vaultKey seal a whisper under 
 * **The server checks** who may reach which vault, that each write is atomic, and that each
   record has its shape and each name is above the floor and within its storage's limits (the
   VaultDB verbs' own checks, `VAULTDB.md`, *Names*); never a label grammar, which is each browser
-  vault's own `validators`, nor what a lockbox's sidecar holds.
-* **It declares the lockbox limit your server holds a vault to**: none (`Infinity`), as the
-  Postgres VaultDB sets none unless told, or the `maxLockboxes` you pass
-  (`graphqlVaultDB({ client, maxLockboxes: 250 })`). Pass the number your server's
+  vault's own `validators`, nor what a box's sidecar holds.
+* **It declares the box limit your server holds a vault to**: none (`Infinity`), as the
+  Postgres VaultDB sets none unless told, or the `maxBoxes` you pass
+  (`graphqlVaultDB({ client, maxBoxes: 250 })`). Pass the number your server's
   VaultDB enforces, so `Vault.make` refuses a vault asking for more up front; the server refuses a
-  new lockbox past its own with kind `vault_full` either way, and the refusal crosses.
+  new box past its own with kind `vault_full` either way, and the refusal crosses.
 * **A subscription that fails** (the server refusing it, the socket dropping) is not retried. It
   is warned of through the `logger`, once, and calls the vault's listener, so the vault reads
   again and meets the trouble itself: a server's `identity_revoked` locks it. After that, the
@@ -196,8 +196,8 @@ by, exactly as safebyok wrote it:
 | Type                    | Carries                                                                     |
 | ----------------------- | --------------------------------------------------------------------------- |
 | `SafebyokVaultProps`    | every field of the `VaultProps`                                             |
-| `SafebyokLockbox`       | every field of the `Lockbox`; its sidecar as JSON text, as written          |
-| `SafebyokListedLockbox` | a lockbox as a listing has it: every field but the two encrypted ones       |
+| `SafebyokBox`       | every field of the `Box`; its sidecar as JSON text, as written          |
+| `SafebyokListedBox` | a box as a listing has it: every field but the two encrypted ones       |
 | `SafebyokCiphered`      | an encrypted value: its `cipher_iv_b64` and its `ciphertext_b64`            |
 | `SafebyokVaultScope`    | which vault: `applabel`, `user_id`, `vaultlabel`                            |
 
@@ -215,7 +215,7 @@ of its own.
   the Postgres table stores the list as one `jsonb`. A new way to unlock reaches the browser with
   no change here. That is by choice, not for want of a typed union: GraphQL has no input unions
   before graphql 17's `@oneOf`, and the adapter is a shelf.
-* **Encrypted**: each whisper (`whisper_ciphered`), each lockboxKey (`lockbox_key_wrapped`), and
+* **Encrypted**: each whisper (`whisper_ciphered`), each boxKey (`box_key_wrapped`), and
   the vaultKey under each way in (inside each wayin). **In the open**: everything else, as
   [`safebyok-postgres`](../safebyok-postgres#what-is-stored) lists it.
 

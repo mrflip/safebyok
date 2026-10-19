@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { cipherCtx, deriveWrappingKey, makeLockboxKey, makeVaultKey, toB64, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
+import { cipherCtx, deriveWrappingKey, makeBoxKey, makeVaultKey, toB64, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
 import * as Wayin from '../src/wayin'
 import { VaultError } from '../src/errors'
 import type { KeyDeriver } from '../src/key-deriver'
@@ -37,12 +37,12 @@ const vaultPropsWith = (wayins: VaultProps['wayins']): VaultProps => VaultProps.
 const epochTwoVaultPropsWith = (wayins: VaultProps['wayins']): VaultProps => VaultProps.parse({ ...TH.vaultPropsAtEpochOf('u1', 2), wayins })
 
 /** Expect `operation` to reject with a VaultError of `kind`. */
-const expectRefusal = async (operation: Promise<unknown>, kind: VaultError['kind']): Promise<VaultError> => {
+const expectRefusal = async (operation: Promise<unknown>, kind: VaultError['refusalkind']): Promise<VaultError> => {
   try {
     await operation
   } catch (err) {
     expect(err).to.be.instanceOf(VaultError)
-    expect((err as VaultError).kind).to.eq(kind)
+    expect((err as VaultError).refusalkind).to.eq(kind)
     return err as VaultError
   }
   throw new Error(`expected a VaultError of kind '${kind}', but nothing was thrown`)
@@ -72,10 +72,10 @@ describe("Wayin.sealFirstPassphrase", () => {
     expect(sessionKey.extractable).to.be.false
     expect(sessionKey.usages).to.have.members(['wrapKey', 'unwrapKey'])
     // The handle is the vaultKey: what the vaultKey wraps, it unwraps.
-    const lockboxKey = await makeLockboxKey()
-    const wrapped = await wrapKeyUnder(vaultKey, lockboxKey, new Uint8Array(1))
+    const boxKey = await makeBoxKey()
+    const wrapped = await wrapKeyUnder(vaultKey, boxKey, new Uint8Array(1))
     const unwrapped = await unwrapKeyUnder(sessionKey, wrapped, new Uint8Array(1), { extractable: true, usage: ['encrypt', 'decrypt'] })
-    expect(await rawOf(unwrapped)).to.eq(await rawOf(lockboxKey))
+    expect(await rawOf(unwrapped)).to.eq(await rawOf(boxKey))
   })
 })
 
@@ -470,7 +470,7 @@ describe("Wayin.openWithPasskey", () => {
     const laptop = await TH.passkeyOf('laptop')
     const vaultProps = vaultPropsWith([await sealedPasskey(laptop, 'laptop', await makeVaultKey())])
     const err = await expectRefusal(Wayin.openWithPasskey({ ...laptop, prfBytes: laptop.prfBytes.toReversed() }, scope, vaultProps), 'wrong_passkey')
-    expect(JSON.stringify({ kind: err.kind, message: err.message, cause: err.cause })).to.not.include(toB64(laptop.prfBytes))
+    expect(JSON.stringify({ kind: err.refusalkind, message: err.message, cause: err.cause })).to.not.include(toB64(laptop.prfBytes))
   })
 })
 

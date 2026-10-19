@@ -64,7 +64,7 @@ export type AskPasskeyOpts = {
  *   const wayinId = await vault.addPasskey(passphrase, makePasskey, { wayinlabel: 'laptop_fingerprint' })    // null: dismissed
  */
 export const createPasskey = async (opts: CreatePasskeyOpts): Promise<PasskeyProof | null> => {
-  ensureAvailable()
+  checkAvailable()
   const prfSaltBytes = crypto.getRandomValues(new Uint8Array(PasskeySaltBytes))
   const created = await askAuthenticator(() => navigator.credentials.create({
     publicKey: {
@@ -120,7 +120,7 @@ export const createPasskey = async (opts: CreatePasskeyOpts): Promise<PasskeyPro
  *   if (passkey !== null) { await vault.unlock(passkey) }
  */
 export const askPasskey = async (wayins: readonly WayinSummary[], opts: AskPasskeyOpts = {}): Promise<PasskeyProof | null> => {
-  ensureAvailable()
+  checkAvailable()
   const listed = wayins.filter((wayin) => wayin.wayinkind === 'passkey')
   if (listed.length === 0) {
     throw new VaultError('absent_wayin', Messages.noPasskeyToAsk)
@@ -184,7 +184,7 @@ const optional = <FieldT extends string, ValT>(field: FieldT, val: ValT | undefi
   val === undefined ? {} : { [field]: val } as Record<FieldT, ValT>
 )
 
-const ensureAvailable = () => {
+const checkAvailable = () => {
   if (! passkeysAvailable()) {
     throw new VaultError('passkey_unavailable', Messages.noWebAuthn)
   }

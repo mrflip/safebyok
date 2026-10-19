@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as Z from 'zod/mini'
-import { Lockbox } from '../src/box'
-import { DeviceMark, EpochMillis, FarFuture, FarPast, ForeverMillis, Lease, LockboxSummary, MaxUnlocks, Sidecar, VaultProps, VaultScope, Whisper } from '../src/types'
+import { Box } from '../src/box'
+import { DeviceMark, EpochMillis, FarFuture, FarPast, ForeverMillis, Lease, BoxSummary, MaxUnlocks, Sidecar, VaultProps, VaultScope, Whisper } from '../src/types'
 import * as TH from './test-helpers'
 
 const WhisperCases = [
@@ -16,7 +16,7 @@ const WhisperCases = [
   [{ deep: { list: [1, null] } },     true,   'nesting, arbitrarily'],
   // what JSON cannot carry is refused, not mangled:
   [undefined,                         false,  'undefined is not a JSON value'],
-  [null,                              false,  'a bare null: emptying a lockbox is retireBox\'s job'],
+  [null,                              false,  'a bare null: emptying a box is delBox\'s job'],
   [() => 'nope',                      false,  'a function is not data'],
   [new Date(),                        false,  'a Date would silently flatten to {}'],
   [new Map([["a", 1]]),               false,  'a Map would silently flatten to {}'],
@@ -164,19 +164,19 @@ describe("Sidecar", () => {
 
 const wholeSummary = { boxlabel: 'anthropic', revision_tok: 'r1', vault_key_epoch: 1, sidecar: {}, registered_at: Date.UTC(2026, 9, 14), written_at: Date.UTC(2026, 9, 14) }
 
-describe("LockboxSummary", () => {
+describe("BoxSummary", () => {
   it("marks a summary undamaged, as its example shows", () => {
-    expect(LockboxSummary.parse(wholeSummary).damaged).to.be.false
+    expect(BoxSummary.parse(wholeSummary).damaged).to.be.false
   })
 
   it("takes a sidecar of any JSON, and refuses a summary without one", () => {
-    expect(LockboxSummary.safeParse({ ...wholeSummary, sidecar: { note: 'work account' } }).success).to.be.true
-    expect(LockboxSummary.safeParse({ ...wholeSummary, sidecar: [1, 2] }).success).to.be.true
-    expect(LockboxSummary.safeParse(TH.omitting(wholeSummary, 'sidecar')).success).to.be.false
+    expect(BoxSummary.safeParse({ ...wholeSummary, sidecar: { note: 'work account' } }).success).to.be.true
+    expect(BoxSummary.safeParse({ ...wholeSummary, sidecar: [1, 2] }).success).to.be.true
+    expect(BoxSummary.safeParse(TH.omitting(wholeSummary, 'sidecar')).success).to.be.false
   })
 
-  it("holds neither ciphered field, the format nor the codec: a whole lockbox is not a summary", () => {
-    const summary = LockboxSummary.parse({ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: {} })
+  it("holds neither ciphered field, the format nor the codec: a whole box is not a summary", () => {
+    const summary = BoxSummary.parse({ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: {} })
     expect(Object.keys(summary)).to.have.members(['boxlabel', 'revision_tok', 'vault_key_epoch', 'sidecar', 'registered_at', 'written_at', 'damaged'])
   })
 })
@@ -298,7 +298,7 @@ describe("DeviceMark", () => {
 // obsolete: never update the snapshot of a format that stands. A refinement (a `Z.refine`, such
 // as the floor's character rules) renders as nothing, so this sees fields, types, optionality and
 // the ranges a check states, not every rule.
-const StoredRecords = [VaultProps, Lockbox, Lease, DeviceMark] as const
+const StoredRecords = [VaultProps, Box, Lease, DeviceMark] as const
 
 describe("Stored record formats", () => {
   for (const schema of StoredRecords) {
