@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { isVaultError } from 'safebyok'
-import { useOpenError, useVault, useVaultSnapshot, useWithUnlockedVault } from 'safebyok-react'
+import { useOpenError, useVault, useVaultSnapshot } from 'safebyok-react'
 import { WhisperFieldAttributes } from 'safebyok/utils'
 import { asksAgain } from '../lib/asks-again'
 import { editableWhisper, parseWhisperText, showWhisper } from '../lib/whisper-text'
@@ -10,8 +10,9 @@ import type { Sidecar, Whisper } from 'safebyok'
 /**
  * Direct manipulation of the vault's boxes: add, view, edit, remove, use. The lines that
  * matter are the one-liners inside each handler -- `vault.putBox(...)`, `vault.getBox(...)`,
- * `vault.useBox(...)`, `vault.delBox(...)`, each wrapped in `withUnlockedVault()` so a locked
- * vault summons the passphrase dialog and retries. Everything else is table furniture.
+ * `vault.useBox(...)`, `vault.delBox(...)`: a locked vault asks for the passphrase through the
+ * provider's dialog and goes on, and a dialog dismissed is refused 'vault_locked', which the
+ * handlers pass over. Everything else is table furniture.
  */
 
 type FormState = { editing: string | null, boxlabelText: string, whisperText: string, noteText: string }
@@ -30,7 +31,6 @@ const noteOf = (sidecar: Sidecar): string => {
 export const VaultDashboard = () => {
   const vault = useVault()
   const { openError, retryOpen, delDamagedVault } = useOpenError()
-  const withUnlockedVault = useWithUnlockedVault()
   const snapshot = useVaultSnapshot()
   const [form, setForm] = useState<FormState | null>(null)
   const [shown, setShown] = useState<Record<string, Whisper>>({})
@@ -74,11 +74,10 @@ export const VaultDashboard = () => {
   // The handle comes at once, and says it is opening until its hello has read storage.
   if (vault === null || snapshot === null || snapshot.state === 'opening') { return <p className="quiet">Opening vault…</p> }
 
-  // A whisper is never null (the vault refuses a bare one), so null from withUnlockedVault can
-  // only mean the user dismissed the passphrase dialog: the read needs no wrapping.
+  // A read the user dismissed the passphrase dialog for is refused vault_locked: nothing to show.
   const view = async (boxlabel: string) => {
-    const whisper = await withUnlockedVault(() => vault.getBox(boxlabel))
-    if (whisper !== null) { setShown((prev) => ({ ...prev, [boxlabel]: whisper })) }
+    const read = await vault.tryGetBox(boxlabel)
+    if (read.ok) { setShown((prev) => ({ ...prev, [boxlabel]: read.val })) }
   }
 
   const hide = (boxlabel: string) => {
@@ -86,39 +85,43 @@ export const VaultDashboard = () => {
   }
 
   const edit = async (boxlabel: string, noteText: string) => {
-    const whisper = await withUnlockedVault(() => vault.getBox(boxlabel))
-    if (whisper !== null) { setForm({ editing: boxlabel, boxlabelText: boxlabel, whisperText: editableWhisper(whisper), noteText }) }
+    const read = await vault.tryGetBox(boxlabel)
+    if (read.ok) { setForm({ editing: boxlabel, boxlabelText: boxlabel, whisperText: editableWhisper(read.val), noteText }) }
   }
 
   const delBox = async (boxlabel: string) => {
     if (! globalThis.confirm(`Remove the box '${boxlabel}'?`)) { return }
     try {
-      await withUnlockedVault(() => vault.delBox(boxlabel))
+      await vault.delBox(boxlabel)
     } catch (err) {
-      // Gone already -- from another device, or with the vault the user deleted to start over from
-      // the passphrase dialog -- is what was asked for.
+      // A dismissed dialog removes nothing; gone already -- from another device, or with the vault
+      // the user deleted to start over from the passphrase dialog -- is what was asked for.
+      if (isVaultError(err, 'vault_locked')) { return }
       if (! isVaultError(err, 'absent_box')) { throw err }
     }
     hide(boxlabel)
   }
 
-  const applyWhisper = (boxlabel: string) => withUnlockedVault(() => vault.useBox(boxlabel, (whisper) => { setPsst({ boxlabel, whisper }) }))
+  const applyWhisper = async (boxlabel: string) => {
+    try {
+      await vault.useBox(boxlabel, (whisper) => { setPsst({ boxlabel, whisper }) })
+    } catch (err) {
+      if (! isVaultError(err, 'vault_locked')) { throw err }
+    }
+  }
 
   const save = async () => {
     if (form === null) { return }
     setGripe(null)
     try {
-      const saved = await withUnlockedVault(async () => {
-        // The cast hands validation to the vault: typing "null" in the box parses to a bare
-        // null, and the store's refusal lands in the gripe below. A blank note leaves the
-        // sidecar out, so the box keeps the one it has.
-        const note = form.noteText.trim()
-        await vault.putBox(form.boxlabelText.trim(), parseWhisperText(form.whisperText)!, note === '' ? {} : { sidecar: { note } })
-        return true
-      })
-      if (saved !== null) { setForm(null) }
+      // The cast hands validation to the vault: typing "null" in the box parses to a bare
+      // null, and the store's refusal lands in the gripe below. A blank note leaves the
+      // sidecar out, so the box keeps the one it has.
+      const note = form.noteText.trim()
+      await vault.putBox(form.boxlabelText.trim(), parseWhisperText(form.whisperText)!, note === '' ? {} : { sidecar: { note } })
+      setForm(null)
     } catch (err) {
-      setGripe(err instanceof Error ? err.message : 'Could not store that.')
+      if (! isVaultError(err, 'vault_locked')) { setGripe(err instanceof Error ? err.message : 'Could not store that.') }
     }
   }
 

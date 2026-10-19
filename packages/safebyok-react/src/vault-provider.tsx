@@ -1,8 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { Vault, checkStrengthTest, checkValidators, delDamagedVault as delStoredDamagedVault, isVaultCondition, isVaultError, parseLogger, type BadNewsHandler, type MakeVaultOpts, type PassphraseStrengthTest, type VaultDB, type VaultError, type VaultLogger, type VaultScope, type VaultSnapshot, type VaultValidators } from 'safebyok'
+import { Vault, type Ask, type GetProof, type ProofAnswer, checkStrengthTest, checkValidators, delDamagedVault as delStoredDamagedVault, isVaultCondition, isVaultError, parseLogger, type BadNewsHandler, type MakeVaultOpts, type PassphraseStrengthTest, type VaultDB, type VaultError, type VaultLogger, type VaultScope, type VaultSnapshot, type VaultValidators } from 'safebyok'
 import { PassphraseModal, type PassphraseAdvice } from './passphrase-modal'
 
-// == [Hooks]: useVault, useVaultSnapshot, useOpenError, useWithUnlockedVault, OpenErrorShape, WithUnlockedVault
+// == [Hooks]: useVault, useVaultSnapshot, useOpenError, OpenErrorShape
 
 /**
  * Why the provider's own `hello()` could not open the vault, and what the app can do about it:
@@ -56,31 +56,8 @@ export type OpenErrorShape = {
   delDamagedVault: () => Promise<void>
 }
 
-/**
- * Run an action that may need the vault unlocked. If it refuses with kind 'vault_locked', the
- * passphrase dialog opens; after a successful unlock the action runs again. Resolves null when
- * the user dismisses the dialog instead -- unambiguously for whisper reads, since a whisper is
- * never null. Only an action whose own result could be null needs to wrap it in an object.
- * Every call settles: actions that find the vault locked while the dialog is already open wait
- * on that same dialog, and each resolves null when the dialog goes without an unlock -- the
- * user signs out or switches, the vault reopens, or the provider unmounts. So does an action
- * still under way when one of those closes the vault it ran on, whether its first run or its run
- * again after an unlock: the close is the provider's, never the caller's to catch.
- * A dialog the vault unlocks under, however that came about (an earlier, cancelled dialog's
- * unlock finishing late, say), closes as unlocked, and the actions waiting on it run again; an
- * action refused just as the vault unlocked runs again without a dialog at all. A dialog
- * belongs to the vault the action ran against: an action whose refusal lands once that vault has
- * gone (another user, a reopen) resolves null and opens no dialog over the next. A `lock()`
- * landing between the unlock and the runs again is the user's word, and wins: those runs meet
- * `vault_locked`, which reaches their callers.
- *
- * @example const whisper = await withUnlockedVault(() => vault.getBox('anthropic_api_key'))
- *          // whisper === null: the user dismissed the dialog
- */
-export type WithUnlockedVault = <ResultT>(action: () => Promise<ResultT>) => Promise<ResultT | null>
-
 /** Everything the provider hands down, each hook reading its part. */
-type Provided = { vault: Vault | null, opened: OpenErrorShape, withUnlockedVault: WithUnlockedVault }
+type Provided = { vault: Vault | null, opened: OpenErrorShape }
 
 const VaultContext = createContext<Provided | null>(null)
 
@@ -134,22 +111,18 @@ export const useVaultSnapshot = (): VaultSnapshot | null => {
  *   if (openError !== null) { return <p>{"Can't reach your vault."} <button onClick={retryOpen}>Retry</button></p> }
  */
 export const useOpenError = (): OpenErrorShape => useProvided('useOpenError').opened
-
-/**
- * The provider's {@link WithUnlockedVault}: an action run through it that finds the vault locked
- * asks for the passphrase, and runs again once unlocked.
- *
- * @example
- *   const withUnlockedVault = useWithUnlockedVault()
- *   const whisper = await withUnlockedVault(() => vault.getBox('anthropic_api_key'))
- */
-export const useWithUnlockedVault = (): WithUnlockedVault => useProvided('useWithUnlockedVault').withUnlockedVault
 // --
 
-// == [VaultProvider]: VaultProviderProps, VaultProvider, settleLogger, adviceFrom, Asking
+// == [VaultProvider]: VaultProviderProps, VaultProvider, settleLogger, adviceFrom, Showing, hasUserGesture
 
-/** One showing of the passphrase dialog: which one, the vault it asks for, and the actions waiting on its outcome. */
-type Asking = { round: number, vault: Vault, waiters: ((unlocked: boolean) => void)[] }
+/** One showing of the passphrase dialog: which one, the ask it answers, and how it answers. */
+type Showing = { round: number, ask: Ask, answer: (answer: ProofAnswer) => void }
+
+/**
+ * Whether the user's gesture is still in hand, so a dialog may be shown: true where the browser
+ * does not say (`navigator.userActivation` is newer than some), as there is no telling.
+ */
+const hasUserGesture = (): boolean => (globalThis.navigator as { userActivation?: { isActive: boolean } } | undefined)?.userActivation?.isActive !== false
 
 /** The scope of `vault`, as the strength test is handed it. */
 const scopeOf = (vault: Vault): VaultScope => ({ applabel: vault.applabel, user_id: vault.user_id, vaultlabel: vault.vaultlabel })
@@ -157,8 +130,8 @@ const getNotOpening = () => false
 
 /**
  * Every Vault.make option, passed through as given (an option left out gets Vault.make's default,
- * and one it does not take is refused, to the error boundary), except that `userId` may be null;
- * and three for the passphrase dialog: whether it offers a forgetful user to start over, what a
+ * and one it does not take is refused, to the error boundary), except that `userId` may be null
+ * and `getProof` left out means the provider's own passphrase dialog; and three for that dialog: whether it offers a forgetful user to start over, what a
  * password manager files the passphrase under, and the advice it shows as the user chooses one
  * (`PassphraseModal` has each). In a browser, spread `browserOpts()` from `safebyok/browser` for
  * the `keyDeriver`, `deviceDB` and `passphraseStrengthTest` Vault.make asks for. `VaultProvider`
@@ -167,6 +140,15 @@ const getNotOpening = () => false
 export type VaultProviderProps = Omit<MakeVaultOpts, 'userId'> & {
   /** The signed-in user from the host's auth, or null when nobody is: then there is no vault. */
   userId:              string | null
+  /**
+   * What asks the user for a proof when a call needs the vault unlocked (Vault.make's `getProof`).
+   * Left out, the provider's own: its passphrase dialog, `PassphraseModal`, one at a time, shown
+   * only while the user's gesture is in hand (`navigator.userActivation`) -- a call a timer makes
+   * is declined unasked, or carries on under a lease ending -- and closing as a lock lands. Null:
+   * none, every ask declined, so a call needing the vault locked refuses 'vault_locked' and the app
+   * prompts on its own. Written inline, it makes no new vault.
+   */
+  getProof?:           GetProof | null | undefined
   /**
    * Whether the passphrase dialog offers a user who has forgotten the passphrase to delete the
    * vault, on every device, and start a new one: `PassphraseModal`'s `allowStartOver`. Off by
@@ -221,8 +203,7 @@ const adviceFrom = (strengthTest: PassphraseStrengthTest, scope: VaultScope): Pa
 
 /**
  * Makes the vault for the signed-in user from its props, says its first `hello()`, and hands it
- * down to {@link useVault}, {@link useVaultSnapshot}, {@link useOpenError} and
- * {@link useWithUnlockedVault}. The provider owns the vault: it closes it when the user signs out
+ * down to {@link useVault}, {@link useVaultSnapshot} and {@link useOpenError}. The provider owns the vault: it closes it when the user signs out
  * (a null `userId`), and makes a new one, closing the last, when a prop that shapes the vault
  * changes -- the user, the scope (`applabel`, `vaultlabel`), the stores (`vaultDB`, `deviceDB`),
  * the `keyDeriver`, `leaseHours`, `staleMinutes`, `maxWhisperBytes`, `maxBoxes`, the `clock`, the
@@ -230,15 +211,19 @@ const adviceFrom = (strengthTest: PassphraseStrengthTest, scope: VaultScope): Pa
  * once -- at module level, or memoized -- never inline in the props; each schema in `validators`
  * likewise, though the bag around them may be built in render. A `logger`, `clock` or
  * `passphraseStrengthTest` that changes identity is warned of once, through the logger. A handler
- * makes no new vault: `onBadNews` may be written inline, and the vault tells whichever the last
- * render passed, for as long as the provider holds it. Under React's StrictMode, whose rehearsal
+ * makes no new vault: `onBadNews` and `getProof` may be written inline, and the vault calls
+ * whichever the last render passed, for as long as the provider holds it. Under React's StrictMode, whose rehearsal
  * makes and closes a vault in development, that rehearsed vault reads nothing: only the vault kept
  * says hello.
  *
  * The provider and its vault say things through one logger: the `logger` given here, else the one
- * the `vaultDB` was made with (the default logger when it was given none). It renders the
- * passphrase dialog when an action run through withUnlockedVault finds the vault locked: unstyled
- * markup under the `modal-scrim` / `modal` class names, for the host's stylesheet to dress.
+ * the `vaultDB` was made with (the default logger when it was given none). Unless given a
+ * `getProof` of the host's own, it renders the passphrase dialog, `PassphraseModal`, whenever a
+ * call on the vault needs it unlocked and finds it not -- `vault.getBox(...)` and the rest, or
+ * `vault.ensureLease()` on an Unlock button -- one at a time: unstyled markup under the
+ * `modal-scrim` / `modal` class names, for the host's stylesheet to dress. The call waits on the
+ * dialog, and goes on once it unlocks; dismissed, it refuses with kind 'vault_locked'. A lock, a
+ * sign-out or another user closes the dialog, its calls refused likewise.
  *
  * If the first `hello()` is refused with a condition (`isVaultCondition` from safebyok) or bad
  * news -- storage that cannot be reached, a signed-out user, a damaged record, a browser
@@ -258,9 +243,12 @@ const adviceFrom = (strengthTest: PassphraseStrengthTest, scope: VaultScope): Pa
  *     onBadNews={(news) => { telemetry.report(news.refusalkind) }}>
  *     <App />
  *   </VaultProvider>
+ * @example
+ *   const { ok, val: whisper } = await vault.tryGetBox('anthropic_api_key')   // asks through the dialog when locked
+ *   if (! ok) { return null }   // dismissed: refused 'vault_locked'
  */
 export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, passphraseAdvice, children, ...opts }: VaultProviderProps) => {
-  const { applabel, vaultlabel, vaultDB, deviceDB, leaseHours, staleMinutes, onBadNews, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, validators, passphraseStrengthTest, ...unlisted } = opts
+  const { applabel, vaultlabel, vaultDB, deviceDB, leaseHours, staleMinutes, onBadNews, getProof, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, validators, passphraseStrengthTest, ...unlisted } = opts
   // Each prop Vault.make does not take, by name -- a misspelling, a deleted name -- handed on to it,
   // so it is refused, to the error boundary, rather than dropped here unseen.
   const unlistedJson = JSON.stringify(Object.keys(unlisted))
@@ -275,16 +263,15 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
   const userIdCheck = validators?.userId
   const wayinlabelCheck = validators?.wayinlabel
   const [vault, setVault] = useState<Vault | null>(null)
-  // The dialog showing now, if any, and the actions waiting on it. The ref is what the callbacks
-  // read, so that a dialog's outcome reaches its own waiters and no newer dialog's; the state
-  // renders it.
-  const [asking, setAsking] = useState<Asking | null>(null)
-  const askingRef = useRef<Asking | null>(null)
+  // The dialog showing now, if any. The ref is what the callbacks read, so that a dialog's answer
+  // reaches its own ask and no newer one's; the state renders it.
+  const [showing, setShowing] = useState<Showing | null>(null)
+  const showingRef = useRef<Showing | null>(null)
   // The handle the open effect holds now, set and cleared with it: null from the moment a vault
-  // goes until the next arrives, when there is nothing for a dialog to unlock.
+  // goes until the next arrives.
   const vaultRef = useRef<Vault | null>(null)
   // Counts the dialog's showings, so that each is a fresh dialog with nothing kept from the last.
-  const askingRounds = useRef(0)
+  const showingRounds = useRef(0)
   // Wrapped, so that a rejection carrying any value at all (null, say) still reads as "failed".
   const [helloFailure, setHelloFailure] = useState<{ err: unknown } | null>(null)
   // What the provider's last hello of each vault was refused with; null once one succeeds.
@@ -307,6 +294,36 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
   // Anything but a function, or none, is misuse: handed to Vault.make as it came, to be refused.
   const badNewsOpt = onBadNews === undefined || onBadNews === null || typeof onBadNews === 'function' ? tellBadNews : onBadNews
 
+  /** Closes `ending` if it is still the dialog showing, and answers its ask. */
+  const endShowing = useCallback((ending: Showing, answer: ProofAnswer) => {
+    if (showingRef.current === ending) {
+      showingRef.current = null
+      setShowing(null)
+    }
+    ending.answer(answer)
+  }, [])
+
+  // The provider's own getProof: its passphrase dialog, shown only while the user's gesture is in
+  // hand. The vault asks one at a time, so a dialog showing is never asked over.
+  const askByDialog = useCallback<GetProof>((ask) => new Promise<ProofAnswer>((answer) => {
+    if (! hasUserGesture()) { answer(ask.why === 'lease_ending' ? 'carry_on' : 'declined'); return }
+    showingRounds.current += 1
+    const next = { round: showingRounds.current, ask, answer }
+    showingRef.current = next
+    setShowing(next)
+  }), [])
+
+  // The host's getProof as of the last commit, held as onBadNews is: the vault is handed one asker
+  // that keeps its identity, so a getProof written inline makes no new vault.
+  const hostAskerRef = useRef(getProof)
+  useLayoutEffect(() => { hostAskerRef.current = getProof })
+  const askProof = useCallback<GetProof>((ask) => {
+    const hosts = hostAskerRef.current
+    if (hosts === undefined) { return askByDialog(ask) }
+    return hosts === null ? 'declined' : hosts(ask)
+  }, [askByDialog])
+  const getProofOpt = getProof === undefined || getProof === null || typeof getProof === 'function' ? askProof : getProof
+
   // A logger, clock or strength test written inline in the props is new at every render, and
   // makes a new vault each time: said once, the first time any changes.
   useEffect(() => {
@@ -321,16 +338,6 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
     toldOfSinks.current = true
     heardBy?.warn(`VaultProvider reopened the vault because its ${changed.join(' and ')} changed identity between renders. Written inline in the props, it is new at every render, and reopens the vault each time: define it once, outside the component, or memoize it.`, { call: 'VaultProvider', props: changed })
   }, [logger, clock, passphraseStrengthTest, heardBy])
-
-  /** Closes `ending` if it is still the dialog showing, and settles every action waiting on it. */
-  const endAsking = useCallback((ending: Asking | null, unlocked: boolean) => {
-    if (ending === null) { return }
-    if (askingRef.current === ending) {
-      askingRef.current = null
-      setAsking(null)
-    }
-    for (const settle of ending.waiters) { settle(unlocked) }
-  }, [])
 
   /**
    * Has `made` say hello, again when retried: the provider owns the vault's first hello. A refusal
@@ -359,7 +366,9 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
     // changed -- is told to no one: the handler now may be the next user's.
     const kept = { held: true }
     const tellWhileHeld: BadNewsHandler = (news) => (kept.held ? tellBadNews(news) : undefined)
-    const makeOpts = { ...refusable, applabel, vaultlabel, userId, vaultDB, deviceDB, leaseHours, staleMinutes, onBadNews: badNewsOpt === tellBadNews ? tellWhileHeld : badNewsOpt, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger: heardBy ?? logger, validators: checks, passphraseStrengthTest } satisfies Record<keyof MakeVaultOpts, unknown>
+    // Likewise, a vault let go asks no one: the getProof now may be the next user's.
+    const askWhileHeld: GetProof = (ask) => (kept.held ? askProof(ask) : 'declined')
+    const makeOpts = { ...refusable, applabel, vaultlabel, userId, vaultDB, deviceDB, leaseHours, staleMinutes, onBadNews: badNewsOpt === tellBadNews ? tellWhileHeld : badNewsOpt, getProof: getProofOpt === askProof ? askWhileHeld : getProofOpt, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger: heardBy ?? logger, validators: checks, passphraseStrengthTest } satisfies Record<keyof MakeVaultOpts, unknown>
     // The handle is this effect's to make and to close, and the render hands it down. A refused
     // option throws from here to the nearest error boundary, as the very VaultError.
     const made = Vault.make(makeOpts)
@@ -373,17 +382,15 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
     return () => {
       kept.held = false
       vaultRef.current = null
-      // A dialog belongs to the vault it was opened over: when that handle goes -- a sign-out,
-      // another user, a reopen, the provider unmounting -- its actions resolve null, and it closes.
-      // Here and not in an effect on `vault`, whose cleanup from the render before the vault came
-      // would end a dialog opened in the very commit that brought it.
-      endAsking(askingRef.current, false)
+      // Closing the vault lands as a lock: its prompt's waiters are refused, and the dialog over it
+      // answers declined and closes.
       made.close()
+      if (showingRef.current?.ask.vault === made) { endShowing(showingRef.current, 'declined') }
       setVault(null)
       setHelloFailure(null)
       setHelloRefusal(null)
     }
-  }, [userId, applabel, vaultlabel, vaultDB, deviceDB, leaseHours, staleMinutes, badNewsOpt, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, heardBy, passphraseStrengthTest, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, wayinlabelCheck, unlistedJson, tellBadNews, endAsking, sayHello])
+  }, [userId, applabel, vaultlabel, vaultDB, deviceDB, leaseHours, staleMinutes, badNewsOpt, getProofOpt, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, heardBy, passphraseStrengthTest, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, wayinlabelCheck, unlistedJson, tellBadNews, askProof, endShowing, sayHello])
 
   const retryOpen = useCallback(() => {
     if (vault !== null && openError !== null) { void sayHello(vault, { staleMinutes: 0 }) }
@@ -403,64 +410,8 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
     void sayHello(vault, { staleMinutes: 0 })
   }, [openError, vault, userId, applabel, vaultlabel, vaultDB, deviceDB, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, wayinlabelCheck, sayHello])
 
-  /**
-   * Waits on the dialog showing over `ranOn` now, opening one if none is; settles false once
-   * `ranOn` is no longer the vault, and true at once if it is unlocked already.
-   */
-  const awaitUnlock = useCallback((ranOn: Vault | null) => new Promise<boolean>((settle) => {
-    // An action whose refusal lands after its vault went resolves null, as the dialog it would
-    // have waited on did, rather than leaving a dialog to show over whichever vault comes next.
-    if (ranOn === null || vaultRef.current !== ranOn) { settle(false); return }
-    // An unlock that landed between the refusal and here has answered it: no dialog to ask.
-    if (ranOn.getSnapshot().state === 'unlocked') { settle(true); return }
-    // A dialog showing is over this same vault: the open effect ends each with its vault.
-    const { current } = askingRef
-    if (current !== null) {
-      current.waiters.push(settle)
-      return
-    }
-    askingRounds.current += 1
-    const showing = { round: askingRounds.current, vault: ranOn, waiters: [settle] }
-    askingRef.current = showing
-    setAsking(showing)
-  }), [])
-
-  // An unlock that lands while a dialog is asking -- the first dialog's, finishing after its Cancel,
-  // or one the app made itself through the handle -- answers it: the dialog closes, and the actions
-  // waiting on it run again. An unlock before the dialog opened is read by awaitUnlock.
-  useEffect(() => {
-    if (vault === null) { return }
-    return vault.subscribe(() => {
-      if (vault.getSnapshot().state === 'unlocked') { endAsking(askingRef.current, true) }
-    })
-  }, [vault, endAsking])
-
-  const withUnlockedVault = useCallback(async <ResultT,>(action: () => Promise<ResultT>): Promise<ResultT | null> => {
-    // The vault the action runs against: its refusal is answered by a dialog over that vault, or none.
-    const ranOn = vaultRef.current
-    /** The action's result, or null when the provider closed the vault it ran on under it. */
-    const run = async (): Promise<ResultT | null> => {
-      try {
-        return await action()
-      } catch (err) {
-        // The provider closes a handle as it lets it go -- a sign-out, another user, a reopen, the
-        // provider unmounting -- and an action that close cut short resolves null, as a dialog it ends does.
-        if (ranOn !== null && vaultRef.current !== ranOn && isVaultError(err, 'vault_closed')) { return null }
-        throw err
-      }
-    }
-    try {
-      return await run()
-    } catch (err) {
-      if (! isVaultError(err, 'vault_locked')) { throw err }
-      const unlocked = await awaitUnlock(ranOn)
-      if (! unlocked) { return null }
-      return await run()
-    }
-  }, [awaitUnlock])
-
   const opened = useMemo(() => ({ openError, retryOpen, delDamagedVault }), [openError, retryOpen, delDamagedVault])
-  const provided = useMemo(() => ({ vault, opened, withUnlockedVault }), [vault, opened, withUnlockedVault])
+  const provided = useMemo(() => ({ vault, opened }), [vault, opened])
 
   // Thrown here, in render, so the nearest error boundary (or the dev overlay) shows it: misuse,
   // the developer's to fix, which no retry would mend. Every hook has run by now, so the throw
@@ -470,14 +421,14 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
   return (
     <VaultContext.Provider value={provided}>
       {children}
-      {asking !== null && asking.vault === vault && (
+      {showing !== null && showing.ask.vault === vault && (
         <PassphraseModal
-          key={asking.round}
-          vault={asking.vault}
+          key={showing.round}
+          ask={showing.ask}
           allowStartOver={allowStartOver}
           passphraseUsername={passphraseUsername}
-          passphraseAdvice={passphraseAdvice ?? adviceFrom(passphraseStrengthTest, scopeOf(asking.vault))}
-          onDone={(unlocked) => { endAsking(asking, unlocked) }}
+          passphraseAdvice={passphraseAdvice ?? adviceFrom(passphraseStrengthTest, scopeOf(showing.ask.vault))}
+          onDone={(answer) => { endShowing(showing, answer) }}
         />
       )}
     </VaultContext.Provider>

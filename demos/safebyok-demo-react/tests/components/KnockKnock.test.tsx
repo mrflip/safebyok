@@ -210,13 +210,13 @@ describe("KnockKnock", () => {
     expect(store.read(ckey)).to.be.null
   })
 
-  it("shows a refused save beside the key form: here, a key over the vault's limit", async () => {
+  it("shows a refused save beside the key form, asking for no passphrase first: here, a key over the vault's limit", async () => {
     TH.makeWorld().renderInVault(<KnockKnock />)
     fireEvent.click(await screen.findByRole('button', { name: 'add your key' }))
     fireEvent.change(screen.getByPlaceholderText('sk-ant-…'), { target: { value: 'k'.repeat(50_000) } })
     fireEvent.click(screen.getByRole('button', { name: 'Save key' }))
-    await TH.answerPassphraseDialog()
     expect(await screen.findByText(/over this vault's limit/, { selector: '.gripe' })).to.not.be.null
+    expect(screen.queryByRole('dialog')).to.be.null
     expect(screen.getByRole('button', { name: 'Save key' })).to.not.be.null
   })
 })

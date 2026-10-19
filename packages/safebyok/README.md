@@ -47,13 +47,13 @@ const vault = Vault.make({
   vaultlabel: 'main',
   vaultDB:    idbVaultDB({ dbName: 'acme' }), // or your backend's adapter
   ...browserOpts({ dbName: 'acme' }),         // the key deriver, device store and passphrase strength test a browser wants
+  getProof:   (ask) => showPassphraseDialog(ask), // your dialog: see *Asking for a proof*
 })
 
 vault.state                       // 'opening': Vault.make reads nothing
 await vault.hello()               // reads storage and this device's lease; every call waits for one anyway
 vault.state                       // 'absent' | 'locked' | 'unlocked'
-await vault.unlock(passphrase)    // on an absent vault, this first unlock creates it
-await vault.putBox('anthropic_api_key', 'sk-ant-...')
+await vault.putBox('anthropic_api_key', 'sk-ant-...')   // locked or absent: asks getProof first
 
 const answer = await vault.useBox('anthropic_api_key', (whisper) => callAnthropic(whisper))
 ```
@@ -344,6 +344,42 @@ would, so one Argon2id cannot run is refused at open, not at the first unlock. A
 name its `algorithm`; it may not declare `'argon2id'` without being a whole spec. `Vault.make` logs
 a warning (not a refusal) for a label beginning `test_`, the mark of a deriver made cheap for
 tests, such as `safebyok/testing`'s.
+
+## Asking for a proof
+
+Data calls never contain UI. A call that needs the vault unlocked -- `putBox`, `getBox`, `useBox`,
+`delBox` -- goes through `vault.ensureLease()`, which says `hello()`, and, when the vault is
+locked or not yet made, hands an `Ask` to your `getProof` and waits for its answer. `safebyok-react`'s
+`VaultProvider` is a `getProof` already: its passphrase dialog.
+
+```ts
+const getProof: GetProof = async (ask) => {
+  // No user gesture in hand (a timer's put, a background sync): don't pop a dialog.
+  if (navigator.userActivation?.isActive === false) { return ask.why === 'lease_ending' ? 'carry_on' : 'declined' }
+  return await showPassphraseDialog(ask)   // calls ask.attempt(passphrase) on each submit
+}
+```
+
+* **`ask.why`** is `absent` (this passphrase makes the vault: offer strength advice), `locked`,
+  or `lease_ending` (the call asked `ensureLease({ renewWithin })` minutes ahead).
+* **`ask.attempt(proof, { wayinId? })`** tries one passphrase, or a passkey's answer, and
+  resolves an `Outcome`. The retry loop lives in your dialog: `wrong_passphrase`,
+  `wrong_passkey`, `weak_passphrase` and `created_elsewhere` are shown in place to ask again;
+  `absent_wayin`, `damaged_wayin` and `passkey_unavailable` offer another way in;
+  `vault_locked` (a lock won), `storage_unavailable` and anything else close the dialog.
+* **Answer** `'unlocked'` once an attempt is ok, `'declined'` when the user dismisses it, and
+  `'carry_on'` -- only for `lease_ending` -- to go on under the lease that stands. Anything else
+  is refused `bad_option`; a `getProof` that throws is `unexpected_error`, never logged.
+* **One prompt at a time.** Every call that needs the vault while a prompt is up waits on its one
+  answer. A `lock()`, `close()` or `del()` landing while it is up refuses every one of them
+  `vault_locked` and settles `ask.lockLanded`: close the dialog. An attempt under way then takes
+  nothing up, and one after refuses at once.
+* **No `getProof`** means every ask is `declined`: the call refuses `vault_locked`, and your app
+  prompts on its own and calls `vault.unlock(passphrase)`.
+
+`vault.ensureLease()` itself unlocks ahead of time, on a button; `ensureLease({ renewWithin: 60 })`
+asks now when the lease ends within the hour. A call that cannot land -- a whisper JSON cannot
+carry, a label the vault's check refuses -- is refused before anything is asked.
 
 ## Locking
 
@@ -733,7 +769,7 @@ Part of normal operation. Each can reach the user; the app decides how.
 
 | Kind                  | What happened                                                    | What to do                                              |
 | --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |
-| `vault_locked`        | a whisper was asked for before the vault was unlocked            | Ask for the passphrase and `unlock()`, then retry (`safebyok-react`'s `withUnlockedVault` does) |
+| `vault_locked`        | the vault is locked and no proof came: the `getProof` prompt was declined, there is no `getProof`, or a lock won while the call ran | Nothing to retry: the user said no, or locked it. With no `getProof`, ask for the passphrase and `unlock()`, then call again |
 | `wrong_passphrase`    | the passphrase did not unlock the vault, or was empty. A passphrase wayin altered in storage refuses its passphrase in just the same way, so the message says that the stored vault may be damaged | Ask again, with a hint to check for typos. If your handling says "check for typos", treat `created_elsewhere` alongside it, with its own advice |
 | `created_elsewhere`   | a first `unlock()` on an `absent` vault lost a race: another device created the vault between this one's look at storage and its write, and the passphrase given does not open that vault. Nothing was created here, and the vault now shows `locked` as the other device made it. A passphrase that does open it unlocks as usual | Show the message as advice, not as a typo: the user enters the passphrase chosen on the other device |
 | `weak_passphrase`     | a new passphrase -- the one the first `unlock()` creates the vault with, or one `addPassphrase()` or `changePassphrase()` sets -- that the vault's `passphraseStrengthTest` finds too easy to guess. The message is the test's own reason. Never raised by an `unlock()` of a vault that stands | Show the message beside the field, and ask for another |

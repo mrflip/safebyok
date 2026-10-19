@@ -17,19 +17,20 @@ import { jsonBytes, type BoxExpectation } from './vault-db'
 import { type VaultLogger, asError } from './logger'
 import * as RefusalPolicy from './refusal-policy'
 import { type PassphraseStrengthTest, checkStrongEnough } from './passphrase-strength'
-import { type BadNewsHandler, type MakeVaultOpts, parseMakeVaultOpts, parseStaleMinutes, readClock, StoredBytesPerWhisperByte, BoxFixedBytes } from './vault-opts'
+import { type BadNewsHandler, type MakeVaultOpts, parseMakeVaultOpts, parseRenewWithin, parseStaleMinutes, readClock, StoredBytesPerWhisperByte, BoxFixedBytes } from './vault-opts'
 import { reportToPlatform } from './report-error'
 import type { DeviceDB } from './device-db'
 import type { KeyDeriver } from './key-deriver'
 import { deviceTroubleAsConditions } from './del-damaged-vault'
+import { Ask, type AskWhy, type GetProof, type RaisedAsk } from './ask'
 
 // == [Public types]: VaultState, VaultSnapshot
 
 /**
  * Where the vault stands, as the UI branches on it:
  *  * `opening`  -- no hello has read storage yet; show nothing yet
- *  * `absent`   -- never created; the first unlock() will choose its passphrase
- *  * `locked`   -- exists, summaries readable, whispers not; unlock() opens it
+ *  * `absent`   -- never created; the first proof, through getProof or unlock(), chooses its passphrase
+ *  * `locked`   -- exists, summaries readable, whispers not; a proof opens it
  *  * `unlocked` -- whispers readable until askPassphraseAt or lock()
  */
 export type VaultState = 'opening' | 'absent' | 'locked' | 'unlocked'
@@ -134,9 +135,10 @@ const UnreadVaultProps = Symbol.for('safebyok.unread_vault_props')
  * is current. A UI renders from `getSnapshot()`, the same fields frozen in one object, and
  * re-renders on `subscribe()`.
  *
- * Operations that touch a whisper -- `putBox`, `getBox`, `useBox`, `delBox` -- require the
- * vault unlocked, and throw a VaultError of kind 'vault_locked' otherwise: the host catches that,
- * asks the user for their passphrase, calls unlock(), and retries. Nothing prompts on open.
+ * Operations that touch a whisper -- `putBox`, `getBox`, `useBox`, `delBox` -- need the vault
+ * unlocked, and go through `ensureLease()` for it: a vault that is not asks the host's `getProof`
+ * (Vault.make's option) for a proof, one prompt at a time, and refuses with kind 'vault_locked'
+ * when it is declined, or when there is no `getProof` to ask. Nothing prompts on open.
  *
  * This device keeps a mark of the newest copy of the vault props it has seen (a device mark, in
  * the deviceDB, which `lock()` leaves and `del()` empties). A call that reads the vault props
@@ -240,7 +242,7 @@ export class Vault {
   get leaseMillis(): number { return this.#leaseMillis }
   // --
 
-  // == [Vault: opening]: hello
+  // == [Vault: opening]: hello, ensureLease
 
   readonly #tryHello = this.#trying(async (given?: AnEvent | { staleMinutes?: number | undefined }): Promise<Vault> => {
     this.#checkOpen()
@@ -295,33 +297,55 @@ export class Vault {
    * @example await vault.hello({ staleMinutes: 0 })   // read now, whatever was read a moment ago
    */
   hello = this.#throwing(this.#tryHello)
+
+  readonly #tryEnsureLease = this.#trying(async (given?: AnEvent | { renewWithin?: number | undefined }): Promise<Vault> => {
+    this.#checkOpen()
+    const leaseOpts = asEnsureLeaseOpts(given)
+    return await this.#ensureLease(parseRenewWithin(leaseOpts?.renewWithin))
+  })
+  /**
+   * {@link Vault.ensureLease}, resolving to an {@link Outcome}: what it answers as `val`, what it refuses
+   * with as `err`, never thrown.
+   */
+  tryEnsureLease = this.#tryEnsureLease
+  /**
+   * Have the vault unlocked, asking for a proof only when it must: what every call that needs a
+   * whisper goes through, so an app rarely calls it itself -- call it to unlock ahead of time, on a
+   * button. It says `hello()` first, whose refusal is its own, as it came. Then, unlocked, with
+   * the lease not ending within `opts.renewWithin` minutes (0 by default), it resolves the vault at
+   * once: no prompt, no write. Otherwise it hands an {@link Ask} to the `getProof` Vault.make was
+   * given -- `why` `absent` (this proof makes the vault), `locked`, or `lease_ending` -- and waits
+   * for its answer. One prompt at a time: a call that finds a prompt up waits on the same answer.
+   * On `unlocked` it says hello again and resolves the vault; on `carry_on`, which only
+   * `lease_ending` allows, it resolves the vault under the lease that stands.
+   *
+   * Refuses with kind 'vault_locked' when the answer is `declined`, when there is no `getProof`,
+   * when a `lock()`, `close()` or `del()` lands while the prompt is up (every caller waiting on it
+   * at once), or when the lease is gone by the time the answer comes. Kind 'bad_option' when
+   * `getProof` answers `carry_on` outside `lease_ending`, or anything but the three, or for a
+   * `renewWithin` that is not zero or more minutes; 'unexpected_error' when it throws, what it
+   * threw the cause, never logged. A wrong passphrase never reaches here: it goes to the dialog,
+   * through `ask.attempt`. An event in place of `opts` is no options, as for `hello`.
+   *
+   * @example await vault.ensureLease()   // unlocked, or refused 'vault_locked'
+   * @example <button onClick={() => { void vault.tryEnsureLease() }}>Unlock</button>
+   * @example await vault.ensureLease({ renewWithin: 60 })   // ask now if the lease ends within the hour
+   */
+  ensureLease = this.#throwing(this.#tryEnsureLease)
   // --
 
   // == [Vault: locking]: unlock, lock
 
-  readonly #tryUnlock = this.#trying(async (givenProof: string | PasskeyProof, unlockOpts?: { wayinId?: string | undefined }): Promise<void> => {
-    this.#checkOpen()
-    const proof = parseProof(givenProof)
-    const wayinId = parseAim(unlockOpts)
-    await this.#hello()
-    // Sync with the backend first: the passphrase proves itself against the vault props as they
-    // stand there now, not against a cached copy a delete or recreate may have outdated.
-    await this.#refresh()
-    const unlocked = this.#closed ? null : await this.#settleUnlock(proof, wayinId)
-    const tookUp = unlocked !== null && await this.#grantLease(unlocked, unlocked.standing, this.#deadlineFor(proof, 'unlock'))
-    this.#settle()
-    if (tookUp) { return }
-    // A close() meanwhile is said as such: the handle, not the vault, is what refuses now.
-    this.#checkOpen()
-    throw new VaultError('vault_locked', 'The vault was removed, or its ways in changed, while this unlock was under way: nothing was unlocked, and this device keeps no lease. Unlock again to carry on.')
-  })
+  readonly #tryUnlock = this.#trying((givenProof: string | PasskeyProof, unlockOpts?: { wayinId?: string | undefined }): Promise<void> => this.#unlockWith(givenProof, unlockOpts))
   /**
    * {@link Vault.unlock}, resolving to an {@link Outcome}: what it answers as `val`, what it refuses
    * with as `err`, never thrown.
    */
   tryUnlock = this.#tryUnlock
   /**
-   * Open the vault with its passphrase, granting this device a lease for `leaseHours`. On an
+   * Open the vault with its passphrase, granting this device a lease for `leaseHours`: the proof
+   * an ask's `attempt` tries, called outside any prompt -- how an app with no `getProof` unlocks
+   * once it has asked the user itself. On an
    * `absent` vault this first unlock creates it, with this passphrase as its one way in, labelled
    * `passphrase` -- once the vault's `passphraseStrengthTest` passes it: kind 'weak_passphrase'
    * otherwise, the test's reason its message, and nothing is created. A vault that stands is never
@@ -381,6 +405,7 @@ export class Vault {
   // lock() does not wait for hello(): it locks at once, storage reachable or not.
   readonly #tryLock = this.#trying(async (): Promise<void> => {
     this.#checkOpen()
+    this.#landLock()
     await this.#shutAndSay()
   })
   /**
@@ -393,7 +418,9 @@ export class Vault {
    * `useBox()` whose read of storage is under way refuses with kind 'vault_locked' once storage
    * answers, handing back nothing, unless an unlock has put a key back in hand meanwhile. An
    * `unlock()` or `changePassphrase()` under way is not stopped: it finishes, and leaves the vault
-   * unlocked. A write already sent to storage lands. Kind 'storage_unavailable' when this device's
+   * unlocked. A prompt up for a proof is: every call waiting on it refuses with kind
+   * 'vault_locked' at once, its ask's `lockLanded` settles so the dialog can close, and an
+   * `attempt` under way, or tried after, takes nothing up and refuses 'vault_locked'. A write already sent to storage lands. Kind 'storage_unavailable' when this device's
    * store fails to erase its lease ('storage_blocked' when the browser withholds that store); the
    * vault is locked all the same.
    *
@@ -632,8 +659,7 @@ export class Vault {
   // == [Vault: boxes]: putBox, getBox, useBox, delBox
 
   readonly #tryPutBox = this.#trying(async (boxlabel: string, whisper: Whisper, storeOpts?: { sidecar?: Sidecar | undefined }): Promise<void> => {
-    await this.#hello()
-    this.#checkUnlocked()
+    this.#checkOpen()
     // A name the check refuses is never written anew, even where a box stored under other
     // checks stands under it: reading and deleting reach that one.
     const label = Names.check(this.#rules, 'boxlabel', boxlabel)
@@ -645,6 +671,8 @@ export class Vault {
     }
     const whisperBytes = new TextEncoder().encode(stableJsonify(checked.data))
     this.#checkWhisperFits(whisperBytes, givenSidecarJson ?? EmptySidecarJson)
+    // Checked before the user is asked for anything: a call that cannot land never prompts.
+    await this.#ensureLease(0)
     const standing = await this.#getBoxOrDamaged(label)
     // A store is one write, over a revision storage arbitrates. A box listed damaged naming none
     // could be cleared only by a delete before it, a second call another device's write could
@@ -698,7 +726,9 @@ export class Vault {
    */
   tryPutBox = this.#tryPutBox
   /**
-   * Write a whisper into the box `boxlabel`, creating or replacing it. Requires unlocked;
+   * Write a whisper into the box `boxlabel`, creating or replacing it. Needs the vault unlocked,
+   * through `ensureLease()`, which asks `getProof` when it is not -- once the whisper, the
+   * boxlabel and the sidecar have passed their checks, so a store that cannot land never prompts;
    * kind 'whisper_too_large' when its JSON and the box's sidecar's together are over the
    * vault's `maxWhisperBytes`, and kind 'vault_full' when `boxlabel` is new and the vault already
    * holds its `maxBoxes` -- delete one first. A sidecar left out, and so kept from the box,
@@ -770,7 +800,8 @@ export class Vault {
    */
   tryGetBox = this.#tryGetBox
   /**
-   * The whisper in `boxlabel`. Requires unlocked; kind 'absent_box' when there is none, and
+   * The whisper in `boxlabel`. Needs the vault unlocked, through `ensureLease()`, which asks
+   * `getProof` when it is not, and refuses 'vault_locked' when that is declined; kind 'absent_box' when there is none, and
    * 'damaged_box' when its stored record fails its checks, or will not open under the vault's
    * key: `delBox()` it, or `putBox()` over it. A box that will not open is named so only
    * after one catch-up with storage: one a vault deleted and made anew elsewhere wrote relocks this
@@ -794,7 +825,7 @@ export class Vault {
   getWhisper = async (boxlabel: string): Promise<Whisper> => valOf(await this.#tryGetBox(boxlabel))
   /**
    * Hand the whisper to `callback` and return its result: the shape that discourages parking a
-   * secret in state. Requires unlocked; kind 'bad_option', before anything is read, for a
+   * secret in state. Needs the vault unlocked, as `getBox()` does; kind 'bad_option', before anything is read, for a
    * `callback` that is not a function. Refuses `boxlabel` as `getBox()` does: 'absent_box',
    * 'damaged_box', and 'bad_label' for a name the vault's check refuses with nothing under it.
    * The throwing form only, as the callback's own throw is the host's: it rejects with it as it
@@ -810,8 +841,8 @@ export class Vault {
   }
 
   readonly #tryDelBox = this.#trying(async (boxlabel: string): Promise<void> => {
-    await this.#hello()
-    this.#checkUnlocked()
+    this.#checkOpen()
+    await this.#ensureLease(0)
     const label = await this.#checkStandingBoxlabel(boxlabel)
     this.#checkUnlocked()
     // Lands only in the vault this device holds keys for, whatever revision of the box stands:
@@ -845,8 +876,8 @@ export class Vault {
    * Remove the box `boxlabel` entirely, whatever revision of it stands -- even one whose
    * stored record fails verification, which the snapshot lists as damaged and reading refuses as
    * 'damaged_box': deleting it needs nothing from it, and is the remedy for it. A box
-   * stored under a boxlabel the vault's check refuses is reached by that name too. Requires
-   * unlocked; kind 'absent_box' when absent, and 'bad_label' for a refused name with nothing
+   * stored under a boxlabel the vault's check refuses is reached by that name too. Needs the vault
+   * unlocked, as `getBox()` does; kind 'absent_box' when absent, and 'bad_label' for a refused name with nothing
    * under it. The deletion lands only in the vault this device last read: if it was deleted, or
    * deleted and made anew, elsewhere, nothing is removed and the call throws kind
    * 'stale_write', after catching up with storage -- which relocks this device -- its message
@@ -872,6 +903,7 @@ export class Vault {
     // this awaits.
     if (this.#vaultProps === null) { await this.#refresh() }
     const doomed = this.#vaultProps
+    this.#landLock()
     await this.#shut()
     if (doomed !== null && doomed !== UnreadVaultProps) {
       await this.#refreshOnStale(this.#vaultDB.delVault(this.#scope, { vault_id: doomed.vault_id }), 'del')
@@ -896,8 +928,8 @@ export class Vault {
    * throws kind 'stale_write', after catching up -- so a second del(), the user asking again,
    * deletes the vault that then stands, the one the snapshot shows. A handle that has seen no
    * vault reads storage first, and deletes whatever vault stands there: "delete my vault" never
-   * reports success over one standing. Locks as `lock()` does, and this device forgets its mark of
-   * the vault.
+   * reports success over one standing. Locks as `lock()` does -- a prompt up for a proof ends as a
+   * `lock()` ends it -- and this device forgets its mark of the vault.
    */
   del = this.#throwing(this.#tryDel)
   // Answers at once, as there is nothing to wait for: its outcome, not a promise of one.
@@ -905,6 +937,7 @@ export class Vault {
     // A second close does nothing: an adapter's unsubscribe may count down a watch it shares.
     if (this.#closed) { return good(undefined) }
     this.#closed = true
+    this.#landLock()
     // Not a lock of the vault: an unlock under way takes nothing up, but nothing this device
     // remembers is erased.
     this.#dropKey()
@@ -923,12 +956,13 @@ export class Vault {
    * vault made takes it up. An `unlock()` still under way takes nothing up and throws kind 'vault_closed';
    * any lease it granted on the device before the close stays too. A `getBox()` or
    * `useBox()` still under way hands back nothing and throws kind 'vault_closed', as after a lock.
-   * A second `close()` does nothing.
+   * A prompt up for a proof ends as a `lock()` ends it: its waiters refuse 'vault_locked', and its
+   * ask's `lockLanded` settles. A second `close()` does nothing.
    */
   close = (): void => { valOf(this.#tryClose()) }
   // --
 
-  // == [Options and setup]: make, the constructor, scope, parsed options, limits, vaultDB, onBadNews, clockNow
+  // == [Options and setup]: make, the constructor, scope, parsed options, limits, vaultDB, onBadNews, getProof, clockNow
 
   readonly #scope: VaultScope
   readonly #rules: Names.NameRules
@@ -942,6 +976,7 @@ export class Vault {
   // How long a hello trusts the last read when its call says nothing: see hello().
   readonly #staleMillis: number
   readonly #onBadNews: BadNewsHandler | null
+  readonly #getProof: GetProof | null
   readonly #logger: VaultLogger
   readonly #clock: Clock
   readonly #keyDeriver: KeyDeriver
@@ -990,6 +1025,7 @@ export class Vault {
     this.#leaseMillis = parsed.leaseMillis
     this.#staleMillis = parsed.staleMillis
     this.#onBadNews = parsed.onBadNews
+    this.#getProof = parsed.getProof
     this.#logger = parsed.logger
     this.#clock = parsed.clock
     this.#keyDeriver = parsed.keyDeriver
@@ -1350,6 +1386,88 @@ export class Vault {
   }
   // --
 
+  // == [Asking for a proof]: asking, ensureLease, whyAsk, raiseAsk, landLock, tryAttempt, unlockWith
+
+  // The prompt up now, if any: every call that needs the vault unlocked while it is up waits on its
+  // one answer. See ensureLease().
+  #asking: RaisedAsk | null = null
+
+  /**
+   * The vault, unlocked: at once while the lease stands past `renewWithinMillis` from now, and
+   * otherwise once the prompt -- the one up, or one raised now -- answers. See `Vault.ensureLease`.
+   */
+  async #ensureLease(renewWithinMillis: number): Promise<Vault> {
+    await this.#helloWithin(this.#staleMillis)
+    const why = this.#whyAsk(renewWithinMillis)
+    if (why === null) { return this }
+    const answer = valOf(await (this.#asking ?? this.#raiseAsk(why)).answer)
+    if (answer === 'declined') { throw declinedError(this.#getProof !== null) }
+    if (answer === 'unlocked') { await this.#helloWithin(this.#staleMillis) }
+    // Unlocked, or carrying on under the lease: either way a lease must stand now.
+    this.#checkUnlocked()
+    return this
+  }
+
+  /** Why the vault must ask for a proof now: null while it is unlocked past `renewWithinMillis` from now. */
+  #whyAsk(renewWithinMillis: number): AskWhy | null {
+    if (this.#vaultProps === null) { return 'absent' }
+    const now = this.#clockNow()
+    if (this.#vaultKey === null || this.#askPassphraseAt === null || this.#askPassphraseAt <= now) {
+      // The threshold is the truth: a key past its deadline goes now, should its timer run late.
+      if (this.#vaultKey !== null) { this.#dropNow() }
+      return 'locked'
+    }
+    return this.#askPassphraseAt - now > renewWithinMillis ? null : 'lease_ending'
+  }
+
+  /** Raise a prompt for `why`, up until it is answered or a lock lands. */
+  #raiseAsk(why: AskWhy): RaisedAsk {
+    const raised = Ask.raise(why, this, this.#tryAttempt, this.#getProof)
+    this.#asking = raised
+    // Answered or refused, the prompt is down: the next call that needs a proof raises another.
+    void raised.answer.then(() => { if (this.#asking === raised) { this.#asking = null } })
+    return raised
+  }
+
+  /** A `lock()`, `close()` or `del()` has landed: the prompt up, if any, refuses its waiters and settles `lockLanded`. */
+  #landLock() {
+    this.#asking?.landLock()
+    this.#asking = null
+  }
+
+  /** An ask's `attempt`: one proof's unlock, standing down once `overtaken` is aborted by a lock landing. */
+  readonly #tryAttempt = this.#trying(async (givenProof: string | PasskeyProof, attemptOpts: { wayinId?: string | undefined } | undefined, overtaken: AbortSignal): Promise<Vault> => {
+    await this.#unlockWith(givenProof, attemptOpts, overtaken)
+    return this
+  })
+
+  /**
+   * Unlock with one proof, as `unlock()` and an ask's `attempt` do: proven against the vault props
+   * as storage holds them now, creating the vault when absent, and a lease granted. One that the
+   * vault outruns -- closed, removed, its ways in changed, or `overtaken` aborted by a lock -- takes
+   * nothing up and refuses.
+   */
+  async #unlockWith(givenProof: string | PasskeyProof, unlockOpts: { wayinId?: string | undefined } | undefined, overtaken?: AbortSignal): Promise<void> {
+    this.#checkOpen()
+    const proof = parseProof(givenProof)
+    const wayinId = parseAim(unlockOpts)
+    await this.#hello()
+    // Sync with the backend first: the passphrase proves itself against the vault props as they
+    // stand there now, not against a cached copy a delete or recreate may have outdated.
+    await this.#refresh()
+    const unlocked = this.#closed ? null : await this.#settleUnlock(proof, wayinId)
+    const tookUp = unlocked !== null && await this.#grantLease(unlocked, unlocked.standing, this.#deadlineFor(proof, 'unlock'), overtaken)
+    this.#settle()
+    if (tookUp) { return }
+    // A close() meanwhile is said as such: the handle, not the vault, is what refuses now.
+    this.#checkOpen()
+    if (overtaken?.aborted === true) {
+      throw new VaultError('vault_locked', 'The vault was locked while this proof was being checked, and the lock wins: nothing was unlocked. Ask again when the user wants the vault.')
+    }
+    throw new VaultError('vault_locked', 'The vault was removed, or its ways in changed, while this unlock was under way: nothing was unlocked, and this device keeps no lease. Unlock again to carry on.')
+  }
+  // --
+
   // == [Unlock and ways in]: unwrapWith, draftVaultProps, settleUnlock, reviseWayins, sealFor, others
 
   /**
@@ -1625,15 +1743,18 @@ export class Vault {
 
   /**
    * Grant this device a lease and take up the vaultKey until `until`, arming the expiry anew --
-   * unless the handle has closed, or the vault props the key was proven against no longer stand:
-   * then nothing is taken up. The lease is a fresh leaseKey and the vaultKey wrapped under it. A
+   * unless the handle has closed, the vault props the key was proven against no longer stand, or
+   * `overtaken` (an ask's attempt, which a lock landing stands down) is aborted: then nothing is
+   * taken up. The lease is a fresh leaseKey and the vaultKey wrapped under it. A
    * record already written stays: a close is no lock, and a record of vault props no longer
    * standing opens nothing.
    *
    * @returns True when the vault is now unlocked.
    */
-  async #grantLease(unlocked: VaultKeyPair, standing: VaultProps, until: number): Promise<boolean> {
-    if (this.#outrun(standing)) { return false }
+  async #grantLease(unlocked: VaultKeyPair, standing: VaultProps, until: number, overtaken?: AbortSignal): Promise<boolean> {
+    // Asked afresh after the wait: a lock may land during it.
+    const isOutrun = () => this.#outrun(standing) || overtaken?.aborted === true
+    if (isOutrun()) { return false }
     // A take-up under way stands down before this lease is written, not after: one that read an
     // older lease could otherwise erase this one as it discards that.
     this.#standDownTakeUp()
@@ -1649,7 +1770,7 @@ export class Vault {
       vault_key_lease_wrapped: wrapped,
       ask_passphrase_at:       until,
     })
-    if (this.#outrun(standing)) { return false }
+    if (isOutrun()) { return false }
     this.#armExpiry(until, this.#clockNow())
     this.#vaultKey = unlocked.sessionKey
     this.#askPassphraseAt = until
@@ -1867,8 +1988,8 @@ export class Vault {
    * close() that has taken the key meanwhile refuses the call as locked, or as closed.
    */
   async #openBox(boxlabel: string): Promise<Whisper> {
-    await this.#hello()
-    this.#checkUnlocked()
+    this.#checkOpen()
+    await this.#ensureLease(0)
     const box = await this.#getBoxOrThrow(boxlabel)
     const whisper = await this.#decipherOrCatchUp(this.#checkUnlocked(), box)
     this.#checkUnlocked()
@@ -2144,7 +2265,7 @@ export class Vault {
   // --
 }
 
-// == [Refusals]: damagedAs, damagedVaultProps, damagedBox, lockedError, closedError
+// == [Refusals]: damagedAs, damagedVaultProps, damagedBox, lockedError, declinedError, closedError
 
 /**
  * What `reading` resolves to, with storage's refusal of the record as corrupt said instead as
@@ -2167,7 +2288,12 @@ const damagedBox = (opts: ErrorOptions) => new VaultError('damaged_box', "That b
 
 const damagedBeyondNaming = () => new VaultError('damaged_box', "That box is damaged beyond naming: its stored record does not say which revision it is, so nothing can be written over it safely. Nothing was written. Remove it with delBox() first, then store its whisper again.")
 
-const lockedError = () => new VaultError('vault_locked', 'The vault is locked: ask the user for their passphrase and call unlock().')
+const lockedError = () => new VaultError('vault_locked', 'The vault is locked, so nothing was read or written: call again, and the vault asks for a proof through getProof, or unlock it first.')
+
+/** The refusal of a call whose ask was declined: by the user, or for want of a `getProof` to ask. */
+const declinedError = (asked: boolean) => new VaultError('vault_locked', asked
+  ? 'The vault is locked, and the user declined to unlock it: nothing was read or written. Ask again when they want the vault.'
+  : 'The vault is locked, and there is no getProof to ask the user for a proof (Vault.make was given none): nothing was read or written. Prompt the user, unlock() with their passphrase, and call again.')
 
 const closedError = () => new VaultError('vault_closed', 'This vault handle was closed: make another with Vault.make.')
 // --
@@ -2268,7 +2394,7 @@ type BoxHeader = Omit<Box, 'format' | 'box_key_wrapped' | 'whisper_ciphered'>
 const EmptySidecarJson = '{}'
 // --
 
-// == [Argument parsers]: checkHelloOpts, checkStoreOpts, sidecarJsonOf, parseAim, parseWayinId, parseWayinlabel, parsePassphrase, others
+// == [Argument parsers]: checkHelloOpts, asEnsureLeaseOpts, checkStoreOpts, sidecarJsonOf, parseAim, parseWayinId, parseWayinlabel, parsePassphrase, others
 
 /** What `hello()`'s options may hold: `staleMinutes`, which `parseStaleMinutes` checks, and nothing else. */
 const checkHelloOpts = optionsCheck({ staleMinutes: Z.optional(Z.unknown()) }, "hello()'s only option is `staleMinutes`, how many minutes it trusts the vault's last read of storage: check its spelling, and leave out any other.")
@@ -2286,6 +2412,15 @@ type AnEvent = { readonly type: string }
 const asHelloOpts = (given: unknown): { staleMinutes?: number | undefined } | undefined => {
   if (typeof given === 'object' && given !== null && ! isPlainBag(given)) { return undefined }
   return checkHelloOpts(given as { staleMinutes?: number | undefined } | undefined)
+}
+
+/** What `ensureLease()`'s options may hold: `renewWithin`, which `parseRenewWithin` checks, and nothing else. */
+const checkEnsureLeaseOpts = optionsCheck({ renewWithin: Z.optional(Z.unknown()) }, "ensureLease()'s only option is `renewWithin`, how many minutes before the lease ends to ask for a proof anyway: check its spelling, and leave out any other.")
+
+/** `ensureLease()`'s options, checked as {@link asHelloOpts} checks hello's: an event is none. */
+const asEnsureLeaseOpts = (given: unknown): { renewWithin?: number | undefined } | undefined => {
+  if (typeof given === 'object' && given !== null && ! isPlainBag(given)) { return undefined }
+  return checkEnsureLeaseOpts(given as { renewWithin?: number | undefined } | undefined)
 }
 
 /** What `putBox()`'s options may hold: a sidecar, which {@link sidecarJsonOf} checks, and nothing else. */

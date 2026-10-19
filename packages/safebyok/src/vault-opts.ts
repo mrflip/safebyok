@@ -9,6 +9,7 @@ import { VaultDB } from './vault-db'
 import { type VaultLogger, parseLogger } from './logger'
 import { type PassphraseStrengthTest, checkStrengthTest } from './passphrase-strength'
 import * as Names from './names'
+import type { GetProof } from './ask'
 
 /**
  * What `onBadNews` is: told each piece of bad news, a VaultError, and never awaited. One that
@@ -75,6 +76,17 @@ export type MakeVaultOpts = {
    * @example Vault.make({ ...opts, onBadNews: (news) => { telemetry.report(news.refusalkind) } })
    */
   onBadNews?: BadNewsHandler | null | undefined
+  /**
+   * Your method that asks the user for a proof, the one place UI meets the vault: every call that
+   * needs the vault unlocked, and finds it not, goes through `ensureLease()`, which hands it an
+   * {@link Ask} and waits for its answer, one prompt at a time. Left out, or null, every ask is
+   * `declined`: the call refuses with kind 'vault_locked', and the app prompts on its own.
+   * `safebyok-react`'s `VaultProvider` passes its passphrase dialog unless told otherwise. Kind
+   * 'bad_option' for anything but a function.
+   *
+   * @example Vault.make({ ...opts, getProof: (ask) => showPassphraseDialog(ask) })
+   */
+  getProof?: GetProof | null | undefined
   /**
    * Time source for expiry and for the times stored with each record; tests inject one. Default:
    * the wall clock. Its `now()` returns epoch milliseconds, as `Date.now()` does, from 1981 to 2255
@@ -159,6 +171,7 @@ const makeVaultOptsShape = Z.strictObject({
   leaseHours:             anyOpt,
   staleMinutes:           anyOpt,
   onBadNews:              anyOpt,
+  getProof:               anyOpt,
   clock:                  anyOpt,
   maxWhisperBytes:        anyOpt,
   maxBoxes:               anyOpt,
@@ -347,6 +360,21 @@ export const parseStaleMinutes = (candidate: unknown, where: 'Vault.make' | 'hel
   return checked.data
 }
 
+const renewWithinAsMillis = Z.pipe(Z._default(someMinutes, 0), minutesToMillis)
+
+/**
+ * `ensureLease()`'s `renewWithin`, in the milliseconds the vault keeps: how many minutes before the
+ * lease ends it asks for a proof anyway, 0 when left out. Kind 'bad_option' for anything but zero
+ * or more minutes, or `Infinity`, which asks whenever it is called.
+ */
+export const parseRenewWithin = (candidate: unknown): number => {
+  const checked = renewWithinAsMillis.safeParse(candidate)
+  if (! checked.success) {
+    throw new VaultError('bad_option', "ensureLease's renewWithin is a number of minutes, zero or more, fractions too, or Infinity: ask for a proof when the lease ends within that many minutes.")
+  }
+  return checked.data
+}
+
 /** The `onBadNews` handler, or null for none. Kind 'bad_option' for anything but a function. */
 export const parseOnBadNews = (candidate: unknown): BadNewsHandler | null => {
   if (candidate === undefined || candidate === null) { return null }
@@ -354,6 +382,15 @@ export const parseOnBadNews = (candidate: unknown): BadNewsHandler | null => {
     throw new VaultError('bad_option', 'onBadNews is a function the vault calls with each piece of bad news, a VaultError: pass one, or leave it out.')
   }
   return candidate as BadNewsHandler
+}
+
+/** The host's `getProof`, or null for none. Kind 'bad_option' for anything but a function. */
+export const parseGetProof = (candidate: unknown): GetProof | null => {
+  if (candidate === undefined || candidate === null) { return null }
+  if (typeof candidate !== 'function') {
+    throw new VaultError('bad_option', 'getProof is a function the vault hands an Ask whenever it needs a proof, answering unlocked, declined or carry_on: pass one, or leave it out.')
+  }
+  return candidate as GetProof
 }
 
 /** What a Clock must carry. Checked only: Vault.make keeps the clock it was handed, and checks each reading. */
@@ -489,6 +526,7 @@ export type ParsedVaultOpts = {
   leaseMillis:      number
   staleMillis:      number
   onBadNews:        BadNewsHandler | null
+  getProof:         GetProof | null
   logger:           VaultLogger
   clock:            Clock
   keyDeriver:       KeyDeriver
@@ -517,6 +555,7 @@ export const parseMakeVaultOpts = (opts: MakeVaultOpts): ParsedVaultOpts => {
   const leaseMillis = parseLeaseHours(opts.leaseHours)
   const staleMillis = parseStaleMinutes(opts.staleMinutes, 'Vault.make')
   const onBadNews = parseOnBadNews(opts.onBadNews)
+  const getProof = parseGetProof(opts.getProof)
   // The host's logger for the vault, else the one its storage was made with; guarded either way.
   const logger = parseLogger(opts.logger ?? vaultDB.logger)
   const clock = parseClock(opts.clock)
@@ -528,7 +567,7 @@ export const parseMakeVaultOpts = (opts: MakeVaultOpts): ParsedVaultOpts => {
   const whisperByteLimit = parseMaxWhisperBytes(opts.maxWhisperBytes)
   const boxLimit = parseMaxBoxes(opts.maxBoxes, parseDeclared(vaultDB, 'maxBoxes'))
   const vaultByteLimit = checkLimitsFit(vaultDB, whisperByteLimit, boxLimit)
-  return { scope, rules, vaultDB, deviceDB, leaseMillis, staleMillis, onBadNews, logger, clock, keyDeriver, strengthTest, whisperByteLimit, boxLimit, vaultByteLimit }
+  return { scope, rules, vaultDB, deviceDB, leaseMillis, staleMillis, onBadNews, getProof, logger, clock, keyDeriver, strengthTest, whisperByteLimit, boxLimit, vaultByteLimit }
 }
 
 /**

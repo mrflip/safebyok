@@ -74,7 +74,7 @@ describe("makeWorld's vaults opened from outside the page", () => {
 })
 
 describe("answerPassphraseDialog", () => {
-  it("unlocks a locked vault through the dialog withUnlockedVault raises", async () => {
+  it("unlocks a locked vault through the dialog a read raises", async () => {
     const world = TH.makeWorld()
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
     world.renderInVault(<TH.VaultProbe />)

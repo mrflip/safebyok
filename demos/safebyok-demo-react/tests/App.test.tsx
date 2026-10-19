@@ -61,8 +61,8 @@ describe("App", () => {
     fireEvent.change(within(choosing).getByPlaceholderText('vault passphrase'), { target: { value: 'correct horse one' } })
     fireEvent.click(within(choosing).getByRole('button', { name: 'Create vault' }))
     await screen.findByText(/🔓 unlocked until/)
-    // The save runs again once the vault unlocks: its box is listed before the lock below,
-    // which would otherwise win the race and refuse the save (withUnlockedVault's doc block).
+    // The save goes on once the vault unlocks: its box is listed before the lock below, which
+    // would otherwise land while the save is under way.
     await screen.findByRole('button', { name: 'view' })
 
     // Lock, then mistype: the dialog stays, saying so.
@@ -85,21 +85,16 @@ describe("App", () => {
     fireEvent.click(screen.getByRole('button', { name: 'Unlock' }))
     await screen.findByText('sk-ant-test-not-a-real-key')
 
-    // Forgot it: start a new vault from the dialog, emptied of every box.
+    // Forgot it: start over from the dialog, the vault emptied of every box.
     fireEvent.click(screen.getByRole('button', { name: 'lock now' }))
     await screen.findByText('🔒 locked')
     vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
     fireEvent.click(screen.getByRole('button', { name: 'remove' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Forgot it? Start a new vault' }))
     fireEvent.click(screen.getByRole('button', { name: 'Remove and start over' }))
-    fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'correct horse two' } })
-    expect(screen.getByRole('dialog', { name: 'Choose a vault passphrase' })).to.not.be.null
-    fireEvent.click(screen.getByRole('button', { name: 'Create vault' }))
-    // The emptied vault lists no boxes the moment it is deleted, before the new one is made:
-    // the test waits for the unlock it started to land, and the dialog to close, rather than end
-    // with it under way.
-    await screen.findByText(/🔓 unlocked until/)
+    // The delete lands as a lock: the dialog closes, the removal it asked for with it, and the
+    // emptied vault lists no boxes. The next store asks for a new vault's passphrase.
     await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })
-    expect(screen.getByText(/No boxes yet/)).to.not.be.null
+    expect(await screen.findByText(/No boxes yet/)).to.not.be.null
   })
 })

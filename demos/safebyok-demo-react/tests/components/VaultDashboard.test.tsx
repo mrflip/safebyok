@@ -123,13 +123,13 @@ describe("VaultDashboard, its boxes", () => {
     expect(await vault.getBox('openai_api_key')).to.deep.equal({ apiKey: 'sk-test-not-a-real-key', orgId: null })
   })
 
-  it("shows a refused store in the form, and keeps the form open", async () => {
+  it("shows a refused store in the form, asking for no passphrase first, and keeps the form open", async () => {
     TH.makeWorld().renderInVault(<VaultDashboard />)
     fireEvent.click(await screen.findByRole('button', { name: 'Add a box' }))
     fillForm({ boxlabel: 'not a label', whisper: 'sk-ant-test-not-a-real-key' })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-    await TH.answerPassphraseDialog()
     expect(await screen.findByText(/label/i, { selector: '.gripe' })).to.not.be.null
+    expect(screen.queryByRole('dialog')).to.be.null
     expect(screen.getByRole('button', { name: 'Save' })).to.not.be.null
   })
 

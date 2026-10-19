@@ -8,7 +8,7 @@ import type { ReactNode } from 'react'
 import { expect } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { localVaultDB, memoryDeviceDB, memoryStore, type VaultDB, type Whisper } from 'safebyok'
-import { VaultProvider, useVault, useVaultSnapshot, useWithUnlockedVault } from 'safebyok-react'
+import { VaultProvider, useVault, useVaultSnapshot } from 'safebyok-react'
 import { memoryVaultOpts, settledVault } from 'safebyok/testing'
 import { JokeModel } from '../src/lib/anthropic'
 import { keepToClose } from './opened-vaults'
@@ -132,21 +132,20 @@ export const fakeAnthropic = (status: number, jokeText = '') => {
 /**
  * The vault as a page sees it, to render beside a component under test: whether there is one
  * (`vault`: `none` or `open`), its `state` (`none` while there is none), its `boxes` (boxlabels,
- * comma-joined), a `read` button that reads `anthropic_api_key` through withUnlockedVault, and an
+ * comma-joined), a `read` button that reads `anthropic_api_key`, asking through the provider's dialog, and an
  * `unlock` button that unlocks it with {@link Passphrase} directly.
  *
  * @example world.renderInVault(<><SessionBar auth={auth} /><TH.VaultProbe /></>)
  */
 export const VaultProbe = () => {
   const vault = useVault()
-  const withUnlockedVault = useWithUnlockedVault()
   const snapshot = useVaultSnapshot()
   return (
     <p>
       <span data-testid="vault">{vault === null ? 'none' : 'open'}</span>
       <span data-testid="state">{snapshot?.state ?? 'none'}</span>
       <span data-testid="boxes">{(snapshot?.boxes ?? []).map((box) => box.boxlabel).join(',')}</span>
-      <button onClick={() => { void withUnlockedVault(() => vault?.getBox('anthropic_api_key') ?? Promise.resolve(null)) }}>read</button>
+      <button onClick={() => { void vault?.tryGetBox('anthropic_api_key') }}>read</button>
       <button onClick={() => { void vault?.unlock(Passphrase) }}>unlock</button>
     </p>
   )

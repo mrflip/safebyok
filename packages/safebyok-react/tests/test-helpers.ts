@@ -8,8 +8,8 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { Component, createElement, use, type ReactElement, type ReactNode } from 'react'
 import { onTestFinished, vi } from 'vitest'
-import { LeaseHours, VaultError, outcomeOf, unexpectedError, type Outcome, type WayinSummary, type Vault, type VaultState } from 'safebyok'
-import { scopeOf } from 'safebyok/testing'
+import { LeaseHours, VaultError, outcomeOf, unexpectedError, type Ask, type AskWhy, type MakeVaultOpts, type Outcome, type ProofAnswer, type WayinSummary, type Vault, type VaultState } from 'safebyok'
+import { eventually, scopeOf, settledVault } from 'safebyok/testing'
 import { fromB64, toB64 } from 'safebyok/utils'
 
 export * from 'safebyok/testing'
@@ -85,6 +85,59 @@ export const vaultUnlockingWith = (unlock: (passphrase: string) => Promise<void>
 
 /** A locked Vault whose every unlock is refused as a wrong passphrase. */
 export const wrong = () => vaultUnlockingWith(() => Promise.reject(new VaultError('wrong_passphrase', 'That passphrase did not open the vault.')))
+
+/** A promise that never settles: a lock that never lands. */
+const never = new Promise<void>(() => { /* never settles */ })
+
+/** The ask {@link askOf} made for each vault handed it with no options, so a dialog rendered again over it keeps its round. */
+const asksMade = new WeakMap<Vault, Ask>()
+
+/**
+ * An {@link Ask} over `vault`, as a dialog reads one, for rendering a dialog or a button without
+ * a vault raising it: its `why` (by default 'absent' for a vault so shown, 'locked' otherwise),
+ * the vault, an `attempt` that is the vault's `tryUnlock` resolving the vault, and a
+ * `lockLanded` that settles when `opts.lockLanded` does, or never. Called again for the same
+ * vault with no options, it hands back the same ask.
+ *
+ * @example render(<PassphraseModal ask={TH.askOf(vault)} onDone={noop} />)
+ * @example const landing = TH.held(); const ask = TH.askOf(vault, { lockLanded: landing.promise })
+ */
+export const askOf = (vault: Vault, opts: { why?: AskWhy, lockLanded?: Promise<void> } = {}): Ask => {
+  const plain = opts.why === undefined && opts.lockLanded === undefined
+  const kept = plain ? asksMade.get(vault) : undefined
+  if (kept !== undefined) { return kept }
+  const ask = {
+    why:        opts.why ?? (vault.getSnapshot().state === 'absent' ? 'absent' : 'locked'),
+    vault,
+    attempt:    async (...args: Parameters<Vault['tryUnlock']>): Promise<Outcome<Vault>> => {
+      const { ok, err } = await vault.tryUnlock(...args)
+      return ok ? { ok, val: vault } : { ok, err }
+    },
+    lockLanded: opts.lockLanded ?? never,
+  } as unknown as Ask
+  if (plain) { asksMade.set(vault, ask) }
+  return ask
+}
+
+/**
+ * A vault made from `opts` with a getProof that holds every ask, and the first ask it raised, as
+ * the vault hands it to a dialog: `ensuring`, the call that asked (a `tryEnsureLease`), and
+ * `answer`, which settles every ask held.
+ *
+ * @example
+ *   const { vault, ask, ensuring } = await TH.askedBy(opts)
+ *   render(<PassphraseModal ask={ask} onDone={noop} />)
+ */
+export const askedBy = async (opts: MakeVaultOpts) => {
+  const answering = held<ProofAnswer>()
+  const asks: Ask[] = []
+  const vault = await settledVault({ ...opts, getProof: (ask) => { asks.push(ask); return answering.promise } })
+  const ensuring = vault.tryEnsureLease()
+  await eventually(() => asks.length > 0)
+  const [ask] = asks
+  if (ask === undefined) { throw new Error('the vault raised no ask') }
+  return { vault, ask, ensuring, answer: answering.resolve }
+}
 
 /** Types the passphrase in the dialog and presses Unlock. */
 export const submitPassphrase = (passphrase: string) => {
