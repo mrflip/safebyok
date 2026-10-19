@@ -5747,8 +5747,35 @@ describe("versioned updates: two devices writing at once", () => {
     expect(told).to.have.lengthOf(1)
     expect(told[0]).to.deep.include({ level: 'warn' })
     expect(told[0]?.message).to.match(/^The lockbox retired was not the revision this device showed/)
+    expect(told[0]?.message).to.not.match(/damaged/)
+    expect(told[0]?.story).to.not.have.property('damaged')
     const text = TH.loggedText(told)
     for (const unsaid of [shown, theirs.revisionTok, 'anthropic']) { expect(text).to.not.include(unsaid) }
+  })
+
+  it("a retirement over a damaged box written over meanwhile elsewhere retires theirs all the same, and warns that the box shown was a damaged one, with damaged: true, naming neither", async () => {
+    const { world, hereDB, here, there } = await twoDeviceWorld()
+    await here.storeBox('anthropic', 'sk-ant-fake-one')
+    world.dbStore.write(u1BoxCkey('anthropic'), '{"not": json')
+    await vi.waitFor(() => {
+      expect(here.getSnapshot().boxes[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true, revision_tok: null })
+      expect(there.getSnapshot().boxes[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true, revision_tok: null })
+    })
+    const theirs = { revisionTok: '' }
+    TH.beforeNextCall(hereDB, 'retireBox', async () => {
+      await there.storeBox('anthropic', 'sk-ant-fake-theirs')
+      theirs.revisionTok = String(storedRowOf(world, 'anthropic')['revision_tok'])
+    })
+    await here.retireBox('anthropic')
+    expect(world.dbStore.read(u1BoxCkey('anthropic'))).to.be.null
+    expect(here.getSnapshot().boxes).to.have.lengthOf(0)
+    const told = world.logged.filter((heard) => heard.story?.['call'] === 'retireBox')
+    expect(told).to.have.lengthOf(1)
+    expect(told[0]).to.deep.include({ level: 'warn' })
+    expect(told[0]?.message).to.match(/^The lockbox this device showed was a damaged one/)
+    expect(told[0]?.story).to.deep.include({ call: 'retireBox', damaged: true })
+    const text = TH.loggedText(told)
+    for (const unsaid of [theirs.revisionTok, 'anthropic']) { expect(text).to.not.include(unsaid) }
   })
 
   it("a store over a damaged box naming no revision, written over meanwhile by a device that saw it damaged too, retires that write, warns, and stores its own", async () => {
@@ -5775,6 +5802,7 @@ describe("versioned updates: two devices writing at once", () => {
     expect(told).to.have.lengthOf(1)
     expect(told[0]).to.deep.include({ level: 'warn' })
     expect(told[0]?.message).to.match(/^Storing over a damaged lockbox first retired what stood under its boxlabel, and that was not the damaged record this device showed/)
+    expect(told[0]?.story).to.deep.include({ call: 'storeBox', damaged: true })
     const text = TH.loggedText(told)
     for (const unsaid of [theirs.revisionTok, 'anthropic']) { expect(text).to.not.include(unsaid) }
   })

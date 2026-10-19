@@ -590,7 +590,9 @@ export type Vault = {
    * saying the lockbox could not be retired because the vault it was in is gone, and the
    * adapter's refusal its cause. Within that vault the retirement wins: when what stood was not the
    * revision the snapshot shows -- another device or tab wrote over it meanwhile -- it is retired
-   * all the same, and the vault warns through its logger, naming neither revision.
+   * all the same, and the vault warns through its logger, naming neither revision. When the lockbox
+   * the snapshot showed was a damaged one, the warning says so and its context carries
+   * `damaged: true` beside `call`.
    */
   retireBox(boxlabel: string): Promise<void>
 
@@ -1648,7 +1650,7 @@ const make = (opts: MakeVaultOpts): Vault => {
       if (clearsFirst) {
         const { outcome } = await refreshOnStale(vaultDB.retireBox(scope, lockbox.boxlabel, { vault_id: expected.vault_id, revision_tok: expected.revision_tok }), 'storeBox')
         if (outcome === 'retired_other') {
-          logger.warn("Storing over a damaged lockbox first retired what stood under its boxlabel, and that was not the damaged record this device showed: another device or tab had written there since. Its write was retired, and this one stored in its place.", { call: 'storeBox' })
+          logger.warn("Storing over a damaged lockbox first retired what stood under its boxlabel, and that was not the damaged record this device showed: another device or tab had written there since. Its write was retired, and this one stored in its place.", { call: 'storeBox', damaged: true })
         }
       }
       await refreshOnStale(vaultDB.updateBox(scope, lockbox, expected), 'storeBox')
@@ -1912,10 +1914,16 @@ const make = (opts: MakeVaultOpts): Vault => {
       // a vault retired and made anew elsewhere refuses it. The revision the listing shows only
       // lets storage say whether it removed that one or another.
       const expected = { vault_id: currentVaultProps().vault_id, revision_tok: listedRevisionOf(label) }
+      // Asked before the call: a catch-up on a stale answer re-lists, and what was shown is what counts.
+      const showedDamaged = isListedDamaged(label)
       try {
         const { outcome } = await refreshOnStale(vaultDB.retireBox(scope, label, expected), 'retireBox')
         if (outcome === 'retired_other') {
-          logger.warn("The lockbox retired was not the revision this device showed: another device or tab had written over it since. That write was retired all the same.", { call: 'retireBox' })
+          if (showedDamaged) {
+            logger.warn("The lockbox this device showed was a damaged one, and the lockbox retired was not that record: another device or tab had written over it since. That write was retired all the same.", { call: 'retireBox', damaged: true })
+          } else {
+            logger.warn("The lockbox retired was not the revision this device showed: another device or tab had written over it since. That write was retired all the same.", { call: 'retireBox' })
+          }
         }
       } catch (err) {
         // Said as what happened to the box, once caught up; a catch-up that failed says so instead.
