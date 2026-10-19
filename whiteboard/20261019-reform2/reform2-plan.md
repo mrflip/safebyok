@@ -293,3 +293,13 @@ The preplan's *Deferred* list, plus threads 3, 4 and 5.
 there must always be a record, a tombstone or a valid one, while the vault exists. Today's
 clear-then-write over a damaged box naming no revision breaks it for the moment between its two
 calls.
+
+*Orchestrator:* the Coach's direction for the always-complete result (2026-10-19): once a new
+return shape is added, an adapter returns the record in the database at the time it returns --
+the old record or the new one -- and an explanation. Until then, only `null` is stale (#177).
+Also deferred, ruled "yes": a `corrupt_record` answer to `updateBox` skips `storeBox`'s refresh;
+the work that folds a write's answer into the snapshot should refresh or fold before it throws.
+
+*Orchestrator:* TODO entries for a TODO PR of its own at wrap-up: Postgres `InsertBoxOutcome`
+loosely typed, its lockbox columns untyped beside the four flags (type them, or return them as
+one `row_to_json` column), next time Postgres is touched (Coach: "add as todo", #177 review).
