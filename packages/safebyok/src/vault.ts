@@ -159,7 +159,8 @@ const NoWayins: readonly (PassphraseWayin | PasskeyWayin)[] = Object.freeze([])
  * that was removed. Storage so little to be trusted locks the vault, as `lock()` does, as a storage
  * refusal of kind 'identity_revoked' does. A host that knows its storage was restored from an
  * older copy on purpose accepts it on this device by erasing the device's mark of the vault
- * (`deviceDB.delMark(scope)`) and calling `hello()` again.
+ * (`valOf(await deviceDB.delMark(scope))`, which throws should the erase fail) and calling
+ * `hello()` again.
  *
  * Storage alone settles a race. When it refuses a write as stale, or a box will not open, the
  * vault catches up with storage once before it names the refusal: a vault deleted and made
