@@ -16,7 +16,7 @@ import { jsonBytes, type BoxExpectation } from './vault-db'
 import { type VaultLogger, asError } from './logger'
 import * as RefusalPolicy from './refusal-policy'
 import { type PassphraseStrengthTest, checkStrongEnough } from './passphrase-strength'
-import { type BadNewsHandler, type MakeVaultOpts, parseMakeVaultOpts, parseRenewWithin, parseStaleMinutes, readClock, StoredBytesPerWhisperByte, BoxFixedBytes } from './vault-opts'
+import { type BadNewsHandler, type MakeVaultOpts, parseMakeVaultOpts, parseRenewMinutes, parseStaleMinutes, readClock, StoredBytesPerWhisperByte, BoxFixedBytes } from './vault-opts'
 import { reportToPlatform } from './report-error'
 import type { DeviceDB } from './device-db'
 import type { KeyDeriver } from './key-deriver'
@@ -327,10 +327,10 @@ export class Vault {
    */
   hello = this.#throwing(this.#tryHello)
 
-  readonly #tryEnsureLease = this.#trying(async (given?: AnEvent | { renewWithin?: number | undefined }): Promise<Vault> => {
+  readonly #tryEnsureLease = this.#trying(async (given?: AnEvent | { renewMinutes?: number | undefined }): Promise<Vault> => {
     this.#checkOpen()
     const leaseOpts = asEnsureLeaseOpts(given)
-    return await this.#ensureLease(parseRenewWithin(leaseOpts?.renewWithin))
+    return await this.#ensureLease(parseRenewMinutes(leaseOpts?.renewMinutes))
   })
   /**
    * {@link Vault.ensureLease}, resolving to an {@link Outcome}: what it answers as `val`, what it refuses
@@ -341,7 +341,7 @@ export class Vault {
    * Have the vault unlocked, asking for a proof only when it must: what every call that needs a
    * whisper goes through, so an app rarely calls it itself -- call it to unlock ahead of time, on a
    * button. It says `hello()` first, whose refusal is its own, as it came. Then, unlocked, with
-   * the lease not ending within `opts.renewWithin` minutes (0 by default), it resolves the vault at
+   * the lease not ending within `opts.renewMinutes` minutes (0 by default), it resolves the vault at
    * once: no prompt, no write. Otherwise it hands an {@link Ask} to the `getProof` Vault.make was
    * given -- `why` `absent` (this proof makes the vault), `locked`, or `lease_ending` -- and waits
    * for its answer. One prompt at a time: a call that finds a prompt up waits on the same answer.
@@ -352,13 +352,13 @@ export class Vault {
    * when a `lock()`, `close()` or `del()` lands while the prompt is up (every caller waiting on it
    * at once), or when the lease is gone by the time the answer comes. Kind 'bad_option' when
    * `getProof` answers `carry_on` outside `lease_ending`, or anything but the three, or for a
-   * `renewWithin` that is not zero or more minutes; 'unexpected_error' when it throws, what it
+   * `renewMinutes` that is not zero or more minutes; 'unexpected_error' when it throws, what it
    * threw the cause, never logged. A wrong passphrase never reaches here: it goes to the dialog,
    * through `ask.attempt`. An event in place of `opts` is no options, as for `hello`.
    *
    * @example await vault.ensureLease()   // unlocked, or refused 'vault_locked'
    * @example <button onClick={() => { void vault.tryEnsureLease() }}>Unlock</button>
-   * @example await vault.ensureLease({ renewWithin: 60 })   // ask now if the lease ends within the hour
+   * @example await vault.ensureLease({ renewMinutes: 60 })   // ask now if the lease ends within the hour
    */
   ensureLease = this.#throwing(this.#tryEnsureLease)
   // --
@@ -1435,14 +1435,14 @@ export class Vault {
   #asking: RaisedAsk | null = null
 
   /**
-   * The vault, unlocked: at once while the lease stands past `renewWithinMillis` from now, and
+   * The vault, unlocked: at once while the lease stands past `renewMillis` from now, and
    * otherwise once the prompt -- the one up, or one raised now -- answers. See `Vault.ensureLease`.
    */
-  async #ensureLease(renewWithinMillis: number): Promise<Vault> {
+  async #ensureLease(renewMillis: number): Promise<Vault> {
     await this.#helloWithin(this.#staleMillis)
     // A close() during the hello: no ask is raised over a closed handle.
     this.#checkOpen()
-    const why = this.#whyAsk(renewWithinMillis)
+    const why = this.#whyAsk(renewMillis)
     if (why === null) { return this }
     const answer = valOf(await (this.#asking ?? this.#raiseAsk(why)).answer)
     if (answer === 'declined') { throw declinedError(this.#getProof !== null) }
@@ -1452,8 +1452,8 @@ export class Vault {
     return this
   }
 
-  /** Why the vault must ask for a proof now: null while it is unlocked past `renewWithinMillis` from now. */
-  #whyAsk(renewWithinMillis: number): AskWhy | null {
+  /** Why the vault must ask for a proof now: null while it is unlocked past `renewMillis` from now. */
+  #whyAsk(renewMillis: number): AskWhy | null {
     if (this.#vaultProps === null) { return 'absent' }
     const now = this.#clockNow()
     if (this.#vaultKey === null || this.#askPassphraseAt === null || this.#askPassphraseAt <= now) {
@@ -1461,7 +1461,7 @@ export class Vault {
       if (this.#vaultKey !== null) { this.#dropNow() }
       return 'locked'
     }
-    return this.#askPassphraseAt - now > renewWithinMillis ? null : 'lease_ending'
+    return this.#askPassphraseAt - now > renewMillis ? null : 'lease_ending'
   }
 
   /** Raise a prompt for `why`, up until it is answered or a lock lands. */
@@ -2388,13 +2388,13 @@ const asHelloOpts = (given: unknown): { staleMinutes?: number | undefined } | un
   return checkHelloOpts(given as { staleMinutes?: number | undefined } | undefined)
 }
 
-/** What `ensureLease()`'s options may hold: `renewWithin`, which `parseRenewWithin` checks, and nothing else. */
-const checkEnsureLeaseOpts = optionsCheck({ renewWithin: Z.optional(Z.unknown()) }, "ensureLease()'s only option is `renewWithin`, how many minutes before the lease ends to ask for a proof anyway: check its spelling, and leave out any other.")
+/** What `ensureLease()`'s options may hold: `renewMinutes`, which `parseRenewMinutes` checks, and nothing else. */
+const checkEnsureLeaseOpts = optionsCheck({ renewMinutes: Z.optional(Z.unknown()) }, "ensureLease()'s only option is `renewMinutes`, how many minutes before the lease ends to ask for a proof anyway: check its spelling, and leave out any other.")
 
 /** `ensureLease()`'s options, checked as {@link asHelloOpts} checks hello's: an event is none. */
-const asEnsureLeaseOpts = (given: unknown): { renewWithin?: number | undefined } | undefined => {
+const asEnsureLeaseOpts = (given: unknown): { renewMinutes?: number | undefined } | undefined => {
   if (typeof given === 'object' && given !== null && ! isPlainBag(given)) { return undefined }
-  return checkEnsureLeaseOpts(given as { renewWithin?: number | undefined } | undefined)
+  return checkEnsureLeaseOpts(given as { renewMinutes?: number | undefined } | undefined)
 }
 
 /** What `putBox()`'s options may hold: a sidecar, which {@link sidecarJsonOf} checks, and nothing else. */

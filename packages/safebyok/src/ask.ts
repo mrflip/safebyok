@@ -8,7 +8,7 @@ export const AskWhyVals = ['absent', 'locked', 'lease_ending'] as const
 /**
  * Why the vault asks for a proof: `absent`, the vault has never been made, and this proof makes
  * it, its one passphrase; `locked`, the vault stands and this device holds no lease; or
- * `lease_ending`, this device's lease ends within the `renewWithin` its call asked for.
+ * `lease_ending`, this device's lease ends within the `renewMinutes` its call asked for.
  */
 export type AskWhy = typeof AskWhyVals[number]
 

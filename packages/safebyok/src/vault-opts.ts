@@ -361,17 +361,17 @@ export const parseStaleMinutes = (candidate: unknown, where: 'Vault.make' | 'hel
   return checked.data
 }
 
-const renewWithinAsMillis = Z.pipe(Z._default(someMinutes, 0), minutesToMillis)
+const renewMinutesAsMillis = Z.pipe(Z._default(someMinutes, 0), minutesToMillis)
 
 /**
- * `ensureLease()`'s `renewWithin`, in the milliseconds the vault keeps: how many minutes before the
+ * `ensureLease()`'s `renewMinutes`, in the milliseconds the vault keeps: how many minutes before the
  * lease ends it asks for a proof anyway, 0 when left out. Kind 'bad_option' for anything but zero
  * or more minutes, or `Infinity`, which asks whenever it is called.
  */
-export const parseRenewWithin = (candidate: unknown): number => {
-  const checked = renewWithinAsMillis.safeParse(candidate)
+export const parseRenewMinutes = (candidate: unknown): number => {
+  const checked = renewMinutesAsMillis.safeParse(candidate)
   if (! checked.success) {
-    throw new VaultError('bad_option', "ensureLease's renewWithin is a number of minutes, zero or more, fractions too, or Infinity: ask for a proof when the lease ends within that many minutes.")
+    throw new VaultError('bad_option', "ensureLease's renewMinutes is a number of minutes, zero or more, fractions too, or Infinity: ask for a proof when the lease ends within that many minutes.")
   }
   return checked.data
 }

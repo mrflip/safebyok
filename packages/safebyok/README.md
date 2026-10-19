@@ -363,7 +363,7 @@ const getProof: GetProof = async (ask) => {
 ```
 
 * **`ask.why`** is `absent` (this passphrase makes the vault: offer strength advice), `locked`,
-  or `lease_ending` (the call asked `ensureLease({ renewWithin })` minutes ahead).
+  or `lease_ending` (the call asked `ensureLease({ renewMinutes })` minutes ahead).
 * **`ask.attempt(proof, { wayinId? })`** tries one passphrase, or a passkey's answer, and
   resolves an `Outcome`. The retry loop lives in your dialog: `wrong_passphrase`,
   `wrong_passkey`, `weak_passphrase` and `created_elsewhere` are shown in place to ask again;
@@ -379,7 +379,7 @@ const getProof: GetProof = async (ask) => {
 * **No `getProof`** means every ask is `declined`: the call refuses `vault_locked`, and your app
   prompts on its own and calls `vault.unlock(passphrase)`.
 
-`vault.ensureLease()` itself unlocks ahead of time, on a button; `ensureLease({ renewWithin: 60 })`
+`vault.ensureLease()` itself unlocks ahead of time, on a button; `ensureLease({ renewMinutes: 60 })`
 asks now when the lease ends within the hour. A call that cannot land -- a whisper JSON cannot
 carry, a label the vault's check refuses -- is refused before anything is asked.
 

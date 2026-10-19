@@ -770,13 +770,13 @@ describe("vault.ensureLease, by the Contract", () => {
     expect(vault.state).to.eq('opening')
   })
 
-  it("resolves the vault at once while unlocked and the lease not ending within renewWithin: no prompt, no write (Contract: ensureLease, Does 2)", async () => {
+  it("resolves the vault at once while unlocked and the lease not ending within renewMinutes: no prompt, no write (Contract: ensureLease, Does 2)", async () => {
     const world = makeWorld()
     const getProof = typingPw()
     const vault = await world.openUnlocked('pw', { getProof })
     const putLease = vi.spyOn(world.deviceDB, 'putLease')
     expect(await vault.ensureLease()).to.eq(vault)
-    expect(await vault.ensureLease({ renewWithin: 60 })).to.eq(vault)
+    expect(await vault.ensureLease({ renewMinutes: 60 })).to.eq(vault)
     expect(getProof).not.toHaveBeenCalled()
     expect(putLease).not.toHaveBeenCalled()
   })
@@ -799,14 +799,14 @@ describe("vault.ensureLease, by the Contract", () => {
     expect(vault.state).to.eq('unlocked')
   })
 
-  it("asks why 'lease_ending' when the lease ends within renewWithin minutes, and renews it (Contract: ensureLease, Does 3)", async () => {
+  it("asks why 'lease_ending' when the lease ends within renewMinutes, and renews it (Contract: ensureLease, Does 3)", async () => {
     const world = makeWorld()
     const getProof = typingPw()
     const vault = await world.openUnlocked('pw', { getProof, leaseHours: 1 })
     world.advance(HourMillis - (10 * MinuteMillis))
-    await vault.ensureLease({ renewWithin: 5 })
+    await vault.ensureLease({ renewMinutes: 5 })
     expect(getProof).not.toHaveBeenCalled()
-    await vault.ensureLease({ renewWithin: 15 })
+    await vault.ensureLease({ renewMinutes: 15 })
     expect(getProof.mock.calls[0]?.[0].why).to.eq('lease_ending')
     expect(vault.askPassphraseAt).to.eq(world.clock.now() + HourMillis)
   })
@@ -886,7 +886,7 @@ describe("vault.ensureLease, by the Contract", () => {
     const vault = await world.openUnlocked('pw', { getProof, leaseHours: 1 })
     const deadline = vault.askPassphraseAt
     world.advance(HourMillis - MinuteMillis)
-    expect(await vault.ensureLease({ renewWithin: 5 })).to.eq(vault)
+    expect(await vault.ensureLease({ renewMinutes: 5 })).to.eq(vault)
     expect(getProof).toHaveBeenCalledOnce()
     expect(vault.askPassphraseAt).to.eq(deadline)
     expect(vault.state).to.eq('unlocked')
@@ -899,7 +899,7 @@ describe("vault.ensureLease, by the Contract", () => {
       leaseHours: 1,
     })
     world.advance(HourMillis - MinuteMillis)
-    await TH.expectRefusal(vault.ensureLease({ renewWithin: 5 }), 'vault_locked')
+    await TH.expectRefusal(vault.ensureLease({ renewMinutes: 5 }), 'vault_locked')
     expect(vault.state).to.eq('locked')
   })
 
@@ -1055,26 +1055,26 @@ describe("vault.ensureLease, by the Contract", () => {
     }
   })
 
-  it("refuses a renewWithin that is not zero or more minutes, and a misspelt option, as bad_option", async () => {
+  it("refuses a renewMinutes that is not zero or more minutes, and a misspelt option, as bad_option", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    await TH.expectRefusal(vault.ensureLease({ renewWithin: -1 }), 'bad_option')
-    await TH.expectRefusal(vault.ensureLease({ renewWithin: '5' as unknown as number }), 'bad_option')
-    await TH.expectRefusal(vault.ensureLease({ renewWhithin: 5 } as unknown as { renewWithin: number }), 'bad_option')
+    await TH.expectRefusal(vault.ensureLease({ renewMinutes: -1 }), 'bad_option')
+    await TH.expectRefusal(vault.ensureLease({ renewMinutes: '5' as unknown as number }), 'bad_option')
+    await TH.expectRefusal(vault.ensureLease({ renewMinuts: 5 } as unknown as { renewMinutes: number }), 'bad_option')
   })
 
-  it("asks whenever it is called with renewWithin Infinity, as its third example's reading shows", async () => {
+  it("asks whenever it is called with renewMinutes Infinity, as its third example's reading shows", async () => {
     const world = makeWorld()
     const getProof = typingPw()
     const vault = await world.openUnlocked('pw', { getProof })
-    await vault.ensureLease({ renewWithin: Infinity })
+    await vault.ensureLease({ renewMinutes: Infinity })
     expect(getProof.mock.calls[0]?.[0].why).to.eq('lease_ending')
   })
 
   it("takes an event in place of options, as a button's handler, as its second example shows", async () => {
     const getProof = typingPw()
     const { vault } = await lockedVaultWith({ getProof })
-    await TH.expectGood(vault.tryEnsureLease(new Event('click') as unknown as { renewWithin?: number }))
+    await TH.expectGood(vault.tryEnsureLease(new Event('click') as unknown as { renewMinutes?: number }))
     expect(vault.state).to.eq('unlocked')
   })
 
@@ -1138,7 +1138,7 @@ describe("Vault.make's getProof", () => {
       const { vault } = await lockedVaultWith({ getProof })
       await TH.expectRefusal(vault.getBox('anthropic'), 'vault_locked')
       await vault.unlock('pw')
-      expect(await vault.ensureLease({ renewWithin: Infinity })).to.eq(vault)
+      expect(await vault.ensureLease({ renewMinutes: Infinity })).to.eq(vault)
       expect(showPassphraseDialog).not.toHaveBeenCalled()
     } finally {
       vi.unstubAllGlobals()

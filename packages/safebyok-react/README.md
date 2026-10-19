@@ -210,7 +210,7 @@ if (! ok) { return null }   // dismissed: refused 'vault_locked'
   to end. A call that cannot land -- a whisper JSON cannot carry, a bad label -- is refused before
   anything is asked.
 * **Unlock ahead of time** with `vault.ensureLease()` on a button: `onClick={() => { void
-  vault.tryEnsureLease() }}`; `vault.ensureLease({ renewWithin: 60 })` asks now if the lease ends
+  vault.tryEnsureLease() }}`; `vault.ensureLease({ renewMinutes: 60 })` asks now if the lease ends
   within the hour.
 * **Your own dialog**: pass `getProof={(ask) => ...}`, which the vault hands an `Ask` -- `why`
   (`absent`, `locked` or `lease_ending`), the `vault`, `attempt(proof)` and `lockLanded` -- and

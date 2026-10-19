@@ -347,7 +347,7 @@ describe("VaultProvider", () => {
         await TH.expectBad(vault.tryGetBox('anthropic_api_key'), 'vault_locked')
         expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null
         await vault.unlock('pw')
-        expect(await vault.ensureLease({ renewWithin: Infinity })).to.eq(vault)
+        expect(await vault.ensureLease({ renewMinutes: Infinity })).to.eq(vault)
         expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null
       } finally {
         Reflect.deleteProperty(navigator, 'userActivation')
