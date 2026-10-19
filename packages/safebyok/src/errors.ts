@@ -1,5 +1,5 @@
 import type { Box } from './box'
-import type { Capacity, DamagedBox, VaultProps } from './types'
+import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types'
 
 /**
  * Every way a vault call can refuse, as a caller branches on them -- and every refusalkind any
@@ -190,6 +190,8 @@ export type RefusalMeta = {
   capacity?:           Capacity
   /** `damaged_box` told of a listing: the box as the listing shows it, its boxlabel and the revision it names. */
   box_listed?:         DamagedBox
+  /** `damaged_wayin` told of a read of the vault props: the way in as the snapshot lists it. */
+  wayin_listed?:       WayinSummary
 }
 
 /** What a VaultError is made with beside its refusalkind and message: the `cause` behind it, and its `meta`. */

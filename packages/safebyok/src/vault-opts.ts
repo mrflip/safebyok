@@ -67,7 +67,8 @@ export type MakeVaultOpts = {
    * refusal of the `bad_news` family (`damaged_vault`, `rolled_back`, `identity_revoked`,
    * `newer_format`, `damaged_box`, `damaged_wayin`), once, whichever calls share it; and a box a
    * listing shows damaged, the first time it shows so, as `damaged_box` news whose `meta.box_listed`
-   * is the box, though the listing itself succeeds. It changes nothing the caller gets: a refusal
+   * is the box, though the listing itself succeeds; and a way in stored damaged, likewise, as
+   * `damaged_wayin` news whose `meta.wayin_listed` is its summary. It changes nothing the caller gets: a refusal
    * still reaches its caller. The vault never awaits it; whatever it throws, or the promise it
    * returns rejects with, becomes the vault's `trouble` (kind 'bad_option', what it threw the
    * cause), and goes to the logger and to the platform's `reportError` where there is one. Kind

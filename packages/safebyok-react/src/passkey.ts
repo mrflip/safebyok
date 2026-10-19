@@ -1,11 +1,11 @@
-import { PasskeySaltBytes, VaultError, type PasskeyProof, type WayinSummary } from 'safebyok'
+import { PasskeySaltBytes, VaultError, type PasskeyAnswer, type WayinSummary } from 'safebyok'
 import { fromB64, toB64 } from 'safebyok/utils'
 import { Messages } from './messages'
 
 /**
  * The WebAuthn half of a passkey unlock, which the core leaves to the host: `createPasskey` makes a
  * new passkey and asks it for its first answer, `askPasskey` asks one of a vault's passkeys for its
- * answer again. Both hand back a {@link PasskeyProof} for the vault (`addPasskey`, `unlock`), or
+ * answer again. Both hand back a {@link PasskeyAnswer} for the vault (`addPasskey`, `unlock`), or
  * null when the user dismissed the prompt. Nothing here imports React: any framework's host may use
  * them.
  *
@@ -63,7 +63,7 @@ export type AskPasskeyOpts = {
  *   const makePasskey = () => createPasskey({ rp: { name: 'Acme' }, user: { name: email, displayName: fullName } })
  *   const wayinId = await vault.addPasskey(passphrase, makePasskey, { wayinlabel: 'laptop_fingerprint' })    // null: dismissed
  */
-export const createPasskey = async (opts: CreatePasskeyOpts): Promise<PasskeyProof | null> => {
+export const createPasskey = async (opts: CreatePasskeyOpts): Promise<PasskeyAnswer | null> => {
   checkAvailable()
   const prfSaltBytes = crypto.getRandomValues(new Uint8Array(PasskeySaltBytes))
   const created = await askAuthenticator(() => navigator.credentials.create({
@@ -82,7 +82,7 @@ export const createPasskey = async (opts: CreatePasskeyOpts): Promise<PasskeyPro
   if (created === null) { return null }
   const credentialId = toB64(new Uint8Array(created.rawId))
   const { prf } = created.getClientExtensionResults()
-  if (prf?.results !== undefined) { return proofOf(credentialId, prfSaltBytes, prf.results.first) }
+  if (prf?.results !== undefined) { return answerOf(credentialId, prfSaltBytes, prf.results.first) }
   if (prf?.enabled !== true) { throw noPrf() }
   // Many authenticators turn PRF on as they make the passkey, and answer only when asked again.
   const asked = await askAuthenticator(() => navigator.credentials.get({
@@ -98,7 +98,7 @@ export const createPasskey = async (opts: CreatePasskeyOpts): Promise<PasskeyPro
   if (asked === null) { return null }
   const answer = asked.getClientExtensionResults().prf?.results?.first
   if (answer === undefined) { throw noPrf() }
-  return proofOf(credentialId, prfSaltBytes, answer)
+  return answerOf(credentialId, prfSaltBytes, answer)
 }
 
 /**
@@ -119,7 +119,7 @@ export const createPasskey = async (opts: CreatePasskeyOpts): Promise<PasskeyPro
  *   const passkey = await askPasskey(vault.getSnapshot().wayins)
  *   if (passkey !== null) { await vault.unlock(passkey) }
  */
-export const askPasskey = async (wayins: readonly WayinSummary[], opts: AskPasskeyOpts = {}): Promise<PasskeyProof | null> => {
+export const askPasskey = async (wayins: readonly WayinSummary[], opts: AskPasskeyOpts = {}): Promise<PasskeyAnswer | null> => {
   checkAvailable()
   const listed = wayins.filter((wayin) => wayin.wayinkind === 'passkey')
   if (listed.length === 0) {
@@ -145,7 +145,7 @@ export const askPasskey = async (wayins: readonly WayinSummary[], opts: AskPassk
   const answer = asked.getClientExtensionResults().prf?.results?.first
   // A browser answers only for a credential it was offered; one that does not has nothing to unlock.
   if (answering === undefined || answer === undefined) { throw noPrf() }
-  return proofOf(credentialId, answering.saltBytes, answer)
+  return answerOf(credentialId, answering.saltBytes, answer)
 }
 
 /**
@@ -166,8 +166,8 @@ const askable = (wayin: WayinSummary & { wayinkind: 'passkey' }) => {
   }
 }
 
-/** A PasskeyProof of the credential `credentialId`, answering `answer` over `saltBytes`. */
-const proofOf = (credentialId: string, saltBytes: Uint8Array, answer: BufferSource): PasskeyProof => ({
+/** A PasskeyAnswer of the credential `credentialId`, answering `answer` over `saltBytes`. */
+const answerOf = (credentialId: string, saltBytes: Uint8Array, answer: BufferSource): PasskeyAnswer => ({
   credentialId,
   prfSaltB64: toB64(saltBytes),
   prfBytes:   bytesOf(answer),

@@ -211,7 +211,7 @@ export type Capacity = {
 }
 
 /**
- * The ways into a vault, each a {@link Wayin}'s `wayinkind`: a `passphrase` the user types,
+ * The ways into a vault, each a {@link WayinRecord}'s `wayinkind`: a `passphrase` the user types,
  * or a `passkey` the user touches (a fingerprint, a face, a security key). Each wayinkind has a
  * wayin shape of its own, and the vault tells them apart by this field.
  */
@@ -233,7 +233,7 @@ export const MaxUnlocks = 8
  * visible, and all of them are bound into that wrap, so a wayin altered or moved to another
  * vault refuses to open.
  */
-export const PassphraseWayin = Z.object({
+export const PassphraseWayinRecord = Z.object({
   wayinkind:               Z.literal('passphrase'),
   /** Random id minted when the wayin is added, and kept when its passphrase changes. */
   wayin_id:                Z.string().check(Z.minLength(1)),
@@ -255,11 +255,11 @@ export const PassphraseWayin = Z.object({
   /** The vaultKey, wrapped under the passphraseKey: decrypting this IS the passphrase check. */
   vault_key_wayin_wrapped: Ciphered,
 })
-export type PassphraseWayin = Z.infer<typeof PassphraseWayin>
+export type PassphraseWayinRecord = Z.infer<typeof PassphraseWayinRecord>
 
 /**
  * How many random bytes a passkey wayin's PRF salt holds, as `prf_salt_b64`: what the vault
- * asks the passkey's authenticator to evaluate its PRF over. A {@link PasskeyProof} for a new
+ * asks the passkey's authenticator to evaluate its PRF over. A {@link PasskeyAnswer} for a new
  * passkey carries a fresh salt this long; `safebyok-react`'s `createPasskey` mints one.
  */
 export const PasskeySaltBytes = 32
@@ -271,7 +271,7 @@ export const PasskeySaltBytes = 32
  * which credential to ask (`credential_id`) and what to ask it (`prf_salt_b64`). Every field but
  * `vault_key_wayin_wrapped` is visible, and all of them are bound into that wrap.
  */
-export const PasskeyWayin = Z.object({
+export const PasskeyWayinRecord = Z.object({
   wayinkind:               Z.literal('passkey'),
   /** Random id minted when the wayin is added. */
   wayin_id:                Z.string().check(Z.minLength(1)),
@@ -293,31 +293,32 @@ export const PasskeyWayin = Z.object({
   /** The vaultKey, wrapped under the passkeyKey: decrypting this IS the passkey check. */
   vault_key_wayin_wrapped: Ciphered,
 })
-export type PasskeyWayin = Z.infer<typeof PasskeyWayin>
+export type PasskeyWayinRecord = Z.infer<typeof PasskeyWayinRecord>
 
 /**
- * One way into a vault: the vaultKey, wrapped under a key that one {@link WayinKind} makes,
- * with the visible fields that kind needs. Told apart by `wayinkind`: a {@link PassphraseWayin}
- * or a {@link PasskeyWayin}.
+ * One way into a vault as stored: the vaultKey, wrapped under a key that one {@link WayinKind}
+ * makes, with the visible fields that kind needs. Told apart by `wayinkind`: a
+ * {@link PassphraseWayinRecord} or a {@link PasskeyWayinRecord}. The vault hands each out as a
+ * `Wayin`, made from its record by `Wayin.make`.
  */
-export const Wayin = Z.discriminatedUnion('wayinkind', [PassphraseWayin, PasskeyWayin])
-export type Wayin = Z.infer<typeof Wayin>
+export const WayinRecord = Z.discriminatedUnion('wayinkind', [PassphraseWayinRecord, PasskeyWayinRecord])
+export type WayinRecord = Z.infer<typeof WayinRecord>
 
 /** True when no two of `wayins` share `field`. */
-const distinctIn = (wayins: readonly Wayin[], field: 'wayin_id' | 'wayinlabel'): boolean => (
+const distinctIn = (wayins: readonly WayinRecord[], field: 'wayin_id' | 'wayinlabel'): boolean => (
   new Set(wayins.map((wayin) => wayin[field])).size === wayins.length
 )
 
 /** True when no two of `wayins`' passkeys are the same credential. */
-const distinctCredentials = (wayins: readonly Wayin[]): boolean => {
+const distinctCredentials = (wayins: readonly WayinRecord[]): boolean => {
   const credentialIds = wayins
-    .filter((wayin): wayin is PasskeyWayin => wayin.wayinkind === 'passkey')
+    .filter((wayin): wayin is PasskeyWayinRecord => wayin.wayinkind === 'passkey')
     .map((wayin) => wayin.credential_id)
   return new Set(credentialIds).size === credentialIds.length
 }
 
 /** The vault props' wayins: at least one, at most {@link MaxUnlocks}, no id, label or credential twice. */
-const wayinList = Z.array(Wayin).check(
+const wayinList = Z.array(WayinRecord).check(
   Z.minLength(1, "A vault has at least one way in"),
   Z.maxLength(MaxUnlocks, `A vault holds at most ${String(MaxUnlocks)} wayins`),
   Z.refine((wayins) => distinctIn(wayins, 'wayin_id'), "No two wayins share a wayin_id"),
@@ -340,21 +341,22 @@ const wayinList = Z.array(Wayin).check(
  * @example vault.getSnapshot().wayins.filter((wayin) => wayin.wayinkind === 'passkey') // [{ wayinkind: 'passkey', wayin_id, wayinlabel: 'laptop', device_id, registered_at, credential_id: 'AXk3...', prf_salt_b64: 'q83v...' }]
  */
 export type WayinSummary =
-  | Pick<PassphraseWayin, 'wayinkind' | 'wayin_id' | 'wayinlabel' | 'device_id' | 'registered_at'>
-  | Pick<PasskeyWayin, 'wayinkind' | 'wayin_id' | 'wayinlabel' | 'device_id' | 'registered_at' | 'credential_id' | 'prf_salt_b64'>
+  | Pick<PassphraseWayinRecord, 'wayinkind' | 'wayin_id' | 'wayinlabel' | 'device_id' | 'registered_at'>
+  | Pick<PasskeyWayinRecord, 'wayinkind' | 'wayin_id' | 'wayinlabel' | 'device_id' | 'registered_at' | 'credential_id' | 'prf_salt_b64'>
 
 /**
  * What a passkey answers when asked for a vault's PRF, as a host hands it to the vault: which
  * credential answered (`credentialId`, base64url, as `PublicKeyCredential.id` gives it), the salt
- * it was asked to evaluate (`prfSaltB64`), and its 32-byte answer (`prfBytes`). The bytes are
- * secret, as good as a passphrase for this vault: pass them to the vault, then drop them.
+ * it was asked to evaluate (`prfSaltB64`), and its 32-byte answer (`prfBytes`). The vault checks it
+ * into a `PasskeyProof` at its door. The bytes are secret, as good as a passphrase for this vault:
+ * pass them to the vault, then drop them.
  * `safebyok-react`'s `createPasskey` and `askPasskey` make one.
  *
  * @example
  *   const passkey = await askPasskey(vault.getSnapshot().wayins)   // null when the user dismissed it
  *   if (passkey !== null) { await vault.unlock(passkey) }
  */
-export type PasskeyProof = {
+export type PasskeyAnswer = {
   credentialId: string
   prfSaltB64:   string
   prfBytes:     Uint8Array
@@ -362,7 +364,7 @@ export type PasskeyProof = {
 
 /**
  * The per-vault record the storage layer holds so any device can unlock the vault: its scope,
- * its `vault_id`, and its `wayins`, each a {@link Wayin} wrapping the one vaultKey.
+ * its `vault_id`, and its `wayins`, each a {@link WayinRecord} wrapping the one vaultKey.
  * All of it is safe in the open; none of it opens without a passphrase or a passkey.
  *
  * `unlock_epoch` goes up by one on every change to the wayins -- a passphrase or passkey
@@ -379,7 +381,7 @@ export const VaultProps = Z.object({
   unlock_epoch:        Z.int().check(Z.positive()),
   /** Which vaultKey the wayins wrap: see {@link vaultKeyEpoch}. */
   vault_key_epoch:     vaultKeyEpoch,
-  /** The ways into the vault, each wrapping the one vaultKey: see {@link Wayin}. */
+  /** The ways into the vault, each wrapping the one vaultKey: see {@link WayinRecord}. */
   wayins:              wayinList,
   /** When the vault was made, an {@link EpochMillis}; never changed. */
   registered_at:       EpochMillis,

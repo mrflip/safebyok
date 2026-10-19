@@ -590,7 +590,11 @@ written down at home, one a partner holds. Each wraps the same vaultKey under it
 passphrase is ever stored, and adding or removing one rewrites no box. The snapshot lists
 them, locked or not, as `wayins`: each a `wayinkind` (`passphrase` or `passkey`), a `wayin_id`, the
 `wayinlabel` the user chose, and when it was added and by which device (`registered_at`,
-`device_id`).
+`device_id`). The vault's own `vault.wayins` holds the same ways in as `Wayin`s
+(`PassphraseWayin`, `PasskeyWayin`): each stored field its own, `summary` what the snapshot lists,
+and `props` the stored record, frozen. A way in stored in a form this package never writes
+cannot be tried, but the others still open the vault: the read that finds it succeeds, and
+`onBadNews` is told `damaged_wayin`, `meta.wayin_listed` naming it.
 
 ```ts
 vault.getSnapshot().wayins        // [{ wayinkind: 'passphrase', wayin_id: '1b9d...', wayinlabel: 'passphrase', device_id: 'k3x9...', registered_at: 1760000000000 }]
@@ -677,7 +681,7 @@ await zxcvbnPassphraseTest('skylarkpinecone', { applabel: 'skylark', user_id: 'u
 
 A vault's ways in may include passkeys: a fingerprint, a face, a phone or a security key, whose
 authenticator answers for the vault through the WebAuthn PRF extension. The core never calls
-WebAuthn: it takes the answer as a `PasskeyProof` (`{ credentialId, prfSaltB64, prfBytes }`),
+WebAuthn: it takes the answer as a `PasskeyAnswer` (`{ credentialId, prfSaltB64, prfBytes }`),
 which `safebyok-react`'s `createPasskey` and `askPasskey` make (they import no React, so any
 framework's host can use them).
 

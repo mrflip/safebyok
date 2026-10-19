@@ -697,8 +697,10 @@ describe("the vault's fields, by the Contract", () => {
     const snapshot = vault.getSnapshot()
     expect(vault.snapshot).to.eq(snapshot)
     for (const [field, shown] of Object.entries(snapshot)) {
+      if (field === 'wayins') { continue }
       expect(vault[field as keyof typeof snapshot], field).to.eq(shown)
     }
+    expect(vault.wayins.map((wayin) => wayin.summary)).to.deep.equal(snapshot.wayins)
     await vault.lock()
     expect(vault.state).to.eq('locked')
   })
@@ -718,12 +720,12 @@ describe("the vault's fields, by the Contract", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox('anthropic', 'sk-fake')
-    for (const field of ['state', 'boxes', 'wayins', 'capacity', 'trouble', 'vault_id', 'applabel', 'askPassphraseAt', 'snapshot', 'leaseMillis']) {
+    for (const field of ['state', 'boxes', 'wayins', 'props', 'capacity', 'trouble', 'vault_id', 'applabel', 'askPassphraseAt', 'snapshot', 'leaseMillis', 'logger', 'clock', 'keyDeriver']) {
       expect(Reflect.set(vault, field, null), field).to.be.false
     }
     expect(vault.state).to.eq('unlocked')
     const { snapshot } = vault
-    for (const part of [snapshot, snapshot.boxes, snapshot.boxes[0], snapshot.wayins, snapshot.wayins[0], snapshot.capacity, snapshot.capacity.boxes, snapshot.capacity.bytes]) {
+    for (const part of [snapshot, snapshot.boxes, snapshot.boxes[0], snapshot.wayins, snapshot.wayins[0], snapshot.props, snapshot.props?.wayins, snapshot.props?.wayins[0], snapshot.props?.wayins[0]?.vault_key_wayin_wrapped, snapshot.capacity, snapshot.capacity.boxes, snapshot.capacity.bytes]) {
       expect(Object.isFrozen(part)).to.be.true
     }
   })

@@ -4,7 +4,7 @@ import type { KeyDeriver } from '../../src/key-deriver'
 import { type PassphraseStrengthTest, StrongVerdict } from '../../src/passphrase-strength'
 import { memoryStore } from '../../src/string-store'
 import type { Box } from '../../src/box'
-import type { VaultScope, PassphraseWayin, PasskeyWayin, PasskeyProof, VaultProps, Sidecar, BoxSummary, DamagedBox, DeviceMark, SeenVault, Lease } from '../../src/types'
+import type { VaultScope, PassphraseWayinRecord, PasskeyWayinRecord, PasskeyAnswer, VaultProps, Sidecar, BoxSummary, DamagedBox, DeviceMark, SeenVault, Lease } from '../../src/types'
 import { stableJsonify } from '../../src/stable-jsonify'
 import { Vault } from '../../src/vault'
 import { type MakeVaultOpts } from '../../src/vault-opts'
@@ -30,6 +30,18 @@ export const testDeriver: KeyDeriver = {
     return new Uint8Array(await crypto.subtle.digest('SHA-256', joined))
   },
 }
+
+/**
+ * The slice of a vault a model reads -- its scope and its key deriver -- for a test that makes a
+ * `Wayin` or a `Proof` with no vault behind it: `userId`'s `main` vault, as {@link scopeOf} has
+ * it, deriving with `keyDeriver`.
+ *
+ * @example Wayin.make(TH.vaultSliceOf('u1'), TH.wayinOf('passphrase'), TH.vaultPropsOf('u1'))
+ * @example Proof.parse(TH.vaultSliceOf('u1', argon2idWebV1Deriver), 'pw')
+ */
+export const vaultSliceOf = (userId: string, keyDeriver: KeyDeriver = testDeriver): Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'keyDeriver'> => (
+  { ...scopeOf(userId), keyDeriver }
+)
 
 /**
  * A passphraseStrengthTest for tests, admitting every passphrase, so a suite may unlock with a
@@ -117,7 +129,7 @@ export const scopeOf = (userId: string, vaultlabel = 'main'): VaultScope => ({ a
  * @example wayinOf('passphrase')                                            // the one vaultPropsOf holds
  * @example wayinOf('home_phrase', { vault_key_wayin_wrapped: fakeCiphered('home') })
  */
-export const wayinOf = (wayinlabel: string, overrides: Partial<PassphraseWayin> = {}): PassphraseWayin => ({
+export const wayinOf = (wayinlabel: string, overrides: Partial<PassphraseWayinRecord> = {}): PassphraseWayinRecord => ({
   wayinkind:               'passphrase',
   wayin_id:                `wayin-${wayinlabel}`,
   wayinlabel,
@@ -139,7 +151,7 @@ export const wayinOf = (wayinlabel: string, overrides: Partial<PassphraseWayin> 
  * @example passkeyWayinOf('laptop')
  * @example vaultPropsOf('u1', { wayins: [wayinOf('passphrase'), passkeyWayinOf('laptop')] })
  */
-export const passkeyWayinOf = (wayinlabel: string, overrides: Partial<PasskeyWayin> = {}): PasskeyWayin => ({
+export const passkeyWayinOf = (wayinlabel: string, overrides: Partial<PasskeyWayinRecord> = {}): PasskeyWayinRecord => ({
   wayinkind:               'passkey',
   wayin_id:                `wayin-${wayinlabel}`,
   wayinlabel,
@@ -169,7 +181,7 @@ const digestOf = async (text: string): Promise<Uint8Array> => (
  * @example await vault.unlock(await passkeyOf('laptop'))
  * @example await passkeyOf('laptop', otherSaltB64)  // the same credential, answering another salt
  */
-export const passkeyOf = async (tag: string, prfSaltB64?: string): Promise<PasskeyProof> => {
+export const passkeyOf = async (tag: string, prfSaltB64?: string): Promise<PasskeyAnswer> => {
   const credentialId = toB64(new TextEncoder().encode(`cred-${tag}`))
   const saltB64 = prfSaltB64 ?? toB64(await digestOf(`salt-${tag}`))
   return { credentialId, prfSaltB64: saltB64, prfBytes: await digestOf(`${credentialId}:${saltB64}`) }

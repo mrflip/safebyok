@@ -16,8 +16,8 @@ is a bug.
   them, as the wider ecosystem does.
 * No barrel files beyond the package's entry points: import from the file that defines the thing.
 * **A module of related functions around one concern is imported whole**, under its Startcase
-  name: `import * as Wayin from './wayin'`, then `Wayin.open(...)`. Its functions are
-  vigorous verbs: `open`, not `wayinOpen`.
+  name: `import * as Names from './names'`, then `Names.check(...)`. Its functions are
+  vigorous verbs: `check`, not `namesCheck`.
 * **A module with one primary noun** is imported by name, its friends riding along:
   `import { Box, BoxKinds } from './box'`.
 * When a list of type imports grows cumbersome, import the types whole under a short name ending

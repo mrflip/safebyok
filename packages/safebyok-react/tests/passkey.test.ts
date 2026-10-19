@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { PasskeySaltBytes, VaultError, localVaultDB, memoryDeviceDB, memoryStore, type PasskeyProof, type WayinSummary, type VaultDB } from 'safebyok'
+import { PasskeySaltBytes, VaultError, localVaultDB, memoryDeviceDB, memoryStore, type PasskeyAnswer, type WayinSummary, type VaultDB } from 'safebyok'
 import { fromB64, toB64 } from 'safebyok/utils'
 import { askPasskey, createPasskey, passkeysAvailable } from '../src/passkey'
 import * as TH from './test-helpers'
@@ -19,7 +19,7 @@ const expectRefusal = async (operation: Promise<unknown>, kind: VaultError['refu
 }
 
 /** A passkey's way in as the snapshot lists it, for `proof`. */
-const summaryOf = (proof: PasskeyProof, wayinlabel: string): WayinSummary => ({
+const summaryOf = (proof: PasskeyAnswer, wayinlabel: string): WayinSummary => ({
   wayinkind: 'passkey', wayin_id: `wayin-${wayinlabel}`, wayinlabel, device_id: 'device-one', registered_at: Date.UTC(2026, 9, 15),
   credential_id: proof.credentialId, prf_salt_b64: proof.prfSaltB64,
 })

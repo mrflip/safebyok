@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { MaxUnlocks, type PasskeyProof, VaultScope } from '../../src/types'
+import { MaxUnlocks, type PasskeyAnswer, VaultScope } from '../../src/types'
 import { VaultError } from '../../src/errors'
 import { memoryDeviceDB } from '../../src/device-db'
 import { type MakeVaultOpts } from '../../src/vault-opts'
@@ -7,6 +7,7 @@ import { toB64 } from '../../src/crypto'
 import * as Ckeys from '../../src/ckeys'
 import type { PassphraseVerdict, PassphraseStrengthTest } from '../../src/passphrase-strength'
 import { zxcvbnPassphraseTest } from '../../src/zxcvbn-passphrase-test'
+import { PasskeyWayin, PassphraseWayin, Wayin } from '../../src/wayin'
 import * as TH from '../test-helpers'
 import { makeWorld, wayinlabelsOf, storedVaultPropsOf, vaultWithPasskey, SevenDaysMillis, u1VaultPropsCkey, storedWayinsOf, addLaptopPasskey } from './world'
 
@@ -343,7 +344,7 @@ describe("several passphrases", () => {
 // == [Passkeys]: answering, passkeys
 
 /** A passkey maker whose authenticator answers `answer`, whatever it is: for a test of what addPasskey refuses. */
-const answering = (answer: unknown) => () => Promise.resolve(answer as PasskeyProof)
+const answering = (answer: unknown) => () => Promise.resolve(answer as PasskeyAnswer)
 
 describe("passkeys", () => {
   it("addPasskey gives a way in that opens the vault on any device, with no key derivation", async () => {
@@ -483,7 +484,7 @@ describe("passkeys", () => {
   for (const [notMaker, blurb] of NotMakers) {
     it(`addPasskey refuses, as bad_option, ${blurb} in place of a passkey maker`, async () => {
       const { vault } = await vaultWithPasskey()
-      await TH.expectRefusal(vault.addPasskey('pw', notMaker as unknown as () => Promise<PasskeyProof>, { wayinlabel: 'phone' }), 'bad_option')
+      await TH.expectRefusal(vault.addPasskey('pw', notMaker as unknown as () => Promise<PasskeyAnswer>, { wayinlabel: 'phone' }), 'bad_option')
     })
   }
 
@@ -501,7 +502,7 @@ describe("passkeys", () => {
 
   it("a passkey's answer of the wrong shape is refused as misuse wherever it is a proof, never quoting it", async () => {
     const { vault, laptop } = await vaultWithPasskey()
-    const misshapen = { ...laptop, prfBytes: [...laptop.prfBytes] } as unknown as PasskeyProof
+    const misshapen = { ...laptop, prfBytes: [...laptop.prfBytes] } as unknown as PasskeyAnswer
     for (const refused of [vault.unlock(misshapen), vault.addPassphrase(misshapen, 'pw two', { wayinlabel: 'two' }), vault.delWayin(misshapen, 'wayin-gone')]) {
       const err = await TH.expectRefusal(refused, 'bad_option')
       expect(err.message).to.not.include(laptop.credentialId)
@@ -585,7 +586,7 @@ describe("passkeys", () => {
     const { vault, laptop } = await vaultWithPasskey()
     await TH.expectRefusal(vault.changePassphrase(laptop, ' '.repeat(3)), 'wrong_passphrase')
     await TH.expectRefusal(vault.changePassphrase(laptop, 42 as unknown as string), 'bad_option')
-    const misshapen = { ...laptop, prfBytes: [...laptop.prfBytes] } as unknown as PasskeyProof
+    const misshapen = { ...laptop, prfBytes: [...laptop.prfBytes] } as unknown as PasskeyAnswer
     const err = await TH.expectRefusal(vault.changePassphrase(misshapen, 'new pw'), 'bad_option')
     expect(err.message).to.not.include(laptop.prfBytes.join(','))
   })
@@ -752,6 +753,119 @@ describe("a new passphrase's strength", () => {
     const err = await TH.expectRefusal(broken.unlock('pw'), 'unexpected_error')
     expect(err.cause).to.eq(thrown)
     expect(world.dbStore.ckeys()).to.have.lengthOf(0)
+  })
+})
+// --
+
+// == [Ways in as models]: wayins, props, logger, clock, keyDeriver, damaged_wayin news
+
+/** A world whose `u1` vault stands with a passphrase and a second one, the second's salt spoiled in storage. */
+const damagedWayinWorld = async () => {
+  const world = makeWorld()
+  const vault = await world.openUnlocked('pw')
+  await vault.addPassphrase('pw', 'spare passphrase', { wayinlabel: 'spare' })
+  vault.close()
+  const stored = storedVaultPropsOf(world)
+  const [first, second] = storedWayinsOf(world)
+  world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...stored, wayins: [first, { ...second, salt_b64: 'c2FsdA' }] }))
+  return world
+}
+
+/** An onBadNews that keeps what it is told. */
+const newsKeeper = () => {
+  const told: VaultError[] = []
+  return { told, onBadNews: (news: VaultError) => { told.push(news) } }
+}
+
+describe("the vault's ways in, as models (Contract: Vault, Wayin)", () => {
+  it("lists each way in as a Wayin made from the vault props, its summary what the snapshot lists", async () => {
+    const { vault } = await vaultWithPasskey()
+    expect(vault.wayins.map((wayin) => wayin.constructor)).to.deep.equal([PassphraseWayin, PasskeyWayin])
+    expect(vault.wayins.every((wayin) => wayin instanceof Wayin && wayin.vault === vault)).to.be.true
+    expect(vault.wayins.map((wayin) => wayin.summary)).to.deep.equal(vault.getSnapshot().wayins)
+    expect(vault.wayins.map((wayin) => wayin.props)).to.deep.equal(vault.props?.wayins)
+  })
+
+  it("keeps the same Wayins until the vault props change", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    const before = vault.wayins
+    await vault.hello({ staleMinutes: 0 })
+    expect(vault.wayins).to.eq(before)
+    await vault.addPassphrase('pw', 'spare passphrase', { wayinlabel: 'spare' })
+    expect(vault.wayins).to.not.eq(before)
+    expect(vault.wayins).to.have.lengthOf(2)
+  })
+
+  it("has no ways in, and no props, until a read finds a vault", async () => {
+    const world = makeWorld()
+    const vault = await world.open()
+    expect(vault.wayins).to.deep.equal([])
+    expect(vault.props).to.be.null
+  })
+
+  it("shows the vault props as storage holds them, one frozen record (Contract: Vault)", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    expect(vault.props).to.deep.equal(storedVaultPropsOf(world))
+    expect(Object.isFrozen(vault.props)).to.be.true
+    expect(vault.props).to.eq(vault.getSnapshot().props)
+  })
+
+  it("lends its models its logger, its key deriver and a checked clock, none writable", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    expect(vault.keyDeriver).to.eq(TH.testDeriver)
+    expect(vault.logger).to.be.an('object')
+    expect(vault.clock.now()).to.eq(world.clock.now())
+    world.advance(5)
+    expect(vault.clock.now()).to.eq(world.clock.now())
+    for (const field of ['logger', 'clock', 'keyDeriver']) {
+      expect(Reflect.set(vault, field, null), field).to.be.false
+    }
+  })
+
+  it("tells a way in stored damaged as damaged_wayin news, its summary in meta.wayin_listed, and the read succeeds", async () => {
+    const world = await damagedWayinWorld()
+    const { told, onBadNews } = newsKeeper()
+    const vault = await world.open({ onBadNews, deviceDB: memoryDeviceDB() })
+    expect(vault.state).to.eq('locked')
+    expect(told.map((news) => news.refusalkind)).to.deep.equal(['damaged_wayin'])
+    expect(told[0]?.meta?.wayin_listed).to.deep.equal(vault.wayins[1]?.summary)
+    expect(told[0]?.family).to.eq('bad_news')
+    expect(vault.trouble).to.eq(told[0])
+    await vault.unlock('pw')
+    expect(vault.state).to.eq('unlocked')
+  })
+
+  it("tells a damaged way in once, not again at each read that finds it as it was", async () => {
+    const world = await damagedWayinWorld()
+    const { told, onBadNews } = newsKeeper()
+    const vault = await world.open({ onBadNews })
+    await vault.hello({ staleMinutes: 0 })
+    await vault.hello({ staleMinutes: 0 })
+    expect(told).to.have.lengthOf(1)
+    expect(vault.trouble).to.eq(told[0])
+  })
+
+  it("clears the trouble once a read finds the damaged way in gone", async () => {
+    const world = await damagedWayinWorld()
+    const { onBadNews } = newsKeeper()
+    const vault = await world.open({ onBadNews })
+    const spoiled = vault.wayins[1]?.wayin_id ?? ''
+    await vault.delWayin('pw', spoiled)
+    await vault.hello({ staleMinutes: 0 })
+    expect(vault.trouble).to.be.null
+    expect(vault.wayins).to.have.lengthOf(1)
+  })
+
+  it("never quotes a passphrase in the news, nor its salt", async () => {
+    const world = await damagedWayinWorld()
+    const { told, onBadNews } = newsKeeper()
+    await world.open({ onBadNews })
+    const said = JSON.stringify({ message: told[0]?.message, meta: told[0]?.meta })
+    expect(said).to.not.include('spare passphrase')
+    expect(said).to.not.include('c2FsdA')
   })
 })
 // --

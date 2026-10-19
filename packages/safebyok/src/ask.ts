@@ -1,5 +1,5 @@
 import type { Vault } from './vault'
-import type { PasskeyProof } from './types'
+import type { PasskeyAnswer } from './types'
 import { VaultError } from './errors'
 import { type Outcome, bad, outcomeOf, unexpectedError } from './outcome'
 
@@ -38,7 +38,7 @@ export type ProofAnswer = typeof ProofAnswerVals[number]
 export type GetProof = (ask: Ask) => ProofAnswer | Promise<ProofAnswer>
 
 /** The vault's own run of one proof, for {@link Ask}: its unlock, standing down once `overtaken` is aborted. */
-export type Attempter = (proof: string | PasskeyProof, opts: { wayinId?: string | undefined } | undefined, overtaken: AbortSignal) => Promise<Outcome<Vault>>
+export type Attempter = (proof: string | PasskeyAnswer, opts: { wayinId?: string | undefined } | undefined, overtaken: AbortSignal) => Promise<Outcome<Vault>>
 
 /**
  * One prompt, raised: the {@link Ask} handed to `getProof`, and the vault's handles on it. The
@@ -102,7 +102,7 @@ export class Ask {
    * @example const { ok, err } = await ask.attempt(passphrase)
    * @example const { ok } = await ask.attempt(passkey)   // from askPasskey(ask.vault.wayins)
    */
-  attempt = async (proof: string | PasskeyProof, opts?: { wayinId?: string | undefined }): Promise<Outcome<Vault>> => {
+  attempt = async (proof: string | PasskeyAnswer, opts?: { wayinId?: string | undefined }): Promise<Outcome<Vault>> => {
     if (this.#landed.signal.aborted) { return bad(lockLandedError()) }
     return await this.#attempter(proof, opts, this.#landed.signal)
   }
