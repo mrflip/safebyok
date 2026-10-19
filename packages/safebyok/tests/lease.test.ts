@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import * as Z from 'zod/mini'
 import { cipherCtx, makeBoxKey, makeVaultKey, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
 import { Lease, type LeaseHolder, type LeaseVault } from '../src/lease'
 import { MinuteMillis, type LeaseRecord } from '../src/types'
@@ -98,7 +99,7 @@ describe("Lease.grant", () => {
   ] as const) {
     it(`throws, as misuse, at ${blurb}: no lease record could hold it`, async () => {
       const { vault } = leaseVaultOf()
-      await expect(Lease.grant(vault, badHolder as LeaseHolder, await vaultKeyPairOf(), badDeadline as number)).rejects.toThrow()
+      await expect(Lease.grant(vault, badHolder as LeaseHolder, await vaultKeyPairOf(), badDeadline as number)).rejects.toThrow(Z.core.$ZodError)
     })
   }
 
