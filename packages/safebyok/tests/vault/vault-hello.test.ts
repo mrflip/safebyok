@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { VaultScope, StaleMinutes, MinuteMillis } from '../../src/types'
 import { VaultError, isVaultError } from '../../src/errors'
 import { memoryDeviceDB } from '../../src/device-db'
+import { localVaultDB } from '../../src/local-vault-db'
 import { Vault } from '../../src/vault'
 import { delDamagedVault, deviceTroubleAsConditions } from '../../src/del-damaged-vault'
 import { bad } from '../../src/outcome'
@@ -976,7 +977,102 @@ const reloadHeldAtUnwrap = async () => {
   return { world, vault, hello, other, release: unwrapping.release }
 }
 
-describe("a lease take-up the vault props outrun", () => {
+describe("a revocation read while a key is being taken up: a take-up, an unlock, a change to the ways in", () => {
+  it("stays locked when a take-up finishes while a refresh that has read a new epoch is still listing the boxes", async () => {
+    const world = makeWorld()
+    const before = await world.openUnlocked('pw')
+    before.close()
+    // Its own adapter over the same store, so that holding this device's listing holds no other's.
+    const other = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB(), vaultDB: localVaultDB({ store: world.dbStore }) })
+    const unwrapping = TH.holdNextCall(crypto.subtle, 'unwrapKey')
+    const vault = Vault.make(world.optsWith())
+    const hello = vault.hello()
+    await unwrapping.reached
+    const listing = TH.holdNextCall(world.vaultDB, 'listBoxes')
+    await other.changePassphrase('pw', 'pw-new')
+    // The change bell's refresh has read epoch 2, and waits on the listing.
+    await listing.reached
+    unwrapping.release()
+    await hello
+    listing.release()
+    await TH.eventually(() => vault.unlock_epoch === 2)
+    expect(vault.state).to.eq('locked')
+    await vault.hello({ staleMinutes: 0 })
+    expect(vault.state).to.eq('locked')
+    expect(await world.getLease()).to.be.null
+  })
+
+  it("leaves a later change elsewhere standing over this device's own change to the ways in, read as it notes its own", async () => {
+    const world = makeWorld()
+    // A device that hears no change bells: its reads are the test's to make.
+    const vault = await world.openUnlocked('pw', { vaultDB: world.deafVaultDB() })
+    const other = await world.open({ deviceDB: memoryDeviceDB() })
+    // The change's own read (two looks at the mark) passes; its note of the change, the third look, is held.
+    const noting = TH.makeGate()
+    const getMark = world.deviceDB.getMark.bind(world.deviceDB)
+    let marksRead = 0
+    vi.spyOn(world.deviceDB, 'getMark').mockImplementation(async (scope) => {
+      marksRead += 1
+      if (marksRead === 3) { await noting.pass() }
+      return await getMark(scope)
+    })
+    const changing = vault.changePassphrase('pw', 'pw-two')
+    await noting.reached
+    await other.unlock('pw-two')
+    await other.changePassphrase('pw-two', 'pw-three')
+    await vault.hello({ staleMinutes: 0 })
+    expect(vault.unlock_epoch).to.eq(3)
+    noting.release()
+    await changing
+    expect(vault.unlock_epoch).to.eq(3)
+    expect(vault.state).to.eq('locked')
+  })
+
+  it("leaves a change elsewhere standing over the vault this device just made, read as it notes its own", async () => {
+    const world = makeWorld()
+    const vault = await world.open({ vaultDB: world.deafVaultDB() })
+    const other = await world.open({ deviceDB: memoryDeviceDB() })
+    // The unlock's read of an absent vault and its look before the make pass; its note of the vault it made, the third look, is held.
+    const noting = TH.makeGate()
+    const getMark = world.deviceDB.getMark.bind(world.deviceDB)
+    let marksRead = 0
+    vi.spyOn(world.deviceDB, 'getMark').mockImplementation(async (scope) => {
+      marksRead += 1
+      if (marksRead === 3) { await noting.pass() }
+      return await getMark(scope)
+    })
+    const making = vault.tryUnlock('pw')
+    await noting.reached
+    await other.unlock('pw')
+    await other.changePassphrase('pw', 'pw-two')
+    await vault.hello({ staleMinutes: 0 })
+    expect(vault.unlock_epoch).to.eq(2)
+    noting.release()
+    await TH.expectBad(making, 'vault_locked')
+    expect(vault.unlock_epoch).to.eq(2)
+    expect(vault.state).to.eq('locked')
+  })
+
+  it("stays locked when an unlock proven against the old epoch finishes while a refresh erases the outdated lease", async () => {
+    const world = makeRacingWorld()
+    const vault = await world.openUnlocked('pw')
+    const other = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB(), vaultDB: localVaultDB({ store: world.dbStore }) })
+    const deriving = world.holdNextDerive()
+    const unlocking = vault.tryUnlock('pw')
+    await deriving.reached
+    const erasing = TH.holdNextCall(world.deviceDB, 'delLease')
+    await other.changePassphrase('pw', 'pw-new')
+    // The change bell's refresh has read epoch 2, dropped the key, and waits on the lease's erasure.
+    await erasing.reached
+    deriving.release()
+    await TH.expectBad(unlocking, 'vault_locked')
+    erasing.release()
+    await TH.eventually(() => vault.unlock_epoch === 2)
+    await vault.hello({ staleMinutes: 0 })
+    expect(vault.state).to.eq('locked')
+    expect(await world.getLease()).to.be.null
+  })
+
   it("stays locked when the passphrase changes on another device while a hello unwraps this device's lease", async () => {
     const { world, vault, hello, other, release } = await reloadHeldAtUnwrap()
     expect(vault.unlock_epoch).to.eq(1)

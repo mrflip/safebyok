@@ -1218,18 +1218,25 @@ export class Vault {
     const read = await damagedAs(this.#vaultDB.getVaultProps(this.#scope), damagedVaultProps)
     const fresh = read === null ? null : frozenVaultProps(read)
     const mark = fresh === null ? null : await this.#heedMark(fresh, { seenBefore, call: 'refresh' })
-    // A change to the wayins elsewhere (new epoch) or a deletion ends this device's unlock: the
-    // vaultKey in hand still works on old rows, but passing as current invites confusion. The
-    // key goes, and the lease, outdated by the same change, is discarded.
-    const outlived = this.#vaultKey !== null && this.#vaultProps !== UnreadVaultProps && this.#vaultProps !== null
-      && (fresh?.unlock_epoch !== this.#vaultProps.unlock_epoch || fresh.vault_id !== this.#vaultProps.vault_id)
-    if (outlived) {
+    const held = this.#vaultProps
+    // A change to the wayins (new epoch) or a deletion or remaking, here or elsewhere, ends this
+    // device's unlock, and wins by construction: the vault props it brings are taken up at once,
+    // with the key dropped and any take-up stood down, before any further wait. A take-up or an
+    // unlock finishing during one asks whether its vault props were outrun, and finds these. The
+    // lease, outdated by the same change, is discarded when a key was held.
+    if (held !== UnreadVaultProps && held !== null && (fresh?.unlock_epoch !== held.unlock_epoch || fresh.vault_id !== held.vault_id)) {
+      const wasUnlocked = this.#vaultKey !== null
+      this.#vaultProps = fresh
+      this.#deviceMark = mark
+      // Never another vault's boxes beside these vault props, should the listing below fail.
+      if (fresh?.vault_id !== held.vault_id) { this.#boxes = [] }
       this.#dropKey()
-      await this.#deviceDB.delLease(this.#scope)
+      if (wasUnlocked) { await this.#deviceDB.delLease(this.#scope) }
     }
     const listed = fresh === null ? [] : await this.#vaultDB.listBoxes(this.#scope)
     // Taken up together once all is read, so a read that fails partway leaves the snapshot's
-    // vault, mark and boxes as they stood: never a vault beside another's boxes.
+    // vault, mark and boxes as they stood (but for a revocation, taken up above): never a vault
+    // beside another's boxes.
     this.#vaultProps = fresh
     this.#deviceMark = mark
     const shown = this.#boxes
@@ -1581,8 +1588,12 @@ export class Vault {
       const seenBefore = this.#checkedMark(await this.#deviceDB.getMark(this.#scope))
       const settled = frozenVaultProps(await damagedAs(this.#vaultDB.ensureVaultProps(draft), damagedVaultProps))
       const mark = await this.#heedMark(settled, { seenBefore, call: 'unlock' })
-      this.#vaultProps = settled
-      this.#deviceMark = mark
+      // Vault props a read took up meanwhile are not put back: should they differ, the grant that
+      // follows finds these outrun, and takes nothing up.
+      if (this.#vaultProps === null || this.#vaultProps === UnreadVaultProps) {
+        this.#vaultProps = settled
+        this.#deviceMark = mark
+      }
       if (settled.vault_id === draft.vault_id) { return { standing: settled, transientKey, sessionKey } }
       // Another device created the vault between our look and our write: the settled vault props are
       // theirs, and this passphrase must prove itself against them like any other.
@@ -1635,8 +1646,13 @@ export class Vault {
     await this.#refreshOnStale(this.#vaultDB.putVaultProps(next, { vault_id: standing.vault_id, unlock_epoch: standing.unlock_epoch }), plan.call)
     // The change has landed, whatever happens now: what follows is this device's own, and a
     // failure of it is said through the logger, never thrown as though the change had not landed.
-    this.#deviceMark = await this.#raiseMarkAfter(next, plan.call)
-    this.#vaultProps = next
+    const raised = await this.#raiseMarkAfter(next, plan.call)
+    // A read that took up other vault props meanwhile -- this change's own, or a later one from
+    // elsewhere -- is not undone: should they differ from these, the grant below takes nothing up.
+    if (! this.#outrun(standing)) {
+      this.#deviceMark = raised
+      this.#vaultProps = next
+    }
     try {
       await this.#grantLease(proven, next, this.#deadlineFor(proof, 'revise'))
     } catch (err) {
