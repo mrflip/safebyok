@@ -54,8 +54,9 @@ const leaseCtxOf = (vault: LeaseVault, holder: LeaseHolder, askPassphraseAt: num
  * is that tradeoff, and `lock()` erases the lease at once.
  *
  * @example
- *   const lease = Lease.make(vault, valOf(await deviceDB.getLease(scope)))
- *   lease.ask_passphrase_at                // when the vault asks again
+ *   const record = valOf(await deviceDB.getLease(scope))   // null when this device holds none
+ *   const lease = Lease.make(vault, record)                 // once it is not null
+ *   lease.ask_passphrase_at               // when the vault asks again
  *   const { ok, val } = await lease.tryOpen(vaultProps)   // val: the vaultKey, to hold for the session
  */
 export class Lease {
@@ -109,7 +110,7 @@ export class Lease {
    * @param record - The lease as the device store keeps it.
    * @returns The lease.
    *
-   * @example const lease = Lease.make(vault, valOf(await deviceDB.getLease(scope)))
+   * @example const lease = Lease.make(vault, record)   // record: what deviceDB.getLease resolved, once it is not null
    * @example Lease.make(vault, { ...record, ask_passphrase_at: 'soon' })   // throws 'corrupt_record'
    * @example Lease.make(vault, { ...record, user_id: 'someone_else' })   // throws 'corrupt_record': another vault's
    */
