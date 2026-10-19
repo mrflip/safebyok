@@ -1,7 +1,7 @@
 import { isVaultError } from 'safebyok'
 
 /**
- * What a dialog does with a refusal an ask's `attempt` met, as the Contract's *getProof* groups
+ * What a dialog does with a refusal an ask's `attempt` met, as `Ask.attempt` groups
  * them: `in_place`, show its message beside the field and ask again (a wrong passphrase or
  * passkey, a weak new passphrase, and the ways in that cannot answer: a way in absent or damaged,
  * a passkey the browser cannot ask); `created_elsewhere`, show it as advice, empty the field and

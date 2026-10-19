@@ -67,7 +67,7 @@ const unlockedFor = (leaseMillis: number, creating: boolean): string => {
  * keeping nothing typed for the last. Taken away, it lets go: an attempt, a delete or advice still
  * under way finishes unheard, calling `onDone` no more and showing nothing. It calls `onDone` once.
  *
- * The refusals an attempt meets it handles as the Contract's *getProof* groups them. A wrong
+ * The refusals an attempt meets it handles as `Ask.attempt` groups them. A wrong
  * passphrase or passkey, a weak new passphrase, or a way in that cannot answer shows in the dialog
  * in place, in the vault's own calm words, through a live region a screen reader announces, and
  * the user may try again or cancel. A lock that won, storage out of reach, or any other refusal
@@ -343,7 +343,7 @@ const UnlockForm = ({ ask, onDone, allowStartOver, passphraseUsername, passphras
   if (startingOver && creating) { setStartingOver(false) }
   const askingStartOver = startingOver && ! creating
 
-  /** A refusal the user meets, as the Contract groups them: in place, as advice, closing the dialog, or misuse rethrown in render, for PassphraseModal's boundary. */
+  /** A refusal the user meets, as `attemptRefusalFlavor` groups them: in place, as advice, closing the dialog, or misuse rethrown in render, for PassphraseModal's boundary. */
   const meet = (err: unknown) => {
     const flavor = attemptRefusalFlavor(err)
     if (flavor === 'created_elsewhere') {
