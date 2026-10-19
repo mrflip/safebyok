@@ -87,6 +87,28 @@ describe("Lease.grant", () => {
     const unwrapped = await unwrapKeyUnder(lease.lease_key, lease.vault_key_lease_wrapped, leaseCtx, { extractable: false, usage: ['wrapKey'] })
     expect(unwrapped).to.be.instanceOf(CryptoKey)
   })
+  for (const [badHolder, badDeadline, blurb] of [
+    [holder, NaN, 'a deadline that is no number'],
+    [holder, Infinity, 'an infinite deadline'],
+    [holder, Deadline + 0.5, 'a deadline in part-milliseconds'],
+    [holder, 'soon', 'a deadline that is a string'],
+    [{ vault_id: '', unlock_epoch: 3 }, Deadline, 'a holder with an empty vault_id'],
+    [{ vault_id: 'vault-id-u1', unlock_epoch: 0 }, Deadline, 'a holder at unlock_epoch 0'],
+    [{ vault_id: 'vault-id-u1' }, Deadline, 'a holder with no unlock_epoch'],
+  ] as const) {
+    it(`throws, as misuse, at ${blurb}: no lease record could hold it`, async () => {
+      const { vault } = leaseVaultOf()
+      await expect(Lease.grant(vault, badHolder as LeaseHolder, await vaultKeyPairOf(), badDeadline as number)).rejects.toThrow()
+    })
+  }
+
+  it("takes whole vault props as its holder, keeping only their vault_id and unlock_epoch", async () => {
+    const { vault } = leaseVaultOf()
+    const vaultProps = TH.vaultPropsOf('u1', { vault_id: 'vault-id-u1', unlock_epoch: 3 })
+    const lease = await Lease.grant(vault, vaultProps, await vaultKeyPairOf(), Deadline)
+    expect(lease.vault_id).to.eq('vault-id-u1')
+    expect(lease.unlock_epoch).to.eq(3)
+  })
 })
 
 describe("Lease.make", () => {
@@ -246,13 +268,6 @@ describe("lease.endsWithin", () => {
     setNow(NaN)
     expect(lease.endsWithin(0)).to.be.true
     await TH.expectBad(lease.tryOpen(holder), 'vault_locked')
-  })
-
-  it("counts a lease granted with a deadline that is no number as ended", async () => {
-    const { vault } = leaseVaultOf()
-    const lease = await Lease.grant(vault, holder, await vaultKeyPairOf(), NaN)
-    expect(lease.endsWithin(0)).to.be.true
-    expect(lease.endsWithin(HourMillis)).to.be.true
   })
 
   it("reads the vault's clock at each call, never a time it kept", async () => {

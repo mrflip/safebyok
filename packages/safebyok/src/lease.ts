@@ -2,6 +2,7 @@ import { cipherCtx, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder, type Ciphered } 
 import { VaultError } from './errors'
 import { sameScope } from './names'
 import { type Outcome, bad, good } from './outcome'
+import * as Z from 'zod/mini'
 import { LeaseRecord, type VaultProps } from './types'
 import { decorate } from './utils'
 import type { Vault } from './vault'
@@ -38,6 +39,12 @@ const SessionUsage = { extractable: false, usage: ['wrapKey', 'unwrapKey'] } as 
  * The ctx a lease's wrap is bound to: the scope of `vault`, the `vault_id` and `unlock_epoch` of
  * `holder`, the deadline, and the purpose. Every field of the record but the leaseKey and the wrap.
  */
+/** What {@link Lease.grant} is handed beside the vaultKey, held to what its record will hold. */
+const GrantArgs = Z.object({
+  holder:          Z.pick(LeaseRecord, { vault_id: true, unlock_epoch: true }),
+  askPassphraseAt: LeaseRecord.shape.ask_passphrase_at,
+})
+
 const leaseCtxOf = (vault: LeaseVault, holder: LeaseHolder, askPassphraseAt: number): Uint8Array => (
   cipherCtx(LeaseFormat, vault.applabel, vault.user_id, vault.vaultlabel, holder.vault_id, holder.unlock_epoch, askPassphraseAt, 'vault_key_lease_wrapped')
 )
@@ -130,7 +137,9 @@ export class Lease {
    * so not even this code can export it, and the vaultKey's extractable handle wrapped under it,
    * bound to the lease's ctx, and not kept. Writes nothing: the vault puts the record (`props`)
    * in the device store, in place of any before, and computes `askPassphraseAt` from its clock
-   * and `leaseHours`. Refuses nothing of its own.
+   * and `leaseHours`. Throws a Zod error, as misuse, for a `holder` or `askPassphraseAt` that a
+   * lease record could not hold (`LeaseRecord`'s checks): the vault hands it only what it read
+   * and computed.
    *
    * @param vault - The vault it is for: its scope is bound into the wrap.
    * @param holder - The vault props the vaultKey was proven against: their `vault_id` and `unlock_epoch` are bound into the wrap.
@@ -140,7 +149,8 @@ export class Lease {
    *
    * @example const lease = await Lease.grant(vault, vaultProps, opened, now + vault.leaseMillis)
    */
-  static async grant(vault: LeaseVault, holder: LeaseHolder, vaultKeyPair: VaultKeyPair, askPassphraseAt: number): Promise<Lease> {
+  static async grant(vault: LeaseVault, givenHolder: LeaseHolder, vaultKeyPair: VaultKeyPair, givenAskPassphraseAt: number): Promise<Lease> {
+    const { holder, askPassphraseAt } = GrantArgs.parse({ holder: givenHolder, askPassphraseAt: givenAskPassphraseAt })
     const leaseKey = await makeLeaseKey()
     const wrapped = await wrapKeyUnder(leaseKey, vaultKeyPair.transientKey, leaseCtxOf(vault, holder, askPassphraseAt))
     return new Lease(vault, {
