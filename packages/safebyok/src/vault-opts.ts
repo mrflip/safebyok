@@ -1,5 +1,5 @@
 import * as Z from 'zod/mini'
-import { type Clock, type VaultScope, MaxWhisperBytes, MinuteMillis, MaxLeaseHours, LeaseHours, ForeverMillis, wallClock, FarPast, FarFuture, MaxBoxes } from './types'
+import { type Clock, type VaultScope, MaxWhisperBytes, MinuteMillis, MaxLeaseHours, LeaseHours, StaleMinutes, ForeverMillis, wallClock, FarPast, FarFuture, MaxBoxes } from './types'
 import type { VaultValidators } from './validators'
 import { VaultError } from './errors'
 import type { KeyDeriver } from './key-deriver'
@@ -9,6 +9,12 @@ import { VaultDB } from './vault-db'
 import { type VaultLogger, parseLogger } from './logger'
 import { type PassphraseStrengthTest, checkStrengthTest } from './passphrase-strength'
 import * as Names from './names'
+
+/**
+ * What `onBadNews` is: told each piece of bad news, a VaultError, and never awaited. One that
+ * returns a promise may: what it rejects with is kept as the vault's `trouble`, as a throw is.
+ */
+export type BadNewsHandler = (news: VaultError) => void | Promise<void>
 
 export type MakeVaultOpts = {
   /** The host application's namespace: one backend can serve several apps without collision. */
@@ -46,6 +52,29 @@ export type MakeVaultOpts = {
    * which is not supported (`notes/wontfix.md`): the lower one wins.
    */
   leaseHours?: number | undefined
+  /**
+   * How many minutes `hello()` trusts the vault's last read of storage, when its own call says
+   * nothing: a hello within that many minutes of the last read reads nothing anew, and only
+   * settles the picture it has. Default: {@link StaleMinutes}, 1. Any number from zero up,
+   * fractions too (0.5 is thirty seconds); `0` has every hello read, and `Infinity` has a hello
+   * read only when no read has succeeded yet, or what it read may no longer stand. Kind
+   * 'bad_option' for anything else.
+   */
+  staleMinutes?: number | undefined
+  /**
+   * Told every piece of bad news the vault learns, before the call that learned it settles: each
+   * refusal of the `bad_news` family (`damaged_vault`, `rolled_back`, `identity_revoked`,
+   * `newer_format`, `damaged_box`, `damaged_wayin`), once, whichever calls share it; and a box a
+   * listing shows damaged, the first time it shows so, as `damaged_box` news whose `meta.box_listed`
+   * is the box, though the listing itself succeeds. It changes nothing the caller gets: a refusal
+   * still reaches its caller. The vault never awaits it; whatever it throws, or the promise it
+   * returns rejects with, becomes the vault's `trouble` (kind 'bad_option', what it threw the
+   * cause), and goes to the logger and to the platform's `reportError` where there is one. Kind
+   * 'bad_option' for anything but a function.
+   *
+   * @example Vault.make({ ...opts, onBadNews: (news) => { telemetry.report(news.refusalkind) } })
+   */
+  onBadNews?: BadNewsHandler | null | undefined
   /**
    * Time source for expiry and for the times stored with each record; tests inject one. Default:
    * the wall clock. Its `now()` returns epoch milliseconds, as `Date.now()` does, from 1981 to 2255
@@ -128,7 +157,9 @@ const makeVaultOptsShape = Z.strictObject({
   deviceDB:               anyOpt,
   keyDeriver:             anyOpt,
   leaseHours:             anyOpt,
-  clock:                  anyOpt,
+  staleMinutes:           anyOpt,
+  onBadNews:              anyOpt,
+  clock:                anyOpt,
   maxWhisperBytes:        anyOpt,
   maxBoxes:               anyOpt,
   logger:                 anyOpt,
@@ -291,6 +322,40 @@ export const parseLeaseHours = (candidate: number | undefined): number => {
   return checked.data
 }
 
+/**
+ * Minutes, as the host thinks of them, to whole milliseconds: zero or more, or `Infinity`, which
+ * becomes {@link ForeverMillis}.
+ */
+const someMinutes = Z.union([Z.number().check(Z.gte(0)), Z.literal(Infinity)])
+
+const minutesToMillis = Z.transform((minutes: number) => (minutes === Infinity ? ForeverMillis : Math.round(minutes * MinuteMillis)))
+
+const staleMinutesAsMillis = Z.pipe(Z._default(someMinutes, StaleMinutes), minutesToMillis)
+
+/**
+ * `staleMinutes`, as Vault.make or `hello()` is handed it, in the milliseconds the vault keeps:
+ * `fallback` when it is left out. Kind 'bad_option', naming `where`, for anything but zero or more
+ * minutes, or `Infinity`.
+ *
+ * @example parseStaleMinutes(0.5, 'Vault.make')   // 30000
+ */
+export const parseStaleMinutes = (candidate: unknown, where: 'Vault.make' | 'hello'): number => {
+  const checked = staleMinutesAsMillis.safeParse(candidate)
+  if (! checked.success) {
+    throw new VaultError('bad_option', `${where}'s staleMinutes is a number of minutes, zero or more, fractions too (0.5 is thirty seconds), or Infinity: how long a hello trusts the last read of storage before it reads again.`)
+  }
+  return checked.data
+}
+
+/** The `onBadNews` handler, or null for none. Kind 'bad_option' for anything but a function. */
+export const parseOnBadNews = (candidate: unknown): BadNewsHandler | null => {
+  if (candidate === undefined || candidate === null) { return null }
+  if (typeof candidate !== 'function') {
+    throw new VaultError('bad_option', 'onBadNews is a function the vault calls with each piece of bad news, a VaultError: pass one, or leave it out.')
+  }
+  return candidate as BadNewsHandler
+}
+
 /** What a Clock must carry. Checked only: Vault.make keeps the clock it was handed, and checks each reading. */
 const clockShape = Z.object({
   now: Z.custom<Clock['now']>((candidate) => typeof candidate === 'function'),
@@ -422,6 +487,8 @@ export type ParsedVaultOpts = {
   vaultDB:          VaultDB
   deviceDB:         DeviceDB
   leaseMillis:      number
+  staleMillis:      number
+  onBadNews:        BadNewsHandler | null
   logger:           VaultLogger
   clock:            Clock
   keyDeriver:       KeyDeriver
@@ -448,6 +515,8 @@ export const parseMakeVaultOpts = (opts: MakeVaultOpts): ParsedVaultOpts => {
   const vaultDB = parseVaultDB(opts.vaultDB)
   const deviceDB = parseDeviceDB(opts.deviceDB)
   const leaseMillis = parseLeaseHours(opts.leaseHours)
+  const staleMillis = parseStaleMinutes(opts.staleMinutes, 'Vault.make')
+  const onBadNews = parseOnBadNews(opts.onBadNews)
   // The host's logger for the vault, else the one its storage was made with; guarded either way.
   const logger = parseLogger(opts.logger ?? vaultDB.logger)
   const clock = parseClock(opts.clock)
@@ -459,7 +528,7 @@ export const parseMakeVaultOpts = (opts: MakeVaultOpts): ParsedVaultOpts => {
   const whisperByteLimit = parseMaxWhisperBytes(opts.maxWhisperBytes)
   const boxLimit = parseMaxBoxes(opts.maxBoxes, parseDeclared(vaultDB, 'maxBoxes'))
   const vaultByteLimit = checkLimitsFit(vaultDB, whisperByteLimit, boxLimit)
-  return { scope, rules, vaultDB, deviceDB, leaseMillis, logger, clock, keyDeriver, strengthTest, whisperByteLimit, boxLimit, vaultByteLimit }
+  return { scope, rules, vaultDB, deviceDB, leaseMillis, staleMillis, onBadNews, logger, clock, keyDeriver, strengthTest, whisperByteLimit, boxLimit, vaultByteLimit }
 }
 
 /**

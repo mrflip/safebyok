@@ -384,7 +384,7 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
                 ref={fieldRef}
                 creating={creating}
                 takesFocus={! passkeyFirst}
-                username={passphraseUsername ?? Messages.passphraseUsername(snapshot.scope.user_id, snapshot.scope.vaultlabel)}
+                username={passphraseUsername ?? Messages.passphraseUsername(snapshot.user_id, snapshot.vaultlabel)}
                 advice={creating && passphraseAdvice !== undefined ? advice.said : undefined}
                 onChange={hearPassphrase}
               />

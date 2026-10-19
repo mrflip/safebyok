@@ -16,8 +16,8 @@ export type VaultContextShape = {
    */
   vault: Vault | null
   /**
-   * Why the vault could not be opened, when it is a condition the app can show in place: the
-   * snapshot's `trouble` while the vault is still `opening`, its hello refused by storage that
+   * Why the vault could not be opened, when it is a condition the app can show in place: what
+   * the provider's own `hello()` was refused with, while the vault is still `opening` -- storage that
    * cannot be reached (`storage_unavailable`), a user storage no longer serves
    * (`identity_revoked`, as when signed out of the backend, or not yet signed in to it), a vault
    * whose stored props fail their checks (`damaged_vault`), a browser that will not let the app
@@ -92,22 +92,27 @@ export const useVault = (): VaultContextShape => {
   return shape
 }
 
-const emptySnapshot: VaultSnapshot = {
-  state:           'opening',
-  scope:           { applabel: 'none', user_id: 'none', vaultlabel: 'none' },
-  boxes:           [],
-  askPassphraseAt: null,
+const emptySnapshot: VaultSnapshot = Object.freeze({
+  applabel:        'none',
+  user_id:         'none',
+  vaultlabel:      'none',
+  vault_id:        null,
+  registered_at:   null,
+  unlock_epoch:    null,
+  vault_key_epoch: null,
   wayins:          [],
-  syncing:         true,
+  state:           'opening',
+  boxes:           [],
+  capacity:        { boxes: { used: 0, max: 0 }, bytes: { used: 0, max: 0 } },
+  askPassphraseAt: null,
   trouble:         null,
-}
+  syncing:         true,
+})
 const getEmptySnapshot = () => emptySnapshot
-const getNoTrouble = () => null
+const getNotOpening = () => false
 
-/** What the provider hands down as `openError`: the snapshot's trouble while the vault is still opening, when it is a condition. */
-const openErrorOf = (snapshot: VaultSnapshot): VaultError | null => (
-  snapshot.state === 'opening' && isVaultCondition(snapshot.trouble) ? snapshot.trouble : null
-)
+/** The scope of `vault`, as the strength test is handed it. */
+const scopeOf = (vault: Vault): VaultScope => ({ applabel: vault.applabel, user_id: vault.user_id, vaultlabel: vault.vaultlabel })
 const unsubscribeFromNothing = () => { /* nothing was heard */ }
 const subscribeToNothing = () => unsubscribeFromNothing
 
@@ -129,7 +134,7 @@ export const useVaultSnapshot = (): VaultSnapshot => {
  * the `keyDeriver`, `deviceDB` and `passphraseStrengthTest` Vault.make asks for. The vault reopens whenever an option changes
  * identity, so build each once -- at module level, or memoized -- never inline in the props; each
  * schema in `validators` likewise, though the bag around them may be built in render, as the
- * provider watches each schema rather than the bag. A `logger`, `clock` or
+ * provider watches each schema rather than the bag. A `logger`, `clock`, `onBadNews` or
  * `passphraseStrengthTest` that changes identity is warned of once, through the logger. The
  * provider and the vault it opens say things through one logger: the `logger` given here, else
  * the one the `vaultDB` was made with (the default logger when it was given none).
@@ -195,9 +200,10 @@ const adviceFrom = (strengthTest: PassphraseStrengthTest, scope: VaultScope): Pa
  * when an action run through withUnlockedVault finds the vault locked. The dialog is unstyled markup under the
  * `modal-scrim` / `modal` class names; the host's stylesheet dresses it.
  *
- * If the vault's `hello()` is refused with a condition (`isVaultCondition` from safebyok) --
- * storage that cannot be reached, a signed-out user, a damaged record, a browser withholding
- * storage -- the snapshot keeps it as its `trouble`, and the provider hands it down as
+ * The provider says the vault's first `hello()` itself, in the effect that makes the vault, as
+ * `Vault.make` reads nothing. If it is refused with a condition (`isVaultCondition` from safebyok)
+ * -- storage that cannot be reached, a signed-out user, a damaged record, a browser withholding
+ * storage -- the provider keeps the refusal, while the vault is still opening, and hands it down as
  * `openError`, for the app to show in place, beside a `retryOpen` button where a retry may mend
  * it (not `storage_blocked`). Misuse -- a bad label or option, which `Vault.make` throws, or a
  * hello refused as misuse or with a value that is no VaultError at all -- the provider throws
@@ -210,7 +216,7 @@ const adviceFrom = (strengthTest: PassphraseStrengthTest, scope: VaultScope): Pa
  *   </VaultProvider>
  */
 export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, passphraseAdvice, children, ...opts }: VaultProviderProps) => {
-  const { applabel, vaultlabel, vaultDB, deviceDB, leaseHours, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, validators, passphraseStrengthTest, ...unlisted } = opts
+  const { applabel, vaultlabel, vaultDB, deviceDB, leaseHours, staleMinutes, onBadNews, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, validators, passphraseStrengthTest, ...unlisted } = opts
   // Each prop Vault.make does not take, by name -- a misspelling, a deleted name -- handed on to it,
   // so it is refused, to the error boundary, rather than dropped here unseen.
   const unlistedJson = JSON.stringify(Object.keys(unlisted))
@@ -237,29 +243,34 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
   const askingRounds = useRef(0)
   // Wrapped, so that a rejection carrying any value at all (null, say) still reads as "failed".
   const [openFailure, setOpenFailure] = useState<{ err: unknown } | null>(null)
-  // The vault's own word on why its hello failed, read so the provider renders only when that changes.
-  const readOpenError = useCallback(() => (vault === null ? null : openErrorOf(vault.getSnapshot())), [vault])
-  const openError = useSyncExternalStore(vault === null ? subscribeToNothing : vault.subscribe, vault === null ? getNoTrouble : readOpenError)
+  // What the provider's last hello of each vault was refused with, a condition; null once one succeeds.
+  const [helloRefusal, setHelloRefusal] = useState<{ vault: Vault, err: VaultError } | null>(null)
+  // Whether the vault is still opening, read so the provider renders only when that changes.
+  const readOpening = useCallback(() => vault?.getSnapshot().state === 'opening', [vault])
+  const opening = useSyncExternalStore(vault === null ? subscribeToNothing : vault.subscribe, vault === null ? getNotOpening : readOpening)
+  // A refusal says why the vault is not open only while it is not: a ring from storage that settles it clears it.
+  const openError = opening && helloRefusal !== null && helloRefusal.vault === vault ? helloRefusal.err : null
   // Settled once for each logger and vaultDB, so the provider and every vault it opens share it.
   const heardBy = useMemo(() => settleLogger(logger, vaultDB), [logger, vaultDB])
-  // The logger, clock and strength test the last render had, and whether a change of any was warned of yet.
-  const sinks = useRef({ logger, clock, passphraseStrengthTest })
+  // The logger, clock, handler and strength test the last render had, and whether a change of any was warned of yet.
+  const sinks = useRef({ logger, clock, onBadNews, passphraseStrengthTest })
   const toldOfSinks = useRef(false)
 
-  // A logger, clock or strength test written inline in the props is new at every render, and
-  // reopens the vault each time: said once, the first time any changes.
+  // A logger, clock, handler or strength test written inline in the props is new at every render,
+  // and reopens the vault each time: said once, the first time any changes.
   useEffect(() => {
     const last = sinks.current
-    sinks.current = { logger, clock, passphraseStrengthTest }
+    sinks.current = { logger, clock, onBadNews, passphraseStrengthTest }
     const changed = [
       ...(last.logger === logger ? [] : ['logger']),
       ...(last.clock === clock ? [] : ['clock']),
+      ...(last.onBadNews === onBadNews ? [] : ['onBadNews']),
       ...(last.passphraseStrengthTest === passphraseStrengthTest ? [] : ['passphraseStrengthTest']),
     ]
     if (toldOfSinks.current || changed.length === 0) { return }
     toldOfSinks.current = true
     heardBy?.warn(`VaultProvider reopened the vault because its ${changed.join(' and ')} changed identity between renders. Written inline in the props, it is new at every render, and reopens the vault each time: define it once, outside the component, or memoize it.`, { call: 'VaultProvider', props: changed })
-  }, [logger, clock, passphraseStrengthTest, heardBy])
+  }, [logger, clock, onBadNews, passphraseStrengthTest, heardBy])
 
   /** Closes `ending` if it is still the dialog showing, and settles every action waiting on it. */
   const endAsking = useCallback((ending: Asking | null, unlocked: boolean) => {
@@ -272,17 +283,24 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
   }, [])
 
   /**
-   * Has `made` say hello, again when retried: a refusal that is misuse, or no VaultError at all, goes
-   * to the error boundary; a condition is the snapshot's trouble already, which openError reads.
-   * Nothing is heard from a vault the provider has let go.
+   * Has `made` say hello, again when retried: the provider owns the vault's first hello. A refusal
+   * that is a condition is kept for openError, until a hello succeeds; one that is misuse, or no
+   * VaultError at all, goes to the error boundary. Nothing is heard from a vault the provider has
+   * let go.
    */
   const sayHello = useCallback(async (made: Vault) => {
     try {
       await made.hello()
     } catch (err) {
-      if (vaultRef.current !== made || isVaultCondition(err)) { return }
+      if (vaultRef.current !== made) { return }
+      if (isVaultCondition(err)) {
+        setHelloRefusal({ vault: made, err })
+        return
+      }
       setOpenFailure({ err })
+      return
     }
+    if (vaultRef.current === made) { setHelloRefusal(null) }
   }, [])
 
   useEffect(() => {
@@ -291,7 +309,7 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
     // option is ever added and not passed through.
     const checks = { applabel: applabelCheck, vaultlabel: vaultlabelCheck, boxlabel: boxlabelCheck, userId: userIdCheck, wayinlabel: wayinlabelCheck } satisfies Record<keyof VaultValidators, unknown>
     const refusable = Object.fromEntries((JSON.parse(unlistedJson) as string[]).map((ckey) => [ckey, undefined]))
-    const makeOpts = { ...refusable, applabel, vaultlabel, userId, vaultDB, deviceDB, leaseHours, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger: heardBy ?? logger, validators: checks, passphraseStrengthTest } satisfies Record<keyof MakeVaultOpts, unknown>
+    const makeOpts = { ...refusable, applabel, vaultlabel, userId, vaultDB, deviceDB, leaseHours, staleMinutes, onBadNews, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger: heardBy ?? logger, validators: checks, passphraseStrengthTest } satisfies Record<keyof MakeVaultOpts, unknown>
     // The handle is this effect's to make and to close, and the render hands it down: so the state
     // is set here, once per handle, as Vault.make answers at once.
     let made: Vault | null = null
@@ -315,8 +333,9 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
       made?.close()
       setVault(null)
       setOpenFailure(null)
+      setHelloRefusal(null)
     }
-  }, [userId, applabel, vaultlabel, vaultDB, deviceDB, leaseHours, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, heardBy, passphraseStrengthTest, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, wayinlabelCheck, unlistedJson, endAsking, sayHello])
+  }, [userId, applabel, vaultlabel, vaultDB, deviceDB, leaseHours, staleMinutes, onBadNews, clock, keyDeriver, maxWhisperBytes, maxBoxes, logger, heardBy, passphraseStrengthTest, applabelCheck, vaultlabelCheck, boxlabelCheck, userIdCheck, wayinlabelCheck, unlistedJson, endAsking, sayHello])
 
   const retryOpen = useCallback(() => {
     if (vault !== null && openError !== null) { void sayHello(vault) }
@@ -406,7 +425,7 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
           vault={asking.vault}
           allowStartOver={allowStartOver}
           passphraseUsername={passphraseUsername}
-          passphraseAdvice={passphraseAdvice ?? adviceFrom(passphraseStrengthTest, asking.vault.getSnapshot().scope)}
+          passphraseAdvice={passphraseAdvice ?? adviceFrom(passphraseStrengthTest, scopeOf(asking.vault))}
           onDone={(unlocked) => { endAsking(asking, unlocked) }}
         />
       )}

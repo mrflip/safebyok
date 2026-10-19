@@ -712,10 +712,10 @@ describe("a new passphrase's strength", () => {
     }
     const vault = await world.open({ passphraseStrengthTest: strengthTest })
     await vault.unlock('pw')
-    expect(heard[0]).to.eq(vault.getSnapshot().scope)
-    expect(Object.isFrozen(vault.getSnapshot().scope)).to.be.true
-    expect(() => { Object.assign(vault.getSnapshot().scope, { user_id: 'u2' }) }).to.throw(TypeError)
-    expect(vault.getSnapshot().scope).to.deep.equal(TH.scopeOf('u1'))
+    expect(Object.isFrozen(heard[0])).to.be.true
+    expect(() => { Object.assign(heard[0] ?? {}, { user_id: 'u2' }) }).to.throw(TypeError)
+    expect(heard[0]).to.deep.equal(TH.scopeOf('u1'))
+    expect(vault.getSnapshot()).to.deep.include(TH.scopeOf('u1'))
   })
 
   it("refuses a weak passphrase at addPassphrase and changePassphrase before any key derivation, changing nothing", async () => {

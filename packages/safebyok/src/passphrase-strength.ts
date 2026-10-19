@@ -27,7 +27,7 @@ export type PassphraseVerdict = { strong: true } | { strong: false, reason: stri
  * replace it, or wrap it to ask for more.
  *
  * @example
- *   const verdict = await passphraseStrengthTest(typed, vault.getSnapshot().scope)
+ *   const verdict = await passphraseStrengthTest(typed, { applabel: vault.applabel, user_id: vault.user_id, vaultlabel: vault.vaultlabel })
  *   setHint(verdict.strong ? '' : verdict.reason)
  */
 export type PassphraseStrengthTest = (passphrase: string, scope: VaultScope) => PassphraseVerdict | Promise<PassphraseVerdict>

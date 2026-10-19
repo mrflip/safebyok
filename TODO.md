@@ -175,23 +175,14 @@ the vault). The Coach: "Yes add to TODO: version number on box." Give boxes a "n
 touch" state like the vault's `newer_format`: the format tag read as a version, so that a newer
 box lists as one to leave alone and an older, unreadable one still lists as damaged.
 
-## hello, make and the react lifecycle
+## The react lifecycle
 
-The Coach (2026-10-18), on the make_hello sprint's review: "This sounds like a design issue, sweep
-to a todo section for all of the below, hello and make and react lifecycle." Four behaviours that
-came with `Vault.make` and `hello()` ([#166](https://github.com/mrflip/safebyok/pull/166)); each
-works as built, and a redesign of the lifecycle may change all four.
+`Vault.make` touches nothing, and `VaultProvider` owns the vault's first `hello()`, in the effect
+that makes the vault (the contract sprint, thread A3). `lock()` and `close()` acting without
+waiting for a hello is *Lock timing vs. work in flight*'s; a refused hello keeping its handle for a
+retry, and React's handle being non-null while `opening`, stand as designed. One item is open, for
+the provider's rework (A5, which makes the vault from props):
 
-* **`lock()` and `close()` don't wait for `hello()`.** Every other method waits for storage to
-  answer first; these two act at once. A lock made while `hello()` runs no longer wins over taking
-  up the lease (*Lock timing vs. work in flight*, scenario 1). `del()` waits. (#166, thread 8)
-* **A failed `hello()` keeps the handle alive.** A refused `hello()` no longer closes the storage
-  watch, so the same handle can retry; after an untrusted-storage refusal the next call meets that
-  refusal again rather than `vault_locked`. (#166, thread 8)
-* **React's vault is non-null while opening.** `VaultProvider` hands down the handle at once, in
-  state `opening`; `openError` comes from the snapshot's trouble, and `retryOpen()` no longer clears
-  it while the retry runs. A host checking `vault !== null` for "ready" must check the state
-  instead. (#166, thread 8)
 * **The `react-hooks/set-state-in-effect` suppression in `vault-provider.tsx`.** `VaultProvider`
   makes the vault in an effect, and `Vault.make` throws synchronously (`bad_option`, for one), so
   the failure is set in the effect body. Making the vault in render doubles its side effects under

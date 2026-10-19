@@ -452,6 +452,15 @@ export type DeviceMark = Z.infer<typeof DeviceMark>
 export const LeaseHours = 168 // seven days
 
 /**
+ * How many minutes a `hello()` trusts the vault's last read of storage, unless the caller says
+ * otherwise: within one minute of it, a hello reads nothing anew, so a burst of hellos -- each
+ * component that mounts calling one -- costs one read.
+ *
+ * @example Vault.make({ ...opts, staleMinutes: 5 })   // hello() reads at most every five minutes
+ */
+export const StaleMinutes = 1
+
+/**
  * The longest finite `leaseHours` a vault takes: 588 hours, 24.5 days. The vault drops its key
  * with a timer when the lease ends, and one timer reaches no further than 2^31 - 1 milliseconds,
  * about 24.8 days. A longer lease is `Infinity`, until `lock()`; anything between is refused.

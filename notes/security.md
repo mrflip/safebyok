@@ -34,7 +34,20 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
-* 2026-10-19 (branch 20261019-vault_class): **the vault's in-memory state, the vaultKey among it,
+* 2026-10-19 (branch 20261019-fields_and_make): **`Vault.make` takes a host function, `onBadNews(news)`,
+  called with every `bad_news` refusal.** The family (`damaged_vault`, `rolled_back`,
+  `identity_revoked`, `newer_format`, `damaged_box`, `damaged_wayin`) is told synchronously, before
+  the public call's promise settles, for each refusal a public vault call meets; also for bad news a
+  background storage read or a write's catch-up meets (which has no caller), and once per box a
+  listing newly shows damaged (a `damaged_box` `VaultError` carrying `meta.box_listed`, the
+  DamagedBox: its boxlabel and `revision_tok`). Each error object is told once (a `WeakSet`). The
+  handler is never awaited; what it throws, or its promise rejects with, becomes the vault's
+  `trouble` (a `bad_option` `VaultError` whose `cause` is the host's thrown value) and goes to the
+  vault's logger (`error`) and the platform's `reportError`. It cannot change what the caller gets.
+  The news carries no secret material; `meta.box_listed` carries a boxlabel, which the vault never
+  quotes in a message (a host's validators may admit any text) but does carry in meta, as
+  `meta.box_stored` already does.
+* 2026-10-19 (branch 20261019-vault_class); 2026-10-19 (branch 20261019-fields_and_make): **the vault's in-memory state, the vaultKey among it,
   lives in ES private fields.** `Vault` (`packages/safebyok/src/vault.ts`) is now a class, and
   `Vault.make(opts)` returns an instance; its state used to live in the closure of `make`. Every
   piece of it -- the vaultKey in hand, the vault props, the device mark, the stores, the logger,
@@ -49,7 +62,14 @@ added or folded into through the subagent, and no other entry changes.
   one, and it parses every option (`parseMakeVaultOpts`, `packages/safebyok/src/vault-opts.ts`)
   before anything else runs. Where to look: that no field holding key material is declared without
   `#`, and that later threads, which pull methods out into model classes holding a `vault`
-  back-reference, do not widen the state into public fields to reach it.
+  back-reference, do not widen the state into public fields to reach it. 2026-10-19
+  (20261019-fields_and_make): the public fields (`state`, `boxes`, `wayins`, `capacity`,
+  `askPassphraseAt`, `trouble`, `vault_id`, `unlock_epoch` and the rest) are getters with no setter,
+  each reading the frozen snapshot that one private `#settle()` publishes; the snapshot, its arrays,
+  their entries and `capacity` are `Object.freeze`d (a box's sidecar JSON inside a summary is not
+  deep-frozen). The vault never reads its own state back through a public property, only through
+  `#` fields, so a host writing over a handle's property (`hello`, or shadowing `leaseMillis` with
+  `Object.defineProperty`) changes nothing inside the vault; a test pins this.
 * 2026-10-19 (branch 20261019-softlock_gone, on PR #189): **the rotation schema is removed; no
   `rotateVaultKey` was ever built.** The vault props' `prior_vault_key` (the previous vaultKey wrapped
   under the current one), its `PriorVaultKey` schema and the `priorFits` refinement (a prior exactly
@@ -126,7 +146,7 @@ added or folded into through the subagent, and no other entry changes.
   old is ever decrypted by the new code, and nothing is rewritten in place. A Convex deployment
   refuses the new schema until its tables are cleared; Postgres hosts must run the summary
   changeset's Postgres steps before the new table SQL.
-* 2026-10-18 (make_hello); 2026-10-19 (20261019-softlock_gone, amending points 1 and 2): **`openVault` is split into `Vault.make`, which returns a handle at
+* 2026-10-18 (make_hello); 2026-10-19 (20261019-softlock_gone, amending points 1 and 2); 2026-10-19 (20261019-fields_and_make, amending the opening and point 4): **`openVault` is split into `Vault.make`, which returns a handle at
   once, and `vault.hello()`, which reads storage and the lease.** `Vault.make(opts)` is synchronous:
   it validates every option and starts `hello()` itself. `hello()` reads the vault props and this
   device's lease and settles the snapshot from `opening` into `absent`, `locked` or `unlocked`.
@@ -178,6 +198,22 @@ added or folded into through the subagent, and no other entry changes.
   props of one read beside the boxes of another. When the fresh vault props show the vault
   changed elsewhere, the vaultKey is still dropped and the lease, outdated by the change, discarded before the listing is read,
   as before.
+  Amended 2026-10-19 (20261019-fields_and_make): **`Vault.make` touches nothing; the first `hello()`
+  reads.** Make reads no storage and no device store and starts no timer and no watch (it still reads
+  the host's clock once, to check it); it no longer starts `hello()` itself. The first `hello()` --
+  the host's, or the one any call but `lock()` and `close()` starts -- reads storage, starts the
+  storage watch and settles. `hello({ staleMinutes })` (default from `Vault.make`'s `staleMinutes`,
+  1 minute; `Infinity` accepted) reads nothing when the last successful storage read began within
+  that many minutes by the vault's clock, and only re-settles the picture (a lease past its deadline
+  shows locked); it always reads afresh after a failed read, after untrusted storage
+  (`identity_revoked`, `rolled_back`, `newer_format`) or after `del()`. Data calls keep their own
+  reads before writes; the window affects only what a host's `hello()` shows. The clock read that
+  stamps each read is the vault's checked clock: a clock gone wrong now refuses a storage refresh
+  too, dropping the vaultKey first. Point 4: `trouble` no longer carries storage conditions. It is
+  the latest bad news (or the `onBadNews` handler's throw), cleared when a storage read finds no
+  damaged box; a condition such as `storage_unavailable` reaches only its caller (a refused
+  `hello()` rejects to whoever called it) and the snapshot's `syncing: false`, so a background
+  read's failure shows in the snapshot only as `syncing: false` (and the logger's warning).
 
 * 2026-10-18: **the context bytes of every wayin changed spelling, not construction, with the
   rename to "wayin".** A wayin's wrap is bound to a context of the record's format tag, then its

@@ -794,7 +794,7 @@ describe("the host's validators", () => {
     const trimming = { boxlabel: ZClassic.string().trim().toLowerCase().min(1), userId: ZClassic.string().trim().min(1) }
     const world = makeWorld({ validators: trimming })
     const vault = await world.openUnlocked('pw', { userId: '  U1  ' })
-    expect(vault.getSnapshot().scope.user_id).to.eq('  U1  ')
+    expect(vault.user_id).to.eq('  U1  ')
     await vault.putBox('  Padded Box  ', 'sk-fake')
     expect(boxlabelsOf(vault)).to.deep.equal(['  Padded Box  '])
     expect(await vault.getBox('  Padded Box  ')).to.eq('sk-fake')

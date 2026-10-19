@@ -49,8 +49,9 @@ const vault = Vault.make({
   ...browserOpts({ dbName: 'acme' }),         // the key deriver, device store and passphrase strength test a browser wants
 })
 
-await vault.hello()               // reads storage and this device's lease; every call waits for it anyway
-vault.getSnapshot().state         // 'absent' | 'locked' | 'unlocked'
+vault.state                       // 'opening': Vault.make reads nothing
+await vault.hello()               // reads storage and this device's lease; every call waits for one anyway
+vault.state                       // 'absent' | 'locked' | 'unlocked'
 await vault.unlock(passphrase)    // on an absent vault, this first unlock creates it
 await vault.putBox('anthropic_api_key', 'sk-ant-...')
 
@@ -62,11 +63,18 @@ makes for itself. Any option you pass after the spread replaces the default it n
 option `Vault.make` does not take -- a misspelling, or a name it no longer uses -- is refused with
 `bad_option` rather than quietly ignored.
 
-`Vault.make` answers at once, and the handle starts its own `hello()`: until that has read
-storage, the snapshot says `opening`, and any call made meanwhile waits for it. A hello that
-fails reading storage leaves the vault `opening`, saying why as the snapshot's `trouble` (and
-through the logger); one that fails after it, as this device's store refuses its lease, settles
-`locked` with the `trouble` beside it. `vault.hello()` tries again, and so does any other call.
+`Vault.make` answers at once, and touches nothing: no storage, no device store, no timer, no
+prompt. The vault says `opening` until its first `hello()` -- yours, or the one any other call
+but `lock()` and `close()` starts and waits for -- reads storage, starts its watch on storage, and
+settles it. A hello that fails reading storage refuses to its caller and leaves the vault
+`opening`; one that fails after it, as this device's store refuses its lease, settles `locked`.
+`vault.hello()` tries again, and so does any other call. Once a hello has read storage, another
+within `staleMinutes` (a minute, unless `Vault.make` or the call says otherwise) reads nothing
+anew; call `hello()` on `visibilitychange`, and `hello({ staleMinutes: 0 })` to read now.
+
+The vault's fields -- `state`, `boxes`, `wayins`, `capacity`, `askPassphraseAt`, `trouble`,
+`vault_id` and the rest -- are live and read-only: read them in an event handler and they are
+current. React renders from `getSnapshot()`, the same fields frozen in one object.
 
 Serve the app over https: a browser withholds WebCrypto from a page served over plain http, so
 `Vault.make` refuses one at once, with kind `insecure_context` (`http://localhost` counts as
@@ -535,9 +543,9 @@ says these things:
   device or tab wrote over the box meanwhile (`{ call: 'delBox' }`). The call carries on.
   When the box shown was damaged, the message says so and the story adds `damaged: true`. It
   names no revision or boxlabel.
-* `warn`: the hello `Vault.make` starts was refused (`{ call: 'hello' }`, the refusal as its
-  error). The vault stays `opening`, saying why as its snapshot's `trouble`; `vault.hello()`, or
-  any other call, tries again.
+* `error`: the `onBadNews` handler threw, or its promise rejected, as it was told of bad news
+  (`{ call: 'onBadNews' }`, what it threw as its error). It goes to the platform's `reportError`
+  too, where there is one, and the vault's `trouble` keeps it.
 
 ## Several passphrases
 
@@ -733,6 +741,17 @@ Part of normal operation. Each can reach the user; the app decides how.
 Something the app is told whether or not the call was refused: storage found damaged, a copy older
 than this device has seen, a user signed out. Each may reach the user; none is the code's to fix.
 
+Give `Vault.make` an `onBadNews` handler and it is told each piece, once, before the call that
+learned it settles -- a background read's included, which has no caller -- and a box a listing
+shows damaged the first time it does, as `damaged_box` news whose `meta.box_listed` is the box,
+though the listing itself succeeds. It changes nothing the caller gets, and is never awaited. The
+vault's `trouble` keeps the latest piece, with or without a handler, until a read finds nothing
+amiss; what the handler throws lands there instead, as `bad_option`. Conditions never reach it.
+
+```ts
+const vault = Vault.make({ ...opts, onBadNews: (news) => { telemetry.report(news.refusalkind) } })
+```
+
 | Kind                  | What happened                                                    | What to do                                              |
 | --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |
 | `damaged_vault`       | the vault's stored props failed their checks (not a shape this package writes, or naming another vault), so no way in can be tried: `hello()` refuses it | Nothing was changed, and a retry will not mend it. Tell the user the vault cannot be opened; restore its props from a backup, if there is one, or, if the user chooses to start over, `delDamagedVault()` (see *A vault that cannot be opened*) |
@@ -742,10 +761,11 @@ than this device has seen, a user signed out. Each may reach the user; none is t
 | `rolled_back`         | this device has already seen a newer copy of the vault props than storage offers now (storage restored from a backup, or altered), so it won't use this one, and the vault locked: nothing was unlocked or written | Tell the user this device has seen a newer copy of the vault than storage holds. If the storage was restored from an older copy on purpose, accept it on this device (see *A vault rolled back*, below); otherwise the app's support should look at its storage |
 | `identity_revoked`    | the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in. The vault has locked itself (see *When the user signs out*) | Have the user sign in again, then open the vault for whoever that is |
 
-`Vault.make` itself throws `bad_option`, `bad_label` or `insecure_context`, at once. Its `hello()`,
-as it reads the vault from storage, can refuse with `storage_unavailable`, `not_permitted`,
-`identity_revoked` or `damaged_vault` (a damaged box never stops it): conditions and bad news, which the
-snapshot keeps as its `trouble`, the vault still `opening`. So is `storage_blocked`, from this
+`Vault.make` itself throws `bad_option`, `bad_label` or `insecure_context`, at once. Its first
+`hello()`, as it reads the vault from storage, can refuse with `storage_unavailable`,
+`not_permitted`, `identity_revoked`, `newer_format`, `rolled_back` or `damaged_vault` (a damaged
+box never stops it), the vault still `opening`: the refusal reaches the hello's caller, and the
+bad news among them `onBadNews` and `trouble` too. So can `storage_blocked`, from this
 device's own store or a vault store on it, which saying hello again will not mend. A refused hello
 leaves the handle as it was, its storage watch live, so the host calls `hello()` again, or simply
 carries on: every call but `lock()` and `close()` tries again first. Close the

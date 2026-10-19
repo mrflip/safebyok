@@ -90,7 +90,7 @@ kind, its family, and what it means.
 **A condition or bad news stays in place.** Storage that cannot be reached (`storage_unavailable`), a user
 storage no longer serves (`identity_revoked`, as when signed out of the backend, or not yet
 signed in to it) or a vault whose stored props fail their checks (`damaged_vault`) arrives as
-`openError`, a `VaultError`: the snapshot's `trouble`, the vault still `opening`. (A damaged box never stops the open:
+`openError`, a `VaultError`: what the provider's own first `hello()` was refused with, the vault still `opening`. (A damaged box never stops the open:
 the snapshot lists it with `damaged: true`, for your UI to offer `delBox()` or, while it
 names its `revision_tok`, a fresh `putBox()`; see the `safebyok` README's *Damaged boxes*.) Show it where the vault's UI
 would be, and offer `retryOpen()`, which has the vault say hello again: `openError` clears once it
@@ -158,7 +158,7 @@ reason the vault's `passphraseStrengthTest` gave -- with `browserOpts()`, `zxcvb
 which asks for 12 characters and turns away common passwords, keyboard patterns and the vault's
 own names. The user hears the same reason before pressing Create, as advice (below). The test is
 a plain function of the passphrase and the vault's scope, so a field of your own can call the
-same one as the user types: `const verdict = await passphraseStrengthTest(typed, vault.getSnapshot().scope)`,
+same one as the user types: `const verdict = await passphraseStrengthTest(typed, { applabel: vault.applabel, user_id: vault.user_id, vaultlabel: vault.vaultlabel })`,
 then show `verdict.reason` while `verdict.strong` is false.
 
 **Anything else never takes your page down.** Misuse -- a closed vault handle, an `rpId` that

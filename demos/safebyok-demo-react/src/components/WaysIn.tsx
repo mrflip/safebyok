@@ -24,7 +24,7 @@ export const WaysIn = () => {
     evt.preventDefault()
     setGripe(null)
     try {
-      const makePasskey = () => createPasskey({ rp: { name: 'safebyok playground' }, user: { name: snapshot.scope.user_id, displayName: snapshot.scope.user_id } })
+      const makePasskey = () => createPasskey({ rp: { name: 'safebyok playground' }, user: { name: snapshot.user_id, displayName: snapshot.user_id } })
       const wayinId = await vault.addPasskey(passphraseRef.current?.value ?? '', makePasskey, { wayinlabel })
       if (wayinId === null) { return }
       formRef.current?.reset()
@@ -45,7 +45,7 @@ export const WaysIn = () => {
         ? (
           <form ref={formRef} className="box-form" onSubmit={(evt) => { void addFingerprint(evt) }}>
             {/* What a password manager files the passphrase under, as the passphrase dialog names it. */}
-            <input type="text" name="username" autoComplete="username" value={`${snapshot.scope.user_id} (${snapshot.scope.vaultlabel} vault)`} readOnly hidden style={{ display: 'none' }} />
+            <input type="text" name="username" autoComplete="username" value={`${snapshot.user_id} (${snapshot.vaultlabel} vault)`} readOnly hidden style={{ display: 'none' }} />
             <label>
               your passphrase <span className="quiet">(the proof any change to the ways in asks for)</span>
               <input ref={passphraseRef} type="password" name="current-password" autoComplete="current-password" />

@@ -1,5 +1,5 @@
 import type { Box } from './box'
-import type { Capacity, VaultProps } from './types'
+import type { Capacity, DamagedBox, VaultProps } from './types'
 
 /**
  * Every way a vault call can refuse, as a caller branches on them -- and every refusalkind any
@@ -186,6 +186,8 @@ export type RefusalMeta = {
   vault_props_stored?: VaultProps | null
   /** `box_too_large`, `vault_full`: how much room there is. */
   capacity?:           Capacity
+  /** `damaged_box` told of a listing: the box as the listing shows it, its boxlabel and the revision it names. */
+  box_listed?:         DamagedBox
 }
 
 /** What a VaultError is made with beside its refusalkind and message: the `cause` behind it, and its `meta`. */

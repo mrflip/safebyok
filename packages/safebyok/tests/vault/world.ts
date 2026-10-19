@@ -163,3 +163,17 @@ export const makeRacingWorld = (defaults?: Partial<MakeVaultOpts>) => {
 
 /** The stored vault props' ways in, as the backend holds them. */
 export const storedWayinsOf = (world: ReturnType<typeof makeWorld>) => storedVaultPropsOf(world)['wayins'] as Record<string, unknown>[]
+
+/**
+ * A world whose `u1` vault has moved on past a copy of its props: `older`, as stored before a way
+ * in was added and removed, and `newer`, as stored now, which this device has seen.
+ */
+export const rolledBackWorld = async () => {
+  const world = makeWorld()
+  const vault = await world.openUnlocked('pw')
+  const spareId = await vault.addPassphrase('pw', 'spare phrase', { wayinlabel: 'spare' })
+  const older = world.dbStore.read(u1VaultPropsCkey) ?? ''
+  await vault.delWayin('pw', spareId)
+  const newer = world.dbStore.read(u1VaultPropsCkey) ?? ''
+  return { world, vault, older, newer }
+}

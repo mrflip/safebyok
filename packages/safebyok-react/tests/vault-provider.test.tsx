@@ -625,13 +625,22 @@ describe("VaultProvider", () => {
     // A fixed instant the vault accepts as a time: after 1981, before FarFuture.
     const ClockMillis = Date.UTC(2026, 9, 15)
     const { Grab, opened } = grabber()
+    const vaultDB = localVaultDB({ store: memoryStore() })
+    const told: VaultError[] = []
+    const onBadNews = (news: VaultError) => { told.push(news) }
     render(
-      <VaultProvider applabel="acme" vaultlabel="main" userId="u1" vaultDB={localVaultDB({ store: memoryStore() })} deviceDB={memoryDeviceDB()}
-        keyDeriver={TH.testDeriver} passphraseStrengthTest={TH.anyPassphraseTest} clock={{ now: () => ClockMillis }} leaseHours={1} maxWhisperBytes={8} maxBoxes={1}>
+      <VaultProvider applabel="acme" vaultlabel="main" userId="u1" vaultDB={vaultDB} deviceDB={memoryDeviceDB()}
+        keyDeriver={TH.testDeriver} passphraseStrengthTest={TH.anyPassphraseTest} clock={{ now: () => ClockMillis }} leaseHours={1} maxWhisperBytes={8} maxBoxes={1}
+        staleMinutes={0} onBadNews={onBadNews}>
         <Grab />
       </VaultProvider>,
     )
     const vault = await opened()
+    // No minute trusted: each hello reads, and bad news it meets is told to the handler given.
+    const revoked = new VaultError('identity_revoked', 'Sign in again to reach this vault.')
+    vi.spyOn(vaultDB, 'getVaultProps').mockResolvedValueOnce(TH.bad(revoked))
+    await TH.expectRefusal(vault.hello(), 'identity_revoked')
+    expect(told).to.deep.equal([revoked])
 
     await vault.unlock('correct horse battery staple')
     // One hour, 3,600,000 ms, after the clock's time.
@@ -1032,18 +1041,18 @@ describe("VaultProvider", () => {
       })
     }
 
-    it("hands down the very VaultError, beside the handle still opening, whose trouble it is", async () => {
+    it("hands down the very VaultError its hello was refused with, beside the handle still opening", async () => {
       const world = makeWorld()
-      const trouble = unreachable()
-      vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(TH.bad(trouble))
+      const refusal = unreachable()
+      vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(TH.bad(refusal))
       const { Grab, latest } = grabber()
       render(
         <VaultProvider {...world.props} userId="u1">
           <Grab />
         </VaultProvider>,
       )
-      await waitFor(() => { expect(latest().openError).to.eq(trouble) })
-      expect(latest().vault?.getSnapshot()).to.deep.include({ state: 'opening', trouble })
+      await waitFor(() => { expect(latest().openError).to.eq(refusal) })
+      expect(latest().vault?.getSnapshot()).to.deep.include({ state: 'opening', trouble: null })
     })
 
     it("hands down the vault at once, still opening, while its hello reads storage, and no openError", async () => {
@@ -1104,6 +1113,16 @@ describe("VaultProvider", () => {
       await expectShown('open error: storage_unavailable')
       fireEvent.click(screen.getByText('Retry'))
       await expectShown('absent')
+    })
+
+    it("clears openError once a ring from storage settles the vault, with no retry", async () => {
+      const world = makeWorld()
+      vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(TH.bad(unreachable()))
+      world.mount('u1')
+      await expectShown('open error: storage_unavailable')
+      const elsewhere = await TH.settledVault({ ...world.props, userId: 'u1', deviceDB: memoryDeviceDB() })
+      await elsewhere.unlock('correct horse battery staple')
+      await expectShown('locked')
     })
 
     it("a retry that fails again hands down the fresh error", async () => {

@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, afterEach, expectTypeOf } from 'vitest'
-import { LeaseHours, FarFuture } from '../../src/types'
+import { LeaseHours, FarFuture, ForeverMillis, MinuteMillis } from '../../src/types'
 import { MaxUserIdChars } from '../../src/validators'
 import { VaultError } from '../../src/errors'
 import { memoryDeviceDB } from '../../src/device-db'
 import { Vault } from '../../src/vault'
-import { type MakeVaultOpts } from '../../src/vault-opts'
+import { type MakeVaultOpts, parseStaleMinutes } from '../../src/vault-opts'
 import { fromB64 } from '../../src/crypto'
 import type { KeyDeriver, CustomKeyDeriver } from '../../src/key-deriver'
 import { type VaultLogger } from '../../src/logger'
@@ -129,7 +129,9 @@ describe("Vault.make's options", () => {
   it("makes a handle that settles once its hello is awaited, as its first two examples, and the Vault's own, show", async () => {
     const { vaultDB, deviceDB } = makeWorld()
     const vault = Vault.make({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB, keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest })
+    expect(vault.state).to.eq('opening')
     await vault.hello()
+    expect(vault.state).to.eq('absent')
     expect(vault.getSnapshot().state).to.eq('absent')
   })
 
@@ -542,6 +544,205 @@ describe("the key deriver seam", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw', { keyDeriver: new PrototypeDeriver() })
     expect(vault.getSnapshot().state).to.eq('unlocked')
+  })
+})
+// --
+
+// == [Vault.make, by the Contract]: Does, Guarantees, Returns, Refuses; the new options
+
+const BadNewOptionCases = [
+  [{ staleMinutes: -1 },               'staleMinutes below zero'],
+  [{ staleMinutes: 'a while' },        'staleMinutes that are not a number'],
+  [{ staleMinutes: NaN },              'staleMinutes that are no number at all'],
+  [{ onBadNews: 'tell me' },           'an onBadNews that is no function'],
+  [{ onBadNews: { report: () => 1 } }, 'an onBadNews that is an object, not a function'],
+] as const
+
+describe("Vault.make, by the Contract", () => {
+  for (const [given, blurb] of BadNewOptionCases) {
+    it(`validates every option, refusing ${blurb} by throwing 'bad_option', touching nothing (Contract: Vault.make, Does 1)`, () => {
+      const world = makeWorld()
+      const propsReads = vi.spyOn(world.vaultDB, 'getVaultProps')
+      TH.expectSyncRefusal(() => Vault.make(world.optsWith(given as Partial<MakeVaultOpts>)), 'bad_option')
+      expect(propsReads).not.toHaveBeenCalled()
+    })
+  }
+
+  it("takes staleMinutes of zero, fractions and Infinity, and an onBadNews of null as none (Contract: Vault.make, Does 1)", () => {
+    const world = makeWorld()
+    for (const staleMinutes of [0, 0.5, 30, Infinity]) { expect(Vault.make(world.optsWith({ staleMinutes })).state).to.eq('opening') }
+    expect(Vault.make(world.optsWith({ onBadNews: null })).state).to.eq('opening')
+  })
+
+  it("returns the instance in state opening, nothing read: no vault, no ways in, no boxes (Contract: Vault.make, Does 2)", () => {
+    const world = makeWorld()
+    const vault = Vault.make(world.optsWith())
+    expect(vault).to.be.instanceOf(Vault)
+    expect(vault.snapshot).to.deep.include({ state: 'opening', vault_id: null, registered_at: null, unlock_epoch: null, vault_key_epoch: null, askPassphraseAt: null, trouble: null, syncing: true })
+    expect(vault.wayins).to.have.lengthOf(0)
+    expect(vault.boxes).to.have.lengthOf(0)
+    expect(vault.capacity.boxes.used).to.eq(0)
+  })
+
+  it("touches no storage, no device store, no timer and no prompt until a call asks (Contract: Vault.make, Guarantees)", async () => {
+    const world = makeWorld()
+    const vaultDBCalls = VaultDBVerbsUsed.map((verb) => vi.spyOn(world.vaultDB, verb))
+    const deviceDBCalls = (Object.keys(world.deviceDB) as (keyof typeof world.deviceDB)[]).map((verb) => vi.spyOn(world.deviceDB, verb))
+    const derivations = vi.spyOn(TH.testDeriver, 'deriveKeyBytes')
+    const strengthTests = vi.fn(TH.anyPassphraseTest)
+    vi.useFakeTimers()
+    try {
+      Vault.make(world.optsWith({ passphraseStrengthTest: strengthTests }))
+      expect(vi.getTimerCount()).to.eq(0)
+    } finally {
+      vi.useRealTimers()
+    }
+    await TH.wakeupAtNextTick()
+    for (const called of [...vaultDBCalls, ...deviceDBCalls, derivations, strengthTests]) { expect(called).not.toHaveBeenCalled() }
+    expect(world.logged).to.have.lengthOf(0)
+  })
+
+  it("has the first hello read storage, start the storage watch, and settle (Contract: Vault.make, Guarantees)", async () => {
+    const world = makeWorld()
+    const tally = TH.tallyWatches(world.vaultDB)
+    const vault = Vault.make(world.optsWith())
+    expect(tally).to.deep.equal({ opened: 0, closed: 0 })
+    await vault.hello()
+    expect(tally).to.deep.equal({ opened: 1, closed: 0 })
+    expect(vault.state).to.eq('absent')
+    await vault.hello({ staleMinutes: 0 })
+    expect(tally.opened).to.eq(1)
+  })
+
+  it("has a data call's own first hello read and settle, as the host's would (Contract: Vault.make, Guarantees)", async () => {
+    const world = makeWorld()
+    const tally = TH.tallyWatches(world.vaultDB)
+    const vault = Vault.make(world.optsWith())
+    await vault.unlock('pw')
+    expect(vault.state).to.eq('unlocked')
+    expect(tally.opened).to.eq(1)
+  })
+
+  it("closes a handle that never said hello with nothing to undo, its watch never started", () => {
+    const world = makeWorld()
+    const tally = TH.tallyWatches(world.vaultDB)
+    Vault.make(world.optsWith()).close()
+    expect(tally).to.deep.equal({ opened: 0, closed: 0 })
+  })
+
+  it("returns the instance synchronously, no promise (Contract: Vault.make, Returns)", () => {
+    const world = makeWorld()
+    const made: unknown = Vault.make(world.optsWith())
+    expect(made).to.be.instanceOf(Vault)
+    expect(made).to.not.be.instanceOf(Promise)
+    expect(typeof (made as { then?: unknown }).then).to.eq('undefined')
+  })
+
+  it("refuses by throwing, and only misuse, fix-the-code refusals: bad_option among them (Contract: Vault.make, Refuses)", () => {
+    const world = makeWorld()
+    const refusals = [
+      TH.expectSyncRefusal(() => Vault.make(TH.omitting(world.optsWith(), 'deviceDB')), 'bad_option'),
+      TH.expectSyncRefusal(() => Vault.make(world.optsWith({ staleMinutes: -1 })), 'bad_option'),
+      TH.expectSyncRefusal(() => Vault.make(world.optsWith({ vaultlabel: 'not-a-label' })), 'bad_label'),
+    ]
+    expect(refusals.map((err) => err.family)).to.deep.equal(['misuse', 'misuse', 'misuse'])
+  })
+
+  it("reads half a minute as thirty seconds, and Infinity as forever, as parseStaleMinutes's example shows", () => {
+    expect(parseStaleMinutes(0.5, 'Vault.make')).to.eq(30_000)
+    expect(parseStaleMinutes(Infinity, 'hello')).to.eq(ForeverMillis)
+    expect(parseStaleMinutes(undefined, 'hello')).to.eq(MinuteMillis)
+  })
+
+  it("has hello read at most every five minutes, as StaleMinutes's example shows", async () => {
+    const world = makeWorld()
+    const vault = Vault.make({ ...world.optsWith(), staleMinutes: 5 })   // hello() reads at most every five minutes
+    await vault.hello()
+    const propsReads = vi.spyOn(world.vaultDB, 'getVaultProps')
+    world.advance(4 * MinuteMillis)
+    await vault.hello()
+    expect(propsReads).not.toHaveBeenCalled()
+    world.advance(MinuteMillis)
+    await vault.hello()
+    expect(propsReads).toHaveBeenCalledTimes(1)
+  })
+})
+// --
+
+// == [The vault's fields]: fields, snapshot, capacity, the host's writes
+
+describe("the vault's fields, by the Contract", () => {
+  it("shows each field as the snapshot holds it, live, in an event handler as in render (Contract: Vault)", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.putBox('anthropic', 'sk-fake')
+    const snapshot = vault.getSnapshot()
+    expect(vault.snapshot).to.eq(snapshot)
+    for (const [field, shown] of Object.entries(snapshot)) {
+      expect(vault[field as keyof typeof snapshot], field).to.eq(shown)
+    }
+    await vault.lock()
+    expect(vault.state).to.eq('locked')
+  })
+
+  it("reads the live fields in a handler, as the Vault's second example shows", async () => {
+    const world = makeWorld()
+    const elsewhere = await world.openUnlocked('pw')
+    await elsewhere.lock()
+    const vault = await world.open()
+    const asked: unknown[] = []
+    const askForPassphrase = (wayins: unknown) => { asked.push(wayins) }
+    if (vault.state === 'locked') { askForPassphrase(vault.wayins) }
+    expect(asked).to.deep.equal([vault.wayins])
+  })
+
+  it("lets no host write over a field: each is a getter with no setter, and the snapshot is frozen", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.putBox('anthropic', 'sk-fake')
+    for (const field of ['state', 'boxes', 'wayins', 'capacity', 'trouble', 'vault_id', 'applabel', 'askPassphraseAt', 'snapshot', 'leaseMillis']) {
+      expect(Reflect.set(vault, field, null), field).to.be.false
+    }
+    expect(vault.state).to.eq('unlocked')
+    const { snapshot } = vault
+    for (const part of [snapshot, snapshot.boxes, snapshot.boxes[0], snapshot.wayins, snapshot.wayins[0], snapshot.capacity, snapshot.capacity.boxes, snapshot.capacity.bytes]) {
+      expect(Object.isFrozen(part)).to.be.true
+    }
+  })
+
+  it("keeps its own lease length and hello, whatever a host writes over the handle's", async () => {
+    const world = makeWorld({ leaseHours: 1 })
+    const vault = await world.open()
+    const helloWrittenOver = vi.fn(() => Promise.resolve(vault))
+    Object.defineProperties(vault, { leaseMillis: { value: 1 }, hello: { value: helloWrittenOver } })
+    expect(vault.leaseMillis).to.eq(1)
+    await vault.unlock('pw')
+    expect(vault.askPassphraseAt).to.eq(world.clock.now() + HourMillis)
+    await vault.putBox('anthropic', 'sk-fake')
+    expect(helloWrittenOver).not.toHaveBeenCalled()
+  })
+
+  it("reckons capacity from the last read: the boxes against maxBoxes, and the bytes they reserve against what storage holds (Contract: Vault)", async () => {
+    const world = makeWorld({ maxBoxes: 3 })
+    const vault = await world.openUnlocked('pw')
+    const before = vault.capacity
+    await vault.putBox('anthropic', 'sk-fake')
+    await vault.putBox('openai', 'sk-fake-too')
+    expect(vault.capacity.boxes).to.deep.equal({ used: 2, max: 3 })
+    expect(vault.capacity.bytes.used).to.be.greaterThan(0)
+    expect(vault.capacity.bytes.max).to.eq(before.bytes.max)
+    expect(before.boxes).to.deep.equal({ used: 0, max: 3 })
+  })
+
+  it("warns that the vault is nearly full, as capacity's example shows", async () => {
+    const world = makeWorld({ maxBoxes: 3 })
+    const vault = await world.openUnlocked('pw')
+    await vault.putBox('anthropic', 'sk-fake')
+    await vault.putBox('openai', 'sk-fake-too')
+    const warnings: string[] = []
+    const warn = (said: string) => { warnings.push(said) }
+    const { boxes } = vault.capacity; if (boxes.used >= boxes.max - 1) { warn('Your vault is nearly full.') }
+    expect(warnings).to.deep.equal(['Your vault is nearly full.'])
   })
 })
 // --

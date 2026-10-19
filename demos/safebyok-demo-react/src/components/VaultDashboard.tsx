@@ -123,7 +123,7 @@ export const VaultDashboard = () => {
   return (
     <section className="vault-dashboard">
       <div className="row spread">
-        <h2>Vault dashboard <span className="quiet">vault “{snapshot.scope.vaultlabel}”</span></h2>
+        <h2>Vault dashboard <span className="quiet">vault “{snapshot.vaultlabel}”</span></h2>
         <LockChip state={snapshot.state} askPassphraseAt={snapshot.askPassphraseAt} onLock={() => { void vault.lock() }} />
       </div>
 

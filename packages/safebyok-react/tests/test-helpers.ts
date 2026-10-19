@@ -47,15 +47,16 @@ export const DefaultLeaseMillis = LeaseHours * 3_600_000
 /**
  * Just enough of a Vault for a component to render it: a snapshot that keeps its identity and
  * never changes (`state`, default 'locked'; `wayins`, default none; the scope of `u1`'s `main`
- * vault in the `acme` app, as `scopeOf` has it), a window (default seven days), a subscribe that
+ * vault in the `acme` app, as `scopeOf` has it, its fields beside it), a window (default seven days), a subscribe that
  * never calls back, and whichever calls the test hands it.
  *
  * @example const vault = TH.stubVault({ state: 'absent' })
  * @example const vault = TH.stubVault({ unlock: () => Promise.reject(new VaultError('wrong_passphrase', 'Not that one.')) })
  */
 export const stubVault = (opts: StubVaultOpts = {}): Vault => {
-  const snapshot = { state: opts.state ?? 'locked', wayins: opts.wayins ?? [], scope: scopeOf('u1') }
+  const snapshot = { state: opts.state ?? 'locked', wayins: opts.wayins ?? [], ...scopeOf('u1') }
   return {
+    ...scopeOf('u1'),
     getSnapshot:     () => snapshot,
     subscribe:       () => unsubscribeFromNothing,
     leaseMillis:     opts.leaseMillis ?? DefaultLeaseMillis,

@@ -9,7 +9,7 @@ import { delDamagedVault } from '../../src/del-damaged-vault'
 import { setDefaultLogger, DefaultLogger } from '../../src/logger'
 import { bad } from '../../src/outcome'
 import * as TH from '../test-helpers'
-import { makeWorld, boxlabelsOf, isU1Box, u1BoxCkey, u1VaultPropsCkey, SevenDaysMillis, uncheckingDeviceDB, storedVaultPropsOf, storedWayinsOf, HourMillis, damagedVaultWorld, storedRowOf, rowsOf } from './world'
+import { makeWorld, boxlabelsOf, isU1Box, u1BoxCkey, u1VaultPropsCkey, SevenDaysMillis, uncheckingDeviceDB, storedVaultPropsOf, storedWayinsOf, HourMillis, damagedVaultWorld, storedRowOf, rowsOf, rolledBackWorld } from './world'
 
 
 // == [Scoping, snapshot, tampering]: scoping, snapshot and subscribers, what the backend sees, SpoiledShells, tampering
@@ -374,7 +374,7 @@ describe("the logger", () => {
     expect(world.logged.map((heard) => heard.level)).to.deep.equal(['warn'])
   })
 
-  it("says nothing of an unreadable lease that could not be erased: hello rejects instead, and says only that", async () => {
+  it("says nothing of an unreadable lease that could not be erased: hello rejects instead, and the logger hears nothing", async () => {
     const world = makeWorld()
     const device = uncheckingDeviceDB()
     await world.openUnlocked('pw', { deviceDB: device.deviceDB })
@@ -383,7 +383,7 @@ describe("the logger", () => {
     vi.spyOn(device.deviceDB, 'delLease').mockRejectedValueOnce(jammed)
     const err = await TH.expectRefusal(world.open({ deviceDB: device.deviceDB }), 'storage_unavailable')
     expect(err.cause).to.eq(jammed)
-    expect(world.logged.map((heard) => [heard.level, heard.story, heard.err])).to.deep.equal([['warn', { call: 'hello' }, err]])
+    expect(world.logged).to.have.lengthOf(0)
   })
 
   it("says nothing of a lease that simply ran out, or that a new passphrase outdated", async () => {
@@ -444,7 +444,7 @@ describe("the logger", () => {
     const vault = await world.openUnlocked(passphrase, { deviceDB: device.deviceDB })
     await vault.putBox('anthropic', whisper, { sidecar: { note: 'FAKESECRET note' } })
     // every call site: a change whose mark could not be kept (its error carrying the device
-    // store's as its cause), a lease unreadable, a background refresh refused, a hello refused
+    // store's as its cause), a lease unreadable, a background refresh refused
     vi.spyOn(device.deviceDB, 'putMark').mockRejectedValueOnce(new Error('the device store broke: disk full'))
     await vault.changePassphrase(passphrase, `${passphrase} two`)
     const secrets = storedSecrets(world)
@@ -455,7 +455,7 @@ describe("the logger", () => {
     await TH.wakeupAtNextTick()
     vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(bad(new VaultError('not_permitted', 'Sign in to reach this vault.')))
     await TH.expectRefusal(world.open(), 'not_permitted')
-    expect(world.logged.map((heard) => heard.level)).to.deep.equal(['warn', 'warn', 'warn', 'warn'])
+    expect(world.logged.map((heard) => heard.level)).to.deep.equal(['warn', 'warn', 'warn'])
     expect((world.logged[0]?.err?.cause as Error).message).to.match(/disk full/)
     const text = TH.loggedText(world.logged)
     // the walk reached the cause, so its search covers what causes hold
@@ -516,7 +516,9 @@ describe("when storage says the user is no longer signed in", () => {
     vault.subscribe(() => { heard.push(vault.getSnapshot().state) })
     vi.spyOn(world.vaultDB, 'getBox').mockResolvedValueOnce(bad(signedOut()))
     await TH.expectRefusal(vault.getBox('anthropic'), 'identity_revoked')
-    expect(heard).to.deep.equal(['locked'])
+    // Told locked, then told of the bad news as its trouble: never unlocked again between.
+    expect([...new Set(heard)]).to.deep.equal(['locked'])
+    expect(vault.trouble?.refusalkind).to.eq('identity_revoked')
   })
 
   it("revokes the lease when it meets the open, which then refuses", async () => {
@@ -675,16 +677,6 @@ describe("the device mark", () => {
  * A world whose `u1` vault had a way in, `spare`, removed, and the text of its vault props from
  * before the removal, for storage to hand back.
  */
-const rolledBackWorld = async () => {
-  const world = makeWorld()
-  const vault = await world.openUnlocked('pw')
-  const spareId = await vault.addPassphrase('pw', 'spare phrase', { wayinlabel: 'spare' })
-  const older = world.dbStore.read(u1VaultPropsCkey) ?? ''
-  await vault.delWayin('pw', spareId)
-  const newer = world.dbStore.read(u1VaultPropsCkey) ?? ''
-  return { world, vault, older, newer }
-}
-
 /**
  * The README's recipe for a vault whose storage was restored from an older copy on purpose: open
  * it, and on 'rolled_back', when the host knows of the restore, erase this device's mark and open

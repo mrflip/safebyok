@@ -106,7 +106,8 @@ when given (`convexVaultDB({ client, api, logger })`), hears what the VaultDB ha
   the vault once the Convex client is authenticated (in React, once `useConvexAuth()` says so):
   a call made before then is refused with kind `identity_revoked`, which also makes this device
   revoke its lease, so the user types their passphrase again. A hello refused
-  that way leaves the vault `opening`, saying why as its snapshot's `trouble`: call `hello()` again once signed in.
+  that way leaves the vault `opening`, the refusal its caller's (and, as bad news, the vault's
+  `trouble`): call `hello()` again once signed in.
 * **Signing out locks the vault.** Once the Convex client signs out (or signs in as someone
   else), the vault's live `watchVault` query is refused, the vault looks again, meets
   `identity_revoked`, and locks itself, as `lock()` does: an idle vault in another tab included.
