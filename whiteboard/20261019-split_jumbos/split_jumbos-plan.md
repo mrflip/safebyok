@@ -196,3 +196,27 @@ Each step ends green (`pnpm justify` at the root) and committed; the Coach is in
 * `git diff --color-moved` from the base shows no changed line inside a moved block.
 * `dist/testing.js` exports the same names; `src/index.ts` exports the same names.
 * STYLE.md states the rule, and CLAUDE.md's reading list matches the tree.
+
+## What was done (2026-10-19)
+
+The Coach ruled the plan's numbers and split points guides, not rules. PRs: #188 (Parts 1, 2 and
+the guidance of Part 4), #189 (Part 3, stacked). Where the work differs from the plan above:
+
+* **`tests/vault/`** as planned: eight files and `world.ts`, 23 shared helpers. The "watch for"
+  note was moot: `vault.test.ts` had no top-level hook.
+* **`tests/test-helpers/`**: seven parts, with `fixtures.ts` named `builders.ts` (`fixtures/` means
+  sample data here). The front door names its exports (`export { … } from`) instead of
+  `export *`, because six internals that two parts share would otherwise have joined
+  `safebyok/testing`. The plan's line ranges cut across families in places (`deferred`, `ticks`,
+  `microtasks`, `unresolved`, `unheard` belong to timing; `NotRefused` to refusals), which would
+  have made import cycles. `import-x/no-cycle`, which the plan relied on, is not in the eslint
+  config; one run with it switched on over `src` and `tests` found none. The eslint glob is
+  `tests/test-helpers/*.ts`, and `tests/test-helpers.test.ts` (1,318 lines) stayed whole, its
+  doc block saying why, so no test file sits among the shipped parts.
+* **Part 3**: `src/vault-opts.ts` (416) and `src/retire-damaged-vault.ts` (115); `vault.ts` is
+  2,208 lines, not 1,900. `src/local-vault-db.ts` was not made: about a dozen importers changed
+  for 160 lines out of a 1,020-line file. `retireDamagedVault`'s tests, a public verb of their own,
+  became `tests/retire-damaged-vault.test.ts`.
+* **Part 4**: STYLE.md and CLAUDE.md edits ride in #188, in the commits they describe, at the
+  Coach's word that guidance needs no PR of its own. Two empty changesets, one per PR.
+* softlock_gone's plan now says where the code it cites has gone.
