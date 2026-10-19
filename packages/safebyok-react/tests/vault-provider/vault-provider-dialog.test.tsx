@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { Vault, isVaultError, memoryDeviceDB, type Ask, type GetProof, type VaultError } from 'safebyok'
+import { Ask, Vault, isVaultError, memoryDeviceDB, type GetProof, type Outcome, type VaultError } from 'safebyok'
 import { useLayoutEffect } from 'react'
 import * as TH from 'safebyok/testing'
 import { VaultProvider, useVault } from '../../src/vault-provider'
@@ -243,6 +243,14 @@ describe("VaultProvider", () => {
       const world = await lockedWorld()
       const gate = TH.makeGate()
       const slowDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase: string, saltBytes: Uint8Array) => { await gate.pass(); return await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes) } }
+      // Each attempt the dialog makes, kept, so the test waits for the one cancelled to finish.
+      const attempts: Promise<Outcome<Vault>>[] = []
+      const raise = Ask.raise.bind(Ask)
+      vi.spyOn(Ask, 'raise').mockImplementation((why, raising, attempter, getProof) => raise(why, raising, (...args) => {
+        const attempting = attempter(...args)
+        attempts.push(attempting)
+        return attempting
+      }, getProof))
       render(world.tree('u1', slowDeriver))
       const vault = await world.opened()
       const first = vault.tryGetBox('anthropic_api_key')
@@ -256,7 +264,8 @@ describe("VaultProvider", () => {
       await screen.findByPlaceholderText('vault passphrase')
       expect(second.outcome).to.eq('pending')
       gate.release()
-      await TH.wakeupAtNextTick()
+      const outcomes = await Promise.all(attempts)
+      expect(outcomes.map((outcome) => (outcome.ok ? 'unlocked' : outcome.err.refusalkind))).to.deep.equal(['vault_locked'])
       expect(vault.getSnapshot().state).to.eq('locked')
       expect(screen.queryByPlaceholderText('vault passphrase')).to.not.be.null
       expect(second.outcome).to.eq('pending')
