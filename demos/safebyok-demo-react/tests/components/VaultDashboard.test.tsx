@@ -52,7 +52,7 @@ describe("VaultDashboard, opening", () => {
 
   it("says a damaged vault record can't be opened, and offers no Retry", async () => {
     const world = TH.makeWorld()
-    vi.spyOn(world.vaultDB, 'getVaultProps').mockRejectedValue(new VaultError('corrupt_record', 'The stored vault failed its checks.'))
+    vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValue(TH.bad(new VaultError('corrupt_record', 'The stored vault failed its checks.')))
     world.renderInVault(<VaultDashboard />)
     await screen.findByText(/stored record is damaged/)
     expect(screen.queryByRole('button', { name: 'Retry' })).to.be.null
@@ -86,7 +86,7 @@ describe("VaultDashboard, a vault stored damaged", () => {
 
   it("says why deleting it failed, and keeps offering it", async () => {
     const { world } = await damagedWorld()
-    vi.spyOn(world.vaultDB, 'delDamagedVault').mockRejectedValueOnce(new VaultError('storage_unavailable', 'The vault storage could not be reached: try again shortly.'))
+    vi.spyOn(world.vaultDB, 'delDamagedVault').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'The vault storage could not be reached: try again shortly.')))
     vi.spyOn(globalThis, 'confirm').mockReturnValue(true)
     world.renderInVault(<VaultDashboard />)
     fireEvent.click(await screen.findByRole('button', { name: 'Remove and start over' }))
