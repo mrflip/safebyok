@@ -5775,7 +5775,7 @@ describe("versioned updates: two devices writing at once", () => {
     expect(told[0]?.message).to.match(/^The lockbox this device showed was a damaged one/)
     expect(told[0]?.story).to.deep.include({ call: 'retireBox', damaged: true })
     const text = TH.loggedText(told)
-    for (const unsaid of [theirs.revisionTok, 'anthropic']) { expect(text).to.not.include(unsaid) }
+    for (const unsaid of [theirs.revisionTok, 'anthropic', 'sk-ant-fake-one', 'sk-ant-fake-theirs']) { expect(text).to.not.include(unsaid) }
   })
 
   it("a store over a damaged box naming no revision, written over meanwhile by a device that saw it damaged too, retires that write, warns, and stores its own", async () => {
