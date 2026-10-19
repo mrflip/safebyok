@@ -53,10 +53,15 @@ added or folded into through the subagent, and no other entry changes.
   longer retires first and logs no `retired_other` of its own; a store is always one conditional
   `updateBox`. A lockbox listed damaged that names a revision is written over in that one write; one
   that names no revision is refused as `damaged_lockbox`, writing nothing, its message telling the
-  user to `retireBox()` it first. This closes the residual this entry recorded (A retires and
-  writes; B retires A's write and writes; neither throws), and the gap between the two calls in
-  which a refused write could say nothing was written after the retire had removed a record.
-  Nothing stored changes.
+  user to `retireBox()` it first. This closes the race inside `storeBox()` (A retires and writes;
+  B retires A's write and writes; neither throws), and the gap between the two calls in which a
+  refused write could say nothing was written after the retire had removed a record. The race
+  still runs through an explicit `retireBox()`: both devices list the box damaged with
+  `revision_tok` null; A calls `retireBox()` and then `storeBox()`; B, its listing still stale,
+  calls `retireBox()` naming null and removes A's fresh write. B is warned only through the host's
+  logger, as `retired_other` with `damaged: true`, because a retirement within the vault wins over
+  any revision. That stays the stated residual until the tombstone rework. Nothing stored
+  changes.
 * 2026-10-19 (returning): **`VaultDB.updateBox` now resolves the lockbox as storage holds it after
   the write lands, and the base class takes that answer as untrusted storage input.** Each
   adapter's `doUpdateBox` hands the lockbox back from the same atomic step as the conditional
