@@ -5,9 +5,11 @@ they disagree. Workers look things up here; they do not write it.
 
 ## Line
 
-*Orchestrator:* 0 `rename_pass` #193 (905b75ec) → A1 `outcome` #194 (35fdadb7) → A2
-`vault_class` #196 (7b175db8) → A3 `fields_and_make` #197 (f924b90e) → A4 `try_twins` building. A1b `outcome_adapters` #195
-(15b238fc) stands on A1 beside A2; it joins the line at the restack before phase B.
+*Orchestrator:* phase A is filed as one line: main → #193 `rename_pass` → #194 `outcome` → #196
+`vault_class` → #197 `fields_and_make` → #198 `try_twins` → #199 `react_over_class` → #200
+`getproof` → #195 `outcome_adapters` (A1b, restacked on top: tip 19c0cc87). Phase B builds from
+19c0cc87: B1 `proof_wayin` and B3 `box` beside each other; phase A's review passes 1 and 2 run
+alongside; `a-fixes` comes on B's line once the passes report.
 
 ## Decisions and discoveries
 
@@ -90,6 +92,34 @@ they disagree. Workers look things up here; they do not write it.
 * The hello theme lives in `tests/vault/vault-hello.test.ts`; `rolledBackWorld` moved to `world.ts`.
 * The react suite resolves `safebyok` through its `dist/`: rebuild the core first.
 
+*Orchestrator:* from A4 (#198):
+
+* Each public call: `readonly #tryX = this.#trying(async (...) => {...})`; `tryX = this.#tryX`;
+  `X = this.#throwing(this.#tryX)`. `tryClose` answers synchronously. `valOf` and
+  `unexpectedError` exported; `outcomeOf(thunk, otherwise?)`.
+* A throw that is no `VaultError` is `storage_unavailable` only where an adapter's `do*` ran;
+  elsewhere `unexpected_error` (misuse), **never logged** at the vault boundary (a host's strength
+  test or key deriver was handed the passphrase).
+* The VaultDB base refuses a `do*` hook's Outcome-shaped answer as `bad_option` (unwrap with
+  `valOf`). Its verbs cannot use `#private` members (a duck-typed `Object.create(vaultDB)` breaks).
+* `hello` ignores a non-plain-bag first argument (bare event handler).
+
+*Orchestrator:* from A5 (#199) and A6 (#200):
+
+* `useVault()` → `Vault | null`; `useVaultSnapshot()` → `VaultSnapshot | null`; `useOpenError()`.
+  The provider makes the vault in an effect (a closed vault cannot reopen); StrictMode's
+  rehearsal makes an inert one that reads nothing; handlers (`onBadNews`, `getProof`) are held by
+  ref behind a gate per vault, closed in cleanup.
+* `src/ask.ts`: `class Ask` (`why`, `vault`, `attempt`, `lockLanded`, one shared answer), made by
+  `Ask.raise`, one AbortController per ask. `#ensureLease` is sequencing only. Every data call goes
+  through `#ensureLease(0)`. `#tryAttempt(proof, opts, overtaken)` and `#unlockWith` are the unlock
+  path (B4's `putWayin` reuses it). A lock/close/del under a prompt refuses waiters `vault_locked`,
+  settles `lockLanded`, stands the attempt down; the attempt erases any lease it wrote and stands
+  down any take-up first.
+* The shipped dialog is the provider's default `getProof` (`getProof={null}` declines); it asks
+  only while a user gesture is in hand. The provider tests live in `tests/vault-provider/`.
+* Proof parsing is still at the vault's edge (`parseProof`), for B1 to lift.
+
 ## Interim shims standing
 
 *Orchestrator:* each is listed until a later thread removes it.
@@ -97,6 +127,5 @@ they disagree. Workers look things up here; they do not write it.
 * `RefusalPolicy.heed` (`refusal-policy.ts`): every vault.ts store call goes through it, turning
   an Outcome back into a throw. A4 / phase C.
 * `del-damaged-vault.ts` unwraps via `valOf`.
-* The demo's `OutageVaultDB` `answered` helper, until `valOf` (or its successor) is exported (A4).
 * GraphQL's `served` and the Postgres route recipe are not shims (A1b): a resolver reports failure
   only by throwing, and the route turns an Outcome into JSON by design.
