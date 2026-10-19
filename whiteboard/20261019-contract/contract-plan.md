@@ -16,7 +16,7 @@ this line.
   (56 kB; `grep -n '^#'` is its outline). The handoff says when a ruling has changed it since.
 * **Sprint doc:** https://claude.ai/code/artifact/362ec68d-5bf3-46aa-a379-59a9c8bfb548
   (*Open Matters*, *Resolved*, *Progress*).
-* **Status:** thread 0 filed (#193); A1 built (#194), in review.
+* **Status:** 0 and A1 filed (#193, #194); A1b and A2 building.
 
 ## How this plan relates to the preplan
 
@@ -81,6 +81,14 @@ Filed as an *Open Matters* row so the Coach can close the PR and run it by hand 
 | A6 | `getproof` | A5 | opus | high | `ensureLease`, `Ask` class, `attempt`, `lockLanded`; react modal as `getProof`. |
 
 *Orchestrator:* A1b does not hold up A3 to A6; it joins the line at the restack before phase B.
+
+*Review (A1, #194, `fixed`):* six test spies still rejecting from `getVaultProps` now resolve
+`bad(...)`; doc blocks rewrapped; `VaultDB`'s doc block tells a wrapping `do*` to unwrap. Test
+counts did not fall (the worker reported passed-only). Left: the demo's
+`VaultDashboard.test.tsx:55,89` mocks still reject (to A1b); `expectBad`'s unreported `!`;
+`outcomeOf` in the base maps a bug to `storage_unavailable` (an Open Matters row, A4);
+`RefusalMeta` fields unfilled until C1; unused `settledKind` in e2e; the battery's "never a
+rejection" covers only the base's refusals. Live-backend e2e (96) not run: A1b's reviewer runs them.
 
 **Closing phase A:** passes 1 and 2 (opus, `high`, worktree-isolated agents, one lens each) over
 `origin/main...<A's tip>` while B1 and B3 build; findings filed as a comment on the sprint PR and
