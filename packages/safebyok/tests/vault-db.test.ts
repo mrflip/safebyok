@@ -65,13 +65,13 @@ class MapVaultDB extends VaultDB {
     const meets = standingVaultProps?.vault_id === expected.vault_id && standingVaultProps.vault_key_epoch === expected.vault_key_epoch
       && (standingBox?.revision_tok ?? null) === expected.revision_tok
     if (! meets) {
-      return Promise.resolve(false)
+      return Promise.resolve(null)
     }
     if (standingBox === undefined && this.boxCount(scope) >= this.maxLockboxes) {
       return Promise.reject(new VaultError('vault_full', 'This vault is full: remove a lockbox to make room, then try again.'))
     }
     this.rows.set(Ckeys.box(scope, lockbox.boxlabel), lockbox)
-    return Promise.resolve(true)
+    return Promise.resolve(this.rows.get(Ckeys.box(scope, lockbox.boxlabel)))
   }
 
   /** How many lockboxes `scope` holds: counted through the ckeys, never copying the rows. */
@@ -112,7 +112,7 @@ class TroubledVaultDB extends MapVaultDB {
 
   protected override doReadVaultProps(): Promise<unknown> { this.failure() }
   protected override doSubscribe(): () => void { this.failure() }
-  protected override doUpdateBox(): Promise<boolean> { return Promise.reject(new Error('the backend dropped the connection')) }
+  protected override doUpdateBox(): Promise<unknown> { return Promise.reject(new Error('the backend dropped the connection')) }
 }
 
 const unheard = (): void => undefined
@@ -587,6 +587,66 @@ describe("the abstract VaultDB, on the way in", () => {
     await vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'two'), { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 1 })
     await vaultDB.retireBox(TH.scopeOf('u1'), 'anthropic', TH.thisVault)
     expect(await vaultDB.listBoxes(TH.scopeOf('u1'))).to.have.lengthOf(0)
+  })
+})
+
+/** A MapVaultDB that writes each lockbox as it should, then hands back `handedBack` in place of what it stored. */
+class MisansweringVaultDB extends MapVaultDB {
+  private readonly handedBack: unknown
+
+  constructor(handedBack: unknown) {
+    super()
+    this.handedBack = handedBack
+  }
+
+  protected override async doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<unknown> {
+    const stored = await super.doUpdateBox(scope, lockbox, expected)
+    return stored === null ? null : this.handedBack
+  }
+}
+
+const MisansweredCases = [
+  [true,                                                             'the true an older adapter answered with'],
+  [undefined,                                                        'nothing at all'],
+  [omit(TH.boxOf('anthropic', 'one'), ['whisper_ciphered']),         'a lockbox missing a ciphered field'],
+  [{ ...TH.boxOf('anthropic', 'one'), written_at: '1792022400000' }, 'a lockbox whose time is text'],
+  [TH.boxOf('openai', 'one'),                                        'a lockbox under another boxlabel than the one written'],
+] as const
+
+describe("the abstract VaultDB, on the way back from a lockbox write", () => {
+  it("resolves the lockbox its adapter hands back, as storage now holds it", async () => {
+    const vaultDB = new MapVaultDB()
+    await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
+    expect(await vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet)).to.deep.equal(TH.boxOf('anthropic', 'one'))
+  })
+
+  it("refuses as stale, resolving nothing, a write whose adapter answers null", async () => {
+    const vaultDB = new MapVaultDB()
+    await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
+    await vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet)
+    await TH.expectRefusal(vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'two'), TH.noBoxYet), 'stale_write')
+    expect(vaultDB.rows.get(u1BoxCkey('anthropic'))).to.deep.equal(TH.boxOf('anthropic', 'one'))
+  })
+
+  for (const [handedBack, blurb] of MisansweredCases) {
+    it(`refuses as corrupt_record a landed write whose adapter hands back ${blurb}, saying the write may have landed`, async () => {
+      const vaultDB = new MisansweringVaultDB(handedBack)
+      await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
+      const refusal = await TH.expectRefusal(vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet), 'corrupt_record')
+      expect(refusal.message).to.match(/landed/)
+      expect(refusal.message).to.match(/cannot read back/)
+      expect((refusal.cause as VaultError).kind).to.eq('corrupt_record')
+      // What the adapter stored stands: the refusal is about its answer, not its write.
+      expect(vaultDB.rows.get(u1BoxCkey('anthropic'))).to.deep.equal(TH.boxOf('anthropic', 'one'))
+    })
+  }
+
+  it("never quotes the record it refuses on the way back", async () => {
+    const vaultDB = new MisansweringVaultDB({ ...TH.boxOf('anthropic', 'one', { whisper_ciphered: TH.fakeCiphered('SUPERSECRET') }), revision_tok: '' })
+    await vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
+    const refusal = await TH.expectRefusal(vaultDB.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet), 'corrupt_record')
+    expect(refusal.message).to.not.include('SUPERSECRET')
+    expect(refusal.message).to.not.include('anthropic')
   })
 })
 

@@ -91,12 +91,14 @@ class IdbVaultDB extends VaultDB {
       .filter((stored): stored is StoredLockbox => stored.boxlabel !== null)
   }
 
-  protected async doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<boolean> {
+  // The lockbox handed back is the row as the put left it, read in the same transaction.
+  protected async doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<unknown> {
     return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {
-      const [standingVaultProps, standingBox] = await Promise.all([rowAt(store, Ckeys.vaultProps(scope)), rowAt(store, Ckeys.box(scope, lockbox.boxlabel))])
-      if (! Expectations.lockboxMeets(standingVaultProps, standingBox, expected)) { return false }
-      store.put(lockbox, Ckeys.box(scope, lockbox.boxlabel))
-      return true
+      const ckey = Ckeys.box(scope, lockbox.boxlabel)
+      const [standingVaultProps, standingBox] = await Promise.all([rowAt(store, Ckeys.vaultProps(scope)), rowAt(store, ckey)])
+      if (! Expectations.lockboxMeets(standingVaultProps, standingBox, expected)) { return null }
+      store.put(lockbox, ckey)
+      return await rowAt(store, ckey)
     }))
   }
 
@@ -129,8 +131,9 @@ class IdbVaultDB extends VaultDB {
 
   private ring() { ChangeBell.ring(bellnameOf(this.dbName)) }
 
-  private ringIfLanded(landed: boolean): boolean {
-    if (landed) { this.ring() }
+  /** Rings once a write lands: `true`, or what it handed back; never for `false` or `null`, a write that did not. */
+  private ringIfLanded<LandedT>(landed: LandedT): LandedT {
+    if (landed !== false && landed !== null) { this.ring() }
     return landed
   }
 }

@@ -19,8 +19,9 @@ Three layers share the work, and each guarantee below belongs to one of them.
   the other device wrote or retired stands, and the host hears that its write lost. It also holds the app's own lockbox limit (`maxLockboxes`, 100 by default): the alarm bell for an
   app that is storing far more than it meant to.
 * **The base class** (`VaultDB`'s public verbs) checks every name, record and expectation on the
-  way in and every record on the way out, refuses what is malformed before your code sees it,
-  turns a `false` from you into `stale_write`, and turns anything you throw that is not a
+  way in and every record on the way out -- the lockbox a write hands back among them -- refuses
+  what is malformed before your code sees it, turns a `false` or `null` from you into
+  `stale_write`, and turns anything you throw that is not a
   `VaultError` into `storage_unavailable`, your error as its cause. It holds every name to the
   floor and to what your adapter declares (*Names*, below), never to a host's own validators.
   It guards `subscribe`: each listener is called so that nothing it throws, and no promise it
@@ -32,7 +33,9 @@ Three layers share the work, and each guarantee below belongs to one of them.
 * **Your adapter** (the `do*` methods) stores and returns records, and makes each write
   conditional: it checks the expectation and writes in one atomic step. It never resolves a
   conflict itself, never merges two writes, and never retries one: a write whose expectation
-  failed resolves `false`, and the vault decides what happens next.
+  failed resolves `false` (a lockbox write, `null`), and the vault decides what happens next. A
+  lockbox write that lands resolves the record as you now hold it, read back in the same atomic
+  step as the write.
 
 A server that serves these verbs to browsers -- the Convex component, the Postgres route recipe,
 the GraphQL resolvers -- checks who may reach which vault (line 5.4), makes each write atomic, and
@@ -174,6 +177,17 @@ under that boxlabel. Otherwise it refuses as `stale_write`: over a revision it n
 scope with no vault props, or into a vault retired and made anew under another `vault_id`, even
 where no lockbox stands in either.
 
+A write that lands resolves the lockbox as storage now holds it, field for field the one written
+(line 1.1), and the adapter hands it back from the same atomic step as the write: a `RETURNING`
+(Postgres), the mutation's return value (Convex, and over GraphQL its payload), a read in the
+write's transaction (IndexedDB) or synchronous turn (`localVaultDB`), never a second call. A
+refused write resolves nothing: its adapter resolves `null`, and the base class throws
+`stale_write`, carrying no record. The base class holds what comes back to the check a `readBox`
+makes, and refuses one that fails it as `corrupt_record`, saying the write may have landed: the
+adapter wrote something it cannot read back. *That refusal is proven by the base class's own
+tests* (the core's `vault-db.test.ts`), which can have an adapter answer with a malformed record;
+the battery, through an adapter that keeps this line, cannot.
+
 **3.4. A retirement wins, within its vault.** `retireBox` removes the lockbox under its boxlabel,
 whatever revision stands, while the scope's standing vault props have the expected `vault_id`; it is
 quiet when there is no such lockbox. A write over a revision retired meanwhile refuses, and the
@@ -253,15 +267,16 @@ refuses at that limit as `vault_full`, and declares a `maxLockboxes` well inside
 for a backend with no such limit enforces none beyond line 4.2's best effort, unless the host
 opts in to one and pays what it costs. *Not tested by the battery*: each adapter tests its own.
 
-A write that lands resolves with nothing: it reports no count of the vault's lockboxes. The vault
-already learns the count from the listing it reads after every write, and asking every adapter for
-one would put a count into every adapter's write path. An adapter that enforces a limit says, in
+A write that lands reports no count of the vault's lockboxes: a lockbox write resolves its record
+(line 3.3), and nothing more. The vault already learns the count from the listing it reads after
+every write, and asking every adapter for one would put a count into every adapter's write path. An adapter that enforces a limit says, in
 its README, what its count is as of: the start of the write's statement, say, or its commit.
 
 ## 5. Errors
 
 **5.1. Every refusal is a VaultError whose kind says what to do.** An adapter refuses with a
-`VaultError`: `stale_write` (by resolving `false`; the base class throws it), `vault_full`,
+`VaultError`: `stale_write` (by resolving `false`, or `null` from a lockbox write; the base class
+throws it), `vault_full`,
 `identity_revoked`, `not_permitted`, or anything it throws otherwise, which becomes
 `storage_unavailable`. The base
 class refuses `bad_label`, `bad_option`, `lockbox_too_large` and `corrupt_record` itself, before

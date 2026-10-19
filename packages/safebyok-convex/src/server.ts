@@ -135,7 +135,7 @@ export class SafebyokComponent {
       }),
       updateBox: publicMutation({
         args:    { scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation },
-        returns: v.boolean(),
+        returns: v.nullable(Lockbox),
         handler: async (ctx, args) => {
           await mustBe(ctx, args.scope.user_id)
           return await ctx.runMutation(vaults.updateBox, args)

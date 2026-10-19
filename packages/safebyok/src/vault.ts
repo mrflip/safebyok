@@ -513,6 +513,13 @@ export type Vault = {
    * catch-up's failure its cause, and the snapshot says `syncing: false` -- or, for a catch-up
    * refused as 'identity_revoked', 'rolled_back' or 'newer_format', that refusal as it came.
    *
+   * A store can also throw after its write has landed. Once storage takes the write, the call reads
+   * storage again to show the new revision, and that read can fail as any read does: kind
+   * 'storage_unavailable', 'identity_revoked', 'rolled_back', 'newer_format' or 'damaged_vault'. A
+   * storage adapter that hands back a record it cannot read throws kind 'corrupt_record' the same
+   * way. Either way the lockbox may already hold this whisper, and calling `storeBox()` again
+   * writes the same whisper over itself, harmlessly.
+   *
    * The lockbox keeps the time it was first stored as `registered_at`, and stamps `written_at`
    * with the time of this write: every store moves it, the same whisper stored again included, so
    * it says when the lockbox was last written, never whether its whisper changed.
@@ -1945,11 +1952,12 @@ const make = (opts: MakeVaultOpts): Vault => {
    * reborn elsewhere, or its ways in changed, relocks this device. A catch-up that fails is
    * thrown as 'stale_write' too, its failure the cause, the snapshot saying `syncing: false` --
    * but for a catch-up refused as 'identity_revoked', 'rolled_back' or 'newer_format', which is
-   * thrown as it came: each asks something else of the caller than a stale write does.
+   * thrown as it came: each asks something else of the caller than a stale write does. A write
+   * that lands resolves as it came.
    */
-  const refreshOnStale = async (write: Promise<void>, call: VaultCall): Promise<void> => {
+  const refreshOnStale = async <WrittenT>(write: Promise<WrittenT>, call: VaultCall): Promise<WrittenT> => {
     try {
-      await write
+      return await write
     } catch (err) {
       if (! isVaultError(err, 'stale_write')) { throw err }
       await catchUp(err, call)

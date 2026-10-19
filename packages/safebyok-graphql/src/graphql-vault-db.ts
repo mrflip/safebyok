@@ -98,7 +98,7 @@ const UpdateVaultPropsDoc = `mutation SafebyokUpdateVaultProps($vaultProps: Safe
   safebyokUpdateVaultProps(vaultProps: $vaultProps, expected: $expected)
 }`
 const UpdateBoxDoc = `mutation SafebyokUpdateBox(${Scope}, $lockbox: SafebyokLockboxInput!, $expected: SafebyokLockboxExpectationInput!) {
-  safebyokUpdateBox(scope: $scope, lockbox: $lockbox, expected: $expected)
+  safebyokUpdateBox(scope: $scope, lockbox: $lockbox, expected: $expected) { ${selectionOf(LockboxFields)} }
 }`
 const RetireBoxDoc = `mutation SafebyokRetireBox(${Scope}, $boxlabel: String!, $expected: SafebyokRetireExpectationInput!) {
   safebyokRetireBox(scope: $scope, boxlabel: $boxlabel, expected: $expected)
@@ -184,10 +184,12 @@ class UrqlVaultDB extends VaultDB {
     })
   }
 
-  protected async doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<boolean> {
+  // A stale write refuses on the server and crosses as its kind, so a write that answers landed,
+  // with the lockbox as the server's storage holds it.
+  protected async doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<unknown> {
     const { vault_id, revision_tok, vault_key_epoch } = expected
-    await this.told(UpdateBoxDoc, { scope: scopeOut(scope), lockbox: recordOf(lockbox, LockboxFields), expected: { vault_id, revision_tok, vault_key_epoch } })
-    return true
+    const { safebyokUpdateBox } = await this.told(UpdateBoxDoc, { scope: scopeOut(scope), lockbox: recordOf(lockbox, LockboxFields), expected: { vault_id, revision_tok, vault_key_epoch } })
+    return recordOf(safebyokUpdateBox, LockboxFields)
   }
 
   protected async doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation): Promise<boolean> {

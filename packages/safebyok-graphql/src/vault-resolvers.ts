@@ -128,10 +128,7 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
         await vaultDB.updateVaultProps(vaultPropsIn(args), vaultPropsExpectationIn(args))
         return true
       }),
-      safebyokUpdateBox: served(async (vaultDB, args) => {
-        await vaultDB.updateBox(scopeIn(args), recordOf(args.lockbox, LockboxFields) as Lockbox, lockboxExpectationIn(args))
-        return true
-      }),
+      safebyokUpdateBox: served((vaultDB, args) => vaultDB.updateBox(scopeIn(args), recordOf(args.lockbox, LockboxFields) as Lockbox, lockboxExpectationIn(args))),
       safebyokRetireBox: served(async (vaultDB, args) => {
         await vaultDB.retireBox(scopeIn(args), args.boxlabel as string, retireExpectationIn(args))
         return true

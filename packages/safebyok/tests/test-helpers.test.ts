@@ -818,7 +818,7 @@ const servingOnly = (userId: string | null, store: StringStore): TH.VaultDBVerbs
     readBox:                 async (scope, boxlabel) => { permitted(scope); return await shared.readBox(scope, boxlabel) },
     listBoxes:               async (scope) => { permitted(scope); return await shared.listBoxes(scope) },
     listBoxRecords:          async (scope) => { permitted(scope); return await shared.listBoxRecords(scope) },
-    updateBox:               async (scope, lockbox, expected) => { permitted(scope); await shared.updateBox(scope, lockbox, expected) },
+    updateBox:               async (scope, lockbox, expected) => { permitted(scope); return await shared.updateBox(scope, lockbox, expected) },
     retireBox:               async (scope, boxlabel, expected) => { permitted(scope); await shared.retireBox(scope, boxlabel, expected) },
     retireVault:             async (scope, expected) => { permitted(scope); await shared.retireVault(scope, expected) },
     retireDamagedVault:      async (scope) => { permitted(scope); await shared.retireDamagedVault(scope) },
@@ -1054,7 +1054,8 @@ class RoundTripVaultDB extends VaultDB {
       }
       return true
     }
-    return await this.step({ check: meets, write: (rows) => { rows.set(ckey, lockbox) } })
+    // What it set is what it holds: its rows keep each record as it was handed them.
+    return await this.step({ check: meets, write: (rows) => { rows.set(ckey, lockbox) } }) ? lockbox : null
   }
 
   protected doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation) {

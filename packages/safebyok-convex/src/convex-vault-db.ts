@@ -134,7 +134,7 @@ class ConvexVaultDB extends VaultDB {
     return rows.map((row) => ({ boxlabel: row.boxlabel, lockbox: row }))
   }
 
-  protected doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<boolean> {
+  protected doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<unknown> {
     return refusing(() => this.client.mutation(this.api.updateBox, { scope, lockbox, expected }))
   }
 

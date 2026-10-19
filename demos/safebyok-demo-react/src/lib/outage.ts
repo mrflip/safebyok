@@ -114,10 +114,9 @@ export class OutageVaultDB extends VaultDB {
     }
   }
 
-  protected async doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<boolean> {
+  protected async doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<unknown> {
     this.refuseWhileDown()
-    await this.inner.updateBox(scope, lockbox, expected)
-    return true
+    return await this.inner.updateBox(scope, lockbox, expected)
   }
 
   protected async doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation): Promise<boolean> {
