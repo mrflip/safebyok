@@ -1302,8 +1302,8 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
         const lockbox = await vaultDB.readBox(scopeOf('u1'), boxlabel)
         expect(lockbox?.revision_tok).to.eq(`rev-of-${String(ii)}`)
       }
-      const quoted = OddLabels.indexOf('main"')
-      await vaultDB.retireBox(scopeOf('u1'), 'main"', retiring(`rev-of-${String(quoted)}`))
+      const quoted = retiring(`rev-of-${String(OddLabels.indexOf('main"'))}`)
+      expect(await vaultDB.retireBox(scopeOf('u1'), 'main"', quoted)).to.deep.equal({ outcome: 'retired' })
       const remaining = await vaultDB.listBoxes(scopeOf('u1'))
       expect(remaining).to.have.lengthOf(OddLabels.length - 1)
     })
