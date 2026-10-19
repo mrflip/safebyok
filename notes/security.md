@@ -55,7 +55,12 @@ added or folded into through the subagent, and no other entry changes.
   `VaultError` with `refusalkind` `identity_revoked`) never carries it. Under the old name-and-kind
   test, such a remote error was kept "as it came", so a backend could choose the refusal's kind
   (lock the vault, raise bad news) and the message the app shows the user. Now it is wrapped as
-  `storage_unavailable`, safebyok's own message, the error as its `cause`. A plain object (not an
+  `storage_unavailable`, safebyok's own message, the error as its `cause`. safebyok's own clients,
+  `safebyok-graphql`'s `graphqlVaultDB` and `safebyok-convex`'s `convexVaultDB`, deliberately rebuild
+  a real `VaultError` from their server's kind and message (`new VaultError(kind, message, { cause })`),
+  so through them the server (the package's own server code: `vaultResolvers`, the Convex component)
+  still chooses both the kind and the message; the mark protects only against an error a host's own
+  client rebuilds by name. A plain object (not an
   `Error`) never passes, even carrying the mark. The mark is not a defence against code running in
   the page, which could construct a `VaultError` directly anyway; it marks "made by a `VaultError`
   constructor in this process", which is what `instanceof` meant, across copies. Tests:
@@ -74,11 +79,14 @@ added or folded into through the subagent, and no other entry changes.
   `putBox` already checked label, sidecar and whisper first. The check runs only when the vault must
   ask; an unlocked vault reads storage for the box as before. The listing (boxlabels, visible
   metadata) is already shown while locked, so refusing `absent_box` without a prompt discloses
-  nothing new; the listing may be up to `staleMinutes` old, so a box just made on another device can
-  read `absent_box` on a locked vault rather than prompt, and reads normally once the listing
-  catches up or after an unlock -- no weakening, since the box is still read and checked from
-  storage once unlocked. Tests: `tests/vault/vault-lease.test.ts`, "every data call, through
-  `ensureLease`".
+  nothing new. The listing in hand is not the last word: when it shows nothing under the name, the
+  vault reads storage once more (`#refresh()`, inside `#checkListed`, which is async;
+  `#ensureLease`'s `beforeAsking` is async too, and the reason to ask is read again after it), and
+  refuses `absent_box` only if that read also shows nothing. With a store that pushes no changes, the
+  listing may lag storage by up to `staleMinutes`, so a miss costs one read of storage before the
+  refusal, and a box another device stored meanwhile is asked for as any other; a box truly absent is
+  still refused with no prompt. Tests: `tests/vault/vault-lease.test.ts`, "every data call, through
+  `ensureLease`", and its tests that the vault "reads storage once before refusing absent_box ...".
 * 2026-10-19 (thread B3 rework, box holder): **a box takes the vault props it lies under explicitly,
   as `holder`, and no longer reads `vault_id` and the vaultKey epoch off the vault's published
   snapshot; sealing is split so a store too large is refused before any key is made.** This replaces
