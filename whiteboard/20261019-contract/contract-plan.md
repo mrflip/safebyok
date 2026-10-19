@@ -16,7 +16,7 @@ this line.
   (56 kB; `grep -n '^#'` is its outline). The handoff says when a ruling has changed it since.
 * **Sprint doc:** https://claude.ai/code/artifact/362ec68d-5bf3-46aa-a379-59a9c8bfb548
   (*Open Matters*, *Resolved*, *Progress*).
-* **Status:** 0, A1, A2 filed (#193, #194, #196); A1b filing (#195); A3 building.
+* **Status:** 0, A1, A1b, A2 filed (#193-#196); A3 (#197) reworking a flagged race.
 
 ## How this plan relates to the preplan
 
@@ -76,8 +76,8 @@ Filed as an *Open Matters* row so the Coach can close the PR and run it by hand 
 | A1b | `outcome-adapters` | A1 | default | medium + battery per adapter | Postgres needs the container; if Docker is unavailable, say so and run what can run. Notes how each backend does C1's one-statement write. |
 | A2 | `vault-class` | A1 | opus | low (preplan's checklist) | Runs beside A1b. Pure move; per-file test count unchanged; banners kept as B's seams. |
 | A3 | `fields-and-make` | A2 | opus | medium | `make` inert, first `hello()` reads, `settle()`, `onBadNews`, `staleMinutes`. |
-| A4 | `try-twins` | A3 | sonnet | low (preplan's checklist) | Every public call as `tryX`/`X`; thread file lists the pairs and which bodies still throw. |
-| A5 | `react-over-class` | A4 | default | medium + StrictMode | Provider makes the vault from props and owns the first `hello()`. |
+| A4 | `try-twins` | A3 | sonnet | low (preplan's checklist) | Every public call as `tryX`/`X`; thread file lists the pairs and which bodies still throw. *Orchestrator:* A3's `#tellingBadNews` wrapper is the seam to build the pairs on. Also: export `valOf` (or its successor) and drop the demo's `answered` shim; decide what `outcomeOf` does with a bug at the VaultDB base and the vault's boundary; a runtime guard refusing an Outcome-shaped record from a `do*` hook; `subscribe`'s synchronous throws; `hello` ignoring a non-options first argument (bare event handler). Each pending its Open Matters row. |
+| A5 | `react-over-class` | A4 | default | medium + StrictMode | Provider makes the vault from props and owns the first `hello()`. *Orchestrator:* StrictMode still opens two vaults in development, each reading once (A3 review): defer the provider's first hello past StrictMode's cleanup. Hold `onBadNews` in a ref so an inline handler does not remake the vault each render. `openError` now comes from the provider's own hello (`helloRefusal`), since `trouble` is bad news only. |
 | A6 | `getproof` | A5 | opus | high | `ensureLease`, `Ask` class, `attempt`, `lockLanded`; react modal as `getProof`. |
 
 *Orchestrator:* A1b does not hold up A3 to A6; it joins the line at the restack before phase B.
@@ -100,6 +100,15 @@ GRANT reads `not_permitted` (row); VAULTDB.md 5.6's RLS wording broader than the
 both writable by a host on the handle; now `#leaseMillis` and `#hello()`. Regression test carried
 into A3.
 
+*Review (A3, #197, `flagged`):* fixed a recursion over an adapter that rings as it is subscribed
+to, an alignment, and the make_hello entry in `notes/security.md` (in place, under the Coach's
+grant). **Flagged:** a stale `hello()` re-running `#fetchLease` can undo a `lock()` landing during
+the lease read. YOLO: the worker is resumed to make any key change cancel a take-up in flight (no
+counter); a second review covers only the new commits. Minors: `trouble` sticks while a damaged
+box stands; bare `vault.hello` as an event handler (to A4); handler told before the snapshot moves
+and thenables unhandled (to the rework, if small); shallow freeze of `sidecar`; StrictMode's two
+vaults (to A5); capacity reckoned twice.
+
 **Closing phase A:** passes 1 and 2 (opus, `high`, worktree-isolated agents, one lens each) over
 `origin/main...<A's tip>` while B1 and B3 build; findings filed as a comment on the sprint PR and
 fixed in a small thread `a-fixes` (on B's line, after B4), with the `a-shims` grep folded in.
@@ -108,7 +117,7 @@ fixed in a small thread `a-fixes` (on B's line, after B4), with the `a-shims` gr
 
 | # | Label | Base | Model | Review | Gloss |
 |---|---|---|---|---|---|
-| B1 | `proof-wayin` | A's line (A1b restacked in) | opus | high | Adds `adorn`/`decorate` to `utils.ts` first. |
+| B1 | `proof-wayin` | A's line (A1b restacked in) | opus | high | Adds `adorn`/`decorate` to `utils.ts` first. *Orchestrator:* A3 left `props` unbuilt and `damaged_wayin` news from a listing unbuilt (summaries flag no damaged wayin yet); both are B1's. |
 | B3 | `box` | A's line | opus | high | Beside B1. |
 | B2 | `lease` | B1 | opus | high | |
 | B4 | `put-wayin` | B2 | opus | medium | Writes its Contract section to the thread file first; YOLO builds to the brief. |
