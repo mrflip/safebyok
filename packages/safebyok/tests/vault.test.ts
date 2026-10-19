@@ -2115,7 +2115,7 @@ describe("while locked", () => {
     await TH.expectRefusal(warm.retireBox('anthropic'), 'vault_locked')
   })
 
-  it("lockbox summaries stay readable: that is what public metadata is for", async () => {
+  it("lockbox summaries stay readable: that is what their visible fields are for", async () => {
     const world = makeWorld()
     const warm = await world.openUnlocked('pw')
     await warm.storeBox('anthropic', 'sk-fake', { sidecar: { note: 'visible while locked' } })
