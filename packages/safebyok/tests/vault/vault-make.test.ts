@@ -928,7 +928,7 @@ describe("a hello that fails", () => {
 
   it("says stored vault props that do not parse as damaged_vault, which the snapshot keeps as its trouble", async () => {
     const world = makeWorld()
-    world.dbStore.write(u1VaultPropsCkey, '{"format":"safebyok-vault-v3"}')
+    world.dbStore.write(u1VaultPropsCkey, '{"format":"safebyok-vault-v4"}')
     const vault = Vault.make(world.optsWith())
     const err = await TH.expectRefusal(vault.hello(), 'damaged_vault')
     expect(vault.getSnapshot().trouble).to.eq(err)

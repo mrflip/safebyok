@@ -36,7 +36,7 @@ export const VaultScope = v.object({
 })
 
 /** The VaultProps formats this package stores. */
-export const VaultPropsFormat = v.union(v.literal('safebyok-vault-v3'))
+export const VaultPropsFormat = v.union(v.literal('safebyok-vault-v4'))
 
 /** The formats of a Lockbox this package stores. */
 export const LockboxFormat = v.union(v.literal('safebyok-lockbox-v5'))
@@ -88,17 +88,8 @@ export const PasskeyWayin = v.object({
 export const Wayin = v.union(PassphraseWayin, PasskeyWayin)
 
 /**
- * The vaultKey before the vault's own, wrapped under its own, at its `vault_key_epoch`: absent
- * until a vault's vaultKey is first replaced.
- */
-export const PriorVaultKey = v.object({
-  vault_key_epoch:   v.number(),
-  vault_key_wrapped: Ciphered,
-})
-
-/**
  * A vault's props: its scope, `vault_id`, `unlock_epoch`, which vaultKey its ways in wrap
- * (`vault_key_epoch`, and the one before as `prior_vault_key`), its ways in (`wayins`, each the
+ * (`vault_key_epoch`, always 1: reserved for a rotation not yet built), its ways in (`wayins`, each the
  * vaultKey wrapped under a wayinKey one kind of wayin makes), and when it was made (`registered_at`, epoch
  * milliseconds). Nothing in it opens without a passphrase or passkey. How many ways in, and that no two
  * share an id or label, are the client's rules.
@@ -111,7 +102,6 @@ export const VaultProps = v.object({
   vault_id:         v.string(),
   unlock_epoch:     v.number(),
   vault_key_epoch:  v.number(),
-  prior_vault_key:  v.optional(PriorVaultKey),
   wayins:           v.array(Wayin),
   registered_at:    v.number(),
 })

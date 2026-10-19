@@ -758,7 +758,7 @@ const newerVaultProps = () => new VaultError('newer_format', "This vault's store
  * The vault props formats earlier versions of this package wrote: a record in one is older, never
  * newer, and fails today's checks as damage does.
  */
-const OlderVaultPropsFormats: ReadonlySet<unknown> = new Set(['safebyok-vault-v1', 'safebyok-vault-v2'])
+const OlderVaultPropsFormats: ReadonlySet<unknown> = new Set(['safebyok-vault-v1', 'safebyok-vault-v2', 'safebyok-vault-v3'])
 
 /**
  * True when a record that fails this version's checks may be one a later version writes, which

@@ -49,7 +49,7 @@ export type VaultIdentity = Pick<VaultProps, 'vault_id' | 'registered_at'>
 export type WayinStamp = Pick<Wayin, 'wayin_id' | 'wayinlabel' | 'vault_key_epoch' | 'device_id' | 'registered_at'>
 
 /** The ctx's first part: the vault props' format, under which every wayin's wrap is bound. */
-const VaultPropsFormat = 'safebyok-vault-v3'
+const VaultPropsFormat = 'safebyok-vault-v4'
 
 /** The ctx purpose of each wayinkind's wrap, so no kind of wayin opens as another. */
 const PurposeForWayinkind = {

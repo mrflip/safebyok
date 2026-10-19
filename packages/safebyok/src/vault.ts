@@ -854,7 +854,7 @@ const make = (opts: MakeVaultOpts): Vault => {
     }
     const { wayin, sessionKey } = await Wayin.sealFirstPassphrase(keyDeriver, passphrase, scope, identity, stamp, freshKey)
     const draft: VaultProps = {
-      format:              'safebyok-vault-v3',
+      format:              'safebyok-vault-v4',
       ...scope,
       ...identity,
       unlock_epoch:        1,
@@ -1797,11 +1797,11 @@ const parseNewPasskey = (candidate: PasskeyProof): PasskeyProof => {
 }
 
 /**
- * True when `box` lists as damaged already, or stands under a vaultKey `standing` holds: its own,
- * or the prior one. A lockbox under any other epoch opens under no key the vault holds.
+ * True when `box` lists as damaged already, or stands under the vaultKey `standing` holds. A
+ * lockbox under any other epoch opens under no key the vault holds.
  */
 const isUnderHeldKey = (box: LockboxSummary | DamagedLockbox, standing: VaultProps): boolean => (
-  box.damaged || box.vault_key_epoch === standing.vault_key_epoch || box.vault_key_epoch === standing.prior_vault_key?.vault_key_epoch
+  box.damaged || box.vault_key_epoch === standing.vault_key_epoch
 )
 
 /** `box`, a lockbox listed sound, as damaged: under its boxlabel and revision, nothing else of it trusted. */

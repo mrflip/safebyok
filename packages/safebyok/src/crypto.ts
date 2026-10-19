@@ -65,7 +65,7 @@ export type CipherCtxPart = string | number | Readonly<Record<string, string | n
  * field as no field at all), so nothing is encrypted or opened under it.
  *
  * @example cipherCtx('safebyok-lease-v1', 'acme', 'u1', 'main', vaultId, 1, askPassphraseAt, 'vault_key_lease_wrapped')
- * @example cipherCtx('safebyok-vault-v3', 'acme', 'u1', 'main', vaultId, registeredAt, 'vault_key_passphrase_wrapped', { wayinkind: 'passphrase', wayin_id, wayinlabel, key_deriver_label, salt_b64 })
+ * @example cipherCtx('safebyok-vault-v4', 'acme', 'u1', 'main', vaultId, registeredAt, 'vault_key_passphrase_wrapped', { wayinkind: 'passphrase', wayin_id, wayinlabel, key_deriver_label, salt_b64 })
  */
 export const cipherCtx = (...parts: readonly CipherCtxPart[]): Uint8Array => {
   if (parts.some((part) => isUnbound(part))) {
@@ -124,7 +124,7 @@ export const importWrappingKeyBytes = (keyBytes: Uint8Array): Promise<CryptoKey>
  * bytes put to another use, or in another place, make another key: the passkeyKey. The bytes stay
  * with the caller; drop them promptly.
  *
- * @example await deriveWrappingKey(prfBytes, cipherCtx('safebyok-vault-v3', 'acme', 'u1', 'main', vaultId, registeredAt, 'vault_key_passkey_wrapped', header))
+ * @example await deriveWrappingKey(prfBytes, cipherCtx('safebyok-vault-v4', 'acme', 'u1', 'main', vaultId, registeredAt, 'vault_key_passkey_wrapped', header))
  */
 export const deriveWrappingKey = async (keyBytes: Uint8Array, info: Uint8Array): Promise<CryptoKey> => {
   const inputKey = await crypto.subtle.importKey('raw', keyBytes as BufferSource, 'HKDF', false, ['deriveKey'])

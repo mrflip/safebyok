@@ -4,7 +4,7 @@ import type { VaultProps, LockboxSummary, DamagedLockbox } from '../../src/types
 import { NameFloorBytes } from '../../src/validators'
 import { type VaultDB, type VaultDBOpts, type LockboxRetireExpectation } from '../../src/vault-db'
 import { type MakeDevices, type Turnstile, openTurnstile, raceEveryWay, makeTurnstile, type RaceOutcome, outcomeOf } from './racing'
-import { vaultPropsOf, scopeOf, boxOf, noBoxYet, summaryOf, sidecarJsonOf, thisVault, OddLabels, retiring, wayinOf, fakeCiphered, rotatedVaultPropsOf } from './builders'
+import { vaultPropsOf, scopeOf, boxOf, noBoxYet, summaryOf, sidecarJsonOf, thisVault, OddLabels, retiring, wayinOf, fakeCiphered, vaultPropsAtEpochOf } from './builders'
 import { expectRefusal } from './refusals'
 import { unheard, ticks, wakeupAtNextTick } from './timing'
 import { spyLogger, thrownText, leafTexts } from './logging'
@@ -616,11 +616,11 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
     timingTestsOf('3.7')
   })
 
-  /** A fresh adapter whose u1 vault held `anthropic` under its first vaultKey, and then replaced the vaultKey. */
-  const rotatedHolding = async () => {
+  /** A fresh adapter whose u1 vault held `anthropic` under vaultKey epoch 1, its vault props since moved to epoch 2. */
+  const epochMovedHolding = async () => {
     const vaultDB = await withVaultProps()
     await storeEach(vaultDB, ['anthropic'])
-    await vaultDB.updateVaultProps(rotatedVaultPropsOf('u1'), { vault_id: 'vault-id-u1', unlock_epoch: 1 })
+    await vaultDB.updateVaultProps(vaultPropsAtEpochOf('u1', 2), { vault_id: 'vault-id-u1', unlock_epoch: 1 })
     return vaultDB
   }
 
@@ -628,26 +628,26 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
     const underFirstKey = { vault_id: 'vault-id-u1', revision_tok: 'rev-anthropic', vault_key_epoch: 1 } as const
     const underSecondKey = { ...underFirstKey, vault_key_epoch: 2 } as const
 
-    it("refuses a write sealed under a vaultKey since replaced, over the revision it read, writing nothing", async () => {
-      const vaultDB = await rotatedHolding()
+    it("refuses a write sealed under another vaultKey epoch than the vault props', over the revision it read, writing nothing", async () => {
+      const vaultDB = await epochMovedHolding()
       await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'stale'), underFirstKey), 'stale_write')
       expect(await revisionIn(vaultDB, 'anthropic')).to.eq('rev-anthropic')
     })
 
-    it("refuses a new lockbox sealed under a vaultKey since replaced, though none stands under its boxlabel", async () => {
-      const vaultDB = await rotatedHolding()
+    it("refuses a new lockbox sealed under another vaultKey epoch than the vault props', though none stands under its boxlabel", async () => {
+      const vaultDB = await epochMovedHolding()
       await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('openai', 'stale'), noBoxYet), 'stale_write')
       expect(await vaultDB.readBox(scopeOf('u1'), 'openai')).to.be.null
     })
 
-    it("refuses a write sealed under a vaultKey the vault does not stand for yet", async () => {
+    it("refuses a write sealed under a vaultKey epoch the vault props do not stand for", async () => {
       const vaultDB = await withVaultProps()
       await expectRefusal(vaultDB.updateBox(scopeOf('u1'), boxOf('anthropic', 'ahead', { vault_key_epoch: 2 }), { ...noBoxYet, vault_key_epoch: 2 }), 'stale_write')
       expect(await vaultDB.readBox(scopeOf('u1'), 'anthropic')).to.be.null
     })
 
-    it("lands a write sealed under the vaultKey that stands, over a lockbox sealed under the one before", async () => {
-      const vaultDB = await rotatedHolding()
+    it("lands a write sealed under the vault props' vaultKey epoch, over a lockbox sealed under another", async () => {
+      const vaultDB = await epochMovedHolding()
       const resealed = boxOf('anthropic', 'resealed', { vault_key_epoch: 2 })
       await vaultDB.updateBox(scopeOf('u1'), resealed, underSecondKey)
       expect(await vaultDB.readBox(scopeOf('u1'), 'anthropic')).to.deep.equal(resealed)

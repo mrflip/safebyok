@@ -10,7 +10,7 @@
  * deriver is worthless against a brute-forcer.
  */
 export { testDeriver, anyPassphraseTest, memoryVaultOpts, settledVault, freshDbName, fakeCiphered, scopeOf,
-  wayinOf, passkeyWayinOf, passkeyOf, vaultPropsOf, rotatedVaultPropsOf, boxOf, sidecarJsonOf, OddLabels,
+  wayinOf, passkeyWayinOf, passkeyOf, vaultPropsOf, vaultPropsAtEpochOf, boxOf, sidecarJsonOf, OddLabels,
   summaryOf, noBoxYet, thisVault, retiring, markOf, leaseOf, tweakB64 } from './test-helpers/builders'
 export type { MarkOverrides } from './test-helpers/builders'
 export { wakeupAtNextTick, aWhile, eventually, changeCounter, liveWatch, makeGate, beforeNextCall,

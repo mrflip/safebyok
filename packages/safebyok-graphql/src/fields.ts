@@ -43,7 +43,6 @@ export const VaultPropsFields = everyFieldOf<VaultProps>()([
   ['vault_id',         'plain'],
   ['unlock_epoch',     'plain'],
   ['vault_key_epoch',  'plain'],
-  ['prior_vault_key',  'plain'],
   ['wayins',           'plain'],
   ['registered_at',    'plain'],
 ] as const)
@@ -82,13 +81,12 @@ export const selectionOf = (fields: readonly Field[]): string => fields.map(([fi
 )).join(' ')
 
 /**
- * The record `sent` carries, field by field: each of `fields`, a null or missing one left out (the
- * prior vaultKey of vault props that hold none), and a ciphered one as its two halves -- so
+ * The record `sent` carries, field by field: each of `fields`, a null or missing one left out, and a ciphered one as its two halves -- so
  * whatever else rode along, a GraphQL client's `__typename` or a stray field, stays behind. Nothing is checked here: the
  * VaultDB on each side validates what it is handed. What is not an object comes back as it is,
  * for that validation to refuse.
  *
- * @example recordOf({ vault_id: 'v1', prior_vault_key: null, __typename: 'SafebyokVaultProps' }, [['vault_id', 'plain'], ['prior_vault_key', 'plain']])   // { vault_id: 'v1' }
+ * @example recordOf({ vault_id: 'v1', wayins: null, __typename: 'SafebyokVaultProps' }, [['vault_id', 'plain'], ['wayins', 'plain']])   // { vault_id: 'v1' }
  */
 export const recordOf = (sent: unknown, fields: readonly Field[]): unknown => {
   if (! isBag(sent)) { return sent }

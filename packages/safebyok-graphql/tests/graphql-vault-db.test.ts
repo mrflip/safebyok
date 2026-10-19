@@ -255,16 +255,11 @@ describe("graphqlVaultDB, its refusals", () => {
     const counting = { query: () => answered, mutation: () => answered, subscription: () => answered }
     const vaultDB = graphqlVaultDB({ client: counting as unknown as GraphqlVaultClient })
     const past = 2 ** 31
-    const rotatedPast = TH.vaultPropsOf('u1', {
-      unlock_epoch:    2,
-      vault_key_epoch: past,
-      prior_vault_key: { vault_key_epoch: past - 1, vault_key_wrapped: TH.fakeCiphered('prior') },
-      wayins:          [TH.wayinOf('passphrase', { vault_key_epoch: past })],
-    })
+    const epochPast = TH.vaultPropsAtEpochOf('u1', past)
     const refusals = [
       await TH.expectRefusal(vaultDB.fetchOrCreateVaultProps(TH.vaultPropsOf('u1', { unlock_epoch: past })), 'bad_record'),
       await TH.expectRefusal(vaultDB.updateVaultProps(TH.vaultPropsOf('u1', { unlock_epoch: 2 }), { ...thisVault, unlock_epoch: past }), 'bad_record'),
-      await TH.expectRefusal(vaultDB.updateVaultProps(rotatedPast, { ...thisVault, unlock_epoch: 1 }), 'bad_record'),
+      await TH.expectRefusal(vaultDB.updateVaultProps(epochPast, { ...thisVault, unlock_epoch: 1 }), 'bad_record'),
       await TH.expectRefusal(vaultDB.updateBox(u1, TH.boxOf('openai', 'r1', { vault_key_epoch: past }), { ...thisVault, revision_tok: null, vault_key_epoch: past }), 'bad_record'),
     ]
     expect(refusals.map((refusal) => /^Nothing was written: .* past 2147483647/.test(refusal.message))).to.deep.equal([true, true, true, true])
