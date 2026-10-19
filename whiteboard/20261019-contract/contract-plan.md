@@ -16,7 +16,7 @@ this line.
   (56 kB; `grep -n '^#'` is its outline). The handoff says when a ruling has changed it since.
 * **Sprint doc:** https://claude.ai/code/artifact/362ec68d-5bf3-46aa-a379-59a9c8bfb548
   (*Open Matters*, *Resolved*, *Progress*).
-* **Status:** 0, A1, A1b, A2, A3 filed (#193-#197); A4 building.
+* **Status:** 0, A1, A1b, A2, A3, A4 filed (#193-#198); A5 building.
 
 ## How this plan relates to the preplan
 
@@ -114,9 +114,19 @@ already sent is not called back on an unordered device store (fails safe; to the
 inside `onBadNews`, `vault.trouble` is one step behind. One `unicorn/no-thenable` suppression in a
 test, judged right.
 
+*Review (A4, #198, `fixed`, at medium):* the wrapped-answer guard now proven for `delVault` too.
+Left: another copy's VaultError kept only half the way (to `a-fixes`); `hello`'s handler example
+should use `tryHello` (to `a-fixes`); `asHelloOpts` ignores any non-plain object; a stored record
+shaped like an Outcome reads `bad_option` not damaged; `delDamagedVault` has no `try` form (C5).
+
 **Closing phase A:** passes 1 and 2 (opus, `high`, worktree-isolated agents, one lens each) over
 `origin/main...<A's tip>` while B1 and B3 build; findings filed as a comment on the sprint PR and
 fixed in a small thread `a-fixes` (on B's line, after B4), with the `a-shims` grep folded in.
+*Orchestrator:* `a-fixes` already holds, from A4's review: one shared `isVaultError` that knows a
+refusal from another copy of safebyok, used at every `instanceof` site (`asStorageTrouble`,
+`#hearBadNews`, `RefusalPolicy`, react's `isVaultCondition`), and the changeset and
+`notes/security.md` narrowed to match; `hello`'s handler example as `vault.tryHello`; the A4
+thread file's "Throwing alone" list gains `delDamagedVault` (its `try` form is phase C's, C5).
 
 ### Phase B: `models`
 
