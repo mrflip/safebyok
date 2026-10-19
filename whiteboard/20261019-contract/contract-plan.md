@@ -16,7 +16,7 @@ this line.
   (56 kB; `grep -n '^#'` is its outline). The handoff says when a ruling has changed it since.
 * **Sprint doc:** https://claude.ai/code/artifact/362ec68d-5bf3-46aa-a379-59a9c8bfb548
   (*Open Matters*, *Resolved*, *Progress*).
-* **Status:** 0, A1, A1b, A2, A3, A4 filed (#193-#198); A5 building.
+* **Status:** 0, A1, A1b, A2-A5 filed (#193-#199); A6 building.
 
 ## How this plan relates to the preplan
 
@@ -119,6 +119,12 @@ Left: another copy's VaultError kept only half the way (to `a-fixes`); `hello`'s
 should use `tryHello` (to `a-fixes`); `asHelloOpts` ignores any non-plain object; a stored record
 shaped like an Outcome reads `bad_option` not damaged; `delDamagedVault` has no `try` form (C5).
 
+*Review (A5, #199, `fixed`):* the ref-held `onBadNews` teller was shared by every vault the
+provider made, so an old user's late read could tell the next user's handler: now a gate per vault,
+closed in cleanup. Tests added for `<Activity>` and `WithUnlockedVault`'s example. Left: no server
+snapshot for `useVault()` (as at base); the deferred first hello assumes StrictMode's rehearsal is
+one task; the security note line (to `a-fixes`); `vault-provider.test.tsx` ~1,597 lines (A6 splits).
+
 **Closing phase A:** passes 1 and 2 (opus, `high`, worktree-isolated agents, one lens each) over
 `origin/main...<A's tip>` while B1 and B3 build; findings filed as a comment on the sprint PR and
 fixed in a small thread `a-fixes` (on B's line, after B4), with the `a-shims` grep folded in.
@@ -126,7 +132,9 @@ fixed in a small thread `a-fixes` (on B's line, after B4), with the `a-shims` gr
 refusal from another copy of safebyok, used at every `instanceof` site (`asStorageTrouble`,
 `#hearBadNews`, `RefusalPolicy`, react's `isVaultCondition`), and the changeset and
 `notes/security.md` narrowed to match; `hello`'s handler example as `vault.tryHello`; the A4
-thread file's "Throwing alone" list gains `delDamagedVault` (its `try` form is phase C's, C5).
+thread file's "Throwing alone" list gains `delDamagedVault` (its `try` form is phase C's, C5). From A5's review: one sentence in
+`notes/security.md`'s A5 entry, through the sonnet subagent: a vault the provider has let go
+tells no handler.
 
 ### Phase B: `models`
 
