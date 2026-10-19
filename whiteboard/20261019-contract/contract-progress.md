@@ -167,3 +167,10 @@ drift, once ruled (their rows). From 2026-10-19's rulings:
 * `isVaultError` is the declared interface, inside and out.
 * putBox/delBox take the revision from the listing in hand and read nothing more (already so;
   `lean_core` makes the code match). Every op uses the lazy hello (YOLO row).
+* Every op uses the lazy hello; a host wanting fresh state sets `staleMinutes` to 0 (the Coach:
+  "the essential thing is that our contract is clean").
+* *Lease* (B2, ruled): `tryOpen` may refuse `corrupt_record` (fits but will not open); the scope is
+  checked in `Lease.make`, not `tryOpen`; vault first, then holder, everywhere
+  (`Lease.grant(vault, holder, vaultKeyPair, askPassphraseAt)`, `lease.tryOpen(holder)`); the device
+  store hands back records ("pojos from storage layers, vault makes them live instances"); a failed
+  lease write refuses the unlock until the policy session says otherwise.
