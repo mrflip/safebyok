@@ -81,6 +81,11 @@ as recommended**: thread 19 (`rotateVaultKey`, not yet built) keeps only the way
 the rotation.
 Revisit before 1.0 if rotation signing every other device out is too blunt.
 
+`softlock_gone` (2026-10-19) removed the schema rotation would have written: the vault props'
+`prior_vault_key` (the vaultKey before, wrapped under the current one) and the check that it sat
+one epoch below theirs. `vault_key_epoch` stays on every record, reserved at 1, with storage's
+comparison of a lockbox's epoch against the vault props'.
+
 ### `retire()`'s edge cases
 
 From the Convex sprint ([#18](https://github.com/mrflip/safebyok/pull/18)): a handle that never
