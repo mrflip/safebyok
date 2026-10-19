@@ -24,17 +24,19 @@ specifics. User instructions override the defaults below.
 - Never merge a PR.
 - Force-push only with a **named** lease,
   `--force-with-lease=<branch>:<expected origin SHA>`.
-- Do all checkouts and edits in the worktree you create for this run;
-  leave other worktrees' branches and files alone.
+- Do all checkouts and edits in the clone you create for this run (§2);
+  leave every worktree of the repo, the main checkout included, alone.
+- Use only the rerere resolutions this run recorded (§2): none from the
+  repo's shared cache.
 - A rebase that needs a judgement call gets aborted and set aside (see
   Conflict triage) — don't guess, don't drop either side's change, and
   don't let it block unrelated PRs.
 
 ## Delegation
 
-One agent owns the worktree. Rebases are serial by construction and share
+One agent owns the clone. Rebases are serial by construction and share
 one index and HEAD — don't farm them out or run them in parallel.
-Concurrent rebases in a single worktree corrupt each other, and a worktree
+Concurrent rebases in a single clone corrupt each other, and a clone
 per PR costs more in installs than it saves.
 
 Delegate where output is large and the answer is small:
@@ -47,7 +49,9 @@ Don't delegate merge-tree probes or `gh pr view` inventory: one bash loop
 returns all of it for less than a subagent launch costs.
 
 Subagents here are read-only — none may rebase, merge, commit, check out,
-push, or write to the index. If they aren't installed, do the work inline.
+push, or write to the index. If they aren't installed, do the work inline:
+for a test run, redirect the output to a log file and read only the tail
+and the count lines, which keeps the suite out of context as well.
 
 ## 1. Inventory and plan
 
@@ -98,16 +102,43 @@ files before ones that do; all else equal, lower PR numbers first.
 Announce the plan in chat — order, units, exclusions, and what merge-tree
 predicted — then proceed (don't wait for approval unless asked).
 
-## 2. Worktree
+## 2. A clone of its own
+
+The run works in a throwaway clone, not a `git worktree`, because
+rerere's cache (`.git/rr-cache`) is shared by every worktree of a repo,
+and so would carry in resolutions the Coach or another session recorded
+(perhaps the ones that sent the Coach here). A clone has a cache of its
+own, empty at the start, which holds only what this run resolves and
+replays it only within this run: the same conflict meeting a rebased
+branch again in §4 is resolved once.
 
 ```bash
 git -C <repo> fetch origin
-git -C <repo> worktree add --detach <repo>-restack-<timestamp> origin/<default>
+git clone --shared --no-checkout <repo> <repo>-restack-<timestamp>
+git -C <clone> remote set-url origin "$(git -C <repo> remote get-url origin)"
+git -C <clone> fetch origin
+git -C <clone> switch --detach origin/<default>
+git -C <clone> rev-parse --git-path rr-cache   # must be inside <clone>
+ls <clone>/.git/rr-cache                        # must not exist, or be empty
 ```
 
-(Use a user-supplied path if given.) Prefix every later shell command
-with `cd <worktree> && `. If `scripts/clear-ds-store.sh` exists, run it
-now and again before cleanup.
+(`--shared` borrows the repo's objects instead of copying them; plain
+`--local` hardlinks fail across devices. Use a user-supplied path if
+given.) Stop if the cache path is not inside the clone or the cache is
+not empty. Prefix every later shell command with `cd <clone> && `. If
+`scripts/clear-ds-store.sh` exists, run it now and again before cleanup.
+
+Rerere is on from the global git config here, so it will act. Know when
+it does: git prints `Staged '<path>' using previous resolution.`
+(`Resolved '<path>' ...` without autoupdate), leaves no conflict markers
+and no unmerged file, and still stops the rebase. A check for unmerged
+files alone will not show it: grep the rebase output for `previous
+resolution`, never filter that line out. Such a line is this run's own
+earlier resolution, good or bad; if the conflict was hairy, diff the file
+against what you meant. These resolutions stay in the clone's cache and
+go nowhere: they are discarded with the clone and never reach the repo's
+cache. Don't list the replays in the report; report the controversial
+calls you made, as you would anyway.
 
 ## 3. Rebase in tranches
 
@@ -153,6 +184,19 @@ Resolve these yourself, following `PROCESS.md` where it applies:
 
 Hairy = resolving it means deciding which behaviour wins, dropping a
 change from either side, or a large volume of conflicted files/lines.
+A commit that deletes or empties text the base has since reworded or
+added to around (a "move these entries out of TODO.md" commit meeting
+a base that reworded them) is hairy even when both sides are docs: the
+resolution is a ruling on whether the newer work stands. Also hairy: a
+modify/delete conflict where the base removed a file on purpose
+(resolve by honouring the deletion only if the PR's edit was a path or
+wording fix; otherwise set aside).
+
+A commit left empty by your resolution is dropped by the rebase, which
+is usually right, but check that what it carried is already in the base
+(`git diff <orig> HEAD -- <its files>`) before trusting it. Rerere's
+replays are this run's own (§2); never run `git rerere` commands against
+`<repo>`'s cache.
 Then `git rebase --abort`, leave the origin branch untouched, and carry
 on with the rest. Send `restack-conflict-scout` the branch, base, and
 conflicted files; use its findings for the report rather than reading
@@ -208,7 +252,12 @@ Stacked as main -> [#40](https://github.com/<org>/<repo>/pull/40) -> [#45](https
 On the top PR only, append:
 `**The top: merge this one, with a merge commit, and the whole line lands.**`
 Replace any older first line starting "Stacked as", "Stacked on", or
-"In the line"; keep the rest of the body unchanged
+"In the line"; keep the rest of the body unchanged. Often that old line
+is a sentence of prose that begins "Stacked on #N (...)." and goes on
+to say what the PR changes: replace only the stacking sentence,
+parenthetical included, and keep the remainder as the next paragraph
+(a regex for the sentence stops at the first ")." or "#N." and leaves a
+fragment such as "(above #158, ...)." behind; read the result back)
 (`gh pr view <n> --json body -q .body` → edit → `gh pr edit <n> --body-file`).
 Set-aside and skipped PRs get no line and appear in nobody's.
 
@@ -219,8 +268,18 @@ the report.
 ## 7. Clean up and report
 
 Run `scripts/clear-ds-store.sh` again if present, confirm no rebase is in
-progress, then `git -C <repo> worktree remove <worktree>`. Keep the
-prerestack tags as the rollback path.
+progress, and that every restacked branch equals its origin. Bring the
+rollback tags home (give `<clone>` as an absolute path), then remove the clone:
+
+```bash
+git -C <repo> fetch <clone> 'refs/tags/*-prerestack-<run-id>:refs/tags/*-prerestack-<run-id>'
+rm -rf <clone>
+```
+
+The tags name only commits already in `<repo>` (the old tips), so this
+moves refs, not history; if the fetch fails, list the old tip SHAs in
+the report instead. Don't `rm -rf` a clone holding a branch that is not
+pushed. Keep the tags as the rollback path.
 
 Give `restack-verifier` the intended chain and have it confirm the pushed
 state before you report.
