@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MinPassphraseChars, MinZxcvbnScore, zxcvbnPassphraseTest } from '../src/zxcvbn-passphrase-test'
 import type { VaultScope } from '../src/types'
-import { openVault } from '../src/vault'
 import * as TH from './test-helpers'
 
 /** The reason a verdict gives, or '' for a strong one. */
@@ -176,7 +175,7 @@ describe("zxcvbnPassphraseTest's loading", () => {
 
   it("refuses a vault's Create as 'storage_unavailable' when zxcvbn fails to load, making nothing", async () => {
     const { fresh } = await freshModule(true)
-    const vault = await openVault(TH.memoryVaultOpts({ passphraseStrengthTest: fresh.zxcvbnPassphraseTest }))
+    const vault = await TH.settledVault(TH.memoryVaultOpts({ passphraseStrengthTest: fresh.zxcvbnPassphraseTest }))
     try {
       // The fresh module's VaultError is a class of its own: told by kind.
       await expect(vault.unlock('correct horse battery staple')).rejects.toThrow(expect.objectContaining({ kind: 'storage_unavailable' }))

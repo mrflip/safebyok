@@ -36,7 +36,7 @@ pnpm justify    # from e2e/: install, lint, typecheck, test (it builds the packa
     turnstile: some land, none past the writers racing, every one readable (bounds and read-back,
     not the limit: it is a best effort); and a write that
     counted before another's lockbox committed, which lands past the limit as the README says.
-  * [foreign-key.test.ts](tests/postgres/foreign-key.test.ts) -- the `23503` of a vault erased
+  * [foreign-key.test.ts](tests/postgres/foreign-key.test.ts) -- the `23503` of a vault retired
     while a lockbox's insert waited on the foreign key, refused as `stale_write`.
   * [test-helpers.ts](tests/postgres/test-helpers.ts) -- the file databases, the devices, and
     **`OnRealPostgres`, the one list of which suites run against the server**; the rest of the

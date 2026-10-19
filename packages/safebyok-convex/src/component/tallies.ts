@@ -5,12 +5,12 @@ import type { DatabaseReader, DatabaseWriter } from './_generated/server'
 
 /**
  * Each vault's tally, and the limits the component holds every vault to, so that any vault it
- * takes in can be erased whole. Erasing a vault (`eraseVault`, which `destroy()` calls) reads
+ * takes in can be retired whole. Retiring a vault (`retireVault`, which `retire()` calls) reads
  * every row of it twice in one transaction -- once to find it, once to delete it -- and a Convex
  * transaction may read 16 MiB and 32,000 documents, and write 16,000. A client keeps its vault far
  * smaller (`maxLockboxes`, under `convexVaultDB`'s `maxVaultBytes`), but a modified client need
  * not, so the component checks these limits itself on every lockbox write, against a tally kept in
- * step with each write and erase rather than by reading the vault.
+ * step with each write and retire rather than by reading the vault.
  */
 
 /** Convex's most for one document, in bytes: 1 MiB. */
@@ -22,20 +22,20 @@ const ConvexTransactionReadBytes = 16_777_216
 /** Convex's most documents for one transaction to write. */
 const ConvexTransactionWrittenDocuments = 16_000
 
-/** Room for the vault's tally row, which an erase reads twice as well: several times its weight. */
+/** Room for the vault's tally row, which a retire reads twice as well: several times its weight. */
 const TallyReserveBytes = 1024
 
 /**
  * The most lockboxes one vault holds: half the documents a Convex transaction may write, so that
- * an erase -- a deletion and two reads per lockbox -- stays well inside every per-transaction
+ * a retire -- a deletion and two reads per lockbox -- stays well inside every per-transaction
  * limit. Twice the most any client's `maxLockboxes` can be over `convexVaultDB`.
  */
 export const MaxVaultLockboxes = ConvexTransactionWrittenDocuments / 2
 
 /**
  * The most one vault's lockboxes weigh together, in bytes as Convex counts a document: half of
- * what a transaction may read, as an erase reads every row twice, less a whole document for the
- * vault's bundle and room for its tally, which the erase reads twice too. 7 MiB less 1 KiB.
+ * what a transaction may read, as a retire reads every row twice, less a whole document for the
+ * vault's props and room for its tally, which the retire reads twice too. 7 MiB less 1 KiB.
  */
 export const MaxVaultLockboxBytes = (ConvexTransactionReadBytes / 2) - ConvexDocumentBytes - TallyReserveBytes
 
@@ -74,16 +74,16 @@ export const weigh = (row: Record<string, Value>, rowId?: Id<'safebyok_lockboxes
  * The vault's tally as it stands, for a lockbox write to check: the one kept, or -- for a vault
  * with none yet -- counted afresh from its rows, reading them once. Counting stops at the first
  * row past a limit, so it never reads much more than a vault may hold; the tally then comes back
- * null, and the vault is refused anything that adds to it until erases bring it back in.
+ * null, and the vault is refused anything that adds to it until retired lockboxes bring it back in.
  *
  * @param db - The transaction's database.
- * @param bundleId - The vault's bundle row, which its tally is filed under.
+ * @param vaultRowId - The vault row, which its tally is filed under.
  * @param boxRows - The vault's lockbox rows, read only when there is no tally to keep.
  */
 export const reckon = async (
-  db: DatabaseReader, bundleId: Id<'safebyok_bundles'>, boxRows: AsyncIterable<Doc<'safebyok_lockboxes'>>,
+  db: DatabaseReader, vaultRowId: Id<'safebyok_vaults'>, boxRows: AsyncIterable<Doc<'safebyok_lockboxes'>>,
 ): Promise<Reckoning> => {
-  const kept = await findTallyRow(db, bundleId)
+  const kept = await findTallyRow(db, vaultRowId)
   if (kept) { return { kept, tally: { lockbox_count: kept.lockbox_count, lockbox_bytes: kept.lockbox_bytes } } }
   // A loop rather than a reduce: it reads the rows as it goes, and stops reading past a limit.
   let tally: Tally = { lockbox_count: 0, lockbox_bytes: 0 }
@@ -120,29 +120,29 @@ export const refuses = (tally: Tally | null, growth: Tally): boolean => {
  * the first time. A vault whose count stopped at a limit keeps no tally: its next write counts it
  * again.
  */
-export const record = async (db: DatabaseWriter, bundleId: Id<'safebyok_bundles'>, { kept, tally }: Reckoning, growth: Tally): Promise<void> => {
+export const record = async (db: DatabaseWriter, vaultRowId: Id<'safebyok_vaults'>, { kept, tally }: Reckoning, growth: Tally): Promise<void> => {
   if (tally === null) { return }
   const moved = plus(tally, growth)
   if (kept) {
     await db.patch('safebyok_vault_tallies', kept._id, moved)
   } else {
-    await db.insert('safebyok_vault_tallies', { bundle_id: bundleId, ...moved })
+    await db.insert('safebyok_vault_tallies', { vault_row_id: vaultRowId, ...moved })
   }
 }
 
 /**
- * Take an erased lockbox off its vault's tally, when the vault has one. An erase never counts a
- * vault that has none: a vault too large to read whole must still be erasable, a box at a time.
+ * Take a retired lockbox off its vault's tally, when the vault has one. A retire never counts a
+ * vault that has none: a vault too large to read whole must still be retirable, a box at a time.
  */
-export const forget = async (db: DatabaseWriter, bundleId: Id<'safebyok_bundles'>, erased: Doc<'safebyok_lockboxes'>): Promise<void> => {
-  const kept = await findTallyRow(db, bundleId)
+export const forget = async (db: DatabaseWriter, vaultRowId: Id<'safebyok_vaults'>, retired: Doc<'safebyok_lockboxes'>): Promise<void> => {
+  const kept = await findTallyRow(db, vaultRowId)
   if (! kept) { return }
-  await db.patch('safebyok_vault_tallies', kept._id, plus(kept, { lockbox_count: -1, lockbox_bytes: -weigh(erased) }))
+  await db.patch('safebyok_vault_tallies', kept._id, plus(kept, { lockbox_count: -1, lockbox_bytes: -weigh(retired) }))
 }
 
-/** Remove the vault's tally, when it has one: its vault is being erased. */
-export const drop = async (db: DatabaseWriter, bundleId: Id<'safebyok_bundles'>): Promise<void> => {
-  const kept = await findTallyRow(db, bundleId)
+/** Remove the vault's tally, when it has one: its vault is being retired. */
+export const drop = async (db: DatabaseWriter, vaultRowId: Id<'safebyok_vaults'>): Promise<void> => {
+  const kept = await findTallyRow(db, vaultRowId)
   if (kept) { await db.delete('safebyok_vault_tallies', kept._id) }
 }
 
@@ -153,8 +153,8 @@ const plus = (tally: Tally, growth: Tally): Tally => ({
 
 // `.unique()` throws on a second row: a tally is inserted only where none was found, in the same
 // transaction, so two would be damage, and damage surfaces rather than being papered over.
-const findTallyRow = (db: DatabaseReader, bundleId: Id<'safebyok_bundles'>) => (
+const findTallyRow = (db: DatabaseReader, vaultRowId: Id<'safebyok_vaults'>) => (
   db.query('safebyok_vault_tallies')
-    .withIndex('by_bundle', (idx) => idx.eq('bundle_id', bundleId))
+    .withIndex('by_vault_row', (idx) => idx.eq('vault_row_id', vaultRowId))
     .unique()
 )

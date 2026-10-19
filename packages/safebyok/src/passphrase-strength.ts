@@ -10,7 +10,7 @@ import type { VaultScope } from './types'
 export type PassphraseVerdict = { strong: true } | { strong: false, reason: string }
 
 /**
- * A check that a new passphrase is strong enough, `openVault`'s `passphraseStrengthTest`: handed
+ * A check that a new passphrase is strong enough, `Vault.make`'s `passphraseStrengthTest`: handed
  * the passphrase as typed, and the scope of the vault it is for -- the applabel, the user's id
  * and the vaultlabel, words a guesser who knows the user tries first -- it answers a
  * {@link PassphraseVerdict}, at once or as a promise. The vault runs it on every passphrase about
@@ -57,7 +57,7 @@ export const ensureStrongEnough = async (strengthTest: PassphraseStrengthTest, p
 /**
  * A host's `passphraseStrengthTest`, exactly as handed in, once it is a function; kind
  * 'bad_option' for anything else, a missing one among them: the vault has no test of its own, so
- * every host chooses one (`browserOpts()` from `safebyok/browser` supplies a good one). openVault
+ * every host chooses one (`browserOpts()` from `safebyok/browser` supplies a good one). Vault.make
  * runs it on its option; a binding or wrapper that takes the options apart runs it first, once, as
  * soon as it is handed the test.
  *

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as TH from './test-helpers'
-import { BundleFields, ListedLockboxFields, LockboxFields, recordOf, selectionOf } from '../src/fields'
+import { VaultPropsFields, ListedLockboxFields, LockboxFields, recordOf, selectionOf } from '../src/fields'
 
 describe("selectionOf", () => {
   it("asks for each field, a ciphered one by its two halves", () => {
@@ -8,13 +8,13 @@ describe("selectionOf", () => {
   })
 
   it("asks for a listed lockbox without either ciphered field", () => {
-    expect(selectionOf(ListedLockboxFields)).to.eq('format boxlabel revision_id vault_key_epoch whisper_codec whisper_schema_version public_json registered_at written_at')
+    expect(selectionOf(ListedLockboxFields)).to.eq('format boxlabel revision_tok vault_key_epoch whisper_codec whisper_schema_version sidecar_json registered_at written_at')
   })
 })
 
 describe("recordOf", () => {
   it("keeps the fields asked for, leaving out a null one and a GraphQL client's __typename", () => {
-    expect(recordOf({ vault_id: 'v1', prior_vault_key: null, __typename: 'SafebyokVaultBundle' }, [['vault_id', 'plain'], ['prior_vault_key', 'plain']])).to.deep.equal({ vault_id: 'v1' })
+    expect(recordOf({ vault_id: 'v1', prior_vault_key: null, __typename: 'SafebyokVaultProps' }, [['vault_id', 'plain'], ['prior_vault_key', 'plain']])).to.deep.equal({ vault_id: 'v1' })
   })
 
   it("gives back a whole lockbox as it was, and a ciphered field as its two halves alone", () => {
@@ -24,20 +24,20 @@ describe("recordOf", () => {
     expect(recordOf(answered, LockboxFields)).to.deep.equal(lockbox)
   })
 
-  it("gives back a bundle's unlock envelopes as they were, never looked inside", () => {
-    const bundle = TH.bundleOf('u1', { unlocks: [TH.envelopeOf('passphrase'), TH.envelopeOf('home_phrase')] })
-    expect(recordOf(bundle, BundleFields)).to.deep.equal(bundle)
+  it("gives back the vault props' wayins as they were, never looked inside", () => {
+    const vaultProps = TH.vaultPropsOf('u1', { wayins: [TH.wayinOf('passphrase'), TH.wayinOf('home_phrase')] })
+    expect(recordOf(vaultProps, VaultPropsFields)).to.deep.equal(vaultProps)
   })
 
-  it("leaves out a bundle's missing or undefined prior vaultKey", () => {
-    const bundle = TH.bundleOf('u1')
-    expect(recordOf({ ...bundle, prior_vault_key: undefined }, BundleFields)).to.deep.equal(bundle)
-    expect(recordOf(bundle, BundleFields)).to.not.have.property('prior_vault_key')
+  it("leaves out the vault props' prior vaultKey when it is missing or undefined", () => {
+    const vaultProps = TH.vaultPropsOf('u1')
+    expect(recordOf({ ...vaultProps, prior_vault_key: undefined }, VaultPropsFields)).to.deep.equal(vaultProps)
+    expect(recordOf(vaultProps, VaultPropsFields)).to.not.have.property('prior_vault_key')
   })
 
-  it("carries a lockbox's public bag as the JSON text it was written as", () => {
-    const lockbox = TH.boxOf('openai', 'r1', { public_json: '{"b": 1, "a": "caf\u{E9}"}' })
-    expect(recordOf(lockbox, LockboxFields)).to.include({ public_json: '{"b": 1, "a": "caf\u{E9}"}' })
+  it("carries a lockbox's sidecar as the JSON text it was written as", () => {
+    const lockbox = TH.boxOf('openai', 'r1', { sidecar_json: '{"b": 1, "a": "caf\u{E9}"}' })
+    expect(recordOf(lockbox, LockboxFields)).to.include({ sidecar_json: '{"b": 1, "a": "caf\u{E9}"}' })
   })
 
   it("drops a field the record has not got", () => {

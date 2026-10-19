@@ -194,7 +194,7 @@ describe("AnyTextValidators", () => {
   })
 
   it("is the floor itself, field by field", () => {
-    expect(AnyTextValidators).to.deep.equal({ applabel: NameFloor, vaultlabel: NameFloor, boxlabel: NameFloor, userId: NameFloor, unlocklabel: NameFloor })
+    expect(AnyTextValidators).to.deep.equal({ applabel: NameFloor, vaultlabel: NameFloor, boxlabel: NameFloor, userId: NameFloor, wayinlabel: NameFloor })
   })
 
   it("refuses, in every field, a lone surrogate, a carriage return, and text not in NFC", () => {
@@ -231,13 +231,13 @@ describe("AnyTextValidators", () => {
 })
 
 describe("DefaultValidators", () => {
-  it("checks each label with Label, an unlocklabel included, and the user with UserId", () => {
-    expect(DefaultValidators).to.deep.equal({ applabel: Label, vaultlabel: Label, boxlabel: Label, userId: UserId, unlocklabel: Label })
+  it("checks each label with Label, a wayinlabel included, and the user with UserId", () => {
+    expect(DefaultValidators).to.deep.equal({ applabel: Label, vaultlabel: Label, boxlabel: Label, userId: UserId, wayinlabel: Label })
     expect(DefaultValidators.applabel).to.eq(Label)
     expect(DefaultValidators.userId).to.eq(UserId)
   })
 
-  it("is frozen: a host replaces a check in openVault's validators, never here", () => {
+  it("is frozen: a host replaces a check in Vault.make's validators, never here", () => {
     expect(Object.isFrozen(DefaultValidators)).to.be.true
   })
 

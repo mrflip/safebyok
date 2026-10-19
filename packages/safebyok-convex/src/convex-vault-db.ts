@@ -2,7 +2,7 @@ import { getFunctionName } from 'convex/server'
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server'
 import { ConvexError } from 'convex/values'
 import { Sanitizer, VaultDB, VaultError } from 'safebyok'
-import type { BundleExpectation, VaultDBOpts, EraseExpectation, Lockbox, LockboxExpectation, StoredLockbox, VaultBundle, VaultScope } from 'safebyok'
+import type { VaultPropsExpectation, VaultDBOpts, RetireExpectation, Lockbox, LockboxExpectation, StoredLockbox, VaultProps, VaultScope } from 'safebyok'
 import { MaxVaultLockboxes } from './component/tallies'
 import { isSafebyokErrorData } from './refusals'
 import type { SafebyokApi } from './server'
@@ -53,7 +53,7 @@ export type ConvexVaultDBOpts = VaultDBOpts & {
 /**
  * safebyok's storage over Convex: a VaultDB whose every verb is one call to the safebyok functions
  * your app serves (see `safebyok-convex/server`), through the Convex client your app already has.
- * Hand it to `openVault` as its `vaultDB`.
+ * Hand it to `Vault.make` as its `vaultDB`.
  *
  * * **Who may reach a vault** is your Convex backend's call: a vault call made while signed out,
  *   or for another user's vault, refuses with a VaultError of kind `identity_revoked`, and the
@@ -73,13 +73,13 @@ export type ConvexVaultDBOpts = VaultDBOpts & {
  * @param opts - Your app's Convex `client`, the safebyok functions as its `api`, and optionally a
  *   `logger`, the default logger without one (a vault opened with no logger of its own hears it too): it hears a ConvexClient watch that fails.
  * @returns The VaultDB, holding at most 1 MiB in one record, Convex's document limit, and 8 MiB
- *   in one vault, half of what one Convex function may read (erasing a vault reads it twice), in
+ *   in one vault, half of what one Convex function may read (retiring a vault reads it twice), in
  *   at most 8,000 lockboxes, the component's own limit.
  *
  * @example
  *   import { api } from '../convex/_generated/api'
  *   const vaultDB = convexVaultDB({ client: convex, api: api.safebyok })
- *   const vault = await openVault({ applabel: 'acme', userId, vaultlabel: 'main', vaultDB, ...browserOpts() })
+ *   const vault = Vault.make({ applabel: 'acme', userId, vaultlabel: 'main', vaultDB, ...browserOpts() })
  */
 export const convexVaultDB = (opts: ConvexVaultDBOpts): VaultDB => {
   const { client, api } = (opts as Partial<ConvexVaultDBOpts> | null | undefined) ?? {}
@@ -95,8 +95,8 @@ export const convexVaultDB = (opts: ConvexVaultDBOpts): VaultDB => {
 /** Each verb one call to the function of the same purpose; the base class validates both ways. */
 class ConvexVaultDB extends VaultDB {
   readonly maxRecordBytes = ConvexDocumentBytes
-  // Listing, watching and erasing each read the whole vault in one transaction, and erasing reads
-  // every row twice: half the read budget is what a vault can hold and still be erased whole.
+  // Listing, watching and retiring each read the whole vault in one transaction, and retiring reads
+  // every row twice: half the read budget is what a vault can hold and still be retired whole.
   readonly maxVaultBytes = ConvexTransactionReadBytes / 2
   // The component's own limit, which it enforces whatever a client asks.
   readonly maxLockboxes = MaxVaultLockboxes
@@ -112,16 +112,16 @@ class ConvexVaultDB extends VaultDB {
     this.api    = opts.api
   }
 
-  protected doReadBundle(scope: VaultScope): Promise<unknown> {
-    return refusing(() => this.client.query(this.api.getBundle, { scope }))
+  protected doReadVaultProps(scope: VaultScope): Promise<unknown> {
+    return refusing(() => this.client.query(this.api.getVaultProps, { scope }))
   }
 
-  protected doCreateBundle(bundle: VaultBundle): Promise<unknown> {
-    return refusing(() => this.client.mutation(this.api.createBundle, { bundle }))
+  protected doFetchOrCreateVaultProps(vaultProps: VaultProps): Promise<unknown> {
+    return refusing(() => this.client.mutation(this.api.fetchOrCreateVaultProps, { vaultProps }))
   }
 
-  protected doUpdateBundle(bundle: VaultBundle, expected: BundleExpectation): Promise<boolean> {
-    return refusing(() => this.client.mutation(this.api.updateBundle, { bundle, expected }))
+  protected doUpdateVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<boolean> {
+    return refusing(() => this.client.mutation(this.api.updateVaultProps, { vaultProps, expected }))
   }
 
   protected doReadBox(scope: VaultScope, boxlabel: string): Promise<unknown> {
@@ -138,12 +138,12 @@ class ConvexVaultDB extends VaultDB {
     return refusing(() => this.client.mutation(this.api.updateBox, { scope, lockbox, expected }))
   }
 
-  protected doEraseBox(scope: VaultScope, boxlabel: string, expected: EraseExpectation): Promise<boolean> {
-    return refusing(() => this.client.mutation(this.api.eraseBox, { scope, boxlabel, expected }))
+  protected doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation): Promise<boolean> {
+    return refusing(() => this.client.mutation(this.api.retireBox, { scope, boxlabel, expected }))
   }
 
-  protected doEraseVault(scope: VaultScope, expected: EraseExpectation): Promise<boolean> {
-    return refusing(() => this.client.mutation(this.api.eraseVault, { scope, expected }))
+  protected doRetireVault(scope: VaultScope, expected: RetireExpectation): Promise<boolean> {
+    return refusing(() => this.client.mutation(this.api.retireVault, { scope, expected }))
   }
 
   // Every result `watchVault` delivers calls `onChange`, the first included. The vault subscribes
@@ -193,7 +193,7 @@ const refusing = async <ValT>(call: () => Promise<ValT>): Promise<ValT> => {
       throw Sanitizer.refusalFor(err, err.data.kind, err.data.message)
     }
     // On a dev deployment, Convex's own error -- its validator refusing the arguments, say --
-    // quotes the call's arguments: scope, names, public bags and ciphertext. The sanitizer drops it.
+    // quotes the call's arguments: scope, names, sidecars and ciphertext. The sanitizer drops it.
     throw Sanitizer.refusalFor(err, 'storage_unavailable', ConvexTroubleMessage)
   }
 }
@@ -206,11 +206,11 @@ const isConvexClient = (client: unknown): client is ConvexVaultClient => {
 }
 
 const SafebyokFnNames = [
-  'getBundle', 'createBundle', 'updateBundle', 'getBox', 'listBoxSummaries', 'updateBox', 'eraseBox', 'eraseVault', 'watchVault',
+  'getVaultProps', 'fetchOrCreateVaultProps', 'updateVaultProps', 'getBox', 'listBoxSummaries', 'updateBox', 'retireBox', 'retireVault', 'watchVault',
 ] as const
 
 // Each function must name itself as `<module>:<function>`. The whole generated `api` answers any
-// property, so `api.getBundle` exists -- but names no module, and Convex refuses to name it.
+// property, so `api.getVaultProps` exists -- but names no module, and Convex refuses to name it.
 const isSafebyokApi = (api: unknown): api is SafebyokApi => {
   if (typeof api !== 'object' || api === null) { return false }
   const fnRefs = api as Partial<Record<string, FunctionReference<'query' | 'mutation'>>>

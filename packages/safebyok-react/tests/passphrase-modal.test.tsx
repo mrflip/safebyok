@@ -1,14 +1,19 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ForeverMillis, MinuteMillis, VaultError, openVault } from 'safebyok'
+import { ForeverMillis, MinuteMillis, VaultError, localVaultDB, memoryDeviceDB, memoryStore } from 'safebyok'
 import { PassphraseModal, type PassphraseAdvice } from '../src/passphrase-modal'
 import * as TH from './test-helpers'
 
 /** Just enough of a Vault for the dialog to read its state and window (the default, unless given). */
-const vaultInState = (state: 'absent' | 'locked', reentryWindowMillis = TH.DefaultWindowMillis) => TH.stubVault({ state, reentryWindowMillis })
+const vaultInState = (state: 'absent' | 'locked', leaseMillis = TH.DefaultLeaseMillis) => TH.stubVault({ state, leaseMillis })
 
 /** The dialog's `onDone` for tests that never submit. */
 const noop = (_unlocked: boolean) => undefined
+
+/** An unsubscribe with nothing to undo. */
+const silence = (): void => undefined
+/** A store's subscribe that never rings. */
+const neverRings = () => silence
 
 /** The dialog's word to a user it cannot help, once something not theirs to mend went wrong. */
 const Trouble = /This app ran into a problem of its own, not one you caused, and could not unlock your vault\. Your secrets are safe\./
@@ -21,9 +26,9 @@ const wordingOf = (relative: string | null, creating: boolean) => {
 
 /** A vault made under 'pw', holding one lockbox, and locked, in memory. */
 const lockedVault = async () => {
-  const vault = await openVault(TH.memoryVaultOpts())
+  const vault = await TH.settledVault(TH.memoryVaultOpts())
   await vault.unlock('pw')
-  await vault.store('anthropic_api_key', 'sk-fake')
+  await vault.storeBox('anthropic_api_key', 'sk-fake')
   await vault.lock()
   return vault
 }
@@ -126,6 +131,93 @@ describe("PassphraseModal", () => {
     })
   })
 
+  describe("a vault created on another device meanwhile", () => {
+    const Advice = 'A vault was just created for this label on another device, with a different passphrase than the one you entered. Enter the passphrase you chose there to unlock it.'
+    const createdElsewhere = () => TH.stubVault({
+      state:  'absent',
+      unlock: () => Promise.reject(new VaultError('created_elsewhere', Advice)),
+    })
+
+    it("shows the vault's message as advice, quiet and not a gripe, in the live region, and not as a wrong passphrase", async () => {
+      render(<PassphraseModal vault={createdElsewhere()} onDone={noop} />)
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw one' } })
+      fireEvent.click(screen.getByText('Create vault'))
+      await waitFor(() => { expect(screen.getByRole('alert').textContent).to.eq(Advice) })
+      const said = screen.getByText(Advice)
+      expect(said.className).to.eq('quiet')
+      expect(screen.queryByText(/didn't unlock|did not open/)).to.be.null
+    })
+
+    it("stays in the dialog for another try, not reporting done", async () => {
+      const heard: boolean[] = []
+      render(<PassphraseModal vault={createdElsewhere()} onDone={(unlocked) => { heard.push(unlocked) }} />)
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw one' } })
+      fireEvent.click(screen.getByText('Create vault'))
+      await waitFor(() => { expect(screen.queryByText(Advice)).to.not.be.null })
+      expect(heard).to.deep.equal([])
+      expect(screen.getByRole('dialog')).to.not.be.null
+    })
+
+    it("empties the passphrase field and focuses it, for the passphrase chosen on the other device", async () => {
+      render(<PassphraseModal vault={createdElsewhere()} onDone={noop} />)
+      const field = screen.getByPlaceholderText<HTMLInputElement>('vault passphrase')
+      fireEvent.change(field, { target: { value: 'pw one' } })
+      screen.getByText('Cancel').focus()
+      fireEvent.click(screen.getByText('Create vault'))
+      await waitFor(() => { expect(screen.queryByText(Advice)).to.not.be.null })
+      expect(screen.getByPlaceholderText('vault passphrase')).to.equal(field)
+      expect(field.value).to.eq('')
+      expect(document.activeElement).to.equal(field)
+    })
+
+    it("keeps the advice through typing, and clears it at the next submit, replaced by that submit's outcome", async () => {
+      const outcomes = [new VaultError('created_elsewhere', Advice), new VaultError('wrong_passphrase', 'That passphrase did not open the vault.')]
+      let tries = 0
+      const vault = TH.stubVault({ state: 'absent', unlock: () => Promise.reject(outcomes[tries++] ?? new Error('no more outcomes')) })
+      render(<PassphraseModal vault={vault} onDone={noop} />)
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw one' } })
+      fireEvent.click(screen.getByText('Create vault'))
+      await waitFor(() => { expect(screen.queryByText(Advice)).to.not.be.null })
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw t' } })
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw two' } })
+      expect(screen.queryByText(Advice)).to.not.be.null
+      fireEvent.click(screen.getByText('Create vault'))
+      expect(screen.getByRole('alert').textContent).to.eq('')
+      await waitFor(() => { expect(screen.getByRole('alert').textContent).to.eq('That passphrase did not open the vault.') })
+    })
+
+    it("turns, with a real vault that lost the race, into an unlock: the same field, emptied, focused, and asking for the current password", async () => {
+      const store = memoryStore()
+      const opts = TH.memoryVaultOpts({ vaultDB: localVaultDB({ store }) })
+      // Deaf to the other device's create, so that it is met only at this device's own write.
+      const deafDB = localVaultDB({ store: { ...store, subscribe: neverRings } })
+      const here = await TH.settledVault({ ...opts, vaultDB: deafDB })
+      const there = await TH.settledVault({ ...opts, deviceDB: memoryDeviceDB() })
+      TH.beforeNextCall(deafDB, 'fetchOrCreateVaultProps', () => there.unlock('pw one'))
+      render(<PassphraseModal vault={here} onDone={noop} />)
+      const field = screen.getByPlaceholderText<HTMLInputElement>('vault passphrase')
+      fireEvent.change(field, { target: { value: 'pw two' } })
+      fireEvent.click(screen.getByText('Create vault'))
+      await waitFor(() => { expect(screen.getByRole('alert').textContent).to.match(/created for this label on another device/) })
+      expect(screen.queryByText('Unlock your vault')).to.not.be.null
+      expect(screen.getByPlaceholderText('vault passphrase')).to.equal(field)
+      expect(field.value).to.eq('')
+      expect(document.activeElement).to.equal(field)
+      expect(field.getAttribute('autocomplete')).to.eq('current-password')
+      expect(field.name).to.eq('current-password')
+      here.close()
+      there.close()
+    })
+
+    it("shows a wrong passphrase as a gripe still", async () => {
+      render(<PassphraseModal vault={TH.wrong()} onDone={noop} />)
+      TH.submitPassphrase('pw wrong')
+      await waitFor(() => { expect(screen.getByText('That passphrase did not open the vault.').className).to.eq('gripe') })
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw again' } })
+      expect(screen.queryByText('That passphrase did not open the vault.')).to.be.null
+    })
+  })
+
   describe("any other failure of the unlock", () => {
     it("shows a condition in the dialog in place, as it does a wrong passphrase", async () => {
       const heard: boolean[] = []
@@ -213,18 +305,18 @@ describe("PassphraseModal", () => {
       [1.5,        "in 90 minutes",  'an hour and a half reads as minutes'],
     ] as const
 
-    // Each from a vault opened with the hours given, so the dialog reads what openVault made of
+    // Each from a vault opened with the hours given, so the dialog reads what Vault.make made of
     // them: one not yet created reads 'Locks on', one created and locked 'Locks again'.
     for (const [hours, relative, blurb] of WindowCases) {
       it(`${blurb}, while it creates the vault`, async () => {
-        const vault = await openVault(TH.memoryVaultOpts({ forcePassphraseReentryHours: hours }))
+        const vault = await TH.settledVault(TH.memoryVaultOpts({ leaseHours: hours }))
         render(<PassphraseModal vault={vault} onDone={noop} />)
         expect(screen.queryByText(wordingOf(relative, true))).to.not.be.null
         vault.close()
       })
 
       it(`${blurb}, on an ordinary unlock`, async () => {
-        const vault = await openVault(TH.memoryVaultOpts({ forcePassphraseReentryHours: hours }))
+        const vault = await TH.settledVault(TH.memoryVaultOpts({ leaseHours: hours }))
         await vault.unlock('pw')
         await vault.lock()
         render(<PassphraseModal vault={vault} onDone={noop} />)
@@ -290,10 +382,10 @@ describe("PassphraseModal", () => {
 
     it("follows the vault as it changes: one made on another device meanwhile turns 'choose' into 'unlock'", async () => {
       const opts = TH.memoryVaultOpts()
-      const vault = await openVault(opts)
+      const vault = await TH.settledVault(opts)
       render(<PassphraseModal vault={vault} onDone={noop} />)
       expect(screen.queryByText('Choose a vault passphrase')).to.not.be.null
-      const elsewhere = await openVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
+      const elsewhere = await TH.settledVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
       await act(async () => { await elsewhere.unlock('pw') })
       elsewhere.close()
       await waitFor(() => { expect(screen.queryByText('Unlock your vault')).to.not.be.null })
@@ -328,7 +420,7 @@ describe("PassphraseModal", () => {
       expect(screen.queryByText('Forgot it? Start a new vault')).to.be.null
     })
 
-    it("asks first, and keeping the vault goes back to the passphrase, erasing nothing", async () => {
+    it("asks first, and keeping the vault goes back to the passphrase, retiring nothing", async () => {
       const vault = await lockedVault()
       render(<PassphraseModal vault={vault} allowStartOver onDone={noop} />)
       fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
@@ -341,7 +433,7 @@ describe("PassphraseModal", () => {
       vault.close()
     })
 
-    it("erases the vault once confirmed, and asks the user to choose a passphrase for a new one", async () => {
+    it("retires the vault once confirmed, and asks the user to choose a passphrase for a new one", async () => {
       const vault = await lockedVault()
       const heard: boolean[] = []
       render(<PassphraseModal vault={vault} allowStartOver onDone={(unlocked) => { heard.push(unlocked) }} />)
@@ -356,48 +448,48 @@ describe("PassphraseModal", () => {
       vault.close()
     })
 
-    it("shows a condition the erase meets in place, to try again", async () => {
-      const destroy = vi.fn().mockRejectedValue(new VaultError('storage_unavailable', 'Storage could not be reached; try again in a moment.'))
-      render(<PassphraseModal vault={TH.stubVault({ destroy })} allowStartOver onDone={noop} />)
+    it("shows a condition the retire meets in place, to try again", async () => {
+      const retire = vi.fn().mockRejectedValue(new VaultError('storage_unavailable', 'Storage could not be reached; try again in a moment.'))
+      render(<PassphraseModal vault={TH.stubVault({ retire })} allowStartOver onDone={noop} />)
       fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
       fireEvent.click(screen.getByText('Erase and start over'))
       await screen.findByText('Storage could not be reached; try again in a moment.')
       expect(screen.getByText('Erase and start over')).to.have.property('disabled', false)
     })
 
-    it("erases once for a double press, taking no second press while the erase runs", () => {
-      const destroy = vi.fn(() => new Promise<void>(() => { /* still erasing */ }))
-      render(<PassphraseModal vault={TH.stubVault({ destroy })} allowStartOver onDone={noop} />)
+    it("retires once for a double press, taking no second press while the retire runs", () => {
+      const retire = vi.fn(() => new Promise<void>(() => { /* still retiring */ }))
+      render(<PassphraseModal vault={TH.stubVault({ retire })} allowStartOver onDone={noop} />)
       fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
       fireEvent.click(screen.getByText('Erase and start over'))
       fireEvent.click(screen.getByText('Erase and start over'))
-      expect(destroy).toHaveBeenCalledOnce()
+      expect(retire).toHaveBeenCalledOnce()
       expect(screen.getByText('Erase and start over')).to.have.property('disabled', true)
     })
 
-    it("asks afresh once the vault it was asked of changed elsewhere, rather than erasing the one that stands", async () => {
-      const destroy = vi.fn().mockRejectedValue(new VaultError('stale_write', 'The vault changed in storage since this device read it.'))
-      render(<PassphraseModal vault={TH.stubVault({ destroy })} allowStartOver onDone={noop} />)
+    it("asks afresh once the vault it was asked of changed elsewhere, rather than retiring the one that stands", async () => {
+      const retire = vi.fn().mockRejectedValue(new VaultError('stale_write', 'The vault changed in storage since this device read it.'))
+      render(<PassphraseModal vault={TH.stubVault({ retire })} allowStartOver onDone={noop} />)
       fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
       fireEvent.click(screen.getByText('Erase and start over'))
       await screen.findByText('The vault changed in storage since this device read it.')
       expect(screen.queryByText('Erase and start over')).to.be.null
       expect(screen.queryByPlaceholderText('vault passphrase')).to.not.be.null
-      expect(destroy).toHaveBeenCalledOnce()
+      expect(retire).toHaveBeenCalledOnce()
     })
 
-    it("drops the question once the vault is erased elsewhere, and never asks it of a vault made after", async () => {
+    it("drops the question once the vault is retired elsewhere, and never asks it of a vault made after", async () => {
       const opts = TH.memoryVaultOpts()
-      const vault = await openVault(opts)
+      const vault = await TH.settledVault(opts)
       await vault.unlock('pw')
       await vault.lock()
       render(<PassphraseModal vault={vault} allowStartOver onDone={noop} />)
       fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
-      const eraser = await openVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
-      await act(async () => { await eraser.destroy() })
-      eraser.close()
+      const retirer = await TH.settledVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
+      await act(async () => { await retirer.retire() })
+      retirer.close()
       await screen.findByText('Choose a vault passphrase')
-      const maker = await openVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
+      const maker = await TH.settledVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
       await act(async () => { await maker.unlock('another pw') })
       maker.close()
       await screen.findByText('Unlock your vault')
@@ -566,9 +658,9 @@ describe("PassphraseModal", () => {
       expect(adviceRegion().textContent).to.eq('said of fast')
     })
 
-    it("forgets what it said once the vault is made and erased elsewhere, and an answer still on its way with it", async () => {
+    it("forgets what it said once the vault is made and retired elsewhere, and an answer still on its way with it", async () => {
       const opts = TH.memoryVaultOpts()
-      const vault = await openVault(opts)
+      const vault = await TH.settledVault(opts)
       const gate = TH.makeGate()
       const advice = async (typed: string) => {
         if (typed === 'slow') { await gate.pass() }
@@ -579,10 +671,10 @@ describe("PassphraseModal", () => {
       await waitFor(() => { expect(adviceRegion().textContent).to.eq('said of quick') })
       fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'slow' } })
       await gate.reached
-      const elsewhere = await openVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
+      const elsewhere = await TH.settledVault({ ...opts, deviceDB: TH.memoryVaultOpts().deviceDB })
       await act(async () => { await elsewhere.unlock('pw') })
       await screen.findByText('Unlock your vault')
-      await act(async () => { await elsewhere.destroy() })
+      await act(async () => { await elsewhere.retire() })
       elsewhere.close()
       await screen.findByText('Choose a vault passphrase')
       await act(async () => {
@@ -665,24 +757,24 @@ describe("PassphraseModal", () => {
       expect(screen.getByText('Unlock your vault')).to.not.be.null
     })
 
-    const EraseOutcomes = [
-      [null,                                                                   'an erase that succeeds'],
-      [new VaultError('stale_write', 'The vault changed in storage.'),         'an erase refused: the vault changed elsewhere'],
-      [new VaultError('storage_unavailable', 'Storage could not be reached.'), 'an erase that meets a condition'],
-      [new VaultError('vault_closed', 'This vault handle was closed.'),        'an erase that meets misuse: a closed handle'],
+    const RetireOutcomes = [
+      [null,                                                                   'a retire that succeeds'],
+      [new VaultError('stale_write', 'The vault changed in storage.'),         'a retire refused: the vault changed elsewhere'],
+      [new VaultError('storage_unavailable', 'Storage could not be reached.'), 'a retire that meets a condition'],
+      [new VaultError('vault_closed', 'This vault handle was closed.'),        'a retire that meets misuse: a closed handle'],
     ] as const
 
-    for (const [refusal, blurb] of EraseOutcomes) {
+    for (const [refusal, blurb] of RetireOutcomes) {
       it(`does nothing with ${blurb}, landing after it unmounted`, async () => {
-        const erasing = TH.held()
+        const retiring = TH.held()
         const heard: boolean[] = []
-        const { reported, unmount } = TH.renderReporting(<PassphraseModal vault={TH.stubVault({ destroy: () => erasing.promise })} allowStartOver onDone={(unlocked) => { heard.push(unlocked) }} />)
+        const { reported, unmount } = TH.renderReporting(<PassphraseModal vault={TH.stubVault({ retire: () => retiring.promise })} allowStartOver onDone={(unlocked) => { heard.push(unlocked) }} />)
         fireEvent.click(screen.getByText('Forgot it? Start a new vault'))
         fireEvent.click(screen.getByText('Erase and start over'))
         unmount()
         const updates = TH.watchStateUpdates()
         await act(async () => {
-          if (refusal === null) { erasing.resolve(undefined) } else { erasing.reject(refusal) }
+          if (refusal === null) { retiring.resolve(undefined) } else { retiring.reject(refusal) }
           await TH.wakeupAtNextTick()
         })
         expect(updates.count()).to.eq(0)

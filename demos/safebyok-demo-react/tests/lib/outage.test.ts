@@ -4,7 +4,7 @@ import * as TH from 'safebyok/testing'
 import { OutageVaultDB, makeOutage } from '../../src/lib/outage'
 
 const scope = TH.scopeOf('u1')
-const bundle = TH.bundleOf('u1')
+const vaultProps = TH.vaultPropsOf('u1')
 
 /** An OutageVaultDB over a fresh in-memory adapter, with its switch. */
 const downOver = () => {
@@ -53,7 +53,7 @@ describe("OutageVaultDB, while up", () => {
   it("lists a lockbox its inner adapter finds damaged as damaged, and the sound ones as they are", async () => {
     const store = memoryStore()
     const vaultDB = new OutageVaultDB(localVaultDB({ store }), makeOutage())
-    await vaultDB.createBundle(bundle)
+    await vaultDB.fetchOrCreateVaultProps(vaultProps)
     await vaultDB.updateBox(scope, TH.boxOf('openai', 'two'), TH.noBoxYet)
     store.write(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), '{"not": json')
     // missing its whisper: the inner list finds it sound, and only a whole read finds it damaged
@@ -64,29 +64,29 @@ describe("OutageVaultDB, while up", () => {
   })
 })
 
-/** An outage-switched adapter over a store holding `u1`'s vault, its bundle damaged but for its vault_id. */
+/** An outage-switched adapter over a store holding `u1`'s vault, its props damaged but for their vault_id. */
 const damagedOver = async () => {
   const store = memoryStore()
   const outage = makeOutage()
   const vaultDB = new OutageVaultDB(localVaultDB({ store }), outage)
-  await vaultDB.createBundle(bundle)
+  await vaultDB.fetchOrCreateVaultProps(vaultProps)
   await vaultDB.updateBox(scope, TH.boxOf('openai', 'two'), TH.noBoxYet)
-  store.write(Ckeys.bundle(scope), JSON.stringify({ ...bundle, unlock_epoch: 'one' }))
+  store.write(Ckeys.vaultProps(scope), JSON.stringify({ ...vaultProps, unlock_epoch: 'one' }))
   return { store, outage, vaultDB }
 }
 
-describe("OutageVaultDB, erasing a damaged vault", () => {
-  it("hands the erase to its inner adapter, which reads the record as stored", async () => {
+describe("OutageVaultDB, retiring a damaged vault", () => {
+  it("hands the retire to its inner adapter, which reads the record as stored", async () => {
     const { store, vaultDB } = await damagedOver()
-    await TH.expectRefusal(vaultDB.readBundle(scope), 'corrupt_record')
-    await vaultDB.eraseDamagedVault(scope)
+    await TH.expectRefusal(vaultDB.readVaultProps(scope), 'corrupt_record')
+    await vaultDB.retireDamagedVault(scope)
     expect(store.ckeys()).to.deep.equal([])
   })
 
-  it("refuses while the pretend backend is down, erasing nothing", async () => {
+  it("refuses while the pretend backend is down, retiring nothing", async () => {
     const { store, outage, vaultDB } = await damagedOver()
     outage.setDown(true)
-    await TH.expectRefusal(vaultDB.eraseDamagedVault(scope), 'storage_unavailable')
+    await TH.expectRefusal(vaultDB.retireDamagedVault(scope), 'storage_unavailable')
     expect(store.ckeys()).to.have.lengthOf(2)
   })
 })
@@ -97,25 +97,25 @@ describe("OutageVaultDB, while down", () => {
   it("refuses a read as storage_unavailable, as a real adapter whose backend is down", async () => {
     const { outage, vaultDB } = downOver()
     outage.setDown(true)
-    expect(await TH.expectRefusal(vaultDB.readBundle(scope), 'storage_unavailable')).to.satisfy(isVaultError)
+    expect(await TH.expectRefusal(vaultDB.readVaultProps(scope), 'storage_unavailable')).to.satisfy(isVaultError)
     expect(await TH.expectRefusal(vaultDB.listBoxes(scope), 'storage_unavailable')).to.satisfy(isVaultError)
   })
 
   it("refuses a write, and writes nothing", async () => {
     const { outage, vaultDB } = downOver()
     outage.setDown(true)
-    expect(await TH.expectRefusal(vaultDB.createBundle(bundle), 'storage_unavailable')).to.satisfy(isVaultError)
+    expect(await TH.expectRefusal(vaultDB.fetchOrCreateVaultProps(vaultProps), 'storage_unavailable')).to.satisfy(isVaultError)
     outage.setDown(false)
-    expect(await vaultDB.readBundle(scope)).to.be.null
+    expect(await vaultDB.readVaultProps(scope)).to.be.null
   })
 
   it("serves again once the switch is back up", async () => {
     const { outage, vaultDB } = downOver()
-    await vaultDB.createBundle(bundle)
+    await vaultDB.fetchOrCreateVaultProps(vaultProps)
     outage.setDown(true)
-    expect(await TH.expectRefusal(vaultDB.readBundle(scope), 'storage_unavailable')).to.satisfy(isVaultError)
+    expect(await TH.expectRefusal(vaultDB.readVaultProps(scope), 'storage_unavailable')).to.satisfy(isVaultError)
     outage.setDown(false)
-    expect(await vaultDB.readBundle(scope)).to.deep.equal(bundle)
+    expect(await vaultDB.readVaultProps(scope)).to.deep.equal(vaultProps)
   })
 
   it("keeps watching through the outage", async () => {
@@ -124,7 +124,7 @@ describe("OutageVaultDB, while down", () => {
     outage.setDown(true)
     const unsubscribe = vaultDB.subscribe(scope, () => { heard += 1 })
     outage.setDown(false)
-    await vaultDB.createBundle(bundle)
+    await vaultDB.fetchOrCreateVaultProps(vaultProps)
     expect(heard).to.be.greaterThan(0)
     unsubscribe()
   })

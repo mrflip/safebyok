@@ -3,6 +3,7 @@ import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { Ckeys, localVaultDB, memoryStore } from 'safebyok'
 import { KnockKnock, SavedFlashMillis } from '../../src/components/KnockKnock'
+import { OutageVaultDB, makeOutage } from '../../src/lib/outage'
 import * as TH from '../test-helpers'
 
 /** Anthropic, faked at the global `fetch` the SDK calls: see TH.fakeAnthropic. */
@@ -25,6 +26,16 @@ describe("KnockKnock", () => {
     expect(screen.getByRole<HTMLButtonElement>('button', { name: /Banana Who\?/ }).disabled).to.be.true
   })
 
+  it("shows nothing while the vault is still opening, never offering to add a key it may hold", async () => {
+    const outage = makeOutage()
+    outage.setDown(true)
+    const vaultDB = new OutageVaultDB(localVaultDB({ store: memoryStore() }), outage)
+    const { container } = TH.makeWorld({ vaultDB }).renderInVault(<KnockKnock />)
+    await TH.aWhile()
+    expect(container.textContent).to.eq('')
+    expect(screen.queryByText(/No Anthropic API key yet/)).to.be.null
+  })
+
   it("saves a key into the vault, asking for a new vault's passphrase on the way", async () => {
     const world = TH.makeWorld()
     world.renderInVault(<KnockKnock />)
@@ -34,7 +45,7 @@ describe("KnockKnock", () => {
     await TH.answerPassphraseDialog()
     await screen.findByText(/Anthropic key saved/)
     const vault = await world.openUnlocked()
-    expect(await vault.read('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
+    expect(await vault.readBox('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
   })
 
   it("flashes 'saved' after a save, then relaxes to when the key was last saved", async () => {
@@ -81,7 +92,7 @@ describe("KnockKnock", () => {
     expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null
     const vault = await world.open()
     expect(vault.getSnapshot().state).to.eq('unlocked')
-    expect(await vault.read('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
+    expect(await vault.readBox('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
   })
 
   it("tells the joke Claude tells, the key going to Anthropic and nowhere on the page", async () => {
@@ -158,7 +169,7 @@ describe("KnockKnock", () => {
     await TH.answerPassphraseDialog()
     await screen.findByText(/Anthropic key saved/)
     const vault = await world.openUnlocked()
-    expect(await vault.read('anthropic_api_key')).to.eq('sk-ant-test-replaced')
+    expect(await vault.readBox('anthropic_api_key')).to.eq('sk-ant-test-replaced')
   })
 
   it("won't knock with a damaged key, and replaces it afresh", async () => {
@@ -178,7 +189,7 @@ describe("KnockKnock", () => {
     await TH.answerPassphraseDialog()
     await screen.findByText(/Anthropic key saved/)
     const vault = await world.openUnlocked()
-    expect(await vault.read('anthropic_api_key')).to.eq('sk-ant-test-replaced')
+    expect(await vault.readBox('anthropic_api_key')).to.eq('sk-ant-test-replaced')
   })
 
   it("shows a refused save beside the key form: here, a key over the vault's limit", async () => {

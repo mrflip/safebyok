@@ -7,9 +7,9 @@
 import type { ReactNode } from 'react'
 import { expect } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { localVaultDB, memoryDeviceDB, memoryStore, openVault, type VaultDB, type Whisper } from 'safebyok'
+import { localVaultDB, memoryDeviceDB, memoryStore, type VaultDB, type Whisper } from 'safebyok'
 import { VaultProvider, useVault, useVaultSnapshot } from 'safebyok-react'
-import { memoryVaultOpts } from 'safebyok/testing'
+import { memoryVaultOpts, settledVault } from 'safebyok/testing'
 import { JokeModel } from '../src/lib/anthropic'
 import { keepToClose } from './opened-vaults'
 
@@ -45,7 +45,7 @@ export const makeWorld = ({ vaultDB = localVaultDB({ store: memoryStore() }) }: 
     render(<VaultProvider {...opts} userId={userId}>{ui}</VaultProvider>)
   )
 
-  const open = async (userId = 'u1') => keepToClose(await openVault({ ...opts, userId }))
+  const open = async (userId = 'u1') => keepToClose(await settledVault({ ...opts, userId }))
 
   const openUnlocked = async (userId = 'u1') => {
     const vault = await open(userId)
@@ -54,11 +54,11 @@ export const makeWorld = ({ vaultDB = localVaultDB({ store: memoryStore() }) }: 
   }
 
   const seed = async (whispers: Record<string, Whisper>, userId = 'u1') => {
-    const vault = await openVault({ ...opts, userId, deviceDB: memoryDeviceDB() })
+    const vault = await settledVault({ ...opts, userId, deviceDB: memoryDeviceDB() })
     try {
       await vault.unlock(Passphrase)
       for (const [boxlabel, whisper] of Object.entries(whispers)) {
-        await vault.store(boxlabel, whisper)
+        await vault.storeBox(boxlabel, whisper)
       }
     } finally {
       vault.close()
@@ -145,7 +145,7 @@ export const VaultProbe = () => {
       <span data-testid="vault">{vault === null ? 'none' : 'open'}</span>
       <span data-testid="state">{snapshot.state}</span>
       <span data-testid="boxes">{snapshot.boxes.map((box) => box.boxlabel).join(',')}</span>
-      <button onClick={() => { void withUnlockedVault(() => vault?.read('anthropic_api_key') ?? Promise.resolve(null)) }}>read</button>
+      <button onClick={() => { void withUnlockedVault(() => vault?.readBox('anthropic_api_key') ?? Promise.resolve(null)) }}>read</button>
       <button onClick={() => { void vault?.unlock(Passphrase) }}>unlock</button>
     </p>
   )

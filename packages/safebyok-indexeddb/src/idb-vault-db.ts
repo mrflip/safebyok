@@ -1,5 +1,5 @@
 import { Ckeys, Expectations, VaultDB } from 'safebyok'
-import type { BundleExpectation, EraseExpectation, Lockbox, LockboxExpectation, StoredLockbox, VaultBundle, VaultScope } from 'safebyok'
+import type { VaultPropsExpectation, RetireExpectation, Lockbox, LockboxExpectation, StoredLockbox, VaultProps, VaultScope } from 'safebyok'
 import { ChangeBell } from 'safebyok/idb'
 import { boxRange } from './ckeys'
 import { bellnameOf, parseDbName, type IdbVaultDBOpts } from './idb-opts'
@@ -30,11 +30,11 @@ import { inOneTransaction, settle, withheldShelfOf } from './shelf'
  *
  * @param opts - Where to keep the records: `dbName`, default 'safebyok'; and optionally a
  *   `logger`, the default logger without one (a vault opened with no logger of its own hears it too).
- * @returns The VaultDB, to hand `openVault`. Kind 'bad_option' for a `dbName` that is not
+ * @returns The VaultDB, to hand `Vault.make`. Kind 'bad_option' for a `dbName` that is not
  *   non-empty text, or a `logger` that is not a VaultLogger. Nothing is opened until the first read or write.
  *
  * @example
- *   const vault = await openVault({ applabel: 'acme', userId, vaultlabel: 'main', vaultDB: idbVaultDB({ dbName: 'acme' }), ...browserOpts({ dbName: 'acme' }) })
+ *   const vault = Vault.make({ applabel: 'acme', userId, vaultlabel: 'main', vaultDB: idbVaultDB({ dbName: 'acme' }), ...browserOpts({ dbName: 'acme' }) })
  */
 export const idbVaultDB = (opts?: IdbVaultDBOpts): VaultDB => new IdbVaultDB(parseDbName(opts, 'idbVaultDB'), opts)
 
@@ -53,26 +53,26 @@ class IdbVaultDB extends VaultDB {
 
   private get shelf() { return withheldShelfOf(this.dbName) }
 
-  protected async doReadBundle(scope: VaultScope): Promise<unknown> {
-    return (await this.shelf('readonly', (store) => rowAt(store, Ckeys.bundle(scope)))) ?? null
+  protected async doReadVaultProps(scope: VaultScope): Promise<unknown> {
+    return (await this.shelf('readonly', (store) => rowAt(store, Ckeys.vaultProps(scope)))) ?? null
   }
 
-  protected async doCreateBundle(bundle: VaultBundle): Promise<unknown> {
+  protected async doFetchOrCreateVaultProps(vaultProps: VaultProps): Promise<unknown> {
     const { standing, created } = await inOneTransaction(this.shelf, async (store) => {
-      const already = await rowAt(store, Ckeys.bundle(bundle))
+      const already = await rowAt(store, Ckeys.vaultProps(vaultProps))
       if (already !== undefined) { return { standing: already, created: false } }
-      store.put(bundle, Ckeys.bundle(bundle))
-      return { standing: bundle, created: true }
+      store.put(vaultProps, Ckeys.vaultProps(vaultProps))
+      return { standing: vaultProps, created: true }
     })
     if (created) { this.ring() }
     return standing
   }
 
-  protected async doUpdateBundle(bundle: VaultBundle, expected: BundleExpectation): Promise<boolean> {
+  protected async doUpdateVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<boolean> {
     return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {
-      const standing = await rowAt(store, Ckeys.bundle(bundle))
-      if (! Expectations.bundleMeets(standing, expected)) { return false }
-      store.put(bundle, Ckeys.bundle(bundle))
+      const standing = await rowAt(store, Ckeys.vaultProps(vaultProps))
+      if (! Expectations.vaultPropsMeets(standing, expected)) { return false }
+      store.put(vaultProps, Ckeys.vaultProps(vaultProps))
       return true
     }))
   }
@@ -93,31 +93,31 @@ class IdbVaultDB extends VaultDB {
 
   protected async doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<boolean> {
     return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {
-      const [standingBundle, standingBox] = await Promise.all([rowAt(store, Ckeys.bundle(scope)), rowAt(store, Ckeys.box(scope, lockbox.boxlabel))])
-      if (! Expectations.lockboxMeets(standingBundle, standingBox, expected)) { return false }
+      const [standingVaultProps, standingBox] = await Promise.all([rowAt(store, Ckeys.vaultProps(scope)), rowAt(store, Ckeys.box(scope, lockbox.boxlabel))])
+      if (! Expectations.lockboxMeets(standingVaultProps, standingBox, expected)) { return false }
       store.put(lockbox, Ckeys.box(scope, lockbox.boxlabel))
       return true
     }))
   }
 
-  protected async doEraseBox(scope: VaultScope, boxlabel: string, expected: EraseExpectation): Promise<boolean> {
+  protected async doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation): Promise<boolean> {
     return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {
-      const standing = await rowAt(store, Ckeys.bundle(scope))
+      const standing = await rowAt(store, Ckeys.vaultProps(scope))
       if (! Expectations.vaultMeets(standing, expected)) { return false }
       store.delete(Ckeys.box(scope, boxlabel))
       return true
     }))
   }
 
-  // The look at the bundle and every deletion (the lockboxes by their key range, then the bundle)
-  // are one transaction: a lockbox another tab writes waits for the erase and then finds no
-  // bundle, so no lockbox outlives its vault.
-  protected async doEraseVault(scope: VaultScope, expected: EraseExpectation): Promise<boolean> {
+  // The look at the vault props and every deletion (the lockboxes by their key range, then the
+  // vault props) are one transaction: a lockbox another tab writes waits for the retire and then
+  // finds no vault props, so no lockbox outlives its vault.
+  protected async doRetireVault(scope: VaultScope, expected: RetireExpectation): Promise<boolean> {
     return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {
-      const standing = await rowAt(store, Ckeys.bundle(scope))
+      const standing = await rowAt(store, Ckeys.vaultProps(scope))
       if (! Expectations.vaultIdMeets(standing, expected)) { return false }
       store.delete(boxRange(scope))
-      store.delete(Ckeys.bundle(scope))
+      store.delete(Ckeys.vaultProps(scope))
       return true
     }))
   }

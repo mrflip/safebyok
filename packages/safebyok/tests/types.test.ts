@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as Z from 'zod/mini'
 import { Lockbox } from '../src/lockbox'
-import { DeviceMark, DeviceUnlock, EpochMillis, FarFuture, FarPast, ForeverMillis, LockboxSummary, MaxUnlocks, PublicBag, VaultBundle, VaultScope, Whisper } from '../src/types'
+import { DeviceMark, EpochMillis, FarFuture, FarPast, ForeverMillis, Lease, LockboxSummary, MaxUnlocks, Sidecar, VaultProps, VaultScope, Whisper } from '../src/types'
 import * as TH from './test-helpers'
 
 const WhisperCases = [
@@ -16,7 +16,7 @@ const WhisperCases = [
   [{ deep: { list: [1, null] } },     true,   'nesting, arbitrarily'],
   // what JSON cannot carry is refused, not mangled:
   [undefined,                         false,  'undefined is not a JSON value'],
-  [null,                              false,  'a bare null: emptying a lockbox is erase\'s job'],
+  [null,                              false,  'a bare null: emptying a lockbox is retireBox\'s job'],
   [() => 'nope',                      false,  'a function is not data'],
   [new Date(),                        false,  'a Date would silently flatten to {}'],
   [new Map([["a", 1]]),               false,  'a Map would silently flatten to {}'],
@@ -58,14 +58,14 @@ describe("VaultScope", () => {
 
 /** An ISO time, as records stored them before every time became epoch milliseconds. */
 const OldIso = '2026-10-14T00:00:00.000Z'
-const { registered_at: _bundleTime, ...bundleWithoutTime } = TH.bundleOf('u1')
-const { unlocks: _unlocks, ...bundleWithoutUnlocks } = TH.bundleOf('u1')
-const { unlock_epoch: _epoch, ...bundleWithoutEpoch } = TH.bundleOf('u1')
-const { vault_key_epoch: _keyEpoch, ...bundleWithoutKeyEpoch } = TH.bundleOf('u1')
-const { prior_vault_key: _prior, ...rotatedWithoutPrior } = TH.rotatedBundleOf('u1')
+const { registered_at: _vaultPropsTime, ...vaultPropsWithoutTime } = TH.vaultPropsOf('u1')
+const { wayins: _wayins, ...vaultPropsWithoutWayins } = TH.vaultPropsOf('u1')
+const { unlock_epoch: _epoch, ...vaultPropsWithoutEpoch } = TH.vaultPropsOf('u1')
+const { vault_key_epoch: _keyEpoch, ...vaultPropsWithoutKeyEpoch } = TH.vaultPropsOf('u1')
+const { prior_vault_key: _prior, ...rotatedWithoutPrior } = TH.rotatedVaultPropsOf('u1')
 const priorAt = (vaultKeyEpoch: number) => ({ vault_key_epoch: vaultKeyEpoch, vault_key_wrapped: TH.fakeCiphered('prior') })
-/** The three fields a bundle held its one passphrase in, before `unlocks`. */
-const EnvelopeFieldsOfOld = {
+/** The three fields the vault props held their one passphrase in, before `wayins`. */
+const WayinFieldsOfOld = {
   key_deriver_label:            'test_digest_v0',
   // eslint-disable-next-line sonarjs/no-hardcoded-passwords -- base64 of the literal text 'saltsaltsaltsalt': a fake salt (which is public material anyway), not a credential
   passphrase_salt_b64:          'c2FsdHNhbHRzYWx0c2FsdA',
@@ -73,78 +73,78 @@ const EnvelopeFieldsOfOld = {
 }
 
 
-const BundleCases = [
+const VaultPropsCases = [
   // regular usage:
-  [TH.bundleOf('u1'),                                       true,   'a whole bundle'],
+  [TH.vaultPropsOf('u1'),                                   true,   'whole vault props'],
   // refused, as a damaged or foreign record:
-  [{ ...TH.bundleOf('u1'), format: 'safebyok-vault-v3' },    false,  'a format this version does not know'],
-  [{ ...TH.bundleOf('u1'), unlock_epoch: 0 },                false,  'an epoch starts at one'],
-  [{ ...TH.bundleOf('u1'), unlock_epoch: 1.5 },              false,  'an epoch is a whole number'],
-  [{ ...TH.bundleOf('u1'), vault_id: '' },                   false,  'an empty vault_id'],
-  [TH.bundleOf('u'.repeat(101)),                            true,   'a user_id of any length: the validators check names, not the record'],
-  [{ ...TH.bundleOf('u1'), vaultlabel: null },               false,  'a vaultlabel that is not text'],
-  [{ ...TH.bundleOf('u1'), unlocks: [TH.envelopeOf('passphrase', { vault_key_wrapped: { cipher_iv_b64: 'iv' } as never })] }, false, 'an envelope missing its ciphertext'],
-  [{ ...TH.bundleOf('u1'), registered_at: 1_792_022_400 },   false,  'a registered_at in epoch seconds'],
-  [{ ...TH.bundleOf('u1'), registered_at: Infinity },        false,  'a registered_at that never comes'],
-  [{ ...TH.bundleOf('u1'), registered_at: OldIso },          false,  'a registered_at as an ISO string'],
-  [bundleWithoutTime,                                       false,  'a bundle missing its registered_at'],
-  [{ ...bundleWithoutTime, created_at: OldIso, updated_at: OldIso }, false, 'a bundle from before its time was named registered_at'],
-  [{ ...bundleWithoutUnlocks, ...EnvelopeFieldsOfOld },      false,  'a bundle from before its unlocks were a list of envelopes'],
-  [{ ...bundleWithoutEpoch, passphrase_epoch: 1 },           false,  'a bundle from before its epoch was named unlock_epoch'],
-  [{ ...bundleWithoutKeyEpoch, format: 'safebyok-vault-v1' }, false, 'a bundle from before vaultKey epochs'],
-  [bundleWithoutKeyEpoch,                                   false,  'a bundle missing its vault_key_epoch'],
-  [{ ...TH.bundleOf('u1'), vault_key_epoch: 0 },             false,  'a vaultKey epoch starts at one'],
+  [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v4' }, false,  'a format this version does not know'],
+  [{ ...TH.vaultPropsOf('u1'), unlock_epoch: 0 },            false,  'an epoch starts at one'],
+  [{ ...TH.vaultPropsOf('u1'), unlock_epoch: 1.5 },          false,  'an epoch is a whole number'],
+  [{ ...TH.vaultPropsOf('u1'), vault_id: '' },               false,  'an empty vault_id'],
+  [TH.vaultPropsOf('u'.repeat(101)),                        true,   'a user_id of any length: the validators check names, not the record'],
+  [{ ...TH.vaultPropsOf('u1'), vaultlabel: null },           false,  'a vaultlabel that is not text'],
+  [{ ...TH.vaultPropsOf('u1'), wayins: [TH.wayinOf('passphrase', { vault_key_wayin_wrapped: { cipher_iv_b64: 'iv' } as never })] }, false, 'a wayin missing its ciphertext'],
+  [{ ...TH.vaultPropsOf('u1'), registered_at: 1_792_022_400 }, false,  'a registered_at in epoch seconds'],
+  [{ ...TH.vaultPropsOf('u1'), registered_at: Infinity },    false,  'a registered_at that never comes'],
+  [{ ...TH.vaultPropsOf('u1'), registered_at: OldIso },      false,  'a registered_at as an ISO string'],
+  [vaultPropsWithoutTime,                                   false,  'vault props missing their registered_at'],
+  [{ ...vaultPropsWithoutTime, created_at: OldIso, updated_at: OldIso }, false, 'vault props from before their time was named registered_at'],
+  [{ ...vaultPropsWithoutWayins, ...WayinFieldsOfOld },      false,  'vault props from before their wayins were a list'],
+  [{ ...vaultPropsWithoutEpoch, passphrase_epoch: 1 },       false,  'vault props from before their epoch was named unlock_epoch'],
+  [{ ...vaultPropsWithoutKeyEpoch, format: 'safebyok-vault-v1' }, false, 'vault props from before vaultKey epochs'],
+  [vaultPropsWithoutKeyEpoch,                               false,  'vault props missing their vault_key_epoch'],
+  [{ ...TH.vaultPropsOf('u1'), vault_key_epoch: 0 },         false,  'a vaultKey epoch starts at one'],
   // the prior vaultKey: none at the first, the one just before from the second on
-  [TH.rotatedBundleOf('u1'),                                true,   'a bundle at its second vaultKey, holding the first as its prior'],
-  [rotatedWithoutPrior,                                     false,  'a bundle past its first vaultKey with no prior'],
-  [{ ...TH.bundleOf('u1'), prior_vault_key: priorAt(1) },    false,  'a bundle at its first vaultKey holding a prior'],
-  [{ ...TH.rotatedBundleOf('u1'), vault_key_epoch: 3 },      false,  'a prior that is not the vaultKey just before'],
-  [{ ...TH.rotatedBundleOf('u1'), prior_vault_key: { vault_key_epoch: 1 } }, false, 'a prior with no wrap'],
+  [TH.rotatedVaultPropsOf('u1'),                            true,   'vault props at their second vaultKey, holding the first as their prior'],
+  [rotatedWithoutPrior,                                     false,  'vault props past their first vaultKey with no prior'],
+  [{ ...TH.vaultPropsOf('u1'), prior_vault_key: priorAt(1) }, false,  'vault props at their first vaultKey holding a prior'],
+  [{ ...TH.rotatedVaultPropsOf('u1'), vault_key_epoch: 3 },  false,  'a prior that is not the vaultKey just before'],
+  [{ ...TH.rotatedVaultPropsOf('u1'), prior_vault_key: { vault_key_epoch: 1 } }, false, 'a prior with no wrap'],
 ] as const
 
-const manyEnvelopes = (count: number) => Array.from({ length: count }, (_unused, ii) => TH.envelopeOf(`phrase${String(ii)}`))
-const UnlockListCases = [
+const manyWayins = (count: number) => Array.from({ length: count }, (_unused, ii) => TH.wayinOf(`phrase${String(ii)}`))
+const WayinListCases = [
   // regular usage:
-  [[TH.envelopeOf('passphrase')],                                          true,   'one way in'],
-  [[TH.envelopeOf('passphrase'), TH.envelopeOf('home_phrase')],            true,   'two passphrases, each with its own id and label'],
-  [manyEnvelopes(MaxUnlocks),                                              true,   'as many ways in as MaxUnlocks allows'],
+  [[TH.wayinOf('passphrase')],                                             true,   'one way in'],
+  [[TH.wayinOf('passphrase'), TH.wayinOf('home_phrase')],                  true,   'two passphrases, each with its own id and label'],
+  [manyWayins(MaxUnlocks),                                                 true,   'as many ways in as MaxUnlocks allows'],
   // refused, as a damaged or foreign record:
   [[],                                                                     false,  'no way in at all'],
-  [manyEnvelopes(MaxUnlocks + 1),                                          false,  'one envelope past MaxUnlocks, which would make an unlock run long'],
-  [[TH.envelopeOf('passphrase'), TH.envelopeOf('home_phrase', { unlock_id: 'unlock-passphrase' })], false, 'two envelopes sharing an unlock_id'],
-  [[TH.envelopeOf('passphrase'), TH.envelopeOf('passphrase', { unlock_id: 'unlock-other' })],      false, 'two envelopes sharing an unlocklabel'],
-  [[TH.envelopeOf('passphrase'), TH.passkeyEnvelopeOf('laptop')],         true,   'a passphrase and a passkey'],
-  [[TH.passkeyEnvelopeOf('laptop'), TH.passkeyEnvelopeOf('phone')],        true,   'two passkeys, each its own credential'],
-  [[TH.envelopeOf('passphrase', { method: 'fingerprint' as never })],      false,  'a method this version does not know'],
-  [[TH.envelopeOf('passphrase', { method: 'passkey' as never })],          false,  "a passphrase's fields under the passkey method"],
-  [[TH.passkeyEnvelopeOf('laptop'), TH.passkeyEnvelopeOf('phone', { credential_id: 'cred-laptop' })], false, 'two passkey envelopes for the same credential'],
-  [[TH.passkeyEnvelopeOf('laptop', { credential_id: '' })],               false,  'a passkey with an empty credential_id'],
-  [[TH.passkeyEnvelopeOf('laptop', { prf_salt_b64: '' })],                false,  'a passkey with an empty salt'],
-  [[TH.envelopeOf('Not_a_label')],                                         true,   'an unlocklabel outside the label grammar: the vault checks the grammar when it adds a way in, and a stored record only needs text'],
-  [[TH.envelopeOf('passphrase', { salt_b64: '' })],                        false,  'an empty salt'],
-  [[TH.envelopeOf('passphrase', { unlock_id: '' })],                       false,  'an empty unlock_id'],
-  [[TH.envelopeOf('passphrase', { device_id: '' })],                       false,  'an empty device_id'],
-  [[TH.passkeyEnvelopeOf('laptop', { registered_at: 1_792_022_400 })],    false,  'a registered_at in epoch seconds'],
-  [[TH.envelopeOf('passphrase', { vault_key_epoch: 0 })],                  false,  'a vaultKey epoch of zero'],
-  [[TH.envelopeOf('passphrase', { vault_key_epoch: 2 })],                  true,   "an envelope at another vaultKey epoch than the bundle's: a damaged way in, which an unlock passes over"],
+  [manyWayins(MaxUnlocks + 1),                                             false,  'one wayin past MaxUnlocks, which would make an unlock run long'],
+  [[TH.wayinOf('passphrase'), TH.wayinOf('home_phrase', { wayin_id: 'wayin-passphrase' })], false, 'two wayins sharing a wayin_id'],
+  [[TH.wayinOf('passphrase'), TH.wayinOf('passphrase', { wayin_id: 'wayin-other' })],              false, 'two wayins sharing a wayinlabel'],
+  [[TH.wayinOf('passphrase'), TH.passkeyWayinOf('laptop')],               true,   'a passphrase and a passkey'],
+  [[TH.passkeyWayinOf('laptop'), TH.passkeyWayinOf('phone')],              true,   'two passkeys, each its own credential'],
+  [[TH.wayinOf('passphrase', { wayinkind: 'fingerprint' as never })],      false,  'a wayinkind this version does not know'],
+  [[TH.wayinOf('passphrase', { wayinkind: 'passkey' as never })],          false,  "a passphrase's fields under the passkey wayinkind"],
+  [[TH.passkeyWayinOf('laptop'), TH.passkeyWayinOf('phone', { credential_id: 'cred-laptop' })], false, 'two passkey wayins for the same credential'],
+  [[TH.passkeyWayinOf('laptop', { credential_id: '' })],                  false,  'a passkey with an empty credential_id'],
+  [[TH.passkeyWayinOf('laptop', { prf_salt_b64: '' })],                   false,  'a passkey with an empty salt'],
+  [[TH.wayinOf('Not_a_label')],                                            true,   'a wayinlabel outside the label grammar: the vault checks the grammar when it adds a way in, and a stored record only needs text'],
+  [[TH.wayinOf('passphrase', { salt_b64: '' })],                           false,  'an empty salt'],
+  [[TH.wayinOf('passphrase', { wayin_id: '' })],                           false,  'an empty wayin_id'],
+  [[TH.wayinOf('passphrase', { device_id: '' })],                          false,  'an empty device_id'],
+  [[TH.passkeyWayinOf('laptop', { registered_at: 1_792_022_400 })],       false,  'a registered_at in epoch seconds'],
+  [[TH.wayinOf('passphrase', { vault_key_epoch: 0 })],                     false,  'a vaultKey epoch of zero'],
+  [[TH.wayinOf('passphrase', { vault_key_epoch: 2 })],                     true,   "a wayin at another vaultKey epoch than the vault props': a damaged way in, which an unlock passes over"],
 ] as const
 
-describe("VaultBundle's unlocks", () => {
-  for (const [unlocks, expected, blurb] of UnlockListCases) {
-    it(blurb, () => { expect(VaultBundle.safeParse({ ...TH.bundleOf('u1'), unlocks }).success).to.eq(expected) })
+describe("VaultProps.wayins", () => {
+  for (const [wayins, expected, blurb] of WayinListCases) {
+    it(blurb, () => { expect(VaultProps.safeParse({ ...TH.vaultPropsOf('u1'), wayins }).success).to.eq(expected) })
   }
 })
 
-describe("VaultBundle", () => {
-  for (const [candidate, expected, blurb] of BundleCases) {
-    it(blurb, () => { expect(VaultBundle.safeParse(candidate).success).to.eq(expected) })
+describe("VaultProps", () => {
+  for (const [candidate, expected, blurb] of VaultPropsCases) {
+    it(blurb, () => { expect(VaultProps.safeParse(candidate).success).to.eq(expected) })
   }
 })
 
-const PublicBagCases = [
+const SidecarCases = [
   // any JSON value:
   [{ note: "work account" },          true,   'a plain object, the common case'],
-  [{},                                true,   'an empty bag'],
+  [{},                                true,   'an empty sidecar'],
   ["work account",                    true,   'a string'],
   [null,                              true,   'null, a JSON value'],
   [[1, "two", { three: 3 }],          true,   'an array, nested as deep as it likes'],
@@ -155,34 +155,34 @@ const PublicBagCases = [
   [() => 'nope',                      false,  'a function is not data'],
 ] as const
 
-describe("PublicBag", () => {
-  for (const [candidate, expected, blurb] of PublicBagCases) {
-    it(blurb, () => { expect(PublicBag.safeParse(candidate).success).to.eq(expected) })
+describe("Sidecar", () => {
+  for (const [candidate, expected, blurb] of SidecarCases) {
+    it(blurb, () => { expect(Sidecar.safeParse(candidate).success).to.eq(expected) })
   }
 
   it("passes the examples its doc block shows", () => {
-    expect(PublicBag.parse({ note: 'work account', project: 'atlas' })).to.deep.equal({ note: 'work account', project: 'atlas' })
-    expect(PublicBag.safeParse({ when: new Date() }).success).to.be.false
-    expect(PublicBag.safeParse(undefined).success).to.be.false
+    expect(Sidecar.parse({ note: 'work account', project: 'atlas' })).to.deep.equal({ note: 'work account', project: 'atlas' })
+    expect(Sidecar.safeParse({ when: new Date() }).success).to.be.false
+    expect(Sidecar.safeParse(undefined).success).to.be.false
   })
 })
 
-const wholeSummary = { boxlabel: 'anthropic', revision_id: 'r1', vault_key_epoch: 1, public: {}, registered_at: Date.UTC(2026, 9, 14), written_at: Date.UTC(2026, 9, 14) }
+const wholeSummary = { boxlabel: 'anthropic', revision_tok: 'r1', vault_key_epoch: 1, sidecar: {}, registered_at: Date.UTC(2026, 9, 14), written_at: Date.UTC(2026, 9, 14) }
 
 describe("LockboxSummary", () => {
   it("marks a summary undamaged, as its example shows", () => {
     expect(LockboxSummary.parse(wholeSummary).damaged).to.be.false
   })
 
-  it("takes a public bag of any JSON, and refuses a summary without one", () => {
-    expect(LockboxSummary.safeParse({ ...wholeSummary, public: { note: 'work account' } }).success).to.be.true
-    expect(LockboxSummary.safeParse({ ...wholeSummary, public: [1, 2] }).success).to.be.true
-    expect(LockboxSummary.safeParse(TH.omitting(wholeSummary, 'public')).success).to.be.false
+  it("takes a sidecar of any JSON, and refuses a summary without one", () => {
+    expect(LockboxSummary.safeParse({ ...wholeSummary, sidecar: { note: 'work account' } }).success).to.be.true
+    expect(LockboxSummary.safeParse({ ...wholeSummary, sidecar: [1, 2] }).success).to.be.true
+    expect(LockboxSummary.safeParse(TH.omitting(wholeSummary, 'sidecar')).success).to.be.false
   })
 
   it("holds neither ciphered field, the format nor the codec: a whole lockbox is not a summary", () => {
-    const summary = LockboxSummary.parse({ ...TH.boxOf('anthropic_api_key', 'a1'), public: {} })
-    expect(Object.keys(summary)).to.have.members(['boxlabel', 'revision_id', 'vault_key_epoch', 'public', 'registered_at', 'written_at', 'damaged'])
+    const summary = LockboxSummary.parse({ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: {} })
+    expect(Object.keys(summary)).to.have.members(['boxlabel', 'revision_tok', 'vault_key_epoch', 'sidecar', 'registered_at', 'written_at', 'damaged'])
   })
 })
 
@@ -211,11 +211,11 @@ describe("ForeverMillis", () => {
   })
 })
 
-describe("DeviceUnlock", () => {
+describe("Lease", () => {
   it("takes a user_id of any length, and refuses one that is not text", async () => {
-    const unlock = await TH.unlockOf('u'.repeat(1000))
-    expect(DeviceUnlock.safeParse(unlock).success).to.be.true
-    expect(DeviceUnlock.safeParse({ ...unlock, user_id: 42 }).success).to.be.false
+    const lease = await TH.leaseOf('u'.repeat(1000))
+    expect(Lease.safeParse(lease).success).to.be.true
+    expect(Lease.safeParse({ ...lease, user_id: 42 }).success).to.be.false
   })
 })
 
@@ -306,7 +306,7 @@ describe("DeviceMark", () => {
 // obsolete: never update the snapshot of a format that stands. A refinement (a `Z.refine`, such
 // as the floor's character rules) renders as nothing, so this sees fields, types, optionality and
 // the ranges a check states, not every rule.
-const StoredRecords = [VaultBundle, Lockbox, DeviceUnlock, DeviceMark] as const
+const StoredRecords = [VaultProps, Lockbox, Lease, DeviceMark] as const
 
 describe("Stored record formats", () => {
   for (const schema of StoredRecords) {

@@ -4,8 +4,8 @@ import { consoleLogger } from './console-logger'
 
 /**
  * Where a vault says what it has nobody to throw to: a lock that had to skip its grace, a
- * background refresh that failed, a remembered unlock it could not read. Pass one to the storage
- * adapter's factory as `logger`, and the vault opened over it hears it too; pass openVault one of
+ * background refresh that failed, a lease it could not read. Pass one to the storage
+ * adapter's factory as `logger`, and the vault opened over it hears it too; pass Vault.make one of
  * its own to keep them apart. With none anywhere, the {@link DefaultLogger}: the console, unless the
  * app handed {@link setDefaultLogger} its own. Each call has a plain-language
  * `message`, a `story` of a few facts to filter on (`call`, the vault call it happened in), and
@@ -15,7 +15,7 @@ import { consoleLogger } from './console-logger'
  * VaultError's `cause`, so what it quotes is the host's to keep clean.
  *
  * A logger that throws, or returns a promise that rejects, is ignored: logging never breaks a
- * lock, an open or a store. A host's logger typed `story?: Record<string, any>` fits, and so does
+ * lock, a hello or a store. A host's logger typed `story?: Record<string, any>` fits, and so does
  * the console itself. To log nowhere, pass functions that do nothing.
  *
  * @example
@@ -24,9 +24,9 @@ import { consoleLogger } from './console-logger'
  *     warn:  (message, story, err) => { telemetry.warn(message, story, err) },
  *     error: (message, story, err) => { telemetry.error(message, story, err) },
  *   }
- *   const vault = await openVault({ ...opts, logger })
- * @example openVault({ ...opts, logger: { log: () => {}, warn: () => {}, error: () => {} } })  // silent
- * @example openVault({ ...opts, logger: console })  // untagged, a missing story or error printed as undefined or null
+ *   const vault = Vault.make({ ...opts, logger })
+ * @example Vault.make({ ...opts, logger: { log: () => {}, warn: () => {}, error: () => {} } })  // silent
+ * @example Vault.make({ ...opts, logger: console })  // untagged, a missing story or error printed as undefined or null
  */
 export type VaultLogger = {
   /** Something worth knowing, with nothing to act on. */
@@ -42,7 +42,7 @@ export const VaultLoggerLevelVals = ['log', 'warn', 'error'] as const
 export type VaultLoggerLevel = typeof VaultLoggerLevelVals[number]
 
 const loggerCall = Z.custom<VaultLogger['log']>((candidate) => typeof candidate === 'function')
-/** What a VaultLogger must carry. Checked only: what openVault keeps calls the host's own, `this` and all. */
+/** What a VaultLogger must carry. Checked only: what Vault.make keeps calls the host's own, `this` and all. */
 const loggerShape = Z.object({ log: loggerCall, warn: loggerCall, error: loggerCall })
 
 // Every logger safebyok has guarded, so that one handed back comes back as itself: kept here, out
@@ -62,7 +62,7 @@ const guardedFor = new WeakMap<object, VaultLogger>()
  * It is idempotent, and keeps identity: a logger it has made safe comes back as itself, and the
  * same host logger, however often it is handed in, comes back as the same safe one.
  *
- * @param candidate - The host's logger, as handed to openVault.
+ * @param candidate - The host's logger, as handed to Vault.make.
  *
  * @example parseLogger(props.logger).warn('VaultProvider reopened the vault for a logger rebuilt in render', { call: 'VaultProvider' })
  * @example parseLogger(undefined).log('opened')  // to the default: the console says 'safebyok: opened'
@@ -120,10 +120,10 @@ const forwarding = (): VaultLogger => {
  * The default logger: what every storage adapter, vault, provider and store says things through
  * when it was given no logger of its own. One object, which hands each call on to the console --
  * each line tagged 'safebyok:' -- or to the logger the host handed {@link setDefaultLogger}, as it
- * stands when the call is made. Pass it to openVault, or to VaultProvider, to have the vault use
+ * stands when the call is made. Pass it to Vault.make, or to VaultProvider, to have the vault use
  * the default whatever its storage adapter was given.
  *
- * @example openVault({ ...opts, vaultDB: idbVaultDB({ logger: storageLogger }), logger: DefaultLogger })  // the storage to its own, the vault to the default
+ * @example Vault.make({ ...opts, vaultDB: idbVaultDB({ logger: storageLogger }), logger: DefaultLogger })  // the storage to its own, the vault to the default
  */
 export const DefaultLogger: VaultLogger = forwarding()
 
@@ -131,7 +131,7 @@ export const DefaultLogger: VaultLogger = forwarding()
  * Sends everything safebyok would say to the console to `logger` instead: what every storage
  * adapter, vault, provider and store says when it was given no logger of its own, made before
  * this call or after. Call it once, as the app starts. A logger handed to an adapter's factory,
- * to openVault or to VaultProvider still wins there, as a child logger would. Guarded as
+ * to Vault.make or to VaultProvider still wins there, as a child logger would. Guarded as
  * parseLogger guards any logger. Kind 'bad_option' for anything that is not a VaultLogger.
  *
  * @param logger - The app's own logger; none (or null) puts the console back.

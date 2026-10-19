@@ -1,4 +1,4 @@
-import { VaultDB, VaultError, isVaultError, type BundleExpectation, type EraseExpectation, type Lockbox, type LockboxExpectation, type StoredLockbox, type VaultBundle, type VaultScope } from 'safebyok'
+import { VaultDB, VaultError, isVaultError, type VaultPropsExpectation, type RetireExpectation, type Lockbox, type LockboxExpectation, type StoredLockbox, type VaultProps, type VaultScope } from 'safebyok'
 
 /**
  * DEMO JANK: a pretend backend outage, switched on and off from the backend inspection panel, so
@@ -71,21 +71,21 @@ export class OutageVaultDB extends VaultDB {
     this.maxNameBytes = inner.maxNameBytes
   }
 
-  protected async doReadBundle(scope: VaultScope): Promise<unknown> {
+  protected async doReadVaultProps(scope: VaultScope): Promise<unknown> {
     this.refuseWhileDown()
-    return await this.inner.readBundle(scope)
+    return await this.inner.readVaultProps(scope)
   }
 
-  protected async doCreateBundle(bundle: VaultBundle): Promise<unknown> {
+  protected async doFetchOrCreateVaultProps(vaultProps: VaultProps): Promise<unknown> {
     this.refuseWhileDown()
-    return await this.inner.createBundle(bundle)
+    return await this.inner.fetchOrCreateVaultProps(vaultProps)
   }
 
   // The inner adapter's public verbs refuse a failed expectation as stale_write themselves, and a
   // VaultError passes through this adapter's verbs untouched: so reaching the end means it landed.
-  protected async doUpdateBundle(bundle: VaultBundle, expected: BundleExpectation): Promise<boolean> {
+  protected async doUpdateVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<boolean> {
     this.refuseWhileDown()
-    await this.inner.updateBundle(bundle, expected)
+    await this.inner.updateVaultProps(vaultProps, expected)
     return true
   }
 
@@ -95,7 +95,7 @@ export class OutageVaultDB extends VaultDB {
   }
 
   // The inner list hands back public summaries, without the `format` this adapter's own list
-  // verb checks for, so each lockbox is read whole; one erased between the list and its read is
+  // verb checks for, so each lockbox is read whole; one retired between the list and its read is
   // simply gone. One the inner verbs refuse as damaged goes up as a stand-in that no lockbox
   // matches, so this adapter's own list marks it damaged too.
   protected async doListBoxes(scope: VaultScope): Promise<StoredLockbox[]> {
@@ -120,24 +120,24 @@ export class OutageVaultDB extends VaultDB {
     return true
   }
 
-  protected async doEraseBox(scope: VaultScope, boxlabel: string, expected: EraseExpectation): Promise<boolean> {
+  protected async doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation): Promise<boolean> {
     this.refuseWhileDown()
-    await this.inner.eraseBox(scope, boxlabel, expected)
+    await this.inner.retireBox(scope, boxlabel, expected)
     return true
   }
 
-  protected async doEraseVault(scope: VaultScope, expected: EraseExpectation): Promise<boolean> {
+  protected async doRetireVault(scope: VaultScope, expected: RetireExpectation): Promise<boolean> {
     this.refuseWhileDown()
-    await this.inner.eraseVault(scope, expected)
+    await this.inner.retireVault(scope, expected)
     return true
   }
 
-  // The one public verb this adapter hands on itself: erasing a vault whose bundle is damaged
-  // needs the record as stored, which this adapter's own doReadBundle never sees, as the inner
-  // verbs refuse it. The inner adapter does the checking and the erasing.
-  override async eraseDamagedVault(scope: VaultScope): Promise<void> {
+  // The one public verb this adapter hands on itself: retiring a vault whose props are damaged
+  // needs the record as stored, which this adapter's own doReadVaultProps never sees, as the inner
+  // verbs refuse it. The inner adapter does the checking and the retiring.
+  override async retireDamagedVault(scope: VaultScope): Promise<void> {
     this.refuseWhileDown()
-    await this.inner.eraseDamagedVault(scope)
+    await this.inner.retireDamagedVault(scope)
   }
 
   protected override doSubscribe(scope: VaultScope, onChange: () => void): () => void {

@@ -11,7 +11,6 @@ import { argon2idWebV1Deriver } from '../src/key-deriver'
 import { inspectIdbDeviceDB } from '../src/idb'
 import { memoryStore } from '../src/string-store'
 import { localVaultDB } from '../src/vault-db'
-import { openVault } from '../src/vault'
 import * as TH from './test-helpers'
 
 describe("browserOpts", () => {
@@ -28,10 +27,10 @@ describe("browserOpts", () => {
 
   it("keeps the device store's records in the database it names", async () => {
     const dbName = TH.freshDbName()
-    await browserOpts({ dbName }).deviceDB.writeUnlock(await TH.unlockOf('u1'), TH.NoLocks)
+    await browserOpts({ dbName }).deviceDB.writeLease(await TH.leaseOf('u1'), TH.NoLocks)
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
-    expect(rows.map((row) => row.ckey)).to.deep.equal(['unlock^acme^u1^main'])
-    expect(await browserOpts().deviceDB.readUnlock(TH.scopeOf('u1'))).to.be.null
+    expect(rows.map((row) => row.ckey)).to.deep.equal(['lease^acme^u1^main'])
+    expect(await browserOpts().deviceDB.readLease(TH.scopeOf('u1'))).to.be.null
   })
 
   it("answers the same frozen bag for the same dbName, so a render may call it", () => {
@@ -48,21 +47,21 @@ describe("browserOpts", () => {
     }
   })
 
-  it("spreads into openVault beside the host's vault store", async () => {
-    const vault = await openVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: localVaultDB({ store: memoryStore() }), ...browserOpts({ dbName: TH.freshDbName() }) })
+  it("spreads into Vault.make beside the host's vault store", async () => {
+    const vault = await TH.settledVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: localVaultDB({ store: memoryStore() }), ...browserOpts({ dbName: TH.freshDbName() }) })
     expect(vault.getSnapshot().state).to.eq('absent')
     vault.close()
   })
 
   it("yields to a strength test of the host's own, passed after it", async () => {
-    const vault = await openVault({ ...browserOpts({ dbName: TH.freshDbName() }), applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: localVaultDB({ store: memoryStore() }), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest })
+    const vault = await TH.settledVault({ ...browserOpts({ dbName: TH.freshDbName() }), applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: localVaultDB({ store: memoryStore() }), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest })
     await vault.unlock('pw')
     expect(vault.getSnapshot().state).to.eq('unlocked')
     vault.close()
   })
 
-  it("brings the zxcvbn test to openVault: a common password is refused at create", async () => {
-    const vault = await openVault({ ...browserOpts({ dbName: TH.freshDbName() }), applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: localVaultDB({ store: memoryStore() }), keyDeriver: TH.testDeriver })
+  it("brings the zxcvbn test to Vault.make: a common password is refused at create", async () => {
+    const vault = await TH.settledVault({ ...browserOpts({ dbName: TH.freshDbName() }), applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: localVaultDB({ store: memoryStore() }), keyDeriver: TH.testDeriver })
     await TH.expectRefusal(vault.unlock('password1234'), 'weak_passphrase')
     expect(vault.getSnapshot().state).to.eq('absent')
     vault.close()
@@ -72,7 +71,7 @@ describe("browserOpts", () => {
     const { deviceDB } = browserOpts({ dbName: TH.freshDbName() })
     const opts = { ...browserOpts({ dbName: 'acme' }), applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: localVaultDB({ store: memoryStore() }), deviceDB }
     expect(opts.deviceDB).to.eq(deviceDB)
-    const vault = await openVault(opts)
+    const vault = await TH.settledVault(opts)
     expect(vault.getSnapshot().state).to.eq('absent')
     vault.close()
   })
@@ -84,9 +83,9 @@ describe("safebyok/browser", () => {
   })
 })
 
-describe("zxcvbnPassphraseTest, as openVault's passphraseStrengthTest", () => {
+describe("zxcvbnPassphraseTest, as Vault.make's passphraseStrengthTest", () => {
   it("refuses a common password at create with kind 'weak_passphrase', and creates the vault with a strong one", async () => {
-    const vault = await openVault({ ...TH.memoryVaultOpts(), passphraseStrengthTest: zxcvbnPassphraseTest })
+    const vault = await TH.settledVault({ ...TH.memoryVaultOpts(), passphraseStrengthTest: zxcvbnPassphraseTest })
     const err = await TH.expectRefusal(vault.unlock('password1234'), 'weak_passphrase')
     expect(err.message).to.match(/commonly used password/)
     expect(vault.getSnapshot().state).to.eq('absent')

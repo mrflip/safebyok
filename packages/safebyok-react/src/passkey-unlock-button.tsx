@@ -49,7 +49,7 @@ type PasskeyUnlockButtonProps = {
 
 /** Whether the button shows for a vault in this state: the browser offers WebAuthn, and the vault lists a passkey. */
 export const offersPasskey = (snapshot: VaultSnapshot): boolean => (
-  passkeysAvailable() && snapshot.unlocks.some((unlock) => unlock.method === 'passkey')
+  passkeysAvailable() && snapshot.wayins.some((wayin) => wayin.wayinkind === 'passkey')
 )
 
 /** The button itself, inside PasskeyUnlockButton's boundary. */
@@ -68,7 +68,7 @@ const PasskeyPress = ({ vault, onDone, onGripe, rpId, autoFocus }: PasskeyUnlock
     setAsking(true)
     onGripe(null)
     try {
-      const passkey = await askPasskey(snapshot.unlocks, { rpId })
+      const passkey = await askPasskey(snapshot.wayins, { rpId })
       if (passkey === null || ! isMounted()) { return }
       await vault.unlock(passkey)
       if (! isMounted()) { return }

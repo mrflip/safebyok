@@ -1,5 +1,5 @@
 import { createStore, del, delMany, entries, get, keys, promisifyRequest, clear, update, type UseStore } from 'idb-keyval'
-import { DeviceMark, DeviceUnlock } from './types'
+import { DeviceMark, Lease } from './types'
 import * as Ckeys from './ckeys'
 import { keepingLocks, lockGenerationOf, lockedMeanwhile, type DeviceDB } from './device-db'
 import { parseDbName, type IdbOpts } from './idb-opts'
@@ -12,7 +12,7 @@ export * as ChangeBell from './change-bell'
 /**
  * The device store over this browser's IndexedDB (through `idb-keyval`), as an entry point of its
  * own, `safebyok/idb`: device storage is exactly what IndexedDB is, and the only browser storage
- * that can hold a non-extractable localUnlockKey. Where a vault itself lives is a backend choice,
+ * that can hold a non-extractable leaseKey. Where a vault itself lives is a backend choice,
  * not a fact about the device, so the IndexedDB vault store is a package of its own,
  * `safebyok-indexeddb`.
  *
@@ -59,15 +59,14 @@ const bellnameOf = (dbName: string) => `safebyok-idb:${dbName}:device_db`
 
 /**
  * DeviceDB over this browser's IndexedDB: the real device storage. IndexedDB keeps the
- * DeviceUnlock record by structured clone, which is the only way a browser persists the
- * non-extractable localUnlockKey -- as a handle, never as bytes. Device marks share its shelf.
+ * {@link Lease} record by structured clone, which is the only way a browser persists the
+ * non-extractable leaseKey -- as a handle, never as bytes. Device marks share its shelf.
  *
  * A record that will not read back (damaged, or written by another version) reads as "no
- * remembered unlock", or no device mark, and is dropped: losing the convenience is the safe
- * failure. A row filed under an earlier version's ckey is deleted unread at the next read or
- * erase of a remembered unlock. Its rows are filed under `Ckeys`, names joined on `^`, and a
- * scope with a name holding one is refused with kind 'bad_label'. Kind 'bad_option' for a
- * `dbName` that is not non-empty text.
+ * lease", or no device mark, and is dropped: losing the convenience is the safe failure. A row
+ * filed under an earlier version's ckey is deleted unread at the next read or erase of a lease.
+ * Its rows are filed under `Ckeys`, names joined on `^`, and a scope with a name holding one is
+ * refused with kind 'bad_label'. Kind 'bad_option' for a `dbName` that is not non-empty text.
  *
  * Its failures are IndexedDB's own errors, which a vault says as conditions: one the browser gives
  * for storage withheld or full (a `SecurityError`, a `QuotaExceededError`) as 'storage_blocked',
@@ -76,48 +75,48 @@ const bellnameOf = (dbName: string) => `safebyok-idb:${dbName}:device_db`
  *
  * @example
  *   const deviceDB = idbDeviceDB()
- *   await deviceDB.readUnlock({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // null
+ *   await deviceDB.readLease({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // null
  * @example
- *   await deviceDB.readMark({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })    // null
+ *   await deviceDB.readMark({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })   // null
  */
 export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
   const dbName = parseDbName(opts, 'idbDeviceDB')
   const shelf = () => shelfStore(dbName)
   const ring = () => { ChangeBell.ring(bellnameOf(dbName)) }
 
-  // A row under any ckey but an unlock's or a mark's is one an earlier version filed
-  // (`["unlock","acme","u1","main"]` before the joined ckeys), which nothing else would ever
-  // reach, expire or erase. It is deleted unread, so an old remembered unlock never outlives the
+  // A row under any ckey but a lease's or a mark's is one an earlier version filed (`unlock^…`
+  // before the lease, `["unlock","acme","u1","main"]` before the joined ckeys), which nothing else
+  // would ever reach, expire or erase. It is deleted unread, so an old record never outlives the
   // lock that should forget it.
   const sweepStrays = async () => {
     const ckeys = await keys(shelf())
-    const strays = ckeys.filter((ckey) => ! Ckeys.isUnlock(ckey) && ! Ckeys.isMark(ckey))
+    const strays = ckeys.filter((ckey) => ! Ckeys.isLease(ckey) && ! Ckeys.isMark(ckey))
     if (strays.length === 0) { return }
     await delMany(strays, shelf())
     ring()
   }
 
   return {
-    readUnlock: async (scope) => {
+    readLease: async (scope) => {
       await sweepStrays()
-      const raw: unknown = await get(Ckeys.unlock(scope), shelf())
+      const raw: unknown = await get(Ckeys.lease(scope), shelf())
       if (raw === undefined || raw === null) { return null }
-      const checked = DeviceUnlock.safeParse(raw)
+      const checked = Lease.safeParse(raw)
       if (! checked.success) {
-        await del(Ckeys.unlock(scope), shelf())
+        await del(Ckeys.lease(scope), shelf())
         ring()
         return null
       }
       return checked.data
     },
 
-    // The mark is read and the unlock written in one transaction: a lock's raise of the mark lands
+    // The mark is read and the lease written in one transaction: a lock's raise of the mark lands
     // wholly before it or wholly after.
-    writeUnlock: async (unlock, expected) => {
+    writeLease: async (lease, expected) => {
       const written = await shelf()('readwrite', async (records) => {
-        const kept: unknown = await promisifyRequest(records.get(Ckeys.mark(unlock)))
+        const kept: unknown = await promisifyRequest(records.get(Ckeys.mark(lease)))
         if (lockGenerationOf(kept) !== expected.lock_generation) { return false }
-        records.put(unlock, Ckeys.unlock(unlock))
+        records.put(lease, Ckeys.lease(lease))
         await promisifyRequest(records.transaction)
         return true
       })
@@ -125,9 +124,9 @@ export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
       ring()
     },
 
-    // The scope's own unlock goes first, so a sweep that fails never keeps a lock from forgetting it.
-    eraseUnlock: async (scope) => {
-      await del(Ckeys.unlock(scope), shelf())
+    // The scope's own lease goes first, so a sweep that fails never keeps a lock from forgetting it.
+    eraseLease: async (scope) => {
+      await del(Ckeys.lease(scope), shelf())
       ring()
       await sweepStrays()
     },
@@ -154,7 +153,7 @@ export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
       ring()
     },
 
-    // The shelf holds remembered unlocks and device marks and nothing else, so forgetting them all
+    // The shelf holds leases and device marks and nothing else, so forgetting them all
     // is clearing it: any row an earlier version filed under another ckey goes too.
     eraseAll: async () => {
       await clear(shelf())
@@ -198,7 +197,7 @@ export const inspectIdbDeviceDB = (opts?: IdbOpts) => {
       if (typeof listener !== 'function') { throw new VaultError('bad_option', 'subscribe needs a listener function to call after each write.') }
       return ChangeBell.listen(bellnameOf(dbName), listener)
     },
-    /** Remove every row on the shelf: every remembered unlock and device mark in this database. */
+    /** Remove every row on the shelf: every lease and device mark in this database. */
     wipe: async (): Promise<void> => {
       await clear(shelfStore(dbName))
       ChangeBell.ring(bellnameOf(dbName))

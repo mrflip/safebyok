@@ -1,9 +1,9 @@
-import type { Lockbox, VaultBundle, VaultScope } from 'safebyok'
+import type { Lockbox, VaultProps, VaultScope } from 'safebyok'
 
 /**
- * How one field crosses the wire: `plain`, as it is -- text, a number, or the bundle's prior
- * vaultKey and its list of unlock envelopes, each one opaque JSON -- or `ciphered`, a Ciphered sent as its own two fields,
- * `cipher_iv_b64` and `ciphertext_b64`.
+ * How one field crosses the wire: `plain`, as it is -- text, a number, or the vault props' prior
+ * vaultKey and their list of wayins, each one opaque JSON -- or `ciphered`, a Ciphered sent as its
+ * own two fields, `cipher_iv_b64` and `ciphertext_b64`.
  */
 export type FieldKind = 'plain' | 'ciphered'
 
@@ -32,10 +32,10 @@ export const ScopeFields = everyFieldOf<VaultScope>()([
 ] as const)
 
 /**
- * Every field of a VaultBundle, as `SafebyokVaultBundle` has them: the one place that names the
- * bundle's fields for the wire. The compiler holds it to the bundle's shape.
+ * Every field of a VaultProps, as `SafebyokVaultProps` has them: the one place that names the
+ * vault props' fields for the wire. The compiler holds it to their shape.
  */
-export const BundleFields = everyFieldOf<VaultBundle>()([
+export const VaultPropsFields = everyFieldOf<VaultProps>()([
   ['format',           'plain'],
   ['applabel',         'plain'],
   ['user_id',          'plain'],
@@ -44,7 +44,7 @@ export const BundleFields = everyFieldOf<VaultBundle>()([
   ['unlock_epoch',     'plain'],
   ['vault_key_epoch',  'plain'],
   ['prior_vault_key',  'plain'],
-  ['unlocks',          'plain'],
+  ['wayins',           'plain'],
   ['registered_at',    'plain'],
 ] as const)
 
@@ -55,13 +55,13 @@ export const BundleFields = everyFieldOf<VaultBundle>()([
 export const LockboxFields = everyFieldOf<Lockbox>()([
   ['format',                 'plain'],
   ['boxlabel',               'plain'],
-  ['revision_id',            'plain'],
+  ['revision_tok',           'plain'],
   ['vault_key_epoch',        'plain'],
   ['lockbox_key_wrapped',    'ciphered'],
   ['whisper_ciphered',       'ciphered'],
   ['whisper_codec',          'plain'],
   ['whisper_schema_version', 'plain'],
-  ['public_json',            'plain'],
+  ['sidecar_json',           'plain'],
   ['registered_at',          'plain'],
   ['written_at',             'plain'],
 ] as const)
@@ -82,13 +82,13 @@ export const selectionOf = (fields: readonly Field[]): string => fields.map(([fi
 )).join(' ')
 
 /**
- * The record `sent` carries, field by field: each of `fields`, a null or missing one left out (a
- * bundle with no prior vaultKey), and a ciphered one as its two halves -- so whatever else rode along, a
- * GraphQL client's `__typename` or a stray field, stays behind. Nothing is checked here: the
+ * The record `sent` carries, field by field: each of `fields`, a null or missing one left out (the
+ * prior vaultKey of vault props that hold none), and a ciphered one as its two halves -- so
+ * whatever else rode along, a GraphQL client's `__typename` or a stray field, stays behind. Nothing is checked here: the
  * VaultDB on each side validates what it is handed. What is not an object comes back as it is,
  * for that validation to refuse.
  *
- * @example recordOf({ vault_id: 'v1', prior_vault_key: null, __typename: 'SafebyokVaultBundle' }, [['vault_id', 'plain'], ['prior_vault_key', 'plain']])  // { vault_id: 'v1' }
+ * @example recordOf({ vault_id: 'v1', prior_vault_key: null, __typename: 'SafebyokVaultProps' }, [['vault_id', 'plain'], ['prior_vault_key', 'plain']])   // { vault_id: 'v1' }
  */
 export const recordOf = (sent: unknown, fields: readonly Field[]): unknown => {
   if (! isBag(sent)) { return sent }

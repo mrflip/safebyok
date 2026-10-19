@@ -11,7 +11,7 @@ describe("the limits every vault is held to", () => {
     expect(MaxVaultLockboxes).to.eq(8000)
   })
 
-  it("holds at most 7 MiB less 1 KiB of lockboxes: half the read budget, less a whole bundle and room for the tally", () => {
+  it("holds at most 7 MiB less 1 KiB of lockboxes: half the read budget, less a whole document of vault props and room for the tally", () => {
     expect(MaxVaultLockboxBytes).to.eq((7 * MiB) - 1024)
   })
 })

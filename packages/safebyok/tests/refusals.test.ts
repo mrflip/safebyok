@@ -47,9 +47,9 @@ describe("Refusals.staleWrite", () => {
   }
 
   it("says which write was refused", () => {
-    expect(Refusals.staleWrite('bundle').message).to.include('this change was refused')
+    expect(Refusals.staleWrite('vaultProps').message).to.include('this change was refused')
     expect(Refusals.staleWrite('lockbox').message).to.include('That lockbox changed')
-    expect(Refusals.staleWrite('erase').message).to.include('this erase was refused')
+    expect(Refusals.staleWrite('retire').message).to.include('this retirement was refused')
   })
 })
 
@@ -77,12 +77,12 @@ describe("Refusals.vaultFull", () => {
   it("refuses as vault_full, naming the limit met, with no cause when none is given", () => {
     const refusal = Refusals.vaultFull(250)
     expect(refusal.kind).to.eq('vault_full')
-    expect(refusal.message).to.eq('This vault already holds the 250 lockboxes its storage keeps in one vault: erase one before storing another.')
+    expect(refusal.message).to.eq('This vault already holds the 250 lockboxes its storage keeps in one vault: retire one before storing another.')
     expect(refusal).to.not.have.property('cause')
   })
 
   it("says only that the vault is full when no count is the limit met", () => {
-    expect(Refusals.vaultFull().message).to.eq('This vault is full: erase a lockbox to make room, then try again.')
+    expect(Refusals.vaultFull().message).to.eq('This vault is full: retire a lockbox to make room, then try again.')
   })
 
   it("keeps the backend's own refusal as its cause, never a null one", () => {

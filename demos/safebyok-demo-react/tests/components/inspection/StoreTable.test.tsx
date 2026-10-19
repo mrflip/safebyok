@@ -32,8 +32,8 @@ describe("StoreTable", () => {
 
   it("shows each row's ckey and text, with a chip for ciphertext and for a key handle", () => {
     const rows: StoreRow[] = [
-      { ckey: 'bundle:acme',  text: '{"vault_key_passphrase_wrapped":{}}', flavor: 'ciphered' },
-      { ckey: 'unlock:acme',  text: '«CryptoKey non-extractable handle»',  flavor: 'keyhandle' },
+      { ckey: 'vault:acme',   text: '{"vault_key_passphrase_wrapped":{}}', flavor: 'ciphered' },
+      { ckey: 'lease:acme',   text: '«CryptoKey non-extractable handle»',  flavor: 'keyhandle' },
       { ckey: 'session:acme', text: '{"userlabel":"margo"}',               flavor: 'plain' },
     ]
     render(<StoreTable rows={rows} />)
@@ -62,24 +62,24 @@ describe("useStoreRows", () => {
 
 describe("useIdbRows", () => {
   it("fetches a shelf's rows as display text, and again when the shelf rings", async () => {
-    const shelf = fakeInspector([{ ckey: 'bundle:acme', row: { lockbox_key_wrapped: { ciphertext_b64: 'ct' } } }])
+    const shelf = fakeInspector([{ ckey: 'vault:acme', row: { lockbox_key_wrapped: { ciphertext_b64: 'ct' } } }])
     const { result } = renderHook(() => useIdbRows(shelf.inspector))
     await waitFor(() => { expect(result.current).to.have.lengthOf(1) })
-    expect(result.current[0]).to.deep.equal({ ckey: 'bundle:acme', text: '{"lockbox_key_wrapped":{"ciphertext_b64":"ct"}}', flavor: 'ciphered' })
+    expect(result.current[0]).to.deep.equal({ ckey: 'vault:acme', text: '{"lockbox_key_wrapped":{"ciphertext_b64":"ct"}}', flavor: 'ciphered' })
     act(() => { shelf.put({ ckey: 'note:acme', row: 'plain text' }) })
     await waitFor(() => { expect(result.current).to.have.lengthOf(2) })
   })
 
   it("shows a CryptoKey as the handle it is, and what JSON cannot write as String() has it", async () => {
-    const localUnlockKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['wrapKey', 'unwrapKey'])
+    const leaseKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['wrapKey', 'unwrapKey'])
     const shelf = fakeInspector([
-      { ckey: 'unlock:acme', row: { local_unlock_key: localUnlockKey } },
+      { ckey: 'lease:acme', row: { lease_key: leaseKey } },
       { ckey: 'gone:acme',   row: undefined },
     ])
     const { result } = renderHook(() => useIdbRows(shelf.inspector))
     await waitFor(() => { expect(result.current).to.have.lengthOf(2) })
     expect(result.current).to.deep.equal([
-      { ckey: 'unlock:acme', text: '{"local_unlock_key":"«CryptoKey non-extractable handle»"}', flavor: 'keyhandle' },
+      { ckey: 'lease:acme', text: '{"lease_key":"«CryptoKey non-extractable handle»"}', flavor: 'keyhandle' },
       { ckey: 'gone:acme',   text: 'undefined',                                                  flavor: 'plain' },
     ])
   })

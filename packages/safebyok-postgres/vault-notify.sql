@@ -26,8 +26,8 @@ BEGIN
 END
 $$;
 
-CREATE OR REPLACE TRIGGER safebyok_bundles_changed
-  AFTER INSERT OR UPDATE OR DELETE ON safebyok_bundles
+CREATE OR REPLACE TRIGGER safebyok_vaults_changed
+  AFTER INSERT OR UPDATE OR DELETE ON safebyok_vaults
   FOR EACH ROW EXECUTE FUNCTION safebyok_vault_changed();
 
 CREATE OR REPLACE TRIGGER safebyok_lockboxes_changed

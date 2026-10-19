@@ -1,4 +1,4 @@
-import { PasskeySaltBytes, VaultError, type PasskeyProof, type UnlockSummary } from 'safebyok'
+import { PasskeySaltBytes, VaultError, type PasskeyProof, type WayinSummary } from 'safebyok'
 import { fromB64, toB64 } from 'safebyok/utils'
 import { Messages } from './messages'
 
@@ -61,7 +61,7 @@ export type AskPasskeyOpts = {
  *
  * @example
  *   const makePasskey = () => createPasskey({ rp: { name: 'Acme' }, user: { name: email, displayName: fullName } })
- *   const unlockId = await vault.addPasskey(passphrase, makePasskey, { unlocklabel: 'laptop_fingerprint' })  // null: dismissed
+ *   const wayinId = await vault.addPasskey(passphrase, makePasskey, { wayinlabel: 'laptop_fingerprint' })    // null: dismissed
  */
 export const createPasskey = async (opts: CreatePasskeyOpts): Promise<PasskeyProof | null> => {
   ensureAvailable()
@@ -103,31 +103,31 @@ export const createPasskey = async (opts: CreatePasskeyOpts): Promise<PasskeyPro
 
 /**
  * The answer of whichever of a vault's passkeys the user touches: what `vault.unlock` (or any
- * change's proof) takes. `unlocks` is the snapshot's list, whole; the browser offers the user each
+ * change's proof) takes. `wayins` is the snapshot's list, whole; the browser offers the user each
  * passkey in it, and asks the one chosen for its answer over that passkey's own salt. A passkey
  * stored damaged -- its `credential_id` or `prf_salt_b64` not base64url, or its salt not
  * `PasskeySaltBytes` long, which the vault would refuse -- is left out, and the others offered as
  * ever.
  *
  * Resolves null when the user dismisses the prompt (or lets it time out, or has none of these
- * passkeys at hand). Refuses with kind 'absent_unlock' when `unlocks` holds no passkey,
- * 'damaged_unlock' when every one it holds is stored damaged,
+ * passkeys at hand). Refuses with kind 'absent_wayin' when `wayins` holds no passkey,
+ * 'damaged_wayin' when every one it holds is stored damaged,
  * 'passkey_unavailable' when the browser has no WebAuthn or the passkey gives no PRF answer, and
  * 'bad_option' when `opts.rpId` does not fit this page.
  *
  * @example
- *   const passkey = await askPasskey(vault.getSnapshot().unlocks)
+ *   const passkey = await askPasskey(vault.getSnapshot().wayins)
  *   if (passkey !== null) { await vault.unlock(passkey) }
  */
-export const askPasskey = async (unlocks: readonly UnlockSummary[], opts: AskPasskeyOpts = {}): Promise<PasskeyProof | null> => {
+export const askPasskey = async (wayins: readonly WayinSummary[], opts: AskPasskeyOpts = {}): Promise<PasskeyProof | null> => {
   ensureAvailable()
-  const listed = unlocks.filter((unlock) => unlock.method === 'passkey')
+  const listed = wayins.filter((wayin) => wayin.wayinkind === 'passkey')
   if (listed.length === 0) {
-    throw new VaultError('absent_unlock', Messages.noPasskeyToAsk)
+    throw new VaultError('absent_wayin', Messages.noPasskeyToAsk)
   }
-  const passkeys = listed.flatMap((unlock) => askable(unlock) ?? [])
+  const passkeys = listed.flatMap((wayin) => askable(wayin) ?? [])
   if (passkeys.length === 0) {
-    throw new VaultError('damaged_unlock', Messages.passkeysDamaged)
+    throw new VaultError('damaged_wayin', Messages.passkeysDamaged)
   }
   const asked = await askAuthenticator(() => navigator.credentials.get({
     publicKey: {
@@ -152,13 +152,13 @@ export const askPasskey = async (unlocks: readonly UnlockSummary[], opts: AskPas
  * A passkey of the vault's, its credential id and salt as bytes for WebAuthn; null when either is
  * not base64url, or the salt is not `PasskeySaltBytes` long.
  */
-const askable = (unlock: UnlockSummary & { method: 'passkey' }) => {
+const askable = (wayin: WayinSummary & { wayinkind: 'passkey' }) => {
   try {
-    const saltBytes = fromB64(unlock.prf_salt_b64) as Uint8Array<ArrayBuffer>
+    const saltBytes = fromB64(wayin.prf_salt_b64) as Uint8Array<ArrayBuffer>
     if (saltBytes.length !== PasskeySaltBytes) { return null }
     return {
-      credentialId:    unlock.credential_id,
-      credentialBytes: fromB64(unlock.credential_id) as Uint8Array<ArrayBuffer>,
+      credentialId:    wayin.credential_id,
+      credentialBytes: fromB64(wayin.credential_id) as Uint8Array<ArrayBuffer>,
       saltBytes,
     }
   } catch {

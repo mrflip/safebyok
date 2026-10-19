@@ -15,6 +15,80 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
 
 ## Of Interest
 
+* 2026-10-18 (sprint reform): **three stored-format tags changed in the renaming, none with a
+  migration.** Against the last release (0.3.0), the vault props format `safebyok-vault-v2` became
+  `safebyok-vault-v3` (the unlock envelope became the "wayin", with the field renames that follow;
+  vault props never carried a `revision_id`); the lockbox format `safebyok-lockbox-v2` became
+  `safebyok-lockbox-v5` (`note` became the sidecar, `sidecar_json`, beside the new `whisper_codec`
+  and `whisper_schema_version`; `changed_at` became `written_at`; `revision_id` became
+  `revision_tok`; `-v3` and `-v4` were only ever on `main`, never released); the device lease
+  format `safebyok-unlock-v1` became `safebyok-lease-v1`. A 0.3.0 device store holds JSON-tuple
+  rows (`["unlock",...]`, `["mark",...]`); today's ckeys are `lease^` and `mark^`. Each record's
+  ctx (the associated data its ciphertext is bound to) follows that record's fields and tag; the
+  construction is unchanged, and only field names, the tag and the purpose strings moved. The
+  package is before 1.0.0, where stored shapes do not bind backward. An old record fails safe: a
+  v2 vault reads as damaged (`damaged_vault`, never `newer_format`, since `safebyok-vault-v2` is
+  listed among the older formats), and any older lockbox lists as damaged. An old lease is never
+  read as a lease: `idbDeviceDB` sweeps the old rows itself, silently, at the next lease read or
+  erase (`src/idb.ts`), the 0.3.0 device mark along with the lease; a host's own DeviceDB that
+  hands back an old `safebyok-mark-v1` mark sees it read as none, with the vault's one logger
+  warning. So the device mark is not kept from 0.3.0: rollback-check state starts afresh. Nothing
+  old is ever decrypted by the new code, and nothing is rewritten in place. A Convex deployment
+  refuses the new schema until its tables are cleared; Postgres hosts must run the summary
+  changeset's Postgres steps before the new table SQL.
+* 2026-10-18 (make_hello): **`openVault` is split into `Vault.make`, which returns a handle at
+  once, and `vault.hello()`, which reads storage and the lease.** `Vault.make(opts)` is synchronous:
+  it validates every option and starts `hello()` itself. `hello()` reads the vault props and this
+  device's lease and settles the snapshot from `opening` into `absent`, `locked` or `unlocked`.
+  Every method but `lock()`, `lockSoon()` and `close()` awaits it first (after its synchronous
+  argument checks), so a call made before storage answers waits; a call that touches a whisper
+  still needs the vault unlocked once `hello()` settles. Nothing that failed closed proceeds. No
+  construction, ctx, stored format or key handling changed. Five points to look at:
+  (1) **A lock does not wait for `hello()`.** `lock()` and `lockSoon()` act at once, storage
+  reachable or not. A `hello()` taking up the lease while a lock lands takes nothing up:
+  `takeUpLease` returns at once unless the counter `forgetsSoFar` (raised by every hard lock --
+  `lock()`, `retire()`, a lock for untrusted storage -- and every `lockSoon()`) was 0 when that
+  hello started, and it takes nothing up if the counter has moved by the time the lease opens or
+  the handle has closed. Tests hold the lease read open while each lock lands.
+  (2) **`hello()` is memoised, and a lock is never undone on its handle by a later `hello()`.**
+  Callers share one in-flight promise; a rejected one clears at once; a resolved one stands until a
+  read of storage fails, storage the vault cannot trust refuses it (`identity_revoked`,
+  `rolled_back`, `newer_format`, from any call, read or write), or the vault is retired. The next
+  call then reads storage and the lease again, but a handle that has ever forgotten (the counter
+  above is not 0) takes up no lease: so a lock, hard, soft or for untrusted storage, stays locked
+  on that handle even when the device store failed to erase the lease, and whispers stay refused as
+  `vault_locked` until a proof unlocks it. A lease the lock could not erase is left for the next
+  handle made (the next page load), as before. A handle whose first `hello()` was refused for
+  untrusted storage has locked, so it takes up none; one whose first `hello()` failed otherwise
+  (storage unreachable, say) has forgotten nothing, so it still takes its lease up once a `hello()`
+  (or a storage change bell) succeeds; an unlocked handle holds its key and loses nothing. If storage still refuses, the call meets the
+  refusal again and the vault stays locked. A plain `lock()` does not reset the memo and erases the
+  lease in any case. Regression tests cover `lock()`, `lockSoon()` and the untrusted-storage case.
+  (3) **`Vault.make` refuses any option it does not take**, `bad_option`, by a strict Zod object
+  over the option names. Before, unknown keys were ignored, so a host still passing the retired
+  `forcePassphraseReentryHours` (now `leaseHours`) got the 7-day default lease: a longer unlock.
+  The refusal names the unknown keys (the host's own field names, never a value) and, from a small
+  table, the new name of a retired one. React's `VaultProvider` forwards the names of props it does
+  not know to `Vault.make`, so those reach the error boundary rather than being dropped.
+  (4) **A refused `hello()` no longer closes the handle.** The handle stands, its storage watch
+  live, until the host closes it; the snapshot carries the refusal in a new public field,
+  `trouble: VaultError | null` (cleared by the next successful read), and the vault's logger warns
+  of it. A `VaultError` carries no secret material, as before. While no `hello()` has succeeded, a
+  storage change bell runs `hello()` (lease take-up included) rather than a bare refresh.
+  (5) **A read of storage takes up the vault props, the device mark and the lockbox listing
+  together, only once the listing has been read**, so a read failing partway never leaves the vault
+  props of one read beside the lockboxes of another. When the fresh vault props show the vault
+  changed elsewhere, the vaultKey is still dropped and the lease erased before the listing is read,
+  as before.
+
+* 2026-10-18: **the context bytes of every way in changed spelling, not construction, with the
+  rename to "wayin".** A wayin's wrap is bound to a context of the record's format tag, then its
+  whole stored header, as key-sorted JSON (a passkey wayin's HKDF `info` is the same bytes); it now
+  spells the renamed fields and begins `safebyok-vault-v3`. The construction and the purpose
+  strings are unchanged. A `safebyok-vault-v2` record reads as `damaged_bundle` on adapters that read
+  it (a Convex deployment refuses the new schema until its tables are cleared), with no migration,
+  so no old ciphertext has to open under the new bytes. Rejected: a translation back to the old
+  spellings under the v2 tag, which puts a name table in the crypto path for records nobody reads.
 * 2026-10-16: `describeVaultDB` now races every compare-and-write line (VAULTDB.md, 3.1 to 3.5, 3.7,
   4.5) from two devices, holding one before each of its round trips while the other moves
   (`raceEveryWay`, a turnstile the adapter's test factory wires into its client). What it shows: no
@@ -473,14 +547,21 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
   from a tarball checked against the sha512 `dist.integrity` recorded in `release.yml`, offline
   (npm bundles its dependencies), so a changed tarball on the registry stops the job instead of
   running beside the token. Moving npm means recording the new version's integrity by hand.
-* 2026-10-15: `store()` retries a write storage refused as stale, up to three attempts in all.
-  Every attempt reads the box afresh and seals the whisper anew, under its own lockboxKey and
-  `revision_id`: a refused attempt's ciphertext is never reused, so no two ciphertexts share a
-  binding. The retry's first act is to require unlocked, so a refusal that caught the device up
-  with a vault reborn elsewhere (or its ways in changed) relocks it and ends the retry as
-  `vault_locked` before any whisper is sealed for the new vault. A retry overwrites what the
-  other device wrote (last writer wins), as a host's own retry did, except that a box erased
-  elsewhere is not brought back (an erase wins: `stale_write` at once); `erase()` is never retried.
+* 2026-10-15; 2026-10-18 (reform, thread 2, `20261018-no_retry`): `store()` makes one attempt and
+  no longer retries a write storage refused as stale. It reads the box, seals, and writes under the
+  versioned expectation (same `vault_id`, same `vault_key_epoch`, same `revision_id` or none). On a
+  `stale_write` refusal it catches up with storage once and throws `stale_write` (nothing written;
+  the adapter's refusal is the `cause`); a catch-up that relocks the device (vault reborn, or its
+  ways in changed) throws `vault_locked` with nothing written, and one that fails throws as it came
+  (`stale_write` with the failure as cause, `identity_revoked`, `rolled_back`, `newer_format`). A
+  box erased elsewhere is now just a stale write. So no whisper is sealed over what another device
+  wrote without the caller's say, and no jittered wait or `crypto.getRandomValues` draw remains in
+  the path. Until 2026-10-18 a refused store tried up to three times (waits of 1-2 s, then 2-4 s,
+  jittered), each attempt sealing anew under its own lockboxKey and `revision_id`, and overwrote
+  the other device's box (last writer wins) unless it found the box erased (an erase wins). Still
+  load-bearing: the versioned write (a stale tab cannot resurrect a retired or erased box, and a
+  box sealed under a retired vaultKey never lands) and the damaged-box handling below; `erase()` is
+  never retried.
 * 2026-10-15: the published package has a `safebyok/testing` entry point of test helpers
   (the `TH` namespace of its tests), among them `testDeriver`, a KeyDeriver that is one SHA-256
   of passphrase and salt, labelled `test_digest_v0`. `openVault` accepts any KeyDeriver, so
@@ -620,7 +701,7 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
   ID can ask the authenticator for the answer (with the user's touch), as it could read a typed
   passphrase. The credential's challenge is random and never verified, and no attestation is
   checked: the authenticator is the user's to trust.
-* 2026-10-15: **every field a record writes is bound, unless a reason below says not** (the
+* 2026-10-15; 2026-10-18: **every field a record writes is bound, unless a reason below says not** (the
   Coach: "make everything verifiable unless there's a good reason not to"). A passkey envelope's
   HKDF `info` is now its wrap's whole additional data -- format, scope, `vault_id`, the bundle's
   `registered_at`, purpose, and the envelope's public header (`method`, `unlock_id`,
@@ -648,6 +729,15 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
   record, so never bound. Were an Argon2 setting ever to go in, it would be as a difficulty
   measure -- a floor on the cost a vault accepts from its stored deriver label -- not as a binding
   (the Coach, 2026-10-16).
+  (2026-10-18, with the rename of the device record to the "lease": the device record's context
+  changed spelling, not construction. Its first part, the format, is now `safebyok-lease-v1`, and
+  its last, the purpose, `vault_key_lease_wrapped`; the parts between and their order are as
+  before, joined by the same `cipherCtx`, and the lockbox and wayin contexts did not move.
+  `tests/ctx-bytes.test.ts` pins the new bytes. A `safebyok-unlock-v1` record is not read: it fails
+  validation and is erased, and the IndexedDB device store, which now files leases under `lease^`
+  rather than `unlock^`, deletes the old row unread at its next lease read or erase. The user
+  proves once more on each device; there is no migration. The device mark (lock generation and
+  seen-vault record) is untouched.)
 * 2026-10-15: any way in proves any change. A passkey's answer is accepted as proof by
   `addPassphrase`, `addPasskey` and `removeUnlock`, so whoever holds one passkey can set a new
   passphrase and remove the user's others: the vault is as strong as its weakest way in. A vault
@@ -915,7 +1005,7 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
   clients cannot keep. `VaultDB` verbs no longer take a validators bag at all, so no server or
   wrapper can be handed the wrong one. Each adapter declares `maxNameBytes` (Postgres: 640, so a
   lockbox's four-name primary key fits a btree entry) and the base class refuses a longer name.
-* 2026-10-16: **a lockbox's note becomes a public bag of any JSON, bound; its whisper's codec
+* 2026-10-16; 2026-10-18: **a lockbox's note becomes a public bag of any JSON, bound; its whisper's codec
   and schema version are reserved, bound too** (push_to_100_a, thread 2; G023, G025, G040). The
   lockbox (`safebyok-lockbox-v3`) holds `public_json`, the host's bag as stable-serialized JSON
   text, always written (`{}` when the host gave none, so an absent bag and an empty one are one
@@ -941,7 +1031,24 @@ Interest*. Either way it keeps the voice above, and returns the lines it changed
   refuses a record part holding a field set to `undefined` (`bad_option`) instead of dropping it
   as JSON would, so a field gone missing by mistake can never bind as if it were absent. The
   note's control-character floor (G177) goes with the note: the bag is the host's, and a host
-  that shows it checks what it shows.
+  that shows it checks what it shows. 2026-10-18 (branch `20261018-sidecar`, thread 5 of sprint
+  reform): the bag is renamed the "sidecar", `public_json` is now `sidecar_json`, and the format
+  tag moves from `safebyok-lockbox-v4` to `safebyok-lockbox-v5`. Both of a lockbox's encryptions
+  (the lockboxKey wrap and the whisper cipher) bind a context (`boxCtx`) of the format tag, the
+  vault's scope and `vault_id`, the purpose string, and the whole stored header as key-sorted JSON,
+  so those bytes follow the renamed field and the v5 tag, and the header now spells `sidecar_json`
+  after `revision_id` rather than after `boxlabel`. The construction is unchanged: same parts,
+  same order, same purpose strings, the sidecar in the header where the bag was. A v4 lockbox
+  lists as damaged and reads as `damaged_lockbox` on every adapter that reads it (a Convex
+  deployment refuses the new component schema until its tables are cleared), with no migration,
+  so no old ciphertext has to open under the new bytes. Also 2026-10-18 (branch
+  `20261018-vaultprops`): the lockbox's stored field `revision_id` is renamed `revision_tok` (a
+  `_tok` names a value that changes on every write), and `boxCtx` follows it, so the field name in
+  the bound header changes; the construction is unchanged, the same parts in the same order, and
+  `revision_tok` sorts where `revision_id` did. It rides the format bump to `safebyok-lockbox-v5`
+  already in this release, so there is no second bump, and a lockbox in an older format lists as
+  damaged, as before, with no migration. The wayin's and the lease's contexts bind no field the
+  rename touches, so their bytes do not move. `tests/ctx-bytes.test.ts` pins the lockbox's bytes.
 * 2026-10-16 (locks_and_expiry): **the unlock window has a hard edge, and a timer.** The
   threshold is the truth: every call that starts work checks `askPassphraseAt` against the host's
   clock, and past it throws `vault_locked`. A `setTimeout` enforces it: armed at each take-up of a

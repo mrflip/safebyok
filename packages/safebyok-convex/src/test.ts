@@ -22,7 +22,7 @@ export { default as schema } from './component/schema'
  * @example
  *   const CVX = convexTest(schema, modules)
  *   register(CVX)
- *   await CVX.withIdentity({ subject: 'u1' }).query(api.safebyok.getBundle, { scope })
+ *   await CVX.withIdentity({ subject: 'u1' }).query(api.safebyok.getVaultProps, { scope })
  *
  * @example
  *   const app = defineTestApp({ schema, components: { safebyok: { register } } })

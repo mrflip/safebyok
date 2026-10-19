@@ -8,8 +8,8 @@ describe("the package's entry point", () => {
   it("exports exactly the public surface", () => {
     expect(Object.keys(safebyok)).to.have.members([
       'Argon2idWebV1', 'argon2idDeriver', 'argon2idWebV1Deriver', 'ensureSaltFits', 'parseKeyDeriverSpec',
-      'openVault', 'eraseDamagedVault', 'parseLogger', 'DefaultLogger', 'setDefaultLogger', 'checkStrengthTest',
-      'Ciphered', 'EpochMillis', 'FarFuture', 'FarPast', 'ForcePassphraseReentryHours', 'ForeverMillis', 'Lockbox', 'LockboxSummary', 'MaxLockboxes', 'MaxReentryHours', 'MaxUnlocks', 'MaxWhisperBytes', 'MinuteMillis', 'PasskeyEnvelope', 'PasskeySaltBytes', 'PassphraseEnvelope', 'PublicBag', 'UnlockEnvelope', 'UnlockMethodVals', 'VaultBundle', 'VaultScope', 'Whisper', 'wallClock',
+      'Vault', 'retireDamagedVault', 'parseLogger', 'DefaultLogger', 'setDefaultLogger', 'checkStrengthTest',
+      'Ciphered', 'EpochMillis', 'FarFuture', 'FarPast', 'LeaseHours', 'ForeverMillis', 'Lockbox', 'LockboxSummary', 'MaxLockboxes', 'MaxLeaseHours', 'MaxUnlocks', 'MaxWhisperBytes', 'MinuteMillis', 'PasskeyWayin', 'PasskeySaltBytes', 'PassphraseWayin', 'Sidecar', 'Wayin', 'WayinKindVals', 'VaultProps', 'VaultScope', 'Whisper', 'wallClock',
       'AnyTextValidators', 'DefaultValidators', 'Label', 'LabelPattern', 'MaxLabelChars', 'MaxUserIdChars', 'NameFloor', 'NameFloorBytes', 'UserId', 'UserIdPattern', 'checkValidators',
       'VaultError', 'VaultErrorFamilyForKind', 'VaultErrorFamilyVals', 'VaultErrorKindVals', 'isVaultCondition', 'isVaultError',
       'VaultDB', 'Ckeys', 'Expectations', 'Refusals', 'Sanitizer', 'localVaultDB', 'memoryDeviceDB',
@@ -25,7 +25,7 @@ describe("the package's entry point", () => {
   })
 
   it("exports the ckeys an adapter over a key-value store files rows under, as one namespace", () => {
-    expect(Object.keys(safebyok.Ckeys)).to.have.members(['Delimiter', 'bundle', 'box', 'unlock', 'mark', 'boxPrefix', 'isBoxIn', 'boxlabelOf', 'isUnlock', 'isMark'])
+    expect(Object.keys(safebyok.Ckeys)).to.have.members(['Delimiter', 'vaultProps', 'box', 'lease', 'mark', 'boxPrefix', 'isBoxIn', 'boxlabelOf', 'isLease', 'isMark'])
   })
 
   it("exports the sanitizer an adapter throws through in place of a foreign error, as one namespace", () => {
@@ -34,7 +34,7 @@ describe("the package's entry point", () => {
 
   it("exports the refusals an adapter throws, and the comparisons a key-value adapter makes, each as one namespace", () => {
     expect(Object.keys(safebyok.Refusals)).to.have.members(['StorageTroubleMessage', 'StaleWriteVals', 'storageUnavailable', 'staleWrite', 'notPermitted', 'vaultFull', 'StorageBlockedMessage', 'storageBlocked', 'isStorageBlocked'])
-    expect(Object.keys(safebyok.Expectations)).to.have.members(['bundleMeets', 'vaultMeets', 'vaultIdMeets', 'lockboxMeets'])
+    expect(Object.keys(safebyok.Expectations)).to.have.members(['vaultPropsMeets', 'vaultMeets', 'vaultIdMeets', 'lockboxMeets'])
   })
 })
 
@@ -58,14 +58,14 @@ const bundleOf = async (imports: string): Promise<string> => {
   return built.output.map((piece) => (piece.type === 'chunk' ? piece.code : '')).join('\n')
 }
 
-// The supplied spec's label ships with openVault, which refuses a deriver wearing it without its
+// The supplied spec's label ships with Vault.make, which refuses a deriver wearing it without its
 // parameters; Argon2id's implementation shows by the variants it names, Argon2d among them.
 const Argon2Implementation = /argon2d/iu
 
 describe("the main entry's tree-shaking", () => {
-  it("leaves Argon2id out of an app that imports openVault alone", async () => {
-    const shipped = await bundleOf('openVault')
-    expect(shipped).to.include('openVault')
+  it("leaves Argon2id out of an app that imports Vault.make alone", async () => {
+    const shipped = await bundleOf('Vault')
+    expect(shipped).to.include('Vault.make')
     expect(shipped).to.include('argon2id_web_v1')
     expect(shipped).to.not.match(Argon2Implementation)
   }, 30_000)

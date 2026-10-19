@@ -5,7 +5,7 @@ import { gripeForJokeErr, tellKnockKnockJoke } from '../lib/anthropic'
 /**
  * The "app": a knock-knock machine powered by the user's own Anthropic key. This is what using
  * the library day-to-day looks like -- one lockbox holding the key, `withUnlockedVault()` around
- * anything that needs it, and `vault.use()` scoping the decrypted key to the API call.
+ * anything that needs it, and `vault.useBox()` scoping the decrypted key to the API call.
  */
 
 /** The lockbox the knock-knock machine keeps its key in. */
@@ -25,7 +25,8 @@ export const KnockKnock = () => {
   const [telling, setTelling] = useState(false)
   const [gripe, setGripe] = useState<string | null>(null)
 
-  if (vault === null) { return null }
+  // The handle comes at once, its lockboxes listed only once its hello has read storage.
+  if (vault === null || snapshot.state === 'opening') { return null }
   const keyBox = snapshot.boxes.find((box) => box.boxlabel === ApiKeyBoxlabel)
   // The button and the Enter key alike: a sound key, someone at the door, and no joke underway.
   const canKnock = ! telling && whosThere.trim() !== '' && keyBox !== undefined && ! keyBox.damaged
@@ -35,7 +36,7 @@ export const KnockKnock = () => {
     setJoke(null)
     setGripe(null)
     try {
-      const told = await withUnlockedVault(() => vault.use(ApiKeyBoxlabel, (whisper) => tellKnockKnockJoke(apiKeyOf(whisper), whosThere.trim())))
+      const told = await withUnlockedVault(() => vault.useBox(ApiKeyBoxlabel, (whisper) => tellKnockKnockJoke(apiKeyOf(whisper), whosThere.trim())))
       if (told !== null) { setJoke(told) }
     } catch (err) {
       setGripe(gripeForJokeErr(err))
@@ -125,7 +126,7 @@ const ApiKeySlot = ({ haveKeyBox, damaged, savedAt }: { haveKeyBox: boolean, dam
     setGripe(null)
     try {
       const saved = await withUnlockedVault(async () => {
-        await vault.store(ApiKeyBoxlabel, keyText.trim(), { public: { note: 'feeds the knock-knock machine' } })
+        await vault.storeBox(ApiKeyBoxlabel, keyText.trim(), { sidecar: { note: 'feeds the knock-knock machine' } })
         return true
       })
       if (saved !== null) {

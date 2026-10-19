@@ -11,9 +11,9 @@ const MinutesPerDay = 24 * MinutesPerHour
 
 type Unit = 'day' | 'hour' | 'minute'
 
-/** The window as a count of whole days, else of whole hours, else of minutes (at least one). */
-const windowCount = (reentryWindowMillis: number): { count: number, unit: Unit } => {
-  const minutes = Math.max(1, Math.round(reentryWindowMillis / MinuteMillis))
+/** The lease as a count of whole days, else of whole hours, else of minutes (at least one). */
+const leaseCount = (leaseMillis: number): { count: number, unit: Unit } => {
+  const minutes = Math.max(1, Math.round(leaseMillis / MinuteMillis))
   if (minutes % MinutesPerDay === 0) { return { count: minutes / MinutesPerDay, unit: 'day' } }
   if (minutes % MinutesPerHour === 0) { return { count: minutes / MinutesPerHour, unit: 'hour' } }
   return { count: minutes, unit: 'minute' }
@@ -30,17 +30,17 @@ const relativeTimeIn = (locale: string): Intl.RelativeTimeFormat => {
 }
 
 /**
- * What the dialog promises about how long an unlock lasts, from the vault's `reentryWindowMillis`:
+ * What the dialog promises about how long an unlock lasts, from the vault's `leaseMillis`:
  * 'Locks again on this device in 7 days' (a whole number of days, else of hours, else of
  * minutes, phrased by `Intl.RelativeTimeFormat`), or 'Locks on this device in 7 days' when the
- * dialog is creating the vault, which has nothing yet to lock "again". A window within a minute
+ * dialog is creating the vault, which has nothing yet to lock "again". A lease within a minute
  * of the longest a vault keeps (`ForeverMillis`, which `Infinity` hours becomes) reads as lasting
  * until the user locks it.
  */
-const unlockedFor = (reentryWindowMillis: number, creating: boolean): string => {
+const unlockedFor = (leaseMillis: number, creating: boolean): string => {
   // Never compared for equality: the far future is anything within a minute of it.
-  if (reentryWindowMillis >= ForeverMillis - MinuteMillis) { return Messages.staysUnlocked }
-  const { count, unit } = windowCount(reentryWindowMillis)
+  if (leaseMillis >= ForeverMillis - MinuteMillis) { return Messages.staysUnlocked }
+  const { count, unit } = leaseCount(leaseMillis)
   const relative = relativeTimeIn(Locale).format(count, unit)
   return creating ? Messages.locksIn(relative) : Messages.locksAgainIn(relative)
 }
@@ -59,13 +59,17 @@ const unlockedFor = (reentryWindowMillis: number, creating: boolean): string => 
  *
  * It follows the vault as it changes -- a vault made on another device meanwhile turns "choose"
  * into "unlock", a passkey added brings its button -- and handed another vault, it starts afresh,
- * keeping nothing typed for the last. Taken away, it lets go: an unlock, an erase or advice still
+ * keeping nothing typed for the last. Taken away, it lets go: an unlock, a retire or advice still
  * under way finishes unheard, calling `onDone` no more and showing nothing (the vault's own
  * snapshot says whether an unlock landed).
  *
  * A condition the unlock meets (storage that cannot be reached, a record that fails
  * verification) shows in the dialog in place, in the vault's own calm words, through a live
- * region a screen reader announces, and the user may try again or cancel. Anything else --
+ * region a screen reader announces, and the user may try again or cancel. A first unlock that
+ * lost the race to create the vault to another device (`created_elsewhere`) is shown as advice,
+ * in the `quiet` style rather than the `gripe` one -- it is no typo -- and the dialog, now an
+ * unlock of that vault, stays open: the field is emptied and focused for the passphrase chosen
+ * there, and the advice stays, through typing, until the next submit. Anything else --
  * misuse, such as a closed vault handle, or a failure that is no VaultError -- never reaches the
  * host's page: the dialog shows a calm notice in its place, "Something went wrong", whose Close
  * (or Escape) calls `onDone(false)`, and React reports the error through the root's
@@ -73,15 +77,15 @@ const unlockedFor = (reentryWindowMillis: number, creating: boolean): string => 
  * error tracker meet it. A passkey that fails that way takes its button away and leaves the
  * passphrase.
  *
- * How long an unlock lasts it reads from the vault itself (its `reentryWindowMillis`, the
- * `forcePassphraseReentryHours` it was opened with): 'Locks again on this device in 7 days', 'in 15
- * minutes', 'Stays unlocked on this device until you lock it' for `Infinity`; while it creates the
- * vault, 'Locks on this device in 7 days', with nothing yet to lock again. Nobody need tell the
- * dialog the window again. It needs `Intl.RelativeTimeFormat`, which a host on an engine without
- * it (Hermes, an older browser) supplies with the standard polyfill: the README says how.
+ * How long a lease lasts it reads from the vault itself (its `leaseMillis`, the `leaseHours` it
+ * was opened with): 'Locks again on this device in 7 days', 'in 15 minutes', 'Stays unlocked on
+ * this device until you lock it' for `Infinity`; while it creates the vault, 'Locks on this
+ * device in 7 days', with nothing yet to lock again. Nobody need tell the dialog the lease again.
+ * It needs `Intl.RelativeTimeFormat`, which a host on an engine without it (Hermes, an older
+ * browser) supplies with the standard polyfill: the README says how.
  *
  * With `allowStartOver`, a user who has forgotten the passphrase is offered a way out: "Forgot it?
- * Start a new vault" asks first, then erases the vault (`vault.destroy()`, on every device) and
+ * Start a new vault" asks first, then retires the vault (`vault.retire()`, on every device) and
  * turns the dialog into "Choose a vault passphrase" for the new one. Off by default.
  *
  * The passphrase field is made for password managers, so that a user may keep a long, strong
@@ -103,7 +107,7 @@ const unlockedFor = (reentryWindowMillis: number, creating: boolean): string => 
  *
  * @example
  *   <PassphraseModal vault={vault} onDone={(unlocked) => { setAsking(false) }} />
- * @example <PassphraseModal vault={vault} allowStartOver onDone={close} />  // offers to erase and start over
+ * @example <PassphraseModal vault={vault} allowStartOver onDone={close} />  // offers to retire the vault and start over
  * @example <PassphraseModal vault={vault} passphraseUsername={`${email} (vault)`} onDone={close} />
  * @example <PassphraseModal vault={vault} passphraseAdvice={(typed) => (typed.length < 12 ? 'Twelve characters or more, please.' : null)} onDone={close} />
  */
@@ -127,7 +131,7 @@ export type PassphraseAdvice = (passphrase: string) => string | null | Promise<s
 export type PassphraseModalProps = {
   vault:               Vault
   onDone:              (unlocked: boolean) => void
-  /** Whether to offer a user who has forgotten the passphrase to erase the vault and start a new one. */
+  /** Whether to offer a user who has forgotten the passphrase to retire the vault and start a new one. */
   allowStartOver?:     boolean | undefined
   /** What a password manager files the passphrase under. Default: the user and the vault, as 'u1 (main vault)'. */
   passphraseUsername?: string | undefined
@@ -172,11 +176,14 @@ const DialogTrouble = ({ onDone }: { onDone: (unlocked: boolean) => void }) => {
 }
 
 /**
- * What the dialog says to the user, and whether it is about the passkey: a word about the typed
- * passphrase goes once the user types again; one about the passkey stays until the next submit,
- * or the next press of the passkey.
+ * What the dialog says to the user, whether it is about the passkey, and whether it is advice
+ * rather than a complaint: a word about the typed passphrase goes once the user types again;
+ * one about the passkey stays until the next submit, or the next press of the passkey. Advice
+ * (a vault created on another device meanwhile) shows in the `quiet` style, not the `gripe` one,
+ * and stays until the next submit as the passkey's does: the user's first move is to clear the
+ * field, and the advice is what tells them what to type instead.
  */
-type Gripe = { text: string, fromPasskey: boolean }
+type Gripe = { text: string, fromPasskey: boolean, asAdvice: boolean }
 
 /** Whether the focus is inside `container`, read in the document or shadow root it lives in. */
 const holdsFocus = (container: HTMLElement | null): boolean => {
@@ -197,7 +204,7 @@ const holdsFocus = (container: HTMLElement | null): boolean => {
 const useAdvice = (passphraseAdvice: PassphraseAdvice | undefined, creating: boolean, fail: (err: unknown) => void) => {
   const [said, setSaid] = useState<string | null>(null)
   const asked = useRef(0)
-  // A change of mode -- the vault made elsewhere, or erased -- forgets what was said (React's
+  // A change of mode -- the vault made elsewhere, or retired -- forgets what was said (React's
   // "adjusting state while rendering"), and makes any answer or failure still on its way stale,
   // in the same commit: advice given while choosing never shows again after the vault changed.
   // The dialog unmounting makes them stale too, so that none reaches a dialog that has gone.
@@ -279,8 +286,8 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
   const snapshot = useSyncExternalStore(vault.subscribe, vault.getSnapshot)
   const [gripe, setGripe] = useState<Gripe | null>(null)
   const [startingOver, setStartingOver] = useState(false)
-  // While an erase runs, so that a second press never starts another.
-  const [erasing, setErasing] = useState(false)
+  // While a retire runs, so that a second press never starts another.
+  const [retiring, setRetiring] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
   const fieldRef = useRef<HTMLInputElement>(null)
   // Asked after each await: a dialog gone meanwhile -- its host took it away, another vault
@@ -294,8 +301,8 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
   if (failure !== null) { throw failure.err }
   const creating = snapshot.state === 'absent'
   const passkeyFirst = ! creating && offersPasskey(snapshot)
-  const windowLine = unlockedFor(vault.reentryWindowMillis, creating)
-  // Asked only of a vault there is to erase: one erased meanwhile has the user choose anew, and
+  const windowLine = unlockedFor(vault.leaseMillis, creating)
+  // Asked only of a vault there is to retire: one retired meanwhile has the user choose anew, and
   // ends the question, so that a vault made after it is never asked of. React's "adjusting state
   // while rendering": it renders again at once, before committing this.
   if (startingOver && creating) { setStartingOver(false) }
@@ -303,7 +310,15 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
 
   /** A refusal the user meets: a condition shown in place, misuse rethrown in render, for PassphraseModal's boundary. */
   const meet = (err: unknown) => {
-    if (isVaultCondition(err)) { setGripe({ text: err.message, fromPasskey: false }); return }
+    if (isVaultError(err, 'created_elsewhere')) {
+      // The passphrase typed has just been shown not to open the vault: the field is emptied for
+      // the one chosen on the other device, and the advice stays until the next submit.
+      setGripe({ text: err.message, fromPasskey: false, asAdvice: true })
+      if (fieldRef.current !== null) { fieldRef.current.value = '' }
+      fieldRef.current?.focus()
+      return
+    }
+    if (isVaultCondition(err)) { setGripe({ text: err.message, fromPasskey: false, asAdvice: false }); return }
     // Thrown from an event handler, it would miss every boundary.
     setFailure({ err })
   }
@@ -324,31 +339,31 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
   }
 
   const startOver = async () => {
-    setErasing(true)
+    setRetiring(true)
     setGripe(null)
     try {
-      await vault.destroy()
+      await vault.retire()
       if (! isMounted()) { return }
       setStartingOver(false)
     } catch (err) {
       if (! isMounted()) { return }
-      // The vault the user agreed to erase was destroyed or made anew elsewhere: what stands now
-      // was never confirmed, so the question goes, to be asked afresh.
+      // The vault the user agreed to retire was retired already, or made anew, elsewhere: what
+      // stands now was never confirmed, so the question goes, to be asked afresh.
       if (isVaultError(err, 'stale_write')) { setStartingOver(false) }
       meet(err)
     } finally {
-      if (isMounted()) { setErasing(false) }
+      if (isMounted()) { setRetiring(false) }
     }
   }
 
-  /** Each change to the field: a word about what was typed before goes, and, while choosing, the host's advice is asked anew. */
+  /** Each change to the field: a complaint about what was typed before goes (a passkey's word, or a vault made elsewhere, stays till the next submit), and, while choosing, the host's advice is asked anew. */
   const hearPassphrase = (typed: string) => {
-    setGripe((prev) => (prev?.fromPasskey === true ? prev : null))
+    setGripe((prev) => (prev?.fromPasskey === true || prev?.asAdvice === true ? prev : null))
     if (creating) { void advice.hear(typed) }
   }
 
   const passkeyGripe = (text: string | null) => {
-    setGripe(text === null ? null : { text, fromPasskey: true })
+    setGripe(text === null ? null : { text, fromPasskey: true, asAdvice: false })
     // A passkey button that took itself away took the focus with it: back to the passphrase.
     if (text !== null && ! holdsFocus(formRef.current)) { fieldRef.current?.focus() }
   }
@@ -376,12 +391,12 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
             </>
           )}
         {/* A live region, mounted from the start, so that each word put in it is announced. */}
-        <div role="alert">{gripe !== null && <p className="gripe">{gripe.text}</p>}</div>
+        <div role="alert">{gripe !== null && <p className={gripe.asAdvice ? 'quiet' : 'gripe'}>{gripe.text}</p>}</div>
         {! askingStartOver && <p className="quiet">{windowLine}</p>}
         {askingStartOver
           ? (
             <div className="row" key="start-over">
-              <button type="button" disabled={erasing} onClick={() => { void startOver() }}>{Messages.startOverConfirm}</button>
+              <button type="button" disabled={retiring} onClick={() => { void startOver() }}>{Messages.startOverConfirm}</button>
               {/* eslint-disable-next-line jsx-a11y/no-autofocus -- the button that held focus is gone; it moves to the choice that loses nothing */}
               <button type="button" autoFocus onClick={() => { setStartingOver(false); setGripe(null) }}>{Messages.startOverBack}</button>
             </div>

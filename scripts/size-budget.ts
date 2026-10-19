@@ -165,7 +165,7 @@ function lean(row: BudgetRow): string {
 function additionsFrom(adds: readonly string[]): Map<string, number> {
   return new Map(adds.map((add) => {
     const match = /^([^=]+)=(\d+(?:\.\d+)?)$/.exec(add)
-    if (! match) { throw new Error(`size-budget: --add takes <entry>=<kB>, as --add openVault=1.5, not "${add}".`) }
+    if (! match) { throw new Error(`size-budget: --add takes <entry>=<kB>, as --add Vault=1.5, not "${add}".`) }
     return [match[1]!, Math.round(Number(match[2]) * 1000)]
   }))
 }

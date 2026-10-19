@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { VaultError, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, openVault, type UnlockSummary, type Vault } from 'safebyok'
+import { VaultError, isVaultError, localVaultDB, memoryDeviceDB, memoryStore, type WayinSummary, type Vault } from 'safebyok'
 import { createPasskey } from '../src/passkey'
 import { PasskeyUnlockButton } from '../src/passkey-unlock-button'
 import { PassphraseModal } from '../src/passphrase-modal'
@@ -10,17 +10,17 @@ import * as TH from './test-helpers'
 const lockedVaultWithPasskey = async () => {
   const authenticator = TH.installFakeAuthenticator()
   const vaultDB = localVaultDB({ store: memoryStore() })
-  const open = async () => await openVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest })
+  const open = async () => await TH.settledVault({ applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest })
   const maker = await open()
   await maker.unlock('pw')
-  const unlockId = await maker.addPasskey('pw', () => createPasskey({ rp: { name: 'Acme' }, user: { name: 'ada@example.com', displayName: 'Ada' } }), { unlocklabel: 'laptop' })
-  if (unlockId === null) { throw new Error('the fake authenticator made no passkey') }
+  const wayinId = await maker.addPasskey('pw', () => createPasskey({ rp: { name: 'Acme' }, user: { name: 'ada@example.com', displayName: 'Ada' } }), { wayinlabel: 'laptop' })
+  if (wayinId === null) { throw new Error('the fake authenticator made no passkey') }
   return { authenticator, vault: await open() }
 }
 
 /** A vault that refuses every unlock with `err`, and lists one passkey. */
 const vaultRefusing = (err: Error, credentialId: string) => TH.stubVault({
-  unlocks: [TH.passkeyEnvelopeOf('laptop', { credential_id: credentialId })] as unknown as UnlockSummary[],
+  wayins:  [TH.passkeyWayinOf('laptop', { credential_id: credentialId })] as unknown as WayinSummary[],
   unlock:  () => Promise.reject(err),
 })
 
@@ -50,7 +50,7 @@ describe("PasskeyUnlockButton", () => {
     render(<PasskeyUnlockButton vault={vault} onDone={noop} onGripe={noop} />)
     expect(screen.queryByRole('button')).to.be.null
     TH.installFakeAuthenticator()
-    const passphraseOnly = TH.stubVault({ unlocks: [TH.envelopeOf('passphrase')] as unknown as UnlockSummary[] })
+    const passphraseOnly = TH.stubVault({ wayins: [TH.wayinOf('passphrase')] as unknown as WayinSummary[] })
     render(<PasskeyUnlockButton vault={passphraseOnly} onDone={noop} onGripe={noop} />)
     expect(screen.queryByRole('button')).to.be.null
   })
@@ -69,12 +69,12 @@ describe("PasskeyUnlockButton", () => {
 
   it("follows the vault's snapshot: a passkey added meanwhile brings the button", async () => {
     TH.installFakeAuthenticator()
-    const vault = await openVault(TH.memoryVaultOpts())
+    const vault = await TH.settledVault(TH.memoryVaultOpts())
     await vault.unlock('pw')
     render(<PasskeyUnlockButton vault={vault} onDone={noop} onGripe={noop} />)
     expect(screen.queryByText('Use a passkey')).to.be.null
     await act(async () => {
-      await vault.addPasskey('pw', () => createPasskey({ rp: { name: 'Acme' }, user: { name: 'ada@example.com', displayName: 'Ada' } }), { unlocklabel: 'laptop' })
+      await vault.addPasskey('pw', () => createPasskey({ rp: { name: 'Acme' }, user: { name: 'ada@example.com', displayName: 'Ada' } }), { wayinlabel: 'laptop' })
     })
     expect(screen.queryByText('Use a passkey')).to.not.be.null
     vault.close()
@@ -172,7 +172,7 @@ describe("PasskeyUnlockButton", () => {
         const [credentialId = ''] = authenticator.credentialIds()
         const unlocking = TH.held()
         const unlock = vi.fn(() => unlocking.promise)
-        const vault = TH.stubVault({ unlocks: [TH.passkeyEnvelopeOf('laptop', { credential_id: credentialId })] as unknown as UnlockSummary[], unlock })
+        const vault = TH.stubVault({ wayins: [TH.passkeyWayinOf('laptop', { credential_id: credentialId })] as unknown as WayinSummary[], unlock })
         const gripes: (string | null)[] = []
         const heard: boolean[] = []
         const { reported, unmount } = TH.renderReporting(<PasskeyUnlockButton vault={vault} onDone={(unlocked) => { heard.push(unlocked) }} onGripe={(gripe) => { gripes.push(gripe) }} />)

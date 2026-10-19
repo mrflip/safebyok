@@ -1,9 +1,9 @@
 import { anyApi, defineSchema } from 'convex/server'
 import { ConvexError } from 'convex/values'
 import { convexTest, defineTestApp } from 'convex-test'
-import { Lockbox, VaultBundle, localVaultDB, memoryStore, openVault } from 'safebyok'
-import type { PublicBag, StringStore, Whisper } from 'safebyok'
-import { boxOf, memoryVaultOpts } from 'safebyok/testing'
+import { Lockbox, VaultProps, localVaultDB, memoryStore } from 'safebyok'
+import type { Sidecar, StringStore, Whisper } from 'safebyok'
+import { boxOf, memoryVaultOpts, settledVault } from 'safebyok/testing'
 import type { ComponentApi } from '../src/component-api'
 import { SafebyokComponent } from '../src/server'
 import type { GetUserId, SafebyokErrorData } from '../src/server'
@@ -45,7 +45,7 @@ export const installedComponent = () => {
  * @returns The refusal's data, its `kind` and `message`.
  *
  * @example
- *   const refusal = await TH.convexRefusalOf(CVX.query(api.safebyok.getBundle, { scope }))
+ *   const refusal = await TH.convexRefusalOf(CVX.query(api.safebyok.getVaultProps, { scope }))
  *   expect(refusal.kind).to.eq('identity_revoked')
  */
 export const convexRefusalOf = async (operation: Promise<unknown>): Promise<SafebyokErrorData> => {
@@ -73,35 +73,35 @@ export const heavyBox = (boxlabel: string, bytes: number, tag = boxlabel) => (
 )
 
 /** The whispers a real vault is made with: obvious fakes, never real keys. */
-export const RealWhispers: Record<string, { whisper: Whisper, bag?: PublicBag }> = {
-  anthropic_api_key: { whisper: 'sk-ant-test-not-a-real-key', bag: { note: 'work account' } },
+export const RealWhispers: Record<string, { whisper: Whisper, sidecar?: Sidecar }> = {
+  anthropic_api_key: { whisper: 'sk-ant-test-not-a-real-key', sidecar: { note: 'work account' } },
   openai_api_key:    { whisper: { apiKey: 'sk-test-not-a-real-key', orgId: null } },
 }
 
 export const RealPassphrase = 'correct horse battery staple'
 
 /** Opens a vault for `userId` over `store` the way an app does, deriving through the cheap test deriver. */
-export const openOver = (store: StringStore, userId = 'u1') => openVault(memoryVaultOpts({ userId, vaultDB: localVaultDB({ store }) }))
+export const openOver = (store: StringStore, userId = 'u1') => settledVault(memoryVaultOpts({ userId, vaultDB: localVaultDB({ store }) }))
 
 /**
- * A real vault, made by the core's own code: a bundle and a lockbox per {@link RealWhispers}
+ * A real vault, made by the core's own code: vault props and a lockbox per {@link RealWhispers}
  * entry, each record exactly as the core stores it, read back from its in-memory store by ckey.
  */
 export const realRecords = async (userId = 'u1') => {
   const store = memoryStore()
   const vault = await openOver(store, userId)
   await vault.unlock(RealPassphrase)
-  for (const [boxlabel, { whisper, bag }] of Object.entries(RealWhispers)) {
-    await vault.store(boxlabel, whisper, { public: bag })
+  for (const [boxlabel, { whisper, sidecar }] of Object.entries(RealWhispers)) {
+    await vault.storeBox(boxlabel, whisper, { sidecar })
   }
   vault.close()
   const rows = store.ckeys().map((ckey) => ({ ckey, record: JSON.parse(store.read(ckey) ?? 'null') as unknown }))
-  const bundleRow = rows.find((row) => VaultBundle.safeParse(row.record).success)
-  if (! bundleRow) { throw new Error('the core stored no bundle') }
+  const vaultPropsRow = rows.find((row) => VaultProps.safeParse(row.record).success)
+  if (! vaultPropsRow) { throw new Error('the core stored no vault props') }
   return {
-    bundleCkey: bundleRow.ckey,
-    bundle:     VaultBundle.parse(bundleRow.record),
-    boxes:      rows.flatMap((row) => {
+    vaultPropsCkey: vaultPropsRow.ckey,
+    vaultProps:     VaultProps.parse(vaultPropsRow.record),
+    boxes:          rows.flatMap((row) => {
       const checked = Lockbox.safeParse(row.record)
       return checked.success ? { ckey: row.ckey, lockbox: checked.data } : []
     }),

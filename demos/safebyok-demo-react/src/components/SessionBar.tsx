@@ -8,7 +8,7 @@ import { keepStorage } from '../lib/persist-storage'
  * The app's sign-in strip. Typing a username signs you in (or up); there is no password, because
  * the demo's point is that the vault passphrase is a separate thing from signing in. Signing in
  * asks the browser to keep this site's storage, on the user's gesture. Signing out locks the
- * vault: the remembered unlock on this device ends with the session.
+ * vault: the lease on this device ends with the session.
  */
 export const SessionBar = ({ auth }: { auth: Auth }) => {
   const session = useSession(auth)
@@ -51,7 +51,7 @@ export const SessionBar = ({ auth }: { auth: Auth }) => {
 
   const deleteAccount = async () => {
     if (! globalThis.confirm('Delete this account and its vault? The stored lockboxes are gone for good.')) { return }
-    await vault?.destroy()
+    await vault?.retire()
     await auth.deleteAccount()
   }
 

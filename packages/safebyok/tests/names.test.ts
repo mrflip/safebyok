@@ -15,7 +15,7 @@ describe("Names.checkValidators", () => {
     expect(Names.checkValidators(undefined)).to.be.undefined
     expect(Names.checkValidators({ boxlabel: undefined, userId: Z.string() })).to.have.property('userId')
     expect(Names.checkValidators(AnyTextValidators)).to.eq(AnyTextValidators)
-    expect(Names.checkValidators({ unlocklabel: Z.string() })).to.have.property('unlocklabel')
+    expect(Names.checkValidators({ wayinlabel: Z.string() })).to.have.property('wayinlabel')
   })
 
   it("refuses a misspelt field as 'bad_option', as its second example shows, rather than keep the default unseen", () => {
@@ -23,7 +23,7 @@ describe("Names.checkValidators", () => {
     expect(err.message).to.include('spelling')
   })
 
-  it("refuses a note check, as there is no note: a lockbox's public bag is the host's to check", () => {
+  it("refuses a note check, as there is no note: a lockbox's sidecar is the host's to check", () => {
     TH.expectSyncRefusal(() => Names.checkValidators({ note: ZClassic.string() } as never), 'bad_option')
   })
 
@@ -46,8 +46,8 @@ describe("Names.rulesOf", () => {
     expect(rules.boxlabel).to.eq(AnyBoxlabel)
     expect(rules.applabel).to.eq(Label)
     expect(rules.userId).to.eq(UserId)
-    expect(rules.unlocklabel).to.eq(Label)
-    expect(Names.rulesOf({ unlocklabel: AnyBoxlabel }).unlocklabel).to.eq(AnyBoxlabel)
+    expect(rules.wayinlabel).to.eq(Label)
+    expect(Names.rulesOf({ wayinlabel: AnyBoxlabel }).wayinlabel).to.eq(AnyBoxlabel)
   })
 
   it("refuses a misspelt field, as checkValidators does", () => {
@@ -128,7 +128,7 @@ describe("Names.check", () => {
       ['userId',   '',                         "can't be empty"],
       ['userId',   'sk-fake\u{D800}',          'lone surrogate'],
       ['boxlabel', 'sk-fak\u{E9}'.normalize('NFD'), 'NFC'],
-      ['unlocklabel', 'sk-fake\u{7}',          'no control characters'],
+      ['wayinlabel', 'sk-fake\u{7}',           'no control characters'],
       ['vaultlabel', 'sk-fake\u{DD11}',        'well-formed Unicode'],
     ] as const
     for (const [field, candidate, said] of cases) {
@@ -165,7 +165,7 @@ describe("Names.check", () => {
   it("names a host check that refuses, and that the check is the host's, saying nothing of why", () => {
     const rules = Names.rulesOf({ boxlabel: ZClassic.string().max(5, 'too long for our forms') })
     const err = TH.expectSyncRefusal(() => Names.check(rules, 'boxlabel', 'sk-fake-long'), 'bad_label')
-    expect(err.message).to.include("boxlabel check passed in openVault's validators")
+    expect(err.message).to.include("boxlabel check passed in Vault.make's validators")
     expect(err.message).to.not.include('too long for our forms')
   })
 
@@ -220,7 +220,7 @@ describe("Names.checkFloor", () => {
 
 describe("Names.sameScope", () => {
   it("is true for a record naming the same app, user and vault, whatever else it holds", () => {
-    expect(Names.sameScope(TH.bundleOf('u1'), TH.scopeOf('u1'))).to.be.true
+    expect(Names.sameScope(TH.vaultPropsOf('u1'), TH.scopeOf('u1'))).to.be.true
   })
 
   it("is false when any one of the three differs", () => {

@@ -4,7 +4,7 @@ import { VaultError } from '../src/errors'
 import { DefaultLogger, asError, parseLogger, setDefaultLogger, type VaultLogger } from '../src/logger'
 import * as TH from './test-helpers'
 
-/** What a host might hand openVault as its logger that is not one. */
+/** What a host might hand Vault.make as its logger that is not one. */
 const NotLoggers = [
   [{},                                                         'an empty object'],
   [{ log: () => undefined, warn: () => undefined },            'a logger without error'],
@@ -203,7 +203,7 @@ describe("VaultLogger", () => {
 
   it("takes a story of any plain facts, nested ones too", () => {
     const spy = TH.spyLogger()
-    const story = { call: 'store', attempt: 2, retried: true, when: null, detail: { kinds: ['stale_write'] } }
+    const story = { call: 'storeBox', attempt: 2, retried: true, when: null, detail: { kinds: ['stale_write'] } }
     spy.logger.warn('a store retried', story)
     expect(spy.calls[0]?.story).to.deep.equal(story)
   })

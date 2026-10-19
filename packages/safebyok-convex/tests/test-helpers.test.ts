@@ -4,14 +4,14 @@ import * as TH from './test-helpers'
 
 describe("convexRefusalOf", () => {
   it("hands back the data of the ConvexError the operation refused with", async () => {
-    const data = { kind: 'vault_full', message: 'This vault is full: erase a lockbox to make room, then try again.' }
+    const data = { kind: 'vault_full', message: 'This vault is full: retire a lockbox to make room, then try again.' }
     const refusal = await TH.convexRefusalOf(Promise.reject(new ConvexError(data)))
     expect(refusal).to.deep.equal(data)
   })
 
   it("reads a refusal from the host's functions, as its @example has it", async () => {
     const { api, createTest } = TH.hostWith(TH.bySubject)
-    const refusal = await TH.convexRefusalOf(createTest().query(api.safebyok.getBundle, { scope: TH.scopeOf('u1') }))
+    const refusal = await TH.convexRefusalOf(createTest().query(api.safebyok.getVaultProps, { scope: TH.scopeOf('u1') }))
     expect(refusal.kind).to.eq('identity_revoked')
   })
 

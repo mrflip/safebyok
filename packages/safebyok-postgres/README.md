@@ -64,11 +64,11 @@ const vaultDB = postgresVaultDB({ client: pool, userId: session.userId })
   `{ query: async (text, params) => ({ rows: await sql.unsafe(text, params) }) }`.
 * **Every write is one statement**, atomic as Postgres makes every statement, so it asks no
   transaction of your driver and no retry: a write lands only while what it expects still
-  stands, and refuses with kind `stale_write` otherwise. A lockbox write reads its vault's bundle
-  row `FOR SHARE`, a shared lock: lockbox writes never wait for each other on the bundle (two
-  writes to one boxlabel still meet at that lockbox's row), and a bundle update waits for the
-  lockbox writes under way (or they for it), so a lockbox lands only under the vaultKey that
-  stands.
+  stands, and refuses with kind `stale_write` otherwise. A lockbox write reads its vault row
+  `FOR SHARE`, a shared lock: lockbox writes never wait for each other on the vault row (two
+  writes to one boxlabel still meet at that lockbox's row), and an update of the vault props waits
+  for the lockbox writes under way (or they for it), so a lockbox lands only under the vaultKey
+  that stands.
 * **Isolation**: every guarantee here holds under READ COMMITTED, Postgres's default. Above it --
   a session default of REPEATABLE READ or SERIALIZABLE, or your own transaction around a call --
   some races fail with a serialization error (`40001`) instead, which refuses as
@@ -85,7 +85,7 @@ const vaultDB = postgresVaultDB({ client: pool, userId: session.userId })
 * **What the server checks** is who may reach which vault, that each write is atomic, and that
   each record has its shape and each name is above the floor (`VAULTDB.md`, *Names*) and within
   the limit above: the same checks every VaultDB's verbs make, on the server side of the wire.
-  It never holds a name to a label grammar, nor looks inside a lockbox's public bag: the one is
+  It never holds a name to a label grammar, nor looks inside a lockbox's sidecar: the one is
   each browser vault's own `validators`, checked where a name enters it, the other the host's.
   A host whose clients run different validators has chosen that, and a client reads a record
   another's validators let through as any other, never as damage.
@@ -105,7 +105,7 @@ The server half, `app/api/safebyok/route.ts`:
 ```ts
 import { Pool } from 'pg'
 import { VaultError } from 'safebyok'
-import type { BundleExpectation, EraseExpectation, Lockbox, LockboxExpectation, VaultBundle, VaultScope } from 'safebyok'
+import type { VaultPropsExpectation, RetireExpectation, Lockbox, LockboxExpectation, VaultProps, VaultScope } from 'safebyok'
 import { postgresVaultDB } from 'safebyok-postgres'
 import type { VaultDB } from 'safebyok'
 
@@ -119,14 +119,14 @@ type Served = (vaultDB: VaultDB, args: unknown[]) => Promise<unknown>
 // vault's own validators' to say. A listing goes as the stored records, which the browser's
 // VaultDB validates.
 const served = new Map<string, Served>([
-  ['readBundle',   (vaultDB, [scope]) => vaultDB.readBundle(scope as VaultScope)],
-  ['createBundle', (vaultDB, [bundle]) => vaultDB.createBundle(bundle as VaultBundle)],
-  ['updateBundle', (vaultDB, [bundle, expected]) => vaultDB.updateBundle(bundle as VaultBundle, expected as BundleExpectation)],
+  ['readVaultProps',   (vaultDB, [scope]) => vaultDB.readVaultProps(scope as VaultScope)],
+  ['fetchOrCreateVaultProps', (vaultDB, [vaultProps]) => vaultDB.fetchOrCreateVaultProps(vaultProps as VaultProps)],
+  ['updateVaultProps', (vaultDB, [vaultProps, expected]) => vaultDB.updateVaultProps(vaultProps as VaultProps, expected as VaultPropsExpectation)],
   ['readBox',      (vaultDB, [scope, boxlabel]) => vaultDB.readBox(scope as VaultScope, boxlabel as string)],
   ['listBoxes',    (vaultDB, [scope]) => vaultDB.listBoxRecords(scope as VaultScope)],
   ['updateBox',    (vaultDB, [scope, lockbox, expected]) => vaultDB.updateBox(scope as VaultScope, lockbox as Lockbox, expected as LockboxExpectation)],
-  ['eraseBox',     (vaultDB, [scope, boxlabel, expected]) => vaultDB.eraseBox(scope as VaultScope, boxlabel as string, expected as EraseExpectation)],
-  ['eraseVault',   (vaultDB, [scope, expected]) => vaultDB.eraseVault(scope as VaultScope, expected as EraseExpectation)],
+  ['retireBox',     (vaultDB, [scope, boxlabel, expected]) => vaultDB.retireBox(scope as VaultScope, boxlabel as string, expected as RetireExpectation)],
+  ['retireVault',   (vaultDB, [scope, expected]) => vaultDB.retireVault(scope as VaultScope, expected as RetireExpectation)],
 ])
 
 /** What a request posts: its verb and arguments, or nothing when its body is not a JSON object. */
@@ -161,11 +161,11 @@ export async function POST(request: Request): Promise<Response> {
 A listing goes through `listBoxRecords`, not `listBoxes`: `listBoxes` hands back summaries, the
 shape a vault shows, and a VaultDB in the browser must hand back records as stored.
 
-The client half, a VaultDB over `fetch`, to hand `openVault` as its `vaultDB`:
+The client half, a VaultDB over `fetch`, to hand `Vault.make` as its `vaultDB`:
 
 ```ts
 import { VaultDB, VaultError, VaultErrorKindVals } from 'safebyok'
-import type { BundleExpectation, EraseExpectation, Lockbox, LockboxExpectation, VaultBundle, VaultDBOpts, VaultErrorKind, VaultScope } from 'safebyok'
+import type { VaultPropsExpectation, RetireExpectation, Lockbox, LockboxExpectation, VaultProps, VaultDBOpts, VaultErrorKind, VaultScope } from 'safebyok'
 
 const VaultRouteUrl = '/api/safebyok'
 
@@ -178,10 +178,10 @@ export class RouteVaultDB extends VaultDB {
   // Its logger: the host's `logger`, or the default logger when it gives none.
   constructor(opts: VaultDBOpts = {}) { super(opts) }
 
-  protected doReadBundle(scope: VaultScope) { return this.call('readBundle', scope) }
-  protected doCreateBundle(bundle: VaultBundle) { return this.call('createBundle', bundle) }
-  protected async doUpdateBundle(bundle: VaultBundle, expected: BundleExpectation) {
-    await this.call('updateBundle', bundle, expected)
+  protected doReadVaultProps(scope: VaultScope) { return this.call('readVaultProps', scope) }
+  protected doFetchOrCreateVaultProps(vaultProps: VaultProps) { return this.call('fetchOrCreateVaultProps', vaultProps) }
+  protected async doUpdateVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation) {
+    await this.call('updateVaultProps', vaultProps, expected)
     return true
   }
   protected doReadBox(scope: VaultScope, boxlabel: string) { return this.call('readBox', scope, boxlabel) }
@@ -193,12 +193,12 @@ export class RouteVaultDB extends VaultDB {
     await this.call('updateBox', scope, lockbox, expected)
     return true
   }
-  protected async doEraseBox(scope: VaultScope, boxlabel: string, expected: EraseExpectation) {
-    await this.call('eraseBox', scope, boxlabel, expected)
+  protected async doRetireBox(scope: VaultScope, boxlabel: string, expected: RetireExpectation) {
+    await this.call('retireBox', scope, boxlabel, expected)
     return true
   }
-  protected async doEraseVault(scope: VaultScope, expected: EraseExpectation) {
-    await this.call('eraseVault', scope, expected)
+  protected async doRetireVault(scope: VaultScope, expected: RetireExpectation) {
+    await this.call('retireVault', scope, expected)
     return true
   }
 
@@ -230,7 +230,7 @@ const isKind = (kind: unknown): kind is VaultErrorKind => (VaultErrorKindVals as
 * **A limit of the server's own, if you give one.** Pass `maxLockboxes` and this VaultDB holds
   every vault to that many lockboxes, whatever the browser asks: a new lockbox past it refuses
   with kind `vault_full`, and a lockbox replacing one already there never does. Declare the same
-  number as the browser VaultDB's `maxLockboxes`, so that `openVault` refuses a larger one up
+  number as the browser VaultDB's `maxLockboxes`, so that `Vault.make` refuses a larger one up
   front. A limit costs the statement that inserts a new lockbox one count of its vault; with
   none (`Infinity`, the default), nothing is counted, and how large a vault grows is yours to
   bound, by your own quotas. Nothing bounds a vault's bytes beyond that: your framework's request-size limit bounds
@@ -241,12 +241,12 @@ const isKind = (kind: unknown): kind is VaultErrorKind => (VaultErrorKindVals as
     past its limit. Writers racing for the last places may each count room and all land: with
     `N` racers one place short of the limit, up to `N - 1` more than it, never an unbounded
     number. That is what the limit is for -- stopping a runaway loop, and keeping a vault inside
-    what can be listed and erased -- and not for holding off a determined client, whose quota is
+    what can be listed and retired -- and not for holding off a determined client, whose quota is
     yours to meter like any other abuse.
   * **A refused write stored nothing.** The refusal is the `WHERE` of one atomic statement.
   * **No lockbox is lost.** Every lockbox that landed reads back by its boxlabel and appears in
-    the listing, past the limit as under it; erases bring the vault back under, and a new lockbox
-    lands again.
+    the listing, past the limit as under it; retiring lockboxes brings the vault back under, and a
+    new lockbox lands again.
   * **The count a write checks is the vault's, as of the start of its statement.** A write reports
     no count; the vault learns it from the listing it reads after every write.
   * **It costs the host nothing** but the count: no column, trigger, lock or retry, and one
@@ -328,30 +328,29 @@ subscriber: at worst, a refresh that finds nothing new.
 
 Two tables, each record **a column to a field**, exactly as safebyok wrote it: text as text, a
 time or a count as a `bigint`, and each structured value as one opaque `jsonb` -- an encrypted
-value (a cipherIv and its ciphertext, `{ cipher_iv_b64, ciphertext_b64 }`), or the bundle's
-`unlocks`, its list of unlock envelopes. A lockbox's public bag is `text`, never `jsonb`, which
-would rewrite it. Nothing is normalized: a public bag or a user id reads back byte for byte, as it
-must, since every field a record holds is bound into its encryption (all but the bundle's
-`unlock_epoch` and which envelopes its `unlocks` holds).
+value (a cipherIv and its ciphertext, `{ cipher_iv_b64, ciphertext_b64 }`), or the vault props'
+`wayins`, their list of wayins. A lockbox's sidecar is `text`, never `jsonb`, which
+would rewrite it. Nothing is normalized: a sidecar or a user id reads back byte for byte, as it
+must, since every field a record holds is bound into its encryption (all but the vault props'
+`unlock_epoch` and which wayins their `wayins` holds).
 
 | Table                | One row per | Primary key                                     | Columns                                                                                                |
 | -------------------- | ----------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `safebyok_bundles`   | vault       | `applabel`, `user_id`, `vaultlabel`             | every field of the `VaultBundle`                                                                       |
-| `safebyok_lockboxes` | lockbox     | `applabel`, `user_id`, `vaultlabel`, `boxlabel` | the vault's scope and `vault_id`, then every field of the `Lockbox`; its public bag as `text`          |
+| `safebyok_vaults`    | vault       | `applabel`, `user_id`, `vaultlabel`             | every field of the `VaultProps`                                                                        |
+| `safebyok_lockboxes` | lockbox     | `applabel`, `user_id`, `vaultlabel`, `boxlabel` | the vault's scope and `vault_id`, then every field of the `Lockbox`; its sidecar as `text`             |
 
 * **Encrypted**: each whisper (`whisper_ciphered`), each lockbox's lockboxKey
-  (`lockbox_key_wrapped`), and the vaultKey, once under each way into the vault (each unlock
-  envelope's `vault_key_wrapped`, inside the bundle's `unlocks`).
-* **In the open**: the scope, each `boxlabel` and public bag (`public_json`), each whisper's codec
-  and schema version, the `vault_id`, `unlock_epoch`, `revision_id`s, each unlock envelope's method, id, label, salt and key deriver's label, when
+  (`lockbox_key_wrapped`), and the vaultKey, once under each way into the vault (each
+  wayin's `vault_key_wayin_wrapped`, inside the vault props' `wayins`).
+* **In the open**: the scope, each `boxlabel` and sidecar (`sidecar_json`), each whisper's codec
+  and schema version, the `vault_id`, `unlock_epoch`, `revision_tok`s, each wayin's wayinkind, id, label, salt and key deriver's label, when
   each vault and lockbox was first stored and each lockbox last written (`registered_at`,
   `written_at`, epoch milliseconds), and the length of every ciphertext.
-* **Never**: a whisper, a passphrase, any key in usable form, or the device-local remembered
-  unlock. No history: an update replaces its row (your database's backups and WAL keep what
+* **Never**: a whisper, a passphrase, any key in usable form, or the device-local lease. No history: an update replaces its row (your database's backups and WAL keep what
   they keep).
-* **A lockbox stands only beside its bundle**, under the same `vault_id`: the foreign key
-  erases a vault's lockboxes with its bundle, in one statement, and refuses a lockbox written for
-  a vault since erased and made anew.
+* **A lockbox stands only beside its vault props**, under the same `vault_id`: the foreign key
+  retires a vault's lockboxes with its props, in one statement, and refuses a lockbox written for
+  a vault since retired and made anew.
 * **Row-level security is on, with no policy**: the tables' owner -- the role your server
   connects as -- reaches them as before, and every other role reaches no row. To serve the
   tables to another role, give it a policy of your own, or connect as their owner.
@@ -387,11 +386,11 @@ shape of table, copy it, and keep to what makes it right:
   the `WHERE` (`UPDATE ... WHERE vault_id = $ AND unlock_epoch = $ RETURNING 1`), and a row
   back means it landed. A create returns the row that stands with `ON CONFLICT ... DO UPDATE`
   (a no-op update), since `DO NOTHING` returns no row when another device got in first.
-* **Let the schema hold the vault together.** The lockbox's foreign key names its bundle down to
-  the `vault_id`, so a lockbox cannot outlive its vault or land in one made anew, and erasing a
-  vault is one `DELETE` of its bundle.
+* **Let the schema hold the vault together.** The lockbox's foreign key names its vault row down
+  to the `vault_id`, so a lockbox cannot outlive its vault or land in one made anew, and retiring
+  a vault is one `DELETE` of its vault row.
 * **Store each record a column to a field**, and compare only the scope, `boxlabel`, `vault_id`,
-  `unlock_epoch`, `vault_key_epoch` and `revision_id`. `src/columns.ts` names each record's columns once, the
+  `unlock_epoch`, `vault_key_epoch` and `revision_tok`. `src/columns.ts` names each record's columns once, the
   compiler holding the list to the record's fields both ways, and builds every statement from it.
 * **Authorize in the adapter**: made per request for one user, it refuses every other user's
   scope with `identity_revoked`.
@@ -401,17 +400,17 @@ shape of table, copy it, and keep to what makes it right:
   all land. The contract allows that (line 4.2), and costs nothing. Have the insert answer, from
   its one snapshot, why it missed -- the vault stood, the boxlabel was already taken, the vault
   was full -- so that no second read is needed to tell a full vault from a stale writer. And
-  map a foreign key violation (`23503`) on the insert to `stale_write`: a vault erased after the
+  map a foreign key violation (`23503`) on the insert to `stale_write`: a vault retired after the
   statement's snapshot, before its foreign key check, is only a stale writer.
-* **Read the bundle `FOR SHARE` in a lockbox write, and know why.** A lockbox write compares the
-  bundle's `vault_key_epoch` (contract line 3.8), a column no foreign key covers, and a plain
-  read would take it from the statement's snapshot: a bundle update committed after the snapshot
-  -- a rotation of the vaultKey -- would go unseen, and a device still holding the replaced
-  vaultKey could seal a whisper under it. `FOR SHARE` makes the update wait for the write, or the
-  write for the update and then re-read the bundle as it stands. It is a shared lock, so lockbox
-  writes never wait for each other on the bundle. A trigger of your own that locks the bundle row anew -- `FOR
-  UPDATE`, say -- turns two such writers into a deadlock: serialize on something else (the hard
-  cap above takes an advisory lock).
+* **Read the vault row `FOR SHARE` in a lockbox write, and know why.** A lockbox write compares
+  the vault props' `vault_key_epoch` (contract line 3.8), a column no foreign key covers, and a
+  plain read would take it from the statement's snapshot: an update of the vault props committed
+  after the snapshot -- a rotation of the vaultKey -- would go unseen, and a device still holding
+  the replaced vaultKey could seal a whisper under it. `FOR SHARE` makes the update wait for the
+  write, or the write for the update and then re-read the vault props as they stand. It is a
+  shared lock, so lockbox writes never wait for each other on the vault row. A trigger of your own
+  that locks the vault row anew -- `FOR UPDATE`, say -- turns two such writers into a deadlock:
+  serialize on something else (the hard cap above takes an advisory lock).
 * **Prove it with the shared suite**: `describeVaultDB` from `safebyok/testing` runs every verb,
   expectation and refusal against a fresh adapter. Its two users' vaults go through one adapter,
   so a per-request adapter answers it with one VaultDB per user, through `perUser` from

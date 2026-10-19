@@ -31,7 +31,7 @@ export type KeyDeriverSpec = {
  * 64 MiB, three passes, one lane, a 16-byte salt and a 32-byte key. It is above OWASP's
  * Argon2id minimums, and is RFC 9106's second recommended option with one lane in place of four
  * (a JavaScript deriver runs lanes one after another, so more lanes buy a browser nothing).
- * A deriver that wears its label must carry exactly these parameters: openVault and
+ * A deriver that wears its label must carry exactly these parameters: Vault.make and
  * `argon2idDeriver` refuse one that does not.
  *
  * @example Argon2idWebV1.key_deriver_label  // 'argon2id_web_v1'
@@ -140,7 +140,7 @@ const SpecLimitForField: Readonly<Record<keyof KeyDeriverSpec, string>> = {
 
 /**
  * `candidate` as a KeyDeriverSpec Argon2id can run, holding only a spec's fields: the check
- * {@link argon2idDeriver} makes, and `openVault` makes of any key deriver declaring
+ * {@link argon2idDeriver} makes, and `Vault.make` makes of any key deriver declaring
  * `algorithm: 'argon2id'`, for a deriver of another Argon2id implementation to make the same.
  * Refuses (kind 'bad_option') a spec Argon2id cannot run -- a salt under 8 bytes or over
  * 65536, memory under 8 KiB a lane or over 1 GiB, no passes, no lanes, a key other than 32
@@ -177,5 +177,5 @@ export const parseKeyDeriverSpec = (candidate: KeyDeriverSpec): KeyDeriverSpec =
 /** The label prefix that marks a deriver made cheap for tests, which no vault of real secrets should use. */
 export const TestLabelPrefix = 'test_'
 
-/** What `openVault` warns through the logger when the keyDeriver's label begins {@link TestLabelPrefix}. */
+/** What `Vault.make` warns through the logger when the keyDeriver's label begins {@link TestLabelPrefix}. */
 export const TestDeriverNotice = "The keyDeriver's label begins test_, the mark of a deriver made cheap for tests: it gives a passphrase next to no protection against guessing. If this vault holds real secrets, open it with argon2idWebV1Deriver, or another vetted Argon2id deriver."

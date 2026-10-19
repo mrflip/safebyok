@@ -4,12 +4,12 @@ Reasonable tasks that we do not plan to do in the near term. Do not anticipate t
 implementation.
 
 * **Lock out a device: every way in it added.** From another device, the user locks out a lost or
-  compromised one: its passkeys removed, its remembered unlock void, and nothing it holds reading
+  compromised one: its passkeys removed, its lease void, and nothing it holds reading
   what is written next. Vault-key rotation does the cryptography (designed in
   `whiteboard/20261016-rotation/rotation-design.md`, built as sprint matters' threads 14 and
   18-20); what waits is the UX, a device list, and, if the Coach wants rotation not to sign every
   other device out, a key pair per way in (that design's open question 1). The data it needs goes
-  in with rotation: a random `device_id` per vault per device, recorded on every envelope it adds.
+  in with rotation: a random `device_id` per vault per device, recorded on every wayin it adds.
   * **What we record now.** `device_id` is random, minted per vault per device, never derived from
     the device, so the backend can't link one device's vaults to each other. That reading follows
     Apple's ban on fingerprinting and Google's guidance to use a privately stored random ID; it is
@@ -38,9 +38,9 @@ implementation.
   as `e2e/README.md` says). The binding's tests run under jsdom, which announces nothing.
 * **A conflict handler.** The Coach (2026-10-16, thread 4,
   [#132](https://github.com/mrflip/safebyok/pull/132)), G499: "Leave conflict handler as NOTYET, so
-  that when the idea keeps coming up there's some place to point to." There is none today: an erase
-  wins, the last writer wins, and the vault never clears damage on its own, so `store()` over a
-  box is the handler (`packages/safebyok/VAULTDB.md`). A host may one day want the say on a lockbox
+  that when the idea keeps coming up there's some place to point to." There is none today: a write
+  that lost is refused as `stale_write`, never merged or tried again, and the vault never clears
+  damage on its own, so `store()` over a box is the handler (`packages/safebyok/VAULTDB.md`). A host may one day want the say on a lockbox
   too damaged to name its epoch, meeting a healthy store.
 * **The Postgres adapter's own tests on a real server.** The Coach (2026-10-16, thread 11,
   [#131](https://github.com/mrflip/safebyok/pull/131)): the adapter's own tests
@@ -53,11 +53,11 @@ implementation.
 Things we are leaving as they are until they bite again. Each is filed so that the next person to
 be bitten finds the ruling.
 
-* **Storing without a public bag keeps the old one.** The Coach (2026-10-16, thread 2,
+* **Storing without a sidecar keeps the old one.** The Coach (2026-10-16, thread 2,
   [#133](https://github.com/mrflip/safebyok/pull/133)): "I hate optional fields but we can wait for
   it to bug me again, go ahead as you propose." Storing a new whisper under an existing label with
-  no public bag keeps the lockbox's bag; passing `{}` empties it. The alternative, an omitted bag
-  meaning empty, is one line.
+  no sidecar keeps the lockbox's sidecar; passing `{}` empties it. The alternative, an omitted
+  sidecar meaning empty, is one line.
 * **The demo's App tests depend on order.** The Coach (2026-10-16, thread 14,
   [#134](https://github.com/mrflip/safebyok/pull/134)): "leave, file under RAGEBAIT." Under
   `--sequence.shuffle`, two App tests fail when they run after the click-through test, whose fake

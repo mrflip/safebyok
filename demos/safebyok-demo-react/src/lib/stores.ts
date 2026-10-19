@@ -10,7 +10,7 @@ import { OutageVaultDB, makeOutage } from './outage'
  *  * the `vault_db` shelf stands in for the remote database a backend would hold -- rows of
  *    ciphertext that never open without your passphrase
  *  * the `device_db` shelf is genuinely device-local, exactly as it would be in production: the
- *    remembered unlock, around a key handle that cannot leave this browser. Its store comes with
+ *    lease, around a key handle that cannot leave this browser. Its store comes with
  *    the browser's defaults, `browserOpts({ dbName: Applabel })`, which App.tsx spreads into the
  *    provider
  *

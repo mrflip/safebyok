@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as TH from './test-helpers'
 import * as Columns from '../src/columns'
-import { BundleColumns, ListedLockboxColumns, LockboxColumns } from '../src/columns'
+import { VaultPropsColumns, ListedLockboxColumns, LockboxColumns } from '../src/columns'
 import type { Column } from '../src/columns'
 
 const Pair: Column[] = [['vault_id', 'text'], ['registered_at', 'bigint']]
@@ -49,8 +49,8 @@ describe("Columns.paramsOf", () => {
       .to.deep.equal(['{"cipher_iv_b64":"iv-a1","ciphertext_b64":"ct-a1"}'])
   })
 
-  it("covers every column of a real bundle and lockbox", () => {
-    expect(Columns.paramsOf(TH.bundleOf('u1'), BundleColumns)).to.have.lengthOf(BundleColumns.length)
+  it("covers every column of real vault props and a real lockbox", () => {
+    expect(Columns.paramsOf(TH.vaultPropsOf('u1'), VaultPropsColumns)).to.have.lengthOf(VaultPropsColumns.length)
     expect(Columns.paramsOf(TH.boxOf('anthropic', 'a1'), LockboxColumns)).to.not.include(undefined)
   })
 })
@@ -80,6 +80,6 @@ describe("Columns.recordOf", () => {
 
 describe("ListedLockboxColumns", () => {
   it("is every lockbox column but the two ciphered ones", () => {
-    expect(ListedLockboxColumns.map(([field]) => field)).to.deep.equal(['format', 'boxlabel', 'revision_id', 'vault_key_epoch', 'whisper_codec', 'whisper_schema_version', 'public_json', 'registered_at', 'written_at'])
+    expect(ListedLockboxColumns.map(([field]) => field)).to.deep.equal(['format', 'boxlabel', 'revision_tok', 'vault_key_epoch', 'whisper_codec', 'whisper_schema_version', 'sidecar_json', 'registered_at', 'written_at'])
   })
 })

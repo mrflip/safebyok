@@ -8,17 +8,17 @@
  *   boundary or the dev overlay; do not show it to the user, and do not retry.
  * - **Condition**: something the app handles at run time, which may reach the user: ask again,
  *   show a message, retry, or tell them to free room. `vault_locked`, `wrong_passphrase`,
- *   `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `absent_box`, `absent_vault`, `absent_unlock`,
- *   `whisper_too_large`, `lockbox_too_large`, `vault_full`, `too_many_unlocks`, `last_unlock`,
- *   `corrupt_record`, `damaged_bundle`, `damaged_unlock`, `damaged_lockbox`, `newer_format`, `stale_write`,
+ *   `created_elsewhere`, `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `absent_box`, `absent_vault`, `absent_wayin`,
+ *   `whisper_too_large`, `lockbox_too_large`, `vault_full`, `too_many_wayins`, `last_wayin`,
+ *   `corrupt_record`, `damaged_vault`, `damaged_wayin`, `damaged_lockbox`, `newer_format`, `stale_write`,
  *   `rolled_back`, `not_permitted`, `identity_revoked`, `storage_unavailable`, `storage_blocked`.
  *
  * `vault_full` means a new lockbox in a vault already holding its `maxLockboxes` (a limit the
  * client keeps), and also that storage has no room for the write (a limit of the backend's own,
- * such as the Convex component's or the Postgres server's). Either way the user erases a lockbox,
+ * such as the Convex component's or the Postgres server's). Either way the user retires a lockbox,
  * or the host raises `maxLockboxes` where the backend allows. `whisper_too_large` is the user's value, with its
- * lockbox's public bag, over `maxWhisperBytes`, so a condition, and `lockbox_too_large` the
- * user's whisper and bag together over what storage holds in one record. `bad_label` is a label the app passed that fails the
+ * lockbox's sidecar, over `maxWhisperBytes`, so a condition, and `lockbox_too_large` the
+ * user's whisper and sidecar together over what storage holds in one record. `bad_label` is a label the app passed that fails the
  * vault's check, a misuse -- a label the user types is checked first, with `Label` or with the
  * host's own `validators.boxlabel`.
  *
@@ -34,6 +34,13 @@
  * `wrong_passphrase` or `wrong_passkey` even when the stored vault was altered, because the
  * decryption fails alike either way. Their messages say so.
  *
+ * `created_elsewhere` is a first unlock that found the vault made on another device in the moment
+ * between this device's look at storage and its own write, under a passphrase other than the one
+ * given. Nothing was created here; the vault now stands as the other device made it, and shows
+ * `locked`. The user's next move is to enter the passphrase chosen there, so it is told apart
+ * from `wrong_passphrase`, which says "check for typos". A passphrase that does open that vault
+ * unlocks it as any unlock does, with no refusal at all.
+ *
  * `weak_passphrase` is a new passphrase -- the one a vault is created with, one added, or one
  * changed to -- that the vault's `passphraseStrengthTest` finds too easy to guess; its message is
  * the test's own reason, which a field can show beside the passphrase. Never raised by `unlock()`
@@ -44,9 +51,9 @@
  *
  * `newer_format` is a stored vault in a form this version does not know, which a newer version of
  * safebyok may have written: the user's next move is to update the app, never to start over, so
- * it is told apart from `damaged_bundle`, and nothing erases it.
+ * it is told apart from `damaged_vault`, and nothing retires it.
  *
- * `rolled_back` is storage handing back an older copy of a vault's bundle than this device has
+ * `rolled_back` is storage handing back an older copy of a vault's props than this device has
  * already seen -- a backup restored over it, or storage tampered with -- which the vault refuses to
  * use, and locks, as for `identity_revoked`: nothing is unlocked from it and nothing written over it. Only a device that saw the newer
  * copy can tell, and only while its own storage keeps the mark of it.
@@ -72,24 +79,25 @@
 export const VaultErrorKindVals = [
   'vault_locked',        // a whisper was asked for before the vault was unlocked
   'wrong_passphrase',    // the passphrase given did not unlock the vault
+  'created_elsewhere',   // a first unlock found the vault just made on another device, under another passphrase
   'weak_passphrase',     // a new passphrase the vault's passphraseStrengthTest finds too easy to guess
   'wrong_passkey',       // the passkey's answer did not unlock the vault, or was for another salt
   'passkey_unavailable', // this browser or authenticator cannot answer for a passkey unlock (no WebAuthn, or no PRF)
   'absent_box',          // no lockbox under that label
   'absent_vault',        // the vault has never been created, and this call will not create it
-  'absent_unlock',       // no unlock envelope of that unlock_id, or none of the method asked for
+  'absent_wayin',        // no wayin of that wayin_id, or none of the wayinkind asked for
   'bad_label',           // a label, or the userId, that fails the vault's check for it
   'bad_whisper',         // a whisper JSON cannot carry (undefined, a function, a class), or a non-string
-  'whisper_too_large',   // a whisper, with its lockbox's public bag, over the vault's maxWhisperBytes
-  'lockbox_too_large',   // a lockbox -- whisper, names and public bag together -- over what storage holds in one record
+  'whisper_too_large',   // a whisper, with its lockbox's sidecar, over the vault's maxWhisperBytes
+  'lockbox_too_large',   // a lockbox -- whisper, names and sidecar together -- over what storage holds in one record
   'vault_full',          // a new lockbox in a vault already holding its maxLockboxes, or a write storage has no room for
-  'too_many_unlocks',    // a new unlock envelope in a vault already holding MaxUnlocks
-  'last_unlock',         // removing the vault's last passphrase, which would leave no sure way in
-  'bad_option',          // an option or argument out of its range: openVault's, mask's, argon2idDeriver's, a store()'s public bag, a VaultDB write's record
+  'too_many_wayins',     // a new wayin in a vault already holding MaxUnlocks
+  'last_wayin',          // removing the vault's last passphrase, which would leave no sure way in
+  'bad_option',          // an option or argument out of its range: Vault.make's, mask's, argon2idDeriver's, a storeBox()'s sidecar, a VaultDB write's record
   'vault_closed',        // the vault handle was closed and cannot be used again
   'corrupt_record',      // a stored record failed validation as storage read it back
-  'damaged_bundle',      // the vault's stored bundle failed its checks, so no way in can be tried
-  'damaged_unlock',      // a way in is stored in a form this package never writes, so it cannot be tried
+  'damaged_vault',       // the vault's stored props failed their checks, so no way in can be tried
+  'damaged_wayin',       // a way in is stored in a form this package never writes, so it cannot be tried
   'damaged_lockbox',     // a lockbox failed its checks, or would not open under the vault's own vaultKey
   'newer_format',        // a stored vault in a form this version does not know, which a newer one may have written
   'unknown_key_deriver', // the vault names a key deriver this handle was not built with
@@ -109,7 +117,7 @@ export type VaultErrorKind = typeof VaultErrorKindVals[number]
  * secret material -- not in the message, not as a property.
  *
  * @example
- *   try { await vault.read('ANTHROPIC_API_KEY') } catch (err) {
+ *   try { await vault.readBox('ANTHROPIC_API_KEY') } catch (err) {
  *     if (err instanceof VaultError && err.kind === 'vault_locked') { promptForPassphrase() }
  *   }
  */
@@ -152,24 +160,25 @@ export type VaultErrorFamily = typeof VaultErrorFamilyVals[number]
 export const VaultErrorFamilyForKind = {
   vault_locked:        'condition',
   wrong_passphrase:    'condition',
+  created_elsewhere:   'condition',
   weak_passphrase:     'condition',
   wrong_passkey:       'condition',
   passkey_unavailable: 'condition',
   absent_box:          'condition',
   absent_vault:        'condition',
-  absent_unlock:       'condition',
+  absent_wayin:        'condition',
   bad_label:           'misuse',
   bad_whisper:         'misuse',
   whisper_too_large:   'condition',
   lockbox_too_large:   'condition',
   vault_full:          'condition',
-  too_many_unlocks:    'condition',
-  last_unlock:         'condition',
+  too_many_wayins:     'condition',
+  last_wayin:          'condition',
   bad_option:          'misuse',
   vault_closed:        'misuse',
   corrupt_record:      'condition',
-  damaged_bundle:      'condition',
-  damaged_unlock:      'condition',
+  damaged_vault:       'condition',
+  damaged_wayin:       'condition',
   damaged_lockbox:     'condition',
   newer_format:        'condition',
   unknown_key_deriver: 'misuse',
@@ -188,7 +197,7 @@ export const VaultErrorFamilyForKind = {
  * false, and belongs with an error boundary.
  *
  * @example
- *   try { await vault.store(boxlabel, whisper) } catch (err) {
+ *   try { await vault.storeBox(boxlabel, whisper) } catch (err) {
  *     if (! isVaultCondition(err)) { throw err }
  *     showGripe(err.message)
  *   }

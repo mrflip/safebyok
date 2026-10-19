@@ -5,8 +5,8 @@ import { boxRange } from '../src/ckeys'
 import * as TH from './test-helpers'
 
 describe("the ckeys", () => {
-  it("keys a bundle and its lockboxes under their kind and scope joined on ^, spelled out because they are stored", () => {
-    expect(Ckeys.bundle(TH.scopeOf('u1'))).to.eq('vault^acme^u1^main')
+  it("keys a vault's props and its lockboxes under their kind and scope joined on ^, spelled out because they are stored", () => {
+    expect(Ckeys.vaultProps(TH.scopeOf('u1'))).to.eq('vault^acme^u1^main')
     expect(Ckeys.box(TH.scopeOf('u1'), 'anthropic')).to.eq('box^acme^u1^main^anthropic')
   })
 })
@@ -27,12 +27,12 @@ describe("boxRange", () => {
   }
 
   const OutsideCases = [
-    ['vault^acme^u1^main',                  "the vault's own bundle"],
+    ['vault^acme^u1^main',                  "the vault's own props"],
     ['box^acme^u1^spare^anthropic',         "a lockbox of the user's other vault"],
     ['box^acme^u12^main^anthropic',         'a lockbox of a user whose id starts the same'],
     ['box^acme^u1^mainx^anthropic',         'a lockbox of a vault whose label starts the same'],
     ['box^acme^u1^main_',                   'the prefix with its ^ raised by one, where the range stops'],
-    ['unlock^acme^u1^main',                 "a remembered unlock"],
+    ['lease^acme^u1^main',                  "a lease"],
     ['["box","acme","u1","main","x"]',      "a lockbox under an earlier version's ckey"],
   ] as const
 

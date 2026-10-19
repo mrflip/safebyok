@@ -15,18 +15,18 @@ export const WaysIn = () => {
   // submit, so a password manager's autofill counts even when it sends no input event.
   const formRef = useRef<HTMLFormElement>(null)
   const passphraseRef = useRef<HTMLInputElement>(null)
-  const [unlocklabel, setUnlocklabel] = useState('laptop_fingerprint')
+  const [wayinlabel, setWayinlabel] = useState('laptop_fingerprint')
   const [gripe, setGripe] = useState<string | null>(null)
 
-  if (vault === null || snapshot.unlocks.length === 0) { return null }
+  if (vault === null || snapshot.wayins.length === 0) { return null }
 
   const addFingerprint = async (evt: SubmitEvent) => {
     evt.preventDefault()
     setGripe(null)
     try {
       const makePasskey = () => createPasskey({ rp: { name: 'safebyok playground' }, user: { name: snapshot.scope.user_id, displayName: snapshot.scope.user_id } })
-      const unlockId = await vault.addPasskey(passphraseRef.current?.value ?? '', makePasskey, { unlocklabel })
-      if (unlockId === null) { return }
+      const wayinId = await vault.addPasskey(passphraseRef.current?.value ?? '', makePasskey, { wayinlabel })
+      if (wayinId === null) { return }
       formRef.current?.reset()
     } catch (err) {
       setGripe(err instanceof Error ? err.message : 'Could not add that passkey.')
@@ -37,8 +37,8 @@ export const WaysIn = () => {
     <section className="ways-in">
       <h2>Ways in</h2>
       <ul>
-        {snapshot.unlocks.map((unlock) => (
-          <li key={unlock.unlock_id}><code>{unlock.unlocklabel}</code> <span className="quiet">{unlock.method}</span></li>
+        {snapshot.wayins.map((wayin) => (
+          <li key={wayin.wayin_id}><code>{wayin.wayinlabel}</code> <span className="quiet">{wayin.wayinkind}</span></li>
         ))}
       </ul>
       {passkeysAvailable()
@@ -52,7 +52,7 @@ export const WaysIn = () => {
             </label>
             <label>
               label
-              <input value={unlocklabel} onChange={(evt) => { setUnlocklabel(evt.target.value) }} />
+              <input value={wayinlabel} onChange={(evt) => { setWayinlabel(evt.target.value) }} />
             </label>
             {gripe !== null && <p className="gripe">{gripe}</p>}
             <div className="row">

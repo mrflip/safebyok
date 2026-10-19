@@ -3,19 +3,19 @@ import * as Z from 'zod/mini'
 import { optionsCheck } from '../src/options'
 import * as TH from './test-helpers'
 
-const Said = "store()'s only option is `public`."
-const checkStoreOpts = optionsCheck({ public: Z.optional(Z.unknown()) }, Said)
+const Said = "storeBox()'s only option is `sidecar`."
+const checkStoreOpts = optionsCheck({ sidecar: Z.optional(Z.unknown()) }, Said)
 
 describe("optionsCheck", () => {
   it("hands back the bag it was handed, as its example's first call shows", () => {
-    const opts = { public: { note: 'work' } }
+    const opts = { sidecar: { note: 'work' } }
     expect(checkStoreOpts(opts)).to.eq(opts)
   })
 
   it("passes a bag left out, or one with its optional field left out or undefined", () => {
     expect(checkStoreOpts<object | undefined>(undefined)).to.be.undefined
     expect(checkStoreOpts({})).to.deep.equal({})
-    expect(checkStoreOpts({ public: undefined })).to.deep.equal({ public: undefined })
+    expect(checkStoreOpts({ sidecar: undefined })).to.deep.equal({ sidecar: undefined })
   })
 
   it("refuses a field it does not know as 'bad_option', as its example's second call shows, saying what it was told to", () => {
@@ -24,9 +24,9 @@ describe("optionsCheck", () => {
   })
 
   it("refuses an unknown field beside a known one, quoting neither", () => {
-    const err = TH.expectSyncRefusal(() => checkStoreOpts({ public: {}, pubilc: { hint: 'SUPERSECRET' } }), 'bad_option')
+    const err = TH.expectSyncRefusal(() => checkStoreOpts({ sidecar: {}, sidcar: { hint: 'SUPERSECRET' } }), 'bad_option')
     expect(TH.thrownText(err)).to.not.include('SUPERSECRET')
-    expect(TH.thrownText(err)).to.not.include('pubilc')
+    expect(TH.thrownText(err)).to.not.include('sidcar')
   })
 
   it("refuses a bag that is not an object, or is null", () => {
@@ -36,8 +36,8 @@ describe("optionsCheck", () => {
   })
 
   it("refuses a known field its schema refuses", () => {
-    const checkAim = optionsCheck({ unlockId: Z.optional(Z.string()) }, 'unlockId is text.')
-    expect(checkAim({ unlockId: 'u-1' })).to.deep.equal({ unlockId: 'u-1' })
-    TH.expectSyncRefusal(() => checkAim({ unlockId: 7 }), 'bad_option')
+    const checkAim = optionsCheck({ wayinId: Z.optional(Z.string()) }, 'wayinId is text.')
+    expect(checkAim({ wayinId: 'u-1' })).to.deep.equal({ wayinId: 'u-1' })
+    TH.expectSyncRefusal(() => checkAim({ wayinId: 7 }), 'bad_option')
   })
 })
