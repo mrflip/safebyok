@@ -5778,6 +5778,33 @@ describe("versioned updates: two devices writing at once", () => {
     for (const unsaid of [theirs.revisionTok, 'anthropic', 'sk-ant-fake-one', 'sk-ant-fake-theirs']) { expect(text).to.not.include(unsaid) }
   })
 
+  it("a retirement over a box listed damaged with a readable revision, written over meanwhile elsewhere, retires theirs all the same, and warns of the damaged box shown with damaged: true, naming neither", async () => {
+    const { world, hereDB, here, there } = await twoDeviceWorld()
+    await here.storeBox('anthropic', 'sk-ant-fake-one')
+    world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), written_at: 'later' }))
+    const damagedRevision = String(storedRowOf(world, 'anthropic')['revision_tok'])
+    await vi.waitFor(() => {
+      expect(here.getSnapshot().boxes[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true, revision_tok: damagedRevision })
+      expect(there.getSnapshot().boxes[0]).to.deep.equal({ boxlabel: 'anthropic', damaged: true, revision_tok: damagedRevision })
+    })
+    const theirs = { revisionTok: '' }
+    TH.beforeNextCall(hereDB, 'retireBox', async () => {
+      await there.storeBox('anthropic', 'sk-ant-fake-theirs')
+      theirs.revisionTok = String(storedRowOf(world, 'anthropic')['revision_tok'])
+    })
+    const retireBox = vi.spyOn(hereDB, 'retireBox')
+    await here.retireBox('anthropic')
+    expect(retireBox.mock.calls[0]?.[2]).to.deep.include({ revision_tok: damagedRevision })
+    expect(world.dbStore.read(u1BoxCkey('anthropic'))).to.be.null
+    const told = world.logged.filter((heard) => heard.story?.['call'] === 'retireBox')
+    expect(told).to.have.lengthOf(1)
+    expect(told[0]).to.deep.include({ level: 'warn' })
+    expect(told[0]?.message).to.match(/^The lockbox this device showed was a damaged one/)
+    expect(told[0]?.story).to.deep.include({ call: 'retireBox', damaged: true })
+    const text = TH.loggedText(told)
+    for (const unsaid of [damagedRevision, theirs.revisionTok, 'anthropic', 'sk-ant-fake-one', 'sk-ant-fake-theirs']) { expect(text).to.not.include(unsaid) }
+  })
+
   it("a store over a damaged box naming no revision, written over meanwhile by a device that saw it damaged too, retires that write, warns, and stores its own", async () => {
     // The lost write the warning is for: A retires the damaged box and writes; B, which saw the
     // same damage, retires A's write and writes in its place.

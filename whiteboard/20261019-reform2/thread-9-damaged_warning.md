@@ -16,3 +16,7 @@ Branch `20261019-damaged_warning`, PR [#183](https://github.com/mrflip/safebyok/
 
 * **Two messages, not one with a clause (decision taken).** Recommendation: keep.
 * **The invariant (always a record while the vault stands) is the deferred tombstones' work**, not done here, as the sprint says.
+
+## Review follow-up
+
+The reviewer's three fixes stand (story wording; the whisper check). On the orchestrator's directive: the changeset is back at `minor` (the sprint's ground rule), the README's logger list gains a bullet for the two `retired_other` warnings, and a test covers a box listed damaged *with* a readable revision, retired by `retireBox()` after another device wrote over it.
