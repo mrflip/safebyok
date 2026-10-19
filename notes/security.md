@@ -620,7 +620,7 @@ added or folded into through the subagent, and no other entry changes.
   `changePassphrase` replaced, which still opens only the vaultKey the vault stands under, never a
   replaced one. (A device that opens such vault props through its lease opens no wayin:
   it takes the vaultKey it already held, and lists the older copy's wayins.) The way out of a
-  refusal is the host's: it erases the device's mark (`deviceDB.delMark(scope)`) and opens again,
+  refusal is the host's: it erases the device's mark (`valOf(await deviceDB.delMark(scope))`; amended 2026-10-19: once a bare `deviceDB.delMark(scope)`, before every DeviceDB verb resolved an `Outcome`) and opens again,
   taking the older copy as it stands, the core README's recipe. The README has the host decide that
   from its own knowledge of a restore, never from the user's answer: storage that rolls back on its
   own would ask the user the same, and the user cannot tell the two apart. `del()` and
