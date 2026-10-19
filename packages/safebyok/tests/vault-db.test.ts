@@ -713,16 +713,6 @@ describe("the abstract VaultDB, by what threw", () => {
     expect(refusal.cause).to.eq(thrown)
   })
 
-  it("keeps a refusal its adapter threw from another copy of safebyok as it came, and wraps an Error that only names itself one", async () => {
-    const foreign = TH.foreignRefusal('identity_revoked', 'No one is signed in.')
-    const { ok, err } = await new TroubledVaultDB(() => { throw foreign }).getVaultProps(TH.scopeOf('u1'))
-    expect(ok).to.be.false
-    expect(err).to.eq(foreign)
-    const lookalike = TH.lookalikeRefusal('identity_revoked', 'No one is signed in.')
-    const wrapped = await TH.expectBad(new TroubledVaultDB(() => { throw lookalike }).getVaultProps(TH.scopeOf('u1')), 'storage_unavailable')
-    expect(wrapped.cause).to.eq(lookalike)
-  })
-
   it("still says the adapter's own throw as storage_unavailable, whatever it threw: a TypeError is how fetch says the network failed", async () => {
     const networkDown = new TypeError('Failed to fetch')
     const vaultDB = new TroubledVaultDB(() => { throw networkDown })

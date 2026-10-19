@@ -156,15 +156,6 @@ describe("a throw that is no refusal (Contract: Shapes)", () => {
     const refusal = await TH.expectBad(vault.tryAddPasskey('pw', refusing, { wayinlabel: 'laptop' }), 'passkey_unavailable')
     expect(refusal).to.eq(unavailable)
   })
-
-  it("keeps a VaultError from another copy of safebyok, as an ESM and a CJS build loaded side by side make, as it came", async () => {
-    const world = makeWorld()
-    const foreign = TH.foreignRefusal('storage_unavailable', 'The strength service could not be reached.')
-    const vault = await world.open({ passphraseStrengthTest: () => { throw foreign } })
-    const { ok, err } = await vault.tryUnlock('pw')
-    expect(ok).to.be.false
-    expect(err).to.eq(foreign)
-  })
 })
 // --
 

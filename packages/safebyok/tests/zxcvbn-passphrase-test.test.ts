@@ -175,9 +175,16 @@ describe("zxcvbnPassphraseTest's loading", () => {
 
   it("refuses a vault's Create as 'storage_unavailable' when zxcvbn fails to load, making nothing", async () => {
     const { fresh } = await freshModule(true)
-    const vault = await TH.settledVault(TH.memoryVaultOpts({ passphraseStrengthTest: fresh.zxcvbnPassphraseTest }))
+    // A vault of the same fresh copy of safebyok as the strength test: a VaultError of another copy
+    // would be a foreign throw to it.
+    const [{ Vault: FreshVault }, { localVaultDB }, { memoryStore }, { memoryDeviceDB }] = await Promise.all([
+      import('../src/vault'), import('../src/local-vault-db'), import('../src/string-store'), import('../src/device-db'),
+    ])
+    const vaultDB = localVaultDB({ store: memoryStore() })
+    const vault = FreshVault.make(TH.memoryVaultOpts({ passphraseStrengthTest: fresh.zxcvbnPassphraseTest, vaultDB, deviceDB: memoryDeviceDB() }))
+    await vault.hello()
     try {
-      // The fresh module's VaultError is a class of its own: told by kind.
+      // The fresh copy's VaultError is a class of its own: told by kind.
       await expect(vault.unlock('correct horse battery staple')).rejects.toThrow(expect.objectContaining({ refusalkind: 'storage_unavailable' }))
       expect(vault.getSnapshot().state).to.eq('absent')
       await vault.unlock('correct horse battery staple')

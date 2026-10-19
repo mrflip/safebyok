@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError, RefusalFamilyForKind, RefusalFamilyVals, RefusalKindVals, isCondition, isVaultError } from '../src/errors'
-import * as TH from './test-helpers'
 
 const readmeText = readFileSync(new URL('../README.md', import.meta.url), 'utf8')
 const errorsSource = readFileSync(new URL('../src/errors.ts', import.meta.url), 'utf8')
@@ -169,9 +168,6 @@ const ConditionCases = [
   [new VaultError('vault_closed', 'This vault handle was closed.'),                  false, 'a closed handle, misuse too'],
   [new Error('storage_unavailable'),                                                       false, 'a plain Error, even one whose message names a condition'],
   [{ refusalkind: 'storage_unavailable', message: 'down' },                                false, 'an object shaped like a VaultError, but not one'],
-  [TH.foreignRefusal('storage_unavailable', 'The vault storage could not be reached.'),     true,  'a condition from another copy of safebyok'],
-  [TH.foreignRefusal('bad_option', 'That option is not one.'),                             false, 'misuse from another copy of safebyok'],
-  [TH.lookalikeRefusal('storage_unavailable', 'The vault storage could not be reached.'),  false, 'an Error that only names itself a VaultError'],
   [null,                                                                                   false, 'a thrown null'],
   [undefined,                                                                              false, 'a thrown undefined'],
   ['storage_unavailable',                                                                  false, 'a thrown string'],
@@ -201,49 +197,33 @@ describe("isCondition", () => {
   })
 })
 
-describe("isVaultError, for a VaultError of another copy of safebyok", () => {
-  it("tells one from a fresh copy of the module, as an ESM and a CJS build loaded side by side make, by its kind", async () => {
+describe("isVaultError", () => {
+  it("tells a refusal of the kind asked, as its example shows", () => {
+    const prompted: string[] = []
+    const handle = (err: unknown) => { if (isVaultError(err, 'vault_locked')) { prompted.push('passphrase') } }
+    handle(new VaultError('vault_locked', 'Unlock the vault first.'))
+    handle(new VaultError('absent_box', 'No box under that label.'))
+    expect(prompted).to.deep.equal(['passphrase'])
+  })
+
+  it("is false for a VaultError of another copy of safebyok, as an ESM and a CJS build loaded side by side make: it is a foreign throw", async () => {
     vi.resetModules()
     const Other = await import('../src/errors')
     expect(Other.VaultError).to.not.eq(VaultError)
-    const foreign = new Other.VaultError('identity_revoked', 'Sign in again to reach this vault.')
-    expect(foreign instanceof VaultError).to.be.false
-    expect(isVaultError(foreign)).to.be.true
-    expect(isVaultError(foreign, 'identity_revoked')).to.be.true
-    expect(isVaultError(foreign, 'not_permitted')).to.be.false
-    expect(isCondition(foreign)).to.be.true
-    expect(Other.isVaultError(new VaultError('vault_locked', 'Unlock the vault first.'), 'vault_locked')).to.be.true
+    expect(isVaultError(new Other.VaultError('identity_revoked', 'Sign in again to reach this vault.'))).to.be.false
   })
 
-  it("tells the one the tests hand-make for it alike, so a test of another copy's refusal stands for the real thing", async () => {
-    vi.resetModules()
-    const Other = await import('../src/errors')
-    const made = new Other.VaultError('not_permitted', 'You may not change this vault.')
-    const handmade = TH.foreignRefusal('not_permitted', 'You may not change this vault.')
-    expect(isVaultError(handmade, 'not_permitted')).to.eq(isVaultError(made, 'not_permitted'))
-    expect(handmade).to.include({ name: made.name, refusalkind: made.refusalkind, family: made.family, message: made.message })
-  })
-
-  it("carries its mark out of sight: unenumerable, out of its JSON and its keys", () => {
-    const err = new VaultError('vault_locked', 'Unlock the vault first.')
-    expect(Object.keys(err)).to.not.include('Symbol(safebyok.VaultError)')
-    expect(JSON.stringify(err)).to.not.match(/safebyok\.VaultError/)
-    expect(Object.getOwnPropertySymbols(err).map(String)).to.deep.equal(['Symbol(safebyok.VaultError)'])
-    expect(Object.getOwnPropertyDescriptor(err, Symbol.for('safebyok.VaultError'))).to.include({ enumerable: false, writable: false, configurable: false })
-  })
-
-  const mark = Symbol.for('safebyok.VaultError')
+  // As a client rebuilds one from a server's JSON: an Error that names itself, with a kind.
+  class LookalikeError extends Error {
+    override readonly name = 'VaultError'
+    readonly refusalkind = 'identity_revoked'
+  }
   const sent = new VaultError('identity_revoked', 'Sign in again to reach this vault.')
   const ImpostorCases = [
-    // what crossed a wire or a store, which carries no symbol:
-    [TH.lookalikeRefusal('identity_revoked', 'Sign in at another site.'),                                   'an Error that names itself a VaultError and claims a kind, as a client rebuilds one from a server'],
+    [new LookalikeError('Sign in at another site.'),                                                         'an Error that names itself a VaultError and claims a kind, as a client rebuilds one from a server'],
     [JSON.parse('{"name":"VaultError","refusalkind":"identity_revoked","family":"bad_news","message":"Signed out."}') as unknown, 'a VaultError as JSON, as a server sends one'],
     [structuredClone(sent),                                                                                 'a VaultError through structuredClone, as postMessage hands one over'],
-    // plain objects, which no VaultError is:
     [{ name: 'VaultError', refusalkind: 'identity_revoked', family: 'bad_news', message: 'Signed out.' },     'a plain object shaped like one'],
-    [{ [mark]: true, name: 'VaultError', refusalkind: 'identity_revoked', message: 'Signed out.' },         'a plain object carrying the mark, which is no Error'],
-    // marked, but of a kind this copy does not know:
-    [Object.defineProperty(Object.assign(new Error('Odd.'), { refusalkind: 'no_such_kind' }), mark, { value: true }), 'a marked Error of a kind this copy does not know'],
   ] as const
 
   for (const [impostor, blurb] of ImpostorCases) {
@@ -253,13 +233,4 @@ describe("isVaultError, for a VaultError of another copy of safebyok", () => {
       expect(isCondition(impostor)).to.be.false
     })
   }
-
-  it("tells a refusal of the kind asked, as its example shows", () => {
-    const prompted: string[] = []
-    const handle = (err: unknown) => { if (isVaultError(err, 'vault_locked')) { prompted.push('passphrase') } }
-    handle(TH.foreignRefusal('vault_locked', 'Unlock the vault first.'))
-    handle(new VaultError('vault_locked', 'Unlock the vault first.'))
-    handle(new VaultError('absent_box', 'No box under that label.'))
-    expect(prompted).to.deep.equal(['passphrase', 'passphrase'])
-  })
 })

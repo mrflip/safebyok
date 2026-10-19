@@ -2,7 +2,6 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import { VaultError } from '../src/errors'
 import { type Outcome, bad, good, hostThrewRefusal, isOutcomeShaped, outcomeOf, unexpectedError, valOf } from '../src/outcome'
 import * as Refusals from '../src/refusals'
-import * as TH from './test-helpers'
 
 /** An app's own call, which rejects: what outcomeOf's first example wraps. */
 const fetchBackup = (vaultlabel: string): Promise<string> => Promise.reject(new TypeError(`no backup of ${vaultlabel}`))
@@ -99,20 +98,6 @@ describe("outcomeOf, told otherwise", () => {
     const kept = await outcomeOf(() => { throw refusal }, unexpectedError)
     expect(kept.err).to.eq(refusal)
   })
-
-  it("keeps a VaultError of another copy of safebyok, one class per copy, told by the mark its constructor set", async () => {
-    const foreign = TH.foreignRefusal('not_permitted', 'Refused by another copy of safebyok.')
-    const kept = await outcomeOf(() => { throw foreign })
-    expect(kept.err).to.eq(foreign)
-  })
-
-  it("wraps an Error that only names itself a VaultError, so what a server sent never chooses the refusal or its message", async () => {
-    const lookalike = TH.lookalikeRefusal('identity_revoked', 'Sign in again at evil.example.')
-    const wrapped = await outcomeOf(() => { throw lookalike })
-    expect(wrapped.err?.refusalkind).to.eq('storage_unavailable')
-    expect(wrapped.err?.message).to.not.include('evil.example')
-    expect(wrapped.err?.cause).to.eq(lookalike)
-  })
 })
 
 describe("unexpectedError", () => {
@@ -132,12 +117,9 @@ describe("unexpectedError", () => {
 const HostThrowCases = [
   // a condition, for the caller to show or retry:
   [new VaultError('storage_unavailable', 'The word list could not be loaded: try again shortly.'), "kept",              'keeps a condition, its word list out of reach'],
-  [TH.foreignRefusal('wrong_passphrase', 'Refused by another copy of safebyok.'),                 "kept",              'keeps a condition of another copy of safebyok'],
   // anything else, which may quote the passphrase:
   [new VaultError('bad_option', 'acme acme acme is no passphrase I can judge.'),                    "unexpected_error",  'wraps a VaultError of misuse'],
   [new VaultError('damaged_vault', 'acme acme acme broke me.'),                                     "unexpected_error",  'wraps a VaultError of bad news, never to be told to onBadNews'],
-  [TH.foreignRefusal('bad_option', 'Refused by another copy of safebyok.'),                       "unexpected_error",  'wraps misuse of another copy of safebyok'],
-  [TH.lookalikeRefusal('wrong_passphrase', 'Refused, says a server.'),                           "unexpected_error",  'wraps a lookalike of a condition, which no VaultError made'],
   [new TypeError('could not judge acme acme acme'),                                                 "unexpected_error",  'wraps a throw that is no VaultError'],
 ] as const
 

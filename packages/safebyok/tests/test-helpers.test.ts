@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { Vault, deviceOutcomeOf, localVaultDB, memoryDeviceDB, memoryStore, type DeviceDB, type StringStore } from '../src/index'
 import { Ciphered, fromB64, toB64 } from '../src/crypto'
-import { VaultError, isVaultError } from '../src/errors'
+import { VaultError } from '../src/errors'
 import { type Outcome, bad, good } from '../src/outcome'
 import { BoxRecord } from '../src/box'
 import { argon2idWebV1Deriver } from '../src/key-deriver'
@@ -16,7 +16,6 @@ import { Wayin } from '../src/wayin'
 import { PasskeySaltBytes, VaultProps, VaultScope, type DeviceMark, type LeaseRecord } from '../src/types'
 import * as Ckeys from '../src/ckeys'
 import * as Expectations from '../src/expectations'
-import * as RefusalPolicy from '../src/refusal-policy'
 import { VaultDB, type VaultPropsExpectation, type VaultDelExpectation, type BoxExpectation, type BoxDelExpectation, type StoredBox, type VaultDBOpts } from '../src/vault-db'
 import * as TH from './test-helpers'
 import { raceOutcomeOf } from './test-helpers/racing'
@@ -667,7 +666,7 @@ describe("the fixtures", () => {
 })
 // --
 
-// == [Logging and refusals]: spyLogger, loggedText, thrownText, leafTexts, expectRefusal, omitting, foreignRefusal, lookalikeRefusal
+// == [Logging and refusals]: spyLogger, loggedText, thrownText, leafTexts, expectRefusal, omitting
 
 describe("spyLogger", () => {
   it("keeps every call it hears, in order, with what it was handed", () => {
@@ -772,7 +771,7 @@ describe("expectRefusal", () => {
   })
 
   it("fails the test when the operation resolves, or refuses with anything but a VaultError of the kind", async () => {
-    // As another copy's VaultError is: a subclass of Error that names itself, with a kind.
+    // As a client rebuilds one from a server's JSON: a subclass of Error that names itself, with a kind.
     class LookalikeError extends Error {
       override readonly name = 'VaultError'
       readonly kind = 'vault_locked'
@@ -864,33 +863,14 @@ describe("omitting", () => {
   })
 })
 
-describe("foreignRefusal", () => {
-  it("has a storage adapter answer with another copy's refusal, as its example shows", async () => {
-    const vaultDB = localVaultDB({ store: memoryStore() })
-    vi.spyOn(vaultDB, 'getBox').mockResolvedValueOnce(TH.bad(TH.foreignRefusal('identity_revoked', 'Signed out.')))
-    const { ok, err } = await vaultDB.getBox(TH.scopeOf('u1'), 'anthropic')
-    expect(ok).to.be.false
-    expect(err instanceof VaultError).to.be.false
-    expect(isVaultError(err, 'identity_revoked')).to.be.true
-    expect(err).to.include({ name: 'VaultError', refusalkind: 'identity_revoked', family: 'bad_news', message: 'Signed out.' })
-  })
-})
-
-describe("lookalikeRefusal", () => {
-  it("is no refusal to the vault, though it names itself one, as its example shows", () => {
-    const lookalike = TH.lookalikeRefusal('identity_revoked', 'Signed out.')
-    expect(RefusalPolicy.decide(lookalike)).to.eq('none')
-    expect(isVaultError(lookalike)).to.be.false
-    expect(lookalike).to.include({ name: 'VaultError', refusalkind: 'identity_revoked', message: 'Signed out.' })
-  })
-})
-
 describe("raceOutcomeOf", () => {
-  it("reads a verb refused with another copy's VaultError as refused, and one refused with a lookalike as no Outcome at all, so a race's verdict fails that adapter", async () => {
-    const refused = TH.bad(TH.foreignRefusal('stale_write', 'Another device wrote first.'))
-    const foreign = await raceOutcomeOf(Promise.resolve(refused))
-    expect(foreign.kind).to.eq('stale_write')
-    const lookalike = TH.lookalikeRefusal('stale_write', 'Another device wrote first.')
+  it("reads a verb refused with an Error that only names itself a VaultError as no Outcome at all, so a race's verdict fails that adapter", async () => {
+    // As a client rebuilds one from a server's JSON: an Error that names itself, with a kind.
+    class LookalikeError extends Error {
+      override readonly name = 'VaultError'
+      readonly refusalkind = 'stale_write'
+    }
+    const lookalike = new LookalikeError('Another device wrote first.')
     const posing = await raceOutcomeOf(Promise.resolve({ ok: false, err: lookalike }))
     expect(posing.kind).to.eq('landed')
   })

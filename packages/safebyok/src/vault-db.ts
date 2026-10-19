@@ -777,7 +777,7 @@ const heldName = (facts: NameFacts, said: string, part: string): string => {
  */
 const answering = <ValT>(body: () => Promise<ValT>): Promise<Outcome<ValT>> => outcomeOf(body, unexpectedError)
 
-/** What an adapter threw, as a VaultError: its own VaultError untouched, another copy's included, anything else wrapped. */
+/** What an adapter threw, as a VaultError: a VaultError untouched, anything else wrapped. */
 const asStorageTrouble = (err: unknown): VaultError => (isVaultError(err) ? err : Refusals.storageUnavailable(err))
 
 /**

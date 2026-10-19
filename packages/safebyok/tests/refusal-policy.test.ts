@@ -21,10 +21,6 @@ describe("RefusalPolicy.decide", () => {
     // what is no refusal of storage's:
     [new Error('identity_revoked'),                                            "none",  'does nothing for a plain Error naming the kind'],
     [{ refusalkind: 'identity_revoked', message: 'Signed out.' },              "none",  'does nothing for an object shaped like the refusal'],
-    [TH.lookalikeRefusal('identity_revoked', 'Signed out.'),                   "none",  'does nothing for an Error that only names itself a VaultError, as a client rebuilds one from a server'],
-    // another copy of safebyok's, an ESM and a CJS build side by side:
-    [TH.foreignRefusal('identity_revoked', 'Signed out.'),                     "lock",  'locks for identity_revoked from another copy of safebyok'],
-    [TH.foreignRefusal('not_permitted', 'Not yours.'),                         "none",  'does nothing more for not_permitted from another copy'],
   ] as const
 
   for (const [refusal, expected, blurb] of DecideCases) {

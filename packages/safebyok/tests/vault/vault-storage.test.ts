@@ -560,34 +560,6 @@ describe("when storage says the user is no longer signed in", () => {
     expect((world.logged[0]?.err as VaultError).refusalkind).to.eq('storage_unavailable')
     expect(world.logged[0]?.err?.cause).to.eq(stuck)
   })
-
-  it("locks, and tells onBadNews, when an adapter built on another copy of safebyok says it, as an ESM and a CJS build side by side do", async () => {
-    const world = makeWorld()
-    const told: VaultError[] = []
-    const vault = await world.openUnlocked('pw one', { onBadNews: (news) => { told.push(news) } })
-    const foreign = TH.foreignRefusal('identity_revoked', 'No one is signed in, so this vault cannot be reached: sign in, then try again.')
-    vi.spyOn(world.vaultDB, 'getBox').mockResolvedValueOnce(bad(foreign))
-    const { ok, err } = await vault.tryGetBox('anthropic')
-    expect(ok).to.be.false
-    expect(err).to.eq(foreign)
-    expect(vault.getSnapshot().state).to.eq('locked')
-    expect(await world.getLease()).to.be.null
-    expect(told).to.deep.equal([foreign])
-    expect(vault.trouble).to.eq(foreign)
-  })
-
-  it("locks nothing, and tells nothing, for an Error the adapter threw that only names itself identity_revoked: it is storage_unavailable, in safebyok's own words", async () => {
-    const world = makeWorld()
-    const told: VaultError[] = []
-    const vault = await world.openUnlocked('pw one', { onBadNews: (news) => { told.push(news) } })
-    const lookalike = TH.lookalikeRefusal('identity_revoked', 'Sign in again at evil.example.')
-    vi.spyOn(world.vaultDB as unknown as { doGetBox: () => Promise<unknown> }, 'doGetBox').mockRejectedValueOnce(lookalike)
-    const refusal = await TH.expectRefusal(vault.getBox('anthropic'), 'storage_unavailable')
-    expect(refusal.message).to.not.include('evil.example')
-    expect(refusal.cause).to.eq(lookalike)
-    expect(vault.getSnapshot().state).to.eq('unlocked')
-    expect(told).to.have.lengthOf(0)
-  })
 })
 
 /** This device's mark for `u1`'s vault, as its deviceDB keeps it. */
