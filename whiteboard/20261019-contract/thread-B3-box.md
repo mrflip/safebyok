@@ -1,6 +1,6 @@
 # Thread B3: box (2026-10-19)
 
-Branch `20261019-box`, PR #PRNUM, stacked on [#195](https://github.com/mrflip/safebyok/pull/195) (`20261019-outcome_adapters`). Justify: green; core 2439 tests (35 skipped), every package green, size within every line.
+Branch `20261019-box`, [PR #202](https://github.com/mrflip/safebyok/pull/202), stacked on [#195](https://github.com/mrflip/safebyok/pull/195) (`20261019-outcome_adapters`). Justify: green; core 2439 tests (35 skipped), every package green, size within every line.
 
 * **Built**:
   * `utils.ts`: `adorn<VT>(obj, val: VT): VT` and `decorate<OT>(obj: OT, props: Partial<OT>): OT`,
