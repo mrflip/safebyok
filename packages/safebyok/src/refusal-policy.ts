@@ -42,9 +42,9 @@ export type HeededVaultDB = { [VerbT in HeededVerb]: Thrown<VaultDB[VerbT]> } & 
 /**
  * `vaultDB`'s verbs, each resolving its outcome's `val`, or handing its refusal to `onRefusal`, and
  * waiting for it, before rejecting with that refusal: so a vault meets every storage refusal,
- * whichever of its calls made it, a background refresh's included. Each verb takes its arguments as `vaultDB`'s
- * does, passed on whole, and is looked up on `vaultDB` as it is called, so a test's spy on one is
- * heard. `subscribe`, which answers at once, passes through.
+ * whichever of its calls made it, a background refresh's included. Each verb takes its arguments
+ * as `vaultDB`'s does, passed on whole, and is looked up on `vaultDB` as it is called, so a
+ * test's spy on one is heard. `subscribe`, which answers at once, passes through.
  *
  * The refused call waits for `onRefusal` before it rejects, so a device store that never settles
  * as the vault locks holds that call with it; the vaultKey is dropped before the device store is

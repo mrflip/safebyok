@@ -159,11 +159,12 @@ export type VaultDBOpts = {
  * every record on the way out, `stale_write` for a failed expectation, and `storage_unavailable`
  * (your own error as its `cause`) for anything you throw that is not already a VaultError. Each
  * resolves an {@link Outcome} and never rejects: its answer as `val`, or every refusal -- the
- * base's own, and whatever your `do*` method throws -- as `err`, a VaultError. They also own what every adapter would otherwise write again: `subscribe` calls each listener so
- * that nothing it throws reaches your code, and its unsubscribe runs once; and `listBoxRecords`
- * lists a vault as stored, for a server to serve. Implement the `do*` methods, and hand `super()`
- * the host's {@link VaultDBOpts}; never override the public verbs, but for
- * `listBoxRecords` where your backend lists more cheaply. To refuse, throw what `Refusals` makes.
+ * base's own, and whatever your `do*` method throws -- as `err`, a VaultError. They also own what
+ * every adapter would otherwise write again: `subscribe` calls each listener so that nothing it
+ * throws reaches your code, and its unsubscribe runs once; and `listBoxRecords` lists a vault as
+ * stored, for a server to serve. Implement the `do*` methods, and hand `super()` the host's
+ * {@link VaultDBOpts}; never override the public verbs, but for `listBoxRecords` where your
+ * backend lists more cheaply. To refuse, throw what `Refusals` makes.
  * The package's `VAULTDB.md` is the whole contract, line by line, and `describeVaultDB` (from
  * `safebyok/testing`) tests it so.
  *
