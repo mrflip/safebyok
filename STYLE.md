@@ -60,7 +60,7 @@ a menu choice is a `kind` or a `flavor`.
 **`ensure` acquires or constructs, idempotently.** `ensureLease()`, `ensureVaultProps()`: have
 one, or make one, and hand it back, so a second call costs nothing. A function that only checks
 and refuses is not an `ensure`: it is a `check` (`checkBoxlabel(label)`,
-`strengthChecker.check(passphrase)`), or a `parse` when it also hands back the cleaned value
+`checkStrongEnough(passphrase)`), or a `parse` when it also hands back the cleaned value
 (*Validation*). Reviewers: an `ensure` that returns nothing is misnamed.
 
 **Stored fields are underbar_case** (`salt_bytes`, `memory_kib`): they are written to someone

@@ -139,6 +139,16 @@ vault should hold several passphrases, was settled by the Coach on 2026-10-19: o
 at most one passkey, built in `slots`, B4a of the contract sprint.) Decide before the wayin
 surface is 1.0.
 
+### A passkey made for a refused `putWayin`
+
+From the contract sprint's B4 (`put_wayin`): `vault.putWayin(passphrase, answer)` takes a passkey's
+answer made before the call, so the core holds no UI and calls no host code inside the change. A
+passphrase the vault then refuses -- a typo -- leaves that new passkey on the authenticator, a way
+into nothing, and each retry makes another. The earlier `addPasskey(passphrase, makePasskey)` asked
+the authenticator only once the proof held, at the cost of host code inside the call. Decide, once
+the control flow is mature, whether the user experience earns a check of the passphrase ahead of
+`createPasskey` (a separate call, or a maker again), or whether the README's note is enough.
+
 ### Identity should not be tied to the backing database
 
 The Coach (2026-10-16), in a note to the push_to_100_a sprint: "Identity should not be tied to the
