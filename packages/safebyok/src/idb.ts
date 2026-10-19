@@ -1,7 +1,7 @@
-import { createStore, del, delMany, entries, get, keys, promisifyRequest, clear, update, type UseStore } from 'idb-keyval'
+import { createStore, del, delMany, entries, get, keys, set, clear, type UseStore } from 'idb-keyval'
 import { DeviceMark, Lease } from './types'
 import * as Ckeys from './ckeys'
-import { keepingLocks, lockGenerationOf, lockedMeanwhile, type DeviceDB } from './device-db'
+import type { DeviceDB } from './device-db'
 import { parseDbName, type IdbOpts } from './idb-opts'
 import { VaultError } from './errors'
 import * as ChangeBell from './change-bell'
@@ -110,17 +110,8 @@ export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
       return checked.data
     },
 
-    // The mark is read and the lease written in one transaction: a lock's raise of the mark lands
-    // wholly before it or wholly after.
-    writeLease: async (lease, expected) => {
-      const written = await shelf()('readwrite', async (records) => {
-        const kept: unknown = await promisifyRequest(records.get(Ckeys.mark(lease)))
-        if (lockGenerationOf(kept) !== expected.lock_generation) { return false }
-        records.put(lease, Ckeys.lease(lease))
-        await promisifyRequest(records.transaction)
-        return true
-      })
-      if (! written) { throw lockedMeanwhile() }
+    writeLease: async (lease) => {
+      await set(Ckeys.lease(lease), lease, shelf())
       ring()
     },
 
@@ -144,7 +135,7 @@ export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
     },
 
     writeMark: async (mark) => {
-      await update(Ckeys.mark(mark), (kept: unknown) => keepingLocks(mark, kept), shelf())
+      await set(Ckeys.mark(mark), mark, shelf())
       ring()
     },
 

@@ -438,31 +438,20 @@ export const SeenVault = Z.object({
 export type SeenVault = Z.infer<typeof SeenVault>
 
 /**
- * What a device keeps of a vault's scope, locked or not, on its own storage: its `lock_generation`,
- * how many times a hard lock on this device has revoked the lease, so that an unlock under way in
- * another tab when the lock lands is granted none; and what it has `seen` of the vault
- * standing under the scope (a {@link SeenVault}), or null when it has seen none. Nothing in it is
- * secret. One per scope: a vault made anew under the scope, with another `vault_id`, is seen
- * afresh, under a new `device_id`, and the lock generation counts on. `lock()` leaves the mark,
- * raising its lock generation; `retire()` raises it too, and forgets what was seen.
+ * What a device keeps of a vault's scope, locked or not, on its own storage: what it has `seen` of
+ * the vault standing under the scope, a {@link SeenVault}. Nothing in it is secret. One per scope:
+ * a vault made anew under the scope, with another `vault_id`, is seen afresh, under a new
+ * `device_id`. `lock()` leaves the mark; `retire()` erases it.
  *
- * @example { format: 'safebyok-mark-v3', ...scope, lock_generation: 0, seen: { device_id, vault_id, unlock_epoch: 1, vault_key_epoch: 1 } }
- * @example { format: 'safebyok-mark-v3', ...scope, lock_generation: 2, seen: null }  // locked twice, the vault since retired
+ * @example { format: 'safebyok-mark-v4', ...scope, seen: { device_id, vault_id, unlock_epoch: 1, vault_key_epoch: 1 } }
  */
 export const DeviceMark = Z.object({
-  format:          Z.literal('safebyok-mark-v3'),
-  applabel:        NameFloor,
-  user_id:         NameFloor,
-  vaultlabel:      NameFloor,
-  /**
-   * How many hard locks on this device have revoked the scope's lease: 0 at first, one more at
-   * each. A soft lock's revocation (`lockSoon()`'s) leaves it be.
-   * A lease is written only while the mark stands at the generation its unlock began under; see
-   * `DeviceDB.writeLease`.
-   */
-  lock_generation: Z.int().check(Z.gte(0)),
-  /** The vault this device has seen under the scope, or null for none. */
-  seen:            Z.nullable(SeenVault),
+  format:     Z.literal('safebyok-mark-v4'),
+  applabel:   NameFloor,
+  user_id:    NameFloor,
+  vaultlabel: NameFloor,
+  /** The vault this device has seen under the scope. */
+  seen:       SeenVault,
 })
 export type DeviceMark = Z.infer<typeof DeviceMark>
 

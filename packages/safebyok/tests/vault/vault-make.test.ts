@@ -310,13 +310,12 @@ describe("hello", () => {
     expect(vault.getSnapshot().state).to.eq('absent')
   })
 
-  it("reads nothing anew after a lock, a lockSoon or a stale write caught up with", async () => {
+  it("reads nothing anew after a lock or a stale write caught up with", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.storeBox('anthropic', 'sk-fake')
     vi.spyOn(world.vaultDB, 'updateBox').mockRejectedValueOnce(new VaultError('stale_write', 'Someone else wrote first.'))
     await TH.expectRefusal(vault.storeBox('anthropic', 'sk-other'), 'stale_write')
-    await vault.lockSoon()
     await vault.lock()
     const reads = vi.spyOn(world.vaultDB, 'readVaultProps')
     await vault.hello()
@@ -361,33 +360,6 @@ describe("hello", () => {
     expect(vault.getSnapshot()).to.eq(settled)
   })
 
-  const LockThatKeptItsLeaseCases = [
-    ["lock()",                       async (vault: Vault) => { await TH.expectRefusal(vault.lock(), 'storage_unavailable') }],
-    ["lockSoon()",                   async (vault: Vault) => { await TH.expectRefusal(vault.lockSoon(), 'storage_unavailable') }],
-    ["a lock for untrusted storage", async (vault: Vault, world: ReturnType<typeof makeWorld>) => {
-      vi.spyOn(world.vaultDB, 'readBox').mockRejectedValueOnce(new VaultError('identity_revoked', 'Signed out.'))
-      await TH.expectRefusal(vault.readBox('anthropic'), 'identity_revoked')
-    }],
-  ] as const
-
-  for (const [blurb, lockIt] of LockThatKeptItsLeaseCases) {
-    it(`takes up no lease after ${blurb} could not erase it, though a failed read has it say hello afresh: a page load may, this handle never`, async () => {
-      const world = makeWorld()
-      const vault = await world.openUnlocked('pw')
-      await vault.storeBox('anthropic', 'sk-fake')
-      vi.spyOn(world.deviceDB, 'eraseLease').mockRejectedValueOnce(new Error('the device store is read-only'))
-      await lockIt(vault, world)
-      expect(vault.getSnapshot().state).to.eq('locked')
-      expect(await world.readLease()).to.not.be.null
-      vi.spyOn(world.vaultDB, 'readVaultProps').mockRejectedValueOnce(new VaultError('storage_unavailable', 'The vault storage could not be reached.'))
-      world.dbStore.write('elsewhere', '{}')
-      await TH.wakeupAtNextTick()
-      await TH.expectRefusal(vault.readBox('anthropic'), 'vault_locked')
-      expect(vault.getSnapshot()).to.deep.include({ state: 'locked', trouble: null })
-      expect(await world.stateOnOpen()).to.eq('unlocked')
-    })
-  }
-
   it("lets lock() win at once, waiting for no hello: storage unreachable, and the lease being read is not taken up", async () => {
     const world = makeWorld()
     await seedVault(world)
@@ -399,19 +371,6 @@ describe("hello", () => {
     await vault.hello()
     expect(vault.getSnapshot().state).to.eq('locked')
     expect(await world.readLease()).to.be.null
-  })
-
-  it("lets lockSoon() win likewise over a lease being read: no new secrets from this instant", async () => {
-    const world = makeWorld()
-    await seedVault(world)
-    const gate = TH.holdNextCall(world.deviceDB, 'readLease')
-    const vault = Vault.make(world.optsWith())
-    await gate.reached
-    await vault.lockSoon()
-    gate.release()
-    await vault.hello()
-    expect(vault.getSnapshot().state).to.eq('locked')
-    await TH.expectRefusal(vault.readBox('anthropic'), 'vault_locked')
   })
 
   it("lets lock() and close() go while storage has not answered at all", async () => {
@@ -525,25 +484,16 @@ describe("the host's clock", () => {
     expect(world.dbStore.ckeys()).to.have.lengthOf(0)
   })
 
-  it("still locks when the clock has gone wrong: lock(), and lockSoon() at once, without a grace", async () => {
+  it("still locks when the clock has gone wrong", async () => {
     const world = makeWorld()
     let reading = world.clock.now()
     const vault = await world.openUnlocked('pw', { clock: { now: () => reading } })
-    reading = NaN
-    await vault.lockSoon(5)
-    expect(world.logged).to.have.lengthOf(1)
-    expect(world.logged[0]?.level).to.eq('warn')
-    expect(world.logged[0]?.message).to.match(/locked at once/)
-    expect(world.logged[0]?.message).to.not.include('NaN')
-    expect(vault.getSnapshot().state).to.eq('locked')
-    expect(await world.readLease()).to.be.null
-    reading = world.clock.now()
-    await TH.expectRefusal(vault.readBox('anthropic'), 'vault_locked')
-    await vault.unlock('pw')
     reading = 0
     await vault.lock()
     expect(vault.getSnapshot().state).to.eq('locked')
     expect(await world.readLease()).to.be.null
+    reading = world.clock.now()
+    await TH.expectRefusal(vault.readBox('anthropic'), 'vault_locked')
   })
 
   it("fails closed: a reading gone wrong while unlocked drops the vaultKey before it refuses the clock", async () => {

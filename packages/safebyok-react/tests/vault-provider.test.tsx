@@ -749,26 +749,28 @@ describe("VaultProvider", () => {
 
   it("passes the logger through: what the vault has nobody to throw to reaches it", async () => {
     const spy = TH.spyLogger()
-    let reading = Date.UTC(2026, 9, 15)
-    const clock = { now: () => reading }
+    const store = memoryStore()
+    const vaultDB = localVaultDB({ store })
     const { Grab, opened } = grabber()
     render(
-      <VaultProvider {...makeWorld().props} userId="u1" clock={clock} logger={spy.logger}>
+      <VaultProvider {...makeWorld().props} vaultDB={vaultDB} userId="u1" logger={spy.logger}>
         <Grab />
       </VaultProvider>,
     )
     const vault = await opened()
     await vault.unlock('correct horse battery staple')
-    reading = NaN
-    await vault.lockSoon()
-    expect(spy.calls.map((heard) => heard.level)).to.deep.equal(['warn'])
-    expect(spy.calls[0]?.story).to.deep.equal({ call: 'lockSoon' })
+    // A change pushed from storage that the vault cannot read: its background refresh warns.
+    vi.spyOn(vaultDB, 'readVaultProps').mockRejectedValueOnce(new VaultError('storage_unavailable', 'The vault storage could not be reached.'))
+    store.write('elsewhere', '{}')
+    await waitFor(() => { expect(spy.calls.map((heard) => heard.level)).to.deep.equal(['warn']) })
+    expect(spy.calls[0]?.story).to.deep.equal({ call: 'refresh' })
   })
 
   it("uses the logger its vaultDB was made with when given none: the provider's warnings and its vault's reach the one logger", async () => {
     const spy = TH.spyLogger()
-    const vaultDB = localVaultDB({ store: memoryStore(), logger: spy.logger })
-    let reading = Date.UTC(2026, 9, 15)
+    const store = memoryStore()
+    const vaultDB = localVaultDB({ store, logger: spy.logger })
+    const reading = Date.UTC(2026, 9, 15)
     const { Grab, opened } = grabber()
     const providing = (clock: { now: () => number }) => (
       <VaultProvider {...makeWorld().props} vaultDB={vaultDB} userId="u1" clock={clock}>
@@ -781,9 +783,10 @@ describe("VaultProvider", () => {
     await waitFor(() => { expect(spy.calls.map((heard) => heard.story?.['call'])).to.include('VaultProvider') })
     const vault = await opened()
     await vault.unlock('correct horse battery staple')
-    reading = NaN
-    await vault.lockSoon()
-    expect(spy.calls.map((heard) => [heard.level, heard.story?.['call']])).to.deep.equal([['warn', 'VaultProvider'], ['warn', 'lockSoon']])
+    vi.spyOn(vaultDB, 'readVaultProps').mockRejectedValueOnce(new VaultError('storage_unavailable', 'The vault storage could not be reached.'))
+    store.write('elsewhere', '{}')
+    await waitFor(() => { expect(spy.calls).to.have.lengthOf(2) })
+    expect(spy.calls.map((heard) => [heard.level, heard.story?.['call']])).to.deep.equal([['warn', 'VaultProvider'], ['warn', 'refresh']])
   })
 
   it("passes allowStartOver to the dialog: a user who forgot the passphrase may start a new vault", async () => {

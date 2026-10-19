@@ -1,13 +1,5 @@
 import { DeviceMark, Lease, type VaultScope } from './types'
 import * as Ckeys from './ckeys'
-import { VaultError } from './errors'
-
-/**
- * What a lease's write expects of the device: that no hard lock has revoked the vault's lease
- * since the unlock granting it began, its device mark still at the `lock_generation` it read then
- * (0 for a scope with no mark).
- */
-export type LeaseExpectation = { lock_generation: number }
 
 /**
  * Device-local storage for what a device keeps of each vault: its lease, what lets "enter your
@@ -27,27 +19,16 @@ export type LeaseExpectation = { lock_generation: number }
 export interface DeviceDB {
   /** The lease for one vault, or null when there is none. Expiry is the vault's call. */
   readLease(scope: VaultScope): Promise<Lease | null>
-  /**
-   * Keep `lease` as the lease of its vault, in place of any before, only while the device mark of
-   * its scope stands at `expected.lock_generation` (a scope with no mark, or one that does not
-   * read, stands at 0); otherwise write nothing and refuse with kind 'stale_write'.
-   * The compare and the write are one step, as a VaultDB's are: an IndexedDB adapter makes them
-   * in one transaction. This is how a lock in one tab stops an unlock under way in another.
-   */
-  writeLease(lease: Lease, expected: LeaseExpectation): Promise<void>
+  /** Keep `lease` as the lease of its vault, in place of any before. */
+  writeLease(lease: Lease): Promise<void>
   eraseLease(scope: VaultScope): Promise<void>
   /** This device's mark for one vault, or null when there is none. What it says is the vault's to judge. */
   readMark(scope: VaultScope): Promise<DeviceMark | null>
-  /**
-   * Keep `mark` as this device's mark for its vault, in place of any it kept before -- but never
-   * at a lower `lock_generation` than the mark it replaces: the higher of the two is kept, in the
-   * same step as the write, so a mark written from an older read never undoes a lock.
-   */
+  /** Keep `mark` as this device's mark for its vault, in place of any it kept before. */
   writeMark(mark: DeviceMark): Promise<void>
   /**
-   * Forget this device's mark for one vault, its lock generation with it. The vault never calls
-   * this on its own (`retire()` writes a mark with nothing `seen`, keeping the generation): it is
-   * for a host accepting storage restored on purpose, and for `retireDamagedVault`.
+   * Forget this device's mark for one vault: `retire()` calls it, and so does a host accepting
+   * storage restored on purpose, and `retireDamagedVault`.
    */
   eraseMark(scope: VaultScope): Promise<void>
   /** Remove every lease and device mark on this device: the device's part of a full reset. */
@@ -82,10 +63,7 @@ export const memoryDeviceDB = (): DeviceDB => {
       return Promise.resolve(checked.data)
     },
 
-    writeLease: (lease, expected) => {
-      if (lockGenerationOf(marks.get(Ckeys.mark(lease))) !== expected.lock_generation) {
-        return Promise.reject(lockedMeanwhile())
-      }
+    writeLease: (lease) => {
       leases.set(Ckeys.lease(lease), lease)
       return Promise.resolve()
     },
@@ -108,8 +86,7 @@ export const memoryDeviceDB = (): DeviceDB => {
     },
 
     writeMark: (mark) => {
-      const ckey = Ckeys.mark(mark)
-      marks.set(ckey, keepingLocks(mark, marks.get(ckey)))
+      marks.set(Ckeys.mark(mark), mark)
       return Promise.resolve()
     },
 
@@ -125,20 +102,3 @@ export const memoryDeviceDB = (): DeviceDB => {
     },
   }
 }
-
-/**
- * The lock generation `kept`, a stored mark, stands at: its own when it reads as a mark, and 0
- * when there is none, or it does not read.
- */
-export const lockGenerationOf = (kept: unknown): number => {
-  const checked = DeviceMark.safeParse(kept)
-  return checked.success ? checked.data.lock_generation : 0
-}
-
-/** `mark`, to be written over `kept`, at the higher of the two lock generations. */
-export const keepingLocks = (mark: DeviceMark, kept: unknown): DeviceMark => (
-  { ...mark, lock_generation: Math.max(mark.lock_generation, lockGenerationOf(kept)) }
-)
-
-/** A lease's write refused, a hard lock having revoked the vault's lease since the unlock granting it began. */
-export const lockedMeanwhile = () => new VaultError('stale_write', "A lock on this device revoked the vault's lease while this unlock was under way, so no lease was granted: the lock wins.")

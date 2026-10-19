@@ -161,11 +161,5 @@ export const makeRacingWorld = (defaults?: Partial<MakeVaultOpts>) => {
   return { ...world, holdNextLook, holdNextDerive, holdNextLease, holdNextBoxRead }
 }
 
-/** The lock generation of this world's device mark for `u1`'s vault; undefined with no mark. */
-export const generationOf = async (world: ReturnType<typeof makeWorld>) => {
-  const mark = await world.deviceDB.readMark(TH.scopeOf('u1'))
-  return mark?.lock_generation
-}
-
 /** The stored vault props' ways in, as the backend holds them. */
 export const storedWayinsOf = (world: ReturnType<typeof makeWorld>) => storedVaultPropsOf(world)['wayins'] as Record<string, unknown>[]
