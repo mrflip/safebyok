@@ -34,6 +34,51 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-19 (thread a_fixes): **one shared check for a refusal from another copy of safebyok.**
+  `isVaultError(err, refusalkind?)` (`packages/safebyok/src/errors.ts`) is now the one test for a
+  refusal, and it recognizes a `VaultError` made by another copy of safebyok loaded beside this one
+  (an ESM and a CJS build side by side, each with its own `VaultError` class). Every `VaultError`'s
+  constructor sets a non-enumerable, non-writable own property keyed by
+  `Symbol.for('safebyok.VaultError')` (the "mark"). `isVaultError` is true for an `instanceof` this
+  copy's `VaultError`, or for an object that is `instanceof Error`, carries the mark as an own
+  property, and has a `refusalkind` this copy knows (a key of `RefusalFamilyForKind`). Every site
+  that branches on a refusal now uses it instead of `instanceof`: `outcomeOf` (`src/outcome.ts`,
+  which used to test `name === 'VaultError'` plus a known `refusalkind`), the `VaultDB` base's
+  `asStorageTrouble` (`src/vault-db.ts`: a foreign `VaultError` thrown by an adapter's `do*` hook was
+  wrapped as `storage_unavailable`, so a foreign `identity_revoked` did not lock), the vault's
+  bad-news hearing (`#hearBadNews`), `RefusalPolicy.decide` (`identity_revoked` and `rolled_back`
+  lock), `isCondition`, and `safebyok-graphql`'s resolvers (`vaultDBOf` passing a host's refusal
+  through, and `crossing`). So a foreign refusal is kept, told to `onBadNews`, and locks the vault,
+  as this copy's own does. Why a mark and not duck typing on `name` and `refusalkind`: a
+  symbol-keyed property survives no JSON, structured clone or postMessage, so an error rebuilt from
+  what a server or storage sent (a GraphQL or fetch client turning a response into an `Error` named
+  `VaultError` with `refusalkind` `identity_revoked`) never carries it. Under the old name-and-kind
+  test, such a remote error was kept "as it came", so a backend could choose the refusal's kind
+  (lock the vault, raise bad news) and the message the app shows the user. Now it is wrapped as
+  `storage_unavailable`, safebyok's own message, the error as its `cause`. A plain object (not an
+  `Error`) never passes, even carrying the mark. The mark is not a defence against code running in
+  the page, which could construct a `VaultError` directly anyway; it marks "made by a `VaultError`
+  constructor in this process", which is what `instanceof` meant, across copies. Tests:
+  `packages/safebyok/tests/errors.test.ts` ("isVaultError, for a VaultError of another copy of
+  safebyok": a real fresh copy of the module via `vi.resetModules`, the hand-made one tests use, and
+  impostors: a lookalike `Error`, JSON, `structuredClone`, plain objects with and without the mark,
+  an unknown kind), `outcome.test.ts`, `refusal-policy.test.ts`, `vault-db.test.ts`,
+  `tests/vault/vault-storage.test.ts` (a foreign `identity_revoked` locks and is told; a lookalike
+  thrown by an adapter is `storage_unavailable`, locks nothing, tells nothing), and
+  `safebyok-graphql/tests/vault-resolvers.test.ts`.
+  2026-10-19 (thread a_fixes): **a call that cannot land never prompts.** On a locked vault,
+  `getBox`, `getWhisper`, `useBox` and `delBox` (`packages/safebyok/src/vault.ts`, `#openBox`,
+  `#tryDelBox`, `#checkListed`, and a `beforeAsking` callback on `#ensureLease`) now refuse
+  `bad_label` (the name's floor, and the vault's own `boxlabel` check when nothing is listed under
+  it) and `absent_box` from the box listing in hand, after the hello and before `getProof` is asked;
+  `putBox` already checked label, sidecar and whisper first. The check runs only when the vault must
+  ask; an unlocked vault reads storage for the box as before. The listing (boxlabels, visible
+  metadata) is already shown while locked, so refusing `absent_box` without a prompt discloses
+  nothing new; the listing may be up to `staleMinutes` old, so a box just made on another device can
+  read `absent_box` on a locked vault rather than prompt, and reads normally once the listing
+  catches up or after an unlock -- no weakening, since the box is still read and checked from
+  storage once unlocked. Tests: `tests/vault/vault-lease.test.ts`, "every data call, through
+  `ensureLease`".
 * 2026-10-19 (thread B3 rework, box holder): **a box takes the vault props it lies under explicitly,
   as `holder`, and no longer reads `vault_id` and the vaultKey epoch off the vault's published
   snapshot; sealing is split so a store too large is refused before any key is made.** This replaces
@@ -418,7 +463,7 @@ added or folded into through the subagent, and no other entry changes.
   the host's clock once, to check it); it no longer starts `hello()` itself. The first `hello()` --
   the host's, or the one any call but `lock()` and `close()` starts -- reads storage, starts the
   storage watch and settles. `hello({ staleMinutes })` (default from `Vault.make`'s `staleMinutes`,
-  1 minute; `Infinity` accepted) reads nothing when the last successful storage read began within
+  5 minutes; `Infinity` accepted) reads nothing when the last successful storage read began within
   that many minutes by the vault's clock, and only re-settles the picture (a lease past its deadline
   shows locked); it always reads afresh after a failed read, after untrusted storage
   (`identity_revoked`, `rolled_back`, `newer_format`) or after `del()`. Data calls keep their own
@@ -432,7 +477,7 @@ added or folded into through the subagent, and no other entry changes.
   Amended 2026-10-19 (20261019-fields_and_make, PR #197; amending point 1): **a `lock()` landing
   while a `hello()` takes up this device's lease is no longer undone.** A take-up (`#fetchLease`)
   reads the lease record, checks it fits, unwraps the vaultKey under the leaseKey, then installs the
-  key and deadline; as the default one-minute `staleMinutes` makes a routine `hello()` re-run it, a
+  key and deadline; as the default five-minute `staleMinutes` makes a routine `hello()` re-run it, a
   `lock()` between the read and the install could be reversed (unlocked in memory, lease deleted),
   and an older lease could overwrite a fresher `unlock()`. Each take-up now holds an
   `AbortController`; whatever drops or replaces the key (`#dropKey`, called by lock, close, del, the
@@ -811,7 +856,7 @@ added or folded into through the subagent, and no other entry changes.
   `cause`, so an app must not throw secret material from a body it wraps. `VaultError` gains
   `family` (`misuse`, `condition`, `bad_news`), read from `refusalkind` through one table and never
   set by a caller; `bad_news` (`damaged_vault`, `damaged_wayin`, `damaged_box`, `newer_format`,
-  `rolled_back`, `identity_revoked`) was `condition`, and `isVaultCondition` is true for both. It
+  `rolled_back`, `identity_revoked`) was `condition`, and `isCondition` is true for both. It
   also gains `meta?` (`box_stored`, `vault_props_stored`, `capacity`): stored records as storage
   holds them (ciphertext and visible fields) and counts only, never secret material; no refusal
   fills it yet (a later thread, C1, will fill `box_stored` on `stale_write`). The vault still locks
@@ -831,11 +876,8 @@ added or folded into through the subagent, and no other entry changes.
   `unexpected_error` (not retryable). A `do*` hook that returns an `Outcome`-shaped value (a wrapper
   `VaultDB` that forgot to unwrap another's answer, `valOf`) is refused as `bad_option`; before, a
   wrapped refusal from `doPutVaultProps` or `doDelVault` was a truthy object and read as "landed".
-  `outcomeOf`, so every vault and `VaultDB` boundary, now keeps as it is an error from another copy
-  of safebyok loaded beside this one (ESM and CJS builds): any `Error` whose `name` is `VaultError`
-  and whose `refusalkind` is a known kind. That object passes as a refusal without being an
-  `instanceof` this copy's `VaultError`, so code past the boundary that uses `instanceof` or
-  `isVaultError` (for instance `RefusalPolicy`'s lock on `identity_revoked`) does not recognize it.
+  `outcomeOf` kept a `VaultError` of another copy of safebyok as it came; how a foreign
+  `VaultError` is now told, and where, is in the 2026-10-19 (thread a_fixes) entry.
 * 2026-10-15: `localVaultDB` and `idbVaultDB` key rows by `applabel:user_id:vaultlabel`, and
   `user_id` may hold a colon, so one user's rows can share another scope's ckey prefix. Listing
   and deleting a vault now take only ckeys whose remainder after the prefix is a bare boxlabel
