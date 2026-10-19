@@ -1176,7 +1176,7 @@ export class Vault {
   }
   // --
 
-  // == [Reading storage]: refresh, readStorage, takeStorage, readAt, hello, helloWithin, greet, watchStorage
+  // == [Reading storage]: refresh, readStorage, takeStorage, heedRevocation, readAt, hello, helloWithin, greet, watchStorage
 
   /**
    * Bring the snapshot up to what storage holds now, one read at a time: a refresh asked for while
@@ -1211,40 +1211,54 @@ export class Vault {
     const read = await damagedAs(this.#vaultDB.getVaultProps(this.#scope), damagedVaultProps)
     const fresh = read === null ? null : frozenVaultProps(read)
     const mark = fresh === null ? null : await this.#heedMark(fresh, { seenBefore, call: 'refresh' })
-    const held = this.#vaultProps
-    // A change to the wayins (new epoch) or a deletion or remaking, here or elsewhere, ends this
-    // device's unlock, and wins by construction: the vault props it brings are taken up at once,
-    // with the key dropped and any take-up stood down, before any further wait. A take-up or an
-    // unlock finishing during one asks whether its vault props were outrun, and finds these. The
-    // lease, outdated by the same change, is discarded when a key was held.
-    if (held !== UnreadVaultProps && held !== null && (fresh?.unlock_epoch !== held.unlock_epoch || fresh.vault_id !== held.vault_id)) {
-      const wasUnlocked = this.#vaultKey !== null
-      this.#vaultProps = fresh
-      this.#deviceMark = mark
-      // Never another vault's boxes beside these vault props, should the listing below fail.
-      if (fresh?.vault_id !== held.vault_id) { this.#boxes = [] }
-      this.#dropKey()
-      if (wasUnlocked) { valOf(await this.#deviceDB.delLease(this.#scope)) }
-    }
+    await this.#heedRevocation(fresh, mark)
     const listed = fresh === null ? [] : await this.#vaultDB.listBoxes(this.#scope)
     // Taken up together once all is read, so a read that fails partway leaves the snapshot's
     // vault, mark and boxes as they stood (but for a revocation, taken up above): never a vault
-    // beside another's boxes.
-    this.#vaultProps = fresh
-    this.#deviceMark = mark
+    // beside another's boxes. Vault props newer than these, which this device's own write put in
+    // hand while they were read, stand.
+    const inHand = this.#vaultProps
+    const standing = inHand !== UnreadVaultProps && isNewerCopy(inHand, fresh) ? inHand : fresh
+    if (standing === fresh) {
+      this.#vaultProps = fresh
+      this.#deviceMark = mark
+    }
     const shown = this.#boxes
     const shownWayins = this.#snapshot.props === null ? NoWayins : this.#wayinsOf(this.#snapshot.props)
     // A box under a vaultKey the vault does not hold lists as damaged from its epoch alone.
-    this.#boxes = fresh === null ? [] : listed.map((box) => heldListing(isUnderHeldKey(box, fresh) ? box : asDamaged(box)))
+    this.#boxes = standing === null ? [] : listed.map((box) => heldListing(isUnderHeldKey(box, standing) ? box : asDamaged(box)))
     this.#syncing = true
     this.#readAt = readAt
     // A read with no damaged box or way in clears the trouble: nothing amiss stands. The listing is
     // published before its news is told, so a handler reading the vault sees what it lists.
-    const damagedWayins = fresh === null ? [] : this.#wayinsOf(fresh).filter((wayin) => wayin.isDamaged())
+    const damagedWayins = standing === null ? [] : this.#wayinsOf(standing).filter((wayin) => wayin.isDamaged())
     if (this.#boxes.every((box) => ! box.damaged) && damagedWayins.length === 0) { this.#trouble = null }
     this.#settle()
     this.#tellListingNews(shown)
     this.#tellWayinNews(damagedWayins, shownWayins)
+  }
+
+  /**
+   * Take up `fresh`, vault props just read, at once when they revoke the ones in hand: a change to
+   * the wayins (new epoch) or a deletion or remaking, here or elsewhere, ends this device's unlock,
+   * and wins by construction. They are taken up with `mark` before any further wait, with the key
+   * dropped, any take-up and any first unlock's make stood down. A take-up or an unlock finishing
+   * during the read asks whether its vault props were outrun, and finds these. The lease, outdated
+   * by the same change, is discarded when a key was held. An older copy of the vault in hand is no
+   * change: see isNewerCopy.
+   */
+  async #heedRevocation(fresh: VaultProps | null, mark: DeviceMark | null) {
+    const held = this.#vaultProps
+    if (held === UnreadVaultProps || held === null || isNewerCopy(held, fresh)) { return }
+    if (fresh?.unlock_epoch === held.unlock_epoch && fresh.vault_id === held.vault_id) { return }
+    const wasUnlocked = this.#vaultKey !== null
+    this.#vaultProps = fresh
+    this.#deviceMark = mark
+    // Never another vault's boxes beside these vault props, should the listing that follows fail.
+    if (fresh?.vault_id !== held.vault_id) { this.#boxes = [] }
+    this.#dropKey()
+    this.#standDownMakes()
+    if (wasUnlocked) { valOf(await this.#deviceDB.delLease(this.#scope)) }
   }
 
   // When the last read of storage to succeed began, by the vault's clock: what a hello's
@@ -1524,7 +1538,7 @@ export class Vault {
   }
   // --
 
-  // == [Unlock and ways in]: unwrapWith, draftVaultProps, settleUnlock, reviseWayins, sealFor, others
+  // == [Unlock and ways in]: unwrapWith, draftVaultProps, settleUnlock, standDownMakes, reviseWayins, sealFor, others
 
   /**
    * The vaultKey out of whichever of `standing`'s ways in `proof` opens, or the one `wayinId`
@@ -1578,11 +1592,14 @@ export class Vault {
       this.#drafted = { vault_id: draft.vault_id, device_id: deviceId }
       // Another device's vault, if one was made meanwhile, is held to the mark as it was before it.
       const seenBefore = this.#checkedMark(valOf(await this.#deviceDB.getMark(this.#scope)))
+      const revoked = this.#makesStandDown.signal
       const settled = frozenVaultProps(await damagedAs(this.#vaultDB.ensureVaultProps(draft), damagedVaultProps))
       const mark = await this.#heedMark(settled, { seenBefore, call: 'unlock' })
       // Vault props a read took up meanwhile are not put back: should they differ, the grant that
-      // follows finds these outrun, and takes nothing up.
-      if (this.#vaultProps === null || this.#vaultProps === UnreadVaultProps) {
+      // follows finds these outrun, and takes nothing up. Nor are these put back once a read has
+      // found vault props deleted or replaced while they were written: no vault in hand then may
+      // be these, deleted, and the grant finds them outrun too.
+      if (! revoked.aborted && (this.#vaultProps === null || this.#vaultProps === UnreadVaultProps)) {
         this.#vaultProps = settled
         this.#deviceMark = mark
       }
@@ -1598,6 +1615,18 @@ export class Vault {
     }
     const standing = this.#vaultProps
     return { standing, ...await this.#unwrapWith(standing, proof, wayinId) }
+  }
+
+  // Aborted, and made anew, at each revocation a read takes up (see takeStorage): a first unlock's
+  // make holds the signal standing as it writes its vault props, and once that is aborted, it puts
+  // none back, as "no vault in hand" may then be its own vault, deleted elsewhere. One signal
+  // serves every make under way, however many.
+  #makesStandDown = new AbortController()
+
+  /** Have every first unlock's make under way stand down: a read has found vault props deleted or replaced. */
+  #standDownMakes() {
+    this.#makesStandDown.abort()
+    this.#makesStandDown = new AbortController()
   }
 
   /**
@@ -2352,7 +2381,7 @@ const declinedError = (asked: boolean) => new VaultError('vault_locked', asked
 const closedError = () => new VaultError('vault_closed', 'This vault handle was closed: make another with Vault.make.')
 // --
 
-// == [Vocabulary]: frozenVaultProps, isUnderHeldKey, asDamaged, MarkFormat, VaultCall, UntrustedStorageKinds
+// == [Vocabulary]: frozenVaultProps, isUnderHeldKey, isNewerCopy, asDamaged, MarkFormat, VaultCall, UntrustedStorageKinds
 
 /**
  * A copy of `props`, frozen through its ways in: what the vault holds as its vault props, so the
@@ -2370,6 +2399,17 @@ const frozenVaultProps = (props: VaultProps): VaultProps => {
  */
 const isUnderHeldKey = (box: BoxSummary | DamagedBox, standing: VaultProps): boolean => (
   box.damaged || box.vault_key_epoch === standing.vault_key_epoch
+)
+
+/**
+ * True when `inHand` is the vault `fresh` is, at a later `unlock_epoch` or `vault_key_epoch`:
+ * `fresh` was read before a write of this device's own landed, and is an older copy. Storage
+ * never takes a vault's epochs back (the device mark refuses a store that does, as
+ * 'rolled_back'), so such a read stands for nothing, and never replaces what is in hand.
+ */
+const isNewerCopy = (inHand: VaultProps | null, fresh: VaultProps | null): boolean => (
+  fresh !== null && inHand !== null && inHand.vault_id === fresh.vault_id
+  && (fresh.unlock_epoch < inHand.unlock_epoch || fresh.vault_key_epoch < inHand.vault_key_epoch)
 )
 
 /** `box`, a box listed sound, as damaged: under its boxlabel and revision, nothing else of it trusted. */

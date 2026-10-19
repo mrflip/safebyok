@@ -330,6 +330,78 @@ describe("a vault that moves elsewhere while an unlock is under way", () => {
   })
 })
 
+/**
+ * A world whose first unlock's make, once begun, is held as it notes the vault it wrote in this
+ * device's mark: storage holds that vault, and the unlock has yet to take it up. Its vault hears no
+ * change bells, so only the test's own hellos read; `there` is another device.
+ */
+const makingWorld = async () => {
+  const world = makeWorld()
+  const vault = await world.open({ vaultDB: world.deafVaultDB() })
+  const there = await world.open({ deviceDB: memoryDeviceDB() })
+  const noting = TH.holdNextCall(world.deviceDB, 'putMark')
+  return { world, vault, there, noting }
+}
+
+describe("a first unlock's make, and a read that finds the vault gone while it is under way", () => {
+  it("deleted elsewhere once a read took it up: the make stands down, nothing unlocked and no lease left, the vault absent", async () => {
+    const { world, vault, there, noting } = await makingWorld()
+    const unlocking = TH.expectRefusal(vault.unlock('pw'), 'vault_locked')
+    await noting.reached
+    await vault.hello({ staleMinutes: 0 })
+    expect(vault.vault_id).to.not.be.null
+    await there.del()
+    await vault.hello({ staleMinutes: 0 })
+    expect(vault.state).to.eq('absent')
+    noting.release()
+    await unlocking
+    expect(vault.state).to.eq('absent')
+    expect(vault.vault_id).to.be.null
+    expect(await world.getLease()).to.be.null
+    // The next unlock makes the vault anew.
+    await vault.unlock('pw')
+    expect(vault.state).to.eq('unlocked')
+  })
+
+  it("taken up by a read meanwhile, and still standing: the make is not stood down, and unlocks", async () => {
+    const { world, vault, noting } = await makingWorld()
+    const unlocking = vault.unlock('pw')
+    await noting.reached
+    await vault.hello({ staleMinutes: 0 })
+    noting.release()
+    await unlocking
+    expect(vault.state).to.eq('unlocked')
+    expect(await world.getLease()).to.not.be.null
+  })
+})
+
+describe("a read that began before this device's own change to the ways in landed", () => {
+  it("never puts the older vault props it read back over the change's: the vault stays unlocked under the new ways in", async () => {
+    const world = makeWorld()
+    const deaf = world.deafVaultDB()
+    const vault = await world.openUnlocked('pw', { vaultDB: deaf })
+    let listing: ReturnType<typeof TH.makeGate> | undefined
+    let reading: Promise<Vault> | undefined
+    // The read starts as the change is about to write, and is held at its listing, the vault props
+    // it read the older copy, while the change lands.
+    TH.beforeNextCall(deaf, 'putVaultProps', async () => {
+      listing = TH.holdNextCall(deaf, 'listBoxes')
+      reading = vault.hello({ staleMinutes: 0 })
+      await listing.reached
+    })
+    await vault.addPassphrase('pw', 'spare phrase', { wayinlabel: 'spare' })
+    expect(vault.unlock_epoch).to.eq(2)
+    listing?.release()
+    await reading
+    expect(vault.unlock_epoch).to.eq(2)
+    expect(vault.wayins.map((wayin) => wayin.wayinlabel)).to.include('spare')
+    expect(vault.state).to.eq('unlocked')
+    await vault.hello({ staleMinutes: 0 })
+    expect(vault.state).to.eq('unlocked')
+    expect(await world.getLease()).to.not.be.null
+  })
+})
+
 describe("a lock in another handle on this device", () => {
   it("leaves an unlock begun after it alone", async () => {
     const world = makeRacingWorld()

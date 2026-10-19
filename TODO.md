@@ -202,6 +202,17 @@ new record, so the next open asks for the passphrase. The direction is safe, and
 refreshes does not cure it. The Coach (2026-10-16): into the TODO, beside the multiple-passphrases
 question. The fix, small: do not judge `outlived` against vault props this handle wrote itself.
 
+### Cross-device invalidation, by a token each device authenticates
+
+From the contract sprint's `a_sec2` ([#203](https://github.com/mrflip/safebyok/pull/203)'s second
+review): a device learns that another deleted the vault, or changed its ways in, only when it next
+reads, so until then it may stay unlocked on vault props that no longer stand (it fails safe at
+that read: the key is dropped and the lease erased). `a_sec2` closed the one window where that
+could outlast a read, a first unlock creating the vault as it is deleted. The Coach (2026-10-19):
+"cross device invalidation should be done by a proper mechanism that is coming, where each device
+authenticates a token when it joins or creates a vault." Not to be built piecemeal ahead of it: the
+design question is the token, what storage checks it against, and how a deletion revokes it.
+
 ### A "newer, don't touch" state for boxes
 
 From [#163](https://github.com/mrflip/safebyok/pull/163) (thread 5 and its review): a box has
