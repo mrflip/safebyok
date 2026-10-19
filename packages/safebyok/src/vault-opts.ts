@@ -159,7 +159,7 @@ const makeVaultOptsShape = Z.strictObject({
   leaseHours:             anyOpt,
   staleMinutes:           anyOpt,
   onBadNews:              anyOpt,
-  clock:                anyOpt,
+  clock:                  anyOpt,
   maxWhisperBytes:        anyOpt,
   maxBoxes:               anyOpt,
   logger:                 anyOpt,
