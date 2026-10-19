@@ -185,7 +185,7 @@ export const passkeyOf = async (tag: string, prfSaltB64?: string): Promise<Passk
  * @example vaultPropsOf('u1', { wayins: [wayinOf('passphrase'), wayinOf('home_phrase')] })
  */
 export const vaultPropsOf = (userId: string, overrides: Partial<VaultProps> = {}): VaultProps => ({
-  format:              'safebyok-vault-v3',
+  format:              'safebyok-vault-v4',
   ...scopeOf(userId),
   vault_id:            `vault-id-${userId}`,
   unlock_epoch:        1,
@@ -196,19 +196,20 @@ export const vaultPropsOf = (userId: string, overrides: Partial<VaultProps> = {}
 })
 
 /**
- * {@link vaultPropsOf}'s vault once its vaultKey has been replaced: at unlock epoch 2 and vaultKey
- * epoch 2, its one way in sealed around the new vaultKey, and the first vaultKey kept, fake, as
- * its `prior_vault_key`. What a lockbox write sealed under the first vaultKey meets once the
- * vaultKey has moved on.
+ * {@link vaultPropsOf}'s vault at a vaultKey epoch other than 1, at unlock epoch 2, its one way in
+ * sealed at that epoch: what a lockbox write sealed under epoch 1 meets when the vault props stand
+ * for another. No vault safebyok makes stands at any epoch but 1; storage may still hand one back.
  *
- * @example await vaultDB.updateVaultProps(TH.rotatedVaultPropsOf('u1'), { vault_id: 'vault-id-u1', unlock_epoch: 1 })
+ * @example await vaultDB.updateVaultProps(TH.vaultPropsAtEpochOf('u1', 2), { vault_id: 'vault-id-u1', unlock_epoch: 1 })
  */
-export const rotatedVaultPropsOf = (userId: string): VaultProps => vaultPropsOf(userId, {
-  unlock_epoch:    2,
-  vault_key_epoch: 2,
-  prior_vault_key: { vault_key_epoch: 1, vault_key_wrapped: fakeCiphered(`prior-${userId}`) },
-  wayins:          [wayinOf('passphrase', { vault_key_epoch: 2, vault_key_wayin_wrapped: fakeCiphered(`rotated-${userId}`) })],
-})
+export const vaultPropsAtEpochOf = (userId: string, vaultKeyEpoch: number): VaultProps => {
+  const wrapped = fakeCiphered(`epoch-${String(vaultKeyEpoch)}-${userId}`)
+  return vaultPropsOf(userId, {
+    unlock_epoch:    2,
+    vault_key_epoch: vaultKeyEpoch,
+    wayins:          [wayinOf('passphrase', { vault_key_epoch: vaultKeyEpoch, vault_key_wayin_wrapped: wrapped })],
+  })
+}
 
 /**
  * A shape-valid Lockbox for storage-layer tests, its ciphered fields fake: revision `rev-<tag>`,

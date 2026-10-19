@@ -193,7 +193,7 @@ describe("a record the deployment refused", () => {
   // Distinctive values throughout, so that finding one in what is thrown means it was quoted.
   const subject = 'user_quotable'
   const scope = { applabel: 'quotable_app', user_id: subject, vaultlabel: 'quotable_vault' }
-  const quotableKey = { vault_key_epoch: 52_874, prior_vault_key: { vault_key_epoch: 52_873, vault_key_wrapped: TH.fakeCiphered('prior_quotable') } }
+  const quotableKey = { vault_key_epoch: 52_874 }
   const quotableWayins = [TH.wayinOf('quotable_phrase', { vault_key_epoch: 52_874, device_id: 'device_quotable', registered_at: Date.UTC(2026, 8, 17) })]
   const standing = TH.vaultPropsOf(subject, { ...scope, ...quotableKey, unlock_epoch: 52_871, wayins: quotableWayins })
   const nextVaultProps = { ...standing, unlock_epoch: 52_872, vault_key_passphrase_wrapped: TH.fakeCiphered('rewrapped_quotable') }
@@ -205,7 +205,7 @@ describe("a record the deployment refused", () => {
   // with it -- the format literals, the test deriver's label, the fake salt -- is public and the
   // same in every record, so finding it in a refusal is no leak; only what varies per record counts.
   const rivalScope = { applabel: 'rival_app', user_id: 'user_rival', vaultlabel: 'rival_vault' }
-  const rivalVaultProps = TH.vaultPropsOf('user_rival', { ...rivalScope, vault_key_epoch: 11, prior_vault_key: { vault_key_epoch: 10, vault_key_wrapped: TH.fakeCiphered('prior_rival') }, unlock_epoch: 7, wayins: [TH.wayinOf('rival_phrase', { vault_key_epoch: 11, device_id: 'device_rival', registered_at: Date.UTC(2026, 0, 2) })] })
+  const rivalVaultProps = TH.vaultPropsOf('user_rival', { ...rivalScope, vault_key_epoch: 11, unlock_epoch: 7, wayins: [TH.wayinOf('rival_phrase', { vault_key_epoch: 11, device_id: 'device_rival', registered_at: Date.UTC(2026, 0, 2) })] })
   const rivalBox = TH.boxOf('rival_box', 'rival_rev', { sidecar_json: TH.sidecarJsonOf({ note: 'a rival note' }), vault_key_epoch: 11 })
   const rivalLeaves = new Set(TH.leafTexts({ scope: rivalScope, record: [rivalVaultProps, { ...rivalVaultProps, unlock_epoch: 8, vault_key_passphrase_wrapped: TH.fakeCiphered('rewrapped_rival') }, rivalBox] }))
   const perRecordLeaves = (record: unknown) => TH.leafTexts({ scope, record }).filter((leaf) => ! rivalLeaves.has(leaf))

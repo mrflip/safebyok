@@ -4,10 +4,9 @@
 --
 -- Each record is stored field by field, a column to a field, exactly as safebyok wrote it:
 -- text as text, a time or a count as a bigint, and each structured value -- an encrypted value
--- (a cipherIv and its ciphertext), the vault props' prior vaultKey, or their list of wayins --
--- as one opaque jsonb. A record's secret fields are ciphertext, every one.
+-- (a cipherIv and its ciphertext), or the vault props' list of wayins -- as one opaque jsonb. A record's secret fields are ciphertext, every one.
 
--- One row of vault props per vault. A null prior_vault_key is a vault still at its first vaultKey.
+-- One row of vault props per vault.
 CREATE TABLE IF NOT EXISTS safebyok_vaults (
   applabel         text   NOT NULL,
   user_id          text   NOT NULL,
@@ -16,7 +15,6 @@ CREATE TABLE IF NOT EXISTS safebyok_vaults (
   format           text   NOT NULL,
   unlock_epoch     bigint NOT NULL,
   vault_key_epoch  bigint NOT NULL,
-  prior_vault_key  jsonb,
   wayins           jsonb  NOT NULL,
   registered_at    bigint NOT NULL,
   PRIMARY KEY (applabel, user_id, vaultlabel),

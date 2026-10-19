@@ -925,7 +925,7 @@ describe("refreshes, one at a time", () => {
     const vault = await world.openUnlocked('pw')
     expect(vault.getSnapshot().syncing).to.be.true
     const sound = world.dbStore.read(u1VaultPropsCkey) ?? ''
-    world.dbStore.write(u1VaultPropsCkey, '{"format":"safebyok-vault-v3"}')
+    world.dbStore.write(u1VaultPropsCkey, '{"format":"safebyok-vault-v4"}')
     await TH.wakeupAtNextTick()
     for (const ii of [1, 2]) {
       world.dbStore.write('elsewhere', String(ii))

@@ -468,8 +468,8 @@ describe("the abstract VaultDB, retiring a vault whose vault props are damaged",
 
   const Wayin = TH.vaultPropsOf('u1').wayins[0]
   const NewerRecords = [
-    [{ format: 'safebyok-vault-v4' },                                                      'a format this version does not know, whatever else it holds'],
-    [(vaultProps: VaultProps) => ({ ...vaultProps, format: 'safebyok-vault-v4' }),                'vault props that are otherwise sound but for their format'],
+    [{ format: 'safebyok-vault-v5' },                                                      'a format this version does not know, whatever else it holds'],
+    [(vaultProps: VaultProps) => ({ ...vaultProps, format: 'safebyok-vault-v5' }),                'vault props that are otherwise sound but for their format'],
     [(vaultProps: VaultProps) => ({ ...vaultProps, format: 2 }),                           'a format of another type'],
     [(vaultProps: VaultProps) => ({ ...vaultProps, wayins: [...vaultProps.wayins, { wayinkind: 'smartcard', wayin_id: 'x' }] }), 'a wayinkind this version does not know'],
     [(vaultProps: VaultProps) => ({ ...vaultProps, wayins: Array.from({ length: 9 }, () => Wayin) }), 'more wayins than this version holds'],

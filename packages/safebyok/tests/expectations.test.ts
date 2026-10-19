@@ -65,8 +65,8 @@ const LockboxCases = [
   // the vault props half:
   [undefined,  undefined,                     null,       false,  'a write into a scope with no vault props'],
   [TH.vaultPropsOf('u1', { vault_id: 'reborn' }), Box, "rev-one",  false,  'a write sealed for a vault since made anew'],
-  [TH.rotatedVaultPropsOf('u1'),              Box,  "rev-one",  false,  'a write sealed under a vaultKey since replaced'],
-  [TH.rotatedVaultPropsOf('u1'),              undefined, null,  false,  'a first write sealed under a vaultKey since replaced'],
+  [TH.vaultPropsAtEpochOf('u1', 2),          Box,  "rev-one",  false,  "a write sealed under another vaultKey epoch than the vault props'"],
+  [TH.vaultPropsAtEpochOf('u1', 2),          undefined, null,  false,  "a first write sealed under another vaultKey epoch than the vault props'"],
   // nothing, or damage, standing:
   [{ vault_id: "vault-id-u1" },  undefined,   null,       false,  'a vault row that shows no epoch'],
   [{ vault_id: "vault-id-u1", unlock_epoch: 1 }, undefined, null, false, "a vault row that shows no vaultKey's epoch"],
@@ -83,12 +83,12 @@ describe("Expectations.lockboxMeets", () => {
   }
 })
 
-describe("Expectations.lockboxMeets, under a vaultKey replaced", () => {
-  it("holds for a write sealed under the vaultKey that stands, over a lockbox sealed under the one before", () => {
-    expect(Expectations.lockboxMeets(TH.rotatedVaultPropsOf('u1'), Box, { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 2 })).to.be.true
+describe("Expectations.lockboxMeets, across vaultKey epochs", () => {
+  it("holds for a write sealed under the vault props' vaultKey epoch, over a lockbox sealed under another", () => {
+    expect(Expectations.lockboxMeets(TH.vaultPropsAtEpochOf('u1', 2), Box, { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 2 })).to.be.true
   })
 
-  it("fails a write sealed under a vaultKey the vault props do not stand for yet", () => {
+  it("fails a write sealed under a vaultKey epoch the vault props do not stand for", () => {
     expect(Expectations.lockboxMeets(VaultProps, undefined, { vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 2 })).to.be.false
   })
 })

@@ -62,8 +62,6 @@ const { registered_at: _vaultPropsTime, ...vaultPropsWithoutTime } = TH.vaultPro
 const { wayins: _wayins, ...vaultPropsWithoutWayins } = TH.vaultPropsOf('u1')
 const { unlock_epoch: _epoch, ...vaultPropsWithoutEpoch } = TH.vaultPropsOf('u1')
 const { vault_key_epoch: _keyEpoch, ...vaultPropsWithoutKeyEpoch } = TH.vaultPropsOf('u1')
-const { prior_vault_key: _prior, ...rotatedWithoutPrior } = TH.rotatedVaultPropsOf('u1')
-const priorAt = (vaultKeyEpoch: number) => ({ vault_key_epoch: vaultKeyEpoch, vault_key_wrapped: TH.fakeCiphered('prior') })
 /** The three fields the vault props held their one passphrase in, before `wayins`. */
 const WayinFieldsOfOld = {
   key_deriver_label:            'test_digest_v0',
@@ -77,7 +75,8 @@ const VaultPropsCases = [
   // regular usage:
   [TH.vaultPropsOf('u1'),                                   true,   'whole vault props'],
   // refused, as a damaged or foreign record:
-  [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v4' }, false,  'a format this version does not know'],
+  [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v5' }, false,  'a format this version does not know'],
+  [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v3' }, false,  'vault props from before the prior vaultKey went'],
   [{ ...TH.vaultPropsOf('u1'), unlock_epoch: 0 },            false,  'an epoch starts at one'],
   [{ ...TH.vaultPropsOf('u1'), unlock_epoch: 1.5 },          false,  'an epoch is a whole number'],
   [{ ...TH.vaultPropsOf('u1'), vault_id: '' },               false,  'an empty vault_id'],
@@ -94,12 +93,8 @@ const VaultPropsCases = [
   [{ ...vaultPropsWithoutKeyEpoch, format: 'safebyok-vault-v1' }, false, 'vault props from before vaultKey epochs'],
   [vaultPropsWithoutKeyEpoch,                               false,  'vault props missing their vault_key_epoch'],
   [{ ...TH.vaultPropsOf('u1'), vault_key_epoch: 0 },         false,  'a vaultKey epoch starts at one'],
-  // the prior vaultKey: none at the first, the one just before from the second on
-  [TH.rotatedVaultPropsOf('u1'),                            true,   'vault props at their second vaultKey, holding the first as their prior'],
-  [rotatedWithoutPrior,                                     false,  'vault props past their first vaultKey with no prior'],
-  [{ ...TH.vaultPropsOf('u1'), prior_vault_key: priorAt(1) }, false,  'vault props at their first vaultKey holding a prior'],
-  [{ ...TH.rotatedVaultPropsOf('u1'), vault_key_epoch: 3 },  false,  'a prior that is not the vaultKey just before'],
-  [{ ...TH.rotatedVaultPropsOf('u1'), prior_vault_key: { vault_key_epoch: 1 } }, false, 'a prior with no wrap'],
+  // the vaultKey epoch is reserved at 1, but the schema leaves binding it to the wayins
+  [TH.vaultPropsAtEpochOf('u1', 2),                         true,   'vault props at a vaultKey epoch other than 1'],
 ] as const
 
 const manyWayins = (count: number) => Array.from({ length: count }, (_unused, ii) => TH.wayinOf(`phrase${String(ii)}`))

@@ -197,10 +197,9 @@ describe("postgresVaultDB, what it stores", () => {
       user_id:          'u1',
       vaultlabel:       'main',
       vault_id:         'vault-id-u1',
-      format:           'safebyok-vault-v3',
+      format:           'safebyok-vault-v4',
       unlock_epoch:     1,
       vault_key_epoch:  1,
-      prior_vault_key:  null,
       wayins:           TH.vaultPropsOf('u1').wayins,
       registered_at:    Date.UTC(2026, 9, 14),
     }])

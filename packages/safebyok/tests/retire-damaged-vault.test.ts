@@ -71,7 +71,7 @@ describe("retireDamagedVault", () => {
 
   it("refuses a vault a newer safebyok may have written as newer_format, as hello() does: nothing retired, the lease kept", async () => {
     const world = await damagedVaultWorld()
-    const newer = JSON.stringify({ ...storedVaultPropsOf(world), format: 'safebyok-vault-v4' })
+    const newer = JSON.stringify({ ...storedVaultPropsOf(world), format: 'safebyok-vault-v5' })
     world.dbStore.write(u1VaultPropsCkey, newer)
     const atOpen = await TH.expectRefusal(world.open(), 'newer_format')
     expect(atOpen.message).to.include('update the app')
