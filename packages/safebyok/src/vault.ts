@@ -591,7 +591,7 @@ export type Vault = {
    * adapter's refusal its cause. Within that vault the retirement wins: when what stood was not the
    * revision the snapshot shows -- another device or tab wrote over it meanwhile -- it is retired
    * all the same, and the vault warns through its logger, naming neither revision. When the lockbox
-   * the snapshot showed was a damaged one, the warning says so and its context carries
+   * the snapshot showed was a damaged one, the warning says so and its story carries
    * `damaged: true` beside `call`.
    */
   retireBox(boxlabel: string): Promise<void>

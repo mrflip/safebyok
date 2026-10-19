@@ -905,7 +905,7 @@ write all the same; so does the retirement a `storeBox()` makes first over a rec
 revision, should another device have stored there meanwhile, and the store then writes its own.
 Either way the vault warns through your logger that a different revision than the one it showed
 was retired, naming neither: the other device's whisper is gone, and only the log says so. When the
-lockbox the vault showed was a damaged one, the warning says that, and its context carries
+lockbox the vault showed was a damaged one, the warning says that, and its story carries
 `damaged: true` beside `call`, so a host can branch on it.
 
 In code, `VaultErrorFamilyForKind` gives each kind's family (`VaultErrorFamilyVals`: `misuse`,
