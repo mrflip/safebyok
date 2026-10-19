@@ -220,7 +220,7 @@ export class Vault {
    * The ways in, in the order the vault tries them: each a {@link Wayin}, made from the vault props
    * the snapshot shows, its `summary` what the snapshot lists. Empty until a read finds a vault.
    */
-  get wayins(): readonly (PassphraseWayin | PasskeyWayin)[] { return this.#snapshot.props === null ? NoWayins : this.#modelsOf(this.#snapshot.props).wayins }
+  get wayins(): readonly (PassphraseWayin | PasskeyWayin)[] { return this.#snapshot.props === null ? NoWayins : this.#wayinsOf(this.#snapshot.props) }
   /** The vault props as storage holds them, one frozen record; null until a read finds a vault. See {@link VaultSnapshot}. */
   get props(): VaultProps | null { return this.#snapshot.props }
   /** Where the vault stands: `opening` until a hello has read storage, then `absent`, `locked` or `unlocked`. */
@@ -1106,22 +1106,17 @@ export class Vault {
     if (this.#vaultKey !== null && this.#askPassphraseAt !== null && this.#askPassphraseAt > this.#clockNow()) { return 'unlocked' }
     return 'locked'
   }
-  // The models of each vault props record the vault has held, made once per record: the props
-  // frozen, as the snapshot shows them, and their ways in, made over that frozen copy: a way in's
-  // holder is in the host's hands, so it is never the record the vault works from. Keyed by the
-  // record as read and by its frozen copy alike, so `wayins` finds the models of the props the
-  // snapshot shows.
-  readonly #modelled = new WeakMap<VaultProps, { props: VaultProps, wayins: readonly (PassphraseWayin | PasskeyWayin)[] }>()
-  #modelsOf(standing: VaultProps): { props: VaultProps, wayins: readonly (PassphraseWayin | PasskeyWayin)[] } {
+  // The ways in of each vault props record the vault has held, made once per record. Every record
+  // the vault holds is frozen as it takes it up (see frozenVaultProps), so a way in's holder, a
+  // box's, the snapshot's props and the record the vault works from are one object, and a host
+  // holding it can change none of them.
+  readonly #modelled = new WeakMap<VaultProps, readonly (PassphraseWayin | PasskeyWayin)[]>()
+  #wayinsOf(standing: VaultProps): readonly (PassphraseWayin | PasskeyWayin)[] {
     const known = this.#modelled.get(standing)
     if (known !== undefined) { return known }
-    const records = standing.wayins.map((record) => frozenRecord(record))
-    Object.freeze(records)
-    const props = Object.freeze({ ...standing, wayins: records })
-    const models = { props, wayins: Object.freeze(Wayin.listOf(this, props)) }
-    this.#modelled.set(standing, models)
-    this.#modelled.set(models.props, models)
-    return models
+    const wayins = Object.freeze(Wayin.listOf(this, standing))
+    this.#modelled.set(standing, wayins)
+    return wayins
   }
   // Whether the last read of storage succeeded, as the snapshot says; and whether the storage
   // watch has warned of a failing streak it has not yet seen end.
@@ -1139,7 +1134,7 @@ export class Vault {
   #picture(): VaultSnapshot {
     const state = this.#vaultState()
     const standing = this.#vaultProps === UnreadVaultProps ? null : this.#vaultProps
-    const models = standing === null ? null : this.#modelsOf(standing)
+    const wayins = standing === null ? NoWayins : this.#wayinsOf(standing)
     const { boxes, bytes } = this.#capacity()
     return Object.freeze({
       ...this.#scope,
@@ -1147,8 +1142,8 @@ export class Vault {
       registered_at:   standing?.registered_at ?? null,
       unlock_epoch:    standing?.unlock_epoch ?? null,
       vault_key_epoch: standing?.vault_key_epoch ?? null,
-      wayins:          Object.freeze((models?.wayins ?? NoWayins).map((wayin) => Object.freeze(wayin.summary))),
-      props:           models?.props ?? null,
+      wayins:          Object.freeze(wayins.map((wayin) => Object.freeze(wayin.summary))),
+      props:           standing,
       state,
       boxes:           Object.freeze(this.#boxes.map((box) => Object.freeze(box))),
       capacity:        Object.freeze({ boxes: Object.freeze(boxes), bytes: Object.freeze(bytes) }),
@@ -1215,7 +1210,8 @@ export class Vault {
     // The mark the vault props are held to is read before them (see heedMark), and an older copy of a vault
     // this device has seen newer is refused before anything is taken from it.
     const seenBefore = this.#checkedMark(await this.#deviceDB.getMark(this.#scope))
-    const fresh = await damagedAs(this.#vaultDB.getVaultProps(this.#scope), damagedVaultProps)
+    const read = await damagedAs(this.#vaultDB.getVaultProps(this.#scope), damagedVaultProps)
+    const fresh = read === null ? null : frozenVaultProps(read)
     const mark = fresh === null ? null : await this.#heedMark(fresh, { seenBefore, call: 'refresh' })
     // A change to the wayins elsewhere (new epoch) or a deletion ends this device's unlock: the
     // vaultKey in hand still works on old rows, but passing as current invites confusion. The
@@ -1232,14 +1228,14 @@ export class Vault {
     this.#vaultProps = fresh
     this.#deviceMark = mark
     const shown = this.#boxes
-    const shownWayins = this.#snapshot.props === null ? NoWayins : this.#modelsOf(this.#snapshot.props).wayins
+    const shownWayins = this.#snapshot.props === null ? NoWayins : this.#wayinsOf(this.#snapshot.props)
     // A box under a vaultKey the vault does not hold lists as damaged from its epoch alone.
     this.#boxes = fresh === null ? [] : listed.map((box) => heldListing(isUnderHeldKey(box, fresh) ? box : asDamaged(box)))
     this.#syncing = true
     this.#readAt = readAt
     // A read with no damaged box or way in clears the trouble: nothing amiss stands. The listing is
     // published before its news is told, so a handler reading the vault sees what it lists.
-    const damagedWayins = fresh === null ? [] : this.#modelsOf(fresh).wayins.filter((wayin) => wayin.isDamaged())
+    const damagedWayins = fresh === null ? [] : this.#wayinsOf(fresh).filter((wayin) => wayin.isDamaged())
     if (this.#boxes.every((box) => ! box.damaged) && damagedWayins.length === 0) { this.#trouble = null }
     this.#settle()
     this.#tellListingNews(shown)
@@ -1523,7 +1519,7 @@ export class Vault {
    * names; its refusal IS the passphrase (or passkey) check.
    */
   async #unwrapWith(standing: VaultProps, proof: Proof, wayinId?: string) {
-    return valOf(await Wayin.tryOpenAmong(this.#modelsOf(standing).wayins, proof, wayinId))
+    return valOf(await Wayin.tryOpenAmong(this.#wayinsOf(standing), proof, wayinId))
   }
 
   /**
@@ -1570,7 +1566,7 @@ export class Vault {
       this.#drafted = { vault_id: draft.vault_id, device_id: deviceId }
       // Another device's vault, if one was made meanwhile, is held to the mark as it was before it.
       const seenBefore = this.#checkedMark(await this.#deviceDB.getMark(this.#scope))
-      const settled = await damagedAs(this.#vaultDB.ensureVaultProps(draft), damagedVaultProps)
+      const settled = frozenVaultProps(await damagedAs(this.#vaultDB.ensureVaultProps(draft), damagedVaultProps))
       const mark = await this.#heedMark(settled, { seenBefore, call: 'unlock' })
       this.#vaultProps = settled
       this.#deviceMark = mark
@@ -1618,11 +1614,11 @@ export class Vault {
     const proven = await this.#unwrapWith(standing, proof, wayinId)
     const wayins = await plan.revise(standing, proven, deviceId)
     if (wayins === null) { return false }
-    const next: VaultProps = {
+    const next = frozenVaultProps({
       ...standing,
       unlock_epoch:     standing.unlock_epoch + 1,
       wayins,
-    }
+    })
     await this.#refreshOnStale(this.#vaultDB.putVaultProps(next, { vault_id: standing.vault_id, unlock_epoch: standing.unlock_epoch }), plan.call)
     // The change has landed, whatever happens now: what follows is this device's own, and a
     // failure of it is said through the logger, never thrown as though the change had not landed.
@@ -2326,7 +2322,17 @@ const declinedError = (asked: boolean) => new VaultError('vault_locked', asked
 const closedError = () => new VaultError('vault_closed', 'This vault handle was closed: make another with Vault.make.')
 // --
 
-// == [Vocabulary]: isUnderHeldKey, asDamaged, MarkFormat, VaultCall, UntrustedStorageKinds
+// == [Vocabulary]: frozenVaultProps, isUnderHeldKey, asDamaged, MarkFormat, VaultCall, UntrustedStorageKinds
+
+/**
+ * A copy of `props`, frozen through its ways in: what the vault holds as its vault props, so the
+ * very object its ways in and boxes lie under, and its snapshot shows, is one no host can write to.
+ */
+const frozenVaultProps = (props: VaultProps): VaultProps => {
+  const wayins = props.wayins.map((record) => frozenRecord(record))
+  Object.freeze(wayins)
+  return Object.freeze({ ...props, wayins })
+}
 
 /**
  * True when `box` lists as damaged already, or stands under the vaultKey `standing` holds. A

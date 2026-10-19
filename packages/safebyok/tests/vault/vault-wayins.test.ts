@@ -810,6 +810,20 @@ describe("the vault's ways in, as models (Contract: Vault, Wayin)", () => {
     expect(vault.state).to.eq('unlocked')
   })
 
+  it("holds every vault props record it takes up frozen through, and that one record is its ways in's holder, whether it made, read or rewrote the record", async () => {
+    const world = makeWorld()
+    const made = await world.openUnlocked('pw')
+    const read = await world.open()
+    await read.hello({ staleMinutes: 0 })
+    await made.addPassphrase('pw', 'spare passphrase', { wayinlabel: 'spare' })
+    for (const vault of [made, read]) {
+      const { props } = vault
+      expect(Object.isFrozen(props) && Object.isFrozen(props?.wayins)).to.be.true
+      expect(props?.wayins.every((record) => Object.isFrozen(record) && Object.isFrozen(record.vault_key_wayin_wrapped))).to.be.true
+      for (const wayin of vault.wayins) { expect(wayin.holder).to.eq(props) }
+    }
+  })
+
   it("keeps the same Wayins until the vault props change", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
