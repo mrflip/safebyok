@@ -2,7 +2,7 @@ import { v } from 'convex/values'
 
 /**
  * Convex validators for safebyok's stored records, field for field with the core's Zod records
- * (`Box`, `VaultProps`, `Ciphered`, `VaultScope` in `safebyok`). They check what Convex can:
+ * (`BoxRecord`, `VaultProps`, `Ciphered`, `VaultScope` in `safebyok`). They check what Convex can:
  * which fields, their types, which are optional, and each record's `format`. Every name, and a
  * box's sidecar, is any text here: the floor beneath every name (well-formed, NFC, no
  * control characters, 1 KiB) and that the sidecar is JSON are the core's records' to hold, and what text each may be beyond it

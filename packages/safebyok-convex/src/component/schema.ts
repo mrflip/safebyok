@@ -13,7 +13,7 @@ export default defineSchema({
   safebyok_vaults: defineTable(VaultProps)
     .index('by_scope', ['user_id', 'applabel', 'vaultlabel']),
   /**
-   * One Box per boxlabel, as-is, with its vault's scope columns beside it: added on write,
+   * One BoxRecord per boxlabel, as-is, with its vault's scope columns beside it: added on write,
    * stripped on read. `by_box` serves one box (all four fields) and a vault's boxes (the first three).
    */
   safebyok_boxes: defineTable(BoxRecord.extend(VaultScope.fields))
