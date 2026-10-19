@@ -106,7 +106,8 @@ export class PassphraseProof extends Proof {
    * The passphraseKey this passphrase makes over the salt of `wayin`: the vault's key deriver's 32
    * bytes, imported as a non-extractable wrapping key and then zeroed. Refuses with kind
    * 'bad_option' for a key deriver that hands back anything but 32 bytes of memory of their own,
-   * or 32 zero bytes. A key deriver that throws throws through.
+   * or 32 zero bytes. What a key deriver throws is refused as {@link hostThrewRefusal} says: a
+   * condition as itself, anything else as 'unexpected_error', the throw its cause.
    *
    * @param wayin - The way in to make the key for: its `salt_b64` is all that is read.
    *
