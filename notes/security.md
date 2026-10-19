@@ -32,6 +32,19 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-19 (branch 20261019-softlock_gone, on PR #189): **the rotation schema is removed; no
+  `rotateVaultKey` was ever built.** The vault props' `prior_vault_key` (the previous vaultKey wrapped
+  under the current one), its `PriorVaultKey` schema and the `priorFits` refinement (a prior exactly
+  one epoch below from epoch 2 on, none at epoch 1) are gone from the core and the Convex, Postgres
+  and GraphQL adapters' schemas, and the vault props moved to `safebyok-vault-v4`. That tag opens
+  every wayin's wrap ctx, so v3 wayins no longer open; a stored v3 record reads as `damaged_vault`
+  (never `newer_format`), `retireDamagedVault` clears it, and nothing migrates. `vault_key_epoch`
+  stays on every record, reserved at 1 and never written otherwise by safebyok, but the schema still
+  admits any positive epoch on vault props and checks none against a prior. It remains bound into each
+  wayin's HKDF info / wrap ctx and held equal to the vault props', so storage cannot raise it and
+  still have a wayin open, and the rollback check still refuses vault props at a lower
+  `vault_key_epoch` than the device has seen. A lockbox lists as under the held key only when its
+  epoch equals the vault props'; any other lists as damaged.
 * 2026-10-19 (branch 20261019-retire_revision, on PR #177); 2026-10-19 (branch 20261019-no_clear): **`VaultDB.retireBox` now takes the
   revision the device read, and storage reports what it removed; the base class takes that report
   as untrusted storage input.** The expectation is `{ vault_id, revision_tok }` (null for a
@@ -151,7 +164,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-18: **the context bytes of every wayin changed spelling, not construction, with the
   rename to "wayin".** A wayin's wrap is bound to a context of the record's format tag, then its
   whole stored header, as key-sorted JSON (a passkey wayin's HKDF `info` is the same bytes); it now
-  spells the renamed fields and begins `safebyok-vault-v3`. The construction and the purpose
+  spells the renamed fields and begins `safebyok-vault-v3` (since 2026-10-19, `safebyok-vault-v4`, so v3 wayins no longer open). The construction and the purpose
   strings are unchanged. A `safebyok-vault-v2` record reads as `damaged_vault` on adapters that read
   it (a Convex deployment refuses the new schema until its tables are cleared), with no migration,
   so no old ciphertext has to open under the new bytes. Rejected: a translation back to the old
@@ -168,7 +181,7 @@ added or folded into through the subagent, and no other entry changes.
   run over an in-memory backend, not over each real one. Separately, `postgresVaultDB` now calls a
   subscriber once as its listen begins (6.1), so a vault reads a write that landed while its watch
   was starting, which it missed before.
-* 2026-10-16: **the `vault_key_epoch` expectation** (`VAULTDB.md` line 3.8). Every lockbox carries
+* 2026-10-16; 2026-10-19: **the `vault_key_epoch` expectation** (`VAULTDB.md` line 3.8). Every lockbox carries
   the `vault_key_epoch` of the vaultKey its lockboxKey is wrapped under (bound into both its
   encryptions with the rest of its header), and `updateBox` lands only while the scope's standing
   vault props have that epoch, compared by the adapter in the same atomic step as `vault_id` and
@@ -178,7 +191,9 @@ added or folded into through the subagent, and no other entry changes.
   An adapter that skips the comparison lets that device write a lockbox the replaced vaultKey
   opens. `localVaultDB` compares it now; IndexedDB, Convex, Postgres (and GraphQL through it) do
   not yet, and the battery holds them to it as a pending test until they do. Every vault is at
-  epoch 1 today: nothing replaces a vaultKey yet. Retirements name no epoch. A lockbox whose epoch is
+  epoch 1 today: nothing replaces a vaultKey yet (2026-10-19: the rotation schema is gone, so the
+  comparison now guards a lockbox built wrong, and stays so a later rotation needs no new
+  contract). Retirements name no epoch. A lockbox whose epoch is
   not the vault props' reads as `damaged_lockbox`, its key never tried.
 * 2026-10-16: **the rollback check.** Each device keeps a device mark per scope in its deviceDB:
   the vault's `vault_id` and the highest `unlock_epoch` and `vault_key_epoch` it has seen the
@@ -226,7 +241,7 @@ added or folded into through the subagent, and no other entry changes.
   user-chosen device label is stored. Clearing site data mints a new id; wayins keep the old.
 * 2026-10-16: the record formats moved on with these fields (to `safebyok-vault-v2`,
   `safebyok-lockbox-v2` and `safebyok-mark-v1`, since moved on again to today's `safebyok-vault-v3`,
-  `safebyok-lockbox-v5` and `safebyok-mark-v3`; the mark moved to `safebyok-mark-v4` on 2026-10-19), and each ctx's first part with
+  `safebyok-lockbox-v5` and `safebyok-mark-v3`; the mark moved to `safebyok-mark-v4` on 2026-10-19, and the vault props to `safebyok-vault-v4` the same day, so a stored `safebyok-vault-v3` record reads as `damaged_vault`, listed among the older formats), and each ctx's first part with
   them. No vault written before reads: its vault props are `damaged_vault`, and `retireDamagedVault`
   recognizes `safebyok-vault-v1` as an older format, not a possibly newer one, so it clears such a
   vault rather than asking the user to update the app.
