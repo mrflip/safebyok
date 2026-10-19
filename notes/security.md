@@ -130,7 +130,7 @@ added or folded into through the subagent, and no other entry changes.
   table, the new name of a retired one. React's `VaultProvider` forwards the names of props it does
   not know to `Vault.make`, so those reach the error boundary rather than being dropped.
   (4) **A refused `hello()` no longer closes the handle.** The handle stands, its storage watch
-  live, until the host closes it; the snapshot carries the refusal in a new public field,
+  live, until the host closes it; the snapshot carries the refusal in a new snapshot field,
   `trouble: VaultError | null` (cleared by the next successful read), and the vault's logger warns
   of it. A `VaultError` carries no secret material, as before. While no `hello()` has succeeded, a
   storage change bell runs `hello()` (lease take-up included) rather than a bare refresh.
