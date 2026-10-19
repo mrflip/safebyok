@@ -1,5 +1,6 @@
 import { it, describe, expect, vi } from 'vitest'
 import type { BoxRecord } from '../../src/box'
+import { isVaultError } from '../../src/errors'
 import type { Outcome } from '../../src/outcome'
 import type { VaultProps, BoxSummary, DamagedBox } from '../../src/types'
 import { NameFloorBytes } from '../../src/validators'
@@ -759,7 +760,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       const outcomes = await Promise.all(refused)
       for (const outcome of outcomes) {
         expect(outcome.ok).to.be.false
-        expect(outcome.err).to.be.instanceOf(Error).and.to.have.property('name', 'VaultError')
+        expect(isVaultError(outcome.err), 'a refusal that is no VaultError: a lookalike, unmarked, is not one').to.be.true
         expect(outcome.err?.family).to.eq('misuse')
         expect(outcome).to.not.have.property('val')
       }
@@ -1348,7 +1349,7 @@ const expectWholeOrRefused = async (vaultDB: VaultDBVerbs, boxlabels: readonly s
     expect(listed.map((box) => box.boxlabel)).to.have.members([...boxlabels])
     return
   }
-  expect(listing.val, 'a listing refused with something other than a VaultError').to.have.property('name', 'VaultError')
+  expect(isVaultError(listing.val), 'a listing refused with something other than a VaultError').to.be.true
 }
 
 /** What u1's vault holds as one device reads it: its vault props, and each listed box's boxlabel and revision. */

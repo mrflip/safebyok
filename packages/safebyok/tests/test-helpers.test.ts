@@ -19,6 +19,7 @@ import * as Expectations from '../src/expectations'
 import * as RefusalPolicy from '../src/refusal-policy'
 import { VaultDB, type VaultPropsExpectation, type VaultDelExpectation, type BoxExpectation, type BoxDelExpectation, type StoredBox, type VaultDBOpts } from '../src/vault-db'
 import * as TH from './test-helpers'
+import { raceOutcomeOf } from './test-helpers/racing'
 
 
 // == [Tweaks and timing]: tweakB64, wakeupAtNextTick, aWhile, eventually, changeCounter, liveWatch
@@ -881,6 +882,17 @@ describe("lookalikeRefusal", () => {
     expect(RefusalPolicy.decide(lookalike)).to.eq('none')
     expect(isVaultError(lookalike)).to.be.false
     expect(lookalike).to.include({ name: 'VaultError', refusalkind: 'identity_revoked', message: 'Signed out.' })
+  })
+})
+
+describe("raceOutcomeOf", () => {
+  it("reads a verb refused with another copy's VaultError as refused, and one refused with a lookalike as no Outcome at all, so a race's verdict fails that adapter", async () => {
+    const refused = TH.bad(TH.foreignRefusal('stale_write', 'Another device wrote first.'))
+    const foreign = await raceOutcomeOf(Promise.resolve(refused))
+    expect(foreign.kind).to.eq('stale_write')
+    const lookalike = TH.lookalikeRefusal('stale_write', 'Another device wrote first.')
+    const posing = await raceOutcomeOf(Promise.resolve({ ok: false, err: lookalike }))
+    expect(posing.kind).to.eq('landed')
   })
 })
 // --

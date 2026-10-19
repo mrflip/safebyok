@@ -1,4 +1,4 @@
-import { VaultError } from '../../src/errors'
+import { isVaultError } from '../../src/errors'
 import type { Outcome } from '../../src/outcome'
 import { makeGate, type AsyncVerbOf, microtasks, ticks } from './timing'
 
@@ -214,7 +214,7 @@ const refusedAs = (err: unknown): RaceOutcome => {
 /** True for what a VaultDB verb resolves: a good Outcome with its `val`, or a bad one with a VaultError. */
 const isOutcome = (settled: unknown): settled is Outcome<unknown> => {
   if (typeof settled !== 'object' || settled === null || ! ('ok' in settled)) { return false }
-  return settled.ok === true ? 'val' in settled : settled.ok === false && 'err' in settled && settled.err instanceof VaultError
+  return settled.ok === true ? 'val' in settled : settled.ok === false && 'err' in settled && isVaultError(settled.err)
 }
 
 /** The two moves of a pair race, `firstIdx`'s first: the first device's and the second's, swapped for 1. */
