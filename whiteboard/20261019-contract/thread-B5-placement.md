@@ -1,6 +1,6 @@
 # Thread B5: placement (2026-10-20)
 
-Branch `20261020-placement`, PR #PRNUM, stacked on #208 (`put_wayin`). Justify: green. Per package: core 2554 passed, 35 skipped; react 280; convex 274 (8 skipped); postgres 268 (14 skipped); graphql 262 (14 skipped); indexeddb 144 (10 skipped); fastkey 49; demo 203 (16 skipped); e2e 89 (96 skipped); root 265.
+Branch `20261020-placement`, PR [#209](https://github.com/mrflip/safebyok/pull/209), stacked on #208 (`put_wayin`). Justify: green. Per package: core 2554 passed, 35 skipped; react 280; convex 274 (8 skipped); postgres 268 (14 skipped); graphql 262 (14 skipped); indexeddb 144 (10 skipped); fastkey 49; demo 203 (16 skipped); e2e 89 (96 skipped); root 265.
 Size budgets unmoved (`pnpm size:budget`: every line at the rule).
 
 The table, re-done from the code, with the arguments row by row, is
