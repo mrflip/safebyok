@@ -199,6 +199,8 @@ over `Object.keys(vault.snapshot)`; `created_elsewhere` and `damaged_wayin` prov
 *Orchestrator (line):* B's line is B1 → B3 → `a_fixes` → `a_sec` → B2 → `a_sec2` → B4a → B4 → B5.
 `a_sec` is restacked onto #204 (ruled 2026-10-19), and B2 cuts from it.
 
+*Review (B5, #209, `fixed`, medium, raised from low):* the `Wayin.seal` ctx move keeps the bytes (ctx-bytes tests pin them); the double-load check runs at every entry and never misreads a plain record; private constructors and `Ask[raiseAsk]` leave nothing public behind. Fixed: a second copy's Box is checked before its fields parse (a foreign Box that lined up with a record would have been accepted). Left (minor, to `b-fixes`): `hello`'s third example still shows `void vault.hello()` (make it `tryHello`); an unreported `getProof!` in react's dialog test.
+
 *Review (B4, #208, `fixed`, high, raised from medium for the seal merge):* `Wayin.seal` seals exactly as the three statics did (same keying, same ctx bytes, no new construction); the extra unwrap's key is non-extractable and dropped at once; only the standing passphrase proves a change; the strength checker meets the ruling (no throw leaks; CUSTOMIZATION.md ships, last clause verbatim); `mayBeNewer` fits the Contract's table. Fixed: the blank-at-create kind in `errors.ts` and the README (`wrong_passphrase`), `UnchosenCheckerSaid`'s wording, two messages' quotes. Left (minor): a blank passphrase is two kinds (row); the unchosen default found by identity (row); a passkey's ctx built twice in `Wayin.seal` (B5); the demo orphans a passkey from an empty field (D4, UX); a weak passphrase masks `absent_vault` (Contract's order); a non-text stored format reads newer; stale Contract Refusals rows (carried with B4's drift); two `notes/security.md` wordings (b-fixes).
 
 *Review (B4a, #207, `fixed`, high):* each wrap binds what it bound before minus the way-in id and label; a passkey's wrap cannot sit in the passphrase slot; only the standing passphrase proves a change; a replaced passkey refuses `wrong_passkey`; adapters keep a null only for `passkey`. Fixed: two refusal messages' quotes, `deriveWrappingKey`'s v4 example, a test's `wayinlabel` wording. Left (minor): `mayBeNewer` by format alone (row; B4 confirms); three shapes for the pair of ways in; react's second `useSyncExternalStore`; two stale `notes/security.md` passages (to B4).
@@ -236,7 +238,8 @@ stale listing; reworked to read once on a miss. Left: a stale hello plus a miss 
 `close()` during that read answers `absent_box`; a host's `instanceof` misses another copy.
 
 **Closing phase B:** passes 1 and 2 again, as C1 builds; fixes in `b-fixes`.
-*Orchestrator:* `b-fixes` also takes, through its sonnet subagent, three `notes/security.md` wordings left by B4's work and review: ~1903's secure_floor "core default of 12 code points" that never existed; ~1428's "lives for one proof and one wrap" (one proof, one seal and one lease wrap); ~1946's sentence reading as if `putWayin` existed before.
+*Orchestrator (2026-10-20):* phase B filed in one line, #201 → #202 → #204 → #203 → #205 → #206 → #207 → #208 → #209 (47ab50be). Passes 1 and 2 run over `19c0cc87...47ab50be` beside C1; findings on #192.
+*Orchestrator:* `b-fixes` also takes, from B5's review: `hello`'s third example as `void vault.tryHello()`; react's dialog test's `getProof!` narrowed or reported. And, through its sonnet subagent, three `notes/security.md` wordings left by B4's work and review: ~1903's secure_floor "core default of 12 code points" that never existed; ~1428's "lives for one proof and one wrap" (one proof, one seal and one lease wrap); ~1946's sentence reading as if `putWayin` existed before.
 
 ### Phase C: `calls`
 
