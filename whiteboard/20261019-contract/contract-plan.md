@@ -16,7 +16,7 @@ this line.
   (56 kB; `grep -n '^#'` is its outline). The handoff says when a ruling has changed it since.
 * **Sprint doc:** https://claude.ai/code/artifact/362ec68d-5bf3-46aa-a379-59a9c8bfb548
   (*Open Matters*, *Resolved*, *Progress*).
-* **Status:** running. `a_sec` (#203) restacked onto #204 and filed at 9e5ed329 after a third, restack review (the Coach's leave). B2 `lease` building from it.
+* **Status:** paused 2026-10-20 for the Coach's weekly usage limit (`human/20261020-sprint_contract_paused.md`). Phases A and B filed, #193 → … → #209 (47ab50be). C1 `putbox_store` and `b_fixes` stopped mid-build, uncommitted, in their worktrees.
 
 ## How this plan relates to the preplan
 
