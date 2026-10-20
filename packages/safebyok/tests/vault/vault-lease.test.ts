@@ -1133,11 +1133,22 @@ describe("vault.ensureLease, by the Contract", () => {
     expect(getProof.mock.calls[0]?.[0].why).to.eq('lease_ending')
   })
 
-  it("takes an event in place of options, as a button's handler, as its second example shows", async () => {
+  it("refuses an event in place of options as bad_option, naming the wrap, and asks no one", async () => {
     const getProof = typingPw()
     const { vault } = await lockedVaultWith({ getProof })
-    await TH.expectGood(vault.tryEnsureLease(new Event('click') as unknown as { renewMinutes?: number }))
-    expect(vault.state).to.eq('unlocked')
+    const err = await TH.expectBad(vault.tryEnsureLease(new Event('click') as unknown as { renewMinutes?: number }), 'bad_option')
+    expect(err.message).to.include('`() => { void vault.tryEnsureLease() }`')
+    expect(getProof).to.not.have.been.called
+    expect(vault.state).to.eq('locked')
+  })
+
+  it("unlocks from a button's handler wrapped as its second example shows", async () => {
+    const getProof = typingPw()
+    const { vault } = await lockedVaultWith({ getProof })
+    const button = new EventTarget()
+    button.addEventListener('click', () => { void vault.tryEnsureLease() })
+    button.dispatchEvent(new Event('click'))
+    await vi.waitFor(() => { expect(vault.state).to.eq('unlocked') })
   })
 
   it("resolves unlocked or refuses vault_locked, as its first example shows", async () => {

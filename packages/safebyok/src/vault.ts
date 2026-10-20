@@ -185,7 +185,8 @@ type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin 
  * throw their misuse; `getWhisper()` and `useBox()` come in the throwing form alone.
  *
  * Every method is bound to its vault, so each may be handed on alone: to `useSyncExternalStore`,
- * as an event handler, or taken out of the vault by name.
+ * as an event handler, or taken out of the vault by name. `hello` and `ensureLease`, which take
+ * options, refuse the event a handler is handed: wrap them, `() => { void vault.tryHello() }`.
  *
  * @example const snapshot = useSyncExternalStore(vault.subscribe, vault.getSnapshot)
  * @example if (vault.state === 'locked') { askForProof(vault.passkey) }
@@ -273,9 +274,9 @@ export class Vault {
 
   // == [Vault: opening]: hello, ensureLease
 
-  readonly #tryHello = this.#trying(async (given?: AnEvent | { staleMinutes?: number | undefined }): Promise<Vault> => {
+  readonly #tryHello = this.#trying(async (given?: { staleMinutes?: number | undefined }): Promise<Vault> => {
     this.#checkOpen()
-    const helloOpts = asHelloOpts(given)
+    const helloOpts = checkHelloOpts(checkBagOrNone(given, 'hello'))
     const staleMillis = helloOpts?.staleMinutes === undefined ? this.#staleMillis : parseStaleMinutes(helloOpts.staleMinutes, 'hello')
     await this.#helloWithin(staleMillis)
     return this
@@ -303,8 +304,9 @@ export class Vault {
    * storage the vault cannot trust (`identity_revoked`, `rolled_back`, `newer_format`), or the
    * vault deleted. A hello that fails may be called again at once. After `close()` it refuses with
    * kind 'vault_closed'; `opts` other than `staleMinutes`, or minutes that are not zero or more, are
-   * kind 'bad_option'. An event in place of `opts` -- `hello` itself the handler, as in the fourth
-   * example -- is no options, and is ignored.
+   * kind 'bad_option'. So is anything in place of `opts` that is no plain bag of options: an
+   * event, above all, when `hello` itself is handed to `addEventListener` or `onClick` as the
+   * handler. Wrap it, as the fourth example does.
    *
    * It refuses with storage's own error -- storage unreachable (`storage_unavailable`), a user
    * storage does not serve (`not_permitted`, `identity_revoked`) -- and leaves the vault as it last
@@ -322,14 +324,14 @@ export class Vault {
    *     if (isVaultError(err, 'damaged_vault') && userConfirmedStartingOver()) { await delDamagedVault(opts) }
    *   }
    * @example document.addEventListener('visibilitychange', () => { if (! document.hidden) { void vault.hello() } })
-   * @example window.addEventListener('focus', vault.hello)   // the handler itself: the event is ignored
+   * @example window.addEventListener('focus', () => { void vault.tryHello() })   // never vault.hello itself: it refuses the event
    * @example await vault.hello({ staleMinutes: 0 })   // read now, whatever was read a moment ago
    */
   hello = this.#throwing(this.#tryHello)
 
-  readonly #tryEnsureLease = this.#trying(async (given?: AnEvent | { renewMinutes?: number | undefined }): Promise<Vault> => {
+  readonly #tryEnsureLease = this.#trying(async (given?: { renewMinutes?: number | undefined }): Promise<Vault> => {
     this.#checkOpen()
-    const leaseOpts = asEnsureLeaseOpts(given)
+    const leaseOpts = checkEnsureLeaseOpts(checkBagOrNone(given, 'ensureLease'))
     return await this.#ensureLease(parseRenewMinutes(leaseOpts?.renewMinutes))
   })
   /**
@@ -354,7 +356,8 @@ export class Vault {
    * `getProof` answers `carry_on` outside `lease_ending`, or anything but the three, or for a
    * `renewMinutes` that is not zero or more minutes; 'unexpected_error' when it throws, what it
    * threw the cause, never logged. A wrong passphrase never reaches here: it goes to the dialog,
-   * through `ask.attempt`. An event in place of `opts` is no options, as for `hello`.
+   * through `ask.attempt`. An event in place of `opts`, or anything else that is no plain bag of
+   * options, is kind 'bad_option', as for `hello`: wrap it, as the second example does.
    *
    * @example await vault.ensureLease()   // unlocked, or refused 'vault_locked'
    * @example <button onClick={() => { void vault.tryEnsureLease() }}>Unlock</button>
@@ -2317,34 +2320,25 @@ const FirstVaultKeyEpoch = 1
 const UntrustedStorageKinds = ['identity_revoked', 'rolled_back', 'newer_format'] as const satisfies readonly RefusalKind[]
 // --
 
-// == [Argument parsers]: checkHelloOpts, asEnsureLeaseOpts, checkStoreOpts, sidecarJsonOf, standingPassphraseOf, newProofOf, absentBox
+// == [Argument parsers]: checkBagOrNone, checkHelloOpts, checkEnsureLeaseOpts, checkStoreOpts, sidecarJsonOf, standingPassphraseOf, newProofOf, absentBox
+
+/**
+ * `given`, once it is left out or a plain bag of options, as `call` takes: kind 'bad_option'
+ * otherwise, saying how to wrap the call. What else comes is an event, almost always: `hello` or
+ * `ensureLease` handed to `addEventListener` or `onClick` as the handler itself, which would
+ * otherwise read the event as options, and reject where nothing hears it.
+ */
+const checkBagOrNone = <BagT>(given: BagT, call: 'hello' | 'ensureLease'): BagT => {
+  if (given === undefined || isPlainBag(given)) { return given }
+  const tried = call === 'hello' ? 'tryHello' : 'tryEnsureLease'
+  throw new VaultError('bad_option', `${call}() takes a bag of options, or nothing, and was handed something else: an event, most likely, as ${call} was handed to addEventListener or onClick as the handler itself. Wrap it: \`() => { void vault.${tried}() }\`, whose refusal, being returned, never surfaces as an unhandled rejection.`)
+}
 
 /** What `hello()`'s options may hold: `staleMinutes`, which `parseStaleMinutes` checks, and nothing else. */
 const checkHelloOpts = optionsCheck({ staleMinutes: Z.optional(Z.unknown()) }, "hello()'s only option is `staleMinutes`, how many minutes it trusts the vault's last read of storage: check its spelling, and leave out any other.")
 
-/**
- * An event, as a DOM listener or a React handler hands one: what `hello` is handed when it is
- * itself the handler, `addEventListener('visibilitychange', vault.hello)`.
- */
-type AnEvent = { readonly type: string }
-
-/**
- * `hello()`'s options, checked: none for an object that is no plain bag of options -- an event,
- * handed to `hello` as a handler -- and kind 'bad_option' for anything else that is not one.
- */
-const asHelloOpts = (given: unknown): { staleMinutes?: number | undefined } | undefined => {
-  if (typeof given === 'object' && given !== null && ! isPlainBag(given)) { return undefined }
-  return checkHelloOpts(given as { staleMinutes?: number | undefined } | undefined)
-}
-
 /** What `ensureLease()`'s options may hold: `renewMinutes`, which `parseRenewMinutes` checks, and nothing else. */
 const checkEnsureLeaseOpts = optionsCheck({ renewMinutes: Z.optional(Z.unknown()) }, "ensureLease()'s only option is `renewMinutes`, how many minutes before the lease ends to ask for a proof anyway: check its spelling, and leave out any other.")
-
-/** `ensureLease()`'s options, checked as {@link asHelloOpts} checks hello's: an event is none. */
-const asEnsureLeaseOpts = (given: unknown): { renewMinutes?: number | undefined } | undefined => {
-  if (typeof given === 'object' && given !== null && ! isPlainBag(given)) { return undefined }
-  return checkEnsureLeaseOpts(given as { renewMinutes?: number | undefined } | undefined)
-}
 
 /** What `putBox()`'s options may hold: a sidecar, which {@link sidecarJsonOf} checks, and nothing else. */
 const checkStoreOpts = optionsCheck({ sidecar: Z.optional(Z.unknown()) }, "putBox()'s only option is `sidecar`, the box's own visible data (it is authenticated but never encrypted): check its spelling, and leave out any other. A note is kept in the sidecar: { sidecar: { note } }.")

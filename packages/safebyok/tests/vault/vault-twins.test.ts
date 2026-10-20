@@ -178,22 +178,32 @@ describe("vault.subscribe", () => {
 // == [hello as a handler]: an event in place of its options
 
 describe("vault.hello as an event handler", () => {
-  it("takes an event in place of its options and ignores it, as its fourth example shows", async () => {
+  it("refuses an event in place of its options as bad_option, naming the wrap, and reads nothing", async () => {
+    const world = makeWorld()
+    const vault = Vault.make(world.optsWith())
+    const err = await TH.expectBad(vault.tryHello(new Event('focus') as unknown as { staleMinutes: number }), 'bad_option')
+    expect(err.message).to.include('handed to addEventListener or onClick as the handler itself')
+    expect(err.message).to.include('`() => { void vault.tryHello() }`')
+    expect(vault.state).to.eq('opening')
+  })
+
+  it("hellos when wrapped as its fourth example shows, the handler reading storage on the event", async () => {
     const world = makeWorld()
     const vault = Vault.make(world.optsWith())
     const window = new EventTarget()
-    window.addEventListener('focus', vault.hello)  // eslint-disable-line @typescript-eslint/no-misused-promises -- the example's own form: a handler whose promise nobody awaits
+    window.addEventListener('focus', () => { void vault.tryHello() })
     window.dispatchEvent(new Event('focus'))
     await vi.waitFor(() => { expect(vault.state).to.eq('absent') })
     expect(vault.trouble).to.be.null
   })
 
-  it("ignores any object that is no plain bag of options, as a React event is", async () => {
+  it("refuses any object that is no plain bag of options, as a React event is, as bad_option", async () => {
     const world = makeWorld()
     const vault = Vault.make(world.optsWith())
     class SyntheticEvent { readonly type = 'click' }
     const clicked = new SyntheticEvent()
-    expect(await TH.expectGood(vault.tryHello(clicked))).to.eq(vault)
+    await TH.expectBad(vault.tryHello(clicked as unknown as { staleMinutes: number }), 'bad_option')
+    await TH.expectBad(vault.tryHello(null as unknown as { staleMinutes: number }), 'bad_option')
   })
 
   it("still refuses a plain bag that misspells its option, and a value that is no object, with kind 'bad_option'", async () => {
@@ -201,6 +211,13 @@ describe("vault.hello as an event handler", () => {
     const vault = Vault.make(world.optsWith())
     await TH.expectBad(vault.tryHello({ staleMinute: 0 } as unknown as { staleMinutes: number }), 'bad_option')
     await TH.expectBad(vault.tryHello(5 as unknown as { staleMinutes: number }), 'bad_option')
+  })
+
+  it("takes a bag of options with no prototype, as a plain bag", async () => {
+    const world = makeWorld()
+    const vault = Vault.make(world.optsWith())
+    const opts = Object.assign(Object.create(null) as object, { staleMinutes: 0 })
+    expect(await TH.expectGood(vault.tryHello(opts))).to.eq(vault)
   })
 })
 // --
