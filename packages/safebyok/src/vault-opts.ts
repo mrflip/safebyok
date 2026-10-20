@@ -548,7 +548,7 @@ export type ParsedVaultOpts = {
  */
 export const parseMakeVaultOpts = (opts: MakeVaultOpts): ParsedVaultOpts => {
   checkSecureContext()
-  if (! isBag(opts)) { throw new VaultError('bad_option', 'Vault.make takes one bag of options: applabel, userId, vaultlabel, vaultDB, deviceDB and keyDeriver at least.') }
+  if (! isBag(opts)) { throw new VaultError('bad_option', "Vault.make takes one bag of options: applabel, userId, vaultlabel, vaultDB, deviceDB and keyDeriver at least.") }
   checkKnownOpts(opts)
   const rules = Names.rulesOf(opts.validators)
   const scope = Names.checkScope(rules, { applabel: opts.applabel, user_id: opts.userId, vaultlabel: opts.vaultlabel })

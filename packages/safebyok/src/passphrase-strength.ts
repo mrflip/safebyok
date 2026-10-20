@@ -76,7 +76,7 @@ export const checkStrongEnough = async (strengthChecker: StrengthChecker, passph
   }
   const checked = passphraseVerdict.safeParse(verdict)
   if (! checked.success) {
-    throw new VaultError('bad_option', 'The strengthChecker answered something other than a verdict: { strong: true }, or { strong: false, reason } with the reason as non-empty text.')
+    throw new VaultError('bad_option', "The strengthChecker answered something other than a verdict: { strong: true }, or { strong: false, reason } with the reason as non-empty text.")
   }
   if (! checked.data.strong) { throw new VaultError('weak_passphrase', checked.data.reason) }
 }
