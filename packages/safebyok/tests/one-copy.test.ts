@@ -79,6 +79,12 @@ describe("a model of another copy, where this copy takes one", () => {
     expect(err.message).to.include('Box.make was handed a Box made by another copy')
   })
 
+  it("refuses a Box of another copy at Box.make even when its fields read as a box record", () => {
+    const theirs = { ...TH.boxOf('anthropic_api_key', 'a1'), constructor: { [ModelMark]: 'Box' } }
+    const err = TH.expectSyncRefusal(() => Box.make(vault, theirs, holder), 'bad_option')
+    expect(err.message).to.include('Box.make was handed a Box made by another copy')
+  })
+
   it("refuses a Proof of another copy handed in as a proof, naming the double load", async () => {
     const other = await secondCopy()
     const theirs = other.Proof.parse(vault, 'pw')

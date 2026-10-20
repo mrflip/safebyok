@@ -455,9 +455,9 @@ const parseJsonOrNull = (text: string): unknown => {
  * safebyok, as {@link checkOneCopy} refuses one, naming `said`, the call that was handed it.
  */
 export const checkedBoxRecord = (record: unknown, said: string): BoxRecord => {
+  checkOneCopy(record, Box, said)
   const checked = BoxRecord.safeParse(record)
   if (! checked.success) {
-    checkOneCopy(record, Box, said)
     throw new VaultError('bad_record', "That is not a box record this package writes: a box is made from the record storage holds, as a VaultDB's getBox hands it back, or from a box's own props.")
   }
   return checked.data
