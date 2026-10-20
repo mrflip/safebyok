@@ -16,10 +16,10 @@ is a bug.
   them, as the wider ecosystem does.
 * No barrel files beyond the package's entry points: import from the file that defines the thing.
 * **A module of related functions around one concern is imported whole**, under its Startcase
-  name: `import * as Wayin from './wayin'`, then `Wayin.open(...)`. Its functions are
-  vigorous verbs: `open`, not `wayinOpen`.
+  name: `import * as Names from './names'`, then `Names.check(...)`. Its functions are
+  vigorous verbs: `check`, not `namesCheck`.
 * **A module with one primary noun** is imported by name, its friends riding along:
-  `import { Lockbox, LockboxKinds } from './lockbox'`.
+  `import { Box, BoxKinds } from './box'`.
 * When a list of type imports grows cumbersome, import the types whole under a short name ending
   in `T`: `import type * as VT from './vault-types'`.
 * Follow a library's own import conventions where it has one: `import * as Z from 'zod/mini'` is ours
@@ -39,15 +39,15 @@ always a salient prefix: `vaultlabel`, `profilename`. The linter refuses these, 
 variable, parameter or destructured name; a property spelled that way (`{ name: 'AES-GCM' }`)
 is someone else's interface, and fine.
 
-**The cast is named in VOCABULARY.md** -- whisper, lockbox, vault, passphrase, each key and its
+**The cast is named in VOCABULARY.md** -- whisper, box, vault, passphrase, each key and its
 encrypted form -- and those names are used as written, never a synonym. Never `data`, `contents`
 or `payload` for a variable or field we control: it is a whisper, or a whisperCiphered.
 
 **Never bare `key`.** In this package a key is cryptographic until proven otherwise, so:
 
 * a **cryptographic key** is named for its role, as VOCABULARY.md has it: `passphraseKey`,
-  `vaultKey`, `lockboxKey`, `leaseKey`. Not `kek` or `dek`. A WebCrypto `CryptoKey` and its
-  raw bytes are told apart by a tag: `lockboxKey` is the `CryptoKey`, `lockboxKeyBytes` the
+  `vaultKey`, `boxKey`, `leaseKey`. Not `kek` or `dek`. A WebCrypto `CryptoKey` and its
+  raw bytes are told apart by a tag: `boxKey` is the `CryptoKey`, `boxKeyBytes` the
   `Uint8Array`.
 * a **map key** is a `ckey` (see *Tags*).
 
@@ -56,6 +56,12 @@ or `payload` for a variable or field we control: it is a whisper, or a whisperCi
 
 **Never `type` to mean "kind"**, not even inside an identifier. `type` is reserved for a datatype;
 a menu choice is a `kind` or a `flavor`.
+
+**`ensure` acquires or constructs, idempotently.** `ensureLease()`, `ensureVaultProps()`: have
+one, or make one, and hand it back, so a second call costs nothing. A function that only checks
+and refuses is not an `ensure`: it is a `check` (`checkBoxlabel(label)`,
+`checkStrongEnough(passphrase)`), or a `parse` when it also hands back the cleaned value
+(*Validation*). Reviewers: an `ensure` that returns nothing is misnamed.
 
 **Stored fields are underbar_case** (`salt_bytes`, `memory_kib`): they are written to someone
 else's database, and stay one spelling from the wire to the code. Everything else is camelCase.
@@ -82,7 +88,7 @@ Specificity is a virtue (`saltBytes` says it is bytes), but don't tag the obviou
   freely chosen, usually by a user (`vaultlabel`, `boxlabel`). All four are strict: `\w` only,
   starting with a letter, ending with a letter or digit, two or more characters.
 * `_id`, `_tok` -- a stored `_id` is a hard identifier a record is found by (`vault_id`,
-  `wayin_id`); a value that changes on every write is a `_tok` (`revision_tok`). VOCABULARY.md
+  `device_id`); a value that changes on every write is a `_tok` (`revision_tok`). VOCABULARY.md
   has the rule.
 * `bytes` -- a `Uint8Array`; `fooBytes` for a particular one. `b64` -- base64url text of bytes;
   `fooB64`.
@@ -153,14 +159,29 @@ between columns lets the editor align them (see *Tests*).
   functions, its limits checks: `Z.optional(Z.string().check(Z.maxLength(256)))` where classic
   reads `z.string().max(256).optional()`. A test playing a host may import classic, as a host
   would.
-* Enumerations lead with their values, then the type: `export const LockboxKindVals = [...] as
-  const`, `export type LockboxKind = typeof LockboxKindVals[number]`.
+* Enumerations lead with their values, then the type: `export const BoxKindVals = [...] as
+  const`, `export type BoxKind = typeof BoxKindVals[number]`.
 * Name a schema after what it checks, in the same case: the field `salt_bytes` has the validator
   `salt_bytes`.
 * **A validation error must never quote a secret.** Zod's issues can carry the input they
   refused: a schema that sees secret material reports without it.
 * Records read back from storage are validated too: storage is someone else's database, and a
   vault may have been written by another version of this package.
+
+## Control flow and refusals
+
+* **Prioritize simple, analyzable control flow over UX niceties until the control flow is
+  mature** (the Coach, 2026-10-19). "We must not allow complicated interactions in the critical
+  path. If that leads to a horrible user experience, we'll use that as evidence for a flawed
+  design, outside the scope of current work; until then the code is safe and users will have to
+  deal." Add no retry, refresh, re-read or "if X then try Y" to the core: it is hello, then
+  unlock, then the operation.
+* **Generate refusal and logging statements that are safe, specific, actionable, empathetic to
+  the customer (failures) or the user (conditions)** (the Coach, 2026-10-19). Safe: no secret
+  material, in the message, a `cause` or `meta` (*Validation*). Specific: what went wrong, and a
+  `refusalkind` to branch on. Actionable: what to do next. Empathetic: a failure (misuse, bad
+  news) speaks to the developer integrating the package; a condition speaks, calmly, to the user
+  who will see it.
 
 ## Comments and doc blocks
 
@@ -170,10 +191,10 @@ between columns lets the editor align them (see *Tests*).
   what it is and how to use it, never how it came to be, what's next, or how it works inside. A
   caveat for future authors is a running comment by the code it concerns.
 * Lead with what the thing *is* or *returns*, skipping "Creates" and "Calculates" and articles
-  that add nothing: `One lockbox's whisper, ciphered under its lockboxKey`.
+  that add nothing: `One box's whisper, ciphered under its boxKey`.
 * Order: header, `@param`, `@returns`, a blank line, then `@example`s -- don't be stingy with
   those. A short example on one line; a long one on following lines, indented two spaces.
-* A `@param` is the parameter's role, an entry in the playbill: `@param boxlabel - Lockbox to
+* A `@param` is the parameter's role, an entry in the playbill: `@param boxlabel - Box to
   open, as its owner named it.`
 * The first line must stand alone when folded in an editor: `/** Brief statement */`, or a
   sentence that continues on the following lines.

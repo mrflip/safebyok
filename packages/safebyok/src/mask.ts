@@ -82,7 +82,7 @@ const butcher = (chars: readonly string[], { head, tail, minStars, maxLen }: Rec
 
 /**
  * A whisper's outline, to show in a log or a reminder: a whiff of interesting text from each end
- * with stars between, so a user can tell which API key a lockbox holds without the key being
+ * with stars between, so a user can tell which API key a box holds without the key being
  * revealed. It is best effort, not a copy: the result is always one plain line, and fidelity
  * gives way to that. The result is public: show it, but never count on it to hide more than it
  * does -- it gives away the whisper's ends, and (up to `maxLen`) its length.

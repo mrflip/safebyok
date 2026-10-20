@@ -2,9 +2,9 @@ import { v } from 'convex/values'
 
 /**
  * Convex validators for safebyok's stored records, field for field with the core's Zod records
- * (`Lockbox`, `VaultProps`, `Ciphered`, `VaultScope` in `safebyok`). They check what Convex can:
+ * (`BoxRecord`, `VaultProps`, `Ciphered`, `VaultScope` in `safebyok`). They check what Convex can:
  * which fields, their types, which are optional, and each record's `format`. Every name, and a
- * lockbox's sidecar, is any text here: the floor beneath every name (well-formed, NFC, no
+ * box's sidecar, is any text here: the floor beneath every name (well-formed, NFC, no
  * control characters, 1 KiB) and that the sidecar is JSON are the core's records' to hold, and what text each may be beyond it
  * the vault's validators', which the server never sees. The finer rules -- the floor, non-empty
  * strings, a positive whole `unlock_epoch`, each time's bounds as epoch milliseconds -- are the
@@ -36,23 +36,20 @@ export const VaultScope = v.object({
 })
 
 /** The VaultProps formats this package stores. */
-export const VaultPropsFormat = v.union(v.literal('safebyok-vault-v4'))
+export const VaultPropsFormat = v.union(v.literal('safebyok-vault-v5'))
 
-/** The formats of a Lockbox this package stores. */
-export const LockboxFormat = v.union(v.literal('safebyok-lockbox-v5'))
+/** The formats of a BoxRecord this package stores. */
+export const BoxFormat = v.union(v.literal('safebyok-box-v6'))
 
 /**
- * A passphrase's way into a vault: its `wayin_id` and `wayinlabel`, how its passphraseKey is
- * derived (`key_deriver_label`, `salt_b64`), which vaultKey it wraps (`vault_key_epoch`), the
- * device and time that added it (`device_id`, `registered_at`), and the vaultKey wrapped under
- * that passphraseKey.
+ * A passphrase's way into a vault: how its passphraseKey is derived (`key_deriver_label`,
+ * `salt_b64`), which vaultKey it wraps (`vault_key_epoch`), the device and time that added it
+ * (`device_id`, `registered_at`), and the vaultKey wrapped under that passphraseKey.
  *
- * @example { wayinkind: 'passphrase', wayin_id: '1b9d...', wayinlabel: 'passphrase', key_deriver_label: 'argon2id_web_v1', salt_b64: 'q83v...', vault_key_wayin_wrapped: { cipher_iv_b64, ciphertext_b64 } }
+ * @example { wayinkind: 'passphrase', key_deriver_label: 'argon2id_web_v1', salt_b64: 'q83v...', vault_key_wayin_wrapped: { cipher_iv_b64, ciphertext_b64 } }
  */
 export const PassphraseWayin = v.object({
   wayinkind:               v.literal('passphrase'),
-  wayin_id:                v.string(),
-  wayinlabel:              v.string(),
   key_deriver_label:       v.string(),
   salt_b64:                v.string(),
   vault_key_epoch:         v.number(),
@@ -62,16 +59,14 @@ export const PassphraseWayin = v.object({
 })
 
 /**
- * A passkey's way into a vault: its `wayin_id` and `wayinlabel`, which WebAuthn credential to ask
- * (`credential_id`) and the salt to ask its PRF with (`prf_salt_b64`), which vaultKey it wraps,
- * the device and time that added it, and the vaultKey wrapped under the key that answer makes.
+ * A passkey's way into a vault: which WebAuthn credential to ask (`credential_id`) and the salt
+ * to ask its PRF with (`prf_salt_b64`), which vaultKey it wraps, the device and time that added
+ * it, and the vaultKey wrapped under the key that answer makes.
  *
- * @example { wayinkind: 'passkey', wayin_id: '7c2e...', wayinlabel: 'laptop', credential_id: 'AXk3...', prf_salt_b64: 'q83v...', vault_key_wayin_wrapped: { cipher_iv_b64, ciphertext_b64 } }
+ * @example { wayinkind: 'passkey', credential_id: 'AXk3...', prf_salt_b64: 'q83v...', vault_key_wayin_wrapped: { cipher_iv_b64, ciphertext_b64 } }
  */
 export const PasskeyWayin = v.object({
   wayinkind:               v.literal('passkey'),
-  wayin_id:                v.string(),
-  wayinlabel:              v.string(),
   credential_id:           v.string(),
   prf_salt_b64:            v.string(),
   vault_key_epoch:         v.number(),
@@ -81,18 +76,11 @@ export const PasskeyWayin = v.object({
 })
 
 /**
- * One way into a vault, told apart by its `wayinkind`: a {@link PassphraseWayin} or a
- * {@link PasskeyWayin}. A new wayinkind widens this union, an additive deploy shipped with this
- * package.
- */
-export const Wayin = v.union(PassphraseWayin, PasskeyWayin)
-
-/**
  * A vault's props: its scope, `vault_id`, `unlock_epoch`, which vaultKey its ways in wrap
- * (`vault_key_epoch`, always 1: reserved for a rotation not yet built), its ways in (`wayins`, each the
- * vaultKey wrapped under a wayinKey one kind of wayin makes), and when it was made (`registered_at`, epoch
- * milliseconds). Nothing in it opens without a passphrase or passkey. How many ways in, and that no two
- * share an id or label, are the client's rules.
+ * (`vault_key_epoch`, always 1: reserved for a rotation not yet built), its two ways in -- the
+ * `passphrase` every vault has, and the `passkey` it may have (null when it has none), each the
+ * vaultKey wrapped under a wayinKey -- and when it was made (`registered_at`, epoch milliseconds).
+ * Nothing in it opens without a passphrase or passkey.
  */
 export const VaultProps = v.object({
   format:           VaultPropsFormat,
@@ -102,23 +90,24 @@ export const VaultProps = v.object({
   vault_id:         v.string(),
   unlock_epoch:     v.number(),
   vault_key_epoch:  v.number(),
-  wayins:           v.array(Wayin),
+  passphrase:       PassphraseWayin,
+  passkey:          v.nullable(PasskeyWayin),
   registered_at:    v.number(),
 })
 
 /**
- * One lockbox: its whisper ciphered under its own lockboxKey, that lockboxKey wrapped under the
+ * One box: its whisper ciphered under its own boxKey, that boxKey wrapped under the
  * vaultKey, and the visible fields -- boxlabel, revision, which vaultKey (`vault_key_epoch`), the
  * whisper's codec and schema version, the sidecar as JSON text (`sidecar_json`, always
  * written), and the epoch-millisecond times it was first stored (`registered_at`) and this
  * revision written (`written_at`).
  */
-export const Lockbox = v.object({
-  format:                 LockboxFormat,
+export const BoxRecord = v.object({
+  format:                 BoxFormat,
   boxlabel:               v.string(),
   revision_tok:           v.string(),
   vault_key_epoch:        v.number(),
-  lockbox_key_wrapped:    Ciphered,
+  box_key_wrapped:        Ciphered,
   whisper_ciphered:       Ciphered,
   whisper_codec:          v.literal('json_v1'),
   whisper_schema_version: v.literal(1),
@@ -128,10 +117,10 @@ export const Lockbox = v.object({
 })
 
 /**
- * A lockbox as a listing returns it: every field but the two ciphered ones, `format` kept, so the
+ * A box as a listing returns it: every field but the two ciphered ones, `format` kept, so the
  * client validates it as it would a whole record.
  */
-export const ListedLockbox = Lockbox.omit('lockbox_key_wrapped', 'whisper_ciphered')
+export const ListedBox = BoxRecord.omit('box_key_wrapped', 'whisper_ciphered')
 
 /**
  * What an update of the vault props was proven against: it lands only while the vault props
@@ -145,55 +134,55 @@ export const VaultPropsExpectation = v.object({
 })
 
 /**
- * What a lockbox update was written for and read: it lands only while the scope's vault props
- * have this `vault_id`, and the standing lockbox this `revision_tok` -- or, for null, there is no
- * lockbox. Its `vault_key_epoch` names the vaultKey the lockbox was sealed under.
+ * What a box update was written for and read: it lands only while the scope's vault props
+ * have this `vault_id`, and the standing box this `revision_tok` -- or, for null, there is no
+ * box. Its `vault_key_epoch` names the vaultKey the box was sealed under.
  *
  * @example { vault_id: vaultProps.vault_id, revision_tok: null, vault_key_epoch: vaultProps.vault_key_epoch } // a box that was not there
  */
-export const LockboxExpectation = v.object({
+export const BoxExpectation = v.object({
   vault_id:        v.string(),
   revision_tok:    v.nullable(v.string()),
   vault_key_epoch: v.number(),
 })
 
 /**
- * What a retire of a vault was meant for: the vault it lands in. A retire lands only while the
- * scope's vault props have this `vault_id` -- so a stale session never retires a vault made anew
+ * What a delete of a vault was meant for: the vault it lands in. A delete lands only while the
+ * scope's vault props have this `vault_id` -- so a stale session never deletes a vault made anew
  * elsewhere.
  *
  * @example { vault_id: vaultProps.vault_id }
  */
-export const RetireExpectation = v.object({
+export const VaultDelExpectation = v.object({
   vault_id: v.string(),
 })
 
 /**
- * What a retire of a lockbox was meant for: the vault it lands in, and the `revision_tok` its
- * writer read for the lockbox, or null for one listed damaged with none. It lands only while the
+ * What a delete of a box was meant for: the vault it lands in, and the `revision_tok` its
+ * writer read for the box, or null for one listed damaged with none. It lands only while the
  * scope's vault props have this `vault_id`, whatever revision stands -- so a stale session never
- * retires anything from a vault made anew elsewhere -- and the revision only says whether what it
- * removed was the one meant (a {@link LockboxRetirement}).
+ * deletes anything from a vault made anew elsewhere -- and the revision only says whether what it
+ * removed was the one meant (a {@link BoxDeletion}).
  *
  * @example { vault_id: vaultProps.vault_id, revision_tok: listed.revision_tok }
  */
-export const LockboxRetireExpectation = v.object({
+export const BoxDelExpectation = v.object({
   vault_id:     v.string(),
   revision_tok: v.nullable(v.string()),
 })
 
 /**
- * What a lockbox retire that landed removed: `retired`, the revision it named; `retired_other`,
+ * What a box delete that landed removed: `deleted`, the revision it named; `deleted_other`,
  * another (written over meanwhile, or one where it named none); `absent`, nothing.
  *
- * @example { outcome: 'retired' }
+ * @example { outcome: 'deleted' }
  */
-export const LockboxRetirement = v.object({
-  outcome: v.union(v.literal('retired'), v.literal('retired_other'), v.literal('absent')),
+export const BoxDeletion = v.object({
+  outcome: v.union(v.literal('deleted'), v.literal('deleted_other'), v.literal('absent')),
 })
 
 /**
- * One lockbox's place in a {@link VaultSignature}: `[boxlabel, revision_tok]`. Convex has no
+ * One box's place in a {@link VaultSignature}: `[boxlabel, revision_tok]`. Convex has no
  * fixed-length tuple validator, so any list of strings passes: the component makes these, and a
  * client only compares one signature with the next.
  */
@@ -201,7 +190,7 @@ const BoxRevision = v.array(v.string())
 
 /**
  * The vault's change signature: its vault props' `vault_id` and `unlock_epoch` (null while it has
- * no vault props) and each lockbox's `[boxlabel, revision_tok]`, in boxlabel order. It changes
+ * no vault props) and each box's `[boxlabel, revision_tok]`, in boxlabel order. It changes
  * exactly when a write lands in the vault, and holds nothing a listing does not already show.
  *
  * @example { vault_id: 'b3f1...', unlock_epoch: 2, boxes: [['anthropic_api_key', '9c4e...']] }

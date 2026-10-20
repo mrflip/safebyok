@@ -1,23 +1,30 @@
+import type { BoxRecord } from './box'
+import type { Capacity, DamagedBox, WayinSummary } from './types'
+
 /**
- * Every way a vault call can refuse, as a caller branches on them -- and every kind any safebyok
- * package throws: the storage adapters' kinds are these same strings. Each belongs to one of two
- * families, told apart by who must act:
+ * Every way a vault call can refuse, as a caller branches on them -- and every refusalkind any
+ * safebyok package refuses with: the storage adapters' kinds are these same strings. Each belongs
+ * to one of three families, told apart by who handles it:
  *
  * - **Misuse**: a programming error, the host developer's to fix, and loud. `bad_label`,
- *   `bad_whisper`, `bad_option`, `bad_record`, `vault_closed`, `unknown_key_deriver`, `insecure_context`. Let it reach an error
- *   boundary or the dev overlay; do not show it to the user, and do not retry.
+ *   `bad_whisper`, `bad_option`, `bad_record`, `vault_closed`, `unknown_key_deriver`,
+ *   `insecure_context`, `unexpected_error`. Let it reach an error boundary or the dev overlay; do not show it to the
+ *   user, and do not retry.
  * - **Condition**: something the app handles at run time, which may reach the user: ask again,
  *   show a message, retry, or tell them to free room. `vault_locked`, `wrong_passphrase`,
- *   `created_elsewhere`, `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `absent_box`, `absent_vault`, `absent_wayin`,
- *   `whisper_too_large`, `lockbox_too_large`, `vault_full`, `too_many_wayins`, `last_wayin`,
- *   `corrupt_record`, `damaged_vault`, `damaged_wayin`, `damaged_lockbox`, `newer_format`, `stale_write`,
- *   `rolled_back`, `not_permitted`, `identity_revoked`, `storage_unavailable`, `storage_blocked`.
+ *   `created_elsewhere`, `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `absent_box`,
+ *   `absent_vault`, `absent_wayin`, `whisper_too_large`, `box_too_large`, `vault_full`,
+ *   `corrupt_record`, `stale_write`, `not_permitted`,
+ *   `storage_unavailable`, `storage_blocked`.
+ * - **Bad news**: something the app is told about whether or not the call was refused, and
+ *   may show the user. `damaged_vault`, `damaged_wayin`, `damaged_box`, `newer_format`,
+ *   `rolled_back`, `identity_revoked`.
  *
- * `vault_full` means a new lockbox in a vault already holding its `maxLockboxes` (a limit the
+ * `vault_full` means a new box in a vault already holding its `maxBoxes` (a limit the
  * client keeps), and also that storage has no room for the write (a limit of the backend's own,
- * such as the Convex component's or the Postgres server's). Either way the user retires a lockbox,
- * or the host raises `maxLockboxes` where the backend allows. `whisper_too_large` is the user's value, with its
- * lockbox's sidecar, over `maxWhisperBytes`, so a condition, and `lockbox_too_large` the
+ * such as the Convex component's or the Postgres server's). Either way the user deletes a box,
+ * or the host raises `maxBoxes` where the backend allows. `whisper_too_large` is the user's value, with its
+ * box's sidecar, over `maxWhisperBytes`, so a condition, and `box_too_large` the
  * user's whisper and sidecar together over what storage holds in one record. `bad_label` is a label the app passed that fails the
  * vault's check, a misuse -- a label the user types is checked first, with `Label` or with the
  * host's own `validators.boxlabel`.
@@ -41,9 +48,10 @@
  * from `wrong_passphrase`, which says "check for typos". A passphrase that does open that vault
  * unlocks it as any unlock does, with no refusal at all.
  *
- * `weak_passphrase` is a new passphrase -- the one a vault is created with, one added, or one
- * changed to -- that the vault's `passphraseStrengthTest` finds too easy to guess; its message is
- * the test's own reason, which a field can show beside the passphrase. Never raised by `unlock()`
+ * `weak_passphrase` is a new passphrase -- the one a vault is created with, or one `putWayin()`
+ * sets -- that the vault's `strengthChecker` finds too easy to guess, or one `putWayin()` is handed
+ * blank (a blank one to `unlock()` is `wrong_passphrase`, as for any proof); its message is the
+ * checker's own reason, which a field can show beside the passphrase. Never raised by `unlock()`
  * of a vault that stands: a passphrase already in use is the user's to replace, not to be refused.
  *
  * `insecure_context` is a page served over plain http (anywhere but localhost), where the browser
@@ -51,7 +59,7 @@
  *
  * `newer_format` is a stored vault in a form this version does not know, which a newer version of
  * safebyok may have written: the user's next move is to update the app, never to start over, so
- * it is told apart from `damaged_vault`, and nothing retires it.
+ * it is told apart from `damaged_vault`, and nothing deletes it.
  *
  * `rolled_back` is storage handing back an older copy of a vault's props than this device has
  * already seen -- a backup restored over it, or storage tampered with -- which the vault refuses to
@@ -62,7 +70,7 @@
  * trying again may help. `storage_unavailable` is a failure a retry may mend: a backend that could
  * not be reached, or an error from storage that names no lasting cause -- a device store's
  * transaction aborted, its connection closed under it, a failure the browser gives no reason
- * for -- or, as the nearest kind, `zxcvbnPassphraseTest`'s word list that could not be fetched. `storage_blocked` is this device's own store -- its device store, or a vault kept on the
+ * for. `storage_blocked` is this device's own store -- its device store, or a vault kept on the
  * device, as `safebyok-indexeddb`'s -- refusing for a reason that holds until
  * something outside the app changes, so that trying again cannot help until then: the browser
  * withholding storage from the page (site data blocked, a sandboxed frame, cookies turned off:
@@ -76,33 +84,32 @@
  *
  * The package README's *Errors* section lists what each kind means and what to do about it.
  */
-export const VaultErrorKindVals = [
+export const RefusalKindVals = [
   'vault_locked',        // a whisper was asked for before the vault was unlocked
   'wrong_passphrase',    // the passphrase given did not unlock the vault
   'created_elsewhere',   // a first unlock found the vault just made on another device, under another passphrase
-  'weak_passphrase',     // a new passphrase the vault's passphraseStrengthTest finds too easy to guess
+  'weak_passphrase',     // a new passphrase the vault's strengthChecker finds too easy to guess
   'wrong_passkey',       // the passkey's answer did not unlock the vault, or was for another salt
   'passkey_unavailable', // this browser or authenticator cannot answer for a passkey unlock (no WebAuthn, or no PRF)
-  'absent_box',          // no lockbox under that label
+  'absent_box',          // no box under that label
   'absent_vault',        // the vault has never been created, and this call will not create it
-  'absent_wayin',        // no wayin of that wayin_id, or none of the wayinkind asked for
+  'absent_wayin',        // the vault has no passkey, and one was asked for: to unlock with, or to remove
   'bad_label',           // a label, or the userId, that fails the vault's check for it
   'bad_whisper',         // a whisper JSON cannot carry (undefined, a function, a class), or a non-string
-  'whisper_too_large',   // a whisper, with its lockbox's sidecar, over the vault's maxWhisperBytes
-  'lockbox_too_large',   // a lockbox -- whisper, names and sidecar together -- over what storage holds in one record
-  'vault_full',          // a new lockbox in a vault already holding its maxLockboxes, or a write storage has no room for
-  'too_many_wayins',     // a new wayin in a vault already holding MaxUnlocks
-  'last_wayin',          // removing the vault's last passphrase, which would leave no sure way in
-  'bad_option',          // an option or argument out of its range: Vault.make's, mask's, argon2idDeriver's, a storeBox()'s sidecar
+  'whisper_too_large',   // a whisper, with its box's sidecar, over the vault's maxWhisperBytes
+  'box_too_large',       // a box -- whisper, names and sidecar together -- over what storage holds in one record
+  'vault_full',          // a new box in a vault already holding its maxBoxes, or a write storage has no room for
+  'bad_option',          // an option or argument out of its range: Vault.make's, mask's, argon2idDeriver's, a putBox()'s sidecar
   'bad_record',          // a record or expectation handed to a VaultDB verb that is not one this package builds
   'vault_closed',        // the vault handle was closed and cannot be used again
   'corrupt_record',      // a stored record failed validation as storage read it back
   'damaged_vault',       // the vault's stored props failed their checks, so no way in can be tried
   'damaged_wayin',       // a way in is stored in a form this package never writes, so it cannot be tried
-  'damaged_lockbox',     // a lockbox failed its checks, or would not open under the vault's own vaultKey, or names no revision to store over
+  'damaged_box',         // a box failed its checks, or would not open under the vault's own vaultKey, or names no revision to store over
   'newer_format',        // a stored vault in a form this version does not know, which a newer one may have written
   'unknown_key_deriver', // the vault names a key deriver this handle was not built with
   'insecure_context',    // the page is not a secure context (plain http), where the browser withholds WebCrypto
+  'unexpected_error',    // something threw that is no refusal: a bug, in safebyok or in a function the app handed it
   'stale_write',         // storage changed since this device read it, so the write was refused
   'rolled_back',         // storage handed back an older copy of the vault than this device has seen, which it refuses to use
   'not_permitted',       // the storage backend refused the signed-in user this call: not theirs to make
@@ -110,56 +117,29 @@ export const VaultErrorKindVals = [
   'storage_unavailable', // the storage backend could not be reached, or failed: a retry may mend it
   'storage_blocked',     // this device's own store refuses until something outside the app changes: storage blocked, or no room
 ] as const
-export type VaultErrorKind = typeof VaultErrorKindVals[number]
+export type RefusalKind = typeof RefusalKindVals[number]
 
 /**
- * Error thrown by every vault operation that refuses: a calm message saying what went wrong and
- * what to do, and a `kind` to branch on. It never carries a whisper, a passphrase, or any other
- * secret material -- not in the message, not as a property.
- *
- * @example
- *   try { await vault.readBox('ANTHROPIC_API_KEY') } catch (err) {
- *     if (err instanceof VaultError && err.kind === 'vault_locked') { promptForPassphrase() }
- *   }
- */
-export class VaultError extends Error {
-  readonly kind: VaultErrorKind
-
-  /**
-   * @param kind - What went wrong, from {@link VaultErrorKindVals}: what a caller branches on.
-   * @param message - What went wrong and what to do, calmly. Never quotes secret material.
-   * @param opts - `cause`: the lower-level failure behind this one, such as a storage adapter's
-   *   own error, kept for debugging. Never a value that holds secret material.
-   */
-  constructor(kind: VaultErrorKind, message: string, opts?: ErrorOptions) {
-    super(message, opts)
-    this.name = 'VaultError'
-    this.kind = kind
-  }
-}
-
-/** True when `err` is a VaultError of the given kind. */
-export const isVaultError = (err: unknown, kind?: VaultErrorKind): err is VaultError => (
-  err instanceof VaultError && (kind === undefined || err.kind === kind)
-)
-
-/**
- * The two families a VaultError kind belongs to, told apart by who must act. `misuse` is a
+ * The three families a refusalkind belongs to, told apart by who handles it. `misuse` is a
  * programming error, the host developer's to fix: let it reach an error boundary or the dev
  * overlay, never show it to the user, never retry. `condition` is something the app handles at
- * run time, which may reach the user: ask again, show a message, retry.
+ * run time, which may reach the user: ask again, show a message, retry. `bad_news` is something
+ * the app is told whether or not the call was refused -- damage found, storage that went back in
+ * time, a user signed out -- which it may show the user.
  */
-export const VaultErrorFamilyVals = ['misuse', 'condition'] as const
-export type VaultErrorFamily = typeof VaultErrorFamilyVals[number]
+export const RefusalFamilyVals = ['misuse', 'condition', 'bad_news'] as const
+export type RefusalFamily = typeof RefusalFamilyVals[number]
 
 /**
- * Which family each kind belongs to: every kind in {@link VaultErrorKindVals}, exactly once.
+ * Which family each refusalkind belongs to: every kind in {@link RefusalKindVals}, exactly once.
+ * A VaultError's `family` is read from it.
  *
- * @example VaultErrorFamilyForKind.bad_option           // 'misuse'
- * @example VaultErrorFamilyForKind.bad_record           // 'misuse'
- * @example VaultErrorFamilyForKind.storage_unavailable  // 'condition'
+ * @example RefusalFamilyForKind.bad_option           // 'misuse'
+ * @example RefusalFamilyForKind.bad_record           // 'misuse'
+ * @example RefusalFamilyForKind.storage_unavailable  // 'condition'
+ * @example RefusalFamilyForKind.damaged_box          // 'bad_news'
  */
-export const VaultErrorFamilyForKind = {
+export const RefusalFamilyForKind = {
   vault_locked:        'condition',
   wrong_passphrase:    'condition',
   created_elsewhere:   'condition',
@@ -172,39 +152,112 @@ export const VaultErrorFamilyForKind = {
   bad_label:           'misuse',
   bad_whisper:         'misuse',
   whisper_too_large:   'condition',
-  lockbox_too_large:   'condition',
+  box_too_large:       'condition',
   vault_full:          'condition',
-  too_many_wayins:     'condition',
-  last_wayin:          'condition',
   bad_option:          'misuse',
   bad_record:          'misuse',
   vault_closed:        'misuse',
   corrupt_record:      'condition',
-  damaged_vault:       'condition',
-  damaged_wayin:       'condition',
-  damaged_lockbox:     'condition',
-  newer_format:        'condition',
+  damaged_vault:       'bad_news',
+  damaged_wayin:       'bad_news',
+  damaged_box:         'bad_news',
+  newer_format:        'bad_news',
   unknown_key_deriver: 'misuse',
   insecure_context:    'misuse',
+  unexpected_error:    'misuse',
   stale_write:         'condition',
-  rolled_back:         'condition',
+  rolled_back:         'bad_news',
   not_permitted:       'condition',
-  identity_revoked:    'condition',
+  identity_revoked:    'bad_news',
   storage_unavailable: 'condition',
   storage_blocked:     'condition',
-} as const satisfies Readonly<Record<VaultErrorKind, VaultErrorFamily>>
+} as const satisfies Readonly<Record<RefusalKind, RefusalFamily>>
 
 /**
- * True when `err` is a VaultError of the `condition` family: one the app may show the user, or
- * retry. Anything else -- misuse, an error that is not a VaultError, a thrown non-error -- is
- * false, and belongs with an error boundary.
+ * What a refusal learned, each fact under its own name. Each is filled only by the refusals that
+ * name it, and holds records as storage holds them -- ciphertext and visible fields -- never
+ * secret material.
+ */
+export type RefusalMeta = {
+  /** `stale_write`: the box that won, as stored; null when nothing stands under the boxlabel. */
+  box_stored?:   BoxRecord | null
+  /** `box_too_large`, `vault_full`: how much room there is. */
+  capacity?:     Capacity
+  /** `damaged_box` told of a listing: the box as the listing shows it, its boxlabel and the revision it names. */
+  box_listed?:   DamagedBox
+  /** `damaged_wayin` told of a read of the vault props: the way in as the snapshot shows it. */
+  wayin_listed?: WayinSummary
+}
+
+/** What a VaultError is made with beside its refusalkind and message: the `cause` behind it, and its `meta`. */
+export type VaultErrorOpts = ErrorOptions & { meta?: RefusalMeta }
+
+/**
+ * Every refusal any safebyok call makes: a calm message saying what went wrong and what to do, a
+ * `refusalkind` to branch on, and the `family` that says who handles it. It never carries a
+ * whisper, a passphrase, or any other secret material -- not in the message, its `cause` or its
+ * `meta`, not as a property.
  *
  * @example
- *   try { await vault.storeBox(boxlabel, whisper) } catch (err) {
- *     if (! isVaultCondition(err)) { throw err }
+ *   try { await vault.getBox('ANTHROPIC_API_KEY') } catch (err) {
+ *     if (isVaultError(err, 'vault_locked')) { promptForPassphrase() }
+ *   }
+ * @example
+ *   const { ok, val, err } = await vaultDB.getVaultProps(scope)
+ *   if (! ok && err.family === 'misuse') { throw err }
+ */
+export class VaultError extends Error {
+  /** What went wrong, from {@link RefusalKindVals}: what a caller branches on. */
+  readonly refusalkind:  RefusalKind
+  /** Who handles it, read from {@link RefusalFamilyForKind}: `misuse`, `condition` or `bad_news`. */
+  readonly family:       RefusalFamily
+  /** What the refusal learned, each fact under its own name, when it learned any. */
+  declare readonly meta?: RefusalMeta
+
+  /**
+   * @param refusalkind - What went wrong, from {@link RefusalKindVals}: what a caller branches on.
+   * @param message - What went wrong and what to do, calmly. Never quotes secret material.
+   * @param opts - `cause`: the lower-level failure behind this one, such as a storage adapter's
+   *   own error, kept for debugging. `meta`: what the refusal learned, as {@link RefusalMeta}
+   *   names it. Never a value that holds secret material.
+   */
+  constructor(refusalkind: RefusalKind, message: string, opts?: VaultErrorOpts) {
+    const { meta, ...errorOpts } = opts ?? {}
+    super(message, errorOpts)
+    this.name = 'VaultError'
+    this.refusalkind = refusalkind
+    this.family = RefusalFamilyForKind[refusalkind]
+    if (meta !== undefined) { this.meta = meta }
+  }
+}
+
+/**
+ * True when `err` is a VaultError, and of the given `refusalkind` when one is given: the one test
+ * for a refusal, which safebyok asks everywhere it branches on one, and a host should too. An
+ * error that only names itself `VaultError` and carries a `refusalkind` -- one rebuilt from a
+ * server's JSON, say -- is not one, nor is a VaultError of a second copy of safebyok loaded beside
+ * this one (an ESM and a CJS build side by side): that is a foreign throw, met as any other.
+ *
+ * @example
+ *   try { await vault.getBox('ANTHROPIC_API_KEY') } catch (err) {
+ *     if (isVaultError(err, 'vault_locked')) { promptForPassphrase() }
+ *   }
+ */
+export const isVaultError = (err: unknown, refusalkind?: RefusalKind): err is VaultError => (
+  err instanceof VaultError && (refusalkind === undefined || err.refusalkind === refusalkind)
+)
+
+/**
+ * True when `err` is a VaultError the app may show the user, or retry: one of the `condition`
+ * family, or of `bad_news`. Anything else -- misuse, an error that is not a VaultError, a thrown
+ * non-error -- is false, and belongs with an error boundary.
+ *
+ * @example
+ *   try { await vault.putBox(boxlabel, whisper) } catch (err) {
+ *     if (! isCondition(err)) { throw err }
  *     showGripe(err.message)
  *   }
  */
-export const isVaultCondition = (err: unknown): err is VaultError => (
-  isVaultError(err) && VaultErrorFamilyForKind[err.kind] === 'condition'
+export const isCondition = (err: unknown): err is VaultError => (
+  isVaultError(err) && err.family !== 'misuse'
 )

@@ -7,7 +7,7 @@ decide. Add an entry at the end of the list, dated, with the ruling or the row i
 
 * 2026-10-16 (G129, the Coach: "make a file WONTFIX"): **one device, one setting.** Opening the
   same vault on one device with different settings -- a different `leaseHours`,
-  `maxWhisperBytes`, `maxLockboxes`, `validators` or `keyDeriver` -- is
+  `maxWhisperBytes`, `maxBoxes`, `validators` or `keyDeriver` -- is
   undefined behaviour, whether the handles are in one tab or in two. A device keeps one lease
   and one device mark per vault, shared by every handle on it, and each handle reads them by its
   own settings. Today, for the lease: an open with a shorter `leaseHours` than the lease was

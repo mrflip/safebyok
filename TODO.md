@@ -12,7 +12,7 @@ Small irritants, each a few lines, picked up by whoever is nearby.
 * **Postgres `InsertBoxOutcome` typed loosely.** From the reform2 sprint
   ([#177](https://github.com/mrflip/safebyok/pull/177)'s review; the Coach: "add as todo"):
   `insertBox` in `safebyok-postgres/src/postgres-vault-db.ts` casts its row to a type naming only
-  the four flags, its lockbox columns untyped beside them. Type them, or return the lockbox as
+  the four flags, its box columns untyped beside them. Type them, or return the box as
   one `row_to_json` column, next time Postgres is touched.
 * **GraphQL's `'plain'` field class.** From the reform2 sprint
   ([#176](https://github.com/mrflip/safebyok/pull/176); the Coach: "yes", leave it for a later
@@ -84,14 +84,14 @@ Revisit before 1.0 if rotation signing every other device out is too blunt.
 `softlock_gone` (2026-10-19) removed the schema rotation would have written: the vault props'
 `prior_vault_key` (the vaultKey before, wrapped under the current one) and the check that it sat
 one epoch below theirs. `vault_key_epoch` stays on every record, reserved at 1, with storage's
-comparison of a lockbox's epoch against the vault props'.
+comparison of a box's epoch against the vault props'.
 
-### `retire()`'s edge cases
+### `del()`'s edge cases
 
 From the Convex sprint ([#18](https://github.com/mrflip/safebyok/pull/18)): a handle that never
-saw vault props resolves `retire()` without retiring anything, even if a vault has since appeared elsewhere, so
-"delete account" can report success while a vault stands. And after a refused `retire()`, an
-app's automatic retry retires the vault that was made again in between. The Coach (2026-10-16):
+saw vault props resolves `del()` without deleting anything, even if a vault has since appeared elsewhere, so
+"delete account" can report success while a vault stands. And after a refused `del()`, an
+app's automatic retry deletes the vault that was made again in between. The Coach (2026-10-16):
 assess these once the contract is tight and the tests unified -- that is, against
 `packages/safebyok/VAULTDB.md` ([#107](https://github.com/mrflip/safebyok/pull/107)) and the
 shared battery ([#114](https://github.com/mrflip/safebyok/pull/114)), after the Convex tests settle
@@ -109,7 +109,9 @@ mechanism per case now. The scenarios, each with today's outcome:
 
 1. `lock()` lands during an unlock's derivation or its lease write, same handle: the unlock
    finishes; the vault is unlocked and a lease written. A `lock()` while a `hello()` reads the
-   lease likewise: the hello takes it up.
+   lease is the exception: since the contract sprint's A3 (a stale hello re-reads the lease, so
+   this became routine) a key dropped or replaced during a lease take-up aborts it, and the hello
+   takes nothing up.
 2. The same, the lock in another tab on this device: as 1; the lease write is no longer refused.
 3. A read's fetch or decipher straddles a lock: refused `vault_locked` if no key is in hand when
    the whisper is ready; handed back if another unlock has put a key in hand meanwhile.
@@ -129,16 +131,23 @@ answers the question this entry replaces (*Lock NOW vs soft lock*, from
 [#106](https://github.com/mrflip/safebyok/pull/106)): whether `lock()` claws back a store already in
 flight.
 
-### Are we doing anyone a favor by accepting multiple passphrases?
+### Must the passphrase be asked again once a vault has a passkey?
 
-From [#126](https://github.com/mrflip/safebyok/pull/126) (thread 6): `changePassphrase` takes any
-proof, a passkey's included, and when a vault has several passphrases and the proof is a passkey,
-the caller must name which to replace (`wayinId`), or the call is refused rather than guessing.
-The Coach (2026-10-16): "keep as built, but this is too complicated for a user to tolerate or a
-customer to implement UX for." Decide whether a vault should hold more than one passphrase at
-all, or exactly one, with passkeys the other wayins. The Gripefest doc's NOT YET row G530 asks the
-deeper question beside it: whether asking for the passphrase again whenever a lease expires is still the right demand once a
-vault has a passkey. Decide both before the wayin surface is 1.0.
+The Gripefest doc's NOT YET row G530: whether asking for the passphrase again whenever a lease
+expires is still the right demand once a vault has a passkey. (The question beside it, whether a
+vault should hold several passphrases, was settled by the Coach on 2026-10-19: one passphrase and
+at most one passkey, built in `slots`, B4a of the contract sprint.) Decide before the wayin
+surface is 1.0.
+
+### A passkey made for a refused `putWayin`
+
+From the contract sprint's B4 (`put_wayin`): `vault.putWayin(passphrase, answer)` takes a passkey's
+answer made before the call, so the core holds no UI and calls no host code inside the change. A
+passphrase the vault then refuses -- a typo -- leaves that new passkey on the authenticator, a way
+into nothing, and each retry makes another. The earlier `addPasskey(passphrase, makePasskey)` asked
+the authenticator only once the proof held, at the cost of host code inside the call. Decide, once
+the control flow is mature, whether the user experience earns a check of the passphrase ahead of
+`createPasskey` (a separate call, or a maker again), or whether the README's note is enough.
 
 ### Identity should not be tied to the backing database
 
@@ -147,6 +156,41 @@ backing database." No design yet. Today a vault is found by the scope's `user_id
 storage adapter reads from the host's own auth (a Convex subject, a Postgres `userId`, a GraphQL
 context); the question is what a vault's identity is, so that a host can change its database
 without orphaning vaults.
+
+### Changing a vault's scope means a new vault
+
+The Coach (2026-10-19, sprint contract): "changing scope requires a new vault from scratch:
+vault_id, applabel, user_id, vaultlabel are immutable." A vault's scope fields are fixed for its
+life (a test holds every field its snapshot shows read-only), so renaming a vault, or moving it to
+a new `user_id` -- an auth provider changed, accounts merged -- means making a new vault and
+storing each whisper again, the old one's passphrase in hand. Decide whether safebyok offers that
+move as a call, or documents it as the host's, alongside *Identity should not be tied to the
+backing database*.
+
+### A throwing `getProof` is always `unexpected_error`
+
+The Coach (2026-10-19, sprint contract): "a throwing getProof is always unexpected_error: we need
+to allow more specificity." Today the answer is checked once, as the vault raises each ask (`src/ask.ts`): a
+throw from the host's `getProof` becomes `unexpected_error` (misuse), whatever it threw, so a
+dialog that fails for a reason the host could name -- a lost user gesture, a passkey the platform
+refused -- cannot say so. Decide what a `getProof` may refuse with: a `VaultError` it throws kept
+as it came (as `outcomeOf` keeps one elsewhere), a fourth answer, or a short list of kinds.
+
+### Should `tryClose` be a promise?
+
+The Coach (2026-10-19, sprint contract): "should tryClose really be a promise." Every `try` form
+resolves its `Outcome`, but `tryClose()` answers one at once, because `close()` stays synchronous
+for React's effect cleanup (thread A4). Decide with phase C's close (C5): whether `tryClose`
+resolves, as its twins do, and whether a close waits for the calls it refuses.
+
+### Redaction, batteries included
+
+The Coach (2026-10-19, sprint contract): "redact with batteries included opts." A refusal's
+`cause` chain carries a storage driver's own errors, which may name the database, a statement or a
+parameter: `safebyok-graphql` hands the refusal on as its `GraphQLError`'s `cause`, for the
+server's logs, so an in-process GraphQL host logs the chain whole. Offer options that redact it
+-- a `cause` dropped, or cut to its class and message, at `vaultResolvers` or the logger -- on by
+default, so a host gets the safe log without writing a formatter of its own.
 
 ### Call-time work that could be composed once or memoized
 
@@ -165,38 +209,40 @@ new record, so the next open asks for the passphrase. The direction is safe, and
 refreshes does not cure it. The Coach (2026-10-16): into the TODO, beside the multiple-passphrases
 question. The fix, small: do not judge `outlived` against vault props this handle wrote itself.
 
-### A "newer, don't touch" state for lockboxes
+### Cross-device invalidation, by a token each device authenticates
 
-From [#163](https://github.com/mrflip/safebyok/pull/163) (thread 5 and its review): a lockbox has
-no format version to read ahead of, so it has no newer-format state. A lockbox in any format but
-today's lists as damaged, and an app on an older safebyok shows a lockbox written by a newer one as
-damaged, where the user may retire it or store over it (only on the user's own action, never by
-the vault). The Coach: "Yes add to TODO: version number on lockbox." Give lockboxes a "newer, don't
+From the contract sprint's `a_sec2` ([#203](https://github.com/mrflip/safebyok/pull/203)'s second
+review): a device learns that another deleted the vault, or changed its ways in, only when it next
+reads, so until then it may stay unlocked on vault props that no longer stand (it fails safe at
+that read: the key is dropped and the lease erased). `a_sec2` closed the one window where that
+could outlast a read, a first unlock creating the vault as it is deleted. The Coach (2026-10-19):
+"cross device invalidation should be done by a proper mechanism that is coming, where each device
+authenticates a token when it joins or creates a vault." Not to be built piecemeal ahead of it: the
+design question is the token, what storage checks it against, and how a deletion revokes it.
+
+### A "newer, don't touch" state for boxes
+
+From [#163](https://github.com/mrflip/safebyok/pull/163) (thread 5 and its review): a box has
+no format version to read ahead of, so it has no newer-format state. A box in any format but
+today's lists as damaged, and an app on an older safebyok shows a box written by a newer one as
+damaged, where the user may delete it or store over it (only on the user's own action, never by
+the vault). The Coach: "Yes add to TODO: version number on box." Give boxes a "newer, don't
 touch" state like the vault's `newer_format`: the format tag read as a version, so that a newer
-lockbox lists as one to leave alone and an older, unreadable one still lists as damaged.
+box lists as one to leave alone and an older, unreadable one still lists as damaged.
 
-## hello, make and the react lifecycle
+## The react lifecycle
 
-The Coach (2026-10-18), on the make_hello sprint's review: "This sounds like a design issue, sweep
-to a todo section for all of the below, hello and make and react lifecycle." Four behaviours that
-came with `Vault.make` and `hello()` ([#166](https://github.com/mrflip/safebyok/pull/166)); each
-works as built, and a redesign of the lifecycle may change all four.
-
-* **`lock()` and `close()` don't wait for `hello()`.** Every other method waits for storage to
-  answer first; these two act at once. A lock made while `hello()` runs no longer wins over taking
-  up the lease (*Lock timing vs. work in flight*, scenario 1). `retire()` waits. (#166, thread 8)
-* **A failed `hello()` keeps the handle alive.** A refused `hello()` no longer closes the storage
-  watch, so the same handle can retry; after an untrusted-storage refusal the next call meets that
-  refusal again rather than `vault_locked`. (#166, thread 8)
-* **React's vault is non-null while opening.** `VaultProvider` hands down the handle at once, in
-  state `opening`; `openError` comes from the snapshot's trouble, and `retryOpen()` no longer clears
-  it while the retry runs. A host checking `vault !== null` for "ready" must check the state
-  instead. (#166, thread 8)
-* **The `react-hooks/set-state-in-effect` suppression in `vault-provider.tsx`.** `VaultProvider`
-  makes the vault in an effect, and `Vault.make` throws synchronously (`bad_option`, for one), so
-  the failure is set in the effect body. Making the vault in render doubles its side effects under
-  StrictMode, and deferring the failure brings back a late handle. A lifecycle redesign may remove
-  the need for the suppression. (#166, thread 8 and review)
+`VaultProvider` makes its vault in an effect and hands it down with `setVault` from that effect,
+under a `react-hooks/set-state-in-effect` suppression (`safebyok-react/src/vault-provider.tsx`).
+Thread A5 of the contract sprint ([#199](https://github.com/mrflip/safebyok/pull/199)) moved the
+suppression to `setVault` and closed this section; the Coach (2026-10-19) reopened it: "Leave the
+todo, this is a big problem. Don't need a fix, do need the caveat." The caveat for hosts is in
+`safebyok-react`'s README (*Use*): the vault one render late, `null` on the first render and on the
+server, a second render of the subtree per vault made, and calls on the old vault refused
+`vault_closed` as a prop changes. Making the vault in render doubles its side effects under
+StrictMode, and deferring a refused `Vault.make` brings back a late handle; a lifecycle redesign
+(a store outside React that the provider subscribes to, say) may remove the need. (#166, thread 8
+and review; a_fixes)
 
 ## Accessibility
 

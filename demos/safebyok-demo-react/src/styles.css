@@ -91,8 +91,8 @@ th, td { padding: 0.35rem 0.6rem 0.35rem 0; border-bottom: 1px solid var(--line)
 
 .whisper-cell code { word-break: break-all; }
 
-.lockbox-form { border-top: 1px dashed var(--line); margin-top: 0.75rem; padding-top: 0.75rem; display: grid; gap: 0.5rem; }
-.lockbox-form label { display: grid; gap: 0.2rem; font-size: 0.9rem; }
+.box-form { border-top: 1px dashed var(--line); margin-top: 0.75rem; padding-top: 0.75rem; display: grid; gap: 0.5rem; }
+.box-form label { display: grid; gap: 0.2rem; font-size: 0.9rem; }
 
 .chip {
   font-size: 0.8rem;

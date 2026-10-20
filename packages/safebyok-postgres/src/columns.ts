@@ -1,9 +1,9 @@
-import type { Lockbox, VaultProps } from 'safebyok'
+import type { BoxRecord, VaultProps } from 'safebyok'
 
 /**
  * How one field is stored: `text` as given, `bigint` for a whole number (a time, an epoch), and
- * `jsonb` for an opaque structured value -- a Ciphered, or the vault props' list of wayins -- whose ctx safebyok rebuilds from field values, so jsonb's reordering of keys is
- * harmless. A lockbox's `sidecar_json` is `text`: its exact text is what is bound.
+ * `jsonb` for an opaque structured value -- a Ciphered, or one of the vault props' two ways in -- whose ctx safebyok rebuilds from field values, so jsonb's reordering of keys is
+ * harmless. A box's `sidecar_json` is `text`: its exact text is what is bound.
  */
 export type ColumnKind = 'text' | 'bigint' | 'jsonb'
 
@@ -36,21 +36,22 @@ export const VaultPropsColumns = everyFieldOf<VaultProps>()([
   ['format',           'text'],
   ['unlock_epoch',     'bigint'],
   ['vault_key_epoch',  'bigint'],
-  ['wayins',           'jsonb'],
+  ['passphrase',       'jsonb'],
+  ['passkey',          'jsonb'],
   ['registered_at',    'bigint'],
 ] as const)
 
 /**
- * Every field of a Lockbox, in `safebyok_lockboxes`'s order after the four columns the adapter
+ * Every field of a BoxRecord, in `safebyok_boxes`'s order after the four columns the adapter
  * adds (the vault's scope and `vault_id`, never part of the record). The compiler holds it to the
- * lockbox's shape.
+ * box's shape.
  */
-export const LockboxColumns = everyFieldOf<Lockbox>()([
+export const BoxColumns = everyFieldOf<BoxRecord>()([
   ['format',                 'text'],
   ['boxlabel',               'text'],
   ['revision_tok',           'text'],
   ['vault_key_epoch',        'bigint'],
-  ['lockbox_key_wrapped',    'jsonb'],
+  ['box_key_wrapped',        'jsonb'],
   ['whisper_ciphered',       'jsonb'],
   ['whisper_codec',          'text'],
   ['whisper_schema_version', 'bigint'],
@@ -59,8 +60,8 @@ export const LockboxColumns = everyFieldOf<Lockbox>()([
   ['written_at',             'bigint'],
 ] as const)
 
-/** A lockbox as a listing reads it: every column but the two ciphered ones. */
-export const ListedLockboxColumns = LockboxColumns.filter(([field]) => field !== 'lockbox_key_wrapped' && field !== 'whisper_ciphered')
+/** A box as a listing reads it: every column but the two ciphered ones. */
+export const ListedBoxColumns = BoxColumns.filter(([field]) => field !== 'box_key_wrapped' && field !== 'whisper_ciphered')
 
 
 /**
@@ -108,9 +109,9 @@ export const selected = (columns: readonly Column[]): string => columns.map(([fi
 
 /**
  * The record's values for its columns, in their order, as {@link placeholders} numbers them: a
- * jsonb value as its JSON text, and a field the record leaves out as null.
+ * jsonb value as its JSON text, and a null field, or one the record leaves out, as null.
  *
- * @example paramsOf({ vault_id: 'v1', wayins: undefined }, [['vault_id', 'text'], ['wayins', 'jsonb']])  // ['v1', null]
+ * @example paramsOf({ vault_id: 'v1', passkey: null }, [['vault_id', 'text'], ['passkey', 'jsonb']])  // ['v1', null]
  */
 export const paramsOf = (record: object, columns: readonly Column[]): unknown[] => (
   columns.map(([field, kind]) => {
@@ -121,18 +122,19 @@ export const paramsOf = (record: object, columns: readonly Column[]): unknown[] 
 )
 
 /**
- * A row read through {@link selected}, as the record it stores: a null column as a field left
+ * A row read through {@link selected}, as the record it stores: a null column as a null field
+ * (the vault props' `passkey`, when the vault has none), a column the row lacks as a field left
  * out, and a jsonb column's text parsed. Nothing is checked here: the VaultDB validates what it
  * reads. A row that is not an object comes back as it is, for that validation to refuse.
  *
- * @example recordOf({ vault_id: 'v1', wayins: null }, [['vault_id', 'text'], ['wayins', 'jsonb']])  // { vault_id: 'v1' }
+ * @example recordOf({ vault_id: 'v1', passkey: null }, [['vault_id', 'text'], ['passkey', 'jsonb']])  // { vault_id: 'v1', passkey: null }
  */
 export const recordOf = (row: unknown, columns: readonly Column[]): unknown => {
   if (typeof row !== 'object' || row === null) { return row }
   const cells = row as Record<string, unknown>
   return Object.fromEntries(columns.flatMap(([field, kind]) => {
     const cell = cells[field]
-    if (cell === null || cell === undefined) { return [] }
+    if (cell === undefined) { return [] }
     return [[field, kind === 'jsonb' && typeof cell === 'string' ? JSON.parse(cell) as unknown : cell]]
   }))
 }

@@ -22,11 +22,11 @@ TH.describeOnPostgres('battery', "postgresVaultDB over a real Postgres", () => {
     const vaultDBFor = await freshServer(vaultDBOpts)
     return TH.perUser((userId) => vaultDBFor(userId))
   }, {
-    makeCappedVaultDB:     async (maxLockboxes) => {
+    makeCappedVaultDB:     async (maxBoxes) => {
       const db = getDb()
       await db.endDevices()
       await db.empty()
-      const vaultDBFor = TH.deviceOver(db, undefined, { maxLockboxes })
+      const vaultDBFor = TH.deviceOver(db, undefined, { maxBoxes })
       return TH.perUser((userId) => vaultDBFor(userId))
     },
     makeVaultDBFor: async () => {

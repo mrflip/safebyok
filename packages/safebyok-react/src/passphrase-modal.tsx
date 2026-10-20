@@ -1,6 +1,7 @@
-import { useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type Ref, type SubmitEvent } from 'react'
-import { ForeverMillis, MinuteMillis, isVaultCondition, isVaultError, type Vault } from 'safebyok'
-import { Boundary, useRoundFor } from './boundary'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type Ref, type SubmitEvent } from 'react'
+import { ForeverMillis, MinuteMillis, Sanitizer, isCondition, isVaultError, type Ask, type ProofAnswer } from 'safebyok'
+import { attemptRefusalFlavor } from './attempt-refusals'
+import { Boundary, forBoundary, useRoundFor } from './boundary'
 import { Locale, Messages } from './messages'
 import { PasskeyUnlockButton, offersPasskey } from './passkey-unlock-button'
 import { useIsMounted } from './is-mounted'
@@ -46,33 +47,39 @@ const unlockedFor = (leaseMillis: number, creating: boolean): string => {
 }
 
 /**
- * The dialog withUnlockedVault summons when the vault turns out to be locked. Unstyled markup
- * under the `modal-scrim` / `modal` / `quiet` / `gripe` class names, for the host's stylesheet
- * to dress, with a dialog's semantics: the scrim is the `dialog`, named by its heading, and
- * Escape anywhere in it cancels. Its behaviors are the contract: a first-ever unlock reads as
- * "choose a passphrase" (it creates the vault); a wrong passphrase stays in the dialog with a
- * calm message rather than failing the action; and an unlock that loses to a `lock()` called
- * while it ran closes the dialog as if dismissed. Whichever the case, it says plainly that a
- * forgotten passphrase cannot be recovered, and how long an unlock lasts on this device. For a
- * vault with a passkey, in a browser offering WebAuthn, "Use a passkey" comes first, and takes
- * the focus.
+ * The passphrase dialog: safebyok-react's `getProof`, which `VaultProvider` shows for each
+ * {@link Ask} the vault hands it, unless given a `getProof` of the host's own. A host writing its
+ * own `getProof` may render it too: hand it the ask, and answer with what `onDone` is told.
+ * Unstyled markup under the `modal-scrim` / `modal` / `quiet` / `gripe` class names, for the
+ * host's stylesheet to dress, with a dialog's semantics: the scrim is the `dialog`, named by its
+ * heading, and Escape anywhere in it cancels, answering `declined`. Each submit is one
+ * `ask.attempt`. Its behaviors are the contract: an ask whose `why` is `absent` reads as "choose a
+ * passphrase" (it creates the vault); a wrong passphrase stays in the dialog with a calm message;
+ * an attempt that is ok answers `unlocked`; and a lock that lands while it is up -- its ask's
+ * `lockLanded` -- closes it, answering `declined`, as does an attempt the lock won. Whichever the
+ * case, it says plainly that a forgotten passphrase cannot be recovered, and how long an unlock
+ * lasts on this device. For a vault with a passkey, in a browser offering WebAuthn, "Use a
+ * passkey" comes first, and takes the focus. A vault that comes to be unlocked while it asks for
+ * a locked or absent one -- by `unlock()` elsewhere in the app, say -- answers it `unlocked`.
  *
  * It follows the vault as it changes -- a vault made on another device meanwhile turns "choose"
- * into "unlock", a passkey added brings its button -- and handed another vault, it starts afresh,
- * keeping nothing typed for the last. Taken away, it lets go: an unlock, a retire or advice still
- * under way finishes unheard, calling `onDone` no more and showing nothing (the vault's own
- * snapshot says whether an unlock landed).
+ * into "unlock", a passkey added brings its button -- and handed another ask, it starts afresh,
+ * keeping nothing typed for the last. Taken away, it lets go: an attempt, a delete or advice still
+ * under way finishes unheard, calling `onDone` no more and showing nothing. It calls `onDone` once.
  *
- * A condition the unlock meets (storage that cannot be reached, a record that fails
- * verification) shows in the dialog in place, in the vault's own calm words, through a live
- * region a screen reader announces, and the user may try again or cancel. A first unlock that
+ * The refusals an attempt meets it handles as `Ask.attempt` groups them. A wrong
+ * passphrase or passkey, a weak new passphrase, or a way in that cannot answer shows in the dialog
+ * in place, in the vault's own calm words, through a live region a screen reader announces, and
+ * the user may try again or cancel. A lock that won, storage out of reach, or any other refusal
+ * closes it, answering `declined`. A first unlock that
  * lost the race to create the vault to another device (`created_elsewhere`) is shown as advice,
  * in the `quiet` style rather than the `gripe` one -- it is no typo -- and the dialog, now an
  * unlock of that vault, stays open: the field is emptied and focused for the passphrase chosen
  * there, and the advice stays, through typing, until the next submit. Anything else --
  * misuse, such as a closed vault handle, or a failure that is no VaultError -- never reaches the
  * host's page: the dialog shows a calm notice in its place, "Something went wrong", whose Close
- * (or Escape) calls `onDone(false)`, and React reports the error through the root's
+ * (or Escape) calls `onDone('declined')` -- unless a lock lands or the vault unlocks under it first,
+ * as for the form -- and React reports the error, carrying nothing typed, through the root's
  * `onCaughtError` (the console, by default, with the component stack), where the developer and an
  * error tracker meet it. A passkey that fails that way takes its button away and leaves the
  * passphrase.
@@ -85,8 +92,9 @@ const unlockedFor = (leaseMillis: number, creating: boolean): string => {
  * browser) supplies with the standard polyfill: the README says how.
  *
  * With `allowStartOver`, a user who has forgotten the passphrase is offered a way out: "Forgot it?
- * Start a new vault" asks first, then retires the vault (`vault.retire()`, on every device) and
- * turns the dialog into "Choose a vault passphrase" for the new one. Off by default.
+ * Start a new vault" asks first, then deletes the vault (`vault.del()`, on every device). A
+ * delete lands as a lock does, so the dialog then closes, answering `declined`, and the next call
+ * that needs the vault asks the user to choose a passphrase for the new one. Off by default.
  *
  * The passphrase field is made for password managers, so that a user may keep a long, strong
  * passphrase without remembering it: a real form, `autocomplete="new-password"` while choosing
@@ -106,16 +114,30 @@ const unlockedFor = (leaseMillis: number, creating: boolean): string => {
  * does. It is never asked while unlocking.
  *
  * @example
- *   <PassphraseModal vault={vault} onDone={(unlocked) => { setAsking(false) }} />
- * @example <PassphraseModal vault={vault} allowStartOver onDone={close} />  // offers to retire the vault and start over
- * @example <PassphraseModal vault={vault} passphraseUsername={`${email} (vault)`} onDone={close} />
- * @example <PassphraseModal vault={vault} passphraseAdvice={(typed) => (typed.length < 12 ? 'Twelve characters or more, please.' : null)} onDone={close} />
+ *   const getProof: GetProof = (ask) => new Promise((answer) => { showDialog(<PassphraseModal ask={ask} onDone={answer} />) })
+ * @example <PassphraseModal ask={ask} allowStartOver onDone={answer} />  // offers to delete the vault and start over
+ * @example <PassphraseModal ask={ask} passphraseUsername={`${email} (vault)`} onDone={answer} />
+ * @example <PassphraseModal ask={ask} passphraseAdvice={(typed) => (typed.length < 12 ? 'Twelve characters or more, please.' : null)} onDone={answer} />
  */
 export const PassphraseModal = (props: PassphraseModalProps) => (
-  <Boundary key={useRoundFor(props.vault)} fallback={<DialogTrouble onDone={props.onDone} />}>
-    <UnlockForm {...props} />
-  </Boundary>
+  <AnsweringOnce key={useRoundFor(props.ask)} {...props} />
 )
+
+/**
+ * The dialog's one answer, kept above its boundary, so that the notice shown once something went
+ * wrong follows the ask as the form did: a lock landing closes it, answering `declined`, and a vault
+ * unlocked under it answers `unlocked`, once, whatever its Close says later.
+ */
+const AnsweringOnce = (props: PassphraseModalProps) => {
+  const { ask, onDone } = props
+  const snapshot = useSyncExternalStore(ask.vault.subscribe, ask.vault.getSnapshot)
+  const done = useAnswerOnce(ask, onDone, snapshot.state === 'unlocked')
+  return (
+    <Boundary fallback={<DialogTrouble onDone={done} />}>
+      <UnlockForm {...props} onDone={done} />
+    </Boundary>
+  )
+}
 
 /**
  * What a host says of a passphrase as the user chooses it: a sentence to show beside the field, or
@@ -129,9 +151,11 @@ export type PassphraseAdvice = (passphrase: string) => string | null | Promise<s
 
 /** What PassphraseModal is handed. */
 export type PassphraseModalProps = {
-  vault:               Vault
-  onDone:              (unlocked: boolean) => void
-  /** Whether to offer a user who has forgotten the passphrase to retire the vault and start a new one. */
+  /** The ask the dialog answers, as the vault handed it to `getProof`. */
+  ask:                 Ask
+  /** Called once, with the dialog's answer: 'unlocked' once an attempt is ok, 'declined' otherwise. */
+  onDone:              (answer: ProofAnswer) => void
+  /** Whether to offer a user who has forgotten the passphrase to delete the vault and start a new one. */
   allowStartOver?:     boolean | undefined
   /** What a password manager files the passphrase under. Default: the user and the vault, as 'u1 (main vault)'. */
   passphraseUsername?: string | undefined
@@ -139,18 +163,21 @@ export type PassphraseModalProps = {
   passphraseAdvice?:   PassphraseAdvice | undefined
 }
 
+/** The refusal for a host's `passphraseAdvice` that threw: it heard the passphrase, so nothing of its throw goes on. */
+const adviceFailed = (thrown: unknown) => Sanitizer.refusalFor(thrown, 'unexpected_error', "The passphraseAdvice handed to the dialog threw rather than answering. What it threw is left out of this report, as it may quote the passphrase: have it answer a sentence or null, and catch its own failures.")
+
 /** Escape, from anywhere in a dialog, cancels it, and goes no further: a host's own Escape handler never hears it too. */
-const cancelOnEscape = (onDone: (unlocked: boolean) => void) => (evt: KeyboardEvent) => {
+const cancelOnEscape = (onDone: (answer: ProofAnswer) => void) => (evt: KeyboardEvent) => {
   if (evt.key !== 'Escape') { return }
   evt.stopPropagation()
-  onDone(false)
+  onDone('declined')
 }
 
 /**
  * What the dialog shows once something has gone wrong inside it that is not the user's to mend:
  * a calm word, and the way out.
  */
-const DialogTrouble = ({ onDone }: { onDone: (unlocked: boolean) => void }) => {
+const DialogTrouble = ({ onDone }: { onDone: (answer: ProofAnswer) => void }) => {
   const titleId = useId()
   const wordId = useId()
   return (
@@ -168,7 +195,7 @@ const DialogTrouble = ({ onDone }: { onDone: (unlocked: boolean) => void }) => {
         <p className="gripe" id={wordId}>{Messages.troubleWord}</p>
         <div className="row">
           {/* eslint-disable-next-line jsx-a11y/no-autofocus -- the field that held focus is gone; the WAI-ARIA dialog pattern moves focus to the dialog's one control */}
-          <button type="button" autoFocus onClick={() => { onDone(false) }}>{Messages.closeButton}</button>
+          <button type="button" autoFocus onClick={() => { onDone('declined') }}>{Messages.closeButton}</button>
         </div>
       </div>
     </div>
@@ -204,7 +231,7 @@ const holdsFocus = (container: HTMLElement | null): boolean => {
 const useAdvice = (passphraseAdvice: PassphraseAdvice | undefined, creating: boolean, fail: (err: unknown) => void) => {
   const [said, setSaid] = useState<string | null>(null)
   const asked = useRef(0)
-  // A change of mode -- the vault made elsewhere, or retired -- forgets what was said (React's
+  // A change of mode -- the vault made elsewhere, or deleted -- forgets what was said (React's
   // "adjusting state while rendering"), and makes any answer or failure still on its way stale,
   // in the same commit: advice given while choosing never shows again after the vault changed.
   // The dialog unmounting makes them stale too, so that none reaches a dialog that has gone.
@@ -281,13 +308,38 @@ const PassphraseField = ({ ref, creating, takesFocus, username, advice, onChange
   )
 }
 
-/** The dialog itself, inside PassphraseModal's boundary. */
-const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphraseAdvice }: PassphraseModalProps) => {
+/**
+ * The dialog's one answer to `ask`: `done`, which calls the host's `onDone` (as of the last
+ * commit) the first time only. A lock landing answers `declined`, and a vault `unlocked` under a
+ * dialog asking for a locked or absent one answers `unlocked`.
+ */
+const useAnswerOnce = (ask: Ask, onDone: (answer: ProofAnswer) => void, unlocked: boolean) => {
+  const onDoneRef = useRef(onDone)
+  useLayoutEffect(() => { onDoneRef.current = onDone })
+  const answered = useRef(false)
+  const done = useCallback((answer: ProofAnswer) => {
+    if (answered.current) { return }
+    answered.current = true
+    onDoneRef.current(answer)
+  }, [])
+  useEffect(() => {
+    let current = true
+    void ask.lockLanded.then(() => { if (current) { done('declined') } })
+    return () => { current = false }
+  }, [ask, done])
+  const unlockedUnder = ask.why !== 'lease_ending' && unlocked
+  useEffect(() => { if (unlockedUnder) { done('unlocked') } }, [unlockedUnder, done])
+  return done
+}
+
+/** The dialog itself, inside PassphraseModal's boundary: its `onDone` is the one answer, `AnsweringOnce`'s. */
+const UnlockForm = ({ ask, onDone: done, allowStartOver, passphraseUsername, passphraseAdvice }: PassphraseModalProps) => {
+  const { vault } = ask
   const snapshot = useSyncExternalStore(vault.subscribe, vault.getSnapshot)
   const [gripe, setGripe] = useState<Gripe | null>(null)
   const [startingOver, setStartingOver] = useState(false)
-  // While a retire runs, so that a second press never starts another.
-  const [retiring, setRetiring] = useState(false)
+  // While a delete runs, so that a second press never starts another.
+  const [deleting, setDeleting] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
   const fieldRef = useRef<HTMLInputElement>(null)
   // Asked after each await: a dialog gone meanwhile -- its host took it away, another vault
@@ -297,28 +349,31 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
   const blurbId = useId()
   // Wrapped, so that a failure carrying any value at all still reads as "failed".
   const [failure, setFailure] = useState<{ err: unknown } | null>(null)
-  const advice = useAdvice(passphraseAdvice, snapshot.state === 'absent', (err) => { setFailure({ err }) })
-  if (failure !== null) { throw failure.err }
+  // The host's advice heard the passphrase: what it threw may quote it, so none of it goes on.
+  const advice = useAdvice(passphraseAdvice, snapshot.state === 'absent', (err) => { setFailure({ err: adviceFailed(err) }) })
+  if (failure !== null) { throw forBoundary(failure.err, 'PassphraseModal') }
   const creating = snapshot.state === 'absent'
   const passkeyFirst = ! creating && offersPasskey(snapshot)
   const windowLine = unlockedFor(vault.leaseMillis, creating)
-  // Asked only of a vault there is to retire: one retired meanwhile has the user choose anew, and
+  // Asked only of a vault there is to delete: one deleted meanwhile has the user choose anew, and
   // ends the question, so that a vault made after it is never asked of. React's "adjusting state
   // while rendering": it renders again at once, before committing this.
   if (startingOver && creating) { setStartingOver(false) }
   const askingStartOver = startingOver && ! creating
 
-  /** A refusal the user meets: a condition shown in place, misuse rethrown in render, for PassphraseModal's boundary. */
+  /** A refusal the user meets, as `attemptRefusalFlavor` groups them: in place, as advice, closing the dialog, or misuse rethrown in render, for PassphraseModal's boundary. */
   const meet = (err: unknown) => {
-    if (isVaultError(err, 'created_elsewhere')) {
+    const flavor = attemptRefusalFlavor(err)
+    if (flavor === 'created_elsewhere') {
       // The passphrase typed has just been shown not to open the vault: the field is emptied for
       // the one chosen on the other device, and the advice stays until the next submit.
-      setGripe({ text: err.message, fromPasskey: false, asAdvice: true })
+      setGripe({ text: (err as Error).message, fromPasskey: false, asAdvice: true })
       if (fieldRef.current !== null) { fieldRef.current.value = '' }
       fieldRef.current?.focus()
       return
     }
-    if (isVaultCondition(err)) { setGripe({ text: err.message, fromPasskey: false, asAdvice: false }); return }
+    if (flavor === 'in_place') { setGripe({ text: (err as Error).message, fromPasskey: false, asAdvice: false }); return }
+    if (flavor === 'close') { done('declined'); return }
     // Thrown from an event handler, it would miss every boundary.
     setFailure({ err })
   }
@@ -326,34 +381,26 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
   const submit = async (evt: SubmitEvent) => {
     evt.preventDefault()
     setGripe(null)
-    try {
-      await vault.unlock(fieldRef.current?.value ?? '')
-      if (! isMounted()) { return }
-      onDone(true)
-    } catch (err) {
-      if (! isMounted()) { return }
-      // The vault was locked while this unlock was under way, and the lock wins: as if dismissed.
-      if (isVaultError(err, 'vault_locked')) { onDone(false); return }
-      meet(err)
-    }
+    const { ok, err } = await ask.attempt(fieldRef.current?.value ?? '')
+    if (! isMounted()) { return }
+    if (ok) { done('unlocked'); return }
+    meet(err)
   }
 
   const startOver = async () => {
-    setRetiring(true)
+    setDeleting(true)
     setGripe(null)
-    try {
-      await vault.retire()
-      if (! isMounted()) { return }
-      setStartingOver(false)
-    } catch (err) {
-      if (! isMounted()) { return }
-      // The vault the user agreed to retire was retired already, or made anew, elsewhere: what
-      // stands now was never confirmed, so the question goes, to be asked afresh.
-      if (isVaultError(err, 'stale_write')) { setStartingOver(false) }
-      meet(err)
-    } finally {
-      if (isMounted()) { setRetiring(false) }
-    }
+    const { ok, err } = await vault.tryDel()
+    if (! isMounted()) { return }
+    setDeleting(false)
+    // A delete lands as a lock: lockLanded closes the dialog.
+    if (ok) { setStartingOver(false); return }
+    // The vault the user agreed to delete was deleted already, or made anew, elsewhere: what
+    // stands now was never confirmed, so the question goes, to be asked afresh.
+    if (isVaultError(err, 'stale_write')) { setStartingOver(false) }
+    // A condition the delete meets is shown in place, to try again; misuse goes to the boundary.
+    if (isCondition(err)) { setGripe({ text: err.message, fromPasskey: false, asAdvice: false }); return }
+    setFailure({ err })
   }
 
   /** Each change to the field: a complaint about what was typed before goes (a passkey's word, or a vault made elsewhere, stays till the next submit), and, while choosing, the host's advice is asked anew. */
@@ -370,7 +417,7 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
 
   return (
     // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Escape closes a dialog from anywhere inside it, as the WAI-ARIA dialog pattern has it
-    <div className="modal-scrim" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={blurbId} onKeyDown={cancelOnEscape(onDone)}>
+    <div className="modal-scrim" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={blurbId} onKeyDown={cancelOnEscape(done)}>
       <form ref={formRef} className="modal" onSubmit={(evt) => { void submit(evt) }}>
         <h3 id={titleId}>{creating ? Messages.chooseTitle : Messages.unlockTitle}</h3>
         <p className="quiet" id={blurbId}>{creating ? Messages.chooseBlurb : Messages.unlockBlurb}</p>
@@ -379,12 +426,12 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
           : (
             <>
               {/* eslint-disable-next-line jsx-a11y/no-autofocus -- the passkey is the dialog's first choice: the WAI-ARIA dialog pattern moves focus to its first control */}
-              {passkeyFirst && <PasskeyUnlockButton vault={vault} autoFocus onDone={onDone} onGripe={passkeyGripe} />}
+              {passkeyFirst && <PasskeyUnlockButton ask={ask} autoFocus onDone={done} onGripe={passkeyGripe} />}
               <PassphraseField
                 ref={fieldRef}
                 creating={creating}
                 takesFocus={! passkeyFirst}
-                username={passphraseUsername ?? Messages.passphraseUsername(snapshot.scope.user_id, snapshot.scope.vaultlabel)}
+                username={passphraseUsername ?? Messages.passphraseUsername(snapshot.user_id, snapshot.vaultlabel)}
                 advice={creating && passphraseAdvice !== undefined ? advice.said : undefined}
                 onChange={hearPassphrase}
               />
@@ -396,7 +443,7 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
         {askingStartOver
           ? (
             <div className="row" key="start-over">
-              <button type="button" disabled={retiring} onClick={() => { void startOver() }}>{Messages.startOverConfirm}</button>
+              <button type="button" disabled={deleting} onClick={() => { void startOver() }}>{Messages.startOverConfirm}</button>
               {/* eslint-disable-next-line jsx-a11y/no-autofocus -- the button that held focus is gone; it moves to the choice that loses nothing */}
               <button type="button" autoFocus onClick={() => { setStartingOver(false); setGripe(null) }}>{Messages.startOverBack}</button>
             </div>
@@ -404,7 +451,7 @@ const UnlockForm = ({ vault, onDone, allowStartOver, passphraseUsername, passphr
           : (
             <div className="row" key="unlock">
               <button type="submit">{creating ? Messages.createButton : Messages.unlockButton}</button>
-              <button type="button" onClick={() => { onDone(false) }}>{Messages.cancelButton}</button>
+              <button type="button" onClick={() => { done('declined') }}>{Messages.cancelButton}</button>
               {allowStartOver === true && ! creating && (
                 <button type="button" className="quiet" onClick={() => { setStartingOver(true); setGripe(null) }}>{Messages.startOverButton}</button>
               )}

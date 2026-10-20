@@ -19,7 +19,7 @@ describe("parseDbName", () => {
   it("refuses an empty or non-text dbName, naming the call, never the input", () => {
     for (const dbName of ['', 42, ['acme'], null]) {
       expect(() => parseDbName({ dbName } as unknown as IdbVaultDBOpts, 'inspectIdbVaultDB'))
-        .to.throw(VaultError, /^inspectIdbVaultDB takes an optional dbName/).with.property('kind', 'bad_option')
+        .to.throw(VaultError, /^inspectIdbVaultDB takes an optional dbName/).with.property('refusalkind', 'bad_option')
     }
   })
 

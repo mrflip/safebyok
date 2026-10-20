@@ -6,7 +6,7 @@ import type { DatabaseReader, DatabaseWriter } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 import * as Tallies from './tallies'
 import {
-  VaultPropsExpectation, RetireExpectation, ListedLockbox, Lockbox, LockboxExpectation, LockboxRetireExpectation, LockboxRetirement, VaultProps, VaultScope, VaultSignature,
+  VaultPropsExpectation, VaultDelExpectation, ListedBox, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, VaultProps, VaultScope, VaultSignature,
 } from './validators'
 
 /**
@@ -16,14 +16,14 @@ import {
  *
  * Every update checks its expectation in the same transaction it writes in, and Convex runs
  * mutations serializably, so the check holds for real. A failed expectation writes nothing and
- * resolves `false` -- for a lockbox write, `null` -- which the client refuses as `stale_write`; it
- * is not an error. A lockbox write that lands resolves the lockbox as stored, read back in its
- * own transaction. A retire lands only in the vault it expects: it wins over any lockbox revision,
- * but never lands in a vault made anew. A lockbox retire that lands resolves what it removed.
+ * resolves `false` -- for a box write, `null` -- which the client refuses as `stale_write`; it
+ * is not an error. A box write that lands resolves the box as stored, read back in its
+ * own transaction. A delete lands only in the vault it expects: it wins over any box revision,
+ * but never lands in a vault made anew. A box delete that lands resolves what it removed.
  *
  * Every vault is held to the limits in `./tallies`, whatever its client asks, so that it can
- * always be retired whole: a lockbox write that would take the vault past one is refused with a
- * `ConvexError` of kind `vault_full`. A retire is never refused for room.
+ * always be deleted whole: a box write that would take the vault past one is refused with a
+ * `ConvexError` of kind `vault_full`. A delete is never refused for room.
  */
 
 // ------------------------------------------------------------------------------- the vault props
@@ -43,7 +43,7 @@ export const getVaultProps = query({
  * afterwards: these, or those another device got in first with. Find and insert are one
  * transaction, so two devices creating at once settle on one vault row.
  */
-export const fetchOrCreateVaultProps = mutation({
+export const ensureVaultProps = mutation({
   args:    { vaultProps: VaultProps },
   returns: VaultProps,
   handler: async (ctx, { vaultProps }) => {
@@ -60,7 +60,7 @@ export const fetchOrCreateVaultProps = mutation({
  * `unlock_epoch` forward. True when written; false, writing nothing, otherwise -- including when
  * no vault props stand.
  */
-export const updateVaultProps = mutation({
+export const putVaultProps = mutation({
   args:    { vaultProps: VaultProps, expected: VaultPropsExpectation },
   returns: v.boolean(),
   handler: async (ctx, { vaultProps, expected }) => {
@@ -77,115 +77,115 @@ export const updateVaultProps = mutation({
   },
 })
 
-// ----------------------------------------------------------------------------- the lockboxes
+// ----------------------------------------------------------------------------- the boxes
 
-/** One lockbox, exactly as stored, or null when there is none under `boxlabel`. */
+/** One box, exactly as stored, or null when there is none under `boxlabel`. */
 export const getBox = query({
   args:    { scope: VaultScope, boxlabel: v.string() },
-  returns: v.nullable(Lockbox),
+  returns: v.nullable(BoxRecord),
   handler: async (ctx, { scope, boxlabel }) => {
     const row = await findBoxRow(ctx.db, scope, boxlabel)
-    return row && lockboxOfRow(row)
+    return row && boxOfRow(row)
   },
 })
 
 /**
- * Every lockbox in the vault without its two ciphered fields, `format` kept, in boxlabel order.
- * Reads the whole vault in one query: a vault's lockboxes together must fit in one Convex
+ * Every box in the vault without its two ciphered fields, `format` kept, in boxlabel order.
+ * Reads the whole vault in one query: a vault's boxes together must fit in one Convex
  * transaction's read limits.
  */
 export const listBoxSummaries = query({
   args:    { scope: VaultScope },
-  returns: v.array(ListedLockbox),
+  returns: v.array(ListedBox),
   handler: async (ctx, { scope }) => {
     const rows = await vaultBoxRows(ctx.db, scope)
     return rows.map((row) => {
-      const { lockbox_key_wrapped: _lockboxKeyWrapped, whisper_ciphered: _whisperCiphered, ...listed } = lockboxOfRow(row)
+      const { box_key_wrapped: _boxKeyWrapped, whisper_ciphered: _whisperCiphered, ...listed } = boxOfRow(row)
       return listed
     })
   },
 })
 
 /**
- * Write `lockbox` under its boxlabel, only while the scope's vault props have `expected.vault_id`
- * and `expected.vault_key_epoch` -- they stand for the vaultKey the lockbox was sealed under -- and
- * the standing lockbox has `expected.revision_tok` -- or, for null, there is none. Resolves the
- * lockbox as stored once written, read back in this same transaction; null, writing nothing,
+ * Write `box` under its boxlabel, only while the scope's vault props have `expected.vault_id`
+ * and `expected.vault_key_epoch` -- they stand for the vaultKey the box was sealed under -- and
+ * the standing box has `expected.revision_tok` -- or, for null, there is none. Resolves the
+ * box as stored once written, read back in this same transaction; null, writing nothing,
  * otherwise -- including when the scope holds no vault props.
  *
  * Refuses, writing nothing, with a `ConvexError` of kind `vault_full` a write that would take the
- * vault past {@link Tallies.MaxVaultLockboxes} lockboxes or {@link Tallies.MaxVaultLockboxBytes}
- * bytes and leave it larger than it was: a new lockbox in a full vault, or a heavier replacement.
+ * vault past {@link Tallies.MaxVaultBoxes} boxes or {@link Tallies.MaxVaultBoxBytes}
+ * bytes and leave it larger than it was: a new box in a full vault, or a heavier replacement.
  * A vault with no tally yet is counted first, reading it once.
  */
-export const updateBox = mutation({
-  args:    { scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation },
-  returns: v.nullable(Lockbox),
-  handler: async (ctx, { scope, lockbox, expected }) => {
+export const putBox = mutation({
+  args:    { scope: VaultScope, box: BoxRecord, expected: BoxExpectation },
+  returns: v.nullable(BoxRecord),
+  handler: async (ctx, { scope, box, expected }) => {
     const vaultProps = await findVaultPropsRow(ctx.db, scope)
     if (vaultProps?.vault_id !== expected.vault_id || vaultProps.vault_key_epoch !== expected.vault_key_epoch) { return null }
-    const standing = await findBoxRow(ctx.db, scope, lockbox.boxlabel)
+    const standing = await findBoxRow(ctx.db, scope, box.boxlabel)
     const standingRevisionTok = standing?.revision_tok ?? null
     if (standingRevisionTok !== expected.revision_tok) { return null }
     //
-    const row = boxRowOf(scope, lockbox)
+    const row = boxRowOf(scope, box)
     const reckoning = await Tallies.reckon(ctx.db, vaultProps._id, vaultBoxQuery(ctx.db, scope))
     const standingBytes = standing === null ? 0 : Tallies.weigh(standing)
     // A new row is weighed with Convex's estimate of an `_id` until it has one.
-    const growthAs = (rowId?: Id<'safebyok_lockboxes'>) => ({
-      lockbox_count: standing === null ? 1 : 0,
-      lockbox_bytes: Tallies.weigh(row, rowId) - standingBytes,
+    const growthAs = (rowId?: Id<'safebyok_boxes'>) => ({
+      box_count: standing === null ? 1 : 0,
+      box_bytes: Tallies.weigh(row, rowId) - standingBytes,
     })
     if (Tallies.refuses(reckoning.tally, growthAs(standing?._id))) {
-      throw new ConvexError<SafebyokErrorData>({ kind: 'vault_full', message: 'This vault is full: remove a lockbox to make room, then try again.' })
+      throw new ConvexError<SafebyokErrorData>({ kind: 'vault_full', message: 'This vault is full: remove a box to make room, then try again.' })
     }
     const rowId = standing === null
-      ? await ctx.db.insert('safebyok_lockboxes', row)
+      ? await ctx.db.insert('safebyok_boxes', row)
       : await replaceBoxRow(ctx.db, standing._id, row)
     await Tallies.record(ctx.db, vaultProps._id, reckoning, growthAs(rowId))
-    const stored = await ctx.db.get('safebyok_lockboxes', rowId)
-    return stored && lockboxOfRow(stored)
+    const stored = await ctx.db.get('safebyok_boxes', rowId)
+    return stored && boxOfRow(stored)
   },
 })
 
 /**
- * Remove the lockbox under `boxlabel`, whatever revision stands, only while the scope's vault props
- * have `expected.vault_id`. Resolves what it removed when that holds -- `retired` for a lockbox at
- * `expected.revision_tok` (for null, one holding none the client reads as one), `retired_other` for
+ * Remove the box under `boxlabel`, whatever revision stands, only while the scope's vault props
+ * have `expected.vault_id`. Resolves what it removed when that holds -- `deleted` for a box at
+ * `expected.revision_tok` (for null, one holding none the client reads as one), `deleted_other` for
  * any other, `absent` for none; null, removing nothing, otherwise -- including when the scope holds
  * no vault props.
  */
-export const retireBox = mutation({
-  args:    { scope: VaultScope, boxlabel: v.string(), expected: LockboxRetireExpectation },
-  returns: v.nullable(LockboxRetirement),
-  handler: async (ctx, { scope, boxlabel, expected }): Promise<Infer<typeof LockboxRetirement> | null> => {
+export const delBox = mutation({
+  args:    { scope: VaultScope, boxlabel: v.string(), expected: BoxDelExpectation },
+  returns: v.nullable(BoxDeletion),
+  handler: async (ctx, { scope, boxlabel, expected }): Promise<Infer<typeof BoxDeletion> | null> => {
     const vaultProps = await findVaultPropsRow(ctx.db, scope)
     if (vaultProps?.vault_id !== expected.vault_id) { return null }
     const standing = await findBoxRow(ctx.db, scope, boxlabel)
     if (! standing) { return { outcome: 'absent' } }
-    await ctx.db.delete('safebyok_lockboxes', standing._id)
+    await ctx.db.delete('safebyok_boxes', standing._id)
     await Tallies.forget(ctx.db, vaultProps._id, standing)
-    // An empty revision reads as none, as the client lists a damaged lockbox holding one.
+    // An empty revision reads as none, as the client lists a damaged box holding one.
     const standingRevision = standing.revision_tok === '' ? null : standing.revision_tok
-    return { outcome: standingRevision === expected.revision_tok ? 'retired' : 'retired_other' }
+    return { outcome: standingRevision === expected.revision_tok ? 'deleted' : 'deleted_other' }
   },
 })
 
 // --------------------------------------------------------------------------------- the vault
 
 /**
- * Remove the vault props and every lockbox, in one transaction, only while the vault props have
+ * Remove the vault props and every box, in one transaction, only while the vault props have
  * `expected.vault_id`. True when removed; false, removing nothing, otherwise -- including when
  * the scope holds no vault props.
  */
-export const retireVault = mutation({
-  args:    { scope: VaultScope, expected: RetireExpectation },
+export const delVault = mutation({
+  args:    { scope: VaultScope, expected: VaultDelExpectation },
   returns: v.boolean(),
   handler: async (ctx, { scope, expected }) => {
     const vaultProps = await findVaultPropsRow(ctx.db, scope)
     if (vaultProps?.vault_id !== expected.vault_id) { return false }
     const boxes = await vaultBoxRows(ctx.db, scope)
-    await Promise.all(boxes.map((row) => ctx.db.delete('safebyok_lockboxes', row._id)))
+    await Promise.all(boxes.map((row) => ctx.db.delete('safebyok_boxes', row._id)))
     await Tallies.drop(ctx.db, vaultProps._id)
     await ctx.db.delete('safebyok_vaults', vaultProps._id)
     return true
@@ -194,10 +194,10 @@ export const retireVault = mutation({
 
 /**
  * The vault's change signature, for a client to subscribe to: it changes when, and only when, a
- * write lands in the vault -- the vault props replaced, a lockbox written or retired, the vault
- * retired. It reads each lockbox document whole, ciphertext and all, for its revision: a Convex
+ * write lands in the vault -- the vault props replaced, a box written or deleted, the vault
+ * deleted. It reads each box document whole, ciphertext and all, for its revision: a Convex
  * query cannot read some of a document's fields. So each run reads the vault, within the read
- * limits a listing and a retire keep it to.
+ * limits a listing and a delete keep it to.
  */
 export const watchVault = query({
   args:    { scope: VaultScope },
@@ -217,7 +217,7 @@ export const watchVault = query({
 
 type VaultScope = Infer<typeof VaultScope>
 type VaultProps = Infer<typeof VaultProps>
-type Lockbox = Infer<typeof Lockbox>
+type BoxRecord = Infer<typeof BoxRecord>
 
 const scopeOfVaultProps = ({ applabel, user_id, vaultlabel }: VaultProps): VaultScope => ({ applabel, user_id, vaultlabel })
 
@@ -230,34 +230,34 @@ const findVaultPropsRow = (db: DatabaseReader, scope: VaultScope) => (
 )
 
 const findBoxRow = (db: DatabaseReader, scope: VaultScope, boxlabel: string) => (
-  db.query('safebyok_lockboxes')
+  db.query('safebyok_boxes')
     .withIndex('by_box', (idx) => idx.eq('user_id', scope.user_id).eq('applabel', scope.applabel).eq('vaultlabel', scope.vaultlabel).eq('boxlabel', boxlabel))
     .unique()
 )
 
 // One vault's range of one index: bounded by that vault, not by the table.
 const vaultBoxQuery = (db: DatabaseReader, scope: VaultScope) => (
-  db.query('safebyok_lockboxes')
+  db.query('safebyok_boxes')
     .withIndex('by_box', (idx) => idx.eq('user_id', scope.user_id).eq('applabel', scope.applabel).eq('vaultlabel', scope.vaultlabel))
 )
 
-// Every lockbox row of one vault, which the tallies' limits keep within one transaction's reads.
+// Every box row of one vault, which the tallies' limits keep within one transaction's reads.
 const vaultBoxRows = (db: DatabaseReader, scope: VaultScope) => vaultBoxQuery(db, scope).collect()
 
-/** Replace a lockbox row in place, handing back its `_id`, which a replacement keeps. */
-const replaceBoxRow = async (db: DatabaseWriter, rowId: Id<'safebyok_lockboxes'>, row: ReturnType<typeof boxRowOf>) => {
-  await db.replace('safebyok_lockboxes', rowId, row)
+/** Replace a box row in place, handing back its `_id`, which a replacement keeps. */
+const replaceBoxRow = async (db: DatabaseWriter, rowId: Id<'safebyok_boxes'>, row: ReturnType<typeof boxRowOf>) => {
+  await db.replace('safebyok_boxes', rowId, row)
   return rowId
 }
 
 /** A vault row as the vault props it holds: Convex's system fields stripped. */
 const vaultPropsOfRow = ({ _id, _creationTime, ...vaultProps }: Doc<'safebyok_vaults'>): VaultProps => vaultProps
 
-/** A lockbox row as the record it holds: system fields and scope columns stripped. */
-const lockboxOfRow = (row: Doc<'safebyok_lockboxes'>): Lockbox => {
-  const { _id, _creationTime, applabel: _applabel, user_id: _userId, vaultlabel: _vaultlabel, ...lockbox } = row
-  return lockbox
+/** A box row as the record it holds: system fields and scope columns stripped. */
+const boxOfRow = (row: Doc<'safebyok_boxes'>): BoxRecord => {
+  const { _id, _creationTime, applabel: _applabel, user_id: _userId, vaultlabel: _vaultlabel, ...box } = row
+  return box
 }
 
-/** The row a lockbox is stored as: its scope columns added. */
-const boxRowOf = (scope: VaultScope, lockbox: Lockbox) => ({ ...scope, ...lockbox })
+/** The row a box is stored as: its scope columns added. */
+const boxRowOf = (scope: VaultScope, box: BoxRecord) => ({ ...scope, ...box })

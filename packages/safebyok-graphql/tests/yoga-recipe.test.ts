@@ -84,18 +84,18 @@ describe("the README Yoga recipe", () => {
   it("carries a real vault, made and opened by the core in the browser", async () => {
     const route = await routeOver()
     const vault = await TH.settledVault({
-      applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: browserFor(route, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest,
+      applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: browserFor(route, 'u1'), deviceDB: memoryDeviceDB(), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker,
     })
     await vault.unlock('correct horse battery staple')
-    await vault.storeBox('anthropic_api_key', 'sk-ant-test-not-a-real-key')
-    expect(await vault.readBox('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
+    await vault.putBox('anthropic_api_key', 'sk-ant-test-not-a-real-key')
+    expect(await vault.getBox('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
     vault.close()
   })
 
   it("never sends the driver's own error to the browser, not even in Yoga's development mode", async () => {
     const dbDown = new Error('password authentication failed for user "vault_owner"')
     const route = vaultRoute(TH.failingClient(dbDown), undefined, () => Promise.resolve('u1'), true)
-    const document = 'query ($scope: SafebyokVaultScopeInput!) { safebyokReadVaultProps(scope: $scope) { vault_id } }'
+    const document = 'query ($scope: SafebyokVaultScopeInput!) { safebyokGetVaultProps(scope: $scope) { vault_id } }'
     const variables = { scope: TH.scopeOf('u1') }
     const response = await route(new Request('https://app.example.test/api/graphql', {
       method:  'POST',
@@ -111,7 +111,7 @@ describe("the README Yoga recipe", () => {
     const route = await routeOver()
     const elsewhere = browserFor(route, 'u1')
     const { heard, unsubscribe } = await TH.liveWatch(browserFor(route, 'u1'), TH.scopeOf('u1'))
-    await elsewhere.fetchOrCreateVaultProps(TH.vaultPropsOf('u1'))
+    await TH.expectingGood(elsewhere).ensureVaultProps(TH.vaultPropsOf('u1'))
     await TH.eventually(() => heard.count > 0)
     unsubscribe()
     expect(heard.count).to.eq(1)

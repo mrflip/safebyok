@@ -1,4 +1,5 @@
 import { VaultError, isVaultError } from './errors'
+import type { Outcome } from './outcome'
 import type { VaultDB } from './vault-db'
 
 /** What a vault does with a refusal from storage beyond throwing it: lock, or nothing more. */
@@ -29,15 +30,21 @@ export const decide = (refusal: unknown): RefusalResponse => (
   isVaultError(refusal, 'identity_revoked') || isVaultError(refusal, 'rolled_back') ? 'lock' : 'none'
 )
 
-/** The verbs a vault calls on its VaultDB. */
-export type HeededVaultDB = Pick<VaultDB, 'readVaultProps' | 'fetchOrCreateVaultProps' | 'updateVaultProps' | 'readBox' | 'listBoxes' | 'updateBox' | 'retireBox' | 'retireVault' | 'subscribe'>
+/** The VaultDB verbs a vault calls, each resolving to an Outcome. */
+type HeededVerb = 'getVaultProps' | 'ensureVaultProps' | 'putVaultProps' | 'getBox' | 'listBoxes' | 'putBox' | 'delBox' | 'delVault'
+
+/** A VaultDB verb as {@link heed} hands it on: resolving its outcome's `val`, rejecting with its `err`. */
+type Thrown<VerbT> = VerbT extends (...args: infer ArgsT) => Promise<Outcome<infer ValT>> ? (...args: ArgsT) => Promise<ValT> : never
+
+/** The verbs a vault calls on its VaultDB, each answering with its `val` and refusing by rejecting. */
+export type HeededVaultDB = { [VerbT in HeededVerb]: Thrown<VaultDB[VerbT]> } & Pick<VaultDB, 'subscribe'>
 
 /**
- * `vaultDB`'s verbs, each handing any VaultError it rejects with to `onRefusal`, and waiting for
- * it, before rejecting with it as before: so a vault meets every storage refusal, whichever of its
- * calls made it, a background refresh's included. Each verb takes its arguments as `vaultDB`'s
- * does, passed on whole, and is looked up on `vaultDB` as it is called, so a test's spy on one is
- * heard. `subscribe`, which answers at once, passes through.
+ * `vaultDB`'s verbs, each resolving its outcome's `val`, or handing its refusal to `onRefusal`, and
+ * waiting for it, before rejecting with that refusal: so a vault meets every storage refusal,
+ * whichever of its calls made it, a background refresh's included. Each verb takes its arguments
+ * as `vaultDB`'s does, passed on whole, and is looked up on `vaultDB` as it is called, so a
+ * test's spy on one is heard. `subscribe`, which answers at once, passes through.
  *
  * The refused call waits for `onRefusal` before it rejects, so a device store that never settles
  * as the vault locks holds that call with it; the vaultKey is dropped before the device store is
@@ -48,24 +55,22 @@ export type HeededVaultDB = Pick<VaultDB, 'readVaultProps' | 'fetchOrCreateVault
  *   refusal is what the caller must hear.
  */
 export const heed = (vaultDB: VaultDB, onRefusal: (refusal: VaultError) => Promise<void>): HeededVaultDB => {
-  const heeding = async <ValT>(call: () => Promise<ValT>): Promise<ValT> => {
-    try {
-      return await call()
-    } catch (err) {
-      if (err instanceof VaultError) { await heard(onRefusal, err) }
-      throw err
-    }
+  const heeding = async <ValT>(call: () => Promise<Outcome<ValT>>): Promise<ValT> => {
+    const { ok, val, err } = await call()
+    if (ok) { return val }
+    await heard(onRefusal, err)
+    throw err
   }
   return {
-    readVaultProps:          (...args) => heeding(() => vaultDB.readVaultProps(...args)),
-    fetchOrCreateVaultProps: (...args) => heeding(() => vaultDB.fetchOrCreateVaultProps(...args)),
-    updateVaultProps:        (...args) => heeding(() => vaultDB.updateVaultProps(...args)),
-    readBox:                 (...args) => heeding(() => vaultDB.readBox(...args)),
-    listBoxes:               (...args) => heeding(() => vaultDB.listBoxes(...args)),
-    updateBox:               (...args) => heeding(() => vaultDB.updateBox(...args)),
-    retireBox:               (...args) => heeding(() => vaultDB.retireBox(...args)),
-    retireVault:             (...args) => heeding(() => vaultDB.retireVault(...args)),
-    subscribe:               (...args) => vaultDB.subscribe(...args),
+    getVaultProps:    (...args) => heeding(() => vaultDB.getVaultProps(...args)),
+    ensureVaultProps: (...args) => heeding(() => vaultDB.ensureVaultProps(...args)),
+    putVaultProps:    (...args) => heeding(() => vaultDB.putVaultProps(...args)),
+    getBox:           (...args) => heeding(() => vaultDB.getBox(...args)),
+    listBoxes:        (...args) => heeding(() => vaultDB.listBoxes(...args)),
+    putBox:           (...args) => heeding(() => vaultDB.putBox(...args)),
+    delBox:           (...args) => heeding(() => vaultDB.delBox(...args)),
+    delVault:         (...args) => heeding(() => vaultDB.delVault(...args)),
+    subscribe:        (...args) => vaultDB.subscribe(...args),
   }
 }
 

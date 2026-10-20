@@ -12,7 +12,7 @@ import { keepStorage } from '../lib/persist-storage'
  */
 export const SessionBar = ({ auth }: { auth: Auth }) => {
   const session = useSession(auth)
-  const { vault } = useVault()
+  const vault = useVault()
   const [userlabelText, setUserlabelText] = useState('')
   const [gripe, setGripe] = useState<string | null>(null)
 
@@ -50,8 +50,8 @@ export const SessionBar = ({ auth }: { auth: Auth }) => {
   }
 
   const deleteAccount = async () => {
-    if (! globalThis.confirm('Delete this account and remove its vault? The stored lockboxes are gone for good.')) { return }
-    await vault?.retire()
+    if (! globalThis.confirm('Delete this account and remove its vault? The stored boxes are gone for good.')) { return }
+    await vault?.del()
     await auth.deleteAccount()
   }
 

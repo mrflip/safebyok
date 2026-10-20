@@ -2,15 +2,77 @@
 // exercise real IndexedDB semantics (structured clone included) without a browser.
 import 'fake-indexeddb/auto'
 import { createStore, set } from 'idb-keyval'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { idbDeviceDB, inspectIdbDeviceDB, type IdbOpts } from '../src/idb'
 import * as Entry from '../src/idb'
 import { VaultError } from '../src/errors'
 import * as Ckeys from '../src/ckeys'
 import * as TH from './test-helpers'
 
-// Each test gets its own database, so tests never see each other's rows.
-TH.describeDeviceDB('idbDeviceDB', () => idbDeviceDB({ dbName: TH.freshDbName() }))
+/**
+ * Has every `indexedDB.open` fail as a browser fails it for storage it withholds (site data
+ * blocked, a sandboxed frame): the request it hands back fires `onerror`, its `error` a
+ * DOMException named `SecurityError`. Undone as the test ends.
+ */
+const failOpens = () => {
+  const opening = vi.spyOn(indexedDB, 'open').mockImplementation(() => {
+    const request: { error: DOMException, onerror: ((event: Event) => void) | null } = { error: new DOMException('The operation is insecure.', 'SecurityError'), onerror: null }
+    queueMicrotask(() => { request.onerror?.(new Event('error')) })
+    return request as unknown as IDBOpenDBRequest
+  })
+  onTestFinished(() => { opening.mockRestore() })
+}
+
+/**
+ * Has every write's transaction abort as a browser's does when the origin is out of room: its
+ * `error` a DOMException named `QuotaExceededError`, through fake-indexeddb's own abort. Reads
+ * and deletions go on. Undone as the test ends.
+ */
+const failWritesOverQuota = () => {
+  const put = Object.getOwnPropertyDescriptor(IDBObjectStore.prototype, 'put')?.value as IDBObjectStore['put']
+  const putting = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function overQuota(this: IDBObjectStore, ...args: Parameters<IDBObjectStore['put']>) {
+    const request = put.apply(this, args)
+    ;(this.transaction as unknown as { _abort: (errName: string) => void })._abort('QuotaExceededError')
+    return request
+  })
+  onTestFinished(() => { putting.mockRestore() })
+}
+
+// Each test gets its own database, so tests never see each other's rows. Its blocked store is one
+// whose every open the browser refuses, as describeDeviceDB's second example runs it.
+TH.describeDeviceDB('idbDeviceDB', () => idbDeviceDB({ dbName: TH.freshDbName() }), () => {
+  // Every open refused as a browser refuses one from an opaque origin, until the test ends.
+  const opening = vi.spyOn(indexedDB, 'open').mockImplementation(() => { throw new DOMException('The operation is insecure.', 'SecurityError') })
+  onTestFinished(() => { opening.mockRestore() })
+  return idbDeviceDB({ dbName: TH.freshDbName() })
+})
+
+describe("idbDeviceDB over storage the browser withholds", () => {
+  it("answers a write over quota as storage_blocked, the browser's QuotaExceededError its cause, and keeps nothing of it", async () => {
+    const deviceDB = idbDeviceDB({ dbName: TH.freshDbName() })
+    failWritesOverQuota()
+    const refused = await TH.expectBad(deviceDB.putLease(await TH.leaseOf('u1')), 'storage_blocked')
+    expect(refused.cause).to.have.property('name', 'QuotaExceededError')
+    await TH.expectBad(deviceDB.putMark(TH.markOf('u1')), 'storage_blocked')
+    const scope = TH.scopeOf('u1')
+    expect(await TH.expectGood(deviceDB.getLease(scope))).to.be.null
+    expect(await TH.expectGood(deviceDB.getMark(scope))).to.be.null
+  })
+
+  it("answers every verb as storage_blocked when the browser refuses each open through its request's onerror, its SecurityError the cause", async () => {
+    const deviceDB = idbDeviceDB({ dbName: TH.freshDbName() })
+    failOpens()
+    const scope = TH.scopeOf('u1')
+    const refused = await TH.expectBad(deviceDB.getLease(scope), 'storage_blocked')
+    expect(refused.cause).to.be.instanceOf(DOMException).and.to.have.property('name', 'SecurityError')
+    await TH.expectBad(deviceDB.putLease(await TH.leaseOf('u1')), 'storage_blocked')
+    await TH.expectBad(deviceDB.delLease(scope), 'storage_blocked')
+    await TH.expectBad(deviceDB.getMark(scope), 'storage_blocked')
+    await TH.expectBad(deviceDB.putMark(TH.markOf('u1')), 'storage_blocked')
+    await TH.expectBad(deviceDB.delMark(scope), 'storage_blocked')
+    await TH.expectBad(deviceDB.delAll(), 'storage_blocked')
+  })
+})
 
 describe("safebyok/idb", () => {
   it("exports the device store, its inspector and the change bell, and no vault store: that is safebyok-indexeddb's", () => {
@@ -35,7 +97,7 @@ describe("the IndexedDB device store's options", () => {
   for (const [makerTitle, make] of Makers) {
     for (const [opts, blurb] of BadIdbOpts) {
       it(`${makerTitle} refuses ${blurb} with kind 'bad_option'`, () => {
-        expect(() => make(opts as unknown as IdbOpts)).to.throw(VaultError, /dbName/).with.property('kind', 'bad_option')
+        expect(() => make(opts as unknown as IdbOpts)).to.throw(VaultError, /dbName/).with.property('refusalkind', 'bad_option')
       })
     }
     it(`${makerTitle} keeps its records in 'safebyok' given no options, or no dbName`, () => {
@@ -45,16 +107,6 @@ describe("the IndexedDB device store's options", () => {
   }
 })
 
-/** What `attempt` rejects with; it fails the test should it resolve. */
-const rejectionOf = async (attempt: Promise<unknown>): Promise<unknown> => {
-  try {
-    await attempt
-  } catch (err) {
-    return err
-  }
-  throw new Error('it resolved, where a rejection was expected')
-}
-
 describe("idbDeviceDB", () => {
   const NoIndexedDBCases = [
     [undefined,  'a runtime with no indexedDB global'],
@@ -62,11 +114,12 @@ describe("idbDeviceDB", () => {
   ] as const
 
   for (const [factory, blurb] of NoIndexedDBCases) {
-    it(`refuses at its first use with a NotSupportedError, in ${blurb}`, async () => {
+    it(`refuses at its first use as 'storage_blocked', a NotSupportedError its cause, in ${blurb}`, async () => {
       const deviceDB = idbDeviceDB({ dbName: TH.freshDbName() })
       vi.stubGlobal('indexedDB', factory)
       try {
-        await expect(deviceDB.readMark(TH.scopeOf('u1'))).rejects.toThrow(expect.objectContaining({ name: 'NotSupportedError' }))
+        const err = await TH.expectBad(deviceDB.getMark(TH.scopeOf('u1')), 'storage_blocked')
+        expect(err.cause).to.have.property('name', 'NotSupportedError')
       } finally {
         vi.unstubAllGlobals()
       }
@@ -84,27 +137,27 @@ describe("idbDeviceDB", () => {
     })
   }
 
-  it("refuses with a DOMException where the runtime has one", async () => {
+  it("refuses with a DOMException as its cause where the runtime has one", async () => {
     const deviceDB = idbDeviceDB({ dbName: TH.freshDbName() })
     vi.stubGlobal('indexedDB', undefined)
     try {
-      const err = await rejectionOf(deviceDB.readMark(TH.scopeOf('u1')))
-      expect(err).to.be.instanceOf(DOMException)
-      expect(err).to.have.property('name', 'NotSupportedError')
+      const { cause } = await TH.expectBad(deviceDB.getMark(TH.scopeOf('u1')), 'storage_blocked')
+      expect(cause).to.be.instanceOf(DOMException)
+      expect(cause).to.have.property('name', 'NotSupportedError')
     } finally {
       vi.unstubAllGlobals()
     }
   })
 
-  it("refuses with a plain Error named NotSupportedError where the runtime has no DOMException, as Hermes has none", async () => {
+  it("refuses with a plain Error named NotSupportedError as its cause where the runtime has no DOMException, as Hermes has none", async () => {
     const deviceDB = idbDeviceDB({ dbName: TH.freshDbName() })
     vi.stubGlobal('indexedDB', undefined)
     vi.stubGlobal('DOMException', undefined)
     try {
-      const err = await rejectionOf(deviceDB.readMark(TH.scopeOf('u1')))
-      expect(err).to.be.instanceOf(Error)
-      expect(err).to.have.property('name', 'NotSupportedError')
-      expect(err).to.have.property('message').that.includes('no IndexedDB')
+      const { cause } = await TH.expectBad(deviceDB.getMark(TH.scopeOf('u1')), 'storage_blocked')
+      expect(cause).to.be.instanceOf(Error)
+      expect(cause).to.have.property('name', 'NotSupportedError')
+      expect(cause).to.have.property('message').that.includes('no IndexedDB')
     } finally {
       vi.unstubAllGlobals()
     }
@@ -115,13 +168,13 @@ describe("idbDeviceDB", () => {
     const shelf = createStore(`${dbName}:device_db`, 'records')
     await set('unlock:acme:u1:main', await TH.leaseOf('u1'), shelf)
     await set(['unlock', 'acme', 'u1', 'main'], await TH.leaseOf('u1'), shelf)
-    const deviceDB = idbDeviceDB({ dbName })
-    await deviceDB.writeLease(await TH.leaseOf('u2'))
+    const deviceDB = TH.expectingGood(idbDeviceDB({ dbName }))
+    await deviceDB.putLease(await TH.leaseOf('u2'))
     const gets = vi.spyOn(IDBObjectStore.prototype, 'get')
     const getAlls = vi.spyOn(IDBObjectStore.prototype, 'getAll')
     const cursors = vi.spyOn(IDBObjectStore.prototype, 'openCursor')
     try {
-      expect(await deviceDB.readLease(TH.scopeOf('u1'))).to.be.null
+      expect(await deviceDB.getLease(TH.scopeOf('u1'))).to.be.null
       expect(gets.mock.calls.map(([ckey]) => ckey)).to.deep.equal([Ckeys.lease(TH.scopeOf('u1'))])
       expect(getAlls).to.have.callCount(0)
       expect(cursors).to.have.callCount(0)
@@ -136,10 +189,10 @@ describe("idbDeviceDB", () => {
     const dbName = TH.freshDbName()
     const shelf = createStore(`${dbName}:device_db`, 'records')
     await set('unlock:acme:u1:main', await TH.leaseOf('u1'), shelf)
-    const deviceDB = idbDeviceDB({ dbName })
-    await deviceDB.writeLease(await TH.leaseOf('u2'))
-    await deviceDB.eraseLease(TH.scopeOf('u3'))
-    expect(await deviceDB.readLease(TH.scopeOf('u2'))).to.not.be.null
+    const deviceDB = TH.expectingGood(idbDeviceDB({ dbName }))
+    await deviceDB.putLease(await TH.leaseOf('u2'))
+    await deviceDB.delLease(TH.scopeOf('u3'))
+    expect(await deviceDB.getLease(TH.scopeOf('u2'))).to.not.be.null
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
     expect(rows.map((row) => row.ckey)).to.deep.equal([Ckeys.lease(TH.scopeOf('u2'))])
   })
@@ -147,23 +200,23 @@ describe("idbDeviceDB", () => {
   it("discards a device's lease from before the rename, filed under unlock^, keeping its device mark: the user proves once more", async () => {
     const dbName = TH.freshDbName()
     const shelf = createStore(`${dbName}:device_db`, 'records')
-    const deviceDB = idbDeviceDB({ dbName })
-    await deviceDB.writeMark(TH.markOf('u1'))
+    const deviceDB = TH.expectingGood(idbDeviceDB({ dbName }))
+    await deviceDB.putMark(TH.markOf('u1'))
     // Even a record that would read today is swept unread: its ckey is not one this version files.
     await set('unlock^acme^u1^main', await TH.leaseOf('u1'), shelf)
-    expect(await deviceDB.readLease(TH.scopeOf('u1'))).to.be.null
+    expect(await deviceDB.getLease(TH.scopeOf('u1'))).to.be.null
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
     expect(rows.map((row) => row.ckey)).to.deep.equal(['mark^acme^u1^main'])
-    expect(await deviceDB.readMark(TH.scopeOf('u1'))).to.deep.equal(TH.markOf('u1'))
+    expect(await deviceDB.getMark(TH.scopeOf('u1'))).to.deep.equal(TH.markOf('u1'))
   })
 
   it("keeps every device mark through a sweep: a mark's ckey is one this version files", async () => {
     const dbName = TH.freshDbName()
     const shelf = createStore(`${dbName}:device_db`, 'records')
     await set('unlock:acme:u1:main', await TH.leaseOf('u1'), shelf)
-    const deviceDB = idbDeviceDB({ dbName })
-    await deviceDB.writeMark(TH.markOf('u1'))
-    await deviceDB.readLease(TH.scopeOf('u1'))
+    const deviceDB = TH.expectingGood(idbDeviceDB({ dbName }))
+    await deviceDB.putMark(TH.markOf('u1'))
+    await deviceDB.getLease(TH.scopeOf('u1'))
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
     expect(rows.map((row) => row.ckey)).to.deep.equal([Ckeys.mark(TH.scopeOf('u1'))])
   })
@@ -172,8 +225,8 @@ describe("idbDeviceDB", () => {
     const dbName = TH.freshDbName()
     const shelf = createStore(`${dbName}:device_db`, 'records')
     await set(Ckeys.mark(TH.scopeOf('u1')), { ...TH.markOf('u1'), seen: { ...TH.markOf('u1').seen, unlock_epoch: 'one' } }, shelf)
-    const deviceDB = idbDeviceDB({ dbName })
-    expect(await deviceDB.readMark(TH.scopeOf('u1'))).to.be.null
+    const deviceDB = TH.expectingGood(idbDeviceDB({ dbName }))
+    expect(await deviceDB.getMark(TH.scopeOf('u1'))).to.be.null
     expect(await inspectIdbDeviceDB({ dbName }).rows()).to.have.lengthOf(0)
   })
 
@@ -181,12 +234,12 @@ describe("idbDeviceDB", () => {
     const dbName = TH.freshDbName()
     const shelf = createStore(`${dbName}:device_db`, 'records')
     await set('unlock:acme:u1:main', await TH.leaseOf('u1'), shelf)
-    const deviceDB = idbDeviceDB({ dbName })
+    const deviceDB = TH.expectingGood(idbDeviceDB({ dbName }))
     let heardCount = 0
     const unsubscribe = inspectIdbDeviceDB({ dbName }).subscribe(() => { heardCount += 1 })
-    await deviceDB.readLease(TH.scopeOf('u2'))
+    await deviceDB.getLease(TH.scopeOf('u2'))
     expect(heardCount).to.equal(1)
-    await deviceDB.readLease(TH.scopeOf('u2'))
+    await deviceDB.getLease(TH.scopeOf('u2'))
     expect(heardCount).to.equal(1)
     unsubscribe()
   })
@@ -198,7 +251,7 @@ describe("idbDeviceDB", () => {
     const otherHeard: unknown[] = []
     otherTab.addEventListener('message', (event) => { otherHeard.push(event.data) })
     try {
-      await idbDeviceDB({ dbName }).eraseLease(TH.scopeOf('u1'))
+      await idbDeviceDB({ dbName }).delLease(TH.scopeOf('u1'))
       await vi.waitFor(() => { expect(otherHeard).to.deep.equal(['changed']) })
     } finally {
       otherTab.close()
@@ -207,24 +260,25 @@ describe("idbDeviceDB", () => {
 
   it("erases the scope's own lease even when the sweep fails", async () => {
     const dbName = TH.freshDbName()
-    const deviceDB = idbDeviceDB({ dbName })
-    await deviceDB.writeLease(await TH.leaseOf('u1'))
+    const shelfDB = idbDeviceDB({ dbName })
+    await TH.expectGood(shelfDB.putLease(await TH.leaseOf('u1')))
     vi.spyOn(IDBObjectStore.prototype, 'getAllKeys').mockImplementation(() => { throw new Error('the shelf will not list') })
     try {
-      await expect(deviceDB.eraseLease(TH.scopeOf('u1'))).rejects.toThrow('the shelf will not list')
+      const { cause } = await TH.expectBad(shelfDB.delLease(TH.scopeOf('u1')), 'storage_unavailable')
+      expect(cause).to.have.property('message', 'the shelf will not list')
     } finally {
       vi.restoreAllMocks()
     }
     expect(await inspectIdbDeviceDB({ dbName }).rows()).to.have.lengthOf(0)
   })
 
-  it("clears the whole shelf at eraseAll, a lease filed under the colon-joined ckey of 0.2 and before included", async () => {
+  it("clears the whole shelf at delAll, a lease filed under the colon-joined ckey of 0.2 and before included", async () => {
     const dbName = TH.freshDbName()
     const shelf = createStore(`${dbName}:device_db`, 'records')
     await set('unlock:acme:u1:main', await TH.leaseOf('u1'), shelf)
-    const deviceDB = idbDeviceDB({ dbName })
-    await deviceDB.writeLease(await TH.leaseOf('u2'))
-    await deviceDB.eraseAll()
+    const deviceDB = TH.expectingGood(idbDeviceDB({ dbName }))
+    await deviceDB.putLease(await TH.leaseOf('u2'))
+    await deviceDB.delAll()
     expect(await inspectIdbDeviceDB({ dbName }).rows()).to.have.lengthOf(0)
   })
 })
@@ -232,19 +286,19 @@ describe("idbDeviceDB", () => {
 describe("inspectIdbDeviceDB", () => {
   it("shows the raw rows of the device shelf, hears writes, and wipes it clean", async () => {
     const dbName = TH.freshDbName()
-    const deviceDB = idbDeviceDB({ dbName })
+    const deviceDB = TH.expectingGood(idbDeviceDB({ dbName }))
     const inspector = inspectIdbDeviceDB({ dbName })
     let heardCount = 0
     const unsubscribe = inspector.subscribe(() => { heardCount += 1 })
 
-    await deviceDB.writeLease(await TH.leaseOf('u1'))
+    await deviceDB.putLease(await TH.leaseOf('u1'))
     const rows = await inspector.rows()
     expect(rows.map((row) => row.ckey)).to.deep.equal(['lease^acme^u1^main'])
     await vi.waitFor(() => { expect(heardCount).to.be.greaterThan(0) })
 
     await inspector.wipe()
     expect(await inspector.rows()).to.have.lengthOf(0)
-    expect(await deviceDB.readLease(TH.scopeOf('u1'))).to.be.null
+    expect(await deviceDB.getLease(TH.scopeOf('u1'))).to.be.null
     unsubscribe()
   })
 
@@ -252,7 +306,7 @@ describe("inspectIdbDeviceDB", () => {
     const dbName = TH.freshDbName()
     const inspector = inspectIdbDeviceDB({ dbName })
     expect(() => inspector.subscribe('not a listener' as unknown as () => void)).to.throw(VaultError, /listener function/)
-    await idbDeviceDB({ dbName }).writeLease(await TH.leaseOf('u1'))
+    await idbDeviceDB({ dbName }).putLease(await TH.leaseOf('u1'))
     expect(await inspector.rows()).to.have.lengthOf(1)
   })
 })

@@ -13,17 +13,19 @@ reach says so, and says where it is proven instead.
 
 Three layers share the work, and each guarantee below belongs to one of them.
 
-* **The vault** (`Vault.make`) decides what to write. It reads a lockbox, seals a new revision over
+* **The vault** (`Vault.make`) decides what to write. It reads a box, seals a new revision over
   it, and writes with an expectation of what it read. When storage refuses the write as stale, it
   catches up with storage once and refuses the store as `stale_write`, never trying again: what
-  the other device wrote or retired stands, and the host hears that its write lost. It also holds the app's own lockbox limit (`maxLockboxes`, 100 by default): the alarm bell for an
+  the other device wrote or deleted stands, and the host hears that its write lost. It also holds the app's own box limit (`maxBoxes`, 100 by default): the alarm bell for an
   app that is storing far more than it meant to.
 * **The base class** (`VaultDB`'s public verbs) checks every name, record and expectation on the
-  way in and every record on the way out -- the lockbox a write hands back among them, and what a
-  lockbox retirement reports -- refuses what is malformed before your code sees it, turns a
-  `false` from you (from a lockbox write or retirement, a `null`) into `stale_write`, and turns
+  way in and every record on the way out -- the box a write hands back among them, and what a
+  box deletion reports -- refuses what is malformed before your code sees it, turns a
+  `false` from you (from a box write or deletion, a `null`) into `stale_write`, and turns
   anything you throw that is not a
-  `VaultError` into `storage_unavailable`, your error as its cause. It holds every name to the
+  `VaultError` into `storage_unavailable`, your error as its cause. Every verb resolves an
+  `Outcome` and never rejects: `{ ok: true, val }`, or `{ ok: false, err }` with the refusal as
+  a `VaultError`, whether the base class refused or your code threw. It holds every name to the
   floor and to what your adapter declares (*Names*, below), never to a host's own validators.
   It guards `subscribe`: each listener is called so that nothing it throws, and no promise it
   hands back that rejects, escapes -- each goes to the logger as an error -- and your unsubscribe
@@ -34,9 +36,9 @@ Three layers share the work, and each guarantee below belongs to one of them.
 * **Your adapter** (the `do*` methods) stores and returns records, and makes each write
   conditional: it checks the expectation and writes in one atomic step. It never resolves a
   conflict itself, never merges two writes, and never retries one: a write whose expectation
-  failed resolves `false` (a lockbox write or retirement, `null`), and the vault decides what
-  happens next. A lockbox write that lands resolves the record as you now hold it, read back in
-  the same atomic step as the write; a lockbox retirement that lands, what it removed (line 3.4).
+  failed resolves `false` (a box write or deletion, `null`), and the vault decides what
+  happens next. A box write that lands resolves the record as you now hold it, read back in
+  the same atomic step as the write; a box deletion that lands, what it removed (line 3.4).
 
 A server that serves these verbs to browsers -- the Convex component, the Postgres route recipe,
 the GraphQL resolvers -- checks who may reach which vault (line 5.4), makes each write atomic, and
@@ -52,21 +54,27 @@ So the versioned update is split: the adapter owns the atomic compare-and-write 
 wins, and the second hears of it" is the vault's policy over the adapter's guarantee, not something
 an adapter implements.
 
-Nothing is retried. A lockbox write, a change to the ways in, a `retire()` or a `retireBox()` that
+Nothing is retried. A box write, a change to the ways in, a `del()` or a `delBox()` that
 meets someone else's is news the user must hear, refused once as `stale_write`. Before it names any
-refusal -- a stale write, or a lockbox that will not open -- the vault catches up with storage
-once, so a vault retired and made anew elsewhere relocks the device rather than reading as
+refusal -- a stale write, or a box that will not open -- the vault catches up with storage
+once, so a vault deleted and made anew elsewhere relocks the device rather than reading as
 damage. There is no conflict handler beyond this, and no hook for one: whatever landed first
-stands, and a host that disagrees calls `storeBox()` or `retireBox()` again. The vault never clears
-a damaged record on its own; the user's `retireBox()` on its boxlabel does, or a `storeBox()` over
-one that names its revision, in its one `updateBox`: a store never retires. A `retireBox()` that
-storage says removed another revision than the one the vault showed stands too, as a retirement
+stands, and a host that disagrees calls `putBox()` or `delBox()` again. The vault never clears
+a damaged record on its own; the user's `delBox()` on its boxlabel does, or a `putBox()` over
+one that names its revision, in its one `putBox`: a store never deletes. A `delBox()` that
+storage says removed another revision than the one the vault showed stands too, as a deletion
 within its vault does (line 3.4): the vault warns through its logger, naming neither revision.
 
 The base class turns anything your code throws that is not a `VaultError` into
 `storage_unavailable` -- a bug in your adapter among it, which it cannot tell from a driver's
-failure: the `cause` carries your error, and an adapter that means a kind throws a `VaultError` of
-it.
+failure (a `fetch` says the network failed with a `TypeError`): the `cause` carries your error, and
+an adapter that means a kind throws a `VaultError` of it. Whatever your code throws reaches the
+caller as a bad `Outcome`'s `err`, never as a rejection. A throw from the base class's own code
+that is not a `VaultError` is a bug in safebyok, not an outage: `unexpected_error`, never to be
+retried. An adapter that hands its calls on to another VaultDB unwraps each answer with `valOf`,
+returning its `val` and throwing its `err`: an answer handed back still wrapped as an `Outcome` is
+refused as `bad_option`, never read as a record. `subscribe`, which answers at once with the
+unsubscribe, is the one verb that throws its refusal rather than resolving it.
 
 ## The baseline
 
@@ -94,11 +102,11 @@ host who wants more than it ships (a hard limit enforced in the database, say): 
 and never needed for any line here.
 
 **A backend with no atomic step at all** cannot keep this contract: line 3.3 compares the
-vault's props and the lockbox's revision before writing, and nothing short of an atomic step
+vault's props and the box's revision before writing, and nothing short of an atomic step
 makes that comparison and the write one event. A backend with single-record conditional writes
 but nothing spanning two records (a plain key-value store with compare-and-set) keeps lines 3.1
 and 3.2, which touch the vault props alone, and no more: lines 3.3 and 3.4 check the vault props
-and write a lockbox, and 3.5 removes the vault props with every lockbox, and it can make neither
+and write a box, and 3.5 removes the vault props with every box, and it can make neither
 one event.
 Every adapter in this repository has an atomic step that spans a vault: a statement and a foreign key
 (Postgres), a transaction (Convex, IndexedDB), or one synchronous turn of a single tab
@@ -106,21 +114,21 @@ Every adapter in this repository has an atomic step that spans a vault: a statem
 
 ## Names
 
-A vault is named by its scope -- applabel, user id and vaultlabel -- and a lockbox by its boxlabel
+A vault is named by its scope -- applabel, user id and vaultlabel -- and a box by its boxlabel
 within it. Every name a verb is handed passes, before the adapter sees it:
 
 * **The floor** (`NameFloor`): one character to 1 KiB of UTF-8, well-formed Unicode, in its
   composed form (NFC), with no control character and no `^`. Nothing turns it off, and no host's
   validators widen it. A stored record holding a name below it reads back as damaged.
   `^` is there because a key-value store joins a row's names into one ckey on it (`Ckeys`): a
-  name holding it could make two rows' ckeys one, another user's lockbox under this one's name.
+  name holding it could make two rows' ckeys one, another user's box under this one's name.
   Every store refuses it alike, whether it joins names or keeps each in a column of its own, so a
   name that one store holds every other does too.
 * **What the adapter declares** (line 7.3): no more bytes than `maxNameBytes`.
 
 A name handed to a verb on its own or in a scope, and a name the floor admits but over
 `maxNameBytes` wherever it is, is refused as `bad_label`, naming which name and which rule, and
-quoting none of it. A name below the floor inside a record -- the vault props' scope, a lockbox's
+quoting none of it. A name below the floor inside a record -- the vault props' scope, a box's
 boxlabel -- makes that record one this package does not build, refused whole as `bad_record`,
 naming the record and quoting none of it.
 
@@ -128,47 +136,47 @@ naming the record and quoting none of it.
 
 **1.1. What is stored reads back whole.** A record reads back exactly as it was written, field
 for field, and nothing is added. Text comes back as the exact text written: a
-lockbox's `sidecar_json` is bound into its encryption as written, so a store that rewrites JSON
+box's `sidecar_json` is bound into its encryption as written, so a store that rewrites JSON
 it holds (Postgres's `jsonb`, say) keeps that field as plain text. Before anything is written, a read finds nothing: `null`, never a
 default.
 
 **1.2. Each vault keeps to itself.** Two scopes that differ anywhere, by however little (a
-colon, a quote, a bracket, a script), never share a record, a listing or a retirement, whatever names
+colon, a quote, a bracket, a script), never share a record, a listing or a deletion, whatever names
 above the floor and within the adapter's declared limits they hold (*Names*, above).
 
 **1.3. Nothing is repaired, and nothing is dropped.** An adapter hands up every record as it is
 stored, damaged or not; the base class decides what is damaged, and the vault lists a damaged
-lockbox so that the user can retire it. *Proven by the base class's own tests* (the core's
+box so that the user can delete it. *Proven by the base class's own tests* (the core's
 `vault-db.test.ts`), which can plant a damaged record; the battery cannot, through public verbs
 that refuse to write one.
 
 ## 2. Reads
 
 **2.1. A write that resolved is seen by every read after it.** Once a write's promise resolves,
-every read that starts afterwards -- `readVaultProps`, `readBox`, `listBoxes`, on any device -- sees
-it, and once a retirement resolves, none sees what it retired. Normal use gives the same answer from
+every read that starts afterwards -- `getVaultProps`, `getBox`, `listBoxes`, on any device -- sees
+it, and once a deletion resolves, none sees what it deleted. Normal use gives the same answer from
 every device.
 
-**2.2. Every lockbox stored can be read by its boxlabel.** `readBox` reaches each lockbox the
+**2.2. Every box stored can be read by its boxlabel.** `getBox` reaches each box the
 vault holds, however many it holds -- even a vault that racing writers took past its limit (line
 4.2).
 
-**2.3. A listing is whole.** `listBoxes` returns every lockbox in the vault: never a page, a
+**2.3. A listing is whole.** `listBoxes` returns every box in the vault: never a page, a
 sample, or the first so many. Asked twice with nothing written between, it gives the same
 listing, sorted by boxlabel. There is no limit to ask for; a listing that takes one would also say
-which lockboxes it keeps, and none does. Within the limits the adapter declares (section 7 and
-line 4.1) a listing succeeds; past them, a backend that cannot read so many lockboxes at once
-refuses the listing with an error rather than return part of it, and once retirements bring the vault
+which boxes it keeps, and none does. Within the limits the adapter declares (section 7 and
+line 4.1) a listing succeeds; past them, a backend that cannot read so many boxes at once
+refuses the listing with an error rather than return part of it, and once deletions bring the vault
 back within its limits, the listing is whole again.
 
 ## 3. Versioned writes
 
-**3.1. Vault props are created once.** `fetchOrCreateVaultProps` stores the vault props only where
+**3.1. Vault props are created once.** `ensureVaultProps` stores the vault props only where
 the scope holds none, and returns whichever vault props stand afterwards: the given ones, or, when the
 vault already exists, the ones standing, exactly as stored and under their own `vault_id` -- another
 device's, perhaps created in the same moment. Two devices creating at once settle on one vault.
 
-**3.2. An update of the vault props lands only over the props it read.** `updateVaultProps`
+**3.2. An update of the vault props lands only over the props it read.** `putVaultProps`
 writes only while the standing vault props have the expected `vault_id` and `unlock_epoch`, and
 refuses as `stale_write` otherwise, including where no vault props stand: an update never
 creates. A server-side adapter, which a client of another version's may reach, also enforces what
@@ -177,121 +185,121 @@ every update carries: it lands only vault props that keep the standing `vault_id
 do). The core always sends the standing
 `unlock_epoch` plus one, so none of its own writes meets this refusal.
 
-**3.3. A lockbox write lands only over the lockbox it read, in the vault it was sealed for.**
-`updateBox` writes only while the scope's standing vault props have the expected `vault_id` and the
-standing lockbox has the expected `revision_tok` -- or, for a null revision, no lockbox stands
+**3.3. A box write lands only over the box it read, in the vault it was sealed for.**
+`putBox` writes only while the scope's standing vault props have the expected `vault_id` and the
+standing box has the expected `revision_tok` -- or, for a null revision, no box stands
 under that boxlabel. Otherwise it refuses as `stale_write`: over a revision it never read, in a
-scope with no vault props, or into a vault retired and made anew under another `vault_id`, even
-where no lockbox stands in either.
+scope with no vault props, or into a vault deleted and made anew under another `vault_id`, even
+where no box stands in either.
 
-A write that lands resolves the lockbox as storage now holds it, field for field the one written
+A write that lands resolves the box as storage now holds it, field for field the one written
 (line 1.1), and the adapter hands it back from the same atomic step as the write: a `RETURNING`
 (Postgres), the mutation's return value (Convex, and over GraphQL its payload), a read in the
 write's transaction (IndexedDB) or synchronous turn (`localVaultDB`), never a second call. A
-refused write resolves nothing: its adapter resolves `null`, and the base class throws
-`stale_write`, carrying no record. The base class holds what comes back to the check a `readBox`
+refused write resolves nothing: its adapter resolves `null`, and the base class refuses it as
+`stale_write`, carrying no record. The base class holds what comes back to the check a `getBox`
 makes, and refuses one that fails it as `corrupt_record`, saying the write may have landed: the
 adapter wrote something it cannot read back. *That refusal is proven by the base class's own
 tests* (the core's `vault-db.test.ts`), which can have an adapter answer with a malformed record;
 the battery, through an adapter that keeps this line, cannot.
 
-**3.4. A retirement wins, within its vault, and says what it removed.** `retireBox` removes the
-lockbox under its boxlabel, whatever revision stands, while the scope's standing vault props have
+**3.4. A deletion wins, within its vault, and says what it removed.** `delBox` removes the
+box under its boxlabel, whatever revision stands, while the scope's standing vault props have
 the expected `vault_id`, and resolves what it found there, reported from the same atomic step as
-the removal: `retired` for the revision its expectation names (its `revision_tok`, the one the
-retiring device read; for null, which names a damaged lockbox listed with none, a record holding
-none that reads as one), `retired_other` for any other record -- one written over the revision
-named, or holding one where none was named -- and `absent` where no lockbox stands. The revision
-only reports, and never refuses: a retirement naming another revision removes what stands all the
-same, and the vault decides what to tell its user. A write over a revision retired meanwhile
-refuses, and the lockbox stays gone. A retirement aimed at a vault since retired and made anew
+the removal: `deleted` for the revision its expectation names (its `revision_tok`, the one the
+deleting device read; for null, which names a damaged box listed with none, a record holding
+none that reads as one), `deleted_other` for any other record -- one written over the revision
+named, or holding one where none was named -- and `absent` where no box stands. The revision
+only reports, and never refuses: a deletion naming another revision removes what stands all the
+same, and the vault decides what to tell its user. A write over a revision deleted meanwhile
+refuses, and the box stays gone. A deletion aimed at a vault since deleted and made anew
 refuses as `stale_write`, whatever revision it names -- its adapter resolves `null` -- and the new
-vault keeps its lockbox. Nothing of what is retired is kept: no tombstone.
+vault keeps its box. Nothing of what is deleted is kept: no tombstone.
 
 An adapter that keeps a typed revision column reports from its delete (Postgres's `RETURNING`, the
 row a Convex mutation deletes); a key-value store reads the row in the step that removes it. Each
 compares the revision as the listing reads it: Postgres and the key-value stores through
-`Expectations.retirementOf`, and the Convex component, which runs on Convex's servers apart from
+`Expectations.deletionOf`, and the Convex component, which runs on Convex's servers apart from
 the core, in its own mutation. The base class refuses an answer
-in any other shape as `corrupt_record`, saying the retirement may have landed. *That refusal, and
-`retired` for a damaged record holding no revision, are proven by the base class's own tests* (the
+in any other shape as `corrupt_record`, saying the deletion may have landed. *That refusal, and
+`deleted` for a damaged record holding no revision, are proven by the base class's own tests* (the
 core's `vault-db.test.ts` and `expectations.test.ts`), which can have an adapter answer badly and
 plant a damaged record; the battery, through public verbs that do neither, cannot.
 
-**3.5. A vault is retired whole, and alone.** `retireVault` removes the vault props and every
-lockbox of its scope, and nothing of any other scope, while the standing vault props have the
+**3.5. A vault is deleted whole, and alone.** `delVault` removes the vault props and every
+box of its scope, and nothing of any other scope, while the standing vault props have the
 expected `vault_id`; otherwise it refuses as `stale_write` and removes nothing, so a vault made anew
 survives a device that missed its predecessor's end.
 
 It compares the `vault_id` and nothing else, so a vault whose props are damaged in any other field
-is still retired, and vault props rewritten under the same `vault_id` between a read and the
-retirement are retired with them: it is the same vault. A typed backend (Convex, Postgres) cannot
+is still deleted, and vault props rewritten under the same `vault_id` between a read and the
+deletion are deleted with them: it is the same vault. A typed backend (Convex, Postgres) cannot
 hold damaged vault props, so there the hatch below has nothing to do: the vault's
-`retireDamagedVault`, the one way to clear a vault whose `hello()` refuses it as `damaged_vault`, reads
-the vault props through `doReadVaultProps` as stored, takes their `vault_id`, and aims this
-retirement at it. An adapter that hands each call on to another VaultDB's public verbs hands
-`retireDamagedVault` on too. Proven by the base class's own tests for a damaged record, which the
-battery cannot plant, and by the battery for a sound vault, which it refuses to retire.
+`delDamagedVault`, the one way to clear a vault whose `hello()` refuses it as `damaged_vault`, reads
+the vault props through `doGetVaultProps` as stored, takes their `vault_id`, and aims this
+deletion at it. An adapter that hands each call on to another VaultDB's public verbs hands
+`delDamagedVault` on too. Proven by the base class's own tests for a damaged record, which the
+battery cannot plant, and by the battery for a sound vault, which it refuses to delete.
 
 **3.6. A refused write wrote nothing.** Whatever the refusal -- `stale_write`, `vault_full`,
-`lockbox_too_large`, a malformed record -- the vault stands afterwards exactly as it stood before:
-its vault props, its lockboxes, its listing. When storage is unreachable or fails partway
+`box_too_large`, a malformed record -- the vault stands afterwards exactly as it stood before:
+its vault props, its boxes, its listing. When storage is unreachable or fails partway
 (`storage_unavailable`), an adapter's own atomic step decides: the write landed whole or not at
 all, and the vault's next read shows which.
 
-**3.7. Writes that do not collide all land.** Writes to different lockboxes in one vault, made at
+**3.7. Writes that do not collide all land.** Writes to different boxes in one vault, made at
 once from different devices, all land: none refuses as `stale_write`, none fails for contention,
-and no host retries. Only writes to one lockbox -- or a retirement of the vault -- can collide, and
+and no host retries. Only writes to one box -- or a deletion of the vault -- can collide, and
 then line 3.3 or 3.4 says which wins.
 
-**3.8. A lockbox write lands only under the vaultKey that stands.** A lockbox carries the
-`vault_key_epoch` of the vaultKey its lockboxKey is wrapped under, and its write's expectation
-names the same one (the base class refuses a lockbox whose epoch is not the expected one, as
-`bad_record`, before the adapter sees it). `updateBox` writes only while the scope's standing
+**3.8. A box write lands only under the vaultKey that stands.** A box carries the
+`vault_key_epoch` of the vaultKey its boxKey is wrapped under, and its write's expectation
+names the same one (the base class refuses a box whose epoch is not the expected one, as
+`bad_record`, before the adapter sees it). `putBox` writes only while the scope's standing
 vault props have that `vault_key_epoch`, as well as the `vault_id` and revision of line 3.3,
 compared in the same atomic step as the write; otherwise it refuses as `stale_write` and writes
-nothing. So a lockbox only ever lands sealed under the vaultKey its vault props stand for. Every
+nothing. So a box only ever lands sealed under the vaultKey its vault props stand for. Every
 vault carries `vault_key_epoch` 1 today, the epoch reserved for a rotation of the vaultKey not yet
 built, so for now the comparison refuses a record built wrong. It is kept so that rotation needs
 no new contract: the vault does not read the vault props before each write, so only storage can
 refuse a device that still holds a vaultKey since replaced and has not looked at the vault props
-meanwhile. Retirements name no `vault_key_epoch` (line 3.4): a retirement reveals nothing.
+meanwhile. Deletions name no `vault_key_epoch` (line 3.4): a deletion reveals nothing.
 
-## 4. The lockbox limit
+## 4. The box limit
 
-**4.1. An adapter declares the most lockboxes it holds in one vault.** `maxLockboxes` is a whole
+**4.1. An adapter declares the most boxes it holds in one vault.** `maxBoxes` is a whole
 number above zero, or `Infinity` for a backend that sets no such limit; a limit that crosses a
 wire or is stored, where `Infinity` cannot go, is a large whole number instead. A vault refuses to
-open with a larger `maxLockboxes` of its own.
+open with a larger `maxBoxes` of its own.
 
-**4.2. A new lockbox past the limit is refused, on a best effort.** An adapter with a finite limit
-refuses a new lockbox in a vault already holding that many, with kind `vault_full`. Its check is
+**4.2. A new box past the limit is refused, on a best effort.** An adapter with a finite limit
+refuses a new box in a vault already holding that many, with kind `vault_full`. Its check is
 a best effort: writes made one after another never take a vault past the limit, but writers racing
 for the last places may each find room and all land, taking it a few past. That is the limit's
-job -- to stop a runaway loop, and to keep a vault inside what its backend can list and retire --
+job -- to stop a runaway loop, and to keep a vault inside what its backend can list and delete --
 not to hold off a determined client, which is the host's to meter like any other abuse.
 
-**4.3. A replacement is never refused for the count.** A lockbox written over one already there
+**4.3. A replacement is never refused for the count.** A box written over one already there
 is never refused as `vault_full`, however full the vault. A first write under a boxlabel that is
-already taken missed a lockbox it would replace, and refuses as `stale_write`, never as
+already taken missed a box it would replace, and refuses as `stale_write`, never as
 `vault_full`, so the store that follows the catch-up replaces it.
 
-**4.4. Under the limit, a new lockbox lands.** Once a vault holds fewer lockboxes than its
-limit -- retirements having made room, or brought back under it a vault that racing writers took past
+**4.4. Under the limit, a new box lands.** Once a vault holds fewer boxes than its
+limit -- deletions having made room, or brought back under it a vault that racing writers took past
 -- a new one lands.
 
 **4.5. Past the limit, nothing is lost.** A vault taken past its limit by racing writers keeps
-every lockbox that landed, each readable by its boxlabel (line 2.2), and every write refused as
-`vault_full` left nothing behind (line 3.6). Retirements bring it back under the limit, and its listing
+every box that landed, each readable by its boxlabel (line 2.2), and every write refused as
+`vault_full` left nothing behind (line 3.6). Deletions bring it back under the limit, and its listing
 is whole again (line 2.3).
 
 **4.6. A hard limit is the backend's, or opt-in.** A backend that cannot hold more than some
 amount in a vault -- Convex, whose transactions read and write a bounded number of documents --
-refuses at that limit as `vault_full`, and declares a `maxLockboxes` well inside it. An adapter
+refuses at that limit as `vault_full`, and declares a `maxBoxes` well inside it. An adapter
 for a backend with no such limit enforces none beyond line 4.2's best effort, unless the host
 opts in to one and pays what it costs. *Not tested by the battery*: each adapter tests its own.
 
-A write that lands reports no count of the vault's lockboxes: a lockbox write resolves its record
+A write that lands reports no count of the vault's boxes: a box write resolves its record
 (line 3.3), and nothing more. The vault already learns the count from the listing it reads after
 every write, and asking every adapter for one would put a count into every adapter's write path. An adapter that enforces a limit says, in
 its README, what its count is as of: the start of the write's statement, say, or its commit.
@@ -299,13 +307,14 @@ its README, what its count is as of: the start of the write's statement, say, or
 ## 5. Errors
 
 **5.1. Every refusal is a VaultError whose kind says what to do.** An adapter refuses with a
-`VaultError`: `stale_write` (by resolving `false`, or `null` from a lockbox write or retirement;
-the base class throws it), `vault_full`,
+`VaultError`: `stale_write` (by resolving `false`, or `null` from a box write or deletion;
+the base class refuses with it), `vault_full`,
 `identity_revoked`, `not_permitted`, or anything it throws otherwise, which becomes
 `storage_unavailable`. The base
-class refuses `bad_label`, `bad_record`, `bad_option`, `lockbox_too_large` and `corrupt_record` itself, before
+class refuses `bad_label`, `bad_record`, `bad_option`, `box_too_large` and `corrupt_record` itself, before
 the adapter is asked or after it answers. Each message says calmly what went wrong and what to do
-about it, and a caller branches on the kind, never the message.
+about it, and a caller branches on the kind, never the message. Every verb resolves an `Outcome`
+and never rejects: the refusal is its `err`, whoever made it.
 
 **5.2. A stale write means an expectation failed, and nothing else.** `stale_write` says the vault
 changed under the writer, and the writer should read it again. Contention is never dressed up as
@@ -336,8 +345,10 @@ the battery cannot make a fault.
 
 **5.6. not_permitted refuses one call, and locks nothing.** The scope's own user, still signed
 in, whom the host's backend refuses this call by a rule of its own, is refused with kind
-`not_permitted`; signing in again would not help. No adapter in this repository has such a rule:
-the kind is a host backend's. *Tested per adapter*.
+`not_permitted`; signing in again would not help. No adapter in this repository has such a rule
+of its own: the kind is a host backend's, and each passes its host's through, its error as the
+`cause` -- Postgres's `42501` (a privilege, or a row-level security policy), a Convex host's
+`getUserId`, a GraphQL server's `FORBIDDEN` or its `vaultDBFor`. *Tested per adapter*.
 
 **5.7. An adapter with no notion of identity says neither.** One that serves whoever holds it --
 `localVaultDB`, IndexedDB -- never refuses `identity_revoked` or `not_permitted`. *Tested per
@@ -367,16 +378,16 @@ sit idle and unlocked. *Tested per adapter*: the battery cannot fail a watch.
 ## 7. What an adapter declares
 
 **7.1. The most it holds in one record.** `maxRecordBytes`, above zero, or `Infinity`. The base
-class refuses a heavier lockbox (`lockbox_too_large`) before the adapter sees it, and a vault
+class refuses a heavier box (`box_too_large`) before the adapter sees it, and a vault
 refuses to open with a `maxWhisperBytes` over half of it.
 
 **7.2. The most it holds of one vault.** `maxVaultBytes`, no less than one record, or `Infinity`:
-what the backend can still list and retire whole. A vault refuses to open when its `maxLockboxes`
-lockboxes might not fit in it.
+what the backend can still list and delete whole. A vault refuses to open when its `maxBoxes`
+boxes might not fit in it.
 
 **7.3. The most it holds in one name.** `maxNameBytes`, a whole number above zero, or `Infinity`
 for a backend that holds any name the floor admits: the bytes of UTF-8 its keys and indexes hold
-of one name. Postgres, whose lockbox key is a btree entry of four names together, declares 640.
+of one name. Postgres, whose box key is a btree entry of four names together, declares 640.
 The base class refuses a longer name (`bad_label`) before the adapter sees it, in every verb.
 
 A backend that does not hold to the limits it declares, or a vault opened with limits that
@@ -390,7 +401,7 @@ writes at once through one adapter, over a backend that runs one call at a time,
 they came out, not that they raced. So `describeVaultDB` races them.
 
 **What the battery runs, for every adapter.** Each race -- two creates of one vault, two updates
-of one vault, two first writes or two replacements of one lockbox, a retirement against a write, two
+of one vault, two first writes or two replacements of one box, a deletion against a write, two
 writes that do not collide, four writers for a vault's last place -- runs under every schedule
 `raceEveryWay` makes, each over a fresh backend, and its outcome is checked after each: the two
 moves made together; one started one to three microtasks, then one and two ticks, after the other,
@@ -424,7 +435,7 @@ against a real server: `e2e/tests/postgres/` runs this battery, with a pool and 
 connection to each device, against `postgres:17` (a CI job, and `e2e/compose.yaml` on a contributor's
 machine; `pnpm justify` needs neither and skips those tests where `SAFEBYOK_PG_URL` is unset). Its
 other files race what the battery's turnstile cannot hold: writers for a vault's last places, with no
-turnstile and no PGlite to take turns; a foreign key violation (`23503`) from a vault retired while
+turnstile and no PGlite to take turns; a foreign key violation (`23503`) from a vault deleted while
 an insert waited on the foreign key. Of the one-statement writes -- a conditional `UPDATE`
 re-checking the row it waited on, `INSERT ... ON CONFLICT`, the foreign key read against the vault
 row that stands -- the races and that run show how they came out on that server and no other; which

@@ -1,5 +1,5 @@
 import { Ckeys, Expectations, VaultDB } from 'safebyok'
-import type { VaultPropsExpectation, RetireExpectation, Lockbox, LockboxExpectation, LockboxRetireExpectation, LockboxRetirement, StoredLockbox, VaultProps, VaultScope } from 'safebyok'
+import type { VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, StoredBox, VaultProps, VaultScope } from 'safebyok'
 import { ChangeBell } from 'safebyok/idb'
 import { boxRange } from './ckeys'
 import { bellnameOf, parseDbName, type IdbVaultDBOpts } from './idb-opts'
@@ -16,7 +16,7 @@ import { inOneTransaction, settle, withheldShelfOf } from './shelf'
  *   `stale_write` otherwise.
  * * **Other tabs' writes** ring `subscribe`, over a BroadcastChannel.
  * * **No limits of its own**: IndexedDB sets none per record or per vault, so `maxRecordBytes`,
- *   `maxVaultBytes`, `maxLockboxes` and `maxNameBytes` are `Infinity`; the origin's storage quota
+ *   `maxVaultBytes`, `maxBoxes` and `maxNameBytes` are `Infinity`; the origin's storage quota
  *   bounds the whole database.
  * * **Storage the browser withholds** -- site data blocked, a private window or frame that keeps
  *   none, no room left, or no IndexedDB at all -- refuses with kind `storage_blocked`, which a
@@ -41,7 +41,7 @@ export const idbVaultDB = (opts?: IdbVaultDBOpts): VaultDB => new IdbVaultDB(par
 class IdbVaultDB extends VaultDB {
   readonly maxRecordBytes = Infinity
   readonly maxVaultBytes = Infinity
-  readonly maxLockboxes = Infinity
+  readonly maxBoxes = Infinity
   readonly maxNameBytes = Infinity
 
   private readonly dbName: string
@@ -53,11 +53,11 @@ class IdbVaultDB extends VaultDB {
 
   private get shelf() { return withheldShelfOf(this.dbName) }
 
-  protected async doReadVaultProps(scope: VaultScope): Promise<unknown> {
+  protected async doGetVaultProps(scope: VaultScope): Promise<unknown> {
     return (await this.shelf('readonly', (store) => rowAt(store, Ckeys.vaultProps(scope)))) ?? null
   }
 
-  protected async doFetchOrCreateVaultProps(vaultProps: VaultProps): Promise<unknown> {
+  protected async doEnsureVaultProps(vaultProps: VaultProps): Promise<unknown> {
     const { standing, created } = await inOneTransaction(this.shelf, async (store) => {
       const already = await rowAt(store, Ckeys.vaultProps(vaultProps))
       if (already !== undefined) { return { standing: already, created: false } }
@@ -68,7 +68,7 @@ class IdbVaultDB extends VaultDB {
     return standing
   }
 
-  protected async doUpdateVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<boolean> {
+  protected async doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<boolean> {
     return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {
       const standing = await rowAt(store, Ckeys.vaultProps(vaultProps))
       if (! Expectations.vaultPropsMeets(standing, expected)) { return false }
@@ -77,49 +77,49 @@ class IdbVaultDB extends VaultDB {
     }))
   }
 
-  protected async doReadBox(scope: VaultScope, boxlabel: string): Promise<unknown> {
+  protected async doGetBox(scope: VaultScope, boxlabel: string): Promise<unknown> {
     return (await this.shelf('readonly', (store) => rowAt(store, Ckeys.box(scope, boxlabel)))) ?? null
   }
 
-  // Reads the key range of the scope's lockboxes, not the whole shelf: every other vault's rows, of
+  // Reads the key range of the scope's boxes, not the whole shelf: every other vault's rows, of
   // every user in this database, stay unread. The ckeys and their rows come from one transaction.
-  protected async doListBoxes(scope: VaultScope): Promise<StoredLockbox[]> {
+  protected async doListBoxes(scope: VaultScope): Promise<StoredBox[]> {
     const range = boxRange(scope)
     const [ckeys, rows] = await this.shelf('readonly', (store) => Promise.all([settle(store.getAllKeys(range)), settle<unknown[]>(store.getAll(range))]))
     return ckeys
-      .map((ckey, idx) => ({ boxlabel: typeof ckey === 'string' ? Ckeys.boxlabelOf(ckey) : null, lockbox: rows[idx] }))
-      .filter((stored): stored is StoredLockbox => stored.boxlabel !== null)
+      .map((ckey, idx) => ({ boxlabel: typeof ckey === 'string' ? Ckeys.boxlabelOf(ckey) : null, box: rows[idx] }))
+      .filter((stored): stored is StoredBox => stored.boxlabel !== null)
   }
 
-  // The lockbox handed back is the row as the put left it, read in the same transaction.
-  protected async doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<unknown> {
+  // The box handed back is the row as the put left it, read in the same transaction.
+  protected async doPutBox(scope: VaultScope, box: BoxRecord, expected: BoxExpectation): Promise<unknown> {
     return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {
-      const ckey = Ckeys.box(scope, lockbox.boxlabel)
+      const ckey = Ckeys.box(scope, box.boxlabel)
       const [standingVaultProps, standingBox] = await Promise.all([rowAt(store, Ckeys.vaultProps(scope)), rowAt(store, ckey)])
-      if (! Expectations.lockboxMeets(standingVaultProps, standingBox, expected)) { return null }
-      store.put(lockbox, ckey)
+      if (! Expectations.boxMeets(standingVaultProps, standingBox, expected)) { return null }
+      store.put(box, ckey)
       return rowAt(store, ckey)
     }))
   }
 
-  // What it removed is the row read in the transaction that deletes it. A retirement that found
+  // What it removed is the row read in the transaction that deletes it. A deletion that found
   // nothing to remove changed nothing, and rings no other tab.
-  protected async doRetireBox(scope: VaultScope, boxlabel: string, expected: LockboxRetireExpectation): Promise<LockboxRetirement | null> {
-    const retirement = await inOneTransaction(this.shelf, async (store) => {
+  protected async doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<BoxDeletion | null> {
+    const deletion = await inOneTransaction(this.shelf, async (store) => {
       const ckey = Ckeys.box(scope, boxlabel)
       const [standingVaultProps, standingBox] = await Promise.all([rowAt(store, Ckeys.vaultProps(scope)), rowAt(store, ckey)])
       if (! Expectations.vaultMeets(standingVaultProps, expected)) { return null }
       store.delete(ckey)
-      return Expectations.retirementOf(standingBox, expected)
+      return Expectations.deletionOf(standingBox, expected)
     })
-    if (retirement !== null && retirement.outcome !== 'absent') { this.ring() }
-    return retirement
+    if (deletion !== null && deletion.outcome !== 'absent') { this.ring() }
+    return deletion
   }
 
-  // The look at the vault props and every deletion (the lockboxes by their key range, then the
-  // vault props) are one transaction: a lockbox another tab writes waits for the retire and then
-  // finds no vault props, so no lockbox outlives its vault.
-  protected async doRetireVault(scope: VaultScope, expected: RetireExpectation): Promise<boolean> {
+  // The look at the vault props and every deletion (the boxes by their key range, then the
+  // vault props) are one transaction: a box another tab writes waits for the delete and then
+  // finds no vault props, so no box outlives its vault.
+  protected async doDelVault(scope: VaultScope, expected: VaultDelExpectation): Promise<boolean> {
     return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {
       const standing = await rowAt(store, Ckeys.vaultProps(scope))
       if (! Expectations.vaultIdMeets(standing, expected)) { return false }

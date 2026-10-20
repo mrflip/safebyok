@@ -46,8 +46,8 @@ const Unjoined = /* @__PURE__ */ Z.refine<string>((text) => ! text.includes(Join
 const utf8Within = (limit: number, said: string) => Z.refine<string>((text) => new TextEncoder().encode(text).length <= limit, said)
 
 /**
- * The floor beneath every name -- an applabel, a user_id, a vaultlabel, a boxlabel, a
- * wayinlabel -- whatever validators a host passed: text of one character to {@link
+ * The floor beneath every name -- an applabel, a user_id, a vaultlabel, a boxlabel --
+ * whatever validators a host passed: text of one character to {@link
  * NameFloorBytes} (1 KiB) of UTF-8, well-formed, in NFC, with no control character and no `^`,
  * which key-value stores join a row's names on (`Ckeys`). A host's own
  * check narrows what passes; nothing widens it. The vault refuses a name below the floor with kind
@@ -83,8 +83,7 @@ export const MaxLabelChars = 40
 export const LabelPattern = /^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$/
 
 /**
- * The default check for every label in the package: `applabel`, `vaultlabel`, `boxlabel` and a
- * wayin's `wayinlabel`.
+ * The default check for every label in the package: `applabel`, `vaultlabel` and `boxlabel`.
  * Lowercase words of letters and digits joined by single underscores, starting with a letter,
  * two to forty characters (STYLE.md's tag glossary). A host that wants other labels passes its own
  * schema in Vault.make's `validators`. (A scope's `user_id` is the host's auth identity,
@@ -151,15 +150,15 @@ export type NameValidator = Z.core.$ZodType<string>
  *
  * | Check | Job | Runs | Fails as |
  * |---|---|---|---|
- * | These validators (`Label` and `UserId` by default) | an alarm for names your app never meant to use | at entry only: Vault.make (the scope), storeBox (the boxlabel), addPassphrase and addPasskey (the wayinlabel) | `bad_label` |
+ * | These validators (`Label` and `UserId` by default) | an alarm for names your app never meant to use | at entry only: Vault.make (the scope), putBox (the boxlabel) | `bad_label` |
  * | The floor ({@link NameFloor}) | what text must be for every client and store to agree (no `^` in a name, which key-value stores join names on) | beneath these at entry, whatever they are; at every storage verb; on every record read back | `bad_label` at entry and for a verb's own names; `bad_record` in a record sent; damaged on read |
  * | The record's shape, scope, boxlabel, ciphertext and expectations | what the design needs | when sent to storage and when read back | `bad_record` (a bug) when sent; damaged on read; `stale_write` |
- * | The storage's own limits (`maxRecordBytes`, `maxVaultBytes`, `maxLockboxes`, `maxNameBytes`) | facts about the backend | when sent to storage | `lockbox_too_large`, `vault_full`, `bad_label` |
+ * | The storage's own limits (`maxRecordBytes`, `maxVaultBytes`, `maxBoxes`, `maxNameBytes`) | facts about the backend | when sent to storage | `box_too_large`, `vault_full`, `bad_label` |
  *
- * So a check of yours is an alarm, not a promise about what storage holds: a lockbox stored under a
+ * So a check of yours is an alarm, not a promise about what storage holds: a box stored under a
  * name it refuses -- written by another client, or before you narrowed it -- lists, reads and
- * retires as any other, by the name it was stored under; only a name below the floor is damage.
- * A lockbox's sidecar is never checked by the vault: a host checks its own before `storeBox()`. A server holds names to the floor and its own limits, never to these (`VAULTDB.md`).
+ * deletes as any other, by the name it was stored under; only a name below the floor is damage.
+ * A box's sidecar is never checked by the vault: a host checks its own before `putBox()`. A server holds names to the floor and its own limits, never to these (`VAULTDB.md`).
  *
  * Widening with care. A name is stored and bound exactly as given, so a check admitting text
  * outside ASCII should require what the floor does, Unicode's composed form (NFC), and an app
@@ -181,17 +180,15 @@ export type VaultValidators = {
   applabel?:    NameValidator | undefined
   /** Checks the vault's label. Default: {@link Label}. */
   vaultlabel?:  NameValidator | undefined
-  /** Checks each lockbox's label. Default: {@link Label}. */
+  /** Checks each box's label. Default: {@link Label}. */
   boxlabel?:    NameValidator | undefined
   /** Checks the signed-in user's id. Default: {@link UserId}. */
   userId?:      NameValidator | undefined
-  /** Checks the label of each way in a host adds: a passphrase or a passkey. Default: {@link Label}. */
-  wayinlabel?:  NameValidator | undefined
 }
 
 /**
- * The checks a vault runs when its host passes none: {@link Label} for each label, a
- * wayinlabel's among them, and {@link UserId} for the user. Frozen.
+ * The checks a vault runs when its host passes none: {@link Label} for each label, and
+ * {@link UserId} for the user. Frozen.
  *
  * @example DefaultValidators.boxlabel.safeParse('anthropic_api_key').success  // true
  */
@@ -200,7 +197,6 @@ export const DefaultValidators = Object.freeze({
   vaultlabel:  Label,
   boxlabel:    Label,
   userId:      UserId,
-  wayinlabel:  Label,
 })
 
 /**
@@ -218,5 +214,4 @@ export const AnyTextValidators = /* @__PURE__ */ Object.freeze({
   vaultlabel:  NameFloor,
   boxlabel:    NameFloor,
   userId:      NameFloor,
-  wayinlabel:  NameFloor,
 })

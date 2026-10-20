@@ -131,7 +131,7 @@ These are long enough to search instead, reading only the lines you need: in
 `packages/safebyok/`, `src/vault.ts`, `src/vault-db.ts`, `README.md`, `tests/vault-db.test.ts`,
 `tests/test-helpers.test.ts`, `tests/test-helpers/vault-db-conformance.ts`, and the `tests/vault/`
 folder taken together (a theme per file: grep it, read the one file);
-`safebyok-react/tests/vault-provider.test.tsx` and `passphrase-modal.test.tsx`;
+`safebyok-react/tests/vault-provider/` taken together (a theme per file) and `passphrase-modal.test.tsx`;
 `safebyok-postgres/tests/postgres-vault-db.test.ts`. The README is searched by its headings; each
 code file here carries section banners: `grep -n '// == '` is its table of contents
 (`// == [Name]: key names` opens a section, `// --` closes it), then read the range.
@@ -141,7 +141,7 @@ The documents below are looked up by section, not read through.
 
 * `PROCESS.md` -- threads, branches, commits, PRs, changesets, dependencies. **Read the section
   you need before any git operation beyond a commit, and before adding a dependency.**
-* `VOCABULARY.md` -- the cast: whisper, lockbox, vault, passphrase, each key by role, and their
+* `VOCABULARY.md` -- the cast: whisper, box, vault, passphrase, each key by role, and their
   encrypted forms. Its names are the only names for those things, in code, docs and stored fields.
   The code already speaks it: **look up a term you do not recognize**, or before naming a new
   thing in the cast.
@@ -177,13 +177,13 @@ banned names. STYLE.md is the real source.
   `} else if (...) {`, `} catch (err) {`. Parenthesize and space every negation: `if (! approved)`.
 * `"` for prose, error messages, and `describe`/`it` titles. Otherwise use `'`.
 * No single-letter names, even in a lambda: `(row) => row.label`. `ii`, `jj` for a loop counter.
-* The cast keeps VOCABULARY.md's names -- whisper, lockbox, vault -- never `data` or `payload`. A
-  cryptographic key is named for its role (`vaultKey`, `lockboxKey`); a map key is a `ckey`.
+* The cast keeps VOCABULARY.md's names -- whisper, box, vault -- never `data` or `payload`. A
+  cryptographic key is named for its role (`vaultKey`, `boxKey`); a map key is a `ckey`.
 * Smush the tags `name`, `kind`, `label`, `path` and `bag` into one word: `vaultlabel`,
   `woodkind`. `type` is only a datatype; a menu choice is a `kind` or a `flavor`.
 * Stored fields are underbar_case (`salt_bytes`); everything else camelCase. Use integer
   UTC epoch milliseconds, not strings or `Date`s, for times.
-* A module of related verbs is star-imported under its Startcase name: `Wayin.open(...)`.
+* A module of related verbs is star-imported under its Startcase name: `Names.checkFloor(...)`.
 * Every export has a doc block written for its caller. Each `@example` in it has a test whose
   title points back to it: `"refuses a misspelt field, as its second example shows"`.
 * Tests are chai-style (`expect(foo).to.eq(bar)`), their helpers star-imported as `TH`.

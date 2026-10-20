@@ -5,7 +5,7 @@ import { VaultError } from 'safebyok'
 import type { ComponentApi } from './component-api'
 import type { SafebyokErrorData } from './refusals'
 import {
-  VaultPropsExpectation, RetireExpectation, ListedLockbox, Lockbox, LockboxExpectation, LockboxRetireExpectation, LockboxRetirement, VaultProps, VaultScope, VaultSignature,
+  VaultPropsExpectation, VaultDelExpectation, ListedBox, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, VaultProps, VaultScope, VaultSignature,
 } from './component/validators'
 
 export type { ComponentApi } from './component-api'
@@ -15,8 +15,21 @@ export type { SafebyokErrorData, SafebyokErrorKind } from './refusals'
 /**
  * The host app's answer to "who is calling?": the signed-in user's id, as the vault scopes it, or
  * null (or undefined, or empty) when no one is signed in. Runs first in every safebyok function.
+ * To refuse a signed-in user by a rule of the app's own, it throws a `ConvexError` whose `data` is
+ * `{ kind: 'not_permitted', message }` ({@link SafebyokErrorData}), which reaches the client's
+ * vault as a refusal of that kind, locking nothing; `identity_revoked` likewise, which locks the
+ * vault, for a user the app knows is gone. Anything else it throws is the client's
+ * `storage_unavailable`, as a passing fault.
  *
  * @example async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null
+ * @example
+ *   async (ctx) => {
+ *     const identity = await ctx.auth.getUserIdentity()
+ *     if (identity?.['suspended'] === true) {
+ *       throw new ConvexError<SafebyokErrorData>({ kind: 'not_permitted', message: 'This account is suspended: its vault is closed to it.' })
+ *     }
+ *     return identity?.subject ?? null
+ *   }
  */
 export type GetUserId<DataModel extends GenericDataModel = GenericDataModel> =
   (ctx: GenericQueryCtx<DataModel>) => Promise<string | null | undefined> | string | null | undefined
@@ -38,8 +51,8 @@ export type SafebyokApiOpts<DataModel extends GenericDataModel = GenericDataMode
  *   import { components } from './_generated/api'
  *
  *   export const {
- *     getVaultProps, fetchOrCreateVaultProps, updateVaultProps, getBox, listBoxSummaries,
- *     updateBox, retireBox, retireVault, watchVault,
+ *     getVaultProps, ensureVaultProps, putVaultProps, getBox, listBoxSummaries,
+ *     putBox, delBox, delVault, watchVault,
  *   } = new SafebyokComponent(components.safebyok).api({
  *     getUserId: async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null,
  *   })
@@ -63,7 +76,8 @@ export class SafebyokComponent {
    * The nine public functions a client's `convexVaultDB` calls, one per storage verb. Each first
    * resolves `getUserId(ctx)`, and refuses with a `ConvexError` of kind `identity_revoked` when
    * it is null, or when the vault's `user_id` is someone else's -- the user the vault was opened
-   * for is not the one signed in, and the vault locks itself -- then it calls the component.
+   * for is not the one signed in, and the vault locks itself -- then it calls the component. A
+   * refusal `getUserId` throws itself goes to the client as it was thrown.
    *
    * @param opts - `getUserId`: who is calling, from the host's own auth.
    * @returns The functions, to export under these names from one module of the host's `convex/`.
@@ -101,25 +115,25 @@ export class SafebyokComponent {
           return await ctx.runQuery(vaults.getVaultProps, args)
         },
       }),
-      fetchOrCreateVaultProps: publicMutation({
+      ensureVaultProps: publicMutation({
         args:    { vaultProps: VaultProps },
         returns: VaultProps,
         handler: async (ctx, args) => {
           await mustBe(ctx, args.vaultProps.user_id)
-          return await ctx.runMutation(vaults.fetchOrCreateVaultProps, args)
+          return await ctx.runMutation(vaults.ensureVaultProps, args)
         },
       }),
-      updateVaultProps: publicMutation({
+      putVaultProps: publicMutation({
         args:    { vaultProps: VaultProps, expected: VaultPropsExpectation },
         returns: v.boolean(),
         handler: async (ctx, args) => {
           await mustBe(ctx, args.vaultProps.user_id)
-          return await ctx.runMutation(vaults.updateVaultProps, args)
+          return await ctx.runMutation(vaults.putVaultProps, args)
         },
       }),
       getBox: publicQuery({
         args:    { scope: VaultScope, boxlabel: v.string() },
-        returns: v.nullable(Lockbox),
+        returns: v.nullable(BoxRecord),
         handler: async (ctx, args) => {
           await mustBe(ctx, args.scope.user_id)
           return await ctx.runQuery(vaults.getBox, args)
@@ -127,34 +141,34 @@ export class SafebyokComponent {
       }),
       listBoxSummaries: publicQuery({
         args:    { scope: VaultScope },
-        returns: v.array(ListedLockbox),
+        returns: v.array(ListedBox),
         handler: async (ctx, args) => {
           await mustBe(ctx, args.scope.user_id)
           return await ctx.runQuery(vaults.listBoxSummaries, args)
         },
       }),
-      updateBox: publicMutation({
-        args:    { scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation },
-        returns: v.nullable(Lockbox),
+      putBox: publicMutation({
+        args:    { scope: VaultScope, box: BoxRecord, expected: BoxExpectation },
+        returns: v.nullable(BoxRecord),
         handler: async (ctx, args) => {
           await mustBe(ctx, args.scope.user_id)
-          return await ctx.runMutation(vaults.updateBox, args)
+          return await ctx.runMutation(vaults.putBox, args)
         },
       }),
-      retireBox: publicMutation({
-        args:    { scope: VaultScope, boxlabel: v.string(), expected: LockboxRetireExpectation },
-        returns: v.nullable(LockboxRetirement),
+      delBox: publicMutation({
+        args:    { scope: VaultScope, boxlabel: v.string(), expected: BoxDelExpectation },
+        returns: v.nullable(BoxDeletion),
         handler: async (ctx, args) => {
           await mustBe(ctx, args.scope.user_id)
-          return await ctx.runMutation(vaults.retireBox, args)
+          return await ctx.runMutation(vaults.delBox, args)
         },
       }),
-      retireVault: publicMutation({
-        args:    { scope: VaultScope, expected: RetireExpectation },
+      delVault: publicMutation({
+        args:    { scope: VaultScope, expected: VaultDelExpectation },
         returns: v.boolean(),
         handler: async (ctx, args) => {
           await mustBe(ctx, args.scope.user_id)
-          return await ctx.runMutation(vaults.retireVault, args)
+          return await ctx.runMutation(vaults.delVault, args)
         },
       }),
       watchVault: publicQuery({

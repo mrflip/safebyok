@@ -253,7 +253,7 @@ export default defineConfig([
         'ArrayPattern > Identifier.elements',
       ].map((binding) => ({
         selector: `${binding}[name=/^(key|name|value|node|error|query)$/]`,
-        message:  'Name it for what it holds (STYLE.md, Naming): a cryptographic key by its role (vaultKey, lockboxKey: VOCABULARY.md), a map key `ckey`, `err` for an error, `vaultlabel` over `name`.',
+        message:  'Name it for what it holds (STYLE.md, Naming): a cryptographic key by its role (vaultKey, boxKey: VOCABULARY.md), a map key `ckey`, `err` for an error, `vaultlabel` over `name`.',
       }))],
     },
   },

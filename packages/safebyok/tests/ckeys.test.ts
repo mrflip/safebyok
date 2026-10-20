@@ -11,7 +11,7 @@ describe("Ckeys, the ckey of each row", () => {
     expect(Ckeys.vaultProps(u1)).to.eq('vault^acme^u1^main')
   })
 
-  it("files a lockbox under its kind, scope and boxlabel, joined on ^", () => {
+  it("files a box under its kind, scope and boxlabel, joined on ^", () => {
     expect(Ckeys.box(u1, 'anthropic')).to.eq('box^acme^u1^main^anthropic')
   })
 
@@ -23,12 +23,12 @@ describe("Ckeys, the ckey of each row", () => {
     expect(Ckeys.mark(u1)).to.eq('mark^acme^u1^main')
   })
 
-  it("begins every lockbox ckey of a scope with its box prefix: the first four parts and a trailing ^", () => {
+  it("begins every box ckey of a scope with its box prefix: the first four parts and a trailing ^", () => {
     expect(Ckeys.boxPrefix(u1)).to.eq('box^acme^u1^main^')
     expect(Ckeys.box(u1, 'anthropic').startsWith(Ckeys.boxPrefix(u1))).to.be.true
   })
 
-  it("picks a scope's lockbox ckeys out of a store, and nothing else", () => {
+  it("picks a scope's box ckeys out of a store, and nothing else", () => {
     const store = memoryStore()
     const others = [Ckeys.vaultProps(u1), Ckeys.lease(u1), Ckeys.box(TH.scopeOf('u2'), 'anthropic'), Ckeys.box(TH.scopeOf('u12'), 'anthropic'), '["box","acme","u1","main","legacy"]']
     for (const ckey of [...others, Ckeys.box(u1, 'anthropic'), Ckeys.box(u1, 'openai')]) {
@@ -89,7 +89,7 @@ const scopeFrom = ([applabel = '', userId = '', vaultlabel = '']: readonly strin
 /**
  * Pairs of addresses -- applabel, user_id, vaultlabel, boxlabel -- that a join on a separator
  * other than ^ would confuse. Each must get two different ckeys, and neither's scope may list the
- * other's lockbox.
+ * other's box.
  */
 const NearTwins = [
   // a separator, slid across a boundary:
@@ -133,7 +133,7 @@ describe("Ckeys, over every split of one awkward string", () => {
     expect(boxCkeys.size).to.eq(addresses.length)
   })
 
-  it("lists each scope's lockboxes alone", () => {
+  it("lists each scope's boxes alone", () => {
     const leaks = addresses.map((address) => scopeFrom(address)).flatMap((scope) => {
       const isBox = Ckeys.isBoxIn(scope)
       return addresses.filter((address) => {
@@ -147,7 +147,7 @@ describe("Ckeys, over every split of one awkward string", () => {
 })
 
 describe("Ckeys.boxlabelOf", () => {
-  it("reads the boxlabel back from a lockbox's ckey, whatever text it holds but the delimiter", () => {
+  it("reads the boxlabel back from a box's ckey, whatever text it holds but the delimiter", () => {
     expect(Ckeys.boxlabelOf(Ckeys.box(u1, 'anthropic'))).to.eq('anthropic')
     expect(Ckeys.boxlabelOf('box^acme^u1^main^anthropic')).to.eq('anthropic')
     expect(Ckeys.boxlabelOf(Ckeys.box(u1, 'OpenAI: "work", [1]'))).to.eq('OpenAI: "work", [1]')
@@ -195,7 +195,7 @@ describe("Ckeys.isMark", () => {
 })
 
 describe("Ckeys, between kinds", () => {
-  it("never takes vault props or a lease for a lockbox, nor one kind's ckey for another's", () => {
+  it("never takes vault props or a lease for a box, nor one kind's ckey for another's", () => {
     const isBox = Ckeys.isBoxIn(u1)
     expect(isBox(Ckeys.vaultProps(u1))).to.be.false
     expect(isBox(Ckeys.lease(u1))).to.be.false

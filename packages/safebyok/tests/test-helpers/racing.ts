@@ -1,3 +1,5 @@
+import { isVaultError } from '../../src/errors'
+import type { Outcome } from '../../src/outcome'
 import { makeGate, type AsyncVerbOf, microtasks, ticks } from './timing'
 
 
@@ -111,8 +113,8 @@ export type Race<DeviceT> = {
  * @example
  *   await TH.raceEveryWay({
  *     makeDevices: (turnstile) => () => postgresVaultDB({ client: TH.throughTurnstile(turnstile, db, ['query']), userId: 'u1' }),
- *     setup:       (first) => first.fetchOrCreateVaultProps(TH.vaultPropsOf('u1')),
- *     moves:       [(one) => one.retireVault(TH.scopeOf('u1'), TH.thisVault), (two) => two.updateBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet)],
+ *     setup:       (first) => first.ensureVaultProps(TH.vaultPropsOf('u1')),
+ *     moves:       [(one) => one.delVault(TH.scopeOf('u1'), TH.thisVault), (two) => two.putBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet)],
  *     verdict:     async (outcomes, [one]) => { expect(await one.listBoxes(TH.scopeOf('u1'))).to.have.lengthOf(0) },
  *   })
  */
@@ -176,7 +178,7 @@ const runRaceOnce = async <DeviceT>(race: Race<DeviceT>, title: string, schedule
     const deviceFor = await race.makeDevices(keeper.turnstile)
     const entrants = race.moves.map((move) => {
       const device = deviceFor()
-      return { device, start: () => outcomeOf(move(device)) }
+      return { device, start: () => raceOutcomeOf(move(device)) }
     })
     const devices = entrants.map((entrant) => entrant.device)
     if (race.setup && devices[0] !== undefined) { await race.setup(devices[0]) }
@@ -188,14 +190,31 @@ const runRaceOnce = async <DeviceT>(race: Race<DeviceT>, title: string, schedule
   }
 }
 
-/** How a move settled, never rejecting: `landed` and its value, or its refusal's kind (`unknown` for none) and the refusal. */
-export const outcomeOf = async (move: Promise<unknown>): Promise<RaceOutcome> => {
+/**
+ * How a move settled, never rejecting: `landed` and its value, or its refusal's kind (`unknown` for
+ * none) and the refusal. A move that resolves an Outcome -- a VaultDB verb's -- settles as that
+ * Outcome says: its `val` landed, or its `err` refused.
+ */
+export const raceOutcomeOf = async (move: Promise<unknown>): Promise<RaceOutcome> => {
   try {
-    return { kind: 'landed', val: await move }
+    const settled = await move
+    if (! isOutcome(settled)) { return { kind: 'landed', val: settled } }
+    return settled.ok ? { kind: 'landed', val: settled.val } : refusedAs(settled.err)
   } catch (err) {
-    const { kind } = (err ?? {}) as { kind?: unknown }
-    return { kind: typeof kind === 'string' ? kind : 'unknown', val: err }
+    return refusedAs(err)
   }
+}
+
+/** A refusal as a race records it: its refusalkind (`unknown` for none), and the refusal itself. */
+const refusedAs = (err: unknown): RaceOutcome => {
+  const { refusalkind } = (err ?? {}) as { refusalkind?: unknown }
+  return { kind: typeof refusalkind === 'string' ? refusalkind : 'unknown', val: err }
+}
+
+/** True for what a VaultDB verb resolves: a good Outcome with its `val`, or a bad one with a VaultError. */
+const isOutcome = (settled: unknown): settled is Outcome<unknown> => {
+  if (typeof settled !== 'object' || settled === null || ! ('ok' in settled)) { return false }
+  return settled.ok === true ? 'val' in settled : settled.ok === false && 'err' in settled && isVaultError(settled.err)
 }
 
 /** The two moves of a pair race, `firstIdx`'s first: the first device's and the second's, swapped for 1. */

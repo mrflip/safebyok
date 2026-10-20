@@ -1,4 +1,4 @@
-import { VaultScope, type Lease, type DeviceMark } from '../../src/types'
+import { VaultScope, type LeaseRecord, type DeviceMark } from '../../src/types'
 import { memoryDeviceDB, type DeviceDB } from '../../src/device-db'
 import { localVaultDB } from '../../src/local-vault-db'
 import { memoryStore } from '../../src/string-store'
@@ -8,7 +8,7 @@ import type { KeyDeriver } from '../../src/key-deriver'
 import * as Ckeys from '../../src/ckeys'
 import * as TH from '../test-helpers'
 
-/** Where the vault each world opens, `u1`'s `main`, files its props and each of its lockboxes. */
+/** Where the vault each world opens, `u1`'s `main`, files its props and each of its boxes. */
 export const u1VaultPropsCkey = Ckeys.vaultProps(TH.scopeOf('u1'))
 
 export const u1BoxCkey = (boxlabel: string) => Ckeys.box(TH.scopeOf('u1'), boxlabel)
@@ -39,7 +39,7 @@ export const makeWorld = (defaults?: Partial<MakeVaultOpts>) => {
   const advance = (byMillis: number) => { nowMillis += byMillis }
   const { logger, calls: logged } = TH.spyLogger()
   const optsWith = (overrides?: Partial<MakeVaultOpts>): MakeVaultOpts => (
-    { applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB, clock, keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest, logger, ...defaults, ...overrides }
+    { applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB, deviceDB, clock, keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, logger, ...defaults, ...overrides }
   )
   const open = (overrides?: Partial<MakeVaultOpts>) => TH.settledVault(optsWith(overrides))
   const openUnlocked = async (passphrase: string, overrides?: Partial<MakeVaultOpts>) => {
@@ -47,13 +47,13 @@ export const makeWorld = (defaults?: Partial<MakeVaultOpts>) => {
     await vault.unlock(passphrase)
     return vault
   }
-  const readLease = () => deviceDB.readLease(TH.scopeOf('u1'))
+  const getLease = () => TH.expectGood(deviceDB.getLease(TH.scopeOf('u1')))
   const deafVaultDB = () => localVaultDB({ store: { ...dbStore, subscribe: neverRings } })
   const stateOnOpen = async (overrides?: Partial<MakeVaultOpts>) => {
     const vault = await open(overrides)
     return vault.getSnapshot().state
   }
-  return { dbStore, vaultDB, deviceDB, clock, advance, logged, optsWith, open, openUnlocked, readLease, stateOnOpen, deafVaultDB }
+  return { dbStore, vaultDB, deviceDB, clock, advance, logged, optsWith, open, openUnlocked, getLease, stateOnOpen, deafVaultDB }
 }
 
 /** Boxlabels in the snapshot, in order. */
@@ -61,9 +61,9 @@ export const boxlabelsOf = (vault: Vault) => vault.getSnapshot().boxes.map((summ
 
 /** Storage adapters Vault.make refuses: short of a verb the vault calls. */
 export const MisfitStores: readonly (readonly [Partial<MakeVaultOpts>, string])[] = [
-  [{ vaultDB: { readVaultProps: () => Promise.resolve(null) } as unknown as MakeVaultOpts['vaultDB'] }, 'a vaultDB with only some of its verbs'],
-  [{ deviceDB: { ...memoryDeviceDB(), eraseAll: 'never' } as unknown as MakeVaultOpts['deviceDB'] }, 'a deviceDB whose eraseAll is no function'],
-  [{ deviceDB: TH.omitting(memoryDeviceDB(), 'readMark') }, 'a deviceDB that keeps no device mark'],
+  [{ vaultDB: { getVaultProps: () => Promise.resolve(null) } as unknown as MakeVaultOpts['vaultDB'] }, 'a vaultDB with only some of its verbs'],
+  [{ deviceDB: { ...memoryDeviceDB(), delAll: 'never' } as unknown as MakeVaultOpts['deviceDB'] }, 'a deviceDB whose delAll is no function'],
+  [{ deviceDB: TH.omitting(memoryDeviceDB(), 'getMark') }, 'a deviceDB that keeps no device mark'],
 ]
 
 export const HourMillis = 60 * 60 * 1000
@@ -80,13 +80,13 @@ export const uncheckingDeviceDB = () => {
   const rows = new Map<string, unknown>()
   const marks = new Map<string, unknown>()
   const deviceDB: DeviceDB = {
-    readLease:  (scope) => Promise.resolve((rows.get(ckeyOf(scope)) ?? null) as Lease | null),
-    writeLease: (lease) => { rows.set(ckeyOf(lease), lease); return Promise.resolve() },
-    eraseLease: (scope) => { rows.delete(ckeyOf(scope)); return Promise.resolve() },
-    readMark:   (scope) => Promise.resolve((marks.get(ckeyOf(scope)) ?? null) as DeviceMark | null),
-    writeMark:  (mark) => { marks.set(ckeyOf(mark), mark); return Promise.resolve() },
-    eraseMark:  (scope) => { marks.delete(ckeyOf(scope)); return Promise.resolve() },
-    eraseAll:   () => { rows.clear(); marks.clear(); return Promise.resolve() },
+    getLease: (scope) => { const kept = (rows.get(ckeyOf(scope)) ?? null) as LeaseRecord | null; return Promise.resolve(TH.good(kept)) },
+    putLease: (record) => { rows.set(ckeyOf(record), record); return Promise.resolve(TH.good(undefined)) },
+    delLease: (scope) => { rows.delete(ckeyOf(scope)); return Promise.resolve(TH.good(undefined)) },
+    getMark:  (scope) => { const kept = (marks.get(ckeyOf(scope)) ?? null) as DeviceMark | null; return Promise.resolve(TH.good(kept)) },
+    putMark:  (mark) => { marks.set(ckeyOf(mark), mark); return Promise.resolve(TH.good(undefined)) },
+    delMark:  (scope) => { marks.delete(ckeyOf(scope)); return Promise.resolve(TH.good(undefined)) },
+    delAll:   () => { rows.clear(); marks.clear(); return Promise.resolve(TH.good(undefined)) },
   }
   /** Rewrite the one stored row through `spoil`. */
   const spoilRow = (spoil: (row: Record<string, unknown>) => unknown) => {
@@ -96,7 +96,7 @@ export const uncheckingDeviceDB = () => {
   return { deviceDB, rows, spoilRow }
 }
 
-/** The stored row of the lockbox `boxlabel`, as the backend holds it. */
+/** The stored row of the box `boxlabel`, as the backend holds it. */
 export const storedRowOf = (world: ReturnType<typeof makeWorld>, boxlabel: string): Record<string, unknown> => (
   JSON.parse(world.dbStore.read(u1BoxCkey(boxlabel)) ?? 'null') as Record<string, unknown>
 )
@@ -106,60 +106,75 @@ export const storedVaultPropsOf = (world: ReturnType<typeof makeWorld>): Record<
   JSON.parse(world.dbStore.read(u1VaultPropsCkey) ?? 'null') as Record<string, unknown>
 )
 
-/** The ckeys of every row `userId`'s vault has in storage: its vault props and its lockboxes. */
+/** The ckeys of every row `userId`'s vault has in storage: its vault props and its boxes. */
 export const rowsOf = (world: ReturnType<typeof makeWorld>, userId: string) => (
   world.dbStore.ckeys().filter((ckey) => ckey === Ckeys.vaultProps(TH.scopeOf(userId)) || Ckeys.isBoxIn(TH.scopeOf(userId))(ckey))
 )
 
-/** A world whose `u1` vault, with a lockbox and a lease, has had its stored vault props spoiled. */
+/** u1's stored vault props in `world`, their way in of `wayinkind` spoiled by `spoil`. */
+export const spoilWayin = (world: ReturnType<typeof makeWorld>, wayinkind: 'passphrase' | 'passkey', spoil: Record<string, unknown>) => {
+  const vaultProps = JSON.parse(world.dbStore.read(u1VaultPropsCkey) ?? '{}') as Record<string, Record<string, unknown>>
+  world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...vaultProps, [wayinkind]: { ...vaultProps[wayinkind], ...spoil } }))
+}
+
+/** A world whose `u1` vault, with a box and a lease, has had its stored vault props spoiled. */
 export const damagedVaultWorld = async () => {
   const world = makeWorld()
   const vault = await world.openUnlocked('pw')
-  await vault.storeBox('anthropic', 'sk-fake')
+  await vault.putBox('anthropic', 'sk-fake')
   vault.close()
   world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...storedVaultPropsOf(world), unlock_epoch: 'one' }))
   return world
 }
 
 /** The verbs Vault.make asks of a VaultDB, and so all a duck-typed one has. */
-export const VaultDBVerbsUsed = ['readVaultProps', 'fetchOrCreateVaultProps', 'updateVaultProps', 'readBox', 'listBoxes', 'updateBox', 'retireBox', 'retireVault', 'subscribe'] as const
+export const VaultDBVerbsUsed = ['getVaultProps', 'ensureVaultProps', 'putVaultProps', 'getBox', 'listBoxes', 'putBox', 'delBox', 'delVault', 'subscribe'] as const
 
-/** The wayinlabels a vault's snapshot lists, in order. */
-export const wayinlabelsOf = (vault: Vault) => vault.getSnapshot().wayins.map((summary) => summary.wayinlabel)
-
-/** The wayin_id of the passkey `laptop` that `vault` adds under the passphrase `pw`; fails the test when it adds none. */
-export const addLaptopPasskey = async (vault: Vault): Promise<string> => {
-  const wayinId = await vault.addPasskey('pw', () => TH.passkeyOf('laptop'), { wayinlabel: 'laptop' })
-  if (wayinId === null) { throw new Error('addPasskey added no passkey') }
-  return wayinId
+/** The passkey `laptop`, put into `vault` under the passphrase `pw`. */
+export const addLaptopPasskey = async (vault: Vault): Promise<void> => {
+  await vault.putWayin('pw', await TH.passkeyOf('laptop'))
 }
 
-/** A vault in a fresh world, unlocked with `pw`, holding one lockbox and a passkey labelled `laptop`. */
+/** A vault in a fresh world, unlocked with `pw`, holding one box and the passkey `laptop`. */
 export const vaultWithPasskey = async () => {
   const world = makeWorld()
   const vault = await world.open()
   await vault.unlock('pw')
-  await vault.storeBox('anthropic', 'sk-fake')
+  await vault.putBox('anthropic', 'sk-fake')
   const laptop = await TH.passkeyOf('laptop')
-  const wayinId = await addLaptopPasskey(vault)
-  return { world, vault, laptop, wayinId }
+  await addLaptopPasskey(vault)
+  return { world, vault, laptop }
 }
 
 /**
  * A world whose slow waits can be held mid-flight, to land a lock inside an unlock: each
  * `holdNext` arms a gate on the next look at the vault props, passphrase derivation, device-record
- * write, or (to hold a store in hand) read of a lockbox, and hands it back. Its key deriver is its
+ * write, or (to hold a store in hand) read of a box, and hands it back. Its key deriver is its
  * own copy of testDeriver, so a spy on it stays here.
  */
 export const makeRacingWorld = (defaults?: Partial<MakeVaultOpts>) => {
   const keyDeriver: KeyDeriver = { ...TH.testDeriver }
   const world = makeWorld({ keyDeriver, ...defaults })
-  const holdNextLook = () => TH.holdNextCall(world.vaultDB, 'readVaultProps')
+  const holdNextLook = () => TH.holdNextCall(world.vaultDB, 'getVaultProps')
   const holdNextDerive = () => TH.holdNextCall(keyDeriver, 'deriveKeyBytes')
-  const holdNextLease = () => TH.holdNextCall(world.deviceDB, 'writeLease')
-  const holdNextBoxRead = () => TH.holdNextCall(world.vaultDB, 'readBox')
+  const holdNextLease = () => TH.holdNextCall(world.deviceDB, 'putLease')
+  const holdNextBoxRead = () => TH.holdNextCall(world.vaultDB, 'getBox')
   return { ...world, holdNextLook, holdNextDerive, holdNextLease, holdNextBoxRead }
 }
 
-/** The stored vault props' ways in, as the backend holds them. */
-export const storedWayinsOf = (world: ReturnType<typeof makeWorld>) => storedVaultPropsOf(world)['wayins'] as Record<string, unknown>[]
+/** The stored vault props' way in of `wayinkind`, as the backend holds it: null for no passkey. */
+export const storedWayinOf = (world: ReturnType<typeof makeWorld>, wayinkind: 'passphrase' | 'passkey') => storedVaultPropsOf(world)[wayinkind] as Record<string, unknown> | null
+
+/**
+ * A world whose `u1` vault has moved on past a copy of its props: `older`, as stored once a
+ * passkey was added, and `newer`, as stored now, the passkey removed, which this device has seen.
+ */
+export const rolledBackWorld = async () => {
+  const world = makeWorld()
+  const vault = await world.openUnlocked('pw')
+  await addLaptopPasskey(vault)
+  const older = world.dbStore.read(u1VaultPropsCkey) ?? ''
+  await vault.delWayin('pw')
+  const newer = world.dbStore.read(u1VaultPropsCkey) ?? ''
+  return { world, vault, older, newer }
+}

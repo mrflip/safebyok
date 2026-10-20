@@ -37,7 +37,7 @@ import type { JSONValue, Value } from 'convex/values'
  * @example
  *   const deployment = fakeDeployment(host)
  *   const reactClient = deployment.connectWith('u1', (address, opts) => new ConvexReactClient(address, opts))
- *   await reactClient.mutation(deployment.api.safebyok.fetchOrCreateVaultProps, { vaultProps })
+ *   await reactClient.mutation(deployment.api.safebyok.ensureVaultProps, { vaultProps })
  */
 export const fakeDeployment = <Host extends FakeHost>(host: Host): FakeDeployment<Host> => new FakeDeployment(host)
 

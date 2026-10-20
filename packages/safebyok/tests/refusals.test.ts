@@ -8,7 +8,7 @@ describe("Refusals.storageUnavailable", () => {
     const outage = new Error('connection reset')
     const refusal = Refusals.storageUnavailable(outage)
     expect(refusal).to.be.instanceOf(VaultError)
-    expect(refusal.kind).to.eq('storage_unavailable')
+    expect(refusal.refusalkind).to.eq('storage_unavailable')
     expect(refusal.message).to.eq(Refusals.StorageTroubleMessage)
     expect(refusal.cause).to.eq(outage)
   })
@@ -40,7 +40,7 @@ describe("Refusals.staleWrite", () => {
   for (const what of Refusals.StaleWriteVals) {
     it(`refuses a ${what} write as stale_write, saying to read again, with no cause`, () => {
       const refusal = Refusals.staleWrite(what)
-      expect(refusal.kind).to.eq('stale_write')
+      expect(refusal.refusalkind).to.eq('stale_write')
       expect(refusal.message).to.match(/Read (it|the vault) again before retrying\./)
       expect(refusal).to.not.have.property('cause')
     })
@@ -48,15 +48,15 @@ describe("Refusals.staleWrite", () => {
 
   it("says which write was refused", () => {
     expect(Refusals.staleWrite('vaultProps').message).to.include('this change was refused')
-    expect(Refusals.staleWrite('lockbox').message).to.include('That lockbox changed')
-    expect(Refusals.staleWrite('retire').message).to.include('this removal was refused')
+    expect(Refusals.staleWrite('box').message).to.include('That box changed')
+    expect(Refusals.staleWrite('del').message).to.include('this removal was refused')
   })
 })
 
 describe("Refusals.notPermitted", () => {
   it("refuses as not_permitted, saying signing in again will not help, with no cause when none is given", () => {
     const refusal = Refusals.notPermitted()
-    expect(refusal.kind).to.eq('not_permitted')
+    expect(refusal.refusalkind).to.eq('not_permitted')
     expect(refusal.message).to.include('Signing in again will not help')
     expect(refusal).to.not.have.property('cause')
   })
@@ -76,13 +76,13 @@ describe("Refusals.notPermitted", () => {
 describe("Refusals.vaultFull", () => {
   it("refuses as vault_full, naming the limit met, with no cause when none is given", () => {
     const refusal = Refusals.vaultFull(250)
-    expect(refusal.kind).to.eq('vault_full')
-    expect(refusal.message).to.eq('This vault already holds the 250 lockboxes its storage keeps in one vault: remove one before storing another.')
+    expect(refusal.refusalkind).to.eq('vault_full')
+    expect(refusal.message).to.eq('This vault already holds the 250 boxes its storage keeps in one vault: remove one before storing another.')
     expect(refusal).to.not.have.property('cause')
   })
 
   it("says only that the vault is full when no count is the limit met", () => {
-    expect(Refusals.vaultFull().message).to.eq('This vault is full: remove a lockbox to make room, then try again.')
+    expect(Refusals.vaultFull().message).to.eq('This vault is full: remove a box to make room, then try again.')
   })
 
   it("keeps the backend's own refusal as its cause, never a null one", () => {
@@ -95,7 +95,7 @@ describe("Refusals.vaultFull", () => {
 describe("Refusals.storageBlocked", () => {
   it("refuses as storage_blocked, saying trying again will not help, with no cause when none is given", () => {
     const refusal = Refusals.storageBlocked()
-    expect(refusal.kind).to.eq('storage_blocked')
+    expect(refusal.refusalkind).to.eq('storage_blocked')
     expect(refusal.message).to.eq(Refusals.StorageBlockedMessage)
     expect(refusal.message).to.include('Trying again will not help')
     expect(refusal).to.not.have.property('cause')
@@ -148,7 +148,7 @@ describe("Refusals.isStorageBlocked", () => {
 describe("Refusals, between them", () => {
   it("quote nothing they were handed but the message an adapter writes", () => {
     const quoted = 'SUPERSECRET-ciphertext'
-    const refusals = [Refusals.staleWrite('lockbox'), Refusals.vaultFull(3), Refusals.notPermitted(), Refusals.storageBlocked()]
+    const refusals = [Refusals.staleWrite('box'), Refusals.vaultFull(3), Refusals.notPermitted(), Refusals.storageBlocked()]
     for (const refusal of refusals) { expect(TH.thrownText(refusal)).to.not.include(quoted) }
   })
 })

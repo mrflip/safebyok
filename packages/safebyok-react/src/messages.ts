@@ -45,8 +45,8 @@ export const Messages = {
   // The passkey button
   passkeyButton:     'Use a passkey',
   passkeyTrouble:    "Your passkey can't be used here just now. Unlock with your passphrase instead.",
-  noPasskeyToAsk:    'This vault has no passkey to ask: unlock it with a passphrase, then add one.',
-  passkeysDamaged:   'Every passkey of this vault is stored damaged, so none can be asked. Unlock with a passphrase, then remove the passkeys and add them again.',
+  noPasskeyToAsk:    'This vault has no passkey to ask: unlock it with your passphrase, then add one.',
+  passkeyDamaged:    "This vault's passkey is stored damaged, so it can't be asked. Unlock with your passphrase, then add a passkey again: the new one takes its place.",
   noWebAuthn:        'This browser offers no passkeys (WebAuthn): unlock with a passphrase.',
   noPrf:             "This passkey's authenticator does not offer the PRF extension a passkey unlock needs: unlock with a passphrase, or try another device or security key.",
   passkeyAskFailed:  "The browser could not ask for a passkey: unlock with a passphrase. The browser's own error is this error's cause.",

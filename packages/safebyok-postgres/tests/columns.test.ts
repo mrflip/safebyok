@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as TH from './test-helpers'
 import * as Columns from '../src/columns'
-import { VaultPropsColumns, ListedLockboxColumns, LockboxColumns } from '../src/columns'
+import { VaultPropsColumns, ListedBoxColumns, BoxColumns } from '../src/columns'
 import type { Column } from '../src/columns'
 
 const Pair: Column[] = [['vault_id', 'text'], ['registered_at', 'bigint']]
@@ -40,8 +40,9 @@ describe("Columns.selected", () => {
 })
 
 describe("Columns.paramsOf", () => {
-  it("is the record's values in column order, a missing field as null", () => {
-    expect(Columns.paramsOf({ vault_id: 'v1', wayins: undefined }, [['vault_id', 'text'], ['wayins', 'jsonb']])).to.deep.equal(['v1', null])
+  it("is the record's values in column order, a null or missing field as null, as its example shows", () => {
+    expect(Columns.paramsOf({ vault_id: 'v1', passkey: null }, [['vault_id', 'text'], ['passkey', 'jsonb']])).to.deep.equal(['v1', null])
+    expect(Columns.paramsOf({ vault_id: 'v1' }, [['vault_id', 'text'], ['passkey', 'jsonb']])).to.deep.equal(['v1', null])
   })
 
   it("sends a jsonb value as its JSON text", () => {
@@ -49,15 +50,19 @@ describe("Columns.paramsOf", () => {
       .to.deep.equal(['{"cipher_iv_b64":"iv-a1","ciphertext_b64":"ct-a1"}'])
   })
 
-  it("covers every column of real vault props and a real lockbox", () => {
+  it("covers every column of real vault props and a real box", () => {
     expect(Columns.paramsOf(TH.vaultPropsOf('u1'), VaultPropsColumns)).to.have.lengthOf(VaultPropsColumns.length)
-    expect(Columns.paramsOf(TH.boxOf('anthropic', 'a1'), LockboxColumns)).to.not.include(undefined)
+    expect(Columns.paramsOf(TH.boxOf('anthropic', 'a1'), BoxColumns)).to.not.include(undefined)
   })
 })
 
 describe("Columns.recordOf", () => {
-  it("leaves a null column out of the record", () => {
-    expect(Columns.recordOf({ vault_id: 'v1', wayins: null }, [['vault_id', 'text'], ['wayins', 'jsonb']])).to.deep.equal({ vault_id: 'v1' })
+  it("reads a null column as a null field, as its example shows", () => {
+    expect(Columns.recordOf({ vault_id: 'v1', passkey: null }, [['vault_id', 'text'], ['passkey', 'jsonb']])).to.deep.equal({ vault_id: 'v1', passkey: null })
+  })
+
+  it("leaves a column the row lacks out of the record", () => {
+    expect(Columns.recordOf({ vault_id: 'v1' }, [['vault_id', 'text'], ['passkey', 'jsonb']])).to.deep.equal({ vault_id: 'v1' })
   })
 
   it("parses a jsonb column's text, and leaves one a driver already parsed as it is", () => {
@@ -71,15 +76,15 @@ describe("Columns.recordOf", () => {
     expect(Columns.recordOf('vault-id', Pair)).to.eq('vault-id')
   })
 
-  it("rebuilds a lockbox from its params' round trip", () => {
-    const lockbox = TH.boxOf('anthropic', 'a1')
-    const row = Object.fromEntries(LockboxColumns.map(([field], ii) => [field, Columns.paramsOf(lockbox, LockboxColumns)[ii]]))
-    expect(Columns.recordOf(row, LockboxColumns)).to.deep.equal(lockbox)
+  it("rebuilds a box from its params' round trip", () => {
+    const box = TH.boxOf('anthropic', 'a1')
+    const row = Object.fromEntries(BoxColumns.map(([field], ii) => [field, Columns.paramsOf(box, BoxColumns)[ii]]))
+    expect(Columns.recordOf(row, BoxColumns)).to.deep.equal(box)
   })
 })
 
-describe("ListedLockboxColumns", () => {
-  it("is every lockbox column but the two ciphered ones", () => {
-    expect(ListedLockboxColumns.map(([field]) => field)).to.deep.equal(['format', 'boxlabel', 'revision_tok', 'vault_key_epoch', 'whisper_codec', 'whisper_schema_version', 'sidecar_json', 'registered_at', 'written_at'])
+describe("ListedBoxColumns", () => {
+  it("is every box column but the two ciphered ones", () => {
+    expect(ListedBoxColumns.map(([field]) => field)).to.deep.equal(['format', 'boxlabel', 'revision_tok', 'vault_key_epoch', 'whisper_codec', 'whisper_schema_version', 'sidecar_json', 'registered_at', 'written_at'])
   })
 })

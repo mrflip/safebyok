@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
-import { VaultError, VaultErrorFamilyForKind, VaultErrorFamilyVals, VaultErrorKindVals, isVaultCondition, isVaultError } from '../src/errors'
+import { describe, expect, it, vi } from 'vitest'
+import { VaultError, RefusalFamilyForKind, RefusalFamilyVals, RefusalKindVals, isCondition, isVaultError } from '../src/errors'
 
 const readmeText = readFileSync(new URL('../README.md', import.meta.url), 'utf8')
 const errorsSource = readFileSync(new URL('../src/errors.ts', import.meta.url), 'utf8')
@@ -19,60 +19,95 @@ const tableKinds = (text: string): string[] => (
 
 /** The kinds a doc block names, in backticks. */
 const namedKinds = (text: string): string[] => (
-  VaultErrorKindVals.filter((kind) => text.includes(`\`${kind}\``))
+  RefusalKindVals.filter((kind) => text.includes(`\`${kind}\``))
 )
 
 const MisuseKinds    = tableKinds(between(readmeText, '### Misuse', '### Conditions'))
-const ConditionKinds = tableKinds(between(readmeText, '### Conditions', '\n## '))
+const ConditionKinds = tableKinds(between(readmeText, '### Conditions', '### Bad news'))
+const BadNewsKinds   = tableKinds(between(readmeText, '### Bad news', '\n## '))
 
-describe("VaultErrorKindVals", () => {
+describe("RefusalKindVals", () => {
   it("lists each kind once", () => {
-    expect(new Set(VaultErrorKindVals).size).to.eq(VaultErrorKindVals.length)
+    expect(new Set(RefusalKindVals).size).to.eq(RefusalKindVals.length)
   })
 
   it("is documented in the README, each kind in exactly one family's table", () => {
-    expect([...MisuseKinds, ...ConditionKinds]).to.have.members([...VaultErrorKindVals])
-    expect(MisuseKinds.filter((kind) => ConditionKinds.includes(kind))).to.deep.equal([])
+    expect([...MisuseKinds, ...ConditionKinds, ...BadNewsKinds]).to.have.members([...RefusalKindVals])
   })
 
   it("puts the same kinds in each family as the doc block in errors.ts does", () => {
     expect(namedKinds(between(errorsSource, '- **Misuse**', '- **Condition**'))).to.have.members(MisuseKinds)
-    expect(namedKinds(between(errorsSource, '- **Condition**', '`vault_full` means'))).to.have.members(ConditionKinds)
+    expect(namedKinds(between(errorsSource, '- **Condition**', '- **Bad news**'))).to.have.members(ConditionKinds)
+    expect(namedKinds(between(errorsSource, '- **Bad news**', '`vault_full` means'))).to.have.members(BadNewsKinds)
   })
 })
 
 describe("VaultError", () => {
   it("carries its kind, and isVaultError tells it apart", () => {
     const err = new VaultError('vault_full', 'This vault is full.')
-    expect(err.kind).to.eq('vault_full')
+    expect(err.refusalkind).to.eq('vault_full')
     expect(isVaultError(err)).to.be.true
     expect(isVaultError(err, 'vault_full')).to.be.true
     expect(isVaultError(err, 'stale_write')).to.be.false
     expect(isVaultError(new Error('vault_full'))).to.be.false
   })
-})
 
-/** The kinds VaultErrorFamilyForKind puts in `family`. */
-const familyKinds = (family: string): string[] => VaultErrorKindVals.filter((kind) => VaultErrorFamilyForKind[kind] === family)
-
-describe("VaultErrorFamilyForKind", () => {
-  it("names a family for every kind, and only for kinds", () => {
-    expect(Object.keys(VaultErrorFamilyForKind)).to.have.members([...VaultErrorKindVals])
+  it("carries refusalkind, family, message and cause, and its family read from the one table (Contract: Shapes)", () => {
+    const cause = new Error('socket closed')
+    const err = new VaultError('storage_unavailable', 'Try again shortly.', { cause })
+    expect(err).to.include({ refusalkind: 'storage_unavailable', family: 'condition', message: 'Try again shortly.', cause })
+    for (const refusalkind of RefusalKindVals) {
+      expect(new VaultError(refusalkind, 'Said.').family).to.eq(RefusalFamilyForKind[refusalkind])
+    }
   })
 
-  it("uses only the families in VaultErrorFamilyVals, and uses both", () => {
-    expect([...new Set(Object.values(VaultErrorFamilyForKind))]).to.have.members([...VaultErrorFamilyVals])
+  it("keeps each fact a refusal learned under its own name in meta, and has no meta when it learned none (Contract: Shapes)", () => {
+    const capacity = { boxes: { used: 3, max: 3 }, bytes: { used: 900, max: 1000 } }
+    const full = new VaultError('vault_full', 'This vault is full.', { meta: { capacity } })
+    expect(full.meta).to.deep.equal({ capacity })
+    const stale = new VaultError('stale_write', 'Read it again.', { meta: { box_stored: null } })
+    expect(stale.meta).to.deep.equal({ box_stored: null })
+    const plain = new VaultError('vault_locked', 'Unlock it first.')
+    expect(plain.meta).to.be.undefined
+    expect(Object.keys(plain)).to.not.include('meta')
+  })
+
+  it("keeps meta out of the options Error is given, and keeps a cause given with it", () => {
+    const cause = new Error('quota')
+    const err = new VaultError('vault_full', 'This vault is full.', { cause, meta: { capacity: { boxes: { used: 1, max: 1 }, bytes: { used: 0, max: 0 } } } })
+    expect(err.cause).to.eq(cause)
+    expect(Object.keys(err)).to.have.members(['name', 'refusalkind', 'family', 'meta'])
+  })
+
+  it("lets a caller branch on family, as its second example shows", () => {
+    const err = new VaultError('bad_record', 'Not one this package builds.')
+    expect(err.family).to.eq('misuse')
+  })
+})
+
+/** The kinds RefusalFamilyForKind puts in `family`. */
+const familyKinds = (family: string): string[] => RefusalKindVals.filter((kind) => RefusalFamilyForKind[kind] === family)
+
+describe("RefusalFamilyForKind", () => {
+  it("names a family for every kind, and only for kinds", () => {
+    expect(Object.keys(RefusalFamilyForKind)).to.have.members([...RefusalKindVals])
+  })
+
+  it("uses only the families in RefusalFamilyVals, and uses each of them", () => {
+    expect([...new Set(Object.values(RefusalFamilyForKind))]).to.have.members([...RefusalFamilyVals])
   })
 
   it("puts each kind in the family the README's tables do", () => {
     expect(familyKinds('misuse')).to.have.members(MisuseKinds)
     expect(familyKinds('condition')).to.have.members(ConditionKinds)
+    expect(familyKinds('bad_news')).to.have.members(BadNewsKinds)
   })
 
   it("matches the @examples", () => {
-    expect(VaultErrorFamilyForKind.bad_option).to.eq('misuse')
-    expect(VaultErrorFamilyForKind.bad_record).to.eq('misuse')
-    expect(VaultErrorFamilyForKind.storage_unavailable).to.eq('condition')
+    expect(RefusalFamilyForKind.bad_option).to.eq('misuse')
+    expect(RefusalFamilyForKind.bad_record).to.eq('misuse')
+    expect(RefusalFamilyForKind.storage_unavailable).to.eq('condition')
+    expect(RefusalFamilyForKind.damaged_box).to.eq('bad_news')
   })
 })
 
@@ -85,77 +120,115 @@ const FamilyCases = [
   ["vault_closed",        "misuse",    'using a handle after close() is a bug'],
   ["unknown_key_deriver", "misuse",    'opening with the wrong key deriver is a bug'],
   ["insecure_context",    "misuse",    'serving the app over plain http is a deployment bug'],
-  // conditions: normal operation, which may reach the user
+  ["unexpected_error",    "misuse",    'a throw that is no refusal is a bug, in safebyok or in a function the app handed it'],
+  // conditions: normal operation, which may reach the user; bad news: told to the user, nobody's bug
   ["vault_locked",        "condition", 'a locked vault asks for the passphrase'],
   ["wrong_passphrase",    "condition", 'a mistyped passphrase asks again'],
   ["created_elsewhere",   "condition", 'a vault made on another device meanwhile asks for the passphrase chosen there'],
   ["weak_passphrase",     "condition", 'a passphrase too easy to guess asks the user for another'],
   ["wrong_passkey",       "condition", 'a passkey that does not open the vault asks again, or for a passphrase'],
   ["passkey_unavailable", "condition", 'a browser or authenticator without PRF falls back to the passphrase'],
-  ["absent_box",          "condition", 'a lockbox retired elsewhere is a fact of syncing'],
+  ["absent_box",          "condition", 'a box deleted elsewhere is a fact of syncing'],
   ["absent_vault",        "condition", 'a vault never made is made by the first unlock'],
-  ["absent_wayin",        "condition", 'a passphrase removed on another device is a fact of syncing'],
+  ["absent_wayin",        "condition", 'a passkey removed on another device is a fact of syncing'],
   ["whisper_too_large",   "condition", "an oversized whisper is the user's value, not the code"],
-  ["lockbox_too_large",   "condition", "a lockbox too heavy for one record is the user's whisper and note, not the code"],
-  ["vault_full",          "condition", 'a full vault tells the user to remove a lockbox'],
-  ["too_many_wayins",     "condition", 'a vault holding its limit of passphrases tells the user to remove one'],
-  ["last_wayin",          "condition", 'removing the last passphrase is refused, and the user told why'],
+  ["box_too_large",       "condition", "a box too heavy for one record is the user's whisper and note, not the code"],
+  ["vault_full",          "condition", 'a full vault tells the user to remove a box'],
   ["corrupt_record",      "condition", 'a damaged record is told to the user, not thrown at the developer'],
-  ["damaged_vault",       "condition", 'a vault stored damaged is told to the user, who cannot open it'],
-  ["damaged_wayin",       "condition", 'a way in stored damaged sends the user to another way in'],
-  ["damaged_lockbox",     "condition", 'a lockbox stored damaged is told to the user, who may remove it'],
-  ["newer_format",        "condition", 'a vault a newer version wrote is told to the user, who updates the app'],
+  ["damaged_vault",       "bad_news",  'a vault stored damaged is told to the user, who cannot open it'],
+  ["damaged_wayin",       "bad_news",  'a way in stored damaged sends the user to another way in'],
+  ["damaged_box",         "bad_news",  'a box stored damaged is told to the user, who may remove it'],
+  ["newer_format",        "bad_news",  'a vault a newer version wrote is told to the user, who updates the app'],
   ["stale_write",         "condition", 'another device writing first is a fact of syncing'],
-  ["rolled_back",         "condition", 'storage handing back an older copy of the vault is a fact a user can be told'],
+  ["rolled_back",         "bad_news",  'storage handing back an older copy of the vault is a fact a user can be told'],
   ["not_permitted",       "condition", 'a call refused to the signed-in owner is told to them'],
-  ["identity_revoked",    "condition", 'a signed-out user signs in again'],
+  ["identity_revoked",    "bad_news",  'a signed-out user signs in again'],
   ["storage_unavailable", "condition", 'unreachable storage is tried again shortly'],
   ["storage_blocked",     "condition", 'a browser withholding its storage is told to the user, without a retry'],
 ] as const
 
 describe("each kind's family", () => {
   it("covers every kind in the cases below", () => {
-    expect(FamilyCases.map(([kind]) => kind)).to.have.members([...VaultErrorKindVals])
+    expect(FamilyCases.map(([kind]) => kind)).to.have.members([...RefusalKindVals])
   })
 
   for (const [kind, family, blurb] of FamilyCases) {
-    it(blurb, () => { expect(VaultErrorFamilyForKind[kind]).to.eq(family) })
+    it(blurb, () => { expect(RefusalFamilyForKind[kind]).to.eq(family) })
   }
 })
 
 const ConditionCases = [
   [new VaultError('storage_unavailable', 'The vault storage could not be reached.'), true,  'a condition VaultError'],
-  [new VaultError('identity_revoked', 'Sign in to reach this vault.'),               true,  'a signed-out refusal'],
+  [new VaultError('identity_revoked', 'Sign in to reach this vault.'),               true,  'a signed-out refusal, bad news the app shows'],
+  [new VaultError('damaged_box', 'That box is damaged.'),                            true,  'a damaged box, bad news too'],
   [new VaultError('not_permitted', 'You may not change this vault.'),                true,  'a refusal of the signed-in user'],
   [new VaultError('bad_label', 'A label is 2-40 lowercase letters.'),                false, 'a misuse VaultError'],
   [new VaultError('vault_closed', 'This vault handle was closed.'),                  false, 'a closed handle, misuse too'],
-  [new Error('storage_unavailable'),                                                false, 'a plain Error, even one whose message names a condition'],
-  [{ kind: 'storage_unavailable', message: 'down' },                                false, 'an object shaped like a VaultError, but not one'],
-  [null,                                                                            false, 'a thrown null'],
-  [undefined,                                                                       false, 'a thrown undefined'],
-  ['storage_unavailable',                                                           false, 'a thrown string'],
+  [new Error('storage_unavailable'),                                                       false, 'a plain Error, even one whose message names a condition'],
+  [{ refusalkind: 'storage_unavailable', message: 'down' },                                false, 'an object shaped like a VaultError, but not one'],
+  [null,                                                                                   false, 'a thrown null'],
+  [undefined,                                                                              false, 'a thrown undefined'],
+  ['storage_unavailable',                                                                  false, 'a thrown string'],
 ] as const
 
-describe("isVaultCondition", () => {
+describe("isCondition", () => {
   for (const [thrown, expected, blurb] of ConditionCases) {
-    it(`is ${String(expected)} for ${blurb}`, () => { expect(isVaultCondition(thrown)).to.eq(expected) })
+    it(`is ${String(expected)} for ${blurb}`, () => { expect(isCondition(thrown)).to.eq(expected) })
   }
 
   it("narrows to a VaultError, so the caller can read its kind and message", () => {
     const err: unknown = new VaultError('storage_unavailable', 'The vault storage could not be reached.')
-    if (! isVaultCondition(err)) { throw new Error('expected a condition') }
-    expect(err.kind).to.eq('storage_unavailable')
+    if (! isCondition(err)) { throw new Error('expected a condition') }
+    expect(err.refusalkind).to.eq('storage_unavailable')
     expect(err.message).to.eq('The vault storage could not be reached.')
   })
 
   it("matches the @example: a condition is shown, anything else is rethrown", () => {
     const shown: string[] = []
     const handle = (err: unknown) => {
-      if (! isVaultCondition(err)) { throw err }
+      if (! isCondition(err)) { throw err }
       shown.push(err.message)
     }
     handle(new VaultError('whisper_too_large', 'That whisper is over the limit.'))
     expect(shown).to.deep.equal(['That whisper is over the limit.'])
     expect(() => { handle(new VaultError('bad_whisper', 'A whisper must be a JSON value.')) }).to.throw('A whisper must be a JSON value.')
   })
+})
+
+describe("isVaultError", () => {
+  it("tells a refusal of the kind asked, as its example shows", () => {
+    const prompted: string[] = []
+    const handle = (err: unknown) => { if (isVaultError(err, 'vault_locked')) { prompted.push('passphrase') } }
+    handle(new VaultError('vault_locked', 'Unlock the vault first.'))
+    handle(new VaultError('absent_box', 'No box under that label.'))
+    expect(prompted).to.deep.equal(['passphrase'])
+  })
+
+  it("is false for a VaultError of another copy of safebyok, as an ESM and a CJS build loaded side by side make: it is a foreign throw", async () => {
+    vi.resetModules()
+    const Other = await import('../src/errors')
+    expect(Other.VaultError).to.not.eq(VaultError)
+    expect(isVaultError(new Other.VaultError('identity_revoked', 'Sign in again to reach this vault.'))).to.be.false
+  })
+
+  // As a client rebuilds one from a server's JSON: an Error that names itself, with a kind.
+  class LookalikeError extends Error {
+    override readonly name = 'VaultError'
+    readonly refusalkind = 'identity_revoked'
+  }
+  const sent = new VaultError('identity_revoked', 'Sign in again to reach this vault.')
+  const ImpostorCases = [
+    [new LookalikeError('Sign in at another site.'),                                                         'an Error that names itself a VaultError and claims a kind, as a client rebuilds one from a server'],
+    [JSON.parse('{"name":"VaultError","refusalkind":"identity_revoked","family":"bad_news","message":"Signed out."}') as unknown, 'a VaultError as JSON, as a server sends one'],
+    [structuredClone(sent),                                                                                 'a VaultError through structuredClone, as postMessage hands one over'],
+    [{ name: 'VaultError', refusalkind: 'identity_revoked', family: 'bad_news', message: 'Signed out.' },     'a plain object shaped like one'],
+  ] as const
+
+  for (const [impostor, blurb] of ImpostorCases) {
+    it(`is false for ${blurb}, so it can pose as no refusal`, () => {
+      expect(isVaultError(impostor)).to.be.false
+      expect(isVaultError(impostor, 'identity_revoked')).to.be.false
+      expect(isCondition(impostor)).to.be.false
+    })
+  }
 })

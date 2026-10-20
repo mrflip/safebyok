@@ -13,84 +13,564 @@ fact into that entry, keeping its date and adding the new one beside it ("2026-1
 ..."), and changes no other entry. Otherwise it writes a new dated entry at the top of *Of
 Interest*. Either way it keeps the voice above, and returns the lines it changed.
 
-**A one-time rename (2026-10-18; extended 2026-10-18).** With the Coach's approval, the entries
+**A one-time rename (2026-10-18; extended 2026-10-18, 2026-10-19).** With the Coach's approval, the entries
 below had their retired words changed to the reform's cast in one mechanical pass (VOCABULARY.md;
 the retired names are in `notes/old_vocabulary.md`), so that a search for a current name finds
 the entries that discuss it. Only names moved. A second pass, on the Coach's word "use the modern
 terms everywhere; security.md is not history, it's a current advisory for a security reviewer",
-finished it: the lockbox's "note" and "public bag" became the sidecar wherever an entry describes
-today's lockbox, "erase" of a vault or lockbox became retire, "way in" became wayin, and the
-"window" of a lease became the lease. Where an entry once said the vault checks a lockbox's note
+finished it: the box's "note" and "public bag" became the sidecar wherever an entry describes
+today's box, "erase" of a vault or box became retire, "way in" became wayin, and the
+"window" of a lease became the lease. Where an entry once said the vault checks a box's note
 (a floor, the host's validators), it now says the sidecar is never checked by the vault, which is
 what the code does; the sidecar entry says why. Left as they were: the literal format tags and
 stored-key strings that describe what an older version wrote (`safebyok-vault-v2`,
 `safebyok-unlock-v1`, `unlock^`), each now marked as an older version's where it could be read as
 today's, and the entries that narrate the renaming itself. Old records are not read, and no
-entry here promises that they will be. Four statements that `storeBox()` retried were corrected,
-each marked "amended 2026-10-18". This leaves the rule above as it was: from here on, an entry is
+entry here promises that they will be. Four statements that `putBox()` retried were corrected,
+each marked "amended 2026-10-18". A third pass, 2026-10-19 (the rename pass), moved the names again:
+lockbox became box, in stored names too; the store verbs became get, put and del on every layer; retire
+became delete; and `VaultError.kind` became `refusalkind`. A fourth, 2026-10-19 (put_wayin): `changePassphrase` and
+`addPasskey` became `putWayin`, and the strength test became the strength checker, with the sentences
+the renames falsified amended in place, each marked. This leaves the rule above as it was: from here on, an entry is
 added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-20 (thread B5, placement, branch 20261019-placement): **a second copy of safebyok loaded
+  beside this one is refused as misuse, and a handler passed bare is refused rather than ignored.**
+  (1) A `Box` or a `Proof` made by another copy of safebyok (two versions, or the ESM and CommonJS
+  builds side by side) is refused `bad_option`, naming the double load and telling the developer to load
+  safebyok once. The refusal is made at `vault.openBox`, `Box.make`, `Box.seal`'s `over`, `Proof.parse`
+  (so at `unlock`), `wayin.tryOpen` and `Wayin.seal`. Each class carries a static mark keyed by
+  `Symbol.for('safebyok.model')`, the same symbol in every copy, and `checkOneCopy`
+  (`packages/safebyok/src/one-copy.ts`) refuses an object whose constructor carries the mark but which
+  fails `instanceof`. The refusal quotes nothing of what it was handed. Before, such a box read as
+  `bad_record` and such a proof as the wrong kind of proof. The Coach's rule: anything revealing a second
+  safebyok should crash the app (the misuse family). This differs from a `VaultError` of another copy,
+  which is still a foreign throw (the a_fixes entry below): there the mark was removed; here the mark
+  is used only to refuse, never to accept. (2) `vault.hello()` and `vault.ensureLease()` refuse, as
+  `bad_option`, anything in place of their options that is not a plain object, an event above all, as
+  when the method itself is passed to `addEventListener` or `onClick`; the message names the fix,
+  `() => { void vault.tryHello() }`. Before, an event was silently ignored and a handler passed bare
+  would reject unheard.
+* 2026-10-19 (thread put_wayin, B4, branch 20261019-put_wayin, PR [#208](https://github.com/mrflip/safebyok/pull/208); the sprint contract): **one verb, `putWayin(passphrase, newProof)`, replaces
+  `changePassphrase` and `addPasskey`; the host makes a passkey before the call, and the strength
+  checker is a contract to answer.** (1) `putWayin` proves with the standing passphrase only (a passkey's
+  answer as the proof is refused `bad_option`), as `changePassphrase` and `addPasskey` did. A new
+  passphrase as text replaces the passphrase; a passkey's answer (`PasskeyAnswer`) puts the passkey,
+  replacing any. The passkey is now made by the host before the call and its answer handed in, so a
+  passphrase the vault then refuses leaves a fresh passkey on the authenticator that opens nothing
+  (no wrap under it is ever written). The trade: the core holds no UI and calls no host code inside
+  the change. A new passkey's salt is checked at the call's door, before any key derivation
+  (`checkFreshSalt`: 32 bytes of base64url, `bad_option` otherwise). (2) A blank new passphrase is
+  refused `weak_passphrase` before the strength checker or any derivation. (3) The strength
+  checker (`strengthChecker`, type `StrengthChecker`; `src/passphrase-strength.ts`): its contract is
+  to answer a verdict. A throw from it is refused `unexpected_error` with no `cause`, `meta` or kind
+  of what it threw, as it heard the passphrase; before, a thrown condition passed through as
+  itself, and a non-condition was carried as `cause`. Left out, the default
+  `UnchosenStrengthChecker` refuses every passphrase as too weak, and the vault logs once per
+  handle, at error level, that a checker must be chosen, the log quoting no passphrase (before,
+  `Vault.make` refused a missing one `bad_option`). `zxcvbnStrengthChecker` now answers weak (a
+  reason saying to try again) when its dictionary chunk fails to load, instead of rejecting
+  `storage_unavailable`: without the dictionary it cannot judge, so it never admits. (4)
+  `Wayin.seal(vault, proof, holder, stamp, vaultKey)`, one function where `sealPassphrase`,
+  `sealFirstPassphrase` and `sealPasskey` were three, hands back for every seal `{ wayin, sessionKey }`:
+  a non-extractable session handle on the vaultKey, one more AES-KW unwrap under the just-made
+  wayinKey. Only the creating unlock keeps it; `putWayin` drops it. (5) `putWayin` and `delWayin`
+  resolve the vault (they resolved nothing, or a boolean).
+* 2026-10-19 (thread slots, B4a, branch 20261019-slots; the Coach's ruling): **the ways in are two slots,
+  and only the passphrase proves a change to them.** (1) Stored: vault props hold `passphrase` (a
+  passphrase wayin, required) and `passkey` (a passkey wayin, or null) where they held a list of one to
+  `MaxUnlocks` (8) wayins, each with a `wayin_id` and a `wayinlabel`. Format `safebyok-vault-v5`; v4 joins
+  the older formats, so every stored vault reads `damaged_vault` (no migration before 1.0.0).
+  `MaxUnlocks`, `wayin_id`, `wayinlabel`, its validator and the refusals `last_wayin` and
+  `too_many_wayins` are gone. (2) Each wrap's ctx is built as before (`cipherCtx(format, scope...,
+  vault_id, registered_at, purpose, header)`), its first part now `safebyok-vault-v5`; the header (every
+  field but the wrap, keys sorted) is `wayinkind`, `key_deriver_label` and `salt_b64` or `credential_id`
+  and `prf_salt_b64`, `vault_key_epoch`, `device_id`, `registered_at`. The passkey's HKDF info is that
+  same ctx. The purpose (`vault_key_passphrase_wrapped`, `vault_key_passkey_wrapped`) keeps one slot's
+  record from opening as the other's; which records fill the slots, and the `unlock_epoch`, are bound
+  into no ctx, as for the list, so storage can put an older record of the same vault in a slot. (3)
+  Opening: the vault picks the slot by the proof's kind and calls `wayin.tryOpen(proof)`, so a
+  passphrase costs exactly one key derivation (`Wayin.tryOpenAmong`, `openWithPassphrase`,
+  `openWithPasskey` and `Wayin.listOf` are gone, and with them the walk over up to eight). A passkey's
+  answer to a vault with no passkey refuses `absent_wayin`; one from another credential than the vault's
+  refuses `wrong_passkey` (it was `absent_wayin`). (4) Proving: `putWayin(passphrase,
+  newProof)` and `delWayin(passphrase)` take the standing
+  passphrase only; a passkey's answer handed as the proof is refused `bad_option` before anything is
+  read or derived. Before, any wayin proved any change, so a passkey holder could reset the passphrase;
+  now a passkey opens the vault but cannot change who may. `addPassphrase` is gone. Consequence: a
+  forgotten passphrase can no longer be reset with the passkey, and a passphrase stored damaged cannot
+  be replaced. (5) A vault holds at most one passkey: `putWayin` of a passkey's answer replaces the standing one (the old
+  credential no longer opens; the same credential again mends a damaged one, with a fresh wrap), and
+  `delWayin(passphrase)` removes the passkey, refusing `absent_wayin` when there is none; the passphrase
+  can never be removed. Removal is still not revocation. Every change still moves `unlock_epoch`,
+  relocking other devices, and is written conditionally on `vault_id` and `unlock_epoch`. (6) Every
+  change is proven by the passphrase, so each starts the lease again from now (`#deadlineFromNow()`;
+  before, a passkey-proven change kept the standing deadline). (7) `snapshot.wayins` is replaced by
+  `snapshot.passphrase` and `snapshot.passkey` (summaries: wayinkind, device_id, registered_at, and for
+  the passkey credential_id and prf_salt_b64); still no passphrase salt and no wrap reaches a host.
+  (8) `mayBeNewer` tells newer from damaged by `format` alone (it looked at unknown wayinkinds and
+  more wayins than `MaxUnlocks`); any change to a stored record bumps `format`. (9) The Convex
+  validators, Postgres (`passphrase jsonb NOT NULL`, `passkey jsonb` nullable) and GraphQL
+  (`passphrase: SafebyokWayin!`, `passkey: SafebyokWayin`) follow. Postgres and GraphQL used to drop a
+  null field on read; they now keep a null cell as a null field, else every vault without a passkey
+  would read damaged.
+* 2026-10-19 (thread a_sec2, PR [#206](https://github.com/mrflip/safebyok/pull/206)): **the create
+  window closed.** A first unlock that creates the vault (`#settleUnlock`'s make path,
+  `packages/safebyok/src/vault.ts`) while another device deletes it could leave this device unlocked
+  on the deleted vault, holding a lease, until its next read (found in #203's second review). Now
+  the make captures a stand-down signal (`#createsStandDown`; amended 2026-10-20 (placement): once `#makesStandDown`, and the signal that stands it down, now `#standDownCreates`, was `#standDownMakes`; behaviour unchanged) just before it writes its vault props; a
+  read that finds the vault props in hand deleted or replaced (`#heedRevocation`) aborts it, and an
+  aborted make puts no vault props back, so the grant (`#grantLease`) finds its props outrun, takes
+  nothing up and writes no lease; the unlock refuses `vault_locked`. A race test in
+  `packages/safebyok/tests/vault/vault-races.test.ts` fails without the fix. Known residue, failing
+  safe: a make stood down by the deletion of *another* device's vault refuses although its own vault
+  stands (the next read takes it up, the next unlock opens it). Cross-device invalidation in general
+  (a device learning of a deletion before its next read) is left to a coming mechanism, a token each
+  device authenticates when it joins or creates a vault (TODO.md); until then, a device learns at
+  its next read and fails safe there. Also 2026-10-19 (a_sec2): **an older read never rolls the
+  vault props back.** A read that began before this device's own change to the ways in landed could
+  hand back the older copy and put it over the change's, which the vault then took as a revocation
+  and locked. Now a read whose vault props are the same vault at a lower `unlock_epoch` or
+  `vault_key_epoch` than those in hand (`isNewerCopy`) neither revokes nor replaces them: storage
+  never takes a vault's epochs back (the device mark refuses as `rolled_back` a store that does), so
+  such a read is stale by construction.
+* 2026-10-19 (thread a_sec2, #206): **no salt or wrapped key in the snapshot.** Since thread B1,
+  `snapshot.props`, `vault.props` and `vault.wayins` (as `Wayin` models) carried each passphrase's
+  salt and every wrapped vaultKey: everything an offline guess at a passphrase needs, into React
+  state, devtools and error reporters. Now `VaultSnapshot.props` and `vault.props` are gone, and
+  the snapshot carries summaries of the wayins: `snapshot.passphrase` and `snapshot.passkey` (amended
+  2026-10-19, slots: once a `wayins` list of `WayinSummary`) -- `wayinkind`, `device_id`,
+  `registered_at`, and for a passkey also `credential_id` and `prf_salt_b64`, which an
+  authenticator needs and which open nothing without the passkey. The vault and its models keep the
+  full records privately. Tests check that the snapshot's JSON holds no stored salt or wrap. The
+  Coach: "yes good call".
+* 2026-10-19 (thread a_sec2, #206): **no proof is kept after an unlock, and this is not tested.**
+  The vault keeps no reference to a proof (a `PassphraseProof` or `PasskeyProof`) once an unlock or
+  a change to the ways in settles: the proof lives in the call's locals only, and no field of the
+  vault or its ask holds one. No test could observe this without depending on garbage collection,
+  which would be flaky; the Coach's ruling: "note it in security md, don't write a test we can't
+  write".
+* 2026-10-19 (thread a_sec2, #206): **`Lease.grant` validates its input.** `Lease.grant(vault,
+  holder, vaultKeyPair, askPassphraseAt)` parses `holder`'s `vault_id` and `unlock_epoch` and
+  `askPassphraseAt` with `LeaseRecord`'s own Zod checks at entry and lets a bad input throw as
+  misuse (the Coach: "run a good zod validator but don't catch"). A deadline that is no number used
+  to grant a lease that never opened.
+* 2026-10-19 (thread B2 `lease`, branch 20261019-lease): **the lease is a class, `Lease`, and its
+  crypto lives apart from the vault's decisions.** `Lease` (`packages/safebyok/src/lease.ts`) holds
+  the lease's fields and its wrap and unwrap; when to grant, when to ask, and every write to the
+  device store stay in the vault (`#grantLease`, `#takeUpLease` in `vault.ts`). `Lease.grant(vault,
+  holder, vaultKeyPair, askPassphraseAt)` makes a fresh AES-GCM 256 leaseKey, `extractable: false`,
+  usages wrapKey and unwrapKey only, and wraps the vaultKey's extractable transient handle under it,
+  bound to leaseCtx; it keeps no reference to either handle of the pair (a test checks that nothing on
+  the lease or its record is that key), and writes nothing: the vault puts `lease.props` through
+  `deviceDB.putLease`. leaseCtx is unchanged byte for byte (`cipherCtx('safebyok-lease-v1',
+  applabel, user_id, vaultlabel, vault_id, unlock_epoch, ask_passphrase_at,
+  'vault_key_lease_wrapped')`, pinned by `tests/ctx-bytes.test.ts`), so leases already on a device
+  still open. `Lease.make(vault, record)` checks a record through the `LeaseRecord` Zod schema
+  (renamed from `Lease`) and refuses one this package does not write, or one naming another app,
+  user or vault than its vault's, as `corrupt_record`, quoting nothing of it. `lease.tryOpen(holder)`
+  refuses `vault_locked` before any unwrap when the holder's `vault_id` or `unlock_epoch` differ from
+  the lease's, or the vault's clock is at or past `ask_passphrase_at`; it then unwraps under a ctx
+  rebuilt from the vault's own scope and the holder's `vault_id` and `unlock_epoch` (what the vault
+  expects, not the record's own fields), into a non-extractable handle (wrapKey, unwrapKey). An
+  unwrap that fails (a tampered wrap, a moved deadline, a swapped leaseKey) is `corrupt_record`, with
+  no cause attached. The vault erases the lease on either refusal, and warns through the logger only
+  for `corrupt_record`, as before. The `leaseHours` fit check (a lease ending further off than this
+  handle's `leaseHours` allows is discarded) stays in the vault, as `! lease.endsWithin(leaseMillis)`
+  before `tryOpen`; `ensureLease`'s renew threshold is `lease.endsWithin(renewMillis)`; the vault holds
+  the `Lease` beside the vaultKey in place of a bare `askPassphraseAt`. **`DeviceDB`'s verbs
+  (`getLease`, `putLease`, `delLease`, `getMark`, `putMark`, `delMark`, `delAll`) now resolve an
+  `Outcome` and never reject.** `deviceOutcomeOf(verb, body)` (`src/device-db.ts`) turns an adapter's
+  failure into `storage_blocked` or `storage_unavailable`, the store's error as `cause`, the message
+  naming no scope and quoting no record. `deviceTroubleAsConditions`, moved there from
+  `del-damaged-vault.ts`, is the vault's guard on a host's own `DeviceDB`: a throw, or a bad Outcome
+  whose `err` is no `VaultError`, is said the same way, and an answer that is no Outcome is refused
+  `bad_option`. Unchanged: every abort and outrun check from `a_sec` around the take-up and the grant
+  (the take-up's AbortController, the grant standing a take-up down before it writes, an overtaken
+  grant erasing its own lease) is where it was, in the vault.
+* 2026-10-19 (thread a_fixes); amended 2026-10-19 (a_sec2, #206): **one test for a refusal, and a
+  refusal from another copy of safebyok is a foreign throw.** `isVaultError(err, refusalkind?)`
+  (`packages/safebyok/src/errors.ts`) is `err instanceof VaultError` plus the kind check, the one
+  declared test for a refusal. Every site that branches on a refusal uses it: `outcomeOf`
+  (`src/outcome.ts`), the `VaultDB` base's `asStorageTrouble` (`src/vault-db.ts`), the vault's
+  bad-news hearing (`#hearBadNews`), `RefusalPolicy.decide` (`identity_revoked` and `rolled_back`
+  lock), `isCondition`, and `safebyok-graphql`'s resolvers (`vaultDBOf` and `crossing`). a_fixes
+  made it also recognize a `VaultError` of another copy of safebyok loaded beside this one (an ESM
+  and a CJS build side by side, each with its own class), by a symbol-keyed mark,
+  `Symbol.for('safebyok.VaultError')`, that every constructor set, and an `isMarked` check; that
+  mark is gone (a_sec2, #206). The Coach's ruling, 2026-10-19: "Whatever leads to the least amount
+  of logic I'm for. It's a weird dangerous situation that should be dealt with brutally." A refusal
+  from another copy is now a foreign throw, met as any foreign throw is where it lands: from a
+  storage adapter's `do*` hook it becomes `storage_unavailable`, elsewhere `unexpected_error`, its
+  message safebyok's own, the throw its `cause`. So it is not told to `onBadNews`, and a foreign
+  `identity_revoked` does not lock the vault. An Error that only names itself `VaultError`, as a
+  GraphQL or fetch client rebuilds one from a server's JSON, is no refusal either (nor is JSON, a
+  `structuredClone` or a plain object), so a backend cannot choose a refusal's kind or the message
+  the app shows the user through one; before a_fixes such an error was kept "as it came". safebyok's
+  own clients, `safebyok-graphql`'s `graphqlVaultDB` and `safebyok-convex`'s `convexVaultDB`,
+  deliberately rebuild a real `VaultError` from their server's kind and message (`new
+  VaultError(kind, message, { cause })`), so through them the server (the package's own server code:
+  `vaultResolvers`, the Convex component) still chooses both the kind and the message. Tests:
+  `packages/safebyok/tests/errors.test.ts` ("isVaultError": false for a `VaultError` of a fresh copy
+  of the module made with `vi.resetModules`, and for impostors: a lookalike `Error`, JSON,
+  `structuredClone`, plain objects), and the tests of each site above.
+  2026-10-19 (thread a_fixes); amended 2026-10-19 (a_sec2, #206): **a call that cannot land never
+  prompts.** On a locked vault, `getBox`, `getWhisper`, `useBox` and `delBox`
+  (`packages/safebyok/src/vault.ts`, `#openBox`, `#tryDelBox`, `#checkListed`, and a `beforeAsking`
+  callback on `#ensureLease`) now refuse `bad_label` (the name's floor, and the vault's own
+  `boxlabel` check when nothing is listed under it) and `absent_box` from the box listing in hand,
+  after the hello and before `getProof` is asked;
+  `putBox` already checked label, sidecar and whisper first. The check runs only when the vault must
+  ask; an unlocked vault reads storage for the box as before. The listing (boxlabels, visible
+  metadata) is already shown while locked, so refusing `absent_box` without a prompt discloses
+  nothing new. Amended 2026-10-19 (a_sec2, #206): the listing in hand is the last word. `#checkListed`
+  is now synchronous and refuses `absent_box` from that listing alone, reading nothing (it was async,
+  read storage once more with `#refresh()` on a miss, and refused only if that read also showed
+  nothing; `ensureLease`'s `beforeAsking` was async too and is now a plain callback). The listing is
+  as fresh as the host's `staleMinutes` keeps it, so a box another device stored since the last read
+  is refused `absent_box` until the next read. Tests: `tests/vault/vault-lease.test.ts`, "every data
+  call, through `ensureLease`", and its test that the vault "refuses absent_box from the listing in
+  hand, reading nothing more, though another device stored the box meanwhile ...".
+* 2026-10-19 (thread B3 rework, box holder): **a box takes the vault props it lies under explicitly,
+  as `holder`, and no longer reads `vault_id` and the vaultKey epoch off the vault's published
+  snapshot; sealing is split so a store too large is refused before any key is made.** This replaces
+  part (5) of the entry above (thread B3, box), whose snapshot-lag reasoning no longer applies.
+  (1) `BoxHolder = Pick<VaultProps, 'vault_id' | 'vault_key_epoch'>` (`packages/safebyok/src/box.ts`):
+  `Box.make(vault, record, holder)` and `Box.seal(vault, boxlabel, whisper, holder, vaultKey, opts)`.
+  The vault passes its private `#vaultProps` at each call, and in `putBox` the same object, read
+  once, supplies both the seal's `holder` and the write's expectation (`vault_id`,
+  `vault_key_epoch`), so the ctx a box is sealed under and the vault its write is aimed at agree by
+  construction, not by timing. `BoxVault` is now only the scope (`applabel`, `user_id`, `vaultlabel`,
+  fixed for the handle's life) and the clock. `holder` is copied, frozen, and attached
+  non-enumerable like `vault`; a holder missing either field is `bad_option`. (2) Vouching for the
+  box being replaced (`over`) opens it under the seal's own `holder`, not the one `over` was made
+  under, so the carry-forward of `registered_at` and the sidecar is vouched by the same vault props
+  the new box is sealed under. (3) Internally, sealing is `planSeal` and `sealPlanned`. `planSeal`
+  (the caller has done the checks) vouches for `over` and settles the sidecar JSON and
+  `registered_at`; it makes no key and ciphers nothing. `sealPlanned` makes the fresh boxKey and
+  fresh revision, then wraps and ciphers under the rebuilt ctx. Between the two, `putBox` checks the
+  whisper plus the kept sidecar against `maxWhisperBytes`, so a store that is too large is refused
+  before any key is generated or anything enciphered (a test spies `generateKey` and `encrypt` to
+  show neither runs). The whisper is serialized once per put (`whisperBytesOf`). The plan holds the
+  whisper's bytes: it is internal, frozen and short-lived, and is never logged, stored or exported
+  from the package. (4) `vault.openBox(box)` checks the record first (`bad_record`), then the key in
+  hand (`vault_locked`), then re-makes the box under the vault's own props; `box.tryOpen` has no
+  `absent_vault` path any more, since a box cannot be made without vault props. (5) A box read from
+  storage (in `getBox`, `putBox` and `delBox`) is made only while the vaultKey is in hand: the key is
+  checked first, so a call whose storage read answers after a refresh found the vault deleted
+  elsewhere refuses `vault_locked`, never `absent_vault` (the fix in commit 96f64d61 of the second
+  review). (6) Restacked on thread B1 (proof_wayin, [#201](https://github.com/mrflip/safebyok/pull/201)):
+  the vault freezes every vault props record as it takes it up (`frozenVaultProps` in
+  `packages/safebyok/src/vault.ts`: a copy, its `passphrase` and `passkey` wayin records and each
+  `vault_key_wayin_wrapped` frozen; amended 2026-10-19, slots: once a `wayins` array) at each of the three places it does so (a read in refresh, the
+  unlock that creates the vault, a change to the ways in). So the record the vault works from, each
+  wayin's `holder` and the `holder` each box is made or sealed under are one frozen object. Amended
+  2026-10-19 (a_sec2, #206): `snapshot.props` is gone and the host no longer receives the record at
+  all (see the a_sec2 entry at the top of *Of Interest*); a box's `holder` is itself reduced to
+  `vault_id` and `vault_key_epoch`, kept as its own frozen copy in each `Box`.
+* 2026-10-19 (thread B3, box); 2026-10-20 (placement): **the stored box is a model class, `Box`, holding a back-reference to
+  its vault; sealing and opening moved into it, and a box's enumerable fields are exactly its stored
+  ones.** (1) The class (`packages/safebyok/src/box.ts`): the Zod schema once exported as `Box` is
+  now `BoxRecord`, the stored contract, unchanged (`safebyok-box-v6`). `Box.make(vault, record)`
+  validates through `BoxRecord` and refuses `bad_record`, quoting nothing and carrying no cause. The
+  record is kept as `box.props`: a copy, frozen, its two `Ciphered` objects frozen too, so a caller's
+  later change to its own record reaches nothing in the box; the instance is frozen. `box.sidecar` is
+  the parse of `sidecar_json` with a reviver that freezes every object and array as it builds them.
+  `vault`, `props` and `summary` are attached by `decorate` (amended 2026-10-20 (placement): in `src/adorn.ts`, once `utils.ts`; it calls `adorn(obj, ckey, val)` per entry, `Object.defineProperty`,
+  non-enumerable, non-writable, non-configurable), so a spread, `Object.keys`, a log line or
+  `JSON.stringify` never reaches the vault; `toJSON()` returns `props`. 2026-10-20 (placement): `adorn` and `decorate` left the public
+  `safebyok/utils` entry point for that internal module, so a host cannot import them; `adorn` hands back
+  `val`, and the same pair attaches each model's `vault` and `props` and a proof's secret field. What
+  they attach did not change. (2) What a log line of a box
+  shows: the visible fields and the two ciphered ones (`box_key_wrapped`, `whisper_ciphered`). The
+  record holds no secret: the whisper is ciphered under a boxKey, the boxKey wrapped under the
+  vaultKey, and neither key is in it; it is what the backend already holds. The vault never logs a
+  box, and a refusal from opening carries no cause and no meta, and names nothing of the box (no
+  label, revision, sidecar or ciphertext). (3) `Box.seal(vault, boxlabel, whisper, vaultKey, {
+  sidecar, over })` is the sealing that sat in the vault's `putBox`, the construction unchanged: a
+  fresh boxKey from WebCrypto `generateKey` per seal (a test spies `generateKey` and `wrapKey` to
+  show one fresh key per seal, wrapped under the vaultKey), a fresh `revision_tok`
+  (`crypto.randomUUID`), the whisper's stable JSON ciphered under the boxKey and the boxKey wrapped
+  under the vaultKey, both bound to `boxCtx`: the format, the scope (applabel, user_id, vaultlabel),
+  the vault's `vault_id`, the purpose, and every visible header field, rebuilt on every seal and open
+  and never stored. `registered_at` and the sidecar carry forward from `over` only when `over` opens
+  under the vaultKey, so a sidecar planted in storage is never sealed into a revision that reads
+  clean. Inputs are checked at the door (`bad_whisper`, `bad_option`, `bad_label`, `absent_vault`),
+  quoting nothing; the seal ends in `Box.make`, so what it returns has passed the record schema, and
+  it writes nothing. (4) `box.tryOpen(vaultKey)` (an Outcome; `open` throws) is the old
+  `decipherBox`: a vaultKey that is no CryptoKey is `bad_option`; a box whose `vault_key_epoch` is
+  not the vault's is `damaged_box`; the boxKey is unwrapped non-extractable and decrypt-only under
+  the rebuilt ctx; WebCrypto's own failure is dropped, with no cause, and said as `damaged_box`; the
+  plaintext is parsed and validated as a whisper, else `damaged_box`. Nothing partial is returned. A
+  box re-made for another scope, another `vault_id` (a vault made anew) or another label, or with any
+  visible field altered, refuses; a test goes field by field. (5) What a box reads off its vault is
+  `BoxVault = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_id' | 'vault_key_epoch' |
+  'clock'>`. The vault gains read-only getters `logger`, `clock` and `keyDeriver`; `vault.clock` is
+  the vault's checked clock, so a box's reading that fails drops the vaultKey as the vault's own
+  readings do. `vault_id` and `vault_key_epoch` come off the vault's snapshot getters, which can lag
+  the vault's private vault props only inside a first unlock's awaits, before any key is in hand;
+  `putBox`'s expectation and the seal read them in one synchronous run. A stale read can only make a
+  box fail to open. (6) `vault.openBox(box)` and `tryOpenBox` take a `Box` or a `BoxRecord` and
+  re-make it under this vault (`Box.make(this, props)`), so it opens under this vault's scope and id
+  whatever vault the box was made for; they need the key in hand (`vault_locked` otherwise), ask for
+  no proof and read no storage, re-check the key after the open, and tell `onBadNews` of
+  `damaged_box`. (7) `vault.boxes` entries are copies, frozen through (the sidecar re-parsed with the
+  freezing reviver) when the vault takes a listing up, so nothing a host is handed shares an object
+  with what the vault holds. This closes the note, in the entry on the vault's private fields below,
+  that a summary's sidecar was not deep-frozen, and the A3 review's note that summaries' sidecars
+  were shared with the vault's private listing.
+* 2026-10-19 (branch 20261019-proof_wayin, [#201](https://github.com/mrflip/safebyok/pull/201)); 2026-10-20 (placement): **what a host hands in to prove itself is
+  checked at the vault's door into a `Proof`, and a wayin opens only under one.** (1) `Proof.parse`
+  (`packages/safebyok/src/proof.ts`) turns a passphrase string, or a passkey's answer `{ credentialId,
+  prfSaltB64, prfBytes }` (typed `PasskeyAnswer`), into a `PassphraseProof` or `PasskeyProof`. The secret
+  (the passphrase; the 32 PRF bytes) is a non-enumerable, non-writable, non-configurable property of a
+  frozen instance, and `toJSON()` returns `{ kind }` only, so JSON, `Object.keys`, a spread and Node's
+  inspect do not show it. The passkey's PRF bytes are held by reference to the host's `Uint8Array`, not
+  copied. The vault itself still reads `proof.passphrase` to give a new passphrase to the host's strength
+  test. (2) `proof.wayinKeyFor(wayin)` derives the wayinKey, reading only the wayin's `salt_b64`
+  (passphrase) or `wayinCtx` (passkey). (3) A `Wayin` (`PassphraseWayin`, `PasskeyWayin`) is made by
+  `Wayin.make(vault, record, holder)`, which re-validates the stored record through its Zod schema
+  (refusing `damaged_wayin`), freezes a copy as `props`, and is itself frozen. Its wayinCtx binds the
+  vault's scope (the vault's public applabel, user_id and vaultlabel getters) and the `vault_id` and
+  `registered_at` of the `holder`, the vault props record it was made from, passed explicitly because the
+  vault's public fields lag its private state until it publishes. 2026-10-20 (placement): the
+  constructors of `PassphraseWayin` and `PasskeyWayin` are private; a wayin is made only by `Wayin.make`
+  or `Wayin.seal`, which reach them through a static keyed by a module-private symbol (`madeFrom`), so
+  no exported name builds a wayin from a record the Zod schema has not checked. This is TypeScript
+  privacy only: JavaScript can still call `new`, as for `Box`, `Lease` and `Proof`. `isDamaged()` (another vaultKey epoch
+  than the holder's, or a salt of a length its kind never writes) is checked before any derivation.
+  (4) `wayin.tryOpen(proof)` returns an Outcome and never throws: a proof of the wrong kind is
+  `bad_option`; a passphrase wayin made by another key deriver is `unknown_key_deriver`, and a damaged one
+  `damaged_wayin`, each before deriving; a key deriver that throws anything but a VaultError becomes
+  `unexpected_error` with the throw as `cause`, and nothing is logged. (Amended 2026-10-19, slots:
+  `Wayin.tryOpenAmong`, a search across a list of wayins, is gone; the vault picks the slot by the
+  proof's kind and calls `wayin.tryOpen(proof)`.)
+* 2026-10-19 (branch 20261019-outcome_adapters): **a refusal whose source cannot have quoted a record now
+  carries that source as its `cause`, and `not_permitted` can come from the host and the driver.**
+  (1) `convexVaultDB` (`refusing`, `safebyok-convex/src/convex-vault-db.ts`): a `ConvexError` whose
+  `data` is `{ kind, message }` with kind `identity_revoked`, `not_permitted` or `vault_full`
+  becomes a VaultError of that kind and message with the `ConvexError` as `cause` (before: nothing of
+  it, through `Sanitizer.refusalFor`). Its text is `[CONVEX M(<function>)] <message> Called by client`
+  and its data was written by safebyok's server or the host's `getUserId`: function name, request id
+  and that data, never the call's arguments. Every other Convex failure (`storage_unavailable`)
+  still carries nothing of Convex's error, since a dev deployment's validator error quotes the
+  arguments. Residual: a host that puts something sensitive in its own `ConvexError` data sees it
+  ride as the cause. `SafebyokErrorKindVals` gains `not_permitted`: `getUserId` may throw
+  `ConvexError({ kind: 'not_permitted', message })` to refuse a signed-in user (locks nothing) or
+  `identity_revoked` (locks the vault). (2) `graphqlVaultDB` (`refusalOf`, `safebyok-graphql/src/graphql-vault-db.ts`):
+  a server refusal with `extensions.kind` becomes the VaultError with the client-side GraphQL error
+  as `cause` (before: none); it holds the calm message, `kind`, path and locations, what the
+  server's `crossing` already limits the wire to. A GraphQL error with `extensions.code`
+  `FORBIDDEN` (a host's auth layer) is now `not_permitted` with a fixed message and that error as
+  cause; `UNAUTHENTICATED` stays `storage_unavailable` on purpose (VAULTDB.md 5.5: a token expired
+  mid-refresh is a passing fault, and `identity_revoked` would lock the vault). (3) `vaultResolvers`
+  (`vaultDBOf`, `vault-resolvers.ts`): a VaultError thrown by the host's `vaultDBFor` of kind
+  `not_permitted` or `identity_revoked` now crosses to the browser as it is, kind and message (the
+  host chose the message); any other throw, VaultErrors of other kinds included (`postgresVaultDB`'s
+  `bad_option` naming its setup), still crosses as a generic `bad_option`, its own message kept on
+  the server as cause. (4) `postgresVaultDB` (`sent`, `safebyok-postgres/src/postgres-vault-db.ts`):
+  a driver error with code `42501` (insufficient privilege, or a row-level security WITH CHECK
+  violation) is now `not_permitted` with the driver's error as cause, not `storage_unavailable`.
+  That cause may quote the statement's parameters (`query`/`params` on a PGlite or pg error) as
+  before, and stays on the server: the README route recipe and the resolvers send only kind and
+  message. An RLS policy that hides rows (USING) refuses nothing: Postgres filters them, so a vault
+  reads as absent and a write over a hidden row as `stale_write`; only a refused insert or a
+  missing privilege becomes `not_permitted`.
+* 2026-10-19 (thread A6, getproof); 2026-10-19 (a_sec, #203): **`lockLanded`: a `lock()`, `close()` or `del()` landing while a
+  prompt is up aborts the ask's `AbortController`, and the lock wins over an `attempt()` under way.**
+  Every waiter on the ask is refused `vault_locked` at once and `ask.lockLanded` settles, so the
+  dialog closes; an `attempt()` after that refuses `vault_locked` without reading storage or deriving
+  a key. An attempt already under way is stood down in `#grantLease`, which asks the signal after the
+  vault props are checked, again after the vaultKey is wrapped under the new leaseKey, and again
+  after `putLease`: before the write it installs no key and writes no lease; if the abort came during
+  the write it erases the lease it just wrote (`delLease`), so the lock holds across a reload; either
+  way `#vaultKey` is not set. This follows thread A3's take-up `AbortController` pattern (no
+  counters). The signal covers only `lock()`, `close()` and `del()`: other relocks
+  (`identity_revoked`, `rolled_back`, a moved `unlock_epoch`, the lease expiring) do not land on the
+  prompt, and `unlock()` outside a prompt keeps its earlier behaviour (a lock during it does not stop
+  it; TODO.md's lock-timing scenario 1, for the policy session). Starting over from the dialog
+  (`vault.del()`) lands as a lock and closes the dialog.
+  Amended 2026-10-19 (a_sec, #203; replacing the earlier statement that an attempt under way after
+  Cancel may unlock the vault afterwards): an ask's answer, whatever it is, now stands down every
+  attempt still under way on that ask. `Ask` holds a second `AbortController` (`#over`), aborted by a
+  lock landing and by the answer settling (before any waiter hears the answer), and that is the
+  signal the attempt's unlock checks before the lease wrap, before the lease write and after it. So an
+  attempt still running after Cancel, or a second submit's attempt still running after the first
+  answered `unlocked`, unlocks nothing, and a later `lock()` is never undone by it. `lockLanded` is
+  still settled only by a lock (the first controller). An attempt after the answer refuses
+  `vault_locked` without trying. Before, once answered, the ask was no longer tracked, so a `lock()`
+  after a Cancel could be followed by the attempt finishing and leaving the vault unlocked with a
+  lease. Edge: an answer landing exactly while an attempt is writing its lease under `lease_ending`
+  erases that lease (and so the one it overwrote), while the key already held in memory stays until
+  its deadline. An overtaken attempt stands down any lease take-up (`#standDownTakeUp`) as it erases
+  the lease it wrote, so a hello that read that lease in between takes nothing up.
+* 2026-10-19 (thread A6, getproof); 2026-10-20 (placement): **`Ask`: one per prompt, with one shared answer, and its
+  `attempt(proof)` runs the same unlock body as `unlock()`** (amended 2026-10-19, slots: it once took
+  `{ wayinId? }`, an aim at one wayin, and `unlock()` likewise). `Ask`
+  (`packages/safebyok/src/ask.ts`; `Ask.raise`, the static that makes an `Ask` and hands it to the host's
+  `getProof`, is off the public surface since 2026-10-20 (placement): it is keyed by a symbol
+  (`raiseAsk`) that no entry point exports, so only the vault raises a prompt and a host only answers
+  the `Ask` it is handed) owns `why`, the vault handle,
+  `attempt`, `lockLanded` and the one answer: every call that needs the vault while a prompt is up
+  awaits that same answer, so there is never more than one prompt. `attempt` proves against the vault
+  props as storage holds them now (a refresh first); a wrong passphrase is learned from the wayin's
+  decrypt failing, never a comparison. The ask hands the dialog the live vault handle (`ask.vault`),
+  whose public surface is the host's anyway. In `safebyok-react`, the dialog groups `attempt`'s
+  refusals as the Contract does (`attempt-refusals.ts`): wrong passphrase or passkey, weak passphrase
+  and wayin problems are shown in place; `created_elsewhere` as advice; `vault_locked`,
+  `storage_unavailable` and any refusal not named close the dialog, answering `declined`; misuse and
+  anything that is no `VaultError` go to the dialog's error boundary (reported through React's
+  `onCaughtError`, the page untouched), whose Close answers `declined`.
+* 2026-10-19 (thread A6, getproof): **`Vault.make` takes `getProof`, the host's method that asks the
+  user for a proof, and every data call now goes through `ensureLease()` to it.** `putBox`, `getBox`,
+  `useBox` and `delBox` call `#ensureLease()`, which, when the vault is locked, absent or its lease
+  ending, hands an `Ask` to `getProof` and waits. The host's `getProof`, and the dialog it shows,
+  handle the passphrase. (1) Whatever `getProof` throws, or its promise rejects with, becomes kind
+  `unexpected_error` (misuse) with the throw as `cause`; it is never logged, never told to
+  `onBadNews`, never put in a message. (2) An answer that is not one of `'unlocked'`, `'declined'` or
+  `'carry_on'` is refused `bad_option` without quoting the answer (a buggy `getProof` could hand back
+  the passphrase); `'carry_on'` is accepted only when the ask's `why` is `lease_ending`. (3) With no
+  `getProof` every ask is `declined` and the call refuses `vault_locked`, as before. (4) After
+  `'unlocked'` or `'carry_on'` the vault still checks that a lease stands (`#checkUnlocked`), so a
+  `getProof` that lies, or a lease that ended while the prompt was up, still refuses `vault_locked`.
+  (5) `putBox` validates its whisper, boxlabel and sidecar before it asks, so a call that cannot land
+  never prompts. (6) In `safebyok-react`, `VaultProvider` is the default `getProof` (its
+  `PassphraseModal`), held by a ref as `onBadNews` is, and gated per vault so a vault the provider
+  let go asks no one. It shows the dialog only while `navigator.userActivation.isActive` is not
+  `false` (true where the browser does not say), so a timer's or background call is answered
+  `declined` unasked, or `carry_on` under a lease ending, rather than popping a dialog the user did
+  not ask for. Amended 2026-10-19 (a_sec, #203): a vault the provider has let go tells no handler and
+  asks no one. The provider's refs to the host's `onBadNews` and `getProof` now move in passive
+  effects, not layout effects (replacing "layout effect" in the next entry); since React runs every
+  passive cleanup before any passive effect, the effect cleanup that closes the old vault's gate
+  always runs before the next user's handlers are installed, closing a sub-frame window in which the
+  last user's news (with a boxlabel in `meta.box_listed`) or ask could reach the next user's handler.
+* 2026-10-19 (thread A5, react_over_class): **`VaultProvider` holds `onBadNews` in a ref, defers its
+  first `hello()` a microtask, and throws `Vault.make`'s refusal from the effect.** (1) The provider
+  hands `Vault.make` one stable teller that calls whichever handler the last committed render passed
+  (updated in a layout effect), so a handler written inline makes no new vault. Bad news (a
+  `VaultError`, never secret material) may therefore reach a handler from a later render than the one
+  that made the vault; with no handler the teller does nothing, as `Vault.make`'s own default (null)
+  does; the vault still keeps a handler's throw as `trouble`, as before. A handler that is anything
+  but a function (or none) is passed to `Vault.make` as it came, which refuses it `bad_option`.
+  (2) The provider's first `hello()` runs one microtask after the effect that makes the vault, and is
+  skipped if the provider has let that vault go by then. StrictMode's development rehearsal makes a
+  vault and closes it in the same task, so the rehearsed vault never subscribes or reads storage (a
+  test counts `subscribe`, `getVaultProps` and `getMark`: one each); `Vault.make` is inert, so the
+  rehearsed handle holds nothing. (3) `Vault.make`'s throw (misuse, `bad_option`) is thrown from the
+  effect itself, which React delivers to the nearest error boundary as the very `VaultError`, rather
+  than held in state and rethrown in render; a `hello()` refused as misuse, or with a value that is no
+  `VaultError`, is still held and thrown in render. (4) `useOpenError().openError` is what the
+  provider's own `hello()` was refused with while the vault is still `opening` (a condition or bad
+  news), cleared once it opens; the snapshot's `trouble` is the latest bad news on any read, never a
+  condition; a damaged record is both, the very same error object. `retryOpen()` and the re-hello
+  after `delDamagedVault()` call `vault.tryHello({ staleMinutes: 0 })`, a fresh read of storage.
+* 2026-10-19 (branch 20261019-fields_and_make); 2026-10-19 (branch 20261019-proof_wayin, #201): **`Vault.make` takes a host function, `onBadNews(news)`,
+  called with every `bad_news` refusal.** The family (`damaged_vault`, `rolled_back`,
+  `identity_revoked`, `newer_format`, `damaged_box`, `damaged_wayin`) is told synchronously, before
+  the public call's promise settles, for each refusal a public vault call meets; also for bad news a
+  background storage read or a write's catch-up meets (which has no caller), and once per box a
+  listing newly shows damaged (a `damaged_box` `VaultError` carrying `meta.box_listed`, the
+  DamagedBox: its boxlabel and `revision_tok`). Each error object is told once (a `WeakSet`). The
+  handler is never awaited; what it throws, or its promise rejects with, becomes the vault's
+  `trouble` (a `bad_option` `VaultError` whose `cause` is the host's thrown value) and goes to the
+  vault's logger (`error`) and the platform's `reportError`. It cannot change what the caller gets.
+  The news carries no secret material; `meta.box_listed` carries a boxlabel, which the vault never
+  quotes in a message (a host's validators may admit any text) but does carry in meta, as
+  `meta.box_stored` already does. 2026-10-19 (#201): a read of the vault props that finds a wayin
+  `isDamaged()` tells `onBadNews` a `damaged_wayin` news whose `meta.wayin_listed` is that wayin's
+  summary (no salt of a passphrase, no wrap), once per distinct stored record; the read still succeeds
+  and the other slot's wayin opens as before.
+* 2026-10-19 (branch 20261019-vault_class); 2026-10-19 (branch 20261019-fields_and_make): **the vault's in-memory state, the vaultKey among it,
+  lives in ES private fields.** `Vault` (`packages/safebyok/src/vault.ts`) is now a class, and
+  `Vault.make(opts)` returns an instance; its state used to live in the closure of `make`. Every
+  piece of it -- the vaultKey in hand, the vault props, the device mark, the stores, the logger,
+  the clock, the expiry timer -- is an ES private field (`#vaultKey` and so on), not a TypeScript
+  `private` one, which is an ordinary property at runtime: `vault['vaultKey']`, `Object.keys(vault)`,
+  `JSON.stringify(vault)` and a host's logging of the handle would all reach it. An ES private field
+  is reachable only from code inside the class body, as the closure's variables were, so nothing
+  outside the class, a host's script included, can read the key off the handle. The public methods
+  are arrow-function fields bound to the instance (so `useSyncExternalStore(vault.subscribe,
+  vault.getSnapshot)` and handing a method on alone work); they hold no secret and reach the state
+  only through the class body. The constructor is private: `Vault.make` is the only way to make
+  one, and it parses every option (`parseMakeVaultOpts`, `packages/safebyok/src/vault-opts.ts`)
+  before anything else runs. Where to look: that no field holding key material is declared without
+  `#`, and that later threads, which pull methods out into model classes holding a `vault`
+  back-reference, do not widen the state into public fields to reach it. 2026-10-19
+  (20261019-fields_and_make): the public fields (`state`, `boxes`, `passphrase`, `passkey`, `capacity`,
+  `askPassphraseAt`, `trouble`, `vault_id`, `unlock_epoch` and the rest) are getters with no setter,
+  each reading the frozen snapshot that one private `#settle()` publishes; the snapshot, its arrays,
+  their entries and `capacity` are `Object.freeze`d (a box's sidecar JSON inside a summary is not
+  deep-frozen). The vault never reads its own state back through a public property, only through
+  `#` fields, so a host writing over a handle's property (`hello`, or shadowing `leaseMillis` with
+  `Object.defineProperty`) changes nothing inside the vault; a test pins this. 2026-10-19
+  (20261019-proof_wayin, #201); amended 2026-10-19 (a_sec2, #206): `vault.props` and `vault.wayins` exposed the stored
+  vault props (frozen) and the `Wayin` instances to the host, wraps included. Now `vault.props` and
+  `VaultSnapshot.props` are gone, and the snapshot's `passphrase` and `passkey` are summaries (2026-10-19,
+  slots; once a `wayins` list of `WayinSummary`): no passphrase salt and no wrapped vaultKey (a
+  passkey's summary carries its `credential_id` and `prf_salt_b64`); see the a_sec2 entry at the top of *Of Interest*. The vault also exposes
+  `keyDeriver`, `logger` and a checked `clock` as read-only getters, which the wayin models read.
 * 2026-10-19 (branch 20261019-softlock_gone, on PR #189): **the rotation schema is removed; no
   `rotateVaultKey` was ever built.** The vault props' `prior_vault_key` (the previous vaultKey wrapped
   under the current one), its `PriorVaultKey` schema and the `priorFits` refinement (a prior exactly
   one epoch below from epoch 2 on, none at epoch 1) are gone from the core and the Convex, Postgres
-  and GraphQL adapters' schemas, and the vault props moved to `safebyok-vault-v4`. That tag opens
+  and GraphQL adapters' schemas, and the vault props moved to `safebyok-vault-v4` (2026-10-19, slots: and on to `-v5`). That tag opens
   every wayin's wrap ctx, so v3 wayins no longer open; a stored v3 record reads as `damaged_vault`
-  (never `newer_format`), `retireDamagedVault` clears it, and nothing migrates. `vault_key_epoch`
+  (never `newer_format`), `delDamagedVault` clears it, and nothing migrates. `vault_key_epoch`
   stays on every record, reserved at 1 and never written otherwise by safebyok, but the schema still
   admits any positive epoch on vault props and checks none against a prior. It remains bound into each
   wayin's HKDF info / wrap ctx and held equal to the vault props', so storage cannot raise it and
   still have a wayin open, and the rollback check still refuses vault props at a lower
-  `vault_key_epoch` than the device has seen. A lockbox lists as under the held key only when its
+  `vault_key_epoch` than the device has seen. A box lists as under the held key only when its
   epoch equals the vault props'; any other lists as damaged.
-* 2026-10-19 (branch 20261019-retire_revision, on PR #177); 2026-10-19 (branch 20261019-no_clear): **`VaultDB.retireBox` now takes the
+* 2026-10-19 (branch 20261019-delete_revision, on PR #177); 2026-10-19 (branch 20261019-no_clear): **`VaultDB.delBox` now takes the
   revision the device read, and storage reports what it removed; the base class takes that report
   as untrusted storage input.** The expectation is `{ vault_id, revision_tok }` (null for a
-  lockbox listed as damaged with no readable revision); `retireVault` and `retireDamagedVault`
+  box listed as damaged with no readable revision); `delVault` and `delDamagedVault`
   keep the vault-only expectation. The arbitration is unchanged: the adapter compares only
-  `vault_id` and removes whatever lockbox stands under the boxlabel, in one atomic step, so a
-  retirement within the right vault still wins over any write; the revision never refuses. It only
-  lets the adapter answer `retired` (the revision named; for null, a record holding none that
-  reads as one, compared as the listing reads it), `retired_other` (another record, for instance
-  one written over the lockbox meanwhile) or `absent`; a vault mismatch is `null`, thrown as
+  `vault_id` and removes whatever box stands under the boxlabel, in one atomic step, so a
+  deletion within the right vault still wins over any write; the revision never refuses. It only
+  lets the adapter answer `deleted` (the revision named; for null, a record holding none that
+  reads as one, compared as the listing reads it), `deleted_other` (another record, for instance
+  one written over the box meanwhile) or `absent`; a vault mismatch is `null`, thrown as
   `stale_write`. Each adapter reads that answer from the same atomic step as the delete (Postgres
   `DELETE ... RETURNING`, one Convex mutation, one IndexedDB transaction, one synchronous turn in
   `localVaultDB`, the GraphQL server's reply), never a second storage call. The base class keeps
-  only the `outcome` field, through the same `writtenBack` step `updateBox` uses, and refuses
-  anything else as `corrupt_record`, saying the retirement may have landed and quoting nothing.
-  The vault's `retireBox()` honors `retired_other` and warns through the host's logger, naming
+  only the `outcome` field, through the same `writtenBack` step `putBox` uses, and refuses
+  anything else as `corrupt_record`, saying the deletion may have landed and quoting nothing.
+  The vault's `delBox()` honors `deleted_other` and warns through the host's logger, naming
   neither revision nor boxlabel; the result stays void. Honoring and warning, rather than refusing
-  as stale, awaits a Coach's confirmation. Amended 2026-10-19 (20261019-no_clear): `storeBox()` no
-  longer retires first and logs no `retired_other` of its own; a store is always one conditional
-  `updateBox`. A lockbox listed damaged that names a revision is written over in that one write; one
-  that names no revision is refused as `damaged_lockbox`, writing nothing, its message telling the
-  user to `retireBox()` it first. This closes the race inside `storeBox()` (A retires and writes;
-  B retires A's write and writes; neither throws), and the gap between the two calls in which a
-  refused write could say nothing was written after the retire had removed a record. The race
-  still runs through an explicit `retireBox()`: both devices list the box damaged with
-  `revision_tok` null; A calls `retireBox()` and then `storeBox()`; B, its listing still stale,
-  calls `retireBox()` naming null and removes A's fresh write. B is warned only through the host's
-  logger, as `retired_other` with `damaged: true`, because a retirement within the vault wins over
+  as stale, awaits a Coach's confirmation. Amended 2026-10-19 (20261019-no_clear): `putBox()` no
+  longer deletes first and logs no `deleted_other` of its own; a store is always one conditional
+  `putBox`. A box listed damaged that names a revision is written over in that one write; one
+  that names no revision is refused as `damaged_box`, writing nothing, its message telling the
+  user to `delBox()` it first. This closes the race inside `putBox()` (A deletes and writes;
+  B deletes A's write and writes; neither throws), and the gap between the two calls in which a
+  refused write could say nothing was written after the delete had removed a record. The race
+  still runs through an explicit `delBox()`: both devices list the box damaged with
+  `revision_tok` null; A calls `delBox()` and then `putBox()`; B, its listing still stale,
+  calls `delBox()` naming null and removes A's fresh write. B is warned only through the host's
+  logger, as `deleted_other` with `damaged: true`, because a deletion within the vault wins over
   any revision. That stays the stated residual until the tombstone rework. Nothing stored
   changes.
-* 2026-10-19 (returning): **`VaultDB.updateBox` now resolves the lockbox as storage holds it after
+* 2026-10-19 (returning): **`VaultDB.putBox` now resolves the box as storage holds it after
   the write lands, and the base class takes that answer as untrusted storage input.** Each
-  adapter's `doUpdateBox` hands the lockbox back from the same atomic step as the conditional
+  adapter's `doPutBox` hands the box back from the same atomic step as the conditional
   write (Postgres `RETURNING`, the Convex mutation's return value, a read inside the same
   IndexedDB transaction or `localVaultDB` synchronous turn, the GraphQL mutation payload), never a
   second storage call, so the compare-and-write stays one event. The base class holds the answer
-  to the check `readBox` makes (the Lockbox schema, and the boxlabel matching the one written)
+  to the check `getBox` makes (the Box schema, and the boxlabel matching the one written)
   and refuses a malformed one as `corrupt_record`; its message says the write may have landed and
   quotes nothing of the record, and its cause is the inner `corrupt_record` refusal, which quotes
   nothing either. A refused write (`null` from the adapter) throws `stale_write` and carries no
   record: returned state is data, never a thrown value's property. No stored shape changed, and
-  the vault does not yet use the returned value; `storeBox` still refreshes after its write.
+  the vault does not yet use the returned value; `putBox` still refreshes after its write.
 * 2026-10-18 (sprint reform): **three stored-format tags changed in the renaming, none with a
   migration.** Against the last release (0.3.0), the vault props format `safebyok-vault-v2` became
   `safebyok-vault-v3` (the unlock envelope became the "wayin", with the field renames that follow;
-  vault props never carried a `revision_id`); the lockbox format `safebyok-lockbox-v2` became
+  vault props never carried a `revision_id`); the box format `safebyok-lockbox-v2` became
   `safebyok-lockbox-v5` (`note` became the sidecar, `sidecar_json`, beside the new `whisper_codec`
   and `whisper_schema_version`; `changed_at` became `written_at`; `revision_id` became
   `revision_tok`; `-v3` and `-v4` were only ever on `main`, never released); the device lease
@@ -100,7 +580,7 @@ added or folded into through the subagent, and no other entry changes.
   construction is unchanged, and only field names, the tag and the purpose strings moved. The
   package is before 1.0.0, where stored shapes do not bind backward. An old record fails safe: a
   v2 vault reads as damaged (`damaged_vault`, never `newer_format`, since `safebyok-vault-v2` is
-  listed among the older formats), and any older lockbox lists as damaged. An old lease is never
+  listed among the older formats), and any older box lists as damaged. An old lease is never
   read as a lease: `idbDeviceDB` sweeps the old rows itself, silently, at the next lease read or
   erase (`src/idb.ts`), the 0.3.0 device mark along with the lease; a host's own DeviceDB that
   hands back an old `safebyok-mark-v1` mark sees it read as none, with the vault's one logger
@@ -108,22 +588,26 @@ added or folded into through the subagent, and no other entry changes.
   old is ever decrypted by the new code, and nothing is rewritten in place. A Convex deployment
   refuses the new schema until its tables are cleared; Postgres hosts must run the summary
   changeset's Postgres steps before the new table SQL.
-* 2026-10-18 (make_hello); 2026-10-19 (20261019-softlock_gone, amending points 1 and 2): **`openVault` is split into `Vault.make`, which returns a handle at
+* 2026-10-18 (make_hello); 2026-10-19 (20261019-softlock_gone, amending points 1 and 2); 2026-10-19 (20261019-fields_and_make, amending the opening and points 1 and 4): **`openVault` is split into `Vault.make`, which returns a handle at
   once, and `vault.hello()`, which reads storage and the lease.** `Vault.make(opts)` is synchronous:
-  it validates every option and starts `hello()` itself. `hello()` reads the vault props and this
-  device's lease and settles the snapshot from `opening` into `absent`, `locked` or `unlocked`.
+  it validates every option and returns the handle in state `opening`, reading no storage and starting
+  no timer or watch; the first `hello()` reads (see the 2026-10-19 amendment below). `hello()` reads
+  the vault props and this device's lease and settles the snapshot from `opening` into `absent`,
+  `locked` or `unlocked`.
   Every method but `lock()` and `close()` awaits it first (amended 2026-10-19: `lockSoon()` is gone) (after its synchronous
   argument checks), so a call made before storage answers waits; a call that touches a whisper
   still needs the vault unlocked once `hello()` settles. Nothing that failed closed proceeds. No
   construction, ctx, stored format or key handling changed. Five points to look at:
   (1) **A lock does not wait for `hello()`.** `lock()` acts at once, storage reachable or not.
   Amended 2026-10-19 (20261019-softlock_gone): `lockSoon()` and the counter `revokesSoFar` are
-  gone, and a `lock()` landing while `hello()` reads the lease no longer stops the lease being
-  taken up: last writer wins, accepted as a user annoyance until the store reform, with a policy
-  owed before 1.0 (TODO.md, *Lock timing vs. work in flight*). Until then, a `hello()` taking up
+  gone. Corrected 2026-10-19 (20261019-fields_and_make, PR #197): a `lock()` landing while
+  `hello()` takes up the lease still wins, by another mechanism (each take-up is aborted by
+  whatever drops or replaces the key; see this entry's 2026-10-19 fields_and_make amendment
+  below), and the policy for lock timing versus other work in flight is still owed before 1.0
+  (TODO.md, *Lock timing vs. work in flight*). Until then, a `hello()` taking up
   the lease while a lock landed took nothing up:
   `fetchLease` returned at once unless the counter `revokesSoFar` (raised by every hard lock --
-  `lock()`, `retire()`, a lock for untrusted storage -- and every `lockSoon()`) was 0 when that
+  `lock()`, `del()`, a lock for untrusted storage -- and every `lockSoon()`) was 0 when that
   hello started, and it took nothing up if the counter had moved by the time the lease opened or
   the handle had closed. Tests held the lease read open while each lock landed.
   (2) **`hello()` is memoised.** Amended 2026-10-19 (20261019-softlock_gone): a lock is no longer
@@ -133,7 +617,7 @@ added or folded into through the subagent, and no other entry changes.
   counter, and of a lock staying locked on its handle, describes what stood until then.
   Callers share one in-flight promise; a rejected one clears at once; a resolved one stands until a
   read of storage fails, storage the vault cannot trust refuses it (`identity_revoked`,
-  `rolled_back`, `newer_format`, from any call, read or write), or the vault is retired. The next
+  `rolled_back`, `newer_format`, from any call, read or write), or the vault is deleted. The next
   call then reads storage and the lease again, but a handle on which a lock has revoked a lease (the counter
   above is not 0) takes up no lease: so a lock, hard, soft or for untrusted storage, stays locked
   on that handle even when the device store failed to erase the lease, and whispers stay refused as
@@ -155,16 +639,63 @@ added or folded into through the subagent, and no other entry changes.
   `trouble: VaultError | null` (cleared by the next successful read), and the vault's logger warns
   of it. A `VaultError` carries no secret material, as before. While no `hello()` has succeeded, a
   storage change bell runs `hello()` (lease take-up included) rather than a bare refresh.
-  (5) **A read of storage takes up the vault props, the device mark and the lockbox listing
+  (5) **A read of storage takes up the vault props, the device mark and the box listing
   together, only once the listing has been read**, so a read failing partway never leaves the vault
-  props of one read beside the lockboxes of another. When the fresh vault props show the vault
+  props of one read beside the boxes of another. When the fresh vault props show the vault
   changed elsewhere, the vaultKey is still dropped and the lease, outdated by the change, discarded before the listing is read,
   as before.
+  Amended 2026-10-19 (20261019-fields_and_make): **`Vault.make` touches nothing; the first `hello()`
+  reads.** Make reads no storage and no device store and starts no timer and no watch (it still reads
+  the host's clock once, to check it); it no longer starts `hello()` itself. The first `hello()` --
+  the host's, or the one any call but `lock()` and `close()` starts -- reads storage, starts the
+  storage watch and settles. `hello({ staleMinutes })` (default from `Vault.make`'s `staleMinutes`,
+  5 minutes; `Infinity` accepted) reads nothing when the last successful storage read began within
+  that many minutes by the vault's clock, and only re-settles the picture (a lease past its deadline
+  shows locked); it always reads afresh after a failed read, after untrusted storage
+  (`identity_revoked`, `rolled_back`, `newer_format`) or after `del()`. Data calls keep their own
+  reads before writes; the window affects only what a host's `hello()` shows. The clock read that
+  stamps each read is the vault's checked clock: a clock gone wrong now refuses a storage refresh
+  too, dropping the vaultKey first. Point 4: `trouble` no longer carries storage conditions. It is
+  the latest bad news (or the `onBadNews` handler's throw), cleared when a storage read finds no
+  damaged box; a condition such as `storage_unavailable` reaches only its caller (a refused
+  `hello()` rejects to whoever called it) and the snapshot's `syncing: false`, so a background
+  read's failure shows in the snapshot only as `syncing: false` (and the logger's warning).
+  Amended 2026-10-19 (20261019-fields_and_make, PR #197; amending point 1): **a `lock()` landing
+  while a `hello()` takes up this device's lease is no longer undone.** A take-up (`#fetchLease`)
+  reads the lease record, checks it fits, unwraps the vaultKey under the leaseKey, then installs the
+  key and deadline; as the default five-minute `staleMinutes` makes a routine `hello()` re-run it, a
+  `lock()` between the read and the install could be reversed (unlocked in memory, lease deleted),
+  and an older lease could overwrite a fresher `unlock()`. Each take-up now holds an
+  `AbortController`; whatever drops or replaces the key (`#dropKey`, called by lock, close, del, the
+  expiry timer and relocks; and `#grantLease`, as an unlock or wayin change begins writing its
+  lease, before the write, so a take-up that read an older lease cannot erase the fresh one by
+  discarding the older) aborts it. An aborted take-up installs nothing and discards no lease
+  record (the lease standing may be the overtaking change's own). Nothing else about lock timing
+  versus work in flight changed: the policy owed before 1.0 (TODO.md, *Lock timing vs. work in
+  flight*) is still open.
+  Amended 2026-10-19 (a_sec, #203): a hello's lease take-up also takes nothing up when the vault
+  props it fitted the lease against are outrun during its waits (`#outrun(standing)`: `vault_id` or
+  `unlock_epoch` moved, or the handle closed), even though no key is held for the "outlived" relock
+  to drop. Before, a passphrase change or wayin removal on another device (new `unlock_epoch`), or the
+  vault deleted and made anew elsewhere (new `vault_id`), landing during the unwrap left this device
+  unlocked under the new props with the old key, indefinitely, defeating the epoch's revocation. The
+  lease is left for the next hello, which discards it as not fitting. Also 2026-10-19 (a_sec, #203):
+  a storage read (`#takeStorage`) that finds the vault props changed from those held (a new
+  `unlock_epoch` or `vault_id`, or the vault gone) now takes them up at once, together with the mark,
+  before any further await: it drops the key, stands down any take-up, and (for a different
+  `vault_id`) empties the box listing; only then does it erase the lease and list the boxes. Before,
+  it decided "outlived" first and assigned the new props only after awaiting `delLease` and
+  `listBoxes`, so a take-up or an unlock's lease grant that finished inside those waits still saw the
+  old props through `#outrun`, installed a key fitted to them, and was never relocked. A revocation
+  now wins by construction, not by timing. Two other writes of vault props no longer write older
+  props over newer ones a read took up meanwhile: an unlock that creates the vault (`#settleUnlock`)
+  and a change to the wayins (`#reviseWayins`); in both, the lease grant that follows finds its props
+  outrun and takes nothing up.
 
 * 2026-10-18: **the context bytes of every wayin changed spelling, not construction, with the
   rename to "wayin".** A wayin's wrap is bound to a context of the record's format tag, then its
   whole stored header, as key-sorted JSON (a passkey wayin's HKDF `info` is the same bytes); it now
-  spells the renamed fields and begins `safebyok-vault-v3` (since 2026-10-19, `safebyok-vault-v4`, so v3 wayins no longer open). The construction and the purpose
+  spells the renamed fields and begins `safebyok-vault-v3` (since 2026-10-19, `safebyok-vault-v5`, so v3 and v4 wayins no longer open, and with a header that holds no `wayin_id` or `wayinlabel`: see the slots entry at the top). The construction and the purpose
   strings are unchanged. A `safebyok-vault-v2` record reads as `damaged_vault` on adapters that read
   it (a Convex deployment refuses the new schema until its tables are cleared), with no migration,
   so no old ciphertext has to open under the new bytes. Rejected: a translation back to the old
@@ -181,21 +712,21 @@ added or folded into through the subagent, and no other entry changes.
   run over an in-memory backend, not over each real one. Separately, `postgresVaultDB` now calls a
   subscriber once as its listen begins (6.1), so a vault reads a write that landed while its watch
   was starting, which it missed before.
-* 2026-10-16; 2026-10-19: **the `vault_key_epoch` expectation** (`VAULTDB.md` line 3.8). Every lockbox carries
-  the `vault_key_epoch` of the vaultKey its lockboxKey is wrapped under (bound into both its
-  encryptions with the rest of its header), and `updateBox` lands only while the scope's standing
+* 2026-10-16; 2026-10-19: **the `vault_key_epoch` expectation** (`VAULTDB.md` line 3.8). Every box carries
+  the `vault_key_epoch` of the vaultKey its boxKey is wrapped under (bound into both its
+  encryptions with the rest of its header), and `putBox` lands only while the scope's standing
   vault props have that epoch, compared by the adapter in the same atomic step as `vault_id` and
-  `revision_tok`; the base class refuses a lockbox whose own epoch is not the expected one. This is
+  `revision_tok`; the base class refuses a box whose own epoch is not the expected one. This is
   the only thing that stops a device still holding a replaced vaultKey, which has not looked at
-  the vault props since, from sealing a new whisper under it: `storeBox()` does not read the vault props first.
-  An adapter that skips the comparison lets that device write a lockbox the replaced vaultKey
+  the vault props since, from sealing a new whisper under it: `putBox()` does not read the vault props first.
+  An adapter that skips the comparison lets that device write a box the replaced vaultKey
   opens. `localVaultDB` compares it now; IndexedDB, Convex, Postgres (and GraphQL through it) do
   not yet, and the battery holds them to it as a pending test until they do. Every vault is at
   epoch 1 today: nothing replaces a vaultKey yet (2026-10-19: the rotation schema is gone, so the
-  comparison now guards a lockbox built wrong, and stays so a later rotation needs no new
-  contract). Retirements name no epoch. A lockbox whose epoch is
-  not the vault props' reads as `damaged_lockbox`, its key never tried.
-* 2026-10-16: **the rollback check.** Each device keeps a device mark per scope in its deviceDB:
+  comparison now guards a box built wrong, and stays so a later rotation needs no new
+  contract). Deletions name no epoch. A box whose epoch is
+  not the vault props' reads as `damaged_box`, its key never tried.
+* 2026-10-16; 2026-10-19 (a_sec2, #206): **the rollback check.** Each device keeps a device mark per scope in its deviceDB:
   the vault's `vault_id` and the highest `unlock_epoch` and `vault_key_epoch` it has seen the
   vault props at, raised on every read of newer vault props and after its own writes. Vault props of the same
   `vault_id` at a lower `unlock_epoch`, or a lower `vault_key_epoch`, are refused as `rolled_back`
@@ -204,7 +735,7 @@ added or folded into through the subagent, and no other entry changes.
   stood. Its reach: only a device that saw the newer vault props, and only while its local storage
   lasts (clearing site data, a damaged mark, or another `vault_id` -- a vault made anew -- starts
   a new mark). Its blind spot: vault props cannot be ordered across `vault_id`s, so storage serving an
-  old, retired vault in place of the current one is not caught, nor is anything on a device
+  old, deleted vault in place of the current one is not caught, nor is anything on a device
   that never saw the newer vault props. A mark holds one vault per scope, so storage that hands back
   another vault's vault props even once moves the mark to that vault, and an older copy of the first is
   then taken as it stands. `unlock_epoch` is bound into no encryption, so storage can serve an
@@ -213,15 +744,25 @@ added or folded into through the subagent, and no other entry changes.
   wayin open, and the mark refuses one at a lower `vault_key_epoch` whatever its `unlock_epoch`:
   vault props from before a rotation, and with it the vaultKey the rotation replaced, are caught even
   so. What still passes is older vault props at the same `vault_key_epoch` under a forged higher
-  `unlock_epoch`: it can bring back only a wayin `retireWayin` dropped, or a passphrase
-  `changePassphrase` replaced, which still opens only the vaultKey the vault stands under, never a
+  `unlock_epoch`: it can bring back only a passkey `delWayin` dropped or `putWayin` replaced, or a passphrase
+  `putWayin` replaced, which still opens only the vaultKey the vault stands under, never a
   replaced one. (A device that opens such vault props through its lease opens no wayin:
-  it takes the vaultKey it already held, and lists the older copy's wayins.) The way out of a
-  refusal is the host's: it erases the device's mark (`deviceDB.eraseMark(scope)`) and opens again,
-  taking the older copy as it stands, the core README's recipe. The README has the host decide that
+  it takes the vaultKey it already held, and shows the older copy's wayin summaries.) The way out of a
+  refusal is the host's: it erases the device's mark (`valOf(await deviceDB.delMark(scope))`;
+  amended 2026-10-19: once a bare `deviceDB.delMark(scope)`, before every DeviceDB verb resolved an
+  `Outcome`) and opens again,
+  taking the older copy as it stands, the core README's recipe. Amended 2026-10-19 (a_sec2, #206): a
+  handle that locks as `rolled_back` now also forgets the vault props it holds (its state reads
+  `opening`), so the recipe works on the very handle that refused. It used to keep the newer vault
+  props, and a later read's older copy was then taken for a stale read and declined; the handle kept
+  the newer epoch, and every change to the wayins refused `stale_write`. A test runs the recipe on
+  one open handle. A known corner, with no mechanism added: suppose this device's own write of its
+  mark failed after a change to the wayins (logged by `#raiseMarkAfter`), and storage was then
+  restored; the handle may go on refusing `stale_write`. The class doc tells the host to close the
+  handle and open a new one. The README has the host decide that
   from its own knowledge of a restore, never from the user's answer: storage that rolls back on its
-  own would ask the user the same, and the user cannot tell the two apart. `retire()` and
-  `retireDamagedVault` erase the mark. Two tabs of one device
+  own would ask the user the same, and the user cannot tell the two apart. `del()` and
+  `delDamagedVault` erase the mark. Two tabs of one device
   each read and write the mark without a lock, so a tab that read older vault props before the
   other tab's newer one can write the mark back down: the check weakens to the older epoch. The
   mark is read before the vault props are, so newer vault props that another tab,
@@ -240,54 +781,54 @@ added or folded into through the subagent, and no other entry changes.
   vaults, or between users on one device. It is visible to the server in the clear. No
   user-chosen device label is stored. Clearing site data mints a new id; wayins keep the old.
 * 2026-10-16: the record formats moved on with these fields (to `safebyok-vault-v2`,
-  `safebyok-lockbox-v2` and `safebyok-mark-v1`, since moved on again to today's `safebyok-vault-v3`,
-  `safebyok-lockbox-v5` and `safebyok-mark-v3`; the mark moved to `safebyok-mark-v4` on 2026-10-19, and the vault props to `safebyok-vault-v4` the same day, so a stored `safebyok-vault-v3` record reads as `damaged_vault`, listed among the older formats), and each ctx's first part with
-  them. No vault written before reads: its vault props are `damaged_vault`, and `retireDamagedVault`
+  `safebyok-lockbox-v2` and `safebyok-mark-v1`, since moved on again to `safebyok-vault-v3`,
+  `safebyok-box-v6` and `safebyok-mark-v3` (amended 2026-10-19 (put_wayin): this said "today's" of `safebyok-vault-v3`; the vault props' format is now `safebyok-vault-v5`, as follows); the mark moved to `safebyok-mark-v4` on 2026-10-19, and the vault props to `safebyok-vault-v4` the same day and on to `safebyok-vault-v5` (slots), so a stored `safebyok-vault-v3` or `-v4` record reads as `damaged_vault`, listed among the older formats), and each ctx's first part with
+  them. No vault written before reads: its vault props are `damaged_vault`, and `delDamagedVault`
   recognizes `safebyok-vault-v1` as an older format, not a possibly newer one, so it clears such a
   vault rather than asking the user to update the app.
 * 2026-10-16: the VaultDB contract (`packages/safebyok/VAULTDB.md`, line 4.2) makes a storage
-  adapter's lockbox limit a best effort: writes made one after another never pass it, but writers
+  adapter's box limit a best effort: writes made one after another never pass it, but writers
   racing for the last places may take a vault a few past it, and a client that bypasses the
   library (a modified browser) is the host's to meter, as an abuse quota, not the adapter's to
-  stop. An adapter may offer a hard limit only as an opt-in. The vault's own `maxLockboxes` is
+  stop. An adapter may offer a hard limit only as an opt-in. The vault's own `maxBoxes` is
   enforced in the client alone. Postgres today holds a hard limit on the server (#89); the next
   thread replaces it with this best effort.
-* 2026-10-15: a lockbox row that fails the listing's check (not JSON, a malformed sidecar or time, a
+* 2026-10-15: a box row that fails the listing's check (not JSON, a malformed sidecar or time, a
   record naming another boxlabel than the ckey it sits under, an unknown `format`) is listed as
   `{ boxlabel, damaged: true }` instead of making `listBoxes` -- so every `refresh()` and
   `hello()` -- refuse `corrupt_record`. The boxlabel comes from where the row is stored (a
-  `VaultDB`'s `doListBoxes` now hands up `{ boxlabel, lockbox }` pairs; the in-tree adapters read
+  `VaultDB`'s `doListBoxes` now hands up `{ boxlabel, box }` pairs; the in-tree adapters read
   it from the ckey, Convex from its column), never from the damaged record, and nothing else of
   the record reaches the snapshot. A row whose boxlabel the vault's `validators` refuse --
-  stored under other checks, before a host narrowed them -- lists as damaged too, and `retireBox()`
-  reaches it by its stored name: for a box that already stands, `retireBox` checks the boxlabel only as
+  stored under other checks, before a host narrowed them -- lists as damaged too, and `delBox()`
+  reaches it by its stored name: for a box that already stands, `delBox` checks the boxlabel only as
   text (the ckey it rebuilds is still this scope's own). So the snapshot carries a damaged box's
   boxlabel as stored, text the host's check refuses: one who can write storage can put any text
-  there, as a name a host renders. `storeBox()` checks every boxlabel against
+  there, as a name a host renders. `putBox()` checks every boxlabel against
   the host's check, so it refuses a refused name (`bad_label`, writing nothing) even over a box
-  standing under it. `storeBox()` over a
-  lockbox whose record fails validation (any listed as damaged, and one whose ciphered fields are
-  missing or malformed) now retires it (`retireBox`, expecting only the `vault_id`) and then writes
-  a fresh lockbox expecting no revision, carrying neither its sidecar nor its `registered_at`; two
-  steps, so a failure between them leaves the box retired. Since that retirement names no revision, it
-  also removes a sound lockbox another device stored under the boxlabel after this store read the
+  standing under it. `putBox()` over a
+  box whose record fails validation (any listed as damaged, and one whose ciphered fields are
+  missing or malformed) now deletes it (`delBox`, expecting only the `vault_id`) and then writes
+  a fresh box expecting no revision, carrying neither its sidecar nor its `registered_at`; two
+  steps, so a failure between them leaves the box deleted. Since that deletion names no revision, it
+  also removes a sound box another device stored under the boxlabel after this store read the
   damaged one (this store's write then stands in its place, but should the write fail, neither stands;
-  amended 2026-10-18: this once said "as a retried store's would", before `storeBox()` stopped retrying), and a retirement of the damaged box elsewhere does not stop this
+  amended 2026-10-18: this once said "as a retried store's would", before `putBox()` stopped retrying), and a deletion of the damaged box elsewhere does not stop this
   store. What one who can write storage could already do -- delete or replace any row -- is
   unchanged; what is new is that planting junk under a boxlabel shows the user a damaged box where
-  a refused open used to show, and that the user's next `storeBox()` to that boxlabel clears the junk
-  rather than refusing. `readBox()` and `useBox()` still refuse a damaged box. (Amended
-  2026-10-19, 20261019-no_clear: the retire-first is gone. `storeBox()` is one conditional
-  `updateBox`; a damaged lockbox naming a revision is written over in it, carrying nothing forward,
-  and one naming no revision is refused as `damaged_lockbox`, writing nothing, until the user calls
-  `retireBox()`; the two-step and removal behaviors described here no longer exist.)
+  a refused open used to show, and that the user's next `putBox()` to that boxlabel clears the junk
+  rather than refusing. `getBox()` and `useBox()` still refuse a damaged box. (Amended
+  2026-10-19, 20261019-no_clear: the delete-first is gone. `putBox()` is one conditional
+  `putBox`; a damaged box naming a revision is written over in it, carrying nothing forward,
+  and one naming no revision is refused as `damaged_box`, writing nothing, until the user calls
+  `delBox()`; the two-step and removal behaviors described here no longer exist.)
 
-* 2026-10-15: `retireBox(boxlabel)` removes a lockbox whose stored record fails validation or
+* 2026-10-15: `delBox(boxlabel)` removes a box whose stored record fails validation or
   verification (`corrupt_record`), rather than refusing it: it reads the record only to tell an
   absent box (`absent_box`) from a present one, and a damaged record counts as present. It still
   needs the vault unlocked, still names the boxlabel the caller gave, and still lands only in the
-  vault this device holds keys for (its `vault_id` expectation). `readBox()`, `useBox()` and the
-  background refresh still leave a damaged record in place; only an explicit retirement of that
+  vault this device holds keys for (its `vault_id` expectation). `getBox()`, `useBox()` and the
+  background refresh still leave a damaged record in place; only an explicit deletion of that
   boxlabel deletes it.
 * 2026-10-15: a scope's `user_id` is text of 1 to 100 characters (`UserId`), checked at
   `Vault.make`, by every `VaultDB` verb, and in every stored record that names a scope; a refusal
@@ -356,7 +897,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-14: every encryption binds its context as AES-GCM additional data
   (`cipherCtx`): format, applabel, user_id, vaultlabel, vaultId, plus unlockEpoch
   for key wraps (since 2026-10-15, the lease's only: a wayin binds its own
-  header instead, below) and boxlabel + revisionTok for lockboxes, encoded as a JSON array. Ciphertext
+  header instead, below) and boxlabel + revisionTok for boxes, encoded as a JSON array. Ciphertext
   moved between users, vaults, boxes or revisions refuses to open. (Widened 2026-10-15 to every
   field each record writes: the sweep entry below.)
 * 2026-10-14: a wrong passphrase is learned from the vaultKey wayin's AEAD failure, never a
@@ -364,7 +905,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-14: the leaseKey is a non-extractable WebCrypto key persisted only by structured
   clone (IndexedDB, `safebyok/idb`); the vaultKey handle a vault holds between operations is also
   non-extractable. The operations that must wrap the vaultKey (granting a lease at unlock, the
-  re-wrap in changePassphrase) unwrap a separate extractable transient from the same wayin and
+  re-wrap in putWayin) unwrap a separate extractable transient from the same wayin and
   drop it on return; the lease path makes no extractable handle at all.
 * 2026-10-14: a stored record that fails validation or AEAD verification is refused with kind
   `corrupt_record` and left in place -- remote data is never auto-deleted. A device-local
@@ -374,52 +915,52 @@ added or folded into through the subagent, and no other entry changes.
   inside `vault.useBox(...)` and sent only to `api.anthropic.com`.
 * 2026-10-14: `safe-stable-stringify` is a runtime dependency: `stableJsonify`
   (`src/stable-jsonify.ts`) is a thin alias of it, backing snapshot change detection and the
-  comparison that once decided whether a lockbox's `changed_at` moved (superseded 2026-10-17: that
+  comparison that once decided whether a box's `changed_at` moved (superseded 2026-10-17: that
   field is now `written_at`, stamped on every write; see the `written_at` entry below).
 * 2026-10-14: `zod` moved from a regular dependency to a peer dependency (`^4.0.0`): the host app
   supplies it, so safebyok validates with whatever zod instance that app ships.
-* 2026-10-15: storage writes are versioned updates (`VaultDB.updateVaultProps`, `updateBox`). A
+* 2026-10-15: storage writes are versioned updates (`VaultDB.putVaultProps`, `putBox`). A
   vault props update carries the `vault_id` and `unlock_epoch` it was proven against, and lands
-  only while the standing vault props have both. A lockbox update carries the `vault_id` its whisper
+  only while the standing vault props have both. A box update carries the `vault_id` its whisper
   was sealed for and the `revision_tok` it read (or null for none), and lands only while the
-  scope's standing vault props have that `vault_id` and the standing lockbox that `revision_tok` (or
+  scope's standing vault props have that `vault_id` and the standing box that `revision_tok` (or
   there is none); a scope with no vault props refuse. A failed expectation refuses with kind
-  `stale_write`, writes nothing, and `storeBox()` / `changePassphrase()` / `retireBox()` / `retire()`
-  surface it on the first failure, with no retry. Retirements (`retireBox`, `retireVault`) carry a
+  `stale_write`, writes nothing, and `putBox()` / `putWayin()` / `delBox()` / `del()`
+  surface it on the first failure, with no retry. Deletions (`delBox`, `delVault`) carry a
   `vault_id`-only expectation (the Coach's ruling): they land only while the scope's standing
   vault props have that `vault_id`, refuse where no vault props stand, and expect no revision, so within
-  its vault a retirement wins over a concurrent update; retiring an absent lockbox is quiet. The
+  its vault a deletion wins over a concurrent update; deleting an absent box is quiet. The
   atomicity of check-and-write is each adapter's: `localVaultDB` checks and saves in one
   synchronous step; the Convex component checks inside the transaction of the mutation that
   writes (below).
-* 2026-10-15: `idbVaultDB` performs its versioned updates, its retirements and `fetchOrCreateVaultProps` as a
+* 2026-10-15: `idbVaultDB` performs its versioned updates, its deletions and `ensureVaultProps` as a
   read, then a separate write, in separate IndexedDB transactions: another tab writing in
   between can still be buried, two tabs can each create vault props, and a vault another tab
-  retires and makes anew in between can still lose a lockbox (`retireBox`) or be retired whole
-  (`retireVault`). Its `retireVault` also lists the vault's rows in one transaction and deletes
-  them in another: a lockbox another tab writes in between survives the retirement, orphaned without
+  deletes and makes anew in between can still lose a box (`delBox`) or be deleted whole
+  (`delVault`). Its `delVault` also lists the vault's rows in one transaction and deletes
+  them in another: a box another tab writes in between survives the deletion, orphaned without
   vault props. Doing these inside one IndexedDB transaction is a ruled TODO, not yet built. (Built
   when the store moved to `safebyok-indexeddb`: see the entry on it below.)
-* 2026-10-14: a lockbox's ciphertext length reveals its whisper's length to the backend: there is
-  no padding yet (TODO). `storeBox()` refuses a whisper over `maxWhisperBytes` of JSON, an
+* 2026-10-14: a box's ciphertext length reveals its whisper's length to the backend: there is
+  no padding yet (TODO). `putBox()` refuses a whisper over `maxWhisperBytes` of JSON, an
   `Vault.make` option defaulting to `MaxWhisperBytes` (40444), checked on write only.
-* 2026-10-14: `changePassphrase` re-wraps the vaultKey under the new passphrase but does not
+* 2026-10-14: `putWayin` of a new passphrase re-wraps the vaultKey under it but does not
   rotate it, so a superseded vault props plus its old passphrase still yields the current vaultKey,
   with no expiry. The Convex adapter (`packages/safebyok-convex`) keeps no vault props history, but
   Convex's own backups and snapshot exports retain superseded vault props for as long as they are
   kept.
 * 2026-10-14: `pnpm-workspace.yaml` denies `esbuild`'s install script (`esbuild: false`); esbuild
   arrives with `convex` and vite, and runs from its platform binary package without it.
-* 2026-10-15: a session holding keys for a vault since retired or recreated elsewhere cannot
-  write a lockbox into the successor, retire one of its lockboxes, or retire it: `storeBox()`,
-  `retireBox()` and `retire()` no longer look at the vault props first, and rely on the `vault_id`
-  expectation, checked by the backend, to refuse. A refused `retire()` has already revoked
-  this device's lease; a second `retire()`, now holding the successor's `vault_id`,
-  retires the successor. On a vault the handle has never seen created, `retire()` removes only
-  the device-local record: lockboxes orphaned without vault props are not reached.
-  `changePassphrase()` and `unlock()` re-read the vault props first, as they must to prove the
-  passphrase against it. A change to the wayins elsewhere (a passphrase or passkey added, removed or changed) does not stop a stale session's
-  `storeBox()` or `retireBox()` (their expectations carry no epoch); the session relocks on its next
+* 2026-10-15: a session holding keys for a vault since deleted or recreated elsewhere cannot
+  write a box into the successor, delete one of its boxes, or delete it: `putBox()`,
+  `delBox()` and `del()` no longer look at the vault props first, and rely on the `vault_id`
+  expectation, checked by the backend, to refuse. A refused `del()` has already revoked
+  this device's lease; a second `del()`, now holding the successor's `vault_id`,
+  deletes the successor. On a vault the handle has never seen created, `del()` removes only
+  the device-local record: boxes orphaned without vault props are not reached.
+  `putWayin()` and `unlock()` re-read the vault props first, as they must to prove the
+  passphrase against it. A change to the wayins elsewhere (the passphrase changed, or the passkey added, replaced or removed) does not stop a stale session's
+  `putBox()` or `delBox()` (their expectations carry no epoch); the session relocks on its next
   look at the vault props.
 * 2026-10-14 (the option was named `rememberForMs` until its rename on 2026-10-15): the lease
   length (`leaseHours`) is chosen by the app at each `Vault.make`, so two devices on
@@ -434,7 +975,7 @@ added or folded into through the subagent, and no other entry changes.
   `FarFuture` (see the next entry), and the stored `ask_passphrase_at` is a finite number; no schema
   past that parse, and no stored field, accepts `Infinity`. What still ends such a lease: `lock()`
   (memory and lease), a change to the wayins on another device (the next look at the vault props
-  sees a new epoch), and the vault being retired or made anew (a new `vault_id`). Nothing else
+  sees a new epoch), and the vault being deleted or made anew (a new `vault_id`). Nothing else
   does: no timer, and no idle detection. Two consequences: an open handle sees that new epoch only
   when it next reads the vault props (an unlock, a write, or a change the vaultDB pushes), so a handle
   that only reads whispers, on storage that pushes nothing, keeps its vaultKey in memory until then;
@@ -443,8 +984,8 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-15 (revised the same day by clean_times); 2026-10-19 (20261019-softlock_gone): every time the package stores is an
   `EpochMillis`: epoch ms from `FarPast` (1981-01-01T00:00:00Z) to `FarFuture`, the microsecond
   epochalypse (`Math.floor(Number.MAX_SAFE_INTEGER / 1000)`, 2255-06-05T23:47:34.740Z) -- the
-  lease's `ask_passphrase_at` (named `expires_at` until then), and the lockbox's and
-  vault props' `registered_at` and the lockbox's `written_at`: whole ms, so a stored record with a
+  lease's `ask_passphrase_at` (named `expires_at` until then), and the box's and
+  vault props' `registered_at` and the box's `written_at`: whole ms, so a stored record with a
   fraction of a millisecond fails its schema as one out of bounds does. A lease that
   fails the schema reads as "no lease", and is erased; it is not clamped on read. That
   includes records written by 0.1.0 and 0.2.0 under a lease length above about two million hours (some
@@ -457,8 +998,8 @@ added or folded into through the subagent, and no other entry changes.
   `bad_option`, so a clock gone wrong never mints a deadline or a stored time, and leaves the vault
   locked in memory (the lease stays). A lock never waits on the clock: `lock()` reads
   none. (Amended 2026-10-19: `lockSoon()`, which locked at once on a clock it could not read,
-  with a warning to the vault's logger, is gone.) A clock that goes wrong in the middle of a `storeBox()`,
-  `retireBox()` or `changePassphrase()` lets the write land, then throws `bad_option` from the refresh
+  with a warning to the vault's logger, is gone.) A clock that goes wrong in the middle of a `putBox()`,
+  `delBox()` or `putWayin()` lets the write land, then throws `bad_option` from the refresh
   after it. A clock in bounds but wrong (set a year ahead, say) is not detected.
 * 2026-10-15; 2026-10-19 (20261019-softlock_gone): `Vault.make` takes a host's `logger` (`log`, `warn`, `error`, each
   `(message?, story?, err?)`), checked at the door (`bad_option`) and wrapped so that whatever it
@@ -478,10 +1019,10 @@ added or folded into through the subagent, and no other entry changes.
   approval: "yes with no logger console is the fallback"); the lint rule itself is unchanged
   everywhere else. A host silences it by passing a logger whose calls do nothing.
 * 2026-10-15 (superseded 2026-10-17: `changed_at` is now `written_at`, stamped on every write
-  without comparing whispers; see the `written_at` entry below): a lockbox kept two times,
+  without comparing whispers; see the `written_at` entry below): a box kept two times,
   `registered_at` (first stored, carried forward) and
   `changed_at`, which moves only when the whisper's serialized form (`stableJsonify`) differs from
-  the one it replaces. To know, `storeBox()` deciphers the previous record it already reads and
+  the one it replaces. To know, `putBox()` deciphers the previous record it already reads and
   compares the two serialized whispers with plain string equality, in memory on the client; the
   comparison is not constant-time. A previous record that will not open counts as changed and is
   written over, as before. The backend learns one bit it did not before: a `changed_at` that
@@ -491,7 +1032,7 @@ added or folded into through the subagent, and no other entry changes.
   can alter them undetected; binding the whole header is TODO.md's roadmap 3, not yet built.
   (Built since: the sweep entry below binds both times and the sidecar.)
 * 2026-10-15: until 1.0.0 a stored-shape change carries no migration (the Coach's ruling). A
-  lockbox or vault props written with `created_at`/`updated_at`, or a lease with
+  box or vault props written with `created_at`/`updated_at`, or a lease with
   `expires_at`, fails its schema: the vault refuses it as `corrupt_record` and leaves it as it
   is (a lease is discarded, and the user enters the passphrase again). A Convex deployment
   holding such rows refuses the new component schema at deploy until those rows are deleted.
@@ -514,18 +1055,79 @@ added or folded into through the subagent, and no other entry changes.
   tags are also the first element of every encryption's additional data, so a record written
   under a `byok-*-v1` tag would neither validate nor decrypt. No reader for the old tags is
   kept: they existed only in development and demo storage, never in a published version.
-* 2026-10-15: `VaultDB`'s public verbs turn any failure from an adapter that is not already a
+* 2026-10-15; 2026-10-19 (thread A1 `outcome`, sprint contract, branch 20261019-outcome); 2026-10-19 (thread A4, sprint
+  contract, branch 20261019-try_twins); 2026-10-19 (a_sec, #203); 2026-10-19 (a_sec2, #206):
+  `VaultDB`'s public verbs turn any failure from an adapter that is not already a
   `VaultError` into kind `storage_unavailable`, with the adapter's own error attached as the
   standard `cause`. Adapters see only ciphertext and unencrypted record fields, but that cause is
-  whatever the backend's client threw, unfiltered.
+  whatever the backend's client threw, unfiltered. As of 2026-10-19 every public verb
+  (`getVaultProps`, `ensureVaultProps`, `putVaultProps`, `delVault`, `delDamagedVault`,
+  `listBoxes`, `listBoxRecords`, `getBox`, `putBox`, `delBox`) resolves an `Outcome`
+  (`{ ok: true, val }` or `{ ok: false, err }`) and never rejects; the adapter's `do*` hooks still
+  throw, and the one catch is `outcomeOf` (`src/outcome.ts`), which makes the same
+  `storage_unavailable`-with-`cause` conversion. `outcomeOf` is exported for an app wrapping its
+  own calls: whatever such a body throws that is not a `VaultError` is kept, as it came, as the
+  `cause`, so an app must not throw secret material from a body it wraps. `VaultError` gains
+  `family` (`misuse`, `condition`, `bad_news`), read from `refusalkind` through one table and never
+  set by a caller; `bad_news` (`damaged_vault`, `damaged_wayin`, `damaged_box`, `newer_format`,
+  `rolled_back`, `identity_revoked`) was `condition`, and `isCondition` is true for both. It
+  also gains `meta?` (`box_stored`, `capacity`; amended 2026-10-19, a_sec2, #206: `vault_props_stored`
+  is removed, see below): stored records as storage holds them (ciphertext and visible fields) and
+  counts only, never secret material; no refusal fills `box_stored` yet (an earlier amendment of
+  2026-10-19, a_sec2, #206, which said it was filled, was mistaken). The vault still locks
+  on `identity_revoked` and `rolled_back` from storage: `RefusalPolicy.heed` unwraps each Outcome,
+  hands every bad `err` to the vault's refusal handler and awaits it, then throws it, as before --
+  an interim shim until the vault's own calls are Outcome-shaped.
+  2026-10-19 (a_sec2, #206): `vault_props_stored` is removed from `RefusalMeta`. Nothing ever
+  filled it. Filled, it would have put every passphrase's salt and every wrapped vaultKey into a
+  refusal's `meta`, and from there into `snapshot.trouble`, logs and error reporters; the Coach has
+  ruled those out of the snapshot. A later refusal that wants to name the vault props storage holds
+  must carry a summary instead: `vault_id`, `unlock_epoch` and the passphrase and passkey summaries.
+  2026-10-19 (A4): every public vault call (`packages/safebyok/src/vault.ts`) now has a `tryX` form
+  resolving an `Outcome` and an `X` form throwing the same `err` (`#trying`, `#throwing`). A throw
+  inside a vault call that is not a `VaultError` -- a bug in safebyok, or a throw from a host
+  function such as the strength checker or the key deriver,
+  several of which are handed the passphrase -- becomes a `VaultError` of kind `unexpected_error`
+  (family `misuse`) carrying the thrown value as `cause` (amended 2026-10-19 (put_wayin): a throw from the strength
+  checker is the exception, refused `unexpected_error` with no `cause`, `meta` or kind of what it threw;
+  see the put_wayin entry); it is deliberately never logged and never
+  reported to the platform, since the thrown value may quote secret material, and the cause still
+  reaches the caller (before, the raw throw propagated). In the `VaultDB` base
+  (`src/vault-db.ts`), a non-`VaultError` throw from the adapter's `do*` hook stays
+  `storage_unavailable` (retryable), while a throw from the base's own checks becomes
+  `unexpected_error` (not retryable). A `do*` hook that returns an `Outcome`-shaped value (a wrapper
+  `VaultDB` that forgot to unwrap another's answer, `valOf`) is refused as `bad_option`; before, a
+  wrapped refusal from `doPutVaultProps` or `doDelVault` was a truthy object and read as "landed".
+  `outcomeOf` kept a `VaultError` of another copy of safebyok as it came; how a foreign
+  `VaultError` is now told, and where, is in the 2026-10-19 (thread a_fixes) entry.
+  Amended 2026-10-19 (a_sec, #203; corrected 2026-10-19, a_sec2, #206): what a key deriver
+  (`deriveKeyBytes`) or a passphrase strength test throws, both handed the passphrase, goes through
+  `hostThrewRefusal` (`src/outcome.ts`), applied in `passphraseKeyOf` (`src/proof.ts`) (amended
+  2026-10-19 (put_wayin): not the strength checker's throw, which `checkStrongEnough`
+  (`src/passphrase-strength.ts`) refuses as `unexpected_error` with no `cause`, `meta` or kind
+  of what it threw; see the put_wayin entry). Only a
+  `VaultError` of the `condition` family passes through as itself: a key deriver's, say. Everything else becomes `unexpected_error` with the throw
+  as its `cause`, the treatment A6 gave `getProof`: a `VaultError` of misuse (`bad_option`, say),
+  bad news, a refusal of another loaded copy of safebyok (a foreign throw, see the a_fixes entry
+  above), and any non-`VaultError`. So the throw's own message is never the refusal's, and
+  `safebyok-react`'s `forBoundary` then strips the cause before React's `onCaughtError`. Bad news
+  from a host function is never told to `onBadNews` or put in `snapshot.trouble`. A condition's
+  message, if a host deriver or test wrote one quoting the passphrase, can reach the caller, and the
+  dialog shows it in place; it never reaches `onCaughtError`. On unlock, `wayin.tryOpen`
+  (`src/wayin.ts`; amended 2026-10-19, slots: once `openWithPassphrase`, a walk over several passphrases) turns any `wrong_passphrase` from a way in into the vault's own
+  `wrong_passphrase` (kind kept, message replaced), so a deriver's message, such as
+  safebyok-fastkey's for an empty passphrase, never reaches the caller there; on the sealing paths
+  (creating the vault, a new passphrase) a deriver's condition passes through as itself. The vault
+  refuses an empty passphrase before any deriver sees it anyway. Before, `checkStrongEnough` rethrew
+  whatever the test threw, and any `VaultError` from a deriver passed through with its message.
 * 2026-10-15: `localVaultDB` and `idbVaultDB` key rows by `applabel:user_id:vaultlabel`, and
   `user_id` may hold a colon, so one user's rows can share another scope's ckey prefix. Listing
-  and retiring a vault now take only ckeys whose remainder after the prefix is a bare boxlabel
-  (no colon); before, a prefix match alone listed a colon-holding user's lockboxes in another
+  and deleting a vault now take only ckeys whose remainder after the prefix is a bare boxlabel
+  (no colon); before, a prefix match alone listed a colon-holding user's boxes in another
   user's vault. Exact ckeys cannot collide.
 * 2026-10-15: the string-keyed adapters (`localVaultDB`, `idbVaultDB`, `idbDeviceDB`,
   `memoryDeviceDB`) file rows under the JSON text of a tuple -- the row's kind, the applabel,
-  `user_id` and vaultlabel, and a lockbox's boxlabel -- from one module, `Ckeys`, now exported for
+  `user_id` and vaultlabel, and a box's boxlabel -- from one module, `Ckeys`, now exported for
   adapter authors. This replaces the colon-joined ckeys of the entry above. `JSON.stringify`
   quotes and escapes every string, so two different tuples never share a ckey whatever their
   names hold, and a vault's box prefix (its tuple's JSON up to the comma before the boxlabel)
@@ -533,12 +1135,12 @@ added or folded into through the subagent, and no other entry changes.
   A name is encoded as given, never normalized: two Unicode spellings of one name are two vaults,
   as they are two cipher ctxs. Rows under the old ckeys are never read or moved: a vault
   stored before reads as absent, and its rows, ciphertext only, stay in storage. An old lease (a leaseKey and the vaultKey wrapped under it) would otherwise linger in IndexedDB
-  beyond the reach of `lock()` and of any expiry, so `idbDeviceDB` sweeps it: `readLease` and
-  `eraseLease` list the device shelf's ckeys and delete, unread, every one that is not a lease
+  beyond the reach of `lock()` and of any expiry, so `idbDeviceDB` sweeps it: `getLease` and
+  `delLease` list the device shelf's ckeys and delete, unread, every one that is not a lease
   tuple (`Ckeys.isLease`). An open that finds the vault does it, and so does every lock; under
   `idbVaultDB` or `localVaultDB`, whose first open after an upgrade finds no vault (so reads no
   lease), the old row waits for the first lock or the next open after an unlock. A test proves
-  no old value is fetched. `eraseAll()` clears the whole shelf. `memoryDeviceDB` keeps nothing past the
+  no old value is fetched. `delAll()` clears the whole shelf. `memoryDeviceDB` keeps nothing past the
   page, so it needs no sweep.
 * 2026-10-15: the Convex component (`packages/safebyok-convex`) authenticates in the host app,
   not inside the component (where `ctx.auth` does not exist): `SafebyokComponent.api({ getUserId })`
@@ -552,9 +1154,9 @@ added or folded into through the subagent, and no other entry changes.
   `unlock_epoch` and a sidecar's length are checked by the client's Zod records, not on the
   server. A signed-in user can therefore store malformed rows in their own vaults, which their
   own clients then refuse as `corrupt_record`.
-* 2026-10-15: the Convex component checks each update's and retirement's expectation by reading the
+* 2026-10-15: the Convex component checks each update's and deletion's expectation by reading the
   standing rows inside the same mutation that writes, relying on Convex's serializable
-  transactions; a failed expectation resolves `false` rather than throwing. `fetchOrCreateVaultProps` is a
+  transactions; a failed expectation resolves `false` rather than throwing. `ensureVaultProps` is a
   find-or-insert in one mutation; the indexes are not unique, and a second vault props row for one
   scope would make every later call on that vault fail (`.unique()` throws) rather than pick one.
 * 2026-10-15: the Convex component's refusals carry `ConvexError` data of a fixed `kind`
@@ -578,31 +1180,31 @@ added or folded into through the subagent, and no other entry changes.
   but the unlocked vaultKey stays in memory until the vault locks, expires or is closed. The
   README tells apps to close the vault on sign-out; nothing enforces it. *Superseded 2026-10-16*: a sign-out now locks the vault
   (`identity_revoked`, below).
-* 2026-10-15: a vault's lockbox count is capped on the client (`maxLockboxes`, `storeBox()`
+* 2026-10-15: a vault's box count is capped on the client (`maxBoxes`, `putBox()`
   refusing `vault_full`), counted from the handle's last look at storage, so stores of new
-  lockboxes running at once -- on several devices, or on one handle, since nothing serializes
+  boxes running at once -- on several devices, or on one handle, since nothing serializes
   them -- can overshoot it. Neither local backend (`idbVaultDB`, `localVaultDB`) enforces a count
   or a size per vault; the Convex component does (next entry).
-* 2026-10-15: the Convex component holds every vault to 8,000 lockboxes and 7 MiB less 1 KiB of
-  lockbox rows (as `getDocumentSize` from `convex/values` weighs them), constants in
-  `src/component/tallies.ts` derived from Convex's per-transaction limits so that `retireVault`
+* 2026-10-15: the Convex component holds every vault to 8,000 boxes and 7 MiB less 1 KiB of
+  box rows (as `getDocumentSize` from `convex/values` weighs them), constants in
+  `src/component/tallies.ts` derived from Convex's per-transaction limits so that `delVault`
   (reading every row twice, beside vault props of up to one 1 MiB document) always fits; neither the
-  client nor the host can change them. `updateBox` checks them against a per-vault tally row
+  client nor the host can change them. `putBox` checks them against a per-vault tally row
   (`safebyok_vault_tallies`, keyed by the vault props' row `_id`) updated in the same transaction as
-  each lockbox write and retirement, and refuses, writing nothing, a write that leaves the vault over a
+  each box write and deletion, and refuses, writing nothing, a write that leaves the vault over a
   limit and larger than before, with `ConvexError` kind `vault_full` and fixed text. Replacements
-  no heavier and all retirements are never refused. A vault with no tally (written before tallies) is
-  counted at its next `updateBox`, reading its rows only until a limit is passed; an over-limit
-  vault keeps no tally and refuses all growth until retirements bring it back. The tally is trusted as
+  no heavier and all deletions are never refused. A vault with no tally (written before tallies) is
+  counted at its next `putBox`, reading its rows only until a limit is passed; an over-limit
+  vault keeps no tally and refuses all growth until deletions bring it back. The tally is trusted as
   kept: a rollback to a component version without tallies, followed by a roll forward, leaves
   tallies stale for vaults written meanwhile (deleting the table's rows makes every vault
   recount). Before this, a vault grown past the client's cap (by a modified client, or many
-  overshoots) could become impossible to retire whole: the vault half of deleting an account.
+  overshoots) could become impossible to delete whole: the vault half of deleting an account.
 * 2026-10-15: records crossing into the core are checked where they cross, and trusted past it.
-  A host's `storeBox()` sidecar is checked against the stored lockbox's own schema before anything is
+  A host's `putBox()` sidecar is checked against the stored box's own schema before anything is
   written (an unchecked over-long sidecar once made every later `hello()` refuse the vault as
   `corrupt_record`). Whatever a `DeviceDB` hands back -- the host may supply its own -- is checked
-  against `Lease` by the vault, and one that does not pass is erased and reads as no
+  against `LeaseRecord` by the vault (through `Lease.make`, amended 2026-10-19), and one that does not pass is erased and reads as no
   lease. `VaultDB`'s write verbs check labels and scope only, not the records the
   vault builds. A lease's `ask_passphrase_at` is not bound into its encryption, so
   whoever can write this device's IndexedDB can extend it (to any finite number of milliseconds).
@@ -636,20 +1238,20 @@ added or folded into through the subagent, and no other entry changes.
   from a tarball checked against the sha512 `dist.integrity` recorded in `release.yml`, offline
   (npm bundles its dependencies), so a changed tarball on the registry stops the job instead of
   running beside the token. Moving npm means recording the new version's integrity by hand.
-* 2026-10-15; 2026-10-18 (reform, thread 2, `20261018-no_retry`): `storeBox()` makes one attempt and
+* 2026-10-15; 2026-10-18 (reform, thread 2, `20261018-no_retry`): `putBox()` makes one attempt and
   no longer retries a write storage refused as stale. It reads the box, seals, and writes under the
   versioned expectation (same `vault_id`, same `vault_key_epoch`, same `revision_tok` or none). On a
   `stale_write` refusal it catches up with storage once and throws `stale_write` (nothing written;
   the adapter's refusal is the `cause`); a catch-up that relocks the device (vault reborn, or its
   wayins changed) throws `vault_locked` with nothing written, and one that fails throws as it came
   (`stale_write` with the failure as cause, `identity_revoked`, `rolled_back`, `newer_format`). A
-  box retired elsewhere is now just a stale write. So no whisper is sealed over what another device
+  box deleted elsewhere is now just a stale write. So no whisper is sealed over what another device
   wrote without the caller's say, and no jittered wait or `crypto.getRandomValues` draw remains in
   the path. Until 2026-10-18 a refused store tried up to three times (waits of 1-2 s, then 2-4 s,
-  jittered), each attempt sealing anew under its own lockboxKey and `revision_tok`, and overwrote
-  the other device's box (last writer wins) unless it found the box retired (a retirement wins). Still
-  load-bearing: the versioned write (a stale tab cannot resurrect a retired box, and a
-  box sealed under a retired vaultKey never lands) and the damaged-box handling below; `retireBox()` is
+  jittered), each attempt sealing anew under its own boxKey and `revision_tok`, and overwrote
+  the other device's box (last writer wins) unless it found the box deleted (a deletion wins). Still
+  load-bearing: the versioned write (a stale tab cannot resurrect a deleted box, and a
+  box sealed under a deleted vaultKey never lands) and the damaged-box handling below; `delBox()` is
   never retried.
 * 2026-10-15: the published package has a `safebyok/testing` entry point of test helpers
   (the `TH` namespace of its tests), among them `testDeriver`, a KeyDeriver that is one SHA-256
@@ -663,10 +1265,10 @@ added or folded into through the subagent, and no other entry changes.
   public package's `prepublishOnly` refuses a publish not run by pnpm.
 * 2026-10-15 (across tabs and on `close()`, revised 2026-10-16 by locks_and_expiry, below); 2026-10-19
   (20261019-softlock_gone: **the per-handle lock counter described here is gone, and a lock no longer
-  defeats an `unlock()` or `changePassphrase()` under way, in this tab or another; last writer wins,
+  defeats an `unlock()` or `putWayin()` under way, in this tab or another; last writer wins,
   see "one kind of lock" below; an unlock still takes up nothing when the handle has closed or the vault
   props it proved against no longer stand; the rest describes what stood until then**): a
-  `lock()` (or `retire()`) called while an `unlock()` or `changePassphrase()` is
+  `lock()` (or `del()`) called while an `unlock()` or `putWayin()` is
   still under way wins. Each lock moves a per-handle counter; the unlock reads it at its start
   and again after each wait (the vault props read, the key derivation, the lease's write),
   and on finding it moved takes up no vaultKey, erases a lease it had already written,
@@ -678,9 +1280,9 @@ added or folded into through the subagent, and no other entry changes.
   on the same handle; that device then asks for the passphrase at its next open. An unlock (or
   the unlock after a passphrase change) also takes up nothing, and throws `vault_locked`, when the
   vault props standing at its end are not the ones its passphrase was proven against, by `vault_id` and
-  `unlock_epoch`: a vault retired, remade, or re-keyed elsewhere while the passphrase was
+  `unlock_epoch`: a vault deleted, remade, or re-keyed elsewhere while the passphrase was
   being checked. Without that, the old vault's vaultKey was taken up against the new vault props, and a
-  `storeBox()` sealed boxes into the new vault that its owner could never open.
+  `putBox()` sealed boxes into the new vault that its owner could never open.
 * 2026-10-15 (`close()` and the timer revised 2026-10-16 by locks_and_expiry, below); 2026-10-19
   (20261019-softlock_gone: **`lockSoon()`, its grace and the shut counter are gone**; the one lock
   drops the key at once, and an unlock under way on a closed handle still takes up nothing; the
@@ -690,8 +1292,8 @@ added or folded into through the subagent, and no other entry changes.
   afterwards throws `vault_locked`; cleared rather than set to now, which a wall clock stepped
   back would reopen), revokes the lease at once, and moves the shut counter
   (an unlock under way loses); a `setTimeout` drops the in-memory vaultKey after the grace. In the
-  grace, `retireBox()`'s second look checks only that the key is still held, not `askPassphraseAt` (amended
-  2026-10-18: this once named `storeBox()`'s retries too; it now makes one attempt), so an operation begun before the gate closed finishes; under natural
+  grace, `delBox()`'s second look checks only that the key is still held, not `askPassphraseAt` (amended
+  2026-10-18: this once named `putBox()`'s retries too; it now makes one attempt), so an operation begun before the gate closed finishes; under natural
   expiry too, an operation begun before `askPassphraseAt` now finishes past it. An `unlock()`
   that lands in the grace cancels the timer, including one begun in the grace and still deriving
   when it would have fired: the timer does not move the counter. A second `lockSoon()` never
@@ -703,7 +1305,7 @@ added or folded into through the subagent, and no other entry changes.
   (`corrupt_record`; since 2026-10-16, `damaged_vault`) to the app in place, as `openError`, rather than throwing it to the error
   boundary: it is a condition, as are `storage_unavailable` and `not_permitted`. A tampered or
   damaged vault props therefore reaches the app's own UI, beside a `retryOpen` that cannot mend it; the
-  React README tells hosts to branch on `openError.kind`, and the error's message carries no
+  React README tells hosts to branch on `openError.refusalkind`, and the error's message carries no
   secret material. Misuse still goes to the boundary.
 * 2026-10-15: every validator in the core is `zod/mini` (`import * as Z from 'zod/mini'`; the
   core's lint refuses classic `zod` in `src/`). Same checks, limits and messages as before; mini
@@ -717,13 +1319,13 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-15: every `VaultDB` write verb validates its record and its expectation against the
   schemas its reads use, before the adapter's half sees them, so the core never writes a record
   its own read would refuse (an over-long sidecar once did, and the vault could not be opened again);
-  Zod strips a field it does not know, so none reaches storage. `updateVaultProps` refuses vault props
+  Zod strips a field it does not know, so none reaches storage. `putVaultProps` refuses vault props
   whose `vault_id` differs from the expected one. Listing still validates only what a listing
-  shows: a lockbox whose ciphered fields are damaged lists, and is refused at `readBox()`, so one
-  damaged box never makes the vault fail to open; such a box cannot be stored over or retired
-  either (both read it first), only retired along with its vault. A lease naming another
+  shows: a box whose ciphered fields are damaged lists, and is refused at `getBox()`, so one
+  damaged box never makes the vault fail to open; such a box cannot be stored over or deleted
+  either (both read it first), only deleted along with its vault. A lease naming another
   scope is discarded before any unwrap; its `vault_key_lease_wrapped` ctx would refuse it
-  anyway. The vault-size check counts each lockbox at twice `maxWhisperBytes` plus 2 KiB for its
+  anyway. The vault-size check counts each box at twice `maxWhisperBytes` plus 2 KiB for its
   other fields against the adapter's whole `maxVaultBytes`: the same outcomes as half the limit
   with 1 KiB, with the fields' allowance now covering them (a test builds the heaviest row) while
   `user_id`, which nothing bounds, is at most 512 bytes; a longer one, or a sidecar a JSON-text
@@ -749,32 +1351,35 @@ added or folded into through the subagent, and no other entry changes.
   the bytes it derives: a stand-in is the host's to test against `argon2idWebV1Deriver`. A host's
   own label is not checked against anything, since a vault stores only the label; the host must
   never change a label's parameters. The stored format is unchanged.
-* 2026-10-15: vault props hold their `wayins`, a list of one to `MaxUnlocks` (8), each the one vaultKey wrapped under its own key. A passphrase wayin has its own
-  random `salt_b64` (never shared between wayins) and its own `wayin_id`, and its wrap's
+* 2026-10-15; 2026-10-19 (slots): vault props hold two slots, `passphrase` (required) and `passkey` (or null), each
+  the one vaultKey wrapped under its own key (until slots, a list of one to `MaxUnlocks` (8), each with a
+  `wayin_id` and a `wayinlabel`). The passphrase wayin has its own random `salt_b64`, and its wrap's
   additional data is the format, scope, `vault_id`, a purpose per wayinkind
   (`vault_key_passphrase_wrapped`), and the wayin's whole visible header (`wayinkind`,
-  `wayin_id`, `wayinlabel`, `key_deriver_label`, `salt_b64`) as key-sorted JSON (and, since
-  the sweep entry below, the vault props' `registered_at`). The
-  `unlock_epoch` is no longer in it, since a change to one wayin bumps the epoch and the
-  others, whose passphrases the device does not hold, must still open: a backend can therefore
-  splice a wayin from older vault props of the same vault (a removed passphrase's, or one from
-  before a change) into the current one, and that old passphrase opens the vault again, as it
-  always opens the older vault props themselves. The list's order and length, and the vault props' other
-  fields, are not bound.
-* 2026-10-15: removing a wayin (`retireWayin`) is not revocation. Whoever knew the
+  `key_deriver_label`, `salt_b64`, `vault_key_epoch`, `device_id`, `registered_at`) as key-sorted
+  JSON (and, since the sweep entry below, the vault props' `registered_at`). The
+  `unlock_epoch` is not in it, since a change to one wayin bumps the epoch and the
+  other, whose key the device does not hold, must still open: a backend can therefore
+  splice a wayin from older vault props of the same vault (a replaced passphrase's, or a removed
+  passkey's) into the current one, and that old passphrase opens the vault again, as it
+  always opens the older vault props themselves. The purpose keeps one slot's record from opening as the
+  other's; which record fills a slot, and the vault props' other fields, are not bound.
+* 2026-10-15; 2026-10-19 (slots): removing a wayin (`delWayin`, which since slots removes the passkey,
+  refusing `absent_wayin` where there is none; the passphrase can never be removed) is not revocation. Whoever knew the
   removed passphrase and kept any earlier vault props holds the vaultKey, which never rotates; the
   removal bumps `unlock_epoch`, so devices unlocked under it lock at their next look, and the
-  vault refuses to remove its last wayin (`last_wayin`). Every change to the wayins
-  (`addPassphrase`, `retireWayin`, `changePassphrase`) asks for a passphrase that opens one,
+  removal needs no `last_wayin` refusal, for the passphrase stays. Every change to the wayins
+  (`putWayin`, `delWayin`) asks for the standing passphrase (see the slots entry),
   even on an unlocked vault: the session's vaultKey handle is non-extractable, so wrapping it
   anew needs the extractable transient that a proof unwraps.
-* 2026-10-15: an `unlock()` or a proof not aimed at one wayin (`wayinId`) tries each
-  passphrase wayin in the vault props' order, one key derivation apiece, and stops at the first
-  that opens: a wrong passphrase costs as many derivations as there are wayins, at most
+* 2026-10-15; 2026-10-19 (slots): a passphrase costs exactly one key derivation to try. Until slots, an
+  `unlock()` or a proof not aimed at one wayin (`wayinId`) tried each passphrase wayin in the vault
+  props' order, one derivation apiece, a wrong passphrase costing as many as there were wayins, at most
   `MaxUnlocks` (8, about 4.8 s with the noble deriver in Node 24), a bound enforced on read, so a
-  backend cannot make one unlock derive more. Which wayin opened shows in how long the unlock
-  took, on the device only. Wayins made by a key deriver the vault was not opened with are
-  passed over, and refused as `unknown_key_deriver` only when no wayin is left to try.
+  backend could not make one unlock derive more, and how long the unlock took showed, on the device
+  only, which wayin opened. Now the vault picks the slot by the proof's kind and the one passphrase
+  wayin is tried; stored data cannot multiply the cost. A passphrase wayin made by a key deriver the
+  vault was not opened with refuses `unknown_key_deriver`.
 * 2026-10-15: a wayin may be a passkey (WebAuthn PRF extension; a security key's `hmac-secret`).
   Its wayin holds `credential_id` and `prf_salt_b64` (32 random bytes, minted by the React
   binding's `createPasskey` with `crypto.getRandomValues`, checked for length by the core). The
@@ -796,28 +1401,33 @@ added or folded into through the subagent, and no other entry changes.
   ID can ask the authenticator for the answer (with the user's touch), as it could read a typed
   passphrase. The credential's challenge is random and never verified, and no attestation is
   checked: the authenticator is the user's to trust.
-* 2026-10-15; 2026-10-18: **every field a record writes is bound, unless a reason below says not** (the
+* 2026-10-15; 2026-10-18; 2026-10-19; 2026-10-20: **every field a record writes is bound, unless a reason below says not** (the
   Coach: "make everything verifiable unless there's a good reason not to"). A passkey wayin's
   HKDF `info` is now its wrap's whole additional data -- format, scope, `vault_id`, the vault props'
-  `registered_at`, purpose, and the wayin's visible header (`wayinkind`, `wayin_id`,
-  `wayinlabel`, `credential_id`, `prf_salt_b64`) -- so the passkeyKey itself, not only the wrap, belongs to one vault
+  `registered_at`, purpose, and the wayin's visible header (`wayinkind`, `credential_id`,
+  `prf_salt_b64`, `vault_key_epoch`, `device_id`, `registered_at`; until slots also `wayin_id` and
+  `wayinlabel`) -- so the passkeyKey itself, not only the wrap, belongs to one vault
   and one wayin; HKDF info and AES-GCM additional data are the same bytes, fed to different
-  primitives. Every wayin's wrap binds the vault props' `registered_at`. A lockbox's two
+  primitives. (2026-10-20, placement: `Wayin.seal` now builds a wayin's ctx once, in its kind's keying
+  helper, and uses that one value both as a passkey's HKDF `info` and as the wrap's ctx; it was built
+  twice from the same inputs. No bytes changed; the key derivation and the wrap are bound to the same ctx
+  by construction, not by two calls agreeing.) (2026-10-19, #201: `PasskeyProof.wayinKeyFor(wayin)` runs that HKDF over the PRF bytes with
+  the wayin's whole wayinCtx as `info`.) Every wayin's wrap binds the vault props' `registered_at`. A box's two
   encryptions bind its whole visible header (`format`, `boxlabel`, `revision_tok`, `sidecar_json`,
   `registered_at`, `written_at`: every field but the two ciphered ones, as Zod's parse leaves the
   record), so a backend that alters a sidecar or a time
-  makes `readBox()` refuse `corrupt_record`; a future field is bound the day it is added to the
+  makes `getBox()` refuse `corrupt_record`; a future field is bound the day it is added to the
   schema. While the vault is locked, the listing still shows these fields unverified: nothing
   checks them before a box is opened. The lease binds `ask_passphrase_at`, under its own
   format tag (`safebyok-lease-v1`; `safebyok-unlock-v1` was 0.3.0's tag, formerly the vault props', and a
   record under it is not read); a deadline moved on the device now
   fails to open and is discarded, so the discarding is logged. No compatibility: every passkey
-  wayin, lockbox and lease written before refuses to open (`wrong_passkey`,
+  wayin, box and lease written before refuses to open (`wrong_passkey`,
   `corrupt_record`, a fresh passphrase prompt), and a passphrase wayin refuses its passphrase.
-  **Left unbound, and why**: the vault props' `unlock_epoch` and the list of `wayins` (order, length,
-  membership), because each wayin's key is held only by its own wayin, and a change to one
-  must not rewrap the others (the 2026-10-15 wayin entry above: an old wayin can be spliced
-  back); the passphraseKey's derivation, which takes no context: its salt is fresh for every
+  **Left unbound, and why**: the vault props' `unlock_epoch` and which records fill the two slots
+  (until slots, the list's order, length and membership), because each wayin's key is held only by
+  its own wayin, and a change to one must not rewrap the other (the 2026-10-15 wayin entry above:
+  an old wayin can be spliced back); the passphraseKey's derivation, which takes no context: its salt is fresh for every
   wayin and bound in the wrap, so the key wraps exactly one thing, and binding it further would
   put Argon2's associated data into the host-pluggable `KeyDeriver` seam and every stand-in
   behind a label, for no added check; the PRF salt, which is random and already bound; and the
@@ -828,41 +1438,48 @@ added or folded into through the subagent, and no other entry changes.
   (2026-10-18, with the rename of the device record to the "lease": the device record's context
   changed spelling, not construction. Its first part, the format, is now `safebyok-lease-v1`, and
   its last, the purpose, `vault_key_lease_wrapped`; the parts between and their order are as
-  before, joined by the same `cipherCtx`, and the lockbox and wayin contexts did not move.
+  before, joined by the same `cipherCtx`, and the box and wayin contexts did not move.
   `tests/ctx-bytes.test.ts` pins the new bytes. A `safebyok-unlock-v1` record is not read: it fails
   validation and is erased, and the IndexedDB device store, which now files leases under `lease^`
   rather than `unlock^`, deletes the old row unread at its next lease read or erase. The user
   proves once more on each device; there is no migration. The device mark (lock generation and
   seen-vault record) is untouched. Amended 2026-10-19: the lock generation is gone; the mark
   holds only the seen vault.)
-* 2026-10-15: any wayin proves any change. A passkey's answer is accepted as proof by
-  `addPassphrase`, `addPasskey` and `retireWayin`, so whoever holds one passkey can set a new
-  passphrase and remove the user's others: the vault is as strong as its weakest wayin. A vault
-  always keeps one passphrase wayin (`last_wayin` refuses removing the last), and is created
-  with one. `createPasskey` registers each passkey under a random user handle, so it cannot replace
+* 2026-10-15; 2026-10-19 (slots, the Coach's ruling): **only the standing passphrase proves a change to
+  the ways in.** Until slots, any wayin proved any change: a passkey's answer was accepted by
+  `addPassphrase`, `putWayin` (once `addPasskey` and `changePassphrase`) and `delWayin`, so whoever held one passkey could set a
+  new passphrase and remove the user's others, and the vault was as strong as its weakest wayin. Now
+  `putWayin(passphrase, ...)` and `delWayin(passphrase)` take the
+  passphrase, and a passkey's answer handed as the proof is refused `bad_option` before anything is read or
+  derived. A passkey opens and reads the vault but cannot change who may. A vault always keeps its
+  passphrase wayin (it can never be removed), and is created with one. `createPasskey` registers each passkey under a random user handle, so it cannot replace
   a sign-in passkey on the same RP; removing a passkey from the vault does not delete it from the
   authenticator, and (as for passphrases) is not revocation.
-* 2026-10-15: `addPasskey` proves first and asks the authenticator after, so a refused proof
-  leaves no orphaned passkey; the cost is that the proven vaultKey's extractable transient handle
-  (`wrapKey` usage only) is held from the proof until the new wayin is sealed, across the
-  WebAuthn prompt: human time, not one derivation. Acceptable because the handle lives only in a
-  closure inside `reviseWayins`, never in the snapshot, a field or an error, so no host script
-  can reach it, and a script able to hook SubtleCrypto already sees every unwrap; while unlocked
-  the session's non-extractable handle opens every lockbox anyway, and extractability adds only
-  the export of the raw bytes. It is bounded by the prompt: the WebAuthn `timeout`
-  (`createPasskey`'s option, or the browser's default, minutes) ends it, a dismissal or a refusal
-  drops the reference, and the change then writes nothing. A `lock()` during the prompt does not
-  cut it short: the passkey still lands and the vault stays locked, as for any change to the ways
-  in (amended 2026-10-19: no lock counter now decides who wins when a lock lands during a change
-  to the wayins; last writer wins, see "one kind of lock" below).
+* 2026-10-15; 2026-10-19 (put_wayin): the proven vaultKey's extractable transient handle
+  (`wrapKey` usage only) is held from the proof until the new wayin is sealed. It was held across a
+  WebAuthn prompt, human time, bounded by the prompt's `timeout`: `addPasskey` proved first and asked
+  the authenticator after, so a refused proof left no orphaned passkey. That prompt is gone:
+  `putWayin` takes the passkey's answer, made by the host before the call, and calls no host code
+  mid-flight, so the handle lives for one proof and one wrap (not human time, and no host timeout
+  bounds it). Acceptable because the handle lives only in a closure inside `reviseWayins`, never in
+  the snapshot, a field or an error, so no host script can reach it, and a script able to hook
+  SubtleCrypto already sees every unwrap; while unlocked the session's non-extractable handle opens
+  every box anyway, and extractability adds only the export of the raw bytes. The cost of the
+  change is the orphan (see the put_wayin entry). Amended 2026-10-19 (put_wayin): this entry said a
+  `lock()` during the prompt does not cut the change short, "the passkey still lands and the vault
+  stays locked". The vault never stayed locked: `reviseWayins` grants this device's lease once the
+  write has landed, whatever a `lock()` did meanwhile. A `lock()` landing while a `putWayin` or a
+  `delWayin` is under way does not stop it: the change lands, and this device ends unlocked with a
+  fresh lease. Lock timing against work in flight is left to a later policy session (the Contract
+  says "Not yet promised. Until the policy is settled, the last writer wins").
 * 2026-10-15: `safebyok-postgres` authorizes on the server, per request: `postgresVaultDB` is
   made with the `userId` the host's auth verified, and refuses (`not_permitted`) any other user's
   scope, or any while signed out, before querying; that check is the whole of the authorization.
   Row-level security is on with no policy (the owner role bypasses it; every other role,
   Supabase's Data API roles among them, reaches no row). The NOTIFY payload is the scope, which
-  any role able to connect may LISTEN for. The server holds a vault to a lockbox count of its own
-  (see the `maxLockboxes` entry below), and to no size in bytes. Past
-  scope and boxlabel, a route's vault props, lockboxes and expectations are validated only as the
+  any role able to connect may LISTEN for. The server holds a vault to a box count of its own
+  (see the `maxBoxes` entry below), and to no size in bytes. Past
+  scope and boxlabel, a route's vault props, boxes and expectations are validated only as the
   core's VaultDB validates them. A driver's error rides as `cause` and may quote key columns, or
   (a malformed record refused by a NOT NULL) the whole failing row, its ciphertext included; the
   README's route recipe sends the browser only a refusal's kind and message.
@@ -909,25 +1526,25 @@ added or folded into through the subagent, and no other entry changes.
   2022, at 1.0.0) left its `argon2` out of scope. hash-wasm's working memory is never zeroed
   (the entry above).
 * 2026-10-15: the IndexedDB vault store moved to a package of its own, `safebyok-indexeddb`, and
-  each of its write verbs (`fetchOrCreateVaultProps`, `updateVaultProps`, `updateBox`, `retireBox`, `retireVault`)
+  each of its write verbs (`ensureVaultProps`, `putVaultProps`, `putBox`, `delBox`, `delVault`)
   is now one readwrite IndexedDB transaction, which reads the standing rows, compares them with
   the expectation, and writes; a failure anywhere in it aborts it, writing nothing. IndexedDB runs
   readwrite transactions over one store one after another, across the origin's tabs, so the
   windows the `idbVaultDB` entry above records are closed: no write lands over a row another tab
-  changed meanwhile, two tabs creating a vault settle on one, and no lockbox outlives a retired
+  changed meanwhile, two tabs creating a vault settle on one, and no box outlives a deleted
   vault. The guarantee rests on the work inside awaiting only IndexedDB's own requests (awaiting
   anything else lets the browser commit the transaction early, and the next request throws);
   `src/shelf.ts`'s `inOneTransaction` says so. Its rows, ckeys and database name are unchanged,
   and its change bell, a BroadcastChannel per database, still carries no scope and no record.
-* 2026-10-15: every `VaultDB` declares a `maxLockboxes`, the most lockboxes its backend holds in
-  one vault (`Infinity` for none), and `Vault.make` refuses (`bad_option`) a `maxLockboxes` above
-  it, defaulting to the smaller of it and `MaxLockboxes`. The core offers no "unlimited" constant:
+* 2026-10-15: every `VaultDB` declares a `maxBoxes`, the most boxes its backend holds in
+  one vault (`Infinity` for none), and `Vault.make` refuses (`bad_option`) a `maxBoxes` above
+  it, defaulting to the smaller of it and `MaxBoxes`. The core offers no "unlimited" constant:
   each store sets its own. `localVaultDB` and `idbVaultDB` declare `Infinity` and enforce nothing;
   `convexVaultDB` declares the component's 8,000; `graphqlVaultDB` declares what its host says the
   server enforces (default 1000), which only moves `Vault.make`'s check: the server's own refusal
-  is the limit. `postgresVaultDB` enforces its `maxLockboxes` (default 1000; a host wanting none
+  is the limit. `postgresVaultDB` enforces its `maxBoxes` (default 1000; a host wanting none
   passes a large safe integer) as a best effort, inside the one statement that inserts a new
-  lockbox (see the 2026-10-16 entry below, which replaced a counter column and a row lock). The
+  box (see the 2026-10-16 entry below, which replaced a counter column and a row lock). The
   refusal's message names the limit, never a boxlabel or a record.
 * 2026-10-15: a host's own checks replace ours for every name
   (`Vault.make({ validators })`, any Zod 4 schema), with no floor beneath them, since the ckeys
@@ -941,26 +1558,36 @@ added or folded into through the subagent, and no other entry changes.
   **Every name is checked everywhere**: the vault and every `VaultDB` verb check with the same
   bag, records read back included, so a stored row whose name the vault's checks refuse
   is `corrupt_record`, not trusted; the bag never reaches storage or the Convex server, which take
-  any text. The stored records (`Lockbox`, `VaultProps`, `Lease`, `VaultScope`) now check
-  names only as text, as does a wayin's `wayinlabel`: the `Label` grammar holds when a
-  wayin is added (`addPassphrase`, `addPasskey`), and a stored wayin under another label still
-  opens, since the host's validators have no slot for it. A host's schema runs on names only, never on a whisper, a sidecar or a
+  any text. The stored records (`Box`, `VaultProps`, `LeaseRecord`, `VaultScope`) now check
+  names only as text. (Until slots, so did a wayin's `wayinlabel`; wayins no longer carry one.) A host's schema runs on names only, never on a whisper, a sidecar or a
   passphrase. A host that admits any text (`AnyTextValidators`) shows its users labels that may
   carry bidirectional or invisible characters, a spoofing risk in its UI that is the host's to
   mind. **Sizes**: with names unbounded, the static 2 KiB allowance no longer bounds a
-  lockbox's other fields. It stays only as `Vault.make`'s plan for `maxLockboxes` at the default
-  checks; `updateBox` now weighs each lockbox with its scope as the UTF-8 bytes of its JSON and
-  refuses one over the adapter's `maxRecordBytes` (`lockbox_too_large`), and each `storeBox()`
-  refuses a lockbox heavier than the one it replaces when the vault, each lockbox counted at twice
+  box's other fields. It stays only as `Vault.make`'s plan for `maxBoxes` at the default
+  checks; `putBox` now weighs each box with its scope as the UTF-8 bytes of its JSON and
+  refuses one over the adapter's `maxRecordBytes` (`box_too_large`), and each `putBox()`
+  refuses a box heavier than the one it replaces when the vault, each box counted at twice
   `maxWhisperBytes`, 512 bytes for its fixed-size fields and its measured names and sidecar, would
   pass `maxVaultBytes` (`vault_full`). The vault's total is reckoned from the snapshot's listing,
   so a vault another device filled meanwhile is caught by the backend's own limit, as before.
-* 2026-10-15: `PassphraseModal` and `PasskeyUnlockButton` (`safebyok-react`) catch, in an error
+* 2026-10-15; 2026-10-19 (a_sec, #203): `PassphraseModal` and `PasskeyUnlockButton` (`safebyok-react`) catch, in an error
   boundary of their own, every failure that is not a condition (misuse, or anything that is no
   `VaultError`, whatever its value), and show the user fixed copy, never the error's message. React
   hands the very thrown value to the host root's `onCaughtError` (the console by default), as it
   would any error a boundary catches; before, it went to the host's boundary instead. The dialog's
   form, and the passphrase typed into its state, unmount with the failure.
+  Amended 2026-10-19 (a_sec, #203): everything rethrown now passes `forBoundary`
+  (`packages/safebyok-react/src/boundary.tsx`): a `VaultError` keeps kind, message and meta but never
+  its `cause` (which for `unexpected_error` can be a host key deriver's or strength test's throw,
+  handed the passphrase), and anything that is not a `VaultError` becomes a fixed `unexpected_error`
+  quoting nothing of it, so "the very thrown value" above no longer reaches `onCaughtError`. A host
+  `passphraseAdvice` that throws (it is handed every keystroke of a new passphrase) is replaced at its
+  source with a fixed refusal, so even a `VaultError` it threw carries nothing on. The report names
+  its component (`PassphraseModal` or `PasskeyUnlockButton`) and, for a `VaultError` whose cause was
+  stripped, says in its message that the cause was left out. `meta` is passed through as is. The
+  dialog's fallback notice once misuse trips it ("Something went wrong") now shares
+  the dialog's one answer: a lock landing closes it answering `declined`, and a vault unlocked under
+  it answers `unlocked`; its Close no longer answers `declined` over a vault that has since unlocked.
 * 2026-10-16 (revised the same day by refusals_and_catchup, below: `whenIdentityRevoked` is gone, and `rolled_back` locks too): **a sign-out locks the vault.** An adapter whose backend knows who is signed in
   refuses a vault whose `user_id` is not that user -- signed out, or another user signed in --
   with kind `identity_revoked`, distinct from `not_permitted` (the vault's own user refused one
@@ -969,7 +1596,7 @@ added or folded into through the subagent, and no other entry changes.
   one policy (`src/refusal-policy.ts`) on its way out of the vault, whichever call made it,
   a background refresh's included; for `identity_revoked` it locks at once, as `lock()` does:
   the vaultKey dropped, the lease revoked (amended 2026-10-19: `lockSoon()`'s grace and the defeat
-  of an unlock under way are gone, see "one kind of lock" below). It never retires the vault or a lockbox. `convexVaultDB`'s `ConvexClient`
+  of an unlock under way are gone, see "one kind of lock" below). It never deletes the vault or a box. `convexVaultDB`'s `ConvexClient`
   watch now calls `onChange` on a failed `watchVault` (as a `ConvexReactClient`'s watch already
   did), so an idle vault locks on a sign-out in another tab. **For review**: (1) the default is
   `'lock'`, but `Vault.make`'s `whenIdentityRevoked: 'stay'` lets a host keep the vault unlocked
@@ -988,57 +1615,58 @@ added or folded into through the subagent, and no other entry changes.
   stored vault may be damaged, and claims no tampering. Told apart, each its own kind: vault props
   that fail their schema or names another scope (`damaged_vault`, mapped by the vault from
   storage's `corrupt_record`, which stays `VaultDB`'s word, the original as `cause`); a wayin
-  whose salt its deriver could not have made (`damaged_wayin`); and a lockbox that fails its
-  schema, or will not open under the vault's vaultKey, or opens to no whisper (`damaged_lockbox`)
+  whose salt its deriver could not have made (`damaged_wayin`); and a box that fails its
+  schema, or will not open under the vault's vaultKey, or opens to no whisper (`damaged_box`)
   -- knowable because that vaultKey was proven by the wayin that gave it. **A damaged wayin
-  is passed over, no longer refused for the whole vault**: the others are tried as ever (no
-  derivation is spent on it, and the outcome still does not hang on order), and
-  `safebyok-react`'s `askPasskey` likewise offers only the passkeys it can ask. Considered and
+  is passed over, no longer refused for the whole vault**: the other slot's wayin opens as ever (no
+  derivation is spent on the damaged one; until slots, the others in a list were tried), and
+  `safebyok-react`'s `askPasskey` likewise offers only a passkey it can ask. Considered and
   refused: telling a wrong passphrase from an altered wayin by re-encrypting a held vaultKey
   under the derived key with the stored IV and comparing ciphertexts -- it works only against
   GCM's structure, needs the vaultKey's bytes, and is a construction of our own. Vault props that
-  fails its checks cannot be retired through a vault handle (`hello()` refuses it, and `retire()`
+  fails its checks cannot be deleted through a vault handle (`hello()` refuses it, and `del()`
   needs a handle); it is left in place, as every damaged remote record is, until the host calls
-  `retireDamagedVault` (the entry below).
-* 2026-10-16: `postgresVaultDB`'s lockbox limit is a best effort (VaultDB contract, lines 4.2 to
-  4.5), not a guarantee: the insert counts the vault's lockboxes in a `count(*)` over its own
+  `delDamagedVault` (the entry below).
+* 2026-10-16: `postgresVaultDB`'s box limit is a best effort (VaultDB contract, lines 4.2 to
+  4.5), not a guarantee: the insert counts the vault's boxes in a `count(*)` over its own
   statement's snapshot, with no lock and no counter, so writers racing for the last places under
   READ COMMITTED may each find room and all land, by at most one less than the number of racers.
-  A client that bypasses the library can add lockboxes without bound, which makes the limit an
+  A client that bypasses the library can add boxes without bound, which makes the limit an
   alarm bell and a guard against a runaway loop, not an abuse quota: the host meters that, like
   its request rates, and the README offers a trigger for a host that wants a hard cap. This
-  replaced the `lockbox_count` column, its trigger and a `FOR UPDATE` row lock, reasoned about
+  replaced the `box_count` column, its trigger and a `FOR UPDATE` row lock, reasoned about
   in `whiteboard/20261015-matters/thread-11-postgres_verdict.md`; what to check: that a refused
-  write inserted nothing (the `WHERE` of one atomic statement), that no lockbox lands in a vault
+  write inserted nothing (the `WHERE` of one atomic statement), that no box lands in a vault
   but its own (the foreign key, re-read against the vault props that stand now, whose violation
-  `23503` is mapped to `stale_write`), and that every lockbox that landed stays readable and
+  `23503` is mapped to `stale_write`), and that every box that landed stays readable and
   erasable. Above READ COMMITTED some races fail with `40001`, refused as `storage_unavailable`.
   The notify trigger is no longer installed by `VaultTablesSql`: a host opts in with
   `VaultNotifySql`, and without it nothing is pushed (the vault refreshes after its own writes).
   Not run against concurrent connections: the tests are on PGlite, one statement at a time.
-* 2026-10-16 (revised the same day by refusals_and_catchup, below: a vault that may be newer is `newer_format`): **`retireDamagedVault`, the one way to retire a vault without a handle** (the Coach:
-  "yes"). `retire()` deliberately needs no unlock ("owning the account is enough"), but needs a
+* 2026-10-16 (revised the same day by refusals_and_catchup, below: a vault that may be newer is `newer_format`): **`delDamagedVault`, the one way to delete a vault without a handle** (the Coach:
+  "yes"). `del()` deliberately needs no unlock ("owning the account is enough"), but needs a
   handle the vault's own reading made; vault props that fail their checks gave none. The new call
-  retires a vault `hello()` refuses as `damaged_vault` and no other: it refuses (`bad_option`,
-  nothing retired) vault props that read back sound, so it cannot become a way round `retire()`'s
-  care, and it retires through `VaultDB.retireDamagedVault`, which reads the record as stored,
-  takes its `vault_id`, and aims the adapter's `doRetireVault` at that one vault, so a vault made
-  anew meanwhile survives as `stale_write`. Like `retire()` it needs no passphrase, and it is as
-  strong as the backend's own authorization of who may retire that user's rows (the contract's
-  5.4): a user can already retire their own vault by `retire()`, so it widens nothing for them,
+  deletes a vault `hello()` refuses as `damaged_vault` and no other: it refuses (`bad_option`,
+  nothing deleted) vault props that read back sound, so it cannot become a way round `del()`'s
+  care, and it deletes through `VaultDB.delDamagedVault`, which reads the record as stored,
+  takes its `vault_id`, and aims the adapter's `doDelVault` at that one vault, so a vault made
+  anew meanwhile survives as `stale_write`. Like `del()` it needs no passphrase, and it is as
+  strong as the backend's own authorization of who may delete that user's rows (the contract's
+  5.4): a user can already delete their own vault by `del()`, so it widens nothing for them,
   and widens nothing for anyone else. It also erases the lease, on this device only.
-  **For review**: (1) the retirement's expectation is the `vault_id` read from a record that is, by
-  definition, untrusted; it can only aim the retirement at the row it read, in the caller's own
-  scope, so a forged `vault_id` in a damaged row retires that row and nothing else; (2) `localVaultDB`
-  and `idbVaultDB` now retire a whole vault on the `vault_id` alone (the contract's line 3.5 always
+  **For review**: (1) the deletion's expectation is the `vault_id` read from a record that is, by
+  definition, untrusted; it can only aim the deletion at the row it read, in the caller's own
+  scope, so a forged `vault_id` in a damaged row deletes that row and nothing else; (2) `localVaultDB`
+  and `idbVaultDB` now delete a whole vault on the `vault_id` alone (the contract's line 3.5 always
   said so), where they had also required a readable `unlock_epoch`, which kept exactly the
-  damaged vaults from being retired; lockbox writes and `retireBox` still need the epoch.
+  damaged vaults from being deleted; box writes and `delBox` still need the epoch.
   **Newer is not damaged** (review of the above): vault props that fail this build's checks may be
-  ones a *later* build writes and opens, and offering "retire" for it would retire, from a device
+  ones a *later* build writes and opens, and offering "delete" for it would delete, from a device
   on an old build, a vault every up-to-date device opens. So the hatch refuses (kind
-  `damaged_vault`, a message to update the app, nothing retired) a record with a `format` this
-  build does not know (of any type), a wayin `wayinkind` it does not know, or more wayins than
-  `MaxUnlocks`, and retires only what fails otherwise. **The rule this rests on, which the Coach
+  `damaged_vault`, a message to update the app, nothing deleted) a record with a `format` this
+  build does not know (of any type), and deletes only what fails otherwise (until slots, it also
+  refused a wayin `wayinkind` it did not know, or more wayins than `MaxUnlocks`; now `format` alone
+  tells newer from damaged). **The rule this rests on, which the Coach
   has ruled (2026-10-16): any change to what a stored record may hold -- a field, a shape, or a
   range a check accepts -- bumps `format`**, so that an older build can tell newer from damaged. Where it cannot tell, it refuses: the hatch fails safe. Not routed through
   `RefusalPolicy.heed`: there is no handle to lock and no key in memory, so `whenIdentityRevoked`
@@ -1050,10 +1678,10 @@ added or folded into through the subagent, and no other entry changes.
   validators now admits any well-formed text** (`AnyTextValidators`), where it used to apply the
   defaults: a wrapper that forgets to forward the vault's bag can no longer refuse a well-formed
   name the vault's own checks passed. The vault passes its bag to every verb (a test spies each
-  one); it had left it off `updateVaultProps`, so a host with a wider `userId` check could not change
+  one); it had left it off `putVaultProps`, so a host with a wider `userId` check could not change
   a passphrase. Before the change, a server calling the verbs bare got the default checks; it now
   gets text-only checks, which is what the shipped server recipes already passed. The same holds
-  for `retireDamagedVault` and its verb. A `damaged_lockbox` refusal no longer quotes the boxlabel,
+  for `delDamagedVault` and its verb. A `damaged_box` refusal no longer quotes the boxlabel,
   as `absent_box` already did not.
 * 2026-10-16: **a foreign error that may quote stays behind.** `Sanitizer.refusalFor`
   (`src/sanitizer.ts`, exported as `Sanitizer`) is the one place that decides what of a foreign
@@ -1066,13 +1694,11 @@ added or folded into through the subagent, and no other entry changes.
   other server error but by its text, so all of them are dropped. The cost is debugging: the
   deployment's logs keep the full error. The other adapters still carry their client's error as
   `cause`, as above.
-* 2026-10-16: **`validators.wayinlabel`**, a sixth slot, checks the label of each wayin a host
-  adds (`addPassphrase`, `addPasskey`), `Label` by default, refused as `bad_label` without
-  quoting it, as the other names are. It is checked only there: a stored wayin's
-  `wayinlabel` is still read as plain text, so a wayin stored under a label a narrowed check
-  refuses still opens the vault and lists as it is. Refusing it on read would make the vault props
-  `corrupt_record` and lock the user out of their own vault, or hide a wayin they rely on. The
-  first wayin, named `passphrase` by the vault itself, is not checked.
+* 2026-10-16; 2026-10-19 (slots): **`validators.wayinlabel` is gone**, with the `wayinlabel` it checked. It
+  was a sixth slot that checked the label of each wayin a host added, `Label` by default, refused as
+  `bad_label` without quoting it, and only there: a stored wayin's `wayinlabel` was read as plain text,
+  since refusing it on read would have made the vault props `corrupt_record` and locked the user out of
+  their own vault. Wayins no longer carry a label, so no name enters the vault through a way in.
 * 2026-10-16: **ckeys are joined on `^`, and a name holding it is refused** (push_to_100_a, thread
   1). The key-value stores (`localVaultDB`, `idbVaultDB`, `idbDeviceDB`, `memoryDeviceDB`) file
   rows under `kind^applabel^user_id^vaultlabel[^boxlabel]` (`Ckeys`), replacing the JSON-tuple
@@ -1081,40 +1707,39 @@ added or folded into through the subagent, and no other entry changes.
   `VaultDB` verb, every record schema and the vault's entry hold every name to, whatever the
   host's validators and whatever the store; and `Ckeys` itself refuses one as it composes, which
   also guards the device shelves, which have no base class. Were either missing, `a^b` + `c` and
-  `a` + `b^c` would share a ckey: one user's lockbox under another's scope. The delimiter is fixed:
+  `a` + `b^c` would share a ckey: one user's box under another's scope. The delimiter is fixed:
   no host sets another (the Coach's ruling), and every store refuses `^` alike, so a host
   never meets a refusal from one store (the browser's device shelf, say) that its vault store
   never raised. A hash was not chosen:
   it hides nothing (each name is plaintext in the row, and an indexed column in Convex and
-  Postgres) and loses the name of a damaged row, which the listing needs to offer `retireBox()`. Rows
+  Postgres) and loses the name of a damaged row, which the listing needs to offer `delBox()`. Rows
   under the JSON ckeys read as absent; the device shelf sweeps them as strays.
 * 2026-10-16: **a floor beneath every name, and the host's validators at entry only**
   (thread 1). `NameFloor` (well-formed Unicode, NFC, no control character, 1 KiB a name) now
   runs beneath whatever schema a host passes, at the vault's entry, in every `VaultDB` verb, and
   in every record schema, so a stored name below it reads back as damaged and never reaches
   `snapshot.boxes` unchecked (a row stored under a name below it is not listed at all). A
-  lockbox's sidecar has no floor of its own: it is the host's, checked by the host. This bounds what storage can put in front
+  box's sidecar has no floor of its own: it is the host's, checked by the host. This bounds what storage can put in front
   of a host's UI whatever its validators: no control characters, no 1 MB label. The host's
-  `validators`, by contrast, now run only where a name enters the vault (`Vault.make`, `storeBox`,
-  `addPassphrase`, `addPasskey`) and never on a record read back: a lockbox stored under a name
-  they refuse lists, reads and retires as sound, as a wayinlabel already did. They are an
+  `validators`, by contrast, now run only where a name enters the vault (`Vault.make`, `putBox`) and never on a record read back: a box stored under a name
+  they refuse lists, reads and deletes as sound (as a wayin's label did, until slots removed it). They are an
   alarm for the host's own use, not a promise about storage, which a server serving several
   clients cannot keep. `VaultDB` verbs no longer take a validators bag at all, so no server or
   wrapper can be handed the wrong one. Each adapter declares `maxNameBytes` (Postgres: 640, so a
-  lockbox's four-name primary key fits a btree entry) and the base class refuses a longer name.
-* 2026-10-16; 2026-10-18: **a lockbox's sidecar is any JSON, bound; its whisper's codec
+  box's four-name primary key fits a btree entry) and the base class refuses a longer name.
+* 2026-10-16; 2026-10-18; 2026-10-19: **a box's sidecar is any JSON, bound; its whisper's codec
   and schema version are reserved, bound too** (push_to_100_a, thread 2; G023, G025, G040). The
-  lockbox (`safebyok-lockbox-v5`) holds `sidecar_json`, the host's sidecar as stable-serialized JSON
+  box (`safebyok-box-v6`) holds `sidecar_json`, the host's sidecar as stable-serialized JSON
   text, always written (`{}` when the host gave none, so an absent sidecar and an empty one are one
   record and one ctx), and `whisper_codec` (`json_v1`) and `whisper_schema_version` (`1`).
-  All three join the header both of the lockbox's encryptions bind, so a sidecar swapped between
-  boxes, emptied, or merely respaced in storage makes `readBox()` refuse it (`damaged_lockbox`);
+  All three join the header both of the box's encryptions bind, so a sidecar swapped between
+  boxes, emptied, or merely respaced in storage makes `getBox()` refuse it (`damaged_box`);
   the bound value is the stored text itself, never a re-serialization, so a store must keep it
   byte for byte (Postgres keeps it as `text`, never `jsonb`). The record's check also requires
   that text to be its own stable re-serialization, inside a try: a sidecar respaced, reordered, or
   nested too deep to serialize (which once overflowed the stack in the snapshot's comparison and
   stopped the vault opening with a bare `RangeError`) lists as damaged and reads as
-  `damaged_lockbox`, so one bad record never hides the rest. A `storeBox()` carries the standing
+  `damaged_box`, so one bad record never hides the rest. A `putBox()` carries the standing
   sidecar and `registered_at` forward only from a record that deciphers: over one that will not, its
   sidecar becomes `{}` unless one is given, and its `registered_at` is now, so a sidecar planted in
   storage is never sealed into a fresh revision that reads clean (found in review). What the sidecar reveals: everything in
@@ -1123,30 +1748,35 @@ added or folded into through the subagent, and no other entry changes.
   every visible field is. Its size is capped only with the whisper's (`maxWhisperBytes` counts
   both), so a host cannot put a sidecar of megabytes in front of the listing through the vault.
   Reserving the codec fields now means a later codec (padding, G026) or a whisper shape version
-  changes no bound field set and re-encrypts nothing. Two ctx fixes ride along: the lockbox's
+  changes no bound field set and re-encrypts nothing. Two ctx fixes ride along: the box's
   format is bound once, as the leading tag (it was also in the header), and `cipherCtx`
   refuses a record part holding a field set to `undefined` (`bad_option`) instead of dropping it
   as JSON would, so a field gone missing by mistake can never bind as if it were absent. The
   sidecar has no control-character floor of its own (G177): it is the host's, and a host
   that shows it checks what it shows. 2026-10-18 (branch `20261018-sidecar`, thread 5 of sprint
-  reform): the host's field, first the lockbox's "note" and then its "public bag", was renamed the
+  reform): the host's field, first the box's "note" and then its "public bag", was renamed the
   "sidecar", `public_json` became `sidecar_json`, and the format
-  tag moved from `safebyok-lockbox-v4` to `safebyok-lockbox-v5`. Both of a lockbox's encryptions
-  (the lockboxKey wrap and the whisper cipher) bind a context (`boxCtx`) of the format tag, the
+  tag moved from `safebyok-lockbox-v4` to `safebyok-lockbox-v5`. Both of a box's encryptions
+  (the boxKey wrap and the whisper cipher) bind a context (`boxCtx`) of the format tag, the
   vault's scope and `vault_id`, the purpose string, and the whole stored header as key-sorted JSON,
   so those bytes follow the renamed field and the v5 tag, and the header now spells `sidecar_json`
   after `revision_id` rather than after `boxlabel`. The construction is unchanged: same parts,
-  same order, same purpose strings, the sidecar in the header where `public_json` was. A v4 lockbox
-  lists as damaged and reads as `damaged_lockbox` on every adapter that reads it (a Convex
+  same order, same purpose strings, the sidecar in the header where `public_json` was. A v4 box
+  lists as damaged and reads as `damaged_box` on every adapter that reads it (a Convex
   deployment refuses the new component schema until its tables are cleared), with no migration,
   so no old ciphertext has to open under the new bytes. Also 2026-10-18 (branch
-  `20261018-vaultprops`): the lockbox's stored field `revision_id` is renamed `revision_tok` (a
+  `20261018-vaultprops`): the box's stored field `revision_id` is renamed `revision_tok` (a
   `_tok` names a value that changes on every write), and `boxCtx` follows it, so the field name in
   the bound header changes; the construction is unchanged, the same parts in the same order, and
   `revision_tok` sorts where `revision_id` did. It rides the format bump to `safebyok-lockbox-v5`
-  already in this release, so there is no second bump, and a lockbox in an older format lists as
+  already in this release, so there is no second bump, and a box in an older format lists as
   damaged, as before, with no migration. The wayin's and the lease's contexts bind no field the
-  rename touches, so their bytes do not move. `tests/ctx-bytes.test.ts` pins the lockbox's bytes.
+  rename touches, so their bytes do not move. `tests/ctx-bytes.test.ts` pins the box's bytes. 2026-10-19 (branch 20261019-rename_pass, on
+  [PR #193](https://github.com/mrflip/safebyok/pull/193)): the box record's format tag, which leads its ctx, moved
+  from `safebyok-lockbox-v5` to `safebyok-box-v6`, and the purpose string that binds a wrapped boxKey
+  moved from `lockbox_key_wrapped` to `box_key_wrapped`. Both are still distinct from every other format
+  tag and purpose string. A box stored under the old names fails schema validation before any
+  decryption is tried, and is listed as damaged.
 * 2026-10-16 (locks_and_expiry); 2026-10-19 (20261019-softlock_gone): **the lease has a hard edge, and a timer.** The
   threshold is the truth: every call that starts work checks `askPassphraseAt` against the host's
   clock, and past it throws `vault_locked`. A `setTimeout` enforces it: armed at each take-up of a
@@ -1154,7 +1784,7 @@ added or folded into through the subagent, and no other entry changes.
   `askPassphraseAt`, the one timer, and drops the vaultKey with no call made (amended 2026-10-19:
   it once rang at `askPassphraseAt` to close the gate, and again 60 s later, the grace work in hand
   got, to drop the key; the minute is gone). Every look at the key
-  (`ensureUnlocked`, and the second look of work in hand) also drops it once that shut time has
+  (`checkUnlocked`, and the second look of work in hand) also drops it once that shut time has
   passed by the clock, so a timer that runs late, on a device asleep, is not depended on. (Amended 2026-10-19:
   `lockSoon()`, which took the lesser of its grace and what the lease had left, is gone; a key
   past `askPassphraseAt` whose timer ran late is dropped at the next call that looks.) To make one timer always reach,
@@ -1165,31 +1795,32 @@ added or folded into through the subagent, and no other entry changes.
   (Node, Bun), so an open vault never holds a process alive; that costs nothing, since a process
   that exits drops the key with it. **The lease renews only on a typed passphrase that proves**
   (the Coach, 2026-10-16: "if I type in a password for any reason and prove I am mrflip, ... no
-  need to type that password again for seven days"): `unlock()`, `changePassphrase()`, and any
-  change to the wayins proved by a passphrase. An `unlock()` by passkey also sets it, as it did.
-  A passkey proving a change on an unlocked vault keeps the deadline standing (on a locked one it
-  sets one, as `unlock()` by passkey would). Reads, stores, retirements and refreshes never move it.
-  One place decides (`deadlineFor` in `vault.ts`), so a new kind of proof cannot slip past it.
+  need to type that password again for seven days"): `unlock()`, `putWayin()`, and any
+  change to the wayins, each proved by the passphrase. An `unlock()` by passkey also sets it, as it did.
+  Amended 2026-10-19 (slots): since only the passphrase proves a change, every change starts the lease
+  again from now; before, a passkey-proven change on an unlocked vault kept the standing deadline.
+  Reads, stores, deletions and refreshes never move it.
+  One place decides (`#deadlineFromNow` in `vault.ts`; once `deadlineFor(proof, call)`), so a new kind of proof cannot slip past it.
   Expiry was a soft lock (the strawman's two locks); amended 2026-10-19: there is one kind of
   lock, which drops the key at once, and no lock, expiry included, defeats an `unlock()` or
-  `changePassphrase()` under way (see "one kind of lock" below). For review: a passkey's proof keeping, not renewing, the deadline is the weaker
-  reading of "proves I am mrflip" (G530 asks the deeper question, NOT YET).
-* 2026-10-16 (locks_and_expiry; revised the same day by refusals_and_catchup, below: `lockSoon()` raises nothing, and the generation outlives a `retire()`; 2026-10-19, 20261019-softlock_gone: **the lock generation, `DeviceDB.writeLease`'s expectation and this versioned erase are gone**, a lock reaches no unlock under way, and what follows describes what stood until then): **a lock reaches every tab's unlock under way: the versioned
+  `putWayin()` under way (see "one kind of lock" below). (The question G530 asked, whether a passkey's proof should only keep the
+  deadline, no longer arises: no passkey proves a change.)
+* 2026-10-16 (locks_and_expiry; revised the same day by refusals_and_catchup, below: `lockSoon()` raises nothing, and the generation outlives a `del()`; 2026-10-19, 20261019-softlock_gone: **the lock generation, `DeviceDB.putLease`'s expectation and this versioned erase are gone**, a lock reaches no unlock under way, and what follows describes what stood until then): **a lock reaches every tab's unlock under way: the versioned
   erase.** The device mark gains `lock_generation` (format `safebyok-mark-v2` then; today's tag is `safebyok-mark-v3`). Every lock that
-  revokes the lease -- `lock()`, `lockSoon()`, a sign-out's lock, `retire()`'s --
+  revokes the lease -- `lock()`, `lockSoon()`, a sign-out's lock, `del()`'s --
   raises it before erasing the record. An unlock (or a change to the wayins) reads it as it
-  starts, and `DeviceDB.writeLease(lease, expected)` writes the lease only while
+  starts, and `DeviceDB.putLease(lease, expected)` writes the lease only while
   the mark still stands at that generation, comparing and writing in one step (one IndexedDB
   transaction in `idbDeviceDB`), else refusing `stale_write`, which the vault takes as "a lock
   won": it takes nothing up and throws `vault_locked`. A record written before the raise is
-  erased by the lock's own erase, which follows it. `writeMark` never lowers the generation (the
+  erased by the lock's own erase, which follows it. `putMark` never lowers the generation (the
   higher of the mark written and the mark replaced is kept, in the same step), so a mark written
   from an older read -- a rollback mark raised by another tab -- cannot undo a lock. Limits: a
   host's own `DeviceDB` that ignores the expectation is back to per-handle locking (the
   `describeDeviceDB` battery checks it); a lock on a device with no mark for the vault (one that
-  never read it, or whose mark would not read) has nothing to raise; and `retire()` erases the
+  never read it, or whose mark would not read) has nothing to raise; and `del()` erases the
   mark, so its generation starts again from 0, and an unlock under way in another tab that began
-  at 0 may write a record of the retired vault, which opens nothing and is erased at the next
+  at 0 may write a record of the deleted vault, which opens nothing and is erased at the next
   open of a vault under the scope. `close()` is no lock: it erases nothing, raises nothing, and a
   record an unlock under way wrote before the close stays (G126). The undoing erase of a losing
   unlock now runs only for a lock in its own handle (which may have erased before the record
@@ -1206,24 +1837,25 @@ added or folded into through the subagent, and no other entry changes.
   lease's expiry is one timer at `askPassphraseAt` that drops the key, and a key past its deadline
   whose timer ran late is dropped at the next call that looks. The three in-handle lock counters
   (`shutsSoFar`, `hardLocksSoFar`, `revokesSoFar`) and the device mark's `lock_generation` (with
-  `DeviceDB.writeLease`'s expectation) are gone: they decided who wins when a lock lands while
+  `DeviceDB.putLease`'s expectation) are gone: they decided who wins when a lock lands while
   something is in flight, and now nothing decides; last writer wins. So a `lock()` landing during
   an unlock (this tab or another tab on the device) no longer stops it: the unlock finishes, the
-  vault ends unlocked, and a lease is written. A `lock()` landing while `hello()` reads the lease no
-  longer stops the lease being taken up. A lease that a lock failed to erase (the device store
-  threw) is taken up by the next `hello()` that reads afresh on the same handle, not only at the
-  next page load. A `readBox()` or `useBox()` still hands back nothing if no key is in hand when
-  storage answers or when the whisper has been deciphered, unless another unlock put a key back in
-  hand meanwhile. An unlock still takes nothing up when the handle has closed or the vault props it
-  proved against no longer stand (retired, remade, wayins changed). **For review**: the Coach's
-  ruling is that these are accepted as user annoyances until the store reform is done; a policy is
-  owed before 1.0, recorded in TODO.md under *Lock timing vs. work in flight* with seven
-  scenarios. The device mark (format now `safebyok-mark-v4`) holds only the seen vault (rollback
-  detection), never null, and `retire()` erases it rather than writing a blank one; a
+  vault ends unlocked, and a lease is written. A `lock()` landing while `hello()` takes up the
+  lease is the exception (corrected 2026-10-19, 20261019-fields_and_make, PR #197): any key change
+  landing then aborts the take-up, which installs nothing (see the `make_hello` entry). A lease that a lock
+  failed to erase (the device store threw) is taken up by the next `hello()` that reads afresh on
+  the same handle, not only at the next page load. A `getBox()` or `useBox()` still hands back
+  nothing if no key is in hand when storage answers or when the whisper has been deciphered, unless
+  another unlock put a key back in hand meanwhile. An unlock still takes nothing up when the handle
+  has closed or the vault props it proved against no longer stand (deleted, remade, wayins changed).
+  **For review**: the Coach's ruling is that these are accepted as user annoyances until the store
+  reform is done; a policy is owed before 1.0, recorded in TODO.md under *Lock timing vs. work in
+  flight* with seven scenarios. The device mark (format now `safebyok-mark-v4`) holds only the seen vault (rollback
+  detection), never null, and `del()` erases it rather than writing a blank one; a
   `safebyok-mark-v3` record reads as no mark, so the device re-checks the vault from what storage
-  holds now. What stood until 2026-10-19: `lock()`, `retire()` and a lock for untrusted storage are hard: the key goes at once,
+  holds now. What stood until 2026-10-19: `lock()`, `del()` and a lock for untrusted storage are hard: the key goes at once,
   the device mark's lock generation rises, an unlock or change under way anywhere on the device
-  takes nothing up, and a `readBox()` or `useBox()` under way refuses `vault_locked` after its last
+  takes nothing up, and a `getBox()` or `useBox()` under way refuses `vault_locked` after its last
   await, dropping the whisper it deciphered (one monotonic compare of the handle's shut count,
   which can only turn a success into a refusal). `lockSoon()` and expiry are soft: the door closes
   at once and the lease is revoked (by `lockSoon()`) or has expired, but work in hand finishes -- an unlock or change
@@ -1234,62 +1866,62 @@ added or folded into through the subagent, and no other entry changes.
   cannot trust.** `identity_revoked` and `rolled_back` both lock the vault at once (amended 2026-10-19: once called hard, before there was one kind of lock), wherever they are
   met -- a call, a catch-up, a background refresh, the open itself (which revokes the lease) -- decided in `refusal-policy.ts`'s `decide`, with no host option: `whenIdentityRevoked`
   and its `'stay'` are gone. An adapter that says `identity_revoked` for a passing fault breaks
-  VAULTDB.md 5.5. After a deliberate restore, the README's `eraseMark` recipe stays the only way
+  VAULTDB.md 5.5. After a deliberate restore, the README's `delMark` recipe stays the only way
   out (G513): no verb puts forgetting the newer copy one call away. **For review**: a storage
   replica that briefly serves an older copy now makes every device that saw the newer one ask for
   the passphrase again.
-* 2026-10-16 (refusals_and_catchup); 2026-10-19 (20261019-softlock_gone: **the generation is gone, and `retire()` erases the mark again; the mark, now `safebyok-mark-v4`, holds only the seen vault, never null**; the rest describes what stood until then): **the lock generation outlives `retire()`, and a lock with
+* 2026-10-16 (refusals_and_catchup); 2026-10-19 (20261019-softlock_gone: **the generation is gone, and `del()` erases the mark again; the mark, now `safebyok-mark-v4`, holds only the seen vault, never null**; the rest describes what stood until then): **the lock generation outlives `del()`, and a lock with
   no mark still counts.** The device mark (then `safebyok-mark-v3`) holds what it has `seen` of the
-  scope's vault, or null; `retire()` writes it with nothing seen at its raised generation, rather
+  scope's vault, or null; `del()` writes it with nothing seen at its raised generation, rather
   than erasing it, and a lock on a scope with no readable mark writes one at generation 1. So an
-  unlock under way elsewhere at generation 0 loses to a `retire()`, and a vault-creating first unlock
-  loses to another tab's lock. `eraseMark` (the restore recipe, `retireDamagedVault`) still resets
+  unlock under way elsewhere at generation 0 loses to a `del()`, and a vault-creating first unlock
+  loses to another tab's lock. `delMark` (the restore recipe, `delDamagedVault`) still resets
   the generation; neither runs with a handle that could be unlocking that vault.
 * 2026-10-16 (refusals_and_catchup): **one catch-up before a kind is named.** A write storage
-  refuses as stale, or a lockbox that will not open, gets one refresh before the vault names it: a
-  vault retired and made anew, or its wayins changed, elsewhere relocks the device (P4: never on
-  no evidence), so a successor vault's lockbox reads as `vault_locked`, not `damaged_lockbox`. A
+  refuses as stale, or a box that will not open, gets one refresh before the vault names it: a
+  vault deleted and made anew, or its wayins changed, elsewhere relocks the device (P4: never on
+  no evidence), so a successor vault's box reads as `vault_locked`, not `damaged_box`. A
   catch-up that fails is thrown as `stale_write` with the failure as cause, never retried blind,
   and the snapshot says `syncing: false`. Refreshes are serialized per handle (one in flight, one
-  queued), so two reads never interleave their snapshot updates. None retries: `storeBox()`, a change
-  to the wayins, `retireBox()` and `retire()` each refuse once (amended 2026-10-18: this said only `storeBox()` retries, until [#160](https://github.com/mrflip/safebyok/pull/160) removed that retry; see the 2026-10-15; 2026-10-18 entry above). There is no conflict hook: a retirement wins.
-* 2026-10-16 (refusals_and_catchup, G498): **a damaged lockbox is replaced in one conditional
+  queued), so two reads never interleave their snapshot updates. None retries: `putBox()`, a change
+  to the wayins, `delBox()` and `del()` each refuse once (amended 2026-10-18: this said only `putBox()` retries, until [#160](https://github.com/mrflip/safebyok/pull/160) removed that retry; see the 2026-10-15; 2026-10-18 entry above). There is no conflict hook: a deletion wins.
+* 2026-10-16 (refusals_and_catchup, G498): **a damaged box is replaced in one conditional
   write.** The listing keeps a damaged record's `revision_tok` when it holds one as text, and
-  `storeBox()` writes over that revision under contract line 3.3, so a sound lockbox another device
-  wrote meanwhile refuses the write and is never retired, and the refusal is thrown as `stale_write`
+  `putBox()` writes over that revision under contract line 3.3, so a sound box another device
+  wrote meanwhile refuses the write and is never deleted, and the refusal is thrown as `stale_write`
   after one catch-up (amended 2026-10-18: the store once retried over it, last writer wins, until [#160](https://github.com/mrflip/safebyok/pull/160) removed the retry). The revision is untrusted text used only as an expectation storage compares. Only
-  a record naming no revision is retired first, which leaves a gap P6 accepts (amended 2026-10-19,
-  20261019-no_clear: the retire-first is gone; `storeBox()` refuses a damaged lockbox naming no
-  revision as `damaged_lockbox`, writing nothing, and the gap with it). A lockbox under a
+  a record naming no revision is deleted first, which leaves a gap P6 accepts (amended 2026-10-19,
+  20261019-no_clear: the delete-first is gone; `putBox()` refuses a damaged box naming no
+  revision as `damaged_box`, writing nothing, and the gap with it). A box under a
   vaultKey epoch neither the vault props' nor the prior's lists as damaged from its epoch alone (G063);
   the listing still never opens ciphertext (G121).
 * 2026-10-16 (refusals_and_catchup): **`Vault.make` takes only a `VaultDB`** (G122): a duck-typed
   object would skip the base class's checks of every record and expectation. `instanceof` holds
   within one copy of the package, as `VaultError`'s does; the peer dependency keeps it one. And a
   vault a newer safebyok may have written is `newer_format`, never `damaged_vault`, so no UI
-  offers to retire it (G120).
+  offers to delete it (G120).
 * 2026-10-16 (epoch_expectation, G065, G138): **every in-tree adapter now compares the
   `vault_key_epoch` expectation** (line 3.8), and the battery holds every adapter to it, with no
   opt-out (`describeVaultDB` no longer takes `comparesVaultKeyEpoch`). IndexedDB compares in the
-  write's transaction; the Convex component in `updateBox`'s mutation; Postgres in the write's one
+  write's transaction; the Convex component in `putBox`'s mutation; Postgres in the write's one
   statement, reading the vault props row `FOR SHARE` -- without the lock, READ COMMITTED would compare
   the epoch in the statement's snapshot, and a rotation committed after it would go unseen; GraphQL
   passes the expectation whole to the VaultDB it serves. So "no look before writing" (G138) holds:
   storage alone refuses a stale vaultKey's write, atomically. The `FOR SHARE` lock is new: vault props
-  update now waits for lockbox writes in flight, and the README's hard-cap trigger takes a
+  update now waits for box writes in flight, and the README's hard-cap trigger takes a
   per-vault advisory lock rather than `FOR UPDATE` on the vault props, which would deadlock two writers
   each holding the shared lock. The real-Postgres race that proves the lock waits on thread 11's
   container suite. The 2026-10-16 entry above that says IndexedDB, Convex and Postgres "do not yet"
   is superseded.
-* 2026-10-16 (epoch_expectation, the Coach's ruling on thread 4's review); 2026-10-19 (20261019-softlock_gone: **the counts are gone**: a `readBox()` or `useBox()` hands back nothing if no key is in hand when storage answers or when the whisper has been deciphered, unless another unlock put a key back in hand meanwhile; the rest describes what stood until then): **`close()` and a key
-  outlived by a refresh are hard locks for a read in flight.** A `readBox()` or `useBox()` notes a
+* 2026-10-16 (epoch_expectation, the Coach's ruling on thread 4's review); 2026-10-19 (20261019-softlock_gone: **the counts are gone**: a `getBox()` or `useBox()` hands back nothing if no key is in hand when storage answers or when the whisper has been deciphered, unless another unlock put a key back in hand meanwhile; the rest describes what stood until then): **`close()` and a key
+  outlived by a refresh are hard locks for a read in flight.** A `getBox()` or `useBox()` notes a
   per-handle count of hard locks when it starts (every shut, a `close()`, a refresh that drops the
   key because the wayins changed or the vault went) and hands back nothing if it moved meanwhile:
   the deciphered whisper is dropped, never returned. It is a separate count from the one unlocks
   race against, so a refresh an `unlock()` makes for itself does not defeat that unlock. Not hard
   locks, by design: a `lockSoon()` grace running out, and a clock that cannot be read.
-* 2026-10-16 (secure_floor, G032): **an all-zero passphraseKey is refused.** `passphraseKeyOf`
-  (`wayin.ts`), the one place the core receives any key deriver's output, refuses 32 zero
+* 2026-10-16 (secure_floor, G032); 2026-10-19: **an all-zero passphraseKey is refused.** `passphraseKeyOf`
+  (`wayin.ts`; since 2026-10-19, #201, `proof.ts`), the one place the core receives any key deriver's output, refuses 32 zero
   bytes as `bad_option`, at create, unlock and every change to the wayins alike. No derivation
   makes them; a host deriver that kept its output and handed back bytes since wiped would, and
   the vault would seal under a key anyone can rebuild. The check reads every byte, OR-ing them
@@ -1300,21 +1932,21 @@ added or folded into through the subagent, and no other entry changes.
   false`) first of all, as `insecure_context` (misuse): a browser withholds WebCrypto from plain
   http, which otherwise failed later as a `TypeError` with no kind. A runtime with no notion of
   one (Node, Bun, React Native: the global is absent) passes.
-* 2026-10-16 (secure_floor): **a new passphrase must pass `passphraseStrengthTest`** before any key
-  derivation: the one a vault is created with, and each one `addPassphrase` or `changePassphrase`
+* 2026-10-16 (secure_floor): **a new passphrase must pass `strengthChecker`** before any key
+  derivation: the one a vault is created with, and each one `putWayin`
   sets; never at `unlock`, so no user is locked out of a vault that stands by a test made
   stricter later. The default is NIST SP 800-63B's length and no composition rules, at 12 code
   points (the Coach's floor; SP 800-63B rev. 4 asks 15 of a password that is the only factor,
   which a vault passphrase is). The refusal's message is the host test's own reason, a host
   string: the doc tells hosts never to quote the passphrase in it, and the core cannot check.
-  `safebyok/browser` offers `zxcvbnPassphraseTest` on `@zxcvbn-ts/core` and
+  `safebyok/browser` offers `zxcvbnStrengthChecker` on `@zxcvbn-ts/core` and
   `@zxcvbn-ts/language-common` (runtime dependencies at the Coach's yes): the length floor, then a
   zxcvbn score of at least 3, which is its blocklist of common passwords (NIST's other ask) and its
   pattern matchers. It keeps nothing of a passphrase between calls.
-* 2026-10-16: **a key deriver's bytes are zeroed once imported.** `passphraseKeyOf`
-  (`src/wayin.ts`) `fill(0)`s the 32 bytes a `KeyDeriver` hands back as soon as
+* 2026-10-16; 2026-10-19: **a key deriver's bytes are zeroed once imported.** `passphraseKeyOf`
+  (`src/wayin.ts`; since 2026-10-19, #201, in `src/proof.ts`, called by `PassphraseProof.wayinKeyFor`, logic unchanged) `fill(0)`s the 32 bytes a `KeyDeriver` hands back as soon as
   `importWrappingKeyBytes` has made the non-extractable passphraseKey of them, whether or not the
-  import succeeded, on every path that derives (sealing, and each wayin tried in an unlock);
+  import succeeded, on every path that derives (sealing, and an unlock);
   a result of another length than 32, refused (`bad_option`), is zeroed likewise.
   Best effort, as it is in any JavaScript crypto: the deriver's own working memory (hash-wasm's
   and `@noble/hashes`' internals), the engine's copies and the passphrase string are not reached.
@@ -1339,22 +1971,23 @@ added or folded into through the subagent, and no other entry changes.
   best-effort signal, not a gate: a host that passes a `logger` doing nothing hears nothing, and a
   deriver as weak under another label is not noticed. The vault's records still name the label
   that sealed them.
-* 2026-10-16: **any wayin proves `changePassphrase`**, a passkey's answer included, as it
-  already proved `addPassphrase`, `addPasskey` and `retireWayin`. A passkey's answer is as good
-  as a passphrase for its vault (VOCABULARY.md), so this opens nothing new: whoever holds the
-  authenticator and passes its user verification could already add a passphrase and remove the
-  old one in two calls, and now does it in one, as one write at one unlockEpoch. With several
-  passphrases the caller names which to replace (`wayinId`); the vault does not guess. The
-  vaultKey is untouched, so what the replaced passphrase's holder kept of earlier vault props still
+* 2026-10-16; 2026-10-19 (slots, the Coach's ruling): **`putWayin` is proved by the standing
+  passphrase only; a passkey's answer is refused `bad_option`.** On 2026-10-16 any wayin proved it, a
+  passkey's answer included, as it already proved `addPassphrase`, `putWayin`'s passkey and `delWayin`: whoever
+  held the authenticator and passed its user verification could set a new passphrase, in one write at
+  one unlockEpoch. Now a passkey cannot, so a forgotten passphrase can no longer be reset with the
+  passkey (which still opens and reads the vault), and a passphrase stored damaged cannot be replaced
+  either. The vaultKey is untouched, so what the replaced passphrase's holder kept of earlier vault props still
   opens that copy, as for any removal.
-* 2026-10-16: **`retireWayin` and a vaultKey rotation stay separate verbs**, as the rotation
-  design, since withdrawn, had them: `retireWayin` is the
-  cheap removal and is not revocation, and `rotateVaultKey` is its own call. Removing a wayin
+* 2026-10-16: **`delWayin` and a vaultKey rotation stay separate verbs**, as the rotation
+  design, since withdrawn, had them: `delWayin` is the
+  cheap removal and is not revocation, and `rotateVaultKey` is its own call. Removing a wayin (since slots, only the passkey)
   stops it opening the vault from here on and cannot take back what it opened; folding a rotation
-  into every removal would rewrite every lockbox for what is usually housekeeping, and make the
+  into every removal would rewrite every box for what is usually housekeeping, and make the
   common call the slow one. A host that removes a wayin because it was compromised rotates too.
-* 2026-10-16: **`WayinSummary` shows `device_id` and `registered_at`.** The snapshot of a locked
-  vault already listed each wayin; it now says too when it was added and by which device, so a
+* 2026-10-16; 2026-10-19 (slots): **the wayin summaries (`PassphraseWayinSummary`, `PasskeyWayinSummary`;
+  once one `WayinSummary` list) show `device_id` and `registered_at`.** The snapshot of a locked
+  vault already summarised each wayin; it now says too when it was added and by which device, so a
   user can spot a wayin they did not make. Both are visible fields of the wayin, bound into its
   wrap, and `device_id` is one random id per device per vault (the mark's `device_id`), so it
   links nothing the vault does not already link: not across vaults, not to the hardware.
@@ -1370,8 +2003,8 @@ added or folded into through the subagent, and no other entry changes.
   manager may honor none, and Chrome ignores `off` on a `type="password"` field, so it may still
   offer a saved password there.
 * 2026-10-16: **Starting over from the passphrase dialog** (`allowStartOver` on `VaultProvider`
-  and `PassphraseModal`, off by default) retires the vault on every device through
-  `vault.retire()`, which by design needs no passphrase. It asks first, in the dialog, and focus
+  and `PassphraseModal`, off by default) deletes the vault on every device through
+  `vault.del()`, which by design needs no passphrase. It asks first, in the dialog, and focus
   lands on "Keep it". Anyone at an unlocked session could already do the same through the handle;
   the option only puts it in the user's reach.
 * 2026-10-16: **`withUnlockedVault` answers a refusal only over the vault the action ran
@@ -1506,7 +2139,8 @@ added or folded into through the subagent, and no other entry changes.
   was given. What safebyok logs carries no secret material by the `VaultLogger` contract, and a
   host's own errors pass as the host made them, so this widens who can read log lines, not what
   they contain. Two copies of safebyok in one bundle each have their own default.
-* 2026-10-17 (thread 5b, store_base): **Convex carries no cause on any refusal.** `convexVaultDB`
+* 2026-10-17 (thread 5b, store_base; amended 2026-10-19: only `storage_unavailable` carries no cause now,
+  see the outcome_adapters entry at the top): **Convex carries no cause on any refusal.** `convexVaultDB`
   (`safebyok-convex/src/convex-vault-db.ts`) refuses with no `cause` at all -- `identity_revoked`,
   `vault_full` and `storage_unavailable` alike -- because a Convex error on a dev deployment may
   quote the call's arguments (names, sidecars, ciphertext). Its refusals are made through
@@ -1517,11 +2151,12 @@ added or folded into through the subagent, and no other entry changes.
   refuses a server's `BAD_USER_INPUT` or `GRAPHQL_VALIDATION_FAILED` as `bad_option` with a fixed
   message and no cause, since such errors may quote the variables, which are records. On the
   server, `vaultResolvers` (`vault-resolvers.ts`) sends a `vaultDBFor` that throws as `bad_option`
+  (amended 2026-10-19: except a VaultError of kind `not_permitted` or `identity_revoked`, which crosses as it is)
   with a generic "the server's setup is wrong" message; its own message, which may name the host's
   setup or the env var names of secrets, is kept only server-side, as the non-enumerable `cause`
   of the GraphQL error.
 * 2026-10-17 (thread 5b, store_base, G247): **the Convex component checks vault props update's
-  `vault_id` and epoch.** The component's `updateVaultProps` (`safebyok-convex/src/component/vaults.ts`)
+  `vault_id` and epoch.** The component's `putVaultProps` (`safebyok-convex/src/component/vaults.ts`)
   writes only when the new vault props keep the standing `vault_id` and its `unlock_epoch` is greater
   than the standing one; otherwise it resolves `false`, which the client reads as `stale_write`.
   This now holds even against a modified client; the core client already never sends otherwise.
@@ -1530,39 +2165,42 @@ added or folded into through the subagent, and no other entry changes.
   itself; the base class's `Refusals.storageUnavailable` (`refusals.ts`) turns a null or
   undefined cause into an Error saying the backend gave none, so no refusal ever carries a null
   cause.
-* 2026-10-17 (thread 5b, store_base, G285): **Postgres sets no lockbox limit unless told.**
-  `postgresVaultDB`'s `maxLockboxes` (`safebyok-postgres/src/postgres-vault-db.ts`) defaults to
+* 2026-10-17 (thread 5b, store_base, G285): **Postgres sets no box limit unless told.**
+  `postgresVaultDB`'s `maxBoxes` (`safebyok-postgres/src/postgres-vault-db.ts`) defaults to
   `Infinity`, where it was 1000: it is sent as SQL null, and the insert counts nothing. A host
   that passes no limit lets one signed-in user, through a modified browser, grow their own vault
   without bound, and Postgres sets no limit on a vault's bytes either; bounding that is the host's,
-  by `maxLockboxes` or its own quotas. `graphqlVaultDB` declares `Infinity` to match, so a browser
+  by `maxBoxes` or its own quotas. `graphqlVaultDB` declares `Infinity` to match, so a browser
   learns a server's limit only when the host declares it there too.
 * 2026-10-17 (thread 16, strength_principles, [PR #142](https://github.com/mrflip/safebyok/pull/142)):
-  **the core has no strength test of its own, and refuses to open without one.** `Vault.make`'s
-  `passphraseStrengthTest` is required: a missing one, or one that is not a function, is refused
-  as `bad_option` before the vault opens (`checkStrengthTest`, `passphrase-strength.ts`, called
-  from `vault.ts`, and exported from `safebyok` beside `checkValidators`). The length-only
+  **the core has no strength test of its own.** `Vault.make`'s
+  `strengthChecker` that is not a function is refused
+  as `bad_option` before the vault opens (`parseStrengthChecker`, `passphrase-strength.ts`, called
+  from `vault.ts`, and exported from `safebyok` beside `checkValidators`). Amended 2026-10-19
+  (put_wayin): one left out was refused `bad_option` too; it now becomes `UnchosenStrengthChecker`,
+  which refuses every passphrase as too weak (see the put_wayin entry). The length-only
   `passphraseLengthTest` is no longer exported; it passed `'a'` plus eleven spaces.
 * 2026-10-17 (thread 16, strength_principles): **the browser default is zxcvbn, loaded on
-  demand.** `browserOpts()` (`browser.ts`) supplies `zxcvbnPassphraseTest`
-  (`zxcvbn-passphrase-test.ts`): at least 12 code points, then a zxcvbn score of at least 3 of
+  demand.** `browserOpts()` (`browser.ts`) supplies `zxcvbnStrengthChecker`
+  (`zxcvbn-strength-checker.ts`): at least 12 code points, then a zxcvbn score of at least 3 of
   4. zxcvbn and its dictionary come in by a dynamic `import()` at the test's first call, which a
   bundler splits into a chunk served from the host's own origin and bundle; no third-party fetch
   is made. If that load fails the call rejects, so the vault refuses the new passphrase (no
-  passphrase is admitted untested); the failed load is forgotten and the next call tries again.
+  passphrase is admitted untested); the failed load is forgotten and the next call tries again
+  (amended 2026-10-19 (put_wayin): it answers weak rather than rejecting; see the put_wayin entry).
   `@zxcvbn-ts/core` and `@zxcvbn-ts/language-common` are ordinary dependencies, not optional
   peers, because `browserOpts()` imports them: about 1.3 MB installed, about 214 kB shipped on
   demand.
 * 2026-10-17 (thread 16, strength_principles): **the strength test is handed the passphrase and
   the vault's scope.** It is called as `test(passphrase, scope)`, `scope` being `{ applabel,
-  user_id, vaultlabel }`. `zxcvbnPassphraseTest` passes each of the three, whole and split into
+  user_id, vaultlabel }`. `zxcvbnStrengthChecker` passes each of the three, whole and split into
   runs of letters and digits, to zxcvbn as user inputs (`check(passphrase, userInputs)`). It
   keeps nothing between calls and sends nothing anywhere. The `user_id` is the host's opaque id,
   already in every stored record.
 * 2026-10-17 (thread 16, strength_principles): **in the dialog, the strength test runs on every
   keystroke by default.** In `VaultProvider` (`safebyok-react/src/vault-provider.tsx`), with no
   host `passphraseAdvice`, the passphrase dialog's advice is the strength test's reason, so the
-  host's `passphraseStrengthTest` is called with each partial passphrase as the user types while
+  host's `strengthChecker` is called with each partial passphrase as the user types while
   creating a vault, never while unlocking. A host test that does anything off the device (a
   breach-check API call, logging) does it per keystroke, on prefixes of the passphrase in plain
   text. The doc blocks and READMEs say the test hears the passphrase in plain text, must stay on
@@ -1570,8 +2208,8 @@ added or folded into through the subagent, and no other entry changes.
   default, and the test is then asked only at submit.
 * 2026-10-17 (thread 16, strength_principles): **the vault holds its strength test for its whole
   life.** Thread 10's ref wrapper is gone: the vault keeps the test it was opened with, unchanged.
-  `VaultProvider` checks the test at render with `checkStrengthTest` (missing, or not a function,
-  goes to the error boundary as `bad_option`), and a test with a new identity reopens the vault,
+  `VaultProvider` checks the test at render with `parseStrengthChecker` (not a function goes to
+  the error boundary as `bad_option`; missing, it is the unchosen checker, as in `Vault.make`), and a test with a new identity reopens the vault,
   warned of once. The test that gates a passphrase is the one validated at open; none is swapped
   in later through a ref.
 * 2026-10-17 (thread 16, strength_principles): **`withUnlockedVault` resolves null when the
@@ -1581,23 +2219,23 @@ added or folded into through the subagent, and no other entry changes.
   provider ends does. A `vault_closed` on a handle the provider still holds still rejects. Null
   from `withUnlockedVault` now also means that the vault went away under the action; the vault
   was already closed and its key dropped.
-* 2026-10-17 (thread 17, written_at, [#141](https://github.com/mrflip/safebyok/pull/141)): **`storeBox()`
-  no longer deciphers the old lockbox to compare whispers; `changed_at` is now `written_at`.**
-  `storeBox()` (`packages/safebyok/src/vault.ts`) used to open the lockbox it replaced and compare the
+* 2026-10-17 (thread 17, written_at, [#141](https://github.com/mrflip/safebyok/pull/141)): **`putBox()`
+  no longer deciphers the old box to compare whispers; `changed_at` is now `written_at`.**
+  `putBox()` (`packages/safebyok/src/vault.ts`) used to open the box it replaced and compare the
   stable-serialized whispers, so storing the same whisper again left `changed_at` standing. Every
   store now stamps `written_at` with the time of the write and the field claims nothing about
   whether the whisper changed, so storage can no longer tell from a standing timestamp that the
-  same whisper was stored again. The field is bound into both of the lockbox's encryptions with the
-  rest of its header, and the stored format moves from `safebyok-lockbox-v3` to `-v4` (today's is `-v5`)
-  (`Lockbox` and `LockboxSummary`, `types.ts`); v3 records fail validation and list as damaged,
+  same whisper was stored again. The field is bound into both of the box's encryptions with the
+  rest of its header, and the stored format moves from `safebyok-lockbox-v3` to `-v4` (today's is `safebyok-box-v6`)
+  (`Box` and `BoxSummary`, `types.ts`); v3 records fail validation and list as damaged,
   with no migration.
-* 2026-10-17 (thread 17, written_at, [#141](https://github.com/mrflip/safebyok/pull/141)): **`storeBox()`
+* 2026-10-17 (thread 17, written_at, [#141](https://github.com/mrflip/safebyok/pull/141)): **`putBox()`
   still deciphers the old record before carrying its visible fields forward.** A store that leaves
   out the sidecar carries the old record's `sidecar_json` and `registered_at` forward only from
   a record that opens under the vault's key (`recordOpens`, `vault.ts`, formerly
   `openedWhisperOf`), so a sidecar or time planted in storage is not sealed into a fresh revision that
   reads clean; the function returns only a boolean and the deciphered whisper is dropped unread.
-  Not taken: unwrapping only the old lockboxKey, whose AES-GCM additional data binds the whole
+  Not taken: unwrapping only the old boxKey, whose AES-GCM additional data binds the whole
   header, would vouch for the header without deciphering the whisper, but a record with only its
   whisper ciphertext altered would then carry its sidecar forward.
 * 2026-10-17 (thread 17, written_at, [#141](https://github.com/mrflip/safebyok/pull/141)): **a write's
@@ -1607,15 +2245,15 @@ added or folded into through the subagent, and no other entry changes.
   `stale_write` with the failure as `cause` (`catchUp`, `CatchUpPassesThrough`, `vault.ts`). The
   vault's locking on `identity_revoked` and `rolled_back` still happens in the refresh; other
   catch-up failures are still wrapped.
-* 2026-10-17 (thread 17, written_at, [#141](https://github.com/mrflip/safebyok/pull/141)): **`retireBox()`
+* 2026-10-17 (thread 17, written_at, [#141](https://github.com/mrflip/safebyok/pull/141)): **`delBox()`
   into a vault reborn elsewhere keeps kind `stale_write` and says why, quoting no boxlabel.** The
-  message says the lockbox's contents could not be retired because the vault it was in is gone
+  message says the box's contents could not be deleted because the vault it was in is gone
   (deleted, or deleted and made anew, on another device), and the adapter's refusal is its
   `cause`. It names no boxlabel, since a host's boxlabel check may admit any text. It is said only
   after a successful catch-up; a failed catch-up keeps its own message.
 * 2026-10-17 (thread 17, written_at, [#141](https://github.com/mrflip/safebyok/pull/141)): **new
   kind `storage_blocked`, told from `storage_unavailable` by the browser error's `name`.** The
-  device-store wrapper (`deviceTroubleAsConditions` / `asCondition`, `vault.ts`) says a failure
+  device-store wrapper (`deviceOutcomeOf` and `deviceTroubleAsConditions`, `device-db.ts`; amended 2026-10-19: they were in `vault.ts`, then `del-damaged-vault.ts`) says a failure
   named `SecurityError`, `QuotaExceededError` or `NotSupportedError` as `storage_blocked` (no
   retry mends it) and every other non-VaultError failure as `storage_unavailable`. The check is
   duck-typed on `name`, not `instanceof`, so a DOMException from another frame is told alike; it
@@ -1634,41 +2272,44 @@ added or folded into through the subagent, and no other entry changes.
   integers (epochs, `EpochMillis`), so it is noted, not guarded.
 * 2026-10-17 (thread 9b, core_tidy, [#144](https://github.com/mrflip/safebyok/pull/144)):
   **Postgres refuses vault props update that does not move `unlock_epoch` forward.**
-  `UpdateVaultPropsSql` (`packages/safebyok-postgres/src/postgres-vault-db.ts`) now carries `AND
+  `PutVaultPropsSql` (`packages/safebyok-postgres/src/postgres-vault-db.ts`) now carries `AND
   unlock_epoch < $new::bigint`; vault props update at the same or a lower epoch is refused as
-  `stale_write` and writes nothing, as the Convex component's `updateVaultProps` already did (G247).
+  `stale_write` and writes nothing, as the Convex component's `putVaultProps` already did (G247).
   Before, a modified or older client reaching the server could write vault props (its wayins) back
   over the one it read at the same or a lower epoch. The core always sends the standing epoch plus
   one. VAULTDB.md line 3.2 now says a server-side adapter enforces it; client-side adapters
   (`localVaultDB`, `idbVaultDB`) are not required to.
 * 2026-10-17 (thread 9b, core_tidy, [#144](https://github.com/mrflip/safebyok/pull/144)):
-  **`zxcvbnPassphraseTest`'s failed load is a `VaultError` of kind `storage_unavailable`.**
-  `loadEstimator` (`packages/safebyok/src/zxcvbn-passphrase-test.ts`) keeps the dynamic import's
+  **`zxcvbnStrengthChecker`'s failed load is a `VaultError` of kind `storage_unavailable`.**
+  `loadEstimator` (`packages/safebyok/src/zxcvbn-strength-checker.ts`) keeps the dynamic import's
   own error as `cause`; that import never saw the passphrase, and the message names none. No new
   error kind was added; `storage_unavailable` is the nearest existing kind meaning a retry may
   mend it. A failed load never admits a passphrase untested: the vault still refuses to create,
-  add or change a passphrase it could not test. Also, `VaultProvider`'s default passphrase advice
+  or to set, a passphrase it could not test. Amended 2026-10-19 (put_wayin): a failed load is no
+  longer a `VaultError`: `loadEstimator` forgets the failure and answers null, and the checker
+  answers weak, with a reason saying to try again, so no error and no `cause` are carried (see the
+  put_wayin entry). Also, `VaultProvider`'s default passphrase advice
   (`adviceFrom`, `packages/safebyok-react/src/vault-provider.tsx`) now treats a strength test that
   rejects as nothing to say (no advice shown) rather than ending the dialog at the error
   boundary; the gate at Create is unchanged, since the vault runs the test again there.
 * 2026-10-17 (thread 9b, core_tidy, [#144](https://github.com/mrflip/safebyok/pull/144)):
-  **the vault-size allowance per lockbox is 1 KiB, down from 2 KiB.** `LockboxFieldsBytes`
+  **the vault-size allowance per box is 1 KiB, down from 2 KiB.** `BoxFieldsBytes`
   (`packages/safebyok/src/vault.ts`) is the allowance for the fields beside the whisper and sidecar.
-  `Vault.make` refuses a `maxLockboxes` whose lockboxes, each counted at twice `maxWhisperBytes`
+  `Vault.make` refuses a `maxBoxes` whose boxes, each counted at twice `maxWhisperBytes`
   plus this allowance, might not fit the adapter's `maxVaultBytes` (the bound that keeps a vault
   erasable whole in one Convex transaction). Those fields measure under 1,000 bytes at the default
-  validators' longest names (a test proves it), and each `storeBox()` still weighs its lockbox's real
-  names against the limit. On Convex's 8 MiB: 102 lockboxes of the default 40,444-byte whisper fit
+  validators' longest names (a test proves it), and each `putBox()` still weighs its box's real
+  names against the limit. On Convex's 8 MiB: 102 boxes of the default 40,444-byte whisper fit
   (was 101), 1,638 of 2 KiB whispers (was 1,365). The Convex component's own server-side limits
-  (8,000 lockboxes, 7 MiB less 1 KiB) are unchanged. This supersedes the 2 KiB allowance named in
+  (8,000 boxes, 7 MiB less 1 KiB) are unchanged. This supersedes the 2 KiB allowance named in
   earlier entries.
 * 2026-10-17 (thread 9b, core_tidy, [#144](https://github.com/mrflip/safebyok/pull/144)):
   **the vault's checked scope is frozen.** `checkScope` (`packages/safebyok/src/names.ts`) returns
-  `Object.freeze(...)`. The same object is handed to the host's `passphraseStrengthTest` and held
+  `Object.freeze(...)`. The same object is handed to the host's `strengthChecker` and held
   in `getSnapshot().scope`, and the vault keys storage and the cipher ctx by it; frozen, none
   of the three can change it for the others.
 * 2026-10-17 (thread 9b, core_tidy, [#144](https://github.com/mrflip/safebyok/pull/144)):
-  **`storeBox()` refuses unknown option keys with `bad_option`.** `optionsCheck`
+  **`putBox()` refuses unknown option keys with `bad_option`.** `optionsCheck`
   (`packages/safebyok/src/options.ts`, shared with the strict check of `Vault.make`'s `validators`)
   refuses a key it does not know. A caller still passing the retired `{ note }`, beside or instead
   of `{ sidecar }`, is told at once rather than silently storing no sidecar. The refusal never
@@ -1678,21 +2319,21 @@ added or folded into through the subagent, and no other entry changes.
   vaultKey handle is a non-extractable WebCrypto `CryptoKey`, so page code cannot export its raw
   bytes. That keeps a passing compromise (an XSS, a malicious extension, a stolen unlocked device)
   from carrying the key away for use after `lock()`. It does not stop injected code, while the
-  vault is unlocked, from calling WebCrypto with the handle to decrypt every lockbox, or from
-  reading whispers through the vault's own API (`readBox()`, `useBox()`), which no design prevents. The
-  `addPasskey` entry of 2026-10-15 mentions this in passing; this entry states it on its own. A
+  vault is unlocked, from calling WebCrypto with the handle to decrypt every box, or from
+  reading whispers through the vault's own API (`getBox()`, `useBox()`), which no design prevents. The
+  `putWayin` entry of 2026-10-15 mentions this in passing; this entry states it on its own. A
   host can keep the lease short, call `lock()` on sign-out and on screen lock, serve the
   page under a strict Content-Security-Policy, and never load third-party script into a page that
   holds an unlocked vault.
 * 2026-10-17 (thread sweep_small, [#143](https://github.com/mrflip/safebyok/pull/143)): **the Postgres README no longer ships a hard-cap trigger
   recipe.** The `safebyok-postgres` README used to carry SQL for a `BEFORE INSERT` trigger on
-  `safebyok_lockboxes` that refused a lockbox past a hard limit, taking a transaction-scoped
+  `safebyok_boxes` that refused a box past a hard limit, taking a transaction-scoped
   advisory lock per vault; under REPEATABLE READ it counts from its snapshot, so racers may
   overshoot. The repository ran that SQL against a real Postgres in
   `e2e/tests/postgres/hard-cap.test.ts`. The recipe, that test, and the PGlite test that read the
   README's SQL are deleted; the README now gives a short prompt a host pastes to its coding agent,
   which reads the library and writes the trigger, explaining the trade-offs. The package's own
-  lockbox limit (`maxLockboxes`, one counting insert) remains a best effort that racing writers
+  box limit (`maxBoxes`, one counting insert) remains a best effort that racing writers
   may overshoot by up to N-1 places, and is documented as such. A host that needs a hard cap now
   owns a trigger the package no longer tests, so its isolation level, its lock and its refusal
   (surfaced as `storage_unavailable`, not `vault_full`) are the host's to verify. The limit exists

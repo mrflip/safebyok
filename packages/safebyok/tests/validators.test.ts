@@ -194,7 +194,7 @@ describe("AnyTextValidators", () => {
   })
 
   it("is the floor itself, field by field", () => {
-    expect(AnyTextValidators).to.deep.equal({ applabel: NameFloor, vaultlabel: NameFloor, boxlabel: NameFloor, userId: NameFloor, wayinlabel: NameFloor })
+    expect(AnyTextValidators).to.deep.equal({ applabel: NameFloor, vaultlabel: NameFloor, boxlabel: NameFloor, userId: NameFloor })
   })
 
   it("refuses, in every field, a lone surrogate, a carriage return, and text not in NFC", () => {
@@ -231,8 +231,8 @@ describe("AnyTextValidators", () => {
 })
 
 describe("DefaultValidators", () => {
-  it("checks each label with Label, a wayinlabel included, and the user with UserId", () => {
-    expect(DefaultValidators).to.deep.equal({ applabel: Label, vaultlabel: Label, boxlabel: Label, userId: UserId, wayinlabel: Label })
+  it("checks each label with Label, and the user with UserId", () => {
+    expect(DefaultValidators).to.deep.equal({ applabel: Label, vaultlabel: Label, boxlabel: Label, userId: UserId })
     expect(DefaultValidators.applabel).to.eq(Label)
     expect(DefaultValidators.userId).to.eq(UserId)
   })
@@ -248,7 +248,7 @@ describe("DefaultValidators", () => {
 })
 
 describe("the default validators, inside a host's own Zod", () => {
-  // A host on classic Zod holds them in its own schemas, as a form checking a lockbox might.
+  // A host on classic Zod holds them in its own schemas, as a form checking a box might.
   const BoxForm = ZClassic.object({ scope: VaultScope, boxlabel: Label, userId: ZClassic.optional(UserId) })
 
   it("compose into a classic Zod schema and check as they do alone", () => {

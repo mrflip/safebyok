@@ -125,7 +125,7 @@ export type AsyncVerbOf<Target> = {
  * @param meanwhile - What to run first, and wait for.
  *
  * @example
- *   TH.beforeNextCall(vaultDB, 'updateBox', () => there.storeBox('anthropic', 'sk-ant-fake-theirs'))
+ *   TH.beforeNextCall(vaultDB, 'putBox', () => there.putBox('anthropic', 'sk-ant-fake-theirs'))
  */
 export const beforeNextCall = <Target extends object>(target: Target, verb: AsyncVerbOf<Target> & string, meanwhile: () => Promise<unknown>): void => {
   const method = (target as unknown as Record<string, AsyncFn | undefined>)[verb]
@@ -184,7 +184,7 @@ const originalOf = new WeakMap<object, AsyncFn>()
  * @returns The gate: await `reached`, then `release()`.
  *
  * @example
- *   const gate = TH.holdNextCall(vaultDB, 'readVaultProps')
+ *   const gate = TH.holdNextCall(vaultDB, 'getVaultProps')
  *   const unlocking = vault.unlock('pw')   // now waiting at the gate
  *   await gate.reached
  *   await vault.lock()                     // lands mid-unlock

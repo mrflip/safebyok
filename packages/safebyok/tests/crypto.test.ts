@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   cipherCtx, cipherBytes, decipherBytes, deriveWrappingKey, fromB64, importWrappingKeyBytes,
-  makeLeaseKey, makeLockboxKey, makeVaultKey, randomBytes, randomId, toB64, unwrapKeyUnder, wrapKeyUnder,
+  makeLeaseKey, makeBoxKey, makeVaultKey, randomBytes, randomId, toB64, unwrapKeyUnder, wrapKeyUnder,
   type CipherCtxPart,
 } from '../src/crypto'
 import * as TH from './test-helpers'
@@ -45,14 +45,14 @@ describe("cipherCtx", () => {
   })
 
   it("encodes a record part with its keys sorted, every field bound", () => {
-    const header = cipherCtx('safebyok-lockbox-v5', { revision_tok: 'r1', boxlabel: 'anthropic', written_at: 1 })
-    expect(toB64(cipherCtx('safebyok-lockbox-v5', { boxlabel: 'anthropic', written_at: 1, revision_tok: 'r1' }))).to.eq(toB64(header))
-    expect(toB64(cipherCtx('safebyok-lockbox-v5', { boxlabel: 'anthropic', written_at: 1, revision_tok: 'r1', sidecar_json: '{}' }))).to.not.eq(toB64(header))
+    const header = cipherCtx('safebyok-box-v6', { revision_tok: 'r1', boxlabel: 'anthropic', written_at: 1 })
+    expect(toB64(cipherCtx('safebyok-box-v6', { boxlabel: 'anthropic', written_at: 1, revision_tok: 'r1' }))).to.eq(toB64(header))
+    expect(toB64(cipherCtx('safebyok-box-v6', { boxlabel: 'anthropic', written_at: 1, revision_tok: 'r1', sidecar_json: '{}' }))).to.not.eq(toB64(header))
   })
 
   it("refuses a record part holding a field set to undefined as bad_option, rather than treating it as if it were not there", () => {
     const holding = { boxlabel: 'anthropic', written_at: 1, revision_tok: 'r1', sidecar_json: undefined } as unknown as CipherCtxPart
-    TH.expectSyncRefusal(() => cipherCtx('safebyok-lockbox-v5', holding), 'bad_option')
+    TH.expectSyncRefusal(() => cipherCtx('safebyok-box-v6', holding), 'bad_option')
   })
 
   it("refuses a part that is undefined or null as bad_option, rather than treating it as null", () => {
@@ -67,30 +67,30 @@ describe("cipherCtx", () => {
 
 describe("cipher and decipher", () => {
   it("round-trips bytes under a ctx", async () => {
-    const lockboxKey = await makeLockboxKey()
+    const boxKey = await makeBoxKey()
     const ctx = cipherCtx('test', 'whisper_ciphered')
-    const ciphered = await cipherBytes(lockboxKey, utf8('sk-ant-fake'), ctx)
-    expect(new TextDecoder().decode(await decipherBytes(lockboxKey, ciphered, ctx))).to.eq('sk-ant-fake')
+    const ciphered = await cipherBytes(boxKey, utf8('sk-ant-fake'), ctx)
+    expect(new TextDecoder().decode(await decipherBytes(boxKey, ciphered, ctx))).to.eq('sk-ant-fake')
   })
 
   it("never repeats ciphertext or iv for the same plaintext", async () => {
-    const lockboxKey = await makeLockboxKey()
+    const boxKey = await makeBoxKey()
     const ctx = cipherCtx('test')
-    const one = await cipherBytes(lockboxKey, utf8('the same whisper'), ctx)
-    const two = await cipherBytes(lockboxKey, utf8('the same whisper'), ctx)
+    const one = await cipherBytes(boxKey, utf8('the same whisper'), ctx)
+    const two = await cipherBytes(boxKey, utf8('the same whisper'), ctx)
     expect(one.cipher_iv_b64).to.not.eq(two.cipher_iv_b64)
     expect(one.ciphertext_b64).to.not.eq(two.ciphertext_b64)
   })
 
   it("refuses a different ctx: ciphertext does not travel", async () => {
-    const lockboxKey = await makeLockboxKey()
-    const ciphered = await cipherBytes(lockboxKey, utf8('sk-ant-fake'), cipherCtx('box_a'))
-    await expect(decipherBytes(lockboxKey, ciphered, cipherCtx('box_b'))).rejects.toThrow()
+    const boxKey = await makeBoxKey()
+    const ciphered = await cipherBytes(boxKey, utf8('sk-ant-fake'), cipherCtx('box_a'))
+    await expect(decipherBytes(boxKey, ciphered, cipherCtx('box_b'))).rejects.toThrow()
   })
 
   it("refuses altered ciphertext and the wrong key alike", async () => {
-    const rightKey = await makeLockboxKey()
-    const wrongKey = await makeLockboxKey()
+    const rightKey = await makeBoxKey()
+    const wrongKey = await makeBoxKey()
     const ctx = cipherCtx('test')
     const ciphered = await cipherBytes(rightKey, utf8('sk-ant-fake'), ctx)
     const bent = { ...ciphered, ciphertext_b64: TH.tweakB64(ciphered.ciphertext_b64) }
@@ -100,14 +100,14 @@ describe("cipher and decipher", () => {
 })
 
 describe("wrap and unwrap", () => {
-  it("round-trips a lockboxKey under a vaultKey, back as a working, non-extractable key", async () => {
+  it("round-trips a boxKey under a vaultKey, back as a working, non-extractable key", async () => {
     const vaultKey = await makeVaultKey()
-    const lockboxKey = await makeLockboxKey()
-    const ctx = cipherCtx('lockbox_key_wrapped')
+    const boxKey = await makeBoxKey()
+    const ctx = cipherCtx('box_key_wrapped')
     const whisperCtx = cipherCtx('whisper_ciphered')
-    const ciphered = await cipherBytes(lockboxKey, utf8('sk-ant-fake'), whisperCtx)
+    const ciphered = await cipherBytes(boxKey, utf8('sk-ant-fake'), whisperCtx)
 
-    const wrapped = await wrapKeyUnder(vaultKey, lockboxKey, ctx)
+    const wrapped = await wrapKeyUnder(vaultKey, boxKey, ctx)
     const recovered = await unwrapKeyUnder(vaultKey, wrapped, ctx, { extractable: false, usage: ['decrypt'] })
     expect(recovered.extractable).to.be.false
     expect(new TextDecoder().decode(await decipherBytes(recovered, ciphered, whisperCtx))).to.eq('sk-ant-fake')
@@ -116,17 +116,17 @@ describe("wrap and unwrap", () => {
   it("refuses to unwrap under the wrong key or the wrong ctx", async () => {
     const vaultKey = await makeVaultKey()
     const otherKey = await makeVaultKey()
-    const lockboxKey = await makeLockboxKey()
-    const wrapped = await wrapKeyUnder(vaultKey, lockboxKey, cipherCtx('right'))
+    const boxKey = await makeBoxKey()
+    const wrapped = await wrapKeyUnder(vaultKey, boxKey, cipherCtx('right'))
     await expect(unwrapKeyUnder(otherKey, wrapped, cipherCtx('right'), { extractable: false, usage: ['decrypt'] })).rejects.toThrow()
     await expect(unwrapKeyUnder(vaultKey, wrapped, cipherCtx('wrong'), { extractable: false, usage: ['decrypt'] })).rejects.toThrow()
   })
 
   it("a non-extractable unwrap refuses exportKey: the platform keeps the bytes", async () => {
     const vaultKey = await makeVaultKey()
-    const lockboxKey = await makeLockboxKey()
-    const ctx = cipherCtx('lockbox_key_wrapped')
-    const wrapped = await wrapKeyUnder(vaultKey, lockboxKey, ctx)
+    const boxKey = await makeBoxKey()
+    const ctx = cipherCtx('box_key_wrapped')
+    const wrapped = await wrapKeyUnder(vaultKey, boxKey, ctx)
     const recovered = await unwrapKeyUnder(vaultKey, wrapped, ctx, { extractable: false, usage: ['decrypt'] })
     await expect(crypto.subtle.exportKey('raw', recovered)).rejects.toThrow()
   })

@@ -1,11 +1,11 @@
 import * as Z from 'zod/mini'
-import { Lockbox } from './lockbox'
+import { BoxRecord } from './box'
 import { VaultScope, VaultProps } from './types'
 import { VaultError } from './errors'
 import type { StringStore } from './string-store'
 import * as Ckeys from './ckeys'
 import * as Expectations from './expectations'
-import { type VaultDBOpts, VaultDB, type VaultPropsExpectation, type StoredLockbox, type LockboxExpectation, type LockboxRetireExpectation, type RetireExpectation } from './vault-db'
+import { type VaultDBOpts, VaultDB, type VaultPropsExpectation, type StoredBox, type BoxExpectation, type BoxDelExpectation, type VaultDelExpectation } from './vault-db'
 
 /** `fn`'s result (or failure) as a promise: a sync throw becomes a rejection, never an escape. */
 const soon = async <ValT>(fn: () => ValT | Promise<ValT>): Promise<ValT> => await fn()
@@ -37,7 +37,7 @@ export type LocalVaultDBOpts = VaultDBOpts & {
  *
  * @example
  *   const vaultDB = localVaultDB({ store: memoryStore() })
- *   await vaultDB.readVaultProps({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // null
+ *   await vaultDB.getVaultProps({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // { ok: true, val: null }
  * @example
  *   const vaultDB = localVaultDB({ store: domStore(localStorage, 'acme:db:'), logger })
  */
@@ -67,8 +67,8 @@ class StringStoreVaultDB extends VaultDB {
   readonly maxRecordBytes = 1024 * 1024
   // Nothing here reads a whole vault under a budget; the store's own quota refuses a write past it.
   readonly maxVaultBytes = Infinity
-  // Nor does it count lockboxes: the vault's own maxLockboxes is the only limit.
-  readonly maxLockboxes = Infinity
+  // Nor does it count boxes: the vault's own maxBoxes is the only limit.
+  readonly maxBoxes = Infinity
   // A ckey holds a name of any length the floor admits.
   readonly maxNameBytes = Infinity
 
@@ -82,11 +82,11 @@ class StringStoreVaultDB extends VaultDB {
   // Work is deferred into the promise even though the store is synchronous: a storage fault must
   // reject the returned promise, never throw before the caller has one in hand. And each write
   // checks and saves in one synchronous step, so nothing else in this tab runs in between.
-  protected doReadVaultProps(scope: VaultScope): Promise<unknown> {
+  protected doGetVaultProps(scope: VaultScope): Promise<unknown> {
     return soon(() => readJson(this.store, Ckeys.vaultProps(scope)))
   }
 
-  protected doFetchOrCreateVaultProps(vaultProps: VaultProps): Promise<unknown> {
+  protected doEnsureVaultProps(vaultProps: VaultProps): Promise<unknown> {
     return soon(() => {
       const standing = readJson(this.store, Ckeys.vaultProps(vaultProps))
       if (standing !== null) { return standing }
@@ -95,7 +95,7 @@ class StringStoreVaultDB extends VaultDB {
     })
   }
 
-  protected doUpdateVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<boolean> {
+  protected doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<boolean> {
     return soon(() => {
       if (! Expectations.vaultPropsMeets(readJson(this.store, Ckeys.vaultProps(vaultProps)), expected)) { return false }
       this.store.write(Ckeys.vaultProps(vaultProps), JSON.stringify(vaultProps))
@@ -103,44 +103,44 @@ class StringStoreVaultDB extends VaultDB {
     })
   }
 
-  protected doReadBox(scope: VaultScope, boxlabel: string): Promise<unknown> {
+  protected doGetBox(scope: VaultScope, boxlabel: string): Promise<unknown> {
     return soon(() => readJson(this.store, Ckeys.box(scope, boxlabel)))
   }
 
-  protected doListBoxes(scope: VaultScope): Promise<StoredLockbox[]> {
+  protected doListBoxes(scope: VaultScope): Promise<StoredBox[]> {
     return soon(() => (
       this.store.ckeys()
         .filter(Ckeys.isBoxIn(scope))
         .map((ckey) => ({ boxlabel: Ckeys.boxlabelOf(ckey), text: this.store.read(ckey) }))
         // A row erased since the ckeys were read is gone; one that is not JSON goes up as its text.
         .filter((row): row is { boxlabel: string, text: string } => row.boxlabel !== null && row.text !== null)
-        .map(({ boxlabel, text }) => ({ boxlabel, lockbox: jsonOrText(text) }))
+        .map(({ boxlabel, text }) => ({ boxlabel, box: jsonOrText(text) }))
     ))
   }
 
-  protected doUpdateBox(scope: VaultScope, lockbox: Lockbox, expected: LockboxExpectation): Promise<unknown> {
+  protected doPutBox(scope: VaultScope, box: BoxRecord, expected: BoxExpectation): Promise<unknown> {
     return soon(() => {
-      const ckey = Ckeys.box(scope, lockbox.boxlabel)
+      const ckey = Ckeys.box(scope, box.boxlabel)
       const standingVaultProps = readJson(this.store, Ckeys.vaultProps(scope))
-      if (! Expectations.lockboxMeets(standingVaultProps, readJson(this.store, ckey), expected)) { return null }
-      this.store.write(ckey, JSON.stringify(lockbox))
+      if (! Expectations.boxMeets(standingVaultProps, readJson(this.store, ckey), expected)) { return null }
+      this.store.write(ckey, JSON.stringify(box))
       return readJson(this.store, ckey)
     })
   }
 
-  protected doRetireBox(scope: VaultScope, boxlabel: string, expected: LockboxRetireExpectation): Promise<unknown> {
+  protected doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<unknown> {
     return soon(() => {
       if (! Expectations.vaultMeets(readJson(this.store, Ckeys.vaultProps(scope)), expected)) { return null }
       const ckey = Ckeys.box(scope, boxlabel)
-      // A row that is not JSON is still retired, and reported as holding no revision.
+      // A row that is not JSON is still deleted, and reported as holding no revision.
       const text = this.store.read(ckey)
-      const retirement = Expectations.retirementOf(text === null ? null : jsonOrText(text), expected)
+      const deletion = Expectations.deletionOf(text === null ? null : jsonOrText(text), expected)
       this.store.erase(ckey)
-      return retirement
+      return deletion
     })
   }
 
-  protected doRetireVault(scope: VaultScope, expected: RetireExpectation): Promise<boolean> {
+  protected doDelVault(scope: VaultScope, expected: VaultDelExpectation): Promise<boolean> {
     return soon(() => {
       if (! Expectations.vaultIdMeets(readJson(this.store, Ckeys.vaultProps(scope)), expected)) { return false }
       const doomed = this.store.ckeys().filter(Ckeys.isBoxIn(scope))

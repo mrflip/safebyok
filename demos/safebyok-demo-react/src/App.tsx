@@ -21,7 +21,7 @@ const Page = () => {
     <main>
       <h1>safebyok playground</h1>
       <p className="quiet">
-        A pretend app whose users bring their own API keys. Secrets live in lockboxes inside a
+        A pretend app whose users bring their own API keys. Secrets live in boxes inside a
         per-user vault; the backend holds only what the vault writes through it.
       </p>
       <SessionBar auth={auth} />

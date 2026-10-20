@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { Rolldown } from 'tsdown'
 import { describe, expect, it } from 'vitest'
 import * as Browser from '../src/browser'
-import { browserOpts, zxcvbnPassphraseTest } from '../src/browser'
+import { browserOpts, zxcvbnStrengthChecker } from '../src/browser'
 import { VaultError } from '../src/errors'
 import { argon2idWebV1Deriver } from '../src/key-deriver'
 import { inspectIdbDeviceDB } from '../src/idb'
@@ -14,11 +14,11 @@ import { localVaultDB } from '../src/local-vault-db'
 import * as TH from './test-helpers'
 
 describe("browserOpts", () => {
-  it("supplies the pinned Argon2id deriver, an IndexedDB device store and the zxcvbn strength test, and nothing else", () => {
+  it("supplies the pinned Argon2id deriver, an IndexedDB device store and the zxcvbn strength checker, and nothing else", () => {
     const bag = browserOpts()
-    expect(Object.keys(bag)).to.have.members(['keyDeriver', 'deviceDB', 'passphraseStrengthTest'])
+    expect(Object.keys(bag)).to.have.members(['keyDeriver', 'deviceDB', 'strengthChecker'])
     expect(bag.keyDeriver).to.eq(argon2idWebV1Deriver)
-    expect(bag.passphraseStrengthTest).to.eq(zxcvbnPassphraseTest)
+    expect(bag.strengthChecker).to.eq(zxcvbnStrengthChecker)
   })
 
   it("never supplies the vault store: the backend is every host's own choice", () => {
@@ -27,10 +27,10 @@ describe("browserOpts", () => {
 
   it("keeps the device store's records in the database it names", async () => {
     const dbName = TH.freshDbName()
-    await browserOpts({ dbName }).deviceDB.writeLease(await TH.leaseOf('u1'))
+    await TH.expectGood(browserOpts({ dbName }).deviceDB.putLease(await TH.leaseOf('u1')))
     const rows = await inspectIdbDeviceDB({ dbName }).rows()
     expect(rows.map((row) => row.ckey)).to.deep.equal(['lease^acme^u1^main'])
-    expect(await browserOpts().deviceDB.readLease(TH.scopeOf('u1'))).to.be.null
+    expect(await TH.expectingGood(browserOpts().deviceDB).getLease(TH.scopeOf('u1'))).to.be.null
   })
 
   it("answers the same frozen bag for the same dbName, so a render may call it", () => {
@@ -43,7 +43,7 @@ describe("browserOpts", () => {
   it("refuses a dbName that is not non-empty text with kind 'bad_option', quoting none of it", () => {
     for (const dbName of ['', 42, null]) {
       expect(() => browserOpts({ dbName } as unknown as { dbName: string }))
-        .to.throw(VaultError, /dbName/).with.property('kind', 'bad_option')
+        .to.throw(VaultError, /dbName/).with.property('refusalkind', 'bad_option')
     }
   })
 
@@ -53,8 +53,8 @@ describe("browserOpts", () => {
     vault.close()
   })
 
-  it("yields to a strength test of the host's own, passed after it", async () => {
-    const vault = await TH.settledVault({ ...browserOpts({ dbName: TH.freshDbName() }), applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: localVaultDB({ store: memoryStore() }), keyDeriver: TH.testDeriver, passphraseStrengthTest: TH.anyPassphraseTest })
+  it("yields to a strength checker of the host's own, passed after it", async () => {
+    const vault = await TH.settledVault({ ...browserOpts({ dbName: TH.freshDbName() }), applabel: 'acme', userId: 'u1', vaultlabel: 'main', vaultDB: localVaultDB({ store: memoryStore() }), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker })
     await vault.unlock('pw')
     expect(vault.getSnapshot().state).to.eq('unlocked')
     vault.close()
@@ -78,14 +78,14 @@ describe("browserOpts", () => {
 })
 
 describe("safebyok/browser", () => {
-  it("exports browserOpts, and the zxcvbn strength test and its bounds beside it", () => {
-    expect(Object.keys(Browser)).to.have.members(['browserOpts', 'zxcvbnPassphraseTest', 'MinPassphraseChars', 'MinZxcvbnScore'])
+  it("exports browserOpts, and the zxcvbn strength checker and its bounds beside it", () => {
+    expect(Object.keys(Browser)).to.have.members(['browserOpts', 'zxcvbnStrengthChecker', 'MinPassphraseChars', 'MinZxcvbnScore'])
   })
 })
 
-describe("zxcvbnPassphraseTest, as Vault.make's passphraseStrengthTest", () => {
+describe("zxcvbnStrengthChecker, as Vault.make's strengthChecker", () => {
   it("refuses a common password at create with kind 'weak_passphrase', and creates the vault with a strong one", async () => {
-    const vault = await TH.settledVault({ ...TH.memoryVaultOpts(), passphraseStrengthTest: zxcvbnPassphraseTest })
+    const vault = await TH.settledVault({ ...TH.memoryVaultOpts(), strengthChecker: zxcvbnStrengthChecker })
     const err = await TH.expectRefusal(vault.unlock('password1234'), 'weak_passphrase')
     expect(err.message).to.match(/commonly used password/)
     expect(vault.getSnapshot().state).to.eq('absent')
@@ -142,8 +142,8 @@ describe("safebyok/browser's tree-shaking", () => {
     expect(onDemand).to.match(ZxcvbnImplementation)
   }, 30_000)
 
-  it("loads zxcvbn on demand for an app that imports zxcvbnPassphraseTest alone, too", async () => {
-    const { atOnce, onDemand } = await bundleOf('zxcvbnPassphraseTest')
+  it("loads zxcvbn on demand for an app that imports zxcvbnStrengthChecker alone, too", async () => {
+    const { atOnce, onDemand } = await bundleOf('zxcvbnStrengthChecker')
     expect(atOnce).to.not.match(ZxcvbnImplementation)
     expect(onDemand).to.match(ZxcvbnImplementation)
   }, 30_000)

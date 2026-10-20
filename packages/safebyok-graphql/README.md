@@ -101,9 +101,12 @@ vaultResolvers({ vaultDBFor: (context) => postgresVaultDB({ client: pool, userId
 * **`vaultDBFor(context)`** makes the VaultDB for one request, from your server's context for it.
   It is called for every vault field resolved, so keep it cheap: `postgresVaultDB` connects to
   nothing. Over a websocket, the context is the connection's, so its user is the one signed in
-  when it opened. Whatever it throws is your server's setup gone wrong, and crosses as
-  `bad_option` saying only that: its own message stays on your server, as the cause. Let the
-  VaultDB, not `vaultDBFor`, refuse a request signed out.
+  when it opened. To refuse a signed-in user by a rule of your own, throw
+  `Refusals.notPermitted('...')` (from `safebyok`) here: it crosses as it is, kind and message,
+  and locks nothing; a `VaultError` of kind `identity_revoked` crosses likewise, and locks the
+  vault, so throw it only for a user your app knows is gone. Anything else it throws is your
+  server's setup gone wrong, and crosses as `bad_option` saying only that: its own message stays
+  on your server, as the cause. Let the VaultDB, not `vaultDBFor`, refuse a request signed out.
 * **Who may reach a vault** is the VaultDB's to say. `postgresVaultDB`, made for the signed-in
   user, refuses every other user's vault, and any while signed out, before asking the database
   anything.
@@ -133,7 +136,7 @@ it meets nothing of yours.
 ### Serving a VaultDB of your own
 
 The resolvers need a **`ServedVaultDB`**: the VaultDB verbs a browser's vault calls, and
-`listBoxRecords(scope)`, which lists a vault's lockboxes as stored records, its two ciphered
+`listBoxRecords(scope)`, which lists a vault's boxes as stored records, its two ciphered
 fields left out. A VaultDB's own `listBoxes` gives summaries instead -- the shape a vault shows,
 without `format` -- which the browser's VaultDB may not hand back from its own listing.
 `safebyok-postgres`'s VaultDB is a ServedVaultDB as it stands; nothing here is tied to Postgres.
@@ -145,8 +148,8 @@ store of your own keeps every field it was handed.
 
 The resolvers decide nothing: every expectation crosses whole, and the VaultDB you serve keeps
 [the VaultDB contract](https://github.com/mrflip/safebyok/blob/main/packages/safebyok/VAULTDB.md)
-for the browser. Its line 3.8 in particular: a lockbox write's expectation names the
-`vault_key_epoch` the lockbox was sealed under, and your VaultDB lands it only while the vault's
+for the browser. Its line 3.8 in particular: a box write's expectation names the
+`vault_key_epoch` the box was sealed under, and your VaultDB lands it only while the vault's
 props stand at that epoch, compared in the same atomic step as the write. One that skips the
 comparison lets a device still holding a replaced vaultKey seal a whisper under it.
 `tests/yoga-recipe.test.ts` runs the shared suite through the recipe, that line included.
@@ -156,7 +159,11 @@ comparison lets a device still holding a replaced vaultKey seal a whisper under 
 `graphqlVaultDB({ client })` is a VaultDB, each verb one operation through `client`.
 
 * **A refusal crosses**: the server's VaultError comes back as the same VaultError, kind and
-  message. A record or expectation at fault is `bad_record`, refused before it is sent (an epoch
+  message, the GraphQL error it crossed as for its `cause`. A GraphQL error your server's own auth
+  raises with `extensions.code` `FORBIDDEN` (Apollo's convention) refuses with kind
+  `not_permitted`, which locks nothing, its error the `cause`; one with `UNAUTHENTICATED` refuses
+  with kind `storage_unavailable`, since a token expired mid-refresh is not a user gone, and
+  `identity_revoked` would lock the vault. A record or expectation at fault is `bad_record`, refused before it is sent (an epoch
   past GraphQL's 32-bit `Int` included), or by the server's VaultDB, crossing by its kind. So a server that refuses the operation's shape or
   variables (`extensions.code` `BAD_USER_INPUT` or `GRAPHQL_VALIDATION_FAILED`) is serving a
   schema of another version, and refuses with kind `bad_option`, quoting nothing of it, since such
@@ -168,12 +175,12 @@ comparison lets a device still holding a replaced vaultKey seal a whisper under 
 * **The server checks** who may reach which vault, that each write is atomic, and that each
   record has its shape and each name is above the floor and within its storage's limits (the
   VaultDB verbs' own checks, `VAULTDB.md`, *Names*); never a label grammar, which is each browser
-  vault's own `validators`, nor what a lockbox's sidecar holds.
-* **It declares the lockbox limit your server holds a vault to**: none (`Infinity`), as the
-  Postgres VaultDB sets none unless told, or the `maxLockboxes` you pass
-  (`graphqlVaultDB({ client, maxLockboxes: 250 })`). Pass the number your server's
+  vault's own `validators`, nor what a box's sidecar holds.
+* **It declares the box limit your server holds a vault to**: none (`Infinity`), as the
+  Postgres VaultDB sets none unless told, or the `maxBoxes` you pass
+  (`graphqlVaultDB({ client, maxBoxes: 250 })`). Pass the number your server's
   VaultDB enforces, so `Vault.make` refuses a vault asking for more up front; the server refuses a
-  new lockbox past its own with kind `vault_full` either way, and the refusal crosses.
+  new box past its own with kind `vault_full` either way, and the refusal crosses.
 * **A subscription that fails** (the server refusing it, the socket dropping) is not retried. It
   is warned of through the `logger`, once, and calls the vault's listener, so the vault reads
   again and meets the trouble itself: a server's `identity_revoked` locks it. After that, the
@@ -193,13 +200,13 @@ comparison lets a device still holding a replaced vaultKey seal a whisper under 
 Every record crosses **field by field**, each its own GraphQL field under the name it is stored
 by, exactly as safebyok wrote it:
 
-| Type                    | Carries                                                                     |
-| ----------------------- | --------------------------------------------------------------------------- |
-| `SafebyokVaultProps`    | every field of the `VaultProps`                                             |
-| `SafebyokLockbox`       | every field of the `Lockbox`; its sidecar as JSON text, as written          |
-| `SafebyokListedLockbox` | a lockbox as a listing has it: every field but the two encrypted ones       |
-| `SafebyokCiphered`      | an encrypted value: its `cipher_iv_b64` and its `ciphertext_b64`            |
-| `SafebyokVaultScope`    | which vault: `applabel`, `user_id`, `vaultlabel`                            |
+| Type                 | Carries                                                           |
+| -------------------- | ----------------------------------------------------------------- |
+| `SafebyokVaultProps` | every field of the `VaultProps`                                   |
+| `SafebyokBox`        | every field of the `BoxRecord`; its sidecar as JSON text, as written    |
+| `SafebyokListedBox`  | a box as a listing has it: every field but the two encrypted ones |
+| `SafebyokCiphered`   | an encrypted value: its `cipher_iv_b64` and its `ciphertext_b64`  |
+| `SafebyokVaultScope` | which vault: `applabel`, `user_id`, `vaultlabel`                  |
 
 Each has an input type twin (`SafebyokVaultPropsInput`, and so on), and each expectation one
 of its own.
@@ -210,13 +217,17 @@ of its own.
   change to a vault's ways in, and `vault_key_epoch`. Past 2,147,483,647 the field fails on the
   wire and the browser sees `storage_unavailable`. That is accepted: two billion changes to
   the ways in is not a vault anyone keeps.
-* **The vault props' `wayins`** is a list of `SafebyokWayin`, each one opaque JSON, its
-  `wayinkind` saying its shape: the adapter carries a wayin as it is, never looking inside, as
-  the Postgres table stores the list as one `jsonb`. A new way to unlock reaches the browser with
-  no change here. That is by choice, not for want of a typed union: GraphQL has no input unions
-  before graphql 17's `@oneOf`, and the adapter is a shelf.
-* **Encrypted**: each whisper (`whisper_ciphered`), each lockboxKey (`lockbox_key_wrapped`), and
-  the vaultKey under each way in (inside each wayin). **In the open**: everything else, as
+* **The vault props' two ways in**, `passphrase` (always there) and `passkey` (null when the
+  vault has none), are each a `SafebyokWayin`, one opaque JSON, its `wayinkind` saying its shape:
+  the adapter carries a way in as it is, never looking inside, as the Postgres table stores each
+  as one `jsonb`. A change inside a way in reaches the browser with no change here. That is by
+  choice, not for want of a typed union: GraphQL has no input unions before graphql 17's
+  `@oneOf`, and the adapter is a shelf. They replace the `wayins` list of the vault format before
+  (`safebyok-vault-v4`): deploy client and server together, and every vault stored before reads
+  as damaged, to be made anew (with `safebyok-postgres` behind your server, drop and recreate its
+  tables).
+* **Encrypted**: each whisper (`whisper_ciphered`), each boxKey (`box_key_wrapped`), and
+  the vaultKey under each way in (inside `passphrase` and `passkey`). **In the open**: everything else, as
   [`safebyok-postgres`](../safebyok-postgres#what-is-stored) lists it.
 
 ## Developing this package

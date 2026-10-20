@@ -203,7 +203,7 @@ describe("VaultLogger", () => {
 
   it("takes a story of any plain facts, nested ones too", () => {
     const spy = TH.spyLogger()
-    const story = { call: 'storeBox', attempt: 2, retried: true, when: null, detail: { kinds: ['stale_write'] } }
+    const story = { call: 'putBox', attempt: 2, retried: true, when: null, detail: { kinds: ['stale_write'] } }
     spy.logger.warn('a store retried', story)
     expect(spy.calls[0]?.story).to.deep.equal(story)
   })

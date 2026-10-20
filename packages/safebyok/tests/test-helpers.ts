@@ -9,9 +9,9 @@
  * runnable over an adapter made per signed-in user). For tests only, and under vitest: the
  * deriver is worthless against a brute-forcer.
  */
-export { testDeriver, anyPassphraseTest, memoryVaultOpts, settledVault, freshDbName, fakeCiphered, scopeOf,
+export { testDeriver, vaultSliceOf, anyStrengthChecker, memoryVaultOpts, settledVault, freshDbName, fakeCiphered, scopeOf,
   wayinOf, passkeyWayinOf, passkeyOf, vaultPropsOf, vaultPropsAtEpochOf, boxOf, sidecarJsonOf, OddLabels,
-  summaryOf, noBoxYet, thisVault, retiring, markOf, leaseOf, tweakB64 } from './test-helpers/builders'
+  summaryOf, noBoxYet, thisVault, deleting, markOf, leaseOf, tweakB64 } from './test-helpers/builders'
 export type { MarkOverrides } from './test-helpers/builders'
 export { wakeupAtNextTick, aWhile, eventually, changeCounter, liveWatch, makeGate, beforeNextCall,
   holdNextCall, tallyWatches } from './test-helpers/timing'
@@ -24,4 +24,5 @@ export { VaultDBContract, describeVaultDB, vaultDBTimingChecks, expectRoundTrips
 export type { VaultDBContractLine, VaultDBVerbs, MakeVaultDB, DescribeVaultDBOpts, VaultDBDeviceOpts,
   MakeVaultDBDevices, VaultDBTimingCheck } from './test-helpers/vault-db-conformance'
 export { describeDeviceDB } from './test-helpers/device-db-conformance'
-export { expectRefusal, expectSyncRefusal, omitting } from './test-helpers/refusals'
+export { expectRefusal, expectSyncRefusal, expectGood, expectingGood, expectBad, good, bad, omitting } from './test-helpers/refusals'
+export type { ExpectingGood } from './test-helpers/refusals'

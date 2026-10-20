@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as Z from 'zod/mini'
-import { Lockbox } from '../src/lockbox'
-import { DeviceMark, EpochMillis, FarFuture, FarPast, ForeverMillis, Lease, LockboxSummary, MaxUnlocks, Sidecar, VaultProps, VaultScope, Whisper } from '../src/types'
+import { BoxRecord } from '../src/box'
+import { DeviceMark, EpochMillis, FarFuture, FarPast, ForeverMillis, LeaseRecord, BoxSummary, Sidecar, VaultProps, VaultScope, Whisper } from '../src/types'
 import * as TH from './test-helpers'
 
 const WhisperCases = [
@@ -16,7 +16,7 @@ const WhisperCases = [
   [{ deep: { list: [1, null] } },     true,   'nesting, arbitrarily'],
   // what JSON cannot carry is refused, not mangled:
   [undefined,                         false,  'undefined is not a JSON value'],
-  [null,                              false,  'a bare null: emptying a lockbox is retireBox\'s job'],
+  [null,                              false,  'a bare null: emptying a box is delBox\'s job'],
   [() => 'nope',                      false,  'a function is not data'],
   [new Date(),                        false,  'a Date would silently flatten to {}'],
   [new Map([["a", 1]]),               false,  'a Map would silently flatten to {}'],
@@ -59,10 +59,11 @@ describe("VaultScope", () => {
 /** An ISO time, as records stored them before every time became epoch milliseconds. */
 const OldIso = '2026-10-14T00:00:00.000Z'
 const { registered_at: _vaultPropsTime, ...vaultPropsWithoutTime } = TH.vaultPropsOf('u1')
-const { wayins: _wayins, ...vaultPropsWithoutWayins } = TH.vaultPropsOf('u1')
+const { passphrase: _passphrase, passkey: _passkey, ...vaultPropsWithoutSlots } = TH.vaultPropsOf('u1')
+const { passkey: _noPasskey, ...vaultPropsWithoutPasskey } = TH.vaultPropsOf('u1')
 const { unlock_epoch: _epoch, ...vaultPropsWithoutEpoch } = TH.vaultPropsOf('u1')
 const { vault_key_epoch: _keyEpoch, ...vaultPropsWithoutKeyEpoch } = TH.vaultPropsOf('u1')
-/** The three fields the vault props held their one passphrase in, before `wayins`. */
+/** The three fields the vault props held their one passphrase in, before it was a way in. */
 const WayinFieldsOfOld = {
   key_deriver_label:            'test_digest_v0',
   // eslint-disable-next-line sonarjs/no-hardcoded-passwords -- base64 of the literal text 'saltsaltsaltsalt': a fake salt (which is public material anyway), not a credential
@@ -75,59 +76,57 @@ const VaultPropsCases = [
   // regular usage:
   [TH.vaultPropsOf('u1'),                                   true,   'whole vault props'],
   // refused, as a damaged or foreign record:
-  [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v5' }, false,  'a format this version does not know'],
+  [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v6' }, false,  'a format this version does not know'],
+  [{ ...vaultPropsWithoutSlots, format: 'safebyok-vault-v4', wayins: [{ ...TH.wayinOf('passphrase'), wayin_id: 'wayin-passphrase', wayinlabel: 'passphrase' }] }, false, 'v4 vault props, their ways in a list'],
   [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v3' }, false,  'vault props from before the prior vaultKey went'],
   [{ ...TH.vaultPropsOf('u1'), unlock_epoch: 0 },            false,  'an epoch starts at one'],
   [{ ...TH.vaultPropsOf('u1'), unlock_epoch: 1.5 },          false,  'an epoch is a whole number'],
   [{ ...TH.vaultPropsOf('u1'), vault_id: '' },               false,  'an empty vault_id'],
   [TH.vaultPropsOf('u'.repeat(101)),                        true,   'a user_id of any length: the validators check names, not the record'],
   [{ ...TH.vaultPropsOf('u1'), vaultlabel: null },           false,  'a vaultlabel that is not text'],
-  [{ ...TH.vaultPropsOf('u1'), wayins: [TH.wayinOf('passphrase', { vault_key_wayin_wrapped: { cipher_iv_b64: 'iv' } as never })] }, false, 'a wayin missing its ciphertext'],
+  [{ ...TH.vaultPropsOf('u1'), passphrase: TH.wayinOf('passphrase', { vault_key_wayin_wrapped: { cipher_iv_b64: 'iv' } as never }) }, false, 'a passphrase missing its ciphertext'],
   [{ ...TH.vaultPropsOf('u1'), registered_at: 1_792_022_400 }, false,  'a registered_at in epoch seconds'],
   [{ ...TH.vaultPropsOf('u1'), registered_at: Infinity },    false,  'a registered_at that never comes'],
   [{ ...TH.vaultPropsOf('u1'), registered_at: OldIso },      false,  'a registered_at as an ISO string'],
   [vaultPropsWithoutTime,                                   false,  'vault props missing their registered_at'],
   [{ ...vaultPropsWithoutTime, created_at: OldIso, updated_at: OldIso }, false, 'vault props from before their time was named registered_at'],
-  [{ ...vaultPropsWithoutWayins, ...WayinFieldsOfOld },      false,  'vault props from before their wayins were a list'],
+  [{ ...vaultPropsWithoutSlots, ...WayinFieldsOfOld },       false,  'vault props from before their passphrase was a way in'],
   [{ ...vaultPropsWithoutEpoch, passphrase_epoch: 1 },       false,  'vault props from before their epoch was named unlock_epoch'],
   [{ ...vaultPropsWithoutKeyEpoch, format: 'safebyok-vault-v1' }, false, 'vault props from before vaultKey epochs'],
   [vaultPropsWithoutKeyEpoch,                               false,  'vault props missing their vault_key_epoch'],
   [{ ...TH.vaultPropsOf('u1'), vault_key_epoch: 0 },         false,  'a vaultKey epoch starts at one'],
-  // the vaultKey epoch is reserved at 1, but the schema leaves binding it to the wayins
+  // the vaultKey epoch is reserved at 1, but the schema leaves binding it to the ways in
   [TH.vaultPropsAtEpochOf('u1', 2),                         true,   'vault props at a vaultKey epoch other than 1'],
 ] as const
 
-const manyWayins = (count: number) => Array.from({ length: count }, (_unused, ii) => TH.wayinOf(`phrase${String(ii)}`))
-const WayinListCases = [
+const SlotCases = [
   // regular usage:
-  [[TH.wayinOf('passphrase')],                                             true,   'one way in'],
-  [[TH.wayinOf('passphrase'), TH.wayinOf('home_phrase')],                  true,   'two passphrases, each with its own id and label'],
-  [manyWayins(MaxUnlocks),                                                 true,   'as many ways in as MaxUnlocks allows'],
+  [{ passkey: null },                                                      true,   'a passphrase and no passkey'],
+  [{ passkey: TH.passkeyWayinOf('laptop') },                               true,   'a passphrase and a passkey'],
   // refused, as a damaged or foreign record:
-  [[],                                                                     false,  'no way in at all'],
-  [manyWayins(MaxUnlocks + 1),                                             false,  'one wayin past MaxUnlocks, which would make an unlock run long'],
-  [[TH.wayinOf('passphrase'), TH.wayinOf('home_phrase', { wayin_id: 'wayin-passphrase' })], false, 'two wayins sharing a wayin_id'],
-  [[TH.wayinOf('passphrase'), TH.wayinOf('passphrase', { wayin_id: 'wayin-other' })],              false, 'two wayins sharing a wayinlabel'],
-  [[TH.wayinOf('passphrase'), TH.passkeyWayinOf('laptop')],               true,   'a passphrase and a passkey'],
-  [[TH.passkeyWayinOf('laptop'), TH.passkeyWayinOf('phone')],              true,   'two passkeys, each its own credential'],
-  [[TH.wayinOf('passphrase', { wayinkind: 'fingerprint' as never })],      false,  'a wayinkind this version does not know'],
-  [[TH.wayinOf('passphrase', { wayinkind: 'passkey' as never })],          false,  "a passphrase's fields under the passkey wayinkind"],
-  [[TH.passkeyWayinOf('laptop'), TH.passkeyWayinOf('phone', { credential_id: 'cred-laptop' })], false, 'two passkey wayins for the same credential'],
-  [[TH.passkeyWayinOf('laptop', { credential_id: '' })],                  false,  'a passkey with an empty credential_id'],
-  [[TH.passkeyWayinOf('laptop', { prf_salt_b64: '' })],                   false,  'a passkey with an empty salt'],
-  [[TH.wayinOf('Not_a_label')],                                            true,   'a wayinlabel outside the label grammar: the vault checks the grammar when it adds a way in, and a stored record only needs text'],
-  [[TH.wayinOf('passphrase', { salt_b64: '' })],                           false,  'an empty salt'],
-  [[TH.wayinOf('passphrase', { wayin_id: '' })],                           false,  'an empty wayin_id'],
-  [[TH.wayinOf('passphrase', { device_id: '' })],                          false,  'an empty device_id'],
-  [[TH.passkeyWayinOf('laptop', { registered_at: 1_792_022_400 })],       false,  'a registered_at in epoch seconds'],
-  [[TH.wayinOf('passphrase', { vault_key_epoch: 0 })],                     false,  'a vaultKey epoch of zero'],
-  [[TH.wayinOf('passphrase', { vault_key_epoch: 2 })],                     true,   "a wayin at another vaultKey epoch than the vault props': a damaged way in, which an unlock passes over"],
+  [{ passphrase: null },                                                   false,  'no passphrase at all'],
+  [{ passkey: [TH.passkeyWayinOf('laptop'), TH.passkeyWayinOf('phone')] }, false,  'a list of passkeys where there is room for one'],
+  [{ passphrase: TH.passkeyWayinOf('laptop') },                            false,  'a passkey in the passphrase slot'],
+  [{ passkey: TH.wayinOf('passphrase') },                                  false,  'a passphrase in the passkey slot'],
+  [{ passphrase: TH.wayinOf('passphrase', { wayinkind: 'fingerprint' as never }) }, false, 'a wayinkind this version does not know'],
+  [{ passphrase: TH.wayinOf('passphrase', { wayinkind: 'passkey' as never }) },     false, "a passphrase's fields under the passkey wayinkind"],
+  [{ passkey: TH.passkeyWayinOf('laptop', { credential_id: '' }) },        false,  'a passkey with an empty credential_id'],
+  [{ passkey: TH.passkeyWayinOf('laptop', { prf_salt_b64: '' }) },         false,  'a passkey with an empty salt'],
+  [{ passphrase: TH.wayinOf('passphrase', { salt_b64: '' }) },             false,  'an empty salt'],
+  [{ passphrase: TH.wayinOf('passphrase', { device_id: '' }) },            false,  'an empty device_id'],
+  [{ passkey: TH.passkeyWayinOf('laptop', { registered_at: 1_792_022_400 }) }, false, 'a registered_at in epoch seconds'],
+  [{ passphrase: TH.wayinOf('passphrase', { vault_key_epoch: 0 }) },       false,  'a vaultKey epoch of zero'],
+  [{ passphrase: TH.wayinOf('passphrase', { vault_key_epoch: 2 }) },       true,   "a passphrase at another vaultKey epoch than the vault props': a damaged way in, which an unlock refuses as damaged"],
 ] as const
 
-describe("VaultProps.wayins", () => {
-  for (const [wayins, expected, blurb] of WayinListCases) {
-    it(blurb, () => { expect(VaultProps.safeParse({ ...TH.vaultPropsOf('u1'), wayins }).success).to.eq(expected) })
+describe("VaultProps.passphrase and VaultProps.passkey", () => {
+  for (const [slots, expected, blurb] of SlotCases) {
+    it(blurb, () => { expect(VaultProps.safeParse({ ...TH.vaultPropsOf('u1'), ...slots }).success).to.eq(expected) })
   }
+
+  it("refuses vault props with no passkey field: a vault without one says so with null", () => {
+    expect(VaultProps.safeParse(vaultPropsWithoutPasskey).success).to.be.false
+  })
 })
 
 describe("VaultProps", () => {
@@ -164,19 +163,19 @@ describe("Sidecar", () => {
 
 const wholeSummary = { boxlabel: 'anthropic', revision_tok: 'r1', vault_key_epoch: 1, sidecar: {}, registered_at: Date.UTC(2026, 9, 14), written_at: Date.UTC(2026, 9, 14) }
 
-describe("LockboxSummary", () => {
+describe("BoxSummary", () => {
   it("marks a summary undamaged, as its example shows", () => {
-    expect(LockboxSummary.parse(wholeSummary).damaged).to.be.false
+    expect(BoxSummary.parse(wholeSummary).damaged).to.be.false
   })
 
   it("takes a sidecar of any JSON, and refuses a summary without one", () => {
-    expect(LockboxSummary.safeParse({ ...wholeSummary, sidecar: { note: 'work account' } }).success).to.be.true
-    expect(LockboxSummary.safeParse({ ...wholeSummary, sidecar: [1, 2] }).success).to.be.true
-    expect(LockboxSummary.safeParse(TH.omitting(wholeSummary, 'sidecar')).success).to.be.false
+    expect(BoxSummary.safeParse({ ...wholeSummary, sidecar: { note: 'work account' } }).success).to.be.true
+    expect(BoxSummary.safeParse({ ...wholeSummary, sidecar: [1, 2] }).success).to.be.true
+    expect(BoxSummary.safeParse(TH.omitting(wholeSummary, 'sidecar')).success).to.be.false
   })
 
-  it("holds neither ciphered field, the format nor the codec: a whole lockbox is not a summary", () => {
-    const summary = LockboxSummary.parse({ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: {} })
+  it("holds neither ciphered field, the format nor the codec: a whole box is not a summary", () => {
+    const summary = BoxSummary.parse({ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: {} })
     expect(Object.keys(summary)).to.have.members(['boxlabel', 'revision_tok', 'vault_key_epoch', 'sidecar', 'registered_at', 'written_at', 'damaged'])
   })
 })
@@ -206,11 +205,11 @@ describe("ForeverMillis", () => {
   })
 })
 
-describe("Lease", () => {
+describe("LeaseRecord", () => {
   it("takes a user_id of any length, and refuses one that is not text", async () => {
     const lease = await TH.leaseOf('u'.repeat(1000))
-    expect(Lease.safeParse(lease).success).to.be.true
-    expect(Lease.safeParse({ ...lease, user_id: 42 }).success).to.be.false
+    expect(LeaseRecord.safeParse(lease).success).to.be.true
+    expect(LeaseRecord.safeParse({ ...lease, user_id: 42 }).success).to.be.false
   })
 })
 
@@ -298,7 +297,7 @@ describe("DeviceMark", () => {
 // obsolete: never update the snapshot of a format that stands. A refinement (a `Z.refine`, such
 // as the floor's character rules) renders as nothing, so this sees fields, types, optionality and
 // the ranges a check states, not every rule.
-const StoredRecords = [VaultProps, Lockbox, Lease, DeviceMark] as const
+const StoredRecords = [VaultProps, BoxRecord, LeaseRecord, DeviceMark] as const
 
 describe("Stored record formats", () => {
   for (const schema of StoredRecords) {

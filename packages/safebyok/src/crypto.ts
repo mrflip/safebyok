@@ -8,7 +8,7 @@ import { stableJsonify } from './stable-jsonify'
  * WebCrypto, random material through `crypto.getRandomValues`. Nothing here is home-made; every
  * primitive is the platform's. Key derivation from a passphrase lives in key-deriver.ts.
  *
- * Every encryption binds its ctx (which app, user, vault, lockbox, revision, and for what
+ * Every encryption binds its ctx (which app, user, vault, box, revision, and for what
  * purpose) as AES-GCM's additional data, so ciphertext copied anywhere else refuses to open.
  */
 
@@ -50,7 +50,7 @@ const IvBytes = 12
 
 /**
  * One part of a {@link cipherCtx} (one string or number, or a flat record of them -- the visible
- * header of a wayin or a lockbox, say) encoded with its keys sorted. Every field of a
+ * header of a wayin or a box, say) encoded with its keys sorted. Every field of a
  * record is bound: one set to undefined is refused, never dropped as JSON would drop it.
  */
 export type CipherCtxPart = string | number | Readonly<Record<string, string | number>>
@@ -58,14 +58,14 @@ export type CipherCtxPart = string | number | Readonly<Record<string, string | n
 /**
  * The ctx an encryption is bound to, as AES-GCM additional data: the props and metadata the
  * ciphertext's tag proves unchanged, as a deterministic encoding of the given parts (format, app,
- * user, vault, lockbox, revision, purpose -- whatever names the slot). Rebuilt rather than
+ * user, vault, box, revision, purpose -- whatever names the slot). Rebuilt rather than
  * stored; if any part differs at decryption, the ciphertext refuses to open. A part that is
  * undefined or null, or a record part holding a field set to undefined, is refused with kind
  * 'bad_option': each would bind the same as some other ctx (a missing part as null; a missing
  * field as no field at all), so nothing is encrypted or opened under it.
  *
  * @example cipherCtx('safebyok-lease-v1', 'acme', 'u1', 'main', vaultId, 1, askPassphraseAt, 'vault_key_lease_wrapped')
- * @example cipherCtx('safebyok-vault-v4', 'acme', 'u1', 'main', vaultId, registeredAt, 'vault_key_passphrase_wrapped', { wayinkind: 'passphrase', wayin_id, wayinlabel, key_deriver_label, salt_b64 })
+ * @example cipherCtx('safebyok-vault-v5', 'acme', 'u1', 'main', vaultId, registeredAt, 'vault_key_passphrase_wrapped', { wayinkind: 'passphrase', key_deriver_label, salt_b64, vault_key_epoch, device_id, registered_at })
  */
 export const cipherCtx = (...parts: readonly CipherCtxPart[]): Uint8Array => {
   if (parts.some((part) => isUnbound(part))) {
@@ -94,10 +94,10 @@ export const makeVaultKey = (): Promise<CryptoKey> => (
 )
 
 /**
- * A fresh random 256-bit AES-GCM key for one lockbox: a lockboxKey, made new on every store.
+ * A fresh random 256-bit AES-GCM key for one box: a boxKey, made new on every store.
  * Extractable for the same reason a vaultKey is: it exists to be wrapped.
  */
-export const makeLockboxKey = (): Promise<CryptoKey> => (
+export const makeBoxKey = (): Promise<CryptoKey> => (
   crypto.subtle.generateKey(AesGcm, true, ['encrypt', 'decrypt'])
 )
 
@@ -124,7 +124,7 @@ export const importWrappingKeyBytes = (keyBytes: Uint8Array): Promise<CryptoKey>
  * bytes put to another use, or in another place, make another key: the passkeyKey. The bytes stay
  * with the caller; drop them promptly.
  *
- * @example await deriveWrappingKey(prfBytes, cipherCtx('safebyok-vault-v4', 'acme', 'u1', 'main', vaultId, registeredAt, 'vault_key_passkey_wrapped', header))
+ * @example await deriveWrappingKey(prfBytes, cipherCtx('safebyok-vault-v5', 'acme', 'u1', 'main', vaultId, registeredAt, 'vault_key_passkey_wrapped', header))
  */
 export const deriveWrappingKey = async (keyBytes: Uint8Array, info: Uint8Array): Promise<CryptoKey> => {
   const inputKey = await crypto.subtle.importKey('raw', keyBytes as BufferSource, 'HKDF', false, ['deriveKey'])
@@ -167,7 +167,7 @@ export const decipherBytes = async (cipherKey: CryptoKey, ciphered: Ciphered, ct
 
 /**
  * `wrappedKey` encrypted under `wrappingKey`, bound to `ctx`: how a vaultKey travels inside
- * the vault props and a lockboxKey inside its lockbox. The key being wrapped must be extractable.
+ * the vault props and a boxKey inside its box. The key being wrapped must be extractable.
  */
 export const wrapKeyUnder = async (wrappingKey: CryptoKey, wrappedKey: CryptoKey, ctx: Uint8Array): Promise<Ciphered> => {
   const cipherIv = randomBytes(IvBytes)
@@ -186,7 +186,7 @@ export const wrapKeyUnder = async (wrappingKey: CryptoKey, wrappedKey: CryptoKey
  * passphrase wayin that rejection IS how a wrong passphrase is learned -- never a comparison.
  *
  * @param usages - What the recovered key may do; also sets extractability. Non-extractable is
- *   the default posture (a lockboxKey, the vaultKey handle a vault holds); an extractable unwrap
+ *   the default posture (a boxKey, the vaultKey handle a vault holds); an extractable unwrap
  *   exists only inside an operation about to re-wrap the key, and is dropped when it returns.
  */
 export const unwrapKeyUnder = async (

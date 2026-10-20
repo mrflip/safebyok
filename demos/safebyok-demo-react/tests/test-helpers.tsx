@@ -58,7 +58,7 @@ export const makeWorld = ({ vaultDB = localVaultDB({ store: memoryStore() }) }: 
     try {
       await vault.unlock(Passphrase)
       for (const [boxlabel, whisper] of Object.entries(whispers)) {
-        await vault.storeBox(boxlabel, whisper)
+        await vault.putBox(boxlabel, whisper)
       }
     } finally {
       vault.close()
@@ -131,21 +131,21 @@ export const fakeAnthropic = (status: number, jokeText = '') => {
 
 /**
  * The vault as a page sees it, to render beside a component under test: whether there is one
- * (`vault`: `none` or `open`), its `state`, its `boxes` (boxlabels, comma-joined), a `read` button
- * that reads `anthropic_api_key` through withUnlockedVault, and an `unlock` button that unlocks it
- * with {@link Passphrase} directly.
+ * (`vault`: `none` or `open`), its `state` (`none` while there is none), its `boxes` (boxlabels,
+ * comma-joined), a `read` button that reads `anthropic_api_key`, asking through the provider's dialog, and an
+ * `unlock` button that unlocks it with {@link Passphrase} directly.
  *
  * @example world.renderInVault(<><SessionBar auth={auth} /><TH.VaultProbe /></>)
  */
 export const VaultProbe = () => {
-  const { vault, withUnlockedVault } = useVault()
+  const vault = useVault()
   const snapshot = useVaultSnapshot()
   return (
     <p>
       <span data-testid="vault">{vault === null ? 'none' : 'open'}</span>
-      <span data-testid="state">{snapshot.state}</span>
-      <span data-testid="boxes">{snapshot.boxes.map((box) => box.boxlabel).join(',')}</span>
-      <button onClick={() => { void withUnlockedVault(() => vault?.readBox('anthropic_api_key') ?? Promise.resolve(null)) }}>read</button>
+      <span data-testid="state">{snapshot?.state ?? 'none'}</span>
+      <span data-testid="boxes">{(snapshot?.boxes ?? []).map((box) => box.boxlabel).join(',')}</span>
+      <button onClick={() => { void vault?.tryGetBox('anthropic_api_key') }}>read</button>
       <button onClick={() => { void vault?.unlock(Passphrase) }}>unlock</button>
     </p>
   )

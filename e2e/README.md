@@ -35,9 +35,9 @@ pnpm justify    # from e2e/: install, lint, typecheck, test (it builds the packa
   * [races.test.ts](tests/postgres/races.test.ts) -- writers for a vault's last places, with no
     turnstile: some land, none past the writers racing, every one readable (bounds and read-back,
     not the limit: it is a best effort); and a write that
-    counted before another's lockbox committed, which lands past the limit as the README says.
-  * [foreign-key.test.ts](tests/postgres/foreign-key.test.ts) -- the `23503` of a vault retired
-    while a lockbox's insert waited on the foreign key, refused as `stale_write`.
+    counted before another's box committed, which lands past the limit as the README says.
+  * [foreign-key.test.ts](tests/postgres/foreign-key.test.ts) -- the `23503` of a vault deleted
+    while a box's insert waited on the foreign key, refused as `stale_write`.
   * [test-helpers.ts](tests/postgres/test-helpers.ts) -- the file databases, the devices, and
     **`OnRealPostgres`, the one list of which suites run against the server**; the rest of the
     Postgres tests stay in `packages/safebyok-postgres`, over a PGlite. To run one more suite on the

@@ -1,24 +1,27 @@
 import { GraphQLError } from 'graphql'
-import { Refusals, VaultError } from 'safebyok'
-import type { VaultPropsExpectation, RetireExpectation, Lockbox, LockboxExpectation, LockboxRetireExpectation, VaultProps, VaultDB, VaultScope } from 'safebyok'
-import { VaultPropsFields, LockboxFields, ScopeFields, recordOf } from './fields'
+import { Refusals, VaultError, isVaultError } from 'safebyok'
+import type { Outcome, RefusalKind, VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, VaultProps, VaultDB, VaultScope } from 'safebyok'
+import { VaultPropsFields, BoxFields, ScopeFields, recordOf } from './fields'
 
 /**
  * What the resolvers need of the VaultDB they serve: the verbs a browser's vault calls, and
- * `listBoxRecords`, which lists a vault's lockboxes as stored records -- what the browser's
+ * `listBoxRecords`, which lists a vault's boxes as stored records -- what the browser's
  * VaultDB must hand back from its own listing -- where a VaultDB's `listBoxes` gives the
  * summaries a vault shows. Every VaultDB is one: `safebyok-postgres`'s, or one of your own.
  */
-export type ServedVaultDB = Pick<VaultDB, 'readVaultProps' | 'fetchOrCreateVaultProps' | 'updateVaultProps' | 'readBox' | 'listBoxRecords' | 'updateBox' | 'retireBox' | 'retireVault' | 'subscribe'>
+export type ServedVaultDB = Pick<VaultDB, 'getVaultProps' | 'ensureVaultProps' | 'putVaultProps' | 'getBox' | 'listBoxRecords' | 'putBox' | 'delBox' | 'delVault' | 'subscribe'>
 
 /** What {@link vaultResolvers} is made with, once, at your server's start. */
 export type VaultResolversOpts<ContextT> = {
   /**
    * The VaultDB for one request, made from your server's context for it: for the user your own
    * auth signed in, never one the request names. Called for every vault field resolved, so it
-   * should be cheap -- `postgresVaultDB` is, connecting to nothing. Whatever it throws is the
-   * server's own setup gone wrong, never the request's: it crosses as `bad_option` with a generic
-   * message, and the VaultDB, not this, refuses a signed-out request.
+   * should be cheap -- `postgresVaultDB` is, connecting to nothing. To refuse the request by a
+   * rule of your own, it throws a VaultError of kind `not_permitted` (`Refusals.notPermitted()`),
+   * or `identity_revoked` for a user your app knows is gone, which crosses as it is, kind and
+   * message. Anything else it throws is the server's own setup gone wrong, never the request's:
+   * it crosses as `bad_option` with a generic message. The VaultDB, not this, refuses a
+   * signed-out request.
    */
   vaultDBFor: (context: ContextT) => ServedVaultDB
 }
@@ -28,7 +31,7 @@ export type VaultFieldArgs = {
   scope?:    unknown
   boxlabel?: unknown
   vaultProps?: unknown
-  lockbox?:  unknown
+  box?:      unknown
   expected?: unknown
 }
 
@@ -41,16 +44,16 @@ export type VaultFieldResolver<ContextT> = (parent: unknown, args: VaultFieldArg
  */
 export type VaultResolvers<ContextT> = {
   Query: {
-    safebyokReadVaultProps: VaultFieldResolver<ContextT>
-    safebyokReadBox:        VaultFieldResolver<ContextT>
-    safebyokListBoxes:      VaultFieldResolver<ContextT>
+    safebyokGetVaultProps:    VaultFieldResolver<ContextT>
+    safebyokGetBox:           VaultFieldResolver<ContextT>
+    safebyokListBoxes:        VaultFieldResolver<ContextT>
   }
   Mutation: {
-    safebyokFetchOrCreateVaultProps: VaultFieldResolver<ContextT>
-    safebyokUpdateVaultProps:        VaultFieldResolver<ContextT>
-    safebyokUpdateBox:               VaultFieldResolver<ContextT>
-    safebyokRetireBox:               VaultFieldResolver<ContextT>
-    safebyokRetireVault:             VaultFieldResolver<ContextT>
+    safebyokEnsureVaultProps: VaultFieldResolver<ContextT>
+    safebyokPutVaultProps:    VaultFieldResolver<ContextT>
+    safebyokPutBox:           VaultFieldResolver<ContextT>
+    safebyokDelBox:           VaultFieldResolver<ContextT>
+    safebyokDelVault:         VaultFieldResolver<ContextT>
   }
   Subscription: {
     safebyokVaultChanged: {
@@ -73,8 +76,10 @@ export type VaultResolvers<ContextT> = {
  *   which may name your database. That stays on the server, as the GraphQL error's `cause`, for
  *   your own logs. Anything else a VaultDB throws crosses as `storage_unavailable`, what it threw
  *   kept as that VaultError's cause.
- * * **A `vaultDBFor` that throws** crosses as `bad_option` saying only that the server is
- *   misconfigured: its own message, which may name your setup, stays on the server as the cause.
+ * * **A `vaultDBFor` that throws** a VaultError of kind `not_permitted` or `identity_revoked` --
+ *   the host refusing the request's user -- crosses as that refusal. Anything else it throws crosses as
+ *   `bad_option` saying only that the server is misconfigured: its own message, which may name
+ *   your setup, stays on the server as the cause.
  * * **`safebyokVaultChanged`** sends the vault's scope after every write to it, as the VaultDB's
  *   `subscribe` hears them -- for `postgresVaultDB`, through its `listen` -- and stops listening
  *   when the subscriber goes. Changes that come while the subscriber is still busy with the last
@@ -97,19 +102,28 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
   // The server holds a name only to the floor every name is held to and to its storage's limits,
   // which every VaultDB verb checks: what text a name may be beyond that is each browser vault's
   // own validators' to say, at its entry. The server's job is to keep each user to their own vault.
-  /** The request's VaultDB, or the refusal that says the server could not make one. */
+  /**
+   * The request's VaultDB; or the host's refusal of the request, as it came; or the refusal that
+   * says the server could not make one.
+   */
   const vaultDBOf = (context: ContextT): ServedVaultDB => {
     try {
       return vaultDBFor(context)
     } catch (err) {
+      if (isVaultError(err) && HostRefusalKinds.has(err.refusalkind)) { throw err }
       throw new VaultError('bad_option', MisconfiguredMessage, { cause: err })
     }
   }
-  /** A resolver calling `verb` on the request's VaultDB, any refusal made one a wire can carry. */
-  const served = (verb: (vaultDB: ServedVaultDB, args: VaultFieldArgs) => Promise<unknown>): VaultFieldResolver<ContextT> => (
+  /**
+   * A resolver calling `verb` on the request's VaultDB: its outcome's `val`, as `answered` hands
+   * it to the wire, or its refusal made one a wire can carry.
+   */
+  const served = (verb: (vaultDB: ServedVaultDB, args: VaultFieldArgs) => Promise<Outcome<unknown>>, answered: (val: unknown) => unknown = (val) => val): VaultFieldResolver<ContextT> => (
     async (_parent, args, context) => {
       try {
-        return await verb(vaultDBOf(context), args)
+        const { ok, val, err } = await verb(vaultDBOf(context), args)
+        if (! ok) { throw err }
+        return answered(val)
       } catch (err) {
         throw crossing(err)
       }
@@ -117,23 +131,17 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
   )
   return {
     Query: {
-      safebyokReadVaultProps: served((vaultDB, args) => vaultDB.readVaultProps(scopeIn(args))),
-      safebyokReadBox:        served((vaultDB, args) => vaultDB.readBox(scopeIn(args), args.boxlabel as string)),
+      safebyokGetVaultProps: served((vaultDB, args) => vaultDB.getVaultProps(scopeIn(args))),
+      safebyokGetBox:        served((vaultDB, args) => vaultDB.getBox(scopeIn(args), args.boxlabel as string)),
       // As stored records, which the browser's VaultDB validates: not listBoxes' summaries.
       safebyokListBoxes:  served((vaultDB, args) => vaultDB.listBoxRecords(scopeIn(args))),
     },
     Mutation: {
-      safebyokFetchOrCreateVaultProps: served((vaultDB, args) => vaultDB.fetchOrCreateVaultProps(vaultPropsIn(args))),
-      safebyokUpdateVaultProps: served(async (vaultDB, args) => {
-        await vaultDB.updateVaultProps(vaultPropsIn(args), vaultPropsExpectationIn(args))
-        return true
-      }),
-      safebyokUpdateBox: served((vaultDB, args) => vaultDB.updateBox(scopeIn(args), recordOf(args.lockbox, LockboxFields) as Lockbox, lockboxExpectationIn(args))),
-      safebyokRetireBox: served((vaultDB, args) => vaultDB.retireBox(scopeIn(args), args.boxlabel as string, lockboxRetireExpectationIn(args))),
-      safebyokRetireVault: served(async (vaultDB, args) => {
-        await vaultDB.retireVault(scopeIn(args), retireExpectationIn(args))
-        return true
-      }),
+      safebyokEnsureVaultProps: served((vaultDB, args) => vaultDB.ensureVaultProps(vaultPropsIn(args))),
+      safebyokPutVaultProps: served((vaultDB, args) => vaultDB.putVaultProps(vaultPropsIn(args), vaultPropsExpectationIn(args)), () => true),
+      safebyokPutBox: served((vaultDB, args) => vaultDB.putBox(scopeIn(args), recordOf(args.box, BoxFields) as BoxRecord, boxExpectationIn(args))),
+      safebyokDelBox: served((vaultDB, args) => vaultDB.delBox(scopeIn(args), args.boxlabel as string, boxDelExpectationIn(args))),
+      safebyokDelVault: served((vaultDB, args) => vaultDB.delVault(scopeIn(args), vaultDelExpectationIn(args)), () => true),
     },
     Subscription: {
       safebyokVaultChanged: {
@@ -150,6 +158,12 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
   }
 }
 
+/**
+ * The refusals a `vaultDBFor` throws that cross as they are: the host refusing the request's user,
+ * by its own rules or as gone. Any other is the server's setup gone wrong.
+ */
+const HostRefusalKinds: ReadonlySet<RefusalKind> = new Set(['not_permitted', 'identity_revoked'])
+
 /** What a browser hears when `vaultDBFor` throws: the server's own message stays on the server. */
 const MisconfiguredMessage = "The vault's server could not serve this request: its own setup is wrong, not the request. Retrying will not help until it is fixed; the server's logs say what is wrong."
 
@@ -164,18 +178,18 @@ const vaultPropsExpectationIn = (args: VaultFieldArgs): VaultPropsExpectation =>
 }
 
 // A revision_tok left out, as a GraphQL client may leave out a null, is the null it means.
-const lockboxExpectationIn = (args: VaultFieldArgs): LockboxExpectation => {
+const boxExpectationIn = (args: VaultFieldArgs): BoxExpectation => {
   const { vault_id, revision_tok = null, vault_key_epoch } = args.expected as { vault_id: string, revision_tok?: string | null, vault_key_epoch: number }
   return { vault_id, revision_tok, vault_key_epoch }
 }
 
-const retireExpectationIn = (args: VaultFieldArgs): RetireExpectation => {
-  const { vault_id } = args.expected as RetireExpectation
+const vaultDelExpectationIn = (args: VaultFieldArgs): VaultDelExpectation => {
+  const { vault_id } = args.expected as VaultDelExpectation
   return { vault_id }
 }
 
-// A revision_tok left out, as for a lockbox write, is the null it means.
-const lockboxRetireExpectationIn = (args: VaultFieldArgs): LockboxRetireExpectation => {
+// A revision_tok left out, as for a box write, is the null it means.
+const boxDelExpectationIn = (args: VaultFieldArgs): BoxDelExpectation => {
   const { vault_id, revision_tok = null } = args.expected as { vault_id: string, revision_tok?: string | null }
   return { vault_id, revision_tok }
 }
@@ -223,8 +237,8 @@ const noUnsubscribing = (): void => undefined
  * an Error's own cause is, for the server's logs: no GraphQL server sends a cause.
  */
 const crossing = (err: unknown): GraphQLError => {
-  const refusal = err instanceof VaultError ? err : Refusals.storageUnavailable(err)
-  const crossed = new GraphQLError(refusal.message, { extensions: { kind: refusal.kind } })
+  const refusal = isVaultError(err) ? err : Refusals.storageUnavailable(err)
+  const crossed = new GraphQLError(refusal.message, { extensions: { kind: refusal.refusalkind } })
   // Set after, never as the constructor's `cause` or `originalError`: either becomes the error's
   // originalError, and Yoga masks a GraphQLError whose originalError is not a GraphQLError too.
   Object.defineProperty(crossed, 'cause', { value: refusal, configurable: true, writable: true })
