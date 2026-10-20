@@ -248,8 +248,7 @@ export abstract class Wayin {
   static async seal(vault: WayinVault, proof: PassphraseProof | PasskeyProof, holder: WayinHolder, stamp: WayinStamp, vaultKey: CryptoKey): Promise<{ wayin: PassphraseWayin | PasskeyWayin, sessionKey: CryptoKey }>
   static async seal(vault: WayinVault, proof: PassphraseProof | PasskeyProof, holder: WayinHolder, stamp: WayinStamp, vaultKey: CryptoKey): Promise<{ wayin: PassphraseWayin | PasskeyWayin, sessionKey: CryptoKey }> {
     checkOneCopy(proof, Proof, 'Wayin.seal')
-    const { header, wayinKey } = proof instanceof PassphraseProof ? await passphraseKeying(vault, proof, stamp) : await passkeyKeying(vault, proof, holder, stamp)
-    const wayinCtx = wayinCtxOf(vault, holder, header)
+    const { header, wayinCtx, wayinKey } = proof instanceof PassphraseProof ? await passphraseKeying(vault, proof, holder, stamp) : await passkeyKeying(vault, proof, holder, stamp)
     const record = { ...header, vault_key_wayin_wrapped: await wrapKeyUnder(wayinKey, vaultKey, wayinCtx) }
     const wayin = record.wayinkind === 'passphrase' ? PassphraseWayin[madeFrom](vault, record, holder) : PasskeyWayin[madeFrom](vault, record, holder)
     const sessionKey = await unwrapKeyUnder(wayinKey, record.vault_key_wayin_wrapped, wayinCtx, SessionUsage)
@@ -395,10 +394,17 @@ export class PasskeyWayin extends Wayin {
   }
 }
 
-// == [Sealing and refusals]: passphraseKeying, checkFreshSalt, passkeyKeying, wrongPassphrase, unknownKeyDeriver, damagedPassphrase, damagedPasskey
+// == [Sealing and refusals]: Keying, passphraseKeying, checkFreshSalt, passkeyKeying, wrongPassphrase, unknownKeyDeriver, damagedPassphrase, damagedPasskey
 
-/** A new passphrase's way in's header, under a fresh salt for the vault's key deriver, and the key `proof` makes over it. */
-const passphraseKeying = async (vault: WayinVault, proof: PassphraseProof, stamp: WayinStamp) => {
+/**
+ * What sealing a new way in needs of its kind: its header, the ctx that header and its vault make,
+ * built once, and the wayinKey its proof makes. For a passkey the same ctx is the HKDF's `info` and
+ * the wrap's, by construction.
+ */
+type Keying<HeaderT extends WayinHeader> = { header: HeaderT, wayinCtx: Uint8Array, wayinKey: CryptoKey }
+
+/** A new passphrase's way in's {@link Keying}: its header under a fresh salt for the vault's key deriver, and the key `proof` makes over that salt. */
+const passphraseKeying = async (vault: WayinVault, proof: PassphraseProof, holder: WayinHolder, stamp: WayinStamp): Promise<Keying<Omit<PassphraseWayinRecord, 'vault_key_wayin_wrapped'>>> => {
   const { keyDeriver } = vault
   const header = {
     wayinkind:         'passphrase',
@@ -406,7 +412,7 @@ const passphraseKeying = async (vault: WayinVault, proof: PassphraseProof, stamp
     key_deriver_label: keyDeriver.key_deriver_label,
     salt_b64:          toB64(randomBytes(keyDeriver.salt_bytes)),
   } as const
-  return { header, wayinKey: await proof.wayinKeyFor(header) }
+  return { header, wayinCtx: wayinCtxOf(vault, holder, header), wayinKey: await proof.wayinKeyFor(header) }
 }
 
 /**
@@ -422,8 +428,8 @@ export const checkFreshSalt = (proof: PasskeyProof): void => {
   }
 }
 
-/** A new passkey's way in's header, for the credential and salt `proof` answered over, and the key its answer makes. */
-const passkeyKeying = async (vault: WayinVault, proof: PasskeyProof, holder: WayinHolder, stamp: WayinStamp) => {
+/** A new passkey's way in's {@link Keying}: its header for the credential and salt `proof` answered over, and the key its answer makes under that header's ctx. */
+const passkeyKeying = async (vault: WayinVault, proof: PasskeyProof, holder: WayinHolder, stamp: WayinStamp): Promise<Keying<Omit<PasskeyWayinRecord, 'vault_key_wayin_wrapped'>>> => {
   checkFreshSalt(proof)
   const header = {
     wayinkind:     'passkey',
@@ -431,7 +437,8 @@ const passkeyKeying = async (vault: WayinVault, proof: PasskeyProof, holder: Way
     credential_id: proof.credentialId,
     prf_salt_b64:  proof.prfSaltB64,
   } as const
-  return { header, wayinKey: await proof.wayinKeyFor({ wayinCtx: wayinCtxOf(vault, holder, header) }) }
+  const wayinCtx = wayinCtxOf(vault, holder, header)
+  return { header, wayinCtx, wayinKey: await proof.wayinKeyFor({ wayinCtx }) }
 }
 
 /** The refusal of a passphrase that opened nothing. */
