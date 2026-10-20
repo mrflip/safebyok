@@ -1135,7 +1135,7 @@ export class Vault {
    * Take up `fresh`, vault props just read, at once when they revoke the ones in hand: a change to
    * the wayins (new epoch) or a deletion or remaking, here or elsewhere, ends this device's unlock,
    * and wins by construction. They are taken up with `mark` before any further wait, with the key
-   * dropped, any take-up and any first unlock's make stood down. A take-up or an unlock finishing
+   * dropped, any take-up and any first unlock's create stood down. A take-up or an unlock finishing
    * during the read asks whether its vault props were outrun, and finds these. The lease, outdated
    * by the same change, is discarded when a key was held. An older copy of the vault in hand is no
    * change: see isNewerCopy.
@@ -1150,7 +1150,7 @@ export class Vault {
     // Never another vault's boxes beside these vault props, should the listing that follows fail.
     if (fresh?.vault_id !== held.vault_id) { this.#boxes = [] }
     this.#dropKey()
-    this.#standDownMakes()
+    this.#standDownCreates()
     if (wasUnlocked) { valOf(await this.#deviceDB.delLease(this.#scope)) }
   }
 
@@ -1430,7 +1430,7 @@ export class Vault {
   }
   // --
 
-  // == [Unlock and ways in]: unwrapWith, draftVaultProps, settleUnlock, standDownMakes, reviseWayins, raiseMarkAfter, checkStrongEnough, newStamp
+  // == [Unlock and ways in]: unwrapWith, draftVaultProps, settleUnlock, standDownCreates, reviseWayins, raiseMarkAfter, checkStrongEnough, newStamp
 
   /**
    * The vaultKey out of `standing`'s way in of `proof`'s kind -- the passphrase, or the passkey --
@@ -1486,7 +1486,7 @@ export class Vault {
       this.#drafted = { vault_id: draft.vault_id, device_id: deviceId }
       // Another device's vault, if one was made meanwhile, is held to the mark as it was before it.
       const seenBefore = this.#checkedMark(valOf(await this.#deviceDB.getMark(this.#scope)))
-      const revoked = this.#makesStandDown.signal
+      const revoked = this.#createsStandDown.signal
       const settled = frozenVaultProps(await damagedAs(this.#vaultDB.ensureVaultProps(draft), damagedVaultProps))
       const mark = await this.#heedMark(settled, { seenBefore, call: 'unlock' })
       // Vault props a read took up meanwhile are not put back: should they differ, the grant that
@@ -1511,16 +1511,16 @@ export class Vault {
     return { standing, ...await this.#unwrapWith(standing, proof) }
   }
 
-  // Aborted, and made anew, at each revocation a read takes up (see takeStorage): a first unlock's
-  // make holds the signal standing as it writes its vault props, and once that is aborted, it puts
-  // none back, as "no vault in hand" may then be its own vault, deleted elsewhere. One signal
-  // serves every make under way, however many.
-  #makesStandDown = new AbortController()
+  // Aborted, and made anew, at each revocation a read takes up (see takeStorage): a first unlock
+  // creating the vault holds the signal standing as it writes its vault props, and once that is
+  // aborted, it puts none back, as "no vault in hand" may then be its own vault, deleted elsewhere.
+  // One signal serves every create under way, however many.
+  #createsStandDown = new AbortController()
 
-  /** Have every first unlock's make under way stand down: a read has found vault props deleted or replaced. */
-  #standDownMakes() {
-    this.#makesStandDown.abort()
-    this.#makesStandDown = new AbortController()
+  /** Have every first unlock's create under way stand down: a read has found vault props deleted or replaced. */
+  #standDownCreates() {
+    this.#createsStandDown.abort()
+    this.#createsStandDown = new AbortController()
   }
 
   /**
@@ -1661,13 +1661,13 @@ export class Vault {
 
   /**
    * Forget the vault props in hand, as though storage had not been read, with their mark and their
-   * boxes; any first unlock's make stands down, so puts none back.
+   * boxes; any first unlock's create stands down, so puts none back.
    */
   #forgetVaultProps() {
     this.#vaultProps = UnreadVaultProps
     this.#deviceMark = null
     this.#boxes = []
-    this.#standDownMakes()
+    this.#standDownCreates()
   }
 
   /** Forget the unlock in memory, and the timer left to do so; a lease take-up under way stands down. */
