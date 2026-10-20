@@ -3,7 +3,7 @@ import { VaultError } from './errors'
 import { type Outcome, outcomeOf, unexpectedError } from './outcome'
 import { PasskeyProof, PassphraseProof, type Proof } from './proof'
 import { PasskeySaltBytes, WayinRecord, type PasskeyWayinRecord, type PasskeyWayinSummary, type PassphraseWayinRecord, type PassphraseWayinSummary, type VaultProps, type WayinKind, type WayinSummary } from './types'
-import { decorate } from './utils'
+import { decorate } from './adorn'
 import type { Vault } from './vault'
 
 /**
@@ -52,6 +52,13 @@ export type WayinHeader = HeaderOf<WayinRecord>
  * sealed it. A way in is one.
  */
 export type WayinStamp = Pick<WayinRecord, 'vault_key_epoch' | 'device_id' | 'registered_at'>
+
+/**
+ * The name of each kind's maker, held by this module alone: a way in is made only by
+ * {@link Wayin.make}, from a record it checks, or by {@link Wayin.seal}, so its constructors are
+ * no one else's to call.
+ */
+const madeFrom = Symbol('Wayin.madeFrom')
 
 /** The ctx's first part: the vault props' format, under which every way in's wrap is bound. */
 const VaultPropsFormat = 'safebyok-vault-v5'
@@ -163,7 +170,7 @@ export abstract class Wayin {
     if (! checked.success) {
       throw new VaultError('damaged_wayin', "A way into this vault is stored in a form this package never writes, so it can't be tried. The other way in, if the vault has one, still can.", { cause: checked.error })
     }
-    return checked.data.wayinkind === 'passphrase' ? new PassphraseWayin(vault, checked.data, holder) : new PasskeyWayin(vault, checked.data, holder)
+    return checked.data.wayinkind === 'passphrase' ? PassphraseWayin[madeFrom](vault, checked.data, holder) : PasskeyWayin[madeFrom](vault, checked.data, holder)
   }
 
   /** What a locked vault may show of this way in: every field but its wrap and, for a passphrase, its salt. */
@@ -242,7 +249,7 @@ export abstract class Wayin {
     const { header, wayinKey } = proof instanceof PassphraseProof ? await passphraseKeying(vault, proof, stamp) : await passkeyKeying(vault, proof, holder, stamp)
     const wayinCtx = wayinCtxOf(vault, holder, header)
     const record = { ...header, vault_key_wayin_wrapped: await wrapKeyUnder(wayinKey, vaultKey, wayinCtx) }
-    const wayin = record.wayinkind === 'passphrase' ? new PassphraseWayin(vault, record, holder) : new PasskeyWayin(vault, record, holder)
+    const wayin = record.wayinkind === 'passphrase' ? PassphraseWayin[madeFrom](vault, record, holder) : PasskeyWayin[madeFrom](vault, record, holder)
     const sessionKey = await unwrapKeyUnder(wayinKey, record.vault_key_wayin_wrapped, wayinCtx, SessionUsage)
     return { wayin, sessionKey }
   }
@@ -262,12 +269,16 @@ export class PassphraseWayin extends Wayin {
   /** This way in's passphraseSalt: fresh for every passphrase the vault takes. */
   readonly salt_b64: string
 
-  /** The way in `record` stands for: made by {@link Wayin.make}, which checks the record first. */
-  constructor(vault: WayinVault, record: PassphraseWayinRecord, holder: WayinHolder) {
+  private constructor(vault: WayinVault, record: PassphraseWayinRecord, holder: WayinHolder) {
     super(vault, record, holder)
     this.key_deriver_label = record.key_deriver_label
     this.salt_b64 = record.salt_b64
     Object.freeze(this)
+  }
+
+  /** The way in `record` stands for, a record already checked: what {@link Wayin.make} and {@link Wayin.seal} make. */
+  static [madeFrom](vault: WayinVault, record: PassphraseWayinRecord, holder: WayinHolder): PassphraseWayin {
+    return new PassphraseWayin(vault, record, holder)
   }
 
   /** Its kind, and the device and time that sealed it: never its salt, never its wrap. */
@@ -326,12 +337,16 @@ export class PasskeyWayin extends Wayin {
   /** The salt the passkey's PRF is evaluated over: {@link PasskeySaltBytes} random bytes, fresh for every way in. */
   readonly prf_salt_b64: string
 
-  /** The way in `record` stands for: made by {@link Wayin.make}, which checks the record first. */
-  constructor(vault: WayinVault, record: PasskeyWayinRecord, holder: WayinHolder) {
+  private constructor(vault: WayinVault, record: PasskeyWayinRecord, holder: WayinHolder) {
     super(vault, record, holder)
     this.credential_id = record.credential_id
     this.prf_salt_b64 = record.prf_salt_b64
     Object.freeze(this)
+  }
+
+  /** The way in `record` stands for, a record already checked: what {@link Wayin.make} and {@link Wayin.seal} make. */
+  static [madeFrom](vault: WayinVault, record: PasskeyWayinRecord, holder: WayinHolder): PasskeyWayin {
+    return new PasskeyWayin(vault, record, holder)
   }
 
   /** Its kind, the device and time that added it, and the credential and salt a host asks its authenticator with: never its wrap. */

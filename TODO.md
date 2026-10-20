@@ -170,7 +170,7 @@ backing database*.
 ### A throwing `getProof` is always `unexpected_error`
 
 The Coach (2026-10-19, sprint contract): "a throwing getProof is always unexpected_error: we need
-to allow more specificity." Today the answer is checked once, in `Ask.raise` (`src/ask.ts`): a
+to allow more specificity." Today the answer is checked once, as the vault raises each ask (`src/ask.ts`): a
 throw from the host's `getProof` becomes `unexpected_error` (misuse), whatever it threw, so a
 dialog that fails for a reason the host could name -- a lost user gesture, a passkey the platform
 refused -- cannot say so. Decide what a `getProof` may refuse with: a `VaultError` it throws kept

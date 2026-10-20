@@ -41,6 +41,12 @@ export type GetProof = (ask: Ask) => ProofAnswer | Promise<ProofAnswer>
 export type Attempter = (proof: string | PasskeyAnswer, overtaken: AbortSignal) => Promise<Outcome<Vault>>
 
 /**
+ * The name of the one maker of an {@link Ask}, held inside safebyok and exported by no entry
+ * point: the vault raises each prompt, and nothing else makes an ask.
+ */
+export const raiseAsk = Symbol('Ask.raise')
+
+/**
  * One prompt, raised: the {@link Ask} handed to `getProof`, and the vault's handles on it. The
  * vault keeps this; a host sees only the ask.
  */
@@ -116,7 +122,7 @@ export class Ask {
    * Raise one prompt: make the ask and hand it to `getProof` (none answers `declined`). The
    * vault's, one per prompt; the answer is checked here, once, for every caller that waits on it.
    */
-  static raise(why: AskWhy, vault: Vault, attempter: Attempter, getProof: GetProof | null): RaisedAsk {
+  static [raiseAsk](why: AskWhy, vault: Vault, attempter: Attempter, getProof: GetProof | null): RaisedAsk {
     const landed = new AbortController()
     const over = new AbortController()
     const ask = new Ask(why, vault, attempter, landed, over, onAbort(landed.signal, () => undefined))

@@ -4,7 +4,7 @@ import { VaultError } from './errors'
 import { sameScope } from './names'
 import { type Outcome, bad, good } from './outcome'
 import { LeaseRecord, type VaultProps } from './types'
-import { decorate } from './utils'
+import { decorate } from './adorn'
 import type { Vault } from './vault'
 import type { VaultKeyPair } from './wayin'
 

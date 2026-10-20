@@ -5,7 +5,7 @@ import type { KeyDeriver } from './key-deriver'
 import { hostThrewRefusal } from './outcome'
 import { PassphraseKeyBytes } from './key-deriver-spec'
 import type { PasskeyAnswer, WayinKind } from './types'
-import { decorate } from './utils'
+import { decorate } from './adorn'
 import type { Vault } from './vault'
 import type { PasskeyWayin, PassphraseWayin } from './wayin'
 

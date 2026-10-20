@@ -19,7 +19,7 @@ import { reportToPlatform } from './report-error'
 import { type DeviceDB, deviceTroubleAsConditions } from './device-db'
 import type { KeyDeriver } from './key-deriver'
 import { Lease } from './lease'
-import { Ask, type AskWhy, type GetProof, type RaisedAsk } from './ask'
+import { Ask, type AskWhy, type GetProof, type RaisedAsk, raiseAsk } from './ask'
 
 // == [Public types]: VaultState, VaultSnapshot
 
@@ -1382,7 +1382,7 @@ export class Vault {
 
   /** Raise a prompt for `why`, up until it is answered or a lock lands. */
   #raiseAsk(why: AskWhy): RaisedAsk {
-    const raised = Ask.raise(why, this, this.#tryAttempt, this.#getProof)
+    const raised = Ask[raiseAsk](why, this, this.#tryAttempt, this.#getProof)
     this.#asking = raised
     // Answered or refused, the prompt is down: the next call that needs a proof raises another.
     void raised.answer.then(() => { if (this.#asking === raised) { this.#asking = null } })

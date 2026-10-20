@@ -58,6 +58,9 @@ const openIn = async (vaultProps: VaultProps, given: string | PasskeyAnswer, opt
   return valOf(await Wayin.make(opening, record, vaultProps).tryOpen(proof))
 }
 
+/** True when code outside `ClassT` could make one with `new`: false for a class whose constructor is private. */
+type NewableFromOutside<ClassT> = ClassT extends abstract new (...args: never[]) => unknown ? true : false
+
 /** The vaultKey's raw bytes, to compare two handles on it. */
 const rawOf = async (vaultKey: CryptoKey) => toB64(new Uint8Array(await crypto.subtle.exportKey('raw', vaultKey)))
 
@@ -134,6 +137,14 @@ describe("Wayin.make", () => {
     expect(JSON.stringify(wayin)).to.eq(JSON.stringify(record))
     const spread = Object.fromEntries(Object.entries(wayin))
     expect(JSON.stringify(spread)).to.not.include('applabel')
+  })
+
+  it("is the one maker of a way in, with Wayin.seal: neither kind's constructor is the caller's to call", () => {
+    // Each assignment fails the typecheck should the class be made newable from outside it.
+    const passphraseNewable: NewableFromOutside<typeof PassphraseWayin> = false
+    const passkeyNewable: NewableFromOutside<typeof PasskeyWayin> = false
+    expect([passphraseNewable, passkeyNewable]).to.deep.equal([false, false])
+    expect(Wayin.make(slice, TH.passkeyWayinOf('laptop'), identity)).to.be.instanceOf(PasskeyWayin)
   })
 
   it("is frozen: a field, the vault or the props written over throws, and nothing moves", () => {

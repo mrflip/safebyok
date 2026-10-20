@@ -833,6 +833,13 @@ describe("vault.ensureLease, by the Contract", () => {
     expect(await TH.expectGood(ensuring)).to.eq(vault)
   })
 
+  it("hands getProof an Ask it can only answer: the class offers a host no way to make or raise one", () => {
+    // Fails the typecheck should Ask's constructor become the caller's to call.
+    const newable: typeof Ask extends abstract new (...args: never[]) => unknown ? true : false = false
+    expect(newable).to.be.false
+    expect(Object.getOwnPropertyNames(Ask)).to.not.include('raise')
+  })
+
   it("says hello again on unlocked, and resolves the fresh vault (Contract: ensureLease, Does 3.4, and Returns)", async () => {
     const getProof = typingPw()
     const { world, vault } = await lockedVaultWith({ getProof })

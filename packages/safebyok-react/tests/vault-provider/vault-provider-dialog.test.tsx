@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { Ask, Vault, isVaultError, memoryDeviceDB, type GetProof, type Outcome, type VaultError } from 'safebyok'
+import { Vault, isVaultError, memoryDeviceDB, type Ask, type GetProof, type Outcome, type VaultError } from 'safebyok'
 import { useLayoutEffect } from 'react'
 import * as TH from 'safebyok/testing'
 import { VaultProvider, useVault } from '../../src/vault-provider'
@@ -243,14 +243,18 @@ describe("VaultProvider", () => {
       const world = await lockedWorld()
       const gate = TH.makeGate()
       const slowDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase: string, saltBytes: Uint8Array) => { await gate.pass(); return await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes) } }
-      // Each attempt the dialog makes, kept, so the test waits for the one cancelled to finish.
+      // Each attempt the dialog makes, kept, so the test waits for the one cancelled to finish: the
+      // dialog is handed each ask through one whose attempt keeps what it starts.
       const attempts: Promise<Outcome<Vault>>[] = []
-      const raise = Ask.raise.bind(Ask)
-      vi.spyOn(Ask, 'raise').mockImplementation((why, raising, attempter, getProof) => raise(why, raising, (...args) => {
-        const attempting = attempter(...args)
-        attempts.push(attempting)
-        return attempting
-      }, getProof))
+      const make = Vault.make.bind(Vault)
+      vi.spyOn(Vault, 'make').mockImplementation((opts) => make({ ...opts, getProof: async (ask) => {
+        const attempt: Ask['attempt'] = (proof) => {
+          const attempting = ask.attempt(proof)
+          attempts.push(attempting)
+          return attempting
+        }
+        return await opts.getProof!(Object.create(ask, { attempt: { value: attempt } }) as Ask)
+      } }))
       render(world.tree('u1', slowDeriver))
       const vault = await world.opened()
       const first = vault.tryGetBox('anthropic_api_key')
