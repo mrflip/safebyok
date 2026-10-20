@@ -52,7 +52,7 @@ const UnchosenVerdict: PassphraseVerdict = Object.freeze({
 export const UnchosenStrengthChecker: StrengthChecker = () => UnchosenVerdict
 
 /** What the vault logs, once, when it first consults {@link UnchosenStrengthChecker}. */
-export const UnchosenCheckerSaid = "Vault.make was given no strengthChecker, so every new passphrase is refused as too weak, and no vault can be made. Choose one: in a browser, spread browserOpts() from safebyok/browser, which supplies zxcvbnStrengthChecker, or pass strengthChecker yourself. CUSTOMIZATION.md, under Pluggable Passphrase Strength Checker, says how to choose."
+export const UnchosenCheckerSaid = "Vault.make was given no strengthChecker, so every new passphrase is refused as too weak: no vault can be made, nor a passphrase changed. Choose one: in a browser, spread browserOpts() from safebyok/browser, which supplies zxcvbnStrengthChecker, or pass strengthChecker yourself. CUSTOMIZATION.md, under Pluggable Passphrase Strength Checker, says how to choose."
 
 const reasonText = Z.string().check(Z.minLength(1))
 const passphraseVerdict = Z.union([
