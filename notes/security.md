@@ -36,6 +36,23 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-20 (thread B5, placement, branch 20261019-placement): **a second copy of safebyok loaded
+  beside this one is refused as misuse, and a handler passed bare is refused rather than ignored.**
+  (1) A `Box` or a `Proof` made by another copy of safebyok (two versions, or the ESM and CommonJS
+  builds side by side) is refused `bad_option`, naming the double load and telling the developer to load
+  safebyok once. The refusal is made at `vault.openBox`, `Box.make`, `Box.seal`'s `over`, `Proof.parse`
+  (so at `unlock`), `wayin.tryOpen` and `Wayin.seal`. Each class carries a static mark keyed by
+  `Symbol.for('safebyok.model')`, the same symbol in every copy, and `checkOneCopy`
+  (`packages/safebyok/src/one-copy.ts`) refuses an object whose constructor carries the mark but which
+  fails `instanceof`. The refusal quotes nothing of what it was handed. Before, such a box read as
+  `bad_record` and such a proof as the wrong kind of proof. The Coach's rule: anything revealing a second
+  safebyok should crash the app (the misuse family). This differs from a `VaultError` of another copy,
+  which is still a foreign throw (the a_fixes entry below): there the mark was removed; here the mark
+  is used only to refuse, never to accept. (2) `vault.hello()` and `vault.ensureLease()` refuse, as
+  `bad_option`, anything in place of their options that is not a plain object, an event above all, as
+  when the method itself is passed to `addEventListener` or `onClick`; the message names the fix,
+  `() => { void vault.tryHello() }`. Before, an event was silently ignored and a handler passed bare
+  would reject unheard.
 * 2026-10-19 (thread put_wayin, B4, branch 20261019-put_wayin, PR [#208](https://github.com/mrflip/safebyok/pull/208); the sprint contract): **one verb, `putWayin(passphrase, newProof)`, replaces
   `changePassphrase` and `addPasskey`; the host makes a passkey before the call, and the strength
   checker is a contract to answer.** (1) `putWayin` proves with the standing passphrase only (a passkey's
@@ -103,7 +120,7 @@ added or folded into through the subagent, and no other entry changes.
   window closed.** A first unlock that creates the vault (`#settleUnlock`'s make path,
   `packages/safebyok/src/vault.ts`) while another device deletes it could leave this device unlocked
   on the deleted vault, holding a lease, until its next read (found in #203's second review). Now
-  the make captures a stand-down signal (`#makesStandDown`) just before it writes its vault props; a
+  the make captures a stand-down signal (`#createsStandDown`; amended 2026-10-20 (placement): once `#makesStandDown`, and the signal that stands it down, now `#standDownCreates`, was `#standDownMakes`; behaviour unchanged) just before it writes its vault props; a
   read that finds the vault props in hand deleted or replaced (`#heedRevocation`) aborts it, and an
   aborted make puts no vault props back, so the grant (`#grantLease`) finds its props outrun, takes
   nothing up and writes no lease; the unlock refuses `vault_locked`. A race test in
@@ -253,7 +270,7 @@ added or folded into through the subagent, and no other entry changes.
   2026-10-19 (a_sec2, #206): `snapshot.props` is gone and the host no longer receives the record at
   all (see the a_sec2 entry at the top of *Of Interest*); a box's `holder` is itself reduced to
   `vault_id` and `vault_key_epoch`, kept as its own frozen copy in each `Box`.
-* 2026-10-19 (thread B3, box): **the stored box is a model class, `Box`, holding a back-reference to
+* 2026-10-19 (thread B3, box); 2026-10-20 (placement): **the stored box is a model class, `Box`, holding a back-reference to
   its vault; sealing and opening moved into it, and a box's enumerable fields are exactly its stored
   ones.** (1) The class (`packages/safebyok/src/box.ts`): the Zod schema once exported as `Box` is
   now `BoxRecord`, the stored contract, unchanged (`safebyok-box-v6`). `Box.make(vault, record)`
@@ -261,9 +278,12 @@ added or folded into through the subagent, and no other entry changes.
   record is kept as `box.props`: a copy, frozen, its two `Ciphered` objects frozen too, so a caller's
   later change to its own record reaches nothing in the box; the instance is frozen. `box.sidecar` is
   the parse of `sidecar_json` with a reviver that freezes every object and array as it builds them.
-  `vault`, `props` and `summary` are attached by `decorate` (`utils.ts`: `Object.defineProperty`,
+  `vault`, `props` and `summary` are attached by `decorate` (amended 2026-10-20 (placement): in `src/adorn.ts`, once `utils.ts`; it calls `adorn(obj, ckey, val)` per entry, `Object.defineProperty`,
   non-enumerable, non-writable, non-configurable), so a spread, `Object.keys`, a log line or
-  `JSON.stringify` never reaches the vault; `toJSON()` returns `props`. (2) What a log line of a box
+  `JSON.stringify` never reaches the vault; `toJSON()` returns `props`. 2026-10-20 (placement): `adorn` and `decorate` left the public
+  `safebyok/utils` entry point for that internal module, so a host cannot import them; `adorn` hands back
+  `val`, and the same pair attaches each model's `vault` and `props` and a proof's secret field. What
+  they attach did not change. (2) What a log line of a box
   shows: the visible fields and the two ciphered ones (`box_key_wrapped`, `whisper_ciphered`). The
   record holds no secret: the whisper is ciphered under a boxKey, the boxKey wrapped under the
   vaultKey, and neither key is in it; it is what the backend already holds. The vault never logs a
@@ -301,7 +321,7 @@ added or folded into through the subagent, and no other entry changes.
   with what the vault holds. This closes the note, in the entry on the vault's private fields below,
   that a summary's sidecar was not deep-frozen, and the A3 review's note that summaries' sidecars
   were shared with the vault's private listing.
-* 2026-10-19 (branch 20261019-proof_wayin, [#201](https://github.com/mrflip/safebyok/pull/201)): **what a host hands in to prove itself is
+* 2026-10-19 (branch 20261019-proof_wayin, [#201](https://github.com/mrflip/safebyok/pull/201)); 2026-10-20 (placement): **what a host hands in to prove itself is
   checked at the vault's door into a `Proof`, and a wayin opens only under one.** (1) `Proof.parse`
   (`packages/safebyok/src/proof.ts`) turns a passphrase string, or a passkey's answer `{ credentialId,
   prfSaltB64, prfBytes }` (typed `PasskeyAnswer`), into a `PassphraseProof` or `PasskeyProof`. The secret
@@ -315,7 +335,11 @@ added or folded into through the subagent, and no other entry changes.
   (refusing `damaged_wayin`), freezes a copy as `props`, and is itself frozen. Its wayinCtx binds the
   vault's scope (the vault's public applabel, user_id and vaultlabel getters) and the `vault_id` and
   `registered_at` of the `holder`, the vault props record it was made from, passed explicitly because the
-  vault's public fields lag its private state until it publishes. `isDamaged()` (another vaultKey epoch
+  vault's public fields lag its private state until it publishes. 2026-10-20 (placement): the
+  constructors of `PassphraseWayin` and `PasskeyWayin` are private; a wayin is made only by `Wayin.make`
+  or `Wayin.seal`, which reach them through a static keyed by a module-private symbol (`madeFrom`), so
+  no exported name builds a wayin from a record the Zod schema has not checked. This is TypeScript
+  privacy only: JavaScript can still call `new`, as for `Box`, `Lease` and `Proof`. `isDamaged()` (another vaultKey epoch
   than the holder's, or a salt of a length its kind never writes) is checked before any derivation.
   (4) `wayin.tryOpen(proof)` returns an Outcome and never throws: a proof of the wrong kind is
   `bad_option`; a passphrase wayin made by another key deriver is `unknown_key_deriver`, and a damaged one
@@ -382,10 +406,13 @@ added or folded into through the subagent, and no other entry changes.
   erases that lease (and so the one it overwrote), while the key already held in memory stays until
   its deadline. An overtaken attempt stands down any lease take-up (`#standDownTakeUp`) as it erases
   the lease it wrote, so a hello that read that lease in between takes nothing up.
-* 2026-10-19 (thread A6, getproof): **`Ask`: one per prompt, with one shared answer, and its
+* 2026-10-19 (thread A6, getproof); 2026-10-20 (placement): **`Ask`: one per prompt, with one shared answer, and its
   `attempt(proof)` runs the same unlock body as `unlock()`** (amended 2026-10-19, slots: it once took
   `{ wayinId? }`, an aim at one wayin, and `unlock()` likewise). `Ask`
-  (`packages/safebyok/src/ask.ts`; `Ask.raise` is the vault's) owns `why`, the vault handle,
+  (`packages/safebyok/src/ask.ts`; `Ask.raise`, the static that makes an `Ask` and hands it to the host's
+  `getProof`, is off the public surface since 2026-10-20 (placement): it is keyed by a symbol
+  (`raiseAsk`) that no entry point exports, so only the vault raises a prompt and a host only answers
+  the `Ask` it is handed) owns `why`, the vault handle,
   `attempt`, `lockLanded` and the one answer: every call that needs the vault while a prompt is up
   awaits that same answer, so there is never more than one prompt. `attempt` proves against the vault
   props as storage holds them now (a refresh first); a wrong passphrase is learned from the wayin's
@@ -1374,14 +1401,17 @@ added or folded into through the subagent, and no other entry changes.
   ID can ask the authenticator for the answer (with the user's touch), as it could read a typed
   passphrase. The credential's challenge is random and never verified, and no attestation is
   checked: the authenticator is the user's to trust.
-* 2026-10-15; 2026-10-18; 2026-10-19: **every field a record writes is bound, unless a reason below says not** (the
+* 2026-10-15; 2026-10-18; 2026-10-19; 2026-10-20: **every field a record writes is bound, unless a reason below says not** (the
   Coach: "make everything verifiable unless there's a good reason not to"). A passkey wayin's
   HKDF `info` is now its wrap's whole additional data -- format, scope, `vault_id`, the vault props'
   `registered_at`, purpose, and the wayin's visible header (`wayinkind`, `credential_id`,
   `prf_salt_b64`, `vault_key_epoch`, `device_id`, `registered_at`; until slots also `wayin_id` and
   `wayinlabel`) -- so the passkeyKey itself, not only the wrap, belongs to one vault
   and one wayin; HKDF info and AES-GCM additional data are the same bytes, fed to different
-  primitives. (2026-10-19, #201: `PasskeyProof.wayinKeyFor(wayin)` runs that HKDF over the PRF bytes with
+  primitives. (2026-10-20, placement: `Wayin.seal` now builds a wayin's ctx once, in its kind's keying
+  helper, and uses that one value both as a passkey's HKDF `info` and as the wrap's ctx; it was built
+  twice from the same inputs. No bytes changed; the key derivation and the wrap are bound to the same ctx
+  by construction, not by two calls agreeing.) (2026-10-19, #201: `PasskeyProof.wayinKeyFor(wayin)` runs that HKDF over the PRF bytes with
   the wayin's whole wayinCtx as `info`.) Every wayin's wrap binds the vault props' `registered_at`. A box's two
   encryptions bind its whole visible header (`format`, `boxlabel`, `revision_tok`, `sidecar_json`,
   `registered_at`, `written_at`: every field but the two ciphered ones, as Zod's parse leaves the
