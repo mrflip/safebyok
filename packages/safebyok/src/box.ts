@@ -7,6 +7,7 @@ import { stableJsonify } from './stable-jsonify'
 import { type BoxSummary, type DamagedBox, EpochMillis, Sidecar, VaultProps, Whisper, vaultKeyEpoch } from './types'
 import { decorate } from './adorn'
 import { NameFloor } from './validators'
+import { ModelMark, checkOneCopy } from './one-copy'
 import * as Names from './names'
 import type { Vault } from './vault'
 
@@ -170,6 +171,9 @@ export class Box {
   /** The whisper, ciphered under the boxKey. */
   readonly whisper_ciphered:       Ciphered
 
+  /** `Box`: the mark every copy of safebyok gives its box class, so a box from another copy is told from no box at all. */
+  static readonly [ModelMark] = 'Box'
+
   private constructor(vault: BoxVault, record: BoxRecord, holder: BoxHolder) {
     const props = Object.freeze({
       ...record,
@@ -213,7 +217,7 @@ export class Box {
     if (typeof given !== 'object' || given === null) {
       throw new VaultError('bad_option', "Box.make needs the vault the box belongs to, as its first argument.")
     }
-    const checked = checkedBoxRecord(record)
+    const checked = checkedBoxRecord(record, 'Box.make')
     checkHolder(holder, 'Box.make')
     return new this(vault, checked, holder)
   }
@@ -255,6 +259,7 @@ export class Box {
     checkVaultKey(vaultKey, 'Box.seal')
     const over = opts?.over ?? null
     if (over !== null && (! (over instanceof this) || over.boxlabel !== label)) {
+      checkOneCopy(over, this, "Box.seal's `over`")
       throw new VaultError('bad_option', "Box.seal's `over` is the box the new one replaces, under the same boxlabel: a Box, or null for none.")
     }
     const plan = await planSeal(vault, holder, vaultKey, { boxlabel: label, whisperBytes, sidecarJson, over })
@@ -444,10 +449,15 @@ const parseJsonOrNull = (text: string): unknown => {
   }
 }
 
-/** `record`, once it is a box record: kind 'bad_record' otherwise, saying nothing of it, since its fields could be anything a caller had in hand. */
-export const checkedBoxRecord = (record: unknown): BoxRecord => {
+/**
+ * `record`, once it is a box record: kind 'bad_record' otherwise, saying nothing of it, since its
+ * fields could be anything a caller had in hand; and 'bad_option' for a box of another copy of
+ * safebyok, as {@link checkOneCopy} refuses one, naming `said`, the call that was handed it.
+ */
+export const checkedBoxRecord = (record: unknown, said: string): BoxRecord => {
   const checked = BoxRecord.safeParse(record)
   if (! checked.success) {
+    checkOneCopy(record, Box, said)
     throw new VaultError('bad_record', "That is not a box record this package writes: a box is made from the record storage holds, as a VaultDB's getBox hands it back, or from a box's own props.")
   }
   return checked.data

@@ -728,7 +728,7 @@ export class Vault {
 
   readonly #tryOpenBox = this.#trying(async (box: Box | BoxRecord): Promise<Whisper> => {
     this.#checkOpen()
-    const record = box instanceof Box ? box.props : checkedBoxRecord(box)
+    const record = box instanceof Box ? box.props : checkedBoxRecord(box, 'openBox()')
     const unlockedKey = this.#checkUnlocked()
     // Made anew for this vault: a box opens under this vault's scope and the props it holds, whichever it came from.
     const held = Box.make(this, record, this.#currentVaultProps())

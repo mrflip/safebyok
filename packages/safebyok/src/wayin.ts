@@ -1,9 +1,10 @@
 import { cipherCtx, fromB64, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder, type Ciphered } from './crypto'
 import { VaultError } from './errors'
 import { type Outcome, outcomeOf, unexpectedError } from './outcome'
-import { PasskeyProof, PassphraseProof, type Proof } from './proof'
+import { PasskeyProof, PassphraseProof, Proof } from './proof'
 import { PasskeySaltBytes, WayinRecord, type PasskeyWayinRecord, type PasskeyWayinSummary, type PassphraseWayinRecord, type PassphraseWayinSummary, type VaultProps, type WayinKind, type WayinSummary } from './types'
 import { decorate } from './adorn'
+import { checkOneCopy } from './one-copy'
 import type { Vault } from './vault'
 
 /**
@@ -246,6 +247,7 @@ export abstract class Wayin {
   static async seal(vault: WayinVault, proof: PasskeyProof, holder: WayinHolder, stamp: WayinStamp, vaultKey: CryptoKey): Promise<{ wayin: PasskeyWayin, sessionKey: CryptoKey }>
   static async seal(vault: WayinVault, proof: PassphraseProof | PasskeyProof, holder: WayinHolder, stamp: WayinStamp, vaultKey: CryptoKey): Promise<{ wayin: PassphraseWayin | PasskeyWayin, sessionKey: CryptoKey }>
   static async seal(vault: WayinVault, proof: PassphraseProof | PasskeyProof, holder: WayinHolder, stamp: WayinStamp, vaultKey: CryptoKey): Promise<{ wayin: PassphraseWayin | PasskeyWayin, sessionKey: CryptoKey }> {
+    checkOneCopy(proof, Proof, 'Wayin.seal')
     const { header, wayinKey } = proof instanceof PassphraseProof ? await passphraseKeying(vault, proof, stamp) : await passkeyKeying(vault, proof, holder, stamp)
     const wayinCtx = wayinCtxOf(vault, holder, header)
     const record = { ...header, vault_key_wayin_wrapped: await wrapKeyUnder(wayinKey, vaultKey, wayinCtx) }
@@ -310,6 +312,7 @@ export class PassphraseWayin extends Wayin {
   async tryOpen(proof: Proof): Promise<Outcome<VaultKeyPair>> {
     return await outcomeOf(async () => {
       if (! (proof instanceof PassphraseProof)) {
+        checkOneCopy(proof, Proof, 'wayin.tryOpen')
         throw new VaultError('bad_option', "A passkey's answer opens no passphrase's way in: hand it the passphrase the user typed.")
       }
       if (this.key_deriver_label !== this.vault.keyDeriver.key_deriver_label) { throw unknownKeyDeriver() }
@@ -373,6 +376,7 @@ export class PasskeyWayin extends Wayin {
   async tryOpen(proof: Proof): Promise<Outcome<VaultKeyPair>> {
     return await outcomeOf(async () => {
       if (! (proof instanceof PasskeyProof)) {
+        checkOneCopy(proof, Proof, 'wayin.tryOpen')
         throw new VaultError('bad_option', "A passphrase opens no passkey's way in: hand it the passkey's answer, as askPasskey gives it.")
       }
       if (this.isDamaged()) { throw damagedPasskey() }
