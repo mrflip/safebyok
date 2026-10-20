@@ -49,8 +49,9 @@ import type { Capacity, DamagedBox, WayinSummary } from './types'
  * unlocks it as any unlock does, with no refusal at all.
  *
  * `weak_passphrase` is a new passphrase -- the one a vault is created with, or one `putWayin()`
- * sets -- that the vault's `strengthChecker` finds too easy to guess, or that is blank; its message
- * is the checker's own reason, which a field can show beside the passphrase. Never raised by `unlock()`
+ * sets -- that the vault's `strengthChecker` finds too easy to guess, or one `putWayin()` is handed
+ * blank (a blank one to `unlock()` is `wrong_passphrase`, as for any proof); its message is the
+ * checker's own reason, which a field can show beside the passphrase. Never raised by `unlock()`
  * of a vault that stands: a passphrase already in use is the user's to replace, not to be refused.
  *
  * `insecure_context` is a page served over plain http (anywhere but localhost), where the browser
