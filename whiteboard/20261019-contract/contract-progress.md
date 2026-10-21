@@ -157,6 +157,8 @@ token when it joins or creates a vault): don't build one ahead of it.
 * Way-in constructors are plain and public (`madeFrom` gone). The double-load check is gone: another copy's Box is refused `bad_record` by `Box.make`/`openBox`, `bad_option` by `Box.seal`'s `over` and `Proof.parse`.
 * `no-misused-promises` runs with `checksVoidReturn: false` in all ten eslint configs. `notes/security.md`'s header makes amend-in-place (marked) the rule.
 
+* *Orchestrator (`wayin_rules`, #215):* `Wayin.seal(vault, holder, proof, deviceId, vaultKey)` stamps the way in itself (epoch from the holder, time from `vault.clock`) and resolves only the way in; `WayinVault` gains `clock`. A create seals, writes, then opens its way in as stored to get the kept key (a second derivation). `PassphraseProof.checkStrongEnough()` calls back through a public `vault.strengthChecker` getter; the vault never reads `proof.passphrase`. `checkSaltShape` lives in `proof.ts`, run once at `newProofOf`. The default checker is `DefaultStrengthChecker` (internal), answering weak, logging nothing. A blank new passphrase is `weak_passphrase` (create and putWayin, before the checker); a blank proof is `wrong_passphrase`, refused in `PassphraseWayin.tryOpen` before any derivation. A new passphrase removes the passkey. `putWayin` resolves the summary of the way in it wrote (STYLE.md *Naming*: "`put` resolves what is stored"); `#reviseWayins` resolves the props it wrote; `VaultDB.putVaultProps` still resolves `void` (C7's). `safebyok/testing`'s `vaultSliceOf` carries `strengthChecker` and `clock`, with a `VaultSlice` type; `fromB64OrNull` is new in `crypto.ts`.
+
 ## Interim shims standing
 
 *Orchestrator:* each is listed until a later thread removes it.
