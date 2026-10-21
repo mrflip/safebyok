@@ -306,6 +306,14 @@ describe("graphqlVaultDB, its refusals", () => {
     expect(refusal.message).to.match(/^Nothing was written/)
   })
 
+  it("leaves behind a box_stored that crossed with any refusal but a stale write, which alone carries one, checked", async () => {
+    const mismatched = new GraphQLError('The vault changed.', { extensions: { kind: 'vault_mismatch', meta: { box_stored: { boxlabel: 'openai', not: 'a box' } } } })
+    const answered = { toPromise: () => Promise.resolve({ error: new CombinedError({ graphQLErrors: [mismatched] }) }) }
+    const server = { query: () => answered, mutation: () => answered, subscription: () => answered }
+    const refusal = await TH.expectBad(graphqlVaultDB({ client: server as unknown as GraphqlVaultClient }).putBox(u1, { ...thisVault, revision_tok: null, vault_key_epoch: 1 }, TH.boxOf('openai', 'r1')), 'vault_mismatch')
+    expect(refusal).to.not.have.property('meta')
+  })
+
   it("carries a server's refusal by its kind, though a validation code came before it", async () => {
     const misuse = new GraphQLError('Variable "$scope" got invalid value', { extensions: { code: 'BAD_USER_INPUT' } })
     const revoked = new GraphQLError('No one is signed in, so this vault cannot be reached: sign in, then try again.', { extensions: { kind: 'identity_revoked' } })

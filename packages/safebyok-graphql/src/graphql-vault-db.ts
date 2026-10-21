@@ -280,7 +280,7 @@ const answerOf = (result: OperationResult): Record<string, unknown> => {
 const refusalOf = (err: CombinedError): Error => {
   for (const refused of err.graphQLErrors) {
     const { kind, meta } = refused.extensions
-    if (isKind(kind)) { return new VaultError(kind, refused.message, { cause: refused, ...crossedMeta(meta) }) }
+    if (isKind(kind)) { return new VaultError(kind, refused.message, { cause: refused, ...crossedMeta(kind, meta) }) }
   }
   const forbidden = err.graphQLErrors.find(({ extensions: { code } }) => code === 'FORBIDDEN')
   if (forbidden) { return Refusals.notPermitted(ForbiddenMessage, { cause: forbidden }) }
@@ -302,12 +302,11 @@ const ForbiddenMessage = "The vault's GraphQL server refused the signed-in user 
 /** The `extensions.code`s a GraphQL server marks a malformed operation or variable with. */
 const MisuseCodes: ReadonlySet<string> = new Set(['BAD_USER_INPUT', 'GRAPHQL_VALIDATION_FAILED'])
 
-/**
- * The `meta` a refusal crossed with, as the VaultError's: only `box_stored`, the one fact a refusal
- * carries across, handed on unchecked for the base class to check. Anything else is left behind.
+/** The `meta` a refusal of `kind` crossed with, as the VaultError's: a stale write's `box_stored`, and nothing else.
+ * It is handed on unchecked: the base class checks it as it checks a record, for a `stale_write` alone.
  */
-const crossedMeta = (meta: unknown): { meta?: RefusalMeta } => {
-  if (typeof meta !== 'object' || meta === null || ! ('box_stored' in meta)) { return {} }
+const crossedMeta = (kind: RefusalKind, meta: unknown): { meta?: RefusalMeta } => {
+  if (kind !== 'stale_write' || typeof meta !== 'object' || meta === null || ! ('box_stored' in meta)) { return {} }
   return { meta: { box_stored: meta.box_stored as Exclude<RefusalMeta['box_stored'], undefined> } }
 }
 
