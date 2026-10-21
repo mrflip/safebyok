@@ -12,7 +12,7 @@
 export { testDeriver, vaultSliceOf, anyStrengthChecker, memoryVaultOpts, settledVault, freshDbName, fakeCiphered, scopeOf,
   wayinOf, passkeyWayinOf, passkeyOf, vaultPropsOf, vaultPropsAtEpochOf, boxOf, sidecarJsonOf, OddLabels,
   summaryOf, noBoxYet, thisVault, deleting, markOf, leaseOf, tweakB64 } from './test-helpers/builders'
-export type { MarkOverrides } from './test-helpers/builders'
+export type { MarkOverrides, VaultSlice } from './test-helpers/builders'
 export { wakeupAtNextTick, aWhile, eventually, changeCounter, liveWatch, makeGate, beforeNextCall,
   holdNextCall, tallyWatches } from './test-helpers/timing'
 export type { AsyncVerbOf } from './test-helpers/timing'

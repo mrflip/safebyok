@@ -753,12 +753,11 @@ describe("the vault's fields, by the Contract", () => {
     }
   })
 
-  it("keeps its own lease length and hello, whatever a host writes over the handle's", async () => {
+  it("keeps its own hello, whatever a host writes over the handle's", async () => {
     const world = makeWorld({ leaseHours: 1 })
     const vault = await world.open()
     const helloWrittenOver = vi.fn(() => Promise.resolve(vault))
-    Object.defineProperties(vault, { leaseMillis: { value: 1 }, hello: { value: helloWrittenOver } })
-    expect(vault.leaseMillis).to.eq(1)
+    Object.defineProperties(vault, { hello: { value: helloWrittenOver } })
     await vault.unlock('pw')
     expect(vault.askPassphraseAt).to.eq(world.clock.now() + HourMillis)
     await vault.putBox('anthropic', 'sk-fake')

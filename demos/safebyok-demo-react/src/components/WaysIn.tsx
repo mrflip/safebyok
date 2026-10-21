@@ -4,9 +4,10 @@ import { createPasskey, passkeysAvailable, useVault, useVaultSnapshot } from 'sa
 /**
  * The vault's two ways in -- its one passphrase, and its passkey if it has one, shown even while
  * locked -- and a form to change them. Every change takes the passphrase as it stands as its
- * proof, even unlocked: `vault.putWayin(passphrase, newPassphrase)`; `vault.putWayin(passphrase,
- * answer)`, with the answer of a passkey `createPasskey()` has just made, which replaces the
- * passkey the vault had; and `vault.delWayin(passphrase)`, which removes it. With a passkey, the passphrase dialog offers
+ * proof, even unlocked: `vault.putWayin(passphrase, newPassphrase)`, which removes the passkey
+ * with the old passphrase; `vault.putWayin(passphrase, answer)`, with the answer of a passkey
+ * `createPasskey()` has just made, which replaces the passkey the vault had; and
+ * `vault.delWayin(passphrase)`, which removes it. With a passkey, the passphrase dialog offers
  * "Use a passkey".
  */
 export const WaysIn = () => {
@@ -62,7 +63,7 @@ export const WaysIn = () => {
           <input ref={passphraseRef} type="password" name="current-password" autoComplete="current-password" />
         </label>
         <label>
-          new passphrase <span className="quiet">(to change it)</span>
+          new passphrase <span className="quiet">(to change it{passkey !== null && '; your fingerprint goes with the old one, to add again'})</span>
           <input ref={newPassphraseRef} type="password" name="new-password" autoComplete="new-password" />
         </label>
         {gripe !== null && <p className="gripe">{gripe}</p>}

@@ -606,7 +606,7 @@ describe("vault.hello, by the Contract", () => {
     const world = makeWorld()
     const vault = await world.open({ vaultDB: world.deafVaultDB() })
     const shown = new EventTarget()
-    shown.addEventListener('visibilitychange', () => { void vault.hello() })
+    shown.addEventListener('visibilitychange', () => { void vault.tryHello() })
     await seedVault(world)
     world.advance(StaleMinutes * MinuteMillis)
     shown.dispatchEvent(new Event('visibilitychange'))

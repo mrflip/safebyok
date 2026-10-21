@@ -3,7 +3,7 @@ import { cipherCtx, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder, type Ciphered } 
 import { VaultError } from './errors'
 import { sameScope } from './names'
 import { type Outcome, bad, good } from './outcome'
-import { LeaseRecord, type VaultProps } from './types'
+import { FarFuture, LeaseRecord, type VaultProps } from './types'
 import { decorate } from './adorn'
 import type { Vault } from './vault'
 import type { VaultKeyPair } from './wayin'
@@ -18,8 +18,8 @@ import type { VaultKeyPair } from './wayin'
  * the write to the device store are the vault's: a lease is its fields and its crypto.
  */
 
-/** The slice of a {@link Vault} a lease reads: the scope its wrap is bound to, and the clock its deadline is read by. */
-export type LeaseVault = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'clock'>
+/** The slice of a {@link Vault} a lease reads: the scope its wrap is bound to, the clock its deadline is read by, and how long a grant lasts. */
+export type LeaseVault = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'clock' | 'leaseMillis'>
 
 /**
  * The vault props a lease is granted under, as far as it reads them: the vault's id and its
@@ -36,10 +36,13 @@ const LeaseFormat = 'safebyok-lease-v1'
 const SessionUsage = { extractable: false, usage: ['wrapKey', 'unwrapKey'] } as const
 
 /** What {@link Lease.grant} is handed beside the vaultKey, held to what its record will hold. */
-const GrantArgs = Z.object({
-  holder:          Z.pick(LeaseRecord, { vault_id: true, unlock_epoch: true }),
-  askPassphraseAt: LeaseRecord.shape.ask_passphrase_at,
-})
+const GrantHolder = Z.pick(LeaseRecord, { vault_id: true, unlock_epoch: true })
+
+/** The deadline {@link Lease.grant} works out from its vault's clock and `leaseMillis`, held to what its record will hold. */
+const GrantDeadline = LeaseRecord.shape.ask_passphrase_at
+
+/** The deadline of a lease granted at `nowMillis`: `leaseMillis` later, in whole ms, but never past {@link FarFuture}. */
+const deadlineAfter = (nowMillis: number, leaseMillis: number): number => Math.min(Math.floor(nowMillis + leaseMillis), FarFuture)
 
 /**
  * The ctx a lease's wrap is bound to: the scope of `vault`, the `vault_id` and `unlock_epoch` of
@@ -52,8 +55,8 @@ const leaseCtxOf = (vault: LeaseVault, holder: LeaseHolder, askPassphraseAt: num
 /**
  * This device's lease on one vault: the vaultKey under a leaseKey that never leaves this browser
  * profile, and the instant it ends. Its stored fields are its own, read-only; `props` is the
- * stored record, frozen, and `toJSON()` the same, so a log line shows the record alone, and the
- * leaseKey in it as `{}`. It holds `vault`, not enumerable. The record is what the device store
+ * stored record, frozen, and `toJSON()` every field of it but the leaseKey and the wrap, so a log
+ * line never carries the vaultKey's wrap. It holds `vault`, not enumerable. The record is what the device store
  * keeps, by structured clone: the leaseKey has no other form, and nothing of a lease reaches the
  * backend.
  *
@@ -132,25 +135,25 @@ export class Lease {
     return new Lease(vault, checked.data)
   }
 
-  /**
-   * A fresh lease around the vaultKey a proof just opened: a new leaseKey, made non-extractable
-   * so not even this code can export it, and the vaultKey's extractable handle wrapped under it,
-   * bound to the lease's ctx, and not kept. Writes nothing: the vault puts the record (`props`)
-   * in the device store, in place of any before, and computes `askPassphraseAt` from its clock
-   * and `leaseHours`. Throws a Zod error, as misuse, for a `holder` or `askPassphraseAt` that a
-   * lease record could not hold (`LeaseRecord`'s checks): the vault hands it only what it read
-   * and computed.
+  /** A fresh lease around the vaultKey a proof just opened, ending `vault.leaseMillis` from now by the vault's clock.
+   * The deadline is never past {@link FarFuture}, which is how `leaseHours: Infinity` reads. A new
+   * leaseKey is made non-extractable, so not even this code can export it. The vaultKey's
+   * extractable handle is wrapped under it, bound to the lease's ctx, and not kept. Writes
+   * nothing: the vault puts the record (`props`) in the device store, in place of any before.
+   * Throws a Zod error, as misuse, for a `holder`, or a deadline from `vault`'s clock and
+   * `leaseMillis`, that a lease record could not hold (`LeaseRecord`'s checks): a vault hands it
+   * only what it read and checked.
    *
-   * @param vault - The vault it is for: its scope is bound into the wrap.
+   * @param vault - The vault it is for: its scope is bound into the wrap, its clock and `leaseMillis` set the deadline.
    * @param holder - The vault props the vaultKey was proven against: their `vault_id` and `unlock_epoch` are bound into the wrap.
    * @param vaultKeyPair - The vaultKey as a way in handed it over; only its `transientKey` is read, to be wrapped.
-   * @param askPassphraseAt - When the lease ends, in epoch milliseconds.
    * @returns The lease.
    *
-   * @example const lease = await Lease.grant(vault, vaultProps, opened, now + vault.leaseMillis)
+   * @example const lease = await Lease.grant(vault, vaultProps, opened)   // lease.ask_passphrase_at: leaseHours from now
    */
-  static async grant(vault: LeaseVault, givenHolder: LeaseHolder, vaultKeyPair: VaultKeyPair, givenAskPassphraseAt: number): Promise<Lease> {
-    const { holder, askPassphraseAt } = GrantArgs.parse({ holder: givenHolder, askPassphraseAt: givenAskPassphraseAt })
+  static async grant(vault: LeaseVault, givenHolder: LeaseHolder, vaultKeyPair: VaultKeyPair): Promise<Lease> {
+    const holder = GrantHolder.parse(givenHolder)
+    const askPassphraseAt = GrantDeadline.parse(deadlineAfter(vault.clock.now(), vault.leaseMillis))
     const leaseKey = await makeLeaseKey()
     const wrapped = await wrapKeyUnder(leaseKey, vaultKeyPair.transientKey, leaseCtxOf(vault, holder, askPassphraseAt))
     return new Lease(vault, {
@@ -213,8 +216,9 @@ export class Lease {
     return remaining <= millis || Number.isNaN(remaining)
   }
 
-  /** The record, as `JSON.stringify` and a log line show this lease: its leaseKey as `{}`. */
-  toJSON(): LeaseRecord {
-    return this.props
+  /** Which vault it opens and until when: all JSON and a log line show of it, never its leaseKey or wrap. */
+  toJSON(): Omit<LeaseRecord, 'lease_key' | 'vault_key_lease_wrapped'> {
+    const { format, applabel, user_id, vaultlabel, vault_id, unlock_epoch, ask_passphrase_at } = this
+    return { format, applabel, user_id, vaultlabel, vault_id, unlock_epoch, ask_passphrase_at }
   }
 }

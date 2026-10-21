@@ -7,7 +7,6 @@ import { stableJsonify } from './stable-jsonify'
 import { type BoxSummary, type DamagedBox, EpochMillis, Sidecar, VaultProps, Whisper, vaultKeyEpoch } from './types'
 import { decorate } from './adorn'
 import { NameFloor } from './validators'
-import { ModelMark, checkOneCopy } from './one-copy'
 import * as Names from './names'
 import type { Vault } from './vault'
 
@@ -171,9 +170,6 @@ export class Box {
   /** The whisper, ciphered under the boxKey. */
   readonly whisper_ciphered:       Ciphered
 
-  /** `Box`: the mark every copy of safebyok gives its box class, so a box from another copy is told from no box at all. */
-  static readonly [ModelMark] = 'Box'
-
   private constructor(vault: BoxVault, record: BoxRecord, holder: BoxHolder) {
     const props = Object.freeze({
       ...record,
@@ -217,7 +213,7 @@ export class Box {
     if (typeof given !== 'object' || given === null) {
       throw new VaultError('bad_option', "Box.make needs the vault the box belongs to, as its first argument.")
     }
-    const checked = checkedBoxRecord(record, 'Box.make')
+    const checked = checkedBoxRecord(record)
     checkHolder(holder, 'Box.make')
     return new this(vault, checked, holder)
   }
@@ -240,17 +236,17 @@ export class Box {
    * it was handed.
    *
    * @param vault - The vault the box belongs to: its scope and clock.
+   * @param holder - The vault props it will lie under: their `vault_id` and `vault_key_epoch` are bound into it.
    * @param boxlabel - The box's label, already through the vault's own checks.
    * @param whisper - What the box holds.
-   * @param holder - The vault props it will lie under: their `vault_id` and `vault_key_epoch` are bound into it.
    * @param vaultKey - The vaultKey in hand, which wraps the fresh boxKey.
    * @param opts - The sidecar, and the box this one replaces.
    * @returns The sealed box.
    *
-   * @example const box = await Box.seal(vault, 'anthropic_api_key', 'sk-ant-...', vaultProps, vaultKey, { sidecar: { note: 'work account' } })
-   * @example const next = await Box.seal(vault, 'anthropic_api_key', 'sk-ant-...', vaultProps, vaultKey, { over: box })   // keeps box's sidecar and registered_at
+   * @example const box = await Box.seal(vault, vaultProps, 'anthropic_api_key', 'sk-ant-...', vaultKey, { sidecar: { note: 'work account' } })
+   * @example const next = await Box.seal(vault, vaultProps, 'anthropic_api_key', 'sk-ant-...', vaultKey, { over: box })   // keeps box's sidecar and registered_at
    */
-  static async seal(vault: BoxVault, boxlabel: string, whisper: Whisper, holder: BoxHolder, vaultKey: CryptoKey, opts?: SealBoxOpts): Promise<Box> {
+  static async seal(vault: BoxVault, holder: BoxHolder, boxlabel: string, whisper: Whisper, vaultKey: CryptoKey, opts?: SealBoxOpts): Promise<Box> {
     checkSealOpts(opts)
     const label = Names.checkFloor('boxlabel', boxlabel)
     const whisperBytes = whisperBytesOf(whisper)
@@ -259,7 +255,6 @@ export class Box {
     checkVaultKey(vaultKey, 'Box.seal')
     const over = opts?.over ?? null
     if (over !== null && (! (over instanceof this) || over.boxlabel !== label)) {
-      checkOneCopy(over, this, "Box.seal's `over`")
       throw new VaultError('bad_option', "Box.seal's `over` is the box the new one replaces, under the same boxlabel: a Box, or null for none.")
     }
     const plan = await planSeal(vault, holder, vaultKey, { boxlabel: label, whisperBytes, sidecarJson, over })
@@ -451,11 +446,9 @@ const parseJsonOrNull = (text: string): unknown => {
 
 /**
  * `record`, once it is a box record: kind 'bad_record' otherwise, saying nothing of it, since its
- * fields could be anything a caller had in hand; and 'bad_option' for a box of another copy of
- * safebyok, as {@link checkOneCopy} refuses one, naming `said`, the call that was handed it.
+ * fields could be anything a caller had in hand.
  */
-export const checkedBoxRecord = (record: unknown, said: string): BoxRecord => {
-  checkOneCopy(record, Box, said)
+export const checkedBoxRecord = (record: unknown): BoxRecord => {
   const checked = BoxRecord.safeParse(record)
   if (! checked.success) {
     throw new VaultError('bad_record', "That is not a box record this package writes: a box is made from the record storage holds, as a VaultDB's getBox hands it back, or from a box's own props.")

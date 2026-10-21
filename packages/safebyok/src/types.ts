@@ -198,17 +198,26 @@ export type BoxSummary = Z.infer<typeof BoxSummary>
  */
 export type DamagedBox = { boxlabel: string, damaged: true, revision_tok: string | null }
 
+/** A limit as a storage adapter reports one: a whole number above zero, or `Infinity` for none. */
+const roomLimit = Z.union([Z.int().check(Z.positive()), Z.literal(Infinity)])
+
+// A storage adapter's `Infinity`, its way of saying it sets no limit, is kept as the largest
+// safe integer, as Vault.make keeps a declared limit: past this check, no limit is infinite.
+const roomKept = Z.transform((most: number) => Math.min(most, Number.MAX_SAFE_INTEGER))
+
+/** How much of one limit a vault has used: a whole number `used`, against a whole number `max` above zero. */
+const Room = Z.object({ used: Z.int().check(Z.nonnegative()), max: Z.pipe(roomLimit, roomKept) })
+
 /**
- * How much room a vault has, as this device reckons it from its last read: boxes against the most
- * the vault holds, and bytes against the most its storage holds. Storage checks again on every
- * write, and its answer wins.
+ * How much room a vault has: boxes against the most it holds, and bytes against the most its
+ * storage holds of one vault. A vault reckons it from its last read; a VaultDB from storage,
+ * through `getCapacity` and on a `vault_full` refusal's `meta.capacity`. Either is an estimate:
+ * storage checks again on every write, and its answer wins.
  *
  * @example { boxes: { used: 12, max: 100 }, bytes: { used: 48_000, max: 1_000_000 } }
  */
-export type Capacity = {
-  boxes: { used: number, max: number }
-  bytes: { used: number, max: number }
-}
+export const Capacity = Z.object({ boxes: Room, bytes: Room })
+export type Capacity = Z.infer<typeof Capacity>
 
 /**
  * The ways into a vault, each a {@link WayinRecord}'s `wayinkind`: a `passphrase` the user types,

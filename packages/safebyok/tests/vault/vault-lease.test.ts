@@ -36,11 +36,22 @@ describe("unlock and lock", () => {
     expect(vault.getSnapshot().state).to.eq('unlocked')
   })
 
-  it("a passphrase of only whitespace is refused outright", async () => {
+  it("a passphrase of only whitespace creates nothing: as a new passphrase, it is too weak", async () => {
     const world = makeWorld()
     const vault = await world.open()
-    await TH.expectRefusal(vault.unlock(' '.repeat(3)), 'wrong_passphrase')
+    await TH.expectRefusal(vault.unlock(' '.repeat(3)), 'weak_passphrase')
     expect(vault.getSnapshot().state).to.eq('absent')
+  })
+
+  it("a passphrase of only whitespace opens nothing: as a proof, it is wrong, and costs no derivation", async () => {
+    const derivations = vi.fn(async (passphrase: string, saltBytes: Uint8Array) => await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes))
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw one', { keyDeriver: { ...TH.testDeriver, deriveKeyBytes: derivations } })
+    await vault.lock()
+    derivations.mockClear()
+    await TH.expectRefusal(vault.unlock(' '.repeat(3)), 'wrong_passphrase')
+    expect(derivations).not.toHaveBeenCalled()
+    expect(vault.getSnapshot().state).to.eq('locked')
   })
 
   it("lock() forgets the unlock on this device too: a reopened handle is locked", async () => {
@@ -574,10 +585,60 @@ describe("a change to the ways in, once it has landed", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
     vi.spyOn(world.deviceDB, 'putLease').mockRejectedValueOnce(new Error('device storage is full'))
-    expect(await vault.putWayin('pw one', await TH.passkeyOf('laptop'))).to.eq(vault)
-    expect(vault.getSnapshot().passkey).to.not.be.null
+    const put = await vault.putWayin('pw one', await TH.passkeyOf('laptop'))
+    expect(vault.getSnapshot().passkey).to.deep.equal(put)
     expect(world.logged.map((heard) => [heard.level, heard.story])).to.deep.equal([['warn', { call: 'putWayin' }]])
     expect(await world.stateOnOpen()).to.eq('locked')
+  })
+})
+
+describe("the lease, kept on this device alone", () => {
+  it("sends nothing of itself to the backend: no record there holds its wrap, its deadline's name, or its format (Contract: Lease)", async () => {
+    const world = makeWorld()
+    await world.openUnlocked('pw')
+    const lease = await world.getLease()
+    expect(lease).to.not.be.null
+    const everything = world.dbStore.ckeys().map((ckey) => world.dbStore.read(ckey)).join('\n')
+    expect(everything).to.not.include(lease?.vault_key_lease_wrapped.ciphertext_b64)
+    expect(everything).to.not.include('ask_passphrase_at')
+    expect(everything).to.not.include(lease?.format)
+  })
+})
+
+describe("an unlock this device cannot keep a lease for", () => {
+  afterEach(() => { vi.restoreAllMocks() })
+
+  it("refuses as 'storage_blocked' when the device store has no room for the lease, and the vault stays locked", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw one')
+    await vault.lock()
+    const trouble = new DOMException('The quota has been exceeded.', 'QuotaExceededError')
+    vi.spyOn(world.deviceDB, 'putLease').mockRejectedValueOnce(trouble)
+    const err = await TH.expectRefusal(vault.unlock('pw one'), 'storage_blocked')
+    expect(err.cause).to.eq(trouble)
+    expect(vault.getSnapshot().state).to.eq('locked')
+    expect(await world.getLease()).to.be.null
+    await vault.unlock('pw one')
+    expect(vault.getSnapshot().state).to.eq('unlocked')
+  })
+
+  it("refuses as 'storage_unavailable' when the device store fails to write it, and the vault stays locked", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw one')
+    await vault.lock()
+    vi.spyOn(world.deviceDB, 'putLease').mockRejectedValueOnce(new Error('device storage is unavailable'))
+    await TH.expectRefusal(vault.unlock('pw one'), 'storage_unavailable')
+    expect(vault.getSnapshot().state).to.eq('locked')
+  })
+
+  it("refuses the first unlock as 'storage_blocked' too, the vault created in storage and locked here", async () => {
+    const world = makeWorld()
+    const vault = await world.open()
+    vi.spyOn(world.deviceDB, 'putLease').mockRejectedValueOnce(new DOMException('The quota has been exceeded.', 'QuotaExceededError'))
+    await TH.expectRefusal(vault.unlock('pw one'), 'storage_blocked')
+    expect(vault.getSnapshot().state).to.eq('locked')
+    await vault.unlock('pw one')
+    expect(vault.getSnapshot().state).to.eq('unlocked')
   })
 })
 
@@ -642,14 +703,27 @@ const extractableUnwraps = (spied: ReturnType<typeof watchUnwraps>) => (
 )
 
 describe("the session vaultKey is non-extractable", () => {
-  it("creating a vault unwraps only the session handle, never an extractable one", async () => {
+  afterEach(() => { vi.restoreAllMocks() })
+
+  it("creating a vault takes its key out of the way in it stored, as any unlock does: one extractable transient, for the device wrap", async () => {
     const world = makeWorld()
     const vault = await world.open()
     const spied = watchUnwraps()
     await vault.unlock('pw one')
     expect(vault.getSnapshot().state).to.eq('unlocked')
-    expect(spied.mock.calls).to.have.lengthOf(1)
-    expect(extractableUnwraps(spied)).to.have.lengthOf(0)
+    expect(spied.mock.calls).to.have.lengthOf(2)
+    expect(extractableUnwraps(spied)).to.have.lengthOf(1)
+  })
+
+  it("creating a vault keeps a vaultKey that cannot be exported: the one each new boxKey is wrapped under", async () => {
+    const world = makeWorld()
+    const vault = await world.open()
+    await vault.unlock('pw one')
+    const wraps = vi.spyOn(crypto.subtle, 'wrapKey')
+    await vault.putBox('anthropic', 'sk-ant-fake')
+    const wrappingKeys = wraps.mock.calls.map((callArgs) => callArgs[2])
+    expect(wrappingKeys).to.have.lengthOf(1)
+    expect(wrappingKeys[0]?.extractable).to.be.false
   })
 
   it("a passphrase unlock asks for exactly one extractable transient, for the device wrap", async () => {
@@ -1137,7 +1211,7 @@ describe("vault.ensureLease, by the Contract", () => {
     const getProof = typingPw()
     const { vault } = await lockedVaultWith({ getProof })
     const err = await TH.expectBad(vault.tryEnsureLease(new Event('click') as unknown as { renewMinutes?: number }), 'bad_option')
-    expect(err.message).to.include('`() => { void vault.tryEnsureLease() }`')
+    expect(err.message).to.include('`() => vault.tryEnsureLease()`')
     expect(getProof).to.not.have.been.called
     expect(vault.state).to.eq('locked')
   })
@@ -1146,7 +1220,8 @@ describe("vault.ensureLease, by the Contract", () => {
     const getProof = typingPw()
     const { vault } = await lockedVaultWith({ getProof })
     const button = new EventTarget()
-    button.addEventListener('click', () => { void vault.tryEnsureLease() })
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- the example's own form: a handler whose Outcome nobody reads
+    button.addEventListener('click', () => vault.tryEnsureLease())
     button.dispatchEvent(new Event('click'))
     await vi.waitFor(() => { expect(vault.state).to.eq('unlocked') })
   })

@@ -54,6 +54,8 @@ const vault = Vault.make({
   `maxVaultBytes` and `maxBoxes` are `Infinity`: a vault holds what `Vault.make`'s
   `maxBoxes` allows (100 by default), the origin's storage quota bounds the whole database,
   and a write past it refuses with kind `storage_blocked`, IndexedDB's own error as its `cause`.
+  Its `getCapacity` counts a vault's boxes, and weighs each row as its JSON in UTF-8 bytes,
+  in one transaction: about what the vault's records take, not the room the vault reserves.
 * **Storage the browser withholds** -- site data blocked, a private window or frame that keeps
   none, no room left, or no IndexedDB at all -- refuses with kind `storage_blocked`, which a retry
   cannot mend, by the rule the vault says its device store's failures by; any other trouble from
@@ -137,7 +139,9 @@ places:
 And keep, as they are:
 
 * **`Expectations`, from `safebyok`**: the comparisons each write makes before it lands
-  (`Expectations.vaultPropsMeets`, `boxMeets`, `vaultMeets`, `vaultIdMeets`). An adapter
+  (`Expectations.vaultPropsMeets`, `vaultMeets`, `vaultIdMeets`), and for a box write, the
+  refusal it throws when it misses (`Expectations.boxRefusalOf`: `vault_mismatch`, or
+  `stale_write` carrying the box that stands). An adapter
   compares only the scope, `boxlabel`, `vault_id`, `unlock_epoch`, `vault_key_epoch` and
   `revision_tok`, and a standing row too damaged to show one of them fails the comparison. A
   box write compares the vault props' `vault_key_epoch` too, in the same transaction: skip it,

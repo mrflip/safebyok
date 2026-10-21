@@ -32,7 +32,7 @@ export const good = <ValT>(val: ValT): GoodOutcome<ValT> => ({ ok: true, val })
 /**
  * `err` as the outcome of a call that was refused.
  *
- * @example bad(Refusals.staleWrite('box'))  // { ok: false, err }
+ * @example bad(Refusals.staleWrite('vaultProps'))  // { ok: false, err }
  */
 export const bad = (err: VaultError): BadOutcome => ({ ok: false, err })
 
@@ -77,13 +77,13 @@ export const unexpectedError = (thrown: unknown): VaultError => (
   new VaultError('unexpected_error', "Something went wrong that safebyok did not expect: a bug, in safebyok or in a function the app handed it (a key deriver, say). Nothing was retried, and a retry is unlikely to help; what was thrown is this error's cause.", { cause: thrown ?? new Error('Nothing was thrown with it.') })
 )
 
-/**
- * The refusal in place of what a function the app handed the vault threw, when that function
- * hears the passphrase -- the key deriver: a condition it raised (a resource out of reach) as
- * itself, from this copy of safebyok or
- * another loaded beside it, for the caller to show or retry; anything else, a VaultError of misuse
- * or of bad news among them, as 'unexpected_error' with the throw as its cause, so that no message
- * of its, which may quote the passphrase, is ever the refusal's own, nor told to `onBadNews`.
+/** The refusal in place of what the key deriver, which hears the passphrase, threw.
+ * A condition it raised (a resource out of reach) passes as itself, for the caller to show or
+ * retry. Anything else -- a VaultError of misuse or of bad news, or one from another copy of
+ * safebyok, among them -- is refused as 'unexpected_error' with the throw as its `cause`, so that
+ * no message of the deriver's is ever the refusal's own, nor told to `onBadNews`. The `cause`
+ * still carries the throw whole: whoever logs it logs whatever the deriver put in it, which may
+ * quote the passphrase. (A strength checker's throw, by contrast, carries nothing.)
  *
  * @param thrown - What the function threw, as it came.
  * @returns The refusal.

@@ -1,9 +1,7 @@
 import type { BoxRecord, VaultProps, VaultScope } from 'safebyok'
 
-/**
- * How one field crosses the wire: `plain`, as it is -- text, a number, or one of the vault props'
- * two ways in, `passphrase` and `passkey`, each one opaque JSON -- or `ciphered`, a Ciphered sent as its
- * own two fields, `cipher_iv_b64` and `ciphertext_b64`.
+/** How one field crosses the wire: `plain`, as it is, or `ciphered`, a Ciphered sent as its own two fields.
+ * A plain field is text, a number, or one of the vault props' two ways in, each one opaque JSON.
  */
 export type FieldKind = 'plain' | 'ciphered'
 
@@ -13,10 +11,8 @@ export type Field<FieldT extends string = string> = readonly [field: FieldT, kin
 /** The fields of `RecordT` that `FieldsT` does not carry. */
 type Uncarried<RecordT, FieldsT extends readonly Field[]> = Exclude<keyof RecordT, FieldsT[number][0]>
 
-/**
- * `fields` as they are, once the compiler has held them to `RecordT`: each a field of it, and
- * every field of it among them -- so a record's new field can never be dropped on its way across
- * the wire, nor a field asked for that the record has not got.
+/** `fields` as given, once the compiler holds them to `RecordT`: every one a field of it, and every field of it among them.
+ * A field added to the record then fails to compile until it is carried.
  */
 function everyFieldOf<RecordT>() {
   return <FieldsT extends readonly Field<keyof RecordT & string>[]>(
@@ -31,10 +27,7 @@ export const ScopeFields = everyFieldOf<VaultScope>()([
   ['vaultlabel', 'plain'],
 ] as const)
 
-/**
- * Every field of a VaultProps, as `SafebyokVaultProps` has them: the one place that names the
- * vault props' fields for the wire. The compiler holds it to their shape.
- */
+/** Every field of a VaultProps, as `SafebyokVaultProps` has them: the one place naming them for the wire. */
 export const VaultPropsFields = everyFieldOf<VaultProps>()([
   ['format',           'plain'],
   ['applabel',         'plain'],
@@ -48,10 +41,7 @@ export const VaultPropsFields = everyFieldOf<VaultProps>()([
   ['registered_at',    'plain'],
 ] as const)
 
-/**
- * Every field of a BoxRecord, as `SafebyokBox` has them: the one place that names the
- * box's fields for the wire. The compiler holds it to the box's shape.
- */
+/** Every field of a BoxRecord, as `SafebyokBox` has them: the one place naming them for the wire. */
 export const BoxFields = everyFieldOf<BoxRecord>()([
   ['format',                 'plain'],
   ['boxlabel',               'plain'],
@@ -72,8 +62,7 @@ export const ListedBoxFields = BoxFields.filter(([_field, kind]) => kind !== 'ci
 /** The two halves of a Ciphered, as `SafebyokCiphered` has them. */
 const CipheredHalves = ['cipher_iv_b64', 'ciphertext_b64'] as const
 
-/**
- * The fields as a GraphQL document asks for them, a ciphered one by its two halves.
+/** The fields as a GraphQL document asks for them, a ciphered one by its two halves.
  *
  * @example selectionOf([['boxlabel', 'plain'], ['whisper_ciphered', 'ciphered']])  // 'boxlabel whisper_ciphered { cipher_iv_b64 ciphertext_b64 }'
  */
@@ -81,12 +70,10 @@ export const selectionOf = (fields: readonly Field[]): string => fields.map(([fi
   kind === 'ciphered' ? `${field} { ${CipheredHalves.join(' ')} }` : field
 )).join(' ')
 
-/**
- * The record `sent` carries, field by field: each of `fields`, a null one as null (the vault props' `passkey`, when the vault has none),
- * a missing one left out, and a ciphered one as its two halves -- so
- * whatever else rode along, a GraphQL client's `__typename` or a stray field, stays behind. Nothing is checked here: the
- * VaultDB on each side validates what it is handed. What is not an object comes back as it is,
- * for that validation to refuse.
+/** The record `sent` carries, rebuilt from `fields` alone, so whatever else rode along stays behind: a `__typename`, a stray field.
+ * A null field stays null, a missing one is left out, and a ciphered one keeps only its two
+ * halves. Nothing is checked here: the VaultDB on each side validates what it is handed. What is
+ * not an object comes back as it is, for that validation to refuse.
  *
  * @example recordOf({ vault_id: 'v1', passkey: null, __typename: 'SafebyokVaultProps' }, [['vault_id', 'plain'], ['passkey', 'plain']])   // { vault_id: 'v1', passkey: null }
  */

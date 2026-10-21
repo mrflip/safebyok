@@ -28,6 +28,33 @@ describe("a lock that lands while an unlock or a change is under way", () => {
     expect(await world.getLease()).to.be.null
   })
 
+  it("a del() that lands while an unlock's lease is written leaves no lease: the unlock erases the one it wrote", async () => {
+    const world = makeRacingWorld()
+    const vault = await world.openUnlocked('pw one')
+    await vault.lock()
+    const gate = world.holdNextLease()
+    const unlocking = TH.expectRefusal(vault.unlock('pw one'), 'vault_locked')
+    await gate.reached
+    await vault.del()
+    gate.release()
+    await unlocking
+    expect(vault.getSnapshot().state).to.eq('absent')
+    expect(await world.getLease()).to.be.null
+  })
+
+  it("a del() that lands while putWayin()'s lease is written leaves no lease: the change erases the one it wrote", async () => {
+    const world = makeRacingWorld()
+    const vault = await world.openUnlocked('pw one')
+    const gate = world.holdNextLease()
+    const changing = vault.putWayin('pw one', 'pw two')
+    await gate.reached
+    await vault.del()
+    gate.release()
+    await changing
+    expect(vault.getSnapshot().state).to.eq('absent')
+    expect(await world.getLease()).to.be.null
+  })
+
   it("during putWayin(): the passphrase still changes", async () => {
     const world = makeRacingWorld()
     const vault = await world.openUnlocked('old passphrase')
@@ -491,7 +518,7 @@ const rebornWorld = async () => {
 }
 
 describe("a stale session cannot reach into a vault reborn elsewhere", () => {
-  it("putBox() is refused by storage as stale, and its catch-up finds the device relocked, instead of landing in the reborn vault", async () => {
+  it("putBox() is refused by storage as vault_mismatch, and its catch-up finds the device relocked, instead of landing in the reborn vault", async () => {
     const { vaultOne, vaultTwo } = await rebornWorld()
     expect(vaultOne.getSnapshot().state).to.eq('unlocked')
     await TH.expectRefusal(vaultOne.putBox('anthropic', 'sk-ant-fake-stale'), 'vault_locked')
@@ -711,8 +738,35 @@ describe("versioned updates: two devices writing at once", () => {
     expect(await there.getBox('anthropic')).to.eq('sk-ant-fake-theirs')
     await here.putBox('anthropic', 'sk-ant-fake-mine')
     expect(putBox).toHaveBeenCalledTimes(2)
-    expect(putBox.mock.calls[1]?.[2].revision_tok).to.eq(theirRevision)
+    expect(putBox.mock.calls[1]?.[1].revision_tok).to.eq(theirRevision)
     expect(await there.getBox('anthropic')).to.eq('sk-ant-fake-mine')
+  })
+
+  it("a store refused as stale carries storage's word on what won as meta.box_stored: the box, whole, as storage holds it", async () => {
+    const { world, hereDB, here, there, beforeNextWrite } = await twoDeviceWorld()
+    beforeNextWrite('putBox', () => there.putBox('anthropic', 'sk-ant-fake-theirs', { sidecar: { note: 'theirs' } }))
+    const putBox = vi.spyOn(hereDB, 'putBox')
+    const err = await TH.expectRefusal(here.putBox('anthropic', 'sk-ant-fake-mine'), 'stale_write')
+    expect(putBox).toHaveBeenCalledTimes(1)
+    expect(err.meta?.box_stored).to.deep.equal(storedRowOf(world, 'anthropic'))
+  })
+
+  it("a store whose box storage refuses as invalid_box is refused as bad_record: the vault sealed that box, so the fault is not the caller's input", async () => {
+    const { hereDB, here } = await twoDeviceWorld()
+    const refused = new VaultError('invalid_box', 'Nothing was written: that box is not one this package builds.')
+    vi.spyOn(hereDB, 'putBox').mockResolvedValueOnce(bad(refused))
+    const err = await TH.expectRefusal(here.putBox('anthropic', 'sk-ant-fake-mine'), 'bad_record')
+    expect(err.cause).to.eq(refused)
+    expect(here.getSnapshot().boxes).to.have.lengthOf(0)
+  })
+
+  it("a store whose box storage refuses as vault_mismatch, though a catch-up finds the vault as it was, is refused as stale_write, never as storage's own word", async () => {
+    const { hereDB, here } = await twoDeviceWorld()
+    vi.spyOn(hereDB, 'putBox').mockResolvedValueOnce(bad(new VaultError('vault_mismatch', 'The vault changed.')))
+    const err = await TH.expectRefusal(here.putBox('anthropic', 'sk-ant-fake-mine'), 'stale_write')
+    expect(err.message).to.match(/^The vault changed in storage while this device was storing into it, so nothing was written\./)
+    expect(err.cause).to.have.property('refusalkind', 'vault_mismatch')
+    expect(here.getSnapshot().state).to.eq('unlocked')
   })
 
   it("a store over a box deleted meanwhile elsewhere is refused as stale like any other: the box stays gone", async () => {
@@ -754,7 +808,7 @@ describe("versioned updates: two devices writing at once", () => {
     expect(putBox).toHaveBeenCalledTimes(1)
     expect(await there.getBox('anthropic')).to.eq('sk-ant-fake-theirs')
     await here.putBox('anthropic', 'sk-ant-fake-mine')
-    expect(putBox.mock.calls[1]?.[2].revision_tok).to.eq(theirs.revisionTok)
+    expect(putBox.mock.calls[1]?.[1].revision_tok).to.eq(theirs.revisionTok)
     expect(await there.getBox('anthropic')).to.eq('sk-ant-fake-mine')
   })
 
@@ -771,11 +825,11 @@ describe("versioned updates: two devices writing at once", () => {
     const putBox = vi.spyOn(hereDB, 'putBox')
     await TH.expectRefusal(here.putBox('anthropic', 'sk-ant-fake-mine'), 'stale_write')
     expect(putBox).toHaveBeenCalledTimes(1)
-    expect(putBox.mock.calls[0]?.[2].revision_tok).to.be.null
+    expect(putBox.mock.calls[0]?.[1].revision_tok).to.be.null
     expect(here.getSnapshot().boxes[0]).to.deep.include({ damaged: true, revision_tok: damagedRevision })
     await here.putBox('anthropic', 'sk-ant-fake-mine')
     expect(delBox).not.toHaveBeenCalled()
-    expect(putBox.mock.calls[1]?.[2].revision_tok).to.eq(damagedRevision)
+    expect(putBox.mock.calls[1]?.[1].revision_tok).to.eq(damagedRevision)
     expect(await there.getBox('anthropic')).to.eq('sk-ant-fake-mine')
   })
 
@@ -796,7 +850,7 @@ describe("versioned updates: two devices writing at once", () => {
     expect(await there.getBox('anthropic')).to.eq('sk-ant-fake-theirs')
   })
 
-  it("a store whose catch-up fails is refused as stale, the failure its cause, saying so", async () => {
+  it("a store whose catch-up fails is refused as stale, the failure its cause, saying so, and still carries what won as meta.box_stored", async () => {
     const { world, hereDB, here, there, beforeNextWrite } = await twoDeviceWorld()
     await here.putBox('anthropic', 'sk-ant-fake-one')
     const down = new VaultError('storage_unavailable', 'The vault storage could not be reached.')
@@ -808,6 +862,7 @@ describe("versioned updates: two devices writing at once", () => {
     const err = await TH.expectRefusal(here.putBox('anthropic', 'sk-ant-fake-mine'), 'stale_write')
     expect(err.cause).to.eq(down)
     expect(err.message).to.include('Catching up with storage afterwards failed too')
+    expect(err.meta?.box_stored).to.deep.equal(storedRowOf(world, 'anthropic'))
     expect(putBox).toHaveBeenCalledTimes(1)
     expect(delaysAsked(waits)).to.have.lengthOf(0)
     expect(here.getSnapshot().syncing).to.be.false
@@ -1006,7 +1061,7 @@ describe("refreshes, one at a time", () => {
     vault.close()
   })
 
-  it("says syncing: false while the storage watch cannot read, warns once for the streak, and says once when a read succeeds", async () => {
+  it("says syncing: false while the storage watch cannot read, warns once for the streak, once more for the hellos it says, and once when a read succeeds", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     expect(vault.getSnapshot().syncing).to.be.true
@@ -1019,12 +1074,14 @@ describe("refreshes, one at a time", () => {
     }
     expect(vault.getSnapshot().syncing).to.be.false
     expect(vault.getSnapshot().state).to.eq('unlocked')
-    expect(world.logged.map((heard) => [heard.level, heard.story])).to.deep.equal([['warn', { call: 'refresh' }]])
+    // The failed read had the next ring say a hello, which failed as itself: warned of in its own words.
+    expect(world.logged.map((heard) => [heard.level, heard.story])).to.deep.equal([['warn', { call: 'refresh' }], ['warn', { call: 'hello' }]])
+    expect(world.logged[1]?.message).to.eq(world.logged[1]?.err?.message)
     world.dbStore.write(u1VaultPropsCkey, sound)
     await TH.wakeupAtNextTick()
     expect(vault.getSnapshot().syncing).to.be.true
-    expect(world.logged.map((heard) => heard.level)).to.deep.equal(['warn', 'log'])
-    expect(world.logged[1]?.message).to.match(/reads again/)
+    expect(world.logged.map((heard) => heard.level)).to.deep.equal(['warn', 'warn', 'log'])
+    expect(world.logged[2]?.message).to.match(/reads again/)
   })
 })
 // --

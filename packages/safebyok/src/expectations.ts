@@ -1,4 +1,6 @@
 import { BoxRecord } from './box'
+import type { VaultError } from './errors'
+import * as Refusals from './refusals'
 import type { BoxExpectation, BoxDelExpectation, BoxDeletion, VaultDelExpectation, VaultPropsExpectation } from './vault-db'
 
 /**
@@ -62,20 +64,32 @@ export const vaultIdMeets = (standing: unknown, expected: VaultDelExpectation): 
 )
 
 /**
- * True when the vault props and box standing are the ones `expected` names: the props of its
- * vault, standing for the vaultKey the box was sealed under (its `vault_key_epoch`, line 3.8),
- * and the box at its revision -- or, for a null `revision_tok`, no box at all (line 3.3).
+ * What a box write meets, from the vault props and box standing, read in its one atomic step:
+ * null when they are the ones `expected` names, and the write lands; otherwise the refusal to
+ * throw, writing nothing. `vault_mismatch` when the vault props are not those of its vault,
+ * standing for the vaultKey the box was sealed under (its `vault_key_epoch`, line 3.8) -- none
+ * stand, or another vault's, or too damaged to compare; else `stale_write`, carrying the box
+ * standing as it is (or null for none), when the box is not at its revision -- or, for a null
+ * `revision_tok`, when any box stands at all (line 3.3).
  *
  * @param standingVaultProps - The vault props' row standing in storage, or undefined (or null) when there is none.
  * @param standingBox - The box row standing under the boxlabel, or undefined (or null) when there is none.
  * @param expected - What the box write was sealed for and read.
+ * @returns Null when the write lands; otherwise the refusal, `Refusals.vaultMismatch()` or `Refusals.staleBox(standing)`.
  *
- * @example Expectations.boxMeets(vaultProps, undefined, { vault_id: 'v1', revision_tok: null, vault_key_epoch: 1 }) // a first write
+ * @example
+ *   const refusal = Expectations.boxRefusalOf(vaultProps, standingBox, expected)
+ *   if (refusal) { throw refusal }
  */
-export const boxMeets = (standingVaultProps: unknown, standingBox: unknown, expected: BoxExpectation): boolean => {
-  if (! vaultMeets(standingVaultProps, expected) || fieldOf(standingVaultProps, 'vault_key_epoch') !== expected.vault_key_epoch) { return false }
-  if (standingBox === undefined || standingBox === null) { return expected.revision_tok === null }
-  return expected.revision_tok !== null && fieldOf(standingBox, 'revision_tok') === expected.revision_tok
+export const boxRefusalOf = (standingVaultProps: unknown, standingBox: unknown, expected: BoxExpectation): VaultError | null => {
+  if (! vaultMeets(standingVaultProps, expected) || fieldOf(standingVaultProps, 'vault_key_epoch') !== expected.vault_key_epoch) {
+    return Refusals.vaultMismatch()
+  }
+  const standing = standingBox ?? null
+  const boxMeets = standing === null
+    ? expected.revision_tok === null
+    : expected.revision_tok !== null && fieldOf(standing, 'revision_tok') === expected.revision_tok
+  return boxMeets ? null : Refusals.staleBox(standing)
 }
 
 /**

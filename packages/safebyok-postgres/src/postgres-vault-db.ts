@@ -4,12 +4,9 @@ import * as Columns from './columns'
 import { VaultPropsColumns, ListedBoxColumns, BoxColumns } from './columns'
 import { VaultChangeChannel } from './vault-tables'
 
-/**
- * What this VaultDB needs of a Postgres driver: one statement, its parameters numbered `$1`, `$2`
- * and on, and the rows it returns. A `pg` Pool, Client or PoolClient is one as it stands, and so
- * is a PGlite; postgres.js takes a one-line wrapper. Every statement this VaultDB sends is one
- * statement, so each is atomic on its own, and every write is one: no transaction is asked of the
- * driver.
+/** What this VaultDB needs of a Postgres driver: one statement, its parameters numbered `$1` on, and the rows it returns.
+ * A `pg` Pool, Client or PoolClient is one as it stands, and so is a PGlite; postgres.js takes a
+ * one-line wrapper. Every write is one statement, atomic on its own: no transaction is asked of the driver.
  *
  * @example new Pool({ connectionString })                                      // pg
  * @example new PGlite()                                                         // @electric-sql/pglite
@@ -22,12 +19,11 @@ export type PostgresClient = {
 /** Ends what a {@link PostgresListen} began; it may return a promise, which nothing awaits. */
 export type PostgresUnlisten = () => unknown
 
-/**
- * The host's way to hear Postgres notifications on `channel` (always {@link VaultChangeChannel}):
- * call `onNotify` with each one's payload, and return the unlisten, or a promise for it. A
- * PGlite's `listen` is one, called on its PGlite as the example does: passed bare, it loses its
- * `this`. With `pg`, one long-lived connection LISTENs for the whole server, and this hands its
- * notifications to every VaultDB made per request (see the README).
+/** The host's way to hear Postgres notifications on `channel`, always {@link VaultChangeChannel}.
+ * It calls `onNotify` with each payload, and returns the unlisten, or a promise for it. A PGlite's
+ * `listen` is one, called on its PGlite as the example does: passed bare, it loses its `this`.
+ * With `pg`, one long-lived connection LISTENs for the whole server, and hands its notifications
+ * to every VaultDB made per request (see the README).
  *
  * @example (channel, onNotify) => pglite.listen(channel, onNotify)
  */
@@ -35,68 +31,44 @@ export type PostgresListen = (channel: string, onNotify: (payload: string) => vo
 
 /** What {@link postgresVaultDB} is made with, once per request. */
 export type PostgresVaultDBOpts = VaultDBOpts & {
-  /** The database: a {@link PostgresClient}, such as your server's `pg` Pool. */
+  /** The database, such as your server's `pg` Pool. */
   client: PostgresClient
-  /**
-   * The signed-in user this request is for, as your server's own auth established it -- never
-   * as the browser claims it -- or null (or undefined, or empty) when no one is signed in. Only
-   * that user's vaults are reached.
+  /** The signed-in user this request is for, as your server's own auth established it, never as the browser claims it.
+   * Null, undefined or empty when no one is signed in. Only that user's vaults are reached.
    */
   userId: string | null | undefined
-  /** Where the VaultDB hears other writes, to call its subscribers; without it, it never calls. */
+  /** Where the VaultDB hears other writes, to call its subscribers; without it, it never calls them. */
   listen?: PostgresListen | undefined
-  /**
-   * The most boxes one vault holds: a whole number above zero, or `Infinity`, the default,
-   * for none. A limit is enforced here, on the server, as a best effort, so a modified browser
-   * cannot grow a vault far past it; the browser's vault opens with no larger `maxBoxes`. With
-   * none, nothing is counted, and how large a vault grows is the host's to bound, by its own quotas.
+  /** The most boxes one vault holds: a whole number above zero, or `Infinity`, the default, for no limit.
+   * The server enforces it, as a best effort, so a modified browser cannot grow a vault far past it;
+   * the browser's vault opens with no larger `maxBoxes`. With no limit nothing is counted, and the
+   * host bounds how large a vault grows by its own quotas.
    */
   maxBoxes?: number | undefined
 }
 
-/**
- * safebyok's storage in Postgres: a VaultDB over the tables {@link VaultTablesSql} makes, run on
- * your server -- Postgres has nowhere to run a vault's verbs, and the vault itself runs in the
- * browser -- made per request for the signed-in user. Your route layer calls its verbs for the
- * browser's vault (the README has the recipe), or a GraphQL server does (`safebyok-graphql`).
+/** safebyok's storage in Postgres: a VaultDB over `VaultTablesSql`'s tables, made per request for the signed-in user.
+ * It runs on your server, as the vault itself runs in the browser. Your route layer calls its verbs
+ * for the browser's vault (the README has the recipe), or a GraphQL server does (`safebyok-graphql`).
  *
- * * **Who may reach a vault**: only `userId`. A verb naming any other user's scope, or any at
- *   all while no one is signed in, refuses with a VaultError of kind `identity_revoked` before
- *   the database is asked anything: the user the browser's vault was opened for is not the one
- *   signed in, and that vault locks itself.
- * * **Every write is one statement**, atomic as Postgres makes every statement: a write lands only
- *   while what it expects still stands, and a failed expectation refuses with kind `stale_write`,
- *   as does an update of the vault props that does not move their `unlock_epoch` forward.
- *   A box write reads its vault row `FOR SHARE`, so it lands only while those vault props
- *   stand for the vaultKey the box was sealed under: an update of the vault props waits for it
- *   to end, or it for the update, and box writes never wait for each other on the vault row.
- * * **A full vault**: a new box in a vault already holding `maxBoxes` refuses with kind
- *   `vault_full`, and the refused write stored nothing. The check is a best effort, made in the
- *   statement that inserts, by counting the vault's boxes as of that statement's start, with
- *   no lock on them and no counter kept: writes made one after another never take a vault past the limit,
- *   but writers racing for the last places may each find room, and all land. A box replacing
- *   one already there is never refused for the count, and a stale writer is told from a full
- *   vault by the same statement.
- * * **Isolation**: every guarantee above holds under READ COMMITTED, Postgres's default. Under
- *   REPEATABLE READ or SERIALIZABLE (a host's session default, or its own transaction around a
- *   call), some races fail with a serialization error instead, as `storage_unavailable`, and
- *   the call may simply be tried again.
- * * **Other writes**: with `listen` and the optional triggers `VaultNotifySql` installs,
- *   `subscribe` hears every write to the vault, from any server and any device, and calls once as
- *   its listen begins, so a write made while it began is read too; without either, nothing is
- *   pushed.
- * * **Your database's own rules**: a statement it refuses for want of a privilege, or by a
- *   row-level security policy (Postgres's `42501`), refuses with kind `not_permitted`, which locks
- *   nothing, the driver's error as its `cause`.
- * * **Trouble**: anything else the driver throws refuses with kind `storage_unavailable`, the
- *   driver's own error as its `cause`. Every refusal is a VaultError, whose `refusalkind` a wire
- *   can carry.
- *
- * @param opts - The `client`, the `userId` this request is for, an optional `listen`, an
- *   optional `maxBoxes`, and an optional `logger`, which hears a `listen` that fails (the default logger without one; a vault opened with no logger of its own hears it too).
- * @returns The VaultDB, holding at most 1 MiB in one record and `maxBoxes` boxes in one
- *   vault, setting no limit on a vault's bytes; its `listBoxRecords` lists a vault as stored, for
- *   a route to serve.
+ * * **Who may reach a vault**: only `userId`. A verb naming another user's scope, or any while no
+ *   one is signed in, refuses with kind `identity_revoked` before the database is asked anything.
+ * * **Every write is one statement**, atomic as Postgres makes every statement. An update of the
+ *   vault props that does not move their `unlock_epoch` forward refuses as `stale_write`.
+ * * **Locks**: a box write holds its vault row `FOR SHARE` and its box `FOR UPDATE`. It waits on a
+ *   write to the vault props or to the same box, never on another box's write.
+ * * **A full vault**: a new box in a vault holding `maxBoxes` refuses with kind `vault_full`. The
+ *   count is a best effort: writes one after another never pass the limit, but writers racing for
+ *   the last places may all land.
+ * * **Limits**: at most 1 MiB in one record and 640 bytes in one name, and no limit on a vault's bytes.
+ *   `getCapacity` weighs each box as its row's JSON, a little more than the record's own.
+ * * **Isolation**: every guarantee holds under READ COMMITTED, Postgres's default. Under REPEATABLE
+ *   READ or SERIALIZABLE, some races fail with a serialization error instead, as `storage_unavailable`.
+ * * **Other writes**: with `listen` and the triggers `VaultNotifySql` installs, `subscribe`
+ *   hears every write to the vault, from any server and device. It also calls once as its listen
+ *   begins, so a write made meanwhile is read. Without both, nothing is pushed.
+ * * **Your database's own rules**: a statement refused for want of a privilege, or by a row-level
+ *   security policy (`42501`), refuses with kind `not_permitted`, the driver's error its `cause`.
  *
  * @example
  *   const vaultDB = postgresVaultDB({ client: pool, userId: session.userId })
@@ -167,19 +139,47 @@ const ListBoxesSql = `SELECT ${Columns.selected(ListedBoxColumns)} FROM safebyok
 // vault props -- a rotation replacing the vaultKey -- waits until the write's statement ends, or the
 // write waits for it, and then reads the vault props as they stand: the vault_key_epoch compared is
 // the one standing when the write lands, never only the one in the statement's snapshot. Box
-// writers share the lock, so they never wait on each other for the vault row (two writes to one
-// boxlabel still meet at its row, or at the unique index).
+// writers share the lock, so they never wait on each other for the vault row.
 const ExpectedVaultSql = `SELECT applabel, user_id, vaultlabel, vault_id FROM safebyok_vaults
     WHERE ${ScopeIs} AND vault_id = $4::text AND vault_key_epoch = $5::bigint
     FOR SHARE`
 
+// The box standing under the boxlabel, beside the expected vault: what a box write compares, and
+// reports when it misses. FOR UPDATE locks it without writing it -- two writes to one boxlabel meet
+// here, one after the other -- and reads it as it stands once locked, a box another writer
+// committed since this statement began included, never only as the snapshot had it. It is read
+// after the vault row, so a write takes its locks in the order a vault's deletion does. A box
+// first inserted since this statement began is not in its snapshot, so not here: only the insert's
+// ON CONFLICT meets it.
+const StandingBoxSql = `SELECT ${Columns.selected(BoxColumns)} FROM safebyok_boxes
+    WHERE ${ScopeIs} AND boxlabel = ${Columns.placeholderOf(BoxColumns, 'boxlabel', BoxParamsFrom)}
+      AND EXISTS (SELECT 1 FROM vault)
+    FOR UPDATE`
+
+// The vault's boxes, and what they weigh: each row as JSON, in UTF-8 bytes (Postgres writes a
+// jsonb column with a space after each colon and comma, so a little more than the record's own JSON).
+const VaultBoxesSql = `FROM safebyok_boxes AS box WHERE ${ScopeIs}`
+const BoxBytesSql = 'COALESCE(sum(octet_length(row_to_json(box)::text)), 0)::float8'
+
+// How full the vault is, as of this statement: every box of the scope counted and weighed.
+const GetCapacitySql = `SELECT count(*)::float8 AS box_count, ${BoxBytesSql} AS bytes_used ${VaultBoxesSql}`
+
+// Each box write answers one row, whether or not it landed: `vault_stands`, whether the vault props
+// it expects stood; `landed`, whether its own comparison passed and it wrote (null when no box
+// stands to report); `was_full`, a first write's vault at its limit, with its `box_count`, and its
+// `bytes_used` when the write is refused for it; and the box columns of what stands under the
+// boxlabel now -- the box written, as its RETURNING hands it back, or the one standing, as the FOR
+// UPDATE read it -- null when none does. One statement, so one snapshot and one round trip: the
+// closing SELECT reads the CTEs' rows, and the boxes table again only to weigh a vault that refuses
+// the write as full.
+
 // A first box under its boxlabel: inserted only beside the vault props it expects, only where no
-// box stands, and only while the vault holds fewer than $6 boxes -- or, for a null $6, no
-// limit, when nothing is counted: Postgres runs the count, an uncorrelated subquery, only when the
-// CASE asks for it. It answers one row that says why it did or did not land: whether it landed,
-// whether the vault props it expects stood, whether the boxlabel was already taken, and whether
-// the vault was already at its limit -- and, when it landed, the box's columns as the insert
-// stored them, from its RETURNING, null otherwise.
+// box stands, and only while the vault holds fewer than $6 boxes -- or, for a null $6, no limit,
+// when nothing is counted: Postgres runs the count, an uncorrelated subquery, only when the CASE
+// asks for it. A box standing in the snapshot is locked and reported, and nothing is inserted. A
+// box another writer inserted since the statement began is met by the ON CONFLICT, whose no-op
+// DO UPDATE locks it and returns it as it now stands: then `xmax = 0` is false, since Postgres
+// marks a row it locked, and only a row this statement inserted lands.
 //
 // Nothing is counted in advance: the limit is the count of the vault's boxes at the start of
 // this statement, a best effort. Under READ COMMITTED, Postgres's default, writers racing for the
@@ -188,35 +188,49 @@ const ExpectedVaultSql = `SELECT applabel, user_id, vaultlabel, vault_id FROM sa
 // and a refused write inserted nothing, since the refusal is the WHERE of one atomic statement. A
 // vault deleted after the statement began is met by the vault row's FOR SHARE read, which finds it
 // gone, or by the foreign key, which reads the vault row that stands now: that failure is caught as
-// a stale writer (see insertBox), and no box ever lands in a vault but its own.
+// the vault gone (see insertBox), and no box ever lands in a vault but its own. A write refused as
+// full weighs the vault's boxes for its capacity, in the same statement; no other write weighs them.
 const InsertBoxSql = `WITH vault AS (
     ${ExpectedVaultSql}
+  ), standing AS MATERIALIZED (
+    ${StandingBoxSql}
   ), counted AS (
-    SELECT CASE WHEN $6::bigint IS NULL THEN 0 ELSE (SELECT count(*) FROM safebyok_boxes WHERE ${ScopeIs}) END AS standing
-  ), inserted AS (
+    SELECT CASE WHEN $6::bigint IS NULL THEN 0 ELSE (SELECT count(*) ${VaultBoxesSql}) END AS box_count
+  ), written AS (
     INSERT INTO safebyok_boxes (applabel, user_id, vaultlabel, vault_id, ${Columns.names(BoxColumns)})
     SELECT applabel, user_id, vaultlabel, vault_id, ${Columns.placeholders(BoxColumns, BoxParamsFrom)}
-    FROM vault, counted WHERE $6::bigint IS NULL OR counted.standing < $6::bigint
-    ON CONFLICT (applabel, user_id, vaultlabel, boxlabel) DO NOTHING
-    RETURNING ${Columns.selected(BoxColumns)}
+    FROM vault, counted WHERE NOT EXISTS (SELECT 1 FROM standing) AND ($6::bigint IS NULL OR counted.box_count < $6::bigint)
+    ON CONFLICT (applabel, user_id, vaultlabel, boxlabel) DO UPDATE SET format = safebyok_boxes.format
+    RETURNING ${Columns.selected(BoxColumns)}, xmax = 0 AS landed
   )
-  SELECT EXISTS (SELECT 1 FROM inserted) AS landed,
-         EXISTS (SELECT 1 FROM vault) AS vault_stands,
-         EXISTS (SELECT 1 FROM safebyok_boxes WHERE ${ScopeIs} AND boxlabel = ${Columns.placeholderOf(BoxColumns, 'boxlabel', BoxParamsFrom)}) AS box_stood,
-         COALESCE((SELECT standing FROM counted) >= $6::bigint, false) AS was_full,
-         inserted.*
-  FROM (SELECT 1) AS answer LEFT JOIN inserted ON true`
+  SELECT EXISTS (SELECT 1 FROM vault) AS vault_stands,
+         COALESCE(counted.box_count >= $6::bigint, false) AS was_full,
+         counted.box_count::float8 AS box_count,
+         CASE WHEN counted.box_count >= $6::bigint AND EXISTS (SELECT 1 FROM vault) AND NOT EXISTS (SELECT 1 FROM standing)
+           THEN (SELECT ${BoxBytesSql} ${VaultBoxesSql}) ELSE 0 END AS bytes_used,
+         box.*
+  FROM counted LEFT JOIN (SELECT * FROM written UNION ALL SELECT *, false FROM standing) AS box ON true`
 
-// A box over the revision read, beside the vault props it expects, answering with its columns
-// as the update stored them: no row when it did not land.
+// A box over the revision read, beside the vault props it expects: written only over the box
+// standing locked, and only while it is at that revision.
 const ReplaceBoxSql = `WITH vault AS (
     ${ExpectedVaultSql}
+  ), standing AS MATERIALIZED (
+    ${StandingBoxSql}
+  ), written AS (
+    UPDATE safebyok_boxes SET (${Columns.names(BoxColumns)}) = ROW(${Columns.placeholders(BoxColumns, BoxParamsFrom)})
+    WHERE ${ScopeIs} AND vault_id = $4::text
+      AND boxlabel = ${Columns.placeholderOf(BoxColumns, 'boxlabel', BoxParamsFrom)}
+      AND revision_tok = $6::text
+      AND EXISTS (SELECT 1 FROM standing)
+    RETURNING ${Columns.selected(BoxColumns)}
   )
-  UPDATE safebyok_boxes SET (${Columns.names(BoxColumns)}) = ROW(${Columns.placeholders(BoxColumns, BoxParamsFrom)})
-  WHERE ${ScopeIs} AND vault_id = $4::text AND revision_tok = $6::text
-    AND boxlabel = ${Columns.placeholderOf(BoxColumns, 'boxlabel', BoxParamsFrom)}
-    AND EXISTS (SELECT 1 FROM vault)
-  RETURNING ${Columns.selected(BoxColumns)}`
+  SELECT EXISTS (SELECT 1 FROM vault) AS vault_stands, false AS was_full, box.*
+  FROM (SELECT 1) AS answer LEFT JOIN (
+    SELECT *, true AS landed FROM written
+    UNION ALL
+    SELECT *, false FROM standing WHERE NOT EXISTS (SELECT 1 FROM written)
+  ) AS box ON true`
 
 // Lands while the vault props of that vault_id stand, whether or not there was a box to delete,
 // and answers one row then, saying what it removed: the revision_tok its DELETE returned, or null
@@ -235,7 +249,7 @@ const DelVaultSql = `DELETE FROM safebyok_vaults WHERE ${ScopeIs} AND vault_id =
 
 // ------------------------------------------------------------------------------------ the adapter
 
-/** Each write one statement, first checking the scope is the signed-in user's own. */
+/** The VaultDB {@link postgresVaultDB} makes: each write one statement, after checking the scope is the signed-in user's own. */
 class TablesVaultDB extends VaultDB {
   // Postgres holds far more in one row; a mebibyte is what this adapter promises, as the other
   // in-tree adapters do, and more than most servers accept in one request.
@@ -290,36 +304,49 @@ class TablesVaultDB extends VaultDB {
     return rows.map((row) => ({ boxlabel: (row as { boxlabel: string }).boxlabel, box: Columns.recordOf(row, ListedBoxColumns) }))
   }
 
-  // The box handed back is the row as the statement that wrote it returned it.
-  protected async doPutBox(scope: VaultScope, box: BoxRecord, expected: BoxExpectation): Promise<unknown> {
+  // The box handed back, and the one a stale write reports, is the row as the statement that
+  // wrote it, or locked it, returned it.
+  protected async doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<unknown> {
     this.mustReach(scope)
     const boxParams = Columns.paramsOf(box, BoxColumns)
-    if (expected.revision_tok !== null) {
-      const params = [...scopeParams(scope), expected.vault_id, expected.vault_key_epoch, expected.revision_tok, ...boxParams]
-      const { rows } = await this.sent(ReplaceBoxSql, params)
-      return rows.length === 0 ? null : Columns.recordOf(rows[0], BoxColumns)
-    }
-    const outcome = await this.insertBox([...scopeParams(scope), expected.vault_id, expected.vault_key_epoch, this.maxBoxes === Infinity ? null : this.maxBoxes, ...boxParams])
-    if (outcome === null) { return null }
-    if (outcome.landed) { return Columns.recordOf(outcome, BoxColumns) }
-    // A vault gone or made anew, or its vaultKey replaced, or a boxlabel already taken (a box
-    // the writer missed, which it would replace, and which is never refused for the count), is a
-    // stale writer. Otherwise
-    // the vault was at its limit when the statement began; and if it was not, a writer racing for
-    // this boxlabel got in after the snapshot, and this one is only stale as well.
-    if (! outcome.vault_stands || outcome.box_stood || ! outcome.was_full) { return null }
-    throw Refusals.vaultFull(this.maxBoxes)
+    const answer = expected.revision_tok === null
+      ? await this.insertBox([...scopeParams(scope), expected.vault_id, expected.vault_key_epoch, this.maxBoxes === Infinity ? null : this.maxBoxes, ...boxParams])
+      : await this.replaceBox([...scopeParams(scope), expected.vault_id, expected.vault_key_epoch, expected.revision_tok, ...boxParams])
+    if (! answer.vault_stands) { throw Refusals.vaultMismatch() }
+    const standing = answer.landed === null ? null : Columns.recordOf(answer, BoxColumns)
+    if (answer.landed) { return standing }
+    // A full vault refuses a new box; a boxlabel already taken, even in a full vault, is a box
+    // the writer missed, which it would replace, and which is never refused for the count.
+    if (standing === null && answer.was_full) { throw Refusals.vaultFull(this.capacityOf(answer)) }
+    throw Refusals.staleBox(standing)
   }
 
-  // Runs InsertBoxSql and reads its one row; null for the one failure that is only a stale writer:
-  // its vault deleted between the statement's snapshot and the foreign key's check, which reads the
-  // vault row as it stands then.
-  private async insertBox(params: unknown[]): Promise<InsertBoxOutcome | null> {
+  // Counted and weighed in one statement, against this VaultDB's limits.
+  protected async doGetCapacity(scope: VaultScope): Promise<unknown> {
+    this.mustReach(scope)
+    const { rows } = await this.sent(GetCapacitySql, scopeParams(scope))
+    return this.capacityOf(rows[0] as VaultTally)
+  }
+
+  /** How full a vault is, from what a statement counted and weighed, against this VaultDB's limits. */
+  private capacityOf({ box_count: boxCount, bytes_used: bytesUsed }: VaultTally) {
+    return { boxes: { used: boxCount, max: this.maxBoxes }, bytes: { used: bytesUsed, max: this.maxVaultBytes } }
+  }
+
+  // Runs ReplaceBoxSql and reads its one row.
+  private async replaceBox(params: unknown[]): Promise<BoxAnswer> {
+    const { rows } = await this.sent(ReplaceBoxSql, params)
+    return rows[0] as BoxAnswer
+  }
+
+  // Runs InsertBoxSql and reads its one row. A foreign key violation is the vault deleted between
+  // the statement's snapshot and the foreign key's check, which reads the vault row as it stands then.
+  private async insertBox(params: unknown[]): Promise<BoxAnswer> {
     try {
       const { rows } = await this.sent(InsertBoxSql, params)
-      return rows[0] as InsertBoxOutcome
+      return rows[0] as BoxAnswer
     } catch (err) {
-      if ((err as { code?: unknown } | null)?.code === ForeignKeyViolation) { return null }
+      if ((err as { code?: unknown } | null)?.code === ForeignKeyViolation) { return { vault_stands: false, was_full: false, landed: null, box_count: 0, bytes_used: 0 } }
       throw err
     }
   }
@@ -355,10 +382,9 @@ class TablesVaultDB extends VaultDB {
     return () => { void endListen(unlistening, (err) => { this.logger.error("A Postgres unlisten failed, so its listen may still hear notifications. Nothing else is affected.", { call: 'subscribe' }, err instanceof Error ? err : null) }) }
   }
 
-  /**
-   * Sends one statement. The database refusing it by a rule of the host's -- a privilege this
-   * connection's role lacks, or a row-level security policy -- refuses the call as
-   * `not_permitted`, the driver's error as its `cause`; anything else it throws goes up as it came.
+  /** The rows of one statement, sent as given.
+   * The database refusing it by a rule of the host's, a privilege or a row-level security policy,
+   * refuses as `not_permitted`, the driver's error its `cause`. Anything else it throws goes up as it came.
    */
   private async sent(text: string, params: unknown[]): Promise<{ rows: unknown[] }> {
     try {
@@ -382,27 +408,24 @@ class TablesVaultDB extends VaultDB {
   }
 }
 
-/**
- * The one row {@link InsertBoxSql} answers: why a first box write did, or did not, land, beside
- * the box's columns as inserted, null where it did not.
+/** How many boxes a vault holds, and what they weigh, as a statement counted them. */
+type VaultTally = { box_count: number, bytes_used: number }
+
+/** The one row a box write answers, beside the columns of the box standing now, null where none does.
+ * `landed` is null when no box stands to report. The tally is weighed only for a first write
+ * that met a full vault, `was_full`.
  */
-type InsertBoxOutcome = { landed: boolean, vault_stands: boolean, box_stood: boolean, was_full: boolean }
+type BoxAnswer = VaultTally & { vault_stands: boolean, was_full: boolean, landed: boolean | null }
 
 /** Postgres's error code for a foreign key violation: `23503`. */
 const ForeignKeyViolation = '23503'
 
-/**
- * Postgres's error code for a privilege refused, `42501`: a table or column the connection's role
- * may not reach, or a row a row-level security policy refuses.
- */
+/** Postgres's error code for a privilege refused, `42501`, by a role's grants or a row-level security policy. */
 const InsufficientPrivilege = '42501'
 
 const NotPermittedMessage = "The vault's database refused this call by a rule of the app's own -- a privilege, or a row-level security policy -- so nothing was read or written. Signing in again will not help: the app's own rules decide who may."
 
-/**
- * The most bytes of UTF-8 a Postgres-backed name holds: a box's primary key is its applabel,
- * user_id, vaultlabel and boxlabel together, and Postgres refuses a btree entry over 2704 bytes.
- */
+/** The most bytes of UTF-8 a Postgres-backed name holds: a box's four names share one primary key, and a btree entry holds 2704 bytes. */
 const MaxNameBytes = 640
 
 const scopeParams = (scope: VaultScope): string[] => [scope.applabel, scope.user_id, scope.vaultlabel]
@@ -410,10 +433,7 @@ const scopeParams = (scope: VaultScope): string[] => [scope.applabel, scope.user
 /** True when a write's `RETURNING` or `SELECT` says it landed: one row back. */
 const landed = ({ rows }: { rows: unknown[] }): boolean => rows.length > 0
 
-/**
- * True when a notification's payload names `scope`, or names nothing readable: an empty payload
- * (a scope too long for one), or one in an unexpected shape, costs a spurious refresh at worst.
- */
+/** True when a notification's payload names `scope`, or names nothing readable, which costs a spurious refresh at worst. */
 const namesScope = (payload: string, scope: VaultScope): boolean => {
   const named = VaultScope.safeParse(jsonOrNull(payload))
   if (! named.success) { return true }
@@ -428,9 +448,8 @@ const jsonOrNull = (text: string): unknown => {
   }
 }
 
-/**
- * What a {@link PostgresListen} hands back, once it has: the unlisten, or null when the listen
- * failed, which `failed` hears. Its subscriber then hears nothing more, as without a listen.
+/** The unlisten a {@link PostgresListen} hands back, or null when the listen failed, which `failed` hears.
+ * Its subscriber then hears nothing more, as without a listen.
  */
 const settled = async (unlisten: Promise<PostgresUnlisten>, failed: (err: unknown) => void): Promise<PostgresUnlisten | null> => {
   try {
@@ -446,10 +465,7 @@ const onceListening = async (unlistening: Promise<PostgresUnlisten | null>, onLi
   if (await unlistening) { onListening() }
 }
 
-/**
- * Ends a listen once it has begun -- at once, or as it arrives -- with anything the unlisten
- * throws or rejects with handed to `failed`: the subscriber already hears nothing.
- */
+/** Ends a listen once it has begun, handing `failed` anything the unlisten throws: the subscriber already hears nothing. */
 const endListen = async (unlistening: Promise<PostgresUnlisten | null>, failed: (err: unknown) => void): Promise<void> => {
   const unlisten = await unlistening
   if (! unlisten) { return }

@@ -17,7 +17,7 @@ const seeded = async () => {
 
 type Caller = ReturnType<ReturnType<typeof createTest>['withIdentity']>
 
-/** One call of each of the nine functions, on `u1`'s vault, as `caller`. */
+/** One call of each of the ten functions, on `u1`'s vault, as `caller`. */
 const EveryCall: [string, (caller: Caller) => Promise<unknown>][] = [
   ['getVaultProps',    (caller) => caller.query(api.safebyok.getVaultProps, { scope: u1 })],
   ['ensureVaultProps', (caller) => caller.mutation(api.safebyok.ensureVaultProps, { vaultProps: TH.vaultPropsOf('u1') })],
@@ -25,6 +25,7 @@ const EveryCall: [string, (caller: Caller) => Promise<unknown>][] = [
   ['getBox',           (caller) => caller.query(api.safebyok.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })],
   ['listBoxSummaries', (caller) => caller.query(api.safebyok.listBoxSummaries, { scope: u1 })],
   ['putBox',           (caller) => caller.mutation(api.safebyok.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a2'), expected: { vault_id: 'vault-id-u1', revision_tok: 'rev-a1', vault_key_epoch: 1 } })],
+  ['getCapacity',      (caller) => caller.query(api.safebyok.getCapacity, { scope: u1 })],
   ['delBox',           (caller) => caller.mutation(api.safebyok.delBox, { scope: u1, boxlabel: 'anthropic_api_key', expected: TH.deleting('rev-a2') })],
   ['delVault',         (caller) => caller.mutation(api.safebyok.delVault, { scope: u1, expected: TH.thisVault })],
   ['watchVault',       (caller) => caller.query(api.safebyok.watchVault, { scope: u1 })],
@@ -48,26 +49,31 @@ describe("SafebyokComponent.api, for the vault's own user", () => {
     })
   })
 
-  it("passes on the component's refusal of a box it has no room for, as it came", async () => {
+  it("passes on the component's answer to a box it has no room for, as it came, with how full the vault is", async () => {
     const CVX = await seeded()
     const asU1 = CVX.withIdentity({ subject: 'u1' })
     for (let ii = 0; ii < 8; ii++) {
       await asU1.mutation(api.safebyok.putBox, { scope: u1, box: TH.heavyBox(`heavy_${String(ii)}`, 900_000), expected: TH.noBoxYet })
     }
-    const refusal = await TH.convexRefusalOf(asU1.mutation(api.safebyok.putBox, { scope: u1, box: TH.heavyBox('one_too_many', 200_000), expected: TH.noBoxYet }))
-    expect(refusal).to.deep.equal({ kind: 'vault_full', message: 'This vault is full: remove a box to make room, then try again.' })
+    const answer = await asU1.mutation(api.safebyok.putBox, { scope: u1, box: TH.heavyBox('one_too_many', 200_000), expected: TH.noBoxYet })
+    expect(answer).to.deep.include({ landed: false, refusalkind: 'vault_full' })
+    expect(answer).to.have.nested.property('capacity.boxes.used', 9)
+    expect(await asU1.query(api.safebyok.getCapacity, { scope: u1 })).to.deep.equal((answer as { capacity: unknown }).capacity)
   })
 
-  it("resolves a failed expectation null, not as a refusal", async () => {
+  it("resolves a failed expectation as why it failed, with the box that stands, not as a refusal", async () => {
     const CVX = await seeded()
     const stale = { vault_id: 'vault-id-u1', revision_tok: 'rev-a0', vault_key_epoch: 1 }
-    expect(await CVX.withIdentity({ subject: 'u1' }).mutation(api.safebyok.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a2'), expected: stale })).to.be.null
+    const answer = await CVX.withIdentity({ subject: 'u1' }).mutation(api.safebyok.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a2'), expected: stale })
+    expect(answer).to.deep.include({ landed: false, refusalkind: 'stale_write' })
+    expect(answer).to.have.nested.property('box_stored.revision_tok', 'rev-a1')
+    expect(answer).to.have.nested.property('box_stored.whisper_ciphered')
   })
 
   it("resolves a box write that lands with the box as stored", async () => {
     const CVX = await seeded()
     const over = { vault_id: 'vault-id-u1', revision_tok: 'rev-a1', vault_key_epoch: 1 }
-    expect(await CVX.withIdentity({ subject: 'u1' }).mutation(api.safebyok.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a2'), expected: over })).to.deep.equal(TH.boxOf('anthropic_api_key', 'a2'))
+    expect(await CVX.withIdentity({ subject: 'u1' }).mutation(api.safebyok.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a2'), expected: over })).to.deep.equal({ landed: true, box_stored: TH.boxOf('anthropic_api_key', 'a2') })
   })
 })
 

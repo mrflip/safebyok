@@ -146,8 +146,8 @@ of the above supplies it.
 * `safebyok/browser` -- `browserOpts({ dbName }?)`: the pinned Argon2id key deriver
   (`argon2idWebV1Deriver`), the IndexedDB device store (`idbDeviceDB`) and the passphrase
   strength checker (`zxcvbnStrengthChecker`), as a bag of options. The checker's zxcvbn
-  dictionary loads, as a chunk of its own, only when a passphrase is first checked (see *A new
-  passphrase's strength*).
+  dictionary loads, as a chunk of its own, at the vault's first `hello()`, never at import (see
+  *A new passphrase's strength*).
 * `safebyok/idb` -- the IndexedDB device store, `idbDeviceDB`, and `inspectIdbDeviceDB`, a raw
   window onto its rows for a debug panel. The IndexedDB vault store, `idbVaultDB`, is a package
   of its own, `safebyok-indexeddb`.
@@ -619,14 +619,16 @@ the vault: the read that finds it succeeds, and `onBadNews` is told `damaged_way
 vault.getSnapshot().passphrase    // { wayinkind: 'passphrase', device_id: 'k3x9...', registered_at: 1760000000000 }
 vault.getSnapshot().passkey       // null, until one is put
 
-await vault.putWayin(passphrase, newPassphrase)   // the passphrase replaced, stamped afresh: this device, now
+await vault.putWayin(passphrase, newPassphrase)   // the passphrase replaced, stamped afresh: this device, now; any passkey removed
 await vault.putWayin(passphrase, passkeyAnswer)   // the passkey put, replacing any (below)
 await vault.delWayin(passphrase)                  // the passkey removed; the passphrase always stays
 ```
 
-Each resolves the vault, unlocked, its lease starting again from now (`tryPutWayin` and
-`tryDelWayin` resolve the same as an `Outcome`). Each refuses, changing nothing: `wrong_passphrase`
-for a `passphrase` that does not open the vault; `weak_passphrase` for a new passphrase the
+`putWayin` resolves the new way in as stored, its summary, as the snapshot's `passphrase` or
+`passkey` now shows it; `delWayin` resolves the vault. Each leaves the vault unlocked, its lease
+starting again from now (`tryPutWayin` and `tryDelWayin` resolve the same as an `Outcome`). Each
+refuses, changing nothing: `wrong_passphrase`
+for a `passphrase` that does not open the vault, or is blank; `weak_passphrase` for a new passphrase the
 `strengthChecker` finds weak, or a blank one; `bad_option` for a passkey's answer as the proof,
 or a new one over anything but a fresh salt; `damaged_wayin` when the passphrase is stored damaged;
 `absent_wayin` from `delWayin` on a vault with no passkey; and `stale_write` when another device
@@ -637,6 +639,10 @@ changed the vault meanwhile.
   a way in. Only the standing passphrase proves a change -- a new passphrase, a passkey put or
   removed -- never a passkey's answer, which is refused `bad_option`: this is how it is done
   everywhere else. A passkey opens the vault; it does not change who may.
+* **One passphrase, and a passkey matched to it.** A vault always has its passphrase, and at most
+  one passkey, added by proving the passphrase. A new passphrase removes the passkey with the old
+  one: the user adds a passkey again, proving the new passphrase. Warn them before they change it
+  ("your passkey will be removed; add it again afterwards").
 * **Every change locks the other devices.** It moves the vault props' `unlock_epoch`, so each
   other device falls back to `locked` and must unlock again. This device stays unlocked.
 * **An unlock tries the one passphrase**: one key derivation, about 0.6 s with the browser's
@@ -650,7 +656,8 @@ changed the vault meanwhile.
 Every passphrase about to become a way in -- the one the first `unlock()` creates the vault
 with, and each `putWayin()` sets -- is put to the vault's
 `strengthChecker` first, before any key derivation. One it finds weak is refused with kind
-`weak_passphrase`, the checker's reason the message. An `unlock()` of a vault that stands is never
+`weak_passphrase`, the checker's reason the message; a blank one is refused so before the checker
+hears it. An `unlock()` of a vault that stands is never
 refused for weakness: a passphrase already in use is the user's to change, not the vault's to
 lock them out with.
 
@@ -665,24 +672,24 @@ await zxcvbnStrengthChecker('skylarkpinecone', { applabel: 'skylark', user_id: '
 ```
 
 * **The core's default refuses every passphrase.** Leave `strengthChecker` out and every new
-  passphrase is refused as too weak, so no vault can be made until you choose a checker, and the
-  vault says so once, through your logger, pointing at
-  [CUSTOMIZATION.md](CUSTOMIZATION.md#pluggable-passphrase-strength-checker). A checker of length
+  passphrase is refused as too weak, so no vault can be made until you choose a checker. The
+  refusal's message says so, to the user and to you, pointing at
+  [CUSTOMIZATION.md](CUSTOMIZATION.md#pluggable-passphrase-strength-checker); nothing is logged.
+  A checker of length
   alone is no checker -- 'a' and eleven spaces is twelve characters -- so the core offers none.
-  `parseStrengthChecker` is `Vault.make`'s own check, for a wrapper that takes the options apart.
 * **In a browser, `browserOpts()` brings `zxcvbnStrengthChecker`.** It asks for at least
   `MinPassphraseChars` (12) characters, each Unicode code point counting one, and then a zxcvbn
   score of at least `MinZxcvbnScore` (3 of 4), through `@zxcvbn-ts/core` and its common-password
   dictionary: it turns away common passwords and ones very like them, keyboard walks, repeats,
   sequences, dates, and the vault's own names. No composition rules (a digit, a capital, a
   symbol): NIST SP 800-63B advises against them, as they make a passphrase harder to remember and
-  no harder to guess. Its dictionary is about 214 kB (minified and brotlied), so the checker
-  loads it with a dynamic `import()` at its first call, and a bundler splits it into a chunk of
-  its own: a page that never chooses a passphrase never fetches it. It answers through a promise,
-  in a few milliseconds after that first load. Without its dictionary it cannot tell a common
-  password from a good one, so if the load fails (the network dropped) it answers weak, its reason
-  saying to try again shortly; the vault refuses the new passphrase with `weak_passphrase`, making
-  nothing, and the next call loads again.
+  no harder to guess. Its dictionary is about 214 kB (minified and brotlied), which a bundler
+  splits into a chunk of its own, fetched with a dynamic `import()` by the checker's `load`: the
+  vault's `hello()` runs it, so a page that never opens a vault never fetches it. It answers
+  through a promise, in a few milliseconds once loaded. Without its dictionary it cannot tell a
+  common password from a good one, so a load that fails (the network dropped, the chunk was left
+  out of the build) fails the hello, `unexpected_error` with the load's error as its cause, and
+  the vault reads nothing; the next hello loads again.
 * **The checker hears the vault's scope.** It is called as `strengthChecker(passphrase, scope)`, `scope` the
   vault's `{ applabel, user_id, vaultlabel }`: words a guesser who knows the user tries first.
   `zxcvbnStrengthChecker` hands each name, whole and split into its runs of letters and digits, to
@@ -690,20 +697,25 @@ await zxcvbnStrengthChecker('skylarkpinecone', { applabel: 'skylark', user_id: '
 * **Your own checker** replaces it: pass it after the spread. It is any function from the passphrase
   (and the scope) to a verdict, `{ strong: true }` or `{ strong: false, reason }`, at once or as a
   promise; the reason is shown to the user, so write it calmly, say what to do, and never quote the
-  passphrase. To ask for more, wrap ours:
-  `async (typed, scope) => (typed.includes('acme') ? { strong: false, reason: 'Leave out the name of the app.' } : await zxcvbnStrengthChecker(typed, scope))`.
-  Its whole contract is that verdict: what it cannot judge, it answers weak, with a reason.
-  `Vault.make` refuses anything but a function, and a checker that answers anything but a verdict,
-  with `bad_option`; one that throws is refused `unexpected_error`, carrying nothing of what it
-  threw, as it heard the passphrase. CUSTOMIZATION.md says how to choose one.
+  passphrase. A checker that needs something fetched first carries it as `load`, idempotent, which
+  every `hello()` that reads storage runs beside the read; a `load` that fails fails the hello. To ask for
+  more, wrap ours, carrying its `load` along:
+  `Object.assign(async (typed, scope) => (typed.includes('acme') ? { strong: false, reason: 'Leave out the name of the app.' } : await zxcvbnStrengthChecker(typed, scope)), { load: zxcvbnStrengthChecker.load })`.
+  Its whole contract is that verdict, for every passphrase: it never throws. `Vault.make` refuses
+  anything but a function (whose `load`, if any, is a function too) with `bad_option`. The vault
+  keeps it held to its contract, and asks it as `vault.checkPassphrase(typed)`. A checker that
+  answers anything but a verdict (`bad_option`), or throws (`unexpected_error`, carrying nothing
+  of what it threw, as it heard the passphrase), is a bug: the call that asked it throws, even a
+  `try` form, for your error handler. CUSTOMIZATION.md says how to choose one.
 * **Build it once.** The vault keeps the checker it was opened with for its life. A binding that
   reopens on a changed option (`safebyok-react`'s provider) reopens for a new checker, so define it
   at module level, or memoize it, rather than writing it inline.
-* **Call it from the field as well.** A strength checker is a plain function of the passphrase and
-  the scope, with no vault behind it, so the field the user types into can call the very same one
-  on each keystroke, and show the reason before the user submits: `safebyok-react`'s dialog does
-  so by default. It hears the passphrase in plain text, so it must run on the device and keep
-  nothing: never send it to a server, log it, or let an error tracker capture it.
+* **Call it from the field as well, through the vault.** The field the user types into can ask
+  `vault.checkPassphrase(typed)` on each keystroke, and show the reason before the user
+  submits: the same check, held to the same contract, so the field and Create decide alike (a
+  blank passphrase is weak without the checker hearing it). `safebyok-react`'s dialog does so by
+  default. It hears the passphrase in plain text, so it must run on the device and keep nothing:
+  never send it to a server, log it, or let an error tracker capture it.
 
 ## Fingerprint unlock (passkeys)
 
@@ -732,7 +744,8 @@ await vault.delWayin(passphrase)                                // the passkey i
 * **One passkey per vault.** Putting one replaces the passkey the vault had, if any: the snapshot's
   `passkey` says which it is, when it was added and from which device, so warn the user before
   asking ("this replaces the passkey added on 3 Oct from another device"). Putting the same
-  passkey again mends one stored damaged.
+  passkey again mends one stored damaged. A new passphrase removes the passkey: it was matched to
+  the old one, and the user adds it again under the new.
 * **Putting or removing one asks for the passphrase**, as every change to the ways in does; a
   passkey's answer proves neither. The passkey is made before the passphrase is checked, so a
   mistyped passphrase leaves the new passkey on its authenticator, a way into nothing: the user
@@ -792,12 +805,13 @@ nearest error boundary, and hands a condition down as `useOpenError()`'s `openEr
 | --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |
 | `bad_label`           | a label (or the `userId`) that fails the vault's check: `Label` (or `UserId`) by default, or the host's own in `validators` | Pass labels the app chose; check a user-typed one first with the same check |
 | `bad_whisper`         | a whisper JSON cannot carry (`undefined`, a function, a class instance) | Store plain JSON; to empty a box, `delBox` it |
-| `bad_option`          | an option or argument out of its range: a `Vault.make` option, or one it does not take, an `argon2idDeriver` spec, a `putBox()`'s sidecar, a passphrase or callback of the wrong type; a passkey's answer of the wrong shape; an event handed to `hello()` or `ensureLease()` as its options; a `Box` or proof made by a second copy of safebyok loaded beside this one | Fix the call; the message names what it takes. For a second copy, load safebyok once |
-| `bad_record`          | a record or expectation handed to a `VaultDB` verb that is not one this package builds: a malformed box or vault props, a name in one below the floor and a store handed no box at all included, an expectation missing a field, or a record and its expectation that disagree about the `vault_id` or `vault_key_epoch` (a name handed to a verb on its own or in a scope is `bad_label`, and so is a name the floor admits but longer than the storage holds, in a record or not) | A bug in a hand-built record or a custom adapter's caller: hand a `VaultDB` only the records and expectations a vault builds; the message names which |
+| `bad_option`          | an option or argument out of its range: a `Vault.make` option, or one it does not take, an `argon2idDeriver` spec, a `putBox()`'s sidecar, a passphrase or callback of the wrong type; a passkey's answer of the wrong shape; an event handed to `hello()` or `ensureLease()` as its options | Fix the call; the message names what it takes |
+| `bad_record`          | a record or expectation handed to a `VaultDB` verb that is not one this package builds: malformed vault props, a name in them below the floor included, an expectation missing a field, or vault props and their expectation that disagree about the `vault_id` (a box is `invalid_box`; a name handed to a verb on its own or in a scope is `bad_label`, and so is a name the floor admits but longer than the storage holds, in a record or not). A vault says a box its `VaultDB` refused as `invalid_box` as this | A bug in a hand-built record or a custom adapter's caller: hand a `VaultDB` only the records and expectations a vault builds; the message names which |
+| `invalid_box`         | a box handed to a `VaultDB`'s `putBox` that is not one this package builds -- malformed, a name in it below the floor, or no box at all -- or one sealed under another vaultKey than its expectation names; storage's word, from a `VaultDB` called directly: a vault built the box, and says `bad_record` | A bug in a hand-built box or a custom adapter's caller: hand `putBox` only the boxes a vault seals |
 | `vault_closed`        | the vault handle was closed                                      | Open the vault again; do not use a handle after `close()` |
 | `unknown_key_deriver` | the vault names a key deriver this handle was not built with     | Update safebyok, or open the vault with the deriver that made it |
 | `insecure_context`    | `Vault.make` in a page that is not a secure context: served over plain http from anywhere but localhost, where the browser withholds WebCrypto | Serve the app over https |
-| `unexpected_error`    | something threw that is no refusal: a bug, in safebyok or in a function the app handed it (a key deriver that throws something other than a `VaultError` condition, or a `strengthChecker` that throws at all). What a key deriver threw is its `cause`; what a strength checker threw is left out entirely, kind, meta and cause; the vault never logs either, as such a function was handed a passphrase | Do not retry; read the `cause`, and fix the function, or report the bug |
+| `unexpected_error`    | something threw that is no refusal: a bug, in safebyok or in a function the app handed it (a key deriver that throws something other than a `VaultError` condition, a `strengthChecker` that throws at all, or its `load` failing at `hello()`). What a key deriver threw is its `cause`; what a strength checker threw is left out entirely, kind, meta and cause; the vault never logs either, as such a function was handed a passphrase. What a checker's `load` threw is its `cause`, as it heard nothing | Do not retry; read the `cause`, and fix the function, or report the bug |
 
 ### Conditions: handle them at run time
 
@@ -808,7 +822,7 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `vault_locked`        | the vault is locked and no proof came: the `getProof` prompt was declined, there is no `getProof`, or a lock won while the call ran | Nothing to retry: the user said no, or locked it. With no `getProof`, ask for the passphrase and `unlock()`, then call again |
 | `wrong_passphrase`    | the passphrase did not unlock the vault, or was empty. A passphrase wayin altered in storage refuses its passphrase in just the same way, so the message says that the stored vault may be damaged | Ask again, with a hint to check for typos. If your handling says "check for typos", treat `created_elsewhere` alongside it, with its own advice |
 | `created_elsewhere`   | a first `unlock()` on an `absent` vault lost a race: another device created the vault between this one's look at storage and its write, and the passphrase given does not open that vault. Nothing was created here, and the vault now shows `locked` as the other device made it. A passphrase that does open it unlocks as usual | Show the message as advice, not as a typo: the user enters the passphrase chosen on the other device |
-| `weak_passphrase`     | a new passphrase -- the one the first `unlock()` creates the vault with, or one `putWayin()` sets -- that the vault's `strengthChecker` finds too easy to guess, or a blank one handed to `putWayin()` (a blank one to `unlock()` is `wrong_passphrase`). The message is the checker's own reason. Never raised by an `unlock()` of a vault that stands | Show the message beside the field, and ask for another |
+| `weak_passphrase`     | a new passphrase -- the one the first `unlock()` creates the vault with, or one `putWayin()` sets -- that the vault's `strengthChecker` finds too easy to guess, or a blank one (a blank one offered as proof, to unlock a vault that stands or to prove a change, is `wrong_passphrase`). The message is the checker's own reason. Never raised by an `unlock()` of a vault that stands | Show the message beside the field, and ask for another |
 | `wrong_passkey`       | the passkey's answer did not unlock the vault, or answered for another salt. An answer for the wayin's own salt that does not open it most likely means the wayin was altered in storage, and the message says so | Ask for the passphrase; if it works, the user may add the passkey again, which replaces it |
 | `passkey_unavailable` | this browser or authenticator cannot answer for a passkey unlock: no WebAuthn, or no PRF extension | Offer the passphrase instead; on `createPasskey`, tell the user this device cannot be a fingerprint unlock |
 | `absent_box`          | no box under that label                                      | Offer to create it, or refresh the list: it may have been deleted elsewhere |
@@ -816,9 +830,10 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `absent_wayin`        | a passkey was asked for -- to unlock with, or to remove -- and the vault has none: it may have been removed on another device | Offer the passphrase; the snapshot's `passkey` is null |
 | `whisper_too_large`   | a whisper over the vault's `maxWhisperBytes`                     | Tell the user it is too large; a host that means to allow more passes a larger `maxWhisperBytes` |
 | `box_too_large`   | a box -- its whisper, sidecar and boxlabel together, as the UTF-8 bytes of its JSON -- over its storage's `maxRecordBytes`; only a host whose validators admit long names, or a backend with small records, meets it | Tell the user to store a smaller whisper or sidecar |
-| `vault_full`          | a new box in a vault already holding its `maxBoxes`, a new box whose names would take the vault past its storage's `maxVaultBytes`, or a write the storage backend has no room for | Tell the user to remove a box first; the host may raise `maxBoxes` where the backend allows |
+| `vault_full`          | a new box in a vault already holding its `maxBoxes`, a new box whose names would take the vault past its storage's `maxVaultBytes`, or a write the storage backend has no room for | Tell the user to remove a box first; the host may raise `maxBoxes` where the backend allows. The backend's own refusal carries how full it reckons the vault as `meta.capacity` |
 | `corrupt_record`      | a stored record failed validation as storage read it back: storage's own word, from a `VaultDB` called directly. A vault call says what it means for the vault instead, as one of the three below -- but for a `putBox()` whose storage adapter answered its write with a record that fails its checks, or a `delBox()` whose adapter answered in a shape this package does not know: a bug in that adapter | Nothing was changed, unless a write was answered so: then it may have landed. Do not retry; see a developer: the record is damaged, was moved, or came from a newer safebyok, or the adapter cannot read back what it writes or reports |
-| `stale_write`         | storage changed since this device read it, so the write was refused and nothing was written: another device or tab wrote, created or deleted the box a `putBox()` was writing; a `delBox()` into a vault deleted or made anew elsewhere, its message saying the box could not be removed because its vault is gone; and a write whose catch-up with storage then failed too (its `cause` says why; the snapshot reads `syncing: false`) -- unless the catch-up was refused as `identity_revoked`, `rolled_back` or `newer_format`, which the write throws as it came | The vault has caught up: show what stands now and, if the change still applies, repeat it (*Two devices storing at once*, below). Nothing is tried again by itself |
+| `stale_write`         | storage changed since this device read it, so the write was refused and nothing was written: another device or tab wrote, created or deleted the box a `putBox()` was writing; a `delBox()` into a vault deleted or made anew elsewhere, its message saying the box could not be removed because its vault is gone; and a write whose catch-up with storage then failed too (its `cause` says why; the snapshot reads `syncing: false`) -- unless the catch-up was refused as `identity_revoked`, `rolled_back` or `newer_format`, which the write throws as it came | The vault has caught up: show what stands now and, if the change still applies, repeat it (*Two devices storing at once*, below). A `putBox()`'s refusal carries the box that won as `meta.box_stored`. Nothing is tried again by itself |
+| `vault_mismatch`      | a box write met vault props other than the ones it was sealed for: the vault deleted, made anew under another `vault_id`, or its vaultKey replaced, on another device. Storage's word, from a `VaultDB`'s `putBox` called directly; nothing was written | The device that sealed the box is out of date: read the vault again (`hello()`), and unlock the vault that stands now before writing |
 | `not_permitted`       | the storage backend refused the signed-in user, still the vault's own, this one call | Tell the user they may not; signing in again will not help |
 | `storage_unavailable` | the storage backend could not be reached, or failed; or this device's own store failed for a reason that may pass | Try again shortly; the adapter's own error is the `cause`, unless it may quote the call (Convex's) |
 | `storage_blocked`     | this device's own store (its device store, or a vault kept on the device, as `safebyok-indexeddb`'s) refused for a reason that holds until something outside the app changes: the browser withholds storage from the page (site data blocked, a sandboxed frame), has no room for it (a quota of zero, as some private windows give, or a full disk), or offers no IndexedDB at all | Do not offer a retry: tell the user this browser is keeping the app from storing anything on this device. The app may open the vault again with `memoryDeviceDB()`, which keeps no lease here; the browser's own error is the `cause` |

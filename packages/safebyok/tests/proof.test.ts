@@ -2,7 +2,8 @@ import { inspect } from 'node:util'
 import { describe, expect, it, vi } from 'vitest'
 import { deriveWrappingKey, fromB64, makeVaultKey, toB64, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
 import type { KeyDeriver } from '../src/key-deriver'
-import { PasskeyProof, PassphraseProof, Proof, type ProofVault } from '../src/proof'
+import { PasskeyProof, PassphraseProof, Proof, checkSaltShape, type ProofVault } from '../src/proof'
+import { type StrengthChecker, guardStrengthChecker } from '../src/passphrase-strength'
 import type { PasskeyAnswer } from '../src/types'
 import { Wayin } from '../src/wayin'
 import * as TH from './test-helpers'
@@ -48,11 +49,16 @@ describe("Proof.parse", () => {
     expect(proof).to.include({ kind: 'passkey', credentialId: answer.credentialId, prfSaltB64: answer.prfSaltB64 })
   })
 
-  it("refuses a blank passphrase as wrong_passphrase without a derivation, as its third example shows (Contract: Proof, Guarantees)", () => {
+  it("refuses a passkey's answer short of its fields as bad_option, as its third example shows", () => {
+    TH.expectSyncRefusal(() => Proof.parse(slice, { credentialId: 'abc' }), 'bad_option')
+  })
+
+  it("takes a blank passphrase as a proof, deriving nothing: its use says what it is refused as", () => {
     const { keyDeriver, derivations } = countingDeriver()
     for (const blank of ['', ' '.repeat(3), '\t\n']) {
-      const err = TH.expectSyncRefusal(() => Proof.parse(sliceWith(keyDeriver), blank), 'wrong_passphrase')
-      expect(err.message).to.include("can't be empty")
+      const proof = Proof.parse(sliceWith(keyDeriver), blank)
+      expect(proof).to.be.instanceOf(PassphraseProof)
+      expect(proof).to.include({ isBlank: true })
     }
     expect(derivations).not.toHaveBeenCalled()
   })
@@ -73,6 +79,14 @@ describe("Proof.parse", () => {
       expect(JSON.stringify({ message: err.message, cause: err.cause }), blurb).to.not.include(answer.credentialId)
     }
   })
+
+  it("refuses a proof made by another copy of safebyok as bad_option, as it refuses any answer of the wrong shape", async () => {
+    vi.resetModules()
+    const other = await import('../src/proof')
+    const theirs = other.Proof.parse(slice, 'pw')
+    expect(theirs).to.not.be.instanceOf(Proof)
+    TH.expectSyncRefusal(() => Proof.parse(slice, theirs), 'bad_option')
+  })
 })
 
 describe("PassphraseProof.parse", () => {
@@ -90,7 +104,66 @@ describe("PassphraseProof.parse", () => {
 
   it("keeps the passphrase as typed, spaces and all", () => {
     expect(PassphraseProof.parse(slice, '  padded  ').passphrase).to.eq('  padded  ')
+    expect(PassphraseProof.parse(slice, '  padded  ').isBlank).to.be.false
   })
+})
+
+/** The slice of a vault whose strength checker is `strengthChecker`, held to its contract as a vault holds it. */
+const sliceChecking = (strengthChecker: StrengthChecker): ProofVault => ({ ...slice, checkPassphrase: guardStrengthChecker(strengthChecker, TH.scopeOf('u1')) })
+
+describe("passphraseProof.checkStrongEnough", () => {
+  it("refuses a passphrase its vault's checker finds weak as weak_passphrase, the reason its message, as its example shows", async () => {
+    const proof = PassphraseProof.parse(sliceChecking(() => ({ strong: false, reason: 'Add a few more words.' })), 'short')
+    const err = await TH.expectRefusal(proof.checkStrongEnough(), 'weak_passphrase')
+    expect(err.message).to.eq('Add a few more words.')
+  })
+
+  it("passes a passphrase its vault's checker finds strong, handing the checker the vault's scope", async () => {
+    const checker = vi.fn<StrengthChecker>(() => ({ strong: true }))
+    await PassphraseProof.parse(sliceChecking(checker), 'correct horse battery staple').checkStrongEnough()
+    expect(checker).toHaveBeenCalledWith('correct horse battery staple', TH.scopeOf('u1'))
+  })
+
+  it("refuses a blank passphrase as weak_passphrase before its vault's checker hears it", async () => {
+    const checker = vi.fn<StrengthChecker>(() => ({ strong: true }))
+    for (const blank of ['', ' '.repeat(3), '\t\n']) {
+      const err = await TH.expectRefusal(PassphraseProof.parse(sliceChecking(checker), blank).checkStrongEnough(), 'weak_passphrase')
+      expect(err.message).to.include("can't be empty")
+    }
+    expect(checker).not.toHaveBeenCalled()
+  })
+
+  it("asks the checker the vault has now: it calls back to its vault, never a checker of its own", async () => {
+    const checking = { ...slice, checkPassphrase: guardStrengthChecker(() => ({ strong: true }), TH.scopeOf('u1')) }
+    const proof = PassphraseProof.parse(checking, 'pw')
+    checking.checkPassphrase = guardStrengthChecker(() => ({ strong: false, reason: 'Not today.' }), TH.scopeOf('u1'))
+    await TH.expectRefusal(proof.checkStrongEnough(), 'weak_passphrase')
+  })
+})
+
+/** Salts no new passkey's way in is sealed over. */
+const SaltShapeCases = [
+  [toB64(new Uint8Array(16)), 'a salt of 16 bytes, not 32'],
+  ["not base64url!",          'a salt that is not base64url'],
+] as const
+
+describe("checkSaltShape", () => {
+  it("passes an answer over a fresh 32-byte salt, as its first example shows", async () => {
+    const answer = await TH.passkeyOf('laptop')
+    expect(() => { checkSaltShape(PasskeyProof.parse(slice, answer)) }).to.not.throw()
+  })
+
+  it("refuses an answer over a salt too short as bad_option, as its second example shows", async () => {
+    const answer = await TH.passkeyOf('laptop', 'c2hvcnQ')
+    TH.expectSyncRefusal(() => { checkSaltShape(PasskeyProof.parse(slice, answer)) }, 'bad_option')
+  })
+
+  for (const [prfSaltB64, blurb] of SaltShapeCases) {
+    it(`refuses an answer over ${blurb} as bad_option, naming createPasskey`, async () => {
+      const answer = await TH.passkeyOf('laptop', prfSaltB64)
+      expect(() => { checkSaltShape(PasskeyProof.parse(slice, answer)) }).to.throw(/createPasskey/).with.property('refusalkind', 'bad_option')
+    })
+  }
 })
 
 describe("PasskeyProof.parse", () => {
@@ -200,9 +273,6 @@ describe("passkeyProof.wayinKeyFor", () => {
   })
 })
 
-/** What a way in is stamped with: its vaultKey epoch, and the device and time that sealed it. */
-const stamp = { vault_key_epoch: 1, device_id: 'device-one', registered_at: Date.UTC(2026, 9, 15) }
-
 /** A deriver whose handed-back bytes the test keeps hold of, to look at after the proof is through with them. */
 const keepingDeriver = () => {
   const handed: Uint8Array[] = []
@@ -232,7 +302,7 @@ describe("a key deriver's bytes", () => {
 
   it("are zeroed after every try when opening, a wrong passphrase's included", async () => {
     const identity = TH.vaultPropsOf('u1')
-    const { wayin: sealed } = await Wayin.seal(slice, PassphraseProof.parse(slice, 'first'), identity, stamp, await makeVaultKey())
+    const sealed = await Wayin.seal(slice, identity, PassphraseProof.parse(slice, 'first'), 'device-one', await makeVaultKey())
     const { keyDeriver, handed } = keepingDeriver()
     const opening = TH.vaultSliceOf('u1', keyDeriver)
     const wayin = Wayin.make(opening, sealed.props, identity)

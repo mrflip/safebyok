@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { Vault, type Ask, type GetProof, type ProofAnswer, parseStrengthChecker, checkValidators, delDamagedVault as delStoredDamagedVault, isCondition, isVaultError, parseLogger, type BadNewsHandler, type MakeVaultOpts, type StrengthChecker, type VaultDB, type VaultError, type VaultLogger, type VaultScope, type VaultSnapshot, type VaultValidators } from 'safebyok'
+import { Vault, type Ask, type GetProof, type ProofAnswer, checkValidators, delDamagedVault as delStoredDamagedVault, isCondition, isVaultError, parseLogger, type BadNewsHandler, type MakeVaultOpts, type VaultDB, type VaultError, type VaultLogger, type VaultSnapshot, type VaultValidators } from 'safebyok'
 import { PassphraseModal, type PassphraseAdvice } from './passphrase-modal'
 
 // == [Hooks]: useVault, useVaultSnapshot, useOpenError, OpenErrorShape
@@ -117,7 +117,7 @@ export const useVaultSnapshot = (): VaultSnapshot | null => {
 export const useOpenError = (): OpenErrorShape => useProvided('useOpenError').opened
 // --
 
-// == [VaultProvider]: VaultProviderProps, VaultProvider, settleLogger, adviceFrom, Showing, hasUserGesture
+// == [VaultProvider]: VaultProviderProps, VaultProvider, settleLogger, Showing, hasUserGesture
 
 /** One showing of the passphrase dialog: which one, the ask it answers, and how it answers. */
 type Showing = { round: number, ask: Ask, answer: (answer: ProofAnswer) => void }
@@ -128,8 +128,6 @@ type Showing = { round: number, ask: Ask, answer: (answer: ProofAnswer) => void 
  */
 const hasUserGesture = (): boolean => (globalThis.navigator as { userActivation?: { isActive: boolean } } | undefined)?.userActivation?.isActive !== false
 
-/** The scope of `vault`, as the strength checker is handed it. */
-const scopeOf = (vault: Vault): VaultScope => ({ applabel: vault.applabel, user_id: vault.user_id, vaultlabel: vault.vaultlabel })
 const getNotOpening = () => false
 
 /** The snapshot's trouble when it is a 'rolled_back' refusal that holds the vault opening; null otherwise. */
@@ -172,9 +170,9 @@ export type VaultProviderProps = Omit<MakeVaultOpts, 'userId'> & {
   passphraseUsername?: string | undefined
   /**
    * What to say beside the field as the user chooses a passphrase: `PassphraseModal`'s
-   * `passphraseAdvice`. Default: the `strengthChecker`'s reason for a passphrase it finds
-   * weak, and nothing for one it admits, so the user hears why before pressing Create. Like the
-   * strength checker, it hears the passphrase in plain text: keep it on the device.
+   * `passphraseAdvice`. Default: the dialog's, `vault.checkPassphrase`'s reason for a passphrase it
+   * finds weak, so the user hears why before pressing Create. Like the strength checker, it hears
+   * the passphrase in plain text: keep it on the device.
    */
   passphraseAdvice?:   PassphraseAdvice | undefined
   children:            ReactNode
@@ -191,22 +189,6 @@ const settleLogger = (logger: VaultLogger | null | undefined, vaultDB: VaultDB):
   } catch {
     // Vault.make refuses the same logger or vaultDB, and the provider throws that to the error boundary.
     return undefined
-  }
-}
-
-/**
- * The strength checker as the dialog's advice: its reason for a passphrase it finds weak, and
- * nothing for one it admits, or for one it fails to judge -- a checker that throws, or answers no
- * verdict -- which Create, running the checker again, then says as its own refusal. It runs on the
- * device, as the checker does.
- */
-const adviceFrom = (strengthChecker: StrengthChecker, scope: VaultScope): PassphraseAdvice => async (typed) => {
-  try {
-    const verdict = await strengthChecker(typed, scope)
-    return verdict.strong ? null : verdict.reason
-  } catch {
-    // Advice is a courtesy: a checker that cannot answer now ends nothing, and Create asks it again.
-    return null
   }
 }
 
@@ -263,9 +245,6 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
   const unlistedJson = JSON.stringify(Object.keys(unlisted))
   // The bag is taken apart below, so a misspelt field would be dropped unseen: refused here, as Vault.make refuses it.
   checkValidators(validators)
-  // Checked at the first render that has it, as Vault.make checks it; the vault keeps it for its life.
-  // Left out, the advice is the unchosen checker's, as the vault's refusal will be.
-  const adviser = parseStrengthChecker(strengthChecker)
   // The vault is made anew when a check changes, never for a bag rebuilt in render around the same ones.
   const applabelCheck = validators?.applabel
   const vaultlabelCheck = validators?.vaultlabel
@@ -442,7 +421,7 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
           ask={showing.ask}
           allowStartOver={allowStartOver}
           passphraseUsername={passphraseUsername}
-          passphraseAdvice={passphraseAdvice ?? adviceFrom(adviser, scopeOf(showing.ask.vault))}
+          passphraseAdvice={passphraseAdvice}
           onDone={(answer) => { endShowing(showing, answer) }}
         />
       )}

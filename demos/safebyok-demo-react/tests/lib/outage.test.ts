@@ -54,7 +54,7 @@ describe("OutageVaultDB, while up", () => {
     const store = memoryStore()
     const vaultDB = new OutageVaultDB(localVaultDB({ store }), makeOutage())
     await TH.expectingGood(vaultDB).ensureVaultProps(vaultProps)
-    await TH.expectingGood(vaultDB).putBox(scope, TH.boxOf('openai', 'two'), TH.noBoxYet)
+    await TH.expectingGood(vaultDB).putBox(scope, TH.noBoxYet, TH.boxOf('openai', 'two'))
     store.write(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), '{"not": json')
     // missing its whisper: the inner list finds it sound, and only a whole read finds it damaged
     const { whisper_ciphered: _gone, ...whisperless } = TH.boxOf('cohere', 'three')
@@ -70,7 +70,7 @@ const damagedOver = async () => {
   const outage = makeOutage()
   const vaultDB = new OutageVaultDB(localVaultDB({ store }), outage)
   await TH.expectingGood(vaultDB).ensureVaultProps(vaultProps)
-  await TH.expectingGood(vaultDB).putBox(scope, TH.boxOf('openai', 'two'), TH.noBoxYet)
+  await TH.expectingGood(vaultDB).putBox(scope, TH.noBoxYet, TH.boxOf('openai', 'two'))
   store.write(Ckeys.vaultProps(scope), JSON.stringify({ ...vaultProps, unlock_epoch: 'one' }))
   return { store, outage, vaultDB }
 }

@@ -1121,15 +1121,14 @@ describe("vault.openBox", () => {
     await TH.expectRefusal(vault.openBox({ boxlabel: 'anthropic' } as unknown as BoxRecord), 'bad_record')
   })
 
-  it("refuses a box made by another copy of safebyok as 'bad_option', naming the double load", async () => {
+  it("refuses a box made by another copy of safebyok as 'bad_record', as it refuses anything that is no box record", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox('anthropic', 'sk-fake')
     vi.resetModules()
     const { Box: OtherCopyBox } = await import('../../src/box')
     const theirs = OtherCopyBox.make(vault, await storedBoxOf(world), TH.vaultPropsOf('u1'))
-    const err = await TH.expectBad(vault.tryOpenBox(theirs), 'bad_option')
-    expect(err.message).to.include('openBox() was handed a Box made by another copy of safebyok')
+    await TH.expectBad(vault.tryOpenBox(theirs), 'bad_record')
   })
 
   it("refuses 'vault_closed' once the vault is closed", async () => {

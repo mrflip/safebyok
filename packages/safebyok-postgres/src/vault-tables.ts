@@ -1,11 +1,10 @@
-/**
- * The SQL that makes safebyok's tables in your Postgres (14 or later, in a UTF8 database): one
- * row of vault props per vault in `safebyok_vaults`, one row per box in `safebyok_boxes`,
- * each record a column to a field and its ciphered values opaque jsonb; and row-level security on,
- * with no policy, so only the tables' owner reaches them. Tables, columns and keys, and nothing
- * more: no trigger, no function, no extra table. Run it once, as a migration or at your server's start: it
- * is safe to run again. The package also ships it as `vault-tables.sql`, for a migration tool to
- * copy. Push between devices is {@link VaultNotifySql}'s, which you opt in to.
+/** The SQL that makes safebyok's tables in your Postgres, 14 or later, in a UTF8 database.
+ * Run it once, as a migration or at your server's start: it is safe to run again. The package also
+ * ships it as `vault-tables.sql`, for a migration tool to copy.
+ *
+ * It makes `safebyok_vaults`, a row of vault props per vault, and `safebyok_boxes`, a row per box:
+ * no trigger, no function, no other table. Row-level security is on with no policy, so only the
+ * tables' owner reaches them. Push between devices is {@link VaultNotifySql}'s, which you opt in to.
  *
  * @example await pool.query(VaultTablesSql)  // pg runs several statements in one query without parameters
  * @example await pglite.exec(VaultTablesSql)
@@ -67,12 +66,11 @@ ALTER TABLE safebyok_vaults ENABLE ROW LEVEL SECURITY;
 ALTER TABLE safebyok_boxes  ENABLE ROW LEVEL SECURITY;
 `
 
-/**
- * The SQL that lets a vault hear other devices' writes, which you opt in to: after every write
- * that changes a vault, a trigger notifies {@link VaultChangeChannel}, and a `listen` you hand
- * `postgresVaultDB` calls its subscribers. Run it after {@link VaultTablesSql}, once; it is safe
- * to run again. Without it nothing is pushed: a vault refreshes after its own writes, and learns
- * of another device's when it next reads. The package also ships it as `vault-notify.sql`.
+/** The SQL for an optional trigger that lets a vault hear other devices' writes.
+ * After every write that changes a vault, the trigger notifies {@link VaultChangeChannel}, and a
+ * `listen` handed to `postgresVaultDB` calls its subscribers. Run it once, after {@link
+ * VaultTablesSql}; it is safe to run again. The package also ships it as `vault-notify.sql`.
+ * Without it nothing is pushed: a vault learns of another device's writes when it next reads.
  *
  * @example await pool.query(VaultNotifySql)  // after VaultTablesSql
  * @example await pglite.exec(VaultNotifySql)
@@ -114,9 +112,8 @@ CREATE OR REPLACE TRIGGER safebyok_boxes_changed
   FOR EACH ROW EXECUTE FUNCTION safebyok_vault_changed();
 `
 
-/**
- * The channel {@link VaultNotifySql}'s trigger notifies after every write that changes a vault.
- * Its payload is the vault's scope as JSON -- applabel, user_id and vaultlabel, no record and
- * nothing ciphered -- or empty, for a scope too long for one, which every listener hears as its own.
+/** The channel {@link VaultNotifySql}'s trigger notifies after every write that changes a vault.
+ * Its payload is the vault's scope as JSON, with no record and nothing ciphered. It is empty for a
+ * scope too long for a payload, which every listener hears as its own.
  */
 export const VaultChangeChannel = 'safebyok_vault_changes'

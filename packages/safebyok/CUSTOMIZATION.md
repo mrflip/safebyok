@@ -10,17 +10,26 @@ goes to `Vault.make`'s `strengthChecker` before anything is derived or saved. A 
 checker finds weak is refused with kind `weak_passphrase`, its reason the message your user sees.
 A passphrase already in use is never checked again: `unlock()` of a vault that stands never asks.
 
-**The contract** is one answer, good or bad:
+**The contract** is one answer, good or bad, and, if the checker needs one, a load:
 
 ```ts
-type StrengthChecker = (passphrase: string, scope: { applabel: string, user_id: string, vaultlabel: string })
-  => { strong: true } | { strong: false, reason: string } | Promise<...the same>
+type StrengthChecker = {
+  (passphrase: string, scope: { applabel: string, user_id: string, vaultlabel: string }):
+    { strong: true } | { strong: false, reason: string } | Promise<...the same>
+  load?: () => void | Promise<void>
+}
 ```
 
-* Answer, never throw. A passphrase the checker cannot judge -- its word list did not load, a
-  service it asks is down -- is answered `{ strong: false, reason }`, the reason saying what to
-  do. A checker that throws is refused `unexpected_error`, and nothing of what it threw is kept:
-  it heard the passphrase, so its error might quote it.
+* Answer, never throw. A checker that throws is a bug: the call that asked it throws
+  `unexpected_error`, even a `try` form, for your error handler, and nothing of what the checker
+  threw is kept: it heard the passphrase, so its error might quote it. A checker that answers
+  anything but a verdict is thrown the same way, as `bad_option`.
+* Whatever it needs fetched or built first -- a word list, say -- it fetches in `load`, which the
+  vault's `hello()` runs beside its read of storage, every time it reads: so `load` is idempotent, costing
+  nothing once it has succeeded, and forgets a failure, so the next hello tries again. A `load`
+  that fails fails the hello, `unexpected_error` with what it threw as the cause: a vault that
+  cannot judge a new passphrase never opens, rather than failing later, when the user chooses one.
+* A blank passphrase (empty, or only spaces) is weak before the checker hears it.
 * The reason is for your user: calm, saying what to do, and never quoting the passphrase.
 * It runs on the device, keeps nothing, and sends nothing anywhere: it hears the passphrase in
   plain text.
@@ -29,8 +38,9 @@ type StrengthChecker = (passphrase: string, scope: { applabel: string, user_id: 
 * Build it once, at module level. The vault keeps the checker it was opened with, and
   `safebyok-react`'s provider reopens the vault for a new one.
 
-**If you choose none**, every new passphrase is refused as too weak, so no vault can be made,
-and the vault logs once, at error level, that a checker must be chosen, pointing here. That is the
+**If you choose none**, every new passphrase is refused as too weak, so no vault can be made, and
+the refusal's message says, to the user and to you, that a checker must be chosen, pointing here.
+Nothing is logged: the first passphrase anyone tries in development meets it. That is the
 contract at its plainest: the core will not guess how strong a passphrase your users need, and a
 checker of length alone is no checker ('a' and eleven spaces is twelve characters).
 
@@ -50,23 +60,27 @@ It is a good checker: at least 12 characters, then a zxcvbn score of at least 3 
 away common passwords and ones very like them, keyboard walks, repeats, sequences, dates, and the
 vault's own names, with no composition rules (NIST SP 800-63B advises against them). But it is
 useless without its dictionary. Its strength is `@zxcvbn-ts/language-common`'s common-password
-list, about 214 kB minified and brotlied, which it loads with a dynamic `import()` at its first
-check, as a chunk of its own. Without that list it cannot tell `password1234` from a good
-passphrase, so when the chunk does not load -- a dropped connection, a bundler that leaves the
-chunk out, a Content Security Policy that blocks it, an offline build -- it answers weak ("This
-passphrase couldn't be checked just now"), and no passphrase can be set until it does. Check that
-your build ships the chunk and your page may load it.
+list, about 214 kB minified and brotlied, which its `load` fetches with a dynamic `import()`, as a
+chunk of its own, at the vault's `hello()`. Without that list it cannot tell `password1234` from a
+good passphrase, so when the chunk does not load -- a dropped connection, a bundler that leaves the
+chunk out, a Content Security Policy that blocks it, an offline build -- the hello fails, loud
+and clear, and the vault does not open until a later hello loads it. Check that your build ships
+the chunk and your page may load it.
 
-To ask for more than it does, wrap it:
+To ask for more than it does, wrap it, and carry its `load` along:
 
 ```ts
 import { zxcvbnStrengthChecker } from 'safebyok/browser'
 
-const strengthChecker = async (typed: string, scope: VaultScope) => (
+const strengthChecker = Object.assign(async (typed: string, scope: VaultScope) => (
   typed.toLowerCase().includes('acme') ? { strong: false, reason: 'Leave out the name of the app.' } : await zxcvbnStrengthChecker(typed, scope)
-)
+), { load: zxcvbnStrengthChecker.load })
 const vault = Vault.make({ ...opts, ...browserOpts(), strengthChecker })
 ```
+
+A wrapper that leaves `load` behind still works -- zxcvbn loads at the first check instead -- but
+a chunk that will not load then fails that check, `unexpected_error`, as the user chooses a
+passphrase, rather than the hello.
 
 ### Your own
 
@@ -80,8 +94,9 @@ import { idbDeviceDB } from 'safebyok/idb'
 const vault = Vault.make({ ...opts, keyDeriver: argon2idWebV1Deriver, deviceDB: idbDeviceDB(), strengthChecker: myStrengthChecker })
 ```
 
-Call the same checker from your passphrase field as the user types, so they hear the reason
-before they submit; `safebyok-react`'s dialog does so by default.
+Ask the vault's checker from your passphrase field as the user types, so they hear the reason
+before they submit: `vault.checkPassphrase(typed)` is yours, held to the contract above, so
+the field and the vault decide alike. `safebyok-react`'s dialog does so by default.
 
 ### Asking an AI for help
 
@@ -91,9 +106,10 @@ blanks:
 > I'm building an app on safebyok (https://www.npmjs.com/package/safebyok), an end-to-end
 > encrypted vault for API keys and other small secrets. `Vault.make` takes a `strengthChecker`
 > option: a function `(passphrase, scope) => { strong: true } | { strong: false, reason }`, sync
-> or async, where `scope` is `{ applabel, user_id, vaultlabel }`. Its contract, from the
-> package's CUSTOMIZATION.md ("Pluggable Passphrase Strength Checker"): it answers and never
-> throws, answering weak with a reason for anything it cannot judge; the reason is shown to my
+> or async, where `scope` is `{ applabel, user_id, vaultlabel }`, and an optional idempotent
+> `load` the vault runs at `hello()` for anything it must fetch first. Its contract, from the
+> package's CUSTOMIZATION.md ("Pluggable Passphrase Strength Checker"): it answers a verdict for
+> every passphrase and never throws; the reason is shown to my
 > user, so it is calm, says what to do, and never quotes the passphrase; and it runs on the
 > device, keeping and sending nothing. Left out, every new passphrase is refused. safebyok ships
 > `zxcvbnStrengthChecker` in `safebyok/browser`, which `browserOpts()` supplies.

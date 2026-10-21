@@ -29,7 +29,8 @@ export type LocalVaultDBOpts = VaultDBOpts & {
  *   every write is one IndexedDB transaction.
  * * **No limits but a record's**: a mebibyte in one record, and none on a vault. The origin's
  *   storage quota bounds the whole store: a write past it is refused as `storage_unavailable`, the
- *   browser's own error (a `QuotaExceededError`) its cause, and nothing is written.
+ *   browser's own error (a `QuotaExceededError`) its cause, and nothing is written. Its
+ *   `getCapacity` counts the vault's boxes and weighs each as its row's JSON text, in UTF-8 bytes.
  *
  * @param opts - The `store`, and optionally a `logger`. Kind 'bad_option' for a `store` that is
  *   not a StringStore, or a `logger` that is not a VaultLogger.
@@ -118,13 +119,27 @@ class StringStoreVaultDB extends VaultDB {
     ))
   }
 
-  protected doPutBox(scope: VaultScope, box: BoxRecord, expected: BoxExpectation): Promise<unknown> {
+  // A row that is not JSON stands as its text, so a stale write names it, damaged, as the listing does.
+  protected doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<unknown> {
     return soon(() => {
       const ckey = Ckeys.box(scope, box.boxlabel)
-      const standingVaultProps = readJson(this.store, Ckeys.vaultProps(scope))
-      if (! Expectations.boxMeets(standingVaultProps, readJson(this.store, ckey), expected)) { return null }
+      const standingText = this.store.read(ckey)
+      const refusal = Expectations.boxRefusalOf(readJson(this.store, Ckeys.vaultProps(scope)), standingText === null ? null : jsonOrText(standingText), expected)
+      if (refusal) { throw refusal }
       this.store.write(ckey, JSON.stringify(box))
       return readJson(this.store, ckey)
+    })
+  }
+
+  // Each box weighs its row's text as stored, in UTF-8 bytes, against no limit: the store keeps none.
+  protected doGetCapacity(scope: VaultScope): Promise<unknown> {
+    return soon(() => {
+      const texts = this.store.ckeys()
+        .filter(Ckeys.isBoxIn(scope))
+        .map((ckey) => this.store.read(ckey))
+        .filter((text): text is string => text !== null)
+      const bytesUsed = texts.reduce((sum, text) => sum + new TextEncoder().encode(text).length, 0)
+      return { boxes: { used: texts.length, max: this.maxBoxes }, bytes: { used: bytesUsed, max: this.maxVaultBytes } }
     })
   }
 

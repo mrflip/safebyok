@@ -1,5 +1,5 @@
 // @vitest-environment node
-// The `23503` the postgres README maps to `stale_write`: a box whose vault is deleted after the
+// The `23503` the postgres README maps to `vault_mismatch`: a box whose vault is deleted after the
 // insert's statement began. PGlite cannot raise it between two statements; here one device's
 // insert is held at its foreign key check by another's uncommitted delete of the vault row, and
 // meets the foreign key's own verdict when that delete commits.
@@ -11,7 +11,7 @@ const u1 = TH.scopeOf('u1')
 
 TH.describeOnPostgres('foreign key', "postgresVaultDB's first write, over a real Postgres", () => {
   // The insert's own count sees the vault standing, so only the foreign key's `23503` can refuse it here.
-  it("refuses as stale_write a box whose vault another connection deleted while its insert waited on the foreign key, and stores nothing", async () => {
+  it("refuses as vault_mismatch a box whose vault another connection deleted while its insert waited on the foreign key, and stores nothing", async () => {
     const db = getDb()
     await db.empty()
     const device = TH.deviceOver(db, undefined, {})('u1')
@@ -20,8 +20,8 @@ TH.describeOnPostgres('foreign key', "postgresVaultDB's first write, over a real
     await eraser.query('BEGIN')
     await eraser.query("DELETE FROM safebyok_vaults WHERE user_id = 'u1'")
 
-    const write = TH.expectBad(device.putBox(u1, TH.boxOf('anthropic', 'sk-fake'), TH.noBoxYet), 'stale_write')
-    await TH.untilStatementBlocked(db, TH.FirstWriteStatement)
+    const write = TH.expectBad(device.putBox(u1, TH.noBoxYet, TH.boxOf('anthropic', 'sk-fake')), 'vault_mismatch')
+    await TH.untilBlockedBy(db, eraser)
     await eraser.query('COMMIT')
     await write
 
@@ -38,8 +38,8 @@ TH.describeOnPostgres('foreign key', "postgresVaultDB's first write, over a real
     await eraser.query('BEGIN')
     await eraser.query("DELETE FROM safebyok_vaults WHERE user_id = 'u1'")
 
-    const write = device.putBox(u1, TH.boxOf('anthropic', 'sk-fake'), TH.noBoxYet)
-    await TH.untilStatementBlocked(db, TH.FirstWriteStatement)
+    const write = device.putBox(u1, TH.noBoxYet, TH.boxOf('anthropic', 'sk-fake'))
+    await TH.untilBlockedBy(db, eraser)
     await eraser.query('ROLLBACK')
     await TH.expectGood(write)
 

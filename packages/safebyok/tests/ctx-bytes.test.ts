@@ -5,7 +5,7 @@ import { memoryDeviceDB } from '../src/device-db'
 import { memoryStore } from '../src/string-store'
 import { localVaultDB } from '../src/local-vault-db'
 import { Proof, PasskeyProof, PassphraseProof } from '../src/proof'
-import { Wayin, type WayinStamp } from '../src/wayin'
+import { Wayin } from '../src/wayin'
 import * as TH from './test-helpers'
 
 // These tests pin the exact bytes each ctx builder produces as of the current format tags, so a
@@ -22,9 +22,9 @@ import * as TH from './test-helpers'
 const textBytes = (text: string) => new TextEncoder().encode(text)
 
 const scope = TH.scopeOf('u1')
-const slice = TH.vaultSliceOf('u1')
+// A way in is stamped by its vault's clock: this one's always reads the same.
+const slice = { ...TH.vaultSliceOf('u1'), clock: { now: () => Date.UTC(2026, 9, 15) } }
 const identity = TH.vaultPropsOf('u1')
-const stamp: WayinStamp = { vault_key_epoch: 1, device_id: 'device-one', registered_at: Date.UTC(2026, 9, 15) }
 
 describe("the ctx builders' output, byte for byte", () => {
   it("cipherCtx's encoding of strings, numbers and a record with its keys sorted is pinned byte for byte", () => {
@@ -35,7 +35,7 @@ describe("the ctx builders' output, byte for byte", () => {
 
   it("a passphrase wayin's wrap is bound to the vault, the purpose and its whole header, byte for byte", async () => {
     const vaultKey = await makeVaultKey()
-    const { wayin } = await Wayin.seal(slice, PassphraseProof.parse(slice, 'pw'), identity, stamp, vaultKey)
+    const wayin = await Wayin.seal(slice, identity, PassphraseProof.parse(slice, 'pw'), 'device-one', vaultKey)
     const ctx = textBytes(
       '["safebyok-vault-v5","acme","u1","main","vault-id-u1",' + String(identity.registered_at) + ',"vault_key_passphrase_wrapped",'
       + `{"device_id":"device-one","key_deriver_label":"test_digest_v0","registered_at":${String(Date.UTC(2026, 9, 15))},"salt_b64":"${wayin.salt_b64}","vault_key_epoch":1,"wayinkind":"passphrase"}]`,
@@ -46,7 +46,7 @@ describe("the ctx builders' output, byte for byte", () => {
 
   it("a passkey wayin's wrap and its key are bound to the vault, the purpose and its whole header, byte for byte", async () => {
     const passkey = await TH.passkeyOf('laptop')
-    const { wayin } = await Wayin.seal(slice, PasskeyProof.parse(slice, passkey), identity, stamp, await makeVaultKey())
+    const wayin = await Wayin.seal(slice, identity, PasskeyProof.parse(slice, passkey), 'device-one', await makeVaultKey())
     const ctx = textBytes(
       '["safebyok-vault-v5","acme","u1","main","vault-id-u1",' + String(identity.registered_at) + ',"vault_key_passkey_wrapped",'
       + `{"credential_id":"${wayin.credential_id}","device_id":"device-one","prf_salt_b64":"${wayin.prf_salt_b64}","registered_at":${String(Date.UTC(2026, 9, 15))},"vault_key_epoch":1,"wayinkind":"passkey"}]`,

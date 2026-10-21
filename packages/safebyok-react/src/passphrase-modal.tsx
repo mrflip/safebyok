@@ -106,12 +106,20 @@ const unlockedFor = (leaseMillis: number, creating: boolean): string => {
  * React never writes what is typed into the page; a Show / Hide button reveals it, and it is
  * never capitalized, corrected or spell-checked.
  *
- * While the user chooses a passphrase, `passphraseAdvice` (if given) hears what they have typed
- * after each change, and what it answers shows beside the field, tied to it by
- * `aria-describedby` and announced politely: 'Longer is stronger: try a few unrelated words'.
- * It answers null for nothing to say, and may answer through a promise; only the answer to the
- * latest text shows. It is advice: what the vault itself refuses at creation shows as any refusal
- * does. It is never asked while unlocking.
+ * While the user chooses a passphrase, `passphraseAdvice` hears what they have typed after each
+ * change, and what it answers shows beside the field, tied to it by `aria-describedby` and
+ * announced politely: 'Longer is stronger: try a few unrelated words'. It answers null for
+ * nothing to say, and may answer through a promise; only the answer to the latest text shows.
+ * Left out, the dialog asks `vault.checkPassphrase`, and shows its reason for a passphrase it
+ * finds weak, so the advice and Create decide alike. It is advice: what the vault itself refuses
+ * at creation shows as any refusal does. It is never asked while unlocking.
+ *
+ * Advice that throws, and an attempt that throws rather than refusing (a broken strength checker),
+ * are not the dialog's to handle: the dialog throws them on to the app's error boundary, above its
+ * own. Advice of the host's that throws is reported as 'unexpected_error', carrying nothing of
+ * what it heard; the vault's own check throws a refusal that quotes nothing, which goes on as it is.
+ * Taken away by that boundary, the dialog answers `declined`, so the call that asked is refused,
+ * never left waiting.
  *
  * @example
  *   const getProof: GetProof = (ask) => new Promise((answer) => { showDialog(<PassphraseModal ask={ask} onDone={answer} />) })
@@ -132,9 +140,17 @@ const AnsweringOnce = (props: PassphraseModalProps) => {
   const { ask, onDone } = props
   const snapshot = useSyncExternalStore(ask.vault.subscribe, ask.vault.getSnapshot)
   const done = useAnswerOnce(ask, onDone, snapshot.state === 'unlocked')
+  // What the form threw rather than met: thrown here, above the dialog's boundary, for the app's.
+  // Wrapped, so that a failure carrying any value at all still reads as "failed".
+  const [raised, setRaised] = useState<{ err: unknown } | null>(null)
+  const thrownOn = useRef(false)
+  const raise = useCallback((err: unknown) => { thrownOn.current = true; setRaised({ err }) }, [])
+  // Taken away by the boundary it threw to, it answers declined, so no call waits on it for good.
+  useEffect(() => () => { if (thrownOn.current) { done('declined') } }, [done])
+  if (raised !== null) { throw forBoundary(raised.err, 'PassphraseModal') }
   return (
     <Boundary fallback={<DialogTrouble onDone={done} />}>
-      <UnlockForm {...props} onDone={done} />
+      <UnlockForm {...props} onDone={done} raise={raise} />
     </Boundary>
   )
 }
@@ -159,12 +175,18 @@ export type PassphraseModalProps = {
   allowStartOver?:     boolean | undefined
   /** What a password manager files the passphrase under. Default: the user and the vault, as 'u1 (main vault)'. */
   passphraseUsername?: string | undefined
-  /** What to say beside the field as the user chooses a passphrase. Default: nothing. */
+  /** What to say beside the field as the user chooses a passphrase. Default: `vault.checkPassphrase`'s reason for a weak one. */
   passphraseAdvice?:   PassphraseAdvice | undefined
 }
 
-/** The refusal for a host's `passphraseAdvice` that threw: it heard the passphrase, so nothing of its throw goes on. */
+/** The refusal for a host's `passphraseAdvice` that threw: it heard the passphrase, so nothing of what it threw goes on. */
 const adviceFailed = (thrown: unknown) => Sanitizer.refusalFor(thrown, 'unexpected_error', "The passphraseAdvice handed to the dialog threw rather than answering. What it threw is left out of this report, as it may quote the passphrase: have it answer a sentence or null, and catch its own failures.")
+
+/** The vault's own advice: `vault.checkPassphrase`'s reason for a passphrase it finds weak, and nothing for one it admits. */
+const vaultAdvice = async (vault: Ask['vault'], typed: string): Promise<string | null> => {
+  const verdict = await vault.checkPassphrase(typed)
+  return verdict.strong ? null : verdict.reason
+}
 
 /** Escape, from anywhere in a dialog, cancels it, and goes no further: a host's own Escape handler never hears it too. */
 const cancelOnEscape = (onDone: (answer: ProofAnswer) => void) => (evt: KeyboardEvent) => {
@@ -223,12 +245,13 @@ const holdsFocus = (container: HTMLElement | null): boolean => {
 }
 
 /**
- * What the host's `passphraseAdvice` last said of the text typed so far, and `hear`, which asks it
- * of a new text. Only the answer to the latest text is kept, and only the latest call's failure
- * goes to `fail`; an empty text has nothing said of it, nor has an undefined answer; what was
- * said goes when `creating` changes; and nothing comes back once the dialog has gone.
+ * What the advice last said of the text typed so far -- the host's `passphraseAdvice`, or the
+ * vault's own -- and `hear`, which asks it of a new text. Only the answer to the latest text is
+ * kept, and only the latest call's failure goes to `fail`; an empty text has nothing said of it,
+ * nor has an undefined answer; what was said goes when `creating` changes; and nothing comes back
+ * once the dialog has gone.
  */
-const useAdvice = (passphraseAdvice: PassphraseAdvice | undefined, creating: boolean, fail: (err: unknown) => void) => {
+const useAdvice = (passphraseAdvice: PassphraseAdvice | undefined, vault: Ask['vault'], creating: boolean, fail: (err: unknown) => void) => {
   const [said, setSaid] = useState<string | null>(null)
   const asked = useRef(0)
   // A change of mode -- the vault made elsewhere, or deleted -- forgets what was said (React's
@@ -244,17 +267,17 @@ const useAdvice = (passphraseAdvice: PassphraseAdvice | undefined, creating: boo
     return () => { asked.current += 1 }
   }, [creating])
   const hear = async (typed: string) => {
-    if (passphraseAdvice === undefined) { return }
     asked.current += 1
     if (typed === '') { setSaid(null); return }
     const askedNow = asked.current
     try {
       // A JavaScript host's undefined is nothing to say, as null is.
-      const answer = (await passphraseAdvice(typed)) ?? null
+      const answer = passphraseAdvice === undefined ? await vaultAdvice(vault, typed) : (await passphraseAdvice(typed)) ?? null
       if (askedNow === asked.current) { setSaid(answer) }
     } catch (err) {
-      // Only the latest call can fail the dialog: a superseded one's failure is as stale as its answer.
-      if (askedNow === asked.current) { fail(err) }
+      // Only the latest call can fail: a superseded one's failure is as stale as its answer. The
+      // vault's own check throws only a refusal that quotes nothing; the host's may quote anything.
+      if (askedNow === asked.current) { fail(passphraseAdvice === undefined ? err : adviceFailed(err)) }
     }
   }
   return { said, hear }
@@ -333,7 +356,7 @@ const useAnswerOnce = (ask: Ask, onDone: (answer: ProofAnswer) => void, unlocked
 }
 
 /** The dialog itself, inside PassphraseModal's boundary: its `onDone` is the one answer, `AnsweringOnce`'s. */
-const UnlockForm = ({ ask, onDone: done, allowStartOver, passphraseUsername, passphraseAdvice }: PassphraseModalProps) => {
+const UnlockForm = ({ ask, onDone: done, raise, allowStartOver, passphraseUsername, passphraseAdvice }: PassphraseModalProps & { raise: (err: unknown) => void }) => {
   const { vault } = ask
   const snapshot = useSyncExternalStore(vault.subscribe, vault.getSnapshot)
   const [gripe, setGripe] = useState<Gripe | null>(null)
@@ -349,8 +372,8 @@ const UnlockForm = ({ ask, onDone: done, allowStartOver, passphraseUsername, pas
   const blurbId = useId()
   // Wrapped, so that a failure carrying any value at all still reads as "failed".
   const [failure, setFailure] = useState<{ err: unknown } | null>(null)
-  // The host's advice heard the passphrase: what it threw may quote it, so none of it goes on.
-  const advice = useAdvice(passphraseAdvice, snapshot.state === 'absent', (err) => { setFailure({ err: adviceFailed(err) }) })
+  // Advice that throws is the app's to handle, never the dialog's.
+  const advice = useAdvice(passphraseAdvice, vault, snapshot.state === 'absent', raise)
   if (failure !== null) { throw forBoundary(failure.err, 'PassphraseModal') }
   const creating = snapshot.state === 'absent'
   const passkeyFirst = ! creating && offersPasskey(snapshot)
@@ -381,7 +404,15 @@ const UnlockForm = ({ ask, onDone: done, allowStartOver, passphraseUsername, pas
   const submit = async (evt: SubmitEvent) => {
     evt.preventDefault()
     setGripe(null)
-    const { ok, err } = await ask.attempt(fieldRef.current?.value ?? '')
+    let tried: Awaited<ReturnType<Ask['attempt']>>
+    try {
+      tried = await ask.attempt(fieldRef.current?.value ?? '')
+    } catch (err) {
+      // An attempt throws only what no refusal says, a broken strength checker: the app's to handle.
+      if (isMounted()) { raise(err) }
+      return
+    }
+    const { ok, err } = tried
     if (! isMounted()) { return }
     if (ok) { done('unlocked'); return }
     meet(err)
@@ -432,7 +463,7 @@ const UnlockForm = ({ ask, onDone: done, allowStartOver, passphraseUsername, pas
                 creating={creating}
                 takesFocus={! passkeyFirst}
                 username={passphraseUsername ?? Messages.passphraseUsername(snapshot.user_id, snapshot.vaultlabel)}
-                advice={creating && passphraseAdvice !== undefined ? advice.said : undefined}
+                advice={creating ? advice.said : undefined}
                 onChange={hearPassphrase}
               />
             </>

@@ -48,8 +48,33 @@ describe("Refusals.staleWrite", () => {
 
   it("says which write was refused", () => {
     expect(Refusals.staleWrite('vaultProps').message).to.include('this change was refused')
-    expect(Refusals.staleWrite('box').message).to.include('That box changed')
     expect(Refusals.staleWrite('del').message).to.include('this removal was refused')
+  })
+})
+
+describe("Refusals.staleBox", () => {
+  it("refuses a box write as stale_write, carrying what stands as meta.box_stored, as its example shows", () => {
+    const standing = { boxlabel: 'anthropic', revision_tok: 'rev-two' }
+    const refusal = Refusals.staleBox(standing)
+    expect(refusal.refusalkind).to.eq('stale_write')
+    expect(refusal.message).to.eq(Refusals.StaleBoxMessage)
+    expect(refusal.meta).to.deep.equal({ box_stored: standing })
+    expect(refusal).to.not.have.property('cause')
+  })
+
+  it("carries null when nothing stands under the boxlabel", () => {
+    expect(Refusals.staleBox(null).meta).to.deep.equal({ box_stored: null })
+  })
+})
+
+describe("Refusals.vaultMismatch", () => {
+  it("refuses as vault_mismatch, a condition, carrying no meta and no cause, as its example shows", () => {
+    const refusal = Refusals.vaultMismatch()
+    expect(refusal.refusalkind).to.eq('vault_mismatch')
+    expect(refusal.family).to.eq('condition')
+    expect(refusal).to.not.have.property('meta')
+    expect(refusal).to.not.have.property('cause')
+    expect(refusal.message).to.include('nothing was written')
   })
 })
 
@@ -74,21 +99,28 @@ describe("Refusals.notPermitted", () => {
 })
 
 describe("Refusals.vaultFull", () => {
-  it("refuses as vault_full, naming the limit met, with no cause when none is given", () => {
-    const refusal = Refusals.vaultFull(250)
+  const boxesFull = { boxes: { used: 250, max: 250 }, bytes: { used: 40_000, max: Infinity } }
+  const bytesFull = { boxes: { used: 12, max: 250 }, bytes: { used: 1_048_000, max: 1_048_576 } }
+
+  it("refuses as vault_full, carrying how full the vault is as meta.capacity, with no cause when none is given, as its first example shows", () => {
+    const refusal = Refusals.vaultFull(boxesFull)
     expect(refusal.refusalkind).to.eq('vault_full')
-    expect(refusal.message).to.eq('This vault already holds the 250 boxes its storage keeps in one vault: remove one before storing another.')
+    expect(refusal.meta).to.deep.equal({ capacity: boxesFull })
     expect(refusal).to.not.have.property('cause')
   })
 
-  it("says only that the vault is full when no count is the limit met", () => {
-    expect(Refusals.vaultFull().message).to.eq('This vault is full: remove a box to make room, then try again.')
+  it("names the count of boxes when that is the limit met", () => {
+    expect(Refusals.vaultFull(boxesFull).message).to.eq('This vault holds 250 boxes, and its storage keeps at most 250 in one vault, so nothing was written: remove a box before storing another.')
   })
 
-  it("keeps the backend's own refusal as its cause, never a null one", () => {
+  it("names the bytes when the boxes have room but the bytes have not", () => {
+    expect(Refusals.vaultFull(bytesFull).message).to.eq("This vault's boxes take 1048000 of the 1048576 bytes its storage holds of one vault, leaving no room for this one, so nothing was written: remove a box, or store a smaller one.")
+  })
+
+  it("keeps the backend's own refusal as its cause, never a null one, as its second example shows", () => {
     const overByte = new Error('over the byte limit')
-    expect(Refusals.vaultFull(undefined, { cause: overByte }).cause).to.eq(overByte)
-    expect(Refusals.vaultFull(undefined, { cause: undefined }).cause).to.be.instanceOf(Error)
+    expect(Refusals.vaultFull(bytesFull, { cause: overByte }).cause).to.eq(overByte)
+    expect(Refusals.vaultFull(bytesFull, { cause: undefined }).cause).to.be.instanceOf(Error)
   })
 })
 
@@ -148,7 +180,7 @@ describe("Refusals.isStorageBlocked", () => {
 describe("Refusals, between them", () => {
   it("quote nothing they were handed but the message an adapter writes", () => {
     const quoted = 'SUPERSECRET-ciphertext'
-    const refusals = [Refusals.staleWrite('box'), Refusals.vaultFull(3), Refusals.notPermitted(), Refusals.storageBlocked()]
+    const refusals = [Refusals.staleWrite('vaultProps'), Refusals.staleBox(null), Refusals.vaultMismatch(), Refusals.vaultFull({ boxes: { used: 3, max: 3 }, bytes: { used: 0, max: Infinity } }), Refusals.notPermitted(), Refusals.storageBlocked()]
     for (const refusal of refusals) { expect(TH.thrownText(refusal)).to.not.include(quoted) }
   })
 })

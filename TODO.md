@@ -4,6 +4,8 @@ Three shelves. **Roadmapped**: the order we build in, in flight or next, each a 
 **Side quests**: straightforward, likely to be done, not needed yet; pick one up when the roadmap
 is blocked. **Soonish**: wanted, but a design question stands in the way; the note says which.
 What is reasonable but deferred is in `NOTYET.md`: do not anticipate it in your implementation.
+**Potential Optimizations**: a user-facing rough edge the core leaves alone for now, to keep its
+control flow simple (STYLE.md, *Control flow and refusals*), with the argument for smoothing it.
 
 ## Sand in the sandals
 
@@ -85,6 +87,15 @@ Revisit before 1.0 if rotation signing every other device out is too blunt.
 `prior_vault_key` (the vaultKey before, wrapped under the current one) and the check that it sat
 one epoch below theirs. `vault_key_epoch` stays on every record, reserved at 1, with storage's
 comparison of a box's epoch against the vault props'.
+
+### "tombstone vaults; decide if the vault_id is a check -- the labels are meant to be the primary key"
+
+The Coach (2026-10-21, sprint contract, on #216's row "Rollback check and del()"): "Add a todo
+"tombstone vaults; decide if the vault_id is a check -- the labels are meant to be the primary
+key"". Today a deleted vault leaves nothing behind, and a vault is found by its labels (applabel,
+user id, vaultlabel) while `vault_id` is checked against the device's mark and on each write.
+Decide whether a deleted vault leaves a tombstone, and whether `vault_id`
+stays a check or the labels alone identify the vault.
 
 ### `del()`'s edge cases
 
@@ -176,6 +187,16 @@ dialog that fails for a reason the host could name -- a lost user gesture, a pas
 refused -- cannot say so. Decide what a `getProof` may refuse with: a `VaultError` it throws kept
 as it came (as `outcomeOf` keeps one elsewhere), a fourth answer, or a short list of kinds.
 
+### "Add "sensitive" and "host" flags to refusals"
+
+The Coach (2026-10-21, sprint contract, on a key deriver's throw riding as `cause` where the
+strength checker's carries nothing): "Leave it, we will audit these. Add todo: "Add "sensitive"
+and "host" flags to refusals"". Today each wrap of a host function decides alone: a key deriver's
+throw is its refusal's `cause`; the strength checker's, which heard the passphrase, is dropped
+whole; its `load`'s, which heard nothing, rides as `cause`. Decide the two flags -- a refusal
+that heard secret material, one whose cause is the host's own code -- and audit each wrap
+against them.
+
 ### Should `tryClose` be a promise?
 
 The Coach (2026-10-19, sprint contract): "should tryClose really be a promise." Every `try` form
@@ -229,6 +250,26 @@ damaged, where the user may delete it or store over it (only on the user's own a
 the vault). The Coach: "Yes add to TODO: version number on box." Give boxes a "newer, don't
 touch" state like the vault's `newer_format`: the format tag read as a version, so that a newer
 box lists as one to leave alone and an older, unreadable one still lists as damaged.
+
+## Potential Optimizations
+
+### A storage read begun before a create can undo it
+
+From the contract sprint's `a_sec2` ([#206](https://github.com/mrflip/safebyok/pull/206)): a
+read of the vault props that began before this device's first unlock made the vault can land after
+it, find no vault, and stand the new one down; the unlock then refuses `vault_locked`, though the
+vault it made stands, and the next read takes it up. The Coach (2026-10-21):
+
+> So: hello, in parallel, asks for props from VaultDB and DeviceDB; this makes sense, as a lot of
+> normal conditions have both. There's a known situation -- very common, important and expected --
+> where this will go badly. Namely, if the vault is new, one can conjecture that the chance of a
+> race successfully completing a healthy vault in both deviceDB and vaultDB is more than
+> theoretical, and that it would likely manifest by successfully retrieving the slower ground-truth
+> VaultDB record but no DeviceDB record. We can, with certainty, (1) identify this situation; (2)
+> guarantee that a re-fetched DeviceDB corresponds beyond doubt to the VaultDB record.
+
+For now: "apologize for bad UX, keep control flow clean". The core stays hello, then unlock, then
+the operation, with no re-fetch; the refusal says what happened and to unlock again.
 
 ## The react lifecycle
 

@@ -30,7 +30,7 @@ localStorage.
 * **Ways in** ([src/components/WaysIn.tsx](src/components/WaysIn.tsx)) -- the vault's one
   passphrase and its passkey, if it has one, shown even while locked, and buttons to change them,
   each taking your passphrase as proof: "Change passphrase" (`vault.putWayin()` with the new
-  passphrase); "Add fingerprint", or "Replace fingerprint" once there is one: `createPasskey()`
+  passphrase, which removes the fingerprint: add it again under the new passphrase); "Add fingerprint", or "Replace fingerprint" once there is one: `createPasskey()`
   makes the passkey, and `vault.putWayin()` with its answer checks your passphrase and puts it in
   the place of any the vault had, the passphrase dialog then offering "Use a passkey"; and "Remove
   fingerprint" (`vault.delWayin()`). A passkey needs a browser and authenticator with the WebAuthn PRF extension.

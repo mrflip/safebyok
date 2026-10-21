@@ -5,21 +5,19 @@ import { VaultError } from 'safebyok'
 import type { ComponentApi } from './component-api'
 import type { SafebyokErrorData } from './refusals'
 import {
-  VaultPropsExpectation, VaultDelExpectation, ListedBox, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, VaultProps, VaultScope, VaultSignature,
+  Capacity, VaultPropsExpectation, VaultDelExpectation, ListedBox, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, PutBoxAnswer, VaultProps, VaultScope, VaultSignature,
 } from './component/validators'
 
 export type { ComponentApi } from './component-api'
 export { SafebyokErrorKindVals } from './refusals'
 export type { SafebyokErrorData, SafebyokErrorKind } from './refusals'
 
-/**
- * The host app's answer to "who is calling?": the signed-in user's id, as the vault scopes it, or
- * null (or undefined, or empty) when no one is signed in. Runs first in every safebyok function.
- * To refuse a signed-in user by a rule of the app's own, it throws a `ConvexError` whose `data` is
- * `{ kind: 'not_permitted', message }` ({@link SafebyokErrorData}), which reaches the client's
- * vault as a refusal of that kind, locking nothing; `identity_revoked` likewise, which locks the
- * vault, for a user the app knows is gone. Anything else it throws is the client's
- * `storage_unavailable`, as a passing fault.
+/** The host app's answer to "who is calling?": the signed-in user's id as the vault scopes it, or null, undefined or empty for no one.
+ * It runs first in every safebyok function. To refuse a signed-in user by a rule of the app's own,
+ * it throws a `ConvexError` whose `data` is `{ kind: 'not_permitted', message }` ({@link
+ * SafebyokErrorData}), which locks nothing. `identity_revoked`, thrown likewise, locks the vault:
+ * throw it only for a user the app knows is gone. Anything else it throws reaches the client as
+ * `storage_unavailable`.
  *
  * @example async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null
  * @example
@@ -40,10 +38,9 @@ export type SafebyokApiOpts<DataModel extends GenericDataModel = GenericDataMode
   getUserId: GetUserId<DataModel>
 }
 
-/**
- * safebyok's storage on Convex, as the host app serves it: wraps the installed component
- * (`components.safebyok`) and hands back the functions the host re-exports from its own
- * `convex/` directory, each authenticating its caller through the host's {@link GetUserId}.
+/** safebyok's storage on Convex as the host app serves it: the functions the host re-exports from its own `convex/`.
+ * It wraps the installed component, `components.safebyok`, and each function authenticates its
+ * caller through the host's {@link GetUserId}.
  *
  * @example
  *   // convex/safebyok.ts
@@ -52,7 +49,7 @@ export type SafebyokApiOpts<DataModel extends GenericDataModel = GenericDataMode
  *
  *   export const {
  *     getVaultProps, ensureVaultProps, putVaultProps, getBox, listBoxSummaries,
- *     putBox, delBox, delVault, watchVault,
+ *     putBox, getCapacity, delBox, delVault, watchVault,
  *   } = new SafebyokComponent(components.safebyok).api({
  *     getUserId: async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null,
  *   })
@@ -60,10 +57,8 @@ export type SafebyokApiOpts<DataModel extends GenericDataModel = GenericDataMode
 export class SafebyokComponent {
   private readonly component: ComponentApi
 
-  /**
-   * @param component - The installed component, `components.safebyok` from the host's generated api.
-   *   Kind 'bad_option' for anything that is not an object, such as the `undefined` a forgotten
-   *   install leaves.
+  /** Wrap the installed component, `components.safebyok` from the host's generated api.
+   * Kind 'bad_option' for anything that is not an object, such as the `undefined` a forgotten install leaves.
    */
   constructor(component: ComponentApi) {
     if ((component as unknown) === null || (typeof component !== 'object' && typeof component !== 'function')) {
@@ -72,17 +67,11 @@ export class SafebyokComponent {
     this.component = component
   }
 
-  /**
-   * The nine public functions a client's `convexVaultDB` calls, one per storage verb. Each first
-   * resolves `getUserId(ctx)`, and refuses with a `ConvexError` of kind `identity_revoked` when
-   * it is null, or when the vault's `user_id` is someone else's -- the user the vault was opened
-   * for is not the one signed in, and the vault locks itself -- then it calls the component. A
-   * refusal `getUserId` throws itself goes to the client as it was thrown.
-   *
-   * @param opts - `getUserId`: who is calling, from the host's own auth.
-   * @returns The functions, to export under these names from one module of the host's `convex/`.
-   *   Kind 'bad_option', here and now rather than on the first request, for options that are not
-   *   a bag holding a `getUserId` function.
+  /** The ten public functions a client's `convexVaultDB` calls, one per storage verb.
+   * Export them under these names from one module of the host's `convex/`. Each refuses with
+   * `identity_revoked` unless `getUserId` names the vault's own `user_id`, before it calls the
+   * component. A refusal `getUserId` throws itself reaches the client as it was thrown. Kind
+   * 'bad_option' at once, not on the first request, for options with no `getUserId` function.
    */
   api<DataModel extends GenericDataModel>(opts: SafebyokApiOpts<DataModel>) {
     if (typeof (opts as Partial<SafebyokApiOpts<DataModel>> | null | undefined)?.getUserId !== 'function') {
@@ -148,11 +137,19 @@ export class SafebyokComponent {
         },
       }),
       putBox: publicMutation({
-        args:    { scope: VaultScope, box: BoxRecord, expected: BoxExpectation },
-        returns: v.nullable(BoxRecord),
+        args:    { scope: VaultScope, expected: BoxExpectation, box: BoxRecord },
+        returns: PutBoxAnswer,
         handler: async (ctx, args) => {
           await mustBe(ctx, args.scope.user_id)
           return await ctx.runMutation(vaults.putBox, args)
+        },
+      }),
+      getCapacity: publicQuery({
+        args:    { scope: VaultScope },
+        returns: Capacity,
+        handler: async (ctx, args) => {
+          await mustBe(ctx, args.scope.user_id)
+          return await ctx.runQuery(vaults.getCapacity, args)
         },
       }),
       delBox: publicMutation({
@@ -183,9 +180,8 @@ export class SafebyokComponent {
   }
 }
 
-/**
- * The host's safebyok functions as its clients reference them: the type of `api.safebyok` when
- * the host re-exports {@link SafebyokComponent.api}'s functions from `convex/safebyok.ts`.
+/** The host's safebyok functions as its clients reference them: the type of `api.safebyok`.
+ * That holds when the host re-exports {@link SafebyokComponent.api}'s functions from `convex/safebyok.ts`.
  */
 export type SafebyokApi = ApiFromModules<{ safebyok: ReturnType<SafebyokComponent['api']> }>['safebyok']
 

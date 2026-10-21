@@ -5,33 +5,23 @@ import { boxRange } from './ckeys'
 import { bellnameOf, parseDbName, type IdbVaultDBOpts } from './idb-opts'
 import { inOneTransaction, settle, withheldShelfOf } from './shelf'
 
-/**
- * safebyok's storage in this browser's IndexedDB: a VaultDB for an app with no backend, keeping
- * everything a synced backend would hold on this device instead, so its whispers are encrypted
- * at rest all the same. Nothing syncs, but the rows are exactly what a backend would store, and
- * every secret field in them is ciphertext.
+/** safebyok's storage in this browser's IndexedDB: a VaultDB for an app with no backend.
+ * It keeps on this device the rows a synced backend would hold, so whispers are encrypted at rest
+ * all the same. Nothing syncs. Nothing is opened until the first read or write.
  *
- * * **Every verb is one IndexedDB transaction**: a write lands only while what it expects still
- *   stands, even with another tab writing at the same moment, and refuses with kind
- *   `stale_write` otherwise.
+ * * **Each verb is one IndexedDB transaction**: a write lands only while what it expects stands,
+ *   even with another tab writing at the same moment.
  * * **Other tabs' writes** ring `subscribe`, over a BroadcastChannel.
- * * **No limits of its own**: IndexedDB sets none per record or per vault, so `maxRecordBytes`,
- *   `maxVaultBytes`, `maxBoxes` and `maxNameBytes` are `Infinity`; the origin's storage quota
- *   bounds the whole database.
- * * **Storage the browser withholds** -- site data blocked, a private window or frame that keeps
- *   none, no room left, or no IndexedDB at all -- refuses with kind `storage_blocked`, which a
- *   retry cannot mend; any other trouble from IndexedDB, with kind `storage_unavailable`.
- * * **Names joined on `^`** in each row's ckey (the core's `Ckeys`), which the floor keeps out of
- *   every name.
+ * * **No limits of its own**: the four `max*` limits are `Infinity`, and the origin's storage quota
+ *   bounds the whole database. `getCapacity` weighs each box as the UTF-8 bytes of its JSON.
+ * * **Storage the browser withholds** refuses with kind `storage_blocked`, which a retry cannot
+ *   mend: site data blocked, a private window or frame that keeps none, no room left, no IndexedDB.
  *
  * Browser storage is best-effort: the browser may evict it under pressure, and "clear site data"
- * removes it. An app keeping its vaults here should call `navigator.storage.persist()`, and say
- * plainly that the vault lives only in this browser.
+ * removes it. An app keeping its vaults here should call `navigator.storage.persist()`, and tell
+ * the user plainly that the vault lives only in this browser.
  *
- * @param opts - Where to keep the records: `dbName`, default 'safebyok'; and optionally a
- *   `logger`, the default logger without one (a vault opened with no logger of its own hears it too).
- * @returns The VaultDB, to hand `Vault.make`. Kind 'bad_option' for a `dbName` that is not
- *   non-empty text, or a `logger` that is not a VaultLogger. Nothing is opened until the first read or write.
+ * @returns The VaultDB, to hand `Vault.make`. Kind 'bad_option' for a `dbName` that is not non-empty text.
  *
  * @example
  *   const vault = Vault.make({ applabel: 'acme', userId, vaultlabel: 'main', vaultDB: idbVaultDB({ dbName: 'acme' }), ...browserOpts({ dbName: 'acme' }) })
@@ -91,15 +81,28 @@ class IdbVaultDB extends VaultDB {
       .filter((stored): stored is StoredBox => stored.boxlabel !== null)
   }
 
-  // The box handed back is the row as the put left it, read in the same transaction.
-  protected async doPutBox(scope: VaultScope, box: BoxRecord, expected: BoxExpectation): Promise<unknown> {
-    return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {
+  // The box handed back is the row as the put left it, read in the same transaction; a write that
+  // misses is refused from the rows that transaction read, once it has ended, writing nothing.
+  protected async doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<unknown> {
+    const { refusal, stored } = await inOneTransaction(this.shelf, async (store) => {
       const ckey = Ckeys.box(scope, box.boxlabel)
       const [standingVaultProps, standingBox] = await Promise.all([rowAt(store, Ckeys.vaultProps(scope)), rowAt(store, ckey)])
-      if (! Expectations.boxMeets(standingVaultProps, standingBox, expected)) { return null }
+      const missed = Expectations.boxRefusalOf(standingVaultProps, standingBox, expected)
+      if (missed) { return { refusal: missed, stored: null } }
       store.put(box, ckey)
-      return rowAt(store, ckey)
-    }))
+      return { refusal: null, stored: await rowAt(store, ckey) }
+    })
+    if (refusal) { throw refusal }
+    this.ring()
+    return stored
+  }
+
+  // Counted and weighed in one transaction over the scope's key range: each row as its JSON, in
+  // UTF-8 bytes, against no limit, as IndexedDB keeps none.
+  protected async doGetCapacity(scope: VaultScope): Promise<unknown> {
+    const rows = await this.shelf('readonly', (store) => settle<unknown[]>(store.getAll(boxRange(scope))))
+    const bytesUsed = rows.reduce<number>((sum, row) => sum + new TextEncoder().encode(JSON.stringify(row)).length, 0)
+    return { boxes: { used: rows.length, max: this.maxBoxes }, bytes: { used: bytesUsed, max: this.maxVaultBytes } }
   }
 
   // What it removed is the row read in the transaction that deletes it. A deletion that found
@@ -136,12 +139,12 @@ class IdbVaultDB extends VaultDB {
 
   private ring() { ChangeBell.ring(bellnameOf(this.dbName)) }
 
-  /** Rings once a write lands: `true`, or what it handed back; never for `false` or `null`, a write that did not. */
+  /** `landed`, ringing the bell unless it is `false` or `null`, a write that did not land. */
   private ringIfLanded<LandedT>(landed: LandedT): LandedT {
     if (landed !== false && landed !== null) { this.ring() }
     return landed
   }
 }
 
-/** The row standing at `ckey`, read within the transaction `store` belongs to: undefined for none. */
+/** The row at `ckey`, read in the transaction `store` belongs to, or undefined for none. */
 const rowAt = (store: IDBObjectStore, ckey: string): Promise<unknown> => settle<unknown>(store.get(ckey))

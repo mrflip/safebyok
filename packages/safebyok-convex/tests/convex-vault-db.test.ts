@@ -111,9 +111,34 @@ describe("convexVaultDB, as it is made", () => {
 const nearlyFull = async (vaultDB: ReturnType<typeof convexVaultDB>) => {
   await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
   for (let ii = 0; ii < 8; ii++) {
-    await TH.expectingGood(vaultDB).putBox(u1, TH.heavyBox(`heavy_${String(ii)}`, 900_000), TH.noBoxYet)
+    await TH.expectingGood(vaultDB).putBox(u1, TH.noBoxYet, TH.heavyBox(`heavy_${String(ii)}`, 900_000))
   }
 }
+
+/** What a component of another version might answer a box write with, and what each is. */
+const UnknownAnswers = [
+  [null,                                                     'null'],
+  [TH.boxOf('anthropic_api_key', 'a1'),                      'the bare box an older component answered with'],
+  [{ landed: 'yes', box_stored: null },                      'a landed flag that is no boolean'],
+  [{ landed: false, refusalkind: 'stale_write' },            'a stale write naming nothing standing'],
+  [{ landed: false, refusalkind: 'vault_full' },             'a full vault saying nothing of how full'],
+  [{ landed: false, refusalkind: 'quota_exceeded' },         'a refusal of a kind this client does not know'],
+] as const
+
+describe("convexVaultDB, answered by a component of another version", () => {
+  for (const [answer, blurb] of UnknownAnswers) {
+    it(`refuses a box write answered with ${blurb} as corrupt_record, saying the deployed component is out of date`, async () => {
+      const deployment = deploy()
+      const client = deployment.client('u1')
+      const vaultDB = convexVaultDB({ client, api: deployment.api.safebyok })
+      await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
+      vi.spyOn(client, 'mutation').mockResolvedValue(answer)
+      const refusal = await TH.expectBad(vaultDB.putBox(u1, TH.noBoxYet, TH.boxOf('anthropic_api_key', 'a1')), 'corrupt_record')
+      expect(refusal.message).to.match(/deployed safebyok component is out of date/)
+      expect(refusal).to.not.have.property('cause')
+    })
+  }
+})
 
 describe("convexVaultDB, refusing", () => {
   // Every verb's identity_revoked is the battery's line 5.4: these are what Convex's own says.
@@ -130,7 +155,7 @@ describe("convexVaultDB, refusing", () => {
     it(`refuses over a ${clientTitle} as identity_revoked for another user's vault, saying so, its ConvexError as the cause`, async () => {
       const deployment = deploy()
       const vaultDB = convexVaultDB({ client: connect(deployment, 'u2'), api: deployment.api.safebyok })
-      const refusal = await TH.expectBad(vaultDB.putBox(u1, TH.boxOf('anthropic_api_key', 'a1'), TH.noBoxYet), 'identity_revoked')
+      const refusal = await TH.expectBad(vaultDB.putBox(u1, TH.noBoxYet, TH.boxOf('anthropic_api_key', 'a1')), 'identity_revoked')
       expect(refusal.message).to.eq('This vault belongs to another user than the one signed in: a signed-in user reaches only their own vaults. If the user changed, open the vault for the new one.')
       expect(refusal.cause).to.be.instanceOf(ConvexError).with.nested.property('data.kind', 'identity_revoked')
     })
@@ -167,7 +192,7 @@ describe("convexVaultDB, refusing", () => {
     const client = deployment.client('u1')
     const vaultDB = convexVaultDB({ client, api: deployment.api.safebyok })
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
-    await TH.expectingGood(vaultDB).putBox(u1, TH.boxOf('openai', 'two'), TH.noBoxYet)
+    await TH.expectingGood(vaultDB).putBox(u1, TH.noBoxYet, TH.boxOf('openai', 'two'))
     // Past the adapter's own checks, straight to the component, which bounds no time's form.
     const box = { ...TH.boxOf('anthropic', 'one'), written_at: Date.UTC(2026, 9, 14) + 0.5 }
     await client.mutation(deployment.api.safebyok.putBox, { scope: u1, box, expected: TH.noBoxYet })
@@ -178,13 +203,14 @@ describe("convexVaultDB, refusing", () => {
   })
 
   for (const [clientTitle, connect] of ClientCases) {
-    it(`refuses a box the component has no room for over a ${clientTitle} as vault_full`, async () => {
+    it(`refuses a box the component has no room for over a ${clientTitle} as vault_full, saying how full the vault is`, async () => {
       const deployment = deploy()
       const vaultDB = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
       await nearlyFull(vaultDB)
-      const refusal = await TH.expectBad(vaultDB.putBox(u1, TH.heavyBox('one_too_many', 200_000), TH.noBoxYet), 'vault_full')
-      expect(refusal.message).to.eq('This vault is full: remove a box to make room, then try again.')
-      expect(refusal.cause).to.be.instanceOf(ConvexError).with.nested.property('data.kind', 'vault_full')
+      const refusal = await TH.expectBad(vaultDB.putBox(u1, TH.noBoxYet, TH.heavyBox('one_too_many', 200_000)), 'vault_full')
+      expect(refusal.message).to.match(/bytes its storage holds of one vault/)
+      expect(refusal.meta?.capacity).to.deep.equal(await TH.expectingGood(vaultDB).getCapacity(u1))
+      expect(refusal.meta?.capacity?.boxes).to.deep.equal({ used: 8, max: MaxVaultBoxes })
       const listed = await TH.expectingGood(vaultDB).listBoxes(u1)
       expect(listed.map((summary) => summary.boxlabel)).to.not.include('one_too_many')
     })
@@ -200,10 +226,11 @@ describe("convexVaultDB, refusing", () => {
     const vaultProps = await TH.expectingGood(vaultDB).getVaultProps(u1)
     const vaultId = vaultProps?.vault_id ?? ''
     for (const [ii, bytes] of [...Array.from({ length: 8 }, () => 900_000), 120_000].entries()) {
-      await TH.expectingGood(vaultDB).putBox(u1, TH.heavyBox(`heavy_${String(ii)}`, bytes), { vault_id: vaultId, revision_tok: null, vault_key_epoch: 1 })
+      await TH.expectingGood(vaultDB).putBox(u1, { vault_id: vaultId, revision_tok: null, vault_key_epoch: 1 }, TH.heavyBox(`heavy_${String(ii)}`, bytes))
     }
     const refusal = await TH.expectRefusal(vault.putBox('anthropic_api_key', 'x'.repeat(40_000)), 'vault_full')
-    expect(refusal.message).to.eq('This vault is full: remove a box to make room, then try again.')
+    expect(refusal.message).to.match(/no room for this one/)
+    expect(refusal.meta?.capacity?.boxes.used).to.eq(9)
     expect(vault.getSnapshot().boxes.map((box) => box.boxlabel)).to.not.include('anthropic_api_key')
     vault.close()
   })
@@ -243,7 +270,7 @@ describe("a record the deployment refused", () => {
 
   const RefusedWrites: [string, unknown, (vaultDB: ReturnType<typeof convexVaultDB>) => Promise<Outcome<unknown>>][] = [
     ['putVaultProps', nextVaultProps, (vaultDB) => vaultDB.putVaultProps(nextVaultProps, { vault_id: standing.vault_id, unlock_epoch: 52_871 })],
-    ['putBox',        quotableBox, (vaultDB) => vaultDB.putBox(scope, box, { vault_id: standing.vault_id, revision_tok: null, vault_key_epoch: 52_874 })],
+    ['putBox',        quotableBox, (vaultDB) => vaultDB.putBox(scope, { vault_id: standing.vault_id, revision_tok: null, vault_key_epoch: 52_874 }, box)],
   ]
 
   for (const [verb, record, write] of RefusedWrites) {
@@ -288,7 +315,7 @@ describe("a record the deployment refused", () => {
       mutation: (mutationRef, args) => client.mutation(mutationRef, withSidecarNotText(args)),
     }
     const vaultDB = convexVaultDB({ client: quoting, api: deployment.api.safebyok })
-    const refusal = await TH.expectBad(vaultDB.putBox(scope, box, expected), 'storage_unavailable')
+    const refusal = await TH.expectBad(vaultDB.putBox(scope, expected, box), 'storage_unavailable')
     expect(refusal.cause).to.be.undefined
     expect(TH.thrownText(refusal)).to.not.include('quoted_by_convex')
     expect(await TH.expectingGood(vaultDB).getBox(scope, 'quotable_box')).to.be.null

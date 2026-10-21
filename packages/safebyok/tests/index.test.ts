@@ -8,7 +8,7 @@ describe("the package's entry point", () => {
   it("exports exactly the public surface", () => {
     expect(Object.keys(safebyok)).to.have.members([
       'Argon2idWebV1', 'argon2idDeriver', 'argon2idWebV1Deriver', 'checkSaltFits', 'parseKeyDeriverSpec',
-      'Vault', 'Ask', 'AskWhyVals', 'ProofAnswerVals', 'delDamagedVault', 'parseLogger', 'DefaultLogger', 'setDefaultLogger', 'parseStrengthChecker',
+      'Vault', 'Ask', 'AskWhyVals', 'ProofAnswerVals', 'delDamagedVault', 'parseLogger', 'DefaultLogger', 'setDefaultLogger',
       'Ciphered', 'EpochMillis', 'FarFuture', 'FarPast', 'LeaseHours', 'ForeverMillis', 'Box', 'BoxRecord', 'BoxSummary', 'MaxBoxes', 'MaxLeaseHours', 'MaxWhisperBytes', 'MinuteMillis', 'PasskeyWayinRecord', 'PasskeySaltBytes', 'PassphraseWayinRecord', 'Sidecar', 'StaleMinutes', 'WayinRecord', 'WayinKindVals', 'Wayin', 'PassphraseWayin', 'PasskeyWayin', 'Lease', 'LeaseRecord', 'VaultProps', 'VaultScope', 'Whisper', 'wallClock',
       'AnyTextValidators', 'DefaultValidators', 'Label', 'LabelPattern', 'MaxLabelChars', 'MaxUserIdChars', 'NameFloor', 'NameFloorBytes', 'UserId', 'UserIdPattern', 'checkValidators',
       'VaultError', 'RefusalFamilyForKind', 'RefusalFamilyVals', 'RefusalKindVals', 'isCondition', 'isVaultError', 'outcomeOf', 'unexpectedError', 'valOf',
@@ -33,8 +33,8 @@ describe("the package's entry point", () => {
   })
 
   it("exports the refusals an adapter throws, and the comparisons a key-value adapter makes, each as one namespace", () => {
-    expect(Object.keys(safebyok.Refusals)).to.have.members(['StorageTroubleMessage', 'StaleWriteVals', 'storageUnavailable', 'staleWrite', 'notPermitted', 'vaultFull', 'StorageBlockedMessage', 'storageBlocked', 'isStorageBlocked'])
-    expect(Object.keys(safebyok.Expectations)).to.have.members(['vaultPropsMeets', 'vaultMeets', 'vaultIdMeets', 'boxMeets', 'deletionOf'])
+    expect(Object.keys(safebyok.Refusals)).to.have.members(['StorageTroubleMessage', 'StaleWriteVals', 'storageUnavailable', 'staleWrite', 'staleBox', 'StaleBoxMessage', 'vaultMismatch', 'notPermitted', 'vaultFull', 'StorageBlockedMessage', 'storageBlocked', 'isStorageBlocked'])
+    expect(Object.keys(safebyok.Expectations)).to.have.members(['vaultPropsMeets', 'vaultMeets', 'vaultIdMeets', 'boxRefusalOf', 'deletionOf'])
   })
 })
 

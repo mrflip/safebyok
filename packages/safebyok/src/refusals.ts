@@ -1,10 +1,11 @@
-import { VaultError } from './errors'
+import { VaultError, type RefusalMeta } from './errors'
+import type { Capacity } from './types'
 
 /**
  * The refusals a storage adapter throws, made the one way: the core's own messages, and a
  * `cause` that is never null. An adapter throws these rather than copying the core's words, and a
  * caller branches on each one's `kind`. Import it whole: `import { Refusals } from 'safebyok'`,
- * then `throw Refusals.vaultFull(limit)`.
+ * then `throw Refusals.vaultMismatch()`.
  *
  * A `cause` given as null or undefined -- a backend that failed without an error, as an aborted
  * IndexedDB transaction can -- becomes an Error saying so, so nothing downstream meets a null
@@ -32,14 +33,13 @@ export const storageUnavailable = (cause: unknown, message: string = StorageTrou
   new VaultError('storage_unavailable', message, { cause: causeOf(cause) })
 )
 
-/** What a write met that it did not expect, as {@link staleWrite} says it. */
-export const StaleWriteVals = ['vaultProps', 'box', 'del'] as const
+/** What a write met that it did not expect, as {@link staleWrite} says it. A box write's is {@link staleBox}. */
+export const StaleWriteVals = ['vaultProps', 'del'] as const
 export type StaleWrite = typeof StaleWriteVals[number]
 
 /** What each stale write says: what changed under the writer, and to read again. */
 const StaleWriteSaid: Readonly<Record<StaleWrite, string>> = {
   vaultProps: 'The vault changed in storage since this device read it -- its ways in were changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. Read the vault again before retrying.',
-  box:    'That box changed in storage since this device read it -- another device or tab wrote or removed it, or the vault was made anew -- so this write was refused and nothing was written. Read it again before retrying.',
   del:    'The vault changed in storage since this device read it -- it was deleted, or deleted and made anew, elsewhere -- so this removal was refused and nothing was removed. Read the vault again before retrying.',
 }
 
@@ -48,12 +48,47 @@ const StaleWriteSaid: Readonly<Record<StaleWrite, string>> = {
  * base class throws it for an adapter's `false`; an adapter that hands each call on to another
  * VaultDB meets it as it is.
  *
- * @param what - The write refused: an update of the vault props, a box write, or a deletion.
+ * @param what - The write refused: an update of the vault props, or a deletion.
  * @returns The refusal, to throw.
  *
- * @example throw Refusals.staleWrite('box')
+ * @example throw Refusals.staleWrite('vaultProps')
  */
 export const staleWrite = (what: StaleWrite): VaultError => new VaultError('stale_write', StaleWriteSaid[what])
+
+/** A `stale_write` refusal of a box write, carrying what stands under its boxlabel.
+ * The box standing there is not the one the write expected, so nothing was written. `boxStored`
+ * is what stands, read in the same atomic
+ * step that refused the write -- the record exactly as stored, damaged or not, or null when
+ * nothing stands there -- and the refusal carries it as `meta.box_stored`. The base class checks
+ * it on the way up, as `getBox` checks a record, so a caller meets the box, a `DamagedBox` or
+ * null, never what the adapter handed in unchecked.
+ *
+ * @param boxStored - The record standing under the boxlabel, exactly as stored, or null for none.
+ * @returns The refusal, to throw from `doPutBox`.
+ *
+ * @example throw Refusals.staleBox(standingRow ?? null)
+ */
+export const staleBox = (boxStored: unknown): VaultError => (
+  // Unchecked here, as the adapter read it: the base class replaces it with the record checked.
+  new VaultError('stale_write', StaleBoxMessage, { meta: { box_stored: boxStored as Exclude<RefusalMeta['box_stored'], undefined> } })
+)
+
+/** What a box write's `stale_write` says: what changed under the writer, and where to look. */
+export const StaleBoxMessage = "That box changed in storage since this device read it -- another device or tab wrote or removed it -- so this write was refused and nothing was written. What stands now is this error's meta.box_stored: write again over it, or leave it."
+
+/** A `vault_mismatch` refusal of a box write, carrying nothing of the vault props that stand.
+ * The scope's standing vault props are not the ones the box was sealed for -- none stand, or
+ * they have another `vault_id`, or another `vault_key_epoch` -- so nothing was written. Nothing
+ * of them is carried, as they hold every way in.
+ *
+ * @returns The refusal, to throw from `doPutBox`.
+ *
+ * @example throw Refusals.vaultMismatch()
+ */
+export const vaultMismatch = (): VaultError => new VaultError('vault_mismatch', VaultMismatchMessage)
+
+/** What `vault_mismatch` says. */
+const VaultMismatchMessage = "This vault was deleted, made anew, or had its key replaced on another device since this one read it, so nothing was written. Open the vault again to see what stands now."
 
 /**
  * A `not_permitted` refusal: the signed-in user, still the vault's own, refused this one call by a
@@ -72,20 +107,25 @@ export const notPermitted = (message = "The vault's storage does not let the sig
 
 /**
  * A `vault_full` refusal: a box write past a limit the backend keeps on a vault, which wrote
- * nothing. The user deletes a box, or the host raises the limit where the backend allows.
+ * nothing. It carries `capacity`, how full the vault is, as `meta.capacity`, and its message names
+ * the limit met: boxes, where `boxes.used` has reached `boxes.max`, else bytes. The user deletes
+ * a box, or the host raises the limit where the backend allows. The base class checks the
+ * capacity on the way up, and refuses a `vault_full` without a sound one as `corrupt_record`.
  *
- * @param limit - The most boxes the backend keeps in one vault, when that is the limit met.
+ * @param capacity - How full the vault is, read in the same atomic step that refused the write: a
+ *   `max` of `Infinity` for a limit the backend does not keep.
  * @param opts - `cause`: the backend's own refusal, when there is one.
- * @returns The refusal, to throw.
+ * @returns The refusal, to throw from `doPutBox`.
  *
- * @example throw Refusals.vaultFull(this.maxBoxes)
- * @example throw Refusals.vaultFull()  // a limit on bytes, say
+ * @example throw Refusals.vaultFull({ boxes: { used: 250, max: this.maxBoxes }, bytes: { used: bytesUsed, max: Infinity } })
+ * @example throw Refusals.vaultFull(capacity, { cause: backendRefusal })
  */
-export const vaultFull = (limit?: number, opts?: ErrorOptions): VaultError => {
-  const message = limit === undefined
-    ? 'This vault is full: remove a box to make room, then try again.'
-    : `This vault already holds the ${String(limit)} boxes its storage keeps in one vault: remove one before storing another.`
-  return new VaultError('vault_full', message, optsOf(opts))
+export const vaultFull = (capacity: Capacity, opts?: ErrorOptions): VaultError => {
+  const { boxes, bytes } = capacity
+  const message = boxes.used >= boxes.max
+    ? `This vault holds ${String(boxes.used)} boxes, and its storage keeps at most ${String(boxes.max)} in one vault, so nothing was written: remove a box before storing another.`
+    : `This vault's boxes take ${String(bytes.used)} of the ${String(bytes.max)} bytes its storage holds of one vault, leaving no room for this one, so nothing was written: remove a box, or store a smaller one.`
+  return new VaultError('vault_full', message, { ...optsOf(opts), meta: { capacity } })
 }
 
 /** What `storage_blocked` says unless an adapter says more exactly what was withheld. */

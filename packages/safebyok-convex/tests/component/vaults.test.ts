@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { ConvexError, getDocumentSize } from 'convex/values'
+import { getDocumentSize } from 'convex/values'
 import { BoxSummary, memoryStore } from 'safebyok'
 import * as TH from '../test-helpers'
-import { MaxVaultBoxBytes, MaxVaultBoxes } from '../../src/component/tallies'
+import { MaxVaultBoxBytes, MaxVaultBoxes, capacityOf } from '../../src/component/tallies'
 
 const u1 = TH.scopeOf('u1')
 
@@ -67,18 +67,26 @@ describe("putVaultProps", () => {
 })
 
 describe("getBox and putBox", () => {
-  it("has no box until one is written, then reads it back exactly, without its scope columns", async () => {
+  it("has no box until one is written, then reads it back exactly, without its scope columns, answering as PutBoxAnswer's first example shows", async () => {
     const CVX = await withVaultProps()
     expect(await CVX.query(TH.vaults.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })).to.be.null
-    expect(await CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a1'), expected: TH.noBoxYet })).to.deep.equal(TH.boxOf('anthropic_api_key', 'a1'))
+    expect(await CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a1'), expected: TH.noBoxYet })).to.deep.equal({ landed: true, box_stored: TH.boxOf('anthropic_api_key', 'a1') })
     expect(await CVX.query(TH.vaults.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })).to.deep.equal(TH.boxOf('anthropic_api_key', 'a1'))
   })
 
-  it("resolves null for a write whose expectation failed, writing nothing", async () => {
+  it("resolves a write whose box expectation failed as stale_write, with the box standing as a read returns it, writing nothing, as PutBoxAnswer's second example shows", async () => {
     const CVX = await withVaultProps()
     await CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a1'), expected: TH.noBoxYet })
-    expect(await CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a2'), expected: TH.noBoxYet })).to.be.null
+    expect(await CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a2'), expected: TH.noBoxYet })).to.deep.equal({ landed: false, refusalkind: 'stale_write', box_stored: TH.boxOf('anthropic_api_key', 'a1') })
+    expect(await CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.boxOf('openai_api_key', 'o1'), expected: { ...TH.noBoxYet, revision_tok: 'rev-gone' } })).to.deep.equal({ landed: false, refusalkind: 'stale_write', box_stored: null })
     expect(await CVX.query(TH.vaults.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })).to.deep.equal(TH.boxOf('anthropic_api_key', 'a1'))
+  })
+
+  it("resolves a write whose vault props are not the ones expected as vault_mismatch, carrying nothing of them, writing nothing, as PutBoxAnswer's third example shows", async () => {
+    const CVX = await withVaultProps()
+    const answer = await CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a1'), expected: { ...TH.noBoxYet, vault_id: 'vault-id-gone' } })
+    expect(answer).to.deep.equal({ landed: false, refusalkind: 'vault_mismatch' })
+    expect(await CVX.query(TH.vaults.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })).to.be.null
   })
 
   it("stores a box's sidecar as the JSON text it was handed, and reads it back so", async () => {
@@ -175,7 +183,7 @@ describe("a real vault's records", () => {
     const CVX = TH.componentTest()
     expect(await CVX.mutation(TH.vaults.ensureVaultProps, { vaultProps: real.vaultProps })).to.deep.equal(real.vaultProps)
     for (const { box } of real.boxes) {
-      expect(await CVX.mutation(TH.vaults.putBox, { scope: u1, box, expected: { vault_id: real.vaultProps.vault_id, revision_tok: null, vault_key_epoch: 1 } })).to.deep.equal(box)
+      expect(await CVX.mutation(TH.vaults.putBox, { scope: u1, box, expected: { vault_id: real.vaultProps.vault_id, revision_tok: null, vault_key_epoch: 1 } })).to.deep.equal({ landed: true, box_stored: box })
     }
 
     // Read back from Convex, and placed where the core keeps them, they open as before.
@@ -245,12 +253,13 @@ const writeUntallied = (CVX: ReturnType<typeof TH.componentTest>, boxes: ReturnT
   await Promise.all(boxes.map((box) => ctx.db.insert('safebyok_boxes', { ...u1, ...box })))
 })
 
-/** The refusal's data, when `u1`'s vault refuses `box` with a ConvexError. */
-const refusedWrite = (CVX: ReturnType<typeof TH.componentTest>, box: ReturnType<typeof TH.boxOf>, expected: { vault_id: string, revision_tok: string | null, vault_key_epoch: number }) => (
-  TH.convexRefusalOf(CVX.mutation(TH.vaults.putBox, { scope: u1, box, expected }))
+/** What `u1`'s vault answers a write of `box` over `expected`. */
+const answeredWrite = (CVX: ReturnType<typeof TH.componentTest>, box: ReturnType<typeof TH.boxOf>, expected: { vault_id: string, revision_tok: string | null, vault_key_epoch: number }) => (
+  CVX.mutation(TH.vaults.putBox, { scope: u1, box, expected })
 )
 
-const VaultFull = { kind: 'vault_full', message: 'This vault is full: remove a box to make room, then try again.' }
+/** What a write the vault has no room for answers, but for the capacity it carries. */
+const VaultFull = { landed: false, refusalkind: 'vault_full' }
 
 /** The expectation a replacement of the box tagged `tag` carries. */
 const over = (tag: string) => ({ vault_id: 'vault-id-u1', revision_tok: `rev-${tag}`, vault_key_epoch: 1 })
@@ -342,31 +351,55 @@ const nearlyFull = async () => {
   return { CVX, room: MaxVaultBoxBytes - boxBytes }
 }
 
+describe("getCapacity", () => {
+  it("answers nothing used for a scope that holds no vault, against the component's limits", async () => {
+    const CVX = TH.componentTest()
+    expect(await CVX.query(TH.vaults.getCapacity, { scope: u1 })).to.deep.equal({ boxes: { used: 0, max: MaxVaultBoxes }, bytes: { used: 0, max: MaxVaultBoxBytes } })
+  })
+
+  it("answers the vault's tally, kept in step with its writes and deletes", async () => {
+    const CVX = await withVaultProps()
+    await CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a1'), expected: TH.noBoxYet })
+    await CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.boxOf('openai_api_key', 'o1'), expected: TH.noBoxYet })
+    expect(await CVX.query(TH.vaults.getCapacity, { scope: u1 })).to.deep.equal(capacityOf(await weighedTally(CVX)))
+  })
+
+  it("counts afresh a vault with no tally yet, and answers one past a limit, uncounted, as full", async () => {
+    const CVX = TH.componentTest(true)
+    await CVX.mutation(TH.vaults.ensureVaultProps, { vaultProps: TH.vaultPropsOf('u1') })
+    await writeUntallied(CVX, [TH.boxOf('anthropic_api_key', 'a1')])
+    expect(await CVX.query(TH.vaults.getCapacity, { scope: u1 })).to.deep.equal(capacityOf(await weighedTally(CVX)))
+    await writeUntallied(CVX, Array.from({ length: 9 }, (_, ii) => TH.heavyBox(`heavy_${String(ii)}`, 900_000)))
+    expect(await CVX.query(TH.vaults.getCapacity, { scope: u1 })).to.deep.equal(capacityOf(null))
+  })
+})
+
 describe("a vault's weight limit", () => {
-  it("refuses a new box that would take the vault past it, writing nothing, and says so calmly", async () => {
+  it("refuses a new box that would take the vault past it, writing nothing, and says how full the vault is, as its tally stood, as PutBoxAnswer's fourth example shows", async () => {
     const { CVX, room } = await nearlyFull()
     const ante = { rows: await allRows(CVX), tally: await keptTally(CVX) }
-    const refusal = await refusedWrite(CVX, TH.heavyBox('one_too_many', room), TH.noBoxYet)
-    expect(refusal).to.deep.equal(VaultFull)
-    expect(JSON.stringify(refusal)).to.not.include('one_too_many')
+    const answer = await answeredWrite(CVX, TH.heavyBox('one_too_many', room), TH.noBoxYet)
+    expect(answer).to.deep.equal({ ...VaultFull, capacity: capacityOf(ante.tally) })
+    expect(answer).to.have.nested.property('capacity.bytes.max', MaxVaultBoxBytes)
+    expect(JSON.stringify(answer)).to.not.include('one_too_many')
     expect({ rows: await allRows(CVX), tally: await keptTally(CVX) }).to.deep.equal(ante)
   })
 
   it("lets in a new box that fits", async () => {
     const { CVX } = await nearlyFull()
-    expect(await CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a1'), expected: TH.noBoxYet })).to.deep.equal(TH.boxOf('anthropic_api_key', 'a1'))
+    expect(await CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a1'), expected: TH.noBoxYet })).to.deep.equal({ landed: true, box_stored: TH.boxOf('anthropic_api_key', 'a1') })
     expect(await keptTally(CVX)).to.deep.equal(await weighedTally(CVX))
   })
 
   it("lets a replacement grow the vault up to it exactly, then refuses one byte more, and lets a lighter one in", async () => {
     const { CVX, room } = await nearlyFull()
     const grown = TH.heavyBox('heavy_0', 900_000 + room, 'grown_0')
-    expect(await CVX.mutation(TH.vaults.putBox, { scope: u1, box: grown, expected: over('heavy_0') })).to.deep.equal(grown)
+    expect(await CVX.mutation(TH.vaults.putBox, { scope: u1, box: grown, expected: over('heavy_0') })).to.deep.equal({ landed: true, box_stored: grown })
     expect(await keptTally(CVX)).to.deep.equal({ box_count: 8, box_bytes: MaxVaultBoxBytes })
     //
     const overgrown = TH.heavyBox('heavy_1', 900_001, 'grown_1')
-    expect(await refusedWrite(CVX, overgrown, over('heavy_1'))).to.deep.equal(VaultFull)
-    expect(await CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.heavyBox('heavy_1', 800_000, 'shrunk1'), expected: over('heavy_1') })).to.deep.equal(TH.heavyBox('heavy_1', 800_000, 'shrunk1'))
+    expect(await answeredWrite(CVX, overgrown, over('heavy_1'))).to.deep.include(VaultFull)
+    expect(await CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.heavyBox('heavy_1', 800_000, 'shrunk1'), expected: over('heavy_1') })).to.deep.equal({ landed: true, box_stored: TH.heavyBox('heavy_1', 800_000, 'shrunk1') })
     expect(await keptTally(CVX)).to.deep.equal(await weighedTally(CVX))
   })
 
@@ -375,14 +408,14 @@ describe("a vault's weight limit", () => {
     await CVX.mutation(TH.vaults.ensureVaultProps, { vaultProps: TH.vaultPropsOf('u1') })
     // Nine of 900,000 bytes, written before tallies were kept: past the limit, still readable whole.
     await writeUntallied(CVX, Array.from({ length: 9 }, (_, ii) => TH.heavyBox(`heavy_${String(ii)}`, 900_000)))
-    expect(await refusedWrite(CVX, TH.boxOf('anthropic_api_key', 'a1'), TH.noBoxYet)).to.deep.equal(VaultFull)
+    expect(await answeredWrite(CVX, TH.boxOf('anthropic_api_key', 'a1'), TH.noBoxYet)).to.deep.include(VaultFull)
     const overgrown = TH.heavyBox('heavy_0', 900_001, 'grown_0')
-    expect(await refusedWrite(CVX, overgrown, over('heavy_0'))).to.deep.equal(VaultFull)
-    expect(await CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.heavyBox('heavy_0', 800_000, 'shrunk0'), expected: over('heavy_0') })).to.deep.equal(TH.heavyBox('heavy_0', 800_000, 'shrunk0'))
+    expect(await answeredWrite(CVX, overgrown, over('heavy_0'))).to.deep.include(VaultFull)
+    expect(await CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.heavyBox('heavy_0', 800_000, 'shrunk0'), expected: over('heavy_0') })).to.deep.equal({ landed: true, box_stored: TH.heavyBox('heavy_0', 800_000, 'shrunk0') })
     expect(await keptTally(CVX)).to.be.null
     //
     expect(await CVX.mutation(TH.vaults.delBox, { scope: u1, boxlabel: 'heavy_1', expected: TH.deleting('rev-heavy_1') })).to.deep.equal({ outcome: 'deleted' })
-    expect(await CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a1'), expected: TH.noBoxYet })).to.deep.equal(TH.boxOf('anthropic_api_key', 'a1'))
+    expect(await CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a1'), expected: TH.noBoxYet })).to.deep.equal({ landed: true, box_stored: TH.boxOf('anthropic_api_key', 'a1') })
     expect(await keptTally(CVX)).to.deep.equal(await weighedTally(CVX))
   })
 
@@ -394,7 +427,7 @@ describe("a vault's weight limit", () => {
       await writeUntallied(CVX, Array.from({ length: 5 }, (_, ii) => TH.heavyBox(`heavy_${String((batch * 5) + ii)}`, 900_000)))
     }
     await expect(CVX.query(TH.vaults.listBoxSummaries, { scope: u1 })).rejects.toThrow(/Read too much data/)
-    expect(await refusedWrite(CVX, TH.boxOf('anthropic_api_key', 'a1'), TH.noBoxYet)).to.deep.equal(VaultFull)
+    expect(await answeredWrite(CVX, TH.boxOf('anthropic_api_key', 'a1'), TH.noBoxYet)).to.deep.include(VaultFull)
     for (let ii = 0; ii < 20; ii++) {
       const boxlabel = `heavy_${String(ii)}`
       expect(await CVX.mutation(TH.vaults.delBox, { scope: u1, boxlabel, expected: TH.deleting(`rev-${boxlabel}`) })).to.deep.equal({ outcome: 'deleted' })
@@ -442,12 +475,8 @@ const fillVault = async (count: number, whisperBytes: number, vaultProps = TH.va
 
 /** True when `box` lands in `u1`'s vault as a new box, false when the vault refuses it as full. */
 const landsOrIsFull = async (CVX: ReturnType<typeof TH.componentTest>, box: ReturnType<typeof TH.boxOf>) => {
-  try {
-    return await CVX.mutation(TH.vaults.putBox, { scope: u1, box, expected: TH.noBoxYet })
-  } catch (err) {
-    if (err instanceof ConvexError && (err.data as { kind?: unknown }).kind === 'vault_full') { return false }
-    throw err
-  }
+  const answer = await CVX.mutation(TH.vaults.putBox, { scope: u1, box, expected: TH.noBoxYet })
+  return answer.landed
 }
 
 /** What listing, watching and deleting the `u1` vault find: each a whole transaction over it. */
@@ -485,8 +514,8 @@ describe("a large vault, within Convex's per-transaction limits", () => {
     const CVX = TH.componentTest(true)
     await CVX.mutation(TH.vaults.ensureVaultProps, { vaultProps: TH.vaultPropsOf('u1') })
     await writeUntallied(CVX, Array.from({ length: MaxVaultBoxes }, (_, ii) => TH.boxOf(`b${String(ii).padStart(4, '0')}`, String(ii))))
-    expect(await refusedWrite(CVX, TH.boxOf('one_too_many', 'x'), TH.noBoxYet)).to.deep.equal(VaultFull)
-    expect(await CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.boxOf('b0000', 'replaced'), expected: over('0') })).to.deep.equal(TH.boxOf('b0000', 'replaced'))
+    expect(await answeredWrite(CVX, TH.boxOf('one_too_many', 'x'), TH.noBoxYet)).to.deep.include(VaultFull)
+    expect(await CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.boxOf('b0000', 'replaced'), expected: over('0') })).to.deep.equal({ landed: true, box_stored: TH.boxOf('b0000', 'replaced') })
     expect(await keptTally(CVX)).to.deep.equal(await weighedTally(CVX))
     expect(await keptTally(CVX)).to.have.property('box_count', MaxVaultBoxes)
     expect(await listWatchDel(CVX)).to.deep.equal({ listedCount: MaxVaultBoxes, watchedCount: MaxVaultBoxes, deleted: true, leftCount: 0 })

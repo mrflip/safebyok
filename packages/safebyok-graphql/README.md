@@ -111,7 +111,9 @@ vaultResolvers({ vaultDBFor: (context) => postgresVaultDB({ client: pool, userId
   user, refuses every other user's vault, and any while signed out, before asking the database
   anything.
 * **A refusal crosses as a GraphQL error**: its message the VaultError's calm one, its
-  `extensions.kind` its kind, and nothing else -- never the VaultError's `cause`, your driver's
+  `extensions.kind` its kind, a stale box write's `extensions.meta.box_stored` (the box that
+  stands under the boxlabel, whole, as a read would send it), a full vault's
+  `extensions.meta.capacity` (how full it is), and nothing else -- never the VaultError's `cause`, your driver's
   own error, which may name your database or quote a row. That stays on your server, as the
   GraphQL error's `cause`, for your own logs. Anything else a VaultDB throws crosses as
   `storage_unavailable`.
@@ -180,7 +182,8 @@ comparison lets a device still holding a replaced vaultKey seal a whisper under 
   Postgres VaultDB sets none unless told, or the `maxBoxes` you pass
   (`graphqlVaultDB({ client, maxBoxes: 250 })`). Pass the number your server's
   VaultDB enforces, so `Vault.make` refuses a vault asking for more up front; the server refuses a
-  new box past its own with kind `vault_full` either way, and the refusal crosses.
+  new box past its own with kind `vault_full` either way, and the refusal crosses, with how full
+  the vault is. `getCapacity` asks the server's VaultDB the same, through `safebyokGetCapacity`.
 * **A subscription that fails** (the server refusing it, the socket dropping) is not retried. It
   is warned of through the `logger`, once, and calls the vault's listener, so the vault reads
   again and meets the trouble itself: a server's `identity_revoked` locks it. After that, the
