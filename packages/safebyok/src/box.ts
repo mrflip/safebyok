@@ -163,10 +163,8 @@ export class Box {
    * @example Box.make(vault, { boxlabel: 'anthropic_api_key' })   // throws 'bad_record': no box record
    */
   static make(vault: BoxVault, record: BoxRecord, vaultId: string | null = vault.vault_id): Box {
-    if (vaultId === null) {
-      throw new VaultError('absent_vault', 'This vault has not been created yet, so no box lies in it: the first unlock() creates it.')
-    }
-    return new this(vault, vaultId, checkedBoxRecord(record))
+    const checked = checkedBoxRecord(record)
+    return new this(vault, standingVaultId(vaultId), checked)
   }
 
   /** A new box of `vault` holding `whisper`, sealed under `lease`. Nothing is written: the vault puts the box.
@@ -325,20 +323,20 @@ const openRecord = async (vault: BoxVault, vaultId: string, record: BoxRecord, l
 // == [Listing]: heldListing
 
 /** A listed box as a vault holds it and hands it out, lying under `vaultId`, the vault props the listing was read beside.
- * It is a fresh copy, frozen through, so nothing a host is handed reaches what the vault keeps. A
- * sound one is a box's visible fields, as `{ ...box }` holds them, and `damaged: false`. A damaged
- * one keeps its boxlabel and revision alone.
+ * A sound one is a box's visible fields, as `{ ...box }` holds them, and `damaged: false`, frozen
+ * through. Its sidecar is the one the listing's check made, frozen where it stands, never parsed
+ * again. A damaged one keeps its boxlabel and revision alone.
  *
  * @example vault.boxes[0].sidecar.note = 'changed'   // throws in strict code; the vault's own copy is untouched either way
  */
 export const heldListing = (listed: ListedSummary | DamagedBox, vaultId: string): BoxSummary | DamagedBox => {
   if (listed.damaged) { return Object.freeze({ boxlabel: listed.boxlabel, damaged: true, revision_tok: listed.revision_tok }) }
   const { boxlabel, revision_tok, registered_at, written_at } = listed
-  return Object.freeze({ boxlabel, revision_tok, sidecar: frozenThrough(structuredClone(listed.sidecar)), registered_at, written_at, vault_id: vaultId, damaged: false })
+  return Object.freeze({ boxlabel, revision_tok, sidecar: frozenThrough(listed.sidecar), registered_at, written_at, vault_id: vaultId, damaged: false })
 }
 // --
 
-// == [Helpers]: BoxHeader, boxCtx, frozenThrough, parseJsonOrNull, checkedBoxRecord, checkedWhisper, checkedSidecar, checkLease
+// == [Helpers]: BoxHeader, boxCtx, frozenThrough, parseJsonOrNull, checkedBoxRecord, checkedWhisper, checkedSidecar, standingVaultId, checkLease
 
 /** A box's visible header: every field of its record but its format, which leads each ctx, and the two encrypted ones. */
 type BoxHeader = Omit<BoxRecord, 'format' | 'box_key_wrapped' | 'whisper_ciphered'>
@@ -375,7 +373,7 @@ const parseJsonOrNull = (text: string): unknown => {
 }
 
 /** `record`, once it is a box record: 'bad_record' otherwise, quoting none of it. */
-export const checkedBoxRecord = (record: unknown): BoxRecord => {
+const checkedBoxRecord = (record: unknown): BoxRecord => {
   const checked = BoxRecord.safeParse(record)
   if (! checked.success) {
     throw new VaultError('bad_record', "That is not a box record this package writes: a box is made from the record storage holds, as a VaultDB's getBox hands it back, or from a box's own record.")
@@ -399,6 +397,14 @@ export const checkedSidecar = (sidecar: unknown): Sidecar => {
     throw new VaultError('bad_option', "A box's sidecar must be a JSON value: a string, number, boolean, null, array, or plain object, with nothing JSON cannot carry (undefined, a function, a Date) inside it.")
   }
   return checked.data
+}
+
+/** `vaultId`, the id of the vault props a box lies under: kind 'absent_vault' for none, a vault not made yet. */
+const standingVaultId = (vaultId: string | null): string => {
+  if (vaultId === null) {
+    throw new VaultError('absent_vault', 'This vault has not been created yet, so no box lies in it: the first unlock() creates it.')
+  }
+  return vaultId
 }
 
 /** `lease`, once it is a Lease: kind 'bad_option' otherwise. */
