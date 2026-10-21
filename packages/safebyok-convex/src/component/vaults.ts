@@ -153,9 +153,8 @@ export const putBox = mutation({
   },
 })
 
-/**
- * How full the vault is: its tally against the component's limits, as a box write checks them. A
- * vault with no tally yet is counted afresh, reading it once; a scope holding no vault is empty.
+/** How full the vault is: its tally against the component's limits, as a box write checks them.
+ * A vault with no tally yet is counted afresh, reading it once; a scope holding no vault is empty.
  */
 export const getCapacity = query({
   args:    { scope: VaultScope },

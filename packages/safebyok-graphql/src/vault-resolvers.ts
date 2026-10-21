@@ -247,9 +247,8 @@ const crossing = (err: unknown): GraphQLError => {
   return crossed
 }
 
-/**
- * What of a refusal's meta crosses the wire: a stale box write's `box_stored`, the box that
- * stands, whole, as a read would send it; or a full vault's `capacity`. Nothing else.
+/** What of a refusal's meta crosses the wire: a stale write's `box_stored`, or a full vault's `capacity`.
+ * The box that stands goes whole, as a read would send it. Nothing else crosses.
  */
 const metaCrossing = (refusal: VaultError): { meta?: RefusalMeta } => {
   const { box_stored: boxStored, capacity } = refusal.meta ?? {}

@@ -198,10 +198,9 @@ const ConvexTransactionReadBytes = 16_777_216
 /** What a box write answered in a shape this client does not know says: whose version to fix. */
 const OutOfDateMessage = "The vault's Convex functions answered a box write in a shape this version of safebyok-convex does not know, so whether it landed is unknown: the deployed safebyok component is out of date, or newer than this app. Deploy the component from the same version of safebyok-convex as the app, then read the vault again."
 
-/**
- * True when `answer` is a box write's answer as this version's component makes it: `landed`, and
- * for a refusal its kind, each with the field that kind carries. What those fields hold, the base
- * class checks; this tells only one version's answer from another's, or from null.
+/** True when `answer` is a box write's answer as this version's component makes it.
+ * That is `landed`, and for a refusal its kind, each with the field that kind carries. What those
+ * fields hold, the base class checks; this tells only one version's answer from another's, or from null.
  */
 const isPutBoxAnswer = (answer: unknown): answer is Infer<typeof PutBoxAnswer> => {
   if (typeof answer !== 'object' || answer === null) { return false }

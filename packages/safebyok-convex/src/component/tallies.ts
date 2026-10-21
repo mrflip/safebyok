@@ -45,10 +45,9 @@ export type Tally = {
   box_bytes: number
 }
 
-/**
- * How full a vault is, from its tally, against the component's limits: its boxes, and their
- * bytes as Convex counts a document. A vault past a limit and left uncounted (a null tally) is
- * answered as full by both, as {@link refuses} treats it.
+/** How full a vault is, from its tally, against the component's limits.
+ * Its boxes, and their bytes as Convex counts a document. A vault past a limit and left uncounted
+ * (a null tally) is answered as full by both, as {@link refuses} treats it.
  *
  * @example capacityOf({ box_count: 12, box_bytes: 48_000 })  // { boxes: { used: 12, max: 8000 }, bytes: { used: 48000, max: MaxVaultBoxBytes } }
  */

@@ -662,11 +662,10 @@ export abstract class VaultDB {
    * reads both rows and asks `Expectations.boxRefusalOf` which.
    */
   protected abstract doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<unknown>
-  /**
-   * How full the vault is, read in one step: a {@link Capacity}, its boxes counted and its bytes
-   * weighed as the backend weighs them, each against the most the backend holds of one vault, or
-   * `Infinity` for a limit it does not keep. A box write refused for room reports the same
-   * reckoning, with `Refusals.vaultFull(capacity)`.
+  /** How full the vault is, read in one step: a {@link Capacity}.
+   * Its boxes counted and its bytes weighed as the backend weighs them, each against the most the
+   * backend holds of one vault, or `Infinity` for a limit it does not keep. A box write refused for
+   * room reports the same reckoning, with `Refusals.vaultFull(capacity)`.
    */
   protected abstract doGetCapacity(scope: VaultScope): Promise<unknown>
   /**
