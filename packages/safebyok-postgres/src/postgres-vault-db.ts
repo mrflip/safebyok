@@ -201,11 +201,12 @@ const GetCapacitySql = `SELECT count(*)::float8 AS box_count, ${BoxBytesSql} AS 
 
 // Each box write answers one row, whether or not it landed: `vault_stands`, whether the vault props
 // it expects stood; `landed`, whether its own comparison passed and it wrote (null when no box
-// stands to report); `was_full`, a first write's vault at its limit, with its `box_count` and
-// `bytes_used` then; and the box columns of what stands under the boxlabel now -- the box written,
-// as its RETURNING hands it back, or the one standing, as the FOR UPDATE read it -- null when none
-// does. One statement, so one snapshot and one round trip: the closing SELECT reads the CTEs'
-// rows, never the tables again.
+// stands to report); `was_full`, a first write's vault at its limit, with its `box_count`, and its
+// `bytes_used` when the write is refused for it; and the box columns of what stands under the
+// boxlabel now -- the box written, as its RETURNING hands it back, or the one standing, as the FOR
+// UPDATE read it -- null when none does. One statement, so one snapshot and one round trip: the
+// closing SELECT reads the CTEs' rows, and the boxes table again only to weigh a vault that refuses
+// the write as full.
 
 // A first box under its boxlabel: inserted only beside the vault props it expects, only where no
 // box stands, and only while the vault holds fewer than $6 boxes -- or, for a null $6, no limit,
@@ -222,8 +223,8 @@ const GetCapacitySql = `SELECT count(*)::float8 AS box_count, ${BoxBytesSql} AS 
 // and a refused write inserted nothing, since the refusal is the WHERE of one atomic statement. A
 // vault deleted after the statement began is met by the vault row's FOR SHARE read, which finds it
 // gone, or by the foreign key, which reads the vault row that stands now: that failure is caught as
-// the vault gone (see insertBox), and no box ever lands in a vault but its own. A refused write
-// weighs the vault's boxes for its capacity, in the same statement.
+// the vault gone (see insertBox), and no box ever lands in a vault but its own. A write refused as
+// full weighs the vault's boxes for its capacity, in the same statement; no other write weighs them.
 const InsertBoxSql = `WITH vault AS (
     ${ExpectedVaultSql}
   ), standing AS MATERIALIZED (
@@ -240,7 +241,8 @@ const InsertBoxSql = `WITH vault AS (
   SELECT EXISTS (SELECT 1 FROM vault) AS vault_stands,
          COALESCE(counted.box_count >= $6::bigint, false) AS was_full,
          counted.box_count::float8 AS box_count,
-         CASE WHEN counted.box_count >= $6::bigint THEN (SELECT ${BoxBytesSql} ${VaultBoxesSql}) ELSE 0 END AS bytes_used,
+         CASE WHEN counted.box_count >= $6::bigint AND EXISTS (SELECT 1 FROM vault) AND NOT EXISTS (SELECT 1 FROM standing)
+           THEN (SELECT ${BoxBytesSql} ${VaultBoxesSql}) ELSE 0 END AS bytes_used,
          box.*
   FROM counted LEFT JOIN (SELECT * FROM written UNION ALL SELECT *, false FROM standing) AS box ON true`
 
