@@ -1,6 +1,6 @@
 import * as Z from 'zod/mini'
 import { type Capacity, type Clock, type VaultScope, BoxSummary, type DamagedBox, type PasskeyWayinSummary, type PassphraseWayinSummary, type PasskeyAnswer, type WayinSummary, Whisper, Sidecar, VaultProps, DeviceMark, MinuteMillis, FarFuture, FarPast } from './types'
-import { Box, type BoxRecord, checkedBoxRecord, checkedSidecar, heldListing, planSeal, sealPlanned, whisperBytesOf } from './box'
+import { Box, type BoxRecord, checkedSidecar, heldListing, planSeal, sealPlanned, whisperBytesOf } from './box'
 import * as Names from './names'
 import { optionsCheck } from './options'
 import { VaultError, isVaultError, type RefusalKind } from './errors'
@@ -760,12 +760,13 @@ export class Vault {
   /**
    * The whisper `box` holds, opened under the lease in hand: a box already in hand, or its
    * stored record, is deciphered and checked, and nothing is read from storage and nobody is
-   * asked for a proof. A record lies under the vault props the lease opens; a box, under the ones
-   * it was read or sealed under. Refuses kind 'vault_locked' when no lease is in hand --
-   * `ensureLease()` first -- when a lock lands while the box opens, or for a box of another vault
-   * than the lease opens (one deleted and made anew since); 'damaged_box' for a box that will not open
-   * under this vault's key, as `box.tryOpen` says, told to `onBadNews` as well; 'bad_record' for a
-   * record this package does not write; 'vault_closed' after `close()`.
+   * asked for a proof. A record lies under the vault props in hand, which the lease opens; a box,
+   * under the ones it was read or sealed under. Refuses kind 'bad_record' for a record this package
+   * does not write, before any key is looked for, and 'absent_vault' for a record handed to a
+   * vault not made yet; 'vault_locked' when no lease is in hand -- `ensureLease()` first -- when
+   * a lock lands while the box opens, or for a box of another vault than the lease opens (one
+   * deleted and made anew since); 'damaged_box' for a box that will not open under this vault's
+   * key, as `box.tryOpen` says, told to `onBadNews` as well; 'vault_closed' after `close()`.
    *
    * @example const whisper = await vault.decryptWhisper(box)
    */
@@ -775,11 +776,12 @@ export class Vault {
   async tryDecryptWhisper(box: Box | BoxRecord): Promise<Outcome<Whisper>> {
     try {
       this.#checkOpen()
-      const record = box instanceof Box ? box.record : checkedBoxRecord(box)
+      // Made anew for this vault, its record checked once, by Box.make, before any key is looked
+      // for: a box opens under this vault's scope, whichever it came from, and under the vault props
+      // it was read under; a record, under those in hand, which the lease in hand, if any, opens.
+      const inHand = this.#vaultProps === UnreadVaultProps ? null : this.#vaultProps?.vault_id ?? null
+      const held = box instanceof Box ? Box.make(this, box.record, box.vault_id) : Box.make(this, box, inHand)
       const lease = this.#checkUnlocked()
-      // Made anew for this vault: a box opens under this vault's scope, whichever it came from, and
-      // under the vault props it was read under; a record, under those the lease opens.
-      const held = Box.make(this, record, box instanceof Box ? box.vault_id : lease.vault_id)
       const whisper = valOf(await held.tryOpen(lease))
       this.#checkUnlocked()
       return good(whisper)

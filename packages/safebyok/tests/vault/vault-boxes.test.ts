@@ -1123,6 +1123,21 @@ const storedBoxOf = async (world: ReturnType<typeof makeWorld>): Promise<BoxReco
 }
 
 describe("vault.decryptWhisper", () => {
+  it("checks a record handed in once, as Box.make does, and a box once, remaking it under this vault", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.putBox('anthropic', 'sk-fake')
+    const record = await storedBoxOf(world)
+    const box = Box.make(vault, record)
+    const checks = vi.spyOn(BoxRecord, 'safeParse')
+    expect(await vault.decryptWhisper(record)).to.eq('sk-fake')
+    expect(checks).toHaveBeenCalledTimes(1)
+    checks.mockClear()
+    expect(await vault.decryptWhisper(box)).to.eq('sk-fake')
+    expect(checks).toHaveBeenCalledTimes(1)
+    vi.restoreAllMocks()
+  })
+
   it("opens a box with the key in hand, reading no storage and asking for no proof, as its example shows", async () => {
     const world = makeWorld()
     const getProof = vi.fn<GetProof>(() => 'declined')
@@ -1232,6 +1247,23 @@ describe("what a vault hands its boxes", () => {
     expect(() => { sidecar.tags.push('mallory') }).to.throw(TypeError)
     await vault.hello({ staleMinutes: 0 })
     expect(TH.summaryOf(vault.boxes[0])?.sidecar).to.deep.equal({ note: 'work account', tags: ['team'] })
+  })
+
+  it("lists each sidecar as the listing's check made it, frozen where it stands, never serialized and parsed again", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    const listings = vi.spyOn(world.vaultDB, 'listBoxes')
+    const parses = vi.spyOn(JSON, 'parse')
+    const stringifies = vi.spyOn(JSON, 'stringify')
+    await vault.putBox('anthropic', 'sk-fake', { sidecar: { note: 'work account' } })
+    const sidecar = TH.summaryOf(vault.boxes[0])?.sidecar
+    const listed = await Promise.all(listings.mock.results.map(async (result) => valOf(await (result.value as ReturnType<VaultDB['listBoxes']>))))
+    expect(listed.some(([box]) => box !== undefined && ! box.damaged && box.sidecar === sidecar)).to.be.true
+    expect(Object.isFrozen(sidecar)).to.be.true
+    const sidecarText = '{"note":"work account"}'
+    expect(parses.mock.calls.filter(([text]) => text === sidecarText)).to.have.lengthOf(0)
+    expect(stringifies.mock.calls.filter(([val]) => val === sidecar)).to.have.lengthOf(0)
+    vi.restoreAllMocks()
   })
 
   it("seals every put under a fresh boxKey and revision, the same whisper twice included (Contract: vault.putBox, Guarantees)", async () => {
