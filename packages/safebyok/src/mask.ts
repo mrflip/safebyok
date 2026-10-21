@@ -9,10 +9,7 @@ export interface MaskOpts {
   tail?: number | undefined
   /** Fewest stars the result may carry, however short the whisper. Default 6. */
   minStars?: number | undefined
-  /**
-   * Longest result, in characters (code points). A longer one collapses to `head`, `***...***`,
-   * `tail`; if even that is too long, to `maxLen` stars alone. Default 15. `Infinity` never collapses.
-   */
+  /** Longest result, in code points. Default 15. `Infinity` never collapses. */
   maxLen?: number | undefined
 }
 
@@ -39,25 +36,15 @@ const parseMaskOpts = (candidate: MaskOpts | undefined): Record<keyof MaskOpts, 
   return checked.data
 }
 
-/**
- * What `plainLine` removes: combining marks, every control, format, surrogate, private-use and
- * unassigned code point, every space and line or paragraph separator, anything a renderer is told
- * to ignore, the bidirectional controls and direction marks, the symbols drawn blank (the blank
- * braille pattern and the musical null notehead), and the object replacement character, which is
- * drawn as a boxed "OBJ". Right-to-left letters and numbers are not here: they are kept.
+/** What `plainLine` removes: combining marks, controls, invisibles, spaces, bidirectional controls, and symbols drawn blank or boxed.
+ * Right-to-left letters and numbers are kept.
  */
 const Unsafe = /[\p{M}\p{C}\p{Z}\p{Default_Ignorable_Code_Point}\p{Bidi_Control}\u{2800}\u{1D159}\u{FFFC}]/gu
 
 const composeAndStrip = (text: string): string => text.normalize('NFC').replaceAll(Unsafe, '')
 
-/**
- * `text` reduced to one compact, safe line: composed (so a letter and its accent are one letter),
- * then stripped, never escaped, of every combining mark (stacked "Zalgo" marks among them),
- * invisible or control character, lone surrogate, bidirectional control and direction mark, and
- * space of any kind. Whatever is left is visible and stays on one line, though a wide character
- * (an ideograph, an emoji) takes two columns, and right-to-left letters, which are kept, may
- * reorder the neutral characters beside them in a display. Composed and stripped twice, since
- * removing an invisible from between two Hangul jamo leaves them to compose.
+/** `text` reduced to one compact line of visible characters: composed to NFC, then stripped, never escaped, of all {@link Unsafe} holds.
+ * It runs twice, since removing an invisible from between two Hangul jamo leaves them to compose.
  */
 const plainLine = (text: string): string => composeAndStrip(composeAndStrip(text))
 
@@ -80,49 +67,21 @@ const butcher = (chars: readonly string[], { head, tail, minStars, maxLen }: Rec
   return '*'.repeat(maxLen)
 }
 
-/**
- * A whisper's outline, to show in a log or a reminder: a whiff of interesting text from each end
- * with stars between, so a user can tell which API key a box holds without the key being
- * revealed. It is best effort, not a copy: the result is always one plain line, and fidelity
- * gives way to that. The result is public: show it, but never count on it to hide more than it
- * does -- it gives away the whisper's ends, and (up to `maxLen`) its length.
+/** A whisper's outline for a log or a reminder: a whiff of each end with stars between, so a user can tell which API key a box holds.
+ * The result is always one plain line of visible characters, and fidelity gives way to that. It is
+ * public: it gives away the whisper's ends and, up to `maxLen`, its length. Pass `{ head: 0, tail:
+ * 0 }` to show only the length. At `minStars: 0` a short whisper may be shown whole.
  *
- * `mask` is intended for plain text. Calling it with arbitrary blobs may give unusual behavior.
- * Every combining mark is stripped, so a script that writes its vowels as marks loses them:
- * Hindi `नमस्ते` comes out as `नमसत`, and Thai, Tamil, Bengali and Khmer fare alike. An API key is
- * ASCII, and is untouched.
+ * It is meant for plain text. It strips marks, invisibles, controls and spaces, so a script that
+ * writes vowels as marks loses them (Hindi `नमस्ते` comes out as `नमसत`). An API key is ASCII, and
+ * untouched. Right-to-left letters are kept, so a display may reorder the stars beside them.
  *
- * It works in three stages. First it makes the whisper safe to butcher: the whole input is
- * composed and stripped of combining marks (so, the accents of scripts that rely on them),
- * invisible and control characters, every bidirectional control and direction mark, and every
- * kind of space. Then it butchers, cutting head and tail by code point with stars between. Last
- * it checks the result is safe, passing it through the same stripping again; that last stage is
- * what guarantees no result contains a stripped code point, whatever the cut left behind. If it
- * ever changes the result, the result may be shorter than intended.
+ * It cuts by code point, so it can part an emoji sequence. At least `minStars` stars hide the
+ * whisper: a short one gives up `head` characters first, then `tail`. The result never passes
+ * `maxLen`: past it, the result is `head`, `***...***`, `tail`, or else `maxLen` stars alone.
  *
- * Right-to-left letters and numbers (Hebrew, Arabic and the rest) are kept, and fall where they
- * fall; a display may therefore reorder the neutral characters, such as stars and punctuation,
- * beside them.
- *
- * What is cut is cut by code point, so a cut can part an emoji sequence or a flag; whatever that
- * leaves is visible text. At least `minStars` stars stand in the whisper's place, unless the
- * result is shortened for `maxLen`: a whisper too short to keep `head` and `tail` and still hide
- * `minStars` characters gives up `head` characters first, then `tail`, and one shorter than
- * `minStars` shows only stars. A result that would pass `maxLen` characters is instead the `head`
- * kept, `***...***`, then the `tail` kept, whatever `minStars` is; if that is too long too, it is
- * `maxLen` stars, nothing else. Whatever the options, the result is never longer than `maxLen`.
- * An empty whisper gives the empty string; a whisper that is nothing but removed characters gives
- * `minStars` stars, or `maxLen` if that is fewer.
- *
- * Pass `{ head: 0, tail: 0 }` to show nothing of the whisper but how long it is. Lower `minStars`
- * with care: at 0 a short whisper may be shown whole.
- *
- * @param whisper - Text to mask: an API key, say.
- * @param opts - How much to keep and hide; see {@link MaskOpts}.
- * @returns The masked text. Throws a VaultError of kind 'bad_option' for an option that is not a
- *   whole number of at least zero (`head`, `tail` and `minStars` at most 1000; `maxLen` also
- *   `Infinity`), and of kind 'bad_whisper' for a whisper that is not a string. Neither message
- *   quotes the whisper.
+ * It refuses 'bad_option' for an option out of range, and 'bad_whisper' for a whisper that is no
+ * string. Neither message quotes the whisper.
  *
  * @example mask('sk-ant-api03-abcdefghijklmnopqrstuvwxyz')  // 'sk***...***wxyz'
  * @example mask('sk-ant-abcd1234')                          // 'sk*********1234'

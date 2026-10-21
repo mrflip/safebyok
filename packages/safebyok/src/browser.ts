@@ -6,13 +6,7 @@ import { zxcvbnStrengthChecker } from './zxcvbn-strength-checker'
 
 export { MinPassphraseChars, MinZxcvbnScore, zxcvbnStrengthChecker } from './zxcvbn-strength-checker'
 
-/**
- * The defaults for an app in a browser, as an entry point of their own, `safebyok/browser`: the
- * options `Vault.make` asks for that nearly every browser app answers the same way. The main entry
- * asks for each of them outright, so an app that answers differently -- another key deriver, a
- * device store of its own -- never ships the code for these. Among them is `zxcvbnStrengthChecker`,
- * the passphrase strength checker, whose dictionary loads only when a passphrase is first checked.
- */
+/** `safebyok/browser`: the answers nearly every browser app gives to `Vault.make`'s options, so an app that answers otherwise never ships them. */
 
 /** The Vault.make options {@link browserOpts} supplies: spread them in beside your own. */
 export type BrowserOpts = Readonly<Pick<MakeVaultOpts, 'keyDeriver' | 'deviceDB' | 'strengthChecker'>>
@@ -21,17 +15,12 @@ export type BrowserOpts = Readonly<Pick<MakeVaultOpts, 'keyDeriver' | 'deviceDB'
 // its vault whenever an option changes identity, and a fresh deviceDB each render would loop.
 const bagsByDbName = new Map<string, BrowserOpts>()
 
-/**
- * The browser's answers to Vault.make's options: the pinned Argon2id key deriver
- * (`argon2idWebV1Deriver`), the IndexedDB device store (`idbDeviceDB`), and the passphrase
- * strength checker (`zxcvbnStrengthChecker`), whose zxcvbn dictionary loads, as a chunk of its own,
- * only when a passphrase is first checked. Spread the bag into `Vault.make` beside the storage
- * adapter for your backend, which is never a default; any field you pass after the spread wins,
- * a strength checker of your own among them. The same `dbName` always answers the same bag.
+/** A frozen bag of the browser's `keyDeriver`, `deviceDB` and `strengthChecker`, to spread into `Vault.make` beside your storage adapter.
+ * They are {@link argon2idWebV1Deriver}, {@link idbDeviceDB} and {@link zxcvbnStrengthChecker}. A
+ * field you pass after the spread wins. The same `dbName` always answers the same bag, so it is
+ * safe to call during render. It refuses 'bad_option' for a `dbName` that is not non-empty text.
  *
  * @param opts - Where the device store keeps its records: `dbName`, default 'safebyok'.
- * @returns A frozen bag of `keyDeriver`, `deviceDB` and `strengthChecker`. Kind 'bad_option' for a `dbName` that is
- *   not non-empty text.
  *
  * @example
  *   const vault = Vault.make({ applabel: 'acme', userId, vaultlabel: 'main', vaultDB, ...browserOpts() })

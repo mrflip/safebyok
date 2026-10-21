@@ -1,18 +1,8 @@
-/**
- * What each model attaches beside its stored record -- the vault it belongs to, the record itself
- * as `props` -- is attached by these two, where no loop, spread, log line or `JSON.stringify` will
- * find it. Internal: no entry point exports them.
- */
+/** How a model attaches its vault and its record as `props`, where no loop, spread, log line or `JSON.stringify` will find them. */
 
-/** `val`, once attached to `obj` as the property `ckey`, hidden: non-enumerable, so `Object.keys`, a spread, `JSON.stringify` and a log line pass it by.
- * It is otherwise an ordinary property, writable and configurable: a model that freezes itself
- * afterwards fixes it with the rest. Handing back `val` lets a getter attach what it works out
- * the first time it is read, and every later read find the attached value in place of the getter.
- *
- * @param obj - The object to attach to; changed in place.
- * @param ckey - Name of the property.
- * @param val - What to attach.
- * @returns `val`.
+/** `val`, once attached to `obj` as the non-enumerable property `ckey`, which `Object.keys`, a spread and `JSON.stringify` pass by.
+ * It is writable and configurable, so a model that freezes itself afterwards fixes it with the
+ * rest. A getter that attaches what it works out under its own name is read once.
  *
  * @example adorn(wayin, 'vault', vault)   // => vault; JSON.stringify(wayin) leaves it out
  * @example get wayinCtx() { return adorn(this, 'wayinCtx', wayinCtxOf(this)) }   // worked out once, on the first read
@@ -22,12 +12,7 @@ export const adorn = <VT>(obj: object, ckey: string, val: VT): VT => {
   return val
 }
 
-/** `obj`, with each of `props`' own entries attached to it as {@link adorn} attaches one, hidden.
- * What a model's constructor calls to attach its vault and its record, before it freezes itself.
- *
- * @param obj - The object to attach to; changed in place.
- * @param props - The properties to attach, by name.
- * @returns `obj`.
+/** `obj`, with each of `props`' own entries attached as {@link adorn} attaches one: what a model's constructor calls before it freezes itself.
  *
  * @example decorate(box, { vault, props: record })   // box.vault reads; JSON.stringify(box) leaves both out
  */

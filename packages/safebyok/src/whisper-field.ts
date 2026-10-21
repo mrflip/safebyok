@@ -1,16 +1,12 @@
-/**
- * The attributes for a field a user types or pastes a whisper into (an API key, say), so that the
- * browser and the password managers in it leave it alone: each major password manager's flag to
- * ignore the field, `autoComplete: 'off'` (the field is no credential: nothing is to be filled into
- * it, saved from it, or generated for it), and no capitalizing, correcting or spell-checking -- a
- * browser's enhanced spell-check may send what is typed to its maker's servers. Give the field a
- * name that says `whisper`, never `key`, `password` or `token`, which managers look for. A field
- * for the vault's passphrase wants the opposite: see `safebyok-react`'s passphrase dialog.
+/** The attributes for a field a user types a whisper into, so the browser and its password managers leave it alone.
+ * They set each major manager's flag to ignore it, `autoComplete: 'off'`, and no capitalizing,
+ * correcting or spell-checking: enhanced spell-check may send what is typed to the browser's maker.
+ * Name the field for `whisper`, never `key`, `password` or `token`, which managers look for. A
+ * passphrase field wants the opposite: see `safebyok-react`'s passphrase dialog.
  *
- * Spelled as React spells props, every value text, so they spread onto a React input as they
- * are, and onto a DOM element by `setAttribute` (an HTML document lowercases the names). Each
- * manager honors only its own flag, and a browser's built-in manager may honor none: Chrome's still
- * offers a saved password for a `type="password"` field marked `off`.
+ * They are spelled as React props with text values, so they also go onto a DOM element by
+ * `setAttribute`. A browser's built-in manager may honor none: Chrome's still offers a saved
+ * password for a `type="password"` field marked `off`.
  *
  * @example <input name="whisper_text" type="password" {...WhisperFieldAttributes} />
  * @example for (const [attrname, attrval] of Object.entries(WhisperFieldAttributes)) { field.setAttribute(attrname, attrval) }
