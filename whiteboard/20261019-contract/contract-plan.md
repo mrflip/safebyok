@@ -14,9 +14,9 @@ this line.
   A markdown export of rev 2025 (after the first batch of rulings) sits at
   `/tmp/claude-1000/-workspace-byok/23ac0f81-dcca-476b-9702-e252de19ef92/scratchpad/contract/contract.md`
   (56 kB; `grep -n '^#'` is its outline). The handoff says when a ruling has changed it since.
-* **Sprint doc:** https://claude.ai/code/artifact/362ec68d-5bf3-46aa-a379-59a9c8bfb548
+* **Sprint doc:** https://claude.ai/artifact/7h4ZNsYfYYD6aS81htMwgB
   (*Open Matters*, *Resolved*, *Progress*).
-* **Status:** paused 2026-10-20 for the Coach's weekly usage limit (`human/20261020-sprint_contract_paused.md`). Phases A and B filed, #193 → … → #209 (47ab50be). C1 `putbox_store` and `b_fixes` stopped mid-build, uncommitted, in their worktrees.
+* **Status:** resumed 2026-10-21. C1 `putbox_store` and `b_fixes` building again from 47ab50be (fresh workers over the stopped work); both review at `high`, then restack into one line and pause for the Coach before `lean_core`. Phases A and B filed, #193 → … → #209 (47ab50be).
 
 ## How this plan relates to the preplan
 
