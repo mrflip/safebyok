@@ -36,7 +36,7 @@
     "eslint-plugin-sonarjs": "^4.2.2",
     "eslint-plugin-unicorn": "^77.0.0",
     "pg": "^8.23.1",
-    "react": "^19.3.0",
+    "react": "^19.3.1",
     "safebyok": "workspace:*",
     "safebyok-convex": "workspace:*",
     "safebyok-postgres": "workspace:*",
