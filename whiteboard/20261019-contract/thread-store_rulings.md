@@ -1,6 +1,6 @@
 # Thread store_rulings: the Coach's fourth pass on C1's rows (2026-10-21)
 
-Branch `20261021-store_rulings`, PR #PRNUM, stacked on #216, in the line main → #213 → #212 →
+Branch `20261021-store_rulings`, PR [#217](https://github.com/mrflip/safebyok/pull/217), stacked on #216, in the line main → #213 → #212 →
 #214 → #215 → #216. Justify: green (core 2696 passed / 37 skipped; postgres 282/15; convex
 293/9; graphql 279/15; indexeddb 150/11; react 284; fastkey 49; demo 209/17; e2e 95 passed, 104
 skipped: no Docker here, so no live Postgres or Convex backend ran).
@@ -39,6 +39,8 @@ skipped: no Docker here, so no live Postgres or Convex backend ran).
       with `extensions.meta.capacity`. The Postgres route recipe sends a refusal's `meta` whole and
       serves `getCapacity`; the demo's outage adapter hands it on.
     * Battery line 4.7, *An adapter says how full a vault is* (VAULTDB.md 4.7).
+  * `notes/security.md` (sonnet): the C1 putBox entry, the `FOR SHARE` entry, the `meta` entry,
+    and the Convex, GraphQL and route-recipe entries amended in place for all four rulings.
 * **Decisions taken**:
   * `getCapacity`, a `get` verb as STYLE.md has them; the hook answers a whole `Capacity`, since
     only the adapter knows the limit it enforces (Convex's bytes limit is not its declared
