@@ -323,7 +323,7 @@ export class Vault {
    *   try { await vault.hello() } catch (err) {
    *     if (isVaultError(err, 'damaged_vault') && userConfirmedStartingOver()) { await delDamagedVault(opts) }
    *   }
-   * @example document.addEventListener('visibilitychange', () => { if (! document.hidden) { void vault.hello() } })
+   * @example document.addEventListener('visibilitychange', () => { if (! document.hidden) { void vault.tryHello() } })
    * @example window.addEventListener('focus', () => { void vault.tryHello() })   // never vault.hello itself: it refuses the event
    * @example await vault.hello({ staleMinutes: 0 })   // read now, whatever was read a moment ago
    */

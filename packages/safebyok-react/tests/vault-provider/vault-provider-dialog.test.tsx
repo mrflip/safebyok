@@ -247,14 +247,18 @@ describe("VaultProvider", () => {
       // dialog is handed each ask through one whose attempt keeps what it starts.
       const attempts: Promise<Outcome<Vault>>[] = []
       const make = Vault.make.bind(Vault)
-      vi.spyOn(Vault, 'make').mockImplementation((opts) => make({ ...opts, getProof: async (ask) => {
-        const attempt: Ask['attempt'] = (proof) => {
-          const attempting = ask.attempt(proof)
-          attempts.push(attempting)
-          return attempting
-        }
-        return await opts.getProof!(Object.create(ask, { attempt: { value: attempt } }) as Ask)
-      } }))
+      vi.spyOn(Vault, 'make').mockImplementation((opts) => {
+        const { getProof } = opts
+        if (getProof === undefined || getProof === null) { throw new Error("The provider hands every vault it makes a getProof.") }
+        return make({ ...opts, getProof: async (ask) => {
+          const attempt: Ask['attempt'] = (proof) => {
+            const attempting = ask.attempt(proof)
+            attempts.push(attempting)
+            return attempting
+          }
+          return await getProof(Object.create(ask, { attempt: { value: attempt } }) as Ask)
+        } })
+      })
       render(world.tree('u1', slowDeriver))
       const vault = await world.opened()
       const first = vault.tryGetBox('anthropic_api_key')
