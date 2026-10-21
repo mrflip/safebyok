@@ -440,7 +440,7 @@ export class Vault {
         // proved it, and the user makes a new one under the new passphrase. A new passkey leaves
         // the passphrase as it stood.
         revise: async (standing, proven, deviceId) => {
-          const wayin = await Wayin.seal(this, standing, putting, deviceId, proven.transientKey)
+          const wayin = await Wayin.seal(this, standing.vault_id, putting, deviceId, proven.transientKey)
           return wayin.wayinkind === 'passphrase' ? { passphrase: wayin.record, passkey: null } : { passphrase: standing.passphrase, passkey: wayin.record }
         },
       })
@@ -862,8 +862,8 @@ export class Vault {
     const known = this.#modelled.get(standing)
     if (known !== undefined) { return known }
     const wayins = Object.freeze({
-      passphrase: Wayin.make(this, standing, standing.passphrase),
-      passkey:    standing.passkey === null ? null : Wayin.make(this, standing, standing.passkey),
+      passphrase: Wayin.make(this, standing.vault_id, standing.passphrase),
+      passkey:    standing.passkey === null ? null : Wayin.make(this, standing.vault_id, standing.passkey),
     })
     this.#modelled.set(standing, wayins)
     return wayins
@@ -1286,12 +1286,14 @@ export class Vault {
    * does.
    */
   async #draftVaultProps(passphrase: PassphraseProof, deviceId: string): Promise<VaultProps> {
-    const identity = { vault_id: randomId(), registered_at: this.#clockNow() }
-    const wayin = await Wayin.seal(this, identity, passphrase, deviceId, await makeVaultKey())
+    const vaultId = randomId()
+    const registeredAt = this.#clockNow()
+    const wayin = await Wayin.seal(this, vaultId, passphrase, deviceId, await makeVaultKey())
     return {
       format:              'safebyok-vault-v6',
       ...this.#scope,
-      ...identity,
+      vault_id:            vaultId,
+      registered_at:       registeredAt,
       unlock_epoch:        1,
       passphrase:          wayin.record,
       passkey:             null,

@@ -144,11 +144,11 @@ describe("tampering", () => {
     })
   }
 
-  it("vault props whose registered_at was altered open to no passphrase: it is bound into every way in", async () => {
+  it("vault props whose vault_id was altered open to no passphrase: it is bound into every way in", async () => {
     const world = makeWorld()
     await world.openUnlocked('pw')
-    const vaultProps = JSON.parse(world.dbStore.read(u1VaultPropsCkey) ?? '{}') as { registered_at: number }
-    world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...vaultProps, registered_at: vaultProps.registered_at - 1 }))
+    const vaultProps = JSON.parse(world.dbStore.read(u1VaultPropsCkey) ?? '{}') as { vault_id: string }
+    world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...vaultProps, vault_id: `${vaultProps.vault_id}-moved` }))
     const vault = await world.open({ deviceDB: memoryDeviceDB() })
     const err = await TH.expectRefusal(vault.unlock('pw'), 'wrong_passphrase')
     // The decryption fails as for a typo, so the message names both, and claims neither.

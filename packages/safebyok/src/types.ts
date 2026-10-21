@@ -229,19 +229,19 @@ export type PasskeyWayinRecord = Z.infer<typeof PasskeyWayinRecord>
 export const WayinRecord = Z.discriminatedUnion('wayinkind', [PassphraseWayinRecord, PasskeyWayinRecord])
 export type WayinRecord = Z.infer<typeof WayinRecord>
 
-/** A vault's passphrase as its snapshot shows it, even while locked: its kind, and when and by which device it was sealed.
+/** A vault's passphrase as its snapshot shows it, even while locked: its kind, when and by which device it was sealed, and its `vault_id`.
  * The `device_id` is one per device per vault, so it links nothing the vault does not already link.
  *
- * @example vault.getSnapshot().passphrase   // { wayinkind: 'passphrase', device_id: 'k3x9...', registered_at: 1760000000000 }
+ * @example vault.getSnapshot().passphrase   // { wayinkind: 'passphrase', device_id: 'k3x9...', registered_at: 1760000000000, vault_id: 'v7q2...' }
  */
-export type PassphraseWayinSummary = Pick<PassphraseWayinRecord, 'wayinkind' | 'device_id' | 'registered_at'>
+export type PassphraseWayinSummary = Pick<PassphraseWayinRecord, 'wayinkind' | 'device_id' | 'registered_at'> & Pick<VaultProps, 'vault_id'>
 
 /** A vault's passkey as its snapshot shows it, even while locked: a {@link PassphraseWayinSummary}'s fields, and what to ask the authenticator with.
  * `safebyok-react`'s `askPasskey` takes it.
  *
- * @example vault.getSnapshot().passkey   // { wayinkind: 'passkey', device_id, registered_at, credential_id: 'AXk3...', prf_salt_b64: 'q83v...' }, or null
+ * @example vault.getSnapshot().passkey   // { wayinkind: 'passkey', device_id, registered_at, vault_id, credential_id: 'AXk3...', prf_salt_b64: 'q83v...' }, or null
  */
-export type PasskeyWayinSummary = Pick<PasskeyWayinRecord, 'wayinkind' | 'device_id' | 'registered_at' | 'credential_id' | 'prf_salt_b64'>
+export type PasskeyWayinSummary = Pick<PasskeyWayinRecord, 'wayinkind' | 'device_id' | 'registered_at' | 'credential_id' | 'prf_salt_b64'> & Pick<VaultProps, 'vault_id'>
 
 /** A wayin of either kind as a snapshot shows it, told apart by `wayinkind`: what a `damaged_wayin` refusal's `meta.wayin_listed` holds. */
 export type WayinSummary = PassphraseWayinSummary | PasskeyWayinSummary
@@ -280,13 +280,6 @@ export const VaultProps = Z.object({
   registered_at:       EpochMillis,
 })
 export type VaultProps = Z.infer<typeof VaultProps>
-
-/** What names one vault's props for good: their `vault_id` and `registered_at`, which never change once the vault is made, and which each wayin's wrap is bound to.
- * A whole {@link VaultProps} is one.
- *
- * @example const identity: VaultIdentity = { vault_id: vaultProps.vault_id, registered_at: vaultProps.registered_at }
- */
-export type VaultIdentity = Pick<VaultProps, 'vault_id' | 'registered_at'>
 
 /** A lease as this device keeps it: the non-extractable leaseKey, and the vaultKey wrapped under it. What a `Lease` is made from.
  * It has no JSON form, so only structured-clone storage (IndexedDB) or memory holds it. Nothing in
