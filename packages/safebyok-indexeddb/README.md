@@ -142,10 +142,8 @@ And keep, as they are:
   (`Expectations.vaultPropsMeets`, `vaultMeets`, `vaultIdMeets`), and for a box write, the
   refusal it throws when it misses (`Expectations.boxRefusalOf`: `vault_mismatch`, or
   `stale_write` carrying the box that stands). An adapter
-  compares only the scope, `boxlabel`, `vault_id`, `unlock_epoch`, `vault_key_epoch` and
-  `revision_tok`, and a standing row too damaged to show one of them fails the comparison. A
-  box write compares the vault props' `vault_key_epoch` too, in the same transaction: skip it,
-  and a device still holding a vaultKey since replaced can seal a whisper under it.
+  compares only the scope, `boxlabel`, `vault_id`, `unlock_epoch` and `revision_tok`, and a
+  standing row too damaged to show one of them fails the comparison.
 * **Store each record as itself, field by field**, exactly as handed to you, and return it
   exactly as stored, or null for none. Never look inside a ciphered field, never repair a
   damaged row: safebyok validates everything it reads back.

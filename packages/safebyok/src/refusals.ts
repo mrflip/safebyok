@@ -78,7 +78,7 @@ export const StaleBoxMessage = "That box changed in storage since this device re
 
 /** A `vault_mismatch` refusal of a box write, carrying nothing of the vault props that stand.
  * The scope's standing vault props are not the ones the box was sealed for -- none stand, or
- * they have another `vault_id`, or another `vault_key_epoch` -- so nothing was written. Nothing
+ * they have another `vault_id` -- so nothing was written. Nothing
  * of them is carried, as they hold every way in.
  *
  * @returns The refusal, to throw from `doPutBox`.

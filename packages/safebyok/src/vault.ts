@@ -60,8 +60,6 @@ export type VaultSnapshot = Readonly<{
    * other device back to `locked`. Null until a read finds a vault.
    */
   unlock_epoch:    number | null
-  /** Which vaultKey the stored vault's ways in wrap: 1, reserved; null until a read finds a vault. */
-  vault_key_epoch: VaultProps['vault_key_epoch'] | null
   /**
    * The vault's passphrase, visible fields only ({@link PassphraseWayinSummary}): when it was set,
    * and from which device. Never its salt, never its wrap. Null until a read finds a vault. The
@@ -157,8 +155,8 @@ type BoundVaultProps = Readonly<BoxVaultProps & WayinVaultProps & LeaseVaultProp
  * This device keeps a mark of the newest copy of the vault props it has seen (a device mark, in
  * the deviceDB, which `lock()` leaves and `del()` empties). A call that reads the vault props
  * afresh -- `hello()`, `unlock()`, a change to the ways in, a store that catches up with storage, a
- * background refresh -- refuses an older copy of that same vault, one at a lower unlock epoch or
- * vaultKey epoch than this device has seen, with kind 'rolled_back', taking nothing from it and
+ * background refresh -- refuses an older copy of that same vault, one at a lower unlock epoch than
+ * this device has seen, with kind 'rolled_back', taking nothing from it and
  * writing nothing: storage handing back older vault props could otherwise bring back a way in
  * that was removed. Storage so little to be trusted locks the vault, as `lock()` does, as a storage
  * refusal of kind 'identity_revoked' does. A host that knows its storage was restored from an
@@ -200,7 +198,7 @@ type BoundVaultProps = Readonly<BoxVaultProps & WayinVaultProps & LeaseVaultProp
  *   if (! ok && err.refusalkind === 'wrong_passphrase') { askAgain(err.message) }
  */
 export class Vault {
-  // == [Vault: fields]: applabel, user_id, vaultlabel, vault_id, registered_at, unlock_epoch, vault_key_epoch, passphrase, passkey, state, boxes, capacity, askPassphraseAt, trouble, syncing, snapshot, getSnapshot, subscribe, leaseMillis, logger, keyDeriver
+  // == [Vault: fields]: applabel, user_id, vaultlabel, vault_id, registered_at, unlock_epoch, passphrase, passkey, state, boxes, capacity, askPassphraseAt, trouble, syncing, snapshot, getSnapshot, subscribe, leaseMillis, logger, keyDeriver
 
   // Each field reads the snapshot `#settle()` last published, so the fields and the snapshot always
   // agree. A getter with no setter: a host cannot write over one, and the vault never reads one back:
@@ -218,8 +216,6 @@ export class Vault {
   get registered_at(): number | null { return this.#snapshot.registered_at }
   /** Up by one on every change to the ways in, which sends every other device back to `locked`; null until a read finds a vault. */
   get unlock_epoch(): number | null { return this.#snapshot.unlock_epoch }
-  /** Which vaultKey the ways in wrap: 1, reserved; null until a read finds a vault. */
-  get vault_key_epoch(): VaultProps['vault_key_epoch'] | null { return this.#snapshot.vault_key_epoch }
   /** The vault's passphrase, its summary: no salt, no wrapped vaultKey; null until a read finds a vault. See {@link VaultSnapshot}. */
   get passphrase(): PassphraseWayinSummary | null { return this.#snapshot.passphrase }
   /** The vault's passkey, its summary: no wrapped vaultKey; null while it has none. See {@link VaultSnapshot}. */
@@ -685,14 +681,13 @@ export class Vault {
       const unlockedKey = this.#checkUnlocked()
       // The vault props the box is sealed under are the ones its write names: one object, read once.
       const sealing = this.#boundPropsOf(this.#currentVaultProps())
-      const { vault_id: vaultId, vault_key_epoch: vaultKeyEpoch } = sealing
-      // Lands only in the vault this whisper is sealed for, under the vaultKey that seals it, over
-      // the revision just read -- for a damaged box, the one the listing names -- : a vault reborn
-      // elsewhere, a vaultKey replaced, or a box written meanwhile by another device, refuses it.
+      // Lands only in the vault this whisper is sealed for, over the revision just read -- for a
+      // damaged box, the one the listing names -- : a vault reborn elsewhere, or a box written
+      // meanwhile by another device, refuses it.
       const overRevision = standing === 'damaged' ? this.#listedRevisionOf(label) : prev?.revision_tok ?? null
       // A damaged box the listing does not show yet is written as over none, which storage refuses
       // while it stands; the catch-up lists it, with its revision for the next store.
-      const expected = { vault_id: vaultId, revision_tok: overRevision, vault_key_epoch: vaultKeyEpoch }
+      const expected = { vault_id: sealing.vault_id, revision_tok: overRevision }
       // The sidecar a store keeps from the box it replaces, when none is given, counts toward the
       // limit too: known once the plan has vouched for that box, and weighed before any key is made.
       const plan = await planSeal(sealing, unlockedKey, { boxlabel: label, whisperBytes, sidecarJson: givenSidecarJson, over: prev })
@@ -1084,7 +1079,6 @@ export class Vault {
       vault_id:        standing?.vault_id ?? null,
       registered_at:   standing?.registered_at ?? null,
       unlock_epoch:    standing?.unlock_epoch ?? null,
-      vault_key_epoch: standing?.vault_key_epoch ?? null,
       passphrase:      wayins === null ? null : Object.freeze(wayins.passphrase.summary),
       passkey:         wayins?.passkey ? Object.freeze(wayins.passkey.summary) : null,
       state,
@@ -1161,8 +1155,7 @@ export class Vault {
     }
     const shown = this.#boxes
     const shownWayins = this.#wayinListOf(this.#shownProps)
-    // A box under a vaultKey the vault does not hold lists as damaged from its epoch alone.
-    this.#boxes = standing === null ? [] : listed.map((box) => heldListing(isUnderHeldKey(box, standing) ? box : asDamaged(box)))
+    this.#boxes = standing === null ? [] : listed.map((box) => heldListing(box))
     this.#syncing = true
     this.#readAt = readAt
     // A read with no damaged box or way in clears the trouble: nothing amiss stands. The listing is
@@ -1305,11 +1298,9 @@ export class Vault {
 
   /**
    * This device's mark for `fresh`, vault props storage handed back, kept up to date: vault props
-   * of the vault the mark names, at an `unlock_epoch` or a `vault_key_epoch` below the one this
-   * device has seen, are refused as 'rolled_back', and nothing is written or taken from them. The
-   * vaultKey's epoch is bound into every wayin and held to the vault props', so storage cannot
-   * raise it on older vault props and still have a way in open; the unlock epoch is bound into
-   * nothing, so older vault props at the same vaultKey under a raised unlock epoch pass.
+   * of the vault the mark names, at an `unlock_epoch` below the one this device has seen, are
+   * refused as 'rolled_back', and nothing is written or taken from them. The unlock epoch is bound
+   * into nothing, so older vault props under a raised unlock epoch pass.
    *
    * `seenBefore` is the mark as it was read before `fresh` was, which the vault props are then held
    * to, when the caller read one: storage held that epoch when the mark was written, so vault props
@@ -1321,7 +1312,7 @@ export class Vault {
     const kept = await this.#keptMark(opts.call)
     const held = (opts.seenBefore === undefined ? kept : opts.seenBefore)?.seen ?? null
     const older = held !== null && held.vault_id === fresh.vault_id
-      && (fresh.unlock_epoch < held.unlock_epoch || fresh.vault_key_epoch < held.vault_key_epoch)
+      && fresh.unlock_epoch < held.unlock_epoch
     if (older) {
       const refusal = new VaultError('rolled_back', "This device has already seen a newer copy of this vault than storage offers now, so it won't use this one, and the vault locked: nothing was unlocked or written. Storage restored from a backup, or altered, does this. If the vault's storage was restored from an older copy on purpose, the app can have this device accept it by forgetting what it saw of the vault (its deviceDB's delMark) and opening the vault again; otherwise the app's support should look at its storage.")
       // Storage that hands back an older copy is not to be trusted with an unlocked vault.
@@ -1333,8 +1324,8 @@ export class Vault {
 
   /**
    * The mark this device keeps once it has seen `fresh`: `kept` itself when it has already seen
-   * that vault at that `unlock_epoch` and `vault_key_epoch` or past both, and otherwise a new mark
-   * at the higher of each, written before it is returned -- under the `device_id` `kept` has seen
+   * that vault at that `unlock_epoch` or past it, and otherwise a new mark
+   * at the higher of the two, written before it is returned -- under the `device_id` `kept` has seen
    * that vault under, and for a vault not seen, the one this handle drafted it under, or a new one.
    */
   async #raiseMark(kept: DeviceMark | null, fresh: VaultProps): Promise<DeviceMark> {
@@ -1346,15 +1337,14 @@ export class Vault {
   /** The mark {@link raiseMark} keeps, `kept` itself (whose `seen` it keeps) when nothing is raised. */
   #markSeeing(kept: DeviceMark | null, fresh: VaultProps): DeviceMark {
     const seen = kept?.seen.vault_id === fresh.vault_id ? kept.seen : null
-    if (kept !== null && seen !== null && seen.unlock_epoch >= fresh.unlock_epoch && seen.vault_key_epoch >= fresh.vault_key_epoch) { return kept }
+    if (kept !== null && seen !== null && seen.unlock_epoch >= fresh.unlock_epoch) { return kept }
     return {
       format: MarkFormat,
       ...this.#scope,
       seen:   {
-        device_id:       seen?.device_id ?? this.#newDeviceIdFor(fresh.vault_id),
-        vault_id:        fresh.vault_id,
-        unlock_epoch:    Math.max(seen?.unlock_epoch ?? 0, fresh.unlock_epoch),
-        vault_key_epoch: Math.max(seen?.vault_key_epoch ?? 0, fresh.vault_key_epoch),
+        device_id:    seen?.device_id ?? this.#newDeviceIdFor(fresh.vault_id),
+        vault_id:     fresh.vault_id,
+        unlock_epoch: Math.max(seen?.unlock_epoch ?? 0, fresh.unlock_epoch),
       },
     }
   }
@@ -1404,8 +1394,8 @@ export class Vault {
    * model is handed this one frozen value, so what an encryption binds is in one place.
    */
   #boundPropsOf(props: VaultProps): BoundVaultProps {
-    const { vault_id, registered_at, vault_key_epoch, unlock_epoch } = props
-    return Object.freeze({ ...this.#scope, vault_id, registered_at, vault_key_epoch, unlock_epoch })
+    const { vault_id, registered_at, unlock_epoch } = props
+    return Object.freeze({ ...this.#scope, vault_id, registered_at, unlock_epoch })
   }
   // --
 
@@ -1518,10 +1508,10 @@ export class Vault {
    * vault takes it out of the way in as stored, as any unlock does.
    */
   async #draftVaultProps(passphrase: PassphraseProof, deviceId: string): Promise<VaultProps> {
-    const identity = { vault_id: randomId(), registered_at: this.#clockNow(), vault_key_epoch: FirstVaultKeyEpoch }
+    const identity = { vault_id: randomId(), registered_at: this.#clockNow() }
     const wayin = await Wayin.seal({ ...this.#scope, ...identity }, identity.registered_at, passphrase, deviceId, await makeVaultKey())
     return {
-      format:              'safebyok-vault-v5',
+      format:              'safebyok-vault-v6',
       ...this.#scope,
       ...identity,
       unlock_epoch:        1,
@@ -2293,7 +2283,7 @@ const declinedError = (asked: boolean) => new VaultError('vault_locked', asked
 const closedError = () => new VaultError('vault_closed', 'This vault handle was closed: make another with Vault.make.')
 // --
 
-// == [Vocabulary]: frozenVaultProps, isUnderHeldKey, isNewerCopy, asDamaged, MarkFormat, VaultCall, UntrustedStorageKinds, isCatchingUpKind
+// == [Vocabulary]: frozenVaultProps, isNewerCopy, MarkFormat, VaultCall, UntrustedStorageKinds, isCatchingUpKind
 
 /**
  * A copy of `props`, frozen through its ways in: what the vault holds as its vault props, so the
@@ -2309,36 +2299,22 @@ const frozenVaultProps = (props: VaultProps): VaultProps => Object.freeze({
 type StandingWayins = Pick<VaultProps, 'passphrase' | 'passkey'>
 
 /**
- * True when `box` lists as damaged already, or stands under the vaultKey `standing` holds. A
- * box under any other epoch opens under no key the vault holds.
- */
-const isUnderHeldKey = (box: BoxSummary | DamagedBox, standing: VaultProps): boolean => (
-  box.damaged || box.vault_key_epoch === standing.vault_key_epoch
-)
-
-/**
- * True when `inHand` is the vault `fresh` is, at a later `unlock_epoch` or `vault_key_epoch`:
+ * True when `inHand` is the vault `fresh` is, at a later `unlock_epoch`:
  * `fresh` was read before a write of this device's own landed, and is an older copy. Storage
- * never takes a vault's epochs back (the device mark refuses a store that does, as
+ * never takes a vault's unlock epoch back (the device mark refuses a store that does, as
  * 'rolled_back'), so such a read stands for nothing, and never replaces what is in hand.
  */
 const isNewerCopy = (inHand: VaultProps | null, fresh: VaultProps | null): boolean => (
   fresh !== null && inHand !== null && inHand.vault_id === fresh.vault_id
-  && (fresh.unlock_epoch < inHand.unlock_epoch || fresh.vault_key_epoch < inHand.vault_key_epoch)
+  && fresh.unlock_epoch < inHand.unlock_epoch
 )
 
-/** `box`, a box listed sound, as damaged: under its boxlabel and revision, nothing else of it trusted. */
-const asDamaged = (box: BoxSummary | DamagedBox): DamagedBox => ({ boxlabel: box.boxlabel, damaged: true, revision_tok: box.revision_tok })
-
 /** The device mark's format, as each mark carries it. */
-const MarkFormat = 'safebyok-mark-v4'
+const MarkFormat = 'safebyok-mark-v5'
 
 /** The vault call, or the moment, a logger's story names: where what it hears happened. */
 type VaultCall = 'make' | 'hello' | 'refresh' | 'unlock' | 'del' | 'untrustedStorage'
   | 'putWayin' | 'delWayin' | 'putBox' | 'delBox' | 'getBox'
-
-/** The `vault_key_epoch` of a vault's first vaultKey, the one it is created with. */
-const FirstVaultKeyEpoch = 1
 
 /**
  * The refusals that say storage cannot be trusted as it stands, each asking the caller for

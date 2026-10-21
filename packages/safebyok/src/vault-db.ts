@@ -26,21 +26,19 @@ const VaultPropsExpectation = Z.object({
 })
 
 /**
- * What a box write was sealed for and read: the vault and the vaultKey that sealed it -- its
- * `vault_id`, and the `vault_key_epoch` the box carries -- and the `revision_tok` of the box
- * the writer read under its boxlabel, or null when there was none. The write lands only while the
- * scope's standing vault props have that `vault_id` and that `vault_key_epoch` (else
+ * What a box write was sealed for and read: the vault that sealed it, by its `vault_id`, and the
+ * `revision_tok` of the box the writer read under its boxlabel, or null when there was none. The
+ * write lands only while the scope's standing vault props have that `vault_id` (else
  * `vault_mismatch`), and the standing box has that `revision_tok` -- or, for null, while there is
  * no box there at all (else `stale_write`). Plain JSON, so it crosses any wire as-is.
  *
- * @example { vault_id: vaultProps.vault_id, revision_tok: prev?.revision_tok ?? null, vault_key_epoch: vaultProps.vault_key_epoch }
+ * @example { vault_id: vaultProps.vault_id, revision_tok: prev?.revision_tok ?? null }
  */
 export type BoxExpectation = Z.infer<typeof BoxExpectation>
 
 const BoxExpectation = Z.object({
-  vault_id:        VaultProps.shape.vault_id,
-  revision_tok:    Z.nullable(BoxRecord.shape.revision_tok),
-  vault_key_epoch: VaultProps.shape.vault_key_epoch,
+  vault_id:     VaultProps.shape.vault_id,
+  revision_tok: Z.nullable(BoxRecord.shape.revision_tok),
 })
 
 /**
@@ -135,8 +133,7 @@ export type VaultDBOpts = {
  *    fields are base64url text), so any backend that can hold JSON can hold a vault, as-is.
  *  * **Never look inside.** Every secret field arrives encrypted; nothing you hold can open a
  *    vault, and nothing safebyok does ever needs you to understand a record -- only to compare a
- *    few unencrypted fields (`vault_id`, `unlock_epoch`, `vault_key_epoch`, `revision_tok`) before a
- *    write.
+ *    few unencrypted fields (`vault_id`, `unlock_epoch`, `revision_tok`) before a write.
  *  * **Write only as expected.** Every update and deletion carries an expectation of what
  *    stands in storage, and writes only if it still does: check and write in one atomic step (a
  *    transaction, a conditional write), and resolve `false` when the expectation fails. A box
@@ -386,8 +383,7 @@ export abstract class VaultDB {
 
   /**
    * Write `box` under its boxlabel, in one atomic conditional write: only while the scope's
-   * standing vault props have the `vault_id` and `vault_key_epoch` in `expected`, and the standing
-   * box has its `revision_tok` -- or, for null, none stands. Resolves the box as storage now holds
+   * standing vault props have the `vault_id` in `expected`, and the standing box has its `revision_tok` -- or, for null, none stands. Resolves the box as storage now holds
    * it, handed back by the same atomic step as the write and held to the check `getBox` makes,
    * at the revision written: one that fails is refused as `corrupt_record`, though the write may
    * have landed, as the adapter wrote something it cannot read back.
@@ -395,7 +391,7 @@ export abstract class VaultDB {
    * Refuses, writing nothing:
    *
    * * `vault_mismatch` when the vault props standing are not the ones `expected` names -- none
-   *   stand, or another `vault_id`'s, or another `vault_key_epoch`'s -- carrying nothing of them.
+   *   stand, or another `vault_id`'s -- carrying nothing of them.
    * * `stale_write` when the box standing is not the one `expected` names, with what stands, as
    *   the same atomic step read it, in `err.meta.box_stored`: the box that won, its record whole
    *   and checked as `getBox` checks one, to open or to write over with no second read; a
@@ -403,10 +399,9 @@ export abstract class VaultDB {
    *   any); or null when nothing stands. A write over it names that revision, or null when nothing
    *   stands; a damaged box that names no revision is only removed, with `delBox`.
    * * `invalid_box` for a box this package would not build -- a missing box, or one whose
-   *   boxlabel is below the floor, among it -- or one sealed under another `vault_key_epoch` than
-   *   `expected` names; `bad_record` for an `expected` it would not build; `bad_label` for a scope
-   *   below the floor, or a name the floor admits but longer than the backend holds. Each before
-   *   storage sees the box.
+   *   boxlabel is below the floor, among it; `bad_record` for an `expected` it would not build;
+   *   `bad_label` for a scope below the floor, or a name the floor admits but longer than the
+   *   backend holds. Each before storage sees the box.
    * * `box_too_large` for a box, with its scope, heavier than the backend's `maxRecordBytes`,
    *   before storage sees it; `vault_full` for a backend's own limit on a vault, with how full the
    *   vault is, as the same atomic step reckoned it, in `err.meta.capacity` (a {@link Capacity}).
@@ -415,12 +410,12 @@ export abstract class VaultDB {
    * `stale_write`, its own box in `err.meta.box_stored`: what it expected no longer stands.
    *
    * @param scope - The vault the box is written into.
-   * @param expected - The vault and vaultKey the box was sealed for, and the revision read under
-   *   its boxlabel (null for none).
+   * @param expected - The vault the box was sealed for, and the revision read under its boxlabel
+   *   (null for none).
    * @param box - The box, as a vault seals it.
    *
    * @example
-   *   const { ok, val, err } = await vaultDB.putBox(scope, { vault_id, vault_key_epoch: 1, revision_tok: null }, box)
+   *   const { ok, val, err } = await vaultDB.putBox(scope, { vault_id, revision_tok: null }, box)
    *   if (! ok && err.refusalkind === 'stale_write') { return err.meta?.box_stored }  // what won
    */
   putBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<Outcome<BoxRecord>> {
@@ -429,9 +424,6 @@ export abstract class VaultDB {
       const outgoing = checked(BoxRecord, box, invalidBox)
       heldBoxlabel(this, outgoing.boxlabel)
       const expectation = checkOutgoing(BoxExpectation, expected, 'box expectation')
-      if (outgoing.vault_key_epoch !== expectation.vault_key_epoch) {
-        throw new VaultError('invalid_box', "Nothing was written: putBox writes a box under the vaultKey it was sealed with, so the box's vault_key_epoch must be the expected one. Hand a VaultDB's putBox only the boxes a vault seals, with the expectation it sealed them for.")
-      }
       const recordBytes = jsonBytes({ ...asked, ...outgoing })
       if (recordBytes > this.maxRecordBytes) {
         throw new VaultError('box_too_large', `That box weighs ${String(recordBytes)} bytes, over the ${String(this.maxRecordBytes)} its storage holds in one record, so nothing was written: store a smaller whisper or sidecar, or under a shorter boxlabel.`)
@@ -651,15 +643,14 @@ export abstract class VaultDB {
   protected abstract doListBoxes(scope: VaultScope): Promise<StoredBox[]>
   /**
    * Store `box` under its boxlabel if, and only if, the scope's standing vault props have
-   * `expected.vault_id` and `expected.vault_key_epoch`, and the standing box has
-   * `expected.revision_tok` -- or, when that is null, no box stands there: all compared in the
-   * same atomic step as the write. Resolves the record as stored once written, read back in that
-   * same step (a `RETURNING`, a mutation's return value, a read in the transaction), exactly as a
-   * `doGetBox` would hand it up. Otherwise it writes nothing, and throws, from that same step:
-   * `Refusals.vaultMismatch()` when the vault props are not the expected ones (none, another
-   * vault's, another vaultKey epoch's); else `Refusals.staleBox(standing)`, `standing` the record
-   * under the boxlabel exactly as stored, damaged or not, or null for none. A key-value backend
-   * reads both rows and asks `Expectations.boxRefusalOf` which.
+   * `expected.vault_id`, and the standing box has `expected.revision_tok` -- or, when that is
+   * null, no box stands there: all compared in the same atomic step as the write. Resolves the
+   * record as stored once written, read back in that same step (a `RETURNING`, a mutation's return
+   * value, a read in the transaction), exactly as a `doGetBox` would hand it up. Otherwise it
+   * writes nothing, and throws, from that same step: `Refusals.vaultMismatch()` when the vault
+   * props are not the expected ones (none, or another vault's); else `Refusals.staleBox(standing)`,
+   * `standing` the record under the boxlabel exactly as stored, damaged or not, or null for none.
+   * A key-value backend reads both rows and asks `Expectations.boxRefusalOf` which.
    */
   protected abstract doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<unknown>
   /** How full the vault is, read in one step: a {@link Capacity}.
@@ -782,8 +773,8 @@ const StoredRevision = Z.object({ revision_tok: BoxRecord.shape.revision_tok })
  * (`sidecar_json` is JSON text, as the record's check has found).
  */
 const summaryOf = (listed: Z.infer<typeof ListedBox>): BoxSummary => {
-  const { boxlabel, revision_tok, vault_key_epoch, sidecar_json, registered_at, written_at } = listed
-  return { boxlabel, revision_tok, vault_key_epoch, sidecar: JSON.parse(sidecar_json) as Sidecar, registered_at, written_at, damaged: false }
+  const { boxlabel, revision_tok, sidecar_json, registered_at, written_at } = listed
+  return { boxlabel, revision_tok, sidecar: JSON.parse(sidecar_json) as Sidecar, registered_at, written_at, damaged: false }
 }
 
 /** Two names in one order on every device: character by character, by UTF-16 code unit, never by a locale. */
@@ -961,7 +952,7 @@ const newerVaultProps = () => new VaultError('newer_format', "This vault's store
  * The vault props formats earlier versions of this package wrote: a record in one is older, never
  * newer, and fails today's checks as damage does.
  */
-const OlderVaultPropsFormats: ReadonlySet<unknown> = new Set(['safebyok-vault-v1', 'safebyok-vault-v2', 'safebyok-vault-v3', 'safebyok-vault-v4'])
+const OlderVaultPropsFormats: ReadonlySet<unknown> = new Set(['safebyok-vault-v1', 'safebyok-vault-v2', 'safebyok-vault-v3', 'safebyok-vault-v4', 'safebyok-vault-v5'])
 
 /**
  * True when a record that fails this version's checks may be one a later version writes, which

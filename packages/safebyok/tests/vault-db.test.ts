@@ -413,7 +413,6 @@ const RefusedWrites = [
   ['bad_record', (vaultDB: VaultDB) => vaultDB.putVaultProps(TH.vaultPropsOf('u1'), { vault_id: 'vault-id-u1', unlock_epoch: 0 }),          'an expectation of the vault props at epoch zero'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.putVaultProps(TH.vaultPropsOf('u1'), undefined as unknown as VaultPropsExpectation), 'no expectation of the vault props at all'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.putBox(TH.scopeOf('u1'), { vault_id: 'vault-id-u1' } as BoxExpectation, TH.boxOf('anthropic', 'one')), 'a box expectation missing its revision_tok'],
-  ['bad_record', (vaultDB: VaultDB) => vaultDB.putBox(TH.scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: null } as BoxExpectation, TH.boxOf('anthropic', 'one')), 'a box expectation naming no vaultKey epoch'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.delBox(TH.scopeOf('u1'), 'anthropic', { revision_tok: null } as BoxDelExpectation), 'a delete expectation naming no vault'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.delBox(TH.scopeOf('u1'), 'anthropic', TH.thisVault as BoxDelExpectation),          'a box delete expectation missing its revision_tok'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.delBox(TH.scopeOf('u1'), 'anthropic', TH.deleting('')),                                  'a box delete expectation naming an empty revision_tok'],
@@ -421,7 +420,6 @@ const RefusedWrites = [
   ['bad_record', (vaultDB: VaultDB) => vaultDB.delVault(TH.scopeOf('u1'), { vault_id: '' }),                                         'a delete expectation naming an empty vault_id'],
   // the two together:
   ['bad_record', (vaultDB: VaultDB) => vaultDB.putVaultProps(TH.vaultPropsOf('u1', { vault_id: 'vault-id-new', unlock_epoch: 2 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'an update of the vault props that would change the vault_id'],
-  ['invalid_box', (vaultDB: VaultDB) => vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one', { vault_key_epoch: 2 })), 'a box sealed under another vaultKey than the expected one'],
 ] as const
 
 /** A vault in `u1`'s slot with a box, its vault props spoiled by `spoil`, and a sound neighbour beside it. */
@@ -478,8 +476,8 @@ describe("the abstract VaultDB, deleting a vault whose vault props are damaged",
   })
 
   const NewerRecords = [
-    [{ format: 'safebyok-vault-v6' },                                                      'a format this version does not know, whatever else it holds'],
-    [(vaultProps: VaultProps) => ({ ...vaultProps, format: 'safebyok-vault-v6' }),         'vault props that are otherwise sound but for their format'],
+    [{ format: 'safebyok-vault-v7' },                                                      'a format this version does not know, whatever else it holds'],
+    [(vaultProps: VaultProps) => ({ ...vaultProps, format: 'safebyok-vault-v7' }),         'vault props that are otherwise sound but for their format'],
     [(vaultProps: VaultProps) => ({ ...vaultProps, format: 2 }),                           'a format of another type'],
   ] as const
 
@@ -509,7 +507,8 @@ describe("the abstract VaultDB, deleting a vault whose vault props are damaged",
   it("deletes vault props in a format an earlier version wrote, which is older, never newer", async () => {
     const { passphrase, passkey: _passkey, ...vaultPropsWithoutSlots } = TH.vaultPropsOf('u1')
     const olders = [
-      ({ vault_key_epoch: _epoch, ...vaultProps }: VaultProps) => ({ ...vaultProps, format: 'safebyok-vault-v1' }),
+      (vaultProps: VaultProps) => ({ ...vaultProps, format: 'safebyok-vault-v1' }),
+      (vaultProps: VaultProps) => ({ ...vaultProps, format: 'safebyok-vault-v5', vault_key_epoch: 1 }),
       () => ({ ...vaultPropsWithoutSlots, format: 'safebyok-vault-v4', wayins: [{ ...passphrase, wayin_id: 'wayin-passphrase', wayinlabel: 'passphrase' }] }),
     ]
     for (const older of olders) {
@@ -611,7 +610,7 @@ describe("the abstract VaultDB, on the way in", () => {
     const emptied = TH.boxOf('anthropic', 'one', { sidecar_json: '{}' })
     await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), TH.noBoxYet, emptied)
     expect(vaultDB.rows.get(u1AnthropicBoxCkey)).to.deep.equal(emptied)
-    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 1 }, TH.boxOf('anthropic', 'two'))
+    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-one' }, TH.boxOf('anthropic', 'two'))
     await TH.expectingGood(vaultDB).delBox(TH.scopeOf('u1'), 'anthropic', TH.deleting('rev-two'))
     expect(await TH.expectingGood(vaultDB).listBoxes(TH.scopeOf('u1'))).to.have.lengthOf(0)
   })

@@ -4,7 +4,7 @@ import { VaultError } from './errors'
 import { optionsCheck } from './options'
 import { type Outcome, outcomeOf, unexpectedError, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
-import { type BoxSummary, type DamagedBox, EpochMillis, Sidecar, VaultProps, Whisper, vaultKeyEpoch } from './types'
+import { type BoxSummary, type DamagedBox, EpochMillis, Sidecar, VaultProps, Whisper } from './types'
 import { decorate } from './adorn'
 import { NameFloor } from './validators'
 import * as Names from './names'
@@ -26,7 +26,7 @@ const isStableJsonText = (text: string): boolean => {
 }
 
 /** The box's format, as each record carries it and each of its ctxs begins. */
-export const BoxFormat = 'safebyok-box-v6'
+export const BoxFormat = 'safebyok-box-v7'
 
 /** The JSON of an empty sidecar: what a box given none holds. */
 export const EmptySidecarJson = '{}'
@@ -52,11 +52,6 @@ export const BoxRecord = Z.object({
   format:                 Z.literal(BoxFormat),
   boxlabel:               NameFloor,
   revision_tok:           Z.string().check(Z.minLength(1)),
-  /**
-   * Which vaultKey this box's boxKey is wrapped under: the vault props' `vault_key_epoch` when
-   * it was written. Visible, so a locked vault's listing shows which boxes stand under which.
-   */
-  vault_key_epoch:        vaultKeyEpoch,
   /** This box's boxKey, wrapped under the vaultKey. */
   box_key_wrapped:        Ciphered,
   /** The whisper, ciphered under this box's boxKey. */
@@ -85,16 +80,16 @@ export type BoxRecord = Z.infer<typeof BoxRecord>
 
 /**
  * The vault props a box lies under, as far as its encryptions are bound to them: the scope (app,
- * user and vault label) and the vault's id, which both of the box's encryptions are bound to, and
- * the epoch of the vaultKey its boxKey is wrapped under. With the box's own visible header, that
+ * user and vault label) and the vault's id, which both of the box's encryptions are bound to. With
+ * the box's own visible header, that
  * is the whole of its ctx. A whole {@link VaultProps} is one; the vault builds one at each call
  * from its own scope and the vault props it holds, the same it names in the write that puts the
  * box, so the two never disagree.
  */
-export type BoxVaultProps = Pick<VaultProps, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_id' | 'vault_key_epoch'>
+export type BoxVaultProps = Pick<VaultProps, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_id'>
 
 /** What {@link BoxVaultProps} must hold, checked where a caller hands them in. */
-const BoxVaultPropsShape = Z.pick(VaultProps, { applabel: true, user_id: true, vaultlabel: true, vault_id: true, vault_key_epoch: true })
+const BoxVaultPropsShape = Z.pick(VaultProps, { applabel: true, user_id: true, vaultlabel: true, vault_id: true })
 
 /** The options {@link Box.seal} takes. */
 export type SealBoxOpts = {
@@ -132,21 +127,19 @@ const checkSealOpts = optionsCheck({ sidecar: Z.optional(Z.unknown()), over: Z.o
  *   box.summary         // what vault.boxes lists for it
  */
 export class Box {
-  /** The vault props this box lies under, frozen and hidden: the scope, vault id and vaultKey epoch it opens under. It never serializes, and no log line shows it. */
+  /** The vault props this box lies under, frozen and hidden: the scope and vault id it opens under. It never serializes, and no log line shows it. */
   declare readonly vaultProps: BoxVaultProps
   /** The stored record this box was made from, frozen: what storage holds. Hidden, as `vaultProps` is: a log line shows the fields once. */
   declare readonly props: BoxRecord
   /** Every visible field, the sidecar parsed, and `damaged: false`: what `vault.boxes` lists for this box. Frozen. */
   declare readonly summary: BoxSummary
 
-  /** The record's format, `safebyok-box-v6`. */
+  /** The record's format, `safebyok-box-v7`. */
   readonly format:                 BoxRecord['format']
   /** The box's label within its vault. */
   readonly boxlabel:               string
   /** Fresh on every put: what a conditional write over this box names. */
   readonly revision_tok:           string
-  /** Which vaultKey this box's boxKey is wrapped under. */
-  readonly vault_key_epoch:        BoxRecord['vault_key_epoch']
   /** How the whisper became the bytes ciphered: `json_v1`. */
   readonly whisper_codec:          BoxRecord['whisper_codec']
   /** Which generation of the whisper's shape this box holds: 1. */
@@ -172,7 +165,6 @@ export class Box {
     this.format                 = props.format
     this.boxlabel               = props.boxlabel
     this.revision_tok           = props.revision_tok
-    this.vault_key_epoch        = props.vault_key_epoch
     this.whisper_codec          = props.whisper_codec
     this.whisper_schema_version = props.whisper_schema_version
     this.sidecar                = sidecar
@@ -180,10 +172,10 @@ export class Box {
     this.written_at             = props.written_at
     this.box_key_wrapped        = props.box_key_wrapped
     this.whisper_ciphered       = props.whisper_ciphered
-    const { boxlabel, revision_tok, vault_key_epoch, registered_at, written_at } = props
-    const summary: BoxSummary = Object.freeze({ boxlabel, revision_tok, vault_key_epoch, sidecar, registered_at, written_at, damaged: false })
+    const { boxlabel, revision_tok, registered_at, written_at } = props
+    const summary: BoxSummary = Object.freeze({ boxlabel, revision_tok, sidecar, registered_at, written_at, damaged: false })
     const { applabel, user_id, vaultlabel, vault_id } = vaultProps
-    decorate<Box>(this, { vaultProps: Object.freeze({ applabel, user_id, vaultlabel, vault_id, vault_key_epoch: vaultProps.vault_key_epoch }), props, summary })
+    decorate<Box>(this, { vaultProps: Object.freeze({ applabel, user_id, vaultlabel, vault_id }), props, summary })
     Object.freeze(this)
   }
 
@@ -223,7 +215,7 @@ export class Box {
    * 'bad_label' for a boxlabel below the floor every name is held to. Each quotes none of what
    * it was handed.
    *
-   * @param vaultProps - The vault props it will lie under: their scope, `vault_id` and `vault_key_epoch` are bound into it.
+   * @param vaultProps - The vault props it will lie under: their scope and `vault_id` are bound into it.
    * @param now - The time of this sealing, in epoch milliseconds: its `written_at`.
    * @param boxlabel - The box's label, already through the vault's own checks.
    * @param whisper - What the box holds.
@@ -347,7 +339,6 @@ export const sealPlanned = async (vaultProps: BoxVaultProps, now: number, vaultK
   const header: BoxHeader = {
     boxlabel:               plan.boxlabel,
     revision_tok:           randomId(),
-    vault_key_epoch:        vaultProps.vault_key_epoch,
     whisper_codec:          'json_v1',
     whisper_schema_version: 1,
     sidecar_json:           plan.sidecarJson,
@@ -365,15 +356,10 @@ export const sealPlanned = async (vaultProps: BoxVaultProps, now: number, vaultK
 
 /**
  * The whisper `props` holds, opened under `vaultKey` for `vaultProps`: kind 'damaged_box' when
- * its vaultKey epoch is not the vault props', when it will not unwrap or decipher under the ctx
- * rebuilt from the vault props' scope and `vault_id` and its visible fields, or when it opens to
+ * it will not unwrap or decipher under the ctx rebuilt from the vault props' scope and `vault_id` and its visible fields, or when it opens to
  * no whisper. Names nothing of the box.
  */
 const openRecord = async (vaultProps: BoxVaultProps, props: BoxRecord, vaultKey: CryptoKey): Promise<Whisper> => {
-  if (props.vault_key_epoch !== vaultProps.vault_key_epoch) {
-    // Quotes no boxlabel, as no refusal here does: a host's boxlabel check may admit any text.
-    throw new VaultError('damaged_box', "That box is damaged: it says it was sealed under a vaultKey this vault does not hold, so it can't be opened. It was left as it is; remove it, or store its whisper again over it.")
-  }
   const { format: _format, box_key_wrapped: boxKeyWrapped, whisper_ciphered: whisperCiphered, ...header } = props
   let whisperBytes: Uint8Array
   try {
@@ -402,8 +388,8 @@ const openRecord = async (vaultProps: BoxVaultProps, props: BoxRecord, vaultKey:
  */
 export const heldListing = (listed: BoxSummary | DamagedBox): BoxSummary | DamagedBox => {
   if (listed.damaged) { return Object.freeze({ boxlabel: listed.boxlabel, damaged: true, revision_tok: listed.revision_tok }) }
-  const { boxlabel, revision_tok, vault_key_epoch, registered_at, written_at } = listed
-  return Object.freeze({ boxlabel, revision_tok, vault_key_epoch, sidecar: frozenJsonOf(stableJsonify(listed.sidecar) ?? EmptySidecarJson), registered_at, written_at, damaged: false })
+  const { boxlabel, revision_tok, registered_at, written_at } = listed
+  return Object.freeze({ boxlabel, revision_tok, sidecar: frozenJsonOf(stableJsonify(listed.sidecar) ?? EmptySidecarJson), registered_at, written_at, damaged: false })
 }
 // --
 
@@ -417,7 +403,7 @@ type BoxHeader = Omit<BoxRecord, 'format' | 'box_key_wrapped' | 'whisper_ciphere
 
 // A box's ctx binds its format, the vault it lies in (its scope and id), and its record's whole
 // visible header: every field but the format, which leads, and the two encrypted ones, so a
-// sidecar, a time, its codec or its vaultKey's epoch altered in storage refuses to open. See
+// sidecar, a time or its codec altered in storage refuses to open. See
 // VOCABULARY.md on ctx.
 const boxCtx = (vaultProps: BoxVaultProps, header: BoxHeader, purpose: 'box_key_wrapped' | 'whisper_ciphered') => (
   cipherCtx(BoxFormat, vaultProps.applabel, vaultProps.user_id, vaultProps.vaultlabel, vaultProps.vault_id, purpose, header)
@@ -450,7 +436,7 @@ export const checkedBoxRecord = (record: unknown): BoxRecord => {
 /** `vaultProps`, once they are vault props a box can lie under: kind 'bad_option' otherwise. */
 const checkVaultProps = (vaultProps: unknown, said: string) => {
   if (! BoxVaultPropsShape.safeParse(vaultProps).success) {
-    throw new VaultError('bad_option', `${said} needs the vault props the box lies under -- their applabel, user_id, vaultlabel, vault_id and vault_key_epoch -- as its first argument: a vault builds them from its scope and the props it holds.`)
+    throw new VaultError('bad_option', `${said} needs the vault props the box lies under -- their applabel, user_id, vaultlabel and vault_id -- as its first argument: a vault builds them from its scope and the props it holds.`)
   }
 }
 

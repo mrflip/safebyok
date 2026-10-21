@@ -85,8 +85,10 @@ Revisit before 1.0 if rotation signing every other device out is too blunt.
 
 `softlock_gone` (2026-10-19) removed the schema rotation would have written: the vault props'
 `prior_vault_key` (the vaultKey before, wrapped under the current one) and the check that it sat
-one epoch below theirs. `vault_key_epoch` stays on every record, reserved at 1, with storage's
-comparison of a box's epoch against the vault props'.
+one epoch below theirs. `trust_lines` (2026-10-21) removed `vault_key_epoch` from every record, and
+storage's comparison of a box's epoch against the vault props', on the Coach's ruling: the vaultKey
+never changes until rotation is built, and a vault made anew has a new `vault_id`, which already
+voids every box. Rotation adds an epoch back, with its own format bump, when it is built.
 
 ### "tombstone vaults; decide if the vault_id is a check -- the labels are meant to be the primary key"
 

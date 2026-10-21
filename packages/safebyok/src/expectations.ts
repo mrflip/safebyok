@@ -6,7 +6,7 @@ import type { BoxExpectation, BoxDelExpectation, BoxDeletion, VaultDelExpectatio
 /**
  * Whether what stands in storage is what a write expects: the comparisons a key-value adapter
  * makes, inside its one atomic step, before a versioned write lands. They compare the few unencrypted
- * fields an adapter compares (`vault_id`, `unlock_epoch`, `vault_key_epoch`, `revision_tok`) and
+ * fields an adapter compares (`vault_id`, `unlock_epoch`, `revision_tok`) and
  * nothing else, reading the standing row as it is, unvalidated: a row too damaged to show a field
  * fails the comparison, so nothing lands on it ({@link deletionOf}, which reports rather than
  * decides, reads a damaged one as the listing does). The expectation itself is clean -- `VaultDB`'s
@@ -66,9 +66,8 @@ export const vaultIdMeets = (standing: unknown, expected: VaultDelExpectation): 
 /**
  * What a box write meets, from the vault props and box standing, read in its one atomic step:
  * null when they are the ones `expected` names, and the write lands; otherwise the refusal to
- * throw, writing nothing. `vault_mismatch` when the vault props are not those of its vault,
- * standing for the vaultKey the box was sealed under (its `vault_key_epoch`, line 3.8) -- none
- * stand, or another vault's, or too damaged to compare; else `stale_write`, carrying the box
+ * throw, writing nothing. `vault_mismatch` when the vault props are not those of its vault --
+ * none stand, or another vault's, or too damaged to compare; else `stale_write`, carrying the box
  * standing as it is (or null for none), when the box is not at its revision -- or, for a null
  * `revision_tok`, when any box stands at all (line 3.3).
  *
@@ -82,9 +81,7 @@ export const vaultIdMeets = (standing: unknown, expected: VaultDelExpectation): 
  *   if (refusal) { throw refusal }
  */
 export const boxRefusalOf = (standingVaultProps: unknown, standingBox: unknown, expected: BoxExpectation): VaultError | null => {
-  if (! vaultMeets(standingVaultProps, expected) || fieldOf(standingVaultProps, 'vault_key_epoch') !== expected.vault_key_epoch) {
-    return Refusals.vaultMismatch()
-  }
+  if (! vaultMeets(standingVaultProps, expected)) { return Refusals.vaultMismatch() }
   const standing = standingBox ?? null
   const boxMeets = standing === null
     ? expected.revision_tok === null

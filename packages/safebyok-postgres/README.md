@@ -433,7 +433,7 @@ shape of table, copy it, and keep to what makes it right:
   to the `vault_id`, so a box cannot outlive its vault or land in one made anew, and deleting
   a vault is one `DELETE` of its vault row.
 * **Store each record a column to a field**, and compare only the scope, `boxlabel`, `vault_id`,
-  `unlock_epoch`, `vault_key_epoch` and `revision_tok`. `src/columns.ts` names each record's columns once, the
+  `unlock_epoch` and `revision_tok`. `src/columns.ts` names each record's columns once, the
   compiler holding the list to the record's fields both ways, and builds every statement from it.
 * **Authorize in the adapter**: made per request for one user, it refuses every other user's
   scope with `identity_revoked`, and passes the database's own refusal of a call (`42501`) up as
@@ -449,13 +449,12 @@ shape of table, copy it, and keep to what makes it right:
   (and which), the vault was full -- so that no second read is needed to tell a full vault from
   a stale writer. And map a foreign key violation (`23503`) on the insert to `vault_mismatch`: a
   vault deleted after the statement's snapshot, before its foreign key check, no longer stands.
-* **Read the vault row `FOR SHARE` in a box write, and know why.** A box write compares
-  the vault props' `vault_key_epoch` (contract line 3.8), a column no foreign key covers, and a
-  plain read would take it from the statement's snapshot: an update of the vault props committed
-  after the snapshot -- a rotation of the vaultKey -- would go unseen, and a device still holding
-  the replaced vaultKey could seal a whisper under it. `FOR SHARE` makes the update wait for the
-  write, or the write for the update and then re-read the vault props as they stand. It is a
-  shared lock, so box writes never wait for each other on the vault row. A trigger of your own
+* **Read the vault row `FOR SHARE` in a box write, and know why.** A plain read takes the vault
+  row from the statement's snapshot, so a deletion of the vault committed after it would go unseen
+  until the foreign key's check. `FOR SHARE` makes the deletion wait for the write, or the write
+  for the deletion and then read the vault row as it stands, and it takes the write's locks in
+  the order a deletion takes them (vault row, then box). It is a shared lock, so box writes never
+  wait for each other on the vault row. A trigger of your own
   that locks the vault row anew -- `FOR UPDATE`, say -- turns two such writers into a deadlock:
   serialize on something else (the hard cap above takes an advisory lock).
 * **Prove it with the shared suite**: `describeVaultDB` from `safebyok/testing` runs every verb,

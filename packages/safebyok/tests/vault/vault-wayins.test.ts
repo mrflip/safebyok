@@ -230,7 +230,7 @@ describe("the vault's passphrase", () => {
 
   it("stored damaged, is refused as damaged_wayin, deriving nothing, and cannot be changed: only the passkey still opens the vault (Contract: putWayin, Refuses)", async () => {
     const { world, laptop } = await vaultWithPasskey()
-    spoilWayin(world, 'passphrase', { vault_key_epoch: 2 })
+    spoilWayin(world, 'passphrase', { salt_b64: 'c2FsdA' })
     const { keyDeriver, derivations } = countingDeriver()
     const vault = await world.open({ deviceDB: memoryDeviceDB(), keyDeriver })
     const err = await TH.expectRefusal(vault.unlock('pw'), 'damaged_wayin')
@@ -958,7 +958,7 @@ describe("a change to the ways in, refused, changes nothing stored (Contract: pu
 
     it(`${callTitle} refuses damaged_wayin when the passphrase is stored damaged, deriving nothing`, async () => {
       const { world } = await vaultWithPasskey()
-      spoilWayin(world, 'passphrase', { vault_key_epoch: 2 })
+      spoilWayin(world, 'passphrase', { salt_b64: 'c2FsdA' })
       const before = storedText(world)
       const { keyDeriver, derivations } = countingDeriver()
       const vault = await world.open({ deviceDB: memoryDeviceDB(), keyDeriver })

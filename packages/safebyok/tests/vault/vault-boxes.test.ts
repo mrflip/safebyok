@@ -437,7 +437,7 @@ describe("the sidecar", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox('anthropic', { apiKey: 'sk-fake' })
-    expect(storedRowOf(world, 'anthropic')).to.include({ format: 'safebyok-box-v6', whisper_codec: 'json_v1', whisper_schema_version: 1 })
+    expect(storedRowOf(world, 'anthropic')).to.include({ format: 'safebyok-box-v7', whisper_codec: 'json_v1', whisper_schema_version: 1 })
   })
 })
 // --
@@ -463,7 +463,7 @@ const declaringBoxes = (vaultDB: VaultDB, maxBoxes: unknown): VaultDB => (
 /**
  * A box row as a backend files it, with every field but the whisper and its sidecar at its
  * largest: the longest labels, a user_id of 100 UTF-16 code units at three UTF-8 bytes apiece, the
- * latest times, the longest vaultKey epoch, real ciphertext of `whisperBytes` random bytes, and
+ * latest times, real ciphertext of `whisperBytes` random bytes, and
  * `sidecar` as its sidecar.
  */
 const heaviestRowOf = async (whisperBytes: number, sidecar: Sidecar = {}) => {
@@ -473,10 +473,9 @@ const heaviestRowOf = async (whisperBytes: number, sidecar: Sidecar = {}) => {
     applabel:               'a'.repeat(40),
     user_id:                '\u{4E00}'.repeat(MaxUserIdChars),
     vaultlabel:             'v'.repeat(40),
-    format:                 'safebyok-box-v6',
+    format:                 'safebyok-box-v7',
     boxlabel:               'b'.repeat(40),
     revision_tok:           crypto.randomUUID(),
-    vault_key_epoch:        Number.MAX_SAFE_INTEGER,
     box_key_wrapped:        await wrapKeyUnder(await makeVaultKey(), boxKey, ctx),
     whisper_ciphered:       await cipherBytes(boxKey, randomBytes(whisperBytes), ctx),
     whisper_codec:          'json_v1',
