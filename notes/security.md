@@ -406,7 +406,7 @@ added or folded into through the subagent, and no other entry changes.
   from the package. (4) `vault.openBox(box)` checks the record first (`bad_record`), then the key in
   hand (`vault_locked`), then re-makes the box under the vault's own props (amended 2026-10-21 (trust_lines): now `vault.decryptWhisper(box)`
   takes the lease first, so a locked vault always refuses `vault_locked`, a malformed record and a call before `hello()` included,
-  and only then checks what it was handed; a record is opened under the lease's `vault_id`, and the earlier `absent_vault`
+  and only then checks what it was handed (amended 2026-10-21 (fault_kinds): a well-formed record the host hands in that will not decrypt stays `damaged_box`, since storage's damage and the host's cannot be told apart there; a shape failure stays `bad_record`); a record is opened under the lease's `vault_id`, and the earlier `absent_vault`
   refusal of a record handed to a vault not yet made is gone); `box.tryOpen` has no
   `absent_vault` path any more, since a box cannot be made without vault props. (5) A box read from
   storage (in `getBox`, `putBox` and `delBox`) is made only while the vaultKey is in hand: the key is
@@ -1048,7 +1048,8 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-15: a box row that fails the listing's check (not JSON, a malformed sidecar or time, a
   record naming another boxlabel than the ckey it sits under, an unknown `format`) is listed as
   `{ boxlabel, damaged: true }` instead of making `listBoxes` -- so every `refresh()` and
-  `hello()` -- refuse `corrupt_record`. The boxlabel comes from where the row is stored (a
+  `hello()` -- refuse `corrupt_record` (amended 2026-10-21 (fault_kinds): `getBox` on such a row
+  refuses `damaged_box` at the `VaultDB` layer, a record naming another boxlabel included). The boxlabel comes from where the row is stored (a
   `VaultDB`'s `doListBoxes` now hands up `{ boxlabel, box }` pairs; the in-tree adapters read
   it from the ckey, Convex from its column), never from the damaged record, and nothing else of
   the record reaches the snapshot. A row whose boxlabel the vault's `validators` refuse --
@@ -1081,7 +1082,7 @@ added or folded into through the subagent, and no other entry changes.
   floor alone.
 
 * 2026-10-15: `delBox(boxlabel)` removes a box whose stored record fails validation or
-  verification (`corrupt_record`), rather than refusing it: it reads the record only to tell an
+  verification (`corrupt_record`; amended 2026-10-21 (fault_kinds): `damaged_box`), rather than refusing it: it reads the record only to tell an
   absent box (`absent_box`) from a present one, and a damaged record counts as present. It still
   needs the vault unlocked, still names the boxlabel the caller gave, and still lands only in the
   vault this device holds keys for (its `vault_id` expectation). `getBox()`, `useBox()` and the
@@ -1173,7 +1174,16 @@ added or folded into through the subagent, and no other entry changes.
   vaultKey).
 * 2026-10-14: a stored record that fails validation or AEAD verification is refused with kind
   `corrupt_record` and left in place -- remote data is never auto-deleted. A device-local
-  lease that fails is the one exception: it is dropped, and the user asks again.
+  lease that fails is the one exception: it is dropped, and the user asks again. Amended 2026-10-21
+  (fault_kinds, PR [#240](https://github.com/mrflip/safebyok/pull/240)): a record read from storage
+  that fails its checks is refused `damaged_box` (a box, one naming another boxlabel included) or
+  `damaged_vault` (vault props, one naming another scope included), at the `VaultDB` layer as at the
+  vault's, still left in place; Zod's error is the refusal's `cause`, and `corrupt_record` now means
+  only an adapter answering in the wrong shape (a write echo, a stale or full refusal missing its
+  meta, a deletion report, capacity), its family moved from condition to misuse. A lease read from
+  this device's own store still fails as `corrupt_record` internally, never surfaced (the vault asks
+  for a proof). `localVaultDB` hands a row that is not JSON up as text, so it reads as
+  `damaged_box` or `damaged_vault`, not as the adapter throwing `corrupt_record`.
 * 2026-10-14: the demo app calls Anthropic directly from the browser with the user's own key
   (`dangerouslyAllowBrowser: true` on the SDK client), by design: the key is decrypted on-device
   inside `vault.useBox(...)` and sent only to `api.anthropic.com`.
@@ -1305,7 +1315,8 @@ added or folded into through the subagent, and no other entry changes.
   (Built since: the sweep entry below binds both times and the sidecar.)
 * 2026-10-15: until 1.0.0 a stored-shape change carries no migration (the Coach's ruling). A
   box or vault props written with `created_at`/`updated_at`, or a lease with
-  `expires_at`, fails its schema: the vault refuses it as `corrupt_record` and leaves it as it
+  `expires_at`, fails its schema: the vault refuses it as `corrupt_record` (amended 2026-10-21
+  (fault_kinds): `damaged_box` or `damaged_vault`) and leaves it as it
   is (a lease is discarded, and the user enters the passphrase again). A Convex deployment
   holding such rows refuses the new component schema at deploy until those rows are deleted.
 * 2026-10-15: lowering `leaseHours` reaches leases already granted. At each
@@ -1342,7 +1353,8 @@ added or folded into through the subagent, and no other entry changes.
   `cause`, so an app must not throw secret material from a body it wraps. `VaultError` gains
   `family` (`misuse`, `condition`, `bad_news`), read from `refusalkind` through one table and never
   set by a caller; `bad_news` (`damaged_vault`, `damaged_wayin`, `damaged_box`, `newer_format`,
-  `rolled_back`, `identity_revoked`) was `condition`, and `isCondition` is true for both. It
+  `rolled_back`, `identity_revoked`) was `condition`, and `isCondition` is true for both (amended
+  2026-10-21 (fault_kinds): `corrupt_record` is in the `misuse` family, no longer `condition`). It
   also gains `meta?` (`box_stored`, `capacity`; amended 2026-10-19, a_sec2, #206: `vault_props_stored`
   is removed, see below): stored records as storage holds them (ciphertext and visible fields) and
   counts only, never secret material; amended 2026-10-21 (C1): a refused `putBox` that finds a
@@ -1446,7 +1458,8 @@ added or folded into through the subagent, and no other entry changes.
   optionality, the `format` literal); the label grammar, non-empty ids, a positive whole
   `unlock_epoch` and a sidecar's length are checked by the client's Zod records, not on the
   server. A signed-in user can therefore store malformed rows in their own vaults, which their
-  own clients then refuse as `corrupt_record`.
+  own clients then refuse as `corrupt_record` (amended 2026-10-21 (fault_kinds): `damaged_box` or
+  `damaged_vault`).
 * 2026-10-15: the Convex component checks each update's and deletion's expectation by reading the
   standing rows inside the same mutation that writes, relying on Convex's serializable
   transactions; a failed expectation resolves `false` rather than throwing. `ensureVaultProps` is a
@@ -1619,7 +1632,11 @@ added or folded into through the subagent, and no other entry changes.
   Zod's English message; see the `putBox()` unknown-keys entry). A host calling an exported schema's `.safeParse` itself
   gets zod's issues, which name paths and limits but carry no input (zod's `reportInput` is
   off). The build keeps each module its own file in `dist/` (`unbundle`), so a host's bundle
-  carries only the modules its imports reach.
+  carries only the modules its imports reach. Amended 2026-10-21 (fault_kinds): a `damaged_box` or
+  `damaged_vault` refusal for a stored record that failed its schema now carries Zod's error as its
+  `cause`, so a Zod message does reach a caller there. `reportInput` stays off: an issue's path can
+  name a stored sidecar's keys, never its values. A test checks that each damaged refusal's message,
+  stack, `cause` and JSON hold no ciphertext and no sidecar text.
 * 2026-10-15: every `VaultDB` write verb validates its record and its expectation against the
   schemas its reads use, before the adapter's half sees them, so the core never writes a record
   its own read would refuse (an over-long sidecar once did, and the vault could not be opened again);
@@ -1722,7 +1739,7 @@ added or folded into through the subagent, and no other entry changes.
   (amended 2026-10-21 (trust_lines): `sidecar`, bound as its key-sorted JSON),
   `registered_at`, `written_at`: every field but the two ciphered ones, as Zod's parse leaves the
   record), so a backend that alters a sidecar or a time
-  makes `getBox()` refuse `corrupt_record`; a future field is bound the day it is added to the
+  makes `getBox()` refuse `corrupt_record` (amended 2026-10-21 (fault_kinds): `damaged_box`); a future field is bound the day it is added to the
   schema. While the vault is locked, the listing still shows these fields unverified: nothing
   checks them before a box is opened. The lease binds `ask_passphrase_at`, under its own
   format tag (`safebyok-lease-v1`; `safebyok-unlock-v1` was 0.3.0's tag, formerly the vault props', and a
@@ -1866,7 +1883,7 @@ added or folded into through the subagent, and no other entry changes.
   may quote the name, and any text, a pasted key among it, may now be one.
   **Every name is checked everywhere**: the vault and every `VaultDB` verb check with the same
   bag, records read back included, so a stored row whose name the vault's checks refuse
-  is `corrupt_record`, not trusted; the bag never reaches storage or the Convex server, which take
+  is `corrupt_record` (amended 2026-10-21 (fault_kinds): `damaged_box` or `damaged_vault`), not trusted; the bag never reaches storage or the Convex server, which take
   any text. The stored records (`Box`, `VaultProps`, `LeaseRecord`, `VaultScope`) now check
   names only as text. (Until slots, so did a wayin's `wayinlabel`; wayins no longer carry one.) A host's schema runs on names only, never on a whisper, a sidecar or a
   passphrase. A host that admits any text (`AnyTextValidators`) shows its users labels that may
@@ -1938,8 +1955,9 @@ added or folded into through the subagent, and no other entry changes.
   `wrong_passphrase`, and a passkey's answer for its wayin's own salt that does not open it is
   still `wrong_passkey`, even when the vault props were altered in storage: each message now says the
   stored vault may be damaged, and claims no tampering. Told apart, each its own kind: vault props
-  that fail their schema or names another scope (`damaged_vault`, mapped by the vault from
-  storage's `corrupt_record`, which stays `VaultDB`'s word, the original as `cause`); a wayin
+  that fail their schema or names another scope (`damaged_vault`; amended 2026-10-21 (fault_kinds):
+  `VaultDB` says `damaged_vault` itself, Zod's error as `cause`, no longer mapped by the vault from
+  `corrupt_record`); a wayin
   whose salt its deriver could not have made (`damaged_wayin`); and a box that fails its
   schema, or will not open under the vault's vaultKey, or opens to no whisper (`damaged_box`)
   -- knowable because that vaultKey was proven by the wayin that gave it. **A damaged wayin
@@ -2217,7 +2235,11 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-16 (refusals_and_catchup): **one catch-up before a kind is named.** A write storage
   refuses as stale, or a box that will not open, gets one refresh before the vault names it: a
   vault deleted and made anew, or its wayins changed, elsewhere relocks the device (P4: never on
-  no evidence), so a successor vault's box reads as `vault_locked`, not `damaged_box`. A
+  no evidence), so a successor vault's box reads as `vault_locked`, not `damaged_box`. Amended
+  2026-10-21 (fault_kinds): a box that will not open under the lease in hand is `damaged_box` at
+  once, with no re-read first, its message saying to read again with `hello({ staleMinutes: 0 })` in
+  case the vault was made anew on another device; such a vault shows first as `damaged_box`, then
+  relocks on a fresh `hello()`. The catch-up after a `stale_write` write is unchanged. A
   catch-up that fails is thrown as `stale_write` with the failure as cause, never retried blind,
   and the snapshot says `syncing: false`. Refreshes are serialized per handle (one in flight, one
   queued), so two reads never interleave their snapshot updates. None retries: `putBox()`, a change
