@@ -1709,9 +1709,8 @@ export class Vault {
     return this.#closed || this.#movedOn(standing)
   }
 
-  /**
-   * True when the vault props standing now are no longer `standing`: deleted, made anew, or their
-   * ways in changed, here or elsewhere. {@link outrun} without the close.
+  /** True when the vault props standing now are no longer `standing`: {@link outrun} without the close.
+   * Deleted, made anew, or their ways in changed, here or elsewhere.
    */
   #movedOn(standing: VaultProps) {
     return this.#vaultProps === null || this.#vaultProps === UnreadVaultProps
