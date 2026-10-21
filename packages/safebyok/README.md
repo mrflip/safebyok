@@ -622,7 +622,7 @@ the vault: the read that finds it succeeds, and `onBadNews` is told `damaged_way
 `meta.wayin_listed` naming it.
 
 ```ts
-vault.getSnapshot().passphrase    // { wayinkind: 'passphrase', device_id: 'k3x9...', registered_at: 1760000000000 }
+vault.getSnapshot().passphrase    // { wayinkind: 'passphrase', device_id: 'k3x9...', registered_at: 1760000000000, vault_id: 'v7q2...' }
 vault.getSnapshot().passkey       // null, until one is put
 
 await vault.putWayin(passphrase, newPassphrase)   // the passphrase replaced, stamped afresh: this device, now; any passkey removed

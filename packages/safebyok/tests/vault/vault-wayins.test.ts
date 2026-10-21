@@ -38,7 +38,7 @@ describe("putWayin, with a new passphrase", () => {
     await vault.putBox('anthropic', 'sk-fake')
     const put = await vault.putWayin('old passphrase', 'new passphrase')
     expect(put).to.deep.equal(vault.passphrase)
-    expect(put).to.deep.equal({ wayinkind: 'passphrase', device_id: storedWayinOf(world, 'passphrase')?.['device_id'], registered_at: storedWayinOf(world, 'passphrase')?.['registered_at'] })
+    expect(put).to.deep.equal({ wayinkind: 'passphrase', device_id: storedWayinOf(world, 'passphrase')?.['device_id'], registered_at: storedWayinOf(world, 'passphrase')?.['registered_at'], vault_id: vault.vault_id })
     expect(vault.getSnapshot().state).to.eq('unlocked')
     expect(await vault.getWhisper('anthropic')).to.eq('sk-fake')
 
@@ -201,7 +201,7 @@ describe("the vault's passphrase", () => {
     await vault.unlock('pw')
     await vault.lock()
     const { passphrase, passkey } = vault.getSnapshot()
-    expect(passphrase).to.deep.equal({ wayinkind: 'passphrase', device_id: passphrase?.device_id, registered_at: Date.parse('2026-10-14T12:00:00Z') })
+    expect(passphrase).to.deep.equal({ wayinkind: 'passphrase', device_id: passphrase?.device_id, registered_at: Date.parse('2026-10-14T12:00:00Z'), vault_id: vault.vault_id })
     expect(passphrase?.device_id).to.have.length.greaterThan(0)
     expect(passkey).to.be.null
   })
@@ -305,7 +305,7 @@ describe("the vault's passkey", () => {
     expect(fresh.getSnapshot().state).to.eq('locked')
     const shown = fresh.getSnapshot().passkey
     expect(shown).to.deep.equal({
-      wayinkind: 'passkey', device_id: shown?.device_id, registered_at: shown?.registered_at,
+      wayinkind: 'passkey', device_id: shown?.device_id, registered_at: shown?.registered_at, vault_id: fresh.vault_id,
       credential_id: laptop.credentialId, prf_salt_b64: laptop.prfSaltB64,
     })
     expect(shown?.device_id).to.have.length.greaterThan(0)
@@ -848,8 +848,8 @@ describe("the vault's ways in, as models (Contract: Vault, Wayin)", () => {
   it("makes its ways in from the vault props as storage holds them, told apart by wayinkind, as the PassphraseWayin's and PasskeyWayin's examples show", async () => {
     const { world, vault, laptop } = await vaultWithPasskey()
     const stored = VaultProps.parse(storedVaultPropsOf(world))
-    const passphrase = Wayin.make(vault, stored, stored.passphrase)
-    const passkey = Wayin.make(vault, stored, stored.passkey ?? TH.passkeyWayinOf('none'))
+    const passphrase = Wayin.make(vault, stored.vault_id, stored.passphrase)
+    const passkey = Wayin.make(vault, stored.vault_id, stored.passkey ?? TH.passkeyWayinOf('none'))
     expect([passphrase.constructor, passkey.constructor]).to.deep.equal([PassphraseWayin, PasskeyWayin])
     const wayins: (PassphraseWayin | PasskeyWayin)[] = [passphrase, passkey]
     const told = wayins.map((wayin) => (wayin instanceof PassphraseWayin ? wayin.record.key_deriver_label : wayin.credential_id))

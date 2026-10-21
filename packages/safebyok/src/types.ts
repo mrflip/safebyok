@@ -297,23 +297,24 @@ export type WayinRecord = Z.infer<typeof WayinRecord>
 
 /**
  * The visible fields of a vault's passphrase, as its snapshot shows them even while locked: its
- * `wayinkind`, and when it was sealed (`registered_at`) and by which device (`device_id`, this
+ * `wayinkind`, when it was sealed (`registered_at`) and by which device (`device_id`, this
  * vault's id for that device: one per device per vault, so it links nothing the vault does not
- * already link). Never its salt, never its wrap.
+ * already link), and the `vault_id` of the vault props it is one of. Never its salt, never its wrap.
  *
- * @example vault.getSnapshot().passphrase   // { wayinkind: 'passphrase', device_id: 'k3x9...', registered_at: 1760000000000 }
+ * @example vault.getSnapshot().passphrase   // { wayinkind: 'passphrase', device_id: 'k3x9...', registered_at: 1760000000000, vault_id: 'v7q2...' }
  */
-export type PassphraseWayinSummary = Pick<PassphraseWayinRecord, 'wayinkind' | 'device_id' | 'registered_at'>
+export type PassphraseWayinSummary = Pick<PassphraseWayinRecord, 'wayinkind' | 'device_id' | 'registered_at'> & Pick<VaultProps, 'vault_id'>
 
 /**
  * The visible fields of a vault's passkey, as its snapshot shows them even while locked: its
- * `wayinkind`, when it was added and by which device, as for {@link PassphraseWayinSummary}, and
- * the `credential_id` and `prf_salt_b64` a host needs before unlocking, to ask the authenticator
- * (`safebyok-react`'s `askPasskey` takes this summary). Never its wrap.
+ * `wayinkind`, when it was added and by which device, and its `vault_id`, as for
+ * {@link PassphraseWayinSummary}, and the `credential_id` and `prf_salt_b64` a host needs before
+ * unlocking, to ask the authenticator (`safebyok-react`'s `askPasskey` takes this summary). Never
+ * its wrap.
  *
- * @example vault.getSnapshot().passkey   // { wayinkind: 'passkey', device_id, registered_at, credential_id: 'AXk3...', prf_salt_b64: 'q83v...' }, or null
+ * @example vault.getSnapshot().passkey   // { wayinkind: 'passkey', device_id, registered_at, vault_id, credential_id: 'AXk3...', prf_salt_b64: 'q83v...' }, or null
  */
-export type PasskeyWayinSummary = Pick<PasskeyWayinRecord, 'wayinkind' | 'device_id' | 'registered_at' | 'credential_id' | 'prf_salt_b64'>
+export type PasskeyWayinSummary = Pick<PasskeyWayinRecord, 'wayinkind' | 'device_id' | 'registered_at' | 'credential_id' | 'prf_salt_b64'> & Pick<VaultProps, 'vault_id'>
 
 /**
  * The visible fields of one way into a vault, either kind: a {@link PassphraseWayinSummary} or a
@@ -365,15 +366,6 @@ export const VaultProps = Z.object({
   registered_at:       EpochMillis,
 })
 export type VaultProps = Z.infer<typeof VaultProps>
-
-/**
- * What names one vault's props for good: their `vault_id` and `registered_at`, the two fields
- * that never change once the vault is made, and which each way in's wrap is bound to. A whole
- * {@link VaultProps} is one.
- *
- * @example const identity: VaultIdentity = { vault_id: vaultProps.vault_id, registered_at: vaultProps.registered_at }
- */
-export type VaultIdentity = Pick<VaultProps, 'vault_id' | 'registered_at'>
 
 /**
  * The device-local record of a lease: this browser's leaseKey (a non-extractable handle -- it
