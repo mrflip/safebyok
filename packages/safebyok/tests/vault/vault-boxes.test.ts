@@ -1125,21 +1125,29 @@ describe("vault.decryptWhisper", () => {
     const getProof = vi.fn<GetProof>(() => 'declined')
     const vault = await world.openUnlocked('pw', { getProof })
     await vault.putBox('anthropic', 'sk-fake', { sidecar: { note: 'work account' } })
-    const box = Box.make(TH.vaultPropsOf('u1'), await storedBoxOf(world))
+    const box = Box.make(vault, await storedBoxOf(world))
     const reads = (['getBox', 'listBoxes', 'getVaultProps'] as const).map((verb) => vi.spyOn(world.vaultDB, verb))
     expect(await vault.decryptWhisper(box)).to.eq('sk-fake')
     for (const read of reads) { expect(read).not.toHaveBeenCalled() }
     expect(getProof).not.toHaveBeenCalled()
   })
 
-  it("opens a stored record, or a box made for another vault, as this vault's own", async () => {
+  it("opens a stored record, or a box another vault handle made of it, as this vault's own", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox('anthropic', 'sk-fake')
     const record = await storedBoxOf(world)
     expect(await vault.decryptWhisper(record)).to.eq('sk-fake')
-    const foreign = Box.make(TH.vaultPropsOf('u2'), record)
+    const foreign = Box.make(TH.vaultSliceOf('u2'), record, vault.vault_id)
     expect(await vault.decryptWhisper(foreign)).to.eq('sk-fake')
+  })
+
+  it("refuses as 'vault_locked' a box that lies under other vault props than the lease in hand opens: one read before the vault was made anew", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.putBox('anthropic', 'sk-fake')
+    const elder = Box.make(vault, await storedBoxOf(world), 'vault-id-before')
+    await TH.expectRefusal(vault.decryptWhisper(elder), 'vault_locked')
   })
 
   it("resolves the whisper as an Outcome's val from tryDecryptWhisper", async () => {
@@ -1184,7 +1192,7 @@ describe("vault.decryptWhisper", () => {
     await vault.putBox('anthropic', 'sk-fake')
     vi.resetModules()
     const { Box: OtherCopyBox } = await import('../../src/box')
-    const theirs = OtherCopyBox.make(TH.vaultPropsOf('u1'), await storedBoxOf(world))
+    const theirs = OtherCopyBox.make(vault, await storedBoxOf(world))
     await TH.expectBad(vault.tryDecryptWhisper(theirs), 'bad_record')
   })
 

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Box, BoxRecord, type BoxVaultProps } from '../src/box'
+import { Box, BoxRecord } from '../src/box'
 import { cipherBytes, cipherCtx, makeBoxKey, makeVaultKey, wrapKeyUnder } from '../src/crypto'
+import { Lease } from '../src/lease'
 import { localVaultDB } from '../src/local-vault-db'
 import { valOf } from '../src/outcome'
 import { memoryStore } from '../src/string-store'
@@ -61,45 +62,55 @@ describe("BoxRecord", () => {
   })
 })
 
-// == [Box]: boxVaultPropsOf, the model, sealing, opening
+// == [Box]: vaultOf, leaseOf, the model, sealing, opening
 
-/** The time every box here is sealed at, unless a test says otherwise. */
-const T0 = Date.UTC(2026, 9, 19, 12)
+/** The time every box here is sealed at, unless a test says otherwise: what its vault's clock reads. */
+const T0 = TH.SliceNow
 
-/** The vault props a box lies under, as far as a box reads them: `u1`'s `main` vault. */
-const boxVaultPropsOf = (overrides: Partial<BoxVaultProps> = {}): BoxVaultProps => ({
-  applabel:        'acme',
-  user_id:         'u1',
-  vaultlabel:      'main',
-  vault_id:        'vault-id-u1',
-  ...overrides,
-})
+/** The vault a box here is of: `u1`'s `main` vault, holding the vault props `vault-id-u1`, its clock reading `at`. */
+const vaultOf = (overrides: Partial<TH.VaultSlice> = {}, at = T0): TH.VaultSlice => TH.vaultSliceOf('u1', TH.testDeriver, { now: () => at, ...overrides })
+
+/** A lease on `vault`, opened around `vaultKey`, granted under the vault props `vaultId` at unlock epoch 1. */
+const leaseOf = async (vaultKey: CryptoKey, vaultId = 'vault-id-u1', vault: TH.VaultSlice = vaultOf()): Promise<Lease> => (
+  await Lease.grant(vault, { vault_id: vaultId, unlock_epoch: 1 }, { transientKey: vaultKey, sessionKey: vaultKey })
+)
+
+/** A lease on a fresh vaultKey whose vault's clock reads what `clock.at` holds, {@link T0} until a test moves it. */
+const movingLease = async () => {
+  const clock = { at: T0 }
+  const lease = await leaseOf(await makeVaultKey(), 'vault-id-u1', TH.vaultSliceOf('u1', TH.testDeriver, { now: () => clock.at }))
+  return { lease, clock }
+}
 
 const Secret = 'sk-ant-SUPERSECRET'
 
 /** A box sealed by a second copy of safebyok, loaded afresh beside this one as two versions in one bundle would be: its class is its own. */
 const otherCopyBox = async (): Promise<unknown> => {
   vi.resetModules()
-  const other = await import('../src/box')
-  return await other.Box.seal(boxVaultPropsOf(), T0, 'anthropic_api_key', Secret, await makeVaultKey())
+  const { Box: OtherBox } = await import('../src/box')
+  const { Lease: OtherLease } = await import('../src/lease')
+  const vaultKey = await makeVaultKey()
+  const lease = await OtherLease.grant(vaultOf(), { vault_id: 'vault-id-u1', unlock_epoch: 1 }, { transientKey: vaultKey, sessionKey: vaultKey })
+  return await OtherBox.seal(vaultOf(), lease, 'anthropic_api_key', Secret)
 }
 
-/** `boxlabel` sealed for `u1`'s vault props at {@link T0} under a fresh vaultKey, the key and the props beside it. */
-const sealedOf = async (whisper: Whisper = Secret, opts?: Parameters<typeof Box.seal>[5]) => {
-  const vaultProps = boxVaultPropsOf()
+/** `whisper` sealed into `u1`'s vault at {@link T0} under a lease on a fresh vaultKey: the box, the vault, the key and the lease. */
+const sealedOf = async (whisper: Whisper = Secret, opts?: Parameters<typeof Box.seal>[4]) => {
+  const vault = vaultOf()
   const vaultKey = await makeVaultKey()
-  const box = await Box.seal(vaultProps, T0, 'anthropic_api_key', whisper, vaultKey, opts)
-  return { vaultProps, vaultKey, box }
+  const lease = await leaseOf(vaultKey)
+  const box = await Box.seal(vault, lease, 'anthropic_api_key', whisper, opts)
+  return { vault, vaultKey, lease, box }
 }
 
 /**
  * A box record holding `plainBytes` as its whisper, ciphered and wrapped by hand under the ctx a
- * box's ctx is documented to be: the format, the scope, the vault's id, the purpose, and every
- * visible field.
+ * box's ctx is documented to be: the format, the vault's scope, the vault props' id, the
+ * purpose, and every visible field.
  */
-const handSealedOf = async (vaultProps: BoxVaultProps, vaultKey: CryptoKey, plainBytes: Uint8Array): Promise<BoxRecord> => {
+const handSealedOf = async (vault: TH.VaultSlice, vaultKey: CryptoKey, plainBytes: Uint8Array): Promise<BoxRecord> => {
   const { format, box_key_wrapped: _wrapped, whisper_ciphered: _ciphered, ...header } = TH.boxOf('anthropic_api_key', 'hand')
-  const ctxFor = (purpose: string) => cipherCtx(format, vaultProps.applabel, vaultProps.user_id, vaultProps.vaultlabel, vaultProps.vault_id, purpose, header)
+  const ctxFor = (purpose: string) => cipherCtx(format, vault.applabel, vault.user_id, vault.vaultlabel, vault.vault_id ?? '', purpose, header)
   const boxKey = await makeBoxKey()
   return {
     format,
@@ -112,21 +123,31 @@ const handSealedOf = async (vaultProps: BoxVaultProps, vaultKey: CryptoKey, plai
 afterEach(() => { vi.restoreAllMocks() })
 
 describe("Box.make", () => {
-  it("makes a box whose every stored field is a field of its own, the sidecar parsed, as the class's example shows (Contract: Box)", () => {
+  it("makes a box whose every stored field is a field of its own, the sidecar parsed, and the vault props' id beside them, as the class's example shows (Contract: Box)", () => {
     const record = TH.boxOf('anthropic_api_key', 'a1', { sidecar_json: TH.sidecarJsonOf({ note: 'work account' }) })
-    const box = Box.make(boxVaultPropsOf(), record)
+    const box = Box.make(vaultOf(), record)
     const { sidecar_json: _sidecarJson, ...rest } = record
     for (const [field, val] of Object.entries(rest)) {
       expect(box[field as keyof typeof rest], field).to.deep.equal(val)
     }
     expect(box.boxlabel).to.eq('anthropic_api_key')
     expect(box.sidecar).to.deep.equal({ note: 'work account' })
+    expect(box.vault_id).to.eq('vault-id-u1')
     expect(box).to.not.have.property('sidecar_json')
+  })
+
+  it("lies under the vault props its vault holds, or under the vault id it is handed", () => {
+    expect(Box.make(vaultOf({ vault_id: 'vault-id-now' }), TH.boxOf('anthropic_api_key', 'a1')).vault_id).to.eq('vault-id-now')
+    expect(Box.make(vaultOf(), TH.boxOf('anthropic_api_key', 'a1'), 'vault-id-read').vault_id).to.eq('vault-id-read')
+  })
+
+  it("refuses as 'absent_vault' a box of a vault that holds no vault props, when no vault id is handed", () => {
+    TH.expectSyncRefusal(() => Box.make(vaultOf({ vault_id: null }), TH.boxOf('anthropic_api_key', 'a1')), 'absent_vault')
   })
 
   it("gives the record back as props, frozen, and serializes as it, as toJSON's example shows (Contract: Box)", () => {
     const record = TH.boxOf('anthropic_api_key', 'a1')
-    const box = Box.make(boxVaultPropsOf(), record)
+    const box = Box.make(vaultOf(), record)
     expect(box.props).to.deep.equal(record)
     expect(Object.isFrozen(box.props)).to.be.true
     expect(Object.isFrozen(box.props.box_key_wrapped)).to.be.true
@@ -136,29 +157,25 @@ describe("Box.make", () => {
     expect(JSON.parse(serialized)).to.deep.equal(box.props)
   })
 
-  it("holds its vault props frozen, a copy of their five fields alone, where no key list, spread or JSON sees them (Contract: Box)", () => {
-    const vaultProps = TH.vaultPropsOf('u1')
-    const box = Box.make(vaultProps, TH.boxOf('anthropic_api_key', 'a1'))
-    expect(box.vaultProps).to.deep.equal(boxVaultPropsOf())
-    expect(Object.isFrozen(box.vaultProps)).to.be.true
-    expect(Object.keys(box)).to.not.include.members(['vaultProps', 'props', 'summary'])
-    expect(Object.fromEntries(Object.entries(box))).to.not.have.property('vaultProps')
-    expect(JSON.stringify(box)).to.not.include('vault-id-u1')
-    expect(Reflect.set(box, 'vaultProps', boxVaultPropsOf({ vault_id: 'vault-id-other' }))).to.be.false
+  it("holds its vault where no key list, spread or JSON sees it (Contract: Box)", () => {
+    const box = Box.make(vaultOf(), TH.boxOf('anthropic_api_key', 'a1'))
+    expect(Object.keys(box)).to.not.include.members(['vault', 'props', 'summary'])
+    expect(JSON.stringify(box)).to.not.include('acme')
   })
 
-  it("shows its stored fields once in a log line, and its vault props not at all", () => {
-    const box = Box.make(boxVaultPropsOf(), TH.boxOf('anthropic_api_key', 'a1'))
+  it("shows its stored fields and its vault props' id once in a log line, and its vault not at all", () => {
+    const box = Box.make(vaultOf(), TH.boxOf('anthropic_api_key', 'a1'))
     expect(Object.keys(box)).to.have.members([
-      'format', 'boxlabel', 'revision_tok', 'whisper_codec', 'whisper_schema_version',
+      'vault_id', 'format', 'boxlabel', 'revision_tok', 'whisper_codec', 'whisper_schema_version',
       'sidecar', 'registered_at', 'written_at', 'box_key_wrapped', 'whisper_ciphered',
     ])
   })
 
   it("freezes the box, its sidecar through and its summary: nothing a host is handed can be changed", () => {
-    const box = Box.make(boxVaultPropsOf(), TH.boxOf('anthropic_api_key', 'a1', { sidecar_json: TH.sidecarJsonOf({ team: { members: ['ana'] } }) }))
+    const box = Box.make(vaultOf(), TH.boxOf('anthropic_api_key', 'a1', { sidecar_json: TH.sidecarJsonOf({ team: { members: ['ana'] } }) }))
     expect(Object.isFrozen(box)).to.be.true
     expect(Reflect.set(box, 'boxlabel', 'other')).to.be.false
+    expect(Reflect.set(box, 'vault_id', 'other')).to.be.false
     const sidecar = box.sidecar as { team: { members: string[] } }
     expect(Object.isFrozen(sidecar.team.members)).to.be.true
     expect(() => { sidecar.team.members.push('mallory') }).to.throw(TypeError)
@@ -168,7 +185,7 @@ describe("Box.make", () => {
 
   it("keeps nothing of the caller's record: a change to it afterwards reaches nothing in the box", () => {
     const record = structuredClone(TH.boxOf('anthropic_api_key', 'a1'))
-    const box = Box.make(boxVaultPropsOf(), record)
+    const box = Box.make(vaultOf(), record)
     record.box_key_wrapped.ciphertext_b64 = 'changed'
     record.revision_tok = 'changed'
     expect(box.props.box_key_wrapped.ciphertext_b64).to.eq('ct-boxkey-a1')
@@ -176,7 +193,7 @@ describe("Box.make", () => {
   })
 
   it("lists its visible fields as its summary, damaged false, no ciphertext: what vault.boxes lists (Contract: Box)", () => {
-    const box = Box.make(boxVaultPropsOf(), TH.boxOf('anthropic_api_key', 'a1'))
+    const box = Box.make(vaultOf(), TH.boxOf('anthropic_api_key', 'a1'))
     expect(box.summary).to.deep.equal({
       boxlabel: 'anthropic_api_key', revision_tok: 'rev-a1', sidecar: { note: 'a test box' },
       registered_at: Date.UTC(2026, 9, 14), written_at: Date.UTC(2026, 9, 14), damaged: false,
@@ -188,12 +205,12 @@ describe("Box.make", () => {
     valOf(await vaultDB.ensureVaultProps(TH.vaultPropsOf('u1')))
     valOf(await vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic_api_key', 'a1')))
     const record = valOf(await vaultDB.getBox(TH.scopeOf('u1'), 'anthropic_api_key'))
-    const box = Box.make(boxVaultPropsOf(), record!)
+    const box = Box.make(vaultOf(), record!)
     expect(box.props).to.deep.equal(TH.boxOf('anthropic_api_key', 'a1'))
   })
 
   it("refuses what is no box record as 'bad_record', quoting none of it, as its second example shows", () => {
-    const err = TH.expectSyncRefusal(() => Box.make(boxVaultPropsOf(), { boxlabel: 'anthropic_api_key', revision_tok: Secret } as unknown as BoxRecord), 'bad_record')
+    const err = TH.expectSyncRefusal(() => Box.make(vaultOf(), { boxlabel: 'anthropic_api_key', revision_tok: Secret } as unknown as BoxRecord), 'bad_record')
     expect(err.message).to.not.include(Secret)
     expect(err.cause).to.be.undefined
   })
@@ -201,29 +218,28 @@ describe("Box.make", () => {
   it("refuses a Box of another copy of safebyok as 'bad_record', as it refuses anything that is no box record", async () => {
     const theirs = await otherCopyBox()
     expect(theirs).to.not.be.instanceOf(Box)
-    TH.expectSyncRefusal(() => Box.make(boxVaultPropsOf(), theirs as BoxRecord), 'bad_record')
-  })
-
-  it("refuses missing vault props, or props missing their scope or vault id, as 'bad_option'", () => {
-    const record = TH.boxOf('anthropic_api_key', 'a1')
-    for (const given of [undefined, TH.scopeOf('u1'), { vault_id: 'vault-id-u1' }, boxVaultPropsOf({ vault_id: null } as unknown as BoxVaultProps)]) {
-      TH.expectSyncRefusal(() => Box.make(given as unknown as BoxVaultProps, record), 'bad_option')
-    }
+    TH.expectSyncRefusal(() => Box.make(vaultOf(), theirs as BoxRecord), 'bad_record')
   })
 })
 
 describe("Box.seal", () => {
-  it("seals a whisper that opens under the vaultKey it was sealed with, the sidecar given, as its first example shows (Contract: Box)", async () => {
-    const { vaultKey, box } = await sealedOf(Secret, { sidecar: { note: 'work account' } })
+  it("seals a whisper that opens under the lease it was sealed with, the sidecar given, as its first example shows (Contract: Box)", async () => {
+    const { lease, box } = await sealedOf(Secret, { sidecar: { note: 'work account' } })
     expect(box.sidecar).to.deep.equal({ note: 'work account' })
     expect(box.props.sidecar_json).to.eq('{"note":"work account"}')
-    expect(await box.open(vaultKey)).to.eq(Secret)
+    expect(await box.open(lease)).to.eq(Secret)
+  })
+
+  it("lays the box under the lease's vault props, whatever its vault holds: the vault it names is the one whose key sealed it", async () => {
+    const vaultKey = await makeVaultKey()
+    const box = await Box.seal(vaultOf({ vault_id: 'vault-id-other' }), await leaseOf(vaultKey, 'vault-id-leased'), 'anthropic_api_key', Secret)
+    expect(box.vault_id).to.eq('vault-id-leased')
   })
 
   it("ciphers the whisper as its JSON with every object's keys sorted, so it opens with them in order (Contract: Box, whisper_codec)", async () => {
-    const { vaultKey, box } = await sealedOf({ zeta: 'sk-fake', alpha: { omega: 1, beta: 2 } })
+    const { lease, box } = await sealedOf({ zeta: 'sk-fake', alpha: { omega: 1, beta: 2 } })
     expect(box.whisper_codec).to.eq('json_v1')
-    const opened = await box.open(vaultKey) as Record<string, Record<string, number>>
+    const opened = await box.open(lease) as Record<string, Record<string, number>>
     expect(Object.keys(opened)).to.deep.equal(['alpha', 'zeta'])
     expect(Object.keys(opened['alpha'] ?? {})).to.deep.equal(['beta', 'omega'])
   })
@@ -234,13 +250,13 @@ describe("Box.seal", () => {
     expect(JSON.stringify(box.props)).to.not.include(btoa(Secret).slice(0, 12))
   })
 
-  it("mints a fresh boxKey for every seal, wrapped under the vaultKey, and drops it (Contract: vault.putBox, Guarantees)", async () => {
+  it("mints a fresh boxKey for every seal, wrapped under the lease's vaultKey, and drops it (Contract: vault.putBox, Guarantees)", async () => {
+    const vaultKey = await makeVaultKey()
+    const lease = await leaseOf(vaultKey)
     const generateKey = vi.spyOn(crypto.subtle, 'generateKey')
     const wrapKey = vi.spyOn(crypto.subtle, 'wrapKey')
-    const vaultKey = await makeVaultKey()
-    generateKey.mockClear()
-    const one = await Box.seal(boxVaultPropsOf(), T0, 'anthropic_api_key', Secret, vaultKey)
-    const two = await Box.seal(boxVaultPropsOf(), T0, 'anthropic_api_key', Secret, vaultKey)
+    const one = await Box.seal(vaultOf(), lease, 'anthropic_api_key', Secret)
+    const two = await Box.seal(vaultOf(), lease, 'anthropic_api_key', Secret)
     expect(generateKey).toHaveBeenCalledTimes(2)
     const minted = await Promise.all(generateKey.mock.results.map((result) => result.value as Promise<CryptoKey>))
     expect(wrapKey.mock.calls.map((call) => call[1])).to.deep.equal(minted)
@@ -251,15 +267,15 @@ describe("Box.seal", () => {
     expect(one).to.not.have.property('boxKey')
   })
 
-  it("stamps written_at, and a new box's registered_at, with the time it is handed", async () => {
+  it("stamps written_at, and a new box's registered_at, with the time its vault's clock reads", async () => {
     const { box } = await sealedOf()
     expect(box.written_at).to.eq(T0)
     expect(box.registered_at).to.eq(T0)
   })
 
   it("carries registered_at and the sidecar forward from the box it replaces, as its second example shows", async () => {
-    const { vaultProps, vaultKey, box } = await sealedOf(Secret, { sidecar: { note: 'work account' } })
-    const next = await Box.seal(vaultProps, T0 + 1000, 'anthropic_api_key', 'sk-ant-NEXT', vaultKey, { over: box })
+    const { lease, box } = await sealedOf(Secret, { sidecar: { note: 'work account' } })
+    const next = await Box.seal(vaultOf({}, T0 + 1000), lease, 'anthropic_api_key', 'sk-ant-NEXT', { over: box })
     expect(next.registered_at).to.eq(T0)
     expect(next.written_at).to.eq(T0 + 1000)
     expect(next.sidecar).to.deep.equal({ note: 'work account' })
@@ -267,15 +283,15 @@ describe("Box.seal", () => {
   })
 
   it("lets a sidecar given win over the replaced box's, {} emptying it", async () => {
-    const { vaultProps, vaultKey, box } = await sealedOf(Secret, { sidecar: { note: 'work account' } })
-    const emptied = await Box.seal(vaultProps, T0, 'anthropic_api_key', Secret, vaultKey, { over: box, sidecar: {} })
+    const { vault, lease, box } = await sealedOf(Secret, { sidecar: { note: 'work account' } })
+    const emptied = await Box.seal(vault, lease, 'anthropic_api_key', Secret, { over: box, sidecar: {} })
     expect(emptied.sidecar).to.deep.equal({})
   })
 
   it("carries nothing forward from a box it replaces that will not open: nothing vouches for its fields", async () => {
-    const { vaultProps, vaultKey, box } = await sealedOf(Secret, { sidecar: { note: 'work account' } })
-    const planted = Box.make(vaultProps, { ...box.props, sidecar_json: '{"note":"planted"}', registered_at: T0 - 1000 })
-    const next = await Box.seal(vaultProps, T0 + 1000, 'anthropic_api_key', Secret, vaultKey, { over: planted })
+    const { vault, lease, box } = await sealedOf(Secret, { sidecar: { note: 'work account' } })
+    const planted = Box.make(vault, { ...box.props, sidecar_json: '{"note":"planted"}', registered_at: T0 - 1000 })
+    const next = await Box.seal(vaultOf({}, T0 + 1000), lease, 'anthropic_api_key', Secret, { over: planted })
     expect(next.sidecar).to.deep.equal({})
     expect(next.registered_at).to.eq(T0 + 1000)
   })
@@ -286,60 +302,60 @@ describe("Box.seal", () => {
     [{ whisper: { apiKey: Secret, when: new Date() } },             'bad_whisper',  'a whisper JSON would flatten, quoting none of it'],
     [{ opts: { sidecar: { apiKey: Secret, when: new Date() } } },   'bad_option',   'a sidecar JSON would flatten, quoting none of it'],
     [{ opts: { sidcar: { note: Secret } } },                        'bad_option',   'a misspelt option'],
-    [{ vaultKey: Secret },                                          'bad_option',   'a vaultKey that is no CryptoKey'],
+    [{ lease: Secret },                                             'bad_option',   'a lease that is no Lease'],
     [{ opts: { over: TH.boxOf('anthropic_api_key', 'a1') } },       'bad_option',   'an over that is a record rather than a box'],
     [{ boxlabel: '' },                                              'bad_label',    'an empty boxlabel'],
-    [{ vaultProps: { vault_id: 'vault-id-u1' } }, 'bad_option', 'vault props missing their scope'],
-    [{ vaultProps: TH.scopeOf('u1') },                              'bad_option',   'vault props missing their vault id'],
-    [{ now: T0 / 1000 },                                            'bad_option',   'a now in epoch seconds'],
-    [{ now: T0 + 0.5 },                                             'bad_option',   'a now with a fraction of a millisecond'],
   ] as const
 
   for (const [given, refusalkind, blurb] of SealRefusals) {
     it(`refuses ${blurb} as '${refusalkind}'`, async () => {
-      const vaultKey = await makeVaultKey()
-      const args = { vaultProps: boxVaultPropsOf(), now: T0, boxlabel: 'anthropic_api_key', whisper: Secret, vaultKey, opts: undefined, ...given }
-      const sealing = Box.seal(args.vaultProps as BoxVaultProps, args.now, args.boxlabel, args.whisper as Whisper, args.vaultKey as CryptoKey, args.opts as Parameters<typeof Box.seal>[5])
+      const lease = await leaseOf(await makeVaultKey())
+      const args = { boxlabel: 'anthropic_api_key', whisper: Secret, lease, opts: undefined, ...given }
+      const sealing = Box.seal(vaultOf(), args.lease as Lease, args.boxlabel, args.whisper as Whisper, args.opts as Parameters<typeof Box.seal>[4])
       const err = await TH.expectRefusal(sealing, refusalkind)
       expect(err.message).to.not.include(Secret)
     })
   }
 
   it("refuses an over under another boxlabel as 'bad_option': it is not the box this one replaces", async () => {
-    const { vaultProps, vaultKey, box } = await sealedOf()
-    await TH.expectRefusal(Box.seal(vaultProps, T0, 'openai_api_key', Secret, vaultKey, { over: box }), 'bad_option')
+    const { vault, lease, box } = await sealedOf()
+    await TH.expectRefusal(Box.seal(vault, lease, 'openai_api_key', Secret, { over: box }), 'bad_option')
   })
 
   it("refuses an over that is a Box of another copy of safebyok as 'bad_option': it is no Box of this one", async () => {
     const over = await otherCopyBox()
-    await TH.expectRefusal(Box.seal(boxVaultPropsOf(), T0, 'anthropic_api_key', Secret, await makeVaultKey(), { over: over as Box }), 'bad_option')
+    const lease = await leaseOf(await makeVaultKey())
+    await TH.expectRefusal(Box.seal(vaultOf(), lease, 'anthropic_api_key', Secret, { over: over as Box }), 'bad_option')
+  })
+
+  it("refuses as 'vault_locked' an over of another vault than the lease: the vault was deleted and made anew since it was read", async () => {
+    const { vault, vaultKey, box } = await sealedOf()
+    const reborn = await leaseOf(vaultKey, 'vault-id-reborn')
+    await TH.expectRefusal(Box.seal(vault, reborn, 'anthropic_api_key', Secret, { over: box }), 'vault_locked')
+  })
+
+  it("refuses as 'vault_locked' a lease not opened, or ended by its vault's clock", async () => {
+    const { lease, clock } = await movingLease()
+    const stored = Lease.make(vaultOf(), lease.props)
+    await TH.expectRefusal(Box.seal(vaultOf(), stored, 'anthropic_api_key', Secret), 'vault_locked')
+    clock.at = lease.ask_passphrase_at
+    await TH.expectRefusal(Box.seal(vaultOf(), lease, 'anthropic_api_key', Secret), 'vault_locked')
   })
 })
 
 describe("box.tryOpen", () => {
   it("opens to the whisper sealed, as its example shows (Contract: box.tryOpen, Returns)", async () => {
-    const { vaultKey, box } = await sealedOf({ apiKey: Secret, org: 'acme' })
-    const { ok, val: whisper } = await box.tryOpen(vaultKey)
+    const { lease, box } = await sealedOf({ apiKey: Secret, org: 'acme' })
+    const { ok, val: whisper } = await box.tryOpen(lease)
     expect(ok).to.be.true
     expect(whisper).to.deep.equal({ apiKey: Secret, org: 'acme' })
   })
 
-  it("rebuilds boxCtx from the scope, the vault's id and every visible field, unwraps, deciphers and checks (Contract: box.tryOpen, Does)", async () => {
-    const vaultProps = boxVaultPropsOf()
+  it("rebuilds boxCtx from the vault's scope, the vault props' id and every visible field, unwraps, deciphers and checks (Contract: box.tryOpen, Does)", async () => {
+    const vault = vaultOf()
     const vaultKey = await makeVaultKey()
-    const record = await handSealedOf(vaultProps, vaultKey, new TextEncoder().encode(JSON.stringify(Secret)))
-    expect(await Box.make(vaultProps, record).open(vaultKey)).to.eq(Secret)
-  })
-
-  it("seals and opens under the vault props passed in, a whole VaultProps among them, and keeps them hidden", async () => {
-    const vaultProps = TH.vaultPropsOf('u1')
-    const vaultKey = await makeVaultKey()
-    const box = await Box.seal(vaultProps, T0, 'anthropic_api_key', Secret, vaultKey)
-    expect(box.vaultProps).to.deep.equal(boxVaultPropsOf())
-    expect(Object.keys(box)).to.not.include('vaultProps')
-    expect(await Box.make(vaultProps, box.props).open(vaultKey)).to.eq(Secret)
-    const reborn = TH.vaultPropsOf('u1', { vault_id: 'vault-id-reborn' })
-    await TH.expectBad(Box.make(reborn, box.props).tryOpen(vaultKey), 'damaged_box')
+    const record = await handSealedOf(vault, vaultKey, new TextEncoder().encode(JSON.stringify(Secret)))
+    expect(await Box.make(vault, record).open(await leaseOf(vaultKey))).to.eq(Secret)
   })
 
   const Alterations = [
@@ -352,8 +368,8 @@ describe("box.tryOpen", () => {
 
   for (const [altered, blurb] of Alterations) {
     it(`refuses a box ${blurb} in storage as 'damaged_box' (Contract: box.tryOpen, Guarantees)`, async () => {
-      const { vaultProps, vaultKey, box } = await sealedOf()
-      await TH.expectBad(Box.make(vaultProps, { ...box.props, ...altered }).tryOpen(vaultKey), 'damaged_box')
+      const { vault, lease, box } = await sealedOf()
+      await TH.expectBad(Box.make(vault, { ...box.props, ...altered }).tryOpen(lease), 'damaged_box')
     })
   }
 
@@ -361,42 +377,53 @@ describe("box.tryOpen", () => {
     [{ applabel: 'other_app' },          'another app'],
     [{ user_id: 'u2' },                  'another user'],
     [{ vaultlabel: 'spare' },            'another vault of the same user'],
-    [{ vault_id: 'vault-id-reborn' },    'the same vault made anew'],
   ] as const
 
   for (const [elsewhere, blurb] of Elsewheres) {
     it(`refuses a box moved to ${blurb} as 'damaged_box', even under the same vaultKey (Contract: box.tryOpen, Guarantees)`, async () => {
-      const { vaultKey, box } = await sealedOf()
-      await TH.expectBad(Box.make(boxVaultPropsOf(elsewhere), box.props).tryOpen(vaultKey), 'damaged_box')
+      const { lease, box } = await sealedOf()
+      await TH.expectBad(Box.make(vaultOf(elsewhere), box.props).tryOpen(lease), 'damaged_box')
     })
   }
 
+  it("refuses a box moved to the same vault made anew as 'damaged_box', even under the same vaultKey (Contract: box.tryOpen, Guarantees)", async () => {
+    const { vault, vaultKey, box } = await sealedOf()
+    await TH.expectBad(Box.make(vault, box.props, 'vault-id-reborn').tryOpen(await leaseOf(vaultKey, 'vault-id-reborn')), 'damaged_box')
+  })
+
+  it("refuses as 'vault_locked' a lease of another vault than the box lies in: the vault was deleted and made anew since the box was read", async () => {
+    const { vaultKey, box } = await sealedOf()
+    const err = await TH.expectBad(box.tryOpen(await leaseOf(vaultKey, 'vault-id-reborn')), 'vault_locked')
+    expect(err.message).to.match(/another vault/)
+  })
+
   it("refuses ciphertext swapped in from another box as 'damaged_box' (Contract: box.tryOpen, Guarantees)", async () => {
-    const { vaultProps, vaultKey, box } = await sealedOf()
-    const other = await Box.seal(vaultProps, T0, 'anthropic_api_key', 'sk-ant-OTHER', vaultKey)
-    await TH.expectBad(Box.make(vaultProps, { ...box.props, whisper_ciphered: other.whisper_ciphered }).tryOpen(vaultKey), 'damaged_box')
-    await TH.expectBad(Box.make(vaultProps, { ...box.props, box_key_wrapped: other.box_key_wrapped }).tryOpen(vaultKey), 'damaged_box')
+    const { vault, lease, box } = await sealedOf()
+    const other = await Box.seal(vault, lease, 'anthropic_api_key', 'sk-ant-OTHER')
+    await TH.expectBad(Box.make(vault, { ...box.props, whisper_ciphered: other.whisper_ciphered }).tryOpen(lease), 'damaged_box')
+    await TH.expectBad(Box.make(vault, { ...box.props, box_key_wrapped: other.box_key_wrapped }).tryOpen(lease), 'damaged_box')
   })
 
   it("refuses a box under a vaultKey the vault does not hold as 'damaged_box' (Contract: box.tryOpen, Refuses)", async () => {
-    const { vaultKey, box } = await sealedOf()
-    await TH.expectBad(box.tryOpen(await makeVaultKey()), 'damaged_box')
-    expect(await box.open(vaultKey)).to.eq(Secret)
+    const { lease, box } = await sealedOf()
+    const another = await leaseOf(await makeVaultKey())
+    await TH.expectBad(box.tryOpen(another), 'damaged_box')
+    expect(await box.open(lease)).to.eq(Secret)
   })
 
   it("refuses a box that opens to no whisper as 'damaged_box' (Contract: box.tryOpen, Refuses)", async () => {
-    const vaultProps = boxVaultPropsOf()
+    const vault = vaultOf()
     const vaultKey = await makeVaultKey()
     for (const plain of ['not json', 'null', '']) {
-      const record = await handSealedOf(vaultProps, vaultKey, new TextEncoder().encode(plain))
-      const err = await TH.expectBad(Box.make(vaultProps, record).tryOpen(vaultKey), 'damaged_box')
+      const record = await handSealedOf(vault, vaultKey, new TextEncoder().encode(plain))
+      const err = await TH.expectBad(Box.make(vault, record).tryOpen(await leaseOf(vaultKey)), 'damaged_box')
       expect(err.message).to.include('not a whisper')
     }
   })
 
   it("hands back nothing partial on a refusal, and names nothing of the box in it (Contract: box.tryOpen, Guarantees)", async () => {
-    const { vaultProps, vaultKey, box } = await sealedOf(Secret, { sidecar: { note: 'sk-ant-SIDECAR' } })
-    const outcome = await Box.make(vaultProps, { ...box.props, written_at: T0 + 1 }).tryOpen(vaultKey)
+    const { vault, lease, box } = await sealedOf(Secret, { sidecar: { note: 'sk-ant-SIDECAR' } })
+    const outcome = await Box.make(vault, { ...box.props, written_at: T0 + 1 }).tryOpen(lease)
     expect(outcome).to.not.have.property('val')
     const err = await TH.expectBad(outcome, 'damaged_box')
     for (const quoted of [Secret, 'sk-ant-SIDECAR', 'anthropic_api_key', box.revision_tok, box.whisper_ciphered.ciphertext_b64]) {
@@ -406,21 +433,32 @@ describe("box.tryOpen", () => {
     expect(err.meta).to.be.undefined
   })
 
-  it("refuses a vaultKey that is no CryptoKey as 'bad_option'", async () => {
+  it("refuses a lease that is no Lease as 'bad_option'", async () => {
     const { box } = await sealedOf()
-    await TH.expectBad(box.tryOpen('not a key' as unknown as CryptoKey), 'bad_option')
+    await TH.expectBad(box.tryOpen('not a lease' as unknown as Lease), 'bad_option')
+  })
+
+  it("refuses as 'vault_locked' a lease not opened, or ended by its vault's clock", async () => {
+    const { lease, clock } = await movingLease()
+    const box = await Box.seal(vaultOf(), lease, 'anthropic_api_key', Secret)
+    const stored = Lease.make(vaultOf(), lease.props)
+    await TH.expectBad(box.tryOpen(stored), 'vault_locked')
+    clock.at = lease.ask_passphrase_at - 1
+    expect(await box.open(lease)).to.eq(Secret)
+    clock.at = lease.ask_passphrase_at
+    await TH.expectBad(box.tryOpen(lease), 'vault_locked')
   })
 })
 
 describe("box.open", () => {
   it("opens to the whisper, as its example shows", async () => {
-    const { vaultKey, box } = await sealedOf()
-    expect(await box.open(vaultKey)).to.eq(Secret)
+    const { lease, box } = await sealedOf()
+    expect(await box.open(lease)).to.eq(Secret)
   })
 
   it("throws what tryOpen refuses with", async () => {
-    const { vaultKey, box } = await sealedOf()
-    await TH.expectRefusal(Box.make(boxVaultPropsOf({ vault_id: 'vault-id-reborn' }), box.props).open(vaultKey), 'damaged_box')
+    const { vault, lease, box } = await sealedOf()
+    await TH.expectRefusal(Box.make(vault, { ...box.props, written_at: T0 + 1 }).open(lease), 'damaged_box')
   })
 })
 // --

@@ -108,7 +108,9 @@ code, the stored records and these docs all use its words.
   `unlocked`. Its boxes are written with `putBox`, read with `getBox` (the sealed `Box`), `getWhisper` and `useWhisper` (its
   whisper), and removed with `delBox`; `del()` removes the whole vault. A box in hand -- a `Box`, or the
   `BoxRecord` storage holds -- opens with `decryptWhisper(box)`, under the key in hand, reading nothing.
-  A `Box` holds its stored record as `box.props`, and serializes as it. Two devices that write at once
+  A `Box` holds its stored record as `box.props`, and serializes as it. While unlocked, the vault
+  keeps the vaultKey in one place, its `Lease`, opened: a box seals and opens under it
+  (`Box.seal(vault, lease, ...)`, `box.open(lease)`), and locking drops it. Two devices that write at once
   cannot both win: the late one is refused as `stale_write` (see *Two devices storing at once*),
   and a first unlock that loses the race to create the vault, and whose passphrase does not open
   the vault made there, is `created_elsewhere`.
@@ -449,7 +451,7 @@ A host clock is checked once, at `Vault.make`: one reading must be epoch millise
 to 2255, so a clock counting in seconds or microseconds is refused there with `bad_option`.
 After that the vault takes each reading as the clock gives it, rounded down to whole
 milliseconds; a clock that later throws fails the call that read it with `unexpected_error`, its
-error the cause.
+error the cause. `vault.now()` reads it so, as the vault's boxes, ways in and lease do.
 
 **Locking ends the lease.** A host that wants "stay unlocked on this device for a
 week" should not lock on tab-away: each time the user comes back to the tab, the vault would ask
