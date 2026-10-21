@@ -1119,7 +1119,7 @@ describe("vault.decryptWhisper", () => {
     const getProof = vi.fn<GetProof>(() => 'declined')
     const vault = await world.openUnlocked('pw', { getProof })
     await vault.putBox('anthropic', 'sk-fake', { sidecar: { note: 'work account' } })
-    const box = Box.make(vault, await storedBoxOf(world), TH.vaultPropsOf('u1'))
+    const box = Box.make(TH.vaultPropsOf('u1'), await storedBoxOf(world))
     const reads = (['getBox', 'listBoxes', 'getVaultProps'] as const).map((verb) => vi.spyOn(world.vaultDB, verb))
     expect(await vault.decryptWhisper(box)).to.eq('sk-fake')
     for (const read of reads) { expect(read).not.toHaveBeenCalled() }
@@ -1131,9 +1131,8 @@ describe("vault.decryptWhisper", () => {
     const vault = await world.openUnlocked('pw')
     await vault.putBox('anthropic', 'sk-fake')
     const record = await storedBoxOf(world)
-    const elsewhere = await makeWorld().open({ userId: 'u2' })
     expect(await vault.decryptWhisper(record)).to.eq('sk-fake')
-    const foreign = Box.make(elsewhere, record, TH.vaultPropsOf('u2'))
+    const foreign = Box.make(TH.vaultPropsOf('u2'), record)
     expect(await vault.decryptWhisper(foreign)).to.eq('sk-fake')
   })
 
@@ -1179,7 +1178,7 @@ describe("vault.decryptWhisper", () => {
     await vault.putBox('anthropic', 'sk-fake')
     vi.resetModules()
     const { Box: OtherCopyBox } = await import('../../src/box')
-    const theirs = OtherCopyBox.make(vault, await storedBoxOf(world), TH.vaultPropsOf('u1'))
+    const theirs = OtherCopyBox.make(TH.vaultPropsOf('u1'), await storedBoxOf(world))
     await TH.expectBad(vault.tryDecryptWhisper(theirs), 'bad_record')
   })
 
@@ -1194,26 +1193,16 @@ describe("vault.decryptWhisper", () => {
 })
 
 describe("what a vault hands its boxes", () => {
-  it("exposes the logger, clock and key deriver it was made with, read-only", async () => {
+  it("exposes the logger and key deriver it was made with, read-only", async () => {
     const world = makeWorld()
     const vault = await world.open()
     expect(vault.keyDeriver).to.equal(TH.testDeriver)
-    expect(vault.clock.now()).to.eq(world.clock.now())
     vault.logger.warn('a word from a box', { call: 'getBox' })
     expect(world.logged.map((call) => call.message)).to.include('a word from a box')
-    for (const field of ['logger', 'clock', 'keyDeriver'] as const) {
+    for (const field of ['logger', 'keyDeriver'] as const) {
       expect(Reflect.set(vault, field, null), field).to.be.false
       expect(Object.keys(vault), field).to.not.include(field)
     }
-  })
-
-  it("hands out a clock no host can rewind: the one the vault's boxes stamp their times by", async () => {
-    const world = makeWorld()
-    const vault = await world.openUnlocked('pw')
-    expect(Reflect.set(vault.clock, 'now', () => 0)).to.be.false
-    await vault.putBox('anthropic', 'sk-fake')
-    const { written_at: writtenAt } = await storedBoxOf(world)
-    expect(writtenAt).to.eq(world.clock.now())
   })
 
   it("lists summaries frozen through, so a host changing one reaches nothing the vault holds, as heldListing's example shows", async () => {

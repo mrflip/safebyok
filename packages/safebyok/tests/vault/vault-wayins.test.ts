@@ -848,8 +848,8 @@ describe("the vault's ways in, as models (Contract: Vault, Wayin)", () => {
   it("makes its ways in from the vault props as storage holds them, told apart by wayinkind, as the PassphraseWayin's and PasskeyWayin's examples show", async () => {
     const { world, vault, laptop } = await vaultWithPasskey()
     const stored = VaultProps.parse(storedVaultPropsOf(world))
-    const passphrase = Wayin.make(vault, stored.passphrase, stored)
-    const passkey = Wayin.make(vault, stored.passkey ?? TH.passkeyWayinOf('none'), stored)
+    const passphrase = Wayin.make(stored, stored.passphrase, vault.keyDeriver)
+    const passkey = Wayin.make(stored, stored.passkey ?? TH.passkeyWayinOf('none'), vault.keyDeriver)
     expect([passphrase.constructor, passkey.constructor]).to.deep.equal([PassphraseWayin, PasskeyWayin])
     const wayins: (PassphraseWayin | PasskeyWayin)[] = [passphrase, passkey]
     const told = wayins.map((wayin) => (wayin.wayinkind === 'passphrase' ? wayin.key_deriver_label : wayin.summary.credential_id))
@@ -875,15 +875,12 @@ describe("the vault's ways in, as models (Contract: Vault, Wayin)", () => {
     expect(vault.passkey).to.be.null
   })
 
-  it("lends its models its logger, its key deriver and its clock, none writable", async () => {
+  it("shows its logger and its key deriver, none writable", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     expect(vault.keyDeriver).to.eq(TH.testDeriver)
     expect(vault.logger).to.be.an('object')
-    expect(vault.clock.now()).to.eq(world.clock.now())
-    world.advance(5)
-    expect(vault.clock.now()).to.eq(world.clock.now())
-    for (const field of ['logger', 'clock', 'keyDeriver', 'passphrase', 'passkey']) {
+    for (const field of ['logger', 'keyDeriver', 'passphrase', 'passkey']) {
       expect(Reflect.set(vault, field, null), field).to.be.false
     }
   })

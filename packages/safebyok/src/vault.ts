@@ -1,12 +1,12 @@
 import * as Z from 'zod/mini'
 import { type Capacity, type Clock, type VaultScope, BoxSummary, type DamagedBox, type PasskeyWayinSummary, type PassphraseWayinSummary, type PasskeyAnswer, type WayinSummary, Whisper, Sidecar, VaultProps, DeviceMark, MinuteMillis, FarFuture, FarPast } from './types'
-import { Box, type BoxRecord, EmptySidecarJson, checkedBoxRecord, checkedSidecar, heldListing, planSeal, sealPlanned, whisperBytesOf } from './box'
+import { Box, type BoxRecord, type BoxVaultProps, EmptySidecarJson, checkedBoxRecord, checkedSidecar, heldListing, planSeal, sealPlanned, whisperBytesOf } from './box'
 import * as Names from './names'
 import { optionsCheck } from './options'
 import { VaultError, isVaultError, type RefusalKind } from './errors'
 import { type Outcome, type BadOutcome, bad, good, outcomeOf, unexpectedError, valOf } from './outcome'
 import { makeVaultKey, randomId } from './crypto'
-import { Wayin, frozenRecord, type PasskeyWayin, type PassphraseWayin, type VaultKeyPair } from './wayin'
+import { Wayin, frozenRecord, type PasskeyWayin, type PassphraseWayin, type VaultKeyPair, type WayinVaultProps } from './wayin'
 import { Proof, PassphraseProof, PasskeyProof, checkSaltShape } from './proof'
 import { stableJsonify } from './stable-jsonify'
 import { oneAtATime } from './one-at-a-time'
@@ -18,7 +18,7 @@ import { type BadNewsHandler, type MakeVaultOpts, parseMakeVaultOpts, parseRenew
 import { reportToPlatform } from './report-error'
 import { type DeviceDB, deviceTroubleAsConditions } from './device-db'
 import type { KeyDeriver } from './key-deriver'
-import { Lease } from './lease'
+import { Lease, type LeaseVaultProps } from './lease'
 import { Ask, type AskWhy, type GetProof, type RaisedAsk, raiseAsk } from './ask'
 
 // == [Public types]: VaultState, VaultSnapshot
@@ -112,6 +112,9 @@ const UnreadVaultProps = Symbol('UnreadVaultProps')
 /** The ways in of vault props, as the vault holds them: the passphrase's, and the passkey's or null. */
 type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin | null }>
 
+/** The vault props a box, a way in or a lease is bound to, as the vault hands them each (`#boundPropsOf`). */
+type BoundVaultProps = Readonly<BoxVaultProps & WayinVaultProps & LeaseVaultProps>
+
 /** One user's vault of boxes, for as long as the app holds it: every read and write of a whisper goes through here.
  * `Vault.make` returns one, touching nothing. Its fields (`state`, `boxes`, `passkey`,
  * `capacity`, `trouble` and the rest) are live and read-only. A UI renders from `getSnapshot()`,
@@ -169,12 +172,11 @@ type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin 
  *   if (! ok && err.refusalkind === 'wrong_passphrase') { askAgain(err.message) }
  */
 export class Vault {
-  // == [Vault: fields]: applabel, user_id, vaultlabel, vault_id, registered_at, unlock_epoch, vault_key_epoch, passphrase, passkey, state, boxes, capacity, askPassphraseAt, trouble, syncing, snapshot, getSnapshot, subscribe, leaseMillis, logger, clock, keyDeriver
+  // == [Vault: fields]: applabel, user_id, vaultlabel, vault_id, registered_at, unlock_epoch, vault_key_epoch, passphrase, passkey, state, boxes, capacity, askPassphraseAt, trouble, syncing, snapshot, getSnapshot, subscribe, leaseMillis, logger, keyDeriver
 
   // Each field reads the snapshot `#settle()` last published, so the fields and the snapshot always
   // agree. A getter with no setter: a host cannot write over one, and the vault never reads one back:
-  // nor do its boxes, which read only the scope, fixed for the handle's life, and take the vault
-  // props they lie under from the vault at each call.
+  // nor do its boxes, ways in and lease, which are handed the vault props they are bound to at each call.
 
   /** The scope's app: where the vault is found. Fixed for the Vault object's life. */
   get applabel(): string { return this.#snapshot.applabel }
@@ -226,8 +228,6 @@ export class Vault {
   get leaseMillis(): number { return this.#leaseMillis }
   /** The logger the vault was made with, which its boxes and ways in log through. */
   get logger(): VaultLogger { return this.#logger }
-  /** The vault's clock: the host's, each reading rounded down to whole milliseconds. */
-  get clock(): Clock { return this.#flooredClock }
   /** The key deriver the vault was made with, which its ways in derive through. */
   get keyDeriver(): KeyDeriver { return this.#keyDeriver }
   // --
@@ -440,7 +440,7 @@ export class Vault {
         // proved it, and the user makes a new one under the new passphrase. A new passkey leaves
         // the passphrase as it stood.
         revise: async (standing, proven, deviceId) => {
-          const wayin = await Wayin.seal(this, standing, putting, deviceId, proven.transientKey)
+          const wayin = await Wayin.seal(this.#boundPropsOf(standing), this.#clockNow(), putting, deviceId, proven.transientKey)
           return wayin.wayinkind === 'passphrase' ? { passphrase: wayin.props, passkey: null } : { passphrase: standing.passphrase, passkey: wayin.props }
         },
       })
@@ -545,8 +545,8 @@ export class Vault {
       // The key and the vault it belongs to, taken together after the last look at storage.
       const unlockedKey = this.#checkUnlocked()
       // The vault props the box is sealed under are the ones its write names: one object, read once.
-      const standingVaultProps = this.#currentVaultProps()
-      const { vault_id: vaultId, vault_key_epoch: vaultKeyEpoch } = standingVaultProps
+      const sealing = this.#boundPropsOf(this.#currentVaultProps())
+      const { vault_id: vaultId, vault_key_epoch: vaultKeyEpoch } = sealing
       // Lands only in the vault this whisper is sealed for, under the vaultKey that seals it, over
       // the revision just read -- for a damaged box, the one the listing names -- : a vault reborn
       // elsewhere, a vaultKey replaced, or a box written meanwhile by another device, refuses it.
@@ -556,9 +556,9 @@ export class Vault {
       const expected = { vault_id: vaultId, revision_tok: overRevision, vault_key_epoch: vaultKeyEpoch }
       // The sidecar a store keeps from the box it replaces, when none is given, counts toward the
       // limit too: known once the plan has vouched for that box, and weighed before any key is made.
-      const plan = await planSeal(this, standingVaultProps, unlockedKey, { boxlabel: label, whisperBytes, sidecarJson: givenSidecarJson, over: prev })
+      const plan = await planSeal(sealing, unlockedKey, { boxlabel: label, whisperBytes, sidecarJson: givenSidecarJson, over: prev })
       this.#checkWhisperFits(plan.whisperBytes, plan.sidecarJson)
-      const box = await sealPlanned(this, standingVaultProps, unlockedKey, plan)
+      const box = await sealPlanned(sealing, this.#clockNow(), unlockedKey, plan)
       await this.#writeOver(box, expected)
       await this.#refresh()
       return good(undefined)
@@ -621,7 +621,7 @@ export class Vault {
       const record = box instanceof Box ? box.props : checkedBoxRecord(box)
       const unlockedKey = this.#checkUnlocked()
       // Made anew for this vault: a box opens under this vault's scope and the props it holds, whichever it came from.
-      const held = Box.make(this, record, this.#currentVaultProps())
+      const held = Box.make(this.#boundPropsOf(this.#currentVaultProps()), record)
       const whisper = valOf(await held.tryOpen(unlockedKey))
       this.#checkUnlocked()
       return good(whisper)
@@ -774,8 +774,6 @@ export class Vault {
   readonly #whisperByteLimit: number
   readonly #boxLimit: number
   readonly #vaultByteLimit: number
-  // Frozen: `vault.clock` hands it out, and the vault's boxes stamp their times by it.
-  readonly #flooredClock: Clock = Object.freeze({ now: () => this.#clockNow() })
 
   /** Make a Vault object for one user's vault, in state `opening`: its options checked, and nothing else done.
    * It reads nothing, starts no timer or watch, and prompts nobody until a call asks. So it may be
@@ -852,18 +850,19 @@ export class Vault {
   }
   /** True while a vaultKey is held under a lease that has not ended, by the clock read now. */
   #unlockStands(): boolean {
-    return this.#vaultKey !== null && this.#lease !== null && ! this.#lease.endsWithin(0)
+    return this.#vaultKey !== null && this.#lease !== null && ! this.#lease.endsBy(this.#clockNow())
   }
   // The ways in of each vault props record the vault has held, made once per record. Every record
-  // the vault holds is frozen as it takes it up (see frozenVaultProps), so a way in's holder, a
-  // box's and the record the vault works from are one object, which nothing can change.
+  // the vault holds is frozen as it takes it up (see frozenVaultProps), so the ways in made of one,
+  // and the vault props they are bound to, never change under it.
   readonly #modelled = new WeakMap<VaultProps, HeldWayins>()
   #wayinsOf(standing: VaultProps): HeldWayins {
     const known = this.#modelled.get(standing)
     if (known !== undefined) { return known }
+    const bound = this.#boundPropsOf(standing)
     const wayins = Object.freeze({
-      passphrase: Wayin.make(this, standing.passphrase, standing),
-      passkey:    standing.passkey === null ? null : Wayin.make(this, standing.passkey, standing),
+      passphrase: Wayin.make(bound, standing.passphrase, this.#keyDeriver),
+      passkey:    standing.passkey === null ? null : Wayin.make(bound, standing.passkey, this.#keyDeriver),
     })
     this.#modelled.set(standing, wayins)
     return wayins
@@ -1161,7 +1160,7 @@ export class Vault {
   }
   // --
 
-  // == [Guards]: checkOpen, checkUnlocked, currentVaultProps
+  // == [Guards]: checkOpen, checkUnlocked, currentVaultProps, boundPropsOf
 
   #checkOpen() {
     if (this.#closed) { throw closedError() }
@@ -1182,6 +1181,16 @@ export class Vault {
       throw new VaultError('absent_vault', 'This vault has not been created yet: the first unlock() creates it.')
     }
     return this.#vaultProps
+  }
+
+  /**
+   * What a box, a way in or a lease of this vault is bound to, under `props`: the vault's own
+   * scope, never storage's, and the ids and epochs of the vault props a call took, once. Each
+   * model is handed this one frozen value, so what an encryption binds is in one place.
+   */
+  #boundPropsOf(props: VaultProps): BoundVaultProps {
+    const { vault_id, registered_at, vault_key_epoch, unlock_epoch } = props
+    return Object.freeze({ ...this.#scope, vault_id, registered_at, vault_key_epoch, unlock_epoch })
   }
   // --
 
@@ -1219,7 +1228,7 @@ export class Vault {
       if (this.#vaultKey !== null) { this.#dropNow() }
       return 'locked'
     }
-    return this.#lease.endsWithin(renewMillis) ? 'lease_ending' : null
+    return this.#lease.endsBy(this.#clockNow() + renewMillis) ? 'lease_ending' : null
   }
 
   /** Raise a prompt for `why`, up until it is answered or a lock lands. */
@@ -1289,7 +1298,7 @@ export class Vault {
    */
   async #draftVaultProps(passphrase: PassphraseProof, deviceId: string): Promise<VaultProps> {
     const identity = { vault_id: randomId(), registered_at: this.#clockNow(), vault_key_epoch: FirstVaultKeyEpoch }
-    const wayin = await Wayin.seal(this, identity, passphrase, deviceId, await makeVaultKey())
+    const wayin = await Wayin.seal({ ...this.#scope, ...identity }, identity.registered_at, passphrase, deviceId, await makeVaultKey())
     return {
       format:              'safebyok-vault-v5',
       ...this.#scope,
@@ -1529,8 +1538,9 @@ export class Vault {
     // A take-up under way stands down before this lease is written, not after: one that read an
     // older lease could otherwise erase this one as it discards that.
     this.#standDownTakeUp()
-    // The transient's last act: wrapped into this device's lease, then dropped.
-    const lease = await Lease.grant(this, standing, unlocked)
+    // The transient's last act: wrapped into this device's lease, then dropped. The deadline is
+    // leaseHours from now, and never past FarFuture, which is how leaseHours: Infinity reads.
+    const lease = await Lease.grant(this.#boundPropsOf(standing), Math.min(this.#clockNow() + this.#leaseMillis, FarFuture), unlocked)
     // Asked again before the write: the prompt may have ended, or the props moved on, while the key was wrapped.
     if (isVoided()) { return false }
     valOf(await this.#deviceDB.putLease(lease.props))
@@ -1590,7 +1600,7 @@ export class Vault {
     // the lease standing now may be the one that change wrote.
     if (kept === null || isOvertaken()) { return }
     // A record that is no lease, or another vault's, is unreadable.
-    const made = await outcomeOf(() => Lease.make(this, kept), unexpectedError)
+    const made = await outcomeOf(() => Lease.make(this.#scope, kept), unexpectedError)
     if (isOvertaken()) { return }
     if (! made.ok) {
       await this.#discardLease(made.err)
@@ -1599,7 +1609,8 @@ export class Vault {
     const lease = made.val
     // Granted under a longer leaseHours than this handle's: it does not fit. Otherwise the lease
     // judges itself against the vault props standing, and the clock.
-    const opened = lease.endsWithin(this.#leaseMillis) ? await lease.tryOpen(standing) : null
+    const now = this.#clockNow()
+    const opened = lease.endsBy(now + this.#leaseMillis) ? await lease.tryOpen(this.#boundPropsOf(standing), now) : null
     // One overtaken is left alone, as the lease standing now may be the overtaking change's own,
     // and the next hello judges it against the vault props that stand then.
     if (isOvertaken()) { return }
@@ -1728,7 +1739,7 @@ export class Vault {
    */
   #boxFrom(record: BoxRecord): Box {
     this.#checkUnlocked()
-    return Box.make(this, record, this.#currentVaultProps())
+    return Box.make(this.#boundPropsOf(this.#currentVaultProps()), record)
   }
 
   /** Why nothing stands under `boxlabel`, a name above the floor: 'bad_label' when the vault's boxlabel check refuses it, 'absent_box' otherwise.
