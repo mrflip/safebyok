@@ -1,6 +1,6 @@
 # Thread C1: putbox_store (2026-10-21)
 
-Branch `20261020-putbox_store`, PR #PRNUM, cut from 47ab50be (#209, B5 `placement`). Justify: green
+Branch `20261020-putbox_store`, PR [#213](https://github.com/mrflip/safebyok/pull/213), cut from 47ab50be (#209, B5 `placement`). Justify: green
 (core 2602 passed / 35 skipped; postgres 276/14; convex 279/8; graphql 270/14; indexeddb 148/10;
 react 280; fastkey 49; demo 207/16; e2e 93 passed, 100 skipped: no Docker here, live backends unrun).
 
