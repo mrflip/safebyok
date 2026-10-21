@@ -1,11 +1,10 @@
 import * as Z from 'zod/mini'
 import { VaultError, type VaultDBOpts } from 'safebyok'
 
-/** What `idbVaultDB` and `inspectIdbVaultDB` are made with: `inspectIdbVaultDB` takes no logger. */
+/** What `idbVaultDB` and `inspectIdbVaultDB` are made with; `inspectIdbVaultDB` ignores `logger`. */
 export type IdbVaultDBOpts = VaultDBOpts & {
-  /**
-   * The name the IndexedDB databases are made under: non-empty text, default 'safebyok'. Pass the
-   * same one to `browserOpts`, and the vault and its device store sit side by side.
+  /** The name the IndexedDB databases are made under: non-empty text, default 'safebyok'.
+   * Pass the same one to `browserOpts`, and the vault and its device store sit side by side.
    */
   dbName?: string | undefined
 }
@@ -15,11 +14,9 @@ const DefaultDbName = 'safebyok'
 const dbName = Z.string().check(Z.minLength(1))
 const idbVaultDBOpts = Z.object({ dbName: Z._default(dbName, DefaultDbName) })
 
-/**
- * The database name a call was handed: `opts.dbName`, or 'safebyok' when there is none. Kind
- * 'bad_option' for anything else, quoting none of it.
+/** The database name a call was handed, or 'safebyok' without one.
+ * Kind 'bad_option' for anything else, quoting none of it.
  *
- * @param opts - What the host handed the call, or nothing.
  * @param said - The function the host called, as the refusal names it.
  *
  * @example parseDbName({ dbName: 'acme' }, 'idbVaultDB')  // 'acme'
@@ -33,10 +30,8 @@ export const parseDbName = (opts: IdbVaultDBOpts | undefined, said: string): str
   return checked.data.dbName
 }
 
-/**
- * The change bell of the vault shelf in `dbName`: every write rings it, here and in every other
- * tab. Its name is shared with every other tab, and with any other version of this package running
- * in one, so it stays as it is.
+/** The name of the change bell that every write to the shelf in `dbName` rings, in every tab.
+ * Other tabs, and other versions of this package running in them, listen by this name: it never changes.
  *
  * @example ChangeBell.ring(bellnameOf('acme'))  // 'safebyok-idb:acme:vault_db'
  */
