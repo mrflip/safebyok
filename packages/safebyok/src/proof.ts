@@ -19,9 +19,9 @@ import type { PasskeyWayin, PassphraseWayin } from './wayin'
  * the bytes behind it are dropped at once.
  */
 
-/**
- * The slice of a {@link Vault} a proof reads: the key deriver a passphrase's derivation runs on,
- * and the strength checker a new passphrase is put to, with the scope it is told.
+/** The slice of a {@link Vault} a proof reads.
+ * The key deriver a passphrase's derivation runs on, and the strength checker a new passphrase is
+ * put to, with the scope it is told.
  */
 export type ProofVault = Pick<Vault, 'keyDeriver' | 'strengthChecker' | 'applabel' | 'user_id' | 'vaultlabel'>
 
@@ -110,12 +110,12 @@ export class PassphraseProof extends Proof {
     return ! this.passphrase.trim()
   }
 
-  /**
-   * Check this passphrase as a new one, before it becomes a way in: put to its vault's
-   * `strengthChecker`, with the vault's scope. Refuses with kind 'weak_passphrase' for a blank one,
-   * before the checker hears it, and for one the checker finds weak, its reason the message. A
-   * checker that throws is refused 'unexpected_error', carrying nothing of what it threw; one that
-   * answers no verdict, 'bad_option'. Only a new passphrase is checked: one that proves never is.
+  /** Check this passphrase as a new one, before it becomes a way in.
+   * It is put to its vault's `strengthChecker`, with the vault's scope. Refuses with kind
+   * 'weak_passphrase' for a blank one, before the checker hears it, and for one the checker finds
+   * weak, its reason the message. A checker that throws is refused 'unexpected_error', carrying
+   * nothing of what it threw; one that answers no verdict, 'bad_option'. Only a new passphrase is
+   * checked: one that proves never is.
    *
    * @example await PassphraseProof.parse(vault, chosen).checkStrongEnough()   // throws 'weak_passphrase' with the checker's reason
    */
@@ -212,10 +212,10 @@ export class PasskeyProof extends Proof {
   }
 }
 
-/**
- * Refuse with kind 'bad_option' a new passkey's answer over anything but a salt of
- * {@link PasskeySaltBytes} bytes, as base64url text. A passkey's way in sealed over another would
- * read as damaged at every later unlock. The vault checks it at its door, before any key is made.
+/** Refuse a new passkey's answer over a salt of any shape but a new passkey's.
+ * Kind 'bad_option' for anything but {@link PasskeySaltBytes} bytes, as base64url text. A
+ * passkey's way in sealed over another would read as damaged at every later unlock. The vault
+ * checks it at its door, before any key is made.
  *
  * @example checkSaltShape(PasskeyProof.parse(vault, await createPasskey(opts)))   // passes
  * @example checkSaltShape(PasskeyProof.parse(vault, { ...answer, prfSaltB64: 'c2hvcnQ' }))   // throws 'bad_option'

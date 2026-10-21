@@ -45,9 +45,8 @@ export const toB64 = (bytes: Uint8Array): string => base64urlnopad.encode(bytes)
  */
 export const fromB64 = (b64: string): Uint8Array => base64urlnopad.decode(b64)
 
-/**
- * Base64url text back to bytes, or null for text that is not base64url: for judging a salt's
- * shape, where bad text is an answer rather than an error.
+/** Base64url text back to bytes, or null for text that is not base64url.
+ * For judging a salt's shape, where bad text is an answer rather than an error.
  *
  * @example fromB64OrNull('Y3JlZC1sYXB0b3A')?.length   // 11
  * @example fromB64OrNull('not/base64url+!')           // null
