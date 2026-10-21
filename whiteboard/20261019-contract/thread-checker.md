@@ -1,6 +1,6 @@
 # Thread checker: the strength checker held to its contract in one place (2026-10-21)
 
-Branch `20261021-checker`, PR #PR, stacked on [#215](https://github.com/mrflip/safebyok/pull/215),
+Branch `20261021-checker`, PR [#216](https://github.com/mrflip/safebyok/pull/216), stacked on [#215](https://github.com/mrflip/safebyok/pull/215),
 in the line main → #213 → #212 → #214 → #215 → this. Justify: green. Core 2668 passed, 35
 skipped; react 284; convex 279 (8 skipped); postgres 276 (14 skipped); graphql 271 (14 skipped);
 indexeddb 148 (10 skipped); fastkey 49; demo 207 (16 skipped); e2e 93 (100 skipped); root 265.
@@ -79,3 +79,6 @@ indexeddb 148 (10 skipped); fastkey 49; demo 207 (16 skipped); e2e 93 (100 skipp
     passphrase in its own `passphraseAdvice` would have it reported. Recommend accepting.
   - **Vault.make's other function options** (`getProof`, `onBadNews`, `clock`) still use
     hand-written parsers; they could move into the schema the same way. Recommend a later pass.
+  - **Suppressions** (all `@typescript-eslint/no-misused-promises`, next-line): `tests/vault-db.test.ts`,
+    `tests/test-helpers/vault-db-conformance.ts`, `tests/vault/vault-twins.test.ts`,
+    `tests/vault/vault-lease.test.ts`.
