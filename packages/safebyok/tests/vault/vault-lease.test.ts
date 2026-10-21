@@ -1320,17 +1320,18 @@ describe("every data call, through ensureLease", () => {
   })
 
   for (const [call, blurb] of [
-    [(vault: Vault, boxlabel: string) => vault.getWhisper(boxlabel), 'getBox'],
+    [(vault: Vault, boxlabel: string) => vault.getBox(boxlabel), 'getBox'],
     [(vault: Vault, boxlabel: string) => vault.getWhisper(boxlabel), 'getWhisper'],
     [(vault: Vault, boxlabel: string) => vault.useWhisper(boxlabel, (whisper) => whisper), 'useWhisper'],
     [(vault: Vault, boxlabel: string) => vault.delBox(boxlabel), 'delBox'],
   ] as const) {
-    it(`refuses bad_label and absent_box from what it holds, before asking for anything: ${blurb} (Contract: ensureLease, a call that cannot land never prompts)`, async () => {
+    it(`refuses bad_label below the floor and absent_box from what it holds, before asking for anything: ${blurb} (Contract: ensureLease, a call that cannot land never prompts)`, async () => {
       const getProof = typingPw()
       const { vault } = await lockedVaultWith({ getProof })
-      // Below the floor every name is held to; refused by the vault's own check; above both, but not listed.
+      // Below the floor every name is held to; refused by the vault's own check, which gates only
+      // writes, and not listed; passing both, and not listed.
       await TH.expectRefusal(call(vault, 'tab\there'), 'bad_label')
-      await TH.expectRefusal(call(vault, 'no such label!'), 'bad_label')
+      await TH.expectRefusal(call(vault, 'no such label!'), 'absent_box')
       await TH.expectRefusal(call(vault, 'openai'), 'absent_box')
       expect(getProof).not.toHaveBeenCalled()
       expect(vault.state).to.eq('locked')

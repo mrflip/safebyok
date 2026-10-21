@@ -507,7 +507,7 @@ export class Vault {
    * the box's first store. A box that will not read or open is overwritten as new, carrying over
    * neither its sidecar nor its `registered_at`. One listed damaged with no revision refuses
    * 'damaged_box', writing nothing: {@link Vault.delBox} it first. A boxlabel the vault's check
-   * refuses is refused 'bad_label', even where a box stored under other checks stands under it.
+   * refuses is refused 'bad_label', even where a box stands under it: the check gates writes alone.
    *
    * @param storeOpts - `sidecar`, the box's {@link Sidecar}: your app's own JSON data beside the
    *   whisper, shown in the snapshot while locked, and never interpreted by the vault. It is stored
@@ -525,8 +525,7 @@ export class Vault {
   async tryPutBox(boxlabel: string, whisper: Whisper, storeOpts?: { sidecar?: Sidecar | undefined }): Promise<Outcome<void>> {
     try {
       this.#checkOpen()
-      // A name the check refuses is never written anew, even where a box stored under other
-      // checks stands under it: reading and deleting reach that one.
+      // The host's check gates every name written; reads and deletes hold a name to the floor alone.
       const label = Names.check(this.#rules, 'boxlabel', boxlabel)
       const givenSidecarJson = sidecarJsonOf(storeOpts)
       // The refusal never quotes its input: a whisper stays out of error messages.
@@ -573,8 +572,8 @@ export class Vault {
    * does not open the whisper, so a whisper that will not open shows only at `decryptWhisper()` or
    * `getWhisper()`. A lock, a `del()` or the lease ending while storage is read refuses
    * 'vault_locked', handing nothing back, unless an unlock has put a key back in hand meanwhile; a
-   * `close()` refuses 'vault_closed'. A box stored under a name the vault's boxlabel check refuses
-   * reads by that name, as any other: such a name refuses 'bad_label' only with nothing under it.
+   * `close()` refuses 'vault_closed'. The boxlabel is held to the floor alone, 'bad_label' below it:
+   * the vault's boxlabel check gates only writes, so a name it refuses reads as any other.
    *
    * @example const box = await vault.getBox('anthropic_api_key')
    */
@@ -644,7 +643,8 @@ export class Vault {
 
   /** Remove the box `boxlabel`, whatever revision of it stands: a damaged one too, as deleting is its remedy.
    * Once it resolves, storage holds no box under `boxlabel`. It asks for a proof, and refuses
-   * 'absent_box' or 'bad_label', as {@link Vault.getBox} does. Writes with `VaultDB.delBox`.
+   * 'absent_box' or 'bad_label', as {@link Vault.getBox} does; 'absent_box' too when another device
+   * or tab deleted it first. Writes with `VaultDB.delBox`.
    *
    * The delete lands only in the vault this device last read. If that vault was deleted, or made
    * anew, elsewhere, nothing is removed, and the call refuses 'stale_write' once this device has
@@ -658,10 +658,9 @@ export class Vault {
   async tryDelBox(boxlabel: string): Promise<Outcome<void>> {
     try {
       this.#checkOpen()
-      const floored = Names.checkFloor('boxlabel', boxlabel)
+      const label = Names.checkFloor('boxlabel', boxlabel)
       // Checked before the user is asked for anything: a call that cannot land never prompts.
-      await this.#ensureLease(0, () => { this.#checkListed(floored) })
-      const label = await this.#checkStandingBoxlabel(floored)
+      await this.#ensureLease(0, () => { this.#checkListed(label) })
       this.#checkUnlocked()
       // Lands only in the vault this device holds keys for, whatever revision of the box stands:
       // a vault deleted and made anew elsewhere refuses it. The revision the listing shows only
@@ -671,6 +670,8 @@ export class Vault {
       const showedDamaged = this.#isListedDamaged(label)
       try {
         const { outcome } = await this.#refreshOnStale(this.#vaultDB.delBox(this.#scope, label, expected), 'delBox')
+        // Storage arbitrates: nothing stood there to delete.
+        if (outcome === 'absent') { throw absentBox() }
         if (outcome === 'deleted_other') {
           if (showedDamaged) {
             this.#logger.warn("The box this device showed was a damaged one, and the box deleted was not that record: another device or tab had written over it since. That write was deleted all the same.", { call: 'delBox', damaged: true })
@@ -1687,16 +1688,7 @@ export class Vault {
   }
   // --
 
-  // == [Reading boxes]: checkStandingBoxlabel, checkListed, getBoxOrThrow, boxFrom, getBoxUnlocked, decipherOrCatchUp
-
-  /** `boxlabel`, once a box stands under it, for `delBox()`: a damaged record stands, and so does one under a name the vault's check refuses.
-   * Reads storage once, and refuses as `#nothingUnder` says.
-   */
-  async #checkStandingBoxlabel(boxlabel: string): Promise<string> {
-    const label = Names.checkFloor('boxlabel', boxlabel)
-    if (await this.#getBoxOrDamaged(label) === null) { throw this.#nothingUnder(label) }
-    return label
-  }
+  // == [Reading boxes]: checkListed, getBoxOrThrow, boxFrom, getBoxUnlocked, decipherOrCatchUp
 
   /** The revision the listing names for the box under `boxlabel`, sound or damaged; null for none listed, or a damaged record that holds none.
    * Storage arbitrates a write that names it, so a listing gone stale costs a refusal and a second
@@ -1707,12 +1699,12 @@ export class Vault {
   /** True when the snapshot's listing shows the box under `boxlabel` as damaged. */
   #isListedDamaged(boxlabel: string): boolean { return this.#boxes.some((box) => box.boxlabel === boxlabel && box.damaged) }
 
-  /** Refuse `boxlabel`, a name above the floor, as `#nothingUnder` does, when the listing in hand shows no box under it.
+  /** Refuse `boxlabel` as 'absent_box' when the listing in hand shows no box under it.
    * That is what a locked vault can know before it asks for a proof. Reads nothing: the listing is
    * as fresh as `staleMinutes` keeps it.
    */
   #checkListed(boxlabel: string) {
-    if (this.#boxes.every((box) => box.boxlabel !== boxlabel)) { throw this.#nothingUnder(boxlabel) }
+    if (this.#boxes.every((box) => box.boxlabel !== boxlabel)) { throw absentBox() }
   }
 
   /** The box under `boxlabel`; null when there is none, and 'damaged' when its record fails verification. */
@@ -1726,10 +1718,10 @@ export class Vault {
     }
   }
 
+  /** The box under `boxlabel`, a name already held to the floor: kind 'absent_box' when there is none, and 'damaged_box' when its record fails verification. */
   async #getBoxOrThrow(boxlabel: string): Promise<Box> {
-    const label = Names.checkFloor('boxlabel', boxlabel)
-    const record = await damagedAs(this.#vaultDB.getBox(this.#scope, label), damagedBox)
-    if (record === null) { throw this.#nothingUnder(label) }
+    const record = await damagedAs(this.#vaultDB.getBox(this.#scope, boxlabel), damagedBox)
+    if (record === null) { throw absentBox() }
     return this.#boxFrom(record)
   }
 
@@ -1740,15 +1732,6 @@ export class Vault {
   #boxFrom(record: BoxRecord): Box {
     this.#checkUnlocked()
     return Box.make(this.#boundPropsOf(this.#currentVaultProps()), record)
-  }
-
-  /** Why nothing stands under `boxlabel`, a name above the floor: 'bad_label' when the vault's boxlabel check refuses it, 'absent_box' otherwise.
-   * Call it only once storage holds nothing under the name: a box stored under a name the check
-   * refuses reads and deletes as any other.
-   */
-  #nothingUnder(boxlabel: string): VaultError {
-    Names.check(this.#rules, 'boxlabel', boxlabel)
-    return absentBox()
   }
 
   /** The box under `boxlabel`, once the vault is unlocked for it, while a key is still in hand.

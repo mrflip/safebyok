@@ -232,12 +232,12 @@ await vault.putBox('מפתח OpenAI: עבודה', 'sk-...', { sidecar: { note: '
   makes of it: a name is bound into the ciphertext and names its rows, so a schema that trims or
   lowercases would otherwise send the same user to another vault. Nothing is normalized either:
   text not in NFC is refused, never composed for you.
-* **Your checks are an alarm at the door, not a promise about storage.** They run where a name
-  enters the vault: `Vault.make` (the scope) and `putBox()` (the boxlabel). A box already stored under a name they refuse
-  -- by another client, or before you narrowed them -- lists, reads and deletes as any other, by
-  the name it was stored under; `putBox()` refuses only to write a new one under a refused name.
-  With nothing stored under it, a name they refuse is `bad_label` at `getBox()`, `getWhisper()`, `useWhisper()` and
-  `delBox()`.
+* **Your checks gate writes; reads and deletes hold a name to the floor alone.** They run where
+  a name enters the vault: `Vault.make` (the scope) and `putBox()` (the boxlabel). `getBox()`,
+  `getWhisper()`, `useWhisper()` and `delBox()` check a boxlabel against the floor only, so a box
+  already stored under a name your checks refuse -- by another client, or before you narrowed
+  them -- lists, reads and deletes as any other, and a name with nothing under it is
+  `absent_box`, whatever your checks say of it.
 * **Widen with care.** A check admitting text outside ASCII should require NFC, as the floor
   does, and widen only once every client you serve runs the wider check: an older one refuses at
   its door the names a newer one stores.
@@ -1022,7 +1022,9 @@ the box written over since the snapshot showed it, on another device or tab, del
 write all the same, and the vault warns through your logger that a different revision than the
 one it showed was deleted, naming neither: the other device's whisper is gone, and only the log
 says so. When the box the vault showed was a damaged one, the warning says that, and its story
-carries `damaged: true` beside `call`, so a host can branch on it.
+carries `damaged: true` beside `call`, so a host can branch on it. A `delBox()` that finds nothing
+left to delete -- another device or tab deleted the box first -- is `absent_box`, as storage
+answers it: the vault reads no box beforehand.
 
 In code, `err.family` is each kind's family, as `RefusalFamilyForKind` gives it (`RefusalFamilyVals`:
 `misuse`, `condition`, `bad_news`), and `isCondition(err)` is true for a `VaultError` of the

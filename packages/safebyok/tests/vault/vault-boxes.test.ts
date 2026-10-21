@@ -882,7 +882,7 @@ describe("the host's validators", () => {
     expect(boxlabelsOf(narrow)).to.deep.equal(['anthropic'])
   })
 
-  it("delBox() reads storage once for the box it deletes, under a refused boxlabel or a passing one", async () => {
+  it("delBox() reads no box before it deletes, under a refused boxlabel or a passing one, and a name with nothing there is absent_box", async () => {
     const world = makeWorld()
     const roomy = await world.openUnlocked('pw', { validators: AnyScript })
     await roomy.putBox('OpenAI: work', 'sk-fake')
@@ -891,12 +891,19 @@ describe("the host's validators", () => {
     const narrow = await world.openUnlocked('pw')
     const getBox = vi.spyOn(world.vaultDB, 'getBox')
     await narrow.delBox('OpenAI: work')
-    expect(getBox.mock.calls).to.have.lengthOf(1)
     await narrow.delBox('anthropic')
-    expect(getBox.mock.calls).to.have.lengthOf(2)
-    await TH.expectRefusal(narrow.delBox('OpenAI: work'), 'bad_label')
-    expect(getBox.mock.calls).to.have.lengthOf(3)
+    await TH.expectRefusal(narrow.delBox('OpenAI: work'), 'absent_box')
+    expect(getBox).not.toHaveBeenCalled()
     expect(boxlabelsOf(narrow)).to.deep.equal([])
+  })
+
+  it("reads a name the host's check refuses, with nothing under it, as absent_box: the check gates writes alone", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.putBox('anthropic', 'sk-fake')
+    for (const call of [() => vault.getBox('Other: box'), () => vault.getWhisper('Other: box'), () => vault.useWhisper('Other: box', (whisper) => whisper), () => vault.delBox('Other: box')]) {
+      await TH.expectRefusal(call(), 'absent_box')
+    }
   })
 
   it("refuse a wayinlabel check as bad_option, as a vault's ways in carry no labels", async () => {
@@ -928,7 +935,7 @@ describe("the host's validators", () => {
     expect(world.dbStore.read(u1BoxCkey('OpenAI: work'))).to.eq(stored)
     expect(narrow.getSnapshot().boxes.map((box) => [box.boxlabel, box.damaged])).to.deep.equal([['OpenAI: work', false]])
     await TH.expectRefusal(narrow.putBox('Other: box', 'sk-fake'), 'bad_label')
-    await TH.expectRefusal(narrow.delBox('Other: box'), 'bad_label')
+    await TH.expectRefusal(narrow.delBox('Other: box'), 'absent_box')
     expect(world.dbStore.read(u1BoxCkey('Other: box'))).to.be.null
   })
 })

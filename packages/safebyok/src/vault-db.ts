@@ -652,9 +652,7 @@ const ListedBox = Z.omit(BoxRecord, { box_key_wrapped: true, whisper_ciphered: t
 /** True when a listed box is stored under a name above the floor, which a verb can reach. */
 const isNameable = (stored: StoredBox): boolean => NameFloor.safeParse((stored as { boxlabel?: unknown }).boxlabel).success
 
-/** One nameable stored box as the listing shows it: its summary, or a {@link DamagedBox} where `getBox` would refuse it.
- * A name the vault's own validators refuse is no damage: it lists as it stands.
- */
+/** One nameable stored box as the listing shows it: its summary, or a {@link DamagedBox} where `getBox` would refuse it. */
 const listedOrDamaged = ({ boxlabel, box }: StoredBox): BoxSummary | DamagedBox => {
   const checked = ListedBox.safeParse(box)
   const sound = checked.success && checked.data.boxlabel === boxlabel
@@ -865,7 +863,7 @@ const StoredVaultId = Z.object({ vault_id: VaultProps.shape.vault_id })
 /** A stored box, as `getBox` holds it: a box's shape, under the boxlabel it was asked for. */
 const checkStoredBox = (raw: unknown, boxlabel: string): BoxRecord => {
   const box = checkRecord(BoxRecord, raw, 'box')
-  // A record that names some other boxlabel is a record out of place, wherever it came from.
+  // A record naming another boxlabel is out of place: a misfiling adapter, or a moved record.
   if (box.boxlabel !== boxlabel) {
     throw new VaultError('corrupt_record', 'The stored box names a different boxlabel than the one asked for. It was left as it is.')
   }

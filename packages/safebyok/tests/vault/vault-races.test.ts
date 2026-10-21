@@ -148,7 +148,6 @@ describe("a read in flight when a lock lands", () => {
   const ReadsOfABox = [
     ['getWhisper', (vault: Vault) => vault.getWhisper('anthropic'),              'a read'],
     ['putBox', (vault: Vault) => vault.putBox('anthropic', 'sk-fake-2'), 'a store'],
-    ['delBox', (vault: Vault) => vault.delBox('anthropic'),              'a deletion'],
   ] as const
 
   for (const [verb, calling, blurb] of ReadsOfABox) {
@@ -915,13 +914,26 @@ describe("versioned updates: two devices writing at once", () => {
     expect(await there.getWhisper('anthropic')).to.eq('sk-ant-fake-new')
   })
 
-  it("a deletion in a vault deleted elsewhere, and not made anew, finds no box to delete", async () => {
+  it("a deletion in a vault deleted elsewhere, and not made anew, is refused as stale by storage itself, the vault it was in gone", async () => {
     const world = makeWorld()
     const here = await world.openUnlocked('pw one', { vaultDB: world.deafVaultDB() })
     await here.putBox('anthropic', 'sk-ant-fake-old')
     const there = await world.open({ deviceDB: memoryDeviceDB() })
     await there.del()
+    const getBox = vi.spyOn(world.vaultDB, 'getBox')
+    const err = await TH.expectRefusal(here.delBox('anthropic'), 'stale_write')
+    expect(err.message).to.match(/vault it was in is gone/)
+    expect(getBox).not.toHaveBeenCalled()
+  })
+
+  it("a deletion of a box another device deleted first is absent_box, as storage answers it, reading no box beforehand", async () => {
+    const { world, hereDB, here, there } = await twoDeviceWorld()
+    await here.putBox('anthropic', 'sk-ant-fake-one')
+    TH.beforeNextCall(hereDB, 'delBox', async () => { await there.delBox('anthropic') })
+    const getBox = vi.spyOn(hereDB, 'getBox')
     await TH.expectRefusal(here.delBox('anthropic'), 'absent_box')
+    expect(getBox).not.toHaveBeenCalled()
+    expect(world.dbStore.read(u1BoxCkey('anthropic'))).to.be.null
   })
 
   it("a deletion whose catch-up fails says so, the failure its cause, rather than that the vault is gone", async () => {
