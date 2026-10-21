@@ -5,6 +5,7 @@ import { Box, BoxRecord } from '../../src/box'
 import type { VaultError } from '../../src/errors'
 import type { GetProof } from '../../src/ask'
 import { valOf } from '../../src/outcome'
+import { Vault } from '../../src/vault'
 import { type Whisper, MaxWhisperBytes, type Sidecar, FarFuture, MaxBoxes, VaultScope } from '../../src/types'
 import { AnyTextValidators, MaxUserIdChars, NameFloorBytes } from '../../src/validators'
 import { type VaultDB, jsonBytes } from '../../src/vault-db'
@@ -1189,10 +1190,24 @@ describe("vault.decryptWhisper", () => {
     expect(err.message).to.not.include('sk-fake')
   })
 
-  it("refuses what is no box record as 'bad_record', before it looks for a key", async () => {
+  it("refuses what is no box record as 'bad_record', before it opens anything", async () => {
     const world = makeWorld()
-    const vault = await world.open()
+    const vault = await world.openUnlocked('pw')
     await TH.expectRefusal(vault.decryptWhisper({ boxlabel: 'anthropic' } as unknown as BoxRecord), 'bad_record')
+  })
+
+  it("refuses 'vault_locked' while locked, before it looks at what it was handed: a record, no record at all, or a call before hello() has read the vault props", async () => {
+    const world = makeWorld()
+    const first = await world.openUnlocked('pw')
+    await first.putBox('anthropic', 'sk-fake')
+    const record = await storedBoxOf(world)
+    // Locking erases this device's lease, so no vault opened after it holds a key.
+    await first.lock()
+    const locked = await world.open()
+    await TH.expectRefusal(locked.decryptWhisper(record), 'vault_locked')
+    await TH.expectRefusal(locked.decryptWhisper({ boxlabel: 'anthropic' } as unknown as BoxRecord), 'vault_locked')
+    const unread = Vault.make(world.optsWith())
+    await TH.expectRefusal(unread.decryptWhisper(record), 'vault_locked')
   })
 
   it("refuses a box made by another copy of safebyok as 'bad_record', as it refuses anything that is no box record", async () => {
