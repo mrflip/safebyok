@@ -5,6 +5,7 @@ import { VaultError } from '../../src/errors'
 import { memoryDeviceDB } from '../../src/device-db'
 import { localVaultDB } from '../../src/local-vault-db'
 import { Vault } from '../../src/vault'
+import { Lease } from '../../src/lease'
 import { type MakeVaultOpts, parseStaleMinutes } from '../../src/vault-opts'
 import { fromB64 } from '../../src/crypto'
 import type { KeyDeriver, CustomKeyDeriver } from '../../src/key-deriver'
@@ -234,6 +235,16 @@ describe("the host's clock", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw', { clock: { now: () => world.clock.now() + 0.5 } })
     expect(vault.getSnapshot().state).to.eq('unlocked')
+  })
+
+  it("reads now() off the clock, rounded down to whole milliseconds, the time the lease is judged by, as its example shows", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw', { clock: { now: () => world.clock.now() + 0.5 } })
+    expect(vault.now()).to.eq(world.clock.now())
+    const lease = Lease.make(vault, await world.getLease())
+    expect(lease.endsBy(vault.now())).to.be.false
+    world.advance(vault.leaseMillis)
+    expect(lease.endsBy(vault.now())).to.be.true
   })
 
   it("checks the clock once, at Vault.make: a later reading in seconds is taken as it comes, and checked by nothing", async () => {
