@@ -37,6 +37,8 @@ Open questions too many for chat go to a doc's **Open Matters** tab, run by `/tu
 (`.claude/skills/turbochat/SKILL.md`): the Coach flips a row's state, and agents act on that.
 A set of open PRs is made one merge line by `/restacker` (`.claude/skills/restacker/SKILL.md`),
 which rebases in a clone of its own, tests once at the tip, and force-pushes only under named leases.
+Doc blocks are brought to STYLE.md's rules by the `documentarian` agent
+(`.claude/agents/documentarian.md`), on a target a Coach names.
 
 ## The history we keep
 
@@ -189,8 +191,7 @@ budget lives here. size-limit's `kB` is 1000 bytes, and it measures minified and
    least +1 kB, so a small bundle is not given more room than its own size.
 3. **Round up to a round number**: two significant figures, never down (2.3 kB of measure is
    3.5 kB of budget; 22.15 kB is 23 kB; 26.83 kB is 27 kB). Round numbers keep a stack of PRs
-   from fighting over digits: a budget of 2_431 bytes is a conflict waiting for the next
-   thread, and 2_500 is not.
+   from fighting over digits.
 
 `pnpm size:budget` applies the rule: it prints each budget beside the rule's, and `--raise` or
 `--write` sets them (its header says how).

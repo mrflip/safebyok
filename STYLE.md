@@ -190,19 +190,57 @@ between columns lets the editor align them (see *Tests*).
 * **Every exported function, class, constant and type gets a doc block**, written for its caller:
   what it is and how to use it, never how it came to be, what's next, or how it works inside. A
   caveat for future authors is a running comment by the code it concerns.
-* Lead with what the thing *is* or *returns*, skipping "Creates" and "Calculates" and articles
-  that add nothing: `One box's whisper, ciphered under its boxKey`.
-* Order: header, `@param`, `@returns`, a blank line, then `@example`s -- don't be stingy with
-  those. A short example on one line; a long one on following lines, indented two spaces.
-* A `@param` is the parameter's role, an entry in the playbill: `@param boxlabel - Box to
-  open, as its owner named it.`
-* The first line must stand alone when folded in an editor: `/** Brief statement */`, or a
-  sentence that continues on the following lines.
+* **The purpose goes on the `/**` line**, a sentence that stands alone when the block is folded
+  in an editor: `/** Brief statement */` alone, or `/** Brief statement.` with the rest on the
+  lines below. Never `/**` alone on its line.
+* Lead with what the thing *is* or *returns*: `/** The fields written to storage: the visible
+  ones, the ciphered whisper and the wrapped boxKey. */`, not `/** Creates a bag of the fields
+  that will be written to the database */`.
+* **Each sentence tells the caller something they would otherwise get wrong**, given the
+  signature, the names, what a capable developer already knows, and what is said once elsewhere
+  (a class's own doc, `errors.ts`). Leave out what those already say.
+* **A block is as long as its contract, not its code.** A patently obvious export needs its
+  first line and nothing more. A guard, or an entrypoint other calls go through, states its
+  contract even when it is simple: what holds once it succeeds. Most public methods take 5 to
+  15 lines of prose.
+* **Name the refusals that are common and not obvious**: those a caller will meet in normal use
+  and should branch on. Not those passed through from another call, and not those only a bug or
+  a record that breaks the package's own invariants brings about.
+* **Plain sentences**: subject, verb, object, in that order; one fact to a sentence; under 25
+  words.
+* Don't be stingy with `@example`s. A short example on one line; a long one on following lines,
+  indented two spaces.
+* `@param` and `@returns` only for what the name and type can't say. A `@param` is the
+  parameter's role, an entry in the playbill: `@param boxlabel - Box to open, as its owner named
+  it.`
 * **A file past about 40 KB is sectioned.** `// == [Mark]: heedMark, markSeeing, others` opens a
   section (its name, then the names a reader would grep for), `// --` closes it, both at the
   section's indentation; sections are flat, never nested. `grep -n '// == '` is the file's table
   of contents. A banner groups declarations; it does not excuse a file that should be split, and
   it moves with the code it names.
+
+A doc block before and after, its examples left out. Before, 41 lines opening:
+
+```ts
+/**
+ * Read storage and settle the vault: one read of the vault props, their ways in and the box
+ * listing, then this device's lease, taken up when it still fits and still opens, and the vault
+ * settled from those into `absent`, `locked` or `unlocked`, its snapshot published -- never
+ * prompting: asking for a passphrase is the host's job, and only when a whisper is actually
+```
+
+After:
+
+```ts
+/** Read storage and settle the vault as `absent`, `locked` or `unlocked`, resolving the vault.
+ * Never prompts. Optional: every call but `lock()` and `close()` awaits a first hello. Call it
+ * again to refresh: within `opts.staleMinutes` of the last read it re-settles without reading.
+ * Reads {@link VaultDB.getVaultProps}, {@link VaultDB.listBoxes} and {@link DeviceDB.getLease}.
+ *
+ * A refused hello leaves the vault as it last settled. Stored vault props it cannot use refuse
+ * with 'damaged_vault' ({@link delDamagedVault} clears them), 'newer_format' or 'rolled_back'.
+ */
+```
 
 Well-named, short functions rarely need running comments. A comment that narrates the code, makes
 up for a poor name, or marks off a stanza that should be its own function is a sign to rewrite.

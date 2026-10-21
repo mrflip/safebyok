@@ -186,4 +186,7 @@ banned names. STYLE.md is the real source.
 * A module of related verbs is star-imported under its Startcase name: `Names.checkFloor(...)`.
 * Every export has a doc block written for its caller. Each `@example` in it has a test whose
   title points back to it: `"refuses a misspelt field, as its second example shows"`.
+* A doc block's purpose goes on its `/**` line, a sentence that stands alone when the block is
+  folded: `/** Read storage and settle the vault.`, the rest on ` * ` lines below. Never `/**`
+  alone on its line, whatever the blocks around you do (STYLE.md, *Comments and doc blocks*).
 * Tests are chai-style (`expect(foo).to.eq(bar)`), their helpers star-imported as `TH`.
