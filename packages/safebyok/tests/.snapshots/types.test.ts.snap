@@ -1,7 +1,43 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`Stored record formats > safebyok-box-v6 1`] = `
+exports[`Stored record formats > safebyok-box-v8 1`] = `
 {
+  "$defs": {
+    "__schema0": {
+      "additionalProperties": {
+        "$ref": "#/$defs/__schema1",
+      },
+      "propertyNames": {
+        "type": "string",
+      },
+      "type": "object",
+    },
+    "__schema1": {
+      "anyOf": [
+        {
+          "type": "string",
+        },
+        {
+          "type": "number",
+        },
+        {
+          "type": "boolean",
+        },
+        {
+          "type": "null",
+        },
+        {
+          "items": {
+            "$ref": "#/$defs/__schema1",
+          },
+          "type": "array",
+        },
+        {
+          "$ref": "#/$defs/__schema0",
+        },
+      ],
+    },
+  },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
@@ -29,7 +65,7 @@ exports[`Stored record formats > safebyok-box-v6 1`] = `
       "type": "string",
     },
     "format": {
-      "const": "safebyok-box-v6",
+      "const": "safebyok-box-v8",
       "type": "string",
     },
     "registered_at": {
@@ -41,13 +77,8 @@ exports[`Stored record formats > safebyok-box-v6 1`] = `
       "minLength": 1,
       "type": "string",
     },
-    "sidecar_json": {
-      "type": "string",
-    },
-    "vault_key_epoch": {
-      "exclusiveMinimum": 0,
-      "maximum": 9007199254740991,
-      "type": "integer",
+    "sidecar": {
+      "$ref": "#/$defs/__schema0",
     },
     "whisper_ciphered": {
       "additionalProperties": false,
@@ -85,12 +116,11 @@ exports[`Stored record formats > safebyok-box-v6 1`] = `
     "format",
     "boxlabel",
     "revision_tok",
-    "vault_key_epoch",
     "box_key_wrapped",
     "whisper_ciphered",
     "whisper_codec",
     "whisper_schema_version",
-    "sidecar_json",
+    "sidecar",
     "registered_at",
     "written_at",
   ],
@@ -171,7 +201,7 @@ exports[`Stored record formats > safebyok-lease-v1 1`] = `
 }
 `;
 
-exports[`Stored record formats > safebyok-mark-v4 1`] = `
+exports[`Stored record formats > safebyok-mark-v5 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -182,7 +212,7 @@ exports[`Stored record formats > safebyok-mark-v4 1`] = `
       "type": "string",
     },
     "format": {
-      "const": "safebyok-mark-v4",
+      "const": "safebyok-mark-v5",
       "type": "string",
     },
     "seen": {
@@ -201,17 +231,11 @@ exports[`Stored record formats > safebyok-mark-v4 1`] = `
           "minLength": 1,
           "type": "string",
         },
-        "vault_key_epoch": {
-          "exclusiveMinimum": 0,
-          "maximum": 9007199254740991,
-          "type": "integer",
-        },
       },
       "required": [
         "device_id",
         "vault_id",
         "unlock_epoch",
-        "vault_key_epoch",
       ],
       "type": "object",
     },
@@ -237,7 +261,7 @@ exports[`Stored record formats > safebyok-mark-v4 1`] = `
 }
 `;
 
-exports[`Stored record formats > safebyok-vault-v5 1`] = `
+exports[`Stored record formats > safebyok-vault-v6 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -248,7 +272,7 @@ exports[`Stored record formats > safebyok-vault-v5 1`] = `
       "type": "string",
     },
     "format": {
-      "const": "safebyok-vault-v5",
+      "const": "safebyok-vault-v6",
       "type": "string",
     },
     "passkey": {
@@ -271,11 +295,6 @@ exports[`Stored record formats > safebyok-vault-v5 1`] = `
             "registered_at": {
               "maximum": 9007199254740,
               "minimum": 347155200000,
-              "type": "integer",
-            },
-            "vault_key_epoch": {
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991,
               "type": "integer",
             },
             "vault_key_wayin_wrapped": {
@@ -305,7 +324,6 @@ exports[`Stored record formats > safebyok-vault-v5 1`] = `
             "wayinkind",
             "credential_id",
             "prf_salt_b64",
-            "vault_key_epoch",
             "device_id",
             "registered_at",
             "vault_key_wayin_wrapped",
@@ -337,11 +355,6 @@ exports[`Stored record formats > safebyok-vault-v5 1`] = `
           "minLength": 1,
           "type": "string",
         },
-        "vault_key_epoch": {
-          "exclusiveMinimum": 0,
-          "maximum": 9007199254740991,
-          "type": "integer",
-        },
         "vault_key_wayin_wrapped": {
           "additionalProperties": false,
           "properties": {
@@ -369,7 +382,6 @@ exports[`Stored record formats > safebyok-vault-v5 1`] = `
         "wayinkind",
         "key_deriver_label",
         "salt_b64",
-        "vault_key_epoch",
         "device_id",
         "registered_at",
         "vault_key_wayin_wrapped",
@@ -395,11 +407,6 @@ exports[`Stored record formats > safebyok-vault-v5 1`] = `
       "minLength": 1,
       "type": "string",
     },
-    "vault_key_epoch": {
-      "exclusiveMinimum": 0,
-      "maximum": 9007199254740991,
-      "type": "integer",
-    },
     "vaultlabel": {
       "maxLength": 1024,
       "minLength": 1,
@@ -413,7 +420,6 @@ exports[`Stored record formats > safebyok-vault-v5 1`] = `
     "vaultlabel",
     "vault_id",
     "unlock_epoch",
-    "vault_key_epoch",
     "passphrase",
     "passkey",
     "registered_at",

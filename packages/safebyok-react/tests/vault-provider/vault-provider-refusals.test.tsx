@@ -388,7 +388,7 @@ describe("VaultProvider", () => {
 
     it("matches openError's @example for a damaged record: no Retry, which cannot mend it", async () => {
       const world = makeWorld()
-      vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValue(TH.bad(new VaultError('corrupt_record', 'The stored vault failed its checks.')))
+      vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValue(TH.bad(new VaultError('damaged_vault', "This vault's stored props failed their checks.")))
       render(
         <VaultProvider {...world.props} userId="u1">
           <OpenErrorExample />

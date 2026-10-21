@@ -78,7 +78,7 @@ const damagedOver = async () => {
 describe("OutageVaultDB, deleting a damaged vault", () => {
   it("hands the delete to its inner adapter, which reads the record as stored", async () => {
     const { store, vaultDB } = await damagedOver()
-    await TH.expectBad(vaultDB.getVaultProps(scope), 'corrupt_record')
+    await TH.expectBad(vaultDB.getVaultProps(scope), 'damaged_vault')
     await TH.expectingGood(vaultDB).delDamagedVault(scope)
     expect(store.ckeys()).to.deep.equal([])
   })

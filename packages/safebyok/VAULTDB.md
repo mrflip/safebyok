@@ -53,15 +53,15 @@ validators has chosen that. A record a client's validators would refuse reads ba
 damage.
 
 So the versioned update is split: the adapter owns the atomic compare-and-write (lines 3.1 to
-3.5, and 3.8), and the vault owns the read before it and the refusal after it. "The first write
+3.5), and the vault owns the read before it and the refusal after it. "The first write
 wins, and the second hears of it" is the vault's policy over the adapter's guarantee, not something
 an adapter implements.
 
 Nothing is retried. A box write, a change to the ways in, a `del()` or a `delBox()` that
-meets someone else's is news the user must hear, refused once as `stale_write`. Before it names any
-refusal -- a stale write, or a box that will not open -- the vault catches up with storage
-once, so a vault deleted and made anew elsewhere relocks the device rather than reading as
-damage. There is no conflict handler beyond this, and no hook for one: whatever landed first
+meets someone else's is news the user must hear, refused once as `stale_write`. Before it names a
+stale write the vault catches up with storage once, so a vault deleted and made anew elsewhere
+relocks the device. It names a box that will not open `damaged_box` at once, reading nothing
+more: the host reads again (`hello()`) to see what stands. There is no conflict handler beyond this, and no hook for one: whatever landed first
 stands, and a host that disagrees calls `putBox()` or `delBox()` again. The vault never clears
 a damaged record on its own; the user's `delBox()` on its boxlabel does, or a `putBox()` over
 one that names its revision, in its one `putBox`: a store never deletes. A `delBox()` that
@@ -138,9 +138,12 @@ boxlabel -- makes that record one this package does not build, refused whole as 
 ## 1. Records
 
 **1.1. What is stored reads back whole.** A record reads back exactly as it was written, field
-for field, and nothing is added. Text comes back as the exact text written: a
-box's `sidecar_json` is bound into its encryption as written, so a store that rewrites JSON
-it holds (Postgres's `jsonb`, say) keeps that field as plain text. Before anything is written, a read finds nothing: `null`, never a
+for field, and nothing is added. Text comes back as the exact text written. A structured value
+-- an encrypted value, a way in, a box's `sidecar` -- comes back as the same JSON value, though a
+store that keeps JSON its own way (Postgres's `jsonb`, say) may hand back its object keys in
+another order: the vault binds each by its fields, a sidecar as its JSON with keys sorted, so
+that order changes nothing. A box's `sidecar` is always a JSON object, `{}` for none, and
+comes back as that object. Before anything is written, a read finds nothing: `null`, never a
 default.
 
 **1.2. Each vault keeps to itself.** Two scopes that differ anywhere, by however little (a
@@ -271,19 +274,6 @@ once from different devices, all land: none refuses as `stale_write`, none fails
 and no host retries. Only writes to one box -- or a deletion of the vault -- can collide, and
 then line 3.3 or 3.4 says which wins.
 
-**3.8. A box write lands only under the vaultKey that stands.** A box carries the
-`vault_key_epoch` of the vaultKey its boxKey is wrapped under, and its write's expectation
-names the same one (the base class refuses a box whose epoch is not the expected one, as
-`invalid_box`, before the adapter sees it). `putBox` writes only while the scope's standing
-vault props have that `vault_key_epoch`, as well as the `vault_id` and revision of line 3.3,
-compared in the same atomic step as the write; otherwise it refuses as `vault_mismatch` and writes
-nothing. So a box only ever lands sealed under the vaultKey its vault props stand for. Every
-vault carries `vault_key_epoch` 1 today, the epoch reserved for a rotation of the vaultKey not yet
-built, so for now the comparison refuses a record built wrong. It is kept so that rotation needs
-no new contract: the vault does not read the vault props before each write, so only storage can
-refuse a device that still holds a vaultKey since replaced and has not looked at the vault props
-meanwhile. Deletions name no `vault_key_epoch` (line 3.4): a deletion reveals nothing.
-
 ## 4. The box limit
 
 **4.1. An adapter declares the most boxes it holds in one vault.** `maxBoxes` is a whole
@@ -340,8 +330,19 @@ class refusing with it; a box write throws `Refusals.staleBox(standing)`), `vaul
 (a box write, `Refusals.vaultMismatch()`), `vault_full`,
 `identity_revoked`, `not_permitted`, or anything it throws otherwise, which becomes
 `storage_unavailable`. The base
-class refuses `bad_label`, `bad_record`, `invalid_box`, `bad_option`, `box_too_large` and `corrupt_record` itself, before
-the adapter is asked or after it answers. Each message says calmly what went wrong and what to do
+class refuses `bad_label`, `bad_record`, `invalid_box`, `bad_option`, `box_too_large`, `damaged_vault`,
+`damaged_box` and `corrupt_record` itself, before the adapter is asked or after it answers.
+
+A record that fails its checks is named for who is at fault. One the caller hands in is
+`bad_record` (a box handed to `putBox`, `invalid_box`). One read from storage is damaged:
+`damaged_vault` for vault props (from `getVaultProps` and `ensureVaultProps`), `damaged_box` for a
+box (from `getBox`; a listing shows it as a `DamagedBox` instead, and a stale write's
+`meta.box_stored` likewise), Zod's own error its `cause` where a check failed. An answer the
+adapter owes in the protocol's shape that comes in another -- a box write's echo that fails a
+box's checks or holds another boxlabel or revision, a `Refusals.staleBox` or `Refusals.vaultFull`
+missing what it must carry, a deletion's report or a capacity in another shape -- is
+`corrupt_record`: the adapter's bug, and the one thing that kind means. An adapter does not
+refuse a damaged record itself (line 1.3): it hands it up, and the base class names it. Each message says calmly what went wrong and what to do
 about it, and a caller branches on the kind, never the message. Every verb resolves an `Outcome`
 and never rejects: the refusal is its `err`, whoever made it.
 

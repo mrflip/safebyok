@@ -14,7 +14,6 @@ CREATE TABLE IF NOT EXISTS safebyok_vaults (
   vault_id         text   NOT NULL,
   format           text   NOT NULL,
   unlock_epoch     bigint NOT NULL,
-  vault_key_epoch  bigint NOT NULL,
   passphrase       jsonb  NOT NULL,
   passkey          jsonb,
   registered_at    bigint NOT NULL,
@@ -25,8 +24,9 @@ CREATE TABLE IF NOT EXISTS safebyok_vaults (
 
 -- One box per boxlabel, beside its vault's scope and vault_id. A box stands only while
 -- its vault's props do, under the same vault_id: deleting the vault deletes its boxes with
--- it, and no write can leave a box in a vault made anew. The sidecar is kept as the JSON
--- text it was written as, never jsonb, which would rewrite it: that text is bound into the box.
+-- it, and no write can leave a box in a vault made anew. The sidecar is the app's own JSON object,
+-- {} for none, kept as jsonb, so a server can query it: the box binds it with its keys sorted, so
+-- jsonb's own order changes nothing.
 CREATE TABLE IF NOT EXISTS safebyok_boxes (
   applabel               text   NOT NULL,
   user_id                text   NOT NULL,
@@ -35,12 +35,11 @@ CREATE TABLE IF NOT EXISTS safebyok_boxes (
   format                 text   NOT NULL,
   boxlabel               text   NOT NULL,
   revision_tok           text   NOT NULL,
-  vault_key_epoch        bigint NOT NULL,
   box_key_wrapped        jsonb  NOT NULL,
   whisper_ciphered       jsonb  NOT NULL,
   whisper_codec          text   NOT NULL,
   whisper_schema_version bigint NOT NULL,
-  sidecar_json           text   NOT NULL,
+  sidecar                jsonb  NOT NULL DEFAULT '{}',
   registered_at          bigint NOT NULL,
   written_at             bigint NOT NULL,
   PRIMARY KEY (applabel, user_id, vaultlabel, boxlabel),

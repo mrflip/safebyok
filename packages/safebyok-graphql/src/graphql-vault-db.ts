@@ -186,8 +186,8 @@ class UrqlVaultDB extends VaultDB {
   // server's storage holds it.
   protected async doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<unknown> {
     checkInts('box', box)
-    const { vault_id, revision_tok, vault_key_epoch } = expected
-    const { safebyokPutBox } = await this.told(PutBoxDoc, { scope: scopeOut(scope), box: recordOf(box, BoxFields), expected: { vault_id, revision_tok, vault_key_epoch } })
+    const { vault_id, revision_tok } = expected
+    const { safebyokPutBox } = await this.told(PutBoxDoc, { scope: scopeOut(scope), box: recordOf(box, BoxFields), expected: { vault_id, revision_tok } })
     return recordOf(safebyokPutBox, BoxFields)
   }
 
@@ -241,11 +241,10 @@ const scopeOut = (scope: VaultScope) => recordOf(scope, ScopeFields)
 const GraphqlIntMax = 2_147_483_647
 
 /** The fields a record or expectation sends as an `Int!`, each a whole number above zero once the base class has checked it. */
-const IntFields = ['unlock_epoch', 'vault_key_epoch', 'whisper_schema_version'] as const
+const IntFields = ['unlock_epoch', 'whisper_schema_version'] as const
 
 /** Refuse `outgoing` with kind 'bad_record', before it is sent, unless each of its `Int!` fields fits a GraphQL `Int`.
- * No vault builds an epoch that large. A box's expectation names the box's own `vault_key_epoch`,
- * so checking the box checks it.
+ * No vault builds an epoch that large.
  */
 const checkInts = (said: string, outgoing: Partial<Record<typeof IntFields[number], number>>) => {
   const over = IntFields.find((field) => (outgoing[field] ?? 0) > GraphqlIntMax)

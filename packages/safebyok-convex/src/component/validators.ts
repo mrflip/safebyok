@@ -2,9 +2,9 @@ import { v } from 'convex/values'
 
 /** Convex validators for safebyok's stored records, field for field with the core's Zod records of the same names.
  * They check what Convex can: which fields, their types, which are optional, and each record's
- * `format`. Every name, and a box's sidecar, is any text here. The finer rules, the name floor
- * and a sidecar's being JSON among them, are the client's, checked by the core's records on every
- * write and every read. The vault's own validators the server never sees.
+ * `format`. Every name is any text here, and a box's sidecar any object Convex holds. The finer
+ * rules, the name floor and a sidecar's values being JSON among them, are the client's, checked by the
+ * core's records on every write and every read. The vault's own validators the server never sees.
  *
  * A new record format widens its `format` union: an additive deploy, shipped with this package.
  */
@@ -30,10 +30,10 @@ export const VaultScope = v.object({
 })
 
 /** The VaultProps formats this package stores. */
-export const VaultPropsFormat = v.union(v.literal('safebyok-vault-v5'))
+export const VaultPropsFormat = v.union(v.literal('safebyok-vault-v6'))
 
 /** The formats of a BoxRecord this package stores. */
-export const BoxFormat = v.union(v.literal('safebyok-box-v6'))
+export const BoxFormat = v.union(v.literal('safebyok-box-v8'))
 
 /** A passphrase's way into a vault: how its passphraseKey is derived, and the vaultKey wrapped under that key.
  *
@@ -43,7 +43,6 @@ export const PassphraseWayin = v.object({
   wayinkind:               v.literal('passphrase'),
   key_deriver_label:       v.string(),
   salt_b64:                v.string(),
-  vault_key_epoch:         v.number(),
   device_id:               v.string(),
   registered_at:           v.number(),
   vault_key_wayin_wrapped: Ciphered,
@@ -57,15 +56,13 @@ export const PasskeyWayin = v.object({
   wayinkind:               v.literal('passkey'),
   credential_id:           v.string(),
   prf_salt_b64:            v.string(),
-  vault_key_epoch:         v.number(),
   device_id:               v.string(),
   registered_at:           v.number(),
   vault_key_wayin_wrapped: Ciphered,
 })
 
 /** A vault's props: its scope and identity, and its ways in, each the vaultKey wrapped under a wayinKey.
- * Every vault has a `passphrase`; `passkey` is null when it has none. `vault_key_epoch` is 1 in
- * every vault safebyok makes. Nothing in it opens without a passphrase or passkey.
+ * Every vault has a `passphrase`; `passkey` is null when it has none. Nothing in it opens without a passphrase or passkey.
  */
 export const VaultProps = v.object({
   format:           VaultPropsFormat,
@@ -74,25 +71,23 @@ export const VaultProps = v.object({
   vaultlabel:       v.string(),
   vault_id:         v.string(),
   unlock_epoch:     v.number(),
-  vault_key_epoch:  v.number(),
   passphrase:       PassphraseWayin,
   passkey:          v.nullable(PasskeyWayin),
   registered_at:    v.number(),
 })
 
 /** One box: its whisper ciphered under its own boxKey, that boxKey wrapped under the vaultKey, and the visible fields.
- * The sidecar is JSON text, `sidecar_json`, always written. Times are epoch milliseconds.
+ * The sidecar is the app's own JSON object, as a Convex object, always written, `{}` for none. Times are epoch milliseconds.
  */
 export const BoxRecord = v.object({
   format:                 BoxFormat,
   boxlabel:               v.string(),
   revision_tok:           v.string(),
-  vault_key_epoch:        v.number(),
   box_key_wrapped:        Ciphered,
   whisper_ciphered:       Ciphered,
   whisper_codec:          v.literal('json_v1'),
   whisper_schema_version: v.literal(1),
-  sidecar_json:           v.string(),
+  sidecar:                v.record(v.string(), v.any()),
   registered_at:          v.number(),
   written_at:             v.number(),
 })
@@ -110,15 +105,14 @@ export const VaultPropsExpectation = v.object({
 })
 
 /** What a box write was sealed for and read: the vault props it lands beside, and the box it replaces.
- * It lands only while the scope's vault props have this `vault_id` and `vault_key_epoch`, and the
- * standing box this `revision_tok`, or, for null, there is no box.
+ * It lands only while the scope's vault props have this `vault_id`, and the standing box this
+ * `revision_tok`, or, for null, there is no box.
  *
- * @example { vault_id: vaultProps.vault_id, revision_tok: null, vault_key_epoch: vaultProps.vault_key_epoch } // a box that was not there
+ * @example { vault_id: vaultProps.vault_id, revision_tok: null } // a box that was not there
  */
 export const BoxExpectation = v.object({
-  vault_id:        v.string(),
-  revision_tok:    v.nullable(v.string()),
-  vault_key_epoch: v.number(),
+  vault_id:     v.string(),
+  revision_tok: v.nullable(v.string()),
 })
 
 /** How much of one limit a vault has used, against the most the component holds of one vault. */

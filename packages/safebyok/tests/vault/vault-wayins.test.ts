@@ -38,7 +38,7 @@ describe("putWayin, with a new passphrase", () => {
     await vault.putBox('anthropic', 'sk-fake')
     const put = await vault.putWayin('old passphrase', 'new passphrase')
     expect(put).to.deep.equal(vault.passphrase)
-    expect(put).to.deep.equal({ wayinkind: 'passphrase', device_id: storedWayinOf(world, 'passphrase')?.['device_id'], registered_at: storedWayinOf(world, 'passphrase')?.['registered_at'] })
+    expect(put).to.deep.equal({ wayinkind: 'passphrase', device_id: storedWayinOf(world, 'passphrase')?.['device_id'], registered_at: storedWayinOf(world, 'passphrase')?.['registered_at'], vault_id: vault.vault_id })
     expect(vault.getSnapshot().state).to.eq('unlocked')
     expect(await vault.getWhisper('anthropic')).to.eq('sk-fake')
 
@@ -201,7 +201,7 @@ describe("the vault's passphrase", () => {
     await vault.unlock('pw')
     await vault.lock()
     const { passphrase, passkey } = vault.getSnapshot()
-    expect(passphrase).to.deep.equal({ wayinkind: 'passphrase', device_id: passphrase?.device_id, registered_at: Date.parse('2026-10-14T12:00:00Z') })
+    expect(passphrase).to.deep.equal({ wayinkind: 'passphrase', device_id: passphrase?.device_id, registered_at: Date.parse('2026-10-14T12:00:00Z'), vault_id: vault.vault_id })
     expect(passphrase?.device_id).to.have.length.greaterThan(0)
     expect(passkey).to.be.null
   })
@@ -230,7 +230,7 @@ describe("the vault's passphrase", () => {
 
   it("stored damaged, is refused as damaged_wayin, deriving nothing, and cannot be changed: only the passkey still opens the vault (Contract: putWayin, Refuses)", async () => {
     const { world, laptop } = await vaultWithPasskey()
-    spoilWayin(world, 'passphrase', { vault_key_epoch: 2 })
+    spoilWayin(world, 'passphrase', { salt_b64: 'c2FsdA' })
     const { keyDeriver, derivations } = countingDeriver()
     const vault = await world.open({ deviceDB: memoryDeviceDB(), keyDeriver })
     const err = await TH.expectRefusal(vault.unlock('pw'), 'damaged_wayin')
@@ -305,7 +305,7 @@ describe("the vault's passkey", () => {
     expect(fresh.getSnapshot().state).to.eq('locked')
     const shown = fresh.getSnapshot().passkey
     expect(shown).to.deep.equal({
-      wayinkind: 'passkey', device_id: shown?.device_id, registered_at: shown?.registered_at,
+      wayinkind: 'passkey', device_id: shown?.device_id, registered_at: shown?.registered_at, vault_id: fresh.vault_id,
       credential_id: laptop.credentialId, prf_salt_b64: laptop.prfSaltB64,
     })
     expect(shown?.device_id).to.have.length.greaterThan(0)
@@ -848,13 +848,13 @@ describe("the vault's ways in, as models (Contract: Vault, Wayin)", () => {
   it("makes its ways in from the vault props as storage holds them, told apart by wayinkind, as the PassphraseWayin's and PasskeyWayin's examples show", async () => {
     const { world, vault, laptop } = await vaultWithPasskey()
     const stored = VaultProps.parse(storedVaultPropsOf(world))
-    const passphrase = Wayin.make(vault, stored.passphrase, stored)
-    const passkey = Wayin.make(vault, stored.passkey ?? TH.passkeyWayinOf('none'), stored)
+    const passphrase = Wayin.make(vault, stored.vault_id, stored.passphrase)
+    const passkey = Wayin.make(vault, stored.vault_id, stored.passkey ?? TH.passkeyWayinOf('none'))
     expect([passphrase.constructor, passkey.constructor]).to.deep.equal([PassphraseWayin, PasskeyWayin])
     const wayins: (PassphraseWayin | PasskeyWayin)[] = [passphrase, passkey]
-    const told = wayins.map((wayin) => (wayin.wayinkind === 'passphrase' ? wayin.key_deriver_label : wayin.summary.credential_id))
+    const told = wayins.map((wayin) => (wayin instanceof PassphraseWayin ? wayin.record.key_deriver_label : wayin.credential_id))
     expect(told).to.deep.equal([TH.testDeriver.key_deriver_label, laptop.credentialId])
-    expect([passphrase.summary, passkey.summary]).to.deep.equal([vault.passphrase, vault.passkey])
+    expect([TH.shownOf(passphrase), TH.shownOf(passkey)]).to.deep.equal([vault.passphrase, vault.passkey])
   })
 
   it("keeps the same summaries until the vault props change", async () => {
@@ -875,15 +875,12 @@ describe("the vault's ways in, as models (Contract: Vault, Wayin)", () => {
     expect(vault.passkey).to.be.null
   })
 
-  it("lends its models its logger, its key deriver and a checked clock, none writable", async () => {
+  it("shows its logger and its key deriver, none writable", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     expect(vault.keyDeriver).to.eq(TH.testDeriver)
     expect(vault.logger).to.be.an('object')
-    expect(vault.clock.now()).to.eq(world.clock.now())
-    world.advance(5)
-    expect(vault.clock.now()).to.eq(world.clock.now())
-    for (const field of ['logger', 'clock', 'keyDeriver', 'passphrase', 'passkey']) {
+    for (const field of ['logger', 'keyDeriver', 'passphrase', 'passkey']) {
       expect(Reflect.set(vault, field, null), field).to.be.false
     }
   })
@@ -961,7 +958,7 @@ describe("a change to the ways in, refused, changes nothing stored (Contract: pu
 
     it(`${callTitle} refuses damaged_wayin when the passphrase is stored damaged, deriving nothing`, async () => {
       const { world } = await vaultWithPasskey()
-      spoilWayin(world, 'passphrase', { vault_key_epoch: 2 })
+      spoilWayin(world, 'passphrase', { salt_b64: 'c2FsdA' })
       const before = storedText(world)
       const { keyDeriver, derivations } = countingDeriver()
       const vault = await world.open({ deviceDB: memoryDeviceDB(), keyDeriver })

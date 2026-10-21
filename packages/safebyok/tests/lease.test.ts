@@ -1,24 +1,23 @@
+import { inspect } from 'node:util'
 import { describe, expect, it } from 'vitest'
 import * as Z from 'zod/mini'
-import { cipherCtx, makeBoxKey, makeVaultKey, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
-import { Lease, type LeaseHolder, type LeaseVault } from '../src/lease'
+import { cipherCtx, makeBoxKey, makeVaultKey, unwrapKeyUnder } from '../src/crypto'
+import { Lease, type LeaseStanding } from '../src/lease'
 import { FarFuture, ForeverMillis, MinuteMillis, type LeaseRecord } from '../src/types'
 import * as TH from './test-helpers'
 
-const GrantedAt = Date.UTC(2026, 9, 19, 12)
+const GrantedAt = TH.SliceNow
 const HourMillis = 60 * MinuteMillis
 const LeaseMillis = 7 * 24 * HourMillis
 const Deadline = GrantedAt + LeaseMillis
 
-/** A stand-in for the vault a lease reads: u1's scope, a week's lease, and a clock the test moves. */
-const leaseVaultOf = (userId = 'u1', leaseMillis = LeaseMillis) => {
-  let nowMillis = GrantedAt
-  const vault: LeaseVault = { ...TH.scopeOf(userId), clock: { now: () => nowMillis }, leaseMillis }
-  const setNow = (at: number) => { nowMillis = at }
-  return { vault, setNow }
-}
+/** The vault props every lease here is granted under: u1's `main` vault, at unlock epoch 3. */
+const standing: LeaseStanding = { vault_id: 'vault-id-u1', unlock_epoch: 3 }
 
-const holder: LeaseHolder = { vault_id: 'vault-id-u1', unlock_epoch: 3 }
+/** A slice of u1's `main` vault whose clock reads what `clock.at` holds: GrantedAt, unless a test moves it. */
+const vaultAt = (clock?: { at: number }, overrides: Partial<TH.VaultSlice> = {}) => (
+  TH.vaultSliceOf('u1', TH.testDeriver, { now: () => clock?.at ?? GrantedAt, ...overrides })
+)
 
 /** A vaultKey, as a way in hands it over: here one extractable key in both roles. */
 const vaultKeyPairOf = async () => {
@@ -26,10 +25,10 @@ const vaultKeyPairOf = async () => {
   return { transientKey: vaultKey, sessionKey: vaultKey }
 }
 
-/** True when `candidate` is the same AES key as `vaultKey`: what one wraps, the other unwraps. */
-const isSameKey = async (candidate: CryptoKey, vaultKey: CryptoKey): Promise<boolean> => {
+/** True when `lease`, opened, wraps a boxKey that `vaultKey` unwraps: the two hold one AES key. */
+const holdsKey = async (lease: Lease, vaultKey: CryptoKey): Promise<boolean> => {
   const ctx = cipherCtx('a test', 'of keys')
-  const wrapped = await wrapKeyUnder(candidate, await makeBoxKey(), ctx)
+  const wrapped = await lease.wrapBoxKey(await makeBoxKey(), ctx)
   try {
     await unwrapKeyUnder(vaultKey, wrapped, ctx, { extractable: false, usage: ['decrypt'] })
     return true
@@ -38,130 +37,120 @@ const isSameKey = async (candidate: CryptoKey, vaultKey: CryptoKey): Promise<boo
   }
 }
 
-/** A lease granted to u1 at `GrantedAt`, until `Deadline`, and what it was made from. */
+/** A lease granted to u1 at `GrantedAt` until `Deadline`, the vaultKey it was made from, and the clock its vault reads. */
 const grantedLease = async () => {
-  const { vault, setNow } = leaseVaultOf()
+  const clock = { at: GrantedAt }
   const pair = await vaultKeyPairOf()
-  const lease = await Lease.grant(vault, holder, pair)
-  return { vault, setNow, pair, lease }
+  const lease = await Lease.grant(vaultAt(clock), standing, pair)
+  return { pair, lease, clock }
 }
 
 describe("Lease.grant", () => {
-  it("makes a lease of every field the record holds, the scope its vault's, the epoch its holder's and the deadline leaseMillis from now, as its example shows", async () => {
+  it("makes a lease whose record holds the scope its vault's, its ids the vault props', and its deadline leaseMillis from now, as its example shows", async () => {
     const { lease } = await grantedLease()
-    expect(lease).to.deep.include({
-      format:            'safebyok-lease-v1',
-      ...TH.scopeOf('u1'),
-      vault_id:          'vault-id-u1',
-      unlock_epoch:      3,
-      ask_passphrase_at: Deadline,
-    })
-    expect(lease.vault_key_lease_wrapped).to.have.keys(['cipher_iv_b64', 'ciphertext_b64'])
+    const visible = { ...TH.scopeOf('u1'), vault_id: 'vault-id-u1', unlock_epoch: 3, ask_passphrase_at: Deadline }
+    expect(lease.record).to.deep.include({ format: 'safebyok-lease-v1', ...visible })
+    expect(TH.shownOf(lease)).to.deep.equal(visible)
+    expect(lease.record.vault_key_lease_wrapped).to.have.keys(['cipher_iv_b64', 'ciphertext_b64'])
   })
 
   it("makes its leaseKey non-extractable, so not even this code can export it", async () => {
     const { lease } = await grantedLease()
-    expect(lease.lease_key).to.be.instanceOf(CryptoKey)
-    expect(lease.lease_key.extractable).to.be.false
-    expect(lease.lease_key.usages).to.have.members(['wrapKey', 'unwrapKey'])
-    await expect(crypto.subtle.exportKey('raw', lease.lease_key)).rejects.toThrow()
+    expect(lease.record.lease_key).to.be.instanceOf(CryptoKey)
+    expect(lease.record.lease_key.extractable).to.be.false
+    expect(lease.record.lease_key.usages).to.have.members(['wrapKey', 'unwrapKey'])
+    await expect(crypto.subtle.exportKey('raw', lease.record.lease_key)).rejects.toThrow()
   })
 
-  it("keeps no handle to the vaultKey it wrapped: nothing on the lease or its record is that key", async () => {
+  it("is opened, holding the vaultKey out of sight: no field, record field or JSON of it is that key", async () => {
     const { lease, pair } = await grantedLease()
-    const held: unknown[] = [...Object.values(lease) as unknown[], ...Object.values(lease.props) as unknown[], lease.vault]
+    expect(await holdsKey(lease, pair.transientKey)).to.be.true
+    const held: unknown[] = [...Object.values(lease) as unknown[], ...Object.values(lease.record) as unknown[]]
     expect(held).to.not.include(pair.transientKey)
     expect(held).to.not.include(pair.sessionKey)
+    expect(JSON.stringify(lease)).to.not.include('vaultKey')
   })
 
   it("makes a fresh leaseKey at each grant", async () => {
-    const { vault } = leaseVaultOf()
     const pair = await vaultKeyPairOf()
-    const one = await Lease.grant(vault, holder, pair)
-    const two = await Lease.grant(vault, holder, pair)
-    expect(one.lease_key).to.not.eq(two.lease_key)
-    expect(one.vault_key_lease_wrapped).to.not.deep.equal(two.vault_key_lease_wrapped)
+    const one = await Lease.grant(vaultAt(), standing, pair)
+    const two = await Lease.grant(vaultAt(), standing, pair)
+    expect(one.record.lease_key).to.not.eq(two.record.lease_key)
+    expect(one.record.vault_key_lease_wrapped).to.not.deep.equal(two.record.vault_key_lease_wrapped)
   })
 
   it("binds its wrap to the scope, vault_id, unlock_epoch and deadline, under the lease's format and purpose", async () => {
     const { lease } = await grantedLease()
     const leaseCtx = cipherCtx('safebyok-lease-v1', 'acme', 'u1', 'main', 'vault-id-u1', 3, Deadline, 'vault_key_lease_wrapped')
-    const unwrapped = await unwrapKeyUnder(lease.lease_key, lease.vault_key_lease_wrapped, leaseCtx, { extractable: false, usage: ['wrapKey'] })
+    const unwrapped = await unwrapKeyUnder(lease.record.lease_key, lease.record.vault_key_lease_wrapped, leaseCtx, { extractable: false, usage: ['wrapKey'] })
     expect(unwrapped).to.be.instanceOf(CryptoKey)
   })
-  it("reads the deadline off the vault's clock at the grant, in whole milliseconds", async () => {
-    const { vault, setNow } = leaseVaultOf()
-    setNow(GrantedAt + HourMillis + 0.5)
-    const lease = await Lease.grant(vault, holder, await vaultKeyPairOf())
-    expect(lease.ask_passphrase_at).to.eq(Deadline + HourMillis)
+
+  it("ends at FarFuture for a vault whose leases last until lock(): how leaseHours: Infinity ends", async () => {
+    const lease = await Lease.grant(vaultAt(undefined, { leaseMillis: ForeverMillis }), standing, await vaultKeyPairOf())
+    expect(lease.ask_passphrase_at).to.eq(FarFuture)
   })
 
-  it("ends a lease of leaseHours: Infinity at FarFuture, from any instant the clock may read", async () => {
-    const { vault, setNow } = leaseVaultOf('u1', ForeverMillis)
-    const now = await Lease.grant(vault, holder, await vaultKeyPairOf())
-    setNow(FarFuture)
-    const atTheEnd = await Lease.grant(vault, holder, await vaultKeyPairOf())
-    expect([now.ask_passphrase_at, atTheEnd.ask_passphrase_at]).to.deep.equal([FarFuture, FarFuture])
-  })
-
-  for (const [badHolder, blurb] of [
-    [{ vault_id: '', unlock_epoch: 3 }, 'a holder with an empty vault_id'],
-    [{ vault_id: 'vault-id-u1', unlock_epoch: 0 }, 'a holder at unlock_epoch 0'],
-    [{ vault_id: 'vault-id-u1' }, 'a holder with no unlock_epoch'],
+  for (const [badStanding, blurb] of [
+    [{ ...standing, vault_id: '' },              'vault props with an empty vault_id'],
+    [{ ...standing, unlock_epoch: 0 },           'vault props at unlock_epoch 0'],
+    [TH.omitting(standing, 'unlock_epoch'),      'vault props with no unlock_epoch'],
   ] as const) {
-    it(`throws, as misuse, at ${blurb}: no lease record could hold it`, async () => {
-      const { vault } = leaseVaultOf()
-      await expect(Lease.grant(vault, badHolder as LeaseHolder, await vaultKeyPairOf())).rejects.toThrow(Z.core.$ZodError)
+    it(`throws, as misuse, at ${blurb}: no lease record could hold them`, async () => {
+      await expect(Lease.grant(vaultAt(), badStanding as LeaseStanding, await vaultKeyPairOf())).rejects.toThrow(Z.core.$ZodError)
     })
   }
 
-  for (const [leaseMillis, readAt, blurb] of [
-    [NaN,          GrantedAt,  'a leaseMillis that is no number'],
-    [LeaseMillis,  NaN,        'a clock that reads no number'],
-    [LeaseMillis,  0,          'a clock that reads before any lease could be granted'],
+  for (const [at, blurb] of [
+    [NaN,              'a clock that reads no number'],
+    [GrantedAt + 0.5,  'a clock read with a fraction of a millisecond'],
+    [0,                'a clock reading before any lease could be granted'],
   ] as const) {
-    it(`throws, as misuse, at ${blurb}: no lease record could hold the deadline it makes`, async () => {
-      const { vault, setNow } = leaseVaultOf('u1', leaseMillis)
-      setNow(readAt)
-      await expect(Lease.grant(vault, holder, await vaultKeyPairOf())).rejects.toThrow(Z.core.$ZodError)
+    it(`throws, as misuse, at ${blurb}: no lease record could hold the deadline`, async () => {
+      await expect(Lease.grant(vaultAt({ at }), standing, await vaultKeyPairOf())).rejects.toThrow(Z.core.$ZodError)
     })
   }
 
-  it("takes whole vault props as its holder, keeping only their vault_id and unlock_epoch", async () => {
-    const { vault } = leaseVaultOf()
-    const vaultProps = TH.vaultPropsOf('u1', { vault_id: 'vault-id-u1', unlock_epoch: 3 })
-    const lease = await Lease.grant(vault, vaultProps, await vaultKeyPairOf())
+  it("takes whole vault props, keeping only their vault_id and unlock_epoch", async () => {
+    const whole = TH.vaultPropsOf('u1', { vault_id: 'vault-id-u1', unlock_epoch: 3 })
+    const lease = await Lease.grant(vaultAt(), whole, await vaultKeyPairOf())
     expect(lease.vault_id).to.eq('vault-id-u1')
     expect(lease.unlock_epoch).to.eq(3)
+    expect(lease.record).to.not.have.property('passphrase')
   })
 })
 
 describe("Lease.make", () => {
-  it("makes the lease a stored record stands for, as its first example shows", async () => {
-    const { vault, lease } = await grantedLease()
-    const made = Lease.make(vault, lease.props)
-    expect(made.props).to.deep.equal(lease.props)
-    expect(made.lease_key).to.eq(lease.lease_key)
-    expect(made.ask_passphrase_at).to.eq(Deadline)
-  })
-
-  it("keeps its record frozen as props, its fields read-only, and its vault out of sight", async () => {
-    const { vault, lease } = await grantedLease()
-    const made = Lease.make(vault, { ...lease.props })
-    expect(Object.isFrozen(made)).to.be.true
-    expect(Object.isFrozen(made.props)).to.be.true
-    expect(Object.isFrozen(made.props.vault_key_lease_wrapped)).to.be.true
-    expect(made.vault).to.eq(vault)
-    expect(Object.keys(made)).to.not.include('vault').and.to.not.include('props')
-  })
-
-  it("shows JSON.stringify which vault it opens and until when, and neither its leaseKey nor its wrap", async () => {
+  it("makes the lease a stored record stands for, not opened, as its first example shows", async () => {
     const { lease } = await grantedLease()
-    const { lease_key: _leaseKey, vault_key_lease_wrapped: wrapped, ...rest } = lease.props
-    expect(lease.toJSON()).to.deep.equal(rest)
-    for (const stored of ['lease_key', 'vault_key_lease_wrapped', wrapped.ciphertext_b64, wrapped.cipher_iv_b64]) {
-      expect(JSON.stringify(lease)).to.not.include(stored)
+    const made = Lease.make(vaultAt(), lease.record)
+    expect(made.record).to.deep.equal(lease.record)
+    expect(made.record.lease_key).to.eq(lease.record.lease_key)
+    expect(made.ask_passphrase_at).to.eq(Deadline)
+    await TH.expectRefusal(made.wrapBoxKey(await makeBoxKey(), cipherCtx('a test')), 'vault_locked')
+  })
+
+  it("keeps its record frozen as record, out of sight, its fields read-only", async () => {
+    const { lease } = await grantedLease()
+    const made = Lease.make(vaultAt(), { ...lease.record })
+    expect(Object.isFrozen(made)).to.be.true
+    expect(Object.isFrozen(made.record)).to.be.true
+    expect(Object.isFrozen(made.record.vault_key_lease_wrapped)).to.be.true
+    expect(Reflect.set(made, 'vault_id', 'other')).to.be.false
+  })
+
+  it("shows each visible field once in a key list, JSON and a log line -- which vault it opens and until when -- and neither its leaseKey, its wrap, its format nor the vaultKey", async () => {
+    const { lease } = await grantedLease()
+    const visible = ['applabel', 'user_id', 'vaultlabel', 'vault_id', 'unlock_epoch', 'ask_passphrase_at']
+    expect(Object.keys(lease)).to.deep.equal(visible)
+    expect(Object.keys(TH.jsonOf(lease))).to.deep.equal(visible)
+    expect(lease.toJSON()).to.deep.equal(TH.shownOf(lease))
+    const wrapped = lease.record.vault_key_lease_wrapped
+    for (const hidden of ['lease_key', 'vault_key_lease_wrapped', 'CryptoKey', 'safebyok-lease', wrapped.ciphertext_b64, wrapped.cipher_iv_b64]) {
+      expect(JSON.stringify(lease)).to.not.include(hidden)
+      expect(inspect(lease)).to.not.include(hidden)
     }
+    expect(inspect(lease).match(/vault_id/g)).to.have.lengthOf(1)
   })
 
   const MangledCases = [
@@ -175,57 +164,51 @@ describe("Lease.make", () => {
 
   for (const [spoil, blurb] of MangledCases) {
     it(`refuses ${blurb} as 'corrupt_record'`, async () => {
-      const { vault, lease } = await grantedLease()
-      const err = TH.expectSyncRefusal(() => Lease.make(vault, { ...lease.props, ...spoil }), 'corrupt_record')
+      const { lease } = await grantedLease()
+      const err = TH.expectSyncRefusal(() => Lease.make(vaultAt(), { ...lease.record, ...spoil }), 'corrupt_record')
       expect(err.message).to.not.include('vault-id-u1')
-      expect(err.message).to.not.include(lease.vault_key_lease_wrapped.ciphertext_b64)
+      expect(err.message).to.not.include(lease.record.vault_key_lease_wrapped.ciphertext_b64)
     })
   }
 
   it("refuses a record naming another user as 'corrupt_record', as its third example shows: it is another vault's", async () => {
-    const { vault, lease } = await grantedLease()
-    const err = TH.expectSyncRefusal(() => Lease.make(vault, { ...lease.props, user_id: 'someone_else' }), 'corrupt_record')
+    const { lease } = await grantedLease()
+    const err = TH.expectSyncRefusal(() => Lease.make(vaultAt(), { ...lease.record, user_id: 'someone_else' }), 'corrupt_record')
     expect(err.message).to.match(/another app, user or vault/)
     expect(err.message).to.not.include('someone_else')
   })
 
   it("refuses a lease granted under another user's vault as 'corrupt_record': it can never reach tryOpen here", async () => {
-    const { vault } = leaseVaultOf('u2')
-    const theirs = await Lease.grant(vault, holder, await vaultKeyPairOf())
-    const { vault: mine } = leaseVaultOf('u1')
-    TH.expectSyncRefusal(() => Lease.make(mine, theirs.props), 'corrupt_record')
+    const theirs = await Lease.grant(vaultAt(undefined, TH.scopeOf('u2')), standing, await vaultKeyPairOf())
+    TH.expectSyncRefusal(() => Lease.make(vaultAt(), theirs.record), 'corrupt_record')
   })
 
   it("refuses null and a bare string as 'corrupt_record'", () => {
-    const { vault } = leaseVaultOf()
-    TH.expectSyncRefusal(() => Lease.make(vault, null), 'corrupt_record')
-    TH.expectSyncRefusal(() => Lease.make(vault, 'lease'), 'corrupt_record')
+    TH.expectSyncRefusal(() => Lease.make(vaultAt(), null), 'corrupt_record')
+    TH.expectSyncRefusal(() => Lease.make(vaultAt(), 'lease'), 'corrupt_record')
   })
 })
 
 describe("lease.tryOpen", () => {
-  it("hands back the vaultKey it was granted around, as its first example shows", async () => {
+  it("hands back a new lease, opened around the vaultKey it was granted around, as its first example shows", async () => {
     const { lease, pair } = await grantedLease()
-    const vaultKey = await TH.expectGood(lease.tryOpen(holder))
-    expect(await isSameKey(vaultKey, pair.transientKey)).to.be.true
+    const stored = Lease.make(vaultAt(), lease.record)
+    const opened = await TH.expectGood(stored.tryOpen(standing))
+    expect(opened).to.not.eq(stored)
+    expect(opened.record).to.deep.equal(stored.record)
+    expect(await holdsKey(opened, pair.transientKey)).to.be.true
+    await TH.expectRefusal(stored.wrapBoxKey(await makeBoxKey(), cipherCtx('a test')), 'vault_locked')
   })
 
-  it("hands it back non-extractable, for wrapping and unwrapping boxKeys only", async () => {
-    const { lease } = await grantedLease()
-    const vaultKey = await TH.expectGood(lease.tryOpen(holder))
-    expect(vaultKey.extractable).to.be.false
-    expect(vaultKey.usages).to.have.members(['wrapKey', 'unwrapKey'])
-  })
-
-  it("opens for a whole VaultProps as its holder", async () => {
+  it("opens for whole VaultProps", async () => {
     const { lease } = await grantedLease()
     await TH.expectGood(lease.tryOpen({ ...TH.vaultPropsOf('u1'), vault_id: 'vault-id-u1', unlock_epoch: 3 }))
   })
 
   it("opens until the last millisecond before its deadline", async () => {
-    const { lease, setNow } = await grantedLease()
-    setNow(Deadline - 1)
-    await TH.expectGood(lease.tryOpen(holder))
+    const { lease, clock } = await grantedLease()
+    clock.at = Deadline - 1
+    await TH.expectGood(lease.tryOpen(standing))
   })
 
   const UnfitCases = [
@@ -238,14 +221,14 @@ describe("lease.tryOpen", () => {
   for (const [moved, blurb] of UnfitCases) {
     it(`refuses as 'vault_locked' under ${blurb}`, async () => {
       const { lease } = await grantedLease()
-      await TH.expectBad(lease.tryOpen({ ...holder, ...moved }), 'vault_locked')
+      await TH.expectBad(lease.tryOpen({ ...standing, ...moved }), 'vault_locked')
     })
   }
 
-  it("refuses as 'vault_locked' once its deadline comes", async () => {
-    const { lease, setNow } = await grantedLease()
-    setNow(Deadline)
-    const err = await TH.expectBad(lease.tryOpen(holder), 'vault_locked')
+  it("refuses as 'vault_locked' once its deadline comes by its vault's clock", async () => {
+    const { lease, clock } = await grantedLease()
+    clock.at = Deadline
+    const err = await TH.expectBad(lease.tryOpen(standing), 'vault_locked')
     expect(err.message).to.match(/ended/)
   })
 
@@ -255,52 +238,61 @@ describe("lease.tryOpen", () => {
     [(record: LeaseRecord) => Promise.resolve({ ...record, vault_key_lease_wrapped: { ...record.vault_key_lease_wrapped, ciphertext_b64: TH.tweakB64(record.vault_key_lease_wrapped.ciphertext_b64) } }), 'a wrap altered where the record is kept'],
     [async (record: LeaseRecord) => {
       const { lease: another } = await grantedLease()
-      return { ...record, lease_key: another.lease_key }
+      return { ...record, lease_key: another.record.lease_key }
     }, "another lease's leaseKey swapped in"],
   ] as const
 
   for (const [tamper, blurb] of TamperCases) {
     it(`refuses ${blurb} as 'corrupt_record', quoting nothing of it`, async () => {
-      const { vault, lease } = await grantedLease()
-      const tampered = Lease.make(vault, await tamper(lease.props))
-      const err = await TH.expectBad(tampered.tryOpen(holder), 'corrupt_record')
+      const { lease } = await grantedLease()
+      const tampered = Lease.make(vaultAt(), await tamper(lease.record))
+      const err = await TH.expectBad(tampered.tryOpen(standing), 'corrupt_record')
       expect(err.message).to.not.include('vault-id-u1')
       expect(err.cause).to.be.undefined
     })
   }
 })
 
-describe("lease.endsWithin", () => {
+describe("lease.wrapBoxKey and lease.unwrapBoxKey", () => {
+  it("wraps a boxKey under the vaultKey it holds, and unwraps it again, as their examples show", async () => {
+    const { lease } = await grantedLease()
+    const ctx = cipherCtx('a test', 'of a box')
+    const boxKey = await makeBoxKey()
+    const unwrapped = await lease.unwrapBoxKey(await lease.wrapBoxKey(boxKey, ctx), ctx)
+    expect(unwrapped.extractable).to.be.false
+    expect(unwrapped.usages).to.deep.equal(['decrypt'])
+  })
+
+  it("refuses as 'vault_locked' once the lease has ended by its vault's clock, and for a lease not opened", async () => {
+    const { lease, clock } = await grantedLease()
+    const ctx = cipherCtx('a test', 'of a box')
+    const wrapped = await lease.wrapBoxKey(await makeBoxKey(), ctx)
+    clock.at = Deadline
+    await TH.expectRefusal(lease.wrapBoxKey(await makeBoxKey(), ctx), 'vault_locked')
+    await TH.expectRefusal(lease.unwrapBoxKey(wrapped, ctx), 'vault_locked')
+    clock.at = GrantedAt
+    await TH.expectRefusal(Lease.make(vaultAt(clock), lease.record).unwrapBoxKey(wrapped, ctx), 'vault_locked')
+  })
+
+  it("throws WebCrypto's own error for a wrap that will not open under its ctx", async () => {
+    const { lease } = await grantedLease()
+    const wrapped = await lease.wrapBoxKey(await makeBoxKey(), cipherCtx('a test', 'of a box'))
+    await expect(lease.unwrapBoxKey(wrapped, cipherCtx('another', 'box'))).rejects.toThrow(DOMException)
+  })
+})
+
+describe("lease.endsBy", () => {
   it("is true once the lease has ended, as its first example shows", async () => {
-    const { lease, setNow } = await grantedLease()
-    expect(lease.endsWithin(0)).to.be.false
-    setNow(Deadline - 1)
-    expect(lease.endsWithin(0)).to.be.false
-    setNow(Deadline)
-    expect(lease.endsWithin(0)).to.be.true
-    setNow(Deadline + 1)
-    expect(lease.endsWithin(0)).to.be.true
+    const { lease } = await grantedLease()
+    expect(lease.endsBy(GrantedAt)).to.be.false
+    expect(lease.endsBy(Deadline - 1)).to.be.false
+    expect(lease.endsBy(Deadline)).to.be.true
+    expect(lease.endsBy(Deadline + 1)).to.be.true
   })
 
   it("is true when the lease ends within the hour, as its second example shows", async () => {
-    const { lease, setNow } = await grantedLease()
-    setNow(Deadline - (2 * HourMillis))
-    expect(lease.endsWithin(60 * MinuteMillis)).to.be.false
-    setNow(Deadline - HourMillis)
-    expect(lease.endsWithin(60 * MinuteMillis)).to.be.true
-  })
-
-  it("counts the lease as ended when the clock reads no number, and opens nothing", async () => {
-    const { lease, setNow } = await grantedLease()
-    setNow(NaN)
-    expect(lease.endsWithin(0)).to.be.true
-    await TH.expectBad(lease.tryOpen(holder), 'vault_locked')
-  })
-
-  it("reads the vault's clock at each call, never a time it kept", async () => {
-    const { lease, setNow } = await grantedLease()
-    expect(lease.endsWithin(HourMillis)).to.be.false
-    setNow(Deadline - MinuteMillis)
-    expect(lease.endsWithin(HourMillis)).to.be.true
+    const { lease } = await grantedLease()
+    expect(lease.endsBy(Deadline - (2 * HourMillis) + (60 * MinuteMillis))).to.be.false
+    expect(lease.endsBy(Deadline - HourMillis + (60 * MinuteMillis))).to.be.true
   })
 })

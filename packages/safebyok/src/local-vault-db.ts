@@ -171,7 +171,7 @@ class StringStoreVaultDB extends VaultDB {
   }
 }
 
-/** Stored text as the JSON it holds, or as itself when it holds none: a damaged row, for the listing to mark. */
+/** Stored text as the JSON it holds, or as itself when it holds none: a damaged row, for the base class's checks to refuse or the listing to mark. */
 const jsonOrText = (text: string): unknown => {
   try {
     return JSON.parse(text)
@@ -180,12 +180,8 @@ const jsonOrText = (text: string): unknown => {
   }
 }
 
+/** The row under `ckey` as {@link jsonOrText} reads it, or null when there is none. */
 const readJson = (store: StringStore, ckey: string): unknown => {
   const text = store.read(ckey)
-  if (text === null) { return null }
-  try {
-    return JSON.parse(text)
-  } catch {
-    throw new VaultError('corrupt_record', 'A stored record did not read back as JSON. It may be damaged; it was left as it is.')
-  }
+  return text === null ? null : jsonOrText(text)
 }

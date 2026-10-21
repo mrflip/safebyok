@@ -16,6 +16,11 @@ it is, never looked inside.
 """
 scalar SafebyokWayin
 
+"""
+A box's sidecar: the app's own JSON object, {} for none, carried as it is, never looked inside.
+"""
+scalar SafebyokSidecar
+
 """An encrypted value: its cipherIv and its ciphertext, each base64url text."""
 type SafebyokCiphered {
   cipher_iv_b64:  String!
@@ -53,7 +58,6 @@ type SafebyokVaultProps {
   vaultlabel:       String!
   vault_id:         String!
   unlock_epoch:     Int!
-  vault_key_epoch:  Int!
   passphrase:       SafebyokWayin!
   passkey:          SafebyokWayin
   registered_at:    Float!
@@ -67,7 +71,6 @@ input SafebyokVaultPropsInput {
   vaultlabel:       String!
   vault_id:         String!
   unlock_epoch:     Int!
-  vault_key_epoch:  Int!
   passphrase:       SafebyokWayin!
   passkey:          SafebyokWayin
   registered_at:    Float!
@@ -75,34 +78,32 @@ input SafebyokVaultPropsInput {
 
 """
 One box, as stored: its whisper encrypted under its boxKey, that boxKey wrapped under
-the vaultKey, and its visible fields. Times are epoch milliseconds; the sidecar is the JSON text
-it was written as, which is bound into the box's encryption.
+the vaultKey, and its visible fields. Times are epoch milliseconds; the sidecar is the app's own
+JSON object, bound into the box's encryption.
 """
 type SafebyokBox {
   format:                 String!
   boxlabel:               String!
   revision_tok:           String!
-  vault_key_epoch:        Int!
   box_key_wrapped:        SafebyokCiphered!
   whisper_ciphered:       SafebyokCiphered!
   whisper_codec:          String!
   whisper_schema_version: Int!
-  sidecar_json:           String!
+  sidecar:                SafebyokSidecar!
   registered_at:          Float!
   written_at:             Float!
 }
 
-"""One box, as stored. Times are epoch milliseconds; the sidecar is its JSON text."""
+"""One box, as stored. Times are epoch milliseconds; the sidecar is the app's own JSON object."""
 input SafebyokBoxInput {
   format:                 String!
   boxlabel:               String!
   revision_tok:           String!
-  vault_key_epoch:        Int!
   box_key_wrapped:        SafebyokCipheredInput!
   whisper_ciphered:       SafebyokCipheredInput!
   whisper_codec:          String!
   whisper_schema_version: Int!
-  sidecar_json:           String!
+  sidecar:                SafebyokSidecar!
   registered_at:          Float!
   written_at:             Float!
 }
@@ -112,10 +113,9 @@ type SafebyokListedBox {
   format:                 String!
   boxlabel:               String!
   revision_tok:           String!
-  vault_key_epoch:        Int!
   whisper_codec:          String!
   whisper_schema_version: Int!
-  sidecar_json:           String!
+  sidecar:                SafebyokSidecar!
   registered_at:          Float!
   written_at:             Float!
 }
@@ -127,14 +127,12 @@ input SafebyokVaultPropsExpectationInput {
 }
 
 """
-What a box write was written for and read: it lands only while the vault has that vault_id
-and that vault_key_epoch, and the box that revision_tok, or, for a null revision_tok, while
-there is no box there.
+What a box write was written for and read: it lands only while the vault has that vault_id,
+and the box that revision_tok, or, for a null revision_tok, while there is no box there.
 """
 input SafebyokBoxExpectationInput {
-  vault_id:        String!
-  revision_tok:    String
-  vault_key_epoch: Int!
+  vault_id:     String!
+  revision_tok: String
 }
 
 """What a delete of a vault was aimed at: it lands only while the vault has that vault_id."""

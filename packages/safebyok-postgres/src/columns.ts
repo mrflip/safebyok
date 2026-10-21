@@ -1,8 +1,9 @@
 import type { BoxRecord, VaultProps } from 'safebyok'
 
 /** How one field is stored: `text` as given, `bigint` for a whole number, `jsonb` for an opaque structured value.
- * jsonb reorders keys, which is harmless for a Ciphered or a way in: safebyok rebuilds their ctx
- * from field values. A box's `sidecar_json` is `text`, since its exact text is bound into the box.
+ * jsonb reorders keys, which is harmless for a Ciphered, a way in or a box's sidecar: safebyok
+ * rebuilds their ctx from field values, a sidecar as its JSON with keys sorted. A null jsonb value
+ * goes as a SQL null, and comes back as one: a vault with no passkey.
  */
 export type ColumnKind = 'text' | 'bigint' | 'jsonb'
 
@@ -29,7 +30,6 @@ export const VaultPropsColumns = everyFieldOf<VaultProps>()([
   ['vault_id',         'text'],
   ['format',           'text'],
   ['unlock_epoch',     'bigint'],
-  ['vault_key_epoch',  'bigint'],
   ['passphrase',       'jsonb'],
   ['passkey',          'jsonb'],
   ['registered_at',    'bigint'],
@@ -40,12 +40,11 @@ export const BoxColumns = everyFieldOf<BoxRecord>()([
   ['format',                 'text'],
   ['boxlabel',               'text'],
   ['revision_tok',           'text'],
-  ['vault_key_epoch',        'bigint'],
   ['box_key_wrapped',        'jsonb'],
   ['whisper_ciphered',       'jsonb'],
   ['whisper_codec',          'text'],
   ['whisper_schema_version', 'bigint'],
-  ['sidecar_json',           'text'],
+  ['sidecar',                'jsonb'],
   ['registered_at',          'bigint'],
   ['written_at',             'bigint'],
 ] as const)

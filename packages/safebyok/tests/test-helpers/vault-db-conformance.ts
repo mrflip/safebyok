@@ -6,8 +6,8 @@ import type { VaultProps, BoxSummary, DamagedBox } from '../../src/types'
 import { NameFloorBytes } from '../../src/validators'
 import { type VaultDB, type VaultDBOpts, type BoxDelExpectation } from '../../src/vault-db'
 import { type MakeDevices, type Turnstile, openTurnstile, raceEveryWay, makeTurnstile, type RaceOutcome, raceOutcomeOf } from './racing'
-import { vaultPropsOf, scopeOf, boxOf, noBoxYet, summaryOf, sidecarJsonOf, thisVault, OddLabels, deleting, wayinOf, fakeCiphered, vaultPropsAtEpochOf } from './builders'
-import { expectGood, expectingGood, expectBad } from './refusals'
+import { vaultPropsOf, scopeOf, boxOf, noBoxYet, summaryOf, thisVault, OddLabels, deleting, wayinOf, fakeCiphered } from './builders'
+import { expectGood, expectingGood, expectBad, omitting } from './refusals'
 import { unheard, ticks, wakeupAtNextTick } from './timing'
 import { spyLogger, thrownText, leafTexts } from './logging'
 
@@ -36,7 +36,6 @@ export const VaultDBContract = Object.freeze({
   '3.5': 'A vault is deleted whole, and alone',
   '3.6': 'A refused write wrote nothing',
   '3.7': 'Writes that do not collide all land',
-  '3.8': 'A box write lands only under the vaultKey that stands',
   '4.1': 'An adapter declares the most boxes it holds in one vault',
   '4.2': 'A new box past the limit is refused, on a best effort',
   '4.3': 'A replacement is never refused for the count',
@@ -218,18 +217,18 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
 
     it("reads back a box with an empty sidecar as stored, and lists it with that sidecar", async () => {
       const vaultDB = await withVaultProps()
-      const sidecarless = boxOf('anthropic', 'one', { sidecar_json: '{}' })
+      const sidecarless = boxOf('anthropic', 'one', { sidecar: {} })
       await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, sidecarless)
       expect(await expectingGood(vaultDB).getBox(scopeOf('u1'), 'anthropic')).to.deep.equal(sidecarless)
       const [summary] = await expectingGood(vaultDB).listBoxes(scopeOf('u1'))
       expect(summaryOf(summary)?.sidecar).to.deep.equal({})
     })
 
-    it("reads a sidecar's JSON back exactly as written, as it is bound: accented letters, an emoji, a tab, a newline, quotes and backslashes", async () => {
+    it("reads a sidecar back as the JSON value written, as it is bound: accented letters, an emoji, a tab, a newline, quotes and backslashes", async () => {
       const vaultDB = await withVaultProps()
-      await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, boxOf('anthropic', 'one', { sidecar_json: sidecarJsonOf(LiteralSidecar) }))
+      await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, boxOf('anthropic', 'one', { sidecar: LiteralSidecar }))
       const box = await expectingGood(vaultDB).getBox(scopeOf('u1'), 'anthropic')
-      expect(box?.sidecar_json).to.eq(sidecarJsonOf(LiteralSidecar))
+      expect(box?.sidecar).to.deep.equal(LiteralSidecar)
       const [summary] = await expectingGood(vaultDB).listBoxes(scopeOf('u1'))
       expect(summaryOf(summary)?.sidecar).to.deep.equal(LiteralSidecar)
     })
@@ -247,8 +246,10 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       const vaultDB = await withVaultProps()
       const writes = [
         [boxOf('anthropic', 'one'),                                                   noBoxYet],
-        [boxOf('anthropic', 'two', { sidecar_json: sidecarJsonOf(LiteralSidecar) }), { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 1 }],
-        [boxOf('openai', 'one', { sidecar_json: '{}' }),                              noBoxYet],
+        [boxOf('anthropic', 'two', { sidecar: LiteralSidecar }),                      { vault_id: 'vault-id-u1', revision_tok: 'rev-one' }],
+        [boxOf('openai', 'one', { sidecar: {} }),                                     noBoxYet],
+        [boxOf('mistral', 'one', { sidecar: { gone: null } }),                        noBoxYet],
+        [boxOf('gemini', 'one', { sidecar: { list: ['a list', { zeta: 1, alpha: [true, 'two'] }] } }), noBoxYet],
       ] as const
       for (const [box, expected] of writes) {
         const written = await expectingGood(vaultDB).putBox(scopeOf('u1'), expected, box)
@@ -263,7 +264,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       const vaultDB = await withVaultProps()
       await expectingGood(vaultDB).ensureVaultProps(vaultPropsOf('u2'))
       await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, boxOf('anthropic', 'one'))
-      await expectingGood(vaultDB).putBox(scopeOf('u2'), { vault_id: 'vault-id-u2', revision_tok: null, vault_key_epoch: 1 }, boxOf('anthropic', 'two'))
+      await expectingGood(vaultDB).putBox(scopeOf('u2'), { vault_id: 'vault-id-u2', revision_tok: null }, boxOf('anthropic', 'two'))
       const oneBox = await expectingGood(vaultDB).getBox(scopeOf('u1'), 'anthropic')
       const twoBox = await expectingGood(vaultDB).getBox(scopeOf('u2'), 'anthropic')
       expect(oneBox?.revision_tok).to.eq('rev-one')
@@ -276,7 +277,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       const userIds = ['u1', 'u1:', 'u1"', String.raw`u1\\`, 'u1,', 'u1[', 'u1]', 'u1","main']
       for (const [ii, userId] of userIds.entries()) {
         await expectingGood(vaultDB).ensureVaultProps(vaultPropsOf(userId))
-        await expectingGood(vaultDB).putBox(scopeOf(userId), { vault_id: `vault-id-${userId}`, revision_tok: null, vault_key_epoch: 1 }, boxOf('anthropic', `of-${String(ii)}`))
+        await expectingGood(vaultDB).putBox(scopeOf(userId), { vault_id: `vault-id-${userId}`, revision_tok: null }, boxOf('anthropic', `of-${String(ii)}`))
       }
       const listEach = () => Promise.all(userIds.map((userId) => expectingGood(vaultDB).listBoxes(scopeOf(userId))))
       const before = await listEach()
@@ -300,7 +301,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       const scopes = OddLabels.map((vaultlabel) => scopeOf('u1', vaultlabel))
       for (const [ii, scope] of scopes.entries()) {
         await expectingGood(vaultDB).ensureVaultProps(vaultPropsOf('u1', { ...scope, vault_id: `vault-id-${String(ii)}` }))
-        await expectingGood(vaultDB).putBox(scope, { vault_id: `vault-id-${String(ii)}`, revision_tok: null, vault_key_epoch: 1 }, boxOf(OddLabels[ii] ?? '', `of-${String(ii)}`))
+        await expectingGood(vaultDB).putBox(scope, { vault_id: `vault-id-${String(ii)}`, revision_tok: null }, boxOf(OddLabels[ii] ?? '', `of-${String(ii)}`))
       }
       const listEach = () => Promise.all(scopes.map((scope) => expectingGood(vaultDB).listBoxes(scope)))
       const before = await listEach()
@@ -340,7 +341,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       })
       await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, boxOf('anthropic', 'one'))
       expect(await revisionsNow()).to.deep.equal({ read: 'rev-one', listed: ['rev-one'] })
-      await expectingGood(vaultDB).putBox(scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 1 }, boxOf('anthropic', 'two'))
+      await expectingGood(vaultDB).putBox(scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-one' }, boxOf('anthropic', 'two'))
       expect(await revisionsNow()).to.deep.equal({ read: 'rev-two', listed: ['rev-two'] })
       await expectingGood(vaultDB).delBox(scopeOf('u1'), 'anthropic', deleting('rev-two'))
       expect(await revisionsNow()).to.deep.equal({ read: null, listed: [] })
@@ -368,7 +369,6 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       expect(summaries[0]).to.deep.equal({
         boxlabel:        'anthropic',
         revision_tok:    'rev-one',
-        vault_key_epoch: 1,
         sidecar:         { note: 'a test box' },
         registered_at:   Date.UTC(2026, 9, 14),
         written_at:      Date.UTC(2026, 9, 14),
@@ -393,7 +393,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       const vaultDB = await withVaultProps()
       await storeEach(vaultDB, ['openai', 'anthropic'])
       await expectingGood(vaultDB).ensureVaultProps(vaultPropsOf('u2'))
-      await expectingGood(vaultDB).putBox(scopeOf('u2'), { vault_id: 'vault-id-u2', revision_tok: null, vault_key_epoch: 1 }, boxOf('mistral', 'other'))
+      await expectingGood(vaultDB).putBox(scopeOf('u2'), { vault_id: 'vault-id-u2', revision_tok: null }, boxOf('mistral', 'other'))
       const records = await expectingGood(vaultDB).listBoxRecords(scopeOf('u1'))
       const listedOf = (boxlabel: string) => {
         const { box_key_wrapped: _boxKeyWrapped, whisper_ciphered: _whisperCiphered, ...listed } = boxOf(boxlabel, boxlabel)
@@ -455,7 +455,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
     it("replaces a box over the revision it read", async () => {
       const vaultDB = await withVaultProps()
       await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, boxOf('anthropic', 'one'))
-      await expectingGood(vaultDB).putBox(scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 1 }, boxOf('anthropic', 'two'))
+      await expectingGood(vaultDB).putBox(scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-one' }, boxOf('anthropic', 'two'))
       expect(await expectingGood(vaultDB).getBox(scopeOf('u1'), 'anthropic')).to.deep.equal(boxOf('anthropic', 'two'))
     })
 
@@ -464,14 +464,14 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, boxOf('anthropic', 'one'))
       // A second device that saw no box, and one that saw some other revision, both lose.
       const sawNone = await expectBad(vaultDB.putBox(scopeOf('u1'), noBoxYet, boxOf('anthropic', 'two')), 'stale_write')
-      const sawOther = await expectBad(vaultDB.putBox(scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-other', vault_key_epoch: 1 }, boxOf('anthropic', 'two')), 'stale_write')
+      const sawOther = await expectBad(vaultDB.putBox(scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-other' }, boxOf('anthropic', 'two')), 'stale_write')
       for (const refusal of [sawNone, sawOther]) { expect(refusal.meta).to.deep.equal({ box_stored: boxOf('anthropic', 'one') }) }
       expect(await expectingGood(vaultDB).getBox(scopeOf('u1'), 'anthropic')).to.deep.equal(boxOf('anthropic', 'one'))
     })
 
     it("refuses a write over a box since deleted as stale_write, with null as meta.box_stored: nothing stands (Contract: VaultDB.putBox, Refuses)", async () => {
       const vaultDB = await withVaultProps()
-      const refusal = await expectBad(vaultDB.putBox(scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-gone', vault_key_epoch: 1 }, boxOf('anthropic', 'late')), 'stale_write')
+      const refusal = await expectBad(vaultDB.putBox(scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-gone' }, boxOf('anthropic', 'late')), 'stale_write')
       expect(refusal.meta).to.deep.equal({ box_stored: null })
       expect(await expectingGood(vaultDB).getBox(scopeOf('u1'), 'anthropic')).to.be.null
     })
@@ -479,10 +479,10 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
     it("hands back the box it wrote over the revision it read, and from a write refused as stale the winner, whole, as a read would (Contract: VaultDB.putBox, Returns)", async () => {
       const vaultDB = await withVaultProps()
       await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, boxOf('anthropic', 'one'))
-      const landed = await expectingGood(vaultDB).putBox(scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 1 }, boxOf('anthropic', 'two'))
+      const landed = await expectingGood(vaultDB).putBox(scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-one' }, boxOf('anthropic', 'two'))
       expect(landed).to.deep.equal(boxOf('anthropic', 'two'))
       // Refused, it names what stands as a read hands it back: enough to open it, or to write over it.
-      const refusal = await expectBad(vaultDB.putBox(scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 1 }, boxOf('anthropic', 'three')), 'stale_write')
+      const refusal = await expectBad(vaultDB.putBox(scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-one' }, boxOf('anthropic', 'three')), 'stale_write')
       expect(refusal.meta?.box_stored).to.deep.equal(landed)
       expect(await expectingGood(vaultDB).getBox(scopeOf('u1'), 'anthropic')).to.deep.equal(landed)
     })
@@ -502,7 +502,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       expect(refusal).to.not.have.property('meta')
       expect(thrownText(refusal)).to.not.include('vault-id-reborn')
       expect(await expectingGood(vaultDB).getBox(scopeOf('u1'), 'anthropic')).to.be.null
-      await expectingGood(vaultDB).putBox(scopeOf('u1'), { vault_id: 'vault-id-reborn', revision_tok: null, vault_key_epoch: 1 }, boxOf('anthropic', 'fresh'))
+      await expectingGood(vaultDB).putBox(scopeOf('u1'), { vault_id: 'vault-id-reborn', revision_tok: null }, boxOf('anthropic', 'fresh'))
       const reborn = await expectingGood(vaultDB).getBox(scopeOf('u1'), 'anthropic')
       expect(reborn?.revision_tok).to.eq('rev-fresh')
     })
@@ -510,7 +510,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
     it("refuses a write expecting another user's vault_id as vault_mismatch", async () => {
       const vaultDB = await withVaultProps()
       await expectingGood(vaultDB).ensureVaultProps(vaultPropsOf('u2'))
-      await expectBad(vaultDB.putBox(scopeOf('u1'), { vault_id: 'vault-id-u2', revision_tok: null, vault_key_epoch: 1 }, boxOf('anthropic', 'one')), 'vault_mismatch')
+      await expectBad(vaultDB.putBox(scopeOf('u1'), { vault_id: 'vault-id-u2', revision_tok: null }, boxOf('anthropic', 'one')), 'vault_mismatch')
     })
 
     it("refuses the same write sent twice, once it has landed, as stale_write naming the box it wrote: a first write and a replacement alike (Contract: VaultDB.putBox, Refuses)", async () => {
@@ -518,7 +518,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       const first = await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, boxOf('anthropic', 'one'))
       const firstAgain = await expectBad(vaultDB.putBox(scopeOf('u1'), noBoxYet, boxOf('anthropic', 'one')), 'stale_write')
       expect(firstAgain.meta).to.deep.equal({ box_stored: first })
-      const overOne = { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 1 }
+      const overOne = { vault_id: 'vault-id-u1', revision_tok: 'rev-one' }
       const second = await expectingGood(vaultDB).putBox(scopeOf('u1'), overOne, boxOf('anthropic', 'two'))
       const secondAgain = await expectBad(vaultDB.putBox(scopeOf('u1'), overOne, boxOf('anthropic', 'two')), 'stale_write')
       expect(secondAgain.meta).to.deep.equal({ box_stored: second })
@@ -545,7 +545,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
     it("removes a box written over the revision it names all the same, saying it deleted another", async () => {
       const vaultDB = await withVaultProps()
       await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, boxOf('anthropic', 'one'))
-      await expectingGood(vaultDB).putBox(scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 1 }, boxOf('anthropic', 'two'))
+      await expectingGood(vaultDB).putBox(scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-one' }, boxOf('anthropic', 'two'))
       expect(await expectingGood(vaultDB).delBox(scopeOf('u1'), 'anthropic', deleting('rev-one'))).to.deep.equal({ outcome: 'deleted_other' })
       expect(await expectingGood(vaultDB).getBox(scopeOf('u1'), 'anthropic')).to.be.null
       expect(await expectingGood(vaultDB).listBoxes(scopeOf('u1'))).to.have.lengthOf(0)
@@ -569,7 +569,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       const vaultDB = await withVaultProps()
       await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, boxOf('anthropic', 'one'))
       await expectingGood(vaultDB).delBox(scopeOf('u1'), 'anthropic', deleting('rev-one'))
-      await expectBad(vaultDB.putBox(scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 1 }, boxOf('anthropic', 'two')), 'stale_write')
+      await expectBad(vaultDB.putBox(scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-one' }, boxOf('anthropic', 'two')), 'stale_write')
       expect(await expectingGood(vaultDB).getBox(scopeOf('u1'), 'anthropic')).to.be.null
     })
 
@@ -577,7 +577,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       const vaultDB = await withVaultProps()
       await expectingGood(vaultDB).delVault(scopeOf('u1'), thisVault)
       await expectingGood(vaultDB).ensureVaultProps({ ...vaultPropsOf('u1'), vault_id: 'vault-id-reborn' })
-      await expectingGood(vaultDB).putBox(scopeOf('u1'), { vault_id: 'vault-id-reborn', revision_tok: null, vault_key_epoch: 1 }, boxOf('anthropic', 'reborn'))
+      await expectingGood(vaultDB).putBox(scopeOf('u1'), { vault_id: 'vault-id-reborn', revision_tok: null }, boxOf('anthropic', 'reborn'))
       await expectBad(vaultDB.delBox(scopeOf('u1'), 'anthropic', deleting('rev-reborn')), 'stale_write')
       await expectBad(vaultDB.delBox(scopeOf('u1'), 'anthropic', deleting(null)), 'stale_write')
       const kept = await expectingGood(vaultDB).getBox(scopeOf('u1'), 'anthropic')
@@ -597,7 +597,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       const vaultDB = await withVaultProps()
       await expectingGood(vaultDB).ensureVaultProps(vaultPropsOf('u2'))
       await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, boxOf('anthropic', 'one'))
-      await expectingGood(vaultDB).putBox(scopeOf('u2'), { vault_id: 'vault-id-u2', revision_tok: null, vault_key_epoch: 1 }, boxOf('anthropic', 'two'))
+      await expectingGood(vaultDB).putBox(scopeOf('u2'), { vault_id: 'vault-id-u2', revision_tok: null }, boxOf('anthropic', 'two'))
       await expectingGood(vaultDB).delVault(scopeOf('u1'), thisVault)
       expect(await expectingGood(vaultDB).getVaultProps(scopeOf('u1'))).to.be.null
       expect(await expectingGood(vaultDB).listBoxes(scopeOf('u1'))).to.have.lengthOf(0)
@@ -610,7 +610,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       await expectingGood(vaultDB).delVault(scopeOf('u1'), thisVault)
       const reborn = { ...vaultPropsOf('u1'), vault_id: 'vault-id-reborn' }
       await expectingGood(vaultDB).ensureVaultProps(reborn)
-      await expectingGood(vaultDB).putBox(scopeOf('u1'), { vault_id: 'vault-id-reborn', revision_tok: null, vault_key_epoch: 1 }, boxOf('anthropic', 'reborn'))
+      await expectingGood(vaultDB).putBox(scopeOf('u1'), { vault_id: 'vault-id-reborn', revision_tok: null }, boxOf('anthropic', 'reborn'))
       await expectBad(vaultDB.delVault(scopeOf('u1'), thisVault), 'stale_write')
       expect(await expectingGood(vaultDB).getVaultProps(scopeOf('u1'))).to.deep.equal(reborn)
       expect(await expectingGood(vaultDB).listBoxes(scopeOf('u1'))).to.have.lengthOf(1)
@@ -636,7 +636,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
   })
   // --
 
-  // == [Refused and independent writes]: 3.6 refused wrote nothing, 3.7 independent writes, 3.8 vaultKey
+  // == [Refused and independent writes]: 3.6 refused wrote nothing, 3.7 independent writes
 
   describe(lineTitle('3.6'), () => {
     it("leaves the whole vault as it stood after each refusal: vault props, boxes and listing", async () => {
@@ -645,9 +645,9 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       const before = await standingVault(vaultDB, ['anthropic', 'openai', 'mistral'])
       const refusals = [
         [() => vaultDB.putVaultProps(vaultPropsOf('u1', { unlock_epoch: 3 }), { vault_id: 'vault-id-u1', unlock_epoch: 2 }),         'stale_write'],
-        [() => vaultDB.putBox(scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-other', vault_key_epoch: 1 }, boxOf('anthropic', 'late')),     'stale_write'],
-        [() => vaultDB.putBox(scopeOf('u1'), { vault_id: 'vault-id-gone', revision_tok: null, vault_key_epoch: 1 }, boxOf('mistral', 'late')),            'vault_mismatch'],
-        [() => vaultDB.putBox(scopeOf('u1'), noBoxYet, boxOf('mistral', 'late', { sidecar_json: '{"note":' })),                      'invalid_box'],
+        [() => vaultDB.putBox(scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-other' }, boxOf('anthropic', 'late')),     'stale_write'],
+        [() => vaultDB.putBox(scopeOf('u1'), { vault_id: 'vault-id-gone', revision_tok: null }, boxOf('mistral', 'late')),            'vault_mismatch'],
+        [() => vaultDB.putBox(scopeOf('u1'), noBoxYet, omitting(boxOf('mistral', 'late'), 'sidecar')),                                'invalid_box'],
         [() => vaultDB.delBox(scopeOf('u1'), 'anthropic', { vault_id: 'vault-id-gone', revision_tok: 'rev-anthropic' }),               'stale_write'],
         [() => vaultDB.delVault(scopeOf('u1'), { vault_id: 'vault-id-gone' }),                                                         'stale_write'],
       ] as const
@@ -660,46 +660,6 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
 
   describe(lineTitle('3.7'), () => {
     timingTestsOf('3.7')
-  })
-
-  /** A fresh adapter whose u1 vault held `anthropic` under vaultKey epoch 1, its vault props since moved to epoch 2. */
-  const epochMovedHolding = async () => {
-    const vaultDB = await withVaultProps()
-    await storeEach(vaultDB, ['anthropic'])
-    await expectingGood(vaultDB).putVaultProps(vaultPropsAtEpochOf('u1', 2), { vault_id: 'vault-id-u1', unlock_epoch: 1 })
-    return vaultDB
-  }
-
-  describe(lineTitle('3.8'), () => {
-    const underFirstKey = { vault_id: 'vault-id-u1', revision_tok: 'rev-anthropic', vault_key_epoch: 1 } as const
-    const underSecondKey = { ...underFirstKey, vault_key_epoch: 2 } as const
-
-    it("refuses a write sealed under another vaultKey epoch than the vault props', over the revision it read, as vault_mismatch, writing nothing", async () => {
-      const vaultDB = await epochMovedHolding()
-      await expectBad(vaultDB.putBox(scopeOf('u1'), underFirstKey, boxOf('anthropic', 'stale')), 'vault_mismatch')
-      expect(await revisionIn(vaultDB, 'anthropic')).to.eq('rev-anthropic')
-    })
-
-    it("refuses a new box sealed under another vaultKey epoch than the vault props', though none stands under its boxlabel, as vault_mismatch", async () => {
-      const vaultDB = await epochMovedHolding()
-      await expectBad(vaultDB.putBox(scopeOf('u1'), noBoxYet, boxOf('openai', 'stale')), 'vault_mismatch')
-      expect(await expectingGood(vaultDB).getBox(scopeOf('u1'), 'openai')).to.be.null
-    })
-
-    it("refuses a write sealed under a vaultKey epoch the vault props do not stand for as vault_mismatch", async () => {
-      const vaultDB = await withVaultProps()
-      await expectBad(vaultDB.putBox(scopeOf('u1'), { ...noBoxYet, vault_key_epoch: 2 }, boxOf('anthropic', 'ahead', { vault_key_epoch: 2 })), 'vault_mismatch')
-      expect(await expectingGood(vaultDB).getBox(scopeOf('u1'), 'anthropic')).to.be.null
-    })
-
-    it("lands a write sealed under the vault props' vaultKey epoch, over a box sealed under another", async () => {
-      const vaultDB = await epochMovedHolding()
-      const resealed = boxOf('anthropic', 'resealed', { vault_key_epoch: 2 })
-      await expectingGood(vaultDB).putBox(scopeOf('u1'), underSecondKey, resealed)
-      expect(await expectingGood(vaultDB).getBox(scopeOf('u1'), 'anthropic')).to.deep.equal(resealed)
-      const [listed] = await expectingGood(vaultDB).listBoxes(scopeOf('u1'))
-      expect(summaryOf(listed)?.vault_key_epoch).to.eq(2)
-    })
   })
   // --
 
@@ -734,7 +694,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
   describe.runIf(capped)(lineTitle('4.3'), () => {
     it("replaces a box in a full vault", async () => {
       const vaultDB = await cappedHolding(['anthropic', 'openai', 'mistral'])
-      await expectingGood(vaultDB).putBox(scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-openai', vault_key_epoch: 1 }, boxOf('openai', 'next'))
+      await expectingGood(vaultDB).putBox(scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-openai' }, boxOf('openai', 'next'))
       const replaced = await expectingGood(vaultDB).getBox(scopeOf('u1'), 'openai')
       expect(replaced?.revision_tok).to.eq('rev-next')
     })
@@ -860,14 +820,13 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       expect(box?.revision_tok).to.eq('rev-one')
     })
 
-    it("refuses a malformed record or expectation, or vault props under another vault_id, as bad_record, and a malformed box or one under another vault_key_epoch as invalid_box, before storage sees it (Contract: VaultDB.putBox, Does)", async () => {
+    it("refuses a malformed record or expectation, or vault props under another vault_id, as bad_record, and a malformed box as invalid_box, before storage sees it (Contract: VaultDB.putBox, Does)", async () => {
       const vaultDB = await withVaultProps()
       await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, boxOf('anthropic', 'kept'))
-      const unparsable = boxOf('anthropic', 'one', { sidecar_json: 'not json' })
+      const unparsable = omitting(boxOf('anthropic', 'one'), 'sidecar')
       await expectBad(vaultDB.ensureVaultProps(vaultPropsOf('u1', { unlock_epoch: 0 })), 'bad_record')
       await expectBad(vaultDB.putBox(scopeOf('u1'), noBoxYet, unparsable), 'invalid_box')
-      await expectBad(vaultDB.putBox(scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: '', vault_key_epoch: 1 }, boxOf('anthropic', 'one')), 'bad_record')
-      await expectBad(vaultDB.putBox(scopeOf('u1'), noBoxYet, boxOf('anthropic', 'one', { vault_key_epoch: 2 })), 'invalid_box')
+      await expectBad(vaultDB.putBox(scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: '' }, boxOf('anthropic', 'one')), 'bad_record')
       await expectBad(vaultDB.putVaultProps(vaultPropsOf('u1', { unlock_epoch: 0 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'bad_record')
       await expectBad(vaultDB.putVaultProps(vaultPropsOf('u1', { vault_id: 'vault-id-new', unlock_epoch: 2 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'bad_record')
       await expectBad(vaultDB.delBox(scopeOf('u1'), 'anthropic', deleting('')), 'bad_record')
@@ -883,8 +842,8 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
   describe(lineTitle('5.3'), () => {
     it("quotes no ciphertext, boxlabel or sidecar of a write it refuses as vault_mismatch", async () => {
       const vaultDB = await withVaultProps()
-      const box = boxOf('secret_project_x', 'sk-fake-quoted', { sidecar_json: sidecarJsonOf({ note: 'a sidecar never to be quoted' }) })
-      const refusal = await expectBad(vaultDB.putBox(scopeOf('u1'), { vault_id: 'vault-id-gone', revision_tok: null, vault_key_epoch: 1 }, box), 'vault_mismatch')
+      const box = boxOf('secret_project_x', 'sk-fake-quoted', { sidecar: { note: 'a sidecar never to be quoted' } })
+      const refusal = await expectBad(vaultDB.putBox(scopeOf('u1'), { vault_id: 'vault-id-gone', revision_tok: null }, box), 'vault_mismatch')
       expect(quotedOf(refusal, box)).to.deep.equal([])
     })
 
@@ -892,7 +851,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       const vaultDB = await withVaultProps()
       const standing = boxOf('secret_project_x', 'sk-fake-standing')
       await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, standing)
-      const box = boxOf('secret_project_x', 'sk-fake-quoted', { sidecar_json: sidecarJsonOf({ note: 'a sidecar never to be quoted' }) })
+      const box = boxOf('secret_project_x', 'sk-fake-quoted', { sidecar: { note: 'a sidecar never to be quoted' } })
       const refusal = await expectBad(vaultDB.putBox(scopeOf('u1'), noBoxYet, box), 'stale_write')
       expect(quotedOf(refusal, { ...box, boxlabel: '' })).to.deep.equal([])
       expect(refusal.meta?.box_stored).to.deep.equal(standing)
@@ -900,7 +859,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
 
     it.runIf(capped)("quotes no ciphertext, boxlabel or sidecar of a box it refuses as vault_full", async () => {
       const vaultDB = await cappedHolding(['anthropic', 'openai', 'mistral'])
-      const box = boxOf('secret_project_x', 'sk-fake-quoted', { sidecar_json: sidecarJsonOf({ note: 'a sidecar never to be quoted' }) })
+      const box = boxOf('secret_project_x', 'sk-fake-quoted', { sidecar: { note: 'a sidecar never to be quoted' } })
       const refusal = await expectBad(vaultDB.putBox(scopeOf('u1'), noBoxYet, box), 'vault_full')
       expect(quotedOf(refusal, box)).to.deep.equal([])
     })
@@ -964,7 +923,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       const longest = 'n'.repeat(Math.min(vaultDB.maxNameBytes, NameFloorBytes))
       const scope = { applabel: longest, user_id: longest, vaultlabel: longest }
       await expectingGood(vaultDB).ensureVaultProps({ ...vaultPropsOf(longest), ...scope })
-      await expectingGood(vaultDB).putBox(scope, { vault_id: `vault-id-${longest}`, revision_tok: null, vault_key_epoch: 1 }, boxOf(longest, 'one'))
+      await expectingGood(vaultDB).putBox(scope, { vault_id: `vault-id-${longest}`, revision_tok: null }, boxOf(longest, 'one'))
       const box = await expectingGood(vaultDB).getBox(scope, longest)
       expect(box?.revision_tok).to.eq('rev-one')
     })
@@ -1426,7 +1385,7 @@ const holdingFirst = (boxlabels: readonly string[]) => async (first: VaultDBVerb
 }
 
 /** What a replacement in u1's vault expects: that vault, and the revision it read. */
-const over = (revisionTok: string) => ({ vault_id: 'vault-id-u1', revision_tok: revisionTok, vault_key_epoch: 1 })
+const over = (revisionTok: string) => ({ vault_id: 'vault-id-u1', revision_tok: revisionTok })
 
 /** The `meta` a race's refused move carried, read by shape, as a refusal from another copy of the package has it too. */
 const metaOf = (outcome: RaceOutcome | undefined): unknown => (outcome?.val as { meta?: unknown } | undefined)?.meta
@@ -1549,7 +1508,7 @@ const expectEachWriteHeard = async (pair: () => Promise<[VaultDBVerbs, VaultDBVe
     () => writer.putVaultProps(vaultPropsOf('u1', { unlock_epoch: epoch + 1 }), { vault_id: 'vault-id-u1', unlock_epoch: epoch }),
     () => writer.putBox(scopeOf('u1'), noBoxYet, boxOf('anthropic', 'anthropic')),
     () => writer.putBox(scopeOf('u1'), noBoxYet, boxOf('openai', 'openai')),
-    () => writer.putBox(scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-anthropic', vault_key_epoch: 1 }, boxOf('anthropic', 'next')),
+    () => writer.putBox(scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-anthropic' }, boxOf('anthropic', 'next')),
     () => writer.delBox(scopeOf('u1'), 'anthropic', deleting('rev-next')),
     () => writer.delVault(scopeOf('u1'), thisVault),
     () => writer.ensureVaultProps(vaultPropsOf('u1', { vault_id: 'vault-id-anew' })),
@@ -1568,7 +1527,7 @@ const everyVerbOn = (stranger: VaultDBVerbs) => [
   () => stranger.putVaultProps(vaultPropsOf('u1', { unlock_epoch: 2 }), { vault_id: 'vault-id-u1', unlock_epoch: 1 }),
   () => stranger.getBox(scopeOf('u1'), 'anthropic'),
   () => stranger.listBoxes(scopeOf('u1')),
-  () => stranger.putBox(scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-anthropic', vault_key_epoch: 1 }, boxOf('anthropic', 'theirs')),
+  () => stranger.putBox(scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-anthropic' }, boxOf('anthropic', 'theirs')),
   () => stranger.putBox(scopeOf('u1'), noBoxYet, boxOf('mistral', 'theirs')),
   () => stranger.delBox(scopeOf('u1'), 'openai', deleting('rev-openai')),
   () => stranger.delVault(scopeOf('u1'), thisVault),
@@ -1577,7 +1536,8 @@ const everyVerbOn = (stranger: VaultDBVerbs) => [
 /** Text no normalization leaves alone: "café" with its accent composed, then decomposed, and a key. */
 /**
  * A sidecar of accented letters, an emoji, a tab, a newline, quotes, backslashes, Hebrew, a
- * null and a fraction: JSON a store must hand back byte for byte as it was written, as it is bound.
+ * null and a fraction: a JSON value a store must hand back as the same value, every string in it
+ * byte for byte, as it is bound.
  */
 const LiteralSidecar = Object.freeze({
   note: 'caf\u{E9} na\u{EF}ve \u{1F511}\trotated\nin March',
@@ -1621,7 +1581,7 @@ const settledKind = async (write: Promise<Outcome<unknown>>): Promise<string> =>
 /** Which of a box's boxlabel, sidecar and ciphertexts a refusal quotes anywhere. */
 const quotedOf = (refusal: unknown, box: BoxRecord): string[] => {
   const told = thrownText(refusal)
-  const quotable = [box.boxlabel, box.sidecar_json, ...leafTexts(box.box_key_wrapped), ...leafTexts(box.whisper_ciphered)]
+  const quotable = [box.boxlabel, ...leafTexts(box.sidecar), ...leafTexts(box.box_key_wrapped), ...leafTexts(box.whisper_ciphered)]
   return quotable.filter((text) => text !== '' && told.includes(text))
 }
 // --

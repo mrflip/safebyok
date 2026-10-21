@@ -156,8 +156,8 @@ const vaultPropsExpectationIn = (args: VaultFieldArgs): VaultPropsExpectation =>
 
 // A revision_tok left out, as a GraphQL client may leave out a null, is the null it means.
 const boxExpectationIn = (args: VaultFieldArgs): BoxExpectation => {
-  const { vault_id, revision_tok = null, vault_key_epoch } = args.expected as { vault_id: string, revision_tok?: string | null, vault_key_epoch: number }
-  return { vault_id, revision_tok, vault_key_epoch }
+  const { vault_id, revision_tok = null } = args.expected as { vault_id: string, revision_tok?: string | null }
+  return { vault_id, revision_tok }
 }
 
 const vaultDelExpectationIn = (args: VaultFieldArgs): VaultDelExpectation => {

@@ -62,7 +62,6 @@ const { registered_at: _vaultPropsTime, ...vaultPropsWithoutTime } = TH.vaultPro
 const { passphrase: _passphrase, passkey: _passkey, ...vaultPropsWithoutSlots } = TH.vaultPropsOf('u1')
 const { passkey: _noPasskey, ...vaultPropsWithoutPasskey } = TH.vaultPropsOf('u1')
 const { unlock_epoch: _epoch, ...vaultPropsWithoutEpoch } = TH.vaultPropsOf('u1')
-const { vault_key_epoch: _keyEpoch, ...vaultPropsWithoutKeyEpoch } = TH.vaultPropsOf('u1')
 /** The three fields the vault props held their one passphrase in, before it was a way in. */
 const WayinFieldsOfOld = {
   key_deriver_label:            'test_digest_v0',
@@ -76,7 +75,8 @@ const VaultPropsCases = [
   // regular usage:
   [TH.vaultPropsOf('u1'),                                   true,   'whole vault props'],
   // refused, as a damaged or foreign record:
-  [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v6' }, false,  'a format this version does not know'],
+  [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v7' }, false,  'a format this version does not know'],
+  [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v5', vault_key_epoch: 1, passphrase: { ...TH.wayinOf('passphrase'), vault_key_epoch: 1 } }, false, 'v5 vault props, which carried a vaultKey epoch'],
   [{ ...vaultPropsWithoutSlots, format: 'safebyok-vault-v4', wayins: [{ ...TH.wayinOf('passphrase'), wayin_id: 'wayin-passphrase', wayinlabel: 'passphrase' }] }, false, 'v4 vault props, their ways in a list'],
   [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v3' }, false,  'vault props from before the prior vaultKey went'],
   [{ ...TH.vaultPropsOf('u1'), unlock_epoch: 0 },            false,  'an epoch starts at one'],
@@ -92,11 +92,7 @@ const VaultPropsCases = [
   [{ ...vaultPropsWithoutTime, created_at: OldIso, updated_at: OldIso }, false, 'vault props from before their time was named registered_at'],
   [{ ...vaultPropsWithoutSlots, ...WayinFieldsOfOld },       false,  'vault props from before their passphrase was a way in'],
   [{ ...vaultPropsWithoutEpoch, passphrase_epoch: 1 },       false,  'vault props from before their epoch was named unlock_epoch'],
-  [{ ...vaultPropsWithoutKeyEpoch, format: 'safebyok-vault-v1' }, false, 'vault props from before vaultKey epochs'],
-  [vaultPropsWithoutKeyEpoch,                               false,  'vault props missing their vault_key_epoch'],
-  [{ ...TH.vaultPropsOf('u1'), vault_key_epoch: 0 },         false,  'a vaultKey epoch starts at one'],
-  // the vaultKey epoch is reserved at 1, but the schema leaves binding it to the ways in
-  [TH.vaultPropsAtEpochOf('u1', 2),                         true,   'vault props at a vaultKey epoch other than 1'],
+  [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v1' }, false, 'vault props from before vaultKey epochs'],
 ] as const
 
 const SlotCases = [
@@ -115,8 +111,6 @@ const SlotCases = [
   [{ passphrase: TH.wayinOf('passphrase', { salt_b64: '' }) },             false,  'an empty salt'],
   [{ passphrase: TH.wayinOf('passphrase', { device_id: '' }) },            false,  'an empty device_id'],
   [{ passkey: TH.passkeyWayinOf('laptop', { registered_at: 1_792_022_400 }) }, false, 'a registered_at in epoch seconds'],
-  [{ passphrase: TH.wayinOf('passphrase', { vault_key_epoch: 0 }) },       false,  'a vaultKey epoch of zero'],
-  [{ passphrase: TH.wayinOf('passphrase', { vault_key_epoch: 2 }) },       true,   "a passphrase at another vaultKey epoch than the vault props': a damaged way in, which an unlock refuses as damaged"],
 ] as const
 
 describe("VaultProps.passphrase and VaultProps.passkey", () => {
@@ -136,12 +130,15 @@ describe("VaultProps", () => {
 })
 
 const SidecarCases = [
-  // any JSON value:
+  // a JSON object of any JSON values:
   [{ note: "work account" },          true,   'a plain object, the common case'],
   [{},                                true,   'an empty sidecar'],
-  ["work account",                    true,   'a string'],
-  [null,                              true,   'null, a JSON value'],
-  [[1, "two", { three: 3 }],          true,   'an array, nested as deep as it likes'],
+  [{ list: [1, "two", { three: 3 }], gone: null }, true, 'an object of any JSON values, nested as deep as it likes'],
+  // JSON that is no object is refused:
+  ["work account",                    false,  'a string'],
+  [null,                              false,  'null'],
+  [[1, "two", { three: 3 }],          false,  'an array'],
+  [42,                                false,  'a number'],
   // what JSON cannot carry is refused, not mangled:
   [undefined,                         false,  'undefined is not a JSON value'],
   [{ when: new Date() },              false,  'a Date would silently flatten to {}'],
@@ -157,26 +154,30 @@ describe("Sidecar", () => {
   it("passes the examples its doc block shows", () => {
     expect(Sidecar.parse({ note: 'work account', project: 'atlas' })).to.deep.equal({ note: 'work account', project: 'atlas' })
     expect(Sidecar.safeParse({ when: new Date() }).success).to.be.false
-    expect(Sidecar.safeParse(undefined).success).to.be.false
+    expect(Sidecar.safeParse('work account').success).to.be.false
   })
 })
 
-const wholeSummary = { boxlabel: 'anthropic', revision_tok: 'r1', vault_key_epoch: 1, sidecar: {}, registered_at: Date.UTC(2026, 9, 14), written_at: Date.UTC(2026, 9, 14) }
+const wholeSummary = { boxlabel: 'anthropic', revision_tok: 'r1', sidecar: {}, registered_at: Date.UTC(2026, 9, 14), written_at: Date.UTC(2026, 9, 14), vault_id: 'vault-id-u1' }
 
 describe("BoxSummary", () => {
   it("marks a summary undamaged, as its example shows", () => {
     expect(BoxSummary.parse(wholeSummary).damaged).to.be.false
   })
 
-  it("takes a sidecar of any JSON, and refuses a summary without one", () => {
+  it("takes a sidecar that is a JSON object, and refuses a summary without one, or with one that is no object", () => {
     expect(BoxSummary.safeParse({ ...wholeSummary, sidecar: { note: 'work account' } }).success).to.be.true
-    expect(BoxSummary.safeParse({ ...wholeSummary, sidecar: [1, 2] }).success).to.be.true
+    expect(BoxSummary.safeParse({ ...wholeSummary, sidecar: [1, 2] }).success).to.be.false
     expect(BoxSummary.safeParse(TH.omitting(wholeSummary, 'sidecar')).success).to.be.false
   })
 
   it("holds neither ciphered field, the format nor the codec: a whole box is not a summary", () => {
-    const summary = BoxSummary.parse({ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: {} })
-    expect(Object.keys(summary)).to.have.members(['boxlabel', 'revision_tok', 'vault_key_epoch', 'sidecar', 'registered_at', 'written_at', 'damaged'])
+    const summary = BoxSummary.parse({ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: {}, vault_id: 'vault-id-u1' })
+    expect(Object.keys(summary)).to.have.members(['boxlabel', 'revision_tok', 'sidecar', 'registered_at', 'written_at', 'vault_id', 'damaged'])
+  })
+
+  it("refuses a summary with no vault_id: it names the vault props the box lies under", () => {
+    expect(BoxSummary.safeParse(TH.omitting(wholeSummary, 'vault_id')).success).to.be.false
   })
 })
 
@@ -272,7 +273,8 @@ const MarkCases = [
   [TH.markOf('u1'),                                               true,   'a whole mark'],
   [TH.markOf('u1', { seen: { unlock_epoch: 40 } }),               true,   'a mark of a vault seen at a later epoch'],
   // refused, as a damaged or foreign record:
-  [TH.markOf('u1', { format: 'safebyok-mark-v5' as never }),      false,  'a format this version does not know'],
+  [TH.markOf('u1', { format: 'safebyok-mark-v6' as never }),      false,  'a format this version does not know'],
+  [TH.markOf('u1', { format: 'safebyok-mark-v4' as never }),      false,  'a mark from before the vaultKey epoch went, which reads as none'],
   [{ ...TH.markOf('u1', { format: 'safebyok-mark-v3' as never }), lock_generation: 0 }, false, 'a mark from before the lock generation went, which reads as none'],
   [TH.markOf('u1', { format: 'safebyok-mark-v2' as never }),      false,  'a mark from before a mark could see no vault, which reads as none'],
   [TH.omitting(TH.markOf('u1'), 'seen'),                          false,  'a mark missing what it has seen'],
@@ -280,8 +282,6 @@ const MarkCases = [
   [TH.markOf('u1', { seen: { device_id: '' } }),                  false,  'an empty device_id'],
   [TH.markOf('u1', { seen: { vault_id: '' } }),                   false,  'an empty vault_id'],
   [TH.markOf('u1', { seen: { unlock_epoch: 0 } }),                false,  'an epoch starts at one'],
-  [TH.markOf('u1', { seen: { vault_key_epoch: 0 } }),             false,  'a vaultKey epoch starts at one'],
-  [{ ...TH.markOf('u1'), seen: { device_id: 'device-one', vault_id: 'vault-id-u1', unlock_epoch: 1 } }, false, 'a mark missing the vaultKey epoch it has seen'],
 ] as const
 
 describe("DeviceMark", () => {

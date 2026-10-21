@@ -12,8 +12,7 @@ import { type Outcome, bad, good } from '../src/outcome'
 import { BoxRecord } from '../src/box'
 import { argon2idWebV1Deriver } from '../src/key-deriver'
 import { Proof } from '../src/proof'
-import { Wayin } from '../src/wayin'
-import { PasskeySaltBytes, VaultProps, VaultScope, wallClock, type Capacity, type DeviceMark, type LeaseRecord } from '../src/types'
+import { PasskeySaltBytes, VaultProps, VaultScope, type Capacity, type DeviceMark, type LeaseRecord } from '../src/types'
 import * as Refusals from '../src/refusals'
 import * as Ckeys from '../src/ckeys'
 import * as Expectations from '../src/expectations'
@@ -605,12 +604,19 @@ describe("the fixtures", () => {
     expect(VaultScope.safeParse(TH.scopeOf('u1', 'spare')).success).to.be.true
   })
 
-  it("vaultSliceOf: the scope, key deriver, passphrase check and clock a Wayin or a Proof reads, as its examples show", () => {
-    const wayin = Wayin.make(TH.vaultSliceOf('u1'), TH.wayinOf('passphrase'), TH.vaultPropsOf('u1'))
-    const { checkPassphrase, ...rest } = wayin.vault as TH.VaultSlice
+  it("vaultSliceOf: the scope, vault id, key deriver, passphrase check, lease length and clock a proof, box, way in or lease reads, as its first example shows", () => {
+    const { checkPassphrase, now, ...rest } = TH.vaultSliceOf('u1')
     expect(checkPassphrase).to.be.a('function')
-    expect(rest).to.deep.equal({ ...TH.scopeOf('u1'), keyDeriver: TH.testDeriver, clock: wallClock })
+    expect(now()).to.eq(TH.SliceNow)
+    expect(rest).to.deep.equal({ ...TH.scopeOf('u1'), vault_id: 'vault-id-u1', keyDeriver: TH.testDeriver, leaseMillis: 7 * 24 * 60 * 60_000 })
     expect(Proof.parse(TH.vaultSliceOf('u1', argon2idWebV1Deriver), 'pw').vault.keyDeriver).to.eq(argon2idWebV1Deriver)
+  })
+
+  it("vaultSliceOf: any field as its overrides say, as its second example shows", () => {
+    const later = TH.SliceNow + 1000
+    const slice = TH.vaultSliceOf('u1', TH.testDeriver, { now: () => later, vault_id: null })
+    expect(slice.now()).to.eq(later)
+    expect(slice.vault_id).to.be.null
   })
 
   it("vaultSliceOf's passphrase check admits any passphrase but a blank one, held to its contract as a vault's is", async () => {
@@ -665,17 +671,12 @@ describe("the fixtures", () => {
   it("boxOf: a shape-valid BoxRecord, with any field overridden", () => {
     expect(BoxRecord.safeParse(TH.boxOf('anthropic_api_key', 'a1')).success).to.be.true
     expect(TH.boxOf('anthropic_api_key', 'a1').revision_tok).to.eq('rev-a1')
-    expect(TH.boxOf('anthropic_api_key', 'a1', { sidecar_json: '{}' }).sidecar_json).to.eq('{}')
-  })
-
-  it("sidecarJsonOf: a sidecar as a box holds it, its keys sorted, as the example shows", () => {
-    expect(TH.sidecarJsonOf({ note: 'work account' })).to.eq('{"note":"work account"}')
-    expect(TH.sidecarJsonOf({ tier: 2, note: 'work' })).to.eq('{"note":"work","tier":2}')
+    expect(TH.boxOf('anthropic_api_key', 'a1', { sidecar: { note: 'work account' } }).sidecar).to.deep.equal({ note: 'work account' })
   })
 })
 // --
 
-// == [Logging and refusals]: spyLogger, loggedText, thrownText, leafTexts, expectRefusal, omitting
+// == [Logging and refusals]: spyLogger, loggedText, thrownText, leafTexts, shownOf, jsonOf, expectRefusal, omitting
 
 describe("spyLogger", () => {
   it("keeps every call it hears, in order, with what it was handed", () => {
@@ -770,6 +771,28 @@ describe("leafTexts", () => {
   it("lists every value of a stored record", () => {
     const leaves = TH.leafTexts(TH.vaultPropsOf('u1'))
     expect(leaves).to.include.members(['vault-id-u1', 'ct-vault-u1', 'iv-vault-u1', String(Date.UTC(2026, 9, 14))])
+  })
+})
+
+describe("shownOf and jsonOf", () => {
+  /** A model of the shape the package's are: a private field, a getter, a method, and two fields of its own. */
+  class Shown {
+    readonly #hidden = 'never shown'
+    readonly label = 'shown'
+    readonly count = 2
+    get hidden() { return this.#hidden }
+    toJSON() { return { label: this.label } }
+  }
+
+  it("shownOf: a model's own fields alone, never a private field or a getter, as its example shows", () => {
+    const shown = new Shown()
+    expect(TH.shownOf(shown)).to.deep.equal({ label: 'shown', count: 2 })
+    expect(TH.shownOf(shown)).to.not.have.property('hidden')
+  })
+
+  it("jsonOf: what JSON.stringify writes of it, through its toJSON, read back, as its example shows", () => {
+    expect(TH.jsonOf(new Shown())).to.deep.equal({ label: 'shown' })
+    expect(Object.keys(TH.jsonOf({ two: 2, one: 1 }))).to.deep.equal(['two', 'one'])
   })
 })
 
@@ -974,7 +997,7 @@ describe("perUser", () => {
     const { vaultDB, store } = counted()
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u2'))
-    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u2'), { vault_id: 'vault-id-u2', revision_tok: null, vault_key_epoch: 1 }, TH.boxOf('anthropic', 'two'))
+    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u2'), { vault_id: 'vault-id-u2', revision_tok: null }, TH.boxOf('anthropic', 'two'))
     expect(await TH.expectingGood(servingOnly('u2', store)).getBox(TH.scopeOf('u2'), 'anthropic')).to.deep.equal(TH.boxOf('anthropic', 'two'))
     expect(await TH.expectingGood(vaultDB).listBoxes(TH.scopeOf('u1'))).to.have.lengthOf(0)
   })
@@ -983,7 +1006,7 @@ describe("perUser", () => {
     const { vaultDB, store } = counted()
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u2'))
-    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u2'), { vault_id: 'vault-id-u2', revision_tok: null, vault_key_epoch: 1 }, TH.boxOf('anthropic', 'two'))
+    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u2'), { vault_id: 'vault-id-u2', revision_tok: null }, TH.boxOf('anthropic', 'two'))
     await TH.expectingGood(vaultDB).putVaultProps({ ...TH.vaultPropsOf('u2'), unlock_epoch: 2 }, { vault_id: 'vault-id-u2', unlock_epoch: 1 })
     vaultDB.subscribe(TH.scopeOf('u2'), () => undefined)()
     await TH.expectingGood(vaultDB).delBox(TH.scopeOf('u2'), 'anthropic', { vault_id: 'vault-id-u2', revision_tok: 'rev-two' })

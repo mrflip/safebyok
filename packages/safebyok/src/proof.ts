@@ -4,10 +4,10 @@ import { VaultError } from './errors'
 import type { KeyDeriver } from './key-deriver'
 import { hostThrewRefusal } from './outcome'
 import { PassphraseKeyBytes } from './key-deriver-spec'
-import { PasskeySaltBytes, type PasskeyAnswer, type WayinKind } from './types'
+import { PasskeySaltBytes, type PasskeyAnswer, type PassphraseWayinRecord, type WayinKind } from './types'
 import { decorate } from './adorn'
 import type { Vault } from './vault'
-import type { PasskeyWayin, PassphraseWayin } from './wayin'
+import type { PasskeyWayin } from './wayin'
 
 /** Proofs: what the user hands in to show a wayin is theirs, checked once at the vault's door.
  * Neither kind is ever stored or logged, and each is held for one attempt only. The secret never
@@ -58,7 +58,7 @@ export abstract class Proof {
 /** A passphrase the user typed, as proof: it opens a passphrase wayin through the key deriver, over that wayin's own salt.
  *
  * @example const proof = PassphraseProof.parse(vault, typed)
- * @example await proof.wayinKeyFor(wayin)   // the passphraseKey, non-extractable
+ * @example await proof.wayinKeyFor(wayin.record)   // the passphraseKey, non-extractable
  */
 export class PassphraseProof extends Proof {
   /** Always `passphrase`. */
@@ -106,9 +106,9 @@ export class PassphraseProof extends Proof {
    * back anything but 32 bytes, in memory of their own and not all zero. What the deriver throws
    * is refused as {@link hostThrewRefusal} says.
    *
-   * @example await proof.wayinKeyFor(wayin)   // a CryptoKey that wraps and unwraps, and cannot be exported
+   * @example await proof.wayinKeyFor(wayin.record)   // a CryptoKey that wraps and unwraps, and cannot be exported
    */
-  async wayinKeyFor(wayin: Pick<PassphraseWayin, 'salt_b64'>): Promise<CryptoKey> {
+  async wayinKeyFor(wayin: Pick<PassphraseWayinRecord, 'salt_b64'>): Promise<CryptoKey> {
     return await passphraseKeyOf(this.vault.keyDeriver, this.passphrase, fromB64(wayin.salt_b64))
   }
 }

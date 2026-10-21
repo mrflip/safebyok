@@ -5,13 +5,14 @@ import { VaultError } from '../../src/errors'
 import { memoryDeviceDB } from '../../src/device-db'
 import { localVaultDB } from '../../src/local-vault-db'
 import { Vault } from '../../src/vault'
+import { Lease } from '../../src/lease'
 import { type MakeVaultOpts, parseStaleMinutes } from '../../src/vault-opts'
 import { fromB64 } from '../../src/crypto'
 import type { KeyDeriver, CustomKeyDeriver } from '../../src/key-deriver'
 import { type VaultLogger } from '../../src/logger'
 import { Argon2idWebV1, MaxSaltBytes, TestDeriverNotice } from '../../src/key-deriver-spec'
 import * as TH from '../test-helpers'
-import { makeWorld, MisfitStores, VaultDBVerbsUsed, uncheckingDeviceDB, HourMillis, isU1Box, vaultWithPasskey, addLaptopPasskey } from './world'
+import { makeWorld, MisfitStores, VaultDBVerbsUsed, uncheckingDeviceDB, HourMillis, vaultWithPasskey, addLaptopPasskey } from './world'
 
 
 // == [Making a vault]: Vault.make, options
@@ -81,12 +82,21 @@ describe("Vault.make", () => {
     expect(err.message).to.include('extends the VaultDB class')
   })
 
-  it("says stored vault props refused as corrupt as damaged_vault, even from an adapter that throws before its promise", async () => {
+  it("hands on storage's damaged_vault as it came, even from a VaultDB that throws before its promise", async () => {
     const world = makeWorld()
-    const corrupt = new VaultError('corrupt_record', 'The stored vault props did not read back.')
-    vi.spyOn(world.vaultDB, 'getVaultProps').mockImplementationOnce(() => { throw corrupt })
+    const damaged = new VaultError('damaged_vault', "This vault's stored props did not read back.")
+    vi.spyOn(world.vaultDB, 'getVaultProps').mockImplementationOnce(() => { throw damaged })
     const err = await TH.expectRefusal(world.open(), 'damaged_vault')
-    expect(err.cause).to.eq(corrupt)
+    expect(err).to.eq(damaged)
+    vi.restoreAllMocks()
+  })
+
+  it("hands on an adapter's corrupt_record as it came, never as damage: that kind is an adapter's wrong answer", async () => {
+    const world = makeWorld()
+    const wrongAnswer = new VaultError('corrupt_record', 'Storage answered a vault read in a shape this package does not know.')
+    vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(TH.bad(wrongAnswer))
+    const err = await TH.expectRefusal(world.open(), 'corrupt_record')
+    expect(err).to.eq(wrongAnswer)
     vi.restoreAllMocks()
   })
 
@@ -236,48 +246,34 @@ describe("the host's clock", () => {
     expect(vault.getSnapshot().state).to.eq('unlocked')
   })
 
-  it("is checked at every reading: a clock gone wrong after the open refuses each call that reads it, and unlocks nothing", async () => {
+  it("reads now() off the clock, rounded down to whole milliseconds, the time the lease is judged by, as its example shows", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw', { clock: { now: () => world.clock.now() + 0.5 } })
+    expect(vault.now()).to.eq(world.clock.now())
+    const lease = Lease.make(vault, await world.getLease())
+    expect(lease.endsBy(vault.now())).to.be.false
+    world.advance(vault.leaseMillis)
+    expect(lease.endsBy(vault.now())).to.be.true
+  })
+
+  it("checks the clock once, at Vault.make: a later reading in seconds is taken as it comes, and checked by nothing", async () => {
     const world = makeWorld()
     let reading = world.clock.now()
     const vault = await world.openUnlocked('pw', { clock: { now: () => reading } })
-    await vault.lock()
     reading /= 1000
-    await TH.expectRefusal(vault.unlock('pw'), 'bad_option')
-    expect(vault.getSnapshot().state).to.eq('locked')
-    expect(await world.getLease()).to.be.null
+    await vault.hello({ staleMinutes: 0 })
+    expect(vault.getSnapshot().state).to.eq('unlocked')
+    expect(await vault.ensureLease()).to.eq(vault)
   })
 
-  it("refuses an unlock that would create the vault, writing nothing, when the clock has gone wrong", async () => {
+  it("lets a clock that throws after the open fail the call that reads it, as the clock's own error", async () => {
     const world = makeWorld()
-    let reading = world.clock.now()
-    const vault = await world.open({ clock: { now: () => reading } })
-    reading *= 1000
-    await TH.expectRefusal(vault.unlock('pw'), 'bad_option')
-    expect(world.dbStore.ckeys()).to.have.lengthOf(0)
-  })
-
-  it("still locks when the clock has gone wrong", async () => {
-    const world = makeWorld()
-    let reading = world.clock.now()
-    const vault = await world.openUnlocked('pw', { clock: { now: () => reading } })
-    reading = 0
-    await vault.lock()
-    expect(vault.getSnapshot().state).to.eq('locked')
-    expect(await world.getLease()).to.be.null
-    reading = world.clock.now()
-    await TH.expectRefusal(vault.ensureLease(), 'vault_locked')
-  })
-
-  it("fails closed: a reading gone wrong while unlocked drops the vaultKey before it refuses the clock", async () => {
-    const world = makeWorld()
-    let reading = world.clock.now()
-    const vault = await world.openUnlocked('pw', { clock: { now: () => reading } })
-    await vault.putBox('anthropic', 'sk-fake')
-    reading = world.clock.now() / 1000
-    await TH.expectRefusal(vault.getWhisper('anthropic'), 'bad_option')
-    expect(vault.getSnapshot().state).to.eq('locked')
-    reading = world.clock.now()
-    await TH.expectRefusal(vault.getWhisper('anthropic'), 'vault_locked')
+    let broken = false
+    const thrown = new Error('no time today')
+    const vault = await world.openUnlocked('pw', { clock: { now: () => { if (broken) { throw thrown } return world.clock.now() } } })
+    broken = true
+    const err = await TH.expectRefusal(vault.hello({ staleMinutes: 0 }), 'unexpected_error')
+    expect(err.cause).to.eq(thrown)
   })
 
   it("refuses a clock whose now() throws, at Vault.make, keeping its error as the cause and quoting none of it", async () => {
@@ -286,29 +282,6 @@ describe("the host's clock", () => {
     const err = await TH.expectRefusal(world.open({ clock: { now: () => { throw thrown } } }), 'bad_option')
     expect(err.cause).to.eq(thrown)
     expect(err.message).to.not.include('SUPERSECRET')
-  })
-
-  it("refuses, and drops the vaultKey, when now() starts throwing after the open", async () => {
-    const world = makeWorld()
-    let broken = false
-    const clock = { now: () => { if (broken) { throw new Error('no time today') } return world.clock.now() } }
-    const vault = await world.openUnlocked('pw', { clock })
-    await vault.putBox('anthropic', 'sk-fake')
-    broken = true
-    const err = await TH.expectRefusal(vault.getWhisper('anthropic'), 'bad_option')
-    expect((err.cause as Error).message).to.eq('no time today')
-    broken = false
-    expect(vault.getSnapshot().state).to.eq('locked')
-    await TH.expectRefusal(vault.getWhisper('anthropic'), 'vault_locked')
-  })
-
-  it("refuses a store when the clock has gone wrong while unlocked", async () => {
-    const world = makeWorld()
-    let reading = world.clock.now()
-    const vault = await world.openUnlocked('pw', { clock: { now: () => reading } })
-    reading = Infinity
-    await TH.expectRefusal(vault.putBox('anthropic', 'sk-fake'), 'bad_option')
-    expect(world.dbStore.ckeys().filter((ckey) => isU1Box(ckey))).to.have.lengthOf(0)
   })
 })
 // --
@@ -602,7 +575,7 @@ describe("Vault.make, by the Contract", () => {
     const world = makeWorld()
     const vault = Vault.make(world.optsWith())
     expect(vault).to.be.instanceOf(Vault)
-    expect(vault.snapshot).to.deep.include({ state: 'opening', vault_id: null, registered_at: null, unlock_epoch: null, vault_key_epoch: null, askPassphraseAt: null, trouble: null, syncing: true })
+    expect(vault.snapshot).to.deep.include({ state: 'opening', vault_id: null, registered_at: null, unlock_epoch: null, askPassphraseAt: null, trouble: null, syncing: true })
     expect(vault.passphrase).to.be.null
     expect(vault.passkey).to.be.null
     expect(vault.boxes).to.have.lengthOf(0)
@@ -744,7 +717,7 @@ describe("the vault's fields, by the Contract", () => {
     await vault.putBox('anthropic', 'sk-fake')
     await addLaptopPasskey(vault)
     // Every field the snapshot shows, the scope's among them, and those only the handle has.
-    for (const field of [...Object.keys(vault.snapshot), 'snapshot', 'leaseMillis', 'logger', 'clock', 'keyDeriver']) {
+    for (const field of [...Object.keys(vault.snapshot), 'snapshot', 'leaseMillis', 'logger', 'keyDeriver']) {
       expect(Reflect.set(vault, field, null), field).to.be.false
     }
     expect(vault.state).to.eq('unlocked')

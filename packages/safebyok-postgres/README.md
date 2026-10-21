@@ -28,8 +28,8 @@ what is missing, and never changes the columns or keys of a table already there.
 is no migration: a release that changes the tables says so in its changelog, and you drop them
 and run it again.
 
-**Upgrading from a release whose `safebyok_vaults` has a `wayins` column**: its vault props now
-hold their two ways in as the columns `passphrase` and `passkey` (null when the vault has none).
+**Upgrading from a release whose tables have a `vault_key_epoch` or `sidecar_json` column**: the
+vault props and boxes hold neither now, and a box's sidecar is the column `sidecar`, a `jsonb`.
 No vault stored before is read (each reads as damaged, its boxes with it), so drop both tables --
 the boxes too, or the new vaults table would stand without their foreign key -- and run
 `VaultTablesSql` again; each user then makes their vault anew.
@@ -354,21 +354,26 @@ subscriber: at worst, a refresh that finds nothing new.
 Two tables, each record **a column to a field**, exactly as safebyok wrote it: text as text, a
 time or a count as a `bigint`, and each structured value as one opaque `jsonb` -- an encrypted
 value (a cipherIv and its ciphertext, `{ cipher_iv_b64, ciphertext_b64 }`), or one of the vault
-props' two ways in, `passphrase` and `passkey` (a SQL null when the vault has no passkey). A box's sidecar is `text`, never `jsonb`, which
-would rewrite it. Nothing is normalized: a sidecar or a user id reads back byte for byte, as it
-must, since every field a record holds is bound into its encryption (all but the vault props'
-`unlock_epoch`, and, for each way in, the other one beside it).
+props' two ways in, `passphrase` and `passkey` (a SQL null when the vault has no passkey). A box's
+sidecar is a `jsonb` too, never null, which your server can query: always a JSON object, `{}` for none.
+`jsonb` may reorder an object's keys and drop its spacing, which changes nothing: safebyok binds
+each structured value into its encryption by its fields, a sidecar as its JSON with keys sorted.
+Nothing else is normalized: a user id or a string inside a sidecar reads back byte for byte, as
+it must, since every field a record holds is bound into its encryption (all but the vault props'
+`unlock_epoch`, and, for each way in, the other one beside it). A sidecar Postgres's `jsonb`
+cannot hold -- a string holding `\u0000`, say -- is refused by Postgres, and the write fails with
+its error as the cause, nothing written.
 
 | Table             | One row per | Primary key                                     | Columns                                                                                |
 | ----------------- | ----------- | ----------------------------------------------- | -------------------------------------------------------------------------------------- |
 | `safebyok_vaults` | vault       | `applabel`, `user_id`, `vaultlabel`             | every field of the `VaultProps`                                                        |
-| `safebyok_boxes`  | box         | `applabel`, `user_id`, `vaultlabel`, `boxlabel` | the vault's scope and `vault_id`, then every field of the `BoxRecord`; its sidecar as `text` |
+| `safebyok_boxes`  | box         | `applabel`, `user_id`, `vaultlabel`, `boxlabel` | the vault's scope and `vault_id`, then every field of the `BoxRecord`; its sidecar as `jsonb` |
 
 * **Encrypted**: each whisper (`whisper_ciphered`), each box's boxKey
   (`box_key_wrapped`), and the vaultKey, once under each way into the vault (the
   `vault_key_wayin_wrapped` inside the vault props' `passphrase`, and inside their `passkey` when
   they have one).
-* **In the open**: the scope, each `boxlabel` and sidecar (`sidecar_json`), each whisper's codec
+* **In the open**: the scope, each `boxlabel` and `sidecar`, each whisper's codec
   and schema version, the `vault_id`, `unlock_epoch`, `revision_tok`s, each way in's `wayinkind`, `device_id` and `registered_at`, the passphrase's
   salt and key deriver's label, whether the vault has a passkey, and its `credential_id` and
   `prf_salt_b64`, when
@@ -433,7 +438,7 @@ shape of table, copy it, and keep to what makes it right:
   to the `vault_id`, so a box cannot outlive its vault or land in one made anew, and deleting
   a vault is one `DELETE` of its vault row.
 * **Store each record a column to a field**, and compare only the scope, `boxlabel`, `vault_id`,
-  `unlock_epoch`, `vault_key_epoch` and `revision_tok`. `src/columns.ts` names each record's columns once, the
+  `unlock_epoch` and `revision_tok`. `src/columns.ts` names each record's columns once, the
   compiler holding the list to the record's fields both ways, and builds every statement from it.
 * **Authorize in the adapter**: made per request for one user, it refuses every other user's
   scope with `identity_revoked`, and passes the database's own refusal of a call (`42501`) up as
@@ -449,13 +454,12 @@ shape of table, copy it, and keep to what makes it right:
   (and which), the vault was full -- so that no second read is needed to tell a full vault from
   a stale writer. And map a foreign key violation (`23503`) on the insert to `vault_mismatch`: a
   vault deleted after the statement's snapshot, before its foreign key check, no longer stands.
-* **Read the vault row `FOR SHARE` in a box write, and know why.** A box write compares
-  the vault props' `vault_key_epoch` (contract line 3.8), a column no foreign key covers, and a
-  plain read would take it from the statement's snapshot: an update of the vault props committed
-  after the snapshot -- a rotation of the vaultKey -- would go unseen, and a device still holding
-  the replaced vaultKey could seal a whisper under it. `FOR SHARE` makes the update wait for the
-  write, or the write for the update and then re-read the vault props as they stand. It is a
-  shared lock, so box writes never wait for each other on the vault row. A trigger of your own
+* **Read the vault row `FOR SHARE` in a box write, and know why.** A plain read takes the vault
+  row from the statement's snapshot, so a deletion of the vault committed after it would go unseen
+  until the foreign key's check. `FOR SHARE` makes the deletion wait for the write, or the write
+  for the deletion and then read the vault row as it stands, and it takes the write's locks in
+  the order a deletion takes them (vault row, then box). It is a shared lock, so box writes never
+  wait for each other on the vault row. A trigger of your own
   that locks the vault row anew -- `FOR UPDATE`, say -- turns two such writers into a deadlock:
   serialize on something else (the hard cap above takes an advisory lock).
 * **Prove it with the shared suite**: `describeVaultDB` from `safebyok/testing` runs every verb,

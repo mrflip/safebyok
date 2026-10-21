@@ -145,16 +145,15 @@ without `format` -- which the browser's VaultDB may not hand back from its own l
 
 Every stored field is non-null in the schema. A listing of yours that hands back a record missing
 one fails in GraphQL itself, before any VaultError is made, and reaches the browser as
-`storage_unavailable`, not `corrupt_record`: Postgres's `NOT NULL` columns rule it out, and a
+`storage_unavailable`, not as a box listed damaged: Postgres's `NOT NULL` columns rule it out, and a
 store of your own keeps every field it was handed.
 
 The resolvers decide nothing: every expectation crosses whole, and the VaultDB you serve keeps
 [the VaultDB contract](https://github.com/mrflip/safebyok/blob/main/packages/safebyok/VAULTDB.md)
-for the browser. Its line 3.8 in particular: a box write's expectation names the
-`vault_key_epoch` the box was sealed under, and your VaultDB lands it only while the vault's
-props stand at that epoch, compared in the same atomic step as the write. One that skips the
-comparison lets a device still holding a replaced vaultKey seal a whisper under it.
-`tests/yoga-recipe.test.ts` runs the shared suite through the recipe, that line included.
+for the browser. Its line 3.3 in particular: a box write's expectation names the `vault_id` the
+box was sealed for and the revision it read, and your VaultDB lands it only while both stand,
+compared in the same atomic step as the write. `tests/yoga-recipe.test.ts` runs the shared suite
+through the recipe, that line included.
 
 ## The browser half
 
@@ -206,7 +205,7 @@ by, exactly as safebyok wrote it:
 | Type                 | Carries                                                           |
 | -------------------- | ----------------------------------------------------------------- |
 | `SafebyokVaultProps` | every field of the `VaultProps`                                   |
-| `SafebyokBox`        | every field of the `BoxRecord`; its sidecar as JSON text, as written    |
+| `SafebyokBox`        | every field of the `BoxRecord`; its sidecar a `SafebyokSidecar`        |
 | `SafebyokListedBox`  | a box as a listing has it: every field but the two encrypted ones |
 | `SafebyokCiphered`   | an encrypted value: its `cipher_iv_b64` and its `ciphertext_b64`  |
 | `SafebyokVaultScope` | which vault: `applabel`, `user_id`, `vaultlabel`                  |
@@ -217,7 +216,7 @@ of its own.
 * **Text is a `String`**, a count (`unlock_epoch`) an `Int`, and a time a `Float` -- epoch
   milliseconds, a whole number past what GraphQL's 32-bit `Int` holds.
 * **A count is held to GraphQL's 32-bit `Int`**: `unlock_epoch`, which goes up by one on each
-  change to a vault's ways in, and `vault_key_epoch`. Past 2,147,483,647 the field fails on the
+  change to a vault's ways in. Past 2,147,483,647 the field fails on the
   wire and the browser sees `storage_unavailable`. That is accepted: two billion changes to
   the ways in is not a vault anyone keeps.
 * **The vault props' two ways in**, `passphrase` (always there) and `passkey` (null when the
@@ -229,6 +228,11 @@ of its own.
   (`safebyok-vault-v4`): deploy client and server together, and every vault stored before reads
   as damaged, to be made anew (with `safebyok-postgres` behind your server, drop and recreate its
   tables).
+* **A box's sidecar is a `SafebyokSidecar!`**, the app's own JSON object, `{}` for none, carried
+  as it is, never null: your server's storage may keep it as a JSON column and
+  query it, reordering its keys as it likes, since the box binds its sidecar with keys sorted.
+  It replaces `sidecar_json`, the text the box format before (`safebyok-box-v7`) held: deploy
+  client and server together, and every vault stored before reads as damaged, to be made anew.
 * **Encrypted**: each whisper (`whisper_ciphered`), each boxKey (`box_key_wrapped`), and
   the vaultKey under each way in (inside `passphrase` and `passkey`). **In the open**: everything else, as
   [`safebyok-postgres`](../safebyok-postgres#what-is-stored) lists it.
