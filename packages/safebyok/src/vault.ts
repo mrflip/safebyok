@@ -1721,12 +1721,13 @@ export class Vault {
 
   /**
    * Grant this device a lease and take up the vaultKey until its deadline, `leaseHours` from now,
-   * arming the expiry anew -- unless the handle has closed, the vault props the key was proven against no longer stand, or
-   * `overtaken` (an ask's attempt, which its prompt's end stands down) is aborted: then nothing is
-   * taken up, and the lease, should it have been written already, is erased -- a deleted vault
-   * keeps no lease on this device, even should storage later bring it back. The lease is
-   * `Lease.grant`'s, a fresh leaseKey and the vaultKey wrapped under it; the write is the vault's.
-   * A close alone erases nothing: a close is no lock, and the next open takes the lease up.
+   * arming the expiry anew -- unless the handle has closed, the vault props the key was proven
+   * against no longer stand, or `overtaken` (an ask's attempt, which its prompt's end stands down)
+   * is aborted: then nothing is taken up, and the lease, should it have been written already, is
+   * erased -- a deleted vault keeps no lease on this device, even should storage later bring it
+   * back. The lease is `Lease.grant`'s, a fresh leaseKey and the vaultKey wrapped under it; the
+   * write is the vault's. A close alone erases nothing: a close is no lock, and the next open takes
+   * the lease up.
    *
    * The lease renews whenever the user proves who they are, in any call: an `unlock()` by
    * passphrase or passkey, or a change to the ways in, which the passphrase proves. Every proof
