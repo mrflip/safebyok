@@ -1,0 +1,67 @@
+# The databases beside the dev container, which every session in it reaches by service name. The
+# host starts them as their own compose project before the container (devcontainer.json's
+# initializeCommand), and the container joins that project's network (its runArgs). Nothing is
+# published to the host, so a contributor's `pnpm --filter safebyok-e2e db:up` never collides.
+#
+# One server to a backend, shared by every worktree in the container: a session keeps to itself
+# by database, as each e2e test file makes one of its own and drops it. A file that crashes before
+# its afterAll leaves its database behind; `down -v` clears them all.
+#
+#   docker compose -p byok-services ps        # on the host: the project is <host folder>-services
+#   docker compose -p byok-services down      # stop them; they outlive the dev container
+#   docker compose -p byok-services down -v   # and throw their data away
+#
+# Each service has no password to keep: it holds nothing but ciphertext made by the tests.
+# `extends` with `!reset` needs Docker Compose 2.24 or later.
+
+services:
+  # The Postgres the e2e tests run on, extended from e2e/compose.yaml for its image digest and
+  # healthcheck, without its host port. SAFEBYOK_PG_URL in devcontainer.json points at it.
+  postgres:
+    extends: { file: ../e2e/compose.yaml, service: postgres }
+    ports: !reset []
+
+  # The slots below are examples, to bring live as the tests that use them are written: uncomment
+  # the service (and its volumes), uncomment its lines in devcontainer.json, pin its image by
+  # digest, and add /.devcontainer to the docker-compose entry in .github/dependabot.yml.
+
+  # MySQL, for a later storage adapter. SAFEBYOK_MYSQL_URL in devcontainer.json points at it; a
+  # test file makes a database of its own, as the Postgres ones do. First start takes ~20s.
+  #
+  # mysql:
+  #   image: mysql:8.4@sha256:<digest>
+  #   environment:
+  #     MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+  #   healthcheck:
+  #     test: ["CMD", "mysqladmin", "ping", "--host", "127.0.0.1", "--user", "root"]
+  #     interval: 2s
+  #     timeout: 5s
+  #     retries: 60
+
+  # Convex's self-hosted backend, for safebyok-convex against a real deployment. Unlike the
+  # databases, one backend is one deployment: two sessions pushing different component code to it
+  # overwrite each other, so the tests that use it say how they share it.
+  #
+  # The entrypoint writes an admin key to the convex-key volume, which the dev container mounts
+  # read-only at /run/convex, then starts the backend as the image's own entrypoint does (check
+  # `docker inspect` when pinning). The instance secret behind the key is made on first start
+  # and kept in convex-data, by the image's read_credentials.sh.
+  #
+  # convex:
+  #   image: ghcr.io/convex/convex-backend@sha256:<digest>
+  #   entrypoint: ["bash", "-c", "./generate_admin_key.sh > /keys/admin_key && exec ./run_backend.sh"]
+  #   environment:
+  #     CONVEX_CLOUD_ORIGIN: http://convex:3210
+  #     CONVEX_SITE_ORIGIN: http://convex:3211
+  #   volumes:
+  #     - convex-data:/convex/data
+  #     - convex-key:/keys
+  #   healthcheck:
+  #     test: curl -f http://localhost:3210/version
+  #     interval: 2s
+  #     timeout: 5s
+  #     retries: 30
+
+# volumes:
+#   convex-data:
+#   convex-key:
