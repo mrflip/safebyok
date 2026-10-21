@@ -177,7 +177,9 @@ added or folded into through the subagent, and no other entry changes.
   to grant a lease that never opened. Amended 2026-10-21 (b_simplify): `Lease.grant(vault, holder,
   vaultKeyPair)` takes no deadline; it computes its own, `vault.clock.now() + vault.leaseMillis`,
   floored and capped at `FarFuture`, read through the vault's accessors, and still parses `holder`
-  with `LeaseRecord`'s checks and throws a Zod error as misuse. The lease reads the handle's public
+  with `LeaseRecord`'s checks and throws a Zod error as misuse. It also parses the deadline it
+  computes against `LeaseRecord.shape.ask_passphrase_at`, throwing as misuse on a NaN or an
+  out-of-range value, so a deadline that is no number is never bound into a lease's wrap or written. The lease reads the handle's public
   `leaseMillis` getter, so a host that `Object.defineProperty`s over the handle's `leaseMillis`
   changes its own lease length, as one overwriting the handle's `clock` already changed every model's
   clock; the vault handle is not frozen.
