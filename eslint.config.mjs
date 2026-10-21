@@ -278,6 +278,7 @@ export default defineConfig([
       // `Promise.withResolvers` is ES2024.
       'unicorn/prefer-iterator-to-array':       'off',
       'unicorn/prefer-promise-with-resolvers':  'off',
+      'sonarjs/fixme-tag': 'off',
     },
   },
 
