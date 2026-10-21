@@ -77,8 +77,8 @@ export type MakeVaultOpts = {
   getProof?: GetProof | null | undefined
   /** Time source for expiry and for the times stored with each record; tests inject one. Default: the wall clock.
    * Its `now()` returns epoch milliseconds, as `Date.now()` does, from 1981 to 2255 ({@link FarPast}
-   * to {@link FarFuture}); fractions are rounded down. `Vault.make` reads it once to check it. A
-   * later reading out of bounds, or one that throws, locks the vault and refuses 'bad_option'.
+   * to {@link FarFuture}); fractions are rounded down. `Vault.make` reads it once, and refuses
+   * 'bad_option' for one out of bounds or one that throws. Every later reading is taken as it comes.
    */
   clock?: Clock | undefined
   /** The largest whisper `putBox()` accepts, in bytes of its JSON and its box's sidecar's together. Default: {@link MaxWhisperBytes}, 40444.
@@ -336,37 +336,31 @@ export const parseGetProof = (candidate: unknown): GetProof | null => {
   return candidate as GetProof
 }
 
-/** What a Clock must carry. Checked only: Vault.make keeps the clock it was handed, and checks each reading. */
+/** What a Clock must carry: a `now()` function. */
 const clockShape = Z.object({
   now: Z.custom<Clock['now']>((candidate) => typeof candidate === 'function'),
 })
 
-/** The host's clock, or the wall clock when left out: 'bad_option' for one with no `now()`. */
+/** A clock reading Vault.make accepts: epoch milliseconds from {@link FarPast} to {@link FarFuture}, a fraction allowed. */
+const clockReading = Z.number().check(Z.gte(FarPast), Z.lte(FarFuture))
+
+/** The host's clock, or the wall clock when left out, checked by one reading: 'bad_option' for one with no `now()`, that throws, or that reads outside 1981 to 2255. */
 export const parseClock = (candidate: Clock | undefined): Clock => {
   if (candidate === undefined) { return wallClock }
   if (! clockShape.safeParse(candidate).success) {
     throw new VaultError('bad_option', 'clock is not a Clock: it needs a now() function returning epoch milliseconds, as Date.now() does.')
   }
-  return candidate
-}
-
-/** A clock reading the package accepts: epoch milliseconds from {@link FarPast} to {@link FarFuture}, a fraction allowed. */
-const clockReading = Z.number().check(Z.gte(FarPast), Z.lte(FarFuture))
-
-/** A reading of the host's clock, rounded down to whole milliseconds: 'bad_option' out of bounds, or for a clock that throws. */
-export const readClock = (clock: Clock): number => {
   let reading: unknown
   try {
-    reading = clock.now()
+    reading = candidate.now()
   } catch (err) {
     // The host's own error rides along as the cause, unquoted.
     throw new VaultError('bad_option', "The clock passed to Vault.make threw when read: its now() must return epoch milliseconds, as Date.now() does. The clock's own error is this error's cause.", { cause: err })
   }
-  const checked = clockReading.safeParse(reading)
-  if (! checked.success) {
+  if (! clockReading.safeParse(reading).success) {
     throw new VaultError('bad_option', "The clock passed to Vault.make read a time outside 1981 to 2255: its now() must return epoch milliseconds, as Date.now() does, not seconds or microseconds.")
   }
-  return Math.floor(checked.data)
+  return candidate
 }
 
 /** `maxWhisperBytes`, or its default: 'bad_option' for anything but a whole number above zero. */
@@ -494,9 +488,6 @@ export const parseMakeVaultOpts = (opts: MakeVaultOpts): ParsedVaultOpts => {
   // The host's logger for the vault, else the one its storage was made with; guarded either way.
   const logger = parseLogger(opts.logger ?? vaultDB.logger)
   const clock = parseClock(opts.clock)
-  // Every reading of the host's clock is checked, this first one so that a clock counting in the
-  // wrong unit fails make rather than some later call.
-  readClock(clock)
   const keyDeriver = parseKeyDeriver(opts.keyDeriver, logger)
   const whisperByteLimit = parseMaxWhisperBytes(opts.maxWhisperBytes)
   const boxLimit = parseMaxBoxes(opts.maxBoxes, parseDeclared(vaultDB, 'maxBoxes'))

@@ -1216,17 +1216,6 @@ describe("what a vault hands its boxes", () => {
     expect(writtenAt).to.eq(world.clock.now())
   })
 
-  it("reads its clock checked: a reading that fails drops the vaultKey, as the vault's own readings do", async () => {
-    const world = makeWorld()
-    let broken = false
-    const clock = { now: () => (broken ? NaN : world.clock.now()) }
-    const vault = await world.openUnlocked('pw', { clock })
-    broken = true
-    TH.expectSyncRefusal(() => vault.clock.now(), 'bad_option')
-    broken = false
-    expect(vault.state).to.eq('locked')
-  })
-
   it("lists summaries frozen through, so a host changing one reaches nothing the vault holds, as heldListing's example shows", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')

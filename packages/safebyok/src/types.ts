@@ -362,8 +362,8 @@ export const MaxWhisperBytes = 40_444 // searchable: 40444
 export const MaxBoxes = 100
 
 /** A source of the time, `Vault.make`'s `clock`: `now()` is epoch milliseconds, as `Date.now()` gives, a fraction rounded down.
- * The vault refuses 'bad_option' for a reading outside {@link FarPast} to {@link FarFuture}, or a
- * throw: at `Vault.make`, and at any later call that reads it so, which drops the vaultKey first.
+ * `Vault.make` reads it once, and refuses 'bad_option' for a reading outside {@link FarPast} to
+ * {@link FarFuture}, or a throw. The vault takes every later reading as it comes.
  */
 export type Clock = { now(): number }
 

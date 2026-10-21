@@ -875,7 +875,7 @@ describe("the vault's ways in, as models (Contract: Vault, Wayin)", () => {
     expect(vault.passkey).to.be.null
   })
 
-  it("lends its models its logger, its key deriver and a checked clock, none writable", async () => {
+  it("lends its models its logger, its key deriver and its clock, none writable", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     expect(vault.keyDeriver).to.eq(TH.testDeriver)
