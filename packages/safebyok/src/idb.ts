@@ -9,18 +9,10 @@ import * as ChangeBell from './change-bell'
 export type { IdbOpts } from './idb-opts'
 export * as ChangeBell from './change-bell'
 
-/**
- * The device store over this browser's IndexedDB (through `idb-keyval`), as an entry point of its
- * own, `safebyok/idb`: device storage is exactly what IndexedDB is, and the only browser storage
- * that can hold a non-extractable leaseKey. Where a vault itself lives is a backend choice,
- * not a fact about the device, so the IndexedDB vault store is a package of its own,
- * `safebyok-indexeddb`.
- *
- * This entry point touches IndexedDB only when the store is used, so importing it is safe
- * anywhere; the store itself needs a browser (or anything else with `indexedDB`). It reaches
- * IndexedDB through `idb-keyval`, a regular dependency of about 600 bytes that only this entry
- * point loads. Beside the device store, it exports the change bell its writes ring,
- * {@link ChangeBell}, which `safebyok-indexeddb` rings too.
+/** `safebyok/idb`: the device store over this browser's IndexedDB, the only browser storage that can keep a non-extractable leaseKey.
+ * Importing it is safe anywhere: it touches IndexedDB only when the store is used. It loads
+ * `idb-keyval`, about 600 bytes. It also exports {@link ChangeBell}, which its writes ring. The
+ * IndexedDB vault store is a package of its own, `safebyok-indexeddb`.
  */
 
 // One UseStore per dbName, shared by stores and inspectors alike: idb-keyval opens the
@@ -37,11 +29,7 @@ const shelfStore = (dbName: string): UseStore => {
   return fresh
 }
 
-/**
- * The refusal of a context with no IndexedDB, named as a browser names a storage it does not
- * offer: a `NotSupportedError` DOMException, or, in a runtime with no DOMException either (React
- * Native's Hermes, say), a plain Error of that name.
- */
+/** The error for a context with no IndexedDB: a `NotSupportedError` DOMException, or a plain Error of that name where there is no DOMException. */
 const noIndexedDB = (): Error => {
   const message = 'This context offers no IndexedDB, so the device store has nowhere to keep its records.'
   if (typeof DOMException === 'function') { return new DOMException(message, 'NotSupportedError') }
@@ -57,22 +45,14 @@ class NotSupportedError extends Error {
 // shared with every other tab, and with any other version of this package running in one.
 const bellnameOf = (dbName: string) => `safebyok-idb:${dbName}:device_db`
 
-/**
- * DeviceDB over this browser's IndexedDB: the real device storage. IndexedDB keeps the
- * {@link LeaseRecord} by structured clone, which is the only way a browser persists the
- * non-extractable leaseKey -- as a handle, never as bytes. Device marks share its shelf.
+/** A {@link DeviceDB} over this browser's IndexedDB, keeping the leaseKey as a handle by structured clone, never as bytes.
+ * Each write rings its change bell, in this tab and every other. A record that will not read back
+ * reads as null, and is discarded. A row under an earlier version's ckey is deleted unread at the
+ * next read or erase of a lease. It files rows under {@link Ckeys}, and refuses alike a name
+ * holding `^`. It refuses 'bad_option' for a `dbName` that is not non-empty text.
  *
- * A record that will not read back (damaged, or written by another version) reads as "no
- * lease", or no device mark, and is discarded: losing the convenience is the safe failure. A row
- * filed under an earlier version's ckey is deleted unread at the next read or erase of a lease.
- * Its rows are filed under `Ckeys`, names joined on `^`, and a scope with a name holding one is
- * refused with kind 'bad_label'. Kind 'bad_option' for a `dbName` that is not non-empty text.
- *
- * Every verb resolves an Outcome. A failure of IndexedDB's own is said as a condition, the
- * browser's error its cause: one the browser gives for storage withheld or full (a
- * `SecurityError`, a `QuotaExceededError`) as 'storage_blocked', and so a context with no
- * IndexedDB at all, which this store meets as a `NotSupportedError` at its first use; any other
- * as 'storage_unavailable'.
+ * A failure of IndexedDB's own is a condition, as {@link deviceOutcomeOf} says. A context with no
+ * IndexedDB meets 'storage_blocked' at first use.
  *
  * @example
  *   const deviceDB = idbDeviceDB()
@@ -157,16 +137,11 @@ export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
 /** One stored row, as {@link inspectIdbDeviceDB} reports it: its ckey and the raw stored value. */
 export type IdbRow = { ckey: string, row: unknown }
 
-/**
- * A window onto the rows {@link idbDeviceDB} keeps, for inspectors and debug panels: the raw
- * rows, a change bell, and a wipe. This is how the demo shows what this device remembers without
- * asking the vault's opinion -- what it reports is what is actually stored. The vault store's
- * own rows have their window beside it, `inspectIdbVaultDB` from `safebyok-indexeddb`.
- *
- * @param opts - The database to look at: `dbName`, default 'safebyok'.
- * @returns The inspector. Kind 'bad_option' for a `dbName` that is not non-empty text, and from
- *   its `subscribe`, for a listener that is not a function. Its `rows()` and `wipe()` reject in a
- *   context with no IndexedDB, as the device store does, with a `NotSupportedError`.
+/** A window onto the rows {@link idbDeviceDB} keeps, as stored, for inspectors and debug panels: the raw rows, a change bell and a wipe.
+ * `safebyok-indexeddb`'s `inspectIdbVaultDB` is the vault store's. It refuses 'bad_option' for a
+ * `dbName` that is not non-empty text, and its `subscribe` for a listener that is no function.
+ * Unlike the store, its `rows()` and `wipe()` reject, with a `NotSupportedError` where there is no
+ * IndexedDB.
  *
  * @example
  *   const inspector = inspectIdbDeviceDB({ dbName: 'acme' })
@@ -184,7 +159,7 @@ export const inspectIdbDeviceDB = (opts?: IdbOpts) => {
         .map(([ckey, row]) => ({ ckey, row }))
         .toSorted((one, two) => one.ckey.localeCompare(two.ckey))
     },
-    /** Calls `listener` after any write to the shelf, this tab or another; returns the unsubscribe. */
+    /** Call `listener` after any write to the shelf, in this tab or another; returns the unsubscribe. */
     subscribe: (listener: () => void): (() => void) => {
       if (typeof listener !== 'function') { throw new VaultError('bad_option', 'subscribe needs a listener function to call after each write.') }
       return ChangeBell.listen(bellnameOf(dbName), listener)

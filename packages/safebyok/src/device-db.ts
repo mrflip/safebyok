@@ -4,40 +4,31 @@ import { VaultError } from './errors'
 import { type Outcome, isOutcomeShaped, outcomeOf, valOf } from './outcome'
 import { isStorageBlocked } from './refusals'
 
-/**
- * Device-local storage for what a device keeps of each vault: its lease, what lets "enter your
- * passphrase once, keep it for seven days" survive a page reload, and its device mark,
- * the device's own id for the vault and the newest copy of the vault props it has seen. A
- * {@link LeaseRecord} holds this browser's leaseKey -- a non-extractable CryptoKey
- * handle, which has no JSON form -- so an adapter must keep records by structured clone
- * (IndexedDB: see `safebyok/idb`) or in memory; nothing here ever goes to the backend.
+/** Storage on this device for what it keeps of each vault: its lease, which survives a page reload, and its device mark.
+ * A {@link LeaseRecord} holds a non-extractable leaseKey, a CryptoKey with no JSON form. So an
+ * adapter keeps records by structured clone (IndexedDB: `safebyok/idb`) or in memory. Nothing here
+ * ever goes to the backend.
  *
- * Every verb resolves an {@link Outcome}, as a VaultDB's do, and never rejects: a failure is a
- * bad outcome holding a VaultError, which {@link deviceOutcomeOf} makes of whatever the store
- * threw. A vault calls a host's own DeviceDB through a guard all the same, so one that throws, or
- * answers with something that is no Outcome, is said as a condition rather than trusted.
+ * Every verb resolves an {@link Outcome} and never rejects: wrap each body in {@link
+ * deviceOutcomeOf}. A vault guards a host's DeviceDB all the same, and says a throw as a condition.
  *
- * An adapter may answer a damaged or unreadable record with null rather than a refusal: losing a
- * lease only means asking for the passphrase again, and losing a device mark only
- * means the device checks the vault from what storage holds now, as on a device that never saw
- * it. Both are the safe failure. The vault checks whatever `getLease` and `getMark` hand back
- * all the same, so an adapter that returns a record exactly as it stored it is never trusted
- * blindly.
+ * An adapter may answer a damaged or unreadable record with null rather than refuse. That is the
+ * safe failure: a lost lease asks for the passphrase again, and a lost mark checks the vault
+ * afresh. The vault checks whatever `getLease` and `getMark` hand back.
  */
 export interface DeviceDB {
-  /** The lease record for one vault, or null when there is none. Whether it still fits is the vault's call. */
+  /** The lease record for one vault, or null for none. The vault judges whether it still fits. */
   getLease(scope: VaultScope): Promise<Outcome<LeaseRecord | null>>
   /** Keep `record` as the lease of its vault, in place of any before. */
   putLease(record: LeaseRecord): Promise<Outcome<void>>
-  /** Forget the lease of one vault: a lock revokes it, and a lease that no longer fits is discarded. */
+  /** Erase the lease of one vault: how a lock revokes it, and how a lease that no longer fits is discarded. */
   delLease(scope: VaultScope): Promise<Outcome<void>>
-  /** This device's mark for one vault, or null when there is none. What it says is the vault's to judge. */
+  /** This device's mark for one vault, or null for none. The vault judges what it says. */
   getMark(scope: VaultScope): Promise<Outcome<DeviceMark | null>>
-  /** Keep `mark` as this device's mark for its vault, in place of any it kept before. */
+  /** Keep `mark` as this device's mark for its vault, in place of any before. */
   putMark(mark: DeviceMark): Promise<Outcome<void>>
-  /**
-   * Forget this device's mark for one vault: `del()` calls it, and so does a host accepting
-   * storage restored on purpose, and `delDamagedVault`.
+  /** Erase this device's mark for one vault, as `del()` and `delDamagedVault` do.
+   * A host accepting storage restored from an older copy on purpose, after `rolled_back`, calls it.
    */
   delMark(scope: VaultScope): Promise<Outcome<void>>
   /** Remove every lease and device mark on this device: the device's part of a full reset. */
@@ -47,11 +38,9 @@ export interface DeviceDB {
 /** A verb of {@link DeviceDB}. */
 export type DeviceVerb = keyof DeviceDB
 
-/**
- * DeviceDB over a Map: what the tests use, and the fallback anywhere without IndexedDB. Leases
- * and device marks last exactly as long as the page -- which is to say, it remembers
- * nothing, safely. Its rows are filed under `Ckeys`, names joined on `^`, and a scope with a name
- * holding one is refused with kind 'bad_label'.
+/** A DeviceDB over a Map, which remembers nothing past the page: for tests, and wherever IndexedDB is missing or blocked.
+ * It files rows under {@link Ckeys}, and refuses alike a name holding `^`. A malformed record reads
+ * as null, and is discarded.
  *
  * @example
  *   const deviceDB = memoryDeviceDB()
@@ -104,21 +93,12 @@ export const memoryDeviceDB = (): DeviceDB => {
 
 // == [Device trouble]: deviceOutcomeOf, deviceTroubleAsConditions, DeviceTroubleSaid, deviceTrouble
 
-/**
- * The answer of one verb of a device store you write yourself: wrap each verb's body in it, and
- * the store answers as a {@link DeviceDB} must, an Outcome that never rejects. What the body
- * returns is a good outcome; a VaultError it throws passes as it came; and anything else it
- * throws -- your storage's own error -- is said as the vault's condition, that error its `cause`
- * and the message naming what failed: 'storage_blocked' for a refusal the browser gives for a
- * reason that holds until something outside the app changes (an error named `SecurityError`,
- * `QuotaExceededError` or `NotSupportedError`: site data blocked, no room, no such storage),
- * which a host shows without offering a retry; 'storage_unavailable' for any other, which it shows
- * in place and offers to retry. Neither message names a scope or quotes a record. `memoryDeviceDB`
- * and `idbDeviceDB` answer through it.
+/** The outcome of one verb of a device store you write yourself: wrap each verb's body in it, as a {@link DeviceDB} must answer.
+ * A VaultError the body throws passes as it came. Anything else it throws becomes a condition,
+ * that error its `cause`. It is 'storage_blocked' for an error {@link isStorageBlocked} names,
+ * and 'storage_unavailable' for any other. Neither message names a scope or quotes a record.
  *
  * @param verb - The DeviceDB verb answering, which the message names.
- * @param body - Its work, sync or async.
- * @returns Its outcome.
  *
  * @example getMark: (scope) => deviceOutcomeOf('getMark', () => myStore.read(markCkeyOf(scope)))   // { ok: true, val: the record, or null }
  * @example await deviceOutcomeOf('putMark', () => myStore.write(ckey, mark))   // site data blocked (a SecurityError): { ok: false, err } of 'storage_blocked', "...will not help until that changes..."
@@ -127,15 +107,9 @@ export const deviceOutcomeOf = <ValT>(verb: DeviceVerb, body: () => ValT | Promi
   outcomeOf(body, (thrown) => deviceTrouble(verb, thrown))
 )
 
-/**
- * `deviceDB`, each verb guarded: the outcome it resolves passed on as it came, and anything else
- * -- a throw, a rejection, a bad outcome whose `err` is no VaultError -- said as
- * {@link deviceOutcomeOf} says a failure; an answer that is no Outcome at all is refused
- * 'bad_option'. What a vault and `delDamagedVault` call a host's device store through; not
- * exported from the package.
- *
- * @param deviceDB - The device store a host handed in.
- * @returns The same verbs, each answering one Outcome whatever the store does.
+/** `deviceDB` guarded, as a vault and `delDamagedVault` call a host's device store: each verb answers one Outcome whatever the store does.
+ * A throw, a rejection, or a bad outcome whose `err` is no VaultError, becomes what {@link
+ * deviceOutcomeOf} makes of a failure. An answer that is no Outcome refuses 'bad_option'.
  *
  * @example await deviceTroubleAsConditions(deviceDB).getMark(scope)  // a failing IndexedDB: 'storage_unavailable', "...failed reading its mark of this vault..."
  * @example await deviceTroubleAsConditions(deviceDB).getMark(scope)  // site data blocked (a SecurityError): 'storage_blocked', "...will not help until that changes..."
@@ -161,12 +135,7 @@ const guarded = <ValT>(verb: DeviceVerb, call: () => Promise<Outcome<ValT>>): Pr
   })
 )
 
-/**
- * What failed, for each device-store verb, and what it leaves undone: the heart of the message a
- * failure of that verb is said with; and, where there is one, what the user may do instead of
- * trying again, which holds whether a retry may mend it or not. None names a scope or quotes a
- * record.
- */
+/** What failed, for each device-store verb, and what it leaves undone; and what the user may do instead of trying again, if anything. */
 const DeviceTroubleSaid: Record<DeviceVerb, { failed: string, instead?: string }> = {
   getLease: { failed: "reading the lease it keeps for this vault, so the vault could not take it up", instead: "unlock with a passphrase or passkey" },
   putLease: { failed: "writing the lease it keeps for this vault, so this device may ask for the passphrase again at the next open" },
@@ -177,7 +146,7 @@ const DeviceTroubleSaid: Record<DeviceVerb, { failed: string, instead?: string }
   delAll:   { failed: "erasing everything it keeps for safebyok, so some of it may remain" },
 }
 
-/** The condition a failure of the device store's `verb` is said as, `thrown` its cause: see {@link deviceOutcomeOf}. */
+/** The condition a failure of the device store's `verb` becomes, `thrown` its cause, as {@link deviceOutcomeOf} says. */
 const deviceTrouble = (verb: DeviceVerb, thrown: unknown): VaultError => {
   const { failed, instead } = DeviceTroubleSaid[verb]
   if (isStorageBlocked(thrown)) {
