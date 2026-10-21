@@ -67,14 +67,14 @@ describe("putVaultProps", () => {
 })
 
 describe("getBox and putBox", () => {
-  it("has no box until one is written, then reads it back exactly, without its scope columns", async () => {
+  it("has no box until one is written, then reads it back exactly, without its scope columns, answering as PutBoxAnswer's first example shows", async () => {
     const CVX = await withVaultProps()
     expect(await CVX.query(TH.vaults.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })).to.be.null
     expect(await CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a1'), expected: TH.noBoxYet })).to.deep.equal({ landed: true, box_stored: TH.boxOf('anthropic_api_key', 'a1') })
     expect(await CVX.query(TH.vaults.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })).to.deep.equal(TH.boxOf('anthropic_api_key', 'a1'))
   })
 
-  it("resolves a write whose box expectation failed as stale_write, with the box standing as a read returns it, writing nothing", async () => {
+  it("resolves a write whose box expectation failed as stale_write, with the box standing as a read returns it, writing nothing, as PutBoxAnswer's second example shows", async () => {
     const CVX = await withVaultProps()
     await CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a1'), expected: TH.noBoxYet })
     expect(await CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a2'), expected: TH.noBoxYet })).to.deep.equal({ landed: false, refusalkind: 'stale_write', box_stored: TH.boxOf('anthropic_api_key', 'a1') })
@@ -82,7 +82,7 @@ describe("getBox and putBox", () => {
     expect(await CVX.query(TH.vaults.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })).to.deep.equal(TH.boxOf('anthropic_api_key', 'a1'))
   })
 
-  it("resolves a write whose vault props are not the ones expected as vault_mismatch, carrying nothing of them, writing nothing", async () => {
+  it("resolves a write whose vault props are not the ones expected as vault_mismatch, carrying nothing of them, writing nothing, as PutBoxAnswer's third example shows", async () => {
     const CVX = await withVaultProps()
     const answer = await CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a1'), expected: { ...TH.noBoxYet, vault_id: 'vault-id-gone' } })
     expect(answer).to.deep.equal({ landed: false, refusalkind: 'vault_mismatch' })

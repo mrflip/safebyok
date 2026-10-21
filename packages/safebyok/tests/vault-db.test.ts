@@ -773,6 +773,14 @@ describe("the abstract VaultDB, a box write's signal", () => {
     expect(removed).toHaveBeenCalledWith('abort', expect.any(Function))
   })
 
+  it("lands a write under a timeout signal, and a stale one names what won, as putBox's and VaultDBCallOpts's examples show", async () => {
+    const vaultDB = new MapVaultDB()
+    await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
+    const landed = await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'), { signal: AbortSignal.timeout(10_000) })
+    const refusal = await TH.expectBad(vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'two'), { signal: AbortSignal.timeout(10_000) }), 'stale_write')
+    expect(refusal.meta?.box_stored).to.deep.equal(landed)
+  })
+
   const BadCallOpts = [
     ['soon',                        'a string in place of the options'],
     [{ signal: 'soon' },            'a signal that is no AbortSignal'],
