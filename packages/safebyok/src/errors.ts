@@ -191,12 +191,11 @@ export const RefusalFamilyForKind = {
  * secret material.
  */
 export type RefusalMeta = {
-  /**
-   * `stale_write` from a box write: what stands under the boxlabel, reported by the same atomic
-   * step that refused the write, as a read of it would hand it back -- the box that won, its
-   * record whole, its wrapped boxKey and ciphered whisper among it, so the caller can open it or
-   * write over it with no second read; a {@link DamagedBox} when what stands does not read back
-   * as a box, naming the revision it holds, if any; or null when nothing stands there.
+  /** `stale_write` from a box write: what stands under the boxlabel, as a read would hand it back.
+   * The same atomic step that refused the write reported it. It is the box that won, its record
+   * whole, its wrapped boxKey and ciphered whisper among it, so the caller can open it or write
+   * over it with no second read; a {@link DamagedBox} when what stands does not read back as a
+   * box, naming the revision it holds, if any; or null when nothing stands there.
    */
   box_stored?:   BoxRecord | DamagedBox | null
   /** `box_too_large`, `vault_full`: how much room there is. */

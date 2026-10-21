@@ -125,9 +125,8 @@ export type VaultDBOpts = {
   logger?: VaultLogger | null | undefined
 }
 
-/**
- * What a VaultDB verb that takes options may be handed beside its arguments: a `signal`, the
- * caller's own timeout or cancel. A verb whose signal aborts, before it is called or while storage
+/** What a VaultDB verb that takes options may be handed beside its arguments: a `signal`.
+ * The signal is the caller's own timeout or cancel. A verb whose signal aborts, before it is called or while storage
  * has not answered, resolves `storage_unavailable` at once, the signal's `reason` as its `cause`:
  * a write already sent may have landed, and a later read shows whether it did. Without one, a
  * backend that never answers is a call that never completes.
@@ -852,9 +851,8 @@ const checkCallOpts = optionsCheck(
   "A VaultDB verb's only option is `signal`, an AbortSignal that abandons the call (AbortSignal.timeout(ms), or an AbortController's): check its spelling, and leave out any other.",
 )
 
-/**
- * What `work` resolves, unless `signal` aborts first: then `storage_unavailable`, the signal's
- * reason as its cause, at once. A signal already aborted starts no work, so nothing was sent;
+/** What `work` resolves, unless `signal` aborts first: then `storage_unavailable`, at once.
+ * The signal's reason is its cause. A signal already aborted starts no work, so nothing was sent;
  * one that aborts later leaves the work to finish unheard, so it may have landed.
  */
 const untilAborted = async <ValT>(signal: AbortSignal | undefined, work: () => Promise<ValT>): Promise<ValT> => {
@@ -874,9 +872,8 @@ const untilAborted = async <ValT>(signal: AbortSignal | undefined, work: () => P
   }
 }
 
-/**
- * What a box write resolves, or its refusal; a `stale_write` with what stands under `boxlabel`
- * checked as a read checks it, as {@link boxStoredOf} says. A `stale_write` that names nothing
+/** What a box write resolves, or its refusal, a stale one's `box_stored` checked as a read checks it.
+ * What stands under `boxlabel` is checked as {@link boxStoredOf} says. A `stale_write` that names nothing
  * standing is the adapter's bug: refused as `corrupt_record`, nothing written.
  */
 const withStandingChecked = async <ValT>(writing: Promise<ValT>, boxlabel: string): Promise<ValT> => {
@@ -893,9 +890,8 @@ const withStandingChecked = async <ValT>(writing: Promise<ValT>, boxlabel: strin
   }
 }
 
-/**
- * What stands under `boxlabel`, as a stale box write reports it: null for nothing; the box, when
- * it passes the check `getBox` makes of one stored under that boxlabel; otherwise a
+/** What stands under `boxlabel`, as a stale box write reports it: the box, a damaged box, or null.
+ * Null for nothing; the box, when it passes the check `getBox` makes of one stored under that boxlabel; otherwise a
  * {@link DamagedBox}, as a listing shows it.
  */
 const boxStoredOf = (raw: unknown, boxlabel: string): BoxRecord | DamagedBox | null => {
@@ -1014,9 +1010,8 @@ const checkStoredBox = (raw: unknown, boxlabel: string): BoxRecord => {
   return box
 }
 
-/**
- * The box an adapter handed back as `written` landed: the check `getBox` makes, at the revision
- * written. One at another revision is someone else's box: `corrupt_record`, quoting neither.
+/** The box an adapter handed back as `written` landed, held to the check `getBox` makes, at the revision written.
+ * One at another revision is someone else's box: `corrupt_record`, quoting neither.
  */
 const checkWrittenBox = (raw: unknown, written: BoxRecord): BoxRecord => {
   const box = checkStoredBox(raw, written.boxlabel)

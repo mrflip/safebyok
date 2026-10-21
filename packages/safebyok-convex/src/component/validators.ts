@@ -146,12 +146,10 @@ export const BoxExpectation = v.object({
   vault_key_epoch: v.number(),
 })
 
-/**
- * What a box write answers, from its one transaction: `landed`, with the box as stored; or a
- * refusal naming its kind, writing nothing -- `stale_write`, with the box standing under the
- * boxlabel as a read returns it (`box_stored`, whole; null for none),
- * or `vault_mismatch`, when the scope's vault props are not the ones the box was sealed for,
- * carrying nothing of them.
+/** What a box write answers, from its one transaction: `landed`, or the kind of refusal that wrote nothing.
+ * A write that landed carries the box as stored. `stale_write` carries the box standing under the
+ * boxlabel as a read returns it (`box_stored`, whole; null for none). `vault_mismatch`, when the
+ * scope's vault props are not the ones the box was sealed for, carries nothing of them.
  *
  * @example { landed: true, box_stored: stored }
  * @example { landed: false, refusalkind: 'stale_write', box_stored: winner }

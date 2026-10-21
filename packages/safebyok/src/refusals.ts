@@ -54,9 +54,9 @@ const StaleWriteSaid: Readonly<Record<StaleWrite, string>> = {
  */
 export const staleWrite = (what: StaleWrite): VaultError => new VaultError('stale_write', StaleWriteSaid[what])
 
-/**
- * A `stale_write` refusal of a box write: the box standing under its boxlabel is not the one the
- * write expected, so nothing was written. `boxStored` is what stands, read in the same atomic
+/** A `stale_write` refusal of a box write, carrying what stands under its boxlabel.
+ * The box standing there is not the one the write expected, so nothing was written. `boxStored`
+ * is what stands, read in the same atomic
  * step that refused the write -- the record exactly as stored, damaged or not, or null when
  * nothing stands there -- and the refusal carries it as `meta.box_stored`. The base class checks
  * it on the way up, as `getBox` checks a record, so a caller meets the box, a `DamagedBox` or
@@ -75,11 +75,10 @@ export const staleBox = (boxStored: unknown): VaultError => (
 /** What a box write's `stale_write` says: what changed under the writer, and where to look. */
 export const StaleBoxMessage = "That box changed in storage since this device read it -- another device or tab wrote or removed it -- so this write was refused and nothing was written. What stands now is this error's meta.box_stored: write again over it, or leave it."
 
-/**
- * A `vault_mismatch` refusal of a box write: the scope's standing vault props are not the ones the
- * box was sealed for -- none stand, or they have another `vault_id`, or another `vault_key_epoch`
- * -- so nothing was written. It carries nothing of the vault props that stand: they hold every
- * way in.
+/** A `vault_mismatch` refusal of a box write, carrying nothing of the vault props that stand.
+ * The scope's standing vault props are not the ones the box was sealed for -- none stand, or
+ * they have another `vault_id`, or another `vault_key_epoch` -- so nothing was written. Nothing
+ * of them is carried, as they hold every way in.
  *
  * @returns The refusal, to throw from `doPutBox`.
  *
