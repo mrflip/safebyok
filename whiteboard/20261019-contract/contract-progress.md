@@ -150,6 +150,13 @@ token when it joins or creates a vault): don't build one ahead of it.
 * `meta.capacity` is not filled on storage's `vault_full`/`box_too_large` (a row: the vault fills it in C2). `BoxExpectation` stays the type of `expected`.
 * putBox's arguments were reordered by codemod: spy assertions like `mock.calls[0]?.[2]` type-check at the wrong index, so grep for them on any reorder. Run GraphQL's tests through `pnpm --filter` (they need Postgres's `dist/`).
 
+*Orchestrator:* from `b_simplify` (#214, ready 2026-10-21):
+
+* Makers: `Wayin.seal(vault, holder, proof, stamp, vaultKey)`, `Box.seal(vault, holder, boxlabel, whisper, vaultKey, opts)`; `planSeal`/`sealPlanned` keep `(vault, holder, vaultKey, plan)` until C2 merges them into `Box.seal`.
+* `Lease.grant(vault, holder, vaultKeyPair)` sets its deadline from `vault.clock.now() + vault.leaseMillis` (capped at `FarFuture`); `LeaseVault` has `leaseMillis`; `#deadlineFromNow` is gone and `#grantLease` arms the expiry from `lease.ask_passphrase_at`. Models read `clock`, scope and `leaseMillis` off the public handle (a row: freeze the handle).
+* Way-in constructors are plain and public (`madeFrom` gone). The double-load check is gone: another copy's Box is refused `bad_record` by `Box.make`/`openBox`, `bad_option` by `Box.seal`'s `over` and `Proof.parse`.
+* `no-misused-promises` runs with `checksVoidReturn: false` in all ten eslint configs. `notes/security.md`'s header makes amend-in-place (marked) the rule.
+
 ## Interim shims standing
 
 *Orchestrator:* each is listed until a later thread removes it.
