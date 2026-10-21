@@ -375,7 +375,7 @@ describe("getCapacity", () => {
 })
 
 describe("a vault's weight limit", () => {
-  it("refuses a new box that would take the vault past it, writing nothing, and says how full the vault is, as its tally stood", async () => {
+  it("refuses a new box that would take the vault past it, writing nothing, and says how full the vault is, as its tally stood, as PutBoxAnswer's fourth example shows", async () => {
     const { CVX, room } = await nearlyFull()
     const ante = { rows: await allRows(CVX), tally: await keptTally(CVX) }
     const answer = await answeredWrite(CVX, TH.heavyBox('one_too_many', room), TH.noBoxYet)

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getDocumentSize } from 'convex/values'
 import * as TH from '../test-helpers'
 import type { Id } from '../../src/component/_generated/dataModel'
-import { MaxVaultBoxBytes, MaxVaultBoxes, refuses, weigh } from '../../src/component/tallies'
+import { MaxVaultBoxBytes, MaxVaultBoxes, capacityOf, refuses, weigh } from '../../src/component/tallies'
 
 const MiB = 1024 * 1024
 
@@ -78,4 +78,15 @@ describe("refuses", () => {
   for (const [tally, growth, expected, blurb] of RefusalCases) {
     it(blurb, () => { expect(refuses(tally, growth)).to.eq(expected) })
   }
+})
+
+describe("capacityOf", () => {
+  it("answers a tally against the component's limits, as its example shows", () => {
+    expect(capacityOf({ box_count: 12, box_bytes: 48_000 })).to.deep.equal({ boxes: { used: 12, max: 8000 }, bytes: { used: 48_000, max: MaxVaultBoxBytes } })
+  })
+
+  it("answers a vault past a limit and left uncounted as full by both, as refuses treats it", () => {
+    expect(capacityOf(null)).to.deep.equal({ boxes: { used: MaxVaultBoxes, max: MaxVaultBoxes }, bytes: { used: MaxVaultBoxBytes, max: MaxVaultBoxBytes } })
+    expect(refuses(null, { box_count: 1, box_bytes: 0 })).to.be.true
+  })
 })
