@@ -28,6 +28,33 @@ describe("a lock that lands while an unlock or a change is under way", () => {
     expect(await world.getLease()).to.be.null
   })
 
+  it("a del() that lands while an unlock's lease is written leaves no lease: the unlock erases the one it wrote", async () => {
+    const world = makeRacingWorld()
+    const vault = await world.openUnlocked('pw one')
+    await vault.lock()
+    const gate = world.holdNextLease()
+    const unlocking = TH.expectRefusal(vault.unlock('pw one'), 'vault_locked')
+    await gate.reached
+    await vault.del()
+    gate.release()
+    await unlocking
+    expect(vault.getSnapshot().state).to.eq('absent')
+    expect(await world.getLease()).to.be.null
+  })
+
+  it("a del() that lands while putWayin()'s lease is written leaves no lease: the change erases the one it wrote", async () => {
+    const world = makeRacingWorld()
+    const vault = await world.openUnlocked('pw one')
+    const gate = world.holdNextLease()
+    const changing = vault.putWayin('pw one', 'pw two')
+    await gate.reached
+    await vault.del()
+    gate.release()
+    await changing
+    expect(vault.getSnapshot().state).to.eq('absent')
+    expect(await world.getLease()).to.be.null
+  })
+
   it("during putWayin(): the passphrase still changes", async () => {
     const world = makeRacingWorld()
     const vault = await world.openUnlocked('old passphrase')

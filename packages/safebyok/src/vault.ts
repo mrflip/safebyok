@@ -1706,7 +1706,15 @@ export class Vault {
    * elsewhere.
    */
   #outrun(standing: VaultProps) {
-    return this.#closed || this.#vaultProps === null || this.#vaultProps === UnreadVaultProps
+    return this.#closed || this.#movedOn(standing)
+  }
+
+  /**
+   * True when the vault props standing now are no longer `standing`: deleted, made anew, or their
+   * ways in changed, here or elsewhere. {@link outrun} without the close.
+   */
+  #movedOn(standing: VaultProps) {
+    return this.#vaultProps === null || this.#vaultProps === UnreadVaultProps
     || this.#vaultProps.vault_id !== standing.vault_id || this.#vaultProps.unlock_epoch !== standing.unlock_epoch
   }
   // --
@@ -1727,30 +1735,32 @@ export class Vault {
    * Grant this device a lease and take up the vaultKey until `until`, arming the expiry anew --
    * unless the handle has closed, the vault props the key was proven against no longer stand, or
    * `overtaken` (an ask's attempt, which its prompt's end stands down) is aborted: then nothing is
-   * taken up, and an overtaken attempt's lease, should it have been written already, is erased.
-   * The lease is `Lease.grant`'s, a fresh leaseKey and the vaultKey wrapped under it; the write is
-   * the vault's. A record already written stays: a close is no lock, and a record of vault props
-   * no longer standing opens nothing.
+   * taken up, and the lease, should it have been written already, is erased -- a deleted vault
+   * keeps no lease on this device, even should storage later bring it back. The lease is
+   * `Lease.grant`'s, a fresh leaseKey and the vaultKey wrapped under it; the write is the vault's.
+   * A close alone erases nothing: a close is no lock, and the next open takes the lease up.
    *
    * @returns True when the vault is now unlocked.
    */
   async #grantLease(unlocked: VaultKeyPair, standing: VaultProps, until: number, overtaken?: AbortSignal): Promise<boolean> {
     // Asked afresh after each wait: a lock may land during any of them.
     const isOvertaken = () => overtaken?.aborted === true
-    const isOutrun = () => this.#outrun(standing) || isOvertaken()
+    // What no lease may outlast: a prompt that ended under an ask's attempt -- a lock, an answer --
+    // or the vault props deleted, made anew or changed.
+    const isVoided = () => isOvertaken() || this.#movedOn(standing)
+    const isOutrun = () => this.#closed || isVoided()
     if (isOutrun()) { return false }
     // A take-up under way stands down before this lease is written, not after: one that read an
     // older lease could otherwise erase this one as it discards that.
     this.#standDownTakeUp()
     // The transient's last act: wrapped into this device's lease, then dropped.
     const lease = await Lease.grant(this, standing, unlocked, until)
-    // An ask's attempt asks again before the write: its prompt may have ended while the key was wrapped.
-    if (isOvertaken()) { return false }
+    // Asked again before the write: the prompt may have ended, or the props moved on, while the key was wrapped.
+    if (isVoided()) { return false }
     valOf(await this.#deviceDB.putLease(lease.props))
-    // A prompt that ended under an ask's attempt -- a lock, an answer -- wins on this device too: the
-    // lease the attempt just wrote is erased, and a hello's take-up that may have read it meanwhile
-    // stands down, taking nothing up.
-    if (isOvertaken()) {
+    // Voided while the lease was written: it is erased, and a hello's take-up that may have read it
+    // meanwhile stands down, taking nothing up.
+    if (isVoided()) {
       this.#standDownTakeUp()
       valOf(await this.#deviceDB.delLease(this.#scope))
     }
