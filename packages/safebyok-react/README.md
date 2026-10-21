@@ -265,22 +265,15 @@ does (Escape too); the typed passphrase goes with the form. A
 instead; `PassphraseModal` announces that, keeps it on screen until the next submit, and moves
 focus to the passphrase field. Your error boundary never sees it.
 
-**What is thrown, rather than refused, reaches your error boundary.** A `strengthChecker` that
-throws or answers no verdict is a bug, which the vault throws rather than refusing: met as the
-user types, or at Create, the dialog throws it on to the nearest error boundary above it, as is a
-`passphraseAdvice` that throws. A broken checker arrives as the vault's own `unexpected_error`
-(or `bad_option`), quoting nothing of what it heard; advice that threw, as a fixed
-`unexpected_error` quoting none of it. The dialog then answers `declined`, so the call that asked
-is refused `vault_locked`, never left waiting. Wrap the app, or the part of it under
-`VaultProvider`, in one.
-
 **React reports it to you.** Each component catches such a failure in an error boundary of its
 own, so React hands the error to the root's `onCaughtError`: by default the console, with the
 component stack, in development and production alike. It arrives with nothing the user typed: a
 `VaultError` keeps its kind, message and meta but never its `cause`; whatever a key deriver
 throws, a `VaultError` of its own included, is the vault's `unexpected_error` with that throw as the
-cause, as it heard the passphrase; and anything else arrives as a fixed `unexpected_error`
-quoting none of it. (A
+cause, as it heard the passphrase; a `strengthChecker` that threw, or answered no verdict, is the
+vault's own refusal of it (`unexpected_error` quoting none of it, or `bad_option`); and anything
+else -- a `passphraseAdvice` that threw, say -- arrives as a fixed `unexpected_error` quoting none
+of it. (A
 condition a key deriver raises is met as the same condition from storage is -- shown in the
 dialog, or closing it -- and never reported.) Hook your error tracker there:
 

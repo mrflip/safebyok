@@ -417,42 +417,19 @@ describe("PassphraseModal", () => {
       vault.close()
     })
 
-    it("throws an attempt that throws -- a broken strength checker, met at Create -- on to the app's error boundary, quoting nothing of the passphrase", async () => {
+    it("meets a broken strength checker at Create with the calm trouble notice, reporting the vault's refusal to React, quoting nothing of the passphrase", async () => {
       const misuse = new VaultError('bad_option', 'pw-the-passphrase is not a passphrase I take.')
       const vault = await TH.settledVault(TH.memoryVaultOpts({ strengthChecker: () => Promise.reject(misuse) }))
       // The host's advice says nothing, so the broken checker is met only at Create.
-      const { reported } = TH.renderReporting(<TH.Catcher><PassphraseModal ask={TH.askOf(vault)} passphraseAdvice={() => null} onDone={noop} /></TH.Catcher>)
+      const { reported } = TH.renderReporting(<PassphraseModal ask={TH.askOf(vault)} passphraseAdvice={() => null} onDone={noop} />)
       fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw-the-passphrase' } })
       fireEvent.click(screen.getByText('Create vault'))
-      expect(await screen.findByText(/^caught: /)).to.not.be.null
-      expect(screen.queryByText('Something went wrong')).to.be.null
+      expect(await screen.findByText('Something went wrong')).to.not.be.null
       expect(reported).to.have.lengthOf(1)
       const told = reported[0] as VaultError
       expect(told.refusalkind).to.eq('unexpected_error')
       expect(told.message).to.match(/strengthChecker handed to Vault\.make threw/)
       expect(TH.thrownText(told)).to.not.include('pw-the-passphrase')
-      vault.close()
-    })
-
-    it("answers declined once taken away by the boundary it threw to, so the call that asked is refused vault_locked, never left waiting", async () => {
-      const host: { show: (dialog: ReactNode) => void } = { show: noopShow }
-      const Host = () => {
-        const [shown, setShown] = useState<ReactNode>(null)
-        host.show = setShown
-        return <TH.Catcher>{shown}</TH.Catcher>
-      }
-      TH.renderReporting(<Host />)
-      const heard: ProofAnswer[] = []
-      const getProof: GetProof = (ask) => new Promise((answer) => {
-        act(() => { host.show(<PassphraseModal ask={ask} passphraseAdvice={() => null} onDone={(said) => { heard.push(said); answer(said) }} />) })
-      })
-      const vault = await TH.settledVault(TH.memoryVaultOpts({ strengthChecker: () => Promise.reject(new Error('down')), getProof }))
-      const leasing = vault.tryEnsureLease()
-      fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'pw-the-passphrase' } })
-      fireEvent.click(screen.getByText('Create vault'))
-      expect(await screen.findByText(/^caught: /)).to.not.be.null
-      expect(await leasing).to.have.nested.property('err.refusalkind', 'vault_locked')
-      expect(heard).to.deep.equal(['declined'])
       vault.close()
     })
 
@@ -878,11 +855,10 @@ describe("PassphraseModal", () => {
       await waitFor(() => { expect(given).to.deep.equal(['pw']) })
     })
 
-    it("throws advice that throws on to the app's error boundary, a fixed unexpected_error quoting nothing of the throw, which heard the passphrase", async () => {
-      const { reported } = TH.renderReporting(<TH.Catcher><PassphraseModal ask={TH.askOf(vaultInState('absent'))} passphraseAdvice={quotingAdvice} onDone={noop} /></TH.Catcher>)
+    it("meets advice that throws with the calm trouble notice, and reports to React a fixed unexpected_error quoting nothing of the throw, which heard the passphrase", async () => {
+      const { reported } = TH.renderReporting(<PassphraseModal ask={TH.askOf(vaultInState('absent'))} passphraseAdvice={quotingAdvice} onDone={noop} />)
       fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw-the-passphrase' } })
-      expect(await screen.findByText(/^caught: /)).to.not.be.null
-      expect(screen.queryByText(Trouble)).to.be.null
+      expect(await screen.findByText(Trouble)).to.not.be.null
       expect(reported).to.have.lengthOf(1)
       const told = reported[0] as VaultError
       expect(told).to.include({ refusalkind: 'unexpected_error' })
@@ -892,9 +868,9 @@ describe("PassphraseModal", () => {
 
     it("reports a VaultError the host's advice throws as any throw of it, quoting nothing of it: the host may have put the passphrase in it", async () => {
       const refusal = new VaultError('bad_option', 'pw-the-passphrase is no passphrase I can judge.')
-      const { reported } = TH.renderReporting(<TH.Catcher><PassphraseModal ask={TH.askOf(vaultInState('absent'))} passphraseAdvice={() => Promise.reject(refusal)} onDone={noop} /></TH.Catcher>)
+      const { reported } = TH.renderReporting(<PassphraseModal ask={TH.askOf(vaultInState('absent'))} passphraseAdvice={() => Promise.reject(refusal)} onDone={noop} />)
       fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw-the-passphrase' } })
-      expect(await screen.findByText(/^caught: /)).to.not.be.null
+      expect(await screen.findByText(Trouble)).to.not.be.null
       expect(reported).to.have.lengthOf(1)
       expect(reported[0]).to.not.eq(refusal)
       expect(reported[0]).to.include({ refusalkind: 'unexpected_error' })
@@ -911,12 +887,11 @@ describe("PassphraseModal", () => {
       expect(checkPassphrase.mock.calls).to.deep.equal([['pw'], ['pw longer']])
     })
 
-    it("throws a broken strength checker, met by its own advice as the user types, on to the app's error boundary as the vault's refusal", async () => {
+    it("meets a broken strength checker, met by its own advice as the user types, with the trouble notice, reporting the vault's refusal", async () => {
       const vault = await TH.settledVault(TH.memoryVaultOpts({ strengthChecker: () => Promise.reject(new Error('could not judge pw-the-passphrase')) }))
-      const { reported } = TH.renderReporting(<TH.Catcher><PassphraseModal ask={TH.askOf(vault)} onDone={noop} /></TH.Catcher>)
+      const { reported } = TH.renderReporting(<PassphraseModal ask={TH.askOf(vault)} onDone={noop} />)
       fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw-the-passphrase' } })
-      expect(await screen.findByText(/^caught: /)).to.not.be.null
-      expect(screen.queryByText(Trouble)).to.be.null
+      expect(await screen.findByText(Trouble)).to.not.be.null
       expect(reported).to.have.lengthOf(1)
       expect(reported[0]).to.include({ refusalkind: 'unexpected_error' })
       expect((reported[0] as Error).message).to.match(/strengthChecker handed to Vault\.make threw/)

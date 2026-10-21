@@ -704,9 +704,9 @@ await zxcvbnStrengthChecker('skylarkpinecone', { applabel: 'skylark', user_id: '
   Its whole contract is that verdict, for every passphrase: it never throws. `Vault.make` refuses
   anything but a function (whose `load`, if any, is a function too) with `bad_option`. The vault
   keeps it held to its contract, and asks it as `vault.checkPassphrase(typed)`. A checker that
-  answers anything but a verdict (`bad_option`), or throws (`unexpected_error`, carrying nothing
-  of what it threw, as it heard the passphrase), is a bug: the call that asked it throws, even a
-  `try` form, for your error handler. CUSTOMIZATION.md says how to choose one.
+  answers anything but a verdict is refused `bad_option`, and one that throws `unexpected_error`,
+  carrying nothing of what it threw, as it heard the passphrase. CUSTOMIZATION.md says how to
+  choose one.
 * **Build it once.** The vault keeps the checker it was opened with for its life. A binding that
   reopens on a changed option (`safebyok-react`'s provider) reopens for a new checker, so define it
   at module level, or memoize it, rather than writing it inline.

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { StrongVerdict, DefaultStrengthChecker, guardStrengthChecker, type StrengthChecker, type PassphraseVerdict } from '../src/passphrase-strength'
 import type { VaultScope } from '../src/types'
-import { ThrownMistake, VaultError } from '../src/errors'
+import { VaultError } from '../src/errors'
 import * as TH from './test-helpers'
 
 /** The scope the tests hand a strength checker. */
@@ -70,10 +70,9 @@ describe("guardStrengthChecker", () => {
     ['Too short.',                      'a reason alone, not in a verdict'],
   ] as const
   for (const [answer, blurb] of Misanswers) {
-    it(`throws a checker answering ${blurb} as a ThrownMistake of kind 'bad_option', as its second example shows`, async () => {
+    it(`refuses a checker answering ${blurb} as kind 'bad_option', as its second example shows`, async () => {
       const misfit = (() => answer) as unknown as StrengthChecker
       const err = await TH.expectRefusal(guardStrengthChecker(misfit, scope)('acme acme acme'), 'bad_option')
-      expect(err).to.be.instanceOf(ThrownMistake)
       expect(err.message).to.match(/strengthChecker/)
       expect(err.message).to.not.include('acme acme acme')
     })
@@ -85,10 +84,9 @@ describe("guardStrengthChecker", () => {
     [new VaultError('storage_unavailable', 'The checker could not be loaded: try again shortly.'), 'a VaultError of a condition'],
   ] as const
   for (const [thrown, blurb] of Throws) {
-    it(`throws a checker that throws ${blurb} as a ThrownMistake of kind unexpected_error naming strengthChecker, carrying nothing of the throw`, async () => {
+    it(`refuses a checker that throws ${blurb} as kind unexpected_error naming strengthChecker, carrying nothing of the throw`, async () => {
       const broken: StrengthChecker = () => Promise.reject(thrown)
       const err = await TH.expectRefusal(guardStrengthChecker(broken, scope)('acme acme acme'), 'unexpected_error')
-      expect(err).to.be.instanceOf(ThrownMistake)
       expect(err).to.not.eq(thrown)
       expect(err.message).to.match(/strengthChecker handed to Vault.make threw/)
       expect(err.cause).to.be.undefined
@@ -129,7 +127,6 @@ describe("guardStrengthChecker's load", () => {
     const chunkLost = new TypeError('Failed to fetch dynamically imported module')
     const checker = Object.assign(() => StrongVerdict, { load: () => Promise.reject(chunkLost) })
     const err = await TH.expectRefusal(guardStrengthChecker(checker, scope).load(), 'unexpected_error')
-    expect(err).to.not.be.instanceOf(ThrownMistake)
     expect(err.message).to.match(/strengthChecker's load\(\) failed/)
     expect(err.cause).to.eq(chunkLost)
   })

@@ -1,6 +1,6 @@
 import type { Vault } from './vault'
 import type { PasskeyAnswer } from './types'
-import { ThrownMistake, VaultError } from './errors'
+import { VaultError } from './errors'
 import { type Outcome, bad, outcomeOf, unexpectedError } from './outcome'
 
 /** Why the vault asks for a proof: each `why` an {@link Ask} may carry. */
@@ -107,9 +107,7 @@ export class Ask {
    * `vault_locked` -- a lock won, under this attempt or before it -- `storage_unavailable`, or any
    * other, to close the dialog, answering `declined`. Once the prompt is over -- `lockLanded`
    * settled, or the ask answered -- it refuses 'vault_locked' at once, and an attempt still under
-   * way then unlocks nothing: a Cancel during it stays cancelled, and a lock after it wins. A
-   * broken strength checker, creating the vault, is thrown, never resolved: the app's error handler
-   * is told, not the user (see `vault.checkPassphrase`).
+   * way then unlocks nothing: a Cancel during it stays cancelled, and a lock after it wins.
    *
    * @example const { ok, err } = await ask.attempt(passphrase)
    * @example const { ok } = await ask.attempt(passkey)   // from askPasskey(ask.vault.passkey)
@@ -149,8 +147,6 @@ export class Ask {
     try {
       answered = await getProof(this)
     } catch (err) {
-      // An attempt's thrown mistake, which getProof let escape, stays thrown: no call resolves it.
-      if (err instanceof ThrownMistake) { throw err }
       // A bug in getProof, a VaultError it let escape too: never a refusal of the call that asked.
       throw unexpectedError(err)
     }

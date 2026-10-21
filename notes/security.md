@@ -50,12 +50,14 @@ added or folded into through the subagent, and no other entry changes.
   finds a blank passphrase (empty, or only spaces) weak before the host's checker hears it; hands the
   checker a frozen copy of the scope, frozen once at `Vault.make`; and throws a verdict that breaks
   the contract as `bad_option`, and a checker's throw, or a verdict getter's, as `unexpected_error`
-  (amended 2026-10-21 (checker2): both are thrown as a `ThrownMistake`, an internal subclass of
-  `VaultError`, not exported; before, a refusal), carrying nothing (no kind of the host's, `meta`,
-  `cause` or text), because the checker heard the passphrase. Such a throw is never resolved as a
-  refusal result, even from the `try` forms (`tryUnlock`, `tryPutWayin`, `ask.attempt`, and
-  `tryEnsureLease` when `getProof` lets it escape): the vault's `#trying` wrapper rethrows it, and it
-  is not told to `onBadNews`. (2) A checker may carry an idempotent `load`; every `hello()` runs it,
+  (amended 2026-10-21 (checker2): both were thrown as a `ThrownMistake`, an internal subclass of
+  `VaultError`, never resolved as a refusal result, even from the `try` forms; amended 2026-10-21
+  (try_forms): `ThrownMistake` is removed, and each is an ordinary `VaultError`, refused like any
+  call: the `try` forms (`tryUnlock`, `tryPutWayin`, `tryEnsureLease` by way of `getProof`) resolve
+  it as a bad Outcome, `ask.attempt` resolves it, the throwing forms throw it, and `safebyok-react`'s
+  dialog meets it with its calm "Something went wrong" notice and reports it to React as it does any
+  misuse), carrying nothing (no kind of the host's, `meta`, `cause` or text), because the checker
+  heard the passphrase. Misuse family, it is never told to `onBadNews`. (2) A checker may carry an idempotent `load`; every `hello()` runs it,
   through the guard, beside the storage read (amended 2026-10-21 (checker2): `Promise.allSettled` of
   both; before, ahead of it). A load that fails fails the `hello()` as `unexpected_error` with the
   load's throw as `cause`: the load hears no passphrase, so its error may ride. No lease is taken
@@ -138,7 +140,9 @@ added or folded into through the subagent, and no other entry changes.
   to answer a verdict (amended 2026-10-21 (checker): the host's checker is called only through
   `guardStrengthChecker`; see the checker entry). A throw from it is refused `unexpected_error` with no `cause`, `meta` or kind
   of what it threw, as it heard the passphrase (amended 2026-10-21 (checker2): thrown as a
-  `ThrownMistake`, never resolved as a refusal result; see the checker entry); so is a throw as its verdict is read (a `strong` or
+  `ThrownMistake`, never resolved as a refusal result; amended 2026-10-21 (try_forms): `ThrownMistake`
+  is removed, an ordinary refusal again, resolved by the `try` forms; see the checker entry); a
+  checker that answers no verdict is `bad_option`, likewise quoting nothing of what it heard; so is a throw as its verdict is read (a `strong` or
   `reason` getter: amended 2026-10-21, the read now being inside the guard); before, a thrown
   condition passed through as itself, and a non-condition was carried as `cause`. Left out, the default
   `UnchosenStrengthChecker` (amended 2026-10-21 (wayin_rules): now `DefaultStrengthChecker`, an ordinary checker answering
@@ -1279,7 +1283,7 @@ added or folded into through the subagent, and no other entry changes.
   `hostThrewRefusal` (`src/outcome.ts`), applied in `passphraseKeyOf` (`src/proof.ts`) (amended
   2026-10-19 (put_wayin), 2026-10-21: now only the key deriver's, not the strength checker's throw, which `checkStrongEnough`
   (`src/passphrase-strength.ts`; amended 2026-10-21 (wayin_rules): now `PassphraseProof.checkStrongEnough()`, `src/proof.ts`; amended 2026-10-21 (checker): through `guardStrengthChecker`; amended 2026-10-21 (checker2): thrown as a `ThrownMistake`, not
-  resolved as a refusal, even from the `try` forms) refuses as `unexpected_error` with no `cause`, `meta` or kind
+  resolved as a refusal, even from the `try` forms; amended 2026-10-21 (try_forms): `ThrownMistake` is removed, and the `try` forms resolve it as a refusal) refuses as `unexpected_error` with no `cause`, `meta` or kind
   of what it threw; see the put_wayin entry). Only a
   `VaultError` of the `condition` family, of this copy of safebyok, passes through as itself: a key
   deriver's, say. Everything else becomes `unexpected_error` with the throw as its `cause` (amended
@@ -1791,7 +1795,12 @@ added or folded into through the subagent, and no other entry changes.
   (checker2): as the boundary takes the dialog away on such a throw, the dialog answers `declined`
   to the ask it was showing, so the call that asked is refused `vault_locked` and no unlock waits
   forever (before, it never answered, which under a host's own `getProof` held every later prompt
-  behind it). A dialog a thrown mistake tears down always answers. The report names
+  behind it). A dialog a thrown mistake tears down always answers. Amended 2026-10-21 (try_forms):
+  a host strength checker that throws or answers no verdict no longer reaches the app's boundary from
+  the dialog: `ThrownMistake` is removed, `ask.attempt` resolves the refusal (`unexpected_error`
+  carrying nothing, or `bad_option`), and the dialog shows its calm "Something went wrong" notice
+  and reports the refusal to React as it does any other misuse (through `forBoundary`, as above).
+  The report names
   its component (`PassphraseModal` or `PasskeyUnlockButton`) and, for a `VaultError` whose cause was
   stripped, says in its message that the cause was left out. `meta` is passed through as is. The
   dialog's fallback notice once misuse trips it ("Something went wrong") now shares

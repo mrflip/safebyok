@@ -20,10 +20,9 @@ type StrengthChecker = {
 }
 ```
 
-* Answer, never throw. A checker that throws is a bug: the call that asked it throws
-  `unexpected_error`, even a `try` form, for your error handler, and nothing of what the checker
+* Answer, never throw. A checker that throws is refused `unexpected_error`, and nothing of what the checker
   threw is kept: it heard the passphrase, so its error might quote it. A checker that answers
-  anything but a verdict is thrown the same way, as `bad_option`.
+  anything but a verdict is refused `bad_option`.
 * Whatever it needs fetched or built first -- a word list, say -- it fetches in `load`, which the
   vault's `hello()` runs beside its read of storage, every time it reads: so `load` is idempotent, costing
   nothing once it has succeeded, and forgets a failure, so the next hello tries again. A `load`
