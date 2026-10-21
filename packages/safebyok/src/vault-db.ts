@@ -411,7 +411,8 @@ export abstract class VaultDB {
    *   the same atomic step read it, in `err.meta.box_stored`: the box that won, its record whole
    *   and checked as `getBox` checks one, to open or to write over with no second read; a
    *   `DamagedBox` when what stands does not read back as a box (naming the revision it holds, if
-   *   any); or null when nothing stands. A write over it names that revision (`null` for none).
+   *   any); or null when nothing stands. A write over it names that revision, or null when nothing
+   *   stands; a damaged box that names no revision is only removed, with `delBox`.
    * * `invalid_box` for a box this package would not build -- a missing box, or one whose
    *   boxlabel is below the floor, among it -- or one sealed under another `vault_key_epoch` than
    *   `expected` names; `bad_record` for an `expected` it would not build; `bad_label` for a scope
