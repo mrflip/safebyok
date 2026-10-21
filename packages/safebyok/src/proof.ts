@@ -6,7 +6,6 @@ import { hostThrewRefusal } from './outcome'
 import { PassphraseKeyBytes } from './key-deriver-spec'
 import type { PasskeyAnswer, WayinKind } from './types'
 import { decorate } from './adorn'
-import { ModelMark, checkOneCopy } from './one-copy'
 import type { Vault } from './vault'
 import type { PasskeyWayin, PassphraseWayin } from './wayin'
 
@@ -41,9 +40,6 @@ export abstract class Proof {
     decorate<Proof>(this, { vault })
   }
 
-  /** `Proof`: the mark every copy of safebyok gives its proof classes, so a proof from another copy is told from no proof at all. */
-  static readonly [ModelMark] = 'Proof'
-
   /**
    * A proof as a host hands one in, checked: text is a passphrase, anything else a passkey's
    * answer. Refuses a blank passphrase (empty, or only spaces) as kind 'wrong_passphrase' before
@@ -58,7 +54,6 @@ export abstract class Proof {
    * @example Proof.parse(vault, '   ')   // throws 'wrong_passphrase'
    */
   static parse(vault: ProofVault, given: unknown): PassphraseProof | PasskeyProof {
-    checkOneCopy(given, this, 'The vault')
     if (typeof given === 'string') { return PassphraseProof.parse(vault, given) }
     return PasskeyProof.parse(vault, given)
   }

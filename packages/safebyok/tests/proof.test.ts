@@ -73,6 +73,14 @@ describe("Proof.parse", () => {
       expect(JSON.stringify({ message: err.message, cause: err.cause }), blurb).to.not.include(answer.credentialId)
     }
   })
+
+  it("refuses a proof made by another copy of safebyok as bad_option, as it refuses any answer of the wrong shape", async () => {
+    vi.resetModules()
+    const other = await import('../src/proof')
+    const theirs = other.Proof.parse(slice, 'pw')
+    expect(theirs).to.not.be.instanceOf(Proof)
+    TH.expectSyncRefusal(() => Proof.parse(slice, theirs), 'bad_option')
+  })
 })
 
 describe("PassphraseProof.parse", () => {
@@ -232,7 +240,7 @@ describe("a key deriver's bytes", () => {
 
   it("are zeroed after every try when opening, a wrong passphrase's included", async () => {
     const identity = TH.vaultPropsOf('u1')
-    const { wayin: sealed } = await Wayin.seal(slice, PassphraseProof.parse(slice, 'first'), identity, stamp, await makeVaultKey())
+    const { wayin: sealed } = await Wayin.seal(slice, identity, PassphraseProof.parse(slice, 'first'), stamp, await makeVaultKey())
     const { keyDeriver, handed } = keepingDeriver()
     const opening = TH.vaultSliceOf('u1', keyDeriver)
     const wayin = Wayin.make(opening, sealed.props, identity)

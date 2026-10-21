@@ -32,7 +32,7 @@ export const good = <ValT>(val: ValT): GoodOutcome<ValT> => ({ ok: true, val })
 /**
  * `err` as the outcome of a call that was refused.
  *
- * @example bad(Refusals.staleWrite('box'))  // { ok: false, err }
+ * @example bad(Refusals.staleWrite('vaultProps'))  // { ok: false, err }
  */
 export const bad = (err: VaultError): BadOutcome => ({ ok: false, err })
 

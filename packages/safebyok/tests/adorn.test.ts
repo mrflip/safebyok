@@ -6,14 +6,13 @@ type Handle = { label: string, vault?: { vault_id: string } }
 const decorated = () => decorate<Handle>({ label: 'anthropic' }, { vault: { vault_id: 'v1' } })
 
 describe("adorn", () => {
-  it("attaches the value under its name, hidden and fixed, and hands the value back, as its first example shows", () => {
+  it("attaches the value under its name, hidden, and hands the value back, as its first example shows", () => {
     const handle = { label: 'anthropic' }
     const vault = { vault_id: 'v1' }
     expect(adorn(handle, 'vault', vault)).to.equal(vault)
     expect((handle as { vault?: unknown }).vault).to.equal(vault)
     expect(Object.keys(handle)).to.deep.equal(['label'])
     expect(JSON.stringify(handle)).to.eq('{"label":"anthropic"}')
-    expect(Reflect.set(handle, 'vault', null)).to.be.false
   })
 
   it("lets a getter attach what it works out on the first read, which every later read finds in its place, as its second example shows", () => {
@@ -54,13 +53,19 @@ describe("decorate", () => {
     expect(JSON.stringify(handle)).to.eq('{"label":"box"}')
   })
 
-  it("lets nothing write over, or delete, what it attached", () => {
+  it("leaves what it attached writable and configurable, as any property is, still hidden once written", () => {
     const handle = decorated()
+    expect(Reflect.set(handle, 'vault', { vault_id: 'v2' })).to.be.true
+    expect(handle.vault).to.deep.equal({ vault_id: 'v2' })
+    expect(Object.keys(handle)).to.deep.equal(['label'])
+    expect(Reflect.deleteProperty(handle, 'vault')).to.be.true
+    expect(handle.vault).to.be.undefined
+  })
+
+  it("is fixed with the rest of an object frozen after it, as a model freezes itself", () => {
+    const handle = Object.freeze(decorated())
     expect(Reflect.set(handle, 'vault', { vault_id: 'v2' })).to.be.false
     expect(Reflect.deleteProperty(handle, 'vault')).to.be.false
-    expect(Reflect.defineProperty(handle, 'vault', { value: null })).to.be.false
-    // A module is strict code, where an assignment to a fixed property throws.
-    expect(() => { (handle as { vault: unknown }).vault = null }).to.throw(TypeError)
     expect(handle.vault).to.deep.equal({ vault_id: 'v1' })
   })
 

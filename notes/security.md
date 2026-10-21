@@ -8,10 +8,13 @@ security expert who knows what questions to ask.
 **Adding an entry.** The agent that made the decision hands it to a `sonnet` subagent with this
 file's path, the caution in a sentence or two, the date, and the PR or branch, and commits what
 the subagent wrote. The subagent searches the entries for the same mechanism (`grep -n` for its
-names), reading only the ones it finds. Where one already says it, the subagent folds the new
-fact into that entry, keeping its date and adding the new one beside it ("2026-10-14; 2026-10-17:
-..."), and changes no other entry. Otherwise it writes a new dated entry at the top of *Of
-Interest*. Either way it keeps the voice above, and returns the lines it changed.
+names), reading only the ones it finds. Where one already says it, the subagent amends that
+entry in place (below) and changes no other entry. Otherwise it writes a new dated entry at the top
+of *Of Interest*. Either way it keeps the voice above, and returns the lines it changed.
+
+**Amending an entry.** An entry that later work changes is amended in place, never superseded by a
+new entry elsewhere. The amendment is marked inline, `amended YYYY-MM-DD (thread)`, for example
+`amended 2026-10-21 (b_simplify)`, so a reader sees what stood and what stands now in one place.
 
 **A one-time rename (2026-10-18; extended 2026-10-18, 2026-10-19).** With the Coach's approval, the entries
 below had their retired words changed to the reform's cast in one mechanical pass (VOCABULARY.md;
@@ -37,15 +40,25 @@ added or folded into through the subagent, and no other entry changes.
 ## Of Interest
 
 * 2026-10-20 (thread B5, placement, branch 20261019-placement): **a second copy of safebyok loaded
-  beside this one is refused as misuse, and a handler passed bare is refused rather than ignored.**
-  (1) A `Box` or a `Proof` made by another copy of safebyok (two versions, or the ESM and CommonJS
-  builds side by side) is refused `bad_option`, naming the double load and telling the developer to load
-  safebyok once. The refusal is made at `vault.openBox`, `Box.make`, `Box.seal`'s `over`, `Proof.parse`
-  (so at `unlock`), `wayin.tryOpen` and `Wayin.seal`. Each class carries a static mark keyed by
-  `Symbol.for('safebyok.model')`, the same symbol in every copy, and `checkOneCopy`
-  (`packages/safebyok/src/one-copy.ts`) refuses an object whose constructor carries the mark but which
-  fails `instanceof`. The refusal quotes nothing of what it was handed. Before, such a box read as
-  `bad_record` and such a proof as the wrong kind of proof. The Coach's rule: anything revealing a second
+  beside this one (amended 2026-10-21 (b_simplify): no longer refused as such; see (1)), and a handler passed bare is refused rather than ignored.**
+  (1) *Amended 2026-10-21 (b_simplify): the special check and its marks are gone (the Coach: "If you
+  can't reduce the second loaded copy check to a single one once in the process lifecycle remove it
+  altogether"). Nothing is refused with a message about a double load any more, and there is no
+  `checkOneCopy`, `one-copy.ts` or `Symbol.for('safebyok.model')` mark. A `Box` or a `Proof` made by
+  another copy of safebyok (two versions, or the ESM and CommonJS builds side by side) is refused as
+  any foreign object is, by the `instanceof` or schema check that already followed: `Box.make` and
+  `vault.openBox` refuse it `bad_record` (a Box is no box record), `Box.seal`'s `over` refuses it
+  `bad_option`, and `Proof.parse` (so every unlock) refuses a foreign proof `bad_option` as an answer
+  of the wrong shape. The exception: a foreign `PasskeyProof` whose fields read as a passkey answer is
+  taken as one, which is harmless, for it is the same answer the host handed in. The vault's private
+  sentinel for unread vault props is now a plain module `Symbol`, no longer `Symbol.for`.* What stood
+  until then: a `Box` or a `Proof` made by another copy was refused `bad_option`, naming the double
+  load and telling the developer to load safebyok once, at `vault.openBox`, `Box.make`, `Box.seal`'s
+  `over`, `Proof.parse` (so at `unlock`), `wayin.tryOpen` and `Wayin.seal`. Each class carried a static
+  mark keyed by `Symbol.for('safebyok.model')`, the same symbol in every copy, and `checkOneCopy`
+  (`packages/safebyok/src/one-copy.ts`) refused an object whose constructor carried the mark but which
+  failed `instanceof`. The refusal quoted nothing of what it was handed. Before, such a box read as
+  `bad_record` and such a proof as the wrong kind of proof. The Coach's rule then: anything revealing a second
   safebyok should crash the app (the misuse family). This differs from a `VaultError` of another copy,
   which is still a foreign throw (the a_fixes entry below): there the mark was removed; here the mark
   is used only to refuse, never to accept. (2) `vault.hello()` and `vault.ensureLease()` refuse, as
@@ -108,7 +121,7 @@ added or folded into through the subagent, and no other entry changes.
   can never be removed. Removal is still not revocation. Every change still moves `unlock_epoch`,
   relocking other devices, and is written conditionally on `vault_id` and `unlock_epoch`. (6) Every
   change is proven by the passphrase, so each starts the lease again from now (`#deadlineFromNow()`;
-  before, a passkey-proven change kept the standing deadline). (7) `snapshot.wayins` is replaced by
+  before, a passkey-proven change kept the standing deadline; amended 2026-10-21 (b_simplify): `#deadlineFromNow()` is removed, and each proof's grant starts the lease again from now inside `Lease.grant`). (7) `snapshot.wayins` is replaced by
   `snapshot.passphrase` and `snapshot.passkey` (summaries: wayinkind, device_id, registered_at, and for
   the passkey credential_id and prf_salt_b64); still no passphrase salt and no wrap reaches a host.
   (8) `mayBeNewer` tells newer from damaged by `format` alone (it looked at unknown wayinkinds and
@@ -161,12 +174,18 @@ added or folded into through the subagent, and no other entry changes.
   holder, vaultKeyPair, askPassphraseAt)` parses `holder`'s `vault_id` and `unlock_epoch` and
   `askPassphraseAt` with `LeaseRecord`'s own Zod checks at entry and lets a bad input throw as
   misuse (the Coach: "run a good zod validator but don't catch"). A deadline that is no number used
-  to grant a lease that never opened.
+  to grant a lease that never opened. Amended 2026-10-21 (b_simplify): `Lease.grant(vault, holder,
+  vaultKeyPair)` takes no deadline; it computes its own, `vault.clock.now() + vault.leaseMillis`,
+  floored and capped at `FarFuture`, read through the vault's accessors, and still parses `holder`
+  with `LeaseRecord`'s checks and throws a Zod error as misuse. The lease reads the handle's public
+  `leaseMillis` getter, so a host that `Object.defineProperty`s over the handle's `leaseMillis`
+  changes its own lease length, as one overwriting the handle's `clock` already changed every model's
+  clock; the vault handle is not frozen.
 * 2026-10-19 (thread B2 `lease`, branch 20261019-lease): **the lease is a class, `Lease`, and its
   crypto lives apart from the vault's decisions.** `Lease` (`packages/safebyok/src/lease.ts`) holds
   the lease's fields and its wrap and unwrap; when to grant, when to ask, and every write to the
   device store stay in the vault (`#grantLease`, `#takeUpLease` in `vault.ts`). `Lease.grant(vault,
-  holder, vaultKeyPair, askPassphraseAt)` makes a fresh AES-GCM 256 leaseKey, `extractable: false`,
+  holder, vaultKeyPair, askPassphraseAt)` (amended 2026-10-21 (b_simplify): it takes no `askPassphraseAt` now and computes the deadline itself; see the a_sec2 entry above) makes a fresh AES-GCM 256 leaseKey, `extractable: false`,
   usages wrapKey and unwrapKey only, and wraps the vaultKey's extractable transient handle under it,
   bound to leaseCtx; it keeps no reference to either handle of the pair (a test checks that nothing on
   the lease or its record is that key), and writes nothing: the vault puts `lease.props` through
@@ -293,7 +312,10 @@ added or folded into through the subagent, and no other entry changes.
   later change to its own record reaches nothing in the box; the instance is frozen. `box.sidecar` is
   the parse of `sidecar_json` with a reviver that freezes every object and array as it builds them.
   `vault`, `props` and `summary` are attached by `decorate` (amended 2026-10-20 (placement): in `src/adorn.ts`, once `utils.ts`; it calls `adorn(obj, ckey, val)` per entry, `Object.defineProperty`,
-  non-enumerable, non-writable, non-configurable), so a spread, `Object.keys`, a log line or
+  non-enumerable, non-writable, non-configurable; amended 2026-10-21 (b_simplify): they attach a hidden
+  (non-enumerable) property that is writable and configurable, the Coach: "adorn and decorate should be
+  writeable and configurable", and every model freezes itself after its constructor attaches them, so
+  on a model they are still fixed), so a spread, `Object.keys`, a log line or
   `JSON.stringify` never reaches the vault; `toJSON()` returns `props`. 2026-10-20 (placement): `adorn` and `decorate` left the public
   `safebyok/utils` entry point for that internal module, so a host cannot import them; `adorn` hands back
   `val`, and the same pair attaches each model's `vault` and `props` and a proof's secret field. What
@@ -340,7 +362,7 @@ added or folded into through the subagent, and no other entry changes.
   (`packages/safebyok/src/proof.ts`) turns a passphrase string, or a passkey's answer `{ credentialId,
   prfSaltB64, prfBytes }` (typed `PasskeyAnswer`), into a `PassphraseProof` or `PasskeyProof`. The secret
   (the passphrase; the 32 PRF bytes) is a non-enumerable, non-writable, non-configurable property of a
-  frozen instance, and `toJSON()` returns `{ kind }` only, so JSON, `Object.keys`, a spread and Node's
+  frozen instance (amended 2026-10-21 (b_simplify): `adorn` attaches it writable and configurable, and the proof's constructor then freezes the instance, so it is still fixed), and `toJSON()` returns `{ kind }` only, so JSON, `Object.keys`, a spread and Node's
   inspect do not show it. The passkey's PRF bytes are held by reference to the host's `Uint8Array`, not
   copied. The vault itself still reads `proof.passphrase` to give a new passphrase to the host's strength
   test. (2) `proof.wayinKeyFor(wayin)` derives the wayinKey, reading only the wayin's `salt_b64`
@@ -353,7 +375,11 @@ added or folded into through the subagent, and no other entry changes.
   constructors of `PassphraseWayin` and `PasskeyWayin` are private; a wayin is made only by `Wayin.make`
   or `Wayin.seal`, which reach them through a static keyed by a module-private symbol (`madeFrom`), so
   no exported name builds a wayin from a record the Zod schema has not checked. This is TypeScript
-  privacy only: JavaScript can still call `new`, as for `Box`, `Lease` and `Proof`. `isDamaged()` (another vaultKey epoch
+  privacy only: JavaScript can still call `new`, as for `Box`, `Lease` and `Proof`. (Amended 2026-10-21
+  (b_simplify): the constructors are ordinary public constructors that take a record already checked,
+  and `madeFrom` is gone; `Wayin.make`, which checks a stored record against its schema, and
+  `Wayin.seal` remain the documented ways to get one. The Coach: "This is paranoia. No, just write
+  normal code.") `isDamaged()` (another vaultKey epoch
   than the holder's, or a salt of a length its kind never writes) is checked before any derivation.
   (4) `wayin.tryOpen(proof)` returns an Outcome and never throws: a proof of the wrong kind is
   `bad_option`; a passphrase wayin made by another key deriver is `unknown_key_deriver`, and a damaged one
@@ -1863,7 +1889,7 @@ added or folded into through the subagent, and no other entry changes.
   Amended 2026-10-19 (slots): since only the passphrase proves a change, every change starts the lease
   again from now; before, a passkey-proven change on an unlocked vault kept the standing deadline.
   Reads, stores, deletions and refreshes never move it.
-  One place decides (`#deadlineFromNow` in `vault.ts`; once `deadlineFor(proof, call)`), so a new kind of proof cannot slip past it.
+  One place decides (`#deadlineFromNow` in `vault.ts`; once `deadlineFor(proof, call)`; amended 2026-10-21 (b_simplify): `#deadlineFromNow` is removed, and the one place is now `Lease.grant`, which every proof's grant passes through (`#grantLease` calls it), the vault arming its expiry from the lease's `ask_passphrase_at`; nothing else, a read, a store or a refresh, moves the deadline, as before), so a new kind of proof cannot slip past it.
   Expiry was a soft lock (the strawman's two locks); amended 2026-10-19: there is one kind of
   lock, which drops the key at once, and no lock, expiry included, defeats an `unlock()` or
   `putWayin()` under way (see "one kind of lock" below). (The question G530 asked, whether a passkey's proof should only keep the

@@ -183,7 +183,7 @@ describe("vault.hello as an event handler", () => {
     const vault = Vault.make(world.optsWith())
     const err = await TH.expectBad(vault.tryHello(new Event('focus') as unknown as { staleMinutes: number }), 'bad_option')
     expect(err.message).to.include('handed to addEventListener or onClick as the handler itself')
-    expect(err.message).to.include('`() => { void vault.tryHello() }`')
+    expect(err.message).to.include('`() => vault.tryHello()`')
     expect(vault.state).to.eq('opening')
   })
 
@@ -191,7 +191,7 @@ describe("vault.hello as an event handler", () => {
     const world = makeWorld()
     const vault = Vault.make(world.optsWith())
     const window = new EventTarget()
-    window.addEventListener('focus', () => { void vault.tryHello() })
+    window.addEventListener('focus', () => vault.tryHello())
     window.dispatchEvent(new Event('focus'))
     await vi.waitFor(() => { expect(vault.state).to.eq('absent') })
     expect(vault.trouble).to.be.null

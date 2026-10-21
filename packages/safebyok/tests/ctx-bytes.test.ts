@@ -35,7 +35,7 @@ describe("the ctx builders' output, byte for byte", () => {
 
   it("a passphrase wayin's wrap is bound to the vault, the purpose and its whole header, byte for byte", async () => {
     const vaultKey = await makeVaultKey()
-    const { wayin } = await Wayin.seal(slice, PassphraseProof.parse(slice, 'pw'), identity, stamp, vaultKey)
+    const { wayin } = await Wayin.seal(slice, identity, PassphraseProof.parse(slice, 'pw'), stamp, vaultKey)
     const ctx = textBytes(
       '["safebyok-vault-v5","acme","u1","main","vault-id-u1",' + String(identity.registered_at) + ',"vault_key_passphrase_wrapped",'
       + `{"device_id":"device-one","key_deriver_label":"test_digest_v0","registered_at":${String(Date.UTC(2026, 9, 15))},"salt_b64":"${wayin.salt_b64}","vault_key_epoch":1,"wayinkind":"passphrase"}]`,
@@ -46,7 +46,7 @@ describe("the ctx builders' output, byte for byte", () => {
 
   it("a passkey wayin's wrap and its key are bound to the vault, the purpose and its whole header, byte for byte", async () => {
     const passkey = await TH.passkeyOf('laptop')
-    const { wayin } = await Wayin.seal(slice, PasskeyProof.parse(slice, passkey), identity, stamp, await makeVaultKey())
+    const { wayin } = await Wayin.seal(slice, identity, PasskeyProof.parse(slice, passkey), stamp, await makeVaultKey())
     const ctx = textBytes(
       '["safebyok-vault-v5","acme","u1","main","vault-id-u1",' + String(identity.registered_at) + ',"vault_key_passkey_wrapped",'
       + `{"credential_id":"${wayin.credential_id}","device_id":"device-one","prf_salt_b64":"${wayin.prf_salt_b64}","registered_at":${String(Date.UTC(2026, 9, 15))},"vault_key_epoch":1,"wayinkind":"passkey"}]`,

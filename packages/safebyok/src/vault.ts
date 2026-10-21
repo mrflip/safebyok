@@ -131,10 +131,9 @@ export type VaultSnapshot = Readonly<{
 
 /**
  * What `vaultProps` holds before the backend's first answer arrives: distinct from null, which is
- * the backend's own answer ("no vault props: this vault was never created"). Symbol.for, not Symbol, so
- * the sentinel stays one value even when the ESM and CJS builds load side by side.
+ * the backend's own answer ("no vault props: this vault was never created").
  */
-const UnreadVaultProps = Symbol.for('safebyok.unread_vault_props')
+const UnreadVaultProps = Symbol('UnreadVaultProps')
 
 /** The ways in of vault props, as the vault holds them: the passphrase's, and the passkey's or null. */
 type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin | null }>
@@ -186,7 +185,7 @@ type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin 
  *
  * Every method is bound to its vault, so each may be handed on alone: to `useSyncExternalStore`,
  * as an event handler, or taken out of the vault by name. `hello` and `ensureLease`, which take
- * options, refuse the event a handler is handed: wrap them, `() => { void vault.tryHello() }`.
+ * options, refuse the event a handler is handed: wrap them, `() => vault.tryHello()`.
  *
  * @example const snapshot = useSyncExternalStore(vault.subscribe, vault.getSnapshot)
  * @example if (vault.state === 'locked') { askForProof(vault.passkey) }
@@ -324,7 +323,7 @@ export class Vault {
    *     if (isVaultError(err, 'damaged_vault') && userConfirmedStartingOver()) { await delDamagedVault(opts) }
    *   }
    * @example document.addEventListener('visibilitychange', () => { if (! document.hidden) { void vault.tryHello() } })
-   * @example window.addEventListener('focus', () => { void vault.tryHello() })   // never vault.hello itself: it refuses the event
+   * @example window.addEventListener('focus', () => vault.tryHello())   // never vault.hello itself: it refuses the event
    * @example await vault.hello({ staleMinutes: 0 })   // read now, whatever was read a moment ago
    */
   hello = this.#throwing(this.#tryHello)
@@ -360,7 +359,7 @@ export class Vault {
    * options, is kind 'bad_option', as for `hello`: wrap it, as the second example does.
    *
    * @example await vault.ensureLease()   // unlocked, or refused 'vault_locked'
-   * @example <button onClick={() => { void vault.tryEnsureLease() }}>Unlock</button>
+   * @example <button onClick={() => vault.tryEnsureLease()}>Unlock</button>
    * @example await vault.ensureLease({ renewMinutes: 60 })   // ask now if the lease ends within the hour
    */
   ensureLease = this.#throwing(this.#tryEnsureLease)
@@ -468,7 +467,7 @@ export class Vault {
       call:   'putWayin',
       // The new way in is stamped afresh: this device, now. The other slot stands as it was.
       revise: async (standing, proven, deviceId) => {
-        const { wayin } = await Wayin.seal(this, putting, standing, this.#newStamp(standing, deviceId), proven.transientKey)
+        const { wayin } = await Wayin.seal(this, standing, putting, this.#newStamp(standing, deviceId), proven.transientKey)
         return wayin.wayinkind === 'passphrase' ? { passphrase: wayin.props, passkey: standing.passkey } : { passphrase: standing.passphrase, passkey: wayin.props }
       },
     })
@@ -728,7 +727,7 @@ export class Vault {
 
   readonly #tryOpenBox = this.#trying(async (box: Box | BoxRecord): Promise<Whisper> => {
     this.#checkOpen()
-    const record = box instanceof Box ? box.props : checkedBoxRecord(box, 'openBox()')
+    const record = box instanceof Box ? box.props : checkedBoxRecord(box)
     const unlockedKey = this.#checkUnlocked()
     // Made anew for this vault: a box opens under this vault's scope and the props it holds, whichever it came from.
     const held = Box.make(this, record, this.#currentVaultProps())
@@ -1418,7 +1417,7 @@ export class Vault {
     // stand there now, not against a cached copy a delete or recreate may have outdated.
     await this.#refresh()
     const unlocked = this.#closed ? null : await this.#settleUnlock(proof)
-    const tookUp = unlocked !== null && await this.#grantLease(unlocked, unlocked.standing, this.#deadlineFromNow(), overtaken)
+    const tookUp = unlocked !== null && await this.#grantLease(unlocked, unlocked.standing, overtaken)
     this.#settle()
     if (tookUp) { return }
     // A close() meanwhile is said as such: the handle, not the vault, is what refuses now.
@@ -1458,7 +1457,7 @@ export class Vault {
       device_id:       deviceId,
       registered_at:   identity.registered_at,
     }
-    const { wayin, sessionKey } = await Wayin.seal(this, passphrase, identity, stamp, freshKey)
+    const { wayin, sessionKey } = await Wayin.seal(this, identity, passphrase, stamp, freshKey)
     const draft: VaultProps = {
       format:              'safebyok-vault-v5',
       ...this.#scope,
@@ -1566,7 +1565,7 @@ export class Vault {
       this.#vaultProps = next
     }
     try {
-      await this.#grantLease(proven, next, this.#deadlineFromNow())
+      await this.#grantLease(proven, next)
     } catch (err) {
       this.#logger.warn("The change to the vault's ways in landed in storage, but this device could not take up its unlock afresh: it stands as it stood here, and asks for the passphrase at its next open.", { call: plan.call }, asError(err))
     }
@@ -1718,30 +1717,24 @@ export class Vault {
   }
   // --
 
-  // == [Lease]: deadlineFromNow, grantLease, fetchLease, takeUp, standDownTakeUp, takeUpLease, discardLease
+  // == [Lease]: grantLease, fetchLease, takeUp, standDownTakeUp, takeUpLease, discardLease
 
   /**
-   * The deadline of an unlock taken up now: `leaseHours` from now. The lease renews whenever the
-   * user proves who they are, in any call: an `unlock()` by passphrase or passkey, or a change to
-   * the ways in, which the passphrase proves. Every proof passes through here, and nothing else
-   * -- a read, a store, a refresh -- moves the deadline.
-   */
-  #deadlineFromNow(): number {
-    return deadlineAfter(this.#clockNow(), this.#leaseMillis)
-  }
-
-  /**
-   * Grant this device a lease and take up the vaultKey until `until`, arming the expiry anew --
-   * unless the handle has closed, the vault props the key was proven against no longer stand, or
+   * Grant this device a lease and take up the vaultKey until its deadline, `leaseHours` from now,
+   * arming the expiry anew -- unless the handle has closed, the vault props the key was proven against no longer stand, or
    * `overtaken` (an ask's attempt, which its prompt's end stands down) is aborted: then nothing is
    * taken up, and the lease, should it have been written already, is erased -- a deleted vault
    * keeps no lease on this device, even should storage later bring it back. The lease is
    * `Lease.grant`'s, a fresh leaseKey and the vaultKey wrapped under it; the write is the vault's.
    * A close alone erases nothing: a close is no lock, and the next open takes the lease up.
    *
+   * The lease renews whenever the user proves who they are, in any call: an `unlock()` by
+   * passphrase or passkey, or a change to the ways in, which the passphrase proves. Every proof
+   * passes through here, and nothing else -- a read, a store, a refresh -- moves the deadline.
+   *
    * @returns True when the vault is now unlocked.
    */
-  async #grantLease(unlocked: VaultKeyPair, standing: VaultProps, until: number, overtaken?: AbortSignal): Promise<boolean> {
+  async #grantLease(unlocked: VaultKeyPair, standing: VaultProps, overtaken?: AbortSignal): Promise<boolean> {
     // Asked afresh after each wait: a lock may land during any of them.
     const isOvertaken = () => overtaken?.aborted === true
     // What no lease may outlast: a prompt that ended under an ask's attempt -- a lock, an answer --
@@ -1753,7 +1746,7 @@ export class Vault {
     // older lease could otherwise erase this one as it discards that.
     this.#standDownTakeUp()
     // The transient's last act: wrapped into this device's lease, then dropped.
-    const lease = await Lease.grant(this, standing, unlocked, until)
+    const lease = await Lease.grant(this, standing, unlocked)
     // Asked again before the write: the prompt may have ended, or the props moved on, while the key was wrapped.
     if (isVoided()) { return false }
     valOf(await this.#deviceDB.putLease(lease.props))
@@ -1764,7 +1757,7 @@ export class Vault {
       valOf(await this.#deviceDB.delLease(this.#scope))
     }
     if (isOutrun()) { return false }
-    this.#armExpiry(until, this.#clockNow())
+    this.#armExpiry(lease.ask_passphrase_at, this.#clockNow())
     this.#vaultKey = unlocked.sessionKey
     this.#lease = lease
     return true
@@ -2353,7 +2346,7 @@ const isCatchingUpKind = (err: unknown): err is VaultError => isVaultError(err, 
 const checkBagOrNone = <BagT>(given: BagT, call: 'hello' | 'ensureLease'): BagT => {
   if (given === undefined || isPlainBag(given)) { return given }
   const tried = call === 'hello' ? 'tryHello' : 'tryEnsureLease'
-  throw new VaultError('bad_option', `${call}() takes a bag of options, or nothing, and was handed something else: an event, most likely, as ${call} was handed to addEventListener or onClick as the handler itself. Wrap it: \`() => { void vault.${tried}() }\`, whose refusal, being returned, never surfaces as an unhandled rejection.`)
+  throw new VaultError('bad_option', `${call}() takes a bag of options, or nothing, and was handed something else: an event, most likely, as ${call} was handed to addEventListener or onClick as the handler itself. Wrap it: \`() => vault.${tried}()\`, whose refusal, being returned, never surfaces as an unhandled rejection.`)
 }
 
 /** What `hello()`'s options may hold: `staleMinutes`, which `parseStaleMinutes` checks, and nothing else. */
@@ -2407,7 +2400,7 @@ const absentBox = () => new VaultError('absent_box', 'No box stands under that b
 
 // --
 
-// == [Timers and grace]: isFarFuture, unrefTimeout, deadlineAfter
+// == [Timers and grace]: isFarFuture, unrefTimeout
 
 /**
  * True for an instant within a minute of {@link FarFuture}: a deadline that never comes. Never
@@ -2426,7 +2419,4 @@ const unrefTimeout = (callback: () => void, delayMillis: number): ReturnType<typ
   if (typeof handle.unref === 'function') { handle.unref() }
   return timer
 }
-
-/** The deadline for a lease granted at `nowMillis`: `leaseMillis` later, in whole ms, but never past {@link FarFuture}. */
-const deadlineAfter = (nowMillis: number, leaseMillis: number): number => Math.min(Math.floor(nowMillis + leaseMillis), FarFuture)
 // --

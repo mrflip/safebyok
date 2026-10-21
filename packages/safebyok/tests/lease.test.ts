@@ -2,17 +2,18 @@ import { describe, expect, it } from 'vitest'
 import * as Z from 'zod/mini'
 import { cipherCtx, makeBoxKey, makeVaultKey, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
 import { Lease, type LeaseHolder, type LeaseVault } from '../src/lease'
-import { MinuteMillis, type LeaseRecord } from '../src/types'
+import { FarFuture, ForeverMillis, MinuteMillis, type LeaseRecord } from '../src/types'
 import * as TH from './test-helpers'
 
 const GrantedAt = Date.UTC(2026, 9, 19, 12)
 const HourMillis = 60 * MinuteMillis
-const Deadline = GrantedAt + (7 * 24 * HourMillis)
+const LeaseMillis = 7 * 24 * HourMillis
+const Deadline = GrantedAt + LeaseMillis
 
-/** A stand-in for the vault a lease reads: u1's scope, and a clock the test moves. */
-const leaseVaultOf = (userId = 'u1') => {
+/** A stand-in for the vault a lease reads: u1's scope, a week's lease, and a clock the test moves. */
+const leaseVaultOf = (userId = 'u1', leaseMillis = LeaseMillis) => {
   let nowMillis = GrantedAt
-  const vault: LeaseVault = { ...TH.scopeOf(userId), clock: { now: () => nowMillis } }
+  const vault: LeaseVault = { ...TH.scopeOf(userId), clock: { now: () => nowMillis }, leaseMillis }
   const setNow = (at: number) => { nowMillis = at }
   return { vault, setNow }
 }
@@ -41,12 +42,12 @@ const isSameKey = async (candidate: CryptoKey, vaultKey: CryptoKey): Promise<boo
 const grantedLease = async () => {
   const { vault, setNow } = leaseVaultOf()
   const pair = await vaultKeyPairOf()
-  const lease = await Lease.grant(vault, holder, pair, Deadline)
+  const lease = await Lease.grant(vault, holder, pair)
   return { vault, setNow, pair, lease }
 }
 
 describe("Lease.grant", () => {
-  it("makes a lease of every field the record holds, the scope its vault's and the epoch its holder's, as its example shows", async () => {
+  it("makes a lease of every field the record holds, the scope its vault's, the epoch its holder's and the deadline leaseMillis from now, as its example shows", async () => {
     const { lease } = await grantedLease()
     expect(lease).to.deep.include({
       format:            'safebyok-lease-v1',
@@ -76,8 +77,8 @@ describe("Lease.grant", () => {
   it("makes a fresh leaseKey at each grant", async () => {
     const { vault } = leaseVaultOf()
     const pair = await vaultKeyPairOf()
-    const one = await Lease.grant(vault, holder, pair, Deadline)
-    const two = await Lease.grant(vault, holder, pair, Deadline)
+    const one = await Lease.grant(vault, holder, pair)
+    const two = await Lease.grant(vault, holder, pair)
     expect(one.lease_key).to.not.eq(two.lease_key)
     expect(one.vault_key_lease_wrapped).to.not.deep.equal(two.vault_key_lease_wrapped)
   })
@@ -88,25 +89,36 @@ describe("Lease.grant", () => {
     const unwrapped = await unwrapKeyUnder(lease.lease_key, lease.vault_key_lease_wrapped, leaseCtx, { extractable: false, usage: ['wrapKey'] })
     expect(unwrapped).to.be.instanceOf(CryptoKey)
   })
-  for (const [badHolder, badDeadline, blurb] of [
-    [holder, NaN, 'a deadline that is no number'],
-    [holder, Infinity, 'an infinite deadline'],
-    [holder, Deadline + 0.5, 'a deadline in part-milliseconds'],
-    [holder, 'soon', 'a deadline that is a string'],
-    [{ vault_id: '', unlock_epoch: 3 }, Deadline, 'a holder with an empty vault_id'],
-    [{ vault_id: 'vault-id-u1', unlock_epoch: 0 }, Deadline, 'a holder at unlock_epoch 0'],
-    [{ vault_id: 'vault-id-u1' }, Deadline, 'a holder with no unlock_epoch'],
+  it("reads the deadline off the vault's clock at the grant, in whole milliseconds", async () => {
+    const { vault, setNow } = leaseVaultOf()
+    setNow(GrantedAt + HourMillis + 0.5)
+    const lease = await Lease.grant(vault, holder, await vaultKeyPairOf())
+    expect(lease.ask_passphrase_at).to.eq(Deadline + HourMillis)
+  })
+
+  it("ends a lease of leaseHours: Infinity at FarFuture, from any instant the clock may read", async () => {
+    const { vault, setNow } = leaseVaultOf('u1', ForeverMillis)
+    const now = await Lease.grant(vault, holder, await vaultKeyPairOf())
+    setNow(FarFuture)
+    const atTheEnd = await Lease.grant(vault, holder, await vaultKeyPairOf())
+    expect([now.ask_passphrase_at, atTheEnd.ask_passphrase_at]).to.deep.equal([FarFuture, FarFuture])
+  })
+
+  for (const [badHolder, blurb] of [
+    [{ vault_id: '', unlock_epoch: 3 }, 'a holder with an empty vault_id'],
+    [{ vault_id: 'vault-id-u1', unlock_epoch: 0 }, 'a holder at unlock_epoch 0'],
+    [{ vault_id: 'vault-id-u1' }, 'a holder with no unlock_epoch'],
   ] as const) {
     it(`throws, as misuse, at ${blurb}: no lease record could hold it`, async () => {
       const { vault } = leaseVaultOf()
-      await expect(Lease.grant(vault, badHolder as LeaseHolder, await vaultKeyPairOf(), badDeadline as number)).rejects.toThrow(Z.core.$ZodError)
+      await expect(Lease.grant(vault, badHolder as LeaseHolder, await vaultKeyPairOf())).rejects.toThrow(Z.core.$ZodError)
     })
   }
 
   it("takes whole vault props as its holder, keeping only their vault_id and unlock_epoch", async () => {
     const { vault } = leaseVaultOf()
     const vaultProps = TH.vaultPropsOf('u1', { vault_id: 'vault-id-u1', unlock_epoch: 3 })
-    const lease = await Lease.grant(vault, vaultProps, await vaultKeyPairOf(), Deadline)
+    const lease = await Lease.grant(vault, vaultProps, await vaultKeyPairOf())
     expect(lease.vault_id).to.eq('vault-id-u1')
     expect(lease.unlock_epoch).to.eq(3)
   })
@@ -167,7 +179,7 @@ describe("Lease.make", () => {
 
   it("refuses a lease granted under another user's vault as 'corrupt_record': it can never reach tryOpen here", async () => {
     const { vault } = leaseVaultOf('u2')
-    const theirs = await Lease.grant(vault, holder, await vaultKeyPairOf(), Deadline)
+    const theirs = await Lease.grant(vault, holder, await vaultKeyPairOf())
     const { vault: mine } = leaseVaultOf('u1')
     TH.expectSyncRefusal(() => Lease.make(mine, theirs.props), 'corrupt_record')
   })

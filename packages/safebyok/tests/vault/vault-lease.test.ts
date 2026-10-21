@@ -1187,7 +1187,7 @@ describe("vault.ensureLease, by the Contract", () => {
     const getProof = typingPw()
     const { vault } = await lockedVaultWith({ getProof })
     const err = await TH.expectBad(vault.tryEnsureLease(new Event('click') as unknown as { renewMinutes?: number }), 'bad_option')
-    expect(err.message).to.include('`() => { void vault.tryEnsureLease() }`')
+    expect(err.message).to.include('`() => vault.tryEnsureLease()`')
     expect(getProof).to.not.have.been.called
     expect(vault.state).to.eq('locked')
   })
@@ -1196,7 +1196,7 @@ describe("vault.ensureLease, by the Contract", () => {
     const getProof = typingPw()
     const { vault } = await lockedVaultWith({ getProof })
     const button = new EventTarget()
-    button.addEventListener('click', () => { void vault.tryEnsureLease() })
+    button.addEventListener('click', () => vault.tryEnsureLease())
     button.dispatchEvent(new Event('click'))
     await vi.waitFor(() => { expect(vault.state).to.eq('unlocked') })
   })
