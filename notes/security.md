@@ -445,7 +445,8 @@ added or folded into through the subagent, and no other entry changes.
   carries that source as its `cause`, and `not_permitted` can come from the host and the driver.**
   (1) `convexVaultDB` (`refusing`, `safebyok-convex/src/convex-vault-db.ts`): a `ConvexError` whose
   `data` is `{ kind, message }` with kind `identity_revoked`, `not_permitted` or `vault_full`
-  becomes a VaultError of that kind and message with the `ConvexError` as `cause` (before: nothing of
+  (amended 2026-10-21 (store_rulings, #217): no longer `vault_full`, see the Convex component entry
+  below) becomes a VaultError of that kind and message with the `ConvexError` as `cause` (before: nothing of
   it, through `Sanitizer.refusalFor`). Its text is `[CONVEX M(<function>)] <message> Called by client`
   and its data was written by safebyok's server or the host's `getUserId`: function name, request id
   and that data, never the call's arguments. Every other Convex failure (`storage_unavailable`)
@@ -469,7 +470,8 @@ added or folded into through the subagent, and no other entry changes.
   violation) is now `not_permitted` with the driver's error as cause, not `storage_unavailable`.
   That cause may quote the statement's parameters (`query`/`params` on a PGlite or pg error) as
   before, and stays on the server: the README route recipe and the resolvers send only kind and
-  message. An RLS policy that hides rows (USING) refuses nothing: Postgres filters them, so a vault
+  message (amended 2026-10-21 (store_rulings, #217): the route recipe now sends a refusal's `meta`
+  whole as well, only `box_stored` or `capacity` from a `VaultDB` verb; the `cause` still stays). An RLS policy that hides rows (USING) refuses nothing: Postgres filters them, so a vault
   reads as absent and a write over a hidden row as `stale_write`; only a refused insert or a
   missing privilege becomes `not_permitted`.
 * 2026-10-19 (thread A6, getproof); 2026-10-19 (a_sec, #203): **`lockLanded`: a `lock()`, `close()` or `del()` landing while a
@@ -663,7 +665,7 @@ added or folded into through the subagent, and no other entry changes.
   nothing either. No stored shape changed, and the vault does not yet use the returned value;
   `putBox` still refreshes after its write.
   2026-10-21 (C1): a refused write now answers from that same atomic step too, and the
-  refusal carries what stands. `putBox(scope, expected, box, opts?)` is one conditional write per
+  refusal carries what stands. `putBox(scope, expected, box)` (amended 2026-10-21 (store_rulings, #217): it took `opts?`) is one conditional write per
   adapter (Postgres: one statement, an UPDATE whose SET is `CASE WHEN revision_tok = $read THEN
   new ELSE own`, or an INSERT ... ON CONFLICT DO UPDATE no-op, each `RETURNING` the row that
   stands, so the winner reported is the latest committed, locked row and not the statement's
@@ -687,10 +689,23 @@ added or folded into through the subagent, and no other entry changes.
   longer stand; it carries no meta, since vault props (salts, wrapped vaultKey) never ride on a
   refusal (the a_sec2 ruling). `invalid_box` (misuse) is a box the base class would not build,
   refused before storage sees it, which the vault relabels `bad_record`; neither message quotes the
-  box. `putBox` also takes `opts.signal`: an abort before storage answers resolves
-  `storage_unavailable` with the signal's reason as `cause`, and a write already sent may still
-  land (the base stops waiting; the adapter's write is not cancelled), so a later read shows
-  whether.
+  box. `putBox` also took `opts.signal`: an abort before storage answers resolved
+  `storage_unavailable` with the signal's reason as `cause`, and a write already sent might still
+  land (the base stopped waiting; the adapter's write was not cancelled), so a later read showed
+  whether. Superseded, amended 2026-10-21 (store_rulings, #217): `VaultDB.putBox(scope, expected,
+  box)` takes no signal any more (the Coach: "Rip it out"), so there is no abandon ->
+  `storage_unavailable` path and no "may have landed" from a caller's abort. No storage call can be
+  abandoned midway by the caller; timeouts are a later thread's (D1).
+  Amended 2026-10-21 (store_rulings, #217): **Postgres box writes lock, and "landed" is the write's
+  own condition.** Each box write locks the vault row `FOR SHARE`, then the box standing under the
+  boxlabel `FOR UPDATE` (the same lock order as a vault deletion, vault row first), writing nothing
+  to that box row by the lock; the write is conditioned on that row. A write has landed when its own
+  condition passed: a row back from the UPDATE, or the INSERT's own new row, told from an
+  `ON CONFLICT` no-op update by `xmax = 0`; never because the standing revision equals the one sent.
+  So on every adapter a box write sent again after it landed refuses as `stale_write`, naming that
+  box (the whole stored record, as the C1 ruling above already allows in `meta.box_stored`). The
+  `xmax = 0` test is a Postgres implementation detail; if it misread, a rival's box would come back
+  "landed" at another revision, which the base class already refuses as `corrupt_record`.
 * 2026-10-18 (sprint reform): **three stored-format tags changed in the renaming, none with a
   migration.** Against the last release (0.3.0), the vault props format `safebyok-vault-v2` became
   `safebyok-vault-v3` (the unlock envelope became the "wayin", with the field renames that follow;
@@ -1208,7 +1223,16 @@ added or folded into through the subagent, and no other entry changes.
   counts only, never secret material; amended 2026-10-21 (C1): a refused `putBox` that finds a
   different box standing now fills `box_stored` with the whole stored record, ciphertext and
   wrapped boxKey included (see the 2026-10-19 (returning) entry; an earlier amendment of
-  2026-10-19, a_sec2, #206, which said it was filled, was mistaken at the time). The vault still locks
+  2026-10-19, a_sec2, #206, which said it was filled, was mistaken at the time); amended
+  2026-10-21 (store_rulings, #217): **capacity.** Every `VaultDB` answers `getCapacity(scope)` ->
+  `{ boxes: { used, max }, bytes: { used, max } }`, and storage's `vault_full` carries the same as
+  `err.meta.capacity`. Numbers only: no names, records or ciphertext. They reveal a vault's box
+  count and approximate size to the caller already authorized for that vault (the listing already
+  shows the count). The base class validates the capacity (whole numbers; `Infinity` becomes
+  `Number.MAX_SAFE_INTEGER`) and refuses a `vault_full` without a sound one as `corrupt_record`.
+  It crosses the GraphQL wire as `extensions.meta.capacity`; the Postgres route recipe in the
+  README now sends a refusal's `meta` whole, which from a `VaultDB` verb is only `box_stored` (stale
+  write) or `capacity` (`vault_full`). The vault still locks
   on `identity_revoked` and `rolled_back` from storage: `RefusalPolicy.heed` unwraps each Outcome,
   hands every bad `err` to the vault's refusal handler and awaits it, then throws it, as before --
   an interim shim until the vault's own calls are Outcome-shaped.
@@ -1304,17 +1328,24 @@ added or folded into through the subagent, and no other entry changes.
   scope would make every later call on that vault fail (`.unique()` throws) rather than pick one.
 * 2026-10-15: the Convex component's refusals carry `ConvexError` data of a fixed `kind`
   (`not_permitted`, `vault_full`) and a fixed message; neither names the user or quotes a record.
-  Its functions log nothing.
+  Its functions log nothing. Amended 2026-10-21 (store_rulings, #217): the component now answers
+  `vault_full` inside `putBox`'s result rather than throwing a `ConvexError`, with the vault's
+  capacity numbers beside it, so the only `ConvexError` kinds are `identity_revoked` and
+  `not_permitted`.
 * 2026-10-15: Convex's own argument and return validation errors quote the value they refused.
   A malformed call to one of the Convex component's functions therefore writes its arguments --
   `user_id`, scope, sidecars, ciphertext, never plaintext or keys -- into the host's Convex logs,
   and on a dev deployment back to the calling client as well. safebyok's own refusals
-  (`not_permitted`, `vault_full`) quote nothing.
+  (`not_permitted`; amended 2026-10-21 (store_rulings, #217): `vault_full` is no longer thrown) quote nothing.
 * 2026-10-15: `convexVaultDB`, the Convex client adapter, turns a `ConvexError` whose data has a
   safebyok `kind` and a string `message` into a `VaultError` of that kind carrying that message as
   sent by the server (the component's own are fixed text). Any other error becomes
   `storage_unavailable` with Convex's error as `cause`; on a dev deployment that error's message
   may quote the arguments Convex refused (scope, sidecars, ciphertext; never plaintext or keys).
+  Amended 2026-10-21 (store_rulings, #217): the client checks a box write's answer shape before
+  reading it. An unknown shape (`null`, or an older component's answer) is refused as
+  `corrupt_record`, saying the deployed component is out of date, never a raw `TypeError`; the
+  refusal quotes nothing of the answer.
 * 2026-10-15: `convexVaultDB` sets no timeout. Offline, a Convex query or mutation waits for the
   socket, and Convex resends an unacknowledged mutation on reconnect, so a write can land after
   its caller stopped waiting; a vault call waits as long as the connection is down.
@@ -1335,7 +1366,9 @@ added or folded into through the subagent, and no other entry changes.
   client nor the host can change them. `putBox` checks them against a per-vault tally row
   (`safebyok_vault_tallies`, keyed by the vault props' row `_id`) updated in the same transaction as
   each box write and deletion, and refuses, writing nothing, a write that leaves the vault over a
-  limit and larger than before, with `ConvexError` kind `vault_full` and fixed text. Replacements
+  limit and larger than before, with `ConvexError` kind `vault_full` and fixed text (amended
+  2026-10-21 (store_rulings, #217): answered inside the mutation's result, with the capacity numbers,
+  not thrown). Replacements
   no heavier and all deletions are never refused. A vault with no tally (written before tallies) is
   counted at its next `putBox`, reading its rows only until a limit is passed; an over-limit
   vault keeps no tally and refuses all growth until deletions bring it back. The tally is trusted as
@@ -1629,7 +1662,8 @@ added or folded into through the subagent, and no other entry changes.
   scope and boxlabel, a route's vault props, boxes and expectations are validated only as the
   core's VaultDB validates them. A driver's error rides as `cause` and may quote key columns, or
   (a malformed record refused by a NOT NULL) the whole failing row, its ciphertext included; the
-  README's route recipe sends the browser only a refusal's kind and message.
+  README's route recipe sends the browser only a refusal's kind and message (amended 2026-10-21
+  (store_rulings, #217): and its `meta`, whole: only `box_stored` or `capacity` from a `VaultDB` verb).
 * 2026-10-15: `safebyok-graphql` carries the verbs over GraphQL and authorizes nothing itself:
   each resolver calls the VaultDB `vaultDBFor(context)` makes for the request, so the rule is
   `postgresVaultDB`'s (or the host's own ServedVaultDB's), fed the user the host's auth verified.
@@ -2067,7 +2101,9 @@ added or folded into through the subagent, and no other entry changes.
   update now waits for box writes in flight, and the README's hard-cap trigger takes a
   per-vault advisory lock rather than `FOR UPDATE` on the vault props, which would deadlock two writers
   each holding the shared lock. The real-Postgres race that proves the lock waits on thread 11's
-  container suite. The 2026-10-16 entry above that says IndexedDB, Convex and Postgres "do not yet"
+  container suite (amended 2026-10-21 (store_rulings, #217): a Postgres box write now also locks the box
+  standing under its boxlabel `FOR UPDATE` after the vault row `FOR SHARE`, the same order as a vault
+  deletion, vault row first; see the 2026-10-19 (returning) entry). The 2026-10-16 entry above that says IndexedDB, Convex and Postgres "do not yet"
   is superseded.
 * 2026-10-16 (epoch_expectation, the Coach's ruling on thread 4's review); 2026-10-19 (20261019-softlock_gone: **the counts are gone**: a `getBox()` or `useBox()` hands back nothing if no key is in hand when storage answers or when the whisper has been deciphered, unless another unlock put a key back in hand meanwhile; the rest describes what stood until then): **`close()` and a key
   outlived by a refresh are hard locks for a read in flight.** A `getBox()` or `useBox()` notes a
@@ -2301,7 +2337,8 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-17 (thread 5b, store_base; amended 2026-10-19: only `storage_unavailable` carries no cause now,
   see the outcome_adapters entry at the top): **Convex carries no cause on any refusal.** `convexVaultDB`
   (`safebyok-convex/src/convex-vault-db.ts`) refuses with no `cause` at all -- `identity_revoked`,
-  `vault_full` and `storage_unavailable` alike -- because a Convex error on a dev deployment may
+  `vault_full` and `storage_unavailable` alike (amended 2026-10-21 (store_rulings, #217): `vault_full`
+  is now an answer in `putBox`'s result, not a thrown error) -- because a Convex error on a dev deployment may
   quote the call's arguments (names, sidecars, ciphertext). Its refusals are made through
   `Sanitizer.refusalFor`, and the message points the developer to the deployment's logs and the
   browser console instead.
