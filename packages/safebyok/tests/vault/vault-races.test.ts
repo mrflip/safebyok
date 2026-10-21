@@ -823,7 +823,7 @@ describe("versioned updates: two devices writing at once", () => {
     expect(await there.getBox('anthropic')).to.eq('sk-ant-fake-theirs')
   })
 
-  it("a store whose catch-up fails is refused as stale, the failure its cause, saying so", async () => {
+  it("a store whose catch-up fails is refused as stale, the failure its cause, saying so, and still carries what won as meta.box_stored", async () => {
     const { world, hereDB, here, there, beforeNextWrite } = await twoDeviceWorld()
     await here.putBox('anthropic', 'sk-ant-fake-one')
     const down = new VaultError('storage_unavailable', 'The vault storage could not be reached.')
@@ -835,6 +835,7 @@ describe("versioned updates: two devices writing at once", () => {
     const err = await TH.expectRefusal(here.putBox('anthropic', 'sk-ant-fake-mine'), 'stale_write')
     expect(err.cause).to.eq(down)
     expect(err.message).to.include('Catching up with storage afterwards failed too')
+    expect(err.meta?.box_stored).to.deep.equal(storedRowOf(world, 'anthropic'))
     expect(putBox).toHaveBeenCalledTimes(1)
     expect(delaysAsked(waits)).to.have.lengthOf(0)
     expect(here.getSnapshot().syncing).to.be.false

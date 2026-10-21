@@ -2111,7 +2111,9 @@ export class Vault {
       // Bad news the catch-up met is told, even where the write names it only as its cause.
       this.#hearBadNews(err)
       if (UntrustedStorageKinds.some((kind) => isVaultError(err, kind))) { throw err }
-      throw new VaultError('stale_write', `${refusal.message} Catching up with storage afterwards failed too, so what the vault shows may be behind it: this error's cause says why.`, { cause: err })
+      // What the refused write learned of storage (a box write's box_stored) still holds: no read replaced it.
+      const learned = refusal.meta === undefined ? {} : { meta: refusal.meta }
+      throw new VaultError('stale_write', `${refusal.message} Catching up with storage afterwards failed too, so what the vault shows may be behind it: this error's cause says why.`, { cause: err, ...learned })
     }
   }
 
