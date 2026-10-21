@@ -360,28 +360,28 @@ sidecar is a `jsonb` too, never null, which your server can query: always a JSON
 each structured value into its encryption by its fields, a sidecar as its JSON with keys sorted.
 Nothing else is normalized: a user id or a string inside a sidecar reads back byte for byte, as
 it must, since every field a record holds is bound into its encryption (all but the vault props'
-`unlock_epoch`, and, for each way in, the other one beside it). A sidecar Postgres's `jsonb`
+`gate_epoch`, and, for each way in, the other one beside it). A sidecar Postgres's `jsonb`
 cannot hold -- a string holding `\u0000`, say -- is refused by Postgres, and the write fails with
 its error as the cause, nothing written.
 
 | Table             | One row per | Primary key                                     | Columns                                                                                |
 | ----------------- | ----------- | ----------------------------------------------- | -------------------------------------------------------------------------------------- |
 | `safebyok_vaults` | vault       | `applabel`, `user_id`, `vaultlabel`             | every field of the `VaultProps`                                                        |
-| `safebyok_boxes`  | box         | `applabel`, `user_id`, `vaultlabel`, `boxlabel` | the vault's scope and `vault_id`, then every field of the `BoxRecord`; its sidecar as `jsonb` |
+| `safebyok_boxes`  | box         | `applabel`, `user_id`, `vaultlabel`, `boxlabel` | the vault's scope and `vault_tok`, then every field of the `BoxRecord`; its sidecar as `jsonb` |
 
 * **Encrypted**: each whisper (`whisper_ciphered`), each box's boxKey
   (`box_key_wrapped`), and the vaultKey, once under each way into the vault (the
   `vault_key_wayin_wrapped` inside the vault props' `passphrase`, and inside their `passkey` when
   they have one).
 * **In the open**: the scope, each `boxlabel` and `sidecar`, each whisper's codec
-  and schema version, the `vault_id`, `unlock_epoch`, `revision_tok`s, each way in's `wayinkind`, `device_id` and `registered_at`, the passphrase's
+  and schema version, the `vault_tok`, `gate_epoch`, `revision_tok`s, each way in's `wayinkind`, `device_id` and `registered_at`, the passphrase's
   salt and key deriver's label, whether the vault has a passkey, and its `credential_id` and
   `prf_salt_b64`, when
   each vault and box was first stored and each box last written (`registered_at`,
   `written_at`, epoch milliseconds), and the length of every ciphertext.
 * **Never**: a whisper, a passphrase, any key in usable form, or the device-local lease. No history: an update replaces its row (your database's backups and WAL keep what
   they keep).
-* **A box stands only beside its vault props**, under the same `vault_id`: the foreign key
+* **A box stands only beside its vault props**, under the same `vault_tok`: the foreign key
   deletes a vault's boxes with its props, in one statement, and refuses a box written for
   a vault since deleted and made anew.
 * **Row-level security is on, with no policy**: the tables' owner -- the role your server
@@ -418,7 +418,7 @@ shape of table, copy it, and keep to what makes it right:
   throw into `storage_unavailable`. A box write that misses throws instead, from the rows its
   statement read: `Refusals.vaultMismatch()`, or `Refusals.staleBox(standing)`.
 * **One statement per verb**, so each is atomic without a transaction: the expectation goes in
-  the `WHERE` (`UPDATE ... WHERE vault_id = $ AND unlock_epoch = $ RETURNING 1`), and a row
+  the `WHERE` (`UPDATE ... WHERE vault_tok = $ AND gate_epoch = $ RETURNING 1`), and a row
   back means it landed. A box write returns the row's columns (`RETURNING format, boxlabel,
   ...`): the box as stored, which the base class reads back as it would a read. It first locks
   the box standing under the boxlabel with `SELECT ... FOR UPDATE`, which writes nothing and,
@@ -435,10 +435,10 @@ shape of table, copy it, and keep to what makes it right:
   named, another, or none. A create returns the row that stands with `ON CONFLICT ... DO UPDATE`
   (a no-op update), since `DO NOTHING` returns no row when another device got in first.
 * **Let the schema hold the vault together.** The box's foreign key names its vault row down
-  to the `vault_id`, so a box cannot outlive its vault or land in one made anew, and deleting
+  to the `vault_tok`, so a box cannot outlive its vault or land in one made anew, and deleting
   a vault is one `DELETE` of its vault row.
-* **Store each record a column to a field**, and compare only the scope, `boxlabel`, `vault_id`,
-  `unlock_epoch` and `revision_tok`. `src/columns.ts` names each record's columns once, the
+* **Store each record a column to a field**, and compare only the scope, `boxlabel`, `vault_tok`,
+  `gate_epoch` and `revision_tok`. `src/columns.ts` names each record's columns once, the
   compiler holding the list to the record's fields both ways, and builds every statement from it.
 * **Authorize in the adapter**: made per request for one user, it refuses every other user's
   scope with `identity_revoked`, and passes the database's own refusal of a call (`42501`) up as
