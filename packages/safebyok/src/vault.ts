@@ -327,9 +327,7 @@ export class Vault {
       const staleMillis = helloOpts?.staleMinutes === undefined ? this.#staleMillis : parseStaleMinutes(helloOpts.staleMinutes, 'hello')
       await this.#helloWithin(staleMillis)
       return good(this)
-    } catch (err) {
-      return this.#badOutcome(err)
-    }
+    } catch (err) { if (err instanceof ThrownMistake) { throw err } return this.#badOutcome(err) }
   }
 
   /**
@@ -364,9 +362,7 @@ export class Vault {
       this.#checkOpen()
       const leaseOpts = checkEnsureLeaseOpts(given)
       return good(await this.#ensureLease(parseRenewMinutes(leaseOpts?.renewMinutes)))
-    } catch (err) {
-      return this.#badOutcome(err)
-    }
+    } catch (err) { if (err instanceof ThrownMistake) { throw err } return this.#badOutcome(err) }
   }
   // --
 
@@ -432,9 +428,7 @@ export class Vault {
     try {
       await this.#unlockWith(givenProof)
       return good(undefined)
-    } catch (err) {
-      return this.#badOutcome(err)
-    }
+    } catch (err) { if (err instanceof ThrownMistake) { throw err } return this.#badOutcome(err) }
   }
 
   // lock() does not wait for hello(): it locks at once, storage reachable or not.
@@ -464,9 +458,7 @@ export class Vault {
       this.#landLock()
       await this.#shutAndSay()
       return good(undefined)
-    } catch (err) {
-      return this.#badOutcome(err)
-    }
+    } catch (err) { if (err instanceof ThrownMistake) { throw err } return this.#badOutcome(err) }
   }
   // --
 
@@ -566,9 +558,7 @@ export class Vault {
       })
       const { passphrase: storedPassphrase, passkey: storedPasskey } = this.#wayinsOf(stored)
       return good(storedPasskey === null || putting.kind === 'passphrase' ? storedPassphrase.summary : storedPasskey.summary)
-    } catch (err) {
-      return this.#badOutcome(err)
-    }
+    } catch (err) { if (err instanceof ThrownMistake) { throw err } return this.#badOutcome(err) }
   }
 
   /**
@@ -605,9 +595,7 @@ export class Vault {
         revise: (standing) => ({ passphrase: standing.passphrase, passkey: null }),
       })
       return good(this)
-    } catch (err) {
-      return this.#badOutcome(err)
-    }
+    } catch (err) { if (err instanceof ThrownMistake) { throw err } return this.#badOutcome(err) }
   }
   // --
 
@@ -723,9 +711,7 @@ export class Vault {
       await this.#writeOver(box, expected)
       await this.#refresh()
       return good(undefined)
-    } catch (err) {
-      return this.#badOutcome(err)
-    }
+    } catch (err) { if (err instanceof ThrownMistake) { throw err } return this.#badOutcome(err) }
   }
   /**
    * The {@link Box} stored under `boxlabel`, still sealed: its visible fields, its `sidecar`
@@ -751,9 +737,7 @@ export class Vault {
   async tryGetBox(boxlabel: string): Promise<Outcome<Box>> {
     try {
       return good(await this.#getBoxUnlocked(boxlabel))
-    } catch (err) {
-      return this.#badOutcome(err)
-    }
+    } catch (err) { if (err instanceof ThrownMistake) { throw err } return this.#badOutcome(err) }
   }
 
   /**
@@ -784,9 +768,7 @@ export class Vault {
       const whisper = await this.#decipherOrCatchUp(this.#checkUnlocked(), box)
       this.#checkUnlocked()
       return good(whisper)
-    } catch (err) {
-      return this.#badOutcome(err)
-    }
+    } catch (err) { if (err instanceof ThrownMistake) { throw err } return this.#badOutcome(err) }
   }
 
   /**
@@ -812,9 +794,7 @@ export class Vault {
       const whisper = valOf(await held.tryOpen(unlockedKey))
       this.#checkUnlocked()
       return good(whisper)
-    } catch (err) {
-      return this.#badOutcome(err)
-    }
+    } catch (err) { if (err instanceof ThrownMistake) { throw err } return this.#badOutcome(err) }
   }
 
   /**
@@ -886,9 +866,7 @@ export class Vault {
       }
       await this.#refresh()
       return good(undefined)
-    } catch (err) {
-      return this.#badOutcome(err)
-    }
+    } catch (err) { if (err instanceof ThrownMistake) { throw err } return this.#badOutcome(err) }
   }
   // --
 
@@ -929,9 +907,7 @@ export class Vault {
       await this.#refresh()
       this.#forgetHello()
       return good(undefined)
-    } catch (err) {
-      return this.#badOutcome(err)
-    }
+    } catch (err) { if (err instanceof ThrownMistake) { throw err } return this.#badOutcome(err) }
   }
   /**
    * Release subscriptions and refuse further calls, dropping the vaultKey from memory. It is not
@@ -1499,9 +1475,7 @@ export class Vault {
     try {
       await this.#unlockWith(givenProof, overtaken)
       return good(this)
-    } catch (err) {
-      return this.#badOutcome(err)
-    }
+    } catch (err) { if (err instanceof ThrownMistake) { throw err } return this.#badOutcome(err) }
   }
 
   /**
@@ -2226,13 +2200,12 @@ export class Vault {
 
   /**
    * The refusal `thrown` makes, as the outcome a public `tryX` resolves: a throw that is no
-   * VaultError said as `unexpected_error`, and the bad news told before the outcome resolves. A
-   * {@link ThrownMistake} is thrown as it came, never resolved.
+   * VaultError said as `unexpected_error`, and the bad news told before the outcome resolves.
+   * A `tryX` rethrows a {@link ThrownMistake} itself, before it gets here.
    */
   #badOutcome(thrown: unknown): BadOutcome {
     // Never logged: a host's function that threw (a key deriver) may have been handed a passphrase.
     const err = isVaultError(thrown) ? thrown : unexpectedError(thrown)
-    if (err instanceof ThrownMistake) { throw err }
     this.#hearBadNews(err)
     return bad(err)
   }
