@@ -63,8 +63,8 @@ export const staleBox = (boxStored: unknown): VaultError => (
 export const StaleBoxMessage = "That box changed in storage since this device read it -- another device or tab wrote or removed it -- so this write was refused and nothing was written. What stands now is this error's meta.box_stored: write again over it, or leave it."
 
 /** A `vault_mismatch` refusal of a box write, for vault props that are not the ones it was sealed for. Throw it from `doPutBox`.
- * None stand, or they have another `vault_id` or `vault_key_epoch`. It carries nothing of the
- * props that stand, as they hold every wayin.
+ * None stand, or they have another `vault_id`. It carries nothing of the props that stand, as they
+ * hold every wayin.
  *
  * @example throw Refusals.vaultMismatch()
  */

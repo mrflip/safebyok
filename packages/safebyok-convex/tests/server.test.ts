@@ -24,7 +24,7 @@ const EveryCall: [string, (caller: Caller) => Promise<unknown>][] = [
   ['putVaultProps',    (caller) => caller.mutation(api.safebyok.putVaultProps, { vaultProps: TH.vaultPropsOf('u1', { unlock_epoch: 2 }), expected: { vault_id: 'vault-id-u1', unlock_epoch: 1 } })],
   ['getBox',           (caller) => caller.query(api.safebyok.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })],
   ['listBoxSummaries', (caller) => caller.query(api.safebyok.listBoxSummaries, { scope: u1 })],
-  ['putBox',           (caller) => caller.mutation(api.safebyok.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a2'), expected: { vault_id: 'vault-id-u1', revision_tok: 'rev-a1', vault_key_epoch: 1 } })],
+  ['putBox',           (caller) => caller.mutation(api.safebyok.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a2'), expected: { vault_id: 'vault-id-u1', revision_tok: 'rev-a1' } })],
   ['getCapacity',      (caller) => caller.query(api.safebyok.getCapacity, { scope: u1 })],
   ['delBox',           (caller) => caller.mutation(api.safebyok.delBox, { scope: u1, boxlabel: 'anthropic_api_key', expected: TH.deleting('rev-a2') })],
   ['delVault',         (caller) => caller.mutation(api.safebyok.delVault, { scope: u1, expected: TH.thisVault })],
@@ -63,7 +63,7 @@ describe("SafebyokComponent.api, for the vault's own user", () => {
 
   it("resolves a failed expectation as why it failed, with the box that stands, not as a refusal", async () => {
     const CVX = await seeded()
-    const stale = { vault_id: 'vault-id-u1', revision_tok: 'rev-a0', vault_key_epoch: 1 }
+    const stale = { vault_id: 'vault-id-u1', revision_tok: 'rev-a0' }
     const answer = await CVX.withIdentity({ subject: 'u1' }).mutation(api.safebyok.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a2'), expected: stale })
     expect(answer).to.deep.include({ landed: false, refusalkind: 'stale_write' })
     expect(answer).to.have.nested.property('box_stored.revision_tok', 'rev-a1')
@@ -72,7 +72,7 @@ describe("SafebyokComponent.api, for the vault's own user", () => {
 
   it("resolves a box write that lands with the box as stored", async () => {
     const CVX = await seeded()
-    const over = { vault_id: 'vault-id-u1', revision_tok: 'rev-a1', vault_key_epoch: 1 }
+    const over = { vault_id: 'vault-id-u1', revision_tok: 'rev-a1' }
     expect(await CVX.withIdentity({ subject: 'u1' }).mutation(api.safebyok.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a2'), expected: over })).to.deep.equal({ landed: true, box_stored: TH.boxOf('anthropic_api_key', 'a2') })
   })
 })

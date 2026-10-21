@@ -33,11 +33,11 @@ const BoxCases = [
   [{ ...wholeBox, whisper_codec: 'json_v2' },              false,  'a whisper codec this version does not know'],
   [{ ...wholeBox, whisper_schema_version: 2 },             false,  'a whisper schema version this version does not know'],
   [TH.omitting(wholeBox, 'whisper_codec'),                 false,  'a box missing its whisper codec'],
-  [{ ...wholeBox, format: 'safebyok-box-v7' },             false,  'a format this version does not know'],
+  [{ ...wholeBox, format: 'safebyok-box-v8' },             false,  'a format this version does not know'],
+  [{ ...wholeBox, format: 'safebyok-box-v6', vault_key_epoch: 1 }, false, 'a box from before the vaultKey epoch went'],
   [{ ...wholeBox, format: 'safebyok-box-v2' },             false,  'a box from before the sidecar'],
   [boxV3,                                                  false,  'a box from before written_at, holding changed_at'],
   [boxV4,                                                  false,  'a box from before the sidecar was named, holding public_json'],
-  [{ ...wholeBox, vault_key_epoch: 1.5 },                  false,  'a vaultKey epoch that is not a whole number'],
   [{ ...wholeBox, written_at: FarFuture + 1 },             false,  'a written_at past FarFuture'],
   [{ ...wholeBox, registered_at: Infinity },               false,  'a registered_at that never comes'],
   [{ ...wholeBox, written_at: null },                      false,  'a null written_at'],
@@ -66,13 +66,12 @@ describe("BoxRecord", () => {
 /** The time every box here is sealed at, unless a test says otherwise. */
 const T0 = Date.UTC(2026, 9, 19, 12)
 
-/** The vault props a box lies under, as far as a box reads them: `u1`'s `main` vault, at the first vaultKey. */
+/** The vault props a box lies under, as far as a box reads them: `u1`'s `main` vault. */
 const boxVaultPropsOf = (overrides: Partial<BoxVaultProps> = {}): BoxVaultProps => ({
   applabel:        'acme',
   user_id:         'u1',
   vaultlabel:      'main',
   vault_id:        'vault-id-u1',
-  vault_key_epoch: 1,
   ...overrides,
 })
 
@@ -151,7 +150,7 @@ describe("Box.make", () => {
   it("shows its stored fields once in a log line, and its vault props not at all", () => {
     const box = Box.make(boxVaultPropsOf(), TH.boxOf('anthropic_api_key', 'a1'))
     expect(Object.keys(box)).to.have.members([
-      'format', 'boxlabel', 'revision_tok', 'vault_key_epoch', 'whisper_codec', 'whisper_schema_version',
+      'format', 'boxlabel', 'revision_tok', 'whisper_codec', 'whisper_schema_version',
       'sidecar', 'registered_at', 'written_at', 'box_key_wrapped', 'whisper_ciphered',
     ])
   })
@@ -179,7 +178,7 @@ describe("Box.make", () => {
   it("lists its visible fields as its summary, damaged false, no ciphertext: what vault.boxes lists (Contract: Box)", () => {
     const box = Box.make(boxVaultPropsOf(), TH.boxOf('anthropic_api_key', 'a1'))
     expect(box.summary).to.deep.equal({
-      boxlabel: 'anthropic_api_key', revision_tok: 'rev-a1', vault_key_epoch: 1, sidecar: { note: 'a test box' },
+      boxlabel: 'anthropic_api_key', revision_tok: 'rev-a1', sidecar: { note: 'a test box' },
       registered_at: Date.UTC(2026, 9, 14), written_at: Date.UTC(2026, 9, 14), damaged: false,
     })
   })
@@ -205,9 +204,9 @@ describe("Box.make", () => {
     TH.expectSyncRefusal(() => Box.make(boxVaultPropsOf(), theirs as BoxRecord), 'bad_record')
   })
 
-  it("refuses missing vault props, or props missing their scope, vault id or vaultKey epoch, as 'bad_option'", () => {
+  it("refuses missing vault props, or props missing their scope or vault id, as 'bad_option'", () => {
     const record = TH.boxOf('anthropic_api_key', 'a1')
-    for (const given of [undefined, TH.scopeOf('u1'), { vault_id: 'vault-id-u1', vault_key_epoch: 1 }, boxVaultPropsOf({ vault_id: null, vault_key_epoch: null } as unknown as BoxVaultProps)]) {
+    for (const given of [undefined, TH.scopeOf('u1'), { vault_id: 'vault-id-u1' }, boxVaultPropsOf({ vault_id: null } as unknown as BoxVaultProps)]) {
       TH.expectSyncRefusal(() => Box.make(given as unknown as BoxVaultProps, record), 'bad_option')
     }
   })
@@ -256,7 +255,6 @@ describe("Box.seal", () => {
     const { box } = await sealedOf()
     expect(box.written_at).to.eq(T0)
     expect(box.registered_at).to.eq(T0)
-    expect(box.vault_key_epoch).to.eq(1)
   })
 
   it("carries registered_at and the sidecar forward from the box it replaces, as its second example shows", async () => {
@@ -291,8 +289,8 @@ describe("Box.seal", () => {
     [{ vaultKey: Secret },                                          'bad_option',   'a vaultKey that is no CryptoKey'],
     [{ opts: { over: TH.boxOf('anthropic_api_key', 'a1') } },       'bad_option',   'an over that is a record rather than a box'],
     [{ boxlabel: '' },                                              'bad_label',    'an empty boxlabel'],
-    [{ vaultProps: { vault_id: 'vault-id-u1', vault_key_epoch: 1 } }, 'bad_option', 'vault props missing their scope'],
-    [{ vaultProps: TH.scopeOf('u1') },                              'bad_option',   'vault props missing their vault id and vaultKey epoch'],
+    [{ vaultProps: { vault_id: 'vault-id-u1' } }, 'bad_option', 'vault props missing their scope'],
+    [{ vaultProps: TH.scopeOf('u1') },                              'bad_option',   'vault props missing their vault id'],
     [{ now: T0 / 1000 },                                            'bad_option',   'a now in epoch seconds'],
     [{ now: T0 + 0.5 },                                             'bad_option',   'a now with a fraction of a millisecond'],
   ] as const
@@ -383,9 +381,7 @@ describe("box.tryOpen", () => {
   it("refuses a box under a vaultKey the vault does not hold as 'damaged_box' (Contract: box.tryOpen, Refuses)", async () => {
     const { vaultKey, box } = await sealedOf()
     await TH.expectBad(box.tryOpen(await makeVaultKey()), 'damaged_box')
-    const epochTwo = boxVaultPropsOf({ vault_key_epoch: 2 })
-    const err = await TH.expectBad(Box.make(epochTwo, box.props).tryOpen(vaultKey), 'damaged_box')
-    expect(err.message).to.include('a vaultKey this vault does not hold')
+    expect(await box.open(vaultKey)).to.eq(Secret)
   })
 
   it("refuses a box that opens to no whisper as 'damaged_box' (Contract: box.tryOpen, Refuses)", async () => {

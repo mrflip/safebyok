@@ -224,30 +224,6 @@ describe("damaged boxes", () => {
     expect(await vault.getWhisper('anthropic')).to.eq('sk-ant-new')
   })
 
-  it("lists a box under a vaultKey the vault does not hold as damaged from its epoch alone, its revision kept, and putBox() replaces it", async () => {
-    const world = makeWorld()
-    const vault = await world.openUnlocked('pw')
-    await vault.putBox('anthropic', 'sk-fake')
-    const row = storedRowOf(world, 'anthropic')
-    world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...row, vault_key_epoch: 5 }))
-    await TH.wakeupAtNextTick()
-    expect(vault.getSnapshot().boxes).to.deep.equal([{ boxlabel: 'anthropic', damaged: true, revision_tok: row['revision_tok'] }])
-    await TH.expectRefusal(vault.getWhisper('anthropic'), 'damaged_box')
-    await vault.putBox('anthropic', 'sk-fake-again')
-    expect(await vault.getWhisper('anthropic')).to.eq('sk-fake-again')
-    expect(TH.summaryOf(vault.getSnapshot().boxes[0])?.vault_key_epoch).to.eq(1)
-  })
-
-  it("putBox over a box it lists as damaged under its epoch alone carries nothing from it: a record that will not open vouches for no sidecar", async () => {
-    const world = makeWorld()
-    const vault = await world.openUnlocked('pw')
-    await vault.putBox('anthropic', 'sk-fake', { sidecar: { note: 'work account' } })
-    world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), vault_key_epoch: 5 }))
-    await TH.wakeupAtNextTick()
-    await vault.putBox('anthropic', 'sk-fake-again')
-    expect(TH.summaryOf(vault.getSnapshot().boxes[0])?.sidecar).to.deep.equal({})
-  })
-
   it("putBox over a damaged box keeps a sidecar given with it", async () => {
     const [spoil] = DamagedListings[3]
     const { vault } = await worldWithDamagedBox(spoil)

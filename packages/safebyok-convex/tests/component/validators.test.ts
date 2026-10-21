@@ -147,7 +147,7 @@ const VaultPropsCases = [
   // names are any text to both: the vault's validators check them, client side
   [{ ...TH.vaultPropsOf('u1'), passkey: TH.passkeyWayinOf('laptop') },     true,   true,   'vault props with a passphrase and a passkey'],
   // both refuse -- what Convex can see:
-  [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v6' },              false,  false,  'a format this package does not know'],
+  [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v7' },              false,  false,  'a format this package does not know'],
   [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-box-v1' },                false,  false,  "another record's format"],
   [vaultPropsWithoutVaultId,                                               false,  false,  'vault props missing their vault_id'],
   [{ ...TH.vaultPropsOf('u1'), unlock_epoch: '1' },                        false,  false,  'an epoch written as text'],

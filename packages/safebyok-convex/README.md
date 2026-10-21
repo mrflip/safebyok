@@ -66,8 +66,7 @@ mistake for the first request.
   auth provider that is down -- reaches the client as `storage_unavailable`, a passing fault.
 * **Writes that come too late.** An update (`putVaultProps`, `putBox`) or a delete
   (`delBox`, `delVault`) carries what its writer expects to stand -- the vault's `vault_id`,
-  and the vault props' `unlock_epoch`, or the box's `revision_tok` and the vault props'
-  `vault_key_epoch` (the vaultKey the box was sealed under) -- and checks it in the same
+  and the vault props' `unlock_epoch`, or the box's `revision_tok` -- and checks it in the same
   transaction it writes in. When that no longer stands, it writes nothing and resolves `false`
   (`putBox` and `delBox`, `null`), which the client turns into a `stale_write`. Not an error: no `ConvexError`, nothing in your logs.
   A `delBox` also carries the `revision_tok` its writer read, but only to say what it removed:
@@ -177,11 +176,11 @@ Three tables, inside the component, beside nothing of your app's:
   were kept has none, and reads as ever: its next box write counts it, reading the vault
   once (and no further than its limits). A delete never counts a vault.
 
-**Upgrading from a version that stored `wayins`.** The vault props now hold their two ways in as
-`passphrase` and `passkey` (format `safebyok-vault-v5`, in place of v4's list of `wayins`), and no
-older vault is read: each one reads as damaged, its boxes with it. Convex refuses to deploy a
-schema its documents do not match, so clear the component's three tables before you deploy (on
-the dashboard's Data page, pick the `safebyok` component); each user then makes their vault anew.
+**Upgrading from an older version.** The vault props are format `safebyok-vault-v6` and each box
+`safebyok-box-v7`, neither holding a `vault_key_epoch` any more, and no older vault is read: each
+one reads as damaged, its boxes with it. Convex refuses to deploy a schema its documents do not
+match, so clear the component's three tables before you deploy (on the dashboard's Data page,
+pick the `safebyok` component); each user then makes their vault anew.
 
 **How big a vault can be.** Listing a vault, watching it and deleting it each read the whole vault
 in one Convex transaction -- watching reads each box whole, ciphertext and all, to sign it by
@@ -229,7 +228,7 @@ the core's own records, scopes and expectations.
 | `putVaultProps`        | mutation | `{ vaultProps, expected: { vault_id, unlock_epoch } }`                      | `true` if written, `false` if not                                                          |
 | `getBox`                  | query    | `{ scope, boxlabel }`                                                       | the `BoxRecord`, or null                                                               |
 | `listBoxSummaries`        | query    | `{ scope }`                                                                 | each box without its ciphered fields, `format` kept, in boxlabel order                 |
-| `putBox`               | mutation | `{ scope, box, expected: { vault_id, revision_tok, vault_key_epoch } }` | `{ landed: true, box_stored }` if written; else `{ landed: false, refusalkind }`, with the box standing (`stale_write`) or the vault's capacity (`vault_full`) |
+| `putBox`               | mutation | `{ scope, box, expected: { vault_id, revision_tok } }` | `{ landed: true, box_stored }` if written; else `{ landed: false, refusalkind }`, with the box standing (`stale_write`) or the vault's capacity (`vault_full`) |
 | `getCapacity`             | query    | `{ scope }`                                                                 | `{ boxes: { used, max }, bytes: { used, max } }`, from the vault's tally                   |
 | `delBox`               | mutation | `{ scope, boxlabel, expected: { vault_id, revision_tok } }`                 | `{ outcome }` if the vault still stands -- `deleted`, `deleted_other` or `absent` -- null if not |
 | `delVault`             | mutation | `{ scope, expected: { vault_id } }`                                         | `true` if deleted, `false` if not                                                          |

@@ -975,8 +975,7 @@ refusal on every device that saw a newer copy than the backup.
 
 A box whose stored record does not read back -- not JSON, a malformed time, a sidecar
 that is not JSON, a record naming another boxlabel than the one it is stored under, one from a newer
-safebyok, or one sealed under a vaultKey the vault does not hold (its `vault_key_epoch` not the
-vault props') -- is listed in the snapshot as damaged,
+safebyok or an older one -- is listed in the snapshot as damaged,
 `{ boxlabel, damaged: true, revision_tok }`, sorted among the sound ones, which carry
 `damaged: false`. Its `revision_tok` is the one its record holds, when it holds one as text, and
 null otherwise; nothing else of it is trusted. (One stored under a name your `validators` refuse

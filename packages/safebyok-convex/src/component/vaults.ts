@@ -102,7 +102,7 @@ export const putBox = mutation({
   returns: PutBoxAnswer,
   handler: async (ctx, { scope, expected, box }): Promise<Infer<typeof PutBoxAnswer>> => {
     const vaultProps = await findVaultPropsRow(ctx.db, scope)
-    if (vaultProps?.vault_id !== expected.vault_id || vaultProps.vault_key_epoch !== expected.vault_key_epoch) {
+    if (vaultProps?.vault_id !== expected.vault_id) {
       return { landed: false, refusalkind: 'vault_mismatch' }
     }
     const standing = await findBoxRow(ctx.db, scope, box.boxlabel)

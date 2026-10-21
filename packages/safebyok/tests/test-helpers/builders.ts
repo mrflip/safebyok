@@ -137,7 +137,6 @@ export const wayinOf = (tag: string, overrides: Partial<PassphraseWayinRecord> =
   key_deriver_label:       'test_digest_v0',
   // base64 of the literal text 'saltsaltsaltsalt': a fake salt, public material anyway
   salt_b64:                'c2FsdHNhbHRzYWx0c2FsdA',
-  vault_key_epoch:         1,
   device_id:               'device-one',
   registered_at:           Date.UTC(2026, 9, 14),
   vault_key_wayin_wrapped: fakeCiphered(`wayin-${tag}`),
@@ -157,7 +156,6 @@ export const passkeyWayinOf = (tag: string, overrides: Partial<PasskeyWayinRecor
   credential_id:           `cred-${tag}`,
   // base64 of the literal text 'prfsaltprfsaltprfsaltprfsaltprfs': a fake 32-byte salt, public material anyway
   prf_salt_b64:            'cHJmc2FsdHByZnNhbHRwcmZzYWx0cHJmc2FsdHByZnM',
-  vault_key_epoch:         1,
   device_id:               'device-one',
   registered_at:           Date.UTC(2026, 9, 14),
   vault_key_wayin_wrapped: fakeCiphered(`wayin-${tag}`),
@@ -189,18 +187,17 @@ export const passkeyOf = async (tag: string, prfSaltB64?: string): Promise<Passk
 /**
  * A shape-valid VaultProps for `userId`'s `main` vault, its passphrase's wrap fake and no passkey:
  * for storage-layer tests, which never decrypt. Its vault_id is `vault-id-<userId>`, its unlock
- * epoch and its vaultKey's epoch both 1, and its passphrase a {@link wayinOf} whose wrap is
+ * epoch 1, and its passphrase a {@link wayinOf} whose wrap is
  * `vault-<userId>`.
  *
  * @example vaultPropsOf('u1', { unlock_epoch: 2 })
  * @example vaultPropsOf('u1', { passkey: passkeyWayinOf('laptop') })
  */
 export const vaultPropsOf = (userId: string, overrides: Partial<VaultProps> = {}): VaultProps => ({
-  format:              'safebyok-vault-v5',
+  format:              'safebyok-vault-v6',
   ...scopeOf(userId),
   vault_id:            `vault-id-${userId}`,
   unlock_epoch:        1,
-  vault_key_epoch:     1,
   passphrase:          wayinOf(`vault-${userId}`, { vault_key_wayin_wrapped: fakeCiphered(`vault-${userId}`) }),
   passkey:             null,
   registered_at:       Date.UTC(2026, 9, 14),
@@ -208,33 +205,16 @@ export const vaultPropsOf = (userId: string, overrides: Partial<VaultProps> = {}
 })
 
 /**
- * {@link vaultPropsOf}'s vault at a vaultKey epoch other than 1, at unlock epoch 2, its one way in
- * sealed at that epoch: what a box write sealed under epoch 1 meets when the vault props stand
- * for another. No vault safebyok makes stands at any epoch but 1; storage may still hand one back.
- *
- * @example await vaultDB.putVaultProps(TH.vaultPropsAtEpochOf('u1', 2), { vault_id: 'vault-id-u1', unlock_epoch: 1 })
- */
-export const vaultPropsAtEpochOf = (userId: string, vaultKeyEpoch: number): VaultProps => {
-  const wrapped = fakeCiphered(`epoch-${String(vaultKeyEpoch)}-${userId}`)
-  return vaultPropsOf(userId, {
-    unlock_epoch:    2,
-    vault_key_epoch: vaultKeyEpoch,
-    passphrase:      wayinOf('passphrase', { vault_key_epoch: vaultKeyEpoch, vault_key_wayin_wrapped: wrapped }),
-  })
-}
-
-/**
  * A shape-valid BoxRecord for storage-layer tests, its ciphered fields fake: revision `rev-<tag>`,
- * sealed under the vault's first vaultKey, with the sidecar `{ note: 'a test box' }` unless
+ * with the sidecar `{ note: 'a test box' }` unless
  * `overrides` says otherwise.
  *
  * @example boxOf('anthropic_api_key', 'a1', { sidecar_json: sidecarJsonOf({ note: 'work account' }) })
  */
 export const boxOf = (boxlabel: string, tag: string, overrides: Partial<BoxRecord> = {}): BoxRecord => ({
-  format:                 'safebyok-box-v6',
+  format:                 'safebyok-box-v7',
   boxlabel,
   revision_tok:           `rev-${tag}`,
-  vault_key_epoch:        1,
   box_key_wrapped:        fakeCiphered(`boxkey-${tag}`),
   whisper_ciphered:       fakeCiphered(`whisper-${tag}`),
   whisper_codec:          'json_v1',
@@ -281,7 +261,7 @@ export const summaryOf = (box: BoxSummary | DamagedBox | undefined): BoxSummary 
  *
  * @example vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
  */
-export const noBoxYet = Object.freeze({ vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 1 } as const)
+export const noBoxYet = Object.freeze({ vault_id: 'vault-id-u1', revision_tok: null } as const)
 
 /**
  * What a deletion of {@link vaultPropsOf}('u1')'s vault expects: that vault.
@@ -305,7 +285,7 @@ export type MarkOverrides = Partial<Omit<DeviceMark, 'seen'>> & { seen?: Partial
 
 /**
  * A shape-valid DeviceMark for device-storage tests: `userId`'s `main` vault as {@link vaultPropsOf}
- * has it, seen at unlock epoch 1 and vaultKey epoch 1, by the device `device-one`.
+ * has it, seen at unlock epoch 1, by the device `device-one`.
  *
  * @example await deviceDB.putMark(TH.markOf('u1'))
  * @example TH.markOf('u1', { seen: { unlock_epoch: 3 } })  // a device that has seen the vault at epoch 3
@@ -313,14 +293,13 @@ export type MarkOverrides = Partial<Omit<DeviceMark, 'seen'>> & { seen?: Partial
 export const markOf = (userId: string, overrides: MarkOverrides = {}): DeviceMark => {
   const { seen, ...head } = overrides
   return {
-    format: 'safebyok-mark-v4',
+    format: 'safebyok-mark-v5',
     ...scopeOf(userId),
     ...head,
     seen:   {
-      device_id:       'device-one',
-      vault_id:        `vault-id-${userId}`,
-      unlock_epoch:    1,
-      vault_key_epoch: 1,
+      device_id:    'device-one',
+      vault_id:     `vault-id-${userId}`,
+      unlock_epoch: 1,
       ...seen,
     },
   }

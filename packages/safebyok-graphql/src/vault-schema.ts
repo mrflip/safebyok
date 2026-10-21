@@ -53,7 +53,6 @@ type SafebyokVaultProps {
   vaultlabel:       String!
   vault_id:         String!
   unlock_epoch:     Int!
-  vault_key_epoch:  Int!
   passphrase:       SafebyokWayin!
   passkey:          SafebyokWayin
   registered_at:    Float!
@@ -67,7 +66,6 @@ input SafebyokVaultPropsInput {
   vaultlabel:       String!
   vault_id:         String!
   unlock_epoch:     Int!
-  vault_key_epoch:  Int!
   passphrase:       SafebyokWayin!
   passkey:          SafebyokWayin
   registered_at:    Float!
@@ -82,7 +80,6 @@ type SafebyokBox {
   format:                 String!
   boxlabel:               String!
   revision_tok:           String!
-  vault_key_epoch:        Int!
   box_key_wrapped:        SafebyokCiphered!
   whisper_ciphered:       SafebyokCiphered!
   whisper_codec:          String!
@@ -97,7 +94,6 @@ input SafebyokBoxInput {
   format:                 String!
   boxlabel:               String!
   revision_tok:           String!
-  vault_key_epoch:        Int!
   box_key_wrapped:        SafebyokCipheredInput!
   whisper_ciphered:       SafebyokCipheredInput!
   whisper_codec:          String!
@@ -112,7 +108,6 @@ type SafebyokListedBox {
   format:                 String!
   boxlabel:               String!
   revision_tok:           String!
-  vault_key_epoch:        Int!
   whisper_codec:          String!
   whisper_schema_version: Int!
   sidecar_json:           String!
@@ -127,14 +122,12 @@ input SafebyokVaultPropsExpectationInput {
 }
 
 """
-What a box write was written for and read: it lands only while the vault has that vault_id
-and that vault_key_epoch, and the box that revision_tok, or, for a null revision_tok, while
-there is no box there.
+What a box write was written for and read: it lands only while the vault has that vault_id,
+and the box that revision_tok, or, for a null revision_tok, while there is no box there.
 """
 input SafebyokBoxExpectationInput {
-  vault_id:        String!
-  revision_tok:    String
-  vault_key_epoch: Int!
+  vault_id:     String!
+  revision_tok: String
 }
 
 """What a delete of a vault was aimed at: it lands only while the vault has that vault_id."""

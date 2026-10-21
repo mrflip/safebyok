@@ -24,9 +24,8 @@ const countingDeriver = () => {
   return { keyDeriver: { ...TH.testDeriver, deriveKeyBytes: derivations }, derivations }
 }
 
-/** What a way in here is stamped with: the vault props' vaultKey epoch, the device that sealed it and when. */
+/** What a way in here is stamped with: the device that sealed it and when. */
 const stamp: WayinStamp = {
-  vault_key_epoch: 1,
   device_id:       'device-one',
   registered_at:   SealedAt,
 }
@@ -192,7 +191,7 @@ describe("wayin.wayinCtx", () => {
     const record = TH.passkeyWayinOf('laptop')
     const { vault_key_wayin_wrapped: _wrapped, ...header } = record
     expect(Wayin.make(identity, record, slice.keyDeriver).wayinCtx).to.deep.equal(
-      cipherCtx('safebyok-vault-v5', 'acme', 'u1', 'main', 'vault-id-u1', identity.registered_at, 'vault_key_passkey_wrapped', header),
+      cipherCtx('safebyok-vault-v6', 'acme', 'u1', 'main', 'vault-id-u1', identity.registered_at, 'vault_key_passkey_wrapped', header),
     )
   })
 })
@@ -201,11 +200,9 @@ describe("wayin.isDamaged", () => {
   const DamagedCases = [
     [TH.wayinOf('passphrase', { salt_b64: 'c2FsdA' }),            true,  'a passphrase whose salt is not the deriver\'s length'],
     [TH.wayinOf('passphrase', { salt_b64: 'not base64!' }),       true,  'a passphrase whose salt is not base64url'],
-    [TH.wayinOf('passphrase', { vault_key_epoch: 2 }),            true,  'a passphrase at another vaultKey epoch than its vault props'],
     [TH.wayinOf('passphrase', { key_deriver_label: 'elsewhere_v1', salt_b64: 'c2FsdA' }), false, "a passphrase another deriver made, whose salt is not this vault's to judge"],
     [TH.wayinOf('passphrase'),                                    false, 'a passphrase stored as this package writes it'],
     [TH.passkeyWayinOf('laptop', { prf_salt_b64: 'c2FsdA' }),      true,  'a passkey whose salt is not 32 bytes'],
-    [TH.passkeyWayinOf('laptop', { vault_key_epoch: 2 }),          true,  'a passkey at another vaultKey epoch than its vault props'],
     [TH.passkeyWayinOf('laptop'),                                  false, 'a passkey stored as this package writes it'],
   ] as const
 
@@ -267,10 +264,9 @@ describe("each field of a way in, as sealed (Contract: Wayin, How each field is 
 })
 
 describe("Wayin.seal's stamp and answer", () => {
-  it("stamps the vaultKey epoch of the vault props it seals into, the device it is given, and the time it is handed", async () => {
-    const atEpochThree = TH.vaultPropsAtEpochOf('u1', 3)
-    const wayin = await Wayin.seal(atEpochThree, SealedAt + 1000, PassphraseProof.parse(slice, 'pw'), 'device-two', await makeVaultKey())
-    expect(wayin).to.include({ vault_key_epoch: 3, device_id: 'device-two', registered_at: SealedAt + 1000 })
+  it("stamps the device it is given, and the time it is handed", async () => {
+    const wayin = await Wayin.seal(identity, SealedAt + 1000, PassphraseProof.parse(slice, 'pw'), 'device-two', await makeVaultKey())
+    expect(wayin).to.include({ device_id: 'device-two', registered_at: SealedAt + 1000 })
   })
 
   it("hands back the way in alone, holding no key: the vault takes its key out of a way in as stored", async () => {
@@ -380,7 +376,6 @@ describe("wayin.tryOpen, by the Contract", () => {
     const opening = sliceOf(keyDeriver)
     const record = await sealed('pw', await makeVaultKey())
     await TH.expectBad(Wayin.make(identity, { ...record, salt_b64: 'c2FsdA' }, opening.keyDeriver).tryOpen(PassphraseProof.parse(opening, 'pw')), 'damaged_wayin')
-    await TH.expectBad(Wayin.make({ ...identity, vault_key_epoch: 2 }, record, opening.keyDeriver).tryOpen(PassphraseProof.parse(opening, 'pw')), 'damaged_wayin')
     const answer = await TH.passkeyOf('laptop')
     const passkey = await sealedPasskey(answer, await makeVaultKey())
     await TH.expectBad(Wayin.make(identity, { ...passkey, prf_salt_b64: 'c2FsdA' }, opening.keyDeriver).tryOpen(PasskeyProof.parse(opening, answer)), 'damaged_wayin')
@@ -453,12 +448,6 @@ describe("a passphrase's way in's ctx", () => {
       await TH.expectRefusal(openIn(vaultProps, 'pw', { keyDeriver }), 'wrong_passphrase')
     })
   }
-
-  it("refuses to open with its vault_key_epoch moved, though the vault props' is moved with it", async () => {
-    const vaultKey = await makeVaultKey()
-    const vaultProps = VaultProps.parse({ ...TH.vaultPropsAtEpochOf('u1', 2), passphrase: { ...await sealed('pw', vaultKey), vault_key_epoch: 2 } })
-    await TH.expectRefusal(openIn(vaultProps, 'pw'), 'wrong_passphrase')
-  })
 
   it("refuses to open with its salt swapped for another way in's", async () => {
     const vaultKey = await makeVaultKey()
@@ -541,7 +530,7 @@ describe("a passkey's way in's key", () => {
     const laptop = await TH.passkeyOf('laptop')
     const wayin = await sealedPasskey(laptop, await makeVaultKey())
     const { vault_key_wayin_wrapped: _wrapped, ...header } = wayin
-    const ctx = cipherCtx('safebyok-vault-v5', 'acme', 'u1', 'main', 'vault-id-u1', identity.registered_at, 'vault_key_passkey_wrapped', header)
+    const ctx = cipherCtx('safebyok-vault-v6', 'acme', 'u1', 'main', 'vault-id-u1', identity.registered_at, 'vault_key_passkey_wrapped', header)
     expect(await unwrapsUnder(wayin, laptop.prfBytes, ctx, ctx)).to.be.instanceOf(CryptoKey)
   })
 
@@ -549,8 +538,8 @@ describe("a passkey's way in's key", () => {
     const laptop = await TH.passkeyOf('laptop')
     const wayin = await sealedPasskey(laptop, await makeVaultKey())
     const { vault_key_wayin_wrapped: _wrapped, ...header } = wayin
-    const ctx = cipherCtx('safebyok-vault-v5', 'acme', 'u1', 'main', 'vault-id-u1', identity.registered_at, 'vault_key_passkey_wrapped', header)
-    const vaultlessInfo = cipherCtx('safebyok-vault-v5', 'vault_key_passkey_wrapped', laptop.credentialId)
+    const ctx = cipherCtx('safebyok-vault-v6', 'acme', 'u1', 'main', 'vault-id-u1', identity.registered_at, 'vault_key_passkey_wrapped', header)
+    const vaultlessInfo = cipherCtx('safebyok-vault-v6', 'vault_key_passkey_wrapped', laptop.credentialId)
     await expect(unwrapsUnder(wayin, laptop.prfBytes, vaultlessInfo, ctx)).rejects.toThrow()
   })
 })

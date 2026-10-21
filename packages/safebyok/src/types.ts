@@ -107,11 +107,6 @@ export const VaultScope = Z.object({
 })
 export type VaultScope = Z.infer<typeof VaultScope>
 
-/** Which vaultKey a record stands for: on the vault props, the one their wayins wrap; on a box, the one its boxKey is wrapped under.
- * It is reserved for a rotation not yet built: every record carries 1.
- */
-export const vaultKeyEpoch = Z.int().check(Z.positive())
-
 /** A CryptoKey, as a record holds one: never its bytes. */
 const cryptoKeyHandle = Z.custom<CryptoKey>((val) => val instanceof CryptoKey, 'a CryptoKey handle')
 
@@ -131,12 +126,11 @@ export type Sidecar = Z.infer<typeof Sidecar>
  * Its sidecar is `{}` when the host gave none. The sidecar is as storage holds it: only
  * `getWhisper()` opens the box and so proves it unaltered.
  *
- * @example BoxSummary.parse({ boxlabel: 'anthropic', revision_tok: 'r1', vault_key_epoch: 1, sidecar: {}, registered_at, written_at }).damaged // false
+ * @example BoxSummary.parse({ boxlabel: 'anthropic', revision_tok: 'r1', sidecar: {}, registered_at, written_at }).damaged // false
  */
 export const BoxSummary = Z.object({
   boxlabel:        NameFloor,
   revision_tok:    Z.string().check(Z.minLength(1)),
-  vault_key_epoch: vaultKeyEpoch,
   sidecar:         Sidecar,
   registered_at:   EpochMillis,
   written_at:      EpochMillis,
@@ -191,8 +185,6 @@ export const PassphraseWayinRecord = Z.object({
   key_deriver_label:       Z.string().check(Z.minLength(1)),
   /** This wayin's passphraseSalt: fresh for every passphrase the vault takes. */
   salt_b64:                Z.string().check(Z.minLength(1)),
-  /** The `vault_key_epoch` of the vaultKey this wayin wraps: in sound vault props, the props' own. */
-  vault_key_epoch:         vaultKeyEpoch,
   /** The sealing device's random id for the vault, from its device mark: never drawn from the device itself. */
   device_id:               Z.string().check(Z.minLength(1)),
   /** When this wayin was sealed: a new passphrase stamps it afresh. */
@@ -217,8 +209,6 @@ export const PasskeyWayinRecord = Z.object({
   credential_id:           Z.string().check(Z.minLength(1)),
   /** The salt the passkey's PRF is evaluated over: {@link PasskeySaltBytes} random bytes, fresh for every wayin. */
   prf_salt_b64:            Z.string().check(Z.minLength(1)),
-  /** The `vault_key_epoch` of the vaultKey this wayin wraps: in sound vault props, the props' own. */
-  vault_key_epoch:         vaultKeyEpoch,
   /** The adding device's random id for the vault, from its device mark: never drawn from the device itself. */
   device_id:               Z.string().check(Z.minLength(1)),
   /** When this wayin was added. */
@@ -268,15 +258,13 @@ export type PasskeyAnswer = {
  * other devices and leases know to ask again.
  */
 export const VaultProps = Z.object({
-  format:              Z.literal('safebyok-vault-v5'),
+  format:              Z.literal('safebyok-vault-v6'),
   applabel:            NameFloor,
   user_id:             NameFloor,
   vaultlabel:          NameFloor,
   /** A random id minted when the vault is made, never changed, and bound into every encryption. */
   vault_id:            Z.string().check(Z.minLength(1)),
   unlock_epoch:        Z.int().check(Z.positive()),
-  /** Which vaultKey the wayins wrap: see {@link vaultKeyEpoch}. */
-  vault_key_epoch:     vaultKeyEpoch,
   /** The vault's passphrase wayin, which every vault has. */
   passphrase:          PassphraseWayinRecord,
   /** The vault's passkey, or null when it has none: at most one. */
@@ -307,7 +295,7 @@ export const LeaseRecord = Z.object({
 })
 export type LeaseRecord = Z.infer<typeof LeaseRecord>
 
-/** What a device mark holds of the vault it has seen under its scope: its own id for the vault, and the highest epochs it has seen.
+/** What a device mark holds of the vault it has seen under its scope: its own id for the vault, and the highest `unlock_epoch` it has seen.
  * Older vault props that storage hands back later are refused as 'rolled_back'.
  */
 export const SeenVault = Z.object({
@@ -317,8 +305,6 @@ export const SeenVault = Z.object({
   vault_id:        Z.string().check(Z.minLength(1)),
   /** The highest `unlock_epoch` this device has seen the vault props at. */
   unlock_epoch:    Z.int().check(Z.positive()),
-  /** The highest `vault_key_epoch` this device has seen the vault props at. */
-  vault_key_epoch: vaultKeyEpoch,
 })
 export type SeenVault = Z.infer<typeof SeenVault>
 
@@ -326,10 +312,10 @@ export type SeenVault = Z.infer<typeof SeenVault>
  * There is one per scope: a vault made anew there is seen afresh, under a new `device_id`.
  * `lock()` leaves the mark, and `del()` erases it.
  *
- * @example { format: 'safebyok-mark-v4', ...scope, seen: { device_id, vault_id, unlock_epoch: 1, vault_key_epoch: 1 } }
+ * @example { format: 'safebyok-mark-v5', ...scope, seen: { device_id, vault_id, unlock_epoch: 1 } }
  */
 export const DeviceMark = Z.object({
-  format:     Z.literal('safebyok-mark-v4'),
+  format:     Z.literal('safebyok-mark-v5'),
   applabel:   NameFloor,
   user_id:    NameFloor,
   vaultlabel: NameFloor,

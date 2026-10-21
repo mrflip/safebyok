@@ -38,8 +38,8 @@ describe("the ctx builders' output, byte for byte", () => {
     const vaultKey = await makeVaultKey()
     const wayin = await Wayin.seal(identity, SealedAt, PassphraseProof.parse(slice, 'pw'), 'device-one', vaultKey)
     const ctx = textBytes(
-      '["safebyok-vault-v5","acme","u1","main","vault-id-u1",' + String(identity.registered_at) + ',"vault_key_passphrase_wrapped",'
-      + `{"device_id":"device-one","key_deriver_label":"test_digest_v0","registered_at":${String(Date.UTC(2026, 9, 15))},"salt_b64":"${wayin.salt_b64}","vault_key_epoch":1,"wayinkind":"passphrase"}]`,
+      '["safebyok-vault-v6","acme","u1","main","vault-id-u1",' + String(identity.registered_at) + ',"vault_key_passphrase_wrapped",'
+      + `{"device_id":"device-one","key_deriver_label":"test_digest_v0","registered_at":${String(Date.UTC(2026, 9, 15))},"salt_b64":"${wayin.salt_b64}","wayinkind":"passphrase"}]`,
     )
     const wayinKey = await importWrappingKeyBytes(await TH.testDeriver.deriveKeyBytes('pw', fromB64(wayin.salt_b64)))
     expect(await unwrapKeyUnder(wayinKey, wayin.vault_key_wayin_wrapped, ctx, { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)
@@ -49,8 +49,8 @@ describe("the ctx builders' output, byte for byte", () => {
     const passkey = await TH.passkeyOf('laptop')
     const wayin = await Wayin.seal(identity, SealedAt, PasskeyProof.parse(slice, passkey), 'device-one', await makeVaultKey())
     const ctx = textBytes(
-      '["safebyok-vault-v5","acme","u1","main","vault-id-u1",' + String(identity.registered_at) + ',"vault_key_passkey_wrapped",'
-      + `{"credential_id":"${wayin.credential_id}","device_id":"device-one","prf_salt_b64":"${wayin.prf_salt_b64}","registered_at":${String(Date.UTC(2026, 9, 15))},"vault_key_epoch":1,"wayinkind":"passkey"}]`,
+      '["safebyok-vault-v6","acme","u1","main","vault-id-u1",' + String(identity.registered_at) + ',"vault_key_passkey_wrapped",'
+      + `{"credential_id":"${wayin.credential_id}","device_id":"device-one","prf_salt_b64":"${wayin.prf_salt_b64}","registered_at":${String(Date.UTC(2026, 9, 15))},"wayinkind":"passkey"}]`,
     )
     const passkeyKey = await deriveWrappingKey(passkey.prfBytes, ctx)
     expect(await unwrapKeyUnder(passkeyKey, wayin.vault_key_wayin_wrapped, ctx, { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)
@@ -69,9 +69,9 @@ describe("the ctx builders' output, byte for byte", () => {
     const box = (await TH.expectingGood(vaultDB).getBox(scope, 'anthropic'))!
     const lease = (await TH.expectGood(deviceDB.getLease(scope)))!
     const scopeText = `"acme","u1","main","${vaultProps.vault_id}"`
-    const header = `{"boxlabel":"anthropic","registered_at":${String(box.registered_at)},"revision_tok":"${box.revision_tok}","sidecar_json":"{}","vault_key_epoch":1,"whisper_codec":"json_v1","whisper_schema_version":1,"written_at":${String(box.written_at)}}`
-    const keyCtx = textBytes(`["safebyok-box-v6",${scopeText},"box_key_wrapped",${header}]`)
-    const whisperCtx = textBytes(`["safebyok-box-v6",${scopeText},"whisper_ciphered",${header}]`)
+    const header = `{"boxlabel":"anthropic","registered_at":${String(box.registered_at)},"revision_tok":"${box.revision_tok}","sidecar_json":"{}","whisper_codec":"json_v1","whisper_schema_version":1,"written_at":${String(box.written_at)}}`
+    const keyCtx = textBytes(`["safebyok-box-v7",${scopeText},"box_key_wrapped",${header}]`)
+    const whisperCtx = textBytes(`["safebyok-box-v7",${scopeText},"whisper_ciphered",${header}]`)
     const leaseCtx = textBytes(`["safebyok-lease-v1",${scopeText},${String(lease.unlock_epoch)},${String(lease.ask_passphrase_at)},"vault_key_lease_wrapped"]`)
 
     const { sessionKey } = await TH.expectGood(Wayin.make(vaultProps, vaultProps.passphrase, slice.keyDeriver).tryOpen(Proof.parse(slice, 'pw')))

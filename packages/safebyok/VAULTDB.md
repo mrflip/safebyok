@@ -53,7 +53,7 @@ validators has chosen that. A record a client's validators would refuse reads ba
 damage.
 
 So the versioned update is split: the adapter owns the atomic compare-and-write (lines 3.1 to
-3.5, and 3.8), and the vault owns the read before it and the refusal after it. "The first write
+3.5), and the vault owns the read before it and the refusal after it. "The first write
 wins, and the second hears of it" is the vault's policy over the adapter's guarantee, not something
 an adapter implements.
 
@@ -270,19 +270,6 @@ all, and the vault's next read shows which.
 once from different devices, all land: none refuses as `stale_write`, none fails for contention,
 and no host retries. Only writes to one box -- or a deletion of the vault -- can collide, and
 then line 3.3 or 3.4 says which wins.
-
-**3.8. A box write lands only under the vaultKey that stands.** A box carries the
-`vault_key_epoch` of the vaultKey its boxKey is wrapped under, and its write's expectation
-names the same one (the base class refuses a box whose epoch is not the expected one, as
-`invalid_box`, before the adapter sees it). `putBox` writes only while the scope's standing
-vault props have that `vault_key_epoch`, as well as the `vault_id` and revision of line 3.3,
-compared in the same atomic step as the write; otherwise it refuses as `vault_mismatch` and writes
-nothing. So a box only ever lands sealed under the vaultKey its vault props stand for. Every
-vault carries `vault_key_epoch` 1 today, the epoch reserved for a rotation of the vaultKey not yet
-built, so for now the comparison refuses a record built wrong. It is kept so that rotation needs
-no new contract: the vault does not read the vault props before each write, so only storage can
-refuse a device that still holds a vaultKey since replaced and has not looked at the vault props
-meanwhile. Deletions name no `vault_key_epoch` (line 3.4): a deletion reveals nothing.
 
 ## 4. The box limit
 

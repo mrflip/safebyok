@@ -8,7 +8,7 @@ describe("selectionOf", () => {
   })
 
   it("asks for a listed box without either ciphered field", () => {
-    expect(selectionOf(ListedBoxFields)).to.eq('format boxlabel revision_tok vault_key_epoch whisper_codec whisper_schema_version sidecar_json registered_at written_at')
+    expect(selectionOf(ListedBoxFields)).to.eq('format boxlabel revision_tok whisper_codec whisper_schema_version sidecar_json registered_at written_at')
   })
 })
 

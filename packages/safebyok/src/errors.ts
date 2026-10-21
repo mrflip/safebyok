@@ -96,7 +96,7 @@ export const RefusalKindVals = [
   'insecure_context',    // the page is not a secure context (plain http), where the browser withholds WebCrypto
   'unexpected_error',    // something threw that is no refusal: a bug, in safebyok or in a function the app handed it
   'stale_write',         // storage changed since this device read it, so the write was refused
-  'vault_mismatch',      // a box write's vault props are not the ones standing -- another vault_id, vaultKey epoch, or none -- so it was refused
+  'vault_mismatch',      // a box write's vault props are not the ones standing -- another vault_id, or none -- so it was refused
   'rolled_back',         // storage handed back an older copy of the vault than this device has seen, which it refuses to use
   'not_permitted',       // the storage backend refused the signed-in user this call: not theirs to make
   'identity_revoked',    // the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in

@@ -48,7 +48,7 @@ describe("postgresVaultDB's devices, for the battery's races", () => {
 
 const u1 = TH.scopeOf('u1')
 const thisVault = { vault_id: 'vault-id-u1' }
-const noBoxYet = { vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 1 }
+const noBoxYet = { vault_id: 'vault-id-u1', revision_tok: null }
 
 describe("postgresVaultDB, its options", () => {
   const BadOpts = [
@@ -140,7 +140,7 @@ describe("postgresVaultDB, who may reach a vault", () => {
     ['getBox',           (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.getBox(u2, 'anthropic')],
     ['listBoxes',        (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.listBoxes(u2)],
     ['listBoxRecords',   (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.listBoxRecords(u2)],
-    ['putBox',           (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.putBox(u2, { vault_id: 'vault-id-u2', revision_tok: null, vault_key_epoch: 1 }, TH.boxOf('anthropic', 'one'))],
+    ['putBox',           (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.putBox(u2, { vault_id: 'vault-id-u2', revision_tok: null }, TH.boxOf('anthropic', 'one'))],
     ['delBox',           (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.delBox(u2, 'anthropic', { vault_id: 'vault-id-u2', revision_tok: null })],
     ['delVault',         (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.delVault(u2, { vault_id: 'vault-id-u2' })],
     ['subscribe',        (vaultDB: ReturnType<typeof postgresVaultDB>) => outcomeOf(() => { vaultDB.subscribe(u2, TH.changeCounter().onChange) })],
@@ -240,9 +240,8 @@ describe("postgresVaultDB, what it stores", () => {
       user_id:          'u1',
       vaultlabel:       'main',
       vault_id:         'vault-id-u1',
-      format:           'safebyok-vault-v5',
+      format:           'safebyok-vault-v6',
       unlock_epoch:     1,
-      vault_key_epoch:  1,
       passphrase:       TH.vaultPropsOf('u1').passphrase,
       passkey:          null,
       registered_at:    Date.UTC(2026, 9, 14),
@@ -290,10 +289,9 @@ describe("postgresVaultDB, what it stores", () => {
       user_id:                'u1',
       vaultlabel:             'main',
       vault_id:               'vault-id-u1',
-      format:                 'safebyok-box-v6',
+      format:                 'safebyok-box-v7',
       boxlabel:               'anthropic',
       revision_tok:           'rev-one',
-      vault_key_epoch:        1,
       box_key_wrapped:        TH.fakeCiphered('boxkey-one'),
       whisper_ciphered:       TH.fakeCiphered('whisper-one'),
       whisper_codec:          'json_v1',
@@ -323,7 +321,7 @@ describe("postgresVaultDB, what it stores", () => {
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
     await TH.expectingGood(vaultDB).putVaultProps({ ...TH.vaultPropsOf('u1'), unlock_epoch: 2 }, { vault_id: 'vault-id-u1', unlock_epoch: 1 })
     await TH.expectingGood(vaultDB).putBox(u1, noBoxYet, TH.boxOf('anthropic', 'one'))
-    await TH.expectingGood(vaultDB).putBox(u1, { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 1 }, TH.boxOf('anthropic', 'two'))
+    await TH.expectingGood(vaultDB).putBox(u1, { vault_id: 'vault-id-u1', revision_tok: 'rev-one' }, TH.boxOf('anthropic', 'two'))
     await TH.expectingGood(vaultDB).getBox(u1, 'anthropic')
     expect(await TH.expectingGood(vaultDB).delBox(u1, 'anthropic', TH.deleting('rev-two'))).to.deep.equal({ outcome: 'deleted' })
     await TH.expectingGood(vaultDB).delVault(u1, thisVault)
@@ -381,7 +379,7 @@ describe("postgresVaultDB, its box limit", () => {
   it("refuses a first write in a full vault of another vault_id as vault_mismatch: the count is the standing vault's", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = await filledTo(db, 1, ['openai'])
-    await TH.expectBad(vaultDB.putBox(u1, { vault_id: 'vault-id-gone', revision_tok: null, vault_key_epoch: 1 }, TH.boxOf('anthropic', 'sk-fake')), 'vault_mismatch')
+    await TH.expectBad(vaultDB.putBox(u1, { vault_id: 'vault-id-gone', revision_tok: null }, TH.boxOf('anthropic', 'sk-fake')), 'vault_mismatch')
     expect(await boxlabelsIn(vaultDB)).to.deep.equal(['openai'])
   })
 
@@ -430,8 +428,8 @@ describe("postgresVaultDB, its box limit", () => {
     const vaultDB = await filledTo(db, 5, [])
     const orphan = TH.boxOf('anthropic', 'sk-fake')
     const insertOrphan = db.query(
-      `INSERT INTO safebyok_boxes (applabel, user_id, vaultlabel, vault_id, format, boxlabel, revision_tok, vault_key_epoch, box_key_wrapped, whisper_ciphered, whisper_codec, whisper_schema_version, sidecar_json, registered_at, written_at)
-       VALUES ('acme', 'u1', 'main', 'vault-id-gone', $1, $2, $3, 1, '{}', '{}', 'json_v1', 1, '{}', 0, 0)`,
+      `INSERT INTO safebyok_boxes (applabel, user_id, vaultlabel, vault_id, format, boxlabel, revision_tok, box_key_wrapped, whisper_ciphered, whisper_codec, whisper_schema_version, sidecar_json, registered_at, written_at)
+       VALUES ('acme', 'u1', 'main', 'vault-id-gone', $1, $2, $3, '{}', '{}', 'json_v1', 1, '{}', 0, 0)`,
       [orphan.format, orphan.boxlabel, orphan.revision_tok],
     )
     await expect(insertOrphan).rejects.toMatchObject({ code: '23503' })
@@ -445,7 +443,7 @@ describe("postgresVaultDB, its box limit", () => {
     const vaultDB = postgresVaultDB({ client: spy.client, userId: 'u1', maxBoxes: 2 })
     await TH.expectingGood(vaultDB).putBox(u1, noBoxYet, TH.boxOf('anthropic', 'sk-fake'))
     await TH.expectBad(vaultDB.putBox(u1, noBoxYet, TH.boxOf('mistral', 'sk-fake')), 'vault_full')
-    await TH.expectBad(vaultDB.putBox(u1, { vault_id: 'vault-id-gone', revision_tok: null, vault_key_epoch: 1 }, TH.boxOf('mistral', 'sk-fake')), 'vault_mismatch')
+    await TH.expectBad(vaultDB.putBox(u1, { vault_id: 'vault-id-gone', revision_tok: null }, TH.boxOf('mistral', 'sk-fake')), 'vault_mismatch')
     await TH.expectingGood(vaultDB).delBox(u1, 'anthropic', TH.deleting('rev-sk-fake'))
     expect(spy.sent).to.have.lengthOf(4)
     for (const { text } of spy.sent) {
@@ -574,7 +572,7 @@ describe("postgresVaultDB, listBoxRecords", () => {
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
     await TH.expectingGood(vaultDB).putBox(u1, noBoxYet, TH.boxOf('anthropic', 'one'))
     const [record] = await TH.expectingGood(vaultDB).listBoxRecords(u1)
-    expect(record).to.have.property('format', 'safebyok-box-v6')
+    expect(record).to.have.property('format', 'safebyok-box-v7')
     const [summary] = await TH.expectingGood(vaultDB).listBoxes(u1)
     expect(summary).to.not.have.property('format')
   })

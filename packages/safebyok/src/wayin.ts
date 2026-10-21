@@ -12,9 +12,7 @@ import type { KeyDeriver } from './key-deriver'
  * Each wrap is bound to its vault (the scope, and the props' unchanging `vault_id` and
  * `registered_at`), to its own visible header, and to a purpose its wayinkind names. A passkey's
  * key is made with that same ctx as its HKDF `info`. The props' `unlock_epoch` and the other
- * wayin are not bound, so changing one wayin leaves the other open. A wayin at another
- * `vault_key_epoch` than its props is damaged, so one spliced in from older props never hands over
- * its older vaultKey.
+ * wayin are not bound, so changing one wayin leaves the other open.
  */
 
 /** The vaultKey's two forms after an unwrap: a `transientKey` to wrap anew, and a non-extractable `sessionKey` to keep.
@@ -26,20 +24,20 @@ export type VaultKeyPair = { transientKey: CryptoKey, sessionKey: CryptoKey }
 
 /** The vault props a wayin is one of, as far as it reads them: a whole {@link VaultProps} is one.
  * Its wrap is bound to their scope, `vault_id` and `registered_at`: with its own header, the whole
- * of its ctx. Its `vault_key_epoch` must match theirs.
+ * of its ctx.
  */
-export type WayinVaultProps = Pick<VaultProps, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_id' | 'registered_at' | 'vault_key_epoch'>
+export type WayinVaultProps = Pick<VaultProps, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_id' | 'registered_at'>
 
 /** `RecordT` with every field but its wrap, member by member of a union. */
 type HeaderOf<RecordT> = RecordT extends unknown ? Omit<RecordT, 'vault_key_wayin_wrapped'> : never
 /** A wayin's visible header, every field but its wrap: what the wrap is bound to. */
 export type WayinHeader = HeaderOf<WayinRecord>
 
-/** What `Wayin.seal` stamps on a wayin beside its kind's own fields: the epoch of the vaultKey it wraps, and the device and time that sealed it. */
-export type WayinStamp = Pick<WayinRecord, 'vault_key_epoch' | 'device_id' | 'registered_at'>
+/** What `Wayin.seal` stamps on a wayin beside its kind's own fields: the device and time that sealed it. */
+export type WayinStamp = Pick<WayinRecord, 'device_id' | 'registered_at'>
 
 /** The ctx's first part: the vault props' format, under which every wayin's wrap is bound. */
-const VaultPropsFormat = 'safebyok-vault-v5'
+const VaultPropsFormat = 'safebyok-vault-v6'
 
 /** The ctx purpose of each wayinkind's wrap, so no kind of wayin opens as another. */
 const PurposeForWayinkind = {
@@ -89,8 +87,6 @@ export abstract class Wayin {
   readonly device_id: string
   /** When the wayin was sealed. */
   readonly registered_at: number
-  /** The epoch of the vaultKey it wraps: in sound vault props, the props' own. */
-  readonly vault_key_epoch: number
   /** The vaultKey, wrapped under this wayin's wayinKey, bound to its `wayinCtx`. */
   readonly vault_key_wayin_wrapped: Ciphered
 
@@ -99,7 +95,6 @@ export abstract class Wayin {
     this.wayinkind = record.wayinkind
     this.device_id = record.device_id
     this.registered_at = record.registered_at
-    this.vault_key_epoch = record.vault_key_epoch
     this.vault_key_wayin_wrapped = this.props.vault_key_wayin_wrapped
   }
 
@@ -132,7 +127,7 @@ export abstract class Wayin {
   }
 
   /** True when this wayin is stored in a form this package never writes, so it cannot be tried.
-   * That is another vaultKey epoch than its props', or a salt its kind never makes.
+   * That is a salt its kind never makes.
    */
   abstract isDamaged(): boolean
 
@@ -165,7 +160,7 @@ export abstract class Wayin {
     }
   }
 
-  /** A new wayin wrapping `vaultKey` for `proof`, stamped with `vaultProps`' vaultKey epoch, `deviceId`, and `now` as its `registered_at`.
+  /** A new wayin wrapping `vaultKey` for `proof`, stamped with `deviceId`, and `now` as its `registered_at`.
    * A passphrase wayin gets a fresh passphraseSalt for the key deriver `proof` derives through, and
    * refuses as {@link PassphraseProof.wayinKeyFor} does. A passkey wayin keeps the credential's id
    * and salt to ask it again, never its answer. Check the proof first: a new passphrase with
@@ -182,7 +177,7 @@ export abstract class Wayin {
   static async seal(vaultProps: WayinVaultProps, now: number, proof: PasskeyProof, deviceId: string, vaultKey: CryptoKey): Promise<PasskeyWayin>
   static async seal(vaultProps: WayinVaultProps, now: number, proof: PassphraseProof | PasskeyProof, deviceId: string, vaultKey: CryptoKey): Promise<PassphraseWayin | PasskeyWayin>
   static async seal(vaultProps: WayinVaultProps, now: number, proof: PassphraseProof | PasskeyProof, deviceId: string, vaultKey: CryptoKey): Promise<PassphraseWayin | PasskeyWayin> {
-    const stamp: WayinStamp = { vault_key_epoch: vaultProps.vault_key_epoch, device_id: deviceId, registered_at: now }
+    const stamp: WayinStamp = { device_id: deviceId, registered_at: now }
     if (proof instanceof PassphraseProof) {
       const { header, wayinCtx, wayinKey } = await passphraseKeying(vaultProps, proof, stamp)
       return new PassphraseWayin(vaultProps, { ...header, vault_key_wayin_wrapped: await wrapKeyUnder(wayinKey, vaultKey, wayinCtx) }, proof.vault.keyDeriver)
@@ -221,11 +216,10 @@ export class PassphraseWayin extends Wayin {
     return { wayinkind, device_id, registered_at }
   }
 
-  /** True at another vaultKey epoch than its props, or with a salt the vault's own key deriver could not have made.
+  /** True with a salt the vault's own key deriver could not have made.
    * A salt for another key deriver is not this vault's to judge.
    */
   isDamaged(): boolean {
-    if (this.vault_key_epoch !== this.vaultProps.vault_key_epoch) { return true }
     const { keyDeriver } = this
     return this.key_deriver_label === keyDeriver.key_deriver_label && fromB64OrNull(this.salt_b64)?.length !== keyDeriver.salt_bytes
   }
@@ -279,9 +273,9 @@ export class PasskeyWayin extends Wayin {
     return { wayinkind, device_id, registered_at, credential_id, prf_salt_b64 }
   }
 
-  /** True at another vaultKey epoch than its vault props, or with a salt that is not base64url of {@link PasskeySaltBytes} bytes. */
+  /** True with a salt that is not base64url of {@link PasskeySaltBytes} bytes. */
   isDamaged(): boolean {
-    return this.vault_key_epoch !== this.vaultProps.vault_key_epoch || fromB64OrNull(this.prf_salt_b64)?.length !== PasskeySaltBytes
+    return fromB64OrNull(this.prf_salt_b64)?.length !== PasskeySaltBytes
   }
 
   /** {@link Wayin.tryOpen} for a passkey's answer: one HKDF, with no derivation to wait for.

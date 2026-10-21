@@ -51,7 +51,7 @@ describe("localVaultDB", () => {
     expect(summaries.map((box) => TH.summaryOf(box)?.sidecar)).to.deep.equal([{ note: 'a test box' }, {}])
     const prev = await TH.expectingGood(vaultDB).getBox(TH.scopeOf('u1'), 'openai')
     expect(prev).to.deep.equal(emptied)
-    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-two', vault_key_epoch: 1 }, emptied)
+    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-two' }, emptied)
     expect(store.read(u1BoxCkey('openai'))).to.eq(emptiedRow)
   })
 
