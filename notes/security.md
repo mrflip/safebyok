@@ -39,6 +39,22 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-21 (thread checker, branch 20261021-checker): **one guard is the only caller of a host's
+  strength checker, and a checker's `load` runs at every `hello()`.** (1) `guardStrengthChecker`
+  (`packages/safebyok/src/passphrase-strength.ts`) is the only code that calls the host's checker.
+  `Vault.make` wraps the host's checker once; `vault.strengthChecker` returns the guarded one (type
+  `GuardedStrengthChecker`), and `PassphraseProof.checkStrongEnough()` and `safebyok-react`'s dialog
+  advice both go through it. The guard finds a blank passphrase (empty, or only spaces) weak before
+  the host's checker hears it; hands the checker a frozen copy of the scope; refuses a verdict that
+  breaks the contract as `bad_option`; and refuses a checker's throw, or a verdict getter's, as
+  `unexpected_error` carrying nothing (no kind, `meta`, `cause` or text), because the checker heard
+  the passphrase. (2) A checker may carry an idempotent `load`; every `hello()` runs it, through the
+  guard, before reading storage. A load that fails fails the `hello()` as `unexpected_error` with the
+  load's throw as `cause`: the load hears no passphrase, so its error may ride. `zxcvbnStrengthChecker`'s
+  load fetches its dictionary chunk, and no longer answers "weak, try again" when the chunk will not
+  load; a check whose load fails now throws, which the guard refuses carrying nothing. The Coach: "Late
+  checks are dangerous: you want a fundamental thing to break loud and clear."
+
 * 2026-10-21 (thread wayin_rules, branch 20261021-wayin_rules, stacked on [#214](https://github.com/mrflip/safebyok/pull/214)): **the key a create keeps comes out
   of a stored way in, under a proof, as every unlock's does.** Before, `Wayin.seal` unwrapped a
   non-extractable session handle from the way in it had just wrapped, the creating unlock kept that
@@ -104,7 +120,8 @@ added or folded into through the subagent, and no other entry changes.
   puts the passphrase to the vault's `strengthChecker`, a public getter on `Vault`, with a frozen copy
   of the vault's scope; the vault no longer reads `proof.passphrase`). (3) The strength
   checker (`strengthChecker`, type `StrengthChecker`; `src/passphrase-strength.ts`): its contract is
-  to answer a verdict. A throw from it is refused `unexpected_error` with no `cause`, `meta` or kind
+  to answer a verdict (amended 2026-10-21 (checker): the host's checker is called only through
+  `guardStrengthChecker`; see the checker entry). A throw from it is refused `unexpected_error` with no `cause`, `meta` or kind
   of what it threw, as it heard the passphrase; so is a throw as its verdict is read (a `strong` or
   `reason` getter: amended 2026-10-21, the read now being inside the guard); before, a thrown
   condition passed through as itself, and a non-condition was carried as `cause`. Left out, the default
@@ -115,7 +132,9 @@ added or folded into through the subagent, and no other entry changes.
   vault's identity comparison against the default and its once-per-handle log are gone; nothing logs; before,
   `Vault.make` refused a missing one `bad_option`). `zxcvbnStrengthChecker` now answers weak (a
   reason saying to try again) when its dictionary chunk fails to load, instead of rejecting
-  `storage_unavailable`: without the dictionary it cannot judge, so it never admits. (4)
+  `storage_unavailable`: without the dictionary it cannot judge, so it never admits (amended 2026-10-21
+  (checker): no longer; its `load` runs at `hello()`, and a failed load fails the `hello()` or, in a
+  check, throws and is refused `unexpected_error` carrying nothing; see the checker entry). (4)
   `Wayin.seal(vault, proof, holder, stamp, vaultKey)`, one function where `sealPassphrase`,
   `sealFirstPassphrase` and `sealPasskey` were three, hands back for every seal `{ wayin, sessionKey }`:
   a non-extractable session handle on the vaultKey, one more AES-KW unwrap under the just-made
@@ -1219,7 +1238,7 @@ added or folded into through the subagent, and no other entry changes.
   (`deriveKeyBytes`) or a passphrase strength test throws, both handed the passphrase, goes through
   `hostThrewRefusal` (`src/outcome.ts`), applied in `passphraseKeyOf` (`src/proof.ts`) (amended
   2026-10-19 (put_wayin), 2026-10-21: now only the key deriver's, not the strength checker's throw, which `checkStrongEnough`
-  (`src/passphrase-strength.ts`; amended 2026-10-21 (wayin_rules): now `PassphraseProof.checkStrongEnough()`, `src/proof.ts`) refuses as `unexpected_error` with no `cause`, `meta` or kind
+  (`src/passphrase-strength.ts`; amended 2026-10-21 (wayin_rules): now `PassphraseProof.checkStrongEnough()`, `src/proof.ts`; amended 2026-10-21 (checker): through `guardStrengthChecker`) refuses as `unexpected_error` with no `cause`, `meta` or kind
   of what it threw; see the put_wayin entry). Only a
   `VaultError` of the `condition` family, of this copy of safebyok, passes through as itself: a key
   deriver's, say. Everything else becomes `unexpected_error` with the throw as its `cause` (amended
@@ -1436,7 +1455,8 @@ added or folded into through the subagent, and no other entry changes.
   shares classic's parsing core, and the test suite passes against zod 4.0.0, the peer range's
   floor, as against the current 4.6. Mini loads no locale, so a zod issue's default message is
   generic, but no zod message reaches a caller of the vault or its VaultDB: every refusal there
-  is a VaultError of our own wording. A host calling an exported schema's `.safeParse` itself
+  is a VaultError of our own wording (amended 2026-10-21 (checker): the options-bag refusals now carry
+  Zod's English message; see the `putBox()` unknown-keys entry). A host calling an exported schema's `.safeParse` itself
   gets zod's issues, which name paths and limits but carry no input (zod's `reportInput` is
   off). The build keeps each module its own file in `dist/` (`unbundle`), so a host's bundle
   carries only the modules its imports reach.
@@ -1709,7 +1729,12 @@ added or folded into through the subagent, and no other entry changes.
   a strength checker's throw carries nothing, amended 2026-10-21), and anything that is not a `VaultError` becomes a fixed `unexpected_error`
   quoting nothing of it, so "the very thrown value" above no longer reaches `onCaughtError`. A host
   `passphraseAdvice` that throws (it is handed every keystroke of a new passphrase) is replaced at its
-  source with a fixed refusal, so even a `VaultError` it threw carries nothing on. The report names
+  source with a fixed refusal, so even a `VaultError` it threw carries nothing on. Amended 2026-10-21
+  (checker): a `passphraseAdvice` that throws a `VaultError` now has that `VaultError` reported as it
+  came, since safebyok made it and safebyok's refusals never quote a passphrase; anything else is still
+  replaced by a fixed `unexpected_error` carrying nothing. A host that itself constructs a `VaultError`
+  quoting the passphrase and throws it from its advice would have it reported; that is the host's own
+  deliberate act, not a side door. The report names
   its component (`PassphraseModal` or `PasskeyUnlockButton`) and, for a `VaultError` whose cause was
   stripped, says in its message that the cause was left out. `meta` is passed through as is. The
   dialog's fallback notice once misuse trips it ("Something went wrong") now shares
@@ -2312,7 +2337,12 @@ added or folded into through the subagent, and no other entry changes.
   as `bad_option` before the vault opens (`parseStrengthChecker`, `passphrase-strength.ts`, called
   from `vault.ts`, and exported from `safebyok` beside `checkValidators`). Amended 2026-10-19
   (put_wayin): one left out was refused `bad_option` too; it now becomes `UnchosenStrengthChecker` (amended 2026-10-21 (wayin_rules): now `DefaultStrengthChecker`),
-  which refuses every passphrase as too weak (see the put_wayin entry). The length-only
+  which refuses every passphrase as too weak (see the put_wayin entry). Amended 2026-10-21 (checker):
+  `parseStrengthChecker` no longer exists. `Vault.make`'s options schema checks `strengthChecker` (a
+  function, whose `load`, if any, is a function too; refused `bad_option` otherwise, in the schema's
+  words) and defaults one left out to `DefaultStrengthChecker` (weak for every passphrase, logs
+  nothing); `Vault.make` then wraps it with `guardStrengthChecker` and keeps the guarded one for the
+  vault's life as `vault.strengthChecker` (see the checker entry). The length-only
   `passphraseLengthTest` is no longer exported; it passed `'a'` plus eleven spaces.
 * 2026-10-17 (thread 16, strength_principles): **the browser default is zxcvbn, loaded on
   demand.** `browserOpts()` (`browser.ts`) supplies `zxcvbnStrengthChecker`
@@ -2321,7 +2351,9 @@ added or folded into through the subagent, and no other entry changes.
   bundler splits into a chunk served from the host's own origin and bundle; no third-party fetch
   is made. If that load fails the call rejects, so the vault refuses the new passphrase (no
   passphrase is admitted untested); the failed load is forgotten and the next call tries again
-  (amended 2026-10-19 (put_wayin): it answers weak rather than rejecting; see the put_wayin entry).
+  (amended 2026-10-19 (put_wayin): it answers weak rather than rejecting; see the put_wayin entry;
+  amended 2026-10-21 (checker): the import is the checker's `load`, run at `hello()`, and a failed load
+  fails the `hello()`; see the checker entry).
   `@zxcvbn-ts/core` and `@zxcvbn-ts/language-common` are ordinary dependencies, not optional
   peers, because `browserOpts()` imports them: about 1.3 MB installed, about 214 kB shipped on
   demand.
@@ -2330,12 +2362,14 @@ added or folded into through the subagent, and no other entry changes.
   user_id, vaultlabel }`. `zxcvbnStrengthChecker` passes each of the three, whole and split into
   runs of letters and digits, to zxcvbn as user inputs (`check(passphrase, userInputs)`). It
   keeps nothing between calls and sends nothing anywhere. The `user_id` is the host's opaque id,
-  already in every stored record.
+  already in every stored record. Amended 2026-10-21 (checker): the guard hands the checker a frozen
+  copy of the scope on every call.
 * 2026-10-17 (thread 16, strength_principles): **in the dialog, the strength test runs on every
   keystroke by default.** In `VaultProvider` (`safebyok-react/src/vault-provider.tsx`), with no
   host `passphraseAdvice`, the passphrase dialog's advice is the strength test's reason, so the
   host's `strengthChecker` is called with each partial passphrase as the user types while
-  creating a vault, never while unlocking. A host test that does anything off the device (a
+  creating a vault, never while unlocking (amended 2026-10-21 (checker): through the vault's guarded
+  `strengthChecker`, so a blank partial passphrase never reaches the host's checker). A host test that does anything off the device (a
   breach-check API call, logging) does it per keystroke, on prefixes of the passphrase in plain
   text. The doc blocks and READMEs say the test hears the passphrase in plain text, must stay on
   the device, keep nothing and send nothing. A host's own `passphraseAdvice` replaces this
@@ -2345,7 +2379,10 @@ added or folded into through the subagent, and no other entry changes.
   `VaultProvider` checks the test at render with `parseStrengthChecker` (not a function goes to
   the error boundary as `bad_option`; missing, it is the unchosen checker, as in `Vault.make`), and a test with a new identity reopens the vault,
   warned of once. The test that gates a passphrase is the one validated at open; none is swapped
-  in later through a ref.
+  in later through a ref. Amended 2026-10-21 (checker): `VaultProvider` no longer parses the checker
+  at render; `Vault.make` refuses a bad one (to the error boundary), and the vault keeps the guarded
+  checker for its life as `vault.strengthChecker`. The dialog's advice asks `vault.strengthChecker` of
+  the vault the ask came from.
 * 2026-10-17 (thread 16, strength_principles): **`withUnlockedVault` resolves null when the
   provider's own close cuts an action short.** An action, or its run again after an unlock, still
   under way when the provider closes the handle (unmount, sign-out, user switch, reopen) used to
@@ -2422,7 +2459,9 @@ added or folded into through the subagent, and no other entry changes.
   or to set, a passphrase it could not test. Amended 2026-10-19 (put_wayin): a failed load is no
   longer a `VaultError`: `loadEstimator` forgets the failure and answers null, and the checker
   answers weak, with a reason saying to try again, so no error and no `cause` are carried (see the
-  put_wayin entry). Also, `VaultProvider`'s default passphrase advice
+  put_wayin entry). Amended 2026-10-21 (checker): the load is now the checker's `load`, run at every
+  `hello()`; a failed load fails the `hello()` as `unexpected_error` with the throw as `cause`, and a
+  check that throws is refused carrying nothing (see the checker entry). Also, `VaultProvider`'s default passphrase advice
   (`adviceFrom`, `packages/safebyok-react/src/vault-provider.tsx`) now treats a strength test that
   rejects as nothing to say (no advice shown) rather than ending the dialog at the error
   boundary; the gate at Create is unchanged, since the vault runs the test again there.
@@ -2441,13 +2480,19 @@ added or folded into through the subagent, and no other entry changes.
   **the vault's checked scope is frozen.** `checkScope` (`packages/safebyok/src/names.ts`) returns
   `Object.freeze(...)`. The same object is handed to the host's `strengthChecker` and held
   in `getSnapshot().scope`, and the vault keys storage and the cipher ctx by it; frozen, none
-  of the three can change it for the others.
+  of the three can change it for the others. Amended 2026-10-21 (checker): the host's checker is handed
+  a frozen copy of it by the guard, not this object.
 * 2026-10-17 (thread 9b, core_tidy, [#144](https://github.com/mrflip/safebyok/pull/144)):
   **`putBox()` refuses unknown option keys with `bad_option`.** `optionsCheck`
   (`packages/safebyok/src/options.ts`, shared with the strict check of `Vault.make`'s `validators`)
   refuses a key it does not know. A caller still passing the retired `{ note }`, beside or instead
   of `{ sidecar }`, is told at once rather than silently storing no sidecar. The refusal never
-  quotes the options.
+  quotes the options. Amended 2026-10-21 (checker): every options-bag check (`optionsCheck`: `hello`,
+  `ensureLease`, `putBox`, `Box.seal`, the validators, a VaultDB call's opts) and `Vault.make`'s options
+  schema now report Zod's own English message, `zod/mini`'s `en` locale passed per parse and never by
+  `Z.config`, so the host's Zod is untouched. Zod's English names the type of a refused value, never
+  the value; it does quote the options bag's field names (the host's code), where `optionsCheck`
+  formerly quoted nothing. No secret material reaches these bags.
 * 2026-10-17 (PR [#6](https://github.com/mrflip/safebyok/pull/6)): **the non-extractable vaultKey
   is not a defence against code running in the page while the vault is unlocked.** The session's
   vaultKey handle is a non-extractable WebCrypto `CryptoKey`, so page code cannot export its raw

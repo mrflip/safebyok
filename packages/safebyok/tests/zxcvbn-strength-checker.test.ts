@@ -132,9 +132,18 @@ describe("zxcvbnStrengthChecker's loading", () => {
     vi.resetModules()
   })
 
-  it("loads zxcvbn at its first call, never at import, and once", async () => {
+  it("loads zxcvbn at its load, never at import, and once, as its load example shows", async () => {
     const { loads, fresh } = await freshModule(false)
     expect(loads.count).to.eq(0)
+    await fresh.zxcvbnStrengthChecker.load()
+    await fresh.zxcvbnStrengthChecker.load()
+    expect(loads.count).to.eq(1)
+    expect(await fresh.zxcvbnStrengthChecker('password1234')).to.have.property('strong', false)
+    expect(loads.count).to.eq(1)
+  })
+
+  it("loads zxcvbn at its first call when nothing ran its load, and once", async () => {
+    const { loads, fresh } = await freshModule(false)
     expect(await fresh.zxcvbnStrengthChecker('password1234')).to.have.property('strong', false)
     expect(await fresh.zxcvbnStrengthChecker('correct horse battery staple')).to.deep.equal({ strong: true })
     expect(loads.count).to.eq(1)
@@ -146,33 +155,34 @@ describe("zxcvbnStrengthChecker's loading", () => {
     expect(loads.count).to.eq(0)
   })
 
-  it("answers weak when zxcvbn fails to load, never rejecting, and tries again at the next call", async () => {
+  it("rejects its load when zxcvbn fails to load, and loads again at the next", async () => {
     const { loads, fresh } = await freshModule(true)
-    const unloaded = await fresh.zxcvbnStrengthChecker('correct horse battery staple')
-    expect(unloaded).to.have.property('strong', false)
-    expect(unloaded).to.have.property('reason').that.matches(/couldn't be checked just now/)
-    expect(await fresh.zxcvbnStrengthChecker('correct horse battery staple')).to.deep.equal({ strong: true })
+    await expect(fresh.zxcvbnStrengthChecker.load()).rejects.toThrow()
+    await fresh.zxcvbnStrengthChecker.load()
     expect(loads.count).to.eq(2)
   })
 
-  it("says a failed load in a reason written for the user, quoting no passphrase", async () => {
+  it("rejects a call whose load fails, rather than answering weak", async () => {
     const { fresh } = await freshModule(true)
-    const verdict = await fresh.zxcvbnStrengthChecker('SUPERSECRET staple horse')
-    expect(JSON.stringify(verdict)).to.match(/Try again shortly/)
-    expect(JSON.stringify(verdict)).to.not.include('SUPERSECRET')
+    await expect(fresh.zxcvbnStrengthChecker('correct horse battery staple')).rejects.toThrow()
+    expect(await fresh.zxcvbnStrengthChecker('correct horse battery staple')).to.deep.equal({ strong: true })
   })
 
-  it("refuses a vault's Create as 'weak_passphrase' when zxcvbn fails to load, making nothing, and admits it at the next try", async () => {
+  it("fails a vault's hello as unexpected_error when zxcvbn fails to load, reading nothing, and opens at the next hello", async () => {
     const { fresh } = await freshModule(true)
     const [{ Vault: FreshVault }, { localVaultDB }, { memoryStore }, { memoryDeviceDB }] = await Promise.all([
       import('../src/vault'), import('../src/local-vault-db'), import('../src/string-store'), import('../src/device-db'),
     ])
     const vaultDB = localVaultDB({ store: memoryStore() })
     const vault = FreshVault.make(TH.memoryVaultOpts({ strengthChecker: fresh.zxcvbnStrengthChecker, vaultDB, deviceDB: memoryDeviceDB() }))
-    await vault.hello()
     try {
       // The fresh copy's VaultError is a class of its own: told by kind.
-      await expect(vault.unlock('correct horse battery staple')).rejects.toThrow(expect.objectContaining({ refusalkind: 'weak_passphrase' }))
+      const refused = await vault.tryHello()
+      if (refused.ok) { throw new Error('the hello was not refused') }
+      expect(refused.err.refusalkind).to.eq('unexpected_error')
+      expect(refused.err.cause).to.be.instanceOf(Error)
+      expect(vault.getSnapshot().state).to.eq('opening')
+      await vault.hello()
       expect(vault.getSnapshot().state).to.eq('absent')
       await vault.unlock('correct horse battery staple')
       expect(vault.getSnapshot().state).to.eq('unlocked')

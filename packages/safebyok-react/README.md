@@ -71,8 +71,10 @@ function or object literal written in the props is a new one at every render, an
 vault each time, ending any dialog. The provider warns of it once, the first time any of them
 changes, through the one logger it and its vault share: your `logger` prop, or, when you pass
 none, the logger your `vaultDB` was made with (the default logger, if it was given none). The vault keeps the checker it
-was opened with for its life; one that is no function is thrown at the render that has it, as
-`bad_option`, to the nearest error boundary. Leave it out and every new passphrase is refused as
+was opened with for its life; one that is no function is thrown, as `Vault.make` refuses it, as
+`bad_option`, to the nearest error boundary. Its `load`, if it carries one (`zxcvbnStrengthChecker`
+fetches its dictionary), runs at the provider's `hello()`, and a load that fails is thrown, as
+`unexpected_error`, to the nearest error boundary. Leave it out and every new passphrase is refused as
 too weak, the dialog's advice saying so, until you choose one (the core's CUSTOMIZATION.md). `validators` is the exception: the provider watches each schema in
 the bag rather than the bag, so `validators={{ boxlabel: BoxlabelCheck }}` is fine in the props, so
 long as `BoxlabelCheck` itself is built once, at module level. A bag with a field it does not know
@@ -248,9 +250,9 @@ Storage out of reach, a lock that won, or a refusal the dialog cannot mend close
 `declined`, so the call that asked is refused `vault_locked`. So does a new passphrase too easy to guess (`weak_passphrase`): its message is the
 reason the vault's `strengthChecker` gave -- with `browserOpts()`, `zxcvbnStrengthChecker`,
 which asks for 12 characters and turns away common passwords, keyboard patterns and the vault's
-own names. The user hears the same reason before pressing Create, as advice (below). The checker
-is a plain function of the passphrase and the vault's scope, so a field of your own can call the
-same one as the user types: `const verdict = await strengthChecker(typed, { applabel: vault.applabel, user_id: vault.user_id, vaultlabel: vault.vaultlabel })`,
+own names. The user hears the same reason before pressing Create, as advice (below). A field of
+your own can ask the vault's checker, held to the same contract, as the user types:
+`const verdict = await vault.strengthChecker(typed, { applabel: vault.applabel, user_id: vault.user_id, vaultlabel: vault.vaultlabel })`,
 then show `verdict.reason` while `verdict.strong` is false.
 
 **Anything else never takes your page down.** Misuse -- a closed vault handle, an `rpId` that
@@ -268,8 +270,10 @@ own, so React hands the error to the root's `onCaughtError`: by default the cons
 component stack, in development and production alike. It arrives with nothing the user typed: a
 `VaultError` keeps its kind, message and meta but never its `cause`; whatever a key deriver
 throws, a `VaultError` of its own included, is the vault's `unexpected_error` with that throw as the
-cause, as it heard the passphrase; and anything else -- a `strengthChecker` or a
-`passphraseAdvice` that threw, say -- arrives as a fixed `unexpected_error` quoting none of it. (A
+cause, as it heard the passphrase; a `strengthChecker` that threw, or answered no verdict, is the
+vault's own refusal of it (`unexpected_error` quoting none of it, or `bad_option`); and anything
+else -- a `passphraseAdvice` that threw, say -- arrives as a fixed `unexpected_error` quoting none
+of it. (A
 condition a key deriver raises is met as the same condition from storage is -- shown in the
 dialog, or closing it -- and never reported.) Hook your error tracker there:
 
@@ -315,9 +319,10 @@ It has a Show / Hide button (`aria-pressed`), flipping the field between `passwo
 and is never capitalized, corrected or spell-checked, shown or hidden. Like `WhisperField`, it is
 uncontrolled: React never writes the passphrase into the page.
 
-**Advice while choosing.** By default the dialog `VaultProvider` renders says the
+**Advice while choosing.** By default the dialog `VaultProvider` renders says the vault's
 `strengthChecker`'s reason as the user chooses a weak passphrase, and nothing once the checker
-admits it, so they hear why before pressing Create; a `PassphraseModal` you render yourself says
+admits it, so they hear why before pressing Create; a checker that breaks its contract fails the
+dialog, as Create would; a `PassphraseModal` you render yourself says
 nothing unless you pass it `passphraseAdvice`. Pass `passphraseAdvice`, a function of what has
 been typed, to say something of your own instead (the checker then goes unasked until Create); what
 it answers shows beside the field as the user chooses a passphrase: tied to the field by

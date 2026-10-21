@@ -56,6 +56,23 @@ describe("VaultProvider", () => {
       expect((caught[0] as Error).message).to.include('strengthChecker')
     })
 
+    it("throws a hello whose strengthChecker's load fails to the error boundary, as unexpected_error, what the load threw its cause", async () => {
+      hushConsole()
+      const caught: unknown[] = []
+      const lost = new Error('the word list did not load')
+      const checker = Object.assign(TH.anyStrengthChecker.bind(null), { load: () => Promise.reject(lost) })
+      render(
+        <CatchingBoundary caught={caught}>
+          <VaultProvider {...makeWorld().props} userId="u1" strengthChecker={checker}>
+            <Probe />
+          </VaultProvider>
+        </CatchingBoundary>,
+      )
+      await expectShown('boundary')
+      expect(isVaultError(caught[0], 'unexpected_error')).to.be.true
+      expect((caught[0] as Error).cause).to.eq(lost)
+    })
+
     it("throws a bad option to the error boundary, as the very VaultError", async () => {
       hushConsole()
       const caught: unknown[] = []

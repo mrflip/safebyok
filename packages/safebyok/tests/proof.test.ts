@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { deriveWrappingKey, fromB64, makeVaultKey, toB64, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
 import type { KeyDeriver } from '../src/key-deriver'
 import { PasskeyProof, PassphraseProof, Proof, checkSaltShape, type ProofVault } from '../src/proof'
-import type { StrengthChecker } from '../src/passphrase-strength'
+import { type StrengthChecker, guardStrengthChecker } from '../src/passphrase-strength'
 import type { PasskeyAnswer } from '../src/types'
 import { Wayin } from '../src/wayin'
 import * as TH from './test-helpers'
@@ -108,8 +108,8 @@ describe("PassphraseProof.parse", () => {
   })
 })
 
-/** The slice of a vault whose strength checker is `strengthChecker`. */
-const sliceChecking = (strengthChecker: StrengthChecker): ProofVault => ({ ...slice, strengthChecker })
+/** The slice of a vault whose strength checker is `strengthChecker`, held to its contract as a vault holds it. */
+const sliceChecking = (strengthChecker: StrengthChecker): ProofVault => ({ ...slice, strengthChecker: guardStrengthChecker(strengthChecker) })
 
 describe("passphraseProof.checkStrongEnough", () => {
   it("refuses a passphrase its vault's checker finds weak as weak_passphrase, the reason its message, as its example shows", async () => {
@@ -134,9 +134,9 @@ describe("passphraseProof.checkStrongEnough", () => {
   })
 
   it("asks the checker the vault has now: it calls back to its vault, never a checker of its own", async () => {
-    const checking = { ...slice, strengthChecker: (() => ({ strong: true })) as StrengthChecker }
+    const checking = { ...slice, strengthChecker: guardStrengthChecker(() => ({ strong: true })) }
     const proof = PassphraseProof.parse(checking, 'pw')
-    checking.strengthChecker = () => ({ strong: false, reason: 'Not today.' })
+    checking.strengthChecker = guardStrengthChecker(() => ({ strong: false, reason: 'Not today.' }))
     await TH.expectRefusal(proof.checkStrongEnough(), 'weak_passphrase')
   })
 })

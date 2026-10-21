@@ -606,8 +606,17 @@ describe("the fixtures", () => {
 
   it("vaultSliceOf: the scope, key deriver, strength checker and clock a Wayin or a Proof reads, as its examples show", () => {
     const wayin = Wayin.make(TH.vaultSliceOf('u1'), TH.wayinOf('passphrase'), TH.vaultPropsOf('u1'))
-    expect(wayin.vault).to.deep.equal({ ...TH.scopeOf('u1'), keyDeriver: TH.testDeriver, strengthChecker: TH.anyStrengthChecker, clock: wallClock })
+    const { strengthChecker, ...rest } = wayin.vault as TH.VaultSlice
+    expect(strengthChecker).to.be.a('function')
+    expect(rest).to.deep.equal({ ...TH.scopeOf('u1'), keyDeriver: TH.testDeriver, clock: wallClock })
     expect(Proof.parse(TH.vaultSliceOf('u1', argon2idWebV1Deriver), 'pw').vault.keyDeriver).to.eq(argon2idWebV1Deriver)
+  })
+
+  it("vaultSliceOf's strength checker admits any passphrase but a blank one, held to its contract as a vault's is", async () => {
+    const { strengthChecker } = TH.vaultSliceOf('u1')
+    expect(await strengthChecker('pw', TH.scopeOf('u1'))).to.deep.equal({ strong: true })
+    expect(await strengthChecker(' ', TH.scopeOf('u1'))).to.have.property('strong', false)
+    await strengthChecker.load()
   })
 
   it("vaultPropsOf: a shape-valid VaultProps, with any field overridden", () => {

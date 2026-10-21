@@ -169,6 +169,10 @@ between columns lets the editor align them (see *Tests*).
   const`, `export type BoxKind = typeof BoxKindVals[number]`.
 * Name a schema after what it checks, in the same case: the field `salt_bytes` has the validator
   `salt_bytes`.
+* **A refusal of a host's bag of options says what Zod found, in Zod's English**: parse with
+  `InEnglish` and say `issuesText(err)` first (`src/options.ts`; `optionsCheck` does both), then
+  what to do. zod/mini alone says only "Invalid input"; never `Z.config`, which is the host's Zod
+  too. Zod's English names a refused value's type, never the value.
 * **A validation error must never quote a secret.** Zod's issues can carry the input they
   refused: a schema that sees secret material reports without it.
 * Records read back from storage are validated too: storage is someone else's database, and a

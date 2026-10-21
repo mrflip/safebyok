@@ -146,8 +146,8 @@ of the above supplies it.
 * `safebyok/browser` -- `browserOpts({ dbName }?)`: the pinned Argon2id key deriver
   (`argon2idWebV1Deriver`), the IndexedDB device store (`idbDeviceDB`) and the passphrase
   strength checker (`zxcvbnStrengthChecker`), as a bag of options. The checker's zxcvbn
-  dictionary loads, as a chunk of its own, only when a passphrase is first checked (see *A new
-  passphrase's strength*).
+  dictionary loads, as a chunk of its own, at the vault's first `hello()`, never at import (see
+  *A new passphrase's strength*).
 * `safebyok/idb` -- the IndexedDB device store, `idbDeviceDB`, and `inspectIdbDeviceDB`, a raw
   window onto its rows for a debug panel. The IndexedDB vault store, `idbVaultDB`, is a package
   of its own, `safebyok-indexeddb`.
@@ -677,20 +677,19 @@ await zxcvbnStrengthChecker('skylarkpinecone', { applabel: 'skylark', user_id: '
   [CUSTOMIZATION.md](CUSTOMIZATION.md#pluggable-passphrase-strength-checker); nothing is logged.
   A checker of length
   alone is no checker -- 'a' and eleven spaces is twelve characters -- so the core offers none.
-  `parseStrengthChecker` is `Vault.make`'s own check, for a wrapper that takes the options apart.
 * **In a browser, `browserOpts()` brings `zxcvbnStrengthChecker`.** It asks for at least
   `MinPassphraseChars` (12) characters, each Unicode code point counting one, and then a zxcvbn
   score of at least `MinZxcvbnScore` (3 of 4), through `@zxcvbn-ts/core` and its common-password
   dictionary: it turns away common passwords and ones very like them, keyboard walks, repeats,
   sequences, dates, and the vault's own names. No composition rules (a digit, a capital, a
   symbol): NIST SP 800-63B advises against them, as they make a passphrase harder to remember and
-  no harder to guess. Its dictionary is about 214 kB (minified and brotlied), so the checker
-  loads it with a dynamic `import()` at its first call, and a bundler splits it into a chunk of
-  its own: a page that never chooses a passphrase never fetches it. It answers through a promise,
-  in a few milliseconds after that first load. Without its dictionary it cannot tell a common
-  password from a good one, so if the load fails (the network dropped) it answers weak, its reason
-  saying to try again shortly; the vault refuses the new passphrase with `weak_passphrase`, making
-  nothing, and the next call loads again.
+  no harder to guess. Its dictionary is about 214 kB (minified and brotlied), which a bundler
+  splits into a chunk of its own, fetched with a dynamic `import()` by the checker's `load`: the
+  vault's `hello()` runs it, so a page that never opens a vault never fetches it. It answers
+  through a promise, in a few milliseconds once loaded. Without its dictionary it cannot tell a
+  common password from a good one, so a load that fails (the network dropped, the chunk was left
+  out of the build) fails the hello, `unexpected_error` with the load's error as its cause, and
+  the vault reads nothing; the next hello loads again.
 * **The checker hears the vault's scope.** It is called as `strengthChecker(passphrase, scope)`, `scope` the
   vault's `{ applabel, user_id, vaultlabel }`: words a guesser who knows the user tries first.
   `zxcvbnStrengthChecker` hands each name, whole and split into its runs of letters and digits, to
@@ -698,20 +697,24 @@ await zxcvbnStrengthChecker('skylarkpinecone', { applabel: 'skylark', user_id: '
 * **Your own checker** replaces it: pass it after the spread. It is any function from the passphrase
   (and the scope) to a verdict, `{ strong: true }` or `{ strong: false, reason }`, at once or as a
   promise; the reason is shown to the user, so write it calmly, say what to do, and never quote the
-  passphrase. To ask for more, wrap ours:
-  `async (typed, scope) => (typed.includes('acme') ? { strong: false, reason: 'Leave out the name of the app.' } : await zxcvbnStrengthChecker(typed, scope))`.
-  Its whole contract is that verdict: what it cannot judge, it answers weak, with a reason.
-  `Vault.make` refuses anything but a function, and a checker that answers anything but a verdict,
-  with `bad_option`; one that throws is refused `unexpected_error`, carrying nothing of what it
-  threw, as it heard the passphrase. CUSTOMIZATION.md says how to choose one.
+  passphrase. A checker that needs something fetched first carries it as `load`, idempotent, which
+  every `hello()` runs before reading storage; a `load` that fails fails the hello. To ask for
+  more, wrap ours, carrying its `load` along:
+  `Object.assign(async (typed, scope) => (typed.includes('acme') ? { strong: false, reason: 'Leave out the name of the app.' } : await zxcvbnStrengthChecker(typed, scope)), { load: zxcvbnStrengthChecker.load })`.
+  Its whole contract is that verdict, for every passphrase: it never throws. `Vault.make` refuses
+  anything but a function (whose `load`, if any, is a function too) with `bad_option`. The vault
+  keeps it held to its contract, as `vault.strengthChecker`: that refuses a checker that answers
+  anything but a verdict with `bad_option`, and one that throws with `unexpected_error`, carrying
+  nothing of what it threw, as it heard the passphrase. CUSTOMIZATION.md says how to choose one.
 * **Build it once.** The vault keeps the checker it was opened with for its life. A binding that
   reopens on a changed option (`safebyok-react`'s provider) reopens for a new checker, so define it
   at module level, or memoize it, rather than writing it inline.
-* **Call it from the field as well.** A strength checker is a plain function of the passphrase and
-  the scope, with no vault behind it, so the field the user types into can call the very same one
-  on each keystroke, and show the reason before the user submits: `safebyok-react`'s dialog does
-  so by default. It hears the passphrase in plain text, so it must run on the device and keep
-  nothing: never send it to a server, log it, or let an error tracker capture it.
+* **Call it from the field as well, through the vault.** The field the user types into can ask
+  `vault.strengthChecker(typed, scope)` on each keystroke, and show the reason before the user
+  submits: the same check, held to the same contract, so the field and Create decide alike (a
+  blank passphrase is weak without the checker hearing it). `safebyok-react`'s dialog does so by
+  default. It hears the passphrase in plain text, so it must run on the device and keep nothing:
+  never send it to a server, log it, or let an error tracker capture it.
 
 ## Fingerprint unlock (passkeys)
 
@@ -807,7 +810,7 @@ nearest error boundary, and hands a condition down as `useOpenError()`'s `openEr
 | `vault_closed`        | the vault handle was closed                                      | Open the vault again; do not use a handle after `close()` |
 | `unknown_key_deriver` | the vault names a key deriver this handle was not built with     | Update safebyok, or open the vault with the deriver that made it |
 | `insecure_context`    | `Vault.make` in a page that is not a secure context: served over plain http from anywhere but localhost, where the browser withholds WebCrypto | Serve the app over https |
-| `unexpected_error`    | something threw that is no refusal: a bug, in safebyok or in a function the app handed it (a key deriver that throws something other than a `VaultError` condition, or a `strengthChecker` that throws at all). What a key deriver threw is its `cause`; what a strength checker threw is left out entirely, kind, meta and cause; the vault never logs either, as such a function was handed a passphrase | Do not retry; read the `cause`, and fix the function, or report the bug |
+| `unexpected_error`    | something threw that is no refusal: a bug, in safebyok or in a function the app handed it (a key deriver that throws something other than a `VaultError` condition, a `strengthChecker` that throws at all, or its `load` failing at `hello()`). What a key deriver threw is its `cause`; what a strength checker threw is left out entirely, kind, meta and cause; the vault never logs either, as such a function was handed a passphrase. What a checker's `load` threw is its `cause`, as it heard nothing | Do not retry; read the `cause`, and fix the function, or report the bug |
 
 ### Conditions: handle them at run time
 

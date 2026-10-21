@@ -1,5 +1,5 @@
 import * as Z from 'zod/mini'
-import { isPlainBag, type Capacity, type Clock, type VaultScope, BoxSummary, type DamagedBox, type PasskeyWayinSummary, type PassphraseWayinSummary, type PasskeyAnswer, type WayinSummary, Whisper, Sidecar, VaultProps, DeviceMark, MinuteMillis, FarFuture, FarPast } from './types'
+import { type Capacity, type Clock, type VaultScope, BoxSummary, type DamagedBox, type PasskeyWayinSummary, type PassphraseWayinSummary, type PasskeyAnswer, type WayinSummary, Whisper, Sidecar, VaultProps, DeviceMark, MinuteMillis, FarFuture, FarPast } from './types'
 import { Box, type BoxRecord, EmptySidecarJson, checkedBoxRecord, checkedSidecar, heldListing, planSeal, sealPlanned, whisperBytesOf } from './box'
 import * as Names from './names'
 import { optionsCheck } from './options'
@@ -13,7 +13,7 @@ import { oneAtATime } from './one-at-a-time'
 import { jsonBytes, type BoxExpectation } from './vault-db'
 import { type VaultLogger, asError } from './logger'
 import * as RefusalPolicy from './refusal-policy'
-import type { StrengthChecker } from './passphrase-strength'
+import type { GuardedStrengthChecker } from './passphrase-strength'
 import { type BadNewsHandler, type MakeVaultOpts, parseMakeVaultOpts, parseRenewMinutes, parseStaleMinutes, readClock, StoredBytesPerWhisperByte, BoxFixedBytes } from './vault-opts'
 import { reportToPlatform } from './report-error'
 import { type DeviceDB, deviceTroubleAsConditions } from './device-db'
@@ -269,15 +269,18 @@ export class Vault {
   get clock(): Clock { return this.#checkedClock }
   /** The key deriver the vault was made with, which its ways in derive through. */
   get keyDeriver(): KeyDeriver { return this.#keyDeriver }
-  /** The strength checker the vault was made with, which every new passphrase is put to (`proof.checkStrongEnough()`). */
-  get strengthChecker(): StrengthChecker { return this.#strengthChecker }
+  /**
+   * The strength checker the vault was made with, held to its contract: what every new passphrase
+   * is put to (`proof.checkStrongEnough()`), and what a field asks as the user types.
+   */
+  get strengthChecker(): GuardedStrengthChecker { return this.#strengthChecker }
   // --
 
   // == [Vault: opening]: hello, ensureLease
 
   readonly #tryHello = this.#trying(async (given?: { staleMinutes?: number | undefined }): Promise<Vault> => {
     this.#checkOpen()
-    const helloOpts = checkHelloOpts(checkBagOrNone(given, 'hello'))
+    const helloOpts = checkHelloOpts(given)
     const staleMillis = helloOpts?.staleMinutes === undefined ? this.#staleMillis : parseStaleMinutes(helloOpts.staleMinutes, 'hello')
     await this.#helloWithin(staleMillis)
     return this
@@ -297,6 +300,10 @@ export class Vault {
    * hello to succeed, starting one if none has, so a host that never calls it still gets a settled
    * vault. Resolves the vault itself, settled, in any of the three states.
    *
+   * Before it reads, it runs the strength checker's `load`, if it carries one (zxcvbn's fetches
+   * its dictionary). A load that fails is refused 'unexpected_error', what it threw the cause, and
+   * nothing is read: a vault that cannot check a new passphrase does not open.
+   *
    * Calls under way share one read. Once a hello has read storage, a later one within
    * `opts.staleMinutes` of the vault's last read -- by default the `staleMinutes` the vault was
    * made with, five minutes unless it said otherwise -- reads nothing, and only settles the picture it
@@ -305,9 +312,8 @@ export class Vault {
    * storage the vault cannot trust (`identity_revoked`, `rolled_back`, `newer_format`), or the
    * vault deleted. A hello that fails may be called again at once. After `close()` it refuses with
    * kind 'vault_closed'; `opts` other than `staleMinutes`, or minutes that are not zero or more, are
-   * kind 'bad_option'. So is anything in place of `opts` that is no plain bag of options: an
-   * event, above all, when `hello` itself is handed to `addEventListener` or `onClick` as the
-   * handler. Wrap it, as the fourth example does.
+   * kind 'bad_option'. So is an event in place of `opts`, when `hello` itself is handed to
+   * `addEventListener` or `onClick` as the handler: wrap it, as the fourth example does.
    *
    * It refuses with storage's own error -- storage unreachable (`storage_unavailable`), a user
    * storage does not serve (`not_permitted`, `identity_revoked`) -- and leaves the vault as it last
@@ -332,7 +338,7 @@ export class Vault {
 
   readonly #tryEnsureLease = this.#trying(async (given?: { renewMinutes?: number | undefined }): Promise<Vault> => {
     this.#checkOpen()
-    const leaseOpts = checkEnsureLeaseOpts(checkBagOrNone(given, 'ensureLease'))
+    const leaseOpts = checkEnsureLeaseOpts(given)
     return await this.#ensureLease(parseRenewMinutes(leaseOpts?.renewMinutes))
   })
   /**
@@ -357,8 +363,8 @@ export class Vault {
    * `getProof` answers `carry_on` outside `lease_ending`, or anything but the three, or for a
    * `renewMinutes` that is not zero or more minutes; 'unexpected_error' when it throws, what it
    * threw the cause, never logged. A wrong passphrase never reaches here: it goes to the dialog,
-   * through `ask.attempt`. An event in place of `opts`, or anything else that is no plain bag of
-   * options, is kind 'bad_option', as for `hello`: wrap it, as the second example does.
+   * through `ask.attempt`. An event in place of `opts` is kind 'bad_option', as for `hello`: wrap
+   * it, as the second example does.
    *
    * @example await vault.ensureLease()   // unlocked, or refused 'vault_locked'
    * @example <button onClick={() => vault.tryEnsureLease()}>Unlock</button>
@@ -903,7 +909,7 @@ export class Vault {
   readonly #logger: VaultLogger
   readonly #clock: Clock
   readonly #keyDeriver: KeyDeriver
-  readonly #strengthChecker: StrengthChecker
+  readonly #strengthChecker: GuardedStrengthChecker
   readonly #whisperByteLimit: number
   readonly #boxLimit: number
   readonly #vaultByteLimit: number
@@ -1196,13 +1202,15 @@ export class Vault {
   }
 
   /**
-   * One hello: storage read, then this device's lease taken up. One that fails says so in the
-   * snapshot and forgets itself, so the next hello reads afresh; so does one whose vault props a
-   * refusal of an older copy forgot while it ran (see forgetVaultProps). No other hello can start
-   * while one runs (see forgetHello), so the one this ends is always the one in `greeting`.
+   * One hello: the strength checker loaded, storage read, then this device's lease taken up, so
+   * a vault that could not check a new passphrase reads nothing. One that fails says so in the
+   * snapshot and forgets itself, so the next hello loads and reads afresh; so does one whose vault
+   * props a refusal of an older copy forgot while it ran (see forgetVaultProps). No other hello can
+   * start while one runs (see forgetHello), so the one this ends is always the one in `greeting`.
    */
   async #greet(): Promise<void> {
     try {
+      await this.#strengthChecker.load()
       await this.#refresh()
       await this.#fetchLease()
     } catch (err) {
@@ -2315,25 +2323,19 @@ const UntrustedStorageKinds = ['identity_revoked', 'rolled_back', 'newer_format'
 const isCatchingUpKind = (err: unknown): err is VaultError => isVaultError(err, 'stale_write') || isVaultError(err, 'vault_mismatch')
 // --
 
-// == [Argument parsers]: checkBagOrNone, checkHelloOpts, checkEnsureLeaseOpts, checkStoreOpts, sidecarJsonOf, standingPassphraseOf, newProofOf, absentBox
+// == [Argument parsers]: eventHint, checkHelloOpts, checkEnsureLeaseOpts, checkStoreOpts, sidecarJsonOf, standingPassphraseOf, newProofOf, absentBox
 
 /**
- * `given`, once it is left out or a plain bag of options, as `call` takes: kind 'bad_option'
- * otherwise, saying how to wrap the call. What else comes is an event, almost always: `hello` or
- * `ensureLease` handed to `addEventListener` or `onClick` as the handler itself, which would
- * otherwise read the event as options, and reject where nothing hears it.
+ * What a call that takes options most likely had in place of its bag, and what to do: an event,
+ * as `call` was handed to `addEventListener` or `onClick` as the handler itself.
  */
-const checkBagOrNone = <BagT>(given: BagT, call: 'hello' | 'ensureLease'): BagT => {
-  if (given === undefined || isPlainBag(given)) { return given }
-  const tried = call === 'hello' ? 'tryHello' : 'tryEnsureLease'
-  throw new VaultError('bad_option', `${call}() takes a bag of options, or nothing, and was handed something else: an event, most likely, as ${call} was handed to addEventListener or onClick as the handler itself. Wrap it: \`() => vault.${tried}()\`, whose refusal, being returned, never surfaces as an unhandled rejection.`)
-}
+const eventHint = (call: 'hello' | 'ensureLease', tried: 'tryHello' | 'tryEnsureLease') => `${call}() was handed something other than a bag of options: an event, most likely, as ${call} was handed to addEventListener or onClick as the handler itself. Wrap it: \`() => vault.${tried}()\`, whose refusal, being returned, never surfaces as an unhandled rejection.`
 
 /** What `hello()`'s options may hold: `staleMinutes`, which `parseStaleMinutes` checks, and nothing else. */
-const checkHelloOpts = optionsCheck({ staleMinutes: Z.optional(Z.unknown()) }, "hello()'s only option is `staleMinutes`, how many minutes it trusts the vault's last read of storage: check its spelling, and leave out any other.")
+const checkHelloOpts = optionsCheck({ staleMinutes: Z.optional(Z.unknown()) }, "hello()'s only option is `staleMinutes`, how many minutes it trusts the vault's last read of storage: check its spelling, and leave out any other.", eventHint('hello', 'tryHello'))
 
 /** What `ensureLease()`'s options may hold: `renewMinutes`, which `parseRenewMinutes` checks, and nothing else. */
-const checkEnsureLeaseOpts = optionsCheck({ renewMinutes: Z.optional(Z.unknown()) }, "ensureLease()'s only option is `renewMinutes`, how many minutes before the lease ends to ask for a proof anyway: check its spelling, and leave out any other.")
+const checkEnsureLeaseOpts = optionsCheck({ renewMinutes: Z.optional(Z.unknown()) }, "ensureLease()'s only option is `renewMinutes`, how many minutes before the lease ends to ask for a proof anyway: check its spelling, and leave out any other.", eventHint('ensureLease', 'tryEnsureLease'))
 
 /** What `putBox()`'s options may hold: a sidecar, which {@link sidecarJsonOf} checks, and nothing else. */
 const checkStoreOpts = optionsCheck({ sidecar: Z.optional(Z.unknown()) }, "putBox()'s only option is `sidecar`, the box's own visible data (it is authenticated but never encrypted): check its spelling, and leave out any other. A note is kept in the sidecar: { sidecar: { note } }.")

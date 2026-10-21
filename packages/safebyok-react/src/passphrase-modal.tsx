@@ -111,7 +111,8 @@ const unlockedFor = (leaseMillis: number, creating: boolean): string => {
  * `aria-describedby` and announced politely: 'Longer is stronger: try a few unrelated words'.
  * It answers null for nothing to say, and may answer through a promise; only the answer to the
  * latest text shows. It is advice: what the vault itself refuses at creation shows as any refusal
- * does. It is never asked while unlocking.
+ * does. It is never asked while unlocking. Advice that throws fails the dialog: a VaultError as it
+ * came, anything else as 'unexpected_error', carrying nothing of what it heard.
  *
  * @example
  *   const getProof: GetProof = (ask) => new Promise((answer) => { showDialog(<PassphraseModal ask={ask} onDone={answer} />) })
@@ -163,8 +164,12 @@ export type PassphraseModalProps = {
   passphraseAdvice?:   PassphraseAdvice | undefined
 }
 
-/** The refusal for a host's `passphraseAdvice` that threw: it heard the passphrase, so nothing of its throw goes on. */
-const adviceFailed = (thrown: unknown) => Sanitizer.refusalFor(thrown, 'unexpected_error', "The passphraseAdvice handed to the dialog threw rather than answering. What it threw is left out of this report, as it may quote the passphrase: have it answer a sentence or null, and catch its own failures.")
+/**
+ * The refusal for a `passphraseAdvice` that threw. A VaultError, which safebyok made -- the vault's
+ * own strength checker refusing a broken host checker, say -- goes on as it came, as it quotes no
+ * passphrase. Anything else heard the passphrase, so nothing of it goes on.
+ */
+const adviceFailed = (thrown: unknown) => (isVaultError(thrown) ? thrown : Sanitizer.refusalFor(thrown, 'unexpected_error', "The passphraseAdvice handed to the dialog threw rather than answering. What it threw is left out of this report, as it may quote the passphrase: have it answer a sentence or null, and catch its own failures."))
 
 /** Escape, from anywhere in a dialog, cancels it, and goes no further: a host's own Escape handler never hears it too. */
 const cancelOnEscape = (onDone: (answer: ProofAnswer) => void) => (evt: KeyboardEvent) => {
@@ -349,7 +354,7 @@ const UnlockForm = ({ ask, onDone: done, allowStartOver, passphraseUsername, pas
   const blurbId = useId()
   // Wrapped, so that a failure carrying any value at all still reads as "failed".
   const [failure, setFailure] = useState<{ err: unknown } | null>(null)
-  // The host's advice heard the passphrase: what it threw may quote it, so none of it goes on.
+  // The advice heard the passphrase: what it threw may quote it, so none of it goes on but safebyok's own refusal.
   const advice = useAdvice(passphraseAdvice, snapshot.state === 'absent', (err) => { setFailure({ err: adviceFailed(err) }) })
   if (failure !== null) { throw forBoundary(failure.err, 'PassphraseModal') }
   const creating = snapshot.state === 'absent'

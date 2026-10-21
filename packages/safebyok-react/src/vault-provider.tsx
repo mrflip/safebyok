@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { Vault, type Ask, type GetProof, type ProofAnswer, parseStrengthChecker, checkValidators, delDamagedVault as delStoredDamagedVault, isCondition, isVaultError, parseLogger, type BadNewsHandler, type MakeVaultOpts, type StrengthChecker, type VaultDB, type VaultError, type VaultLogger, type VaultScope, type VaultSnapshot, type VaultValidators } from 'safebyok'
+import { Vault, type Ask, type GetProof, type ProofAnswer, checkValidators, delDamagedVault as delStoredDamagedVault, isCondition, isVaultError, parseLogger, type BadNewsHandler, type MakeVaultOpts, type VaultDB, type VaultError, type VaultLogger, type VaultScope, type VaultSnapshot, type VaultValidators } from 'safebyok'
 import { PassphraseModal, type PassphraseAdvice } from './passphrase-modal'
 
 // == [Hooks]: useVault, useVaultSnapshot, useOpenError, OpenErrorShape
@@ -172,9 +172,10 @@ export type VaultProviderProps = Omit<MakeVaultOpts, 'userId'> & {
   passphraseUsername?: string | undefined
   /**
    * What to say beside the field as the user chooses a passphrase: `PassphraseModal`'s
-   * `passphraseAdvice`. Default: the `strengthChecker`'s reason for a passphrase it finds
-   * weak, and nothing for one it admits, so the user hears why before pressing Create. Like the
-   * strength checker, it hears the passphrase in plain text: keep it on the device.
+   * `passphraseAdvice`. Default: the vault's `strengthChecker`'s reason for a passphrase it finds
+   * weak, and nothing for one it admits, so the user hears why before pressing Create; a broken
+   * checker fails the dialog, which reports the vault's refusal to React. Like the strength
+   * checker, it hears the passphrase in plain text: keep it on the device.
    */
   passphraseAdvice?:   PassphraseAdvice | undefined
   children:            ReactNode
@@ -195,19 +196,14 @@ const settleLogger = (logger: VaultLogger | null | undefined, vaultDB: VaultDB):
 }
 
 /**
- * The strength checker as the dialog's advice: its reason for a passphrase it finds weak, and
- * nothing for one it admits, or for one it fails to judge -- a checker that throws, or answers no
- * verdict -- which Create, running the checker again, then says as its own refusal. It runs on the
- * device, as the checker does.
+ * The vault's strength checker as the dialog's advice: its reason for a passphrase it finds weak,
+ * and nothing for one it admits. It asks `vault.strengthChecker`, which holds the host's checker to
+ * its contract, so the advice and Create decide alike; a broken checker's refusal fails the
+ * dialog, which says so calmly and reports it to React. It runs on the device, as the checker does.
  */
-const adviceFrom = (strengthChecker: StrengthChecker, scope: VaultScope): PassphraseAdvice => async (typed) => {
-  try {
-    const verdict = await strengthChecker(typed, scope)
-    return verdict.strong ? null : verdict.reason
-  } catch {
-    // Advice is a courtesy: a checker that cannot answer now ends nothing, and Create asks it again.
-    return null
-  }
+const adviceFrom = (vault: Vault): PassphraseAdvice => async (typed) => {
+  const verdict = await vault.strengthChecker(typed, scopeOf(vault))
+  return verdict.strong ? null : verdict.reason
 }
 
 /**
@@ -263,9 +259,6 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
   const unlistedJson = JSON.stringify(Object.keys(unlisted))
   // The bag is taken apart below, so a misspelt field would be dropped unseen: refused here, as Vault.make refuses it.
   checkValidators(validators)
-  // Checked at the first render that has it, as Vault.make checks it; the vault keeps it for its life.
-  // Left out, the advice is the default checker's, as the vault's refusal will be.
-  const adviser = parseStrengthChecker(strengthChecker)
   // The vault is made anew when a check changes, never for a bag rebuilt in render around the same ones.
   const applabelCheck = validators?.applabel
   const vaultlabelCheck = validators?.vaultlabel
@@ -442,7 +435,7 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
           ask={showing.ask}
           allowStartOver={allowStartOver}
           passphraseUsername={passphraseUsername}
-          passphraseAdvice={passphraseAdvice ?? adviceFrom(adviser, scopeOf(showing.ask.vault))}
+          passphraseAdvice={passphraseAdvice ?? adviceFrom(showing.ask.vault)}
           onDone={(answer) => { endShowing(showing, answer) }}
         />
       )}

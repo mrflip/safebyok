@@ -182,6 +182,7 @@ describe("vault.hello as an event handler", () => {
     const world = makeWorld()
     const vault = Vault.make(world.optsWith())
     const err = await TH.expectBad(vault.tryHello(new Event('focus') as unknown as { staleMinutes: number }), 'bad_option')
+    expect(err.message).to.match(/^Unrecognized keys?: "[^.]*\. hello\(\)'s only option is `staleMinutes`/)
     expect(err.message).to.include('handed to addEventListener or onClick as the handler itself')
     expect(err.message).to.include('`() => vault.tryHello()`')
     expect(vault.state).to.eq('opening')
@@ -210,8 +211,10 @@ describe("vault.hello as an event handler", () => {
   it("still refuses a plain bag that misspells its option, and a value that is no object, with kind 'bad_option'", async () => {
     const world = makeWorld()
     const vault = Vault.make(world.optsWith())
-    await TH.expectBad(vault.tryHello({ staleMinute: 0 } as unknown as { staleMinutes: number }), 'bad_option')
-    await TH.expectBad(vault.tryHello(5 as unknown as { staleMinutes: number }), 'bad_option')
+    const misspelt = await TH.expectBad(vault.tryHello({ staleMinute: 0 } as unknown as { staleMinutes: number }), 'bad_option')
+    expect(misspelt.message).to.eq("Unrecognized key: \"staleMinute\". hello()'s only option is `staleMinutes`, how many minutes it trusts the vault's last read of storage: check its spelling, and leave out any other.")
+    const numbered = await TH.expectBad(vault.tryHello(5 as unknown as { staleMinutes: number }), 'bad_option')
+    expect(numbered.message).to.match(/^Invalid input: expected object, received number\. hello\(\)'s only option .* an event, most likely/)
   })
 
   it("takes a bag of options with no prototype, as a plain bag", async () => {

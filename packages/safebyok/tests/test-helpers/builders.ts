@@ -1,7 +1,7 @@
 import { type Ciphered, toB64 } from '../../src/crypto'
 import { memoryDeviceDB } from '../../src/device-db'
 import type { KeyDeriver } from '../../src/key-deriver'
-import { type StrengthChecker, StrongVerdict } from '../../src/passphrase-strength'
+import { type StrengthChecker, StrongVerdict, guardStrengthChecker } from '../../src/passphrase-strength'
 import { memoryStore } from '../../src/string-store'
 import type { BoxRecord } from '../../src/box'
 import { wallClock, type VaultScope, type PassphraseWayinRecord, type PasskeyWayinRecord, type PasskeyAnswer, type VaultProps, type Sidecar, type BoxSummary, type DamagedBox, type DeviceMark, type SeenVault, type LeaseRecord } from '../../src/types'
@@ -35,13 +35,13 @@ export const testDeriver: KeyDeriver = {
  * The slice of a vault a model reads -- its scope, key deriver, strength checker and clock -- for a
  * test that makes a `Wayin` or a `Proof` with no vault behind it: `userId`'s `main` vault, as
  * {@link scopeOf} has it, deriving with `keyDeriver`, admitting any passphrase
- * ({@link anyStrengthChecker}), on the wall clock.
+ * ({@link anyStrengthChecker}, held to its contract as a vault holds it), on the wall clock.
  *
  * @example Wayin.make(TH.vaultSliceOf('u1'), TH.wayinOf('passphrase'), TH.vaultPropsOf('u1'))
  * @example Proof.parse(TH.vaultSliceOf('u1', argon2idWebV1Deriver), 'pw')
  */
 export const vaultSliceOf = (userId: string, keyDeriver: KeyDeriver = testDeriver): VaultSlice => (
-  { ...scopeOf(userId), keyDeriver, strengthChecker: anyStrengthChecker, clock: wallClock }
+  { ...scopeOf(userId), keyDeriver, strengthChecker: guardStrengthChecker(anyStrengthChecker), clock: wallClock }
 )
 
 /** What {@link vaultSliceOf} makes: the slice of a vault a way in or a proof reads. */

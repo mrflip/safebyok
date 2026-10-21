@@ -4,7 +4,6 @@ import { VaultError } from './errors'
 import type { KeyDeriver } from './key-deriver'
 import { hostThrewRefusal } from './outcome'
 import { PassphraseKeyBytes } from './key-deriver-spec'
-import { checkStrongEnough } from './passphrase-strength'
 import { PasskeySaltBytes, type PasskeyAnswer, type WayinKind } from './types'
 import { decorate } from './adorn'
 import type { Vault } from './vault'
@@ -112,18 +111,16 @@ export class PassphraseProof extends Proof {
 
   /** Check this passphrase as a new one, before it becomes a way in.
    * It is put to its vault's `strengthChecker`, with the vault's scope. Refuses with kind
-   * 'weak_passphrase' for a blank one, before the checker hears it, and for one the checker finds
-   * weak, its reason the message. A checker that throws is refused 'unexpected_error', carrying
-   * nothing of what it threw; one that answers no verdict, 'bad_option'. Only a new passphrase is
-   * checked: one that proves never is.
+   * 'weak_passphrase' for one the checker finds weak, its reason the message, and for a blank one,
+   * which the checker never hears; a broken checker's refusals pass as they came. Only a new
+   * passphrase is checked: one that proves never is.
    *
    * @example await PassphraseProof.parse(vault, chosen).checkStrongEnough()   // throws 'weak_passphrase' with the checker's reason
    */
   async checkStrongEnough(): Promise<void> {
     const { vault } = this
-    // Frozen, so the host's checker can change nothing of what it is told.
-    const scope = Object.freeze({ applabel: vault.applabel, user_id: vault.user_id, vaultlabel: vault.vaultlabel })
-    await checkStrongEnough(vault.strengthChecker, this.passphrase, scope)
+    const verdict = await vault.strengthChecker(this.passphrase, { applabel: vault.applabel, user_id: vault.user_id, vaultlabel: vault.vaultlabel })
+    if (! verdict.strong) { throw new VaultError('weak_passphrase', verdict.reason) }
   }
 
   /**

@@ -856,6 +856,14 @@ describe("PassphraseModal", () => {
       expect(told.cause).to.be.undefined
     })
 
+    it("meets advice that throws a VaultError -- the vault's strength checker refusing a broken checker -- with the trouble notice, reporting that very refusal", async () => {
+      const refusal = new VaultError('bad_option', 'The strengthChecker answered something other than a verdict.')
+      const { reported } = TH.renderReporting(<PassphraseModal ask={TH.askOf(vaultInState('absent'))} passphraseAdvice={() => Promise.reject(refusal)} onDone={noop} />)
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw-the-passphrase' } })
+      expect(await screen.findByText(Trouble)).to.not.be.null
+      expect(reported).to.deep.equal([refusal])
+    })
+
     it("lets a superseded call's failure pass unseen: only the latest call can fail the dialog", async () => {
       const gate = TH.makeGate()
       const advice = async (typed: string) => {

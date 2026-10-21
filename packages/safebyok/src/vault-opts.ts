@@ -7,7 +7,8 @@ import { MaxSaltBytes, parseKeyDeriverSpec, type KeyDeriverSpec, checkSuppliedSp
 import type { DeviceDB } from './device-db'
 import { VaultDB } from './vault-db'
 import { type VaultLogger, parseLogger } from './logger'
-import { type StrengthChecker, parseStrengthChecker } from './passphrase-strength'
+import { type GuardedStrengthChecker, type StrengthChecker, DefaultStrengthChecker, guardStrengthChecker, strengthChecker } from './passphrase-strength'
+import { InEnglish, issuesText } from './options'
 import * as Names from './names'
 import type { GetProof } from './ask'
 
@@ -140,13 +141,15 @@ export type MakeVaultOpts = {
    * `unlock()` creates the vault with, and each `putWayin()` sets, before any key derivation. It is
    * handed the passphrase and the vault's scope, and a passphrase it finds weak is refused with
    * kind 'weak_passphrase', its reason the message. It never runs on `unlock()` of a vault that
-   * stands. In a browser, `browserOpts()` from `safebyok/browser` supplies `zxcvbnStrengthChecker`,
-   * which turns away short passphrases, common passwords and patterns. Left out, every new
-   * passphrase is refused as too weak, the refusal's message saying that a checker must be chosen
-   * (CUSTOMIZATION.md). The vault keeps the checker it was opened with for its life, as its
-   * `strengthChecker`.
-   * Kind 'bad_option' for anything but a function, and for a checker that answers anything but a
-   * verdict; one that throws is 'unexpected_error', carrying nothing of what it threw.
+   * stands. Its `load`, if it carries one, runs at every `hello()`, and a `load` that fails fails
+   * the hello. In a browser, `browserOpts()` from `safebyok/browser` supplies
+   * `zxcvbnStrengthChecker`, which turns away short passphrases, common passwords and patterns.
+   * Left out, every new passphrase is refused as too weak, the refusal's message saying that a
+   * checker must be chosen (CUSTOMIZATION.md). The vault keeps the checker it was opened with for
+   * its life, held to its contract, as its `strengthChecker`.
+   * Kind 'bad_option' for anything but a function (whose `load`, if any, is a function too), and
+   * for a checker that answers anything but a verdict; one that throws is 'unexpected_error',
+   * carrying nothing of what it threw.
    */
   strengthChecker?: StrengthChecker | undefined
 }
@@ -158,10 +161,10 @@ export const isBag = (candidate: unknown) => typeof candidate === 'object' && ca
 const anyOpt = Z.optional(Z.unknown())
 
 /**
- * Every option Vault.make takes, each checked by a parse of its own: this check refuses any other.
- * An option quietly ignored could leave the vault less safe than the host asked -- a lease setting
- * under its deleted name would leave the default seven days -- so a misspelt option, or one this
- * version no longer takes, is refused instead.
+ * Every option Vault.make takes, each checked here or by a parse of its own: this check refuses
+ * any other. An option quietly ignored could leave the vault less safe than the host asked -- a
+ * lease setting under its deleted name would leave the default seven days -- so a misspelt option,
+ * or one this version no longer takes, is refused instead.
  */
 const makeVaultOptsShape = Z.strictObject({
   applabel:               anyOpt,
@@ -179,8 +182,9 @@ const makeVaultOptsShape = Z.strictObject({
   maxBoxes:               anyOpt,
   logger:                 anyOpt,
   validators:             anyOpt,
-  strengthChecker:        anyOpt,
-} satisfies Record<keyof MakeVaultOpts, typeof anyOpt>)
+  // A function default is read as the factory for one, so the default checker is handed back by one.
+  strengthChecker:        Z._default(Z.optional(strengthChecker), () => DefaultStrengthChecker),
+} satisfies Record<keyof MakeVaultOpts, Z.core.SomeType>)
 
 /** Each option Vault.make once took under another name, and the name it takes now (notes/old_vocabulary.md). */
 const RenamedMakeVaultOpts: ReadonlyMap<string, keyof MakeVaultOpts> = new Map([
@@ -189,18 +193,21 @@ const RenamedMakeVaultOpts: ReadonlyMap<string, keyof MakeVaultOpts> = new Map([
 ])
 
 /**
- * Refuse a bag of options holding one Vault.make does not take, with kind 'bad_option', naming
- * each such option, and the name a renamed one goes by now. It quotes the bag's field names, the
- * host's own code, and never a value.
+ * A bag of Vault.make's options, as its schema reads it: `strengthChecker` checked, the default
+ * one in place of one left out, and every other option as handed in, for its own parse. Kind
+ * 'bad_option' for a bag holding an option Vault.make does not take, naming each such option, and
+ * the name a renamed one goes by now; and for a `strengthChecker` that is not one, in Zod's words.
+ * It quotes the bag's field names, the host's own code, and never a value.
  */
-export const checkKnownOpts = (opts: object) => {
-  const checked = makeVaultOptsShape.safeParse(opts)
-  if (checked.success) { return }
+export const checkMakeVaultOpts = (opts: object) => {
+  const checked = makeVaultOptsShape.safeParse(opts, InEnglish)
+  if (checked.success) { return checked.data }
   const unknownCkeys = checked.error.issues.flatMap((issue) => (issue.code === 'unrecognized_keys' ? issue.keys : []))
   const named = unknownCkeys.map((ckey) => {
     const renamed = RenamedMakeVaultOpts.get(ckey)
     return renamed === undefined ? ckey : `${ckey} (called ${renamed} now)`
   })
+  if (unknownCkeys.length === 0) { throw new VaultError('bad_option', `Vault.make's ${issuesText(checked.error)}`) }
   const takes = Object.keys(makeVaultOptsShape.def.shape).join(', ')
   throw new VaultError('bad_option', `Vault.make does not take ${named.length === 1 ? 'the option' : 'the options'} ${named.join(', ')}: check the spelling. It takes ${takes}, and refuses any other rather than quietly ignore it.`)
 }
@@ -533,7 +540,7 @@ export type ParsedVaultOpts = {
   logger:           VaultLogger
   clock:            Clock
   keyDeriver:       KeyDeriver
-  strengthChecker:  StrengthChecker
+  strengthChecker:  GuardedStrengthChecker
   whisperByteLimit: number
   boxLimit:         number
   vaultByteLimit:   number
@@ -550,7 +557,7 @@ export type ParsedVaultOpts = {
 export const parseMakeVaultOpts = (opts: MakeVaultOpts): ParsedVaultOpts => {
   checkSecureContext()
   if (! isBag(opts)) { throw new VaultError('bad_option', "Vault.make takes one bag of options: applabel, userId, vaultlabel, vaultDB, deviceDB and keyDeriver at least.") }
-  checkKnownOpts(opts)
+  const shaped = checkMakeVaultOpts(opts)
   const rules = Names.rulesOf(opts.validators)
   const scope = Names.checkScope(rules, { applabel: opts.applabel, user_id: opts.userId, vaultlabel: opts.vaultlabel })
   const vaultDB = parseVaultDB(opts.vaultDB)
@@ -566,11 +573,10 @@ export const parseMakeVaultOpts = (opts: MakeVaultOpts): ParsedVaultOpts => {
   // wrong unit fails make rather than some later call.
   readClock(clock)
   const keyDeriver = parseKeyDeriver(opts.keyDeriver, logger)
-  const strengthChecker = parseStrengthChecker(opts.strengthChecker)
   const whisperByteLimit = parseMaxWhisperBytes(opts.maxWhisperBytes)
   const boxLimit = parseMaxBoxes(opts.maxBoxes, parseDeclared(vaultDB, 'maxBoxes'))
   const vaultByteLimit = checkLimitsFit(vaultDB, whisperByteLimit, boxLimit)
-  return { scope, rules, vaultDB, deviceDB, leaseMillis, staleMillis, onBadNews, getProof, logger, clock, keyDeriver, strengthChecker, whisperByteLimit, boxLimit, vaultByteLimit }
+  return { scope, rules, vaultDB, deviceDB, leaseMillis, staleMillis, onBadNews, getProof, logger, clock, keyDeriver, strengthChecker: guardStrengthChecker(shaped.strengthChecker), whisperByteLimit, boxLimit, vaultByteLimit }
 }
 
 /**

@@ -1,5 +1,5 @@
 import type { TranslationKeys, ZxcvbnFactory } from '@zxcvbn-ts/core'
-import type { PassphraseVerdict } from './passphrase-strength'
+import type { PassphraseVerdict, StrengthChecker } from './passphrase-strength'
 import type { VaultScope } from './types'
 
 /**
@@ -45,38 +45,29 @@ const PlainSaying = 'That would be easy to guess'
 /** What to do, after whatever was said: more words, never a digit, a capital or a symbol. */
 const Remedy = ': add a few more words, less common ones.'
 
-// zxcvbn and its dictionaries load at the first passphrase checked, never at import: a bundler
-// splits them into a chunk of their own, so browserOpts() costs a page nothing until a passphrase
-// is chosen. Ranking the dictionaries takes some milliseconds more, once. The estimator keeps
-// nothing of any passphrase between calls. A load that fails is forgotten, so the next call tries
-// again.
-const made: { estimator?: Promise<ZxcvbnFactory | null> } = {}
-
-/**
- * What a failed load answers: weak, as the checker cannot tell a common password from a good one
- * without its dictionary, with a reason that says to try again, as a retry may mend it.
- */
-const Unloaded: PassphraseVerdict = Object.freeze({
-  strong: false,
-  reason: "This passphrase couldn't be checked just now: the passphrase checker didn't load, perhaps because the connection dropped. Nothing was saved. Try again shortly; if it fails every time, reload the page.",
-})
+// zxcvbn and its dictionaries load at the vault's hello, or the first passphrase checked, never at
+// import: a bundler splits them into a chunk of their own, so importing browserOpts() costs a page
+// nothing until a vault opens. Ranking the dictionaries takes some milliseconds more, once. The
+// estimator keeps nothing of any passphrase between calls. A load that fails is forgotten, so the
+// next one tries again.
+const made: { estimator?: Promise<ZxcvbnFactory> } = {}
 
 /**
  * Loads zxcvbn and builds its estimator, over the common-password dictionary and the keyboard
- * layouts; null for a load that failed, which is forgotten so the next call loads again.
+ * layouts. A load that fails is forgotten, so the next call loads again.
  */
-const loadEstimator = async (): Promise<ZxcvbnFactory | null> => {
+const loadEstimator = async (): Promise<ZxcvbnFactory> => {
   try {
     const [{ ZxcvbnFactory: Factory }, { adjacencyGraphs, dictionary }] = await Promise.all([import('@zxcvbn-ts/core'), import('@zxcvbn-ts/language-common')])
     return new Factory({ dictionary, graphs: adjacencyGraphs })
-  } catch {
+  } catch (err) {
     delete made.estimator
-    return null
+    throw err
   }
 }
 
-/** The one zxcvbn estimator, loaded at the first call; null while it will not load. */
-const estimatorOf = (): Promise<ZxcvbnFactory | null> => {
+/** The one zxcvbn estimator, loaded at the first call, and loaded again at the next after one that failed. */
+const estimatorOf = (): Promise<ZxcvbnFactory> => {
   made.estimator ??= loadEstimator()
   return made.estimator
 }
@@ -108,6 +99,15 @@ const reasonFor = (warning: string | null): string => {
   return `${saying}${Remedy}`
 }
 
+/** The passphrase as zxcvbn judges it: see {@link zxcvbnStrengthChecker}. */
+const checkWithZxcvbn = async (passphrase: string, scope?: VaultScope): Promise<PassphraseVerdict> => {
+  if (codePointCount(passphrase) < MinPassphraseChars) { return TooShort }
+  const estimator = await estimatorOf()
+  const { score, feedback } = estimator.check(passphrase, userInputsOf(scope))
+  if (score >= MinZxcvbnScore) { return Strong }
+  return { strong: false, reason: reasonFor(feedback.warning) }
+}
+
 /**
  * The `strengthChecker` for a browser, which `browserOpts()` supplies: strong when the
  * passphrase has at least {@link MinPassphraseChars} (12) characters, each Unicode code point
@@ -119,12 +119,12 @@ const reasonFor = (warning: string | null): string => {
  * the passphrase, and says to add words.
  *
  * It answers through a promise: zxcvbn and its dictionary, about 216 kB minified and brotlied,
- * load at its first call, as a chunk of their own in a bundled app, so a page that never chooses a
- * passphrase never fetches them. That first call takes the fetch and about 15 ms more; each after
+ * are a chunk of their own in a bundled app, fetched by its `load`, which the vault's `hello()`
+ * runs, or else by its first call. Loading takes the fetch and about 15 ms more; each call after
  * it a few milliseconds, so a field may call it on every keystroke. Its strength is that
  * dictionary: without it, it cannot tell a common password from a good one, so a load that fails
- * answers weak, its reason saying to try again shortly, and the next call loads again. It never
- * throws, keeps nothing, and sends nothing anywhere.
+ * throws, failing the hello, and the next load tries again. It keeps nothing, and sends nothing
+ * anywhere.
  *
  * @param passphrase - The passphrase as the user typed it.
  * @param scope - The vault it is for, whose names zxcvbn treats as the user's own words. Optional
@@ -136,13 +136,9 @@ const reasonFor = (warning: string | null): string => {
  * @example await zxcvbnStrengthChecker('correct horse battery staple')  // { strong: true }
  * @example await zxcvbnStrengthChecker('password1234')                  // { strong: false, reason: 'That is very like a commonly used password: add a few more words, less common ones.' }
  * @example await zxcvbnStrengthChecker('hunter2')                       // { strong: false, reason: 'A passphrase needs at least 12 characters: ...' }
+ * @example await zxcvbnStrengthChecker.load()   // fetches zxcvbn and its dictionary, as the vault's hello() does; throws if they will not load
  * @example await zxcvbnStrengthChecker('skylarkpinecone', { applabel: 'skylark', user_id: 'u1', vaultlabel: 'pinecone' })  // { strong: false, reason: 'That holds something about you or this site, ...' }
  */
-export const zxcvbnStrengthChecker = async (passphrase: string, scope?: VaultScope): Promise<PassphraseVerdict> => {
-  if (codePointCount(passphrase) < MinPassphraseChars) { return TooShort }
-  const estimator = await estimatorOf()
-  if (estimator === null) { return Unloaded }
-  const { score, feedback } = estimator.check(passphrase, userInputsOf(scope))
-  if (score >= MinZxcvbnScore) { return Strong }
-  return { strong: false, reason: reasonFor(feedback.warning) }
-}
+export const zxcvbnStrengthChecker = Object.assign(checkWithZxcvbn, {
+  load: async (): Promise<void> => { await estimatorOf() },
+}) satisfies StrengthChecker
