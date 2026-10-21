@@ -270,8 +270,9 @@ throws or answers no verdict is a bug, which the vault throws rather than refusi
 user types, or at Create, the dialog throws it on to the nearest error boundary above it, as is a
 `passphraseAdvice` that throws. A broken checker arrives as the vault's own `unexpected_error`
 (or `bad_option`), quoting nothing of what it heard; advice that threw, as a fixed
-`unexpected_error` quoting none of it. Wrap the app, or the part of it under `VaultProvider`, in
-one.
+`unexpected_error` quoting none of it. The dialog then answers `declined`, so the call that asked
+is refused `vault_locked`, never left waiting. Wrap the app, or the part of it under
+`VaultProvider`, in one.
 
 **React reports it to you.** Each component catches such a failure in an error boundary of its
 own, so React hands the error to the root's `onCaughtError`: by default the console, with the

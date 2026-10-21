@@ -434,6 +434,28 @@ describe("PassphraseModal", () => {
       vault.close()
     })
 
+    it("answers declined once taken away by the boundary it threw to, so the call that asked is refused vault_locked, never left waiting", async () => {
+      const host: { show: (dialog: ReactNode) => void } = { show: noopShow }
+      const Host = () => {
+        const [shown, setShown] = useState<ReactNode>(null)
+        host.show = setShown
+        return <TH.Catcher>{shown}</TH.Catcher>
+      }
+      TH.renderReporting(<Host />)
+      const heard: ProofAnswer[] = []
+      const getProof: GetProof = (ask) => new Promise((answer) => {
+        act(() => { host.show(<PassphraseModal ask={ask} passphraseAdvice={() => null} onDone={(said) => { heard.push(said); answer(said) }} />) })
+      })
+      const vault = await TH.settledVault(TH.memoryVaultOpts({ strengthChecker: () => Promise.reject(new Error('down')), getProof }))
+      const leasing = vault.tryEnsureLease()
+      fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'pw-the-passphrase' } })
+      fireEvent.click(screen.getByText('Create vault'))
+      expect(await screen.findByText(/^caught: /)).to.not.be.null
+      expect(await leasing).to.have.nested.property('err.refusalkind', 'vault_locked')
+      expect(heard).to.deep.equal(['declined'])
+      vault.close()
+    })
+
     it("closes its trouble notice as a lock lands, answering declined once, whatever its Close says after", async () => {
       const landing = TH.held()
       const heard: ProofAnswer[] = []

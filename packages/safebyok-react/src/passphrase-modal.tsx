@@ -118,6 +118,8 @@ const unlockedFor = (leaseMillis: number, creating: boolean): string => {
  * are not the dialog's to handle: the dialog throws them on to the app's error boundary, above its
  * own. Advice of the host's that throws is reported as 'unexpected_error', carrying nothing of
  * what it heard; the vault's own check throws a refusal that quotes nothing, which goes on as it is.
+ * Taken away by that boundary, the dialog answers `declined`, so the call that asked is refused,
+ * never left waiting.
  *
  * @example
  *   const getProof: GetProof = (ask) => new Promise((answer) => { showDialog(<PassphraseModal ask={ask} onDone={answer} />) })
@@ -141,7 +143,10 @@ const AnsweringOnce = (props: PassphraseModalProps) => {
   // What the form threw rather than met: thrown here, above the dialog's boundary, for the app's.
   // Wrapped, so that a failure carrying any value at all still reads as "failed".
   const [raised, setRaised] = useState<{ err: unknown } | null>(null)
-  const raise = useCallback((err: unknown) => { setRaised({ err }) }, [])
+  const thrownOn = useRef(false)
+  const raise = useCallback((err: unknown) => { thrownOn.current = true; setRaised({ err }) }, [])
+  // Taken away by the boundary it threw to, it answers declined, so no call waits on it for good.
+  useEffect(() => () => { if (thrownOn.current) { done('declined') } }, [done])
   if (raised !== null) { throw forBoundary(raised.err, 'PassphraseModal') }
   return (
     <Boundary fallback={<DialogTrouble onDone={done} />}>
