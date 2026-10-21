@@ -1,6 +1,6 @@
 # Thread wayin_rules: the way-in half of the Coach's phase-B rulings (2026-10-21)
 
-Branch `20261021-wayin_rules`, PR (opening), stacked on [#214](https://github.com/mrflip/safebyok/pull/214),
+Branch `20261021-wayin_rules`, PR [#215](https://github.com/mrflip/safebyok/pull/215), stacked on [#214](https://github.com/mrflip/safebyok/pull/214),
 in the line main → #213 → #212 → #214 → this. Justify: green. Core 2656 passed, 35 skipped; react
 280; convex 279 (8 skipped); postgres 276 (14 skipped); graphql 271 (14 skipped); indexeddb 148
 (10 skipped); fastkey 49; demo 207 (16 skipped); e2e 93 (100 skipped); root 265.
@@ -49,7 +49,9 @@ Items 1, 2, 4, 11, 12, 13, 14 and 15 of the plan's `b_rulings`.
     stored.**, beside `ensure`.
   * `vaultSliceOf` (test helpers, so `safebyok/testing`) now carries `strengthChecker:
     anyStrengthChecker` and `clock: wallClock`. A `VaultSlice` type is exported beside it.
-  * `notes/security.md`, amended in place through a sonnet subagent.
+  * `notes/security.md`, through a sonnet subagent: a new entry (the key a create keeps comes out
+    of a stored way in), and the put_wayin, slots, proof_wayin, epoch, `hostThrewRefusal`,
+    blank-passphrase and strength-checker entries amended in place.
   * Changeset `.changeset/20261021-wayin_rules.md`, minor.
 * **Decisions taken**:
   * **The kept key at create comes from a second derivation** (item 11). `#draftVaultProps` cannot
