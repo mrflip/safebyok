@@ -8,10 +8,7 @@ import type { PutBoxAnswer } from './component/validators'
 import { isSafebyokErrorData } from './refusals'
 import type { SafebyokApi } from './server'
 
-/**
- * The calls every Convex client makes alike: a query once, and a mutation. `ConvexClient` and
- * `ConvexReactClient` both have them.
- */
+/** The calls every Convex client makes alike, a query once and a mutation: `ConvexClient` and `ConvexReactClient` both have them. */
 export type ConvexCalls = {
   query<QueryRef extends FunctionReference<'query'>>(queryRef: QueryRef, args: FunctionArgs<QueryRef>): Promise<FunctionReturnType<QueryRef>>
   mutation<MutationRef extends FunctionReference<'mutation'>>(mutationRef: MutationRef, args: FunctionArgs<MutationRef>): Promise<FunctionReturnType<MutationRef>>
@@ -34,9 +31,8 @@ export type ConvexReactWatchingClient = ConvexCalls & {
   }
 }
 
-/**
- * The Convex client a vault talks through: a `ConvexClient`, or the `ConvexReactClient` a React
- * app already has, so the vault shares its socket and its signed-in user.
+/** The Convex client a vault talks through: a `ConvexClient`, or the `ConvexReactClient` a React app already has.
+ * Through a React app's own client, the vault shares its socket and its signed-in user.
  */
 export type ConvexVaultClient = ConvexWatchingClient | ConvexReactWatchingClient
 
@@ -44,45 +40,30 @@ export type ConvexVaultClient = ConvexWatchingClient | ConvexReactWatchingClient
 export type ConvexVaultDBOpts = VaultDBOpts & {
   /** Your app's Convex client: a `ConvexClient`, or your `ConvexReactClient`. */
   client: ConvexVaultClient
-  /**
-   * The safebyok functions as your clients reference them: `api.safebyok`, from your
-   * `convex/_generated/api`, when you re-export them from `convex/safebyok.ts`.
-   */
+  /** The safebyok functions as your clients reference them: `api.safebyok`, when you re-export them from `convex/safebyok.ts`. */
   api: SafebyokApi
 }
 
-/**
- * safebyok's storage over Convex: a VaultDB whose every verb is one call to the safebyok functions
- * your app serves (see `safebyok-convex/server`), through the Convex client your app already has.
- * Hand it to `Vault.make` as its `vaultDB`.
+/** safebyok's storage over Convex: a VaultDB whose every verb is one call to the safebyok functions your app serves.
+ * It calls them through the Convex client your app already has; `safebyok-convex/server` makes them.
  *
- * * **Who may reach a vault** is your Convex backend's call: a vault call made while signed out,
- *   or for another user's vault, refuses with a VaultError of kind `identity_revoked`, and the
- *   vault locks itself. A sign-out reaches an open vault through its live `watchVault` query, so
- *   it locks even while idle. Close it when your user signs out all the same. A refusal your
- *   `getUserId` throws (`not_permitted`, say) arrives as a VaultError of its kind; each carries
- *   the `ConvexError` it came as for its `cause`.
- * * **Other devices' writes** reach this one live: the vault subscribes to the safebyok function
- *   `watchVault`, and refreshes when it changes.
- * * **A full vault**: the component holds every vault to limits of its own, whatever a client
- *   asks, and refuses a write past them with kind `vault_full`, carrying how full the vault is
- *   as `meta.capacity`. A vault within its `maxBoxes` stays well inside them. `getCapacity`
- *   answers from the same tally: the vault's boxes, and their bytes as Convex counts a document,
- *   against the component's own limits (8,000 boxes, 7 MiB less 1 KiB of box documents).
- * * **A component of another version**: a box write answered in a shape this client does not
- *   know refuses with kind `corrupt_record`, saying the deployed component is out of date. Deploy
- *   the component from the same version of `safebyok-convex` as the app.
+ * * **Who may reach a vault** is your Convex backend's call, through its `getUserId`. A call made
+ *   signed out, or for another user's vault, refuses with kind `identity_revoked`. A sign-out
+ *   reaches an open vault through its live `watchVault` query, so it locks even while idle; close
+ *   it when your user signs out all the same. A refusal your `getUserId` throws arrives as a
+ *   VaultError of its kind, the `ConvexError` its `cause`.
+ * * **Other devices' writes** reach this one live, through `watchVault`.
+ * * **Limits**: at most 1 MiB in one record, Convex's document limit, and 8 MiB and 8,000 boxes in
+ *   one vault. The component holds every vault to limits of its own, whatever a client asks, and
+ *   refuses a box write past them with kind `vault_full`. `getCapacity` answers against those:
+ *   8,000 boxes, and 7 MiB less 1 KiB of box documents, as Convex counts a document.
+ * * **A component of another version**: a box write answered in a shape this client does not know
+ *   refuses with kind `corrupt_record`. Deploy the component from the same version of
+ *   `safebyok-convex` as the app.
  * * **Offline**, a call waits for the connection, as every Convex call does, rather than failing.
- *   A failure Convex reports (a deployment missing the safebyok functions, say) refuses with kind
- *   `storage_unavailable`, carrying nothing of Convex's own error, which on a dev deployment may
- *   quote the call's arguments: your deployment's logs have it, or, for trouble before the call
- *   left, the browser console, where the Convex client reports its connection.
- *
- * @param opts - Your app's Convex `client`, the safebyok functions as its `api`, and optionally a
- *   `logger`, the default logger without one (a vault opened with no logger of its own hears it too): it hears a ConvexClient watch that fails.
- * @returns The VaultDB, holding at most 1 MiB in one record, Convex's document limit, and 8 MiB
- *   in one vault, half of what one Convex function may read (deleting a vault reads it twice), in
- *   at most 8,000 boxes, the component's own limit.
+ * * **Convex's own errors** (a deployment missing the safebyok functions, say) refuse with kind
+ *   `storage_unavailable`, carrying nothing of the original, which on a dev deployment may quote the
+ *   call's arguments. Your deployment's logs have it, or the browser console for trouble before the call left.
  *
  * @example
  *   import { api } from '../convex/_generated/api'
@@ -100,7 +81,7 @@ export const convexVaultDB = (opts: ConvexVaultDBOpts): VaultDB => {
   return new ConvexVaultDB({ ...opts, client, api })
 }
 
-/** Each verb one call to the function of the same purpose; the base class validates both ways. */
+/** The VaultDB {@link convexVaultDB} makes: each verb one call to the function of the same purpose. */
 class ConvexVaultDB extends VaultDB {
   readonly maxRecordBytes = ConvexDocumentBytes
   // Listing, watching and deleting each read the whole vault in one transaction, and deleting reads
@@ -214,12 +195,10 @@ const isPutBoxAnswer = (answer: unknown): answer is Infer<typeof PutBoxAnswer> =
 
 const ConvexTroubleMessage = "The vault's storage could not be reached, or failed partway: try again shortly. Convex's own error is not carried here, as it may quote the call: see your Convex deployment's logs, or, for trouble before the call left, the browser console, where the Convex client reports its connection."
 
-/**
- * `call`, with a refusal from safebyok's functions -- a `ConvexError` carrying one of its kinds --
- * turned into the VaultError of that kind and message, the `ConvexError` as its `cause`, and
- * anything else into `storage_unavailable`, carrying nothing of Convex's error. A thunk, since a
- * client may throw before it hands back a promise: `ConvexReactClient.query` throws at once a
- * refusal it already holds for that query.
+/** What `call` resolves, with what it throws turned into a VaultError.
+ * A `ConvexError` carrying one of safebyok's kinds becomes the VaultError of that kind and message,
+ * the `ConvexError` its `cause`. Anything else becomes `storage_unavailable`, carrying nothing of
+ * Convex's error. It takes a thunk, since `ConvexReactClient.query` throws at once a refusal it already holds.
  */
 const refusing = async <ValT>(call: () => Promise<ValT>): Promise<ValT> => {
   try {

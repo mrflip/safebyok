@@ -4,26 +4,24 @@ import type { FunctionReference } from 'convex/server'
 import { Base64, ConvexError, convexToJson, jsonToConvex } from 'convex/values'
 import type { JSONValue, Value } from 'convex/values'
 
-/**
- * A Convex deployment in memory that the real Convex clients talk to: `ConvexClient` and, through
- * {@link FakeDeployment.connectWith}, any other client, such as `ConvexReactClient`, unmodified,
- * over a fake WebSocket. `convex-test` runs the host's safebyok functions (as the README has a
- * host serve them) and the component beneath; this answers the handful of sync-protocol messages
- * a client sends for queries and mutations, as convex 1.46 sends them. For the tests of an
- * adapter, a binding, or an app that holds a Convex client: it imports `convex` and nothing else,
- * and `convex-test` stays with you, whose `defineTestApp(...).defineModules(...)` is the `host`.
+/** A Convex deployment in memory that the real Convex clients talk to, unmodified, over a fake WebSocket.
+ * A `ConvexClient` connects through {@link FakeDeployment.client}, and any other client, such as
+ * `ConvexReactClient`, through {@link FakeDeployment.connectWith}. It is for the tests of an
+ * adapter, a binding, or an app that holds a Convex client.
  *
- * What it stands in for, and so cannot prove: the network and a real server. Every call runs one
- * at a time, in arrival order, so no two transactions ever race (Convex's own serializability is
- * the component's tests' to rely on, not this file's). After every mutation it reruns every
- * watched query and pushes those whose results changed, where Convex reruns only those whose
- * reads the write touched: the same results, sooner or later. Each socket is signed in as one
- * user from the start, in place of the client's `setAuth` and a JWT, until `signOut()` signs every
- * one out, rerunning every watched query, as Convex does on a new identity. There is no reconnecting,
- * no ping, no chunked transition, and no action.
+ * `convex-test` runs the host's safebyok functions and the component beneath; this answers the
+ * sync-protocol messages a client sends for queries and mutations, as convex 1.46 sends them. It
+ * imports `convex` and nothing else: `convex-test` stays with you, and its
+ * `defineTestApp(...).defineModules(...)` is the `host`.
  *
- * @param host - A host app as the README has it, from `defineTestApp(...).defineModules(...)`:
- *   its `api`, and `createTest()` for the in-memory backend that runs its functions.
+ * It stands in for the network and a real server, so it cannot prove them:
+ * * Calls run one at a time, in arrival order, so no two transactions ever race.
+ * * After every mutation it reruns every watched query and pushes those whose results changed,
+ *   where Convex reruns only those the write touched: the same results, sooner or later.
+ * * Each socket is signed in as one user from the start, in place of `setAuth` and a JWT, until
+ *   `signOut()` signs every one out.
+ * * There is no reconnecting, no ping, no chunked transition, and no action.
+ *
  * @returns The deployment: connect clients to it, and `close()` it after the test.
  *
  * @example
@@ -99,10 +97,9 @@ export class FakeDeployment<Host extends FakeHost> {
     return this.connectWith(subject, (address, opts) => new ConvexClient(address, opts))
   }
 
-  /**
-   * A client of any other kind on this deployment, signed in as `subject`, or as no one: `make`
-   * constructs it from the address and options it is to be given, and it is closed with the rest.
-   * This is how `ConvexReactClient` connects, without this module importing React.
+  /** A client of any other kind on this deployment, signed in as `subject`, or as no one, and closed with the rest.
+   * `make` constructs it from the address and options it is given. This is how `ConvexReactClient`
+   * connects, without this module importing React.
    */
   connectWith<Client extends { close: () => Promise<void> }>(subject: string | null, make: (address: string, opts: FakeClientOpts) => Client): Client {
     const client = make(FakeAddress, { webSocketConstructor: this.socketsFor(subject), unsavedChangesWarning: false })
@@ -120,10 +117,7 @@ export class FakeDeployment<Host extends FakeHost> {
     return Array.from(this.sessions.values(), (session) => Array.from(session.watched.values(), (watch) => watch.udfPath)).flat()
   }
 
-  /**
-   * Signs every connected socket out, as a client's `clearAuth` would, and pushes each watched
-   * query that now answers differently: a safebyok function's, refused.
-   */
+  /** Signs every connected socket out, as a client's `clearAuth` would, and pushes each watched query that now answers differently. */
   signOut(): void {
     this.enqueue(async () => {
       for (const session of this.sessions.values()) { session.subject = null }
@@ -268,10 +262,7 @@ type SocketLine = {
   hungUp(socket: FakeSocket): void
 }
 
-/**
- * Just enough of a WebSocket for a Convex client: it opens at once, hands each message sent to
- * the deployment, and delivers the deployment's replies later, as a network would.
- */
+/** Just enough of a WebSocket for a Convex client: it opens at once, and delivers the deployment's replies later, as a network would. */
 class FakeSocket {
   onopen:    ((event: object) => void) | null = null
   onmessage: ((event: { data: string }) => void) | null = null

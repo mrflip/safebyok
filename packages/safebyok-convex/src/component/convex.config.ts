@@ -1,7 +1,6 @@
 import { defineComponent } from 'convex/server'
 
-/**
- * The safebyok component, as a host app installs it from its `convex/convex.config.ts`:
+/** The safebyok component, as a host app installs it from its `convex/convex.config.ts`.
  *
  * @example
  *   import { defineApp } from 'convex/server'

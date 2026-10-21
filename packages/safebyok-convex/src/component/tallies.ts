@@ -3,14 +3,11 @@ import type { Value } from 'convex/values'
 import type { Doc, Id } from './_generated/dataModel'
 import type { DatabaseReader, DatabaseWriter } from './_generated/server'
 
-/**
- * Each vault's tally, and the limits the component holds every vault to, so that any vault it
- * takes in can be deleted whole. Deleting a vault (`delVault`, which `del()` calls) reads
- * every row of it twice in one transaction -- once to find it, once to delete it -- and a Convex
- * transaction may read 16 MiB and 32,000 documents, and write 16,000. A client keeps its vault far
- * smaller (`maxBoxes`, under `convexVaultDB`'s `maxVaultBytes`), but a modified client need
- * not, so the component checks these limits itself on every box write, against a tally kept in
- * step with each write and delete rather than by reading the vault.
+/** Each vault's tally, and the limits the component holds every vault to, so that it can always be deleted whole.
+ * `delVault` reads every row twice in one transaction, and a Convex transaction may read 16 MiB and
+ * 32,000 documents, and write 16,000. A modified client need not keep its vault small, so the
+ * component checks these limits on every box write, against a tally kept in step with each write
+ * and delete.
  */
 
 /** Convex's most for one document, in bytes: 1 MiB. */
@@ -25,17 +22,14 @@ const ConvexTransactionWrittenDocuments = 16_000
 /** Room for the vault's tally row, which a delete reads twice as well: several times its weight. */
 const TallyReserveBytes = 1024
 
-/**
- * The most boxes one vault holds: half the documents a Convex transaction may write, so that
- * a delete -- a deletion and two reads per box -- stays well inside every per-transaction
- * limit. Twice the most any client's `maxBoxes` can be over `convexVaultDB`.
+/** The most boxes one vault holds: half the documents a Convex transaction may write.
+ * A delete, a deletion and two reads per box, then stays inside every per-transaction limit.
  */
 export const MaxVaultBoxes = ConvexTransactionWrittenDocuments / 2
 
-/**
- * The most one vault's boxes weigh together, in bytes as Convex counts a document: half of
- * what a transaction may read, as a delete reads every row twice, less a whole document for the
- * vault's props and room for its tally, which the delete reads twice too. 7 MiB less 1 KiB.
+/** The most one vault's boxes weigh together, in bytes as Convex counts a document: 7 MiB less 1 KiB.
+ * That is half of what a transaction may read, as a delete reads every row twice, less a whole
+ * document for the vault props and room for the tally.
  */
 export const MaxVaultBoxBytes = (ConvexTransactionReadBytes / 2) - ConvexDocumentBytes - TallyReserveBytes
 
@@ -56,23 +50,18 @@ export const capacityOf = (tally: Tally | null) => ({
   bytes: { used: tally?.box_bytes ?? MaxVaultBoxBytes, max: MaxVaultBoxBytes },
 })
 
-/**
- * A vault's tally as a write finds it: `kept` is its stored row, if it has one, and `tally` the
- * count -- or null, when counting afresh stopped at a limit, so the vault is past it by an unknown
- * amount.
+/** A vault's tally as a write finds it: its stored row, if any, and the count.
+ * The count is null when counting afresh stopped at a limit: the vault is past it by an unknown amount.
  */
 export type Reckoning = {
   kept:  Doc<'safebyok_vault_tallies'> | null
   tally: Tally | null
 }
 
-/**
- * What a box row weighs toward its vault's limit: its size as Convex counts the document.
+/** What a box row weighs toward its vault's limit: its size as Convex counts the document.
  *
- * @param row - The row, as stored (with its `_id`) or about to be.
- * @param rowId - The `_id` a row not yet read back is stored under; without one, a row lacking its
- *   `_id` is weighed with Convex's estimate of one.
- * @returns The row's size in bytes, as Convex counts it against a transaction's reads.
+ * @param rowId - The `_id` of a row not yet read back; without one, a row lacking its `_id` is
+ *   weighed with Convex's estimate of one.
  *
  * @example weigh(standing)            // a row read from the table
  * @example weigh(row, insertedId)     // a row just inserted
@@ -81,15 +70,10 @@ export const weigh = (row: Record<string, Value>, rowId?: Id<'safebyok_boxes'>):
   getDocumentSize(rowId === undefined ? row : { ...row, _id: rowId, _creationTime: 0 })
 )
 
-/**
- * The vault's tally as it stands, for a box write to check: the one kept, or -- for a vault
- * with none yet -- counted afresh from its rows, reading them once. Counting stops at the first
- * row past a limit, so it never reads much more than a vault may hold; the tally then comes back
- * null, and the vault is refused anything that adds to it until deleted boxes bring it back in.
- *
- * @param db - The transaction's database.
- * @param vaultRowId - The vault row, which its tally is filed under.
- * @param boxRows - The vault's box rows, read only when there is no tally to keep.
+/** The vault's tally as it stands, for a box write to check: the one kept, or one counted afresh from `boxRows`.
+ * Counting stops at the first row past a limit, so it never reads much more than a vault may hold.
+ * The tally then comes back null, and the vault is refused anything that adds to it until deleted
+ * boxes bring it back in.
  */
 export const reckon = async (
   db: DatabaseReader, vaultRowId: Id<'safebyok_vaults'>, boxRows: AsyncIterable<Doc<'safebyok_boxes'>>,
@@ -107,11 +91,9 @@ export const reckon = async (
   return { kept: null, tally }
 }
 
-/**
- * True when a write that changes the vault by `growth` must be refused: it would leave the vault
- * past a limit, and larger by that measure than it found it. A write that adds nothing by a
- * measure -- a replacement, by count; a replacement no heavier, by weight -- is never refused by
- * it, so a vault over its limits can always shrink.
+/** True when a write that changes the vault by `growth` must be refused: it leaves the vault past a limit, and larger by that measure.
+ * A write that adds nothing by a measure (a replacement, by count; one no heavier, by weight) is
+ * never refused by it, so a vault over its limits can always shrink.
  *
  * @param tally - The vault's tally before the write, or null for a vault past a limit, uncounted.
  * @param growth - What the write adds: a box for a new one, and its weight less any it replaces.
@@ -126,10 +108,8 @@ export const refuses = (tally: Tally | null, growth: Tally): boolean => {
     || (growth.box_bytes > 0 && after.box_bytes > MaxVaultBoxBytes)
 }
 
-/**
- * Keep the vault's tally in step with a box write that landed: moved by `growth`, or stored for
- * the first time. A vault whose count stopped at a limit keeps no tally: its next write counts it
- * again.
+/** Keep the vault's tally in step with a box write that landed: moved by `growth`, or stored for the first time.
+ * A vault whose count stopped at a limit keeps no tally: its next write counts it again.
  */
 export const record = async (db: DatabaseWriter, vaultRowId: Id<'safebyok_vaults'>, { kept, tally }: Reckoning, growth: Tally): Promise<void> => {
   if (tally === null) { return }
@@ -141,9 +121,9 @@ export const record = async (db: DatabaseWriter, vaultRowId: Id<'safebyok_vaults
   }
 }
 
-/**
- * Take a deleted box off its vault's tally, when the vault has one. A delete never counts a
- * vault that has none: a vault too large to read whole must still be deletable, a box at a time.
+/** Take a deleted box off its vault's tally, when the vault has one.
+ * A delete never counts a vault that has none: a vault too large to read whole must still be
+ * deletable, a box at a time.
  */
 export const forget = async (db: DatabaseWriter, vaultRowId: Id<'safebyok_vaults'>, deleted: Doc<'safebyok_boxes'>): Promise<void> => {
   const kept = await findTallyRow(db, vaultRowId)

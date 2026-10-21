@@ -8,21 +8,17 @@ import {
   Capacity, VaultPropsExpectation, VaultDelExpectation, ListedBox, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, PutBoxAnswer, VaultProps, VaultScope, VaultSignature,
 } from './validators'
 
-/**
- * The component's functions, one per verb of the core's `VaultDB`: what `convexVaultDB` reaches,
- * through the host's wrappers (`SafebyokComponent.api`), which authenticate first. Inside the
- * component every call is trusted to be its `user_id`'s own.
+/** The component's functions, one per verb of the core's `VaultDB`, reached through the host's `SafebyokComponent.api`.
+ * That wrapper authenticates first: inside the component every call is trusted to be its
+ * `user_id`'s own. Each function keeps the contract of the `VaultDB` method it serves, and says
+ * only where it differs.
  *
- * Every update checks its expectation in the same transaction it writes in, and Convex runs
- * mutations serializably, so the check holds for real. A failed expectation writes nothing and
- * resolves `false` -- for a box deletion, `null` -- which the client refuses as `stale_write`;
- * it is not an error. A box write resolves a {@link PutBoxAnswer} from its own transaction: the
- * box as stored, or why it did not land, with the box that stands. A delete lands only in the vault it expects: it wins over any box revision,
- * but never lands in a vault made anew. A box delete that lands resolves what it removed.
+ * Convex runs mutations serializably, so each check and its write hold together. A failed
+ * expectation is not an error: it resolves `false`, or `null` for a box deletion, which the client
+ * refuses as `stale_write`.
  *
  * Every vault is held to the limits in `./tallies`, whatever its client asks, so that it can
- * always be deleted whole: a box write that would take the vault past one writes nothing and
- * resolves `vault_full`, with how full the vault is. A delete is never refused for room.
+ * always be deleted whole. A delete is never refused for room.
  */
 
 // ------------------------------------------------------------------------------- the vault props
@@ -37,11 +33,7 @@ export const getVaultProps = query({
   },
 })
 
-/**
- * Store `vaultProps` only if their scope holds none, and return whichever vault props stand there
- * afterwards: these, or those another device got in first with. Find and insert are one
- * transaction, so two devices creating at once settle on one vault row.
- */
+/** Store `vaultProps` only if their scope holds none, and return whichever vault props stand there afterwards. */
 export const ensureVaultProps = mutation({
   args:    { vaultProps: VaultProps },
   returns: VaultProps,
@@ -53,11 +45,9 @@ export const ensureVaultProps = mutation({
   },
 })
 
-/**
- * Replace the vault props with `vaultProps`, only while those standing have `expected.vault_id`
- * and `expected.unlock_epoch`, and only when `vaultProps` names the same vault and moves its
- * `unlock_epoch` forward. True when written; false, writing nothing, otherwise -- including when
- * no vault props stand.
+/** Replace the vault props, only while those standing have `expected.vault_id` and `expected.unlock_epoch`.
+ * It also resolves false, writing nothing, for vault props that name another vault or do not move
+ * `unlock_epoch` forward.
  */
 export const putVaultProps = mutation({
   args:    { vaultProps: VaultProps, expected: VaultPropsExpectation },
@@ -88,11 +78,7 @@ export const getBox = query({
   },
 })
 
-/**
- * Every box in the vault without its two ciphered fields, `format` kept, in boxlabel order.
- * Reads the whole vault in one query: a vault's boxes together must fit in one Convex
- * transaction's read limits.
- */
+/** Every box in the vault without its two ciphered fields, in boxlabel order, read in one query within the tallies' limits. */
 export const listBoxSummaries = query({
   args:    { scope: VaultScope },
   returns: v.array(ListedBox),
@@ -105,17 +91,11 @@ export const listBoxSummaries = query({
   },
 })
 
-/**
- * Write `box` under its boxlabel, only while the scope's vault props have `expected.vault_id`
- * and `expected.vault_key_epoch` -- they stand for the vaultKey the box was sealed under -- and
- * the standing box has `expected.revision_tok` -- or, for null, there is none. Resolves the
- * box as stored once written, read back in this same transaction. Otherwise it writes nothing,
- * and resolves why: `vault_mismatch` for vault props other than those expected, or none; else
- * `stale_write`, with the box standing (null for none), read in this same transaction; else
- * `vault_full`, with the vault's capacity as its tally stood, for a write that would take the
- * vault past {@link Tallies.MaxVaultBoxes} boxes or {@link Tallies.MaxVaultBoxBytes} bytes and
- * leave it larger than it was: a new box in a full vault, or a heavier replacement. A vault with
- * no tally yet is counted first, reading it once.
+/** Write `box` as `VaultDB`'s `doPutBox` does, resolving a {@link PutBoxAnswer} where that throws.
+ * Beside its refusals, it resolves `vault_full` for a write that would take the vault past {@link
+ * Tallies.MaxVaultBoxes} boxes or {@link Tallies.MaxVaultBoxBytes} bytes and leave it larger: a new
+ * box in a full vault, or a heavier replacement. A vault with no tally yet is counted first,
+ * reading it once.
  */
 export const putBox = mutation({
   args:    { scope: VaultScope, expected: BoxExpectation, box: BoxRecord },
@@ -167,13 +147,7 @@ export const getCapacity = query({
   },
 })
 
-/**
- * Remove the box under `boxlabel`, whatever revision stands, only while the scope's vault props
- * have `expected.vault_id`. Resolves what it removed when that holds -- `deleted` for a box at
- * `expected.revision_tok` (for null, one holding none the client reads as one), `deleted_other` for
- * any other, `absent` for none; null, removing nothing, otherwise -- including when the scope holds
- * no vault props.
- */
+/** Remove the box under `boxlabel` as `VaultDB`'s `doDelBox` does, and take it off the vault's tally. */
 export const delBox = mutation({
   args:    { scope: VaultScope, boxlabel: v.string(), expected: BoxDelExpectation },
   returns: v.nullable(BoxDeletion),
@@ -192,11 +166,7 @@ export const delBox = mutation({
 
 // --------------------------------------------------------------------------------- the vault
 
-/**
- * Remove the vault props and every box, in one transaction, only while the vault props have
- * `expected.vault_id`. True when removed; false, removing nothing, otherwise -- including when
- * the scope holds no vault props.
- */
+/** Remove the vault props, every box and the tally in one transaction, only while the vault props have `expected.vault_id`. */
 export const delVault = mutation({
   args:    { scope: VaultScope, expected: VaultDelExpectation },
   returns: v.boolean(),
@@ -211,12 +181,9 @@ export const delVault = mutation({
   },
 })
 
-/**
- * The vault's change signature, for a client to subscribe to: it changes when, and only when, a
- * write lands in the vault -- the vault props replaced, a box written or deleted, the vault
- * deleted. It reads each box document whole, ciphertext and all, for its revision: a Convex
- * query cannot read some of a document's fields. So each run reads the vault, within the read
- * limits a listing and a delete keep it to.
+/** The vault's change signature, for a client to subscribe to: it changes when, and only when, a write lands in the vault.
+ * Each run reads every box document whole, ciphertext and all, as a Convex query cannot read some
+ * of a document's fields. The tallies' limits keep that within one query's reads.
  */
 export const watchVault = query({
   args:    { scope: VaultScope },

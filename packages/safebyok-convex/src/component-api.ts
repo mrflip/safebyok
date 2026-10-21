@@ -1,10 +1,8 @@
 import type { ApiFromModules, FunctionReference } from 'convex/server'
 import type * as Vaults from './component/vaults'
 
-/**
- * The safebyok component's functions as its host app references them: the type of
- * `components.safebyok` in the host's generated `api`, and what {@link SafebyokComponent} takes.
- * Derived from the functions themselves, so it cannot drift from them.
+/** The safebyok component's functions as its host app references them: the type of `components.safebyok`.
+ * It is what `SafebyokComponent` takes.
  *
  * @example
  *   import { components } from './_generated/api'
