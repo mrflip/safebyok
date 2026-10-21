@@ -646,12 +646,12 @@ describe("postgresVaultDB, in trouble", () => {
     expect(refusal.cause).to.eq(tooBusy)
   })
 
-  it("refuses a row damaged in the database as corrupt_record, leaving it as it is", async () => {
+  it("refuses a row damaged in the database as damaged_vault, leaving it as it is", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
     await db.query(`UPDATE safebyok_vaults SET passphrase = '"not a wayin"'::jsonb`)
-    await TH.expectBad(vaultDB.getVaultProps(u1), 'corrupt_record')
+    await TH.expectBad(vaultDB.getVaultProps(u1), 'damaged_vault')
     const { rows } = await db.query<{ passphrase: unknown }>('SELECT passphrase FROM safebyok_vaults')
     expect(rows[0]?.passphrase).to.eq('not a wayin')
   })

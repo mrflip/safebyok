@@ -953,7 +953,7 @@ export class Vault {
     // The mark the vault props are held to is read before them (see heedMark), and an older copy of a vault
     // this device has seen newer is refused before anything is taken from it.
     const seenBefore = this.#checkedMark(valOf(await this.#deviceDB.getMark(this.#scope)))
-    const read = await damagedAs(this.#vaultDB.getVaultProps(this.#scope), damagedVaultProps)
+    const read = await this.#vaultDB.getVaultProps(this.#scope)
     const fresh = read === null ? null : frozenVaultProps(read)
     const mark = fresh === null ? null : await this.#heedMark(fresh, { seenBefore, call: 'refresh' })
     await this.#heedRevocation(fresh, mark)
@@ -1316,7 +1316,7 @@ export class Vault {
       // Another device's vault, if one was made meanwhile, is held to the mark as it was before it.
       const seenBefore = this.#checkedMark(valOf(await this.#deviceDB.getMark(this.#scope)))
       const revoked = this.#createsStandDown.signal
-      const settled = frozenVaultProps(await damagedAs(this.#vaultDB.ensureVaultProps(draft), damagedVaultProps))
+      const settled = frozenVaultProps(await this.#vaultDB.ensureVaultProps(draft))
       const mark = await this.#heedMark(settled, { seenBefore, call: 'unlock' })
       // Vault props a read took up meanwhile are not put back: should they differ, the grant that
       // follows finds these outrun, and takes nothing up. Nor are these put back once a read has
@@ -1674,7 +1674,7 @@ export class Vault {
   }
   // --
 
-  // == [Reading boxes]: checkListed, getBoxOrThrow, boxFrom, getBoxUnlocked, decipherOrCatchUp
+  // == [Reading boxes]: listedRevisionOf, isListedDamaged, checkListed, getBoxOrDamaged, getBoxOrThrow, boxFrom, getBoxUnlocked, decipherOrCatchUp
 
   /** The revision the listing names for the box under `boxlabel`, sound or damaged; null for none listed, or a damaged record that holds none.
    * Storage arbitrates a write that names it, so a listing gone stale costs a refusal and a second
@@ -1693,20 +1693,20 @@ export class Vault {
     if (this.#boxes.every((box) => box.boxlabel !== boxlabel)) { throw absentBox() }
   }
 
-  /** The box under `boxlabel`; null when there is none, and 'damaged' when its record fails verification. */
+  /** The box under `boxlabel`; null when there is none, and 'damaged' when storage refuses its record as 'damaged_box'. */
   async #getBoxOrDamaged(boxlabel: string): Promise<Box | 'damaged' | null> {
     try {
       const record = await this.#vaultDB.getBox(this.#scope, boxlabel)
       return record === null ? null : this.#boxFrom(record)
     } catch (err) {
-      if (! isVaultError(err, 'corrupt_record')) { throw err }
+      if (! isVaultError(err, 'damaged_box')) { throw err }
       return 'damaged'
     }
   }
 
-  /** The box under `boxlabel`, a name already held to the floor: kind 'absent_box' when there is none, and 'damaged_box' when its record fails verification. */
+  /** The box under `boxlabel`, a name already held to the floor: kind 'absent_box' when there is none, and 'damaged_box', as storage refuses it, when its record fails its checks. */
   async #getBoxOrThrow(boxlabel: string): Promise<Box> {
-    const record = await damagedAs(this.#vaultDB.getBox(this.#scope, boxlabel), damagedBox)
+    const record = await this.#vaultDB.getBox(this.#scope, boxlabel)
     if (record === null) { throw absentBox() }
     return this.#boxFrom(record)
   }
@@ -1952,22 +1952,7 @@ export class Vault {
   // --
 }
 
-// == [Refusals]: damagedAs, damagedVaultProps, damagedBox, lockedError, declinedError, closedError
-
-/** What `reading` resolves to, with storage's 'corrupt_record' said instead as `damaged` says it, storage's refusal its cause. */
-const damagedAs = async <ResultT>(reading: Promise<ResultT>, damaged: (opts: ErrorOptions) => VaultError): Promise<ResultT> => {
-  try {
-    return await reading
-  } catch (err) {
-    if (! isVaultError(err, 'corrupt_record')) { throw err }
-    throw damaged({ cause: err })
-  }
-}
-
-const damagedVaultProps = (opts: ErrorOptions) => new VaultError('damaged_vault', "This vault's stored record is damaged, so no passphrase or passkey can be tried against it, and it can't be opened. It was left as it is: the app's support may be able to restore it.", opts)
-
-// The refusal never quotes the boxlabel: a host's validators may admit any text, a mistaken paste among it.
-const damagedBox = (opts: ErrorOptions) => new VaultError('damaged_box', "That box is stored damaged, so it can't be read. It was left as it is; remove it, or store its whisper again over it.", opts)
+// == [Refusals]: damagedBeyondNaming, lockedError, declinedError, closedError
 
 const damagedBeyondNaming = () => new VaultError('damaged_box', "That box is damaged beyond naming: its stored record does not say which revision it is, so nothing can be written over it safely. Nothing was written. Remove it with delBox() first, then store its whisper again.")
 

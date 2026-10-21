@@ -5,15 +5,15 @@ import type { Capacity, DamagedBox, WayinSummary } from './types'
  * Each kind belongs to one family ({@link RefusalFamilyForKind}), told apart by who handles it:
  *
  * * **Misuse**: a programming error, the host developer's to fix. `bad_label`, `bad_whisper`,
- *   `bad_option`, `bad_record`, `invalid_box`, `vault_closed`, `unknown_key_deriver`,
- *   `insecure_context`, `unexpected_error`. Let it reach an error boundary or the dev overlay.
+ *   `bad_option`, `bad_record`, `invalid_box`, `corrupt_record`, `vault_closed`,
+ *   `unknown_key_deriver`, `insecure_context`, `unexpected_error`. Let it reach an error boundary
+ *   or the dev overlay.
  *   Never show it to the user, and never retry it.
  * * **Condition**: something the app handles at run time, which may reach the user: ask again,
  *   show a message, retry, or have the user free room. `vault_locked`, `wrong_passphrase`,
  *   `created_elsewhere`, `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `absent_box`,
  *   `absent_vault`, `absent_wayin`, `whisper_too_large`, `box_too_large`, `vault_full`,
- *   `corrupt_record`, `stale_write`, `vault_mismatch`, `not_permitted`, `storage_unavailable`,
- *   `storage_blocked`.
+ *   `stale_write`, `vault_mismatch`, `not_permitted`, `storage_unavailable`, `storage_blocked`.
  * * **Bad news**: something the app is told whether or not the call was refused, and may show
  *   the user. `damaged_vault`, `damaged_wayin`, `damaged_box`, `newer_format`, `rolled_back`,
  *   `identity_revoked`.
@@ -32,8 +32,16 @@ import type { Capacity, DamagedBox, WayinSummary } from './types'
  *   host opens the vault for whoever that is.
  * * `not_permitted`: the signed-in user, still the vault's own, is refused one call. Signing in
  *   again will not help.
- * * `corrupt_record`: storage's word for a record that failed its checks as it read back. The
- *   vault reports what that means as one of the `damaged_` kinds.
+ * * **A record that fails its checks** is named for who is at fault, by a VaultDB and a vault
+ *   alike. One read from storage that fails them, or a box that will not open under the lease in
+ *   hand, is damaged: `damaged_vault` for vault props, `damaged_box` for a box (a listing shows it
+ *   as a `DamagedBox` instead, and tells it as `damaged_box` news), Zod's own error its `cause`
+ *   where a check failed. One the host hands in is `bad_record` (a box handed to a VaultDB's
+ *   `putBox`, `invalid_box`). A storage adapter that answers in a shape its protocol does not
+ *   allow -- a box write's echo, a stale or full refusal missing what it must carry, a deletion's
+ *   report, a capacity -- is `corrupt_record`: a bug in the adapter, and nothing else. (This
+ *   device's own lease read back damaged is refused so too, inside the vault, which never surfaces
+ *   it: it asks for a proof instead.)
  * * `wrong_passphrase`, `wrong_passkey`: the proof did not open its wayin. That is all the vault
  *   can tell even when the stored vault was altered, since decryption fails alike; the message
  *   says so. A blank passphrase offered as proof is `wrong_passphrase` too.
@@ -84,13 +92,13 @@ export const RefusalKindVals = [
   'box_too_large',       // a box -- whisper, names and sidecar together -- over what storage holds in one record
   'vault_full',          // a new box in a vault already holding its maxBoxes, or a write storage has no room for
   'bad_option',          // an option or argument out of its range: Vault.make's, mask's, argon2idDeriver's, a putBox()'s sidecar
-  'bad_record',          // a record or expectation handed to a VaultDB verb that is not one this package builds
+  'bad_record',          // a record or expectation the host handed in that is not one this package builds
   'invalid_box',         // a box handed to a VaultDB's putBox that is not one this package builds, or not for its expectation
   'vault_closed',        // the vault handle was closed and cannot be used again
-  'corrupt_record',      // a stored record failed validation as storage read it back
-  'damaged_vault',       // the vault's stored props failed their checks, so no way in can be tried
+  'corrupt_record',      // a storage adapter answered in a shape its protocol does not allow: a bug in the adapter
+  'damaged_vault',       // the vault's props, read from storage, failed their checks, so no way in can be tried
   'damaged_wayin',       // a way in is stored in a form this package never writes, so it cannot be tried
-  'damaged_box',         // a box failed its checks, or would not open under the vault's own vaultKey, or names no revision to store over
+  'damaged_box',         // a box read from storage failed its checks, or would not open under the vault's own vaultKey, or names no revision to store over
   'newer_format',        // a stored vault in a form this version does not know, which a newer one may have written
   'unknown_key_deriver', // the vault names a key deriver this handle was not built with
   'insecure_context',    // the page is not a secure context (plain http), where the browser withholds WebCrypto
@@ -135,7 +143,7 @@ export const RefusalFamilyForKind = {
   bad_record:          'misuse',
   invalid_box:         'misuse',
   vault_closed:        'misuse',
-  corrupt_record:      'condition',
+  corrupt_record:      'misuse',
   damaged_vault:       'bad_news',
   damaged_wayin:       'bad_news',
   damaged_box:         'bad_news',

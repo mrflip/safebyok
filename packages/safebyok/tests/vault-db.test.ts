@@ -1,5 +1,6 @@
 import { omit } from 'es-toolkit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import * as Z from 'zod/mini'
 import { memoryStore } from '../src/string-store'
 import { VaultDB, jsonBytes, type VaultPropsExpectation, type VaultDelExpectation, type BoxExpectation, type BoxDelExpectation, type StoredBox, type VaultDBOpts, type WatchTrouble } from '../src/vault-db'
 import { localVaultDB } from '../src/local-vault-db'
@@ -257,7 +258,7 @@ describe("the abstract VaultDB, on the way back from a box deletion", () => {
       const refusal = await TH.expectBad(vaultDB.delBox(TH.scopeOf('u1'), 'anthropic', TH.deleting('rev-one')), 'corrupt_record')
       expect(refusal.message).to.match(/deletion landed/)
       expect(refusal.message).to.match(/cannot read back/)
-      expect((refusal.cause as VaultError).refusalkind).to.eq('corrupt_record')
+      expect(refusal.cause).to.be.instanceOf(Z.core.$ZodError)
       expect(TH.thrownText(refusal)).to.not.include('anthropic')
       // What the adapter removed stays removed: the refusal is about its answer, not its deletion.
       expect(vaultDB.rows.has(u1AnthropicBoxCkey)).to.be.false
@@ -284,11 +285,12 @@ const ListedRecordCases = [
 ] as const
 
 describe("the abstract VaultDB, around an adapter's half", () => {
-  it("validates what the adapter returns: a wrong-shaped record is refused, not repaired", async () => {
+  it("validates what the adapter returns: a wrong-shaped record is refused as damaged_vault, Zod's error its cause, not repaired", async () => {
     const vaultDB = new MapVaultDB()
     vaultDB.rows.set(Ckeys.vaultProps(TH.scopeOf('u1')), { format: 'safebyok-vault-v3' })
-    const refusal = await TH.expectBad(vaultDB.getVaultProps(TH.scopeOf('u1')), 'corrupt_record')
+    const refusal = await TH.expectBad(vaultDB.getVaultProps(TH.scopeOf('u1')), 'damaged_vault')
     expect(refusal).to.be.instanceOf(VaultError)
+    expect(refusal.cause).to.be.instanceOf(Z.core.$ZodError)
     // Refused, never repaired or deleted: the record is still there for forensics.
     expect(vaultDB.rows.size).to.eq(1)
   })
@@ -434,7 +436,7 @@ const withDamagedVaultProps = (spoil: (vaultProps: VaultProps) => unknown = (vau
 describe("the abstract VaultDB, deleting a vault whose vault props are damaged", () => {
   it("deletes the vault props and every box of a vault whose props fail their checks, and nothing of any other", async () => {
     const vaultDB = withDamagedVaultProps()
-    await TH.expectBad(vaultDB.getVaultProps(TH.scopeOf('u1')), 'corrupt_record')
+    await TH.expectBad(vaultDB.getVaultProps(TH.scopeOf('u1')), 'damaged_vault')
     await TH.expectingGood(vaultDB).delDamagedVault(TH.scopeOf('u1'))
     expect(vaultDB.rows.size).to.eq(2)
     const theirVaultProps = Ckeys.vaultProps(TH.scopeOf('u2'))
@@ -543,13 +545,14 @@ describe("the abstract VaultDB, deleting a vault whose vault props are damaged",
   it("refuses as damaged_vault, deleting nothing, an adapter that validates on the way up and so never hands the record over", async () => {
     class CheckedVaultDB extends MapVaultDB {
       protected override doGetVaultProps(): Promise<unknown> {
-        return Promise.reject(new VaultError('corrupt_record', 'did not read back'))
+        return Promise.reject(new VaultError('damaged_vault', 'did not read back'))
       }
     }
     const vaultDB = new CheckedVaultDB()
     vaultDB.rows.set(Ckeys.vaultProps(TH.scopeOf('u1')), { ...TH.vaultPropsOf('u1'), unlock_epoch: 'one' })
     const refusal = await TH.expectBad(vaultDB.delDamagedVault(TH.scopeOf('u1')), 'damaged_vault')
-    expect((refusal.cause as VaultError).refusalkind).to.eq('corrupt_record')
+    expect((refusal.cause as VaultError).refusalkind).to.eq('damaged_vault')
+    expect(refusal.message).to.include('nothing was removed')
     expect(vaultDB.rows.size).to.eq(1)
   })
 
@@ -630,14 +633,15 @@ class MisansweringVaultDB extends MapVaultDB {
   }
 }
 
+/** What a misanswering adapter may hand back from a landed box write, and whether it fails a box's shape (Zod's error the cause) or names another box than the one written (no cause). */
 const MisansweredCases = [
-  [true,                                                             'the true an older adapter answered with'],
-  [undefined,                                                        'nothing at all'],
-  [omit(TH.boxOf('anthropic', 'one'), ['whisper_ciphered']),         'a box missing a ciphered field'],
-  [{ ...TH.boxOf('anthropic', 'one'), written_at: '1792022400000' }, 'a box whose time is text'],
-  [TH.boxOf('openai', 'one'),                                        'a box under another boxlabel than the one written'],
-  [TH.boxOf('anthropic', 'other'),                                   'a box at another revision than the one written'],
-  [null,                                                             'the null an older adapter answered a stale write with'],
+  [true,                                                             'shape', 'the true an older adapter answered with'],
+  [undefined,                                                        'shape', 'nothing at all'],
+  [omit(TH.boxOf('anthropic', 'one'), ['whisper_ciphered']),         'shape', 'a box missing a ciphered field'],
+  [{ ...TH.boxOf('anthropic', 'one'), written_at: '1792022400000' }, 'shape', 'a box whose time is text'],
+  [TH.boxOf('openai', 'one'),                                        'names', 'a box under another boxlabel than the one written'],
+  [TH.boxOf('anthropic', 'other'),                                   'names', 'a box at another revision than the one written'],
+  [null,                                                             'shape', 'the null an older adapter answered a stale write with'],
 ] as const
 
 describe("the abstract VaultDB, on the way back from a box write", () => {
@@ -656,14 +660,16 @@ describe("the abstract VaultDB, on the way back from a box write", () => {
     expect(vaultDB.rows.get(u1AnthropicBoxCkey)).to.deep.equal(TH.boxOf('anthropic', 'one'))
   })
 
-  for (const [handedBack, blurb] of MisansweredCases) {
-    it(`refuses as corrupt_record a landed write whose adapter hands back ${blurb}, saying the write may have landed`, async () => {
+  for (const [handedBack, failing, blurb] of MisansweredCases) {
+    it(`refuses as corrupt_record, never as damage, a landed write whose adapter hands back ${blurb}, saying the write may have landed`, async () => {
       const vaultDB = new MisansweringVaultDB(handedBack)
       await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
       const refusal = await TH.expectBad(vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one')), 'corrupt_record')
       expect(refusal.message).to.match(/landed/)
       expect(refusal.message).to.match(/cannot read back/)
-      expect((refusal.cause as VaultError).refusalkind).to.eq('corrupt_record')
+      expect(refusal.message).to.match(/adapter needs a developer's look/)
+      // Zod's error is the cause where a check refused the box; a box naming another one has none.
+      expect(refusal.cause instanceof Z.core.$ZodError ? 'shape' : refusal.cause).to.eq(failing === 'shape' ? 'shape' : undefined)
       // What the adapter stored stands: the refusal is about its answer, not its write.
       expect(vaultDB.rows.get(u1AnthropicBoxCkey)).to.deep.equal(TH.boxOf('anthropic', 'one'))
     })
@@ -870,7 +876,7 @@ describe("the abstract VaultDB, by what threw", () => {
     vaultDB.inner.rows.set(u1AnthropicBoxCkey, TH.boxOf('anthropic', 'one'))
     expect(await TH.expectingGood(vaultDB).getBox(TH.scopeOf('u1'), 'anthropic')).to.deep.equal(TH.boxOf('anthropic', 'one'))
     vaultDB.inner.rows.set(u1AnthropicBoxCkey, 'not a box')
-    await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic'), 'corrupt_record')
+    await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic'), 'damaged_box')
   })
 
   it("refuses an answer still wrapped as an Outcome as 'bad_option', saying to unwrap it with valOf, never reading it as a record", async () => {
@@ -915,8 +921,54 @@ describe("the abstract VaultDB, listing", () => {
     vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'openai'), TH.boxOf('openai', 'two'))
     const summaries = await TH.expectingGood(vaultDB).listBoxes(TH.scopeOf('u1'))
     expect(summaries.map((summary) => summary.boxlabel)).to.deep.equal(['anthropic', 'openai'])
-    const refusal = await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic'), 'corrupt_record')
+    const refusal = await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic'), 'damaged_box')
     expect(refusal.message).to.match(/did not read back in a shape/)
+  })
+})
+
+/** A box whose ciphertext and sidecar hold text distinctive enough that finding it in a refusal means it was quoted. */
+const telltaleBox = TH.boxOf('anthropic', 'one', {
+  box_key_wrapped:  TH.fakeCiphered('boxkey-TELLTALE'),
+  whisper_ciphered: TH.fakeCiphered('whisper-TELLTALE'),
+  sidecar:          { note: 'sidecar-TELLTALE', tags: ['tag-TELLTALE'] },
+})
+
+/** Ways a stored box fails its checks: whether Zod's check refused it (its error the cause), or it names another boxlabel (no cause). */
+const DamagedBoxCases = [
+  [{ ...telltaleBox, registered_at: 'when-TELLTALE' },                                                   'shape', 'a malformed time'],
+  [{ ...telltaleBox, sidecar: { ...telltaleBox.sidecar, when: new Date() } },                            'shape', 'a sidecar holding what JSON cannot carry'],
+  [{ ...telltaleBox, whisper_ciphered: { cipher_iv_b64: 'iv-TELLTALE', ciphertext_b64: ['ct-TELLTALE'] } }, 'shape', 'a ciphered field of the wrong shape'],
+  [omit(telltaleBox, ['box_key_wrapped']),                                                               'shape', 'a ciphered field missing'],
+  [{ ...telltaleBox, boxlabel: 'openai' },                                                               'names', 'another boxlabel than the one it is stored under'],
+] as const
+
+describe("the abstract VaultDB, reading a damaged box", () => {
+  for (const [stored, failing, blurb] of DamagedBoxCases) {
+    it(`refuses a box stored with ${blurb} as damaged_box, its message, cause and JSON holding none of its ciphertext or sidecar text`, async () => {
+      const vaultDB = new MapVaultDB()
+      vaultDB.rows.set(u1AnthropicBoxCkey, stored)
+      const refusal = await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic'), 'damaged_box')
+      // Zod's error is the cause where a check refused the box; a box naming another one has none.
+      expect(refusal.cause instanceof Z.core.$ZodError ? 'shape' : refusal.cause).to.eq(failing === 'shape' ? 'shape' : undefined)
+      const shown = [TH.thrownText(refusal), JSON.stringify(refusal), JSON.stringify(refusal.cause ?? null), String(refusal.cause)].join('\n')
+      expect(shown).to.not.include('TELLTALE')
+    })
+  }
+
+  it("names in its cause, in Zod's English, the field that failed, and none of its value", async () => {
+    const vaultDB = new MapVaultDB()
+    vaultDB.rows.set(u1AnthropicBoxCkey, { ...telltaleBox, registered_at: 'when-TELLTALE' })
+    const refusal = await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic'), 'damaged_box')
+    const { issues } = refusal.cause as Z.core.$ZodError
+    expect(issues.map((issue) => issue.path)).to.deep.equal([['registered_at']])
+    expect(issues[0]?.message).to.match(/expected number, received string/)
+  })
+
+  it("refuses standing vault props that fail their checks, met by ensureVaultProps, as damaged_vault", async () => {
+    const vaultDB = new MapVaultDB()
+    vaultDB.rows.set(u1VaultPropsCkey, { ...TH.vaultPropsOf('u1'), unlock_epoch: 'one' })
+    const refusal = await TH.expectBad(vaultDB.ensureVaultProps(TH.vaultPropsOf('u1', { vault_id: 'vault-id-drafted' })), 'damaged_vault')
+    expect(refusal.cause).to.be.instanceOf(Z.core.$ZodError)
   })
 })
 // --
@@ -971,11 +1023,11 @@ describe("the abstract VaultDB, holding names to the floor", () => {
     expect(await TH.expectingGood(vaultDB).getBox(TH.scopeOf('u1'), 'anthropic')).to.be.null
   })
 
-  it("refuses, as 'corrupt_record', a stored box with no sidecar, and lists it as damaged", async () => {
+  it("refuses, as 'damaged_box', a stored box with no sidecar, and lists it as damaged", async () => {
     const vaultDB = new MapVaultDB()
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
     vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), TH.omitting(TH.boxOf('anthropic', 'one'), 'sidecar'))
-    await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic'), 'corrupt_record')
+    await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic'), 'damaged_box')
     expect(await TH.expectingGood(vaultDB).listBoxes(TH.scopeOf('u1'))).to.deep.equal([{ boxlabel: 'anthropic', damaged: true, revision_tok: 'rev-one' }])
   })
 

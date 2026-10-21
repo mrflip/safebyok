@@ -111,33 +111,41 @@ describe("localVaultDB", () => {
     expect(store.ckeys()).to.have.members([u1VaultPropsCkey, u1BoxCkey('anthropic')])
   })
 
-  it("refuses a mangled row with kind 'corrupt_record', quoting none of it", async () => {
+  it("refuses a mangled vault props row as damaged_vault, quoting none of it", async () => {
     const store = memoryStore()
     const vaultDB = localVaultDB({ store })
     store.write(u1VaultPropsCkey, '{"format":"safebyok-vault-v3","shhh":"SUPERSECRET"}')
-    const refusal = await TH.expectBad(vaultDB.getVaultProps(TH.scopeOf('u1')), 'corrupt_record')
+    const refusal = await TH.expectBad(vaultDB.getVaultProps(TH.scopeOf('u1')), 'damaged_vault')
     expect(refusal).to.be.instanceOf(VaultError)
-    expect(refusal.message).to.not.include('SUPERSECRET')
+    expect(`${refusal.message} ${String(refusal.cause)}`).to.not.include('SUPERSECRET')
   })
 
-  it("refuses a row that is not JSON at all, quoting none of it", async () => {
+  it("hands a row that is not JSON up as its text, which reads back as damaged_box, quoting none of it", async () => {
     const store = memoryStore()
     const vaultDB = localVaultDB({ store })
     store.write(u1BoxCkey('anthropic'), 'SUPERSECRET{')
-    const refusal = await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic'), 'corrupt_record')
-    expect(refusal.message).to.match(/did not read back as JSON/)
-    expect(refusal.message).to.not.include('SUPERSECRET')
+    const refusal = await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic'), 'damaged_box')
+    expect(refusal.message).to.match(/did not read back in a shape this package knows/)
+    expect(`${refusal.message} ${String(refusal.cause)}`).to.not.include('SUPERSECRET')
   })
 
-  it("refuses a record that names a scope or label other than the one asked for", async () => {
+  it("hands vault props that are not JSON up as their text, which reads back as damaged_vault", async () => {
+    const store = memoryStore()
+    const vaultDB = localVaultDB({ store })
+    store.write(u1VaultPropsCkey, 'SUPERSECRET{')
+    const refusal = await TH.expectBad(vaultDB.getVaultProps(TH.scopeOf('u1')), 'damaged_vault')
+    expect(`${refusal.message} ${String(refusal.cause)}`).to.not.include('SUPERSECRET')
+  })
+
+  it("refuses as damaged a record that names a scope or label other than the one asked for", async () => {
     const store = memoryStore()
     const vaultDB = localVaultDB({ store })
     // u2's vault props smuggled into u1's slot, and a box row moved under another label.
     store.write(u1VaultPropsCkey, JSON.stringify(TH.vaultPropsOf('u2')))
-    const elsewhere = await TH.expectBad(vaultDB.getVaultProps(TH.scopeOf('u1')), 'corrupt_record')
-    expect(elsewhere.message).to.match(/different app, user, or vault/)
+    const elsewhere = await TH.expectBad(vaultDB.getVaultProps(TH.scopeOf('u1')), 'damaged_vault')
+    expect(elsewhere.message).to.match(/different app, user or vault/)
     store.write(u1BoxCkey('other_box'), JSON.stringify(TH.boxOf('anthropic', 'one')))
-    const moved = await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'other_box'), 'corrupt_record')
+    const moved = await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'other_box'), 'damaged_box')
     expect(moved.message).to.match(/different boxlabel/)
   })
 })

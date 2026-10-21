@@ -2,6 +2,7 @@ import * as Z from 'zod/mini'
 import { BoxRecord } from './box'
 import { Capacity, VaultProps, VaultScope, type DamagedBox, type ListedSummary } from './types'
 import { VaultError, isVaultError, type RefusalMeta } from './errors'
+import { InEnglish } from './options'
 import * as Names from './names'
 import { AnyTextValidators, NameFloor } from './validators'
 import * as Refusals from './refusals'
@@ -140,9 +141,13 @@ export type VaultDBOpts = {
  *    A name inside a record below the floor refuses as that record does.
  *  * A host's own `validators` are never checked here: a server serving several clients takes any
  *    name above the floor.
- *  * A record or expectation this package would not build refuses 'bad_record' before storage
- *    sees it (a box handed to `putBox`, 'invalid_box').
- *  * Each record storage hands back is validated: one that fails refuses 'corrupt_record'.
+ *  * Who is at fault names a record that fails its checks. One a caller hands in that this
+ *    package would not build refuses 'bad_record' before storage sees it (a box handed to
+ *    `putBox`, 'invalid_box'). One read from storage that fails is damaged: 'damaged_vault' for
+ *    vault props, 'damaged_box' for a box (a listing shows it as a {@link DamagedBox} instead), Zod's
+ *    own error its `cause`. An answer your `do*` method owes in the protocol's shape that comes in
+ *    another -- a box write's echo, a stale or full refusal missing what it must carry, a deletion's
+ *    report, a capacity -- refuses 'corrupt_record': a bug in the adapter.
  *  * A VaultError your `do*` method throws passes through as it came. Anything else it throws
  *    refuses 'storage_unavailable', with what it threw as `cause`.
  *  * A `do*` method that answers with an Outcome, where it owes the bare answer, refuses 'bad_option'.
@@ -223,8 +228,7 @@ export abstract class VaultDB {
 
   /** The scope's vault props, validated, or null when the vault has never been created.
    * Stored vault props in a `format` this version does not know refuse as `newer_format`: a newer
-   * safebyok may have written them. Those that otherwise fail their checks refuse as
-   * `corrupt_record`.
+   * safebyok may have written them.
    */
   getVaultProps(scope: VaultScope): Promise<Outcome<VaultProps | null>> {
     return answering(async () => {
@@ -325,7 +329,7 @@ export abstract class VaultDB {
    * The write lands only while the standing vault props have the `vault_id` in `expected`, and the
    * standing box its `revision_tok` (for null, while no box stands). The box resolved comes from
    * that same atomic step, checked as {@link VaultDB.getBox} checks one, at the revision written.
-   * One that fails refuses as `corrupt_record`, though the write may have landed.
+   * One that fails is the adapter's wrong answer, `corrupt_record`, though the write may have landed.
    *
    * Refuses, writing nothing:
    *
@@ -360,7 +364,7 @@ export abstract class VaultDB {
         throw new VaultError('box_too_large', `That box weighs ${String(recordBytes)} bytes, over the ${String(this.maxRecordBytes)} its storage holds in one record, so nothing was written: store a smaller whisper or sidecar, or under a shorter boxlabel.`)
       }
       const stored = await withMissChecked(adapterAnswer('doPutBox', () => this.doPutBox(asked, expectation, outgoing)), outgoing.boxlabel)
-      return writtenBack('a box write', () => checkWrittenBox(stored, outgoing))
+      return checkWrittenBox(stored, outgoing)
     })
   }
   // --
@@ -407,7 +411,7 @@ export abstract class VaultDB {
       const expectation = checkOutgoing(BoxDelExpectation, expected, 'delete expectation', 'removed')
       const deletion = await adapterAnswer('doDelBox', () => this.doDelBox(asked, label, expectation))
       if (deletion === null) { throw Refusals.staleWrite('del') }
-      return writtenBack('a deletion', () => checkAnswer(BoxDeletion, deletion, 'a deletion'))
+      return checkAnswer(BoxDeletion, deletion, 'a deletion', 'landed')
     })
   }
 
@@ -425,8 +429,8 @@ export abstract class VaultDB {
   }
 
   /** Remove a vault whose stored vault props fail their checks, and no other: the escape hatch behind the package's `delDamagedVault`.
-   * That is the vault `getVaultProps` refuses as `corrupt_record`, and `hello()` as
-   * `damaged_vault`, which no Vault object opens to `del()`. It takes the `vault_id` from the
+   * That is the vault `getVaultProps` and `hello()` refuse as `damaged_vault`, which no Vault
+   * object opens to `del()`. It takes the `vault_id` from the
    * stored vault props, and removes as {@link VaultDB.delVault} does under it. Vault props
    * rewritten under that `vault_id` meanwhile are the same vault, and go with it (`VAULTDB.md`,
    * line 3.5). Resolves quietly when the scope holds no vault props.
@@ -782,10 +786,13 @@ const checkListener = (onChange: unknown) => {
   }
 }
 
-/** `candidate` through `recordSchema`, or the refusal `refused` makes, which never quotes it. */
-const checked = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, candidate: unknown, refused: () => VaultError): RecordT => {
-  const parsed = recordSchema.safeParse(candidate)
-  if (! parsed.success) { throw refused() }
+/** `candidate` through `recordSchema`, or the refusal `refused` makes of Zod's error, which never quotes it.
+ * Zod's issues name each failing field and what it expected, in English, never the value: Zod
+ * leaves the input out of them unless asked for it, and nothing here asks.
+ */
+const checked = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, candidate: unknown, refused: (opts: ErrorOptions) => VaultError): RecordT => {
+  const parsed = recordSchema.safeParse(candidate, InEnglish)
+  if (! parsed.success) { throw refused({ cause: parsed.error }) }
   return parsed.data
 }
 
@@ -797,18 +804,20 @@ const checkOutgoing = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, candidate:
 ))
 // --
 
-// == [Vault props checks]: checkVaultProps, unnamedVaultProps, newerVaultProps, mayBeNewer, readStoredVaultProps, isSoundVaultProps, others
+// == [Vault props checks]: checkVaultProps, damagedVaultProps, unnamedVaultProps, newerVaultProps, mayBeNewer, readStoredVaultProps, isSoundVaultProps, others
 
+/** Vault props read from storage for `scope`, once they pass their checks: 'newer_format' for a format a later version may write, 'damaged_vault' otherwise. */
 const checkVaultProps = (raw: unknown, scope: VaultScope): VaultProps => {
   // A later safebyok may write what this one cannot read, which is no damage: it is said apart.
   if (mayBeNewer(raw)) { throw newerVaultProps() }
-  const vaultProps = checkRecord(VaultProps, raw, 'vault props')
+  const vaultProps = checked(VaultProps, raw, (opts) => damagedVaultProps('did not read back in a shape this package knows: they are damaged, or were written by an older version of safebyok', opts))
   // A record that names some other scope is a record out of place, wherever it came from.
-  if (! Names.sameScope(vaultProps, scope)) {
-    throw new VaultError('corrupt_record', 'The stored vault props name a different app, user, or vault than the one asked for. They were left as they are.')
-  }
+  if (! Names.sameScope(vaultProps, scope)) { throw damagedVaultProps('name a different app, user or vault than the one asked for') }
   return vaultProps
 }
+
+/** Vault props read from storage that fail their checks, as `said` says how: 'damaged_vault', quoting none of them. */
+const damagedVaultProps = (said: string, opts?: ErrorOptions) => new VaultError('damaged_vault', `This vault's stored props ${said}, so no passphrase or passkey can be tried against them, and the vault can't be opened. They were left as they are: restore them from a backup, or, if the user chooses to start over, delDamagedVault() clears them.`, opts)
 
 const unnamedVaultProps = (opts?: ErrorOptions) => new VaultError('damaged_vault', "This vault's stored record is too damaged to say which vault it is, so storage can't be told which one to remove, and nothing was removed. Its backend's own tools can clear it.", opts)
 
@@ -828,12 +837,12 @@ const mayBeNewer = (raw: unknown): boolean => {
   return format !== undefined && ! knownFormat
 }
 
-/** The vault props as the adapter stores them; an adapter's own `corrupt_record` refuses 'damaged_vault', the vault's id out of reach. */
+/** The vault props as the adapter stores them; an adapter's own `damaged_vault`, from a VaultDB it hands on to, refuses as one too damaged to name, the vault's id out of reach. */
 const readStoredVaultProps = async (reading: () => Promise<unknown>): Promise<unknown> => {
   try {
     return await reading()
   } catch (err) {
-    if (isVaultError(err, 'corrupt_record')) { throw unnamedVaultProps({ cause: err }) }
+    if (isVaultError(err, 'damaged_vault')) { throw unnamedVaultProps({ cause: err }) }
     throw err
   }
 }
@@ -844,7 +853,7 @@ const isSoundVaultProps = (raw: unknown, scope: VaultScope): boolean => {
     checkVaultProps(raw, scope)
     return true
   } catch (err) {
-    if (isVaultError(err, 'corrupt_record')) { return false }
+    if (isVaultError(err, 'damaged_vault')) { return false }
     throw err
   }
 }
@@ -853,51 +862,39 @@ const isSoundVaultProps = (raw: unknown, scope: VaultScope): boolean => {
 const StoredVaultId = Z.object({ vault_id: VaultProps.shape.vault_id })
 // --
 
-// == [Box and answer checks]: checkStoredBox, checkWrittenBox, writtenBack, checkAnswer, checkRecord, jsonBytes
+// == [Box and answer checks]: checkStoredBox, damagedBox, checkWrittenBox, checkAnswer, wrongAnswer, jsonBytes
 
-/** A stored box, as `getBox` holds it: a box's shape, under the boxlabel it was asked for. */
+/** A box read from storage, as `getBox` holds it: a box's shape, under the boxlabel it was asked for; 'damaged_box' otherwise. */
 const checkStoredBox = (raw: unknown, boxlabel: string): BoxRecord => {
-  const box = checkRecord(BoxRecord, raw, 'box')
+  const box = checked(BoxRecord, raw, (opts) => damagedBox('did not read back in a shape this package knows: it is damaged, or was written by an older version of safebyok', opts))
   // A record naming another boxlabel is out of place: a misfiling adapter, or a moved record.
-  if (box.boxlabel !== boxlabel) {
-    throw new VaultError('corrupt_record', 'The stored box names a different boxlabel than the one asked for. It was left as it is.')
-  }
+  if (box.boxlabel !== boxlabel) { throw damagedBox('names a different boxlabel than the one it is stored under') }
   return box
 }
 
-/** The box an adapter handed back as `written` landed, held to the check `getBox` makes, at the revision written.
- * One at another revision is someone else's box: `corrupt_record`, quoting neither.
+/** A box read from storage that fails its checks, as `said` says how: 'damaged_box', quoting none of it.
+ * It never quotes the boxlabel either: a host's validators may admit any text, a mistaken paste among it.
  */
+const damagedBox = (said: string, opts?: ErrorOptions) => new VaultError('damaged_box', `That box's stored record ${said}, so it can't be read. It was left as it is; remove it, or store its whisper again over it.`, opts)
+
+/** The box an adapter handed back as `written` landed: a box's shape, under the boxlabel and at the revision written; `corrupt_record` otherwise, quoting neither. */
 const checkWrittenBox = (raw: unknown, written: BoxRecord): BoxRecord => {
-  const box = checkStoredBox(raw, written.boxlabel)
-  if (box.revision_tok !== written.revision_tok) {
-    throw new VaultError('corrupt_record', 'The box storage handed back as written holds another revision than the one written.')
-  }
+  const box = checkAnswer(BoxRecord, raw, 'a box write', 'landed')
+  if (box.boxlabel !== written.boxlabel || box.revision_tok !== written.revision_tok) { throw wrongAnswer('a box write', 'landed') }
   return box
 }
 
-/** What an adapter handed back from `said`, a write that landed, through `check`.
- * A `corrupt_record` from the check refuses as one saying the write may have landed, the check's
- * own refusal as its cause.
+/** An adapter's answer to `said` through `answerSchema`: one in another shape is the adapter's bug, `corrupt_record`, Zod's error its cause. */
+const checkAnswer = <AnswerT>(answerSchema: Z.ZodMiniType<AnswerT>, raw: unknown, said: string, landed?: 'landed'): AnswerT => (
+  checked(answerSchema, raw, (opts) => wrongAnswer(said, landed, opts))
+)
+
+/** The refusal of an adapter's answer to `said` that is not in the protocol's shape: `corrupt_record`, quoting none of it.
+ * For a write or deletion, `landed` says it may have landed all the same.
  */
-const writtenBack = <ResultT>(said: string, check: () => ResultT): ResultT => {
-  try {
-    return check()
-  } catch (err) {
-    if (! isVaultError(err, 'corrupt_record')) { throw err }
-    throw new VaultError('corrupt_record', `Storage says ${said} landed, but answered with what this package cannot read back: its adapter wrote or reported something it should not have. Reading the vault again shows what stands; the storage adapter needs a developer's look.`, { cause: err })
-  }
-}
-
-/** Storage's answer to `said`, a write, through `answerSchema`: one in another shape is `corrupt_record`, quoting none of it. */
-const checkAnswer = <AnswerT>(answerSchema: Z.ZodMiniType<AnswerT>, raw: unknown, said: string): AnswerT => checked(answerSchema, raw, () => (
-  new VaultError('corrupt_record', `Storage answered ${said} in a shape this package does not know.`)
-))
-
-/** A stored record through its validator: 'corrupt_record' otherwise, quoting none of it. */
-const checkRecord = <RecordT>(recordSchema: Z.ZodMiniType<RecordT>, raw: unknown, said: string): RecordT => checked(recordSchema, raw, () => (
-  new VaultError('corrupt_record', `A stored ${said} record did not read back in a shape this package knows. It may be damaged, or written by another version of safebyok; it was left as it is.`)
-))
+const wrongAnswer = (said: string, landed?: 'landed', opts?: ErrorOptions) => new VaultError('corrupt_record', landed === 'landed'
+  ? `Storage says ${said} landed, but answered with what this package cannot read back, so whether it did is not known: reading the vault again shows what stands. The storage adapter needs a developer's look: it wrote or reported something it should not have.`
+  : `Storage answered ${said} in a shape this package does not know. The storage adapter needs a developer's look.`, opts)
 
 /** What `val` weighs as the UTF-8 bytes of its JSON: how the vault measures a record against its storage's limits.
  * Every in-tree backend counts a record as no heavier.

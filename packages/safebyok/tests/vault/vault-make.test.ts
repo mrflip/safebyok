@@ -82,12 +82,21 @@ describe("Vault.make", () => {
     expect(err.message).to.include('extends the VaultDB class')
   })
 
-  it("says stored vault props refused as corrupt as damaged_vault, even from an adapter that throws before its promise", async () => {
+  it("hands on storage's damaged_vault as it came, even from a VaultDB that throws before its promise", async () => {
     const world = makeWorld()
-    const corrupt = new VaultError('corrupt_record', 'The stored vault props did not read back.')
-    vi.spyOn(world.vaultDB, 'getVaultProps').mockImplementationOnce(() => { throw corrupt })
+    const damaged = new VaultError('damaged_vault', "This vault's stored props did not read back.")
+    vi.spyOn(world.vaultDB, 'getVaultProps').mockImplementationOnce(() => { throw damaged })
     const err = await TH.expectRefusal(world.open(), 'damaged_vault')
-    expect(err.cause).to.eq(corrupt)
+    expect(err).to.eq(damaged)
+    vi.restoreAllMocks()
+  })
+
+  it("hands on an adapter's corrupt_record as it came, never as damage: that kind is an adapter's wrong answer", async () => {
+    const world = makeWorld()
+    const wrongAnswer = new VaultError('corrupt_record', 'Storage answered a vault read in a shape this package does not know.')
+    vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(TH.bad(wrongAnswer))
+    const err = await TH.expectRefusal(world.open(), 'corrupt_record')
+    expect(err).to.eq(wrongAnswer)
     vi.restoreAllMocks()
   })
 

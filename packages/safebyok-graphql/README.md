@@ -145,7 +145,7 @@ without `format` -- which the browser's VaultDB may not hand back from its own l
 
 Every stored field is non-null in the schema. A listing of yours that hands back a record missing
 one fails in GraphQL itself, before any VaultError is made, and reaches the browser as
-`storage_unavailable`, not `corrupt_record`: Postgres's `NOT NULL` columns rule it out, and a
+`storage_unavailable`, not as a box listed damaged: Postgres's `NOT NULL` columns rule it out, and a
 store of your own keeps every field it was handed.
 
 The resolvers decide nothing: every expectation crosses whole, and the VaultDB you serve keeps

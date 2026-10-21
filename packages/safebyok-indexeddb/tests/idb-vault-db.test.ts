@@ -153,10 +153,10 @@ describe("idbVaultDB", () => {
     expect(await get(ckey, rawShelf(dbName))).to.be.undefined
   })
 
-  it("refuses damaged vault props as corrupt_record, and leaves them as they are", async () => {
+  it("refuses damaged vault props as damaged_vault, and leaves them as they are", async () => {
     const dbName = TH.freshDbName()
     await set(Ckeys.vaultProps(TH.scopeOf('u1')), { vault_id: 'vault-id-u1', unlock_epoch: 'one' }, rawShelf(dbName))
-    await TH.expectBad(idbVaultDB({ dbName }).getVaultProps(TH.scopeOf('u1')), 'corrupt_record')
+    await TH.expectBad(idbVaultDB({ dbName }).getVaultProps(TH.scopeOf('u1')), 'damaged_vault')
     expect(await get('vault^acme^u1^main', rawShelf(dbName))).to.deep.equal({ vault_id: 'vault-id-u1', unlock_epoch: 'one' })
   })
 

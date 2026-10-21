@@ -330,8 +330,19 @@ class refusing with it; a box write throws `Refusals.staleBox(standing)`), `vaul
 (a box write, `Refusals.vaultMismatch()`), `vault_full`,
 `identity_revoked`, `not_permitted`, or anything it throws otherwise, which becomes
 `storage_unavailable`. The base
-class refuses `bad_label`, `bad_record`, `invalid_box`, `bad_option`, `box_too_large` and `corrupt_record` itself, before
-the adapter is asked or after it answers. Each message says calmly what went wrong and what to do
+class refuses `bad_label`, `bad_record`, `invalid_box`, `bad_option`, `box_too_large`, `damaged_vault`,
+`damaged_box` and `corrupt_record` itself, before the adapter is asked or after it answers.
+
+A record that fails its checks is named for who is at fault. One the caller hands in is
+`bad_record` (a box handed to `putBox`, `invalid_box`). One read from storage is damaged:
+`damaged_vault` for vault props (from `getVaultProps` and `ensureVaultProps`), `damaged_box` for a
+box (from `getBox`; a listing shows it as a `DamagedBox` instead, and a stale write's
+`meta.box_stored` likewise), Zod's own error its `cause` where a check failed. An answer the
+adapter owes in the protocol's shape that comes in another -- a box write's echo that fails a
+box's checks or holds another boxlabel or revision, a `Refusals.staleBox` or `Refusals.vaultFull`
+missing what it must carry, a deletion's report or a capacity in another shape -- is
+`corrupt_record`: the adapter's bug, and the one thing that kind means. An adapter does not
+refuse a damaged record itself (line 1.3): it hands it up, and the base class names it. Each message says calmly what went wrong and what to do
 about it, and a caller branches on the kind, never the message. Every verb resolves an `Outcome`
 and never rejects: the refusal is its `err`, whoever made it.
 

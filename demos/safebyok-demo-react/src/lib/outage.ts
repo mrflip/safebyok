@@ -108,7 +108,7 @@ export class OutageVaultDB extends VaultDB {
   private async wholeOrDamaged(scope: VaultScope, boxlabel: string): Promise<unknown> {
     const { ok, val, err } = await this.inner.getBox(scope, boxlabel)
     if (ok) { return val }
-    if (err.refusalkind !== 'corrupt_record') { throw err }
+    if (err.refusalkind !== 'damaged_box') { throw err }
     return 'damaged'
   }
 
