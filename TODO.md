@@ -178,6 +178,16 @@ dialog that fails for a reason the host could name -- a lost user gesture, a pas
 refused -- cannot say so. Decide what a `getProof` may refuse with: a `VaultError` it throws kept
 as it came (as `outcomeOf` keeps one elsewhere), a fourth answer, or a short list of kinds.
 
+### "Add "sensitive" and "host" flags to refusals"
+
+The Coach (2026-10-21, sprint contract, on a key deriver's throw riding as `cause` where the
+strength checker's carries nothing): "Leave it, we will audit these. Add todo: "Add "sensitive"
+and "host" flags to refusals"". Today each wrap of a host function decides alone: a key deriver's
+throw is its refusal's `cause`; the strength checker's, which heard the passphrase, is dropped
+whole; its `load`'s, which heard nothing, rides as `cause`. Decide the two flags -- a refusal
+that heard secret material, one whose cause is the host's own code -- and audit each wrap
+against them.
+
 ### Should `tryClose` be a promise?
 
 The Coach (2026-10-19, sprint contract): "should tryClose really be a promise." Every `try` form
