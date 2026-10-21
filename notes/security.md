@@ -555,7 +555,7 @@ added or folded into through the subagent, and no other entry changes.
   logger, as `deleted_other` with `damaged: true`, because a deletion within the vault wins over
   any revision. That stays the stated residual until the tombstone rework. Nothing stored
   changes.
-* 2026-10-19 (returning): **`VaultDB.putBox` now resolves the box as storage holds it after
+* 2026-10-19 (returning); 2026-10-21 (thread C1, putbox_store): **`VaultDB.putBox` now resolves the box as storage holds it after
   the write lands, and the base class takes that answer as untrusted storage input.** Each
   adapter's `doPutBox` hands the box back from the same atomic step as the conditional
   write (Postgres `RETURNING`, the Convex mutation's return value, a read inside the same
@@ -564,9 +564,37 @@ added or folded into through the subagent, and no other entry changes.
   to the check `getBox` makes (the Box schema, and the boxlabel matching the one written)
   and refuses a malformed one as `corrupt_record`; its message says the write may have landed and
   quotes nothing of the record, and its cause is the inner `corrupt_record` refusal, which quotes
-  nothing either. A refused write (`null` from the adapter) throws `stale_write` and carries no
-  record: returned state is data, never a thrown value's property. No stored shape changed, and
-  the vault does not yet use the returned value; `putBox` still refreshes after its write.
+  nothing either. No stored shape changed, and the vault does not yet use the returned value;
+  `putBox` still refreshes after its write.
+  2026-10-21 (C1): a refused write now answers from that same atomic step too, and the
+  refusal carries what stands. `putBox(scope, expected, box, opts?)` is one conditional write per
+  adapter (Postgres: one statement, an UPDATE whose SET is `CASE WHEN revision_tok = $read THEN
+  new ELSE own`, or an INSERT ... ON CONFLICT DO UPDATE no-op, each `RETURNING` the row that
+  stands, so the winner reported is the latest committed, locked row and not the statement's
+  snapshot; Convex: one mutation; IndexedDB and `localVaultDB`: one transaction or synchronous
+  step; GraphQL: the server's VaultDB). When the standing box is not the one expected, the write
+  is `stale_write` and `err.meta.box_stored` is the whole stored box record, its wrapped boxKey
+  (`box_key_wrapped`) and ciphered whisper (`whisper_ciphered`) included, held by the base class to
+  the check `getBox` makes: a record that fails becomes a `DamagedBox` (`{ boxlabel, damaged: true,
+  revision_tok }`), and nothing standing is `null`. The Coach's intent: it comes in as a read, so
+  the host can choose (open it and merge, or overwrite naming its revision) with no second round
+  trip. The ciphertext and wrapped boxKey are under the vault's random vaultKey, not a passphrase-derived
+  key, so neither is offline-guessable, and it is what a `getBox` by the same signed-in user
+  returns. What it changes: this is a refusal's `meta` now holding ciphertext of the winning box
+  (never plaintext, never key material in the clear), and it crosses wires: GraphQL's
+  `extensions.meta.box_stored` and the Postgres route recipe's `refusal.box_stored`; the error's
+  `cause` still never crosses. A host that logs or reports a whole `VaultError` including `meta`
+  now logs that ciphertext. An audit of where refusal meta can leak (logs, error reporters, a host
+  serializing errors) is the Coach's, later. (An earlier line here said a refused write
+  carries no record; it did until this change.) Two refusals split off what was `stale_write`.
+  `vault_mismatch` (condition) is a box write whose vault props (`vault_id`, `vault_key_epoch`) no
+  longer stand; it carries no meta, since vault props (salts, wrapped vaultKey) never ride on a
+  refusal (the a_sec2 ruling). `invalid_box` (misuse) is a box the base class would not build,
+  refused before storage sees it, which the vault relabels `bad_record`; neither message quotes the
+  box. `putBox` also takes `opts.signal`: an abort before storage answers resolves
+  `storage_unavailable` with the signal's reason as `cause`, and a write already sent may still
+  land (the base stops waiting; the adapter's write is not cancelled), so a later read shows
+  whether.
 * 2026-10-18 (sprint reform): **three stored-format tags changed in the renaming, none with a
   migration.** Against the last release (0.3.0), the vault props format `safebyok-vault-v2` became
   `safebyok-vault-v3` (the unlock envelope became the "wayin", with the field renames that follow;
@@ -925,7 +953,9 @@ added or folded into through the subagent, and no other entry changes.
   was sealed for and the `revision_tok` it read (or null for none), and lands only while the
   scope's standing vault props have that `vault_id` and the standing box that `revision_tok` (or
   there is none); a scope with no vault props refuse. A failed expectation refuses with kind
-  `stale_write`, writes nothing, and `putBox()` / `putWayin()` / `delBox()` / `del()`
+  `stale_write` (amended 2026-10-21, C1: for a box write whose vault props no longer stand, now
+  `vault_mismatch`, see the 2026-10-19 (returning) entry), writes nothing, and `putBox()` /
+  `putWayin()` / `delBox()` / `del()`
   surface it on the first failure, with no retry. Deletions (`delBox`, `delVault`) carry a
   `vault_id`-only expectation (the Coach's ruling): they land only while the scope's standing
   vault props have that `vault_id`, refuse where no vault props stand, and expect no revision, so within
@@ -1073,8 +1103,10 @@ added or folded into through the subagent, and no other entry changes.
   `rolled_back`, `identity_revoked`) was `condition`, and `isCondition` is true for both. It
   also gains `meta?` (`box_stored`, `capacity`; amended 2026-10-19, a_sec2, #206: `vault_props_stored`
   is removed, see below): stored records as storage holds them (ciphertext and visible fields) and
-  counts only, never secret material; no refusal fills `box_stored` yet (an earlier amendment of
-  2026-10-19, a_sec2, #206, which said it was filled, was mistaken). The vault still locks
+  counts only, never secret material; amended 2026-10-21 (C1): a refused `putBox` that finds a
+  different box standing now fills `box_stored` with the whole stored record, ciphertext and
+  wrapped boxKey included (see the 2026-10-19 (returning) entry; an earlier amendment of
+  2026-10-19, a_sec2, #206, which said it was filled, was mistaken at the time). The vault still locks
   on `identity_revoked` and `rolled_back` from storage: `RefusalPolicy.heed` unwraps each Outcome,
   hands every bad `err` to the vault's refusal handler and awaits it, then throws it, as before --
   an interim shim until the vault's own calls are Outcome-shaped.
@@ -1638,7 +1670,7 @@ added or folded into through the subagent, and no other entry changes.
   in `whiteboard/20261015-matters/thread-11-postgres_verdict.md`; what to check: that a refused
   write inserted nothing (the `WHERE` of one atomic statement), that no box lands in a vault
   but its own (the foreign key, re-read against the vault props that stand now, whose violation
-  `23503` is mapped to `stale_write`), and that every box that landed stays readable and
+  `23503` is mapped to `stale_write`; amended 2026-10-21, C1: `vault_mismatch` for a box write), and that every box that landed stays readable and
   erasable. Above READ COMMITTED some races fail with `40001`, refused as `storage_unavailable`.
   The notify trigger is no longer installed by `VaultTablesSql`: a host opts in with
   `VaultNotifySql`, and without it nothing is pushed (the vault refreshes after its own writes).

@@ -134,9 +134,9 @@ export const VaultPropsExpectation = v.object({
 })
 
 /**
- * What a box update was written for and read: it lands only while the scope's vault props
- * have this `vault_id`, and the standing box this `revision_tok` -- or, for null, there is no
- * box. Its `vault_key_epoch` names the vaultKey the box was sealed under.
+ * What a box write was sealed for and read: it lands only while the scope's vault props have
+ * this `vault_id` and `vault_key_epoch` -- the vaultKey the box was sealed under -- and the
+ * standing box this `revision_tok`, or, for null, there is no box.
  *
  * @example { vault_id: vaultProps.vault_id, revision_tok: null, vault_key_epoch: vaultProps.vault_key_epoch } // a box that was not there
  */
@@ -145,6 +145,23 @@ export const BoxExpectation = v.object({
   revision_tok:    v.nullable(v.string()),
   vault_key_epoch: v.number(),
 })
+
+/**
+ * What a box write answers, from its one transaction: `landed`, with the box as stored; or a
+ * refusal naming its kind, writing nothing -- `stale_write`, with the box standing under the
+ * boxlabel as a read returns it (`box_stored`, whole; null for none),
+ * or `vault_mismatch`, when the scope's vault props are not the ones the box was sealed for,
+ * carrying nothing of them.
+ *
+ * @example { landed: true, box_stored: stored }
+ * @example { landed: false, refusalkind: 'stale_write', box_stored: winner }
+ * @example { landed: false, refusalkind: 'vault_mismatch' }
+ */
+export const PutBoxAnswer = v.union(
+  v.object({ landed: v.literal(true), box_stored: BoxRecord }),
+  v.object({ landed: v.literal(false), refusalkind: v.literal('stale_write'), box_stored: v.nullable(BoxRecord) }),
+  v.object({ landed: v.literal(false), refusalkind: v.literal('vault_mismatch') }),
+)
 
 /**
  * What a delete of a vault was meant for: the vault it lands in. A delete lands only while the

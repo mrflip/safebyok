@@ -268,7 +268,7 @@ export const FirstWriteStatement = '%INSERT INTO safebyok_boxes%'
 /** Makes the u1 vault the helpers' vault props stand for, through `vaultDB`, and writes a box under each of `boxlabels`. */
 export const filled = async (vaultDB: VaultDBVerbs, boxlabels: readonly string[]): Promise<void> => {
   await expectingGood(vaultDB).ensureVaultProps(vaultPropsOf('u1'))
-  for (const boxlabel of boxlabels) { await expectingGood(vaultDB).putBox(scopeOf('u1'), boxOf(boxlabel, `sk-fake-${boxlabel}`), noBoxYet) }
+  for (const boxlabel of boxlabels) { await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, boxOf(boxlabel, `sk-fake-${boxlabel}`)) }
 }
 
 /**

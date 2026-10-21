@@ -1,5 +1,5 @@
 import { Refusals, Sanitizer, VaultDB, VaultError, RefusalKindVals } from 'safebyok'
-import type { VaultPropsExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, StoredBox, VaultProps, RefusalKind, VaultScope } from 'safebyok'
+import type { VaultPropsExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, StoredBox, VaultProps, RefusalKind, RefusalMeta, VaultScope } from 'safebyok'
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
 import { VaultPropsFields, ListedBoxFields, BoxFields, ScopeFields, recordOf, selectionOf } from './fields'
 
@@ -193,9 +193,10 @@ class UrqlVaultDB extends VaultDB {
     })
   }
 
-  // A stale write refuses on the server and crosses as its kind, so a write that answers landed,
-  // with the box as the server's storage holds it.
-  protected async doPutBox(scope: VaultScope, box: BoxRecord, expected: BoxExpectation): Promise<unknown> {
+  // A write that misses refuses on the server and crosses as its kind -- a stale one with what
+  // stands, which the base class checks -- so a write that answers landed, with the box as the
+  // server's storage holds it.
+  protected async doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<unknown> {
     checkInts('box', box)
     const { vault_id, revision_tok, vault_key_epoch } = expected
     const { safebyokPutBox } = await this.told(PutBoxDoc, { scope: scopeOut(scope), box: recordOf(box, BoxFields), expected: { vault_id, revision_tok, vault_key_epoch } })
@@ -271,14 +272,15 @@ const answerOf = (result: OperationResult): Record<string, unknown> => {
 
 /**
  * The server's refusal as the VaultError it was, when one carries a kind, the GraphQL error as its
- * cause; a GraphQL server's own `FORBIDDEN` as `not_permitted`, likewise; a GraphQL validation
+ * cause, and what it learned as its `meta` (a stale box write's `box_stored`, which the base class
+ * checks as it checks a record); a GraphQL server's own `FORBIDDEN` as `not_permitted`, likewise; a GraphQL validation
  * error as misuse, quoting nothing of it, as it may quote the variables; otherwise urql's error,
  * as it is, which the base class says as storage trouble.
  */
 const refusalOf = (err: CombinedError): Error => {
   for (const refused of err.graphQLErrors) {
-    const { kind } = refused.extensions
-    if (isKind(kind)) { return new VaultError(kind, refused.message, { cause: refused }) }
+    const { kind, meta } = refused.extensions
+    if (isKind(kind)) { return new VaultError(kind, refused.message, { cause: refused, ...crossedMeta(meta) }) }
   }
   const forbidden = err.graphQLErrors.find(({ extensions: { code } }) => code === 'FORBIDDEN')
   if (forbidden) { return Refusals.notPermitted(ForbiddenMessage, { cause: forbidden }) }
@@ -299,5 +301,14 @@ const ForbiddenMessage = "The vault's GraphQL server refused the signed-in user 
 
 /** The `extensions.code`s a GraphQL server marks a malformed operation or variable with. */
 const MisuseCodes: ReadonlySet<string> = new Set(['BAD_USER_INPUT', 'GRAPHQL_VALIDATION_FAILED'])
+
+/**
+ * The `meta` a refusal crossed with, as the VaultError's: only `box_stored`, the one fact a refusal
+ * carries across, handed on unchecked for the base class to check. Anything else is left behind.
+ */
+const crossedMeta = (meta: unknown): { meta?: RefusalMeta } => {
+  if (typeof meta !== 'object' || meta === null || ! ('box_stored' in meta)) { return {} }
+  return { meta: { box_stored: meta.box_stored as Exclude<RefusalMeta['box_stored'], undefined> } }
+}
 
 const isKind = (kind: unknown): kind is RefusalKind => (RefusalKindVals as readonly unknown[]).includes(kind)

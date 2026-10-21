@@ -139,7 +139,7 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
     Mutation: {
       safebyokEnsureVaultProps: served((vaultDB, args) => vaultDB.ensureVaultProps(vaultPropsIn(args))),
       safebyokPutVaultProps: served((vaultDB, args) => vaultDB.putVaultProps(vaultPropsIn(args), vaultPropsExpectationIn(args)), () => true),
-      safebyokPutBox: served((vaultDB, args) => vaultDB.putBox(scopeIn(args), recordOf(args.box, BoxFields) as BoxRecord, boxExpectationIn(args))),
+      safebyokPutBox: served((vaultDB, args) => vaultDB.putBox(scopeIn(args), boxExpectationIn(args), recordOf(args.box, BoxFields) as BoxRecord)),
       safebyokDelBox: served((vaultDB, args) => vaultDB.delBox(scopeIn(args), args.boxlabel as string, boxDelExpectationIn(args))),
       safebyokDelVault: served((vaultDB, args) => vaultDB.delVault(scopeIn(args), vaultDelExpectationIn(args)), () => true),
     },
@@ -231,14 +231,16 @@ const noUnsubscribing = (): void => undefined
 
 /**
  * A refusal as the wire carries it: a GraphQL error with the VaultError's message and its kind as
- * `extensions.kind`, and nothing more. A GraphQL server sends a GraphQLError of its resolvers'
+ * `extensions.kind`, and, for a stale box write, `extensions.meta.box_stored`: the box that
+ * stands, whole, as a read would send it. Nothing more. A GraphQL server sends a GraphQLError of its resolvers'
  * as it stands, where it hides anything else behind "Unexpected error" (Yoga) or sends its
  * message as it is (Apollo). The VaultError rides along as the error's `cause`, unenumerable, as
  * an Error's own cause is, for the server's logs: no GraphQL server sends a cause.
  */
 const crossing = (err: unknown): GraphQLError => {
   const refusal = isVaultError(err) ? err : Refusals.storageUnavailable(err)
-  const crossed = new GraphQLError(refusal.message, { extensions: { kind: refusal.refusalkind } })
+  const meta = refusal.meta?.box_stored === undefined ? {} : { meta: { box_stored: refusal.meta.box_stored } }
+  const crossed = new GraphQLError(refusal.message, { extensions: { kind: refusal.refusalkind, ...meta } })
   // Set after, never as the constructor's `cause` or `originalError`: either becomes the error's
   // originalError, and Yoga masks a GraphQLError whose originalError is not a GraphQLError too.
   Object.defineProperty(crossed, 'cause', { value: refusal, configurable: true, writable: true })

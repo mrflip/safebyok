@@ -1,4 +1,4 @@
-import { VaultError } from './errors'
+import { VaultError, type RefusalMeta } from './errors'
 
 /**
  * The refusals a storage adapter throws, made the one way: the core's own messages, and a
@@ -32,14 +32,13 @@ export const storageUnavailable = (cause: unknown, message: string = StorageTrou
   new VaultError('storage_unavailable', message, { cause: causeOf(cause) })
 )
 
-/** What a write met that it did not expect, as {@link staleWrite} says it. */
-export const StaleWriteVals = ['vaultProps', 'box', 'del'] as const
+/** What a write met that it did not expect, as {@link staleWrite} says it. A box write's is {@link staleBox}. */
+export const StaleWriteVals = ['vaultProps', 'del'] as const
 export type StaleWrite = typeof StaleWriteVals[number]
 
 /** What each stale write says: what changed under the writer, and to read again. */
 const StaleWriteSaid: Readonly<Record<StaleWrite, string>> = {
   vaultProps: 'The vault changed in storage since this device read it -- its ways in were changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. Read the vault again before retrying.',
-  box:    'That box changed in storage since this device read it -- another device or tab wrote or removed it, or the vault was made anew -- so this write was refused and nothing was written. Read it again before retrying.',
   del:    'The vault changed in storage since this device read it -- it was deleted, or deleted and made anew, elsewhere -- so this removal was refused and nothing was removed. Read the vault again before retrying.',
 }
 
@@ -48,12 +47,48 @@ const StaleWriteSaid: Readonly<Record<StaleWrite, string>> = {
  * base class throws it for an adapter's `false`; an adapter that hands each call on to another
  * VaultDB meets it as it is.
  *
- * @param what - The write refused: an update of the vault props, a box write, or a deletion.
+ * @param what - The write refused: an update of the vault props, or a deletion.
  * @returns The refusal, to throw.
  *
- * @example throw Refusals.staleWrite('box')
+ * @example throw Refusals.staleWrite('vaultProps')
  */
 export const staleWrite = (what: StaleWrite): VaultError => new VaultError('stale_write', StaleWriteSaid[what])
+
+/**
+ * A `stale_write` refusal of a box write: the box standing under its boxlabel is not the one the
+ * write expected, so nothing was written. `boxStored` is what stands, read in the same atomic
+ * step that refused the write -- the record exactly as stored, damaged or not, or null when
+ * nothing stands there -- and the refusal carries it as `meta.box_stored`. The base class checks
+ * it on the way up, as `getBox` checks a record, so a caller meets the box, a `DamagedBox` or
+ * null, never what the adapter handed in unchecked.
+ *
+ * @param boxStored - The record standing under the boxlabel, exactly as stored, or null for none.
+ * @returns The refusal, to throw from `doPutBox`.
+ *
+ * @example throw Refusals.staleBox(standingRow ?? null)
+ */
+export const staleBox = (boxStored: unknown): VaultError => (
+  // Unchecked here, as the adapter read it: the base class replaces it with the record checked.
+  new VaultError('stale_write', StaleBoxMessage, { meta: { box_stored: boxStored as Exclude<RefusalMeta['box_stored'], undefined> } })
+)
+
+/** What a box write's `stale_write` says: what changed under the writer, and where to look. */
+export const StaleBoxMessage = "That box changed in storage since this device read it -- another device or tab wrote or removed it -- so this write was refused and nothing was written. What stands now is this error's meta.box_stored: write again over it, or leave it."
+
+/**
+ * A `vault_mismatch` refusal of a box write: the scope's standing vault props are not the ones the
+ * box was sealed for -- none stand, or they have another `vault_id`, or another `vault_key_epoch`
+ * -- so nothing was written. It carries nothing of the vault props that stand: they hold every
+ * way in.
+ *
+ * @returns The refusal, to throw from `doPutBox`.
+ *
+ * @example throw Refusals.vaultMismatch()
+ */
+export const vaultMismatch = (): VaultError => new VaultError('vault_mismatch', VaultMismatchMessage)
+
+/** What `vault_mismatch` says. */
+const VaultMismatchMessage = "This vault was deleted, made anew, or had its key replaced on another device since this one read it, so nothing was written. Open the vault again to see what stands now."
 
 /**
  * A `not_permitted` refusal: the signed-in user, still the vault's own, refused this one call by a

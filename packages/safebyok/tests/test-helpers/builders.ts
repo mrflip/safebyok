@@ -275,7 +275,7 @@ export const summaryOf = (box: BoxSummary | DamagedBox | undefined): BoxSummary 
  * What a write into {@link vaultPropsOf}('u1')'s vault expects when its box is not there yet:
  * that vault, under its first vaultKey, and no revision. Frozen, since every test shares it.
  *
- * @example vaultDB.putBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet)
+ * @example vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
  */
 export const noBoxYet = Object.freeze({ vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 1 } as const)
 

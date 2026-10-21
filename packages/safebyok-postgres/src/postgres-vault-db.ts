@@ -173,13 +173,23 @@ const ExpectedVaultSql = `SELECT applabel, user_id, vaultlabel, vault_id FROM sa
     WHERE ${ScopeIs} AND vault_id = $4::text AND vault_key_epoch = $5::bigint
     FOR SHARE`
 
+// Each box write answers one row, whether or not it landed: `vault_stands`, whether the vault props
+// it expects stood; `landed`, whether it wrote (null when no box stands to report); `was_full`, a
+// first write's vault at its limit; and the box columns of what stands under the boxlabel now --
+// the box written, or the one that won -- null when none does. A write that does not land locks
+// and returns the row standing, so the winner it reports is the latest one committed, never only
+// the one in the statement's snapshot: Postgres re-reads a row an UPDATE (or an INSERT's ON
+// CONFLICT) waited on. A miss writes the row back unchanged, which leaves Postgres a dead row
+// version to vacuum, as any update does, and which VaultNotifySql's trigger hears as no change.
+const BoxAnswerColumns = `EXISTS (SELECT 1 FROM vault) AS vault_stands`
+
 // A first box under its boxlabel: inserted only beside the vault props it expects, only where no
 // box stands, and only while the vault holds fewer than $6 boxes -- or, for a null $6, no
 // limit, when nothing is counted: Postgres runs the count, an uncorrelated subquery, only when the
-// CASE asks for it. It answers one row that says why it did or did not land: whether it landed,
-// whether the vault props it expects stood, whether the boxlabel was already taken, and whether
-// the vault was already at its limit -- and, when it landed, the box's columns as the insert
-// stored them, from its RETURNING, null otherwise.
+// CASE asks for it. A box standing under the boxlabel already -- in the snapshot, or inserted
+// since and met by the ON CONFLICT -- is reported, not written over: the no-op DO UPDATE locks it
+// and returns it as it now stands. A write the limit refused is never attempted, so then the box
+// reported is the one in the snapshot, if any.
 //
 // Nothing is counted in advance: the limit is the count of the vault's boxes at the start of
 // this statement, a best effort. Under READ COMMITTED, Postgres's default, writers racing for the
@@ -188,35 +198,43 @@ const ExpectedVaultSql = `SELECT applabel, user_id, vaultlabel, vault_id FROM sa
 // and a refused write inserted nothing, since the refusal is the WHERE of one atomic statement. A
 // vault deleted after the statement began is met by the vault row's FOR SHARE read, which finds it
 // gone, or by the foreign key, which reads the vault row that stands now: that failure is caught as
-// a stale writer (see insertBox), and no box ever lands in a vault but its own.
+// the vault gone (see insertBox), and no box ever lands in a vault but its own.
 const InsertBoxSql = `WITH vault AS (
     ${ExpectedVaultSql}
   ), counted AS (
     SELECT CASE WHEN $6::bigint IS NULL THEN 0 ELSE (SELECT count(*) FROM safebyok_boxes WHERE ${ScopeIs}) END AS standing
-  ), inserted AS (
+  ), written AS (
     INSERT INTO safebyok_boxes (applabel, user_id, vaultlabel, vault_id, ${Columns.names(BoxColumns)})
     SELECT applabel, user_id, vaultlabel, vault_id, ${Columns.placeholders(BoxColumns, BoxParamsFrom)}
     FROM vault, counted WHERE $6::bigint IS NULL OR counted.standing < $6::bigint
-    ON CONFLICT (applabel, user_id, vaultlabel, boxlabel) DO NOTHING
-    RETURNING ${Columns.selected(BoxColumns)}
+    ON CONFLICT (applabel, user_id, vaultlabel, boxlabel) DO UPDATE SET format = safebyok_boxes.format
+    RETURNING ${Columns.names(BoxColumns)}, revision_tok = ${Columns.placeholderOf(BoxColumns, 'revision_tok', BoxParamsFrom)} AS landed
+  ), found AS (
+    SELECT * FROM written
+    UNION ALL
+    SELECT ${Columns.names(BoxColumns)}, false AS landed FROM safebyok_boxes
+      WHERE ${ScopeIs} AND boxlabel = ${Columns.placeholderOf(BoxColumns, 'boxlabel', BoxParamsFrom)} AND NOT EXISTS (SELECT 1 FROM written)
   )
-  SELECT EXISTS (SELECT 1 FROM inserted) AS landed,
-         EXISTS (SELECT 1 FROM vault) AS vault_stands,
-         EXISTS (SELECT 1 FROM safebyok_boxes WHERE ${ScopeIs} AND boxlabel = ${Columns.placeholderOf(BoxColumns, 'boxlabel', BoxParamsFrom)}) AS box_stood,
+  SELECT ${BoxAnswerColumns},
          COALESCE((SELECT standing FROM counted) >= $6::bigint, false) AS was_full,
-         inserted.*
-  FROM (SELECT 1) AS answer LEFT JOIN inserted ON true`
+         found.landed, ${Columns.selected(BoxColumns)}
+  FROM (SELECT 1) AS answer LEFT JOIN found ON true`
 
-// A box over the revision read, beside the vault props it expects, answering with its columns
-// as the update stored them: no row when it did not land.
+// A box over the revision read, beside the vault props it expects. Every column is set to the
+// box's when the standing revision is the one read, and to its own otherwise: so the UPDATE locks
+// and returns the row standing either way, written or not.
 const ReplaceBoxSql = `WITH vault AS (
     ${ExpectedVaultSql}
+  ), written AS (
+    UPDATE safebyok_boxes SET
+      ${BoxColumns.map(([field]) => `${field} = CASE WHEN revision_tok = $6::text THEN ${Columns.placeholderOf(BoxColumns, field, BoxParamsFrom)} ELSE ${field} END`).join(',\n      ')}
+    WHERE ${ScopeIs} AND vault_id = $4::text
+      AND boxlabel = ${Columns.placeholderOf(BoxColumns, 'boxlabel', BoxParamsFrom)}
+      AND EXISTS (SELECT 1 FROM vault)
+    RETURNING ${Columns.selected(BoxColumns)}, revision_tok = ${Columns.placeholderOf(BoxColumns, 'revision_tok', BoxParamsFrom)} AS landed
   )
-  UPDATE safebyok_boxes SET (${Columns.names(BoxColumns)}) = ROW(${Columns.placeholders(BoxColumns, BoxParamsFrom)})
-  WHERE ${ScopeIs} AND vault_id = $4::text AND revision_tok = $6::text
-    AND boxlabel = ${Columns.placeholderOf(BoxColumns, 'boxlabel', BoxParamsFrom)}
-    AND EXISTS (SELECT 1 FROM vault)
-  RETURNING ${Columns.selected(BoxColumns)}`
+  SELECT ${BoxAnswerColumns}, false AS was_full, written.*
+  FROM (SELECT 1) AS answer LEFT JOIN written ON true`
 
 // Lands while the vault props of that vault_id stand, whether or not there was a box to delete,
 // and answers one row then, saying what it removed: the revision_tok its DELETE returned, or null
@@ -290,36 +308,37 @@ class TablesVaultDB extends VaultDB {
     return rows.map((row) => ({ boxlabel: (row as { boxlabel: string }).boxlabel, box: Columns.recordOf(row, ListedBoxColumns) }))
   }
 
-  // The box handed back is the row as the statement that wrote it returned it.
-  protected async doPutBox(scope: VaultScope, box: BoxRecord, expected: BoxExpectation): Promise<unknown> {
+  // The box handed back, and the one a stale write reports, is the row as the statement that
+  // wrote it, or locked it, returned it.
+  protected async doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<unknown> {
     this.mustReach(scope)
     const boxParams = Columns.paramsOf(box, BoxColumns)
-    if (expected.revision_tok !== null) {
-      const params = [...scopeParams(scope), expected.vault_id, expected.vault_key_epoch, expected.revision_tok, ...boxParams]
-      const { rows } = await this.sent(ReplaceBoxSql, params)
-      return rows.length === 0 ? null : Columns.recordOf(rows[0], BoxColumns)
-    }
-    const outcome = await this.insertBox([...scopeParams(scope), expected.vault_id, expected.vault_key_epoch, this.maxBoxes === Infinity ? null : this.maxBoxes, ...boxParams])
-    if (outcome === null) { return null }
-    if (outcome.landed) { return Columns.recordOf(outcome, BoxColumns) }
-    // A vault gone or made anew, or its vaultKey replaced, or a boxlabel already taken (a box
-    // the writer missed, which it would replace, and which is never refused for the count), is a
-    // stale writer. Otherwise
-    // the vault was at its limit when the statement began; and if it was not, a writer racing for
-    // this boxlabel got in after the snapshot, and this one is only stale as well.
-    if (! outcome.vault_stands || outcome.box_stood || ! outcome.was_full) { return null }
-    throw Refusals.vaultFull(this.maxBoxes)
+    const answer = expected.revision_tok === null
+      ? await this.insertBox([...scopeParams(scope), expected.vault_id, expected.vault_key_epoch, this.maxBoxes === Infinity ? null : this.maxBoxes, ...boxParams])
+      : await this.replaceBox([...scopeParams(scope), expected.vault_id, expected.vault_key_epoch, expected.revision_tok, ...boxParams])
+    if (! answer.vault_stands) { throw Refusals.vaultMismatch() }
+    const standing = answer.landed === null ? null : Columns.recordOf(answer, BoxColumns)
+    if (answer.landed) { return standing }
+    // A full vault refuses a new box; a boxlabel already taken, even in a full vault, is a box
+    // the writer missed, which it would replace, and which is never refused for the count.
+    if (standing === null && answer.was_full) { throw Refusals.vaultFull(this.maxBoxes) }
+    throw Refusals.staleBox(standing)
   }
 
-  // Runs InsertBoxSql and reads its one row; null for the one failure that is only a stale writer:
-  // its vault deleted between the statement's snapshot and the foreign key's check, which reads the
-  // vault row as it stands then.
-  private async insertBox(params: unknown[]): Promise<InsertBoxOutcome | null> {
+  // Runs ReplaceBoxSql and reads its one row.
+  private async replaceBox(params: unknown[]): Promise<BoxAnswer> {
+    const { rows } = await this.sent(ReplaceBoxSql, params)
+    return rows[0] as BoxAnswer
+  }
+
+  // Runs InsertBoxSql and reads its one row. A foreign key violation is the vault deleted between
+  // the statement's snapshot and the foreign key's check, which reads the vault row as it stands then.
+  private async insertBox(params: unknown[]): Promise<BoxAnswer> {
     try {
       const { rows } = await this.sent(InsertBoxSql, params)
-      return rows[0] as InsertBoxOutcome
+      return rows[0] as BoxAnswer
     } catch (err) {
-      if ((err as { code?: unknown } | null)?.code === ForeignKeyViolation) { return null }
+      if ((err as { code?: unknown } | null)?.code === ForeignKeyViolation) { return { vault_stands: false, was_full: false, landed: null } }
       throw err
     }
   }
@@ -383,10 +402,11 @@ class TablesVaultDB extends VaultDB {
 }
 
 /**
- * The one row {@link InsertBoxSql} answers: why a first box write did, or did not, land, beside
- * the box's columns as inserted, null where it did not.
+ * The one row a box write answers: whether the vault props it expected stood, whether it landed
+ * (null when no box stands to report), whether a first write met a full vault, beside the
+ * columns of the box standing now, null where none does.
  */
-type InsertBoxOutcome = { landed: boolean, vault_stands: boolean, box_stood: boolean, was_full: boolean }
+type BoxAnswer = { vault_stands: boolean, was_full: boolean, landed: boolean | null }
 
 /** Postgres's error code for a foreign key violation: `23503`. */
 const ForeignKeyViolation = '23503'

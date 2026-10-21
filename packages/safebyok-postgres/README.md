@@ -76,7 +76,9 @@ const vaultDB = postgresVaultDB({ client: pool, userId: session.userId })
   `{ query: async (text, params) => ({ rows: await sql.unsafe(text, params) }) }`.
 * **Every write is one statement**, atomic as Postgres makes every statement, so it asks no
   transaction of your driver and no retry: a write lands only while what it expects still
-  stands, and refuses with kind `stale_write` otherwise. A box write reads its vault row
+  stands, and refuses with kind `stale_write` otherwise -- a box write with what stands under
+  its boxlabel, read by that same statement, or with kind `vault_mismatch` when its vault props
+  no longer stand. A box write reads its vault row
   `FOR SHARE`, a shared lock: box writes never wait for each other on the vault row (two
   writes to one boxlabel still meet at that box's row), and an update of the vault props waits
   for the box writes under way (or they for it), so a box lands only under the vaultKey
@@ -142,7 +144,7 @@ const served = new Map<string, Served>([
   ['putVaultProps', (vaultDB, [vaultProps, expected]) => vaultDB.putVaultProps(vaultProps as VaultProps, expected as VaultPropsExpectation)],
   ['getBox',      (vaultDB, [scope, boxlabel]) => vaultDB.getBox(scope as VaultScope, boxlabel as string)],
   ['listBoxes',    (vaultDB, [scope]) => vaultDB.listBoxRecords(scope as VaultScope)],
-  ['putBox',    (vaultDB, [scope, box, expected]) => vaultDB.putBox(scope as VaultScope, box as BoxRecord, expected as BoxExpectation)],
+  ['putBox',    (vaultDB, [scope, expected, box]) => vaultDB.putBox(scope as VaultScope, expected as BoxExpectation, box as BoxRecord)],
   ['delBox',     (vaultDB, [scope, boxlabel, expected]) => vaultDB.delBox(scope as VaultScope, boxlabel as string, expected as BoxDelExpectation)],
   ['delVault',   (vaultDB, [scope, expected]) => vaultDB.delVault(scope as VaultScope, expected as VaultDelExpectation)],
 ])
@@ -166,8 +168,9 @@ export async function POST(request: Request): Promise<Response> {
   // Made per request, for the user your own auth signed in -- never one the request names.
   const vaultDB = postgresVaultDB({ client: pool, userId: await signedInUserId(request) })
   const { ok, val = null, err } = await serve(vaultDB, args)
-  // A refusal crosses as its kind and its calm message; never its cause, the driver's own error.
-  if (! ok) { return Response.json({ refusal: { kind: err.refusalkind, message: err.message } }) }
+  // A refusal crosses as its kind, its calm message, and a stale box write's box_stored (the
+  // box that stands, as a read would send it); never its cause, the driver's own error.
+  if (! ok) { return Response.json({ refusal: { kind: err.refusalkind, message: err.message, box_stored: err.meta?.box_stored } }) }
   return Response.json({ result: val })
 }
 ```
@@ -180,7 +183,7 @@ The client half, a VaultDB over `fetch`, to hand `Vault.make` as its `vaultDB`:
 
 ```ts
 import { VaultDB, VaultError, RefusalKindVals } from 'safebyok'
-import type { VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, VaultProps, VaultDBOpts, RefusalKind, VaultScope } from 'safebyok'
+import type { VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, DamagedBox, VaultProps, VaultDBOpts, RefusalKind, VaultScope } from 'safebyok'
 
 const VaultRouteUrl = '/api/safebyok'
 
@@ -204,14 +207,15 @@ export class RouteVaultDB extends VaultDB {
     const boxes = await this.call('listBoxes', scope) as { boxlabel: string }[]
     return boxes.map((box) => ({ boxlabel: box.boxlabel, box }))
   }
-  protected doPutBox(scope: VaultScope, box: BoxRecord, expected: BoxExpectation) { return this.call('putBox', scope, box, expected) }
+  protected doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord) { return this.call('putBox', scope, expected, box) }
   protected doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation) { return this.call('delBox', scope, boxlabel, expected) }
   protected async doDelVault(scope: VaultScope, expected: VaultDelExpectation) {
     await this.call('delVault', scope, expected)
     return true
   }
 
-  // A stale write refuses on the server and crosses as its kind, so a write that answers landed:
+  // A stale write refuses on the server and crosses as its kind, with what stands for a box write,
+  // so a write that answers landed:
   // a box write answers with the box as the server's storage holds it, and a box
   // deletion with what it removed.
   private async call(verb: string, ...args: unknown[]): Promise<unknown> {
@@ -220,9 +224,11 @@ export class RouteVaultDB extends VaultDB {
       headers: { 'content-type': 'application/json' },
       body:    JSON.stringify({ verb, args }),
     })
-    const { result, refusal } = await response.json() as { result?: unknown, refusal?: { kind?: unknown, message?: unknown } }
+    const { result, refusal } = await response.json() as { result?: unknown, refusal?: { kind?: unknown, message?: unknown, box_stored?: BoxRecord | DamagedBox | null } }
     if (refusal && isKind(refusal.kind) && typeof refusal.message === 'string') {
-      throw new VaultError(refusal.kind, refusal.message)
+      // What stands, handed on unchecked: the VaultDB checks it as it checks a record.
+      const meta = refusal.box_stored === undefined ? {} : { meta: { box_stored: refusal.box_stored } }
+      throw new VaultError(refusal.kind, refusal.message, meta)
     }
     if (! response.ok) { throw new Error(`The vault route answered ${String(response.status)}`) }
     return result
@@ -400,12 +406,18 @@ shape of table, copy it, and keep to what makes it right:
 
 * **Extend `VaultDB` and write its `do*` methods**, never its public verbs: the base class checks
   labels and scope on the way in, validates every record and answer on the way out, and turns a
-  `false` (from a box write or deletion, a `null`) into `stale_write` and anything you
-  throw into `storage_unavailable`.
+  `false` (from a box deletion, a `null`) into `stale_write` and anything you
+  throw into `storage_unavailable`. A box write that misses throws instead, from the rows its
+  statement read: `Refusals.vaultMismatch()`, or `Refusals.staleBox(standing)`.
 * **One statement per verb**, so each is atomic without a transaction: the expectation goes in
   the `WHERE` (`UPDATE ... WHERE vault_id = $ AND unlock_epoch = $ RETURNING 1`), and a row
   back means it landed. A box write returns the row's columns (`RETURNING format, boxlabel,
-  ...`): the box as stored, which the base class reads back as it would a read. A box
+  ...`): the box as stored, which the base class reads back as it would a read. A box write
+  that misses returns the row that stands instead, locked as the write met it: an `UPDATE` that
+  sets each column to the box's only `CASE WHEN revision_tok = $read`, and to its own otherwise,
+  and an `INSERT ... ON CONFLICT DO UPDATE` with a no-op update, each `RETURNING` the columns
+  and whether its own revision landed. A plain `SELECT` beside the write would read the
+  statement's snapshot, and could miss a winner that committed while the write waited. A box
   deletion deletes whatever stands within the expected vault and returns its `revision_tok`
   (`DELETE ... RETURNING revision_tok`), so it can say whether it removed the revision the device
   named, another, or none. A create returns the row that stands with `ON CONFLICT ... DO UPDATE`
@@ -423,10 +435,10 @@ shape of table, copy it, and keep to what makes it right:
   statement and checked in the next lets writes slip through between them; a `count(*)` inside
   the insert narrows that to writers whose statements overlap, which may each count room and
   all land. The contract allows that (line 4.2), and costs nothing. Have the insert answer, from
-  its one snapshot, why it missed -- the vault stood, the boxlabel was already taken, the vault
-  was full -- so that no second read is needed to tell a full vault from a stale writer. And
-  map a foreign key violation (`23503`) on the insert to `stale_write`: a vault deleted after the
-  statement's snapshot, before its foreign key check, is only a stale writer.
+  its one statement, why it missed -- the vault stood, a box already stands under the boxlabel
+  (and which), the vault was full -- so that no second read is needed to tell a full vault from
+  a stale writer. And map a foreign key violation (`23503`) on the insert to `vault_mismatch`: a
+  vault deleted after the statement's snapshot, before its foreign key check, no longer stands.
 * **Read the vault row `FOR SHARE` in a box write, and know why.** A box write compares
   the vault props' `vault_key_epoch` (contract line 3.8), a column no foreign key covers, and a
   plain read would take it from the statement's snapshot: an update of the vault props committed

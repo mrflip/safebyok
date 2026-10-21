@@ -2028,24 +2028,32 @@ export class Vault {
    */
   async #writeOver(box: Box, expected: BoxExpectation): Promise<void> {
     try {
-      await this.#refreshOnStale(this.#vaultDB.putBox(this.#scope, box.props, expected), 'putBox')
+      await this.#refreshOnStale(this.#vaultDB.putBox(this.#scope, expected, box.props), 'putBox')
     } catch (err) {
       this.#refuseStalePutBox(err)
     }
   }
 
   /**
-   * Throw `err`, what a `putBox()`'s write met, as its refusal. A refusal as stale that
-   * {@link refreshOnStale} has caught this device up after becomes kind 'stale_write', saying
-   * nothing was written and the vault now shows the box as storage holds it, the adapter's
-   * refusal its cause -- or kind 'vault_locked', when that catch-up relocked this device (a vault
-   * reborn, or its ways in changed, elsewhere). Anything else, a catch-up that failed among it, is
-   * thrown as it came.
+   * Throw `err`, what a `putBox()`'s write met, as its refusal. Storage's `invalid_box` is kind
+   * 'bad_record', since this vault sealed the box. A refusal as stale, or as for vault props that no
+   * longer stand, that {@link refreshOnStale} has caught this device up after becomes kind
+   * 'vault_locked' when that catch-up relocked this device (a vault reborn, or its ways in changed,
+   * elsewhere); otherwise kind 'stale_write', saying nothing was written and the vault now shows
+   * storage as it stands, the adapter's refusal its cause and its `meta.box_stored` carried on.
+   * Anything else, a catch-up that failed among it, is thrown as it came.
    */
   #refuseStalePutBox(err: unknown): never {
+    if (isVaultError(err, 'invalid_box')) {
+      throw new VaultError('bad_record', 'Storage refused the box this vault sealed as one this package would not build, so nothing was written. This is a bug: report it, with this error.', { cause: err })
+    }
     if (! this.#isCaughtUpStale(err)) { throw err }
     this.#checkUnlocked()
-    throw new VaultError('stale_write', 'That box was written or removed on another device or tab while this one was storing into it, so nothing was written. This device has caught up with storage, and the vault now shows the box as storage holds it: call putBox() again if this whisper should still replace what is there.', { cause: err })
+    if (err.refusalkind === 'vault_mismatch') {
+      throw new VaultError('stale_write', 'The vault changed in storage while this device was storing into it, so nothing was written. This device has caught up with storage: call putBox() again if this whisper should still be stored.', { cause: err })
+    }
+    const meta = err.meta?.box_stored === undefined ? {} : { meta: { box_stored: err.meta.box_stored } }
+    throw new VaultError('stale_write', 'That box was written or removed on another device or tab while this one was storing into it, so nothing was written. This device has caught up with storage, and the vault now shows the box as storage holds it: call putBox() again if this whisper should still replace what is there.', { cause: err, ...meta })
   }
 
   /**
@@ -2070,7 +2078,7 @@ export class Vault {
   // == [Catching up]: refreshOnStale, catchUp, watchRefresh, unsubscribeDB
 
   /**
-   * `write`, with a refusal as stale catching this device up with storage before it is thrown --
+   * `write`, with a refusal as stale (or a box write's `vault_mismatch`) catching this device up with storage before it is thrown --
    * once, before the kind is named: the snapshot then shows what beat the write, and a vault
    * reborn elsewhere, or its ways in changed, relocks this device. A catch-up that fails is
    * thrown as 'stale_write' too, its failure the cause, the snapshot saying `syncing: false` --
@@ -2082,7 +2090,7 @@ export class Vault {
     try {
       return await write
     } catch (err) {
-      if (! isVaultError(err, 'stale_write')) { throw err }
+      if (! isCatchingUpKind(err)) { throw err }
       await this.#catchUp(err, call)
       throw err
     }
@@ -2092,7 +2100,7 @@ export class Vault {
    * True for a refusal as stale that the catch-up after it has caught up with: what `putBox()` and
    * `delBox()` say as what happened to the box. One whose catch-up failed says that instead.
    */
-  #isCaughtUpStale(err: unknown) { return isVaultError(err, 'stale_write') && this.#syncing }
+  #isCaughtUpStale(err: unknown): err is VaultError { return isCatchingUpKind(err) && this.#syncing }
 
   /** One refresh after `refusal`, a write storage refused as stale; one that fails is said as {@link refreshOnStale} says. */
   async #catchUp(refusal: VaultError, call: VaultCall) {
@@ -2263,7 +2271,7 @@ const declinedError = (asked: boolean) => new VaultError('vault_locked', asked
 const closedError = () => new VaultError('vault_closed', 'This vault handle was closed: make another with Vault.make.')
 // --
 
-// == [Vocabulary]: frozenVaultProps, isUnderHeldKey, isNewerCopy, asDamaged, MarkFormat, VaultCall, UntrustedStorageKinds
+// == [Vocabulary]: frozenVaultProps, isUnderHeldKey, isNewerCopy, asDamaged, MarkFormat, VaultCall, UntrustedStorageKinds, isCatchingUpKind
 
 /**
  * A copy of `props`, frozen through its ways in: what the vault holds as its vault props, so the
@@ -2318,6 +2326,9 @@ const FirstVaultKeyEpoch = 1
  * 'stale_write'; and each, whichever call met it, has the next hello read afresh.
  */
 const UntrustedStorageKinds = ['identity_revoked', 'rolled_back', 'newer_format'] as const satisfies readonly RefusalKind[]
+
+/** True for a write's refusal that says storage moved under it, which the vault catches up after: 'stale_write', or a box write's 'vault_mismatch'. */
+const isCatchingUpKind = (err: unknown): err is VaultError => isVaultError(err, 'stale_write') || isVaultError(err, 'vault_mismatch')
 // --
 
 // == [Argument parsers]: checkBagOrNone, checkHelloOpts, checkEnsureLeaseOpts, checkStoreOpts, sidecarJsonOf, standingPassphraseOf, newProofOf, absentBox

@@ -118,11 +118,13 @@ class StringStoreVaultDB extends VaultDB {
     ))
   }
 
-  protected doPutBox(scope: VaultScope, box: BoxRecord, expected: BoxExpectation): Promise<unknown> {
+  // A row that is not JSON stands as its text, so a stale write names it, damaged, as the listing does.
+  protected doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<unknown> {
     return soon(() => {
       const ckey = Ckeys.box(scope, box.boxlabel)
-      const standingVaultProps = readJson(this.store, Ckeys.vaultProps(scope))
-      if (! Expectations.boxMeets(standingVaultProps, readJson(this.store, ckey), expected)) { return null }
+      const standingText = this.store.read(ckey)
+      const refusal = Expectations.boxRefusalOf(readJson(this.store, Ckeys.vaultProps(scope)), standingText === null ? null : jsonOrText(standingText), expected)
+      if (refusal) { throw refusal }
       this.store.write(ckey, JSON.stringify(box))
       return readJson(this.store, ckey)
     })

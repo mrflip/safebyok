@@ -92,7 +92,7 @@ describe("vaultResolvers, in a host's schema", () => {
   it("answers a listing with the records as stored, format and all, not a vault's summaries", async () => {
     const db = await TH.emptyDatabase()
     await TH.expectGood(TH.requestFor(db, 'u1').ensureVaultProps(TH.vaultPropsOf('u1')))
-    await TH.expectGood(TH.requestFor(db, 'u1').putBox(u1, TH.boxOf('openai', 'r1'), { vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 1 }))
+    await TH.expectGood(TH.requestFor(db, 'u1').putBox(u1, { vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 1 }, TH.boxOf('openai', 'r1')))
     const result = await asked(TH.schemaOver(db), VaultOperations.safebyokListBoxes, { scope: u1 })
     const { box_key_wrapped: _wrapped, whisper_ciphered: _ciphered, ...listed } = TH.boxOf('openai', 'r1')
     expect(result.data).to.deep.equal({ safebyokListBoxes: [listed] })
@@ -108,8 +108,8 @@ describe("vaultResolvers, in a host's schema", () => {
   it("answers a box delete with what it removed, and takes one that leaves out its null revision_tok as one that means it", async () => {
     const db = await TH.emptyDatabase()
     await TH.expectGood(TH.requestFor(db, 'u1').ensureVaultProps(TH.vaultPropsOf('u1')))
-    await TH.expectGood(TH.requestFor(db, 'u1').putBox(u1, TH.boxOf('openai', 'r1'), { vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 1 }))
-    await TH.expectGood(TH.requestFor(db, 'u1').putBox(u1, TH.boxOf('mistral', 'm1'), { vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 1 }))
+    await TH.expectGood(TH.requestFor(db, 'u1').putBox(u1, { vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 1 }, TH.boxOf('openai', 'r1')))
+    await TH.expectGood(TH.requestFor(db, 'u1').putBox(u1, { vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 1 }, TH.boxOf('mistral', 'm1')))
     const named = await asked(TH.schemaOver(db), VaultOperations.safebyokDelBox, { scope: u1, boxlabel: 'openai', expected: { vault_id: 'vault-id-u1', revision_tok: 'rev-r1' } })
     expect(named).to.deep.equal({ data: { safebyokDelBox: { outcome: 'deleted' } } })
     const unnamed = await asked(TH.schemaOver(db), VaultOperations.safebyokDelBox, { scope: u1, boxlabel: 'mistral', expected: { vault_id: 'vault-id-u1' } })

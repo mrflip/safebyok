@@ -91,15 +91,20 @@ class IdbVaultDB extends VaultDB {
       .filter((stored): stored is StoredBox => stored.boxlabel !== null)
   }
 
-  // The box handed back is the row as the put left it, read in the same transaction.
-  protected async doPutBox(scope: VaultScope, box: BoxRecord, expected: BoxExpectation): Promise<unknown> {
-    return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {
+  // The box handed back is the row as the put left it, read in the same transaction; a write that
+  // misses is refused from the rows that transaction read, once it has ended, writing nothing.
+  protected async doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<unknown> {
+    const { refusal, stored } = await inOneTransaction(this.shelf, async (store) => {
       const ckey = Ckeys.box(scope, box.boxlabel)
       const [standingVaultProps, standingBox] = await Promise.all([rowAt(store, Ckeys.vaultProps(scope)), rowAt(store, ckey)])
-      if (! Expectations.boxMeets(standingVaultProps, standingBox, expected)) { return null }
+      const missed = Expectations.boxRefusalOf(standingVaultProps, standingBox, expected)
+      if (missed) { return { refusal: missed, stored: null } }
       store.put(box, ckey)
-      return rowAt(store, ckey)
-    }))
+      return { refusal: null, stored: await rowAt(store, ckey) }
+    })
+    if (refusal) { throw refusal }
+    this.ring()
+    return stored
   }
 
   // What it removed is the row read in the transaction that deletes it. A deletion that found

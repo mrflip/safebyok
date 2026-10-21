@@ -6,7 +6,7 @@ import type { DatabaseReader, DatabaseWriter } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 import * as Tallies from './tallies'
 import {
-  VaultPropsExpectation, VaultDelExpectation, ListedBox, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, VaultProps, VaultScope, VaultSignature,
+  VaultPropsExpectation, VaultDelExpectation, ListedBox, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, PutBoxAnswer, VaultProps, VaultScope, VaultSignature,
 } from './validators'
 
 /**
@@ -16,9 +16,9 @@ import {
  *
  * Every update checks its expectation in the same transaction it writes in, and Convex runs
  * mutations serializably, so the check holds for real. A failed expectation writes nothing and
- * resolves `false` -- for a box write, `null` -- which the client refuses as `stale_write`; it
- * is not an error. A box write that lands resolves the box as stored, read back in its
- * own transaction. A delete lands only in the vault it expects: it wins over any box revision,
+ * resolves `false` -- for a box deletion, `null` -- which the client refuses as `stale_write`;
+ * it is not an error. A box write resolves a {@link PutBoxAnswer} from its own transaction: the
+ * box as stored, or why it did not land, with the box that stands. A delete lands only in the vault it expects: it wins over any box revision,
  * but never lands in a vault made anew. A box delete that lands resolves what it removed.
  *
  * Every vault is held to the limits in `./tallies`, whatever its client asks, so that it can
@@ -110,8 +110,9 @@ export const listBoxSummaries = query({
  * Write `box` under its boxlabel, only while the scope's vault props have `expected.vault_id`
  * and `expected.vault_key_epoch` -- they stand for the vaultKey the box was sealed under -- and
  * the standing box has `expected.revision_tok` -- or, for null, there is none. Resolves the
- * box as stored once written, read back in this same transaction; null, writing nothing,
- * otherwise -- including when the scope holds no vault props.
+ * box as stored once written, read back in this same transaction. Otherwise it writes nothing,
+ * and resolves why: `vault_mismatch` for vault props other than those expected, or none; else
+ * `stale_write`, with the box standing (null for none), read in this same transaction.
  *
  * Refuses, writing nothing, with a `ConvexError` of kind `vault_full` a write that would take the
  * vault past {@link Tallies.MaxVaultBoxes} boxes or {@link Tallies.MaxVaultBoxBytes}
@@ -119,14 +120,18 @@ export const listBoxSummaries = query({
  * A vault with no tally yet is counted first, reading it once.
  */
 export const putBox = mutation({
-  args:    { scope: VaultScope, box: BoxRecord, expected: BoxExpectation },
-  returns: v.nullable(BoxRecord),
-  handler: async (ctx, { scope, box, expected }) => {
+  args:    { scope: VaultScope, expected: BoxExpectation, box: BoxRecord },
+  returns: PutBoxAnswer,
+  handler: async (ctx, { scope, expected, box }): Promise<Infer<typeof PutBoxAnswer>> => {
     const vaultProps = await findVaultPropsRow(ctx.db, scope)
-    if (vaultProps?.vault_id !== expected.vault_id || vaultProps.vault_key_epoch !== expected.vault_key_epoch) { return null }
+    if (vaultProps?.vault_id !== expected.vault_id || vaultProps.vault_key_epoch !== expected.vault_key_epoch) {
+      return { landed: false, refusalkind: 'vault_mismatch' }
+    }
     const standing = await findBoxRow(ctx.db, scope, box.boxlabel)
     const standingRevisionTok = standing?.revision_tok ?? null
-    if (standingRevisionTok !== expected.revision_tok) { return null }
+    if (standingRevisionTok !== expected.revision_tok) {
+      return { landed: false, refusalkind: 'stale_write', box_stored: standing && boxOfRow(standing) }
+    }
     //
     const row = boxRowOf(scope, box)
     const reckoning = await Tallies.reckon(ctx.db, vaultProps._id, vaultBoxQuery(ctx.db, scope))
@@ -143,8 +148,10 @@ export const putBox = mutation({
       ? await ctx.db.insert('safebyok_boxes', row)
       : await replaceBoxRow(ctx.db, standing._id, row)
     await Tallies.record(ctx.db, vaultProps._id, reckoning, growthAs(rowId))
+    // The row just written, which this transaction reads back as it left it.
     const stored = await ctx.db.get('safebyok_boxes', rowId)
-    return stored && boxOfRow(stored)
+    if (stored === null) { throw new Error('A box row this mutation wrote could not be read back in the same transaction.') }
+    return { landed: true, box_stored: boxOfRow(stored) }
   },
 })
 

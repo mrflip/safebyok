@@ -137,7 +137,9 @@ places:
 And keep, as they are:
 
 * **`Expectations`, from `safebyok`**: the comparisons each write makes before it lands
-  (`Expectations.vaultPropsMeets`, `boxMeets`, `vaultMeets`, `vaultIdMeets`). An adapter
+  (`Expectations.vaultPropsMeets`, `vaultMeets`, `vaultIdMeets`), and for a box write, the
+  refusal it throws when it misses (`Expectations.boxRefusalOf`: `vault_mismatch`, or
+  `stale_write` carrying the box that stands). An adapter
   compares only the scope, `boxlabel`, `vault_id`, `unlock_epoch`, `vault_key_epoch` and
   `revision_tok`, and a standing row too damaged to show one of them fails the comparison. A
   box write compares the vault props' `vault_key_epoch` too, in the same transaction: skip it,

@@ -1,7 +1,7 @@
 import { getFunctionName } from 'convex/server'
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server'
 import { ConvexError } from 'convex/values'
-import { Sanitizer, VaultDB, VaultError } from 'safebyok'
+import { Refusals, Sanitizer, VaultDB, VaultError } from 'safebyok'
 import type { VaultPropsExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, StoredBox, VaultProps, VaultScope } from 'safebyok'
 import { MaxVaultBoxes } from './component/tallies'
 import { isSafebyokErrorData } from './refusals'
@@ -136,8 +136,11 @@ class ConvexVaultDB extends VaultDB {
     return rows.map((row) => ({ boxlabel: row.boxlabel, box: row }))
   }
 
-  protected doPutBox(scope: VaultScope, box: BoxRecord, expected: BoxExpectation): Promise<unknown> {
-    return refusing(() => this.client.mutation(this.api.putBox, { scope, box, expected }))
+  // The component answers why a write did not land, from the transaction that refused it.
+  protected async doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<unknown> {
+    const answer = await refusing(() => this.client.mutation(this.api.putBox, { scope, expected, box }))
+    if (answer.landed) { return answer.box_stored }
+    throw answer.refusalkind === 'vault_mismatch' ? Refusals.vaultMismatch() : Refusals.staleBox(answer.box_stored)
   }
 
   protected doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<unknown> {

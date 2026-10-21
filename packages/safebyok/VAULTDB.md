@@ -14,14 +14,16 @@ reach says so, and says where it is proven instead.
 Three layers share the work, and each guarantee below belongs to one of them.
 
 * **The vault** (`Vault.make`) decides what to write. It reads a box, seals a new revision over
-  it, and writes with an expectation of what it read. When storage refuses the write as stale, it
-  catches up with storage once and refuses the store as `stale_write`, never trying again: what
+  it, and writes with an expectation of what it read. When storage refuses the write as stale, or
+  as `vault_mismatch`, it catches up with storage once and refuses the store as `stale_write` (or
+  `vault_locked`, when the catch-up relocks it), never trying again: what
   the other device wrote or deleted stands, and the host hears that its write lost. It also holds the app's own box limit (`maxBoxes`, 100 by default): the alarm bell for an
   app that is storing far more than it meant to.
 * **The base class** (`VaultDB`'s public verbs) checks every name, record and expectation on the
   way in and every record on the way out -- the box a write hands back among them, and what a
-  box deletion reports -- refuses what is malformed before your code sees it, turns a
-  `false` from you (from a box write or deletion, a `null`) into `stale_write`, and turns
+  box deletion reports, and what a stale box write says stands -- refuses what is malformed
+  before your code sees it, turns a `false` from you (from a box deletion, a `null`) into
+  `stale_write`, and turns
   anything you throw that is not a
   `VaultError` into `storage_unavailable`, your error as its cause. Every verb resolves an
   `Outcome` and never rejects: `{ ok: true, val }`, or `{ ok: false, err }` with the refusal as
@@ -129,8 +131,8 @@ within it. Every name a verb is handed passes, before the adapter sees it:
 A name handed to a verb on its own or in a scope, and a name the floor admits but over
 `maxNameBytes` wherever it is, is refused as `bad_label`, naming which name and which rule, and
 quoting none of it. A name below the floor inside a record -- the vault props' scope, a box's
-boxlabel -- makes that record one this package does not build, refused whole as `bad_record`,
-naming the record and quoting none of it.
+boxlabel -- makes that record one this package does not build, refused whole as `bad_record`
+(a box, as `invalid_box`), naming the record and quoting none of it.
 
 ## 1. Records
 
@@ -188,18 +190,33 @@ do). The core always sends the standing
 **3.3. A box write lands only over the box it read, in the vault it was sealed for.**
 `putBox` writes only while the scope's standing vault props have the expected `vault_id` and the
 standing box has the expected `revision_tok` -- or, for a null revision, no box stands
-under that boxlabel. Otherwise it refuses as `stale_write`: over a revision it never read, in a
-scope with no vault props, or into a vault deleted and made anew under another `vault_id`, even
-where no box stands in either.
+under that boxlabel. Where the vault props are not the expected ones -- none stand, or another
+`vault_id`'s, a vault deleted and made anew even where no box stands in either -- it refuses as
+`vault_mismatch`, carrying nothing of the vault props that stand. Where they are, and the box is
+not the one expected -- a revision it never read, a box since deleted, a box where it expected
+none -- it refuses as `stale_write`, with what stands under the boxlabel as `err.meta.box_stored`.
 
 A write that lands resolves the box as storage now holds it, field for field the one written
 (line 1.1), and the adapter hands it back from the same atomic step as the write: a `RETURNING`
 (Postgres), the mutation's return value (Convex, and over GraphQL its payload), a read in the
 write's transaction (IndexedDB) or synchronous turn (`localVaultDB`), never a second call. A
-refused write resolves nothing: its adapter resolves `null`, and the base class refuses it as
-`stale_write`, carrying no record. The base class holds what comes back to the check a `getBox`
-makes, and refuses one that fails it as `corrupt_record`, saying the write may have landed: the
-adapter wrote something it cannot read back. *That refusal is proven by the base class's own
+write that misses resolves no record, and the adapter reports why from that same step: it throws
+`Refusals.vaultMismatch()`, or `Refusals.staleBox(standing)` with the record standing exactly as
+stored (or null for none), and a key-value store reads both rows in the step and asks
+`Expectations.boxRefusalOf` which. The base class checks what stands as `getBox` checks a
+record, and the refusal carries it as a read would hand it back: the box, whole -- its wrapped
+boxKey and ciphered whisper among it, so the caller can open it, or merge and write over it, with
+no second read -- a `DamagedBox` naming the revision it holds when it does not read back as a
+box, or null. A write over it names that revision. A stale write that
+names nothing standing is the adapter's bug, refused as `corrupt_record`. The base class holds
+what a landed write hands back to the check a `getBox` makes, at the revision written, and
+refuses one that fails it as `corrupt_record`, saying the write may have landed: the adapter
+wrote something it cannot read back.
+
+A box write takes a `signal` (`putBox(scope, expected, box, { signal })`), the caller's timeout or
+cancel. One that aborts before storage answers resolves `storage_unavailable` at once, its
+`reason` the cause; a write already sent may then have landed, and a later read shows whether.
+The base class keeps it, so an adapter needs nothing for it. *That refusal is proven by the base class's own
 tests* (the core's `vault-db.test.ts`), which can have an adapter answer with a malformed record;
 the battery, through an adapter that keeps this line, cannot.
 
@@ -241,8 +258,8 @@ deletion at it. An adapter that hands each call on to another VaultDB's public v
 `delDamagedVault` on too. Proven by the base class's own tests for a damaged record, which the
 battery cannot plant, and by the battery for a sound vault, which it refuses to delete.
 
-**3.6. A refused write wrote nothing.** Whatever the refusal -- `stale_write`, `vault_full`,
-`box_too_large`, a malformed record -- the vault stands afterwards exactly as it stood before:
+**3.6. A refused write wrote nothing.** Whatever the refusal -- `stale_write`, `vault_mismatch`,
+`vault_full`, `box_too_large`, a malformed record -- the vault stands afterwards exactly as it stood before:
 its vault props, its boxes, its listing. When storage is unreachable or fails partway
 (`storage_unavailable`), an adapter's own atomic step decides: the write landed whole or not at
 all, and the vault's next read shows which.
@@ -255,9 +272,9 @@ then line 3.3 or 3.4 says which wins.
 **3.8. A box write lands only under the vaultKey that stands.** A box carries the
 `vault_key_epoch` of the vaultKey its boxKey is wrapped under, and its write's expectation
 names the same one (the base class refuses a box whose epoch is not the expected one, as
-`bad_record`, before the adapter sees it). `putBox` writes only while the scope's standing
+`invalid_box`, before the adapter sees it). `putBox` writes only while the scope's standing
 vault props have that `vault_key_epoch`, as well as the `vault_id` and revision of line 3.3,
-compared in the same atomic step as the write; otherwise it refuses as `stale_write` and writes
+compared in the same atomic step as the write; otherwise it refuses as `vault_mismatch` and writes
 nothing. So a box only ever lands sealed under the vaultKey its vault props stand for. Every
 vault carries `vault_key_epoch` 1 today, the epoch reserved for a rotation of the vaultKey not yet
 built, so for now the comparison refuses a record built wrong. It is kept so that rotation needs
@@ -281,8 +298,8 @@ not to hold off a determined client, which is the host's to meter like any other
 
 **4.3. A replacement is never refused for the count.** A box written over one already there
 is never refused as `vault_full`, however full the vault. A first write under a boxlabel that is
-already taken missed a box it would replace, and refuses as `stale_write`, never as
-`vault_full`, so the store that follows the catch-up replaces it.
+already taken missed a box it would replace, and refuses as `stale_write` with that box as
+`meta.box_stored`, never as `vault_full`, so a store over it replaces it.
 
 **4.4. Under the limit, a new box lands.** Once a vault holds fewer boxes than its
 limit -- deletions having made room, or brought back under it a vault that racing writers took past
@@ -300,18 +317,19 @@ for a backend with no such limit enforces none beyond line 4.2's best effort, un
 opts in to one and pays what it costs. *Not tested by the battery*: each adapter tests its own.
 
 A write that lands reports no count of the vault's boxes: a box write resolves its record
-(line 3.3), and nothing more. The vault already learns the count from the listing it reads after
+(line 3.3), and nothing more; a `vault_full` carries no `meta.capacity` from storage yet. The vault already learns the count from the listing it reads after
 every write, and asking every adapter for one would put a count into every adapter's write path. An adapter that enforces a limit says, in
 its README, what its count is as of: the start of the write's statement, say, or its commit.
 
 ## 5. Errors
 
 **5.1. Every refusal is a VaultError whose kind says what to do.** An adapter refuses with a
-`VaultError`: `stale_write` (by resolving `false`, or `null` from a box write or deletion;
-the base class refuses with it), `vault_full`,
+`VaultError`: `stale_write` (by resolving `false`, or `null` from a box deletion, the base
+class refusing with it; a box write throws `Refusals.staleBox(standing)`), `vault_mismatch`
+(a box write, `Refusals.vaultMismatch()`), `vault_full`,
 `identity_revoked`, `not_permitted`, or anything it throws otherwise, which becomes
 `storage_unavailable`. The base
-class refuses `bad_label`, `bad_record`, `bad_option`, `box_too_large` and `corrupt_record` itself, before
+class refuses `bad_label`, `bad_record`, `invalid_box`, `bad_option`, `box_too_large` and `corrupt_record` itself, before
 the adapter is asked or after it answers. Each message says calmly what went wrong and what to do
 about it, and a caller branches on the kind, never the message. Every verb resolves an `Outcome`
 and never rejects: the refusal is its `err`, whoever made it.
@@ -322,8 +340,10 @@ one: a lock timeout or a serialization failure is `storage_unavailable`, and und
 at the backend's default settings, there is none to report. Its test is line 3.7's.
 
 **5.3. A refusal quotes nothing it was handed.** No refusal's message or properties carry a
-record's ciphertext, a boxlabel or a sidecar: the base class never quotes what it refuses, and an
-adapter's own messages name the vault's limits, never its contents. A `storage_unavailable`
+record's ciphertext, a boxlabel or a sidecar it was handed: the base class never quotes what it
+refuses, and an adapter's own messages name the vault's limits, never its contents. A stale box
+write carries the box that stands under its boxlabel as `meta.box_stored`, whole, as a `getBox`
+by the same user would hand it back: ciphertext under keys only the vault holds. A `storage_unavailable`
 refusal's `cause` is the backend's own error, passed up as it came for debugging; it holds only
 what the backend holds, which is ciphertext and unencrypted fields.
 

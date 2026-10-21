@@ -48,8 +48,33 @@ describe("Refusals.staleWrite", () => {
 
   it("says which write was refused", () => {
     expect(Refusals.staleWrite('vaultProps').message).to.include('this change was refused')
-    expect(Refusals.staleWrite('box').message).to.include('That box changed')
     expect(Refusals.staleWrite('del').message).to.include('this removal was refused')
+  })
+})
+
+describe("Refusals.staleBox", () => {
+  it("refuses a box write as stale_write, carrying what stands as meta.box_stored, as its example shows", () => {
+    const standing = { boxlabel: 'anthropic', revision_tok: 'rev-two' }
+    const refusal = Refusals.staleBox(standing)
+    expect(refusal.refusalkind).to.eq('stale_write')
+    expect(refusal.message).to.eq(Refusals.StaleBoxMessage)
+    expect(refusal.meta).to.deep.equal({ box_stored: standing })
+    expect(refusal).to.not.have.property('cause')
+  })
+
+  it("carries null when nothing stands under the boxlabel", () => {
+    expect(Refusals.staleBox(null).meta).to.deep.equal({ box_stored: null })
+  })
+})
+
+describe("Refusals.vaultMismatch", () => {
+  it("refuses as vault_mismatch, a condition, carrying no meta and no cause, as its example shows", () => {
+    const refusal = Refusals.vaultMismatch()
+    expect(refusal.refusalkind).to.eq('vault_mismatch')
+    expect(refusal.family).to.eq('condition')
+    expect(refusal).to.not.have.property('meta')
+    expect(refusal).to.not.have.property('cause')
+    expect(refusal.message).to.include('nothing was written')
   })
 })
 
@@ -148,7 +173,7 @@ describe("Refusals.isStorageBlocked", () => {
 describe("Refusals, between them", () => {
   it("quote nothing they were handed but the message an adapter writes", () => {
     const quoted = 'SUPERSECRET-ciphertext'
-    const refusals = [Refusals.staleWrite('box'), Refusals.vaultFull(3), Refusals.notPermitted(), Refusals.storageBlocked()]
+    const refusals = [Refusals.staleWrite('vaultProps'), Refusals.staleBox(null), Refusals.vaultMismatch(), Refusals.vaultFull(3), Refusals.notPermitted(), Refusals.storageBlocked()]
     for (const refusal of refusals) { expect(TH.thrownText(refusal)).to.not.include(quoted) }
   })
 })

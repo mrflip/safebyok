@@ -201,7 +201,7 @@ describe("damaged boxes", () => {
     await vault.putBox('anthropic', 'sk-ant-new')
     const callsOf = Object.fromEntries(writes.map(([verb, spy]) => [verb, spy.mock.calls.length]))
     expect(callsOf).to.deep.equal({ ensureVaultProps: 0, putVaultProps: 0, putBox: 1, delBox: 0, delVault: 0, delDamagedVault: 0 })
-    expect(putBox.mock.calls[0]?.[2]).to.deep.include({ revision_tok: revisionTok })
+    expect(putBox.mock.calls[0]?.[1]).to.deep.include({ revision_tok: revisionTok })
     expect(await vault.getBox('anthropic')).to.eq('sk-ant-new')
     vi.restoreAllMocks()
   })

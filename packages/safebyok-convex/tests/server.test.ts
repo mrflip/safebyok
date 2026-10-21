@@ -58,16 +58,19 @@ describe("SafebyokComponent.api, for the vault's own user", () => {
     expect(refusal).to.deep.equal({ kind: 'vault_full', message: 'This vault is full: remove a box to make room, then try again.' })
   })
 
-  it("resolves a failed expectation null, not as a refusal", async () => {
+  it("resolves a failed expectation as why it failed, with the box that stands, not as a refusal", async () => {
     const CVX = await seeded()
     const stale = { vault_id: 'vault-id-u1', revision_tok: 'rev-a0', vault_key_epoch: 1 }
-    expect(await CVX.withIdentity({ subject: 'u1' }).mutation(api.safebyok.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a2'), expected: stale })).to.be.null
+    const answer = await CVX.withIdentity({ subject: 'u1' }).mutation(api.safebyok.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a2'), expected: stale })
+    expect(answer).to.deep.include({ landed: false, refusalkind: 'stale_write' })
+    expect(answer).to.have.nested.property('box_stored.revision_tok', 'rev-a1')
+    expect(answer).to.have.nested.property('box_stored.whisper_ciphered')
   })
 
   it("resolves a box write that lands with the box as stored", async () => {
     const CVX = await seeded()
     const over = { vault_id: 'vault-id-u1', revision_tok: 'rev-a1', vault_key_epoch: 1 }
-    expect(await CVX.withIdentity({ subject: 'u1' }).mutation(api.safebyok.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a2'), expected: over })).to.deep.equal(TH.boxOf('anthropic_api_key', 'a2'))
+    expect(await CVX.withIdentity({ subject: 'u1' }).mutation(api.safebyok.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a2'), expected: over })).to.deep.equal({ landed: true, box_stored: TH.boxOf('anthropic_api_key', 'a2') })
   })
 })
 

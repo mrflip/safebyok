@@ -111,7 +111,8 @@ vaultResolvers({ vaultDBFor: (context) => postgresVaultDB({ client: pool, userId
   user, refuses every other user's vault, and any while signed out, before asking the database
   anything.
 * **A refusal crosses as a GraphQL error**: its message the VaultError's calm one, its
-  `extensions.kind` its kind, and nothing else -- never the VaultError's `cause`, your driver's
+  `extensions.kind` its kind, a stale box write's `extensions.meta.box_stored` (the box that
+  stands under the boxlabel, whole, as a read would send it), and nothing else -- never the VaultError's `cause`, your driver's
   own error, which may name your database or quote a row. That stays on your server, as the
   GraphQL error's `cause`, for your own logs. Anything else a VaultDB throws crosses as
   `storage_unavailable`.

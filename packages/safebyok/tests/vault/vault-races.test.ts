@@ -491,7 +491,7 @@ const rebornWorld = async () => {
 }
 
 describe("a stale session cannot reach into a vault reborn elsewhere", () => {
-  it("putBox() is refused by storage as stale, and its catch-up finds the device relocked, instead of landing in the reborn vault", async () => {
+  it("putBox() is refused by storage as vault_mismatch, and its catch-up finds the device relocked, instead of landing in the reborn vault", async () => {
     const { vaultOne, vaultTwo } = await rebornWorld()
     expect(vaultOne.getSnapshot().state).to.eq('unlocked')
     await TH.expectRefusal(vaultOne.putBox('anthropic', 'sk-ant-fake-stale'), 'vault_locked')
@@ -711,8 +711,35 @@ describe("versioned updates: two devices writing at once", () => {
     expect(await there.getBox('anthropic')).to.eq('sk-ant-fake-theirs')
     await here.putBox('anthropic', 'sk-ant-fake-mine')
     expect(putBox).toHaveBeenCalledTimes(2)
-    expect(putBox.mock.calls[1]?.[2].revision_tok).to.eq(theirRevision)
+    expect(putBox.mock.calls[1]?.[1].revision_tok).to.eq(theirRevision)
     expect(await there.getBox('anthropic')).to.eq('sk-ant-fake-mine')
+  })
+
+  it("a store refused as stale carries storage's word on what won as meta.box_stored: the box, whole, as storage holds it", async () => {
+    const { world, hereDB, here, there, beforeNextWrite } = await twoDeviceWorld()
+    beforeNextWrite('putBox', () => there.putBox('anthropic', 'sk-ant-fake-theirs', { sidecar: { note: 'theirs' } }))
+    const putBox = vi.spyOn(hereDB, 'putBox')
+    const err = await TH.expectRefusal(here.putBox('anthropic', 'sk-ant-fake-mine'), 'stale_write')
+    expect(putBox).toHaveBeenCalledTimes(1)
+    expect(err.meta?.box_stored).to.deep.equal(storedRowOf(world, 'anthropic'))
+  })
+
+  it("a store whose box storage refuses as invalid_box is refused as bad_record: the vault sealed that box, so the fault is not the caller's input", async () => {
+    const { hereDB, here } = await twoDeviceWorld()
+    const refused = new VaultError('invalid_box', 'Nothing was written: that box is not one this package builds.')
+    vi.spyOn(hereDB, 'putBox').mockResolvedValueOnce(bad(refused))
+    const err = await TH.expectRefusal(here.putBox('anthropic', 'sk-ant-fake-mine'), 'bad_record')
+    expect(err.cause).to.eq(refused)
+    expect(here.getSnapshot().boxes).to.have.lengthOf(0)
+  })
+
+  it("a store whose box storage refuses as vault_mismatch, though a catch-up finds the vault as it was, is refused as stale_write, never as storage's own word", async () => {
+    const { hereDB, here } = await twoDeviceWorld()
+    vi.spyOn(hereDB, 'putBox').mockResolvedValueOnce(bad(new VaultError('vault_mismatch', 'The vault changed.')))
+    const err = await TH.expectRefusal(here.putBox('anthropic', 'sk-ant-fake-mine'), 'stale_write')
+    expect(err.message).to.match(/^The vault changed in storage while this device was storing into it, so nothing was written\./)
+    expect(err.cause).to.have.property('refusalkind', 'vault_mismatch')
+    expect(here.getSnapshot().state).to.eq('unlocked')
   })
 
   it("a store over a box deleted meanwhile elsewhere is refused as stale like any other: the box stays gone", async () => {
@@ -754,7 +781,7 @@ describe("versioned updates: two devices writing at once", () => {
     expect(putBox).toHaveBeenCalledTimes(1)
     expect(await there.getBox('anthropic')).to.eq('sk-ant-fake-theirs')
     await here.putBox('anthropic', 'sk-ant-fake-mine')
-    expect(putBox.mock.calls[1]?.[2].revision_tok).to.eq(theirs.revisionTok)
+    expect(putBox.mock.calls[1]?.[1].revision_tok).to.eq(theirs.revisionTok)
     expect(await there.getBox('anthropic')).to.eq('sk-ant-fake-mine')
   })
 
@@ -771,11 +798,11 @@ describe("versioned updates: two devices writing at once", () => {
     const putBox = vi.spyOn(hereDB, 'putBox')
     await TH.expectRefusal(here.putBox('anthropic', 'sk-ant-fake-mine'), 'stale_write')
     expect(putBox).toHaveBeenCalledTimes(1)
-    expect(putBox.mock.calls[0]?.[2].revision_tok).to.be.null
+    expect(putBox.mock.calls[0]?.[1].revision_tok).to.be.null
     expect(here.getSnapshot().boxes[0]).to.deep.include({ damaged: true, revision_tok: damagedRevision })
     await here.putBox('anthropic', 'sk-ant-fake-mine')
     expect(delBox).not.toHaveBeenCalled()
-    expect(putBox.mock.calls[1]?.[2].revision_tok).to.eq(damagedRevision)
+    expect(putBox.mock.calls[1]?.[1].revision_tok).to.eq(damagedRevision)
     expect(await there.getBox('anthropic')).to.eq('sk-ant-fake-mine')
   })
 

@@ -28,7 +28,7 @@ TH.describeOnPostgres('races', "postgresVaultDB's box limit, over a real Postgre
       await TH.filled(first('u1'), ['standing_one', 'standing_two', 'standing_three', 'standing_four'])
       const racers = Array.from({ length: Racers }, (_, idx) => ({ boxlabel: `racer_${String(idx)}`, vaultDB: TH.deviceOver(db, undefined, { maxBoxes: Cap })('u1') }))
 
-      const outcomes = await Promise.all(racers.map(({ boxlabel, vaultDB }) => vaultDB.putBox(u1, TH.boxOf(boxlabel, 'sk-fake'), TH.noBoxYet)))
+      const outcomes = await Promise.all(racers.map(({ boxlabel, vaultDB }) => vaultDB.putBox(u1, TH.noBoxYet, TH.boxOf(boxlabel, 'sk-fake'))))
 
       const landed = racers.filter((_, idx) => outcomes[idx]?.ok)
       const refusedKinds = outcomes.flatMap((outcome) => (outcome.ok ? [] : outcome.err.refusalkind))
@@ -49,7 +49,7 @@ TH.describeOnPostgres('races', "postgresVaultDB's box limit, over a real Postgre
     await racer.query('BEGIN')
     await TH.insertRawBox(racer, 'fifth_in_flight', 'one')
 
-    await TH.expectingGood(device).putBox(u1, TH.boxOf('also_fifth', 'sk-fake'), TH.noBoxYet)
+    await TH.expectingGood(device).putBox(u1, TH.noBoxYet, TH.boxOf('also_fifth', 'sk-fake'))
     await racer.query('COMMIT')
 
     expect(await TH.boxesStanding(db)).to.eq(Cap + 1)
@@ -65,14 +65,14 @@ TH.describeOnPostgres('races', "postgresVaultDB's box limit, over a real Postgre
     const racer = await db.client()
     await racer.query('BEGIN')
     await TH.insertRawBox(racer, 'fifth_in_flight', 'one')
-    await TH.expectingGood(device).putBox(u1, TH.boxOf('also_fifth', 'sk-fake'), TH.noBoxYet)
+    await TH.expectingGood(device).putBox(u1, TH.noBoxYet, TH.boxOf('also_fifth', 'sk-fake'))
     await racer.query('COMMIT')
 
-    await TH.expectBad(device.putBox(u1, TH.boxOf('sixth', 'sk-fake'), TH.noBoxYet), 'vault_full')
+    await TH.expectBad(device.putBox(u1, TH.noBoxYet, TH.boxOf('sixth', 'sk-fake')), 'vault_full')
     await TH.expectingGood(device).delBox(u1, 'one', TH.deleting('rev-sk-fake-one'))
-    await TH.expectBad(device.putBox(u1, TH.boxOf('sixth', 'sk-fake'), TH.noBoxYet), 'vault_full')
+    await TH.expectBad(device.putBox(u1, TH.noBoxYet, TH.boxOf('sixth', 'sk-fake')), 'vault_full')
     await TH.expectingGood(device).delBox(u1, 'two', TH.deleting('rev-sk-fake-two'))
-    await TH.expectingGood(device).putBox(u1, TH.boxOf('sixth', 'sk-fake'), TH.noBoxYet)
+    await TH.expectingGood(device).putBox(u1, TH.noBoxYet, TH.boxOf('sixth', 'sk-fake'))
     expect(await TH.boxesStanding(db)).to.eq(Cap)
   })
 })

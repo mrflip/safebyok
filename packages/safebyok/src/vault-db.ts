@@ -2,6 +2,7 @@ import * as Z from 'zod/mini'
 import { BoxRecord } from './box'
 import { VaultProps, VaultScope, type DamagedBox, type BoxSummary, type Sidecar } from './types'
 import { VaultError, isVaultError } from './errors'
+import { optionsCheck } from './options'
 import * as Names from './names'
 import { AnyTextValidators, NameFloor } from './validators'
 import * as Refusals from './refusals'
@@ -26,12 +27,12 @@ const VaultPropsExpectation = Z.object({
 })
 
 /**
- * What a box update was written for and read: the vault and the vaultKey that sealed it -- its
+ * What a box write was sealed for and read: the vault and the vaultKey that sealed it -- its
  * `vault_id`, and the `vault_key_epoch` the box carries -- and the `revision_tok` of the box
- * the writer read under its boxlabel, or null when there was none. The update lands only while the
- * scope's standing vault props have that `vault_id` and that `vault_key_epoch`, and the standing
- * box has that `revision_tok` -- or, for null, while there is no box there at all. Plain
- * JSON, so it crosses any wire as-is.
+ * the writer read under its boxlabel, or null when there was none. The write lands only while the
+ * scope's standing vault props have that `vault_id` and that `vault_key_epoch` (else
+ * `vault_mismatch`), and the standing box has that `revision_tok` -- or, for null, while there is
+ * no box there at all (else `stale_write`). Plain JSON, so it crosses any wire as-is.
  *
  * @example { vault_id: vaultProps.vault_id, revision_tok: prev?.revision_tok ?? null, vault_key_epoch: vaultProps.vault_key_epoch }
  */
@@ -101,7 +102,7 @@ const BoxDeletion = Z.object({
 export type StoredBox = { boxlabel: string, box: unknown }
 // --
 
-// == [Options]: VaultDBOpts
+// == [Options]: VaultDBOpts, VaultDBCallOpts
 
 /**
  * What an adapter's factory takes from the host, beside its backend's own options: an optional
@@ -123,6 +124,20 @@ export type VaultDBOpts = {
    */
   logger?: VaultLogger | null | undefined
 }
+
+/**
+ * What a VaultDB verb that takes options may be handed beside its arguments: a `signal`, the
+ * caller's own timeout or cancel. A verb whose signal aborts, before it is called or while storage
+ * has not answered, resolves `storage_unavailable` at once, the signal's `reason` as its `cause`:
+ * a write already sent may have landed, and a later read shows whether it did. Without one, a
+ * backend that never answers is a call that never completes.
+ *
+ * @example { signal: AbortSignal.timeout(10_000) }
+ */
+export type VaultDBCallOpts = {
+  /** Aborts the call: an `AbortController`'s, or `AbortSignal.timeout(ms)`. */
+  signal?: AbortSignal | undefined
+}
 // --
 
 /**
@@ -139,8 +154,11 @@ export type VaultDBOpts = {
  *  * **Write only as expected.** Every update and deletion carries an expectation of what
  *    stands in storage, and writes only if it still does: check and write in one atomic step (a
  *    transaction, a conditional write), and resolve `false` when the expectation fails. A box
- *    write resolves `null` instead, and when it lands, the record as you now hold it, read back in
- *    the same step. A box deletion resolves `null` too, and when it lands, what it removed
+ *    write resolves, when it lands, the record as you now hold it, read back in the same step;
+ *    when it does not, it throws what `Refusals` makes, from that same step:
+ *    `Refusals.vaultMismatch()` for vault props other than those it was sealed for, and
+ *    `Refusals.staleBox(standing)` for another box -- or none -- under its boxlabel, carrying what
+ *    stands. A box deletion resolves `null` when its vault does not stand, and when it lands, what it removed
  *    (a {@link BoxDeletion}): within the right vault, a deletion wins over any revision,
  *    and only reports whether the one it removed was the one it named.
  *  * **Enforce who may reach which rows.** Your backend should let a signed-in user reach only
@@ -156,7 +174,8 @@ export type VaultDBOpts = {
  *
  * The public verbs -- `getVaultProps`, `putBox` and the rest -- wrap your `do*` methods with the
  * checks every adapter owes: names, scope, records and expectations on the way in, the shape of
- * every record on the way out, `stale_write` for a failed expectation, and `storage_unavailable`
+ * every record on the way out -- the box a stale box write names among them -- `stale_write` for a
+ * failed expectation, and `storage_unavailable`
  * (your own error as its `cause`) for anything you throw that is not already a VaultError. Each
  * resolves an {@link Outcome} and never rejects: its answer as `val`, or every refusal -- the
  * base's own, and whatever your `do*` method throws -- as `err`, a VaultError. A throw from the
@@ -377,39 +396,59 @@ export abstract class VaultDB {
   }
 
   /**
-   * Write `box` under its boxlabel, only while the scope's standing vault props have the
-   * `vault_id` and `vault_key_epoch` in `expected` and the standing box has its `revision_tok`
-   * (or, for null, there is none). Refuses with kind `stale_write` otherwise -- including when the
-   * scope holds no vault props -- and writes nothing. A backend that holds each vault to a limit of
-   * its own refuses a write past it with kind `vault_full`, writing nothing. A box heavier than the
-   * backend's `maxRecordBytes` is refused with kind `box_too_large` before storage sees it, and
-   * a box or an `expected` this package would not build with kind `bad_record`: a missing
-   * box, or one whose boxlabel is below the floor, included. A `scope` below the floor, or a
-   * name the floor admits but longer than the backend holds, is kind `bad_label`. A box is
-   * written under the vaultKey it was sealed with, so its `vault_key_epoch` must be the one in
-   * `expected`: kind 'bad_record' otherwise.
+   * Write `box` under its boxlabel, in one atomic conditional write: only while the scope's
+   * standing vault props have the `vault_id` and `vault_key_epoch` in `expected`, and the standing
+   * box has its `revision_tok` -- or, for null, none stands. Resolves the box as storage now holds
+   * it, handed back by the same atomic step as the write and held to the check `getBox` makes,
+   * at the revision written: one that fails is refused as `corrupt_record`, though the write may
+   * have landed, as the adapter wrote something it cannot read back.
    *
-   * Resolves the box as storage now holds it, handed back by the same atomic step as the write
-   * and held to the check `getBox` makes: field for field the one written, from an adapter that
-   * keeps its contract. One that fails that check is refused as `corrupt_record`, though the write
-   * may have landed: the adapter wrote something it cannot read back.
+   * Refuses, writing nothing:
+   *
+   * * `vault_mismatch` when the vault props standing are not the ones `expected` names -- none
+   *   stand, or another `vault_id`'s, or another `vault_key_epoch`'s -- carrying nothing of them.
+   * * `stale_write` when the box standing is not the one `expected` names, with what stands, as
+   *   the same atomic step read it, in `err.meta.box_stored`: the box that won, its record whole
+   *   and checked as `getBox` checks one, to open or to write over with no second read; a
+   *   `DamagedBox` when what stands does not read back as a box (naming the revision it holds, if
+   *   any); or null when nothing stands. A write over it names that revision (`null` for none).
+   * * `invalid_box` for a box this package would not build -- a missing box, or one whose
+   *   boxlabel is below the floor, among it -- or one sealed under another `vault_key_epoch` than
+   *   `expected` names; `bad_record` for an `expected` it would not build; `bad_label` for a scope
+   *   below the floor, or a name the floor admits but longer than the backend holds; `bad_option`
+   *   for `opts` other than a `signal`. Each before storage sees the box.
+   * * `box_too_large` for a box, with its scope, heavier than the backend's `maxRecordBytes`,
+   *   before storage sees it; `vault_full` for a backend's own limit on a vault.
+   * * `storage_unavailable` when `opts.signal` aborts before storage answers: a write already sent
+   *   may then have landed, and a later read shows whether it did.
+   *
+   * @param scope - The vault the box is written into.
+   * @param expected - The vault and vaultKey the box was sealed for, and the revision read under
+   *   its boxlabel (null for none).
+   * @param box - The box, as a vault seals it.
+   * @param opts - Optionally, a `signal` that abandons the call: {@link VaultDBCallOpts}.
+   *
+   * @example
+   *   const { ok, val, err } = await vaultDB.putBox(scope, { vault_id, vault_key_epoch: 1, revision_tok: null }, box, { signal: AbortSignal.timeout(10_000) })
+   *   if (! ok && err.refusalkind === 'stale_write') { return err.meta?.box_stored }  // what won
    */
-  putBox(scope: VaultScope, box: BoxRecord, expected: BoxExpectation): Promise<Outcome<BoxRecord>> {
+  putBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord, opts?: VaultDBCallOpts): Promise<Outcome<BoxRecord>> {
     return answering(async () => {
       const asked = heldScope(this, scope)
-      const outgoing = checkOutgoing(BoxRecord, box, 'box')
+      const outgoing = checked(BoxRecord, box, invalidBox)
       heldBoxlabel(this, outgoing.boxlabel)
       const expectation = checkOutgoing(BoxExpectation, expected, 'box expectation')
       if (outgoing.vault_key_epoch !== expectation.vault_key_epoch) {
-        throw new VaultError('bad_record', "putBox writes a box under the vaultKey it was sealed with: the box's vault_key_epoch must be the expected one.")
+        throw new VaultError('invalid_box', "Nothing was written: putBox writes a box under the vaultKey it was sealed with, so the box's vault_key_epoch must be the expected one. Hand a VaultDB's putBox only the boxes a vault seals, with the expectation it sealed them for.")
       }
+      const { signal } = checkCallOpts(opts) ?? {}
       const recordBytes = jsonBytes({ ...asked, ...outgoing })
       if (recordBytes > this.maxRecordBytes) {
         throw new VaultError('box_too_large', `That box weighs ${String(recordBytes)} bytes, over the ${String(this.maxRecordBytes)} its storage holds in one record, so nothing was written: store a smaller whisper or sidecar, or under a shorter boxlabel.`)
       }
-      const stored = await adapterAnswer('doPutBox', () => this.doPutBox(asked, outgoing, expectation))
-      if (stored === null) { throw Refusals.staleWrite('box') }
-      return writtenBack('a box write', () => checkStoredBox(stored, outgoing.boxlabel))
+      const writing = untilAborted(signal, () => adapterAnswer('doPutBox', () => this.doPutBox(asked, expectation, outgoing)))
+      const stored = await withStandingChecked(writing, outgoing.boxlabel)
+      return writtenBack('a box write', () => checkWrittenBox(stored, outgoing))
     })
   }
   // --
@@ -601,9 +640,13 @@ export abstract class VaultDB {
    * `expected.revision_tok` -- or, when that is null, no box stands there: all compared in the
    * same atomic step as the write. Resolves the record as stored once written, read back in that
    * same step (a `RETURNING`, a mutation's return value, a read in the transaction), exactly as a
-   * `doGetBox` would hand it up; null, writing nothing, otherwise.
+   * `doGetBox` would hand it up. Otherwise it writes nothing, and throws, from that same step:
+   * `Refusals.vaultMismatch()` when the vault props are not the expected ones (none, another
+   * vault's, another vaultKey epoch's); else `Refusals.staleBox(standing)`, `standing` the record
+   * under the boxlabel exactly as stored, damaged or not, or null for none. A key-value backend
+   * reads both rows and asks `Expectations.boxRefusalOf` which.
    */
-  protected abstract doPutBox(scope: VaultScope, box: BoxRecord, expected: BoxExpectation): Promise<unknown>
+  protected abstract doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<unknown>
   /**
    * Remove the box under `boxlabel`, whatever revision stands, if, and only if, the scope's
    * standing vault props have `expected.vault_id`: compared in the same atomic step as the removal.
@@ -676,7 +719,7 @@ const heedRejection = async (returned: unknown, failed: (err: unknown) => void):
 }
 // --
 
-// == [Listing helpers]: withoutCiphered, ListedBox, isNameable, listedOrDamaged, summaryOf, byCodeUnit
+// == [Listing helpers]: withoutCiphered, ListedBox, isNameable, listedOrDamaged, damagedOf, summaryOf, byCodeUnit
 
 /** A stored box as {@link VaultDB.listBoxRecords} hands it on: its two ciphered fields left out, anything else as it came. */
 const withoutCiphered = (box: unknown): unknown => {
@@ -708,8 +751,13 @@ const isNameable = (stored: StoredBox): boolean => NameFloor.safeParse((stored a
 const listedOrDamaged = ({ boxlabel, box }: StoredBox): BoxSummary | DamagedBox => {
   const checked = ListedBox.safeParse(box)
   const sound = checked.success && checked.data.boxlabel === boxlabel
-  return sound ? summaryOf(checked.data) : { boxlabel, damaged: true, revision_tok: StoredRevision.safeParse(box).data?.revision_tok ?? null }
+  return sound ? summaryOf(checked.data) : damagedOf(boxlabel, box)
 }
+
+/** A record stored under `boxlabel` that does not read back as its box, as a listing shows it: the revision it holds as text, or null. */
+const damagedOf = (boxlabel: string, box: unknown): DamagedBox => (
+  { boxlabel, damaged: true, revision_tok: StoredRevision.safeParse(box).data?.revision_tok ?? null }
+)
 
 /** The one field of a damaged box the listing keeps, when the record holds it as text: what a write over it names. */
 const StoredRevision = Z.object({ revision_tok: BoxRecord.shape.revision_tok })
@@ -767,7 +815,7 @@ const heldName = (facts: NameFacts, said: string, part: string): string => {
 }
 // --
 
-// == [Storage and listener guards]: answering, asStorageTrouble, adapterAnswer, checkListener, checked, checkOutgoing
+// == [Storage and listener guards]: answering, asStorageTrouble, adapterAnswer, checkCallOpts, untilAborted, withStandingChecked, boxStoredOf, invalidBox, checkListener, checked, checkOutgoing
 
 /**
  * `body`'s outcome, as each verb answers. What the adapter throws reaches it a VaultError already
@@ -796,6 +844,67 @@ const adapterAnswer = async <AnswerT>(hookname: string, hook: () => Promise<Answ
   }
   return answer
 }
+
+/** A verb's options, as {@link VaultDBCallOpts} has them: kind 'bad_option' for anything else. */
+const checkCallOpts = optionsCheck(
+  { signal: Z.optional(Z.custom<AbortSignal>((val) => val instanceof AbortSignal)) },
+  "A VaultDB verb's only option is `signal`, an AbortSignal that abandons the call (AbortSignal.timeout(ms), or an AbortController's): check its spelling, and leave out any other.",
+)
+
+/**
+ * What `work` resolves, unless `signal` aborts first: then `storage_unavailable`, the signal's
+ * reason as its cause, at once. A signal already aborted starts no work, so nothing was sent;
+ * one that aborts later leaves the work to finish unheard, so it may have landed.
+ */
+const untilAborted = async <ValT>(signal: AbortSignal | undefined, work: () => Promise<ValT>): Promise<ValT> => {
+  if (signal === undefined) { return await work() }
+  if (signal.aborted) {
+    throw Refusals.storageUnavailable(signal.reason, "This call was abandoned before it reached storage, as its signal had already aborted, so nothing was sent. Try again with a fresh signal.")
+  }
+  let heard = (): void => undefined
+  const aborted = new Promise<never>((_resolve, reject) => {
+    heard = () => { reject(Refusals.storageUnavailable(signal.reason, "This call was abandoned when its signal aborted -- a timeout, say -- before storage answered, so it may or may not have landed. Read the vault again to see what stands, then try again if need be.")) }
+  })
+  signal.addEventListener('abort', heard, { once: true })
+  try {
+    return await Promise.race([work(), aborted])
+  } finally {
+    signal.removeEventListener('abort', heard)
+  }
+}
+
+/**
+ * What a box write resolves, or its refusal; a `stale_write` with what stands under `boxlabel`
+ * checked as a read checks it, as {@link boxStoredOf} says. A `stale_write` that names nothing
+ * standing is the adapter's bug: refused as `corrupt_record`, nothing written.
+ */
+const withStandingChecked = async <ValT>(writing: Promise<ValT>, boxlabel: string): Promise<ValT> => {
+  try {
+    return await writing
+  } catch (err) {
+    if (! isVaultError(err, 'stale_write')) { throw err }
+    const said = err.meta ?? {}
+    if (! ('box_stored' in said)) {
+      throw new VaultError('corrupt_record', "Storage refused a box write as stale, so nothing was written, but did not say what stands under its boxlabel. The storage adapter needs a developer's look: its doPutBox throws Refusals.staleBox(standing).", { cause: err })
+    }
+    const meta = { box_stored: boxStoredOf(said.box_stored, boxlabel) }
+    throw new VaultError('stale_write', err.message, err.cause === undefined ? { meta } : { cause: err.cause, meta })
+  }
+}
+
+/**
+ * What stands under `boxlabel`, as a stale box write reports it: null for nothing; the box, when
+ * it passes the check `getBox` makes of one stored under that boxlabel; otherwise a
+ * {@link DamagedBox}, as a listing shows it.
+ */
+const boxStoredOf = (raw: unknown, boxlabel: string): BoxRecord | DamagedBox | null => {
+  if (raw === null || raw === undefined) { return null }
+  const box = BoxRecord.safeParse(raw)
+  return box.success && box.data.boxlabel === boxlabel ? box.data : damagedOf(boxlabel, raw)
+}
+
+/** A box handed to `putBox` that this package would not build: kind 'invalid_box', quoting none of it. */
+const invalidBox = () => new VaultError('invalid_box', "Nothing was written: that box is not one this package builds. Hand a VaultDB's putBox only the boxes a vault seals.")
 
 const checkListener = (onChange: unknown) => {
   if (typeof onChange !== 'function') {
@@ -892,7 +1001,7 @@ const isSoundVaultProps = (raw: unknown, scope: VaultScope): boolean => {
 const StoredVaultId = Z.object({ vault_id: VaultProps.shape.vault_id })
 // --
 
-// == [Box and answer checks]: checkStoredBox, writtenBack, checkAnswer, checkRecord, jsonBytes
+// == [Box and answer checks]: checkStoredBox, checkWrittenBox, writtenBack, checkAnswer, checkRecord, jsonBytes
 
 /** A stored box, as `getBox` holds it: a box's shape, under the boxlabel it was asked for. */
 const checkStoredBox = (raw: unknown, boxlabel: string): BoxRecord => {
@@ -900,6 +1009,18 @@ const checkStoredBox = (raw: unknown, boxlabel: string): BoxRecord => {
   // A record that names some other boxlabel is a record out of place, wherever it came from.
   if (box.boxlabel !== boxlabel) {
     throw new VaultError('corrupt_record', 'The stored box names a different boxlabel than the one asked for. It was left as it is.')
+  }
+  return box
+}
+
+/**
+ * The box an adapter handed back as `written` landed: the check `getBox` makes, at the revision
+ * written. One at another revision is someone else's box: `corrupt_record`, quoting neither.
+ */
+const checkWrittenBox = (raw: unknown, written: BoxRecord): BoxRecord => {
+  const box = checkStoredBox(raw, written.boxlabel)
+  if (box.revision_tok !== written.revision_tok) {
+    throw new VaultError('corrupt_record', 'The box storage handed back as written holds another revision than the one written.')
   }
   return box
 }

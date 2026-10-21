@@ -157,7 +157,7 @@ describe("VaultNotifySql", () => {
     const db = await tablesOnlyDatabase()
     const { heard, unsubscribe } = await TH.liveWatch(TH.requestFor(db, 'u1'), TH.scopeOf('u1'))
     await TH.expectGood(TH.requestFor(db, 'u1').ensureVaultProps(TH.vaultPropsOf('u1')))
-    await TH.expectGood(TH.requestFor(db, 'u1').putBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'sk-fake'), { vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 1 }))
+    await TH.expectGood(TH.requestFor(db, 'u1').putBox(TH.scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 1 }, TH.boxOf('anthropic', 'sk-fake')))
     await TH.wakeupAtNextTick()
     expect(heard.count).to.eq(0)
     expect(await TH.expectingGood(TH.requestFor(db, 'u1')).listBoxes(TH.scopeOf('u1'))).to.have.lengthOf(1)

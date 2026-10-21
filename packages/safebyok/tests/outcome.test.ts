@@ -14,7 +14,7 @@ describe("good and bad", () => {
   })
 
   it("makes a bad outcome of a refusal, as bad's example shows (Contract: Shapes)", () => {
-    const err = Refusals.staleWrite('box')
+    const err = Refusals.staleWrite('vaultProps')
     const outcome = bad(err)
     expect(outcome).to.deep.equal({ ok: false, err })
     expect(outcome).to.not.have.property('val')
@@ -138,7 +138,7 @@ describe("hostThrewRefusal", () => {
 describe("isOutcomeShaped", () => {
   it("knows an answer handed up still wrapped, as its example shows", () => {
     const answered = good({ vault_id: 'vault-id-u1' })
-    const refused = bad(Refusals.staleWrite('box'))
+    const refused = bad(Refusals.staleWrite('vaultProps'))
     expect(isOutcomeShaped(answered)).to.be.true
     expect(isOutcomeShaped(refused)).to.be.true
   })

@@ -51,7 +51,7 @@ describe("localVaultDB", () => {
     expect(summaries.map((box) => TH.summaryOf(box)?.sidecar)).to.deep.equal([{ note: 'a test box' }, {}])
     const prev = await TH.expectingGood(vaultDB).getBox(TH.scopeOf('u1'), 'openai')
     expect(prev).to.deep.equal(emptied)
-    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), emptied, { vault_id: 'vault-id-u1', revision_tok: 'rev-two', vault_key_epoch: 1 })
+    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-two', vault_key_epoch: 1 }, emptied)
     expect(store.read(u1BoxCkey('openai'))).to.eq(emptiedRow)
   })
 
@@ -104,7 +104,7 @@ describe("localVaultDB", () => {
     const store = memoryStore()
     const vaultDB = localVaultDB({ store })
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
-    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), TH.boxOf('anthropic', 'one'), TH.noBoxYet)
+    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
     expect(store.read(u1VaultPropsCkey)).to.eq(JSON.stringify(TH.vaultPropsOf('u1')))
     expect(store.read(u1BoxCkey('anthropic'))).to.eq(JSON.stringify(TH.boxOf('anthropic', 'one')))
     expect(store.ckeys()).to.have.members([u1VaultPropsCkey, u1BoxCkey('anthropic')])

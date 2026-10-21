@@ -57,39 +57,56 @@ describe("Expectations.vaultIdMeets", () => {
 
 const BoxCases = [
   // regular usage:
-  [VaultProps, undefined,                     null,       true,   'a first write, where no box stands'],
-  [VaultProps, Box,                           "rev-one",  true,   'a write over the revision read'],
-  [VaultProps, Box,                           "rev-two",  false,  'a write over a revision never read'],
-  [VaultProps, Box,                           null,       false,  'a first write where a box now stands'],
-  [VaultProps, undefined,                     "rev-one",  false,  'a write over a box since deleted'],
+  [VaultProps, undefined,                     null,       null,             'a first write, where no box stands'],
+  [VaultProps, Box,                           "rev-one",  null,             'a write over the revision read'],
+  [VaultProps, Box,                           "rev-two",  "stale_write",    'a write over a revision never read'],
+  [VaultProps, Box,                           null,       "stale_write",    'a first write where a box now stands'],
+  [VaultProps, undefined,                     "rev-one",  "stale_write",    'a write over a box since deleted'],
   // the vault props half:
-  [undefined,  undefined,                     null,       false,  'a write into a scope with no vault props'],
-  [TH.vaultPropsOf('u1', { vault_id: 'reborn' }), Box, "rev-one",  false,  'a write sealed for a vault since made anew'],
-  [TH.vaultPropsAtEpochOf('u1', 2),          Box,  "rev-one",  false,  "a write sealed under another vaultKey epoch than the vault props'"],
-  [TH.vaultPropsAtEpochOf('u1', 2),          undefined, null,  false,  "a first write sealed under another vaultKey epoch than the vault props'"],
+  [undefined,  undefined,                     null,       "vault_mismatch", 'a write into a scope with no vault props'],
+  [TH.vaultPropsOf('u1', { vault_id: 'reborn' }), Box, "rev-one",  "vault_mismatch", 'a write sealed for a vault since made anew'],
+  [TH.vaultPropsAtEpochOf('u1', 2),          Box,  "rev-one",  "vault_mismatch", "a write sealed under another vaultKey epoch than the vault props'"],
+  [TH.vaultPropsAtEpochOf('u1', 2),          undefined, null,  "vault_mismatch", "a first write sealed under another vaultKey epoch than the vault props'"],
   // nothing, or damage, standing:
-  [{ vault_id: "vault-id-u1" },  undefined,   null,       false,  'a vault row that shows no epoch'],
-  [{ vault_id: "vault-id-u1", unlock_epoch: 1 }, undefined, null, false, "a vault row that shows no vaultKey's epoch"],
-  [{ ...VaultProps, vault_key_epoch: "1" }, undefined,  null,  false,  "a vaultKey's epoch stored as text"],
-  [VaultProps, null,                          null,       true,   'a null row reads as no box, as a read does'],
-  [VaultProps, { boxlabel: "anthropic" },     "rev-one",  false,  'a box row that shows no revision'],
+  [{ vault_id: "vault-id-u1" },  undefined,   null,       "vault_mismatch", 'a vault row that shows no epoch'],
+  [{ vault_id: "vault-id-u1", unlock_epoch: 1 }, undefined, null, "vault_mismatch", "a vault row that shows no vaultKey's epoch"],
+  [{ ...VaultProps, vault_key_epoch: "1" }, undefined,  null,  "vault_mismatch", "a vaultKey's epoch stored as text"],
+  [VaultProps, null,                          null,       null,             'a null row reads as no box, as a read does'],
+  [VaultProps, { boxlabel: "anthropic" },     "rev-one",  "stale_write",    'a box row that shows no revision'],
 ] as const
 
-describe("Expectations.boxMeets", () => {
-  for (const [standingVaultProps, standingBox, revisionTok, landed, blurb] of BoxCases) {
-    it(blurb, () => {
-      expect(Expectations.boxMeets(standingVaultProps, standingBox, { vault_id: 'vault-id-u1', revision_tok: revisionTok, vault_key_epoch: 1 })).to.eq(landed)
+describe("Expectations.boxRefusalOf", () => {
+  for (const [standingVaultProps, standingBox, revisionTok, refusalkind, blurb] of BoxCases) {
+    it(`${refusalkind ?? 'lands'}: ${blurb}`, () => {
+      const refusal = Expectations.boxRefusalOf(standingVaultProps, standingBox, { vault_id: 'vault-id-u1', revision_tok: revisionTok, vault_key_epoch: 1 })
+      expect(refusal?.refusalkind ?? null).to.eq(refusalkind)
     })
   }
-})
 
-describe("Expectations.boxMeets, across vaultKey epochs", () => {
-  it("holds for a write sealed under the vault props' vaultKey epoch, over a box sealed under another", () => {
-    expect(Expectations.boxMeets(TH.vaultPropsAtEpochOf('u1', 2), Box, { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 2 })).to.be.true
+  it("refuses a stale write with the box standing as it read it, as its example shows", () => {
+    const refusal = Expectations.boxRefusalOf(VaultProps, Box, { vault_id: 'vault-id-u1', revision_tok: 'rev-two', vault_key_epoch: 1 })
+    expect(refusal?.meta).to.deep.equal({ box_stored: Box })
   })
 
-  it("fails a write sealed under a vaultKey epoch the vault props do not stand for", () => {
-    expect(Expectations.boxMeets(VaultProps, undefined, { vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 2 })).to.be.false
+  it("refuses a stale write over a box since deleted with null standing, not undefined", () => {
+    const refusal = Expectations.boxRefusalOf(VaultProps, undefined, { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 1 })
+    expect(refusal?.meta).to.deep.equal({ box_stored: null })
+  })
+
+  it("refuses a vault mismatch carrying nothing of the vault props standing", () => {
+    const refusal = Expectations.boxRefusalOf(TH.vaultPropsOf('u1', { vault_id: 'reborn' }), Box, { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 1 })
+    expect(refusal).to.not.have.property('meta')
+    expect(TH.thrownText(refusal)).to.not.include('reborn')
+  })
+})
+
+describe("Expectations.boxRefusalOf, across vaultKey epochs", () => {
+  it("lands a write sealed under the vault props' vaultKey epoch, over a box sealed under another", () => {
+    expect(Expectations.boxRefusalOf(TH.vaultPropsAtEpochOf('u1', 2), Box, { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 2 })).to.be.null
+  })
+
+  it("refuses a write sealed under a vaultKey epoch the vault props do not stand for as vault_mismatch", () => {
+    expect(Expectations.boxRefusalOf(VaultProps, undefined, { vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 2 })?.refusalkind).to.eq('vault_mismatch')
   })
 })
 
