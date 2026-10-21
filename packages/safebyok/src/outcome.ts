@@ -1,10 +1,8 @@
 import { RefusalFamilyForKind, VaultError, isVaultError } from './errors'
 import * as Refusals from './refusals'
 
-/**
- * What a safebyok call resolves to, at every layer: a {@link GoodOutcome} holding its `val`, or a
- * {@link BadOutcome} holding its refusal as `err`. A refusal is data, never thrown: `ok` tells the
- * two apart, and TypeScript narrows on it.
+/** What a non-throwing safebyok call resolves to: a {@link GoodOutcome} holding its `val`, or a {@link BadOutcome} holding its refusal as `err`.
+ * TypeScript narrows on `ok`.
  *
  * @example
  *   const { ok, val, err } = await vaultDB.getVaultProps(scope)
@@ -16,38 +14,28 @@ export type Outcome<ValT> = GoodOutcome<ValT> | BadOutcome
 /** A call that succeeded: `ok` true, and its answer as `val`. */
 export type GoodOutcome<ValT> = { ok: true, val: ValT, err?: never }
 
-/**
- * A call that was refused: `ok` false, and the refusal as `err`, always a {@link VaultError}, so
- * `throw err` always works.
- */
+/** A call that was refused: `ok` false, and the refusal as `err`, always a {@link VaultError}. */
 export type BadOutcome = { ok: false, val?: never, err: VaultError }
 
-/**
- * `val` as the outcome of a call that succeeded.
+/** `val` as the outcome of a call that succeeded.
  *
  * @example good(vaultProps)  // { ok: true, val: vaultProps }
  */
 export const good = <ValT>(val: ValT): GoodOutcome<ValT> => ({ ok: true, val })
 
-/**
- * `err` as the outcome of a call that was refused.
+/** `err` as the outcome of a call that was refused.
  *
  * @example bad(Refusals.staleWrite('vaultProps'))  // { ok: false, err }
  */
 export const bad = (err: VaultError): BadOutcome => ({ ok: false, err })
 
-/**
- * The outcome of `thunk`, a body that answers by returning and refuses by throwing: what it
- * returns, or resolves to, as a good outcome; what it throws, or rejects with, as a bad one. A
- * VaultError is kept as it came, as {@link isVaultError} tells one. Anything else -- a backend's
- * own error, a thrown string, a rejection with nothing -- becomes the VaultError `otherwise` makes of it: by default one of kind
- * `storage_unavailable`, the thrown value as its `cause`, as a call out to storage wants. It never
- * rejects, so a call made through it is one `Outcome` whatever happens.
+/** The outcome of `thunk`, a body that refuses by throwing: what it returns as a good outcome, what it throws as a bad one. Never rejects.
+ * A thrown VaultError is kept as it came, as {@link isVaultError} tells one. Anything else thrown
+ * becomes the VaultError `otherwise` makes of it.
  *
- * @param thunk - The body to run, sync or async.
- * @param otherwise - What a throw that is no VaultError becomes: by default `storage_unavailable`,
- *   which says "try again". A body that calls nothing a retry could mend says otherwise.
- * @returns Its outcome.
+ * @param otherwise - What a throw that is no VaultError becomes. By default it is a
+ *   `storage_unavailable`, its cause the throw, as suits a call out to storage. A body that calls
+ *   nothing a retry could mend passes {@link unexpectedError}.
  *
  * @example
  *   const { ok, val, err } = await outcomeOf(() => fetchBackup(vaultlabel))
@@ -63,13 +51,7 @@ export const outcomeOf = async <ValT>(thunk: () => ValT | Promise<ValT>, otherwi
   }
 }
 
-/**
- * A refusal of kind `unexpected_error`, `thrown` its cause: what a throw that is no VaultError
- * becomes where nothing a retry could mend was called -- a bug, in safebyok or in a function the
- * app handed it. It is misuse: fix the code, never retry.
- *
- * @param thrown - What was thrown, as it came.
- * @returns The refusal.
+/** An `unexpected_error` refusal, `thrown` its cause: a bug, in safebyok or in a function the app handed it.
  *
  * @example unexpectedError(new TypeError("Cannot read properties of undefined (reading 'passkey')"))
  */
@@ -78,23 +60,17 @@ export const unexpectedError = (thrown: unknown): VaultError => (
 )
 
 /** The refusal in place of what the key deriver, which hears the passphrase, threw.
- * A condition it raised (a resource out of reach) passes as itself, for the caller to show or
- * retry. Anything else -- a VaultError of misuse or of bad news, or one from another copy of
- * safebyok, among them -- is refused as 'unexpected_error' with the throw as its `cause`, so that
- * no message of the deriver's is ever the refusal's own, nor told to `onBadNews`. The `cause`
- * still carries the throw whole: whoever logs it logs whatever the deriver put in it, which may
- * quote the passphrase. (A strength checker's throw, by contrast, carries nothing.)
- *
- * @param thrown - What the function threw, as it came.
- * @returns The refusal.
+ * A condition-family VaultError passes as itself, for the caller to show or retry. Anything else,
+ * a VaultError from another copy of safebyok among it, becomes 'unexpected_error' with the throw
+ * as its `cause`. So no message of the deriver's is ever the refusal's own, nor told to
+ * `onBadNews`. The `cause` still holds the throw whole, and may quote the passphrase: whoever logs
+ * it logs that. A strength checker's throw, by contrast, carries nothing.
  */
 export const hostThrewRefusal = (thrown: unknown): VaultError => (
   isVaultError(thrown) && RefusalFamilyForKind[thrown.refusalkind] === 'condition' ? thrown : unexpectedError(thrown)
 )
 
-/**
- * True for a value shaped as an {@link Outcome} -- `ok` a boolean, beside a `val` or an `err` --
- * which a stored record never is: an answer handed up still wrapped.
+/** True for a value shaped as an {@link Outcome}: an answer handed up still wrapped, since a stored record never is one.
  *
  * @example isOutcomeShaped(await inner.getBox(scope, boxlabel))  // true: the caller forgot valOf
  */
@@ -102,9 +78,7 @@ export const isOutcomeShaped = (candidate: unknown): boolean => (
   typeof candidate === 'object' && candidate !== null && typeof (candidate as { ok?: unknown }).ok === 'boolean' && ('val' in candidate || 'err' in candidate)
 )
 
-/**
- * `outcome`'s `val`, or its `err` thrown: an outcome handed to code that refuses by throwing, as a
- * VaultDB that hands each call on to another must hand on each answer, unwrapped.
+/** `outcome`'s `val`, or its `err` thrown: how a VaultDB that hands each call on to another unwraps each answer.
  *
  * @example const vaultProps = valOf(await vaultDB.getVaultProps(scope))  // throws the refusal, if any
  * @example
