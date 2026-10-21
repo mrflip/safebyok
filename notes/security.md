@@ -39,6 +39,15 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-21 (thread trust_lines, branch 20261021-trust_lines, stacked on [#225](https://github.com/mrflip/safebyok/pull/225)):
+  **threat model, by party.** Storage and the backend are treated as hostile and defended by
+  cryptography alone (AES-GCM, with the context bound as additional data). The host app is trusted but
+  fallible: its inputs are checked once at the public entry and refused as misuse, and code past that
+  boundary does not defend against it, since it shares the JS realm. Other tabs and devices are
+  concurrent, not hostile, and are met by conflict detection (revision tokens, `stale_write`,
+  `vault_mismatch`). The clock, `Box`, `Wayin`, `Lease` and boxlabel decisions of this thread are
+  amended in place in the entries on each.
+
 * 2026-10-21 (thread checker, branch 20261021-checker): **one guard is the only caller of a host's
   strength checker, and a checker's `load` runs at every `hello()`.** (1) `guardStrengthChecker`
   (`packages/safebyok/src/passphrase-strength.ts`) is the only code that calls the host's checker.
@@ -161,7 +170,9 @@ added or folded into through the subagent, and no other entry changes.
   wayinKey. Only the creating unlock keeps it; `putWayin` drops it. (amended 2026-10-21 (wayin_rules): `Wayin.seal(vault,
   holder, proof, deviceId, vaultKey)` returns only the way in and unwraps nothing, so no session
   handle comes out of a seal; and it stamps itself: `vault_key_epoch` from the holder, `registered_at`
-  from `vault.clock.now()`, the vault's checked clock, and the `device_id` it is handed; the vault's
+  from `vault.clock.now()`, the vault's checked clock (amended 2026-10-21 (trust_lines): from the time it is
+  handed as a number, with a `WayinVaultProps` value in place of the vault; the clock is checked only at
+  `Vault.make`), and the `device_id` it is handed; the vault's
   `#newStamp` is gone. See the 2026-10-21 (wayin_rules) entry on the key a create keeps.) (5) `putWayin` and `delWayin`
   resolve the vault (they resolved nothing, or a boolean).
 * 2026-10-19 (thread slots, B4a, branch 20261019-slots; the Coach's ruling): **the ways in are two slots,
@@ -254,7 +265,14 @@ added or folded into through the subagent, and no other entry changes.
   out-of-range value, so a deadline that is no number is never bound into a lease's wrap or written. The lease reads the handle's public
   `leaseMillis` getter, so a host that `Object.defineProperty`s over the handle's `leaseMillis`
   changes its own lease length, as one overwriting the handle's `clock` already changed every model's
-  clock; the vault handle is not frozen.
+  clock; the vault handle is not frozen. Amended 2026-10-21 (trust_lines): `Lease.grant` takes a
+  `LeaseVaultProps` value (scope, `vault_id`, epochs) and the time as a number, not the Vault object,
+  so the lease no longer reads the handle's `clock`; its deadline rests on the host's clock as read after
+  construction (see the clock entry, amended). Also amended 2026-10-21 (trust_lines): the Lease no longer
+  reads `leaseMillis` off the Vault object either. The vault computes the deadline itself,
+  `Math.min(now + leaseMillis, FarFuture)`, and hands `Lease.grant(vaultProps, askPassphraseAt,
+  vaultKeyPair)` the number, so the sentences above on `leaseMillis` and `clock` being overwritable on the
+  handle no longer hold for the lease.
 * 2026-10-19 (thread B2 `lease`, branch 20261019-lease): **the lease is a class, `Lease`, and its
   crypto lives apart from the vault's decisions.** `Lease` (`packages/safebyok/src/lease.ts`) holds
   the lease's fields and its wrap and unwrap; when to grant, when to ask, and every write to the
@@ -272,12 +290,15 @@ added or folded into through the subagent, and no other entry changes.
   refuses `vault_locked` before any unwrap when the holder's `vault_id` or `unlock_epoch` differ from
   the lease's, or the vault's clock is at or past `ask_passphrase_at`; it then unwraps under a ctx
   rebuilt from the vault's own scope and the holder's `vault_id` and `unlock_epoch` (what the vault
-  expects, not the record's own fields), into a non-extractable handle (wrapKey, unwrapKey). An
+  expects, not the record's own fields), into a non-extractable handle (wrapKey, unwrapKey) (amended
+  2026-10-21 (trust_lines): the call is `lease.tryOpen(vaultProps, now)`, the time handed in as a number, not
+  read off the vault's clock). An
   unwrap that fails (a tampered wrap, a moved deadline, a swapped leaseKey) is `corrupt_record`, with
   no cause attached. The vault erases the lease on either refusal, and warns through the logger only
   for `corrupt_record`, as before. The `leaseHours` fit check (a lease ending further off than this
   handle's `leaseHours` allows is discarded) stays in the vault, as `! lease.endsWithin(leaseMillis)`
-  before `tryOpen`; `ensureLease`'s renew threshold is `lease.endsWithin(renewMillis)`; the vault holds
+  before `tryOpen`; `ensureLease`'s renew threshold is `lease.endsWithin(renewMillis)` (amended 2026-10-21
+  (trust_lines): `endsWithin(millis)` is now `endsBy(instant)`); the vault holds
   the `Lease` beside the vaultKey in place of a bare `askPassphraseAt`. **`DeviceDB`'s verbs
   (`getLease`, `putLease`, `delLease`, `getMark`, `putMark`, `delMark`, `delAll`) now resolve an
   `Outcome` and never reject.** `deviceOutcomeOf(verb, body)` (`src/device-db.ts`) turns an adapter's
@@ -340,6 +361,9 @@ added or folded into through the subagent, and no other entry changes.
   is refused `absent_box` until the next read. Tests: `tests/vault/vault-lease.test.ts`, "every data
   call, through `ensureLease`", and its test that the vault "refuses absent_box from the listing in
   hand, reading nothing more, though another device stored the box meanwhile ...".
+  Amended 2026-10-21 (trust_lines): `bad_label` here is now only the floor every name is held to; the
+  host's boxlabel validators gate writes only, so reads and deletes check no more than the floor, and
+  an absent name is `absent_box`, not `bad_label`.
 * 2026-10-19 (thread B3 rework, box holder): **a box takes the vault props it lies under explicitly,
   as `holder`, and no longer reads `vault_id` and the vaultKey epoch off the vault's published
   snapshot; sealing is split so a store too large is refused before any key is made.** This replaces
@@ -376,7 +400,12 @@ added or folded into through the subagent, and no other entry changes.
   wayin's `holder` and the `holder` each box is made or sealed under are one frozen object. Amended
   2026-10-19 (a_sec2, #206): `snapshot.props` is gone and the host no longer receives the record at
   all (see the a_sec2 entry at the top of *Of Interest*); a box's `holder` is itself reduced to
-  `vault_id` and `vault_key_epoch`, kept as its own frozen copy in each `Box`.
+  `vault_id` and `vault_key_epoch`, kept as its own frozen copy in each `Box`. Amended 2026-10-21
+  (trust_lines): `BoxHolder` and the live Vault object are replaced by one plain value, `BoxVaultProps`
+  (scope plus `vault_id` and the relevant epochs), from which the AES-GCM context is built, and the time
+  as a number; `Box.make` and `Box.seal` take no Vault. The ctx bytes are unchanged. `Wayin` takes a
+  `WayinVaultProps` and `Lease` a `LeaseVaultProps` the same way. `Box`, `Wayin` and `Lease` remain
+  public exports and check that value at their entry.
 * 2026-10-19 (thread B3, box); 2026-10-20 (placement): **the stored box is a model class, `Box`, holding a back-reference to
   its vault; sealing and opening moved into it, and a box's enumerable fields are exactly its stored
   ones.** (1) The class (`packages/safebyok/src/box.ts`): the Zod schema once exported as `Box` is
@@ -417,9 +446,12 @@ added or folded into through the subagent, and no other entry changes.
   box re-made for another scope, another `vault_id` (a vault made anew) or another label, or with any
   visible field altered, refuses; a test goes field by field. (5) What a box reads off its vault is
   `BoxVault = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_id' | 'vault_key_epoch' |
-  'clock'>`. The vault gains read-only getters `logger`, `clock` and `keyDeriver`; `vault.clock` is
+  'clock'>` (amended 2026-10-21 (trust_lines): `BoxVault` is gone; it is `BoxVaultProps`, a slice of
+  `VaultProps` that the vault builds, frozen, per call from its scope plus the snapshot it took, so the
+  snapshot-getter sentences below no longer apply). The vault gains read-only getters `logger`, `clock` and `keyDeriver`; `vault.clock` is
   the vault's checked clock, so a box's reading that fails drops the vaultKey as the vault's own
-  readings do. `vault_id` and `vault_key_epoch` come off the vault's snapshot getters, which can lag
+  readings do (amended 2026-10-21 (trust_lines): `vault.clock` is no longer exposed, a box takes the time
+  as a number, and a later bad reading drops nothing; see the clock entry). `vault_id` and `vault_key_epoch` come off the vault's snapshot getters, which can lag
   the vault's private vault props only inside a first unlock's awaits, before any key is in hand;
   `putBox`'s expectation and the seal read them in one synchronous run. A stale read can only make a
   box fail to open. (6) `vault.openBox(box)` and `tryOpenBox` take a `Box` or a `BoxRecord` and
@@ -814,7 +846,9 @@ added or folded into through the subagent, and no other entry changes.
   (`identity_revoked`, `rolled_back`, `newer_format`) or after `del()`. Data calls keep their own
   reads before writes; the window affects only what a host's `hello()` shows. The clock read that
   stamps each read is the vault's checked clock: a clock gone wrong now refuses a storage refresh
-  too, dropping the vaultKey first. Point 4: `trouble` no longer carries storage conditions. It is
+  too, dropping the vaultKey first (amended 2026-10-21 (trust_lines): there is no checked clock after
+  `Vault.make`, and a clock gone wrong no longer refuses a refresh or drops the vaultKey; a clock that
+  throws fails that call as `unexpected_error`). Point 4: `trouble` no longer carries storage conditions. It is
   the latest bad news (or the `onBadNews` handler's throw), cleared when a storage read finds no
   damaged box; a condition such as `storage_unavailable` reaches only its caller (a refused
   `hello()` rejects to whoever called it) and the snapshot's `syncing: false`, so a background
@@ -980,7 +1014,12 @@ added or folded into through the subagent, and no other entry changes.
   2026-10-19, 20261019-no_clear: the delete-first is gone. `putBox()` is one conditional
   `putBox`; a damaged box naming a revision is written over in it, carrying nothing forward,
   and one naming no revision is refused as `damaged_box`, writing nothing, until the user calls
-  `delBox()`; the two-step and removal behaviors described here no longer exist.)
+  `delBox()`; the two-step and removal behaviors described here no longer exist.) Amended 2026-10-21
+  (trust_lines): the boxlabel stays bound into each box's encryption context. A plain check that a
+  stored record's boxlabel matches the label it is stored under remains in `getBox` and the listing; it
+  catches a misfiling adapter, but a hostile server can rewrite both, and the listing shown while locked
+  is unauthenticated. The host's validators gate writes only (`putBox`); reads and deletes check the
+  floor alone.
 
 * 2026-10-15: `delBox(boxlabel)` removes a box whose stored record fails validation or
   verification (`corrupt_record`), rather than refusing it: it reads the record only to tell an
@@ -988,7 +1027,8 @@ added or folded into through the subagent, and no other entry changes.
   needs the vault unlocked, still names the boxlabel the caller gave, and still lands only in the
   vault this device holds keys for (its `vault_id` expectation). `getBox()`, `useBox()` and the
   background refresh still leave a damaged record in place; only an explicit deletion of that
-  boxlabel deletes it.
+  boxlabel deletes it. Amended 2026-10-21 (trust_lines): `delBox` no longer reads the box before
+  deleting; storage's own `absent` answer is reported as `absent_box`.
 * 2026-10-15: a scope's `user_id` is text of 1 to 100 characters (`UserId`), checked at
   `Vault.make`, by every `VaultDB` verb, and in every stored record that names a scope; a refusal
   names the bound and never quotes the id. The Convex component's validators and its `getUserId`
@@ -1168,6 +1208,12 @@ added or folded into through the subagent, and no other entry changes.
   with a warning to the vault's logger, is gone.) A clock that goes wrong in the middle of a `putBox()`,
   `delBox()` or `putWayin()` lets the write land, then throws `bad_option` from the refresh
   after it. A clock in bounds but wrong (set a year ahead, say) is not detected.
+  Amended 2026-10-21 (trust_lines): the host's clock is checked once, at `Vault.make` (one reading
+  must be epoch milliseconds between 1981 and 2255). After that its readings are floored and used
+  unchecked, and a later bad or throwing reading no longer drops the vaultKey; the "checked on every
+  later reading", "fails closed" and mid-`putBox()` sentences above no longer hold. Lease deadlines
+  and stored timestamps after construction therefore rest on the host's clock. `vault.clock` is no
+  longer exposed.
 * 2026-10-15; 2026-10-19 (20261019-softlock_gone): `Vault.make` takes a host's `logger` (`log`, `warn`, `error`, each
   `(message?, story?, err?)`), checked at the door (`bad_option`) and wrapped so that whatever it
   throws or rejects with is dropped. The vault calls it in three places (amended 2026-10-19: a fourth, `lockSoon()` locking
