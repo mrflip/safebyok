@@ -12,160 +12,125 @@ import { InEnglish, issuesText } from './options'
 import * as Names from './names'
 import type { GetProof } from './ask'
 
-/**
- * What `onBadNews` is: told each piece of bad news, a VaultError, and never awaited. One that
- * returns a promise may: what it rejects with is kept as the vault's `trouble`, as a throw is.
- */
+/** The type of {@link MakeVaultOpts.onBadNews}: told each piece of bad news, and never awaited. */
 export type BadNewsHandler = (news: VaultError) => void | Promise<void>
 
+/** The options `Vault.make` takes: which vault, the stores it lives in, and how it behaves.
+ * `Vault.make` refuses ('bad_option') an option it does not take, and one out of its range or of
+ * the wrong type; the scope's three names refuse 'bad_label' instead. Each refusal names the
+ * option, never its value.
+ */
 export type MakeVaultOpts = {
   /** The host application's namespace: one backend can serve several apps without collision. */
   applabel:   string
-  /**
-   * Stable identifier of the signed-in user, from the host's auth: by default 1 to 100 ASCII
-   * letters, digits and `-_.:@+|`, as the exported `UserId` checks, or what `validators.userId`
-   * admits. The provider's stable, opaque id: never an email or a handle, which can change and
-   * would orphan the vault.
+  /** The signed-in user's stable, opaque id from the host's auth: never an email or a handle, which can change and would orphan the vault.
+   * By default 1 to 100 ASCII letters, digits and `-_.:@+|`, as the exported `UserId` checks, or
+   * what `validators.userId` admits.
    */
   userId:     string
   /** The vault's own label; an app that keeps one vault per user calls it `main`. */
   vaultlabel: string
   vaultDB:    VaultDB
+  /** What this device keeps of the vault: in a browser, from `browserOpts()`; elsewhere, `memoryDeviceDB()`. */
   deviceDB:   DeviceDB
-  /**
-   * What turns a passphrase into passphraseKey bytes: in a browser, the pinned Argon2id deriver
-   * that `browserOpts()` from `safebyok/browser` supplies. See {@link KeyDeriver} for the narrow
-   * reasons to substitute. Asked for outright, so an app that passes another never ships this one.
+  /** What turns a passphrase into passphraseKey bytes: in a browser, the pinned Argon2id deriver `browserOpts()` supplies.
+   * See {@link KeyDeriver} for the narrow reasons to substitute.
    */
   keyDeriver: KeyDeriver
-  /**
-   * How many hours a lease lasts on this device, across reloads, after a proof unlocks the vault,
-   * before the vault asks for a proof again. Default: {@link LeaseHours}, 168 (seven days).
+  /** How many hours a proof's lease keeps the vault unlocked on this device, across reloads. Default: {@link LeaseHours}, 168 (seven days).
    * Any number above zero up to {@link MaxLeaseHours}, 588 (24.5 days), fractions too: 0.25 is
-   * fifteen minutes. `Infinity` means never on this device: the vault stays unlocked until
-   * `lock()` (or the vault changes under it), and `askPassphraseAt` reads as {@link FarFuture}.
-   * A finite number past 588 is refused with kind 'bad_option': the vault drops its key with a
-   * timer a minute after the lease ends, and no timer reaches further.
+   * fifteen minutes. No timer reaches further. `Infinity` means never ask again on this device:
+   * the vault stays unlocked until `lock()`, or the vault changes under it, and `askPassphraseAt`
+   * reads as {@link FarFuture}.
    *
-   * Lowering it takes hold on each device at its next hello: a lease granted under the longer
-   * setting, whose deadline lies past this many hours from then, is discarded, and the vault
-   * opens locked. Raising it lengthens no lease already granted. A device keeps one lease per
-   * vault, so two tabs opening a vault with different settings are one device with two settings,
-   * which is not supported (`notes/wontfix.md`): the lower one wins.
+   * Lowering it takes hold on each device at its next hello: a lease ending further off than this
+   * is discarded, and the vault opens locked. Raising it lengthens no lease already granted. Two
+   * tabs opening one vault with different settings are not supported (`notes/wontfix.md`): the
+   * lower one wins.
    */
   leaseHours?: number | undefined
-  /**
-   * How many minutes `hello()` trusts the vault's last read of storage, when its own call says
-   * nothing: a hello within that many minutes of the last read reads nothing anew, and only
-   * settles the picture it has. Default: {@link StaleMinutes}, 5. Any number from zero up,
-   * fractions too (0.5 is thirty seconds); `0` has every hello read, and `Infinity` has a hello
-   * read only when no read has succeeded yet, or what it read may no longer stand. Kind
-   * 'bad_option' for anything else.
+  /** How many minutes `hello()` trusts the vault's last read of storage, when its own call does not say. Default: {@link StaleMinutes}, 5.
+   * A hello within that many minutes settles the picture it has without reading. Zero or more,
+   * fractions too (0.5 is thirty seconds). `0` has every hello read; `Infinity` has a hello read
+   * only when no read has succeeded yet, or what it read may no longer stand.
    */
   staleMinutes?: number | undefined
-  /**
-   * Told every piece of bad news the vault learns, before the call that learned it settles: each
-   * refusal of the `bad_news` family (`damaged_vault`, `rolled_back`, `identity_revoked`,
-   * `newer_format`, `damaged_box`, `damaged_wayin`), once, whichever calls share it; and a box a
-   * listing shows damaged, the first time it shows so, as `damaged_box` news whose `meta.box_listed`
-   * is the box, though the listing itself succeeds; and a way in stored damaged, likewise, as
-   * `damaged_wayin` news whose `meta.wayin_listed` is its summary. It changes nothing the caller gets: a refusal
-   * still reaches its caller. The vault never awaits it; whatever it throws, or the promise it
-   * returns rejects with, becomes the vault's `trouble` (kind 'bad_option', what it threw the
-   * cause), and goes to the logger and to the platform's `reportError` where there is one. Kind
-   * 'bad_option' for anything but a function.
+  /** Told each piece of bad news the vault learns, once, before the call that learned it settles; it changes nothing that call gets.
+   * News is each refusal of the `bad_news` family, whichever calls share it. A box a listing first
+   * shows damaged is news too, as `damaged_box` with the box in `meta.box_listed`, though the
+   * listing succeeds. So is a way in stored damaged, as `damaged_wayin` with its summary in
+   * `meta.wayin_listed`. The vault never awaits it. What it throws or rejects with becomes the
+   * vault's `trouble` ('bad_option', what it threw the cause), and goes to the logger and to the
+   * platform's `reportError` where there is one.
    *
    * @example Vault.make({ ...opts, onBadNews: (news) => { telemetry.report(news.refusalkind) } })
    */
   onBadNews?: BadNewsHandler | null | undefined
-  /**
-   * Your method that asks the user for a proof, the one place UI meets the vault: every call that
-   * needs the vault unlocked, and finds it not, goes through `ensureLease()`, which hands it an
-   * {@link Ask} and waits for its answer, one prompt at a time. Left out, or null, every ask is
-   * `declined`: the call refuses with kind 'vault_locked', and the app prompts on its own.
-   * `safebyok-react`'s `VaultProvider` passes its passphrase dialog unless told otherwise. Kind
-   * 'bad_option' for anything but a function.
+  /** Your method that asks the user for a proof: the one place UI meets the vault.
+   * Every call that needs the vault unlocked, and finds it not, goes through `ensureLease()`. That
+   * hands it an `Ask` and awaits its answer, one prompt at a time. Left out or null, every ask is
+   * `declined`: the call refuses 'vault_locked', and the app prompts on its own. `safebyok-react`'s
+   * `VaultProvider` passes its passphrase dialog unless told otherwise.
    *
    * @example Vault.make({ ...opts, getProof: (ask) => showPassphraseDialog(ask) })
    */
   getProof?: GetProof | null | undefined
-  /**
-   * Time source for expiry and for the times stored with each record; tests inject one. Default:
-   * the wall clock. Its `now()` returns epoch milliseconds, as `Date.now()` does, from 1981 to 2255
-   * ({@link FarPast} to {@link FarFuture}), fractions allowed (each reading is rounded down to
-   * whole milliseconds). Vault.make reads it once and refuses a clock outside those bounds, or one
-   * that throws, with kind 'bad_option'; so does any later call that reads it so, dropping the
-   * vaultKey first, so the vault is locked.
+  /** Time source for expiry and for the times stored with each record; tests inject one. Default: the wall clock.
+   * Its `now()` returns epoch milliseconds, as `Date.now()` does, from 1981 to 2255 ({@link FarPast}
+   * to {@link FarFuture}); fractions are rounded down. `Vault.make` reads it once to check it. A
+   * later reading out of bounds, or one that throws, locks the vault and refuses 'bad_option'.
    */
   clock?: Clock | undefined
-  /**
-   * The largest whisper `putBox()` accepts, in bytes of its JSON and its box's sidecar's
-   * together. Default: {@link MaxWhisperBytes}, 40444. Checked on write only, so lowering it never
-   * strands a whisper already stored. At most half the vaultDB's `maxRecordBytes`: Vault.make
-   * refuses more with kind 'bad_option'.
+  /** The largest whisper `putBox()` accepts, in bytes of its JSON and its box's sidecar's together. Default: {@link MaxWhisperBytes}, 40444.
+   * Checked on write only, so lowering it never strands a whisper already stored. At most half the
+   * vaultDB's `maxRecordBytes`.
    */
   maxWhisperBytes?: number | undefined
-  /**
-   * The most boxes the vault holds. Default: {@link MaxBoxes}, 100, or the vaultDB's own
-   * `maxBoxes` when that is smaller. `putBox()` refuses a new box past it with kind
-   * 'vault_full'; replacing one already there is always allowed, and lowering it strands nothing
-   * already stored. Raise this or `maxWhisperBytes` freely while this stays within the vaultDB's
-   * `maxBoxes` and the two fit its `maxVaultBytes`: Vault.make refuses otherwise, with kind
-   * 'bad_option'.
+  /** The most boxes the vault holds. Default: the smaller of {@link MaxBoxes}, 100, and the vaultDB's own `maxBoxes`.
+   * `putBox()` refuses a new box past it as 'vault_full'. Replacing a box already there is always
+   * allowed, and lowering it strands nothing stored. It may not exceed the vaultDB's `maxBoxes`, and
+   * with `maxWhisperBytes` it must fit the vaultDB's `maxVaultBytes`.
    */
   maxBoxes?: number | undefined
-  /**
-   * Where the vault says what it has nobody to throw to -- a background refresh that failed, a
-   * lease it could not read -- as a
-   * {@link VaultLogger}: `log`, `warn` and `error` functions. The vault hands
-   * it no secret material or option's value (a host's own error goes as the host made it); whatever
-   * it throws is ignored. Pass functions that do nothing for quiet. Default (none, or null): the
-   * logger the `vaultDB` was made with, which is the default logger when it was given none. It does
-   * not go the other way: a storage adapter keeps the logger it was made with, so to have one logger
-   * hear both, give it to the adapter's factory and leave this out; to have the vault use the
-   * default whatever the adapter was given, pass `DefaultLogger`. Kind 'bad_option' for anything else.
+  /** Where the vault says what it has nobody to throw to, such as a background refresh that failed, as a {@link VaultLogger}.
+   * The vault hands it no secret material and no option's value; a host's own error goes as the
+   * host made it. Whatever it throws is ignored. Pass functions that do nothing for quiet.
+   *
+   * Left out or null, the `vaultDB`'s own logger. It does not go the other way: to have one logger
+   * hear both, give it to the adapter's factory and leave this out. To have the vault use the
+   * default whatever the adapter was given, pass `DefaultLogger`.
    */
   logger?: VaultLogger | null | undefined
-  /**
-   * The checks for the vault's names where they enter it, as a {@link VaultValidators} bag: each
-   * field given replaces ours (`Label` for each label,
-   * `UserId` for the user, from `safebyok/validators`), and each left out keeps ours. Each is a Zod
-   * schema that checks synchronously, and only checks: what passes is kept exactly as given.
-   * Beneath every one, the floor (`NameFloor`) holds whatever the bag says. Kind 'bad_option' for
-   * a bag holding anything else, or a field it does not know (a `note` among them: a box's
-   * sidecar is the host's to check).
+  /** The checks for the vault's names where they enter it, as a {@link VaultValidators} bag: each field given replaces ours, each left out keeps ours.
+   * Ours are `Label` and `UserId`, from `safebyok/validators`. Each is a Zod schema that checks
+   * synchronously, and only checks: what passes is kept exactly as given. The floor (`NameFloor`)
+   * holds beneath every one. A field the bag does not know refuses, a `note` among them: a box's
+   * sidecar is the host's to check.
    */
   validators?: VaultValidators | undefined
-  /**
-   * The check every new passphrase must pass, as a {@link StrengthChecker}: the one the first
-   * `unlock()` creates the vault with, and each `putWayin()` sets, before any key derivation. It is
-   * handed the passphrase and the vault's scope, and a passphrase it finds weak is refused with
-   * kind 'weak_passphrase', its reason the message. It never runs on `unlock()` of a vault that
-   * stands. Its `load`, if it carries one, runs at every `hello()` that reads storage, and a
-   * `load` that fails fails the hello. In a browser, `browserOpts()` from `safebyok/browser`
-   * supplies `zxcvbnStrengthChecker`, which turns away short passphrases, common passwords and
-   * patterns. Left out, every new passphrase is refused as too weak, the refusal's message saying
-   * that a checker must be chosen (CUSTOMIZATION.md). The vault keeps the checker it was opened
-   * with for its life, held to its contract, and asks it as `vault.checkPassphrase(typed)`.
-   * Kind 'bad_option' for anything but a function (whose `load`, if any, is a function too). A
-   * checker that answers anything but a verdict, or throws, is thrown by the call that asked it,
-   * even a `try` form: kind 'bad_option' or 'unexpected_error', carrying nothing of what it threw.
+  /** The check every new passphrase must pass, as a {@link StrengthChecker}: when the first `unlock()` creates the vault, and at each `putWayin()`.
+   * It runs before any key derivation, handed the passphrase and the vault's scope; never on
+   * `unlock()` of a vault that stands. A passphrase it finds weak refuses 'weak_passphrase', its
+   * reason the message. Left out, every new passphrase refuses so, the message saying a checker
+   * must be chosen (CUSTOMIZATION.md). In a browser, `browserOpts()` supplies
+   * `zxcvbnStrengthChecker`.
+   *
+   * Its `load`, if any, runs at every `hello()` that reads storage, and one that fails fails the
+   * hello. The vault keeps the checker for its life, and asks it as `vault.checkPassphrase(typed)`.
+   * A checker that answers anything but a verdict refuses the call that asked it 'bad_option'; one
+   * that throws, 'unexpected_error', carrying nothing of what it threw.
    */
   strengthChecker?: StrengthChecker | undefined
 }
 
 const isFunction = (candidate: unknown) => typeof candidate === 'function'
 
+/** True for any object but null, an array included. */
 export const isBag = (candidate: unknown) => typeof candidate === 'object' && candidate !== null
 
 const anyOpt = Z.optional(Z.unknown())
 
-/**
- * Every option Vault.make takes, each checked here or by a parse of its own: this check refuses
- * any other. An option quietly ignored could leave the vault less safe than the host asked -- a
- * lease setting under its deleted name would leave the default seven days -- so a misspelt option,
- * or one this version no longer takes, is refused instead.
- */
+/** Every option Vault.make takes, each checked here or by a parse of its own: this check refuses any other. */
 const makeVaultOptsShape = Z.strictObject({
   applabel:               anyOpt,
   userId:                 anyOpt,
@@ -192,12 +157,9 @@ const RenamedMakeVaultOpts: ReadonlyMap<string, keyof MakeVaultOpts> = new Map([
   ['passphraseStrengthTest', 'strengthChecker'],
 ])
 
-/** A bag of Vault.make's options, as its schema reads it.
- * `strengthChecker` is checked, the default one in place of one left out, and every other option
- * is as handed in, for its own parse. Kind
- * 'bad_option' for a bag holding an option Vault.make does not take, naming each such option, and
- * the name a renamed one goes by now; and for a `strengthChecker` that is not one, in Zod's words.
- * It quotes the bag's field names, the host's own code, and never a value.
+/** Vault.make's options with `strengthChecker` checked, or the default in its place; every other option as handed in, for its own parse.
+ * Refuses 'bad_option' for an option Vault.make does not take, naming each, with the name a
+ * renamed one goes by now; and for a `strengthChecker` that is not one, in Zod's words.
  */
 export const checkMakeVaultOpts = (opts: object) => {
   const checked = makeVaultOptsShape.safeParse(opts, InEnglish)
@@ -212,11 +174,7 @@ export const checkMakeVaultOpts = (opts: object) => {
   throw new VaultError('bad_option', `Vault.make does not take ${named.length === 1 ? 'the option' : 'the options'} ${named.join(', ')}: check the spelling. It takes ${takes}, and refuses any other rather than quietly ignore it.`)
 }
 
-/**
- * What a VaultDB must carry: its public verbs, on an instance of the `VaultDB` base class, whose
- * verbs check every record and expectation an adapter's own code sees. Checked only: Vault.make
- * keeps the adapter.
- */
+/** The public verbs a VaultDB must carry, beside being an instance of the `VaultDB` base class. Checked only: Vault.make keeps the adapter. */
 const vaultDBShape = Z.object({
   getVaultProps:    Z.custom(isFunction),
   ensureVaultProps: Z.custom(isFunction),
@@ -229,6 +187,7 @@ const vaultDBShape = Z.object({
   subscribe:        Z.custom(isFunction),
 })
 
+/** `candidate`, once it is a {@link VaultDB} carrying its verbs: 'bad_option' otherwise. */
 export const parseVaultDB = (candidate: VaultDB): VaultDB => {
   if (! (candidate instanceof VaultDB) || ! vaultDBShape.safeParse(candidate).success) {
     throw new VaultError('bad_option', "vaultDB is not a VaultDB: pass a storage adapter, such as localVaultDB({ store }), idbVaultDB() from 'safebyok-indexeddb', or your backend's own, which extends the VaultDB class.")
@@ -247,6 +206,7 @@ const deviceDBShape = Z.object({
   delAll:   Z.custom(isFunction),
 })
 
+/** `candidate`, once it carries a {@link DeviceDB}'s verbs: 'bad_option' otherwise. */
 export const parseDeviceDB = (candidate: DeviceDB): DeviceDB => {
   if (! deviceDBShape.safeParse(candidate).success) {
     throw new VaultError('bad_option', "deviceDB is not a DeviceDB: in a browser, spread browserOpts() from 'safebyok/browser' into Vault.make's options; elsewhere, pass memoryDeviceDB().")
@@ -254,32 +214,24 @@ export const parseDeviceDB = (candidate: DeviceDB): DeviceDB => {
   return candidate
 }
 
-/**
- * How many bytes of storage a vault reserves for each byte of whisper and sidecar: two.
- * Stored, a whisper's ciphertext is base64, a third larger than the whisper, and a sidecar's JSON,
- * written as text inside its record, at most twice its own (each quote and backslash escaped);
- * the rest is room for each backend's own way of counting bytes. So one whisper and its sidecar may
- * claim at most half of an adapter's `maxRecordBytes`.
+/** How many bytes of storage a vault reserves for each byte of whisper and sidecar: two.
+ * A whisper's base64 ciphertext is a third larger, and a sidecar's JSON, escaped as text, at most
+ * twice its own; the rest is room for each backend's way of counting bytes. So a whisper and its
+ * sidecar may claim at most half of an adapter's `maxRecordBytes`.
  */
 export const StoredBytesPerWhisperByte = 2
 
-/**
- * The room Vault.make plans for a box's stored fields besides its whisper and sidecar, in
- * bytes of their JSON, when it checks that `maxBoxes` boxes fit the storage's
- * `maxVaultBytes`: its format, boxlabel, revision, codec, times, wrapped boxKey, the cipherIv
- * and tag of its whisperCiphered, and the scope a backend files it under. Under the default
- * validators, at their largest -- a forty-character boxlabel, applabel and vaultlabel and a
- * user_id of 100, each unit at three UTF-8 bytes -- they take under 1000. A host's validators may
- * admit longer names, so each store also weighs its box as it is ({@link BoxFixedBytes});
- * this is only the plan.
+/** The room Vault.make plans for a box's stored fields besides its whisper and sidecar, in bytes of their JSON.
+ * It is what Vault.make counts when it checks that `maxBoxes` boxes fit the storage's
+ * `maxVaultBytes`. Under the default validators, the fields at their largest, the scope and
+ * boxlabel included, take under 1000. A host's validators may admit longer names, so each store
+ * also weighs its box as it is ({@link BoxFixedBytes}): this is only the plan.
  */
 export const BoxFieldsBytes = 1024
 
-/**
- * Room for the stored fields every box has at the same size, in bytes of their JSON: its
- * format, revision, codec, times, wrapped boxKey, and the cipherIv and tag of its
- * whisperCiphered, with every field's name. A store weighs a box as this, its whisper and
- * sidecar's room, and its scope and boxlabel as measured.
+/** Room for the stored fields every box has at the same size, in bytes of their JSON, field names included.
+ * A store weighs a box as this, its whisper and sidecar's room, and its scope and boxlabel as
+ * measured.
  */
 export const BoxFixedBytes = 512
 
@@ -287,10 +239,7 @@ const maxWhisperBytes = Z._default(Z.int().check(Z.positive()), MaxWhisperBytes)
 
 const maxBoxes = Z.optional(Z.int().check(Z.positive()))
 
-/**
- * The largest limit in bytes the vault keeps. An adapter's `Infinity`, its way of saying it sets
- * no limit, becomes this as Vault.make reads it: past that read, no limit is infinite.
- */
+/** The largest limit in bytes the vault keeps: an adapter's `Infinity` becomes this as Vault.make reads it. */
 const UnlimitedBytes = Number.MAX_SAFE_INTEGER
 
 /** A limit as an adapter declares one, some bytes or `Infinity` for none, to the finite form the vault keeps. */
@@ -302,10 +251,7 @@ const byteLimit = Z.number().check(Z.positive(), Z.lte(UnlimitedBytes))
 
 const declaredBytes = Z.pipe(Z.pipe(someBytes, bytesKept), byteLimit)
 
-/**
- * The most boxes the vault keeps as a limit. An adapter's `Infinity`, its way of saying it
- * counts none, becomes this as Vault.make reads it: past that read, no limit is infinite.
- */
+/** The most boxes the vault keeps as a limit: an adapter's `Infinity` becomes this as Vault.make reads it. */
 const UnlimitedBoxes = Number.MAX_SAFE_INTEGER
 
 /** A count of boxes as an adapter declares one, a whole number or `Infinity` for none, to the finite form the vault keeps. */
@@ -322,11 +268,7 @@ const DeclaredLimitFor = {
 
 const HourMillis = 60 * MinuteMillis
 
-/**
- * Hours, as the host thinks of them, to whole milliseconds, as every time inside is kept: a lease
- * one timer can reach ({@link MaxLeaseHours} at most), or `Infinity`, which becomes
- * {@link ForeverMillis}.
- */
+/** A lease in hours, above zero and at most {@link MaxLeaseHours}, or `Infinity`, which becomes {@link ForeverMillis}. */
 const someHours = Z.union([Z.number().check(Z.positive(), Z.lte(MaxLeaseHours)), Z.literal(Infinity)])
 
 const leaseHoursOrDefault = Z._default(someHours, LeaseHours)
@@ -337,6 +279,7 @@ const someMillis = Z.number().check(Z.gte(1))
 
 const leaseHoursAsMillis = Z.pipe(Z.pipe(leaseHoursOrDefault, hoursToMillis), someMillis)
 
+/** `leaseHours`, or its default, in the whole milliseconds the vault keeps: 'bad_option' out of range. */
 export const parseLeaseHours = (candidate: number | undefined): number => {
   const checked = leaseHoursAsMillis.safeParse(candidate)
   if (! checked.success) {
@@ -345,20 +288,14 @@ export const parseLeaseHours = (candidate: number | undefined): number => {
   return checked.data
 }
 
-/**
- * Minutes, as the host thinks of them, to whole milliseconds: zero or more, or `Infinity`, which
- * becomes {@link ForeverMillis}.
- */
+/** Minutes, zero or more, or `Infinity`, which becomes {@link ForeverMillis}. */
 const someMinutes = Z.union([Z.number().check(Z.gte(0)), Z.literal(Infinity)])
 
 const minutesToMillis = Z.transform((minutes: number) => (minutes === Infinity ? ForeverMillis : Math.round(minutes * MinuteMillis)))
 
 const staleMinutesAsMillis = Z.pipe(Z._default(someMinutes, StaleMinutes), minutesToMillis)
 
-/**
- * `staleMinutes`, as Vault.make or `hello()` is handed it, in the milliseconds the vault keeps:
- * `fallback` when it is left out. Kind 'bad_option', naming `where`, for anything but zero or more
- * minutes, or `Infinity`.
+/** `staleMinutes`, as Vault.make or `hello()` is handed it, in the milliseconds the vault keeps: 'bad_option', naming `where`, out of range.
  *
  * @example parseStaleMinutes(0.5, 'Vault.make')   // 30000
  */
@@ -372,11 +309,7 @@ export const parseStaleMinutes = (candidate: unknown, where: 'Vault.make' | 'hel
 
 const renewMinutesAsMillis = Z.pipe(Z._default(someMinutes, 0), minutesToMillis)
 
-/**
- * `ensureLease()`'s `renewMinutes`, in the milliseconds the vault keeps: how many minutes before the
- * lease ends it asks for a proof anyway, 0 when left out. Kind 'bad_option' for anything but zero
- * or more minutes, or `Infinity`, which asks whenever it is called.
- */
+/** `ensureLease()`'s `renewMinutes`, in the milliseconds the vault keeps, 0 when left out: 'bad_option' out of range. */
 export const parseRenewMinutes = (candidate: unknown): number => {
   const checked = renewMinutesAsMillis.safeParse(candidate)
   if (! checked.success) {
@@ -385,7 +318,7 @@ export const parseRenewMinutes = (candidate: unknown): number => {
   return checked.data
 }
 
-/** The `onBadNews` handler, or null for none. Kind 'bad_option' for anything but a function. */
+/** The `onBadNews` handler, or null for none: 'bad_option' for anything but a function. */
 export const parseOnBadNews = (candidate: unknown): BadNewsHandler | null => {
   if (candidate === undefined || candidate === null) { return null }
   if (typeof candidate !== 'function') {
@@ -394,7 +327,7 @@ export const parseOnBadNews = (candidate: unknown): BadNewsHandler | null => {
   return candidate as BadNewsHandler
 }
 
-/** The host's `getProof`, or null for none. Kind 'bad_option' for anything but a function. */
+/** The host's `getProof`, or null for none: 'bad_option' for anything but a function. */
 export const parseGetProof = (candidate: unknown): GetProof | null => {
   if (candidate === undefined || candidate === null) { return null }
   if (typeof candidate !== 'function') {
@@ -408,6 +341,7 @@ const clockShape = Z.object({
   now: Z.custom<Clock['now']>((candidate) => typeof candidate === 'function'),
 })
 
+/** The host's clock, or the wall clock when left out: 'bad_option' for one with no `now()`. */
 export const parseClock = (candidate: Clock | undefined): Clock => {
   if (candidate === undefined) { return wallClock }
   if (! clockShape.safeParse(candidate).success) {
@@ -416,14 +350,10 @@ export const parseClock = (candidate: Clock | undefined): Clock => {
   return candidate
 }
 
-/**
- * A clock reading the package accepts: epoch milliseconds from {@link FarPast} to {@link FarFuture},
- * a fraction allowed, as a clock may return one. Floored as it is read, so every time kept is a
- * whole-millisecond {@link EpochMillis}.
- */
+/** A clock reading the package accepts: epoch milliseconds from {@link FarPast} to {@link FarFuture}, a fraction allowed. */
 const clockReading = Z.number().check(Z.gte(FarPast), Z.lte(FarFuture))
 
-/** A reading of the host's clock, checked and rounded down to whole milliseconds. */
+/** A reading of the host's clock, rounded down to whole milliseconds: 'bad_option' out of bounds, or for a clock that throws. */
 export const readClock = (clock: Clock): number => {
   let reading: unknown
   try {
@@ -439,6 +369,7 @@ export const readClock = (clock: Clock): number => {
   return Math.floor(checked.data)
 }
 
+/** `maxWhisperBytes`, or its default: 'bad_option' for anything but a whole number above zero. */
 export const parseMaxWhisperBytes = (candidate: number | undefined): number => {
   const checked = maxWhisperBytes.safeParse(candidate)
   if (! checked.success) {
@@ -447,9 +378,9 @@ export const parseMaxWhisperBytes = (candidate: number | undefined): number => {
   return checked.data
 }
 
-/**
- * The vault's `maxBoxes`: as given, or by default the smaller of {@link MaxBoxes} and
- * `storeBoxes`, the most the vaultDB holds in one vault -- which a given one may not exceed.
+/** The vault's `maxBoxes`, or by default the smaller of {@link MaxBoxes} and `storeBoxes`: 'bad_option' past `storeBoxes`.
+ *
+ * @param storeBoxes - The most the vaultDB holds in one vault.
  */
 export const parseMaxBoxes = (candidate: number | undefined, storeBoxes: number): number => {
   const checked = maxBoxes.safeParse(candidate)
@@ -471,10 +402,10 @@ const keyDeriverShape = Z.object({
   deriveKeyBytes:    Z.custom<KeyDeriver['deriveKeyBytes']>((candidate) => typeof candidate === 'function'),
 })
 
-/**
- * `candidate` as the KeyDeriver a vault keeps, once it passes: the shape of a deriver, a label
- * that is not safebyok's to reserve, and -- for one declaring `algorithm: 'argon2id'` -- a whole
- * spec Argon2id can run. Warns through `logger`, and goes on, for the label of a test deriver.
+/** `candidate` as the KeyDeriver a vault keeps, once it passes: 'bad_option' otherwise.
+ * It needs the shape of a deriver, a label that is not safebyok's to reserve, and, for one
+ * declaring `algorithm: 'argon2id'`, a whole spec Argon2id can run. A test deriver's label warns
+ * through `logger`, and goes on.
  */
 export const parseKeyDeriver = (candidate: KeyDeriver | undefined, logger: VaultLogger): KeyDeriver => {
   if (candidate === undefined) {
@@ -493,10 +424,7 @@ export const parseKeyDeriver = (candidate: KeyDeriver | undefined, logger: Vault
   return candidate
 }
 
-/**
- * One of the adapter's declared limits, in the finite form the vault keeps: `Infinity` becomes
- * {@link UnlimitedBytes} or {@link UnlimitedBoxes}.
- */
+/** One of the adapter's declared limits, `Infinity` made finite: 'bad_option' for an adapter that declares none. */
 export const parseDeclared = (vaultDB: VaultDB, limitname: keyof typeof DeclaredLimitFor): number => {
   const checked = DeclaredLimitFor[limitname].safeParse(vaultDB[limitname])
   // An adapter that declares no limit, or one written before a limit existed, is refused: never guessed.
@@ -506,9 +434,7 @@ export const parseDeclared = (vaultDB: VaultDB, limitname: keyof typeof Declared
   return checked.data
 }
 
-/**
- * Refuse limits the storage adapter might not honour: a whisper too large for one of its records,
- * or a vault too large for it to hold, list and delete whole.
+/** Refuse ('bad_option') limits the storage adapter might not honour: a whisper too large for one of its records, or a vault too large for it.
  *
  * @returns The most the adapter holds of one vault, in the finite form the vault keeps.
  */
@@ -546,11 +472,10 @@ export type ParsedVaultOpts = {
   vaultByteLimit:   number
 }
 
-/**
- * Vault.make's options, checked and read, before storage is touched: kind 'insecure_context'
- * first, in a page the browser says is not a secure context; then kind 'bad_option' for anything
- * but a bag, for an option the vault does not take, or for one out of its range, and 'bad_label'
- * for a scope that fails its check (`validators`).
+/** Vault.make's options, checked and read, before storage is touched.
+ * Refuses 'insecure_context' first, in a page the browser says is not a secure context. Then
+ * 'bad_option' for anything but a bag, or for an option it does not take or out of range, and
+ * 'bad_label' for a scope that fails its `validators`.
  *
  * @example const { scope, leaseMillis } = parseMakeVaultOpts(opts)
  */
@@ -579,10 +504,9 @@ export const parseMakeVaultOpts = (opts: MakeVaultOpts): ParsedVaultOpts => {
   return { scope, rules, vaultDB, deviceDB, leaseMillis, staleMillis, onBadNews, getProof, logger, clock, keyDeriver, strengthChecker: guardStrengthChecker(shaped.strengthChecker, scope), whisperByteLimit, boxLimit, vaultByteLimit }
 }
 
-/**
- * Refuse, with kind 'insecure_context', a page the platform says is not a secure context: plain
- * http, anywhere but localhost, where a browser withholds WebCrypto and the vault would fail with
- * a TypeError and no kind. A runtime with no such notion (Node, Bun, React Native) passes.
+/** Refuse ('insecure_context') a page the platform says is not a secure context, where a browser withholds WebCrypto.
+ * That is plain http, anywhere but localhost. A runtime with no such notion (Node, Bun, React
+ * Native) passes.
  */
 const checkSecureContext = () => {
   if ((globalThis as { isSecureContext?: unknown }).isSecureContext === false) {
