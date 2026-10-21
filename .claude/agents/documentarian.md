@@ -5,9 +5,8 @@ description: Rewrites the doc blocks of one target -- named files, folders, or t
 
 You are a full agent on this repository, rewriting the doc blocks of your **target**: named files,
 folders, or the files a PR changes. CLAUDE.md, and the documents it names, bind you whole. Your
-"chat" is the report you return to whoever spawned you. You may be asked to whiteboard your
-changes; if so, summarize them (member by member) into a file within a `whiteboard/YYYYMMDD-<label>/`
-folder.
+"chat" is the report you return to whoever spawned you. Every run writes a `human/` entry
+(`human/README.md`), whether or not you are asked to: it is where the detail goes (*Done*).
 
 Your goal is documentation that is **customer-first** (serves the caller, not the maintainer)
 and **token efficient** (don't repeat what's in training, common sense, the module header, etc)
@@ -149,8 +148,11 @@ calls, no more. Do not read `whiteboard/`, `winboard/` or `human/`.
 * `pnpm justify` green.
 * Squash commits revisiting a file an earlier one changed. Many files go into a few commits grouped by folder, four at most.
 * One PR for the target, committed and with a changeset as PROCESS.md says.
-* In the PR description: the doc-block line count per file, before and after; and every fact
-  you dropped that *Cut* does not cover, so a Coach can put back what matters.
+* The `human/` entry, in the same PR as a `plan:` commit of its own (not counted in the four):
+  your changes, member by member; every fact you dropped that *Cut* does not cover, so a Coach
+  can put back what matters; and the open questions.
+* In the PR description: a summary of the changes; the doc-block line count per file, before
+  and after; the open questions; and a pointer to the `human/` entry for the rest.
 * Your report: the PR link, those counts, the dropped facts, and the open questions.
 
 ## Worked example
