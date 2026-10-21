@@ -115,12 +115,13 @@ const saltBytesOf = (saltB64: string): Uint8Array | null => {
  * ({@link PasskeyWayin}), told apart by `wayinkind`. Its stored fields are its own, read-only;
  * `props` is the stored record, frozen. It holds `vault` and `holder` (the vault props it is one
  * of) too, neither enumerable. `summary` is what a locked vault may show of it, and all that
- * `toJSON()` gives, so a log line never carries its salt or its wrap. The vault makes each from
+ * `toJSON()` gives, so a log line never carries its wrap, nor a passphrase's salt (a passkey's
+ * prfSalt, which it is asked with, is in its summary). The vault makes each from
  * the vault props it reads, and shows their summaries, never the ways in themselves, as its
  * `passphrase` and `passkey`.
  *
  * @example Wayin.make(vault, vaultProps.passphrase, vaultProps).wayinkind   // 'passphrase'
- * @example JSON.stringify(wayin) === JSON.stringify(wayin.summary)   // true: no salt, no wrap
+ * @example JSON.stringify(wayin) === JSON.stringify(wayin.summary)   // true: no wrap, and no passphrase's salt
  */
 export abstract class Wayin {
   /** The vault this way in belongs to, for its scope and key deriver. Not enumerable, not in `props`. */
@@ -205,7 +206,7 @@ export abstract class Wayin {
    */
   abstract tryOpen(proof: Proof): Promise<Outcome<VaultKeyPair>>
 
-  /** Its {@link summary}: all JSON and a log line show of this way in, never its salt or its wrap. */
+  /** Its {@link summary}: all JSON and a log line show of this way in, never its wrap nor a passphrase's salt. */
   toJSON(): WayinSummary {
     return this.summary
   }
