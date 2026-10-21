@@ -4,65 +4,65 @@ import type { Capacity, DamagedBox, WayinSummary } from './types'
 /** Every refusalkind a safebyok call refuses with, in any safebyok package: storage adapters refuse with these same strings.
  * Each kind belongs to one family ({@link RefusalFamilyForKind}), told apart by who handles it:
  *
- * - **Misuse**: a programming error, the host developer's to fix. `bad_label`, `bad_whisper`,
+ * * **Misuse**: a programming error, the host developer's to fix. `bad_label`, `bad_whisper`,
  *   `bad_option`, `bad_record`, `invalid_box`, `vault_closed`, `unknown_key_deriver`,
  *   `insecure_context`, `unexpected_error`. Let it reach an error boundary or the dev overlay.
  *   Never show it to the user, and never retry it.
- * - **Condition**: something the app handles at run time, which may reach the user: ask again,
+ * * **Condition**: something the app handles at run time, which may reach the user: ask again,
  *   show a message, retry, or have the user free room. `vault_locked`, `wrong_passphrase`,
  *   `created_elsewhere`, `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`, `absent_box`,
  *   `absent_vault`, `absent_wayin`, `whisper_too_large`, `box_too_large`, `vault_full`,
  *   `corrupt_record`, `stale_write`, `vault_mismatch`, `not_permitted`, `storage_unavailable`,
  *   `storage_blocked`.
- * - **Bad news**: something the app is told whether or not the call was refused, and may show
+ * * **Bad news**: something the app is told whether or not the call was refused, and may show
  *   the user. `damaged_vault`, `damaged_wayin`, `damaged_box`, `newer_format`, `rolled_back`,
  *   `identity_revoked`.
  *
  * Each kind's one-line meaning sits beside it below. These need more:
  *
- * - `vault_full` means a new box in a vault already holding its `maxBoxes`, or a box past the
+ * * `vault_full` means a new box in a vault already holding its `maxBoxes`, or a box past the
  *   room the vault reckons storage holds of one vault. Storage refuses it too, at its own limit.
  *   Either way the user deletes a box, or the host raises `maxBoxes` where the backend allows.
- * - `whisper_too_large`: the whisper with its sidecar over `maxWhisperBytes`. `box_too_large`: the
+ * * `whisper_too_large`: the whisper with its sidecar over `maxWhisperBytes`. `box_too_large`: the
  *   whisper and sidecar together over what storage holds in one record.
- * - `bad_label`: a label the app passed that fails the vault's check. Check a label the user types
+ * * `bad_label`: a label the app passed that fails the vault's check. Check a label the user types
  *   first, with `Label` or the host's own `validators.boxlabel`.
- * - `identity_revoked`: storage no longer serves the user this vault was opened for (signed out,
+ * * `identity_revoked`: storage no longer serves the user this vault was opened for (signed out,
  *   or another user signed in). The vault locks as it refuses. The user signs in again, and the
  *   host opens the vault for whoever that is.
- * - `not_permitted`: the signed-in user, still the vault's own, is refused one call. Signing in
+ * * `not_permitted`: the signed-in user, still the vault's own, is refused one call. Signing in
  *   again will not help.
- * - `corrupt_record`: storage's word for a record that failed its checks as it read back. The
+ * * `corrupt_record`: storage's word for a record that failed its checks as it read back. The
  *   vault reports what that means as one of the `damaged_` kinds.
- * - `wrong_passphrase`, `wrong_passkey`: the proof did not open its wayin. That is all the vault
+ * * `wrong_passphrase`, `wrong_passkey`: the proof did not open its wayin. That is all the vault
  *   can tell even when the stored vault was altered, since decryption fails alike; the message
  *   says so. A blank passphrase offered as proof is `wrong_passphrase` too.
- * - `created_elsewhere`: a first unlock found the vault just made on another device, under another
+ * * `created_elsewhere`: a first unlock found the vault just made on another device, under another
  *   passphrase. Nothing was created here, and the vault shows `locked` as the other device made it.
  *   The user enters the passphrase chosen there. A passphrase that opens it unlocks with no refusal.
- * - `weak_passphrase`: a new passphrase (the one a vault is created with, or one `putWayin()`
+ * * `weak_passphrase`: a new passphrase (the one a vault is created with, or one `putWayin()`
  *   sets) that the `strengthChecker` finds too easy to guess, or a blank one. Its message is the
  *   checker's reason, fit to show beside the field. `unlock()` of a standing vault never raises it.
- * - `insecure_context`: a page served over plain http (anywhere but localhost), where the browser
+ * * `insecure_context`: a page served over plain http (anywhere but localhost), where the browser
  *   withholds WebCrypto. The host serves it over https.
- * - `newer_format`: a stored vault in a form this version does not know, perhaps written by a newer
+ * * `newer_format`: a stored vault in a form this version does not know, perhaps written by a newer
  *   safebyok. The user updates the app, never starts over, and nothing deletes it.
- * - `rolled_back`: storage handed back older vault props than this device has seen (a backup
+ * * `rolled_back`: storage handed back older vault props than this device has seen (a backup
  *   restored over it, or tampering). The vault takes nothing from them, writes nothing over them,
  *   and locks. Only a device whose own storage still holds the mark of the newer props can tell.
- * - `storage_unavailable`: a storage failure a retry may mend. A backend out of reach, an aborted
+ * * `storage_unavailable`: a storage failure a retry may mend. A backend out of reach, an aborted
  *   transaction, a closed connection, or a browser error naming no lasting cause
  *   (`InvalidStateError`, `UnknownError`).
- * - `storage_blocked`: this device's own store (its deviceDB, or a vault kept on the device)
+ * * `storage_blocked`: this device's own store (its deviceDB, or a vault kept on the device)
  *   refuses until something outside the app changes. That is site data blocked, a sandboxed frame
  *   or cookies off (`SecurityError`); no room (`QuotaExceededError`, as from a private window's
  *   zero quota or a full disk); or no IndexedDB (`NotSupportedError`). A private window with room
  *   is no block. Stop offering a retry: tell the user why. The host may reopen the vault with
  *   `memoryDeviceDB`, which remembers no unlock on this device.
- * - `vault_mismatch`: from a `VaultDB.putBox` called directly, a box sealed for vault props
+ * * `vault_mismatch`: from a `VaultDB.putBox` called directly, a box sealed for vault props
  *   that no longer stand (the vault deleted, remade under another `vault_id`, or its vaultKey
  *   replaced). Nothing was written, and the device that sealed it is out of date.
- * - `invalid_box`: from a `VaultDB.putBox` called directly, a box this package would not
+ * * `invalid_box`: from a `VaultDB.putBox` called directly, a box this package would not
  *   build, or sealed under another vaultKey than its expectation names. It is refused before
  *   storage sees it. A vault reports the same as `bad_record`, since it built the box.
  *
