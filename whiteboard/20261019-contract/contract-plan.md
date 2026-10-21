@@ -16,7 +16,7 @@ this line.
   (56 kB; `grep -n '^#'` is its outline). The handoff says when a ruling has changed it since.
 * **Sprint doc:** https://claude.ai/artifact/7h4ZNsYfYYD6aS81htMwgB
   (*Open Matters*, *Resolved*, *Progress*).
-* **Status:** resumed 2026-10-21. C1 `putbox_store` and `b_fixes` building again from 47ab50be (fresh workers over the stopped work); both review at `high`, then restack into one line and pause for the Coach before `lean_core`. Phases A and B filed, #193 → … → #209 (47ab50be).
+* **Status:** resumed 2026-10-21. C1 (#213, 7e00da79) and `b_fixes` (#212) reviewed at `high` and filed; restacking into main → #213 → #212 (a `notes/security.md` conflict, with a worker). Then `b_rulings` and `props_bag` (the Coach's 2026-10-21 rulings), then a pause before `lean_core`.
 
 ## How this plan relates to the preplan
 
@@ -265,6 +265,7 @@ stale listing; reworked to read once on a miss. Left: a stale hello plus a miss 
 14. *A blank passphrase is two different refusals* -- "How would a blank passphrase ever reach the vault? every passphrase entered as an input (not verification) should be checked": a passphrase handed in as a new one -- the first at create, as well as putWayin's -- goes through the strength check (blank: `weak_passphrase`); only a passphrase that proves (unlock, the standing one in putWayin/delWayin) is read as a proof.
 15. *addPasskey returns true or false* -- "putFoo should return the foo object as it is in the database (not what was sent) on success": a rule for every `put*` (STYLE.md, and the Contract's principles): `putWayin` resolves the way in as stored (its summary); C2's `vault.putBox` and C7's props verbs follow it (C1's `VaultDB.putBox` already does).
 16. *security.md entries amended in place* (took the Rec): amend-in-place, marked "amended YYYY-MM-DD (thread)", is the rule; the header of `notes/security.md` says so, through its sonnet subagent.
+17. From C1's review: `outcome.ts` `bad`'s `@example` reads `Refusals.staleWrite('vaultProps')` (`'box'` left `StaleWriteVals`).
 
 **`props_bag`** (*Orchestrator:* added 2026-10-21; stacked on `b_rulings`; opus, review `medium`). *The vault's public props are gone* -- "Yes adopt that rule. Vault should also have "virtual" capacity props given over by VaultDB": every model keeps a `props` getter under one rule (its stored fields minus key material: salts, wrapped keys, ciphertext; an empty bag when nothing qualifies); `vault.props` and `snapshot.props` return the vault's bag (`vault_id`, `unlock_epoch`, `vault_key_epoch`, `registered_at`) with the VaultDB's capacity as virtual props beside them; the way-in summaries stay. The rule goes into STYLE.md and the Contract's principles (orchestrator).
 
@@ -280,6 +281,8 @@ stale listing; reworked to read once on a miss. Left: a stale hello plus a miss 
 | C4 | `getbox` | C2 + C7 line | default | medium | Beside C3. Writes `getBox`/`openBox` nesting first. *Orchestrator:* removes the vault's own `useBox(boxlabel, callback)` (ruled); renames the private `#openBox(boxlabel)`, which reads storage and asks, unlike the public `openBox(box)` (B3 review). |
 | C5 | `lock-close-del` | C3 + C4 restacked | opus | medium | Rewrites the Contract's first guess; files the rewrite as an *Open Matters* row. |
 | C6 | `subscriptions` | C5 | default | medium | |
+
+*Review (C1, #213, `fixed`, high):* every backend's conditional write is one atomic step; no ciphertext-carrying `cause` crosses a wire; the codemod's spy indexes are right; `#refuseStalePutBox` is interim and safe. Fixed: a failed catch-up dropped `meta.box_stored`; GraphQL attached `box_stored` to any refusal kind; putBox's `null` doc; ten doc-block first lines; the new examples' tests. Left (minor): `outcome.ts` `bad`'s example says `staleWrite('box')` (to `b_rulings`); Convex trusts its answer's shape under skew (row); Postgres answers `landed` to a replayed write where the others say `stale_write` (row); a refused write is a no-op UPDATE in Postgres (row); a reborn row during the wait reports `null` (safe); `boxStoredOf` duplicates `checkStoredBox`; the route recipe hands on `box_stored` with any kind.
 
 **Closing phase C:** passes 1, 2 and 5; fixes in `c-fixes`.
 
