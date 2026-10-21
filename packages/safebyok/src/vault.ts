@@ -1146,8 +1146,8 @@ export class Vault {
     }
   }
 
-  /** The `device_id` a mark of `vaultId` starts under: the one this Vault object drafted it under, or a new one. */
-  #newDeviceIdFor(vaultId: string): string { return this.#drafted?.vault_id === vaultId ? this.#drafted.device_id : randomId() }
+  /** The `device_id` a mark of `vaultTok` starts under: the one this Vault object drafted it under, or a new one. */
+  #newDeviceIdFor(vaultTok: string): string { return this.#drafted?.vault_id === vaultTok ? this.#drafted.device_id : randomId() }
 
   /** This device's id for the vault `standing` is, which every way in it adds carries: the one the mark held with the vault props in hand names.
    * Refuses 'stale_write' when the vault props in hand have moved on to another vault meanwhile.
@@ -1286,13 +1286,13 @@ export class Vault {
    * does.
    */
   async #draftVaultProps(passphrase: PassphraseProof, deviceId: string): Promise<VaultProps> {
-    const vaultId = randomId()
+    const vaultTok = randomId()
     const registeredAt = this.#clockNow()
-    const wayin = await Wayin.seal(this, vaultId, passphrase, deviceId, await makeVaultKey())
+    const wayin = await Wayin.seal(this, vaultTok, passphrase, deviceId, await makeVaultKey())
     return {
       format:              'safebyok-vault-v6',
       ...this.#scope,
-      vault_id:            vaultId,
+      vault_id:            vaultTok,
       registered_at:       registeredAt,
       unlock_epoch:        1,
       passphrase:          wayin.record,

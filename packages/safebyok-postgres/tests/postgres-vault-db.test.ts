@@ -267,7 +267,7 @@ describe("postgresVaultDB, what it stores", () => {
     const vaultDB = TH.requestFor(db, 'u1')
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1', { unlock_epoch: 2 }))
     const atTwo = { vault_id: 'vault-id-u1', unlock_epoch: 2 }
-    const rewrapped = (unlockEpoch: number) => TH.vaultPropsOf('u1', { unlock_epoch: unlockEpoch, passphrase: TH.wayinOf('home_phrase') })
+    const rewrapped = (gateEpoch: number) => TH.vaultPropsOf('u1', { unlock_epoch: gateEpoch, passphrase: TH.wayinOf('home_phrase') })
     await TH.expectBad(vaultDB.putVaultProps(rewrapped(2), atTwo), 'stale_write')
     await TH.expectBad(vaultDB.putVaultProps(rewrapped(1), atTwo), 'stale_write')
     expect(await TH.expectingGood(vaultDB).getVaultProps(u1)).to.deep.equal(TH.vaultPropsOf('u1', { unlock_epoch: 2 }))

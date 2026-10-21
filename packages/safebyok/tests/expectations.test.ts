@@ -40,18 +40,18 @@ describe("Expectations.vaultMeets", () => {
   })
 })
 
-describe("Expectations.vaultIdMeets", () => {
+describe("Expectations.vaultTokMeets", () => {
   it("holds for any standing vault props that name the vault, however damaged the rest of them", () => {
-    expect(Expectations.vaultIdMeets(VaultProps, { vault_id: 'vault-id-u1' })).to.be.true
-    expect(Expectations.vaultIdMeets({ vault_id: 'vault-id-u1' }, { vault_id: 'vault-id-u1' })).to.be.true
-    expect(Expectations.vaultIdMeets({ vault_id: 'vault-id-u1', unlock_epoch: '1' }, { vault_id: 'vault-id-u1' })).to.be.true
+    expect(Expectations.vaultTokMeets(VaultProps, { vault_id: 'vault-id-u1' })).to.be.true
+    expect(Expectations.vaultTokMeets({ vault_id: 'vault-id-u1' }, { vault_id: 'vault-id-u1' })).to.be.true
+    expect(Expectations.vaultTokMeets({ vault_id: 'vault-id-u1', unlock_epoch: '1' }, { vault_id: 'vault-id-u1' })).to.be.true
   })
 
   it("fails the props of another vault, props that name none, and none at all", () => {
-    expect(Expectations.vaultIdMeets(VaultProps, { vault_id: 'reborn' })).to.be.false
-    expect(Expectations.vaultIdMeets({ unlock_epoch: 1 }, { vault_id: 'vault-id-u1' })).to.be.false
-    expect(Expectations.vaultIdMeets(undefined, { vault_id: 'vault-id-u1' })).to.be.false
-    expect(Expectations.vaultIdMeets('not vault props', { vault_id: 'vault-id-u1' })).to.be.false
+    expect(Expectations.vaultTokMeets(VaultProps, { vault_id: 'reborn' })).to.be.false
+    expect(Expectations.vaultTokMeets({ unlock_epoch: 1 }, { vault_id: 'vault-id-u1' })).to.be.false
+    expect(Expectations.vaultTokMeets(undefined, { vault_id: 'vault-id-u1' })).to.be.false
+    expect(Expectations.vaultTokMeets('not vault props', { vault_id: 'vault-id-u1' })).to.be.false
   })
 })
 

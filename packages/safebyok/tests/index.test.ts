@@ -34,7 +34,7 @@ describe("the package's entry point", () => {
 
   it("exports the refusals an adapter throws, and the comparisons a key-value adapter makes, each as one namespace", () => {
     expect(Object.keys(safebyok.Refusals)).to.have.members(['StorageTroubleMessage', 'StaleWriteVals', 'storageUnavailable', 'staleWrite', 'staleBox', 'StaleBoxMessage', 'vaultMismatch', 'notPermitted', 'vaultFull', 'StorageBlockedMessage', 'storageBlocked', 'isStorageBlocked'])
-    expect(Object.keys(safebyok.Expectations)).to.have.members(['vaultPropsMeets', 'vaultMeets', 'vaultIdMeets', 'boxRefusalOf', 'deletionOf'])
+    expect(Object.keys(safebyok.Expectations)).to.have.members(['vaultPropsMeets', 'vaultMeets', 'vaultTokMeets', 'boxRefusalOf', 'deletionOf'])
   })
 })
 

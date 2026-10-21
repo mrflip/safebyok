@@ -134,7 +134,7 @@ const convexAccepts = async (call: Promise<unknown>): Promise<boolean> => {
   }
 }
 
-const { vault_id: _vaultId, ...vaultPropsWithoutVaultId } = TH.vaultPropsOf('u1')
+const { vault_id: _vaultTok, ...vaultPropsWithoutVaultTok } = TH.vaultPropsOf('u1')
 const { sidecar: _sidecar, ...boxWithoutSidecar } = TH.boxOf('anthropic_api_key', 'a1')
 const { registered_at: _vaultPropsTime, ...vaultPropsWithoutTime } = TH.vaultPropsOf('u1')
 const { passphrase: _passphrase, passkey: _passkey, ...vaultPropsWithoutWayins } = TH.vaultPropsOf('u1')
@@ -159,7 +159,7 @@ const VaultPropsCases = [
   // both refuse -- what Convex can see:
   [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v7' },              false,  false,  'a format this package does not know'],
   [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-box-v1' },                false,  false,  "another record's format"],
-  [vaultPropsWithoutVaultId,                                               false,  false,  'vault props missing their vault_id'],
+  [vaultPropsWithoutVaultTok,                                               false,  false,  'vault props missing their vault_id'],
   [{ ...TH.vaultPropsOf('u1'), unlock_epoch: '1' },                        false,  false,  'an epoch written as text'],
   [{ ...TH.vaultPropsOf('u1'), passphrase: TH.wayinOf('passphrase', { vault_key_wayin_wrapped: { cipher_iv_b64: 'iv' } as never }) }, false, false, 'a ciphered wayin missing its ciphertext'],
   [{ ...TH.vaultPropsOf('u1'), passphrase: TH.wayinOf('passphrase', { wayinkind: 'fingerprint' as never }) }, false, false, 'a wayinkind this package does not know'],

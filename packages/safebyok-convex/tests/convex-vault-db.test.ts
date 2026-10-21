@@ -224,9 +224,9 @@ describe("convexVaultDB, refusing", () => {
     // Boxes the vault never opens, leaving less room than one whisper of 40,000 bytes takes.
     const vaultDB = convexVaultDB({ client, api: deployment.api.safebyok })
     const vaultProps = await TH.expectingGood(vaultDB).getVaultProps(u1)
-    const vaultId = vaultProps?.vault_id ?? ''
+    const vaultTok = vaultProps?.vault_id ?? ''
     for (const [ii, bytes] of [...Array.from({ length: 8 }, () => 900_000), 120_000].entries()) {
-      await TH.expectingGood(vaultDB).putBox(u1, { vault_id: vaultId, revision_tok: null }, TH.heavyBox(`heavy_${String(ii)}`, bytes))
+      await TH.expectingGood(vaultDB).putBox(u1, { vault_id: vaultTok, revision_tok: null }, TH.heavyBox(`heavy_${String(ii)}`, bytes))
     }
     const refusal = await TH.expectRefusal(vault.putBox('anthropic_api_key', 'x'.repeat(40_000)), 'vault_full')
     expect(refusal.message).to.match(/no room for this one/)

@@ -23,7 +23,7 @@ const textBytes = (text: string) => new TextEncoder().encode(text)
 
 const scope = TH.scopeOf('u1')
 const slice = TH.vaultSliceOf('u1')
-const { vault_id: vaultId } = TH.vaultPropsOf('u1')
+const { vault_id: vaultTok } = TH.vaultPropsOf('u1')
 // When the ways in here are sealed: each is stamped with it, as the slice sealing them reads it.
 const SealedAt = Date.UTC(2026, 9, 15)
 const sealing = TH.vaultSliceOf('u1', TH.testDeriver, { now: () => SealedAt })
@@ -37,7 +37,7 @@ describe("the ctx builders' output, byte for byte", () => {
 
   it("a passphrase wayin's wrap is bound to the vault, the purpose and its whole header, byte for byte", async () => {
     const vaultKey = await makeVaultKey()
-    const wayin = await Wayin.seal(sealing, vaultId, PassphraseProof.parse(slice, 'pw'), 'device-one', vaultKey)
+    const wayin = await Wayin.seal(sealing, vaultTok, PassphraseProof.parse(slice, 'pw'), 'device-one', vaultKey)
     const ctx = textBytes(
       '["safebyok-vault-v6","acme","u1","main","vault-id-u1","vault_key_passphrase_wrapped",'
       + `{"device_id":"device-one","key_deriver_label":"test_digest_v0","registered_at":${String(Date.UTC(2026, 9, 15))},"salt_b64":"${wayin.record.salt_b64}","wayinkind":"passphrase"}]`,
@@ -48,7 +48,7 @@ describe("the ctx builders' output, byte for byte", () => {
 
   it("a passkey wayin's wrap and its key are bound to the vault, the purpose and its whole header, byte for byte", async () => {
     const passkey = await TH.passkeyOf('laptop')
-    const wayin = await Wayin.seal(sealing, vaultId, PasskeyProof.parse(slice, passkey), 'device-one', await makeVaultKey())
+    const wayin = await Wayin.seal(sealing, vaultTok, PasskeyProof.parse(slice, passkey), 'device-one', await makeVaultKey())
     const ctx = textBytes(
       '["safebyok-vault-v6","acme","u1","main","vault-id-u1","vault_key_passkey_wrapped",'
       + `{"credential_id":"${wayin.credential_id}","device_id":"device-one","prf_salt_b64":"${wayin.prf_salt_b64}","registered_at":${String(Date.UTC(2026, 9, 15))},"wayinkind":"passkey"}]`,
