@@ -1284,7 +1284,6 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
         const unsubscribes = [
           vaultDB.subscribe(scopeOf('u1'), () => { throw thrown }),
           // A host's listener may be async, though subscribe types it as returning nothing.
-          // eslint-disable-next-line @typescript-eslint/no-misused-promises
           vaultDB.subscribe(scopeOf('u1'), () => Promise.reject(rejected)),
         ]
         const watch = readingWatch(vaultDB)

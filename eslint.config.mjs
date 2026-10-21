@@ -162,7 +162,7 @@ export default defineConfig([
       'prefer-template':                           ['off'],
 
       '@typescript-eslint/default-param-last':     ['error'],
-      '@typescript-eslint/no-misused-promises':    ['error'],
+      '@typescript-eslint/no-misused-promises':    ['error', { checksVoidReturn: false }], // an async listener where a void one is asked for is fine
       '@typescript-eslint/explicit-module-boundary-types': ['off'],
       '@typescript-eslint/naming-convention':      ['off'],
       '@typescript-eslint/no-this-alias':          ['off'],

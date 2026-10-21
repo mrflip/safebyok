@@ -1143,7 +1143,6 @@ describe("the abstract VaultDB, calling a subscriber's listener", () => {
     const spy = TH.spyLogger()
     const vaultDB = new RingingVaultDB({ logger: spy.logger })
     const rejected = new Error('an async listener that fails')
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- a host's listener may be async
     vaultDB.subscribe(TH.scopeOf('u1'), async () => { await Promise.resolve(); throw rejected })
     vaultDB.ring()
     await vi.waitFor(() => { expect(spy.calls.map((call) => call.err)).to.deep.equal([rejected]) })
