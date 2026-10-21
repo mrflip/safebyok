@@ -3,9 +3,8 @@ import type { VaultPropsExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
 import { VaultPropsFields, ListedBoxFields, BoxFields, ScopeFields, recordOf, selectionOf } from './fields'
 
-/**
- * What graphqlVaultDB needs of an urql Client: its three ways to send an operation. The Client
- * your app already has is one, whatever its exchanges.
+/** What graphqlVaultDB needs of an urql Client: its three ways to send an operation.
+ * The Client your app already has is one, whatever its exchanges.
  */
 export type GraphqlVaultClient = Pick<Client, 'query' | 'mutation' | 'subscription'>
 
@@ -13,11 +12,9 @@ export type GraphqlVaultClient = Pick<Client, 'query' | 'mutation' | 'subscripti
 export type GraphqlVaultDBOpts = VaultDBOpts & {
   /** Your app's urql Client, its `url` your GraphQL server's. */
   client: GraphqlVaultClient
-  /**
-   * The most boxes one vault holds, as the VaultDB behind your server enforces it: a whole
-   * number above zero, or `Infinity` for a server that sets none. Default: `Infinity`, as the
-   * Postgres VaultDB sets none unless told. Declare your server's own, so that `Vault.make`
-   * refuses a vault asking for more up front, rather than the server at the first box past it.
+  /** The most boxes one vault holds, as the VaultDB behind your server enforces it: a whole number above zero, or `Infinity`, the default, for none.
+   * Declare your server's own, so that `Vault.make` refuses a vault asking for more up front,
+   * rather than the server at the first box past it.
    */
   maxBoxes?: number | undefined
 }
@@ -25,36 +22,25 @@ export type GraphqlVaultDBOpts = VaultDBOpts & {
 /** The most bytes of UTF-8 the Postgres VaultDB behind the server holds in one name. */
 const ServerMaxNameBytes = 640
 
-/**
- * safebyok's storage over GraphQL, in the browser: a VaultDB whose every verb is one operation,
- * sent through your app's urql Client to a server serving `VaultSchemaSdl` with `vaultResolvers`
- * (from `safebyok-graphql/server`), which runs each on a VaultDB made there for the signed-in
- * user. Hand it to `Vault.make` as its `vaultDB`.
+/** safebyok's storage over GraphQL, in the browser: a VaultDB whose every verb is one operation through your app's urql Client.
+ * The server serves `VaultSchemaSdl` with `vaultResolvers`, from `safebyok-graphql/server`, and
+ * runs each operation on a VaultDB made there for the signed-in user.
  *
- * * **Every query goes to the network** (`requestPolicy: 'network-only'`): your Client's cache
- *   never answers for a vault.
+ * * **Every query goes to the network**: your Client's cache never answers for a vault.
+ * * **Limits** are those of the Postgres VaultDB behind the server: 1 MiB in one record, 640 bytes
+ *   in one name, `maxBoxes` boxes, and no limit on a vault's bytes.
  * * **A refusal crosses**: the server's VaultError comes back as the same VaultError, kind and
- *   message, the GraphQL error it crossed as for its `cause`. A GraphQL error your server's own
- *   auth raises with `extensions.code` `FORBIDDEN` refuses with kind `not_permitted`, which locks
- *   nothing; one with `UNAUTHENTICATED` is `storage_unavailable`, as a token expired mid-refresh
- *   is not a user gone. Anything else that goes wrong -- the network, a server that is not serving
- *   the schema -- refuses with kind `storage_unavailable`, urql's own error as its `cause`.
+ *   message, the GraphQL error its `cause`. A GraphQL error your server's own auth raises with
+ *   `extensions.code` `FORBIDDEN` refuses with kind `not_permitted`. One with `UNAUTHENTICATED` is
+ *   `storage_unavailable`, as a token expired mid-refresh is not a user gone.
  * * **Other writes** reach `subscribe` through the `safebyokVaultChanged` subscription, when your
- *   Client has a way to send subscriptions (a `subscriptionExchange` over graphql-ws, say, or
- *   `fetchSubscriptions`); without one, nothing is pushed, and the vault refreshes after its own
- *   writes as before. A subscription that fails is not retried: it is logged, once for a failing
- *   streak, and calls `onChange`, so the vault reads again and meets the trouble itself.
- * * **Misuse crosses as misuse**: a record or expectation at fault is refused as `bad_record`,
- *   by this VaultDB before it is sent (an epoch past GraphQL's 32-bit `Int` included) or by the
- *   server's own after, crossing by its kind. A
- *   GraphQL validation error (`BAD_USER_INPUT`, `GRAPHQL_VALIDATION_FAILED`) is therefore the
- *   server's schema at odds with what this version sends, never the record, and refuses with kind
- *   `bad_option`, quoting nothing of what the server said, which may quote the variables.
- *
- * @param opts - Your app's urql `client`; optionally, the `maxBoxes` your server holds a vault
- *   to, and a `logger`, the default logger without one (a vault opened with no logger of its own hears it too).
- * @returns The VaultDB, holding at most 1 MiB in one record, as the Postgres VaultDB behind it
- *   does, and `maxBoxes` boxes in one vault, setting no limit on a vault's bytes.
+ *   Client can send subscriptions (a `subscriptionExchange` over graphql-ws, say, or
+ *   `fetchSubscriptions`). Without one, nothing is pushed. A subscription that fails is not
+ *   retried: the vault reads again, and meets the trouble itself.
+ * * **Misuse crosses as misuse**: a record or expectation at fault refuses as `bad_record`, here
+ *   before it is sent (an epoch past GraphQL's 32-bit `Int` included) or on the server. So a
+ *   GraphQL validation error means the server's schema is at odds with what this version sends:
+ *   it refuses with kind `bad_option`, quoting nothing of what the server said.
  *
  * @example
  *   const vaultDB = graphqlVaultDB({ client: new Client({ url: '/api/graphql', exchanges: [fetchExchange] }) })
@@ -119,11 +105,9 @@ const VaultChangedDoc = `subscription SafebyokVaultChanged(${Scope}) {
   safebyokVaultChanged(scope: $scope) { ${selectionOf(ScopeFields)} }
 }`
 
-/**
- * Every operation graphqlVaultDB sends, by the root field it asks for: the documents a host whose
- * GraphQL server accepts only allowlisted (persisted) operations registers, and a test holds to
- * the schema. They change only as the SDL ({@link VaultSchemaSdl}) does, and are versioned with
- * the package, which moves its client and its server together.
+/** Every operation graphqlVaultDB sends, by the root field it asks for: the documents to register with a server that allows only listed operations.
+ * They change only as `VaultSchemaSdl` does, versioned with the package, which moves its client
+ * and its server together.
  *
  * @example
  *   for (const document of Object.values(VaultOperations)) { allowlist.register(document) }
@@ -143,7 +127,7 @@ export const VaultOperations = {
 
 // ------------------------------------------------------------------------------------ the adapter
 
-/** Each verb one operation; the base class validates both ways, and the server checks the user. */
+/** The VaultDB {@link graphqlVaultDB} makes: each verb one operation, the server checking the user. */
 class UrqlVaultDB extends VaultDB {
   // What the Postgres VaultDB behind the server holds in one record, and about what a GraphQL
   // server accepts in one request by default.
@@ -259,10 +243,9 @@ const GraphqlIntMax = 2_147_483_647
 /** The fields a record or expectation sends as an `Int!`, each a whole number above zero once the base class has checked it. */
 const IntFields = ['unlock_epoch', 'vault_key_epoch', 'whisper_schema_version'] as const
 
-/**
- * Refuses `outgoing` with kind 'bad_record', before it is sent, unless each of its `Int!` fields
- * fits a GraphQL `Int`, as no vault builds an epoch that large. A box's expectation names the
- * box's own `vault_key_epoch`, so checking the box checks it.
+/** Refuse `outgoing` with kind 'bad_record', before it is sent, unless each of its `Int!` fields fits a GraphQL `Int`.
+ * No vault builds an epoch that large. A box's expectation names the box's own `vault_key_epoch`,
+ * so checking the box checks it.
  */
 const checkInts = (said: string, outgoing: Partial<Record<typeof IntFields[number], number>>) => {
   const over = IntFields.find((field) => (outgoing[field] ?? 0) > GraphqlIntMax)
@@ -280,12 +263,11 @@ const answerOf = (result: OperationResult): Record<string, unknown> => {
   return result.data as Record<string, unknown>
 }
 
-/**
- * The server's refusal as the VaultError it was, when one carries a kind, the GraphQL error as its
- * cause, and what it learned as its `meta` (a stale box write's `box_stored`, a full vault's
- * `capacity`, which the base class checks); a GraphQL server's own `FORBIDDEN` as `not_permitted`, likewise; a GraphQL validation
- * error as misuse, quoting nothing of it, as it may quote the variables; otherwise urql's error,
- * as it is, which the base class says as storage trouble.
+/** What a failed operation refuses with: the server's VaultError, when one carries a kind, or urql's error as it is.
+ * A crossed VaultError keeps its message, the GraphQL error its cause, and its {@link crossedMeta}.
+ * A GraphQL server's own `FORBIDDEN` becomes `not_permitted`. A GraphQL validation error becomes
+ * `bad_option`, quoting nothing of it, as it may quote the variables. urql's error, as it is, the
+ * base class says as `storage_unavailable`.
  */
 const refusalOf = (err: CombinedError): Error => {
   for (const refused of err.graphQLErrors) {
@@ -303,10 +285,7 @@ const refusalOf = (err: CombinedError): Error => {
   return err
 }
 
-/**
- * What a GraphQL server's own `FORBIDDEN` says: its message is the host's, and may say more, so it
- * rides along as the cause.
- */
+/** What a GraphQL server's own `FORBIDDEN` says: its message is the host's, and may say more, so it rides along as the cause. */
 const ForbiddenMessage = "The vault's GraphQL server refused the signed-in user this call by a rule of the app's own. Signing in again will not help: the app's own rules decide who may."
 
 /** The `extensions.code`s a GraphQL server marks a malformed operation or variable with. */

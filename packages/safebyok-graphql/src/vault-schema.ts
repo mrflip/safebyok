@@ -1,13 +1,11 @@
-/**
- * The GraphQL schema safebyok's verbs cross by, as SDL: one root field per VaultDB verb, each
- * record an object type with a field per stored field, and a subscription that says when a vault
- * changed. Hand it to your GraphQL server beside your own type definitions, with
- * {@link vaultResolvers} beside your own resolvers. Everything it adds to your schema is named
- * `safebyok...` or `Safebyok...`, so it meets nothing of yours.
+/** The GraphQL schema safebyok's verbs cross by, as SDL: a root field per VaultDB verb, and a subscription that says when a vault changed.
+ * Hand it to your GraphQL server beside your own type definitions, with `vaultResolvers` beside
+ * your own resolvers. Everything it adds is named `safebyok...` or `Safebyok...`, so it meets
+ * nothing of yours.
  *
- * It defines `type Query`, `type Mutation` and `type Subscription`. Yoga's `createSchema`,
- * Apollo Server and graphql-tools' `makeExecutableSchema` merge it with your own root types when
- * the type definitions go in as a list.
+ * It defines `type Query`, `type Mutation` and `type Subscription`. Yoga's `createSchema`, Apollo
+ * Server and graphql-tools' `makeExecutableSchema` merge it with your own root types when the type
+ * definitions go in as a list.
  *
  * @example createSchema({ typeDefs: [appTypeDefs, VaultSchemaSdl], resolvers: [appResolvers, vaultResolvers({ vaultDBFor })] })
  */
