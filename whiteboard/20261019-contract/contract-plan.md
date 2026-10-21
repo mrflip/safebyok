@@ -16,7 +16,7 @@ this line.
   (56 kB; `grep -n '^#'` is its outline). The handoff says when a ruling has changed it since.
 * **Sprint doc:** https://claude.ai/artifact/7h4ZNsYfYYD6aS81htMwgB
   (*Open Matters*, *Resolved*, *Progress*).
-* **Status:** 2026-10-21. The line is main → #213 (C1) → #212 (`b_fixes`) → #214 (`b_simplify`) → #215 (`wayin_rules`) → #216 (`checker`). `store_rulings` building, then `checker2`; then the sprint pauses for the weekend (the Coach: wrap up what's natural), restacked, the sprint PR on top. At the restart: `props_bag`, `wayin_api` (once its verbs row is ruled), `lean_core`, phase C, a pause before D1, phase D. The sprint doc's *For Restart Sprint* tab lists it.
+* **Status:** **paused for the weekend** (2026-10-21). The line is main → #213 (C1) → #212 (`b_fixes`) → #214 (`b_simplify`) → #215 (`wayin_rules`) → #216 (`checker`) → #217 (`store_rulings`) → #218 (`checker2`) → #192 (this sprint PR, out of draft). At the restart: `props_bag`, `wayin_api` (once its verbs row is ruled), `lean_core`, phase C, a pause before D1, phase D. `human/20261021-sprint_contract_paused.md` and the sprint doc's *For Restart Sprint* tab say where things stand.
 
 ## How this plan relates to the preplan
 
@@ -305,6 +305,8 @@ stale listing; reworked to read once on a miss. Left: a stale hello plus a miss 
 3. *The guarded checker takes a scope its vault already knows* -- "yes. vault.checkPassphrase(...) validates and strength check": the guarded checker becomes `vault.checkPassphrase(typed)`, binding the vault's own scope, validating its argument and running the strength check. *Orchestrator:* the proposal row "The way-in verbs, proposed" used `checkPassphrase` for the authorizing check; that row now has to pick another name.
 4. *A failed checker load is logged as a storage fault* -- "why are functions messing with other functions' errors? If hello throws, how does that become a storage error?": the storage watch stops rewording what a hello it runs throws; answer the Coach's question in the thread file.
 5. *Rollback check and del()* -- "Add a todo "tombstone vaults; decide if the vault_id is a check -- the labels are meant to be the primary key"": a TODO entry in those words. The rest of that row's Rec stands (keep the rollback check; drop the recipe telling hosts to erase the mark; `del()` waits on hello and hands `delVault` its scope and `vault_id`, with no read first): `lean_core`'s.
+
+*Review (`checker2`, #218, `fixed`, medium):* fixed: a hello whose load failed still tells the read's bad news (fac92fdd); `checkPassphrase`'s quotes and return (8e3929bd); `PassphraseModal` answers `declined` when a thrown mistake takes it away, where a host's own `getProof` waited for good (8837bea9); the security notes amended for both by the orchestrator's sonnet subagent. Left (minor): the watch never logs a failed hello's recovery (row); `errors.ts` overstates where `ThrownMistake` gets through; `useAdvice` tests the advice twice; the thread file's watch answer is too narrow (the doc's row is corrected). The flaky dialog test is a timeout under load.
 
 **`wayin_api`** (*Orchestrator:* added 2026-10-21; stacked on `props_bag`; opus, review `high`). **Waits on the Coach's ruling of the proposal row "The way-in verbs, proposed"** (item 4 below).
 
