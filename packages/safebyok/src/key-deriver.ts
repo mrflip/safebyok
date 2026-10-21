@@ -13,6 +13,9 @@ type KeyDeriverBase = {
   /**
    * 32 key bytes from the passphrase and its salt: deterministic, and slow by design. Refuses a
    * salt of another length than `salt_bytes` (kind 'bad_option'), as the supplied derivers do.
+   * A VaultError condition it throws (a resource out of reach) reaches the caller as itself;
+   * anything else as 'unexpected_error', with what was thrown, whole, as its `cause`, where a host
+   * that logs it will log it: never put the passphrase in what you throw.
    */
   deriveKeyBytes(passphrase: string, saltBytes: Uint8Array): Promise<Uint8Array>
 }
