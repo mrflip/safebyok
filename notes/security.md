@@ -149,7 +149,7 @@ added or folded into through the subagent, and no other entry changes.
   full records privately. Tests check that the snapshot's JSON holds no stored salt or wrap. The
   Coach: "yes good call". Amended 2026-10-21 (thread b_fixes): the same holds of a `Wayin` and a
   `Lease` themselves, in any log line or `JSON.stringify`: `Wayin.toJSON()` gives the wayin's
-  `summary` (no salt, no wrap), and `Lease.toJSON()` every field but `lease_key` and
+  `summary` (no wrap and no passphrase's salt; a passkey's `prf_salt_b64` stays, as above), and `Lease.toJSON()` every field but `lease_key` and
   `vault_key_lease_wrapped`; each gave its full stored record before.
 * 2026-10-19 (thread a_sec2, #206): **no proof is kept after an unlock, and this is not tested.**
   The vault keeps no reference to a proof (a `PassphraseProof` or `PasskeyProof`) once an unlock or
