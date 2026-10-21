@@ -39,6 +39,22 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-21 (thread wayin_rules, branch 20261021-wayin_rules, stacked on [#214](https://github.com/mrflip/safebyok/pull/214)): **the key a create keeps comes out
+  of a stored way in, under a proof, as every unlock's does.** Before, `Wayin.seal` unwrapped a
+  non-extractable session handle from the way in it had just wrapped, the creating unlock kept that
+  handle and used its own freshly generated, extractable vaultKey as the transient for the lease wrap,
+  and `putWayin` threw the handle away. Now `Wayin.seal(vault, holder, proof, deviceId, vaultKey)` seals
+  and returns only the way in. The creating unlock (`#settleUnlock`, `packages/safebyok/src/vault.ts`)
+  writes the drafted vault props, then proves the passphrase against the vault props storage settled
+  on, its own or another device's, through the ordinary `wayin.tryOpen(proof)`, which unwraps the
+  extractable transient (for the lease wrap, then dropped) and the non-extractable session handle the
+  vault keeps. The generated extractable vaultKey is used only to seal the way in, then dropped. So the
+  handle the vault keeps is never the extractable one it generated, and one control path serves a create and
+  the created-elsewhere race: a `wrong_passphrase` against another device's vault is still refused
+  `created_elsewhere`. The cost is two key derivations to create a vault, one to seal and one to open
+  as stored. A test pins that after a create the kept key (the wrapping key a new boxKey is wrapped
+  under) is non-extractable, and that a create unwraps exactly one extractable transient.
+
 * 2026-10-20 (thread B5, placement, branch 20261019-placement): **a second copy of safebyok loaded
   beside this one (amended 2026-10-21 (b_simplify): no longer refused as such; see (1)), and a handler passed bare is refused rather than ignored.**
   (1) *Amended 2026-10-21 (b_simplify): the special check and its marks are gone (the Coach: "If you
@@ -70,27 +86,44 @@ added or folded into through the subagent, and no other entry changes.
   `changePassphrase` and `addPasskey`; the host makes a passkey before the call, and the strength
   checker is a contract to answer.** (1) `putWayin` proves with the standing passphrase only (a passkey's
   answer as the proof is refused `bad_option`), as `changePassphrase` and `addPasskey` did. A new
-  passphrase as text replaces the passphrase; a passkey's answer (`PasskeyAnswer`) puts the passkey,
-  replacing any. The passkey is now made by the host before the call and its answer handed in, so a
+  passphrase as text replaces the passphrase (amended 2026-10-21 (wayin_rules): and removes the
+  passkey, writing vault props with `passkey: null`, so a passkey added under the old passphrase no
+  longer opens the current vault props; the user adds a passkey again by proving the new passphrase;
+  removal, not revocation: a copy of older vault props still opens with it, as before); a passkey's
+  answer (`PasskeyAnswer`) puts the passkey, replacing any. The passkey is now made by the host before the call and its answer handed in, so a
   passphrase the vault then refuses leaves a fresh passkey on the authenticator that opens nothing
   (no wrap under it is ever written). The trade: the core holds no UI and calls no host code inside
   the change. A new passkey's salt is checked at the call's door, before any key derivation
-  (`checkFreshSalt`: 32 bytes of base64url, `bad_option` otherwise). (2) A blank new passphrase is
-  refused `weak_passphrase` before the strength checker or any derivation. (3) The strength
+  (amended 2026-10-21 (wayin_rules): `checkFreshSalt` in `wayin.ts` is now `checkSaltShape` in `proof.ts`, called once, in
+  `newProofOf`; the repeat inside `Wayin.seal`'s passkey keying is gone, so `Wayin.seal` called
+  directly no longer refuses a misshapen salt, and such a way in would read as damaged at every later
+  unlock. It checks shape only: a `prfSaltB64` that is base64url of exactly 32 bytes, `bad_option`
+  otherwise. There is no list of salts and nothing checks freshness; the host mints the salt.) (2) A
+  blank new passphrase (empty, or only whitespace) is refused `weak_passphrase` before the host's
+  strength checker or any derivation (amended 2026-10-21 (wayin_rules): by `PassphraseProof.checkStrongEnough()`, which
+  puts the passphrase to the vault's `strengthChecker`, a public getter on `Vault`, with a frozen copy
+  of the vault's scope; the vault no longer reads `proof.passphrase`). (3) The strength
   checker (`strengthChecker`, type `StrengthChecker`; `src/passphrase-strength.ts`): its contract is
   to answer a verdict. A throw from it is refused `unexpected_error` with no `cause`, `meta` or kind
   of what it threw, as it heard the passphrase; so is a throw as its verdict is read (a `strong` or
   `reason` getter: amended 2026-10-21, the read now being inside the guard); before, a thrown
   condition passed through as itself, and a non-condition was carried as `cause`. Left out, the default
-  `UnchosenStrengthChecker` refuses every passphrase as too weak, and the vault logs once per
-  handle, at error level, that a checker must be chosen, the log quoting no passphrase (before,
+  `UnchosenStrengthChecker` (amended 2026-10-21 (wayin_rules): now `DefaultStrengthChecker`, an ordinary checker answering
+  weak, its reason, shown to the user and the refusal's message, telling the app's makers to choose a
+  `strengthChecker`) refuses every passphrase as too weak, and the vault logs once per
+  handle, at error level, that a checker must be chosen, the log quoting no passphrase (amended 2026-10-21 (wayin_rules): the
+  vault's identity comparison against the default and its once-per-handle log are gone; nothing logs; before,
   `Vault.make` refused a missing one `bad_option`). `zxcvbnStrengthChecker` now answers weak (a
   reason saying to try again) when its dictionary chunk fails to load, instead of rejecting
   `storage_unavailable`: without the dictionary it cannot judge, so it never admits. (4)
   `Wayin.seal(vault, proof, holder, stamp, vaultKey)`, one function where `sealPassphrase`,
   `sealFirstPassphrase` and `sealPasskey` were three, hands back for every seal `{ wayin, sessionKey }`:
   a non-extractable session handle on the vaultKey, one more AES-KW unwrap under the just-made
-  wayinKey. Only the creating unlock keeps it; `putWayin` drops it. (5) `putWayin` and `delWayin`
+  wayinKey. Only the creating unlock keeps it; `putWayin` drops it. (amended 2026-10-21 (wayin_rules): `Wayin.seal(vault,
+  holder, proof, deviceId, vaultKey)` returns only the way in and unwraps nothing, so no session
+  handle comes out of a seal; and it stamps itself: `vault_key_epoch` from the holder, `registered_at`
+  from `vault.clock.now()`, the vault's checked clock, and the `device_id` it is handed; the vault's
+  `#newStamp` is gone. See the 2026-10-21 (wayin_rules) entry on the key a create keeps.) (5) `putWayin` and `delWayin`
   resolve the vault (they resolved nothing, or a boolean).
 * 2026-10-19 (thread slots, B4a, branch 20261019-slots; the Coach's ruling): **the ways in are two slots,
   and only the passphrase proves a change to them.** (1) Stored: vault props hold `passphrase` (a
@@ -115,7 +148,7 @@ added or folded into through the subagent, and no other entry changes.
   read or derived. Before, any wayin proved any change, so a passkey holder could reset the passphrase;
   now a passkey opens the vault but cannot change who may. `addPassphrase` is gone. Consequence: a
   forgotten passphrase can no longer be reset with the passkey, and a passphrase stored damaged cannot
-  be replaced. (5) A vault holds at most one passkey: `putWayin` of a passkey's answer replaces the standing one (the old
+  be replaced. (5) A vault holds at most one passkey: `putWayin` of a passkey's answer replaces the standing one (amended 2026-10-21 (wayin_rules): so does `putWayin` of a new passphrase, which removes it; the old
   credential no longer opens; the same credential again mends a damaged one, with a fresh wrap), and
   `delWayin(passphrase)` removes the passkey, refusing `absent_wayin` when there is none; the passphrase
   can never be removed. Removal is still not revocation. Every change still moves `unlock_epoch`,
@@ -367,7 +400,7 @@ added or folded into through the subagent, and no other entry changes.
   frozen instance (amended 2026-10-21 (b_simplify): `adorn` attaches it writable and configurable, and the proof's constructor then freezes the instance, so it is still fixed), and `toJSON()` returns `{ kind }` only, so JSON, `Object.keys`, a spread and Node's
   inspect do not show it. The passkey's PRF bytes are held by reference to the host's `Uint8Array`, not
   copied. The vault itself still reads `proof.passphrase` to give a new passphrase to the host's strength
-  test. (2) `proof.wayinKeyFor(wayin)` derives the wayinKey, reading only the wayin's `salt_b64`
+  test (amended 2026-10-21 (wayin_rules): it does not; `PassphraseProof.checkStrongEnough()` does it). (2) `proof.wayinKeyFor(wayin)` derives the wayinKey, reading only the wayin's `salt_b64`
   (passphrase) or `wayinCtx` (passkey). (3) A `Wayin` (`PassphraseWayin`, `PasskeyWayin`) is made by
   `Wayin.make(vault, record, holder)`, which re-validates the stored record through its Zod schema
   (refusing `damaged_wayin`), freezes a copy as `props`, and is itself frozen. Its wayinCtx binds the
@@ -816,7 +849,7 @@ added or folded into through the subagent, and no other entry changes.
   wayin open, and the mark refuses one at a lower `vault_key_epoch` whatever its `unlock_epoch`:
   vault props from before a rotation, and with it the vaultKey the rotation replaced, are caught even
   so. What still passes is older vault props at the same `vault_key_epoch` under a forged higher
-  `unlock_epoch`: it can bring back only a passkey `delWayin` dropped or `putWayin` replaced, or a passphrase
+  `unlock_epoch`: it can bring back only a passkey `delWayin` dropped or `putWayin` replaced (amended 2026-10-21 (wayin_rules): or removed by a new passphrase), or a passphrase
   `putWayin` replaced, which still opens only the vaultKey the vault stands under, never a
   replaced one. (A device that opens such vault props through its lease opens no wayin:
   it takes the vaultKey it already held, and shows the older copy's wayin summaries.) The way out of a
@@ -1186,7 +1219,7 @@ added or folded into through the subagent, and no other entry changes.
   (`deriveKeyBytes`) or a passphrase strength test throws, both handed the passphrase, goes through
   `hostThrewRefusal` (`src/outcome.ts`), applied in `passphraseKeyOf` (`src/proof.ts`) (amended
   2026-10-19 (put_wayin), 2026-10-21: now only the key deriver's, not the strength checker's throw, which `checkStrongEnough`
-  (`src/passphrase-strength.ts`) refuses as `unexpected_error` with no `cause`, `meta` or kind
+  (`src/passphrase-strength.ts`; amended 2026-10-21 (wayin_rules): now `PassphraseProof.checkStrongEnough()`, `src/proof.ts`) refuses as `unexpected_error` with no `cause`, `meta` or kind
   of what it threw; see the put_wayin entry). Only a
   `VaultError` of the `condition` family, of this copy of safebyok, passes through as itself: a key
   deriver's, say. Everything else becomes `unexpected_error` with the throw as its `cause` (amended
@@ -1203,10 +1236,13 @@ added or folded into through the subagent, and no other entry changes.
   safebyok-fastkey's for an empty passphrase, never reaches the caller there; on the sealing paths
   (creating the vault, a new passphrase) a deriver's condition passes through as itself. The vault
   refuses a blank passphrase (empty, or only spaces) before any deriver sees it anyway (amended
-  2026-10-21): as a proof, in `PassphraseProof.parse` (`src/proof.ts`), `wrong_passphrase`, whether it
-  opens a vault (`unlock()`, the first one that creates a vault included) or proves a change
-  (`standingPassphraseOf`, `src/vault.ts`: `putWayin`, `delWayin`); as the new passphrase of
-  `putWayin`, `weak_passphrase`, in `newProofOf`. Before, `checkStrongEnough` rethrew
+  2026-10-21; amended 2026-10-21 (wayin_rules): two refusals, and `PassphraseProof.parse` refuses
+  neither): as a proof, `wrong_passphrase`, whether it opens a vault that stands (`unlock()`) or
+  proves a change (`standingPassphraseOf`, `src/vault.ts`: `putWayin`, `delWayin`), refused by
+  `PassphraseWayin.tryOpen` (`proof.isBlank`) before any key derivation, so after the vault has read
+  storage rather than at the door; as a new passphrase, `weak_passphrase`, from
+  `PassphraseProof.checkStrongEnough()`, whether the first at create or `putWayin`'s new one (before,
+  a blank passphrase at create was `wrong_passphrase` at the door). Before, `checkStrongEnough` rethrew
   whatever the test threw, and any `VaultError` from a deriver passed through with its message.
 * 2026-10-15: `localVaultDB` and `idbVaultDB` key rows by `applabel:user_id:vaultlabel`, and
   `user_id` may hold a colon, so one user's rows can share another scope's ckey prefix. Listing
@@ -2031,7 +2067,7 @@ added or folded into through the subagent, and no other entry changes.
   derivation: the one a vault is created with, and each one `putWayin`
   sets; never at `unlock`, so no user is locked out of a vault that stands by a test made
   stricter later. The core sets no floor of its own, and amended 2026-10-21 there is no core default
-  of 12 code points: a vault made with no `strengthChecker` has `UnchosenStrengthChecker`, which
+  of 12 code points: a vault made with no `strengthChecker` has `UnchosenStrengthChecker` (amended 2026-10-21 (wayin_rules): now `DefaultStrengthChecker`), which
   refuses every passphrase. The floor is the browser entry's `zxcvbnStrengthChecker`
   (`browserOpts()`), NIST SP 800-63B's length and no composition rules, at 12 code points
   (`MinPassphraseChars`, the Coach's floor; SP 800-63B rev. 4 asks 15 of a password that is the only
@@ -2275,7 +2311,7 @@ added or folded into through the subagent, and no other entry changes.
   `strengthChecker` that is not a function is refused
   as `bad_option` before the vault opens (`parseStrengthChecker`, `passphrase-strength.ts`, called
   from `vault.ts`, and exported from `safebyok` beside `checkValidators`). Amended 2026-10-19
-  (put_wayin): one left out was refused `bad_option` too; it now becomes `UnchosenStrengthChecker`,
+  (put_wayin): one left out was refused `bad_option` too; it now becomes `UnchosenStrengthChecker` (amended 2026-10-21 (wayin_rules): now `DefaultStrengthChecker`),
   which refuses every passphrase as too weak (see the put_wayin entry). The length-only
   `passphraseLengthTest` is no longer exported; it passed `'a'` plus eleven spaces.
 * 2026-10-17 (thread 16, strength_principles): **the browser default is zxcvbn, loaded on
