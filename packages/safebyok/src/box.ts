@@ -195,8 +195,8 @@ export class Box {
    * and these times. Nothing partial is handed back, and the bare boxKey is dropped on return.
    *
    * Throws 'damaged_box' for a record that will not open: altered in storage, moved from another
-   * boxlabel or vault, sealed under a vaultKey this vault does not hold, or opened to something that
-   * is no whisper. Throws 'vault_locked' for a lease not opened or ended, or one of another vault
+   * boxlabel or vault, sealed under a vaultKey this vault does not hold (a vault made anew elsewhere
+   * since it was read among them), or opened to something that is no whisper. Throws 'vault_locked' for a lease not opened or ended, or one of another vault
    * than the box lies in (a vault deleted and made anew since the box was read).
    *
    * @example const whisper = await box.open(lease)
@@ -291,7 +291,7 @@ const openRecord = async (vault: BoxVault, vaultId: string, record: BoxRecord, l
   } catch (err) {
     // A lease that holds no key is said as such; WebCrypto's own refusal is dropped: it says nothing a caller can act on.
     if (isVaultError(err)) { throw err }
-    throw new VaultError('damaged_box', "That box is damaged: it would not open under this vault's key, as if altered in storage or moved there from somewhere else. It was left as it is; remove it, or store its whisper again over it.")
+    throw new VaultError('damaged_box', "That box would not open under this vault's key, so it is damaged: altered in storage, moved there from somewhere else, or sealed by a vault deleted and made anew on another device since this one read it. It was left as it is. Read the vault again, with hello({ staleMinutes: 0 }), to see what stands: a vault made anew elsewhere locks this device, to be unlocked afresh. If the box still will not open, remove it, or store its whisper again over it.")
   }
   const checked = Whisper.safeParse(parseJsonOrNull(new TextDecoder().decode(whisperBytes)))
   if (! checked.success) {

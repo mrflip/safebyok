@@ -58,10 +58,10 @@ wins, and the second hears of it" is the vault's policy over the adapter's guara
 an adapter implements.
 
 Nothing is retried. A box write, a change to the ways in, a `del()` or a `delBox()` that
-meets someone else's is news the user must hear, refused once as `stale_write`. Before it names any
-refusal -- a stale write, or a box that will not open -- the vault catches up with storage
-once, so a vault deleted and made anew elsewhere relocks the device rather than reading as
-damage. There is no conflict handler beyond this, and no hook for one: whatever landed first
+meets someone else's is news the user must hear, refused once as `stale_write`. Before it names a
+stale write the vault catches up with storage once, so a vault deleted and made anew elsewhere
+relocks the device. It names a box that will not open `damaged_box` at once, reading nothing
+more: the host reads again (`hello()`) to see what stands. There is no conflict handler beyond this, and no hook for one: whatever landed first
 stands, and a host that disagrees calls `putBox()` or `delBox()` again. The vault never clears
 a damaged record on its own; the user's `delBox()` on its boxlabel does, or a `putBox()` over
 one that names its revision, in its one `putBox`: a store never deletes. A `delBox()` that

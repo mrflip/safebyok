@@ -507,13 +507,14 @@ describe("close", () => {
 // has a new vault_id and its own passphrase.
 const rebornWorld = async () => {
   const world = makeWorld()
-  const vaultOne = await world.openUnlocked('pw one', { vaultDB: world.deafVaultDB() })
+  const deafDB = world.deafVaultDB()
+  const vaultOne = await world.openUnlocked('pw one', { vaultDB: deafDB })
   await vaultOne.putBox('anthropic', 'sk-ant-fake-old')
   const vaultTwo = await world.open()
   await vaultTwo.del()
   await vaultTwo.unlock('pw two')
   await vaultTwo.putBox('anthropic', 'sk-ant-fake-new')
-  return { world, vaultOne, vaultTwo }
+  return { world, vaultOne, vaultTwo, deafDB }
 }
 
 describe("a stale session cannot reach into a vault reborn elsewhere", () => {
@@ -525,14 +526,20 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
     expect(await vaultTwo.getWhisper('anthropic')).to.eq('sk-ant-fake-new')
   })
 
-  it("getWhisper() of a box the reborn vault wrote catches up once, finds the vault moved, and refuses as locked, not damaged", async () => {
-    const { vaultOne } = await rebornWorld()
+  it("getWhisper() of a box the reborn vault wrote refuses as damaged_box at once, reading no vault props; a hello that reads afresh then finds the vault moved, and locks", async () => {
+    const { vaultOne, deafDB } = await rebornWorld()
     expect(vaultOne.getSnapshot().state).to.eq('unlocked')
-    await TH.expectRefusal(vaultOne.getWhisper('anthropic'), 'vault_locked')
+    const getVaultProps = vi.spyOn(deafDB, 'getVaultProps')
+    const err = await TH.expectRefusal(vaultOne.getWhisper('anthropic'), 'damaged_box')
+    expect(err.message).to.include('hello({ staleMinutes: 0 })')
+    expect(getVaultProps).not.toHaveBeenCalled()
+    expect(vaultOne.getSnapshot().state).to.eq('unlocked')
+    await vaultOne.hello({ staleMinutes: 0 })
     expect(vaultOne.getSnapshot().state).to.eq('locked')
+    vi.restoreAllMocks()
   })
 
-  it("getWhisper() of a box that will not open in a vault that has not moved catches up once, and names it damaged", async () => {
+  it("getWhisper() of a box that will not open in a vault that has not moved names it damaged at once, reading no vault props", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox('anthropic', 'sk-fake')
@@ -542,12 +549,12 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
     await TH.wakeupAtNextTick()
     const getVaultProps = vi.spyOn(world.vaultDB, 'getVaultProps')
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'damaged_box')
-    expect(getVaultProps).toHaveBeenCalledTimes(1)
+    expect(getVaultProps).not.toHaveBeenCalled()
     expect(vault.getSnapshot().state).to.eq('unlocked')
     vi.restoreAllMocks()
   })
 
-  it("getWhisper() whose catch-up fails throws the catch-up's own refusal: whether the box is damaged is not known", async () => {
+  it("getWhisper() names a box that will not open damaged_box while storage's vault props are out of reach: it never reads them to decide", async () => {
     const world = makeWorld()
     const deafDB = world.deafVaultDB()
     const vault = await world.openUnlocked('pw', { vaultDB: deafDB })
@@ -555,10 +562,9 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
     const row = storedRowOf(world, 'anthropic')
     world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...row, revision_tok: 'tampered' }))
     const down = new VaultError('storage_unavailable', 'The vault storage could not be reached.')
-    vi.spyOn(deafDB, 'getVaultProps').mockResolvedValueOnce(bad(down))
-    expect(await TH.expectRefusal(vault.getWhisper('anthropic'), 'storage_unavailable')).to.eq(down)
-    expect(vault.getSnapshot().syncing).to.be.false
+    const getVaultProps = vi.spyOn(deafDB, 'getVaultProps').mockResolvedValue(bad(down))
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'damaged_box')
+    expect(getVaultProps).not.toHaveBeenCalled()
     expect(vault.getSnapshot().syncing).to.be.true
     vi.restoreAllMocks()
   })

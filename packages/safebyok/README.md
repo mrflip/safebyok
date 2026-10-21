@@ -872,7 +872,7 @@ const vault = Vault.make({ ...opts, onBadNews: (news) => { telemetry.report(news
 | --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |
 | `damaged_vault`       | the vault's props, read from storage, failed their checks (not a shape this package writes, or naming another vault), so no way in can be tried: `hello()` refuses it, as a `VaultDB`'s `getVaultProps` does | Nothing was changed, and a retry will not mend it. Tell the user the vault cannot be opened; restore its props from a backup, if there is one, or, if the user chooses to start over, `delDamagedVault()` (see *A vault that cannot be opened*) |
 | `damaged_wayin`       | a way in is stored in a form this package never writes (a salt of the wrong length, or not base64url), so it cannot be tried: the passphrase, or the passkey. The other is still tried | A damaged passkey: unlock with the passphrase, and add the passkey again. A damaged passphrase: unlock with the passkey, if there is one, to read what the vault holds; it cannot be changed, so the vault is then removed and made again |
-| `damaged_box`     | a box failed its checks as read from storage (a `VaultDB`'s `getBox` refuses it so too), or would not open under the vault's own vaultKey, or opened to no whisper: altered in storage, or moved there from elsewhere. A `putBox()` refuses so a box listed damaged that names no revision, damaged beyond naming, writing nothing. A box that will not open is named so only after the vault has caught up with storage once: one a vault made anew elsewhere wrote makes the call `vault_locked` instead | Nothing was changed. Offer `delBox()`, or a fresh `putBox()` over it while it names a revision (see *Damaged boxes*) |
+| `damaged_box`     | a box failed its checks as read from storage (a `VaultDB`'s `getBox` refuses it so too), or would not open under the vault's own vaultKey, or opened to no whisper: altered in storage, moved there from elsewhere, or written by a vault deleted and made anew on another device since this one read it. A `putBox()` refuses so a box listed damaged that names no revision, damaged beyond naming, writing nothing | Nothing was changed. Read the vault again, `hello({ staleMinutes: 0 })`: a vault made anew elsewhere relocks this device. A box still damaged: offer `delBox()`, or a fresh `putBox()` over it while it names a revision (see *Damaged boxes*) |
 | `newer_format`        | the vault's stored props are in a form this version does not know -- a `format` -- which a newer safebyok may have written: `hello()` and `delDamagedVault` refuse it | Nothing was changed. Tell the user to update the app; never offer to start over |
 | `rolled_back`         | this device has already seen a newer copy of the vault props than storage offers now (storage restored from a backup, or altered), so it won't use this one, and the vault locked: nothing was unlocked or written | Tell the user this device has seen a newer copy of the vault than storage holds. If the storage was restored from an older copy on purpose, accept it on this device (see *A vault rolled back*, below); otherwise the app's support should look at its storage |
 | `identity_revoked`    | the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in. The vault has locked itself (see *When the user signs out*) | Have the user sign in again, then open the vault for whoever that is |
@@ -1009,10 +1009,11 @@ for (const box of vault.getSnapshot().boxes) {
 Damage the listing cannot see -- altered ciphertext, a missing or malformed ciphered field --
 shows only when the box is read: the listing reads each record's shape and never opens its
 ciphertext, which would cost deciphering the whole vault at every refresh. Such a box lists
-as sound, `getWhisper()` refuses it with `damaged_box`, and `delBox()` removes it. Before it says
-`damaged_box` of a box that will not open, the vault catches up with storage once: a
-box written by a vault deleted and made anew elsewhere relocks this device, and the read
-refuses with `vault_locked` instead. `putBox()` starts afresh over any record it cannot read as a
+as sound, `getWhisper()` refuses it with `damaged_box`, and `delBox()` removes it. The vault
+names it so at once, with no second look at storage, so a box written by a vault deleted and
+made anew on another device since this one read it is refused the same way: reading again,
+`hello({ staleMinutes: 0 })`, relocks this device, and the user unlocks the vault that stands.
+`putBox()` starts afresh over any record it cannot read as a
 box -- every one the snapshot lists as damaged, and one missing or mangling a ciphered field --
 carrying nothing from it, neither its sidecar nor when it was first stored. It writes over the
 revision the listing names, in one write that lands only while that record still stands, so a

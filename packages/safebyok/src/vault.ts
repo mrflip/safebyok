@@ -138,11 +138,12 @@ type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin 
  * A Vault object that goes on refusing changes to the ways in as 'stale_write' after a restore, or
  * after its device mark could not be written, is to be closed, and a new one made.
  *
- * Storage alone settles a race. When it refuses a write as stale, or a box will not open, the
- * vault catches up with storage once before it names the refusal. A vault deleted, made anew, or
- * with its ways in changed elsewhere then relocks this device. A catch-up that fails leaves the
- * snapshot `syncing: false`, and the write refuses 'stale_write', that failure its cause; but an
- * 'identity_revoked', 'rolled_back' or 'newer_format' comes as it came.
+ * Storage alone settles a race. When it refuses a write as stale, the vault catches up with
+ * storage once before it names the refusal. A vault deleted, made anew, or with its ways in
+ * changed elsewhere then relocks this device. A catch-up that fails leaves the snapshot
+ * `syncing: false`, and the write refuses 'stale_write', that failure its cause; but an
+ * 'identity_revoked', 'rolled_back' or 'newer_format' comes as it came. A box that will not open
+ * under the lease in hand is 'damaged_box' at once, with no read of storage first.
  *
  * Every call comes in two forms. `tryUnlock()`, `tryPutBox()` and the rest resolve to an
  * {@link Outcome}, `{ ok: true, val }` or `{ ok: false, err }`, never thrown: the form for code
@@ -595,7 +596,7 @@ export class Vault {
   async tryGetWhisper(boxlabel: string): Promise<Outcome<Whisper>> {
     try {
       const box = await this.#getBoxUnlocked(boxlabel)
-      const whisper = await this.#decipherOrCatchUp(this.#checkUnlocked(), box)
+      const whisper = await box.open(this.#checkUnlocked())
       this.#checkUnlocked()
       return good(whisper)
     } catch (err) { return this.#badOutcome(err) }
@@ -1674,7 +1675,7 @@ export class Vault {
   }
   // --
 
-  // == [Reading boxes]: listedRevisionOf, isListedDamaged, checkListed, getBoxOrDamaged, getBoxOrThrow, boxFrom, getBoxUnlocked, decipherOrCatchUp
+  // == [Reading boxes]: listedRevisionOf, isListedDamaged, checkListed, getBoxOrDamaged, getBoxOrThrow, boxFrom, getBoxUnlocked
 
   /** The revision the listing names for the box under `boxlabel`, sound or damaged; null for none listed, or a damaged record that holds none.
    * Storage arbitrates a write that names it, so a listing gone stale costs a refusal and a second
@@ -1729,19 +1730,6 @@ export class Vault {
     // Checked before the user is asked for anything: a call that cannot land never prompts.
     await this.#ensureLease(0, () => { this.#checkListed(label) })
     return await this.#getBoxOrThrow(label)
-  }
-
-  /** The whisper `box` holds; for one that will not open under the lease in hand, one catch-up with storage, then 'damaged_box'.
-   * A catch-up that relocks this device refuses 'vault_locked'. One that fails is thrown as it came,
-   * as whether the box is damaged is not known.
-   */
-  async #decipherOrCatchUp(lease: Lease, box: Box): Promise<Whisper> {
-    const { ok, val: whisper, err } = await box.tryOpen(lease)
-    if (ok) { return whisper }
-    if (err.refusalkind !== 'damaged_box') { throw err }
-    await this.#refresh()
-    this.#checkUnlocked()
-    throw err
   }
   // --
 
