@@ -445,9 +445,11 @@ gone, drops the key the same way for this handle.
 granted before the close; an unlock under way on the closed handle takes nothing up, and a `getWhisper()` or `useWhisper()` under way hands back nothing,
 refusing with `vault_closed`.
 
-A host clock that turns bad partway through a call (it throws, or reads outside 1981 to 2255)
-drops the key and fails the call with `bad_option`, even when the call's write had already
-landed: fix the clock, and look again.
+A host clock is checked once, at `Vault.make`: one reading must be epoch milliseconds from 1981
+to 2255, so a clock counting in seconds or microseconds is refused there with `bad_option`.
+After that the vault takes each reading as the clock gives it, rounded down to whole
+milliseconds; a clock that later throws fails the call that read it with `unexpected_error`, its
+error the cause.
 
 **Locking ends the lease.** A host that wants "stay unlocked on this device for a
 week" should not lock on tab-away: each time the user comes back to the tab, the vault would ask

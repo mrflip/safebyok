@@ -472,9 +472,9 @@ export const MaxBoxes = 100
 /**
  * Injected time source, so expiry is testable; defaults to the wall clock. `now()` returns epoch
  * milliseconds, as `Date.now()` does, from {@link FarPast} to {@link FarFuture}; a fraction is
- * fine, and rounded down. The vault checks every reading, and refuses a clock that reads outside
- * those bounds -- counting in seconds or microseconds, say -- or throws, with kind 'bad_option':
- * at `Vault.make`, and at any later call that reads it so, which drops the vaultKey first.
+ * fine, and rounded down. `Vault.make` reads it once, and refuses a clock that reads outside
+ * those bounds -- counting in seconds or microseconds, say -- or throws, with kind 'bad_option'.
+ * The vault takes every later reading as it comes.
  */
 export type Clock = { now(): number }
 

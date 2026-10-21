@@ -93,9 +93,9 @@ export type MakeVaultOpts = {
    * Time source for expiry and for the times stored with each record; tests inject one. Default:
    * the wall clock. Its `now()` returns epoch milliseconds, as `Date.now()` does, from 1981 to 2255
    * ({@link FarPast} to {@link FarFuture}), fractions allowed (each reading is rounded down to
-   * whole milliseconds). Vault.make reads it once and refuses a clock outside those bounds, or one
-   * that throws, with kind 'bad_option'; so does any later call that reads it so, dropping the
-   * vaultKey first, so the vault is locked.
+   * whole milliseconds). Vault.make reads it once, and refuses with kind 'bad_option' a clock
+   * that throws or reads outside those bounds -- one counting in seconds or microseconds, say.
+   * Every later reading is taken as the clock gives it.
    */
   clock?: Clock | undefined
   /**
@@ -403,40 +403,36 @@ export const parseGetProof = (candidate: unknown): GetProof | null => {
   return candidate as GetProof
 }
 
-/** What a Clock must carry. Checked only: Vault.make keeps the clock it was handed, and checks each reading. */
+/** What a Clock must carry: a `now()` function. */
 const clockShape = Z.object({
   now: Z.custom<Clock['now']>((candidate) => typeof candidate === 'function'),
 })
 
+/** A clock reading Vault.make accepts: epoch milliseconds from {@link FarPast} to {@link FarFuture}, a fraction allowed. */
+const clockReading = Z.number().check(Z.gte(FarPast), Z.lte(FarFuture))
+
+/**
+ * The host's clock, checked once: a `now()` function whose one reading here is epoch
+ * milliseconds from 1981 to 2255, so a clock counting in another unit fails Vault.make, before
+ * anything is read or written. Kind 'bad_option' otherwise, and for a `now()` that throws, its
+ * error the cause. Every later reading is the host's, taken as it comes.
+ */
 export const parseClock = (candidate: Clock | undefined): Clock => {
   if (candidate === undefined) { return wallClock }
   if (! clockShape.safeParse(candidate).success) {
     throw new VaultError('bad_option', 'clock is not a Clock: it needs a now() function returning epoch milliseconds, as Date.now() does.')
   }
-  return candidate
-}
-
-/**
- * A clock reading the package accepts: epoch milliseconds from {@link FarPast} to {@link FarFuture},
- * a fraction allowed, as a clock may return one. Floored as it is read, so every time kept is a
- * whole-millisecond {@link EpochMillis}.
- */
-const clockReading = Z.number().check(Z.gte(FarPast), Z.lte(FarFuture))
-
-/** A reading of the host's clock, checked and rounded down to whole milliseconds. */
-export const readClock = (clock: Clock): number => {
   let reading: unknown
   try {
-    reading = clock.now()
+    reading = candidate.now()
   } catch (err) {
     // The host's own error rides along as the cause, unquoted.
     throw new VaultError('bad_option', "The clock passed to Vault.make threw when read: its now() must return epoch milliseconds, as Date.now() does. The clock's own error is this error's cause.", { cause: err })
   }
-  const checked = clockReading.safeParse(reading)
-  if (! checked.success) {
+  if (! clockReading.safeParse(reading).success) {
     throw new VaultError('bad_option', "The clock passed to Vault.make read a time outside 1981 to 2255: its now() must return epoch milliseconds, as Date.now() does, not seconds or microseconds.")
   }
-  return Math.floor(checked.data)
+  return candidate
 }
 
 export const parseMaxWhisperBytes = (candidate: number | undefined): number => {
@@ -569,9 +565,6 @@ export const parseMakeVaultOpts = (opts: MakeVaultOpts): ParsedVaultOpts => {
   // The host's logger for the vault, else the one its storage was made with; guarded either way.
   const logger = parseLogger(opts.logger ?? vaultDB.logger)
   const clock = parseClock(opts.clock)
-  // Every reading of the host's clock is checked, this first one so that a clock counting in the
-  // wrong unit fails make rather than some later call.
-  readClock(clock)
   const keyDeriver = parseKeyDeriver(opts.keyDeriver, logger)
   const whisperByteLimit = parseMaxWhisperBytes(opts.maxWhisperBytes)
   const boxLimit = parseMaxBoxes(opts.maxBoxes, parseDeclared(vaultDB, 'maxBoxes'))

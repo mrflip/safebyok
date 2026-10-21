@@ -14,7 +14,7 @@ import { jsonBytes, type BoxExpectation } from './vault-db'
 import { type VaultLogger, asError } from './logger'
 import * as RefusalPolicy from './refusal-policy'
 import type { GuardedStrengthChecker, PassphraseVerdict } from './passphrase-strength'
-import { type BadNewsHandler, type MakeVaultOpts, parseMakeVaultOpts, parseRenewMinutes, parseStaleMinutes, readClock, StoredBytesPerWhisperByte, BoxFixedBytes } from './vault-opts'
+import { type BadNewsHandler, type MakeVaultOpts, parseMakeVaultOpts, parseRenewMinutes, parseStaleMinutes, StoredBytesPerWhisperByte, BoxFixedBytes } from './vault-opts'
 import { reportToPlatform } from './report-error'
 import { type DeviceDB, deviceTroubleAsConditions } from './device-db'
 import type { KeyDeriver } from './key-deriver'
@@ -260,12 +260,8 @@ export class Vault {
   get leaseMillis(): number { return this.#leaseMillis }
   /** The logger the vault was made with, which the vault's boxes and ways in log through. */
   get logger(): VaultLogger { return this.#logger }
-  /**
-   * The vault's clock, checked: each reading is the host's clock's, held to epoch milliseconds,
-   * and one that fails drops the vaultKey before it throws, as the vault's own readings do. The
-   * vault's boxes stamp their times by it.
-   */
-  get clock(): Clock { return this.#checkedClock }
+  /** The vault's clock: the host's, each reading rounded down to whole milliseconds. The vault's boxes stamp their times by it. */
+  get clock(): Clock { return this.#flooredClock }
   /** The key deriver the vault was made with, which its ways in derive through. */
   get keyDeriver(): KeyDeriver { return this.#keyDeriver }
   // --
@@ -442,8 +438,8 @@ export class Vault {
    * vault is locked all the same.
    *
    * The vault also locks of itself: when the lease ends at `askPassphraseAt`, at `del()`, for
-   * storage it cannot trust (a user signed out, an older copy of the vault), at a refresh that
-   * finds the vault's ways in changed or the vault gone, and when its clock cannot be read.
+   * storage it cannot trust (a user signed out, an older copy of the vault), and at a refresh that
+   * finds the vault's ways in changed or the vault gone.
    *
    * @example document.addEventListener('visibilitychange', () => { if (document.hidden) { void vault.lock() } })
    */
@@ -957,7 +953,7 @@ export class Vault {
   readonly #boxLimit: number
   readonly #vaultByteLimit: number
   // Frozen: `vault.clock` hands it out, and the vault's boxes stamp their times by it.
-  readonly #checkedClock: Clock = Object.freeze({ now: () => this.#clockNow() })
+  readonly #flooredClock: Clock = Object.freeze({ now: () => this.#clockNow() })
 
   /**
    * A handle on one user's vault, made at once, in state `opening`: its options checked, and
@@ -1010,16 +1006,8 @@ export class Vault {
     this.#snapshot = this.#picture()
   }
 
-  /** A checked reading of the host's clock. One that fails drops the vaultKey first: no deadline can be trusted now. */
-  #clockNow() {
-    try {
-      return readClock(this.#clock)
-    } catch (err) {
-      this.#dropKey()
-      this.#settle()
-      throw err
-    }
-  }
+  /** The host's clock, read now, rounded down to whole milliseconds: every time a record keeps is an integer. */
+  #clockNow(): number { return Math.floor(this.#clock.now()) }
   // --
 
   // == [State and snapshot]: vaultProps, vaultKey, lease, unlockStands, listeners, snapshot, picture, settle
