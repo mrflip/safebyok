@@ -39,7 +39,7 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
-* 2026-10-21 (thread trust_lines, branch 20261021-trust_lines, stacked on [#225](https://github.com/mrflip/safebyok/pull/225)):
+* 2026-10-21 (thread trust_lines, branch 20261021-trust_lines, PR [#239](https://github.com/mrflip/safebyok/pull/239); amended 2026-10-21 (trust_lines): rebased on main, once stacked on [#225](https://github.com/mrflip/safebyok/pull/225)):
   **threat model, by party.** Storage and the backend are treated as hostile and defended by
   cryptography alone (AES-GCM, with the context bound as additional data). The host app is trusted but
   fallible: its inputs are checked once at the public entry and refused as misuse, and code past that
@@ -50,7 +50,7 @@ added or folded into through the subagent, and no other entry changes.
   `Wayin` and `Lease` hold a reference to their Vault and read scope, key deriver, lease length and
   time (the public `vault.now()`) from it, inside that same trust of the host's realm; the opened
   vaultKey is held only in a private field of an opened `Lease`; `vault_key_epoch` is removed from
-  every stored record; a box's sidecar is a JSON value, bound by its key-sorted JSON.
+  every stored record; a box's sidecar is a JSON object (`{}` for none; amended 2026-10-21 (trust_lines), third round: once any JSON value), bound by its key-sorted JSON.
 
 * 2026-10-21 (thread checker, branch 20261021-checker): **one guard is the only caller of a host's
   strength checker, and a checker's `load` runs at every `hello()`.** (1) `guardStrengthChecker`
@@ -190,7 +190,7 @@ added or folded into through the subagent, and no other entry changes.
   2026-10-21 (trust_lines): `safebyok-vault-v6` now, v5 joining the older formats the same way).
   `MaxUnlocks`, `wayin_id`, `wayinlabel`, its validator and the refusals `last_wayin` and
   `too_many_wayins` are gone. (2) Each wrap's ctx is built as before (`cipherCtx(format, scope...,
-  vault_id, registered_at, purpose, header)`), its first part now `safebyok-vault-v5`; the header (every
+  vault_id, registered_at, purpose, header)`; amended 2026-10-21 (trust_lines): no longer the vault props' `registered_at`, only the scope and `vault_id` of the vault), its first part now `safebyok-vault-v5`; the header (every
   field but the wrap, keys sorted) is `wayinkind`, `key_deriver_label` and `salt_b64` or `credential_id`
   and `prf_salt_b64`, `vault_key_epoch` (amended 2026-10-21 (trust_lines): no longer in the header), `device_id`, `registered_at`. The passkey's HKDF info is that
   same ctx. The purpose (`vault_key_passphrase_wrapped`, `vault_key_passkey_wrapped`) keeps one slot's
@@ -214,7 +214,7 @@ added or folded into through the subagent, and no other entry changes.
   change is proven by the passphrase, so each starts the lease again from now (`#deadlineFromNow()`;
   before, a passkey-proven change kept the standing deadline; amended 2026-10-21 (b_simplify): `#deadlineFromNow()` is removed, and each proof's grant starts the lease again from now inside `Lease.grant`). (7) `snapshot.wayins` is replaced by
   `snapshot.passphrase` and `snapshot.passkey` (summaries: wayinkind, device_id, registered_at, and for
-  the passkey credential_id and prf_salt_b64); still no passphrase salt and no wrap reaches a host.
+  the passkey credential_id and prf_salt_b64; amended 2026-10-21 (trust_lines): each also carries `vault_id`); still no passphrase salt and no wrap reaches a host.
   (8) `mayBeNewer` tells newer from damaged by `format` alone (it looked at unknown wayinkinds and
   more wayins than `MaxUnlocks`); any change to a stored record bumps `format`. (9) The Convex
   validators, Postgres (`passphrase jsonb NOT NULL`, `passkey jsonb` nullable) and GraphQL
@@ -248,7 +248,8 @@ added or folded into through the subagent, and no other entry changes.
   state, devtools and error reporters. Now `VaultSnapshot.props` and `vault.props` are gone, and
   the snapshot carries summaries of the wayins: `snapshot.passphrase` and `snapshot.passkey` (amended
   2026-10-19, slots: once a `wayins` list of `WayinSummary`) -- `wayinkind`, `device_id`,
-  `registered_at`, and for a passkey also `credential_id` and `prf_salt_b64`, which an
+  `registered_at`, and for a passkey also `credential_id` and `prf_salt_b64` (amended 2026-10-21 (trust_lines): each summary also carries
+  `vault_id`, the wayin's own visible field), which an
   authenticator needs and which open nothing without the passkey. The vault and its models keep the
   full records privately. Tests check that the snapshot's JSON holds no stored salt or wrap. The
   Coach: "yes good call". Amended 2026-10-21 (thread b_fixes): the same holds of a `Wayin` and a
@@ -403,7 +404,10 @@ added or folded into through the subagent, and no other entry changes.
   show neither runs). The whisper is serialized once per put (`whisperBytesOf`). The plan holds the
   whisper's bytes: it is internal, frozen and short-lived, and is never logged, stored or exported
   from the package. (4) `vault.openBox(box)` checks the record first (`bad_record`), then the key in
-  hand (`vault_locked`), then re-makes the box under the vault's own props; `box.tryOpen` has no
+  hand (`vault_locked`), then re-makes the box under the vault's own props (amended 2026-10-21 (trust_lines): now `vault.decryptWhisper(box)`
+  takes the lease first, so a locked vault always refuses `vault_locked`, a malformed record and a call before `hello()` included,
+  and only then checks what it was handed; a record is opened under the lease's `vault_id`, and the earlier `absent_vault`
+  refusal of a record handed to a vault not yet made is gone); `box.tryOpen` has no
   `absent_vault` path any more, since a box cannot be made without vault props. (5) A box read from
   storage (in `getBox`, `putBox` and `delBox`) is made only while the vaultKey is in hand: the key is
   checked first, so a call whose storage read answers after a refresh found the vault deleted
@@ -431,8 +435,9 @@ added or folded into through the subagent, and no other entry changes.
   record is kept as `box.props`: a copy, frozen, its two `Ciphered` objects frozen too, so a caller's
   later change to its own record reaches nothing in the box; the instance is frozen. `box.sidecar` is
   the parse of `sidecar_json` with a reviver that freezes every object and array as it builds them
-  (amended 2026-10-21 (trust_lines): the record holds the sidecar as a JSON value, not text, and the box
-  freezes it through with no parse).
+  (amended 2026-10-21 (trust_lines): the record holds the sidecar as a JSON object, not text, and a box's record and its
+  listing's sidecar are deep-frozen with es-toolkit's `deepFreeze`, now a runtime dependency of safebyok; the hand-rolled
+  recursive freeze is gone, and nothing is parsed).
   `vault`, `props` and `summary` are attached by `decorate` (amended 2026-10-20 (placement): in `src/adorn.ts`, once `utils.ts`; it calls `adorn(obj, ckey, val)` per entry, `Object.defineProperty`,
   non-enumerable, non-writable, non-configurable; amended 2026-10-21 (b_simplify): they attach a hidden
   (non-enumerable) property that is writable and configurable, the Coach: "adorn and decorate should be
@@ -487,7 +492,7 @@ added or folded into through the subagent, and no other entry changes.
   whatever vault the box was made for; they need the key in hand (`vault_locked` otherwise), ask for
   no proof and read no storage, re-check the key after the open, and tell `onBadNews` of
   `damaged_box`. (7) `vault.boxes` entries are copies, frozen through (the sidecar re-parsed with the
-  freezing reviver) when the vault takes a listing up, so nothing a host is handed shares an object
+  freezing reviver; amended 2026-10-21 (trust_lines): deep-frozen with es-toolkit's `deepFreeze`, not re-parsed) when the vault takes a listing up, so nothing a host is handed shares an object
   with what the vault holds. This closes the note, in the entry on the vault's private fields below,
   that a summary's sidecar was not deep-frozen, and the A3 review's note that summaries' sidecars
   were shared with the vault's private listing.
@@ -501,12 +506,14 @@ added or folded into through the subagent, and no other entry changes.
   copied. The vault itself still reads `proof.passphrase` to give a new passphrase to the host's strength
   test (amended 2026-10-21 (wayin_rules): it does not; `PassphraseProof.checkStrongEnough()` does it). (2) `proof.wayinKeyFor(wayin)` derives the wayinKey, reading only the wayin's `salt_b64`
   (passphrase) or `wayinCtx` (passkey). (3) A `Wayin` (`PassphraseWayin`, `PasskeyWayin`) is made by
-  `Wayin.make(vault, record, holder)`, which re-validates the stored record through its Zod schema
+  `Wayin.make(vault, record, holder)` (amended 2026-10-21 (trust_lines): `Wayin.make(vault, vaultId, record)`), which re-validates the stored record through its Zod schema
   (refusing `damaged_wayin`), freezes a copy as `props`, and is itself frozen (amended 2026-10-21 (trust_lines): the copy is kept
   privately behind a `record` getter, on no own field). Its wayinCtx binds the
   vault's scope (the vault's public applabel, user_id and vaultlabel getters) and the `vault_id` and
   `registered_at` of the `holder`, the vault props record it was made from, passed explicitly because the
-  vault's public fields lag its private state until it publishes. 2026-10-20 (placement): the
+  vault's public fields lag its private state until it publishes (amended 2026-10-21 (trust_lines): the scope and the `vault_id` alone, the
+  wayin holding that `vault_id` as a visible field of its own; the vault props' `registered_at` is no longer bound, so an
+  altered one no longer stops a wayin opening, and `VaultIdentity` and the `holder` are gone). 2026-10-20 (placement): the
   constructors of `PassphraseWayin` and `PasskeyWayin` are private; a wayin is made only by `Wayin.make`
   or `Wayin.seal`, which reach them through a static keyed by a module-private symbol (`madeFrom`), so
   no exported name builds a wayin from a record the Zod schema has not checked. This is TypeScript
@@ -684,7 +691,7 @@ added or folded into through the subagent, and no other entry changes.
   `askPassphraseAt`, `trouble`, `vault_id`, `unlock_epoch` and the rest) are getters with no setter,
   each reading the frozen snapshot that one private `#settle()` publishes; the snapshot, its arrays,
   their entries and `capacity` are `Object.freeze`d (a box's sidecar JSON inside a summary is not
-  deep-frozen). The vault never reads its own state back through a public property, only through
+  deep-frozen; amended 2026-10-21 (trust_lines): it is, by es-toolkit's `deepFreeze`, as the box entry says). The vault never reads its own state back through a public property, only through
   `#` fields, so a host writing over a handle's property (`hello`, or shadowing `leaseMillis` with
   `Object.defineProperty`) changes nothing inside the vault; a test pins this. 2026-10-19
   (20261019-proof_wayin, #201); amended 2026-10-19 (a_sec2, #206): `vault.props` and `vault.wayins` exposed the stored
@@ -1651,7 +1658,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-15; 2026-10-19 (slots): vault props hold two slots, `passphrase` (required) and `passkey` (or null), each
   the one vaultKey wrapped under its own key (until slots, a list of one to `MaxUnlocks` (8), each with a
   `wayin_id` and a `wayinlabel`). The passphrase wayin has its own random `salt_b64`, and its wrap's
-  additional data is the format, scope, `vault_id`, the vault props' `registered_at`, a purpose per wayinkind
+  additional data is the format, scope, `vault_id`, the vault props' `registered_at` (amended 2026-10-21 (trust_lines): no longer bound), a purpose per wayinkind
   (`vault_key_passphrase_wrapped`), and the wayin's whole visible header (`wayinkind`,
   `key_deriver_label`, `salt_b64`, `vault_key_epoch` (amended 2026-10-21 (trust_lines): no longer in the header), `device_id`, `registered_at`) as key-sorted
   JSON. The
@@ -1684,7 +1691,7 @@ added or folded into through the subagent, and no other entry changes.
   passkeyKey is HKDF-SHA256 over the 32-byte PRF answer, with an empty salt and `info` =
   `["safebyok-vault-v1", "vault_key_passkey_wrapped", credential_id]` as JSON when first written, under the older tag `safebyok-vault-v1` (since the sweep
   entry below, the wrap's whole additional data); the wrap's additional
-  data is the format, scope, `vault_id`, the vault props' `registered_at`, purpose `vault_key_passkey_wrapped` and the wayin's
+  data is the format, scope, `vault_id`, the vault props' `registered_at` (amended 2026-10-21 (trust_lines): no longer bound), purpose `vault_key_passkey_wrapped` and the wayin's
   visible header, as for a passphrase wayin. A stored salt that is not base64url of 32 bytes
   refuses as `corrupt_record` (since 2026-10-16, `damaged_wayin`: see that entry), checked at unlock rather than in the schema (the size budget, as for
   passphrase salts). The core never calls WebAuthn and never stores the answer; the answer passes
@@ -1702,7 +1709,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-15; 2026-10-18; 2026-10-19; 2026-10-20: **every field a record writes is bound, unless a reason below says not** (the
   Coach: "make everything verifiable unless there's a good reason not to"). A passkey wayin's
   HKDF `info` is now its wrap's whole additional data -- format, scope, `vault_id`, the vault props'
-  `registered_at`, purpose, and the wayin's visible header (`wayinkind`, `credential_id`,
+  `registered_at` (amended 2026-10-21 (trust_lines): no longer bound), purpose, and the wayin's visible header (`wayinkind`, `credential_id`,
   `prf_salt_b64`, `vault_key_epoch` (amended 2026-10-21 (trust_lines): no longer in the header), `device_id`, `registered_at`; until slots also `wayin_id` and
   `wayinlabel`) -- so the passkeyKey itself, not only the wrap, belongs to one vault
   and one wayin; HKDF info and AES-GCM additional data are the same bytes, fed to different
@@ -1710,7 +1717,7 @@ added or folded into through the subagent, and no other entry changes.
   helper, and uses that one value both as a passkey's HKDF `info` and as the wrap's ctx; it was built
   twice from the same inputs. No bytes changed; the key derivation and the wrap are bound to the same ctx
   by construction, not by two calls agreeing.) (2026-10-19, #201: `PasskeyProof.wayinKeyFor(wayin)` runs that HKDF over the PRF bytes with
-  the wayin's whole wayinCtx as `info`.) Every wayin's wrap binds the vault props' `registered_at`. A box's two
+  the wayin's whole wayinCtx as `info`.) Every wayin's wrap binds the vault props' `registered_at` (amended 2026-10-21 (trust_lines): it binds the vault's scope and `vault_id`, not the vault props' `registered_at`, which a backend can alter without stopping a wayin opening; the wayin's own `registered_at` stays in its header, bound). A box's two
   encryptions bind its whole visible header (`format`, `boxlabel`, `revision_tok`, `sidecar_json`
   (amended 2026-10-21 (trust_lines): `sidecar`, bound as its key-sorted JSON),
   `registered_at`, `written_at`: every field but the two ciphered ones, as Zod's parse leaves the
@@ -2048,13 +2055,15 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-16; 2026-10-18; 2026-10-19: **a box's sidecar is any JSON, bound; its whisper's codec
   and schema version are reserved, bound too** (push_to_100_a, thread 2; G023, G025, G040). Amended 2026-10-21 (trust_lines): the sidecar
   is stored as the JSON value itself, in the field `sidecar` (once the text `sidecar_json`), box
-  format `safebyok-box-v8`: Postgres `jsonb` (nullable), Convex `v.any()`, GraphQL a `SafebyokSidecar`
-  scalar. The box ctx binds `stableJsonify(sidecar)` (keys sorted), computed at seal and at open, so a
+  format `safebyok-box-v8`: Postgres `jsonb NOT NULL DEFAULT '{}'`, Convex a record, GraphQL a non-null
+  `SafebyokSidecar`; always a JSON object (`{}` for none), and `putBox` refuses any other as `bad_option`
+  (third round: it was any JSON value, `jsonb` nullable and Convex `v.any()`). The box ctx binds `stableJsonify(sidecar)` (keys sorted), computed at seal and at open, so a
   backend that normalizes JSON does not break opening; the sentences below on the stored text kept
   byte for byte, on Postgres `text` and never `jsonb`, and on the record being its own stable
   re-serialization no longer hold. There is no validator for Postgres's limits: a sidecar Postgres
-  refuses (`\u0000`, say) surfaces as `storage_unavailable` with Postgres's error as cause. A sidecar
-  nested too deep for the check still reads as damaged. The
+  refuses (`\u0000`, say) surfaces as `storage_unavailable` with Postgres's error as cause. A stored sidecar
+  nested too deep for the schema check fails its call as `unexpected_error`, not as a damaged box: no check
+  of nesting depth is made, and availability against a hostile backend is not defended. The
   box (`safebyok-box-v6`) holds `sidecar_json`, the host's sidecar as stable-serialized JSON
   text, always written (`{}` when the host gave none, so an absent sidecar and an empty one are one
   record and one ctx), and `whisper_codec` (`json_v1`) and `whisper_schema_version` (`1`).
@@ -2064,13 +2073,13 @@ added or folded into through the subagent, and no other entry changes.
   byte for byte (Postgres keeps it as `text`, never `jsonb`). The record's check also requires
   that text to be its own stable re-serialization, inside a try: a sidecar respaced, reordered, or
   nested too deep to serialize (which once overflowed the stack in the snapshot's comparison and
-  stopped the vault opening with a bare `RangeError`) lists as damaged and reads as
+  stopped the vault opening with a bare `RangeError`; amended 2026-10-21 (trust_lines): the depth check is removed, and a sidecar too deep for the schema check fails its call as `unexpected_error`) lists as damaged and reads as
   `damaged_box`, so one bad record never hides the rest. A `putBox()` carries the standing
   sidecar and `registered_at` forward only from a record that deciphers: over one that will not, its
   sidecar becomes `{}` unless one is given, and its `registered_at` is now, so a sidecar planted in
   storage is never sealed into a fresh revision that reads clean (found in review). What the sidecar reveals: everything in
   it, in the clear, to anyone who reads storage, and its size; the vault never interprets it,
-  checks only that it is JSON, and the snapshot shows it unverified until the box is opened, as
+  checks only that it is a JSON object (amended 2026-10-21 (trust_lines), third round: once any JSON), and the snapshot shows it unverified until the box is opened, as
   every visible field is. Its size is capped only with the whisper's (`maxWhisperBytes` counts
   both), so a host cannot put a sidecar of megabytes in front of the listing through the vault.
   Reserving the codec fields now means a later codec (padding, G026) or a whisper shape version
@@ -2329,7 +2338,7 @@ added or folded into through the subagent, and no other entry changes.
   once one `WayinSummary` list) show `device_id` and `registered_at`.** The snapshot of a locked
   vault already summarised each wayin; it now says too when it was added and by which device, so a
   user can spot a wayin they did not make. Both are visible fields of the wayin, bound into its
-  wrap, and `device_id` is one random id per device per vault (the mark's `device_id`), so it
+  wrap (amended 2026-10-21 (trust_lines): a summary also shows the wayin's `vault_id`, bound into its wrap as before), and `device_id` is one random id per device per vault (the mark's `device_id`), so it
   links nothing the vault does not already link: not across vaults, not to the hardware.
 
 
