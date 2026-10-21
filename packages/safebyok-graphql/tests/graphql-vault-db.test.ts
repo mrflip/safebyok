@@ -49,7 +49,7 @@ describe("graphqlVaultDB's devices, for the battery's races", () => {
 })
 
 const u1 = TH.scopeOf('u1')
-const thisVault = { vault_id: 'vault-id-u1' }
+const thisVault = { vault_tok: 'vault-tok-u1' }
 
 /** u1's main vault, opened by the core in a browser of its own, over graphqlVaultDB to `schema`. */
 const vaultIn = (schema: GraphQLSchema) => TH.settledVault({
@@ -117,8 +117,8 @@ describe("graphqlVaultDB, a server's box limit", () => {
     // A browser declaring more than its server holds: the server holds the line.
     const vaultDB = graphqlVaultDB({ client: TH.urqlClientFor(schema, 'u1'), maxBoxes: Infinity })
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
-    await TH.expectingGood(vaultDB).putBox(u1, { vault_id: 'vault-id-u1', revision_tok: null }, TH.boxOf('openai', 'sk-fake-one'))
-    const refusal = await TH.expectBad(vaultDB.putBox(u1, { vault_id: 'vault-id-u1', revision_tok: null }, TH.boxOf('secret_project_x', 'sk-fake-two')), 'vault_full')
+    await TH.expectingGood(vaultDB).putBox(u1, { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('openai', 'sk-fake-one'))
+    const refusal = await TH.expectBad(vaultDB.putBox(u1, { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('secret_project_x', 'sk-fake-two')), 'vault_full')
     expect(refusal).to.be.instanceOf(VaultError)
     expect(refusal.message).to.include('1 boxes')
     expect(refusal.message).to.not.include('secret_project_x')
@@ -133,7 +133,7 @@ describe("graphqlVaultDB, a server's box limit", () => {
     const schema = TH.schemaOver(db, ({ userId }) => postgresVaultDB({ client: db, userId }))
     const vaultDB = graphqlVaultDB({ client: TH.urqlClientFor(schema, 'u1') })
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
-    await TH.expectingGood(vaultDB).putBox(u1, { vault_id: 'vault-id-u1', revision_tok: null }, TH.boxOf('openai', 'sk-fake-one'))
+    await TH.expectingGood(vaultDB).putBox(u1, { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('openai', 'sk-fake-one'))
     const capacity = await TH.expectingGood(vaultDB).getCapacity(u1)
     expect(capacity.boxes).to.deep.equal({ used: 1, max: Number.MAX_SAFE_INTEGER })
     expect(capacity.bytes.max).to.eq(Number.MAX_SAFE_INTEGER)
@@ -256,7 +256,7 @@ describe("graphqlVaultDB, its refusals", () => {
 
   it("refuses with storage_unavailable when the network fails", async () => {
     const vaultDB = graphqlVaultDB({ client: new Client({ url: 'https://app.example.test/api/graphql', exchanges: [fetchExchange], fetch: offline }) })
-    await TH.expectBad(vaultDB.putBox(u1, { vault_id: 'vault-id-u1', revision_tok: null }, TH.boxOf('openai', 'r1')), 'storage_unavailable')
+    await TH.expectBad(vaultDB.putBox(u1, { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('openai', 'r1')), 'storage_unavailable')
   })
 
   it("refuses with storage_unavailable an answer holding neither data nor an error", async () => {
@@ -295,8 +295,8 @@ describe("graphqlVaultDB, its refusals", () => {
     const vaultDB = graphqlVaultDB({ client: counting as unknown as GraphqlVaultClient })
     const past = 2 ** 31
     const refusals = [
-      await TH.expectBad(vaultDB.ensureVaultProps(TH.vaultPropsOf('u1', { unlock_epoch: past })), 'bad_record'),
-      await TH.expectBad(vaultDB.putVaultProps(TH.vaultPropsOf('u1', { unlock_epoch: 2 }), { ...thisVault, unlock_epoch: past }), 'bad_record'),
+      await TH.expectBad(vaultDB.ensureVaultProps(TH.vaultPropsOf('u1', { gate_epoch: past })), 'bad_record'),
+      await TH.expectBad(vaultDB.putVaultProps(TH.vaultPropsOf('u1', { gate_epoch: 2 }), { ...thisVault, gate_epoch: past }), 'bad_record'),
     ]
     expect(refusals.map((refusal) => /^Nothing was written: .* past 2147483647/.test(refusal.message))).to.deep.equal([true, true])
     expect(sent).to.eq(0)
@@ -306,8 +306,8 @@ describe("graphqlVaultDB, its refusals", () => {
     const schema = TH.schemaOver(await TH.emptyDatabase())
     const vaultDB = TH.browserFor(schema, 'u1')
     const most = (2 ** 31) - 1
-    const created = await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1', { unlock_epoch: most }))
-    expect(created.unlock_epoch).to.eq(most)
+    const created = await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1', { gate_epoch: most }))
+    expect(created.gate_epoch).to.eq(most)
   })
 
   it("carries the server's bad_record by its kind, for a record its own VaultDB refuses", async () => {

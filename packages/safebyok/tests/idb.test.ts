@@ -224,7 +224,7 @@ describe("idbDeviceDB", () => {
   it("reads a mark that does not pass its check as none, and drops it", async () => {
     const dbName = TH.freshDbName()
     const shelf = createStore(`${dbName}:device_db`, 'records')
-    await set(Ckeys.mark(TH.scopeOf('u1')), { ...TH.markOf('u1'), seen: { ...TH.markOf('u1').seen, unlock_epoch: 'one' } }, shelf)
+    await set(Ckeys.mark(TH.scopeOf('u1')), { ...TH.markOf('u1'), seen: { ...TH.markOf('u1').seen, gate_epoch: 'one' } }, shelf)
     const deviceDB = TH.expectingGood(idbDeviceDB({ dbName }))
     expect(await deviceDB.getMark(TH.scopeOf('u1'))).to.be.null
     expect(await inspectIdbDeviceDB({ dbName }).rows()).to.have.lengthOf(0)

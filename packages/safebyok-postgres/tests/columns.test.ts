@@ -4,11 +4,11 @@ import * as Columns from '../src/columns'
 import { VaultPropsColumns, ListedBoxColumns, BoxColumns } from '../src/columns'
 import type { Column } from '../src/columns'
 
-const Pair: Column[] = [['vault_id', 'text'], ['registered_at', 'bigint']]
+const Pair: Column[] = [['vault_tok', 'text'], ['registered_at', 'bigint']]
 
 describe("Columns.names", () => {
   it("lists the columns' names, as an INSERT does", () => {
-    expect(Columns.names(Pair)).to.eq('vault_id, registered_at')
+    expect(Columns.names(Pair)).to.eq('vault_tok, registered_at')
   })
 })
 
@@ -24,7 +24,7 @@ describe("Columns.placeholders", () => {
 
 describe("Columns.placeholderOf", () => {
   it("is the one parameter holding a field", () => {
-    expect(Columns.placeholderOf([['format', 'text'], ['vault_id', 'text']], 'vault_id', 4)).to.eq('$5::text')
+    expect(Columns.placeholderOf([['format', 'text'], ['vault_tok', 'text']], 'vault_tok', 4)).to.eq('$5::text')
   })
 
   it("throws for a field no column holds: a mistake in this package, never a host's", () => {
@@ -34,15 +34,15 @@ describe("Columns.placeholderOf", () => {
 
 describe("Columns.selected", () => {
   it("reads a bigint as a double and a jsonb as text, the same from every driver", () => {
-    expect(Columns.selected(Pair)).to.eq('vault_id, registered_at::float8 AS registered_at')
+    expect(Columns.selected(Pair)).to.eq('vault_tok, registered_at::float8 AS registered_at')
     expect(Columns.selected([['whisper_ciphered', 'jsonb']])).to.eq('whisper_ciphered::text AS whisper_ciphered')
   })
 })
 
 describe("Columns.paramsOf", () => {
   it("is the record's values in column order, a null or missing field as null, as its example shows", () => {
-    expect(Columns.paramsOf({ vault_id: 'v1', passkey: null }, [['vault_id', 'text'], ['passkey', 'jsonb']])).to.deep.equal(['v1', null])
-    expect(Columns.paramsOf({ vault_id: 'v1' }, [['vault_id', 'text'], ['passkey', 'jsonb']])).to.deep.equal(['v1', null])
+    expect(Columns.paramsOf({ vault_tok: 'v1', passkey: null }, [['vault_tok', 'text'], ['passkey', 'jsonb']])).to.deep.equal(['v1', null])
+    expect(Columns.paramsOf({ vault_tok: 'v1' }, [['vault_tok', 'text'], ['passkey', 'jsonb']])).to.deep.equal(['v1', null])
   })
 
   it("sends a jsonb value as its JSON text", () => {
@@ -58,11 +58,11 @@ describe("Columns.paramsOf", () => {
 
 describe("Columns.recordOf", () => {
   it("reads a null column as a null field, as its example shows", () => {
-    expect(Columns.recordOf({ vault_id: 'v1', passkey: null }, [['vault_id', 'text'], ['passkey', 'jsonb']])).to.deep.equal({ vault_id: 'v1', passkey: null })
+    expect(Columns.recordOf({ vault_tok: 'v1', passkey: null }, [['vault_tok', 'text'], ['passkey', 'jsonb']])).to.deep.equal({ vault_tok: 'v1', passkey: null })
   })
 
   it("leaves a column the row lacks out of the record", () => {
-    expect(Columns.recordOf({ vault_id: 'v1' }, [['vault_id', 'text'], ['passkey', 'jsonb']])).to.deep.equal({ vault_id: 'v1' })
+    expect(Columns.recordOf({ vault_tok: 'v1' }, [['vault_tok', 'text'], ['passkey', 'jsonb']])).to.deep.equal({ vault_tok: 'v1' })
   })
 
   it("parses a jsonb column's text, and leaves one a driver already parsed as it is", () => {
@@ -73,7 +73,7 @@ describe("Columns.recordOf", () => {
 
   it("hands back a row that is not an object as it is, for validation to refuse", () => {
     expect(Columns.recordOf(undefined, Pair)).to.be.undefined
-    expect(Columns.recordOf('vault-id', Pair)).to.eq('vault-id')
+    expect(Columns.recordOf('vault-tok', Pair)).to.eq('vault-tok')
   })
 
   it("rebuilds a box from its params' round trip", () => {

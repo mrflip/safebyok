@@ -27,15 +27,15 @@ export const VaultPropsColumns = everyFieldOf<VaultProps>()([
   ['applabel',         'text'],
   ['user_id',          'text'],
   ['vaultlabel',       'text'],
-  ['vault_id',         'text'],
+  ['vault_tok',        'text'],
   ['format',           'text'],
-  ['unlock_epoch',     'bigint'],
+  ['gate_epoch',       'bigint'],
   ['passphrase',       'jsonb'],
   ['passkey',          'jsonb'],
   ['registered_at',    'bigint'],
 ] as const)
 
-/** Every field of a BoxRecord, in `safebyok_boxes`'s order after the scope and `vault_id`, which the adapter adds. */
+/** Every field of a BoxRecord, in `safebyok_boxes`'s order after the scope and `vault_tok`, which the adapter adds. */
 export const BoxColumns = everyFieldOf<BoxRecord>()([
   ['format',                 'text'],
   ['boxlabel',               'text'],
@@ -55,13 +55,13 @@ export const ListedBoxColumns = BoxColumns.filter(([field]) => field !== 'box_ke
 
 /** The columns' names, as an INSERT or an UPDATE lists them.
  *
- * @example names([['vault_id', 'text'], ['registered_at', 'bigint']])  // 'vault_id, registered_at'
+ * @example names([['vault_tok', 'text'], ['registered_at', 'bigint']]) // 'vault_tok, registered_at'
  */
 export const names = (columns: readonly Column[]): string => columns.map(([field]) => field).join(', ')
 
 /** Numbered parameters for the columns from `$first`, each cast to its column's type.
  *
- * @example placeholders([['vault_id', 'text'], ['registered_at', 'bigint']], 4)  // '$4::text, $5::bigint'
+ * @example placeholders([['vault_tok', 'text'], ['registered_at', 'bigint']], 4) // '$4::text, $5::bigint'
  */
 export const placeholders = (columns: readonly Column[], first: number): string => (
   columns.map(([_field, kind], ii) => `$${String(first + ii)}::${kind}`).join(', ')
@@ -69,7 +69,7 @@ export const placeholders = (columns: readonly Column[], first: number): string 
 
 /** The one parameter of `placeholders(columns, first)` that holds `field`.
  *
- * @example placeholderOf([['format', 'text'], ['vault_id', 'text']], 'vault_id', 4)  // '$5::text'
+ * @example placeholderOf([['format', 'text'], ['vault_tok', 'text']], 'vault_tok', 4)  // '$5::text'
  */
 export const placeholderOf = (columns: readonly Column[], field: string, first: number): string => {
   const idx = columns.findIndex(([named]) => named === field)
@@ -83,7 +83,7 @@ export const placeholderOf = (columns: readonly Column[], field: string, first: 
  * A bigint comes back as a double, exact up to 2^53, where some drivers hand back text. A jsonb
  * comes back as its text, which {@link recordOf} parses.
  *
- * @example selected([['vault_id', 'text'], ['registered_at', 'bigint']])  // 'vault_id, registered_at::float8 AS registered_at'
+ * @example selected([['vault_tok', 'text'], ['registered_at', 'bigint']]) // 'vault_tok, registered_at::float8 AS registered_at'
  */
 export const selected = (columns: readonly Column[]): string => columns.map(([field, kind]) => {
   if (kind === 'bigint') { return `${field}::float8 AS ${field}` }
@@ -94,7 +94,7 @@ export const selected = (columns: readonly Column[]): string => columns.map(([fi
 /** The record's values for its columns, in the order {@link placeholders} numbers them.
  * A jsonb value goes as its JSON text, and a null or missing field as null.
  *
- * @example paramsOf({ vault_id: 'v1', passkey: null }, [['vault_id', 'text'], ['passkey', 'jsonb']])  // ['v1', null]
+ * @example paramsOf({ vault_tok: 'v1', passkey: null }, [['vault_tok', 'text'], ['passkey', 'jsonb']])  // ['v1', null]
  */
 export const paramsOf = (record: object, columns: readonly Column[]): unknown[] => (
   columns.map(([field, kind]) => {
@@ -108,7 +108,7 @@ export const paramsOf = (record: object, columns: readonly Column[]): unknown[] 
  * A null column is a null field (`passkey`, for a vault without one), and a column the row lacks
  * is a field left out. A row that is not an object comes back as it is, for that validation to refuse.
  *
- * @example recordOf({ vault_id: 'v1', passkey: null }, [['vault_id', 'text'], ['passkey', 'jsonb']])  // { vault_id: 'v1', passkey: null }
+ * @example recordOf({ vault_tok: 'v1', passkey: null }, [['vault_tok', 'text'], ['passkey', 'jsonb']])  // { vault_tok: 'v1', passkey: null }
  */
 export const recordOf = (row: unknown, columns: readonly Column[]): unknown => {
   if (typeof row !== 'object' || row === null) { return row }

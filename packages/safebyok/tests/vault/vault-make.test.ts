@@ -575,7 +575,7 @@ describe("Vault.make, by the Contract", () => {
     const world = makeWorld()
     const vault = Vault.make(world.optsWith())
     expect(vault).to.be.instanceOf(Vault)
-    expect(vault.snapshot).to.deep.include({ state: 'opening', vault_id: null, registered_at: null, unlock_epoch: null, askPassphraseAt: null, trouble: null, syncing: true })
+    expect(vault.snapshot).to.deep.include({ state: 'opening', vault_tok: null, registered_at: null, gate_epoch: null, askPassphraseAt: null, trouble: null, syncing: true })
     expect(vault.passphrase).to.be.null
     expect(vault.passkey).to.be.null
     expect(vault.boxes).to.have.lengthOf(0)

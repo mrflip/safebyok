@@ -64,14 +64,14 @@ describe("OutageVaultDB, while up", () => {
   })
 })
 
-/** An outage-switched adapter over a store holding `u1`'s vault, its props damaged but for their vault_id. */
+/** An outage-switched adapter over a store holding `u1`'s vault, its props damaged but for their vault_tok. */
 const damagedOver = async () => {
   const store = memoryStore()
   const outage = makeOutage()
   const vaultDB = new OutageVaultDB(localVaultDB({ store }), outage)
   await TH.expectingGood(vaultDB).ensureVaultProps(vaultProps)
   await TH.expectingGood(vaultDB).putBox(scope, TH.noBoxYet, TH.boxOf('openai', 'two'))
-  store.write(Ckeys.vaultProps(scope), JSON.stringify({ ...vaultProps, unlock_epoch: 'one' }))
+  store.write(Ckeys.vaultProps(scope), JSON.stringify({ ...vaultProps, gate_epoch: 'one' }))
   return { store, outage, vaultDB }
 }
 

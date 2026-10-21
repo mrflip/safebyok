@@ -224,9 +224,9 @@ describe("convexVaultDB, refusing", () => {
     // Boxes the vault never opens, leaving less room than one whisper of 40,000 bytes takes.
     const vaultDB = convexVaultDB({ client, api: deployment.api.safebyok })
     const vaultProps = await TH.expectingGood(vaultDB).getVaultProps(u1)
-    const vaultTok = vaultProps?.vault_id ?? ''
+    const vaultTok = vaultProps?.vault_tok ?? ''
     for (const [ii, bytes] of [...Array.from({ length: 8 }, () => 900_000), 120_000].entries()) {
-      await TH.expectingGood(vaultDB).putBox(u1, { vault_id: vaultTok, revision_tok: null }, TH.heavyBox(`heavy_${String(ii)}`, bytes))
+      await TH.expectingGood(vaultDB).putBox(u1, { vault_tok: vaultTok, revision_tok: null }, TH.heavyBox(`heavy_${String(ii)}`, bytes))
     }
     const refusal = await TH.expectRefusal(vault.putBox('anthropic_api_key', 'x'.repeat(40_000)), 'vault_full')
     expect(refusal.message).to.match(/no room for this one/)
@@ -250,8 +250,8 @@ describe("a record the deployment refused", () => {
   const scope = { applabel: 'quotable_app', user_id: subject, vaultlabel: 'quotable_vault' }
   const quotableWayin = { device_id: 'device_quotable', registered_at: Date.UTC(2026, 8, 17) }
   const quotableWayins = { passphrase: TH.wayinOf('quotable_phrase', quotableWayin), passkey: TH.passkeyWayinOf('quotable_passkey', quotableWayin) }
-  const standing = TH.vaultPropsOf(subject, { ...scope, unlock_epoch: 52_871, ...quotableWayins })
-  const nextVaultProps = { ...standing, unlock_epoch: 52_872, vault_key_passphrase_wrapped: TH.fakeCiphered('rewrapped_quotable') }
+  const standing = TH.vaultPropsOf(subject, { ...scope, gate_epoch: 52_871, ...quotableWayins })
+  const nextVaultProps = { ...standing, gate_epoch: 52_872, vault_key_passphrase_wrapped: TH.fakeCiphered('rewrapped_quotable') }
   const box = TH.boxOf('quotable_box', 'quotable_rev', { sidecar: { note: 'a quotable sidecar' } })
   // The whisper's codec and schema version are the same in every box, so nothing to quote.
   const { whisper_codec: _codec, whisper_schema_version: _version, ...quotableBox } = box
@@ -262,14 +262,14 @@ describe("a record the deployment refused", () => {
   const rivalScope = { applabel: 'rival_app', user_id: 'user_rival', vaultlabel: 'rival_vault' }
   const rivalWayin = { device_id: 'device_rival', registered_at: Date.UTC(2026, 0, 2) }
   const rivalWayins = { passphrase: TH.wayinOf('rival_phrase', rivalWayin), passkey: TH.passkeyWayinOf('rival_passkey', rivalWayin) }
-  const rivalVaultProps = TH.vaultPropsOf('user_rival', { ...rivalScope, unlock_epoch: 7, ...rivalWayins })
+  const rivalVaultProps = TH.vaultPropsOf('user_rival', { ...rivalScope, gate_epoch: 7, ...rivalWayins })
   const rivalBox = TH.boxOf('rival_box', 'rival_rev', { sidecar: { note: 'a rival note' } })
-  const rivalLeaves = new Set(TH.leafTexts({ scope: rivalScope, record: [rivalVaultProps, { ...rivalVaultProps, unlock_epoch: 8, vault_key_passphrase_wrapped: TH.fakeCiphered('rewrapped_rival') }, rivalBox] }))
+  const rivalLeaves = new Set(TH.leafTexts({ scope: rivalScope, record: [rivalVaultProps, { ...rivalVaultProps, gate_epoch: 8, vault_key_passphrase_wrapped: TH.fakeCiphered('rewrapped_rival') }, rivalBox] }))
   const perRecordLeaves = (record: unknown) => TH.leafTexts({ scope, record }).filter((leaf) => ! rivalLeaves.has(leaf))
 
   const RefusedWrites: [string, unknown, (vaultDB: ReturnType<typeof convexVaultDB>) => Promise<Outcome<unknown>>][] = [
-    ['putVaultProps', nextVaultProps, (vaultDB) => vaultDB.putVaultProps(nextVaultProps, { vault_id: standing.vault_id, unlock_epoch: 52_871 })],
-    ['putBox',        quotableBox, (vaultDB) => vaultDB.putBox(scope, { vault_id: standing.vault_id, revision_tok: null }, box)],
+    ['putVaultProps', nextVaultProps, (vaultDB) => vaultDB.putVaultProps(nextVaultProps, { vault_tok: standing.vault_tok, gate_epoch: 52_871 })],
+    ['putBox',        quotableBox, (vaultDB) => vaultDB.putBox(scope, { vault_tok: standing.vault_tok, revision_tok: null }, box)],
   ]
 
   for (const [verb, record, write] of RefusedWrites) {
@@ -305,7 +305,7 @@ describe("a record the deployment refused", () => {
     const deployment = deploy()
     const client = deployment.client(subject)
     await TH.expectGood(convexVaultDB({ client, api: deployment.api.safebyok }).ensureVaultProps(standing))
-    const expected = { vault_id: standing.vault_id, revision_tok: null }
+    const expected = { vault_tok: standing.vault_tok, revision_tok: null }
     const quotedArgs = withRevisionNotText({ scope, box, expected })
     await expect(client.mutation(deployment.api.safebyok.putBox, quotedArgs)).rejects.toThrow('quoted_by_convex')
     const quoting: ConvexVaultClient = {

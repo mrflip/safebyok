@@ -110,7 +110,7 @@ describe("delDamagedVault", () => {
         read: (ckey) => {
           if (ckey !== u1VaultPropsCkey) { return world.dbStore.read(ckey) }
           looks += 1
-          return looks === 1 ? world.dbStore.read(ckey) : JSON.stringify({ ...storedVaultPropsOf(world), vault_id: 'made-anew' })
+          return looks === 1 ? world.dbStore.read(ckey) : JSON.stringify({ ...storedVaultPropsOf(world), vault_tok: 'made-anew' })
         },
       },
     })
@@ -154,7 +154,7 @@ describe("delDamagedVault", () => {
     vault.close()
     const ckey = Ckeys.vaultProps({ applabel: 'acme', user_id: 'u1@example', vaultlabel: 'main' })
     const vaultProps = JSON.parse(world.dbStore.read(ckey) ?? 'null') as object
-    world.dbStore.write(ckey, JSON.stringify({ ...vaultProps, unlock_epoch: 'one' }))
+    world.dbStore.write(ckey, JSON.stringify({ ...vaultProps, gate_epoch: 'one' }))
     await delDamagedVault(opts)
     expect(world.dbStore.read(ckey)).to.be.null
   })

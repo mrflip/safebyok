@@ -224,7 +224,7 @@ describe("the times a vault keeps", () => {
     expect(storedVaultPropsOf(world)).to.include({ registered_at: madeAt })
     world.advance(60_000)
     await vault.putWayin('pw one', 'pw two')
-    expect(storedVaultPropsOf(world)).to.include({ registered_at: madeAt, unlock_epoch: 2 })
+    expect(storedVaultPropsOf(world)).to.include({ registered_at: madeAt, gate_epoch: 2 })
   })
 
   it("writes no created_at or updated_at, to a box or the vault props", async () => {
@@ -1148,7 +1148,7 @@ describe("vault.decryptWhisper", () => {
     await vault.putBox('anthropic', 'sk-fake')
     const record = await storedBoxOf(world)
     expect(await vault.decryptWhisper(record)).to.eq('sk-fake')
-    const foreign = Box.make(TH.vaultSliceOf('u2'), record, vault.vault_id)
+    const foreign = Box.make(TH.vaultSliceOf('u2'), record, vault.vault_tok)
     expect(await vault.decryptWhisper(foreign)).to.eq('sk-fake')
   })
 
@@ -1156,7 +1156,7 @@ describe("vault.decryptWhisper", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox('anthropic', 'sk-fake')
-    const elder = Box.make(vault, await storedBoxOf(world), 'vault-id-before')
+    const elder = Box.make(vault, await storedBoxOf(world), 'vault-tok-before')
     await TH.expectRefusal(vault.decryptWhisper(elder), 'vault_locked')
   })
 

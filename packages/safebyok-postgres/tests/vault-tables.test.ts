@@ -66,9 +66,9 @@ describe("VaultTablesSql", () => {
     expect(await describedColumns(db, 'safebyok_vaults')).to.deep.equal(VaultPropsColumns.map(([field, kind]) => [field, TypeForKind[kind]]))
   })
 
-  it("makes a box's columns exactly as the adapter writes them, after its vault's scope and vault_id", async () => {
+  it("makes a box's columns exactly as the adapter writes them, after its vault's scope and vault_tok", async () => {
     const db = await TH.database()
-    const adapterColumns = [['applabel', 'text'], ['user_id', 'text'], ['vaultlabel', 'text'], ['vault_id', 'text']]
+    const adapterColumns = [['applabel', 'text'], ['user_id', 'text'], ['vaultlabel', 'text'], ['vault_tok', 'text']]
     expect(await describedColumns(db, 'safebyok_boxes')).to.deep.equal([
       ...adapterColumns,
       ...BoxColumns.map(([field, kind]) => [field, TypeForKind[kind]]),
@@ -78,11 +78,11 @@ describe("VaultTablesSql", () => {
   it("names each key for its table, as Postgres does a key made with the table", async () => {
     const db = await tablesOnlyDatabase()
     expect(await describedKeys(db, 'safebyok_vaults')).to.deep.equal([
-      ['safebyok_vaults_applabel_user_id_vaultlabel_vault_id_key', 'UNIQUE (applabel, user_id, vaultlabel, vault_id)'],
+      ['safebyok_vaults_applabel_user_id_vaultlabel_vault_tok_key', 'UNIQUE (applabel, user_id, vaultlabel, vault_tok)'],
       ['safebyok_vaults_pkey',                                     'PRIMARY KEY (applabel, user_id, vaultlabel)'],
     ])
     expect(await describedKeys(db, 'safebyok_boxes')).to.deep.equal([
-      ['safebyok_boxes_applabel_user_id_vaultlabel_vault_id_fkey', 'FOREIGN KEY (applabel, user_id, vaultlabel, vault_id) REFERENCES safebyok_vaults(applabel, user_id, vaultlabel, vault_id) ON DELETE CASCADE'],
+      ['safebyok_boxes_applabel_user_id_vaultlabel_vault_tok_fkey', 'FOREIGN KEY (applabel, user_id, vaultlabel, vault_tok) REFERENCES safebyok_vaults(applabel, user_id, vaultlabel, vault_tok) ON DELETE CASCADE'],
       ['safebyok_boxes_pkey',                                      'PRIMARY KEY (applabel, user_id, vaultlabel, boxlabel)'],
     ])
   })
@@ -160,7 +160,7 @@ describe("VaultNotifySql", () => {
     const db = await tablesOnlyDatabase()
     const { heard, unsubscribe } = await TH.liveWatch(TH.requestFor(db, 'u1'), TH.scopeOf('u1'))
     await TH.expectGood(TH.requestFor(db, 'u1').ensureVaultProps(TH.vaultPropsOf('u1')))
-    await TH.expectGood(TH.requestFor(db, 'u1').putBox(TH.scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: null }, TH.boxOf('anthropic', 'sk-fake')))
+    await TH.expectGood(TH.requestFor(db, 'u1').putBox(TH.scopeOf('u1'), { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('anthropic', 'sk-fake')))
     await TH.wakeupAtNextTick()
     expect(heard.count).to.eq(0)
     expect(await TH.expectingGood(TH.requestFor(db, 'u1')).listBoxes(TH.scopeOf('u1'))).to.have.lengthOf(1)

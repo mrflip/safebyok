@@ -33,8 +33,8 @@ export const VaultPropsFields = everyFieldOf<VaultProps>()([
   ['applabel',         'plain'],
   ['user_id',          'plain'],
   ['vaultlabel',       'plain'],
-  ['vault_id',         'plain'],
-  ['unlock_epoch',     'plain'],
+  ['vault_tok',        'plain'],
+  ['gate_epoch',       'plain'],
   ['passphrase',       'plain'],
   ['passkey',          'plain'],
   ['registered_at',    'plain'],
@@ -73,7 +73,7 @@ export const selectionOf = (fields: readonly Field[]): string => fields.map(([fi
  * halves. Nothing is checked here: the VaultDB on each side validates what it is handed. What is
  * not an object comes back as it is, for that validation to refuse.
  *
- * @example recordOf({ vault_id: 'v1', passkey: null, __typename: 'SafebyokVaultProps' }, [['vault_id', 'plain'], ['passkey', 'plain']])   // { vault_id: 'v1', passkey: null }
+ * @example recordOf({ vault_tok: 'v1', passkey: null, __typename: 'SafebyokVaultProps' }, [['vault_tok', 'plain'], ['passkey', 'plain']]) // { vault_tok: 'v1', passkey: null }
  */
 export const recordOf = (sent: unknown, fields: readonly Field[]): unknown => {
   if (! isBag(sent)) { return sent }

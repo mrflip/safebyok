@@ -27,7 +27,7 @@ const expectRefusal = async (operation: Promise<unknown>, kind: VaultError['refu
 
 /** The vault's passkey as its snapshot has it, for `proof`. */
 const summaryOf = (proof: PasskeyAnswer): PasskeyWayinSummary => ({
-  wayinkind: 'passkey', device_id: 'device-one', registered_at: Date.UTC(2026, 9, 15), vault_id: 'vault-id-u1',
+  wayinkind: 'passkey', device_id: 'device-one', registered_at: Date.UTC(2026, 9, 15), vault_tok: 'vault-tok-u1',
   credential_id: proof.credentialId, prf_salt_b64: proof.prfSaltB64,
 })
 

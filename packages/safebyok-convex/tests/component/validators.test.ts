@@ -134,7 +134,7 @@ const convexAccepts = async (call: Promise<unknown>): Promise<boolean> => {
   }
 }
 
-const { vault_id: _vaultTok, ...vaultPropsWithoutVaultTok } = TH.vaultPropsOf('u1')
+const { vault_tok: _vaultTok, ...vaultPropsWithoutVaultTok } = TH.vaultPropsOf('u1')
 const { sidecar: _sidecar, ...boxWithoutSidecar } = TH.boxOf('anthropic_api_key', 'a1')
 const { registered_at: _vaultPropsTime, ...vaultPropsWithoutTime } = TH.vaultPropsOf('u1')
 const { passphrase: _passphrase, passkey: _passkey, ...vaultPropsWithoutWayins } = TH.vaultPropsOf('u1')
@@ -159,8 +159,8 @@ const VaultPropsCases = [
   // both refuse -- what Convex can see:
   [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v7' },              false,  false,  'a format this package does not know'],
   [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-box-v1' },                false,  false,  "another record's format"],
-  [vaultPropsWithoutVaultTok,                                               false,  false,  'vault props missing their vault_id'],
-  [{ ...TH.vaultPropsOf('u1'), unlock_epoch: '1' },                        false,  false,  'an epoch written as text'],
+  [vaultPropsWithoutVaultTok,                                               false,  false,  'vault props missing their vault_tok'],
+  [{ ...TH.vaultPropsOf('u1'), gate_epoch: '1' },                          false,  false,  'an epoch written as text'],
   [{ ...TH.vaultPropsOf('u1'), passphrase: TH.wayinOf('passphrase', { vault_key_wayin_wrapped: { cipher_iv_b64: 'iv' } as never }) }, false, false, 'a ciphered wayin missing its ciphertext'],
   [{ ...TH.vaultPropsOf('u1'), passphrase: TH.wayinOf('passphrase', { wayinkind: 'fingerprint' as never }) }, false, false, 'a wayinkind this package does not know'],
   [{ ...TH.vaultPropsOf('u1'), passkey: TH.wayinOf('laptop', { wayinkind: 'passkey' as never }) }, false, false, "a passphrase's fields in the passkey slot"],
@@ -174,9 +174,9 @@ const VaultPropsCases = [
   // Convex refuses, Zod strips: a field neither record has never reaches storage.
   [{ ...TH.vaultPropsOf('u1'), passphrase_text: 'not-a-real-passphrase' },   true,   false,  'a field the record does not have'],
   // Zod refuses, Convex accepts -- the finer rules are the client's:
-  [{ ...TH.vaultPropsOf('u1'), vault_id: '' },                               false,  true,   'an empty vault_id'],
-  [{ ...TH.vaultPropsOf('u1'), unlock_epoch: 0 },                            false,  true,   'an epoch of zero'],
-  [{ ...TH.vaultPropsOf('u1'), unlock_epoch: 1.5 },                          false,  true,   'a fractional epoch'],
+  [{ ...TH.vaultPropsOf('u1'), vault_tok: '' },                              false,  true,   'an empty vault_tok'],
+  [{ ...TH.vaultPropsOf('u1'), gate_epoch: 0 },                              false,  true,   'an epoch of zero'],
+  [{ ...TH.vaultPropsOf('u1'), gate_epoch: 1.5 },                            false,  true,   'a fractional epoch'],
   [{ ...TH.vaultPropsOf('u1'), registered_at: 1_792_022_400 },               false,  true,   'a registered_at in epoch seconds, before 1981'],
   [{ ...TH.vaultPropsOf('u1'), passphrase: TH.wayinOf('passphrase', { salt_b64: '' }) }, false, true, 'a passphrase with an empty salt'],
   [{ ...TH.vaultPropsOf('u1'), passkey: TH.passkeyWayinOf('laptop', { credential_id: '' }) }, false, true, 'a passkey with an empty credential_id'],

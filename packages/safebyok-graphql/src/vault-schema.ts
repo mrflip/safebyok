@@ -48,7 +48,7 @@ input SafebyokVaultScopeInput {
 }
 
 """
-A vault's props, as stored: its scope, its vault_id, and its two ways in, each wrapping the
+A vault's props, as stored: its scope, its vault_tok, and its two ways in, each wrapping the
 one vaultKey: its passphrase, and its passkey, null when it has none. Times are epoch milliseconds.
 """
 type SafebyokVaultProps {
@@ -56,8 +56,8 @@ type SafebyokVaultProps {
   applabel:         String!
   user_id:          String!
   vaultlabel:       String!
-  vault_id:         String!
-  unlock_epoch:     Int!
+  vault_tok:        String!
+  gate_epoch:       Int!
   passphrase:       SafebyokWayin!
   passkey:          SafebyokWayin
   registered_at:    Float!
@@ -69,8 +69,8 @@ input SafebyokVaultPropsInput {
   applabel:         String!
   user_id:          String!
   vaultlabel:       String!
-  vault_id:         String!
-  unlock_epoch:     Int!
+  vault_tok:        String!
+  gate_epoch:       Int!
   passphrase:       SafebyokWayin!
   passkey:          SafebyokWayin
   registered_at:    Float!
@@ -122,31 +122,31 @@ type SafebyokListedBox {
 
 """What an update of the vault props was proven against: it lands only while the vault props standing have both."""
 input SafebyokVaultPropsExpectationInput {
-  vault_id:         String!
-  unlock_epoch:     Int!
+  vault_tok:        String!
+  gate_epoch:       Int!
 }
 
 """
-What a box write was written for and read: it lands only while the vault has that vault_id,
+What a box write was written for and read: it lands only while the vault has that vault_tok,
 and the box that revision_tok, or, for a null revision_tok, while there is no box there.
 """
 input SafebyokBoxExpectationInput {
-  vault_id:     String!
+  vault_tok:    String!
   revision_tok: String
 }
 
-"""What a delete of a vault was aimed at: it lands only while the vault has that vault_id."""
+"""What a delete of a vault was aimed at: it lands only while the vault has that vault_tok."""
 input SafebyokVaultDelExpectationInput {
-  vault_id: String!
+  vault_tok: String!
 }
 
 """
-What a delete of a box was aimed at: it lands only while the vault has that vault_id, and
+What a delete of a box was aimed at: it lands only while the vault has that vault_tok, and
 removes whatever box stands; the revision_tok its writer read (null for a box listed with
 none) only says whether what it removed was the one meant.
 """
 input SafebyokBoxDelExpectationInput {
-  vault_id:     String!
+  vault_tok:    String!
   revision_tok: String
 }
 

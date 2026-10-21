@@ -11,19 +11,19 @@ CREATE TABLE IF NOT EXISTS safebyok_vaults (
   applabel         text   NOT NULL,
   user_id          text   NOT NULL,
   vaultlabel       text   NOT NULL,
-  vault_id         text   NOT NULL,
+  vault_tok        text   NOT NULL,
   format           text   NOT NULL,
-  unlock_epoch     bigint NOT NULL,
+  gate_epoch       bigint NOT NULL,
   passphrase       jsonb  NOT NULL,
   passkey          jsonb,
   registered_at    bigint NOT NULL,
   PRIMARY KEY (applabel, user_id, vaultlabel),
-  -- What a box's foreign key names: its vault, down to the vault_id.
-  UNIQUE (applabel, user_id, vaultlabel, vault_id)
+  -- What a box's foreign key names: its vault, down to the vault_tok.
+  UNIQUE (applabel, user_id, vaultlabel, vault_tok)
 );
 
--- One box per boxlabel, beside its vault's scope and vault_id. A box stands only while
--- its vault's props do, under the same vault_id: deleting the vault deletes its boxes with
+-- One box per boxlabel, beside its vault's scope and vault_tok. A box stands only while
+-- its vault's props do, under the same vault_tok: deleting the vault deletes its boxes with
 -- it, and no write can leave a box in a vault made anew. The sidecar is the app's own JSON object,
 -- {} for none, kept as jsonb, so a server can query it: the box binds it with its keys sorted, so
 -- jsonb's own order changes nothing.
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS safebyok_boxes (
   applabel               text   NOT NULL,
   user_id                text   NOT NULL,
   vaultlabel             text   NOT NULL,
-  vault_id               text   NOT NULL,
+  vault_tok              text   NOT NULL,
   format                 text   NOT NULL,
   boxlabel               text   NOT NULL,
   revision_tok           text   NOT NULL,
@@ -43,8 +43,8 @@ CREATE TABLE IF NOT EXISTS safebyok_boxes (
   registered_at          bigint NOT NULL,
   written_at             bigint NOT NULL,
   PRIMARY KEY (applabel, user_id, vaultlabel, boxlabel),
-  FOREIGN KEY (applabel, user_id, vaultlabel, vault_id)
-    REFERENCES safebyok_vaults (applabel, user_id, vaultlabel, vault_id) ON DELETE CASCADE
+  FOREIGN KEY (applabel, user_id, vaultlabel, vault_tok)
+    REFERENCES safebyok_vaults (applabel, user_id, vaultlabel, vault_tok) ON DELETE CASCADE
 );
 
 -- Row-level security on, with no policy: the tables' owner -- the role your server connects as --

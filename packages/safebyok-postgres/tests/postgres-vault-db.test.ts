@@ -47,8 +47,8 @@ describe("postgresVaultDB's devices, for the battery's races", () => {
 })
 
 const u1 = TH.scopeOf('u1')
-const thisVault = { vault_id: 'vault-id-u1' }
-const noBoxYet = { vault_id: 'vault-id-u1', revision_tok: null }
+const thisVault = { vault_tok: 'vault-tok-u1' }
+const noBoxYet = { vault_tok: 'vault-tok-u1', revision_tok: null }
 
 describe("postgresVaultDB, its options", () => {
   const BadOpts = [
@@ -136,13 +136,13 @@ describe("postgresVaultDB, who may reach a vault", () => {
   const EveryVerb = [
     ['getVaultProps',    (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.getVaultProps(u2)],
     ['ensureVaultProps', (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.ensureVaultProps(TH.vaultPropsOf('u2'))],
-    ['putVaultProps',    (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.putVaultProps(TH.vaultPropsOf('u2'), { vault_id: 'vault-id-u2', unlock_epoch: 1 })],
+    ['putVaultProps',    (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.putVaultProps(TH.vaultPropsOf('u2'), { vault_tok: 'vault-tok-u2', gate_epoch: 1 })],
     ['getBox',           (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.getBox(u2, 'anthropic')],
     ['listBoxes',        (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.listBoxes(u2)],
     ['listBoxRecords',   (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.listBoxRecords(u2)],
-    ['putBox',           (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.putBox(u2, { vault_id: 'vault-id-u2', revision_tok: null }, TH.boxOf('anthropic', 'one'))],
-    ['delBox',           (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.delBox(u2, 'anthropic', { vault_id: 'vault-id-u2', revision_tok: null })],
-    ['delVault',         (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.delVault(u2, { vault_id: 'vault-id-u2' })],
+    ['putBox',           (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.putBox(u2, { vault_tok: 'vault-tok-u2', revision_tok: null }, TH.boxOf('anthropic', 'one'))],
+    ['delBox',           (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.delBox(u2, 'anthropic', { vault_tok: 'vault-tok-u2', revision_tok: null })],
+    ['delVault',         (vaultDB: ReturnType<typeof postgresVaultDB>) => vaultDB.delVault(u2, { vault_tok: 'vault-tok-u2' })],
     ['subscribe',        (vaultDB: ReturnType<typeof postgresVaultDB>) => outcomeOf(() => { vaultDB.subscribe(u2, TH.changeCounter().onChange) })],
   ] as const
 
@@ -239,9 +239,9 @@ describe("postgresVaultDB, what it stores", () => {
       applabel:         'acme',
       user_id:          'u1',
       vaultlabel:       'main',
-      vault_id:         'vault-id-u1',
+      vault_tok:        'vault-tok-u1',
       format:           'safebyok-vault-v6',
-      unlock_epoch:     1,
+      gate_epoch:       1,
       passphrase:       TH.vaultPropsOf('u1').passphrase,
       passkey:          null,
       registered_at:    Date.UTC(2026, 9, 14),
@@ -252,30 +252,30 @@ describe("postgresVaultDB, what it stores", () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
-    const withPasskey = TH.vaultPropsOf('u1', { unlock_epoch: 2, passphrase: TH.wayinOf('home_phrase'), passkey: TH.passkeyWayinOf('laptop') })
-    await TH.expectingGood(vaultDB).putVaultProps(withPasskey, { vault_id: 'vault-id-u1', unlock_epoch: 1 })
+    const withPasskey = TH.vaultPropsOf('u1', { gate_epoch: 2, passphrase: TH.wayinOf('home_phrase'), passkey: TH.passkeyWayinOf('laptop') })
+    await TH.expectingGood(vaultDB).putVaultProps(withPasskey, { vault_tok: 'vault-tok-u1', gate_epoch: 1 })
     expect(await TH.expectingGood(vaultDB).getVaultProps(u1)).to.deep.equal(withPasskey)
-    const withoutPasskey = { ...withPasskey, unlock_epoch: 3, passkey: null }
-    await TH.expectingGood(vaultDB).putVaultProps(withoutPasskey, { vault_id: 'vault-id-u1', unlock_epoch: 2 })
+    const withoutPasskey = { ...withPasskey, gate_epoch: 3, passkey: null }
+    await TH.expectingGood(vaultDB).putVaultProps(withoutPasskey, { vault_tok: 'vault-tok-u1', gate_epoch: 2 })
     expect(await TH.expectingGood(vaultDB).getVaultProps(u1)).to.deep.equal(withoutPasskey)
   })
 
   // The core never sends it -- its vault moves the epoch on with every update -- so it is a client
   // of another version's, or of none.
-  it("refuses, as stale_write, an update of the vault props that does not move unlock_epoch forward, writing nothing", async () => {
+  it("refuses, as stale_write, an update of the vault props that does not move gate_epoch forward, writing nothing", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
-    await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1', { unlock_epoch: 2 }))
-    const atTwo = { vault_id: 'vault-id-u1', unlock_epoch: 2 }
-    const rewrapped = (gateEpoch: number) => TH.vaultPropsOf('u1', { unlock_epoch: gateEpoch, passphrase: TH.wayinOf('home_phrase') })
+    await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1', { gate_epoch: 2 }))
+    const atTwo = { vault_tok: 'vault-tok-u1', gate_epoch: 2 }
+    const rewrapped = (gateEpoch: number) => TH.vaultPropsOf('u1', { gate_epoch: gateEpoch, passphrase: TH.wayinOf('home_phrase') })
     await TH.expectBad(vaultDB.putVaultProps(rewrapped(2), atTwo), 'stale_write')
     await TH.expectBad(vaultDB.putVaultProps(rewrapped(1), atTwo), 'stale_write')
-    expect(await TH.expectingGood(vaultDB).getVaultProps(u1)).to.deep.equal(TH.vaultPropsOf('u1', { unlock_epoch: 2 }))
+    expect(await TH.expectingGood(vaultDB).getVaultProps(u1)).to.deep.equal(TH.vaultPropsOf('u1', { gate_epoch: 2 }))
     await TH.expectingGood(vaultDB).putVaultProps(rewrapped(3), atTwo)
     expect(await TH.expectingGood(vaultDB).getVaultProps(u1)).to.deep.equal(rewrapped(3))
   })
 
-  it("stores a box a column to a field, beside its vault's scope and vault_id, its sidecar as a jsonb value, its keys in jsonb's own order", async () => {
+  it("stores a box a column to a field, beside its vault's scope and vault_tok, its sidecar as a jsonb value, its keys in jsonb's own order", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
@@ -288,7 +288,7 @@ describe("postgresVaultDB, what it stores", () => {
       applabel:               'acme',
       user_id:                'u1',
       vaultlabel:             'main',
-      vault_id:               'vault-id-u1',
+      vault_tok:              'vault-tok-u1',
       format:                 'safebyok-box-v8',
       boxlabel:               'anthropic',
       revision_tok:           'rev-one',
@@ -331,9 +331,9 @@ describe("postgresVaultDB, what it stores", () => {
     const spy = TH.spyClient(db)
     const vaultDB = postgresVaultDB({ client: spy.client, userId: 'u1' })
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
-    await TH.expectingGood(vaultDB).putVaultProps({ ...TH.vaultPropsOf('u1'), unlock_epoch: 2 }, { vault_id: 'vault-id-u1', unlock_epoch: 1 })
+    await TH.expectingGood(vaultDB).putVaultProps({ ...TH.vaultPropsOf('u1'), gate_epoch: 2 }, { vault_tok: 'vault-tok-u1', gate_epoch: 1 })
     await TH.expectingGood(vaultDB).putBox(u1, noBoxYet, TH.boxOf('anthropic', 'one'))
-    await TH.expectingGood(vaultDB).putBox(u1, { vault_id: 'vault-id-u1', revision_tok: 'rev-one' }, TH.boxOf('anthropic', 'two'))
+    await TH.expectingGood(vaultDB).putBox(u1, { vault_tok: 'vault-tok-u1', revision_tok: 'rev-one' }, TH.boxOf('anthropic', 'two'))
     await TH.expectingGood(vaultDB).getBox(u1, 'anthropic')
     expect(await TH.expectingGood(vaultDB).delBox(u1, 'anthropic', TH.deleting('rev-two'))).to.deep.equal({ outcome: 'deleted' })
     await TH.expectingGood(vaultDB).delVault(u1, thisVault)
@@ -388,10 +388,10 @@ describe("postgresVaultDB, its box limit", () => {
     expect(await boxlabelsIn(vaultDB)).to.have.members(['openai', 'anthropic'])
   })
 
-  it("refuses a first write in a full vault of another vault_id as vault_mismatch: the count is the standing vault's", async () => {
+  it("refuses a first write in a full vault of another vault_tok as vault_mismatch: the count is the standing vault's", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = await filledTo(db, 1, ['openai'])
-    await TH.expectBad(vaultDB.putBox(u1, { vault_id: 'vault-id-gone', revision_tok: null }, TH.boxOf('anthropic', 'sk-fake')), 'vault_mismatch')
+    await TH.expectBad(vaultDB.putBox(u1, { vault_tok: 'vault-tok-gone', revision_tok: null }, TH.boxOf('anthropic', 'sk-fake')), 'vault_mismatch')
     expect(await boxlabelsIn(vaultDB)).to.deep.equal(['openai'])
   })
 
@@ -440,8 +440,8 @@ describe("postgresVaultDB, its box limit", () => {
     const vaultDB = await filledTo(db, 5, [])
     const orphan = TH.boxOf('anthropic', 'sk-fake')
     const insertOrphan = db.query(
-      `INSERT INTO safebyok_boxes (applabel, user_id, vaultlabel, vault_id, format, boxlabel, revision_tok, box_key_wrapped, whisper_ciphered, whisper_codec, whisper_schema_version, sidecar, registered_at, written_at)
-       VALUES ('acme', 'u1', 'main', 'vault-id-gone', $1, $2, $3, '{}', '{}', 'json_v1', 1, '{}', 0, 0)`,
+      `INSERT INTO safebyok_boxes (applabel, user_id, vaultlabel, vault_tok, format, boxlabel, revision_tok, box_key_wrapped, whisper_ciphered, whisper_codec, whisper_schema_version, sidecar, registered_at, written_at)
+       VALUES ('acme', 'u1', 'main', 'vault-tok-gone', $1, $2, $3, '{}', '{}', 'json_v1', 1, '{}', 0, 0)`,
       [orphan.format, orphan.boxlabel, orphan.revision_tok],
     )
     await expect(insertOrphan).rejects.toMatchObject({ code: '23503' })
@@ -455,7 +455,7 @@ describe("postgresVaultDB, its box limit", () => {
     const vaultDB = postgresVaultDB({ client: spy.client, userId: 'u1', maxBoxes: 2 })
     await TH.expectingGood(vaultDB).putBox(u1, noBoxYet, TH.boxOf('anthropic', 'sk-fake'))
     await TH.expectBad(vaultDB.putBox(u1, noBoxYet, TH.boxOf('mistral', 'sk-fake')), 'vault_full')
-    await TH.expectBad(vaultDB.putBox(u1, { vault_id: 'vault-id-gone', revision_tok: null }, TH.boxOf('mistral', 'sk-fake')), 'vault_mismatch')
+    await TH.expectBad(vaultDB.putBox(u1, { vault_tok: 'vault-tok-gone', revision_tok: null }, TH.boxOf('mistral', 'sk-fake')), 'vault_mismatch')
     await TH.expectingGood(vaultDB).delBox(u1, 'anthropic', TH.deleting('rev-sk-fake'))
     expect(spy.sent).to.have.lengthOf(4)
     for (const { text } of spy.sent) {
@@ -725,7 +725,7 @@ describe("postgresVaultDB, subscribe", () => {
     await TH.expectingGood(vaultDB).putBox(u1, noBoxYet, TH.boxOf('openai', 'two'))
     const payloads: string[] = []
     const unlisten = await db.listen(VaultChangeChannel, (payload) => { payloads.push(payload) })
-    await TH.expectingGood(vaultDB).ensureVaultProps({ ...TH.vaultPropsOf('u1'), vault_id: 'the-second-arrival' })
+    await TH.expectingGood(vaultDB).ensureVaultProps({ ...TH.vaultPropsOf('u1'), vault_tok: 'the-second-arrival' })
     await TH.expectingGood(vaultDB).delVault(u1, thisVault)
     await TH.eventually(() => payloads.length > 0)
     await TH.wakeupAtNextTick()

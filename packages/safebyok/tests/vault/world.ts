@@ -123,7 +123,7 @@ export const damagedVaultWorld = async () => {
   const vault = await world.openUnlocked('pw')
   await vault.putBox('anthropic', 'sk-fake')
   vault.close()
-  world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...storedVaultPropsOf(world), unlock_epoch: 'one' }))
+  world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...storedVaultPropsOf(world), gate_epoch: 'one' }))
   return world
 }
 

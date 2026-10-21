@@ -150,25 +150,25 @@ const scopeIn = (args: VaultFieldArgs) => recordOf(args.scope, ScopeFields) as V
 const vaultPropsIn = (args: VaultFieldArgs) => recordOf(args.vaultProps, VaultPropsFields) as VaultProps
 
 const vaultPropsExpectationIn = (args: VaultFieldArgs): VaultPropsExpectation => {
-  const { vault_id, unlock_epoch } = args.expected as VaultPropsExpectation
-  return { vault_id, unlock_epoch }
+  const { vault_tok, gate_epoch } = args.expected as VaultPropsExpectation
+  return { vault_tok, gate_epoch }
 }
 
 // A revision_tok left out, as a GraphQL client may leave out a null, is the null it means.
 const boxExpectationIn = (args: VaultFieldArgs): BoxExpectation => {
-  const { vault_id, revision_tok = null } = args.expected as { vault_id: string, revision_tok?: string | null }
-  return { vault_id, revision_tok }
+  const { vault_tok, revision_tok = null } = args.expected as { vault_tok: string, revision_tok?: string | null }
+  return { vault_tok, revision_tok }
 }
 
 const vaultDelExpectationIn = (args: VaultFieldArgs): VaultDelExpectation => {
-  const { vault_id } = args.expected as VaultDelExpectation
-  return { vault_id }
+  const { vault_tok } = args.expected as VaultDelExpectation
+  return { vault_tok }
 }
 
 // A revision_tok left out, as for a box write, is the null it means.
 const boxDelExpectationIn = (args: VaultFieldArgs): BoxDelExpectation => {
-  const { vault_id, revision_tok = null } = args.expected as { vault_id: string, revision_tok?: string | null }
-  return { vault_id, revision_tok }
+  const { vault_tok, revision_tok = null } = args.expected as { vault_tok: string, revision_tok?: string | null }
+  return { vault_tok, revision_tok }
 }
 
 /** Each change `vaultDB` hears to the vault in `scope`, as its scope, until the subscriber goes.

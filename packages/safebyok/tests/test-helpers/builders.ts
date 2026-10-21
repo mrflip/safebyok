@@ -33,7 +33,7 @@ export const testDeriver: KeyDeriver = {
 /**
  * The slice of a vault a proof, a box, a way in or a lease reads, for a test that makes one with
  * no vault behind it: `userId`'s `main` vault, as {@link scopeOf} has it, holding the vault props
- * `vault-id-<userId>`, deriving with `keyDeriver`, admitting any passphrase
+ * `vault-tok-<userId>`, deriving with `keyDeriver`, admitting any passphrase
  * ({@link anyStrengthChecker}, held to its contract as a vault holds it), granting leases of
  * seven days, and reading {@link SliceNow} on its clock -- each as `overrides` does not say
  * otherwise.
@@ -45,7 +45,7 @@ export const vaultSliceOf = (userId: string, keyDeriver: KeyDeriver = testDerive
   const scope = scopeOf(userId)
   return {
     ...scope,
-    vault_id:        `vault-id-${userId}`,
+    vault_tok:       `vault-tok-${userId}`,
     keyDeriver,
     checkPassphrase: guardStrengthChecker(anyStrengthChecker, scope),
     leaseMillis:     7 * 24 * 60 * 60_000,
@@ -58,7 +58,7 @@ export const vaultSliceOf = (userId: string, keyDeriver: KeyDeriver = testDerive
 export const SliceNow = Date.UTC(2026, 9, 19, 12)
 
 /** What {@link vaultSliceOf} makes: the slice of a vault a proof, a box, a way in and a lease read. */
-export type VaultSlice = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_id' | 'keyDeriver' | 'checkPassphrase' | 'leaseMillis' | 'now'>
+export type VaultSlice = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_tok' | 'keyDeriver' | 'checkPassphrase' | 'leaseMillis' | 'now'>
 
 /**
  * A strengthChecker for tests, admitting every passphrase, so a suite may unlock with a
@@ -199,18 +199,18 @@ export const passkeyOf = async (tag: string, prfSaltB64?: string): Promise<Passk
 
 /**
  * A shape-valid VaultProps for `userId`'s `main` vault, its passphrase's wrap fake and no passkey:
- * for storage-layer tests, which never decrypt. Its vault_id is `vault-id-<userId>`, its unlock
+ * for storage-layer tests, which never decrypt. Its vault_tok is `vault-tok-<userId>`, its unlock
  * epoch 1, and its passphrase a {@link wayinOf} whose wrap is
  * `vault-<userId>`.
  *
- * @example vaultPropsOf('u1', { unlock_epoch: 2 })
+ * @example vaultPropsOf('u1', { gate_epoch: 2 })
  * @example vaultPropsOf('u1', { passkey: passkeyWayinOf('laptop') })
  */
 export const vaultPropsOf = (userId: string, overrides: Partial<VaultProps> = {}): VaultProps => ({
   format:              'safebyok-vault-v6',
   ...scopeOf(userId),
-  vault_id:            `vault-id-${userId}`,
-  unlock_epoch:        1,
+  vault_tok:           `vault-tok-${userId}`,
+  gate_epoch:          1,
   passphrase:          wayinOf(`vault-${userId}`, { vault_key_wayin_wrapped: fakeCiphered(`vault-${userId}`) }),
   passkey:             null,
   registered_at:       Date.UTC(2026, 9, 14),
@@ -266,7 +266,7 @@ export const summaryOf = <SummaryT extends ListedSummary>(box: SummaryT | Damage
  *
  * @example vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
  */
-export const noBoxYet = Object.freeze({ vault_id: 'vault-id-u1', revision_tok: null } as const)
+export const noBoxYet = Object.freeze({ vault_tok: 'vault-tok-u1', revision_tok: null } as const)
 
 /**
  * What a deletion of {@link vaultPropsOf}('u1')'s vault expects: that vault.
@@ -274,7 +274,7 @@ export const noBoxYet = Object.freeze({ vault_id: 'vault-id-u1', revision_tok: n
  *
  * @example vaultDB.delVault(TH.scopeOf('u1'), TH.thisVault)
  */
-export const thisVault = Object.freeze({ vault_id: 'vault-id-u1' } as const)
+export const thisVault = Object.freeze({ vault_tok: 'vault-tok-u1' } as const)
 
 /**
  * What a deletion of a box in {@link vaultPropsOf}('u1')'s vault expects: that vault, and
@@ -283,17 +283,17 @@ export const thisVault = Object.freeze({ vault_id: 'vault-id-u1' } as const)
  *
  * @example vaultDB.delBox(TH.scopeOf('u1'), 'anthropic', TH.deleting('rev-one'))
  */
-export const deleting = (revisionTok: string | null) => ({ vault_id: 'vault-id-u1', revision_tok: revisionTok })
+export const deleting = (revisionTok: string | null) => ({ vault_tok: 'vault-tok-u1', revision_tok: revisionTok })
 
 /** What {@link markOf} may change of its mark: any field of its own, and any of what it has seen. */
 export type MarkOverrides = Partial<Omit<DeviceMark, 'seen'>> & { seen?: Partial<SeenVault> }
 
 /**
  * A shape-valid DeviceMark for device-storage tests: `userId`'s `main` vault as {@link vaultPropsOf}
- * has it, seen at unlock epoch 1, by the device `device-one`.
+ * has it, seen at gate epoch 1, by the device `device-one`.
  *
  * @example await deviceDB.putMark(TH.markOf('u1'))
- * @example TH.markOf('u1', { seen: { unlock_epoch: 3 } })  // a device that has seen the vault at epoch 3
+ * @example TH.markOf('u1', { seen: { gate_epoch: 3 } })    // a device that has seen the vault at epoch 3
  */
 export const markOf = (userId: string, overrides: MarkOverrides = {}): DeviceMark => {
   const { seen, ...head } = overrides
@@ -302,9 +302,9 @@ export const markOf = (userId: string, overrides: MarkOverrides = {}): DeviceMar
     ...scopeOf(userId),
     ...head,
     seen:   {
-      device_id:    'device-one',
-      vault_id:     `vault-id-${userId}`,
-      unlock_epoch: 1,
+      device_id:  'device-one',
+      vault_tok:  `vault-tok-${userId}`,
+      gate_epoch: 1,
       ...seen,
     },
   }
@@ -314,8 +314,8 @@ export const markOf = (userId: string, overrides: MarkOverrides = {}): DeviceMar
 export const leaseOf = async (userId: string): Promise<LeaseRecord> => ({
   format:                  'safebyok-lease-v1',
   ...scopeOf(userId),
-  vault_id:                `vault-id-${userId}`,
-  unlock_epoch:            1,
+  vault_tok:               `vault-tok-${userId}`,
+  gate_epoch:              1,
   lease_key:               await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['wrapKey', 'unwrapKey']),
   vault_key_lease_wrapped: fakeCiphered(`lease-${userId}`),
   ask_passphrase_at:       1_900_000_000_000,

@@ -12,54 +12,54 @@ import { type Outcome, isOutcomeShaped, outcomeOf, unexpectedError } from './out
 
 // == [Expectations and records]: VaultPropsExpectation, BoxExpectation, VaultDelExpectation, BoxDelExpectation, BoxDeletion, StoredBox
 
-/** What an update of the vault props was proven against: the vault, and the `unlock_epoch` the writer read.
+/** What an update of the vault props was proven against: the vault, and the `gate_epoch` the writer read.
  * The update lands only while the standing vault props still have both.
  *
- * @example { vault_id: standing.vault_id, unlock_epoch: standing.unlock_epoch }
+ * @example { vault_tok: standing.vault_tok, gate_epoch: standing.gate_epoch }
  */
 export type VaultPropsExpectation = Z.infer<typeof VaultPropsExpectation>
 
 const VaultPropsExpectation = Z.object({
-  vault_id:         VaultProps.shape.vault_id,
-  unlock_epoch:     VaultProps.shape.unlock_epoch,
+  vault_tok:        VaultProps.shape.vault_tok,
+  gate_epoch:       VaultProps.shape.gate_epoch,
 })
 
 /** What a box write was sealed for and read: the vault, and the revision the writer read.
- * The write lands only while the standing vault props have this `vault_id` (else
+ * The write lands only while the standing vault props have this `vault_tok` (else
  * `vault_mismatch`). It also needs the standing box at this `revision_tok`, or no box at all for
  * null (else `stale_write`).
  *
- * @example { vault_id: vaultProps.vault_id, revision_tok: prev?.revision_tok ?? null }
+ * @example { vault_tok: vaultProps.vault_tok, revision_tok: prev?.revision_tok ?? null }
  */
 export type BoxExpectation = Z.infer<typeof BoxExpectation>
 
 const BoxExpectation = Z.object({
-  vault_id:     VaultProps.shape.vault_id,
+  vault_tok:    VaultProps.shape.vault_tok,
   revision_tok: Z.nullable(BoxRecord.shape.revision_tok),
 })
 
-/** The vault a deletion means to remove whole: it lands only while the standing vault props have this `vault_id`.
+/** The vault a deletion means to remove whole: it lands only while the standing vault props have this `vault_tok`.
  *
- * @example { vault_id: vaultProps.vault_id }
+ * @example { vault_tok: vaultProps.vault_tok }
  */
 export type VaultDelExpectation = Z.infer<typeof VaultDelExpectation>
 
 const VaultDelExpectation = Z.object({
-  vault_id: VaultProps.shape.vault_id,
+  vault_tok: VaultProps.shape.vault_tok,
 })
 
 /** What a box deletion was aimed at: the vault, and the `revision_tok` the deleter read.
  * The `revision_tok` is null for a box listed as damaged with no revision a read could take.
- * The deletion lands only while the standing vault props have this `vault_id`. It then removes
+ * The deletion lands only while the standing vault props have this `vault_tok`. It then removes
  * whatever box stands under the boxlabel: within the right vault, a deletion wins over any write.
  * The revision decides only what the {@link BoxDeletion} reports.
  *
- * @example { vault_id: vaultProps.vault_id, revision_tok: listed.revision_tok }
+ * @example { vault_tok: vaultProps.vault_tok, revision_tok: listed.revision_tok }
  */
 export type BoxDelExpectation = Z.infer<typeof BoxDelExpectation>
 
 const BoxDelExpectation = Z.object({
-  vault_id:     VaultProps.shape.vault_id,
+  vault_tok:    VaultProps.shape.vault_tok,
   revision_tok: Z.nullable(BoxRecord.shape.revision_tok),
 })
 
@@ -114,7 +114,7 @@ export type VaultDBOpts = {
  *  * **Store what you are handed, return what you stored.** Every record and expectation is plain
  *    JSON (binary fields are base64url text), so any backend that holds JSON holds a vault as-is.
  *  * **Never look inside.** Every secret field arrives encrypted, and nothing you hold opens a
- *    vault. You compare only a few unencrypted fields (`vault_id`, `unlock_epoch`, `revision_tok`)
+ *    vault. You compare only a few unencrypted fields (`vault_tok`, `gate_epoch`, `revision_tok`)
  *    before a write.
  *  * **Write only as expected.** Each update and deletion carries an expectation of what stands in
  *    storage. Check it and write in one atomic step (a transaction, a conditional write). Each
@@ -241,8 +241,8 @@ export abstract class VaultDB {
 
   /** Create `vaultProps` unless vault props already stand in their scope, atomically, resolving whichever stand afterwards.
    * Those are `vaultProps` when this call created them. Otherwise they are the standing ones,
-   * untouched, with their own `vault_id`: another device may have made the vault in the same
-   * moment. Compare the `vault_id` resolved with the one drafted to tell which. What it reads back
+   * untouched, with their own `vault_tok`: another device may have made the vault in the same
+   * moment. Compare the `vault_tok` resolved with the one drafted to tell which. What it reads back
    * refuses as {@link VaultDB.getVaultProps} refuses it.
    */
   ensureVaultProps(vaultProps: VaultProps): Promise<Outcome<VaultProps>> {
@@ -254,9 +254,9 @@ export abstract class VaultDB {
     })
   }
 
-  /** Replace the vault props with `vaultProps`, only while the standing ones have the `vault_id` and `unlock_epoch` in `expected`.
+  /** Replace the vault props with `vaultProps`, only while the standing ones have the `vault_tok` and `gate_epoch` in `expected`.
    * Otherwise it refuses `stale_write` and writes nothing, as it does when no vault props stand. A
-   * vault's `vault_id` never changes, so `vaultProps` must carry the one in `expected`:
+   * vault's `vault_tok` never changes, so `vaultProps` must carry the one in `expected`:
    * 'bad_record' otherwise.
    */
   putVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<Outcome<void>> {
@@ -264,8 +264,8 @@ export abstract class VaultDB {
       const outgoing = checkOutgoing(VaultProps, vaultProps, 'vault props record')
       heldScope(this, outgoing)
       const expectation = checkOutgoing(VaultPropsExpectation, expected, 'vault props expectation')
-      if (outgoing.vault_id !== expectation.vault_id) {
-        throw new VaultError('bad_record', "putVaultProps replaces a vault's props within that vault: the vault props' vault_id must be the expected one, as a vault_id never changes.")
+      if (outgoing.vault_tok !== expectation.vault_tok) {
+        throw new VaultError('bad_record', "putVaultProps replaces a vault's props within that vault: the vault props' vault_tok must be the expected one, as a vault_tok never changes.")
       }
       const landed = await adapterAnswer('doPutVaultProps', () => this.doPutVaultProps(outgoing, expectation))
       if (! landed) { throw Refusals.staleWrite('vaultProps') }
@@ -291,7 +291,7 @@ export abstract class VaultDB {
    * code unit, never by locale, so every device lists in one order. A record that does not read
    * back as its box lists as a {@link DamagedBox} rather than refusing. A row stored under a name
    * below the floor is left out: no verb could reach it. A sound box lists as a
-   * {@link ListedSummary}, to which the vault adds its `vault_id`.
+   * {@link ListedSummary}, to which the vault adds its `vault_tok`.
    */
   listBoxes(scope: VaultScope): Promise<Outcome<(ListedSummary | DamagedBox)[]>> {
     return answering(async () => {
@@ -326,7 +326,7 @@ export abstract class VaultDB {
   }
 
   /** Write `box` under its boxlabel in one atomic conditional write, resolving the box as storage now holds it.
-   * The write lands only while the standing vault props have the `vault_id` in `expected`, and the
+   * The write lands only while the standing vault props have the `vault_tok` in `expected`, and the
    * standing box its `revision_tok` (for null, while no box stands). The box resolved comes from
    * that same atomic step, checked as {@link VaultDB.getBox} checks one, at the revision written.
    * One that fails is the adapter's wrong answer, `corrupt_record`, though the write may have landed.
@@ -350,7 +350,7 @@ export abstract class VaultDB {
    * its own box in `err.meta.box_stored`.
    *
    * @example
-   *   const { ok, val, err } = await vaultDB.putBox(scope, { vault_id, revision_tok: null }, box)
+   *   const { ok, val, err } = await vaultDB.putBox(scope, { vault_tok, revision_tok: null }, box)
    *   if (! ok && err.refusalkind === 'stale_write') { return err.meta?.box_stored }  // what won
    */
   putBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<Outcome<BoxRecord>> {
@@ -393,7 +393,7 @@ export abstract class VaultDB {
 
   // == [Delete verbs]: delBox, delVault, delDamagedVault
 
-  /** Remove the box under `boxlabel`, whatever revision stands, only while the standing vault props have `expected`'s `vault_id`.
+  /** Remove the box under `boxlabel`, whatever revision stands, only while the standing vault props have `expected`'s `vault_tok`.
    * Otherwise it refuses `stale_write` and removes nothing, as it does when no vault props stand.
    * Resolves the {@link BoxDeletion} that the removal's own atomic step reports. One in another
    * shape refuses as `corrupt_record`, though the deletion may have landed. Deleted is gone:
@@ -401,7 +401,7 @@ export abstract class VaultDB {
    * `stale_write`.
    *
    * @example
-   *   const { ok, val, err } = await vaultDB.delBox(scope, 'anthropic', { vault_id: vaultProps.vault_id, revision_tok: listed.revision_tok })
+   *   const { ok, val, err } = await vaultDB.delBox(scope, 'anthropic', { vault_tok: vaultProps.vault_tok, revision_tok: listed.revision_tok })
    *   if (ok && val.outcome === 'deleted_other') { await refresh() }   // someone wrote over it first
    */
   delBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<Outcome<BoxDeletion>> {
@@ -415,7 +415,7 @@ export abstract class VaultDB {
     })
   }
 
-  /** Remove the vault props and every box, only while the standing vault props have `expected`'s `vault_id`.
+  /** Remove the vault props and every box, only while the standing vault props have `expected`'s `vault_tok`.
    * This is the backend's part of deleting a vault. Otherwise it refuses `stale_write` and removes
    * nothing, as it does when no vault props stand.
    */
@@ -430,9 +430,9 @@ export abstract class VaultDB {
 
   /** Remove a vault whose stored vault props fail their checks, and no other: the escape hatch behind the package's `delDamagedVault`.
    * That is the vault `getVaultProps` and `hello()` refuse as `damaged_vault`, which no Vault
-   * object opens to `del()`. It takes the `vault_id` from the
+   * object opens to `del()`. It takes the `vault_tok` from the
    * stored vault props, and removes as {@link VaultDB.delVault} does under it. Vault props
-   * rewritten under that `vault_id` meanwhile are the same vault, and go with it (`VAULTDB.md`,
+   * rewritten under that `vault_tok` meanwhile are the same vault, and go with it (`VAULTDB.md`,
    * line 3.5). Resolves quietly when the scope holds no vault props.
    *
    * Refuses, removing nothing:
@@ -460,7 +460,7 @@ export abstract class VaultDB {
       }
       const named = StoredVaultTok.safeParse(raw)
       if (! named.success) { throw unnamedVaultProps() }
-      const landed = await adapterAnswer('doDelVault', () => this.doDelVault(asked, { vault_id: named.data.vault_id }))
+      const landed = await adapterAnswer('doDelVault', () => this.doDelVault(asked, { vault_tok: named.data.vault_tok }))
       if (! landed) { throw Refusals.staleWrite('del') }
     })
   }
@@ -538,7 +538,7 @@ export abstract class VaultDB {
    * atomic step where the backend allows, so two devices creating at once settle on one vault.
    */
   protected abstract doEnsureVaultProps(vaultProps: VaultProps): Promise<unknown>
-  /** Replace the standing vault props with `vaultProps` if, and only if, they have `expected.vault_id` and `expected.unlock_epoch`.
+  /** Replace the standing vault props with `vaultProps` if, and only if, they have `expected.vault_tok` and `expected.gate_epoch`.
    * True when written; false, writing nothing, when the expectation failed or no vault props stand.
    */
   protected abstract doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<boolean>
@@ -551,7 +551,7 @@ export abstract class VaultDB {
    */
   protected abstract doListBoxes(scope: VaultScope): Promise<StoredBox[]>
   /** Store `box` under its boxlabel if, and only if, the standing vault props and box are those `expected` names.
-   * That is vault props with `expected.vault_id`, and the box at `expected.revision_tok`, or no box
+   * That is vault props with `expected.vault_tok`, and the box at `expected.revision_tok`, or no box
    * for null, all compared in the same atomic step as the write. Once written, resolve the record as
    * stored, read back in that same step (a `RETURNING`, a mutation's return value, a read in the
    * transaction), as `doGetBox` would hand it up.
@@ -572,7 +572,7 @@ export abstract class VaultDB {
    * reports the same reckoning, with `Refusals.vaultFull(capacity)`.
    */
   protected abstract doGetCapacity(scope: VaultScope): Promise<unknown>
-  /** Remove the box under `boxlabel`, whatever revision stands, if, and only if, the standing vault props have `expected.vault_id`.
+  /** Remove the box under `boxlabel`, whatever revision stands, if, and only if, the standing vault props have `expected.vault_tok`.
    * Compare in the same atomic step as the removal. Once those vault props stand, resolve a
    * {@link BoxDeletion} saying what that step removed: `deleted` for a record at
    * `expected.revision_tok`, `deleted_other` for any other, `absent` for none. For a null
@@ -581,7 +581,7 @@ export abstract class VaultDB {
    * nothing.
    */
   protected abstract doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<unknown>
-  /** Remove the vault props and every box of `scope` if, and only if, the standing vault props have `expected.vault_id`.
+  /** Remove the vault props and every box of `scope` if, and only if, the standing vault props have `expected.vault_tok`.
    * Use one transaction, where the backend has them. True when removed; false, removing nothing,
    * otherwise.
    */
@@ -859,7 +859,7 @@ const isSoundVaultProps = (raw: unknown, scope: VaultScope): boolean => {
 }
 
 /** The one field of stored vault props a deletion needs, as the vault's own check has it. */
-const StoredVaultTok = Z.object({ vault_id: VaultProps.shape.vault_id })
+const StoredVaultTok = Z.object({ vault_tok: VaultProps.shape.vault_tok })
 // --
 
 // == [Box and answer checks]: checkStoredBox, damagedBox, checkWrittenBox, checkAnswer, wrongAnswer, jsonBytes

@@ -9,9 +9,9 @@ import type { Vault } from './vault'
 /** Wayins: each the one vaultKey wrapped under the wayinKey its kind of proof makes, a passphrase's or a passkey's.
  * `Wayin.make` reads one from its record, `wayin.tryOpen(proof)` opens one, and `Wayin.seal` makes one.
  *
- * Each wrap is bound to its vault (the scope, and the `vault_id` of the vault props it is one of,
+ * Each wrap is bound to its vault (the scope, and the `vault_tok` of the vault props it is one of,
  * random and never reused), to its own visible header, and to a purpose its wayinkind names. A
- * passkey's key is made with that same ctx as its HKDF `info`. The props' `unlock_epoch` and the
+ * passkey's key is made with that same ctx as its HKDF `info`. The props' `gate_epoch` and the
  * other wayin are not bound, so changing one wayin leaves the other open.
  */
 
@@ -67,12 +67,12 @@ export const frozenRecord = <RecordT extends WayinRecord>(record: RecordT): Reco
 
 /** One way into a vault, a {@link PassphraseWayin} or a {@link PasskeyWayin}, told apart by `wayinkind`. Every field is read-only.
  * Its visible fields are its own: its wayinkind, the device and time that sealed it, a passkey's
- * credential and salt, which a host asks the passkey with, and the `vault_id` of the vault props it
+ * credential and salt, which a host asks the passkey with, and the `vault_tok` of the vault props it
  * is one of, which its wrap is bound to. Its wrap, and a passphrase's salt and key deriver's label,
  * stay in its `record`. `{ ...wayin }`, `toJSON()` and a log line show each visible field once, and
  * nothing else. The vault shows those, never the wayins, as its `passphrase` and `passkey`.
  *
- * @example Wayin.make(vault, vaultProps.vault_id, vaultProps.passphrase).wayinkind   // 'passphrase'
+ * @example Wayin.make(vault, vaultProps.vault_tok, vaultProps.passphrase).wayinkind  // 'passphrase'
  * @example JSON.stringify(wayin)   // its visible fields alone: no wrap, and no passphrase's salt
  */
 export abstract class Wayin<RecordT extends WayinRecord = WayinRecord> {
@@ -88,7 +88,7 @@ export abstract class Wayin<RecordT extends WayinRecord = WayinRecord> {
   /** When the wayin was sealed. */
   readonly registered_at: number
   /** The id of the vault props it is one of: bound into its wrap. */
-  readonly vault_id:      string
+  readonly vault_tok:     string
 
   protected constructor(vault: WayinVault, vaultTok: string, record: RecordT) {
     this.#record = frozenRecord(record)
@@ -96,7 +96,7 @@ export abstract class Wayin<RecordT extends WayinRecord = WayinRecord> {
     this.wayinkind = record.wayinkind
     this.device_id = record.device_id
     this.registered_at = record.registered_at
-    this.vault_id = vaultTok
+    this.vault_tok = vaultTok
   }
 
   /** The stored record, frozen, its wrap with it: what the vault props hold of this wayin. */
@@ -107,10 +107,10 @@ export abstract class Wayin<RecordT extends WayinRecord = WayinRecord> {
   /** The wayin a stored record stands for, checked through its schema; refuses 'damaged_wayin' for a record this package never writes.
    * The schema's complaint is the refusal's cause, as a wayin's record holds no secret.
    *
-   * @param vaultTok - The `vault_id` of the vault props it is one of.
+   * @param vaultTok - The `vault_tok` of the vault props it is one of.
    *
-   * @example Wayin.make(vault, vaultProps.vault_id, vaultProps.passphrase)   // a PassphraseWayin
-   * @example Wayin.make(vault, vaultProps.vault_id, { ...record, device_id: '' })   // throws 'damaged_wayin'
+   * @example Wayin.make(vault, vaultProps.vault_tok, vaultProps.passphrase)  // a PassphraseWayin
+   * @example Wayin.make(vault, vaultProps.vault_tok, { ...record, device_id: '' })  // throws 'damaged_wayin'
    */
   static make(vault: WayinVault, vaultTok: string, record: PassphraseWayinRecord): PassphraseWayin
   static make(vault: WayinVault, vaultTok: string, record: PasskeyWayinRecord): PasskeyWayin
@@ -123,9 +123,9 @@ export abstract class Wayin<RecordT extends WayinRecord = WayinRecord> {
     return checked.data.wayinkind === 'passphrase' ? new PassphraseWayin(vault, vaultTok, checked.data) : new PasskeyWayin(vault, vaultTok, checked.data)
   }
 
-  /** The ctx this wayin's wrap is bound to: its vault's scope, the `vault_id` of the vault props it is one of, its purpose, and its whole header. */
+  /** The ctx this wayin's wrap is bound to: its vault's scope, the `vault_tok` of the vault props it is one of, its purpose, and its whole header. */
   get wayinCtx(): Uint8Array {
-    return wayinCtxOf(this.#vault, this.vault_id, headerOf(this.#record))
+    return wayinCtxOf(this.#vault, this.vault_tok, headerOf(this.#record))
   }
 
   /** The key deriver of its vault, which a passphrase wayin derives through. */
@@ -172,11 +172,11 @@ export abstract class Wayin<RecordT extends WayinRecord = WayinRecord> {
    * `proof.checkStrongEnough()`, a new passkey's salt with `checkSaltShape`. It writes nothing, and
    * hands back no key.
    *
-   * @param vaultTok - The `vault_id` of the vault props it will be one of.
+   * @param vaultTok - The `vault_tok` of the vault props it will be one of.
    * @param vaultKey - The vaultKey to wrap, which must be extractable.
    *
-   * @example const wayin = await Wayin.seal(vault, vaultProps.vault_id, PassphraseProof.parse(vault, chosen), deviceId, proven.transientKey)
-   * @example const wayin = await Wayin.seal(vault, vaultProps.vault_id, PasskeyProof.parse(vault, await createPasskey(opts)), deviceId, proven.transientKey)
+   * @example const wayin = await Wayin.seal(vault, vaultProps.vault_tok, PassphraseProof.parse(vault, chosen), deviceId, proven.transientKey)
+   * @example const wayin = await Wayin.seal(vault, vaultProps.vault_tok, PasskeyProof.parse(vault, await createPasskey(opts)), deviceId, proven.transientKey)
    */
   static async seal(vault: WayinVault, vaultTok: string, proof: PassphraseProof, deviceId: string, vaultKey: CryptoKey): Promise<PassphraseWayin>
   static async seal(vault: WayinVault, vaultTok: string, proof: PasskeyProof, deviceId: string, vaultKey: CryptoKey): Promise<PasskeyWayin>

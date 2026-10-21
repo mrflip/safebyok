@@ -95,8 +95,8 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
       expect(await deviceDB.getMark(scopeOf('u1'))).to.be.null
       await deviceDB.putMark(markOf('u1'))
       expect(await deviceDB.getMark(scopeOf('u1'))).to.deep.equal(markOf('u1'))
-      await deviceDB.putMark(markOf('u1', { seen: { unlock_epoch: 4 } }))
-      expect(await deviceDB.getMark(scopeOf('u1'))).to.deep.equal(markOf('u1', { seen: { unlock_epoch: 4 } }))
+      await deviceDB.putMark(markOf('u1', { seen: { gate_epoch: 4 } }))
+      expect(await deviceDB.getMark(scopeOf('u1'))).to.deep.equal(markOf('u1', { seen: { gate_epoch: 4 } }))
     })
 
     it("keeps marks per vault, and apart from leases: erasing one leaves the rest", async () => {

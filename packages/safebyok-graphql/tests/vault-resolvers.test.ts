@@ -75,7 +75,7 @@ describe("vaultResolvers, in a host's schema", () => {
         vaultResolvers({ vaultDBFor: ({ userId }: TH.TestContext) => TH.requestFor(db, userId) }),
       ],
     })
-    const result = await asked(schema, `query { greeting safebyokGetVaultProps(scope: { applabel: "acme", user_id: "u1", vaultlabel: "main" }) { vault_id } }`, {})
+    const result = await asked(schema, `query { greeting safebyokGetVaultProps(scope: { applabel: "acme", user_id: "u1", vaultlabel: "main" }) { vault_tok } }`, {})
     expect(result).to.deep.equal({ data: { greeting: 'hello', safebyokGetVaultProps: null } })
   })
 
@@ -93,7 +93,7 @@ describe("vaultResolvers, in a host's schema", () => {
   it("answers a listing with the records as stored, format and all, not a vault's summaries", async () => {
     const db = await TH.emptyDatabase()
     await TH.expectGood(TH.requestFor(db, 'u1').ensureVaultProps(TH.vaultPropsOf('u1')))
-    await TH.expectGood(TH.requestFor(db, 'u1').putBox(u1, { vault_id: 'vault-id-u1', revision_tok: null }, TH.boxOf('openai', 'r1')))
+    await TH.expectGood(TH.requestFor(db, 'u1').putBox(u1, { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('openai', 'r1')))
     const result = await asked(TH.schemaOver(db), VaultOperations.safebyokListBoxes, { scope: u1 })
     const { box_key_wrapped: _wrapped, whisper_ciphered: _ciphered, ...listed } = TH.boxOf('openai', 'r1')
     expect(result.data).to.deep.equal({ safebyokListBoxes: [listed] })
@@ -102,18 +102,18 @@ describe("vaultResolvers, in a host's schema", () => {
   it("takes a box expectation that leaves out its null revision_tok as one that means it", async () => {
     const db = await TH.emptyDatabase()
     await TH.expectGood(TH.requestFor(db, 'u1').ensureVaultProps(TH.vaultPropsOf('u1')))
-    const result = await asked(TH.schemaOver(db), VaultOperations.safebyokPutBox, { scope: u1, box: TH.boxOf('openai', 'r1'), expected: { vault_id: 'vault-id-u1' } })
+    const result = await asked(TH.schemaOver(db), VaultOperations.safebyokPutBox, { scope: u1, box: TH.boxOf('openai', 'r1'), expected: { vault_tok: 'vault-tok-u1' } })
     expect(result).to.deep.equal({ data: { safebyokPutBox: TH.boxOf('openai', 'r1') } })
   })
 
   it("answers a box delete with what it removed, and takes one that leaves out its null revision_tok as one that means it", async () => {
     const db = await TH.emptyDatabase()
     await TH.expectGood(TH.requestFor(db, 'u1').ensureVaultProps(TH.vaultPropsOf('u1')))
-    await TH.expectGood(TH.requestFor(db, 'u1').putBox(u1, { vault_id: 'vault-id-u1', revision_tok: null }, TH.boxOf('openai', 'r1')))
-    await TH.expectGood(TH.requestFor(db, 'u1').putBox(u1, { vault_id: 'vault-id-u1', revision_tok: null }, TH.boxOf('mistral', 'm1')))
-    const named = await asked(TH.schemaOver(db), VaultOperations.safebyokDelBox, { scope: u1, boxlabel: 'openai', expected: { vault_id: 'vault-id-u1', revision_tok: 'rev-r1' } })
+    await TH.expectGood(TH.requestFor(db, 'u1').putBox(u1, { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('openai', 'r1')))
+    await TH.expectGood(TH.requestFor(db, 'u1').putBox(u1, { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('mistral', 'm1')))
+    const named = await asked(TH.schemaOver(db), VaultOperations.safebyokDelBox, { scope: u1, boxlabel: 'openai', expected: { vault_tok: 'vault-tok-u1', revision_tok: 'rev-r1' } })
     expect(named).to.deep.equal({ data: { safebyokDelBox: { outcome: 'deleted' } } })
-    const unnamed = await asked(TH.schemaOver(db), VaultOperations.safebyokDelBox, { scope: u1, boxlabel: 'mistral', expected: { vault_id: 'vault-id-u1' } })
+    const unnamed = await asked(TH.schemaOver(db), VaultOperations.safebyokDelBox, { scope: u1, boxlabel: 'mistral', expected: { vault_tok: 'vault-tok-u1' } })
     expect(unnamed).to.deep.equal({ data: { safebyokDelBox: { outcome: 'deleted_other' } } })
   })
 })
@@ -157,7 +157,7 @@ describe("vaultResolvers, refusing", () => {
   it("sends anything else a VaultDB throws as storage_unavailable, keeping it as the refusal's cause", async () => {
     const oops = new Error('connection terminated unexpectedly')
     const { served } = fakeServed(() => Promise.reject(oops))
-    const result = await asked(TH.schemaOver(await TH.database(), () => served), VaultOperations.safebyokDelVault, { scope: u1, expected: { vault_id: 'vault-id-u1' } })
+    const result = await asked(TH.schemaOver(await TH.database(), () => served), VaultOperations.safebyokDelVault, { scope: u1, expected: { vault_tok: 'vault-tok-u1' } })
     expect(result.errors![0]!.extensions).to.deep.equal({ kind: 'storage_unavailable' })
     expect(result.errors![0]!.message).to.not.include('terminated')
     expect(refusalBehind(result.errors![0]).cause).to.eq(oops)

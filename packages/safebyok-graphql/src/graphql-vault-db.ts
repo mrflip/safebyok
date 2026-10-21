@@ -162,8 +162,8 @@ class UrqlVaultDB extends VaultDB {
   protected async doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<boolean> {
     checkInts('vault props record', vaultProps)
     checkInts('vault props expectation', expected)
-    const { vault_id, unlock_epoch } = expected
-    await this.told(PutVaultPropsDoc, { vaultProps: recordOf(vaultProps, VaultPropsFields), expected: { vault_id, unlock_epoch } })
+    const { vault_tok, gate_epoch } = expected
+    await this.told(PutVaultPropsDoc, { vaultProps: recordOf(vaultProps, VaultPropsFields), expected: { vault_tok, gate_epoch } })
     return true
   }
 
@@ -186,8 +186,8 @@ class UrqlVaultDB extends VaultDB {
   // server's storage holds it.
   protected async doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<unknown> {
     checkInts('box', box)
-    const { vault_id, revision_tok } = expected
-    const { safebyokPutBox } = await this.told(PutBoxDoc, { scope: scopeOut(scope), box: recordOf(box, BoxFields), expected: { vault_id, revision_tok } })
+    const { vault_tok, revision_tok } = expected
+    const { safebyokPutBox } = await this.told(PutBoxDoc, { scope: scopeOut(scope), box: recordOf(box, BoxFields), expected: { vault_tok, revision_tok } })
     return recordOf(safebyokPutBox, BoxFields)
   }
 
@@ -200,13 +200,13 @@ class UrqlVaultDB extends VaultDB {
   // A stale delete refuses on the server and crosses as its kind, so a delete that answers landed,
   // with what the server's storage removed.
   protected async doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<unknown> {
-    const { vault_id, revision_tok } = expected
-    const { safebyokDelBox } = await this.told(DelBoxDoc, { scope: scopeOut(scope), boxlabel, expected: { vault_id, revision_tok } })
+    const { vault_tok, revision_tok } = expected
+    const { safebyokDelBox } = await this.told(DelBoxDoc, { scope: scopeOut(scope), boxlabel, expected: { vault_tok, revision_tok } })
     return safebyokDelBox
   }
 
   protected async doDelVault(scope: VaultScope, expected: VaultDelExpectation): Promise<boolean> {
-    await this.told(DelVaultDoc, { scope: scopeOut(scope), expected: { vault_id: expected.vault_id } })
+    await this.told(DelVaultDoc, { scope: scopeOut(scope), expected: { vault_tok: expected.vault_tok } })
     return true
   }
 
@@ -241,7 +241,7 @@ const scopeOut = (scope: VaultScope) => recordOf(scope, ScopeFields)
 const GraphqlIntMax = 2_147_483_647
 
 /** The fields a record or expectation sends as an `Int!`, each a whole number above zero once the base class has checked it. */
-const IntFields = ['unlock_epoch', 'whisper_schema_version'] as const
+const IntFields = ['gate_epoch', 'whisper_schema_version'] as const
 
 /** Refuse `outgoing` with kind 'bad_record', before it is sent, unless each of its `Int!` fields fits a GraphQL `Int`.
  * No vault builds an epoch that large.

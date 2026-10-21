@@ -7,7 +7,7 @@ import type { BoxExpectation, BoxDelExpectation, BoxDeletion, VaultDelExpectatio
  * Import it whole: `import { Expectations } from 'safebyok'`, then
  * `Expectations.vaultPropsMeets(standing, expected)`.
  *
- * Each compares only `vault_id`, `unlock_epoch` and `revision_tok`, on the standing row as it is,
+ * Each compares only `vault_tok`, `gate_epoch` and `revision_tok`, on the standing row as it is,
  * unvalidated. A row too damaged to show a field fails, so nothing lands on it. Each `standing`
  * argument is the row in storage, or undefined or null for none. The expectation needs no check:
  * `VaultDB` checked it before the adapter saw it.
@@ -18,32 +18,32 @@ const fieldOf = (standing: unknown, field: string): unknown => (
   typeof standing === 'object' && standing !== null ? (standing as Record<string, unknown>)[field] : undefined
 )
 
-/** True when the vault props standing are `expected`'s vault at its unlock epoch: what an update of the vault props compares (VAULTDB.md, line 3.2).
+/** True when the vault props standing are `expected`'s vault at its gate epoch: what an update of the vault props compares (VAULTDB.md, line 3.2).
  *
- * @example Expectations.vaultPropsMeets(standing, { vault_id: 'v1', unlock_epoch: 2 })
+ * @example Expectations.vaultPropsMeets(standing, { vault_tok: 'v1', gate_epoch: 2 })
  */
 export const vaultPropsMeets = (standing: unknown, expected: VaultPropsExpectation): boolean => (
-  fieldOf(standing, 'vault_id') === expected.vault_id
-  && fieldOf(standing, 'unlock_epoch') === expected.unlock_epoch
+  fieldOf(standing, 'vault_tok') === expected.vault_tok
+  && fieldOf(standing, 'gate_epoch') === expected.gate_epoch
 )
 
 /** True when the vault props standing are `expected`'s vault, at any epoch: what a box deletion, and a box write's vault half, compare.
- * Vault props that show no `unlock_epoch` fail.
+ * Vault props that show no `gate_epoch` fail.
  *
- * @example Expectations.vaultMeets(standing, { vault_id: 'v1' })
+ * @example Expectations.vaultMeets(standing, { vault_tok: 'v1' })
  */
 export const vaultMeets = (standing: unknown, expected: VaultDelExpectation): boolean => (
-  fieldOf(standing, 'vault_id') === expected.vault_id
-  && Number.isFinite(fieldOf(standing, 'unlock_epoch'))
+  fieldOf(standing, 'vault_tok') === expected.vault_tok
+  && Number.isFinite(fieldOf(standing, 'gate_epoch'))
 )
 
-/** True when the vault props standing name `expected`'s `vault_id`, and nothing else: what deleting a whole vault compares (VAULTDB.md, line 3.5).
+/** True when the vault props standing name `expected`'s `vault_tok`, and nothing else: what deleting a whole vault compares (VAULTDB.md, line 3.5).
  * So vault props too damaged to show an epoch can still be deleted.
  *
- * @example Expectations.vaultTokMeets({ vault_id: 'v1', unlock_epoch: 'garbled' }, { vault_id: 'v1' })  // true
+ * @example Expectations.vaultTokMeets({ vault_tok: 'v1', gate_epoch: 'garbled' }, { vault_tok: 'v1' })  // true
  */
 export const vaultTokMeets = (standing: unknown, expected: VaultDelExpectation): boolean => (
-  fieldOf(standing, 'vault_id') === expected.vault_id
+  fieldOf(standing, 'vault_tok') === expected.vault_tok
 )
 
 /** The refusal a box write meets from the vault props and box standing, or null when it may land.
@@ -69,7 +69,7 @@ export const boxRefusalOf = (standingVaultProps: unknown, standingBox: unknown, 
  * (VAULTDB.md, line 3.4). A null `revision_tok` matches a row holding none that reads as one, as the
  * listing shows a damaged box.
  *
- * @example Expectations.deletionOf(standingBox, { vault_id: 'v1', revision_tok: 'r7' })  // { outcome: 'deleted' } while r7 stands
+ * @example Expectations.deletionOf(standingBox, { vault_tok: 'v1', revision_tok: 'r7' }) // { outcome: 'deleted' } while r7 stands
  */
 export const deletionOf = (standingBox: unknown, expected: BoxDelExpectation): BoxDeletion => {
   if (standingBox === undefined || standingBox === null) { return { outcome: 'absent' } }

@@ -66,7 +66,7 @@ const damagedWorld = async () => {
   await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
   const vaultPropsCkey = Ckeys.vaultProps(TH.scopeOf('u1'))
   const vaultProps = JSON.parse(store.read(vaultPropsCkey) ?? 'null') as object
-  store.write(vaultPropsCkey, JSON.stringify({ ...vaultProps, unlock_epoch: 'one' }))
+  store.write(vaultPropsCkey, JSON.stringify({ ...vaultProps, gate_epoch: 'one' }))
   return { store, world }
 }
 

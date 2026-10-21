@@ -7,16 +7,16 @@ const Box = TH.boxOf('anthropic', 'one')
 
 const VaultPropsCases = [
   // regular usage:
-  [VaultProps,                                    { vault_id: "vault-id-u1", unlock_epoch: 1 },  true,   'the vault props proven against'],
-  [VaultProps,                                    { vault_id: "vault-id-u1", unlock_epoch: 2 },  false,  'an epoch the vault props have not reached'],
-  [TH.vaultPropsOf('u1', { unlock_epoch: 2 }),    { vault_id: "vault-id-u1", unlock_epoch: 1 },  false,  'an epoch since moved on'],
-  [TH.vaultPropsOf('u1', { vault_id: 'reborn' }), { vault_id: "vault-id-u1", unlock_epoch: 1 },  false,  'a vault made anew'],
+  [VaultProps,                                    { vault_tok: "vault-tok-u1", gate_epoch: 1 },  true,   'the vault props proven against'],
+  [VaultProps,                                    { vault_tok: "vault-tok-u1", gate_epoch: 2 },  false,  'an epoch the vault props have not reached'],
+  [TH.vaultPropsOf('u1', { gate_epoch: 2 }),      { vault_tok: "vault-tok-u1", gate_epoch: 1 },  false,  'an epoch since moved on'],
+  [TH.vaultPropsOf('u1', { vault_tok: 'reborn' }), { vault_tok: "vault-tok-u1", gate_epoch: 1 }, false,  'a vault made anew'],
   // nothing, or damage, standing:
-  [undefined,                                     { vault_id: "vault-id-u1", unlock_epoch: 1 },  false,  'no vault props at all'],
-  [null,                                          { vault_id: "vault-id-u1", unlock_epoch: 1 },  false,  'a null row, as a string store reads none'],
-  [{ vault_id: "vault-id-u1" },                   { vault_id: "vault-id-u1", unlock_epoch: 1 },  false,  'a row that shows no epoch'],
-  [{ vault_id: "vault-id-u1", unlock_epoch: "1" },    { vault_id: "vault-id-u1", unlock_epoch: 1 },  false,  'an epoch stored as text'],
-  ["vault-id-u1",                                 { vault_id: "vault-id-u1", unlock_epoch: 1 },  false,  'a row that is no object'],
+  [undefined,                                     { vault_tok: "vault-tok-u1", gate_epoch: 1 },  false,  'no vault props at all'],
+  [null,                                          { vault_tok: "vault-tok-u1", gate_epoch: 1 },  false,  'a null row, as a string store reads none'],
+  [{ vault_tok: "vault-tok-u1" },                 { vault_tok: "vault-tok-u1", gate_epoch: 1 },  false,  'a row that shows no epoch'],
+  [{ vault_tok: "vault-tok-u1", gate_epoch: "1" },    { vault_tok: "vault-tok-u1", gate_epoch: 1 },  false,  'an epoch stored as text'],
+  ["vault-tok-u1",                                { vault_tok: "vault-tok-u1", gate_epoch: 1 },  false,  'a row that is no object'],
 ] as const
 
 describe("Expectations.vaultPropsMeets", () => {
@@ -27,31 +27,31 @@ describe("Expectations.vaultPropsMeets", () => {
 
 describe("Expectations.vaultMeets", () => {
   it("holds for the vault props at any epoch, and for nothing else", () => {
-    expect(Expectations.vaultMeets(VaultProps, { vault_id: 'vault-id-u1' })).to.be.true
-    expect(Expectations.vaultMeets(TH.vaultPropsOf('u1', { unlock_epoch: 9 }), { vault_id: 'vault-id-u1' })).to.be.true
-    expect(Expectations.vaultMeets(VaultProps, { vault_id: 'reborn' })).to.be.false
-    expect(Expectations.vaultMeets(undefined, { vault_id: 'vault-id-u1' })).to.be.false
-    expect(Expectations.vaultMeets(null, { vault_id: 'vault-id-u1' })).to.be.false
+    expect(Expectations.vaultMeets(VaultProps, { vault_tok: 'vault-tok-u1' })).to.be.true
+    expect(Expectations.vaultMeets(TH.vaultPropsOf('u1', { gate_epoch: 9 }), { vault_tok: 'vault-tok-u1' })).to.be.true
+    expect(Expectations.vaultMeets(VaultProps, { vault_tok: 'reborn' })).to.be.false
+    expect(Expectations.vaultMeets(undefined, { vault_tok: 'vault-tok-u1' })).to.be.false
+    expect(Expectations.vaultMeets(null, { vault_tok: 'vault-tok-u1' })).to.be.false
   })
 
-  it("fails vault props too damaged to show an epoch, though they show the vault_id", () => {
-    expect(Expectations.vaultMeets({ vault_id: 'vault-id-u1' }, { vault_id: 'vault-id-u1' })).to.be.false
-    expect(Expectations.vaultMeets({ vault_id: 'vault-id-u1', unlock_epoch: '1' }, { vault_id: 'vault-id-u1' })).to.be.false
+  it("fails vault props too damaged to show an epoch, though they show the vault_tok", () => {
+    expect(Expectations.vaultMeets({ vault_tok: 'vault-tok-u1' }, { vault_tok: 'vault-tok-u1' })).to.be.false
+    expect(Expectations.vaultMeets({ vault_tok: 'vault-tok-u1', gate_epoch: '1' }, { vault_tok: 'vault-tok-u1' })).to.be.false
   })
 })
 
 describe("Expectations.vaultTokMeets", () => {
   it("holds for any standing vault props that name the vault, however damaged the rest of them", () => {
-    expect(Expectations.vaultTokMeets(VaultProps, { vault_id: 'vault-id-u1' })).to.be.true
-    expect(Expectations.vaultTokMeets({ vault_id: 'vault-id-u1' }, { vault_id: 'vault-id-u1' })).to.be.true
-    expect(Expectations.vaultTokMeets({ vault_id: 'vault-id-u1', unlock_epoch: '1' }, { vault_id: 'vault-id-u1' })).to.be.true
+    expect(Expectations.vaultTokMeets(VaultProps, { vault_tok: 'vault-tok-u1' })).to.be.true
+    expect(Expectations.vaultTokMeets({ vault_tok: 'vault-tok-u1' }, { vault_tok: 'vault-tok-u1' })).to.be.true
+    expect(Expectations.vaultTokMeets({ vault_tok: 'vault-tok-u1', gate_epoch: '1' }, { vault_tok: 'vault-tok-u1' })).to.be.true
   })
 
   it("fails the props of another vault, props that name none, and none at all", () => {
-    expect(Expectations.vaultTokMeets(VaultProps, { vault_id: 'reborn' })).to.be.false
-    expect(Expectations.vaultTokMeets({ unlock_epoch: 1 }, { vault_id: 'vault-id-u1' })).to.be.false
-    expect(Expectations.vaultTokMeets(undefined, { vault_id: 'vault-id-u1' })).to.be.false
-    expect(Expectations.vaultTokMeets('not vault props', { vault_id: 'vault-id-u1' })).to.be.false
+    expect(Expectations.vaultTokMeets(VaultProps, { vault_tok: 'reborn' })).to.be.false
+    expect(Expectations.vaultTokMeets({ gate_epoch: 1 }, { vault_tok: 'vault-tok-u1' })).to.be.false
+    expect(Expectations.vaultTokMeets(undefined, { vault_tok: 'vault-tok-u1' })).to.be.false
+    expect(Expectations.vaultTokMeets('not vault props', { vault_tok: 'vault-tok-u1' })).to.be.false
   })
 })
 
@@ -64,10 +64,10 @@ const BoxCases = [
   [VaultProps, undefined,                     "rev-one",  "stale_write",    'a write over a box since deleted'],
   // the vault props half:
   [undefined,  undefined,                     null,       "vault_mismatch", 'a write into a scope with no vault props'],
-  [TH.vaultPropsOf('u1', { vault_id: 'reborn' }), Box, "rev-one",  "vault_mismatch", 'a write sealed for a vault since made anew'],
+  [TH.vaultPropsOf('u1', { vault_tok: 'reborn' }), Box, "rev-one", "vault_mismatch", 'a write sealed for a vault since made anew'],
   // nothing, or damage, standing:
-  [{ vault_id: "vault-id-u1" },  undefined,   null,       "vault_mismatch", 'a vault row that shows no epoch'],
-  [{ vault_id: "vault-id-u1", unlock_epoch: 1 }, undefined, null, null,         'a vault row that shows its id and epoch, and nothing more'],
+  [{ vault_tok: "vault-tok-u1" },  undefined, null,       "vault_mismatch", 'a vault row that shows no epoch'],
+  [{ vault_tok: "vault-tok-u1", gate_epoch: 1 }, undefined, null, null,         'a vault row that shows its id and epoch, and nothing more'],
   [VaultProps, null,                          null,       null,             'a null row reads as no box, as a read does'],
   [VaultProps, { boxlabel: "anthropic" },     "rev-one",  "stale_write",    'a box row that shows no revision'],
 ] as const
@@ -75,23 +75,23 @@ const BoxCases = [
 describe("Expectations.boxRefusalOf", () => {
   for (const [standingVaultProps, standingBox, revisionTok, refusalkind, blurb] of BoxCases) {
     it(`${refusalkind ?? 'lands'}: ${blurb}`, () => {
-      const refusal = Expectations.boxRefusalOf(standingVaultProps, standingBox, { vault_id: 'vault-id-u1', revision_tok: revisionTok })
+      const refusal = Expectations.boxRefusalOf(standingVaultProps, standingBox, { vault_tok: 'vault-tok-u1', revision_tok: revisionTok })
       expect(refusal?.refusalkind ?? null).to.eq(refusalkind)
     })
   }
 
   it("refuses a stale write with the box standing as it read it, as its example shows", () => {
-    const refusal = Expectations.boxRefusalOf(VaultProps, Box, { vault_id: 'vault-id-u1', revision_tok: 'rev-two' })
+    const refusal = Expectations.boxRefusalOf(VaultProps, Box, { vault_tok: 'vault-tok-u1', revision_tok: 'rev-two' })
     expect(refusal?.meta).to.deep.equal({ box_stored: Box })
   })
 
   it("refuses a stale write over a box since deleted with null standing, not undefined", () => {
-    const refusal = Expectations.boxRefusalOf(VaultProps, undefined, { vault_id: 'vault-id-u1', revision_tok: 'rev-one' })
+    const refusal = Expectations.boxRefusalOf(VaultProps, undefined, { vault_tok: 'vault-tok-u1', revision_tok: 'rev-one' })
     expect(refusal?.meta).to.deep.equal({ box_stored: null })
   })
 
   it("refuses a vault mismatch carrying nothing of the vault props standing", () => {
-    const refusal = Expectations.boxRefusalOf(TH.vaultPropsOf('u1', { vault_id: 'reborn' }), Box, { vault_id: 'vault-id-u1', revision_tok: 'rev-one' })
+    const refusal = Expectations.boxRefusalOf(TH.vaultPropsOf('u1', { vault_tok: 'reborn' }), Box, { vault_tok: 'vault-tok-u1', revision_tok: 'rev-one' })
     expect(refusal).to.not.have.property('meta')
     expect(TH.thrownText(refusal)).to.not.include('reborn')
   })
@@ -116,11 +116,11 @@ const DeletionCases = [
 describe("Expectations.deletionOf", () => {
   for (const [standingBox, revisionTok, outcome, blurb] of DeletionCases) {
     it(`reports ${outcome} for ${blurb}`, () => {
-      expect(Expectations.deletionOf(standingBox, { vault_id: 'vault-id-u1', revision_tok: revisionTok })).to.deep.equal({ outcome })
+      expect(Expectations.deletionOf(standingBox, { vault_tok: 'vault-tok-u1', revision_tok: revisionTok })).to.deep.equal({ outcome })
     })
   }
 
   it("reports deleted for a box at its revision, as its example shows", () => {
-    expect(Expectations.deletionOf(TH.boxOf('anthropic', 'r7', { revision_tok: 'r7' }), { vault_id: 'v1', revision_tok: 'r7' })).to.deep.equal({ outcome: 'deleted' })
+    expect(Expectations.deletionOf(TH.boxOf('anthropic', 'r7', { revision_tok: 'r7' }), { vault_tok: 'v1', revision_tok: 'r7' })).to.deep.equal({ outcome: 'deleted' })
   })
 })

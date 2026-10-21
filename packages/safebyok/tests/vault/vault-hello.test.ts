@@ -641,7 +641,7 @@ describe("vault.hello, by the Contract", () => {
     const stored = storedVaultPropsOf(world)
     const vault = Vault.make(world.optsWith({ deviceDB: memoryDeviceDB() }))
     await vault.hello()
-    expect(vault).to.deep.include({ vault_id: stored['vault_id'], registered_at: stored['registered_at'], unlock_epoch: stored['unlock_epoch'] })
+    expect(vault).to.deep.include({ vault_tok: stored['vault_tok'], registered_at: stored['registered_at'], gate_epoch: stored['gate_epoch'] })
     expect(vault.passphrase).to.deep.include({ device_id: storedWayinOf(world, 'passphrase')?.['device_id'], registered_at: storedWayinOf(world, 'passphrase')?.['registered_at'] })
     expect(vault.passkey).to.be.null
     expect(boxlabelsOf(vault)).to.deep.equal(['anthropic', 'openai'])
@@ -828,7 +828,7 @@ describe("onBadNews, by the Contract", () => {
     const world = makeWorld()
     const { told, onBadNews } = newsKeeper()
     await world.open({ onBadNews })
-    world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ format: 'safebyok-vault-v6', unlock_epoch: 'one' }))
+    world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ format: 'safebyok-vault-v6', gate_epoch: 'one' }))
     await vi.waitFor(() => { expect(told.map((news) => news.refusalkind)).to.deep.equal(['damaged_vault']) })
   })
 
@@ -838,7 +838,7 @@ describe("onBadNews, by the Contract", () => {
     const deaf = world.deafVaultDB()
     const vault = await world.openUnlocked('pw', { onBadNews, vaultDB: deaf })
     vi.spyOn(deaf, 'putBox').mockResolvedValueOnce(bad(new VaultError('stale_write', 'Someone else wrote first.')))
-    world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ format: 'safebyok-vault-v6', unlock_epoch: 'one' }))
+    world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ format: 'safebyok-vault-v6', gate_epoch: 'one' }))
     const err = await TH.expectRefusal(vault.putBox('anthropic', 'sk-fake'), 'stale_write')
     expect(told.map((news) => news.refusalkind)).to.deep.equal(['damaged_vault'])
     expect(err.cause).to.eq(told[0])
@@ -1012,7 +1012,7 @@ describe("a revocation read while a key is being taken up: a take-up, an unlock,
     unwrapping.release()
     await hello
     listing.release()
-    await TH.eventually(() => vault.unlock_epoch === 2)
+    await TH.eventually(() => vault.gate_epoch === 2)
     expect(vault.state).to.eq('locked')
     await vault.hello({ staleMinutes: 0 })
     expect(vault.state).to.eq('locked')
@@ -1038,10 +1038,10 @@ describe("a revocation read while a key is being taken up: a take-up, an unlock,
     await other.unlock('pw-two')
     await other.putWayin('pw-two', 'pw-three')
     await vault.hello({ staleMinutes: 0 })
-    expect(vault.unlock_epoch).to.eq(3)
+    expect(vault.gate_epoch).to.eq(3)
     noting.release()
     await changing
-    expect(vault.unlock_epoch).to.eq(3)
+    expect(vault.gate_epoch).to.eq(3)
     expect(vault.state).to.eq('locked')
   })
 
@@ -1063,10 +1063,10 @@ describe("a revocation read while a key is being taken up: a take-up, an unlock,
     await other.unlock('pw')
     await other.putWayin('pw', 'pw-two')
     await vault.hello({ staleMinutes: 0 })
-    expect(vault.unlock_epoch).to.eq(2)
+    expect(vault.gate_epoch).to.eq(2)
     noting.release()
     await TH.expectBad(making, 'vault_locked')
-    expect(vault.unlock_epoch).to.eq(2)
+    expect(vault.gate_epoch).to.eq(2)
     expect(vault.state).to.eq('locked')
   })
 
@@ -1084,7 +1084,7 @@ describe("a revocation read while a key is being taken up: a take-up, an unlock,
     deriving.release()
     await TH.expectBad(unlocking, 'vault_locked')
     erasing.release()
-    await TH.eventually(() => vault.unlock_epoch === 2)
+    await TH.eventually(() => vault.gate_epoch === 2)
     await vault.hello({ staleMinutes: 0 })
     expect(vault.state).to.eq('locked')
     expect(await world.getLease()).to.be.null
@@ -1092,10 +1092,10 @@ describe("a revocation read while a key is being taken up: a take-up, an unlock,
 
   it("stays locked when the passphrase changes on another device while a hello unwraps this device's lease", async () => {
     const { world, vault, hello, other, release } = await reloadHeldAtUnwrap()
-    expect(vault.unlock_epoch).to.eq(1)
+    expect(vault.gate_epoch).to.eq(1)
     await other.putWayin('pw', 'pw-new')
     // The change bell's refresh brings the new epoch while the unwrap is held.
-    await TH.eventually(() => vault.unlock_epoch === 2)
+    await TH.eventually(() => vault.gate_epoch === 2)
     release()
     await hello
     expect(vault.state).to.eq('locked')
@@ -1108,13 +1108,13 @@ describe("a revocation read while a key is being taken up: a take-up, an unlock,
 
   it("stays locked when the vault is deleted and made anew on another device while a hello unwraps this device's lease", async () => {
     const { world, vault, hello, other, release } = await reloadHeldAtUnwrap()
-    const formerId = vault.vault_id
+    const formerId = vault.vault_tok
     await other.del()
     const remaker = await world.openUnlocked('pw-new', { deviceDB: memoryDeviceDB() })
-    await TH.eventually(() => vault.vault_id !== null && vault.vault_id !== formerId)
+    await TH.eventually(() => vault.vault_tok !== null && vault.vault_tok !== formerId)
     release()
     await hello
-    expect(remaker.vault_id).to.eq(vault.vault_id)
+    expect(remaker.vault_tok).to.eq(vault.vault_tok)
     expect(vault.state).to.eq('locked')
     expect(vault.askPassphraseAt).to.be.null
     await vault.hello({ staleMinutes: 0 })

@@ -604,19 +604,19 @@ describe("the fixtures", () => {
     expect(VaultScope.safeParse(TH.scopeOf('u1', 'spare')).success).to.be.true
   })
 
-  it("vaultSliceOf: the scope, vault id, key deriver, passphrase check, lease length and clock a proof, box, way in or lease reads, as its first example shows", () => {
+  it("vaultSliceOf: the scope, vault token, key deriver, passphrase check, lease length and clock a proof, box, way in or lease reads, as its first example shows", () => {
     const { checkPassphrase, now, ...rest } = TH.vaultSliceOf('u1')
     expect(checkPassphrase).to.be.a('function')
     expect(now()).to.eq(TH.SliceNow)
-    expect(rest).to.deep.equal({ ...TH.scopeOf('u1'), vault_id: 'vault-id-u1', keyDeriver: TH.testDeriver, leaseMillis: 7 * 24 * 60 * 60_000 })
+    expect(rest).to.deep.equal({ ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', keyDeriver: TH.testDeriver, leaseMillis: 7 * 24 * 60 * 60_000 })
     expect(Proof.parse(TH.vaultSliceOf('u1', argon2idWebV1Deriver), 'pw').vault.keyDeriver).to.eq(argon2idWebV1Deriver)
   })
 
   it("vaultSliceOf: any field as its overrides say, as its second example shows", () => {
     const later = TH.SliceNow + 1000
-    const slice = TH.vaultSliceOf('u1', TH.testDeriver, { now: () => later, vault_id: null })
+    const slice = TH.vaultSliceOf('u1', TH.testDeriver, { now: () => later, vault_tok: null })
     expect(slice.now()).to.eq(later)
-    expect(slice.vault_id).to.be.null
+    expect(slice.vault_tok).to.be.null
   })
 
   it("vaultSliceOf's passphrase check admits any passphrase but a blank one, held to its contract as a vault's is", async () => {
@@ -627,7 +627,7 @@ describe("the fixtures", () => {
 
   it("vaultPropsOf: a shape-valid VaultProps, with any field overridden", () => {
     expect(VaultProps.safeParse(TH.vaultPropsOf('u1')).success).to.be.true
-    expect(TH.vaultPropsOf('u1', { unlock_epoch: 2 })).to.deep.equal({ ...TH.vaultPropsOf('u1'), unlock_epoch: 2 })
+    expect(TH.vaultPropsOf('u1', { gate_epoch: 2 })).to.deep.equal({ ...TH.vaultPropsOf('u1'), gate_epoch: 2 })
   })
 
   it("noBoxYet and thisVault: the expectations u1's vault meets, before its first box and for a deletion", async () => {
@@ -645,7 +645,7 @@ describe("the fixtures", () => {
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
     await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one'))
     expect(await TH.expectingGood(vaultDB).delBox(TH.scopeOf('u1'), 'anthropic', TH.deleting('rev-one'))).to.deep.equal({ outcome: 'deleted' })
-    expect(TH.deleting(null)).to.deep.equal({ vault_id: 'vault-id-u1', revision_tok: null })
+    expect(TH.deleting(null)).to.deep.equal({ vault_tok: 'vault-tok-u1', revision_tok: null })
   })
 
   it("passkeyWayinOf: a shape-valid passkey wayin, with any field overridden", () => {
@@ -760,8 +760,8 @@ describe("thrownText", () => {
 
 describe("leafTexts", () => {
   it("lists every string and number at any depth, as text, and no field name", () => {
-    const leaves = TH.leafTexts({ vault_id: 'vault-id-u1', wrapped: { ciphertext_b64: 'ct-a1' }, epoch: 7 })
-    expect(leaves).to.deep.equal(['vault-id-u1', 'ct-a1', '7'])
+    const leaves = TH.leafTexts({ vault_tok: 'vault-tok-u1', wrapped: { ciphertext_b64: 'ct-a1' }, epoch: 7 })
+    expect(leaves).to.deep.equal(['vault-tok-u1', 'ct-a1', '7'])
   })
 
   it("reaches into arrays, and skips what is neither string nor number", () => {
@@ -770,7 +770,7 @@ describe("leafTexts", () => {
 
   it("lists every value of a stored record", () => {
     const leaves = TH.leafTexts(TH.vaultPropsOf('u1'))
-    expect(leaves).to.include.members(['vault-id-u1', 'ct-vault-u1', 'iv-vault-u1', String(Date.UTC(2026, 9, 14))])
+    expect(leaves).to.include.members(['vault-tok-u1', 'ct-vault-u1', 'iv-vault-u1', String(Date.UTC(2026, 9, 14))])
   })
 })
 
@@ -997,7 +997,7 @@ describe("perUser", () => {
     const { vaultDB, store } = counted()
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u2'))
-    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u2'), { vault_id: 'vault-id-u2', revision_tok: null }, TH.boxOf('anthropic', 'two'))
+    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u2'), { vault_tok: 'vault-tok-u2', revision_tok: null }, TH.boxOf('anthropic', 'two'))
     expect(await TH.expectingGood(servingOnly('u2', store)).getBox(TH.scopeOf('u2'), 'anthropic')).to.deep.equal(TH.boxOf('anthropic', 'two'))
     expect(await TH.expectingGood(vaultDB).listBoxes(TH.scopeOf('u1'))).to.have.lengthOf(0)
   })
@@ -1006,12 +1006,12 @@ describe("perUser", () => {
     const { vaultDB, store } = counted()
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u2'))
-    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u2'), { vault_id: 'vault-id-u2', revision_tok: null }, TH.boxOf('anthropic', 'two'))
-    await TH.expectingGood(vaultDB).putVaultProps({ ...TH.vaultPropsOf('u2'), unlock_epoch: 2 }, { vault_id: 'vault-id-u2', unlock_epoch: 1 })
+    await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u2'), { vault_tok: 'vault-tok-u2', revision_tok: null }, TH.boxOf('anthropic', 'two'))
+    await TH.expectingGood(vaultDB).putVaultProps({ ...TH.vaultPropsOf('u2'), gate_epoch: 2 }, { vault_tok: 'vault-tok-u2', gate_epoch: 1 })
     vaultDB.subscribe(TH.scopeOf('u2'), () => undefined)()
-    await TH.expectingGood(vaultDB).delBox(TH.scopeOf('u2'), 'anthropic', { vault_id: 'vault-id-u2', revision_tok: 'rev-two' })
+    await TH.expectingGood(vaultDB).delBox(TH.scopeOf('u2'), 'anthropic', { vault_tok: 'vault-tok-u2', revision_tok: 'rev-two' })
     expect(await TH.expectingGood(servingOnly('u2', store)).listBoxes(TH.scopeOf('u2'))).to.have.lengthOf(0)
-    await TH.expectingGood(vaultDB).delVault(TH.scopeOf('u2'), { vault_id: 'vault-id-u2' })
+    await TH.expectingGood(vaultDB).delVault(TH.scopeOf('u2'), { vault_tok: 'vault-tok-u2' })
     expect(await TH.expectingGood(servingOnly('u2', store)).getVaultProps(TH.scopeOf('u2'))).to.be.null
     expect(await TH.expectingGood(servingOnly('u1', store)).getVaultProps(TH.scopeOf('u1'))).to.deep.equal(TH.vaultPropsOf('u1'))
   })
@@ -1177,7 +1177,7 @@ class RoundTripVaultDB extends VaultDB {
     const ckey = Ckeys.vaultProps(vaultProps)
     const meets = (rows: Rows) => {
       const standing = rows.get(ckey) as VaultProps | undefined
-      return standing?.vault_id === expected.vault_id && standing.unlock_epoch === expected.unlock_epoch
+      return standing?.vault_tok === expected.vault_tok && standing.gate_epoch === expected.gate_epoch
     }
     return this.step({ check: meets, write: (rows) => { rows.set(ckey, vaultProps) } })
   }
@@ -1269,7 +1269,7 @@ class RoundTripVaultDB extends VaultDB {
   }
 }
 
-const vaultIs = (rows: Rows, scope: VaultScope, expected: { vault_id: string }) => (rows.get(Ckeys.vaultProps(scope)) as VaultProps | undefined)?.vault_id === expected.vault_id
+const vaultIs = (rows: Rows, scope: VaultScope, expected: { vault_tok: string }) => (rows.get(Ckeys.vaultProps(scope)) as VaultProps | undefined)?.vault_tok === expected.vault_tok
 
 const boxesIn = (rows: Rows, scope: VaultScope): StoredBox[] => [...rows]
   .map(([ckey, box]) => ({ boxlabel: Ckeys.isBoxIn(scope)(ckey) ? Ckeys.boxlabelOf(ckey) : null, box }))

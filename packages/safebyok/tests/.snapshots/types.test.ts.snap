@@ -147,18 +147,14 @@ exports[`Stored record formats > safebyok-lease-v1 1`] = `
       "const": "safebyok-lease-v1",
       "type": "string",
     },
-    "lease_key": {},
-    "unlock_epoch": {
+    "gate_epoch": {
       "exclusiveMinimum": 0,
       "maximum": 9007199254740991,
       "type": "integer",
     },
+    "lease_key": {},
     "user_id": {
       "maxLength": 1024,
-      "minLength": 1,
-      "type": "string",
-    },
-    "vault_id": {
       "minLength": 1,
       "type": "string",
     },
@@ -180,6 +176,10 @@ exports[`Stored record formats > safebyok-lease-v1 1`] = `
       ],
       "type": "object",
     },
+    "vault_tok": {
+      "minLength": 1,
+      "type": "string",
+    },
     "vaultlabel": {
       "maxLength": 1024,
       "minLength": 1,
@@ -191,8 +191,8 @@ exports[`Stored record formats > safebyok-lease-v1 1`] = `
     "applabel",
     "user_id",
     "vaultlabel",
-    "vault_id",
-    "unlock_epoch",
+    "vault_tok",
+    "gate_epoch",
     "lease_key",
     "vault_key_lease_wrapped",
     "ask_passphrase_at",
@@ -222,20 +222,20 @@ exports[`Stored record formats > safebyok-mark-v5 1`] = `
           "minLength": 1,
           "type": "string",
         },
-        "unlock_epoch": {
+        "gate_epoch": {
           "exclusiveMinimum": 0,
           "maximum": 9007199254740991,
           "type": "integer",
         },
-        "vault_id": {
+        "vault_tok": {
           "minLength": 1,
           "type": "string",
         },
       },
       "required": [
         "device_id",
-        "vault_id",
-        "unlock_epoch",
+        "vault_tok",
+        "gate_epoch",
       ],
       "type": "object",
     },
@@ -274,6 +274,11 @@ exports[`Stored record formats > safebyok-vault-v6 1`] = `
     "format": {
       "const": "safebyok-vault-v6",
       "type": "string",
+    },
+    "gate_epoch": {
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991,
+      "type": "integer",
     },
     "passkey": {
       "anyOf": [
@@ -393,17 +398,12 @@ exports[`Stored record formats > safebyok-vault-v6 1`] = `
       "minimum": 347155200000,
       "type": "integer",
     },
-    "unlock_epoch": {
-      "exclusiveMinimum": 0,
-      "maximum": 9007199254740991,
-      "type": "integer",
-    },
     "user_id": {
       "maxLength": 1024,
       "minLength": 1,
       "type": "string",
     },
-    "vault_id": {
+    "vault_tok": {
       "minLength": 1,
       "type": "string",
     },
@@ -418,8 +418,8 @@ exports[`Stored record formats > safebyok-vault-v6 1`] = `
     "applabel",
     "user_id",
     "vaultlabel",
-    "vault_id",
-    "unlock_epoch",
+    "vault_tok",
+    "gate_epoch",
     "passphrase",
     "passkey",
     "registered_at",

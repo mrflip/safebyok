@@ -69,18 +69,18 @@ describe("BoxRecord", () => {
 /** The time every box here is sealed at, unless a test says otherwise: what its vault's clock reads. */
 const T0 = TH.SliceNow
 
-/** The vault a box here is of: `u1`'s `main` vault, holding the vault props `vault-id-u1`, its clock reading `at`. */
+/** The vault a box here is of: `u1`'s `main` vault, holding the vault props `vault-tok-u1`, its clock reading `at`. */
 const vaultOf = (overrides: Partial<TH.VaultSlice> = {}, at = T0): TH.VaultSlice => TH.vaultSliceOf('u1', TH.testDeriver, { now: () => at, ...overrides })
 
-/** A lease on `vault`, opened around `vaultKey`, granted under the vault props `vaultTok` at unlock epoch 1. */
-const leaseOf = async (vaultKey: CryptoKey, vaultTok = 'vault-id-u1', vault: TH.VaultSlice = vaultOf()): Promise<Lease> => (
-  await Lease.grant(vault, { vault_id: vaultTok, unlock_epoch: 1 }, { transientKey: vaultKey, sessionKey: vaultKey })
+/** A lease on `vault`, opened around `vaultKey`, granted under the vault props `vaultTok` at gate epoch 1. */
+const leaseOf = async (vaultKey: CryptoKey, vaultTok = 'vault-tok-u1', vault: TH.VaultSlice = vaultOf()): Promise<Lease> => (
+  await Lease.grant(vault, { vault_tok: vaultTok, gate_epoch: 1 }, { transientKey: vaultKey, sessionKey: vaultKey })
 )
 
 /** A lease on a fresh vaultKey whose vault's clock reads what `clock.at` holds, {@link T0} until a test moves it. */
 const movingLease = async () => {
   const clock = { at: T0 }
-  const lease = await leaseOf(await makeVaultKey(), 'vault-id-u1', TH.vaultSliceOf('u1', TH.testDeriver, { now: () => clock.at }))
+  const lease = await leaseOf(await makeVaultKey(), 'vault-tok-u1', TH.vaultSliceOf('u1', TH.testDeriver, { now: () => clock.at }))
   return { lease, clock }
 }
 
@@ -92,7 +92,7 @@ const otherCopyBox = async (): Promise<unknown> => {
   const { Box: OtherBox } = await import('../src/box')
   const { Lease: OtherLease } = await import('../src/lease')
   const vaultKey = await makeVaultKey()
-  const lease = await OtherLease.grant(vaultOf(), { vault_id: 'vault-id-u1', unlock_epoch: 1 }, { transientKey: vaultKey, sessionKey: vaultKey })
+  const lease = await OtherLease.grant(vaultOf(), { vault_tok: 'vault-tok-u1', gate_epoch: 1 }, { transientKey: vaultKey, sessionKey: vaultKey })
   return await OtherBox.seal(vaultOf(), lease, 'anthropic_api_key', Secret)
 }
 
@@ -112,7 +112,7 @@ const sealedOf = async (whisper: Whisper = Secret, opts?: Parameters<typeof Box.
  */
 const handSealedOf = async (vault: TH.VaultSlice, vaultKey: CryptoKey, plainBytes: Uint8Array): Promise<BoxRecord> => {
   const { format, box_key_wrapped: _wrapped, whisper_ciphered: _ciphered, ...header } = TH.boxOf('anthropic_api_key', 'hand')
-  const ctxFor = (purpose: string) => cipherCtx(format, vault.applabel, vault.user_id, vault.vaultlabel, vault.vault_id ?? '', purpose, { ...header, sidecar: stableJsonify(header.sidecar)! })
+  const ctxFor = (purpose: string) => cipherCtx(format, vault.applabel, vault.user_id, vault.vaultlabel, vault.vault_tok ?? '', purpose, { ...header, sidecar: stableJsonify(header.sidecar)! })
   const boxKey = await makeBoxKey()
   return {
     format,
@@ -134,17 +134,17 @@ describe("Box.make", () => {
       sidecar:       { note: 'work account' },
       registered_at: record.registered_at,
       written_at:    record.written_at,
-      vault_id:      'vault-id-u1',
+      vault_tok:     'vault-tok-u1',
     })
   })
 
-  it("lies under the vault props its vault holds, or under the vault id it is handed", () => {
-    expect(Box.make(vaultOf({ vault_id: 'vault-id-now' }), TH.boxOf('anthropic_api_key', 'a1')).vault_id).to.eq('vault-id-now')
-    expect(Box.make(vaultOf(), TH.boxOf('anthropic_api_key', 'a1'), 'vault-id-read').vault_id).to.eq('vault-id-read')
+  it("lies under the vault props its vault holds, or under the vault token it is handed", () => {
+    expect(Box.make(vaultOf({ vault_tok: 'vault-tok-now' }), TH.boxOf('anthropic_api_key', 'a1')).vault_tok).to.eq('vault-tok-now')
+    expect(Box.make(vaultOf(), TH.boxOf('anthropic_api_key', 'a1'), 'vault-tok-read').vault_tok).to.eq('vault-tok-read')
   })
 
-  it("refuses as 'absent_vault' a box of a vault that holds no vault props, when no vault id is handed", () => {
-    TH.expectSyncRefusal(() => Box.make(vaultOf({ vault_id: null }), TH.boxOf('anthropic_api_key', 'a1')), 'absent_vault')
+  it("refuses as 'absent_vault' a box of a vault that holds no vault props, when no vault token is handed", () => {
+    TH.expectSyncRefusal(() => Box.make(vaultOf({ vault_tok: null }), TH.boxOf('anthropic_api_key', 'a1')), 'absent_vault')
   })
 
   it("gives the record back whole as record, frozen through, the one source of its fields (Contract: Box)", () => {
@@ -158,7 +158,7 @@ describe("Box.make", () => {
 
   it("shows each visible field once in a key list, a spread, JSON and a log line, and nothing else: no ciphertext, format, codec or vault, as toJSON's example shows (Contract: Box)", () => {
     const box = Box.make(vaultOf(), TH.boxOf('anthropic_api_key', 'a1'))
-    const visible = ['boxlabel', 'revision_tok', 'sidecar', 'registered_at', 'written_at', 'vault_id']
+    const visible = ['boxlabel', 'revision_tok', 'sidecar', 'registered_at', 'written_at', 'vault_tok']
     expect(Object.keys(box)).to.deep.equal(visible)
     expect(Object.keys(TH.jsonOf(box))).to.deep.equal(visible)
     expect(box.toJSON()).to.deep.equal(TH.shownOf(box))
@@ -173,7 +173,7 @@ describe("Box.make", () => {
     const box = Box.make(vaultOf(), TH.boxOf('anthropic_api_key', 'a1', { sidecar: { team: { members: ['ana'] } } }))
     expect(Object.isFrozen(box)).to.be.true
     expect(Reflect.set(box, 'boxlabel', 'other')).to.be.false
-    expect(Reflect.set(box, 'vault_id', 'other')).to.be.false
+    expect(Reflect.set(box, 'vault_tok', 'other')).to.be.false
     const sidecar = box.sidecar as { team: { members: string[] } }
     expect(Object.isFrozen(sidecar.team.members)).to.be.true
     expect(() => { sidecar.team.members.push('mallory') }).to.throw(TypeError)
@@ -226,8 +226,8 @@ describe("Box.seal", () => {
 
   it("lays the box under the lease's vault props, whatever its vault holds: the vault it names is the one whose key sealed it", async () => {
     const vaultKey = await makeVaultKey()
-    const box = await Box.seal(vaultOf({ vault_id: 'vault-id-other' }), await leaseOf(vaultKey, 'vault-id-leased'), 'anthropic_api_key', Secret)
-    expect(box.vault_id).to.eq('vault-id-leased')
+    const box = await Box.seal(vaultOf({ vault_tok: 'vault-tok-other' }), await leaseOf(vaultKey, 'vault-tok-leased'), 'anthropic_api_key', Secret)
+    expect(box.vault_tok).to.eq('vault-tok-leased')
   })
 
   it("ciphers the whisper as its JSON with every object's keys sorted, so it opens with them in order (Contract: Box, whisper_codec)", async () => {
@@ -324,7 +324,7 @@ describe("Box.seal", () => {
 
   it("refuses as 'vault_locked' an over of another vault than the lease: the vault was deleted and made anew since it was read", async () => {
     const { vault, vaultKey, box } = await sealedOf()
-    const reborn = await leaseOf(vaultKey, 'vault-id-reborn')
+    const reborn = await leaseOf(vaultKey, 'vault-tok-reborn')
     await TH.expectRefusal(Box.seal(vault, reborn, 'anthropic_api_key', Secret, { over: box }), 'vault_locked')
   })
 
@@ -389,12 +389,12 @@ describe("box.tryOpen", () => {
 
   it("refuses a box moved to the same vault made anew as 'damaged_box', even under the same vaultKey (Contract: box.tryOpen, Guarantees)", async () => {
     const { vault, vaultKey, box } = await sealedOf()
-    await TH.expectBad(Box.make(vault, box.record, 'vault-id-reborn').tryOpen(await leaseOf(vaultKey, 'vault-id-reborn')), 'damaged_box')
+    await TH.expectBad(Box.make(vault, box.record, 'vault-tok-reborn').tryOpen(await leaseOf(vaultKey, 'vault-tok-reborn')), 'damaged_box')
   })
 
   it("refuses as 'vault_locked' a lease of another vault than the box lies in: the vault was deleted and made anew since the box was read", async () => {
     const { vaultKey, box } = await sealedOf()
-    const err = await TH.expectBad(box.tryOpen(await leaseOf(vaultKey, 'vault-id-reborn')), 'vault_locked')
+    const err = await TH.expectBad(box.tryOpen(await leaseOf(vaultKey, 'vault-tok-reborn')), 'vault_locked')
     expect(err.message).to.match(/another vault/)
   })
 
