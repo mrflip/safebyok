@@ -1,6 +1,6 @@
 import { GraphQLError } from 'graphql'
 import { Refusals, VaultError, isVaultError } from 'safebyok'
-import type { Outcome, RefusalKind, VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, VaultProps, VaultDB, VaultScope } from 'safebyok'
+import type { Outcome, RefusalKind, RefusalMeta, VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, VaultProps, VaultDB, VaultScope } from 'safebyok'
 import { VaultPropsFields, BoxFields, ScopeFields, recordOf } from './fields'
 
 /**
@@ -9,7 +9,7 @@ import { VaultPropsFields, BoxFields, ScopeFields, recordOf } from './fields'
  * VaultDB must hand back from its own listing -- where a VaultDB's `listBoxes` gives the
  * summaries a vault shows. Every VaultDB is one: `safebyok-postgres`'s, or one of your own.
  */
-export type ServedVaultDB = Pick<VaultDB, 'getVaultProps' | 'ensureVaultProps' | 'putVaultProps' | 'getBox' | 'listBoxRecords' | 'putBox' | 'delBox' | 'delVault' | 'subscribe'>
+export type ServedVaultDB = Pick<VaultDB, 'getVaultProps' | 'ensureVaultProps' | 'putVaultProps' | 'getBox' | 'listBoxRecords' | 'putBox' | 'getCapacity' | 'delBox' | 'delVault' | 'subscribe'>
 
 /** What {@link vaultResolvers} is made with, once, at your server's start. */
 export type VaultResolversOpts<ContextT> = {
@@ -47,6 +47,7 @@ export type VaultResolvers<ContextT> = {
     safebyokGetVaultProps:    VaultFieldResolver<ContextT>
     safebyokGetBox:           VaultFieldResolver<ContextT>
     safebyokListBoxes:        VaultFieldResolver<ContextT>
+    safebyokGetCapacity:      VaultFieldResolver<ContextT>
   }
   Mutation: {
     safebyokEnsureVaultProps: VaultFieldResolver<ContextT>
@@ -135,6 +136,7 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
       safebyokGetBox:        served((vaultDB, args) => vaultDB.getBox(scopeIn(args), args.boxlabel as string)),
       // As stored records, which the browser's VaultDB validates: not listBoxes' summaries.
       safebyokListBoxes:  served((vaultDB, args) => vaultDB.listBoxRecords(scopeIn(args))),
+      safebyokGetCapacity: served((vaultDB, args) => vaultDB.getCapacity(scopeIn(args))),
     },
     Mutation: {
       safebyokEnsureVaultProps: served((vaultDB, args) => vaultDB.ensureVaultProps(vaultPropsIn(args))),
@@ -231,19 +233,27 @@ const noUnsubscribing = (): void => undefined
 
 /**
  * A refusal as the wire carries it: a GraphQL error with the VaultError's message and its kind as
- * `extensions.kind`, and, for a stale box write, `extensions.meta.box_stored`: the box that
- * stands, whole, as a read would send it. Nothing more. A GraphQL server sends a GraphQLError of its resolvers'
+ * `extensions.kind`, and {@link metaCrossing} as `extensions.meta`. Nothing more. A GraphQL server sends a GraphQLError of its resolvers'
  * as it stands, where it hides anything else behind "Unexpected error" (Yoga) or sends its
  * message as it is (Apollo). The VaultError rides along as the error's `cause`, unenumerable, as
  * an Error's own cause is, for the server's logs: no GraphQL server sends a cause.
  */
 const crossing = (err: unknown): GraphQLError => {
   const refusal = isVaultError(err) ? err : Refusals.storageUnavailable(err)
-  const meta = refusal.meta?.box_stored === undefined ? {} : { meta: { box_stored: refusal.meta.box_stored } }
-  const crossed = new GraphQLError(refusal.message, { extensions: { kind: refusal.refusalkind, ...meta } })
+  const crossed = new GraphQLError(refusal.message, { extensions: { kind: refusal.refusalkind, ...metaCrossing(refusal) } })
   // Set after, never as the constructor's `cause` or `originalError`: either becomes the error's
   // originalError, and Yoga masks a GraphQLError whose originalError is not a GraphQLError too.
   Object.defineProperty(crossed, 'cause', { value: refusal, configurable: true, writable: true })
   return crossed
 }
 
+/**
+ * What of a refusal's meta crosses the wire: a stale box write's `box_stored`, the box that
+ * stands, whole, as a read would send it; or a full vault's `capacity`. Nothing else.
+ */
+const metaCrossing = (refusal: VaultError): { meta?: RefusalMeta } => {
+  const { box_stored: boxStored, capacity } = refusal.meta ?? {}
+  if (boxStored !== undefined) { return { meta: { box_stored: boxStored } } }
+  if (capacity !== undefined) { return { meta: { capacity } } }
+  return {}
+}

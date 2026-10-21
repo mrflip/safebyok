@@ -111,7 +111,7 @@ describe("graphqlVaultDB, its client", () => {
 })
 
 describe("graphqlVaultDB, a server's box limit", () => {
-  it("carries the server's vault_full refusal back as itself, kind and message, naming no boxlabel", async () => {
+  it("carries the server's vault_full refusal back as itself, kind, message and how full the vault is, naming no boxlabel", async () => {
     const db = await TH.emptyDatabase()
     const schema = TH.schemaOver(db, ({ userId }) => postgresVaultDB({ client: db, userId, maxBoxes: 1 }))
     // A browser declaring more than its server holds: the server holds the line.
@@ -122,8 +122,22 @@ describe("graphqlVaultDB, a server's box limit", () => {
     expect(refusal).to.be.instanceOf(VaultError)
     expect(refusal.message).to.include('1 boxes')
     expect(refusal.message).to.not.include('secret_project_x')
+    expect(refusal.meta?.capacity).to.deep.equal(await TH.expectingGood(vaultDB).getCapacity(u1))
+    expect(refusal.meta?.capacity?.boxes).to.deep.equal({ used: 1, max: 1 })
     const listed = await TH.expectingGood(vaultDB).listBoxes(u1)
     expect(listed.map((box) => box.boxlabel)).to.deep.equal(['openai'])
+  })
+
+  it("reads how full a vault is from the server's storage, a limit it does not keep the largest safe integer", async () => {
+    const db = await TH.emptyDatabase()
+    const schema = TH.schemaOver(db, ({ userId }) => postgresVaultDB({ client: db, userId }))
+    const vaultDB = graphqlVaultDB({ client: TH.urqlClientFor(schema, 'u1') })
+    await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
+    await TH.expectingGood(vaultDB).putBox(u1, { vault_id: 'vault-id-u1', revision_tok: null, vault_key_epoch: 1 }, TH.boxOf('openai', 'sk-fake-one'))
+    const capacity = await TH.expectingGood(vaultDB).getCapacity(u1)
+    expect(capacity.boxes).to.deep.equal({ used: 1, max: Number.MAX_SAFE_INTEGER })
+    expect(capacity.bytes.max).to.eq(Number.MAX_SAFE_INTEGER)
+    expect(capacity.bytes.used).to.be.greaterThan(0)
   })
 
   it("has a vault opened over it refuse a maxBoxes above what it declares", async () => {
@@ -312,6 +326,13 @@ describe("graphqlVaultDB, its refusals", () => {
     const server = { query: () => answered, mutation: () => answered, subscription: () => answered }
     const refusal = await TH.expectBad(graphqlVaultDB({ client: server as unknown as GraphqlVaultClient }).putBox(u1, { ...thisVault, revision_tok: null, vault_key_epoch: 1 }, TH.boxOf('openai', 'r1')), 'vault_mismatch')
     expect(refusal).to.not.have.property('meta')
+  })
+
+  it("refuses as corrupt_record a vault_full that crossed with no capacity that reads as one", async () => {
+    const full = new GraphQLError('This vault is full.', { extensions: { kind: 'vault_full', meta: { capacity: { boxes: 'many' } } } })
+    const answered = { toPromise: () => Promise.resolve({ error: new CombinedError({ graphQLErrors: [full] }) }) }
+    const server = { query: () => answered, mutation: () => answered, subscription: () => answered }
+    await TH.expectBad(graphqlVaultDB({ client: server as unknown as GraphqlVaultClient }).putBox(u1, { ...thisVault, revision_tok: null, vault_key_epoch: 1 }, TH.boxOf('openai', 'r1')), 'corrupt_record')
   })
 
   it("carries a server's refusal by its kind, though a validation code came before it", async () => {

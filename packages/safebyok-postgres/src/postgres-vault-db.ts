@@ -70,13 +70,20 @@ export type PostgresVaultDBOpts = VaultDBOpts & {
  *   A box write reads its vault row `FOR SHARE`, so it lands only while those vault props
  *   stand for the vaultKey the box was sealed under: an update of the vault props waits for it
  *   to end, or it for the update, and box writes never wait for each other on the vault row.
+ *   It locks the box standing under its boxlabel `FOR UPDATE`, writing nothing to it, and lands
+ *   only where its own comparison passed: one sent again after it landed refuses as `stale_write`,
+ *   naming the box it wrote.
  * * **A full vault**: a new box in a vault already holding `maxBoxes` refuses with kind
  *   `vault_full`, and the refused write stored nothing. The check is a best effort, made in the
  *   statement that inserts, by counting the vault's boxes as of that statement's start, with
  *   no lock on them and no counter kept: writes made one after another never take a vault past the limit,
  *   but writers racing for the last places may each find room, and all land. A box replacing
  *   one already there is never refused for the count, and a stale writer is told from a full
- *   vault by the same statement.
+ *   vault by the same statement, which also weighs the vault for the refusal's `meta.capacity`.
+ * * **How full a vault is**: `getCapacity` counts the vault's boxes and weighs each row as JSON,
+ *   `sum(octet_length(row_to_json(...)))`, in one statement: about the record's own JSON, a
+ *   little more for the `vault_id` column and the spaces Postgres writes in a jsonb. No limit is
+ *   kept on a vault's bytes, so its `bytes.max` is the largest safe integer.
  * * **Isolation**: every guarantee above holds under READ COMMITTED, Postgres's default. Under
  *   REPEATABLE READ or SERIALIZABLE (a host's session default, or its own transaction around a
  *   call), some races fail with a serialization error instead, as `storage_unavailable`, and
@@ -167,29 +174,46 @@ const ListBoxesSql = `SELECT ${Columns.selected(ListedBoxColumns)} FROM safebyok
 // vault props -- a rotation replacing the vaultKey -- waits until the write's statement ends, or the
 // write waits for it, and then reads the vault props as they stand: the vault_key_epoch compared is
 // the one standing when the write lands, never only the one in the statement's snapshot. Box
-// writers share the lock, so they never wait on each other for the vault row (two writes to one
-// boxlabel still meet at its row, or at the unique index).
+// writers share the lock, so they never wait on each other for the vault row.
 const ExpectedVaultSql = `SELECT applabel, user_id, vaultlabel, vault_id FROM safebyok_vaults
     WHERE ${ScopeIs} AND vault_id = $4::text AND vault_key_epoch = $5::bigint
     FOR SHARE`
 
+// The box standing under the boxlabel, beside the expected vault: what a box write compares, and
+// reports when it misses. FOR UPDATE locks it without writing it -- two writes to one boxlabel meet
+// here, one after the other -- and reads it as it stands once locked, a box another writer
+// committed since this statement began included, never only as the snapshot had it. It is read
+// after the vault row, so a write takes its locks in the order a vault's deletion does. A box
+// first inserted since this statement began is not in its snapshot, so not here: only the insert's
+// ON CONFLICT meets it.
+const StandingBoxSql = `SELECT ${Columns.selected(BoxColumns)} FROM safebyok_boxes
+    WHERE ${ScopeIs} AND boxlabel = ${Columns.placeholderOf(BoxColumns, 'boxlabel', BoxParamsFrom)}
+      AND EXISTS (SELECT 1 FROM vault)
+    FOR UPDATE`
+
+// The vault's boxes, and what they weigh: each row as JSON, in UTF-8 bytes (Postgres writes a
+// jsonb column with a space after each colon and comma, so a little more than the record's own JSON).
+const VaultBoxesSql = `FROM safebyok_boxes AS box WHERE ${ScopeIs}`
+const BoxBytesSql = 'COALESCE(sum(octet_length(row_to_json(box)::text)), 0)::float8'
+
+// How full the vault is, as of this statement: every box of the scope counted and weighed.
+const GetCapacitySql = `SELECT count(*)::float8 AS box_count, ${BoxBytesSql} AS bytes_used ${VaultBoxesSql}`
+
 // Each box write answers one row, whether or not it landed: `vault_stands`, whether the vault props
-// it expects stood; `landed`, whether it wrote (null when no box stands to report); `was_full`, a
-// first write's vault at its limit; and the box columns of what stands under the boxlabel now --
-// the box written, or the one that won -- null when none does. A write that does not land locks
-// and returns the row standing, so the winner it reports is the latest one committed, never only
-// the one in the statement's snapshot: Postgres re-reads a row an UPDATE (or an INSERT's ON
-// CONFLICT) waited on. A miss writes the row back unchanged, which leaves Postgres a dead row
-// version to vacuum, as any update does, and which VaultNotifySql's trigger hears as no change.
-const BoxAnswerColumns = `EXISTS (SELECT 1 FROM vault) AS vault_stands`
+// it expects stood; `landed`, whether its own comparison passed and it wrote (null when no box
+// stands to report); `was_full`, a first write's vault at its limit, with its `box_count` and
+// `bytes_used` then; and the box columns of what stands under the boxlabel now -- the box written,
+// as its RETURNING hands it back, or the one standing, as the FOR UPDATE read it -- null when none
+// does. One statement, so one snapshot and one round trip: the closing SELECT reads the CTEs'
+// rows, never the tables again.
 
 // A first box under its boxlabel: inserted only beside the vault props it expects, only where no
-// box stands, and only while the vault holds fewer than $6 boxes -- or, for a null $6, no
-// limit, when nothing is counted: Postgres runs the count, an uncorrelated subquery, only when the
-// CASE asks for it. A box standing under the boxlabel already -- in the snapshot, or inserted
-// since and met by the ON CONFLICT -- is reported, not written over: the no-op DO UPDATE locks it
-// and returns it as it now stands. A write the limit refused is never attempted, so then the box
-// reported is the one in the snapshot, if any.
+// box stands, and only while the vault holds fewer than $6 boxes -- or, for a null $6, no limit,
+// when nothing is counted: Postgres runs the count, an uncorrelated subquery, only when the CASE
+// asks for it. A box standing in the snapshot is locked and reported, and nothing is inserted. A
+// box another writer inserted since the statement began is met by the ON CONFLICT, whose no-op
+// DO UPDATE locks it and returns it as it now stands: then `xmax = 0` is false, since Postgres
+// marks a row it locked, and only a row this statement inserted lands.
 //
 // Nothing is counted in advance: the limit is the count of the vault's boxes at the start of
 // this statement, a best effort. Under READ COMMITTED, Postgres's default, writers racing for the
@@ -198,43 +222,48 @@ const BoxAnswerColumns = `EXISTS (SELECT 1 FROM vault) AS vault_stands`
 // and a refused write inserted nothing, since the refusal is the WHERE of one atomic statement. A
 // vault deleted after the statement began is met by the vault row's FOR SHARE read, which finds it
 // gone, or by the foreign key, which reads the vault row that stands now: that failure is caught as
-// the vault gone (see insertBox), and no box ever lands in a vault but its own.
+// the vault gone (see insertBox), and no box ever lands in a vault but its own. A refused write
+// weighs the vault's boxes for its capacity, in the same statement.
 const InsertBoxSql = `WITH vault AS (
     ${ExpectedVaultSql}
+  ), standing AS MATERIALIZED (
+    ${StandingBoxSql}
   ), counted AS (
-    SELECT CASE WHEN $6::bigint IS NULL THEN 0 ELSE (SELECT count(*) FROM safebyok_boxes WHERE ${ScopeIs}) END AS standing
+    SELECT CASE WHEN $6::bigint IS NULL THEN 0 ELSE (SELECT count(*) ${VaultBoxesSql}) END AS box_count
   ), written AS (
     INSERT INTO safebyok_boxes (applabel, user_id, vaultlabel, vault_id, ${Columns.names(BoxColumns)})
     SELECT applabel, user_id, vaultlabel, vault_id, ${Columns.placeholders(BoxColumns, BoxParamsFrom)}
-    FROM vault, counted WHERE $6::bigint IS NULL OR counted.standing < $6::bigint
+    FROM vault, counted WHERE NOT EXISTS (SELECT 1 FROM standing) AND ($6::bigint IS NULL OR counted.box_count < $6::bigint)
     ON CONFLICT (applabel, user_id, vaultlabel, boxlabel) DO UPDATE SET format = safebyok_boxes.format
-    RETURNING ${Columns.names(BoxColumns)}, revision_tok = ${Columns.placeholderOf(BoxColumns, 'revision_tok', BoxParamsFrom)} AS landed
-  ), found AS (
-    SELECT * FROM written
-    UNION ALL
-    SELECT ${Columns.names(BoxColumns)}, false AS landed FROM safebyok_boxes
-      WHERE ${ScopeIs} AND boxlabel = ${Columns.placeholderOf(BoxColumns, 'boxlabel', BoxParamsFrom)} AND NOT EXISTS (SELECT 1 FROM written)
+    RETURNING ${Columns.selected(BoxColumns)}, xmax = 0 AS landed
   )
-  SELECT ${BoxAnswerColumns},
-         COALESCE((SELECT standing FROM counted) >= $6::bigint, false) AS was_full,
-         found.landed, ${Columns.selected(BoxColumns)}
-  FROM (SELECT 1) AS answer LEFT JOIN found ON true`
+  SELECT EXISTS (SELECT 1 FROM vault) AS vault_stands,
+         COALESCE(counted.box_count >= $6::bigint, false) AS was_full,
+         counted.box_count::float8 AS box_count,
+         CASE WHEN counted.box_count >= $6::bigint THEN (SELECT ${BoxBytesSql} ${VaultBoxesSql}) ELSE 0 END AS bytes_used,
+         box.*
+  FROM counted LEFT JOIN (SELECT * FROM written UNION ALL SELECT *, false FROM standing) AS box ON true`
 
-// A box over the revision read, beside the vault props it expects. Every column is set to the
-// box's when the standing revision is the one read, and to its own otherwise: so the UPDATE locks
-// and returns the row standing either way, written or not.
+// A box over the revision read, beside the vault props it expects: written only over the box
+// standing locked, and only while it is at that revision.
 const ReplaceBoxSql = `WITH vault AS (
     ${ExpectedVaultSql}
+  ), standing AS MATERIALIZED (
+    ${StandingBoxSql}
   ), written AS (
-    UPDATE safebyok_boxes SET
-      ${BoxColumns.map(([field]) => `${field} = CASE WHEN revision_tok = $6::text THEN ${Columns.placeholderOf(BoxColumns, field, BoxParamsFrom)} ELSE ${field} END`).join(',\n      ')}
+    UPDATE safebyok_boxes SET (${Columns.names(BoxColumns)}) = ROW(${Columns.placeholders(BoxColumns, BoxParamsFrom)})
     WHERE ${ScopeIs} AND vault_id = $4::text
       AND boxlabel = ${Columns.placeholderOf(BoxColumns, 'boxlabel', BoxParamsFrom)}
-      AND EXISTS (SELECT 1 FROM vault)
-    RETURNING ${Columns.selected(BoxColumns)}, revision_tok = ${Columns.placeholderOf(BoxColumns, 'revision_tok', BoxParamsFrom)} AS landed
+      AND revision_tok = $6::text
+      AND EXISTS (SELECT 1 FROM standing)
+    RETURNING ${Columns.selected(BoxColumns)}
   )
-  SELECT ${BoxAnswerColumns}, false AS was_full, written.*
-  FROM (SELECT 1) AS answer LEFT JOIN written ON true`
+  SELECT EXISTS (SELECT 1 FROM vault) AS vault_stands, false AS was_full, box.*
+  FROM (SELECT 1) AS answer LEFT JOIN (
+    SELECT *, true AS landed FROM written
+    UNION ALL
+    SELECT *, false FROM standing WHERE NOT EXISTS (SELECT 1 FROM written)
+  ) AS box ON true`
 
 // Lands while the vault props of that vault_id stand, whether or not there was a box to delete,
 // and answers one row then, saying what it removed: the revision_tok its DELETE returned, or null
@@ -321,8 +350,20 @@ class TablesVaultDB extends VaultDB {
     if (answer.landed) { return standing }
     // A full vault refuses a new box; a boxlabel already taken, even in a full vault, is a box
     // the writer missed, which it would replace, and which is never refused for the count.
-    if (standing === null && answer.was_full) { throw Refusals.vaultFull(this.maxBoxes) }
+    if (standing === null && answer.was_full) { throw Refusals.vaultFull(this.capacityOf(answer)) }
     throw Refusals.staleBox(standing)
+  }
+
+  // Counted and weighed in one statement, against this VaultDB's limits.
+  protected async doGetCapacity(scope: VaultScope): Promise<unknown> {
+    this.mustReach(scope)
+    const { rows } = await this.sent(GetCapacitySql, scopeParams(scope))
+    return this.capacityOf(rows[0] as VaultTally)
+  }
+
+  /** How full a vault is, from what a statement counted and weighed, against this VaultDB's limits. */
+  private capacityOf({ box_count: boxCount, bytes_used: bytesUsed }: VaultTally) {
+    return { boxes: { used: boxCount, max: this.maxBoxes }, bytes: { used: bytesUsed, max: this.maxVaultBytes } }
   }
 
   // Runs ReplaceBoxSql and reads its one row.
@@ -338,7 +379,7 @@ class TablesVaultDB extends VaultDB {
       const { rows } = await this.sent(InsertBoxSql, params)
       return rows[0] as BoxAnswer
     } catch (err) {
-      if ((err as { code?: unknown } | null)?.code === ForeignKeyViolation) { return { vault_stands: false, was_full: false, landed: null } }
+      if ((err as { code?: unknown } | null)?.code === ForeignKeyViolation) { return { vault_stands: false, was_full: false, landed: null, box_count: 0, bytes_used: 0 } }
       throw err
     }
   }
@@ -401,12 +442,15 @@ class TablesVaultDB extends VaultDB {
   }
 }
 
+/** How many boxes a vault holds, and what they weigh, as a statement counted them. */
+type VaultTally = { box_count: number, bytes_used: number }
+
 /**
  * The one row a box write answers: whether the vault props it expected stood, whether it landed
- * (null when no box stands to report), whether a first write met a full vault, beside the
- * columns of the box standing now, null where none does.
+ * (null when no box stands to report), whether a first write met a full vault, and then how full
+ * (its tally is weighed only then), beside the columns of the box standing now, null where none does.
  */
-type BoxAnswer = { vault_stands: boolean, was_full: boolean, landed: boolean | null }
+type BoxAnswer = VaultTally & { vault_stands: boolean, was_full: boolean, landed: boolean | null }
 
 /** Postgres's error code for a foreign key violation: `23503`. */
 const ForeignKeyViolation = '23503'

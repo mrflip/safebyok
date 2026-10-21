@@ -120,13 +120,14 @@ describe("convexVaultDB, refusing", () => {
   })
 
   for (const [clientTitle, connect] of ClientCases) {
-    it(`refuses a box the component has no room for over a ${clientTitle} as vault_full`, async () => {
+    it(`refuses a box the component has no room for over a ${clientTitle} as vault_full, saying how full the vault is`, async () => {
       const deployment = deploy()
       const vaultDB = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
       await nearlyFull(vaultDB)
       const refusal = await TH.expectBad(vaultDB.putBox(u1, TH.noBoxYet, TH.heavyBox('one_too_many', 200_000)), 'vault_full')
-      expect(refusal.message).to.eq('This vault is full: remove a box to make room, then try again.')
-      expect(refusal.cause).to.be.instanceOf(ConvexError).with.nested.property('data.kind', 'vault_full')
+      expect(refusal.message).to.match(/bytes its storage holds of one vault/)
+      expect(refusal.meta?.capacity).to.deep.equal(await TH.expectingGood(vaultDB).getCapacity(u1))
+      expect(refusal.meta?.capacity?.boxes).to.deep.equal({ used: 8, max: vaultDB.maxBoxes })
       const listed = await TH.expectingGood(vaultDB).listBoxes(u1)
       expect(listed.map((summary) => summary.boxlabel)).to.not.include('one_too_many')
     })

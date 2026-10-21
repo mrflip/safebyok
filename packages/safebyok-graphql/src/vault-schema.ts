@@ -166,6 +166,18 @@ type SafebyokBoxDeletion {
   outcome: SafebyokDelOutcome!
 }
 
+"""How much of one limit a vault has used, against the most its storage holds: whole numbers, each up to 2^53."""
+type SafebyokRoom {
+  used: Float!
+  max: Float!
+}
+
+"""How full a vault is, as its storage reckons it: its boxes, and the bytes they take."""
+type SafebyokCapacity {
+  boxes: SafebyokRoom!
+  bytes: SafebyokRoom!
+}
+
 type Query {
   """The vault's props, or null when the vault has never been made."""
   safebyokGetVaultProps(scope: SafebyokVaultScopeInput!): SafebyokVaultProps
@@ -173,6 +185,8 @@ type Query {
   safebyokGetBox(scope: SafebyokVaultScopeInput!, boxlabel: String!): SafebyokBox
   """Every box in the vault, in any order, without its encrypted fields."""
   safebyokListBoxes(scope: SafebyokVaultScopeInput!): [SafebyokListedBox!]!
+  """How full the vault is, as its storage reckons it; nothing used for a vault never made."""
+  safebyokGetCapacity(scope: SafebyokVaultScopeInput!): SafebyokCapacity!
 }
 
 type Mutation {

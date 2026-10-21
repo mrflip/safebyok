@@ -40,7 +40,7 @@ import { components } from './_generated/api'
 
 export const {
   getVaultProps, ensureVaultProps, putVaultProps, getBox, listBoxSummaries,
-  putBox, delBox, delVault, watchVault,
+  putBox, getCapacity, delBox, delVault, watchVault,
 } = new SafebyokComponent(components.safebyok).api({
   getUserId: async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null,
 })
@@ -75,10 +75,14 @@ mistake for the first request.
   An update of the vault props lands, too, only when the new vault props keep the vault's
   `vault_id` and move their `unlock_epoch` forward, as every safebyok client's does.
 * **A vault the component has no room for.** `putBox` refuses, writing nothing, a box
-  that would take its vault past the component's own limits (see *How big a vault can be*), with
-  a `ConvexError` whose `data` is `{ kind: 'vault_full', message }`, which the client turns into
-  a `VaultError` of that kind. The limits are the component's, not your app's or the client's to
-  set.
+  that would take its vault past the component's own limits (see *How big a vault can be*): it
+  resolves `{ landed: false, refusalkind: 'vault_full', capacity }`, how full the vault is as its
+  tally stood, which the client turns into a `VaultError` of that kind carrying it as
+  `meta.capacity`. The limits are the component's, not your app's or the client's to set.
+* **One version, both ends.** A client meeting a `putBox` answer in a shape it does not know --
+  a component deployed from another version of this package -- refuses with kind
+  `corrupt_record`, saying the deployed component is out of date. Deploy the component from the
+  same version as your app.
 
 ## What your app does on the client
 
@@ -123,9 +127,10 @@ when given (`convexVaultDB({ client, api, logger })`), hears what the VaultDB ha
   it changes, so its snapshot (and a React render) follows writes from anywhere.
 * **Refusals** are `VaultError`s, each the `err` of the `Outcome` a call resolves, of the kinds in
   the *Errors* tables of the [`safebyok` README](../safebyok/README.md), which say what each means
-  and what a host does. The Convex functions throw three, `identity_revoked`, `not_permitted` (your
-  `getUserId`'s) and `vault_full`, each arriving with the `ConvexError` it came as for its
-  `cause`; a write that came too late is a `stale_write`; and `storage_unavailable` is anything
+  and what a host does. The Convex functions throw two, `identity_revoked` and `not_permitted` (your
+  `getUserId`'s), each arriving with the `ConvexError` it came as for its `cause`; a write that
+  came too late is a `stale_write`, and one with no room a `vault_full`, carrying how full the
+  vault is; and `storage_unavailable` is anything
   else Convex reported. That one carries nothing of Convex's own error, which on a dev deployment
   may quote the call's arguments (names, sidecars, ciphertext): your deployment's logs have it,
   or, for trouble before the call left, the browser console, where the Convex client reports its
@@ -203,6 +208,11 @@ heavier, and every delete, always lands, so a vault over its limits (written bef
 kept) can always shrink, and be deleted a box at a time even when it is too large to delete
 whole.
 
+`getCapacity` answers from the same tally, `{ boxes: { used, max }, bytes: { used, max } }`: the
+vault's boxes, and their bytes as Convex weighs a document (with its scope fields and Convex's
+own), against these two limits. That is the component's measure, not the vault's own
+`capacity`, which weighs each box at the room it reserves against `maxVaultBytes`.
+
 These limits are the component's constants; a host has no knob for them. Deploying client-side
 limits (`maxBoxes`, `maxWhisperBytes`, the adapter's `maxVaultBytes`) that disagree with the
 component's is undefined behaviour: not a bug we will fix, and not one whose outcome we promise.
@@ -219,7 +229,8 @@ the core's own records, scopes and expectations.
 | `putVaultProps`        | mutation | `{ vaultProps, expected: { vault_id, unlock_epoch } }`                      | `true` if written, `false` if not                                                          |
 | `getBox`                  | query    | `{ scope, boxlabel }`                                                       | the `BoxRecord`, or null                                                               |
 | `listBoxSummaries`        | query    | `{ scope }`                                                                 | each box without its ciphered fields, `format` kept, in boxlabel order                 |
-| `putBox`               | mutation | `{ scope, box, expected: { vault_id, revision_tok, vault_key_epoch } }` | the `BoxRecord` as stored if written, null if not; refuses `vault_full` past the vault's limits |
+| `putBox`               | mutation | `{ scope, box, expected: { vault_id, revision_tok, vault_key_epoch } }` | `{ landed: true, box_stored }` if written; else `{ landed: false, refusalkind }`, with the box standing (`stale_write`) or the vault's capacity (`vault_full`) |
+| `getCapacity`             | query    | `{ scope }`                                                                 | `{ boxes: { used, max }, bytes: { used, max } }`, from the vault's tally                   |
 | `delBox`               | mutation | `{ scope, boxlabel, expected: { vault_id, revision_tok } }`                 | `{ outcome }` if the vault still stands -- `deleted`, `deleted_other` or `absent` -- null if not |
 | `delVault`             | mutation | `{ scope, expected: { vault_id } }`                                         | `true` if deleted, `false` if not                                                          |
 | `watchVault`              | query    | `{ scope }`                                                                 | `{ vault_id, unlock_epoch, boxes: [[boxlabel, revision_tok]] }`, changing with every write |

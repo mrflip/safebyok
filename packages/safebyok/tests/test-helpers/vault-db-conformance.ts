@@ -43,6 +43,7 @@ export const VaultDBContract = Object.freeze({
   '4.4': 'Under the limit, a new box lands',
   '4.5': 'Past the limit, nothing is lost',
   '4.6': "A hard limit is the backend's, or opt-in",
+  '4.7': 'An adapter says how full a vault is',
   '5.1': 'Every refusal is a VaultError whose kind says what to do',
   '5.2': 'A stale write means an expectation failed, and nothing else',
   '5.3': 'A refusal quotes nothing it was handed',
@@ -65,7 +66,7 @@ export type VaultDBContractLine = keyof typeof VaultDBContract
  * VaultDB from the built package (`safebyok`) qualifies as readily as one extending `src/`.
  */
 export type VaultDBVerbs = Pick<VaultDB,
-  'maxRecordBytes' | 'maxVaultBytes' | 'maxBoxes' | 'maxNameBytes' | 'getVaultProps' | 'ensureVaultProps' | 'putVaultProps' | 'getBox' | 'listBoxes' | 'listBoxRecords' | 'putBox' | 'delBox' | 'delVault' | 'delDamagedVault' | 'subscribe'
+  'maxRecordBytes' | 'maxVaultBytes' | 'maxBoxes' | 'maxNameBytes' | 'getVaultProps' | 'ensureVaultProps' | 'putVaultProps' | 'getBox' | 'listBoxes' | 'listBoxRecords' | 'putBox' | 'getCapacity' | 'delBox' | 'delVault' | 'delDamagedVault' | 'subscribe'
 >
 
 /**
@@ -512,18 +513,16 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       await expectBad(vaultDB.putBox(scopeOf('u1'), { vault_id: 'vault-id-u2', revision_tok: null, vault_key_epoch: 1 }, boxOf('anthropic', 'one')), 'vault_mismatch')
     })
 
-    it("refuses a call whose signal had already aborted as storage_unavailable, the signal's reason its cause, writing nothing (Contract: VaultDB.putBox, signal)", async () => {
+    it("refuses the same write sent twice, once it has landed, as stale_write naming the box it wrote: a first write and a replacement alike (Contract: VaultDB.putBox, Refuses)", async () => {
       const vaultDB = await withVaultProps()
-      const reason = new Error('the caller gave up')
-      const refusal = await expectBad(vaultDB.putBox(scopeOf('u1'), noBoxYet, boxOf('anthropic', 'one'), { signal: AbortSignal.abort(reason) }), 'storage_unavailable')
-      expect(refusal.cause).to.eq(reason)
-      expect(await expectingGood(vaultDB).getBox(scopeOf('u1'), 'anthropic')).to.be.null
-    })
-
-    it("lands a write whose signal never aborts, as without one", async () => {
-      const vaultDB = await withVaultProps()
-      const controller = new AbortController()
-      expect(await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, boxOf('anthropic', 'one'), { signal: controller.signal })).to.deep.equal(boxOf('anthropic', 'one'))
+      const first = await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, boxOf('anthropic', 'one'))
+      const firstAgain = await expectBad(vaultDB.putBox(scopeOf('u1'), noBoxYet, boxOf('anthropic', 'one')), 'stale_write')
+      expect(firstAgain.meta).to.deep.equal({ box_stored: first })
+      const overOne = { vault_id: 'vault-id-u1', revision_tok: 'rev-one', vault_key_epoch: 1 }
+      const second = await expectingGood(vaultDB).putBox(scopeOf('u1'), overOne, boxOf('anthropic', 'two'))
+      const secondAgain = await expectBad(vaultDB.putBox(scopeOf('u1'), overOne, boxOf('anthropic', 'two')), 'stale_write')
+      expect(secondAgain.meta).to.deep.equal({ box_stored: second })
+      expect(await expectingGood(vaultDB).getBox(scopeOf('u1'), 'anthropic')).to.deep.equal(second)
     })
 
     timingTestsOf('3.3')
@@ -704,7 +703,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
   })
   // --
 
-  // == [Box limits]: 4.1 declared, 4.2 refused, 4.3 replacement, 4.4 under, 4.5 nothing lost
+  // == [Box limits]: 4.1 declared, 4.2 refused, 4.3 replacement, 4.4 under, 4.5 nothing lost, 4.7 capacity
 
   describe(lineTitle('4.1'), () => {
     it("declares a whole number of boxes above zero, or Infinity", async () => {
@@ -761,6 +760,40 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
 
   describe(lineTitle('4.5'), () => {
     timingTestsOf('4.5')
+  })
+
+  describe(lineTitle('4.7'), () => {
+    it("answers nothing used for a scope that holds no vault, against the box limit it declares (Contract: VaultDB.getCapacity)", async () => {
+      const vaultDB = await makeVaultDB()
+      const capacity = await expectingGood(vaultDB).getCapacity(scopeOf('u1'))
+      expect(capacity.boxes).to.deep.equal({ used: 0, max: Math.min(vaultDB.maxBoxes, Number.MAX_SAFE_INTEGER) })
+      expect(capacity.bytes.used).to.eq(0)
+      expect(capacity.bytes.max).to.be.greaterThan(0)
+    })
+
+    it("counts the vault's boxes as its listing does, and weighs more for each box stored and less for each removed, that vault's alone", async () => {
+      const vaultDB = await withVaultProps()
+      await expectingGood(vaultDB).ensureVaultProps(vaultPropsOf('u2'))
+      await storeEach(vaultDB, ['anthropic', 'openai'])
+      const two = await expectingGood(vaultDB).getCapacity(scopeOf('u1'))
+      expect(two.boxes.used).to.eq(2)
+      expect(await expectingGood(vaultDB).listBoxes(scopeOf('u1'))).to.have.lengthOf(two.boxes.used)
+      await storeEach(vaultDB, ['mistral'])
+      const three = await expectingGood(vaultDB).getCapacity(scopeOf('u1'))
+      expect(three.boxes.used).to.eq(3)
+      expect(three.bytes.used).to.be.greaterThan(two.bytes.used)
+      await expectingGood(vaultDB).delBox(scopeOf('u1'), 'mistral', deleting('rev-mistral'))
+      expect(await expectingGood(vaultDB).getCapacity(scopeOf('u1'))).to.deep.equal(two)
+      const other = await expectingGood(vaultDB).getCapacity(scopeOf('u2'))
+      expect(other.boxes.used).to.eq(0)
+    })
+
+    it.runIf(capped)("carries on vault_full the reckoning that refused it, as a read of how full the vault is answers it after (Contract: VaultDB.putBox, Refuses)", async () => {
+      const vaultDB = await cappedHolding(['anthropic', 'openai', 'mistral'])
+      const refusal = await expectBad(vaultDB.putBox(scopeOf('u1'), noBoxYet, boxOf('gemini', 'gemini')), 'vault_full')
+      expect(refusal.meta?.capacity?.boxes).to.deep.equal({ used: CappedBoxes, max: CappedBoxes })
+      expect(refusal.meta).to.deep.equal({ capacity: await expectingGood(vaultDB).getCapacity(scopeOf('u1')) })
+    })
   })
   // --
 
@@ -1015,7 +1048,7 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
   }
   // --
   return {
-    // == [Cross-device and creation races]: seenAcrossDevices, rivalCreates, rivalVaultPropsUpdates, rivalFirstWrites, rivalReplacements
+    // == [Cross-device and creation races]: seenAcrossDevices, rivalCreates, rivalVaultPropsUpdates, rivalFirstWrites, resentFirstWrites, rivalReplacements
 
     seenAcrossDevices: {
       line:  '2.1',
@@ -1084,6 +1117,24 @@ export const vaultDBTimingChecks = (makeAdapter: MakeVaultDB, opts: DescribeVaul
             const winner = rivals[outcomes.findIndex((outcome) => outcome.kind === 'landed')]
             expectLoserNamesWinner(outcomes, winner)
             for (const racer of racers) { expect(await expectingGood(racer).getBox(scopeOf('u1'), 'anthropic')).to.deep.equal(winner) }
+          },
+        })
+      },
+    },
+    resentFirstWrites: {
+      line:  '3.3',
+      title: `lands one of two sends of one first write made at once ${fromTwo}, and refuses the other as stale_write naming that box, however they interleave`,
+      runs:  true,
+      check: async () => {
+        const sent = boxOf('anthropic', 'one')
+        await raceEveryWay({
+          makeDevices: devicesFor(),
+          setup:       withVaultPropsFirst,
+          moves:       [sent, sent].map((box) => (racer: VaultDBVerbs) => racer.putBox(scopeOf('u1'), noBoxYet, box)),
+          verdict:     async (outcomes, racers) => {
+            expect(kindsOf(outcomes)).to.deep.equal(['landed', 'stale_write'])
+            expectLoserNamesWinner(outcomes, sent)
+            for (const racer of racers) { expect(await expectingGood(racer).getBox(scopeOf('u1'), 'anthropic')).to.deep.equal(sent) }
           },
         })
       },
@@ -1611,7 +1662,8 @@ export const perUser = (vaultDBFor: (userId: string) => VaultDBVerbs): VaultDBVe
     getBox:           (scope, boxlabel) => as(scope).getBox(scope, boxlabel),
     listBoxes:        (scope) => as(scope).listBoxes(scope),
     listBoxRecords:   (scope) => as(scope).listBoxRecords(scope),
-    putBox:           (scope, expected, box, opts) => as(scope).putBox(scope, expected, box, opts),
+    putBox:           (scope, expected, box) => as(scope).putBox(scope, expected, box),
+    getCapacity:      (scope) => as(scope).getCapacity(scope),
     delBox:           (scope, boxlabel, expected) => as(scope).delBox(scope, boxlabel, expected),
     delVault:         (scope, expected) => as(scope).delVault(scope, expected),
     delDamagedVault:  (scope) => as(scope).delDamagedVault(scope),

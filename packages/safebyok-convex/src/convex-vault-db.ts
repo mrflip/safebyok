@@ -1,9 +1,10 @@
 import { getFunctionName } from 'convex/server'
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server'
-import { ConvexError } from 'convex/values'
+import { ConvexError, type Infer } from 'convex/values'
 import { Refusals, Sanitizer, VaultDB, VaultError } from 'safebyok'
 import type { VaultPropsExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, StoredBox, VaultProps, VaultScope } from 'safebyok'
 import { MaxVaultBoxes } from './component/tallies'
+import type { PutBoxAnswer } from './component/validators'
 import { isSafebyokErrorData } from './refusals'
 import type { SafebyokApi } from './server'
 
@@ -64,8 +65,13 @@ export type ConvexVaultDBOpts = VaultDBOpts & {
  * * **Other devices' writes** reach this one live: the vault subscribes to the safebyok function
  *   `watchVault`, and refreshes when it changes.
  * * **A full vault**: the component holds every vault to limits of its own, whatever a client
- *   asks, and refuses a write past them with kind `vault_full`. A vault within its
- *   `maxBoxes` stays well inside them.
+ *   asks, and refuses a write past them with kind `vault_full`, carrying how full the vault is
+ *   as `meta.capacity`. A vault within its `maxBoxes` stays well inside them. `getCapacity`
+ *   answers from the same tally: the vault's boxes, and their bytes as Convex counts a document,
+ *   against the component's own limits (8,000 boxes, 7 MiB less 1 KiB of box documents).
+ * * **A component of another version**: a box write answered in a shape this client does not
+ *   know refuses with kind `corrupt_record`, saying the deployed component is out of date. Deploy
+ *   the component from the same version of `safebyok-convex` as the app.
  * * **Offline**, a call waits for the connection, as every Convex call does, rather than failing.
  *   A failure Convex reports (a deployment missing the safebyok functions, say) refuses with kind
  *   `storage_unavailable`, carrying nothing of Convex's own error, which on a dev deployment may
@@ -136,11 +142,19 @@ class ConvexVaultDB extends VaultDB {
     return rows.map((row) => ({ boxlabel: row.boxlabel, box: row }))
   }
 
-  // The component answers why a write did not land, from the transaction that refused it.
+  // The component answers why a write did not land, from the transaction that refused it; what
+  // each answer carries, the base class checks.
   protected async doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<unknown> {
-    const answer = await refusing(() => this.client.mutation(this.api.putBox, { scope, expected, box }))
+    const answer: unknown = await refusing(() => this.client.mutation(this.api.putBox, { scope, expected, box }))
+    if (! isPutBoxAnswer(answer)) { throw new VaultError('corrupt_record', OutOfDateMessage) }
     if (answer.landed) { return answer.box_stored }
-    throw answer.refusalkind === 'vault_mismatch' ? Refusals.vaultMismatch() : Refusals.staleBox(answer.box_stored)
+    if (answer.refusalkind === 'vault_mismatch') { throw Refusals.vaultMismatch() }
+    if (answer.refusalkind === 'vault_full') { throw Refusals.vaultFull(answer.capacity) }
+    throw Refusals.staleBox(answer.box_stored)
+  }
+
+  protected doGetCapacity(scope: VaultScope): Promise<unknown> {
+    return refusing(() => this.client.query(this.api.getCapacity, { scope }))
   }
 
   protected doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<unknown> {
@@ -181,6 +195,24 @@ const ConvexDocumentBytes = 1_048_576
 /** Convex's most for one function to read, in bytes: 16 MiB. */
 const ConvexTransactionReadBytes = 16_777_216
 
+/** What a box write answered in a shape this client does not know says: whose version to fix. */
+const OutOfDateMessage = "The vault's Convex functions answered a box write in a shape this version of safebyok-convex does not know, so whether it landed is unknown: the deployed safebyok component is out of date, or newer than this app. Deploy the component from the same version of safebyok-convex as the app, then read the vault again."
+
+/**
+ * True when `answer` is a box write's answer as this version's component makes it: `landed`, and
+ * for a refusal its kind, each with the field that kind carries. What those fields hold, the base
+ * class checks; this tells only one version's answer from another's, or from null.
+ */
+const isPutBoxAnswer = (answer: unknown): answer is Infer<typeof PutBoxAnswer> => {
+  if (typeof answer !== 'object' || answer === null) { return false }
+  const { landed, refusalkind } = answer as { landed?: unknown, refusalkind?: unknown }
+  if (landed === true) { return 'box_stored' in answer }
+  if (landed !== false) { return false }
+  if (refusalkind === 'stale_write') { return 'box_stored' in answer }
+  if (refusalkind === 'vault_full') { return 'capacity' in answer }
+  return refusalkind === 'vault_mismatch'
+}
+
 const ConvexTroubleMessage = "The vault's storage could not be reached, or failed partway: try again shortly. Convex's own error is not carried here, as it may quote the call: see your Convex deployment's logs, or, for trouble before the call left, the browser console, where the Convex client reports its connection."
 
 /**
@@ -213,7 +245,7 @@ const isConvexClient = (client: unknown): client is ConvexVaultClient => {
 }
 
 const SafebyokFnNames = [
-  'getVaultProps', 'ensureVaultProps', 'putVaultProps', 'getBox', 'listBoxSummaries', 'putBox', 'delBox', 'delVault', 'watchVault',
+  'getVaultProps', 'ensureVaultProps', 'putVaultProps', 'getBox', 'listBoxSummaries', 'putBox', 'getCapacity', 'delBox', 'delVault', 'watchVault',
 ] as const
 
 // Each function must name itself as `<module>:<function>`. The whole generated `api` answers any

@@ -97,6 +97,9 @@ const GetBoxDoc = `query SafebyokGetBox(${Scope}, $boxlabel: String!) {
 const ListBoxesDoc = `query SafebyokListBoxes(${Scope}) {
   safebyokListBoxes(scope: $scope) { ${selectionOf(ListedBoxFields)} }
 }`
+const GetCapacityDoc = `query SafebyokGetCapacity(${Scope}) {
+  safebyokGetCapacity(scope: $scope) { boxes { used max } bytes { used max } }
+}`
 const EnsureVaultPropsDoc = `mutation SafebyokEnsureVaultProps($vaultProps: SafebyokVaultPropsInput!) {
   safebyokEnsureVaultProps(vaultProps: $vaultProps) { ${VaultPropsSelection} }
 }`
@@ -129,6 +132,7 @@ export const VaultOperations = {
   safebyokGetVaultProps:    GetVaultPropsDoc,
   safebyokGetBox:           GetBoxDoc,
   safebyokListBoxes:        ListBoxesDoc,
+  safebyokGetCapacity:      GetCapacityDoc,
   safebyokEnsureVaultProps: EnsureVaultPropsDoc,
   safebyokPutVaultProps:    PutVaultPropsDoc,
   safebyokPutBox:           PutBoxDoc,
@@ -203,6 +207,12 @@ class UrqlVaultDB extends VaultDB {
     return recordOf(safebyokPutBox, BoxFields)
   }
 
+  // How full the vault is, as the server's storage reckons it: the base class checks it.
+  protected async doGetCapacity(scope: VaultScope): Promise<unknown> {
+    const { safebyokGetCapacity } = await this.asked(GetCapacityDoc, { scope: scopeOut(scope) })
+    return safebyokGetCapacity
+  }
+
   // A stale delete refuses on the server and crosses as its kind, so a delete that answers landed,
   // with what the server's storage removed.
   protected async doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<unknown> {
@@ -272,8 +282,8 @@ const answerOf = (result: OperationResult): Record<string, unknown> => {
 
 /**
  * The server's refusal as the VaultError it was, when one carries a kind, the GraphQL error as its
- * cause, and what it learned as its `meta` (a stale box write's `box_stored`, which the base class
- * checks as it checks a record); a GraphQL server's own `FORBIDDEN` as `not_permitted`, likewise; a GraphQL validation
+ * cause, and what it learned as its `meta` (a stale box write's `box_stored`, a full vault's
+ * `capacity`, which the base class checks); a GraphQL server's own `FORBIDDEN` as `not_permitted`, likewise; a GraphQL validation
  * error as misuse, quoting nothing of it, as it may quote the variables; otherwise urql's error,
  * as it is, which the base class says as storage trouble.
  */
@@ -302,12 +312,14 @@ const ForbiddenMessage = "The vault's GraphQL server refused the signed-in user 
 /** The `extensions.code`s a GraphQL server marks a malformed operation or variable with. */
 const MisuseCodes: ReadonlySet<string> = new Set(['BAD_USER_INPUT', 'GRAPHQL_VALIDATION_FAILED'])
 
-/** The `meta` a refusal of `kind` crossed with, as the VaultError's: a stale write's `box_stored`, and nothing else.
- * It is handed on unchecked: the base class checks it as it checks a record, for a `stale_write` alone.
+/** The `meta` a refusal of `kind` crossed with, as the VaultError's: a stale write's `box_stored`, a full vault's `capacity`, and nothing else.
+ * Each is handed on unchecked: the base class checks a `stale_write`'s as it checks a record, and a `vault_full`'s as `getCapacity` checks its answer.
  */
 const crossedMeta = (kind: RefusalKind, meta: unknown): { meta?: RefusalMeta } => {
-  if (kind !== 'stale_write' || typeof meta !== 'object' || meta === null || ! ('box_stored' in meta)) { return {} }
-  return { meta: { box_stored: meta.box_stored as Exclude<RefusalMeta['box_stored'], undefined> } }
+  if (typeof meta !== 'object' || meta === null) { return {} }
+  if (kind === 'stale_write' && 'box_stored' in meta) { return { meta: { box_stored: meta.box_stored as Exclude<RefusalMeta['box_stored'], undefined> } } }
+  if (kind === 'vault_full' && 'capacity' in meta) { return { meta: { capacity: meta.capacity as Exclude<RefusalMeta['capacity'], undefined> } } }
+  return {}
 }
 
 const isKind = (kind: unknown): kind is RefusalKind => (RefusalKindVals as readonly unknown[]).includes(kind)

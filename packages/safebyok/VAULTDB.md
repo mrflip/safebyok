@@ -21,7 +21,8 @@ Three layers share the work, and each guarantee below belongs to one of them.
   app that is storing far more than it meant to.
 * **The base class** (`VaultDB`'s public verbs) checks every name, record and expectation on the
   way in and every record on the way out -- the box a write hands back among them, and what a
-  box deletion reports, and what a stale box write says stands -- refuses what is malformed
+  box deletion reports, what a stale box write says stands, and how full a `vault_full` says the
+  vault is -- refuses what is malformed
   before your code sees it, turns a `false` from you (from a box deletion, a `null`) into
   `stale_write`, and turns
   anything you throw that is not a
@@ -195,6 +196,10 @@ under that boxlabel. Where the vault props are not the expected ones -- none sta
 `vault_mismatch`, carrying nothing of the vault props that stand. Where they are, and the box is
 not the one expected -- a revision it never read, a box since deleted, a box where it expected
 none -- it refuses as `stale_write`, with what stands under the boxlabel as `err.meta.box_stored`.
+A write sent again after it landed -- a retry after its answer was lost, say -- is no exception:
+what it expected no longer stands, so it refuses as `stale_write`, naming the box it wrote. A write
+lands, and says so, only where its own comparison passed, never because the box standing happens
+to be the one it sent.
 
 A write that lands resolves the box as storage now holds it, field for field the one written
 (line 1.1), and the adapter hands it back from the same atomic step as the write: a `RETURNING`
@@ -213,10 +218,7 @@ what a landed write hands back to the check a `getBox` makes, at the revision wr
 refuses one that fails it as `corrupt_record`, saying the write may have landed: the adapter
 wrote something it cannot read back.
 
-A box write takes a `signal` (`putBox(scope, expected, box, { signal })`), the caller's timeout or
-cancel. One that aborts before storage answers resolves `storage_unavailable` at once, its
-`reason` the cause; a write already sent may then have landed, and a later read shows whether.
-The base class keeps it, so an adapter needs nothing for it. *That refusal is proven by the base class's own
+*That refusal is proven by the base class's own
 tests* (the core's `vault-db.test.ts`), which can have an adapter answer with a malformed record;
 the battery, through an adapter that keeps this line, cannot.
 
@@ -316,10 +318,19 @@ refuses at that limit as `vault_full`, and declares a `maxBoxes` well inside it.
 for a backend with no such limit enforces none beyond line 4.2's best effort, unless the host
 opts in to one and pays what it costs. *Not tested by the battery*: each adapter tests its own.
 
-A write that lands reports no count of the vault's boxes: a box write resolves its record
-(line 3.3), and nothing more; a `vault_full` carries no `meta.capacity` from storage yet. The vault already learns the count from the listing it reads after
-every write, and asking every adapter for one would put a count into every adapter's write path. An adapter that enforces a limit says, in
-its README, what its count is as of: the start of the write's statement, say, or its commit.
+**4.7. An adapter says how full a vault is.** `getCapacity(scope)` answers a `Capacity`, `{
+boxes: { used, max }, bytes: { used, max } }`, read in one step: the vault's boxes, counted, and
+the bytes they take, weighed as the backend weighs them, each against the most the backend holds
+of one vault (`Infinity` for a limit it does not keep, which the base class answers as the largest
+safe integer). A scope holding no vault answers nothing used. It is an estimate for a host to warn
+its user by: the count is exact as of its step, and the bytes are the backend's own measure, which
+need not be the vault's (the vault weighs each box at the room it reserves, twice
+`maxWhisperBytes`, against `maxVaultBytes`). Each adapter's README says how it weighs. A
+`vault_full` from storage carries the same reckoning, made in the step that refused the write, as
+`err.meta.capacity`: the adapter throws `Refusals.vaultFull(capacity)`, and the base class checks
+it as it checks `getCapacity`'s answer, refusing a `vault_full` without a sound one as
+`corrupt_record`. An adapter that enforces a limit says, in its README, what its count is as of:
+the start of the write's statement, say, or its commit.
 
 ## 5. Errors
 
@@ -421,7 +432,7 @@ writes at once through one adapter, over a backend that runs one call at a time,
 they came out, not that they raced. So `describeVaultDB` races them.
 
 **What the battery runs, for every adapter.** Each race -- two creates of one vault, two updates
-of one vault, two first writes or two replacements of one box, a deletion against a write, two
+of one vault, two first writes or two replacements of one box, one first write sent twice, a deletion against a write, two
 writes that do not collide, four writers for a vault's last place -- runs under every schedule
 `raceEveryWay` makes, each over a fresh backend, and its outcome is checked after each: the two
 moves made together; one started one to three microtasks, then one and two ticks, after the other,

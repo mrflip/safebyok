@@ -199,7 +199,10 @@ export type RefusalMeta = {
    * box, naming the revision it holds, if any; or null when nothing stands there.
    */
   box_stored?:   BoxRecord | DamagedBox | null
-  /** `box_too_large`, `vault_full`: how much room there is. */
+  /** `vault_full` from storage: how full the vault is, as the step that refused the write reckoned it.
+   * Always there on storage's own `vault_full`, read in the same atomic step as the refusal; never
+   * on the vault's, which refuses from its own reckoning (`vault.capacity`) before storage is asked.
+   */
   capacity?:     Capacity
   /** `damaged_box` told of a listing: the box as the listing shows it, its boxlabel and the revision it names. */
   box_listed?:   DamagedBox

@@ -144,6 +144,7 @@ const served = new Map<string, Served>([
   ['putVaultProps', (vaultDB, [vaultProps, expected]) => vaultDB.putVaultProps(vaultProps as VaultProps, expected as VaultPropsExpectation)],
   ['getBox',      (vaultDB, [scope, boxlabel]) => vaultDB.getBox(scope as VaultScope, boxlabel as string)],
   ['listBoxes',    (vaultDB, [scope]) => vaultDB.listBoxRecords(scope as VaultScope)],
+  ['getCapacity',  (vaultDB, [scope]) => vaultDB.getCapacity(scope as VaultScope)],
   ['putBox',    (vaultDB, [scope, expected, box]) => vaultDB.putBox(scope as VaultScope, expected as BoxExpectation, box as BoxRecord)],
   ['delBox',     (vaultDB, [scope, boxlabel, expected]) => vaultDB.delBox(scope as VaultScope, boxlabel as string, expected as BoxDelExpectation)],
   ['delVault',   (vaultDB, [scope, expected]) => vaultDB.delVault(scope as VaultScope, expected as VaultDelExpectation)],
@@ -168,9 +169,10 @@ export async function POST(request: Request): Promise<Response> {
   // Made per request, for the user your own auth signed in -- never one the request names.
   const vaultDB = postgresVaultDB({ client: pool, userId: await signedInUserId(request) })
   const { ok, val = null, err } = await serve(vaultDB, args)
-  // A refusal crosses as its kind, its calm message, and a stale box write's box_stored (the
-  // box that stands, as a read would send it); never its cause, the driver's own error.
-  if (! ok) { return Response.json({ refusal: { kind: err.refusalkind, message: err.message, box_stored: err.meta?.box_stored } }) }
+  // A refusal crosses as its kind, its calm message, and its meta -- a stale box write's
+  // box_stored (the box that stands, as a read would send it), or a vault_full's capacity --
+  // never its cause, the driver's own error.
+  if (! ok) { return Response.json({ refusal: { kind: err.refusalkind, message: err.message, meta: err.meta } }) }
   return Response.json({ result: val })
 }
 ```
@@ -183,7 +185,7 @@ The client half, a VaultDB over `fetch`, to hand `Vault.make` as its `vaultDB`:
 
 ```ts
 import { VaultDB, VaultError, RefusalKindVals } from 'safebyok'
-import type { VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, DamagedBox, VaultProps, VaultDBOpts, RefusalKind, VaultScope } from 'safebyok'
+import type { VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, VaultProps, VaultDBOpts, RefusalKind, RefusalMeta, VaultScope } from 'safebyok'
 
 const VaultRouteUrl = '/api/safebyok'
 
@@ -208,14 +210,15 @@ export class RouteVaultDB extends VaultDB {
     return boxes.map((box) => ({ boxlabel: box.boxlabel, box }))
   }
   protected doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord) { return this.call('putBox', scope, expected, box) }
+  protected doGetCapacity(scope: VaultScope) { return this.call('getCapacity', scope) }
   protected doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation) { return this.call('delBox', scope, boxlabel, expected) }
   protected async doDelVault(scope: VaultScope, expected: VaultDelExpectation) {
     await this.call('delVault', scope, expected)
     return true
   }
 
-  // A stale write refuses on the server and crosses as its kind, with what stands for a box write,
-  // so a write that answers landed:
+  // A stale write refuses on the server and crosses as its kind, with what stands for a box write
+  // (a full vault, with how full it is), so a write that answers landed:
   // a box write answers with the box as the server's storage holds it, and a box
   // deletion with what it removed.
   private async call(verb: string, ...args: unknown[]): Promise<unknown> {
@@ -224,11 +227,10 @@ export class RouteVaultDB extends VaultDB {
       headers: { 'content-type': 'application/json' },
       body:    JSON.stringify({ verb, args }),
     })
-    const { result, refusal } = await response.json() as { result?: unknown, refusal?: { kind?: unknown, message?: unknown, box_stored?: BoxRecord | DamagedBox | null } }
+    const { result, refusal } = await response.json() as { result?: unknown, refusal?: { kind?: unknown, message?: unknown, meta?: RefusalMeta } }
     if (refusal && isKind(refusal.kind) && typeof refusal.message === 'string') {
-      // What stands, handed on unchecked: the VaultDB checks it as it checks a record.
-      const meta = refusal.box_stored === undefined ? {} : { meta: { box_stored: refusal.box_stored } }
-      throw new VaultError(refusal.kind, refusal.message, meta)
+      // What stands, or how full the vault is, handed on unchecked: the VaultDB checks each.
+      throw new VaultError(refusal.kind, refusal.message, refusal.meta === undefined ? {} : { meta: refusal.meta })
     }
     if (! response.ok) { throw new Error(`The vault route answered ${String(response.status)}`) }
     return result
@@ -264,8 +266,9 @@ const isKind = (kind: unknown): kind is RefusalKind => (RefusalKindVals as reado
   * **No box is lost.** Every box that landed reads back by its boxlabel and appears in
     the listing, past the limit as under it; deleting boxes brings the vault back under, and a
     new box lands again.
-  * **The count a write checks is the vault's, as of the start of its statement.** A write reports
-    no count; the vault learns it from the listing it reads after every write.
+  * **The count a write checks is the vault's, as of the start of its statement.** A write it
+    refuses carries that count, and the vault's bytes weighed in the same statement, as the
+    refusal's `meta.capacity`; a write that lands reports none.
   * **It costs the host nothing** but the count: no column, trigger, lock or retry, and one
     `count(*)` over the vault's primary-key prefix, at most about `maxBoxes` index entries,
     since the limit stops growth near it. With no limit, there is no count either.
@@ -412,12 +415,16 @@ shape of table, copy it, and keep to what makes it right:
 * **One statement per verb**, so each is atomic without a transaction: the expectation goes in
   the `WHERE` (`UPDATE ... WHERE vault_id = $ AND unlock_epoch = $ RETURNING 1`), and a row
   back means it landed. A box write returns the row's columns (`RETURNING format, boxlabel,
-  ...`): the box as stored, which the base class reads back as it would a read. A box write
-  that misses returns the row that stands instead, locked as the write met it: an `UPDATE` that
-  sets each column to the box's only `CASE WHEN revision_tok = $read`, and to its own otherwise,
-  and an `INSERT ... ON CONFLICT DO UPDATE` with a no-op update, each `RETURNING` the columns
-  and whether its own revision landed. A plain `SELECT` beside the write would read the
-  statement's snapshot, and could miss a winner that committed while the write waited. A box
+  ...`): the box as stored, which the base class reads back as it would a read. It first locks
+  the box standing under the boxlabel with `SELECT ... FOR UPDATE`, which writes nothing and,
+  under READ COMMITTED, reads the row as it stands once locked, a winner that committed while it
+  waited included. The write is conditioned on that row (`UPDATE ... WHERE revision_tok = $read`,
+  or an `INSERT` only where none stands), and a miss reports the locked row instead. "Landed" is
+  the write's own condition passing -- a row back from the `UPDATE`, or the `INSERT`'s own row
+  (`xmax = 0`) -- never the standing revision matching the one sent, so a write sent again after
+  it landed is refused as stale. A box another writer first inserted after the statement began
+  is in no snapshot, so no `SELECT` sees it: only the insert's `ON CONFLICT DO UPDATE` (a no-op
+  update) meets it and returns it. A box
   deletion deletes whatever stands within the expected vault and returns its `revision_tok`
   (`DELETE ... RETURNING revision_tok`), so it can say whether it removed the revision the device
   named, another, or none. A create returns the row that stands with `ON CONFLICT ... DO UPDATE`
@@ -431,6 +438,9 @@ shape of table, copy it, and keep to what makes it right:
 * **Authorize in the adapter**: made per request for one user, it refuses every other user's
   scope with `identity_revoked`, and passes the database's own refusal of a call (`42501`) up as
   `not_permitted`, its error as the `cause`.
+* **Say how full a vault is**: `doGetCapacity` counts the vault's boxes and weighs them in one
+  statement (`count(*)`, `sum(octet_length(row_to_json(box)::text))`), and a full vault's
+  refusal carries the same reckoning from the insert's own statement, `Refusals.vaultFull(capacity)`.
 * **Enforce the box limit in the write itself, as a best effort.** A count read in one
   statement and checked in the next lets writes slip through between them; a `count(*)` inside
   the insert narrows that to writers whose statements overlap, which may each count room and

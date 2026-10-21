@@ -46,6 +46,18 @@ export type Tally = {
 }
 
 /**
+ * How full a vault is, from its tally, against the component's limits: its boxes, and their
+ * bytes as Convex counts a document. A vault past a limit and left uncounted (a null tally) is
+ * answered as full by both, as {@link refuses} treats it.
+ *
+ * @example capacityOf({ box_count: 12, box_bytes: 48_000 })  // { boxes: { used: 12, max: 8000 }, bytes: { used: 48000, max: MaxVaultBoxBytes } }
+ */
+export const capacityOf = (tally: Tally | null) => ({
+  boxes: { used: tally?.box_count ?? MaxVaultBoxes, max: MaxVaultBoxes },
+  bytes: { used: tally?.box_bytes ?? MaxVaultBoxBytes, max: MaxVaultBoxBytes },
+})
+
+/**
  * A vault's tally as a write finds it: `kept` is its stored row, if it has one, and `tally` the
  * count -- or null, when counting afresh stopped at a limit, so the vault is past it by an unknown
  * amount.

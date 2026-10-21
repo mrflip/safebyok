@@ -1,12 +1,11 @@
-import { ConvexError, v } from 'convex/values'
+import { v } from 'convex/values'
 import type { Infer } from 'convex/values'
-import type { SafebyokErrorData } from '../refusals'
 import { mutation, query } from './_generated/server'
 import type { DatabaseReader, DatabaseWriter } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 import * as Tallies from './tallies'
 import {
-  VaultPropsExpectation, VaultDelExpectation, ListedBox, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, PutBoxAnswer, VaultProps, VaultScope, VaultSignature,
+  Capacity, VaultPropsExpectation, VaultDelExpectation, ListedBox, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, PutBoxAnswer, VaultProps, VaultScope, VaultSignature,
 } from './validators'
 
 /**
@@ -22,8 +21,8 @@ import {
  * but never lands in a vault made anew. A box delete that lands resolves what it removed.
  *
  * Every vault is held to the limits in `./tallies`, whatever its client asks, so that it can
- * always be deleted whole: a box write that would take the vault past one is refused with a
- * `ConvexError` of kind `vault_full`. A delete is never refused for room.
+ * always be deleted whole: a box write that would take the vault past one writes nothing and
+ * resolves `vault_full`, with how full the vault is. A delete is never refused for room.
  */
 
 // ------------------------------------------------------------------------------- the vault props
@@ -112,12 +111,11 @@ export const listBoxSummaries = query({
  * the standing box has `expected.revision_tok` -- or, for null, there is none. Resolves the
  * box as stored once written, read back in this same transaction. Otherwise it writes nothing,
  * and resolves why: `vault_mismatch` for vault props other than those expected, or none; else
- * `stale_write`, with the box standing (null for none), read in this same transaction.
- *
- * Refuses, writing nothing, with a `ConvexError` of kind `vault_full` a write that would take the
- * vault past {@link Tallies.MaxVaultBoxes} boxes or {@link Tallies.MaxVaultBoxBytes}
- * bytes and leave it larger than it was: a new box in a full vault, or a heavier replacement.
- * A vault with no tally yet is counted first, reading it once.
+ * `stale_write`, with the box standing (null for none), read in this same transaction; else
+ * `vault_full`, with the vault's capacity as its tally stood, for a write that would take the
+ * vault past {@link Tallies.MaxVaultBoxes} boxes or {@link Tallies.MaxVaultBoxBytes} bytes and
+ * leave it larger than it was: a new box in a full vault, or a heavier replacement. A vault with
+ * no tally yet is counted first, reading it once.
  */
 export const putBox = mutation({
   args:    { scope: VaultScope, expected: BoxExpectation, box: BoxRecord },
@@ -142,7 +140,7 @@ export const putBox = mutation({
       box_bytes: Tallies.weigh(row, rowId) - standingBytes,
     })
     if (Tallies.refuses(reckoning.tally, growthAs(standing?._id))) {
-      throw new ConvexError<SafebyokErrorData>({ kind: 'vault_full', message: 'This vault is full: remove a box to make room, then try again.' })
+      return { landed: false, refusalkind: 'vault_full', capacity: Tallies.capacityOf(reckoning.tally) }
     }
     const rowId = standing === null
       ? await ctx.db.insert('safebyok_boxes', row)
@@ -152,6 +150,21 @@ export const putBox = mutation({
     const stored = await ctx.db.get('safebyok_boxes', rowId)
     if (stored === null) { throw new Error('A box row this mutation wrote could not be read back in the same transaction.') }
     return { landed: true, box_stored: boxOfRow(stored) }
+  },
+})
+
+/**
+ * How full the vault is: its tally against the component's limits, as a box write checks them. A
+ * vault with no tally yet is counted afresh, reading it once; a scope holding no vault is empty.
+ */
+export const getCapacity = query({
+  args:    { scope: VaultScope },
+  returns: Capacity,
+  handler: async (ctx, { scope }) => {
+    const vaultProps = await findVaultPropsRow(ctx.db, scope)
+    if (vaultProps === null) { return Tallies.capacityOf({ box_count: 0, box_bytes: 0 }) }
+    const { tally } = await Tallies.reckon(ctx.db, vaultProps._id, vaultBoxQuery(ctx.db, scope))
+    return Tallies.capacityOf(tally)
   },
 })
 

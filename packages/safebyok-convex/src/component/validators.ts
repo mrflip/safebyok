@@ -146,19 +146,31 @@ export const BoxExpectation = v.object({
   vault_key_epoch: v.number(),
 })
 
+/** How much of one limit a vault has used, against the most the component holds of one vault. */
+const Room = v.object({ used: v.number(), max: v.number() })
+
+/** How full a vault is, from its tally: its boxes, and their bytes as Convex counts a document, against the component's limits.
+ *
+ * @example { boxes: { used: 12, max: 8000 }, bytes: { used: 48_000, max: 7_339_008 } }
+ */
+export const Capacity = v.object({ boxes: Room, bytes: Room })
+
 /** What a box write answers, from its one transaction: `landed`, or the kind of refusal that wrote nothing.
  * A write that landed carries the box as stored. `stale_write` carries the box standing under the
  * boxlabel as a read returns it (`box_stored`, whole; null for none). `vault_mismatch`, when the
  * scope's vault props are not the ones the box was sealed for, carries nothing of them.
+ * `vault_full`, for a write the vault has no room for, carries its {@link Capacity} as it found it.
  *
  * @example { landed: true, box_stored: stored }
  * @example { landed: false, refusalkind: 'stale_write', box_stored: winner }
  * @example { landed: false, refusalkind: 'vault_mismatch' }
+ * @example { landed: false, refusalkind: 'vault_full', capacity }
  */
 export const PutBoxAnswer = v.union(
   v.object({ landed: v.literal(true), box_stored: BoxRecord }),
   v.object({ landed: v.literal(false), refusalkind: v.literal('stale_write'), box_stored: v.nullable(BoxRecord) }),
   v.object({ landed: v.literal(false), refusalkind: v.literal('vault_mismatch') }),
+  v.object({ landed: v.literal(false), refusalkind: v.literal('vault_full'), capacity: Capacity }),
 )
 
 /**

@@ -40,6 +40,7 @@ const fakeServed = (answer: () => Promise<unknown>) => {
     getBox:           answer as ServedVaultDB['getBox'],
     listBoxRecords:   answer as ServedVaultDB['listBoxRecords'],
     putBox:           answer as ServedVaultDB['putBox'],
+    getCapacity:      answer as ServedVaultDB['getCapacity'],
     delBox:           answer as ServedVaultDB['delBox'],
     delVault:         answer as ServedVaultDB['delVault'],
     subscribe:        (_scope, onChange) => {

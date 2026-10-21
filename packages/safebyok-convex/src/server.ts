@@ -5,7 +5,7 @@ import { VaultError } from 'safebyok'
 import type { ComponentApi } from './component-api'
 import type { SafebyokErrorData } from './refusals'
 import {
-  VaultPropsExpectation, VaultDelExpectation, ListedBox, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, PutBoxAnswer, VaultProps, VaultScope, VaultSignature,
+  Capacity, VaultPropsExpectation, VaultDelExpectation, ListedBox, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, PutBoxAnswer, VaultProps, VaultScope, VaultSignature,
 } from './component/validators'
 
 export type { ComponentApi } from './component-api'
@@ -52,7 +52,7 @@ export type SafebyokApiOpts<DataModel extends GenericDataModel = GenericDataMode
  *
  *   export const {
  *     getVaultProps, ensureVaultProps, putVaultProps, getBox, listBoxSummaries,
- *     putBox, delBox, delVault, watchVault,
+ *     putBox, getCapacity, delBox, delVault, watchVault,
  *   } = new SafebyokComponent(components.safebyok).api({
  *     getUserId: async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null,
  *   })
@@ -73,7 +73,7 @@ export class SafebyokComponent {
   }
 
   /**
-   * The nine public functions a client's `convexVaultDB` calls, one per storage verb. Each first
+   * The ten public functions a client's `convexVaultDB` calls, one per storage verb. Each first
    * resolves `getUserId(ctx)`, and refuses with a `ConvexError` of kind `identity_revoked` when
    * it is null, or when the vault's `user_id` is someone else's -- the user the vault was opened
    * for is not the one signed in, and the vault locks itself -- then it calls the component. A
@@ -153,6 +153,14 @@ export class SafebyokComponent {
         handler: async (ctx, args) => {
           await mustBe(ctx, args.scope.user_id)
           return await ctx.runMutation(vaults.putBox, args)
+        },
+      }),
+      getCapacity: publicQuery({
+        args:    { scope: VaultScope },
+        returns: Capacity,
+        handler: async (ctx, args) => {
+          await mustBe(ctx, args.scope.user_id)
+          return await ctx.runQuery(vaults.getCapacity, args)
         },
       }),
       delBox: publicMutation({

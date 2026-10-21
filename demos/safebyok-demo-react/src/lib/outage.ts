@@ -117,6 +117,11 @@ export class OutageVaultDB extends VaultDB {
     return valOf(await this.inner.putBox(scope, expected, box))
   }
 
+  protected async doGetCapacity(scope: VaultScope): Promise<unknown> {
+    this.refuseWhileDown()
+    return valOf(await this.inner.getCapacity(scope))
+  }
+
   protected async doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation): Promise<unknown> {
     this.refuseWhileDown()
     return valOf(await this.inner.delBox(scope, boxlabel, expected))

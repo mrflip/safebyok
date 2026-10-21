@@ -13,7 +13,8 @@ import { BoxRecord } from '../src/box'
 import { argon2idWebV1Deriver } from '../src/key-deriver'
 import { Proof } from '../src/proof'
 import { Wayin } from '../src/wayin'
-import { PasskeySaltBytes, VaultProps, VaultScope, wallClock, type DeviceMark, type LeaseRecord } from '../src/types'
+import { PasskeySaltBytes, VaultProps, VaultScope, wallClock, type Capacity, type DeviceMark, type LeaseRecord } from '../src/types'
+import * as Refusals from '../src/refusals'
 import * as Ckeys from '../src/ckeys'
 import * as Expectations from '../src/expectations'
 import { VaultDB, type VaultPropsExpectation, type VaultDelExpectation, type BoxExpectation, type BoxDelExpectation, type StoredBox, type VaultDBOpts } from '../src/vault-db'
@@ -938,7 +939,8 @@ const servingOnly = (userId: string | null, store: StringStore): TH.VaultDBVerbs
     getBox:           (scope, boxlabel) => permitted(scope, () => shared.getBox(scope, boxlabel)),
     listBoxes:        (scope) => permitted(scope, () => shared.listBoxes(scope)),
     listBoxRecords:   (scope) => permitted(scope, () => shared.listBoxRecords(scope)),
-    putBox:           (scope, expected, box, opts) => permitted(scope, () => shared.putBox(scope, expected, box, opts)),
+    putBox:           (scope, expected, box) => permitted(scope, () => shared.putBox(scope, expected, box)),
+    getCapacity:      (scope) => permitted(scope, () => shared.getCapacity(scope)),
     delBox:           (scope, boxlabel, expected) => permitted(scope, () => shared.delBox(scope, boxlabel, expected)),
     delVault:         (scope, expected) => permitted(scope, () => shared.delVault(scope, expected)),
     delDamagedVault:  (scope) => permitted(scope, () => shared.delDamagedVault(scope)),
@@ -1170,7 +1172,7 @@ class RoundTripVaultDB extends VaultDB {
     const isNew = expected.revision_tok === null
     const full = (rows: Rows) => isNew && boxesIn(rows, scope).length >= this.maxBoxes
     if (this.opts.countsApart && await this.backend.atomically((rows) => full(rows) && vaultIs(rows, scope, expected) && ! rows.has(ckey))) {
-      throw vaultFull()
+      throw await this.backend.atomically((rows) => Refusals.vaultFull(capacityIn(rows, scope, this.maxBoxes)))
     }
     // The refusal a miss throws, from the rows its check read.
     const missed: { refusal: VaultError | null } = { refusal: null }
@@ -1179,7 +1181,7 @@ class RoundTripVaultDB extends VaultDB {
       if (missed.refusal) { return false }
       if (! this.opts.countsApart && full(rows)) {
         if (this.opts.keepsRefused) { rows.set(ckey, box) }
-        throw vaultFull()
+        throw Refusals.vaultFull(capacityIn(rows, scope, this.maxBoxes))
       }
       return true
     }
@@ -1187,6 +1189,8 @@ class RoundTripVaultDB extends VaultDB {
     if (await this.step({ check: meets, write: (rows) => { rows.set(ckey, box) } })) { return box }
     throw missed.refusal ?? new Error('a write that did not land, with no refusal from its check')
   }
+
+  protected doGetCapacity(scope: VaultScope) { return this.backend.atomically((rows) => capacityIn(rows, scope, this.maxBoxes)) }
 
   // What it removed is what the write found standing, in the same step.
   protected async doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation) {
@@ -1249,7 +1253,12 @@ const boxesIn = (rows: Rows, scope: VaultScope): StoredBox[] => [...rows]
   .map(([ckey, box]) => ({ boxlabel: Ckeys.isBoxIn(scope)(ckey) ? Ckeys.boxlabelOf(ckey) : null, box }))
   .filter((stored): stored is StoredBox => stored.boxlabel !== null)
 
-const vaultFull = () => new VaultError('vault_full', 'This vault is full: remove a box to make room, then try again.')
+/** How full `scope` is in `rows`: its boxes counted, each weighed as its row's JSON, against `maxBoxes` and no limit on bytes. */
+const capacityIn = (rows: Rows, scope: VaultScope, maxBoxes: number): Capacity => {
+  const boxes = boxesIn(rows, scope)
+  const bytesUsed = boxes.reduce((sum, { box }) => sum + new TextEncoder().encode(JSON.stringify(box)).length, 0)
+  return { boxes: { used: boxes.length, max: maxBoxes }, bytes: { used: bytesUsed, max: Infinity } }
+}
 
 /**
  * makeDevices for a RoundTripVaultDB: a fresh backend, and devices over it, each with `opts` --
@@ -1280,7 +1289,7 @@ TH.describeVaultDB('an honest adapter making round trips through the turnstile',
 TH.describeVaultDB('an honest adapter that counts a vault apart from its write, as a best effort', ...roundTripBattery({ stepping: inOneStep, countsApart: true }))
 
 /** The races a write whose check and write are apart loses, in some interleaving. */
-const SplitLosses = ['rivalCreates', 'rivalVaultPropsUpdates', 'rivalFirstWrites', 'rivalReplacements', 'delBeatsReplacement', 'vaultDelBeatsWrite'] as const
+const SplitLosses = ['rivalCreates', 'rivalVaultPropsUpdates', 'rivalFirstWrites', 'resentFirstWrites', 'rivalReplacements', 'delBeatsReplacement', 'vaultDelBeatsWrite'] as const
 
 /** The battery's checks over a check-then-write adapter whose devices share one lock, a fresh one for each call. */
 const lockedChecks = () => checksOver({ stepping: checkThenWriteUnder(sharedLock()), overTheWire: true })

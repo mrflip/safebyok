@@ -1,10 +1,11 @@
 import { VaultError, type RefusalMeta } from './errors'
+import type { Capacity } from './types'
 
 /**
  * The refusals a storage adapter throws, made the one way: the core's own messages, and a
  * `cause` that is never null. An adapter throws these rather than copying the core's words, and a
  * caller branches on each one's `kind`. Import it whole: `import { Refusals } from 'safebyok'`,
- * then `throw Refusals.vaultFull(limit)`.
+ * then `throw Refusals.vaultMismatch()`.
  *
  * A `cause` given as null or undefined -- a backend that failed without an error, as an aborted
  * IndexedDB transaction can -- becomes an Error saying so, so nothing downstream meets a null
@@ -106,20 +107,25 @@ export const notPermitted = (message = "The vault's storage does not let the sig
 
 /**
  * A `vault_full` refusal: a box write past a limit the backend keeps on a vault, which wrote
- * nothing. The user deletes a box, or the host raises the limit where the backend allows.
+ * nothing. It carries `capacity`, how full the vault is, as `meta.capacity`, and its message names
+ * the limit met: boxes, where `boxes.used` has reached `boxes.max`, else bytes. The user deletes
+ * a box, or the host raises the limit where the backend allows. The base class checks the
+ * capacity on the way up, and refuses a `vault_full` without a sound one as `corrupt_record`.
  *
- * @param limit - The most boxes the backend keeps in one vault, when that is the limit met.
+ * @param capacity - How full the vault is, read in the same atomic step that refused the write: a
+ *   `max` of `Infinity` for a limit the backend does not keep.
  * @param opts - `cause`: the backend's own refusal, when there is one.
- * @returns The refusal, to throw.
+ * @returns The refusal, to throw from `doPutBox`.
  *
- * @example throw Refusals.vaultFull(this.maxBoxes)
- * @example throw Refusals.vaultFull()  // a limit on bytes, say
+ * @example throw Refusals.vaultFull({ boxes: { used: 250, max: this.maxBoxes }, bytes: { used: bytesUsed, max: Infinity } })
+ * @example throw Refusals.vaultFull(capacity, { cause: backendRefusal })
  */
-export const vaultFull = (limit?: number, opts?: ErrorOptions): VaultError => {
-  const message = limit === undefined
-    ? 'This vault is full: remove a box to make room, then try again.'
-    : `This vault already holds the ${String(limit)} boxes its storage keeps in one vault: remove one before storing another.`
-  return new VaultError('vault_full', message, optsOf(opts))
+export const vaultFull = (capacity: Capacity, opts?: ErrorOptions): VaultError => {
+  const { boxes, bytes } = capacity
+  const message = boxes.used >= boxes.max
+    ? `This vault holds ${String(boxes.used)} boxes, and its storage keeps at most ${String(boxes.max)} in one vault, so nothing was written: remove a box before storing another.`
+    : `This vault's boxes take ${String(bytes.used)} of the ${String(bytes.max)} bytes its storage holds of one vault, leaving no room for this one, so nothing was written: remove a box, or store a smaller one.`
+  return new VaultError('vault_full', message, { ...optsOf(opts), meta: { capacity } })
 }
 
 /** What `storage_blocked` says unless an adapter says more exactly what was withheld. */

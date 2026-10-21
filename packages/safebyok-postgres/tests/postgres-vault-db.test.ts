@@ -356,7 +356,7 @@ const filledTo = async (db: PGlite, maxBoxes: number, boxlabels: readonly string
 }
 
 /** What InsertBoxSql answers when a first write does not land: whether its vault stood and was full, and the box standing, if any. */
-type Missed = { vault_stands: boolean, was_full: boolean, standing: BoxRecord | null }
+type Missed = { vault_stands: boolean, was_full: boolean, standing: BoxRecord | null, box_count?: number, bytes_used?: number }
 
 /** What InsertBoxSql answers, for a spy to say in place of the database: why a first write did not land, and what stands. */
 const missedBecause = ({ standing, ...why }: Missed) => (
@@ -397,11 +397,12 @@ describe("postgresVaultDB, its box limit", () => {
   // race can leave.
   const theirs = TH.boxOf('anthropic', 'theirs')
   const misses: [string, Missed, RefusalKind, unknown][] = [
-    ['the vault at its limit when the statement began', { vault_stands: true, was_full: true, standing: null }, 'vault_full', undefined],
+    ['the vault at its limit when the statement began', { vault_stands: true, was_full: true, standing: null, box_count: 1, bytes_used: 512 }, 'vault_full', { capacity: { boxes: { used: 1, max: 1 }, bytes: { used: 512, max: Number.MAX_SAFE_INTEGER } } }],
     ['the vault gone or made anew', { vault_stands: false, was_full: false, standing: null }, 'vault_mismatch', undefined],
     ['a vault gone, though it was counted full', { vault_stands: false, was_full: true, standing: null }, 'vault_mismatch', undefined],
     ['the boxlabel already taken, in a vault at its limit: a replacement is never full', { vault_stands: true, was_full: true, standing: theirs }, 'stale_write', { box_stored: theirs }],
     ['the boxlabel taken by a writer that committed after the statement began, with room in the vault', { vault_stands: true, was_full: false, standing: theirs }, 'stale_write', { box_stored: theirs }],
+    ['this very box, sent again and landed first by its other send: landed only where its own insert passed', { vault_stands: true, was_full: false, standing: TH.boxOf('anthropic', 'sk-fake') }, 'stale_write', { box_stored: TH.boxOf('anthropic', 'sk-fake') }],
   ]
   for (const [blurb, missed, kind, meta] of misses) {
     it(`refuses ${kind} for ${blurb}, in the one statement, carrying what stands (Contract: VaultDB.putBox, Does)`, async () => {
@@ -437,7 +438,7 @@ describe("postgresVaultDB, its box limit", () => {
     expect(await boxlabelsIn(vaultDB)).to.deep.equal([])
   })
 
-  it("asks one statement of every first write, keeping no count, and locking nothing but its vault row, shared", async () => {
+  it("asks one statement of every box write, keeping no count, locking its vault row shared and the box under its boxlabel for update", async () => {
     const db = await TH.emptyDatabase()
     await filledTo(db, 2, ['openai'])
     const spy = TH.spyClient(db)
@@ -448,10 +449,11 @@ describe("postgresVaultDB, its box limit", () => {
     await TH.expectingGood(vaultDB).delBox(u1, 'anthropic', TH.deleting('rev-sk-fake'))
     expect(spy.sent).to.have.lengthOf(4)
     for (const { text } of spy.sent) {
-      expect(text).to.not.match(/FOR (NO KEY )?UPDATE|FOR KEY SHARE|box_count/)
+      expect(text).to.not.match(/FOR NO KEY UPDATE|FOR KEY SHARE|safebyok_vault_tallies/)
     }
-    // Each box write reads its vault row FOR SHARE, once; the delete locks nothing.
+    // Each box write reads its vault row FOR SHARE, once, and locks the box standing FOR UPDATE, once; the delete locks nothing.
     expect(spy.sent.map(({ text }) => text.match(/FOR SHARE/g)?.length ?? 0)).to.deep.equal([1, 1, 1, 0])
+    expect(spy.sent.map(({ text }) => text.match(/FOR UPDATE/g)?.length ?? 0)).to.deep.equal([1, 1, 1, 0])
   })
 
   it("reads the vault row FOR SHARE in a replacement too, in its one statement", async () => {

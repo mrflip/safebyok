@@ -54,6 +54,8 @@ const vault = Vault.make({
   `maxVaultBytes` and `maxBoxes` are `Infinity`: a vault holds what `Vault.make`'s
   `maxBoxes` allows (100 by default), the origin's storage quota bounds the whole database,
   and a write past it refuses with kind `storage_blocked`, IndexedDB's own error as its `cause`.
+  Its `getCapacity` counts a vault's boxes, and weighs each row as its JSON in UTF-8 bytes,
+  in one transaction: about what the vault's records take, not the room the vault reserves.
 * **Storage the browser withholds** -- site data blocked, a private window or frame that keeps
   none, no room left, or no IndexedDB at all -- refuses with kind `storage_blocked`, which a retry
   cannot mend, by the rule the vault says its device store's failures by; any other trouble from

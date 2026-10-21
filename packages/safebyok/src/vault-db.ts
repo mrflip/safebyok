@@ -1,8 +1,7 @@
 import * as Z from 'zod/mini'
 import { BoxRecord } from './box'
-import { VaultProps, VaultScope, type DamagedBox, type BoxSummary, type Sidecar } from './types'
-import { VaultError, isVaultError } from './errors'
-import { optionsCheck } from './options'
+import { Capacity, VaultProps, VaultScope, type DamagedBox, type BoxSummary, type Sidecar } from './types'
+import { VaultError, isVaultError, type RefusalMeta } from './errors'
 import * as Names from './names'
 import { AnyTextValidators, NameFloor } from './validators'
 import * as Refusals from './refusals'
@@ -102,7 +101,7 @@ const BoxDeletion = Z.object({
 export type StoredBox = { boxlabel: string, box: unknown }
 // --
 
-// == [Options]: VaultDBOpts, VaultDBCallOpts
+// == [Options]: VaultDBOpts
 
 /**
  * What an adapter's factory takes from the host, beside its backend's own options: an optional
@@ -125,18 +124,6 @@ export type VaultDBOpts = {
   logger?: VaultLogger | null | undefined
 }
 
-/** What a VaultDB verb that takes options may be handed beside its arguments: a `signal`.
- * The signal is the caller's own timeout or cancel. A verb whose signal aborts, before it is called or while storage
- * has not answered, resolves `storage_unavailable` at once, the signal's `reason` as its `cause`:
- * a write already sent may have landed, and a later read shows whether it did. Without one, a
- * backend that never answers is a call that never completes.
- *
- * @example { signal: AbortSignal.timeout(10_000) }
- */
-export type VaultDBCallOpts = {
-  /** Aborts the call: an `AbortController`'s, or `AbortSignal.timeout(ms)`. */
-  signal?: AbortSignal | undefined
-}
 // --
 
 /**
@@ -157,7 +144,8 @@ export type VaultDBCallOpts = {
  *    when it does not, it throws what `Refusals` makes, from that same step:
  *    `Refusals.vaultMismatch()` for vault props other than those it was sealed for, and
  *    `Refusals.staleBox(standing)` for another box -- or none -- under its boxlabel, carrying what
- *    stands. A box deletion resolves `null` when its vault does not stand, and when it lands, what it removed
+ *    stands; and, from a backend that keeps a limit, `Refusals.vaultFull(capacity)` for a vault with
+ *    no room, saying how full it is. A box deletion resolves `null` when its vault does not stand, and when it lands, what it removed
  *    (a {@link BoxDeletion}): within the right vault, a deletion wins over any revision,
  *    and only reports whether the one it removed was the one it named.
  *  * **Enforce who may reach which rows.** Your backend should let a signed-in user reach only
@@ -167,6 +155,8 @@ export type VaultDBCallOpts = {
  *    itself on it, so say it only when the user really is gone -- never for a passing fault, which
  *    is `storage_unavailable`. When the signed-in user is the scope's own but may not make this
  *    call, refuse with kind `not_permitted`, which locks nothing.
+ *  * **Say how full a vault is**, from `doGetCapacity`: its boxes counted and their bytes
+ *    weighed as your backend weighs them, read in one step.
  *  * **Don't repair.** Return a record exactly as stored, or null when there is none. safebyok
  *    validates everything it reads back; a damaged record is safebyok's to refuse, never yours to
  *    fix or quietly drop.
@@ -415,24 +405,25 @@ export abstract class VaultDB {
    * * `invalid_box` for a box this package would not build -- a missing box, or one whose
    *   boxlabel is below the floor, among it -- or one sealed under another `vault_key_epoch` than
    *   `expected` names; `bad_record` for an `expected` it would not build; `bad_label` for a scope
-   *   below the floor, or a name the floor admits but longer than the backend holds; `bad_option`
-   *   for `opts` other than a `signal`. Each before storage sees the box.
+   *   below the floor, or a name the floor admits but longer than the backend holds. Each before
+   *   storage sees the box.
    * * `box_too_large` for a box, with its scope, heavier than the backend's `maxRecordBytes`,
-   *   before storage sees it; `vault_full` for a backend's own limit on a vault.
-   * * `storage_unavailable` when `opts.signal` aborts before storage answers: a write already sent
-   *   may then have landed, and a later read shows whether it did.
+   *   before storage sees it; `vault_full` for a backend's own limit on a vault, with how full the
+   *   vault is, as the same atomic step reckoned it, in `err.meta.capacity` (a {@link Capacity}).
+   *
+   * A write sent again after it landed -- a retry after a lost answer, say -- refuses as
+   * `stale_write`, its own box in `err.meta.box_stored`: what it expected no longer stands.
    *
    * @param scope - The vault the box is written into.
    * @param expected - The vault and vaultKey the box was sealed for, and the revision read under
    *   its boxlabel (null for none).
    * @param box - The box, as a vault seals it.
-   * @param opts - Optionally, a `signal` that abandons the call: {@link VaultDBCallOpts}.
    *
    * @example
-   *   const { ok, val, err } = await vaultDB.putBox(scope, { vault_id, vault_key_epoch: 1, revision_tok: null }, box, { signal: AbortSignal.timeout(10_000) })
+   *   const { ok, val, err } = await vaultDB.putBox(scope, { vault_id, vault_key_epoch: 1, revision_tok: null }, box)
    *   if (! ok && err.refusalkind === 'stale_write') { return err.meta?.box_stored }  // what won
    */
-  putBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord, opts?: VaultDBCallOpts): Promise<Outcome<BoxRecord>> {
+  putBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<Outcome<BoxRecord>> {
     return answering(async () => {
       const asked = heldScope(this, scope)
       const outgoing = checked(BoxRecord, box, invalidBox)
@@ -441,14 +432,38 @@ export abstract class VaultDB {
       if (outgoing.vault_key_epoch !== expectation.vault_key_epoch) {
         throw new VaultError('invalid_box', "Nothing was written: putBox writes a box under the vaultKey it was sealed with, so the box's vault_key_epoch must be the expected one. Hand a VaultDB's putBox only the boxes a vault seals, with the expectation it sealed them for.")
       }
-      const { signal } = checkCallOpts(opts) ?? {}
       const recordBytes = jsonBytes({ ...asked, ...outgoing })
       if (recordBytes > this.maxRecordBytes) {
         throw new VaultError('box_too_large', `That box weighs ${String(recordBytes)} bytes, over the ${String(this.maxRecordBytes)} its storage holds in one record, so nothing was written: store a smaller whisper or sidecar, or under a shorter boxlabel.`)
       }
-      const writing = untilAborted(signal, () => adapterAnswer('doPutBox', () => this.doPutBox(asked, expectation, outgoing)))
-      const stored = await withStandingChecked(writing, outgoing.boxlabel)
+      const stored = await withMissChecked(adapterAnswer('doPutBox', () => this.doPutBox(asked, expectation, outgoing)), outgoing.boxlabel)
       return writtenBack('a box write', () => checkWrittenBox(stored, outgoing))
+    })
+  }
+  // --
+
+  // == [Capacity]: getCapacity
+
+  /** How full the vault is, as storage reckons it: its boxes, and the bytes they take, each against storage's most.
+   * An estimate, read in one step, for a host to warn its user before a write is refused: storage
+   * checks again on every write, and its `vault_full` carries the same reckoning in
+   * `err.meta.capacity`. Bytes are counted as the backend counts them, which need not be how the
+   * vault's own `capacity` weighs a box (at the room it reserves): each adapter's README says how.
+   * A limit the backend does not keep is answered as the largest safe integer. A scope holding no
+   * vault answers nothing used.
+   *
+   * Refuses `bad_label` for a scope below the floor, or a name longer than the backend holds; and
+   * `corrupt_record` for an answer that is no capacity, quoting none of it.
+   *
+   * @example
+   *   const { ok, val } = await vaultDB.getCapacity(scope)
+   *   if (ok && val.boxes.used >= val.boxes.max) { warnFull() }
+   */
+  getCapacity(scope: VaultScope): Promise<Outcome<Capacity>> {
+    return answering(async () => {
+      const asked = heldScope(this, scope)
+      const raw = await adapterAnswer('doGetCapacity', () => this.doGetCapacity(asked))
+      return checkAnswer(Capacity, raw, 'a capacity reading')
     })
   }
   // --
@@ -648,6 +663,13 @@ export abstract class VaultDB {
    */
   protected abstract doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<unknown>
   /**
+   * How full the vault is, read in one step: a {@link Capacity}, its boxes counted and its bytes
+   * weighed as the backend weighs them, each against the most the backend holds of one vault, or
+   * `Infinity` for a limit it does not keep. A box write refused for room reports the same
+   * reckoning, with `Refusals.vaultFull(capacity)`.
+   */
+  protected abstract doGetCapacity(scope: VaultScope): Promise<unknown>
+  /**
    * Remove the box under `boxlabel`, whatever revision stands, if, and only if, the scope's
    * standing vault props have `expected.vault_id`: compared in the same atomic step as the removal.
    * Resolves, once those vault props stand, a {@link BoxDeletion} saying what that step
@@ -815,7 +837,7 @@ const heldName = (facts: NameFacts, said: string, part: string): string => {
 }
 // --
 
-// == [Storage and listener guards]: answering, asStorageTrouble, adapterAnswer, checkCallOpts, untilAborted, withStandingChecked, boxStoredOf, invalidBox, checkListener, checked, checkOutgoing
+// == [Storage and listener guards]: answering, asStorageTrouble, adapterAnswer, withMissChecked, staleChecked, fullChecked, remade, boxStoredOf, invalidBox, checkListener, checked, checkOutgoing
 
 /**
  * `body`'s outcome, as each verb answers. What the adapter throws reaches it a VaultError already
@@ -845,50 +867,43 @@ const adapterAnswer = async <AnswerT>(hookname: string, hook: () => Promise<Answ
   return answer
 }
 
-/** A verb's options, as {@link VaultDBCallOpts} has them: kind 'bad_option' for anything else. */
-const checkCallOpts = optionsCheck(
-  { signal: Z.optional(Z.custom<AbortSignal>((val) => val instanceof AbortSignal)) },
-  "A VaultDB verb's only option is `signal`, an AbortSignal that abandons the call (AbortSignal.timeout(ms), or an AbortController's): check its spelling, and leave out any other.",
-)
-
-/** What `work` resolves, unless `signal` aborts first: then `storage_unavailable`, at once.
- * The signal's reason is its cause. A signal already aborted starts no work, so nothing was sent;
- * one that aborts later leaves the work to finish unheard, so it may have landed.
+/** What a box write resolves, or its refusal, with what a miss says of storage checked as a read checks it.
+ * A stale write's `box_stored` is checked as {@link boxStoredOf} says, and a `vault_full`'s
+ * `capacity` as `getCapacity` checks one. A stale write that names nothing standing, or a
+ * `vault_full` without a sound capacity, is the adapter's bug: refused as `corrupt_record`.
  */
-const untilAborted = async <ValT>(signal: AbortSignal | undefined, work: () => Promise<ValT>): Promise<ValT> => {
-  if (signal === undefined) { return await work() }
-  if (signal.aborted) {
-    throw Refusals.storageUnavailable(signal.reason, "This call was abandoned before it reached storage, as its signal had already aborted, so nothing was sent. Try again with a fresh signal.")
-  }
-  let heard = (): void => undefined
-  const aborted = new Promise<never>((_resolve, reject) => {
-    heard = () => { reject(Refusals.storageUnavailable(signal.reason, "This call was abandoned when its signal aborted -- a timeout, say -- before storage answered, so it may or may not have landed. Read the vault again to see what stands, then try again if need be.")) }
-  })
-  signal.addEventListener('abort', heard, { once: true })
-  try {
-    return await Promise.race([work(), aborted])
-  } finally {
-    signal.removeEventListener('abort', heard)
-  }
-}
-
-/** What a box write resolves, or its refusal, a stale one's `box_stored` checked as a read checks it.
- * What stands under `boxlabel` is checked as {@link boxStoredOf} says. A `stale_write` that names nothing
- * standing is the adapter's bug: refused as `corrupt_record`, nothing written.
- */
-const withStandingChecked = async <ValT>(writing: Promise<ValT>, boxlabel: string): Promise<ValT> => {
+const withMissChecked = async <ValT>(writing: Promise<ValT>, boxlabel: string): Promise<ValT> => {
   try {
     return await writing
   } catch (err) {
-    if (! isVaultError(err, 'stale_write')) { throw err }
-    const said = err.meta ?? {}
-    if (! ('box_stored' in said)) {
-      throw new VaultError('corrupt_record', "Storage refused a box write as stale, so nothing was written, but did not say what stands under its boxlabel. The storage adapter needs a developer's look: its doPutBox throws Refusals.staleBox(standing).", { cause: err })
-    }
-    const meta = { box_stored: boxStoredOf(said.box_stored, boxlabel) }
-    throw new VaultError('stale_write', err.message, err.cause === undefined ? { meta } : { cause: err.cause, meta })
+    if (isVaultError(err, 'stale_write')) { throw staleChecked(err, boxlabel) }
+    if (isVaultError(err, 'vault_full')) { throw fullChecked(err) }
+    throw err
   }
 }
+
+/** A box write's `stale_write`, its `box_stored` checked; `corrupt_record` when it names nothing standing. */
+const staleChecked = (err: VaultError, boxlabel: string): VaultError => {
+  const said = err.meta ?? {}
+  if (! ('box_stored' in said)) {
+    return new VaultError('corrupt_record', "Storage refused a box write as stale, so nothing was written, but did not say what stands under its boxlabel. The storage adapter needs a developer's look: its doPutBox throws Refusals.staleBox(standing).", { cause: err })
+  }
+  return remade(err, { box_stored: boxStoredOf(said.box_stored, boxlabel) })
+}
+
+/** A box write's `vault_full`, its `capacity` checked; `corrupt_record` when it carries none that reads as one. */
+const fullChecked = (err: VaultError): VaultError => {
+  const capacity = Capacity.safeParse(err.meta?.capacity)
+  if (! capacity.success) {
+    return new VaultError('corrupt_record', "Storage refused a box write as vault_full, so nothing was written, but did not say how full the vault is. The storage adapter needs a developer's look: its doPutBox throws Refusals.vaultFull(capacity).", { cause: err })
+  }
+  return remade(err, { capacity: capacity.data })
+}
+
+/** `err` made again with `meta`, its kind, message and cause kept. */
+const remade = (err: VaultError, meta: RefusalMeta): VaultError => (
+  new VaultError(err.refusalkind, err.message, err.cause === undefined ? { meta } : { cause: err.cause, meta })
+)
 
 /** What stands under `boxlabel`, as a stale box write reports it: the box, a damaged box, or null.
  * Null for nothing; the box, when it passes the check `getBox` makes of one stored under that boxlabel; otherwise a

@@ -17,7 +17,8 @@ import { inOneTransaction, settle, withheldShelfOf } from './shelf'
  * * **Other tabs' writes** ring `subscribe`, over a BroadcastChannel.
  * * **No limits of its own**: IndexedDB sets none per record or per vault, so `maxRecordBytes`,
  *   `maxVaultBytes`, `maxBoxes` and `maxNameBytes` are `Infinity`; the origin's storage quota
- *   bounds the whole database.
+ *   bounds the whole database. Its `getCapacity` counts a vault's boxes and weighs each row as
+ *   its JSON, in UTF-8 bytes, in one transaction.
  * * **Storage the browser withholds** -- site data blocked, a private window or frame that keeps
  *   none, no room left, or no IndexedDB at all -- refuses with kind `storage_blocked`, which a
  *   retry cannot mend; any other trouble from IndexedDB, with kind `storage_unavailable`.
@@ -105,6 +106,14 @@ class IdbVaultDB extends VaultDB {
     if (refusal) { throw refusal }
     this.ring()
     return stored
+  }
+
+  // Counted and weighed in one transaction over the scope's key range: each row as its JSON, in
+  // UTF-8 bytes, against no limit, as IndexedDB keeps none.
+  protected async doGetCapacity(scope: VaultScope): Promise<unknown> {
+    const rows = await this.shelf('readonly', (store) => settle<unknown[]>(store.getAll(boxRange(scope))))
+    const bytesUsed = rows.reduce<number>((sum, row) => sum + new TextEncoder().encode(JSON.stringify(row)).length, 0)
+    return { boxes: { used: rows.length, max: this.maxBoxes }, bytes: { used: bytesUsed, max: this.maxVaultBytes } }
   }
 
   // What it removed is the row read in the transaction that deletes it. A deletion that found

@@ -66,7 +66,7 @@ describe("VaultSchemaSdl", () => {
   })
 
   it("names one root field for each VaultDB verb a browser's vault calls, and one subscription", () => {
-    expect(Object.keys(schema.getQueryType()!.getFields())).to.have.members(['safebyokGetVaultProps', 'safebyokGetBox', 'safebyokListBoxes'])
+    expect(Object.keys(schema.getQueryType()!.getFields())).to.have.members(['safebyokGetVaultProps', 'safebyokGetBox', 'safebyokListBoxes', 'safebyokGetCapacity'])
     expect(Object.keys(schema.getMutationType()!.getFields())).to.have.members([
       'safebyokEnsureVaultProps', 'safebyokPutVaultProps', 'safebyokPutBox', 'safebyokDelBox', 'safebyokDelVault',
     ])

@@ -115,6 +115,31 @@ const nearlyFull = async (vaultDB: ReturnType<typeof convexVaultDB>) => {
   }
 }
 
+/** What a component of another version might answer a box write with, and what each is. */
+const UnknownAnswers = [
+  [null,                                                     'null'],
+  [TH.boxOf('anthropic_api_key', 'a1'),                      'the bare box an older component answered with'],
+  [{ landed: 'yes', box_stored: null },                      'a landed flag that is no boolean'],
+  [{ landed: false, refusalkind: 'stale_write' },            'a stale write naming nothing standing'],
+  [{ landed: false, refusalkind: 'vault_full' },             'a full vault saying nothing of how full'],
+  [{ landed: false, refusalkind: 'quota_exceeded' },         'a refusal of a kind this client does not know'],
+] as const
+
+describe("convexVaultDB, answered by a component of another version", () => {
+  for (const [answer, blurb] of UnknownAnswers) {
+    it(`refuses a box write answered with ${blurb} as corrupt_record, saying the deployed component is out of date`, async () => {
+      const deployment = deploy()
+      const client = deployment.client('u1')
+      const vaultDB = convexVaultDB({ client, api: deployment.api.safebyok })
+      await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
+      vi.spyOn(client, 'mutation').mockResolvedValue(answer)
+      const refusal = await TH.expectBad(vaultDB.putBox(u1, TH.noBoxYet, TH.boxOf('anthropic_api_key', 'a1')), 'corrupt_record')
+      expect(refusal.message).to.match(/deployed safebyok component is out of date/)
+      expect(refusal).to.not.have.property('cause')
+    })
+  }
+})
+
 describe("convexVaultDB, refusing", () => {
   // Every verb's identity_revoked is the battery's line 5.4: these are what Convex's own says.
   for (const [clientTitle, connect] of ClientCases) {
@@ -178,13 +203,14 @@ describe("convexVaultDB, refusing", () => {
   })
 
   for (const [clientTitle, connect] of ClientCases) {
-    it(`refuses a box the component has no room for over a ${clientTitle} as vault_full`, async () => {
+    it(`refuses a box the component has no room for over a ${clientTitle} as vault_full, saying how full the vault is`, async () => {
       const deployment = deploy()
       const vaultDB = convexVaultDB({ client: connect(deployment, 'u1'), api: deployment.api.safebyok })
       await nearlyFull(vaultDB)
       const refusal = await TH.expectBad(vaultDB.putBox(u1, TH.noBoxYet, TH.heavyBox('one_too_many', 200_000)), 'vault_full')
-      expect(refusal.message).to.eq('This vault is full: remove a box to make room, then try again.')
-      expect(refusal.cause).to.be.instanceOf(ConvexError).with.nested.property('data.kind', 'vault_full')
+      expect(refusal.message).to.match(/bytes its storage holds of one vault/)
+      expect(refusal.meta?.capacity).to.deep.equal(await TH.expectingGood(vaultDB).getCapacity(u1))
+      expect(refusal.meta?.capacity?.boxes).to.deep.equal({ used: 8, max: MaxVaultBoxes })
       const listed = await TH.expectingGood(vaultDB).listBoxes(u1)
       expect(listed.map((summary) => summary.boxlabel)).to.not.include('one_too_many')
     })
@@ -203,7 +229,8 @@ describe("convexVaultDB, refusing", () => {
       await TH.expectingGood(vaultDB).putBox(u1, { vault_id: vaultId, revision_tok: null, vault_key_epoch: 1 }, TH.heavyBox(`heavy_${String(ii)}`, bytes))
     }
     const refusal = await TH.expectRefusal(vault.putBox('anthropic_api_key', 'x'.repeat(40_000)), 'vault_full')
-    expect(refusal.message).to.eq('This vault is full: remove a box to make room, then try again.')
+    expect(refusal.message).to.match(/no room for this one/)
+    expect(refusal.meta?.capacity?.boxes.used).to.eq(9)
     expect(vault.getSnapshot().boxes.map((box) => box.boxlabel)).to.not.include('anthropic_api_key')
     vault.close()
   })
