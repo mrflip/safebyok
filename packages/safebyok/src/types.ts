@@ -357,6 +357,15 @@ export const VaultProps = Z.object({
 export type VaultProps = Z.infer<typeof VaultProps>
 
 /**
+ * What names one vault's props for good: their `vault_id` and `registered_at`, the two fields
+ * that never change once the vault is made, and which each way in's wrap is bound to. A whole
+ * {@link VaultProps} is one.
+ *
+ * @example const identity: VaultIdentity = { vault_id: vaultProps.vault_id, registered_at: vaultProps.registered_at }
+ */
+export type VaultIdentity = Pick<VaultProps, 'vault_id' | 'registered_at'>
+
+/**
  * The device-local record of a lease: this browser's leaseKey (a non-extractable handle -- it
  * cannot leave the device even through the code that made it) and the vaultKey wrapped under it.
  * Held only by structured-clone storage (IndexedDB) or memory; it has no JSON form, and nothing

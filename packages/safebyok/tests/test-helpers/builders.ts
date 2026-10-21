@@ -32,20 +32,34 @@ export const testDeriver: KeyDeriver = {
 }
 
 /**
- * The slice of a vault a proof reads -- its key deriver and passphrase check -- for a test that
- * makes a `Proof` with no vault behind it: `userId`'s `main` vault, as {@link scopeOf} has it,
- * deriving with `keyDeriver`, admitting any passphrase ({@link anyStrengthChecker}, held to its
- * contract as a vault holds it).
+ * The slice of a vault a proof, a box, a way in or a lease reads, for a test that makes one with
+ * no vault behind it: `userId`'s `main` vault, as {@link scopeOf} has it, holding the vault props
+ * `vault-id-<userId>`, deriving with `keyDeriver`, admitting any passphrase
+ * ({@link anyStrengthChecker}, held to its contract as a vault holds it), granting leases of
+ * seven days, and reading {@link SliceNow} on its clock -- each as `overrides` does not say
+ * otherwise.
  *
  * @example Proof.parse(TH.vaultSliceOf('u1', argon2idWebV1Deriver), 'pw')
+ * @example Box.make(TH.vaultSliceOf('u1', TH.testDeriver, { now: () => later }), record)
  */
-export const vaultSliceOf = (userId: string, keyDeriver: KeyDeriver = testDeriver): VaultSlice => {
+export const vaultSliceOf = (userId: string, keyDeriver: KeyDeriver = testDeriver, overrides: Partial<VaultSlice> = {}): VaultSlice => {
   const scope = scopeOf(userId)
-  return { keyDeriver, checkPassphrase: guardStrengthChecker(anyStrengthChecker, scope) }
+  return {
+    ...scope,
+    vault_id:        `vault-id-${userId}`,
+    keyDeriver,
+    checkPassphrase: guardStrengthChecker(anyStrengthChecker, scope),
+    leaseMillis:     7 * 24 * 60 * 60_000,
+    now:             () => SliceNow,
+    ...overrides,
+  }
 }
 
-/** What {@link vaultSliceOf} makes: the slice of a vault a proof reads. */
-export type VaultSlice = Pick<Vault, 'keyDeriver' | 'checkPassphrase'>
+/** The time a {@link vaultSliceOf} slice's clock reads, unless told otherwise: noon, 19 October 2026. */
+export const SliceNow = Date.UTC(2026, 9, 19, 12)
+
+/** What {@link vaultSliceOf} makes: the slice of a vault a proof, a box, a way in and a lease read. */
+export type VaultSlice = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_id' | 'keyDeriver' | 'checkPassphrase' | 'leaseMillis' | 'now'>
 
 /**
  * A strengthChecker for tests, admitting every passphrase, so a suite may unlock with a

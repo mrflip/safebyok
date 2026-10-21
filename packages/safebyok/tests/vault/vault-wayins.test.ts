@@ -848,8 +848,8 @@ describe("the vault's ways in, as models (Contract: Vault, Wayin)", () => {
   it("makes its ways in from the vault props as storage holds them, told apart by wayinkind, as the PassphraseWayin's and PasskeyWayin's examples show", async () => {
     const { world, vault, laptop } = await vaultWithPasskey()
     const stored = VaultProps.parse(storedVaultPropsOf(world))
-    const passphrase = Wayin.make(stored, stored.passphrase, vault.keyDeriver)
-    const passkey = Wayin.make(stored, stored.passkey ?? TH.passkeyWayinOf('none'), vault.keyDeriver)
+    const passphrase = Wayin.make(vault, stored, stored.passphrase)
+    const passkey = Wayin.make(vault, stored, stored.passkey ?? TH.passkeyWayinOf('none'))
     expect([passphrase.constructor, passkey.constructor]).to.deep.equal([PassphraseWayin, PasskeyWayin])
     const wayins: (PassphraseWayin | PasskeyWayin)[] = [passphrase, passkey]
     const told = wayins.map((wayin) => (wayin.wayinkind === 'passphrase' ? wayin.key_deriver_label : wayin.summary.credential_id))

@@ -604,11 +604,19 @@ describe("the fixtures", () => {
     expect(VaultScope.safeParse(TH.scopeOf('u1', 'spare')).success).to.be.true
   })
 
-  it("vaultSliceOf: the key deriver and passphrase check a Proof reads, as its example shows", () => {
-    const { checkPassphrase, ...rest } = TH.vaultSliceOf('u1')
+  it("vaultSliceOf: the scope, vault id, key deriver, passphrase check, lease length and clock a proof, box, way in or lease reads, as its first example shows", () => {
+    const { checkPassphrase, now, ...rest } = TH.vaultSliceOf('u1')
     expect(checkPassphrase).to.be.a('function')
-    expect(rest).to.deep.equal({ keyDeriver: TH.testDeriver })
+    expect(now()).to.eq(TH.SliceNow)
+    expect(rest).to.deep.equal({ ...TH.scopeOf('u1'), vault_id: 'vault-id-u1', keyDeriver: TH.testDeriver, leaseMillis: 7 * 24 * 60 * 60_000 })
     expect(Proof.parse(TH.vaultSliceOf('u1', argon2idWebV1Deriver), 'pw').vault.keyDeriver).to.eq(argon2idWebV1Deriver)
+  })
+
+  it("vaultSliceOf: any field as its overrides say, as its second example shows", () => {
+    const later = TH.SliceNow + 1000
+    const slice = TH.vaultSliceOf('u1', TH.testDeriver, { now: () => later, vault_id: null })
+    expect(slice.now()).to.eq(later)
+    expect(slice.vault_id).to.be.null
   })
 
   it("vaultSliceOf's passphrase check admits any passphrase but a blank one, held to its contract as a vault's is", async () => {
