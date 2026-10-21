@@ -250,7 +250,10 @@ export const devicesOver = (getDb: () => FileDatabase): MakeVaultDBDevices => as
  * inside the test's own timeout, so a write that never waits fails here, by name, rather than as a
  * timed-out test.
  *
- * @example await TH.untilStatementBlocked(db, '%INSERT INTO safebyok_boxes%')
+ * The server shows only the first `track_activity_query_size` bytes of a statement, 1023 by
+ * default, and the box writes are longer: `statementLike` must match within their first kilobyte.
+ *
+ * @example await TH.untilStatementBlocked(db, TH.BoxWriteStatement)
  */
 export const untilStatementBlocked = async (db: FileDatabase, statementLike: string): Promise<void> => {
   await vi.waitUntil(async () => {
@@ -262,8 +265,13 @@ export const untilStatementBlocked = async (db: FileDatabase, statementLike: str
   }, { timeout: 2000, interval: 10 })
 }
 
-/** The `LIKE` pattern of the statement a first write to a vault sends: an insert of a box. */
-export const FirstWriteStatement = '%INSERT INTO safebyok_boxes%'
+/**
+ * The `LIKE` pattern of a box write as the server shows it while it waits, matched within the head it keeps.
+ *
+ * Box inserts and replacements both open with a `WITH vault AS (` that reads the vault row `FOR
+ * SHARE`; a test holds one write at a time, so it needs no more to name it.
+ */
+export const BoxWriteStatement = 'WITH vault AS (%FROM safebyok_vaults%FOR SHARE%'
 
 /** Makes the u1 vault the helpers' vault props stand for, through `vaultDB`, and writes a box under each of `boxlabels`. */
 export const filled = async (vaultDB: VaultDBVerbs, boxlabels: readonly string[]): Promise<void> => {
