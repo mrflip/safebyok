@@ -1,11 +1,7 @@
-/**
- * safebyok's public surface: an end-to-end encrypted vault for API keys and other small secrets.
- * Whispers are encrypted on the user's device under keys that never leave it; the storage layer
- * holds ciphertext only. The IndexedDB device store lives in its own entry point, `safebyok/idb`,
- * the browser's defaults for Vault.make's options in another, `safebyok/browser` (among them
- * `zxcvbnStrengthChecker`, the passphrase strength checker), the checks for
- * names, with their bounds, in `safebyok/validators` as well as here, and the IndexedDB
- * vault store in a package of its own, `safebyok-indexeddb`.
+/** safebyok: an end-to-end encrypted vault for API keys and other small secrets, encrypted on the user's device under keys that never leave it.
+ * Storage holds ciphertext only. Other entry points: `safebyok/idb` (the IndexedDB device store),
+ * `safebyok/browser` (the browser's defaults for Vault.make), `safebyok/validators` (the name
+ * checks, also here) and `safebyok/utils`. The IndexedDB vault store is `safebyok-indexeddb`.
  */
 export { Argon2idWebV1, checkSaltFits, parseKeyDeriverSpec } from './key-deriver-spec'
 export type { KeyDeriverSpec } from './key-deriver-spec'

@@ -5,29 +5,27 @@ import { type Outcome, bad, outcomeOf, unexpectedError } from './outcome'
 
 /** Why the vault asks for a proof: each `why` an {@link Ask} may carry. */
 export const AskWhyVals = ['absent', 'locked', 'lease_ending'] as const
-/**
- * Why the vault asks for a proof: `absent`, the vault has never been made, and this proof makes
- * it, its one passphrase; `locked`, the vault stands and this device holds no lease; or
- * `lease_ending`, this device's lease ends within the `renewMinutes` its call asked for.
+/** Why the vault asks for a proof: `absent`, `locked` or `lease_ending`.
+ * `absent`: the vault has never been made, and this proof's passphrase makes it. `locked`: the
+ * vault stands and this device holds no lease. `lease_ending`: this device's lease ends within the
+ * `renewMinutes` its call asked for.
  */
 export type AskWhy = typeof AskWhyVals[number]
 
 /** What a {@link GetProof} may answer: each of the three. */
 export const ProofAnswerVals = ['unlocked', 'declined', 'carry_on'] as const
-/**
- * What a {@link GetProof} answers: `unlocked`, an `attempt` was ok; `declined`, the user dismissed
- * the dialog, a lock landed, or there was no user to ask; or `carry_on`, the user would rather not
- * be asked now, which only a lease ending allows (`ask.why` `lease_ending`): the call goes on under
- * the lease that stands.
+/** What a {@link GetProof} answers: `unlocked`, `declined` or `carry_on`.
+ * `unlocked`: an `attempt` was ok. `declined`: the user dismissed the dialog, a lock landed, or
+ * there was no user to ask. `carry_on`: the user would rather not be asked now, and the call goes
+ * on under the lease that stands; only `lease_ending` allows it.
  */
 export type ProofAnswer = typeof ProofAnswerVals[number]
 
-/**
- * Your method, the one place UI meets the vault: handed an {@link Ask} whenever a call needs the
- * vault unlocked and it is not, it shows a dialog for `ask.why`, calls `ask.attempt(proof)` on each
- * submit, and answers once the dialog is done. The vault asks one at a time. It hears the
- * passphrase the user types: keep it on the device, and never log it or let it reach an error
- * tracker. Whatever it throws reaches the call that asked as kind 'unexpected_error', never a log.
+/** Your method, the one place UI meets the vault: handed an {@link Ask}, it shows a dialog and answers once it is done.
+ * The vault asks when a call needs it unlocked and it is not. Call `ask.attempt(proof)` on each submit. The vault asks one at a time. It hears the passphrase
+ * the user types: keep it on the device, and never log it or let it reach an error tracker.
+ * Whatever it throws refuses the call that asked 'unexpected_error', and is never logged. An answer
+ * outside {@link ProofAnswerVals}, or `carry_on` outside `lease_ending`, refuses it 'bad_option'.
  *
  * @example
  *   const getProof: GetProof = async (ask) => {
@@ -37,19 +35,13 @@ export type ProofAnswer = typeof ProofAnswerVals[number]
  */
 export type GetProof = (ask: Ask) => ProofAnswer | Promise<ProofAnswer>
 
-/** The vault's own run of one proof, for {@link Ask}: its unlock, standing down once `overtaken` is aborted (the prompt is over). */
+/** The vault's own run of one proof, for {@link Ask}: its unlock, standing down once `overtaken` is aborted. */
 export type Attempter = (proof: string | PasskeyAnswer, overtaken: AbortSignal) => Promise<Outcome<Vault>>
 
-/**
- * The name of the one maker of an {@link Ask}, held inside safebyok and exported by no entry
- * point: the vault raises each prompt, and nothing else makes an ask.
- */
+/** The name of the one maker of an {@link Ask}, exported by no entry point, so only the vault raises a prompt. */
 export const raiseAsk = Symbol('Ask.raise')
 
-/**
- * One prompt, raised: the {@link Ask} handed to `getProof`, and the vault's handles on it. The
- * vault keeps this; a host sees only the ask.
- */
+/** One prompt, raised: the {@link Ask} handed to `getProof`, and what the vault keeps to answer and end it. */
 export type RaisedAsk = {
   ask:      Ask
   /** The one answer every caller waiting on this prompt shares: the answer, or why there is none. */
@@ -58,12 +50,8 @@ export type RaisedAsk = {
   landLock: () => void
 }
 
-/**
- * One request for a proof, made by the vault when a call needs it unlocked and it is not, and
- * handed to your `getProof`. It carries why the vault asks, the vault itself (its fields live while
- * the dialog is up), `attempt`, which tries one proof, and `lockLanded`, which settles when a lock
- * wins and the dialog should close. Every caller that needs the vault while it is up waits on this
- * one prompt, and hears its one answer.
+/** One request for a proof, handed to your {@link GetProof} when a call needs the vault unlocked and it is not.
+ * Every call that needs the vault while it is up waits on this one prompt, and hears its one answer.
  *
  * @example
  *   const { ok, err } = await ask.attempt(passphrase)
@@ -72,14 +60,12 @@ export type RaisedAsk = {
  * @example void ask.lockLanded.then(() => { closeDialog('declined') })
  */
 export class Ask {
-  /** Why the vault asks: see {@link AskWhy}. `absent` is a create: offer strength advice. */
+  /** Why the vault asks. `absent` is a create: offer strength advice. */
   readonly why: AskWhy
-  /** The vault asking: its fields read live while the dialog is up. */
+  /** The vault asking, its fields live while the dialog is up. */
   readonly vault: Vault
-  /**
-   * Settles when a `lock()`, `close()` or `del()` lands while the prompt is up: every caller
-   * waiting on it is refused 'vault_locked', and the dialog should close, answering `declined`.
-   * It never settles otherwise.
+  /** Settles only when a `lock()`, `close()` or `del()` lands while the prompt is up: close the dialog, answering `declined`.
+   * Every call waiting on the prompt is then refused 'vault_locked'.
    */
   readonly lockLanded: Promise<void>
   readonly #attempter: Attempter
@@ -98,16 +84,13 @@ export class Ask {
     this.lockLanded = lockLanded
   }
 
-  /**
-   * Try one proof: the passphrase the user typed, or a passkey's answer (`safebyok-react`'s
-   * `askPasskey` gets one). Resolves the vault,
-   * unlocked, or the refusal, as `unlock()` refuses: `wrong_passphrase` and `wrong_passkey` to show
-   * in place and ask again (on `absent`, `weak_passphrase` and `created_elsewhere` too);
-   * `absent_wayin` and `damaged_wayin` to offer the other way in; and
-   * `vault_locked` -- a lock won, under this attempt or before it -- `storage_unavailable`, or any
-   * other, to close the dialog, answering `declined`. Once the prompt is over -- `lockLanded`
-   * settled, or the ask answered -- it refuses 'vault_locked' at once, and an attempt still under
-   * way then unlocks nothing: a Cancel during it stays cancelled, and a lock after it wins.
+  /** Try one proof, the passphrase typed or a passkey's answer: resolves the vault unlocked, or the refusal as `unlock()` refuses.
+   * Show 'wrong_passphrase' and 'wrong_passkey' in place and ask again; on `absent`, so too
+   * 'weak_passphrase' and 'created_elsewhere'. On 'absent_wayin' and 'damaged_wayin', offer the
+   * other wayin. On anything else, 'vault_locked' among it, close the dialog, answering `declined`.
+   *
+   * Once the prompt is over (`lockLanded` settled, or the ask answered), it refuses 'vault_locked'
+   * at once. An attempt still under way then unlocks nothing: a Cancel stays cancelled, and a lock wins.
    *
    * @example const { ok, err } = await ask.attempt(passphrase)
    * @example const { ok } = await ask.attempt(passkey)   // from askPasskey(ask.vault.passkey)
@@ -118,9 +101,8 @@ export class Ask {
     return await this.#attempter(proof, this.#over.signal)
   }
 
-  /**
-   * Raise one prompt: make the ask and hand it to `getProof` (none answers `declined`). The
-   * vault's, one per prompt; the answer is checked here, once, for every caller that waits on it.
+  /** Raise one prompt: hand a new ask to `getProof`, checking its answer once for every waiting caller.
+   * With no `getProof`, the answer is `declined`.
    */
   static [raiseAsk](why: AskWhy, vault: Vault, attempter: Attempter, getProof: GetProof | null): RaisedAsk {
     const landed = new AbortController()

@@ -1,12 +1,7 @@
-/**
- * `task`, made to run one at a time. Called while no run is under way, the function this returns
- * starts `task` and hands back that run's promise. Called while one is, it hands back the promise
- * of one more run, started once the run under way has ended, however it ended, and shared by every
- * call made meanwhile. So no two runs overlap, every caller's run begins after it called, and
- * however many calls pile up behind a run, they cost one run more. A run's failure is heard only by
- * the callers that share that run.
+/** `task`, made to run one at a time: no two runs overlap, and each caller's run begins after it called.
+ * Called while a run is under way, it hands back one more run, started once that one ends and
+ * shared by every call made meanwhile. A run's failure is heard only by the callers that share it.
  *
- * @param task - The work to run, such as one read of storage into what a vault shows.
  * @returns A function asking for a run of `task`, settling as the run it is given settles.
  *
  * @example

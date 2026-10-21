@@ -1,22 +1,12 @@
 import { VaultError, type RefusalKind } from './errors'
 
-/**
- * Where safebyok decides what of a foreign error rides along on the refusal it throws in that
- * error's place. A foreign error is one safebyok did not make -- a host's validator that throws, a
- * storage client's failure -- and it may quote what it was handed: a name, a sidecar, a stored
- * record, any text a user typed or pasted, a key among it. Import it whole:
- * `import { Sanitizer } from 'safebyok'`, then `Sanitizer.refusalFor(...)`.
+/** What of a foreign error rides along on the refusal thrown in its place: an error safebyok did not make, which may quote a key it was handed.
+ * Import it whole: `import { Sanitizer } from 'safebyok'`, then `Sanitizer.refusalFor(...)`.
  */
 
-/**
- * The VaultError of `kind`, saying `message`, to throw in place of `foreign`: an error safebyok
- * did not make, which may quote what it was handed. The refusal carries nothing of `foreign` --
- * no `cause`, no text of its message, no property of it -- so nothing it quoted travels on.
- *
- * @param foreign - What was thrown, by code that is not safebyok's: a host's schema, a storage client.
- * @param kind - What went wrong, for a caller to branch on.
+/** The VaultError of `kind`, saying `message`, to throw in place of `foreign`, carrying nothing of it: no `cause`, text or property.
+ * @param _foreign - What code that is not safebyok's threw, such as a host's schema or a storage client.
  * @param message - What went wrong and what to do, calmly, quoting nothing.
- * @returns The refusal, to throw.
  *
  * @example
  *   try { return await client.mutation(fnRef, args) } catch (err) {

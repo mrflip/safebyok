@@ -2,28 +2,22 @@ import { VaultError } from './errors'
 import { DefaultLogger, asError } from './logger'
 import { reportToPlatform } from './report-error'
 
-/**
- * The smallest storage the local adapters need: strings by string ckey, with change notification
- * so the vault and an inspector can watch it. A host backs one with localStorage; the tests
- * back one with a Map.
- */
+/** The smallest storage the local adapters need: text by ckey, with a `subscribe` so the vault and an inspector can watch it. */
 export type StringStore = {
-  /** The stored text under `ckey`, or null when there is none. */
+  /** The stored text under `ckey`, or null for none. */
   read(ckey: string): string | null
   write(ckey: string, text: string): void
   erase(ckey: string): void
   /** Every ckey currently stored, in no particular order. */
   ckeys(): string[]
-  /** Calls `listener` after any write or erase; returns the unsubscribe. */
+  /** Call `listener` after any write or erase; returns the unsubscribe. */
   subscribe(listener: () => void): () => void
 }
 
-/**
- * Listener bookkeeping shared by both stores. A listener that is not a function is refused as it
- * subscribes, with kind 'bad_option', rather than breaking some later write that rings it. Each
- * listener is called in turn, as the write lands; one that throws stops no other and fails no
- * write, and what it threw goes to the default logger, and to the platform's `reportError` where
- * there is one.
+/** The listeners of one store, each called in turn as a write lands.
+ * Its `subscribe` refuses 'bad_option' for a listener that is not a function. A listener that
+ * throws stops no other and fails no write. What it threw goes to the default logger, and to the
+ * platform's `reportError` where there is one.
  */
 const makeBell = () => {
   const listeners = new Set<() => void>()
@@ -46,9 +40,7 @@ const callQuietly = (listener: () => void) => {
   }
 }
 
-/**
- * In-memory StringStore over a Map: what the tests use, and a fallback anywhere localStorage
- * is missing.
+/** A StringStore over a Map: for tests, and wherever localStorage is missing.
  *
  * @example
  *   const store = memoryStore()
@@ -66,15 +58,10 @@ export const memoryStore = (): StringStore => {
   }
 }
 
-/**
- * StringStore over a DOM Storage object (localStorage), confined to one prefix: each store sees
- * only its own entries, so one localStorage can hold two distinct places -- say a vault database
- * and a device cache -- without either seeing the other.
+/** A StringStore over a DOM Storage object, such as localStorage, that sees only the entries under `prefix`.
+ * So one localStorage can hold two stores apart. Its `subscribe` hears only this tab's writes: it
+ * does not listen for the `storage` events other tabs fire.
  *
- * Change notification covers this tab's own writes (DOM `storage` events only fire in *other*
- * tabs, and this store does not listen for them).
- *
- * @param webStorage - The Storage to write through, usually `window.localStorage`.
  * @param prefix - Namespace for this store's entries, e.g. 'safebyok-demo:db:'.
  *
  * @example

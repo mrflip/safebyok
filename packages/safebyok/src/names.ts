@@ -5,10 +5,9 @@ import * as Sanitizer from './sanitizer'
 import type { VaultScope } from './types'
 import { AnyTextValidators, DefaultValidators, NameFloor, type NameValidator, type VaultValidators } from './validators'
 
-/**
- * The one place a name meets its check at the vault's entry: the floor beneath, then the
- * host's validators where it gave them and ours where not. A check decides pass or fail and
- * nothing more: what passes is kept exactly as handed in.
+/** The one place a name meets its check at the vault's entry: the floor, then the host's validators where it gave them, ours where not.
+ * A check decides pass or fail: what passes is kept exactly as handed in. A refusal names the
+ * field, never the name.
  */
 
 /** Which check: one of the fields of {@link VaultValidators}. */
@@ -28,24 +27,17 @@ const validatorsCheck = optionsCheck({
   userId:      nameValidator,
 }, 'validators is a bag of Zod schemas, each checking one of applabel, vaultlabel, boxlabel and userId: leave out any field to keep its default check, and check the spelling of each one given.')
 
-/**
- * A host's `validators` bag, exactly as handed in, once its shape passes: each field one of
- * applabel, vaultlabel, boxlabel and userId, and each a Zod schema or
- * undefined. Kind 'bad_option' otherwise, so a misspelt field (`boxLabel`) is refused rather
- * than leaving the default check quietly in its place. Only the shape is checked: the schemas
- * are the host's.
- * Vault.make runs it on its `validators` option; a binding or wrapper that takes the bag apart
- * runs it first, once, on the bag it was handed.
+/** A host's `validators` bag as handed in, once each field is one {@link VaultValidators} knows and holds a Zod schema or undefined.
+ * It refuses 'bad_option' otherwise, so a misspelt field is not quietly left at its default. A
+ * binding or wrapper that takes the bag apart runs it first, once, as Vault.make does.
  *
  * @example checkValidators({ boxlabel: z.string().max(200) })  // the same bag
  * @example checkValidators({ boxLabel: z.string() })           // throws: bad_option
  */
 export const checkValidators = (validators: VaultValidators | undefined): VaultValidators | undefined => validatorsCheck(validators)
 
-/**
- * The checks a vault runs, from a host's `validators`: each field it gives replaces ours, and
- * each it leaves out (or passes as undefined) keeps ours. A bag of another shape is refused, as
- * {@link checkValidators} refuses it.
+/** The checks a vault runs, from a host's `validators`: a field given replaces ours, one left out or undefined keeps ours.
+ * It refuses as {@link checkValidators} does.
  *
  * @example rulesOf({ boxlabel: z.string().max(200) }).applabel === Label  // true
  */
@@ -59,13 +51,10 @@ export const rulesOf = (validators: VaultValidators = {}): NameRules => {
   }
 }
 
-/**
- * `candidate`, exactly as handed in, once it passes the floor and then the `field` check: kind
- * 'bad_label' when it does not. The host's check runs once, and only on
- * text above the floor. The refusal names the field, never the candidate, and says what one of
- * safebyok's own checks found wrong; a host's check it names only. A check that throws rather
- * than answering -- an async one, or a host's own bug -- is misuse: kind 'bad_option', carrying
- * nothing of what it threw, which may quote the candidate.
+/** `candidate` as handed in, once it passes {@link checkFloor} and then the `field` check; refuses 'bad_label' when it does not.
+ * The host's check runs once, and only on text above the floor. A refusal says what one of our own
+ * checks found wrong, and only names a host's. A check that throws, such as an async one, refuses
+ * 'bad_option', carrying nothing of what it threw.
  */
 export const check = (rules: NameRules, field: NameField, candidate: unknown): string => {
   const floored = checkFloor(field, candidate)
@@ -81,11 +70,7 @@ export const check = (rules: NameRules, field: NameField, candidate: unknown): s
   throw new VaultError('bad_label', `That ${field} does not pass the vault's ${field} check. ${said}.`)
 }
 
-/**
- * `candidate`, exactly as handed in, once it passes the floor beneath every name, whatever the
- * host's validators ({@link NameFloor}): kind 'bad_label' when it does not, saying what was wrong
- * and quoting nothing.
- */
+/** `candidate` as handed in, once it passes {@link NameFloor}; refuses 'bad_label' when it does not, saying what was wrong. */
 export const checkFloor = (field: NameField, candidate: unknown): string => {
   if (typeof candidate !== 'string') {
     throw new VaultError('bad_label', `That ${field} is missing, or is not text.`)
@@ -95,11 +80,7 @@ export const checkFloor = (field: NameField, candidate: unknown): string => {
   throw new VaultError('bad_label', `That ${field} is not text any vault can hold. ${verdict.error.issues[0]?.message ?? 'It fails the floor every name is held to'}.`)
 }
 
-/**
- * `scope`, once its three names pass the floor and their checks, as a frozen copy: whoever it is
- * handed to -- a host's strength checker, a snapshot's reader -- cannot change it for everyone else.
- * Kind 'bad_label' otherwise.
- */
+/** A frozen copy of `scope`, once its three names pass {@link check}: so no one it is handed to can change it for everyone else. */
 export const checkScope = (rules: NameRules, scope: unknown): VaultScope => {
   const checked = ScopeShape.safeParse(scope)
   if (! checked.success) {
