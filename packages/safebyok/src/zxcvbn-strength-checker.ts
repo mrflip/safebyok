@@ -2,17 +2,15 @@ import type { TranslationKeys, ZxcvbnFactory } from '@zxcvbn-ts/core'
 import type { PassphraseVerdict, StrengthChecker } from './passphrase-strength'
 import type { VaultScope } from './types'
 
-/**
- * The fewest characters {@link zxcvbnStrengthChecker} admits, before zxcvbn is asked: 12. NIST SP
- * 800-63B asks for length, and against composition rules (a digit, a capital, a symbol), which
- * make passphrases harder to remember and no harder to guess.
+/** The fewest characters {@link zxcvbnStrengthChecker} admits, before zxcvbn is asked.
+ * NIST SP 800-63B asks for length, and against composition rules, which make passphrases harder to
+ * remember and no harder to guess.
  */
 export const MinPassphraseChars = 12
 
-/**
- * The least zxcvbn score {@link zxcvbnStrengthChecker} admits, of 0 to 4: 3, which zxcvbn calls
- * safely unguessable, holding against an offline attack on a slow hash -- what a copy of the
- * vault's props meets, under Argon2id.
+/** The least zxcvbn score, of 0 to 4, {@link zxcvbnStrengthChecker} admits.
+ * zxcvbn calls 3 safely unguessable: it holds against an offline attack on a slow hash, which is
+ * what a copy of the vault props meets under Argon2id.
  */
 export const MinZxcvbnScore = 3
 
@@ -52,10 +50,7 @@ const Remedy = ': add a few more words, less common ones.'
 // next one tries again.
 const made: { estimator?: Promise<ZxcvbnFactory> } = {}
 
-/**
- * Loads zxcvbn and builds its estimator, over the common-password dictionary and the keyboard
- * layouts. A load that fails is forgotten, so the next call loads again.
- */
+/** Load zxcvbn and build its estimator over the common-password dictionary and keyboard layouts, forgetting a load that fails. */
 const loadEstimator = async (): Promise<ZxcvbnFactory> => {
   try {
     const [{ ZxcvbnFactory: Factory }, { adjacencyGraphs, dictionary }] = await Promise.all([import('@zxcvbn-ts/core'), import('@zxcvbn-ts/language-common')])
@@ -81,11 +76,7 @@ const Strong: PassphraseVerdict = Object.freeze({ strong: true })
 /** The verdict on a passphrase shorter than {@link MinPassphraseChars}. */
 const TooShort: PassphraseVerdict = Object.freeze({ strong: false, reason: `A passphrase needs at least ${String(MinPassphraseChars)} characters: a few words together make one long enough, and easy to remember.` })
 
-/**
- * What zxcvbn hears as the user's own words: each name in the scope whole, and each run of
- * letters or digits in it ('acme', 'jo', 'example' of a user id 'jo@example.com'), since a
- * passphrase built from them is the first a guesser who knows the user tries.
- */
+/** What zxcvbn hears as the user's own words: each name in the scope whole, and each run of letters or digits in it. */
 const userInputsOf = (scope: VaultScope | undefined): string[] => {
   if (scope === undefined) { return [] }
   const names = [scope.applabel, scope.user_id, scope.vaultlabel]
@@ -108,28 +99,19 @@ const checkWithZxcvbn = async (passphrase: string, scope?: VaultScope): Promise<
   return { strong: false, reason: reasonFor(feedback.warning) }
 }
 
-/**
- * The `strengthChecker` for a browser, which `browserOpts()` supplies: strong when the
- * passphrase has at least {@link MinPassphraseChars} (12) characters, each Unicode code point
- * counting one, and zxcvbn, through `@zxcvbn-ts/core` and its common-password dictionary, scores
- * it at least {@link MinZxcvbnScore} of 4. So it turns away short passphrases, common passwords
- * and ones very like them, keyboard walks, repeats, sequences, dates, and the vault's own names --
- * the applabel, the user's id and the vaultlabel in `scope`, whole or in part -- whatever their
- * length; and asks for no digit, capital or symbol. Its reason names the pattern it found, never
- * the passphrase, and says to add words.
+/** The `strengthChecker` `browserOpts()` supplies: strong with at least {@link MinPassphraseChars} code points and a zxcvbn score of at least {@link MinZxcvbnScore}.
+ * So it turns away common passwords and ones like them, keyboard walks, repeats, sequences, dates,
+ * and the vault's own names, whatever their length. It asks for no digit, capital or symbol. Its
+ * reason names the pattern it found, never the passphrase, and says to add words. It keeps
+ * nothing, and sends nothing anywhere.
  *
- * It answers through a promise: zxcvbn and its dictionary, about 216 kB minified and brotlied,
- * are a chunk of their own in a bundled app, fetched by its `load`, which the vault's `hello()`
- * runs, or else by its first call. Loading takes the fetch and about 15 ms more; each call after
- * it a few milliseconds, so a field may call it on every keystroke. Its strength is that
- * dictionary: without it, it cannot tell a common password from a good one, so a load that fails
- * throws, failing the hello, and the next load tries again. It keeps nothing, and sends nothing
- * anywhere.
+ * zxcvbn and its dictionary, about 216 kB brotlied, are a chunk of their own in a bundled app. Its
+ * `load` fetches them, as `hello()` does, or else its first call. After that, a call takes a few
+ * milliseconds, so a field may call it on every keystroke. A load that fails throws, failing the
+ * hello, and the next load tries again.
  *
- * @param passphrase - The passphrase as the user typed it.
- * @param scope - The vault it is for, whose names zxcvbn treats as the user's own words. Optional
- *   when calling it by hand; the vault always passes it.
- * @returns `{ strong: true }`, or `{ strong: false, reason }` saying what makes it weak and what to do.
+ * @param scope - The vault it is for, whose names zxcvbn treats as the user's own words. The vault
+ *   always passes it.
  *
  * @example
  *   const vault = Vault.make({ applabel: 'acme', userId, vaultlabel: 'main', vaultDB, ...browserOpts() })  // brings it in
