@@ -237,26 +237,28 @@ describe("VaultProvider", () => {
       await waitFor(() => { expect(screen.getByRole('status').textContent).to.eq('') })
     })
 
-    it("fails the dialog, reporting to React, for a checker that throws: the vault's refusal, unexpected_error, carrying nothing of the throw", async () => {
+    it("throws a checker that throws on to the app's error boundary: the vault's refusal, unexpected_error, carrying nothing of the throw", async () => {
       const world = makeWorld()
       const flaky = vi.fn(refuseAcme).mockRejectedValueOnce(new Error('could not judge acme'))
-      const { reported } = TH.renderReporting(<VaultProvider {...world.props} userId="u1" strengthChecker={flaky}><Probe /></VaultProvider>)
+      const { reported } = TH.renderReporting(<TH.Catcher><VaultProvider {...world.props} userId="u1" strengthChecker={flaky}><Probe /></VaultProvider></TH.Catcher>)
       fireEvent.click(await screen.findByText('put'))
       fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'acme' } })
-      await waitFor(() => { expect(reported).to.have.lengthOf(1) })
+      expect(await screen.findByText(/^caught: /)).to.not.be.null
+      expect(reported).to.have.lengthOf(1)
       expect(isVaultError(reported[0], 'unexpected_error')).to.be.true
-      expect((reported[0] as Error).message).to.match(/strengthChecker threw/)
+      expect((reported[0] as Error).message).to.match(/strengthChecker handed to Vault\.make threw/)
       expect(TH.thrownText(reported[0])).to.not.include('could not judge')
       expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null
     })
 
-    it("fails the dialog, reporting to React, for a checker that answers no verdict: the vault's refusal, bad_option", async () => {
+    it("throws a checker that answers no verdict on to the app's error boundary: the vault's refusal, bad_option", async () => {
       const world = makeWorld()
       const misfit = (() => ({ strong: 'yes' })) as unknown as VaultProviderProps['strengthChecker']
-      const { reported } = TH.renderReporting(<VaultProvider {...world.props} userId="u1" strengthChecker={misfit}><Probe /></VaultProvider>)
+      const { reported } = TH.renderReporting(<TH.Catcher><VaultProvider {...world.props} userId="u1" strengthChecker={misfit}><Probe /></VaultProvider></TH.Catcher>)
       fireEvent.click(await screen.findByText('put'))
       fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'acme' } })
-      await waitFor(() => { expect(reported).to.have.lengthOf(1) })
+      expect(await screen.findByText(/^caught: /)).to.not.be.null
+      expect(reported).to.have.lengthOf(1)
       expect(isVaultError(reported[0], 'bad_option')).to.be.true
       expect((reported[0] as Error).message).to.match(/answered something other than a verdict/)
     })

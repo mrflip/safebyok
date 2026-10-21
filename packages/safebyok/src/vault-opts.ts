@@ -141,15 +141,15 @@ export type MakeVaultOpts = {
    * `unlock()` creates the vault with, and each `putWayin()` sets, before any key derivation. It is
    * handed the passphrase and the vault's scope, and a passphrase it finds weak is refused with
    * kind 'weak_passphrase', its reason the message. It never runs on `unlock()` of a vault that
-   * stands. Its `load`, if it carries one, runs at every `hello()`, and a `load` that fails fails
-   * the hello. In a browser, `browserOpts()` from `safebyok/browser` supplies
-   * `zxcvbnStrengthChecker`, which turns away short passphrases, common passwords and patterns.
-   * Left out, every new passphrase is refused as too weak, the refusal's message saying that a
-   * checker must be chosen (CUSTOMIZATION.md). The vault keeps the checker it was opened with for
-   * its life, held to its contract, as its `strengthChecker`.
-   * Kind 'bad_option' for anything but a function (whose `load`, if any, is a function too), and
-   * for a checker that answers anything but a verdict; one that throws is 'unexpected_error',
-   * carrying nothing of what it threw.
+   * stands. Its `load`, if it carries one, runs at every `hello()` that reads storage, and a
+   * `load` that fails fails the hello. In a browser, `browserOpts()` from `safebyok/browser`
+   * supplies `zxcvbnStrengthChecker`, which turns away short passphrases, common passwords and
+   * patterns. Left out, every new passphrase is refused as too weak, the refusal's message saying
+   * that a checker must be chosen (CUSTOMIZATION.md). The vault keeps the checker it was opened
+   * with for its life, held to its contract, and asks it as `vault.checkPassphrase(typed)`.
+   * Kind 'bad_option' for anything but a function (whose `load`, if any, is a function too). A
+   * checker that answers anything but a verdict, or throws, is thrown by the call that asked it,
+   * even a `try` form: kind 'bad_option' or 'unexpected_error', carrying nothing of what it threw.
    */
   strengthChecker?: StrengthChecker | undefined
 }
@@ -576,7 +576,7 @@ export const parseMakeVaultOpts = (opts: MakeVaultOpts): ParsedVaultOpts => {
   const whisperByteLimit = parseMaxWhisperBytes(opts.maxWhisperBytes)
   const boxLimit = parseMaxBoxes(opts.maxBoxes, parseDeclared(vaultDB, 'maxBoxes'))
   const vaultByteLimit = checkLimitsFit(vaultDB, whisperByteLimit, boxLimit)
-  return { scope, rules, vaultDB, deviceDB, leaseMillis, staleMillis, onBadNews, getProof, logger, clock, keyDeriver, strengthChecker: guardStrengthChecker(shaped.strengthChecker), whisperByteLimit, boxLimit, vaultByteLimit }
+  return { scope, rules, vaultDB, deviceDB, leaseMillis, staleMillis, onBadNews, getProof, logger, clock, keyDeriver, strengthChecker: guardStrengthChecker(shaped.strengthChecker, scope), whisperByteLimit, boxLimit, vaultByteLimit }
 }
 
 /**

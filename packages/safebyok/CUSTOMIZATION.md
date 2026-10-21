@@ -20,11 +20,12 @@ type StrengthChecker = {
 }
 ```
 
-* Answer, never throw. A checker that throws is refused `unexpected_error`, and nothing of what it
+* Answer, never throw. A checker that throws is a bug: the call that asked it throws
+  `unexpected_error`, even a `try` form, for your error handler, and nothing of what the checker
   threw is kept: it heard the passphrase, so its error might quote it. A checker that answers
-  anything but a verdict is refused `bad_option`.
+  anything but a verdict is thrown the same way, as `bad_option`.
 * Whatever it needs fetched or built first -- a word list, say -- it fetches in `load`, which the
-  vault's `hello()` runs, before it reads storage, every time: so `load` is idempotent, costing
+  vault's `hello()` runs beside its read of storage, every time it reads: so `load` is idempotent, costing
   nothing once it has succeeded, and forgets a failure, so the next hello tries again. A `load`
   that fails fails the hello, `unexpected_error` with what it threw as the cause: a vault that
   cannot judge a new passphrase never opens, rather than failing later, when the user chooses one.
@@ -94,7 +95,7 @@ const vault = Vault.make({ ...opts, keyDeriver: argon2idWebV1Deriver, deviceDB: 
 ```
 
 Ask the vault's checker from your passphrase field as the user types, so they hear the reason
-before they submit: `vault.strengthChecker(typed, scope)` is yours, held to the contract above, so
+before they submit: `vault.checkPassphrase(typed)` is yours, held to the contract above, so
 the field and the vault decide alike. `safebyok-react`'s dialog does so by default.
 
 ### Asking an AI for help

@@ -19,10 +19,9 @@ import type { PasskeyWayin, PassphraseWayin } from './wayin'
  */
 
 /** The slice of a {@link Vault} a proof reads.
- * The key deriver a passphrase's derivation runs on, and the strength checker a new passphrase is
- * put to, with the scope it is told.
+ * The key deriver a passphrase's derivation runs on, and the vault's check a new passphrase is put to.
  */
-export type ProofVault = Pick<Vault, 'keyDeriver' | 'strengthChecker' | 'applabel' | 'user_id' | 'vaultlabel'>
+export type ProofVault = Pick<Vault, 'keyDeriver' | 'checkPassphrase'>
 
 /**
  * What the user handed in to show a way into the vault is theirs, checked: a
@@ -110,16 +109,15 @@ export class PassphraseProof extends Proof {
   }
 
   /** Check this passphrase as a new one, before it becomes a way in.
-   * It is put to its vault's `strengthChecker`, with the vault's scope. Refuses with kind
-   * 'weak_passphrase' for one the checker finds weak, its reason the message, and for a blank one,
-   * which the checker never hears; a broken checker's refusals pass as they came. Only a new
-   * passphrase is checked: one that proves never is.
+   * It is put to its vault's `checkPassphrase`. Refuses with kind 'weak_passphrase' for one the
+   * checker finds weak, its reason the message, and for a blank one, which the checker never
+   * hears; a broken checker is thrown as it came. Only a new passphrase is checked: one that
+   * proves never is.
    *
    * @example await PassphraseProof.parse(vault, chosen).checkStrongEnough()   // throws 'weak_passphrase' with the checker's reason
    */
   async checkStrongEnough(): Promise<void> {
-    const { vault } = this
-    const verdict = await vault.strengthChecker(this.passphrase, { applabel: vault.applabel, user_id: vault.user_id, vaultlabel: vault.vaultlabel })
+    const verdict = await this.vault.checkPassphrase(this.passphrase)
     if (! verdict.strong) { throw new VaultError('weak_passphrase', verdict.reason) }
   }
 

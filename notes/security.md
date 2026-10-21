@@ -42,15 +42,25 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-21 (thread checker, branch 20261021-checker): **one guard is the only caller of a host's
   strength checker, and a checker's `load` runs at every `hello()`.** (1) `guardStrengthChecker`
   (`packages/safebyok/src/passphrase-strength.ts`) is the only code that calls the host's checker.
-  `Vault.make` wraps the host's checker once; `vault.strengthChecker` returns the guarded one (type
-  `GuardedStrengthChecker`), and `PassphraseProof.checkStrongEnough()` and `safebyok-react`'s dialog
-  advice both go through it. The guard finds a blank passphrase (empty, or only spaces) weak before
-  the host's checker hears it; hands the checker a frozen copy of the scope; refuses a verdict that
-  breaks the contract as `bad_option`; and refuses a checker's throw, or a verdict getter's, as
-  `unexpected_error` carrying nothing (no kind, `meta`, `cause` or text), because the checker heard
-  the passphrase. (2) A checker may carry an idempotent `load`; every `hello()` runs it, through the
-  guard, before reading storage. A load that fails fails the `hello()` as `unexpected_error` with the
-  load's throw as `cause`: the load hears no passphrase, so its error may ride. `zxcvbnStrengthChecker`'s
+  `Vault.make` wraps the host's checker once, bound to the vault's own scope. Amended 2026-10-21
+  (checker2): the guarded check is the method `vault.checkPassphrase(typed)` (before, the getter
+  `vault.strengthChecker`, type `GuardedStrengthChecker`, both gone); it validates its argument (a
+  non-string is refused `bad_option`) and resolves `{ strong: true }` or `{ strong: false, reason }`.
+  `PassphraseProof.checkStrongEnough()` and `safebyok-react`'s dialog advice both ask it. The guard
+  finds a blank passphrase (empty, or only spaces) weak before the host's checker hears it; hands the
+  checker a frozen copy of the scope, frozen once at `Vault.make`; and throws a verdict that breaks
+  the contract as `bad_option`, and a checker's throw, or a verdict getter's, as `unexpected_error`
+  (amended 2026-10-21 (checker2): both are thrown as a `ThrownMistake`, an internal subclass of
+  `VaultError`, not exported; before, a refusal), carrying nothing (no kind of the host's, `meta`,
+  `cause` or text), because the checker heard the passphrase. Such a throw is never resolved as a
+  refusal result, even from the `try` forms (`tryUnlock`, `tryPutWayin`, `ask.attempt`, and
+  `tryEnsureLease` when `getProof` lets it escape): the vault's `#trying` wrapper rethrows it, and it
+  is not told to `onBadNews`. (2) A checker may carry an idempotent `load`; every `hello()` runs it,
+  through the guard, beside the storage read (amended 2026-10-21 (checker2): `Promise.allSettled` of
+  both; before, ahead of it). A load that fails fails the `hello()` as `unexpected_error` with the
+  load's throw as `cause`: the load hears no passphrase, so its error may ride. No lease is taken
+  up then, but the storage read may have landed in the snapshot, so state may show absent or locked
+  rather than opening. `zxcvbnStrengthChecker`'s
   load fetches its dictionary chunk, and no longer answers "weak, try again" when the chunk will not
   load; a check whose load fails now throws, which the guard refuses carrying nothing. The Coach: "Late
   checks are dangerous: you want a fundamental thing to break loud and clear."
@@ -117,12 +127,14 @@ added or folded into through the subagent, and no other entry changes.
   otherwise. There is no list of salts and nothing checks freshness; the host mints the salt.) (2) A
   blank new passphrase (empty, or only whitespace) is refused `weak_passphrase` before the host's
   strength checker or any derivation (amended 2026-10-21 (wayin_rules): by `PassphraseProof.checkStrongEnough()`, which
-  puts the passphrase to the vault's `strengthChecker`, a public getter on `Vault`, with a frozen copy
+  puts the passphrase to the vault's `strengthChecker`, a public getter on `Vault` (amended 2026-10-21
+  (checker2): now the method `vault.checkPassphrase(typed)`; the getter is gone), with a frozen copy
   of the vault's scope; the vault no longer reads `proof.passphrase`). (3) The strength
   checker (`strengthChecker`, type `StrengthChecker`; `src/passphrase-strength.ts`): its contract is
   to answer a verdict (amended 2026-10-21 (checker): the host's checker is called only through
   `guardStrengthChecker`; see the checker entry). A throw from it is refused `unexpected_error` with no `cause`, `meta` or kind
-  of what it threw, as it heard the passphrase; so is a throw as its verdict is read (a `strong` or
+  of what it threw, as it heard the passphrase (amended 2026-10-21 (checker2): thrown as a
+  `ThrownMistake`, never resolved as a refusal result; see the checker entry); so is a throw as its verdict is read (a `strong` or
   `reason` getter: amended 2026-10-21, the read now being inside the guard); before, a thrown
   condition passed through as itself, and a non-condition was carried as `cause`. Left out, the default
   `UnchosenStrengthChecker` (amended 2026-10-21 (wayin_rules): now `DefaultStrengthChecker`, an ordinary checker answering
@@ -1262,7 +1274,8 @@ added or folded into through the subagent, and no other entry changes.
   (`deriveKeyBytes`) or a passphrase strength test throws, both handed the passphrase, goes through
   `hostThrewRefusal` (`src/outcome.ts`), applied in `passphraseKeyOf` (`src/proof.ts`) (amended
   2026-10-19 (put_wayin), 2026-10-21: now only the key deriver's, not the strength checker's throw, which `checkStrongEnough`
-  (`src/passphrase-strength.ts`; amended 2026-10-21 (wayin_rules): now `PassphraseProof.checkStrongEnough()`, `src/proof.ts`; amended 2026-10-21 (checker): through `guardStrengthChecker`) refuses as `unexpected_error` with no `cause`, `meta` or kind
+  (`src/passphrase-strength.ts`; amended 2026-10-21 (wayin_rules): now `PassphraseProof.checkStrongEnough()`, `src/proof.ts`; amended 2026-10-21 (checker): through `guardStrengthChecker`; amended 2026-10-21 (checker2): thrown as a `ThrownMistake`, not
+  resolved as a refusal, even from the `try` forms) refuses as `unexpected_error` with no `cause`, `meta` or kind
   of what it threw; see the put_wayin entry). Only a
   `VaultError` of the `condition` family, of this copy of safebyok, passes through as itself: a key
   deriver's, say. Everything else becomes `unexpected_error` with the throw as its `cause` (amended
@@ -1764,11 +1777,13 @@ added or folded into through the subagent, and no other entry changes.
   quoting nothing of it, so "the very thrown value" above no longer reaches `onCaughtError`. A host
   `passphraseAdvice` that throws (it is handed every keystroke of a new passphrase) is replaced at its
   source with a fixed refusal, so even a `VaultError` it threw carries nothing on. Amended 2026-10-21
-  (checker): a `passphraseAdvice` that throws a `VaultError` now has that `VaultError` reported as it
-  came, since safebyok made it and safebyok's refusals never quote a passphrase; anything else is still
-  replaced by a fixed `unexpected_error` carrying nothing. A host that itself constructs a `VaultError`
-  quoting the passphrase and throws it from its advice would have it reported; that is the host's own
-  deliberate act, not a side door. The report names
+  (checker): a `passphraseAdvice` that throws a `VaultError` had that `VaultError` reported as it
+  came. Amended 2026-10-21 (checker2): no longer. A host's own `passphraseAdvice` that throws is
+  always reported as a fixed `unexpected_error` quoting nothing of it, so a host `VaultError` quoting
+  the passphrase is not reported as it came. With no `passphraseAdvice` the dialog asks
+  `vault.checkPassphrase`, and what that throws, and what `ask.attempt` throws, goes on through
+  `forBoundary` (which strips any `cause`) to the app's error boundary above the dialog's own; the
+  vault's own check's thrown error goes on as itself, since it quotes nothing. The report names
   its component (`PassphraseModal` or `PasskeyUnlockButton`) and, for a `VaultError` whose cause was
   stripped, says in its message that the cause was left out. `meta` is passed through as is. The
   dialog's fallback notice once misuse trips it ("Something went wrong") now shares
@@ -2379,7 +2394,8 @@ added or folded into through the subagent, and no other entry changes.
   function, whose `load`, if any, is a function too; refused `bad_option` otherwise, in the schema's
   words) and defaults one left out to `DefaultStrengthChecker` (weak for every passphrase, logs
   nothing); `Vault.make` then wraps it with `guardStrengthChecker` and keeps the guarded one for the
-  vault's life as `vault.strengthChecker` (see the checker entry). The length-only
+  vault's life (amended 2026-10-21 (checker2): behind the method `vault.checkPassphrase`, not a
+  `vault.strengthChecker` getter; see the checker entry). The length-only
   `passphraseLengthTest` is no longer exported; it passed `'a'` plus eleven spaces.
 * 2026-10-17 (thread 16, strength_principles): **the browser default is zxcvbn, loaded on
   demand.** `browserOpts()` (`browser.ts`) supplies `zxcvbnStrengthChecker`
@@ -2406,7 +2422,9 @@ added or folded into through the subagent, and no other entry changes.
   host `passphraseAdvice`, the passphrase dialog's advice is the strength test's reason, so the
   host's `strengthChecker` is called with each partial passphrase as the user types while
   creating a vault, never while unlocking (amended 2026-10-21 (checker): through the vault's guarded
-  `strengthChecker`, so a blank partial passphrase never reaches the host's checker). A host test that does anything off the device (a
+  `strengthChecker`, so a blank partial passphrase never reaches the host's checker; amended 2026-10-21
+  (checker2): through `vault.checkPassphrase`, and the provider no longer supplies an `adviceFrom`,
+  the dialog asking the vault itself). A host test that does anything off the device (a
   breach-check API call, logging) does it per keystroke, on prefixes of the passphrase in plain
   text. The doc blocks and READMEs say the test hears the passphrase in plain text, must stay on
   the device, keep nothing and send nothing. A host's own `passphraseAdvice` replaces this
@@ -2418,8 +2436,8 @@ added or folded into through the subagent, and no other entry changes.
   warned of once. The test that gates a passphrase is the one validated at open; none is swapped
   in later through a ref. Amended 2026-10-21 (checker): `VaultProvider` no longer parses the checker
   at render; `Vault.make` refuses a bad one (to the error boundary), and the vault keeps the guarded
-  checker for its life as `vault.strengthChecker`. The dialog's advice asks `vault.strengthChecker` of
-  the vault the ask came from.
+  checker for its life (amended 2026-10-21 (checker2): as `vault.checkPassphrase`). The dialog's advice asks
+  `vault.checkPassphrase` of the vault the ask came from.
 * 2026-10-17 (thread 16, strength_principles): **`withUnlockedVault` resolves null when the
   provider's own close cuts an action short.** An action, or its run again after an unlock, still
   under way when the provider closes the handle (unmount, sign-out, user switch, reopen) used to
@@ -2501,7 +2519,8 @@ added or folded into through the subagent, and no other entry changes.
   check that throws is refused carrying nothing (see the checker entry). Also, `VaultProvider`'s default passphrase advice
   (`adviceFrom`, `packages/safebyok-react/src/vault-provider.tsx`) now treats a strength test that
   rejects as nothing to say (no advice shown) rather than ending the dialog at the error
-  boundary; the gate at Create is unchanged, since the vault runs the test again there.
+  boundary (amended 2026-10-21 (checker2): `adviceFrom` is gone, and a check that throws goes on to
+  the app's error boundary again, see the 2026-10-19 (a_sec) react entry); the gate at Create is unchanged, since the vault runs the test again there.
 * 2026-10-17 (thread 9b, core_tidy, [#144](https://github.com/mrflip/safebyok/pull/144)):
   **the vault-size allowance per box is 1 KiB, down from 2 KiB.** `BoxFieldsBytes`
   (`packages/safebyok/src/vault.ts`) is the allowance for the fields beside the whisper and sidecar.
@@ -2518,7 +2537,8 @@ added or folded into through the subagent, and no other entry changes.
   `Object.freeze(...)`. The same object is handed to the host's `strengthChecker` and held
   in `getSnapshot().scope`, and the vault keys storage and the cipher ctx by it; frozen, none
   of the three can change it for the others. Amended 2026-10-21 (checker): the host's checker is handed
-  a frozen copy of it by the guard, not this object.
+  a frozen copy of it by the guard, not this object (amended 2026-10-21 (checker2): the copy is made
+  once at `Vault.make`).
 * 2026-10-17 (thread 9b, core_tidy, [#144](https://github.com/mrflip/safebyok/pull/144)):
   **`putBox()` refuses unknown option keys with `bad_option`.** `optionsCheck`
   (`packages/safebyok/src/options.ts`, shared with the strict check of `Vault.make`'s `validators`)

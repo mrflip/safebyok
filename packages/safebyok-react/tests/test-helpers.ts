@@ -39,7 +39,11 @@ export type StubVaultOpts = {
   leaseMillis?:     number
   unlock?:          Vault['unlock']
   del?:             Vault['del']
+  checkPassphrase?: Vault['checkPassphrase']
 }
+
+/** A stub vault's `checkPassphrase` unless the test hands it another: every passphrase is strong. */
+const admitsEvery: Vault['checkPassphrase'] = () => Promise.resolve({ strong: true })
 
 /** The lease, in milliseconds, of a vault opened with the default leaseHours. */
 export const DefaultLeaseMillis = LeaseHours * 3_600_000
@@ -53,8 +57,9 @@ const trying = <ArgsT extends unknown[], ValT>(call: ((...args: ArgsT) => Promis
  * Just enough of a Vault for a component to render it: a snapshot that keeps its identity and
  * never changes (`state`, default 'locked'; `passkey`, default none; the scope of `u1`'s `main`
  * vault in the `acme` app, as `scopeOf` has it, its fields beside it), a window (default seven days), a subscribe that
- * never calls back, and whichever calls the test hands it, each in both its forms: given as the
- * throwing form, its `try` form answers the same as an Outcome.
+ * never calls back, a `checkPassphrase` admitting every passphrase unless the test hands it
+ * another, and whichever calls the test hands it, each in both its forms: given as the throwing
+ * form, its `try` form answers the same as an Outcome.
  *
  * @example const vault = TH.stubVault({ state: 'absent' })
  * @example const vault = TH.stubVault({ unlock: () => Promise.reject(new VaultError('wrong_passphrase', 'Not that one.')) })
@@ -70,6 +75,7 @@ export const stubVault = (opts: StubVaultOpts = {}): Vault => {
     tryUnlock:       trying(opts.unlock),
     del:             opts.del,
     tryDel:          trying(opts.del),
+    checkPassphrase: opts.checkPassphrase ?? admitsEvery,
   } as unknown as Vault
 }
 

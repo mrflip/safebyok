@@ -109,7 +109,7 @@ describe("PassphraseProof.parse", () => {
 })
 
 /** The slice of a vault whose strength checker is `strengthChecker`, held to its contract as a vault holds it. */
-const sliceChecking = (strengthChecker: StrengthChecker): ProofVault => ({ ...slice, strengthChecker: guardStrengthChecker(strengthChecker) })
+const sliceChecking = (strengthChecker: StrengthChecker): ProofVault => ({ ...slice, checkPassphrase: guardStrengthChecker(strengthChecker, TH.scopeOf('u1')) })
 
 describe("passphraseProof.checkStrongEnough", () => {
   it("refuses a passphrase its vault's checker finds weak as weak_passphrase, the reason its message, as its example shows", async () => {
@@ -134,9 +134,9 @@ describe("passphraseProof.checkStrongEnough", () => {
   })
 
   it("asks the checker the vault has now: it calls back to its vault, never a checker of its own", async () => {
-    const checking = { ...slice, strengthChecker: guardStrengthChecker(() => ({ strong: true })) }
+    const checking = { ...slice, checkPassphrase: guardStrengthChecker(() => ({ strong: true }), TH.scopeOf('u1')) }
     const proof = PassphraseProof.parse(checking, 'pw')
-    checking.strengthChecker = guardStrengthChecker(() => ({ strong: false, reason: 'Not today.' }))
+    checking.checkPassphrase = guardStrengthChecker(() => ({ strong: false, reason: 'Not today.' }), TH.scopeOf('u1'))
     await TH.expectRefusal(proof.checkStrongEnough(), 'weak_passphrase')
   })
 })

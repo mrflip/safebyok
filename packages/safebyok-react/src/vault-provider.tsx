@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { Vault, type Ask, type GetProof, type ProofAnswer, checkValidators, delDamagedVault as delStoredDamagedVault, isCondition, isVaultError, parseLogger, type BadNewsHandler, type MakeVaultOpts, type VaultDB, type VaultError, type VaultLogger, type VaultScope, type VaultSnapshot, type VaultValidators } from 'safebyok'
+import { Vault, type Ask, type GetProof, type ProofAnswer, checkValidators, delDamagedVault as delStoredDamagedVault, isCondition, isVaultError, parseLogger, type BadNewsHandler, type MakeVaultOpts, type VaultDB, type VaultError, type VaultLogger, type VaultSnapshot, type VaultValidators } from 'safebyok'
 import { PassphraseModal, type PassphraseAdvice } from './passphrase-modal'
 
 // == [Hooks]: useVault, useVaultSnapshot, useOpenError, OpenErrorShape
@@ -117,7 +117,7 @@ export const useVaultSnapshot = (): VaultSnapshot | null => {
 export const useOpenError = (): OpenErrorShape => useProvided('useOpenError').opened
 // --
 
-// == [VaultProvider]: VaultProviderProps, VaultProvider, settleLogger, adviceFrom, Showing, hasUserGesture
+// == [VaultProvider]: VaultProviderProps, VaultProvider, settleLogger, Showing, hasUserGesture
 
 /** One showing of the passphrase dialog: which one, the ask it answers, and how it answers. */
 type Showing = { round: number, ask: Ask, answer: (answer: ProofAnswer) => void }
@@ -128,8 +128,6 @@ type Showing = { round: number, ask: Ask, answer: (answer: ProofAnswer) => void 
  */
 const hasUserGesture = (): boolean => (globalThis.navigator as { userActivation?: { isActive: boolean } } | undefined)?.userActivation?.isActive !== false
 
-/** The scope of `vault`, as the strength checker is handed it. */
-const scopeOf = (vault: Vault): VaultScope => ({ applabel: vault.applabel, user_id: vault.user_id, vaultlabel: vault.vaultlabel })
 const getNotOpening = () => false
 
 /** The snapshot's trouble when it is a 'rolled_back' refusal that holds the vault opening; null otherwise. */
@@ -172,10 +170,9 @@ export type VaultProviderProps = Omit<MakeVaultOpts, 'userId'> & {
   passphraseUsername?: string | undefined
   /**
    * What to say beside the field as the user chooses a passphrase: `PassphraseModal`'s
-   * `passphraseAdvice`. Default: the vault's `strengthChecker`'s reason for a passphrase it finds
-   * weak, and nothing for one it admits, so the user hears why before pressing Create; a broken
-   * checker fails the dialog, which reports the vault's refusal to React. Like the strength
-   * checker, it hears the passphrase in plain text: keep it on the device.
+   * `passphraseAdvice`. Default: the dialog's, `vault.checkPassphrase`'s reason for a passphrase it
+   * finds weak, so the user hears why before pressing Create. Like the strength checker, it hears
+   * the passphrase in plain text: keep it on the device.
    */
   passphraseAdvice?:   PassphraseAdvice | undefined
   children:            ReactNode
@@ -193,17 +190,6 @@ const settleLogger = (logger: VaultLogger | null | undefined, vaultDB: VaultDB):
     // Vault.make refuses the same logger or vaultDB, and the provider throws that to the error boundary.
     return undefined
   }
-}
-
-/**
- * The vault's strength checker as the dialog's advice: its reason for a passphrase it finds weak,
- * and nothing for one it admits. It asks `vault.strengthChecker`, which holds the host's checker to
- * its contract, so the advice and Create decide alike; a broken checker's refusal fails the
- * dialog, which says so calmly and reports it to React. It runs on the device, as the checker does.
- */
-const adviceFrom = (vault: Vault): PassphraseAdvice => async (typed) => {
-  const verdict = await vault.strengthChecker(typed, scopeOf(vault))
-  return verdict.strong ? null : verdict.reason
 }
 
 /**
@@ -435,7 +421,7 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
           ask={showing.ask}
           allowStartOver={allowStartOver}
           passphraseUsername={passphraseUsername}
-          passphraseAdvice={passphraseAdvice ?? adviceFrom(showing.ask.vault)}
+          passphraseAdvice={passphraseAdvice}
           onDone={(answer) => { endShowing(showing, answer) }}
         />
       )}

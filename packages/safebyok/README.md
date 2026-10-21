@@ -698,19 +698,20 @@ await zxcvbnStrengthChecker('skylarkpinecone', { applabel: 'skylark', user_id: '
   (and the scope) to a verdict, `{ strong: true }` or `{ strong: false, reason }`, at once or as a
   promise; the reason is shown to the user, so write it calmly, say what to do, and never quote the
   passphrase. A checker that needs something fetched first carries it as `load`, idempotent, which
-  every `hello()` runs before reading storage; a `load` that fails fails the hello. To ask for
+  every `hello()` that reads storage runs beside the read; a `load` that fails fails the hello. To ask for
   more, wrap ours, carrying its `load` along:
   `Object.assign(async (typed, scope) => (typed.includes('acme') ? { strong: false, reason: 'Leave out the name of the app.' } : await zxcvbnStrengthChecker(typed, scope)), { load: zxcvbnStrengthChecker.load })`.
   Its whole contract is that verdict, for every passphrase: it never throws. `Vault.make` refuses
   anything but a function (whose `load`, if any, is a function too) with `bad_option`. The vault
-  keeps it held to its contract, as `vault.strengthChecker`: that refuses a checker that answers
-  anything but a verdict with `bad_option`, and one that throws with `unexpected_error`, carrying
-  nothing of what it threw, as it heard the passphrase. CUSTOMIZATION.md says how to choose one.
+  keeps it held to its contract, and asks it as `vault.checkPassphrase(typed)`. A checker that
+  answers anything but a verdict (`bad_option`), or throws (`unexpected_error`, carrying nothing
+  of what it threw, as it heard the passphrase), is a bug: the call that asked it throws, even a
+  `try` form, for your error handler. CUSTOMIZATION.md says how to choose one.
 * **Build it once.** The vault keeps the checker it was opened with for its life. A binding that
   reopens on a changed option (`safebyok-react`'s provider) reopens for a new checker, so define it
   at module level, or memoize it, rather than writing it inline.
 * **Call it from the field as well, through the vault.** The field the user types into can ask
-  `vault.strengthChecker(typed, scope)` on each keystroke, and show the reason before the user
+  `vault.checkPassphrase(typed)` on each keystroke, and show the reason before the user
   submits: the same check, held to the same contract, so the field and Create decide alike (a
   blank passphrase is weak without the checker hearing it). `safebyok-react`'s dialog does so by
   default. It hears the passphrase in plain text, so it must run on the device and keep nothing:

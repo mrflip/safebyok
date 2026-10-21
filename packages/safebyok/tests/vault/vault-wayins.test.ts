@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { type PasskeyAnswer, VaultProps, VaultScope } from '../../src/types'
-import { VaultError } from '../../src/errors'
+import { ThrownMistake, VaultError } from '../../src/errors'
 import { bad } from '../../src/outcome'
 import { Vault } from '../../src/vault'
+import type { Ask } from '../../src/ask'
 import { memoryDeviceDB } from '../../src/device-db'
 import { type MakeVaultOpts } from '../../src/vault-opts'
 import { toB64 } from '../../src/crypto'
@@ -629,49 +630,98 @@ describe("a new passphrase's strength", () => {
     }
   })
 
-  it("keeps the host's checker as vault.strengthChecker, held to its contract: a blank passphrase weak unheard, a broken verdict refused", async () => {
+  it("asks the host's checker as vault.checkPassphrase, told the vault's scope, as its first example shows: a blank passphrase weak unheard", async () => {
     const world = makeWorld()
     const checker = refusing('acme acme acme')
     const vault = Vault.make(world.optsWith({ strengthChecker: checker }))
-    expect(await vault.strengthChecker('acme acme acme', TH.scopeOf('u1'))).to.have.property('strong', false)
-    expect(await vault.strengthChecker('pw', TH.scopeOf('u1'))).to.deep.equal({ strong: true })
-    expect(await vault.strengthChecker('  ', TH.scopeOf('u1'))).to.have.property('strong', false)
-    expect(checker).toHaveBeenCalledTimes(2)
-    const broken = Vault.make(world.optsWith({ strengthChecker: (() => 'weak') as unknown as StrengthChecker }))
-    await TH.expectRefusal(broken.strengthChecker('pw', TH.scopeOf('u1')), 'bad_option')
+    expect(await vault.checkPassphrase('acme acme acme')).to.deep.equal({ strong: false, reason: 'That one is on every list of guesses: try another.' })
+    expect(await vault.checkPassphrase('pw')).to.deep.equal({ strong: true })
+    expect(checker.mock.calls).to.deep.equal([['acme acme acme', TH.scopeOf('u1')], ['pw', TH.scopeOf('u1')]])
   })
 
-  it("runs the checker's load at hello, never at make, before storage is read, and again only at a hello that reads afresh", async () => {
+  it("finds a blank passphrase weak before the checker hears it, as checkPassphrase's second example shows", async () => {
+    const world = makeWorld()
+    const checker = refusing('acme acme acme')
+    const vault = Vault.make(world.optsWith({ strengthChecker: checker }))
+    expect(await vault.checkPassphrase(' '.repeat(3))).to.have.property('reason').that.includes("can't be empty")
+    expect(checker).not.toHaveBeenCalled()
+  })
+
+  it("refuses checkPassphrase anything but text as 'bad_option', as its third example shows, never a TypeError", async () => {
+    const world = makeWorld()
+    const checker = refusing('acme acme acme')
+    const vault = Vault.make(world.optsWith({ strengthChecker: checker }))
+    for (const misfit of [42, undefined, null, { passphrase: 'pw' }]) {
+      const err = await TH.expectRefusal(vault.checkPassphrase(misfit as unknown as string), 'bad_option')
+      expect(err.message).to.match(/checkPassphrase takes the passphrase/)
+    }
+    expect(checker).not.toHaveBeenCalled()
+  })
+
+  it("checks without a hello, and reads nothing", async () => {
+    const world = makeWorld()
+    const getVaultProps = vi.spyOn(world.vaultDB, 'getVaultProps')
+    const load = vi.fn(() => Promise.resolve())
+    const vault = Vault.make(world.optsWith({ strengthChecker: Object.assign(() => StrongVerdict, { load }) }))
+    expect(await vault.checkPassphrase('pw')).to.deep.equal({ strong: true })
+    expect(getVaultProps).not.toHaveBeenCalled()
+    expect(load).not.toHaveBeenCalled()
+    expect(vault.state).to.eq('opening')
+  })
+
+  it("runs the checker's load at hello, never at make, beside the read of storage, and again only at a hello that reads afresh", async () => {
     const world = makeWorld()
     const load = vi.fn(() => Promise.resolve())
-    const getVaultProps = vi.spyOn(world.vaultDB, 'getVaultProps')
     const vault = Vault.make(world.optsWith({ strengthChecker: Object.assign(() => StrongVerdict, { load }) }))
     expect(load).not.toHaveBeenCalled()
     await vault.hello()
     expect(load).toHaveBeenCalledTimes(1)
-    expect(load.mock.invocationCallOrder[0]).to.be.below(getVaultProps.mock.invocationCallOrder[0] ?? 0)
     await vault.hello()
     expect(load).toHaveBeenCalledTimes(1)
     await vault.hello({ staleMinutes: 0 })
     expect(load).toHaveBeenCalledTimes(2)
   })
 
-  it("fails a hello whose checker's load fails as unexpected_error, what it threw the cause, reading nothing, and loads again at the next hello", async () => {
+  it("starts the load and the read of storage together, and settles the hello only once both have", async () => {
     const world = makeWorld()
+    const gate = TH.makeGate()
+    const getVaultProps = vi.spyOn(world.vaultDB, 'getVaultProps')
+    const vault = Vault.make(world.optsWith({ strengthChecker: Object.assign(() => StrongVerdict, { load: gate.pass }) }))
+    const greeting = vault.tryHello()
+    await gate.reached
+    await TH.wakeupAtNextTick()
+    expect(getVaultProps).toHaveBeenCalledOnce()
+    expect(vault.state).to.eq('absent')
+    expect(await Promise.race([greeting, TH.wakeupAtNextTick()])).to.be.undefined
+    gate.release()
+    expect(await greeting).to.have.property('ok', true)
+  })
+
+  it("fails a hello whose checker's load fails as unexpected_error, what it threw the cause, taking up no lease, and loads again at the next hello", async () => {
+    const world = makeWorld()
+    const first = await world.openUnlocked('pw')
+    first.close()
     const lost = new Error('the word list did not load')
     const load = vi.fn<() => Promise<void>>().mockRejectedValueOnce(lost).mockResolvedValue(undefined)
-    const getVaultProps = vi.spyOn(world.vaultDB, 'getVaultProps')
     const vault = Vault.make(world.optsWith({ strengthChecker: Object.assign(() => StrongVerdict, { load }) }))
     const err = await TH.expectRefusal(vault.hello(), 'unexpected_error')
     expect(err.message).to.match(/strengthChecker's load\(\) failed/)
     expect(err.cause).to.eq(lost)
-    expect(getVaultProps).not.toHaveBeenCalled()
-    expect(vault.state).to.eq('opening')
+    expect(vault.state).to.not.eq('unlocked')
     const neverLoads = Object.assign(() => StrongVerdict, { load: () => Promise.reject(lost) })
     await TH.expectRefusal(Vault.make(world.optsWith({ strengthChecker: neverLoads })).unlock('pw'), 'unexpected_error')
     await vault.hello()
-    expect(vault.state).to.eq('absent')
+    expect(vault.state).to.eq('unlocked')
     expect(load).toHaveBeenCalledTimes(2)
+  })
+
+  it("refuses a hello as its load failed, though its read of storage failed too", async () => {
+    const world = makeWorld()
+    const lost = new Error('the word list did not load')
+    vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(bad(new VaultError('storage_unavailable', 'The backend could not be reached.')))
+    const vault = Vault.make(world.optsWith({ strengthChecker: Object.assign(() => StrongVerdict, { load: () => Promise.reject(lost) }) }))
+    const err = await TH.expectRefusal(vault.hello(), 'unexpected_error')
+    expect(err.cause).to.eq(lost)
   })
 
   it("refuses at Vault.make the option's old name, naming the new", async () => {
@@ -680,11 +730,40 @@ describe("a new passphrase's strength", () => {
     expect(err.message).to.include('passphraseStrengthTest (called strengthChecker now)')
   })
 
-  it("refuses with kind 'bad_option' a checker that answers no verdict, creating nothing", async () => {
+  it("throws a checker that answers no verdict as 'bad_option', even from tryUnlock, creating nothing and telling no news", async () => {
     const world = makeWorld()
-    const misfit = await world.open({ strengthChecker: (() => 'weak') as unknown as StrengthChecker })
-    const err = await TH.expectRefusal(misfit.unlock('pw'), 'bad_option')
-    expect(err.message).to.match(/strengthChecker/)
+    const told: VaultError[] = []
+    const misfit = await world.open({ strengthChecker: (() => 'weak') as unknown as StrengthChecker, onBadNews: (news) => { told.push(news) } })
+    const err = await TH.expectRefusal(misfit.tryUnlock('pw'), 'bad_option')
+    expect(err).to.be.instanceOf(ThrownMistake)
+    expect(err.message).to.match(/strengthChecker handed to Vault\.make answered something other than a verdict/)
+    await TH.expectRefusal(misfit.checkPassphrase('pw'), 'bad_option')
+    expect(world.dbStore.ckeys()).to.have.lengthOf(0)
+    expect(told).to.have.lengthOf(0)
+  })
+
+  it("throws a broken checker from tryPutWayin too, changing nothing stored", async () => {
+    const world = makeWorld()
+    await world.openUnlocked('pw')
+    const before = await TH.expectingGood(world.vaultDB).getVaultProps(TH.scopeOf('u1'))
+    const vault = await world.open({ strengthChecker: () => Promise.reject(new Error('down')), deviceDB: memoryDeviceDB() })
+    const err = await TH.expectRefusal(vault.tryPutWayin('pw', 'a new passphrase'), 'unexpected_error')
+    expect(err).to.be.instanceOf(ThrownMistake)
+    expect(await TH.expectingGood(world.vaultDB).getVaultProps(TH.scopeOf('u1'))).to.deep.equal(before)
+  })
+
+  it("throws a broken checker from an ask's attempt, and from the ensureLease that asked, when getProof lets it through", async () => {
+    const world = makeWorld()
+    let attempted: Promise<unknown> = Promise.resolve()
+    const getProof = async (ask: Ask) => {
+      attempted = ask.attempt('pw')
+      await attempted
+      return 'unlocked' as const
+    }
+    const vault = await world.open({ strengthChecker: () => Promise.reject(new Error('down')), getProof })
+    const err = await TH.expectRefusal(vault.tryEnsureLease(), 'unexpected_error')
+    expect(err).to.be.instanceOf(ThrownMistake)
+    await TH.expectRefusal(attempted, 'unexpected_error')
     expect(world.dbStore.ckeys()).to.have.lengthOf(0)
   })
 
@@ -695,11 +774,12 @@ describe("a new passphrase's strength", () => {
   ] as const
 
   for (const [thrown, blurb] of Throws) {
-    it(`refuses a checker that throws ${blurb} as 'unexpected_error' naming strengthChecker, carrying no kind, meta or cause of the throw, creating nothing`, async () => {
+    it(`throws a checker that throws ${blurb} as 'unexpected_error' naming strengthChecker, even from tryUnlock, carrying no kind, meta or cause of the throw, creating nothing`, async () => {
       const world = makeWorld()
       const broken = await world.open({ strengthChecker: () => Promise.reject(thrown) })
-      const err = await TH.expectRefusal(broken.unlock('pw'), 'unexpected_error')
-      expect(err.message).to.match(/strengthChecker threw/)
+      const err = await TH.expectRefusal(broken.tryUnlock('pw'), 'unexpected_error')
+      expect(err).to.be.instanceOf(ThrownMistake)
+      expect(err.message).to.match(/strengthChecker handed to Vault\.make threw/)
       expect(err.cause).to.be.undefined
       expect(err.meta).to.be.undefined
       expect(err).to.not.eq(thrown)
@@ -963,7 +1043,7 @@ describe("a change to the ways in, refused, changes nothing stored (Contract: pu
     })
   }
 
-  it("putWayin() refuses bad_option when the strengthChecker answers no verdict for the new passphrase", async () => {
+  it("putWayin() throws bad_option when the strengthChecker answers no verdict for the new passphrase", async () => {
     const { world } = await vaultWithPasskey()
     const before = storedText(world)
     const vault = await world.open({ deviceDB: memoryDeviceDB(), strengthChecker: (() => 'weak') as unknown as StrengthChecker })
@@ -972,12 +1052,12 @@ describe("a change to the ways in, refused, changes nothing stored (Contract: pu
     expect(storedText(world)).to.eq(before)
   })
 
-  it("putWayin() refuses unexpected_error when the strengthChecker throws, carrying nothing of the throw", async () => {
+  it("putWayin() throws unexpected_error when the strengthChecker throws, carrying nothing of the throw", async () => {
     const { world } = await vaultWithPasskey()
     const before = storedText(world)
     const vault = await world.open({ deviceDB: memoryDeviceDB(), strengthChecker: () => Promise.reject(new Error('could not judge pw two')) })
     const err = await TH.expectRefusal(vault.putWayin('pw', 'pw two'), 'unexpected_error')
-    expect(err.message).to.match(/strengthChecker threw/)
+    expect(err.message).to.match(/strengthChecker handed to Vault\.make threw/)
     expect(err.cause).to.be.undefined
     expect(storedText(world)).to.eq(before)
   })

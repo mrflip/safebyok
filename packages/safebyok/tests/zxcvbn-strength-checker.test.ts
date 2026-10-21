@@ -168,7 +168,7 @@ describe("zxcvbnStrengthChecker's loading", () => {
     expect(await fresh.zxcvbnStrengthChecker('correct horse battery staple')).to.deep.equal({ strong: true })
   })
 
-  it("fails a vault's hello as unexpected_error when zxcvbn fails to load, reading nothing, and opens at the next hello", async () => {
+  it("fails a vault's hello as unexpected_error when zxcvbn fails to load, though it read storage, and opens at the next hello", async () => {
     const { fresh } = await freshModule(true)
     const [{ Vault: FreshVault }, { localVaultDB }, { memoryStore }, { memoryDeviceDB }] = await Promise.all([
       import('../src/vault'), import('../src/local-vault-db'), import('../src/string-store'), import('../src/device-db'),
@@ -181,7 +181,7 @@ describe("zxcvbnStrengthChecker's loading", () => {
       if (refused.ok) { throw new Error('the hello was not refused') }
       expect(refused.err.refusalkind).to.eq('unexpected_error')
       expect(refused.err.cause).to.be.instanceOf(Error)
-      expect(vault.getSnapshot().state).to.eq('opening')
+      expect(vault.getSnapshot().state).to.eq('absent')
       await vault.hello()
       expect(vault.getSnapshot().state).to.eq('absent')
       await vault.unlock('correct horse battery staple')

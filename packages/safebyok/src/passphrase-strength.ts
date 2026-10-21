@@ -1,5 +1,5 @@
 import * as Z from 'zod/mini'
-import { VaultError } from './errors'
+import { ThrownMistake, VaultError } from './errors'
 import type { VaultScope } from './types'
 
 /**
@@ -18,20 +18,21 @@ export type PassphraseVerdict = { strong: true } | { strong: false, reason: stri
  * to become a way in -- the one the first `unlock()` creates a vault with, and each new one
  * `putWayin()` sets -- before any key derivation, and refuses a weak one with kind
  * 'weak_passphrase', the verdict's reason its message. It never runs on `unlock()` of a vault that
- * stands.
+ * stands. One that throws, or answers anything but a verdict, is a bug: the call that asked it
+ * throws, even a `try` form, for the app's error handler.
  *
  * A checker that needs something fetched or built first -- a dictionary, say -- carries it as
- * `load`, which the vault's `hello()` runs, every time: so `load` is idempotent, costing nothing
- * once it has succeeded, and forgetting a failure, so the next hello tries again. A `load` that
- * fails fails the hello, kind 'unexpected_error', what it threw the cause: a vault that cannot
- * check a new passphrase never opens.
+ * `load`, which the vault's `hello()` runs beside its read of storage, at every hello that reads:
+ * so `load` is idempotent, costing nothing once it has succeeded, and forgetting a failure, so the
+ * next hello tries again. A `load` that fails fails the hello, kind 'unexpected_error', what it
+ * threw the cause: a vault that cannot check a new passphrase never opens.
  *
  * It hears the passphrase in plain text: it should keep nothing, send nothing anywhere, and never
  * put the passphrase in its reason. In a browser, `browserOpts()` from `safebyok/browser`
  * supplies `zxcvbnStrengthChecker`, which turns away short passphrases, common passwords and
  * patterns; pass your own after the spread to replace it, or wrap it to ask for more.
- * CUSTOMIZATION.md says how to choose one. To ask it as the user types, call the vault's own,
- * `vault.strengthChecker`, which holds it to this contract.
+ * CUSTOMIZATION.md says how to choose one. To ask it as the user types, call
+ * `vault.checkPassphrase(typed)`, which holds it to this contract.
  *
  * @example
  *   const strengthChecker = (typed: string) => (typed.length < 20 ? { strong: false, reason: 'Twenty characters or more, please.' } : { strong: true })
@@ -44,20 +45,9 @@ export type StrengthChecker = {
   load?: (() => void | Promise<void>) | undefined
 }
 
-/** A strength checker as a vault keeps it, `vault.strengthChecker`: the host's, held to its contract.
- * It answers a verdict through a promise; a blank passphrase (empty, or only spaces) is weak
- * before the host's checker hears it. It refuses only a broken checker: kind 'bad_option'
- * for one that answers anything but a verdict, and 'unexpected_error' for one that throws,
- * carrying nothing of what it threw -- no kind, no meta, no cause -- as the checker heard the
- * passphrase. `load` runs the host's, if any, and refuses its failure as 'unexpected_error', what
- * it threw the cause, as it heard nothing.
- *
- * @example
- *   const verdict = await vault.strengthChecker(typed, { applabel: vault.applabel, user_id: vault.user_id, vaultlabel: vault.vaultlabel })
- *   setHint(verdict.strong ? '' : verdict.reason)
- */
+/** A strength checker as a vault keeps it: the host's, told the vault's scope, held to its contract. */
 export type GuardedStrengthChecker = {
-  (passphrase: string, scope: VaultScope): Promise<PassphraseVerdict>
+  (passphrase: string): Promise<PassphraseVerdict>
   load: () => Promise<void>
 }
 
@@ -98,27 +88,32 @@ const passphraseVerdict = Z.union([
   Z.object({ strong: Z.literal(false), reason: reasonText }),
 ])
 
-/** `hostChecker` held to its contract, as the vault keeps it ({@link GuardedStrengthChecker}).
+/** `hostChecker` held to its contract, told `scope`: the vault's own check, `vault.checkPassphrase`.
  * It is the only caller of the host's checker, so every check -- the vault's, and a dialog's as
- * the user types -- decides strong or weak alike.
+ * the user types -- decides strong or weak alike. A blank passphrase (empty, or only spaces) is
+ * weak before the host's checker hears it. A broken checker is thrown as a {@link ThrownMistake},
+ * which no `try` form resolves: kind 'bad_option' for one that answers anything but a verdict, and
+ * 'unexpected_error' for one that throws, carrying nothing of what it threw -- no kind, no meta,
+ * no cause -- as the checker heard the passphrase. `load` runs the host's, if any, and refuses its
+ * failure as an ordinary 'unexpected_error', what it threw the cause, as it heard nothing.
  *
- * @example guardStrengthChecker(zxcvbnStrengthChecker)('', scope)   // resolves { strong: false, reason: "A new passphrase can't be empty ..." }
- * @example guardStrengthChecker(() => ({ strong: 'yes' }))('pw', scope)   // rejects: bad_option
+ * @example guardStrengthChecker(zxcvbnStrengthChecker, scope)('')   // resolves { strong: false, reason: "A new passphrase can't be empty ..." }
+ * @example guardStrengthChecker(() => ({ strong: 'yes' }), scope)('pw')   // rejects: a ThrownMistake, kind bad_option
  */
-export const guardStrengthChecker = (hostChecker: StrengthChecker): GuardedStrengthChecker => {
-  const check = async (passphrase: string, scope: VaultScope): Promise<PassphraseVerdict> => {
+export const guardStrengthChecker = (hostChecker: StrengthChecker, scope: VaultScope): GuardedStrengthChecker => {
+  // Frozen, so the host's checker can change nothing of what it is told.
+  const told = Object.freeze({ applabel: scope.applabel, user_id: scope.user_id, vaultlabel: scope.vaultlabel })
+  const check = async (passphrase: string): Promise<PassphraseVerdict> => {
     if (! passphrase.trim()) { return BlankVerdict }
-    // Frozen, so the host's checker can change nothing of what it is told.
-    const told = Object.freeze({ applabel: scope.applabel, user_id: scope.user_id, vaultlabel: scope.vaultlabel })
     let checked: ReturnType<typeof passphraseVerdict.safeParse>
     try {
       // Parsed inside the guard: the verdict's fields may be the checker's getters, and throw as they are read.
       checked = passphraseVerdict.safeParse(await hostChecker(passphrase, told))
     } catch {
-      throw new VaultError('unexpected_error', "The strengthChecker threw rather than answering a verdict, or answered one that threw as it was read. What it threw is left out of this report, as it heard the passphrase: have it answer { strong: false, reason } for a passphrase it cannot judge, and catch its own failures.")
+      throw new ThrownMistake('unexpected_error', "The strengthChecker handed to Vault.make threw rather than answering a verdict, or answered one that threw as it was read. What it threw is left out of this report, as it heard the passphrase: have it answer { strong: false, reason } for a passphrase it cannot judge, and catch its own failures.")
     }
     if (! checked.success) {
-      throw new VaultError('bad_option', "The strengthChecker answered something other than a verdict: { strong: true }, or { strong: false, reason } with the reason as non-empty text.")
+      throw new ThrownMistake('bad_option', "The strengthChecker handed to Vault.make answered something other than a verdict: have it answer { strong: true }, or { strong: false, reason } with the reason as non-empty text.")
     }
     return checked.data.strong ? StrongVerdict : checked.data
   }

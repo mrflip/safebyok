@@ -32,7 +32,7 @@ export const testDeriver: KeyDeriver = {
 }
 
 /**
- * The slice of a vault a model reads -- its scope, key deriver, strength checker and clock -- for a
+ * The slice of a vault a model reads -- its scope, key deriver, passphrase check and clock -- for a
  * test that makes a `Wayin` or a `Proof` with no vault behind it: `userId`'s `main` vault, as
  * {@link scopeOf} has it, deriving with `keyDeriver`, admitting any passphrase
  * ({@link anyStrengthChecker}, held to its contract as a vault holds it), on the wall clock.
@@ -40,12 +40,13 @@ export const testDeriver: KeyDeriver = {
  * @example Wayin.make(TH.vaultSliceOf('u1'), TH.wayinOf('passphrase'), TH.vaultPropsOf('u1'))
  * @example Proof.parse(TH.vaultSliceOf('u1', argon2idWebV1Deriver), 'pw')
  */
-export const vaultSliceOf = (userId: string, keyDeriver: KeyDeriver = testDeriver): VaultSlice => (
-  { ...scopeOf(userId), keyDeriver, strengthChecker: guardStrengthChecker(anyStrengthChecker), clock: wallClock }
-)
+export const vaultSliceOf = (userId: string, keyDeriver: KeyDeriver = testDeriver): VaultSlice => {
+  const scope = scopeOf(userId)
+  return { ...scope, keyDeriver, checkPassphrase: guardStrengthChecker(anyStrengthChecker, scope), clock: wallClock }
+}
 
 /** What {@link vaultSliceOf} makes: the slice of a vault a way in or a proof reads. */
-export type VaultSlice = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'keyDeriver' | 'strengthChecker' | 'clock'>
+export type VaultSlice = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'keyDeriver' | 'checkPassphrase' | 'clock'>
 
 /**
  * A strengthChecker for tests, admitting every passphrase, so a suite may unlock with a

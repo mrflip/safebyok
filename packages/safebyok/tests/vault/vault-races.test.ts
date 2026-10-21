@@ -1061,7 +1061,7 @@ describe("refreshes, one at a time", () => {
     vault.close()
   })
 
-  it("says syncing: false while the storage watch cannot read, warns once for the streak, and says once when a read succeeds", async () => {
+  it("says syncing: false while the storage watch cannot read, warns once for the streak, once more for the hellos it says, and once when a read succeeds", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     expect(vault.getSnapshot().syncing).to.be.true
@@ -1074,12 +1074,14 @@ describe("refreshes, one at a time", () => {
     }
     expect(vault.getSnapshot().syncing).to.be.false
     expect(vault.getSnapshot().state).to.eq('unlocked')
-    expect(world.logged.map((heard) => [heard.level, heard.story])).to.deep.equal([['warn', { call: 'refresh' }]])
+    // The failed read had the next ring say a hello, which failed as itself: warned of in its own words.
+    expect(world.logged.map((heard) => [heard.level, heard.story])).to.deep.equal([['warn', { call: 'refresh' }], ['warn', { call: 'hello' }]])
+    expect(world.logged[1]?.message).to.eq(world.logged[1]?.err?.message)
     world.dbStore.write(u1VaultPropsCkey, sound)
     await TH.wakeupAtNextTick()
     expect(vault.getSnapshot().syncing).to.be.true
-    expect(world.logged.map((heard) => heard.level)).to.deep.equal(['warn', 'log'])
-    expect(world.logged[1]?.message).to.match(/reads again/)
+    expect(world.logged.map((heard) => heard.level)).to.deep.equal(['warn', 'warn', 'log'])
+    expect(world.logged[2]?.message).to.match(/reads again/)
   })
 })
 // --

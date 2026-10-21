@@ -8,6 +8,7 @@ import { type MakeVaultOpts } from '../../src/vault-opts'
 import { delDamagedVault } from '../../src/del-damaged-vault'
 import { setDefaultLogger, DefaultLogger } from '../../src/logger'
 import { bad, valOf } from '../../src/outcome'
+import { StrongVerdict } from '../../src/passphrase-strength'
 import * as TH from '../test-helpers'
 import { makeWorld, boxlabelsOf, isU1Box, u1BoxCkey, u1VaultPropsCkey, SevenDaysMillis, uncheckingDeviceDB, storedVaultPropsOf, storedWayinOf, HourMillis, damagedVaultWorld, storedRowOf, rowsOf, rolledBackWorld, addLaptopPasskey } from './world'
 
@@ -236,6 +237,19 @@ describe("the logger", () => {
     } finally {
       warn.mockRestore()
     }
+  })
+
+  it("hears a hello the watch said when storage rang as that hello refused, never as a read that failed", async () => {
+    const world = makeWorld()
+    const lost = new Error('the word list did not load')
+    const strengthChecker = Object.assign(() => StrongVerdict, { load: () => Promise.reject(lost) })
+    const vault = Vault.make(world.optsWith({ strengthChecker }))
+    await TH.expectRefusal(vault.hello(), 'unexpected_error')
+    await TH.expectingGood(world.vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
+    await TH.wakeupAtNextTick()
+    expect(world.logged.map((heard) => [heard.level, heard.story])).to.deep.equal([['warn', { call: 'hello' }]])
+    expect(world.logged[0]?.message).to.match(/^The strengthChecker's load\(\) failed/)
+    expect(world.logged[0]?.err?.cause).to.eq(lost)
   })
 
   it("is not the vaultDB's: what its storage has nobody to throw to goes to the logger the storage was made with", async () => {

@@ -3,7 +3,7 @@ import { type Capacity, type Clock, type VaultScope, BoxSummary, type DamagedBox
 import { Box, type BoxRecord, EmptySidecarJson, checkedBoxRecord, checkedSidecar, heldListing, planSeal, sealPlanned, whisperBytesOf } from './box'
 import * as Names from './names'
 import { optionsCheck } from './options'
-import { VaultError, isVaultError, type RefusalKind } from './errors'
+import { ThrownMistake, VaultError, isVaultError, type RefusalKind } from './errors'
 import { type Outcome, good, outcomeOf, unexpectedError, valOf } from './outcome'
 import { makeVaultKey, randomId } from './crypto'
 import { Wayin, frozenRecord, type PasskeyWayin, type PassphraseWayin, type VaultKeyPair } from './wayin'
@@ -13,7 +13,7 @@ import { oneAtATime } from './one-at-a-time'
 import { jsonBytes, type BoxExpectation } from './vault-db'
 import { type VaultLogger, asError } from './logger'
 import * as RefusalPolicy from './refusal-policy'
-import type { GuardedStrengthChecker } from './passphrase-strength'
+import type { GuardedStrengthChecker, PassphraseVerdict } from './passphrase-strength'
 import { type BadNewsHandler, type MakeVaultOpts, parseMakeVaultOpts, parseRenewMinutes, parseStaleMinutes, readClock, StoredBytesPerWhisperByte, BoxFixedBytes } from './vault-opts'
 import { reportToPlatform } from './report-error'
 import { type DeviceDB, deviceTroubleAsConditions } from './device-db'
@@ -198,7 +198,7 @@ type HeldWayins = Readonly<{ passphrase: PassphraseWayin, passkey: PasskeyWayin 
  *   if (! ok && err.refusalkind === 'wrong_passphrase') { askAgain(err.message) }
  */
 export class Vault {
-  // == [Vault: fields]: applabel, user_id, vaultlabel, vault_id, registered_at, unlock_epoch, vault_key_epoch, passphrase, passkey, state, boxes, capacity, askPassphraseAt, trouble, syncing, snapshot, getSnapshot, subscribe, leaseMillis, logger, clock, keyDeriver, strengthChecker
+  // == [Vault: fields]: applabel, user_id, vaultlabel, vault_id, registered_at, unlock_epoch, vault_key_epoch, passphrase, passkey, state, boxes, capacity, askPassphraseAt, trouble, syncing, snapshot, getSnapshot, subscribe, leaseMillis, logger, clock, keyDeriver
 
   // Each field reads the snapshot `#settle()` last published, so the fields and the snapshot always
   // agree. A getter with no setter: a host cannot write over one, and the vault never reads one back:
@@ -269,10 +269,6 @@ export class Vault {
   get clock(): Clock { return this.#checkedClock }
   /** The key deriver the vault was made with, which its ways in derive through. */
   get keyDeriver(): KeyDeriver { return this.#keyDeriver }
-  /** The strength checker the vault was made with, held to its contract.
-   * Every new passphrase is put to it (`proof.checkStrongEnough()`), and a field asks it as the user types.
-   */
-  get strengthChecker(): GuardedStrengthChecker { return this.#strengthChecker }
   // --
 
   // == [Vault: opening]: hello, ensureLease
@@ -299,9 +295,10 @@ export class Vault {
    * hello to succeed, starting one if none has, so a host that never calls it still gets a settled
    * vault. Resolves the vault itself, settled, in any of the three states.
    *
-   * Before it reads, it runs the strength checker's `load`, if it carries one (zxcvbn's fetches
-   * its dictionary). A load that fails is refused 'unexpected_error', what it threw the cause, and
-   * nothing is read: a vault that cannot check a new passphrase does not open.
+   * As it reads, it runs the strength checker's `load`, if it carries one (zxcvbn's fetches its
+   * dictionary), and waits for both. A load that fails refuses the hello 'unexpected_error', what
+   * it threw the cause, whatever the read found, and no lease is taken up: a vault that cannot
+   * check a new passphrase does not open.
    *
    * Calls under way share one read. Once a hello has read storage, a later one within
    * `opts.staleMinutes` of the vault's last read -- by default the `staleMinutes` the vault was
@@ -377,16 +374,16 @@ export class Vault {
   readonly #tryUnlock = this.#trying((givenProof: string | PasskeyAnswer): Promise<void> => this.#unlockWith(givenProof))
   /**
    * {@link Vault.unlock}, resolving to an {@link Outcome}: what it answers as `val`, what it refuses
-   * with as `err`, never thrown.
+   * with as `err`, never thrown -- but for a broken strength checker, which is (see `checkPassphrase`).
    */
   tryUnlock = this.#tryUnlock
   /**
    * Open the vault with its passphrase, granting this device a lease for `leaseHours`: the proof
    * an ask's `attempt` tries, called outside any prompt -- how an app with no `getProof` unlocks
    * once it has asked the user itself. On an
-   * `absent` vault this first unlock creates it, with this passphrase as its way in -- once the
-   * vault's `strengthChecker` passes it: kind 'weak_passphrase' otherwise, the checker's
-   * reason its message, and nothing is created; a blank one never passes. Creating costs two key
+   * `absent` vault this first unlock creates it, with this passphrase as its way in -- once
+   * `checkPassphrase` passes it: kind 'weak_passphrase' otherwise, the checker's reason its
+   * message, and nothing is created; a blank one never passes. Creating costs two key
    * derivations: one seals the way in, and one opens it as stored, as any unlock does. A vault that
    * stands is never refused its passphrase for weakness. A wrong passphrase throws kind
    * 'wrong_passphrase' and changes nothing -- learned from the vaultKey wayin refusing to decrypt,
@@ -464,7 +461,33 @@ export class Vault {
   lock = this.#throwing(this.#tryLock)
   // --
 
-  // == [Vault: ways in]: putWayin, delWayin
+  // == [Vault: ways in]: checkPassphrase, putWayin, delWayin
+
+  /**
+   * How strong `typed` is as a new passphrase for this vault, by the `strengthChecker` it was made
+   * with, told the vault's scope: what the first `unlock()` and `putWayin()` refuse a weak one by,
+   * so a field asking it as the user types decides alike. Resolves `{ strong: true }`, or
+   * `{ strong: false, reason }`, the reason written for the user. A blank passphrase is weak
+   * before the checker hears it. Reads nothing, and waits on no hello.
+   *
+   * Kind 'bad_option' for a `typed` that is not text. A checker that breaks its contract is a bug,
+   * thrown -- by this and by every call that asks it, `tryUnlock()` and `tryPutWayin()` among them
+   * -- never resolved as a refusal: kind 'bad_option' for an answer that is no verdict, and
+   * 'unexpected_error' for a throw, carrying nothing of what the checker threw, as it heard the
+   * passphrase. Let it reach the app's error handler.
+   *
+   * @example
+   *   const verdict = await vault.checkPassphrase(typed)
+   *   setHint(verdict.strong ? '' : verdict.reason)
+   * @example await vault.checkPassphrase('   ')   // { strong: false, reason: "A new passphrase can't be empty or only spaces: ..." }
+   * @example await vault.checkPassphrase(42)   // throws 'bad_option'
+   */
+  checkPassphrase = async (typed: string): Promise<PassphraseVerdict> => {
+    if (typeof typed !== 'string') {
+      throw new VaultError('bad_option', 'checkPassphrase takes the passphrase as the text the user typed, as a string.')
+    }
+    return await this.#strengthChecker(typed)
+  }
 
   readonly #tryPutWayin = this.#trying(async (passphrase: string, newProof: string | PasskeyAnswer): Promise<WayinSummary> => {
     this.#checkOpen()
@@ -485,7 +508,7 @@ export class Vault {
   })
   /**
    * {@link Vault.putWayin}, resolving to an {@link Outcome}: what it answers as `val`, what it refuses
-   * with as `err`, never thrown.
+   * with as `err`, never thrown -- but for a broken strength checker, which is (see `checkPassphrase`).
    */
   tryPutWayin = this.#tryPutWayin
   /**
@@ -513,8 +536,8 @@ export class Vault {
    *
    * Refuses, changing nothing: with kind 'bad_option' for a `passphrase` that is not text (a
    * passkey's answer among it), or a `newProof` that is neither text nor a passkey's answer over a
-   * fresh salt of `PasskeySaltBytes` bytes; 'weak_passphrase' for a new passphrase the vault's
-   * `strengthChecker` finds weak, or a blank one, before any key derivation or read of storage,
+   * fresh salt of `PasskeySaltBytes` bytes; 'weak_passphrase' for a new passphrase
+   * `checkPassphrase` finds weak, or a blank one, before any key derivation or read of storage,
    * the checker's reason its message; 'wrong_passphrase' for a `passphrase` that does not open the
    * vault, or is blank;
    * 'damaged_wayin' when the vault's passphrase is stored damaged, so that nothing can prove a
@@ -1026,10 +1049,11 @@ export class Vault {
     const { passphrase, passkey } = this.#wayinsOf(standing)
     return passkey === null ? [passphrase] : [passphrase, passkey]
   }
-  // Whether the last read of storage succeeded, as the snapshot says; and whether the storage
-  // watch has warned of a failing streak it has not yet seen end.
+  // Whether the last read of storage succeeded, as the snapshot says; whether the storage watch
+  // has warned of a failing streak of reads it has not yet seen end; and of hellos, likewise.
   #syncing = true
   #watchWarned = false
+  #watchHelloWarned = false
   // The latest bad news, or what the handler threw at it: the snapshot's trouble. See [Bad news].
   #trouble: VaultError | null = null
   // The hello under way, or the last to succeed while what it read still stands (`greeted`); null
@@ -1201,22 +1225,26 @@ export class Vault {
   }
 
   /**
-   * One hello: the strength checker loaded, storage read, then this device's lease taken up, so
-   * a vault that could not check a new passphrase reads nothing. One that fails says so in the
-   * snapshot and forgets itself, so the next hello loads and reads afresh; so does one whose vault
-   * props a refusal of an older copy forgot while it ran (see forgetVaultProps). No other hello can
-   * start while one runs (see forgetHello), so the one this ends is always the one in `greeting`.
+   * One hello: the strength checker loaded and storage read, together, then this device's lease
+   * taken up, so a vault that could not check a new passphrase takes up no lease. A load that fails
+   * is the hello's refusal, whatever the read did. One that fails says so in the snapshot and
+   * forgets itself, so the next hello loads and reads afresh; so does one whose vault props a
+   * refusal of an older copy forgot while it ran (see forgetVaultProps). No other hello can start
+   * while one runs (see forgetHello), so the one this ends is always the one in `greeting`.
    */
   async #greet(): Promise<void> {
     try {
-      await this.#strengthChecker.load()
-      await this.#refresh()
+      // Both settle before either refuses: no read is left running unheard.
+      const [loaded, read] = await Promise.allSettled([this.#strengthChecker.load(), this.#refresh()])
+      if (loaded.status === 'rejected') { throw loaded.reason }
+      if (read.status === 'rejected') { throw read.reason }
       await this.#fetchLease()
     } catch (err) {
       this.#greeting = null
       this.#settle()
       throw err
     }
+    this.#watchHelloWarned = false
     if (this.#vaultProps === UnreadVaultProps) {
       this.#greeting = null
     } else {
@@ -2108,12 +2136,23 @@ export class Vault {
 
   // Watch the backend so boxes written elsewhere (another tab, the inspector's reset button)
   // show up without a manual refresh: by a hello, while none has succeeded or what it read no
-  // longer stands, so a lease is taken up as the vault settles. A failing background read has
-  // nobody to throw to, so it leaves the snapshot standing, saying `syncing: false`, tells any bad
-  // news it met, and warns once for a failing streak; the next read that succeeds says so once.
+  // longer stands, so a lease is taken up as the vault settles. A failure here has nobody to throw
+  // to, so it leaves the snapshot standing and tells any bad news it met. A hello's failure is
+  // warned of as itself, in the words `tryHello()` would refuse with, once until a hello succeeds.
+  // A refresh's leaves the snapshot saying `syncing: false`, and warns once for a failing streak;
+  // the next read that succeeds says so once.
   async #watchRefresh() {
+    if (this.#greeting === null) {
+      const { ok, err } = await outcomeOf(() => this.#hello(), unexpectedError)
+      if (ok) { return }
+      this.#hearBadNews(err)
+      if (this.#watchHelloWarned) { return }
+      this.#watchHelloWarned = true
+      this.#logger.warn(err.message, { call: 'hello' }, err)
+      return
+    }
     try {
-      await (this.#greeting === null ? this.#hello() : this.#refresh())
+      await this.#refresh()
     } catch (err) {
       this.#hearBadNews(err)
       if (this.#watchWarned) { return }
@@ -2131,13 +2170,15 @@ export class Vault {
 
   /**
    * `body`, as a public `tryX` makes it: its outcome, a throw that is no VaultError said as
-   * `unexpected_error`, and the bad news it refuses with told before the outcome resolves. Every
-   * public call that reaches storage is made through here, the throwing form through it too.
+   * `unexpected_error`, and the bad news it refuses with told before the outcome resolves. A
+   * {@link ThrownMistake} is thrown as it came, never resolved. Every public call that reaches
+   * storage is made through here, the throwing form through it too.
    */
   #trying<ArgsT extends unknown[], ValT>(body: (...args: ArgsT) => Promise<ValT>): (...args: ArgsT) => Promise<Outcome<ValT>> {
     return async (...args) => {
       // Never logged: a host's function that threw (a key deriver) may have been handed a passphrase.
       const outcome = await outcomeOf(() => body(...args), unexpectedError)
+      if (! outcome.ok && outcome.err instanceof ThrownMistake) { throw outcome.err }
       if (! outcome.ok) { this.#hearBadNews(outcome.err) }
       return outcome
     }
