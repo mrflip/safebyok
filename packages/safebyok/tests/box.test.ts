@@ -72,9 +72,9 @@ const T0 = TH.SliceNow
 /** The vault a box here is of: `u1`'s `main` vault, holding the vault props `vault-id-u1`, its clock reading `at`. */
 const vaultOf = (overrides: Partial<TH.VaultSlice> = {}, at = T0): TH.VaultSlice => TH.vaultSliceOf('u1', TH.testDeriver, { now: () => at, ...overrides })
 
-/** A lease on `vault`, opened around `vaultKey`, granted under the vault props `vaultId` at unlock epoch 1. */
-const leaseOf = async (vaultKey: CryptoKey, vaultId = 'vault-id-u1', vault: TH.VaultSlice = vaultOf()): Promise<Lease> => (
-  await Lease.grant(vault, { vault_id: vaultId, unlock_epoch: 1 }, { transientKey: vaultKey, sessionKey: vaultKey })
+/** A lease on `vault`, opened around `vaultKey`, granted under the vault props `vaultTok` at unlock epoch 1. */
+const leaseOf = async (vaultKey: CryptoKey, vaultTok = 'vault-id-u1', vault: TH.VaultSlice = vaultOf()): Promise<Lease> => (
+  await Lease.grant(vault, { vault_id: vaultTok, unlock_epoch: 1 }, { transientKey: vaultKey, sessionKey: vaultKey })
 )
 
 /** A lease on a fresh vaultKey whose vault's clock reads what `clock.at` holds, {@link T0} until a test moves it. */

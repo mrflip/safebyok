@@ -301,11 +301,11 @@ describe("a key deriver's bytes", () => {
   })
 
   it("are zeroed after every try when opening, a wrong passphrase's included", async () => {
-    const { vault_id: vaultId } = TH.vaultPropsOf('u1')
-    const sealed = await Wayin.seal(TH.vaultSliceOf('u1', TH.testDeriver, { now: () => Date.UTC(2026, 9, 15) }), vaultId, PassphraseProof.parse(slice, 'first'), 'device-one', await makeVaultKey())
+    const { vault_id: vaultTok } = TH.vaultPropsOf('u1')
+    const sealed = await Wayin.seal(TH.vaultSliceOf('u1', TH.testDeriver, { now: () => Date.UTC(2026, 9, 15) }), vaultTok, PassphraseProof.parse(slice, 'first'), 'device-one', await makeVaultKey())
     const { keyDeriver, handed } = keepingDeriver()
     const opening = TH.vaultSliceOf('u1', keyDeriver)
-    const wayin = Wayin.make(opening, vaultId, sealed.record)
+    const wayin = Wayin.make(opening, vaultTok, sealed.record)
     await TH.expectBad(wayin.tryOpen(Proof.parse(opening, 'wrong')), 'wrong_passphrase')
     await TH.expectGood(wayin.tryOpen(Proof.parse(opening, 'first')))
     expect(handed).to.have.lengthOf(2)

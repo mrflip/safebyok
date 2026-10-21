@@ -458,7 +458,7 @@ export abstract class VaultDB {
       if (isSoundVaultProps(raw, asked)) {
         throw new VaultError('bad_option', "That vault's stored props are sound, so it is not deleted here: a vault that opens is deleted through its handle's del(). Only a vault whose hello() refuses it as damaged_vault is deleted this way.")
       }
-      const named = StoredVaultId.safeParse(raw)
+      const named = StoredVaultTok.safeParse(raw)
       if (! named.success) { throw unnamedVaultProps() }
       const landed = await adapterAnswer('doDelVault', () => this.doDelVault(asked, { vault_id: named.data.vault_id }))
       if (! landed) { throw Refusals.staleWrite('del') }
@@ -859,7 +859,7 @@ const isSoundVaultProps = (raw: unknown, scope: VaultScope): boolean => {
 }
 
 /** The one field of stored vault props a deletion needs, as the vault's own check has it. */
-const StoredVaultId = Z.object({ vault_id: VaultProps.shape.vault_id })
+const StoredVaultTok = Z.object({ vault_id: VaultProps.shape.vault_id })
 // --
 
 // == [Box and answer checks]: checkStoredBox, damagedBox, checkWrittenBox, checkAnswer, wrongAnswer, jsonBytes

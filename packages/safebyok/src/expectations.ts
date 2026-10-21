@@ -40,9 +40,9 @@ export const vaultMeets = (standing: unknown, expected: VaultDelExpectation): bo
 /** True when the vault props standing name `expected`'s `vault_id`, and nothing else: what deleting a whole vault compares (VAULTDB.md, line 3.5).
  * So vault props too damaged to show an epoch can still be deleted.
  *
- * @example Expectations.vaultIdMeets({ vault_id: 'v1', unlock_epoch: 'garbled' }, { vault_id: 'v1' })  // true
+ * @example Expectations.vaultTokMeets({ vault_id: 'v1', unlock_epoch: 'garbled' }, { vault_id: 'v1' })  // true
  */
-export const vaultIdMeets = (standing: unknown, expected: VaultDelExpectation): boolean => (
+export const vaultTokMeets = (standing: unknown, expected: VaultDelExpectation): boolean => (
   fieldOf(standing, 'vault_id') === expected.vault_id
 )
 

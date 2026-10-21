@@ -125,7 +125,7 @@ class IdbVaultDB extends VaultDB {
   protected async doDelVault(scope: VaultScope, expected: VaultDelExpectation): Promise<boolean> {
     return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {
       const standing = await rowAt(store, Ckeys.vaultProps(scope))
-      if (! Expectations.vaultIdMeets(standing, expected)) { return false }
+      if (! Expectations.vaultTokMeets(standing, expected)) { return false }
       store.delete(boxRange(scope))
       store.delete(Ckeys.vaultProps(scope))
       return true

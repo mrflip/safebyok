@@ -157,7 +157,7 @@ class StringStoreVaultDB extends VaultDB {
 
   protected doDelVault(scope: VaultScope, expected: VaultDelExpectation): Promise<boolean> {
     return soon(() => {
-      if (! Expectations.vaultIdMeets(readJson(this.store, Ckeys.vaultProps(scope)), expected)) { return false }
+      if (! Expectations.vaultTokMeets(readJson(this.store, Ckeys.vaultProps(scope)), expected)) { return false }
       const doomed = this.store.ckeys().filter(Ckeys.isBoxIn(scope))
       for (const ckey of [...doomed, Ckeys.vaultProps(scope)]) { this.store.erase(ckey) }
       return true
