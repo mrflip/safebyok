@@ -43,8 +43,8 @@ const zodShape = (schema: ZodLike): Shape => {
   }
   if (def.type === 'array' && def.element) { return { kind: 'array', element: zodShape(def.element) } }
   if (def.type === 'nullable' && def.innerType) { return { kind: 'nullable', inner: zodShape(def.innerType) } }
-  // A box's sidecar: any JSON value, checked through a pipe the core alone runs.
-  if (def.type === 'pipe') { return { kind: 'any' } }
+  // A box's sidecar: any JSON value, checked by a schema the core alone runs.
+  if (def.type === 'lazy') { return { kind: 'any' } }
   throw new Error(`no shape for a Zod ${def.type}`)
 }
 

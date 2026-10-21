@@ -977,8 +977,8 @@ refusal on every device that saw a newer copy than the backup.
 
 ### Damaged boxes
 
-A box whose stored record does not read back -- not JSON, a malformed time, a missing sidecar
-or one nested too deep to check, a record naming another boxlabel than the one it is stored under, one from a newer
+A box whose stored record does not read back -- not JSON, a malformed time, a missing sidecar,
+a record naming another boxlabel than the one it is stored under, one from a newer
 safebyok or an older one -- is listed in the snapshot as damaged,
 `{ boxlabel, damaged: true, revision_tok }`, sorted among the sound ones, which carry
 `damaged: false`. Its `revision_tok` is the one its record holds, when it holds one as text, and

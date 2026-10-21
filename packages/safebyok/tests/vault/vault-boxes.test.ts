@@ -203,22 +203,6 @@ describe("the times a vault keeps", () => {
     expect(await vault.getWhisper('anthropic')).to.eq('sk-fake')
   })
 
-  it("opens a vault holding a box whose stored sidecar is nested too deep to check, listing that one as damaged", async () => {
-    const world = makeWorld()
-    const vault = await world.openUnlocked('pw')
-    await vault.putBox('anthropic', 'sk-fake')
-    await vault.putBox('openai', 'sk-fake-two', { sidecar: { note: 'work account' } })
-    vault.close()
-    const deep = `${'['.repeat(200_000)}${']'.repeat(200_000)}`
-    const [before = '', after = ''] = JSON.stringify(storedRowOf(world, 'anthropic')).split('"sidecar":{}', 2)
-    world.dbStore.write(u1BoxCkey('anthropic'), `${before}"sidecar":${deep}${after}`)
-    const fresh = await world.openUnlocked('pw')
-    expect(fresh.getSnapshot().boxes[0]).to.deep.include({ boxlabel: 'anthropic', damaged: true })
-    expect(TH.summaryOf(fresh.getSnapshot().boxes[1])?.sidecar).to.deep.equal({ note: 'work account' })
-    await TH.expectRefusal(fresh.getWhisper('anthropic'), 'damaged_box')
-    expect(await fresh.getWhisper('openai')).to.eq('sk-fake-two')
-  })
-
   it("opens a box whose stored sidecar storage respaced or reordered, as a jsonb column does: the sidecar is bound as its JSON with keys sorted", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
