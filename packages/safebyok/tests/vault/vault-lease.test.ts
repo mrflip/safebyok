@@ -581,6 +581,43 @@ describe("a change to the ways in, once it has landed", () => {
   })
 })
 
+describe("an unlock this device cannot keep a lease for", () => {
+  afterEach(() => { vi.restoreAllMocks() })
+
+  it("refuses as 'storage_blocked' when the device store has no room for the lease, and the vault stays locked", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw one')
+    await vault.lock()
+    const trouble = new DOMException('The quota has been exceeded.', 'QuotaExceededError')
+    vi.spyOn(world.deviceDB, 'putLease').mockRejectedValueOnce(trouble)
+    const err = await TH.expectRefusal(vault.unlock('pw one'), 'storage_blocked')
+    expect(err.cause).to.eq(trouble)
+    expect(vault.getSnapshot().state).to.eq('locked')
+    expect(await world.getLease()).to.be.null
+    await vault.unlock('pw one')
+    expect(vault.getSnapshot().state).to.eq('unlocked')
+  })
+
+  it("refuses as 'storage_unavailable' when the device store fails to write it, and the vault stays locked", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw one')
+    await vault.lock()
+    vi.spyOn(world.deviceDB, 'putLease').mockRejectedValueOnce(new Error('device storage is unavailable'))
+    await TH.expectRefusal(vault.unlock('pw one'), 'storage_unavailable')
+    expect(vault.getSnapshot().state).to.eq('locked')
+  })
+
+  it("refuses the first unlock as 'storage_blocked' too, the vault created in storage and locked here", async () => {
+    const world = makeWorld()
+    const vault = await world.open()
+    vi.spyOn(world.deviceDB, 'putLease').mockRejectedValueOnce(new DOMException('The quota has been exceeded.', 'QuotaExceededError'))
+    await TH.expectRefusal(vault.unlock('pw one'), 'storage_blocked')
+    expect(vault.getSnapshot().state).to.eq('locked')
+    await vault.unlock('pw one')
+    expect(vault.getSnapshot().state).to.eq('unlocked')
+  })
+})
+
 describe("the unlock window, renewed", () => {
   it("by a passphrase change: the user typed a passphrase, and it proved", async () => {
     const world = makeWorld()
