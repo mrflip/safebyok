@@ -58,6 +58,11 @@ and the security reviewer reading the code.
   written, and says how. **Until 1.0.0, neither binds backward**: no compatibility shims, no
   migrations, no reading of older stored shapes. An old record that fails today's validation
   fails safe (it reads as absent or corrupt), and the changeset says what a host will see.
+* **The vaultDB is the ground truth; what the vault holds is a cache.** A fundamentally
+  inconsistent state (a `vault_id` drifted from its scope, props and boxes naming different
+  vaults, an epoch gone backwards) means a reload of the vault from storage, never a repair, a
+  refusal to handle, or a check added to catch it earlier. A data-integrity failure met in a
+  consistent state (a record known to be irrecoverable) is a different thing, and is reported.
 
 ## Non-Negotiables
 
