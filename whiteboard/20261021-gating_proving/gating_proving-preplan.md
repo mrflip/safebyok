@@ -105,17 +105,21 @@ Success of a gating earns a new or changed wayin, or a lease.
 1. **gate_epoch**: `unlock_epoch` renamed in core, every adapter (Postgres columns, Convex
    validators, GraphQL schema), records and ctx; the vault props, lease and mark formats bump.
    Rename only, no behaviour.
-2. **proving**: `Proof` becomes `Proving`, derived at the door; passkey bytes imported and zeroed
+2. **read_commit**: hello, ensureLease, unlock and the lease take-up recast as precondition,
+   one round of parallel I/O, a synchronous judgment and one commit guarded by an `#era`; the
+   vault's own abort controllers and the double mark read go (`call-paths.md`). Ask's controllers
+   go with **gating**.
+3. **proving**: `Proof` becomes `Proving`, derived at the door; passkey bytes imported and zeroed
    at parse; `tryOpen` and `seal` move off Wayin; the Proving grants the lease as ruled;
    `VaultKeyPair` goes. Wayin is record only.
-3. **gate**: the slots and the policy come off Vault into `Gate`; changes return a new Gate with
+4. **gate**: the slots and the policy come off Vault into `Gate`; changes return a new Gate with
    `gate_epoch` bumped.
-4. **gating**: `Ask` becomes `Gating` with `gatingkind`, `attempt`, `decline`, `lockLanded`; the
+5. **gating**: `Ask` becomes `Gating` with `gatingkind`, `attempt`, `decline`, `lockLanded`; the
    hook renamed; `lease_ending`, `carry_on` and the renew path go; vault calls stop taking
    cleartext (if the one-door guess stands).
-5. **react**: the dialogs dispatch on `gatingkind`, one per kind; `passphrase-modal`,
+6. **react**: the dialogs dispatch on `gatingkind`, one per kind; `passphrase-modal`,
    `passkey-unlock-button`, `attempt-refusals`, `messages` follow.
-6. **docs**: README, VOCABULARY (Gate, Gating, Proving, gatingkind, gate_epoch), the Contract,
+7. **docs**: README, VOCABULARY (Gate, Gating, Proving, gatingkind, gate_epoch), the Contract,
    and `notes/old_vocabulary.md` (Proof, Ask, AskWhy, ProofAnswer, getProof, unlock_epoch,
    lease_ending, carry_on). Each security decision goes to `notes/security.md` in its own
    thread's PR, through the subagent.
