@@ -248,9 +248,10 @@ export const devicesOver = (getDb: () => FileDatabase): MakeVaultDBDevices => as
  * text) is waiting on another's lock on the file's database: the write under test, held where a
  * race wants it -- not any lock wait, nor this check's own query. Rejects after two seconds, well
  * inside the test's own timeout, so a write that never waits fails here, by name, rather than as a
- * timed-out test.
+ * timed-out test. Postgres keeps only the first `track_activity_query_size` (1kB by default) of a
+ * running statement, so `statementLike` must match within that.
  *
- * @example await TH.untilStatementBlocked(db, '%INSERT INTO safebyok_boxes%')
+ * @example await TH.untilStatementBlocked(db, TH.FirstWriteStatement)
  */
 export const untilStatementBlocked = async (db: FileDatabase, statementLike: string): Promise<void> => {
   await vi.waitUntil(async () => {
@@ -262,8 +263,12 @@ export const untilStatementBlocked = async (db: FileDatabase, statementLike: str
   }, { timeout: 2000, interval: 10 })
 }
 
-/** The `LIKE` pattern of the statement a first write to a vault sends: an insert of a box. */
-export const FirstWriteStatement = '%INSERT INTO safebyok_boxes%'
+/**
+ * The `LIKE` pattern of the statement a first write to a vault sends: a box write, which opens with
+ * the vault row it expects. Its insert falls past the first kilobyte `pg_stat_activity` keeps of a
+ * statement, so the pattern names the opening, and would meet a replacing write's too.
+ */
+export const FirstWriteStatement = 'WITH vault AS%'
 
 /** Makes the u1 vault the helpers' vault props stand for, through `vaultDB`, and writes a box under each of `boxlabels`. */
 export const filled = async (vaultDB: VaultDBVerbs, boxlabels: readonly string[]): Promise<void> => {
