@@ -77,7 +77,7 @@ export type SealBoxOpts = {
 const checkSealOpts = optionsCheck({ sidecar: Z.optional(Z.unknown()), over: Z.optional(Z.unknown()) }, "Box.seal's options are `sidecar`, the box's own visible data, and `over`, the box it replaces: check their spelling, and leave out any other.")
 
 /** One box: a whisper sealed under its own boxKey, with the visible fields a locked vault may show.
- * Its visible fields (boxlabel, revision, the sidecar parsed from its JSON, and times) are its own,
+ * Its visible fields (boxlabel, revision, its sidecar, and times) are its own,
  * and so is the `vault_id` of the vault props it lies under. The ciphertext and the storage
  * mechanics (format, codec, schema version) stay in its `record`, which is what crosses to storage
  * and holds no secret: neither key is in it. The box, its record and its sidecar are frozen through.
