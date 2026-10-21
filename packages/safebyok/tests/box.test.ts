@@ -215,6 +215,14 @@ describe("Box.seal", () => {
     expect(await box.open(vaultKey)).to.eq(Secret)
   })
 
+  it("ciphers the whisper as its JSON with every object's keys sorted, so it opens with them in order (Contract: Box, whisper_codec)", async () => {
+    const { vaultKey, box } = await sealedOf({ zeta: 'sk-fake', alpha: { omega: 1, beta: 2 } })
+    expect(box.whisper_codec).to.eq('json_v1')
+    const opened = await box.open(vaultKey) as Record<string, Record<string, number>>
+    expect(Object.keys(opened)).to.deep.equal(['alpha', 'zeta'])
+    expect(Object.keys(opened['alpha'] ?? {})).to.deep.equal(['beta', 'omega'])
+  })
+
   it("writes the whisper only ciphered: no field of the record holds it in the clear (Contract: vault.putBox, Guarantees)", async () => {
     const { box } = await sealedOf()
     expect(JSON.stringify(box.props)).to.not.include(Secret)

@@ -581,6 +581,19 @@ describe("a change to the ways in, once it has landed", () => {
   })
 })
 
+describe("the lease, kept on this device alone", () => {
+  it("sends nothing of itself to the backend: no record there holds its wrap, its deadline's name, or its format (Contract: Lease)", async () => {
+    const world = makeWorld()
+    await world.openUnlocked('pw')
+    const lease = await world.getLease()
+    expect(lease).to.not.be.null
+    const everything = world.dbStore.ckeys().map((ckey) => world.dbStore.read(ckey)).join('\n')
+    expect(everything).to.not.include(lease?.vault_key_lease_wrapped.ciphertext_b64)
+    expect(everything).to.not.include('ask_passphrase_at')
+    expect(everything).to.not.include(lease?.format)
+  })
+})
+
 describe("an unlock this device cannot keep a lease for", () => {
   afterEach(() => { vi.restoreAllMocks() })
 
