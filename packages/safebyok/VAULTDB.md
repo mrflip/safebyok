@@ -179,23 +179,23 @@ back within its limits, the listing is whole again.
 
 **3.1. Vault props are created once.** `ensureVaultProps` stores the vault props only where
 the scope holds none, and returns whichever vault props stand afterwards: the given ones, or, when the
-vault already exists, the ones standing, exactly as stored and under their own `vault_id` -- another
+vault already exists, the ones standing, exactly as stored and under their own `vault_tok` -- another
 device's, perhaps created in the same moment. Two devices creating at once settle on one vault.
 
 **3.2. An update of the vault props lands only over the props it read.** `putVaultProps`
-writes only while the standing vault props have the expected `vault_id` and `unlock_epoch`, and
+writes only while the standing vault props have the expected `vault_tok` and `gate_epoch`, and
 refuses as `stale_write` otherwise, including where no vault props stand: an update never
 creates. A server-side adapter, which a client of another version's may reach, also enforces what
-every update carries: it lands only vault props that keep the standing `vault_id` and move
-`unlock_epoch` forward, and refuses any other as `stale_write` (Convex's component and Postgres
+every update carries: it lands only vault props that keep the standing `vault_tok` and move
+`gate_epoch` forward, and refuses any other as `stale_write` (Convex's component and Postgres
 do). The core always sends the standing
-`unlock_epoch` plus one, so none of its own writes meets this refusal.
+`gate_epoch` plus one, so none of its own writes meets this refusal.
 
 **3.3. A box write lands only over the box it read, in the vault it was sealed for.**
-`putBox` writes only while the scope's standing vault props have the expected `vault_id` and the
+`putBox` writes only while the scope's standing vault props have the expected `vault_tok` and the
 standing box has the expected `revision_tok` -- or, for a null revision, no box stands
 under that boxlabel. Where the vault props are not the expected ones -- none stand, or another
-`vault_id`'s, a vault deleted and made anew even where no box stands in either -- it refuses as
+`vault_tok`'s, a vault deleted and made anew even where no box stands in either -- it refuses as
 `vault_mismatch`, carrying nothing of the vault props that stand. Where they are, and the box is
 not the one expected -- a revision it never read, a box since deleted, a box where it expected
 none -- it refuses as `stale_write`, with what stands under the boxlabel as `err.meta.box_stored`.
@@ -227,7 +227,7 @@ the battery, through an adapter that keeps this line, cannot.
 
 **3.4. A deletion wins, within its vault, and says what it removed.** `delBox` removes the
 box under its boxlabel, whatever revision stands, while the scope's standing vault props have
-the expected `vault_id`, and resolves what it found there, reported from the same atomic step as
+the expected `vault_tok`, and resolves what it found there, reported from the same atomic step as
 the removal: `deleted` for the revision its expectation names (its `revision_tok`, the one the
 deleting device read; for null, which names a damaged box listed with none, a record holding
 none that reads as one), `deleted_other` for any other record -- one written over the revision
@@ -250,15 +250,15 @@ plant a damaged record; the battery, through public verbs that do neither, canno
 
 **3.5. A vault is deleted whole, and alone.** `delVault` removes the vault props and every
 box of its scope, and nothing of any other scope, while the standing vault props have the
-expected `vault_id`; otherwise it refuses as `stale_write` and removes nothing, so a vault made anew
+expected `vault_tok`; otherwise it refuses as `stale_write` and removes nothing, so a vault made anew
 survives a device that missed its predecessor's end.
 
-It compares the `vault_id` and nothing else, so a vault whose props are damaged in any other field
-is still deleted, and vault props rewritten under the same `vault_id` between a read and the
+It compares the `vault_tok` and nothing else, so a vault whose props are damaged in any other field
+is still deleted, and vault props rewritten under the same `vault_tok` between a read and the
 deletion are deleted with them: it is the same vault. A typed backend (Convex, Postgres) cannot
 hold damaged vault props, so there the hatch below has nothing to do: the vault's
 `delDamagedVault`, the one way to clear a vault whose `hello()` refuses it as `damaged_vault`, reads
-the vault props through `doGetVaultProps` as stored, takes their `vault_id`, and aims this
+the vault props through `doGetVaultProps` as stored, takes their `vault_tok`, and aims this
 deletion at it. An adapter that hands each call on to another VaultDB's public verbs hands
 `delDamagedVault` on too. Proven by the base class's own tests for a damaged record, which the
 battery cannot plant, and by the battery for a sound vault, which it refuses to delete.

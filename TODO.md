@@ -87,16 +87,16 @@ Revisit before 1.0 if rotation signing every other device out is too blunt.
 `prior_vault_key` (the vaultKey before, wrapped under the current one) and the check that it sat
 one epoch below theirs. `trust_lines` (2026-10-21) removed `vault_key_epoch` from every record, and
 storage's comparison of a box's epoch against the vault props', on the Coach's ruling: the vaultKey
-never changes until rotation is built, and a vault made anew has a new `vault_id`, which already
+never changes until rotation is built, and a vault made anew has a new `vault_tok`, which already
 voids every box. Rotation adds an epoch back, with its own format bump, when it is built.
 
-### "tombstone vaults; decide if the vault_id is a check -- the labels are meant to be the primary key"
+### "tombstone vaults; decide if the vault_tok is a check -- the labels are meant to be the primary key"
 
 The Coach (2026-10-21, sprint contract, on #216's row "Rollback check and del()"): "Add a todo
-"tombstone vaults; decide if the vault_id is a check -- the labels are meant to be the primary
+"tombstone vaults; decide if the vault_tok is a check -- the labels are meant to be the primary
 key"". Today a deleted vault leaves nothing behind, and a vault is found by its labels (applabel,
-user id, vaultlabel) while `vault_id` is checked against the device's mark and on each write.
-Decide whether a deleted vault leaves a tombstone, and whether `vault_id`
+user id, vaultlabel) while `vault_tok` is checked against the device's mark and on each write.
+Decide whether a deleted vault leaves a tombstone, and whether `vault_tok`
 stays a check or the labels alone identify the vault.
 
 ### `del()`'s edge cases
@@ -173,7 +173,7 @@ without orphaning vaults.
 ### Changing a vault's scope means a new vault
 
 The Coach (2026-10-19, sprint contract): "changing scope requires a new vault from scratch:
-vault_id, applabel, user_id, vaultlabel are immutable." A vault's scope fields are fixed for its
+vault_tok, applabel, user_id, vaultlabel are immutable." A vault's scope fields are fixed for its
 life (a test holds every field its snapshot shows read-only), so renaming a vault, or moving it to
 a new `user_id` -- an auth provider changed, accounts merged -- means making a new vault and
 storing each whisper again, the old one's passphrase in hand. Decide whether safebyok offers that

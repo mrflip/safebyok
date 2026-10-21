@@ -73,7 +73,7 @@ within `staleMinutes` (five minutes, unless `Vault.make` or the call says otherw
 anew; call `hello()` on `visibilitychange`, and `hello({ staleMinutes: 0 })` to read now.
 
 The vault's fields -- `state`, `boxes`, `passphrase`, `passkey`, `capacity`, `askPassphraseAt`, `trouble`,
-`vault_id` and the rest -- are live and read-only: read them in an event handler and they are
+`vault_tok` and the rest -- are live and read-only: read them in an event handler and they are
 current. React renders from `getSnapshot()`, the same fields frozen in one object.
 
 Serve the app over https: a browser withholds WebCrypto from a page served over plain http, so
@@ -622,7 +622,7 @@ the vault: the read that finds it succeeds, and `onBadNews` is told `damaged_way
 `meta.wayin_listed` naming it.
 
 ```ts
-vault.getSnapshot().passphrase    // { wayinkind: 'passphrase', device_id: 'k3x9...', registered_at: 1760000000000, vault_id: 'v7q2...' }
+vault.getSnapshot().passphrase    // { wayinkind: 'passphrase', device_id: 'k3x9...', registered_at: 1760000000000, vault_tok: 'v7q2...' }
 vault.getSnapshot().passkey       // null, until one is put
 
 await vault.putWayin(passphrase, newPassphrase)   // the passphrase replaced, stamped afresh: this device, now; any passkey removed
@@ -649,7 +649,7 @@ changed the vault meanwhile.
   one passkey, added by proving the passphrase. A new passphrase removes the passkey with the old
   one: the user adds a passkey again, proving the new passphrase. Warn them before they change it
   ("your passkey will be removed; add it again afterwards").
-* **Every change locks the other devices.** It moves the vault props' `unlock_epoch`, so each
+* **Every change locks the other devices.** It moves the vault props' `gate_epoch`, so each
   other device falls back to `locked` and must unlock again. This device stays unlocked.
 * **An unlock tries the one passphrase**: one key derivation, about 0.6 s with the browser's
   deriver.
@@ -820,7 +820,7 @@ nearest error boundary, and hands a condition down as `useOpenError()`'s `openEr
 | `bad_label`           | a label (or the `userId`) that fails the vault's check: `Label` (or `UserId`) by default, or the host's own in `validators` | Pass labels the app chose; check a user-typed one first with the same check |
 | `bad_whisper`         | a whisper JSON cannot carry (`undefined`, a function, a class instance) | Store plain JSON; to empty a box, `delBox` it |
 | `bad_option`          | an option or argument out of its range: a `Vault.make` option, or one it does not take, an `argon2idDeriver` spec, a `putBox()`'s sidecar, a passphrase or callback of the wrong type; a passkey's answer of the wrong shape; an event handed to `hello()` or `ensureLease()` as its options | Fix the call; the message names what it takes |
-| `bad_record`          | a record or expectation handed to a `VaultDB` verb that is not one this package builds: malformed vault props, a name in them below the floor included, an expectation missing a field, or vault props and their expectation that disagree about the `vault_id` (a box is `invalid_box`; a name handed to a verb on its own or in a scope is `bad_label`, and so is a name the floor admits but longer than the storage holds, in a record or not). A vault says a box its `VaultDB` refused as `invalid_box` as this | A bug in a hand-built record or a custom adapter's caller: hand a `VaultDB` only the records and expectations a vault builds; the message names which |
+| `bad_record`          | a record or expectation handed to a `VaultDB` verb that is not one this package builds: malformed vault props, a name in them below the floor included, an expectation missing a field, or vault props and their expectation that disagree about the `vault_tok` (a box is `invalid_box`; a name handed to a verb on its own or in a scope is `bad_label`, and so is a name the floor admits but longer than the storage holds, in a record or not). A vault says a box its `VaultDB` refused as `invalid_box` as this | A bug in a hand-built record or a custom adapter's caller: hand a `VaultDB` only the records and expectations a vault builds; the message names which |
 | `invalid_box`         | a box handed to a `VaultDB`'s `putBox` that is not one this package builds -- malformed, a name in it below the floor, or no box at all -- or one sealed under another vaultKey than its expectation names; storage's word, from a `VaultDB` called directly: a vault built the box, and says `bad_record` | A bug in a hand-built box or a custom adapter's caller: hand `putBox` only the boxes a vault seals |
 | `corrupt_record`      | a storage adapter answered a `VaultDB` in a shape its protocol does not allow: a box write's echo that fails a box's checks or names another revision, a stale or full refusal missing the `box_stored` or `capacity` it must carry, a deletion's report or a capacity in another shape (and `safebyok-convex`'s component deployed from another version). Never a record that reads back damaged, which is `damaged_vault` or `damaged_box` | A bug in the adapter: do not retry, and have a developer look at it. A write or deletion answered so may have landed: reading the vault again shows what stands |
 | `vault_closed`        | the vault handle was closed                                      | Open the vault again; do not use a handle after `close()` |
@@ -847,7 +847,7 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `box_too_large`   | a box -- its whisper, sidecar and boxlabel together, as the UTF-8 bytes of its JSON -- over its storage's `maxRecordBytes`; only a host whose validators admit long names, or a backend with small records, meets it | Tell the user to store a smaller whisper or sidecar |
 | `vault_full`          | a new box in a vault already holding its `maxBoxes`, a new box whose names would take the vault past its storage's `maxVaultBytes`, or a write the storage backend has no room for | Tell the user to remove a box first; the host may raise `maxBoxes` where the backend allows. The backend's own refusal carries how full it reckons the vault as `meta.capacity` |
 | `stale_write`         | storage changed since this device read it, so the write was refused and nothing was written: another device or tab wrote, created or deleted the box a `putBox()` was writing; a `delBox()` into a vault deleted or made anew elsewhere, its message saying the box could not be removed because its vault is gone; and a write whose catch-up with storage then failed too (its `cause` says why; the snapshot reads `syncing: false`) -- unless the catch-up was refused as `identity_revoked`, `rolled_back` or `newer_format`, which the write throws as it came | The vault has caught up: show what stands now and, if the change still applies, repeat it (*Two devices storing at once*, below). A `putBox()`'s refusal carries the box that won as `meta.box_stored`. Nothing is tried again by itself |
-| `vault_mismatch`      | a box write met vault props other than the ones it was sealed for: the vault deleted, made anew under another `vault_id`, or its vaultKey replaced, on another device. Storage's word, from a `VaultDB`'s `putBox` called directly; nothing was written | The device that sealed the box is out of date: read the vault again (`hello()`), and unlock the vault that stands now before writing |
+| `vault_mismatch`      | a box write met vault props other than the ones it was sealed for: the vault deleted, made anew under another `vault_tok`, or its vaultKey replaced, on another device. Storage's word, from a `VaultDB`'s `putBox` called directly; nothing was written | The device that sealed the box is out of date: read the vault again (`hello()`), and unlock the vault that stands now before writing |
 | `not_permitted`       | the storage backend refused the signed-in user, still the vault's own, this one call | Tell the user they may not; signing in again will not help |
 | `storage_unavailable` | the storage backend could not be reached, or failed; or this device's own store failed for a reason that may pass | Try again shortly; the adapter's own error is the `cause`, unless it may quote the call (Convex's) |
 | `storage_blocked`     | this device's own store (its device store, or a vault kept on the device, as `safebyok-indexeddb`'s) refused for a reason that holds until something outside the app changes: the browser withholds storage from the page (site data blocked, a sandboxed frame), has no room for it (a quota of zero, as some private windows give, or a full disk), or offers no IndexedDB at all | Do not offer a retry: tell the user this browser is keeping the app from storing anything on this device. The app may open the vault again with `memoryDeviceDB()`, which keeps no lease here; the browser's own error is the `cause` |
@@ -928,7 +928,7 @@ try {
 
 It refuses a vault that is sound, with `bad_option` and nothing removed: a vault that opens is
 deleted through its handle's `del()`. With no vault stored it erases only the device's
-lease, so a call cut short can be made again. It needs the stored record's `vault_id`
+lease, so a call cut short can be made again. It needs the stored record's `vault_tok`
 to aim the deletion, so vault props too damaged to show one are refused as `damaged_vault`
 still, with nothing removed: the backend's own tools can clear them (`localVaultDB`'s vault props
 that are not JSON at all are one case). A record this version cannot read may instead have been written by a **newer**
@@ -942,8 +942,8 @@ it hands it over, as `safebyok-graphql`'s server does: there a damaged row is th
 clear; so is a typed backend's (Convex's, Postgres's), whose rows cannot hold damaged vault props.
 `safebyok-react`'s `useOpenError()` hands `delDamagedVault()` down beside `retryOpen`. A `VaultDB` that wraps
 another's public verbs hands `VaultDB.delDamagedVault` on too (`VAULTDB.md`, line 3.5). The
-deletion aims at the stored `vault_id` alone, so vault props rewritten under that same
-`vault_id` between its read and the deletion go too: it is the same vault, the one the user
+deletion aims at the stored `vault_tok` alone, so vault props rewritten under that same
+`vault_tok` between its read and the deletion go too: it is the same vault, the one the user
 asked to delete.
 
 ### A vault rolled back

@@ -150,7 +150,7 @@ store of your own keeps every field it was handed.
 
 The resolvers decide nothing: every expectation crosses whole, and the VaultDB you serve keeps
 [the VaultDB contract](https://github.com/mrflip/safebyok/blob/main/packages/safebyok/VAULTDB.md)
-for the browser. Its line 3.3 in particular: a box write's expectation names the `vault_id` the
+for the browser. Its line 3.3 in particular: a box write's expectation names the `vault_tok` the
 box was sealed for and the revision it read, and your VaultDB lands it only while both stand,
 compared in the same atomic step as the write. `tests/yoga-recipe.test.ts` runs the shared suite
 through the recipe, that line included.
@@ -213,9 +213,9 @@ by, exactly as safebyok wrote it:
 Each has an input type twin (`SafebyokVaultPropsInput`, and so on), and each expectation one
 of its own.
 
-* **Text is a `String`**, a count (`unlock_epoch`) an `Int`, and a time a `Float` -- epoch
+* **Text is a `String`**, a count (`gate_epoch`) an `Int`, and a time a `Float` -- epoch
   milliseconds, a whole number past what GraphQL's 32-bit `Int` holds.
-* **A count is held to GraphQL's 32-bit `Int`**: `unlock_epoch`, which goes up by one on each
+* **A count is held to GraphQL's 32-bit `Int`**: `gate_epoch`, which goes up by one on each
   change to a vault's ways in. Past 2,147,483,647 the field fails on the
   wire and the browser sees `storage_unavailable`. That is accepted: two billion changes to
   the ways in is not a vault anyone keeps.
