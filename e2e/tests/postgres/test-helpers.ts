@@ -54,7 +54,7 @@ export type FileDatabase = {
   url: string
   /** A pool over it, for what the test does as the host's own code: a transaction held open, a count, a truncate. Shared by the file. */
   host: Pool
-  /** A pool of its own over it: one device's connections, ended with {@link FileDatabase.endDevices}. */
+  /** A pool of its own over it: one device's connections, named {@link DeviceApplicationName} to the server and ended with {@link FileDatabase.endDevices}. */
   devicePool: (config?: PoolConfig) => Pool
   /** A connection of its own to it, not from a pool, as a long-lived listener or a held transaction needs; ended with the devices. */
   client: () => Promise<Client>
@@ -63,6 +63,13 @@ export type FileDatabase = {
   /** Ends every device pool and client made since the last call; waits for the statements in flight. */
   endDevices: () => Promise<void>
 }
+
+/**
+ * The `application_name` every device's connections announce, so the server's own views can tell a
+ * device's statement from the host's: the one thing a race can name a statement by, since
+ * `pg_stat_activity` keeps only the first 1,023 characters of a statement's text.
+ */
+export const DeviceApplicationName = 'safebyok_e2e_device'
 
 /**
  * `byteCount` random bytes as lowercase hex, from WebCrypto's `crypto.getRandomValues` (the same
@@ -134,7 +141,7 @@ export const useFileDatabase = (): (() => FileDatabase) => {
       url: fileUrl,
       host,
       devicePool: (config = {}) => {
-        const pool = watched(new Pool({ connectionString: fileUrl, ...config }))
+        const pool = watched(new Pool({ connectionString: fileUrl, application_name: DeviceApplicationName, ...config }))
         devices.push({ end: () => pool.end() })
         return pool
       },
@@ -244,26 +251,24 @@ export const devicesOver = (getDb: () => FileDatabase): MakeVaultDBDevices => as
 // --------------------------------------------------------------------------- what a host's own code does
 
 /**
- * Resolves once a statement matching `statementLike` (an SQL `LIKE` pattern over the statement's
- * text) is waiting on another's lock on the file's database: the write under test, held where a
- * race wants it -- not any lock wait, nor this check's own query. Rejects after two seconds, well
- * inside the test's own timeout, so a write that never waits fails here, by name, rather than as a
- * timed-out test.
+ * Resolves once a statement of a device is waiting on another's lock on the file's database: the
+ * write under test, held where a race wants it -- not the host's own statements, nor this check's
+ * own query. The device is told by its {@link DeviceApplicationName}, not by the statement's text,
+ * which `pg_stat_activity` cuts at 1,023 characters, short of where a long statement says what
+ * it writes. Rejects after two seconds, well inside the test's own timeout, so a write that never
+ * waits fails here, by name, rather than as a timed-out test.
  *
- * @example await TH.untilStatementBlocked(db, '%INSERT INTO safebyok_boxes%')
+ * @example await TH.untilDeviceBlocked(db)
  */
-export const untilStatementBlocked = async (db: FileDatabase, statementLike: string): Promise<void> => {
+export const untilDeviceBlocked = async (db: FileDatabase): Promise<void> => {
   await vi.waitUntil(async () => {
     const { rows } = await db.host.query(
-      "SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid() AND wait_event_type = 'Lock' AND query LIKE $1",
-      [statementLike],
+      "SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid() AND wait_event_type = 'Lock' AND application_name = $1",
+      [DeviceApplicationName],
     )
     return (rows[0] as { waiting: number }).waiting > 0
   }, { timeout: 2000, interval: 10 })
 }
-
-/** The `LIKE` pattern of the statement a first write to a vault sends: an insert of a box. */
-export const FirstWriteStatement = '%INSERT INTO safebyok_boxes%'
 
 /** Makes the u1 vault the helpers' vault props stand for, through `vaultDB`, and writes a box under each of `boxlabels`. */
 export const filled = async (vaultDB: VaultDBVerbs, boxlabels: readonly string[]): Promise<void> => {
