@@ -249,7 +249,7 @@ describe("a vault over convexVaultDB, when its user signs out", () => {
       await vi.waitFor(() => { expect(vault.getSnapshot().state).to.eq('locked') })
       expect(await TH.expectingGood(deviceDB).getLease(u1)).to.be.null
       // Storage it cannot trust has the vault say hello afresh at its next call, refused as ever.
-      await TH.expectRefusal(vault.getBox('anthropic_api_key'), 'identity_revoked')
+      await TH.expectRefusal(vault.getWhisper('anthropic_api_key'), 'identity_revoked')
       await TH.expectRefusal(vault.unlock(TH.RealPassphrase), 'identity_revoked')
       expect(spy.calls.map((heard) => heard.level)).to.include('log')
       expect(await deployment.as('u1').query(deployment.api.safebyok.listBoxSummaries, { scope: u1 })).to.have.lengthOf(1)
@@ -280,7 +280,7 @@ describe("a vault over convexVaultDB, on two devices", () => {
 
     // The phone unlocks and reads what the laptop wrote; what the deployment holds is ciphertext.
     await phone.unlock(TH.RealPassphrase)
-    expect(await phone.getBox('anthropic_api_key')).to.deep.equal(anthropicKey)
+    expect(await phone.getWhisper('anthropic_api_key')).to.deep.equal(anthropicKey)
     const stored = await deployment.as('u1').query(deployment.api.safebyok.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })
     expect(JSON.stringify(stored)).to.not.include(anthropicKey)
     expect(JSON.stringify(stored)).to.not.include(TH.RealPassphrase)
@@ -290,7 +290,7 @@ describe("a vault over convexVaultDB, on two devices", () => {
     await vi.waitFor(() => {
       expect(laptop.getSnapshot().boxes.map((box) => box.boxlabel)).to.deep.equal(['anthropic_api_key', 'openai_api_key'])
     })
-    expect(await laptop.getBox('openai_api_key')).to.deep.equal(openaiKey)
+    expect(await laptop.getWhisper('openai_api_key')).to.deep.equal(openaiKey)
 
     // The laptop changes the passphrase: the phone is locked out of its old unlock, and only the
     // new passphrase opens it again.
@@ -298,7 +298,7 @@ describe("a vault over convexVaultDB, on two devices", () => {
     await vi.waitFor(() => { expect(phone.getSnapshot().state).to.eq('locked') })
     await TH.expectRefusal(phone.unlock(TH.RealPassphrase), 'wrong_passphrase')
     await phone.unlock(NewPassphrase)
-    expect(await phone.getBox('anthropic_api_key')).to.deep.equal(anthropicKey)
+    expect(await phone.getWhisper('anthropic_api_key')).to.deep.equal(anthropicKey)
 
     // The phone deletes the vault; the laptop hears it gone.
     await phone.del()

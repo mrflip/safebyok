@@ -40,12 +40,12 @@ describe("putWayin, with a new passphrase", () => {
     expect(put).to.deep.equal(vault.passphrase)
     expect(put).to.deep.equal({ wayinkind: 'passphrase', device_id: storedWayinOf(world, 'passphrase')?.['device_id'], registered_at: storedWayinOf(world, 'passphrase')?.['registered_at'] })
     expect(vault.getSnapshot().state).to.eq('unlocked')
-    expect(await vault.getBox('anthropic')).to.eq('sk-fake')
+    expect(await vault.getWhisper('anthropic')).to.eq('sk-fake')
 
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })  // a new device: no lease
     await TH.expectRefusal(fresh.unlock('old passphrase'), 'wrong_passphrase')
     await fresh.unlock('new passphrase')
-    expect(await fresh.getBox('anthropic')).to.eq('sk-fake')
+    expect(await fresh.getWhisper('anthropic')).to.eq('sk-fake')
   })
 
   it("rewrites no box: each stands byte for byte as it was (Contract: putWayin, Guarantees)", async () => {
@@ -142,7 +142,7 @@ describe("putWayin, with a new passphrase", () => {
     await TH.expectRefusal(vault.putWayin('pw', laptop), 'wrong_passphrase')
     await vault.putWayin('a new passphrase', laptop)
     await fresh.unlock(laptop)
-    expect(await fresh.getBox('anthropic')).to.eq('sk-fake')
+    expect(await fresh.getWhisper('anthropic')).to.eq('sk-fake')
   })
 
   it("starts the lease again from now, and this device's lease follows, so a reload stays unlocked (Contract: putWayin, Does 7)", async () => {
@@ -239,7 +239,7 @@ describe("the vault's passphrase", () => {
     await TH.expectRefusal(vault.putWayin('pw', await TH.passkeyOf('phone')), 'damaged_wayin')
     expect(derivations).not.toHaveBeenCalled()
     await vault.unlock(laptop)
-    expect(await vault.getBox('anthropic')).to.eq('sk-fake')
+    expect(await vault.getWhisper('anthropic')).to.eq('sk-fake')
   })
 
   it("the backend holds no passphrase, old or new (Contract: putWayin, Guarantees)", async () => {
@@ -283,7 +283,7 @@ describe("the vault's passkey", () => {
     const { keyDeriver, derivations } = countingDeriver()
     const fresh = await world.open({ deviceDB: memoryDeviceDB(), keyDeriver })
     await fresh.unlock(laptop)
-    expect(await fresh.getBox('anthropic')).to.eq('sk-fake')
+    expect(await fresh.getWhisper('anthropic')).to.eq('sk-fake')
     expect(derivations).not.toHaveBeenCalled()
   })
 
@@ -407,7 +407,7 @@ describe("the vault's passkey", () => {
     const fresh = await world.open({ deviceDB: memoryDeviceDB() })
     await TH.expectRefusal(fresh.unlock(laptop), 'wrong_passkey')
     await fresh.unlock(phone)
-    expect(await fresh.getBox('anthropic')).to.eq('sk-fake')
+    expect(await fresh.getWhisper('anthropic')).to.eq('sk-fake')
   })
 
   it("a passkey stored damaged is refused as damaged_wayin, told as news, and mended by putting the passkey again", async () => {
@@ -419,7 +419,7 @@ describe("the vault's passkey", () => {
     await vault.putWayin('pw', laptop)
     await vault.lock()
     await vault.unlock(laptop)
-    expect(await vault.getBox('anthropic')).to.eq('sk-fake')
+    expect(await vault.getWhisper('anthropic')).to.eq('sk-fake')
   })
 
   it("putWayin with a passkey refuses as stale_write when another device changed the ways in meanwhile, writing nothing (Contract: putWayin, Refuses)", async () => {

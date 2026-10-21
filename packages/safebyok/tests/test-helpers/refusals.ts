@@ -17,7 +17,7 @@ const NotRefused = Symbol('not refused')
  * @param refusalkind - The refusal's expected `refusalkind`.
  * @returns The refusal, for a closer look at its message or cause.
  *
- * @example await TH.expectRefusal(vault.getBox('anthropic_api_key'), 'vault_locked')
+ * @example await TH.expectRefusal(vault.getWhisper('anthropic_api_key'), 'vault_locked')
  * @example
  *   const err = await TH.expectRefusal(TH.settledVault(TH.omitting(opts, 'keyDeriver')), 'bad_option')
  *   expect(err.message).to.include('safebyok/browser')

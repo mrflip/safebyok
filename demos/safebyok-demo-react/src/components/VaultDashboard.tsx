@@ -9,8 +9,8 @@ import type { Sidecar, Whisper } from 'safebyok'
 
 /**
  * Direct manipulation of the vault's boxes: add, view, edit, remove, use. The lines that
- * matter are the one-liners inside each handler -- `vault.putBox(...)`, `vault.getBox(...)`,
- * `vault.useBox(...)`, `vault.delBox(...)`: a locked vault asks for the passphrase through the
+ * matter are the one-liners inside each handler -- `vault.putBox(...)`, `vault.getWhisper(...)`,
+ * `vault.useWhisper(...)`, `vault.delBox(...)`: a locked vault asks for the passphrase through the
  * provider's dialog and goes on, and a dialog dismissed is refused 'vault_locked', which the
  * handlers pass over. Everything else is table furniture.
  */
@@ -76,7 +76,7 @@ export const VaultDashboard = () => {
 
   // A read the user dismissed the passphrase dialog for is refused vault_locked: nothing to show.
   const view = async (boxlabel: string) => {
-    const read = await vault.tryGetBox(boxlabel)
+    const read = await vault.tryGetWhisper(boxlabel)
     if (read.ok) { setShown((prev) => ({ ...prev, [boxlabel]: read.val })) }
   }
 
@@ -85,7 +85,7 @@ export const VaultDashboard = () => {
   }
 
   const edit = async (boxlabel: string, noteText: string) => {
-    const read = await vault.tryGetBox(boxlabel)
+    const read = await vault.tryGetWhisper(boxlabel)
     if (read.ok) { setForm({ editing: boxlabel, boxlabelText: boxlabel, whisperText: editableWhisper(read.val), noteText }) }
   }
 
@@ -104,7 +104,7 @@ export const VaultDashboard = () => {
 
   const applyWhisper = async (boxlabel: string) => {
     try {
-      await vault.useBox(boxlabel, (whisper) => { setPsst({ boxlabel, whisper }) })
+      await vault.useWhisper(boxlabel, (whisper) => { setPsst({ boxlabel, whisper }) })
     } catch (err) {
       if (! isVaultError(err, 'vault_locked')) { throw err }
     }

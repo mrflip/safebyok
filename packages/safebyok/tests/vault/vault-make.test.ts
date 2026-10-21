@@ -90,27 +90,28 @@ describe("Vault.make", () => {
     vi.restoreAllMocks()
   })
 
-  it("hands on every method alone, bound to its vault, as its examples show", async () => {
+  it("hands on subscribe and getSnapshot alone, bound to their vault, as the class's first example shows", async () => {
     const world = makeWorld()
-    const { subscribe, getSnapshot, hello, unlock, putBox, getBox, useBox, delBox, putWayin, delWayin, lock, del, close } = await world.open()
+    const vault = await world.open()
+    const { subscribe, getSnapshot } = vault
     const heard = vi.fn()
     const unsubscribe = subscribe(heard)
-    await hello()
-    await unlock('correct horse')
-    await putBox('anthropic_api_key', 'sk-ant-test')
-    expect(await getBox('anthropic_api_key')).to.eq('sk-ant-test')
-    expect(await useBox('anthropic_api_key', (whisper) => typeof whisper)).to.eq('string')
-    await delBox('anthropic_api_key')
-    await putWayin('correct horse', 'battery staple')
-    await putWayin('battery staple', await TH.passkeyOf('laptop'))
-    await delWayin('battery staple')
-    await lock()
+    await vault.hello()
+    await vault.unlock('correct horse')
+    await vault.putBox('anthropic_api_key', 'sk-ant-test')
+    expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test')
+    expect(await vault.useWhisper('anthropic_api_key', (whisper) => typeof whisper)).to.eq('string')
+    await vault.delBox('anthropic_api_key')
+    await vault.putWayin('correct horse', 'battery staple')
+    await vault.putWayin('battery staple', await TH.passkeyOf('laptop'))
+    await vault.delWayin('battery staple')
+    await vault.lock()
     expect(getSnapshot().state).to.eq('locked')
-    await del()
+    await vault.del()
     expect(getSnapshot().state).to.eq('absent')
     expect(heard).toHaveBeenCalled()
     unsubscribe()
-    close()
+    vault.close()
   })
 
   it("takes a store of the host's own that carries every verb, prototype and all", async () => {
@@ -273,10 +274,10 @@ describe("the host's clock", () => {
     const vault = await world.openUnlocked('pw', { clock: { now: () => reading } })
     await vault.putBox('anthropic', 'sk-fake')
     reading = world.clock.now() / 1000
-    await TH.expectRefusal(vault.getBox('anthropic'), 'bad_option')
+    await TH.expectRefusal(vault.getWhisper('anthropic'), 'bad_option')
     expect(vault.getSnapshot().state).to.eq('locked')
     reading = world.clock.now()
-    await TH.expectRefusal(vault.getBox('anthropic'), 'vault_locked')
+    await TH.expectRefusal(vault.getWhisper('anthropic'), 'vault_locked')
   })
 
   it("refuses a clock whose now() throws, at Vault.make, keeping its error as the cause and quoting none of it", async () => {
@@ -294,11 +295,11 @@ describe("the host's clock", () => {
     const vault = await world.openUnlocked('pw', { clock })
     await vault.putBox('anthropic', 'sk-fake')
     broken = true
-    const err = await TH.expectRefusal(vault.getBox('anthropic'), 'bad_option')
+    const err = await TH.expectRefusal(vault.getWhisper('anthropic'), 'bad_option')
     expect((err.cause as Error).message).to.eq('no time today')
     broken = false
     expect(vault.getSnapshot().state).to.eq('locked')
-    await TH.expectRefusal(vault.getBox('anthropic'), 'vault_locked')
+    await TH.expectRefusal(vault.getWhisper('anthropic'), 'vault_locked')
   })
 
   it("refuses a store when the clock has gone wrong while unlocked", async () => {

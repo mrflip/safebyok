@@ -140,7 +140,7 @@ describe("VaultProvider", () => {
     await vault.unlock('correct horse battery staple')
     await expectShown('unlocked')
     vi.spyOn(vaultDB, 'getBox').mockResolvedValueOnce(TH.bad(new VaultError('identity_revoked', 'No one is signed in: sign in, then try again.')))
-    await TH.expectRefusal(vault.getBox('anthropic_api_key'), 'identity_revoked')
+    await TH.expectRefusal(vault.getWhisper('anthropic_api_key'), 'identity_revoked')
     await expectShown('locked')
   })
 
@@ -190,7 +190,7 @@ describe("VaultProvider", () => {
     const world = await lockedWorld()
     render(<VaultProvider {...world.props} userId="u1" allowStartOver><world.Grab /></VaultProvider>)
     const vault = await world.opened()
-    const reading = vault.tryGetBox('anthropic_api_key')
+    const reading = vault.tryGetWhisper('anthropic_api_key')
     fireEvent.click(await screen.findByText('Forgot it? Start a new vault'))
     fireEvent.click(screen.getByText('Remove and start over'))
     // The delete lands as a lock: the dialog closes, and the read that asked is refused.
@@ -297,7 +297,7 @@ describe("VaultProvider", () => {
       const heard = vi.fn(TH.anyStrengthChecker)
       render(<VaultProvider {...world.props} userId="u1" strengthChecker={heard}><world.Grab /></VaultProvider>)
       const vault = await world.opened()
-      void vault.tryGetBox('anthropic_api_key')
+      void vault.tryGetWhisper('anthropic_api_key')
       fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
       expect(screen.queryByRole('status')).to.be.null
       expect(heard).not.toHaveBeenCalled()

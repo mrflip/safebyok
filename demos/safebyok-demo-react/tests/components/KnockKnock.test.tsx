@@ -45,7 +45,7 @@ describe("KnockKnock", () => {
     await TH.answerPassphraseDialog()
     await screen.findByText(/Anthropic key saved/)
     const vault = await world.openUnlocked()
-    expect(await vault.getBox('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
+    expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
   })
 
   it("flashes 'saved' after a save, then relaxes to when the key was last saved", async () => {
@@ -92,7 +92,7 @@ describe("KnockKnock", () => {
     expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null
     const vault = await world.open()
     expect(vault.getSnapshot().state).to.eq('unlocked')
-    expect(await vault.getBox('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
+    expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
   })
 
   it("tells the joke Claude tells, the key going to Anthropic and nowhere on the page", async () => {
@@ -169,7 +169,7 @@ describe("KnockKnock", () => {
     await TH.answerPassphraseDialog()
     await screen.findByText(/Anthropic key saved/)
     const vault = await world.openUnlocked()
-    expect(await vault.getBox('anthropic_api_key')).to.eq('sk-ant-test-replaced')
+    expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-replaced')
   })
 
   it("won't knock with a damaged key, and replaces one that names its revision afresh", async () => {
@@ -192,7 +192,7 @@ describe("KnockKnock", () => {
     await TH.answerPassphraseDialog()
     await screen.findByText(/Anthropic key saved/)
     const vault = await world.openUnlocked()
-    expect(await vault.getBox('anthropic_api_key')).to.eq('sk-ant-test-replaced')
+    expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-replaced')
   })
 
   it("offers a key damaged beyond naming only for removing, and then for adding anew", async () => {

@@ -220,7 +220,7 @@ export type VaultErrorOpts = ErrorOptions & { meta?: RefusalMeta }
  * `meta`, not as a property.
  *
  * @example
- *   try { await vault.getBox('ANTHROPIC_API_KEY') } catch (err) {
+ *   try { await vault.getWhisper('ANTHROPIC_API_KEY') } catch (err) {
  *     if (isVaultError(err, 'vault_locked')) { promptForPassphrase() }
  *   }
  * @example
@@ -268,7 +268,7 @@ export class ThrownMistake extends VaultError {}
  * this one (an ESM and a CJS build side by side): that is a foreign throw, met as any other.
  *
  * @example
- *   try { await vault.getBox('ANTHROPIC_API_KEY') } catch (err) {
+ *   try { await vault.getWhisper('ANTHROPIC_API_KEY') } catch (err) {
  *     if (isVaultError(err, 'vault_locked')) { promptForPassphrase() }
  *   }
  */

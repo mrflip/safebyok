@@ -145,7 +145,7 @@ export const VaultProbe = () => {
       <span data-testid="vault">{vault === null ? 'none' : 'open'}</span>
       <span data-testid="state">{snapshot?.state ?? 'none'}</span>
       <span data-testid="boxes">{(snapshot?.boxes ?? []).map((box) => box.boxlabel).join(',')}</span>
-      <button onClick={() => { void vault?.tryGetBox('anthropic_api_key') }}>read</button>
+      <button onClick={() => { void vault?.tryGetWhisper('anthropic_api_key') }}>read</button>
       <button onClick={() => { void vault?.unlock(Passphrase) }}>unlock</button>
     </p>
   )

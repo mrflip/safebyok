@@ -6,7 +6,7 @@ otherwise write itself.
 * `VaultProvider` -- makes the vault for the signed-in user (`userId` prop from your auth) from
   `Vault.make`'s options, its props; says its first `hello()`; closes it as the user signs out,
   and makes a new one for the next. It is the vault's `getProof`, unless you pass one of your own:
-  whenever a call on the vault needs it unlocked and finds it not -- `vault.getBox(...)`,
+  whenever a call on the vault needs it unlocked and finds it not -- `vault.getWhisper(...)`,
   `vault.putBox(...)`, or `vault.ensureLease()` on an Unlock button -- it shows the passphrase
   dialog, one at a time, and the call waits on it (*Asking for the passphrase*, below).
 * `useVault()` -- the vault itself, or `null` while nobody is signed in. Its fields read live in
@@ -216,13 +216,13 @@ not yet made) asks through the vault's `getProof`, which the provider is unless 
 So a component just calls the vault, and the dialog comes up on its own:
 
 ```tsx
-const { ok, val: whisper } = await vault.tryGetBox('anthropic_api_key')   // asks through the dialog when locked
+const { ok, val: whisper } = await vault.tryGetWhisper('anthropic_api_key')   // asks through the dialog when locked
 if (! ok) { return null }   // dismissed: refused 'vault_locked'
 ```
 
 * **One dialog at a time.** Calls that overlap wait on the one dialog, and its answer settles
   them all: unlocked, each goes on; dismissed, each is refused `vault_locked`. The throwing forms
-  (`vault.getBox(...)`) throw that refusal; the `try` forms resolve it as `err`.
+  (`vault.getWhisper(...)`) throw that refusal; the `try` forms resolve it as `err`.
 * **A lock closes it.** A `lock()`, a sign-out, another user or the provider unmounting closes the
   dialog, and every call waiting on it is refused `vault_locked`. A lock that lands while the
   passphrase is being checked wins: the vault stays locked. So does the start over (below): a
@@ -414,7 +414,7 @@ browser extension or a session-replay tool can read it, hidden or shown. `Whispe
 passphrase dialog are uncontrolled for that reason; a field of your own should be too. Show
 `mask(whisper)` (from `safebyok/utils`) where the user only needs to tell keys apart; read a
 whisper into state only when the user asks to see or edit it, and drop it (set the state back)
-when they hide it, save, or navigate away; and to use a whisper, call `vault.useBox(boxlabel,
+when they hide it, save, or navigate away; and to use a whisper, call `vault.useWhisper(boxlabel,
 callback)`, which hands it to your callback and keeps it out of state altogether.
 
 ## Fingerprint unlock (passkeys)

@@ -24,8 +24,8 @@ describe("scoping", () => {
     expect(two.getSnapshot().state).to.eq('absent')
     await two.unlock('pw two')
     await two.putBox('anthropic', 'u2-secret')
-    expect(await one.getBox('anthropic')).to.eq('u1-secret')
-    expect(await two.getBox('anthropic')).to.eq('u2-secret')
+    expect(await one.getWhisper('anthropic')).to.eq('u1-secret')
+    expect(await two.getWhisper('anthropic')).to.eq('u2-secret')
   })
 
   it("one user's lease opens nothing for another", async () => {
@@ -117,7 +117,7 @@ describe("tampering", () => {
     const row = JSON.parse(world.dbStore.read(ckey ?? '') ?? '{}') as { whisper_ciphered: { ciphertext_b64: string } }
     row.whisper_ciphered.ciphertext_b64 = TH.tweakB64(row.whisper_ciphered.ciphertext_b64)
     world.dbStore.write(ckey ?? '', JSON.stringify(row))
-    const err = await TH.expectRefusal(vault.getBox('anthropic'), 'damaged_box')
+    const err = await TH.expectRefusal(vault.getWhisper('anthropic'), 'damaged_box')
     expect(err.message).to.not.include('sk-fake')
     expect(world.dbStore.read(ckey ?? '')).to.not.be.null  // preserved for forensics, never auto-deleted
   })
@@ -128,7 +128,7 @@ describe("tampering", () => {
     await vault.putBox('victim_box', 'sk-fake')
     const fromCkey = world.dbStore.ckeys().find((candidate) => candidate.includes('victim_box'))
     world.dbStore.write(u1BoxCkey('other_box'), world.dbStore.read(fromCkey ?? '') ?? '')
-    await TH.expectRefusal(vault.getBox('other_box'), 'damaged_box')
+    await TH.expectRefusal(vault.getWhisper('other_box'), 'damaged_box')
   })
 
   for (const [spoil, blurb] of SpoiledShells) {
@@ -140,7 +140,7 @@ describe("tampering", () => {
       const row = JSON.parse(world.dbStore.read(ckey) ?? '{}') as Record<string, unknown>
       const spoiled = JSON.stringify(spoil(row))
       world.dbStore.write(ckey, spoiled)
-      await TH.expectRefusal(vault.getBox('anthropic'), 'damaged_box')
+      await TH.expectRefusal(vault.getWhisper('anthropic'), 'damaged_box')
       expect(world.dbStore.read(ckey)).to.eq(spoiled)
     })
   }
@@ -173,7 +173,7 @@ describe("tampering", () => {
     const row = JSON.parse(world.dbStore.read(u1BoxCkey('anthropic')) ?? '{}') as { whisper_ciphered: { ciphertext_b64: string } }
     row.whisper_ciphered.ciphertext_b64 = TH.tweakB64(row.whisper_ciphered.ciphertext_b64)
     world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify(row))
-    const err = await TH.expectRefusal(vault.getBox('anthropic'), 'damaged_box')
+    const err = await TH.expectRefusal(vault.getWhisper('anthropic'), 'damaged_box')
     expect(err.message).to.include('That box is damaged')
     expect(err.message).to.not.include('anthropic')
     expect(err.message).to.include('remove it')
@@ -213,7 +213,7 @@ describe("the logger", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox('anthropic', 'sk-fake', { sidecar: { note: 'work account' } })
-    await vault.getBox('anthropic')
+    await vault.getWhisper('anthropic')
     await vault.putWayin('pw', 'pw two')
     await vault.lock()
     await vault.unlock('pw two')
@@ -292,7 +292,7 @@ describe("the logger", () => {
     Object.defineProperty(vaultDB, 'logger', { value: { log: throwFromLogger, warn: throwFromLogger, error: throwFromLogger } })
     const vault = await world.openUnlocked('pw', { vaultDB, logger: undefined })
     vi.spyOn(vaultDB, 'getBox').mockResolvedValueOnce(bad(signedOut()))
-    await TH.expectRefusal(vault.getBox('anthropic'), 'identity_revoked')
+    await TH.expectRefusal(vault.getWhisper('anthropic'), 'identity_revoked')
     expect(vault.getSnapshot().state).to.eq('locked')
   })
 
@@ -439,7 +439,7 @@ describe("the logger", () => {
     world.dbStore.write(u1BoxCkey('anthropic'), row)
     // a lock for storage that no longer serves the user
     vi.spyOn(world.vaultDB, 'getBox').mockResolvedValueOnce(bad(signedOut()))
-    await TH.expectRefusal(vault.getBox('anthropic'), 'identity_revoked')
+    await TH.expectRefusal(vault.getWhisper('anthropic'), 'identity_revoked')
     expect(vault.getSnapshot().state).to.eq('locked')
     // an open that discards an unreadable lease
     await vault.unlock('pw')
@@ -486,7 +486,7 @@ describe("the logger", () => {
 describe("when storage says the user is no longer signed in", () => {
   /** Each vault call that reaches storage, the storage verb it reaches, and the call. */
   const RevokedCallCases: readonly (readonly [string, 'getVaultProps' | 'getBox' | 'putBox' | 'putVaultProps', (vault: Vault) => Promise<unknown>])[] = [
-    ['getBox()',           'getBox',        (vault) => vault.getBox('anthropic')],
+    ['getWhisper()',       'getBox',        (vault) => vault.getWhisper('anthropic')],
     ['putBox()',           'putBox',        (vault) => vault.putBox('openai', 'sk-fake-two')],
     ['unlock()',           'getVaultProps', (vault) => vault.unlock('pw one')],
     ['putWayin()', 'putVaultProps', (vault) => vault.putWayin('pw one', 'pw two')],
@@ -503,10 +503,10 @@ describe("when storage says the user is no longer signed in", () => {
       expect(vault.getSnapshot().state).to.eq('locked')
       expect(vault.getSnapshot().askPassphraseAt).to.be.null
       expect(await world.getLease()).to.be.null
-      await TH.expectRefusal(vault.getBox('anthropic'), 'vault_locked')
+      await TH.expectRefusal(vault.getWhisper('anthropic'), 'vault_locked')
       // Signed in again: the passphrase it had still opens it, and the box is still there.
       await vault.unlock('pw one')
-      expect(await vault.getBox('anthropic')).to.eq('sk-fake-one')
+      expect(await vault.getWhisper('anthropic')).to.eq('sk-fake-one')
     })
   }
 
@@ -529,7 +529,7 @@ describe("when storage says the user is no longer signed in", () => {
     const heard: string[] = []
     vault.subscribe(() => { heard.push(vault.getSnapshot().state) })
     vi.spyOn(world.vaultDB, 'getBox').mockResolvedValueOnce(bad(signedOut()))
-    await TH.expectRefusal(vault.getBox('anthropic'), 'identity_revoked')
+    await TH.expectRefusal(vault.getWhisper('anthropic'), 'identity_revoked')
     // Told locked, then told of the bad news as its trouble: never unlocked again between.
     expect([...new Set(heard)]).to.deep.equal(['locked'])
     expect(vault.trouble?.refusalkind).to.eq('identity_revoked')
@@ -556,7 +556,7 @@ describe("when storage says the user is no longer signed in", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
     vi.spyOn(world.vaultDB, 'getBox').mockResolvedValueOnce(bad(new VaultError('not_permitted', 'You may not read this vault.')))
-    await TH.expectRefusal(vault.getBox('anthropic'), 'not_permitted')
+    await TH.expectRefusal(vault.getWhisper('anthropic'), 'not_permitted')
     expect(vault.getSnapshot().state).to.eq('unlocked')
     expect(await world.getLease()).to.not.be.null
   })
@@ -567,7 +567,7 @@ describe("when storage says the user is no longer signed in", () => {
     const stuck = new Error('the device store is read-only')
     vi.spyOn(world.deviceDB, 'delLease').mockRejectedValueOnce(stuck)
     vi.spyOn(world.vaultDB, 'getBox').mockResolvedValueOnce(bad(signedOut()))
-    await TH.expectRefusal(vault.getBox('anthropic'), 'identity_revoked')
+    await TH.expectRefusal(vault.getWhisper('anthropic'), 'identity_revoked')
     expect(vault.getSnapshot().state).to.eq('locked')
     expect(await world.getLease()).to.not.be.null
     expect(world.logged[0]).to.deep.include({ level: 'warn', story: { call: 'untrustedStorage' } })
@@ -742,7 +742,7 @@ describe("vault props rolled back", () => {
     expect(vault.getSnapshot().passkey).to.be.null
     expect(await world.getLease()).to.be.null
     // The next call says hello afresh, and meets the older copy again.
-    await TH.expectRefusal(vault.getBox('anthropic'), 'rolled_back')
+    await TH.expectRefusal(vault.getWhisper('anthropic'), 'rolled_back')
     expect(world.logged.map((call) => [call.level, call.story, (call.err as VaultError | null | undefined)?.refusalkind]))
       .to.deep.equal([['log', { call: 'untrustedStorage' }, undefined], ['warn', { call: 'refresh' }, 'rolled_back']])
   })
@@ -918,7 +918,7 @@ describe("the vaultKey's epoch", () => {
     const vault = await world.openUnlocked('pw')
     await vault.putBox('anthropic', 'sk-fake')
     world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), vault_key_epoch: 2 }))
-    const err = await TH.expectRefusal(vault.getBox('anthropic'), 'damaged_box')
+    const err = await TH.expectRefusal(vault.getWhisper('anthropic'), 'damaged_box')
     expect(err.message).to.include('does not hold')
     expect(TH.thrownText(err)).to.not.include('anthropic')
   })

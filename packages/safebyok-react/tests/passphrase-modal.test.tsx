@@ -248,7 +248,7 @@ describe("PassphraseModal", () => {
       const showDialog = (dialog: ReactNode) => { act(() => { host.show(dialog) }) }
       const getProof: GetProof = (ask) => new Promise((answer) => { showDialog(<PassphraseModal ask={ask} onDone={answer} />) })
       const vault = await TH.settledVault({ ...opts, getProof })
-      const reading = vault.getBox('anthropic_api_key')
+      const reading = vault.getWhisper('anthropic_api_key')
       await screen.findByPlaceholderText('vault passphrase')
       TH.submitPassphrase('pw')
       expect(await reading).to.eq('sk-fake')

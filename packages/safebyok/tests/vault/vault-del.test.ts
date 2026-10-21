@@ -28,12 +28,12 @@ describe("delBox and del()", () => {
       await vault.putBox('anthropic', 'sk-ant-fake')
       await vault.putBox('openai', 'sk-openai-fake', { sidecar: { note: 'work account' } })
       world.dbStore.write(u1BoxCkey('anthropic'), spoil(storedRowOf(world, 'anthropic')))
-      await TH.expectRefusal(vault.getBox('anthropic'), 'damaged_box')
+      await TH.expectRefusal(vault.getWhisper('anthropic'), 'damaged_box')
       await vault.delBox('anthropic')
       expect(world.dbStore.read(u1BoxCkey('anthropic'))).to.be.null
       expect(boxlabelsOf(vault)).to.deep.equal(['openai'])
       expect(TH.summaryOf(vault.getSnapshot().boxes[0])?.sidecar).to.deep.equal({ note: 'work account' })
-      expect(await vault.getBox('openai')).to.eq('sk-openai-fake')
+      expect(await vault.getWhisper('openai')).to.eq('sk-openai-fake')
     })
   }
 
@@ -68,7 +68,7 @@ describe("delBox and del()", () => {
     await mine.del()
     expect(mine.getSnapshot().state).to.eq('absent')
     expect(world.dbStore.ckeys().filter((ckey) => ckey.includes(':u1:'))).to.have.lengthOf(0)
-    expect(await theirs.getBox('anthropic')).to.eq('theirs')
+    expect(await theirs.getWhisper('anthropic')).to.eq('theirs')
   })
 
   it("del() works on a locked vault: owning the account is enough to delete it", async () => {
@@ -144,7 +144,7 @@ describe("damaged boxes", () => {
       await fresh.delBox('anthropic')
       expect(world.dbStore.read(u1BoxCkey('anthropic'))).to.be.null
       expect(boxlabelsOf(fresh)).to.deep.equal(['openai'])
-      expect(await fresh.getBox('openai')).to.eq('sk-openai-fake')
+      expect(await fresh.getWhisper('openai')).to.eq('sk-openai-fake')
     })
   }
 
@@ -154,20 +154,20 @@ describe("damaged boxes", () => {
       const { world, vault } = await worldWithDamagedBox(spoil)
       world.advance(60_000)
       await vault.putBox('anthropic', 'sk-ant-new')
-      expect(await vault.getBox('anthropic')).to.eq('sk-ant-new')
+      expect(await vault.getWhisper('anthropic')).to.eq('sk-ant-new')
       const summary = TH.summaryOf(vault.getSnapshot().boxes[0])
       expect(summary).to.deep.include({ boxlabel: 'anthropic', sidecar: {}, registered_at: world.clock.now(), written_at: world.clock.now() })
       expect(boxlabelsOf(vault)).to.deep.equal(['anthropic', 'openai'])
     })
   }
 
-  it("getBox and useBox refuse a damaged box as 'damaged_box', handing the callback nothing, and leave it as it is", async () => {
+  it("getWhisper and useWhisper refuse a damaged box as 'damaged_box', handing the callback nothing, and leave it as it is", async () => {
     const [spoil] = DamagedListings[1]
     const { world, vault } = await worldWithDamagedBox(spoil)
     const spoiled = world.dbStore.read(u1BoxCkey('anthropic'))
     const callback = vi.fn()
-    await TH.expectRefusal(vault.getBox('anthropic'), 'damaged_box')
-    await TH.expectRefusal(vault.useBox('anthropic', callback), 'damaged_box')
+    await TH.expectRefusal(vault.getWhisper('anthropic'), 'damaged_box')
+    await TH.expectRefusal(vault.useWhisper('anthropic', callback), 'damaged_box')
     expect(callback).not.toHaveBeenCalled()
     expect(world.dbStore.read(u1BoxCkey('anthropic'))).to.eq(spoiled)
     expect(vault.getSnapshot().boxes[0]).to.deep.include({ boxlabel: 'anthropic', damaged: true })
@@ -202,7 +202,7 @@ describe("damaged boxes", () => {
     const callsOf = Object.fromEntries(writes.map(([verb, spy]) => [verb, spy.mock.calls.length]))
     expect(callsOf).to.deep.equal({ ensureVaultProps: 0, putVaultProps: 0, putBox: 1, delBox: 0, delVault: 0, delDamagedVault: 0 })
     expect(putBox.mock.calls[0]?.[1]).to.deep.include({ revision_tok: revisionTok })
-    expect(await vault.getBox('anthropic')).to.eq('sk-ant-new')
+    expect(await vault.getWhisper('anthropic')).to.eq('sk-ant-new')
     vi.restoreAllMocks()
   })
 
@@ -221,7 +221,7 @@ describe("damaged boxes", () => {
     vi.restoreAllMocks()
     await vault.delBox('anthropic')
     await vault.putBox('anthropic', 'sk-ant-new')
-    expect(await vault.getBox('anthropic')).to.eq('sk-ant-new')
+    expect(await vault.getWhisper('anthropic')).to.eq('sk-ant-new')
   })
 
   it("lists a box under a vaultKey the vault does not hold as damaged from its epoch alone, its revision kept, and putBox() replaces it", async () => {
@@ -232,9 +232,9 @@ describe("damaged boxes", () => {
     world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...row, vault_key_epoch: 5 }))
     await TH.wakeupAtNextTick()
     expect(vault.getSnapshot().boxes).to.deep.equal([{ boxlabel: 'anthropic', damaged: true, revision_tok: row['revision_tok'] }])
-    await TH.expectRefusal(vault.getBox('anthropic'), 'damaged_box')
+    await TH.expectRefusal(vault.getWhisper('anthropic'), 'damaged_box')
     await vault.putBox('anthropic', 'sk-fake-again')
-    expect(await vault.getBox('anthropic')).to.eq('sk-fake-again')
+    expect(await vault.getWhisper('anthropic')).to.eq('sk-fake-again')
     expect(TH.summaryOf(vault.getSnapshot().boxes[0])?.vault_key_epoch).to.eq(1)
   })
 
@@ -259,7 +259,7 @@ describe("damaged boxes", () => {
     const [spoil] = DamagedListings[2]
     const { vault } = await worldWithDamagedBox(spoil, { maxBoxes: 2 })
     await vault.putBox('anthropic', 'sk-ant-new')
-    expect(await vault.getBox('anthropic')).to.eq('sk-ant-new')
+    expect(await vault.getWhisper('anthropic')).to.eq('sk-ant-new')
     await TH.expectRefusal(vault.putBox('third', 'sk-fake'), 'vault_full')
   })
 
@@ -268,7 +268,7 @@ describe("damaged boxes", () => {
     expect(TH.summaryOf(vault.getSnapshot().boxes[0])?.sidecar).to.deep.equal({ note: 'personal account' })
     world.advance(60_000)
     await vault.putBox('anthropic', 'sk-ant-new')
-    expect(await vault.getBox('anthropic')).to.eq('sk-ant-new')
+    expect(await vault.getWhisper('anthropic')).to.eq('sk-ant-new')
     expect(TH.summaryOf(vault.getSnapshot().boxes[0])).to.deep.include({ sidecar: {}, registered_at: world.clock.now() })
   })
 
@@ -306,7 +306,7 @@ describe("a way in stored damaged", () => {
   it("shuts out no other: the vault's sound passphrase still opens it", async () => {
     const { fresh } = await vaultWithDamagedPasskey()
     await fresh.unlock('pw')
-    expect(await fresh.getBox('anthropic')).to.eq('sk-fake')
+    expect(await fresh.getWhisper('anthropic')).to.eq('sk-fake')
   })
 
   it("a passkey stored damaged refuses its answer as damaged_wayin, and the passphrase still opens", async () => {
@@ -324,7 +324,7 @@ describe("a way in stored damaged", () => {
     const err = await TH.expectRefusal(fresh.unlock('pw'), 'damaged_wayin')
     expect(TH.thrownText(err)).to.not.include('c2FsdA')
     await fresh.unlock(laptop)
-    expect(await fresh.getBox('anthropic')).to.eq('sk-fake')
+    expect(await fresh.getWhisper('anthropic')).to.eq('sk-fake')
   })
 
   it("a passkey stored damaged is removed by the passphrase, leaving the vault no passkey", async () => {

@@ -210,7 +210,7 @@ const settleLogger = (logger: VaultLogger | null | undefined, vaultDB: VaultDB):
  * The provider and its vault say things through one logger: the `logger` given here, else the one
  * the `vaultDB` was made with (the default logger when it was given none). Unless given a
  * `getProof` of the host's own, it renders the passphrase dialog, `PassphraseModal`, whenever a
- * call on the vault needs it unlocked and finds it not -- `vault.getBox(...)` and the rest, or
+ * call on the vault needs it unlocked and finds it not -- `vault.getWhisper(...)` and the rest, or
  * `vault.ensureLease()` on an Unlock button -- one at a time: unstyled markup under the
  * `modal-scrim` / `modal` class names, for the host's stylesheet to dress. The call waits on the
  * dialog, and goes on once it unlocks; dismissed, it refuses with kind 'vault_locked'. A lock, a
@@ -235,7 +235,7 @@ const settleLogger = (logger: VaultLogger | null | undefined, vaultDB: VaultDB):
  *     <App />
  *   </VaultProvider>
  * @example
- *   const { ok, val: whisper } = await vault.tryGetBox('anthropic_api_key')   // asks through the dialog when locked
+ *   const { ok, val: whisper } = await vault.tryGetWhisper('anthropic_api_key')   // asks through the dialog when locked
  *   if (! ok) { return null }   // dismissed: refused 'vault_locked'
  */
 export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, passphraseAdvice, children, ...opts }: VaultProviderProps) => {

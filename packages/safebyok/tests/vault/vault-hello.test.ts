@@ -53,7 +53,7 @@ describe("hello", () => {
     const vault = Vault.make(world.optsWith())
     const hello = vault.hello()
     await gate.reached
-    const reading = vault.getBox('anthropic')
+    const reading = vault.getWhisper('anthropic')
     expect(vault.getSnapshot().state).to.eq('opening')
     gate.release()
     expect(await reading).to.eq('sk-fake')
@@ -189,7 +189,7 @@ describe("hello", () => {
     const vault = await world.open()
     vault.close()
     await TH.expectRefusal(vault.hello(), 'vault_closed')
-    await TH.expectRefusal(vault.getBox('anthropic'), 'vault_closed')
+    await TH.expectRefusal(vault.getWhisper('anthropic'), 'vault_closed')
   })
 
   it("never takes the state back to opening: a locked vault whose read fails stays locked, saying it is not syncing", async () => {
@@ -755,7 +755,7 @@ describe("onBadNews, by the Contract", () => {
     const world = await damagedVaultWorld()
     const { told, onBadNews } = newsKeeper()
     const vault = Vault.make(world.optsWith({ onBadNews }))
-    const refusals = await Promise.all([TH.expectRefusal(vault.hello(), 'damaged_vault'), TH.expectRefusal(vault.getBox('anthropic'), 'damaged_vault'), TH.expectRefusal(vault.unlock('pw'), 'damaged_vault')])
+    const refusals = await Promise.all([TH.expectRefusal(vault.hello(), 'damaged_vault'), TH.expectRefusal(vault.getWhisper('anthropic'), 'damaged_vault'), TH.expectRefusal(vault.unlock('pw'), 'damaged_vault')])
     expect(new Set(refusals).size).to.eq(1)
     expect(told).to.deep.equal([refusals[0]])
   })

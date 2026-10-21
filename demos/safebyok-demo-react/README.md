@@ -21,7 +21,7 @@ localStorage.
 * **The Knock-Knock Machine** ([src/components/KnockKnock.tsx](src/components/KnockKnock.tsx)) --
   the "app". Save your Anthropic API key once (it goes into the vault as the box
   `anthropic_api_key`), type who's there, and hit *(( … Who? ))*: the key is decrypted on-device
-  inside `vault.useBox(...)` and sent browser-to-Anthropic (Claude Haiku, the cheapest model) for a
+  inside `vault.useWhisper(...)` and sent browser-to-Anthropic (Claude Haiku, the cheapest model) for a
   punchline. No server of ours ever sees the key.
 * **Vault dashboard** ([src/components/VaultDashboard.tsx](src/components/VaultDashboard.tsx)) --
   direct manipulation of the vault: add, view, edit, remove and *use* boxes. Whisper-touching

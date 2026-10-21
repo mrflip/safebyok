@@ -162,8 +162,8 @@ describe("graphqlVaultDB, as the README has it", () => {
 
     const second = await opened()
     await second.unlock('correct horse battery staple')
-    expect(await second.getBox('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
-    expect(await second.getBox('openai_api_key')).to.deep.equal({ apiKey: 'sk-test-not-a-real-key', orgId: null })
+    expect(await second.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
+    expect(await second.getWhisper('openai_api_key')).to.deep.equal({ apiKey: 'sk-test-not-a-real-key', orgId: null })
     expect(second.getSnapshot().boxes.map((box) => box.damaged ? null : box.sidecar)).to.deep.equal([{ note: 'work account' }, {}])
     await second.delBox('openai_api_key')
     expect(second.getSnapshot().boxes.map((box) => box.boxlabel)).to.deep.equal(['anthropic_api_key'])
@@ -202,7 +202,7 @@ describe("graphqlVaultDB, carrying a passkey's way in", () => {
       wayinkind: 'passkey', credential_id: laptop.credentialId, prf_salt_b64: laptop.prfSaltB64,
     })
     await second.unlock(laptop)
-    expect(await second.getBox('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
+    expect(await second.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
     second.close()
   })
 })

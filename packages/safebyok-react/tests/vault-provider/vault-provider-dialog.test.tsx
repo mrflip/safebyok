@@ -152,7 +152,7 @@ describe("VaultProvider", () => {
       const world = await lockedWorld()
       const { unmount } = render(world.tree('u1'))
       const vault = await world.opened()
-      const reading = vault.tryGetBox('anthropic_api_key')
+      const reading = vault.tryGetWhisper('anthropic_api_key')
       await screen.findByPlaceholderText('vault passphrase')
       unmount()
       await TH.expectBad(reading, 'vault_locked')
@@ -162,7 +162,7 @@ describe("VaultProvider", () => {
       const world = await lockedWorld()
       render(world.tree('u1'))
       const vault = await world.opened()
-      const reading = vault.tryGetBox('anthropic_api_key')
+      const reading = vault.tryGetWhisper('anthropic_api_key')
       await screen.findByPlaceholderText('vault passphrase')
       fireEvent.click(screen.getByText('Cancel'))
       const { ok } = await reading
@@ -177,7 +177,7 @@ describe("VaultProvider", () => {
       const Eager = () => {
         const vault = useVault()
         useLayoutEffect(() => {
-          if (vault !== null) { eager.reading = watched(vault.getBox('anthropic_api_key')) }
+          if (vault !== null) { eager.reading = watched(vault.getWhisper('anthropic_api_key')) }
         }, [vault])
         return null
       }
@@ -191,7 +191,7 @@ describe("VaultProvider", () => {
       const world = await lockedWorld()
       const { rerender } = render(world.tree('u1'))
       const vault = await world.opened()
-      const reading = vault.tryGetBox('anthropic_api_key')
+      const reading = vault.tryGetWhisper('anthropic_api_key')
       await screen.findByPlaceholderText('vault passphrase')
       rerender(world.tree('u2'))
       await TH.expectBad(reading, 'vault_locked')
@@ -204,7 +204,7 @@ describe("VaultProvider", () => {
       const world = await lockedWorld()
       const { rerender } = render(world.tree('u1'))
       const vault = await world.opened()
-      const reading = vault.tryGetBox('anthropic_api_key')
+      const reading = vault.tryGetWhisper('anthropic_api_key')
       await screen.findByPlaceholderText('vault passphrase')
       rerender(world.tree(null))
       await TH.expectBad(reading, 'vault_locked')
@@ -215,9 +215,9 @@ describe("VaultProvider", () => {
       const world = await lockedWorld()
       render(world.tree('u1'))
       const vault = await world.opened()
-      const first = vault.getBox('anthropic_api_key')
+      const first = vault.getWhisper('anthropic_api_key')
       await screen.findByPlaceholderText('vault passphrase')
-      const second = vault.getBox('anthropic_api_key')
+      const second = vault.getWhisper('anthropic_api_key')
       await TH.wakeupAtNextTick()
       expect(screen.getAllByPlaceholderText('vault passphrase')).to.have.lengthOf(1)
       fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
@@ -230,9 +230,9 @@ describe("VaultProvider", () => {
       const world = await lockedWorld()
       render(world.tree('u1'))
       const vault = await world.opened()
-      const first = vault.tryGetBox('anthropic_api_key')
+      const first = vault.tryGetWhisper('anthropic_api_key')
       await screen.findByPlaceholderText('vault passphrase')
-      const second = vault.tryGetBox('anthropic_api_key')
+      const second = vault.tryGetWhisper('anthropic_api_key')
       await TH.wakeupAtNextTick()
       fireEvent.click(screen.getByText('Cancel'))
       await TH.expectBad(first, 'vault_locked')
@@ -261,14 +261,14 @@ describe("VaultProvider", () => {
       })
       render(world.tree('u1', slowDeriver))
       const vault = await world.opened()
-      const first = vault.tryGetBox('anthropic_api_key')
+      const first = vault.tryGetWhisper('anthropic_api_key')
       fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
       fireEvent.click(screen.getByText('Unlock'))
       await gate.reached
       fireEvent.click(screen.getByText('Cancel'))
       await TH.expectBad(first, 'vault_locked')
 
-      const second = watched(vault.tryGetBox('anthropic_api_key'))
+      const second = watched(vault.tryGetWhisper('anthropic_api_key'))
       await screen.findByPlaceholderText('vault passphrase')
       expect(second.outcome).to.eq('pending')
       gate.release()
@@ -285,7 +285,7 @@ describe("VaultProvider", () => {
       const world = await lockedWorld()
       render(world.tree('u1'))
       const vault = await world.opened()
-      const reading = vault.getBox('anthropic_api_key')
+      const reading = vault.getWhisper('anthropic_api_key')
       await screen.findByPlaceholderText('vault passphrase')
       await vault.unlock('pw')
       expect(await reading).to.eq('sk-fake')
@@ -296,7 +296,7 @@ describe("VaultProvider", () => {
       const world = await lockedWorld()
       render(world.tree('u1'))
       const vault = await world.opened()
-      const reading = vault.tryGetBox('anthropic_api_key')
+      const reading = vault.tryGetWhisper('anthropic_api_key')
       await screen.findByPlaceholderText('vault passphrase')
       const elsewhere = await TH.settledVault({ ...world.props, deviceDB: memoryDeviceDB(), userId: 'u1' })
       await elsewhere.unlock('pw')
@@ -315,7 +315,7 @@ describe("VaultProvider", () => {
       const slowDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase: string, saltBytes: Uint8Array) => { await gate.pass(); return await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes) } }
       render(world.tree('u1', slowDeriver))
       const vault = await world.opened()
-      const reading = vault.tryGetBox('anthropic_api_key')
+      const reading = vault.tryGetWhisper('anthropic_api_key')
       fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
       fireEvent.click(screen.getByText('Unlock'))
       await gate.reached
@@ -337,7 +337,7 @@ describe("VaultProvider", () => {
       const slowDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase: string, saltBytes: Uint8Array) => { await gate.pass(); return await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes) } }
       const { rerender } = render(world.tree('u1', slowDeriver))
       const vault = await world.opened()
-      const first = vault.tryGetBox('anthropic_api_key')
+      const first = vault.tryGetWhisper('anthropic_api_key')
       fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
       fireEvent.click(screen.getByText('Unlock'))
       await gate.reached
@@ -348,7 +348,7 @@ describe("VaultProvider", () => {
       await waitFor(() => { expect(world.latest().vault).to.not.be.null })
       const vault2 = world.latest().vault
       if (vault2 === null || vault2 === vault) { throw new Error('the provider opened no vault for u2') }
-      const second = watched(vault2.tryGetBox('anthropic_api_key'))
+      const second = watched(vault2.tryGetWhisper('anthropic_api_key'))
       await screen.findByPlaceholderText('vault passphrase')
       gate.release()
       await TH.wakeupAtNextTick()
@@ -365,7 +365,7 @@ describe("VaultProvider", () => {
         const world = await lockedWorld()
         render(world.tree('u1'))
         const vault = await world.opened()
-        await TH.expectBad(vault.tryGetBox('anthropic_api_key'), 'vault_locked')
+        await TH.expectBad(vault.tryGetWhisper('anthropic_api_key'), 'vault_locked')
         expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null
         await vault.unlock('pw')
         expect(await vault.ensureLease({ renewMinutes: Infinity })).to.eq(vault)
@@ -389,7 +389,7 @@ describe("VaultProvider", () => {
       const vault = await world.opened()
       rerender(tree('second'))
       expect(world.latest().vault).to.eq(vault)
-      expect(await vault.getBox('anthropic_api_key')).to.eq('sk-fake')
+      expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-fake')
       expect(heard).to.deep.equal(['second: locked'])
       expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null
     })
@@ -428,7 +428,7 @@ describe("VaultProvider", () => {
       const world = await lockedWorld()
       render(<VaultProvider {...world.props} userId="u1" getProof={null}><world.Grab /></VaultProvider>)
       const vault = await world.opened()
-      await TH.expectBad(vault.tryGetBox('anthropic_api_key'), 'vault_locked')
+      await TH.expectBad(vault.tryGetWhisper('anthropic_api_key'), 'vault_locked')
       expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null
     })
 

@@ -6,7 +6,7 @@ import { gripeForJokeErr, tellKnockKnockJoke } from '../lib/anthropic'
 /**
  * The "app": a knock-knock machine powered by the user's own Anthropic key. This is what using
  * the library day-to-day looks like -- one box holding the key, the vault asking for the
- * passphrase through the provider's dialog whenever a call needs it, and `vault.useBox()` scoping
+ * passphrase through the provider's dialog whenever a call needs it, and `vault.useWhisper()` scoping
  * the decrypted key to the API call. A dialog the user dismissed is refused 'vault_locked': nothing
  * to say.
  */
@@ -39,7 +39,7 @@ export const KnockKnock = () => {
     setJoke(null)
     setGripe(null)
     try {
-      setJoke(await vault.useBox(ApiKeyBoxlabel, (whisper) => tellKnockKnockJoke(apiKeyOf(whisper), whosThere.trim())))
+      setJoke(await vault.useWhisper(ApiKeyBoxlabel, (whisper) => tellKnockKnockJoke(apiKeyOf(whisper), whosThere.trim())))
     } catch (err) {
       if (! isVaultError(err, 'vault_locked')) { setGripe(gripeForJokeErr(err)) }
     } finally {
