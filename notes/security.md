@@ -66,8 +66,9 @@ added or folded into through the subagent, and no other entry changes.
   refused `weak_passphrase` before the strength checker or any derivation. (3) The strength
   checker (`strengthChecker`, type `StrengthChecker`; `src/passphrase-strength.ts`): its contract is
   to answer a verdict. A throw from it is refused `unexpected_error` with no `cause`, `meta` or kind
-  of what it threw, as it heard the passphrase; before, a thrown condition passed through as
-  itself, and a non-condition was carried as `cause`. Left out, the default
+  of what it threw, as it heard the passphrase; so is a throw as its verdict is read (a `strong` or
+  `reason` getter: amended 2026-10-21, the read now being inside the guard); before, a thrown
+  condition passed through as itself, and a non-condition was carried as `cause`. Left out, the default
   `UnchosenStrengthChecker` refuses every passphrase as too weak, and the vault logs once per
   handle, at error level, that a checker must be chosen, the log quoting no passphrase (before,
   `Vault.make` refused a missing one `bad_option`). `zxcvbnStrengthChecker` now answers weak (a
@@ -123,7 +124,8 @@ added or folded into through the subagent, and no other entry changes.
   the make captures a stand-down signal (`#createsStandDown`; amended 2026-10-20 (placement): once `#makesStandDown`, and the signal that stands it down, now `#standDownCreates`, was `#standDownMakes`; behaviour unchanged) just before it writes its vault props; a
   read that finds the vault props in hand deleted or replaced (`#heedRevocation`) aborts it, and an
   aborted make puts no vault props back, so the grant (`#grantLease`) finds its props outrun, takes
-  nothing up and writes no lease; the unlock refuses `vault_locked`. A race test in
+  nothing up and writes no lease (or, outrun only during its write, erases the lease it wrote:
+  amended 2026-10-21, thread b_fixes); the unlock refuses `vault_locked`. A race test in
   `packages/safebyok/tests/vault/vault-races.test.ts` fails without the fix. Known residue, failing
   safe: a make stood down by the deletion of *another* device's vault refuses although its own vault
   stands (the next read takes it up, the next unlock opens it). Cross-device invalidation in general
@@ -145,7 +147,10 @@ added or folded into through the subagent, and no other entry changes.
   `registered_at`, and for a passkey also `credential_id` and `prf_salt_b64`, which an
   authenticator needs and which open nothing without the passkey. The vault and its models keep the
   full records privately. Tests check that the snapshot's JSON holds no stored salt or wrap. The
-  Coach: "yes good call".
+  Coach: "yes good call". Amended 2026-10-21 (thread b_fixes): the same holds of a `Wayin` and a
+  `Lease` themselves, in any log line or `JSON.stringify`: `Wayin.toJSON()` gives the wayin's
+  `summary` (no salt, no wrap), and `Lease.toJSON()` every field but `lease_key` and
+  `vault_key_lease_wrapped`; each gave its full stored record before.
 * 2026-10-19 (thread a_sec2, #206): **no proof is kept after an unlock, and this is not tested.**
   The vault keeps no reference to a proof (a `PassphraseProof` or `PasskeyProof`) once an unlock or
   a change to the ways in settles: the proof lives in the call's locals only, and no field of the
@@ -189,7 +194,16 @@ added or folded into through the subagent, and no other entry changes.
   whose `err` is no `VaultError`, is said the same way, and an answer that is no Outcome is refused
   `bad_option`. Unchanged: every abort and outrun check from `a_sec` around the take-up and the grant
   (the take-up's AbortController, the grant standing a take-up down before it writes, an overtaken
-  grant erasing its own lease) is where it was, in the vault.
+  grant erasing its own lease) is where it was, in the vault. Amended 2026-10-21 (thread b_fixes):
+  `#grantLease` erases the lease it just wrote not only when an ask's prompt ended during the write
+  but also when the vault props it was granted under no longer stand after it (deleted by `del()`,
+  made anew, or their ways in changed: a new `unlock_epoch`), and skips the write when that is so
+  already; before, a lease written by an unlock or a `putWayin()` racing this same handle's `del()`
+  survived the delete until `ask_passphrase_at` (168 h by default). A close alone erases nothing.
+  Limit: a `del()` made through *another* handle (another tab) is not seen by this one until it reads
+  storage, so this handle's grant racing it can still leave a lease; cross-device and cross-handle
+  invalidation awaits a mechanism of its own (each device authenticating a token when it joins or
+  creates a vault).
 * 2026-10-19 (thread a_fixes); amended 2026-10-19 (a_sec2, #206): **one test for a refusal, and a
   refusal from another copy of safebyok is a foreign throw.** `isVaultError(err, refusalkind?)`
   (`packages/safebyok/src/errors.ts`) is `err instanceof VaultError` plus the kind check, the one
@@ -386,7 +400,9 @@ added or folded into through the subagent, and no other entry changes.
   vault props are checked, again after the vaultKey is wrapped under the new leaseKey, and again
   after `putLease`: before the write it installs no key and writes no lease; if the abort came during
   the write it erases the lease it just wrote (`delLease`), so the lock holds across a reload; either
-  way `#vaultKey` is not set. This follows thread A3's take-up `AbortController` pattern (no
+  way `#vaultKey` is not set. The grant erases a lease it wrote in the same way when, after the
+  write, the vault props it was granted under no longer stand (amended 2026-10-21, thread b_fixes;
+  the B2 `lease` entry above has it). This follows thread A3's take-up `AbortController` pattern (no
   counters). The signal covers only `lock()`, `close()` and `del()`: other relocks
   (`identity_revoked`, `rolled_back`, a moved `unlock_epoch`, the lease expiring) do not land on the
   prompt, and `unlock()` outside a prompt keeps its earlier behaviour (a lock during it does not stop
@@ -479,7 +495,7 @@ added or folded into through the subagent, and no other entry changes.
   vault's logger (`error`) and the platform's `reportError`. It cannot change what the caller gets.
   The news carries no secret material; `meta.box_listed` carries a boxlabel, which the vault never
   quotes in a message (a host's validators may admit any text) but does carry in meta, as
-  `meta.box_stored` already does. 2026-10-19 (#201): a read of the vault props that finds a wayin
+  `meta.box_stored` does (see the 2026-10-19 (returning) entry). 2026-10-19 (#201): a read of the vault props that finds a wayin
   `isDamaged()` tells `onBadNews` a `damaged_wayin` news whose `meta.wayin_listed` is that wayin's
   summary (no salt of a passphrase, no wrap), once per distinct stored record; the read still succeeds
   and the other slot's wayin opens as before.
@@ -934,7 +950,13 @@ added or folded into through the subagent, and no other entry changes.
   clone (IndexedDB, `safebyok/idb`); the vaultKey handle a vault holds between operations is also
   non-extractable. The operations that must wrap the vaultKey (granting a lease at unlock, the
   re-wrap in putWayin) unwrap a separate extractable transient from the same wayin and
-  drop it on return; the lease path makes no extractable handle at all.
+  drop it on return; the lease path makes no extractable handle at all. Amended 2026-10-21: the
+  leaseKey's usages are wrapKey and unwrapKey, so whoever can use the lease record in this browser
+  profile (page script, an extension, a person at the unlocked device) can call WebCrypto
+  `unwrapKey` with it, asking for an extractable result, and so recover the vaultKey's bytes; the
+  non-extractable flag keeps the leaseKey, not the vaultKey, from being carried off. This is the
+  power a lease grants, until `ask_passphrase_at` (see the 2026-10-17 entry on the non-extractable
+  vaultKey).
 * 2026-10-14: a stored record that fails validation or AEAD verification is refused with kind
   `corrupt_record` and left in place -- remote data is never auto-deleted. A device-local
   lease that fails is the one exception: it is dropped, and the user asks again.
@@ -1121,8 +1143,8 @@ added or folded into through the subagent, and no other entry changes.
   function such as the strength checker or the key deriver,
   several of which are handed the passphrase -- becomes a `VaultError` of kind `unexpected_error`
   (family `misuse`) carrying the thrown value as `cause` (amended 2026-10-19 (put_wayin): a throw from the strength
-  checker is the exception, refused `unexpected_error` with no `cause`, `meta` or kind of what it threw;
-  see the put_wayin entry); it is deliberately never logged and never
+  checker is the exception, refused `unexpected_error` with no `cause`, `meta` or kind of what it threw,
+  a throw as it reads the verdict's fields included; see the put_wayin entry); it is deliberately never logged and never
   reported to the platform, since the thrown value may quote secret material, and the cause still
   reaches the caller (before, the raw throw propagated). In the `VaultDB` base
   (`src/vault-db.ts`), a non-`VaultError` throw from the adapter's `do*` hook stays
@@ -1135,11 +1157,13 @@ added or folded into through the subagent, and no other entry changes.
   Amended 2026-10-19 (a_sec, #203; corrected 2026-10-19, a_sec2, #206): what a key deriver
   (`deriveKeyBytes`) or a passphrase strength test throws, both handed the passphrase, goes through
   `hostThrewRefusal` (`src/outcome.ts`), applied in `passphraseKeyOf` (`src/proof.ts`) (amended
-  2026-10-19 (put_wayin): not the strength checker's throw, which `checkStrongEnough`
+  2026-10-19 (put_wayin), 2026-10-21: now only the key deriver's, not the strength checker's throw, which `checkStrongEnough`
   (`src/passphrase-strength.ts`) refuses as `unexpected_error` with no `cause`, `meta` or kind
   of what it threw; see the put_wayin entry). Only a
-  `VaultError` of the `condition` family passes through as itself: a key deriver's, say. Everything else becomes `unexpected_error` with the throw
-  as its `cause`, the treatment A6 gave `getProof`: a `VaultError` of misuse (`bad_option`, say),
+  `VaultError` of the `condition` family, of this copy of safebyok, passes through as itself: a key
+  deriver's, say. Everything else becomes `unexpected_error` with the throw as its `cause` (amended
+  2026-10-21: unlike the strength checker's, a key deriver's throw rides whole, and a row stands with
+  the Coach on whether the deriver should match), the treatment A6 gave `getProof`: a `VaultError` of misuse (`bad_option`, say),
   bad news, a refusal of another loaded copy of safebyok (a foreign throw, see the a_fixes entry
   above), and any non-`VaultError`. So the throw's own message is never the refusal's, and
   `safebyok-react`'s `forBoundary` then strips the cause before React's `onCaughtError`. Bad news
@@ -1150,7 +1174,11 @@ added or folded into through the subagent, and no other entry changes.
   `wrong_passphrase` (kind kept, message replaced), so a deriver's message, such as
   safebyok-fastkey's for an empty passphrase, never reaches the caller there; on the sealing paths
   (creating the vault, a new passphrase) a deriver's condition passes through as itself. The vault
-  refuses an empty passphrase before any deriver sees it anyway. Before, `checkStrongEnough` rethrew
+  refuses a blank passphrase (empty, or only spaces) before any deriver sees it anyway (amended
+  2026-10-21): as a proof, in `PassphraseProof.parse` (`src/proof.ts`), `wrong_passphrase`, whether it
+  opens a vault (`unlock()`, the first one that creates a vault included) or proves a change
+  (`standingPassphraseOf`, `src/vault.ts`: `putWayin`, `delWayin`); as the new passphrase of
+  `putWayin`, `weak_passphrase`, in `newProofOf`. Before, `checkStrongEnough` rethrew
   whatever the test threw, and any `VaultError` from a deriver passed through with its message.
 * 2026-10-15: `localVaultDB` and `idbVaultDB` key rows by `applabel:user_id:vaultlabel`, and
   `user_id` may hold a colon, so one user's rows can share another scope's ckey prefix. Listing
@@ -1386,10 +1414,10 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-15; 2026-10-19 (slots): vault props hold two slots, `passphrase` (required) and `passkey` (or null), each
   the one vaultKey wrapped under its own key (until slots, a list of one to `MaxUnlocks` (8), each with a
   `wayin_id` and a `wayinlabel`). The passphrase wayin has its own random `salt_b64`, and its wrap's
-  additional data is the format, scope, `vault_id`, a purpose per wayinkind
+  additional data is the format, scope, `vault_id`, the vault props' `registered_at`, a purpose per wayinkind
   (`vault_key_passphrase_wrapped`), and the wayin's whole visible header (`wayinkind`,
   `key_deriver_label`, `salt_b64`, `vault_key_epoch`, `device_id`, `registered_at`) as key-sorted
-  JSON (and, since the sweep entry below, the vault props' `registered_at`). The
+  JSON. The
   `unlock_epoch` is not in it, since a change to one wayin bumps the epoch and the
   other, whose key the device does not hold, must still open: a backend can therefore
   splice a wayin from older vault props of the same vault (a replaced passphrase's, or a removed
@@ -1399,8 +1427,9 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-15; 2026-10-19 (slots): removing a wayin (`delWayin`, which since slots removes the passkey,
   refusing `absent_wayin` where there is none; the passphrase can never be removed) is not revocation. Whoever knew the
   removed passphrase and kept any earlier vault props holds the vaultKey, which never rotates; the
-  removal bumps `unlock_epoch`, so devices unlocked under it lock at their next look, and the
-  removal needs no `last_wayin` refusal, for the passphrase stays. Every change to the wayins
+  removal bumps `unlock_epoch`, so devices unlocked under it lock at their next look, and no
+  removal can leave the vault with no way in, for the passphrase stays (amended 2026-10-21: this
+  once named a `last_wayin` refusal, which no longer exists). Every change to the wayins
   (`putWayin`, `delWayin`) asks for the standing passphrase (see the slots entry),
   even on an unlocked vault: the session's vaultKey handle is non-extractable, so wrapping it
   anew needs the extractable transient that a proof unwraps.
@@ -1418,7 +1447,7 @@ added or folded into through the subagent, and no other entry changes.
   passkeyKey is HKDF-SHA256 over the 32-byte PRF answer, with an empty salt and `info` =
   `["safebyok-vault-v1", "vault_key_passkey_wrapped", credential_id]` as JSON when first written, under the older tag `safebyok-vault-v1` (since the sweep
   entry below, the wrap's whole additional data); the wrap's additional
-  data is the format, scope, `vault_id`, purpose `vault_key_passkey_wrapped` and the wayin's
+  data is the format, scope, `vault_id`, the vault props' `registered_at`, purpose `vault_key_passkey_wrapped` and the wayin's
   visible header, as for a passphrase wayin. A stored salt that is not base64url of 32 bytes
   refuses as `corrupt_record` (since 2026-10-16, `damaged_wayin`: see that entry), checked at unlock rather than in the schema (the size budget, as for
   passphrase salts). The core never calls WebAuthn and never stores the answer; the answer passes
@@ -1479,7 +1508,8 @@ added or folded into through the subagent, and no other entry changes.
   holds only the seen vault.)
 * 2026-10-15; 2026-10-19 (slots, the Coach's ruling): **only the standing passphrase proves a change to
   the ways in.** Until slots, any wayin proved any change: a passkey's answer was accepted by
-  `addPassphrase`, `putWayin` (once `addPasskey` and `changePassphrase`) and `delWayin`, so whoever held one passkey could set a
+  the calls that set a new passphrase, put a passkey or remove a wayin (`putWayin`, once `addPasskey`,
+  `changePassphrase` and `addPassphrase`, and `delWayin`), so whoever held one passkey could set a
   new passphrase and remove the user's others, and the vault was as strong as its weakest wayin. Now
   `putWayin(passphrase, ...)` and `delWayin(passphrase)` take the
   passphrase, and a passkey's answer handed as the proof is refused `bad_option` before anything is read or
@@ -1488,11 +1518,12 @@ added or folded into through the subagent, and no other entry changes.
   a sign-in passkey on the same RP; removing a passkey from the vault does not delete it from the
   authenticator, and (as for passphrases) is not revocation.
 * 2026-10-15; 2026-10-19 (put_wayin): the proven vaultKey's extractable transient handle
-  (`wrapKey` usage only) is held from the proof until the new wayin is sealed. It was held across a
+  (`wrapKey` usage only) is held from the proof until the new wayin is sealed and the lease wrapped
+  (amended 2026-10-21: the lease wrap, `#grantLease`, comes after the seal). It was held across a
   WebAuthn prompt, human time, bounded by the prompt's `timeout`: `addPasskey` proved first and asked
   the authenticator after, so a refused proof left no orphaned passkey. That prompt is gone:
   `putWayin` takes the passkey's answer, made by the host before the call, and calls no host code
-  mid-flight, so the handle lives for one proof and one wrap (not human time, and no host timeout
+  mid-flight, so the handle lives for one proof, one seal and one lease wrap (not human time, and no host timeout
   bounds it). Acceptable because the handle lives only in a closure inside `reviseWayins`, never in
   the snapshot, a field or an error, so no host script can reach it, and a script able to hook
   SubtleCrypto already sees every unwrap; while unlocked the session's non-extractable handle opens
@@ -1610,8 +1641,8 @@ added or folded into through the subagent, and no other entry changes.
   form, and the passphrase typed into its state, unmount with the failure.
   Amended 2026-10-19 (a_sec, #203): everything rethrown now passes `forBoundary`
   (`packages/safebyok-react/src/boundary.tsx`): a `VaultError` keeps kind, message and meta but never
-  its `cause` (which for `unexpected_error` can be a host key deriver's or strength test's throw,
-  handed the passphrase), and anything that is not a `VaultError` becomes a fixed `unexpected_error`
+  its `cause` (which for `unexpected_error` can be a host key deriver's throw, handed the passphrase;
+  a strength checker's throw carries nothing, amended 2026-10-21), and anything that is not a `VaultError` becomes a fixed `unexpected_error`
   quoting nothing of it, so "the very thrown value" above no longer reaches `onCaughtError`. A host
   `passphraseAdvice` that throws (it is handed every keystroke of a new passphrase) is replaced at its
   source with a fixed refusal, so even a `VaultError` it threw carries nothing on. The report names
@@ -1925,7 +1956,8 @@ added or folded into through the subagent, and no other entry changes.
   a record naming no revision is deleted first, which leaves a gap P6 accepts (amended 2026-10-19,
   20261019-no_clear: the delete-first is gone; `putBox()` refuses a damaged box naming no
   revision as `damaged_box`, writing nothing, and the gap with it). A box under a
-  vaultKey epoch neither the vault props' nor the prior's lists as damaged from its epoch alone (G063);
+  vaultKey epoch other than the vault props' lists as damaged from its epoch alone (G063; amended
+  2026-10-21: it once also named a prior vaultKey's epoch, which the vault no longer keeps);
   the listing still never opens ciphertext (G121).
 * 2026-10-16 (refusals_and_catchup): **`Vault.make` takes only a `VaultDB`** (G122): a duck-typed
   object would skip the base class's checks of every record and expectation. `instanceof` holds
@@ -1937,7 +1969,10 @@ added or folded into through the subagent, and no other entry changes.
   opt-out (`describeVaultDB` no longer takes `comparesVaultKeyEpoch`). IndexedDB compares in the
   write's transaction; the Convex component in `putBox`'s mutation; Postgres in the write's one
   statement, reading the vault props row `FOR SHARE` -- without the lock, READ COMMITTED would compare
-  the epoch in the statement's snapshot, and a rotation committed after it would go unseen; GraphQL
+  the epoch in the statement's snapshot, and a change to the vault props committed after it would go
+  unseen (amended 2026-10-21: a `del()` and remake that moves `vault_id`, or a change to the ways in,
+  `putWayin` or `delWayin`, that moves `unlock_epoch`; `vault_key_epoch` itself is 1 for every
+  vault today, no rotation being built); GraphQL
   passes the expectation whole to the VaultDB it serves. So "no look before writing" (G138) holds:
   storage alone refuses a stale vaultKey's write, atomically. The `FOR SHARE` lock is new: vault props
   update now waits for box writes in flight, and the README's hard-cap trigger takes a
@@ -1967,9 +2002,12 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-16 (secure_floor): **a new passphrase must pass `strengthChecker`** before any key
   derivation: the one a vault is created with, and each one `putWayin`
   sets; never at `unlock`, so no user is locked out of a vault that stands by a test made
-  stricter later. The default is NIST SP 800-63B's length and no composition rules, at 12 code
-  points (the Coach's floor; SP 800-63B rev. 4 asks 15 of a password that is the only factor,
-  which a vault passphrase is). The refusal's message is the host test's own reason, a host
+  stricter later. The core sets no floor of its own, and amended 2026-10-21 there is no core default
+  of 12 code points: a vault made with no `strengthChecker` has `UnchosenStrengthChecker`, which
+  refuses every passphrase. The floor is the browser entry's `zxcvbnStrengthChecker`
+  (`browserOpts()`), NIST SP 800-63B's length and no composition rules, at 12 code points
+  (`MinPassphraseChars`, the Coach's floor; SP 800-63B rev. 4 asks 15 of a password that is the only
+  factor, which a vault passphrase is). The refusal's message is the host test's own reason, a host
   string: the doc tells hosts never to quote the passphrase in it, and the core cannot check.
   `safebyok/browser` offers `zxcvbnStrengthChecker` on `@zxcvbn-ts/core` and
   `@zxcvbn-ts/language-common` (runtime dependencies at the Coach's yes): the length floor, then a
@@ -2004,19 +2042,19 @@ added or folded into through the subagent, and no other entry changes.
   deriver as weak under another label is not noticed. The vault's records still name the label
   that sealed them.
 * 2026-10-16; 2026-10-19 (slots, the Coach's ruling): **`putWayin` is proved by the standing
-  passphrase only; a passkey's answer is refused `bad_option`.** On 2026-10-16 any wayin proved it, a
-  passkey's answer included, as it already proved `addPassphrase`, `putWayin`'s passkey and `delWayin`: whoever
-  held the authenticator and passed its user verification could set a new passphrase, in one write at
-  one unlockEpoch. Now a passkey cannot, so a forgotten passphrase can no longer be reset with the
+  passphrase only; a passkey's answer is refused `bad_option`.** Until slots, any wayin proved a change to
+  the ways in, a passkey's answer included: whoever held the authenticator and passed its user
+  verification could set a new passphrase, in one write at one unlockEpoch. A passkey cannot now, so a forgotten passphrase can no longer be reset with the
   passkey (which still opens and reads the vault), and a passphrase stored damaged cannot be replaced
   either. The vaultKey is untouched, so what the replaced passphrase's holder kept of earlier vault props still
   opens that copy, as for any removal.
-* 2026-10-16: **`delWayin` and a vaultKey rotation stay separate verbs**, as the rotation
-  design, since withdrawn, had them: `delWayin` is the
-  cheap removal and is not revocation, and `rotateVaultKey` is its own call. Removing a wayin (since slots, only the passkey)
+* 2026-10-16; amended 2026-10-21: **`delWayin` is a removal, not a revocation, and the package has no
+  vaultKey rotation.** The rotation design, since withdrawn, kept the two as separate verbs;
+  `delWayin` is the cheap removal. Removing a wayin (since slots, only the passkey)
   stops it opening the vault from here on and cannot take back what it opened; folding a rotation
-  into every removal would rewrite every box for what is usually housekeeping, and make the
-  common call the slow one. A host that removes a wayin because it was compromised rotates too.
+  into every removal would have rewritten every box for what is usually housekeeping. No rotation
+  verb is built, so a host that removes a wayin because it was compromised has nothing yet to call
+  to replace the vaultKey.
 * 2026-10-16; 2026-10-19 (slots): **the wayin summaries (`PassphraseWayinSummary`, `PasskeyWayinSummary`;
   once one `WayinSummary` list) show `device_id` and `registered_at`.** The snapshot of a locked
   vault already summarised each wayin; it now says too when it was added and by which device, so a
@@ -2356,7 +2394,9 @@ added or folded into through the subagent, and no other entry changes.
   `putWayin` entry of 2026-10-15 mentions this in passing; this entry states it on its own. A
   host can keep the lease short, call `lock()` on sign-out and on screen lock, serve the
   page under a strict Content-Security-Policy, and never load third-party script into a page that
-  holds an unlocked vault.
+  holds an unlocked vault. Amended 2026-10-21: the same holds while a lease stands on the device, the vault open or not:
+  anyone who can use this browser profile can open the vault with the lease's leaseKey, and
+  `unwrapKey` can hand back the vaultKey extractable (the 2026-10-14 leaseKey entry above).
 * 2026-10-17 (thread sweep_small, [#143](https://github.com/mrflip/safebyok/pull/143)): **the Postgres README no longer ships a hard-cap trigger
   recipe.** The `safebyok-postgres` README used to carry SQL for a `BEFORE INSERT` trigger on
   `safebyok_boxes` that refused a box past a hard limit, taking a transaction-scoped
