@@ -1220,6 +1220,7 @@ describe("vault.ensureLease, by the Contract", () => {
     const getProof = typingPw()
     const { vault } = await lockedVaultWith({ getProof })
     const button = new EventTarget()
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- the example's own form: a handler whose Outcome nobody reads
     button.addEventListener('click', () => vault.tryEnsureLease())
     button.dispatchEvent(new Event('click'))
     await vi.waitFor(() => { expect(vault.state).to.eq('unlocked') })

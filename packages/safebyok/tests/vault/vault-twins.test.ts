@@ -191,6 +191,7 @@ describe("vault.hello as an event handler", () => {
     const world = makeWorld()
     const vault = Vault.make(world.optsWith())
     const window = new EventTarget()
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- the example's own form: a handler whose Outcome nobody reads
     window.addEventListener('focus', () => vault.tryHello())
     window.dispatchEvent(new Event('focus'))
     await vi.waitFor(() => { expect(vault.state).to.eq('absent') })
