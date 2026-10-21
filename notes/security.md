@@ -60,7 +60,11 @@ added or folded into through the subagent, and no other entry changes.
   both; before, ahead of it). A load that fails fails the `hello()` as `unexpected_error` with the
   load's throw as `cause`: the load hears no passphrase, so its error may ride. No lease is taken
   up then, but the storage read may have landed in the snapshot, so state may show absent or locked
-  rather than opening. `zxcvbnStrengthChecker`'s
+  rather than opening. Amended 2026-10-21 (checker2): when the read also met bad news
+  (`damaged_vault`, `rolled_back`, `identity_revoked`), `onBadNews` is still told it before the
+  `hello()` refuses with the load's failure; the first version of the beside-the-read run dropped it
+  unheard while the load kept failing. Bad news is never dropped for a failed load, and nothing the
+  checker heard reaches the refusal, a log or a `cause`. `zxcvbnStrengthChecker`'s
   load fetches its dictionary chunk, and no longer answers "weak, try again" when the chunk will not
   load; a check whose load fails now throws, which the guard refuses carrying nothing. The Coach: "Late
   checks are dangerous: you want a fundamental thing to break loud and clear."
@@ -1783,7 +1787,11 @@ added or folded into through the subagent, and no other entry changes.
   the passphrase is not reported as it came. With no `passphraseAdvice` the dialog asks
   `vault.checkPassphrase`, and what that throws, and what `ask.attempt` throws, goes on through
   `forBoundary` (which strips any `cause`) to the app's error boundary above the dialog's own; the
-  vault's own check's thrown error goes on as itself, since it quotes nothing. The report names
+  vault's own check's thrown error goes on as itself, since it quotes nothing. Amended 2026-10-21
+  (checker2): as the boundary takes the dialog away on such a throw, the dialog answers `declined`
+  to the ask it was showing, so the call that asked is refused `vault_locked` and no unlock waits
+  forever (before, it never answered, which under a host's own `getProof` held every later prompt
+  behind it). A dialog a thrown mistake tears down always answers. The report names
   its component (`PassphraseModal` or `PasskeyUnlockButton`) and, for a `VaultError` whose cause was
   stripped, says in its message that the cause was left out. `meta` is passed through as is. The
   dialog's fallback notice once misuse trips it ("Something went wrong") now shares
