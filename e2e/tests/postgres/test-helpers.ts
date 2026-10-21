@@ -244,26 +244,25 @@ export const devicesOver = (getDb: () => FileDatabase): MakeVaultDBDevices => as
 // --------------------------------------------------------------------------- what a host's own code does
 
 /**
- * Resolves once a statement matching `statementLike` (an SQL `LIKE` pattern over the statement's
- * text) is waiting on another's lock on the file's database: the write under test, held where a
- * race wants it -- not any lock wait, nor this check's own query. Rejects after two seconds, well
- * inside the test's own timeout, so a write that never waits fails here, by name, rather than as a
- * timed-out test.
+ * Resolves once a statement of another connection is waiting on a lock `blocker` holds: the write
+ * under test, held where a race wants it -- not a wait on any other lock, nor this check's own
+ * query. The waiter is found by what blocks it and never by its text, which `pg_stat_activity`
+ * cuts at `track_activity_query_size` (1 kB unless the server sets more). Rejects after two
+ * seconds, well inside the test's own timeout, so a write that never waits fails here, by name,
+ * rather than as a timed-out test.
  *
- * @example await TH.untilStatementBlocked(db, '%INSERT INTO safebyok_boxes%')
+ * @example await TH.untilBlockedBy(db, eraser)
  */
-export const untilStatementBlocked = async (db: FileDatabase, statementLike: string): Promise<void> => {
+export const untilBlockedBy = async (db: FileDatabase, blocker: Client): Promise<void> => {
+  const { rows: held } = await blocker.query('SELECT pg_backend_pid() AS pid')
   await vi.waitUntil(async () => {
     const { rows } = await db.host.query(
-      "SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid() AND wait_event_type = 'Lock' AND query LIKE $1",
-      [statementLike],
+      'SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE datname = current_database() AND $1::int = ANY (pg_blocking_pids(pid))',
+      [(held[0] as { pid: number }).pid],
     )
     return (rows[0] as { waiting: number }).waiting > 0
   }, { timeout: 2000, interval: 10 })
 }
-
-/** The `LIKE` pattern of the statement a first write to a vault sends: an insert of a box. */
-export const FirstWriteStatement = '%INSERT INTO safebyok_boxes%'
 
 /** Makes the u1 vault the helpers' vault props stand for, through `vaultDB`, and writes a box under each of `boxlabels`. */
 export const filled = async (vaultDB: VaultDBVerbs, boxlabels: readonly string[]): Promise<void> => {
