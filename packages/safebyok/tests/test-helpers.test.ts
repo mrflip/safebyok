@@ -582,7 +582,7 @@ describe("testDeriver", () => {
     await vault.putBox('anthropic_api_key', 'sk-ant-test-not-a-real-key')
     await vault.lock()
     await vault.unlock('correct horse battery staple')
-    expect(await vault.getBox('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
+    expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
   })
 
   it("derives the same bytes from the same passphrase and salt, and others from another", async () => {

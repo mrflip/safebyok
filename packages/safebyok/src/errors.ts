@@ -220,7 +220,7 @@ export type VaultErrorOpts = ErrorOptions & { meta?: RefusalMeta }
  * `meta`, not as a property.
  *
  * @example
- *   try { await vault.getBox('ANTHROPIC_API_KEY') } catch (err) {
+ *   try { await vault.getWhisper('ANTHROPIC_API_KEY') } catch (err) {
  *     if (isVaultError(err, 'vault_locked')) { promptForPassphrase() }
  *   }
  * @example
@@ -252,14 +252,6 @@ export class VaultError extends Error {
   }
 }
 
-/** A VaultError a vault call throws, never resolves as its refusal, even from its `try` form.
- * It is a host's function that broke its contract -- a strength checker that threw, or answered
- * no verdict -- which no caller branches on: it belongs in the app's error handler. Every outcome
- * the vault makes lets it through. It is a VaultError all the same, read by `isVaultError` and
- * `refusalkind` as any other.
- */
-export class ThrownMistake extends VaultError {}
-
 /**
  * True when `err` is a VaultError, and of the given `refusalkind` when one is given: the one test
  * for a refusal, which safebyok asks everywhere it branches on one, and a host should too. An
@@ -268,7 +260,7 @@ export class ThrownMistake extends VaultError {}
  * this one (an ESM and a CJS build side by side): that is a foreign throw, met as any other.
  *
  * @example
- *   try { await vault.getBox('ANTHROPIC_API_KEY') } catch (err) {
+ *   try { await vault.getWhisper('ANTHROPIC_API_KEY') } catch (err) {
  *     if (isVaultError(err, 'vault_locked')) { promptForPassphrase() }
  *   }
  */

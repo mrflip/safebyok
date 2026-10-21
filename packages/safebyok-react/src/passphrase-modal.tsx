@@ -114,12 +114,9 @@ const unlockedFor = (leaseMillis: number, creating: boolean): string => {
  * finds weak, so the advice and Create decide alike. It is advice: what the vault itself refuses
  * at creation shows as any refusal does. It is never asked while unlocking.
  *
- * Advice that throws, and an attempt that throws rather than refusing (a broken strength checker),
- * are not the dialog's to handle: the dialog throws them on to the app's error boundary, above its
- * own. Advice of the host's that throws is reported as 'unexpected_error', carrying nothing of
- * what it heard; the vault's own check throws a refusal that quotes nothing, which goes on as it is.
- * Taken away by that boundary, the dialog answers `declined`, so the call that asked is refused,
- * never left waiting.
+ * Advice that throws fails the dialog: the host's is reported as 'unexpected_error', carrying
+ * nothing of what it heard; the vault's own check throws a refusal that quotes nothing, which goes
+ * on as it is.
  *
  * @example
  *   const getProof: GetProof = (ask) => new Promise((answer) => { showDialog(<PassphraseModal ask={ask} onDone={answer} />) })
@@ -140,17 +137,9 @@ const AnsweringOnce = (props: PassphraseModalProps) => {
   const { ask, onDone } = props
   const snapshot = useSyncExternalStore(ask.vault.subscribe, ask.vault.getSnapshot)
   const done = useAnswerOnce(ask, onDone, snapshot.state === 'unlocked')
-  // What the form threw rather than met: thrown here, above the dialog's boundary, for the app's.
-  // Wrapped, so that a failure carrying any value at all still reads as "failed".
-  const [raised, setRaised] = useState<{ err: unknown } | null>(null)
-  const thrownOn = useRef(false)
-  const raise = useCallback((err: unknown) => { thrownOn.current = true; setRaised({ err }) }, [])
-  // Taken away by the boundary it threw to, it answers declined, so no call waits on it for good.
-  useEffect(() => () => { if (thrownOn.current) { done('declined') } }, [done])
-  if (raised !== null) { throw forBoundary(raised.err, 'PassphraseModal') }
   return (
     <Boundary fallback={<DialogTrouble onDone={done} />}>
-      <UnlockForm {...props} onDone={done} raise={raise} />
+      <UnlockForm {...props} onDone={done} />
     </Boundary>
   )
 }
@@ -356,7 +345,7 @@ const useAnswerOnce = (ask: Ask, onDone: (answer: ProofAnswer) => void, unlocked
 }
 
 /** The dialog itself, inside PassphraseModal's boundary: its `onDone` is the one answer, `AnsweringOnce`'s. */
-const UnlockForm = ({ ask, onDone: done, raise, allowStartOver, passphraseUsername, passphraseAdvice }: PassphraseModalProps & { raise: (err: unknown) => void }) => {
+const UnlockForm = ({ ask, onDone: done, allowStartOver, passphraseUsername, passphraseAdvice }: PassphraseModalProps) => {
   const { vault } = ask
   const snapshot = useSyncExternalStore(vault.subscribe, vault.getSnapshot)
   const [gripe, setGripe] = useState<Gripe | null>(null)
@@ -372,8 +361,8 @@ const UnlockForm = ({ ask, onDone: done, raise, allowStartOver, passphraseUserna
   const blurbId = useId()
   // Wrapped, so that a failure carrying any value at all still reads as "failed".
   const [failure, setFailure] = useState<{ err: unknown } | null>(null)
-  // Advice that throws is the app's to handle, never the dialog's.
-  const advice = useAdvice(passphraseAdvice, vault, snapshot.state === 'absent', raise)
+  // The host's advice heard the passphrase: what it threw may quote it, so none of it goes on but safebyok's own refusal.
+  const advice = useAdvice(passphraseAdvice, vault, snapshot.state === 'absent', (err) => { setFailure({ err }) })
   if (failure !== null) { throw forBoundary(failure.err, 'PassphraseModal') }
   const creating = snapshot.state === 'absent'
   const passkeyFirst = ! creating && offersPasskey(snapshot)
@@ -404,15 +393,7 @@ const UnlockForm = ({ ask, onDone: done, raise, allowStartOver, passphraseUserna
   const submit = async (evt: SubmitEvent) => {
     evt.preventDefault()
     setGripe(null)
-    let tried: Awaited<ReturnType<Ask['attempt']>>
-    try {
-      tried = await ask.attempt(fieldRef.current?.value ?? '')
-    } catch (err) {
-      // An attempt throws only what no refusal says, a broken strength checker: the app's to handle.
-      if (isMounted()) { raise(err) }
-      return
-    }
-    const { ok, err } = tried
+    const { ok, err } = await ask.attempt(fieldRef.current?.value ?? '')
     if (! isMounted()) { return }
     if (ok) { done('unlocked'); return }
     meet(err)

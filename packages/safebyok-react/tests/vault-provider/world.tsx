@@ -36,7 +36,7 @@ export const Probe = () => {
     void vault.tryPutBox('anthropic_api_key', 'sk-fake').then((stored) => { setOutcome(stored.ok ? 'stored' : saidOf(stored.err)) })
   }
   const grab = () => {
-    void vault.tryGetBox('anthropic_api_key').then((read) => { setOutcome(read.ok ? `read:${JSON.stringify(read.val)}` : saidOf(read.err)) })
+    void vault.tryGetWhisper('anthropic_api_key').then((read) => { setOutcome(read.ok ? `read:${JSON.stringify(read.val)}` : saidOf(read.err)) })
   }
 
   return (

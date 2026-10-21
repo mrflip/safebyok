@@ -1,5 +1,5 @@
 import * as Z from 'zod/mini'
-import { ThrownMistake, VaultError } from './errors'
+import { VaultError } from './errors'
 import type { VaultScope } from './types'
 
 /**
@@ -18,8 +18,8 @@ export type PassphraseVerdict = { strong: true } | { strong: false, reason: stri
  * to become a way in -- the one the first `unlock()` creates a vault with, and each new one
  * `putWayin()` sets -- before any key derivation, and refuses a weak one with kind
  * 'weak_passphrase', the verdict's reason its message. It never runs on `unlock()` of a vault that
- * stands. One that throws, or answers anything but a verdict, is a bug: the call that asked it
- * throws, even a `try` form, for the app's error handler.
+ * stands. One that throws, or answers anything but a verdict, is a bug: the call that asked it is
+ * refused 'unexpected_error', or 'bad_option', as any call is.
  *
  * A checker that needs something fetched or built first -- a dictionary, say -- carries it as
  * `load`, which the vault's `hello()` runs beside its read of storage, at every hello that reads:
@@ -91,14 +91,14 @@ const passphraseVerdict = Z.union([
 /** `hostChecker` held to its contract, told `scope`: the vault's own check, `vault.checkPassphrase`.
  * It is the only caller of the host's checker, so every check -- the vault's, and a dialog's as
  * the user types -- decides strong or weak alike. A blank passphrase (empty, or only spaces) is
- * weak before the host's checker hears it. A broken checker is thrown as a {@link ThrownMistake},
- * which no `try` form resolves: kind 'bad_option' for one that answers anything but a verdict, and
- * 'unexpected_error' for one that throws, carrying nothing of what it threw -- no kind, no meta,
- * no cause -- as the checker heard the passphrase. `load` runs the host's, if any, and refuses its
- * failure as an ordinary 'unexpected_error', what it threw the cause, as it heard nothing.
+ * weak before the host's checker hears it. A broken checker is refused as any call is: kind
+ * 'bad_option' for one that answers anything but a verdict, and 'unexpected_error' for one that
+ * throws, carrying nothing of what it threw -- no kind, no meta, no cause -- as the checker heard
+ * the passphrase. `load` runs the host's, if any, and refuses its failure as 'unexpected_error',
+ * what it threw the cause, as it heard nothing.
  *
  * @example guardStrengthChecker(zxcvbnStrengthChecker, scope)('')   // resolves { strong: false, reason: "A new passphrase can't be empty ..." }
- * @example guardStrengthChecker(() => ({ strong: 'yes' }), scope)('pw')   // rejects: a ThrownMistake, kind bad_option
+ * @example guardStrengthChecker(() => ({ strong: 'yes' }), scope)('pw')   // rejects: kind bad_option
  */
 export const guardStrengthChecker = (hostChecker: StrengthChecker, scope: VaultScope): GuardedStrengthChecker => {
   // Frozen, so the host's checker can change nothing of what it is told.
@@ -110,10 +110,10 @@ export const guardStrengthChecker = (hostChecker: StrengthChecker, scope: VaultS
       // Parsed inside the guard: the verdict's fields may be the checker's getters, and throw as they are read.
       checked = passphraseVerdict.safeParse(await hostChecker(passphrase, told))
     } catch {
-      throw new ThrownMistake('unexpected_error', "The strengthChecker handed to Vault.make threw rather than answering a verdict, or answered one that threw as it was read. What it threw is left out of this report, as it heard the passphrase: have it answer { strong: false, reason } for a passphrase it cannot judge, and catch its own failures.")
+      throw new VaultError('unexpected_error', "The strengthChecker handed to Vault.make threw rather than answering a verdict, or answered one that threw as it was read. What it threw is left out of this report, as it heard the passphrase: have it answer { strong: false, reason } for a passphrase it cannot judge, and catch its own failures.")
     }
     if (! checked.success) {
-      throw new ThrownMistake('bad_option', "The strengthChecker handed to Vault.make answered something other than a verdict: have it answer { strong: true }, or { strong: false, reason } with the reason as non-empty text.")
+      throw new VaultError('bad_option', "The strengthChecker handed to Vault.make answered something other than a verdict: have it answer { strong: true }, or { strong: false, reason } with the reason as non-empty text.")
     }
     return checked.data.strong ? StrongVerdict : checked.data
   }

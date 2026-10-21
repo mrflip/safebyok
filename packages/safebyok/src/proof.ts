@@ -111,7 +111,7 @@ export class PassphraseProof extends Proof {
   /** Check this passphrase as a new one, before it becomes a way in.
    * It is put to its vault's `checkPassphrase`. Refuses with kind 'weak_passphrase' for one the
    * checker finds weak, its reason the message, and for a blank one, which the checker never
-   * hears; a broken checker is thrown as it came. Only a new passphrase is checked: one that
+   * hears; a broken checker's refusal passes as it came. Only a new passphrase is checked: one that
    * proves never is.
    *
    * @example await PassphraseProof.parse(vault, chosen).checkStrongEnough()   // throws 'weak_passphrase' with the checker's reason

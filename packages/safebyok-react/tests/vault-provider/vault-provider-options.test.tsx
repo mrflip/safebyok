@@ -140,7 +140,7 @@ describe("VaultProvider", () => {
     await vault.unlock('correct horse battery staple')
     await expectShown('unlocked')
     vi.spyOn(vaultDB, 'getBox').mockResolvedValueOnce(TH.bad(new VaultError('identity_revoked', 'No one is signed in: sign in, then try again.')))
-    await TH.expectRefusal(vault.getBox('anthropic_api_key'), 'identity_revoked')
+    await TH.expectRefusal(vault.getWhisper('anthropic_api_key'), 'identity_revoked')
     await expectShown('locked')
   })
 
@@ -190,7 +190,7 @@ describe("VaultProvider", () => {
     const world = await lockedWorld()
     render(<VaultProvider {...world.props} userId="u1" allowStartOver><world.Grab /></VaultProvider>)
     const vault = await world.opened()
-    const reading = vault.tryGetBox('anthropic_api_key')
+    const reading = vault.tryGetWhisper('anthropic_api_key')
     fireEvent.click(await screen.findByText('Forgot it? Start a new vault'))
     fireEvent.click(screen.getByText('Remove and start over'))
     // The delete lands as a lock: the dialog closes, and the read that asked is refused.
@@ -237,28 +237,26 @@ describe("VaultProvider", () => {
       await waitFor(() => { expect(screen.getByRole('status').textContent).to.eq('') })
     })
 
-    it("throws a checker that throws on to the app's error boundary: the vault's refusal, unexpected_error, carrying nothing of the throw", async () => {
+    it("fails the dialog, reporting to React, for a checker that throws: the vault's refusal, unexpected_error, carrying nothing of the throw", async () => {
       const world = makeWorld()
       const flaky = vi.fn(refuseAcme).mockRejectedValueOnce(new Error('could not judge acme'))
-      const { reported } = TH.renderReporting(<TH.Catcher><VaultProvider {...world.props} userId="u1" strengthChecker={flaky}><Probe /></VaultProvider></TH.Catcher>)
+      const { reported } = TH.renderReporting(<VaultProvider {...world.props} userId="u1" strengthChecker={flaky}><Probe /></VaultProvider>)
       fireEvent.click(await screen.findByText('put'))
       fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'acme' } })
-      expect(await screen.findByText(/^caught: /)).to.not.be.null
-      expect(reported).to.have.lengthOf(1)
+      await waitFor(() => { expect(reported).to.have.lengthOf(1) })
       expect(isVaultError(reported[0], 'unexpected_error')).to.be.true
       expect((reported[0] as Error).message).to.match(/strengthChecker handed to Vault\.make threw/)
       expect(TH.thrownText(reported[0])).to.not.include('could not judge')
       expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null
     })
 
-    it("throws a checker that answers no verdict on to the app's error boundary: the vault's refusal, bad_option", async () => {
+    it("fails the dialog, reporting to React, for a checker that answers no verdict: the vault's refusal, bad_option", async () => {
       const world = makeWorld()
       const misfit = (() => ({ strong: 'yes' })) as unknown as VaultProviderProps['strengthChecker']
-      const { reported } = TH.renderReporting(<TH.Catcher><VaultProvider {...world.props} userId="u1" strengthChecker={misfit}><Probe /></VaultProvider></TH.Catcher>)
+      const { reported } = TH.renderReporting(<VaultProvider {...world.props} userId="u1" strengthChecker={misfit}><Probe /></VaultProvider>)
       fireEvent.click(await screen.findByText('put'))
       fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'acme' } })
-      expect(await screen.findByText(/^caught: /)).to.not.be.null
-      expect(reported).to.have.lengthOf(1)
+      await waitFor(() => { expect(reported).to.have.lengthOf(1) })
       expect(isVaultError(reported[0], 'bad_option')).to.be.true
       expect((reported[0] as Error).message).to.match(/answered something other than a verdict/)
     })
@@ -297,7 +295,7 @@ describe("VaultProvider", () => {
       const heard = vi.fn(TH.anyStrengthChecker)
       render(<VaultProvider {...world.props} userId="u1" strengthChecker={heard}><world.Grab /></VaultProvider>)
       const vault = await world.opened()
-      void vault.tryGetBox('anthropic_api_key')
+      void vault.tryGetWhisper('anthropic_api_key')
       fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
       expect(screen.queryByRole('status')).to.be.null
       expect(heard).not.toHaveBeenCalled()

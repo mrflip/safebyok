@@ -55,7 +55,7 @@ await vault.hello()               // reads storage and this device's lease; ever
 vault.state                       // 'absent' | 'locked' | 'unlocked'
 await vault.putBox('anthropic_api_key', 'sk-ant-...')   // locked or absent: asks getProof first
 
-const answer = await vault.useBox('anthropic_api_key', (whisper) => callAnthropic(whisper))
+const answer = await vault.useWhisper('anthropic_api_key', (whisper) => callAnthropic(whisper))
 ```
 
 The vault store is never among the defaults: where the vault lives is the one choice every app
@@ -105,9 +105,9 @@ code, the stored records and these docs all use its words.
   open.
 * The vault is made with `Vault.make(opts)`, which answers at once, and `hello()` reads what
   storage and this device hold of it, so the snapshot's `state` is `absent`, `locked` or
-  `unlocked`. Its boxes are written with `putBox`, read with `getBox` and `useBox`, and
-  removed with `delBox`; `del()` removes the whole vault. A box in hand -- a `Box`, or the
-  `BoxRecord` storage holds -- opens with `openBox(box)`, under the key in hand, reading nothing.
+  `unlocked`. Its boxes are written with `putBox`, read with `getBox` (the sealed `Box`), `getWhisper` and `useWhisper` (its
+  whisper), and removed with `delBox`; `del()` removes the whole vault. A box in hand -- a `Box`, or the
+  `BoxRecord` storage holds -- opens with `decryptWhisper(box)`, under the key in hand, reading nothing.
   A `Box` holds its stored record as `box.props`, and serializes as it. Two devices that write at once
   cannot both win: the late one is refused as `stale_write` (see *Two devices storing at once*),
   and a first unlock that loses the race to create the vault, and whose passphrase does not open
@@ -186,8 +186,8 @@ vault.getSnapshot().boxes[0]  // { boxlabel: 'anthropic_api_key', sidecar: {}, d
   password, a recovery code. Anyone who can read your storage reads it.
 * **It is guaranteed unchanged.** Its JSON, keys sorted, is bound into the box's encryption with the
   rest of the box's visible fields, so a sidecar altered or swapped in storage makes the box
-  refuse to open (`damaged_box`). The guarantee comes with `getBox()`: the snapshot shows the sidecar as
-  storage holds it, and only `getBox()` proves it unaltered. A sidecar stored other than as the vault writes it (respaced, reordered) lists the
+  refuse to open (`damaged_box`). The guarantee comes with `getWhisper()`: the snapshot shows the sidecar as
+  storage holds it, and only `getWhisper()` proves it unaltered. A sidecar stored other than as the vault writes it (respaced, reordered) lists the
   box as damaged.
 * **Its shape is yours.** The vault checks only that it is JSON (`Sidecar`; anything else is
   `bad_option`): check its shape yourself, with your own schema, before `putBox()`. Left out of a
@@ -236,7 +236,7 @@ await vault.putBox('מפתח OpenAI: עבודה', 'sk-...', { sidecar: { note: '
   enters the vault: `Vault.make` (the scope) and `putBox()` (the boxlabel). A box already stored under a name they refuse
   -- by another client, or before you narrowed them -- lists, reads and deletes as any other, by
   the name it was stored under; `putBox()` refuses only to write a new one under a refused name.
-  With nothing stored under it, a name they refuse is `bad_label` at `getBox()`, `useBox()` and
+  With nothing stored under it, a name they refuse is `bad_label` at `getBox()`, `getWhisper()`, `useWhisper()` and
   `delBox()`.
 * **Widen with care.** A check admitting text outside ASCII should require NFC, as the floor
   does, and widen only once every client you serve runs the wider check: an older one refuses at
@@ -364,7 +364,7 @@ tests, such as `safebyok/testing`'s.
 
 ## Asking for a proof
 
-Data calls never contain UI. A call that needs the vault unlocked -- `putBox`, `getBox`, `useBox`,
+Data calls never contain UI. A call that needs the vault unlocked -- `putBox`, `getBox`, `getWhisper`, `useWhisper`,
 `delBox` -- goes through `vault.ensureLease()`, which says `hello()`, and, when the vault is
 locked or not yet made, hands an `Ask` to your `getProof` and waits for its answer. `safebyok-react`'s
 `VaultProvider` is a `getProof` already: its passphrase dialog.
@@ -434,7 +434,7 @@ setting, and the user is asked again, the safe direction.
 **`vault.lock()`** forgets the unlock in memory and on this device alike, so the user types their
 passphrase again afterwards. Use it for a real lock signal: a Lock button, a locked screen, a
 sign-out. The key is dropped at once, and every call that needs it throws kind `vault_locked`. A
-`getBox()` or `useBox()` under way refuses with `vault_locked` too, handing nothing back, unless an
+`getWhisper()` or `useWhisper()` under way refuses with `vault_locked` too, handing nothing back, unless an
 unlock has put a key back in hand by the time its whisper is ready. An `unlock()` or
 `putWayin()` under way is not stopped: it finishes, and leaves the vault unlocked. A write
 already sent to storage lands. `del()` locks the same way, and so does storage the vault cannot
@@ -442,7 +442,7 @@ trust (below). A refresh that finds the vault's ways in changed on another devic
 gone, drops the key the same way for this handle.
 
 `close()` is not a lock: the lease stays, for the next open, along with any an unlock under way
-granted before the close; an unlock under way on the closed handle takes nothing up, and a `getBox()` or `useBox()` under way hands back nothing,
+granted before the close; an unlock under way on the closed handle takes nothing up, and a `getWhisper()` or `useWhisper()` under way hands back nothing,
 refusing with `vault_closed`.
 
 A host clock that turns bad partway through a call (it throws, or reads outside 1981 to 2255)
@@ -704,9 +704,9 @@ await zxcvbnStrengthChecker('skylarkpinecone', { applabel: 'skylark', user_id: '
   Its whole contract is that verdict, for every passphrase: it never throws. `Vault.make` refuses
   anything but a function (whose `load`, if any, is a function too) with `bad_option`. The vault
   keeps it held to its contract, and asks it as `vault.checkPassphrase(typed)`. A checker that
-  answers anything but a verdict (`bad_option`), or throws (`unexpected_error`, carrying nothing
-  of what it threw, as it heard the passphrase), is a bug: the call that asked it throws, even a
-  `try` form, for your error handler. CUSTOMIZATION.md says how to choose one.
+  answers anything but a verdict is refused `bad_option`, and one that throws `unexpected_error`,
+  carrying nothing of what it threw, as it heard the passphrase. CUSTOMIZATION.md says how to
+  choose one.
 * **Build it once.** The vault keeps the checker it was opened with for its life. A binding that
   reopens on a changed option (`safebyok-react`'s provider) reopens for a new checker, so define it
   at module level, or memoize it, rather than writing it inline.
@@ -775,7 +775,7 @@ for code that branches on the refusal. `unlock()`, `putBox()`, `getBox()` and th
 that `val` or throw that `err`: the form for code that reports failure by throwing, as a TanStack
 `queryFn` does. Either way the refusal is a `VaultError` (`isVaultError(err, refusalkind?)` is the
 test for one), with a calm message, a `refusalkind` to branch on, and the `family` it belongs to; bad
-news is told to `onBadNews` once, whichever form met it. `getWhisper(boxlabel)` and `useBox()` come
+news is told to `onBadNews` once, whichever form met it. `useWhisper()` comes
 in the throwing form alone, and `subscribe()` and `Vault.make` throw their misuse at once.
 
 ```ts
@@ -979,7 +979,7 @@ vault props') -- is listed in the snapshot as damaged,
 `damaged: false`. Its `revision_tok` is the one its record holds, when it holds one as text, and
 null otherwise; nothing else of it is trusted. (One stored under a name your `validators` refuse
 is not damaged: it lists and reads as any other.) The rest of the vault opens and works
-as ever. `getBox()` and `useBox()` refuse a damaged box with `damaged_box`; `delBox()` removes
+as ever. `getBox()`, `getWhisper()` and `useWhisper()` refuse a damaged box with `damaged_box`; `delBox()` removes
 it by the name it is listed under, and `putBox()` writes a fresh box over one that names its
 revision -- except under a name your boxlabel check refuses, which `putBox()` refuses with `bad_label`, writing nothing. A
 damaged box's boxlabel is the name it is stored under, above the floor but perhaps one your
@@ -996,7 +996,7 @@ for (const box of vault.getSnapshot().boxes) {
 Damage the listing cannot see -- altered ciphertext, a missing or malformed ciphered field --
 shows only when the box is read: the listing reads each record's shape and never opens its
 ciphertext, which would cost deciphering the whole vault at every refresh. Such a box lists
-as sound, `getBox()` refuses it with `damaged_box`, and `delBox()` removes it. Before it says
+as sound, `getWhisper()` refuses it with `damaged_box`, and `delBox()` removes it. Before it says
 `damaged_box` of a box that will not open, the vault catches up with storage once: a
 box written by a vault deleted and made anew elsewhere relocks this device, and the read
 refuses with `vault_locked` instead. `putBox()` starts afresh over any record it cannot read as a

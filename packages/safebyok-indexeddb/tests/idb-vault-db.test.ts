@@ -267,7 +267,7 @@ describe("idbVaultDB", () => {
     vault.close()
     const reopened = await TH.settledVault({ ...opts, vaultDB: idbVaultDB({ dbName }) })
     await reopened.unlock('correct horse')
-    expect(await reopened.getBox('anthropic')).to.eq('sk-not-a-real-key')
+    expect(await reopened.getWhisper('anthropic')).to.eq('sk-not-a-real-key')
     reopened.close()
   })
 })

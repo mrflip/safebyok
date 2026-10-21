@@ -8,7 +8,7 @@ import { damagedVaultWorld, makeWorld, vaultWithPasskey } from './world'
 // == [The pairs]: TwinCases, each X over its tryX
 
 /** Every call that comes in two forms, by its throwing name. */
-type TwinName = 'hello' | 'ensureLease' | 'unlock' | 'lock' | 'putWayin' | 'delWayin' | 'putBox' | 'getBox' | 'delBox' | 'del'
+type TwinName = 'hello' | 'ensureLease' | 'unlock' | 'lock' | 'putWayin' | 'delWayin' | 'putBox' | 'getBox' | 'getWhisper' | 'delBox' | 'del'
 
 /** A vault's calls by name, each taking any arguments: how a table row reaches either form. */
 type CallsByName = Record<string, (...args: unknown[]) => Promise<unknown>>
@@ -34,7 +34,8 @@ const TwinCases: readonly (readonly [TwinName, RefusalKind, (twin: Twin) => unkn
   ["putWayin",         "wrong_passphrase", () => ['not it', 'new phrase'],                     () => ['pw', 'new phrase'],                        (val, { vault }) => { expect(val).to.deep.equal(vault.passphrase) }],
   ["delWayin",         "wrong_passphrase", () => ['not it'],                                   () => ['pw'],                                      (val, { vault }) => { expect(val).to.eq(vault) }],
   ["putBox",           "bad_whisper",      () => ['openai', null],                             () => ['openai', 'sk-fake-two'],                   (val) => { expect(val).to.be.undefined }],
-  ["getBox",           "absent_box",       () => ['openai'],                                   () => ['anthropic'],                               (val) => { expect(val).to.eq('sk-fake') }],
+  ["getBox",           "absent_box",       () => ['openai'],                                   () => ['anthropic'],                               (val) => { expect(val).to.have.property('boxlabel', 'anthropic') }],
+  ["getWhisper",       "absent_box",       () => ['openai'],                                   () => ['anthropic'],                               (val) => { expect(val).to.eq('sk-fake') }],
   ["delBox",           "absent_box",       () => ['openai'],                                   () => ['anthropic'],                               (val) => { expect(val).to.be.undefined }],
   ["del",              "vault_closed",     ({ vault }) => { vault.close(); return [] },         () => [],                                          (val) => { expect(val).to.be.undefined }],
 ]
@@ -42,8 +43,8 @@ const TwinCases: readonly (readonly [TwinName, RefusalKind, (twin: Twin) => unkn
 /** `callname`'s two forms on `vault`: its `try` form and its throwing one. */
 const twinsOf = (vault: Vault, callname: TwinName) => {
   const calls = vault as unknown as CallsByName
-  const tryCall = calls[`try${callname[0]!.toUpperCase()}${callname.slice(1)}`]! as (...args: unknown[]) => Promise<Outcome<unknown>>
-  return { tryCall, call: calls[callname]! }
+  const tryCall = calls[`try${callname[0]!.toUpperCase()}${callname.slice(1)}`]!.bind(vault) as (...args: unknown[]) => Promise<Outcome<unknown>>
+  return { tryCall, call: calls[callname]!.bind(vault) }
 }
 
 describe("each call's two forms (Contract: Shapes, Two forms of every call)", () => {
@@ -152,17 +153,11 @@ describe("vault.getWhisper", () => {
     expect(apiKey).to.eq('sk-fake')
   })
 
-  it("throws what getBox refuses with: 'absent_box' for an empty label, 'vault_locked' while locked", async () => {
+  it("throws what getWhisper refuses with: 'absent_box' for an empty label, 'vault_locked' while locked", async () => {
     const { vault } = await twinVault()
     await TH.expectRefusal(vault.getWhisper('openai'), 'absent_box')
     await vault.lock()
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'vault_locked')
-  })
-
-  it("has no try form: tryGetBox is the form that resolves an Outcome", () => {
-    const vault = Vault.make(makeWorld().optsWith())
-    expect(vault).to.not.have.property('tryGetWhisper')
-    expect(vault).to.have.property('tryGetBox').that.is.a('function')
   })
 })
 

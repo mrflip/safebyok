@@ -14,7 +14,7 @@ import * as TH from '../test-helpers'
 import { makeWorld, boxlabelsOf, storedRowOf, u1BoxCkey, storedVaultPropsOf, u1VaultPropsCkey, isU1Box } from './world'
 
 
-// == [Storing and reading]: RoundTrips, putBox and getBox, times a vault keeps
+// == [Storing and reading]: RoundTrips, putBox and getWhisper, times a vault keeps
 
 const RoundTrips: readonly (readonly [Whisper, string])[] = [
   ["sk-ant-api03-fake",            'a string'],
@@ -25,13 +25,13 @@ const RoundTrips: readonly (readonly [Whisper, string])[] = [
   [{ orgId: null },                'an object holding a null'],
 ]
 
-describe("putBox and getBox", () => {
+describe("putBox and getWhisper", () => {
   for (const [whisper, blurb] of RoundTrips) {
     it(`round-trips ${blurb}`, async () => {
       const world = makeWorld()
       const vault = await world.openUnlocked('pw')
       await vault.putBox('the_box', whisper)
-      expect(await vault.getBox('the_box')).to.deep.equal(whisper)
+      expect(await vault.getWhisper('the_box')).to.deep.equal(whisper)
     })
   }
 
@@ -50,7 +50,7 @@ describe("putBox and getBox", () => {
     const vault = await world.openUnlocked('pw')
     await vault.putBox('anthropic', 'sk-old', { sidecar: { note: 'keep me' } })
     await vault.putBox('anthropic', 'sk-new')
-    expect(await vault.getBox('anthropic')).to.eq('sk-new')
+    expect(await vault.getWhisper('anthropic')).to.eq('sk-new')
     expect(TH.summaryOf(vault.getSnapshot().boxes[0])?.sidecar).to.deep.equal({ note: 'keep me' })
   })
 
@@ -71,11 +71,11 @@ describe("putBox and getBox", () => {
     // A JSON string is its characters plus two quotes, and the empty sidecar, {}, is two bytes more.
     const atLimit = 'x'.repeat(MaxWhisperBytes - 4)
     await vault.putBox('the_box', atLimit)
-    expect(await vault.getBox('the_box')).to.eq(atLimit)
+    expect(await vault.getWhisper('the_box')).to.eq(atLimit)
     const oneOver = `${'x'.repeat(MaxWhisperBytes - 9)}SECRET`
     const err = await TH.expectRefusal(vault.putBox('the_box', oneOver), 'whisper_too_large')
     expect(err.message).to.not.include('SECRET')
-    expect(await vault.getBox('the_box')).to.eq(atLimit)
+    expect(await vault.getWhisper('the_box')).to.eq(atLimit)
   })
 
   it("counts the limit in bytes, not characters", async () => {
@@ -93,7 +93,7 @@ describe("putBox and getBox", () => {
     await roomy.putBox('the_box', 'x'.repeat(100))
     roomy.close()
     const tight = await world.open({ maxWhisperBytes: 16 })
-    expect(await tight.getBox('the_box')).to.eq('x'.repeat(100))
+    expect(await tight.getWhisper('the_box')).to.eq('x'.repeat(100))
     await TH.expectRefusal(tight.putBox('the_box', 'x'.repeat(100)), 'whisper_too_large')
   })
 
@@ -121,7 +121,7 @@ describe("putBox and getBox", () => {
   it("reads of an absent box refuse without quoting the boxlabel, which may be any text a host admits", async () => {
     const world = makeWorld({ validators: AnyTextValidators })
     const vault = await world.openUnlocked('pw')
-    const err = await TH.expectRefusal(vault.getBox('sk-fake-pasted-by-mistake'), 'absent_box')
+    const err = await TH.expectRefusal(vault.getWhisper('sk-fake-pasted-by-mistake'), 'absent_box')
     expect(err.message).not.to.include('sk-fake-pasted-by-mistake')
   })
 })
@@ -171,7 +171,7 @@ describe("the times a vault keeps", () => {
     world.advance(60_000)
     await vault.putBox('anthropic', 'sk-fake')
     expect(vault.getSnapshot().boxes[0]).to.deep.include({ registered_at: storedAt + 60_000, written_at: storedAt + 60_000, sidecar: {} })
-    expect(await vault.getBox('anthropic')).to.eq('sk-fake')
+    expect(await vault.getWhisper('anthropic')).to.eq('sk-fake')
   })
 
   it("never seals a sidecar planted in storage into a fresh revision: a store over it without a sidecar writes {}", async () => {
@@ -179,9 +179,9 @@ describe("the times a vault keeps", () => {
     const vault = await world.openUnlocked('pw')
     await vault.putBox('anthropic', 'sk-fake', { sidecar: { note: 'work account' } })
     world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), sidecar_json: '{"note":"INJECTED"}' }))
-    await TH.expectRefusal(vault.getBox('anthropic'), 'damaged_box')
+    await TH.expectRefusal(vault.getWhisper('anthropic'), 'damaged_box')
     await vault.putBox('anthropic', 'sk-fake-2')
-    expect(await vault.getBox('anthropic')).to.eq('sk-fake-2')
+    expect(await vault.getWhisper('anthropic')).to.eq('sk-fake-2')
     expect(TH.summaryOf(vault.getSnapshot().boxes[0])?.sidecar).to.deep.equal({})
     expect(storedRowOf(world, 'anthropic')).to.include({ sidecar_json: '{}' })
     // A sidecar given with the store is written as given, over the planted one.
@@ -196,11 +196,11 @@ describe("the times a vault keeps", () => {
     await vault.putBox('anthropic', 'sk-fake')
     const planted = Date.UTC(2001, 0, 1)
     world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), registered_at: planted }))
-    await TH.expectRefusal(vault.getBox('anthropic'), 'damaged_box')
+    await TH.expectRefusal(vault.getWhisper('anthropic'), 'damaged_box')
     world.advance(60_000)
     await vault.putBox('anthropic', 'sk-fake')
     expect(vault.getSnapshot().boxes[0]).to.include({ registered_at: world.clock.now(), written_at: world.clock.now() })
-    expect(await vault.getBox('anthropic')).to.eq('sk-fake')
+    expect(await vault.getWhisper('anthropic')).to.eq('sk-fake')
   })
 
   it("opens a vault holding a box whose stored sidecar is nested too deep to serialize, listing that one as damaged", async () => {
@@ -214,8 +214,8 @@ describe("the times a vault keeps", () => {
     const fresh = await world.openUnlocked('pw')
     expect(fresh.getSnapshot().boxes[0]).to.deep.include({ boxlabel: 'anthropic', damaged: true })
     expect(TH.summaryOf(fresh.getSnapshot().boxes[1])?.sidecar).to.deep.equal({ note: 'work account' })
-    await TH.expectRefusal(fresh.getBox('anthropic'), 'damaged_box')
-    expect(await fresh.getBox('openai')).to.eq('sk-fake-two')
+    await TH.expectRefusal(fresh.getWhisper('anthropic'), 'damaged_box')
+    expect(await fresh.getWhisper('openai')).to.eq('sk-fake-two')
   })
 
   it("lists a box whose stored sidecar is respaced or reordered as damaged: only the text the vault writes is read", async () => {
@@ -262,7 +262,7 @@ describe("the times a vault keeps", () => {
     await vault.putBox('anthropic', 'sk-fake')
     const box = JSON.stringify({ ...storedRowOf(world, 'anthropic'), written_at: world.clock.now() + 0.5 })
     world.dbStore.write(u1BoxCkey('anthropic'), box)
-    await TH.expectRefusal(vault.getBox('anthropic'), 'damaged_box')
+    await TH.expectRefusal(vault.getWhisper('anthropic'), 'damaged_box')
     expect(world.dbStore.read(u1BoxCkey('anthropic'))).to.eq(box)
     const vaultProps = JSON.stringify({ ...storedVaultPropsOf(world), registered_at: world.clock.now() + 0.5 })
     world.dbStore.write(u1VaultPropsCkey, vaultProps)
@@ -278,10 +278,10 @@ describe("the times a vault keeps", () => {
     await vault.putBox('other', 'sk-fake-two')
     const row = storedRowOf(world, pasted)
     world.dbStore.write(u1BoxCkey(pasted), JSON.stringify({ ...row, written_at: world.clock.now() + 0.5 }))
-    const storedDamaged = await TH.expectRefusal(vault.getBox(pasted), 'damaged_box')
+    const storedDamaged = await TH.expectRefusal(vault.getWhisper(pasted), 'damaged_box')
     // The other box's ciphertext, moved under this boxlabel: it will not open here.
     world.dbStore.write(u1BoxCkey(pasted), JSON.stringify({ ...row, whisper_ciphered: storedRowOf(world, 'other')['whisper_ciphered'] }))
-    const unopened = await TH.expectRefusal(vault.getBox(pasted), 'damaged_box')
+    const unopened = await TH.expectRefusal(vault.getWhisper(pasted), 'damaged_box')
     expect(TH.thrownText(storedDamaged) + TH.thrownText(unopened)).to.not.include('sk-ant-fake')
   })
 
@@ -292,7 +292,7 @@ describe("the times a vault keeps", () => {
     const { registered_at: _registered, written_at: _written, ...row } = storedRowOf(world, 'anthropic')
     const olden = JSON.stringify({ ...row, created_at: '2026-10-14T00:00:00.000Z', updated_at: '2026-10-14T00:00:00.000Z' })
     world.dbStore.write(u1BoxCkey('anthropic'), olden)
-    await TH.expectRefusal(vault.getBox('anthropic'), 'damaged_box')
+    await TH.expectRefusal(vault.getWhisper('anthropic'), 'damaged_box')
     expect(world.dbStore.read(u1BoxCkey('anthropic'))).to.eq(olden)
   })
 
@@ -330,7 +330,7 @@ describe("the sidecar", () => {
     world.dbStore.write(u1BoxCkey('omitted'), JSON.stringify(sidecarless))
     const fresh = await world.open()
     expect(fresh.getSnapshot().boxes[1]).to.deep.include({ boxlabel: 'omitted', damaged: true })
-    expect(await fresh.getBox('emptied')).to.eq('sk-fake-two')
+    expect(await fresh.getWhisper('emptied')).to.eq('sk-fake-two')
   })
 
   it("is stored as its JSON, keys sorted, and handed back in the summary as the value given", async () => {
@@ -523,7 +523,7 @@ describe("the box limit", () => {
     const vault = await world.openUnlocked('pw', { maxBoxes: 1 })
     await vault.putBox('openai', 'sk-fake-old')
     await vault.putBox('openai', 'sk-fake-new')
-    expect(await vault.getBox('openai')).to.eq('sk-fake-new')
+    expect(await vault.getWhisper('openai')).to.eq('sk-fake-new')
   })
 
   it("deleting a box makes room for the next new one", async () => {
@@ -542,7 +542,7 @@ describe("the box limit", () => {
     for (const boxlabel of ['one', 'two', 'three']) { await roomy.putBox(boxlabel, `sk-fake-${boxlabel}`) }
     roomy.close()
     const tight = await world.open({ maxBoxes: 2 })
-    expect(await tight.getBox('three')).to.eq('sk-fake-three')
+    expect(await tight.getWhisper('three')).to.eq('sk-fake-three')
     await tight.putBox('three', 'sk-fake-replaced')
     await tight.delBox('one')
     await TH.expectRefusal(tight.putBox('four', 'sk-fake-four'), 'vault_full')
@@ -728,7 +728,7 @@ describe("the host's validators", () => {
     }
     expect(boxlabelsOf(vault)).to.have.members([...ScriptLabels])
     for (const [ii, boxlabel] of ScriptLabels.entries()) {
-      expect(await vault.getBox(boxlabel)).to.eq(`sk-fake-${String(ii)}`)
+      expect(await vault.getWhisper(boxlabel)).to.eq(`sk-fake-${String(ii)}`)
     }
     await vault.delBox(ScriptLabels[0])
     expect(boxlabelsOf(vault)).to.not.include(ScriptLabels[0])
@@ -742,7 +742,7 @@ describe("the host's validators", () => {
     const vault = await world.openUnlocked('pw', { applabel: 'Acme Corp', userId: 'alice smith', vaultlabel: 'Main vault' })
     await vault.putBox('Work: מפתח API', 'sk-fake', { sidecar: { note: 'n'.repeat(4000) } })
     await vault.putBox(String.raw`["box","acme"] \ x`, 'sk-fake-two')
-    expect(await vault.getBox('Work: מפתח API')).to.eq('sk-fake')
+    expect(await vault.getWhisper('Work: מפתח API')).to.eq('sk-fake')
     expect(boxlabelsOf(vault)).to.have.lengthOf(2)
     await TH.expectRefusal(vault.putBox('', 'sk-fake'), 'bad_label')
     await TH.expectRefusal(world.open({ validators: AnyTextValidators, userId: '' }), 'bad_label')
@@ -804,7 +804,7 @@ describe("the host's validators", () => {
     const world = makeWorld({ validators: { boxlabel: Z.string().check(Z.minLength(1), Z.maxLength(80)) } })
     const vault = await world.openUnlocked('pw')
     await vault.putBox('Anthropic API key', 'sk-fake')
-    expect(await vault.getBox('Anthropic API key')).to.eq('sk-fake')
+    expect(await vault.getWhisper('Anthropic API key')).to.eq('sk-fake')
   })
 
   it("only check: what the vault keeps and binds is what it was handed, never what a schema made of it", async () => {
@@ -814,8 +814,8 @@ describe("the host's validators", () => {
     expect(vault.user_id).to.eq('  U1  ')
     await vault.putBox('  Padded Box  ', 'sk-fake')
     expect(boxlabelsOf(vault)).to.deep.equal(['  Padded Box  '])
-    expect(await vault.getBox('  Padded Box  ')).to.eq('sk-fake')
-    await TH.expectRefusal(vault.getBox('padded box'), 'absent_box')
+    expect(await vault.getWhisper('  Padded Box  ')).to.eq('sk-fake')
+    await TH.expectRefusal(vault.getWhisper('padded box'), 'absent_box')
   })
 
   it("never pass a host schema's issues along, which may quote the name", async () => {
@@ -842,7 +842,7 @@ describe("the host's validators", () => {
     const spies = verbs.map((verb) => vi.spyOn(world.vaultDB, verb))
     const vault = await world.openUnlocked('pw one')
     await vault.putBox('anthropic', 'sk-fake')
-    expect(await vault.getBox('anthropic')).to.eq('sk-fake')
+    expect(await vault.getWhisper('anthropic')).to.eq('sk-fake')
     await vault.putWayin('pw one', 'pw two')
     await vault.delBox('anthropic')
     await vault.del()
@@ -875,8 +875,8 @@ describe("the host's validators", () => {
     roomy.close()
     const narrow = await world.openUnlocked('pw')
     expect(narrow.getSnapshot().boxes.map((box) => [box.boxlabel, box.damaged])).to.deep.equal([['OpenAI: work', false], ['anthropic', false]])
-    expect(await narrow.getBox('OpenAI: work')).to.eq('sk-fake')
-    expect(await narrow.useBox('OpenAI: work', (whisper) => whisper)).to.eq('sk-fake')
+    expect(await narrow.getWhisper('OpenAI: work')).to.eq('sk-fake')
+    expect(await narrow.useWhisper('OpenAI: work', (whisper) => whisper)).to.eq('sk-fake')
     await narrow.delBox('OpenAI: work')
     expect(world.dbStore.read(u1BoxCkey('OpenAI: work'))).to.be.null
     expect(boxlabelsOf(narrow)).to.deep.equal(['anthropic'])
@@ -914,7 +914,7 @@ describe("the host's validators", () => {
     const fresh = await world.openUnlocked('pw')
     expect(boxlabelsOf(fresh)).to.deep.equal(['anthropic'])
     await TH.expectRefusal(fresh.delBox('key \u{D83D}'), 'bad_label')
-    await TH.expectRefusal(fresh.getBox('bell\u{7}'), 'bad_label')
+    await TH.expectRefusal(fresh.getWhisper('bell\u{7}'), 'bad_label')
   })
 
   it("refuses a store under a refused boxlabel as 'bad_label', over a box stored there or not, writing nothing", async () => {
@@ -934,7 +934,7 @@ describe("the host's validators", () => {
 })
 // --
 
-// == [Weight, locked, useBox]: LongScope, declaringRecordBytes, what a box weighs, while locked, useBox
+// == [Weight, locked, useWhisper]: LongScope, declaringRecordBytes, what a box weighs, while locked, useWhisper
 
 /** A scope of names a kibibyte long, which only a host's validators admit: heavier than the default fields' plan. */
 const LongScope = { applabel: 'a'.repeat(1000), vaultlabel: 'v'.repeat(1000) } as const
@@ -1009,9 +1009,9 @@ describe("while locked", () => {
     const warm = await world.openUnlocked('pw')
     await warm.putBox('anthropic', 'sk-fake')
     await warm.lock()
-    await TH.expectRefusal(warm.getBox('anthropic'), 'vault_locked')
+    await TH.expectRefusal(warm.getWhisper('anthropic'), 'vault_locked')
     await TH.expectRefusal(warm.putBox('anthropic', 'sk-new'), 'vault_locked')
-    await TH.expectRefusal(warm.useBox('anthropic', (whisper) => whisper), 'vault_locked')
+    await TH.expectRefusal(warm.useWhisper('anthropic', (whisper) => whisper), 'vault_locked')
     await TH.expectRefusal(warm.delBox('anthropic'), 'vault_locked')
   })
 
@@ -1026,12 +1026,64 @@ describe("while locked", () => {
   })
 })
 
-describe("useBox", () => {
+describe("vault.getBox", () => {
+  it("hands back the sealed box under a boxlabel, as its example shows", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.putBox('anthropic', 'sk-fake', { sidecar: { note: 'work account' } })
+    const box = await vault.getBox('anthropic')
+    expect(box).to.be.instanceOf(Box)
+    expect(box.boxlabel).to.eq('anthropic')
+    expect(box.sidecar).to.deep.equal({ note: 'work account' })
+    expect(box.props).to.deep.equal(await storedBoxOf(world))
+    expect(await vault.decryptWhisper(box)).to.eq('sk-fake')
+  })
+
+  it("keeps the whisper sealed: nothing of it is in the box but its ciphertext", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.putBox('anthropic', 'sk-fake-whisper')
+    expect(JSON.stringify(await vault.getBox('anthropic'))).to.not.include('sk-fake-whisper')
+  })
+
+  it("resolves the box as an Outcome's val from tryGetBox", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.putBox('anthropic', 'sk-fake')
+    const { ok, val: box } = await vault.tryGetBox('anthropic')
+    expect(ok).to.eq(true)
+    expect(box).to.be.instanceOf(Box)
+  })
+
+  it("asks for no proof where the listing shows no box under the boxlabel, and asks when one is there", async () => {
+    const world = makeWorld()
+    const warm = await world.openUnlocked('pw')
+    await warm.putBox('anthropic', 'sk-fake')
+    await warm.lock()
+    const getProof = vi.fn<GetProof>(() => 'declined')
+    const cold = await world.open({ getProof })
+    await TH.expectRefusal(cold.getBox('openai'), 'absent_box')
+    expect(getProof).not.toHaveBeenCalled()
+    await TH.expectRefusal(cold.getBox('anthropic'), 'vault_locked')
+    expect(getProof).toHaveBeenCalledTimes(1)
+  })
+
+  it("hands back a box whose whisper will not open, which only decrypting it finds out", async () => {
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw')
+    await vault.putBox('anthropic', 'sk-fake', { sidecar: { note: 'work account' } })
+    const box = await vault.getBox('anthropic')
+    const planted = { ...box.props, sidecar_json: '{"note":"planted"}' }
+    await TH.expectRefusal(vault.decryptWhisper(planted), 'damaged_box')
+  })
+})
+
+describe("useWhisper", () => {
   it("hands the whisper to the callback and returns its result", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox('anthropic', 'sk-fake')
-    const shouted = await vault.useBox('anthropic', (whisper) => (typeof whisper === 'string' ? whisper.toUpperCase() : ''))
+    const shouted = await vault.useWhisper('anthropic', (whisper) => (typeof whisper === 'string' ? whisper.toUpperCase() : ''))
     expect(shouted).to.eq('SK-FAKE')
   })
 
@@ -1039,20 +1091,20 @@ describe("useBox", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox('anthropic', 'sk-fake')
-    await expect(vault.useBox('anthropic', () => Promise.reject(new Error('the API said no')))).rejects.toThrow('the API said no')
+    await expect(vault.useWhisper('anthropic', () => Promise.reject(new Error('the API said no')))).rejects.toThrow('the API said no')
   })
 
   it("refuses a callback that is not a function before it opens the box", async () => {
     const world = makeWorld()
     const vault = await world.open()
-    const err = await TH.expectRefusal(vault.useBox('anthropic', 'not a callback' as unknown as () => void), 'bad_option')
+    const err = await TH.expectRefusal(vault.useWhisper('anthropic', 'not a callback' as unknown as () => void), 'bad_option')
     expect(err.message).to.include('callback function')
   })
 })
 // --
 
 
-// == [Opening a box]: vault.openBox, what a vault hands its boxes
+// == [Opening a box]: vault.decryptWhisper, what a vault hands its boxes
 
 /** The record storage holds for `u1`'s box `anthropic`, as the world's VaultDB hands it back. */
 const storedBoxOf = async (world: ReturnType<typeof makeWorld>): Promise<BoxRecord> => {
@@ -1061,7 +1113,7 @@ const storedBoxOf = async (world: ReturnType<typeof makeWorld>): Promise<BoxReco
   return record!
 }
 
-describe("vault.openBox", () => {
+describe("vault.decryptWhisper", () => {
   it("opens a box with the key in hand, reading no storage and asking for no proof, as its example shows", async () => {
     const world = makeWorld()
     const getProof = vi.fn<GetProof>(() => 'declined')
@@ -1069,7 +1121,7 @@ describe("vault.openBox", () => {
     await vault.putBox('anthropic', 'sk-fake', { sidecar: { note: 'work account' } })
     const box = Box.make(vault, await storedBoxOf(world), TH.vaultPropsOf('u1'))
     const reads = (['getBox', 'listBoxes', 'getVaultProps'] as const).map((verb) => vi.spyOn(world.vaultDB, verb))
-    expect(await vault.openBox(box)).to.eq('sk-fake')
+    expect(await vault.decryptWhisper(box)).to.eq('sk-fake')
     for (const read of reads) { expect(read).not.toHaveBeenCalled() }
     expect(getProof).not.toHaveBeenCalled()
   })
@@ -1080,16 +1132,16 @@ describe("vault.openBox", () => {
     await vault.putBox('anthropic', 'sk-fake')
     const record = await storedBoxOf(world)
     const elsewhere = await makeWorld().open({ userId: 'u2' })
-    expect(await vault.openBox(record)).to.eq('sk-fake')
+    expect(await vault.decryptWhisper(record)).to.eq('sk-fake')
     const foreign = Box.make(elsewhere, record, TH.vaultPropsOf('u2'))
-    expect(await vault.openBox(foreign)).to.eq('sk-fake')
+    expect(await vault.decryptWhisper(foreign)).to.eq('sk-fake')
   })
 
-  it("resolves the whisper as an Outcome's val from tryOpenBox", async () => {
+  it("resolves the whisper as an Outcome's val from tryDecryptWhisper", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox('anthropic', { apiKey: 'sk-fake' })
-    const { ok, val: whisper } = await vault.tryOpenBox(await storedBoxOf(world))
+    const { ok, val: whisper } = await vault.tryDecryptWhisper(await storedBoxOf(world))
     expect(ok).to.be.true
     expect(whisper).to.deep.equal({ apiKey: 'sk-fake' })
   })
@@ -1100,7 +1152,7 @@ describe("vault.openBox", () => {
     const vault = await world.openUnlocked('pw', { getProof })
     await vault.putBox('anthropic', 'sk-fake')
     await vault.lock()
-    await TH.expectRefusal(vault.openBox(await storedBoxOf(world)), 'vault_locked')
+    await TH.expectRefusal(vault.decryptWhisper(await storedBoxOf(world)), 'vault_locked')
     expect(getProof).not.toHaveBeenCalled()
   })
 
@@ -1110,7 +1162,7 @@ describe("vault.openBox", () => {
     const vault = await world.openUnlocked('pw', { onBadNews: (news) => { told.push(news) } })
     await vault.putBox('anthropic', 'sk-fake', { sidecar: { note: 'work account' } })
     const planted = { ...await storedBoxOf(world), sidecar_json: '{"note":"planted"}' }
-    const err = await TH.expectBad(vault.tryOpenBox(planted), 'damaged_box')
+    const err = await TH.expectBad(vault.tryDecryptWhisper(planted), 'damaged_box')
     expect(told).to.deep.equal([err])
     expect(err.message).to.not.include('sk-fake')
   })
@@ -1118,7 +1170,7 @@ describe("vault.openBox", () => {
   it("refuses what is no box record as 'bad_record', before it looks for a key", async () => {
     const world = makeWorld()
     const vault = await world.open()
-    await TH.expectRefusal(vault.openBox({ boxlabel: 'anthropic' } as unknown as BoxRecord), 'bad_record')
+    await TH.expectRefusal(vault.decryptWhisper({ boxlabel: 'anthropic' } as unknown as BoxRecord), 'bad_record')
   })
 
   it("refuses a box made by another copy of safebyok as 'bad_record', as it refuses anything that is no box record", async () => {
@@ -1128,7 +1180,7 @@ describe("vault.openBox", () => {
     vi.resetModules()
     const { Box: OtherCopyBox } = await import('../../src/box')
     const theirs = OtherCopyBox.make(vault, await storedBoxOf(world), TH.vaultPropsOf('u1'))
-    await TH.expectBad(vault.tryOpenBox(theirs), 'bad_record')
+    await TH.expectBad(vault.tryDecryptWhisper(theirs), 'bad_record')
   })
 
   it("refuses 'vault_closed' once the vault is closed", async () => {
@@ -1137,7 +1189,7 @@ describe("vault.openBox", () => {
     await vault.putBox('anthropic', 'sk-fake')
     const record = await storedBoxOf(world)
     vault.close()
-    await TH.expectRefusal(vault.openBox(record), 'vault_closed')
+    await TH.expectRefusal(vault.decryptWhisper(record), 'vault_closed')
   })
 })
 

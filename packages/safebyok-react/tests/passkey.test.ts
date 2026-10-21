@@ -178,7 +178,7 @@ describe("a passkey unlock, end to end", () => {
     expect(elsewhere.getSnapshot().state).to.eq('locked')
     const passkey = await askPasskey(elsewhere.getSnapshot().passkey)
     if (passkey !== null) { await elsewhere.unlock(passkey) }
-    expect(await elsewhere.getBox('anthropic')).to.eq('sk-fake')
+    expect(await elsewhere.getWhisper('anthropic')).to.eq('sk-fake')
   })
 
   it("createPasskey resolves null when the user dismisses its prompt, as its example says, so nothing reaches the vault", async () => {

@@ -23,7 +23,7 @@ describe("delDamagedVault", () => {
     expect(fresh.getSnapshot().state).to.eq('absent')
     await fresh.unlock('another pw')
     await fresh.putBox('anthropic', 'sk-new-fake')
-    expect(await fresh.getBox('anthropic')).to.eq('sk-new-fake')
+    expect(await fresh.getWhisper('anthropic')).to.eq('sk-new-fake')
   })
 
   it("says the device store failing as it clears this device as 'storage_unavailable', naming what failed, the vault already deleted", async () => {
@@ -41,7 +41,7 @@ describe("delDamagedVault", () => {
     const theirs = await world.openUnlocked('their pw', { userId: 'u2' })
     await theirs.putBox('anthropic', 'theirs')
     await delDamagedVault(world.optsWith())
-    expect(await theirs.getBox('anthropic')).to.eq('theirs')
+    expect(await theirs.getWhisper('anthropic')).to.eq('theirs')
     expect(await TH.expectingGood(world.deviceDB).getLease(TH.scopeOf('u2'))).to.not.be.null
     expect(rowsOf(world, 'u2')).to.not.deep.equal([])
   })
@@ -56,7 +56,7 @@ describe("delDamagedVault", () => {
     expect(err.message).to.include('del()')
     expect(world.dbStore.ckeys().map((ckey) => [ckey, world.dbStore.read(ckey)])).to.deep.equal(before)
     expect(await world.getLease()).to.deep.equal(lease)
-    expect(await vault.getBox('anthropic')).to.eq('sk-fake')
+    expect(await vault.getWhisper('anthropic')).to.eq('sk-fake')
   })
 
   it("refuses vault props too damaged to name their vault, removing nothing, the lease included", async () => {

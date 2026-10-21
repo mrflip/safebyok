@@ -108,7 +108,7 @@ describe("VaultDashboard, its boxes", () => {
     expect(within(rowOf('anthropic_api_key')).getByText('work account')).to.not.be.null
     expect(within(rowOf('anthropic_api_key')).queryByText('sk-ant-test-not-a-real-key')).to.be.null
     const vault = await world.openUnlocked()
-    expect(await vault.getBox('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
+    expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
   })
 
   it("keeps a whisper typed as JSON its type", async () => {
@@ -120,7 +120,7 @@ describe("VaultDashboard, its boxes", () => {
     await TH.answerPassphraseDialog()
     await screen.findByText('openai_api_key')
     const vault = await world.openUnlocked()
-    expect(await vault.getBox('openai_api_key')).to.deep.equal({ apiKey: 'sk-test-not-a-real-key', orgId: null })
+    expect(await vault.getWhisper('openai_api_key')).to.deep.equal({ apiKey: 'sk-test-not-a-real-key', orgId: null })
   })
 
   it("shows a refused store in the form, asking for no passphrase first, and keeps the form open", async () => {
@@ -179,7 +179,7 @@ describe("VaultDashboard, its boxes", () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => { expect(within(rowOf('anthropic_api_key')).queryByText('rotated')).to.not.be.null })
     const vault = await world.openUnlocked()
-    expect(await vault.getBox('anthropic_api_key')).to.eq('sk-ant-test-replaced')
+    expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-replaced')
     expect(vault.getSnapshot().boxes[0]).to.deep.include({ sidecar: { note: 'rotated' } })
   })
 
@@ -197,7 +197,7 @@ describe("VaultDashboard, its boxes", () => {
     await waitFor(() => { expect(screen.queryByRole('button', { name: 'Save' })).to.be.null })
     expect(within(rowOf('anthropic_api_key')).getByText('work account')).to.not.be.null
     const vault = await world.openUnlocked()
-    expect(await vault.getBox('anthropic_api_key')).to.eq('sk-ant-test-replaced')
+    expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-replaced')
   })
 
   it("removes a box once the user confirms, and keeps it when they don't", async () => {
@@ -266,7 +266,7 @@ describe("VaultDashboard, its boxes", () => {
     await TH.answerPassphraseDialog()
     await screen.findByRole('button', { name: 'view' })
     const vault = await world.openUnlocked()
-    expect(await vault.getBox('openai_api_key')).to.eq('sk-test-replaced')
+    expect(await vault.getWhisper('openai_api_key')).to.eq('sk-test-replaced')
   })
 
   it("uses a whisper by whispering it back in the Psst dialog", async () => {

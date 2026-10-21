@@ -166,7 +166,7 @@ export type Sidecar = Z.infer<typeof Sidecar>
  * The visible fields of a box: its boxlabel, revision, vaultKey epoch and times, its sidecar
  * as the JSON value the host stored (`{}` when it gave none), and `damaged` false. This, or a
  * {@link DamagedBox}, is what a VaultDB's `listBoxes` returns and a vault's snapshot holds,
- * readable while locked. The sidecar is shown as storage holds it: only `getBox()` opens the box
+ * readable while locked. The sidecar is shown as storage holds it: only `getWhisper()` opens the box
  * and so proves it unaltered.
  *
  * @example BoxSummary.parse({ boxlabel: 'anthropic', revision_tok: 'r1', vault_key_epoch: 1, sidecar: {}, registered_at, written_at }).damaged // false
@@ -189,7 +189,7 @@ export type BoxSummary = Z.infer<typeof BoxSummary>
  * it holds one as text (null otherwise), which only names the record for a write over it. It
  * sits in a vault's snapshot beside the {@link BoxSummary}s, sorted among them, so a UI can
  * offer to remove it: `delBox()` removes it and `putBox()` writes a fresh box over it,
- * while `getBox()` and `useBox()` refuse it with kind 'damaged_box'.
+ * while `getBox()`, `getWhisper()` and `useWhisper()` refuse it with kind 'damaged_box'.
  *
  * @example
  *   for (const box of snapshot.boxes) {

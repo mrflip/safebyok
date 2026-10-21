@@ -128,7 +128,7 @@ const checkSealOpts = optionsCheck({ sidecar: Z.optional(Z.unknown()), over: Z.o
  * its record (`toJSON()` is `props`). The record holds no secret: the whisper is ciphered under
  * a boxKey, wrapped under the vaultKey, and neither key is in it. It is what storage holds.
  *
- * Opening a box is the vault's: `vault.openBox(box)`, with the vaultKey in hand.
+ * Opening a box is the vault's: `vault.decryptWhisper(box)`, with the vaultKey in hand.
  *
  * @example
  *   const box = Box.make(vault, record, vaultProps)
@@ -272,7 +272,7 @@ export class Box {
    * another label or vault, sealed under a vaultKey this vault does not hold, or opened to
    * something that is no whisper -- naming nothing of it; and 'bad_option' for a `vaultKey` that
    * is no CryptoKey. Through the vault,
-   * `vault.openBox(box)` is the call: the vault holds the key.
+   * `vault.decryptWhisper(box)` is the call: the vault holds the key.
    *
    * @param vaultKey - The vaultKey this box's boxKey is wrapped under.
    * @returns The whisper, or the refusal.
@@ -482,6 +482,6 @@ export const checkedSidecar = (sidecar: unknown): Sidecar => {
 }
 
 const checkVaultKey = (vaultKey: unknown, said: string) => {
-  if (! (vaultKey instanceof CryptoKey)) { throw new VaultError('bad_option', `${said} needs the vaultKey, as a CryptoKey: through the vault, vault.openBox(box) and vault.putBox() hand it in.`) }
+  if (! (vaultKey instanceof CryptoKey)) { throw new VaultError('bad_option', `${said} needs the vaultKey, as a CryptoKey: through the vault, vault.decryptWhisper(box) and vault.putBox() hand it in.`) }
 }
 // --
