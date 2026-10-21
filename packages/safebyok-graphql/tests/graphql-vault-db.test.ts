@@ -283,7 +283,8 @@ describe("graphqlVaultDB, its refusals", () => {
     const counting = { query: () => answered, mutation: () => answered, subscription: () => answered }
     const vaultDB = graphqlVaultDB({ client: counting as unknown as GraphqlVaultClient })
     await TH.expectBad(vaultDB.putBox(u1, { ...thisVault, revision_tok: null }, TH.boxOf('open^ai', 'r1')), 'invalid_box')
-    await TH.expectBad(vaultDB.putBox(u1, { ...thisVault, revision_tok: null }, TH.boxOf('openai', 'r1', { sidecar_json: 'not json' })), 'invalid_box')
+    const sidecarless = TH.omitting(TH.boxOf('openai', 'r1'), 'sidecar')
+    await TH.expectBad(vaultDB.putBox(u1, { ...thisVault, revision_tok: null }, sidecarless), 'invalid_box')
     expect(sent).to.eq(0)
   })
 

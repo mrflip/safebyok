@@ -215,9 +215,9 @@ export const parseDeviceDB = (candidate: DeviceDB): DeviceDB => {
 }
 
 /** How many bytes of storage a vault reserves for each byte of whisper and sidecar: two.
- * A whisper's base64 ciphertext is a third larger, and a sidecar's JSON, escaped as text, at most
- * twice its own; the rest is room for each backend's way of counting bytes. So a whisper and its
- * sidecar may claim at most half of an adapter's `maxRecordBytes`.
+ * A whisper's base64 ciphertext is a third larger, and a sidecar is stored as its own JSON; the
+ * rest is room for each backend's way of counting bytes. So a whisper and its sidecar may claim at
+ * most half of an adapter's `maxRecordBytes`.
  */
 export const StoredBytesPerWhisperByte = 2
 

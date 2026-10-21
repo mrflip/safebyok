@@ -91,7 +91,7 @@ of every name, whatever a host's validators admit.
 
 * **Encrypted**: each whisper (`whisper_ciphered`), each box's boxKey
   (`box_key_wrapped`), and, inside the vault props, the vaultKey, wrapped under each passphrase.
-* **In the open**: the scope, each `boxlabel` and sidecar (`sidecar_json`), the `vault_id`, `unlock_epoch`,
+* **In the open**: the scope, each `boxlabel` and `sidecar`, the `vault_id`, `unlock_epoch`,
   `revision_tok`s, how each passphrase was made into a key (its key deriver's label and salt),
   when each vault and box was first stored and each box last written (epoch
   milliseconds), and the length of every ciphertext.

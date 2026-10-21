@@ -190,8 +190,9 @@ vault.getSnapshot().boxes[0]  // { boxlabel: 'anthropic_api_key', sidecar: {}, d
 * **It is guaranteed unchanged.** Its JSON, keys sorted, is bound into the box's encryption with the
   rest of the box's visible fields, so a sidecar altered or swapped in storage makes the box
   refuse to open (`damaged_box`). The guarantee comes with `getWhisper()`: the snapshot shows the sidecar as
-  storage holds it, and only `getWhisper()` proves it unaltered. A sidecar stored other than as the vault writes it (respaced, reordered) lists the
-  box as damaged.
+  storage holds it, and only `getWhisper()` proves it unaltered. It is stored as the JSON value it
+  is, so a backend may keep it as JSON it can query (a Postgres `jsonb` column) and reorder its
+  keys: the box binds it with its keys sorted, so the same value opens however storage orders it.
 * **Its shape is yours.** The vault checks only that it is JSON (`Sidecar`; anything else is
   `bad_option`): check its shape yourself, with your own schema, before `putBox()`. Left out of a
   `putBox()`, the box keeps the sidecar it has, once its record opens; a new box's is `{}`, as
@@ -976,8 +977,8 @@ refusal on every device that saw a newer copy than the backup.
 
 ### Damaged boxes
 
-A box whose stored record does not read back -- not JSON, a malformed time, a sidecar
-that is not JSON, a record naming another boxlabel than the one it is stored under, one from a newer
+A box whose stored record does not read back -- not JSON, a malformed time, a missing sidecar
+or one nested too deep to check, a record naming another boxlabel than the one it is stored under, one from a newer
 safebyok or an older one -- is listed in the snapshot as damaged,
 `{ boxlabel, damaged: true, revision_tok }`, sorted among the sound ones, which carry
 `damaged: false`. Its `revision_tok` is the one its record holds, when it holds one as text, and

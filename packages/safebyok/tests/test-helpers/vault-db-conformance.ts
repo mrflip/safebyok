@@ -6,8 +6,8 @@ import type { VaultProps, BoxSummary, DamagedBox } from '../../src/types'
 import { NameFloorBytes } from '../../src/validators'
 import { type VaultDB, type VaultDBOpts, type BoxDelExpectation } from '../../src/vault-db'
 import { type MakeDevices, type Turnstile, openTurnstile, raceEveryWay, makeTurnstile, type RaceOutcome, raceOutcomeOf } from './racing'
-import { vaultPropsOf, scopeOf, boxOf, noBoxYet, summaryOf, sidecarJsonOf, thisVault, OddLabels, deleting, wayinOf, fakeCiphered } from './builders'
-import { expectGood, expectingGood, expectBad } from './refusals'
+import { vaultPropsOf, scopeOf, boxOf, noBoxYet, summaryOf, thisVault, OddLabels, deleting, wayinOf, fakeCiphered } from './builders'
+import { expectGood, expectingGood, expectBad, omitting } from './refusals'
 import { unheard, ticks, wakeupAtNextTick } from './timing'
 import { spyLogger, thrownText, leafTexts } from './logging'
 
@@ -217,18 +217,18 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
 
     it("reads back a box with an empty sidecar as stored, and lists it with that sidecar", async () => {
       const vaultDB = await withVaultProps()
-      const sidecarless = boxOf('anthropic', 'one', { sidecar_json: '{}' })
+      const sidecarless = boxOf('anthropic', 'one', { sidecar: {} })
       await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, sidecarless)
       expect(await expectingGood(vaultDB).getBox(scopeOf('u1'), 'anthropic')).to.deep.equal(sidecarless)
       const [summary] = await expectingGood(vaultDB).listBoxes(scopeOf('u1'))
       expect(summaryOf(summary)?.sidecar).to.deep.equal({})
     })
 
-    it("reads a sidecar's JSON back exactly as written, as it is bound: accented letters, an emoji, a tab, a newline, quotes and backslashes", async () => {
+    it("reads a sidecar back as the JSON value written, as it is bound: accented letters, an emoji, a tab, a newline, quotes and backslashes", async () => {
       const vaultDB = await withVaultProps()
-      await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, boxOf('anthropic', 'one', { sidecar_json: sidecarJsonOf(LiteralSidecar) }))
+      await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, boxOf('anthropic', 'one', { sidecar: LiteralSidecar }))
       const box = await expectingGood(vaultDB).getBox(scopeOf('u1'), 'anthropic')
-      expect(box?.sidecar_json).to.eq(sidecarJsonOf(LiteralSidecar))
+      expect(box?.sidecar).to.deep.equal(LiteralSidecar)
       const [summary] = await expectingGood(vaultDB).listBoxes(scopeOf('u1'))
       expect(summaryOf(summary)?.sidecar).to.deep.equal(LiteralSidecar)
     })
@@ -246,8 +246,10 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       const vaultDB = await withVaultProps()
       const writes = [
         [boxOf('anthropic', 'one'),                                                   noBoxYet],
-        [boxOf('anthropic', 'two', { sidecar_json: sidecarJsonOf(LiteralSidecar) }), { vault_id: 'vault-id-u1', revision_tok: 'rev-one' }],
-        [boxOf('openai', 'one', { sidecar_json: '{}' }),                              noBoxYet],
+        [boxOf('anthropic', 'two', { sidecar: LiteralSidecar }),                      { vault_id: 'vault-id-u1', revision_tok: 'rev-one' }],
+        [boxOf('openai', 'one', { sidecar: {} }),                                     noBoxYet],
+        [boxOf('mistral', 'one', { sidecar: null }),                                  noBoxYet],
+        [boxOf('gemini', 'one', { sidecar: ['a list', { zeta: 1, alpha: [true, 'two'] }] }), noBoxYet],
       ] as const
       for (const [box, expected] of writes) {
         const written = await expectingGood(vaultDB).putBox(scopeOf('u1'), expected, box)
@@ -645,7 +647,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
         [() => vaultDB.putVaultProps(vaultPropsOf('u1', { unlock_epoch: 3 }), { vault_id: 'vault-id-u1', unlock_epoch: 2 }),         'stale_write'],
         [() => vaultDB.putBox(scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-other' }, boxOf('anthropic', 'late')),     'stale_write'],
         [() => vaultDB.putBox(scopeOf('u1'), { vault_id: 'vault-id-gone', revision_tok: null }, boxOf('mistral', 'late')),            'vault_mismatch'],
-        [() => vaultDB.putBox(scopeOf('u1'), noBoxYet, boxOf('mistral', 'late', { sidecar_json: '{"note":' })),                      'invalid_box'],
+        [() => vaultDB.putBox(scopeOf('u1'), noBoxYet, omitting(boxOf('mistral', 'late'), 'sidecar')),                                'invalid_box'],
         [() => vaultDB.delBox(scopeOf('u1'), 'anthropic', { vault_id: 'vault-id-gone', revision_tok: 'rev-anthropic' }),               'stale_write'],
         [() => vaultDB.delVault(scopeOf('u1'), { vault_id: 'vault-id-gone' }),                                                         'stale_write'],
       ] as const
@@ -821,7 +823,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
     it("refuses a malformed record or expectation, or vault props under another vault_id, as bad_record, and a malformed box as invalid_box, before storage sees it (Contract: VaultDB.putBox, Does)", async () => {
       const vaultDB = await withVaultProps()
       await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, boxOf('anthropic', 'kept'))
-      const unparsable = boxOf('anthropic', 'one', { sidecar_json: 'not json' })
+      const unparsable = omitting(boxOf('anthropic', 'one'), 'sidecar')
       await expectBad(vaultDB.ensureVaultProps(vaultPropsOf('u1', { unlock_epoch: 0 })), 'bad_record')
       await expectBad(vaultDB.putBox(scopeOf('u1'), noBoxYet, unparsable), 'invalid_box')
       await expectBad(vaultDB.putBox(scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: '' }, boxOf('anthropic', 'one')), 'bad_record')
@@ -840,7 +842,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
   describe(lineTitle('5.3'), () => {
     it("quotes no ciphertext, boxlabel or sidecar of a write it refuses as vault_mismatch", async () => {
       const vaultDB = await withVaultProps()
-      const box = boxOf('secret_project_x', 'sk-fake-quoted', { sidecar_json: sidecarJsonOf({ note: 'a sidecar never to be quoted' }) })
+      const box = boxOf('secret_project_x', 'sk-fake-quoted', { sidecar: { note: 'a sidecar never to be quoted' } })
       const refusal = await expectBad(vaultDB.putBox(scopeOf('u1'), { vault_id: 'vault-id-gone', revision_tok: null }, box), 'vault_mismatch')
       expect(quotedOf(refusal, box)).to.deep.equal([])
     })
@@ -849,7 +851,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
       const vaultDB = await withVaultProps()
       const standing = boxOf('secret_project_x', 'sk-fake-standing')
       await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, standing)
-      const box = boxOf('secret_project_x', 'sk-fake-quoted', { sidecar_json: sidecarJsonOf({ note: 'a sidecar never to be quoted' }) })
+      const box = boxOf('secret_project_x', 'sk-fake-quoted', { sidecar: { note: 'a sidecar never to be quoted' } })
       const refusal = await expectBad(vaultDB.putBox(scopeOf('u1'), noBoxYet, box), 'stale_write')
       expect(quotedOf(refusal, { ...box, boxlabel: '' })).to.deep.equal([])
       expect(refusal.meta?.box_stored).to.deep.equal(standing)
@@ -857,7 +859,7 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
 
     it.runIf(capped)("quotes no ciphertext, boxlabel or sidecar of a box it refuses as vault_full", async () => {
       const vaultDB = await cappedHolding(['anthropic', 'openai', 'mistral'])
-      const box = boxOf('secret_project_x', 'sk-fake-quoted', { sidecar_json: sidecarJsonOf({ note: 'a sidecar never to be quoted' }) })
+      const box = boxOf('secret_project_x', 'sk-fake-quoted', { sidecar: { note: 'a sidecar never to be quoted' } })
       const refusal = await expectBad(vaultDB.putBox(scopeOf('u1'), noBoxYet, box), 'vault_full')
       expect(quotedOf(refusal, box)).to.deep.equal([])
     })
@@ -1534,7 +1536,8 @@ const everyVerbOn = (stranger: VaultDBVerbs) => [
 /** Text no normalization leaves alone: "café" with its accent composed, then decomposed, and a key. */
 /**
  * A sidecar of accented letters, an emoji, a tab, a newline, quotes, backslashes, Hebrew, a
- * null and a fraction: JSON a store must hand back byte for byte as it was written, as it is bound.
+ * null and a fraction: a JSON value a store must hand back as the same value, every string in it
+ * byte for byte, as it is bound.
  */
 const LiteralSidecar = Object.freeze({
   note: 'caf\u{E9} na\u{EF}ve \u{1F511}\trotated\nin March',
@@ -1578,7 +1581,7 @@ const settledKind = async (write: Promise<Outcome<unknown>>): Promise<string> =>
 /** Which of a box's boxlabel, sidecar and ciphertexts a refusal quotes anywhere. */
 const quotedOf = (refusal: unknown, box: BoxRecord): string[] => {
   const told = thrownText(refusal)
-  const quotable = [box.boxlabel, box.sidecar_json, ...leafTexts(box.box_key_wrapped), ...leafTexts(box.whisper_ciphered)]
+  const quotable = [box.boxlabel, ...leafTexts(box.sidecar), ...leafTexts(box.box_key_wrapped), ...leafTexts(box.whisper_ciphered)]
   return quotable.filter((text) => text !== '' && told.includes(text))
 }
 // --

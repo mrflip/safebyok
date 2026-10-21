@@ -498,11 +498,11 @@ describe("a hello that fails", () => {
 
 // == [hello, by the Contract]: hello's Does, Guarantees, Returns and Refuses; staleMinutes
 
-/** A world whose `u1` vault holds one box, `anthropic`, its stored sidecar respaced: listed damaged. */
+/** A world whose `u1` vault holds one box, `anthropic`, its stored sidecar gone: listed damaged. */
 const damagedBoxWorld = async () => {
   const world = makeWorld()
   await seedVault(world)
-  world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), sidecar_json: '{ }' }))
+  world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), sidecar: undefined }))
   return world
 }
 

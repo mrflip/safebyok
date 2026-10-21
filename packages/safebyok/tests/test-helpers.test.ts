@@ -671,12 +671,7 @@ describe("the fixtures", () => {
   it("boxOf: a shape-valid BoxRecord, with any field overridden", () => {
     expect(BoxRecord.safeParse(TH.boxOf('anthropic_api_key', 'a1')).success).to.be.true
     expect(TH.boxOf('anthropic_api_key', 'a1').revision_tok).to.eq('rev-a1')
-    expect(TH.boxOf('anthropic_api_key', 'a1', { sidecar_json: '{}' }).sidecar_json).to.eq('{}')
-  })
-
-  it("sidecarJsonOf: a sidecar as a box holds it, its keys sorted, as the example shows", () => {
-    expect(TH.sidecarJsonOf({ note: 'work account' })).to.eq('{"note":"work account"}')
-    expect(TH.sidecarJsonOf({ tier: 2, note: 'work' })).to.eq('{"note":"work","tier":2}')
+    expect(TH.boxOf('anthropic_api_key', 'a1', { sidecar: { note: 'work account' } }).sidecar).to.deep.equal({ note: 'work account' })
   })
 })
 // --

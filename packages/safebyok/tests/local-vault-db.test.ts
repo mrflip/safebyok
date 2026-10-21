@@ -40,7 +40,7 @@ describe("localVaultDB", () => {
   it("reads boxes as written today, with a sidecar and with an empty one, and writes them back the same", async () => {
     // A stored vault is a contract: these rows are byte for byte what putBox() writes today.
     const store = memoryStore()
-    const emptied = TH.boxOf('openai', 'two', { sidecar_json: '{}' })
+    const emptied = TH.boxOf('openai', 'two', { sidecar: {} })
     const sidecarRow = JSON.stringify(TH.boxOf('anthropic', 'one'))
     const emptiedRow = JSON.stringify(emptied)
     store.write(u1VaultPropsCkey, JSON.stringify(TH.vaultPropsOf('u1')))
@@ -57,7 +57,7 @@ describe("localVaultDB", () => {
 
   it("lists a box written before the sidecar, with a note, as damaged: no earlier record is read", async () => {
     const store = memoryStore()
-    const { sidecar_json: _sidecarJson, whisper_codec: _codec, whisper_schema_version: _version, ...rest } = TH.boxOf('anthropic', 'one')
+    const { sidecar: _sidecar, whisper_codec: _codec, whisper_schema_version: _version, ...rest } = TH.boxOf('anthropic', 'one')
     store.write(u1VaultPropsCkey, JSON.stringify(TH.vaultPropsOf('u1')))
     store.write(u1BoxCkey('anthropic'), JSON.stringify({ ...rest, format: 'safebyok-box-v2', note: 'a test box' }))
     const vaultDB = localVaultDB({ store })
@@ -93,7 +93,8 @@ describe("localVaultDB", () => {
     const store = memoryStore()
     const scope = TH.scopeOf('u1')
     store.write(Ckeys.vaultProps(scope), JSON.stringify(TH.vaultPropsOf('u1')))
-    store.write(Ckeys.box(scope, 'anthropic'), JSON.stringify({ ...TH.boxOf('anthropic', 'one'), sidecar_json: 'not json' }))
+    const sidecarless = TH.omitting(TH.boxOf('anthropic', 'one'), 'sidecar')
+    store.write(Ckeys.box(scope, 'anthropic'), JSON.stringify(sidecarless))
     const vaultDB = localVaultDB({ store })
     expect(await TH.expectingGood(vaultDB).listBoxes(scope)).to.deep.equal([{ boxlabel: 'anthropic', damaged: true, revision_tok: 'rev-one' }])
     expect(await TH.expectingGood(vaultDB).delBox(scope, 'anthropic', TH.deleting(null))).to.deep.equal({ outcome: 'deleted_other' })

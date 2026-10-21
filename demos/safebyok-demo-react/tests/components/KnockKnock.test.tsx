@@ -177,9 +177,9 @@ describe("KnockKnock", () => {
     const world = TH.makeWorld({ vaultDB: localVaultDB({ store }) })
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
     const ckey = Ckeys.box(TH.scopeOf('u1'), 'anthropic_api_key')
-    // A sidecar that is not JSON: damaged, but its record still names its revision.
+    // A record with no sidecar: damaged, but its record still names its revision.
     const row = JSON.parse(store.read(ckey) ?? '{}') as object
-    store.write(ckey, JSON.stringify({ ...row, sidecar_json: '{"note":' }))
+    store.write(ckey, JSON.stringify({ ...row, sidecar: undefined }))
     world.renderInVault(<KnockKnock />)
     await screen.findByText(/stored Anthropic key is damaged/)
     fireEvent.change(screen.getByPlaceholderText('Banana'), { target: { value: 'Banana' } })

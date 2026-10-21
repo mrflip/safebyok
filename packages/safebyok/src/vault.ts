@@ -1,6 +1,6 @@
 import * as Z from 'zod/mini'
 import { type Capacity, type Clock, type VaultScope, BoxSummary, type DamagedBox, type PasskeyWayinSummary, type PassphraseWayinSummary, type PasskeyAnswer, type WayinSummary, Whisper, Sidecar, VaultProps, DeviceMark, MinuteMillis, FarFuture, FarPast } from './types'
-import { Box, type BoxRecord, EmptySidecarJson, checkedBoxRecord, checkedSidecar, heldListing, planSeal, sealPlanned, whisperBytesOf } from './box'
+import { Box, type BoxRecord, checkedBoxRecord, checkedSidecar, heldListing, planSeal, sealPlanned, whisperBytesOf } from './box'
 import * as Names from './names'
 import { optionsCheck } from './options'
 import { VaultError, isVaultError, type RefusalKind } from './errors'
@@ -527,10 +527,10 @@ export class Vault {
       this.#checkOpen()
       // The host's check gates every name written; reads and deletes hold a name to the floor alone.
       const label = Names.check(this.#rules, 'boxlabel', boxlabel)
-      const givenSidecarJson = sidecarJsonOf(storeOpts)
+      const givenSidecar = sidecarOf(storeOpts)
       // The refusal never quotes its input: a whisper stays out of error messages.
       const whisperBytes = whisperBytesOf(whisper)
-      this.#checkWhisperFits(whisperBytes, givenSidecarJson ?? EmptySidecarJson)
+      this.#checkWhisperFits(whisperBytes, givenSidecar ?? {})
       // Checked before the user is asked for anything: a call that cannot land never prompts.
       await this.#ensureLease(0)
       const standing = await this.#getBoxOrDamaged(label)
@@ -552,8 +552,8 @@ export class Vault {
       // while it stands; the catch-up lists it, with its revision for the next store.
       // The sidecar a store keeps from the box it replaces, when none is given, counts toward the
       // limit too: known once the plan has vouched for that box, and weighed before any key is made.
-      const plan = await planSeal(lease, { boxlabel: label, whisperBytes, sidecarJson: givenSidecarJson, over: prev })
-      this.#checkWhisperFits(plan.whisperBytes, plan.sidecarJson)
+      const plan = await planSeal(lease, { boxlabel: label, whisperBytes, sidecar: givenSidecar, over: prev })
+      this.#checkWhisperFits(plan.whisperBytes, plan.sidecar)
       const box = await sealPlanned(this, lease, plan)
       await this.#writeOver(box, { vault_id: box.vault_id, revision_tok: overRevision })
       await this.#refresh()
@@ -1638,8 +1638,8 @@ export class Vault {
   }
 
   /** Refuse 'whisper_too_large' for a whisper whose JSON, with the sidecar's beside it, is over `maxWhisperBytes`, quoting neither. */
-  #checkWhisperFits(whisperBytes: Uint8Array, sidecarJson: string) {
-    const sidecarBytes = new TextEncoder().encode(sidecarJson).length
+  #checkWhisperFits(whisperBytes: Uint8Array, sidecar: Sidecar) {
+    const sidecarBytes = new TextEncoder().encode(stableJsonify(sidecar)).length
     if (whisperBytes.length + sidecarBytes <= this.#whisperByteLimit) { return }
     throw new VaultError('whisper_too_large', `That whisper and its box's sidecar are over this vault's limit of ${String(this.#whisperByteLimit)} bytes of JSON together: check that the right value is being stored. If it really is meant to be this large, pass a larger maxWhisperBytes to Vault.make.`)
   }
@@ -2017,7 +2017,7 @@ const UntrustedStorageKinds = ['identity_revoked', 'rolled_back', 'newer_format'
 const isCatchingUpKind = (err: unknown): err is VaultError => isVaultError(err, 'stale_write') || isVaultError(err, 'vault_mismatch')
 // --
 
-// == [Argument parsers]: eventHint, checkHelloOpts, checkEnsureLeaseOpts, checkStoreOpts, sidecarJsonOf, standingPassphraseOf, newProofOf, absentBox
+// == [Argument parsers]: eventHint, checkHelloOpts, checkEnsureLeaseOpts, checkStoreOpts, sidecarOf, standingPassphraseOf, newProofOf, absentBox
 
 /** What a call that takes options most likely had in place of its bag, and what to do: an event, as `call` was handed to `addEventListener` or `onClick` itself. */
 const eventHint = (call: 'hello' | 'ensureLease', tried: 'tryHello' | 'tryEnsureLease') => `${call}() was handed something other than a bag of options: an event, most likely, as ${call} was handed to addEventListener or onClick as the handler itself. Wrap it: \`() => vault.${tried}()\`, whose refusal, being returned, never surfaces as an unhandled rejection.`
@@ -2028,17 +2028,17 @@ const checkHelloOpts = optionsCheck({ staleMinutes: Z.optional(Z.unknown()) }, "
 /** What `ensureLease()`'s options may hold: `renewMinutes`, which `parseRenewMinutes` checks, and nothing else. */
 const checkEnsureLeaseOpts = optionsCheck({ renewMinutes: Z.optional(Z.unknown()) }, "ensureLease()'s only option is `renewMinutes`, how many minutes before the lease ends to ask for a proof anyway: check its spelling, and leave out any other.", eventHint('ensureLease', 'tryEnsureLease'))
 
-/** What `putBox()`'s options may hold: a sidecar, which {@link sidecarJsonOf} checks, and nothing else. */
+/** What `putBox()`'s options may hold: a sidecar, which {@link sidecarOf} checks, and nothing else. */
 const checkStoreOpts = optionsCheck({ sidecar: Z.optional(Z.unknown()) }, "putBox()'s only option is `sidecar`, the box's own visible data (it is authenticated but never encrypted): check its spelling, and leave out any other. A note is kept in the sidecar: { sidecar: { note } }.")
 
-/** The sidecar a `putBox()` was handed, as the JSON a box keeps, keys sorted; undefined when it was handed none.
+/** The sidecar a `putBox()` was handed, checked; undefined when it was handed none.
  * Refuses 'bad_option' for anything JSON cannot carry, quoting none of it, and for options beside
  * it.
  */
-const sidecarJsonOf = (storeOpts: { sidecar?: Sidecar | undefined } | undefined): string | undefined => {
+const sidecarOf = (storeOpts: { sidecar?: Sidecar | undefined } | undefined): Sidecar | undefined => {
   checkStoreOpts(storeOpts)
   if (storeOpts?.sidecar === undefined) { return undefined }
-  return stableJsonify(checkedSidecar(storeOpts.sidecar))
+  return checkedSidecar(storeOpts.sidecar)
 }
 
 /** The proof of a change to the ways in, `call`'s: the vault's standing passphrase, as text.

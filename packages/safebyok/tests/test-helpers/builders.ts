@@ -4,8 +4,7 @@ import type { KeyDeriver } from '../../src/key-deriver'
 import { type StrengthChecker, StrongVerdict, guardStrengthChecker } from '../../src/passphrase-strength'
 import { memoryStore } from '../../src/string-store'
 import type { BoxRecord } from '../../src/box'
-import { type VaultScope, type PassphraseWayinRecord, type PasskeyWayinRecord, type PasskeyAnswer, type VaultProps, type Sidecar, type ListedSummary, type DamagedBox, type DeviceMark, type SeenVault, type LeaseRecord } from '../../src/types'
-import { stableJsonify } from '../../src/stable-jsonify'
+import { type VaultScope, type PassphraseWayinRecord, type PasskeyWayinRecord, type PasskeyAnswer, type VaultProps, type ListedSummary, type DamagedBox, type DeviceMark, type SeenVault, type LeaseRecord } from '../../src/types'
 import { Vault } from '../../src/vault'
 import { type MakeVaultOpts } from '../../src/vault-opts'
 import { localVaultDB } from '../../src/local-vault-db'
@@ -223,29 +222,21 @@ export const vaultPropsOf = (userId: string, overrides: Partial<VaultProps> = {}
  * with the sidecar `{ note: 'a test box' }` unless
  * `overrides` says otherwise.
  *
- * @example boxOf('anthropic_api_key', 'a1', { sidecar_json: sidecarJsonOf({ note: 'work account' }) })
+ * @example boxOf('anthropic_api_key', 'a1', { sidecar: { note: 'work account' } })
  */
 export const boxOf = (boxlabel: string, tag: string, overrides: Partial<BoxRecord> = {}): BoxRecord => ({
-  format:                 'safebyok-box-v7',
+  format:                 'safebyok-box-v8',
   boxlabel,
   revision_tok:           `rev-${tag}`,
   box_key_wrapped:        fakeCiphered(`boxkey-${tag}`),
   whisper_ciphered:       fakeCiphered(`whisper-${tag}`),
   whisper_codec:          'json_v1',
   whisper_schema_version: 1,
-  sidecar_json:           sidecarJsonOf({ note: 'a test box' }),
+  sidecar:                { note: 'a test box' },
   registered_at:          Date.UTC(2026, 9, 14),
   written_at:             Date.UTC(2026, 9, 14),
   ...overrides,
 })
-
-/**
- * A sidecar as a box's `sidecar_json` holds it: its JSON, every object's keys sorted, as the
- * vault writes it.
- *
- * @example sidecarJsonOf({ note: 'work account' }) // '{"note":"work account"}'
- */
-export const sidecarJsonOf = (sidecar: Sidecar): string => stableJsonify(sidecar) ?? ''
 
 /**
  * Labels the default grammar refuses and a host's validators may admit: ones differing only by a

@@ -49,7 +49,7 @@ export const BoxFields = everyFieldOf<BoxRecord>()([
   ['whisper_ciphered',       'ciphered'],
   ['whisper_codec',          'plain'],
   ['whisper_schema_version', 'plain'],
-  ['sidecar_json',           'plain'],
+  ['sidecar',                'plain'],
   ['registered_at',          'plain'],
   ['written_at',             'plain'],
 ] as const)

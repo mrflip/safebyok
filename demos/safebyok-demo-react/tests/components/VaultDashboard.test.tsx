@@ -255,9 +255,9 @@ describe("VaultDashboard, its boxes", () => {
     const store = memoryStore()
     const world = TH.makeWorld({ vaultDB: localVaultDB({ store }) })
     await world.seed({ openai_api_key: 'sk-test-not-a-real-key' })
-    // A sidecar that is not JSON: damaged, but its record still names its revision.
+    // A record with no sidecar: damaged, but its record still names its revision.
     const row = JSON.parse(store.read(openaiCkey) ?? '{}') as object
-    store.write(openaiCkey, JSON.stringify({ ...row, sidecar_json: '{"note":' }))
+    store.write(openaiCkey, JSON.stringify({ ...row, sidecar: undefined }))
     world.renderInVault(<VaultDashboard />)
     fireEvent.click(await screen.findByRole('button', { name: 'replace' }))
     expect(screen.getByLabelText<HTMLInputElement>(/^label/).disabled).to.be.true

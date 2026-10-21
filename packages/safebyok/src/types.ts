@@ -111,9 +111,11 @@ export type VaultScope = Z.infer<typeof VaultScope>
 const cryptoKeyHandle = Z.custom<CryptoKey>((val) => val instanceof CryptoKey, 'a CryptoKey handle')
 
 /** A box's sidecar: your app's own JSON beside the whisper, shown while the vault is locked. Never put secret material in it.
- * It is stored in the clear, so anyone who can read the database can read it. It is bound into
- * the box's encryption, so a sidecar altered in storage makes the box refuse to open. safebyok
- * never looks inside it: check its shape before `putBox()`.
+ * It is stored in the clear, as the JSON value it is (a `jsonb` column, say, which a server can
+ * query), so anyone who can read the database can read it. It is bound into the box's encryption
+ * as its JSON with keys sorted, so a sidecar altered in storage makes the box refuse to open, while
+ * one whose keys storage reorders still opens. safebyok never looks inside it: check its shape
+ * before `putBox()`.
  *
  * @example Sidecar.parse({ note: 'work account', project: 'atlas' })
  * @example Sidecar.safeParse({ when: new Date() }).success     // false: JSON would flatten it to {}

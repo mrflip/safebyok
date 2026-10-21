@@ -70,9 +70,9 @@ describe("the ctx builders' output, byte for byte", () => {
     const box = (await TH.expectingGood(vaultDB).getBox(scope, 'anthropic'))!
     const lease = (await TH.expectGood(deviceDB.getLease(scope)))!
     const scopeText = `"acme","u1","main","${vaultProps.vault_id}"`
-    const header = `{"boxlabel":"anthropic","registered_at":${String(box.registered_at)},"revision_tok":"${box.revision_tok}","sidecar_json":"{}","whisper_codec":"json_v1","whisper_schema_version":1,"written_at":${String(box.written_at)}}`
-    const keyCtx = textBytes(`["safebyok-box-v7",${scopeText},"box_key_wrapped",${header}]`)
-    const whisperCtx = textBytes(`["safebyok-box-v7",${scopeText},"whisper_ciphered",${header}]`)
+    const header = `{"boxlabel":"anthropic","registered_at":${String(box.registered_at)},"revision_tok":"${box.revision_tok}","sidecar":"{}","whisper_codec":"json_v1","whisper_schema_version":1,"written_at":${String(box.written_at)}}`
+    const keyCtx = textBytes(`["safebyok-box-v8",${scopeText},"box_key_wrapped",${header}]`)
+    const whisperCtx = textBytes(`["safebyok-box-v8",${scopeText},"whisper_ciphered",${header}]`)
     const leaseCtx = textBytes(`["safebyok-lease-v1",${scopeText},${String(lease.unlock_epoch)},${String(lease.ask_passphrase_at)},"vault_key_lease_wrapped"]`)
 
     const { sessionKey } = await TH.expectGood(Wayin.make(slice, vaultProps, vaultProps.passphrase).tryOpen(Proof.parse(slice, 'pw')))

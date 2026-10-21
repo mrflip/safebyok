@@ -157,7 +157,7 @@ Three tables, inside the component, beside nothing of your app's:
   box's boxKey (`box_key_wrapped`), and the vaultKey once for each of the vault's
   ways in (the `vault_key_wayin_wrapped` of the vault props' `passphrase`, and of its `passkey`
   when it has one).
-* **In the open**: the scope (`applabel`, `user_id`, `vaultlabel`), each `boxlabel` and sidecar (`sidecar_json`),
+* **In the open**: the scope (`applabel`, `user_id`, `vaultlabel`), each `boxlabel` and `sidecar`,
   the `vault_id`, `unlock_epoch`, `revision_tok`s, each way in's `wayinkind`, `device_id` and
   `registered_at`, the passphrase's passphraseSalt (`salt_b64`) and key deriver's label, whether
   the vault has a passkey, and its `credential_id` and `prf_salt_b64`, when each vault and box was first stored and each box last written (`registered_at`,
@@ -177,8 +177,8 @@ Three tables, inside the component, beside nothing of your app's:
   once (and no further than its limits). A delete never counts a vault.
 
 **Upgrading from an older version.** The vault props are format `safebyok-vault-v6` and each box
-`safebyok-box-v7`, neither holding a `vault_key_epoch` any more, and no older vault is read: each
-one reads as damaged, its boxes with it. Convex refuses to deploy a schema its documents do not
+`safebyok-box-v8`, neither holding a `vault_key_epoch` any more, and a box holds its sidecar as a
+JSON value; no older vault is read: each one reads as damaged, its boxes with it. Convex refuses to deploy a schema its documents do not
 match, so clear the component's three tables before you deploy (on the dashboard's Data page,
 pick the `safebyok` component); each user then makes their vault anew.
 

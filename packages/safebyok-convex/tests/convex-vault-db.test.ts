@@ -252,7 +252,7 @@ describe("a record the deployment refused", () => {
   const quotableWayins = { passphrase: TH.wayinOf('quotable_phrase', quotableWayin), passkey: TH.passkeyWayinOf('quotable_passkey', quotableWayin) }
   const standing = TH.vaultPropsOf(subject, { ...scope, unlock_epoch: 52_871, ...quotableWayins })
   const nextVaultProps = { ...standing, unlock_epoch: 52_872, vault_key_passphrase_wrapped: TH.fakeCiphered('rewrapped_quotable') }
-  const box = TH.boxOf('quotable_box', 'quotable_rev', { sidecar_json: TH.sidecarJsonOf({ note: 'a quotable sidecar' }) })
+  const box = TH.boxOf('quotable_box', 'quotable_rev', { sidecar: { note: 'a quotable sidecar' } })
   // The whisper's codec and schema version are the same in every box, so nothing to quote.
   const { whisper_codec: _codec, whisper_schema_version: _version, ...quotableBox } = box
 
@@ -263,7 +263,7 @@ describe("a record the deployment refused", () => {
   const rivalWayin = { device_id: 'device_rival', registered_at: Date.UTC(2026, 0, 2) }
   const rivalWayins = { passphrase: TH.wayinOf('rival_phrase', rivalWayin), passkey: TH.passkeyWayinOf('rival_passkey', rivalWayin) }
   const rivalVaultProps = TH.vaultPropsOf('user_rival', { ...rivalScope, unlock_epoch: 7, ...rivalWayins })
-  const rivalBox = TH.boxOf('rival_box', 'rival_rev', { sidecar_json: TH.sidecarJsonOf({ note: 'a rival note' }) })
+  const rivalBox = TH.boxOf('rival_box', 'rival_rev', { sidecar: { note: 'a rival note' } })
   const rivalLeaves = new Set(TH.leafTexts({ scope: rivalScope, record: [rivalVaultProps, { ...rivalVaultProps, unlock_epoch: 8, vault_key_passphrase_wrapped: TH.fakeCiphered('rewrapped_rival') }, rivalBox] }))
   const perRecordLeaves = (record: unknown) => TH.leafTexts({ scope, record }).filter((leaf) => ! rivalLeaves.has(leaf))
 
@@ -306,12 +306,12 @@ describe("a record the deployment refused", () => {
     const client = deployment.client(subject)
     await TH.expectGood(convexVaultDB({ client, api: deployment.api.safebyok }).ensureVaultProps(standing))
     const expected = { vault_id: standing.vault_id, revision_tok: null }
-    const quotedArgs = withSidecarNotText({ scope, box, expected })
+    const quotedArgs = withRevisionNotText({ scope, box, expected })
     await expect(client.mutation(deployment.api.safebyok.putBox, quotedArgs)).rejects.toThrow('quoted_by_convex')
     const quoting: ConvexVaultClient = {
       query:    client.query.bind(client),
       onUpdate: client.onUpdate.bind(client),
-      mutation: (mutationRef, args) => client.mutation(mutationRef, withSidecarNotText(args)),
+      mutation: (mutationRef, args) => client.mutation(mutationRef, withRevisionNotText(args)),
     }
     const vaultDB = convexVaultDB({ client: quoting, api: deployment.api.safebyok })
     const refusal = await TH.expectBad(vaultDB.putBox(scope, expected, box), 'storage_unavailable')
@@ -321,8 +321,8 @@ describe("a record the deployment refused", () => {
   })
 })
 
-/** `args` with its box's sidecar not text, past the core's checks: convex-test's validator quotes it. */
-const withSidecarNotText = <ArgsT extends object>(args: ArgsT): ArgsT => ({ ...args, box: { ...(args as { box?: object }).box, sidecar_json: ['quoted_by_convex'] } })
+/** `args` with its box's revision not text, past the core's checks: convex-test's validator quotes it. */
+const withRevisionNotText = <ArgsT extends object>(args: ArgsT): ArgsT => ({ ...args, box: { ...(args as { box?: object }).box, revision_tok: ['quoted_by_convex'] } })
 
 /** Resolves once every message already sent to `vaultDB`'s client has arrived: one round trip behind them. */
 const caughtUp = async (vaultDB: ReturnType<typeof convexVaultDB>) => { await TH.expectingGood(vaultDB).getVaultProps(u1) }

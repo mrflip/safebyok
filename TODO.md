@@ -18,7 +18,7 @@ Small irritants, each a few lines, picked up by whoever is nearby.
   one `row_to_json` column, next time Postgres is touched.
 * **GraphQL's `'plain'` field class.** From the reform2 sprint
   ([#176](https://github.com/mrflip/safebyok/pull/176); the Coach: "yes", leave it for a later
-  sweep): `safebyok-graphql/src/fields.ts` classes `sidecar_json` as `'plain'`, a code name that
+  sweep): `safebyok-graphql/src/fields.ts` classes `sidecar` as `'plain'`, a code name that
   disagrees with VOCABULARY.md's *visible* (which notes the exception). Rename the class with
   the next GraphQL change.
 * **`postgres` a required check, once it has run a while.** Ruled 2026-10-16

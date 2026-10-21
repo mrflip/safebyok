@@ -110,9 +110,9 @@ const DamagedListings = [
   [() => '{"not": json',                                                                          'that is not JSON at all'],
   [(row: Record<string, unknown>) => JSON.stringify({ ...row, boxlabel: 'other_box' }),           'naming another boxlabel than the one it is stored under'],
   [(row: Record<string, unknown>) => JSON.stringify({ ...row, written_at: 1_792_022_400_000.5 }), 'whose written_at holds a fraction of a millisecond'],
-  [(row: Record<string, unknown>) => JSON.stringify({ ...row, sidecar_json: '{"note":' }),         'whose sidecar is not JSON'],
+  [(row: Record<string, unknown>) => JSON.stringify({ ...row, sidecar: undefined }),              'whose sidecar is gone'],
   [(row: Record<string, unknown>) => JSON.stringify({ ...row, format: 'safebyok-box-v9' }),   'written in a format this version does not know'],
-  [({ sidecar_json: kept, ...row }: Record<string, unknown>) => JSON.stringify({ ...row, format: 'safebyok-box-v4', public_json: kept }), 'written before the sidecar was named, as safebyok-box-v4 with its public_json'],
+  [({ sidecar: kept, ...row }: Record<string, unknown>) => JSON.stringify({ ...row, format: 'safebyok-box-v7', sidecar_json: JSON.stringify(kept) }), 'written before the sidecar was a JSON value, as safebyok-box-v7 with its sidecar_json'],
   [({ written_at: kept, ...row }: Record<string, unknown>) => JSON.stringify({ ...row, format: 'safebyok-box-v3', changed_at: kept }), 'written before written_at, as safebyok-box-v3 with its changed_at'],
 ] as const
 
@@ -258,7 +258,7 @@ describe("damaged boxes", () => {
   })
 
   it("a damaged box's listing quotes nothing from its record", async () => {
-    const { world } = await worldWithDamagedBox((row) => JSON.stringify({ ...row, sidecar_json: '"FAKESECRET' }))
+    const { world } = await worldWithDamagedBox((row) => JSON.stringify({ ...row, written_at: 'FAKESECRET' }))
     const fresh = await world.open()
     expect(JSON.stringify(fresh.getSnapshot())).to.not.include('FAKESECRET')
   })

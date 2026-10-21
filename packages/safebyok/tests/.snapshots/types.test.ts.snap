@@ -1,7 +1,40 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`Stored record formats > safebyok-box-v7 1`] = `
+exports[`Stored record formats > safebyok-box-v8 1`] = `
 {
+  "$defs": {
+    "__schema0": {
+      "anyOf": [
+        {
+          "type": "string",
+        },
+        {
+          "type": "number",
+        },
+        {
+          "type": "boolean",
+        },
+        {
+          "type": "null",
+        },
+        {
+          "items": {
+            "$ref": "#/$defs/__schema0",
+          },
+          "type": "array",
+        },
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema0",
+          },
+          "propertyNames": {
+            "type": "string",
+          },
+          "type": "object",
+        },
+      ],
+    },
+  },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
@@ -29,7 +62,7 @@ exports[`Stored record formats > safebyok-box-v7 1`] = `
       "type": "string",
     },
     "format": {
-      "const": "safebyok-box-v7",
+      "const": "safebyok-box-v8",
       "type": "string",
     },
     "registered_at": {
@@ -41,8 +74,8 @@ exports[`Stored record formats > safebyok-box-v7 1`] = `
       "minLength": 1,
       "type": "string",
     },
-    "sidecar_json": {
-      "type": "string",
+    "sidecar": {
+      "$ref": "#/$defs/__schema0",
     },
     "whisper_ciphered": {
       "additionalProperties": false,
@@ -84,7 +117,7 @@ exports[`Stored record formats > safebyok-box-v7 1`] = `
     "whisper_ciphered",
     "whisper_codec",
     "whisper_schema_version",
-    "sidecar_json",
+    "sidecar",
     "registered_at",
     "written_at",
   ],

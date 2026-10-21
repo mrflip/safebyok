@@ -8,7 +8,7 @@ describe("selectionOf", () => {
   })
 
   it("asks for a listed box without either ciphered field", () => {
-    expect(selectionOf(ListedBoxFields)).to.eq('format boxlabel revision_tok whisper_codec whisper_schema_version sidecar_json registered_at written_at')
+    expect(selectionOf(ListedBoxFields)).to.eq('format boxlabel revision_tok whisper_codec whisper_schema_version sidecar registered_at written_at')
   })
 })
 
@@ -34,9 +34,10 @@ describe("recordOf", () => {
     expect(recordOf(TH.vaultPropsOf('u1'), VaultPropsFields)).to.deep.equal(TH.vaultPropsOf('u1'))
   })
 
-  it("carries a box's sidecar as the JSON text it was written as", () => {
-    const box = TH.boxOf('openai', 'r1', { sidecar_json: '{"b": 1, "a": "caf\u{E9}"}' })
-    expect(recordOf(box, BoxFields)).to.include({ sidecar_json: '{"b": 1, "a": "caf\u{E9}"}' })
+  it("carries a box's sidecar as the JSON value it was written as, a null one among them", () => {
+    const box = TH.boxOf('openai', 'r1', { sidecar: { beta: 1, alpha: 'caf\u{E9}' } })
+    expect(recordOf(box, BoxFields)).to.deep.include({ sidecar: { beta: 1, alpha: 'caf\u{E9}' } })
+    expect(recordOf(TH.boxOf('openai', 'r1', { sidecar: null }), BoxFields)).to.deep.include({ sidecar: null })
   })
 
   it("drops a field the record has not got", () => {

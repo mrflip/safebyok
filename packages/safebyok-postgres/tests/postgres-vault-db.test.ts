@@ -275,32 +275,55 @@ describe("postgresVaultDB, what it stores", () => {
     expect(await TH.expectingGood(vaultDB).getVaultProps(u1)).to.deep.equal(rewrapped(3))
   })
 
-  it("stores a box a column to a field, beside its vault's scope and vault_id, its sidecar as the text it was written as", async () => {
+  it("stores a box a column to a field, beside its vault's scope and vault_id, its sidecar as a jsonb value, its keys in jsonb's own order", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
-    // Keys jsonb would reorder (it sorts the shorter first) and spacing it would add: the text is
-    // bound as written, so it must come back so.
-    const sidecarJson = '{"alpha":"café","zeta":1}'
-    await TH.expectingGood(vaultDB).putBox(u1, noBoxYet, TH.boxOf('anthropic', 'one', { sidecar_json: sidecarJson }))
+    // Keys jsonb reorders (it sorts the shorter first): the box binds its sidecar with keys
+    // sorted, so the value read back is the one written, whatever order jsonb keeps.
+    const sidecar = { alpha: 'café', zeta: 1, be: [true, null] }
+    await TH.expectingGood(vaultDB).putBox(u1, noBoxYet, TH.boxOf('anthropic', 'one', { sidecar }))
     const { rows } = await db.query('SELECT * FROM safebyok_boxes')
     expect(rows).to.deep.equal([{
       applabel:               'acme',
       user_id:                'u1',
       vaultlabel:             'main',
       vault_id:               'vault-id-u1',
-      format:                 'safebyok-box-v7',
+      format:                 'safebyok-box-v8',
       boxlabel:               'anthropic',
       revision_tok:           'rev-one',
       box_key_wrapped:        TH.fakeCiphered('boxkey-one'),
       whisper_ciphered:       TH.fakeCiphered('whisper-one'),
       whisper_codec:          'json_v1',
       whisper_schema_version: 1,
-      sidecar_json:           sidecarJson,
+      sidecar,
       registered_at:          Date.UTC(2026, 9, 14),
       written_at:             Date.UTC(2026, 9, 14),
     }])
-    expect(await TH.expectingGood(vaultDB).getBox(u1, 'anthropic')).to.include({ sidecar_json: sidecarJson })
+    const read = await TH.expectingGood(vaultDB).getBox(u1, 'anthropic')
+    expect(read?.sidecar).to.deep.equal(sidecar)
+    const queried = await db.query("SELECT sidecar->>'alpha' AS alpha FROM safebyok_boxes")
+    expect(queried.rows).to.deep.equal([{ alpha: 'café' }])
+  })
+
+  it("stores a sidecar of JSON null as a SQL null, and reads it back as JSON null", async () => {
+    const db = await TH.emptyDatabase()
+    const vaultDB = TH.requestFor(db, 'u1')
+    await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
+    await TH.expectingGood(vaultDB).putBox(u1, noBoxYet, TH.boxOf('anthropic', 'one', { sidecar: null }))
+    const { rows } = await db.query('SELECT sidecar IS NULL AS absent FROM safebyok_boxes')
+    expect(rows).to.deep.equal([{ absent: true }])
+    const read = await TH.expectingGood(vaultDB).getBox(u1, 'anthropic')
+    expect(read?.sidecar).to.be.null
+  })
+
+  it("passes up Postgres's own refusal of a sidecar its jsonb cannot hold, as the write's failure, writing nothing", async () => {
+    const db = await TH.emptyDatabase()
+    const vaultDB = TH.requestFor(db, 'u1')
+    await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
+    const refusal = await TH.expectBad(vaultDB.putBox(u1, noBoxYet, TH.boxOf('anthropic', 'one', { sidecar: { note: 'nul\0here' } })), 'storage_unavailable')
+    expect(refusal.cause).to.be.instanceOf(Error)
+    expect(await TH.expectingGood(vaultDB).getBox(u1, 'anthropic')).to.be.null
   })
 
   it("lists boxes without asking for their ciphered fields", async () => {
@@ -428,7 +451,7 @@ describe("postgresVaultDB, its box limit", () => {
     const vaultDB = await filledTo(db, 5, [])
     const orphan = TH.boxOf('anthropic', 'sk-fake')
     const insertOrphan = db.query(
-      `INSERT INTO safebyok_boxes (applabel, user_id, vaultlabel, vault_id, format, boxlabel, revision_tok, box_key_wrapped, whisper_ciphered, whisper_codec, whisper_schema_version, sidecar_json, registered_at, written_at)
+      `INSERT INTO safebyok_boxes (applabel, user_id, vaultlabel, vault_id, format, boxlabel, revision_tok, box_key_wrapped, whisper_ciphered, whisper_codec, whisper_schema_version, sidecar, registered_at, written_at)
        VALUES ('acme', 'u1', 'main', 'vault-id-gone', $1, $2, $3, '{}', '{}', 'json_v1', 1, '{}', 0, 0)`,
       [orphan.format, orphan.boxlabel, orphan.revision_tok],
     )
@@ -553,11 +576,11 @@ describe("postgresVaultDB, its box limit", () => {
 // == [Listing and trouble]: listBoxRecords, in trouble
 
 describe("postgresVaultDB, listBoxRecords", () => {
-  it("lists each box as stored, ciphered fields left out, format kept, the sidecar as its JSON text", async () => {
+  it("lists each box as stored, ciphered fields left out, format kept, the sidecar as its JSON value", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
-    const emptied = TH.boxOf('openai', 'two', { sidecar_json: '{}' })
+    const emptied = TH.boxOf('openai', 'two', { sidecar: {} })
     await TH.expectingGood(vaultDB).putBox(u1, noBoxYet, TH.boxOf('anthropic', 'one'))
     await TH.expectingGood(vaultDB).putBox(u1, noBoxYet, emptied)
     const records = await TH.expectingGood(vaultDB).listBoxRecords(u1)
@@ -572,7 +595,7 @@ describe("postgresVaultDB, listBoxRecords", () => {
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
     await TH.expectingGood(vaultDB).putBox(u1, noBoxYet, TH.boxOf('anthropic', 'one'))
     const [record] = await TH.expectingGood(vaultDB).listBoxRecords(u1)
-    expect(record).to.have.property('format', 'safebyok-box-v7')
+    expect(record).to.have.property('format', 'safebyok-box-v8')
     const [summary] = await TH.expectingGood(vaultDB).listBoxes(u1)
     expect(summary).to.not.have.property('format')
   })
