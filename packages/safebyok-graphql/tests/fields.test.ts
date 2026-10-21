@@ -14,11 +14,11 @@ describe("selectionOf", () => {
 
 describe("recordOf", () => {
   it("keeps the fields asked for, a null one as null, leaving out a GraphQL client's __typename, as its example shows", () => {
-    expect(recordOf({ vault_id: 'v1', passkey: null, __typename: 'SafebyokVaultProps' }, [['vault_id', 'plain'], ['passkey', 'plain']])).to.deep.equal({ vault_id: 'v1', passkey: null })
+    expect(recordOf({ vault_tok: 'v1', passkey: null, __typename: 'SafebyokVaultProps' }, [['vault_tok', 'plain'], ['passkey', 'plain']])).to.deep.equal({ vault_tok: 'v1', passkey: null })
   })
 
   it("leaves out a field asked for that was not sent", () => {
-    expect(recordOf({ vault_id: 'v1' }, [['vault_id', 'plain'], ['passkey', 'plain']])).to.deep.equal({ vault_id: 'v1' })
+    expect(recordOf({ vault_tok: 'v1' }, [['vault_tok', 'plain'], ['passkey', 'plain']])).to.deep.equal({ vault_tok: 'v1' })
   })
 
   it("gives back a whole box as it was, and a ciphered field as its two halves alone", () => {
@@ -41,7 +41,7 @@ describe("recordOf", () => {
   })
 
   it("drops a field the record has not got", () => {
-    expect(recordOf({ ...TH.boxOf('openai', 'r1'), vault_id: 'stray' }, BoxFields)).to.not.have.property('vault_id')
+    expect(recordOf({ ...TH.boxOf('openai', 'r1'), vault_tok: 'stray' }, BoxFields)).to.not.have.property('vault_tok')
   })
 
   const NotRecords = [

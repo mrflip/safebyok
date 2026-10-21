@@ -82,7 +82,7 @@ describe("RefusalPolicy.heed", () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
     const onRefusal = vi.fn(() => Promise.resolve())
     const heeded = RefusalPolicy.heed(vaultDB, onRefusal)
-    await TH.expectRefusal(heeded.putVaultProps(TH.vaultPropsOf('u1'), { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'stale_write')
+    await TH.expectRefusal(heeded.putVaultProps(TH.vaultPropsOf('u1'), { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), 'stale_write')
     expect(onRefusal).toHaveBeenCalledTimes(1)
   })
 

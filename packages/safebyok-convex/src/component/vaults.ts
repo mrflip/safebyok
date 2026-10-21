@@ -45,9 +45,9 @@ export const ensureVaultProps = mutation({
   },
 })
 
-/** Replace the vault props, only while those standing have `expected.vault_id` and `expected.unlock_epoch`.
+/** Replace the vault props, only while those standing have `expected.vault_tok` and `expected.gate_epoch`.
  * It also resolves false, writing nothing, for vault props that name another vault or do not move
- * `unlock_epoch` forward.
+ * `gate_epoch` forward.
  */
 export const putVaultProps = mutation({
   args:    { vaultProps: VaultProps, expected: VaultPropsExpectation },
@@ -55,11 +55,11 @@ export const putVaultProps = mutation({
   handler: async (ctx, { vaultProps, expected }) => {
     const standing = await findVaultPropsRow(ctx.db, scopeOfVaultProps(vaultProps))
     const meetsExpectation = standing !== null
-      && standing.vault_id === expected.vault_id
-      && standing.unlock_epoch === expected.unlock_epoch
+      && standing.vault_tok === expected.vault_tok
+      && standing.gate_epoch === expected.gate_epoch
     const movesForward = standing !== null
-      && vaultProps.vault_id === standing.vault_id
-      && vaultProps.unlock_epoch > standing.unlock_epoch
+      && vaultProps.vault_tok === standing.vault_tok
+      && vaultProps.gate_epoch > standing.gate_epoch
     if (! (meetsExpectation && movesForward)) { return false }
     await ctx.db.replace('safebyok_vaults', standing._id, vaultProps)
     return true
@@ -102,7 +102,7 @@ export const putBox = mutation({
   returns: PutBoxAnswer,
   handler: async (ctx, { scope, expected, box }): Promise<Infer<typeof PutBoxAnswer>> => {
     const vaultProps = await findVaultPropsRow(ctx.db, scope)
-    if (vaultProps?.vault_id !== expected.vault_id) {
+    if (vaultProps?.vault_tok !== expected.vault_tok) {
       return { landed: false, refusalkind: 'vault_mismatch' }
     }
     const standing = await findBoxRow(ctx.db, scope, box.boxlabel)
@@ -153,7 +153,7 @@ export const delBox = mutation({
   returns: v.nullable(BoxDeletion),
   handler: async (ctx, { scope, boxlabel, expected }): Promise<Infer<typeof BoxDeletion> | null> => {
     const vaultProps = await findVaultPropsRow(ctx.db, scope)
-    if (vaultProps?.vault_id !== expected.vault_id) { return null }
+    if (vaultProps?.vault_tok !== expected.vault_tok) { return null }
     const standing = await findBoxRow(ctx.db, scope, boxlabel)
     if (! standing) { return { outcome: 'absent' } }
     await ctx.db.delete('safebyok_boxes', standing._id)
@@ -166,13 +166,13 @@ export const delBox = mutation({
 
 // --------------------------------------------------------------------------------- the vault
 
-/** Remove the vault props, every box and the tally in one transaction, only while the vault props have `expected.vault_id`. */
+/** Remove the vault props, every box and the tally in one transaction, only while the vault props have `expected.vault_tok`. */
 export const delVault = mutation({
   args:    { scope: VaultScope, expected: VaultDelExpectation },
   returns: v.boolean(),
   handler: async (ctx, { scope, expected }) => {
     const vaultProps = await findVaultPropsRow(ctx.db, scope)
-    if (vaultProps?.vault_id !== expected.vault_id) { return false }
+    if (vaultProps?.vault_tok !== expected.vault_tok) { return false }
     const boxes = await vaultBoxRows(ctx.db, scope)
     await Promise.all(boxes.map((row) => ctx.db.delete('safebyok_boxes', row._id)))
     await Tallies.drop(ctx.db, vaultProps._id)
@@ -192,9 +192,9 @@ export const watchVault = query({
     const vaultProps = await findVaultPropsRow(ctx.db, scope)
     const boxes = await vaultBoxRows(ctx.db, scope)
     return {
-      vault_id:     vaultProps?.vault_id ?? null,
-      unlock_epoch: vaultProps?.unlock_epoch ?? null,
-      boxes:        boxes.map((row) => [row.boxlabel, row.revision_tok]),
+      vault_tok:  vaultProps?.vault_tok ?? null,
+      gate_epoch: vaultProps?.gate_epoch ?? null,
+      boxes:      boxes.map((row) => [row.boxlabel, row.revision_tok]),
     }
   },
 })

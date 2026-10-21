@@ -61,7 +61,7 @@ const OldIso = '2026-10-14T00:00:00.000Z'
 const { registered_at: _vaultPropsTime, ...vaultPropsWithoutTime } = TH.vaultPropsOf('u1')
 const { passphrase: _passphrase, passkey: _passkey, ...vaultPropsWithoutSlots } = TH.vaultPropsOf('u1')
 const { passkey: _noPasskey, ...vaultPropsWithoutPasskey } = TH.vaultPropsOf('u1')
-const { unlock_epoch: _epoch, ...vaultPropsWithoutEpoch } = TH.vaultPropsOf('u1')
+const { gate_epoch: _epoch, ...vaultPropsWithoutEpoch } = TH.vaultPropsOf('u1')
 /** The three fields the vault props held their one passphrase in, before it was a way in. */
 const WayinFieldsOfOld = {
   key_deriver_label:            'test_digest_v0',
@@ -79,9 +79,9 @@ const VaultPropsCases = [
   [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v5', vault_key_epoch: 1, passphrase: { ...TH.wayinOf('passphrase'), vault_key_epoch: 1 } }, false, 'v5 vault props, which carried a vaultKey epoch'],
   [{ ...vaultPropsWithoutSlots, format: 'safebyok-vault-v4', wayins: [{ ...TH.wayinOf('passphrase'), wayin_id: 'wayin-passphrase', wayinlabel: 'passphrase' }] }, false, 'v4 vault props, their ways in a list'],
   [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v3' }, false,  'vault props from before the prior vaultKey went'],
-  [{ ...TH.vaultPropsOf('u1'), unlock_epoch: 0 },            false,  'an epoch starts at one'],
-  [{ ...TH.vaultPropsOf('u1'), unlock_epoch: 1.5 },          false,  'an epoch is a whole number'],
-  [{ ...TH.vaultPropsOf('u1'), vault_id: '' },               false,  'an empty vault_id'],
+  [{ ...TH.vaultPropsOf('u1'), gate_epoch: 0 },              false,  'an epoch starts at one'],
+  [{ ...TH.vaultPropsOf('u1'), gate_epoch: 1.5 },            false,  'an epoch is a whole number'],
+  [{ ...TH.vaultPropsOf('u1'), vault_tok: '' },              false,  'an empty vault_tok'],
   [TH.vaultPropsOf('u'.repeat(101)),                        true,   'a user_id of any length: the validators check names, not the record'],
   [{ ...TH.vaultPropsOf('u1'), vaultlabel: null },           false,  'a vaultlabel that is not text'],
   [{ ...TH.vaultPropsOf('u1'), passphrase: TH.wayinOf('passphrase', { vault_key_wayin_wrapped: { cipher_iv_b64: 'iv' } as never }) }, false, 'a passphrase missing its ciphertext'],
@@ -91,7 +91,7 @@ const VaultPropsCases = [
   [vaultPropsWithoutTime,                                   false,  'vault props missing their registered_at'],
   [{ ...vaultPropsWithoutTime, created_at: OldIso, updated_at: OldIso }, false, 'vault props from before their time was named registered_at'],
   [{ ...vaultPropsWithoutSlots, ...WayinFieldsOfOld },       false,  'vault props from before their passphrase was a way in'],
-  [{ ...vaultPropsWithoutEpoch, passphrase_epoch: 1 },       false,  'vault props from before their epoch was named unlock_epoch'],
+  [{ ...vaultPropsWithoutEpoch, passphrase_epoch: 1 },       false,  'vault props from before their epoch was named gate_epoch'],
   [{ ...TH.vaultPropsOf('u1'), format: 'safebyok-vault-v1' }, false, 'vault props from before vaultKey epochs'],
 ] as const
 
@@ -158,7 +158,7 @@ describe("Sidecar", () => {
   })
 })
 
-const wholeSummary = { boxlabel: 'anthropic', revision_tok: 'r1', sidecar: {}, registered_at: Date.UTC(2026, 9, 14), written_at: Date.UTC(2026, 9, 14), vault_id: 'vault-id-u1' }
+const wholeSummary = { boxlabel: 'anthropic', revision_tok: 'r1', sidecar: {}, registered_at: Date.UTC(2026, 9, 14), written_at: Date.UTC(2026, 9, 14), vault_tok: 'vault-tok-u1' }
 
 describe("BoxSummary", () => {
   it("marks a summary undamaged, as its example shows", () => {
@@ -172,12 +172,12 @@ describe("BoxSummary", () => {
   })
 
   it("holds neither ciphered field, the format nor the codec: a whole box is not a summary", () => {
-    const summary = BoxSummary.parse({ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: {}, vault_id: 'vault-id-u1' })
-    expect(Object.keys(summary)).to.have.members(['boxlabel', 'revision_tok', 'sidecar', 'registered_at', 'written_at', 'vault_id', 'damaged'])
+    const summary = BoxSummary.parse({ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: {}, vault_tok: 'vault-tok-u1' })
+    expect(Object.keys(summary)).to.have.members(['boxlabel', 'revision_tok', 'sidecar', 'registered_at', 'written_at', 'vault_tok', 'damaged'])
   })
 
-  it("refuses a summary with no vault_id: it names the vault props the box lies under", () => {
-    expect(BoxSummary.safeParse(TH.omitting(wholeSummary, 'vault_id')).success).to.be.false
+  it("refuses a summary with no vault_tok: it names the vault props the box lies under", () => {
+    expect(BoxSummary.safeParse(TH.omitting(wholeSummary, 'vault_tok')).success).to.be.false
   })
 })
 
@@ -271,7 +271,7 @@ describe("EpochMillis", () => {
 const MarkCases = [
   // regular usage:
   [TH.markOf('u1'),                                               true,   'a whole mark'],
-  [TH.markOf('u1', { seen: { unlock_epoch: 40 } }),               true,   'a mark of a vault seen at a later epoch'],
+  [TH.markOf('u1', { seen: { gate_epoch: 40 } }),                 true,   'a mark of a vault seen at a later epoch'],
   // refused, as a damaged or foreign record:
   [TH.markOf('u1', { format: 'safebyok-mark-v6' as never }),      false,  'a format this version does not know'],
   [TH.markOf('u1', { format: 'safebyok-mark-v4' as never }),      false,  'a mark from before the vaultKey epoch went, which reads as none'],
@@ -280,8 +280,8 @@ const MarkCases = [
   [TH.omitting(TH.markOf('u1'), 'seen'),                          false,  'a mark missing what it has seen'],
   [{ ...TH.markOf('u1'), seen: null },                            false,  'a mark that has seen no vault: the device keeps none'],
   [TH.markOf('u1', { seen: { device_id: '' } }),                  false,  'an empty device_id'],
-  [TH.markOf('u1', { seen: { vault_id: '' } }),                   false,  'an empty vault_id'],
-  [TH.markOf('u1', { seen: { unlock_epoch: 0 } }),                false,  'an epoch starts at one'],
+  [TH.markOf('u1', { seen: { vault_tok: '' } }),                  false,  'an empty vault_tok'],
+  [TH.markOf('u1', { seen: { gate_epoch: 0 } }),                  false,  'an epoch starts at one'],
 ] as const
 
 describe("DeviceMark", () => {

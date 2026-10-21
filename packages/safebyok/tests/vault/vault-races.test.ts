@@ -361,14 +361,14 @@ describe("a first unlock's make, and a read that finds the vault gone while it i
     const unlocking = TH.expectRefusal(vault.unlock('pw'), 'vault_locked')
     await noting.reached
     await vault.hello({ staleMinutes: 0 })
-    expect(vault.vault_id).to.not.be.null
+    expect(vault.vault_tok).to.not.be.null
     await there.del()
     await vault.hello({ staleMinutes: 0 })
     expect(vault.state).to.eq('absent')
     noting.release()
     await unlocking
     expect(vault.state).to.eq('absent')
-    expect(vault.vault_id).to.be.null
+    expect(vault.vault_tok).to.be.null
     expect(await world.getLease()).to.be.null
     // The next unlock makes the vault anew.
     await vault.unlock('pw')
@@ -402,10 +402,10 @@ describe("a read that began before this device's own change to the ways in lande
       await listing.reached
     })
     await addLaptopPasskey(vault)
-    expect(vault.unlock_epoch).to.eq(2)
+    expect(vault.gate_epoch).to.eq(2)
     listing?.release()
     await reading
-    expect(vault.unlock_epoch).to.eq(2)
+    expect(vault.gate_epoch).to.eq(2)
     expect(vault.passkey).to.not.be.null
     expect(vault.state).to.eq('unlocked')
     await vault.hello({ staleMinutes: 0 })
@@ -504,7 +504,7 @@ describe("close", () => {
 
 // vaultOne's adapter hears no change bells, so it genuinely does not notice vaultTwo's doings
 // until it next touches the backend: the stale-device scenario, miniaturized. The reborn vault
-// has a new vault_id and its own passphrase.
+// has a new vault_tok and its own passphrase.
 const rebornWorld = async () => {
   const world = makeWorld()
   const deafDB = world.deafVaultDB()
@@ -958,7 +958,7 @@ describe("versioned updates: two devices writing at once", () => {
     const shown = here.getSnapshot().boxes[0]?.revision_tok
     const delBox = vi.spyOn(hereDB, 'delBox')
     await here.delBox('anthropic')
-    expect(delBox.mock.calls[0]?.[2]).to.deep.equal({ vault_id: storedVaultPropsOf(world)['vault_id'], revision_tok: shown })
+    expect(delBox.mock.calls[0]?.[2]).to.deep.equal({ vault_tok: storedVaultPropsOf(world)['vault_tok'], revision_tok: shown })
     expect(world.logged.filter((heard) => heard.story?.['call'] === 'delBox')).to.have.lengthOf(0)
   })
 

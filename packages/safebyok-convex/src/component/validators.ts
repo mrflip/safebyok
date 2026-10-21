@@ -69,8 +69,8 @@ export const VaultProps = v.object({
   applabel:         v.string(),
   user_id:          v.string(),
   vaultlabel:       v.string(),
-  vault_id:         v.string(),
-  unlock_epoch:     v.number(),
+  vault_tok:        v.string(),
+  gate_epoch:       v.number(),
   passphrase:       PassphraseWayin,
   passkey:          v.nullable(PasskeyWayin),
   registered_at:    v.number(),
@@ -95,23 +95,23 @@ export const BoxRecord = v.object({
 /** A box as a listing returns it: every field but the two ciphered ones, `format` kept, so the client validates it as a whole record. */
 export const ListedBox = BoxRecord.omit('box_key_wrapped', 'whisper_ciphered')
 
-/** What an update of the vault props was proven against: it lands only while the standing vault props have this `vault_id` and `unlock_epoch`.
+/** What an update of the vault props was proven against: it lands only while the standing vault props have this `vault_tok` and `gate_epoch`.
  *
- * @example { vault_id: standing.vault_id, unlock_epoch: standing.unlock_epoch }
+ * @example { vault_tok: standing.vault_tok, gate_epoch: standing.gate_epoch }
  */
 export const VaultPropsExpectation = v.object({
-  vault_id:         v.string(),
-  unlock_epoch:     v.number(),
+  vault_tok:        v.string(),
+  gate_epoch:       v.number(),
 })
 
 /** What a box write was sealed for and read: the vault props it lands beside, and the box it replaces.
- * It lands only while the scope's vault props have this `vault_id`, and the standing box this
+ * It lands only while the scope's vault props have this `vault_tok`, and the standing box this
  * `revision_tok`, or, for null, there is no box.
  *
- * @example { vault_id: vaultProps.vault_id, revision_tok: null } // a box that was not there
+ * @example { vault_tok: vaultProps.vault_tok, revision_tok: null } // a box that was not there
  */
 export const BoxExpectation = v.object({
-  vault_id:     v.string(),
+  vault_tok:    v.string(),
   revision_tok: v.nullable(v.string()),
 })
 
@@ -142,24 +142,24 @@ export const PutBoxAnswer = v.union(
   v.object({ landed: v.literal(false), refusalkind: v.literal('vault_full'), capacity: Capacity }),
 )
 
-/** What a vault delete was meant for: it lands only while the scope's vault props have this `vault_id`.
+/** What a vault delete was meant for: it lands only while the scope's vault props have this `vault_tok`.
  * So a stale session never deletes a vault made anew elsewhere.
  *
- * @example { vault_id: vaultProps.vault_id }
+ * @example { vault_tok: vaultProps.vault_tok }
  */
 export const VaultDelExpectation = v.object({
-  vault_id: v.string(),
+  vault_tok: v.string(),
 })
 
 /** What a box delete was meant for: the vault, and the `revision_tok` its writer read, or null for a box listed damaged with none.
- * It lands only while the scope's vault props have this `vault_id`, whatever revision stands, so a
+ * It lands only while the scope's vault props have this `vault_tok`, whatever revision stands, so a
  * stale session never deletes from a vault made anew elsewhere. The revision only says whether
  * what it removed was the one meant, as a {@link BoxDeletion}.
  *
- * @example { vault_id: vaultProps.vault_id, revision_tok: listed.revision_tok }
+ * @example { vault_tok: vaultProps.vault_tok, revision_tok: listed.revision_tok }
  */
 export const BoxDelExpectation = v.object({
-  vault_id:     v.string(),
+  vault_tok:    v.string(),
   revision_tok: v.nullable(v.string()),
 })
 
@@ -179,13 +179,13 @@ export const BoxDeletion = v.object({
 const BoxRevision = v.array(v.string())
 
 /** The vault's change signature: it changes exactly when a write lands in the vault, and holds nothing a listing does not show.
- * It is the vault props' `vault_id` and `unlock_epoch`, null while there are none, and each box's
+ * It is the vault props' `vault_tok` and `gate_epoch`, null while there are none, and each box's
  * `[boxlabel, revision_tok]`, in boxlabel order.
  *
- * @example { vault_id: 'b3f1...', unlock_epoch: 2, boxes: [['anthropic_api_key', '9c4e...']] }
+ * @example { vault_tok: 'b3f1...', gate_epoch: 2, boxes: [['anthropic_api_key', '9c4e...']] }
  */
 export const VaultSignature = v.object({
-  vault_id:         v.nullable(v.string()),
-  unlock_epoch:     v.nullable(v.number()),
+  vault_tok:        v.nullable(v.string()),
+  gate_epoch:       v.nullable(v.number()),
   boxes:            v.array(BoxRevision),
 })

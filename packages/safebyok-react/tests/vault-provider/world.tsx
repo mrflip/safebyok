@@ -110,7 +110,7 @@ export const madeWorld = async () => {
   const spoil = () => {
     const vaultPropsCkey = Ckeys.vaultProps(TH.scopeOf('u1'))
     const vaultProps = JSON.parse(store.read(vaultPropsCkey) ?? 'null') as object
-    store.write(vaultPropsCkey, JSON.stringify({ ...vaultProps, unlock_epoch: 'one' }))
+    store.write(vaultPropsCkey, JSON.stringify({ ...vaultProps, gate_epoch: 'one' }))
   }
   return { store, vaultDB, deviceDB, props, spoil }
 }

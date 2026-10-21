@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { adorn, decorate } from '../src/adorn'
 
-type Handle = { label: string, vault?: { vault_id: string } }
+type Handle = { label: string, vault?: { vault_tok: string } }
 
-const decorated = () => decorate<Handle>({ label: 'anthropic' }, { vault: { vault_id: 'v1' } })
+const decorated = () => decorate<Handle>({ label: 'anthropic' }, { vault: { vault_tok: 'v1' } })
 
 describe("adorn", () => {
   it("attaches the value under its name, hidden, and hands the value back, as its first example shows", () => {
     const handle = { label: 'anthropic' }
-    const vault = { vault_id: 'v1' }
+    const vault = { vault_tok: 'v1' }
     expect(adorn(handle, 'vault', vault)).to.equal(vault)
     expect((handle as { vault?: unknown }).vault).to.equal(vault)
     expect(Object.keys(handle)).to.deep.equal(['label'])
@@ -35,8 +35,8 @@ describe("adorn", () => {
 describe("decorate", () => {
   it("attaches each entry, readable by name, and hands the object back, as its example shows", () => {
     const handle: Handle = { label: 'anthropic' }
-    expect(decorate(handle, { vault: { vault_id: 'v1' } })).to.equal(handle)
-    expect(handle.vault).to.deep.equal({ vault_id: 'v1' })
+    expect(decorate(handle, { vault: { vault_tok: 'v1' } })).to.equal(handle)
+    expect(handle.vault).to.deep.equal({ vault_tok: 'v1' })
   })
 
   it("hides what it attaches from keys, a spread and JSON, as its example shows", () => {
@@ -55,8 +55,8 @@ describe("decorate", () => {
 
   it("leaves what it attached writable and configurable, as any property is, still hidden once written", () => {
     const handle = decorated()
-    expect(Reflect.set(handle, 'vault', { vault_id: 'v2' })).to.be.true
-    expect(handle.vault).to.deep.equal({ vault_id: 'v2' })
+    expect(Reflect.set(handle, 'vault', { vault_tok: 'v2' })).to.be.true
+    expect(handle.vault).to.deep.equal({ vault_tok: 'v2' })
     expect(Object.keys(handle)).to.deep.equal(['label'])
     expect(Reflect.deleteProperty(handle, 'vault')).to.be.true
     expect(handle.vault).to.be.undefined
@@ -64,9 +64,9 @@ describe("decorate", () => {
 
   it("is fixed with the rest of an object frozen after it, as a model freezes itself", () => {
     const handle = Object.freeze(decorated())
-    expect(Reflect.set(handle, 'vault', { vault_id: 'v2' })).to.be.false
+    expect(Reflect.set(handle, 'vault', { vault_tok: 'v2' })).to.be.false
     expect(Reflect.deleteProperty(handle, 'vault')).to.be.false
-    expect(handle.vault).to.deep.equal({ vault_id: 'v1' })
+    expect(handle.vault).to.deep.equal({ vault_tok: 'v1' })
   })
 
   it("leaves the object as it was for an empty set of entries", () => {

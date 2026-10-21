@@ -69,7 +69,7 @@ export const thrownText = (thrown: unknown): string => errorText(thrown, new Set
  * @param val - A record, or any JSON value.
  * @returns Its leaves, in JSON's order.
  *
- * @example TH.leafTexts({ vault_id: 'vault-id-u1', wrapped: { ciphertext_b64: 'ct-a1' }, epoch: 7 })  // => ['vault-id-u1', 'ct-a1', '7']
+ * @example TH.leafTexts({ vault_tok: 'vault-tok-u1', wrapped: { ciphertext_b64: 'ct-a1' }, epoch: 7 })  // => ['vault-tok-u1', 'ct-a1', '7']
  */
 export const leafTexts = (val: unknown): string[] => {
   const leaves: string[] = []
@@ -95,7 +95,7 @@ export const shownOf = (obj: object): Record<string, unknown> => Object.fromEntr
 /**
  * What `JSON.stringify` writes of `val`, read back: for a test of what a model serializes as.
  *
- * @example expect(Object.keys(TH.jsonOf(box))).to.deep.equal(['boxlabel', 'revision_tok', 'sidecar', 'registered_at', 'written_at', 'vault_id'])
+ * @example expect(Object.keys(TH.jsonOf(box))).to.deep.equal(['boxlabel', 'revision_tok', 'sidecar', 'registered_at', 'written_at', 'vault_tok'])
  */
 export const jsonOf = (val: unknown): Record<string, unknown> => {
   const written = JSON.stringify(val)

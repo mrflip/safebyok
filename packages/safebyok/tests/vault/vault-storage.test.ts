@@ -145,11 +145,11 @@ describe("tampering", () => {
     })
   }
 
-  it("vault props whose vault_id was altered open to no passphrase: it is bound into every way in", async () => {
+  it("vault props whose vault_tok was altered open to no passphrase: it is bound into every way in", async () => {
     const world = makeWorld()
     await world.openUnlocked('pw')
-    const vaultProps = JSON.parse(world.dbStore.read(u1VaultPropsCkey) ?? '{}') as { vault_id: string }
-    world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...vaultProps, vault_id: `${vaultProps.vault_id}-moved` }))
+    const vaultProps = JSON.parse(world.dbStore.read(u1VaultPropsCkey) ?? '{}') as { vault_tok: string }
+    world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...vaultProps, vault_tok: `${vaultProps.vault_tok}-moved` }))
     const vault = await world.open({ deviceDB: memoryDeviceDB() })
     const err = await TH.expectRefusal(vault.unlock('pw'), 'wrong_passphrase')
     // The decryption fails as for a typo, so the message names both, and claims neither.
@@ -587,13 +587,13 @@ const seenIn = async (world: ReturnType<typeof makeWorld>) => {
 }
 
 describe("the device mark", () => {
-  it("is kept from the vault's making: its vault_id, the epoch seen, and an id of its own, which the first way in carries", async () => {
+  it("is kept from the vault's making: its vault_tok, the epoch seen, and an id of its own, which the first way in carries", async () => {
     const world = makeWorld()
     await world.openUnlocked('pw')
     const mark = await markIn(world)
     const vaultProps = storedVaultPropsOf(world)
     expect(mark).to.deep.include({ format: 'safebyok-mark-v5', ...TH.scopeOf('u1') })
-    expect(mark?.seen).to.deep.include({ vault_id: vaultProps['vault_id'], unlock_epoch: 1 })
+    expect(mark?.seen).to.deep.include({ vault_tok: vaultProps['vault_tok'], gate_epoch: 1 })
     expect(storedWayinOf(world, 'passphrase')).to.deep.include({ device_id: mark?.seen.device_id, registered_at: world.clock.now() })
   })
 
@@ -618,12 +618,12 @@ describe("the device mark", () => {
     const { device_id: deviceId } = await seenIn(world) ?? {}
     world.advance(HourMillis)
     await addLaptopPasskey(vault)
-    expect(await seenIn(world)).to.deep.include({ device_id: deviceId, unlock_epoch: 2 })
+    expect(await seenIn(world)).to.deep.include({ device_id: deviceId, gate_epoch: 2 })
     expect(storedWayinOf(world, 'passkey')).to.deep.include({ device_id: deviceId, registered_at: world.clock.now() })
     const elsewhere = await world.openUnlocked('pw', { deviceDB: memoryDeviceDB() })
     await elsewhere.putWayin('pw', await TH.passkeyOf('phone'))
     await TH.wakeupAtNextTick()
-    expect(await seenIn(world)).to.deep.include({ device_id: deviceId, unlock_epoch: 3 })
+    expect(await seenIn(world)).to.deep.include({ device_id: deviceId, gate_epoch: 3 })
     expect(storedWayinOf(world, 'passkey')?.['device_id']).to.be.a('string').and.not.eq(deviceId)
   })
 
@@ -660,8 +660,8 @@ describe("the device mark", () => {
     await elsewhere.unlock('pw anew')
     await world.open()
     const after = await seenIn(world)
-    expect(after).to.deep.include({ vault_id: storedVaultPropsOf(world)['vault_id'], unlock_epoch: 1 })
-    expect(after?.vault_id).to.not.eq(before?.vault_id)
+    expect(after).to.deep.include({ vault_tok: storedVaultPropsOf(world)['vault_tok'], gate_epoch: 1 })
+    expect(after?.vault_tok).to.not.eq(before?.vault_tok)
     expect(after?.device_id).to.not.eq(before?.device_id)
   })
 
@@ -670,7 +670,7 @@ describe("the device mark", () => {
     await world.openUnlocked('pw')
     const before = await seenIn(world)
     // Every read of the mark at this open hands back u2's: the one before the vault props, and the one after.
-    const misfiled = vi.spyOn(world.deviceDB, 'getMark').mockResolvedValue(TH.good(TH.markOf('u2', { seen: { unlock_epoch: 9 } })))
+    const misfiled = vi.spyOn(world.deviceDB, 'getMark').mockResolvedValue(TH.good(TH.markOf('u2', { seen: { gate_epoch: 9 } })))
     await world.open()
     misfiled.mockRestore()
     expect(world.logged.map((call) => call.level)).to.deep.equal(['warn'])
@@ -716,9 +716,9 @@ describe("vault props rolled back", () => {
     expect(err.message).to.include('already seen a newer copy')
     expect(err.message).to.include('delMark')
     expect(err.message).to.not.include('Try again later')
-    expect(TH.thrownText(err)).to.not.include((JSON.parse(older) as { vault_id: string }).vault_id)
+    expect(TH.thrownText(err)).to.not.include((JSON.parse(older) as { vault_tok: string }).vault_tok)
     expect(world.dbStore.read(u1VaultPropsCkey)).to.eq(older)
-    expect(await seenIn(world)).to.deep.include({ unlock_epoch: 3 })
+    expect(await seenIn(world)).to.deep.include({ gate_epoch: 3 })
   })
 
   it("refuses an older copy at unlock, so a removed way in stays removed on this device", async () => {
@@ -762,7 +762,7 @@ describe("vault props rolled back", () => {
     })
     await there.unlock('pw')
     expect(there.getSnapshot().state).to.eq('unlocked')
-    expect(await seenIn(world)).to.deep.include({ unlock_epoch: 2 })
+    expect(await seenIn(world)).to.deep.include({ gate_epoch: 2 })
   })
 
   it("refuses no vault another tab made while this one was making it, though that tab raised the mark meanwhile", async () => {
@@ -781,7 +781,7 @@ describe("vault props rolled back", () => {
     })
     await late.unlock('pw')
     expect(late.getSnapshot().state).to.eq('unlocked')
-    expect(await seenIn(world)).to.deep.include({ unlock_epoch: 2 })
+    expect(await seenIn(world)).to.deep.include({ gate_epoch: 2 })
   })
 
   it("takes the copy up again once storage hands back the newest", async () => {
@@ -797,10 +797,10 @@ describe("vault props rolled back", () => {
     expect(reopened.getSnapshot().passkey).to.be.null
   })
 
-  it("takes an older copy under a raised unlock epoch as it stands, its removed way in opening again", async () => {
+  it("takes an older copy under a raised gate epoch as it stands, its removed way in opening again", async () => {
     const { world, vault, older } = await rolledBackWorld()
     vault.close()
-    world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...(JSON.parse(older) as object), unlock_epoch: 9 }))
+    world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...(JSON.parse(older) as object), gate_epoch: 9 }))
     const reopened = await world.open()
     await reopened.unlock(await TH.passkeyOf('laptop'))
     expect(reopened.getSnapshot().state).to.eq('unlocked')
@@ -812,7 +812,7 @@ describe("vault props rolled back", () => {
     world.dbStore.write(u1VaultPropsCkey, older)
     const reopened = await openAcceptingRestore(world.optsWith(), () => Promise.resolve(true))
     expect(reopened.getSnapshot().passkey?.credential_id).to.eq(storedWayinOf(world, 'passkey')?.['credential_id'])
-    expect(await seenIn(world)).to.deep.include({ unlock_epoch: 2 })
+    expect(await seenIn(world)).to.deep.include({ gate_epoch: 2 })
   })
 
   it("is accepted on the very handle that refused it, its mark erased and hello said again, as the Vault's class doc says: unlock and a change to the ways in then land", async () => {
@@ -820,15 +820,15 @@ describe("vault props rolled back", () => {
     world.dbStore.write(u1VaultPropsCkey, older)
     await TH.expectRefusal(vault.hello({ staleMinutes: 0 }), 'rolled_back')
     expect(vault.state).to.eq('opening')
-    expect(vault.vault_id).to.be.null
+    expect(vault.vault_tok).to.be.null
     expect(vault.boxes).to.deep.equal([])
     await TH.expectGood(world.deviceDB.delMark(TH.scopeOf('u1')))
     await vault.hello({ staleMinutes: 0 })
-    expect(vault.unlock_epoch).to.eq(2)
+    expect(vault.gate_epoch).to.eq(2)
     expect(vault.passkey?.credential_id).to.eq(storedWayinOf(world, 'passkey')?.['credential_id'])
     await vault.unlock('pw')
     await vault.putWayin('pw', 'pw two')
-    expect(vault.unlock_epoch).to.eq(3)
+    expect(vault.gate_epoch).to.eq(3)
     expect(vault.state).to.eq('unlocked')
   })
 
@@ -859,7 +859,7 @@ describe("vault props rolled back", () => {
     gate.release()
     await TH.expectRefusal(deleting, 'rolled_back')
     expect(world.dbStore.read(u1VaultPropsCkey)).to.eq(older)
-    expect(await seenIn(world)).to.deep.include({ unlock_epoch: 3 })
+    expect(await seenIn(world)).to.deep.include({ gate_epoch: 3 })
   })
 
   it("is still refused by the README's recipe when the host knows of no restore", async () => {
@@ -867,7 +867,7 @@ describe("vault props rolled back", () => {
     vault.close()
     world.dbStore.write(u1VaultPropsCkey, older)
     await TH.expectRefusal(openAcceptingRestore(world.optsWith(), () => Promise.resolve(false)), 'rolled_back')
-    expect(await seenIn(world)).to.deep.include({ unlock_epoch: 3 })
+    expect(await seenIn(world)).to.deep.include({ gate_epoch: 3 })
   })
 
   it("is not caught on a device that never saw the newer copy, which takes the older as it stands", async () => {

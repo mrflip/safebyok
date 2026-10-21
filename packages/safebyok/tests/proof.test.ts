@@ -264,7 +264,7 @@ describe("passkeyProof.wayinKeyFor", () => {
   it("is HKDF over the answer with the way in's wayinCtx as its info, non-extractable, as its example shows", async () => {
     const answer: PasskeyAnswer = await TH.passkeyOf('laptop')
     const proof = PasskeyProof.parse(slice, answer)
-    const wayin = Wayin.make(slice, TH.vaultPropsOf('u1').vault_id, TH.passkeyWayinOf('laptop'))
+    const wayin = Wayin.make(slice, TH.vaultPropsOf('u1').vault_tok, TH.passkeyWayinOf('laptop'))
     const wayinKey = await proof.wayinKeyFor(wayin)
     expect(wayinKey.extractable).to.be.false
     expect(await wrapsAlike(wayinKey, await deriveWrappingKey(answer.prfBytes, wayin.wayinCtx))).to.be.true
@@ -301,7 +301,7 @@ describe("a key deriver's bytes", () => {
   })
 
   it("are zeroed after every try when opening, a wrong passphrase's included", async () => {
-    const { vault_id: vaultTok } = TH.vaultPropsOf('u1')
+    const { vault_tok: vaultTok } = TH.vaultPropsOf('u1')
     const sealed = await Wayin.seal(TH.vaultSliceOf('u1', TH.testDeriver, { now: () => Date.UTC(2026, 9, 15) }), vaultTok, PassphraseProof.parse(slice, 'first'), 'device-one', await makeVaultKey())
     const { keyDeriver, handed } = keepingDeriver()
     const opening = TH.vaultSliceOf('u1', keyDeriver)

@@ -14,7 +14,7 @@ const SealedAt = Date.UTC(2026, 9, 15)
 /** The slice of a vault every proof here is parsed under: `u1`'s `main` vault, deriving with the test deriver. */
 const slice: TH.VaultSlice = TH.vaultSliceOf('u1', TH.testDeriver, { now: () => SealedAt })
 /** The id of the vault props every way in here is sealed for: with their scope, what a wrap binds of them. */
-const { vault_id: vaultTok } = TH.vaultPropsOf('u1')
+const { vault_tok: vaultTok } = TH.vaultPropsOf('u1')
 
 /** The slice of a vault deriving with `keyDeriver`. */
 const sliceOf = (keyDeriver: KeyDeriver = TH.testDeriver): TH.VaultSlice => ({ ...slice, keyDeriver })
@@ -57,7 +57,7 @@ const openIn = async (vaultProps: VaultProps, given: string | PasskeyAnswer, opt
   const proof = Proof.parse(opening, given)
   const record = proof.kind === 'passphrase' ? vaultProps.passphrase : vaultProps.passkey
   if (record === null) { throw new Error('these vault props hold no passkey') }
-  return valOf(await Wayin.make({ ...opening, ...(opts.scope ?? scope) }, vaultProps.vault_id, record).tryOpen(proof))
+  return valOf(await Wayin.make({ ...opening, ...(opts.scope ?? scope) }, vaultProps.vault_tok, record).tryOpen(proof))
 }
 
 /** The vaultKey's raw bytes, to compare two handles on it. */
@@ -76,7 +76,7 @@ describe("Wayin.make", () => {
   it("makes the vault props' passphrase a PassphraseWayin, bound to those props, as the Wayin's first example shows", async () => {
     const vaultKey = await makeVaultKey()
     const vaultProps = vaultPropsWith(await sealed('pw', vaultKey))
-    const passphrase = Wayin.make(slice, vaultProps.vault_id, vaultProps.passphrase)
+    const passphrase = Wayin.make(slice, vaultProps.vault_tok, vaultProps.passphrase)
     expect(passphrase.wayinkind).to.eq('passphrase')
     await TH.expectGood(passphrase.tryOpen(PassphraseProof.parse(slice, 'pw')))
   })
@@ -87,14 +87,14 @@ describe("Wayin.make", () => {
     expect(wayin.wayinkind).to.eq('passkey')
   })
 
-  it("gives each visible field as a field of its own, read from the record: its kind, device and time, and a passkey's credential and salt, and the vault_id it was made under", () => {
+  it("gives each visible field as a field of its own, read from the record: its kind, device and time, and a passkey's credential and salt, and the vault_tok it was made under", () => {
     const record = TH.wayinOf('passphrase')
     const wayin = Wayin.make(slice, vaultTok, record)
-    expect(TH.shownOf(wayin)).to.deep.equal({ wayinkind: 'passphrase', device_id: record.device_id, registered_at: record.registered_at, vault_id: 'vault-id-u1' })
+    expect(TH.shownOf(wayin)).to.deep.equal({ wayinkind: 'passphrase', device_id: record.device_id, registered_at: record.registered_at, vault_tok: 'vault-tok-u1' })
     const passkeyRecord = TH.passkeyWayinOf('laptop')
     const passkey = Wayin.make(slice, vaultTok, passkeyRecord)
     expect(TH.shownOf(passkey)).to.deep.equal({
-      wayinkind: 'passkey', device_id: passkeyRecord.device_id, registered_at: passkeyRecord.registered_at, vault_id: 'vault-id-u1',
+      wayinkind: 'passkey', device_id: passkeyRecord.device_id, registered_at: passkeyRecord.registered_at, vault_tok: 'vault-tok-u1',
       credential_id: passkeyRecord.credential_id, prf_salt_b64: passkeyRecord.prf_salt_b64,
     })
   })
@@ -127,18 +127,18 @@ describe("Wayin.make", () => {
     expect(Object.isFrozen(wayin.record.vault_key_wayin_wrapped)).to.be.true
   })
 
-  it("shows each visible field once in a key list, JSON and a log line, its vault_id among them, and nothing else: no wrap, no passphrase's salt or key deriver, no vault", () => {
+  it("shows each visible field once in a key list, JSON and a log line, its vault_tok among them, and nothing else: no wrap, no passphrase's salt or key deriver, no vault", () => {
     const record = TH.wayinOf('passphrase')
     const wayin = Wayin.make(slice, vaultTok, record)
-    expect(Object.keys(wayin)).to.deep.equal(['wayinkind', 'device_id', 'registered_at', 'vault_id'])
-    expect(Object.keys(TH.jsonOf(wayin))).to.deep.equal(['wayinkind', 'device_id', 'registered_at', 'vault_id'])
+    expect(Object.keys(wayin)).to.deep.equal(['wayinkind', 'device_id', 'registered_at', 'vault_tok'])
+    expect(Object.keys(TH.jsonOf(wayin))).to.deep.equal(['wayinkind', 'device_id', 'registered_at', 'vault_tok'])
     for (const hidden of ['applabel', record.salt_b64, record.key_deriver_label, record.vault_key_wayin_wrapped.ciphertext_b64, 'salt_b64', 'vault_key_wayin_wrapped']) {
       expect(JSON.stringify(wayin)).to.not.include(hidden)
       expect(inspect(wayin)).to.not.include(hidden)
     }
     expect(inspect(wayin).match(/device_id/g)).to.have.lengthOf(1)
     const passkey = Wayin.make(slice, vaultTok, TH.passkeyWayinOf('laptop'))
-    expect(Object.keys(passkey)).to.deep.equal(['wayinkind', 'device_id', 'registered_at', 'vault_id', 'credential_id', 'prf_salt_b64'])
+    expect(Object.keys(passkey)).to.deep.equal(['wayinkind', 'device_id', 'registered_at', 'vault_tok', 'credential_id', 'prf_salt_b64'])
     expect(inspect(passkey)).to.not.include('vault_key_wayin_wrapped')
   })
 
@@ -163,7 +163,7 @@ describe("Wayin.make", () => {
 describe("wayin.toJSON", () => {
   it("gives the kind and the device and time that sealed it, its spread, so JSON.stringify of the way in carries no salt and no wrap, as the Wayin's second example shows", async () => {
     const wayin = Wayin.make(slice, vaultTok, await sealed('pw', await makeVaultKey()))
-    expect(wayin.toJSON()).to.deep.equal({ wayinkind: 'passphrase', device_id: 'device-one', registered_at: Date.UTC(2026, 9, 15), vault_id: 'vault-id-u1' })
+    expect(wayin.toJSON()).to.deep.equal({ wayinkind: 'passphrase', device_id: 'device-one', registered_at: Date.UTC(2026, 9, 15), vault_tok: 'vault-tok-u1' })
     expect(wayin.toJSON()).to.deep.equal(TH.shownOf(wayin))
     for (const stored of [wayin.record.salt_b64, wayin.record.vault_key_wayin_wrapped.ciphertext_b64, 'vault_key_wayin_wrapped', 'salt_b64']) {
       expect(JSON.stringify(wayin)).to.not.include(stored)
@@ -174,7 +174,7 @@ describe("wayin.toJSON", () => {
     const record = TH.passkeyWayinOf('laptop')
     const wayin = Wayin.make(slice, vaultTok, record)
     expect(wayin.toJSON()).to.deep.equal({
-      wayinkind: 'passkey', device_id: record.device_id, registered_at: record.registered_at, vault_id: 'vault-id-u1',
+      wayinkind: 'passkey', device_id: record.device_id, registered_at: record.registered_at, vault_tok: 'vault-tok-u1',
       credential_id: 'cred-laptop', prf_salt_b64: record.prf_salt_b64,
     })
     expect(JSON.stringify(wayin)).to.not.include('vault_key_wayin_wrapped')
@@ -182,11 +182,11 @@ describe("wayin.toJSON", () => {
 })
 
 describe("wayin.wayinCtx", () => {
-  it("is the vault props' scope and vault_id, the purpose, and the whole header", () => {
+  it("is the vault props' scope and vault_tok, the purpose, and the whole header", () => {
     const record = TH.passkeyWayinOf('laptop')
     const { vault_key_wayin_wrapped: _wrapped, ...header } = record
     expect(Wayin.make(slice, vaultTok, record).wayinCtx).to.deep.equal(
-      cipherCtx('safebyok-vault-v6', 'acme', 'u1', 'main', 'vault-id-u1', 'vault_key_passkey_wrapped', header),
+      cipherCtx('safebyok-vault-v6', 'acme', 'u1', 'main', 'vault-tok-u1', 'vault_key_passkey_wrapped', header),
     )
   })
 })
@@ -324,7 +324,7 @@ describe("wayin.tryOpen, by the Contract", () => {
   it("unwraps the wrap bound to its wayinCtx, and under no other (Contract: wayin.tryOpen, Does 2)", async () => {
     const record = await sealed('pw', await makeVaultKey())
     await TH.expectGood(Wayin.make(slice, vaultTok, record).tryOpen(PassphraseProof.parse(slice, 'pw')))
-    const moved = Wayin.make(slice, 'vault-id-moved', record)
+    const moved = Wayin.make(slice, 'vault-tok-moved', record)
     await TH.expectBad(moved.tryOpen(PassphraseProof.parse(slice, 'pw')), 'wrong_passphrase')
   })
 
@@ -454,20 +454,20 @@ describe("a passphrase's way in's ctx", () => {
   it("refuses to open in another vault, or for another user", async () => {
     const vaultKey = await makeVaultKey()
     const wayin = await sealed('pw', vaultKey)
-    const otherVault = VaultProps.parse(TH.vaultPropsOf('u1', { vault_id: 'vault-id-other', passphrase: wayin }))
+    const otherVault = VaultProps.parse(TH.vaultPropsOf('u1', { vault_tok: 'vault-tok-other', passphrase: wayin }))
     await TH.expectRefusal(openIn(otherVault, 'pw'), 'wrong_passphrase')
     await TH.expectRefusal(openIn(vaultPropsWith(wayin), 'pw', { scope: TH.scopeOf('u2') }), 'wrong_passphrase')
   })
 
-  it("does not bind the vault props' registered_at: their vault_id, random and never reused, names them alone", async () => {
+  it("does not bind the vault props' registered_at: their vault_tok, random and never reused, names them alone", async () => {
     const wayin = await sealed('pw', await makeVaultKey())
     const redated = VaultProps.parse(TH.vaultPropsOf('u1', { registered_at: TH.vaultPropsOf('u1').registered_at + 1, passphrase: wayin }))
     expect(await openIn(redated, 'pw')).to.have.property('sessionKey')
   })
 
-  it("does not bind the unlock epoch: a way in opens at any epoch of its vault", async () => {
+  it("does not bind the gate epoch: a way in opens at any epoch of its vault", async () => {
     const vaultKey = await makeVaultKey()
-    const vaultProps = VaultProps.parse(TH.vaultPropsOf('u1', { unlock_epoch: 7, passphrase: await sealed('pw', vaultKey) }))
+    const vaultProps = VaultProps.parse(TH.vaultPropsOf('u1', { gate_epoch: 7, passphrase: await sealed('pw', vaultKey) }))
     const opened = await openIn(vaultProps, 'pw')
     expect(await rawOf(opened.transientKey)).to.eq(await rawOf(vaultKey))
   })
@@ -499,13 +499,13 @@ describe("a passkey's way in's ctx", () => {
   it("refuses to open in another vault, or for another user", async () => {
     const laptop = await TH.passkeyOf('laptop')
     const wayin = await sealedPasskey(laptop, await makeVaultKey())
-    const otherVault = VaultProps.parse(TH.vaultPropsOf('u1', { vault_id: 'vault-id-other', passkey: wayin }))
+    const otherVault = VaultProps.parse(TH.vaultPropsOf('u1', { vault_tok: 'vault-tok-other', passkey: wayin }))
     await TH.expectRefusal(openIn(otherVault, laptop), 'wrong_passkey')
     const sound = vaultPropsWith(TH.wayinOf('passphrase'), wayin)
     await TH.expectRefusal(openIn(sound, laptop, { scope: TH.scopeOf('u2') }), 'wrong_passkey')
   })
 
-  it("does not bind the vault props' registered_at: their vault_id, random and never reused, names them alone", async () => {
+  it("does not bind the vault props' registered_at: their vault_tok, random and never reused, names them alone", async () => {
     const laptop = await TH.passkeyOf('laptop')
     const wayin = await sealedPasskey(laptop, await makeVaultKey())
     const redated = VaultProps.parse(TH.vaultPropsOf('u1', { registered_at: TH.vaultPropsOf('u1').registered_at + 1, passkey: wayin }))
@@ -520,11 +520,11 @@ const unwrapsUnder = async (wayin: PasskeyWayinRecord, prfBytes: Uint8Array, inf
 }
 
 describe("a passkey's way in's key", () => {
-  it("is HKDF over the answer with the wrap's whole ctx as its info: scope, vault_id, registered_at, purpose and header", async () => {
+  it("is HKDF over the answer with the wrap's whole ctx as its info: scope, vault_tok, registered_at, purpose and header", async () => {
     const laptop = await TH.passkeyOf('laptop')
     const wayin = await sealedPasskey(laptop, await makeVaultKey())
     const { vault_key_wayin_wrapped: _wrapped, ...header } = wayin
-    const ctx = cipherCtx('safebyok-vault-v6', 'acme', 'u1', 'main', 'vault-id-u1', 'vault_key_passkey_wrapped', header)
+    const ctx = cipherCtx('safebyok-vault-v6', 'acme', 'u1', 'main', 'vault-tok-u1', 'vault_key_passkey_wrapped', header)
     expect(await unwrapsUnder(wayin, laptop.prfBytes, ctx, ctx)).to.be.instanceOf(CryptoKey)
   })
 
@@ -532,7 +532,7 @@ describe("a passkey's way in's key", () => {
     const laptop = await TH.passkeyOf('laptop')
     const wayin = await sealedPasskey(laptop, await makeVaultKey())
     const { vault_key_wayin_wrapped: _wrapped, ...header } = wayin
-    const ctx = cipherCtx('safebyok-vault-v6', 'acme', 'u1', 'main', 'vault-id-u1', 'vault_key_passkey_wrapped', header)
+    const ctx = cipherCtx('safebyok-vault-v6', 'acme', 'u1', 'main', 'vault-tok-u1', 'vault_key_passkey_wrapped', header)
     const vaultlessInfo = cipherCtx('safebyok-vault-v6', 'vault_key_passkey_wrapped', laptop.credentialId)
     await expect(unwrapsUnder(wayin, laptop.prfBytes, vaultlessInfo, ctx)).rejects.toThrow()
   })
