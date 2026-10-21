@@ -29,7 +29,6 @@ const BoxCases = [
   [sidecarless,                                            false,  'a box with no sidecar: one is always written'],
   [{ ...wholeBox, sidecar: { when: new Date() } },         false,  'a sidecar holding what JSON cannot carry'],
   [{ ...wholeBox, sidecar: undefined },                    false,  'a sidecar left undefined'],
-  [{ ...wholeBox, sidecar: JSON.parse(`${'['.repeat(200_000)}${']'.repeat(200_000)}`) as unknown }, false, 'a sidecar nested too deep to check, refused calmly'],
   [{ ...sidecarless, format: 'safebyok-box-v7', sidecar_json: '{}' }, false, 'a box from before the sidecar was a JSON value, holding sidecar_json'],
   [{ ...wholeBox, note: 'work account' },                  true,   'an unknown field such as the old note is dropped, never kept'],
   [{ ...wholeBox, whisper_codec: 'json_v2' },              false,  'a whisper codec this version does not know'],

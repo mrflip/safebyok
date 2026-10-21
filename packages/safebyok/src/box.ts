@@ -1,3 +1,4 @@
+import { deepFreeze } from 'es-toolkit'
 import * as Z from 'zod/mini'
 import { Ciphered, cipherBytes, cipherCtx, decipherBytes, makeBoxKey, randomId } from './crypto'
 import { VaultError, isVaultError } from './errors'
@@ -10,26 +11,10 @@ import type { Vault } from './vault'
 import { NameFloor } from './validators'
 import * as Names from './names'
 
-// == [The record]: BoxRecord, BoxFormat, StoredSidecar, isCheckableSidecar
+// == [The record]: BoxRecord, BoxFormat
 
 /** The box's format, as each record carries it and each of its ctxs begins. */
 export const BoxFormat = 'safebyok-box-v8'
-
-/** True when `val` can be held to {@link Sidecar} at all: a value nested deeper than the check can walk throws a RangeError from it.
- * A stored record must not throw so, as storage may hand back anything.
- */
-const isCheckableSidecar = (val: unknown): boolean => {
-  try {
-    Sidecar.safeParse(val)
-    return true
-  } catch {
-    // Nested past what the stack can walk.
-    return false
-  }
-}
-
-/** A box's sidecar as its record holds it: a {@link Sidecar}, refused calmly, as any other damage is, when nested too deep to check. */
-const StoredSidecar = Z.pipe(Z.custom(isCheckableSidecar, "a sidecar is a JSON value nested no deeper than the check can walk"), Sidecar)
 
 /** One box as storage holds it: the whisper ciphered under its own boxKey, that boxKey wrapped under the vaultKey, and the visible fields.
  * Nothing in it opens without the vaultKey. The visible fields, the sidecar among them, are
@@ -59,7 +44,7 @@ export const BoxRecord = Z.object({
    * Storage keeps it as JSON (a `jsonb` column, say), free to reorder its keys or drop its spacing:
    * each ctx binds its JSON with keys sorted, worked out afresh at each seal and open.
    */
-  sidecar:                StoredSidecar,
+  sidecar:                Sidecar,
   /** When this boxlabel was first stored, an {@link EpochMillis}: every later store carries it forward. */
   registered_at:          EpochMillis,
   /** When this revision was written, an {@link EpochMillis}: a store of the same whisper moves it too. */
@@ -132,12 +117,8 @@ export class Box {
   readonly vault_id:      string
 
   private constructor(vault: BoxVault, vaultId: string, record: BoxRecord) {
-    this.#record = Object.freeze({
-      ...record,
-      box_key_wrapped:  Object.freeze({ ...record.box_key_wrapped }),
-      whisper_ciphered: Object.freeze({ ...record.whisper_ciphered }),
-      sidecar:          frozenThrough(record.sidecar),
-    })
+    // The record is the check's own copy, which nothing else holds: frozen where it stands.
+    this.#record       = deepFreeze(record)
     this.#vault        = vault
     this.boxlabel      = record.boxlabel
     this.revision_tok  = record.revision_tok
@@ -332,11 +313,11 @@ const openRecord = async (vault: BoxVault, vaultId: string, record: BoxRecord, l
 export const heldListing = (listed: ListedSummary | DamagedBox, vaultId: string): BoxSummary | DamagedBox => {
   if (listed.damaged) { return Object.freeze({ boxlabel: listed.boxlabel, damaged: true, revision_tok: listed.revision_tok }) }
   const { boxlabel, revision_tok, registered_at, written_at } = listed
-  return Object.freeze({ boxlabel, revision_tok, sidecar: frozenThrough(listed.sidecar), registered_at, written_at, vault_id: vaultId, damaged: false })
+  return Object.freeze({ boxlabel, revision_tok, sidecar: deepFreeze(listed.sidecar), registered_at, written_at, vault_id: vaultId, damaged: false })
 }
 // --
 
-// == [Helpers]: BoxHeader, boxCtx, frozenThrough, parseJsonOrNull, checkedBoxRecord, checkedWhisper, checkedSidecar, standingVaultId, checkLease
+// == [Helpers]: BoxHeader, boxCtx, parseJsonOrNull, checkedBoxRecord, checkedWhisper, checkedSidecar, standingVaultId, checkLease
 
 /** A box's visible header: every field of its record but its format, which leads each ctx, and the two encrypted ones. */
 type BoxHeader = Omit<BoxRecord, 'format' | 'box_key_wrapped' | 'whisper_ciphered'>
@@ -349,19 +330,6 @@ type BoxHeader = Omit<BoxRecord, 'format' | 'box_key_wrapped' | 'whisper_ciphere
 const boxCtx = (vault: BoxVault, vaultId: string, header: BoxHeader, purpose: 'box_key_wrapped' | 'whisper_ciphered') => (
   cipherCtx(BoxFormat, vault.applabel, vault.user_id, vault.vaultlabel, vaultId, purpose, { ...header, sidecar: stableJsonify(header.sidecar)! })
 )
-
-/**
- * `val`, a JSON value this package owns, with every object and array in it frozen, in place:
- * what a box and its listing hand out, so nothing a host is handed can be changed.
- */
-const frozenThrough = <ValT>(val: ValT): ValT => {
-  const held: unknown = val
-  if (typeof held === 'object' && held !== null && ! Object.isFrozen(held)) {
-    for (const inner of Object.values(held)) { frozenThrough(inner) }
-    Object.freeze(held)
-  }
-  return val
-}
 
 /** `text` parsed as JSON, or null when it is none: what a decipher hands the whisper check. */
 const parseJsonOrNull = (text: string): unknown => {

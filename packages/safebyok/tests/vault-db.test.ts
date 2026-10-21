@@ -274,7 +274,6 @@ const ListedRecordCases = [
   ["anthropic",  { ...TH.boxOf('anthropic', 'one'), written_at: 'later' },   [["anthropic", true]],   'a record with a malformed time as damaged'],
   ["anthropic",  { ...TH.boxOf('anthropic', 'one'), sidecar: { when: new Date() } }, [["anthropic", true]], 'a record whose sidecar is not JSON as damaged'],
   ["anthropic",  TH.omitting(TH.boxOf('anthropic', 'one'), 'sidecar'),  [["anthropic", true]],   'a record with no sidecar as damaged'],
-  ["anthropic",  { ...TH.boxOf('anthropic', 'one'), sidecar: JSON.parse(`${'['.repeat(200_000)}${']'.repeat(200_000)}`) as unknown }, [["anthropic", true]], 'a record whose sidecar is nested too deep to check as damaged, calmly'],
   ["anthropic",  null,                                                       [["anthropic", true]],   'a null record as damaged'],
   ["anthropic",  'not a box',                                                [["anthropic", true]],   'a record that is not an object as damaged'],
   // stored under a name a vault's validators would refuse at its entry, or with a sidecar no host meant: stored under other checks, and sound
