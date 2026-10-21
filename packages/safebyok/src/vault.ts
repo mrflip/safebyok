@@ -1097,7 +1097,7 @@ export class Vault {
   }
 
   /** This device's mark for `fresh`, vault props storage handed back, raised to them: older ones refuse 'rolled_back'.
-   * Older means of the vault the mark names, at an `gate_epoch` below what this device has seen.
+   * Older means of the vault the mark names, at a `gate_epoch` below what this device has seen.
    * Nothing is written or taken from them, and the vault locks. `opts.seenBefore` is the mark as
    * the caller read it before `fresh`, to hold them to.
    */
