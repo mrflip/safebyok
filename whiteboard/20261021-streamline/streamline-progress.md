@@ -12,7 +12,7 @@ rules* 3).
 
 | # | Label | Status | PR |
 |---|---|---|---|
-| 1 | renames | planned | |
+| 1 | renames | building | |
 | 2 | get_vault | planned | |
 | 3 | turns | planned | |
 | 4 | bank | planned | |

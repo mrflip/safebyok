@@ -9,7 +9,7 @@
 * **Issued by:** the Coach (flip), by `/sprint streamline` with `/turbochat`.
 * **Sprint doc:** [Sprint streamline](https://claude.ai/artifact/XJsqP4CTaVdfwKMBGS1sQ4): Open
   Matters, Progress, Resolved.
-* **Status:** planned; thread 1 not yet cut.
+* **Status:** thread 1 (renames) building, cut from #241 at origin/20261021-better_paths.
 
 The work is the preplan, `whiteboard/20261021-better_paths/better_paths-plan.md`, on
 [#241](https://github.com/mrflip/safebyok/pull/241)'s branch `20261021-better_paths`. Its ten
