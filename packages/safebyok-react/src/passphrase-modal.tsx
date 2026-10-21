@@ -164,10 +164,10 @@ export type PassphraseModalProps = {
   passphraseAdvice?:   PassphraseAdvice | undefined
 }
 
-/**
- * The refusal for a `passphraseAdvice` that threw. A VaultError, which safebyok made -- the vault's
- * own strength checker refusing a broken host checker, say -- goes on as it came, as it quotes no
- * passphrase. Anything else heard the passphrase, so nothing of it goes on.
+/** The refusal for a `passphraseAdvice` that threw.
+ * A VaultError, which safebyok made -- the vault's own strength checker refusing a broken host
+ * checker, say -- goes on as it came, as it quotes no passphrase. Anything else heard the
+ * passphrase, so nothing of it goes on.
  */
 const adviceFailed = (thrown: unknown) => (isVaultError(thrown) ? thrown : Sanitizer.refusalFor(thrown, 'unexpected_error', "The passphraseAdvice handed to the dialog threw rather than answering. What it threw is left out of this report, as it may quote the passphrase: have it answer a sentence or null, and catch its own failures."))
 

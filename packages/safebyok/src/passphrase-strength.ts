@@ -44,10 +44,9 @@ export type StrengthChecker = {
   load?: (() => void | Promise<void>) | undefined
 }
 
-/**
- * A strength checker as a vault keeps it, `vault.strengthChecker`: the host's, held to its
- * contract. It answers a verdict through a promise; a blank passphrase (empty, or only spaces) is
- * weak before the host's checker hears it. It refuses only a broken checker: kind 'bad_option'
+/** A strength checker as a vault keeps it, `vault.strengthChecker`: the host's, held to its contract.
+ * It answers a verdict through a promise; a blank passphrase (empty, or only spaces) is weak
+ * before the host's checker hears it. It refuses only a broken checker: kind 'bad_option'
  * for one that answers anything but a verdict, and 'unexpected_error' for one that throws,
  * carrying nothing of what it threw -- no kind, no meta, no cause -- as the checker heard the
  * passphrase. `load` runs the host's, if any, and refuses its failure as 'unexpected_error', what
@@ -99,10 +98,9 @@ const passphraseVerdict = Z.union([
   Z.object({ strong: Z.literal(false), reason: reasonText }),
 ])
 
-/**
- * `hostChecker` held to its contract, as the vault keeps it ({@link GuardedStrengthChecker}): the
- * only caller of the host's checker, so every check -- the vault's, and a dialog's as the user
- * types -- decides strong or weak alike.
+/** `hostChecker` held to its contract, as the vault keeps it ({@link GuardedStrengthChecker}).
+ * It is the only caller of the host's checker, so every check -- the vault's, and a dialog's as
+ * the user types -- decides strong or weak alike.
  *
  * @example guardStrengthChecker(zxcvbnStrengthChecker)('', scope)   // resolves { strong: false, reason: "A new passphrase can't be empty ..." }
  * @example guardStrengthChecker(() => ({ strong: 'yes' }))('pw', scope)   // rejects: bad_option

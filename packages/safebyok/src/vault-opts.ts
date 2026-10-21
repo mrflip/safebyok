@@ -192,9 +192,9 @@ const RenamedMakeVaultOpts: ReadonlyMap<string, keyof MakeVaultOpts> = new Map([
   ['passphraseStrengthTest', 'strengthChecker'],
 ])
 
-/**
- * A bag of Vault.make's options, as its schema reads it: `strengthChecker` checked, the default
- * one in place of one left out, and every other option as handed in, for its own parse. Kind
+/** A bag of Vault.make's options, as its schema reads it.
+ * `strengthChecker` is checked, the default one in place of one left out, and every other option
+ * is as handed in, for its own parse. Kind
  * 'bad_option' for a bag holding an option Vault.make does not take, naming each such option, and
  * the name a renamed one goes by now; and for a `strengthChecker` that is not one, in Zod's words.
  * It quotes the bag's field names, the host's own code, and never a value.

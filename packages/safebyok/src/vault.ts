@@ -269,9 +269,8 @@ export class Vault {
   get clock(): Clock { return this.#checkedClock }
   /** The key deriver the vault was made with, which its ways in derive through. */
   get keyDeriver(): KeyDeriver { return this.#keyDeriver }
-  /**
-   * The strength checker the vault was made with, held to its contract: what every new passphrase
-   * is put to (`proof.checkStrongEnough()`), and what a field asks as the user types.
+  /** The strength checker the vault was made with, held to its contract.
+   * Every new passphrase is put to it (`proof.checkStrongEnough()`), and a field asks it as the user types.
    */
   get strengthChecker(): GuardedStrengthChecker { return this.#strengthChecker }
   // --
@@ -2325,9 +2324,8 @@ const isCatchingUpKind = (err: unknown): err is VaultError => isVaultError(err, 
 
 // == [Argument parsers]: eventHint, checkHelloOpts, checkEnsureLeaseOpts, checkStoreOpts, sidecarJsonOf, standingPassphraseOf, newProofOf, absentBox
 
-/**
- * What a call that takes options most likely had in place of its bag, and what to do: an event,
- * as `call` was handed to `addEventListener` or `onClick` as the handler itself.
+/** What a call that takes options most likely had in place of its bag, and what to do.
+ * It is an event, as `call` was handed to `addEventListener` or `onClick` as the handler itself.
  */
 const eventHint = (call: 'hello' | 'ensureLease', tried: 'tryHello' | 'tryEnsureLease') => `${call}() was handed something other than a bag of options: an event, most likely, as ${call} was handed to addEventListener or onClick as the handler itself. Wrap it: \`() => vault.${tried}()\`, whose refusal, being returned, never surfaces as an unhandled rejection.`
 
