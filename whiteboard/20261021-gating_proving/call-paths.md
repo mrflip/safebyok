@@ -165,11 +165,15 @@ The rest follows from that:
   first use, which fits Lease owning its own crypto (preplan guess (b)). (b) leaves hello with no
   crypto at all. Its cost is that a lease with a damaged wrap shows `unlocked` until its first use,
   then locks and asks. A damaged wrap means a tampered device store, which is rare. Leaning (b).
-- **Props and listing in one read.** Option (a): `getVaultProps` and `listBoxes` run in parallel,
-  and a listing that names a different `vault_id` refuses the hello. There's no retry inside the
-  core; the next hello reads again. Option (b): a single `VaultDB.getVault` that the adapter
-  serves from one transaction. (a) needs no adapter change; (b) never sees a split read. Leaning
-  (a), and revisiting if split reads show up outside tests.
+- **Props and listing read in parallel, and not compared.** A listed box carries no `vault_id`:
+  `heldListing` stamps the props' own onto it. A box's ctx binds its `vault_id`, so one from
+  another vault won't open under this lease, and that failure is the consistency check. A listing
+  that's stale for one read is fixed by the next read, and goes in `notes/wontfix.md`.
+  (Retracted: an earlier draft proposed refusing a hello whose listing named another vault. There
+  was nothing to compare.)
+- **One frozen picture, not four fields.** The read's props, mark, boxes and lease are judged
+  together into one frozen picture and swapped in by a single assignment. Then "do these
+  disagree?" is asked in one place, the judge, and not after every await.
 - **The mark.** Option (a): keep it as is, but read it once, in parallel, and raise it after the
   commit. Option (b): keep `device_id` and drop the rollback check, along with `rolled_back`,
   `#drafted` and most of [Mark]. Option (c): make the check mean something by binding `gate_epoch`
