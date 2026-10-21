@@ -25,10 +25,11 @@ type Shape =
   | { kind: 'object', fields: Record<string, { optional: boolean, shape: Shape }> }
   | { kind: 'array', element: Shape }
   | { kind: 'nullable', inner: Shape }
+  | { kind: 'record', value: Shape }
   | { kind: 'any' }
 
 /** Zod's half: read from its public `def`, refinements (min, regex, int) set aside. */
-type ZodLike = { def: { type: string, values?: unknown[], innerType?: ZodLike, shape?: Record<string, ZodLike>, element?: ZodLike } }
+type ZodLike = { def: { type: string, values?: unknown[], innerType?: ZodLike, shape?: Record<string, ZodLike>, element?: ZodLike, out?: ZodLike, valueType?: ZodLike } }
 
 const zodShape = (schema: ZodLike): Shape => {
   const { def } = schema
@@ -43,7 +44,10 @@ const zodShape = (schema: ZodLike): Shape => {
   }
   if (def.type === 'array' && def.element) { return { kind: 'array', element: zodShape(def.element) } }
   if (def.type === 'nullable' && def.innerType) { return { kind: 'nullable', inner: zodShape(def.innerType) } }
-  // A box's sidecar: any JSON value, checked by a schema the core alone runs.
+  // A box's sidecar: a check the core alone runs, piped into an object of JSON values.
+  if (def.type === 'pipe' && def.out) { return zodShape(def.out) }
+  if (def.type === 'record' && def.valueType) { return { kind: 'record', value: zodShape(def.valueType) } }
+  // A JSON value, which Convex holds as any value: the core alone checks it.
   if (def.type === 'lazy') { return { kind: 'any' } }
   throw new Error(`no shape for a Zod ${def.type}`)
 }
@@ -66,6 +70,7 @@ const convexShape = (validator: GenericValidator): Shape => {
     return { kind: 'literal', values: literals.flatMap((shape) => shape.values).toSorted((one, two) => one.localeCompare(two)) }
   }
   case 'array': { return { kind: 'array', element: convexShape(validator.element) } }
+  case 'record': { return { kind: 'record', value: convexShape(validator.value) } }
   case 'any':   { return { kind: 'any' } }
   case 'object': {
     const fields = Object.entries(validator.fields).map(([ckey, field]) => (
@@ -83,7 +88,7 @@ const ShapeCases = [
   [Records.Ciphered,     Ciphered,   'Ciphered: the shared encrypted-value shape'],
   [Records.VaultScope,   VaultScope, 'VaultScope: what names one vault'],
   [Records.VaultProps,   VaultProps,   'VaultProps: every field, the passphrase and the nullable passkey with their ciphered wraps nested'],
-  [Records.BoxRecord,    BoxRecord,  'BoxRecord: every field, the sidecar as any JSON value, both ciphered fields nested'],
+  [Records.BoxRecord,    BoxRecord,  'BoxRecord: every field, the sidecar as an object of any JSON values, both ciphered fields nested'],
   [listedZod,            ListedBox,  'a listed box: the record without its ciphered fields, format kept'],
 ] as const
 
@@ -97,7 +102,7 @@ describe("the Convex validators, field for field with the core's Zod records", (
   it("type the same records, expectations and summaries as the core", () => {
     expectTypeOf<Infer<typeof VaultProps>>().toEqualTypeOf<Records.VaultProps>()
     expectTypeOf<Infer<typeof VaultScope>>().toEqualTypeOf<Records.VaultScope>()
-    // A box's sidecar is any value to Convex, which the core holds to a JSON value on every read.
+    // A box's sidecar is an object of any values to Convex, which the core holds to JSON values on every read.
     expectTypeOf<Omit<Infer<typeof BoxRecord>, 'sidecar'>>().toEqualTypeOf<Omit<Records.BoxRecord, 'sidecar'>>()
     // A listing is the stored record less its ciphered fields, so it is the stored record's shape
     // a listing must meet.
@@ -181,8 +186,7 @@ const BoxCases = [
   // both accept:
   [TH.boxOf('anthropic_api_key', 'a1'),                                      true,   true,   'a whole box'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: {} },                 true,   true,   'a box with an empty sidecar'],
-  [{ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: null },               true,   true,   'a box with a sidecar of JSON null'],
-  [{ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: ['a', 1, { beta: true }] }, true, true, 'a box with a sidecar of any JSON'],
+  [{ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: { list: ['a', 1, { beta: true }], gone: null } }, true, true, 'a box with a sidecar of any JSON values'],
   [{ ...TH.boxOf('مفتاح العمل', 'a1') },                                    true,   true,   'a boxlabel of any text'],
   // both refuse:
   [boxWithoutSidecar,                                                        false,  false,  'a box with no sidecar: one is always written'],
@@ -214,4 +218,11 @@ describe("the Convex validators, against the core's Zod records, record by recor
       expect(await convexAccepts(createTest().mutation(probeApi.probe.takeBox, { box: box as never }))).to.eq(convexOk)
     })
   }
+
+  it("box: a sidecar that is no object -- null, an array, text -- is refused by both: by Zod, and by Convex's record validator, which a deployment runs and convex-test does not", () => {
+    for (const sidecar of [null, ['a', 1], 'work account']) {
+      expect(Records.BoxRecord.safeParse({ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar }).success).to.be.false
+    }
+    expect(BoxRecord.fields.sidecar.kind).to.eq('record')
+  })
 })

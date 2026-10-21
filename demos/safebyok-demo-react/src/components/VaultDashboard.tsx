@@ -23,7 +23,6 @@ const blankForm: FormState = { editing: null, boxlabelText: '', whisperText: '',
  * the sidecar, so the app reads its own shape back out of it, and finds no note in any other.
  */
 const noteOf = (sidecar: Sidecar): string => {
-  if (typeof sidecar !== 'object' || sidecar === null || Array.isArray(sidecar)) { return '' }
   const { note } = sidecar
   return typeof note === 'string' ? note : ''
 }

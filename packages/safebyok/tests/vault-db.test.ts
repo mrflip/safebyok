@@ -278,7 +278,7 @@ const ListedRecordCases = [
   ["anthropic",  'not a box',                                                [["anthropic", true]],   'a record that is not an object as damaged'],
   // stored under a name a vault's validators would refuse at its entry, or with a sidecar no host meant: stored under other checks, and sound
   ["Anthropic",  TH.boxOf('Anthropic', 'one'),                               [["Anthropic", false]],  'a record stored under a boxlabel the default check refuses as sound: a check is an alarm at entry, not a promise about storage'],
-  ["anthropic",  { ...TH.boxOf('anthropic', 'one'), sidecar: 'beep\u{7}' }, [["anthropic", false]], 'a record whose sidecar holds a control character as sound: the sidecar is never interpreted'],
+  ["anthropic",  { ...TH.boxOf('anthropic', 'one'), sidecar: { note: 'beep\u{7}' } }, [["anthropic", false]], 'a record whose sidecar holds a control character as sound: the sidecar is never interpreted'],
   // stored under a name below the floor, which no verb could reach: not listed at all
   ["tab\there",  TH.boxOf('tab\there', 'one'),                               [],                      'nothing for a record stored under a boxlabel below the floor, which no verb could name'],
 ] as const

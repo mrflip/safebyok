@@ -21,14 +21,16 @@ const BoxCases = [
   // regular usage:
   [wholeBox,                                               true,   'a whole box, with its sidecar'],
   [{ ...wholeBox, sidecar: {} },                           true,   'a box with an empty sidecar'],
-  [{ ...wholeBox, sidecar: 'just text' },                  true,   'a sidecar of any JSON, not only an object'],
-  [{ ...wholeBox, sidecar: null },                         true,   'a sidecar of JSON null'],
+  [{ ...wholeBox, sidecar: { gone: null, list: [1, 'two'] } }, true, 'a sidecar of any JSON values'],
   [{ ...wholeBox, sidecar: { beta: [null, 1.5], alpha: 2 } }, true, 'a sidecar with its keys in any order, as a jsonb column may hand it back'],
   [{ ...wholeBox, boxlabel: 'Ключ API: מפתח' },           true,   'a boxlabel of any text'],
   // refused, as a damaged or foreign record:
   [sidecarless,                                            false,  'a box with no sidecar: one is always written'],
   [{ ...wholeBox, sidecar: { when: new Date() } },         false,  'a sidecar holding what JSON cannot carry'],
   [{ ...wholeBox, sidecar: undefined },                    false,  'a sidecar left undefined'],
+  [{ ...wholeBox, sidecar: 'just text' },                  false,  'a sidecar that is no object: text'],
+  [{ ...wholeBox, sidecar: null },                         false,  'a sidecar of JSON null'],
+  [{ ...wholeBox, sidecar: [{ note: 'work account' }] },   false,  'a sidecar that is an array'],
   [{ ...sidecarless, format: 'safebyok-box-v7', sidecar_json: '{}' }, false, 'a box from before the sidecar was a JSON value, holding sidecar_json'],
   [{ ...wholeBox, note: 'work account' },                  true,   'an unknown field such as the old note is dropped, never kept'],
   [{ ...wholeBox, whisper_codec: 'json_v2' },              false,  'a whisper codec this version does not know'],

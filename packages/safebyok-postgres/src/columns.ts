@@ -3,7 +3,7 @@ import type { BoxRecord, VaultProps } from 'safebyok'
 /** How one field is stored: `text` as given, `bigint` for a whole number, `jsonb` for an opaque structured value.
  * jsonb reorders keys, which is harmless for a Ciphered, a way in or a box's sidecar: safebyok
  * rebuilds their ctx from field values, a sidecar as its JSON with keys sorted. A null jsonb value
- * goes as a SQL null, and comes back as one: a vault with no passkey, or a sidecar of JSON null.
+ * goes as a SQL null, and comes back as one: a vault with no passkey.
  */
 export type ColumnKind = 'text' | 'bigint' | 'jsonb'
 

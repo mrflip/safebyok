@@ -110,8 +110,8 @@ export type VaultScope = Z.infer<typeof VaultScope>
 /** A CryptoKey, as a record holds one: never its bytes. */
 const cryptoKeyHandle = Z.custom<CryptoKey>((val) => val instanceof CryptoKey, 'a CryptoKey handle')
 
-/** A box's sidecar: your app's own JSON beside the whisper, shown while the vault is locked. Never put secret material in it.
- * It is stored in the clear, as the JSON value it is (a `jsonb` column, say, which a server can
+/** A box's sidecar: your app's own JSON object beside the whisper, `{}` for none, shown while the vault is locked. Never put secret material in it.
+ * It is stored in the clear, as the JSON object it is (a `jsonb` column, say, which a server can
  * query), so anyone who can read the database can read it. It is bound into the box's encryption
  * as its JSON with keys sorted, so a sidecar altered in storage makes the box refuse to open, while
  * one whose keys storage reorders still opens. safebyok never looks inside it: check its shape
@@ -119,9 +119,9 @@ const cryptoKeyHandle = Z.custom<CryptoKey>((val) => val instanceof CryptoKey, '
  *
  * @example Sidecar.parse({ note: 'work account', project: 'atlas' })
  * @example Sidecar.safeParse({ when: new Date() }).success     // false: JSON would flatten it to {}
- * @example Sidecar.safeParse(undefined).success                // false: undefined is not JSON
+ * @example Sidecar.safeParse('work account').success           // false: a sidecar is an object -- { note: 'work account' }
  */
-export const Sidecar: Z.ZodMiniType<WhisperJson> = whisperJson
+export const Sidecar: Z.ZodMiniType<Record<string, WhisperJson>> = whisperBag
 export type Sidecar = Z.infer<typeof Sidecar>
 
 /** The visible fields of a sound box, readable while locked: what a vault's snapshot holds beside {@link DamagedBox}es.

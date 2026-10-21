@@ -34,10 +34,10 @@ describe("recordOf", () => {
     expect(recordOf(TH.vaultPropsOf('u1'), VaultPropsFields)).to.deep.equal(TH.vaultPropsOf('u1'))
   })
 
-  it("carries a box's sidecar as the JSON value it was written as, a null one among them", () => {
+  it("carries a box's sidecar as the JSON object it was written as, an empty one among them", () => {
     const box = TH.boxOf('openai', 'r1', { sidecar: { beta: 1, alpha: 'caf\u{E9}' } })
     expect(recordOf(box, BoxFields)).to.deep.include({ sidecar: { beta: 1, alpha: 'caf\u{E9}' } })
-    expect(recordOf(TH.boxOf('openai', 'r1', { sidecar: null }), BoxFields)).to.deep.include({ sidecar: null })
+    expect(recordOf(TH.boxOf('openai', 'r1', { sidecar: {} }), BoxFields)).to.deep.include({ sidecar: {} })
   })
 
   it("drops a field the record has not got", () => {

@@ -306,17 +306,6 @@ describe("postgresVaultDB, what it stores", () => {
     expect(queried.rows).to.deep.equal([{ alpha: 'café' }])
   })
 
-  it("stores a sidecar of JSON null as a SQL null, and reads it back as JSON null", async () => {
-    const db = await TH.emptyDatabase()
-    const vaultDB = TH.requestFor(db, 'u1')
-    await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
-    await TH.expectingGood(vaultDB).putBox(u1, noBoxYet, TH.boxOf('anthropic', 'one', { sidecar: null }))
-    const { rows } = await db.query('SELECT sidecar IS NULL AS absent FROM safebyok_boxes')
-    expect(rows).to.deep.equal([{ absent: true }])
-    const read = await TH.expectingGood(vaultDB).getBox(u1, 'anthropic')
-    expect(read?.sidecar).to.be.null
-  })
-
   it("passes up Postgres's own refusal of a sidecar its jsonb cannot hold, as the write's failure, writing nothing", async () => {
     const db = await TH.emptyDatabase()
     const vaultDB = TH.requestFor(db, 'u1')

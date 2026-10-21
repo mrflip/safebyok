@@ -331,14 +331,14 @@ describe("the sidecar", () => {
     expect(TH.summaryOf(again.getSnapshot().boxes[0])?.sidecar).to.deep.equal(sidecar)
   })
 
-  it("takes any JSON value, never interpreting it: text with a control character, null, an array", async () => {
+  it("takes a JSON object of any JSON values, never interpreting it: text with a control character, null, an array", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const sidecars: Sidecar[] = ['beep\u{7}', null, [1, 'two'], 42]
+    const sidecars: Sidecar[] = [{ note: 'beep\u{7}' }, { gone: null }, { list: [1, 'two'] }, { count: 42 }]
     for (const [ii, sidecar] of sidecars.entries()) {
       await vault.putBox(`box${String(ii)}`, 'sk-fake', { sidecar })
     }
-    expect(vault.getSnapshot().boxes.map((box) => TH.summaryOf(box)?.sidecar)).to.deep.equal(['beep\u{7}', null, [1, 'two'], 42])
+    expect(vault.getSnapshot().boxes.map((box) => TH.summaryOf(box)?.sidecar)).to.deep.equal(sidecars)
   })
 
   it("leaving it out keeps the sidecar standing; {} empties it; another sidecar replaces it", async () => {
@@ -355,11 +355,13 @@ describe("the sidecar", () => {
     expect(TH.summaryOf(vault.getSnapshot().boxes[0])?.sidecar).to.deep.equal({})
   })
 
-  it("refuses a sidecar JSON cannot carry, with kind 'bad_option', writing nothing and quoting none of it", async () => {
+  it("refuses a sidecar that is no JSON object, or holds what JSON cannot carry, with kind 'bad_option', writing nothing and quoting none of it", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     const unfit = [{ when: new Date() }, { nested: { hook: () => 'SUPERSECRET' } }, { count: NaN }, new Map([['a', 1]])]
-    for (const sidecar of unfit) {
+    // A sidecar is always a JSON object: JSON that is none is refused alike.
+    const unobject = ['SUPERSECRET', null, ['SUPERSECRET'], 42, true]
+    for (const sidecar of [...unfit, ...unobject]) {
       const err = await TH.expectRefusal(vault.putBox('anthropic', 'sk-fake', { sidecar: sidecar as unknown as Sidecar }), 'bad_option')
       expect(err.message).to.include('sidecar')
       expect(TH.thrownText(err)).to.not.include('SUPERSECRET')
@@ -475,13 +477,18 @@ const heaviestRowOf = async (whisperBytes: number, sidecar: Sidecar = {}) => {
 
 /**
  * The heaviest whisper and sidecar a vault of `limitBytes` (its `maxWhisperBytes`) stores, two
- * ways: all whisper, beside an empty sidecar; and a one-byte whisper beside a sidecar of double
- * quotes, each escaped in its JSON, so the sidecar stands at twice its length there.
+ * ways: all whisper, beside an empty sidecar; and a one-byte whisper beside a sidecar holding a
+ * string of double quotes, each escaped in its JSON, so the string stands at twice its length
+ * there -- or beside `{}`, where the limit leaves no room for one.
  */
-const heaviestSplitsOf = (limitBytes: number) => [
-  { whisperBytes: limitBytes - 2, sidecar: {} },
-  { whisperBytes: 1, sidecar: '"'.repeat(Math.floor((limitBytes - 3) / 2)) },
-]
+const heaviestSplitsOf = (limitBytes: number) => {
+  // `{"":""}` is seven bytes of JSON, and the one-byte whisper beside it makes eight.
+  const quotes = Math.floor((limitBytes - 8) / 2)
+  return [
+    { whisperBytes: limitBytes - 2, sidecar: {} },
+    { whisperBytes: 1, sidecar: quotes < 0 ? {} : { '': '"'.repeat(quotes) } },
+  ]
+}
 
 describe("the box limit", () => {
   it("stores up to maxBoxes, then refuses a new box as 'vault_full', quoting none of its label", async () => {
@@ -942,9 +949,9 @@ describe("what a box weighs in storage", () => {
     const world = makeWorld({ validators: AnyTextValidators })
     const vaultDB = declaringRecordBytes(world.vaultDB, 2048)
     const vault = await world.openUnlocked('pw', { vaultDB, maxWhisperBytes: 1024 })
-    await vault.putBox('anthropic', 'sk-fake', { sidecar: 'n'.repeat(1000) })
+    await vault.putBox('anthropic', 'sk-fake', { sidecar: { note: 'n'.repeat(990) } })
     // A sidecar near the whisper limit, beside a boxlabel the host's validators let run long.
-    const err = await TH.expectRefusal(vault.putBox('o'.repeat(1000), 'sk-fake', { sidecar: 'n'.repeat(1000) }), 'box_too_large')
+    const err = await TH.expectRefusal(vault.putBox('o'.repeat(1000), 'sk-fake', { sidecar: { note: 'n'.repeat(990) } }), 'box_too_large')
     expect(err.message).to.include('2048')
     expect(boxlabelsOf(vault)).to.deep.equal(['anthropic'])
   })

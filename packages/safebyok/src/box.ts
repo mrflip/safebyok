@@ -40,7 +40,7 @@ export const BoxRecord = Z.object({
   whisper_codec:          Z.literal('json_v1'),
   /** Which generation of the whisper's own shape this box holds: 1, the only one so far. */
   whisper_schema_version: Z.literal(1),
-  /** The box's {@link Sidecar}, the JSON value the host gave: `{}` when it gave none.
+  /** The box's {@link Sidecar}, the JSON object the host gave: `{}` when it gave none.
    * Storage keeps it as JSON (a `jsonb` column, say), free to reorder its keys or drop its spacing:
    * each ctx binds its JSON with keys sorted, worked out afresh at each seal and open.
    */
@@ -247,8 +247,7 @@ export const planSeal = async (
   return Object.freeze({
     boxlabel:     given.boxlabel,
     whisperBytes: given.whisperBytes,
-    // A sidecar of JSON null is a sidecar given: only undefined is none.
-    sidecar:      given.sidecar === undefined ? vouched?.sidecar ?? {} : given.sidecar,
+    sidecar:      given.sidecar ?? vouched?.sidecar ?? {},
     registeredAt: vouched?.registered_at ?? null,
   })
 }
@@ -362,7 +361,7 @@ export const checkedWhisper = (whisper: unknown): Whisper => {
 export const checkedSidecar = (sidecar: unknown): Sidecar => {
   const checked = Sidecar.safeParse(sidecar)
   if (! checked.success) {
-    throw new VaultError('bad_option', "A box's sidecar must be a JSON value: a string, number, boolean, null, array, or plain object, with nothing JSON cannot carry (undefined, a function, a Date) inside it.")
+    throw new VaultError('bad_option', "A box's sidecar must be a plain JSON object -- { note: 'work account' }, or {} for none -- never a bare string, number, array or null, with nothing JSON cannot carry (undefined, a function, a Date) inside it.")
   }
   return checked.data
 }

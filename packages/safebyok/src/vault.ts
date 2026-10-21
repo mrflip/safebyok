@@ -509,11 +509,12 @@ export class Vault {
    * 'damaged_box', writing nothing: {@link Vault.delBox} it first. A boxlabel the vault's check
    * refuses is refused 'bad_label', even where a box stands under it: the check gates writes alone.
    *
-   * @param storeOpts - `sidecar`, the box's {@link Sidecar}: your app's own JSON data beside the
-   *   whisper, shown in the snapshot while locked, and never interpreted by the vault. It is stored
-   *   in the clear, readable by anyone who can read the database: never put secret material in it.
-   *   It is authenticated, so a sidecar altered in storage makes the box refuse to open. Left out,
-   *   the box keeps the sidecar it has, and a new box gets `{}`; `{}` empties it.
+   * @param storeOpts - `sidecar`, the box's {@link Sidecar}: your app's own JSON object beside the
+   *   whisper, shown in the snapshot while locked, and never interpreted by the vault. Anything but
+   *   a JSON object, a bare string, array or null among them, refuses 'bad_option'. It is stored in
+   *   the clear, readable by anyone who can read the database: never put secret material in it. It
+   *   is authenticated, so a sidecar altered in storage makes the box refuse to open. Left out, the
+   *   box keeps the sidecar it has, and a new box gets `{}`; `{}` empties it.
    *
    * @example await vault.putBox('anthropic_api_key', 'sk-ant-...', { sidecar: { note: 'work account' } })
    * @example await vault.putBox('anthropic_api_key', 'sk-ant-...')              // keeps the sidecar it has
@@ -2036,7 +2037,7 @@ const checkEnsureLeaseOpts = optionsCheck({ renewMinutes: Z.optional(Z.unknown()
 const checkStoreOpts = optionsCheck({ sidecar: Z.optional(Z.unknown()) }, "putBox()'s only option is `sidecar`, the box's own visible data (it is authenticated but never encrypted): check its spelling, and leave out any other. A note is kept in the sidecar: { sidecar: { note } }.")
 
 /** The sidecar a `putBox()` was handed, checked; undefined when it was handed none.
- * Refuses 'bad_option' for anything JSON cannot carry, quoting none of it, and for options beside
+ * Refuses 'bad_option' for anything but a JSON object, quoting none of it, and for options beside
  * it.
  */
 const sidecarOf = (storeOpts: { sidecar?: Sidecar | undefined } | undefined): Sidecar | undefined => {

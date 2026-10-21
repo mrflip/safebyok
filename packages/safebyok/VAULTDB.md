@@ -142,8 +142,8 @@ for field, and nothing is added. Text comes back as the exact text written. A st
 -- an encrypted value, a way in, a box's `sidecar` -- comes back as the same JSON value, though a
 store that keeps JSON its own way (Postgres's `jsonb`, say) may hand back its object keys in
 another order: the vault binds each by its fields, a sidecar as its JSON with keys sorted, so
-that order changes nothing. A box's `sidecar` may be any JSON value, `null` among them, and
-comes back as that value. Before anything is written, a read finds nothing: `null`, never a
+that order changes nothing. A box's `sidecar` is always a JSON object, `{}` for none, and
+comes back as that object. Before anything is written, a read finds nothing: `null`, never a
 default.
 
 **1.2. Each vault keeps to itself.** Two scopes that differ anywhere, by however little (a
