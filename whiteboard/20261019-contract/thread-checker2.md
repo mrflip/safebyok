@@ -1,6 +1,6 @@
 # Thread checker2: a broken checker is thrown, and the vault checks a passphrase itself (2026-10-21)
 
-Branch `20261021-checker2`, PR #PR, stacked on [#217](https://github.com/mrflip/safebyok/pull/217),
+Branch `20261021-checker2`, PR [#218](https://github.com/mrflip/safebyok/pull/218), stacked on [#217](https://github.com/mrflip/safebyok/pull/217),
 in the line main → #213 → #212 → #214 → #215 → #216 → #217 → this. Justify: green. Core 2704
 passed, 37 skipped; react 287; convex 295 (9 skipped); postgres 282 (15 skipped); graphql 279
 (15 skipped); indexeddb 150 (11 skipped); fastkey 49; demo 209 (17 skipped); e2e 95 (104
