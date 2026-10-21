@@ -156,13 +156,13 @@ export const Sidecar: Z.ZodMiniType<WhisperJson> = whisperJson
 export type Sidecar = Z.infer<typeof Sidecar>
 
 /**
- * The visible fields of a box: its boxlabel, revision and times, its sidecar
- * as the JSON value the host stored (`{}` when it gave none), and `damaged` false. This, or a
- * {@link DamagedBox}, is what a VaultDB's `listBoxes` returns and a vault's snapshot holds,
- * readable while locked. The sidecar is shown as storage holds it: only `getWhisper()` opens the box
- * and so proves it unaltered.
+ * The visible fields of a box: its boxlabel, revision and times, its sidecar as the JSON value
+ * the host stored (`{}` when it gave none), the `vault_id` of the vault props it lies under, and
+ * `damaged` false -- a `Box`'s own fields, as `{ ...box }` holds them, and `damaged`. This, or a
+ * {@link DamagedBox}, is what a vault's snapshot holds, readable while locked. The sidecar is
+ * shown as storage holds it: only `getWhisper()` opens the box and so proves it unaltered.
  *
- * @example BoxSummary.parse({ boxlabel: 'anthropic', revision_tok: 'r1', sidecar: {}, registered_at, written_at }).damaged // false
+ * @example BoxSummary.parse({ boxlabel: 'anthropic', revision_tok: 'r1', sidecar: {}, registered_at, written_at, vault_id }).damaged // false
  */
 export const BoxSummary = Z.object({
   boxlabel:        NameFloor,
@@ -170,9 +170,16 @@ export const BoxSummary = Z.object({
   sidecar:         Sidecar,
   registered_at:   EpochMillis,
   written_at:      EpochMillis,
+  vault_id:        Z.string().check(Z.minLength(1)),
   damaged:         Z._default(Z.literal(false), false),
 })
 export type BoxSummary = Z.infer<typeof BoxSummary>
+
+/**
+ * A box as a VaultDB's `listBoxes` lists it: a {@link BoxSummary} but for its `vault_id`, which
+ * the vault adds from the vault props it read beside the listing.
+ */
+export type ListedSummary = Omit<BoxSummary, 'vault_id'>
 
 /**
  * A box whose stored record does not read back as one -- damaged, tampered with, written by
@@ -369,7 +376,7 @@ export type VaultIdentity = Pick<VaultProps, 'vault_id' | 'registered_at'>
  * The device-local record of a lease: this browser's leaseKey (a non-extractable handle -- it
  * cannot leave the device even through the code that made it) and the vaultKey wrapped under it.
  * Held only by structured-clone storage (IndexedDB) or memory; it has no JSON form, and nothing
- * in it ever goes to the backend. What a `Lease` is made from, and gives back as its `props`.
+ * in it ever goes to the backend. What a `Lease` is made from, and gives back as its `record`.
  */
 export const LeaseRecord = Z.object({
   format:            Z.literal('safebyok-lease-v1'),

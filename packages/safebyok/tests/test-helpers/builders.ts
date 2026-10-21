@@ -4,7 +4,7 @@ import type { KeyDeriver } from '../../src/key-deriver'
 import { type StrengthChecker, StrongVerdict, guardStrengthChecker } from '../../src/passphrase-strength'
 import { memoryStore } from '../../src/string-store'
 import type { BoxRecord } from '../../src/box'
-import { type VaultScope, type PassphraseWayinRecord, type PasskeyWayinRecord, type PasskeyAnswer, type VaultProps, type Sidecar, type BoxSummary, type DamagedBox, type DeviceMark, type SeenVault, type LeaseRecord } from '../../src/types'
+import { type VaultScope, type PassphraseWayinRecord, type PasskeyWayinRecord, type PasskeyAnswer, type VaultProps, type Sidecar, type ListedSummary, type DamagedBox, type DeviceMark, type SeenVault, type LeaseRecord } from '../../src/types'
 import { stableJsonify } from '../../src/stable-jsonify'
 import { Vault } from '../../src/vault'
 import { type MakeVaultOpts } from '../../src/vault-opts'
@@ -264,7 +264,7 @@ export const OddLabels = Object.freeze([
  *
  * @example expect(TH.summaryOf(vault.getSnapshot().boxes[0])?.sidecar).to.deep.equal({ note: 'work account' })
  */
-export const summaryOf = (box: BoxSummary | DamagedBox | undefined): BoxSummary | undefined => {
+export const summaryOf = <SummaryT extends ListedSummary>(box: SummaryT | DamagedBox | undefined): SummaryT | undefined => {
   if (box?.damaged === true) { throw new Error(`The box '${box.boxlabel}' is listed as damaged, where a summary was expected.`) }
   return box
 }

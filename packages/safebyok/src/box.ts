@@ -4,10 +4,9 @@ import { VaultError, isVaultError } from './errors'
 import { optionsCheck } from './options'
 import { type Outcome, outcomeOf, unexpectedError, valOf } from './outcome'
 import { stableJsonify } from './stable-jsonify'
-import { type BoxSummary, type DamagedBox, EpochMillis, Sidecar, Whisper } from './types'
+import { type BoxSummary, type DamagedBox, EpochMillis, type ListedSummary, Sidecar, Whisper } from './types'
 import { Lease } from './lease'
 import type { Vault } from './vault'
-import { decorate } from './adorn'
 import { NameFloor } from './validators'
 import * as Names from './names'
 
@@ -37,7 +36,7 @@ export const EmptySidecarJson = '{}'
  * One box as the storage layer holds it: the whisper ciphered under its own boxKey, that
  * boxKey wrapped under the vaultKey, and the visible fields -- boxlabel, sidecar, the times
  * it was first stored and last written -- a locked vault may show. Nothing in this record opens
- * without the vaultKey. A {@link Box} is made from one, and hands it back as `box.props`.
+ * without the vaultKey. A {@link Box} is made from one, and hands it back as `box.record`.
  *
  * `revision_tok` is minted fresh on every write and bound into both encryptions, so ciphertext
  * moved between revisions (or boxes, or vaults) refuses to open. So is every other field but the
@@ -78,7 +77,7 @@ export const BoxRecord = Z.object({
 export type BoxRecord = Z.infer<typeof BoxRecord>
 // --
 
-// == [Box]: BoxVault, Box, make, seal, tryOpen, open, toJSON, summary
+// == [Box]: BoxVault, BoxView, Box, record, make, seal, tryOpen, open, toJSON
 
 /**
  * The slice of a {@link Vault} a box reads: its scope, which both of a box's encryptions are
@@ -86,6 +85,9 @@ export type BoxRecord = Z.infer<typeof BoxRecord>
  * told otherwise; and the time, which a seal stamps.
  */
 export type BoxVault = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_id' | 'now'>
+
+/** A box's visible fields, each once: what `{ ...box }` and `box.toJSON()` hold, and what a {@link BoxSummary} holds but for `damaged`. */
+export type BoxView = Omit<BoxSummary, 'damaged'>
 
 /** The options {@link Box.seal} takes. */
 export type SealBoxOpts = {
@@ -103,16 +105,18 @@ const checkSealOpts = optionsCheck({ sidecar: Z.optional(Z.unknown()), over: Z.o
 
 /**
  * One box: a whisper sealed under its own boxKey, with the visible fields a locked vault may
- * show. A box is what a vault holds and hands out; its stored record, `props`, is what crosses
- * to storage. Every stored field is a field of the box as well, the sidecar as its JSON value
- * (`props.sidecar_json` holds the text), and so is the `vault_id` of the vault props it lies
- * under; nothing on it can be changed: the box, its record, its sidecar and its summary are
- * frozen.
+ * show. A box is what a vault holds and hands out; its stored record, `record`, is what crosses
+ * to storage, and is all it holds: its visible fields -- what a host decides with: its boxlabel,
+ * revision, sidecar (parsed from its JSON) and times -- are fields of its own, read from the
+ * record, and so is the `vault_id` of the vault props it lies under. The ciphertext and the
+ * storage mechanics (format, codec, schema version) stay in the record. Nothing on it can be
+ * changed: the box, its record and its sidecar are frozen through.
  *
- * The box keeps the vault it is of in a private field, which neither a loop, a spread, a log line
- * nor `JSON.stringify` sees: a box logged shows its fields, and serialized is its record
- * (`toJSON()` is `props`). The record holds no secret: the whisper is ciphered under a boxKey,
- * wrapped under the vaultKey, and neither key is in it. It is what storage holds.
+ * The box keeps its record, and the vault it is of, in private fields, which neither a loop, a
+ * spread, a log line nor `JSON.stringify` sees: a box logged, spread or serialized shows each
+ * visible field once, and nothing else -- what `vault.boxes` lists for it, but for `damaged`.
+ * The record holds no secret: the whisper is ciphered under a boxKey, wrapped under the vaultKey,
+ * and neither key is in it. It is what storage holds.
  *
  * A box opens under the lease the vault holds while unlocked: `box.open(lease)`, or through the
  * vault, `vault.decryptWhisper(box)`.
@@ -122,69 +126,53 @@ const checkSealOpts = optionsCheck({ sidecar: Z.optional(Z.unknown()), over: Z.o
  *   box.boxlabel        // 'anthropic_api_key'
  *   box.sidecar         // { note: 'work account' }
  *   box.vault_id        // the vault props it lies under
- *   box.props           // the record, as storage holds it
- *   box.summary         // what vault.boxes lists for it
+ *   box.record          // the record, as storage holds it
+ *   { ...box }          // its visible fields: what vault.boxes lists for it, but for damaged
  */
 export class Box {
-  /** The stored record this box was made from, frozen: what storage holds. Hidden: a log line shows the fields once. */
-  declare readonly props: BoxRecord
-  /** Every visible field, the sidecar parsed, and `damaged: false`: what `vault.boxes` lists for this box. Frozen. */
-  declare readonly summary: BoxSummary
+  /** The stored record this box was made from, frozen through: what storage holds, and the one source of every field. */
+  readonly #record: BoxRecord
   /** The vault it is of: its scope, which its encryptions are bound to, and its clock. */
   readonly #vault: BoxVault
 
-  /** The id of the vault props this box lies under: bound into both its encryptions, and named by the write that puts it. */
-  readonly vault_id:               string
-  /** The record's format, `safebyok-box-v7`. */
-  readonly format:                 BoxRecord['format']
   /** The box's label within its vault. */
-  readonly boxlabel:               string
+  readonly boxlabel:      string
   /** Fresh on every put: what a conditional write over this box names. */
-  readonly revision_tok:           string
-  /** How the whisper became the bytes ciphered: `json_v1`. */
-  readonly whisper_codec:          BoxRecord['whisper_codec']
-  /** Which generation of the whisper's shape this box holds: 1. */
-  readonly whisper_schema_version: BoxRecord['whisper_schema_version']
+  readonly revision_tok:  string
   /** The app's own JSON beside the whisper, `{}` when none, frozen through: visible in storage, never encrypted. */
-  readonly sidecar:                Sidecar
+  readonly sidecar:       Sidecar
   /** When this boxlabel was first put, in epoch milliseconds. */
-  readonly registered_at:          number
+  readonly registered_at: number
   /** When this revision was put, in epoch milliseconds, whether or not the whisper changed. */
-  readonly written_at:             number
-  /** The boxKey, wrapped under the vaultKey. */
-  readonly box_key_wrapped:        Ciphered
-  /** The whisper, ciphered under the boxKey. */
-  readonly whisper_ciphered:       Ciphered
+  readonly written_at:    number
+  /** The id of the vault props this box lies under: bound into both its encryptions, and named by the write that puts it. */
+  readonly vault_id:      string
 
   private constructor(vault: BoxVault, vaultId: string, record: BoxRecord) {
-    const props = Object.freeze({
+    this.#record = Object.freeze({
       ...record,
       box_key_wrapped:  Object.freeze({ ...record.box_key_wrapped }),
       whisper_ciphered: Object.freeze({ ...record.whisper_ciphered }),
     })
-    const sidecar = frozenJsonOf(props.sidecar_json)
-    this.#vault                 = vault
-    this.vault_id               = vaultId
-    this.format                 = props.format
-    this.boxlabel               = props.boxlabel
-    this.revision_tok           = props.revision_tok
-    this.whisper_codec          = props.whisper_codec
-    this.whisper_schema_version = props.whisper_schema_version
-    this.sidecar                = sidecar
-    this.registered_at          = props.registered_at
-    this.written_at             = props.written_at
-    this.box_key_wrapped        = props.box_key_wrapped
-    this.whisper_ciphered       = props.whisper_ciphered
-    const { boxlabel, revision_tok, registered_at, written_at } = props
-    const summary: BoxSummary = Object.freeze({ boxlabel, revision_tok, sidecar, registered_at, written_at, damaged: false })
-    decorate<Box>(this, { props, summary })
+    this.#vault        = vault
+    this.boxlabel      = record.boxlabel
+    this.revision_tok  = record.revision_tok
+    this.sidecar       = frozenJsonOf(record.sidecar_json)
+    this.registered_at = record.registered_at
+    this.written_at    = record.written_at
+    this.vault_id      = vaultId
     Object.freeze(this)
+  }
+
+  /** The stored record this box was made from, frozen through: what storage holds, ciphertext and all. */
+  get record(): BoxRecord {
+    return this.#record
   }
 
   /**
    * The box a stored record makes, of `vault`, lying under the vault props whose id is `vaultId`
    * -- by default the vault's own, as it holds them now: the record checked against
-   * {@link BoxRecord} and kept, frozen, as `props`. Touches nothing: no storage, no key. Throws
+   * {@link BoxRecord} and kept, frozen, as `record`. Touches nothing: no storage, no key. Throws
    * kind 'bad_record' for a record this package does not write, quoting none of it, and
    * 'absent_vault' when no vault id is given and the vault holds no vault props.
    *
@@ -284,18 +272,19 @@ export class Box {
   }
 
   /**
-   * The box's stored record, `props`: what `JSON.stringify(box)` writes, so a box serializes as
-   * the record storage holds, and never with its vault.
+   * The box's visible fields, each once, as a plain object: what `JSON.stringify(box)` writes and
+   * a log line shows, never its ciphertext or its vault. Storage takes `record`, not this.
    *
-   * @example JSON.parse(JSON.stringify(box))   // deep-equals box.props
+   * @example JSON.parse(JSON.stringify(box))   // { boxlabel, revision_tok, sidecar, registered_at, written_at, vault_id }
    */
-  toJSON(): BoxRecord {
-    return this.props
+  toJSON(): BoxView {
+    const { ...visible } = this
+    return visible
   }
 
   async #open(lease: Lease): Promise<Whisper> {
     checkLease(lease, 'Opening a box')
-    return await openRecord(this.#vault, this.vault_id, this.props, lease)
+    return await openRecord(this.#vault, this.vault_id, this.#record, lease)
   }
 }
 // --
@@ -331,7 +320,7 @@ export const planSeal = async (
   return Object.freeze({
     boxlabel:     given.boxlabel,
     whisperBytes: given.whisperBytes,
-    sidecarJson:  given.sidecarJson ?? vouched?.props.sidecar_json ?? EmptySidecarJson,
+    sidecarJson:  given.sidecarJson ?? vouched?.record.sidecar_json ?? EmptySidecarJson,
     registeredAt: vouched?.registered_at ?? null,
   })
 }
@@ -365,16 +354,16 @@ export const sealPlanned = async (vault: BoxVault, lease: Lease, plan: SealPlan)
 }
 
 /**
- * The whisper `props` holds, a box of `vault` lying under `vaultId`, opened under `lease`: kind
+ * The whisper `record` holds, a box of `vault` lying under `vaultId`, opened under `lease`: kind
  * 'vault_locked' when the lease is of another vault than `vaultId`, or is not opened or has ended;
  * 'damaged_box' when it will not unwrap or decipher under the ctx rebuilt from the vault's scope,
  * `vaultId` and its visible fields, or when it opens to no whisper. Names nothing of the box.
  */
-const openRecord = async (vault: BoxVault, vaultId: string, props: BoxRecord, lease: Lease): Promise<Whisper> => {
+const openRecord = async (vault: BoxVault, vaultId: string, record: BoxRecord, lease: Lease): Promise<Whisper> => {
   if (lease.vault_id !== vaultId) {
     throw new VaultError('vault_locked', "That box lies in another vault than the one this lease opens: the vault was deleted and made anew since the box was read, and its key is not in hand. Read the box again.")
   }
-  const { format: _format, box_key_wrapped: boxKeyWrapped, whisper_ciphered: whisperCiphered, ...header } = props
+  const { format: _format, box_key_wrapped: boxKeyWrapped, whisper_ciphered: whisperCiphered, ...header } = record
   let whisperBytes: Uint8Array
   try {
     const boxKey = await lease.unwrapBoxKey(boxKeyWrapped, boxCtx(vault, vaultId, header, 'box_key_wrapped'))
@@ -394,16 +383,18 @@ const openRecord = async (vault: BoxVault, vaultId: string, props: BoxRecord, le
 // == [Listing]: heldListing
 
 /**
- * A listed box as a vault holds it and hands it out: a fresh copy, frozen through, its sidecar
- * included, so nothing a host is handed reaches what the vault keeps. A damaged one keeps its
- * boxlabel and revision alone.
+ * A listed box as a vault holds it and hands it out, lying under the vault props whose id is
+ * `vaultId`, those the listing was read beside: a fresh copy, frozen through, its sidecar
+ * included, so nothing a host is handed reaches what the vault keeps -- a box's visible fields,
+ * as `{ ...box }` holds them, and `damaged: false`. A damaged one keeps its boxlabel and revision
+ * alone.
  *
  * @example vault.boxes[0].sidecar.note = 'changed'   // throws in strict code; the vault's own copy is untouched either way
  */
-export const heldListing = (listed: BoxSummary | DamagedBox): BoxSummary | DamagedBox => {
+export const heldListing = (listed: ListedSummary | DamagedBox, vaultId: string): BoxSummary | DamagedBox => {
   if (listed.damaged) { return Object.freeze({ boxlabel: listed.boxlabel, damaged: true, revision_tok: listed.revision_tok }) }
   const { boxlabel, revision_tok, registered_at, written_at } = listed
-  return Object.freeze({ boxlabel, revision_tok, sidecar: frozenJsonOf(stableJsonify(listed.sidecar) ?? EmptySidecarJson), registered_at, written_at, damaged: false })
+  return Object.freeze({ boxlabel, revision_tok, sidecar: frozenJsonOf(stableJsonify(listed.sidecar) ?? EmptySidecarJson), registered_at, written_at, vault_id: vaultId, damaged: false })
 }
 // --
 
@@ -442,7 +433,7 @@ const parseJsonOrNull = (text: string): unknown => {
 export const checkedBoxRecord = (record: unknown): BoxRecord => {
   const checked = BoxRecord.safeParse(record)
   if (! checked.success) {
-    throw new VaultError('bad_record', "That is not a box record this package writes: a box is made from the record storage holds, as a VaultDB's getBox hands it back, or from a box's own props.")
+    throw new VaultError('bad_record', "That is not a box record this package writes: a box is made from the record storage holds, as a VaultDB's getBox hands it back, or from a box's own record.")
   }
   return checked.data
 }

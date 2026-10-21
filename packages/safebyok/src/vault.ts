@@ -63,7 +63,7 @@ export type VaultSnapshot = Readonly<{
   /**
    * The vault's passphrase, visible fields only ({@link PassphraseWayinSummary}): when it was set,
    * and from which device. Never its salt, never its wrap. Null until a read finds a vault. The
-   * `summary` of the vault's own passphrase {@link Wayin}.
+   * visible fields of the vault's own passphrase {@link Wayin}, as `wayin.toJSON()` gives them.
    */
   passphrase:      PassphraseWayinSummary | null
   /**
@@ -545,11 +545,11 @@ export class Vault {
         // the passphrase as it stood.
         revise: async (standing, proven, deviceId) => {
           const wayin = await Wayin.seal(this, standing, putting, deviceId, proven.transientKey)
-          return wayin.wayinkind === 'passphrase' ? { passphrase: wayin.props, passkey: null } : { passphrase: standing.passphrase, passkey: wayin.props }
+          return wayin.wayinkind === 'passphrase' ? { passphrase: wayin.record, passkey: null } : { passphrase: standing.passphrase, passkey: wayin.record }
         },
       })
       const { passphrase: storedPassphrase, passkey: storedPasskey } = this.#wayinsOf(stored)
-      return good(storedPasskey === null || putting.kind === 'passphrase' ? storedPassphrase.summary : storedPasskey.summary)
+      return good(storedPasskey === null || putting.kind === 'passphrase' ? storedPassphrase.toJSON() : storedPasskey.toJSON())
     } catch (err) { return this.#badOutcome(err) }
   }
 
@@ -775,7 +775,7 @@ export class Vault {
   async tryDecryptWhisper(box: Box | BoxRecord): Promise<Outcome<Whisper>> {
     try {
       this.#checkOpen()
-      const record = box instanceof Box ? box.props : checkedBoxRecord(box)
+      const record = box instanceof Box ? box.record : checkedBoxRecord(box)
       const lease = this.#checkUnlocked()
       // Made anew for this vault: a box opens under this vault's scope, whichever it came from, and
       // under the vault props it was read under; a record, under those the lease opens.
@@ -1083,8 +1083,8 @@ export class Vault {
       vault_id:        standing?.vault_id ?? null,
       registered_at:   standing?.registered_at ?? null,
       unlock_epoch:    standing?.unlock_epoch ?? null,
-      passphrase:      wayins === null ? null : Object.freeze(wayins.passphrase.summary),
-      passkey:         wayins?.passkey ? Object.freeze(wayins.passkey.summary) : null,
+      passphrase:      wayins === null ? null : Object.freeze(wayins.passphrase.toJSON()),
+      passkey:         wayins?.passkey ? Object.freeze(wayins.passkey.toJSON()) : null,
       state,
       boxes:           Object.freeze(this.#boxes.map((box) => Object.freeze(box))),
       capacity:        Object.freeze({ boxes: Object.freeze(boxes), bytes: Object.freeze(bytes) }),
@@ -1159,7 +1159,7 @@ export class Vault {
     }
     const shown = this.#boxes
     const shownWayins = this.#wayinListOf(this.#shownProps)
-    this.#boxes = standing === null ? [] : listed.map((box) => heldListing(box))
+    this.#boxes = standing === null ? [] : listed.map((box) => heldListing(box, standing.vault_id))
     this.#syncing = true
     this.#readAt = readAt
     // A read with no damaged box or way in clears the trouble: nothing amiss stands. The listing is
@@ -1510,7 +1510,7 @@ export class Vault {
       ...this.#scope,
       ...identity,
       unlock_epoch:        1,
-      passphrase:          wayin.props,
+      passphrase:          wayin.record,
       passkey:             null,
     }
   }
@@ -1774,7 +1774,7 @@ export class Vault {
     const lease = await Lease.grant(this, standing, unlocked)
     // Asked again before the write: the prompt may have ended, or the props moved on, while the key was wrapped.
     if (isVoided()) { return false }
-    valOf(await this.#deviceDB.putLease(lease.props))
+    valOf(await this.#deviceDB.putLease(lease.record))
     // Voided while the lease was written: it is erased, and a hello's take-up that may have read it
     // meanwhile stands down, taking nothing up.
     if (isVoided()) {
@@ -2026,7 +2026,7 @@ export class Vault {
    */
   async #writeOver(box: Box, expected: BoxExpectation): Promise<void> {
     try {
-      await this.#refreshOnStale(this.#vaultDB.putBox(this.#scope, expected, box.props), 'putBox')
+      await this.#refreshOnStale(this.#vaultDB.putBox(this.#scope, expected, box.record), 'putBox')
     } catch (err) {
       this.#refuseStalePutBox(err)
     }
@@ -2223,11 +2223,11 @@ export class Vault {
    * read that found them succeeds all the same, and the other way in, if any, opens as ever.
    */
   #tellWayinNews(damaged: readonly Wayin[], shown: readonly Wayin[]) {
-    const wasShown = new Set(shown.filter((wayin) => wayin.isDamaged()).map((wayin) => stableJsonify(wayin.props)))
-    const news = damaged.filter((wayin) => ! wasShown.has(stableJsonify(wayin.props)))
+    const wasShown = new Set(shown.filter((wayin) => wayin.isDamaged()).map((wayin) => stableJsonify(wayin.record)))
+    const news = damaged.filter((wayin) => ! wasShown.has(stableJsonify(wayin.record)))
     if (news.length === 0) { return }
     for (const wayin of news) {
-      this.#tellBadNews(new VaultError('damaged_wayin', "A way into this vault is stored damaged, so it can't be tried: this error's meta.wayin_listed names it. The other way in, if the vault has one, still opens it. A damaged passkey is mended by adding the passkey again; a damaged passphrase only by removing the vault and making it again.", { meta: { wayin_listed: wayin.summary } }))
+      this.#tellBadNews(new VaultError('damaged_wayin', "A way into this vault is stored damaged, so it can't be tried: this error's meta.wayin_listed names it. The other way in, if the vault has one, still opens it. A damaged passkey is mended by adding the passkey again; a damaged passphrase only by removing the vault and making it again.", { meta: { wayin_listed: wayin.toJSON() } }))
     }
     this.#settle()
   }

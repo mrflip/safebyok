@@ -4,7 +4,6 @@ import { VaultError } from './errors'
 import { sameScope } from './names'
 import { type Outcome, bad, good } from './outcome'
 import { FarFuture, LeaseRecord, type VaultProps } from './types'
-import { decorate } from './adorn'
 import type { Vault } from './vault'
 import type { VaultKeyPair } from './wayin'
 
@@ -29,6 +28,9 @@ export type LeaseVault = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'le
 /** The vault props a lease is granted under: their `vault_id` and `unlock_epoch`, which its wrap is bound to. A whole {@link VaultProps} is one. */
 export type LeaseStanding = Pick<VaultProps, 'vault_id' | 'unlock_epoch'>
 
+/** A lease's visible fields, each once: which vault it opens and until when, as `{ ...lease }` and `lease.toJSON()` hold them. */
+export type LeaseView = Pick<LeaseRecord, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_id' | 'unlock_epoch' | 'ask_passphrase_at'>
+
 /** The ctx's first part: the lease record's format. */
 const LeaseFormat = 'safebyok-lease-v1'
 
@@ -52,16 +54,18 @@ const leaseCtxOf = (lease: LeaseBinding): Uint8Array => (
 
 /**
  * This device's lease on one vault: the vaultKey under a leaseKey that never leaves this browser
- * profile, and the instant it ends. Its stored fields are its own, read-only; `props` is the
- * stored record, frozen, and `toJSON()` every field of it but the leaseKey and the wrap, so a log
- * line never carries the vaultKey's wrap. The record is what the device store keeps, by
- * structured clone: the leaseKey has no other form, and nothing of a lease reaches the
- * backend.
+ * profile, and the instant it ends. Its stored record, `record`, frozen, is all it holds: its
+ * visible fields -- which vault it opens (the scope, `vault_id` and `unlock_epoch`) and until when
+ * -- are fields of its own, read from the record; the leaseKey, the wrap and the format stay in the
+ * record, so `{ ...lease }`, `toJSON()` and a log line show each visible field once and never the
+ * vaultKey's wrap. The record is what the device store keeps, by structured clone: the leaseKey
+ * has no other form, and nothing of a lease reaches the backend.
  *
  * A lease is opened or not. One read from the device store is not, until `tryOpen` hands back
  * one that is; one `Lease.grant` makes is. An opened lease holds the vaultKey, as a
  * non-extractable handle in a private field that no loop, spread, log line or `JSON.stringify`
- * sees, and wraps and unwraps boxKeys under it until it ends: what a box seals and opens with.
+ * sees, as are its record and its vault, and wraps and unwraps boxKeys under it until it ends:
+ * what a box seals and opens with.
  *
  * Anyone who can use this browser profile while a lease stands can open the vault: `leaseHours`
  * is that tradeoff, and `lock()` erases the lease at once.
@@ -73,47 +77,42 @@ const leaseCtxOf = (lease: LeaseBinding): Uint8Array => (
  *   const { ok, val: opened } = await lease.tryOpen(vaultProps)   // the lease, opened, to seal and open boxes with
  */
 export class Lease {
-  /** The stored record, frozen: what crosses to the device store. Not enumerable. */
-  declare readonly props: LeaseRecord
+  /** The stored record, frozen, its wrap with it: what crosses to the device store, and the one source of every field. */
+  readonly #record: LeaseRecord
   /** The vault it is a lease on: its scope, its lease length and its clock. */
   readonly #vault: LeaseVault
   /** The vaultKey, while this lease is opened: the handle boxKeys are wrapped and unwrapped under. Null until it is. */
   readonly #vaultKey: CryptoKey | null
 
-  /** The record's format, `safebyok-lease-v1`. */
-  readonly format:                  LeaseRecord['format']
   /** The app of the vault it is for. */
-  readonly applabel:                string
+  readonly applabel:          string
   /** The user of the vault it is for. */
-  readonly user_id:                 string
+  readonly user_id:           string
   /** The label of the vault it is for. */
-  readonly vaultlabel:              string
+  readonly vaultlabel:        string
   /** The id of the vault props it was granted under. */
-  readonly vault_id:                string
+  readonly vault_id:          string
   /** The vault props' `unlock_epoch` when it was granted: a change to the ways in voids it. */
-  readonly unlock_epoch:            number
-  /** This browser's leaseKey: non-extractable, usable only to wrap and unwrap the vaultKey. */
-  readonly lease_key:               CryptoKey
-  /** The vaultKey, wrapped under `lease_key`, bound to the lease's ctx. */
-  readonly vault_key_lease_wrapped: Ciphered
+  readonly unlock_epoch:      number
   /** The instant from which the lease opens nothing, and the vault asks for a proof: epoch milliseconds. */
-  readonly ask_passphrase_at:       number
+  readonly ask_passphrase_at: number
 
   private constructor(vault: LeaseVault, record: LeaseRecord, vaultKey: CryptoKey | null) {
-    const props = Object.freeze({ ...record, vault_key_lease_wrapped: Object.freeze({ ...record.vault_key_lease_wrapped }) })
-    decorate<Lease>(this, { props })
+    this.#record = Object.freeze({ ...record, vault_key_lease_wrapped: Object.freeze({ ...record.vault_key_lease_wrapped }) })
     this.#vault = vault
     this.#vaultKey = vaultKey
-    this.format                  = props.format
-    this.applabel                = props.applabel
-    this.user_id                 = props.user_id
-    this.vaultlabel              = props.vaultlabel
-    this.vault_id                = props.vault_id
-    this.unlock_epoch            = props.unlock_epoch
-    this.lease_key               = props.lease_key
-    this.vault_key_lease_wrapped = props.vault_key_lease_wrapped
-    this.ask_passphrase_at       = props.ask_passphrase_at
+    this.applabel          = record.applabel
+    this.user_id           = record.user_id
+    this.vaultlabel        = record.vaultlabel
+    this.vault_id          = record.vault_id
+    this.unlock_epoch      = record.unlock_epoch
+    this.ask_passphrase_at = record.ask_passphrase_at
     Object.freeze(this)
+  }
+
+  /** The stored record, frozen: what the device store keeps of this lease, its leaseKey and wrap among it. */
+  get record(): LeaseRecord {
+    return this.#record
   }
 
   /**
@@ -147,7 +146,7 @@ export class Lease {
    * ending the vault's `leaseMillis` from now and never past {@link FarFuture}. A new leaseKey is
    * made non-extractable, so not even this code can export it. The vaultKey's extractable handle
    * is wrapped under it, bound to the lease's ctx, and not kept; its non-extractable handle is
-   * what the lease holds. Writes nothing: the vault puts the record (`props`) in the device store,
+   * what the lease holds. Writes nothing: the vault puts the record (`record`) in the device store,
    * in place of any before. Throws a Zod error, as misuse, for vault props a lease record could
    * not hold (`LeaseRecord`'s checks): a vault hands it only what it read and checked.
    *
@@ -198,8 +197,8 @@ export class Lease {
       return bad(new VaultError('vault_locked', "This device's lease has ended: the vault asks for a proof again."))
     }
     try {
-      const vaultKey = await unwrapKeyUnder(this.lease_key, this.vault_key_lease_wrapped, leaseCtxOf(this), SessionUsage)
-      return good(new Lease(this.#vault, this.props, vaultKey))
+      const vaultKey = await unwrapKeyUnder(this.#record.lease_key, this.#record.vault_key_lease_wrapped, leaseCtxOf(this), SessionUsage)
+      return good(new Lease(this.#vault, this.#record, vaultKey))
     } catch {
       return bad(new VaultError('corrupt_record', "This device's lease would not open: it may have been damaged where it is kept. The vault asks for a proof instead."))
     }
@@ -250,10 +249,10 @@ export class Lease {
     return await unwrapKeyUnder(this.#openedKey(), boxKeyWrapped, ctx, { extractable: false, usage: ['decrypt'] })
   }
 
-  /** Which vault it opens and until when: all JSON and a log line show of it, never its leaseKey, its wrap or the vaultKey. */
-  toJSON(): Omit<LeaseRecord, 'lease_key' | 'vault_key_lease_wrapped'> {
-    const { format, applabel, user_id, vaultlabel, vault_id, unlock_epoch, ask_passphrase_at } = this
-    return { format, applabel, user_id, vaultlabel, vault_id, unlock_epoch, ask_passphrase_at }
+  /** Which vault it opens and until when, each once, as a plain object: all JSON and a log line show of it, never its leaseKey, its wrap or the vaultKey. */
+  toJSON(): LeaseView {
+    const { ...visible } = this
+    return visible
   }
 
   /** The vaultKey this lease holds, while it is opened and has not ended: kind 'vault_locked' otherwise. */

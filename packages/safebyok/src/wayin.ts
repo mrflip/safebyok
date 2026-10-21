@@ -1,9 +1,8 @@
-import { cipherCtx, fromB64OrNull, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder, type Ciphered } from './crypto'
+import { cipherCtx, fromB64OrNull, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder } from './crypto'
 import { VaultError } from './errors'
 import { type Outcome, outcomeOf, unexpectedError } from './outcome'
 import { PasskeyProof, PassphraseProof, Proof } from './proof'
 import { PasskeySaltBytes, WayinRecord, type PasskeyWayinRecord, type PasskeyWayinSummary, type PassphraseWayinRecord, type PassphraseWayinSummary, type VaultIdentity, type WayinKind, type WayinSummary } from './types'
-import { decorate } from './adorn'
 import type { KeyDeriver } from './key-deriver'
 import type { Vault } from './vault'
 
@@ -78,7 +77,7 @@ const headerOf = (record: WayinRecord): WayinHeader => {
   return header
 }
 
-/** `record`, a frozen copy, its wrap frozen with it: what a way in hands back as its `props`. */
+/** `record`, a frozen copy, its wrap frozen with it: what a way in holds as its `record`. */
 export const frozenRecord = <RecordT extends WayinRecord>(record: RecordT): RecordT => {
   const frozen: RecordT = { ...record, vault_key_wayin_wrapped: Object.freeze({ ...record.vault_key_wayin_wrapped }) }
   return Object.freeze(frozen)
@@ -86,43 +85,47 @@ export const frozenRecord = <RecordT extends WayinRecord>(record: RecordT): Reco
 
 /**
  * One way into a vault: a passphrase's ({@link PassphraseWayin}) or a passkey's
- * ({@link PasskeyWayin}), told apart by `wayinkind`. Its stored fields are its own, read-only;
- * `props` is the stored record, frozen. It keeps its vault, and the identity of the vault props it
- * is one of (their `vault_id` and `registered_at`, which its wrap is bound to), in private fields
- * no loop, spread, log line or `JSON.stringify` sees. `summary` is what a locked vault may show of
- * it, and all that `toJSON()` gives, so a log line never carries its wrap, nor a passphrase's salt
- * (a passkey's prfSalt, which it is asked with, is in its summary). The vault makes each from the
- * vault props it reads, and shows their summaries, never the ways in themselves, as its
- * `passphrase` and `passkey`.
+ * ({@link PasskeyWayin}), told apart by `wayinkind`. Its stored record, `record`, frozen, is all
+ * it holds: its visible fields -- what a host decides with: its wayinkind, the device and time
+ * that sealed it, and a passkey's credential and salt, which a host asks the passkey with -- are
+ * fields of its own, read from the record. Its wrap, and a passphrase's salt and key deriver's
+ * label, stay in the record. It keeps the record, its vault, and the identity of the vault props
+ * it is one of (their `vault_id` and `registered_at`, which its wrap is bound to), in private
+ * fields no loop, spread, log line or `JSON.stringify` sees: `{ ...wayin }`, `toJSON()` and a log
+ * line show each visible field once, and nothing else -- what a locked vault may show of it. The
+ * vault makes each from the vault props it reads, and shows those, never the ways in themselves,
+ * as its `passphrase` and `passkey`.
  *
  * @example Wayin.make(vault, vaultProps, vaultProps.passphrase).wayinkind   // 'passphrase'
- * @example JSON.stringify(wayin) === JSON.stringify(wayin.summary)   // true: no wrap, and no passphrase's salt
+ * @example JSON.stringify(wayin)   // its visible fields alone: no wrap, and no passphrase's salt
  */
-export abstract class Wayin {
-  /** The stored record, frozen: what crosses a storage boundary. Not enumerable. */
-  declare readonly props: WayinRecord
+export abstract class Wayin<RecordT extends WayinRecord = WayinRecord> {
+  /** The stored record, frozen, its wrap with it: what crosses a storage boundary, and the one source of every field. */
+  readonly #record: RecordT
   /** The vault it lets into: its scope, its key deriver and its clock. */
   readonly #vault: WayinVault
   /** The identity of the vault props it is one of, frozen: their `vault_id` and `registered_at`, which its wrap is bound to. */
   readonly #identity: VaultIdentity
 
   /** `passphrase` or `passkey`: which kind of proof opens it. */
-  readonly wayinkind: WayinKind
+  readonly wayinkind:     RecordT['wayinkind']
   /** This vault's id for the device that sealed the way in. */
-  readonly device_id: string
+  readonly device_id:     string
   /** When the way in was sealed, in epoch milliseconds. */
   readonly registered_at: number
-  /** The vaultKey, wrapped under this way in's wayinKey, bound to its `wayinCtx`. */
-  readonly vault_key_wayin_wrapped: Ciphered
 
-  protected constructor(vault: WayinVault, identity: VaultIdentity, record: WayinRecord) {
-    decorate<Wayin>(this, { props: frozenRecord(record) })
+  protected constructor(vault: WayinVault, identity: VaultIdentity, record: RecordT) {
+    this.#record = frozenRecord(record)
     this.#vault = vault
     this.#identity = Object.freeze({ vault_id: identity.vault_id, registered_at: identity.registered_at })
     this.wayinkind = record.wayinkind
     this.device_id = record.device_id
     this.registered_at = record.registered_at
-    this.vault_key_wayin_wrapped = this.props.vault_key_wayin_wrapped
+  }
+
+  /** The stored record, frozen, its wrap with it: what the vault props hold of this way in. */
+  get record(): RecordT {
+    return this.#record
   }
 
   /**
@@ -149,12 +152,9 @@ export abstract class Wayin {
     return checked.data.wayinkind === 'passphrase' ? new PassphraseWayin(vault, identity, checked.data) : new PasskeyWayin(vault, identity, checked.data)
   }
 
-  /** What a locked vault may show of this way in: every field but its wrap and, for a passphrase, its salt. */
-  abstract get summary(): WayinSummary
-
   /** The context this way in's wrap is bound to: its vault's scope, the `vault_id` and `registered_at` of the vault props it is one of, its purpose, and its whole header. */
   get wayinCtx(): Uint8Array {
-    return wayinCtxOf(this.#vault, this.#identity, headerOf(this.props))
+    return wayinCtxOf(this.#vault, this.#identity, headerOf(this.#record))
   }
 
   /** The key deriver of its vault, which a passphrase's way in derives through. */
@@ -185,17 +185,15 @@ export abstract class Wayin {
    */
   abstract tryOpen(proof: Proof): Promise<Outcome<VaultKeyPair>>
 
-  /** Its {@link summary}: all JSON and a log line show of this way in, never its wrap nor a passphrase's salt. */
-  toJSON(): WayinSummary {
-    return this.summary
-  }
+  /** Its visible fields, each once, as a plain object: all JSON and a log line show of this way in, never its wrap nor a passphrase's salt. */
+  abstract toJSON(): WayinSummary
 
   /** Both lives of the vaultKey out of this way in's wrap under `wayinKey`, or null when it will not open. */
   protected async unwrapUnder(wayinKey: CryptoKey): Promise<VaultKeyPair | null> {
     const { wayinCtx } = this
     try {
-      const transientKey = await unwrapKeyUnder(wayinKey, this.vault_key_wayin_wrapped, wayinCtx, TransientUsage)
-      const sessionKey = await unwrapKeyUnder(wayinKey, this.vault_key_wayin_wrapped, wayinCtx, SessionUsage)
+      const transientKey = await unwrapKeyUnder(wayinKey, this.#record.vault_key_wayin_wrapped, wayinCtx, TransientUsage)
+      const sessionKey = await unwrapKeyUnder(wayinKey, this.#record.vault_key_wayin_wrapped, wayinCtx, SessionUsage)
       return { transientKey, sessionKey }
     } catch {
       return null
@@ -240,26 +238,17 @@ export abstract class Wayin {
  *
  * @example if (wayin.wayinkind === 'passphrase') { wayin.key_deriver_label }   // 'argon2id_web_v1'
  */
-export class PassphraseWayin extends Wayin {
-  declare readonly wayinkind: 'passphrase'
-  declare readonly props: PassphraseWayinRecord
-  /** Which key deriver made the passphraseKey: `argon2id_web_v1`, or a host's own label. */
-  readonly key_deriver_label: string
-  /** This way in's passphraseSalt: fresh for every passphrase the vault takes. */
-  readonly salt_b64: string
-
+export class PassphraseWayin extends Wayin<PassphraseWayinRecord> {
   /** The way in `record` stands for, taken as already checked: {@link Wayin.make} checks a record read from storage. */
   constructor(vault: WayinVault, identity: VaultIdentity, record: PassphraseWayinRecord) {
     super(vault, identity, record)
-    this.key_deriver_label = record.key_deriver_label
-    this.salt_b64 = record.salt_b64
     Object.freeze(this)
   }
 
-  /** Its kind, and the device and time that sealed it: never its salt, never its wrap. */
-  get summary(): PassphraseWayinSummary {
-    const { wayinkind, device_id, registered_at } = this
-    return { wayinkind, device_id, registered_at }
+  /** Its kind, and the device and time that sealed it, each once: never its salt, never its wrap. */
+  toJSON(): PassphraseWayinSummary {
+    const { ...visible } = this
+    return visible
   }
 
   /**
@@ -268,8 +257,8 @@ export class PassphraseWayin extends Wayin {
    * this vault's to judge.
    */
   isDamaged(): boolean {
-    const { keyDeriver } = this
-    return this.key_deriver_label === keyDeriver.key_deriver_label && fromB64OrNull(this.salt_b64)?.length !== keyDeriver.salt_bytes
+    const { keyDeriver, record } = this
+    return record.key_deriver_label === keyDeriver.key_deriver_label && fromB64OrNull(record.salt_b64)?.length !== keyDeriver.salt_bytes
   }
 
   /**
@@ -287,10 +276,10 @@ export class PassphraseWayin extends Wayin {
       if (! (proof instanceof PassphraseProof)) {
         throw new VaultError('bad_option', "A passkey's answer opens no passphrase's way in: hand it the passphrase the user typed.")
       }
-      if (this.key_deriver_label !== this.keyDeriver.key_deriver_label) { throw unknownKeyDeriver() }
+      if (this.record.key_deriver_label !== this.keyDeriver.key_deriver_label) { throw unknownKeyDeriver() }
       if (this.isDamaged()) { throw damagedPassphrase() }
       if (proof.isBlank) { throw new VaultError('wrong_passphrase', "A passphrase can't be empty or only spaces: type the vault's passphrase.") }
-      const opened = await this.unwrapUnder(await proof.wayinKeyFor(this))
+      const opened = await this.unwrapUnder(await proof.wayinKeyFor(this.record))
       if (opened === null) { throw wrongPassphrase() }
       return opened
     }, unexpectedError)
@@ -303,11 +292,9 @@ export class PassphraseWayin extends Wayin {
  * PRF over this way in's own salt. The authenticator holds the secret; the way in holds only which
  * credential to ask and what to ask it.
  *
- * @example if (wayin.wayinkind === 'passkey') { await askPasskey(wayin.summary) }
+ * @example if (wayin.wayinkind === 'passkey') { await askPasskey(wayin.toJSON()) }
  */
-export class PasskeyWayin extends Wayin {
-  declare readonly wayinkind: 'passkey'
-  declare readonly props: PasskeyWayinRecord
+export class PasskeyWayin extends Wayin<PasskeyWayinRecord> {
   /** The WebAuthn credential's id, base64url, as `PublicKeyCredential.id` gives it: which passkey to ask. */
   readonly credential_id: string
   /** The salt the passkey's PRF is evaluated over: {@link PasskeySaltBytes} random bytes, fresh for every way in. */
@@ -321,10 +308,10 @@ export class PasskeyWayin extends Wayin {
     Object.freeze(this)
   }
 
-  /** Its kind, the device and time that added it, and the credential and salt a host asks its authenticator with: never its wrap. */
-  get summary(): PasskeyWayinSummary {
-    const { wayinkind, device_id, registered_at, credential_id, prf_salt_b64 } = this
-    return { wayinkind, device_id, registered_at, credential_id, prf_salt_b64 }
+  /** Its kind, the device and time that added it, and the credential and salt a host asks its authenticator with, each once: never its wrap. */
+  toJSON(): PasskeyWayinSummary {
+    const { ...visible } = this
+    return visible
   }
 
   /** True with a salt that is not base64url of {@link PasskeySaltBytes} bytes. */

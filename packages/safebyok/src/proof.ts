@@ -4,10 +4,10 @@ import { VaultError } from './errors'
 import type { KeyDeriver } from './key-deriver'
 import { hostThrewRefusal } from './outcome'
 import { PassphraseKeyBytes } from './key-deriver-spec'
-import { PasskeySaltBytes, type PasskeyAnswer, type WayinKind } from './types'
+import { PasskeySaltBytes, type PasskeyAnswer, type PassphraseWayinRecord, type WayinKind } from './types'
 import { decorate } from './adorn'
 import type { Vault } from './vault'
-import type { PasskeyWayin, PassphraseWayin } from './wayin'
+import type { PasskeyWayin } from './wayin'
 
 /**
  * Proofs: what the user hands in to show a way in is theirs, checked once at the vault's door. A
@@ -71,7 +71,7 @@ export abstract class Proof {
  * over that way in's own salt. The passphrase is the one secret field, and is not enumerable.
  *
  * @example const proof = PassphraseProof.parse(vault, typed)
- * @example await proof.wayinKeyFor(wayin)   // the passphraseKey, non-extractable
+ * @example await proof.wayinKeyFor(wayin.record)   // the passphraseKey, non-extractable
  */
 export class PassphraseProof extends Proof {
   /** Always `passphrase`. */
@@ -128,11 +128,11 @@ export class PassphraseProof extends Proof {
    * or 32 zero bytes. What a key deriver throws is refused as {@link hostThrewRefusal} says: a
    * condition as itself, anything else as 'unexpected_error', the throw its cause.
    *
-   * @param wayin - The way in to make the key for: its `salt_b64` is all that is read.
+   * @param wayin - The record of the way in to make the key for: its `salt_b64` is all that is read.
    *
-   * @example await proof.wayinKeyFor(wayin)   // a CryptoKey that wraps and unwraps, and cannot be exported
+   * @example await proof.wayinKeyFor(wayin.record)   // a CryptoKey that wraps and unwraps, and cannot be exported
    */
-  async wayinKeyFor(wayin: Pick<PassphraseWayin, 'salt_b64'>): Promise<CryptoKey> {
+  async wayinKeyFor(wayin: Pick<PassphraseWayinRecord, 'salt_b64'>): Promise<CryptoKey> {
     return await passphraseKeyOf(this.vault.keyDeriver, this.passphrase, fromB64(wayin.salt_b64))
   }
 }

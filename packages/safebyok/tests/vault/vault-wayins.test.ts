@@ -852,9 +852,9 @@ describe("the vault's ways in, as models (Contract: Vault, Wayin)", () => {
     const passkey = Wayin.make(vault, stored, stored.passkey ?? TH.passkeyWayinOf('none'))
     expect([passphrase.constructor, passkey.constructor]).to.deep.equal([PassphraseWayin, PasskeyWayin])
     const wayins: (PassphraseWayin | PasskeyWayin)[] = [passphrase, passkey]
-    const told = wayins.map((wayin) => (wayin.wayinkind === 'passphrase' ? wayin.key_deriver_label : wayin.summary.credential_id))
+    const told = wayins.map((wayin) => (wayin instanceof PassphraseWayin ? wayin.record.key_deriver_label : wayin.credential_id))
     expect(told).to.deep.equal([TH.testDeriver.key_deriver_label, laptop.credentialId])
-    expect([passphrase.summary, passkey.summary]).to.deep.equal([vault.passphrase, vault.passkey])
+    expect([TH.shownOf(passphrase), TH.shownOf(passkey)]).to.deep.equal([vault.passphrase, vault.passkey])
   })
 
   it("keeps the same summaries until the vault props change", async () => {

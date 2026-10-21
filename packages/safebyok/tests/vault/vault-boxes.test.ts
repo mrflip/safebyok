@@ -1041,7 +1041,7 @@ describe("vault.getBox", () => {
     expect(box).to.be.instanceOf(Box)
     expect(box.boxlabel).to.eq('anthropic')
     expect(box.sidecar).to.deep.equal({ note: 'work account' })
-    expect(box.props).to.deep.equal(await storedBoxOf(world))
+    expect(box.record).to.deep.equal(await storedBoxOf(world))
     expect(await vault.decryptWhisper(box)).to.eq('sk-fake')
   })
 
@@ -1079,7 +1079,7 @@ describe("vault.getBox", () => {
     const vault = await world.openUnlocked('pw')
     await vault.putBox('anthropic', 'sk-fake', { sidecar: { note: 'work account' } })
     const box = await vault.getBox('anthropic')
-    const planted = { ...box.props, sidecar_json: '{"note":"planted"}' }
+    const planted = { ...box.record, sidecar_json: '{"note":"planted"}' }
     await TH.expectRefusal(vault.decryptWhisper(planted), 'damaged_box')
   })
 })
