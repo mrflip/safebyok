@@ -1,6 +1,6 @@
 import * as Z from 'zod/mini'
 import { BoxRecord } from './box'
-import { Capacity, VaultProps, VaultScope, type DamagedBox, type ListedSummary, type Sidecar } from './types'
+import { Capacity, VaultProps, VaultScope, type DamagedBox, type ListedSummary } from './types'
 import { VaultError, isVaultError, type RefusalMeta } from './errors'
 import * as Names from './names'
 import { AnyTextValidators, NameFloor } from './validators'
@@ -770,13 +770,10 @@ const damagedOf = (boxlabel: string, box: unknown): DamagedBox => (
 /** The one field of a damaged box the listing keeps, when the record holds it as text: what a write over it names. */
 const StoredRevision = Z.object({ revision_tok: BoxRecord.shape.revision_tok })
 
-/**
- * A listed box's summary: its visible fields, and its sidecar as the JSON value its record holds
- * (`sidecar_json` is JSON text, as the record's check has found).
- */
+/** A listed box's summary: its visible fields, its sidecar the JSON value the record's check handed back. */
 const summaryOf = (listed: Z.infer<typeof ListedBox>): ListedSummary => {
-  const { boxlabel, revision_tok, sidecar_json, registered_at, written_at } = listed
-  return { boxlabel, revision_tok, sidecar: JSON.parse(sidecar_json) as Sidecar, registered_at, written_at, damaged: false }
+  const { boxlabel, revision_tok, sidecar, registered_at, written_at } = listed
+  return { boxlabel, revision_tok, sidecar, registered_at, written_at, damaged: false }
 }
 
 /** Two names in one order on every device: character by character, by UTF-16 code unit, never by a locale. */

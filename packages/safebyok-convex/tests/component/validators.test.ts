@@ -25,6 +25,7 @@ type Shape =
   | { kind: 'object', fields: Record<string, { optional: boolean, shape: Shape }> }
   | { kind: 'array', element: Shape }
   | { kind: 'nullable', inner: Shape }
+  | { kind: 'any' }
 
 /** Zod's half: read from its public `def`, refinements (min, regex, int) set aside. */
 type ZodLike = { def: { type: string, values?: unknown[], innerType?: ZodLike, shape?: Record<string, ZodLike>, element?: ZodLike } }
@@ -42,6 +43,8 @@ const zodShape = (schema: ZodLike): Shape => {
   }
   if (def.type === 'array' && def.element) { return { kind: 'array', element: zodShape(def.element) } }
   if (def.type === 'nullable' && def.innerType) { return { kind: 'nullable', inner: zodShape(def.innerType) } }
+  // A box's sidecar: any JSON value, checked through a pipe the core alone runs.
+  if (def.type === 'pipe') { return { kind: 'any' } }
   throw new Error(`no shape for a Zod ${def.type}`)
 }
 
@@ -63,6 +66,7 @@ const convexShape = (validator: GenericValidator): Shape => {
     return { kind: 'literal', values: literals.flatMap((shape) => shape.values).toSorted((one, two) => one.localeCompare(two)) }
   }
   case 'array': { return { kind: 'array', element: convexShape(validator.element) } }
+  case 'any':   { return { kind: 'any' } }
   case 'object': {
     const fields = Object.entries(validator.fields).map(([ckey, field]) => (
       [ckey, { optional: field.isOptional === 'optional', shape: convexShape(field) }] as const
@@ -79,7 +83,7 @@ const ShapeCases = [
   [Records.Ciphered,     Ciphered,   'Ciphered: the shared encrypted-value shape'],
   [Records.VaultScope,   VaultScope, 'VaultScope: what names one vault'],
   [Records.VaultProps,   VaultProps,   'VaultProps: every field, the passphrase and the nullable passkey with their ciphered wraps nested'],
-  [Records.BoxRecord,    BoxRecord,  'BoxRecord: every field, the sidecar as JSON text, both ciphered fields nested'],
+  [Records.BoxRecord,    BoxRecord,  'BoxRecord: every field, the sidecar as any JSON value, both ciphered fields nested'],
   [listedZod,            ListedBox,  'a listed box: the record without its ciphered fields, format kept'],
 ] as const
 
@@ -93,10 +97,11 @@ describe("the Convex validators, field for field with the core's Zod records", (
   it("type the same records, expectations and summaries as the core", () => {
     expectTypeOf<Infer<typeof VaultProps>>().toEqualTypeOf<Records.VaultProps>()
     expectTypeOf<Infer<typeof VaultScope>>().toEqualTypeOf<Records.VaultScope>()
-    expectTypeOf<Infer<typeof BoxRecord>>().toEqualTypeOf<Records.BoxRecord>()
-    // A listing is the stored record less its ciphered fields; the core's summary of it parses
-    // the sidecar's JSON, so it is the stored record's shape a listing must meet.
-    expectTypeOf<Infer<typeof ListedBox>>().toEqualTypeOf<Omit<Records.BoxRecord, 'box_key_wrapped' | 'whisper_ciphered'>>()
+    // A box's sidecar is any value to Convex, which the core holds to a JSON value on every read.
+    expectTypeOf<Omit<Infer<typeof BoxRecord>, 'sidecar'>>().toEqualTypeOf<Omit<Records.BoxRecord, 'sidecar'>>()
+    // A listing is the stored record less its ciphered fields, so it is the stored record's shape
+    // a listing must meet.
+    expectTypeOf<Omit<Infer<typeof ListedBox>, 'sidecar'>>().toEqualTypeOf<Omit<Records.BoxRecord, 'box_key_wrapped' | 'whisper_ciphered' | 'sidecar'>>()
     expectTypeOf<Infer<typeof VaultPropsExpectation>>().toEqualTypeOf<CoreVaultPropsExpectation>()
     expectTypeOf<Infer<typeof BoxExpectation>>().toEqualTypeOf<CoreBoxExpectation>()
     expectTypeOf<Infer<typeof VaultDelExpectation>>().toEqualTypeOf<CoreVaultDelExpectation>()
@@ -125,7 +130,7 @@ const convexAccepts = async (call: Promise<unknown>): Promise<boolean> => {
 }
 
 const { vault_id: _vaultId, ...vaultPropsWithoutVaultId } = TH.vaultPropsOf('u1')
-const { sidecar_json: _sidecarJson, ...boxWithoutSidecar } = TH.boxOf('anthropic_api_key', 'a1')
+const { sidecar: _sidecar, ...boxWithoutSidecar } = TH.boxOf('anthropic_api_key', 'a1')
 const { registered_at: _vaultPropsTime, ...vaultPropsWithoutTime } = TH.vaultPropsOf('u1')
 const { passphrase: _passphrase, passkey: _passkey, ...vaultPropsWithoutWayins } = TH.vaultPropsOf('u1')
 const { passkey: _noPasskey, ...vaultPropsWithoutPasskey } = TH.vaultPropsOf('u1')
@@ -175,11 +180,12 @@ const VaultPropsCases = [
 const BoxCases = [
   // both accept:
   [TH.boxOf('anthropic_api_key', 'a1'),                                      true,   true,   'a whole box'],
-  [{ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar_json: '{}' },          true,   true,   'a box with an empty sidecar'],
+  [{ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: {} },                 true,   true,   'a box with an empty sidecar'],
+  [{ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: null },               true,   true,   'a box with a sidecar of JSON null'],
+  [{ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: ['a', 1, { beta: true }] }, true, true, 'a box with a sidecar of any JSON'],
   [{ ...TH.boxOf('مفتاح العمل', 'a1') },                                    true,   true,   'a boxlabel of any text'],
   // both refuse:
   [boxWithoutSidecar,                                                        false,  false,  'a box with no sidecar: one is always written'],
-  [{ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar_json: { note: 'x' } },  false,  false,  'a sidecar stored as an object, not its JSON'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), whisper_codec: 'json_v2' },     false,  false,  'a whisper codec neither knows'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), whisper_schema_version: 2 },    false,  false,  'a whisper schema version neither knows'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), format: 'safebyok-box-v2' },    false,  false,  'a box from before the sidecar'],
@@ -189,7 +195,7 @@ const BoxCases = [
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), written_at: '1792022400000' },  false,  false,  'a written_at written as text'],
   [{ ...boxWithoutTimes, created_at: OldIso, updated_at: OldIso },           false,  false,  'a box from before its times were named registered_at and changed_at'],
   // Zod refuses, Convex accepts:
-  [{ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar_json: '{"note":' },     false,  true,   'a sidecar that is not JSON'],
+  [{ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: { note: undefined } }, false, true,   'a sidecar holding what JSON cannot carry'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), revision_tok: '' },             false,  true,   'an empty revision_tok'],
   [{ ...TH.boxOf('anthropic_api_key', 'a1'), written_at: Infinity },         false,  true,   'a written_at that never comes'],
 ] as const

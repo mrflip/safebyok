@@ -28,8 +28,8 @@ what is missing, and never changes the columns or keys of a table already there.
 is no migration: a release that changes the tables says so in its changelog, and you drop them
 and run it again.
 
-**Upgrading from a release whose `safebyok_vaults` has a `wayins` column**: its vault props now
-hold their two ways in as the columns `passphrase` and `passkey` (null when the vault has none).
+**Upgrading from a release whose tables have a `vault_key_epoch` or `sidecar_json` column**: the
+vault props and boxes hold neither now, and a box's sidecar is the column `sidecar`, a `jsonb`.
 No vault stored before is read (each reads as damaged, its boxes with it), so drop both tables --
 the boxes too, or the new vaults table would stand without their foreign key -- and run
 `VaultTablesSql` again; each user then makes their vault anew.
@@ -354,21 +354,26 @@ subscriber: at worst, a refresh that finds nothing new.
 Two tables, each record **a column to a field**, exactly as safebyok wrote it: text as text, a
 time or a count as a `bigint`, and each structured value as one opaque `jsonb` -- an encrypted
 value (a cipherIv and its ciphertext, `{ cipher_iv_b64, ciphertext_b64 }`), or one of the vault
-props' two ways in, `passphrase` and `passkey` (a SQL null when the vault has no passkey). A box's sidecar is `text`, never `jsonb`, which
-would rewrite it. Nothing is normalized: a sidecar or a user id reads back byte for byte, as it
-must, since every field a record holds is bound into its encryption (all but the vault props'
-`unlock_epoch`, and, for each way in, the other one beside it).
+props' two ways in, `passphrase` and `passkey` (a SQL null when the vault has no passkey). A box's
+sidecar is a `jsonb` too, which your server can query (a SQL null for a sidecar of JSON null).
+`jsonb` may reorder an object's keys and drop its spacing, which changes nothing: safebyok binds
+each structured value into its encryption by its fields, a sidecar as its JSON with keys sorted.
+Nothing else is normalized: a user id or a string inside a sidecar reads back byte for byte, as
+it must, since every field a record holds is bound into its encryption (all but the vault props'
+`unlock_epoch`, and, for each way in, the other one beside it). A sidecar Postgres's `jsonb`
+cannot hold -- a string holding `\u0000`, say -- is refused by Postgres, and the write fails with
+its error as the cause, nothing written.
 
 | Table             | One row per | Primary key                                     | Columns                                                                                |
 | ----------------- | ----------- | ----------------------------------------------- | -------------------------------------------------------------------------------------- |
 | `safebyok_vaults` | vault       | `applabel`, `user_id`, `vaultlabel`             | every field of the `VaultProps`                                                        |
-| `safebyok_boxes`  | box         | `applabel`, `user_id`, `vaultlabel`, `boxlabel` | the vault's scope and `vault_id`, then every field of the `BoxRecord`; its sidecar as `text` |
+| `safebyok_boxes`  | box         | `applabel`, `user_id`, `vaultlabel`, `boxlabel` | the vault's scope and `vault_id`, then every field of the `BoxRecord`; its sidecar as `jsonb` |
 
 * **Encrypted**: each whisper (`whisper_ciphered`), each box's boxKey
   (`box_key_wrapped`), and the vaultKey, once under each way into the vault (the
   `vault_key_wayin_wrapped` inside the vault props' `passphrase`, and inside their `passkey` when
   they have one).
-* **In the open**: the scope, each `boxlabel` and sidecar (`sidecar_json`), each whisper's codec
+* **In the open**: the scope, each `boxlabel` and `sidecar`, each whisper's codec
   and schema version, the `vault_id`, `unlock_epoch`, `revision_tok`s, each way in's `wayinkind`, `device_id` and `registered_at`, the passphrase's
   salt and key deriver's label, whether the vault has a passkey, and its `credential_id` and
   `prf_salt_b64`, when

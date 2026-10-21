@@ -6,6 +6,7 @@ import { Lease } from '../src/lease'
 import { localVaultDB } from '../src/local-vault-db'
 import { valOf } from '../src/outcome'
 import { memoryStore } from '../src/string-store'
+import { stableJsonify } from '../src/stable-jsonify'
 import { BoxSummary, FarFuture, type Whisper } from '../src/types'
 import * as TH from './test-helpers'
 
@@ -14,28 +15,27 @@ const OldIso = '2026-10-14T00:00:00.000Z'
 const wholeBox = TH.boxOf('anthropic_api_key', 'a1')
 const { registered_at: _boxRegistered, written_at: _boxWritten, ...boxWithoutTimes } = wholeBox
 const boxV3 = { ...boxWithoutTimes, format: 'safebyok-box-v3', registered_at: Date.UTC(2026, 9, 14), changed_at: Date.UTC(2026, 9, 14) }
-const { sidecar_json: _sidecarJson, ...sidecarless } = wholeBox
+const { sidecar: _sidecar, ...sidecarless } = wholeBox
 const boxV4 = { ...sidecarless, format: 'safebyok-box-v4', public_json: '{}' }
 const BoxCases = [
   // regular usage:
   [wholeBox,                                               true,   'a whole box, with its sidecar'],
-  [{ ...wholeBox, sidecar_json: '{}' },                    true,   'a box with an empty sidecar'],
-  [{ ...wholeBox, sidecar_json: '"just text"' },           true,   'a sidecar of any JSON, not only an object'],
-  [{ ...wholeBox, sidecar_json: '{"a":2,"b":[null,1.5]}' }, true,  'a sidecar as the vault writes it: keys sorted, no spacing'],
+  [{ ...wholeBox, sidecar: {} },                           true,   'a box with an empty sidecar'],
+  [{ ...wholeBox, sidecar: 'just text' },                  true,   'a sidecar of any JSON, not only an object'],
+  [{ ...wholeBox, sidecar: null },                         true,   'a sidecar of JSON null'],
+  [{ ...wholeBox, sidecar: { beta: [null, 1.5], alpha: 2 } }, true, 'a sidecar with its keys in any order, as a jsonb column may hand it back'],
   [{ ...wholeBox, boxlabel: 'Ключ API: מפתח' },           true,   'a boxlabel of any text'],
   // refused, as a damaged or foreign record:
   [sidecarless,                                            false,  'a box with no sidecar: one is always written'],
-  [{ ...wholeBox, sidecar_json: '{"note":' },              false,  'a sidecar that is not JSON'],
-  [{ ...wholeBox, sidecar_json: '{"b":1, "a":2}' },        false,  'a sidecar respaced and reordered: not the text the vault writes'],
-  [{ ...wholeBox, sidecar_json: '{"b":1,"a":2}' },         false,  'a sidecar with its keys out of order'],
-  [{ ...wholeBox, sidecar_json: '1.0' },                   false,  'a number written otherwise than JSON writes it'],
-  [{ ...wholeBox, sidecar_json: `${'['.repeat(200_000)}${']'.repeat(200_000)}` }, false, 'a sidecar nested too deep to serialize again, refused calmly'],
-  [{ ...wholeBox, sidecar_json: { note: 'work' } },        false,  'a sidecar stored as an object rather than its JSON'],
+  [{ ...wholeBox, sidecar: { when: new Date() } },         false,  'a sidecar holding what JSON cannot carry'],
+  [{ ...wholeBox, sidecar: undefined },                    false,  'a sidecar left undefined'],
+  [{ ...wholeBox, sidecar: JSON.parse(`${'['.repeat(200_000)}${']'.repeat(200_000)}`) as unknown }, false, 'a sidecar nested too deep to check, refused calmly'],
+  [{ ...sidecarless, format: 'safebyok-box-v7', sidecar_json: '{}' }, false, 'a box from before the sidecar was a JSON value, holding sidecar_json'],
   [{ ...wholeBox, note: 'work account' },                  true,   'an unknown field such as the old note is dropped, never kept'],
   [{ ...wholeBox, whisper_codec: 'json_v2' },              false,  'a whisper codec this version does not know'],
   [{ ...wholeBox, whisper_schema_version: 2 },             false,  'a whisper schema version this version does not know'],
   [TH.omitting(wholeBox, 'whisper_codec'),                 false,  'a box missing its whisper codec'],
-  [{ ...wholeBox, format: 'safebyok-box-v8' },             false,  'a format this version does not know'],
+  [{ ...wholeBox, format: 'safebyok-box-v9' },             false,  'a format this version does not know'],
   [{ ...wholeBox, format: 'safebyok-box-v6', vault_key_epoch: 1 }, false, 'a box from before the vaultKey epoch went'],
   [{ ...wholeBox, format: 'safebyok-box-v2' },             false,  'a box from before the sidecar'],
   [boxV3,                                                  false,  'a box from before written_at, holding changed_at'],
@@ -107,11 +107,11 @@ const sealedOf = async (whisper: Whisper = Secret, opts?: Parameters<typeof Box.
 /**
  * A box record holding `plainBytes` as its whisper, ciphered and wrapped by hand under the ctx a
  * box's ctx is documented to be: the format, the vault's scope, the vault props' id, the
- * purpose, and every visible field.
+ * purpose, and every visible field, the sidecar as its JSON with keys sorted.
  */
 const handSealedOf = async (vault: TH.VaultSlice, vaultKey: CryptoKey, plainBytes: Uint8Array): Promise<BoxRecord> => {
   const { format, box_key_wrapped: _wrapped, whisper_ciphered: _ciphered, ...header } = TH.boxOf('anthropic_api_key', 'hand')
-  const ctxFor = (purpose: string) => cipherCtx(format, vault.applabel, vault.user_id, vault.vaultlabel, vault.vault_id ?? '', purpose, header)
+  const ctxFor = (purpose: string) => cipherCtx(format, vault.applabel, vault.user_id, vault.vaultlabel, vault.vault_id ?? '', purpose, { ...header, sidecar: stableJsonify(header.sidecar)! })
   const boxKey = await makeBoxKey()
   return {
     format,
@@ -125,7 +125,7 @@ afterEach(() => { vi.restoreAllMocks() })
 
 describe("Box.make", () => {
   it("makes a box whose visible fields are its own, read from the record, the sidecar parsed, and the vault props' id beside them, as the class's example shows (Contract: Box)", () => {
-    const record = TH.boxOf('anthropic_api_key', 'a1', { sidecar_json: TH.sidecarJsonOf({ note: 'work account' }) })
+    const record = TH.boxOf('anthropic_api_key', 'a1', { sidecar: { note: 'work account' } })
     const box = Box.make(vaultOf(), record)
     expect(TH.shownOf(box)).to.deep.equal({
       boxlabel:      'anthropic_api_key',
@@ -169,7 +169,7 @@ describe("Box.make", () => {
   })
 
   it("freezes the box and its sidecar through: nothing a host is handed can be changed", () => {
-    const box = Box.make(vaultOf(), TH.boxOf('anthropic_api_key', 'a1', { sidecar_json: TH.sidecarJsonOf({ team: { members: ['ana'] } }) }))
+    const box = Box.make(vaultOf(), TH.boxOf('anthropic_api_key', 'a1', { sidecar: { team: { members: ['ana'] } } }))
     expect(Object.isFrozen(box)).to.be.true
     expect(Reflect.set(box, 'boxlabel', 'other')).to.be.false
     expect(Reflect.set(box, 'vault_id', 'other')).to.be.false
@@ -219,7 +219,7 @@ describe("Box.seal", () => {
   it("seals a whisper that opens under the lease it was sealed with, the sidecar given, as its first example shows (Contract: Box)", async () => {
     const { lease, box } = await sealedOf(Secret, { sidecar: { note: 'work account' } })
     expect(box.sidecar).to.deep.equal({ note: 'work account' })
-    expect(box.record.sidecar_json).to.eq('{"note":"work account"}')
+    expect(box.record.sidecar).to.deep.equal({ note: 'work account' })
     expect(await box.open(lease)).to.eq(Secret)
   })
 
@@ -283,7 +283,7 @@ describe("Box.seal", () => {
 
   it("carries nothing forward from a box it replaces that will not open: nothing vouches for its fields", async () => {
     const { vault, lease, box } = await sealedOf(Secret, { sidecar: { note: 'work account' } })
-    const planted = Box.make(vault, { ...box.record, sidecar_json: '{"note":"planted"}', registered_at: T0 - 1000 })
+    const planted = Box.make(vault, { ...box.record, sidecar: { note: 'planted' }, registered_at: T0 - 1000 })
     const next = await Box.seal(vaultOf({}, T0 + 1000), lease, 'anthropic_api_key', Secret, { over: planted })
     expect(next.sidecar).to.deep.equal({})
     expect(next.registered_at).to.eq(T0 + 1000)
@@ -354,7 +354,8 @@ describe("box.tryOpen", () => {
   const Alterations = [
     [{ boxlabel: 'openai_api_key' },                 'moved to another boxlabel'],
     [{ revision_tok: 'rev-replayed' },               'its revision altered'],
-    [{ sidecar_json: '{"note":"planted"}' },         'its sidecar altered'],
+    [{ sidecar: { note: 'planted' } },               'its sidecar altered'],
+    [{ sidecar: { note: 'a test box', tier: 1 } },    'its sidecar added to'],
     [{ registered_at: T0 - 1 },                      'its registered_at altered'],
     [{ written_at: T0 + 1 },                         'its written_at altered'],
   ] as const
@@ -365,6 +366,12 @@ describe("box.tryOpen", () => {
       await TH.expectBad(Box.make(vault, { ...box.record, ...altered }).tryOpen(lease), 'damaged_box')
     })
   }
+
+  it("opens a box whose sidecar storage handed back with its keys reordered, as a jsonb column may: the ctx binds its JSON with keys sorted", async () => {
+    const { vault, lease, box } = await sealedOf(Secret, { sidecar: { alpha: 1, beta: { delta: 2, gamma: 3 } } })
+    const reordered = { beta: { gamma: 3, delta: 2 }, alpha: 1 }
+    expect(await Box.make(vault, { ...box.record, sidecar: reordered }).open(lease)).to.eq(Secret)
+  })
 
   const Elsewheres = [
     [{ applabel: 'other_app' },          'another app'],

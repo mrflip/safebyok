@@ -87,12 +87,12 @@ describe("VaultTablesSql", () => {
     ])
   })
 
-  it("holds every column NOT NULL but the vault props' passkey, and defaults none", async () => {
+  it("holds every column NOT NULL but the vault props' passkey and a box's sidecar, each a SQL null for a JSON null, and defaults none", async () => {
     const db = await tablesOnlyDatabase()
     const { rows } = await db.query(
       "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name IN ('safebyok_vaults', 'safebyok_boxes') AND (is_nullable = 'YES' OR column_default IS NOT NULL)",
     )
-    expect(rows).to.deep.equal([{ table_name: 'safebyok_vaults', column_name: 'passkey' }])
+    expect(rows).to.have.deep.members([{ table_name: 'safebyok_vaults', column_name: 'passkey' }, { table_name: 'safebyok_boxes', column_name: 'sidecar' }])
   })
 
   it("never changes the columns of a table already there, so a table of another release's shape stays as it was until the host drops it", async () => {

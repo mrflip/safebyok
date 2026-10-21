@@ -16,6 +16,12 @@ it is, never looked inside.
 """
 scalar SafebyokWayin
 
+"""
+A box's sidecar: the app's own JSON value, carried as it is, never looked inside. A sidecar of
+JSON null crosses as null.
+"""
+scalar SafebyokSidecar
+
 """An encrypted value: its cipherIv and its ciphertext, each base64url text."""
 type SafebyokCiphered {
   cipher_iv_b64:  String!
@@ -73,8 +79,8 @@ input SafebyokVaultPropsInput {
 
 """
 One box, as stored: its whisper encrypted under its boxKey, that boxKey wrapped under
-the vaultKey, and its visible fields. Times are epoch milliseconds; the sidecar is the JSON text
-it was written as, which is bound into the box's encryption.
+the vaultKey, and its visible fields. Times are epoch milliseconds; the sidecar is the app's own
+JSON value, bound into the box's encryption.
 """
 type SafebyokBox {
   format:                 String!
@@ -84,12 +90,12 @@ type SafebyokBox {
   whisper_ciphered:       SafebyokCiphered!
   whisper_codec:          String!
   whisper_schema_version: Int!
-  sidecar_json:           String!
+  sidecar:                SafebyokSidecar
   registered_at:          Float!
   written_at:             Float!
 }
 
-"""One box, as stored. Times are epoch milliseconds; the sidecar is its JSON text."""
+"""One box, as stored. Times are epoch milliseconds; the sidecar is the app's own JSON value."""
 input SafebyokBoxInput {
   format:                 String!
   boxlabel:               String!
@@ -98,7 +104,7 @@ input SafebyokBoxInput {
   whisper_ciphered:       SafebyokCipheredInput!
   whisper_codec:          String!
   whisper_schema_version: Int!
-  sidecar_json:           String!
+  sidecar:                SafebyokSidecar
   registered_at:          Float!
   written_at:             Float!
 }
@@ -110,7 +116,7 @@ type SafebyokListedBox {
   revision_tok:           String!
   whisper_codec:          String!
   whisper_schema_version: Int!
-  sidecar_json:           String!
+  sidecar:                SafebyokSidecar
   registered_at:          Float!
   written_at:             Float!
 }

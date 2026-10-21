@@ -272,13 +272,14 @@ const ListedRecordCases = [
   // damaged, listed so they can be deleted:
   ["anthropic",  TH.boxOf('other_box', 'one'),                               [["anthropic", true]],   'a record naming another boxlabel as damaged, under the one it is stored under'],
   ["anthropic",  { ...TH.boxOf('anthropic', 'one'), written_at: 'later' },   [["anthropic", true]],   'a record with a malformed time as damaged'],
-  ["anthropic",  { ...TH.boxOf('anthropic', 'one'), sidecar_json: '{"a":' }, [["anthropic", true]], 'a record whose sidecar is not JSON as damaged'],
-  ["anthropic",  TH.omitting(TH.boxOf('anthropic', 'one'), 'sidecar_json'),  [["anthropic", true]],   'a record with no sidecar as damaged'],
+  ["anthropic",  { ...TH.boxOf('anthropic', 'one'), sidecar: { when: new Date() } }, [["anthropic", true]], 'a record whose sidecar is not JSON as damaged'],
+  ["anthropic",  TH.omitting(TH.boxOf('anthropic', 'one'), 'sidecar'),  [["anthropic", true]],   'a record with no sidecar as damaged'],
+  ["anthropic",  { ...TH.boxOf('anthropic', 'one'), sidecar: JSON.parse(`${'['.repeat(200_000)}${']'.repeat(200_000)}`) as unknown }, [["anthropic", true]], 'a record whose sidecar is nested too deep to check as damaged, calmly'],
   ["anthropic",  null,                                                       [["anthropic", true]],   'a null record as damaged'],
   ["anthropic",  'not a box',                                                [["anthropic", true]],   'a record that is not an object as damaged'],
   // stored under a name a vault's validators would refuse at its entry, or with a sidecar no host meant: stored under other checks, and sound
   ["Anthropic",  TH.boxOf('Anthropic', 'one'),                               [["Anthropic", false]],  'a record stored under a boxlabel the default check refuses as sound: a check is an alarm at entry, not a promise about storage'],
-  ["anthropic",  { ...TH.boxOf('anthropic', 'one'), sidecar_json: String.raw`"beep\u0007"` }, [["anthropic", false]], 'a record whose sidecar holds a control character as sound: the sidecar is never interpreted'],
+  ["anthropic",  { ...TH.boxOf('anthropic', 'one'), sidecar: 'beep\u{7}' }, [["anthropic", false]], 'a record whose sidecar holds a control character as sound: the sidecar is never interpreted'],
   // stored under a name below the floor, which no verb could reach: not listed at all
   ["tab\there",  TH.boxOf('tab\there', 'one'),                               [],                      'nothing for a record stored under a boxlabel below the floor, which no verb could name'],
 ] as const
@@ -295,12 +296,11 @@ describe("the abstract VaultDB, around an adapter's half", () => {
 
   it("lists a box's sidecar as the JSON value its record holds, and nothing of its codec", async () => {
     const vaultDB = new MapVaultDB()
-    vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), TH.boxOf('anthropic', 'one', { sidecar_json: '{"note":"work","tags":["a",null]}' }))
+    vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), TH.boxOf('anthropic', 'one', { sidecar: { tags: ['a', null], note: 'work' } }))
     const [listed] = await TH.expectingGood(vaultDB).listBoxes(TH.scopeOf('u1'))
     const summary = TH.summaryOf(listed)
     expect(summary?.sidecar).to.deep.equal({ note: 'work', tags: ['a', null] })
     expect(summary).to.not.have.property('whisper_codec')
-    expect(summary).to.not.have.property('sidecar_json')
   })
 
   for (const [boxlabel, record, expected, blurb] of ListedRecordCases) {
@@ -404,7 +404,7 @@ const RefusedWrites = [
   ['bad_record', (vaultDB: VaultDB) => vaultDB.ensureVaultProps({ ...TH.vaultPropsOf('u1'), passphrase: omit(TH.wayinOf('passphrase'), ['vault_key_wayin_wrapped']) } as VaultProps), 'vault props whose passphrase is missing its wrapped vaultKey'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.ensureVaultProps({ ...TH.vaultPropsOf('u1'), applabel: 'Ac\u{7}me' }),                         'vault props whose applabel holds a control character, the record at fault though only its label failed'],
   ['bad_record', (vaultDB: VaultDB) => vaultDB.putVaultProps({ ...TH.vaultPropsOf('u1'), user_id: 'u^1' }, { vault_id: 'vault-id-u1', unlock_epoch: 1 }), 'an update of the vault props whose user_id holds a ^'],
-  ['invalid_box', (vaultDB: VaultDB) => vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one', { sidecar_json: 'not json' })), 'a box whose sidecar no read would accept'],
+  ['invalid_box', (vaultDB: VaultDB) => vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one', { sidecar: { when: new Date() } as never })), 'a box whose sidecar no read would accept'],
   ['invalid_box', (vaultDB: VaultDB) => vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('key\u{D83D}', 'one')),                  'a box whose boxlabel is half of an emoji, the box at fault though only its label failed'],
   ['invalid_box', (vaultDB: VaultDB) => vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic', 'one', { written_at: 1_792_022_400 })), 'a box time in epoch seconds'],
   ['invalid_box', (vaultDB: VaultDB) => vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, undefined as unknown as BoxRecord),               'no box at all'],
@@ -607,7 +607,7 @@ describe("the abstract VaultDB, on the way in", () => {
   it("lets a vault's own writes through untouched: a box with an empty sidecar, a box replaced, a deletion", async () => {
     const vaultDB = new MapVaultDB()
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
-    const emptied = TH.boxOf('anthropic', 'one', { sidecar_json: '{}' })
+    const emptied = TH.boxOf('anthropic', 'one', { sidecar: {} })
     await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), TH.noBoxYet, emptied)
     expect(vaultDB.rows.get(u1AnthropicBoxCkey)).to.deep.equal(emptied)
     await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), { vault_id: 'vault-id-u1', revision_tok: 'rev-one' }, TH.boxOf('anthropic', 'two'))
@@ -967,15 +967,15 @@ describe("the abstract VaultDB, holding names to the floor", () => {
   it("refuses, as 'invalid_box', a box whose sidecar is not JSON, writing nothing", async () => {
     const vaultDB = new MapVaultDB()
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
-    const unparsable = TH.boxOf('anthropic', 'one', { sidecar_json: '{"note":' })
+    const unparsable = TH.boxOf('anthropic', 'one', { sidecar: { when: new Date() } as never })
     await TH.expectBad(vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, unparsable), 'invalid_box')
     expect(await TH.expectingGood(vaultDB).getBox(TH.scopeOf('u1'), 'anthropic')).to.be.null
   })
 
-  it("refuses, as 'corrupt_record', a stored box whose sidecar is not JSON, and lists it as damaged", async () => {
+  it("refuses, as 'corrupt_record', a stored box with no sidecar, and lists it as damaged", async () => {
     const vaultDB = new MapVaultDB()
     await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
-    vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), TH.boxOf('anthropic', 'one', { sidecar_json: '{"note":' }))
+    vaultDB.rows.set(Ckeys.box(TH.scopeOf('u1'), 'anthropic'), TH.omitting(TH.boxOf('anthropic', 'one'), 'sidecar'))
     await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic'), 'corrupt_record')
     expect(await TH.expectingGood(vaultDB).listBoxes(TH.scopeOf('u1'))).to.deep.equal([{ boxlabel: 'anthropic', damaged: true, revision_tok: 'rev-one' }])
   })
@@ -1048,7 +1048,7 @@ class SmallRecordVaultDB extends MapVaultDB {
 
 describe("the abstract VaultDB, weighing a box", () => {
   it("refuses, as 'box_too_large', a box heavier with its scope than its backend holds in one record, writing nothing", async () => {
-    const box = TH.boxOf('anthropic', 'one', { sidecar_json: TH.sidecarJsonOf({ note: 'n'.repeat(900) }) })
+    const box = TH.boxOf('anthropic', 'one', { sidecar: { note: 'n'.repeat(900) } })
     const recordBytes = jsonBytes({ ...TH.scopeOf('u1'), ...box })
     const fits = new SmallRecordVaultDB(recordBytes)
     await TH.expectingGood(fits).ensureVaultProps(TH.vaultPropsOf('u1'))

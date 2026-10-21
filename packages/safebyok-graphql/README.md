@@ -205,7 +205,7 @@ by, exactly as safebyok wrote it:
 | Type                 | Carries                                                           |
 | -------------------- | ----------------------------------------------------------------- |
 | `SafebyokVaultProps` | every field of the `VaultProps`                                   |
-| `SafebyokBox`        | every field of the `BoxRecord`; its sidecar as JSON text, as written    |
+| `SafebyokBox`        | every field of the `BoxRecord`; its sidecar a `SafebyokSidecar`        |
 | `SafebyokListedBox`  | a box as a listing has it: every field but the two encrypted ones |
 | `SafebyokCiphered`   | an encrypted value: its `cipher_iv_b64` and its `ciphertext_b64`  |
 | `SafebyokVaultScope` | which vault: `applabel`, `user_id`, `vaultlabel`                  |
@@ -228,6 +228,11 @@ of its own.
   (`safebyok-vault-v4`): deploy client and server together, and every vault stored before reads
   as damaged, to be made anew (with `safebyok-postgres` behind your server, drop and recreate its
   tables).
+* **A box's sidecar is a `SafebyokSidecar`**, the app's own JSON value, carried as it is (a
+  sidecar of JSON null crosses as null): your server's storage may keep it as a JSON column and
+  query it, reordering its keys as it likes, since the box binds its sidecar with keys sorted.
+  It replaces `sidecar_json`, the text the box format before (`safebyok-box-v7`) held: deploy
+  client and server together, and every vault stored before reads as damaged, to be made anew.
 * **Encrypted**: each whisper (`whisper_ciphered`), each boxKey (`box_key_wrapped`), and
   the vaultKey under each way in (inside `passphrase` and `passkey`). **In the open**: everything else, as
   [`safebyok-postgres`](../safebyok-postgres#what-is-stored) lists it.

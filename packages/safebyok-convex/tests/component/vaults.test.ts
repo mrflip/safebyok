@@ -89,13 +89,13 @@ describe("getBox and putBox", () => {
     expect(await CVX.query(TH.vaults.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })).to.be.null
   })
 
-  it("stores a box's sidecar as the JSON text it was handed, and reads it back so", async () => {
+  it("stores a box's sidecar as the JSON value it was handed, and reads it back so", async () => {
     const CVX = await withVaultProps()
-    const withSidecar = TH.boxOf('anthropic_api_key', 'a1', { sidecar_json: TH.sidecarJsonOf({ note: 'caf\u{E9} "quoted"', tags: [null] }) })
+    const withSidecar = TH.boxOf('anthropic_api_key', 'a1', { sidecar: { note: 'caf\u{E9} "quoted"', tags: [null] } })
     await CVX.mutation(TH.vaults.putBox, { scope: u1, box: withSidecar, expected: TH.noBoxYet })
     const { boxes } = await allRows(CVX)
     const [row] = boxes
-    expect(row).to.include({ sidecar_json: withSidecar.sidecar_json })
+    expect(row?.sidecar).to.deep.equal(withSidecar.sidecar)
     expect(await CVX.query(TH.vaults.getBox, { scope: u1, boxlabel: 'anthropic_api_key' })).to.deep.equal(withSidecar)
   })
 })
@@ -211,10 +211,10 @@ describe("a real vault's records", () => {
     }
     const vault = await TH.openOver(memoryStoreHolding(real))
     const listed = await CVX.query(TH.vaults.listBoxSummaries, { scope: u1 })
-    // The core's summary drops `format` and the codec, parses the sidecar's JSON, and names the
-    // vault props it was listed beside; the listing holds the record's fields as stored.
-    const summaries = listed.map(({ format: _format, whisper_codec: _codec, whisper_schema_version: _version, sidecar_json: sidecarJson, ...shell }) => (
-      BoxSummary.parse({ ...shell, sidecar: JSON.parse(sidecarJson) as unknown, vault_id: real.vaultProps.vault_id })
+    // The core's summary drops `format` and the codec, and names the vault props it was listed
+    // beside; the listing holds the record's fields as stored.
+    const summaries = listed.map(({ format: _format, whisper_codec: _codec, whisper_schema_version: _version, ...shell }) => (
+      BoxSummary.parse({ ...shell, vault_id: real.vaultProps.vault_id })
     ))
     expect(summaries).to.deep.equal(vault.getSnapshot().boxes)
     vault.close()

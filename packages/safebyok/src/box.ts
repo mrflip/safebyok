@@ -10,27 +10,28 @@ import type { Vault } from './vault'
 import { NameFloor } from './validators'
 import * as Names from './names'
 
-// == [The record]: BoxRecord, BoxFormat, EmptySidecarJson, isStableJsonText
+// == [The record]: BoxRecord, BoxFormat, StoredSidecar, isCheckableSidecar
+
+/** The box's format, as each record carries it and each of its ctxs begins. */
+export const BoxFormat = 'safebyok-box-v8'
 
 /**
- * True when `text` is a sidecar's JSON exactly as the vault writes it: parsed and serialized
- * again, keys sorted, it comes back the same. Text respaced, reordered, or nested too deep to
- * serialize is not, and the box holding it reads as damaged, its refusal a calm one.
+ * True when `val` can be held to {@link Sidecar} at all: a value nested deeper than the check can
+ * walk throws a RangeError from it, which a stored record must not, as storage may hand back
+ * anything.
  */
-const isStableJsonText = (text: string): boolean => {
+const isCheckableSidecar = (val: unknown): boolean => {
   try {
-    return stableJsonify(JSON.parse(text)) === text
+    Sidecar.safeParse(val)
+    return true
   } catch {
-    // Not JSON, or nested past what the stack can serialize (a RangeError).
+    // Nested past what the stack can walk.
     return false
   }
 }
 
-/** The box's format, as each record carries it and each of its ctxs begins. */
-export const BoxFormat = 'safebyok-box-v7'
-
-/** The JSON of an empty sidecar: what a box given none holds. */
-export const EmptySidecarJson = '{}'
+/** A box's sidecar as its record holds it: a {@link Sidecar}, refused calmly, as any other damage is, when nested too deep to check. */
+const StoredSidecar = Z.pipe(Z.custom(isCheckableSidecar, "a sidecar is a JSON value nested no deeper than the check can walk"), Sidecar)
 
 /**
  * One box as the storage layer holds it: the whisper ciphered under its own boxKey, that
@@ -43,7 +44,7 @@ export const EmptySidecarJson = '{}'
  * two encrypted ones: an altered sidecar, time or codec refuses to open as well.
  *
  * Stored fields are underbar_case: this record is written to the storage layer as-is, and it is
- * plain JSON -- any backend that can hold text can hold it. Its boxlabel is checked here against
+ * plain JSON -- any backend that can hold JSON can hold it. Its boxlabel is checked here against
  * the floor every name is held to (`NameFloor`); the vault's validators check it only where a
  * host hands it in.
  *
@@ -62,10 +63,12 @@ export const BoxRecord = Z.object({
   /** Which generation of the whisper's own shape this box holds: 1, the only one so far. */
   whisper_schema_version: Z.literal(1),
   /**
-   * The box's {@link Sidecar}, as JSON with every object's keys sorted and no spacing,
-   * exactly as `stableJsonify` writes it: `{}` when the host gave none. Always written, so a box with no sidecar and one with an empty sidecar are one record.
+   * The box's {@link Sidecar}, as the JSON value the host gave: `{}` when it gave none. Always
+   * written, so a box with no sidecar and one with an empty sidecar are one record. Storage keeps
+   * it as JSON (a `jsonb` column, say), free to reorder its keys or drop its spacing: each ctx
+   * binds its JSON with keys sorted, worked out afresh at each seal and open.
    */
-  sidecar_json:           Z.string().check(Z.refine(isStableJsonText, "sidecar_json holds the box's sidecar as the JSON text the vault writes, keys sorted")),
+  sidecar:                StoredSidecar,
   /** When this boxlabel was first stored, an {@link EpochMillis}: every later store carries it forward. */
   registered_at:          EpochMillis,
   /**
@@ -153,11 +156,12 @@ export class Box {
       ...record,
       box_key_wrapped:  Object.freeze({ ...record.box_key_wrapped }),
       whisper_ciphered: Object.freeze({ ...record.whisper_ciphered }),
+      sidecar:          frozenThrough(record.sidecar),
     })
     this.#vault        = vault
     this.boxlabel      = record.boxlabel
     this.revision_tok  = record.revision_tok
-    this.sidecar       = frozenJsonOf(record.sidecar_json)
+    this.sidecar       = this.#record.sidecar
     this.registered_at = record.registered_at
     this.written_at    = record.written_at
     this.vault_id      = vaultId
@@ -225,13 +229,13 @@ export class Box {
     checkSealOpts(opts)
     const label = Names.checkFloor('boxlabel', boxlabel)
     const whisperBytes = whisperBytesOf(whisper)
-    const sidecarJson = opts?.sidecar === undefined ? undefined : stableJsonify(checkedSidecar(opts.sidecar))
+    const sidecar = opts?.sidecar === undefined ? undefined : checkedSidecar(opts.sidecar)
     checkLease(lease, 'Box.seal')
     const over = opts?.over ?? null
     if (over !== null && (! (over instanceof this) || over.boxlabel !== label)) {
       throw new VaultError('bad_option', "Box.seal's `over` is the box the new one replaces, under the same boxlabel: a Box, or null for none.")
     }
-    const plan = await planSeal(lease, { boxlabel: label, whisperBytes, sidecarJson, over })
+    const plan = await planSeal(lease, { boxlabel: label, whisperBytes, sidecar, over })
     return await sealPlanned(vault, lease, plan)
   }
 
@@ -296,7 +300,7 @@ export class Box {
  * ciphers, the sidecar it keeps, and the `registered_at` it carries forward, or null for a new
  * box. Short-lived: it holds the whisper's bytes, and is never logged, stored or handed out.
  */
-export type SealPlan = Readonly<{ boxlabel: string, whisperBytes: Uint8Array, sidecarJson: string, registeredAt: number | null }>
+export type SealPlan = Readonly<{ boxlabel: string, whisperBytes: Uint8Array, sidecar: Sidecar, registeredAt: number | null }>
 
 /** `whisper`'s bytes as a box ciphers them, its JSON with keys sorted: kind 'bad_whisper' for one JSON cannot carry, quoting none of it. */
 export const whisperBytesOf = (whisper: unknown): Uint8Array => new TextEncoder().encode(stableJsonify(checkedWhisper(whisper)))
@@ -311,7 +315,7 @@ export const whisperBytesOf = (whisper: unknown): Uint8Array => new TextEncoder(
  */
 export const planSeal = async (
   lease: Lease,
-  given: { boxlabel: string, whisperBytes: Uint8Array, sidecarJson: string | undefined, over: Box | null },
+  given: { boxlabel: string, whisperBytes: Uint8Array, sidecar: Sidecar | undefined, over: Box | null },
 ): Promise<SealPlan> => {
   const { over } = given
   const opened = over === null ? null : await over.tryOpen(lease)
@@ -320,7 +324,8 @@ export const planSeal = async (
   return Object.freeze({
     boxlabel:     given.boxlabel,
     whisperBytes: given.whisperBytes,
-    sidecarJson:  given.sidecarJson ?? vouched?.record.sidecar_json ?? EmptySidecarJson,
+    // A sidecar of JSON null is a sidecar given: only undefined is none.
+    sidecar:      given.sidecar === undefined ? vouched?.sidecar ?? {} : given.sidecar,
     registeredAt: vouched?.registered_at ?? null,
   })
 }
@@ -339,7 +344,7 @@ export const sealPlanned = async (vault: BoxVault, lease: Lease, plan: SealPlan)
     revision_tok:           randomId(),
     whisper_codec:          'json_v1',
     whisper_schema_version: 1,
-    sidecar_json:           plan.sidecarJson,
+    sidecar:                plan.sidecar,
     registered_at:          plan.registeredAt ?? now,
     written_at:             now,
   }
@@ -394,11 +399,11 @@ const openRecord = async (vault: BoxVault, vaultId: string, record: BoxRecord, l
 export const heldListing = (listed: ListedSummary | DamagedBox, vaultId: string): BoxSummary | DamagedBox => {
   if (listed.damaged) { return Object.freeze({ boxlabel: listed.boxlabel, damaged: true, revision_tok: listed.revision_tok }) }
   const { boxlabel, revision_tok, registered_at, written_at } = listed
-  return Object.freeze({ boxlabel, revision_tok, sidecar: frozenJsonOf(stableJsonify(listed.sidecar) ?? EmptySidecarJson), registered_at, written_at, vault_id: vaultId, damaged: false })
+  return Object.freeze({ boxlabel, revision_tok, sidecar: frozenThrough(structuredClone(listed.sidecar)), registered_at, written_at, vault_id: vaultId, damaged: false })
 }
 // --
 
-// == [Helpers]: BoxHeader, boxCtx, frozenJsonOf, parseJsonOrNull, checkedBoxRecord, checkedWhisper, checkedSidecar, checkLease
+// == [Helpers]: BoxHeader, boxCtx, frozenThrough, parseJsonOrNull, checkedBoxRecord, checkedWhisper, checkedSidecar, checkLease
 
 /**
  * A box's visible header: every field of its record but its format, which leads each ctx,
@@ -409,13 +414,24 @@ type BoxHeader = Omit<BoxRecord, 'format' | 'box_key_wrapped' | 'whisper_ciphere
 // A box's ctx binds its format, the vault it lies in (its vault's scope, and the id of the vault
 // props it lies under), and its record's whole visible header: every field but the format, which
 // leads, and the two encrypted ones, so a sidecar, a time or its codec altered in storage refuses
-// to open. See VOCABULARY.md on ctx.
+// to open. The sidecar is bound as its JSON with keys sorted, worked out here, so storage that
+// reorders its keys or drops its spacing changes nothing. See VOCABULARY.md on ctx.
 const boxCtx = (vault: BoxVault, vaultId: string, header: BoxHeader, purpose: 'box_key_wrapped' | 'whisper_ciphered') => (
-  cipherCtx(BoxFormat, vault.applabel, vault.user_id, vault.vaultlabel, vaultId, purpose, header)
+  cipherCtx(BoxFormat, vault.applabel, vault.user_id, vault.vaultlabel, vaultId, purpose, { ...header, sidecar: stableJsonify(header.sidecar)! })
 )
 
-/** `json`, parsed, with every object and array in it frozen as the parse builds it. */
-const frozenJsonOf = (json: string): Sidecar => JSON.parse(json, (_ckey, val: unknown) => Object.freeze(val)) as Sidecar
+/**
+ * `val`, a JSON value this package owns, with every object and array in it frozen, in place:
+ * what a box and its listing hand out, so nothing a host is handed can be changed.
+ */
+const frozenThrough = <ValT>(val: ValT): ValT => {
+  const held: unknown = val
+  if (typeof held === 'object' && held !== null && ! Object.isFrozen(held)) {
+    for (const inner of Object.values(held)) { frozenThrough(inner) }
+    Object.freeze(held)
+  }
+  return val
+}
 
 /** `text` parsed as JSON, or null when it is none: what a decipher hands the whisper check. */
 const parseJsonOrNull = (text: string): unknown => {

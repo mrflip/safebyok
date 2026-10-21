@@ -2,9 +2,9 @@ import { v } from 'convex/values'
 
 /** Convex validators for safebyok's stored records, field for field with the core's Zod records of the same names.
  * They check what Convex can: which fields, their types, which are optional, and each record's
- * `format`. Every name, and a box's sidecar, is any text here. The finer rules, the name floor
- * and a sidecar's being JSON among them, are the client's, checked by the core's records on every
- * write and every read. The vault's own validators the server never sees.
+ * `format`. Every name is any text here, and a box's sidecar any value Convex holds. The finer
+ * rules, the name floor and a sidecar's being JSON among them, are the client's, checked by the
+ * core's records on every write and every read. The vault's own validators the server never sees.
  *
  * A new record format widens its `format` union: an additive deploy, shipped with this package.
  */
@@ -33,7 +33,7 @@ export const VaultScope = v.object({
 export const VaultPropsFormat = v.union(v.literal('safebyok-vault-v6'))
 
 /** The formats of a BoxRecord this package stores. */
-export const BoxFormat = v.union(v.literal('safebyok-box-v7'))
+export const BoxFormat = v.union(v.literal('safebyok-box-v8'))
 
 /** A passphrase's way into a vault: how its passphraseKey is derived, and the vaultKey wrapped under that key.
  *
@@ -77,7 +77,7 @@ export const VaultProps = v.object({
 })
 
 /** One box: its whisper ciphered under its own boxKey, that boxKey wrapped under the vaultKey, and the visible fields.
- * The sidecar is JSON text, `sidecar_json`, always written. Times are epoch milliseconds.
+ * The sidecar is the app's own JSON value, as a Convex value, always written. Times are epoch milliseconds.
  */
 export const BoxRecord = v.object({
   format:                 BoxFormat,
@@ -87,7 +87,7 @@ export const BoxRecord = v.object({
   whisper_ciphered:       Ciphered,
   whisper_codec:          v.literal('json_v1'),
   whisper_schema_version: v.literal(1),
-  sidecar_json:           v.string(),
+  sidecar:                v.any(),
   registered_at:          v.number(),
   written_at:             v.number(),
 })

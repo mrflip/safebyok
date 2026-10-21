@@ -10,7 +10,7 @@ const schema = buildSchema(VaultSchemaSdl)
 /** A record's validator, as the core exports it: its fields, each one a validator. */
 // A field is optional when Zod says it may be left out (`optin`), whether or not it takes an undefined;
 // nullable when its validator is Zod's nullable.
-type RecordSchema = { shape: Record<string, { _zod: { optin?: string, def: { type: string } } }> }
+type RecordSchema = { shape: Record<string, { _zod: { optin?: string }, safeParse: (val: unknown) => { success: boolean } }> }
 
 /** Each object type and input type, the core record it carries, and the fields it leaves out. */
 const RecordTypes = [
@@ -45,13 +45,20 @@ describe("VaultSchemaSdl", () => {
       expect(Object.keys(fieldsOf(typename))).to.have.members(recordFields)
     })
 
-    it(`makes a field of ${typename} nullable exactly where the record's is optional or nullable`, () => {
+    it(`makes a field of ${typename} nullable exactly where the record's is optional or takes null`, () => {
       const { shape } = recordSchema as unknown as RecordSchema
       const described = Object.entries(fieldsOf(typename))
       for (const [field, { type }] of described) {
-        const { _zod: { optin, def } } = shape[field]!
-        expect(isNonNullType(type), `${typename}.${field}`).to.eq(optin !== 'optional' && def.type !== 'nullable')
+        const fieldSchema = shape[field]!
+        expect(isNonNullType(type), `${typename}.${field}`).to.eq(fieldSchema._zod.optin !== 'optional' && ! fieldSchema.safeParse(null).success)
       }
+    })
+
+    it(`carries ${typename}'s sidecar, if it has one, as a SafebyokSidecar, nullable for a sidecar of JSON null`, () => {
+      const { sidecar } = fieldsOf(typename)
+      if (sidecar === undefined) { return }
+      expect(isNonNullType(sidecar.type)).to.be.false
+      expect(getNamedType(sidecar.type).name).to.eq('SafebyokSidecar')
     })
   }
 
