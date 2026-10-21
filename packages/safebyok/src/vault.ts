@@ -484,9 +484,9 @@ export class Vault {
    */
   checkPassphrase = async (typed: string): Promise<PassphraseVerdict> => {
     if (typeof typed !== 'string') {
-      throw new VaultError('bad_option', 'checkPassphrase takes the passphrase as the text the user typed, as a string.')
+      throw new VaultError('bad_option', "checkPassphrase takes the passphrase as the text the user typed, as a string.")
     }
-    return await this.#strengthChecker(typed)
+    return this.#strengthChecker(typed)
   }
 
   readonly #tryPutWayin = this.#trying(async (passphrase: string, newProof: string | PasskeyAnswer): Promise<WayinSummary> => {
