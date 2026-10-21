@@ -12,7 +12,7 @@ import { StrongVerdict, type PassphraseVerdict, type StrengthChecker } from '../
 import { zxcvbnStrengthChecker } from '../../src/zxcvbn-strength-checker'
 import { PasskeyWayin, PassphraseWayin, Wayin } from '../../src/wayin'
 import * as TH from '../test-helpers'
-import { makeWorld, storedVaultPropsOf, vaultWithPasskey, SevenDaysMillis, u1VaultPropsCkey, storedWayinOf, addLaptopPasskey, spoilWayin, storedRowOf } from './world'
+import { makeWorld, damagedVaultWorld, storedVaultPropsOf, vaultWithPasskey,SevenDaysMillis, u1VaultPropsCkey, storedWayinOf, addLaptopPasskey, spoilWayin, storedRowOf } from './world'
 
 
 // == [Passphrase]: countingDeriver, putWayin with a passphrase, the passphrase
@@ -722,6 +722,16 @@ describe("a new passphrase's strength", () => {
     const vault = Vault.make(world.optsWith({ strengthChecker: Object.assign(() => StrongVerdict, { load: () => Promise.reject(lost) }) }))
     const err = await TH.expectRefusal(vault.hello(), 'unexpected_error')
     expect(err.cause).to.eq(lost)
+  })
+
+  it("still tells the bad news its read met when the load's failure refuses the hello", async () => {
+    const world = await damagedVaultWorld()
+    const told: VaultError[] = []
+    const unloadable = Object.assign(() => StrongVerdict, { load: () => Promise.reject(new Error('the word list did not load')) })
+    const vault = Vault.make(world.optsWith({ strengthChecker: unloadable, onBadNews: (news) => { told.push(news) } }))
+    await TH.expectRefusal(vault.hello(), 'unexpected_error')
+    expect(told.map((news) => news.refusalkind)).to.deep.equal(['damaged_vault'])
+    expect(vault.getSnapshot().trouble).to.have.property('refusalkind', 'damaged_vault')
   })
 
   it("refuses at Vault.make the option's old name, naming the new", async () => {

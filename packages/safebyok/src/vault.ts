@@ -297,8 +297,8 @@ export class Vault {
    *
    * As it reads, it runs the strength checker's `load`, if it carries one (zxcvbn's fetches its
    * dictionary), and waits for both. A load that fails refuses the hello 'unexpected_error', what
-   * it threw the cause, whatever the read found, and no lease is taken up: a vault that cannot
-   * check a new passphrase does not open.
+   * it threw the cause, whatever the read found (bad news it met is still told), and no lease is
+   * taken up: a vault that cannot check a new passphrase does not open.
    *
    * Calls under way share one read. Once a hello has read storage, a later one within
    * `opts.staleMinutes` of the vault's last read -- by default the `staleMinutes` the vault was
@@ -1227,16 +1227,21 @@ export class Vault {
   /**
    * One hello: the strength checker loaded and storage read, together, then this device's lease
    * taken up, so a vault that could not check a new passphrase takes up no lease. A load that fails
-   * is the hello's refusal, whatever the read did. One that fails says so in the snapshot and
-   * forgets itself, so the next hello loads and reads afresh; so does one whose vault props a
-   * refusal of an older copy forgot while it ran (see forgetVaultProps). No other hello can start
-   * while one runs (see forgetHello), so the one this ends is always the one in `greeting`.
+   * is the hello's refusal, whatever the read did, though the read's bad news is told. One that
+   * fails says so in the snapshot and forgets itself, so the next hello loads and reads afresh; so
+   * does one whose vault props a refusal of an older copy forgot while it ran (see
+   * forgetVaultProps). No other hello can start while one runs (see forgetHello), so the one this
+   * ends is always the one in `greeting`.
    */
   async #greet(): Promise<void> {
     try {
       // Both settle before either refuses: no read is left running unheard.
       const [loaded, read] = await Promise.allSettled([this.#strengthChecker.load(), this.#refresh()])
-      if (loaded.status === 'rejected') { throw loaded.reason }
+      if (loaded.status === 'rejected') {
+        // The load's failure is the hello's, but bad news the read met is still told.
+        if (read.status === 'rejected') { this.#hearBadNews(read.reason) }
+        throw loaded.reason
+      }
       if (read.status === 'rejected') { throw read.reason }
       await this.#fetchLease()
     } catch (err) {
