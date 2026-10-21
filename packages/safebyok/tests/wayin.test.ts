@@ -1,3 +1,4 @@
+import { inspect } from 'node:util'
 import { describe, expect, it, vi } from 'vitest'
 import { cipherCtx, deriveWrappingKey, fromB64, makeVaultKey, toB64, unwrapKeyUnder } from '../src/crypto'
 import type { KeyDeriver } from '../src/key-deriver'
@@ -33,13 +34,13 @@ const stamp: WayinStamp = {
 /** A real passphrase's way in around `vaultKey`: its record. */
 const sealed = async (passphrase: string, vaultKey: CryptoKey): Promise<PassphraseWayinRecord> => {
   const wayin = await Wayin.seal(slice, identity, PassphraseProof.parse(slice, passphrase), 'device-one', vaultKey)
-  return wayin.props
+  return wayin.record
 }
 
 /** A real passkey's way in around `vaultKey`, for the passkey that answered `answer`: its record. */
 const sealedPasskey = async (answer: PasskeyAnswer, vaultKey: CryptoKey): Promise<PasskeyWayinRecord> => {
   const wayin = await Wayin.seal(slice, identity, PasskeyProof.parse(slice, answer), 'device-one', vaultKey)
-  return wayin.props
+  return wayin.record
 }
 
 /** Vault props of `passphrase` and `passkey`, validated as storage would read them back. */
@@ -86,16 +87,16 @@ describe("Wayin.make", () => {
     expect(wayin.wayinkind).to.eq('passkey')
   })
 
-  it("gives every stored field as a first-class field of its own", () => {
+  it("gives each visible field as a field of its own, read from the record: its kind, device and time, and a passkey's credential and salt", () => {
     const record = TH.wayinOf('passphrase')
     const wayin = Wayin.make(slice, identity, record)
-    for (const [field, stored] of Object.entries(record)) {
-      expect(wayin[field as keyof PassphraseWayinRecord], field).to.deep.equal(stored)
-    }
+    expect(TH.shownOf(wayin)).to.deep.equal({ wayinkind: 'passphrase', device_id: record.device_id, registered_at: record.registered_at })
     const passkeyRecord = TH.passkeyWayinOf('laptop')
     const passkey = Wayin.make(slice, identity, passkeyRecord)
-    expect(passkey.credential_id).to.eq(passkeyRecord.credential_id)
-    expect(passkey.prf_salt_b64).to.eq(passkeyRecord.prf_salt_b64)
+    expect(TH.shownOf(passkey)).to.deep.equal({
+      wayinkind: 'passkey', device_id: passkeyRecord.device_id, registered_at: passkeyRecord.registered_at,
+      credential_id: passkeyRecord.credential_id, prf_salt_b64: passkeyRecord.prf_salt_b64,
+    })
   })
 
   it("refuses a record this package never writes as damaged_wayin, as its second example shows", () => {
@@ -117,36 +118,41 @@ describe("Wayin.make", () => {
     })
   }
 
-  it("holds its record as `props`, a frozen copy, its wrap frozen with it", () => {
+  it("holds its record as `record`, a frozen copy, its wrap frozen with it", () => {
     const record = TH.wayinOf('passphrase')
     const wayin = Wayin.make(slice, identity, record)
-    expect(wayin.props).to.deep.equal(record)
-    expect(wayin.props).to.not.eq(record)
-    expect(Object.isFrozen(wayin.props)).to.be.true
-    expect(Object.isFrozen(wayin.props.vault_key_wayin_wrapped)).to.be.true
-    expect(wayin.vault_key_wayin_wrapped).to.eq(wayin.props.vault_key_wayin_wrapped)
+    expect(wayin.record).to.deep.equal(record)
+    expect(wayin.record).to.not.eq(record)
+    expect(Object.isFrozen(wayin.record)).to.be.true
+    expect(Object.isFrozen(wayin.record.vault_key_wayin_wrapped)).to.be.true
   })
 
-  it("holds its vault, the identity of its vault props and its props, none of them enumerable, so a spread shows the record alone", () => {
+  it("shows each visible field once in a key list, JSON and a log line, and nothing else: no wrap, no passphrase's salt or key deriver, no vault or vault props", () => {
     const record = TH.wayinOf('passphrase')
     const wayin = Wayin.make(slice, identity, record)
-    expect(Object.keys(wayin)).to.have.members(Object.keys(record))
-    expect(JSON.stringify(wayin)).to.not.include('vault-id-u1')
-    const spread = Object.fromEntries(Object.entries(wayin))
-    expect(JSON.stringify(spread)).to.not.include('applabel')
+    expect(Object.keys(wayin)).to.deep.equal(['wayinkind', 'device_id', 'registered_at'])
+    expect(Object.keys(TH.jsonOf(wayin))).to.deep.equal(['wayinkind', 'device_id', 'registered_at'])
+    for (const hidden of ['vault-id-u1', 'applabel', record.salt_b64, record.key_deriver_label, record.vault_key_wayin_wrapped.ciphertext_b64, 'salt_b64', 'vault_key_wayin_wrapped']) {
+      expect(JSON.stringify(wayin)).to.not.include(hidden)
+      expect(inspect(wayin)).to.not.include(hidden)
+    }
+    expect(inspect(wayin).match(/device_id/g)).to.have.lengthOf(1)
+    const passkey = Wayin.make(slice, identity, TH.passkeyWayinOf('laptop'))
+    expect(Object.keys(passkey)).to.deep.equal(['wayinkind', 'device_id', 'registered_at', 'credential_id', 'prf_salt_b64'])
+    expect(inspect(passkey)).to.not.include('vault_key_wayin_wrapped')
   })
 
   it("makes what each kind's own constructor makes of a record already checked", () => {
     const passphrase = new PassphraseWayin(slice, identity, TH.wayinOf('passphrase'))
     const passkey = new PasskeyWayin(slice, identity, TH.passkeyWayinOf('laptop'))
-    expect(passphrase.props).to.deep.equal(Wayin.make(slice, identity, TH.wayinOf('passphrase')).props)
-    expect(passkey.props).to.deep.equal(Wayin.make(slice, identity, TH.passkeyWayinOf('laptop')).props)
+    expect(passphrase.record).to.deep.equal(Wayin.make(slice, identity, TH.wayinOf('passphrase')).record)
+    expect(passkey.record).to.deep.equal(Wayin.make(slice, identity, TH.passkeyWayinOf('laptop')).record)
     expect(Object.isFrozen(passkey)).to.be.true
   })
 
-  it("is frozen: a field, or the props, written over throws, and nothing moves", () => {
+  it("is frozen: a field, or the record, written over throws, and nothing moves", () => {
     const wayin = Wayin.make(slice, identity, TH.wayinOf('passphrase'))
-    for (const field of ['device_id', 'props', 'salt_b64']) {
+    for (const field of ['device_id', 'record', 'wayinkind']) {
       expect(Reflect.set(wayin, field, null), field).to.be.false
     }
     expect(wayin.device_id).to.eq('device-one')
@@ -155,34 +161,23 @@ describe("Wayin.make", () => {
 })
 
 describe("wayin.toJSON", () => {
-  it("is the summary, so JSON.stringify of the way in carries no salt and no wrap, as the Wayin's second example shows", async () => {
+  it("gives the kind and the device and time that sealed it, its spread, so JSON.stringify of the way in carries no salt and no wrap, as the Wayin's second example shows", async () => {
     const wayin = Wayin.make(slice, identity, await sealed('pw', await makeVaultKey()))
-    expect(wayin.toJSON()).to.deep.equal(wayin.summary)
-    expect(JSON.stringify(wayin)).to.eq(JSON.stringify(wayin.summary))
-    for (const stored of [wayin.salt_b64, wayin.vault_key_wayin_wrapped.ciphertext_b64, 'vault_key_wayin_wrapped', 'salt_b64']) {
+    expect(wayin.toJSON()).to.deep.equal({ wayinkind: 'passphrase', device_id: 'device-one', registered_at: Date.UTC(2026, 9, 15) })
+    expect(wayin.toJSON()).to.deep.equal(TH.shownOf(wayin))
+    for (const stored of [wayin.record.salt_b64, wayin.record.vault_key_wayin_wrapped.ciphertext_b64, 'vault_key_wayin_wrapped', 'salt_b64']) {
       expect(JSON.stringify(wayin)).to.not.include(stored)
     }
   })
 
-  it("is a passkey's summary, its credential and PRF salt and never its wrap", () => {
-    const wayin = Wayin.make(slice, identity, TH.passkeyWayinOf('laptop'))
-    expect(JSON.stringify(wayin)).to.eq(JSON.stringify(wayin.summary))
-    expect(JSON.stringify(wayin)).to.not.include('vault_key_wayin_wrapped')
-  })
-})
-
-describe("wayin.summary", () => {
-  it("gives the kind and the device and time that sealed it, and nothing of the salt or wrap", async () => {
-    const wayin = Wayin.make(slice, identity, await sealed('pw', await makeVaultKey()))
-    expect(wayin.summary).to.deep.equal({ wayinkind: 'passphrase', device_id: 'device-one', registered_at: Date.UTC(2026, 9, 15) })
-  })
-
-  it("gives a passkey's credential and salt besides, what a host asks its authenticator with, and not its wrap", () => {
+  it("gives a passkey's credential and salt besides, what a host asks its authenticator with, and never its wrap", () => {
     const record = TH.passkeyWayinOf('laptop')
-    expect(Wayin.make(slice, identity, record).summary).to.deep.equal({
+    const wayin = Wayin.make(slice, identity, record)
+    expect(wayin.toJSON()).to.deep.equal({
       wayinkind: 'passkey', device_id: record.device_id, registered_at: record.registered_at,
       credential_id: 'cred-laptop', prf_salt_b64: record.prf_salt_b64,
     })
+    expect(JSON.stringify(wayin)).to.not.include('vault_key_wayin_wrapped')
   })
 })
 
@@ -222,10 +217,10 @@ describe("Wayin.seal, for a passphrase", () => {
     const one = await Wayin.seal(slice, identity, PassphraseProof.parse(slice, 'pw'), 'device-one', vaultKey)
     const two = await sealed('pw', vaultKey)
     expect(one).to.be.instanceOf(PassphraseWayin)
-    expect(VaultProps.safeParse(TH.vaultPropsOf('u1', { passphrase: one.props })).success).to.be.true
-    expect(one).to.include({ wayinkind: 'passphrase', key_deriver_label: 'test_digest_v0' })
+    expect(VaultProps.safeParse(TH.vaultPropsOf('u1', { passphrase: one.record })).success).to.be.true
+    expect(one.record).to.include({ wayinkind: 'passphrase', key_deriver_label: 'test_digest_v0' })
     expect(one).to.include(stamp)
-    expect(one.salt_b64).to.not.eq(two.salt_b64)
+    expect(one.record.salt_b64).to.not.eq(two.salt_b64)
   })
 
   it("keeps nothing of the passphrase in the way in it makes", async () => {
@@ -238,11 +233,11 @@ describe("Wayin.seal, for a passphrase", () => {
 describe("each field of a way in, as sealed (Contract: Wayin, How each field is made)", () => {
   it("makes a passphrase's salt 16 fresh random bytes, names the key deriver its proof derives through, and stamps it with the vault props' epoch, the device and the time it is handed", async () => {
     const wayin = await Wayin.seal(slice, identity, PassphraseProof.parse(slice, 'pw'), 'device-one', await makeVaultKey())
-    expect(fromB64(wayin.salt_b64)).to.have.lengthOf(16)
-    expect(wayin.key_deriver_label).to.eq(TH.testDeriver.key_deriver_label)
+    expect(fromB64(wayin.record.salt_b64)).to.have.lengthOf(16)
+    expect(wayin.record.key_deriver_label).to.eq(TH.testDeriver.key_deriver_label)
     expect(wayin).to.include(stamp)
     const again = await Wayin.seal(slice, identity, PassphraseProof.parse(slice, 'pw'), 'device-one', await makeVaultKey())
-    expect(again.salt_b64).to.not.eq(wayin.salt_b64)
+    expect(again.record.salt_b64).to.not.eq(wayin.record.salt_b64)
   })
 
   it("keeps a passkey's 32-byte salt and credential as the answer brings them, and no key deriver", async () => {
@@ -250,14 +245,14 @@ describe("each field of a way in, as sealed (Contract: Wayin, How each field is 
     const wayin = await Wayin.seal(slice, identity, PasskeyProof.parse(slice, answer), 'device-one', await makeVaultKey())
     expect(fromB64(wayin.prf_salt_b64)).to.have.lengthOf(32)
     expect(wayin).to.include({ credential_id: answer.credentialId, prf_salt_b64: answer.prfSaltB64 })
-    expect(wayin).to.not.have.property('key_deriver_label')
+    expect(wayin.record).to.not.have.property('key_deriver_label')
   })
 
   it("wraps the vaultKey under the wayinKey, bound to wayinCtx: the proof's key unwraps it under that ctx", async () => {
     const vaultKey = await makeVaultKey()
     const proof = PassphraseProof.parse(slice, 'pw')
     const wayin = await Wayin.seal(slice, identity, proof, 'device-one', vaultKey)
-    const unwrapped = await unwrapKeyUnder(await proof.wayinKeyFor(wayin), wayin.vault_key_wayin_wrapped, wayin.wayinCtx, { extractable: true, usage: ['wrapKey'] })
+    const unwrapped = await unwrapKeyUnder(await proof.wayinKeyFor(wayin.record), wayin.record.vault_key_wayin_wrapped, wayin.wayinCtx, { extractable: true, usage: ['wrapKey'] })
     expect(await rawOf(unwrapped)).to.eq(await rawOf(vaultKey))
   })
 })
@@ -281,7 +276,7 @@ describe("Wayin.seal, for a passkey", () => {
     const answer = await TH.passkeyOf('laptop')
     const wayin = await Wayin.seal(slice, identity, PasskeyProof.parse(slice, answer), 'device-one', await makeVaultKey())
     expect(wayin).to.be.instanceOf(PasskeyWayin)
-    const vaultProps = TH.vaultPropsOf('u1', { passkey: wayin.props })
+    const vaultProps = TH.vaultPropsOf('u1', { passkey: wayin.record })
     expect(VaultProps.safeParse(vaultProps).success).to.be.true
     expect(wayin).to.include({ wayinkind: 'passkey', credential_id: answer.credentialId, prf_salt_b64: answer.prfSaltB64 })
     expect(JSON.stringify(wayin)).to.not.include(toB64(answer.prfBytes))
@@ -301,7 +296,7 @@ describe("wayin.tryOpen, by the Contract", () => {
     const asked = vi.spyOn(PassphraseProof.prototype, 'wayinKeyFor')
     try {
       await TH.expectGood(wayin.tryOpen(proof))
-      expect(asked).toHaveBeenCalledWith(wayin)
+      expect(asked).toHaveBeenCalledWith(wayin.record)
       expect(asked.mock.contexts).to.deep.equal([proof])
     } finally {
       asked.mockRestore()

@@ -681,7 +681,7 @@ describe("the fixtures", () => {
 })
 // --
 
-// == [Logging and refusals]: spyLogger, loggedText, thrownText, leafTexts, expectRefusal, omitting
+// == [Logging and refusals]: spyLogger, loggedText, thrownText, leafTexts, shownOf, jsonOf, expectRefusal, omitting
 
 describe("spyLogger", () => {
   it("keeps every call it hears, in order, with what it was handed", () => {
@@ -776,6 +776,28 @@ describe("leafTexts", () => {
   it("lists every value of a stored record", () => {
     const leaves = TH.leafTexts(TH.vaultPropsOf('u1'))
     expect(leaves).to.include.members(['vault-id-u1', 'ct-vault-u1', 'iv-vault-u1', String(Date.UTC(2026, 9, 14))])
+  })
+})
+
+describe("shownOf and jsonOf", () => {
+  /** A model of the shape the package's are: a private field, a getter, a method, and two fields of its own. */
+  class Shown {
+    readonly #hidden = 'never shown'
+    readonly label = 'shown'
+    readonly count = 2
+    get hidden() { return this.#hidden }
+    toJSON() { return { label: this.label } }
+  }
+
+  it("shownOf: a model's own fields alone, never a private field or a getter, as its example shows", () => {
+    const shown = new Shown()
+    expect(TH.shownOf(shown)).to.deep.equal({ label: 'shown', count: 2 })
+    expect(TH.shownOf(shown)).to.not.have.property('hidden')
+  })
+
+  it("jsonOf: what JSON.stringify writes of it, through its toJSON, read back, as its example shows", () => {
+    expect(TH.jsonOf(new Shown())).to.deep.equal({ label: 'shown' })
+    expect(Object.keys(TH.jsonOf({ two: 2, one: 1 }))).to.deep.equal(['two', 'one'])
   })
 })
 

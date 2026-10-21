@@ -122,11 +122,12 @@ const cryptoKeyHandle = Z.custom<CryptoKey>((val) => val instanceof CryptoKey, '
 export const Sidecar: Z.ZodMiniType<WhisperJson> = whisperJson
 export type Sidecar = Z.infer<typeof Sidecar>
 
-/** The visible fields of a sound box, readable while locked: what a VaultDB's `listBoxes` and a vault's snapshot hold beside {@link DamagedBox}es.
- * Its sidecar is `{}` when the host gave none. The sidecar is as storage holds it: only
+/** The visible fields of a sound box, readable while locked: what a vault's snapshot holds beside {@link DamagedBox}es.
+ * They are a `Box`'s own fields, as `{ ...box }` holds them, `vault_id` among them, and `damaged`
+ * false. Its sidecar is `{}` when the host gave none. The sidecar is as storage holds it: only
  * `getWhisper()` opens the box and so proves it unaltered.
  *
- * @example BoxSummary.parse({ boxlabel: 'anthropic', revision_tok: 'r1', sidecar: {}, registered_at, written_at }).damaged // false
+ * @example BoxSummary.parse({ boxlabel: 'anthropic', revision_tok: 'r1', sidecar: {}, registered_at, written_at, vault_id }).damaged // false
  */
 export const BoxSummary = Z.object({
   boxlabel:        NameFloor,
@@ -134,9 +135,13 @@ export const BoxSummary = Z.object({
   sidecar:         Sidecar,
   registered_at:   EpochMillis,
   written_at:      EpochMillis,
+  vault_id:        Z.string().check(Z.minLength(1)),
   damaged:         Z._default(Z.literal(false), false),
 })
 export type BoxSummary = Z.infer<typeof BoxSummary>
+
+/** A box as a VaultDB's `listBoxes` lists it: a {@link BoxSummary} but for its `vault_id`, which the vault adds from the vault props it read beside the listing. */
+export type ListedSummary = Omit<BoxSummary, 'vault_id'>
 
 /** A box whose stored record does not read back as one, listed under its boxlabel among the {@link BoxSummary}s of a vault's snapshot.
  * That covers damage, tampering, another version's record, or a vaultKey the vault does not hold.

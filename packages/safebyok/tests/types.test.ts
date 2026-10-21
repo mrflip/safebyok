@@ -155,7 +155,7 @@ describe("Sidecar", () => {
   })
 })
 
-const wholeSummary = { boxlabel: 'anthropic', revision_tok: 'r1', sidecar: {}, registered_at: Date.UTC(2026, 9, 14), written_at: Date.UTC(2026, 9, 14) }
+const wholeSummary = { boxlabel: 'anthropic', revision_tok: 'r1', sidecar: {}, registered_at: Date.UTC(2026, 9, 14), written_at: Date.UTC(2026, 9, 14), vault_id: 'vault-id-u1' }
 
 describe("BoxSummary", () => {
   it("marks a summary undamaged, as its example shows", () => {
@@ -169,8 +169,12 @@ describe("BoxSummary", () => {
   })
 
   it("holds neither ciphered field, the format nor the codec: a whole box is not a summary", () => {
-    const summary = BoxSummary.parse({ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: {} })
-    expect(Object.keys(summary)).to.have.members(['boxlabel', 'revision_tok', 'sidecar', 'registered_at', 'written_at', 'damaged'])
+    const summary = BoxSummary.parse({ ...TH.boxOf('anthropic_api_key', 'a1'), sidecar: {}, vault_id: 'vault-id-u1' })
+    expect(Object.keys(summary)).to.have.members(['boxlabel', 'revision_tok', 'sidecar', 'registered_at', 'written_at', 'vault_id', 'damaged'])
+  })
+
+  it("refuses a summary with no vault_id: it names the vault props the box lies under", () => {
+    expect(BoxSummary.safeParse(TH.omitting(wholeSummary, 'vault_id')).success).to.be.false
   })
 })
 

@@ -1,6 +1,6 @@
 import * as Z from 'zod/mini'
 import { BoxRecord } from './box'
-import { Capacity, VaultProps, VaultScope, type DamagedBox, type BoxSummary, type Sidecar } from './types'
+import { Capacity, VaultProps, VaultScope, type DamagedBox, type ListedSummary, type Sidecar } from './types'
 import { VaultError, isVaultError, type RefusalMeta } from './errors'
 import * as Names from './names'
 import { AnyTextValidators, NameFloor } from './validators'
@@ -286,9 +286,10 @@ export abstract class VaultDB {
    * Ciphered fields are stripped, and the sidecar is the JSON value it holds. The sort is by UTF-16
    * code unit, never by locale, so every device lists in one order. A record that does not read
    * back as its box lists as a {@link DamagedBox} rather than refusing. A row stored under a name
-   * below the floor is left out: no verb could reach it.
+   * below the floor is left out: no verb could reach it. A sound box lists as a
+   * {@link ListedSummary}, to which the vault adds its `vault_id`.
    */
-  listBoxes(scope: VaultScope): Promise<Outcome<(BoxSummary | DamagedBox)[]>> {
+  listBoxes(scope: VaultScope): Promise<Outcome<(ListedSummary | DamagedBox)[]>> {
     return answering(async () => {
       const asked = heldScope(this, scope)
       const stored = await adapterAnswer('doListBoxes', () => this.doListBoxes(asked))
@@ -647,7 +648,7 @@ const ListedBox = Z.omit(BoxRecord, { box_key_wrapped: true, whisper_ciphered: t
 const isNameable = (stored: StoredBox): boolean => NameFloor.safeParse((stored as { boxlabel?: unknown }).boxlabel).success
 
 /** One nameable stored box as the listing shows it: its summary, or a {@link DamagedBox} where `getBox` would refuse it. */
-const listedOrDamaged = ({ boxlabel, box }: StoredBox): BoxSummary | DamagedBox => {
+const listedOrDamaged = ({ boxlabel, box }: StoredBox): ListedSummary | DamagedBox => {
   const checked = ListedBox.safeParse(box)
   const sound = checked.success && checked.data.boxlabel === boxlabel
   return sound ? summaryOf(checked.data) : damagedOf(boxlabel, box)
@@ -662,7 +663,7 @@ const damagedOf = (boxlabel: string, box: unknown): DamagedBox => (
 const StoredRevision = Z.object({ revision_tok: BoxRecord.shape.revision_tok })
 
 /** A listed box's summary: its visible fields, and its sidecar parsed from the `sidecar_json` the check has passed. */
-const summaryOf = (listed: Z.infer<typeof ListedBox>): BoxSummary => {
+const summaryOf = (listed: Z.infer<typeof ListedBox>): ListedSummary => {
   const { boxlabel, revision_tok, sidecar_json, registered_at, written_at } = listed
   return { boxlabel, revision_tok, sidecar: JSON.parse(sidecar_json) as Sidecar, registered_at, written_at, damaged: false }
 }

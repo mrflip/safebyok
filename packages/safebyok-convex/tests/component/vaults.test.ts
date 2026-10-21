@@ -211,10 +211,10 @@ describe("a real vault's records", () => {
     }
     const vault = await TH.openOver(memoryStoreHolding(real))
     const listed = await CVX.query(TH.vaults.listBoxSummaries, { scope: u1 })
-    // The core's summary drops `format` and the codec, and parses the sidecar's JSON; the
-    // listing holds the record's fields as stored.
+    // The core's summary drops `format` and the codec, parses the sidecar's JSON, and names the
+    // vault props it was listed beside; the listing holds the record's fields as stored.
     const summaries = listed.map(({ format: _format, whisper_codec: _codec, whisper_schema_version: _version, sidecar_json: sidecarJson, ...shell }) => (
-      BoxSummary.parse({ ...shell, sidecar: JSON.parse(sidecarJson) as unknown })
+      BoxSummary.parse({ ...shell, sidecar: JSON.parse(sidecarJson) as unknown, vault_id: real.vaultProps.vault_id })
     ))
     expect(summaries).to.deep.equal(vault.getSnapshot().boxes)
     vault.close()

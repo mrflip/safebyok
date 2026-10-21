@@ -305,7 +305,7 @@ describe("a key deriver's bytes", () => {
     const sealed = await Wayin.seal(TH.vaultSliceOf('u1', TH.testDeriver, { now: () => Date.UTC(2026, 9, 15) }), identity, PassphraseProof.parse(slice, 'first'), 'device-one', await makeVaultKey())
     const { keyDeriver, handed } = keepingDeriver()
     const opening = TH.vaultSliceOf('u1', keyDeriver)
-    const wayin = Wayin.make(opening, identity, sealed.props)
+    const wayin = Wayin.make(opening, identity, sealed.record)
     await TH.expectBad(wayin.tryOpen(Proof.parse(opening, 'wrong')), 'wrong_passphrase')
     await TH.expectGood(wayin.tryOpen(Proof.parse(opening, 'first')))
     expect(handed).to.have.lengthOf(2)

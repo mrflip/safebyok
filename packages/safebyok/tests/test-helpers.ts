@@ -18,7 +18,7 @@ export { wakeupAtNextTick, aWhile, eventually, changeCounter, liveWatch, makeGat
 export type { AsyncVerbOf } from './test-helpers/timing'
 export { throughTurnstile, raceEveryWay } from './test-helpers/racing'
 export type { Turnstile, RaceOutcome, MakeDevices, Race } from './test-helpers/racing'
-export { spyLogger, loggedText, thrownText, leafTexts } from './test-helpers/logging'
+export { spyLogger, loggedText, thrownText, leafTexts, shownOf, jsonOf } from './test-helpers/logging'
 export type { LoggedCall } from './test-helpers/logging'
 export { VaultDBContract, describeVaultDB, vaultDBTimingChecks, expectRoundTripsThroughTurnstile, perUser } from './test-helpers/vault-db-conformance'
 export type { VaultDBContractLine, VaultDBVerbs, MakeVaultDB, DescribeVaultDBOpts, VaultDBDeviceOpts,

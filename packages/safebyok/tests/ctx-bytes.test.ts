@@ -40,10 +40,10 @@ describe("the ctx builders' output, byte for byte", () => {
     const wayin = await Wayin.seal(sealing, identity, PassphraseProof.parse(slice, 'pw'), 'device-one', vaultKey)
     const ctx = textBytes(
       '["safebyok-vault-v6","acme","u1","main","vault-id-u1",' + String(identity.registered_at) + ',"vault_key_passphrase_wrapped",'
-      + `{"device_id":"device-one","key_deriver_label":"test_digest_v0","registered_at":${String(Date.UTC(2026, 9, 15))},"salt_b64":"${wayin.salt_b64}","wayinkind":"passphrase"}]`,
+      + `{"device_id":"device-one","key_deriver_label":"test_digest_v0","registered_at":${String(Date.UTC(2026, 9, 15))},"salt_b64":"${wayin.record.salt_b64}","wayinkind":"passphrase"}]`,
     )
-    const wayinKey = await importWrappingKeyBytes(await TH.testDeriver.deriveKeyBytes('pw', fromB64(wayin.salt_b64)))
-    expect(await unwrapKeyUnder(wayinKey, wayin.vault_key_wayin_wrapped, ctx, { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)
+    const wayinKey = await importWrappingKeyBytes(await TH.testDeriver.deriveKeyBytes('pw', fromB64(wayin.record.salt_b64)))
+    expect(await unwrapKeyUnder(wayinKey, wayin.record.vault_key_wayin_wrapped, ctx, { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)
   })
 
   it("a passkey wayin's wrap and its key are bound to the vault, the purpose and its whole header, byte for byte", async () => {
@@ -54,7 +54,7 @@ describe("the ctx builders' output, byte for byte", () => {
       + `{"credential_id":"${wayin.credential_id}","device_id":"device-one","prf_salt_b64":"${wayin.prf_salt_b64}","registered_at":${String(Date.UTC(2026, 9, 15))},"wayinkind":"passkey"}]`,
     )
     const passkeyKey = await deriveWrappingKey(passkey.prfBytes, ctx)
-    expect(await unwrapKeyUnder(passkeyKey, wayin.vault_key_wayin_wrapped, ctx, { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)
+    expect(await unwrapKeyUnder(passkeyKey, wayin.record.vault_key_wayin_wrapped, ctx, { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)
   })
 
   it("a box's two wraps and the lease's open only under the ctx bytes they have always been made with", async () => {

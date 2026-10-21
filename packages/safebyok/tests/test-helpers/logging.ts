@@ -81,6 +81,28 @@ export const leafTexts = (val: unknown): string[] => {
 }
 
 /**
+ * What a spread, a key list, a log line and `JSON.stringify` see of `obj`: its own enumerable
+ * fields, as a plain object, and nothing a private field or a getter holds. For a test of what a
+ * model shows of itself.
+ *
+ * @param obj - A box, a way in, a lease, or any object.
+ * @returns Its own enumerable fields, in their order.
+ *
+ * @example expect(TH.shownOf(box)).to.deep.equal(box.toJSON())
+ */
+export const shownOf = (obj: object): Record<string, unknown> => Object.fromEntries(Object.entries(obj))
+
+/**
+ * What `JSON.stringify` writes of `val`, read back: for a test of what a model serializes as.
+ *
+ * @example expect(Object.keys(TH.jsonOf(box))).to.deep.equal(['boxlabel', 'revision_tok', 'sidecar', 'registered_at', 'written_at', 'vault_id'])
+ */
+export const jsonOf = (val: unknown): Record<string, unknown> => {
+  const written = JSON.stringify(val)
+  return JSON.parse(written) as Record<string, unknown>
+}
+
+/**
  * An error and every cause under it as text: message, stack and own properties each. Anything
  * else thrown, as JSON. `seen` holds the errors already written, so a cause cycle ends.
  */

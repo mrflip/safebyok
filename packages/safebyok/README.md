@@ -108,7 +108,8 @@ code, the stored records and these docs all use its words.
   `unlocked`. Its boxes are written with `putBox`, read with `getBox` (the sealed `Box`), `getWhisper` and `useWhisper` (its
   whisper), and removed with `delBox`; `del()` removes the whole vault. A box in hand -- a `Box`, or the
   `BoxRecord` storage holds -- opens with `decryptWhisper(box)`, under the key in hand, reading nothing.
-  A `Box` holds its stored record as `box.props`, and serializes as it. While unlocked, the vault
+  A `Box` holds its stored record as `box.record`, and shows (and serializes as) its visible
+  fields alone, each once -- what `vault.boxes` lists for it. While unlocked, the vault
   keeps the vaultKey in one place, its `Lease`, opened: a box seals and opens under it
   (`Box.seal(vault, lease, ...)`, `box.open(lease)`), and locking drops it. Two devices that write at once
   cannot both win: the late one is refused as `stale_write` (see *Two devices storing at once*),
