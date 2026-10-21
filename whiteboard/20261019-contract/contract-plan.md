@@ -16,7 +16,7 @@ this line.
   (56 kB; `grep -n '^#'` is its outline). The handoff says when a ruling has changed it since.
 * **Sprint doc:** https://claude.ai/artifact/7h4ZNsYfYYD6aS81htMwgB
   (*Open Matters*, *Resolved*, *Progress*).
-* **Status:** 2026-10-21. The line is main → #213 (C1) → #212 (`b_fixes`) → #214 (`b_simplify`) → #215 (`wayin_rules`). `checker` (#216) in review; then `store_rulings`, `props_bag`, and `wayin_api` once its proposal row is ruled (the Coach's 2026-10-21 rulings); then a pause before `lean_core`. Pause again before D1.
+* **Status:** 2026-10-21. The line is main → #213 (C1) → #212 (`b_fixes`) → #214 (`b_simplify`) → #215 (`wayin_rules`). `checker` (#216) filed; `store_rulings` building; then `props_bag`, and `wayin_api` once its proposal row is ruled (the Coach's 2026-10-21 rulings); then a pause before `lean_core`. Pause again before D1.
 
 ## How this plan relates to the preplan
 
@@ -285,6 +285,8 @@ stale listing; reworked to read once on a miss. Left: a stale hello plus a miss 
 5. *A key deriver's throw rides as cause; the checker's doesn't* -- "Leave it, we will audit these. Add todo: "Add "sensitive" and "host" flags to refusals"": a TODO entry with those words; the deriver's handling stays.
 6. *no-misused-promises relaxed everywhere* -- "does it need to be off everywhere? Where did it need the exceptions? I thought it was a react thing": `b_simplify` turned `checksVoidReturn` off in all ten configs; the only lines it freed were two core tests (`vault-db` subscribe listeners that are async on purpose). Restore the rule's default in every config where nothing trips it; keep it off only where real code passes an async function as a void listener (likely react and the demo), and give the two core tests their `eslint-disable-next-line` back (reported).
 
+
+*Review (`checker`, #216, `fixed`, medium):* no passphrase reaches a message, log or cause through the guard or zod's English (it names fields and types, never values); the load is one sequential first step of hello. Fixed: eight new doc blocks put their purpose on the `/**` line (04ff5fa1). Left (minor): a keyless non-plain object passes as options; a failed load retried on a storage ring is logged as a storage fault (row); `vault.strengthChecker` doesn't check its arguments (row: bind the scope); the modal passes through any VaultError (row); VOCABULARY.md's strengthChecker entry lags (the Contract's rewrite).
 
 **`store_rulings`** (*Orchestrator:* added 2026-10-21 from the Coach's fourth pass of rulings, on C1's rows; stacked on `checker`; opus, review `medium`). The Coach's words are quoted.
 
