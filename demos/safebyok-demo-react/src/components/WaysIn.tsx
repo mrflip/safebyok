@@ -63,7 +63,7 @@ export const WaysIn = () => {
           <input ref={passphraseRef} type="password" name="current-password" autoComplete="current-password" />
         </label>
         <label>
-          new passphrase <span className="quiet">(to change it; your fingerprint goes with the old one, to add again)</span>
+          new passphrase <span className="quiet">(to change it{passkey !== null && '; your fingerprint goes with the old one, to add again'})</span>
           <input ref={newPassphraseRef} type="password" name="new-password" autoComplete="new-password" />
         </label>
         {gripe !== null && <p className="gripe">{gripe}</p>}
