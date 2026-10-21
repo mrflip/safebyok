@@ -63,18 +63,18 @@ const passphraseVerdict = Z.union([
 /**
  * `passphrase` put to `strengthChecker` for the vault named by `scope`, refused with kind
  * 'weak_passphrase' and the checker's reason when it finds it weak; kind 'bad_option' for a
- * checker that answers anything but a verdict. A throw from the checker is refused as
- * 'unexpected_error', carrying nothing of what it threw -- no kind, no meta, no cause -- as the
- * checker heard the passphrase.
+ * checker that answers anything but a verdict. A throw from the checker, or from reading its
+ * verdict, is refused as 'unexpected_error', carrying nothing of what it threw -- no kind, no meta,
+ * no cause -- as the checker heard the passphrase.
  */
 export const checkStrongEnough = async (strengthChecker: StrengthChecker, passphrase: string, scope: VaultScope): Promise<void> => {
-  let verdict: unknown
+  let checked: ReturnType<typeof passphraseVerdict.safeParse>
   try {
-    verdict = await strengthChecker(passphrase, scope)
+    // Parsed inside the guard: the verdict's fields may be the checker's getters, and throw as they are read.
+    checked = passphraseVerdict.safeParse(await strengthChecker(passphrase, scope))
   } catch {
-    throw new VaultError('unexpected_error', "The strengthChecker threw rather than answering a verdict. What it threw is left out of this report, as it heard the passphrase: have it answer { strong: false, reason } for a passphrase it cannot judge, and catch its own failures.")
+    throw new VaultError('unexpected_error', "The strengthChecker threw rather than answering a verdict, or answered one that threw as it was read. What it threw is left out of this report, as it heard the passphrase: have it answer { strong: false, reason } for a passphrase it cannot judge, and catch its own failures.")
   }
-  const checked = passphraseVerdict.safeParse(verdict)
   if (! checked.success) {
     throw new VaultError('bad_option', "The strengthChecker answered something other than a verdict: { strong: true }, or { strong: false, reason } with the reason as non-empty text.")
   }

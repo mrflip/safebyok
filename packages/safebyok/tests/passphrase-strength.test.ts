@@ -26,6 +26,13 @@ describe("StrongVerdict", () => {
   })
 })
 
+/** A checker whose verdict's `field` is a getter that throws, quoting the passphrase. */
+const lazyCheckerThrowingOn = (field: 'strong' | 'reason'): StrengthChecker => (passphrase) => {
+  const verdict = { strong: false, reason: 'Pick another.' }
+  Object.defineProperty(verdict, field, { enumerable: true, get: () => { throw new Error(`could not judge ${passphrase}`) } })
+  return verdict
+}
+
 describe("checkStrongEnough", () => {
   it("refuses one the test finds weak with kind 'weak_passphrase', the test's reason its message", async () => {
     const err = await TH.expectRefusal(checkStrongEnough(neverStrong, 'acme acme acme', scope), 'weak_passphrase')
@@ -70,6 +77,16 @@ describe("checkStrongEnough", () => {
       const broken: StrengthChecker = () => Promise.reject(thrown)
       const err = await TH.expectRefusal(checkStrongEnough(broken, 'acme acme acme', scope), 'unexpected_error')
       expect(err).to.not.eq(thrown)
+      expect(err.message).to.match(/strengthChecker threw/)
+      expect(err.cause).to.be.undefined
+      expect(err.meta).to.be.undefined
+      expect(TH.thrownText(err)).to.not.include('acme acme acme')
+    })
+  }
+
+  for (const field of ['strong', 'reason'] as const) {
+    it(`refuses a verdict whose ${field} is a getter that throws as unexpected_error, carrying nothing of the throw`, async () => {
+      const err = await TH.expectRefusal(checkStrongEnough(lazyCheckerThrowingOn(field), 'acme acme acme', scope), 'unexpected_error')
       expect(err.message).to.match(/strengthChecker threw/)
       expect(err.cause).to.be.undefined
       expect(err.meta).to.be.undefined
