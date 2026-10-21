@@ -144,6 +144,12 @@ token when it joins or creates a vault): don't build one ahead of it.
   props takes them up at once and drops the key; host deriver/strength-test throws become
   `unexpected_error` (conditions pass through); react's `forBoundary` strips `cause`.
 
+*Orchestrator:* from C1 (#213, ready 2026-10-21):
+
+* `VaultDB.putBox(scope, expected, box, opts?)` is one conditional write per adapter and resolves the record as stored. `stale_write` carries the winner whole in `meta.box_stored` (`BoxRecord | DamagedBox | null`; the Coach's ruling, noted in `notes/security.md`), so the listing can be updated and the box opened without a read. `vault_mismatch` (new, condition) carries no meta; `invalid_box` (new) is mapped to `bad_record` at the vault.
+* `meta.capacity` is not filled on storage's `vault_full`/`box_too_large` (a row: the vault fills it in C2). `BoxExpectation` stays the type of `expected`.
+* putBox's arguments were reordered by codemod: spy assertions like `mock.calls[0]?.[2]` type-check at the wrong index, so grep for them on any reorder. Run GraphQL's tests through `pnpm --filter` (they need Postgres's `dist/`).
+
 ## Interim shims standing
 
 *Orchestrator:* each is listed until a later thread removes it.
@@ -151,6 +157,7 @@ token when it joins or creates a vault): don't build one ahead of it.
 * `RefusalPolicy.heed` (`refusal-policy.ts`): every vault.ts store call goes through it, turning
   an Outcome back into a throw. A4 / phase C.
 * `del-damaged-vault.ts` unwraps via `valOf`.
+* `#refuseStalePutBox` (`vault.ts`, C1): after `vault_mismatch` the vault catches up with one read, then refuses `vault_locked` if that relocked it, else `stale_write`. `lean_core`/C2 remove the read.
 * GraphQL's `served` and the Postgres route recipe are not shims (A1b): a resolver reports failure
   only by throwing, and the route turns an Outcome into JSON by design.
 
