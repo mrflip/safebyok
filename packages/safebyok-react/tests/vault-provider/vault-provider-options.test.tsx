@@ -83,7 +83,7 @@ describe("VaultProvider", () => {
     fireEvent.click(await screen.findByText('put'))
     const field = await screen.findByPlaceholderText('vault passphrase')
     fireEvent.change(field, { target: { value: 'correct horse battery staple' } })
-    await waitFor(() => { expect(screen.getByRole('status').textContent).to.match(/can't accept a new passphrase yet/) })
+    await waitFor(() => { expect(screen.getByRole('status').textContent).to.match(/can't take a new passphrase yet/) })
   })
 
   it("throws to the error boundary at the render whose strengthChecker is no function, before any open", () => {

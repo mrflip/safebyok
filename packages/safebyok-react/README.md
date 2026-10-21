@@ -468,6 +468,8 @@ if (passkey !== null) { const { ok } = await ask.attempt(passkey) }
   newPassphrase)`, `vault.putWayin(passphrase, answer)` and `vault.delWayin(passphrase)` each take
   the standing passphrase as proof, never a passkey's answer (refused as `bad_option`). A user who forgot the passphrase can still unlock
   with the passkey, but can set a new passphrase only by starting over (*Starting over*, above).
+  A new passphrase removes the passkey, which was matched to the old one: offer to add it again,
+  under the new passphrase, once the change lands.
 
 ## Development
 

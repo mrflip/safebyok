@@ -1,20 +1,22 @@
 import { describe, expect, it, vi } from 'vitest'
-import { cipherCtx, deriveWrappingKey, fromB64, makeBoxKey, makeVaultKey, toB64, unwrapKeyUnder, wrapKeyUnder } from '../src/crypto'
+import { cipherCtx, deriveWrappingKey, fromB64, makeVaultKey, toB64, unwrapKeyUnder } from '../src/crypto'
 import type { KeyDeriver } from '../src/key-deriver'
 import { valOf } from '../src/outcome'
 import { PasskeyProof, PassphraseProof, Proof } from '../src/proof'
 import { VaultProps, type PasskeyAnswer, type PasskeyWayinRecord, type PassphraseWayinRecord, type VaultScope } from '../src/types'
-import { PasskeyWayin, PassphraseWayin, Wayin, checkFreshSalt, type WayinStamp, type WayinVault } from '../src/wayin'
+import { PasskeyWayin, PassphraseWayin, Wayin, type WayinStamp } from '../src/wayin'
 import * as TH from './test-helpers'
 
 const scope = TH.scopeOf('u1')
-/** The slice of a vault every way in here belongs to: `u1`'s `main` vault, deriving with the test deriver. */
-const slice = TH.vaultSliceOf('u1')
+/** What the clock of every vault here reads: a way in is stamped by it. */
+const SealedAt = Date.UTC(2026, 9, 15)
+/** The slice of a vault every way in here belongs to: `u1`'s `main` vault, deriving with the test deriver, its clock stopped at {@link SealedAt}. */
+const slice: TH.VaultSlice = { ...TH.vaultSliceOf('u1'), clock: { now: () => SealedAt } }
 /** The vault props every way in here is sealed for: their `vault_id` and `registered_at` are what a wrap binds of them. */
 const identity = TH.vaultPropsOf('u1')
 
 /** The slice of a vault of `vaultScope`, deriving with `keyDeriver`. */
-const sliceOf = (vaultScope: VaultScope, keyDeriver: KeyDeriver = TH.testDeriver): WayinVault => ({ ...vaultScope, keyDeriver })
+const sliceOf = (vaultScope: VaultScope, keyDeriver: KeyDeriver = TH.testDeriver): TH.VaultSlice => ({ ...slice, ...vaultScope, keyDeriver })
 
 /** A testDeriver that counts its derivations: the deriver, and the spy that counts. */
 const countingDeriver = () => {
@@ -26,18 +28,18 @@ const countingDeriver = () => {
 const stamp: WayinStamp = {
   vault_key_epoch: 1,
   device_id:       'device-one',
-  registered_at:   Date.UTC(2026, 9, 15),
+  registered_at:   SealedAt,
 }
 
 /** A real passphrase's way in around `vaultKey`: its record. */
 const sealed = async (passphrase: string, vaultKey: CryptoKey): Promise<PassphraseWayinRecord> => {
-  const { wayin } = await Wayin.seal(slice, identity, PassphraseProof.parse(slice, passphrase), stamp, vaultKey)
+  const wayin = await Wayin.seal(slice, identity, PassphraseProof.parse(slice, passphrase), 'device-one', vaultKey)
   return wayin.props
 }
 
 /** A real passkey's way in around `vaultKey`, for the passkey that answered `answer`: its record. */
 const sealedPasskey = async (answer: PasskeyAnswer, vaultKey: CryptoKey): Promise<PasskeyWayinRecord> => {
-  const { wayin } = await Wayin.seal(slice, identity, PasskeyProof.parse(slice, answer), stamp, vaultKey)
+  const wayin = await Wayin.seal(slice, identity, PasskeyProof.parse(slice, answer), 'device-one', vaultKey)
   return wayin.props
 }
 
@@ -215,41 +217,41 @@ describe("wayin.isDamaged", () => {
 })
 // --
 
-// == [Sealing]: seal, checkFreshSalt
+// == [Sealing]: seal
 
 describe("Wayin.seal, for a passphrase", () => {
   it("makes a valid passphrase's way in that names its deriver and a fresh salt, as its first example shows", async () => {
     const vaultKey = await makeVaultKey()
-    const { wayin: one } = await Wayin.seal(slice, identity, PassphraseProof.parse(slice, 'pw'), stamp, vaultKey)
+    const one = await Wayin.seal(slice, identity, PassphraseProof.parse(slice, 'pw'), 'device-one', vaultKey)
     const two = await sealed('pw', vaultKey)
     expect(one).to.be.instanceOf(PassphraseWayin)
     expect(VaultProps.safeParse(TH.vaultPropsOf('u1', { passphrase: one.props })).success).to.be.true
     expect(one).to.include({ wayinkind: 'passphrase', key_deriver_label: 'test_digest_v0' })
-    expect(one).to.include({ vault_key_epoch: 1, device_id: 'device-one', registered_at: Date.UTC(2026, 9, 15) })
+    expect(one).to.include(stamp)
     expect(one.salt_b64).to.not.eq(two.salt_b64)
     expect(one.holder).to.eq(identity)
   })
 
   it("keeps nothing of the passphrase in the way in it makes", async () => {
-    const { wayin } = await Wayin.seal(slice, identity, PassphraseProof.parse(slice, 'hunter2-hunter2'), stamp, await makeVaultKey())
+    const wayin = await Wayin.seal(slice, identity, PassphraseProof.parse(slice, 'hunter2-hunter2'), 'device-one', await makeVaultKey())
     expect(JSON.stringify(wayin)).to.not.include('hunter2')
     expect(Object.values(wayin)).to.not.include('hunter2-hunter2')
   })
 })
 
 describe("each field of a way in, as sealed (Contract: Wayin, How each field is made)", () => {
-  it("makes a passphrase's salt 16 fresh random bytes, names its key deriver, and keeps the stamp it was given", async () => {
-    const { wayin } = await Wayin.seal(slice, identity, PassphraseProof.parse(slice, 'pw'), stamp, await makeVaultKey())
+  it("makes a passphrase's salt 16 fresh random bytes, names its key deriver, and stamps it with the holder's epoch, the device and the vault's clock", async () => {
+    const wayin = await Wayin.seal(slice, identity, PassphraseProof.parse(slice, 'pw'), 'device-one', await makeVaultKey())
     expect(fromB64(wayin.salt_b64)).to.have.lengthOf(16)
     expect(wayin.key_deriver_label).to.eq(TH.testDeriver.key_deriver_label)
     expect(wayin).to.include(stamp)
-    const { wayin: again } = await Wayin.seal(slice, identity, PassphraseProof.parse(slice, 'pw'), stamp, await makeVaultKey())
+    const again = await Wayin.seal(slice, identity, PassphraseProof.parse(slice, 'pw'), 'device-one', await makeVaultKey())
     expect(again.salt_b64).to.not.eq(wayin.salt_b64)
   })
 
   it("keeps a passkey's 32-byte salt and credential as the answer brings them, and no key deriver", async () => {
     const answer = await TH.passkeyOf('laptop')
-    const { wayin } = await Wayin.seal(slice, identity, PasskeyProof.parse(slice, answer), stamp, await makeVaultKey())
+    const wayin = await Wayin.seal(slice, identity, PasskeyProof.parse(slice, answer), 'device-one', await makeVaultKey())
     expect(fromB64(wayin.prf_salt_b64)).to.have.lengthOf(32)
     expect(wayin).to.include({ credential_id: answer.credentialId, prf_salt_b64: answer.prfSaltB64 })
     expect(wayin).to.not.have.property('key_deriver_label')
@@ -258,37 +260,32 @@ describe("each field of a way in, as sealed (Contract: Wayin, How each field is 
   it("wraps the vaultKey under the wayinKey, bound to wayinCtx: the proof's key unwraps it under that ctx", async () => {
     const vaultKey = await makeVaultKey()
     const proof = PassphraseProof.parse(slice, 'pw')
-    const { wayin } = await Wayin.seal(slice, identity, proof, stamp, vaultKey)
+    const wayin = await Wayin.seal(slice, identity, proof, 'device-one', vaultKey)
     const unwrapped = await unwrapKeyUnder(await proof.wayinKeyFor(wayin), wayin.vault_key_wayin_wrapped, wayin.wayinCtx, { extractable: true, usage: ['wrapKey'] })
     expect(await rawOf(unwrapped)).to.eq(await rawOf(vaultKey))
   })
 })
 
-describe("Wayin.seal's session handle", () => {
-  it("hands back, beside the way in, a session handle on the vaultKey that cannot be exported, as its third example shows", async () => {
+describe("Wayin.seal's stamp and answer", () => {
+  it("stamps the vaultKey epoch of the vault props it seals into, the device it is given, and the vault's clock now", async () => {
+    const holder = TH.vaultPropsAtEpochOf('u1', 3)
+    const later: TH.VaultSlice = { ...slice, clock: { now: () => SealedAt + 1000 } }
+    const wayin = await Wayin.seal(later, holder, PassphraseProof.parse(later, 'pw'), 'device-two', await makeVaultKey())
+    expect(wayin).to.include({ vault_key_epoch: 3, device_id: 'device-two', registered_at: SealedAt + 1000 })
+  })
+
+  it("hands back the way in alone, holding no key: the vault takes its key out of a way in as stored", async () => {
     const vaultKey = await makeVaultKey()
-    const { wayin, sessionKey } = await Wayin.seal(slice, identity, PassphraseProof.parse(slice, 'pw'), stamp, vaultKey)
-    expect(wayin).to.include({ wayinkind: 'passphrase', key_deriver_label: 'test_digest_v0' })
-    expect(sessionKey.extractable).to.be.false
-    expect(sessionKey.usages).to.have.members(['wrapKey', 'unwrapKey'])
-    // The handle is the vaultKey: what the vaultKey wraps, it unwraps.
-    const boxKey = await makeBoxKey()
-    const wrapped = await wrapKeyUnder(vaultKey, boxKey, new Uint8Array(1))
-    const unwrapped = await unwrapKeyUnder(sessionKey, wrapped, new Uint8Array(1), { extractable: true, usage: ['encrypt', 'decrypt'] })
-    expect(await rawOf(unwrapped)).to.eq(await rawOf(boxKey))
+    const wayin = await Wayin.seal(slice, identity, PassphraseProof.parse(slice, 'pw'), 'device-one', vaultKey)
+    expect(wayin).to.be.instanceOf(PassphraseWayin)
+    expect(Object.values(wayin).some((val) => val instanceof CryptoKey)).to.be.false
   })
 })
-
-/** Salts no new passkey's way in is sealed over. */
-const FreshSaltCases = [
-  [toB64(new Uint8Array(16)), 'a salt of 16 bytes, not 32'],
-  ["not base64url!",          'a salt that is not base64url'],
-] as const
 
 describe("Wayin.seal, for a passkey", () => {
   it("makes a valid passkey's way in that keeps the credential and its salt, and never the answer, as its second example shows", async () => {
     const answer = await TH.passkeyOf('laptop')
-    const { wayin } = await Wayin.seal(slice, identity, PasskeyProof.parse(slice, answer), stamp, await makeVaultKey())
+    const wayin = await Wayin.seal(slice, identity, PasskeyProof.parse(slice, answer), 'device-one', await makeVaultKey())
     expect(wayin).to.be.instanceOf(PasskeyWayin)
     const vaultProps = TH.vaultPropsOf('u1', { passkey: wayin.props })
     expect(VaultProps.safeParse(vaultProps).success).to.be.true
@@ -296,35 +293,6 @@ describe("Wayin.seal, for a passkey", () => {
     expect(JSON.stringify(wayin)).to.not.include(toB64(answer.prfBytes))
   })
 
-  for (const [prfSaltB64, blurb] of FreshSaltCases) {
-    it(`refuses an answer over ${blurb} as bad_option, wrapping nothing`, async () => {
-      const answer = await TH.passkeyOf('laptop', prfSaltB64)
-      await TH.expectRefusal(Wayin.seal(slice, identity, PasskeyProof.parse(slice, answer), stamp, await makeVaultKey()), 'bad_option')
-    })
-  }
-
-  it("hands a passkey's way in a session handle too: the same vaultKey, whichever kind sealed it", async () => {
-    const vaultKey = await makeVaultKey()
-    const { sessionKey } = await Wayin.seal(slice, identity, PasskeyProof.parse(slice, await TH.passkeyOf('laptop')), stamp, vaultKey)
-    const boxKey = await makeBoxKey()
-    const wrapped = await wrapKeyUnder(vaultKey, boxKey, new Uint8Array(1))
-    const unwrapped = await unwrapKeyUnder(sessionKey, wrapped, new Uint8Array(1), { extractable: true, usage: ['encrypt', 'decrypt'] })
-    expect(await rawOf(unwrapped)).to.eq(await rawOf(boxKey))
-  })
-})
-
-describe("checkFreshSalt", () => {
-  it("passes an answer over a fresh 32-byte salt, as its example shows", async () => {
-    const answer = await TH.passkeyOf('laptop')
-    expect(() => { checkFreshSalt(PasskeyProof.parse(slice, answer)) }).to.not.throw()
-  })
-
-  for (const [prfSaltB64, blurb] of FreshSaltCases) {
-    it(`refuses an answer over ${blurb} as bad_option, naming createPasskey`, async () => {
-      const answer = await TH.passkeyOf('laptop', prfSaltB64)
-      expect(() => { checkFreshSalt(PasskeyProof.parse(slice, answer)) }).to.throw(/createPasskey/).with.property('refusalkind', 'bad_option')
-    })
-  }
 })
 // --
 

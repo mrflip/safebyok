@@ -619,14 +619,16 @@ the vault: the read that finds it succeeds, and `onBadNews` is told `damaged_way
 vault.getSnapshot().passphrase    // { wayinkind: 'passphrase', device_id: 'k3x9...', registered_at: 1760000000000 }
 vault.getSnapshot().passkey       // null, until one is put
 
-await vault.putWayin(passphrase, newPassphrase)   // the passphrase replaced, stamped afresh: this device, now
+await vault.putWayin(passphrase, newPassphrase)   // the passphrase replaced, stamped afresh: this device, now; any passkey removed
 await vault.putWayin(passphrase, passkeyAnswer)   // the passkey put, replacing any (below)
 await vault.delWayin(passphrase)                  // the passkey removed; the passphrase always stays
 ```
 
-Each resolves the vault, unlocked, its lease starting again from now (`tryPutWayin` and
-`tryDelWayin` resolve the same as an `Outcome`). Each refuses, changing nothing: `wrong_passphrase`
-for a `passphrase` that does not open the vault; `weak_passphrase` for a new passphrase the
+`putWayin` resolves the new way in as stored, its summary, as the snapshot's `passphrase` or
+`passkey` now shows it; `delWayin` resolves the vault. Each leaves the vault unlocked, its lease
+starting again from now (`tryPutWayin` and `tryDelWayin` resolve the same as an `Outcome`). Each
+refuses, changing nothing: `wrong_passphrase`
+for a `passphrase` that does not open the vault, or is blank; `weak_passphrase` for a new passphrase the
 `strengthChecker` finds weak, or a blank one; `bad_option` for a passkey's answer as the proof,
 or a new one over anything but a fresh salt; `damaged_wayin` when the passphrase is stored damaged;
 `absent_wayin` from `delWayin` on a vault with no passkey; and `stale_write` when another device
@@ -637,6 +639,10 @@ changed the vault meanwhile.
   a way in. Only the standing passphrase proves a change -- a new passphrase, a passkey put or
   removed -- never a passkey's answer, which is refused `bad_option`: this is how it is done
   everywhere else. A passkey opens the vault; it does not change who may.
+* **One passphrase, and a passkey matched to it.** A vault always has its passphrase, and at most
+  one passkey, added by proving the passphrase. A new passphrase removes the passkey with the old
+  one: the user adds a passkey again, proving the new passphrase. Warn them before they change it
+  ("your passkey will be removed; add it again afterwards").
 * **Every change locks the other devices.** It moves the vault props' `unlock_epoch`, so each
   other device falls back to `locked` and must unlock again. This device stays unlocked.
 * **An unlock tries the one passphrase**: one key derivation, about 0.6 s with the browser's
@@ -650,7 +656,8 @@ changed the vault meanwhile.
 Every passphrase about to become a way in -- the one the first `unlock()` creates the vault
 with, and each `putWayin()` sets -- is put to the vault's
 `strengthChecker` first, before any key derivation. One it finds weak is refused with kind
-`weak_passphrase`, the checker's reason the message. An `unlock()` of a vault that stands is never
+`weak_passphrase`, the checker's reason the message; a blank one is refused so before the checker
+hears it. An `unlock()` of a vault that stands is never
 refused for weakness: a passphrase already in use is the user's to change, not the vault's to
 lock them out with.
 
@@ -665,9 +672,10 @@ await zxcvbnStrengthChecker('skylarkpinecone', { applabel: 'skylark', user_id: '
 ```
 
 * **The core's default refuses every passphrase.** Leave `strengthChecker` out and every new
-  passphrase is refused as too weak, so no vault can be made until you choose a checker, and the
-  vault says so once, through your logger, pointing at
-  [CUSTOMIZATION.md](CUSTOMIZATION.md#pluggable-passphrase-strength-checker). A checker of length
+  passphrase is refused as too weak, so no vault can be made until you choose a checker. The
+  refusal's message says so, to the user and to you, pointing at
+  [CUSTOMIZATION.md](CUSTOMIZATION.md#pluggable-passphrase-strength-checker); nothing is logged.
+  A checker of length
   alone is no checker -- 'a' and eleven spaces is twelve characters -- so the core offers none.
   `parseStrengthChecker` is `Vault.make`'s own check, for a wrapper that takes the options apart.
 * **In a browser, `browserOpts()` brings `zxcvbnStrengthChecker`.** It asks for at least
@@ -732,7 +740,8 @@ await vault.delWayin(passphrase)                                // the passkey i
 * **One passkey per vault.** Putting one replaces the passkey the vault had, if any: the snapshot's
   `passkey` says which it is, when it was added and from which device, so warn the user before
   asking ("this replaces the passkey added on 3 Oct from another device"). Putting the same
-  passkey again mends one stored damaged.
+  passkey again mends one stored damaged. A new passphrase removes the passkey: it was matched to
+  the old one, and the user adds it again under the new.
 * **Putting or removing one asks for the passphrase**, as every change to the ways in does; a
   passkey's answer proves neither. The passkey is made before the passphrase is checked, so a
   mistyped passphrase leaves the new passkey on its authenticator, a way into nothing: the user
@@ -809,7 +818,7 @@ Part of normal operation. Each can reach the user; the app decides how.
 | `vault_locked`        | the vault is locked and no proof came: the `getProof` prompt was declined, there is no `getProof`, or a lock won while the call ran | Nothing to retry: the user said no, or locked it. With no `getProof`, ask for the passphrase and `unlock()`, then call again |
 | `wrong_passphrase`    | the passphrase did not unlock the vault, or was empty. A passphrase wayin altered in storage refuses its passphrase in just the same way, so the message says that the stored vault may be damaged | Ask again, with a hint to check for typos. If your handling says "check for typos", treat `created_elsewhere` alongside it, with its own advice |
 | `created_elsewhere`   | a first `unlock()` on an `absent` vault lost a race: another device created the vault between this one's look at storage and its write, and the passphrase given does not open that vault. Nothing was created here, and the vault now shows `locked` as the other device made it. A passphrase that does open it unlocks as usual | Show the message as advice, not as a typo: the user enters the passphrase chosen on the other device |
-| `weak_passphrase`     | a new passphrase -- the one the first `unlock()` creates the vault with, or one `putWayin()` sets -- that the vault's `strengthChecker` finds too easy to guess, or a blank one handed to `putWayin()` (a blank one to `unlock()` is `wrong_passphrase`). The message is the checker's own reason. Never raised by an `unlock()` of a vault that stands | Show the message beside the field, and ask for another |
+| `weak_passphrase`     | a new passphrase -- the one the first `unlock()` creates the vault with, or one `putWayin()` sets -- that the vault's `strengthChecker` finds too easy to guess, or a blank one (a blank one offered as proof, to unlock a vault that stands or to prove a change, is `wrong_passphrase`). The message is the checker's own reason. Never raised by an `unlock()` of a vault that stands | Show the message beside the field, and ask for another |
 | `wrong_passkey`       | the passkey's answer did not unlock the vault, or answered for another salt. An answer for the wayin's own salt that does not open it most likely means the wayin was altered in storage, and the message says so | Ask for the passphrase; if it works, the user may add the passkey again, which replaces it |
 | `passkey_unavailable` | this browser or authenticator cannot answer for a passkey unlock: no WebAuthn, or no PRF extension | Offer the passphrase instead; on `createPasskey`, tell the user this device cannot be a fingerprint unlock |
 | `absent_box`          | no box under that label                                      | Offer to create it, or refresh the list: it may have been deleted elsewhere |

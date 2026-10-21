@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
-import { StrongVerdict, UnchosenCheckerSaid, UnchosenStrengthChecker, parseStrengthChecker, checkStrongEnough, type StrengthChecker, type PassphraseVerdict } from '../src/passphrase-strength'
+import { StrongVerdict, DefaultStrengthChecker, parseStrengthChecker, checkStrongEnough, type StrengthChecker, type PassphraseVerdict } from '../src/passphrase-strength'
 import { zxcvbnStrengthChecker } from '../src/zxcvbn-strength-checker'
 import type { VaultScope } from '../src/types'
 import { VaultError } from '../src/errors'
@@ -37,6 +37,15 @@ describe("checkStrongEnough", () => {
   it("refuses one the test finds weak with kind 'weak_passphrase', the test's reason its message", async () => {
     const err = await TH.expectRefusal(checkStrongEnough(neverStrong, 'acme acme acme', scope), 'weak_passphrase')
     expect(err.message).to.eq('Pick a phrase nobody would guess.')
+  })
+
+  it("refuses a blank passphrase as weak_passphrase before the checker hears it", async () => {
+    const test = vi.fn((_passphrase: string, _scope: VaultScope): PassphraseVerdict => StrongVerdict)
+    for (const blank of ['', ' '.repeat(3), '\t\n']) {
+      const err = await TH.expectRefusal(checkStrongEnough(test, blank, scope), 'weak_passphrase')
+      expect(err.message).to.include("can't be empty")
+    }
+    expect(test).not.toHaveBeenCalled()
   })
 
   it("awaits a test that answers a promise", async () => {
@@ -104,8 +113,8 @@ describe("parseStrengthChecker", () => {
     expect(parseStrengthChecker(zxcvbnStrengthChecker)).to.eq(zxcvbnStrengthChecker)
   })
 
-  it("hands back UnchosenStrengthChecker for a checker left out, as its second example says", () => {
-    expect(parseStrengthChecker(undefined)).to.eq(UnchosenStrengthChecker)
+  it("hands back DefaultStrengthChecker for a checker left out, as its second example says", () => {
+    expect(parseStrengthChecker(undefined)).to.eq(DefaultStrengthChecker)
   })
 
   it("refuses anything but a function with kind 'bad_option', as its third example says, naming where a good one is", () => {
@@ -115,24 +124,28 @@ describe("parseStrengthChecker", () => {
   })
 })
 
-describe("UnchosenStrengthChecker", () => {
-  it("finds every passphrase weak, with a reason for the user that quotes none, as its example shows", async () => {
-    for (const passphrase of ['correct horse battery staple', 'pw', '']) {
-      const verdict = await UnchosenStrengthChecker(passphrase, scope)
-      expect(verdict).to.have.property('strong', false)
-      expect(verdict).to.have.property('reason').that.matches(/can't accept a new passphrase yet/)
-    }
-    await TH.expectRefusal(checkStrongEnough(UnchosenStrengthChecker, 'correct horse battery staple', scope), 'weak_passphrase')
-  })
-})
-
-describe("UnchosenCheckerSaid, and the CUSTOMIZATION.md section it points at", () => {
+describe("DefaultStrengthChecker, and the CUSTOMIZATION.md section its reason points at", () => {
   const customization = readFileSync(new URL('../CUSTOMIZATION.md', import.meta.url), 'utf8')
 
-  it("names the option, browserOpts and the section by its heading, which CUSTOMIZATION.md has", () => {
-    expect(UnchosenCheckerSaid).to.match(/strengthChecker/)
-    expect(UnchosenCheckerSaid).to.match(/browserOpts/)
-    expect(UnchosenCheckerSaid).to.include('CUSTOMIZATION.md, under Pluggable Passphrase Strength Checker')
+  it("finds every passphrase weak, with a reason for the user that quotes none, as its example shows", async () => {
+    for (const passphrase of ['correct horse battery staple', 'pw', '']) {
+      const verdict = await DefaultStrengthChecker(passphrase, scope)
+      expect(verdict).to.have.property('strong', false)
+      expect(verdict).to.have.property('reason').that.matches(/can't take a new passphrase yet/)
+      expect(JSON.stringify(verdict)).to.not.include(passphrase || 'no passphrase at all')
+    }
+    await TH.expectRefusal(checkStrongEnough(DefaultStrengthChecker, 'correct horse battery staple', scope), 'weak_passphrase')
+  })
+
+  it("answers the same, every time, logging nothing: it is an ordinary checker", async () => {
+    expect(await DefaultStrengthChecker('one', scope)).to.eq(await DefaultStrengthChecker('two', scope))
+  })
+
+  it("names the option and the section by its heading, which CUSTOMIZATION.md has", async () => {
+    const verdict = await DefaultStrengthChecker('pw', scope)
+    const reason = verdict.strong ? '' : verdict.reason
+    expect(reason).to.match(/strengthChecker/)
+    expect(reason).to.include("CUSTOMIZATION.md says under Pluggable Passphrase Strength Checker")
     expect(customization).to.include('\n## Pluggable Passphrase Strength Checker\n')
   })
 

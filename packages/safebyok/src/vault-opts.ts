@@ -142,8 +142,9 @@ export type MakeVaultOpts = {
    * kind 'weak_passphrase', its reason the message. It never runs on `unlock()` of a vault that
    * stands. In a browser, `browserOpts()` from `safebyok/browser` supplies `zxcvbnStrengthChecker`,
    * which turns away short passphrases, common passwords and patterns. Left out, every new
-   * passphrase is refused as too weak, and the vault says once, through its logger, that a checker
-   * must be chosen (CUSTOMIZATION.md). The vault keeps the checker it was opened with for its life.
+   * passphrase is refused as too weak, the refusal's message saying that a checker must be chosen
+   * (CUSTOMIZATION.md). The vault keeps the checker it was opened with for its life, as its
+   * `strengthChecker`.
    * Kind 'bad_option' for anything but a function, and for a checker that answers anything but a
    * verdict; one that throws is 'unexpected_error', carrying nothing of what it threw.
    */

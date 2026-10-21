@@ -36,23 +36,20 @@ export type StrengthChecker = (passphrase: string, scope: VaultScope) => Passphr
 /** A verdict that admits. Frozen, so a checker handing it out shares it safely. */
 export const StrongVerdict: PassphraseVerdict = Object.freeze({ strong: true })
 
-/** What the unchosen checker says to the user of every passphrase. */
-const UnchosenVerdict: PassphraseVerdict = Object.freeze({
+/** What {@link DefaultStrengthChecker} answers of every passphrase: a word to the user, and one to the app's makers. */
+const DefaultVerdict: PassphraseVerdict = Object.freeze({
   strong: false,
-  reason: "This app can't accept a new passphrase yet: it has not been set up to judge how strong one is. Nothing was saved; let the app's makers know.",
+  reason: "This app can't take a new passphrase yet: it hasn't been set up to judge how strong one is, so nothing was saved. To the app's makers: Vault.make needs a strengthChecker, as safebyok's CUSTOMIZATION.md says under Pluggable Passphrase Strength Checker.",
 })
 
 /**
  * The strength checker of a vault whose host chose none: it finds every passphrase too weak, so no
- * vault can be made, nor a passphrase changed, until the host chooses one. The vault says so once
- * through the host's logger, pointing at CUSTOMIZATION.md.
+ * vault can be made, nor a passphrase changed, until the host chooses one. Its reason, which the
+ * refusal carries as its message, tells the app's makers where to look. It logs nothing.
  *
- * @example UnchosenStrengthChecker('correct horse battery staple')   // { strong: false, reason: "This app can't accept a new passphrase yet: ..." }
+ * @example DefaultStrengthChecker('correct horse battery staple')   // { strong: false, reason: "This app can't take a new passphrase yet: ..." }
  */
-export const UnchosenStrengthChecker: StrengthChecker = () => UnchosenVerdict
-
-/** What the vault logs, once, when it first consults {@link UnchosenStrengthChecker}. */
-export const UnchosenCheckerSaid = "Vault.make was given no strengthChecker, so every new passphrase is refused as too weak: no vault can be made, nor a passphrase changed. Choose one: in a browser, spread browserOpts() from safebyok/browser, which supplies zxcvbnStrengthChecker, or pass strengthChecker yourself. CUSTOMIZATION.md, under Pluggable Passphrase Strength Checker, says how to choose."
+export const DefaultStrengthChecker: StrengthChecker = () => DefaultVerdict
 
 const reasonText = Z.string().check(Z.minLength(1))
 const passphraseVerdict = Z.union([
@@ -62,12 +59,16 @@ const passphraseVerdict = Z.union([
 
 /**
  * `passphrase` put to `strengthChecker` for the vault named by `scope`, refused with kind
- * 'weak_passphrase' and the checker's reason when it finds it weak; kind 'bad_option' for a
+ * 'weak_passphrase' and the checker's reason when it finds it weak. A blank one (empty, or only
+ * spaces) is refused 'weak_passphrase' before the checker hears it. Kind 'bad_option' for a
  * checker that answers anything but a verdict. A throw from the checker, or from reading its
  * verdict, is refused as 'unexpected_error', carrying nothing of what it threw -- no kind, no meta,
  * no cause -- as the checker heard the passphrase.
  */
 export const checkStrongEnough = async (strengthChecker: StrengthChecker, passphrase: string, scope: VaultScope): Promise<void> => {
+  if (! passphrase.trim()) {
+    throw new VaultError('weak_passphrase', "A new passphrase can't be empty or only spaces: a few words together make a strong one, and easy to remember.")
+  }
   let checked: ReturnType<typeof passphraseVerdict.safeParse>
   try {
     // Parsed inside the guard: the verdict's fields may be the checker's getters, and throw as they are read.
@@ -83,16 +84,16 @@ export const checkStrongEnough = async (strengthChecker: StrengthChecker, passph
 
 /**
  * A host's `strengthChecker`, exactly as handed in, once it is a function; for one left out,
- * {@link UnchosenStrengthChecker}, which refuses every passphrase. Kind 'bad_option' for anything
+ * {@link DefaultStrengthChecker}, which refuses every passphrase. Kind 'bad_option' for anything
  * else. Vault.make runs it on its option; a binding or wrapper that takes the options apart runs it
  * first, once, as soon as it is handed the checker, and passes on what it hands back.
  *
  * @example parseStrengthChecker(zxcvbnStrengthChecker)  // the same function
- * @example parseStrengthChecker(undefined)               // UnchosenStrengthChecker
+ * @example parseStrengthChecker(undefined)               // DefaultStrengthChecker
  * @example parseStrengthChecker(12)                      // throws: bad_option
  */
 export const parseStrengthChecker = (strengthChecker: StrengthChecker | undefined): StrengthChecker => {
-  if (strengthChecker === undefined) { return UnchosenStrengthChecker }
+  if (strengthChecker === undefined) { return DefaultStrengthChecker }
   if (typeof strengthChecker !== 'function') {
     throw new VaultError('bad_option', "strengthChecker is a function from the passphrase, and the vault's scope, to a verdict, { strong: true } or { strong: false, reason }. In a browser, spread browserOpts() from safebyok/browser, which supplies zxcvbnStrengthChecker; elsewhere, pass your own.")
   }

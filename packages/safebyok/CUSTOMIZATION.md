@@ -29,8 +29,9 @@ type StrengthChecker = (passphrase: string, scope: { applabel: string, user_id: 
 * Build it once, at module level. The vault keeps the checker it was opened with, and
   `safebyok-react`'s provider reopens the vault for a new one.
 
-**If you choose none**, every new passphrase is refused as too weak, so no vault can be made,
-and the vault logs once, at error level, that a checker must be chosen, pointing here. That is the
+**If you choose none**, every new passphrase is refused as too weak, so no vault can be made, and
+the refusal's message says, to the user and to you, that a checker must be chosen, pointing here.
+Nothing is logged: the first passphrase anyone tries in development meets it. That is the
 contract at its plainest: the core will not guess how strong a passphrase your users need, and a
 checker of length alone is no checker ('a' and eleven spaces is twelve characters).
 

@@ -180,7 +180,7 @@ describe("graphqlVaultDB, carrying a passkey's way in", () => {
     const first = await opened()
     await first.unlock('correct horse battery staple')
     await first.putBox('anthropic_api_key', 'sk-ant-test-not-a-real-key')
-    expect(await first.putWayin('correct horse battery staple', laptop)).to.eq(first)
+    expect(await first.putWayin('correct horse battery staple', laptop)).to.deep.equal(first.passkey)
     first.close()
 
     const second = await opened()

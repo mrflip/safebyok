@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  cipherCtx, cipherBytes, decipherBytes, deriveWrappingKey, fromB64, importWrappingKeyBytes,
+  cipherCtx, cipherBytes, decipherBytes, deriveWrappingKey, fromB64, fromB64OrNull, importWrappingKeyBytes,
   makeLeaseKey, makeBoxKey, makeVaultKey, randomBytes, randomId, toB64, unwrapKeyUnder, wrapKeyUnder,
   type CipherCtxPart,
 } from '../src/crypto'
@@ -16,6 +16,11 @@ describe("base64url text", () => {
 
   it("refuses text that is not base64url", () => {
     expect(() => fromB64('not/base64url+!')).to.throw(/Unknown letter/)
+  })
+
+  it("reads base64url text as bytes, or null for text that is not base64url, as fromB64OrNull's examples show", () => {
+    expect(fromB64OrNull('Y3JlZC1sYXB0b3A')).to.have.lengthOf(11)
+    expect(fromB64OrNull('not/base64url+!')).to.be.null
   })
 })
 

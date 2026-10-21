@@ -63,6 +63,12 @@ and refuses is not an `ensure`: it is a `check` (`checkBoxlabel(label)`,
 `checkStrongEnough(passphrase)`), or a `parse` when it also hands back the cleaned value
 (*Validation*). Reviewers: an `ensure` that returns nothing is misnamed.
 
+**`put` resolves what is stored.** On success, `putFoo` resolves the foo as storage now holds it
+(the Coach, 2026-10-21): "putFoo should return the foo object as it is in the database (not what
+was sent)". Not the argument it was handed, not `this`, not a boolean. Where the stored foo holds
+key material, a model's verb resolves its summary: `vault.putWayin()` resolves the way in as
+`vault.passphrase` or `vault.passkey` then shows it; `VaultDB.putBox()` resolves the record.
+
 **Stored fields are underbar_case** (`salt_bytes`, `memory_kib`): they are written to someone
 else's database, and stay one spelling from the wire to the code. Everything else is camelCase.
 That holds wherever the object is the stored record, the facades a record passes through

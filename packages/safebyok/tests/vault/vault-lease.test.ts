@@ -36,11 +36,22 @@ describe("unlock and lock", () => {
     expect(vault.getSnapshot().state).to.eq('unlocked')
   })
 
-  it("a passphrase of only whitespace is refused outright", async () => {
+  it("a passphrase of only whitespace creates nothing: as a new passphrase, it is too weak", async () => {
     const world = makeWorld()
     const vault = await world.open()
-    await TH.expectRefusal(vault.unlock(' '.repeat(3)), 'wrong_passphrase')
+    await TH.expectRefusal(vault.unlock(' '.repeat(3)), 'weak_passphrase')
     expect(vault.getSnapshot().state).to.eq('absent')
+  })
+
+  it("a passphrase of only whitespace opens nothing: as a proof, it is wrong, and costs no derivation", async () => {
+    const derivations = vi.fn(async (passphrase: string, saltBytes: Uint8Array) => await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes))
+    const world = makeWorld()
+    const vault = await world.openUnlocked('pw one', { keyDeriver: { ...TH.testDeriver, deriveKeyBytes: derivations } })
+    await vault.lock()
+    derivations.mockClear()
+    await TH.expectRefusal(vault.unlock(' '.repeat(3)), 'wrong_passphrase')
+    expect(derivations).not.toHaveBeenCalled()
+    expect(vault.getSnapshot().state).to.eq('locked')
   })
 
   it("lock() forgets the unlock on this device too: a reopened handle is locked", async () => {
@@ -574,8 +585,8 @@ describe("a change to the ways in, once it has landed", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
     vi.spyOn(world.deviceDB, 'putLease').mockRejectedValueOnce(new Error('device storage is full'))
-    expect(await vault.putWayin('pw one', await TH.passkeyOf('laptop'))).to.eq(vault)
-    expect(vault.getSnapshot().passkey).to.not.be.null
+    const put = await vault.putWayin('pw one', await TH.passkeyOf('laptop'))
+    expect(vault.getSnapshot().passkey).to.deep.equal(put)
     expect(world.logged.map((heard) => [heard.level, heard.story])).to.deep.equal([['warn', { call: 'putWayin' }]])
     expect(await world.stateOnOpen()).to.eq('locked')
   })
@@ -692,14 +703,27 @@ const extractableUnwraps = (spied: ReturnType<typeof watchUnwraps>) => (
 )
 
 describe("the session vaultKey is non-extractable", () => {
-  it("creating a vault unwraps only the session handle, never an extractable one", async () => {
+  afterEach(() => { vi.restoreAllMocks() })
+
+  it("creating a vault takes its key out of the way in it stored, as any unlock does: one extractable transient, for the device wrap", async () => {
     const world = makeWorld()
     const vault = await world.open()
     const spied = watchUnwraps()
     await vault.unlock('pw one')
     expect(vault.getSnapshot().state).to.eq('unlocked')
-    expect(spied.mock.calls).to.have.lengthOf(1)
-    expect(extractableUnwraps(spied)).to.have.lengthOf(0)
+    expect(spied.mock.calls).to.have.lengthOf(2)
+    expect(extractableUnwraps(spied)).to.have.lengthOf(1)
+  })
+
+  it("creating a vault keeps a vaultKey that cannot be exported: the one each new boxKey is wrapped under", async () => {
+    const world = makeWorld()
+    const vault = await world.open()
+    await vault.unlock('pw one')
+    const wraps = vi.spyOn(crypto.subtle, 'wrapKey')
+    await vault.putBox('anthropic', 'sk-ant-fake')
+    const wrappingKeys = wraps.mock.calls.map((callArgs) => callArgs[2])
+    expect(wrappingKeys).to.have.lengthOf(1)
+    expect(wrappingKeys[0]?.extractable).to.be.false
   })
 
   it("a passphrase unlock asks for exactly one extractable transient, for the device wrap", async () => {

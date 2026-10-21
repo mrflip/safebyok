@@ -1,10 +1,11 @@
 import * as Z from 'zod/mini'
-import { deriveWrappingKey, fromB64, importWrappingKeyBytes } from './crypto'
+import { deriveWrappingKey, fromB64, fromB64OrNull, importWrappingKeyBytes } from './crypto'
 import { VaultError } from './errors'
 import type { KeyDeriver } from './key-deriver'
 import { hostThrewRefusal } from './outcome'
 import { PassphraseKeyBytes } from './key-deriver-spec'
-import type { PasskeyAnswer, WayinKind } from './types'
+import { checkStrongEnough } from './passphrase-strength'
+import { PasskeySaltBytes, type PasskeyAnswer, type WayinKind } from './types'
 import { decorate } from './adorn'
 import type { Vault } from './vault'
 import type { PasskeyWayin, PassphraseWayin } from './wayin'
@@ -18,8 +19,11 @@ import type { PasskeyWayin, PassphraseWayin } from './wayin'
  * the bytes behind it are dropped at once.
  */
 
-/** The slice of a {@link Vault} a proof reads: the key deriver a passphrase's derivation runs on. */
-export type ProofVault = Pick<Vault, 'keyDeriver'>
+/**
+ * The slice of a {@link Vault} a proof reads: the key deriver a passphrase's derivation runs on,
+ * and the strength checker a new passphrase is put to, with the scope it is told.
+ */
+export type ProofVault = Pick<Vault, 'keyDeriver' | 'strengthChecker' | 'applabel' | 'user_id' | 'vaultlabel'>
 
 /**
  * What the user handed in to show a way into the vault is theirs, checked: a
@@ -31,7 +35,7 @@ export type ProofVault = Pick<Vault, 'keyDeriver'>
  * @example JSON.stringify(Proof.parse(vault, passphrase))   // '{"kind":"passphrase"}'
  */
 export abstract class Proof {
-  /** The vault the proof was handed to: its key deriver makes a passphrase's key. Not enumerable. */
+  /** The vault the proof was handed to: its key deriver makes a passphrase's key, its strength checker judges a new one. Not enumerable. */
   declare readonly vault: ProofVault
   /** Which kind of way in the proof can open: `passphrase` or `passkey`. */
   abstract readonly kind: WayinKind
@@ -42,16 +46,16 @@ export abstract class Proof {
 
   /**
    * A proof as a host hands one in, checked: text is a passphrase, anything else a passkey's
-   * answer. Refuses a blank passphrase (empty, or only spaces) as kind 'wrong_passphrase' before
-   * any derivation, since it opens nothing and trying it would cost one; and a passkey's
-   * answer of the wrong shape as 'bad_option'. Neither refusal quotes what it was handed.
+   * answer. Refuses a passkey's answer of the wrong shape as 'bad_option', quoting none of it. A
+   * blank passphrase is a proof all the same: what it is refused as depends on its use, a
+   * new passphrase (`checkStrongEnough`) or one that proves (`wayin.tryOpen`).
    *
    * @param vault - The vault the proof is for.
    * @param given - What the host handed in: the passphrase typed, or a {@link PasskeyAnswer}.
    *
    * @example Proof.parse(vault, 'correct horse battery staple')   // a PassphraseProof
    * @example Proof.parse(vault, await askPasskey(vault.passkey))   // a PasskeyProof
-   * @example Proof.parse(vault, '   ')   // throws 'wrong_passphrase'
+   * @example Proof.parse(vault, { credentialId: 'abc' })   // throws 'bad_option'
    */
   static parse(vault: ProofVault, given: unknown): PassphraseProof | PasskeyProof {
     if (typeof given === 'string') { return PassphraseProof.parse(vault, given) }
@@ -84,9 +88,9 @@ export class PassphraseProof extends Proof {
   }
 
   /**
-   * A passphrase as a host hands one in, checked: kind 'bad_option' for anything but text, and
-   * 'wrong_passphrase' for text that is empty or only spaces. Neither quotes it. What the vault
-   * makes of a passphrase to unlock with, and of a new one to seal.
+   * A passphrase as a host hands one in, checked: kind 'bad_option' for anything but text, not
+   * quoting it. What the vault makes of a passphrase to unlock with, and of a new one to seal; a
+   * new one is then put to {@link checkStrongEnough}.
    *
    * @param vault - The vault the passphrase is for.
    * @param given - The passphrase the user typed.
@@ -98,8 +102,28 @@ export class PassphraseProof extends Proof {
     if (typeof given !== 'string') {
       throw new VaultError('bad_option', 'A passphrase is the text the user typed, as a string.')
     }
-    if (! given.trim()) { throw new VaultError('wrong_passphrase', "A passphrase can't be empty or only spaces.") }
     return new PassphraseProof(vault, given)
+  }
+
+  /** True for a passphrase that is empty or only spaces: no way in opens to one, and no new one may be one. */
+  get isBlank(): boolean {
+    return ! this.passphrase.trim()
+  }
+
+  /**
+   * Check this passphrase as a new one, before it becomes a way in: put to its vault's
+   * `strengthChecker`, with the vault's scope. Refuses with kind 'weak_passphrase' for a blank one,
+   * before the checker hears it, and for one the checker finds weak, its reason the message. A
+   * checker that throws is refused 'unexpected_error', carrying nothing of what it threw; one that
+   * answers no verdict, 'bad_option'. Only a new passphrase is checked: one that proves never is.
+   *
+   * @example await PassphraseProof.parse(vault, chosen).checkStrongEnough()   // throws 'weak_passphrase' with the checker's reason
+   */
+  async checkStrongEnough(): Promise<void> {
+    const { vault } = this
+    // Frozen, so the host's checker can change nothing of what it is told.
+    const scope = Object.freeze({ applabel: vault.applabel, user_id: vault.user_id, vaultlabel: vault.vaultlabel })
+    await checkStrongEnough(vault.strengthChecker, this.passphrase, scope)
   }
 
   /**
@@ -185,6 +209,20 @@ export class PasskeyProof extends Proof {
    */
   async wayinKeyFor(wayin: Pick<PasskeyWayin, 'wayinCtx'>): Promise<CryptoKey> {
     return await deriveWrappingKey(this.prfBytes, wayin.wayinCtx)
+  }
+}
+
+/**
+ * Refuse with kind 'bad_option' a new passkey's answer over anything but a salt of
+ * {@link PasskeySaltBytes} bytes, as base64url text. A passkey's way in sealed over another would
+ * read as damaged at every later unlock. The vault checks it at its door, before any key is made.
+ *
+ * @example checkSaltShape(PasskeyProof.parse(vault, await createPasskey(opts)))   // passes
+ * @example checkSaltShape(PasskeyProof.parse(vault, { ...answer, prfSaltB64: 'c2hvcnQ' }))   // throws 'bad_option'
+ */
+export const checkSaltShape = (proof: PasskeyProof): void => {
+  if (fromB64OrNull(proof.prfSaltB64)?.length !== PasskeySaltBytes) {
+    throw new VaultError('bad_option', `A new passkey answers over a fresh salt of ${String(PasskeySaltBytes)} random bytes, as base64url text: safebyok-react's createPasskey mints one.`)
   }
 }
 

@@ -264,7 +264,7 @@ export const VaultProvider = ({ userId, allowStartOver, passphraseUsername, pass
   // The bag is taken apart below, so a misspelt field would be dropped unseen: refused here, as Vault.make refuses it.
   checkValidators(validators)
   // Checked at the first render that has it, as Vault.make checks it; the vault keeps it for its life.
-  // Left out, the advice is the unchosen checker's, as the vault's refusal will be.
+  // Left out, the advice is the default checker's, as the vault's refusal will be.
   const adviser = parseStrengthChecker(strengthChecker)
   // The vault is made anew when a check changes, never for a bag rebuilt in render around the same ones.
   const applabelCheck = validators?.applabel
