@@ -115,6 +115,18 @@ describe("Lease.grant", () => {
     })
   }
 
+  for (const [leaseMillis, readAt, blurb] of [
+    [NaN,          GrantedAt,  'a leaseMillis that is no number'],
+    [LeaseMillis,  NaN,        'a clock that reads no number'],
+    [LeaseMillis,  0,          'a clock that reads before any lease could be granted'],
+  ] as const) {
+    it(`throws, as misuse, at ${blurb}: no lease record could hold the deadline it makes`, async () => {
+      const { vault, setNow } = leaseVaultOf('u1', leaseMillis)
+      setNow(readAt)
+      await expect(Lease.grant(vault, holder, await vaultKeyPairOf())).rejects.toThrow(Z.core.$ZodError)
+    })
+  }
+
   it("takes whole vault props as its holder, keeping only their vault_id and unlock_epoch", async () => {
     const { vault } = leaseVaultOf()
     const vaultProps = TH.vaultPropsOf('u1', { vault_id: 'vault-id-u1', unlock_epoch: 3 })

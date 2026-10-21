@@ -38,6 +38,9 @@ const SessionUsage = { extractable: false, usage: ['wrapKey', 'unwrapKey'] } as 
 /** What {@link Lease.grant} is handed beside the vaultKey, held to what its record will hold. */
 const GrantHolder = Z.pick(LeaseRecord, { vault_id: true, unlock_epoch: true })
 
+/** The deadline {@link Lease.grant} works out from its vault's clock and `leaseMillis`, held to what its record will hold. */
+const GrantDeadline = LeaseRecord.shape.ask_passphrase_at
+
 /** The deadline of a lease granted at `nowMillis`: `leaseMillis` later, in whole ms, but never past {@link FarFuture}. */
 const deadlineAfter = (nowMillis: number, leaseMillis: number): number => Math.min(Math.floor(nowMillis + leaseMillis), FarFuture)
 
@@ -137,8 +140,9 @@ export class Lease {
    * leaseKey is made non-extractable, so not even this code can export it. The vaultKey's
    * extractable handle is wrapped under it, bound to the lease's ctx, and not kept. Writes
    * nothing: the vault puts the record (`props`) in the device store, in place of any before.
-   * Throws a Zod error, as misuse, for a `holder` a lease record could not hold (`LeaseRecord`'s
-   * checks): the vault hands it only what it read.
+   * Throws a Zod error, as misuse, for a `holder`, or a deadline from `vault`'s clock and
+   * `leaseMillis`, that a lease record could not hold (`LeaseRecord`'s checks): a vault hands it
+   * only what it read and checked.
    *
    * @param vault - The vault it is for: its scope is bound into the wrap, its clock and `leaseMillis` set the deadline.
    * @param holder - The vault props the vaultKey was proven against: their `vault_id` and `unlock_epoch` are bound into the wrap.
@@ -149,7 +153,7 @@ export class Lease {
    */
   static async grant(vault: LeaseVault, givenHolder: LeaseHolder, vaultKeyPair: VaultKeyPair): Promise<Lease> {
     const holder = GrantHolder.parse(givenHolder)
-    const askPassphraseAt = deadlineAfter(vault.clock.now(), vault.leaseMillis)
+    const askPassphraseAt = GrantDeadline.parse(deadlineAfter(vault.clock.now(), vault.leaseMillis))
     const leaseKey = await makeLeaseKey()
     const wrapped = await wrapKeyUnder(leaseKey, vaultKeyPair.transientKey, leaseCtxOf(vault, holder, askPassphraseAt))
     return new Lease(vault, {
