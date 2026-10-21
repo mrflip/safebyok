@@ -88,6 +88,15 @@ Revisit before 1.0 if rotation signing every other device out is too blunt.
 one epoch below theirs. `vault_key_epoch` stays on every record, reserved at 1, with storage's
 comparison of a box's epoch against the vault props'.
 
+### "tombstone vaults; decide if the vault_id is a check -- the labels are meant to be the primary key"
+
+The Coach (2026-10-21, sprint contract, on #216's row "Rollback check and del()"): "Add a todo
+"tombstone vaults; decide if the vault_id is a check -- the labels are meant to be the primary
+key"". Today a deleted vault leaves nothing behind, and a vault is found by its labels (applabel,
+user id, vaultlabel) while `vault_id` is checked against the device's mark and on each write.
+Decide whether a deleted vault leaves a tombstone, and whether `vault_id`
+stays a check or the labels alone identify the vault.
+
 ### `del()`'s edge cases
 
 From the Convex sprint ([#18](https://github.com/mrflip/safebyok/pull/18)): a handle that never
