@@ -38,7 +38,7 @@ export const optionsCheck = (shape: Z.core.$ZodLooseShape, said: string, notBagH
   return <Bag>(candidate: Bag): Bag => {
     const checked = schema.safeParse(candidate, InEnglish)
     if (checked.success) { return candidate }
-    const hint = notBagHint !== undefined && ! isPlainBag(candidate) ? ` ${notBagHint}` : ''
+    const hint = notBagHint === undefined || isPlainBag(candidate) ? '' : ` ${notBagHint}`
     throw new VaultError('bad_option', `${issuesText(checked.error)}. ${said}${hint}`)
   }
 }

@@ -463,7 +463,7 @@ mutations are serializable, and IndexedDB runs transactions that write one store
 another, across tabs and connections. Of Postgres it is not: under READ COMMITTED, statements run at
 once, each over its own snapshot, and PGlite cannot show that. So `safebyok-postgres` is also run
 against a real server: `e2e/tests/postgres/` runs this battery, with a pool and a listening
-connection to each device, against `postgres:17` (a CI job, and `e2e/compose.yaml` on a contributor's
+connection to each device, against `postgres:18` (a CI job, and `e2e/compose.yaml` on a contributor's
 machine; `pnpm justify` needs neither and skips those tests where `SAFEBYOK_PG_URL` is unset). Its
 other files race what the battery's turnstile cannot hold: writers for a vault's last places, with no
 turnstile and no PGlite to take turns; a foreign key violation (`23503`) from a vault deleted while
