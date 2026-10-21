@@ -128,13 +128,12 @@ describe("Wayin.make", () => {
     expect(wayin.vault_key_wayin_wrapped).to.eq(wayin.props.vault_key_wayin_wrapped)
   })
 
-  it("holds its vault, its holder and its props, none of them enumerable, so JSON and a spread show the record alone", () => {
+  it("holds its vault, its holder and its props, none of them enumerable, so a spread shows the record alone", () => {
     const record = TH.wayinOf('passphrase')
     const wayin = Wayin.make(slice, record, identity)
     expect(wayin.vault).to.eq(slice)
     expect(wayin.holder).to.eq(identity)
     expect(Object.keys(wayin)).to.have.members(Object.keys(record))
-    expect(JSON.stringify(wayin)).to.eq(JSON.stringify(record))
     const spread = Object.fromEntries(Object.entries(wayin))
     expect(JSON.stringify(spread)).to.not.include('applabel')
   })
@@ -158,10 +157,19 @@ describe("Wayin.make", () => {
 })
 
 describe("wayin.toJSON", () => {
-  it("is the record, so JSON.stringify of the way in is the record's, as the Wayin's second example shows", () => {
+  it("is the summary, so JSON.stringify of the way in carries no salt and no wrap, as the Wayin's second example shows", async () => {
+    const wayin = Wayin.make(slice, await sealed('pw', await makeVaultKey()), identity)
+    expect(wayin.toJSON()).to.deep.equal(wayin.summary)
+    expect(JSON.stringify(wayin)).to.eq(JSON.stringify(wayin.summary))
+    for (const stored of [wayin.salt_b64, wayin.vault_key_wayin_wrapped.ciphertext_b64, 'vault_key_wayin_wrapped', 'salt_b64']) {
+      expect(JSON.stringify(wayin)).to.not.include(stored)
+    }
+  })
+
+  it("is a passkey's summary, its credential and PRF salt and never its wrap", () => {
     const wayin = Wayin.make(slice, TH.passkeyWayinOf('laptop'), identity)
-    expect(wayin.toJSON()).to.eq(wayin.props)
-    expect(JSON.stringify(wayin)).to.eq(JSON.stringify(wayin.props))
+    expect(JSON.stringify(wayin)).to.eq(JSON.stringify(wayin.summary))
+    expect(JSON.stringify(wayin)).to.not.include('vault_key_wayin_wrapped')
   })
 })
 

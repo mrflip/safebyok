@@ -52,8 +52,8 @@ const leaseCtxOf = (vault: LeaseVault, holder: LeaseHolder, askPassphraseAt: num
 /**
  * This device's lease on one vault: the vaultKey under a leaseKey that never leaves this browser
  * profile, and the instant it ends. Its stored fields are its own, read-only; `props` is the
- * stored record, frozen, and `toJSON()` the same, so a log line shows the record alone, and the
- * leaseKey in it as `{}`. It holds `vault`, not enumerable. The record is what the device store
+ * stored record, frozen, and `toJSON()` every field of it but the leaseKey and the wrap, so a log
+ * line never carries the vaultKey's wrap. It holds `vault`, not enumerable. The record is what the device store
  * keeps, by structured clone: the leaseKey has no other form, and nothing of a lease reaches the
  * backend.
  *
@@ -213,8 +213,9 @@ export class Lease {
     return remaining <= millis || Number.isNaN(remaining)
   }
 
-  /** The record, as `JSON.stringify` and a log line show this lease: its leaseKey as `{}`. */
-  toJSON(): LeaseRecord {
-    return this.props
+  /** Which vault it opens and until when: all JSON and a log line show of it, never its leaseKey or wrap. */
+  toJSON(): Omit<LeaseRecord, 'lease_key' | 'vault_key_lease_wrapped'> {
+    const { format, applabel, user_id, vaultlabel, vault_id, unlock_epoch, ask_passphrase_at } = this
+    return { format, applabel, user_id, vaultlabel, vault_id, unlock_epoch, ask_passphrase_at }
   }
 }

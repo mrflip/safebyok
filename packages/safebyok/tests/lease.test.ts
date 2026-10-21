@@ -131,11 +131,13 @@ describe("Lease.make", () => {
     expect(Object.keys(made)).to.not.include('vault').and.to.not.include('props')
   })
 
-  it("shows its record alone to JSON.stringify, the leaseKey as {}", async () => {
+  it("shows JSON.stringify which vault it opens and until when, and neither its leaseKey nor its wrap", async () => {
     const { lease } = await grantedLease()
-    expect(JSON.stringify(lease)).to.eq(JSON.stringify(lease.props))
-    expect(JSON.stringify(lease)).to.include('"lease_key":{}')
-    expect(lease.toJSON()).to.eq(lease.props)
+    const { lease_key: _leaseKey, vault_key_lease_wrapped: wrapped, ...rest } = lease.props
+    expect(lease.toJSON()).to.deep.equal(rest)
+    for (const stored of ['lease_key', 'vault_key_lease_wrapped', wrapped.ciphertext_b64, wrapped.cipher_iv_b64]) {
+      expect(JSON.stringify(lease)).to.not.include(stored)
+    }
   })
 
   const MangledCases = [
