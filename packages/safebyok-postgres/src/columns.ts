@@ -1,9 +1,8 @@
 import type { BoxRecord, VaultProps } from 'safebyok'
 
-/**
- * How one field is stored: `text` as given, `bigint` for a whole number (a time, an epoch), and
- * `jsonb` for an opaque structured value -- a Ciphered, or one of the vault props' two ways in -- whose ctx safebyok rebuilds from field values, so jsonb's reordering of keys is
- * harmless. A box's `sidecar_json` is `text`: its exact text is what is bound.
+/** How one field is stored: `text` as given, `bigint` for a whole number, `jsonb` for an opaque structured value.
+ * jsonb reorders keys, which is harmless for a Ciphered or a way in: safebyok rebuilds their ctx
+ * from field values. A box's `sidecar_json` is `text`, since its exact text is bound into the box.
  */
 export type ColumnKind = 'text' | 'bigint' | 'jsonb'
 
@@ -13,10 +12,8 @@ export type Column<FieldT extends string = string> = readonly [field: FieldT, ki
 /** The fields of `RecordT` that `ColumnsT` does not store. */
 type Unstored<RecordT, ColumnsT extends readonly Column[]> = Exclude<keyof RecordT, ColumnsT[number][0]>
 
-/**
- * `columns` as they are, once the compiler has held them to `RecordT`: each a field of it, and
- * every field of it among them -- so a record's new field can never be dropped on its way into
- * storage, nor a column name a field the record has not got.
+/** `columns` as given, once the compiler holds them to `RecordT`: every column a field, every field a column.
+ * A field added to the record then fails to compile until it has a column.
  */
 function everyFieldOf<RecordT>() {
   return <ColumnsT extends readonly Column<keyof RecordT & string>[]>(
@@ -24,10 +21,7 @@ function everyFieldOf<RecordT>() {
   ): ColumnsT => columns
 }
 
-/**
- * Every field of a VaultProps, in `safebyok_vaults`'s order: the one place, beside
- * vault-tables.sql, that names the vault props' columns. The compiler holds it to their shape.
- */
+/** Every field of a VaultProps, in `safebyok_vaults`'s order: the one place, beside vault-tables.sql, naming its columns. */
 export const VaultPropsColumns = everyFieldOf<VaultProps>()([
   ['applabel',         'text'],
   ['user_id',          'text'],
@@ -41,11 +35,7 @@ export const VaultPropsColumns = everyFieldOf<VaultProps>()([
   ['registered_at',    'bigint'],
 ] as const)
 
-/**
- * Every field of a BoxRecord, in `safebyok_boxes`'s order after the four columns the adapter
- * adds (the vault's scope and `vault_id`, never part of the record). The compiler holds it to the
- * box's shape.
- */
+/** Every field of a BoxRecord, in `safebyok_boxes`'s order after the scope and `vault_id`, which the adapter adds. */
 export const BoxColumns = everyFieldOf<BoxRecord>()([
   ['format',                 'text'],
   ['boxlabel',               'text'],
@@ -64,16 +54,13 @@ export const BoxColumns = everyFieldOf<BoxRecord>()([
 export const ListedBoxColumns = BoxColumns.filter(([field]) => field !== 'box_key_wrapped' && field !== 'whisper_ciphered')
 
 
-/**
- * The columns' names, as an INSERT or an UPDATE lists them.
+/** The columns' names, as an INSERT or an UPDATE lists them.
  *
  * @example names([['vault_id', 'text'], ['registered_at', 'bigint']])  // 'vault_id, registered_at'
  */
 export const names = (columns: readonly Column[]): string => columns.map(([field]) => field).join(', ')
 
-/**
- * Numbered parameters for the columns, from `$first`, each cast to its column's type: a driver
- * then sends every value as text, and Postgres reads it as the column does.
+/** Numbered parameters for the columns from `$first`, each cast to its column's type.
  *
  * @example placeholders([['vault_id', 'text'], ['registered_at', 'bigint']], 4)  // '$4::text, $5::bigint'
  */
@@ -81,8 +68,7 @@ export const placeholders = (columns: readonly Column[], first: number): string 
   columns.map(([_field, kind], ii) => `$${String(first + ii)}::${kind}`).join(', ')
 )
 
-/**
- * The one parameter of `placeholders(columns, first)` that holds `field`.
+/** The one parameter of `placeholders(columns, first)` that holds `field`.
  *
  * @example placeholderOf([['format', 'text'], ['vault_id', 'text']], 'vault_id', 4)  // '$5::text'
  */
@@ -94,10 +80,9 @@ export const placeholderOf = (columns: readonly Column[], field: string, first: 
   return `$${String(first + idx)}::${columns[idx]![1]}`
 }
 
-/**
- * The columns as a SELECT or RETURNING reads them, in forms every driver hands back alike: a
- * bigint as a double (a whole number up to 2^53, exactly, where a driver would hand a bigint
- * back as text), and a jsonb as its text, which {@link recordOf} parses.
+/** The columns as a SELECT or RETURNING reads them, in forms every driver hands back alike.
+ * A bigint comes back as a double, exact up to 2^53, where some drivers hand back text. A jsonb
+ * comes back as its text, which {@link recordOf} parses.
  *
  * @example selected([['vault_id', 'text'], ['registered_at', 'bigint']])  // 'vault_id, registered_at::float8 AS registered_at'
  */
@@ -107,9 +92,8 @@ export const selected = (columns: readonly Column[]): string => columns.map(([fi
   return field
 }).join(', ')
 
-/**
- * The record's values for its columns, in their order, as {@link placeholders} numbers them: a
- * jsonb value as its JSON text, and a null field, or one the record leaves out, as null.
+/** The record's values for its columns, in the order {@link placeholders} numbers them.
+ * A jsonb value goes as its JSON text, and a null or missing field as null.
  *
  * @example paramsOf({ vault_id: 'v1', passkey: null }, [['vault_id', 'text'], ['passkey', 'jsonb']])  // ['v1', null]
  */
@@ -121,11 +105,9 @@ export const paramsOf = (record: object, columns: readonly Column[]): unknown[] 
   })
 )
 
-/**
- * A row read through {@link selected}, as the record it stores: a null column as a null field
- * (the vault props' `passkey`, when the vault has none), a column the row lacks as a field left
- * out, and a jsonb column's text parsed. Nothing is checked here: the VaultDB validates what it
- * reads. A row that is not an object comes back as it is, for that validation to refuse.
+/** A row read through {@link selected}, as the record it stores, unchecked: the VaultDB validates what it reads.
+ * A null column is a null field (`passkey`, for a vault without one), and a column the row lacks
+ * is a field left out. A row that is not an object comes back as it is, for that validation to refuse.
  *
  * @example recordOf({ vault_id: 'v1', passkey: null }, [['vault_id', 'text'], ['passkey', 'jsonb']])  // { vault_id: 'v1', passkey: null }
  */
