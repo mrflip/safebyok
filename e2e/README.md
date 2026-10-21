@@ -62,7 +62,7 @@ services, one to a backend, for a contributor's machine; CI starts the same imag
 container (the `postgres` job in `.github/workflows/ci.yml`).
 
 ```sh
-pnpm --filter safebyok-e2e db:up           # postgres:17 on 127.0.0.1:54320
+pnpm --filter safebyok-e2e db:up           # postgres:18 on 127.0.0.1:54320
 pnpm --filter safebyok-e2e test:postgres   # SAFEBYOK_PG_URL defaults to that container
 pnpm --filter safebyok-e2e db:down
 ```
