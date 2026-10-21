@@ -67,6 +67,11 @@ pnpm --filter safebyok-e2e test:postgres   # SAFEBYOK_PG_URL defaults to that co
 pnpm --filter safebyok-e2e db:down
 ```
 
+Inside the dev container there is nothing to start: its Postgres runs beside it
+([.devcontainer/services.yaml](../.devcontainer/services.yaml), extended from this compose file),
+and `SAFEBYOK_PG_URL` is set to it, so `pnpm test` here runs the Postgres tests too. Every worktree
+in the container shares that one server, each test file in a database of its own.
+
 To run against a Postgres of your own, set `SAFEBYOK_PG_URL` and run `pnpm test` in this directory
 (or `test:postgres`, which runs only these). The compose file has slots, as comments, for the
 backends to come: Convex's local backend next. A browser (Playwright) is not a service: when its
