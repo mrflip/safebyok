@@ -12,8 +12,7 @@ import { type Outcome, bad, good } from '../src/outcome'
 import { BoxRecord } from '../src/box'
 import { argon2idWebV1Deriver } from '../src/key-deriver'
 import { Proof } from '../src/proof'
-import { Wayin } from '../src/wayin'
-import { PasskeySaltBytes, VaultProps, VaultScope, wallClock, type Capacity, type DeviceMark, type LeaseRecord } from '../src/types'
+import { PasskeySaltBytes, VaultProps, VaultScope, type Capacity, type DeviceMark, type LeaseRecord } from '../src/types'
 import * as Refusals from '../src/refusals'
 import * as Ckeys from '../src/ckeys'
 import * as Expectations from '../src/expectations'
@@ -605,11 +604,10 @@ describe("the fixtures", () => {
     expect(VaultScope.safeParse(TH.scopeOf('u1', 'spare')).success).to.be.true
   })
 
-  it("vaultSliceOf: the scope, key deriver, passphrase check and clock a Wayin or a Proof reads, as its examples show", () => {
-    const wayin = Wayin.make(TH.vaultSliceOf('u1'), TH.wayinOf('passphrase'), TH.vaultPropsOf('u1'))
-    const { checkPassphrase, ...rest } = wayin.vault as TH.VaultSlice
+  it("vaultSliceOf: the key deriver and passphrase check a Proof reads, as its example shows", () => {
+    const { checkPassphrase, ...rest } = TH.vaultSliceOf('u1')
     expect(checkPassphrase).to.be.a('function')
-    expect(rest).to.deep.equal({ ...TH.scopeOf('u1'), keyDeriver: TH.testDeriver, clock: wallClock })
+    expect(rest).to.deep.equal({ keyDeriver: TH.testDeriver })
     expect(Proof.parse(TH.vaultSliceOf('u1', argon2idWebV1Deriver), 'pw').vault.keyDeriver).to.eq(argon2idWebV1Deriver)
   })
 
