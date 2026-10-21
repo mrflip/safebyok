@@ -143,19 +143,20 @@ const cryptoKeyHandle = Z.custom<CryptoKey>((val) => val instanceof CryptoKey, '
 
 /**
  * A box's sidecar: your app's own data, riding beside the whisper, visible in storage --
- * authenticated, but never encrypted, so anyone who can read the database can read it. Any JSON
- * value -- what the user calls the account, which project a key belongs to, what your app wants
- * searchable server-side -- shown while the vault is locked, and never interpreted by safebyok.
- * It is stored in the clear, as the JSON value it is (a `jsonb` column, say, which a server can
- * query), and bound into the box's encryption as its JSON with keys sorted, so a sidecar altered
- * or swapped in storage makes the box refuse to open, while one whose keys storage reorders still
- * opens. A host checks its own sidecar's shape before `putBox()`. Never put secret material in it.
+ * authenticated, but never encrypted, so anyone who can read the database can read it. Always a
+ * JSON object, `{}` for none, of any JSON values -- what the user calls the account, which project
+ * a key belongs to, what your app wants searchable server-side -- shown while the vault is locked,
+ * and never interpreted by safebyok. It is stored in the clear, as the JSON object it is (a
+ * `jsonb` column, say, which a server can query), and bound into the box's encryption as its JSON
+ * with keys sorted, so a sidecar altered or swapped in storage makes the box refuse to open, while
+ * one whose keys storage reorders still opens. A host checks its own sidecar's shape before
+ * `putBox()`. Never put secret material in it.
  *
  * @example Sidecar.parse({ note: 'work account', project: 'atlas' })
  * @example Sidecar.safeParse({ when: new Date() }).success     // false: JSON would flatten it to {}
- * @example Sidecar.safeParse(undefined).success                // false: undefined is not JSON
+ * @example Sidecar.safeParse('work account').success           // false: a sidecar is an object -- { note: 'work account' }
  */
-export const Sidecar: Z.ZodMiniType<WhisperJson> = whisperJson
+export const Sidecar: Z.ZodMiniType<Record<string, WhisperJson>> = whisperBag
 export type Sidecar = Z.infer<typeof Sidecar>
 
 /**

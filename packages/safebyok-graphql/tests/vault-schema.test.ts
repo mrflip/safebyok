@@ -54,10 +54,10 @@ describe("VaultSchemaSdl", () => {
       }
     })
 
-    it(`carries ${typename}'s sidecar, if it has one, as a SafebyokSidecar, nullable for a sidecar of JSON null`, () => {
+    it(`carries ${typename}'s sidecar, if it has one, as a SafebyokSidecar, never null: a sidecar is always an object`, () => {
       const { sidecar } = fieldsOf(typename)
       if (sidecar === undefined) { return }
-      expect(isNonNullType(sidecar.type)).to.be.false
+      expect(isNonNullType(sidecar.type)).to.be.true
       expect(getNamedType(sidecar.type).name).to.eq('SafebyokSidecar')
     })
   }

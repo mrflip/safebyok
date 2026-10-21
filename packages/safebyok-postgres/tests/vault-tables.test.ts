@@ -87,12 +87,15 @@ describe("VaultTablesSql", () => {
     ])
   })
 
-  it("holds every column NOT NULL but the vault props' passkey and a box's sidecar, each a SQL null for a JSON null, and defaults none", async () => {
+  it("holds every column NOT NULL but the vault props' passkey, a SQL null for a JSON null, and defaults none but a box's sidecar, to {}", async () => {
     const db = await tablesOnlyDatabase()
     const { rows } = await db.query(
-      "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name IN ('safebyok_vaults', 'safebyok_boxes') AND (is_nullable = 'YES' OR column_default IS NOT NULL)",
+      "SELECT table_name, column_name, is_nullable, column_default FROM information_schema.columns WHERE table_schema = 'public' AND table_name IN ('safebyok_vaults', 'safebyok_boxes') AND (is_nullable = 'YES' OR column_default IS NOT NULL)",
     )
-    expect(rows).to.have.deep.members([{ table_name: 'safebyok_vaults', column_name: 'passkey' }, { table_name: 'safebyok_boxes', column_name: 'sidecar' }])
+    expect(rows).to.have.deep.members([
+      { table_name: 'safebyok_vaults', column_name: 'passkey', is_nullable: 'YES', column_default: null },
+      { table_name: 'safebyok_boxes',  column_name: 'sidecar', is_nullable: 'NO',  column_default: "'{}'::jsonb" },
+    ])
   })
 
   it("never changes the columns of a table already there, so a table of another release's shape stays as it was until the host drops it", async () => {

@@ -228,8 +228,8 @@ of its own.
   (`safebyok-vault-v4`): deploy client and server together, and every vault stored before reads
   as damaged, to be made anew (with `safebyok-postgres` behind your server, drop and recreate its
   tables).
-* **A box's sidecar is a `SafebyokSidecar`**, the app's own JSON value, carried as it is (a
-  sidecar of JSON null crosses as null): your server's storage may keep it as a JSON column and
+* **A box's sidecar is a `SafebyokSidecar!`**, the app's own JSON object, `{}` for none, carried
+  as it is, never null: your server's storage may keep it as a JSON column and
   query it, reordering its keys as it likes, since the box binds its sidecar with keys sorted.
   It replaces `sidecar_json`, the text the box format before (`safebyok-box-v7`) held: deploy
   client and server together, and every vault stored before reads as damaged, to be made anew.

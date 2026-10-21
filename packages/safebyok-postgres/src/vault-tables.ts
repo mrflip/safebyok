@@ -35,9 +35,9 @@ CREATE TABLE IF NOT EXISTS safebyok_vaults (
 
 -- One box per boxlabel, beside its vault's scope and vault_id. A box stands only while
 -- its vault's props do, under the same vault_id: deleting the vault deletes its boxes with
--- it, and no write can leave a box in a vault made anew. The sidecar is the app's own JSON, kept
--- as jsonb, so a server can query it: the box binds it with its keys sorted, so jsonb's own order
--- changes nothing. A sidecar of JSON null is a SQL null.
+-- it, and no write can leave a box in a vault made anew. The sidecar is the app's own JSON object,
+-- {} for none, kept as jsonb, so a server can query it: the box binds it with its keys sorted, so
+-- jsonb's own order changes nothing.
 CREATE TABLE IF NOT EXISTS safebyok_boxes (
   applabel               text   NOT NULL,
   user_id                text   NOT NULL,
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS safebyok_boxes (
   whisper_ciphered       jsonb  NOT NULL,
   whisper_codec          text   NOT NULL,
   whisper_schema_version bigint NOT NULL,
-  sidecar                jsonb,
+  sidecar                jsonb  NOT NULL DEFAULT '{}',
   registered_at          bigint NOT NULL,
   written_at             bigint NOT NULL,
   PRIMARY KEY (applabel, user_id, vaultlabel, boxlabel),

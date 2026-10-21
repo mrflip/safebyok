@@ -130,12 +130,15 @@ describe("VaultProps", () => {
 })
 
 const SidecarCases = [
-  // any JSON value:
+  // a JSON object of any JSON values:
   [{ note: "work account" },          true,   'a plain object, the common case'],
   [{},                                true,   'an empty sidecar'],
-  ["work account",                    true,   'a string'],
-  [null,                              true,   'null, a JSON value'],
-  [[1, "two", { three: 3 }],          true,   'an array, nested as deep as it likes'],
+  [{ list: [1, "two", { three: 3 }], gone: null }, true, 'an object of any JSON values, nested as deep as it likes'],
+  // JSON that is no object is refused:
+  ["work account",                    false,  'a string'],
+  [null,                              false,  'null'],
+  [[1, "two", { three: 3 }],          false,  'an array'],
+  [42,                                false,  'a number'],
   // what JSON cannot carry is refused, not mangled:
   [undefined,                         false,  'undefined is not a JSON value'],
   [{ when: new Date() },              false,  'a Date would silently flatten to {}'],
@@ -151,7 +154,7 @@ describe("Sidecar", () => {
   it("passes the examples its doc block shows", () => {
     expect(Sidecar.parse({ note: 'work account', project: 'atlas' })).to.deep.equal({ note: 'work account', project: 'atlas' })
     expect(Sidecar.safeParse({ when: new Date() }).success).to.be.false
-    expect(Sidecar.safeParse(undefined).success).to.be.false
+    expect(Sidecar.safeParse('work account').success).to.be.false
   })
 })
 
@@ -162,9 +165,9 @@ describe("BoxSummary", () => {
     expect(BoxSummary.parse(wholeSummary).damaged).to.be.false
   })
 
-  it("takes a sidecar of any JSON, and refuses a summary without one", () => {
+  it("takes a sidecar that is a JSON object, and refuses a summary without one, or with one that is no object", () => {
     expect(BoxSummary.safeParse({ ...wholeSummary, sidecar: { note: 'work account' } }).success).to.be.true
-    expect(BoxSummary.safeParse({ ...wholeSummary, sidecar: [1, 2] }).success).to.be.true
+    expect(BoxSummary.safeParse({ ...wholeSummary, sidecar: [1, 2] }).success).to.be.false
     expect(BoxSummary.safeParse(TH.omitting(wholeSummary, 'sidecar')).success).to.be.false
   })
 

@@ -248,8 +248,8 @@ export const describeVaultDB = (adapterTitle: string, makeAdapter: MakeVaultDB, 
         [boxOf('anthropic', 'one'),                                                   noBoxYet],
         [boxOf('anthropic', 'two', { sidecar: LiteralSidecar }),                      { vault_id: 'vault-id-u1', revision_tok: 'rev-one' }],
         [boxOf('openai', 'one', { sidecar: {} }),                                     noBoxYet],
-        [boxOf('mistral', 'one', { sidecar: null }),                                  noBoxYet],
-        [boxOf('gemini', 'one', { sidecar: ['a list', { zeta: 1, alpha: [true, 'two'] }] }), noBoxYet],
+        [boxOf('mistral', 'one', { sidecar: { gone: null } }),                        noBoxYet],
+        [boxOf('gemini', 'one', { sidecar: { list: ['a list', { zeta: 1, alpha: [true, 'two'] }] } }), noBoxYet],
       ] as const
       for (const [box, expected] of writes) {
         const written = await expectingGood(vaultDB).putBox(scopeOf('u1'), expected, box)

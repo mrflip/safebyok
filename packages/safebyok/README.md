@@ -173,7 +173,7 @@ marked `sideEffects: false`: what you never import never ships.
 
 Each box carries a **sidecar**: your app's own data, riding beside the whisper,
 **visible** -- authenticated, but never encrypted, so anyone who can read your database can
-read it. It is any JSON value your app keeps about the box -- what the user calls the account,
+read it. It is a JSON object your app keeps about the box (`{}` when it keeps nothing) -- what the user calls the account,
 which project a key belongs to, when it was last rotated -- or whatever your app wants searchable
 server-side (a team, a rotation reminder, a count of the calls the app made to OpenRouter with this whisper). It shows in the snapshot while the vault
 is locked, as `box.sidecar`. The vault never looks inside it.
@@ -190,11 +190,11 @@ vault.getSnapshot().boxes[0]  // { boxlabel: 'anthropic_api_key', sidecar: {}, d
 * **It is guaranteed unchanged.** Its JSON, keys sorted, is bound into the box's encryption with the
   rest of the box's visible fields, so a sidecar altered or swapped in storage makes the box
   refuse to open (`damaged_box`). The guarantee comes with `getWhisper()`: the snapshot shows the sidecar as
-  storage holds it, and only `getWhisper()` proves it unaltered. It is stored as the JSON value it
+  storage holds it, and only `getWhisper()` proves it unaltered. It is stored as the JSON object it
   is, so a backend may keep it as JSON it can query (a Postgres `jsonb` column) and reorder its
   keys: the box binds it with its keys sorted, so the same value opens however storage orders it.
-* **Its shape is yours.** The vault checks only that it is JSON (`Sidecar`; anything else is
-  `bad_option`): check its shape yourself, with your own schema, before `putBox()`. Left out of a
+* **Its shape is yours.** The vault checks only that it is a JSON object (`Sidecar`; anything
+  else, a bare string, array or null among them, is `bad_option`): check its shape yourself, with your own schema, before `putBox()`. Left out of a
   `putBox()`, the box keeps the sidecar it has, once its record opens; a new box's is `{}`, as
   is one written over a record that will not open.
 * **It shares the whisper's room.** `maxWhisperBytes` counts the whisper's JSON and the

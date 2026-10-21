@@ -355,7 +355,7 @@ Two tables, each record **a column to a field**, exactly as safebyok wrote it: t
 time or a count as a `bigint`, and each structured value as one opaque `jsonb` -- an encrypted
 value (a cipherIv and its ciphertext, `{ cipher_iv_b64, ciphertext_b64 }`), or one of the vault
 props' two ways in, `passphrase` and `passkey` (a SQL null when the vault has no passkey). A box's
-sidecar is a `jsonb` too, which your server can query (a SQL null for a sidecar of JSON null).
+sidecar is a `jsonb` too, never null, which your server can query: always a JSON object, `{}` for none.
 `jsonb` may reorder an object's keys and drop its spacing, which changes nothing: safebyok binds
 each structured value into its encryption by its fields, a sidecar as its JSON with keys sorted.
 Nothing else is normalized: a user id or a string inside a sidecar reads back byte for byte, as

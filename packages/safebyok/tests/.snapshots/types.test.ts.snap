@@ -4,6 +4,15 @@ exports[`Stored record formats > safebyok-box-v8 1`] = `
 {
   "$defs": {
     "__schema0": {
+      "additionalProperties": {
+        "$ref": "#/$defs/__schema1",
+      },
+      "propertyNames": {
+        "type": "string",
+      },
+      "type": "object",
+    },
+    "__schema1": {
       "anyOf": [
         {
           "type": "string",
@@ -19,18 +28,12 @@ exports[`Stored record formats > safebyok-box-v8 1`] = `
         },
         {
           "items": {
-            "$ref": "#/$defs/__schema0",
+            "$ref": "#/$defs/__schema1",
           },
           "type": "array",
         },
         {
-          "additionalProperties": {
-            "$ref": "#/$defs/__schema0",
-          },
-          "propertyNames": {
-            "type": "string",
-          },
-          "type": "object",
+          "$ref": "#/$defs/__schema0",
         },
       ],
     },

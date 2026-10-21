@@ -2,8 +2,8 @@ import { v } from 'convex/values'
 
 /** Convex validators for safebyok's stored records, field for field with the core's Zod records of the same names.
  * They check what Convex can: which fields, their types, which are optional, and each record's
- * `format`. Every name is any text here, and a box's sidecar any value Convex holds. The finer
- * rules, the name floor and a sidecar's being JSON among them, are the client's, checked by the
+ * `format`. Every name is any text here, and a box's sidecar any object Convex holds. The finer
+ * rules, the name floor and a sidecar's values being JSON among them, are the client's, checked by the
  * core's records on every write and every read. The vault's own validators the server never sees.
  *
  * A new record format widens its `format` union: an additive deploy, shipped with this package.
@@ -77,7 +77,7 @@ export const VaultProps = v.object({
 })
 
 /** One box: its whisper ciphered under its own boxKey, that boxKey wrapped under the vaultKey, and the visible fields.
- * The sidecar is the app's own JSON value, as a Convex value, always written. Times are epoch milliseconds.
+ * The sidecar is the app's own JSON object, as a Convex object, always written, `{}` for none. Times are epoch milliseconds.
  */
 export const BoxRecord = v.object({
   format:                 BoxFormat,
@@ -87,7 +87,7 @@ export const BoxRecord = v.object({
   whisper_ciphered:       Ciphered,
   whisper_codec:          v.literal('json_v1'),
   whisper_schema_version: v.literal(1),
-  sidecar:                v.any(),
+  sidecar:                v.record(v.string(), v.any()),
   registered_at:          v.number(),
   written_at:             v.number(),
 })

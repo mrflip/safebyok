@@ -646,8 +646,8 @@ export class Vault {
    *
    * `opts.sidecar` is the box's sidecar ({@link Sidecar}): your app's own data, riding
    * beside the whisper, visible in storage -- authenticated, but never encrypted, so anyone who can
-   * read the database can read it. Any JSON value, shown in the snapshot while locked, never interpreted by the vault -- kind 'bad_option' for anything JSON
-   * cannot carry. Check its shape yourself before storing it. It is the only option: any other
+   * read the database can read it. A JSON object of any JSON values, shown in the snapshot while locked, never interpreted by the vault -- kind 'bad_option' for
+   * anything else, a bare string, array or null among them, or anything JSON cannot carry. Check its shape yourself before storing it. It is the only option: any other
    * (a misspelt `sidcar`, or a `note` beside it) is kind 'bad_option', writing nothing. Left out, the box keeps the sidecar
    * it has (when its record opens: see above), and a new box gets `{}`; `{}` empties it. The sidecar is stored in the clear and
    * bound into the box's encryption, so a sidecar altered in storage makes the box refuse to
@@ -2342,7 +2342,7 @@ const checkStoreOpts = optionsCheck({ sidecar: Z.optional(Z.unknown()) }, "putBo
 
 /**
  * The sidecar a `putBox()` was handed, checked; undefined when it was handed none. Kind
- * 'bad_option' for anything JSON cannot carry, quoting none of it, and for options beside it.
+ * 'bad_option' for anything but a JSON object, quoting none of it, and for options beside it.
  */
 const sidecarOf = (storeOpts: { sidecar?: Sidecar | undefined } | undefined): Sidecar | undefined => {
   checkStoreOpts(storeOpts)
