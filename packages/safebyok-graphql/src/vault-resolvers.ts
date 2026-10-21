@@ -3,30 +3,25 @@ import { Refusals, VaultError, isVaultError } from 'safebyok'
 import type { Outcome, RefusalKind, RefusalMeta, VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, VaultProps, VaultDB, VaultScope } from 'safebyok'
 import { VaultPropsFields, BoxFields, ScopeFields, recordOf } from './fields'
 
-/**
- * What the resolvers need of the VaultDB they serve: the verbs a browser's vault calls, and
- * `listBoxRecords`, which lists a vault's boxes as stored records -- what the browser's
- * VaultDB must hand back from its own listing -- where a VaultDB's `listBoxes` gives the
- * summaries a vault shows. Every VaultDB is one: `safebyok-postgres`'s, or one of your own.
+/** What the resolvers need of the VaultDB they serve: the verbs a browser's vault calls, with `listBoxRecords` in place of `listBoxes`.
+ * The browser's VaultDB lists stored records, not summaries. Every VaultDB is one:
+ * `safebyok-postgres`'s, or one of your own.
  */
 export type ServedVaultDB = Pick<VaultDB, 'getVaultProps' | 'ensureVaultProps' | 'putVaultProps' | 'getBox' | 'listBoxRecords' | 'putBox' | 'getCapacity' | 'delBox' | 'delVault' | 'subscribe'>
 
 /** What {@link vaultResolvers} is made with, once, at your server's start. */
 export type VaultResolversOpts<ContextT> = {
-  /**
-   * The VaultDB for one request, made from your server's context for it: for the user your own
-   * auth signed in, never one the request names. Called for every vault field resolved, so it
-   * should be cheap -- `postgresVaultDB` is, connecting to nothing. To refuse the request by a
-   * rule of your own, it throws a VaultError of kind `not_permitted` (`Refusals.notPermitted()`),
-   * or `identity_revoked` for a user your app knows is gone, which crosses as it is, kind and
-   * message. Anything else it throws is the server's own setup gone wrong, never the request's:
-   * it crosses as `bad_option` with a generic message. The VaultDB, not this, refuses a
-   * signed-out request.
+  /** The VaultDB for one request, made from your server's context: for the user your own auth signed in, never one the request names.
+   * It is called for every vault field resolved, so it should be cheap, as `postgresVaultDB` is.
+   * To refuse the request by a rule of your own, throw a VaultError of kind `not_permitted`
+   * (`Refusals.notPermitted()`), or `identity_revoked` for a user your app knows is gone: each
+   * crosses as it is. Anything else it throws crosses as `bad_option` with a generic message, its
+   * own staying on the server. The VaultDB, not this, refuses a signed-out request.
    */
   vaultDBFor: (context: ContextT) => ServedVaultDB
 }
 
-/** A root field's arguments, as {@link VaultSchemaSdl} names them and GraphQL has coerced them. */
+/** A root field's arguments, as `VaultSchemaSdl` names them and GraphQL has coerced them. */
 export type VaultFieldArgs = {
   scope?:    unknown
   boxlabel?: unknown
@@ -38,9 +33,8 @@ export type VaultFieldArgs = {
 /** One query or mutation's resolver, as every GraphQL server calls it. */
 export type VaultFieldResolver<ContextT> = (parent: unknown, args: VaultFieldArgs, context: ContextT) => Promise<unknown>
 
-/**
- * The resolvers {@link vaultResolvers} makes, keyed as {@link VaultSchemaSdl} names its root
- * fields: the shape Yoga, Apollo Server, Mercurius and graphql-tools all take.
+/** The resolvers {@link vaultResolvers} makes, keyed as `VaultSchemaSdl` names its root fields.
+ * That is the shape Yoga, Apollo Server, Mercurius and graphql-tools all take.
  */
 export type VaultResolvers<ContextT> = {
   Query: {
@@ -64,31 +58,21 @@ export type VaultResolvers<ContextT> = {
   }
 }
 
-/**
- * The resolvers for {@link VaultSchemaSdl}: each root field one verb of the VaultDB that
- * `vaultDBFor` makes for the request, so they drop into any GraphQL server beside your own.
+/** The resolvers for `VaultSchemaSdl`, for any GraphQL server beside your own: each root field one verb of the request's VaultDB.
  *
  * * **Who may reach a vault** is the VaultDB's to say: `postgresVaultDB`, made for the signed-in
- *   user, refuses every other user's vault, and every vault while signed out, with
- *   `identity_revoked`.
- * * **A refusal crosses as a GraphQL error** whose message is the VaultError's calm one and whose
- *   `extensions.kind` is its kind, which the browser's `graphqlVaultDB` throws as the same
- *   VaultError. Never a record, and never the VaultError's `cause` -- your driver's own error,
- *   which may name your database. That stays on the server, as the GraphQL error's `cause`, for
- *   your own logs. Anything else a VaultDB throws crosses as `storage_unavailable`, what it threw
- *   kept as that VaultError's cause.
- * * **A `vaultDBFor` that throws** a VaultError of kind `not_permitted` or `identity_revoked` --
- *   the host refusing the request's user -- crosses as that refusal. Anything else it throws crosses as
- *   `bad_option` saying only that the server is misconfigured: its own message, which may name
- *   your setup, stays on the server as the cause.
+ *   user, refuses every other user's vault, and every vault while signed out, with `identity_revoked`.
+ * * **A refusal crosses as a GraphQL error** with the VaultError's calm message, its kind as
+ *   `extensions.kind`, which the browser's `graphqlVaultDB` throws as the same VaultError. Beside
+ *   those it carries only a stale write's standing box or a full vault's capacity, as
+ *   `extensions.meta`. The VaultError's `cause`, your driver's own error, which may name your
+ *   database, stays on the server as the GraphQL error's `cause`, for your logs. Anything else a
+ *   VaultDB throws crosses as `storage_unavailable`.
+ * * **A `vaultDBFor` that throws** crosses as {@link VaultResolversOpts} says.
  * * **`safebyokVaultChanged`** sends the vault's scope after every write to it, as the VaultDB's
- *   `subscribe` hears them -- for `postgresVaultDB`, through its `listen` -- and stops listening
- *   when the subscriber goes. Changes that come while the subscriber is still busy with the last
- *   one are sent as one. It sends one as it starts, too, when the VaultDB calls as its watch
- *   begins, as `postgresVaultDB` does: a write made while the browser was subscribing is read then.
- *
- * @param opts - `vaultDBFor`, which makes the VaultDB for a request from its context.
- * @returns The resolver map, for your GraphQL server beside your own.
+ *   `subscribe` hears them, and stops listening when the subscriber goes. Changes that come while
+ *   the subscriber is busy with the last are sent as one. It also sends one as it starts, when the
+ *   VaultDB calls as its watch begins, as `postgresVaultDB` does.
  *
  * @example
  *   const resolvers = vaultResolvers({
@@ -103,10 +87,7 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
   // The server holds a name only to the floor every name is held to and to its storage's limits,
   // which every VaultDB verb checks: what text a name may be beyond that is each browser vault's
   // own validators' to say, at its entry. The server's job is to keep each user to their own vault.
-  /**
-   * The request's VaultDB; or the host's refusal of the request, as it came; or the refusal that
-   * says the server could not make one.
-   */
+  /** The request's VaultDB, or the host's refusal of the request as it came, or a refusal saying the server could not make one. */
   const vaultDBOf = (context: ContextT): ServedVaultDB => {
     try {
       return vaultDBFor(context)
@@ -115,10 +96,7 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
       throw new VaultError('bad_option', MisconfiguredMessage, { cause: err })
     }
   }
-  /**
-   * A resolver calling `verb` on the request's VaultDB: its outcome's `val`, as `answered` hands
-   * it to the wire, or its refusal made one a wire can carry.
-   */
+  /** A resolver calling `verb` on the request's VaultDB: its outcome's `val`, as `answered` hands it to the wire, or its refusal as a wire carries one. */
   const served = (verb: (vaultDB: ServedVaultDB, args: VaultFieldArgs) => Promise<Outcome<unknown>>, answered: (val: unknown) => unknown = (val) => val): VaultFieldResolver<ContextT> => (
     async (_parent, args, context) => {
       try {
@@ -160,10 +138,7 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
   }
 }
 
-/**
- * The refusals a `vaultDBFor` throws that cross as they are: the host refusing the request's user,
- * by its own rules or as gone. Any other is the server's setup gone wrong.
- */
+/** The refusals a `vaultDBFor` throws that cross as they are: the host refusing the request's user, by its own rules or as gone. */
 const HostRefusalKinds: ReadonlySet<RefusalKind> = new Set(['not_permitted', 'identity_revoked'])
 
 /** What a browser hears when `vaultDBFor` throws: the server's own message stays on the server. */
@@ -196,17 +171,15 @@ const boxDelExpectationIn = (args: VaultFieldArgs): BoxDelExpectation => {
   return { vault_id, revision_tok }
 }
 
-/**
- * Each change `vaultDB` hears to the vault in `scope`, as its scope, until the subscriber goes:
- * ending the iteration -- which a GraphQL server does when the subscription ends -- cancels the
- * stream, which unsubscribes. A change heard while one is still waiting to be read is that one:
- * either says the vault changed. A refusal from `subscribe` throws at once, before any stream is
- * made. The stream is read through a reader, not its own iterator: that one's `return` waits for
- * a pending `next`, which for a quiet vault is forever, so a subscriber gone while it waited would
- * keep the VaultDB listening. A reader's `cancel` ends the pending read as done, at once. The
- * iterator is its own iterable, as a GraphQL server expects: graphql-js asks for it twice.
+/** Each change `vaultDB` hears to the vault in `scope`, as its scope, until the subscriber goes.
+ * Ending the iteration, as a GraphQL server does when the subscription ends, unsubscribes. A
+ * change heard while one still waits to be read is that one. A refusal from `subscribe` throws at
+ * once. The iterator is its own iterable, as graphql-js asks for it twice.
  */
 const changesOf = (vaultDB: ServedVaultDB, scope: VaultScope): AsyncIterableIterator<VaultScope> => {
+  // Read through a reader, not the stream's own iterator: that one's `return` waits for a pending
+  // `next`, which for a quiet vault is forever, so a subscriber gone while it waited would keep
+  // the VaultDB listening. A reader's `cancel` ends the pending read as done, at once.
   let unsubscribe = noUnsubscribing
   const changes = new ReadableStream<VaultScope>({
     start: (controller) => {
@@ -231,12 +204,10 @@ const changesOf = (vaultDB: ServedVaultDB, scope: VaultScope): AsyncIterableIter
 
 const noUnsubscribing = (): void => undefined
 
-/**
- * A refusal as the wire carries it: a GraphQL error with the VaultError's message and its kind as
- * `extensions.kind`, and {@link metaCrossing} as `extensions.meta`. Nothing more. A GraphQL server sends a GraphQLError of its resolvers'
- * as it stands, where it hides anything else behind "Unexpected error" (Yoga) or sends its
- * message as it is (Apollo). The VaultError rides along as the error's `cause`, unenumerable, as
- * an Error's own cause is, for the server's logs: no GraphQL server sends a cause.
+/** A refusal as the wire carries it: the VaultError's message, its kind as `extensions.kind`, {@link metaCrossing} as `extensions.meta`, and nothing more.
+ * A GraphQL server sends its resolvers' GraphQLError as it stands, where it hides anything else
+ * behind "Unexpected error" (Yoga) or sends its message as it is (Apollo). The VaultError rides
+ * along as the error's unenumerable `cause`, for the server's logs: no GraphQL server sends a cause.
  */
 const crossing = (err: unknown): GraphQLError => {
   const refusal = isVaultError(err) ? err : Refusals.storageUnavailable(err)
