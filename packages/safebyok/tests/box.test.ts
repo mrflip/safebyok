@@ -366,6 +366,15 @@ describe("Box.seal", () => {
     expect(box).to.be.instanceOf(Box)
     await TH.expectBad(Box.trySeal(vault, { boxlabel: '' }, Secret), 'bad_label')
   })
+
+  it("refuses as 'vault_locked' a seal by another copy of safebyok into a vault this copy holds: that copy reads no lease of it", async () => {
+    const vault = await vaultOf()
+    vi.resetModules()
+    const { Box: OtherBox } = await import('../src/box')
+    // The refusal is the other copy's VaultError, no instance of this one's: its kind is what holds.
+    const sealed = await OtherBox.trySeal(vault, { boxlabel: 'anthropic_api_key' }, Secret)
+    expect(sealed.ok ? null : sealed.err.refusalkind).to.eq('vault_locked')
+  })
 })
 
 describe("box.extractWhisper", () => {
