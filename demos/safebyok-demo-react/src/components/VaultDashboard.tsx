@@ -74,10 +74,10 @@ export const VaultDashboard = () => {
   if (vault === null || snapshot === null || snapshot.state === 'opening') { return <p className="quiet">Opening vault…</p> }
 
   // A read the user dismissed the passphrase dialog for is refused vault_locked, and a box gone
-  // meanwhile reads as null: nothing to show.
+  // meanwhile absent_box: nothing to show.
   const view = async (boxlabel: string) => {
     const read = await vault.tryGetWhisper(boxlabel)
-    if (! read.ok || read.val === null) { return }
+    if (! read.ok) { return }
     const whisper = read.val
     setShown((prev) => ({ ...prev, [boxlabel]: whisper }))
   }
@@ -88,7 +88,7 @@ export const VaultDashboard = () => {
 
   const edit = async (boxlabel: string, noteText: string) => {
     const read = await vault.tryGetWhisper(boxlabel)
-    if (read.ok && read.val !== null) { setForm({ editing: boxlabel, boxlabelText: boxlabel, whisperText: editableWhisper(read.val), noteText }) }
+    if (read.ok) { setForm({ editing: boxlabel, boxlabelText: boxlabel, whisperText: editableWhisper(read.val), noteText }) }
   }
 
   const delBox = async (boxlabel: string) => {
