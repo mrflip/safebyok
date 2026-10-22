@@ -55,9 +55,11 @@ Every worker, beyond CLAUDE.md:
    remove a safety or consistency guarantee a caller relies on, stop building that part, write
    the case in your thread file and the PR's open questions, and report it as an open matter. If
    the rest of the thread can go on without it, go on.
-3. **The Open Matters already raised** (the sprint doc, rows 1-6) are the orchestrator's to carry
-   back. Until ruled, a thread that meets one takes its row's Rec, says so in its PR, and keeps
-   the choice easy to undo.
+3. **The Open Matters already raised** are the orchestrator's to carry back. Until ruled, a thread
+   that meets one takes its row's Rec, says so in its PR, and keeps the choice easy to undo,
+   **except** where the Rec would change the Contract (what a caller is promised): then the
+   thread keeps the current contract and lists the question. *Orchestrator (2026-10-22):* the
+   Coach, on row 1: "Don't make YOLO calls that alter contract at this level".
 4. **One thread, one PR**, "Stacked on #N" in its body. Every PR's base is `main`.
 5. **No format bumps, no back-compat** (the preplan's first paragraph). Each changeset says what a
    host with records written before it will see.
@@ -143,11 +145,13 @@ bigints (thread 10); the interim gateless handling in `vault.ts`, which thread 4
 `vault-turns.test.ts`), TODO.md's *Lock timing vs. work in flight*. `p-limit` is approved
 (preplan, *The rules*): add it with `pnpm --filter safebyok add p-limit`, check that the version
 taken has no Node built-in on its browser path (CLAUDE.md, *Runs everywhere*), and note it in the
-PR. `hello`'s read moves to `vaultDB.getVault`. **From Open Matters 1 and 2:** a call whose turn
-was queued before a lock is handed its whisper; one still in its precondition when the lock lands
-refuses `vault_locked`; the expiry's lock turn is queued at `askPassphraseAt` minus the vault's
-default staleness, so `unlocked` means a lease in hand; the snapshot is computed at a settle, as
-`#picture()` does now, never at a look. **Depends on:** 2. **Look-ahead:** thread 4 turns
+PR. `hello`'s read moves to `vaultDB.getVault`. **Rulings (2026-10-22):** each call that needs the lease calls the sync
+`#checkUnlocked()` inside its own turn, with a TODO.md entry to judge whether it is still needed,
+and the Contract's wording on a lock during a call stays as it is (row 1, ruled). The snapshot
+says `unlocked` until a lock lands (`lock()`, the expiry at `askPassphraseAt`, or a
+`checkUnlocked` that finds the deadline passed); the twilight before `askPassphraseAt` only makes
+`ensureLease` prompt (row 2, the Coach's model, awaiting confirmation). The snapshot is computed at
+a settle, never at a look. **Depends on:** 2. **Look-ahead:** thread 4 turns
 `Vault.make` + first `hello` into a birth; keep the read turn's judgment a function of what one
 read returned plus the fields in hand, so the bank's birth can reuse it. Thread 8's `attempt`
 is an unlock turn. **Size:** L. Likely lowers the `Vault` and `everything` lines (code out) less

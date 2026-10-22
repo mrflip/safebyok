@@ -5,7 +5,12 @@ keeps it. Newer than the plan and the preplan wherever they disagree.
 
 ## Rulings in force
 
-None yet. Until the Coach rules on an Open Matter, threads take its Rec (the plan, *Ground
+* **Row 1, a whisper asked before a lock (2026-10-22):** keep the current contract; a sync
+  `checkUnlocked` inside each call's turn, with a TODO. No contract-level calls without a ruling.
+* **Row 2, when a lease stops counting (the Coach's model, awaiting confirmation):** unlocked
+  until a lock lands; the twilight only makes `ensureLease` prompt; expiry at `askPassphraseAt`.
+
+Otherwise, until the Coach rules on an Open Matter, threads take its Rec (the plan, *Ground
 rules* 3).
 
 ## Threads
