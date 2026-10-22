@@ -160,10 +160,28 @@ describe("idbVaultDB", () => {
     expect(await get('vault^acme^u1^main', rawShelf(dbName))).to.deep.equal({ vault_tok: 'vault-tok-u1', gate_epoch: 'one' })
   })
 
-  it("lands no update on damaged vault props, even ones that show the expected vault_tok", async () => {
+  it("lands no update on damaged vault props, even ones that show the expected vault_tok, refusing as a read of them does", async () => {
     const dbName = TH.freshDbName()
     await set(Ckeys.vaultProps(TH.scopeOf('u1')), { vault_tok: 'vault-tok-u1' }, rawShelf(dbName))
-    await TH.expectBad(idbVaultDB({ dbName }).putVaultProps(TH.vaultPropsOf('u1', { gate_epoch: 2 }), { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), 'stale_write')
+    const next = TH.vaultPropsOf('u1', { gate_epoch: 2 })
+    await TH.expectBad(idbVaultDB({ dbName }).putVaultProps(next, { vault_tok: 'vault-tok-u1', gate_epoch: 1 }), 'damaged_vault')
+    const standing: unknown = await get(Ckeys.vaultProps(TH.scopeOf('u1')), rawShelf(dbName))
+    expect(standing).to.deep.equal({ vault_tok: 'vault-tok-u1' })
+  })
+
+  it("reads a vault's props and every box in one transaction, and ensures a gateless one, ringing other tabs once it is made", async () => {
+    const dbName = TH.freshDbName()
+    const vaultDB = idbVaultDB({ dbName })
+    const { heard, onChange } = TH.changeCounter()
+    const unsubscribe = vaultDB.subscribe(TH.scopeOf('u1'), onChange)
+    await TH.expectingGood(vaultDB).ensureVault(TH.scopeOf('u1'), TH.gatelessOf('u1'))
+    await TH.eventually(() => heard.count > 0)
+    const rungOnMaking = heard.count
+    await TH.expectingGood(vaultDB).ensureVault(TH.scopeOf('u1'), TH.gatelessOf('u1', { vault_tok: 'vault-tok-late' }))
+    await TH.aWhile()
+    expect(heard.count, 'an ensure that found the vault standing rang anyone').to.eq(rungOnMaking)
+    unsubscribe()
+    expect(await TH.expectingGood(vaultDB).getVault(TH.scopeOf('u1'))).to.deep.equal({ vaultProps: TH.gatelessOf('u1'), boxes: [] })
   })
 
   it("deletes a vault whose vault props are damaged -- delDamagedVault reads its vault_tok as stored -- and only that vault", async () => {
