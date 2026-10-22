@@ -14,7 +14,7 @@ import { type MakeBankOpts, type VaultDraft, parseMakeBankOpts, parseVaultDraft 
 import type { Ask } from '../src/ask'
 import type { Vault } from '../src/vault'
 import * as TH from './test-helpers'
-import { makeWorld, makeRacingWorld, rolledBackWorld, u1VaultPropsCkey, VaultDBVerbsUsed, SevenDaysMillis } from './vault/world'
+import { damagedVaultWorld, makeWorld, makeRacingWorld, rolledBackWorld, u1VaultPropsCkey, VaultDBVerbsUsed, SevenDaysMillis } from './vault/world'
 
 // == [Helpers]: U1, bankOptsOf, bankIn, recordOf, highestEpochOf, leaseFieldsOf, stepsOf, checkerLoading, keptTombstones
 
@@ -320,6 +320,39 @@ describe("a vault served behind this device's record", () => {
     expect(bank.entryOf(U1)?.status).to.eq('timely')
     expect(await world.getLease()).to.be.null
     expect(await highestEpochOf(world)).to.eq(1)
+  })
+})
+// --
+
+// == [damaged_vault at birth]: delDamagedVault's way out
+
+describe("bank.delDamagedVault", () => {
+  it("deletes a vault refused 'damaged_vault' with the bank's own stores, letting its entry go; the next ensureVault births a new life, novel, as its example shows", async () => {
+    const world = await damagedVaultWorld()
+    const bank = bankIn(world)
+    const { userId, vaultlabel } = U1
+    const { err } = await bank.tryEnsureVault(U1)
+    expect(bank.entryOf(U1)?.status).to.eq('refused')
+    const confirm = vi.fn(() => true)
+    if (isVaultError(err, 'damaged_vault') && confirm()) {
+      await bank.delDamagedVault({ userId, vaultlabel: 'main' })
+      expect(bank.entryOf(U1)).to.be.null
+      await bank.ensureVault({ userId, vaultlabel })
+    }
+    expect(confirm).toHaveBeenCalledOnce()
+    expect(await world.getLease()).to.be.null
+    expect(bank.entryOf(U1)?.vault?.state).to.eq('novel')
+  })
+
+  it("refuses a vault that reads sound 'bad_option', deleting nothing and keeping its Vault object, and a bad name 'bad_label'", async () => {
+    const world = makeWorld()
+    const bank = bankIn(world)
+    const vault = await bank.ensureVault(U1)
+    await TH.expectRefusal(bank.delDamagedVault(U1), 'bad_option')
+    const stored = await TH.expectGood(world.vaultDB.getVault(TH.scopeOf('u1')))
+    expect(stored).to.not.be.null
+    expect(bank.entryOf(U1)?.vault).to.eq(vault)
+    await TH.expectRefusal(bank.delDamagedVault({ userId: 'u1', vaultlabel: 'Not A Label' }), 'bad_label')
   })
 })
 // --

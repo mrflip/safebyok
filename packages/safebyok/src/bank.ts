@@ -10,6 +10,7 @@ import { loadStrengthChecker } from './passphrase-strength'
 import { reportToPlatform } from './report-error'
 import { type MakeBankOpts, type ParsedBankOpts, type VaultDraft, type VaultParts, parseMakeBankOpts, parseVaultDraft } from './vault-opts'
 import { Vault, bear, letGo } from './vault'
+import { delDamagedVaultIn } from './del-damaged-vault'
 
 // == [Public types]: BankStatus, EntryStatus, VaultEntry, BankSnapshot, VaultChoice
 
@@ -149,7 +150,7 @@ export class Bank {
   }
   // --
 
-  // == [Bank: vaults]: ensureVault, reopenVault, closeVault, closeVaults, clearCachedVault
+  // == [Bank: vaults]: ensureVault, reopenVault, closeVault, closeVaults, clearCachedVault, delDamagedVault
 
   /** The Vault object for the vault `draft` names, born now from one read of storage, or the one the bank holds: never absent, `novel` until its passphrase is set.
    * It says hello first. A birth reads this device's record of the scope, then `VaultDB.ensureVault`
@@ -245,6 +246,31 @@ export class Bank {
       const deviceDB = deviceTroubleAsConditions(parts.deviceDB)
       valOf(await deviceDB.delDeviceRecord(parts.scope))
       valOf(await deviceDB.delLease(parts.scope))
+      return good(undefined)
+    } catch (err) { return this.#badOutcome(err) }
+  }
+
+  /** Delete the vault `draft` names, whose birth was refused 'damaged_vault' -- its vault props, every box, and this device's lease of it -- letting it go: the way out of 'damaged_vault'.
+   * It is the `delDamagedVault` function with the bank's own stores, and refuses as it does: 'bad_option'
+   * for a vault that reads sound (delete that with `vault.del()`), 'stale_write' for one made anew
+   * elsewhere meanwhile, 'storage_unavailable' and the rest. What the vault held is gone for good,
+   * so ask the user first. Once it is deleted, the vault's entry is let go, and the next
+   * {@link Bank.ensureVault} births a new life, `novel`.
+   *
+   * @example
+   *   if (isVaultError(entry.err, 'damaged_vault') && confirm('Remove your vault and start over?')) {
+   *     await bank.delDamagedVault({ userId, vaultlabel: 'main' })
+   *     await bank.ensureVault({ userId, vaultlabel: 'main' })
+   *   }
+   */
+  async delDamagedVault(draft: VaultDraft): Promise<void> { valOf(await this.tryDelDamagedVault(draft)) }
+
+  /** Delete a vault refused 'damaged_vault', as an {@link Outcome}: the non-throwing form of {@link Bank.delDamagedVault}. */
+  async tryDelDamagedVault(draft: VaultDraft): Promise<Outcome<void>> {
+    try {
+      const parts = parseVaultDraft(draft, this.#parts)
+      await delDamagedVaultIn(parts.scope, parts.vaultDB, parts.deviceDB)
+      this.#letGoOf(Ckeys.vaultProps(parts.scope))
       return good(undefined)
     } catch (err) { return this.#badOutcome(err) }
   }

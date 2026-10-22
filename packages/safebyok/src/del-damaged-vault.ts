@@ -1,9 +1,10 @@
 import * as Names from './names'
 import { VaultError } from './errors'
 import { valOf } from './outcome'
-import { deviceTroubleAsConditions } from './device-db'
+import { type DeviceDB, deviceTroubleAsConditions } from './device-db'
 import { randomId } from './crypto'
-import { DeviceRecordFormat } from './types'
+import { type VaultScope, DeviceRecordFormat } from './types'
+import type { VaultDB } from './vault-db'
 import { type MakeBankOpts, type VaultDraft, isBag, parseVaultDB, parseDeviceDB } from './vault-opts'
 
 /** What {@link delDamagedVault} needs of Bank.make's options and the vault's draft: which vault, and the two stores it lives in. */
@@ -38,10 +39,15 @@ export const delDamagedVault = async (opts: DelDamagedVaultOpts): Promise<void> 
   const rules = Names.rulesOf(opts.validators)
   const scope = Names.checkScope(rules, { applabel: opts.applabel, user_id: opts.userId, vaultlabel: opts.vaultlabel })
   const vaultDB = parseVaultDB(opts.vaultDB)
+  await delDamagedVaultIn(scope, vaultDB, parseDeviceDB(opts.deviceDB))
+}
+
+/** {@link delDamagedVault}'s work, for a scope and stores already checked: what `bank.delDamagedVault` calls too. */
+export const delDamagedVaultIn = async (scope: VaultScope, vaultDB: VaultDB, deviceDBGiven: DeviceDB): Promise<void> => {
   if (typeof vaultDB.delDamagedVault !== 'function') {
     throw new VaultError('bad_option', "vaultDB has no delDamagedVault: a storage adapter that hands each call on to another's must hand this one on too.")
   }
-  const deviceDB = deviceTroubleAsConditions(parseDeviceDB(opts.deviceDB))
+  const deviceDB = deviceTroubleAsConditions(deviceDBGiven)
   // The vault first: a sound one refuses, and then the device keeps what it remembers of it. A
   // retry after a failure here finds the vault gone, and still clears the device.
   const tombstone = valOf(await vaultDB.delDamagedVault(scope))
