@@ -78,7 +78,8 @@ rules* 3).
 | 5 | demand | filed, on main | #253 |
 | 6 | lease_box | filed, stacked on #253 | #254 |
 | 6b | box_seal | filed, stacked on #254 | #256 |
-| 7 | bank | building | |
+| 7 | bank | built, in review | #258 |
+| 7b | bank_provider | planned | |
 | 8 | proving_gate | planned | |
 | 9 | gating | planned | |
 | 10 | react | planned | |

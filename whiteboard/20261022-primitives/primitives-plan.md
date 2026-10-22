@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-22
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-22).
-* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 filed (#254, stacked on #253); thread 6b filed (#256, stacked on #254); thread 7 building; threads 1 to 3 restacked onto main by the orchestrator.
+* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 filed (#254, stacked on #253); thread 6b filed (#256, stacked on #254); thread 7 built (#258), in review; thread 7b (the React BankProvider) planned; threads 1 to 3 restacked onto main by the orchestrator.
 * **Review level:** `medium`, reviewer on `sonnet`, unless a thread names another. At the end of
   the sprint, one `opus`, `high` pass over the whole line (see *Wrap-up*).
 * **Threads at once:** 1 in the line, which is serial: every thread rewrites `vault.ts` or builds
@@ -391,6 +391,27 @@ fresh Vault object comes about after a deletion or a rollback, verbatim: "the pr
 new vault is not well thought through, perhaps impossible at the current time, for deletions and
 for rollback": build the smallest path (`clearCachedVault`) and raise what is still unsettled.
 Thread 5 left the first-hello memo `#birth` / `#born` and the device mark for this thread to remove.
+
+*Orchestrator, as built ([#258](https://github.com/mrflip/safebyok/pull/258)):* the first worker built the
+core and split the tests among eight subagents, then was stopped; a second fixed the six src bugs
+they found and was stopped; a third filed. Rulings made along the way (Open Matters): a birth
+refused `identity_revoked` or `vault_behind` erases the stored lease (a sign-out still locks); the
+device record is validated at entry (`deviceRecordFor`); anything that makes the Vault object gone
+refuses calls waiting on the prompt `vault_gone`; VaultProvider re-ensures when its vault goes
+gone. React is adapted minimally: thread 7b below.
+
+### 7b. bank_provider
+
+> *Orchestrator*, from thread 7's text: "`safebyok-react`'s provider becomes `BankProvider`,
+> `useBank`, `useVault(vaultlabel)`, and `openError`/`retryOpen` go."
+
+*Gloss.* `safebyok-react/src/vault-provider.tsx` and its tests, the React README, the demo. Thread 7
+built VaultProvider on a Bank inside, keeping its props. Here: `BankProvider` holds the bank;
+`useBank()` reaches it, so a host can call `bank.clearCachedVault` past `vault_behind` (Open
+Matter); `useVault(vaultlabel)` asks for a vault on demand, never re-ensuring a deleted one on its
+own (Open Matter); `openError` / `retryOpen` go, in favour of the bank's entry. **Depends on:** 7.
+**Look-ahead:** thread 10's dialogs read the bank's entry. **Size:** M. Moves `VaultProvider`'s size
+line.
 
 ### 8. proving_gate
 
