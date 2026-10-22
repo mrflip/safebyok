@@ -71,6 +71,29 @@ Each with what I built meanwhile (the Rec taken) and what the other answer would
 * A lock in another tab in the same clock millisecond as this tab's grant is seen at the next read.
 * `vault_full` is judged from the listing in hand: room another device made shows at a hello.
 
+## Refusals where today coped (toldjaso-style, by the Coach's ruling: expected, not blockers)
+
+* A write refused `stale_write` no longer catches up: the snapshot stays as it was until a hello,
+  and a second `putBox()` lands only because it reads the box afresh. A second `del()` or
+  `delBox()` refuses `stale_write` again until a hello.
+* An `unlock()` proven against vault props that moved meanwhile refuses `vault_gone`,
+  `vault_remade` or `gate_moved`, where it refused `vault_locked`.
+* A box call whose vault was deleted or remade while storage read the box refuses `vault_gone`
+  or `vault_remade`.
+* `putBox()` refuses `vault_full` from the listing in hand, where it read storage first.
+* A handle holding newer vault props refuses a change of the ways in as `stale_write` over storage
+  rolled back beneath it (it was `rolled_back`, the handle emptied).
+* The lease from another tab's renewal, or a lock in another tab, now drops this tab's lease at
+  its next read; the next `ensureLease()` takes up what the pantry holds.
+
+## Loosenings and the thread that closes each
+
+* The ring's lost change (open matter 1): no thread yet. The Rec is a later coordination layer.
+* The first unlock's make racing a deletion: thread 7 (a novel Vault).
+* A cancel during the lease write: thread 8 (`grantLease` step 7) and thread 9 (the gating).
+* A same-handle restore: thread 7 (`clearCachedVault`).
+* Box and lease stamps partial: thread 6.
+
 ## Contract lines this thread makes untrue (for thread 11)
 
 * `putBox`: "the snapshot shows the box as storage now holds it" after `stale_write`; "Refuses

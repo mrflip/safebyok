@@ -52,4 +52,16 @@ whoever files the thread, and thread 11 (the Contract) should read it.
   * A hold at a DeviceDB's door misorders the pantry: `world.holdNextLease` now holds the answer.
   * A handle holding newer props ignores storage rolled back beneath it; it cannot accept a
     restore, a handle made anew can.
+* **Rulings received (2026-10-22, via the orchestrator)**:
+  * *A guarantee may loosen when a later commit fixes it.* I kept the interim carries anyway,
+    since none cost design churn: each is a few lines its thread deletes (the take-up guard and
+    its path, thread 9; the grant's prompt-end check, threads 8 and 9; `#birth`/`#born`, thread
+    7). The loosenings I did take are named in the details file with the thread that closes each.
+  * *More calls refuse, by design.* Where a demand now throws where today's code coped, the
+    details file records it as a toldjaso-style line (*Refusals where today coped*). None is a
+    blocker, and none got a rescue.
+  * *A fetch whose `vault_tok` differs from the picture's is a new life, so reload it.* The
+    refresh already does this: it takes the new life's props and listing whole and drops the
+    lease. Nothing is repaired. A box read cannot tell yet, because a box record names no
+    `vault_tok`; that half is thread 6's, and nothing here builds it.
 * **For the Coach**: the open matters in the details file, the first three loud.
