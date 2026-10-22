@@ -35,7 +35,7 @@ TH.describeOnPostgres('races', "postgresVaultDB's box limit, over a real Postgre
       expect(landed.length).to.be.within(1, Racers)
       expect(refusedKinds.filter((kind) => kind !== 'vault_full')).to.deep.equal([])
       expect(await TH.boxesStanding(db)).to.eq(4 + landed.length)
-      for (const { boxlabel } of landed) { expect(await TH.expectGood(first('u1').getBox(u1, boxlabel))).to.not.be.null }
+      for (const { boxlabel } of landed) { expect(await TH.expectGood(first('u1').getBox(u1, boxlabel, TH.inThisVault))).to.not.be.null }
       expect(await listed(first)).to.have.lengthOf(4 + landed.length)
     }
   })
@@ -53,8 +53,8 @@ TH.describeOnPostgres('races', "postgresVaultDB's box limit, over a real Postgre
     await racer.query('COMMIT')
 
     expect(await TH.boxesStanding(db)).to.eq(Cap + 1)
-    expect(await TH.expectingGood(device).getBox(u1, 'also_fifth')).to.not.be.null
-    expect(await TH.expectingGood(device).getBox(u1, 'fifth_in_flight')).to.not.be.null
+    expect(await TH.expectingGood(device).getBox(u1, 'also_fifth', TH.inThisVault)).to.not.be.null
+    expect(await TH.expectingGood(device).getBox(u1, 'fifth_in_flight', TH.inThisVault)).to.not.be.null
   })
 
   it("keeps every box that landed past the limit readable, refuses a new one until deleted boxes make room, and then lands it", async () => {

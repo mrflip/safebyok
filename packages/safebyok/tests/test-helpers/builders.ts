@@ -319,6 +319,14 @@ export const summaryOf = <SummaryT extends ListedSummary>(box: SummaryT | Damage
 export const noBoxYet = Object.freeze({ vault_tok: 'vault-tok-u1', revision_tok: null } as const)
 
 /**
+ * What a box read in {@link vaultPropsOf}('u1')'s vault expects: that vault. Frozen, since every
+ * test shares it.
+ *
+ * @example vaultDB.getBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault)
+ */
+export const inThisVault = Object.freeze({ vault_tok: 'vault-tok-u1' } as const)
+
+/**
  * What a deletion of {@link vaultPropsOf}('u1')'s vault expects: that vault, at its first gate.
  * Frozen, since every test shares it.
  *

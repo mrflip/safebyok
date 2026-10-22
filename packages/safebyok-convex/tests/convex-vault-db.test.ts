@@ -125,7 +125,27 @@ const UnknownAnswers = [
   [{ landed: false, refusalkind: 'quota_exceeded' },         'a refusal of a kind this client does not know'],
 ] as const
 
+/** Answers a box read might meet from a component of another version: none this client knows. */
+const UnknownReadAnswers = [
+  [TH.boxOf('anthropic_api_key', 'a1'),                      'the bare box an older component answered with'],
+  [{ read: true },                                           'a read carrying no box_stored, not even null'],
+  [{ read: false, refusalkind: 'stale_write' },              'a refusal of a kind no read makes'],
+] as const
+
 describe("convexVaultDB, answered by a component of another version", () => {
+  for (const [answer, blurb] of UnknownReadAnswers) {
+    it(`refuses a box read answered with ${blurb} as corrupt_record, saying the deployed component is out of date`, async () => {
+      const deployment = deploy()
+      const client = deployment.client('u1')
+      const vaultDB = convexVaultDB({ client, api: deployment.api.safebyok })
+      await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
+      vi.spyOn(client, 'query').mockResolvedValue(answer)
+      const refusal = await TH.expectBad(vaultDB.getBox(u1, 'anthropic_api_key', TH.inThisVault), 'corrupt_record')
+      expect(refusal.message).to.match(/deployed safebyok component is out of date/)
+      expect(refusal).to.not.have.property('cause')
+    })
+  }
+
   for (const [answer, blurb] of UnknownAnswers) {
     it(`refuses a box write answered with ${blurb} as corrupt_record, saying the deployed component is out of date`, async () => {
       const deployment = deploy()
@@ -297,7 +317,7 @@ describe("a record the deployment refused", () => {
         expect(thrown).to.not.include(leaf)
       }
       expect(await TH.propsOf(vaultDB, scope)).to.deep.equal(standing)
-      expect(await TH.expectingGood(vaultDB).getBox(scope, 'quotable_box')).to.be.null
+      expect(await TH.expectingGood(vaultDB).getBox(scope, 'quotable_box', { vault_tok: standing.vault_tok })).to.be.null
     })
   }
 
@@ -317,7 +337,7 @@ describe("a record the deployment refused", () => {
     const refusal = await TH.expectBad(vaultDB.putBox(scope, expected, box), 'storage_unavailable')
     expect(refusal.cause).to.be.undefined
     expect(TH.thrownText(refusal)).to.not.include('quoted_by_convex')
-    expect(await TH.expectingGood(vaultDB).getBox(scope, 'quotable_box')).to.be.null
+    expect(await TH.expectingGood(vaultDB).getBox(scope, 'quotable_box', { vault_tok: standing.vault_tok })).to.be.null
   })
 })
 

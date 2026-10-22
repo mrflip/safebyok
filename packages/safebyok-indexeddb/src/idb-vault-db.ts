@@ -1,5 +1,5 @@
-import { Ckeys, Expectations, VaultDB } from 'safebyok'
-import type { VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, GatelessVaultProps, StoredBox, StoredVault, VaultProps, VaultScope } from 'safebyok'
+import { Ckeys, Expectations, Refusals, VaultDB } from 'safebyok'
+import type { VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, GatelessVaultProps, StoredBox, StoredVault, VaultProps, VaultScope } from 'safebyok'
 import { ChangeBell } from 'safebyok/idb'
 import { boxRange } from './ckeys'
 import { bellnameOf, parseDbName, type IdbVaultDBOpts } from './idb-opts'
@@ -78,8 +78,14 @@ class IdbVaultDB extends VaultDB {
     return stored
   }
 
-  protected async doGetBox(scope: VaultScope, boxlabel: string): Promise<unknown> {
-    return (await this.shelf('readonly', (store) => rowAt(store, Ckeys.box(scope, boxlabel)))) ?? null
+  // The vault props and the box are read in one transaction; a read whose vault props are not the
+  // ones expected is refused from that transaction's rows, once it has ended.
+  protected async doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<unknown> {
+    const [standingVaultProps, standingBox] = await this.shelf('readonly', (store) => (
+      Promise.all([rowAt(store, Ckeys.vaultProps(scope)), rowAt(store, Ckeys.box(scope, boxlabel))])
+    ))
+    if (! Expectations.vaultMeets(standingVaultProps, expected)) { throw Refusals.vaultMismatch() }
+    return standingBox ?? null
   }
 
   // The box handed back is the row as the put left it, read in the same transaction; a write that

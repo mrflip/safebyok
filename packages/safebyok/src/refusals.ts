@@ -80,7 +80,7 @@ export const staleVaultProps = (vaultPropsStored: unknown): VaultError => (
 /** What an update of the vault props' `stale_write` says. */
 export const StaleVaultPropsMessage = "The vault changed in storage since this device read it -- its ways in were changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. What stands now is this error's meta.vault_props_stored: read the vault again before retrying."
 
-/** A `vault_mismatch` refusal of a box write, for vault props that are not the ones it was sealed for. Throw it from `doPutBox`.
+/** A `vault_mismatch` refusal of a box read or write, for vault props that are not the ones it expects. Throw it from `doGetBox` or `doPutBox`.
  * None stand, or they have another `vault_tok`. It carries nothing of the props that stand, as they
  * hold every wayin.
  *
@@ -89,7 +89,7 @@ export const StaleVaultPropsMessage = "The vault changed in storage since this d
 export const vaultMismatch = (): VaultError => new VaultError('vault_mismatch', VaultMismatchMessage)
 
 /** What `vault_mismatch` says. */
-const VaultMismatchMessage = "This vault was deleted, made anew, or had its key replaced on another device since this one read it, so nothing was written. Open the vault again to see what stands now."
+const VaultMismatchMessage = "This vault was deleted, made anew, or had its key replaced on another device since this one read it, so the box was neither read nor written. Open the vault again to see what stands now."
 
 /** A `not_permitted` refusal: a rule of the backend's refuses the signed-in user, still the vault's own, this one call.
  * It locks nothing.

@@ -1788,7 +1788,7 @@ export class Vault {
   /** The box under `boxlabel`, lying under `lease`'s vault; null when there is none, and 'damaged' when storage refuses its record as 'damaged_box'. */
   async #getBoxOrDamaged(boxlabel: string, lease: Lease): Promise<Box | 'damaged' | null> {
     try {
-      const record = await this.#vaultDB.getBox(this.#scope, boxlabel)
+      const record = await this.#vaultDB.getBox(this.#scope, boxlabel, { vault_tok: lease.vault_tok })
       return record === null ? null : Box.make(this, record, lease.vault_tok)
     } catch (err) {
       if (! isVaultError(err, 'damaged_box')) { throw err }
@@ -1806,7 +1806,7 @@ export class Vault {
     // Checked before the user is asked for anything: a call that cannot land never prompts.
     await this.#ensureUnlocked(0, () => { this.#checkListed(label) })
     const lease = this.#demandLease(call)
-    const record = await this.#vaultDB.getBox(this.#scope, label)
+    const record = await this.#vaultDB.getBox(this.#scope, label, { vault_tok: lease.vault_tok })
     if (record === null) { throw absentBox() }
     // A box another device wrote is what storage holds, not drift: the box is held to its vault alone.
     const box = Box.make(this, record, lease.vault_tok)

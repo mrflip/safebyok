@@ -89,7 +89,7 @@ describe("Refusals.vaultMismatch", () => {
     expect(refusal.family).to.eq('condition')
     expect(refusal).to.not.have.property('meta')
     expect(refusal).to.not.have.property('cause')
-    expect(refusal.message).to.include('nothing was written')
+    expect(refusal.message).to.include('neither read nor written')
   })
 })
 

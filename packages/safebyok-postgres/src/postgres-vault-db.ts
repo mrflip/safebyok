@@ -1,5 +1,5 @@
 import { Expectations, Refusals, TombstoneFormat, VaultDB, VaultError, VaultScope } from 'safebyok'
-import type { VaultPropsExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, GatelessVaultProps, StoredVault, VaultProps } from 'safebyok'
+import type { VaultPropsExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxGetExpectation, BoxExpectation, BoxDelExpectation, BoxDeletion, GatelessVaultProps, StoredVault, VaultProps } from 'safebyok'
 import * as Columns from './columns'
 import { VaultPropsColumns, ListedBoxColumns, BoxColumns, TombstoneColumns } from './columns'
 import { VaultChangeChannel } from './vault-tables'
@@ -166,7 +166,14 @@ const PutVaultPropsSql = `WITH standing AS MATERIALIZED (
     SELECT * FROM standing WHERE NOT EXISTS (SELECT 1 FROM written)
   ) AS stored ON true`
 
-const GetBoxSql = `SELECT ${Columns.selected(BoxColumns)} FROM safebyok_boxes WHERE ${ScopeIs} AND boxlabel = $4::text`
+// The box under the boxlabel in $4, in the vault of the vault_tok in $5 (line 2.5), from one
+// snapshot: one row while vault props of that vault_tok stand, its `stands` and box columns null
+// where no box does; no row where they do not -- none, a tombstone, or another vault's.
+const GetBoxSql = `SELECT box.* FROM safebyok_vaults AS vault LEFT JOIN (
+    SELECT true AS stands, ${Columns.selected(BoxColumns)} FROM safebyok_boxes
+    WHERE ${ScopeIs} AND boxlabel = $4::text AND vault_tok = $5::text
+  ) AS box ON true
+  WHERE ${ScopeIs} AND vault.vault_tok = $5::text`
 
 // The vault row a box write lands beside: the vault's, of the expected vault_tok (line 3.3). It is
 // read FOR SHARE, so a deletion of the vault waits until the write's statement ends, or the write
@@ -338,10 +345,11 @@ class TablesVaultDB extends VaultDB {
     throw Refusals.staleVaultProps(answer.stands ? Columns.recordOf(answer, VaultPropsColumns) : null)
   }
 
-  protected async doGetBox(scope: VaultScope, boxlabel: string): Promise<unknown> {
+  protected async doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<unknown> {
     this.mustReach(scope)
-    const { rows } = await this.sent(GetBoxSql, [...scopeParams(scope), boxlabel])
-    return rows.length === 0 ? null : Columns.recordOf(rows[0], BoxColumns)
+    const { rows } = await this.sent(GetBoxSql, [...scopeParams(scope), boxlabel, expected.vault_tok])
+    if (rows.length === 0) { throw Refusals.vaultMismatch() }
+    return (rows[0] as { stands: boolean | null }).stands ? Columns.recordOf(rows[0], BoxColumns) : null
   }
 
   // The box handed back, and the one a stale write reports, is the row as the statement that

@@ -1,4 +1,4 @@
-import { VaultDB, VaultError, outcomeOf, valOf, type Outcome, type VaultPropsExpectation, type VaultDelExpectation, type BoxRecord, type BoxExpectation, type BoxDelExpectation, type GatelessVaultProps, type StoredVault, type Tombstone, type VaultProps, type VaultRecords, type VaultScope } from 'safebyok'
+import { VaultDB, VaultError, outcomeOf, valOf, type Outcome, type VaultPropsExpectation, type VaultDelExpectation, type BoxRecord, type BoxGetExpectation, type BoxExpectation, type BoxDelExpectation, type GatelessVaultProps, type StoredVault, type Tombstone, type VaultProps, type VaultRecords, type VaultScope } from 'safebyok'
 
 /**
  * DEMO JANK: a pretend backend outage, switched on and off from the backend inspection panel, so
@@ -91,9 +91,9 @@ export class OutageVaultDB extends VaultDB {
     return valOf(await this.inner.putVaultProps(vaultProps, expected))
   }
 
-  protected async doGetBox(scope: VaultScope, boxlabel: string): Promise<unknown> {
+  protected async doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<unknown> {
     this.refuseWhileDown()
-    return valOf(await this.inner.getBox(scope, boxlabel))
+    return valOf(await this.inner.getBox(scope, boxlabel, expected))
   }
 
   protected async doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord): Promise<unknown> {

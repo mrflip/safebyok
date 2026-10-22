@@ -68,9 +68,10 @@ import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types'
  *   zero quota or a full disk); or no IndexedDB (`NotSupportedError`). A private window with room
  *   is no block. Stop offering a retry: tell the user why. The host may reopen the vault with
  *   `memoryDeviceDB`, which remembers no unlock on this device.
- * * `vault_mismatch`: from a `VaultDB.putBox` called directly, a box sealed for vault props
- *   that no longer stand (the vault deleted, remade under another `vault_tok`, or its vaultKey
- *   replaced). Nothing was written, and the device that sealed it is out of date.
+ * * `vault_mismatch`: from a `VaultDB.putBox` or `VaultDB.getBox` called directly, a box
+ *   written or read under vault props that no longer stand (the vault deleted, remade under
+ *   another `vault_tok`, or its vaultKey replaced). Nothing was written or read, and the device
+ *   that expected them is out of date.
  * * `invalid_box`: from a `VaultDB.putBox` called directly, a box this package would not
  *   build, or sealed under another vaultKey than its expectation names. It is refused before
  *   storage sees it. A vault reports the same as `bad_record`, since it built the box.
@@ -109,7 +110,7 @@ export const RefusalKindVals = [
   'insecure_context',    // the page is not a secure context (plain http), where the browser withholds WebCrypto
   'unexpected_error',    // something threw that is no refusal: a bug, in safebyok or in a function the app handed it
   'stale_write',         // storage changed since this device read it, so the write was refused
-  'vault_mismatch',      // a box write's vault props are not the ones standing -- another vault_tok, or none -- so it was refused
+  'vault_mismatch',      // a box read's or write's vault props are not the ones standing -- another vault_tok, or none -- so it was refused
   'rolled_back',         // storage handed back an older copy of the vault than this device has seen, which it refuses to use
   'not_permitted',       // the storage backend refused the signed-in user this call: not theirs to make
   'identity_revoked',    // the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in

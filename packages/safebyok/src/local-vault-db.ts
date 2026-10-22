@@ -5,7 +5,8 @@ import { VaultError } from './errors'
 import type { StringStore } from './string-store'
 import * as Ckeys from './ckeys'
 import * as Expectations from './expectations'
-import { type VaultDBOpts, VaultDB, type VaultPropsExpectation, type StoredBox, type StoredVault, type BoxExpectation, type BoxDelExpectation, type VaultDelExpectation } from './vault-db'
+import * as Refusals from './refusals'
+import { type VaultDBOpts, VaultDB, type VaultPropsExpectation, type StoredBox, type StoredVault, type BoxGetExpectation, type BoxExpectation, type BoxDelExpectation, type VaultDelExpectation } from './vault-db'
 
 /** `fn`'s result (or failure) as a promise: a sync throw becomes a rejection, never an escape. */
 const soon = async <ValT>(fn: () => ValT | Promise<ValT>): Promise<ValT> => await fn()
@@ -109,8 +110,11 @@ class StringStoreVaultDB extends VaultDB {
     })
   }
 
-  protected doGetBox(scope: VaultScope, boxlabel: string): Promise<unknown> {
-    return soon(() => readJson(this.store, Ckeys.box(scope, boxlabel)))
+  protected doGetBox(scope: VaultScope, boxlabel: string, expected: BoxGetExpectation): Promise<unknown> {
+    return soon(() => {
+      if (! Expectations.vaultMeets(readJson(this.store, Ckeys.vaultProps(scope)), expected)) { throw Refusals.vaultMismatch() }
+      return readJson(this.store, Ckeys.box(scope, boxlabel))
+    })
   }
 
   /** Every box row of `scope`, read in the synchronous step that calls it. */

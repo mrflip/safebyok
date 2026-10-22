@@ -198,7 +198,7 @@ describe("Box.make", () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
     await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
     valOf(await vaultDB.putBox(TH.scopeOf('u1'), TH.noBoxYet, TH.boxOf('anthropic_api_key', 'a1')))
-    const record = valOf(await vaultDB.getBox(TH.scopeOf('u1'), 'anthropic_api_key'))
+    const record = valOf(await vaultDB.getBox(TH.scopeOf('u1'), 'anthropic_api_key', TH.inThisVault))
     const box = Box.make(vaultOf(), record!)
     expect(box.record).to.deep.equal(TH.boxOf('anthropic_api_key', 'a1'))
   })

@@ -101,7 +101,7 @@ describe("idbVaultDB", () => {
     await set('["box","acme","u1","main","anthropic"]', TH.boxOf('anthropic', 'one'), rawShelf(dbName))
     const vaultDB = idbVaultDB({ dbName })
     expect(await TH.propsOf(vaultDB, TH.scopeOf('u1'))).to.be.null
-    expect(await TH.expectingGood(vaultDB).getBox(TH.scopeOf('u1'), 'anthropic')).to.be.null
+    await TH.expectBad(vaultDB.getBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault), 'vault_mismatch')
     expect(await inspectIdbVaultDB({ dbName }).rows()).to.have.lengthOf(4)
   })
 
@@ -351,7 +351,7 @@ describe("idbVaultDB, every verb one transaction", () => {
       failing.mockRestore()
     }
     expect(await TH.propsOf(vaultDB, scope)).to.deep.equal(TH.vaultPropsOf('u1'))
-    expect(await TH.expectingGood(vaultDB).getBox(scope, 'anthropic')).to.deep.equal(TH.boxOf('anthropic', 'one'))
+    expect(await TH.expectingGood(vaultDB).getBox(scope, 'anthropic', TH.inThisVault)).to.deep.equal(TH.boxOf('anthropic', 'one'))
   })
 })
 

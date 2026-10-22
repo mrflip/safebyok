@@ -560,22 +560,21 @@ const rebornWorld = async () => {
 }
 
 describe("a stale session cannot reach into a vault reborn elsewhere", () => {
-  it("putBox() is refused by storage as vault_mismatch, named stale_write, instead of landing in the reborn vault; a hello then relocks", async () => {
+  it("putBox() is refused by storage as vault_mismatch at its read of the box, instead of landing in the reborn vault; a hello then relocks", async () => {
     const { vaultOne, vaultTwo } = await rebornWorld()
     expect(vaultOne.getSnapshot().state).to.eq('unlocked')
-    const err = await TH.expectRefusal(vaultOne.putBox('anthropic', 'sk-ant-fake-stale'), 'stale_write')
-    expect(err.cause).to.have.property('refusalkind', 'vault_mismatch')
+    await TH.expectRefusal(vaultOne.putBox('anthropic', 'sk-ant-fake-stale'), 'vault_mismatch')
     expect(await vaultTwo.getWhisper('anthropic')).to.eq('sk-ant-fake-new')
     await vaultOne.hello({ staleMinutes: 0 })
     expect(vaultOne.getSnapshot().state).to.eq('locked')
   })
 
-  it("getWhisper() of a box the reborn vault wrote refuses as damaged_box at once, reading no vault props; a hello that reads afresh then finds the vault moved, and locks", async () => {
+  it("getWhisper() of a box the reborn vault wrote refuses as vault_mismatch at once, never damaged_box, reading no vault props; a hello that reads afresh then finds the vault moved, and locks", async () => {
     const { vaultOne, deafDB } = await rebornWorld()
     expect(vaultOne.getSnapshot().state).to.eq('unlocked')
     const getVaultProps = vi.spyOn(deafDB, 'getVault')
-    const err = await TH.expectRefusal(vaultOne.getWhisper('anthropic'), 'damaged_box')
-    expect(err.message).to.include('hello({ staleMinutes: 0 })')
+    const err = await TH.expectRefusal(vaultOne.getWhisper('anthropic'), 'vault_mismatch')
+    expect(err.message).to.include('Open the vault again')
     expect(getVaultProps).not.toHaveBeenCalled()
     expect(vaultOne.getSnapshot().state).to.eq('unlocked')
     await vaultOne.hello({ staleMinutes: 0 })
@@ -615,7 +614,7 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
 
   it("putBox() of a box the reborn vault has never held is refused all the same", async () => {
     const { vaultOne, vaultTwo } = await rebornWorld()
-    await TH.expectRefusal(vaultOne.putBox('openai', 'sk-fake-stale'), 'stale_write')
+    await TH.expectRefusal(vaultOne.putBox('openai', 'sk-fake-stale'), 'vault_mismatch')
     expect(boxlabelsOf(vaultTwo)).to.deep.equal(['anthropic'])
   })
 
@@ -673,7 +672,7 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
 
   it("unlock() syncs first: the reborn vault's own passphrase opens it from the stale handle", async () => {
     const { vaultOne } = await rebornWorld()
-    await TH.expectRefusal(vaultOne.putBox('anthropic', 'sk-ant-fake-stale'), 'stale_write')
+    await TH.expectRefusal(vaultOne.putBox('anthropic', 'sk-ant-fake-stale'), 'vault_mismatch')
     await vaultOne.unlock('pw two')
     expect(await vaultOne.getWhisper('anthropic')).to.eq('sk-ant-fake-new')
   })
@@ -683,7 +682,7 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
     const vaultOne = await world.openUnlocked('pw one', { vaultDB: world.deafVaultDB() })
     const vaultTwo = await world.open()
     await vaultTwo.del()
-    await TH.expectRefusal(vaultOne.putBox('anthropic', 'sk-ant-fake-stale'), 'stale_write')
+    await TH.expectRefusal(vaultOne.putBox('anthropic', 'sk-ant-fake-stale'), 'vault_mismatch')
     await vaultOne.hello({ staleMinutes: 0 })
     expect(vaultOne.getSnapshot().state).to.eq('absent')
     expect(world.dbStore.ckeys(), 'the tombstone, and nothing else').to.deep.equal([u1VaultPropsCkey])

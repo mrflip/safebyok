@@ -132,6 +132,15 @@ export const VaultPropsExpectation = v.object({
   gate_epoch:       v.number(),
 })
 
+/** What a box read means to read in: the box is read only while the scope's vault props have this `vault_tok`.
+ * So a reader holding the key of one vault is never handed a box of another life of the scope.
+ *
+ * @example { vault_tok: vaultProps.vault_tok }
+ */
+export const BoxGetExpectation = v.object({
+  vault_tok:    v.string(),
+})
+
 /** What a box write was sealed for and read: the vault props it lands beside, and the box it replaces.
  * It lands only while the scope's vault props have this `vault_tok`, and the standing box this
  * `revision_tok`, or, for null, there is no box.
@@ -151,6 +160,19 @@ const Room = v.object({ used: v.number(), max: v.number() })
  * @example { boxes: { used: 12, max: 8000 }, bytes: { used: 48_000, max: 7_339_008 } }
  */
 export const Capacity = v.object({ boxes: Room, bytes: Room })
+
+/** What a box read answers, from its one query's snapshot: `read`, with the box, or the refusal that read nothing.
+ * A read carries the box under the boxlabel exactly as stored (`box_stored`; null for none).
+ * `vault_mismatch`, when the scope's vault props are not the ones expected, or none stand, carries
+ * nothing of them.
+ *
+ * @example { read: true, box_stored: stored }
+ * @example { read: false, refusalkind: 'vault_mismatch' }
+ */
+export const GetBoxAnswer = v.union(
+  v.object({ read: v.literal(true), box_stored: v.nullable(BoxRecord) }),
+  v.object({ read: v.literal(false), refusalkind: v.literal('vault_mismatch') }),
+)
 
 /** What a box write answers, from its one transaction: `landed`, or the kind of refusal that wrote nothing.
  * A write that landed carries the box as stored. `stale_write` carries the box standing under the

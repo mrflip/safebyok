@@ -1113,9 +1113,11 @@ describe("useWhisper", () => {
 
 // == [Opening a box]: vault.decryptWhisper, what a vault hands its boxes
 
-/** The record storage holds for `u1`'s box `anthropic`, as the world's VaultDB hands it back. */
+/** The record storage holds for `u1`'s box `anthropic`, in the vault standing, as the world's VaultDB hands it back. */
 const storedBoxOf = async (world: ReturnType<typeof makeWorld>): Promise<BoxRecord> => {
-  const record = valOf(await world.vaultDB.getBox(TH.scopeOf('u1'), 'anthropic'))
+  const vaultProps = await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))
+  expect(vaultProps, 'no vault props stand').to.not.be.null
+  const record = valOf(await world.vaultDB.getBox(TH.scopeOf('u1'), 'anthropic', { vault_tok: vaultProps!.vault_tok }))
   expect(record, 'no box stored under anthropic').to.not.be.null
   return record!
 }
