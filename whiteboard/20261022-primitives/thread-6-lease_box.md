@@ -1,6 +1,6 @@
 # Thread 6: lease_box (2026-10-22)
 
-Branch `20261022-lease_box`, PR #PRNUM, stacked on [#253](https://github.com/mrflip/safebyok/pull/253). Justify: green (core 2898 passed, 37 skipped; react 287; convex 316; postgres 311; graphql 323; indexeddb 164; fastkey 49; demo 221; e2e 107; root 265). Size: everything 47 kB, Vault 39 kB, idbVaultDB 2.7 kB (raised by the rule). The open matters, the refusals where today coped, the Contract lines this thread makes untrue and the races are in `thread-6-lease_box-details.md` beside this file: the reviewer, whoever files the thread, and thread 11 should read it.
+Branch `20261022-lease_box`, PR #PRNUM, stacked on [#253](https://github.com/mrflip/safebyok/pull/253). Justify: green (core 2900 passed, 37 skipped; react 287; convex 316; postgres 311; graphql 323; indexeddb 164; fastkey 49; demo 221; e2e 107; root 265). Size: everything 47 kB, Vault 39 kB, idbVaultDB 2.7 kB (raised by the rule). The open matters, the refusals where today coped, the Contract lines this thread makes untrue and the races are in `thread-6-lease_box-details.md` beside this file: the reviewer, whoever files the thread, and thread 11 should read it.
 
 * **Built**:
   * `src/lease.ts`: `Lease.make(vault, record)`, a pure constructor over a record, nothing unwrapped;
@@ -45,9 +45,17 @@ Branch `20261022-lease_box`, PR #PRNUM, stacked on [#253](https://github.com/mrf
   * The wayin still unwraps a `sessionKey` nothing uses now: thread 8's to remove.
   * Thread 5's splice in `#takeStoredBox` (toldjaso 13) is left as it was.
 * **Rulings received (2026-10-22, via the orchestrator)**:
-  1. *Demand after each await in every box path.* Each wait in `putBox`, `getBox`, `getWhisper`,
-     `useWhisper`, `delBox` and `box.extractWhisper` is followed by a demand on what it brought;
-     `extractWhisper` demands the box again after the decipher.
+  1. *Demand after each await in every box path*, and the await audit (`guarantees-audit.md` risk
+     10, *By thread* 6). Each wait is followed by a demand before anything is made of its answer,
+     a refusal included: `vaultDB.getBox` in `#readBox`, `#readBox` and `box.tryExtractWhisper` in
+     `#storedBase`, `Box.trySeal` and `#writeOver` in `#sealAndPutBox`, `vaultDB.delBox` in
+     `tryDelBox`, `lease.tryDecipherWith` in `box.tryExtractWhisper`, and the vaultKey's unwrap and
+     the cipher or decipher in `lease.tryCipheredWith` / `tryDecipherWith`. One private
+     `#demandAfterWait(settled, thing, opts)` does it in `vault.ts`; two exceptions, both in its doc:
+     a refusal of `UntrustedStorageKinds` comes as it came (heeding it moved the picture), and a
+     lease-bound demand after a refused wait asks only the vault half (a `damaged_lease` has dropped
+     itself). Tests: vault-boxes *a box call whose vault is made anew elsewhere during its wait*
+     (`getBox`, `putBox`, `delBox` refuse `vault_remade`), lease.test's decipher racing a remake.
   2. *`box_moved` dropped.* Not added.
   3. *delBox.* No box tombstone stored; `vault.delBox` returns `DeletedBox`, shaped from
      `BoxDeletion`. No case met where a box tombstone would have helped.

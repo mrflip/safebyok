@@ -59,6 +59,9 @@ Each with what I built (the Rec taken) and what the other answer would mean.
 * A `Box` held across a change of the ways in refuses `gate_moved` at `extractWhisper()`; a box made
   before a remake refuses `vault_remade` (it was `vault_locked` from `decryptWhisper`).
 * A `putBox()` leaving out the whisper where none stands refuses `no_whisper`.
+* A `getBox()`, `getWhisper()`, `putBox()` or `delBox()` whose vault is deleted or made anew while
+  it waits on storage refuses as the demand finds the vault (`vault_gone`, `vault_remade`), never as
+  storage answered (`absent_box`, `damaged_box`, `stale_write`).
 
 Loosened: `getBox()` lets a lock landing while storage reads through, handing back the box (it
 holds nothing secret); `getWhisper()` still refuses `vault_locked`.
