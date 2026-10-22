@@ -9,7 +9,7 @@
 * **Issued by:** the Coach (flip), by `/sprint streamline` with `/turbochat`.
 * **Sprint doc:** [Sprint streamline](https://claude.ai/artifact/XJsqP4CTaVdfwKMBGS1sQ4): Open
   Matters, Progress, Resolved.
-* **Status:** thread 1 (renames) building, cut from #241 at origin/20261021-better_paths.
+* **Status:** thread 1 filed (#243); thread 2 (get_vault) building on it.
 
 The work is the preplan, `whiteboard/20261021-better_paths/better_paths-plan.md`, on
 [#241](https://github.com/mrflip/safebyok/pull/241)'s branch `20261021-better_paths`. Its ten
@@ -89,6 +89,14 @@ record written before reads as damaged (`damaged_vault`) or its lease as absent 
 how a host clears dev data. **Model:** `sonnet`. **Depends on:** #241 (cut from
 `origin/20261021-better_paths`). **Look-ahead:** none. **Size:** M (wide, mechanical). Moves no
 size line.
+
+*Review:* fixed (sonnet, medium). A reverse-rename check over the whole diff reproduces the base:
+rename-only, no format string or ctx byte changed. Fixed: the changeset wrongly said
+`delDamagedVault` clears pre-rename props (it cannot: it finds them by `vault_tok`); `@example`
+spacing; prose still calling the token an id. Left: pre-rename vaults stuck at `damaged_vault`
+(Open Matter), mixed old and new builds (Open Matter), old names in four pending changesets and
+`notes/security.md` (Open Matters; thread 2 adds the security note's head line), ragged rows in
+`expectations.test.ts` (cosmetic).
 
 ### 2. get_vault
 
