@@ -1,7 +1,7 @@
 # Thread 4: store_verbs (2026-10-22)
 
-Branch `20261022-store_verbs`, PR TBD, stacked on [#246](https://github.com/mrflip/safebyok/pull/246)
-(the line main, #243, #244, #246, this). Justify: see the PR body for counts; the live-service
+Branch `20261022-store_verbs`, PR [#251](https://github.com/mrflip/safebyok/pull/251), stacked on [#246](https://github.com/mrflip/safebyok/pull/246)
+(the line main, #243, #244, #246, this). Justify: green (core 2802, indexeddb 159, postgres 301, convex 306, graphql 312, react 287, demo 216, e2e 102; size budgets: `everything` to 46 kB, `idbVaultDB` to 2.6 kB); the live-service
 suites (`SAFEBYOK_PG_URL`, a Convex deployment: `e2e/`) skip here and were typechecked and linted
 only.
 
