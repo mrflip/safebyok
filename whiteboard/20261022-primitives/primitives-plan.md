@@ -336,6 +336,13 @@ immutable fields". Make the Box's stamp non-enumerable with `adorn` before the f
 private again (Open Matter), do it here. **Depends on:** 6. **Look-ahead:** thread 8 applies the
 same rule to ways in. **Size:** S. A stored-format change, pre-1.0.
 
+*Orchestrator:* built as [#256](https://github.com/mrflip/safebyok/pull/256): the ctx already bound every
+immutable field, so no stored change; the stamp hidden; `lock()`'s doc names what it spares. YOLO
+(a) on the whole put's unopened `registered_at` (Open Matter). Rework after review, from the
+Coach (2026-10-22): `vault.lease` private, with "selected methods via vault in a block of
+delegating functions/getters" (the lease's deadline first); `getWhisper` of a missing box refuses
+`absent_box` again ("just as if you said box = null box.whisper"); `getBox` keeps `null`.
+
 ### 7. bank
 
 > **bank**: `Bank` with `make`, `hello`, `ensureVault(draft)`, `reopenVault`, `closeVault`,
@@ -489,7 +496,9 @@ demands after each await. TODO entries from the Coach (2026-10-22): the Postgres
 an agent skill set; `capacity` as an attribute of the Vault object for the app; the Vault object
 adopting storage's capacity on `vault_full`; the stamp rather than the scope as VaultDB request
 params; sending the authenticated immutable fields with puts and reads for an early server-side
-check; whether `damaged_lease` should call `lock()` (without recursing). In the Contract, say that a lock spares only the
+check; whether `damaged_lease` should call `lock()` (without recursing); an active sentinel or a
+tighter `putBox` entry point for "whisper unchanged"; only the passphrase proving (or a parent
+object) holding the lease expiry (thread 8 weighs it). In the Contract, say that a lock spares only the
 transactional part: a VaultDB write once sent completes or refuses as storage decides, and every
 step before it refuses `vault_locked` (the Coach: "that covers only the transactional part, which
 I'm sure is uncleaer in the contract"); a stale write never succeeds, refusing `stale_write`, not

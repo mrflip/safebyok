@@ -77,7 +77,7 @@ rules* 3).
 | 4 | store_verbs | merged | #251 |
 | 5 | demand | filed, on main | #253 |
 | 6 | lease_box | filed, stacked on #253 | #254 |
-| 6b | box_seal | planned | |
+| 6b | box_seal | built, in review | #256 |
 | 7 | bank | planned | |
 | 8 | proving_gate | planned | |
 | 9 | gating | planned | |
