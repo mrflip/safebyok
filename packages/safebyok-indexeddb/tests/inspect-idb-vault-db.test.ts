@@ -14,22 +14,22 @@ describe("inspectIdbVaultDB", () => {
     let heardCount = 0
     const unsubscribe = inspector.subscribe(() => { heardCount += 1 })
 
-    await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
+    await TH.ensureGated(vaultDB, TH.vaultPropsOf('u1'))
     await TH.expectingGood(vaultDB).putBox(TH.scopeOf('u1'), { vault_tok: 'vault-tok-u1', revision_tok: null }, TH.boxOf('anthropic', 'one'))
     const rows = await inspector.rows()
     expect(rows.map((row) => row.ckey)).to.deep.equal(['box^acme^u1^main^anthropic', 'vault^acme^u1^main'])
-    await vi.waitFor(() => { expect(heardCount).to.eq(2) })
+    await vi.waitFor(() => { expect(heardCount).to.eq(3) })
 
     await inspector.wipe()
     expect(await inspector.rows()).to.have.lengthOf(0)
-    expect(await TH.expectingGood(vaultDB).getVaultProps(TH.scopeOf('u1'))).to.be.null
-    await vi.waitFor(() => { expect(heardCount).to.eq(3) })
+    expect(await TH.propsOf(vaultDB, TH.scopeOf('u1'))).to.be.null
+    await vi.waitFor(() => { expect(heardCount).to.eq(4) })
     unsubscribe()
   })
 
   it("meets trouble from IndexedDB as an Error, never a null, as the vault's own reads do", async () => {
     const dbName = TH.freshDbName()
-    await TH.expectGood(idbVaultDB({ dbName }).ensureVaultProps(TH.vaultPropsOf('u1')))
+    await TH.ensureGated(idbVaultDB({ dbName }), TH.vaultPropsOf('u1'))
     const failing = vi.spyOn(IDBObjectStore.prototype, 'getAll').mockImplementationOnce(function (this: IDBObjectStore) {
       const request = this.getAll()
       this.transaction.abort()
@@ -43,7 +43,7 @@ describe("inspectIdbVaultDB", () => {
   })
 
   it("looks at 'safebyok' given no options", async () => {
-    await TH.expectGood(idbVaultDB().ensureVaultProps(TH.vaultPropsOf('inspected_u1')))
+    await TH.ensureGated(idbVaultDB(), TH.vaultPropsOf('inspected_u1'))
     const rows = await inspectIdbVaultDB().rows()
     expect(rows.map((row) => row.ckey)).to.include('vault^acme^inspected_u1^main')
   })
@@ -58,7 +58,7 @@ describe("inspectIdbVaultDB", () => {
     const dbName = TH.freshDbName()
     const inspector = inspectIdbVaultDB({ dbName })
     expect(() => inspector.subscribe('not a listener' as unknown as () => void)).to.throw(VaultError, /listener function/).with.property('refusalkind', 'bad_option')
-    await TH.expectGood(idbVaultDB({ dbName }).ensureVaultProps(TH.vaultPropsOf('u1')))
+    await TH.ensureGated(idbVaultDB({ dbName }), TH.vaultPropsOf('u1'))
     expect(await inspector.rows()).to.have.lengthOf(1)
   })
 })
