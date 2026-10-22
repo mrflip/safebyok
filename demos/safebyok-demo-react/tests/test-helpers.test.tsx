@@ -16,7 +16,7 @@ describe("makeWorld", () => {
     const world = TH.makeWorld({ vaultDB })
     await world.seed({ anthropic_api_key: 'sk-ant-test-not-a-real-key' })
     expect(world.vaultDB).to.eq(vaultDB)
-    expect(await TH.expectingGood(vaultDB).getVaultProps(TH.scopeOf('u1'))).to.not.be.null
+    expect(await TH.propsOf(vaultDB, TH.scopeOf('u1'))).to.not.be.null
   })
 
   it("renders no vault for a signed-out page", () => {
@@ -46,7 +46,7 @@ describe("makeWorld", () => {
     const vault = await world.open()
     await vault.unlock(TH.Passphrase)
     expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
-    expect(await TH.expectingGood(world.vaultDB).getVaultProps(TH.scopeOf('u1'))).to.not.be.null
+    expect(await TH.propsOf(world.vaultDB, TH.scopeOf('u1'))).to.not.be.null
   })
 
   it("opens the vault from outside the page already unlocked, with the tests' passphrase", async () => {

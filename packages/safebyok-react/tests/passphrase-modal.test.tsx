@@ -205,7 +205,7 @@ describe("PassphraseModal", () => {
       const deafDB = localVaultDB({ store: { ...store, subscribe: neverRings } })
       const here = await TH.settledVault({ ...opts, vaultDB: deafDB })
       const there = await TH.settledVault({ ...opts, deviceDB: memoryDeviceDB() })
-      TH.beforeNextCall(deafDB, 'ensureVaultProps', () => there.unlock('pw one'))
+      TH.beforeNextCall(deafDB, 'ensureVault', () => there.unlock('pw one'))
       render(<PassphraseModal ask={TH.askOf(here)} onDone={noop} />)
       const field = screen.getByPlaceholderText<HTMLInputElement>('vault passphrase')
       fireEvent.change(field, { target: { value: 'pw two' } })

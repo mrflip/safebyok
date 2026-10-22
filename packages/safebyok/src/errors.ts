@@ -198,7 +198,7 @@ export type VaultErrorOpts = ErrorOptions & { meta?: RefusalMeta }
  *     if (isVaultError(err, 'vault_locked')) { promptForPassphrase() }
  *   }
  * @example
- *   const { ok, val, err } = await vaultDB.getVaultProps(scope)
+ *   const { ok, val, err } = await vaultDB.getVault(scope)
  *   if (! ok && err.family === 'misuse') { throw err }
  */
 export class VaultError extends Error {

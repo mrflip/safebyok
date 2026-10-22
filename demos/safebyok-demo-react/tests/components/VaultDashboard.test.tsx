@@ -52,7 +52,7 @@ describe("VaultDashboard, opening", () => {
 
   it("says a damaged vault record can't be opened, and offers no Retry", async () => {
     const world = TH.makeWorld()
-    vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValue(TH.bad(new VaultError('damaged_vault', "This vault's stored props failed their checks.")))
+    vi.spyOn(world.vaultDB, 'getVault').mockResolvedValue(TH.bad(new VaultError('damaged_vault', "This vault's stored props failed their checks.")))
     world.renderInVault(<VaultDashboard />)
     await screen.findByText(/stored record is damaged/)
     expect(screen.queryByRole('button', { name: 'Retry' })).to.be.null
@@ -81,7 +81,7 @@ describe("VaultDashboard, a vault stored damaged", () => {
     confirming.mockReturnValue(true)
     fireEvent.click(screen.getByRole('button', { name: 'Remove and start over' }))
     expect(await screen.findByText(/No boxes yet/)).to.not.be.null
-    expect(store.ckeys()).to.deep.equal([])
+    expect(store.ckeys(), 'a tombstone in the place of the vault props').to.deep.equal(['vault^acme^u1^main'])
   })
 
   it("says why deleting it failed, and keeps offering it", async () => {

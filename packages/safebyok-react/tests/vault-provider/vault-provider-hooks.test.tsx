@@ -47,7 +47,7 @@ describe("VaultProvider", () => {
 
       const world = makeWorld()
       const refusal = unreachable()
-      vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(TH.bad(refusal))
+      vi.spyOn(world.vaultDB, 'getVault').mockResolvedValueOnce(TH.bad(refusal))
       const reach = grabber()
       render(<VaultProvider {...world.props} userId="u1"><reach.Grab /></VaultProvider>)
       await waitFor(() => { expect(reach.latest().openError).to.eq(refusal) })

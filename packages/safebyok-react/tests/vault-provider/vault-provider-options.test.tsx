@@ -29,7 +29,7 @@ describe("VaultProvider", () => {
     const vault = await opened()
     // No minute trusted: each hello reads, and bad news it meets is told to the handler given.
     const revoked = new VaultError('identity_revoked', 'Sign in again to reach this vault.')
-    vi.spyOn(vaultDB, 'getVaultProps').mockResolvedValueOnce(TH.bad(revoked))
+    vi.spyOn(vaultDB, 'getVault').mockResolvedValueOnce(TH.bad(revoked))
     await TH.expectRefusal(vault.hello(), 'identity_revoked')
     expect(told).to.deep.equal([revoked])
 
@@ -157,7 +157,7 @@ describe("VaultProvider", () => {
     const vault = await opened()
     await vault.unlock('correct horse battery staple')
     // A change pushed from storage that the vault cannot read: its background refresh warns.
-    vi.spyOn(vaultDB, 'getVaultProps').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
+    vi.spyOn(vaultDB, 'getVault').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
     store.write('elsewhere', '{}')
     await waitFor(() => { expect(spy.calls.map((heard) => heard.level)).to.deep.equal(['warn']) })
     expect(spy.calls[0]?.story).to.deep.equal({ call: 'refresh' })
@@ -180,7 +180,7 @@ describe("VaultProvider", () => {
     await waitFor(() => { expect(spy.calls.map((heard) => heard.story?.['call'])).to.include('VaultProvider') })
     const vault = await opened()
     await vault.unlock('correct horse battery staple')
-    vi.spyOn(vaultDB, 'getVaultProps').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
+    vi.spyOn(vaultDB, 'getVault').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
     store.write('elsewhere', '{}')
     await waitFor(() => { expect(spy.calls).to.have.lengthOf(2) })
     expect(spy.calls.map((heard) => [heard.level, heard.story?.['call']])).to.deep.equal([['warn', 'VaultProvider'], ['warn', 'refresh']])

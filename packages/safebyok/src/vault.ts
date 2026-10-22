@@ -239,7 +239,7 @@ export class Vault {
    * Never prompts. Optional: every call that reads storage awaits a first hello. Call it again to
    * refresh: within `opts.staleMinutes` of the last read it re-settles without reading, unless what
    * it read may no longer stand (a read failed, storage was not to be trusted, or the vault was
-   * deleted). Reads `VaultDB.getVaultProps`, `VaultDB.listBoxes` and {@link DeviceDB.getLease};
+   * deleted). Reads `VaultDB.getVault` and {@link DeviceDB.getLease};
    * the first hello also starts the vault's watch, `VaultDB.subscribe`.
    *
    * A refused hello applies no partial read: the vault stands as its last read left it, `locked`
@@ -309,7 +309,7 @@ export class Vault {
    * writes the lease with {@link DeviceDB.putLease}.
    *
    * On an `absent` vault, a passphrase creates the vault, with itself as the way in, through
-   * `VaultDB.ensureVaultProps`. It must pass {@link Vault.checkPassphrase} first, or the unlock
+   * `VaultDB.ensureVault` and a first write of its gate, `VaultDB.putVaultProps`. It must pass {@link Vault.checkPassphrase} first, or the unlock
    * refuses 'weak_passphrase' and creates nothing. Creating costs a second key derivation. A vault
    * that stands never refuses its passphrase as weak.
    *

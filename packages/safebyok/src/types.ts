@@ -142,7 +142,7 @@ export const BoxSummary = Z.object({
 })
 export type BoxSummary = Z.infer<typeof BoxSummary>
 
-/** A box as a VaultDB's `listBoxes` lists it: a {@link BoxSummary} but for its `vault_tok`, which the vault adds from the vault props it read beside the listing. */
+/** A box as a VaultDB's `getVault` lists it: a {@link BoxSummary} but for its `vault_tok`, which the vault adds from the vault props it read beside the listing. */
 export type ListedSummary = Omit<BoxSummary, 'vault_tok'>
 
 /** A box whose stored record does not read back as one, listed under its boxlabel among the {@link BoxSummary}s of a vault's snapshot.

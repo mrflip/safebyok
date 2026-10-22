@@ -240,7 +240,7 @@ const SafebyokFnNames = [
 ] as const
 
 // Each function must name itself as `<module>:<function>`. The whole generated `api` answers any
-// property, so `api.getVaultProps` exists -- but names no module, and Convex refuses to name it.
+// property, so `api.getVault` exists -- but names no module, and Convex refuses to name it.
 const isSafebyokApi = (api: unknown): api is SafebyokApi => {
   if (typeof api !== 'object' || api === null) { return false }
   const fnRefs = api as Partial<Record<string, FunctionReference<'query' | 'mutation'>>>

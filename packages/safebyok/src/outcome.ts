@@ -5,7 +5,7 @@ import * as Refusals from './refusals'
  * TypeScript narrows on `ok`.
  *
  * @example
- *   const { ok, val, err } = await vaultDB.getVaultProps(scope)
+ *   const { ok, val, err } = await vaultDB.getVault(scope)
  *   if (! ok) { return err }
  *   val  // VaultProps | null
  */
@@ -80,7 +80,7 @@ export const isOutcomeShaped = (candidate: unknown): boolean => (
 
 /** `outcome`'s `val`, or its `err` thrown: how a VaultDB that hands each call on to another unwraps each answer.
  *
- * @example const vaultProps = valOf(await vaultDB.getVaultProps(scope))  // throws the refusal, if any
+ * @example const listed = valOf(await vaultDB.getVault(scope))  // throws the refusal, if any
  * @example
  *   protected async doGetBox(scope: VaultScope, boxlabel: string): Promise<unknown> {
  *     return valOf(await this.inner.getBox(scope, boxlabel))

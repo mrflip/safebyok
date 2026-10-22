@@ -74,7 +74,7 @@ export type PostgresVaultDBOpts = VaultDBOpts & {
  *
  * @example
  *   const vaultDB = postgresVaultDB({ client: pool, userId: session.userId })
- *   await vaultDB.getVaultProps({ applabel: 'acme', user_id: session.userId, vaultlabel: 'main' })  // { ok: true, val: null }, or the vault props
+ *   await vaultDB.getVault({ applabel: 'acme', user_id: session.userId, vaultlabel: 'main' })  // { ok: true, val: null }, or the vault and its listing
  * @example
  *   const vaultDB = postgresVaultDB({ client: pool, userId: session.userId, maxBoxes: 250 })
  */
