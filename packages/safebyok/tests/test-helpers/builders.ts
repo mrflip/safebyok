@@ -74,12 +74,11 @@ export type LeasedSlice = VaultSlice & {
   locks:                number
 }
 
-/**
- * A stand-in for `userId`'s `main` vault holding a lease around `vaultKey`, for a test of a box or
- * a lease with no vault behind it, whose vaultKey the test knows. It is a {@link vaultSliceOf}
- * slice (each of its fields as `overrides` does not say otherwise), stamped with its scope and
- * `vault_tok`, vault epoch 1 and gate epoch 1, holding a lease granted at its clock's time. Its demand is the vault's
- * in small: no stamp is `vault_gone`; another scope or `vault_tok`, `vault_remade`; another
+/** A stand-in for `userId`'s `main` vault holding a lease around `vaultKey`, for a test of a box or a lease with no vault behind it, whose vaultKey the test knows.
+ * It is a {@link vaultSliceOf} slice (each of its fields as `overrides` does not say otherwise),
+ * stamped with its scope and `vault_tok`, vault epoch 1 and gate epoch 1, holding a lease granted
+ * at its clock's time. Its demand is the vault's in small: no stamp is `vault_gone`; another scope
+ * or `vault_tok`, `vault_remade`; another
  * `gate_epoch`, `gate_moved`; lease-bound, no lease or one ended by its clock, `vault_locked`. Its
  * `tryLock` drops the lease and counts the call.
  *
@@ -368,9 +367,8 @@ export const summaryOf = <SummaryT extends ListedSummary>(box: SummaryT | Damage
  */
 export const noBoxYet = Object.freeze({ vault_tok: 'vault-tok-u1', revision_tok: null } as const)
 
-/**
- * What a box read in {@link vaultPropsOf}('u1')'s vault expects: that vault. Frozen, since every
- * test shares it.
+/** What a box read in {@link vaultPropsOf}('u1')'s vault expects: that vault.
+ * Frozen, since every test shares it.
  *
  * @example vaultDB.getBox(TH.scopeOf('u1'), 'anthropic', TH.inThisVault)
  */
