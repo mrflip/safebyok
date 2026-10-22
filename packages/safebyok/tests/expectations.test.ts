@@ -67,7 +67,7 @@ const BoxCases = [
   [TH.vaultPropsOf('u1', { vault_tok: 'reborn' }), Box, "rev-one", "vault_mismatch", 'a write sealed for a vault since made anew'],
   // nothing, or damage, standing:
   [{ vault_tok: "vault-tok-u1" },  undefined, null,       "vault_mismatch", 'a vault row that shows no epoch'],
-  [{ vault_tok: "vault-tok-u1", gate_epoch: 1 }, undefined, null, null,         'a vault row that shows its id and epoch, and nothing more'],
+  [{ vault_tok: "vault-tok-u1", gate_epoch: 1 }, undefined, null, null,         'a vault row that shows its token and epoch, and nothing more'],
   [VaultProps, null,                          null,       null,             'a null row reads as no box, as a read does'],
   [VaultProps, { boxlabel: "anthropic" },     "rev-one",  "stale_write",    'a box row that shows no revision'],
 ] as const

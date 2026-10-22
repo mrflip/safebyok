@@ -47,7 +47,7 @@ export type VaultSnapshot = Readonly<{
   user_id:         string
   /** The vault's own label within the app. Fixed for the Vault object's life. */
   vaultlabel:      string
-  /** The stored vault's id, minted when it was made. */
+  /** The stored vault's token, minted when it was made. */
   vault_tok:       string | null
   /** When the stored vault was made, in epoch milliseconds. */
   registered_at:   number | null
@@ -172,7 +172,7 @@ export class Vault {
   // Each field reads the snapshot `#settle()` last published, so the fields and the snapshot always
   // agree. A getter with no setter: a host cannot write over one, and the vault never reads one back.
   // Its boxes, ways in and lease read back only what is fixed for the handle's life -- its scope, its
-  // key deriver, its lease length -- and the time; each holds the ids of the vault props it is bound to.
+  // key deriver, its lease length -- and the time; each holds the token and epoch of the vault props it is bound to.
 
   /** The scope's app: where the vault is found. Fixed for the Vault object's life. */
   get applabel(): string { return this.#snapshot.applabel }
@@ -180,7 +180,7 @@ export class Vault {
   get user_id(): string { return this.#snapshot.user_id }
   /** The vault's own label within the app. Fixed for the Vault object's life. */
   get vaultlabel(): string { return this.#snapshot.vaultlabel }
-  /** The stored vault's id; null until a read finds a vault. */
+  /** The stored vault's token; null until a read finds a vault. */
   get vault_tok(): string | null { return this.#snapshot.vault_tok }
   /** When the stored vault was made, in epoch milliseconds; null until a read finds a vault. */
   get registered_at(): number | null { return this.#snapshot.registered_at }

@@ -107,7 +107,7 @@ const sealedOf = async (whisper: Whisper = Secret, opts?: Parameters<typeof Box.
 
 /**
  * A box record holding `plainBytes` as its whisper, ciphered and wrapped by hand under the ctx a
- * box's ctx is documented to be: the format, the vault's scope, the vault props' id, the
+ * box's ctx is documented to be: the format, the vault's scope, the vault props' token, the
  * purpose, and every visible field, the sidecar as its JSON with keys sorted.
  */
 const handSealedOf = async (vault: TH.VaultSlice, vaultKey: CryptoKey, plainBytes: Uint8Array): Promise<BoxRecord> => {
@@ -125,7 +125,7 @@ const handSealedOf = async (vault: TH.VaultSlice, vaultKey: CryptoKey, plainByte
 afterEach(() => { vi.restoreAllMocks() })
 
 describe("Box.make", () => {
-  it("makes a box whose visible fields are its own, read from the record, the sidecar parsed, and the vault props' id beside them, as the class's example shows (Contract: Box)", () => {
+  it("makes a box whose visible fields are its own, read from the record, the sidecar parsed, and the vault props' token beside them, as the class's example shows (Contract: Box)", () => {
     const record = TH.boxOf('anthropic_api_key', 'a1', { sidecar: { note: 'work account' } })
     const box = Box.make(vaultOf(), record)
     expect(TH.shownOf(box)).to.deep.equal({
@@ -345,7 +345,7 @@ describe("box.tryOpen", () => {
     expect(whisper).to.deep.equal({ apiKey: Secret, org: 'acme' })
   })
 
-  it("rebuilds boxCtx from the vault's scope, the vault props' id and every visible field, unwraps, deciphers and checks (Contract: box.tryOpen, Does)", async () => {
+  it("rebuilds boxCtx from the vault's scope, the vault props' token and every visible field, unwraps, deciphers and checks (Contract: box.tryOpen, Does)", async () => {
     const vault = vaultOf()
     const vaultKey = await makeVaultKey()
     const record = await handSealedOf(vault, vaultKey, new TextEncoder().encode(JSON.stringify(Secret)))

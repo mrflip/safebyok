@@ -55,8 +55,8 @@ export type BoxRecord = Z.infer<typeof BoxRecord>
 
 // == [Box]: BoxVault, BoxView, Box, record, make, seal, tryOpen, open, toJSON
 
-/** The slice of a {@link Vault} a box reads: the scope its encryptions are bound to, the id of the vault props it holds, and the time a seal stamps.
- * A box made from a record lies under that id unless told otherwise.
+/** The slice of a {@link Vault} a box reads: the scope its encryptions are bound to, the token of the vault props it holds, and the time a seal stamps.
+ * A box made from a record lies under that token unless told otherwise.
  */
 export type BoxVault = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_tok' | 'now'>
 
@@ -113,7 +113,7 @@ export class Box {
   readonly registered_at: number
   /** When this revision was put, in epoch milliseconds, whether or not the whisper changed. */
   readonly written_at:    number
-  /** The id of the vault props this box lies under: bound into both its encryptions, and named by the write that puts it. */
+  /** The token of the vault props this box lies under: bound into both its encryptions, and named by the write that puts it. */
   readonly vault_tok:     string
 
   private constructor(vault: BoxVault, vaultTok: string, record: BoxRecord) {
@@ -134,11 +134,11 @@ export class Box {
     return this.#record
   }
 
-  /** The box a stored record makes, of `vault`, lying under the vault props whose id is `vaultTok`; the record kept, frozen, as `record`.
+  /** The box a stored record makes, of `vault`, lying under the vault props whose token is `vaultTok`; the record kept, frozen, as `record`.
    * Touches no storage and no key. Throws 'bad_record' for a record this package does not write,
    * and 'absent_vault' when no `vaultTok` is given and the vault holds no vault props.
    *
-   * @param vaultTok - The id of the vault props it lies under, as the vault held them when it read the record. Default: the vault's own now.
+   * @param vaultTok - The token of the vault props it lies under, as the vault held them when it read the record. Default: the vault's own now.
    *
    * @example const box = Box.make(vault, valOf(await vaultDB.getBox(scope, 'anthropic_api_key')))
    * @example Box.make(vault, { boxlabel: 'anthropic_api_key' })   // throws 'bad_record': no box record
@@ -321,7 +321,7 @@ export const heldListing = (listed: ListedSummary | DamagedBox, vaultTok: string
 /** A box's visible header: every field of its record but its format, which leads each ctx, and the two encrypted ones. */
 type BoxHeader = Omit<BoxRecord, 'format' | 'box_key_wrapped' | 'whisper_ciphered'>
 
-// A box's ctx binds its format, the vault it lies in (its vault's scope, and the id of the vault
+// A box's ctx binds its format, the vault it lies in (its vault's scope, and the token of the vault
 // props it lies under), and its record's whole visible header: every field but the format, which
 // leads, and the two encrypted ones, so a sidecar, a time or its codec altered in storage refuses
 // to open. The sidecar is bound as its JSON with keys sorted, worked out here, so storage that
@@ -366,7 +366,7 @@ export const checkedSidecar = (sidecar: unknown): Sidecar => {
   return checked.data
 }
 
-/** `vaultTok`, the id of the vault props a box lies under: kind 'absent_vault' for none, a vault not made yet. */
+/** `vaultTok`, the token of the vault props a box lies under: kind 'absent_vault' for none, a vault not made yet. */
 const standingVaultTok = (vaultTok: string | null): string => {
   if (vaultTok === null) {
     throw new VaultError('absent_vault', 'This vault has not been created yet, so no box lies in it: the first unlock() creates it.')

@@ -13,7 +13,7 @@ const scope = TH.scopeOf('u1')
 const SealedAt = Date.UTC(2026, 9, 15)
 /** The slice of a vault every proof here is parsed under: `u1`'s `main` vault, deriving with the test deriver. */
 const slice: TH.VaultSlice = TH.vaultSliceOf('u1', TH.testDeriver, { now: () => SealedAt })
-/** The id of the vault props every way in here is sealed for: with their scope, what a wrap binds of them. */
+/** The token of the vault props every way in here is sealed for: with their scope, what a wrap binds of them. */
 const { vault_tok: vaultTok } = TH.vaultPropsOf('u1')
 
 /** The slice of a vault deriving with `keyDeriver`. */

@@ -141,7 +141,7 @@ describe("watchVault", () => {
     expect(await CVX.query(TH.vaults.watchVault, { scope: u1 })).to.deep.equal({ vault_tok: null, gate_epoch: null, boxes: [] })
   })
 
-  it("signs the vault with its vault props' ids and each box's revision, in boxlabel order", async () => {
+  it("signs the vault with its vault props' token and epoch and each box's revision, in boxlabel order", async () => {
     const CVX = await withVaultProps()
     await CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.boxOf('openai_api_key', 'o1'), expected: TH.noBoxYet })
     await CVX.mutation(TH.vaults.putBox, { scope: u1, box: TH.boxOf('anthropic_api_key', 'a1'), expected: TH.noBoxYet })

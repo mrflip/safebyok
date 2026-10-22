@@ -46,7 +46,7 @@ const grantedLease = async () => {
 }
 
 describe("Lease.grant", () => {
-  it("makes a lease whose record holds the scope its vault's, its ids the vault props', and its deadline leaseMillis from now, as its example shows", async () => {
+  it("makes a lease whose record holds the scope its vault's, its vault_tok and gate_epoch the vault props', and its deadline leaseMillis from now, as its example shows", async () => {
     const { lease } = await grantedLease()
     const visible = { ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', gate_epoch: 3, ask_passphrase_at: Deadline }
     expect(lease.record).to.deep.include({ format: 'safebyok-lease-v1', ...visible })
