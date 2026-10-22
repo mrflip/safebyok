@@ -224,7 +224,7 @@ export class Vault {
    * The time it is by the clock the vault was made with, in whole epoch milliseconds (a reading's
    * fraction rounded down): what the vault's boxes, ways in and lease are stamped and judged by.
    *
-   * @example vault.askPassphraseAt !== null && vault.askPassphraseAt <= vault.now()   // true once the lease has ended
+   * @example vault.now() - box.written_at   // how long ago the box was written, by the vault's clock
    */
   now(): number { return this.#clockNow() }
   // --

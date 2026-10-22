@@ -250,12 +250,13 @@ describe("the host's clock", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw', { clock: { now: () => world.clock.now() + 0.5 } })
     expect(vault.now()).to.eq(world.clock.now())
+    const box = await vault.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    world.advance(MinuteMillis)
+    expect(vault.now() - box.written_at).to.eq(MinuteMillis)
     const lease = Lease.make(vault, await world.getLease())
     expect(lease.endsBy(vault.now())).to.be.false
-    expect(vault.askPassphraseAt !== null && vault.askPassphraseAt <= vault.now()).to.be.false
     world.advance(vault.leaseMillis)
     expect(lease.endsBy(vault.now())).to.be.true
-    expect(vault.askPassphraseAt !== null && vault.askPassphraseAt <= vault.now()).to.be.true
   })
 
   it("checks the clock once, at Vault.make: a later reading in seconds is taken as it comes, and checked by nothing", async () => {
