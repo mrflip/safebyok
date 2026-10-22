@@ -62,17 +62,36 @@ export const PasskeyWayin = v.object({
 })
 
 /** A vault's props: its scope and identity, and its ways in, each the vaultKey wrapped under a wayinKey.
- * Every vault has a `passphrase`; `passkey` is null when it has none. Nothing in it opens without a passphrase or passkey.
+ * A vault with a gate (`gate_epoch` 1 or more) has a `passphrase`, and a `passkey` or null. A
+ * gateless one (`gate_epoch` 0) has null for both. Nothing in it opens without a passphrase or passkey.
  */
 export const VaultProps = v.object({
   format:           VaultPropsFormat,
   applabel:         v.string(),
   user_id:          v.string(),
   vaultlabel:       v.string(),
-  vault_id:         v.string(),
-  unlock_epoch:     v.number(),
-  passphrase:       PassphraseWayin,
+  vault_tok:        v.string(),
+  vault_epoch:      v.number(),
+  gate_epoch:       v.number(),
+  passphrase:       v.nullable(PassphraseWayin),
   passkey:          v.nullable(PasskeyWayin),
+  registered_at:    v.number(),
+})
+
+/** The vault props a vault is first stored as, which `ensureVault` takes: `gate_epoch` 0, and no way in.
+ *
+ * @example { format: 'safebyok-vault-v6', ...scope, vault_tok, gate_epoch: 0, passphrase: null, passkey: null, registered_at }
+ */
+export const GatelessVaultProps = v.object({
+  format:           VaultPropsFormat,
+  applabel:         v.string(),
+  user_id:          v.string(),
+  vaultlabel:       v.string(),
+  vault_tok:        v.string(),
+  vault_epoch:      v.number(),
+  gate_epoch:       v.literal(0),
+  passphrase:       v.null(),
+  passkey:          v.null(),
   registered_at:    v.number(),
 })
 
@@ -95,23 +114,32 @@ export const BoxRecord = v.object({
 /** A box as a listing returns it: every field but the two ciphered ones, `format` kept, so the client validates it as a whole record. */
 export const ListedBox = BoxRecord.omit('box_key_wrapped', 'whisper_ciphered')
 
-/** What an update of the vault props was proven against: it lands only while the standing vault props have this `vault_id` and `unlock_epoch`.
+/** A vault as one query or mutation reads it: its vault props, and every box without its two ciphered fields, in boxlabel order.
  *
- * @example { vault_id: standing.vault_id, unlock_epoch: standing.unlock_epoch }
+ * @example { vaultProps, boxes: [listedBox] }
+ */
+export const VaultAnswer = v.object({
+  vaultProps: VaultProps,
+  boxes:      v.array(ListedBox),
+})
+
+/** What an update of the vault props was proven against: it lands only while the standing vault props have this `vault_tok` and `gate_epoch`.
+ *
+ * @example { vault_tok: standing.vault_tok, gate_epoch: standing.gate_epoch }
  */
 export const VaultPropsExpectation = v.object({
-  vault_id:         v.string(),
-  unlock_epoch:     v.number(),
+  vault_tok:        v.string(),
+  gate_epoch:       v.number(),
 })
 
 /** What a box write was sealed for and read: the vault props it lands beside, and the box it replaces.
- * It lands only while the scope's vault props have this `vault_id`, and the standing box this
+ * It lands only while the scope's vault props have this `vault_tok`, and the standing box this
  * `revision_tok`, or, for null, there is no box.
  *
- * @example { vault_id: vaultProps.vault_id, revision_tok: null } // a box that was not there
+ * @example { vault_tok: vaultProps.vault_tok, revision_tok: null } // a box that was not there
  */
 export const BoxExpectation = v.object({
-  vault_id:     v.string(),
+  vault_tok:    v.string(),
   revision_tok: v.nullable(v.string()),
 })
 
@@ -142,24 +170,53 @@ export const PutBoxAnswer = v.union(
   v.object({ landed: v.literal(false), refusalkind: v.literal('vault_full'), capacity: Capacity }),
 )
 
-/** What a vault delete was meant for: it lands only while the scope's vault props have this `vault_id`.
- * So a stale session never deletes a vault made anew elsewhere.
+/** What an update of the vault props answers, from its one transaction: `landed` with the vault props as stored, or the vault props standing that it did not land over.
+ * A landed update carries them as stored, their `vault_epoch` moved up by one (`vault_props_stored`).
+ * A miss carries what stands as a read returns it (`vault_props_stored`; null for none).
  *
- * @example { vault_id: vaultProps.vault_id }
+ * @example { landed: true, vault_props_stored: stored }
+ * @example { landed: false, vault_props_stored: winner }
+ */
+export const PutVaultPropsAnswer = v.union(
+  v.object({ landed: v.literal(true), vault_props_stored: VaultProps }),
+  v.object({ landed: v.literal(false), vault_props_stored: v.nullable(VaultProps) }),
+)
+
+/** What a vault delete was meant for: it lands only while the scope's vault props have this `vault_tok` and `gate_epoch`.
+ * So a stale session never deletes a vault made anew elsewhere, nor one whose gate has changed.
+ * A null `gate_epoch` is for deleting a vault whose props are damaged, and expects the `vault_tok` alone.
+ *
+ * @example { vault_tok: vaultProps.vault_tok, gate_epoch: vaultProps.gate_epoch }
  */
 export const VaultDelExpectation = v.object({
-  vault_id: v.string(),
+  vault_tok:  v.string(),
+  gate_epoch: v.nullable(v.number()),
+})
+
+/** The format a {@link Tombstone} carries. */
+export const TombstoneFormat = v.union(v.literal('safebyok-tombstone-v1'))
+
+/** What a deleted vault leaves in its scope: its counter, which the next vault made there carries on.
+ *
+ * @example { format: 'safebyok-tombstone-v1', ...scope, vault_epoch: 4 }
+ */
+export const Tombstone = v.object({
+  format:       TombstoneFormat,
+  applabel:     v.string(),
+  user_id:      v.string(),
+  vaultlabel:   v.string(),
+  vault_epoch:  v.number(),
 })
 
 /** What a box delete was meant for: the vault, and the `revision_tok` its writer read, or null for a box listed damaged with none.
- * It lands only while the scope's vault props have this `vault_id`, whatever revision stands, so a
+ * It lands only while the scope's vault props have this `vault_tok`, whatever revision stands, so a
  * stale session never deletes from a vault made anew elsewhere. The revision only says whether
  * what it removed was the one meant, as a {@link BoxDeletion}.
  *
- * @example { vault_id: vaultProps.vault_id, revision_tok: listed.revision_tok }
+ * @example { vault_tok: vaultProps.vault_tok, revision_tok: listed.revision_tok }
  */
 export const BoxDelExpectation = v.object({
-  vault_id:     v.string(),
+  vault_tok:    v.string(),
   revision_tok: v.nullable(v.string()),
 })
 
@@ -179,13 +236,13 @@ export const BoxDeletion = v.object({
 const BoxRevision = v.array(v.string())
 
 /** The vault's change signature: it changes exactly when a write lands in the vault, and holds nothing a listing does not show.
- * It is the vault props' `vault_id` and `unlock_epoch`, null while there are none, and each box's
+ * It is the vault props' `vault_tok` and `gate_epoch`, null while there are none, and each box's
  * `[boxlabel, revision_tok]`, in boxlabel order.
  *
- * @example { vault_id: 'b3f1...', unlock_epoch: 2, boxes: [['anthropic_api_key', '9c4e...']] }
+ * @example { vault_tok: 'b3f1...', gate_epoch: 2, boxes: [['anthropic_api_key', '9c4e...']] }
  */
 export const VaultSignature = v.object({
-  vault_id:         v.nullable(v.string()),
-  unlock_epoch:     v.nullable(v.number()),
+  vault_tok:        v.nullable(v.string()),
+  gate_epoch:       v.nullable(v.number()),
   boxes:            v.array(BoxRevision),
 })

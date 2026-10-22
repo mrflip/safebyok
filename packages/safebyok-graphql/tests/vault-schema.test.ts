@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildSchema, getNamedType, isInputObjectType, isNonNullType, isObjectType, parse, validate } from 'graphql'
 import type { GraphQLInputField, GraphQLField } from 'graphql'
-import { Ciphered, BoxRecord, VaultProps, VaultScope } from 'safebyok'
+import { Ciphered, BoxRecord, GatedVaultProps, GatelessVaultProps, VaultScope } from 'safebyok'
 import { VaultSchemaSdl } from '../src/vault-schema'
 import { VaultOperations } from '../src/graphql-vault-db'
 
@@ -12,12 +12,15 @@ const schema = buildSchema(VaultSchemaSdl)
 // nullable when its validator is Zod's nullable.
 type RecordSchema = { shape: Record<string, { _zod: { optin?: string }, safeParse: (val: unknown) => { success: boolean } }> }
 
+/** The fields of vault props gated or gateless, as one GraphQL type carries both: the gated ones, the passphrase taking null as a gateless vault's does. */
+const EitherVaultProps = { shape: { ...GatedVaultProps.shape, passphrase: GatelessVaultProps.shape.passphrase } }
+
 /** Each object type and input type, the core record it carries, and the fields it leaves out. */
 const RecordTypes = [
   ['SafebyokVaultScope',         VaultScope,  []],
   ['SafebyokVaultScopeInput',    VaultScope,  []],
-  ['SafebyokVaultProps',         VaultProps, []],
-  ['SafebyokVaultPropsInput',    VaultProps, []],
+  ['SafebyokVaultProps',         EitherVaultProps, []],
+  ['SafebyokVaultPropsInput',    EitherVaultProps, []],
   ['SafebyokBox',                BoxRecord,   []],
   ['SafebyokBoxInput',           BoxRecord,   []],
   ['SafebyokListedBox',          BoxRecord,   ['box_key_wrapped', 'whisper_ciphered']],
@@ -62,10 +65,10 @@ describe("VaultSchemaSdl", () => {
     })
   }
 
-  it("carries the vault props' passphrase and passkey each as opaque JSON, the passkey nullable", () => {
+  it("carries the vault props' passphrase and passkey each as opaque JSON, both nullable, as a gateless vault holds neither", () => {
     for (const typename of ['SafebyokVaultProps', 'SafebyokVaultPropsInput']) {
       const { passphrase, passkey } = fieldsOf(typename)
-      expect(isNonNullType(passphrase!.type)).to.be.true
+      expect(isNonNullType(passphrase!.type)).to.be.false
       expect(isNonNullType(passkey!.type)).to.be.false
       expect(getNamedType(passphrase!.type).name).to.eq('SafebyokWayin')
       expect(getNamedType(passkey!.type).name).to.eq('SafebyokWayin')
@@ -73,9 +76,9 @@ describe("VaultSchemaSdl", () => {
   })
 
   it("names one root field for each VaultDB verb a browser's vault calls, and one subscription", () => {
-    expect(Object.keys(schema.getQueryType()!.getFields())).to.have.members(['safebyokGetVaultProps', 'safebyokGetBox', 'safebyokListBoxes', 'safebyokGetCapacity'])
+    expect(Object.keys(schema.getQueryType()!.getFields())).to.have.members(['safebyokGetVault', 'safebyokGetBox', 'safebyokGetCapacity'])
     expect(Object.keys(schema.getMutationType()!.getFields())).to.have.members([
-      'safebyokEnsureVaultProps', 'safebyokPutVaultProps', 'safebyokPutBox', 'safebyokDelBox', 'safebyokDelVault',
+      'safebyokEnsureVault', 'safebyokPutVaultProps', 'safebyokPutBox', 'safebyokDelBox', 'safebyokDelVault',
     ])
     expect(Object.keys(schema.getSubscriptionType()!.getFields())).to.have.members(['safebyokVaultChanged'])
   })

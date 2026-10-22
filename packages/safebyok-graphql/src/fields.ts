@@ -1,4 +1,4 @@
-import type { BoxRecord, VaultProps, VaultScope } from 'safebyok'
+import type { BoxRecord, Tombstone, VaultProps, VaultScope } from 'safebyok'
 
 /** How one field crosses the wire: `plain`, as it is, or `ciphered`, a Ciphered sent as its own two fields.
  * A plain field is text, a number, or one of the vault props' two ways in, each one opaque JSON.
@@ -33,11 +33,21 @@ export const VaultPropsFields = everyFieldOf<VaultProps>()([
   ['applabel',         'plain'],
   ['user_id',          'plain'],
   ['vaultlabel',       'plain'],
-  ['vault_id',         'plain'],
-  ['unlock_epoch',     'plain'],
+  ['vault_tok',        'plain'],
+  ['vault_epoch',      'plain'],
+  ['gate_epoch',       'plain'],
   ['passphrase',       'plain'],
   ['passkey',          'plain'],
   ['registered_at',    'plain'],
+] as const)
+
+/** Every field of a Tombstone, as `SafebyokTombstone` has them: what a deleted vault leaves. */
+export const TombstoneFields = everyFieldOf<Tombstone>()([
+  ['format',           'plain'],
+  ['applabel',         'plain'],
+  ['user_id',          'plain'],
+  ['vaultlabel',       'plain'],
+  ['vault_epoch',      'plain'],
 ] as const)
 
 /** Every field of a BoxRecord, as `SafebyokBox` has them: the one place naming them for the wire. */
@@ -73,7 +83,7 @@ export const selectionOf = (fields: readonly Field[]): string => fields.map(([fi
  * halves. Nothing is checked here: the VaultDB on each side validates what it is handed. What is
  * not an object comes back as it is, for that validation to refuse.
  *
- * @example recordOf({ vault_id: 'v1', passkey: null, __typename: 'SafebyokVaultProps' }, [['vault_id', 'plain'], ['passkey', 'plain']])   // { vault_id: 'v1', passkey: null }
+ * @example recordOf({ vault_tok: 'v1', passkey: null, __typename: 'SafebyokVaultProps' }, [['vault_tok', 'plain'], ['passkey', 'plain']])  // { vault_tok: 'v1', passkey: null }
  */
 export const recordOf = (sent: unknown, fields: readonly Field[]): unknown => {
   if (! isBag(sent)) { return sent }

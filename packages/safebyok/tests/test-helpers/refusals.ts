@@ -43,7 +43,7 @@ export const expectRefusal = async (operation: Promise<unknown>, refusalkind: Re
  * @param operation - The call that should succeed, or its outcome.
  * @returns Its `val`.
  *
- * @example expect(await TH.expectGood(vaultDB.getVaultProps(scope))).to.be.null
+ * @example expect(await TH.expectGood(vaultDB.getVault(scope))).to.be.null
  */
 export const expectGood = async <ValT>(operation: Outcome<ValT> | Promise<Outcome<ValT>>): Promise<ValT> => {
   const outcome = await operation

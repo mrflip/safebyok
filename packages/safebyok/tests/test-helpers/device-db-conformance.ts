@@ -8,7 +8,8 @@ import { expectBad, expectingGood } from './refusals'
  * The behaviour every DeviceDB owes, written once: every verb answering a good Outcome; no lease
  * until one is written, then that record back, its leaseKey still a non-extractable CryptoKey;
  * likewise a device mark, the newest written in place of the one before; each scope kept to
- * itself, and marks apart from leases; and an erase of one, or of all. Given a second factory, an
+ * itself, and marks apart from leases; an erase of one, or of all; and one scope's calls landing
+ * in the order they were made, awaited or not. Given a second factory, an
  * adapter over a store the browser withholds, it checks too that every verb then resolves a bad
  * Outcome of 'storage_blocked', never a rejection, as `deviceOutcomeOf` answers. Run it against
  * an adapter with a factory making a fresh, empty one per test. For a DeviceDB's own tests, from
@@ -49,7 +50,7 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
     it("answers every verb with a good Outcome, never a bare record", async () => {
       const deviceDB = await makeDeviceDB()
       const lease = await leaseOf('u1')
-      expect(await deviceDB.putLease(lease)).to.deep.equal({ ok: true, val: undefined })
+      expect(await deviceDB.putLease(lease)).to.deep.equal({ ok: true, val: lease })
       expect(await deviceDB.getLease(scopeOf('u1'))).to.deep.equal({ ok: true, val: lease })
       expect(await deviceDB.putMark(markOf('u1'))).to.deep.equal({ ok: true, val: undefined })
       expect(await deviceDB.getMark(scopeOf('u1'))).to.deep.equal({ ok: true, val: markOf('u1') })
@@ -68,6 +69,31 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
       expect(kept).to.deep.equal(lease)
       expect(kept?.lease_key).to.be.instanceOf(CryptoKey)
       expect(kept?.lease_key.extractable).to.be.false
+    })
+
+    it("resolves the lease as stored, whole, leaseKey handle and all", async () => {
+      const deviceDB = expectingGood(await makeDeviceDB())
+      const lease = await leaseOf('u1')
+      const stored = await deviceDB.putLease(lease)
+      expect(stored).to.deep.equal(lease)
+      expect(stored.lease_key).to.be.instanceOf(CryptoKey)
+      expect(await deviceDB.getLease(scopeOf('u1'))).to.deep.equal(stored)
+    })
+
+    it("lands one scope's calls in the order they were made, awaited or not: the last of a put and an erase made together stands", async () => {
+      const deviceDB = await makeDeviceDB()
+      const first = await leaseOf('u1')
+      const second = await leaseOf('u1', { gate_epoch: 2 })
+      await Promise.all([deviceDB.putLease(first), deviceDB.putLease(second)])
+      expect(await deviceDB.getLease(scopeOf('u1'))).to.deep.equal({ ok: true, val: second })
+      await Promise.all([deviceDB.putLease(first), deviceDB.delLease(scopeOf('u1'))])
+      expect(await deviceDB.getLease(scopeOf('u1'))).to.deep.equal({ ok: true, val: null })
+      await Promise.all([deviceDB.delLease(scopeOf('u1')), deviceDB.putLease(second)])
+      expect(await deviceDB.getLease(scopeOf('u1'))).to.deep.equal({ ok: true, val: second })
+      // A read made first sees what stood then; one made after a write sees the write.
+      const [before, , after] = await Promise.all([deviceDB.getLease(scopeOf('u1')), deviceDB.putLease(first), deviceDB.getLease(scopeOf('u1'))])
+      expect(before).to.deep.equal({ ok: true, val: second })
+      expect(after).to.deep.equal({ ok: true, val: first })
     })
 
     it("keeps leases per user: erasing one leaves the other", async () => {
@@ -95,8 +121,8 @@ export const describeDeviceDB = (adapterTitle: string, makeDeviceDB: () => Devic
       expect(await deviceDB.getMark(scopeOf('u1'))).to.be.null
       await deviceDB.putMark(markOf('u1'))
       expect(await deviceDB.getMark(scopeOf('u1'))).to.deep.equal(markOf('u1'))
-      await deviceDB.putMark(markOf('u1', { seen: { unlock_epoch: 4 } }))
-      expect(await deviceDB.getMark(scopeOf('u1'))).to.deep.equal(markOf('u1', { seen: { unlock_epoch: 4 } }))
+      await deviceDB.putMark(markOf('u1', { seen: { gate_epoch: 4 } }))
+      expect(await deviceDB.getMark(scopeOf('u1'))).to.deep.equal(markOf('u1', { seen: { gate_epoch: 4 } }))
     })
 
     it("keeps marks per vault, and apart from leases: erasing one leaves the rest", async () => {

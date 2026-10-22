@@ -1,6 +1,6 @@
 import { defineSchema, defineTable } from 'convex/server'
 import { v } from 'convex/values'
-import { BoxRecord, VaultProps, VaultScope } from './validators'
+import { BoxRecord, Tombstone, VaultProps, VaultScope } from './validators'
 
 /** The component's own tables, isolated from the host app's: ciphertext and unencrypted fields only.
  * Each row is a record as the core writes it, in typed columns. `user_id` leads every index, so an
@@ -9,6 +9,9 @@ import { BoxRecord, VaultProps, VaultScope } from './validators'
 export default defineSchema({
   /** One VaultProps per vault, as-is. */
   safebyok_vaults: defineTable(VaultProps)
+    .index('by_scope', ['user_id', 'applabel', 'vaultlabel']),
+  /** One Tombstone per scope whose vault was deleted and not made anew: a scope holds a vault row or a tombstone, never both. */
+  safebyok_vault_tombstones: defineTable(Tombstone)
     .index('by_scope', ['user_id', 'applabel', 'vaultlabel']),
   /** One BoxRecord per boxlabel, as-is, with its vault's scope columns beside it, added on write and stripped on read.
    * `by_box` serves one box (all four fields) and a vault's boxes (the first three).

@@ -11,8 +11,8 @@ const HourMillis = 60 * MinuteMillis
 const LeaseMillis = 7 * 24 * HourMillis
 const Deadline = GrantedAt + LeaseMillis
 
-/** The vault props every lease here is granted under: u1's `main` vault, at unlock epoch 3. */
-const standing: LeaseStanding = { vault_id: 'vault-id-u1', unlock_epoch: 3 }
+/** The vault props every lease here is granted under: u1's `main` vault, at gate epoch 3. */
+const standing: LeaseStanding = { vault_tok: 'vault-tok-u1', gate_epoch: 3 }
 
 /** A slice of u1's `main` vault whose clock reads what `clock.at` holds: GrantedAt, unless a test moves it. */
 const vaultAt = (clock?: { at: number }, overrides: Partial<TH.VaultSlice> = {}) => (
@@ -46,9 +46,9 @@ const grantedLease = async () => {
 }
 
 describe("Lease.grant", () => {
-  it("makes a lease whose record holds the scope its vault's, its ids the vault props', and its deadline leaseMillis from now, as its example shows", async () => {
+  it("makes a lease whose record holds the scope its vault's, its vault_tok and gate_epoch the vault props', and its deadline leaseMillis from now, as its example shows", async () => {
     const { lease } = await grantedLease()
-    const visible = { ...TH.scopeOf('u1'), vault_id: 'vault-id-u1', unlock_epoch: 3, ask_passphrase_at: Deadline }
+    const visible = { ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', gate_epoch: 3, ask_passphrase_at: Deadline }
     expect(lease.record).to.deep.include({ format: 'safebyok-lease-v1', ...visible })
     expect(TH.shownOf(lease)).to.deep.equal(visible)
     expect(lease.record.vault_key_lease_wrapped).to.have.keys(['cipher_iv_b64', 'ciphertext_b64'])
@@ -79,9 +79,9 @@ describe("Lease.grant", () => {
     expect(one.record.vault_key_lease_wrapped).to.not.deep.equal(two.record.vault_key_lease_wrapped)
   })
 
-  it("binds its wrap to the scope, vault_id, unlock_epoch and deadline, under the lease's format and purpose", async () => {
+  it("binds its wrap to the scope, vault_tok, gate_epoch and deadline, under the lease's format and purpose", async () => {
     const { lease } = await grantedLease()
-    const leaseCtx = cipherCtx('safebyok-lease-v1', 'acme', 'u1', 'main', 'vault-id-u1', 3, Deadline, 'vault_key_lease_wrapped')
+    const leaseCtx = cipherCtx('safebyok-lease-v1', 'acme', 'u1', 'main', 'vault-tok-u1', 3, Deadline, 'vault_key_lease_wrapped')
     const unwrapped = await unwrapKeyUnder(lease.record.lease_key, lease.record.vault_key_lease_wrapped, leaseCtx, { extractable: false, usage: ['wrapKey'] })
     expect(unwrapped).to.be.instanceOf(CryptoKey)
   })
@@ -92,9 +92,9 @@ describe("Lease.grant", () => {
   })
 
   for (const [badStanding, blurb] of [
-    [{ ...standing, vault_id: '' },              'vault props with an empty vault_id'],
-    [{ ...standing, unlock_epoch: 0 },           'vault props at unlock_epoch 0'],
-    [TH.omitting(standing, 'unlock_epoch'),      'vault props with no unlock_epoch'],
+    [{ ...standing, vault_tok: '' },             'vault props with an empty vault_tok'],
+    [{ ...standing, gate_epoch: 0 },             'vault props at gate_epoch 0'],
+    [TH.omitting(standing, 'gate_epoch'),        'vault props with no gate_epoch'],
   ] as const) {
     it(`throws, as misuse, at ${blurb}: no lease record could hold them`, async () => {
       await expect(Lease.grant(vaultAt(), badStanding as LeaseStanding, await vaultKeyPairOf())).rejects.toThrow(Z.core.$ZodError)
@@ -111,11 +111,11 @@ describe("Lease.grant", () => {
     })
   }
 
-  it("takes whole vault props, keeping only their vault_id and unlock_epoch", async () => {
-    const whole = TH.vaultPropsOf('u1', { vault_id: 'vault-id-u1', unlock_epoch: 3 })
+  it("takes whole vault props, keeping only their vault_tok and gate_epoch", async () => {
+    const whole = TH.vaultPropsOf('u1', { vault_tok: 'vault-tok-u1', gate_epoch: 3 })
     const lease = await Lease.grant(vaultAt(), whole, await vaultKeyPairOf())
-    expect(lease.vault_id).to.eq('vault-id-u1')
-    expect(lease.unlock_epoch).to.eq(3)
+    expect(lease.vault_tok).to.eq('vault-tok-u1')
+    expect(lease.gate_epoch).to.eq(3)
     expect(lease.record).to.not.have.property('passphrase')
   })
 })
@@ -136,12 +136,12 @@ describe("Lease.make", () => {
     expect(Object.isFrozen(made)).to.be.true
     expect(Object.isFrozen(made.record)).to.be.true
     expect(Object.isFrozen(made.record.vault_key_lease_wrapped)).to.be.true
-    expect(Reflect.set(made, 'vault_id', 'other')).to.be.false
+    expect(Reflect.set(made, 'vault_tok', 'other')).to.be.false
   })
 
   it("shows each visible field once in a key list, JSON and a log line -- which vault it opens and until when -- and neither its leaseKey, its wrap, its format nor the vaultKey", async () => {
     const { lease } = await grantedLease()
-    const visible = ['applabel', 'user_id', 'vaultlabel', 'vault_id', 'unlock_epoch', 'ask_passphrase_at']
+    const visible = ['applabel', 'user_id', 'vaultlabel', 'vault_tok', 'gate_epoch', 'ask_passphrase_at']
     expect(Object.keys(lease)).to.deep.equal(visible)
     expect(Object.keys(TH.jsonOf(lease))).to.deep.equal(visible)
     expect(lease.toJSON()).to.deep.equal(TH.shownOf(lease))
@@ -150,7 +150,7 @@ describe("Lease.make", () => {
       expect(JSON.stringify(lease)).to.not.include(hidden)
       expect(inspect(lease)).to.not.include(hidden)
     }
-    expect(inspect(lease).match(/vault_id/g)).to.have.lengthOf(1)
+    expect(inspect(lease).match(/vault_tok/g)).to.have.lengthOf(1)
   })
 
   const MangledCases = [
@@ -158,15 +158,15 @@ describe("Lease.make", () => {
     [{ ask_passphrase_at: 'soon' },                'a deadline that is not epoch milliseconds, as its second example shows'],
     [{ lease_key: 'not a key handle' },            'a leaseKey that is no CryptoKey: the record was serialized'],
     [{ format: 'safebyok-lease-v2' },              'a format this version does not write'],
-    [{ unlock_epoch: 0 },                          'an unlock_epoch below one'],
-    [{ vault_id: '' },                             'an empty vault_id'],
+    [{ gate_epoch: 0 },                            'a gate_epoch below one'],
+    [{ vault_tok: '' },                            'an empty vault_tok'],
   ] as const
 
   for (const [spoil, blurb] of MangledCases) {
     it(`refuses ${blurb} as 'corrupt_record'`, async () => {
       const { lease } = await grantedLease()
       const err = TH.expectSyncRefusal(() => Lease.make(vaultAt(), { ...lease.record, ...spoil }), 'corrupt_record')
-      expect(err.message).to.not.include('vault-id-u1')
+      expect(err.message).to.not.include('vault-tok-u1')
       expect(err.message).to.not.include(lease.record.vault_key_lease_wrapped.ciphertext_b64)
     })
   }
@@ -202,7 +202,7 @@ describe("lease.tryOpen", () => {
 
   it("opens for whole VaultProps", async () => {
     const { lease } = await grantedLease()
-    await TH.expectGood(lease.tryOpen({ ...TH.vaultPropsOf('u1'), vault_id: 'vault-id-u1', unlock_epoch: 3 }))
+    await TH.expectGood(lease.tryOpen({ ...TH.vaultPropsOf('u1'), vault_tok: 'vault-tok-u1', gate_epoch: 3 }))
   })
 
   it("opens until the last millisecond before its deadline", async () => {
@@ -213,9 +213,9 @@ describe("lease.tryOpen", () => {
 
   const UnfitCases = [
     // what a lease granted before opens nothing under:
-    [{ unlock_epoch: 4 },           'a way in changed since, as its second example shows'],
-    [{ unlock_epoch: 2 },           'vault props from before it was granted'],
-    [{ vault_id: 'vault-id-other' }, 'the vault deleted and made anew'],
+    [{ gate_epoch: 4 },             'a way in changed since, as its second example shows'],
+    [{ gate_epoch: 2 },             'vault props from before it was granted'],
+    [{ vault_tok: 'vault-tok-other' }, 'the vault deleted and made anew'],
   ] as const
 
   for (const [moved, blurb] of UnfitCases) {
@@ -247,7 +247,7 @@ describe("lease.tryOpen", () => {
       const { lease } = await grantedLease()
       const tampered = Lease.make(vaultAt(), await tamper(lease.record))
       const err = await TH.expectBad(tampered.tryOpen(standing), 'corrupt_record')
-      expect(err.message).to.not.include('vault-id-u1')
+      expect(err.message).to.not.include('vault-tok-u1')
       expect(err.cause).to.be.undefined
     })
   }

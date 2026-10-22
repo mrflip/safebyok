@@ -34,8 +34,14 @@ No vault stored before is read (each reads as damaged, its boxes with it), so dr
 the boxes too, or the new vaults table would stand without their foreign key -- and run
 `VaultTablesSql` again; each user then makes their vault anew.
 
+**Upgrading from a release whose `safebyok_vaults` has no `vault_epoch` column**: the vault props
+hold a `vault_epoch` now (the counter a gate write and a deletion move), and a deleted vault leaves
+a row in the new table `safebyok_vault_tombstones`. No vault stored before is read (each reads as
+damaged, its boxes with it, and `VaultTablesSql` never adds a column to a table already there), so
+drop the tables and run `VaultTablesSql` again; each user then makes their vault anew.
+
 ```sql
-DROP TABLE safebyok_boxes, safebyok_vaults;
+DROP TABLE safebyok_boxes, safebyok_vault_tombstones, safebyok_vaults;
 ```
 
 ```ts
@@ -125,7 +131,7 @@ The server half, `app/api/safebyok/route.ts`:
 
 ```ts
 import { Pool } from 'pg'
-import type { Outcome, VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, VaultProps, VaultScope } from 'safebyok'
+import type { Outcome, VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, GatelessVaultProps, VaultProps, VaultScope } from 'safebyok'
 import { postgresVaultDB } from 'safebyok-postgres'
 import type { VaultDB } from 'safebyok'
 
@@ -139,11 +145,10 @@ type Served = (vaultDB: VaultDB, args: unknown[]) => Promise<Outcome<unknown>>
 // vault's own validators' to say. A listing goes as the stored records, which the browser's
 // VaultDB validates.
 const served = new Map<string, Served>([
-  ['getVaultProps',   (vaultDB, [scope]) => vaultDB.getVaultProps(scope as VaultScope)],
-  ['ensureVaultProps', (vaultDB, [vaultProps]) => vaultDB.ensureVaultProps(vaultProps as VaultProps)],
+  ['getVault',     (vaultDB, [scope]) => vaultDB.getVaultRecords(scope as VaultScope)],
+  ['ensureVault',  (vaultDB, [draft]) => vaultDB.ensureVaultRecords(draft as GatelessVaultProps)],
   ['putVaultProps', (vaultDB, [vaultProps, expected]) => vaultDB.putVaultProps(vaultProps as VaultProps, expected as VaultPropsExpectation)],
   ['getBox',      (vaultDB, [scope, boxlabel]) => vaultDB.getBox(scope as VaultScope, boxlabel as string)],
-  ['listBoxes',    (vaultDB, [scope]) => vaultDB.listBoxRecords(scope as VaultScope)],
   ['getCapacity',  (vaultDB, [scope]) => vaultDB.getCapacity(scope as VaultScope)],
   ['putBox',    (vaultDB, [scope, expected, box]) => vaultDB.putBox(scope as VaultScope, expected as BoxExpectation, box as BoxRecord)],
   ['delBox',     (vaultDB, [scope, boxlabel, expected]) => vaultDB.delBox(scope as VaultScope, boxlabel as string, expected as BoxDelExpectation)],
@@ -169,23 +174,27 @@ export async function POST(request: Request): Promise<Response> {
   // Made per request, for the user your own auth signed in -- never one the request names.
   const vaultDB = postgresVaultDB({ client: pool, userId: await signedInUserId(request) })
   const { ok, val = null, err } = await serve(vaultDB, args)
-  // A refusal crosses as its kind, its calm message, and its meta -- a stale box write's
-  // box_stored (the box that stands, as a read would send it), or a vault_full's capacity --
-  // never its cause, the driver's own error.
+  // A refusal crosses as its kind, its calm message, and its meta -- what a stale write says
+  // stands (a box write's box_stored, an update's vault_props_stored, as a read would send
+  // them), or a vault_full's capacity -- never its cause, the driver's own error.
   if (! ok) { return Response.json({ refusal: { kind: err.refusalkind, message: err.message, meta: err.meta } }) }
   return Response.json({ result: val })
 }
 ```
 
 `signedInUserId` is your own: the user id from the request's verified session cookie, or null.
-A listing goes through `listBoxRecords`, not `listBoxes`: `listBoxes` hands back summaries, the
-shape a vault shows, and a VaultDB in the browser must hand back records as stored.
+A vault is read through `getVaultRecords` and `ensureVaultRecords`, not `getVault` and
+`ensureVault`: those hand back summaries, the shape a vault shows, and a VaultDB in the browser
+must hand back records as stored. Each is one statement on the server, so the browser's read of a
+vault, its listing included, is one request. An update of the vault props answers the props as
+stored, and a deletion of the vault the tombstone it left: both go to the browser as the route's
+`result`.
 
 The client half, a VaultDB over `fetch`, to hand `Vault.make` as its `vaultDB`:
 
 ```ts
 import { VaultDB, VaultError, RefusalKindVals } from 'safebyok'
-import type { VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, VaultProps, VaultDBOpts, RefusalKind, RefusalMeta, VaultScope } from 'safebyok'
+import type { VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, GatelessVaultProps, StoredVault, VaultProps, VaultDBOpts, RefusalKind, RefusalMeta, VaultScope } from 'safebyok'
 
 const VaultRouteUrl = '/api/safebyok'
 
@@ -198,27 +207,17 @@ export class RouteVaultDB extends VaultDB {
   // Its logger: the host's `logger`, or the default logger when it gives none.
   constructor(opts: VaultDBOpts = {}) { super(opts) }
 
-  protected doGetVaultProps(scope: VaultScope) { return this.call('getVaultProps', scope) }
-  protected doEnsureVaultProps(vaultProps: VaultProps) { return this.call('ensureVaultProps', vaultProps) }
-  protected async doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation) {
-    await this.call('putVaultProps', vaultProps, expected)
-    return true
-  }
+  protected async doGetVault(scope: VaultScope) { return storedVaultOf(await this.call('getVault', scope)) }
+  protected async doEnsureVault(draft: GatelessVaultProps) { return storedVaultOf(await this.call('ensureVault', draft)) }
+  protected doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation) { return this.call('putVaultProps', vaultProps, expected) }
   protected doGetBox(scope: VaultScope, boxlabel: string) { return this.call('getBox', scope, boxlabel) }
-  protected async doListBoxes(scope: VaultScope) {
-    const boxes = await this.call('listBoxes', scope) as { boxlabel: string }[]
-    return boxes.map((box) => ({ boxlabel: box.boxlabel, box }))
-  }
   protected doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord) { return this.call('putBox', scope, expected, box) }
   protected doGetCapacity(scope: VaultScope) { return this.call('getCapacity', scope) }
   protected doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation) { return this.call('delBox', scope, boxlabel, expected) }
-  protected async doDelVault(scope: VaultScope, expected: VaultDelExpectation) {
-    await this.call('delVault', scope, expected)
-    return true
-  }
+  protected doDelVault(scope: VaultScope, expected: VaultDelExpectation) { return this.call('delVault', scope, expected) }
 
-  // A stale write refuses on the server and crosses as its kind, with what stands for a box write
-  // (a full vault, with how full it is), so a write that answers landed:
+  // A stale write refuses on the server and crosses as its kind, with what stands (a full vault,
+  // with how full it is), so a write that answers landed:
   // a box write answers with the box as the server's storage holds it, and a box
   // deletion with what it removed.
   private async call(verb: string, ...args: unknown[]): Promise<unknown> {
@@ -238,6 +237,14 @@ export class RouteVaultDB extends VaultDB {
 }
 
 const isKind = (kind: unknown): kind is RefusalKind => (RefusalKindVals as readonly unknown[]).includes(kind)
+
+// A vault as the route sends it -- its vault props, and its boxes as stored records -- or null for
+// none, as the VaultDB's half hands it up: each box under the boxlabel it holds.
+const storedVaultOf = (sent: unknown): StoredVault => {
+  if (sent === null) { return { vaultProps: null, boxes: [] } }
+  const { vaultProps, boxes } = sent as { vaultProps: unknown, boxes: { boxlabel: string }[] }
+  return { vaultProps, boxes: boxes.map((box) => ({ boxlabel: box.boxlabel, box })) }
+}
 ```
 
 * **Authenticate by your session**, the cookie `fetch` sends to its own origin, and never by a
@@ -304,7 +311,7 @@ await pool.query(VaultNotifySql)    // once, as a migration: safe to run again
 Its trigger sends a notification on the channel `VaultChangeChannel` (`safebyok_vault_changes`)
 after every write that changes a vault, its payload the vault's scope as JSON: no record, nothing
 ciphered. **Why a trigger**: Postgres tells another connection of a write only by `NOTIFY`, and a
-trigger sends one from inside every write to the two tables, whatever made it -- any of your
+trigger sends one from inside every write to the vault and box tables, whatever made it -- any of your
 servers, another version of this adapter, your own SQL, a deleted vault's cascade -- and Postgres
 delivers it only once that write commits. It is the one trigger this package ships; the hard cap
 above is one you would write and own. A `listen` without the trigger hears nothing, by design,
@@ -360,28 +367,29 @@ sidecar is a `jsonb` too, never null, which your server can query: always a JSON
 each structured value into its encryption by its fields, a sidecar as its JSON with keys sorted.
 Nothing else is normalized: a user id or a string inside a sidecar reads back byte for byte, as
 it must, since every field a record holds is bound into its encryption (all but the vault props'
-`unlock_epoch`, and, for each way in, the other one beside it). A sidecar Postgres's `jsonb`
+`gate_epoch`, and, for each way in, the other one beside it). A sidecar Postgres's `jsonb`
 cannot hold -- a string holding `\u0000`, say -- is refused by Postgres, and the write fails with
 its error as the cause, nothing written.
 
 | Table             | One row per | Primary key                                     | Columns                                                                                |
 | ----------------- | ----------- | ----------------------------------------------- | -------------------------------------------------------------------------------------- |
 | `safebyok_vaults` | vault       | `applabel`, `user_id`, `vaultlabel`             | every field of the `VaultProps`                                                        |
-| `safebyok_boxes`  | box         | `applabel`, `user_id`, `vaultlabel`, `boxlabel` | the vault's scope and `vault_id`, then every field of the `BoxRecord`; its sidecar as `jsonb` |
+| `safebyok_vault_tombstones` | deleted vault | `applabel`, `user_id`, `vaultlabel`   | `format` and `vault_epoch`: what a deleted vault leaves, until the scope gets a new vault |
+| `safebyok_boxes`  | box         | `applabel`, `user_id`, `vaultlabel`, `boxlabel` | the vault's scope and `vault_tok`, then every field of the `BoxRecord`; its sidecar as `jsonb` |
 
 * **Encrypted**: each whisper (`whisper_ciphered`), each box's boxKey
   (`box_key_wrapped`), and the vaultKey, once under each way into the vault (the
   `vault_key_wayin_wrapped` inside the vault props' `passphrase`, and inside their `passkey` when
   they have one).
 * **In the open**: the scope, each `boxlabel` and `sidecar`, each whisper's codec
-  and schema version, the `vault_id`, `unlock_epoch`, `revision_tok`s, each way in's `wayinkind`, `device_id` and `registered_at`, the passphrase's
+  and schema version, the `vault_tok`, `gate_epoch`, `revision_tok`s, each way in's `wayinkind`, `device_id` and `registered_at`, the passphrase's
   salt and key deriver's label, whether the vault has a passkey, and its `credential_id` and
   `prf_salt_b64`, when
   each vault and box was first stored and each box last written (`registered_at`,
   `written_at`, epoch milliseconds), and the length of every ciphertext.
 * **Never**: a whisper, a passphrase, any key in usable form, or the device-local lease. No history: an update replaces its row (your database's backups and WAL keep what
   they keep).
-* **A box stands only beside its vault props**, under the same `vault_id`: the foreign key
+* **A box stands only beside its vault props**, under the same `vault_tok`: the foreign key
   deletes a vault's boxes with its props, in one statement, and refuses a box written for
   a vault since deleted and made anew.
 * **Row-level security is on, with no policy**: the tables' owner -- the role your server
@@ -418,7 +426,7 @@ shape of table, copy it, and keep to what makes it right:
   throw into `storage_unavailable`. A box write that misses throws instead, from the rows its
   statement read: `Refusals.vaultMismatch()`, or `Refusals.staleBox(standing)`.
 * **One statement per verb**, so each is atomic without a transaction: the expectation goes in
-  the `WHERE` (`UPDATE ... WHERE vault_id = $ AND unlock_epoch = $ RETURNING 1`), and a row
+  the `WHERE` (`UPDATE ... WHERE vault_tok = $ AND gate_epoch = $ RETURNING 1`), and a row
   back means it landed. A box write returns the row's columns (`RETURNING format, boxlabel,
   ...`): the box as stored, which the base class reads back as it would a read. It first locks
   the box standing under the boxlabel with `SELECT ... FOR UPDATE`, which writes nothing and,
@@ -435,10 +443,10 @@ shape of table, copy it, and keep to what makes it right:
   named, another, or none. A create returns the row that stands with `ON CONFLICT ... DO UPDATE`
   (a no-op update), since `DO NOTHING` returns no row when another device got in first.
 * **Let the schema hold the vault together.** The box's foreign key names its vault row down
-  to the `vault_id`, so a box cannot outlive its vault or land in one made anew, and deleting
+  to the `vault_tok`, so a box cannot outlive its vault or land in one made anew, and deleting
   a vault is one `DELETE` of its vault row.
-* **Store each record a column to a field**, and compare only the scope, `boxlabel`, `vault_id`,
-  `unlock_epoch` and `revision_tok`. `src/columns.ts` names each record's columns once, the
+* **Store each record a column to a field**, and compare only the scope, `boxlabel`, `vault_tok`,
+  `gate_epoch` and `revision_tok`. `src/columns.ts` names each record's columns once, the
   compiler holding the list to the record's fields both ways, and builds every statement from it.
 * **Authorize in the adapter**: made per request for one user, it refuses every other user's
   scope with `identity_revoked`, and passes the database's own refusal of a call (`42501`) up as

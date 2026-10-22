@@ -39,8 +39,7 @@ import { SafebyokComponent } from 'safebyok-convex/server'
 import { components } from './_generated/api'
 
 export const {
-  getVaultProps, ensureVaultProps, putVaultProps, getBox, listBoxSummaries,
-  putBox, getCapacity, delBox, delVault, watchVault,
+  getVault, ensureVault, putVaultProps, getBox, putBox, getCapacity, delBox, delVault, watchVault,
 } = new SafebyokComponent(components.safebyok).api({
   getUserId: async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null,
 })
@@ -65,14 +64,14 @@ mistake for the first request.
   vault: throw it only for a user your app knows is gone. Anything else `getUserId` throws -- an
   auth provider that is down -- reaches the client as `storage_unavailable`, a passing fault.
 * **Writes that come too late.** An update (`putVaultProps`, `putBox`) or a delete
-  (`delBox`, `delVault`) carries what its writer expects to stand -- the vault's `vault_id`,
-  and the vault props' `unlock_epoch`, or the box's `revision_tok` -- and checks it in the same
+  (`delBox`, `delVault`) carries what its writer expects to stand -- the vault's `vault_tok`,
+  and the vault props' `gate_epoch`, or the box's `revision_tok` -- and checks it in the same
   transaction it writes in. When that no longer stands, it writes nothing and resolves `false`
   (`putBox` and `delBox`, `null`), which the client turns into a `stale_write`. Not an error: no `ConvexError`, nothing in your logs.
   A `delBox` also carries the `revision_tok` its writer read, but only to say what it removed:
   within the expected vault it removes whatever stands.
   An update of the vault props lands, too, only when the new vault props keep the vault's
-  `vault_id` and move their `unlock_epoch` forward, as every safebyok client's does.
+  `vault_tok` and move their `gate_epoch` forward, as every safebyok client's does.
 * **A vault the component has no room for.** `putBox` refuses, writing nothing, a box
   that would take its vault past the component's own limits (see *How big a vault can be*): it
   resolves `{ landed: false, refusalkind: 'vault_full', capacity }`, how full the vault is as its
@@ -158,7 +157,7 @@ Three tables, inside the component, beside nothing of your app's:
   ways in (the `vault_key_wayin_wrapped` of the vault props' `passphrase`, and of its `passkey`
   when it has one).
 * **In the open**: the scope (`applabel`, `user_id`, `vaultlabel`), each `boxlabel` and `sidecar`,
-  the `vault_id`, `unlock_epoch`, `revision_tok`s, each way in's `wayinkind`, `device_id` and
+  the `vault_tok`, `gate_epoch`, `revision_tok`s, each way in's `wayinkind`, `device_id` and
   `registered_at`, the passphrase's passphraseSalt (`salt_b64`) and key deriver's label, whether
   the vault has a passkey, and its `credential_id` and `prf_salt_b64`, when each vault and box was first stored and each box last written (`registered_at`,
   `written_at`, epoch milliseconds), and the length of every ciphertext.
@@ -223,16 +222,15 @@ the core's own records, scopes and expectations.
 
 | Function                  | Kind     | Arguments                                                                   | Resolves                                                                                   |
 | ------------------------- | -------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `getVaultProps`           | query    | `{ scope }`                                                                 | the `VaultProps`, or null                                                                  |
-| `ensureVaultProps` | mutation | `{ vaultProps }`                                                            | the vault props standing afterwards: these, or another device's already standing           |
-| `putVaultProps`        | mutation | `{ vaultProps, expected: { vault_id, unlock_epoch } }`                      | `true` if written, `false` if not                                                          |
+| `getVault`                | query    | `{ scope }`                                                                 | `{ vaultProps, boxes }`, read in one query, each box without its ciphered fields, `format` kept, in boxlabel order; or null |
+| `ensureVault`             | mutation | `{ draft }`, gateless vault props                                           | `{ vaultProps, boxes }` standing afterwards: the draft, or another device's, with its boxes |
+| `putVaultProps`        | mutation | `{ vaultProps, expected: { vault_tok, gate_epoch } }`                       | `{ landed: true, vault_props_stored }`, the vault props as stored (their `vault_epoch` one up) if written; else `{ landed: false, vault_props_stored }`, the vault props standing or null |
 | `getBox`                  | query    | `{ scope, boxlabel }`                                                       | the `BoxRecord`, or null                                                               |
-| `listBoxSummaries`        | query    | `{ scope }`                                                                 | each box without its ciphered fields, `format` kept, in boxlabel order                 |
-| `putBox`               | mutation | `{ scope, box, expected: { vault_id, revision_tok } }` | `{ landed: true, box_stored }` if written; else `{ landed: false, refusalkind }`, with the box standing (`stale_write`) or the vault's capacity (`vault_full`) |
+| `putBox`               | mutation | `{ scope, box, expected: { vault_tok, revision_tok } }` | `{ landed: true, box_stored }` if written; else `{ landed: false, refusalkind }`, with the box standing (`stale_write`) or the vault's capacity (`vault_full`) |
 | `getCapacity`             | query    | `{ scope }`                                                                 | `{ boxes: { used, max }, bytes: { used, max } }`, from the vault's tally                   |
-| `delBox`               | mutation | `{ scope, boxlabel, expected: { vault_id, revision_tok } }`                 | `{ outcome }` if the vault still stands -- `deleted`, `deleted_other` or `absent` -- null if not |
-| `delVault`             | mutation | `{ scope, expected: { vault_id } }`                                         | `true` if deleted, `false` if not                                                          |
-| `watchVault`              | query    | `{ scope }`                                                                 | `{ vault_id, unlock_epoch, boxes: [[boxlabel, revision_tok]] }`, changing with every write |
+| `delBox`               | mutation | `{ scope, boxlabel, expected: { vault_tok, revision_tok } }`                | `{ outcome }` if the vault still stands -- `deleted`, `deleted_other` or `absent` -- null if not |
+| `delVault`             | mutation | `{ scope, expected: { vault_tok, gate_epoch } }`                            | the tombstone left (`{ format, ...scope, vault_epoch }`) if deleted, null if not          |
+| `watchVault`              | query    | `{ scope }`                                                                 | `{ vault_tok, gate_epoch, boxes: [[boxlabel, revision_tok]] }`, changing with every write |
 
 `scope` is `{ applabel, user_id, vaultlabel }`. A `revision_tok` of null expects no box there; in a
 `delBox`, it names a box listed with none, so a box it removes that holds a revision is

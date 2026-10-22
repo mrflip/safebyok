@@ -8,13 +8,13 @@ const fetchBackup = (vaultlabel: string): Promise<string> => Promise.reject(new 
 
 describe("good and bad", () => {
   it("makes a good outcome of a val, as good's example shows (Contract: Shapes)", () => {
-    const vaultProps = { vault_id: 'vault-id-u1' }
+    const vaultProps = { vault_tok: 'vault-tok-u1' }
     expect(good(vaultProps)).to.deep.equal({ ok: true, val: vaultProps })
     expect(good(null)).to.deep.equal({ ok: true, val: null })
   })
 
   it("makes a bad outcome of a refusal, as bad's example shows (Contract: Shapes)", () => {
-    const err = Refusals.staleWrite('vaultProps')
+    const err = Refusals.staleWrite('del')
     const outcome = bad(err)
     expect(outcome).to.deep.equal({ ok: false, err })
     expect(outcome).to.not.have.property('val')
@@ -137,14 +137,14 @@ describe("hostThrewRefusal", () => {
 
 describe("isOutcomeShaped", () => {
   it("knows an answer handed up still wrapped, as its example shows", () => {
-    const answered = good({ vault_id: 'vault-id-u1' })
-    const refused = bad(Refusals.staleWrite('vaultProps'))
+    const answered = good({ vault_tok: 'vault-tok-u1' })
+    const refused = bad(Refusals.staleWrite('del'))
     expect(isOutcomeShaped(answered)).to.be.true
     expect(isOutcomeShaped(refused)).to.be.true
   })
 
   it("takes no record for one: a record, null, a boolean, a bag with ok alone", () => {
-    expect(isOutcomeShaped({ vault_id: 'vault-id-u1' })).to.be.false
+    expect(isOutcomeShaped({ vault_tok: 'vault-tok-u1' })).to.be.false
     expect(isOutcomeShaped(null)).to.be.false
     expect(isOutcomeShaped(true)).to.be.false
     expect(isOutcomeShaped({ ok: true })).to.be.false

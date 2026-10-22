@@ -184,7 +184,7 @@ const originalOf = new WeakMap<object, AsyncFn>()
  * @returns The gate: await `reached`, then `release()`.
  *
  * @example
- *   const gate = TH.holdNextCall(vaultDB, 'getVaultProps')
+ *   const gate = TH.holdNextCall(vaultDB, 'getVault')
  *   const unlocking = vault.unlock('pw')   // now waiting at the gate
  *   await gate.reached
  *   await vault.lock()                     // lands mid-unlock

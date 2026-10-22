@@ -224,7 +224,7 @@ describe("the times a vault keeps", () => {
     expect(storedVaultPropsOf(world)).to.include({ registered_at: madeAt })
     world.advance(60_000)
     await vault.putWayin('pw one', 'pw two')
-    expect(storedVaultPropsOf(world)).to.include({ registered_at: madeAt, unlock_epoch: 2 })
+    expect(storedVaultPropsOf(world)).to.include({ registered_at: madeAt, gate_epoch: 2 })
   })
 
   it("writes no created_at or updated_at, to a box or the vault props", async () => {
@@ -832,7 +832,7 @@ describe("the host's validators", () => {
   it("are the vault's alone, checked at its entry: no VaultDB verb is handed them, and every verb takes a name they admitted", async () => {
     const longUserId = ZClassic.string().min(1).max(300)
     const world = makeWorld({ validators: { userId: longUserId }, userId: 'u'.repeat(200) })
-    const verbs = ['getVaultProps', 'ensureVaultProps', 'putVaultProps', 'getBox', 'listBoxes', 'putBox', 'delBox', 'delVault', 'subscribe'] as const
+    const verbs = ['getVault', 'ensureVault', 'putVaultProps', 'getBox', 'getVault', 'putBox', 'delBox', 'delVault', 'subscribe'] as const
     const spies = verbs.map((verb) => vi.spyOn(world.vaultDB, verb))
     const vault = await world.openUnlocked('pw one')
     await vault.putBox('anthropic', 'sk-fake')
@@ -850,7 +850,7 @@ describe("the host's validators", () => {
 
   it("refuse a bag holding anything but schemas, or a field the bag does not know, before storage is touched", async () => {
     const world = makeWorld()
-    const getVaultProps = vi.spyOn(world.vaultDB, 'getVaultProps')
+    const getVaultProps = vi.spyOn(world.vaultDB, 'getVault')
     const misfits = ['acme', 42, { boxlabel: 'Label' }, { boxlabel: /^[a-z]+$/ }, { boxLabel: ZClassic.string() }, { userID: ZClassic.string() }]
     for (const validators of misfits) {
       const err = await TH.expectRefusal(world.open({ validators: validators as unknown as MakeVaultOpts['validators'] }), 'bad_option')
@@ -1136,7 +1136,7 @@ describe("vault.decryptWhisper", () => {
     const vault = await world.openUnlocked('pw', { getProof })
     await vault.putBox('anthropic', 'sk-fake', { sidecar: { note: 'work account' } })
     const box = Box.make(vault, await storedBoxOf(world))
-    const reads = (['getBox', 'listBoxes', 'getVaultProps'] as const).map((verb) => vi.spyOn(world.vaultDB, verb))
+    const reads = (['getBox', 'getVault', 'getVault'] as const).map((verb) => vi.spyOn(world.vaultDB, verb))
     expect(await vault.decryptWhisper(box)).to.eq('sk-fake')
     for (const read of reads) { expect(read).not.toHaveBeenCalled() }
     expect(getProof).not.toHaveBeenCalled()
@@ -1148,7 +1148,7 @@ describe("vault.decryptWhisper", () => {
     await vault.putBox('anthropic', 'sk-fake')
     const record = await storedBoxOf(world)
     expect(await vault.decryptWhisper(record)).to.eq('sk-fake')
-    const foreign = Box.make(TH.vaultSliceOf('u2'), record, vault.vault_id)
+    const foreign = Box.make(TH.vaultSliceOf('u2'), record, vault.vault_tok)
     expect(await vault.decryptWhisper(foreign)).to.eq('sk-fake')
   })
 
@@ -1156,7 +1156,7 @@ describe("vault.decryptWhisper", () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
     await vault.putBox('anthropic', 'sk-fake')
-    const elder = Box.make(vault, await storedBoxOf(world), 'vault-id-before')
+    const elder = Box.make(vault, await storedBoxOf(world), 'vault-tok-before')
     await TH.expectRefusal(vault.decryptWhisper(elder), 'vault_locked')
   })
 
@@ -1258,12 +1258,12 @@ describe("what a vault hands its boxes", () => {
   it("lists each sidecar as the listing's check made it, frozen where it stands, never serialized and parsed again", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const listings = vi.spyOn(world.vaultDB, 'listBoxes')
+    const listings = vi.spyOn(world.vaultDB, 'getVault')
     const parses = vi.spyOn(JSON, 'parse')
     const stringifies = vi.spyOn(JSON, 'stringify')
     await vault.putBox('anthropic', 'sk-fake', { sidecar: { note: 'work account' } })
     const sidecar = TH.summaryOf(vault.boxes[0])?.sidecar
-    const listed = await Promise.all(listings.mock.results.map(async (result) => valOf(await (result.value as ReturnType<VaultDB['listBoxes']>))))
+    const listed = await Promise.all(listings.mock.results.map(async (result) => valOf(await (result.value as ReturnType<VaultDB['getVault']>))?.boxes ?? []))
     expect(listed.some(([box]) => box !== undefined && ! box.damaged && box.sidecar === sidecar)).to.be.true
     expect(Object.isFrozen(sidecar)).to.be.true
     const sidecarText = '{"note":"work account"}'

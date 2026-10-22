@@ -8,7 +8,7 @@ import type { Vault } from './vault'
 import type { VaultKeyPair } from './wayin'
 
 /** Leases: what lets a vault open on this device without a proof, across page loads, until its `ask_passphrase_at`.
- * A lease's wrap is bound to the scope, the props' `vault_id` and `unlock_epoch` at the grant, and
+ * A lease's wrap is bound to the scope, the props' `vault_tok` and `gate_epoch` at the grant, and
  * the deadline. An opened lease is the one place the vault keeps the vaultKey between calls: it
  * wraps and unwraps boxKeys under it, and never hands it out. When to grant, when to ask, and the
  * write to the device store are the vault's.
@@ -17,11 +17,11 @@ import type { VaultKeyPair } from './wayin'
 /** The slice of a {@link Vault} a lease reads: the scope every lease of it names, how long a grant lasts, and the time a lease is granted and judged by. */
 export type LeaseVault = Pick<Vault, 'applabel' | 'user_id' | 'vaultlabel' | 'leaseMillis' | 'now'>
 
-/** The vault props a lease is granted under: their `vault_id` and `unlock_epoch`, which its wrap is bound to. A whole {@link VaultProps} is one. */
-export type LeaseStanding = Pick<VaultProps, 'vault_id' | 'unlock_epoch'>
+/** The vault props a lease is granted under: their `vault_tok` and `gate_epoch`, which its wrap is bound to. A whole {@link VaultProps} is one. */
+export type LeaseStanding = Pick<VaultProps, 'vault_tok' | 'gate_epoch'>
 
 /** A lease's visible fields, each once: which vault it opens and until when, as `{ ...lease }` and `lease.toJSON()` hold them. */
-export type LeaseView = Pick<LeaseRecord, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_id' | 'unlock_epoch' | 'ask_passphrase_at'>
+export type LeaseView = Pick<LeaseRecord, 'applabel' | 'user_id' | 'vaultlabel' | 'vault_tok' | 'gate_epoch' | 'ask_passphrase_at'>
 
 /** The ctx's first part: the lease record's format. */
 const LeaseFormat = 'safebyok-lease-v1'
@@ -30,7 +30,7 @@ const LeaseFormat = 'safebyok-lease-v1'
 const SessionUsage = { extractable: false, usage: ['wrapKey', 'unwrapKey'] } as const
 
 /** What {@link Lease.grant} binds: the scope, the vault props it was proven against, and the deadline, held to what its record will hold. */
-const LeaseGrant = Z.pick(LeaseRecord, { applabel: true, user_id: true, vaultlabel: true, vault_id: true, unlock_epoch: true, ask_passphrase_at: true })
+const LeaseGrant = Z.pick(LeaseRecord, { applabel: true, user_id: true, vaultlabel: true, vault_tok: true, gate_epoch: true, ask_passphrase_at: true })
 
 /** The fields of a lease its wrap is bound to: every field of its record but its format, the leaseKey and the wrap. */
 type LeaseBinding = Z.infer<typeof LeaseGrant>
@@ -39,11 +39,11 @@ type LeaseBinding = Z.infer<typeof LeaseGrant>
  * A lease is one; so is what {@link Lease.grant} is about to make one of.
  */
 const leaseCtxOf = (lease: LeaseBinding): Uint8Array => (
-  cipherCtx(LeaseFormat, lease.applabel, lease.user_id, lease.vaultlabel, lease.vault_id, lease.unlock_epoch, lease.ask_passphrase_at, 'vault_key_lease_wrapped')
+  cipherCtx(LeaseFormat, lease.applabel, lease.user_id, lease.vaultlabel, lease.vault_tok, lease.gate_epoch, lease.ask_passphrase_at, 'vault_key_lease_wrapped')
 )
 
 /** This device's lease on one vault: the vaultKey under a leaseKey that never leaves this browser profile, and the instant it ends.
- * Its visible fields (the scope, `vault_id`, `unlock_epoch` and `ask_passphrase_at`) are its own,
+ * Its visible fields (the scope, `vault_tok`, `gate_epoch` and `ask_passphrase_at`) are its own,
  * read-only: `{ ...lease }`, `toJSON()` and a log line show each once. The leaseKey, the wrap and
  * the format stay in its `record`, which the device store keeps by structured clone. Nothing of a
  * lease reaches the backend.
@@ -77,10 +77,10 @@ export class Lease {
   readonly user_id:           string
   /** The label of the vault it is for. */
   readonly vaultlabel:        string
-  /** The id of the vault props it was granted under. */
-  readonly vault_id:          string
-  /** The vault props' `unlock_epoch` when it was granted: a change of wayins voids it. */
-  readonly unlock_epoch:      number
+  /** The token of the vault props it was granted under. */
+  readonly vault_tok:         string
+  /** The vault props' `gate_epoch` when it was granted: a change of wayins voids it. */
+  readonly gate_epoch:        number
   /** The instant from which the lease opens nothing, and the vault asks for a proof. */
   readonly ask_passphrase_at: number
 
@@ -91,8 +91,8 @@ export class Lease {
     this.applabel          = record.applabel
     this.user_id           = record.user_id
     this.vaultlabel        = record.vaultlabel
-    this.vault_id          = record.vault_id
-    this.unlock_epoch      = record.unlock_epoch
+    this.vault_tok         = record.vault_tok
+    this.gate_epoch        = record.gate_epoch
     this.ask_passphrase_at = record.ask_passphrase_at
     Object.freeze(this)
   }
@@ -135,8 +135,8 @@ export class Lease {
       applabel:          vault.applabel,
       user_id:           vault.user_id,
       vaultlabel:        vault.vaultlabel,
-      vault_id:          standing.vault_id,
-      unlock_epoch:      standing.unlock_epoch,
+      vault_tok:         standing.vault_tok,
+      gate_epoch:        standing.gate_epoch,
       ask_passphrase_at: Math.min(vault.now() + vault.leaseMillis, FarFuture),
     })
     const leaseKey = await makeLeaseKey()
@@ -144,7 +144,7 @@ export class Lease {
     return new Lease(vault, { format: LeaseFormat, ...granted, lease_key: leaseKey, vault_key_lease_wrapped: wrapped }, vaultKeyPair.sessionKey)
   }
 
-  /** This lease, opened, as a new Lease, while it still fits: `standing` has its `vault_id` and `unlock_epoch`, and the vault's clock reads before its deadline.
+  /** This lease, opened, as a new Lease, while it still fits: `standing` has its `vault_tok` and `gate_epoch`, and the vault's clock reads before its deadline.
    * This lease is left as it was. It refuses 'vault_locked' when the lease has ended, or was granted
    * before a change of wayins or before the vault was made anew. It refuses 'corrupt_record' when it
    * fits and still does not open, its wrap or its leaseKey damaged.
@@ -152,10 +152,10 @@ export class Lease {
    * @param standing - The vault props as the vault read them now.
    *
    * @example const { ok, val: opened } = await lease.tryOpen(vaultProps)
-   * @example await lease.tryOpen({ ...vaultProps, unlock_epoch: vaultProps.unlock_epoch + 1 })   // refused 'vault_locked': a way in changed since
+   * @example await lease.tryOpen({ ...vaultProps, gate_epoch: vaultProps.gate_epoch + 1 })       // refused 'vault_locked': a way in changed since
    */
   async tryOpen(standing: LeaseStanding): Promise<Outcome<Lease>> {
-    if (standing.vault_id !== this.vault_id || standing.unlock_epoch !== this.unlock_epoch) {
+    if (standing.vault_tok !== this.vault_tok || standing.gate_epoch !== this.gate_epoch) {
       return bad(new VaultError('vault_locked', "This device's lease was granted before the vault's ways in changed, or before it was deleted and made anew, so it opens nothing: the vault asks for a proof instead."))
     }
     if (this.endsBy(this.#vault.now())) {

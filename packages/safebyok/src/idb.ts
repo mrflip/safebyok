@@ -79,12 +79,16 @@ export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
 
   return {
     getLease: (scope) => deviceOutcomeOf('getLease', async () => {
-      await sweepStrays()
-      const raw: unknown = await get(Ckeys.lease(scope), shelf())
+      const ckey = Ckeys.lease(scope)
+      // The read is asked for first, so it lands where this call was made among the scope's other
+      // calls; the sweep of stray rows goes beside it, after.
+      const [raw] = await Promise.all([get<unknown>(ckey, shelf()), sweepStrays()])
       if (raw === undefined || raw === null) { return null }
       const checked = LeaseRecord.safeParse(raw)
       if (! checked.success) {
-        await del(Ckeys.lease(scope), shelf())
+        // Discarded only while the row still reads as no lease, in one transaction: a lease
+        // written meanwhile is newer than what was found, and stays.
+        await discardedIfUnreadable(shelf(), ckey)
         ring()
         return null
       }
@@ -94,6 +98,7 @@ export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
     putLease: (record) => deviceOutcomeOf('putLease', async () => {
       await set(Ckeys.lease(record), record, shelf())
       ring()
+      return record
     }),
 
     // The scope's own lease goes first, so a sweep that fails never keeps a lock from revoking it.
@@ -133,6 +138,21 @@ export const idbDeviceDB = (opts?: IdbOpts): DeviceDB => {
     }),
   }
 }
+
+/** Delete the lease row under `ckey` if, and only if, it still does not read back as a lease, checked in the transaction that deletes it.
+ * A `getLease` found the row unreadable some moments ago; a `putLease` made after may have
+ * written a good one since, and a good row is never discarded.
+ */
+const discardedIfUnreadable = (store: UseStore, ckey: string): Promise<void> => store('readwrite', (objects) => (
+  new Promise<void>((resolve, reject) => {
+    const reading = objects.get(ckey)
+    reading.addEventListener('error', () => { reject(reading.error ?? new Error('IndexedDB could not read a lease it found unreadable.')) })
+    reading.addEventListener('success', () => {
+      if (! LeaseRecord.safeParse(reading.result).success) { objects.delete(ckey) }
+      resolve()
+    })
+  })
+))
 
 /** One stored row, as {@link inspectIdbDeviceDB} reports it: its ckey and the raw stored value. */
 export type IdbRow = { ckey: string, row: unknown }

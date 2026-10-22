@@ -10,7 +10,7 @@ const u1 = TH.scopeOf('u1')
 
 /** The boxlabels the u1 vault lists, through a device of its own. */
 const listed = async (vaultDBFor: ReturnType<typeof TH.deviceOver>): Promise<string[]> => {
-  const boxes = await TH.expectGood(vaultDBFor('u1').listBoxes(u1))
+  const boxes = await TH.boxesOf(vaultDBFor('u1'), u1)
   return boxes.map((box) => box.boxlabel)
 }
 

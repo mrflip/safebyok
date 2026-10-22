@@ -388,7 +388,7 @@ const SpoiledWayins = [
   [(row: Record<string, unknown>) => ({ ...row, ask_passphrase_at: Infinity }),               'a deadline that never comes'],
   [({ ask_passphrase_at: _gone, ...row }: Record<string, unknown>) => row,                    'a record missing its deadline'],
   [({ ask_passphrase_at: kept, ...row }: Record<string, unknown>) => ({ ...row, expires_at: kept }), 'a record from before its deadline was named ask_passphrase_at'],
-  [({ unlock_epoch: kept, ...row }: Record<string, unknown>) => ({ ...row, passphrase_epoch: kept }), 'a record from before its epoch was named unlock_epoch'],
+  [({ gate_epoch: kept, ...row }: Record<string, unknown>) => ({ ...row, passphrase_epoch: kept }), 'a record from before its epoch was named gate_epoch'],
   [(row: Record<string, unknown>) => ({ ...row, ask_passphrase_at: 1_792_022_400 }),          'a deadline in epoch seconds, before 1981'],
   [(row: Record<string, unknown>) => ({ ...row, ask_passphrase_at: FarFuture + 1 }),          'a deadline past FarFuture'],
   [({ ask_passphrase_at: kept, ...row }: Record<string, unknown>) => ({ ...row, ask_passphrase_at: (kept as number) - 0.5 }), 'a deadline with a fraction of a millisecond'],
@@ -809,7 +809,7 @@ describe("vault.ensureLease, by the Contract", () => {
     const world = makeWorld()
     const getProof = typingPw()
     const vault = Vault.make(world.optsWith({ getProof }))
-    vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
+    vi.spyOn(world.vaultDB, 'getVault').mockResolvedValueOnce(bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
     await TH.expectRefusal(vault.ensureLease(), 'storage_unavailable')
     expect(getProof).not.toHaveBeenCalled()
     expect(vault.state).to.eq('opening')
@@ -917,7 +917,7 @@ describe("vault.ensureLease, by the Contract", () => {
   it("says hello again on unlocked, and resolves the fresh vault (Contract: ensureLease, Does 3.4, and Returns)", async () => {
     const getProof = typingPw()
     const { world, vault } = await lockedVaultWith({ getProof })
-    const reads = vi.spyOn(world.vaultDB, 'getVaultProps')
+    const reads = vi.spyOn(world.vaultDB, 'getVault')
     world.advance((StaleMinutes + 1) * MinuteMillis)
     expect(await vault.ensureLease()).to.eq(vault)
     expect(vault.state).to.eq('unlocked')
@@ -991,7 +991,7 @@ describe("vault.ensureLease, by the Contract", () => {
     const ask = await prompt.asked
     await vault.lock()
     const derive = vi.spyOn(TH.testDeriver, 'deriveKeyBytes')
-    const reads = vi.spyOn(world.vaultDB, 'getVaultProps')
+    const reads = vi.spyOn(world.vaultDB, 'getVault')
     await TH.expectBad(ask.attempt('pw'), 'vault_locked')
     expect(derive).not.toHaveBeenCalled()
     expect(reads).not.toHaveBeenCalled()
@@ -1146,7 +1146,7 @@ describe("vault.ensureLease, by the Contract", () => {
     prompt.answer('declined')
     await TH.expectBad(ensuring, 'vault_locked')
     const derive = vi.spyOn(TH.testDeriver, 'deriveKeyBytes')
-    const reads = vi.spyOn(world.vaultDB, 'getVaultProps')
+    const reads = vi.spyOn(world.vaultDB, 'getVault')
     const err = await TH.expectBad(ask.attempt('pw'), 'vault_locked')
     expect(err.message).to.include('already answered')
     expect(derive).not.toHaveBeenCalled()
@@ -1352,7 +1352,7 @@ describe("every data call, through ensureLease", () => {
     await elsewhere.unlock('pw')
     await elsewhere.putBox('anthropic', 'sk-fake')
     world.advance(MinuteMillis)
-    const reads = vi.spyOn(world.vaultDB, 'getVaultProps')
+    const reads = vi.spyOn(world.vaultDB, 'getVault')
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'absent_box')
     await TH.expectRefusal(vault.delBox('anthropic'), 'absent_box')
     expect(reads).not.toHaveBeenCalled()
@@ -1463,7 +1463,7 @@ describe("getProof's attempt, by the Contract", () => {
     const ask = await prompt.asked
     expect(ask.why).to.eq('absent')
     const elsewhere = await world.open({ deviceDB: memoryDeviceDB() })
-    TH.beforeNextCall(deafDB, 'ensureVaultProps', async () => { await elsewhere.unlock('pw one') })
+    TH.beforeNextCall(deafDB, 'ensureVault', async () => { await elsewhere.unlock('pw one') })
     await TH.expectBad(ask.attempt('pw two'), 'created_elsewhere')
     expect(vault.state).to.eq('locked')
     await TH.expectGood(ask.attempt('pw one'))
@@ -1500,7 +1500,7 @@ describe("getProof's attempt, by the Contract", () => {
     const { world, vault } = await lockedVaultWith({ getProof: prompt.getProof })
     const ensuring = vault.tryEnsureLease()
     const ask = await prompt.asked
-    vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
+    vi.spyOn(world.vaultDB, 'getVault').mockResolvedValueOnce(bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
     await TH.expectBad(ask.attempt('pw'), 'storage_unavailable')
     prompt.answer('declined')
     await TH.expectBad(ensuring, 'vault_locked')

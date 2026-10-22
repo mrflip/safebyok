@@ -1,11 +1,11 @@
 import * as Z from 'zod/mini'
 import { BoxRecord } from './box'
-import { VaultScope, VaultProps } from './types'
+import type { GatelessVaultProps, VaultScope, VaultProps } from './types'
 import { VaultError } from './errors'
 import type { StringStore } from './string-store'
 import * as Ckeys from './ckeys'
 import * as Expectations from './expectations'
-import { type VaultDBOpts, VaultDB, type VaultPropsExpectation, type StoredBox, type BoxExpectation, type BoxDelExpectation, type VaultDelExpectation } from './vault-db'
+import { type VaultDBOpts, VaultDB, type VaultPropsExpectation, type StoredBox, type StoredVault, type BoxExpectation, type BoxDelExpectation, type VaultDelExpectation } from './vault-db'
 
 /** `fn`'s result (or failure) as a promise: a sync throw becomes a rejection, never an escape. */
 const soon = async <ValT>(fn: () => ValT | Promise<ValT>): Promise<ValT> => await fn()
@@ -38,7 +38,7 @@ export type LocalVaultDBOpts = VaultDBOpts & {
  *
  * @example
  *   const vaultDB = localVaultDB({ store: memoryStore() })
- *   await vaultDB.getVaultProps({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // { ok: true, val: null }
+ *   await vaultDB.getVault({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // { ok: true, val: null }
  * @example
  *   const vaultDB = localVaultDB({ store: domStore(localStorage, 'acme:db:'), logger })
  */
@@ -82,25 +82,30 @@ class StringStoreVaultDB extends VaultDB {
 
   // Work is deferred into the promise even though the store is synchronous: a storage fault must
   // reject the returned promise, never throw before the caller has one in hand. And each write
-  // checks and saves in one synchronous step, so nothing else in this tab runs in between.
-  protected doGetVaultProps(scope: VaultScope): Promise<unknown> {
-    return soon(() => readJson(this.store, Ckeys.vaultProps(scope)))
+  // checks and saves in one synchronous step, so nothing else in this tab runs in between; each
+  // read of a vault reads its props and its boxes in one such step.
+  protected doGetVault(scope: VaultScope): Promise<StoredVault> {
+    return soon(() => ({ vaultProps: readJson(this.store, Ckeys.vaultProps(scope)), boxes: this.storedBoxesOf(scope) }))
   }
 
-  protected doEnsureVaultProps(vaultProps: VaultProps): Promise<unknown> {
+  protected doEnsureVault(draft: GatelessVaultProps): Promise<StoredVault> {
     return soon(() => {
-      const standing = readJson(this.store, Ckeys.vaultProps(vaultProps))
-      if (standing !== null) { return standing }
-      this.store.write(Ckeys.vaultProps(vaultProps), JSON.stringify(vaultProps))
-      return vaultProps
+      const ckey = Ckeys.vaultProps(draft)
+      const standing = readJson(this.store, ckey)
+      const life = Expectations.newLifeOf(draft, standing)
+      if (life) { this.store.write(ckey, JSON.stringify(life)) }
+      return { vaultProps: life ?? standing, boxes: this.storedBoxesOf(draft) }
     })
   }
 
-  protected doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<boolean> {
+  protected doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<unknown> {
     return soon(() => {
-      if (! Expectations.vaultPropsMeets(readJson(this.store, Ckeys.vaultProps(vaultProps)), expected)) { return false }
-      this.store.write(Ckeys.vaultProps(vaultProps), JSON.stringify(vaultProps))
-      return true
+      const ckey = Ckeys.vaultProps(vaultProps)
+      const standing = readJson(this.store, ckey)
+      const refusal = Expectations.vaultPropsRefusalOf(standing, expected)
+      if (refusal) { throw refusal }
+      this.store.write(ckey, JSON.stringify(Expectations.vaultPropsPutOf(vaultProps, standing)))
+      return readJson(this.store, ckey)
     })
   }
 
@@ -108,15 +113,14 @@ class StringStoreVaultDB extends VaultDB {
     return soon(() => readJson(this.store, Ckeys.box(scope, boxlabel)))
   }
 
-  protected doListBoxes(scope: VaultScope): Promise<StoredBox[]> {
-    return soon(() => (
-      this.store.ckeys()
-        .filter(Ckeys.isBoxIn(scope))
-        .map((ckey) => ({ boxlabel: Ckeys.boxlabelOf(ckey), text: this.store.read(ckey) }))
-        // A row erased since the ckeys were read is gone; one that is not JSON goes up as its text.
-        .filter((row): row is { boxlabel: string, text: string } => row.boxlabel !== null && row.text !== null)
-        .map(({ boxlabel, text }) => ({ boxlabel, box: jsonOrText(text) }))
-    ))
+  /** Every box row of `scope`, read in the synchronous step that calls it. */
+  private storedBoxesOf(scope: VaultScope): StoredBox[] {
+    return this.store.ckeys()
+      .filter(Ckeys.isBoxIn(scope))
+      .map((ckey) => ({ boxlabel: Ckeys.boxlabelOf(ckey), text: this.store.read(ckey) }))
+      // A row erased since the ckeys were read is gone; one that is not JSON goes up as its text.
+      .filter((row): row is { boxlabel: string, text: string } => row.boxlabel !== null && row.text !== null)
+      .map(({ boxlabel, text }) => ({ boxlabel, box: jsonOrText(text) }))
   }
 
   // A row that is not JSON stands as its text, so a stale write names it, damaged, as the listing does.
@@ -155,12 +159,18 @@ class StringStoreVaultDB extends VaultDB {
     })
   }
 
-  protected doDelVault(scope: VaultScope, expected: VaultDelExpectation): Promise<boolean> {
+  // The tombstone takes the place of the vault props, in their row, so a scope holds one or the other.
+  protected doDelVault(scope: VaultScope, expected: VaultDelExpectation): Promise<unknown> {
     return soon(() => {
-      if (! Expectations.vaultIdMeets(readJson(this.store, Ckeys.vaultProps(scope)), expected)) { return false }
-      const doomed = this.store.ckeys().filter(Ckeys.isBoxIn(scope))
-      for (const ckey of [...doomed, Ckeys.vaultProps(scope)]) { this.store.erase(ckey) }
-      return true
+      const ckey = Ckeys.vaultProps(scope)
+      const tombstone = Expectations.tombstoneOf(readJson(this.store, ckey), scope, expected)
+      if (tombstone === null) { return null }
+      const isBox = Ckeys.isBoxIn(scope)
+      for (const boxCkey of this.store.ckeys()) {
+        if (isBox(boxCkey)) { this.store.erase(boxCkey) }
+      }
+      this.store.write(ckey, JSON.stringify(tombstone))
+      return readJson(this.store, ckey)
     })
   }
 

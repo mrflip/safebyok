@@ -4,7 +4,7 @@ import { VaultError } from '../../src/errors'
 import type { Vault } from '../../src/vault'
 import { memoryDeviceDB } from '../../src/device-db'
 import { localVaultDB } from '../../src/local-vault-db'
-import { bad, good } from '../../src/outcome'
+import { bad, good, valOf } from '../../src/outcome'
 import * as TH from '../test-helpers'
 import { makeRacingWorld, makeWorld, boxlabelsOf, storedWayinOf, storedVaultPropsOf, storedRowOf, u1BoxCkey, u1VaultPropsCkey, addLaptopPasskey } from './world'
 
@@ -24,7 +24,7 @@ describe("a lock that lands while an unlock or a change is under way", () => {
     gate.release()
     await unlocking
     expect(vault.getSnapshot().state).to.eq('absent')
-    expect(world.dbStore.ckeys()).to.have.lengthOf(0)
+    expect(world.dbStore.ckeys(), 'the tombstone, and nothing else').to.deep.equal([u1VaultPropsCkey])
     expect(await world.getLease()).to.be.null
   })
 
@@ -201,12 +201,31 @@ const raceLostToPwOne = async () => {
   const deafDB = world.deafVaultDB()
   const there = await world.open({ vaultDB: deafDB })
   const here = await world.open({ deviceDB: memoryDeviceDB() })
-  TH.beforeNextCall(deafDB, 'ensureVaultProps', async () => {
+  TH.beforeNextCall(deafDB, 'ensureVault', async () => {
     await here.unlock('pw one')
     await here.putBox('anthropic', 'sk-ant-fake-theirs')
   })
   return { world, deafDB, there, here }
 }
+
+describe("a vault another device made gateless, which sets no passphrase", () => {
+  it("reads as no vault yet: gateless vault props hold no way in to try", async () => {
+    const world = makeWorld()
+    await TH.expectingGood(world.vaultDB).ensureVault(TH.gatelessOf('u1'))
+    const vault = await world.open()
+    expect(vault.getSnapshot().state).to.eq('absent')
+  })
+
+  it("takes a first unlock's passphrase as its gate: the vault the other device ensured is gated here, under its vault_tok, and unlocked", async () => {
+    const world = makeWorld()
+    const vault = await world.open()
+    await TH.expectingGood(world.vaultDB).ensureVault(TH.gatelessOf('u1', { vault_tok: 'vault-tok-ensured-elsewhere' }))
+    await vault.unlock('pw one')
+    expect(vault.getSnapshot().state).to.eq('unlocked')
+    expect(storedVaultPropsOf(world)).to.deep.include({ vault_tok: 'vault-tok-ensured-elsewhere', gate_epoch: 1, vault_epoch: 1 })
+    expect(await world.getLease()).to.not.be.null
+  })
+})
 
 describe("a first unlock that loses the race to create the vault", () => {
   it("refuses as created_elsewhere when the passphrase does not open the vault the other device made, as unlock's example shows", async () => {
@@ -248,9 +267,28 @@ describe("a first unlock that loses the race to create the vault", () => {
     expect(here.getSnapshot().state).to.eq('unlocked')
   })
 
+  it("refuses as created_elsewhere when another device gates the vault ensured gateless between this unlock's ensure and its gate, under a passphrase this one does not open", async () => {
+    const world = makeWorld()
+    const deafDB = world.deafVaultDB()
+    const there = await world.open({ vaultDB: deafDB })
+    const here = await world.open({ deviceDB: memoryDeviceDB() })
+    await TH.expectingGood(world.vaultDB).ensureVault(TH.gatelessOf('u1', { vault_tok: 'vault-tok-ensured-elsewhere' }))
+    TH.beforeNextCall(deafDB, 'putVaultProps', async () => { await here.unlock('pw one') })
+    await TH.expectRefusal(there.unlock('pw two'), 'created_elsewhere')
+    expect(there.getSnapshot().state).to.eq('locked')
+    expect(storedVaultPropsOf(world)).to.deep.include({ vault_tok: 'vault-tok-ensured-elsewhere', gate_epoch: 1 })
+    expect(await world.getLease()).to.be.null
+  })
+
   it("is still created_elsewhere when the catch-up after it fails, the snapshot saying it is not syncing, and the failure warned of", async () => {
     const { world, deafDB, there } = await raceLostToPwOne()
-    vi.spyOn(deafDB, 'listBoxes').mockResolvedValueOnce(bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
+    // The read that opens the unlock is served; the catch-up after the lost race is not.
+    const getVault = deafDB.getVault.bind(deafDB)
+    let reads = 0
+    vi.spyOn(deafDB, 'getVault').mockImplementation((...args) => {
+      reads += 1
+      return reads === 1 ? getVault(...args) : Promise.resolve(bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
+    })
     await TH.expectRefusal(there.unlock('pw two'), 'created_elsewhere')
     expect(there.getSnapshot().state).to.eq('locked')
     expect(there.getSnapshot().syncing).to.be.false
@@ -361,14 +399,14 @@ describe("a first unlock's make, and a read that finds the vault gone while it i
     const unlocking = TH.expectRefusal(vault.unlock('pw'), 'vault_locked')
     await noting.reached
     await vault.hello({ staleMinutes: 0 })
-    expect(vault.vault_id).to.not.be.null
+    expect(vault.vault_tok).to.not.be.null
     await there.del()
     await vault.hello({ staleMinutes: 0 })
     expect(vault.state).to.eq('absent')
     noting.release()
     await unlocking
     expect(vault.state).to.eq('absent')
-    expect(vault.vault_id).to.be.null
+    expect(vault.vault_tok).to.be.null
     expect(await world.getLease()).to.be.null
     // The next unlock makes the vault anew.
     await vault.unlock('pw')
@@ -397,15 +435,15 @@ describe("a read that began before this device's own change to the ways in lande
     // The read starts as the change is about to write, and is held at its listing, the vault props
     // it read the older copy, while the change lands.
     TH.beforeNextCall(deaf, 'putVaultProps', async () => {
-      listing = TH.holdNextCall(deaf, 'listBoxes')
+      listing = TH.holdNextCall(deaf, 'getVault')
       reading = vault.hello({ staleMinutes: 0 })
       await listing.reached
     })
     await addLaptopPasskey(vault)
-    expect(vault.unlock_epoch).to.eq(2)
+    expect(vault.gate_epoch).to.eq(2)
     listing?.release()
     await reading
-    expect(vault.unlock_epoch).to.eq(2)
+    expect(vault.gate_epoch).to.eq(2)
     expect(vault.passkey).to.not.be.null
     expect(vault.state).to.eq('unlocked')
     await vault.hello({ staleMinutes: 0 })
@@ -504,7 +542,7 @@ describe("close", () => {
 
 // vaultOne's adapter hears no change bells, so it genuinely does not notice vaultTwo's doings
 // until it next touches the backend: the stale-device scenario, miniaturized. The reborn vault
-// has a new vault_id and its own passphrase.
+// has a new vault_tok and its own passphrase.
 const rebornWorld = async () => {
   const world = makeWorld()
   const deafDB = world.deafVaultDB()
@@ -529,7 +567,7 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
   it("getWhisper() of a box the reborn vault wrote refuses as damaged_box at once, reading no vault props; a hello that reads afresh then finds the vault moved, and locks", async () => {
     const { vaultOne, deafDB } = await rebornWorld()
     expect(vaultOne.getSnapshot().state).to.eq('unlocked')
-    const getVaultProps = vi.spyOn(deafDB, 'getVaultProps')
+    const getVaultProps = vi.spyOn(deafDB, 'getVault')
     const err = await TH.expectRefusal(vaultOne.getWhisper('anthropic'), 'damaged_box')
     expect(err.message).to.include('hello({ staleMinutes: 0 })')
     expect(getVaultProps).not.toHaveBeenCalled()
@@ -547,7 +585,7 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
     const wrapped = row['whisper_ciphered'] as { cipher_iv_b64: string, ciphertext_b64: string }
     world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...row, whisper_ciphered: { ...wrapped, ciphertext_b64: TH.tweakB64(wrapped.ciphertext_b64) } }))
     await TH.wakeupAtNextTick()
-    const getVaultProps = vi.spyOn(world.vaultDB, 'getVaultProps')
+    const getVaultProps = vi.spyOn(world.vaultDB, 'getVault')
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'damaged_box')
     expect(getVaultProps).not.toHaveBeenCalled()
     expect(vault.getSnapshot().state).to.eq('unlocked')
@@ -562,7 +600,7 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
     const row = storedRowOf(world, 'anthropic')
     world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...row, revision_tok: 'tampered' }))
     const down = new VaultError('storage_unavailable', 'The vault storage could not be reached.')
-    const getVaultProps = vi.spyOn(deafDB, 'getVaultProps').mockResolvedValue(bad(down))
+    const getVaultProps = vi.spyOn(deafDB, 'getVault').mockResolvedValue(bad(down))
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'damaged_box')
     expect(getVaultProps).not.toHaveBeenCalled()
     expect(vault.getSnapshot().syncing).to.be.true
@@ -590,7 +628,7 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
     expect(vaultOne.getSnapshot().state).to.eq('locked')
     await vaultOne.del()
     expect(vaultOne.getSnapshot().state).to.eq('absent')
-    expect(world.dbStore.ckeys()).to.have.lengthOf(0)
+    expect(world.dbStore.ckeys(), 'the tombstone, and nothing else').to.deep.equal([u1VaultPropsCkey])
   })
 
   it("del() aims at the vault seen when it was called, not one a change bell brings in while it runs", async () => {
@@ -641,7 +679,7 @@ describe("a stale session cannot reach into a vault reborn elsewhere", () => {
     await vaultTwo.del()
     await TH.expectRefusal(vaultOne.putBox('anthropic', 'sk-ant-fake-stale'), 'vault_locked')
     expect(vaultOne.getSnapshot().state).to.eq('absent')
-    expect(world.dbStore.ckeys()).to.have.lengthOf(0)
+    expect(world.dbStore.ckeys(), 'the tombstone, and nothing else').to.deep.equal([u1VaultPropsCkey])
   })
 
   it("del() of a vault deleted elsewhere, and not remade, is refused as stale; a second del() is quiet", async () => {
@@ -821,7 +859,11 @@ describe("versioned updates: two devices writing at once", () => {
     const { world, hereDB, here, there } = await twoDeviceWorld()
     await here.putBox('anthropic', 'sk-ant-fake-one')
     // A listing gone stale: storage holds a damaged record the snapshot does not show.
-    const listBoxes = vi.spyOn(hereDB, 'listBoxes').mockResolvedValue(good([]))
+    const getVault = hereDB.getVault.bind(hereDB)
+    const listBoxes = vi.spyOn(hereDB, 'getVault').mockImplementation(async (...args) => {
+      const read = valOf(await getVault(...args))
+      return good(read === null ? null : { ...read, boxes: [] })
+    })
     world.dbStore.write(u1BoxCkey('anthropic'), JSON.stringify({ ...storedRowOf(world, 'anthropic'), written_at: 'later' }))
     await vi.waitFor(() => { expect(here.getSnapshot().boxes).to.have.lengthOf(0) })
     listBoxes.mockRestore()
@@ -861,7 +903,7 @@ describe("versioned updates: two devices writing at once", () => {
     const down = new VaultError('storage_unavailable', 'The vault storage could not be reached.')
     beforeNextWrite('putBox', async () => {
       await there.putBox('anthropic', 'sk-ant-fake-theirs')
-      vi.spyOn(hereDB, 'getVaultProps').mockResolvedValue(bad(down))
+      vi.spyOn(hereDB, 'getVault').mockResolvedValue(bad(down))
     })
     const putBox = vi.spyOn(hereDB, 'putBox')
     const err = await TH.expectRefusal(here.putBox('anthropic', 'sk-ant-fake-mine'), 'stale_write')
@@ -889,7 +931,7 @@ describe("versioned updates: two devices writing at once", () => {
       await here.putBox('anthropic', 'sk-ant-fake-one')
       beforeNextWrite('putBox', async () => {
         await there.putBox('anthropic', 'sk-ant-fake-theirs')
-        vi.spyOn(hereDB, 'getVaultProps').mockResolvedValue(bad(refusal))
+        vi.spyOn(hereDB, 'getVault').mockResolvedValue(bad(refusal))
       })
       const putBox = vi.spyOn(hereDB, 'putBox')
       const err = await TH.expectRefusal(here.putBox('anthropic', 'sk-ant-fake-mine'), refusal.refusalkind)
@@ -901,7 +943,7 @@ describe("versioned updates: two devices writing at once", () => {
 
     it(`a deletion whose catch-up is refused as ${refusal.refusalkind} throws that refusal as it came, never as stale`, async () => {
       const { hereDB, here } = await rebornUnheard()
-      vi.spyOn(hereDB, 'getVaultProps').mockResolvedValue(bad(refusal))
+      vi.spyOn(hereDB, 'getVault').mockResolvedValue(bad(refusal))
       const err = await TH.expectRefusal(here.delBox('anthropic'), refusal.refusalkind)
       expect(err).to.eq(refusal)
     })
@@ -945,7 +987,7 @@ describe("versioned updates: two devices writing at once", () => {
   it("a deletion whose catch-up fails says so, the failure its cause, rather than that the vault is gone", async () => {
     const { hereDB, here } = await rebornUnheard()
     const down = new VaultError('storage_unavailable', 'The vault storage could not be reached.')
-    vi.spyOn(hereDB, 'getVaultProps').mockResolvedValue(bad(down))
+    vi.spyOn(hereDB, 'getVault').mockResolvedValue(bad(down))
     const err = await TH.expectRefusal(here.delBox('anthropic'), 'stale_write')
     expect(err.cause).to.eq(down)
     expect(err.message).to.include('Catching up with storage afterwards failed too')
@@ -958,7 +1000,7 @@ describe("versioned updates: two devices writing at once", () => {
     const shown = here.getSnapshot().boxes[0]?.revision_tok
     const delBox = vi.spyOn(hereDB, 'delBox')
     await here.delBox('anthropic')
-    expect(delBox.mock.calls[0]?.[2]).to.deep.equal({ vault_id: storedVaultPropsOf(world)['vault_id'], revision_tok: shown })
+    expect(delBox.mock.calls[0]?.[2]).to.deep.equal({ vault_tok: storedVaultPropsOf(world)['vault_tok'], revision_tok: shown })
     expect(world.logged.filter((heard) => heard.story?.['call'] === 'delBox')).to.have.lengthOf(0)
   })
 
@@ -1056,14 +1098,14 @@ describe("refreshes, one at a time", () => {
   it("runs refreshes asked for at once one after the other, every request made meanwhile sharing one more", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw')
-    const getVaultProps = world.vaultDB.getVaultProps.bind(world.vaultDB)
+    const getVault = world.vaultDB.getVault.bind(world.vaultDB)
     const tally = { inFlight: 0, most: 0 }
-    const reads = vi.spyOn(world.vaultDB, 'getVaultProps').mockImplementation(async (...args) => {
+    const reads = vi.spyOn(world.vaultDB, 'getVault').mockImplementation(async (...args) => {
       tally.inFlight += 1
       tally.most = Math.max(tally.most, tally.inFlight)
       try {
         await TH.wakeupAtNextTick()
-        return await getVaultProps(...args)
+        return await getVault(...args)
       } finally {
         tally.inFlight -= 1
       }

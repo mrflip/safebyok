@@ -17,7 +17,7 @@ afterEach(async () => {
 describe("VaultDBInspectionPanel", () => {
   it("shows the backend's vault rows as they land, ciphertext marked as such", async () => {
     render(<VaultDBInspectionPanel />)
-    await TH.expectGood(act(() => vaultDB.ensureVaultProps(TH.vaultPropsOf('u1'))))
+    await act(() => TH.ensureGated(vaultDB, TH.vaultPropsOf('u1')))
     await waitFor(() => { expect(screen.getAllByText('🔐 ciphertext')).to.have.lengthOf(1) })
     expect(screen.getByText(/ct-vault-u1/)).to.not.be.null
   })

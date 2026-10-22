@@ -4,7 +4,7 @@ import type { PoolConfig } from 'pg'
 import { VaultChangeChannel, VaultNotifySql, VaultTablesSql, postgresVaultDB } from 'safebyok-postgres'
 import type { PostgresListen } from 'safebyok-postgres'
 import type { Outcome, VaultDBOpts } from 'safebyok'
-import { boxOf, vaultPropsOf, noBoxYet, perUser, scopeOf, throughTurnstile, expectingGood } from 'safebyok/testing'
+import { boxOf, vaultPropsOf, noBoxYet, perUser, scopeOf, throughTurnstile, expectingGood, ensureGated } from 'safebyok/testing'
 import type { MakeVaultDBDevices, Turnstile, VaultDBVerbs } from 'safebyok/testing'
 
 // Everything the core's tests use too, so a test here star-imports this one module as TH.
@@ -144,7 +144,7 @@ export const useFileDatabase = (): (() => FileDatabase) => {
         devices.push({ end: () => client.end() })
         return client
       },
-      empty:      async () => { await host.query('TRUNCATE safebyok_boxes, safebyok_vaults') },
+      empty:      async () => { await host.query('TRUNCATE safebyok_boxes, safebyok_vaults, safebyok_vault_tombstones') },
       endDevices: async () => { await Promise.all(devices.splice(0).map((device) => device.end())) },
     }
   }, 60_000)
@@ -266,7 +266,7 @@ export const untilBlockedBy = async (db: FileDatabase, blocker: Client): Promise
 
 /** Makes the u1 vault the helpers' vault props stand for, through `vaultDB`, and writes a box under each of `boxlabels`. */
 export const filled = async (vaultDB: VaultDBVerbs, boxlabels: readonly string[]): Promise<void> => {
-  await expectingGood(vaultDB).ensureVaultProps(vaultPropsOf('u1'))
+  await ensureGated(vaultDB, vaultPropsOf('u1'))
   for (const boxlabel of boxlabels) { await expectingGood(vaultDB).putBox(scopeOf('u1'), noBoxYet, boxOf(boxlabel, `sk-fake-${boxlabel}`)) }
 }
 

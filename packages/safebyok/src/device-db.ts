@@ -15,12 +15,18 @@ import { isStorageBlocked } from './refusals'
  * An adapter may answer a damaged or unreadable record with null rather than refuse. That is the
  * safe failure: a lost lease asks for the passphrase again, and a lost mark checks the vault
  * afresh. The vault checks whatever `getLease` and `getMark` hand back.
+ *
+ * **Calls land in the order they were made.** One scope's calls take effect in the order the
+ * vault made them, whether or not it awaited each: a `putLease` followed by a `delLease` leaves no
+ * lease, a `delLease` followed by a `putLease` leaves the one written, and a `getLease` that
+ * finds a record it cannot read never discards one a later `putLease` has written. A lock's
+ * `delLease`, made after a grant's `putLease`, must erase it. `describeDeviceDB` checks it.
  */
 export interface DeviceDB {
   /** The lease record for one vault, or null for none. The vault judges whether it still fits. */
   getLease(scope: VaultScope): Promise<Outcome<LeaseRecord | null>>
-  /** Keep `record` as the lease of its vault, in place of any before. */
-  putLease(record: LeaseRecord): Promise<Outcome<void>>
+  /** Keep `record` as the lease of its vault, in place of any before, resolving the record as stored. */
+  putLease(record: LeaseRecord): Promise<Outcome<LeaseRecord>>
   /** Erase the lease of one vault: how a lock revokes it, and how a lease that no longer fits is discarded. */
   delLease(scope: VaultScope): Promise<Outcome<void>>
   /** This device's mark for one vault, or null for none. The vault judges what it says. */
@@ -64,7 +70,10 @@ export const memoryDeviceDB = (): DeviceDB => {
       return checked.data
     }),
 
-    putLease: (record) => deviceOutcomeOf('putLease', () => { leases.set(Ckeys.lease(record), record) }),
+    putLease: (record) => deviceOutcomeOf('putLease', () => {
+      leases.set(Ckeys.lease(record), record)
+      return record
+    }),
 
     delLease: (scope) => deviceOutcomeOf('delLease', () => { leases.delete(Ckeys.lease(scope)) }),
 

@@ -76,7 +76,7 @@ its own failures.
 One IndexedDB database per `dbName`, `<dbName>:vault_db`, holding one object store, `records`:
 **a row per record, each the record itself**, as safebyok wrote it, kept by structured clone
 field by field. Nothing is serialized, normalized or repaired: every field a record holds is
-bound into its encryption, but for the vault props' `unlock_epoch` and, for each of their two ways
+bound into its encryption, but for the vault props' `gate_epoch` and, for each of their two ways
 in (`passphrase` and `passkey`), the other one beside it, so one changed in storage makes the
 record refuse to open. A vault stored in the format before (`safebyok-vault-v4`, its ways in a
 `wayins` list) reads as damaged, to be made anew.
@@ -91,7 +91,7 @@ of every name, whatever a host's validators admit.
 
 * **Encrypted**: each whisper (`whisper_ciphered`), each box's boxKey
   (`box_key_wrapped`), and, inside the vault props, the vaultKey, wrapped under each passphrase.
-* **In the open**: the scope, each `boxlabel` and `sidecar`, the `vault_id`, `unlock_epoch`,
+* **In the open**: the scope, each `boxlabel` and `sidecar`, the `vault_tok`, `gate_epoch`,
   `revision_tok`s, how each passphrase was made into a key (its key deriver's label and salt),
   when each vault and box was first stored and each box last written (epoch
   milliseconds), and the length of every ciphertext.
@@ -139,10 +139,10 @@ places:
 And keep, as they are:
 
 * **`Expectations`, from `safebyok`**: the comparisons each write makes before it lands
-  (`Expectations.vaultPropsMeets`, `vaultMeets`, `vaultIdMeets`), and for a box write, the
+  (`Expectations.vaultPropsMeets`, `vaultMeets`, `vaultTokMeets`), and for a box write, the
   refusal it throws when it misses (`Expectations.boxRefusalOf`: `vault_mismatch`, or
   `stale_write` carrying the box that stands). An adapter
-  compares only the scope, `boxlabel`, `vault_id`, `unlock_epoch` and `revision_tok`, and a
+  compares only the scope, `boxlabel`, `vault_tok`, `gate_epoch` and `revision_tok`, and a
   standing row too damaged to show one of them fails the comparison.
 * **Store each record as itself, field by field**, exactly as handed to you, and return it
   exactly as stored, or null for none. Never look inside a ciphered field, never repair a

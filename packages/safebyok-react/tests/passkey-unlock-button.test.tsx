@@ -21,7 +21,7 @@ const lockedVaultWithPasskey = async () => {
 
 /** A vault that refuses every unlock with `err`, and has a passkey. */
 const vaultRefusing = (err: Error, credentialId: string) => TH.stubVault({
-  passkey: { ...TH.passkeyWayinOf('laptop', { credential_id: credentialId }), vault_id: 'vault-id-u1' },
+  passkey: { ...TH.passkeyWayinOf('laptop', { credential_id: credentialId }), vault_tok: 'vault-tok-u1' },
   unlock:  () => Promise.reject(err),
 })
 
@@ -176,7 +176,7 @@ describe("PasskeyUnlockButton", () => {
         const [credentialId = ''] = authenticator.credentialIds()
         const unlocking = TH.held()
         const unlock = vi.fn(() => unlocking.promise)
-        const vault = TH.stubVault({ passkey: { ...TH.passkeyWayinOf('laptop', { credential_id: credentialId }), vault_id: 'vault-id-u1' }, unlock })
+        const vault = TH.stubVault({ passkey: { ...TH.passkeyWayinOf('laptop', { credential_id: credentialId }), vault_tok: 'vault-tok-u1' }, unlock })
         const gripes: (string | null)[] = []
         const heard: ProofAnswer[] = []
         const { reported, unmount } = TH.renderReporting(<PasskeyUnlockButton ask={TH.askOf(vault)} onDone={(unlocked) => { heard.push(unlocked) }} onGripe={(gripe) => { gripes.push(gripe) }} />)
@@ -287,7 +287,7 @@ describe("PassphraseModal, for a vault with a passkey", () => {
     const [credentialId = ''] = authenticator.credentialIds()
     const unlocked: string[] = []
     const misused = TH.stubVault({
-      passkey: { ...TH.passkeyWayinOf('laptop', { credential_id: credentialId }), vault_id: 'vault-id-u1' },
+      passkey: { ...TH.passkeyWayinOf('laptop', { credential_id: credentialId }), vault_tok: 'vault-tok-u1' },
       unlock: (proof) => {
         if (typeof proof === 'string') { unlocked.push(proof); return Promise.resolve() }
         return Promise.reject(new VaultError('vault_closed', 'This vault handle was closed.'))

@@ -29,13 +29,13 @@ import type { JSONValue, Value } from 'convex/values'
  *   const host = app.defineModules({ safebyok: new SafebyokComponent(app.components.safebyok).api({ getUserId }) })
  *   const deployment = fakeDeployment(host)
  *   const client = deployment.client('u1')
- *   await client.query(deployment.api.safebyok.getVaultProps, { scope })
+ *   await client.query(deployment.api.safebyok.getVault, { scope })
  *   await deployment.close()
  *
  * @example
  *   const deployment = fakeDeployment(host)
  *   const reactClient = deployment.connectWith('u1', (address, opts) => new ConvexReactClient(address, opts))
- *   await reactClient.mutation(deployment.api.safebyok.ensureVaultProps, { vaultProps })
+ *   await reactClient.mutation(deployment.api.safebyok.ensureVault, { draft })
  */
 export const fakeDeployment = <Host extends FakeHost>(host: Host): FakeDeployment<Host> => new FakeDeployment(host)
 

@@ -1,5 +1,5 @@
 import type { BoxRecord } from './box'
-import type { Capacity, DamagedBox, WayinSummary } from './types'
+import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types'
 
 /** Every refusalkind a safebyok call refuses with, in any safebyok package: storage adapters refuse with these same strings.
  * Each kind belongs to one family ({@link RefusalFamilyForKind}), told apart by who handles it:
@@ -68,7 +68,7 @@ import type { Capacity, DamagedBox, WayinSummary } from './types'
  *   is no block. Stop offering a retry: tell the user why. The host may reopen the vault with
  *   `memoryDeviceDB`, which remembers no unlock on this device.
  * * `vault_mismatch`: from a `VaultDB.putBox` called directly, a box sealed for vault props
- *   that no longer stand (the vault deleted, remade under another `vault_id`, or its vaultKey
+ *   that no longer stand (the vault deleted, remade under another `vault_tok`, or its vaultKey
  *   replaced). Nothing was written, and the device that sealed it is out of date.
  * * `invalid_box`: from a `VaultDB.putBox` called directly, a box this package would not
  *   build, or sealed under another vaultKey than its expectation names. It is refused before
@@ -104,7 +104,7 @@ export const RefusalKindVals = [
   'insecure_context',    // the page is not a secure context (plain http), where the browser withholds WebCrypto
   'unexpected_error',    // something threw that is no refusal: a bug, in safebyok or in a function the app handed it
   'stale_write',         // storage changed since this device read it, so the write was refused
-  'vault_mismatch',      // a box write's vault props are not the ones standing -- another vault_id, or none -- so it was refused
+  'vault_mismatch',      // a box write's vault props are not the ones standing -- another vault_tok, or none -- so it was refused
   'rolled_back',         // storage handed back an older copy of the vault than this device has seen, which it refuses to use
   'not_permitted',       // the storage backend refused the signed-in user this call: not theirs to make
   'identity_revoked',    // the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in
@@ -170,6 +170,11 @@ export type RefusalMeta = {
    * nothing stands there.
    */
   box_stored?:   BoxRecord | DamagedBox | null
+  /** `stale_write` from an update of the vault props: the vault props standing, read in the step that refused, or null when none stand.
+   * They are the winner's whole record, checked as a read checks one, so the caller can take them
+   * up with no second read.
+   */
+  vault_props_stored?: VaultProps | null
   /** `vault_full` from storage: how full the vault is, read in the step that refused the write.
    * Always there on storage's own `vault_full`. Never on the vault's, which refuses from
    * `vault.capacity` before storage is asked.
@@ -193,7 +198,7 @@ export type VaultErrorOpts = ErrorOptions & { meta?: RefusalMeta }
  *     if (isVaultError(err, 'vault_locked')) { promptForPassphrase() }
  *   }
  * @example
- *   const { ok, val, err } = await vaultDB.getVaultProps(scope)
+ *   const { ok, val, err } = await vaultDB.getVault(scope)
  *   if (! ok && err.family === 'misuse') { throw err }
  */
 export class VaultError extends Error {

@@ -88,7 +88,7 @@ describe("delBox and del()", () => {
     await elsewhere.putBox('anthropic', 'sk-fake')
     await handle.del()
     expect(handle.getSnapshot().state).to.eq('absent')
-    expect(rowsOf(world, 'u1')).to.deep.equal([])
+    expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault props').to.deep.equal([u1VaultPropsCkey])
   })
 
   it("del() on a vault already gone is quiet: a second del() finds nothing to refuse", async () => {
@@ -103,7 +103,7 @@ describe("delBox and del()", () => {
 })
 
 /** The VaultDB verbs that write to storage, so a test can count every write a call makes. */
-const WriteVerbs = ['ensureVaultProps', 'putVaultProps', 'putBox', 'delBox', 'delVault', 'delDamagedVault'] as const
+const WriteVerbs = ['ensureVault', 'putVaultProps', 'putBox', 'delBox', 'delVault', 'delDamagedVault'] as const
 
 /** Ways a stored box row can be spoiled that the listing sees, so that it lists as damaged. */
 const DamagedListings = [
@@ -200,7 +200,7 @@ describe("damaged boxes", () => {
     const putBox = vi.spyOn(world.vaultDB, 'putBox')
     await vault.putBox('anthropic', 'sk-ant-new')
     const callsOf = Object.fromEntries(writes.map(([verb, spy]) => [verb, spy.mock.calls.length]))
-    expect(callsOf).to.deep.equal({ ensureVaultProps: 0, putVaultProps: 0, putBox: 1, delBox: 0, delVault: 0, delDamagedVault: 0 })
+    expect(callsOf).to.deep.equal({ ensureVault: 0, putVaultProps: 0, putBox: 1, delBox: 0, delVault: 0, delDamagedVault: 0 })
     expect(putBox.mock.calls[0]?.[1]).to.deep.include({ revision_tok: revisionTok })
     expect(await vault.getWhisper('anthropic')).to.eq('sk-ant-new')
     vi.restoreAllMocks()

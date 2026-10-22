@@ -8,6 +8,7 @@ VOCABULARY.md.
 
 A name in the New column that also stands in the Old one was renamed again, by the rename pass of
 2026-10-19 (Box everywhere; get, put and del on every layer; `check` for a check): follow it down.
+The last two rows are from the rename of 2026-10-21 (better_paths, streamline thread 1).
 
 To be deleted at 1.0.0.
 
@@ -109,3 +110,5 @@ To be deleted at 1.0.0.
 | GraphQL `safebyok{Read,Update,Retire}Box`, `safebyok{Read,FetchOrCreate,Update}VaultProps`, `safebyokRetireVault` | `safebyok{Get,Put,Del}Box`, `safebyok{Get,Ensure,Put}VaultProps`, `safebyokDelVault` |
 | Convex `fetchOrCreateVaultProps`, `updateVaultProps`, `updateBox`, `retireBox`, `retireVault` | `ensureVaultProps`, `putVaultProps`, `putBox`, `delBox`, `delVault` |
 | files `lockbox.ts`, `retire-damaged-vault.ts`          | `box.ts`, `del-damaged-vault.ts`                        |
+| `vault_id`, `vaultId` (and `vaultIdMeets`, `Expectations.vaultIdMeets`; GraphQL, Convex and Postgres fields and columns of the same name) | `vault_tok`, `vaultTok`, `vaultTokMeets` |
+| `unlock_epoch`, `unlockEpoch` (stored, wire and column names alike) | `gate_epoch`, `gateEpoch`                               |

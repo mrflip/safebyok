@@ -26,21 +26,20 @@ export const storageUnavailable = (cause: unknown, message: string = StorageTrou
   new VaultError('storage_unavailable', message, { cause: causeOf(cause) })
 )
 
-/** Which write {@link staleWrite} refuses. A box write's is {@link staleBox}. */
-export const StaleWriteVals = ['vaultProps', 'del'] as const
+/** Which write {@link staleWrite} refuses. A box write's is {@link staleBox}, and an update of the vault props' {@link staleVaultProps}. */
+export const StaleWriteVals = ['del'] as const
 export type StaleWrite = typeof StaleWriteVals[number]
 
 /** What each stale write says: what changed under the writer, and to read again. */
 const StaleWriteSaid: Readonly<Record<StaleWrite, string>> = {
-  vaultProps: 'The vault changed in storage since this device read it -- its ways in were changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. Read the vault again before retrying.',
-  del:    'The vault changed in storage since this device read it -- it was deleted, or deleted and made anew, elsewhere -- so this removal was refused and nothing was removed. Read the vault again before retrying.',
+  del: 'The vault changed in storage since this device read it -- it was deleted, or deleted and made anew, elsewhere -- so this removal was refused and nothing was removed. Read the vault again before retrying.',
 }
 
-/** A `stale_write` refusal of a vault props write or a deletion: what it expected no longer stands, so nothing was written.
- * The `VaultDB` base class throws it when an adapter's write answers `false`. An adapter that hands
- * each call on to another VaultDB passes it on as it came.
+/** A `stale_write` refusal of a deletion: what it expected no longer stands, so nothing was removed.
+ * The `VaultDB` base class throws it when an adapter's deletion answers `false`, or `null` for a
+ * box. An adapter that hands each call on to another VaultDB passes it on as it came.
  *
- * @example throw Refusals.staleWrite('vaultProps')
+ * @example throw Refusals.staleWrite('del')
  */
 export const staleWrite = (what: StaleWrite): VaultError => new VaultError('stale_write', StaleWriteSaid[what])
 
@@ -62,8 +61,27 @@ export const staleBox = (boxStored: unknown): VaultError => (
 /** What a box write's `stale_write` says. */
 export const StaleBoxMessage = "That box changed in storage since this device read it -- another device or tab wrote or removed it -- so this write was refused and nothing was written. What stands now is this error's meta.box_stored: write again over it, or leave it."
 
+/** A `stale_write` refusal of an update of the vault props, carrying the vault props standing as `meta.vault_props_stored`. Throw it from `doPutVaultProps`.
+ * The `VaultDB` base class checks `vaultPropsStored` as `getVault` checks vault props, so a
+ * caller meets sound vault props or null; damaged ones refuse as a read of them would. A
+ * `stale_write` from `doPutVaultProps` carrying no `vault_props_stored` is refused as
+ * `corrupt_record`.
+ *
+ * @param vaultPropsStored - The vault props record exactly as stored, read in the same atomic step
+ *   that refused the write; null for none.
+ *
+ * @example throw Refusals.staleVaultProps(standingRow ?? null)
+ */
+export const staleVaultProps = (vaultPropsStored: unknown): VaultError => (
+  // Unchecked here, as the adapter read it: the base class replaces it with the record checked.
+  new VaultError('stale_write', StaleVaultPropsMessage, { meta: { vault_props_stored: vaultPropsStored as Exclude<RefusalMeta['vault_props_stored'], undefined> } })
+)
+
+/** What an update of the vault props' `stale_write` says. */
+export const StaleVaultPropsMessage = "The vault changed in storage since this device read it -- its ways in were changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. What stands now is this error's meta.vault_props_stored: read the vault again before retrying."
+
 /** A `vault_mismatch` refusal of a box write, for vault props that are not the ones it was sealed for. Throw it from `doPutBox`.
- * None stand, or they have another `vault_id`. It carries nothing of the props that stand, as they
+ * None stand, or they have another `vault_tok`. It carries nothing of the props that stand, as they
  * hold every wayin.
  *
  * @example throw Refusals.vaultMismatch()

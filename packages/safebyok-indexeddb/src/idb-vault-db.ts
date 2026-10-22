@@ -1,5 +1,5 @@
 import { Ckeys, Expectations, VaultDB } from 'safebyok'
-import type { VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, StoredBox, VaultProps, VaultScope } from 'safebyok'
+import type { VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, BoxDeletion, GatelessVaultProps, StoredBox, StoredVault, VaultProps, VaultScope } from 'safebyok'
 import { ChangeBell } from 'safebyok/idb'
 import { boxRange } from './ckeys'
 import { bellnameOf, parseDbName, type IdbVaultDBOpts } from './idb-opts'
@@ -10,7 +10,8 @@ import { inOneTransaction, settle, withheldShelfOf } from './shelf'
  * all the same. Nothing syncs. Nothing is opened until the first read or write.
  *
  * * **Each verb is one IndexedDB transaction**: a write lands only while what it expects stands,
- *   even with another tab writing at the same moment.
+ *   even with another tab writing at the same moment, and `getVault` reads the vault props and
+ *   every box with no write between.
  * * **Other tabs' writes** ring `subscribe`, over a BroadcastChannel.
  * * **No limits of its own**: the four `max*` limits are `Infinity`, and the origin's storage quota
  *   bounds the whole database. `getCapacity` weighs each box as the UTF-8 bytes of its JSON.
@@ -43,42 +44,42 @@ class IdbVaultDB extends VaultDB {
 
   private get shelf() { return withheldShelfOf(this.dbName) }
 
-  protected async doGetVaultProps(scope: VaultScope): Promise<unknown> {
-    return (await this.shelf('readonly', (store) => rowAt(store, Ckeys.vaultProps(scope)))) ?? null
+  // The vault props and the scope's boxes are read in one transaction: no other tab's write lands
+  // between them.
+  protected async doGetVault(scope: VaultScope): Promise<StoredVault> {
+    return await this.shelf('readonly', (store) => vaultIn(store, scope))
   }
 
-  protected async doEnsureVaultProps(vaultProps: VaultProps): Promise<unknown> {
-    const { standing, created } = await inOneTransaction(this.shelf, async (store) => {
-      const already = await rowAt(store, Ckeys.vaultProps(vaultProps))
-      if (already !== undefined) { return { standing: already, created: false } }
-      store.put(vaultProps, Ckeys.vaultProps(vaultProps))
-      return { standing: vaultProps, created: true }
+  // A tombstone in the vault props' row is no vault: a new life takes its place with the counter carried on.
+  protected async doEnsureVault(draft: GatelessVaultProps): Promise<StoredVault> {
+    const { ensured, created } = await inOneTransaction(this.shelf, async (store) => {
+      const ckey = Ckeys.vaultProps(draft)
+      const life = Expectations.newLifeOf(draft, await rowAt(store, ckey))
+      if (life) { store.put(life, ckey) }
+      return { ensured: await vaultIn(store, draft), created: life !== null }
     })
     if (created) { this.ring() }
-    return standing
+    return ensured
   }
 
-  protected async doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<boolean> {
-    return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {
-      const standing = await rowAt(store, Ckeys.vaultProps(vaultProps))
-      if (! Expectations.vaultPropsMeets(standing, expected)) { return false }
-      store.put(vaultProps, Ckeys.vaultProps(vaultProps))
-      return true
-    }))
+  // The props stored are the row as the put left it, read in the same transaction; a write that
+  // misses is refused from the row its transaction read, once that has ended.
+  protected async doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<unknown> {
+    const { refusal, stored } = await inOneTransaction(this.shelf, async (store) => {
+      const ckey = Ckeys.vaultProps(vaultProps)
+      const standing = await rowAt(store, ckey)
+      const missed = Expectations.vaultPropsRefusalOf(standing, expected)
+      if (missed) { return { refusal: missed, stored: null } }
+      store.put(Expectations.vaultPropsPutOf(vaultProps, standing), ckey)
+      return { refusal: null, stored: await rowAt(store, ckey) }
+    })
+    if (refusal) { throw refusal }
+    this.ring()
+    return stored
   }
 
   protected async doGetBox(scope: VaultScope, boxlabel: string): Promise<unknown> {
     return (await this.shelf('readonly', (store) => rowAt(store, Ckeys.box(scope, boxlabel)))) ?? null
-  }
-
-  // Reads the key range of the scope's boxes, not the whole shelf: every other vault's rows, of
-  // every user in this database, stay unread. The ckeys and their rows come from one transaction.
-  protected async doListBoxes(scope: VaultScope): Promise<StoredBox[]> {
-    const range = boxRange(scope)
-    const [ckeys, rows] = await this.shelf('readonly', (store) => Promise.all([settle(store.getAllKeys(range)), settle<unknown[]>(store.getAll(range))]))
-    return ckeys
-      .map((ckey, idx) => ({ boxlabel: typeof ckey === 'string' ? Ckeys.boxlabelOf(ckey) : null, box: rows[idx] }))
-      .filter((stored): stored is StoredBox => stored.boxlabel !== null)
   }
 
   // The box handed back is the row as the put left it, read in the same transaction; a write that
@@ -119,16 +120,17 @@ class IdbVaultDB extends VaultDB {
     return deletion
   }
 
-  // The look at the vault props and every deletion (the boxes by their key range, then the
-  // vault props) are one transaction: a box another tab writes waits for the delete and then
-  // finds no vault props, so no box outlives its vault.
-  protected async doDelVault(scope: VaultScope, expected: VaultDelExpectation): Promise<boolean> {
+  // The look at the vault props, the deletion of the boxes (by their key range) and the tombstone
+  // laid in the place of the vault props are one transaction: a box another tab writes waits for
+  // the delete and then finds no vault props, so no box outlives its vault.
+  protected async doDelVault(scope: VaultScope, expected: VaultDelExpectation): Promise<unknown> {
     return this.ringIfLanded(await inOneTransaction(this.shelf, async (store) => {
-      const standing = await rowAt(store, Ckeys.vaultProps(scope))
-      if (! Expectations.vaultIdMeets(standing, expected)) { return false }
+      const ckey = Ckeys.vaultProps(scope)
+      const tombstone = Expectations.tombstoneOf(await rowAt(store, ckey), scope, expected)
+      if (tombstone === null) { return null }
       store.delete(boxRange(scope))
-      store.delete(Ckeys.vaultProps(scope))
-      return true
+      store.put(tombstone, ckey)
+      return await rowAt(store, ckey)
     }))
   }
 
@@ -145,6 +147,20 @@ class IdbVaultDB extends VaultDB {
     return landed
   }
 }
+
+/** The vault of `scope` as stored, its vault props (null for none) and every box, read in the transaction `store` belongs to. */
+const vaultIn = async (store: IDBObjectStore, scope: VaultScope): Promise<StoredVault> => {
+  const range = boxRange(scope)
+  const [vaultProps, ckeys, rows] = await Promise.all([rowAt(store, Ckeys.vaultProps(scope)), settle(store.getAllKeys(range)), settle<unknown[]>(store.getAll(range))])
+  return { vaultProps: vaultProps ?? null, boxes: storedBoxesOf(ckeys, rows) }
+}
+
+/** The scope's boxes from the ckeys and rows of its key range, read together: each under the boxlabel its ckey names. */
+const storedBoxesOf = (ckeys: IDBValidKey[], rows: unknown[]): StoredBox[] => (
+  ckeys
+    .map((ckey, idx) => ({ boxlabel: typeof ckey === 'string' ? Ckeys.boxlabelOf(ckey) : null, box: rows[idx] }))
+    .filter((stored): stored is StoredBox => stored.boxlabel !== null)
+)
 
 /** The row at `ckey`, read in the transaction `store` belongs to, or undefined for none. */
 const rowAt = (store: IDBObjectStore, ckey: string): Promise<unknown> => settle<unknown>(store.get(ckey))

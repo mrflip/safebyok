@@ -37,7 +37,85 @@ became delete; and `VaultError.kind` became `refusalkind`. A fourth, 2026-10-19 
 the renames falsified amended in place, each marked. This leaves the rule above as it was: from here on, an entry is
 added or folded into through the subagent, and no other entry changes.
 
+**Names (2026-10-21).** The stored field `vault_id` became `vault_tok` and `unlock_epoch` became `gate_epoch` (`notes/old_vocabulary.md` lists the retired names); the dated entries below keep the names they were written with.
+
 ## Of Interest
+
+* 2026-10-22 (thread store_verbs, branch 20261022-store_verbs): **a deleted vault leaves a tombstone, and `vault_epoch`
+  is the record of a life.** The vault props carry `vault_epoch`, a counter the store, never the writer, moves up
+  by one on every write of the gate (`putVaultProps`) and on `delVault`; no box write moves it. `delVault` leaves
+  `{ format 'safebyok-tombstone-v1', scope, vault_epoch }` in the vault's place (a row in the vault props' row for
+  key-value adapters, a table of its own in Postgres and Convex), and the next `ensureVault` of the scope starts a
+  new life with the counter carried on, so it never goes down across a deletion. The tombstone holds no
+  `vault_tok`, so no expectation can name it: `putVaultProps`, `putBox`, `delBox` and a second `delVault` over
+  it all refuse as over no vault, which is how a stale writer is kept from reviving a deleted vault.
+  `getVault` reads a tombstone as no vault (`Expectations.isTombstone`, `Expectations.tombstoneOf`,
+  `packages/safebyok/src/expectations.ts`; VAULTDB.md 3.1, 3.2, 3.5).
+* 2026-10-22 (thread store_verbs, branch 20261022-store_verbs): **`delVault` expects `{ vault_tok, gate_epoch }`,
+  and `delDamagedVault` expects the `vault_tok` alone.** A delete proven against a gate another device has since
+  changed (an old passphrase in a stale tab) refuses as stale and cannot delete the vault. The one path with no
+  gate to name, `delDamagedVault` over props that fail validation, passes `gate_epoch: null` and counts a
+  `vault_epoch` it cannot read from zero, so a damaged vault's tombstone can carry a counter lower than devices
+  have seen. Left as an open matter for the Coach.
+* 2026-10-22 (thread store_verbs, branch 20261022-store_verbs): **a restored backup is not noticed by every device,
+  and the host must wipe what it restores.** `vault_epoch` moves only on writes to the gate and on deletion, so a
+  restore that rolls back boxes alone under the same gate is seen by no device (the toldjaso entry 1, already
+  ruled "left for the audit"). The README ("A deleted vault's tombstone, and restoring a backup") tells a server
+  that restores a backup to wipe the restored vaults (props, boxes, tombstones) rather than serve them, because a
+  restored vault shows an older counter than devices have seen and a vault deleted since the backup comes back.
+  It also tells a host deleting a user's data to sign the user out first and remove tombstones with the rows,
+  since rows removed straight from the tables leave no tombstone and no counter to carry on. Nothing in the
+  package enforces either.
+* 2026-10-22 (thread store_verbs, branch 20261022-store_verbs): **the first unlock is two writes, so a gateless
+  vault can stand in storage.** `ensureVault` stores a vault gateless (no wrapped vaultKey, no way in), and the
+  first gate is then written over it by `putVaultProps` expecting `gate_epoch` 0. Between the two writes, or for
+  good if the second never lands, the gateless props stand; `getVault` reads them as no vault yet, and the next
+  first unlock sets its passphrase over them. The wayin is sealed before the first write, so a failing key
+  deriver creates nothing. Gateless props carry no secret.
+* 2026-10-22 (thread store_verbs, branch 20261022-store_verbs): **`idbDeviceDB.getLease` is ordered against
+  `putLease` and `delLease`, and discards an unreadable row only in a transaction that re-checks it.** One
+  scope's DeviceDB calls land in the order they were made (stated in the `DeviceDB` interface, checked by
+  `describeDeviceDB`). `getLease` asks for its read before it sweeps stray rows, and deletes a row it found
+  unreadable only inside one readwrite transaction that re-checks the row is still unreadable, so a lock's
+  `delLease` or a newer `putLease` made after the read is never undone by that read's late discard (an undone lock
+  would leave a lease the user locked). `packages/safebyok/src/idb.ts`, `device-db.ts`.
+
+* 2026-10-22 (thread wire_meta, branch 20261022-wire_meta, commit 43746aff): **over GraphQL, what a refused write learned
+  travels in the mutation's response `data`, and a GraphQL error carries `extensions.kind` alone, never a record.**
+  Before, a `stale_write` put the winning vault props (both wayins' salts and wrapped vaultKeys: offline-guessing
+  material) and the winning box (`box_stored`), and a full vault its `capacity`, in `extensions.meta`, which GraphQL
+  servers, gateways and APM tools commonly log. The Coach ruled: move meta out of the error and into the body,
+  available on success or failure. `safebyokPutVaultProps` and `safebyokPutBox` now resolve answer types
+  (`SafebyokPutVaultPropsAnswer`, `SafebyokPutBoxAnswer`) with `landed`; on a `stale_write` (or a box write's
+  `vault_full`) `landed` is false with `refusalkind`, `message`, and `vault_props_stored`, `box_stored` or
+  `capacity`. A stored record, sound or damaged, travels as the `SafebyokStoredRecord` JSON scalar, which GraphQL
+  does not check; `graphqlVaultDB` reads the body and throws the same VaultError with the same
+  `meta`, so the VaultDB layer's `err.meta` is unchanged. Every other refusal still crosses as an error with kind
+  only; tests pin that no error's `extensions` carries a record
+  (`packages/safebyok-graphql/tests/vault-resolvers.test.ts`, "a write's answer in the body"). Residual: the records
+  are now in the response `data`, which a host's response logging can still write down; the README says so.
+  The Postgres route recipe and Convex already answer with the record in a body, not an error.
+
+* 2026-10-22 (thread get_vault, PR [#244](https://github.com/mrflip/safebyok/pull/244)): **the vault props record has two shapes,
+  and `getVault` reads props and box listing in one atomic step.** (1) `VaultProps` (format
+  `safebyok-vault-v6`, unchanged) is checked by the core's Zod schema at every read and write as one of
+  two shapes: *gated* (`gate_epoch` 1 or more, a passphrase wayin, a passkey wayin or null) or *gateless*
+  (`gate_epoch` 0, `passphrase` and `passkey` both null). A record at a gated epoch with no passphrase
+  matches neither, and is refused `damaged_vault` on read and `bad_record` on write. A gateless record
+  holds no wrapped vaultKey, so nothing in it can be tried or opened. `VaultDB.ensureVault` first stores
+  a vault gateless and refuses any draft that is not; the first gate is written over it by
+  `putVaultProps` at `gate_epoch` 1 expecting 0, so of two devices setting the first passphrase at once
+  exactly one lands (the conditional write) and the other is refused. The Postgres and Convex adapters
+  still refuse any update that does not keep the `vault_tok` and move `gate_epoch` forward. (2)
+  `VaultDB.getVault` and `ensureVault` read the vault props and the box listing in one atomic step (one
+  Postgres statement, one Convex query or mutation, one IndexedDB transaction), so the two never name
+  different vaults as handed back; nothing (the base class, the vault, or an adapter) compares or
+  repairs the two afterwards. One narrow case: Postgres's `ensureVault`, when another device's vault
+  props land after its statement's snapshot began, returns those props with the listing as of the
+  snapshot filtered to their `vault_tok`, so the listing may lag but never names another vault. (3) A
+  `putVaultProps` refused `stale_write` carries the vault props standing in `err.meta.vault_props_stored`
+  (null for none), read in the same atomic step and checked as a read checks them. That meta holds only
+  what a read by the same user would return: ciphertext and visible fields, never secret material.
 
 * 2026-10-21 (thread trust_lines, branch 20261021-trust_lines, PR [#239](https://github.com/mrflip/safebyok/pull/239); amended 2026-10-21 (trust_lines): rebased on main, once stacked on [#225](https://github.com/mrflip/safebyok/pull/225)):
   **threat model, by party.** Storage and the backend are treated as hostile and defended by
@@ -728,7 +806,7 @@ added or folded into through the subagent, and no other entry changes.
   revision the device read, and storage reports what it removed; the base class takes that report
   as untrusted storage input.** The expectation is `{ vault_id, revision_tok }` (null for a
   box listed as damaged with no readable revision); `delVault` and `delDamagedVault`
-  keep the vault-only expectation. The arbitration is unchanged: the adapter compares only
+  keep the vault-only expectation (amended 2026-10-22, store_verbs: `delVault` now expects `vault_tok` and `gate_epoch`; `delDamagedVault` the `vault_tok` alone). The arbitration is unchanged: the adapter compares only
   `vault_id` and removes whatever box stands under the boxlabel, in one atomic step, so a
   deletion within the right vault still wins over any write; the revision never refuses. It only
   lets the adapter answer `deleted` (the revision named; for null, a record holding none that
@@ -781,7 +859,9 @@ added or folded into through the subagent, and no other entry changes.
   key, so neither is offline-guessable, and it is what a `getBox` by the same signed-in user
   returns. What it changes: this is a refusal's `meta` now holding ciphertext of the winning box
   (never plaintext, never key material in the clear), and it crosses wires: GraphQL's
-  `extensions.meta.box_stored` and the Postgres route recipe's `refusal.box_stored`; the error's
+  `extensions.meta.box_stored` (amended 2026-10-22 (wire_meta): no longer; over GraphQL it is the `box_stored` of
+  `safebyokPutBox`'s answer in the response `data`, see the 2026-10-22 wire_meta entry) and the Postgres route recipe's
+  `refusal.box_stored`; the error's
   `cause` still never crosses. A host that logs or reports a whole `VaultError` including `meta`
   now logs that ciphertext. An audit of where refusal meta can leak (logs, error reporters, a host
   serializing errors) is the Coach's, later. (An earlier line here said a refused write
@@ -1203,7 +1283,7 @@ added or folded into through the subagent, and no other entry changes.
   `vault_mismatch`, see the 2026-10-19 (returning) entry), writes nothing, and `putBox()` /
   `putWayin()` / `delBox()` / `del()`
   surface it on the first failure, with no retry. Deletions (`delBox`, `delVault`) carry a
-  `vault_id`-only expectation (the Coach's ruling): they land only while the scope's standing
+  `vault_id`-only expectation (amended 2026-10-22, store_verbs: `delVault` also expects the `gate_epoch`; the Coach's ruling for `delBox`): they land only while the scope's standing
   vault props have that `vault_id`, refuse where no vault props stand, and expect no revision, so within
   its vault a deletion wins over a concurrent update; deleting an absent box is quiet. The
   atomicity of check-and-write is each adapter's: `localVaultDB` checks and saves in one
@@ -1367,7 +1447,8 @@ added or folded into through the subagent, and no other entry changes.
   count and approximate size to the caller already authorized for that vault (the listing already
   shows the count). The base class validates the capacity (whole numbers; `Infinity` becomes
   `Number.MAX_SAFE_INTEGER`) and refuses a `vault_full` without a sound one as `corrupt_record`.
-  It crosses the GraphQL wire as `extensions.meta.capacity`; the Postgres route recipe in the
+  It crosses the GraphQL wire as `extensions.meta.capacity` (amended 2026-10-22 (wire_meta): no longer; it is the `capacity`
+  of `safebyokPutBox`'s answer in the response `data`); the Postgres route recipe in the
   README now sends a refusal's `meta` whole, which from a `VaultDB` verb is only `box_stored` (stale
   write) or `capacity` (`vault_full`). The vault still locks
   on `identity_revoked` and `rolled_back` from storage: `RefusalPolicy.heed` unwraps each Outcome,
@@ -1378,6 +1459,9 @@ added or folded into through the subagent, and no other entry changes.
   refusal's `meta`, and from there into `snapshot.trouble`, logs and error reporters; the Coach has
   ruled those out of the snapshot. A later refusal that wants to name the vault props storage holds
   must carry a summary instead: `vault_id`, `unlock_epoch` and the passphrase and passkey summaries.
+  Amended 2026-10-22 (get_vault): `RefusalMeta.vault_props_stored` returns, carried by a
+  `putVaultProps` `stale_write` as the standing vault props, checked as a read checks them (see the
+  2026-10-22 entry).
   2026-10-19 (A4): every public vault call (`packages/safebyok/src/vault.ts`) now has a `tryX` form
   resolving an `Outcome` and an `X` form throwing the same `err` (`#trying`, `#throwing`). A throw
   inside a vault call that is not a `VaultError` -- a bug in safebyok, or a throw from a host
@@ -1442,7 +1526,7 @@ added or folded into through the subagent, and no other entry changes.
   stored before reads as absent, and its rows, ciphertext only, stay in storage. An old lease (a leaseKey and the vaultKey wrapped under it) would otherwise linger in IndexedDB
   beyond the reach of `lock()` and of any expiry, so `idbDeviceDB` sweeps it: `getLease` and
   `delLease` list the device shelf's ckeys and delete, unread, every one that is not a lease
-  tuple (`Ckeys.isLease`). An open that finds the vault does it, and so does every lock; under
+  tuple (`Ckeys.isLease`). (Amended 2026-10-22, store_verbs: `getLease` now reads before it sweeps, and discards an unreadable row only in a re-checking transaction; see the entry at the top.) An open that finds the vault does it, and so does every lock; under
   `idbVaultDB` or `localVaultDB`, whose first open after an upgrade finds no vault (so reads no
   lease), the old row waits for the first lock or the next open after an unlock. A test proves
   no old value is fetched. `delAll()` clears the whole shelf. `memoryDeviceDB` keeps nothing past the

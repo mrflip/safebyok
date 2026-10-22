@@ -20,7 +20,7 @@ export const randomBytes = (count: number): Uint8Array => (
   crypto.getRandomValues(new Uint8Array(count))
 )
 
-/** A fresh random UUID from the platform, for a vaultId or revisionTok. */
+/** A fresh random UUID from the platform, for a vaultTok or revisionTok. */
 export const randomId = (): string => crypto.randomUUID()
 
 /** Bytes as unpadded base64url text: the `_b64` form every stored record uses.
@@ -61,8 +61,8 @@ export type CipherCtxPart = string | number | Readonly<Record<string, string | n
  * open. It refuses 'bad_option' for a part that is undefined or null, or a record field set to
  * undefined: each would bind the same as some other ctx.
  *
- * @example cipherCtx('safebyok-lease-v1', 'acme', 'u1', 'main', vaultId, 1, askPassphraseAt, 'vault_key_lease_wrapped')
- * @example cipherCtx('safebyok-vault-v6', 'acme', 'u1', 'main', vaultId, registeredAt, 'vault_key_passphrase_wrapped', { wayinkind: 'passphrase', key_deriver_label, salt_b64, device_id, registered_at })
+ * @example cipherCtx('safebyok-lease-v1', 'acme', 'u1', 'main', vaultTok, 1, askPassphraseAt, 'vault_key_lease_wrapped')
+ * @example cipherCtx('safebyok-vault-v6', 'acme', 'u1', 'main', vaultTok, registeredAt, 'vault_key_passphrase_wrapped', { wayinkind: 'passphrase', key_deriver_label, salt_b64, device_id, registered_at })
  */
 export const cipherCtx = (...parts: readonly CipherCtxPart[]): Uint8Array => {
   if (parts.some((part) => isUnbound(part))) {
@@ -109,7 +109,7 @@ export const importWrappingKeyBytes = (keyBytes: Uint8Array): Promise<CryptoKey>
  * where, so the same bytes put to another use make another key. The bytes stay with the caller:
  * drop them promptly.
  *
- * @example await deriveWrappingKey(prfBytes, cipherCtx('safebyok-vault-v6', 'acme', 'u1', 'main', vaultId, registeredAt, 'vault_key_passkey_wrapped', header))
+ * @example await deriveWrappingKey(prfBytes, cipherCtx('safebyok-vault-v6', 'acme', 'u1', 'main', vaultTok, registeredAt, 'vault_key_passkey_wrapped', header))
  */
 export const deriveWrappingKey = async (keyBytes: Uint8Array, info: Uint8Array): Promise<CryptoKey> => {
   const inputKey = await crypto.subtle.importKey('raw', keyBytes as BufferSource, 'HKDF', false, ['deriveKey'])

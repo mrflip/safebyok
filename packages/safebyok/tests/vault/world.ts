@@ -81,7 +81,7 @@ export const uncheckingDeviceDB = () => {
   const marks = new Map<string, unknown>()
   const deviceDB: DeviceDB = {
     getLease: (scope) => { const kept = (rows.get(ckeyOf(scope)) ?? null) as LeaseRecord | null; return Promise.resolve(TH.good(kept)) },
-    putLease: (record) => { rows.set(ckeyOf(record), record); return Promise.resolve(TH.good(undefined)) },
+    putLease: (record) => { rows.set(ckeyOf(record), record); return Promise.resolve(TH.good(record)) },
     delLease: (scope) => { rows.delete(ckeyOf(scope)); return Promise.resolve(TH.good(undefined)) },
     getMark:  (scope) => { const kept = (marks.get(ckeyOf(scope)) ?? null) as DeviceMark | null; return Promise.resolve(TH.good(kept)) },
     putMark:  (mark) => { marks.set(ckeyOf(mark), mark); return Promise.resolve(TH.good(undefined)) },
@@ -123,12 +123,12 @@ export const damagedVaultWorld = async () => {
   const vault = await world.openUnlocked('pw')
   await vault.putBox('anthropic', 'sk-fake')
   vault.close()
-  world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...storedVaultPropsOf(world), unlock_epoch: 'one' }))
+  world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...storedVaultPropsOf(world), gate_epoch: 'one' }))
   return world
 }
 
 /** The verbs Vault.make asks of a VaultDB, and so all a duck-typed one has. */
-export const VaultDBVerbsUsed = ['getVaultProps', 'ensureVaultProps', 'putVaultProps', 'getBox', 'listBoxes', 'putBox', 'delBox', 'delVault', 'subscribe'] as const
+export const VaultDBVerbsUsed = ['getVault', 'ensureVault', 'putVaultProps', 'getBox', 'getVault', 'putBox', 'delBox', 'delVault', 'subscribe'] as const
 
 /** The passkey `laptop`, put into `vault` under the passphrase `pw`. */
 export const addLaptopPasskey = async (vault: Vault): Promise<void> => {
@@ -155,7 +155,7 @@ export const vaultWithPasskey = async () => {
 export const makeRacingWorld = (defaults?: Partial<MakeVaultOpts>) => {
   const keyDeriver: KeyDeriver = { ...TH.testDeriver }
   const world = makeWorld({ keyDeriver, ...defaults })
-  const holdNextLook = () => TH.holdNextCall(world.vaultDB, 'getVaultProps')
+  const holdNextLook = () => TH.holdNextCall(world.vaultDB, 'getVault')
   const holdNextDerive = () => TH.holdNextCall(keyDeriver, 'deriveKeyBytes')
   const holdNextLease = () => TH.holdNextCall(world.deviceDB, 'putLease')
   const holdNextBoxRead = () => TH.holdNextCall(world.vaultDB, 'getBox')

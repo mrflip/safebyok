@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Client } from 'pg'
 import { VaultDB, VaultError, RefusalKindVals, memoryDeviceDB } from 'safebyok'
-import type { Outcome, VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, VaultProps, RefusalKind, RefusalMeta, VaultScope } from 'safebyok'
+import type { Outcome, VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, GatelessVaultProps, StoredVault, VaultProps, RefusalKind, RefusalMeta, VaultScope } from 'safebyok'
 import * as TH from './test-helpers'
 import { VaultChangeChannel, postgresVaultDB } from '../src/index'
 import type { PostgresClient, PostgresListen } from '../src/index'
@@ -23,11 +23,10 @@ type Served = (vaultDB: VaultDB, args: unknown[]) => Promise<Outcome<unknown>>
  * VaultDB validates.
  */
 const served = new Map<string, Served>([
-  ['getVaultProps',    (vaultDB, [scope]) => vaultDB.getVaultProps(scope as VaultScope)],
-  ['ensureVaultProps', (vaultDB, [vaultProps]) => vaultDB.ensureVaultProps(vaultProps as VaultProps)],
+  ['getVault',         (vaultDB, [scope]) => vaultDB.getVaultRecords(scope as VaultScope)],
+  ['ensureVault',      (vaultDB, [draft]) => vaultDB.ensureVaultRecords(draft as GatelessVaultProps)],
   ['putVaultProps',    (vaultDB, [vaultProps, expected]) => vaultDB.putVaultProps(vaultProps as VaultProps, expected as VaultPropsExpectation)],
   ['getBox',           (vaultDB, [scope, boxlabel]) => vaultDB.getBox(scope as VaultScope, boxlabel as string)],
-  ['listBoxes',        (vaultDB, [scope]) => vaultDB.listBoxRecords(scope as VaultScope)],
   ['getCapacity',      (vaultDB, [scope]) => vaultDB.getCapacity(scope as VaultScope)],
   ['putBox',           (vaultDB, [scope, expected, box]) => vaultDB.putBox(scope as VaultScope, expected as BoxExpectation, box as BoxRecord)],
   ['delBox',           (vaultDB, [scope, boxlabel, expected]) => vaultDB.delBox(scope as VaultScope, boxlabel as string, expected as BoxDelExpectation)],
@@ -55,9 +54,9 @@ const vaultRoute = (pool: PostgresClient, signedInUserId: (request: Request) => 
     // Made per request, for the user your own auth signed in -- never one the request names.
     const vaultDB = postgresVaultDB({ client: pool, userId: await signedInUserId(request) })
     const { ok, val = null, err } = await serve(vaultDB, args)
-    // A refusal crosses as its kind, its calm message, and its meta -- a stale box write's
-    // box_stored (the box that stands, as a read would send it), or a vault_full's capacity --
-    // never its cause, the driver's own error.
+    // A refusal crosses as its kind, its calm message, and its meta -- what a stale write says
+    // stands (a box write's box_stored, an update's vault_props_stored, as a read would send
+    // them), or a vault_full's capacity -- never its cause, the driver's own error.
     if (! ok) { return Response.json({ refusal: { kind: err.refusalkind, message: err.message, meta: err.meta } }) }
     return Response.json({ result: val })
   }
@@ -84,29 +83,19 @@ class RouteVaultDB extends VaultDB {
     this.fetcher = fetcher
   }
 
-  protected doGetVaultProps(scope: VaultScope) { return this.call('getVaultProps', scope) }
-  protected doEnsureVaultProps(vaultProps: VaultProps) { return this.call('ensureVaultProps', vaultProps) }
-  protected async doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation) {
-    await this.call('putVaultProps', vaultProps, expected)
-    return true
-  }
+  protected async doGetVault(scope: VaultScope) { return storedVaultOf(await this.call('getVault', scope)) }
+  protected async doEnsureVault(draft: GatelessVaultProps) { return storedVaultOf(await this.call('ensureVault', draft)) }
+  protected doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation) { return this.call('putVaultProps', vaultProps, expected) }
   protected doGetBox(scope: VaultScope, boxlabel: string) { return this.call('getBox', scope, boxlabel) }
-  protected async doListBoxes(scope: VaultScope) {
-    const boxes = await this.call('listBoxes', scope) as { boxlabel: string }[]
-    return boxes.map((box) => ({ boxlabel: box.boxlabel, box }))
-  }
   protected doPutBox(scope: VaultScope, expected: BoxExpectation, box: BoxRecord) { return this.call('putBox', scope, expected, box) }
   protected doGetCapacity(scope: VaultScope) { return this.call('getCapacity', scope) }
   protected doDelBox(scope: VaultScope, boxlabel: string, expected: BoxDelExpectation) { return this.call('delBox', scope, boxlabel, expected) }
-  protected async doDelVault(scope: VaultScope, expected: VaultDelExpectation) {
-    await this.call('delVault', scope, expected)
-    return true
-  }
+  protected doDelVault(scope: VaultScope, expected: VaultDelExpectation) { return this.call('delVault', scope, expected) }
 
-  // A stale write refuses on the server and crosses as its kind, with what stands for a box write
-  // (a full vault, with how full it is), so a write that answers landed:
-  // a box write answers with the box as the server's storage holds it, and a box
-  // deletion with what it removed.
+  // A stale write refuses on the server and crosses as its kind, with what stands (a full vault,
+  // with how full it is), so a write that answers landed: an update of the vault props answers with
+  // the vault props as the server's storage holds them, a box write with the box, a box deletion
+  // with what it removed, and a vault deletion with the tombstone it left.
   private async call(verb: string, ...args: unknown[]): Promise<unknown> {
     const response = await this.fetcher(VaultRouteUrl, {
       method:  'POST',
@@ -124,6 +113,14 @@ class RouteVaultDB extends VaultDB {
 }
 
 const isKind = (kind: unknown): kind is RefusalKind => (RefusalKindVals as readonly unknown[]).includes(kind)
+
+// A vault as the route sends it -- its vault props, and its boxes as stored records -- or null for
+// none, as the VaultDB's half hands it up: each box under the boxlabel it holds.
+const storedVaultOf = (sent: unknown): StoredVault => {
+  if (sent === null) { return { vaultProps: null, boxes: [] } }
+  const { vaultProps, boxes } = sent as { vaultProps: unknown, boxes: { boxlabel: string }[] }
+  return { vaultProps, boxes: boxes.map((box) => ({ boxlabel: box.boxlabel, box })) }
+}
 
 // ------------------------------------------------------------------- the listen fan-out, for pg
 
@@ -212,20 +209,20 @@ describe("the README route recipe", () => {
 
   it("answers 400 to anything but a vault verb, a malformed body among them, and the client says so as storage_unavailable", async () => {
     const route = await routeOver()
-    for (const body of [{ verb: 'subscribe', args: [] }, { verb: 'constructor', args: [] }, { verb: 'getVaultProps', args: 'nope' }, null, 42]) {
+    for (const body of [{ verb: 'subscribe', args: [] }, { verb: 'constructor', args: [] }, { verb: 'getVault', args: 'nope' }, null, 42]) {
       const response = await route(postOf(body))
       expect(response.status).to.eq(400)
     }
     const notJson = await route(new Request(`https://app.example.test${VaultRouteUrl}`, { method: 'POST', body: '{"verb": "getVaultProps", ' }))
     expect(notJson.status).to.eq(400)
     const broken = new RouteVaultDB(() => Promise.resolve(Response.json({}, { status: 502 })))
-    await TH.expectBad(broken.getVaultProps(TH.scopeOf('u1')), 'storage_unavailable')
+    await TH.expectBad(broken.getVault(TH.scopeOf('u1')), 'storage_unavailable')
   })
 
   it("never sends the driver's own error to the browser", async () => {
     const dbDown = new Error('password authentication failed for user "vault_owner"')
     const route = vaultRoute(TH.failingClient(dbDown), () => Promise.resolve('u1'))
-    const response = await route(postOf({ verb: 'getVaultProps', args: [TH.scopeOf('u1')] }))
+    const response = await route(postOf({ verb: 'getVault', args: [TH.scopeOf('u1')] }))
     const sent = await response.text()
     expect(sent).to.include('storage_unavailable')
     expect(sent).to.not.include('vault_owner')

@@ -111,12 +111,20 @@ vaultResolvers({ vaultDBFor: (context) => postgresVaultDB({ client: pool, userId
   user, refuses every other user's vault, and any while signed out, before asking the database
   anything.
 * **A refusal crosses as a GraphQL error**: its message the VaultError's calm one, its
-  `extensions.kind` its kind, a stale box write's `extensions.meta.box_stored` (the box that
-  stands under the boxlabel, whole, as a read would send it), a full vault's
-  `extensions.meta.capacity` (how full it is), and nothing else -- never the VaultError's `cause`, your driver's
-  own error, which may name your database or quote a row. That stays on your server, as the
-  GraphQL error's `cause`, for your own logs. Anything else a VaultDB throws crosses as
-  `storage_unavailable`.
+  `extensions.kind` its kind, and nothing else -- never a record, and never the VaultError's
+  `cause`, your driver's own error, which may name your database or quote a row. That stays on
+  your server, as the GraphQL error's `cause`, for your own logs. Anything else a VaultDB throws
+  crosses as `storage_unavailable`.
+* **What a refusal learned crosses in the mutation's body, not in the error.** GraphQL servers,
+  gateways and APM tools commonly log an error's `extensions`, and a stale write learns the
+  winning vault props (both ways in, their salts and wrapped vaultKeys) or a winning box. So
+  `safebyokPutVaultProps` and `safebyokPutBox` answer `landed: true`, or, for a `stale_write` (and
+  for a `vault_full` box write), `landed: false` with the `refusalkind`, the `message`, and
+  `vault_props_stored`, `box_stored` or `capacity`. The browser's `graphqlVaultDB` throws the same
+  VaultError from it. Those fields are in the response's `data`: take care that your server's
+  logging of responses, where it has any, does not write them down. Upgrade the client and the
+  server together; a client and a server of different versions refuse each other's operations
+  as `bad_option`.
 * **`safebyokVaultChanged`** sends the vault's scope after every write to it, as the VaultDB's
   `subscribe` hears them -- for `postgresVaultDB`, through its `listen` and the optional `VaultNotifySql` trigger, one
   `listen` serving every VaultDB your server makes -- and stops listening when the subscriber goes. Changes that come
@@ -138,19 +146,22 @@ it meets nothing of yours.
 ### Serving a VaultDB of your own
 
 The resolvers need a **`ServedVaultDB`**: the VaultDB verbs a browser's vault calls, and
-`listBoxRecords(scope)`, which lists a vault's boxes as stored records, its two ciphered
-fields left out. A VaultDB's own `listBoxes` gives summaries instead -- the shape a vault shows,
-without `format` -- which the browser's VaultDB may not hand back from its own listing.
+`getVaultRecords(scope)` and `ensureVaultRecords(draft)`, which hand on a vault's boxes as stored
+records, their two ciphered fields left out. A VaultDB's own `getVault` and `ensureVault` give
+summaries instead -- the shape a vault shows, without `format` -- which the browser's VaultDB may
+not hand back from its own listing. A
+vault read is one query, its props and its boxes from one step of the server's VaultDB.
 `safebyok-postgres`'s VaultDB is a ServedVaultDB as it stands; nothing here is tied to Postgres.
 
-Every stored field is non-null in the schema. A listing of yours that hands back a record missing
+Every stored field is non-null in the schema but the vault props' `passphrase` and `passkey`,
+both null while a vault has no gate. A listing of yours that hands back a record missing
 one fails in GraphQL itself, before any VaultError is made, and reaches the browser as
 `storage_unavailable`, not as a box listed damaged: Postgres's `NOT NULL` columns rule it out, and a
 store of your own keeps every field it was handed.
 
 The resolvers decide nothing: every expectation crosses whole, and the VaultDB you serve keeps
 [the VaultDB contract](https://github.com/mrflip/safebyok/blob/main/packages/safebyok/VAULTDB.md)
-for the browser. Its line 3.3 in particular: a box write's expectation names the `vault_id` the
+for the browser. Its line 3.3 in particular: a box write's expectation names the `vault_tok` the
 box was sealed for and the revision it read, and your VaultDB lands it only while both stand,
 compared in the same atomic step as the write. `tests/yoga-recipe.test.ts` runs the shared suite
 through the recipe, that line included.
@@ -206,6 +217,7 @@ by, exactly as safebyok wrote it:
 | -------------------- | ----------------------------------------------------------------- |
 | `SafebyokVaultProps` | every field of the `VaultProps`                                   |
 | `SafebyokBox`        | every field of the `BoxRecord`; its sidecar a `SafebyokSidecar`        |
+| `SafebyokTombstone`  | what a deleted vault leaves: its scope, `format` and `vault_epoch`, which a deletion answers |
 | `SafebyokListedBox`  | a box as a listing has it: every field but the two encrypted ones |
 | `SafebyokCiphered`   | an encrypted value: its `cipher_iv_b64` and its `ciphertext_b64`  |
 | `SafebyokVaultScope` | which vault: `applabel`, `user_id`, `vaultlabel`                  |
@@ -213,10 +225,10 @@ by, exactly as safebyok wrote it:
 Each has an input type twin (`SafebyokVaultPropsInput`, and so on), and each expectation one
 of its own.
 
-* **Text is a `String`**, a count (`unlock_epoch`) an `Int`, and a time a `Float` -- epoch
+* **Text is a `String`**, a count (`gate_epoch`, `vault_epoch`) an `Int`, and a time a `Float` -- epoch
   milliseconds, a whole number past what GraphQL's 32-bit `Int` holds.
-* **A count is held to GraphQL's 32-bit `Int`**: `unlock_epoch`, which goes up by one on each
-  change to a vault's ways in. Past 2,147,483,647 the field fails on the
+* **A count is held to GraphQL's 32-bit `Int`**: `gate_epoch`, which goes up by one on each
+  change to a vault's ways in, and `vault_epoch`, which goes up with it and with a deletion. Past 2,147,483,647 the field fails on the
   wire and the browser sees `storage_unavailable`. That is accepted: two billion changes to
   the ways in is not a vault anyone keeps.
 * **The vault props' two ways in**, `passphrase` (always there) and `passkey` (null when the
