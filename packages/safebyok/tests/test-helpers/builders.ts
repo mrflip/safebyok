@@ -220,6 +220,7 @@ export const vaultPropsOf = (userId: string, overrides: Partial<GatedVaultProps>
 
 /** Store `vaultProps` in `vaultDB` as a first unlock does: the vault ensured gateless, then its gate written over it expecting `gate_epoch` 0.
  * Resolves the vault props as stored, so with `vault_epoch` the store's: 1 after the first gate.
+ * Vault props already standing gated are resolved as they stand, as `ensureVault` leaves them.
  * Throws the refusal of whichever step is refused. For setting a storage-layer test's scene.
  *
  * @example const stored = await ensureGated(vaultDB, vaultPropsOf('u1'))   // stored.vault_epoch is 1
@@ -227,8 +228,9 @@ export const vaultPropsOf = (userId: string, overrides: Partial<GatedVaultProps>
  */
 export const ensureGated = async (vaultDB: Pick<VaultDB, 'ensureVault' | 'putVaultProps'>, vaultProps: GatedVaultProps): Promise<GatedVaultProps> => {
   const { vault_epoch: _vaultEpoch, gate_epoch: _gateEpoch, passphrase: _passphrase, passkey: _passkey, ...head } = vaultProps
-  valOf(await vaultDB.ensureVault({ ...head, vault_epoch: 0, gate_epoch: 0, passphrase: null, passkey: null }))
-  return valOf(await vaultDB.putVaultProps(vaultProps, { vault_tok: vaultProps.vault_tok, gate_epoch: 0 })) as GatedVaultProps
+  const ensured = valOf(await vaultDB.ensureVault({ ...head, vault_epoch: 0, gate_epoch: 0, passphrase: null, passkey: null })).vaultProps
+  if (ensured.gate_epoch > 0) { return ensured as GatedVaultProps }
+  return valOf(await vaultDB.putVaultProps({ ...vaultProps, vault_tok: ensured.vault_tok }, { vault_tok: ensured.vault_tok, gate_epoch: 0 })) as GatedVaultProps
 }
 
 /** The vault props `scope` holds in `vaultDB`, as `getVault` reads them, or null for none. Throws the refusal of a read that is refused.

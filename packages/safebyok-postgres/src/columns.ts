@@ -1,4 +1,4 @@
-import type { BoxRecord, VaultProps } from 'safebyok'
+import type { BoxRecord, Tombstone, VaultProps } from 'safebyok'
 
 /** How one field is stored: `text` as given, `bigint` for a whole number, `jsonb` for an opaque structured value.
  * jsonb reorders keys, which is harmless for a Ciphered, a way in or a box's sidecar: safebyok
@@ -29,10 +29,20 @@ export const VaultPropsColumns = everyFieldOf<VaultProps>()([
   ['vaultlabel',       'text'],
   ['vault_tok',        'text'],
   ['format',           'text'],
+  ['vault_epoch',      'bigint'],
   ['gate_epoch',       'bigint'],
   ['passphrase',       'jsonb'],
   ['passkey',          'jsonb'],
   ['registered_at',    'bigint'],
+] as const)
+
+/** Every field of a Tombstone, in `safebyok_vault_tombstones`'s order. */
+export const TombstoneColumns = everyFieldOf<Tombstone>()([
+  ['applabel',         'text'],
+  ['user_id',          'text'],
+  ['vaultlabel',       'text'],
+  ['format',           'text'],
+  ['vault_epoch',      'bigint'],
 ] as const)
 
 /** Every field of a BoxRecord, in `safebyok_boxes`'s order after the scope and `vault_tok`, which the adapter adds. */
@@ -61,10 +71,13 @@ export const names = (columns: readonly Column[]): string => columns.map(([field
 
 /** Numbered parameters for the columns from `$first`, each cast to its column's type.
  *
+ * @param instead - SQL to put in place of a field's parameter, by field: for a value the statement decides, not the client.
+ *
  * @example placeholders([['vault_tok', 'text'], ['registered_at', 'bigint']], 4)  // '$4::text, $5::bigint'
+ * @example placeholders([['vault_tok', 'text'], ['vault_epoch', 'bigint']], 4, { vault_epoch: 'vault_epoch + 1' })  // '$4::text, vault_epoch + 1'
  */
-export const placeholders = (columns: readonly Column[], first: number): string => (
-  columns.map(([_field, kind], ii) => `$${String(first + ii)}::${kind}`).join(', ')
+export const placeholders = (columns: readonly Column[], first: number, instead: Readonly<Record<string, string>> = {}): string => (
+  columns.map(([field, kind], ii) => instead[field] ?? `$${String(first + ii)}::${kind}`).join(', ')
 )
 
 /** The one parameter of `placeholders(columns, first)` that holds `field`.

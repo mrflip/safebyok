@@ -144,7 +144,7 @@ export const useFileDatabase = (): (() => FileDatabase) => {
         devices.push({ end: () => client.end() })
         return client
       },
-      empty:      async () => { await host.query('TRUNCATE safebyok_boxes, safebyok_vaults') },
+      empty:      async () => { await host.query('TRUNCATE safebyok_boxes, safebyok_vaults, safebyok_vault_tombstones') },
       endDevices: async () => { await Promise.all(devices.splice(0).map((device) => device.end())) },
     }
   }, 60_000)

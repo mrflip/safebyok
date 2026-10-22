@@ -7,13 +7,15 @@
 -- (a cipherIv and its ciphertext), or one of the vault props' two ways in -- as one opaque jsonb. A record's secret fields are ciphertext, every one.
 
 -- One row of vault props per vault: its passphrase and passkey both null until its gate is made
--- (gate_epoch 0), then its passphrase always, and its passkey null when it has none.
+-- (gate_epoch 0), then its passphrase always, and its passkey null when it has none. Its
+-- vault_epoch is moved up by the statements that write its gate and delete it, never by a client.
 CREATE TABLE IF NOT EXISTS safebyok_vaults (
   applabel         text   NOT NULL,
   user_id          text   NOT NULL,
   vaultlabel       text   NOT NULL,
   vault_tok        text   NOT NULL,
   format           text   NOT NULL,
+  vault_epoch      bigint NOT NULL,
   gate_epoch       bigint NOT NULL,
   passphrase       jsonb,
   passkey          jsonb,
@@ -21,6 +23,18 @@ CREATE TABLE IF NOT EXISTS safebyok_vaults (
   PRIMARY KEY (applabel, user_id, vaultlabel),
   -- What a box's foreign key names: its vault, down to the vault_tok.
   UNIQUE (applabel, user_id, vaultlabel, vault_tok)
+);
+
+-- What a deleted vault leaves in its scope: its counter, which the next vault made there carries
+-- on. A scope holds a row of vault props or a tombstone, never both: a deletion moves the one to
+-- the other in one statement, and a vault made anew moves it back.
+CREATE TABLE IF NOT EXISTS safebyok_vault_tombstones (
+  applabel         text   NOT NULL,
+  user_id          text   NOT NULL,
+  vaultlabel       text   NOT NULL,
+  format           text   NOT NULL,
+  vault_epoch      bigint NOT NULL,
+  PRIMARY KEY (applabel, user_id, vaultlabel)
 );
 
 -- One box per boxlabel, beside its vault's scope and vault_tok. A box stands only while
@@ -51,5 +65,6 @@ CREATE TABLE IF NOT EXISTS safebyok_boxes (
 -- Row-level security on, with no policy: the tables' owner -- the role your server connects as --
 -- reaches them as before, and every other role reaches no row at all. On Supabase, that keeps
 -- them out of the Data API's reach.
-ALTER TABLE safebyok_vaults ENABLE ROW LEVEL SECURITY;
-ALTER TABLE safebyok_boxes  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE safebyok_vaults           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE safebyok_vault_tombstones ENABLE ROW LEVEL SECURITY;
+ALTER TABLE safebyok_boxes            ENABLE ROW LEVEL SECURITY;

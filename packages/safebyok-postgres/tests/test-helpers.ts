@@ -96,7 +96,7 @@ export const roleClient = async (db: PGlite, role: GuestRole): Promise<PostgresC
 /** This file's database, its tables emptied. */
 export const emptyDatabase = async (): Promise<PGlite> => {
   const db = await database()
-  await db.exec('TRUNCATE safebyok_boxes, safebyok_vaults')
+  await db.exec('TRUNCATE safebyok_boxes, safebyok_vaults, safebyok_vault_tombstones')
   return db
 }
 
