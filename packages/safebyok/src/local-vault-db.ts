@@ -90,40 +90,27 @@ class StringStoreVaultDB extends VaultDB {
 
   protected doEnsureVault(draft: GatelessVaultProps): Promise<StoredVault> {
     return soon(() => {
-      const standing = readJson(this.store, Ckeys.vaultProps(draft))
-      if (standing === null) { this.store.write(Ckeys.vaultProps(draft), JSON.stringify(draft)) }
-      return { vaultProps: standing ?? draft, boxes: this.storedBoxesOf(draft) }
+      const ckey = Ckeys.vaultProps(draft)
+      const standing = readJson(this.store, ckey)
+      const life = Expectations.newLifeOf(draft, standing)
+      if (life) { this.store.write(ckey, JSON.stringify(life)) }
+      return { vaultProps: life ?? standing, boxes: this.storedBoxesOf(draft) }
     })
   }
 
-  protected doGetVaultProps(scope: VaultScope): Promise<unknown> {
-    return soon(() => readJson(this.store, Ckeys.vaultProps(scope)))
-  }
-
-  protected doEnsureVaultProps(vaultProps: VaultProps): Promise<unknown> {
+  protected doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<unknown> {
     return soon(() => {
-      const standing = readJson(this.store, Ckeys.vaultProps(vaultProps))
-      if (standing !== null) { return standing }
-      this.store.write(Ckeys.vaultProps(vaultProps), JSON.stringify(vaultProps))
-      return vaultProps
-    })
-  }
-
-  protected doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<boolean> {
-    return soon(() => {
-      const refusal = Expectations.vaultPropsRefusalOf(readJson(this.store, Ckeys.vaultProps(vaultProps)), expected)
+      const ckey = Ckeys.vaultProps(vaultProps)
+      const standing = readJson(this.store, ckey)
+      const refusal = Expectations.vaultPropsRefusalOf(standing, expected)
       if (refusal) { throw refusal }
-      this.store.write(Ckeys.vaultProps(vaultProps), JSON.stringify(vaultProps))
-      return true
+      this.store.write(ckey, JSON.stringify(Expectations.vaultPropsPutOf(vaultProps, standing)))
+      return readJson(this.store, ckey)
     })
   }
 
   protected doGetBox(scope: VaultScope, boxlabel: string): Promise<unknown> {
     return soon(() => readJson(this.store, Ckeys.box(scope, boxlabel)))
-  }
-
-  protected doListBoxes(scope: VaultScope): Promise<StoredBox[]> {
-    return soon(() => this.storedBoxesOf(scope))
   }
 
   /** Every box row of `scope`, read in the synchronous step that calls it. */
@@ -172,12 +159,18 @@ class StringStoreVaultDB extends VaultDB {
     })
   }
 
-  protected doDelVault(scope: VaultScope, expected: VaultDelExpectation): Promise<boolean> {
+  // The tombstone takes the place of the vault props, in their row, so a scope holds one or the other.
+  protected doDelVault(scope: VaultScope, expected: VaultDelExpectation): Promise<unknown> {
     return soon(() => {
-      if (! Expectations.vaultTokMeets(readJson(this.store, Ckeys.vaultProps(scope)), expected)) { return false }
-      const doomed = this.store.ckeys().filter(Ckeys.isBoxIn(scope))
-      for (const ckey of [...doomed, Ckeys.vaultProps(scope)]) { this.store.erase(ckey) }
-      return true
+      const ckey = Ckeys.vaultProps(scope)
+      const tombstone = Expectations.tombstoneOf(readJson(this.store, ckey), scope, expected)
+      if (tombstone === null) { return null }
+      const isBox = Ckeys.isBoxIn(scope)
+      for (const boxCkey of this.store.ckeys()) {
+        if (isBox(boxCkey)) { this.store.erase(boxCkey) }
+      }
+      this.store.write(ckey, JSON.stringify(tombstone))
+      return readJson(this.store, ckey)
     })
   }
 

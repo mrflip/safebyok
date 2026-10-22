@@ -1,5 +1,5 @@
 import * as Z from 'zod/mini'
-import { type Capacity, type Clock, type VaultScope, BoxSummary, type DamagedBox, type PasskeyWayinSummary, type PassphraseWayinSummary, type PasskeyAnswer, type WayinSummary, Whisper, Sidecar, type GatedVaultProps, isGated, DeviceMark, MinuteMillis, FarFuture, FarPast } from './types'
+import { type Capacity, type Clock, type VaultScope, BoxSummary, type DamagedBox, type PasskeyWayinSummary, type PassphraseWayinSummary, type PasskeyAnswer, type WayinSummary, Whisper, Sidecar, type GatedVaultProps, type GatelessVaultProps, type VaultProps, isGated, DeviceMark, MinuteMillis, FarFuture, FarPast } from './types'
 import { Box, type BoxRecord, checkedSidecar, heldListing, planSeal, sealPlanned, whisperBytesOf } from './box'
 import * as Names from './names'
 import { optionsCheck } from './options'
@@ -695,7 +695,7 @@ export class Vault {
   // == [Vault: deleting and closing]: del, close
 
   /** Delete the vault: every record it has, in storage and on this device, as the vault half of deleting an account.
-   * No tombstone is kept. It needs no unlock: an authenticated owner can always delete their own rows
+   * Storage keeps a tombstone of the scope, which carries the vault's counter into any vault made there later. It needs no unlock: an authenticated owner can always delete their own rows
    * server-side, so requiring one would only look like protection. It locks as `lock()` does, and
    * erases this device's mark. Writes with `VaultDB.delVault` and {@link DeviceDB.delMark}.
    *
@@ -720,7 +720,7 @@ export class Vault {
       this.#landLock()
       await this.#shut()
       if (doomed !== null && doomed !== UnreadVaultProps) {
-        await this.#refreshOnStale(this.#vaultDB.delVault(this.#scope, { vault_tok: doomed.vault_tok }), 'del')
+        await this.#refreshOnStale(this.#vaultDB.delVault(this.#scope, { vault_tok: doomed.vault_tok, gate_epoch: doomed.gate_epoch }), 'del')
       }
       // This device forgets the vault it had seen, too: one made later under this scope is another.
       valOf(await this.#deviceDB.delMark(this.#scope))
@@ -954,12 +954,12 @@ export class Vault {
     // The mark the vault props are held to is read before them (see heedMark), and an older copy of a vault
     // this device has seen newer is refused before anything is taken from it.
     const seenBefore = this.#checkedMark(valOf(await this.#deviceDB.getMark(this.#scope)))
-    const read = await this.#vaultDB.getVaultProps(this.#scope)
+    const read = await this.#vaultDB.getVault(this.#scope)
     // Gateless vault props have no way in to try: this vault reads them as no vault yet.
-    const fresh = read === null || ! isGated(read) ? null : frozenVaultProps(read)
+    const fresh = read === null || ! isGated(read.vaultProps) ? null : frozenVaultProps(read.vaultProps)
     const mark = fresh === null ? null : await this.#heedMark(fresh, { seenBefore, call: 'refresh' })
     await this.#heedRevocation(fresh, mark)
-    const listed = fresh === null ? [] : await this.#vaultDB.listBoxes(this.#scope)
+    const listed = read === null || fresh === null ? [] : read.boxes
     // Taken up together once all is read, so a read that fails partway leaves the snapshot's
     // vault, mark and boxes as they stood (but for a revocation, taken up above): never a vault
     // beside another's boxes. Vault props newer than these, which this device's own write put in
@@ -1282,19 +1282,16 @@ export class Vault {
     return valOf(await wayin.tryOpen(proof))
   }
 
-  /** Brand-new vault props around a brand-new vaultKey, their one way in `passphrase`'s, sealed under `deviceId`.
+  /** The gate for a gateless vault: its one way in `passphrase`'s, sealed under `deviceId` around a brand-new vaultKey, at `gate_epoch` 1.
    * The vaultKey is not handed back: the vault takes it out of the way in as stored, as any unlock
-   * does.
+   * does. `vault_epoch` is the one the store will set, the standing one plus one; the store
+   * ignores what it is handed.
    */
-  async #draftVaultProps(passphrase: PassphraseProof, deviceId: string): Promise<GatedVaultProps> {
-    const vaultTok = randomId()
-    const registeredAt = this.#clockNow()
-    const wayin = await Wayin.seal(this, vaultTok, passphrase, deviceId, await makeVaultKey())
+  async #draftGate(base: GatelessVaultProps, passphrase: PassphraseProof, deviceId: string): Promise<GatedVaultProps> {
+    const wayin = await Wayin.seal(this, base.vault_tok, passphrase, deviceId, await makeVaultKey())
     return {
-      format:              'safebyok-vault-v6',
-      ...this.#scope,
-      vault_tok:           vaultTok,
-      registered_at:       registeredAt,
+      ...base,
+      vault_epoch:         base.vault_epoch + 1,
       gate_epoch:          1,
       passphrase:          wayin.record,
       passkey:             null,
@@ -1307,43 +1304,70 @@ export class Vault {
    * vault meanwhile under a passphrase this one does not open.
    */
   async #settleUnlock(proof: Proof): Promise<{ standing: GatedVaultProps } & VaultKeyPair> {
-    if (this.#vaultProps === null || this.#vaultProps === UnreadVaultProps) {
-      if (! (proof instanceof PassphraseProof)) {
-        throw new VaultError('absent_vault', 'This vault has not been created yet, so no passkey opens it: the first unlock(), with a passphrase, creates it.')
-      }
-      await proof.checkStrongEnough()
-      const deviceId = randomId()
-      const draft = await this.#draftVaultProps(proof, deviceId)
-      this.#drafted = { vault_tok: draft.vault_tok, device_id: deviceId }
-      // Another device's vault, if one was made meanwhile, is held to the mark as it was before it.
-      const seenBefore = this.#checkedMark(valOf(await this.#deviceDB.getMark(this.#scope)))
-      const revoked = this.#createsStandDown.signal
-      const ensured = await this.#vaultDB.ensureVaultProps(draft)
-      // Gateless vault props made elsewhere hold no way in for this passphrase to open.
-      if (! isGated(ensured)) { throw gatelessElsewhereError() }
-      const settled = frozenVaultProps(ensured)
-      const mark = await this.#heedMark(settled, { seenBefore, call: 'unlock' })
-      // Vault props a read took up meanwhile are not put back: should they differ, the grant that
-      // follows finds these outrun, and takes nothing up. Nor are these put back once a read has
-      // found vault props deleted or replaced while they were written: no vault in hand then may
-      // be these, deleted, and the grant finds them outrun too.
-      if (! revoked.aborted && (this.#vaultProps === null || this.#vaultProps === UnreadVaultProps)) {
-        this.#vaultProps = settled
-        this.#deviceMark = mark
-      }
-      // The vaultKey comes out of the way in as stored, so the lease keeps only the non-extractable
-      // handle an unwrap makes. Should another device have created the vault between our look and
-      // our write, the settled vault props are theirs, and the passphrase proves itself against
-      // them like any other.
-      try {
-        return { standing: settled, ...await this.#unwrapWith(settled, proof) }
-      } catch (err) {
-        if (settled.vault_tok !== draft.vault_tok && isVaultError(err, 'wrong_passphrase')) { await this.#refuseCreatedElsewhere(err) }
-        throw err
-      }
-    }
+    if (this.#vaultProps === null || this.#vaultProps === UnreadVaultProps) { return await this.#unlockCreating(proof) }
     const standing = this.#vaultProps
     return { standing, ...await this.#unwrapWith(standing, proof) }
+  }
+
+  /** The first unlock of a vault this device has seen none of: the vault ensured, its gate written, and `proof`'s passphrase tried against whichever vault stands. */
+  async #unlockCreating(proof: Proof): Promise<{ standing: GatedVaultProps } & VaultKeyPair> {
+    if (! (proof instanceof PassphraseProof)) {
+      throw new VaultError('absent_vault', 'This vault has not been created yet, so no passkey opens it: the first unlock(), with a passphrase, creates it.')
+    }
+    await proof.checkStrongEnough()
+    const deviceId = randomId()
+    const draft: GatelessVaultProps = {
+      format: 'safebyok-vault-v6', ...this.#scope, vault_tok: randomId(), vault_epoch: 0, registered_at: this.#clockNow(), gate_epoch: 0, passphrase: null, passkey: null,
+    }
+    // Sealed before storage is touched, so a deriver that fails creates nothing.
+    const sealed = await this.#draftGate(draft, proof, deviceId)
+    // Another device's vault, if one was made meanwhile, is held to the mark as it was before it.
+    const seenBefore = this.#checkedMark(valOf(await this.#deviceDB.getMark(this.#scope)))
+    const revoked = this.#createsStandDown.signal
+    const { vaultProps: ensured } = await this.#vaultDB.ensureVault(draft)
+    const settled = frozenVaultProps(await this.#gatedFrom(ensured, sealed, proof, deviceId))
+    const mark = await this.#heedMark(settled, { seenBefore, call: 'unlock' })
+    // Vault props a read took up meanwhile are not put back: should they differ, the grant that
+    // follows finds these outrun, and takes nothing up. Nor are these put back once a read has
+    // found vault props deleted or replaced while they were written: no vault in hand then may
+    // be these, deleted, and the grant finds them outrun too.
+    if (! revoked.aborted && (this.#vaultProps === null || this.#vaultProps === UnreadVaultProps)) {
+      this.#vaultProps = settled
+      this.#deviceMark = mark
+    }
+    // The vaultKey comes out of the way in as stored, so the lease keeps only the non-extractable
+    // handle an unwrap makes. Should another device have created the vault between our look and
+    // our write, the settled vault props are theirs, and the passphrase proves itself against
+    // them like any other.
+    try {
+      return { standing: settled, ...await this.#unwrapWith(settled, proof) }
+    } catch (err) {
+      if (this.#drafted?.vault_tok !== settled.vault_tok && isVaultError(err, 'wrong_passphrase')) { await this.#refuseCreatedElsewhere(err) }
+      throw err
+    }
+  }
+
+  /** The vault props `ensured` comes to once gated: themselves if another device gated them, else with `sealed` as the gate, sealed afresh where the vault is another's gateless one. */
+  async #gatedFrom(ensured: VaultProps, sealed: GatedVaultProps, proof: PassphraseProof, deviceId: string): Promise<GatedVaultProps> {
+    if (isGated(ensured)) { return ensured }
+    const gate = ensured.vault_tok === sealed.vault_tok ? sealed : await this.#draftGate(ensured, proof, deviceId)
+    return await this.#gated(gate, deviceId)
+  }
+
+  /** The vault props of a gateless vault, once its first gate, `gate`, is written: this passphrase's, or the winner's where another device gated them first.
+   * The first gate is written over the gateless props expecting `gate_epoch` 0, so of two devices
+   * gating one vault at once, one lands and the other hears whose won, as `meta.vault_props_stored`.
+   */
+  async #gated(gate: GatedVaultProps, deviceId: string): Promise<GatedVaultProps> {
+    this.#drafted = { vault_tok: gate.vault_tok, device_id: deviceId }
+    try {
+      const stored = await this.#vaultDB.putVaultProps(gate, { vault_tok: gate.vault_tok, gate_epoch: 0 })
+      return stored as GatedVaultProps
+    } catch (err) {
+      const winner = isVaultError(err, 'stale_write') ? err.meta?.vault_props_stored : undefined
+      if (winner === undefined || winner === null || ! isGated(winner) || winner.vault_tok !== gate.vault_tok) { throw err }
+      return winner
+    }
   }
 
   // Aborted, and made anew, at each revocation a read takes up (see takeStorage): a first unlock
@@ -1382,12 +1406,14 @@ export class Vault {
     const deviceId = this.#deviceIdFor(standing)
     plan.check?.(standing)
     const proven = await this.#unwrapWith(standing, proof)
-    const next = frozenVaultProps({
+    const drafted = frozenVaultProps({
       ...standing,
       gate_epoch:       standing.gate_epoch + 1,
       ...await plan.revise(standing, proven, deviceId),
     })
-    await this.#refreshOnStale(withoutStoredVaultProps(this.#vaultDB.putVaultProps(next, { vault_tok: standing.vault_tok, gate_epoch: standing.gate_epoch })), plan.call)
+    const stored = await this.#refreshOnStale(withoutStoredVaultProps(this.#vaultDB.putVaultProps(drafted, { vault_tok: standing.vault_tok, gate_epoch: standing.gate_epoch })), plan.call)
+    // The vault as storage now holds it, its counter moved by the store.
+    const next = frozenVaultProps(stored as GatedVaultProps)
     // The change has landed, whatever happens now: what follows is this device's own, and a
     // failure of it is said through the logger, never thrown as though the change had not landed.
     const raised = await this.#raiseMarkAfter(next, plan.call)
@@ -1944,7 +1970,7 @@ export class Vault {
   // --
 }
 
-// == [Refusals]: damagedBeyondNaming, lockedError, declinedError, closedError, gatelessElsewhereError, withoutStoredVaultProps
+// == [Refusals]: damagedBeyondNaming, lockedError, declinedError, closedError, withoutStoredVaultProps
 
 const damagedBeyondNaming = () => new VaultError('damaged_box', "That box is damaged beyond naming: its stored record does not say which revision it is, so nothing can be written over it safely. Nothing was written. Remove it with delBox() first, then store its whisper again.")
 
@@ -1958,9 +1984,9 @@ const declinedError = (asked: boolean) => new VaultError('vault_locked', asked
 const closedError = () => new VaultError('vault_closed', 'This vault handle was closed: make another with Vault.make.')
 
 /** What `writing` resolves, or its refusal with the vault props a stale write names stripped: a vault's refusal carries no stored vault props record. */
-const withoutStoredVaultProps = async (writing: Promise<void>): Promise<void> => {
+const withoutStoredVaultProps = async (writing: Promise<VaultProps>): Promise<VaultProps> => {
   try {
-    await writing
+    return await writing
   } catch (err) {
     if (! isVaultError(err, 'stale_write') || err.meta?.vault_props_stored === undefined) { throw err }
     // Not the VaultDB's message, which sends the reader to a meta this refusal does not carry.
@@ -1971,8 +1997,6 @@ const withoutStoredVaultProps = async (writing: Promise<void>): Promise<void> =>
 /** What a change to the ways in says when storage refuses it as stale. */
 const StaleWayinsMessage = "The vault changed in storage since this device read it -- its ways in were changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. Read the vault again before retrying."
 
-/** The refusal of a first unlock that met gateless vault props another device made: no passphrase is set there to open. */
-const gatelessElsewhereError = () => new VaultError('created_elsewhere', 'A vault was just made for this label on another device, which has not set its passphrase yet. Nothing was created on this device. Set the passphrase on that device, then unlock with it here.')
 // --
 
 // == [Vocabulary]: frozenVaultProps, isNewerCopy, MarkFormat, VaultCall, UntrustedStorageKinds, isCatchingUpKind

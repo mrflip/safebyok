@@ -74,6 +74,35 @@ describe("idbDeviceDB over storage the browser withholds", () => {
   })
 })
 
+/** The shelf `idbDeviceDB` keeps `dbName`'s records on, as idb-keyval opens it. */
+const shelfOf = (dbName: string) => createStore(`${dbName}:device_db`, 'records')
+
+describe("idbDeviceDB, reading a lease it cannot read", () => {
+  it("discards a row that will not read back as a lease, and answers none", async () => {
+    const dbName = TH.freshDbName()
+    const deviceDB = idbDeviceDB({ dbName })
+    await set(Ckeys.lease(TH.scopeOf('u1')), { format: 'safebyok-lease-v1', mangled: true }, shelfOf(dbName))
+    const found = await TH.expectGood(deviceDB.getLease(TH.scopeOf('u1')))
+    expect(found).to.be.null
+    const rows = await inspectIdbDeviceDB({ dbName }).rows()
+    expect(rows).to.deep.equal([])
+  })
+
+  it("never discards a lease written after the unreadable row it found: a putLease made as the read began stands", async () => {
+    const dbName = TH.freshDbName()
+    const deviceDB = idbDeviceDB({ dbName })
+    await set(Ckeys.lease(TH.scopeOf('u1')), { format: 'safebyok-lease-v1', mangled: true }, shelfOf(dbName))
+    const lease = await TH.leaseOf('u1')
+    // The read is made first, so it finds the mangled row; the write is made at once after, and
+    // lands after it: the discard the read follows with must not take the new lease with it.
+    const [found, written] = await Promise.all([deviceDB.getLease(TH.scopeOf('u1')), deviceDB.putLease(lease)])
+    expect(found).to.deep.equal({ ok: true, val: null })
+    expect(written).to.deep.equal({ ok: true, val: lease })
+    const kept = await TH.expectGood(deviceDB.getLease(TH.scopeOf('u1')))
+    expect(kept).to.deep.equal(lease)
+  })
+})
+
 describe("safebyok/idb", () => {
   it("exports the device store, its inspector and the change bell, and no vault store: that is safebyok-indexeddb's", () => {
     expect(Object.keys(Entry)).to.have.members(['idbDeviceDB', 'inspectIdbDeviceDB', 'ChangeBell'])

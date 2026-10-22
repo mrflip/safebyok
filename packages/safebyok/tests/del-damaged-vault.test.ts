@@ -17,7 +17,7 @@ describe("delDamagedVault", () => {
     expect(await world.getLease()).to.not.be.null
     await TH.expectRefusal(world.open(), 'damaged_vault')
     await delDamagedVault(world.optsWith())
-    expect(rowsOf(world, 'u1')).to.deep.equal([])
+    expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault props, and no box').to.deep.equal([u1VaultPropsCkey])
     expect(await world.getLease()).to.be.null
     const fresh = await world.open()
     expect(fresh.getSnapshot().state).to.eq('absent')
@@ -33,7 +33,7 @@ describe("delDamagedVault", () => {
     const err = await TH.expectRefusal(delDamagedVault(world.optsWith()), 'storage_unavailable')
     expect(err.message).to.match(/erasing its mark of this vault/)
     expect(err.cause).to.eq(trouble)
-    expect(rowsOf(world, 'u1')).to.deep.equal([])
+    expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault props, and no box').to.deep.equal([u1VaultPropsCkey])
   })
 
   it("deletes that vault alone: another user's vault, and this device's lease of it, stay", async () => {
@@ -94,7 +94,7 @@ describe("delDamagedVault", () => {
     }
     const err = await TH.expectRefusal(delDamagedVault(world.optsWith({ deviceDB: flakyDevice })), 'storage_unavailable')
     expect((err.cause as Error).message).to.include('busy')
-    expect(rowsOf(world, 'u1')).to.deep.equal([])
+    expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault props, and no box').to.deep.equal([u1VaultPropsCkey])
     expect(await world.getLease()).to.not.be.null
     await delDamagedVault(world.optsWith({ deviceDB: flakyDevice }))
     expect(await world.getLease()).to.be.null
@@ -129,7 +129,7 @@ describe("delDamagedVault", () => {
     expect(verb).not.toHaveBeenCalled()
     await delDamagedVault(world.optsWith({ validators: { userId: longUserId } }))
     expect(verb.mock.calls[0]).to.deep.equal([TH.scopeOf('u1')])
-    expect(rowsOf(world, 'u1')).to.deep.equal([])
+    expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault props, and no box').to.deep.equal([u1VaultPropsCkey])
   })
 
   it("takes the options Vault.make took, and refuses misuse before touching storage", async () => {
@@ -156,6 +156,6 @@ describe("delDamagedVault", () => {
     const vaultProps = JSON.parse(world.dbStore.read(ckey) ?? 'null') as object
     world.dbStore.write(ckey, JSON.stringify({ ...vaultProps, gate_epoch: 'one' }))
     await delDamagedVault(opts)
-    expect(world.dbStore.read(ckey)).to.be.null
+    expect(JSON.parse(world.dbStore.read(ckey) ?? 'null')).to.include({ format: 'safebyok-tombstone-v1', vault_epoch: 2 })
   })
 })

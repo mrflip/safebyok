@@ -66,7 +66,7 @@ describe("the ctx builders' output, byte for byte", () => {
     })
     await vault.unlock('pw')
     await vault.putBox('anthropic', 'sk-fake')
-    const vaultProps = (await TH.expectingGood(vaultDB).getVaultProps(scope))!
+    const vaultProps = (await TH.propsOf(vaultDB, scope))!
     const box = (await TH.expectingGood(vaultDB).getBox(scope, 'anthropic'))!
     const lease = (await TH.expectGood(deviceDB.getLease(scope)))!
     const scopeText = `"acme","u1","main","${vaultProps.vault_tok}"`

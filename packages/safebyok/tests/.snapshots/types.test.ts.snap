@@ -261,6 +261,47 @@ exports[`Stored record formats > safebyok-mark-v5 1`] = `
 }
 `;
 
+exports[`Stored record formats > safebyok-tombstone-v1 1`] = `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "applabel": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "type": "string",
+    },
+    "format": {
+      "const": "safebyok-tombstone-v1",
+      "type": "string",
+    },
+    "user_id": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "type": "string",
+    },
+    "vault_epoch": {
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991,
+      "type": "integer",
+    },
+    "vaultlabel": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "type": "string",
+    },
+  },
+  "required": [
+    "format",
+    "applabel",
+    "user_id",
+    "vaultlabel",
+    "vault_epoch",
+  ],
+  "type": "object",
+}
+`;
+
 exports[`Stored record formats > safebyok-vault-v6 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -405,6 +446,11 @@ exports[`Stored record formats > safebyok-vault-v6 1`] = `
           "minLength": 1,
           "type": "string",
         },
+        "vault_epoch": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
         "vault_tok": {
           "minLength": 1,
           "type": "string",
@@ -421,6 +467,7 @@ exports[`Stored record formats > safebyok-vault-v6 1`] = `
         "user_id",
         "vaultlabel",
         "vault_tok",
+        "vault_epoch",
         "gate_epoch",
         "passphrase",
         "passkey",
@@ -460,6 +507,11 @@ exports[`Stored record formats > safebyok-vault-v6 1`] = `
           "minLength": 1,
           "type": "string",
         },
+        "vault_epoch": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
         "vault_tok": {
           "minLength": 1,
           "type": "string",
@@ -476,6 +528,7 @@ exports[`Stored record formats > safebyok-vault-v6 1`] = `
         "user_id",
         "vaultlabel",
         "vault_tok",
+        "vault_epoch",
         "gate_epoch",
         "passphrase",
         "passkey",

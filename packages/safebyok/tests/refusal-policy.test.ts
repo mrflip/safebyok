@@ -34,23 +34,21 @@ describe("RefusalPolicy.heed", () => {
   it("answers each verb as the VaultDB does, passing on every argument", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
     const heeded = RefusalPolicy.heed(vaultDB, () => Promise.resolve())
-    const getVaultProps = vi.spyOn(vaultDB, 'getVaultProps')
-    const listBoxes = vi.spyOn(vaultDB, 'listBoxes')
-    await heeded.ensureVaultProps(TH.vaultPropsOf('u1'))
-    expect(await heeded.getVaultProps(scope)).to.deep.equal(TH.vaultPropsOf('u1'))
-    expect(getVaultProps).toHaveBeenCalledWith(scope)
-    expect(await heeded.listBoxes(scope)).to.deep.equal([])
-    expect(listBoxes).toHaveBeenCalledWith(scope)
+    const getVault = vi.spyOn(vaultDB, 'getVault')
+    expect(await heeded.getVault(scope)).to.be.null
+    expect(getVault).toHaveBeenCalledWith(scope)
+    const ensured = await heeded.ensureVault(TH.gatelessOf('u1'))
+    expect(ensured).to.deep.equal({ vaultProps: TH.gatelessOf('u1'), boxes: [] })
+    expect(await heeded.getVault(scope)).to.deep.equal(ensured)
   })
 
   /** Each heeded verb, and the arguments a vault hands it. */
   const VerbArgsCases = [
-    ['getVaultProps',    [scope]],
-    ['ensureVaultProps', [TH.vaultPropsOf('u1')]],
+    ['getVault',    [scope]],
+    ['ensureVault', [TH.gatelessOf('u1')]],
     ['putVaultProps',    [TH.vaultPropsOf('u1'), TH.thisVault]],
     ['getBox',           [scope, 'anthropic']],
-    ['listBoxes',        [scope]],
-    ['putBox',           [scope, 'anthropic', TH.thisVault]],
+    ['putBox',           [scope, TH.noBoxYet, TH.boxOf('anthropic', 'one')]],
     ['delBox',           [scope, 'anthropic', TH.thisVault]],
     ['delVault',         [scope, TH.thisVault]],
   ] as const
@@ -58,7 +56,7 @@ describe("RefusalPolicy.heed", () => {
   for (const [verb, args] of VerbArgsCases) {
     it(`passes ${verb} every argument it is given`, async () => {
       const vaultDB = localVaultDB({ store: memoryStore() })
-      const spied = vi.spyOn(vaultDB, verb).mockResolvedValue(good(undefined))
+      const spied = vi.spyOn(vaultDB, verb).mockResolvedValue(good(undefined) as never)
       const heeded = RefusalPolicy.heed(vaultDB, () => Promise.resolve())
       await (heeded[verb] as (...given: readonly unknown[]) => Promise<unknown>)(...args)
       expect(spied).toHaveBeenCalledWith(...args)
@@ -89,9 +87,9 @@ describe("RefusalPolicy.heed", () => {
   it("rejects with the refusal even when onRefusal throws", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
     const refusal = signedOut()
-    vi.spyOn(vaultDB, 'getVaultProps').mockResolvedValueOnce(bad(refusal))
+    vi.spyOn(vaultDB, 'getVault').mockResolvedValueOnce(bad(refusal))
     const heeded = RefusalPolicy.heed(vaultDB, () => Promise.reject(new Error('the device store is broken')))
-    expect(await TH.expectRefusal(heeded.getVaultProps(scope), 'identity_revoked')).to.eq(refusal)
+    expect(await TH.expectRefusal(heeded.getVault(scope), 'identity_revoked')).to.eq(refusal)
   })
 
   it("passes subscribe through, its unsubscribe the VaultDB's own", () => {

@@ -246,7 +246,7 @@ describe("the logger", () => {
     const strengthChecker = Object.assign(() => StrongVerdict, { load: () => Promise.reject(lost) })
     const vault = Vault.make(world.optsWith({ strengthChecker }))
     await TH.expectRefusal(vault.hello(), 'unexpected_error')
-    await TH.expectingGood(world.vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
+    await TH.ensureGated(world.vaultDB, TH.vaultPropsOf('u1'))
     await TH.wakeupAtNextTick()
     expect(world.logged.map((heard) => [heard.level, heard.story])).to.deep.equal([['warn', { call: 'hello' }]])
     expect(world.logged[0]?.message).to.match(/^The strengthChecker's load\(\) failed/)
@@ -259,7 +259,7 @@ describe("the logger", () => {
     const vaultDB = localVaultDB({ store: world.dbStore, logger: own.logger })
     await world.open({ vaultDB })
     vaultDB.subscribe(TH.scopeOf('u1'), () => { throw new Error('a listener of the host that throws') })
-    await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
+    await TH.expectingGood(vaultDB).ensureVault(TH.gatelessOf('u1'))
     expect(own.calls).to.have.lengthOf(1)
     expect(world.logged).to.have.lengthOf(0)
   })
@@ -270,7 +270,7 @@ describe("the logger", () => {
     const vaultDB = localVaultDB({ store: world.dbStore })
     await world.open({ vaultDB })
     vaultDB.subscribe(TH.scopeOf('u1'), () => { throw new Error('a listener of the host that throws') })
-    await TH.expectingGood(vaultDB).ensureVaultProps(TH.vaultPropsOf('u1'))
+    await TH.expectingGood(vaultDB).ensureVault(TH.gatelessOf('u1'))
     expect(consoleErrors).toHaveBeenCalledOnce()
     expect(world.logged).to.have.lengthOf(0)
     consoleErrors.mockRestore()
@@ -300,7 +300,7 @@ describe("the logger", () => {
   it("refuses a vaultDB whose logger is not one, before reading storage, when the host passes the vault none", async () => {
     const world = makeWorld()
     const vaultDB = localVaultDB({ store: world.dbStore })
-    const getVaultProps = vi.spyOn(vaultDB, 'getVaultProps')
+    const getVaultProps = vi.spyOn(vaultDB, 'getVault')
     Object.defineProperty(vaultDB, 'logger', { value: { log: () => undefined } })
     const err = await TH.expectRefusal(world.open({ vaultDB, logger: undefined }), 'bad_option')
     expect(err.message).to.match(/log, warn and error functions/)
@@ -358,7 +358,7 @@ describe("the logger", () => {
 
   it("refuses a logger that is not one, before reading storage", async () => {
     const world = makeWorld()
-    const getVaultProps = vi.spyOn(world.vaultDB, 'getVaultProps')
+    const getVaultProps = vi.spyOn(world.vaultDB, 'getVault')
     for (const nonsense of [{}, { log: () => undefined, warn: () => undefined }, 'console']) {
       const err = await TH.expectRefusal(world.open({ logger: nonsense as unknown as MakeVaultOpts['logger'] }), 'bad_option')
       expect(err.message).to.match(/log, warn and error functions/)
@@ -447,7 +447,7 @@ describe("the logger", () => {
     device.spoilRow(() => 'not a record')
     expect(await world.stateOnOpen({ logger, deviceDB: device.deviceDB, clock })).to.eq('locked')
     // a hello refused, which make's own hello tells the logger of
-    vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(bad(new VaultError('not_permitted', 'Sign in to reach this vault.')))
+    vi.spyOn(world.vaultDB, 'getVault').mockResolvedValueOnce(bad(new VaultError('not_permitted', 'Sign in to reach this vault.')))
     await TH.expectRefusal(world.open({ logger }), 'not_permitted')
   })
 
@@ -468,7 +468,7 @@ describe("the logger", () => {
     reopened.close()
     world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...storedVaultPropsOf(world), registered_at: whisper }))
     await TH.wakeupAtNextTick()
-    vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(bad(new VaultError('not_permitted', 'Sign in to reach this vault.')))
+    vi.spyOn(world.vaultDB, 'getVault').mockResolvedValueOnce(bad(new VaultError('not_permitted', 'Sign in to reach this vault.')))
     await TH.expectRefusal(world.open(), 'not_permitted')
     expect(world.logged.map((heard) => heard.level)).to.deep.equal(['warn', 'warn', 'warn'])
     expect((world.logged[0]?.err?.cause as Error).message).to.match(/disk full/)
@@ -486,10 +486,10 @@ describe("the logger", () => {
 
 describe("when storage says the user is no longer signed in", () => {
   /** Each vault call that reaches storage, the storage verb it reaches, and the call. */
-  const RevokedCallCases: readonly (readonly [string, 'getVaultProps' | 'getBox' | 'putBox' | 'putVaultProps', (vault: Vault) => Promise<unknown>])[] = [
+  const RevokedCallCases: readonly (readonly [string, 'getVault' | 'getBox' | 'putBox' | 'putVaultProps', (vault: Vault) => Promise<unknown>])[] = [
     ['getWhisper()',       'getBox',        (vault) => vault.getWhisper('anthropic')],
     ['putBox()',           'putBox',        (vault) => vault.putBox('openai', 'sk-fake-two')],
-    ['unlock()',           'getVaultProps', (vault) => vault.unlock('pw one')],
+    ['unlock()',           'getVault', (vault) => vault.unlock('pw one')],
     ['putWayin()', 'putVaultProps', (vault) => vault.putWayin('pw one', 'pw two')],
   ]
 
@@ -514,7 +514,7 @@ describe("when storage says the user is no longer signed in", () => {
   it("locks when a background refresh meets it, and tells the logger, having nobody to throw to", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw one')
-    vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValue(bad(signedOut()))
+    vi.spyOn(world.vaultDB, 'getVault').mockResolvedValue(bad(signedOut()))
     // Any write rings the store's change bell, and the vault looks.
     world.dbStore.write('elsewhere', '{}')
     await vi.waitFor(() => { expect(vault.getSnapshot().state).to.eq('locked') })
@@ -541,7 +541,7 @@ describe("when storage says the user is no longer signed in", () => {
     const first = await world.openUnlocked('pw one')
     first.close()
     expect(await world.getLease()).to.not.be.null
-    vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(bad(signedOut()))
+    vi.spyOn(world.vaultDB, 'getVault').mockResolvedValueOnce(bad(signedOut()))
     await TH.expectRefusal(world.open(), 'identity_revoked')
     expect(await world.getLease()).to.be.null
     expect(await world.stateOnOpen()).to.eq('locked')
@@ -600,10 +600,10 @@ describe("the device mark", () => {
   it("is started under the id the first way in carries, though a refresh the vault's making set off gets there first", async () => {
     const world = makeWorld()
     const vault = await world.open()
-    const ensureVaultProps = world.vaultDB.ensureVaultProps.bind(world.vaultDB)
+    const ensureVault = world.vaultDB.ensureVault.bind(world.vaultDB)
     // The write rings this handle's own watch, whose refresh runs to its end before the unlock goes on.
-    vi.spyOn(world.vaultDB, 'ensureVaultProps').mockImplementationOnce(async (...args) => {
-      const settled = await ensureVaultProps(...args)
+    vi.spyOn(world.vaultDB, 'ensureVault').mockImplementationOnce(async (...args) => {
+      const settled = await ensureVault(...args)
       await TH.wakeupAtNextTick()
       return settled
     })
@@ -753,10 +753,10 @@ describe("vault props rolled back", () => {
     const here = await world.openUnlocked('pw')
     const slowVaultDB = world.deafVaultDB()
     const there = await world.open({ vaultDB: slowVaultDB })
-    const getVaultProps = slowVaultDB.getVaultProps.bind(slowVaultDB)
+    const getVault = slowVaultDB.getVault.bind(slowVaultDB)
     // There's next read is served at epoch 1, and handed back only once here's change has landed.
-    vi.spyOn(slowVaultDB, 'getVaultProps').mockImplementationOnce(async (...args) => {
-      const served = await getVaultProps(...args)
+    vi.spyOn(slowVaultDB, 'getVault').mockImplementationOnce(async (...args) => {
+      const served = await getVault(...args)
       await addLaptopPasskey(here)
       return served
     })
@@ -770,12 +770,12 @@ describe("vault props rolled back", () => {
     const there = await world.open()
     const slowVaultDB = world.deafVaultDB()
     const late = await world.open({ vaultDB: slowVaultDB })
-    const ensureVaultProps = slowVaultDB.ensureVaultProps.bind(slowVaultDB)
+    const ensureVault = slowVaultDB.ensureVault.bind(slowVaultDB)
     // There makes the vault first, so late's write hands back there's vault props at epoch 1, and only
     // after that does there change it, raising the mark this device shares to epoch 2.
-    vi.spyOn(slowVaultDB, 'ensureVaultProps').mockImplementationOnce(async (...args) => {
+    vi.spyOn(slowVaultDB, 'ensureVault').mockImplementationOnce(async (...args) => {
       await there.unlock('pw')
-      const settled = await ensureVaultProps(...args)
+      const settled = await ensureVault(...args)
       await there.putWayin('pw', 'pw two')
       return settled
     })
@@ -918,7 +918,7 @@ describe("older stored formats", () => {
       world.dbStore.write(u1VaultPropsCkey, JSON.stringify({ ...storedVaultPropsOf(world), ...older }))
       await TH.expectRefusal(world.open(), 'damaged_vault')
       await delDamagedVault(world.optsWith())
-      expect(rowsOf(world, 'u1')).to.deep.equal([])
+      expect(rowsOf(world, 'u1'), 'a tombstone in the place of the vault props').to.deep.equal([u1VaultPropsCkey])
     })
   }
 })

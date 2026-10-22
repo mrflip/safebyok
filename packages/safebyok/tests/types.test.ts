@@ -2,7 +2,7 @@ import { omit } from 'es-toolkit'
 import { describe, expect, it } from 'vitest'
 import * as Z from 'zod/mini'
 import { BoxRecord } from '../src/box'
-import { DeviceMark, EpochMillis, FarFuture, FarPast, ForeverMillis, LeaseRecord, BoxSummary, Sidecar, GatedVaultProps, GatelessVaultProps, VaultProps, VaultScope, Whisper, isGated } from '../src/types'
+import { DeviceMark, Tombstone, EpochMillis, FarFuture, FarPast, ForeverMillis, LeaseRecord, BoxSummary, Sidecar, GatedVaultProps, GatelessVaultProps, VaultProps, VaultScope, Whisper, isGated } from '../src/types'
 import * as TH from './test-helpers'
 
 const WhisperCases = [
@@ -334,6 +334,7 @@ const StoredRecords = [
   [BoxRecord.shape.format, BoxRecord],
   [LeaseRecord.shape.format, LeaseRecord],
   [DeviceMark.shape.format, DeviceMark],
+  [Tombstone.shape.format, Tombstone],
 ] as const
 
 describe("Stored record formats", () => {

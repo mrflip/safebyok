@@ -176,11 +176,10 @@ export const checkMakeVaultOpts = (opts: object) => {
 
 /** The public verbs a VaultDB must carry, beside being an instance of the `VaultDB` base class. Checked only: Vault.make keeps the adapter. */
 const vaultDBShape = Z.object({
-  getVaultProps:    Z.custom(isFunction),
-  ensureVaultProps: Z.custom(isFunction),
+  getVault:         Z.custom(isFunction),
+  ensureVault:      Z.custom(isFunction),
   putVaultProps:    Z.custom(isFunction),
   getBox:           Z.custom(isFunction),
-  listBoxes:        Z.custom(isFunction),
   putBox:           Z.custom(isFunction),
   delBox:           Z.custom(isFunction),
   delVault:         Z.custom(isFunction),

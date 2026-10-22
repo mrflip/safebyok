@@ -21,7 +21,7 @@ export const decide = (refusal: unknown): RefusalResponse => (
 )
 
 /** The VaultDB verbs a vault calls, each resolving to an Outcome. */
-type HeededVerb = 'getVaultProps' | 'ensureVaultProps' | 'putVaultProps' | 'getBox' | 'listBoxes' | 'putBox' | 'delBox' | 'delVault'
+type HeededVerb = 'getVault' | 'ensureVault' | 'putVaultProps' | 'getBox' | 'putBox' | 'delBox' | 'delVault'
 
 /** A VaultDB verb as {@link heed} hands it on: resolving its outcome's `val`, rejecting with its `err`. */
 type Thrown<VerbT> = VerbT extends (...args: infer ArgsT) => Promise<Outcome<infer ValT>> ? (...args: ArgsT) => Promise<ValT> : never
@@ -47,11 +47,10 @@ export const heed = (vaultDB: VaultDB, onRefusal: (refusal: VaultError) => Promi
     throw err
   }
   return {
-    getVaultProps:    (...args) => heeding(() => vaultDB.getVaultProps(...args)),
-    ensureVaultProps: (...args) => heeding(() => vaultDB.ensureVaultProps(...args)),
+    getVault:         (...args) => heeding(() => vaultDB.getVault(...args)),
+    ensureVault:      (...args) => heeding(() => vaultDB.ensureVault(...args)),
     putVaultProps:    (...args) => heeding(() => vaultDB.putVaultProps(...args)),
     getBox:           (...args) => heeding(() => vaultDB.getBox(...args)),
-    listBoxes:        (...args) => heeding(() => vaultDB.listBoxes(...args)),
     putBox:           (...args) => heeding(() => vaultDB.putBox(...args)),
     delBox:           (...args) => heeding(() => vaultDB.delBox(...args)),
     delVault:         (...args) => heeding(() => vaultDB.delVault(...args)),

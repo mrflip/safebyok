@@ -59,18 +59,87 @@ describe("Expectations.vaultMeets", () => {
   })
 })
 
-describe("Expectations.vaultTokMeets", () => {
-  it("holds for any standing vault props that name the vault, however damaged the rest of them", () => {
-    expect(Expectations.vaultTokMeets(VaultProps, { vault_tok: 'vault-tok-u1' })).to.be.true
-    expect(Expectations.vaultTokMeets({ vault_tok: 'vault-tok-u1' }, { vault_tok: 'vault-tok-u1' })).to.be.true
-    expect(Expectations.vaultTokMeets({ vault_tok: 'vault-tok-u1', gate_epoch: '1' }, { vault_tok: 'vault-tok-u1' })).to.be.true
+const Tombstone = { format: 'safebyok-tombstone-v1', ...TH.scopeOf('u1'), vault_epoch: 2 } as const
+const scope = TH.scopeOf('u1')
+
+describe("Expectations.isTombstone", () => {
+  it("holds for a row of the tombstone's format, however damaged the rest of it, and for no vault props", () => {
+    expect(Expectations.isTombstone(Tombstone)).to.be.true
+    expect(Expectations.isTombstone({ format: 'safebyok-tombstone-v1' })).to.be.true
+    expect(Expectations.isTombstone(VaultProps)).to.be.false
+    expect(Expectations.isTombstone(null)).to.be.false
+    expect(Expectations.isTombstone('safebyok-tombstone-v1')).to.be.false
+  })
+})
+
+describe("Expectations, over a tombstone", () => {
+  it("fails every comparison a write makes: it holds no vault_tok, so a stale writer never finds the vault standing", () => {
+    expect(Expectations.vaultPropsMeets(Tombstone, { vault_tok: 'vault-tok-u1', gate_epoch: 1 })).to.be.false
+    expect(Expectations.vaultMeets(Tombstone, { vault_tok: 'vault-tok-u1' })).to.be.false
+    expect(Expectations.boxRefusalOf(Tombstone, undefined, { vault_tok: 'vault-tok-u1', revision_tok: null })?.refusalkind).to.eq('vault_mismatch')
   })
 
-  it("fails the props of another vault, props that name none, and none at all", () => {
-    expect(Expectations.vaultTokMeets(VaultProps, { vault_tok: 'reborn' })).to.be.false
-    expect(Expectations.vaultTokMeets({ gate_epoch: 1 }, { vault_tok: 'vault-tok-u1' })).to.be.false
-    expect(Expectations.vaultTokMeets(undefined, { vault_tok: 'vault-tok-u1' })).to.be.false
-    expect(Expectations.vaultTokMeets('not vault props', { vault_tok: 'vault-tok-u1' })).to.be.false
+  it("is no vault props to a refused update, which names none standing", () => {
+    expect(Expectations.vaultPropsRefusalOf(Tombstone, { vault_tok: 'vault-tok-u1', gate_epoch: 1 })?.meta).to.deep.equal({ vault_props_stored: null })
+  })
+})
+
+describe("Expectations.vaultPropsPutOf", () => {
+  it("stores the vault props with the counter the standing ones show plus one, whatever the writer sent, as its example shows", () => {
+    const next = TH.vaultPropsOf('u1', { gate_epoch: 2, vault_epoch: 99 })
+    expect(Expectations.vaultPropsPutOf(next, TH.vaultPropsOf('u1', { vault_epoch: 4 }))).to.deep.equal({ ...next, vault_epoch: 5 })
+  })
+
+  it("counts from zero over vault props that show no counter, damaged ones", () => {
+    expect(Expectations.vaultPropsPutOf(TH.vaultPropsOf('u1'), { vault_tok: 'vault-tok-u1', vault_epoch: 'x' }).vault_epoch).to.eq(1)
+  })
+})
+
+describe("Expectations.newLifeOf", () => {
+  const draft = TH.gatelessOf('u1', { vault_tok: 'vault-tok-fresh' })
+
+  it("is the draft where nothing stands", () => {
+    expect(Expectations.newLifeOf(draft, null)).to.eq(draft)
+    expect(Expectations.newLifeOf(draft, undefined)).to.eq(draft)
+  })
+
+  it("is the draft with the counter carried on from a tombstone", () => {
+    expect(Expectations.newLifeOf(draft, Tombstone)).to.deep.equal({ ...draft, vault_epoch: 2 })
+  })
+
+  it("is nothing where a vault stands, gated or not, damaged or not: it stores nothing", () => {
+    expect(Expectations.newLifeOf(draft, VaultProps)).to.be.null
+    expect(Expectations.newLifeOf(draft, TH.gatelessOf('u1'))).to.be.null
+    expect(Expectations.newLifeOf(draft, 'not vault props')).to.be.null
+  })
+})
+
+describe("Expectations.tombstoneOf", () => {
+  const gate1 = { vault_tok: 'vault-tok-u1', gate_epoch: 1 }
+
+  it("leaves a tombstone of the vault that stands at the gate expected: the scope and the counter plus one", () => {
+    expect(Expectations.tombstoneOf(VaultProps, scope, gate1)).to.deep.equal({ ...Tombstone, vault_epoch: 2 })
+    expect(Expectations.tombstoneOf(TH.vaultPropsOf('u1', { gate_epoch: 3, vault_epoch: 7 }), scope, { vault_tok: 'vault-tok-u1', gate_epoch: 3 })).to.deep.include({ vault_epoch: 8 })
+  })
+
+  it("misses a vault since made anew, none, props that name no vault, and a gate since changed", () => {
+    expect(Expectations.tombstoneOf(VaultProps, scope, { vault_tok: 'reborn', gate_epoch: 1 })).to.be.null
+    expect(Expectations.tombstoneOf(VaultProps, scope, { vault_tok: 'vault-tok-u1', gate_epoch: 0 })).to.be.null
+    expect(Expectations.tombstoneOf(TH.vaultPropsOf('u1', { gate_epoch: 2 }), scope, gate1)).to.be.null
+    expect(Expectations.tombstoneOf(undefined, scope, gate1)).to.be.null
+    expect(Expectations.tombstoneOf(null, scope, gate1)).to.be.null
+    expect(Expectations.tombstoneOf({ gate_epoch: 1 }, scope, gate1)).to.be.null
+  })
+
+  it("expects the vault_tok alone for a null gate_epoch, however damaged the rest of the vault props, and counts from zero", () => {
+    const damaged = { vault_tok: 'vault-tok-u1', gate_epoch: 'one', vault_epoch: 'x' }
+    expect(Expectations.tombstoneOf(damaged, scope, { vault_tok: 'vault-tok-u1', gate_epoch: null })).to.deep.equal({ ...Tombstone, vault_epoch: 1 })
+    expect(Expectations.tombstoneOf(damaged, scope, { vault_tok: 'reborn', gate_epoch: null })).to.be.null
+  })
+
+  it("misses a tombstone, for any expectation: a vault already deleted is refused as stale, as when nothing stands", () => {
+    expect(Expectations.tombstoneOf(Tombstone, scope, gate1)).to.be.null
+    expect(Expectations.tombstoneOf(Tombstone, scope, { vault_tok: 'vault-tok-u1', gate_epoch: null })).to.be.null
   })
 })
 

@@ -268,6 +268,11 @@ const VaultPropsHead = {
   vaultlabel:          NameFloor,
   /** A random token minted when the vault is made, never changed, and bound into every encryption. */
   vault_tok:           Z.string().check(Z.minLength(1)),
+  /** A counter the store bumps on every write of the gate and on the vault's deletion, and carries on into a new life of the scope.
+   * It only goes up; a device that has seen a higher one than storage shows knows storage was rolled back.
+   * No box write moves it, and a writer's own value is ignored: the store decides.
+   */
+  vault_epoch:         Z.int().check(Z.nonnegative()),
 }
 
 /** The vault props of a vault whose gate is made: a `gate_epoch` of 1 or more, its passphrase wayin, and its passkey or null.
@@ -290,7 +295,7 @@ export type GatedVaultProps = Z.infer<typeof GatedVaultProps>
  * A vault is first stored so, by `VaultDB.ensureVault`. Its first gate is written over it at
  * `gate_epoch` 1, expecting 0.
  *
- * @example { format: 'safebyok-vault-v6', ...scope, vault_tok, registered_at, gate_epoch: 0, passphrase: null, passkey: null }
+ * @example { format: 'safebyok-vault-v6', ...scope, vault_tok, vault_epoch: 0, registered_at, gate_epoch: 0, passphrase: null, passkey: null }
  */
 export const GatelessVaultProps = Z.object({
   ...VaultPropsHead,
@@ -300,6 +305,25 @@ export const GatelessVaultProps = Z.object({
   registered_at:       EpochMillis,
 })
 export type GatelessVaultProps = Z.infer<typeof GatelessVaultProps>
+
+/** The `format` a {@link Tombstone} carries, which tells it from vault props stored in the same place. */
+export const TombstoneFormat = 'safebyok-tombstone-v1'
+
+/** What a deleted vault leaves in its scope: its counter, which the next life of the scope carries on.
+ * `vault_epoch` is the deleted vault's plus one. Every write refuses over a tombstone as it does
+ * over no vault, a deletion included: it holds no `vault_tok` for an expectation to name. The next
+ * `ensureVault` of the scope replaces it with a new life.
+ *
+ * @example { format: 'safebyok-tombstone-v1', ...scope, vault_epoch: 4 }
+ */
+export const Tombstone = Z.object({
+  format:              Z.literal(TombstoneFormat),
+  applabel:            NameFloor,
+  user_id:             NameFloor,
+  vaultlabel:          NameFloor,
+  vault_epoch:         Z.int().check(Z.positive()),
+})
+export type Tombstone = Z.infer<typeof Tombstone>
 
 /** The one record per vault that every device syncs: its scope, its `vault_tok`, and its wayins, each wrapping the one vaultKey.
  * None of it opens without a proof. It is {@link GatedVaultProps} once the vault has a gate, and
