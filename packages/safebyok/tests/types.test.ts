@@ -1,7 +1,8 @@
+import { omit } from 'es-toolkit'
 import { describe, expect, it } from 'vitest'
 import * as Z from 'zod/mini'
 import { BoxRecord } from '../src/box'
-import { DeviceMark, EpochMillis, FarFuture, FarPast, ForeverMillis, LeaseRecord, BoxSummary, Sidecar, VaultProps, VaultScope, Whisper } from '../src/types'
+import { DeviceMark, EpochMillis, FarFuture, FarPast, ForeverMillis, LeaseRecord, BoxSummary, Sidecar, GatedVaultProps, GatelessVaultProps, VaultProps, VaultScope, Whisper, isGated } from '../src/types'
 import * as TH from './test-helpers'
 
 const WhisperCases = [
@@ -127,6 +128,36 @@ describe("VaultProps", () => {
   for (const [candidate, expected, blurb] of VaultPropsCases) {
     it(blurb, () => { expect(VaultProps.safeParse(candidate).success).to.eq(expected) })
   }
+})
+
+const GatelessCases = [
+  // regular usage:
+  [TH.gatelessOf('u1'),                                                     true,   'gateless vault props: gate_epoch 0, and no way in'],
+  [TH.vaultPropsOf('u1'),                                                   true,   'gated vault props: gate_epoch 1, and a passphrase'],
+  // refused, as a damaged record:
+  [{ ...TH.gatelessOf('u1'), gate_epoch: 1 },                               false,  'a gated epoch with no passphrase: a gate that lost its way in'],
+  [{ ...TH.vaultPropsOf('u1'), gate_epoch: 0 },                             false,  'a passphrase at gate_epoch 0'],
+  [{ ...TH.gatelessOf('u1'), passkey: TH.passkeyWayinOf('laptop') },        false,  'a passkey with no gate'],
+  [{ ...TH.gatelessOf('u1'), gate_epoch: -1 },                              false,  'a gate_epoch below 0'],
+  [omit(TH.gatelessOf('u1'), ['passphrase']),                               false,  'gateless vault props that leave out the passphrase slot, rather than saying null'],
+] as const
+
+describe("VaultProps, gated or gateless", () => {
+  for (const [candidate, expected, blurb] of GatelessCases) {
+    it(blurb, () => { expect(VaultProps.safeParse(candidate).success).to.eq(expected) })
+  }
+
+  it("tells the two shapes apart: gateless props are no GatedVaultProps, and gated ones no GatelessVaultProps", () => {
+    expect(GatedVaultProps.safeParse(TH.gatelessOf('u1')).success).to.be.false
+    expect(GatelessVaultProps.safeParse(TH.vaultPropsOf('u1')).success).to.be.false
+  })
+})
+
+describe("isGated", () => {
+  it("is true for gated vault props and false for gateless ones, as its example tells them apart", () => {
+    expect(isGated(TH.vaultPropsOf('u1'))).to.be.true
+    expect(isGated(TH.gatelessOf('u1'))).to.be.false
+  })
 })
 
 const SidecarCases = [
@@ -297,11 +328,17 @@ describe("DeviceMark", () => {
 // obsolete: never update the snapshot of a format that stands. A refinement (a `Z.refine`, such
 // as the floor's character rules) renders as nothing, so this sees fields, types, optionality and
 // the ranges a check states, not every rule.
-const StoredRecords = [VaultProps, BoxRecord, LeaseRecord, DeviceMark] as const
+// Each schema beside its format: the vault props are a union of two shapes under one format.
+const StoredRecords = [
+  [GatedVaultProps.shape.format, VaultProps],
+  [BoxRecord.shape.format, BoxRecord],
+  [LeaseRecord.shape.format, LeaseRecord],
+  [DeviceMark.shape.format, DeviceMark],
+] as const
 
 describe("Stored record formats", () => {
-  for (const schema of StoredRecords) {
-    const format = schema.shape.format.def.values.join(' | ')
+  for (const [formatSchema, schema] of StoredRecords) {
+    const format = formatSchema.def.values.join(' | ')
     it(format, () => {
       const rendered = Z.toJSONSchema(schema, { unrepresentable: 'any' })
       expect(rendered, `The ${format} record's schema is not the one on record: if its shape changed, bump format, then write the new format's snapshot (vitest -u)`).toMatchSnapshot()

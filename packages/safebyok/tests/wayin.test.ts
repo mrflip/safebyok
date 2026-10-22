@@ -4,7 +4,7 @@ import { cipherCtx, deriveWrappingKey, fromB64, makeVaultKey, toB64, unwrapKeyUn
 import type { KeyDeriver } from '../src/key-deriver'
 import { valOf } from '../src/outcome'
 import { PasskeyProof, PassphraseProof, Proof } from '../src/proof'
-import { VaultProps, type PasskeyAnswer, type PasskeyWayinRecord, type PassphraseWayinRecord, type VaultScope } from '../src/types'
+import { GatedVaultProps, VaultProps, type PasskeyAnswer, type PasskeyWayinRecord, type PassphraseWayinRecord, type VaultScope } from '../src/types'
 import { PasskeyWayin, PassphraseWayin, Wayin, type WayinStamp } from '../src/wayin'
 import * as TH from './test-helpers'
 
@@ -44,8 +44,8 @@ const sealedPasskey = async (answer: PasskeyAnswer, vaultKey: CryptoKey): Promis
 }
 
 /** Vault props of `passphrase` and `passkey`, validated as storage would read them back. */
-const vaultPropsWith = (passphrase: PassphraseWayinRecord, passkey: PasskeyWayinRecord | null = null): VaultProps => (
-  VaultProps.parse(TH.vaultPropsOf('u1', { passphrase, passkey }))
+const vaultPropsWith = (passphrase: PassphraseWayinRecord, passkey: PasskeyWayinRecord | null = null): GatedVaultProps => (
+  GatedVaultProps.parse(TH.vaultPropsOf('u1', { passphrase, passkey }))
 )
 
 /**

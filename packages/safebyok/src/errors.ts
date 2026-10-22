@@ -1,5 +1,5 @@
 import type { BoxRecord } from './box'
-import type { Capacity, DamagedBox, WayinSummary } from './types'
+import type { Capacity, DamagedBox, VaultProps, WayinSummary } from './types'
 
 /** Every refusalkind a safebyok call refuses with, in any safebyok package: storage adapters refuse with these same strings.
  * Each kind belongs to one family ({@link RefusalFamilyForKind}), told apart by who handles it:
@@ -170,6 +170,11 @@ export type RefusalMeta = {
    * nothing stands there.
    */
   box_stored?:   BoxRecord | DamagedBox | null
+  /** `stale_write` from an update of the vault props: the vault props standing, read in the step that refused, or null when none stand.
+   * They are the winner's whole record, checked as a read checks one, so the caller can take them
+   * up with no second read.
+   */
+  vault_props_stored?: VaultProps | null
   /** `vault_full` from storage: how full the vault is, read in the step that refused the write.
    * Always there on storage's own `vault_full`. Never on the vault's, which refuses from
    * `vault.capacity` before storage is asked.

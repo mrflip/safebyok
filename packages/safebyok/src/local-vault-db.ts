@@ -1,11 +1,11 @@
 import * as Z from 'zod/mini'
 import { BoxRecord } from './box'
-import { VaultScope, VaultProps } from './types'
+import type { GatelessVaultProps, VaultScope, VaultProps } from './types'
 import { VaultError } from './errors'
 import type { StringStore } from './string-store'
 import * as Ckeys from './ckeys'
 import * as Expectations from './expectations'
-import { type VaultDBOpts, VaultDB, type VaultPropsExpectation, type StoredBox, type BoxExpectation, type BoxDelExpectation, type VaultDelExpectation } from './vault-db'
+import { type VaultDBOpts, VaultDB, type VaultPropsExpectation, type StoredBox, type StoredVault, type BoxExpectation, type BoxDelExpectation, type VaultDelExpectation } from './vault-db'
 
 /** `fn`'s result (or failure) as a promise: a sync throw becomes a rejection, never an escape. */
 const soon = async <ValT>(fn: () => ValT | Promise<ValT>): Promise<ValT> => await fn()
@@ -38,7 +38,7 @@ export type LocalVaultDBOpts = VaultDBOpts & {
  *
  * @example
  *   const vaultDB = localVaultDB({ store: memoryStore() })
- *   await vaultDB.getVaultProps({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // { ok: true, val: null }
+ *   await vaultDB.getVault({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })  // { ok: true, val: null }
  * @example
  *   const vaultDB = localVaultDB({ store: domStore(localStorage, 'acme:db:'), logger })
  */
@@ -82,7 +82,20 @@ class StringStoreVaultDB extends VaultDB {
 
   // Work is deferred into the promise even though the store is synchronous: a storage fault must
   // reject the returned promise, never throw before the caller has one in hand. And each write
-  // checks and saves in one synchronous step, so nothing else in this tab runs in between.
+  // checks and saves in one synchronous step, so nothing else in this tab runs in between; each
+  // read of a vault reads its props and its boxes in one such step.
+  protected doGetVault(scope: VaultScope): Promise<StoredVault> {
+    return soon(() => ({ vaultProps: readJson(this.store, Ckeys.vaultProps(scope)), boxes: this.storedBoxesOf(scope) }))
+  }
+
+  protected doEnsureVault(draft: GatelessVaultProps): Promise<StoredVault> {
+    return soon(() => {
+      const standing = readJson(this.store, Ckeys.vaultProps(draft))
+      if (standing === null) { this.store.write(Ckeys.vaultProps(draft), JSON.stringify(draft)) }
+      return { vaultProps: standing ?? draft, boxes: this.storedBoxesOf(draft) }
+    })
+  }
+
   protected doGetVaultProps(scope: VaultScope): Promise<unknown> {
     return soon(() => readJson(this.store, Ckeys.vaultProps(scope)))
   }
@@ -98,7 +111,8 @@ class StringStoreVaultDB extends VaultDB {
 
   protected doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<boolean> {
     return soon(() => {
-      if (! Expectations.vaultPropsMeets(readJson(this.store, Ckeys.vaultProps(vaultProps)), expected)) { return false }
+      const refusal = Expectations.vaultPropsRefusalOf(readJson(this.store, Ckeys.vaultProps(vaultProps)), expected)
+      if (refusal) { throw refusal }
       this.store.write(Ckeys.vaultProps(vaultProps), JSON.stringify(vaultProps))
       return true
     })
@@ -109,14 +123,17 @@ class StringStoreVaultDB extends VaultDB {
   }
 
   protected doListBoxes(scope: VaultScope): Promise<StoredBox[]> {
-    return soon(() => (
-      this.store.ckeys()
-        .filter(Ckeys.isBoxIn(scope))
-        .map((ckey) => ({ boxlabel: Ckeys.boxlabelOf(ckey), text: this.store.read(ckey) }))
-        // A row erased since the ckeys were read is gone; one that is not JSON goes up as its text.
-        .filter((row): row is { boxlabel: string, text: string } => row.boxlabel !== null && row.text !== null)
-        .map(({ boxlabel, text }) => ({ boxlabel, box: jsonOrText(text) }))
-    ))
+    return soon(() => this.storedBoxesOf(scope))
+  }
+
+  /** Every box row of `scope`, read in the synchronous step that calls it. */
+  private storedBoxesOf(scope: VaultScope): StoredBox[] {
+    return this.store.ckeys()
+      .filter(Ckeys.isBoxIn(scope))
+      .map((ckey) => ({ boxlabel: Ckeys.boxlabelOf(ckey), text: this.store.read(ckey) }))
+      // A row erased since the ckeys were read is gone; one that is not JSON goes up as its text.
+      .filter((row): row is { boxlabel: string, text: string } => row.boxlabel !== null && row.text !== null)
+      .map(({ boxlabel, text }) => ({ boxlabel, box: jsonOrText(text) }))
   }
 
   // A row that is not JSON stands as its text, so a stale write names it, damaged, as the listing does.

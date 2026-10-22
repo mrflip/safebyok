@@ -208,6 +208,25 @@ const raceLostToPwOne = async () => {
   return { world, deafDB, there, here }
 }
 
+describe("a vault another device made gateless, which sets no passphrase", () => {
+  it("reads as no vault yet: gateless vault props hold no way in to try", async () => {
+    const world = makeWorld()
+    await TH.expectingGood(world.vaultDB).ensureVault(TH.scopeOf('u1'), TH.gatelessOf('u1'))
+    const vault = await world.open()
+    expect(vault.getSnapshot().state).to.eq('absent')
+  })
+
+  it("refuses a first unlock as created_elsewhere, creating nothing, and says to set the passphrase on that device", async () => {
+    const world = makeWorld()
+    const vault = await world.open()
+    await TH.expectingGood(world.vaultDB).ensureVault(TH.scopeOf('u1'), TH.gatelessOf('u1'))
+    const err = await TH.expectRefusal(vault.unlock('pw one'), 'created_elsewhere')
+    expect(err.message).to.include('has not set its passphrase yet')
+    expect(await TH.expectingGood(world.vaultDB).getVaultProps(TH.scopeOf('u1'))).to.deep.equal(TH.gatelessOf('u1'))
+    expect(await world.getLease()).to.be.null
+  })
+})
+
 describe("a first unlock that loses the race to create the vault", () => {
   it("refuses as created_elsewhere when the passphrase does not open the vault the other device made, as unlock's example shows", async () => {
     const { there } = await raceLostToPwOne()

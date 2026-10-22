@@ -25,6 +25,25 @@ describe("Expectations.vaultPropsMeets", () => {
   }
 })
 
+describe("Expectations.vaultPropsRefusalOf", () => {
+  it("lets an update land over the vault props it expects, as its example asks before writing", () => {
+    expect(Expectations.vaultPropsRefusalOf(TH.vaultPropsOf('u1'), { vault_tok: 'vault-tok-u1', gate_epoch: 1 })).to.be.null
+    expect(Expectations.vaultPropsRefusalOf(TH.gatelessOf('u1'), { vault_tok: 'vault-tok-u1', gate_epoch: 0 })).to.be.null
+  })
+
+  it("refuses as stale_write, carrying what stands, vault props at another epoch or of another vault, or none", () => {
+    const Misses = [TH.vaultPropsOf('u1', { gate_epoch: 2 }), TH.vaultPropsOf('u1', { vault_tok: 'vault-tok-new' }), { gate_epoch: 'garbled' }]
+    for (const standing of Misses) {
+      const refusal = Expectations.vaultPropsRefusalOf(standing, { vault_tok: 'vault-tok-u1', gate_epoch: 1 })
+      expect(refusal?.refusalkind).to.eq('stale_write')
+      expect(refusal?.meta).to.deep.equal({ vault_props_stored: standing })
+    }
+    for (const none of [null, undefined]) {
+      expect(Expectations.vaultPropsRefusalOf(none, { vault_tok: 'vault-tok-u1', gate_epoch: 1 })?.meta).to.deep.equal({ vault_props_stored: null })
+    }
+  })
+})
+
 describe("Expectations.vaultMeets", () => {
   it("holds for the vault props at any epoch, and for nothing else", () => {
     expect(Expectations.vaultMeets(VaultProps, { vault_tok: 'vault-tok-u1' })).to.be.true
