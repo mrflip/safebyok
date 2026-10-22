@@ -581,6 +581,17 @@ describe("the sidecar", () => {
     expect(TH.summaryOf(vault.getSnapshot().boxes[0])?.sidecar).to.deep.equal({ note: 'n'.repeat(20) })
   })
 
+  it("refuses a sidecar over maxWhisperBytes alone, its whisper left out, before asking for a proof", async () => {
+    const world = makeWorld()
+    const warm = await world.openUnlocked('pw', { maxWhisperBytes: 64 })
+    await warm.putBox({ boxlabel: 'anthropic' }, 'sk-fake')
+    await warm.lock()
+    const getProof = vi.fn<GetProof>(() => 'declined')
+    const cold = await world.open({ maxWhisperBytes: 64, getProof })
+    await TH.expectRefusal(cold.putBox({ boxlabel: 'anthropic', sidecar: { note: 'n'.repeat(60) } }), 'whisper_too_large')
+    expect(getProof).not.toHaveBeenCalled()
+  })
+
   it("weighs a sidecar kept from the box before any key is made for the new one (Contract: vault.putBox, Does)", async () => {
     const world = makeWorld()
     const vault = await world.openUnlocked('pw', { maxWhisperBytes: 64 })

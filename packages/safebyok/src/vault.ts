@@ -635,8 +635,9 @@ export class Vault {
       const label = Names.check(this.#rules, 'boxlabel', boxlabel)
       // The refusal never quotes its input: a whisper stays out of error messages.
       const given = whisper === undefined ? undefined : checkedWhisper(whisper)
-      // Checked before the user is asked for anything: a call that cannot land never prompts.
-      if (given !== undefined) { this.#checkWhisperFits(given, sidecar ?? {}) }
+      // Checked before the user is asked for anything: a call that cannot land never prompts. A
+      // sidecar given beside a whisper left out is weighed alone now, and with the whisper kept once read.
+      this.#checkWhisperFits(given, sidecar ?? {})
       await this.#ensureUnlocked(0)
       return good(await this.#sealAndPutBox(label, sidecar, given))
     } catch (err) { return this.#badOutcome(err) }
@@ -1729,9 +1730,9 @@ export class Vault {
     }
   }
 
-  /** Refuse 'whisper_too_large' for a whisper whose JSON, with the sidecar's beside it, is over `maxWhisperBytes`, quoting neither. */
-  #checkWhisperFits(whisper: Whisper, sidecar: Sidecar) {
-    const whisperBytes = whisperBytesOf(whisper)
+  /** Refuse 'whisper_too_large' for a whisper whose JSON, with the sidecar's beside it, is over `maxWhisperBytes`, quoting neither; the sidecar alone is weighed when the whisper is left out. */
+  #checkWhisperFits(whisper: Whisper | undefined, sidecar: Sidecar) {
+    const whisperBytes = whisper === undefined ? new Uint8Array() : whisperBytesOf(whisper)
     const weight = whisperBytes.length + new TextEncoder().encode(stableJsonify(sidecar)).length
     whisperBytes.fill(0)
     if (weight <= this.#whisperByteLimit) { return }
