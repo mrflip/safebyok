@@ -28,7 +28,9 @@ S breaks a security or consistency guarantee; U degrades the user's experience o
    `vault.lease` anyway. And if a stored record counted as lease-bound, step 7 would always throw
    `vault_locked` on a first unlock. **Fix:** step 7 is `demandConsistentWith(proving)` (which
    asks `gating_landed`), with no lease half. **Test:** hold `putLease`, lock; expect
-   `gating_landed`, no lease in memory or pantry.
+   `gating_landed`, no lease in memory or pantry. *The Coach (2026-10-22):* "It might have to compare
+   against both current and stored". So step 7 demands on the proving (current) and also checks
+   the stored record's stamp (`vault_tok`, `gate_epoch`), never asking the stored record for a lease.
 
 2. **A lock during `ensureUnlocked`'s pantry consult is undone by the take-up (S; thread 9).**
    `getLease` in flight, `lock()` lands and erases, the record read before the erase is taken
@@ -45,6 +47,7 @@ S breaks a security or consistency guarantee; U degrades the user's experience o
    back up from the pantry and never prompt. **Fix:** one predicate wherever a stored lease is
    taken up (birth, the gating's consult): the deadline lies past `now + renewMinutes` and no
    later than `now + leaseMillis`, and the lease's `vault_tok` and `gate_epoch` match the gate.
+   *The Coach (2026-10-22):* took the Rec.
 
 4. **A superseded passphrase or removed passkey opens a stale tab (S; thread 9, thread 4).**
    Another device changes the passphrase; a locked tab whose picture predates it proves against
@@ -80,7 +83,10 @@ S breaks a security or consistency guarantee; U degrades the user's experience o
 
 7. **A full `putBox`'s base revision is unnamed (S; thread 6).** With whisper and sidecar both
    given there is no read, and the spec names no base. **Fix:** the base is the listed revision,
-   or none when the box is unlisted (a create), as `delBox` and today's code do.
+   or none when the box is unlisted (a create), as `delBox` and today's code do. *The Coach
+   (2026-10-22):* "yes a putBox adopts all attributes in the listing; if none, the put is intended
+   to create a record and synthesizes on. If vaultdb sees no current record or a tombstone it
+   accepts the revisiontok".
 
 8. **A tab stuck after another device's gate change (U; threads 5 and 9).** Another device adds
    a passkey; this tab's refresh takes the new gate but keeps its lease (the pantry's record is
@@ -104,10 +110,12 @@ S breaks a security or consistency guarantee; U degrades the user's experience o
   `gate_epoch` dropped (8); a lease of another life dropped, never erased (9). `ensureUnlocked`
   counts a lease only when its stamp matches the gate (8), and keeps today's take-up path until
   thread 9 (2).
-* **6 lease_box:** a full `putBox`'s base is the listed revision (7).
+* **6 lease_box:** a full `putBox` adopts the listing's attributes, its base the listed revision;
+  unlisted, it is a create, which the store accepts over no record or a tombstone (7).
 * **7 bank:** the take-up predicate at birth (3); the device record raised at birth, refresh,
   `putGate` and `delVault` (6); birth drops, never erases, a lease of another life (9).
-* **8 proving_gate:** `grantLease` step 7 demands on the proving (1).
+* **8 proving_gate:** `grantLease` step 7 demands on the proving and checks the stored record's
+  stamp (1).
 * **9 gating:** the pantry consult inside the gating (2); the take-up predicate there (3); each
   attempt opens with `hello({ staleMinutes: 0 })` (4); joins by kind (5); `del_vault` settles
   then locks (9).

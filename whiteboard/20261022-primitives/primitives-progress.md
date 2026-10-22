@@ -47,6 +47,12 @@ keeps it. Newer than the plan and the spec wherever they disagree.
 * *Orchestrator:* **`guarantees-audit.md` binds threads 4 to 9** (2026-10-22): nine places the
   spec as written lets a guarantee fall, each fix by thread (*By thread*), each an Open Matters
   row. It wins over `primitives.md` until ruled.
+* **Ruled from Open Matters** (the Coach, 2026-10-22): risk 1, step 7 checks both the proving and
+  the stored record; risk 3, the take-up predicate as recommended; risk 7, a full `putBox` adopts
+  the listing, and unlisted is a create the store accepts over nothing or a tombstone (all in
+  `guarantees-audit.md`). From #251: `delDamagedVault` stays as built ("if at any point the vault is
+  fundamentally damaged in storage it should go"); garbled rows are the loud TODO's; a first unlock's
+  two writes (gateless, then the gate) are accepted, and the bank births through `ensureVault`.
 
 Otherwise, until the Coach rules on an Open Matter, threads take its Rec (the plan, *Ground
 rules* 3).
