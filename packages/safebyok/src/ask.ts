@@ -35,8 +35,8 @@ export type ProofAnswer = typeof ProofAnswerVals[number]
  */
 export type GetProof = (ask: Ask) => ProofAnswer | Promise<ProofAnswer>
 
-/** The vault's own run of one proof, for {@link Ask}: its unlock, standing down once `overtaken` is aborted. */
-export type Attempter = (proof: string | PasskeyAnswer, overtaken: AbortSignal) => Promise<Outcome<Vault>>
+/** The vault's own run of one proof, for {@link Ask}: its unlock, refused when `promptOver` is aborted by the time the unlock's turn starts. */
+export type Attempter = (proof: string | PasskeyAnswer, promptOver: AbortSignal) => Promise<Outcome<Vault>>
 
 /** The name of the one maker of an {@link Ask}, exported by no entry point, so only the vault raises a prompt. */
 export const raiseAsk = Symbol('Ask.raise')

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { Vault, isVaultError, memoryDeviceDB, type Ask, type GetProof, type Outcome, type VaultError } from 'safebyok'
+import { Vault, isVaultError, memoryDeviceDB, type Ask, type GetProof, type VaultError } from 'safebyok'
 import { useLayoutEffect } from 'react'
 import * as TH from 'safebyok/testing'
 import { VaultProvider, useVault } from '../../src/vault-provider'
@@ -239,26 +239,10 @@ describe("VaultProvider", () => {
       await TH.expectBad(second, 'vault_locked')
     })
 
-    it("stands an attempt down when the user cancels during it: a newer dialog stays asking, and the vault stays locked (Contract: getProof, attempt refuses: vault_locked)", async () => {
+    it("lets an attempt at its work when the user cancels finish: the proof was given, so the vault unlocks, and a call made meanwhile is answered", async () => {
       const world = await lockedWorld()
       const gate = TH.makeGate()
       const slowDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase: string, saltBytes: Uint8Array) => { await gate.pass(); return await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes) } }
-      // Each attempt the dialog makes, kept, so the test waits for the one cancelled to finish: the
-      // dialog is handed each ask through one whose attempt keeps what it starts.
-      const attempts: Promise<Outcome<Vault>>[] = []
-      const make = Vault.make.bind(Vault)
-      vi.spyOn(Vault, 'make').mockImplementation((opts) => {
-        const { getProof } = opts
-        if (getProof === undefined || getProof === null) { throw new Error("The provider hands every vault it makes a getProof.") }
-        return make({ ...opts, getProof: async (ask) => {
-          const attempt: Ask['attempt'] = (proof) => {
-            const attempting = ask.attempt(proof)
-            attempts.push(attempting)
-            return attempting
-          }
-          return await getProof(Object.create(ask, { attempt: { value: attempt } }) as Ask)
-        } })
-      })
       render(world.tree('u1', slowDeriver))
       const vault = await world.opened()
       const first = vault.tryGetWhisper('anthropic_api_key')
@@ -267,18 +251,12 @@ describe("VaultProvider", () => {
       await gate.reached
       fireEvent.click(screen.getByText('Cancel'))
       await TH.expectBad(first, 'vault_locked')
-
-      const second = watched(vault.tryGetWhisper('anthropic_api_key'))
-      await screen.findByPlaceholderText('vault passphrase')
-      expect(second.outcome).to.eq('pending')
+      // Asked while the attempt is at its work: it waits for that turn, and finds the vault unlocked.
+      const second = vault.tryGetWhisper('anthropic_api_key')
       gate.release()
-      const outcomes = await Promise.all(attempts)
-      expect(outcomes.map((outcome) => (outcome.ok ? 'unlocked' : outcome.err.refusalkind))).to.deep.equal(['vault_locked'])
-      expect(vault.getSnapshot().state).to.eq('locked')
-      expect(screen.queryByPlaceholderText('vault passphrase')).to.not.be.null
-      expect(second.outcome).to.eq('pending')
-      fireEvent.click(screen.getByText('Cancel'))
-      await waitFor(() => { expect(second.outcome).to.have.property('ok', false) })
+      expect(await second).to.deep.equal({ ok: true, val: 'sk-fake' })
+      expect(vault.getSnapshot().state).to.eq('unlocked')
+      expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null
     })
 
     it("closes a dialog the vault unlocks under without it, and the calls waiting on it go on", async () => {
@@ -309,7 +287,7 @@ describe("VaultProvider", () => {
       await waitFor(() => { expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null })
     })
 
-    it("leaves the vault locked when a lock lands under the attempt, and closes the dialog (Contract: getProof, attempt refuses: vault_locked)", async () => {
+    it("leaves the vault locked when a lock is asked under the attempt, landing after it, and closes the dialog", async () => {
       const world = await lockedWorld()
       const gate = TH.makeGate()
       const slowDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase: string, saltBytes: Uint8Array) => { await gate.pass(); return await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes) } }
@@ -319,8 +297,9 @@ describe("VaultProvider", () => {
       fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: 'pw' } })
       fireEvent.click(screen.getByText('Unlock'))
       await gate.reached
-      await vault.lock()
+      const locking = vault.lock()
       gate.release()
+      await locking
       await TH.expectBad(reading, 'vault_locked')
       await waitFor(() => { expect(screen.queryByPlaceholderText('vault passphrase')).to.be.null })
       await TH.wakeupAtNextTick()

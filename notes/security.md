@@ -41,6 +41,54 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-10-22 (thread turns, sprint streamline, branch 20261022-turns): **the vault does one turn at a time, reads once per
+  call, and a `lock()` lands after the turn in flight.** (1) Every piece of work against a Vault
+  object's in-memory fields (a hello's read, an unlock, a change to the ways in, a box read or
+  written, `lock()`, `del()`, `close()`, the expiry timer) runs as a turn in one `p-limit(1)` queue
+  (`packages/safebyok/src/vault.ts`). Between a turn's awaits nothing else moves the vault props,
+  listing or lease, so the abort controllers, take-up stand-downs and after-await re-checks
+  (`lockLanded`, `#standDownTakeUp`, `#outrun`) are gone. A `lock()` lands after the turn in flight: a
+  `getWhisper()` whose turn is already reading storage hands its whisper back; an `unlock()` already
+  proving writes its lease; the lock then drops the key and erases the lease. The synchronous
+  `checkUnlocked()` that opens a turn using the lease still refuses `vault_locked` for a lease whose
+  `askPassphraseAt` has passed by the clock (the expiry's own turn is queued behind). The Contract's
+  wording ("a getWhisper under way refuses vault_locked once storage answers") is left as it was,
+  pending the Coach's ruling on the one-sentence policy "a lock lands after the turn in flight; last
+  writer wins". (2) **The expiry and the twilight.** The expiry timer queues a turn at
+  `askPassphraseAt` that drops the lease it was armed for, matched by its deadline and reading no
+  clock. Within the vault's `staleMinutes` before `askPassphraseAt`, `ensureLease()` asks for a proof
+  (`ask.why` `lease_ending`) though the vault still shows `unlocked`; nothing else changes until the
+  deadline. (3) **No read inside a call.** `unlock()`, `putWayin()` and `delWayin()` prove against the
+  vault props as the last hello (within `staleMinutes`) read them, and no longer re-read storage
+  first. A write storage refuses as stale (`stale_write`, or a box write's `vault_mismatch`, said as
+  `stale_write`) refuses at once with no catch-up read, and marks the picture stale so the next hello
+  reads afresh whatever its `staleMinutes`. A gate change's `stale_write` still carries no stored vault
+  props: the VaultDB's `meta.vault_props_stored` is stripped at the vault's surface as before. A change
+  to the ways in still requires the standing passphrase, and storage's expectation (`vault_tok`,
+  `gate_epoch`) still refuses a write over props that moved. (4) **The read turn: one round, judged,
+  committed, then the device store's follow-ups.** `hello()` reads `VaultDB.getVault` (props and
+  listing in one atomic step), this device's lease and its device mark in parallel; a failure of any
+  refuses the hello, taking nothing up. The vault does not compare the listing with the props:
+  consistency is the VaultDB's transaction's to promise (the Coach, 2026-10-22). The lease kept on the
+  device is taken up only when it is of the props' `vault_tok` and `gate_epoch`, has not ended, ends
+  within this vault's `leaseHours`, and opens. A kept record that is the very grant already in hand
+  (same deadline, `vault_tok`, `gate_epoch`, and the same wrapped vaultKey IV and ciphertext) is kept
+  without unwrapping again. After the commit, still inside the turn, a lease the read dropped or
+  discarded is erased and the mark raised; a device store that fails either is now logged, not thrown
+  (it used to refuse the hello). A lease left behind so opens nothing: it is bound to its `vault_tok`
+  and `gate_epoch` and judged at every read. (5) **The device mark, read once.** The mark is read in
+  the read turn's parallel round (and beside `ensureVaultProps` in a first unlock) and raised after
+  the commit from that reading, not re-read before the write. Another tab of this device can raise the
+  mark between this turn's read of it and its write; this device then writes a mark at the lower
+  epoch it saw, weakening the rollback check for that vault until a later read raises it again.
+  Flagged, not solved: the Coach has ruled that a later thread replaces the mark (a write counter,
+  tombstones on delete, a device refusing storage that has gone backwards). A read that finds props
+  of the same `vault_tok` at a lower `gate_epoch` than the mark or than the props in hand refuses
+  `rolled_back`, locking, as before. (6) **`del()` over forgotten props.** A `del()` whose turn
+  finds the vault props forgotten (a read just refused an older copy as `rolled_back`) refuses
+  `rolled_back`, deleting nothing and keeping the device mark, so a background read's rollback cannot
+  be turned into an erased mark by a `del()` queued behind it.
+
 * 2026-10-22 (thread get_vault, PR [#244](https://github.com/mrflip/safebyok/pull/244)): **the vault props record has two shapes,
   and `getVault` reads props and box listing in one atomic step.** (1) `VaultProps` (format
   `safebyok-vault-v6`, unchanged) is checked by the core's Zod schema at every read and write as one of
@@ -617,6 +665,11 @@ added or folded into through the subagent, and no other entry changes.
   erases that lease (and so the one it overwrote), while the key already held in memory stays until
   its deadline. An overtaken attempt stands down any lease take-up (`#standDownTakeUp`) as it erases
   the lease it wrote, so a hello that read that lease in between takes nothing up.
+  Amended 2026-10-22 (turns): the ask's two `AbortController`s, `#grantLease`'s checks of them and
+  the take-up stand-downs are gone; a `lock()`, `close()` or `del()` lands after the turn in flight,
+  so an `attempt()` already proving writes its lease before the lock drops the key and erases it
+  (the first entry of *Of Interest* has it). The statements above that a lock stands an attempt
+  under way down no longer hold.
 * 2026-10-19 (thread A6, getproof); 2026-10-20 (placement): **`Ask`: one per prompt, with one shared answer, and its
   `attempt(proof)` runs the same unlock body as `unlock()`** (amended 2026-10-19, slots: it once took
   `{ wayinId? }`, an aim at one wayin, and `unlock()` likewise). `Ask`
@@ -956,6 +1009,12 @@ added or folded into through the subagent, and no other entry changes.
   props over newer ones a read took up meanwhile: an unlock that creates the vault (`#settleUnlock`)
   and a change to the wayins (`#reviseWayins`); in both, the lease grant that follows finds its props
   outrun and takes nothing up.
+  Amended 2026-10-22 (turns): the take-up's `AbortController`, `#standDownTakeUp` and `#outrun` are
+  gone, as is "Data calls keep their own reads before writes": a hello's read, a take-up, an unlock
+  and a change to the wayins are turns in one queue, and `unlock()`, `putWayin()` and `delWayin()`
+  prove against the props the last hello read, with no read of storage first. A lock lands after the
+  turn in flight, and the take-up rules are those of the read turn (the first entry of *Of Interest*,
+  points 1, 3 and 4).
 
 * 2026-10-18: **the context bytes of every wayin changed spelling, not construction, with the
   rename to "wayin".** A wayin's wrap is bound to a context of the record's format tag, then its
@@ -1042,7 +1101,10 @@ added or folded into through the subagent, and no other entry changes.
   other tab's newer one can write the mark back down: the check weakens to the older epoch. The
   mark is read before the vault props are, so newer vault props that another tab,
   or this one, landed while it was being read never pass for a rollback: against storage whose
-  reads see every write landed before them, the check never refuses wrongly. Within the vault props,
+  reads see every write landed before them, the check never refuses wrongly. (Amended 2026-10-22
+  (turns): the mark is now read in the same parallel round as the vault props, not before them, and
+  raised after the commit from that reading; and a `del()` over forgotten props refuses `rolled_back`
+  and keeps the mark; the first entry of *Of Interest*, points 5 and 6.) Within the vault props,
   a wayin whose `vault_key_epoch` is not the vault props' is passed over as damaged
   (`damaged_wayin`), so a wayin spliced in from older vault props never hands over its vaultKey
   as the current one.
@@ -2186,6 +2248,11 @@ added or folded into through the subagent, and no other entry changes.
   lock, which drops the key at once, and no lock, expiry included, defeats an `unlock()` or
   `putWayin()` under way (see "one kind of lock" below). (The question G530 asked, whether a passkey's proof should only keep the
   deadline, no longer arises: no passkey proves a change.)
+  Amended 2026-10-22 (turns): the timer queues a turn at `askPassphraseAt` that drops the lease it
+  was armed for, matched by its deadline, reading no clock; a look at the key past that deadline
+  refuses `vault_locked` and the expiry's own turn, queued behind, drops it. In the `staleMinutes`
+  before the deadline, `ensureLease()` asks for a proof (`lease_ending`) while the vault still shows
+  `unlocked` (the first entry of *Of Interest*, point 2).
 * 2026-10-16 (locks_and_expiry; revised the same day by refusals_and_catchup, below: `lockSoon()` raises nothing, and the generation outlives a `del()`; 2026-10-19, 20261019-softlock_gone: **the lock generation, `DeviceDB.putLease`'s expectation and this versioned erase are gone**, a lock reaches no unlock under way, and what follows describes what stood until then): **a lock reaches every tab's unlock under way: the versioned
   erase.** The device mark gains `lock_generation` (format `safebyok-mark-v2` then; today's tag is `safebyok-mark-v3`). Every lock that
   revokes the lease -- `lock()`, `lockSoon()`, a sign-out's lock, `del()`'s --

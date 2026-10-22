@@ -182,6 +182,9 @@ describe("convexVaultDB, refusing", () => {
     refusing.now = true
     await TH.expectRefusal(vault.putBox('openai_api_key', 'sk-test-not-a-real-key'), 'not_permitted')
     expect(vault.getSnapshot().state).to.eq('unlocked')
+    // The ring of the first store reads too, and is refused alike: let the client drop that query first.
+    await vi.waitFor(() => { expect(vault.getSnapshot().syncing).to.be.false })
+    await TH.wakeupAtNextTick()
     refusing.now = false
     expect(await vault.getWhisper('anthropic_api_key')).to.eq('sk-ant-test-not-a-real-key')
     vault.close()

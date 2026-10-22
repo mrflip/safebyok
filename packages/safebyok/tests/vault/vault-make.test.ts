@@ -85,7 +85,7 @@ describe("Vault.make", () => {
   it("hands on storage's damaged_vault as it came, even from a VaultDB that throws before its promise", async () => {
     const world = makeWorld()
     const damaged = new VaultError('damaged_vault', "This vault's stored props did not read back.")
-    vi.spyOn(world.vaultDB, 'getVaultProps').mockImplementationOnce(() => { throw damaged })
+    vi.spyOn(world.vaultDB, 'getVault').mockImplementationOnce(() => { throw damaged })
     const err = await TH.expectRefusal(world.open(), 'damaged_vault')
     expect(err).to.eq(damaged)
     vi.restoreAllMocks()
@@ -94,7 +94,7 @@ describe("Vault.make", () => {
   it("hands on an adapter's corrupt_record as it came, never as damage: that kind is an adapter's wrong answer", async () => {
     const world = makeWorld()
     const wrongAnswer = new VaultError('corrupt_record', 'Storage answered a vault read in a shape this package does not know.')
-    vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(TH.bad(wrongAnswer))
+    vi.spyOn(world.vaultDB, 'getVault').mockResolvedValueOnce(TH.bad(wrongAnswer))
     const err = await TH.expectRefusal(world.open(), 'corrupt_record')
     expect(err).to.eq(wrongAnswer)
     vi.restoreAllMocks()
@@ -154,7 +154,7 @@ describe("Vault.make's options", () => {
 
   it("refuses an option it does not take as 'bad_option', naming it, before storage is touched", () => {
     const world = makeWorld()
-    const getVaultProps = vi.spyOn(world.vaultDB, 'getVaultProps')
+    const getVaultProps = vi.spyOn(world.vaultDB, 'getVault')
     const err = TH.expectSyncRefusal(() => Vault.make({ ...world.optsWith(), leaseHour: 1 } as MakeVaultOpts), 'bad_option')
     expect(err.message).to.match(/does not take the option leaseHour: check the spelling/)
     expect(err.message).to.include('leaseHours')
@@ -191,7 +191,7 @@ describe("a page that is not a secure context", () => {
   it("refuses Vault.make over plain http with kind 'insecure_context', before it touches storage", async () => {
     vi.stubGlobal('isSecureContext', false)
     const world = makeWorld()
-    const getVaultProps = vi.spyOn(world.vaultDB, 'getVaultProps')
+    const getVaultProps = vi.spyOn(world.vaultDB, 'getVault')
     const err = await TH.expectRefusal(world.open(), 'insecure_context')
     expect(err.message).to.match(/https/)
     expect(getVaultProps).not.toHaveBeenCalled()
@@ -226,7 +226,7 @@ describe("the host's clock", () => {
   for (const [reading, blurb] of OutOfBoundsReadings) {
     it(`refuses a clock reading ${blurb} at Vault.make, before reading storage`, async () => {
       const world = makeWorld()
-      const getVaultProps = vi.spyOn(world.vaultDB, 'getVaultProps')
+      const getVaultProps = vi.spyOn(world.vaultDB, 'getVault')
       const err = await TH.expectRefusal(world.open({ clock: { now: () => reading as number } }), 'bad_option')
       expect(err.message).to.match(/epoch milliseconds/)
       expect(getVaultProps).not.toHaveBeenCalled()
@@ -559,7 +559,7 @@ describe("Vault.make, by the Contract", () => {
   for (const [given, blurb] of BadNewOptionCases) {
     it(`validates every option, refusing ${blurb} by throwing 'bad_option', touching nothing (Contract: Vault.make, Does 1)`, () => {
       const world = makeWorld()
-      const propsReads = vi.spyOn(world.vaultDB, 'getVaultProps')
+      const propsReads = vi.spyOn(world.vaultDB, 'getVault')
       TH.expectSyncRefusal(() => Vault.make(world.optsWith(given as Partial<MakeVaultOpts>)), 'bad_option')
       expect(propsReads).not.toHaveBeenCalled()
     })
@@ -621,7 +621,7 @@ describe("Vault.make, by the Contract", () => {
     } }
     const vaultDB = localVaultDB({ store: ringingAtOnce })
     const tally = TH.tallyWatches(vaultDB)
-    const propsReads = vi.spyOn(vaultDB, 'getVaultProps')
+    const propsReads = vi.spyOn(vaultDB, 'getVault')
     const vault = Vault.make(world.optsWith({ vaultDB }))
     await vault.hello()
     expect(tally).to.deep.equal({ opened: 1, closed: 0 })
@@ -673,7 +673,7 @@ describe("Vault.make, by the Contract", () => {
     const world = makeWorld()
     const vault = Vault.make({ ...world.optsWith(), staleMinutes: 1 })   // hello() reads at most once a minute
     await vault.hello()
-    const propsReads = vi.spyOn(world.vaultDB, 'getVaultProps')
+    const propsReads = vi.spyOn(world.vaultDB, 'getVault')
     world.advance(MinuteMillis - 1)
     await vault.hello()
     expect(propsReads).not.toHaveBeenCalled()

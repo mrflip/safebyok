@@ -47,7 +47,7 @@ describe("VaultProvider", () => {
 
       const world = makeWorld()
       const refusal = unreachable()
-      vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(TH.bad(refusal))
+      vi.spyOn(world.vaultDB, 'getVault').mockResolvedValueOnce(TH.bad(refusal))
       const reach = grabber()
       render(<VaultProvider {...world.props} userId="u1"><reach.Grab /></VaultProvider>)
       await waitFor(() => { expect(reach.latest().openError).to.eq(refusal) })
@@ -81,7 +81,7 @@ describe("VaultProvider", () => {
       const vault = await opened()
       await waitFor(() => { expect(vault.getSnapshot().state).to.eq('absent') })
       await TH.wakeupAtNextTick()
-      expect(counts()).to.deep.equal({ subscribe: 1, getVaultProps: 1, getMark: 1 })
+      expect(counts()).to.deep.equal({ subscribe: 1, getVault: 1, getMark: 1 })
     })
 
     it("asks for the passphrase and runs the action again, as it does without", async () => {
@@ -107,7 +107,7 @@ describe("VaultProvider", () => {
       const second = await opened()
       await waitFor(() => { expect(second.getSnapshot().state).to.eq('absent') })
       expect(second.user_id).to.eq('u2')
-      expect(counts()).to.deep.equal({ subscribe: 2, getVaultProps: 2, getMark: 2 })
+      expect(counts()).to.deep.equal({ subscribe: 2, getVault: 2, getMark: 2 })
     })
 
     it("makes a fresh vault when a hidden <Activity> shows again, never using the one it closed", async () => {

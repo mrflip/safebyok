@@ -128,7 +128,7 @@ export const damagedVaultWorld = async () => {
 }
 
 /** The verbs Vault.make asks of a VaultDB, and so all a duck-typed one has. */
-export const VaultDBVerbsUsed = ['getVaultProps', 'ensureVaultProps', 'putVaultProps', 'getBox', 'listBoxes', 'putBox', 'delBox', 'delVault', 'subscribe'] as const
+export const VaultDBVerbsUsed = ['getVault', 'ensureVaultProps', 'putVaultProps', 'getBox', 'putBox', 'delBox', 'delVault', 'subscribe'] as const
 
 /** The passkey `laptop`, put into `vault` under the passphrase `pw`. */
 export const addLaptopPasskey = async (vault: Vault): Promise<void> => {
@@ -155,7 +155,7 @@ export const vaultWithPasskey = async () => {
 export const makeRacingWorld = (defaults?: Partial<MakeVaultOpts>) => {
   const keyDeriver: KeyDeriver = { ...TH.testDeriver }
   const world = makeWorld({ keyDeriver, ...defaults })
-  const holdNextLook = () => TH.holdNextCall(world.vaultDB, 'getVaultProps')
+  const holdNextLook = () => TH.holdNextCall(world.vaultDB, 'getVault')
   const holdNextDerive = () => TH.holdNextCall(keyDeriver, 'deriveKeyBytes')
   const holdNextLease = () => TH.holdNextCall(world.deviceDB, 'putLease')
   const holdNextBoxRead = () => TH.holdNextCall(world.vaultDB, 'getBox')

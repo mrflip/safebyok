@@ -313,17 +313,19 @@ describe("holdNextCall", () => {
     expect(heard).to.deep.equal(['later', 'held'])
   })
 
-  it("lands a lock in the middle of an unlock, as its @example has it", async () => {
+  it("asks a lock in the middle of an unlock, which lands after it, as its @example has it", async () => {
     const opts = TH.memoryVaultOpts()
     const vault = await TH.settledVault(opts)
-    const gate = TH.holdNextCall(opts.vaultDB, 'getVaultProps')
+    const gate = TH.holdNextCall(opts.vaultDB, 'ensureVaultProps')
     let settled = false
     const unlocking = (async () => { await vault.unlock('pw'); settled = true })()
     await gate.reached
-    await vault.lock()
+    const locking = vault.lock()
     expect(settled).to.be.false
     gate.release()
     await unlocking
+    await locking
+    expect(vault.getSnapshot().state).to.eq('locked')
   })
 })
 
@@ -343,7 +345,7 @@ describe("settledVault", () => {
 
   it("rejects as hello does, and throws as Vault.make does for misuse", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
-    vi.spyOn(vaultDB, 'getVaultProps').mockResolvedValueOnce(bad(new VaultError('not_permitted', 'Sign in to reach this vault.')))
+    vi.spyOn(vaultDB, 'getVault').mockResolvedValueOnce(bad(new VaultError('not_permitted', 'Sign in to reach this vault.')))
     await TH.expectRefusal(TH.settledVault(TH.memoryVaultOpts({ vaultDB })), 'not_permitted')
     await TH.expectRefusal(TH.settledVault(TH.memoryVaultOpts({ applabel: 'not-a-label' })), 'bad_label')
   })
@@ -371,7 +373,7 @@ describe("tallyWatches", () => {
 
   it("shows no leak once a refused vault is closed, as its @example has it", async () => {
     const vaultDB = localVaultDB({ store: memoryStore() })
-    vi.spyOn(vaultDB, 'getVaultProps').mockResolvedValue(bad(new VaultError('not_permitted', "That vault belongs to someone else.")))
+    vi.spyOn(vaultDB, 'getVault').mockResolvedValue(bad(new VaultError('not_permitted', "That vault belongs to someone else.")))
     const tally = TH.tallyWatches(vaultDB)
     const vault = Vault.make(TH.memoryVaultOpts({ vaultDB }))
     await TH.expectRefusal(vault.hello(), 'not_permitted')

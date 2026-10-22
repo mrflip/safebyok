@@ -454,8 +454,8 @@ const makeTimedWorld = () => {
   vi.setSystemTime(Date.parse('2026-10-14T12:00:00Z'))
   const clock = { now: () => Date.now() }
   const world = makeRacingWorld({ clock })
-  /** Let `byMillis` pass on the host's clock and on the timers alike, ringing each timer in its turn. */
-  const pass = (byMillis: number) => { vi.advanceTimersByTime(byMillis) }
+  /** Let `byMillis` pass on the host's clock and on the timers alike, ringing each timer in its turn, and the turn each queues. */
+  const pass = async (byMillis: number) => { await vi.advanceTimersByTimeAsync(byMillis) }
   /** Move the host's clock alone, ringing no timer. */
   const advance = (byMillis: number) => { vi.setSystemTime(Date.now() + byMillis) }
   return { ...world, clock, advance, pass }
@@ -473,10 +473,10 @@ describe("natural expiry", () => {
     const vault = await world.openUnlocked('pw one', { leaseHours: 1 })
     const listener = vi.fn()
     vault.subscribe(listener)
-    world.pass(HourMillis - 1)
+    await world.pass(HourMillis - 1)
     expect(listener).not.toHaveBeenCalled()
     expect(vi.getTimerCount()).to.eq(1)
-    world.pass(1)
+    await world.pass(1)
     expect(listener).toHaveBeenCalledTimes(1)
     expect(vi.getTimerCount()).to.eq(0)
     expect(vault.getSnapshot().state).to.eq('locked')
@@ -484,7 +484,7 @@ describe("natural expiry", () => {
     await TH.expectRefusal(vault.ensureLease(), 'vault_locked')
   })
 
-  it("drops a key whose timer has not run by its deadline at the next look: the threshold is the truth", async () => {
+  it("drops a key whose timer has not run by its deadline at the next read: the threshold is the truth", async () => {
     const world = makeTimedWorld()
     const vault = await world.openUnlocked('pw one', { leaseHours: 1 })
     world.advance(HourMillis)  // the clock alone, as a device asleep would see it
@@ -513,32 +513,31 @@ describe("natural expiry", () => {
   it("arms the timer for a lease taken up at open, from its own deadline", async () => {
     const world = makeTimedWorld()
     await world.openUnlocked('pw one', { leaseHours: 1 })
-    world.pass(HourMillis / 2)
+    await world.pass(HourMillis / 2)
     const reopened = await world.open({ leaseHours: 1 })
     expect(reopened.getSnapshot().state).to.eq('unlocked')
-    world.pass((HourMillis / 2) + MinuteMillis)
+    await world.pass((HourMillis / 2) + MinuteMillis)
     expect(reopened.getSnapshot().state).to.eq('locked')
   })
 
   it("lets an unlock begun past the deadline win over the timer, with a deadline of its own", async () => {
     const world = makeTimedWorld()
     const vault = await world.openUnlocked('pw one', { leaseHours: 1 })
-    world.pass(HourMillis + 1)
+    await world.pass(HourMillis + 1)
     await vault.unlock('pw one')
-    world.pass(MinuteMillis)
+    await world.pass(MinuteMillis)
     expect(vault.getSnapshot().state).to.eq('unlocked')
     expect(vault.getSnapshot().askPassphraseAt).to.eq(world.clock.now() - MinuteMillis + HourMillis)
   })
 
-  it("leaves a putWayin() under way when it falls due unlocked, under the new passphrase, with a new deadline: a timer is no lock", async () => {
+  it("lands the expiry after a putWayin() under way when it falls due: the change leaves the vault unlocked under the new passphrase, with a new deadline", async () => {
     const world = makeTimedWorld()
     const vault = await world.openUnlocked('old passphrase', { leaseHours: 1 })
     await vault.putBox('anthropic', 'sk-fake')
     const gate = world.holdNextDerive()
     const changing = vault.putWayin('old passphrase', 'new passphrase')
     await gate.reached
-    world.pass(HourMillis + MinuteMillis)
-    expect(vault.getSnapshot().state).to.eq('locked')
+    await world.pass(HourMillis + MinuteMillis)
     gate.release()
     await changing
     expect(vault.getSnapshot().state).to.eq('unlocked')
@@ -551,9 +550,10 @@ describe("natural expiry", () => {
     const world = makeTimedWorld()
     let broken = false
     const clock = { now: () => { if (broken) { throw new Error('the host clock broke: battery flat') } return Date.now() } }
-    const vault = await world.openUnlocked('pw one', { leaseHours: 1, clock })
+    // Deaf, so no ring of the unlock's own write reads the broken clock.
+    const vault = await world.openUnlocked('pw one', { leaseHours: 1, clock, vaultDB: world.deafVaultDB() })
     broken = true
-    world.pass(HourMillis)
+    await world.pass(HourMillis)
     expect(vi.getTimerCount()).to.eq(0)
     expect(world.logged).to.have.lengthOf(0)
     broken = false
@@ -809,7 +809,7 @@ describe("vault.ensureLease, by the Contract", () => {
     const world = makeWorld()
     const getProof = typingPw()
     const vault = Vault.make(world.optsWith({ getProof }))
-    vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
+    vi.spyOn(world.vaultDB, 'getVault').mockResolvedValueOnce(bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
     await TH.expectRefusal(vault.ensureLease(), 'storage_unavailable')
     expect(getProof).not.toHaveBeenCalled()
     expect(vault.state).to.eq('opening')
@@ -914,15 +914,18 @@ describe("vault.ensureLease, by the Contract", () => {
     expect(Object.getOwnPropertyNames(Ask)).to.not.include('raise')
   })
 
-  it("says hello again on unlocked, and resolves the fresh vault (Contract: ensureLease, Does 3.4, and Returns)", async () => {
+  it("reads nothing after the answer: one hello before the ask, and the vault unlocked under the attempt's lease (Contract: ensureLease, Does 3.4, and Returns)", async () => {
     const getProof = typingPw()
     const { world, vault } = await lockedVaultWith({ getProof })
-    const reads = vi.spyOn(world.vaultDB, 'getVaultProps')
+    const deaf = world.deafVaultDB()
+    const quiet = await world.open({ getProof, vaultDB: deaf })
+    const reads = vi.spyOn(deaf, 'getVault')
     world.advance((StaleMinutes + 1) * MinuteMillis)
-    expect(await vault.ensureLease()).to.eq(vault)
-    expect(vault.state).to.eq('unlocked')
-    // The hello before the ask, the attempt's own read, and the hello after, once staleMinutes have passed.
-    expect(reads.mock.calls.length).to.be.at.least(2)
+    expect(await quiet.ensureLease()).to.eq(quiet)
+    expect(quiet.state).to.eq('unlocked')
+    // The hello before the ask reads, once staleMinutes have passed; the attempt's hello finds that read timely.
+    expect(reads).toHaveBeenCalledTimes(1)
+    expect(vault.state).to.eq('locked')
   })
 
   it("refuses vault_locked on declined, the vault as it was (Contract: ensureLease, Does 3.5, and Refuses: vault_locked)", async () => {
@@ -991,7 +994,7 @@ describe("vault.ensureLease, by the Contract", () => {
     const ask = await prompt.asked
     await vault.lock()
     const derive = vi.spyOn(TH.testDeriver, 'deriveKeyBytes')
-    const reads = vi.spyOn(world.vaultDB, 'getVaultProps')
+    const reads = vi.spyOn(world.vaultDB, 'getVault')
     await TH.expectBad(ask.attempt('pw'), 'vault_locked')
     expect(derive).not.toHaveBeenCalled()
     expect(reads).not.toHaveBeenCalled()
@@ -999,7 +1002,7 @@ describe("vault.ensureLease, by the Contract", () => {
     await TH.expectBad(ensuring, 'vault_locked')
   })
 
-  it("leaves the vault locked when a lock lands under an attempt: the lock wins, and the attempt refuses vault_locked (Contract: getProof, attempt refuses)", async () => {
+  it("lands a lock asked while an attempt is at its work after it: the attempt unlocks, and the vault is left locked, with no lease", async () => {
     const prompt = heldPrompt()
     const world = makeRacingWorld()
     const maker = await world.openUnlocked('pw')
@@ -1011,16 +1014,16 @@ describe("vault.ensureLease, by the Contract", () => {
     const gate = world.holdNextDerive()
     const attempting = ask.attempt('pw')
     await gate.reached
-    await vault.lock()
+    const locking = vault.lock()
     gate.release()
-    const err = await TH.expectBad(attempting, 'vault_locked')
-    expect(err.message).to.include('while this proof was being checked')
+    await TH.expectGood(attempting)
+    await locking
     expect(vault.state).to.eq('locked')
     expect(await world.getLease()).to.be.null
     await TH.expectBad(ensuring, 'vault_locked')
   })
 
-  it("erases the lease an attempt wrote when a lock lands as it writes it: the lock wins across a reload too (Contract: getProof, attempt refuses: vault_locked)", async () => {
+  it("erases the lease an attempt wrote when a lock is asked as it writes it: the lock, landing after, wins across a reload too", async () => {
     const prompt = heldPrompt()
     const world = makeRacingWorld()
     const maker = await world.openUnlocked('pw')
@@ -1032,45 +1035,16 @@ describe("vault.ensureLease, by the Contract", () => {
     const gate = world.holdNextLease()
     const attempting = ask.attempt('pw')
     await gate.reached
-    await vault.lock()
+    const locking = vault.lock()
     gate.release()
-    await TH.expectBad(attempting, 'vault_locked')
+    await TH.expectGood(attempting)
+    await locking
     expect(await world.getLease()).to.be.null
     expect(await world.stateOnOpen()).to.eq('locked')
     await TH.expectBad(ensuring, 'vault_locked')
   })
 
-  it("takes up nothing from the lease a stood-down attempt wrote, though a hello reads it before it is erased (Contract: getProof, attempt refuses: vault_locked)", async () => {
-    const prompt = heldPrompt()
-    const world = makeRacingWorld()
-    const maker = await world.openUnlocked('pw')
-    await maker.lock()
-    maker.close()
-    const vault = await world.open({ getProof: prompt.getProof })
-    const ensuring = vault.tryEnsureLease()
-    const ask = await prompt.asked
-    const writing = world.holdNextLease()
-    const attempting = ask.attempt('pw')
-    await writing.reached
-    await vault.lock()
-    // The attempt's erasure, and a hello's read of the device store, each held at the door.
-    const erasing = TH.holdNextCall(world.deviceDB, 'delLease')
-    const fetching = TH.holdNextCall(world.deviceDB, 'getLease')
-    const hello = vault.hello({ staleMinutes: 0 })
-    await fetching.reached
-    writing.release()
-    await erasing.reached
-    // The hello reads the attempt's lease, written and not yet erased.
-    fetching.release()
-    await hello
-    erasing.release()
-    await TH.expectBad(attempting, 'vault_locked')
-    expect(vault.state).to.eq('locked')
-    expect(await world.getLease()).to.be.null
-    await TH.expectBad(ensuring, 'vault_locked')
-  })
-
-  it("stays locked, with no lease, when the user cancels during an attempt and the app then locks: the answer stands the attempt down (Contract: getProof, attempt refuses: vault_locked)", async () => {
+  it("stays locked, with no lease, when the user cancels during an attempt and the app then locks: the lock lands after the attempt", async () => {
     const prompt = heldPrompt()
     const world = makeRacingWorld()
     const maker = await world.openUnlocked('pw')
@@ -1085,16 +1059,16 @@ describe("vault.ensureLease, by the Contract", () => {
     await gate.reached
     prompt.answer('declined')
     await TH.expectBad(ensuring, 'vault_locked')
-    await vault.lock()
+    const locking = vault.lock()
     gate.release()
-    const err = await TH.expectBad(attempting, 'vault_locked')
-    expect(err.message).to.include('while this proof was being checked')
+    await TH.expectGood(attempting)
+    await locking
     expect(vault.state).to.eq('locked')
     expect(await world.getLease()).to.be.null
     expect(await world.stateOnOpen()).to.eq('locked')
   })
 
-  it("erases the lease an attempt wrote when the user cancels as it writes it, so a reload opens locked (Contract: getProof, attempt refuses: vault_locked)", async () => {
+  it("lets an attempt at its work when the user cancels finish: the proof was given, so the vault unlocks under its lease", async () => {
     const prompt = heldPrompt()
     const world = makeRacingWorld()
     const maker = await world.openUnlocked('pw')
@@ -1109,13 +1083,12 @@ describe("vault.ensureLease, by the Contract", () => {
     prompt.answer('declined')
     await TH.expectBad(ensuring, 'vault_locked')
     gate.release()
-    await TH.expectBad(attempting, 'vault_locked')
-    expect(vault.state).to.eq('locked')
-    expect(await world.getLease()).to.be.null
-    expect(await world.stateOnOpen()).to.eq('locked')
+    await TH.expectGood(attempting)
+    expect(vault.state).to.eq('unlocked')
+    expect(await world.getLease()).to.not.be.null
   })
 
-  it("stands a second attempt down once the first has answered unlocked, so a lock after it wins (Contract: getProof, attempt refuses: vault_locked)", async () => {
+  it("lands a lock after a second attempt still at its work once the first has answered unlocked, so the lock wins", async () => {
     const prompt = heldPrompt()
     const world = makeRacingWorld()
     const maker = await world.openUnlocked('pw')
@@ -1131,9 +1104,10 @@ describe("vault.ensureLease, by the Contract", () => {
     await gate.reached
     prompt.answer('unlocked')
     await TH.expectGood(ensuring)
-    await vault.lock()
+    const locking = vault.lock()
     gate.release()
-    await TH.expectBad(second, 'vault_locked')
+    await TH.expectGood(second)
+    await locking
     expect(vault.state).to.eq('locked')
     expect(await world.getLease()).to.be.null
   })
@@ -1146,7 +1120,7 @@ describe("vault.ensureLease, by the Contract", () => {
     prompt.answer('declined')
     await TH.expectBad(ensuring, 'vault_locked')
     const derive = vi.spyOn(TH.testDeriver, 'deriveKeyBytes')
-    const reads = vi.spyOn(world.vaultDB, 'getVaultProps')
+    const reads = vi.spyOn(world.vaultDB, 'getVault')
     const err = await TH.expectBad(ask.attempt('pw'), 'vault_locked')
     expect(err.message).to.include('already answered')
     expect(derive).not.toHaveBeenCalled()
@@ -1352,7 +1326,7 @@ describe("every data call, through ensureLease", () => {
     await elsewhere.unlock('pw')
     await elsewhere.putBox('anthropic', 'sk-fake')
     world.advance(MinuteMillis)
-    const reads = vi.spyOn(world.vaultDB, 'getVaultProps')
+    const reads = vi.spyOn(world.vaultDB, 'getVault')
     await TH.expectRefusal(vault.getWhisper('anthropic'), 'absent_box')
     await TH.expectRefusal(vault.delBox('anthropic'), 'absent_box')
     expect(reads).not.toHaveBeenCalled()
@@ -1500,7 +1474,9 @@ describe("getProof's attempt, by the Contract", () => {
     const { world, vault } = await lockedVaultWith({ getProof: prompt.getProof })
     const ensuring = vault.tryEnsureLease()
     const ask = await prompt.asked
-    vi.spyOn(world.vaultDB, 'getVaultProps').mockResolvedValueOnce(bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
+    // Past staleMinutes, so the attempt's hello reads.
+    world.advance((StaleMinutes + 1) * MinuteMillis)
+    vi.spyOn(world.vaultDB, 'getVault').mockResolvedValueOnce(bad(new VaultError('storage_unavailable', 'The vault storage could not be reached.')))
     await TH.expectBad(ask.attempt('pw'), 'storage_unavailable')
     prompt.answer('declined')
     await TH.expectBad(ensuring, 'vault_locked')

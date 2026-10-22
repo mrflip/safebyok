@@ -95,7 +95,7 @@ export const liveWatch = async (vaultDB: Pick<VaultDB, 'subscribe'>, scope: Vaul
  *   const slowDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase, saltBytes) => { await gate.pass(); return await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes) } }
  *   const unlocking = vault.unlock('pw')   // now waiting at the gate
  *   await gate.reached
- *   await vault.lock()                     // lands mid-unlock
+ *   const locking = vault.lock()           // asked mid-unlock: lands after it
  *   gate.release()
  */
 export const makeGate = () => {
@@ -184,10 +184,10 @@ const originalOf = new WeakMap<object, AsyncFn>()
  * @returns The gate: await `reached`, then `release()`.
  *
  * @example
- *   const gate = TH.holdNextCall(vaultDB, 'getVaultProps')
+ *   const gate = TH.holdNextCall(vaultDB, 'ensureVaultProps')
  *   const unlocking = vault.unlock('pw')   // now waiting at the gate
  *   await gate.reached
- *   await vault.lock()                     // lands mid-unlock
+ *   const locking = vault.lock()           // asked mid-unlock: lands after it
  *   gate.release()
  */
 export const holdNextCall = <Target extends object>(target: Target, verb: AsyncVerbOf<Target> & string) => {

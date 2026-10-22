@@ -136,6 +136,23 @@ mechanism per case now. The scenarios, each with today's outcome:
 7. A sign-out with an unlock in flight in another tab: as 2; harmless, since a lease is scoped by
    user id.
 
+**Since the turns thread (2026-10-22, `20261022-turns`)** every call's work against the vault's
+fields is a turn, one at a time, and `lock()`, `del()`, `close()` and the expiry are turns too: a
+lock lands after the turn in flight, so scenarios 1, 3 and 5 now end with the call in flight
+finishing (its whisper handed back, its lease written) and the lock landing after it, the vault
+locked and the lease erased. The Contract and the doc blocks still say what they said before
+the turns; the Coach rules on the one-sentence policy ("a lock lands after the turn in flight;
+last writer wins") before the wording changes. `tests/vault/vault-turns.test.ts` pins the order
+turns give.
+
+- **Judge whether the in-turn `#checkUnlocked()` is still needed.** Each turn that uses the lease
+  (`getBox`, `getWhisper`, `useWhisper`, `decryptWhisper`, `putBox`, `delBox`) checks it
+  synchronously within its own turn, before it uses it, refusing `vault_locked` as before. With
+  turns serialized, no lock can land inside a turn; the check still catches a lease whose
+  `askPassphraseAt` passed while the turn's read was under way (the expiry's own turn is queued
+  behind). Decide whether that case wants the check, or whether the turn should run on the lease
+  as it stood at its start.
+
 The policy session decides, for each, what the vault promises, and writes the test first. The
 tests this removal deleted, verbatim and by theme, each with the lesson it carried, are its
 checklist: `softlock_gone-removed-tests.md` in the thread's folder (`20261019-softlock_gone/`,
