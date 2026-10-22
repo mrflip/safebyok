@@ -37,7 +37,30 @@ became delete; and `VaultError.kind` became `refusalkind`. A fourth, 2026-10-19 
 the renames falsified amended in place, each marked. This leaves the rule above as it was: from here on, an entry is
 added or folded into through the subagent, and no other entry changes.
 
+**Names (2026-10-21).** The stored field `vault_id` became `vault_tok` and `unlock_epoch` became `gate_epoch` (`notes/old_vocabulary.md` lists the retired names); the dated entries below keep the names they were written with.
+
 ## Of Interest
+
+* 2026-10-22 (thread get_vault, PR [#244](https://github.com/mrflip/safebyok/pull/244)): **the vault props record has two shapes,
+  and `getVault` reads props and box listing in one atomic step.** (1) `VaultProps` (format
+  `safebyok-vault-v6`, unchanged) is checked by the core's Zod schema at every read and write as one of
+  two shapes: *gated* (`gate_epoch` 1 or more, a passphrase wayin, a passkey wayin or null) or *gateless*
+  (`gate_epoch` 0, `passphrase` and `passkey` both null). A record at a gated epoch with no passphrase
+  matches neither, and is refused `damaged_vault` on read and `bad_record` on write. A gateless record
+  holds no wrapped vaultKey, so nothing in it can be tried or opened. `VaultDB.ensureVault` first stores
+  a vault gateless and refuses any draft that is not; the first gate is written over it by
+  `putVaultProps` at `gate_epoch` 1 expecting 0, so of two devices setting the first passphrase at once
+  exactly one lands (the conditional write) and the other is refused. The Postgres and Convex adapters
+  still refuse any update that does not keep the `vault_tok` and move `gate_epoch` forward. (2)
+  `VaultDB.getVault` and `ensureVault` read the vault props and the box listing in one atomic step (one
+  Postgres statement, one Convex query or mutation, one IndexedDB transaction), so the two never name
+  different vaults as handed back; nothing (the base class, the vault, or an adapter) compares or
+  repairs the two afterwards. One narrow case: Postgres's `ensureVault`, when another device's vault
+  props land after its statement's snapshot began, returns those props with the listing as of the
+  snapshot filtered to their `vault_tok`, so the listing may lag but never names another vault. (3) A
+  `putVaultProps` refused `stale_write` carries the vault props standing in `err.meta.vault_props_stored`
+  (null for none), read in the same atomic step and checked as a read checks them. That meta holds only
+  what a read by the same user would return: ciphertext and visible fields, never secret material.
 
 * 2026-10-21 (thread trust_lines, branch 20261021-trust_lines, PR [#239](https://github.com/mrflip/safebyok/pull/239); amended 2026-10-21 (trust_lines): rebased on main, once stacked on [#225](https://github.com/mrflip/safebyok/pull/225)):
   **threat model, by party.** Storage and the backend are treated as hostile and defended by
@@ -1378,6 +1401,9 @@ added or folded into through the subagent, and no other entry changes.
   refusal's `meta`, and from there into `snapshot.trouble`, logs and error reporters; the Coach has
   ruled those out of the snapshot. A later refusal that wants to name the vault props storage holds
   must carry a summary instead: `vault_id`, `unlock_epoch` and the passphrase and passkey summaries.
+  Amended 2026-10-22 (get_vault): `RefusalMeta.vault_props_stored` returns, carried by a
+  `putVaultProps` `stale_write` as the standing vault props, checked as a read checks them (see the
+  2026-10-22 entry).
   2026-10-19 (A4): every public vault call (`packages/safebyok/src/vault.ts`) now has a `tryX` form
   resolving an `Outcome` and an `X` form throwing the same `err` (`#trying`, `#throwing`). A throw
   inside a vault call that is not a `VaultError` -- a bug in safebyok, or a throw from a host
