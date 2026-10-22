@@ -71,7 +71,7 @@ rules* 3).
 | 3 | wire_meta | merged | #246 |
 | 4 | store_verbs | merged | #251 |
 | 5 | demand | filed, on main | #253 |
-| 6 | lease_box | building | |
+| 6 | lease_box | built, in review | #254 |
 | 7 | bank | planned | |
 | 8 | proving_gate | planned | |
 | 9 | gating | planned | |

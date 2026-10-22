@@ -2,7 +2,7 @@
 
 * **Date:** 2026-10-22
 * **Mode:** YOLO (the Coach, at the invocation, 2026-10-22).
-* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 building; threads 1 to 3 restacked onto main by the orchestrator.
+* **Status:** #243, #244, #246 and #251 merged by the Coach (2026-10-22); thread 12 filed (#252, on main; capacity stays in the main meta, per the Coach's question); thread 5 filed (#253, on main); thread 6 built (#254), in review; threads 1 to 3 restacked onto main by the orchestrator.
 * **Review level:** `medium`, reviewer on `sonnet`, unless a thread names another. At the end of
   the sprint, one `opus`, `high` pass over the whole line (see *Wrap-up*).
 * **Threads at once:** 1 in the line, which is serial: every thread rewrites `vault.ts` or builds
@@ -155,6 +155,13 @@ Every worker, beyond CLAUDE.md:
     checking they are reading the same vault -- if scope matches but vault_tok doesn't that implies a
     new vault was created and the current should reload". Scope is the id, `vault_tok` the version
     (checked: every key and index in `packages/*/src` goes by scope).
+19. **A removal is an aspiration; helpers live beside their callers** (the Coach, 2026-10-22,
+    verbatim): "if the plan said "remove methods X, Y, Z, ..." that's an aspiration not a directive:
+    it's the residue of the other functions designs' no longer needing it. (That said: there's a lot
+    of spaghetti stack traces. If one function or method largely serves one or a few closely related
+    ones, move them together. Those are a good thing often: as a test surface, or a sort of
+    "paragraph marker" around a piece of code". Keep a helper the new design still wants; move it
+    beside what it serves.
 
 ## Threads
 
