@@ -125,6 +125,18 @@ describe("bank.hello", () => {
     expect(strengthChecker.load).toHaveBeenCalledOnce()
   })
 
+  it("loads once when a listener says hello as the bank goes 'starting': its hello shares the load under way", async () => {
+    const strengthChecker = checkerLoading(() => undefined)
+    const bank = bankIn(makeWorld(), { strengthChecker })
+    const heard: Promise<Bank>[] = []
+    bank.subscribe(() => { if (bank.status === 'starting' && heard.length === 0) { heard.push(bank.hello()) } })
+    await bank.hello()
+    expect(heard).to.have.lengthOf(1)
+    expect(await heard[0]).to.eq(bank)
+    expect(bank.status).to.eq('timely')
+    expect(strengthChecker.load).toHaveBeenCalledOnce()
+  })
+
   it("leaves the bank 'refused' with its err when the load fails, and the next hello loads again", async () => {
     const thrown = new Error('the zxcvbn chunk did not load')
     const strengthChecker = checkerLoading(() => undefined)

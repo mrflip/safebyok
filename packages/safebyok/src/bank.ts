@@ -278,17 +278,19 @@ export class Bank {
   // The libraries' load, shared while it runs and kept once it succeeds; forgotten when it fails.
   #loaded: Promise<void> | null = null
 
-  /** The libraries loaded, once: a load under way is shared, one that succeeded is kept. */
+  /** The libraries loaded, once: a load under way is shared, one that succeeded is kept. The bank is `starting` while one runs. */
   #ensureLoaded(): Promise<void> {
-    this.#loaded ??= this.#load()
-    return this.#loaded
-  }
-
-  /** Load the strength checker, the bank `starting`, then `timely`; `refused` and forgotten when it fails, so the next hello loads afresh. */
-  async #load(): Promise<void> {
+    if (this.#loaded !== null) { return this.#loaded }
+    this.#loaded = this.#load()
+    // Published once the load is held, so a listener saying hello now shares it.
     this.#status = 'starting'
     this.#err = null
     this.#publish()
+    return this.#loaded
+  }
+
+  /** Load the strength checker: the bank `timely` once it has, `refused` and the load forgotten when it fails, so the next hello loads afresh. */
+  async #load(): Promise<void> {
     const loaded = await outcomeOf(() => loadStrengthChecker(this.#parts.strengthChecker), unexpectedError)
     if (! loaded.ok) {
       this.#loaded = null
