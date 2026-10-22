@@ -34,6 +34,8 @@ const refusalBehind = (crossed: GraphQLError | undefined): VaultError => (crosse
 const fakeServed = (answer: () => Promise<unknown>) => {
   const heard: { onChange?: () => void, unsubscribed: number } = { unsubscribed: 0 }
   const served: ServedVaultDB = {
+    getVaultRecords:    answer as ServedVaultDB['getVaultRecords'],
+    ensureVaultRecords: answer as ServedVaultDB['ensureVaultRecords'],
     getVaultProps:    answer as ServedVaultDB['getVaultProps'],
     ensureVaultProps: answer as ServedVaultDB['ensureVaultProps'],
     putVaultProps:    answer as ServedVaultDB['putVaultProps'],

@@ -1,13 +1,14 @@
 import { GraphQLError } from 'graphql'
 import { Refusals, VaultError, isVaultError } from 'safebyok'
-import type { Outcome, RefusalKind, RefusalMeta, VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, VaultProps, VaultDB, VaultScope } from 'safebyok'
+import type { Outcome, RefusalKind, RefusalMeta, VaultPropsExpectation, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, GatelessVaultProps, VaultProps, VaultDB, VaultScope } from 'safebyok'
 import { VaultPropsFields, BoxFields, ScopeFields, recordOf } from './fields'
 
-/** What the resolvers need of the VaultDB they serve: the verbs a browser's vault calls, with `listBoxRecords` in place of `listBoxes`.
- * The browser's VaultDB lists stored records, not summaries. Every VaultDB is one:
- * `safebyok-postgres`'s, or one of your own.
+/** What the resolvers need of the VaultDB they serve: the verbs a browser's vault calls, the ones handing on records in place of those handing back summaries.
+ * That is `getVaultRecords`, `ensureVaultRecords` and `listBoxRecords` in place of `getVault`,
+ * `ensureVault` and `listBoxes`: the browser's VaultDB checks stored records. Every VaultDB is
+ * one: `safebyok-postgres`'s, or one of your own.
  */
-export type ServedVaultDB = Pick<VaultDB, 'getVaultProps' | 'ensureVaultProps' | 'putVaultProps' | 'getBox' | 'listBoxRecords' | 'putBox' | 'getCapacity' | 'delBox' | 'delVault' | 'subscribe'>
+export type ServedVaultDB = Pick<VaultDB, 'getVaultRecords' | 'ensureVaultRecords' | 'getVaultProps' | 'ensureVaultProps' | 'putVaultProps' | 'getBox' | 'listBoxRecords' | 'putBox' | 'getCapacity' | 'delBox' | 'delVault' | 'subscribe'>
 
 /** What {@link vaultResolvers} is made with, once, at your server's start. */
 export type VaultResolversOpts<ContextT> = {
@@ -26,6 +27,7 @@ export type VaultFieldArgs = {
   scope?:    unknown
   boxlabel?: unknown
   vaultProps?: unknown
+  draft?:    unknown
   box?:      unknown
   expected?: unknown
 }
@@ -38,12 +40,14 @@ export type VaultFieldResolver<ContextT> = (parent: unknown, args: VaultFieldArg
  */
 export type VaultResolvers<ContextT> = {
   Query: {
+    safebyokGetVault:         VaultFieldResolver<ContextT>
     safebyokGetVaultProps:    VaultFieldResolver<ContextT>
     safebyokGetBox:           VaultFieldResolver<ContextT>
     safebyokListBoxes:        VaultFieldResolver<ContextT>
     safebyokGetCapacity:      VaultFieldResolver<ContextT>
   }
   Mutation: {
+    safebyokEnsureVault:      VaultFieldResolver<ContextT>
     safebyokEnsureVaultProps: VaultFieldResolver<ContextT>
     safebyokPutVaultProps:    VaultFieldResolver<ContextT>
     safebyokPutBox:           VaultFieldResolver<ContextT>
@@ -64,7 +68,7 @@ export type VaultResolvers<ContextT> = {
  *   user, refuses every other user's vault, and every vault while signed out, with `identity_revoked`.
  * * **A refusal crosses as a GraphQL error** with the VaultError's calm message, its kind as
  *   `extensions.kind`, which the browser's `graphqlVaultDB` throws as the same VaultError. Beside
- *   those it carries only a stale write's standing box or a full vault's capacity, as
+ *   those it carries only what a stale write says stands or a full vault's capacity, as
  *   `extensions.meta`. The VaultError's `cause`, your driver's own error, which may name your
  *   database, stays on the server as the GraphQL error's `cause`, for your logs. Anything else a
  *   VaultDB throws crosses as `storage_unavailable`.
@@ -110,6 +114,8 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
   )
   return {
     Query: {
+      // As stored records, which the browser's VaultDB validates: not getVault's summaries.
+      safebyokGetVault:      served((vaultDB, args) => vaultDB.getVaultRecords(scopeIn(args))),
       safebyokGetVaultProps: served((vaultDB, args) => vaultDB.getVaultProps(scopeIn(args))),
       safebyokGetBox:        served((vaultDB, args) => vaultDB.getBox(scopeIn(args), args.boxlabel as string)),
       // As stored records, which the browser's VaultDB validates: not listBoxes' summaries.
@@ -117,6 +123,7 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
       safebyokGetCapacity: served((vaultDB, args) => vaultDB.getCapacity(scopeIn(args))),
     },
     Mutation: {
+      safebyokEnsureVault:      served((vaultDB, args) => vaultDB.ensureVaultRecords(scopeIn(args), recordOf(args.draft, VaultPropsFields) as GatelessVaultProps)),
       safebyokEnsureVaultProps: served((vaultDB, args) => vaultDB.ensureVaultProps(vaultPropsIn(args))),
       safebyokPutVaultProps: served((vaultDB, args) => vaultDB.putVaultProps(vaultPropsIn(args), vaultPropsExpectationIn(args)), () => true),
       safebyokPutBox: served((vaultDB, args) => vaultDB.putBox(scopeIn(args), boxExpectationIn(args), recordOf(args.box, BoxFields) as BoxRecord)),
@@ -218,12 +225,13 @@ const crossing = (err: unknown): GraphQLError => {
   return crossed
 }
 
-/** What of a refusal's meta crosses the wire: a stale write's `box_stored`, or a full vault's `capacity`.
- * The box that stands goes whole, as a read would send it. Nothing else crosses.
+/** What of a refusal's meta crosses the wire: a stale write's `box_stored` or `vault_props_stored`, or a full vault's `capacity`.
+ * What stands goes whole, as a read would send it. Nothing else crosses.
  */
 const metaCrossing = (refusal: VaultError): { meta?: RefusalMeta } => {
-  const { box_stored: boxStored, capacity } = refusal.meta ?? {}
+  const { box_stored: boxStored, vault_props_stored: vaultPropsStored, capacity } = refusal.meta ?? {}
   if (boxStored !== undefined) { return { meta: { box_stored: boxStored } } }
+  if (vaultPropsStored !== undefined) { return { meta: { vault_props_stored: vaultPropsStored } } }
   if (capacity !== undefined) { return { meta: { capacity } } }
   return {}
 }

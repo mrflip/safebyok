@@ -1,5 +1,5 @@
 import { Refusals, Sanitizer, VaultDB, VaultError, RefusalKindVals } from 'safebyok'
-import type { VaultPropsExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, StoredBox, VaultProps, RefusalKind, RefusalMeta, VaultScope } from 'safebyok'
+import type { VaultPropsExpectation, VaultDBOpts, VaultDelExpectation, BoxRecord, BoxExpectation, BoxDelExpectation, GatelessVaultProps, StoredBox, StoredVault, VaultProps, RefusalKind, RefusalMeta, VaultScope } from 'safebyok'
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
 import { VaultPropsFields, ListedBoxFields, BoxFields, ScopeFields, recordOf, selectionOf } from './fields'
 
@@ -74,6 +74,14 @@ const isUrqlClient = (client: unknown): client is GraphqlVaultClient => {
 const Scope = '$scope: SafebyokVaultScopeInput!'
 const VaultPropsSelection = selectionOf(VaultPropsFields)
 
+const VaultSelection = `vaultProps { ${VaultPropsSelection} } boxes { ${selectionOf(ListedBoxFields)} }`
+
+const GetVaultDoc = `query SafebyokGetVault(${Scope}) {
+  safebyokGetVault(scope: $scope) { ${VaultSelection} }
+}`
+const EnsureVaultDoc = `mutation SafebyokEnsureVault(${Scope}, $draft: SafebyokVaultPropsInput!) {
+  safebyokEnsureVault(scope: $scope, draft: $draft) { ${VaultSelection} }
+}`
 const GetVaultPropsDoc = `query SafebyokGetVaultProps(${Scope}) {
   safebyokGetVaultProps(scope: $scope) { ${VaultPropsSelection} }
 }`
@@ -113,6 +121,8 @@ const VaultChangedDoc = `subscription SafebyokVaultChanged(${Scope}) {
  *   for (const document of Object.values(VaultOperations)) { allowlist.register(document) }
  */
 export const VaultOperations = {
+  safebyokGetVault:         GetVaultDoc,
+  safebyokEnsureVault:      EnsureVaultDoc,
   safebyokGetVaultProps:    GetVaultPropsDoc,
   safebyokGetBox:           GetBoxDoc,
   safebyokListBoxes:        ListBoxesDoc,
@@ -147,6 +157,17 @@ class UrqlVaultDB extends VaultDB {
     this.maxBoxes = opts.maxBoxes
   }
 
+  // A vault is read in one query, and ensured in one mutation: the server's VaultDB reads it in one step.
+  protected async doGetVault(scope: VaultScope): Promise<StoredVault> {
+    const { safebyokGetVault } = await this.asked(GetVaultDoc, { scope: scopeOut(scope) })
+    return storedVaultOf(safebyokGetVault)
+  }
+
+  protected async doEnsureVault(draft: GatelessVaultProps): Promise<StoredVault> {
+    const { safebyokEnsureVault } = await this.told(EnsureVaultDoc, { scope: scopeOut(draft), draft: recordOf(draft, VaultPropsFields) })
+    return storedVaultOf(safebyokEnsureVault)
+  }
+
   protected async doGetVaultProps(scope: VaultScope): Promise<unknown> {
     const { safebyokGetVaultProps } = await this.asked(GetVaultPropsDoc, { scope: scopeOut(scope) })
     return recordOf(safebyokGetVaultProps, VaultPropsFields)
@@ -158,7 +179,8 @@ class UrqlVaultDB extends VaultDB {
     return recordOf(safebyokEnsureVaultProps, VaultPropsFields)
   }
 
-  // A stale write refuses on the server and crosses as its kind, so a write that answers landed.
+  // A stale write refuses on the server and crosses as its kind, with what stands, which the base
+  // class checks, so a write that answers landed.
   protected async doPutVaultProps(vaultProps: VaultProps, expected: VaultPropsExpectation): Promise<boolean> {
     checkInts('vault props record', vaultProps)
     checkInts('vault props expectation', expected)
@@ -175,10 +197,7 @@ class UrqlVaultDB extends VaultDB {
   // Each row is stored under its own boxlabel, which the server's listing carries as a field.
   protected async doListBoxes(scope: VaultScope): Promise<StoredBox[]> {
     const { safebyokListBoxes } = await this.asked(ListBoxesDoc, { scope: scopeOut(scope) })
-    return (safebyokListBoxes as unknown[]).map((listed) => {
-      const box = recordOf(listed, ListedBoxFields)
-      return { boxlabel: (box as { boxlabel: string }).boxlabel, box }
-    })
+    return storedBoxesOf(safebyokListBoxes)
   }
 
   // A write that misses refuses on the server and crosses as its kind -- a stale one with what
@@ -237,6 +256,19 @@ class UrqlVaultDB extends VaultDB {
 
 const scopeOut = (scope: VaultScope) => recordOf(scope, ScopeFields)
 
+/** Listed boxes as the server sent them, rebuilt as the VaultDB's half hands them up: each under the boxlabel it carries. */
+const storedBoxesOf = (sent: unknown): StoredBox[] => (sent as unknown[]).map((listed) => {
+  const box = recordOf(listed, ListedBoxFields)
+  return { boxlabel: (box as { boxlabel: string }).boxlabel, box }
+})
+
+/** A vault as the server sent it, or null for none, rebuilt as the VaultDB's half hands it up: its vault props and its boxes. */
+const storedVaultOf = (sent: unknown): StoredVault => {
+  if (sent === null || sent === undefined) { return { vaultProps: null, boxes: [] } }
+  const { vaultProps, boxes } = sent as { vaultProps: unknown, boxes: unknown }
+  return { vaultProps: recordOf(vaultProps, VaultPropsFields), boxes: storedBoxesOf(boxes) }
+}
+
 /** The most a GraphQL `Int` carries, a signed 32-bit integer, where the core takes any safe integer. */
 const GraphqlIntMax = 2_147_483_647
 
@@ -290,12 +322,13 @@ const ForbiddenMessage = "The vault's GraphQL server refused the signed-in user 
 /** The `extensions.code`s a GraphQL server marks a malformed operation or variable with. */
 const MisuseCodes: ReadonlySet<string> = new Set(['BAD_USER_INPUT', 'GRAPHQL_VALIDATION_FAILED'])
 
-/** The `meta` a refusal of `kind` crossed with, as the VaultError's: a stale write's `box_stored`, a full vault's `capacity`, and nothing else.
+/** The `meta` a refusal of `kind` crossed with, as the VaultError's: a stale write's `box_stored` or `vault_props_stored`, a full vault's `capacity`, and nothing else.
  * Each is handed on unchecked: the base class checks a `stale_write`'s as it checks a record, and a `vault_full`'s as `getCapacity` checks its answer.
  */
 const crossedMeta = (kind: RefusalKind, meta: unknown): { meta?: RefusalMeta } => {
   if (typeof meta !== 'object' || meta === null) { return {} }
   if (kind === 'stale_write' && 'box_stored' in meta) { return { meta: { box_stored: meta.box_stored as Exclude<RefusalMeta['box_stored'], undefined> } } }
+  if (kind === 'stale_write' && 'vault_props_stored' in meta) { return { meta: { vault_props_stored: meta.vault_props_stored as Exclude<RefusalMeta['vault_props_stored'], undefined> } } }
   if (kind === 'vault_full' && 'capacity' in meta) { return { meta: { capacity: meta.capacity as Exclude<RefusalMeta['capacity'], undefined> } } }
   return {}
 }
