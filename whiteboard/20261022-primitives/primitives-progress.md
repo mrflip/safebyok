@@ -100,8 +100,6 @@ See `whiteboard/20261021-streamline/streamline-progress.md`, *What the threads f
   record. The Lease is private: read inside the package with `heldLeaseOf(vault)` from
   `src/held-lease.ts`; the Vault object exposes `askPassphraseAt` and `leaseMillis`.
 * `getBox` of a missing box resolves `null`; `getWhisper` refuses `absent_box`.
-* **For every worker:** run lint without its cache (delete `.eslintcache`) before reporting green
-  when a public type changes: a stale cache hid a red demo in 6b.
 
 ### Thread 6, lease_box (#254)
 

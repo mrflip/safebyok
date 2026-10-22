@@ -507,7 +507,9 @@ adopting storage's capacity on `vault_full`; the stamp rather than the scope as 
 params; sending the authenticated immutable fields with puts and reads for an early server-side
 check; whether `damaged_lease` should call `lock()` (without recursing); an active sentinel or a
 tighter `putBox` entry point for "whisper unchanged"; only the passphrase proving (or a parent
-object) holding the lease expiry (thread 8 weighs it). In the Contract, say that a lock spares only the
+object) holding the lease expiry (thread 8 weighs it). `askPassphraseAt`'s doc block gets a hint: `Intl` and the
+user's locale for a `passphraseDeadlineText` (the date formatted) and a `passphraseUntilText` ("in
+two days"), and the TODO "React demo offers format helper" (the Coach). In the Contract, say that a lock spares only the
 transactional part: a VaultDB write once sent completes or refuses as storage decides, and every
 step before it refuses `vault_locked` (the Coach: "that covers only the transactional part, which
 I'm sure is uncleaer in the contract"); a stale write never succeeds, refusing `stale_write`, not
