@@ -114,6 +114,12 @@ const stampOf = (vault: TH.LeasedSlice): Stamp => {
   return vault.stamp
 }
 
+/** The stamp `box` carries, read field by field: no spread or key list shows it. */
+const boxStampOf = (box: Box): Stamp => {
+  const { applabel, user_id, vaultlabel, vault_tok, vault_epoch, gate_epoch } = box
+  return { applabel, user_id, vaultlabel, vault_tok, vault_epoch, gate_epoch }
+}
+
 afterEach(() => { vi.restoreAllMocks() })
 
 describe("Box.make", () => {
@@ -126,11 +132,8 @@ describe("Box.make", () => {
       sidecar:       { note: 'work account' },
       registered_at: record.registered_at,
       written_at:    record.written_at,
-      ...TH.scopeOf('u1'),
-      vault_tok:     'vault-tok-u1',
-      vault_epoch:   1,
-      gate_epoch:    1,
     })
+    expect(boxStampOf(box)).to.deep.equal({ ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1', vault_epoch: 1, gate_epoch: 1 })
     expect(box.baseRevisionTok).to.be.null
   })
 
@@ -161,17 +164,27 @@ describe("Box.make", () => {
     expect(Object.isFrozen(box.record.whisper_ciphered)).to.be.true
   })
 
-  it("shows each visible field and its stamp once in a key list, a spread, JSON and a log line, and nothing else: no ciphertext, format, codec, base or vault, as toJSON's example shows (Contract: Box)", async () => {
+  it("shows each visible field once in a key list, a spread, JSON and a log line, and nothing else: no stamp, ciphertext, format, codec, base or vault, as toJSON's example shows (Contract: Box)", async () => {
     const box = Box.make(await vaultOf(), TH.boxOf('anthropic_api_key', 'a1'))
-    const visible = ['boxlabel', 'revision_tok', 'sidecar', 'registered_at', 'written_at', 'applabel', 'user_id', 'vaultlabel', 'vault_tok', 'vault_epoch', 'gate_epoch']
+    const visible = ['boxlabel', 'revision_tok', 'sidecar', 'registered_at', 'written_at']
     expect(Object.keys(box)).to.deep.equal(visible)
     expect(Object.keys(TH.jsonOf(box))).to.deep.equal(visible)
     expect(box.toJSON()).to.deep.equal(TH.shownOf(box))
     const told = [JSON.stringify(box), inspect(box)]
-    for (const hidden of ['ct-boxkey-a1', 'ct-whisper-a1', 'safebyok-box', 'json_v1', 'whisper_schema_version', 'baseRevisionTok']) {
+    for (const hidden of ['ct-boxkey-a1', 'ct-whisper-a1', 'safebyok-box', 'json_v1', 'whisper_schema_version', 'baseRevisionTok', 'vault_tok', 'vault_epoch', 'gate_epoch', 'applabel']) {
       for (const text of told) { expect(text).to.not.include(hidden) }
     }
     expect(inspect(box).match(/boxlabel/g)).to.have.lengthOf(1)
+  })
+
+  it("carries its stamp readable but hidden, frozen with the rest: the vault's, for its demand to judge, as the class's example shows", async () => {
+    const vault = await vaultOf()
+    const box = Box.make(vault, TH.boxOf('anthropic_api_key', 'a1'))
+    const stamp = stampOf(vault)
+    expect(boxStampOf(box)).to.deep.equal(stamp)
+    for (const ckey of Object.keys(stamp)) {
+      expect(Object.getOwnPropertyDescriptor(box, ckey)).to.include({ enumerable: false, writable: false, configurable: false })
+    }
   })
 
   it("freezes the box and its sidecar through: nothing a host is handed can be changed", async () => {
@@ -193,9 +206,9 @@ describe("Box.make", () => {
     expect(box.revision_tok).to.eq('rev-a1')
   })
 
-  it("holds, spread, the visible fields a BoxSummary holds but for damaged, and the rest of its stamp (Contract: Box)", async () => {
+  it("holds, spread, the visible fields a BoxSummary holds but for damaged, which with its stamp's vault_tok are a summary (Contract: Box)", async () => {
     const box = Box.make(await vaultOf(), TH.boxOf('anthropic_api_key', 'a1'))
-    const { applabel: _applabel, user_id: _userId, vaultlabel: _vaultlabel, vault_epoch: _vaultEpoch, gate_epoch: _gateEpoch, ...summary } = TH.shownOf(box)
+    const summary = { ...TH.shownOf(box), vault_tok: box.vault_tok }
     expect(BoxSummary.parse(summary)).to.deep.equal({ ...summary, damaged: false })
     expect(Object.keys(BoxSummary.shape)).to.have.members([...Object.keys(summary), 'damaged'])
   })
@@ -236,7 +249,7 @@ describe("Box.seal", () => {
 
   it("stamps the box with the vault as it stood at the seal, the lease's vault_tok among it", async () => {
     const { vault, box } = await sealedOf()
-    expect(TH.shownOf(box)).to.deep.include(stampOf(vault))
+    expect(boxStampOf(box)).to.deep.equal(stampOf(vault))
     expect(box.vault_tok).to.eq(vault.lease?.vault_tok)
   })
 

@@ -125,8 +125,8 @@ export const Sidecar: Z.ZodMiniType<Record<string, WhisperJson>> = whisperBag
 export type Sidecar = Z.infer<typeof Sidecar>
 
 /** The visible fields of a sound box, readable while locked: what a vault's snapshot holds beside {@link DamagedBox}es.
- * They are a `Box`'s own fields, as `{ ...box }` holds them, `vault_tok` among them, and `damaged`
- * false. Its sidecar is `{}` when the host gave none. The sidecar is as storage holds it: only
+ * They are a `Box`'s own fields, as `{ ...box }` holds them, and `vault_tok`, of the box's stamp,
+ * and `damaged` false. Its sidecar is `{}` when the host gave none. The sidecar is as storage holds it: only
  * `getWhisper()` opens the box and so proves it unaltered.
  *
  * @example BoxSummary.parse({ boxlabel: 'anthropic', revision_tok: 'r1', sidecar: {}, registered_at, written_at, vault_tok }).damaged // false
